@@ -1,49 +1,359 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 23 Jun 2017 13:59:57 -0700
-Subject: [PATCH v2 2/5] arm: Move ELF_ET_DYN_BASE to 4MB
-In-Reply-To: <1498251600-132458-1-git-send-email-keescook@chromium.org>
-References: <1498251600-132458-1-git-send-email-keescook@chromium.org>
-Message-ID: <1498251600-132458-3-git-send-email-keescook@chromium.org>
+From: willy.mh.wolff@gmail.com (Willy Wolff)
+Date: Fri, 23 Jun 2017 22:09:14 +0100
+Subject: [PATCH] ARM: dts: exynos: Exynos5422 Odroid-XU* incomplete
+ thermal-zones definition
+Message-ID: <20170623210913.ugutgop7ratwolfy@inc028000032.lancs.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that explicitly executed loaders are loaded in the mmap region, we
-have more freedom to decide where we position PIE binaries in the address
-space to avoid possible collisions with mmap or stack regions.
+Odroid XU*-familly boards has thermal sensors per A15 cores, but the actual
+ thermal-zones define only cooling-maps action for cpu0.
 
-4MB is chosen here mainly to have parity with x86, where this is the
-traditional minimum load location, likely to avoid historically requiring
-a 4MB page table entry when only a portion of the first 4MB would be used
-(since the NULL address is avoided). For ARM the position could be 0x8000,
-the standard ET_EXEC load address, but that is needlessly close to the
-NULL address, and anyone running PIE on 32-bit ARM will have an MMU, so
-the tight mapping is not needed.
+If the application is running on all cores but core4 (first core of the A15
+ cluster), the CPU can reach high temperature without any proper cooling
+ action.
 
-Cc: stable at vger.kernel.org
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Kees Cook <keescook@chromium.org>
+As already discus in prior mail, and on IRC, it's a quit big code
+duplication, but I don't found the write way to express that in a better
+ way.
+
+The situation for this board is that we have multiple sensors, but
+ matching cooling devices for these sensors act for the same physical
+ device (FAN and A15 cluster, as each core of the cluster share the same
+ frequency).
+In fact, of-thermal.c:473:thermal_zone_of_sensor_register() can't use
+multiple sensors for one single thermal zone.
+This patch follow the path taken in arch/arm/boot/dts/qcom-apq8084.dtsi:97
+
+I'm interested to extending the thermal driver, but it will takes time.
+ So this is a workaround before refactoring the driver.
+If somebody knows how to write it better, any advice and suggestions
+are more than welcome.
+
+Also, the comment for cpu_alert4 in cooling-maps definition is not
+accurate, 11 steps for A15 correspond to 700MHz, not 600MHz.
+
+Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
 ---
- arch/arm/include/asm/elf.h | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 249 +++++++++++++++++++--
+ 1 file changed, 231 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index d2315ffd8f12..f13ae153fb24 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -112,12 +112,8 @@ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
- #define CORE_DUMP_USE_REGSET
- #define ELF_EXEC_PAGESIZE	4096
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index 05b9afdd6757..0759cc0812fb 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -64,22 +64,22 @@
+ 			polling-delay-passive = <250>;
+ 			polling-delay = <0>;
+ 			trips {
+-				cpu_alert0: cpu-alert-0 {
++				cpu0_alert0: cpu-alert-0 {
+ 					temperature = <50000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+ 					type = "active";
+ 				};
+-				cpu_alert1: cpu-alert-1 {
++				cpu0_alert1: cpu-alert-1 {
+ 					temperature = <60000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+ 					type = "active";
+ 				};
+-				cpu_alert2: cpu-alert-2 {
++				cpu0_alert2: cpu-alert-2 {
+ 					temperature = <70000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+ 					type = "active";
+ 				};
+-				cpu_crit0: cpu-crit-0 {
++				cpu0_crit0: cpu-crit-0 {
+ 					temperature = <120000>; /* millicelsius */
+ 					hysteresis = <0>; /* millicelsius */
+ 					type = "critical";
+@@ -88,14 +88,14 @@
+ 				 * Exynos542x supports only 4 trip-points
+ 				 * so for these polling mode is required.
+ 				 * Start polling at temperature level of last
+-				 * interrupt-driven trip: cpu_alert2
++				 * interrupt-driven trip: cpu0_alert2
+ 				 */
+-				cpu_alert3: cpu-alert-3 {
++				cpu0_alert3: cpu-alert-3 {
+ 					temperature = <70000>; /* millicelsius */
+ 					hysteresis = <10000>; /* millicelsius */
+ 					type = "passive";
+ 				};
+-				cpu_alert4: cpu-alert-4 {
++				cpu0_alert4: cpu-alert-4 {
+ 					temperature = <85000>; /* millicelsius */
+ 					hysteresis = <10000>; /* millicelsius */
+ 					type = "passive";
+@@ -104,43 +104,256 @@
+ 			};
+ 			cooling-maps {
+ 				map0 {
+-					trip = <&cpu_alert0>;
++					trip = <&cpu0_alert0>;
+ 					cooling-device = <&fan0 0 1>;
+ 				};
+ 				map1 {
+-					trip = <&cpu_alert1>;
++					trip = <&cpu0_alert1>;
+ 					cooling-device = <&fan0 1 2>;
+ 				};
+ 				map2 {
+-					trip = <&cpu_alert2>;
++					trip = <&cpu0_alert2>;
+ 					cooling-device = <&fan0 2 3>;
+ 				};
+ 				/*
+-				 * When reaching cpu_alert3, reduce CPU
++				 * When reaching cpu0_alert3, reduce CPU
+ 				 * by 2 steps. On Exynos5422/5800 that would
+ 				 * be: 1600 MHz and 1100 MHz.
+ 				 */
+ 				map3 {
+-					trip = <&cpu_alert3>;
++					trip = <&cpu0_alert3>;
+ 					cooling-device = <&cpu0 0 2>;
+ 				};
+ 				map4 {
+-					trip = <&cpu_alert3>;
++					trip = <&cpu0_alert3>;
+ 					cooling-device = <&cpu4 0 2>;
+ 				};
  
--/* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
--   use of this is to invoke "./ld.so someprog" to test out a new version of
--   the loader.  We need to make sure that it is out of the way of the program
--   that it will "exec", and that there is sufficient room for the brk.  */
--
--#define ELF_ET_DYN_BASE	(TASK_SIZE / 3 * 2)
-+/* This is the base location for PIE (ET_DYN with INTERP) loads. */
-+#define ELF_ET_DYN_BASE		0x400000UL
- 
- /* When the program starts, a1 contains a pointer to a function to be 
-    registered with atexit, as per the SVR4 ABI.  A value of 0 means we 
+ 				/*
+-				 * When reaching cpu_alert4, reduce CPU
+-				 * further, down to 600 MHz (11 steps for big,
++				 * When reaching cpu0_alert4, reduce CPU
++				 * further, down to 600 MHz (12 steps for big,
+ 				 * 7 steps for LITTLE).
+ 				 */
+ 				map5 {
+-					trip = <&cpu_alert4>;
++					trip = <&cpu0_alert4>;
+ 					cooling-device = <&cpu0 3 7>;
+ 				};
+ 				map6 {
+-					trip = <&cpu_alert4>;
+-					cooling-device = <&cpu4 3 11>;
++					trip = <&cpu0_alert4>;
++					cooling-device = <&cpu4 3 12>;
++				};
++			};
++		};
++		cpu1_thermal: cpu1-thermal {
++			thermal-sensors = <&tmu_cpu1 0>;
++			polling-delay-passive = <250>;
++			polling-delay = <0>;
++			trips {
++				cpu1_alert0: cpu-alert-0 {
++					temperature = <50000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu1_alert1: cpu-alert-1 {
++					temperature = <60000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu1_alert2: cpu-alert-2 {
++					temperature = <70000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu1_crit0: cpu-crit-0 {
++					temperature = <120000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++
++				cpu1_alert3: cpu-alert-3 {
++					temperature = <70000>;
++					hysteresis = <10000>; /* millicelsius */
++					type = "passive";
++				};
++				cpu1_alert4: cpu-alert-4 {
++					temperature = <85000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
++
++			};
++			cooling-maps {
++				map0 {
++					trip = <&cpu1_alert0>;
++					cooling-device = <&fan0 0 1>;
++				};
++				map1 {
++					trip = <&cpu1_alert1>;
++					cooling-device = <&fan0 1 2>;
++				};
++				map2 {
++					trip = <&cpu1_alert2>;
++					cooling-device = <&fan0 2 3>;
++				};
++
++				map3 {
++					trip = <&cpu1_alert3>;
++					cooling-device = <&cpu0 0 2>;
++				};
++				map4 {
++					trip = <&cpu1_alert3>;
++					cooling-device = <&cpu4 0 2>;
++				};
++
++				map5 {
++					trip = <&cpu1_alert4>;
++					cooling-device = <&cpu0 3 7>;
++				};
++				map6 {
++					trip = <&cpu1_alert4>;
++					cooling-device = <&cpu4 3 12>;
++				};
++			};
++		};
++		cpu2_thermal: cpu2-thermal {
++			thermal-sensors = <&tmu_cpu2 0>;
++			polling-delay-passive = <250>;
++			polling-delay = <0>;
++			trips {
++				cpu2_alert0: cpu-alert-0 {
++					temperature = <50000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu2_alert1: cpu-alert-1 {
++					temperature = <60000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu2_alert2: cpu-alert-2 {
++					temperature = <70000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu2_crit0: cpu-crit-0 {
++					temperature = <120000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++
++				cpu2_alert3: cpu-alert-3 {
++					temperature = <70000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
++				cpu2_alert4: cpu-alert-4 {
++					temperature = <85000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
++
++			};
++			cooling-maps {
++				map0 {
++					trip = <&cpu2_alert0>;
++					cooling-device = <&fan0 0 1>;
++				};
++				map1 {
++					trip = <&cpu2_alert1>;
++					cooling-device = <&fan0 1 2>;
++				};
++				map2 {
++					trip = <&cpu2_alert2>;
++					cooling-device = <&fan0 2 3>;
++				};
++
++				map3 {
++					trip = <&cpu2_alert3>;
++					cooling-device = <&cpu0 0 2>;
++				};
++				map4 {
++					trip = <&cpu2_alert3>;
++					cooling-device = <&cpu4 0 2>;
++				};
++
++				map5 {
++					trip = <&cpu2_alert4>;
++					cooling-device = <&cpu0 3 7>;
++				};
++				map6 {
++					trip = <&cpu2_alert4>;
++					cooling-device = <&cpu4 3 12>;
++				};
++			};
++		};
++		cpu3_thermal: cpu3-thermal {
++			thermal-sensors = <&tmu_cpu3 0>;
++			polling-delay-passive = <250>;
++			polling-delay = <0>;
++			trips {
++				cpu3_alert0: cpu-alert-0 {
++					temperature = <50000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu3_alert1: cpu-alert-1 {
++					temperature = <60000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu3_alert2: cpu-alert-2 {
++					temperature = <70000>;
++					hysteresis = <5000>;
++					type = "active";
++				};
++				cpu3_crit0: cpu-crit-0 {
++					temperature = <120000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++
++				cpu3_alert3: cpu-alert-3 {
++					temperature = <70000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
++				cpu3_alert4: cpu-alert-4 {
++					temperature = <85000>;
++					hysteresis = <10000>;
++					type = "passive";
++				};
++
++			};
++			cooling-maps {
++				map0 {
++					trip = <&cpu3_alert0>;
++					cooling-device = <&fan0 0 1>;
++				};
++				map1 {
++					trip = <&cpu3_alert1>;
++					cooling-device = <&fan0 1 2>;
++				};
++				map2 {
++					trip = <&cpu3_alert2>;
++					cooling-device = <&fan0 2 3>;
++				};
++
++				map3 {
++					trip = <&cpu3_alert3>;
++					cooling-device = <&cpu0 0 2>;
++				};
++				map4 {
++					trip = <&cpu3_alert3>;
++					cooling-device = <&cpu4 0 2>;
++				};
++
++				map5 {
++					trip = <&cpu3_alert4>;
++					cooling-device = <&cpu0 3 7>;
++				};
++				map6 {
++					trip = <&cpu3_alert4>;
++					cooling-device = <&cpu4 3 12>;
+ 				};
+ 			};
+ 		};
 -- 
-2.7.4
+2.11.0
