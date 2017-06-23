@@ -1,47 +1,48 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Fri, 23 Jun 2017 17:13:16 +0800
-Subject: next-20170621 build: 1 failures 7 warnings (next-20170621)
-In-Reply-To: <20170621100440.vcaxagg4yjca2cv4@sirena.org.uk>
-References: <E1dNcMp-0005RN-1w@optimist>
- <20170621100440.vcaxagg4yjca2cv4@sirena.org.uk>
-Message-ID: <1498209196.26313.71.camel@mtkswgap22>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 23 Jun 2017 14:55:29 +0530
+Subject: [PATCH V3 0/5] arch_topology: Minor cleanups
+Message-ID: <cover.1498209817.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for late reply, 
+Hi Greg,
 
-+Lorenzo
+You weren't included in the first [1] version of this series, as it was
+targeting arch/arm*/ directories then.
 
-On Wed, 2017-06-21 at 18:04 +0800, Mark Brown wrote:
-> On Wed, Jun 21, 2017 at 10:56:07AM +0100, Build bot for Mark Brown wrote:
-> 
-> Today's -next fails to build an arm allmodconfig due to:
-> 
-> > 	arm-allmodconfig
-> > ../drivers/pci/host/pcie-mediatek.c:485:8: error: implicit declaration of function 'pci_register_host_bridge' [-Werror=implicit-function-declaration]
-> 
-> caused by eaf3023b0498a (PCI: mediatek: Add MediaTek PCIe host
-> controller support).
+Here are some cleanups for the arch_topology core.
 
+Tested on ARM64 Hikey board by setting following in cpu nodes in DT:
+        capacity-dmips-mhz = <1000>;
 
-Hi Lorenzo,
+V2->V3:
+- topology_parse_cpu_capacity() returns bool now (Juri).
+- "Get rid of cap_parsing_done" is the last patch now and its
+  implementation is change a bit (Juri).
 
-I picked up your changes and had some modifications like what you did
-for other platforms:
+V1->V2:
+- based over linux-next/master (to get Juri's recent changes)
+- More cleanups included. V1 only had the first patch.
+- Rename of cap_parsing_failed isn't required anymore (as it is
+  localized to a single routine now).
 
-9f8e3a5 PCI: Add devm_pci_alloc_host_bridge() interface 
-35a1a84 PCI: Add pci_free_host_bridge() interface
-e33aafd PCI: Initialize bridge release function at bridge allocation
+--
+viresh
 
-...and it looks Okay.
+[1] https://marc.info/?l=linux-arm-kernel&m=149795553024005
 
-I have also noticed that you continue sending patches for other
-platforms but I have not yet had a look in detail. I'm quite busy these
-days and don't have time to dig it, hence it is becoming a little
-unmanageable for me.
+Viresh Kumar (5):
+  arch_topology: Don't break lines unnecessarily
+  arch_topology: Convert switch block to if block
+  arch_topology: Change return type of topology_parse_cpu_capacity() to
+    bool
+  arch_topology: Localize cap_parsing_failed to
+    topology_parse_cpu_capacity()
+  arch_topology: Get rid of cap_parsing_done
 
-Did you have a chance to send the same patches for MediaTek?  I
-appreciate that and I can help to test it on our platforms.
+ drivers/base/arch_topology.c  | 78 +++++++++++++++++++++----------------------
+ include/linux/arch_topology.h |  4 ++-
+ 2 files changed, 42 insertions(+), 40 deletions(-)
 
-
-Ryder.
+-- 
+2.13.0.71.gd7076ec9c9cb
