@@ -1,64 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Jun 2017 14:45:48 +0200
-Subject: [PATCH] ARM64: dts: marvell: armada37xx: Fix timer interrupt
- specifiers
-In-Reply-To: <20170621214508.7810-1-marc.zyngier@arm.com> (Marc Zyngier's
- message of "Wed, 21 Jun 2017 22:45:08 +0100")
-References: <20170621214508.7810-1-marc.zyngier@arm.com>
-Message-ID: <871sqazxc3.fsf@free-electrons.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Fri, 23 Jun 2017 12:49:34 +0000
+Subject: [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon
+ CMD_PREFETCH quirk(erratum 161010701)
+In-Reply-To: <20170623120207.GA2310@arm.com>
+References: <20170517091205.7752-1-shameerali.kolothum.thodi@huawei.com>
+ <5FC3163CFD30C246ABAA99954A238FA838388F08@FRAEML521-MBS.china.huawei.com>
+ <20170623120207.GA2310@arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA83838930B@FRAEML521-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
- 
- On mer., juin 21 2017, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-> Contrary to popular belief, PPIs connected to a GICv3 to not have
-> an affinity field similar to that of GICv2. That is consistent
-> with the fact that GICv3 is designed to accomodate thousands of
-> CPUs, and fitting them as a bitmap in a byte is... difficult.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Applied on mvebu/fixes
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Friday, June 23, 2017 1:02 PM
+> To: Shameerali Kolothum Thodi
+> Cc: robin.murphy at arm.com; mark.rutland at arm.com;
+> lorenzo.pieralisi at arm.com; John Garry; Gabriele Paoloni; Guohanjun
+> (Hanjun Guo); xuwei (O); Linuxarm; devel at acpica.org; linux-
+> acpi at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon
+> CMD_PREFETCH quirk(erratum 161010701)
+> 
+> On Fri, Jun 23, 2017 at 08:29:28AM +0000, Shameerali Kolothum Thodi wrote:
+> > > -----Original Message-----
+> > > From: Shameerali Kolothum Thodi
+> > > Sent: Wednesday, May 17, 2017 10:12 AM
+> > > To: robin.murphy at arm.com; will.deacon at arm.com;
+> mark.rutland at arm.com;
+> > > lorenzo.pieralisi at arm.com
+> > > Cc: John Garry; Gabriele Paoloni; Guohanjun (Hanjun Guo); xuwei (O);
+> > > Linuxarm; devel at acpica.org; linux-acpi at vger.kernel.org; linux-arm-
+> > > kernel at lists.infradead.org; devicetree at vger.kernel.org; Shameerali
+> > > Kolothum Thodi
+> > > Subject: [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon
+> > > CMD_PREFETCH quirk(erratum 161010701)
+> > >
+> > > HiSilicon SMMUv3 on Hip06/Hip07 platforms doesn't support
+> > > CMD_PREFETCH command. The dt based support for this quirk is already
+> > > present in the driver(hisilicon,broken-prefetch-cmd). This adds ACPI
+> > > support for the quirk using the IORT smmu model number.
+> >
+> > This also  has dependency on acpica header update and it looks like
+> > it's going to take a while to appear on Linux mainline. I have seen
+> > patches where a temp local definition for SMMU v3 model number is
+> suggested instead.
+> >
+> > Could you please let me know the plan so that I can base this patch
+> > similar to or on top of Caviums "[PATCH] iommu/arm-smmu-v3, acpi: Add
+> > temporary Cavium SMMU-V3 IORT model number definitions"
+> 
+> I think I've got this in hand, but I'll shout if I run into any issues.
 
-Thanks,
+Ok. Thanks Will. Sure.
 
-Gregory
-
-> ---
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 12 ++++--------
->  1 file changed, 4 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> index 4d495ec39202..bc179efb10ef 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> @@ -75,14 +75,10 @@
->  
->  	timer {
->  		compatible = "arm,armv8-timer";
-> -		interrupts = <GIC_PPI 13
-> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-> -			     <GIC_PPI 14
-> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-> -			     <GIC_PPI 11
-> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
-> -			     <GIC_PPI 10
-> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
->  	};
->  
->  	soc {
-> -- 
-> 2.11.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Shameer
