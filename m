@@ -1,41 +1,53 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 23 Jun 2017 13:08:16 -0500
-Subject: [PATCH] ARM: qcom_defconfig: enable RPMSG_QCOM_SMD
-In-Reply-To: <CAK8P3a1ChrTPYC37sZhkF2edfBGOR4m5eFe8=4-y=R-FaVFdMQ@mail.gmail.com>
-References: <20170615061521.21292-1-bshah@kde.org>
- <20170621050335.GI17640@tuxbook>
- <CAK8P3a1ChrTPYC37sZhkF2edfBGOR4m5eFe8=4-y=R-FaVFdMQ@mail.gmail.com>
-Message-ID: <20170623180816.GC5203@hector.attlocal.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 23 Jun 2017 20:39:25 +0200
+Subject: [PATCH 3/3] arm64: dts: rockchip: set rk3399 dynamic CPU power
+ coefficients
+In-Reply-To: <20170623170737.46265-3-briannorris@chromium.org>
+References: <20170623170737.46265-1-briannorris@chromium.org>
+ <20170623170737.46265-3-briannorris@chromium.org>
+Message-ID: <5395662.EDQ3y7Qj0C@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 01:49:13PM +0200, Arnd Bergmann wrote:
-> On Wed, Jun 21, 2017 at 7:03 AM, Bjorn Andersson
-> <bjorn.andersson@linaro.org> wrote:
-> > + arm at kernel.org
-> >
-> > On Wed 14 Jun 23:15 PDT 2017, Bhushan Shah wrote:
-> >
-> >> As of commit 5052de8deff56, QCOM_SMD_RPM and various other config
-> >> options enabled in the qcom_defconfig depends on the RPMSG. If
-> >> QCOM_SMD_RPM config option is not selected it disables the
-> >> REGULATOR_QCOM_SMD_RPM and other essential config options.
-> >>
-> >> Signed-off-by: Bhushan Shah <bshah@kde.org>
-> >
-> > Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Am Freitag, 23. Juni 2017, 10:07:37 CEST schrieb Brian Norris:
+> Provide the dynamic power coefficient of the big and little CPU
+> clusters. These numbers are currently in use on the Samsung Chromebook
+> Plus ("Kevin").
 > 
-> I see that Andy Gross was not on Cc, he would be the right person to
-> pick up patches like this one.
+> The power allocator thermal governor doesn't know how to do anything if
+> it doesn't get power parameters from its cooling devices (in this case,
+> CPUfreq). So this effectively enables the power-allocator governor.
 > 
-> Andy, do you want to pick that up through the qcom tree, or should
-> we apply it directly on arm-soc?
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 69c56f7316c4..4f6667547814 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -109,6 +109,7 @@
+>  			reg = <0x0 0x0>;
+>  			enable-method = "psci";
+>  			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <100>;
+>  			clocks = <&cru ARMCLKL>;
+>  		};
+>  
+> @@ -142,6 +143,7 @@
+>  			reg = <0x0 0x100>;
+>  			enable-method = "psci";
+>  			#cooling-cells = <2>; /* min followed by max */
+> +			dynamic-power-coefficient = <100>;
+>  			clocks = <&cru ARMCLKB>;
+>  		};
+>  
+> 
 
-I'll send another pull
+I think these should be set for all cores, similar to clocks. While
+cpufreq and friends regularly only take the first number, in a
+hw-description sense, it should be part of every core in the dt.
 
 
-Expect to see it today/tomorrow.
-
-Thanks!
-
-andy
+Heiko
