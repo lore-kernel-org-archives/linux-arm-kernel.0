@@ -1,50 +1,49 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 23 Jun 2017 19:25:54 +0200
-Subject: [GIT PULL] ARM: actions: drivers for v4.13
+Date: Fri, 23 Jun 2017 19:25:55 +0200
+Subject: [GIT PULL] ARM: actions: arm+sps for v4.13
 In-Reply-To: <20170623172556.12618-1-afaerber@suse.de>
 References: <20170623172556.12618-1-afaerber@suse.de>
-Message-ID: <20170623172556.12618-5-afaerber@suse.de>
+Message-ID: <20170623172556.12618-6-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd and Olof,
 
-This is the initial drivers pull for Actions Semi.
-The Kconfig symbol is introduced in the arm and arm64 pulls.
+This is a second arm pull for Actions Semi, merging the SPS driver so that it
+can be reused in mach-actions SMP code for CPU bring-up.
 
 Regards,
 Andreas
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+The following changes since commit ba2694def2361d9b8d944f6df4aa077ad7290746:
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+  MAINTAINERS: Update Actions Semi section with SPS (2017-06-21 18:17:44 +0200)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-drivers-for-4.13
+  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git actions-arm-soc+sps-for-4.13
 
-for you to fetch changes up to d97d0f1b4630d46976b7a275c1636229c3ebf4d0:
+for you to fetch changes up to b6a0e18ca690c2398661c42b942187621ab77e36:
 
-  Merge branch 'v4.13/sps' into v4.13/drivers (2017-06-23 18:03:40 +0200)
-
-----------------------------------------------------------------
-Actions Semi SoC drivers for 4.13
-
-This adds clock source and power domain drivers for S500/S900.
+  ARM: owl: smp: Implement SPS power-gating for CPU2 and CPU3 (2017-06-23 18:01:35 +0200)
 
 ----------------------------------------------------------------
-Andreas F?rber (6):
-      clocksource: Add Owl timer
-      clocksource: owl: Add S900 support
+Actions Semi ARM SoC for v4.13 #2
+
+This adds SMP code to bring up the remaining S500 CPU cores
+by reusing a helper factored out of the SPS power domains driver.
+
+----------------------------------------------------------------
+Andreas F?rber (5):
       dt-bindings: power: Add Owl SPS power domains
       soc: actions: Add Owl SPS
       soc: actions: owl-sps: Factor out owl_sps_set_pg() for power-gating
-      Merge branch 'v4.13/sps' into v4.13/drivers
+      Merge branch 'v4.13/sps' into v4.13/arm+sps
+      ARM: owl: smp: Implement SPS power-gating for CPU2 and CPU3
 
  .../devicetree/bindings/power/actions,owl-sps.txt  |  17 ++
- drivers/clocksource/Kconfig                        |   7 +
- drivers/clocksource/Makefile                       |   1 +
- drivers/clocksource/owl-timer.c                    | 172 ++++++++++++++++
+ arch/arm/mach-actions/Kconfig                      |   1 +
+ arch/arm/mach-actions/platsmp.c                    |  36 +++-
  drivers/soc/Kconfig                                |   1 +
  drivers/soc/Makefile                               |   1 +
  drivers/soc/actions/Kconfig                        |  16 ++
@@ -53,9 +52,8 @@ Andreas F?rber (6):
  drivers/soc/actions/owl-sps.c                      | 224 +++++++++++++++++++++
  include/dt-bindings/power/owl-s500-powergate.h     |  19 ++
  include/linux/soc/actions/owl-sps.h                |  11 +
- 12 files changed, 522 insertions(+)
+ 11 files changed, 377 insertions(+), 2 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/power/actions,owl-sps.txt
- create mode 100644 drivers/clocksource/owl-timer.c
  create mode 100644 drivers/soc/actions/Kconfig
  create mode 100644 drivers/soc/actions/Makefile
  create mode 100644 drivers/soc/actions/owl-sps-helper.c
