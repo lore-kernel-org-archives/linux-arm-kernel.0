@@ -1,53 +1,595 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Fri, 23 Jun 2017 15:01:25 +0200
-Subject: [PATCH v6 0/3] Cavium ARM64 uncore PMU support
-Message-ID: <20170623130128.11006-1-jglauber@cavium.com>
+Date: Fri, 23 Jun 2017 15:01:26 +0200
+Subject: [PATCH v6 1/3] perf: cavium: Support memory controller PMU counters
+In-Reply-To: <20170623130128.11006-1-jglauber@cavium.com>
+References: <20170623130128.11006-1-jglauber@cavium.com>
+Message-ID: <20170623130128.11006-2-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for various PMU counters found on the Cavium ThunderX and
-OcteonTx SoC.
+Add support for the PMU counters on Cavium SOC memory controllers.
 
-The driver provides common "uncore" functions to avoid code duplication and
-support adding more device PMUs (like L2 cache) in the future.
+This patch also adds generic functions to allow supporting more
+devices with PMU counters.
 
-Probe and removal of the PMUs is done by hooking into the ThunderX EDAC
-driver as this driver owns all the PCI devices containing the PMU counters.
+Properties of the LMC PMU counters:
+- not stoppable
+- fixed purpose
+- read-only
+- one PCI device per memory controller
 
-Patches are on top of 4.12-rc6.
-
-Changes to v5:
-- Only allow built-in CONFIG_CAVIUM_PMU
-- Drop unneeded export of perf_event_update_userpage()
-- Simplify callbacks in edac code, move CONFIG_CAVIUM_PMU check
-  to header file
-- Fix some sparse static warnings
-- Add documentation
-- Fix OCX TLK event_valid check
-- Add group validation in event_init
-- Add a guard variable to prevent calling init twice
-- Use kasprintf and fix pmu name allocation
-- Remove unneeded check for embedded pmu
-- Loop around local64_cmpxchg
-- Simplify cvm_pmu_lmc_event_valid
-- Fix list_add error case
-
-Jan Glauber (3):
-  perf: cavium: Support memory controller PMU counters
-  perf: cavium: Support transmit-link PMU counters
-  perf: cavium: Add Documentation
-
- Documentation/perf/cavium-pmu.txt |  74 +++++
- drivers/edac/thunderx_edac.c      |  13 +-
- drivers/perf/Kconfig              |   9 +
- drivers/perf/Makefile             |   1 +
- drivers/perf/cavium_pmu.c         | 643 ++++++++++++++++++++++++++++++++++++++
- include/linux/cpuhotplug.h        |   1 +
- include/linux/perf/cavium_pmu.h   |  54 ++++
- 7 files changed, 794 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/perf/cavium-pmu.txt
+Signed-off-by: Jan Glauber <jglauber@cavium.com>
+---
+ drivers/edac/thunderx_edac.c    |   7 +-
+ drivers/perf/Kconfig            |   9 +
+ drivers/perf/Makefile           |   1 +
+ drivers/perf/cavium_pmu.c       | 418 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h      |   1 +
+ include/linux/perf/cavium_pmu.h |  53 +++++
+ 6 files changed, 488 insertions(+), 1 deletion(-)
  create mode 100644 drivers/perf/cavium_pmu.c
  create mode 100644 include/linux/perf/cavium_pmu.h
 
+diff --git a/drivers/edac/thunderx_edac.c b/drivers/edac/thunderx_edac.c
+index 86d585c..884499a 100644
+--- a/drivers/edac/thunderx_edac.c
++++ b/drivers/edac/thunderx_edac.c
+@@ -20,7 +20,7 @@
+ #include <linux/atomic.h>
+ #include <linux/bitfield.h>
+ #include <linux/circ_buf.h>
+-
++#include <linux/perf/cavium_pmu.h>
+ #include <asm/page.h>
+ 
+ #include "edac_module.h"
+@@ -209,6 +209,8 @@ struct thunderx_lmc {
+ 	struct lmc_err_ctx err_ctx[RING_ENTRIES];
+ 	unsigned long ring_head;
+ 	unsigned long ring_tail;
++
++	void *pmu_data;
+ };
+ 
+ #define ring_pos(pos, size) ((pos) & (size - 1))
+@@ -810,6 +812,7 @@ static int thunderx_lmc_probe(struct pci_dev *pdev,
+ 		}
+ 	}
+ 
++	lmc->pmu_data = cvm_pmu_probe(pdev, lmc->regs, CVM_PMU_LMC);
+ 	return 0;
+ 
+ err_free:
+@@ -824,6 +827,8 @@ static void thunderx_lmc_remove(struct pci_dev *pdev)
+ 	struct mem_ctl_info *mci = pci_get_drvdata(pdev);
+ 	struct thunderx_lmc *lmc = mci->pvt_info;
+ 
++	cvm_pmu_remove(pdev, lmc->pmu_data, CVM_PMU_LMC);
++
+ 	writeq(LMC_INT_ENA_ALL, lmc->regs + LMC_INT_ENA_W1C);
+ 
+ 	edac_mc_del_mc(&pdev->dev);
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index aa587ed..bd0d89f 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -42,4 +42,13 @@ config XGENE_PMU
+         help
+           Say y if you want to use APM X-Gene SoC performance monitors.
+ 
++config CAVIUM_PMU
++	bool "Cavium SOC PMU"
++	default y
++	depends on EDAC_THUNDERX && PERF_EVENTS
++	help
++	  Provides access to various performance counters on Caviums
++	  ARM64 SOCs. Adds support for memory controller (LMC) and
++	  interconnect link (OCX TLK) counters.
++
+ endmenu
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index 6420bd4..b304646 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -3,3 +3,4 @@ obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+ obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
+ obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
+ obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
++obj-$(CONFIG_CAVIUM_PMU) += cavium_pmu.o
+diff --git a/drivers/perf/cavium_pmu.c b/drivers/perf/cavium_pmu.c
+new file mode 100644
+index 0000000..4a85c7fac
+--- /dev/null
++++ b/drivers/perf/cavium_pmu.c
+@@ -0,0 +1,418 @@
++/*
++ * Cavium ARM SOC "uncore" PMU counters
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ *
++ * Copyright Cavium, Inc. 2017
++ * Author(s): Jan Glauber <jan.glauber@cavium.com>
++ *
++ */
++#include <linux/cpumask.h>
++#include <linux/export.h>
++#include <linux/list.h>
++#include <linux/mutex.h>
++#include <linux/pci.h>
++#include <linux/perf_event.h>
++#include <linux/slab.h>
++
++#include <linux/perf/cavium_pmu.h>
++
++static bool cvm_pmu_initialized;
++static struct list_head cvm_pmu_lmcs;
++
++/*
++ * Common Cavium PMU stuff
++ *
++ * Shared properties of the different PMU types:
++ * - all counters are 64 bit long
++ * - there are no overflow interrupts
++ * - all devices with PMU counters appear as PCI devices
++ *
++ * Counter control, access and device association depends on the
++ * PMU type.
++ */
++
++#define to_pmu_dev(x) container_of((x), struct cvm_pmu_dev, pmu)
++
++static int cvm_pmu_event_init(struct perf_event *event)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	struct cvm_pmu_dev *pmu_dev;
++	struct perf_event *sibling;
++
++	if (event->attr.type != event->pmu->type)
++		return -ENOENT;
++
++	/* we do not support sampling */
++	if (is_sampling_event(event))
++		return -EINVAL;
++
++	/* PMU counters do not support any these bits */
++	if (event->attr.exclude_user	||
++	    event->attr.exclude_kernel	||
++	    event->attr.exclude_host	||
++	    event->attr.exclude_guest	||
++	    event->attr.exclude_hv	||
++	    event->attr.exclude_idle)
++		return -EINVAL;
++
++	pmu_dev = to_pmu_dev(event->pmu);
++	if (!pmu_dev->event_valid(event->attr.config))
++		return -EINVAL;
++
++	/*
++	 * Forbid groups containing mixed PMUs, software events are acceptable.
++	 */
++	if (event->group_leader->pmu != event->pmu &&
++			!is_software_event(event->group_leader))
++		return -EINVAL;
++
++	list_for_each_entry(sibling, &event->group_leader->sibling_list,
++			group_entry)
++		if (sibling->pmu != event->pmu &&
++				!is_software_event(sibling))
++			return -EINVAL;
++
++	hwc->config = event->attr.config;
++	hwc->idx = -1;
++	return 0;
++}
++
++static void cvm_pmu_read(struct perf_event *event)
++{
++	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	u64 prev, delta, new;
++
++again:
++	prev = local64_read(&hwc->prev_count);
++	new = readq(hwc->event_base + pmu_dev->map);
++
++	if (local64_cmpxchg(&hwc->prev_count, prev, new) != prev)
++		goto again;
++
++	delta = new - prev;
++	local64_add(delta, &event->count);
++}
++
++static void cvm_pmu_start(struct perf_event *event, int flags)
++{
++	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	u64 new;
++
++	if (WARN_ON_ONCE(!(hwc->state & PERF_HES_STOPPED)))
++		return;
++
++	WARN_ON_ONCE(!(hwc->state & PERF_HES_UPTODATE));
++	hwc->state = 0;
++
++	/* update prev_count always in order support unstoppable counters */
++	new = readq(hwc->event_base + pmu_dev->map);
++	local64_set(&hwc->prev_count, new);
++
++	perf_event_update_userpage(event);
++}
++
++static void cvm_pmu_stop(struct perf_event *event, int flags)
++{
++	struct hw_perf_event *hwc = &event->hw;
++
++	WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
++	hwc->state |= PERF_HES_STOPPED;
++
++	if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
++		cvm_pmu_read(event);
++		hwc->state |= PERF_HES_UPTODATE;
++	}
++}
++
++static int cvm_pmu_add(struct perf_event *event, int flags, u64 config_base,
++		       u64 event_base)
++{
++	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++
++	if (!cmpxchg(&pmu_dev->events[hwc->config], NULL, event))
++		hwc->idx = hwc->config;
++
++	if (hwc->idx == -1)
++		return -EBUSY;
++
++	hwc->config_base = config_base;
++	hwc->event_base = event_base;
++	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
++
++	if (flags & PERF_EF_START)
++		pmu_dev->pmu.start(event, PERF_EF_RELOAD);
++
++	return 0;
++}
++
++static void cvm_pmu_del(struct perf_event *event, int flags)
++{
++	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	int i;
++
++	event->pmu->stop(event, PERF_EF_UPDATE);
++
++	/*
++	 * For programmable counters we need to check where we installed it.
++	 * To keep this function generic always test the more complicated
++	 * case (free running counters won't need the loop).
++	 */
++	for (i = 0; i < pmu_dev->num_counters; i++)
++		if (cmpxchg(&pmu_dev->events[i], event, NULL) == event)
++			break;
++
++	perf_event_update_userpage(event);
++	hwc->idx = -1;
++}
++
++static ssize_t cvm_pmu_event_sysfs_show(struct device *dev,
++					struct device_attribute *attr,
++					char *page)
++{
++	struct perf_pmu_events_attr *pmu_attr =
++		container_of(attr, struct perf_pmu_events_attr, attr);
++
++	if (pmu_attr->event_str)
++		return sprintf(page, "%s", pmu_attr->event_str);
++
++	return 0;
++}
++
++/*
++ * The pmu events are independent from CPUs. Provide a cpumask
++ * nevertheless to prevent perf from adding the event per-cpu and just
++ * set the mask to one online CPU. Use the same cpumask for all "uncore"
++ * devices.
++ *
++ * There is a performance penalty for accessing a device from a CPU on
++ * another socket, but we do not care.
++ */
++static int cvm_pmu_offline_cpu(unsigned int old_cpu, struct hlist_node *node)
++{
++	struct cvm_pmu_dev *pmu_dev;
++	int new_cpu;
++
++	pmu_dev = hlist_entry_safe(node, struct cvm_pmu_dev, cpuhp_node);
++	if (!cpumask_test_and_clear_cpu(old_cpu, &pmu_dev->active_mask))
++		return 0;
++
++	new_cpu = cpumask_any_but(cpu_online_mask, old_cpu);
++	if (new_cpu >= nr_cpu_ids)
++		return 0;
++	perf_pmu_migrate_context(&pmu_dev->pmu, old_cpu, new_cpu);
++	cpumask_set_cpu(new_cpu, &pmu_dev->active_mask);
++	return 0;
++}
++
++static ssize_t cvm_pmu_attr_show_cpumask(struct device *dev,
++					 struct device_attribute *attr,
++					 char *buf)
++{
++	struct pmu *pmu = dev_get_drvdata(dev);
++	struct cvm_pmu_dev *pmu_dev = container_of(pmu, struct cvm_pmu_dev, pmu);
++
++	return cpumap_print_to_pagebuf(true, buf, &pmu_dev->active_mask);
++}
++
++static DEVICE_ATTR(cpumask, S_IRUGO, cvm_pmu_attr_show_cpumask, NULL);
++
++static struct attribute *cvm_pmu_attrs[] = {
++	&dev_attr_cpumask.attr,
++	NULL,
++};
++
++static struct attribute_group cvm_pmu_attr_group = {
++	.attrs = cvm_pmu_attrs,
++};
++
++/*
++ * LMC (memory controller) counters:
++ * - not stoppable, always on, read-only
++ * - one PCI device per memory controller
++ */
++#define LMC_CONFIG_OFFSET		0x188
++#define LMC_CONFIG_RESET_BIT		BIT(17)
++
++/* LMC events */
++#define LMC_EVENT_IFB_CNT		0x1d0
++#define LMC_EVENT_OPS_CNT		0x1d8
++#define LMC_EVENT_DCLK_CNT		0x1e0
++#define LMC_EVENT_BANK_CONFLICT1	0x360
++#define LMC_EVENT_BANK_CONFLICT2	0x368
++
++#define CVM_PMU_LMC_EVENT_ATTR(_name, _id)						\
++	&((struct perf_pmu_events_attr[]) {						\
++		{									\
++			__ATTR(_name, S_IRUGO, cvm_pmu_event_sysfs_show, NULL),		\
++			_id,								\
++			"lmc_event=" __stringify(_id),					\
++		}									\
++	})[0].attr.attr
++
++/* map counter numbers to register offsets */
++static int lmc_events[] = {
++	LMC_EVENT_IFB_CNT,
++	LMC_EVENT_OPS_CNT,
++	LMC_EVENT_DCLK_CNT,
++	LMC_EVENT_BANK_CONFLICT1,
++	LMC_EVENT_BANK_CONFLICT2,
++};
++
++static int cvm_pmu_lmc_add(struct perf_event *event, int flags)
++{
++	struct hw_perf_event *hwc = &event->hw;
++
++	return cvm_pmu_add(event, flags, LMC_CONFIG_OFFSET,
++			   lmc_events[hwc->config]);
++}
++
++PMU_FORMAT_ATTR(lmc_event, "config:0-2");
++
++static struct attribute *cvm_pmu_lmc_format_attr[] = {
++	&format_attr_lmc_event.attr,
++	NULL,
++};
++
++static struct attribute_group cvm_pmu_lmc_format_group = {
++	.name = "format",
++	.attrs = cvm_pmu_lmc_format_attr,
++};
++
++static struct attribute *cvm_pmu_lmc_events_attr[] = {
++	CVM_PMU_LMC_EVENT_ATTR(ifb_cnt,		0),
++	CVM_PMU_LMC_EVENT_ATTR(ops_cnt,		1),
++	CVM_PMU_LMC_EVENT_ATTR(dclk_cnt,	2),
++	CVM_PMU_LMC_EVENT_ATTR(bank_conflict1,	3),
++	CVM_PMU_LMC_EVENT_ATTR(bank_conflict2,	4),
++	NULL,
++};
++
++static struct attribute_group cvm_pmu_lmc_events_group = {
++	.name = "events",
++	.attrs = cvm_pmu_lmc_events_attr,
++};
++
++static const struct attribute_group *cvm_pmu_lmc_attr_groups[] = {
++	&cvm_pmu_attr_group,
++	&cvm_pmu_lmc_format_group,
++	&cvm_pmu_lmc_events_group,
++	NULL,
++};
++
++static bool cvm_pmu_lmc_event_valid(u64 config)
++{
++	return (config < ARRAY_SIZE(lmc_events));
++}
++
++static void *cvm_pmu_lmc_probe(struct pci_dev *pdev, void __iomem *regs)
++{
++	struct cvm_pmu_dev *next, *lmc;
++	int nr = 0, ret = -ENOMEM;
++
++	lmc = kzalloc(sizeof(*lmc), GFP_KERNEL);
++	if (!lmc)
++		goto fail_nomem;
++
++	list_for_each_entry(next, &cvm_pmu_lmcs, entry)
++		nr++;
++	lmc->pmu_name = kasprintf(GFP_KERNEL, "lmc%d", nr);
++
++	lmc->pdev = pdev;
++	lmc->map = regs;
++	lmc->num_counters = ARRAY_SIZE(lmc_events);
++	lmc->pmu = (struct pmu) {
++		.task_ctx_nr    = perf_invalid_context,
++		.event_init	= cvm_pmu_event_init,
++		.add		= cvm_pmu_lmc_add,
++		.del		= cvm_pmu_del,
++		.start		= cvm_pmu_start,
++		.stop		= cvm_pmu_stop,
++		.read		= cvm_pmu_read,
++		.attr_groups	= cvm_pmu_lmc_attr_groups,
++	};
++
++	cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_CVM_ONLINE,
++					 &lmc->cpuhp_node);
++
++	/*
++	 * perf PMU is CPU dependent so pick a random CPU and migrate away
++	 * if it goes offline.
++	 */
++	cpumask_set_cpu(smp_processor_id(), &lmc->active_mask);
++
++	ret = perf_pmu_register(&lmc->pmu, lmc->pmu_name, -1);
++	if (ret)
++		goto fail_hp;
++
++	list_add(&lmc->entry, &cvm_pmu_lmcs);
++
++	lmc->event_valid = cvm_pmu_lmc_event_valid;
++	dev_info(&pdev->dev, "Enabled %s PMU with %d counters\n",
++		 lmc->pmu_name, lmc->num_counters);
++	return lmc;
++
++fail_hp:
++	kfree(lmc->pmu_name);
++	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_CVM_ONLINE,
++				    &lmc->cpuhp_node);
++	kfree(lmc);
++fail_nomem:
++	return ERR_PTR(ret);
++}
++EXPORT_SYMBOL_GPL(cvm_pmu_lmc_probe);
++
++static void cvm_pmu_lmc_remove(struct pci_dev *pdev, void *pmu_data)
++{
++	struct cvm_pmu_dev *lmc = (struct cvm_pmu_dev *) pmu_data;
++
++	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_CVM_ONLINE,
++				    &lmc->cpuhp_node);
++	list_del(&lmc->entry);
++	perf_pmu_unregister(&lmc->pmu);
++	kfree(lmc->pmu_name);
++	kfree(lmc);
++}
++EXPORT_SYMBOL_GPL(cvm_pmu_lmc_remove);
++
++static int cvm_pmu_init(void)
++{
++	if (cvm_pmu_initialized)
++		return 0;
++
++	INIT_LIST_HEAD(&cvm_pmu_lmcs);
++
++	return cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_CVM_ONLINE,
++				       "perf/arm/cvm:online", NULL,
++				       cvm_pmu_offline_cpu);
++}
++
++void *cvm_pmu_probe(struct pci_dev *pdev, void __iomem *regs, int type)
++{
++	if (!cvm_pmu_initialized) {
++		cvm_pmu_init();
++		cvm_pmu_initialized = true;
++	}
++
++	switch (type) {
++	case CVM_PMU_LMC:
++		return cvm_pmu_lmc_probe(pdev, regs);
++	}
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(cvm_pmu_probe);
++
++void cvm_pmu_remove(struct pci_dev *pdev, void *pmu_data, int type)
++{
++	switch (type) {
++	case CVM_PMU_LMC:
++		return cvm_pmu_lmc_remove(pdev, pmu_data);
++	}
++}
++EXPORT_SYMBOL_GPL(cvm_pmu_remove);
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 0f2a803..2fe906c 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -141,6 +141,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
+ 	CPUHP_AP_WORKQUEUE_ONLINE,
+ 	CPUHP_AP_RCUTREE_ONLINE,
++	CPUHP_AP_PERF_ARM_CVM_ONLINE,
+ 	CPUHP_AP_ONLINE_DYN,
+ 	CPUHP_AP_ONLINE_DYN_END		= CPUHP_AP_ONLINE_DYN + 30,
+ 	CPUHP_AP_X86_HPET_ONLINE,
+diff --git a/include/linux/perf/cavium_pmu.h b/include/linux/perf/cavium_pmu.h
+new file mode 100644
+index 0000000..6ddc1c6
+--- /dev/null
++++ b/include/linux/perf/cavium_pmu.h
+@@ -0,0 +1,53 @@
++#ifndef _CAVIUM_PMU_H
++#define _CAVIUM_PMU_H
++
++#include <linux/io.h>
++#include <linux/pci.h>
++
++enum cvm_pmu_type {
++	CVM_PMU_LMC,
++};
++
++#ifdef CONFIG_CAVIUM_PMU
++
++#include <linux/cpumask.h>
++#include <linux/list.h>
++#include <linux/perf_event.h>
++
++/* maximum number of parallel hardware counters for all pmu types */
++#define CVM_PMU_MAX_COUNTERS 64
++
++/* generic struct to cover the different pmu types */
++struct cvm_pmu_dev {
++	struct pmu pmu;
++	const char *pmu_name;
++	bool (*event_valid)(u64);
++	void __iomem *map;
++	struct pci_dev *pdev;
++	int num_counters;
++	struct perf_event *events[CVM_PMU_MAX_COUNTERS];
++	struct list_head entry;
++	struct hlist_node cpuhp_node;
++	cpumask_t active_mask;
++};
++
++
++/* PMU interface used by EDAC driver */
++void *cvm_pmu_probe(struct pci_dev *pdev, void __iomem *regs, int type);
++void cvm_pmu_remove(struct pci_dev *pdev, void *pmu_data, int type);
++
++#else
++static inline void *cvm_pmu_probe(struct pci_dev *pdev, void __iomem *regs,
++				  int type)
++{
++	return NULL;
++}
++
++static inline void cvm_pmu_remove(struct pci_dev *pdev, void *pmu_data,
++				  int type)
++{
++}
++
++#endif
++
++#endif
 -- 
 2.9.0.rc0.21.g7777322
