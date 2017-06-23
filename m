@@ -1,55 +1,50 @@
-From: techping.chan@gmail.com (Ziping Chen)
-Date: Fri, 23 Jun 2017 23:12:42 +0800
-Subject: [PATCH v2 1/3] input: sun4i-a10-lradc-keys: Add support for A83T
-In-Reply-To: <20170623144622.zn6ecwl2dwkc63w2@flea.lan>
-References: <20170620134445.23097-1-techping.chan@gmail.com>
- <20170620134445.23097-2-techping.chan@gmail.com>
- <20170621203502.ng7auh6vfmibobwo@flea.lan>
- <CAAST=9zK8CjpEwy1rSjwnaSrpoQor-NkjWcX8kFSM-o=qP8OWQ@mail.gmail.com>
- <20170623144622.zn6ecwl2dwkc63w2@flea.lan>
-Message-ID: <CAAST=9wwwC6fYyNmSV5w4b37tdXVtELFaV3NmenQhDK70HoY7g@mail.gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 23 Jun 2017 16:15:10 +0100
+Subject: [RFC,20/30] iommu/arm-smmu-v3: Enable PCI PASID in masters
+In-Reply-To: <fad6510f-922a-550b-0429-bc59f857c307@codeaurora.org>
+References: <20170227195441.5170-21-jean-philippe.brucker@arm.com>
+ <f18163da-30a6-a7d4-0a2c-bca4fc1b0fff@codeaurora.org>
+ <fad6510f-922a-550b-0429-bc59f857c307@codeaurora.org>
+Message-ID: <f47b89f9-2fee-22d4-9cac-476a20f8e93b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-23 22:46 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> On Thu, Jun 22, 2017 at 12:50:47PM +0800, Ziping Chen wrote:
->> 2017-06-22 4:35 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+On 06/23/2017 03:39 PM, Sinan Kaya wrote:
+> Hi Jean-Philippe,
+>  
+>> On 2/27/2017 2:54 PM, Jean-Philippe Brucker wrote:
+>> Enable PASID for PCI devices that support it.
 >>
->> > On Tue, Jun 20, 2017 at 09:44:43PM +0800, Ziping Chen wrote:
->> > > From: Ziping Chen <techping.chan@gmail.com>
->> > >
->> > > Allwinner A83T SoC has a low res adc like the one
->> > > in Allwinner A10 SoC, however, the A10 SoC's vref
->> > > of lradc internally is divided by 2/3 and the A83T
->> > > SoC's isn't, thus add a hardware variant for it to
->> > > be compatible with various devices.
->> >
->> > Where did you get that info from?
->> >
->> > Judging from the user manual, the threshold is actually set to 3/4,
->> > and not 2/3, but there's still one.
->> >
+>> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 66 ++++++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 63 insertions(+), 3 deletions(-)
 >>
->> In the top of page 266 of the A10 User Manual V1.50, it said "2/3 ADC_REF
->> (Level A)" which mean Level A is 2/3 of the vref.
->>
->> In the bottom of page 230 of the A83T User Manual V1.5.1, it said "1.35V
->> (Level A)" meaning that Level A is 1.35V. Oh, it's my fault... It's 3/4 of
->> the vref (A83T's ADC_REF is fixed at 1.8V).
->>
->> So... i will change r_lradc_variant_a83t.divisor_numerator to 3
->> and r_lradc_variant_a83t.divisor_denominator to 4...
->>
->> Is there any other problems?
->
-> I don't see any :)
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 499dc1cd07eb..37fd061405e9 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -730,6 +730,8 @@ struct arm_smmu_master_data {
+>>  
+>>  	struct arm_smmu_stream		*streams;
+>>  	struct rb_root			contexts;
+>> +
+>> +	u32				avail_contexts;
+>>  };
+>>  
+> 
+> According to the PASID ECN here (https://pcisig.com/sites/default/files/specification_documents/ECN-PASID-ATS-2011-03-31.pdf),
+> PASID should be enabled only if all switches between the root port and
+> a device support TLP prefix. 
+>  
+> I'm only seeing a call to pci_enable_pasid() in this patch but I don't
+> see anybody checking for TLP prefix support on the hierarchy.
+> 
+> This could potentially be an addition to the PCI core code.
 
-OK! Thanks. I will send v3 soon.
+Good point, I think we should inspect bit "End-End TLP Prefix Supported"
+in the PCI_EXP_DEVCAP2 capability of all bridges between the endpoint
+and the IOMMU. And it should probably be done inside pci_enable_pasid().
 
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Thanks,
+Jean
