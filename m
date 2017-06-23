@@ -1,199 +1,68 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 23 Jun 2017 10:43:50 +0300
-Subject: [PATCH v5 2/2] arm64: dts: renesas: salvator-x: Add ADV7482
- support
-In-Reply-To: <ce388da93b793abc1b54df3e59ab287aedb9797f.1497469745.git-series.kieran.bingham+renesas@ideasonboard.com>
-References: <cover.90fc3153078e79a3f74af832de923ac675eb29ad.1497469745.git-series.kieran.bingham+renesas@ideasonboard.com>
- <ce388da93b793abc1b54df3e59ab287aedb9797f.1497469745.git-series.kieran.bingham+renesas@ideasonboard.com>
-Message-ID: <10057741.K1MBojqRFe@avalon>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 23 Jun 2017 09:51:23 +0200 (CEST)
+Subject: [PATCH 1/1] futex: remove duplicated code and fix UB
+In-Reply-To: <20170621115318.2781-1-jslaby@suse.cz>
+References: <20170621115318.2781-1-jslaby@suse.cz>
+Message-ID: <alpine.DEB.2.20.1706230017520.2221@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kieran,
+On Wed, 21 Jun 2017, Jiri Slaby wrote:
+> diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+> index f32b42e8725d..5bb2fd4674e7 100644
+> --- a/arch/arm64/include/asm/futex.h
+> +++ b/arch/arm64/include/asm/futex.h
+> @@ -48,20 +48,10 @@ do {									\
+>  } while (0)
+>  
+>  static inline int
+> -futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
 
-Thank you for the patch.
+That unsigned int seems to be a change from the arm64 tree in next. It's
+not upstream and it'll cause a (easy to resolve) conflict.
 
-On Wednesday 14 Jun 2017 20:58:13 Kieran Bingham wrote:
-> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> 
-> The Salvator boards use an ADV7482 receiver for HDMI and CVBS inputs.
-> 
-> Provide ADV7482 node on the i2c4 bus, along with connectors for the
-> hdmi and cvbs inputs, and link to the csi20 and csi40 nodes as outputs.
-> 
-> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> 
-> v4:
->  - dt: Rebase to dts/renesas/salvator-x.dtsi
->  - dt: Use AIN0-7 rather than AIN1-8
-> 
-> v5:
->  - dt: Move to salvator-common.dtsi
-> ---
->  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 123 ++++++++++++++++-
->  1 file changed, 123 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> b/arch/arm64/boot/dts/renesas/salvator-common.dtsi index
-> aef35e0b685a..d74fb55c38bc 100644
-> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> @@ -65,6 +65,27 @@
->  		enable-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
->  	};
-> 
-> +	cvbs-in {
-> +		compatible = "composite-video-connector";
-> +		label = "CVBS IN";
-> +
-> +		port {
-> +			cvbs_con: endpoint {
-> +			};
-> +		};
-> +	};
-> +
-> +	hdmi-in {
-> +		compatible = "hdmi-connector";
-> +		label = "HDMI IN";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_in_con: endpoint {
-> +			};
-> +		};
-> +	};
-> +
->  	reg_1p8v: regulator0 {
->  		compatible = "regulator-fixed";
->  		regulator-name = "fixed-1.8V";
-> @@ -257,6 +278,59 @@
->  	};
->  };
-> 
-> +&csi20 {
-> +	status = "okay";
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		port at 0 {
-> +			reg = <0>;
+> +static int futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
+> +{
+> +	int op = (encoded_op >> 28) & 7;
+> +	int cmp = (encoded_op >> 24) & 15;
+> +	int oparg = (int)(encoded_op << 8) >> 20;
+> +	int cmparg = (int)(encoded_op << 20) >> 20;
 
-Aren't #address-cells, #size-cells and reg already present in the SoC .dtsi ? 
-And if they're not, shouldn't they be ? :-)
+So this is really bad. We have implicit and explicit type casting to
+int. And while we are at it can we please stop proliferating the existing
+mess.
 
-> +			csi20_in: endpoint {
-> +				clock-lanes = <0>;
-> +				data-lanes = <1>;
-> +				remote-endpoint = <&adv7482_txb>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&csi40 {
-> +	status = "okay";
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		port at 0 {
-> +			reg = <0>;
-> +
-> +			csi40_in: endpoint {
-> +				clock-lanes = <0>;
-> +				data-lanes = <1 2 3 4>;
-> +				remote-endpoint = <&adv7482_txa>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&cvbs_con {
-> +	port {
-> +		cvbs_in: endpoint {
-> +			remote-endpoint = <&adv7482_ain7>;
-> +		};
-> +	};
-> +};
+'op' and 'cmp' definitly can be unsigned int. There is no reason to cast
+them to int.
 
-You could merge this with the cvbs_con node above.
+oparg, cmparg and oldval are more interesting.
 
-Apart from that the patch looks good to me.
+The logic here is "documented" in uapi/linux/futex.h
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+/* FUTEX_WAKE_OP will perform atomically
+   int oldval = *(int *)UADDR2;
+   *(int *)UADDR2 = oldval OP OPARG;
+   if (oldval CMP CMPARG)
+       wake UADDR2;  */
 
-> +&hdmi_in_con {
-> +	port {
-> +		hdmi_in: endpoint {
-> +			remote-endpoint = <&adv7482_hdmi>;
-> +		};
-> +	};
-> +};
-> +
->  &du {
->  	pinctrl-0 = <&du_pins>;
->  	pinctrl-names = "default";
-> @@ -343,6 +417,55 @@
-> 
->  		shunt-resistor-micro-ohms = <5000>;
->  	};
-> +
-> +	video-receiver at 70 {
-> +		compatible = "adi,adv7482";
-> +		reg = <0x70>;
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		interrupt-parent = <&gpio6>;
-> +		interrupt-names = "intrq1", "intrq2";
-> +		interrupts = <30 IRQ_TYPE_LEVEL_LOW>,
-> +			     <31 IRQ_TYPE_LEVEL_LOW>;
-> +
-> +		port at 7 {
-> +			reg = <7>;
-> +
-> +			adv7482_ain7: endpoint {
-> +				remote-endpoint = <&cvbs_in>;
-> +			};
-> +		};
-> +
-> +		port at 8 {
-> +			reg = <8>;
-> +
-> +			adv7482_hdmi: endpoint {
-> +				remote-endpoint = <&hdmi_in>;
-> +			};
-> +		};
-> +
-> +		port at 10 {
-> +			reg = <10>;
-> +
-> +			adv7482_txa: endpoint {
-> +				clock-lanes = <0>;
-> +				data-lanes = <1 2 3 4>;
-> +				remote-endpoint = <&csi40_in>;
-> +			};
-> +		};
-> +
-> +		port at 11 {
-> +			reg = <11>;
-> +
-> +			adv7482_txb: endpoint {
-> +				clock-lanes = <0>;
-> +				data-lanes = <1>;
-> +				remote-endpoint = <&csi20_in>;
-> +			};
-> +		};
-> +	};
->  };
-> 
->  &i2c_dvfs {
+Now the FUTEX_OP macro which is supposed to compose the encoded_up does:
 
--- 
-Regards,
+#define FUTEX_OP(op, oparg, cmp, cmparg) \
+  (((op & 0xf) << 28) | ((cmp & 0xf) << 24)             \
+   | ((oparg & 0xfff) << 12) | (cmparg & 0xfff))
 
-Laurent Pinchart
+Of course this all is not typed, undocumented and completely ill
+defined.
+
+> +	int oparg = (int)(encoded_op << 8) >> 20;
+> +	int cmparg = (int)(encoded_op << 20) >> 20;
+
+So in fact we sign expand the 12 bits of oparg and cmparg. Really
+intuitive.
+
+Yes, we probably can't change that anymore, but at least we should make it
+very explicit and add a comment to that effect.
+
+Thanks,
+
+	tglx
