@@ -1,89 +1,66 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 23 Jun 2017 11:00:57 +0200
-Subject: [PATCH 4/6] clk: at91: clk-generated: create function to find
- best_diff
-In-Reply-To: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
-References: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170623090059.8371-5-quentin.schulz@free-electrons.com>
+Date: Fri, 23 Jun 2017 11:00:53 +0200
+Subject: [PATCH 0/6] add support for Sama5d2 audio PLL and enable ClassD
+Message-ID: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way to find the best_diff and do the appropriate process afterwards
-can be re-used.
+This patch series adds support for the audio PLL and enables ClassD that
+can be found in ATMEL Sama5d2 SoCs.
 
-This patch prepares the driver for an upcoming patch that will allow
-clk_generated to determine the rate of the audio_pll.
+There are two audio PLLs (PMC and PAD) that shares the same parent (FRAC).
+FRAC can output between 620 and 700MHz and only multiply the rate of its
+parent. The two audio PLLs then divide the FRAC rate to best match the
+asked rate.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
- drivers/clk/at91/clk-generated.c | 41 ++++++++++++++++++++++++++--------------
- 1 file changed, 27 insertions(+), 14 deletions(-)
+I basically took an old patch series posted by Nicolas on December, 6th
+2016[1][2][3] and the comments Boris did on the first version[4] Nicolas
+sent on July, 15th 2015.
 
-diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index dab7002937e6..6530a2e7e84d 100644
---- a/drivers/clk/at91/clk-generated.c
-+++ b/drivers/clk/at91/clk-generated.c
-@@ -99,15 +99,36 @@ clk_generated_recalc_rate(struct clk_hw *hw,
- 	return DIV_ROUND_CLOSEST(parent_rate, gck->gckdiv + 1);
- }
- 
-+static void clk_generated_best_diff(struct clk_rate_request *req,
-+				    struct clk_hw *parent,
-+				    unsigned long parent_rate, u32 div,
-+				    int *best_diff, long *best_rate)
-+{
-+	unsigned long tmp_rate;
-+	int tmp_diff;
-+
-+	if (!div)
-+		tmp_rate = parent_rate;
-+	else
-+		tmp_rate = parent_rate / div;
-+	tmp_diff = abs(req->rate - tmp_rate);
-+
-+	if (*best_diff < 0 || *best_diff > tmp_diff) {
-+		*best_rate = tmp_rate;
-+		*best_diff = tmp_diff;
-+		req->best_parent_rate = parent_rate;
-+		req->best_parent_hw = parent;
-+	}
-+}
-+
- static int clk_generated_determine_rate(struct clk_hw *hw,
- 					struct clk_rate_request *req)
- {
- 	struct clk_generated *gck = to_clk_generated(hw);
- 	struct clk_hw *parent = NULL;
- 	long best_rate = -EINVAL;
--	unsigned long tmp_rate, min_rate;
-+	unsigned long min_rate;
- 	int best_diff = -1;
--	int tmp_diff;
- 	int i;
- 
- 	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
-@@ -125,18 +146,10 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- 			continue;
- 
- 		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
--		if (!div)
--			tmp_rate = parent_rate;
--		else
--			tmp_rate = parent_rate / div;
--		tmp_diff = abs(req->rate - tmp_rate);
--
--		if (best_diff < 0 || best_diff > tmp_diff) {
--			best_rate = tmp_rate;
--			best_diff = tmp_diff;
--			req->best_parent_rate = parent_rate;
--			req->best_parent_hw = parent;
--		}
-+
-+		clk_generated_best_diff(req, parent, parent_rate, div,
-+					&best_diff, &best_rate);
-+
- 
- 		if (!best_diff)
- 			break;
+I also fixed the function used to compute the divisors, removed useless
+spinlocks and added a range to the audio frac PLL to stay within vendor's
+supported range. Clocks that are children of gclk (generated-clk) are now
+able to propagate rate to the audio PLL clocks when needed. However, since
+there is no rate locking, we enforce that classd_gclk be the only child of
+audio_pll_pmc so we avoid multiple children modifiying parent's rate, and
+classd driver modifying parent's rate which would impact the rate of each
+of parent's children.
+
+Thanks,
+Quentin
+
+[1] https://patchwork.kernel.org/patch/9462351/
+[2] https://patchwork.kernel.org/patch/9462347/
+[3] https://patchwork.kernel.org/patch/9462349/
+[4] https://www.spinics.net/lists/arm-kernel/msg436120.html
+
+Cyrille Pitchen (2):
+  ARM: dts: at91: sama5d2: add classd nodes
+  ARM: dts: at91: sama5d2_xplained: add pin muxing and enable classd
+
+Nicolas Ferre (1):
+  clk: at91: add audio pll clock driver
+
+Quentin Schulz (3):
+  clk: at91: clk-generated: remove useless divisor loop
+  clk: at91: clk-generated: create function to find best_diff
+  clk: at91: clk-generated: make gclk determine audio_pll rate
+
+ .../devicetree/bindings/clock/at91-clock.txt       |  10 +
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  16 ++
+ arch/arm/boot/dts/sama5d2.dtsi                     |  39 +++-
+ arch/arm/mach-at91/Kconfig                         |   4 +
+ drivers/clk/at91/Makefile                          |   2 +
+ drivers/clk/at91/clk-audio-pll-pad.c               | 204 ++++++++++++++++++
+ drivers/clk/at91/clk-audio-pll-pmc.c               | 175 +++++++++++++++
+ drivers/clk/at91/clk-audio-pll.c                   | 237 +++++++++++++++++++++
+ drivers/clk/at91/clk-generated.c                   |  79 +++++--
+ include/linux/clk/at91_pmc.h                       |  25 +++
+ sound/soc/atmel/atmel-classd.c                     |  20 +-
+ 11 files changed, 772 insertions(+), 39 deletions(-)
+ create mode 100644 drivers/clk/at91/clk-audio-pll-pad.c
+ create mode 100644 drivers/clk/at91/clk-audio-pll-pmc.c
+ create mode 100644 drivers/clk/at91/clk-audio-pll.c
+
 -- 
 2.11.0
