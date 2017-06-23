@@ -1,48 +1,63 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 23 Jun 2017 09:47:16 +0100
-Subject: [PATCH v2 0/8] io-pgtable lock removal
-In-Reply-To: <cover.1498145008.git.robin.murphy@arm.com>
-References: <cover.1498145008.git.robin.murphy@arm.com>
-Message-ID: <61b7b953-5bf4-eb45-c3e8-b4491e8fdca7@huawei.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 23 Jun 2017 10:49:01 +0200
+Subject: [PATCH 0/6] Update binding documentation for cp110 and ap806
+In-Reply-To: <20170622211456.rip2gveiprlfw3kj@rob-hp-laptop> (Rob Herring's
+ message of "Thu, 22 Jun 2017 16:14:56 -0500")
+References: <20170620083754.28053-1-gregory.clement@free-electrons.com>
+ <87k2463c66.fsf@free-electrons.com>
+ <20170622211456.rip2gveiprlfw3kj@rob-hp-laptop>
+Message-ID: <87shirytqa.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/2017 16:53, Robin Murphy wrote:
-> The feedback has been promising, so v2 is just a final update to cover
-> a handful of memory ordering and cosmetic tweaks that came up when Will
-> and I went through this offline.
+Hi Mike,
+
+
+as you were not in CC of the thread here is the reference:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/514497.html
+
+ On jeu., juin 22 2017, Rob Herring <robh@kernel.org> wrote:
+
+> On Tue, Jun 20, 2017 at 05:34:57PM +0200, Gregory CLEMENT wrote:
+>> Hi Rob, 
+>>  
+>>  On mar., juin 20 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>> 
+>> > Hi Rob,
+>> >
+>> > As you know there were dependencies issue about the binding between my
+>> > different series and you proposed yourself to apply them though the
+>> > device tree subsystem: [1]
 >
-> Thanks,
-> Robin.
+> I did, but ...
+>
+>> >
+>> > All the driver parts have been merged so it's time merging the
+>> > documentation.
+>> 
+>> I forgot to mentioned that this series is based on the clk-ap806-dt
+>> stable branch:
+>> 
+>> https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806-dt
+>
+> ... that was to avoid cross tree dependencies. Now you're creating one. 
+> Either Mike should take everything or drop this branch and I'll take it 
+> too.
 
-Hi Robin,
+Could you take them all? I can do a PR for this and I take this
+opportunity to add the missing ack in pacth 6
 
-Is it worth us retesting this patchset?
-
-If yes, as for a branch (for convenience), does this one now match v2:
-git://linux-arm.org/linux-rm  iommu/pgtable
-
-I saw it was rewritten recently.
 
 Thanks,
-John
 
+Gregory
 >
+> And you missed my ack on patch 6.
 >
-> Robin Murphy (8):
->   iommu/io-pgtable-arm-v7s: Check table PTEs more precisely
->   iommu/io-pgtable-arm: Improve split_blk_unmap
->   iommu/io-pgtable-arm-v7s: Refactor split_blk_unmap
->   iommu/io-pgtable: Introduce explicit coherency
->   iommu/io-pgtable-arm: Support lockless operation
->   iommu/io-pgtable-arm-v7s: Support lockless operation
->   iommu/arm-smmu: Remove io-pgtable spinlock
->   iommu/arm-smmu-v3: Remove io-pgtable spinlock
->
->  drivers/iommu/arm-smmu-v3.c        |  36 ++-----
->  drivers/iommu/arm-smmu.c           |  48 ++++------
->  drivers/iommu/io-pgtable-arm-v7s.c | 179 +++++++++++++++++++++-------------
->  drivers/iommu/io-pgtable-arm.c     | 191 ++++++++++++++++++++++++-------------
->  drivers/iommu/io-pgtable.h         |   6 ++
->  5 files changed, 274 insertions(+), 186 deletions(-)
->
+> Rob
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
