@@ -1,48 +1,53 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Jun 2017 10:39:06 -0400
-Subject: [RFC,20/30] iommu/arm-smmu-v3: Enable PCI PASID in masters
-In-Reply-To: <f18163da-30a6-a7d4-0a2c-bca4fc1b0fff@codeaurora.org>
-References: <20170227195441.5170-21-jean-philippe.brucker@arm.com>
- <f18163da-30a6-a7d4-0a2c-bca4fc1b0fff@codeaurora.org>
-Message-ID: <fad6510f-922a-550b-0429-bc59f857c307@codeaurora.org>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri, 23 Jun 2017 09:41:36 -0500
+Subject: [GIT PULL v2] SoCFPGA DTS updates for v4.13
+Message-ID: <1498228896-698-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Philippe,
- 
-> On 2/27/2017 2:54 PM, Jean-Philippe Brucker wrote:
-> Enable PASID for PCI devices that support it.
->
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 66 ++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 63 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 499dc1cd07eb..37fd061405e9 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -730,6 +730,8 @@ struct arm_smmu_master_data {
->  
->  	struct arm_smmu_stream		*streams;
->  	struct rb_root			contexts;
-> +
-> +	u32				avail_contexts;
->  };
->  
+Hi Arnd, Kevin, and Olof:
 
-According to the PASID ECN here (https://pcisig.com/sites/default/files/specification_documents/ECN-PASID-ATS-2011-03-31.pdf),
-PASID should be enabled only if all switches between the root port and
-a device support TLP prefix. 
- 
-I'm only seeing a call to pci_enable_pasid() in this patch but I don't
-see anybody checking for TLP prefix support on the hierarchy.
+Please pull in these DTS updates for v4.13. This is version 2 of the pull
+request that has the Kconfig patch removed.
 
-This could potentially be an addition to the PCI core code.
+Thanks,
+Dinh
 
-Sinan
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.13
+
+for you to fetch changes up to 3c56909ec2672d74d30f32f1c0ed8cfd7d6e2b14:
+
+  ARM: dts: socfpga: set the i2c frequency (2017-06-23 09:29:13 -0500)
+
+----------------------------------------------------------------
+SoCFPGA DTS updates for v4.13
+- Fix clocks node the EMACs
+- VINING board updtes
+	- Remove I2C EEPROMs and LED node
+	- Add QSPI device
+	- Add 2nd ethernet alias
+- Add 'clock-frequency' binding for i2c node
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: dts: socfpga: set the i2c frequency
+
+Marek Vasut (5):
+      ARM: dts: socfpga: Fix the ethernet clock phandle
+      ARM: dts: socfpga: Enable QSPI support on VINING FPGA
+      ARM: dts: socfpga: Remove I2C EEPROMs from VINING FPGA
+      ARM: dts: socfpga: Drop LED node from VINING FPGA
+      ARM: dts: socfpga: Add second ethernet alias to VINING FPGA
+
+ arch/arm/boot/dts/socfpga.dtsi                     |   4 +-
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi       |   2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts  |   2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts      |   2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 101 +++++++++------------
+ 5 files changed, 46 insertions(+), 65 deletions(-)
