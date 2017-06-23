@@ -1,31 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 23 Jun 2017 16:51:31 -0500
-Subject: [PATCH v2 2/3] dt-bindings: input: Add DT bindings documentation
- for Allwinner A83T R_LRADC
-In-Reply-To: <20170620134445.23097-3-techping.chan@gmail.com>
-References: <20170620134445.23097-1-techping.chan@gmail.com>
- <20170620134445.23097-3-techping.chan@gmail.com>
-Message-ID: <20170623215131.d5kickxtqdxxm3t4@rob-hp-laptop>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 23 Jun 2017 23:01:04 +0100
+Subject: [PATCH] pci:  Add and use PCI_GENERIC_SETUP Kconfig entry
+In-Reply-To: <20170623214538.25967-1-palmer@dabbelt.com>
+References: <20170623214538.25967-1-palmer@dabbelt.com>
+Message-ID: <20170623220104.GE31455@jhogan-linux.le.imgtec.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 09:44:44PM +0800, Ziping Chen wrote:
-> From: Ziping Chen <techping.chan@gmail.com>
+On Fri, Jun 23, 2017 at 02:45:38PM -0700, Palmer Dabbelt wrote:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 4c1a35f15838..86872246951c 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -96,6 +96,7 @@ config ARM
+>  	select PERF_USE_VMALLOC
+>  	select RTC_LIB
+>  	select SYS_SUPPORTS_APM_EMULATION
+> +	select PCI_GENERIC_SETUP
+>  	# Above selects are sorted alphabetically; please add new ones
+>  	# according to that.  Thanks.
 
-Your subject could be more concise. "DT bindings documentation" is 
-redundant.
+This comment seems to suggest PCI_GENERIC_SETUP should be added a few
+lines up to preserve the alphabetical sorting.
 
-> 
-> Allwinner A83T SoC has a low res adc like the one
-> in Allwinner A10 SoC.
-> 
-> Add binding for it.
-> 
-> Signed-off-by: Ziping Chen <techping.chan@gmail.com>
-> ---
->  Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index b2024db225a9..6c684d8c8816 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -115,6 +115,7 @@ config ARM64
+>  	select SPARSE_IRQ
+>  	select SYSCTL_EXCEPTION_TRACE
+>  	select THREAD_INFO_IN_TASK
+> +	select PCI_GENERIC_SETUP
 
-Otherwise,
+Here too.
 
-Acked-by: Rob Herring <robh@kernel.org>
+> diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
+> index 4583c0320059..6679af85a882 100644
+> --- a/arch/tile/Kconfig
+> +++ b/arch/tile/Kconfig
+> @@ -33,6 +33,7 @@ config TILE
+>  	select USER_STACKTRACE_SUPPORT
+>  	select USE_PMC if PERF_EVENTS
+>  	select VIRT_TO_BUS
+> +	select PCI_GENERIC_SETUP
+
+and here
+
+Otherwise
+Reviewed-by: James Hogan <james.hogan@imgtec.com>
+
+Cheers
+James
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170623/def3908f/attachment.sig>
