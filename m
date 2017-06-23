@@ -1,114 +1,98 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 Jun 2017 17:15:58 +0100
-Subject: Applied "spi: atmel: fix corrupted data issue on SAM9 family SoCs" to
- the spi tree
-In-Reply-To: <d174da00f48503eba84dd0f4068749b968628bbb.1498231873.git.cyrille.pitchen@microchip.com>
-Message-ID: <E1dORFW-00037E-N8@debutante>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Jun 2017 17:46:23 +0100
+Subject: [PATCH] arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
+In-Reply-To: <CAKv+Gu-hyWyc3rbuKpOaieqKf=y3mga=DkVviagEBwEFrBgrzg@mail.gmail.com>
+References: <1498226261-21204-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu-hyWyc3rbuKpOaieqKf=y3mga=DkVviagEBwEFrBgrzg@mail.gmail.com>
+Message-ID: <20170623164623.GD21989@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Fri, Jun 23, 2017 at 02:38:31PM +0000, Ard Biesheuvel wrote:
+> On 23 June 2017 at 13:57, Mark Rutland <mark.rutland@arm.com> wrote:
+> > When a kernel is built without CONFIG_ARM64_MODULE_PLTS, we don't
+> > generate the expected branch instruction in ftrace_make_nop(). This
+> > means we pass zero (rather than a valid branch) to ftrace_modify_code()
+> > as the expected instruction to validate. This causes us to return
+> > -EINVAL to the core ftrace code for a valid case, resulting in a splat
+> > at boot time.
+> >
+> > This was an unintended effect of commit:
+> >
+> >   687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
+> >
+> > ... which incorrectly moved the generation of the branch instruction
+> > into the ifdef for CONFIG_ARM64_MODULE_PLTS.
+> >
+> > This patch fixes the issue by moving the ifdef inside of the relevant
+> > if-else case, and always checking that the branch is in range,
+> > regardless of CONFIG_ARM64_MODULE_PLTS. This ensures that we generate
+> > the expected branch instruction, and also improves our sanity checks.
+> >
+> > For consistency, both ftrace_make_nop() and ftrace_make_call() are
+> > updated with this pattern.
+> >
+> > Fixes: 687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/kernel/ftrace.c | 12 ++++++++----
+> >  1 file changed, 8 insertions(+), 4 deletions(-)
+> >
+> > Marc spotted this breakage atop of the arm64 for-next/core branch when ftrace
+> > was enabled.
+> >
+> > I've given this fix a go with all combinations of MODULES and RANDOMIZE_BASE,
+> > with the ftrace boot time self test, and everything seems happy in all
+> > combinations.
+> 
+> Thanks for cleaning this up. I guess Arnd's original fix didn't suffer
+> from this issue.
 
-   spi: atmel: fix corrupted data issue on SAM9 family SoCs
+I haven't gone digging through the (mail) history; I don't know either
+way.
 
-has been applied to the spi tree at
+> 
+> > diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> > index 401aa27..945f506 100644
+> > --- a/arch/arm64/kernel/ftrace.c
+> > +++ b/arch/arm64/kernel/ftrace.c
+> > @@ -73,10 +73,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+> >         unsigned long pc = rec->ip;
+> >         u32 old, new;
+> >
+> > -#ifdef CONFIG_ARM64_MODULE_PLTS
+> >         long offset = (long)pc - (long)addr;
+> >
+> 
+> Could you drop the newline before the #ifdef as well please?
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+Sure thing.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+[...]
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> >         old = aarch64_insn_gen_nop();
+> >         new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
+> > @@ -140,10 +142,10 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+> >         bool validate = true;
+> >         u32 old = 0, new;
+> >
+> > -#ifdef CONFIG_ARM64_MODULE_PLTS
+> >         long offset = (long)pc - (long)addr;
+> >
+> 
+> Please drop the newline as well.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Sure.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+> With the above addressed:
+> 
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Thanks,
-Mark
+Cheers!
 
->From 7094576ccdc3acfe1e06a1e2ab547add375baf7f Mon Sep 17 00:00:00 2001
-From: Cyrille Pitchen <cyrille.pitchen@microchip.com>
-Date: Fri, 23 Jun 2017 17:39:16 +0200
-Subject: [PATCH] spi: atmel: fix corrupted data issue on SAM9 family SoCs
-
-This patch disables the use of the DMA for data transfer and forces the
-use of PIO transfers instead as a quick fixup to solve the cache aliasing
-issue on ARM9 based cores, which embeds a VIVT data cache.
-
-Indeed in the case of VIVT data caches, it is not safe to call dma_map_*()
-functions to map buffers for DMA transfers when those buffers have been
-allocated by vmalloc() or from any DMA-unsafe area.
-
-Further patches may propose a better solution based on the use of a bounce
-buffer at the SPI sub-system level but such solution needs more time to be
-discussed. Then the use of DMA transfers could be enabled again to improve
-the performances but before that, this patch already solves the issue.
-
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@microchip.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
-Cc: stable at vger.kernel.org
----
- drivers/spi/spi-atmel.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 1eb83c9613d5..78c885d80c96 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -269,6 +269,7 @@ struct atmel_spi_caps {
- 	bool	is_spi2;
- 	bool	has_wdrbt;
- 	bool	has_dma_support;
-+	bool	has_pdc_support;
- };
- 
- /*
-@@ -1426,7 +1427,28 @@ static void atmel_get_caps(struct atmel_spi *as)
- 
- 	as->caps.is_spi2 = version > 0x121;
- 	as->caps.has_wdrbt = version >= 0x210;
-+#ifdef CONFIG_SOC_SAM_V4_V5
-+	/*
-+	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
-+	 * since this later function tries to map buffers with dma_map_sg()
-+	 * even if they have not been allocated inside DMA-safe areas.
-+	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
-+	 * those ARM cores, the data cache follows the PIPT model.
-+	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
-+	 * In case of PIPT caches, there cannot be cache aliases.
-+	 * However on ARM9 cores, the data cache follows the VIVT model, hence
-+	 * the cache aliases issue can occur when buffers are allocated from
-+	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
-+	 * not taken into account or at least not handled completely (cache
-+	 * lines of aliases are not invalidated).
-+	 * This is not a theorical issue: it was reproduced when trying to mount
-+	 * a UBI file-system on a at91sam9g35ek board.
-+	 */
-+	as->caps.has_dma_support = false;
-+#else
- 	as->caps.has_dma_support = version >= 0x212;
-+#endif
-+	as->caps.has_pdc_support = version < 0x212;
- }
- 
- /*-------------------------------------------------------------------------*/
-@@ -1567,7 +1589,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
- 		} else if (ret == -EPROBE_DEFER) {
- 			return ret;
- 		}
--	} else {
-+	} else if (as->caps.has_pdc_support) {
- 		as->use_pdc = true;
- 	}
- 
--- 
-2.13.1
+Mark.
