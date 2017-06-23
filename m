@@ -1,147 +1,157 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Fri, 23 Jun 2017 12:02:09 +0800
-Subject: [PATCH v3 1/3] spi: rockchip: add support for "cs-gpios" dts
- property
-In-Reply-To: <CAD=FV=WqhOUqf+JP2=m0Jt5dHqB_FqKLEw2SZTQtBbEv41+u_A@mail.gmail.com>
-References: <1497411483-23377-1-git-send-email-jeffy.chen@rock-chips.com>
- <CAD=FV=WqhOUqf+JP2=m0Jt5dHqB_FqKLEw2SZTQtBbEv41+u_A@mail.gmail.com>
-Message-ID: <594C92C1.1040704@rock-chips.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Fri, 23 Jun 2017 12:13:00 +0800
+Subject: [PATCH v2 4/4] arm: dts: mt2701: Add display subsystem related
+ nodes for MT2701
+In-Reply-To: <1498121019-21984-5-git-send-email-erin.lo@mediatek.com>
+References: <1498121019-21984-1-git-send-email-erin.lo@mediatek.com>
+ <1498121019-21984-5-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1498191180.20705.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi doug,
+On Thu, 2017-06-22 at 16:43 +0800, Erin Lo wrote:
+> From: YT Shen <yt.shen@mediatek.com>
+> 
+> This patch adds the device nodes for the DISP function blocks for MT2701
+> 
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt2701.dtsi | 84 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 84 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index 8e574a0..150c4c7 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -17,6 +17,7 @@
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/reset/mt2701-resets.h>
+> +#include <dt-bindings/memory/mt2701-larb-port.h>
+>  #include "skeleton64.dtsi"
+>  #include "mt2701-pinfunc.h"
+>  
+> @@ -24,6 +25,11 @@
+>  	compatible = "mediatek,mt2701";
+>  	interrupt-parent = <&sysirq>;
+>  
+> +	aliases {
+> +		rdma0 = &rdma0;
+> +		rdma1 = &rdma1;
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -201,6 +207,16 @@
+>  		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+>  	};
+>  
+> +	mipi_tx0: mipi-dphy at 10010000 {
+> +		compatible = "mediatek,mt2701-mipi-tx";
+> +		reg = <0 0x10010000 0 0x90>;
+> +		clocks = <&clk26m>;
+> +		clock-output-names = "mipi_tx0_pll";
+> +		#clock-cells = <0>;
+> +		#phy-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+>  	sysirq: interrupt-controller at 10200100 {
+>  		compatible = "mediatek,mt2701-sysirq",
+>  			     "mediatek,mt6577-sysirq";
+> @@ -366,6 +382,39 @@
+>  		#clock-cells = <1>;
+>  	};
+>  
+> +	display_components: dispsys at 14000000 {
+> +		compatible = "mediatek,mt2701-mmsys";
+> +		reg = <0 0x14000000 0 0x1000>;
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> +	};
 
-Thanx for your comments.
+Sorry for the edition error, I will remove this node in next version.
+Regards,
+Erin
 
-On 06/23/2017 05:41 AM, Doug Anderson wrote:
-> Hi,
->
-> On Tue, Jun 13, 2017 at 8:38 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
->> Support using "cs-gpios" property to specify cs gpios.
->>
->> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->> ---
->>
->> Changes in v3:
->> include linux/gpio/consumer.h for compile errors on ARCH_X86
->> (reported by kbuild test robot <lkp@intel.com>)
->>
->> Changes in v2:
->> 1/ request cs gpios in probe for better error handling
->> 2/ use gpiod* function
->> (suggested by Heiko Stuebner)
->> 3/ split dt-binding changes to new patch
->> (suggested by Shawn Lin & Heiko Stuebner)
->>
->>   drivers/spi/spi-rockchip.c | 31 ++++++++++++++++++++++++++++++-
->>   1 file changed, 30 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
->> index bab9b13..4bcf251 100644
->> --- a/drivers/spi/spi-rockchip.c
->> +++ b/drivers/spi/spi-rockchip.c
->> @@ -16,7 +16,8 @@
->>   #include <linux/clk.h>
->>   #include <linux/dmaengine.h>
->>   #include <linux/module.h>
->> -#include <linux/of.h>
->> +#include <linux/gpio/consumer.h>
->> +#include <linux/of_gpio.h>
->>   #include <linux/pinctrl/consumer.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/spi/spi.h>
->> @@ -663,6 +664,27 @@ static bool rockchip_spi_can_dma(struct spi_master *master,
->>          return (xfer->len > rs->fifo_len);
->>   }
->>
->> +static int rockchip_spi_setup_cs_gpios(struct device *dev)
->> +{
->> +       struct device_node *np = dev->of_node;
->> +       struct gpio_desc *cs_gpio;
->> +       int i, nb;
->> +
->> +       if (!np)
->> +               return 0;
->
-> Not sure you really to check for NULL "np".  Do we really run properly
-> without device tree?  We already call of_property_read_u32()
-> unconditionally...
-hmm, right
->
->
->> +
->> +       nb = of_gpio_named_count(np, "cs-gpios");
->> +       for (i = 0; i < nb; i++) {
->
-> Implicitly if there is any error getting "cs-gpios" (AKA if it doesn't
-> exist) you'll return a negative value here, then return "0" for the
-> function.  AKA cs-gpios is optional...  The behavior is correct, but
-> it's a bit non-obvious.  Personally I would have at least put a
-> comment even if you didn't put an explicit check.
-ok
->
->
->> +               /* We support both GPIO CS and HW CS */
->> +               cs_gpio = devm_gpiod_get_index_optional(dev, "cs",
->> +                                                       i, GPIOD_ASIS);
->> +               if (IS_ERR(cs_gpio))
->> +                       return PTR_ERR(cs_gpio);
->
-> As per your discussion with Brian, your whole reason for having this
-> function is that:
->
-> 1. Core SPI framework treats errors getting the GPIO as non-fatal (SPI
-> framework falls back on using the HW chip select).
->
-> Mark is the expert, but IMHO that seems like a bug in the core SPI
-> framework and you should fix it there rather than hacking around in
-> the driver.  _In theory_ you could break backward compatibility
-> (someone could have been relying on the old behavior that an error
-> caused you to fallback to the HW chip select), but I think that's not
-> likely as long as you handle things like:
->
->    cs-gpios = <&gpio1 0 0>, <0>, <&gpio1 1 0>, <&gpio1 2 0>;
->
-> AKA if someone has explicitly specified <0> for the GPIO then _that_
-> shouldn't be an error and we should do the fallback to HW chip select.
-> If we really expect old buggy DTS files that get broken by the old
-> behavior then we'd have to ask for advice from Mark and/or device tree
-> experts...
-right, it would be good to be handled in the spi core.
-and i think devm_gpiod_get_index_optional would take care of the <0> 
-fallback case
->
->
-> As evidence that the current SPI core is broken in the way it is and
-> could use a patch, it would be easy to "fall back" to a chip select
-> that's greater than "master->num_chipselect", which seems to me like a
-> clear bug.
->
-> --
->
-> 2. The SPI framework doesn't end up calling gpiod_request().  It seems
-> like it ought to.  Requiring the sub driver to do this seems wrong.
->
->
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->>   static int rockchip_spi_probe(struct platform_device *pdev)
->>   {
->>          int ret = 0;
->> @@ -749,6 +771,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
->>          master->transfer_one = rockchip_spi_transfer_one;
->>          master->max_transfer_size = rockchip_spi_max_transfer_size;
->>          master->handle_err = rockchip_spi_handle_err;
->> +       master->flags = SPI_MASTER_GPIO_SS;
->
-> IMHO this one line in your patch makes total sense and it seems like
-> you could post it by itself and it could land.  All the error check
-> and gpiod_request() bikeshedding could be deferred to a separate
-> patch.
-ok, that make sense, will do in next version.
->
->
->
+> +
+> +	ovl at 14007000 {
+> +		compatible = "mediatek,mt2701-disp-ovl";
+> +		reg = <0 0x14007000 0 0x1000>;
+> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_OVL>;
+> +		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+> +	rdma0: rdma at 14008000 {
+> +		compatible = "mediatek,mt2701-disp-rdma";
+> +		reg = <0 0x14008000 0 0x1000>;
+> +		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_RDMA>;
+> +		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+> +	wdma at 14009000 {
+> +		compatible = "mediatek,mt2701-disp-wdma";
+> +		reg = <0 0x14009000 0 0x1000>;
+> +		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_WDMA>;
+> +		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+>  	bls: bls at 1400a000 {
+>  		compatible = "mediatek,mt2701-disp-pwm";
+>  		reg = <0 0x1400a000 0 0x1000>;
+> @@ -375,6 +424,32 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	color at 1400b000 {
+> +		compatible = "mediatek,mt2701-disp-color";
+> +		reg = <0 0x1400b000 0 0x1000>;
+> +		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_COLOR>;
+> +	};
+> +
+> +	dsi: dsi at 1400c000 {
+> +		compatible = "mediatek,mt2701-dsi";
+> +		reg = <0 0x1400c000 0 0x1000>;
+> +		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DSI_ENGINE>, <&mmsys CLK_MM_DSI_DIG>,
+> +			 <&mipi_tx0>;
+> +		clock-names = "engine", "digital", "hs";
+> +		phys = <&mipi_tx0>;
+> +		phy-names = "dphy";
+> +		status = "disabled";
+> +	};
+> +
+> +	mutex: mutex at 1400e000 {
+> +		compatible = "mediatek,mt2701-disp-mutex";
+> +		reg = <0 0x1400e000 0 0x1000>;
+> +		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_MUTEX_32K>;
+> +	};
+> +
+>  	larb0: larb at 14010000 {
+>  		compatible = "mediatek,mt2701-smi-larb";
+>  		reg = <0 0x14010000 0 0x1000>;
+> @@ -385,6 +460,15 @@
+>  		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+>  	};
+>  
+> +	rdma1: rdma at 14012000 {
+> +		compatible = "mediatek,mt2701-disp-rdma";
+> +		reg = <0 0x14012000 0 0x1000>;
+> +		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
+> +		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+>  	imgsys: syscon at 15000000 {
+>  		compatible = "mediatek,mt2701-imgsys", "syscon";
+>  		reg = <0 0x15000000 0 0x1000>;
