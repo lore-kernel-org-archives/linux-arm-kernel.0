@@ -1,60 +1,63 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 24 Jun 2017 00:09:07 +0200
-Subject: [PATCH v2 0/3] rtc: make st-lpc robust against y2038/2106 bug
-In-Reply-To: <47b45b70-91da-ce41-535d-89d92f380274@kernel.org>
-References: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
- <47b45b70-91da-ce41-535d-89d92f380274@kernel.org>
-Message-ID: <20170623220907.kxhkwkl6gt7bho5r@piout.net>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 24 Jun 2017 06:15:05 +0800
+Subject: [arm-platforms:kvm-arm64/gicv4-kvm 43/44]
+ include/linux/irqchip/arm-gic-v4.h:97:57: warning: 'struct irq_domain_ops'
+ declared inside parameter list will not be visible outside of this
+ definition or declaration
+Message-ID: <201706240603.RDf1vl0C%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/06/2017 at 13:40:41 -0600, Shuah Khan wrote:
-> On 06/19/2017 03:36 AM, Benjamin Gaignard wrote:
-> > On 32bits platforms "struct timeval" or "time_t" are using u32 to code the
-> > date, this cause tools like "date" or "hwclock" failed even before setting
-> > the RTC device if the date is superior to year 2038 (or 2106).
-> > 
-> > To avoid this problem I add one RTC test file which directly use RTC ioctl
-> > to set and read RTC time and alarm values.
-> > rtctest_setdate allow to set any date/time given in the command line.
-> > 
-> > On this version 2 I add check of problematics years in rtctest like suggest
-> > by Alexandre.
-> > 
-> > Finally that had allowed me to test and fix rtc-st-lpc driver.
-> > 
-> > Benjamin Gaignard (3):
-> >   tools: timer: add rtctest_setdate
-> >   tool: timer: rtctest add check for problematic dates
-> >   rtc: st-lpc: make it robust against y2038/2106 bug
-> > 
-> >  drivers/rtc/rtc-st-lpc.c                         |  19 ++--
-> >  tools/testing/selftests/timers/Makefile          |   2 +-
-> >  tools/testing/selftests/timers/rtctest.c         | 121 ++++++++++++++++++++++-
-> >  tools/testing/selftests/timers/rtctest_setdate.c |  86 ++++++++++++++++
-> >  4 files changed, 212 insertions(+), 16 deletions(-)
-> >  create mode 100644 tools/testing/selftests/timers/rtctest_setdate.c
-> > 
-> 
-> Hi Thomas/John,
-> 
-> I can take the first two patches in this series through linux-kselftest
-> with your or John's Ack. Please review and let me know one way or the
-> other.
-> 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
+head:   bdab51ab2560539213cf4541763326b0caddbda5
+commit: fa9a010dcb7fa3e34ee10e9aeb0c112bd863f421 [43/44] WIP
+config: arm64-allnoconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout fa9a010dcb7fa3e34ee10e9aeb0c112bd863f421
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Well, I'm the maintainer for rtctest.c and I'll make sure to also be the
-one for rtctest_setdate.c.
+All warnings (new ones prefixed by >>):
 
-> The third one is a rtc driver patch. Please let me know how do you want
-> to handle this series soon we can get this into 4.13-rc1.
-> 
+   In file included from arch/arm64/include/asm/kvm_host.h:27:0,
+                    from include/linux/kvm_host.h:37,
+                    from arch/arm64/kernel/asm-offsets.c:24:
+>> include/linux/irqchip/arm-gic-v4.h:97:57: warning: 'struct irq_domain_ops' declared inside parameter list will not be visible outside of this definition or declaration
+    int its_init_v4(struct irq_domain *domain, const struct irq_domain_ops *ops);
+                                                            ^~~~~~~~~~~~~~
 
-I'll take the three patches but I still have comment I didn't have time
-to give yet.
+vim +97 include/linux/irqchip/arm-gic-v4.h
 
+    81	struct its_cmd_info {
+    82		enum its_vcpu_info_cmd_type	cmd_type;
+    83		union {
+    84			struct its_vlpi_map	*map;
+    85			u8			config;
+    86		};
+    87	};
+    88	
+    89	int its_alloc_vcpu_irqs(struct its_vm *vm);
+    90	void its_free_vcpu_irqs(struct its_vm *vm);
+    91	int its_schedule_vpe(struct its_vpe *vpe, bool on);
+    92	int its_invall_vpe(struct its_vpe *vpe);
+    93	int its_map_vlpi(int irq, struct its_vlpi_map *map);
+    94	int its_unmap_vlpi(int irq);
+    95	int its_prop_update_vlpi(int irq, u8 config);
+    96	
+  > 97	int its_init_v4(struct irq_domain *domain, const struct irq_domain_ops *ops);
+    98	
+    99	#endif
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 6566 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170624/4e66357b/attachment.gz>
