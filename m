@@ -1,59 +1,33 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Fri, 23 Jun 2017 12:59:24 +0200
-Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
-In-Reply-To: <d14b8c6e-b480-36f0-ed0a-684647617dbe@suse.de>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <1498143942-12682-2-git-send-email-hugues.fruchet@st.com>
- <D5629236-95D8-45B6-9719-E8B9796FEC90@goldelico.com>
- <d14b8c6e-b480-36f0-ed0a-684647617dbe@suse.de>
-Message-ID: <3E7B1344-ECE6-4CCC-9E9D-7521BB566CDE@goldelico.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 23 Jun 2017 12:11:17 +0100
+Subject: [PATCH][spi-next] spi: stm32: fix range limit checks on div
+In-Reply-To: <0133c805-c919-f115-7c94-65d88bed8ca2@st.com>
+References: <20170622154142.22481-1-colin.king@canonical.com>
+ <0133c805-c919-f115-7c94-65d88bed8ca2@st.com>
+Message-ID: <20170623111117.yj33dqr4eg4v43wt@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 22, 2017 at 05:49:10PM +0200, Amelie DELAUNAY wrote:
 
-> Am 23.06.2017 um 12:46 schrieb Andreas F?rber <afaerber@suse.de>:
-> 
-> Hi,
-> 
-> Am 23.06.2017 um 12:25 schrieb H. Nikolaus Schaller:
->>> diff --git a/Documentation/devicetree/bindings/media/i2c/ov965x.txt b/Documentation/devicetree/bindings/media/i2c/ov965x.txt
->>> new file mode 100644
->>> index 0000000..0e0de1f
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/media/i2c/ov965x.txt
->>> @@ -0,0 +1,37 @@
->>> +* Omnivision OV9650/9652/9655 CMOS sensor
->>> +
->>> +The Omnivision OV965x sensor support multiple resolutions output, such as
->>> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
->>> +output format.
->>> +
->>> +Required Properties:
->>> +- compatible: should be one of
->>> +	"ovti,ov9650"
->>> +	"ovti,ov9652"
->>> +	"ovti,ov9655"
->>> +- clocks: reference to the mclk input clock.
->> 
->> I wonder why you have removed the clock-frequency property?
->> 
->> In some situations the camera driver must be able to tell the clock source
->> which frequency it wants to see.
-> 
-> That's what assigned-clock-rates property is for:
-> 
-> https://www.kernel.org/doc/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> 
-> AFAIU clock-frequency on devices is deprecated and equivalent to having
-> a clocks property pointing to a fixed-clock, which is different from a
-> clock with varying rate.
+> I'm preparing a v2 for the initial patchset introducing spi-stm32, if you
+> agree, I can directly add your fix.
 
-I am not sure if that helps here. The OMAP3-ISP does not have a fixed clock rate
-so we can only have the driver define what it wants to see.
+Please don't resubmit patches that have already been applied, you should
+submit patches against current code in the tree you're expecting things
+to be applied to.  If any updates are needed to a patch that's already
+been applied you should submit incremental patches which make those
+updates.  This avoids having to change published git commits which could
+cause problems for people working against git.
 
-And common practise for OMAP3-ISP based camera modules (e.g. N900, N9) is that they do it in the driver.
-
-Maybe ISP developers can comment?
-
-BR,
-Nikolaus
+Please don't top post, reply in line with needed context.  This allows
+readers to readily follow the flow of conversation and understand what
+you are talking about and also helps ensure that everything in the
+discussion is being addressed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170623/869852e2/attachment.sig>
