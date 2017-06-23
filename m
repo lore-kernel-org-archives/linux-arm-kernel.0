@@ -1,36 +1,38 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 23 Jun 2017 15:00:53 +0200
-Subject: [PATCH v2 5/5] ARM: configs: stm32: Add DMAMUX support in STM32
- defconfig
-In-Reply-To: <1498222853-11110-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1498222853-11110-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1498222853-11110-6-git-send-email-pierre-yves.mordret@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Jun 2017 15:18:34 +0200
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.13 (#1)
+In-Reply-To: <8760fo1a43.fsf@free-electrons.com>
+References: <8760fo1a43.fsf@free-electrons.com>
+Message-ID: <CAK8P3a3H8ARx24Vei3bRQDcs-SKWuPjOz7URdfRDXpvoi_WCXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DMAMUX support in STM32 defconfig file
+On Thu, Jun 22, 2017 at 2:26 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi,
+>
+> Here is the first pull request for arm64 for mvebu for v4.13.
+>
+> Gregory
+>
+> The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
+>
+>   Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.13-1
+>
+> for you to fetch changes up to 29ad6bd9ada2629fe1b7b30d6d08259005abcb8a:
+>
+>   arm64: marvell: enable ICU and GICP drivers (2017-06-21 17:47:17 +0200)
+>
+> ----------------------------------------------------------------
+> mvebu arm64 for 4.13 (part 1)
+>
+> - enable the ICU and GICP drivers for Armada 7K/8K
+> - enable the pinctrl driver for Armada 7K/8K
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
- Version history:
-    v2: None
----
----
- arch/arm/configs/stm32_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Pulled into next/arm64, thanks!
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index a097538..15fbaba 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -64,6 +64,7 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_STM32=y
- CONFIG_DMADEVICES=y
- CONFIG_STM32_DMA=y
-+CONFIG_STM32_DMAMUX=y
- CONFIG_IIO=y
- CONFIG_STM32_ADC_CORE=y
- CONFIG_STM32_ADC=y
--- 
-1.9.1
+       Arnd
