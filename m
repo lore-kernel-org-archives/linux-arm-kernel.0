@@ -1,59 +1,26 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Fri, 23 Jun 2017 13:02:48 +0800
-Subject: [PATCH 09/11] ARM: dts: rk3228-evb: Enable the internal phy for gmac
-In-Reply-To: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
-References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1498194168-8249-1-git-send-email-david.wu@rock-chips.com>
+From: zhi.mao@mediatek.com (Zhi Mao)
+Date: Fri, 23 Jun 2017 13:08:19 +0800
+Subject: [PATCH v2 0/6] mediatek: pwm driver add MT2712/MT7622 support 
+Message-ID: <1498194505-30930-1-git-send-email-zhi.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the internal phy for rk3228 evb board
-by default.
-To use the external 1000M phy on evb board, need to make
-some switch of evb board to be on.
+change in v2:
+1. add error check for enable colock control flow
+2. use "goto err_clk(main/top)" coding style, for preparing clk error case
+3. remove comments inline /*===*/
+4. move "PWM_CLK_DIV_MAX" modification to its own patch
+5. move pwm source clock selection to its own patch
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
----
- arch/arm/boot/dts/rk3228-evb.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Zhi Mao (6):
+  pwm: kconfig: modify mediatek information
+  pwm: mediatek: fix pwm source clock selection
+  pwm: mediatek: fix clock control issue
+  pwm: bindings: add MT2712/MT7622 information
+  pwm: mediatek: add PWM_CLK_DIV_MAX
+  pwm: mediatek: add MT2712/MT7622 support
 
-diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
-index 5883433..c4002da 100644
---- a/arch/arm/boot/dts/rk3228-evb.dts
-+++ b/arch/arm/boot/dts/rk3228-evb.dts
-@@ -50,6 +50,16 @@
- 		device_type = "memory";
- 		reg = <0x60000000 0x40000000>;
- 	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		regulator-name = "vcc_phy";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
- };
- 
- &emmc {
-@@ -60,6 +70,16 @@
- 	status = "okay";
- };
- 
-+&gmac {
-+	assigned-clocks = <&cru SCLK_MAC_SRC>;
-+	assigned-clock-rates = <50000000>;
-+	clock_in_out = "output";
-+	phy-supply = <&vcc_phy>;
-+	phy-mode = "rmii";
-+	phy-type = "internal";
-+	status = "okay";
-+};
-+
- &tsadc {
- 	status = "okay";
- 
--- 
-1.9.1
+ .../devicetree/bindings/pwm/pwm-mediatek.txt       |    6 +-
+ drivers/pwm/Kconfig                                |    2 +-
+ drivers/pwm/pwm-mediatek.c                         |  132 ++++++++++++++------
+ 3 files changed, 103 insertions(+), 37 deletions(-)
