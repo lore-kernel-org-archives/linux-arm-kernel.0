@@ -1,61 +1,55 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 23 Jun 2017 23:01:04 +0100
+From: palmer@dabbelt.com (Palmer Dabbelt)
+Date: Fri, 23 Jun 2017 15:08:56 -0700
 Subject: [PATCH] pci:  Add and use PCI_GENERIC_SETUP Kconfig entry
-In-Reply-To: <20170623214538.25967-1-palmer@dabbelt.com>
-References: <20170623214538.25967-1-palmer@dabbelt.com>
-Message-ID: <20170623220104.GE31455@jhogan-linux.le.imgtec.org>
+In-Reply-To: <20170623220104.GE31455@jhogan-linux.le.imgtec.org>
+References: <20170623220104.GE31455@jhogan-linux.le.imgtec.org>
+Message-ID: <20170623220857.28774-1-palmer@dabbelt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 02:45:38PM -0700, Palmer Dabbelt wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 4c1a35f15838..86872246951c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -96,6 +96,7 @@ config ARM
->  	select PERF_USE_VMALLOC
->  	select RTC_LIB
->  	select SYS_SUPPORTS_APM_EMULATION
-> +	select PCI_GENERIC_SETUP
->  	# Above selects are sorted alphabetically; please add new ones
->  	# according to that.  Thanks.
+On Fri, 23 Jun 2017 15:01:04 PDT (-0700), james.hogan at imgtec.com wrote:
+> On Fri, Jun 23, 2017 at 02:45:38PM -0700, Palmer Dabbelt wrote:
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 4c1a35f15838..86872246951c 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -96,6 +96,7 @@ config ARM
+>>      select PERF_USE_VMALLOC
+>>      select RTC_LIB
+>>      select SYS_SUPPORTS_APM_EMULATION
+>> +    select PCI_GENERIC_SETUP
+>>      # Above selects are sorted alphabetically; please add new ones
+>>      # according to that.  Thanks.
+>
+> This comment seems to suggest PCI_GENERIC_SETUP should be added a few
+> lines up to preserve the alphabetical sorting.
+>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index b2024db225a9..6c684d8c8816 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -115,6 +115,7 @@ config ARM64
+>>      select SPARSE_IRQ
+>>      select SYSCTL_EXCEPTION_TRACE
+>>      select THREAD_INFO_IN_TASK
+>> +    select PCI_GENERIC_SETUP
+>
+> Here too.
+>
+>> diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
+>> index 4583c0320059..6679af85a882 100644
+>> --- a/arch/tile/Kconfig
+>> +++ b/arch/tile/Kconfig
+>> @@ -33,6 +33,7 @@ config TILE
+>>      select USER_STACKTRACE_SUPPORT
+>>      select USE_PMC if PERF_EVENTS
+>>      select VIRT_TO_BUS
+>> +    select PCI_GENERIC_SETUP
+>
+> and here
+>
+> Otherwise
+> Reviewed-by: James Hogan <james.hogan@imgtec.com>
 
-This comment seems to suggest PCI_GENERIC_SETUP should be added a few
-lines up to preserve the alphabetical sorting.
-
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index b2024db225a9..6c684d8c8816 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -115,6 +115,7 @@ config ARM64
->  	select SPARSE_IRQ
->  	select SYSCTL_EXCEPTION_TRACE
->  	select THREAD_INFO_IN_TASK
-> +	select PCI_GENERIC_SETUP
-
-Here too.
-
-> diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
-> index 4583c0320059..6679af85a882 100644
-> --- a/arch/tile/Kconfig
-> +++ b/arch/tile/Kconfig
-> @@ -33,6 +33,7 @@ config TILE
->  	select USER_STACKTRACE_SUPPORT
->  	select USE_PMC if PERF_EVENTS
->  	select VIRT_TO_BUS
-> +	select PCI_GENERIC_SETUP
-
-and here
-
-Otherwise
-Reviewed-by: James Hogan <james.hogan@imgtec.com>
-
-Cheers
-James
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170623/def3908f/attachment.sig>
+Whoops -- I guess I was just on autopilot after seeing the first one not be
+alphabetized.  A fixed patch is in a threaded message.
