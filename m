@@ -1,39 +1,64 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Fri, 23 Jun 2017 14:42:07 +0200
-Subject: [PATCH][spi-next] spi: stm32: fix range limit checks on div
-In-Reply-To: <20170622154142.22481-1-colin.king@canonical.com>
-References: <20170622154142.22481-1-colin.king@canonical.com>
-Message-ID: <1c40b653-2b52-f631-5f54-57e68270d141@st.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 23 Jun 2017 14:45:48 +0200
+Subject: [PATCH] ARM64: dts: marvell: armada37xx: Fix timer interrupt
+ specifiers
+In-Reply-To: <20170621214508.7810-1-marc.zyngier@arm.com> (Marc Zyngier's
+ message of "Wed, 21 Jun 2017 22:45:08 +0100")
+References: <20170621214508.7810-1-marc.zyngier@arm.com>
+Message-ID: <871sqazxc3.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
+ 
+ On mer., juin 21 2017, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-On 06/22/2017 05:41 PM, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> Currently the check for range limits on div is incorrect and will
-> never return -EINVAL. Fix this by replacing && with ||
-> 
-> Detected by CoverityScan, CID#1446580 ("Structurally dead code")
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> Contrary to popular belief, PPIs connected to a GICv3 to not have
+> an affinity field similar to that of GICv2. That is consistent
+> with the fact that GICv3 is designed to accomodate thousands of
+> CPUs, and fitting them as a bitmap in a byte is... difficult.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Applied on mvebu/fixes
+
+Thanks,
+
+Gregory
+
 > ---
->   drivers/spi/spi-stm32.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
-> index 0553f61ab3b7..b75909e7b117 100644
-> --- a/drivers/spi/spi-stm32.c
-> +++ b/drivers/spi/spi-stm32.c
-> @@ -262,7 +262,7 @@ static int stm32_spi_prepare_mbr(struct stm32_spi *spi, u32 speed_hz)
->   	 * no need to check it there.
->   	 * However, we need to ensure the following calculations.
->   	 */
-> -	if ((div < SPI_MBR_DIV_MIN) &&
-> +	if ((div < SPI_MBR_DIV_MIN) ||
->   	    (div > SPI_MBR_DIV_MAX))
->   		return -EINVAL;
->   
-> 
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 12 ++++--------
+>  1 file changed, 4 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index 4d495ec39202..bc179efb10ef 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -75,14 +75,10 @@
+>  
+>  	timer {
+>  		compatible = "arm,armv8-timer";
+> -		interrupts = <GIC_PPI 13
+> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
+> -			     <GIC_PPI 14
+> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
+> -			     <GIC_PPI 11
+> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
+> -			     <GIC_PPI 10
+> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+> +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
+>  	};
+>  
+>  	soc {
+> -- 
+> 2.11.0
+>
 
-Reviewed-by: Amelie Delaunay <amelie.delaunay@st.com>
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
