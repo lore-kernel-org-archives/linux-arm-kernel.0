@@ -1,46 +1,57 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 23 Jun 2017 10:28:15 +0200
-Subject: [PATCH v3.1 0/3] soc: amlogic: Add Amlogic SoC Information driver
-Message-ID: <1498206498-19139-1-git-send-email-narmstrong@baylibre.com>
+Date: Fri, 23 Jun 2017 10:28:16 +0200
+Subject: [PATCH v3.1 1/3] dt-bindings: arm: amlogic: Add SoC information
+ bindings
+In-Reply-To: <1498206498-19139-1-git-send-email-narmstrong@baylibre.com>
+References: <1498206498-19139-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1498206498-19139-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amlogic SoCs have a SoC information register for SoC type, package type and
-revision information.
-This patchset adds support for this register decoding and exposing with the
-SoC bus infrastructure, with dt-bindings and DT node.
+Add bindings for the SoC information register of the Amlogic SoCs.
 
-Changes since v3.1 at [3] :
- - Prepend amlogic to has-chip-id property
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ Documentation/devicetree/bindings/arm/amlogic.txt | 29 +++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-Changes since v2 at [2] :
- - Removed subnodes of socinfo node
- - Checks has-chip-id property and if node is enabled
-
-Changes since v1 at [1] :
- - Switch DT representation to use regmap ans sub-node of a simple-mfd node
- - Updated DT, bindings and driver accordingly
-
-[1] http://lkml.kernel.org/r/1490950079-10145-1-git-send-email-narmstrong at baylibre.com
-[2] http://lkml.kernel.org/r/1496742340-10307-1-git-send-email-narmstrong at baylibre.com
-[3] http://lkml.kernel.org/r/1497441946-24379-1-git-send-email-narmstrong at baylibre.com
-
-Neil Armstrong (3):
-  dt-bindings: arm: amlogic: Add SoC information bindings
-  ARM64: dts: meson-gx: Add SoC info register
-  soc: Add Amlogic SoC Information driver
-
- Documentation/devicetree/bindings/arm/amlogic.txt |  29 ++++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi         |   6 +
- drivers/soc/Kconfig                               |   1 +
- drivers/soc/Makefile                              |   1 +
- drivers/soc/amlogic/Kconfig                       |  12 ++
- drivers/soc/amlogic/Makefile                      |   1 +
- drivers/soc/amlogic/meson-gx-socinfo.c            | 177 ++++++++++++++++++++++
- 7 files changed, 227 insertions(+)
- create mode 100644 drivers/soc/amlogic/Kconfig
- create mode 100644 drivers/soc/amlogic/Makefile
- create mode 100644 drivers/soc/amlogic/meson-gx-socinfo.c
-
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index 5c01e65..eecb4084 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -60,3 +60,32 @@ Board compatible values (alphabetically, grouped by SoC):
+   - "amlogic,q201" (Meson gxm s912)
+   - "kingnovel,r-box-pro" (Meson gxm S912)
+   - "nexbox,a1" (Meson gxm s912)
++
++Amlogic Meson Firmware registers Interface
++------------------------------------------
++
++The Meson SoCs have a register bank with status and data shared with the
++secure firmware.
++
++Required properties:
++ - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon"
++
++Properties should indentify components of this register interface :
++
++Meson GX SoC Information
++------------------------
++A firmware register encodes the SoC type, package and revision information on
++the Meson GX SoCs.
++If present, the following property should be added :
++
++Optional properties:
++  - amlogic,has-chip-id: If present, the interface gives the current SoC version.
++
++Example
++-------
++
++ao-secure at 140 {
++	compatible = "amlogic,meson-gx-ao-secure", "syscon";
++	reg = <0x0 0x140 0x0 0x140>;
++	amlogic,has-chip-id;
++};
 -- 
 1.9.1
