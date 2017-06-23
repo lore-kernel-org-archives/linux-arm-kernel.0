@@ -1,48 +1,63 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sat, 24 Jun 2017 01:28:52 +0300
-Subject: [PATCH 18/20] arm64: ptrace: handle ptrace_request differently
- for aarch32 and ilp32
-In-Reply-To: <594D49E9.7090900@arm.com>
-References: <20170604120009.342-1-ynorov@caviumnetworks.com>
- <20170604120009.342-19-ynorov@caviumnetworks.com>
- <594D49E9.7090900@arm.com>
-Message-ID: <20170623222852.hao3gi7ppwexu7wq@yury-thinkpad>
+From: shuah@kernel.org (Shuah Khan)
+Date: Fri, 23 Jun 2017 16:34:18 -0600
+Subject: [PATCH v2 0/3] rtc: make st-lpc robust against y2038/2106 bug
+In-Reply-To: <20170623220907.kxhkwkl6gt7bho5r@piout.net>
+References: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
+ <47b45b70-91da-ce41-535d-89d92f380274@kernel.org>
+ <20170623220907.kxhkwkl6gt7bho5r@piout.net>
+Message-ID: <cea926b2-5d84-18a9-9713-52d1495d550f@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 06:03:37PM +0100, James Morse wrote:
-> Hi Yury,
-> 
-> On 04/06/17 13:00, Yury Norov wrote:
-> > ILP32 has context-related structures different from both aarch32 and
-> > aarch64/lp64. In this patch compat_arch_ptrace() renamed to
-> > compat_a32_ptrace(), and compat_arch_ptrace() only makes choice between
-> > compat_a32_ptrace() and new compat_ilp32_ptrace() handler.
-> > 
-> > compat_ilp32_ptrace() calls generic compat_ptrace_request() for all
-> > requests except PTRACE_GETSIGMASK and PTRACE_SETSIGMASK, which need
-> > special handling.
-> 
-> Can you elaborate on this special handling?
-> 
-> How come we don't need to wrap PTRACE_{G,S}ETSIGMASK for aarch32 compat?
-> >From kernel/signal32.c that uses compat_sigset_t too.
-> 
-> It looks like aarch64, ilp32 and aarch32 all use the same size sigset_t,
-> so doesn't compat_ptrace_request() already do everything we need?
-> 
-> ...
-> 
-> Is this fixing an endian problem? If so, can we document it as such. Do we
-> already have the same bug for aarch32 compat?
+Hi Alexandre,
 
-Originally, the problem was found by Zhou Chengming: https://lkml.org/lkml/2016/6/27/18
-But I think you right, this is the fix for endian.
+On 06/23/2017 04:09 PM, Alexandre Belloni wrote:
+> On 23/06/2017 at 13:40:41 -0600, Shuah Khan wrote:
+>> On 06/19/2017 03:36 AM, Benjamin Gaignard wrote:
+>>> On 32bits platforms "struct timeval" or "time_t" are using u32 to code the
+>>> date, this cause tools like "date" or "hwclock" failed even before setting
+>>> the RTC device if the date is superior to year 2038 (or 2106).
+>>>
+>>> To avoid this problem I add one RTC test file which directly use RTC ioctl
+>>> to set and read RTC time and alarm values.
+>>> rtctest_setdate allow to set any date/time given in the command line.
+>>>
+>>> On this version 2 I add check of problematics years in rtctest like suggest
+>>> by Alexandre.
+>>>
+>>> Finally that had allowed me to test and fix rtc-st-lpc driver.
+>>>
+>>> Benjamin Gaignard (3):
+>>>   tools: timer: add rtctest_setdate
+>>>   tool: timer: rtctest add check for problematic dates
+>>>   rtc: st-lpc: make it robust against y2038/2106 bug
+>>>
+>>>  drivers/rtc/rtc-st-lpc.c                         |  19 ++--
+>>>  tools/testing/selftests/timers/Makefile          |   2 +-
+>>>  tools/testing/selftests/timers/rtctest.c         | 121 ++++++++++++++++++++++-
+>>>  tools/testing/selftests/timers/rtctest_setdate.c |  86 ++++++++++++++++
+>>>  4 files changed, 212 insertions(+), 16 deletions(-)
+>>>  create mode 100644 tools/testing/selftests/timers/rtctest_setdate.c
+>>>
+>>
+>> Hi Thomas/John,
+>>
+>> I can take the first two patches in this series through linux-kselftest
+>> with your or John's Ack. Please review and let me know one way or the
+>> other.
+>>> 
+> Well, I'm the maintainer for rtctest.c and I'll make sure to also be the
+> one for rtctest_setdate.c> 
+>> The third one is a rtc driver patch. Please let me know how do you want
+>> to handle this series soon we can get this into 4.13-rc1.
+>>
+> 
+> I'll take the three patches but I still have comment I didn't have time
+> to give yet.
+> 
+> 
 
-It lookd like aarch32 is buggy, but IIUC to confirm it, the BE arm64
-machine is needed. I use qemu and AFAIR it has no BE support.
+Okay. I will drop this off my radar then :)
 
-Zhou, can you test it on your machine and if the bug will be reproduced,
-send the patch for aarch32?
-
-Yury
+thanks,
+-- Shuah
