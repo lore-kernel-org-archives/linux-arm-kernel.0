@@ -1,103 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jun 2017 18:02:06 +0100
-Subject: [PATCHv2] arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
-Message-ID: <1498237326-24727-1-git-send-email-mark.rutland@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 23 Jun 2017 18:03:37 +0100
+Subject: [PATCH 18/20] arm64: ptrace: handle ptrace_request differently
+ for aarch32 and ilp32
+In-Reply-To: <20170604120009.342-19-ynorov@caviumnetworks.com>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-19-ynorov@caviumnetworks.com>
+Message-ID: <594D49E9.7090900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a kernel is built without CONFIG_ARM64_MODULE_PLTS, we don't
-generate the expected branch instruction in ftrace_make_nop(). This
-means we pass zero (rather than a valid branch) to ftrace_modify_code()
-as the expected instruction to validate. This causes us to return
--EINVAL to the core ftrace code for a valid case, resulting in a splat
-at boot time.
+Hi Yury,
 
-This was an unintended effect of commit:
+On 04/06/17 13:00, Yury Norov wrote:
+> ILP32 has context-related structures different from both aarch32 and
+> aarch64/lp64. In this patch compat_arch_ptrace() renamed to
+> compat_a32_ptrace(), and compat_arch_ptrace() only makes choice between
+> compat_a32_ptrace() and new compat_ilp32_ptrace() handler.
+> 
+> compat_ilp32_ptrace() calls generic compat_ptrace_request() for all
+> requests except PTRACE_GETSIGMASK and PTRACE_SETSIGMASK, which need
+> special handling.
 
-  687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
+Can you elaborate on this special handling?
 
-... which incorrectly moved the generation of the branch instruction
-into the ifdef for CONFIG_ARM64_MODULE_PLTS.
+How come we don't need to wrap PTRACE_{G,S}ETSIGMASK for aarch32 compat?
+>From kernel/signal32.c that uses compat_sigset_t too.
 
-This patch fixes the issue by moving the ifdef inside of the relevant
-if-else case, and always checking that the branch is in range,
-regardless of CONFIG_ARM64_MODULE_PLTS. This ensures that we generate
-the expected branch instruction, and also improves our sanity checks.
+It looks like aarch64, ilp32 and aarch32 all use the same size sigset_t,
+so doesn't compat_ptrace_request() already do everything we need?
 
-For consistency, both ftrace_make_nop() and ftrace_make_call() are
-updated with this pattern.
+...
 
-Fixes: 687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/ftrace.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+Is this fixing an endian problem? If so, can we document it as such. Do we
+already have the same bug for aarch32 compat?
 
-Since v1:
-* Kill redundant whitespace
-* Add Ard's Reviewed-by
 
-diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-index 401aa27..c13b1fc 100644
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -72,11 +72,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- {
- 	unsigned long pc = rec->ip;
- 	u32 old, new;
--
--#ifdef CONFIG_ARM64_MODULE_PLTS
- 	long offset = (long)pc - (long)addr;
- 
- 	if (offset < -SZ_128M || offset >= SZ_128M) {
-+#ifdef CONFIG_ARM64_MODULE_PLTS
- 		unsigned long *trampoline;
- 		struct module *mod;
- 
-@@ -121,8 +120,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 			smp_wmb();
- 		}
- 		addr = (unsigned long)&trampoline[1];
--	}
-+#else /* CONFIG_ARM64_MODULE_PLTS */
-+		return -EINVAL;
- #endif /* CONFIG_ARM64_MODULE_PLTS */
-+	}
- 
- 	old = aarch64_insn_gen_nop();
- 	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
-@@ -139,11 +140,10 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
- 	unsigned long pc = rec->ip;
- 	bool validate = true;
- 	u32 old = 0, new;
--
--#ifdef CONFIG_ARM64_MODULE_PLTS
- 	long offset = (long)pc - (long)addr;
- 
- 	if (offset < -SZ_128M || offset >= SZ_128M) {
-+#ifdef CONFIG_ARM64_MODULE_PLTS
- 		u32 replaced;
- 
- 		/*
-@@ -176,11 +176,13 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
- 			return -EINVAL;
- 
- 		validate = false;
-+#else /* CONFIG_ARM64_MODULE_PLTS */
-+		return -EINVAL;
-+#endif /* CONFIG_ARM64_MODULE_PLTS */
- 	} else {
- 		old = aarch64_insn_gen_branch_imm(pc, addr,
- 						  AARCH64_INSN_BRANCH_LINK);
- 	}
--#endif /* CONFIG_ARM64_MODULE_PLTS */
- 
- 	new = aarch64_insn_gen_nop();
- 
--- 
-1.9.1
+Thanks,
+
+James
