@@ -1,76 +1,193 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 23 Jun 2017 10:43:56 +0100
-Subject: next-20170621 build: 1 failures 7 warnings (next-20170621)
-In-Reply-To: <1498209196.26313.71.camel@mtkswgap22>
-References: <E1dNcMp-0005RN-1w@optimist>
- <20170621100440.vcaxagg4yjca2cv4@sirena.org.uk>
- <1498209196.26313.71.camel@mtkswgap22>
-Message-ID: <20170623094356.GA5337@red-moon>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 23 Jun 2017 10:48:59 +0100
+Subject: [PATCH 2/5] arm64: signal: Refactor sigcontext parsing in
+ rt_sigreturn
+In-Reply-To: <20170622193235.esxidcqcsz2zdpf2@yury-thinkpad>
+References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
+ <1497535442-11586-3-git-send-email-Dave.Martin@arm.com>
+ <20170622193235.esxidcqcsz2zdpf2@yury-thinkpad>
+Message-ID: <20170623094857.GF8543@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 05:13:16PM +0800, Ryder Lee wrote:
-> Sorry for late reply, 
+On Thu, Jun 22, 2017 at 10:32:35PM +0300, Yury Norov wrote:
+> Hi Dave,
 > 
-> +Lorenzo
+> It seems that your series conflicts with one of patches of my ILP32:
+> https://patchwork.kernel.org/patch/9599015/
 > 
-> On Wed, 2017-06-21 at 18:04 +0800, Mark Brown wrote:
-> > On Wed, Jun 21, 2017 at 10:56:07AM +0100, Build bot for Mark Brown wrote:
+> Now I try to rebase ilp32 on your patchset, and maybe will have some
+> questions. The first question is below. If you have comments on my
+> series - please share it.
+> 
+> Yury
+> 
+> On Thu, Jun 15, 2017 at 03:03:39PM +0100, Dave Martin wrote:
+> > Currently, rt_sigreturn does very limited checking on the
+> > sigcontext coming from userspace.
 > > 
-> > Today's -next fails to build an arm allmodconfig due to:
+> > Future additions to the sigcontext data will increase the potential
+> > for surprises.  Also, it is not clear whether the sigcontext
+> > extension records are supposed to occur in a particular order.
 > > 
-> > > 	arm-allmodconfig
-> > > ../drivers/pci/host/pcie-mediatek.c:485:8: error: implicit declaration of function 'pci_register_host_bridge' [-Werror=implicit-function-declaration]
+> > To allow the parsing code to be extended more easily, this patch
+> > factors out the sigcontext parsing into a separate function, and
+> > adds extra checks to validate the well-formedness of the sigcontext
+> > structure.
 > > 
-> > caused by eaf3023b0498a (PCI: mediatek: Add MediaTek PCIe host
-> > controller support).
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > 
+> > +static int parse_user_sigframe(struct user_ctxs *user,
+> > +			       struct rt_sigframe __user *sf)
 > 
-> Hi Lorenzo,
+> You parse sigcontext here in fact. At least you take the pointer to 
+
+That's a fair point...
+
+> the sigcontext from rt_sigframe, and never refer it anymore. rt_sigframe
+
+...however, the final patch [1] (which has not appeared in next yet,
+I need to chase it) does refer to the sigframe base in order to
+determine when the signal frame exceeds the maximum allowed size.
+
+> is different for lp64 and ilp32, but sigcontext is the same. So if you'll 
+> rename the function to parse_user_sigcontext, and will pass sigcontext
+> to it directly, I will reuse it in ilp32 code.
+
+Because the rt_sigframe pointer is _only_ used as a base address, the
+rt_sigframe definition is not relevant.  So a refactoring along lines of
+[2] might work.
+
+Other things that may need attention are the handling of the extra_data
+pointer [2] (I changed this from void __user * to u64 after Catalin
+pointed out the ABI dependency here), and the way the {fp,lr} frame
+record is handled.
+
+I think the RT_SIGFRAME_FP_POS() logic can probably be simplified/
+dropped: this is now handled through
+rt_sigframe_user_layout.next_frame.  ILP32 would need its own version
+of sigframe_size(), or that function should test for current being
+ILP32, but the ILP32 equivalent of get_sigframe() would probably look
+very similar to the native version after my patches.
+
+(Note that I've not understood the proposed ILP32 signal changes in
+detail at this point.)
+
+Cheers
+---Dave
+
+[1] [PATCH] arm64: signal: Allow expansion of the signal frame
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/514699.html
+
+[2] [RFC PATCH] arm64: signal: Make parse_user_sigframe() independent of rt_sigframe layout
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/515361.html
+
 > 
-> I picked up your changes and had some modifications like what you did
-> for other platforms:
+> > +{
+> > +	struct sigcontext __user *const sc = &sf->uc.uc_mcontext;
+> > +	struct _aarch64_ctx __user *head =
+> > +		(struct _aarch64_ctx __user *)&sc->__reserved;
+> > +	size_t offset = 0;
+> > +
+> > +	user->fpsimd = NULL;
+> > +
+> > +	while (1) {
+> > +		int err;
+> > +		u32 magic, size;
+> > +
+> > +		head = (struct _aarch64_ctx __user *)&sc->__reserved[offset];
+> > +		if (!IS_ALIGNED((unsigned long)head, 16))
+> > +			goto invalid;
+> > +
+> > +		err = 0;
+> > +		__get_user_error(magic, &head->magic, err);
+> > +		__get_user_error(size, &head->size, err);
+> > +		if (err)
+> > +			return err;
+> > +
+> > +		switch (magic) {
+> > +		case 0:
+> > +			if (size)
+> > +				goto invalid;
+> > +
+> > +			goto done;
+> > +
+> > +		case FPSIMD_MAGIC:
+> > +			if (user->fpsimd)
+> > +				goto invalid;
+> > +
+> > +			if (offset > sizeof(sc->__reserved) -
+> > +					sizeof(*user->fpsimd) ||
+> > +			    size < sizeof(*user->fpsimd))
+> > +				goto invalid;
+> > +
+> > +			user->fpsimd = (struct fpsimd_context __user *)head;
+> > +			break;
+> > +
+> > +		case ESR_MAGIC:
+> > +			/* ignore */
+> > +			break;
+> > +
+> > +		default:
+> > +			goto invalid;
+> > +		}
+> > +
+> > +		if (size < sizeof(*head))
+> > +			goto invalid;
+> > +
+> > +		if (size > sizeof(sc->__reserved) - (sizeof(*head) + offset))
+> > +			goto invalid;
+> > +
+> > +		offset += size;
+> > +	}
+> > +
+> > +done:
+> > +	if (!user->fpsimd)
+> > +		goto invalid;
+> > +
+> > +	return 0;
+> > +
+> > +invalid:
+> > +	return -EINVAL;
+> > +}
+> > +
+> >  static int restore_sigframe(struct pt_regs *regs,
+> >  			    struct rt_sigframe __user *sf)
+> >  {
+> >  	sigset_t set;
+> >  	int i, err;
+> > -	void *aux = sf->uc.uc_mcontext.__reserved;
+> > +	struct user_ctxs user;
+> >  
+> >  	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
+> >  	if (err == 0)
+> > @@ -125,12 +200,11 @@ static int restore_sigframe(struct pt_regs *regs,
+> >  	regs->syscallno = ~0UL;
+> >  
+> >  	err |= !valid_user_regs(&regs->user_regs, current);
+> > +	if (err == 0)
+> > +		err = parse_user_sigframe(&user, sf);
+> >  
+> > -	if (err == 0) {
+> > -		struct fpsimd_context *fpsimd_ctx =
+> > -			container_of(aux, struct fpsimd_context, head);
+> > -		err |= restore_fpsimd_context(fpsimd_ctx);
+> > -	}
+> > +	if (err == 0)
+> > +		err = restore_fpsimd_context(user.fpsimd);
+> >  
+> >  	return err;
+> >  }
+> > -- 
+> > 2.1.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> 9f8e3a5 PCI: Add devm_pci_alloc_host_bridge() interface 
-> 35a1a84 PCI: Add pci_free_host_bridge() interface
-> e33aafd PCI: Initialize bridge release function at bridge allocation
-> 
-> ...and it looks Okay.
-> 
-> I have also noticed that you continue sending patches for other
-> platforms but I have not yet had a look in detail. I'm quite busy these
-> days and don't have time to dig it, hence it is becoming a little
-> unmanageable for me.
-
-If it is unmanageable you don't add yourself as a maintainer of that
-PCI host bridge driver, you know, we are all busy.
-
-Your driver in the PCI tree as it stands contains already two bugs:
-
-1) It leaks memory on the probe failure path
-2) pci_fixup_irqs() is broken on configurations with multiple host
-   bridges
-
-And we keep copy'n'pasting that code.
-
-> Did you have a chance to send the same patches for MediaTek?  I
-> appreciate that and I can help to test it on our platforms.
-
-No, how could I have sent them ? It is not upstream and it is a separate
-branch in the PCI tree. As I mentioned in another thread it is probably
-best to drop my pci_fixup_irqs() removal patches since it is impossible
-to work on them without a stable branch to apply them against, in the
-interim we keep adding PCI host bridges that use the wrong interfaces by
-copy'n'pasting code that I have been trying to remove.
-
-I think the best solution is to repost my series when v4.13-rc1 appears
-and ask all new crop of host bridge drivers to rebase against it.
-
-I won't be able to follow mailing lists till end of next week, which
-is bad timing.
-
-Bjorn, is the plan above ok ? Please let me know how you want to
-proceed.
-
-Thanks,
-Lorenzo
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
