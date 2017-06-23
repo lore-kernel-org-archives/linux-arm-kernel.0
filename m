@@ -1,47 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Jun 2017 17:08:29 +0100
-Subject: [PATCH 1/2] arm64: dts: marvell: fix USB3 regulator definition
- on MacchiatoBin
-In-Reply-To: <20170623154014.20573-1-thomas.petazzoni@free-electrons.com>
-References: <20170623154014.20573-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170623160829.GU4902@n2100.armlinux.org.uk>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 23 Jun 2017 18:15:14 +0200
+Subject: [RFC PATCH 0/7] Hummingboard2 improvements
+In-Reply-To: <20170408143607.15928-1-dev@lynxeye.de>
+References: <20170408143607.15928-1-dev@lynxeye.de>
+Message-ID: <1498234514.24585.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 05:40:13PM +0200, Thomas Petazzoni wrote:
-> Due to the lack of GPIO support, the USB3 regulator definition was
-> left unfinished in the MacchiatoBin DT description. Now that GPIO
-> support is available, this commit adjusts the Device Tree to properly
-> describe the USB3 regulator.
+Hi Russell,
+
+it seems this is making no progress. If you don't mind I'm going to pick
+up the patches from you hb2 branch and submit the whole series to Shawn,
+so we can finally get things merged. Are you okay with this?
+
+Regards,
+Lucas
+
+Am Samstag, den 08.04.2017, 16:36 +0200 schrieb Lucas Stach:
+> Hi Russell,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-
-If you weren't soo keen with your NIH patches, then you wouldn't be
-making a mistake here...
-
-Now, from what you've said on IRC, I know that you're more than happy
-to fetch my git tree and test it on your board, and I've already stated
-in a previous thread that I'm happy for people to take the DTS patches
-I have in that branch, but still you persist in creating your own (and
-in this case broken) patches.
-
-While it _may_ work for you, it is not correct to the binding doc.
-
-Now, you could have taken these three patches from my tree (which I
-know you have from what you said on IRC):
-
-  arm64: dts: marvell: mcbin: add GPIO
-  arm64: dts: marvell: mcbin: add pinctrl nodes
-  arm64: dts: marvell: mcbin: add gpio binding include file
-
-which apply cleanly on top of arm-soc, and tested them with your gpio
-and pinmux work.  In fact, these three patches are solving the exact
-problem you have here.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> the following patches are on top your HB2 branch. They mostly change things
+> that are different/redundant on mainline and allow me to drop my version of
+> the HB2 DT, as they are mostly aligned now.
+> 
+> Feel free to squash those patches down, when you send out the HB2 DT. You
+> may also consider this a Tested-by for the patches from Jon and you that
+> are currently in your HB2 branch.
+> 
+> Regards,
+> Lucas
+> 
+> Lucas Stach (7):
+>   ARM: dts: imx6*-hummingboard2: fix formatting
+>   ARM: dts: imx6*-hummingboard2: add SGTL5000 VDDD supply
+>   ARM: dts: imx6*-hummingboard2: remove LDB node
+>   ARM: dts: imx6*-hummingboard2: fix PCIe reset polarity
+>   ARM: dts: imx6*-hummingboard2: remove non-mainline property from RTC
+>   ARM: dts: imx6*-hummingboard2: remove redundant PWM disables
+>   ARM: dts: imx6*-hummingboard2: rework regulators
+> 
+>  arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 61 ++++++++++------------------
+>  1 file changed, 21 insertions(+), 40 deletions(-)
+> 
