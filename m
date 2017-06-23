@@ -1,82 +1,39 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 23 Jun 2017 22:43:43 +0530
-Subject: [PATCH v3 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <CAFpQJXW2=_8pZr=yB7sFn1V2gP__b_vuMiNyr2ELkA3WEqJFxA@mail.gmail.com>
-References: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <ee7fedb0-a981-1f06-06fa-8e76ef502fa2@hisilicon.com>
- <CAFpQJXW2=_8pZr=yB7sFn1V2gP__b_vuMiNyr2ELkA3WEqJFxA@mail.gmail.com>
-Message-ID: <CAFpQJXUgCwe9GevOJ-H=zK-BUaE4Sy9u956_yfSFbxgYB7fMnQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Jun 2017 18:18:30 +0100
+Subject: Applied "spi: atmel: fix corrupted data issue on SAM9 family
+ SoCs" to the spi tree
+In-Reply-To: <E1dORFW-00037E-N8@debutante>
+References: <d174da00f48503eba84dd0f4068749b968628bbb.1498231873.git.cyrille.pitchen@microchip.com>
+ <E1dORFW-00037E-N8@debutante>
+Message-ID: <20170623171830.GV4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark/Will,
+On Fri, Jun 23, 2017 at 05:15:58PM +0100, Mark Brown wrote:
+> +#ifdef CONFIG_SOC_SAM_V4_V5
+> +	/*
+> +	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
+> +	 * since this later function tries to map buffers with dma_map_sg()
+> +	 * even if they have not been allocated inside DMA-safe areas.
+> +	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
+> +	 * those ARM cores, the data cache follows the PIPT model.
+> +	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
+> +	 * In case of PIPT caches, there cannot be cache aliases.
+> +	 * However on ARM9 cores, the data cache follows the VIVT model, hence
+> +	 * the cache aliases issue can occur when buffers are allocated from
+> +	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
+> +	 * not taken into account or at least not handled completely (cache
+> +	 * lines of aliases are not invalidated).
 
-any comments on this series?
-this patch is required to use implementation defined perf events,
-which are more refined events on ThunderX2.
+There is a solution to this - code (iow, callers of functions that perform
+IO) are expected to use flush_kernel_vmap_range() and
+invalidate_kernel_vmap_range() as documented in Documentation/cachetlb.txt
+to ensure that their "special" views are properly handled.
 
+These are no-ops for PIPT caches, but aliasing caches have to implement
+them.
 
-On Mon, Jun 12, 2017 at 3:51 PM, Ganapatrao Kulkarni
-<gpkulkarni@gmail.com> wrote:
-> Hi Shaokun,
->
-> On Mon, Jun 12, 2017 at 3:19 PM, Zhangshaokun
-> <zhangshaokun@hisilicon.com> wrote:
->> Hi Ganapat
->>
->> This patchset has been tested on Hisilicon's hip08 board for implementation defined PMU events:
->> (1)perf list command is ok;
->> (2)perf stat command -e event_name:
->> When event number is less than 0x3ff, it is ok;
->> if event number is more than 0x3ff, it should be added this patch:
->> https://www.spinics.net/lists/arm-kernel/msg583222.html
->
-> thanks for testing!
->
->>
->> Thanks.
->> Shaokun
->>
->> On 2017/5/16 16:33, Ganapatrao Kulkarni wrote:
->>> Extending json/jevent framework for parsing arm64 event files.
->>> Adding jevents for ThunderX2 implementation defined PMU events.
->>>
->>> v3:
->>>    - Addressed comments from Will Deacon and Jayachandran C.
->>>    - Rebased to 4.12-rc1
->>>
->>> v2:
->>>    - Updated as per Mark Rutland's suggestions.
->>>    - Added provision for get_cpuid_str to get cpu id string
->>>      from associated cpus of pmu core device.
->>>
->>> v1: Initial patchset.
->>>
->>> Ganapatrao Kulkarni (4):
->>>   perf utils: passing pmu as a parameter to function get_cpuid_str
->>>   perf tools arm64: Add support for get_cpuid_str function.
->>>   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
->>>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
->>>     core events
->>>
->>>  tools/perf/arch/arm64/util/Build                   |  1 +
->>>  tools/perf/arch/arm64/util/header.c                | 59 ++++++++++++++++++++
->>>  tools/perf/arch/powerpc/util/header.c              |  2 +-
->>>  tools/perf/arch/x86/util/header.c                  |  2 +-
->>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->>>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->>>  tools/perf/util/header.h                           |  3 +-
->>>  tools/perf/util/pmu.c                              | 53 +++++++++++++++---
->>>  8 files changed, 186 insertions(+), 11 deletions(-)
->>>  create mode 100644 tools/perf/arch/arm64/util/header.c
->>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->>>
->>
->
-> thanks
-> Ganapat
-
-thanks
-Ganapat
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
