@@ -1,42 +1,55 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Fri, 23 Jun 2017 17:01:42 +1000
-Subject: [PATCH 3/4] powerpc: Reduce ELF_ET_DYN_BASE
-In-Reply-To: <1498154792-49952-4-git-send-email-keescook@chromium.org>
-References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
- <1498154792-49952-4-git-send-email-keescook@chromium.org>
-Message-ID: <87podvp4q1.fsf@concordia.ellerman.id.au>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Fri, 23 Jun 2017 07:26:18 +0000
+Subject: [PATCH 01/14] staging: fsl-mc: drop macros with possible side
+ effects
+In-Reply-To: <1498147673.24295.6.camel@perches.com>
+References: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
+ <20170622133600.31694-2-laurentiu.tudor@nxp.com>
+ <1498147673.24295.6.camel@perches.com>
+Message-ID: <594CC299.6010308@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kees Cook <keescook@chromium.org> writes:
+Hi Joe,
 
-> Now that explicitly executed loaders are loaded in the mmap region,
-> position PIE binaries lower in the address space to avoid possible
-> collisions with mmap or stack regions. For 64-bit, align to 4GB to
-> allow runtimes to use the entire 32-bit address space for 32-bit
-> pointers.
+On 06/22/2017 07:07 PM, Joe Perches wrote:
+> On Thu, 2017-06-22 at 16:35 +0300, laurentiu.tudor at nxp.com wrote:
+>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>
+>> Several macros were triggering this checkpatch.pl warning:
+>>    "Macro argument reuse '$arg' - possible side-effects?"
+>> Fix the warning by turning them into real functions.
+>
+> good idea and
+>
+>> diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
+> []
+>> +static bool fsl_mc_device_match(struct fsl_mc_device *mc_dev,
+>> +				struct dprc_obj_desc *obj_desc)
+>> +{
+>> +	return !strcmp(mc_dev->obj_desc.type, obj_desc->type) &&
+>> +		mc_dev->obj_desc.id == obj_desc->id;
+>> +}
+>
+> I'd reverse the test order and do the strcmp after the comparison
+>
+> 	return mc_dev->obj_desc.id == obj_desc->id &&
+> 	       !strcmp(mc_dev->obj_desc.type, obj_desc->type);
+>
+> []
+>
+>> +static bool __must_check fsl_mc_is_allocatable(const char *obj_type)
+>> +{
+>> +	return strcmp(obj_type, "dpbp") == 0 ||
+>> +	       strcmp(obj_type, "dpmcp") == 0 ||
+>> +	       strcmp(obj_type, "dpcon") == 0;
+>> +}
+>
+> please be consistent in using either == 0 or !
+> when using strcmp
+>
 
-The change log and subject are a bit out of whack with the actual patch
-because previously we used 512MB.
+Thanks for the suggestions. Will take care of them in the next round.
 
-How about?
-
-  powerpc: Move ELF_ET_DYN_BASE to 4GB / 4MB
-  
-  Now that explicitly executed loaders are loaded in the mmap region,
-  we have more freedom to decide where we position PIE binaries in the
-  address space to avoid possible collisions with mmap or stack regions.
-  
-  For 64-bit, align to 4GB to allow runtimes to use the entire 32-bit
-  address space for 32-bit pointers. On 32-bit use 4MB.
-
-
-Is there any particular reasoning behind the 4MB value on 32-bit?
-
-
-I gave this a quick spin and it booted OK on all my test boxes, which
-covers 64-bit/32-bit kernel and userspace. So seems to work!
-
-Acked-by: Michael Ellerman <mpe@ellerman.id.au>
-
-cheers
+---
+Best Regards, Laurentiu
