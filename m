@@ -1,125 +1,91 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 Jun 2017 14:38:31 +0000
-Subject: [PATCH] arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
-In-Reply-To: <1498226261-21204-1-git-send-email-mark.rutland@arm.com>
-References: <1498226261-21204-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu-hyWyc3rbuKpOaieqKf=y3mga=DkVviagEBwEFrBgrzg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Jun 2017 16:38:35 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.13 (#2)
+In-Reply-To: <87shiqydwj.fsf@free-electrons.com>
+References: <877f041a4p.fsf@free-electrons.com>
+ <CAK8P3a3UuLFVxZv1o1+gKSafsGgV=vgWRM_yjnT_E4fAUPZx8g@mail.gmail.com>
+ <87wp82yeng.fsf@free-electrons.com>
+ <CAK8P3a1awsqu5eN4eMPMmiZ-JXn64wA+y-LUR0EdHjYiCRK+Bg@mail.gmail.com>
+ <87shiqydwj.fsf@free-electrons.com>
+Message-ID: <CAK8P3a3XTz_DkUsRumQz2OB_qEE2mxUFagfq2sGpAHuFDCiXGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 June 2017 at 13:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> When a kernel is built without CONFIG_ARM64_MODULE_PLTS, we don't
-> generate the expected branch instruction in ftrace_make_nop(). This
-> means we pass zero (rather than a valid branch) to ftrace_modify_code()
-> as the expected instruction to validate. This causes us to return
-> -EINVAL to the core ftrace code for a valid case, resulting in a splat
-> at boot time.
+On Fri, Jun 23, 2017 at 4:30 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Arnd,
 >
-> This was an unintended effect of commit:
+>  On ven., juin 23 2017, Arnd Bergmann <arnd@arndb.de> wrote:
 >
->   687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
+>> On Fri, Jun 23, 2017 at 4:14 PM, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
+>>> Hi Arnd,
+>>>
+>>>  On ven., juin 23 2017, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>
+>>>
+>>>>
+>>>>
+>>>> Please send a revert for that, and remove the code that tries to
+>>>> parse the dma-mask from DT from that driver!
+>>>
+>>> I see on IRC you agree with Antoine about it the driver part. For the DT
+>>> part do you want a PR with the revert or just the patch alone?
+>>
+>> Either way is fine, or just let me know (here or on IRC) if I should
+>> just revert the patch and add an explanation myself.
 >
-> ... which incorrectly moved the generation of the branch instruction
-> into the ifdef for CONFIG_ARM64_MODULE_PLTS.
->
-> This patch fixes the issue by moving the ifdef inside of the relevant
-> if-else case, and always checking that the branch is in range,
-> regardless of CONFIG_ARM64_MODULE_PLTS. This ensures that we generate
-> the expected branch instruction, and also improves our sanity checks.
->
-> For consistency, both ftrace_make_nop() and ftrace_make_call() are
-> updated with this pattern.
->
-> Fixes: 687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/ftrace.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
->
-> Marc spotted this breakage atop of the arm64 for-next/core branch when ftrace
-> was enabled.
->
-> I've given this fix a go with all combinations of MODULES and RANDOMIZE_BASE,
-> with the ftrace boot time self test, and everything seems happy in all
-> combinations.
->
+> If you can do it, it's better. You know better than me why we should
+> revert this patch! :)
 
-Thanks for cleaning this up. I guess Arnd's original fix didn't suffer
-from this issue.
+No worries, I applied this patch now:
 
-> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> index 401aa27..945f506 100644
-> --- a/arch/arm64/kernel/ftrace.c
-> +++ b/arch/arm64/kernel/ftrace.c
-> @@ -73,10 +73,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
->         unsigned long pc = rec->ip;
->         u32 old, new;
->
-> -#ifdef CONFIG_ARM64_MODULE_PLTS
->         long offset = (long)pc - (long)addr;
->
+>From 2b29ca22ed8a79ef1942b6546ccab5953678028d Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 23 Jun 2017 16:33:43 +0200
+Subject: [PATCH] Revert "arm64: dts: marvell: add dma-mask in crypto nodes for
+ 7k/8k"
 
-Could you drop the newline before the #ifdef as well please?
+As I found by chance while merging another patch, the usage of
+a dma-mask in this DT node is wrong for multiple reasons:
 
->         if (offset < -SZ_128M || offset >= SZ_128M) {
-> +#ifdef CONFIG_ARM64_MODULE_PLTS
->                 unsigned long *trampoline;
->                 struct module *mod;
->
-> @@ -121,8 +121,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
->                         smp_wmb();
->                 }
->                 addr = (unsigned long)&trampoline[1];
-> -       }
-> +#else /* CONFIG_ARM64_MODULE_PLTS */
-> +               return -EINVAL;
->  #endif /* CONFIG_ARM64_MODULE_PLTS */
-> +       }
->
+- dma-masks are a Linux specific concept, not a general
+  hardware feature
+- In DT, we use the "dma-ranges" property to describe how DMA
+  addresses related between devices.
+- The 40-bit mask appears to be completely unnecessary here, as
+  the SoC cannot address that much memory anyway, so simply
+  asking for a 64-bit mask (as supported by the device) should
+  succeed anyway.
 
-This is somewhat redundant, given that the
-aarch64_insn_gen_branch_imm() below will notice and complain if the
-offset exceeds the range of a bl instruction. But I have no objection
-to adding it here too.
+The patch to remove the parsing of the property is getting merged
+through the crypto tree.
 
->         old = aarch64_insn_gen_nop();
->         new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
-> @@ -140,10 +142,10 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->         bool validate = true;
->         u32 old = 0, new;
->
-> -#ifdef CONFIG_ARM64_MODULE_PLTS
->         long offset = (long)pc - (long)addr;
->
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Please drop the newline as well.
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index f611e843094c..726528ce54e9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -270,7 +270,6 @@
+                                interrupt-names = "mem", "ring0", "ring1",
+                                "ring2", "ring3", "eip";
+                                clocks = <&cpm_clk 1 26>;
+-                               dma-mask = <0xff 0xffffffff>;
+                        };
+                };
 
->         if (offset < -SZ_128M || offset >= SZ_128M) {
-> +#ifdef CONFIG_ARM64_MODULE_PLTS
->                 u32 replaced;
->
->                 /*
-> @@ -176,11 +178,13 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->                         return -EINVAL;
->
->                 validate = false;
-> +#else /* CONFIG_ARM64_MODULE_PLTS */
-> +               return -EINVAL;
-> +#endif /* CONFIG_ARM64_MODULE_PLTS */
->         } else {
->                 old = aarch64_insn_gen_branch_imm(pc, addr,
->                                                   AARCH64_INSN_BRANCH_LINK);
->         }
-> -#endif /* CONFIG_ARM64_MODULE_PLTS */
->
->         new = aarch64_insn_gen_nop();
->
-
-With the above addressed:
-
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 84d3bd80eb51..95f8e5f607f6 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -261,7 +261,6 @@
+                                interrupt-names = "mem", "ring0", "ring1",
+                                                  "ring2", "ring3", "eip";
+                                clocks = <&cps_clk 1 26>;
+-                               dma-mask = <0xff 0xffffffff>;
+                                /*
+                                 * The cryptographic engine found on the cp110
+                                 * master is enabled by default at the SoC
