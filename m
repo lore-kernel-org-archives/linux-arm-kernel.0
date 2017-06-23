@@ -1,50 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Jun 2017 14:28:58 +0200
-Subject: [GIT PULL 2/2] SoCFPGA update for v4.13
-In-Reply-To: <CAK8P3a1vZVQ5MZDU+qp62LCLnF8z-9LFH=c7XYj=ZnPUzVMjOA@mail.gmail.com>
-References: <1498059352-9483-1-git-send-email-dinguyen@kernel.org>
- <1498059352-9483-2-git-send-email-dinguyen@kernel.org>
- <CAK8P3a1vZVQ5MZDU+qp62LCLnF8z-9LFH=c7XYj=ZnPUzVMjOA@mail.gmail.com>
-Message-ID: <CACRpkdbCrKo7Uvhdyx+4_hMQrPCYaMMijHpYzEY+2MePjpr73g@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 23 Jun 2017 14:29:50 +0200
+Subject: [PATCH 0/2] Couple of fixes for pinctrl-armada-37xx
+Message-ID: <20170623122952.9871-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 2:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wed, Jun 21, 2017 at 5:35 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
->> Hi Arnd, Kevin, and Olof:
->>
->> Please pull in this SoCFPGA Kconfig update for v4.13.
->
-> I'd like to defer this one until I hear back from the GPIO maintainers:
->
-> With this patch, CONFIG_ARCH_NR_GPIO increases from 1024 to 2048
-> in the ARM defconfig build. Is this ok in terms of runtime overhead?
+Hi,
 
-There is no problem with runtime overhead, only with footprint.
+Ken Ma found few issues in the driver. I wrote the first fix is based
+on his report and the second one was written for U-Boot but as they
+use the same driver it can be applied on linux too.
 
-The array of sizeof(gpio_desc) increases to double.
+thanks,
 
-struct looks like so:
+Gregory
 
-struct gpio_desc {
-        struct gpio_device      *gdev;
-        unsigned long           flags;
-        const char              *label;
-        const char              *name;
-};
+Gregory CLEMENT (1):
+  pinctrl: armada-37xx: Fix number of pin in sdio_sb
 
-Looks like 4x32 bits in most cases, so this means a 4*4*1024 =
-16 KiB footprint increase.
+Ken Ma (1):
+  pinctrl: armada-37xx: Fix uart2 group selection register mask
 
-We have had to allocate this statically because so many playforms still
-use the legacy GPIO API.
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-> If not, are there any alternatives?
-
-Not really, if they have this many GPIOs.
-
-Helping out ridding the kernel of users of the old GPIO global
-numberspace ABI is appreciated though.
-
-Yours,
-Linus Walleij
+-- 
+2.11.0
