@@ -1,22 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 23 Jun 2017 15:05:04 -0500
-Subject: [PATCH V1 1/9] dt-bindings: Add Spreadtrum CCU binding
- documentation
-In-Reply-To: <20170618015855.27738-2-chunyan.zhang@spreadtrum.com>
-References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
- <20170618015855.27738-2-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170623200504.k5pigr32uva7ef3p@rob-hp-laptop>
+Date: Fri, 23 Jun 2017 15:06:05 -0500
+Subject: [PATCH v2 1/3] dt-bindings: add Libre Technology vendor prefix
+In-Reply-To: <20170619090440.27099-2-jbrunet@baylibre.com>
+References: <20170619090440.27099-1-jbrunet@baylibre.com>
+ <20170619090440.27099-2-jbrunet@baylibre.com>
+Message-ID: <20170623200605.nkadcign24xj7rs5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 18, 2017 at 09:58:47AM +0800, Chunyan Zhang wrote:
-> Introduce a new binding with its documentation for Spreadtrum clock
-> sub-framework.
+On Mon, Jun 19, 2017 at 11:04:38AM +0200, Jerome Brunet wrote:
+> Shenzhen Libre Technology Co., Ltd is a single board computer
+> manufacturer
 > 
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 > ---
->  .../devicetree/bindings/clock/sprd-ccu.txt         | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sprd-ccu.txt
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
