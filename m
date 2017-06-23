@@ -1,115 +1,57 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 23 Jun 2017 11:00:58 +0200
-Subject: [PATCH 5/6] clk: at91: clk-generated: make gclk determine audio_pll
- rate
+Date: Fri, 23 Jun 2017 11:00:59 +0200
+Subject: [PATCH 6/6] ARM: dts: at91: sama5d2_xplained: add pin muxing and
+ enable classd
 In-Reply-To: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
 References: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170623090059.8371-6-quentin.schulz@free-electrons.com>
+Message-ID: <20170623090059.8371-7-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows gclk to determine audio_pll rate and set the parent rate
-accordingly.
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-However, there are multiple children clocks that could technically
-change the rate of audio_pll. Since the clock rate is usually critical
-for IPs, it isn't a good idea to have multiple clocks changing audio_pll
-clock rate. There isn't any rate locking system for the moment, thus
-we enforce that classd_gclk be the only one allowed to change audio_pll
-rate. To remain consistent, we deny other clocks to be children of
-audio_pll so classd_gclk altering audio_pll rate does not impact any
-other device.
+This patch adds the pin muxing for classd and enables it.
 
-This needs to be re-worked once we have a rate locking system so two
-clocks could be children of the same clock and be sure the clock rate
-isn't changed by one or the other.
-
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- drivers/clk/at91/clk-generated.c | 41 ++++++++++++++++++++++++++++++++++------
- 1 file changed, 35 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index 6530a2e7e84d..e66ee735a569 100644
---- a/drivers/clk/at91/clk-generated.c
-+++ b/drivers/clk/at91/clk-generated.c
-@@ -26,6 +26,9 @@
- #define GENERATED_SOURCE_MAX	6
- #define GENERATED_MAX_DIV	255
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 2e2c3d1a1fa2..e92b030ca45a 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -355,6 +355,14 @@
+ 					bias-pull-up;
+ 				};
  
-+#define GCK_ID_CLASSD		59
-+#define GCK_INDEX_DT_AUDIO_PLL	5
++				pinctrl_classd_default: classd_default {
++					pinmux = <PIN_PB1__CLASSD_R0>,
++						 <PIN_PB2__CLASSD_R1>,
++						 <PIN_PB3__CLASSD_R2>,
++						 <PIN_PB4__CLASSD_R3>;
++					bias-pull-up;
++				};
 +
- struct clk_generated {
- 	struct clk_hw hw;
- 	struct regmap *regmap;
-@@ -126,15 +129,14 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- {
- 	struct clk_generated *gck = to_clk_generated(hw);
- 	struct clk_hw *parent = NULL;
-+	struct clk_rate_request req_parent = *req;
- 	long best_rate = -EINVAL;
--	unsigned long min_rate;
-+	unsigned long min_rate, parent_rate;
- 	int best_diff = -1;
- 	int i;
-+	u32 div;
+ 				pinctrl_flx0_default: flx0_default {
+ 					pinmux = <PIN_PB28__FLEXCOM0_IO0>,
+ 						 <PIN_PB29__FLEXCOM0_IO1>;
+@@ -488,6 +496,14 @@
  
--	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
--		u32 div;
--		unsigned long parent_rate;
--
-+	for (i = 0; i < clk_hw_get_num_parents(hw) - 1; i++) {
- 		parent = clk_hw_get_parent_by_index(hw, i);
- 		if (!parent)
- 			continue;
-@@ -150,11 +152,37 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- 		clk_generated_best_diff(req, parent, parent_rate, div,
- 					&best_diff, &best_rate);
+ 			};
  
-+		if (!best_diff)
-+			break;
-+	}
++			classd: classd at fc048000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_classd_default>;
++				atmel,pwm-type = "diff";
++				atmel,non-overlap-time = <10>;
++				status = "okay";
++			};
 +
-+	/*
-+	 * The audio_pll rate can be modified unlike the five others clocks that
-+	 * should never be altered.
-+	 * The audio_pll can technically be used by multiple consumers. However,
-+	 * they all are likely to want to modify its rate while the rate is
-+	 * critical for each one. Since we do not have a rate locking for the
-+	 * moment, let classd_gclk be the only consumer of the audio_pll clock.
-+	 */
-+
-+	if (gck->id != GCK_ID_CLASSD)
-+		goto end;
-+
-+	parent = clk_hw_get_parent_by_index(hw, GCK_INDEX_DT_AUDIO_PLL);
-+	if (!parent)
-+		goto end;
-+
-+	for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
-+		req_parent.rate = req->rate * div;
-+		__clk_determine_rate(parent, &req_parent);
-+		clk_generated_best_diff(req, parent, req_parent.rate, div,
-+					&best_diff, &best_rate);
- 
- 		if (!best_diff)
- 			break;
- 	}
- 
-+end:
- 	pr_debug("GCLK: %s, best_rate = %ld, parent clk: %s @ %ld\n",
- 		 __func__, best_rate,
- 		 __clk_get_name((req->best_parent_hw)->clk),
-@@ -264,7 +292,8 @@ at91_clk_register_generated(struct regmap *regmap, spinlock_t *lock,
- 	init.ops = &generated_ops;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
--	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
-+	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE |
-+		CLK_SET_RATE_PARENT;
- 
- 	gck->id = id;
- 	gck->hw.init = &init;
+ 			can1: can at fc050000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_can1_default>;
 -- 
 2.11.0
