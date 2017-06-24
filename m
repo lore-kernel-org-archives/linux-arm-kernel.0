@@ -1,78 +1,60 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 25 Jun 2017 04:03:34 +0800
-Subject: [arm64:for-next/core 12/40] arch/arm64/kernel/ftrace.c:102:10:
- error: implicit declaration of function '__module_text_address'
-Message-ID: <201706250432.rgSHO4BO%fengguang.wu@intel.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 24 Jun 2017 21:10:42 +0100
+Subject: [PATCH v2 5/8] dt-bindings: iio: Add STM32 LPTimer trigger binding
+In-Reply-To: <1498055415-31513-6-git-send-email-fabrice.gasnier@st.com>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+ <1498055415-31513-6-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170624211042.1f37f575@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-head:   8486e54d30e170c969090f80bbdfa7142d33ed6a
-commit: f8af0b364e249eef0c71200826563947cd74267e [12/40] arm64: ftrace: don't validate branch via PLT in ftrace_make_nop()
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout f8af0b364e249eef0c71200826563947cd74267e
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On Wed, 21 Jun 2017 16:30:12 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-Note: the arm64/for-next/core HEAD 8486e54d30e170c969090f80bbdfa7142d33ed6a builds fine.
-      It only hurts bisectibility.
+> Add documentation for STMicroelectronics STM32 Low-Power Timer Trigger
+> binding.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+looks sensible to me.
+I'm kind of assuming this whole series will end up going through Lee and MFD.
 
-All error/warnings (new ones prefixed by >>):
-
-   arch/arm64/kernel/ftrace.c: In function 'ftrace_make_nop':
->> arch/arm64/kernel/ftrace.c:102:10: error: implicit declaration of function '__module_text_address' [-Werror=implicit-function-declaration]
-       mod = __module_text_address(pc);
-             ^~~~~~~~~~~~~~~~~~~~~
->> arch/arm64/kernel/ftrace.c:102:8: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-       mod = __module_text_address(pc);
-           ^
->> arch/arm64/kernel/ftrace.c:120:8: error: implicit declaration of function 'within_module' [-Werror=implicit-function-declaration]
-          !within_module(pc + aarch64_get_branch_offset(replaced),
-           ^~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
-
-vim +/__module_text_address +102 arch/arm64/kernel/ftrace.c
-
-    96			 * 'mod' is only set at module load time, but if we end up
-    97			 * dealing with an out-of-range condition, we can assume it
-    98			 * is due to a module being loaded far away from the kernel.
-    99			 */
-   100			if (!mod) {
-   101				preempt_disable();
- > 102				mod = __module_text_address(pc);
-   103				preempt_enable();
-   104	
-   105				if (WARN_ON(!mod))
-   106					return -EINVAL;
-   107			}
-   108	
-   109			/*
-   110			 * The instruction we are about to patch may be a branch and
-   111			 * link instruction that was redirected via a PLT entry. In
-   112			 * this case, the normal validation will fail, but we can at
-   113			 * least check that we are dealing with a branch and link
-   114			 * instruction that points into the right module.
-   115			 */
-   116			if (aarch64_insn_read((void *)pc, &replaced))
-   117				return -EFAULT;
-   118	
-   119			if (!aarch64_insn_is_bl(replaced) ||
- > 120			    !within_module(pc + aarch64_get_branch_offset(replaced),
-   121					   mod))
-   122				return -EINVAL;
-   123	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 55833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170625/55edf5e0/attachment-0001.gz>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+> ---
+> Changes in v2:
+> - s/Low Power/Low-Power
+> - remove leading 0x in example (parent node)
+> - improve reg property description
+> ---
+>  .../bindings/iio/timer/stm32-lptimer-trigger.txt   | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
+> new file mode 100644
+> index 0000000..466d99f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
+> @@ -0,0 +1,23 @@
+> +STMicroelectronics STM32 Low-Power Timer Trigger
+> +
+> +STM32 Low-Power Timer provides trigger source (LPTIM output) that can be used
+> +by STM32 internal ADC and/or DAC.
+> +
+> +Must be a sub-node of an STM32 Low-Power Timer device tree node.
+> +See ../mfd/stm32-lptimer.txt for details about the parent node.
+> +
+> +Required properties:
+> +- compatible:		Must be "st,stm32-lptimer-trigger".
+> +- reg:			Selects trigger hardware block. Must be 0, 1 or 2
+> +			respectively for lptimer1, lptimer2 or lptimer3
+> +			trigger output.
+> +
+> +Example:
+> +	lptimer1: lptimer at 40002400 {
+> +		compatible = "st,stm32-lptimer";
+> +		...
+> +		trigger at 0 {
+> +			compatible = "st,stm32-lptimer-trigger";
+> +			reg = <0>;
+> +		};
+> +	};
