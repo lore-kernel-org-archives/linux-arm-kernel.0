@@ -1,16 +1,16 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sat, 24 Jun 2017 20:07:11 +0800
-Subject: [PATCH v1] arm64: kvm: route synchronous external abort exceptions to
+Date: Sat, 24 Jun 2017 20:20:22 +0800
+Subject: [PATCH v2] arm64: kvm: route synchronous external abort exceptions to
  el2
-Message-ID: <1498306031-23941-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1498306822-2924-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the firmware-first RAS solution, guest OS receives an synchronous external
-abort, then trapped to EL3 by SCR_EL3.EA. Firmware inspects the HCR_EL2.TEA
-and chooses the target to send APEI's SEA notification. If the SCR_EL3.EA is
-set, delegates the error exception to the hypervisor, otherwise it delegates
-to the guest OS kernel
+In the firmware-first RAS solution, guest OS receives an synchronous
+external abort, then trapped to EL3 by SCR_EL3.EA. Firmware inspects
+the HCR_EL2.TEA and chooses the target to send APEI's SEA notification.
+If the SCR_EL3.EA is set, delegates the error exception to the hypervisor,
+otherwise it delegates to the guest OS kernel
 
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
@@ -19,15 +19,15 @@ Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
  2 files changed, 9 insertions(+)
 
 diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 61d694c..f44d2ac 100644
+index 61d694c..1188272 100644
 --- a/arch/arm64/include/asm/kvm_arm.h
 +++ b/arch/arm64/include/asm/kvm_arm.h
 @@ -23,6 +23,8 @@
  #include <asm/types.h>
  
  /* Hyp Configuration Register (HCR) bits */
-+#define HCR_TEA     (UL(1) << 37)
-+#define HCR_TERR    (UL(1) << 36)
++#define HCR_TEA		(UL(1) << 37)
++#define HCR_TERR	(UL(1) << 36)
  #define HCR_E2H		(UL(1) << 34)
  #define HCR_ID		(UL(1) << 33)
  #define HCR_CD		(UL(1) << 32)
