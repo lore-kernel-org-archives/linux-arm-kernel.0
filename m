@@ -1,30 +1,74 @@
-From: rth@twiddle.net (Richard Henderson)
-Date: Sat, 24 Jun 2017 08:08:43 -0700
-Subject: [PATCH] pci: Add and use PCI_GENERIC_SETUP Kconfig entry
-In-Reply-To: <20170623220857.28774-2-palmer@dabbelt.com>
-References: <20170623220104.GE31455@jhogan-linux.le.imgtec.org>
- <20170623220857.28774-1-palmer@dabbelt.com>
- <20170623220857.28774-2-palmer@dabbelt.com>
-Message-ID: <60bd9a54-0220-5d52-8843-ea3a654020a6@twiddle.net>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 24 Jun 2017 10:36:56 -0500
+Subject: clean up and modularize arch dma_mapping interface V2
+In-Reply-To: <20170624071855.GD14580@lst.de>
+References: <20170616181059.19206-1-hch@lst.de>
+ <162d7932-5766-4c29-5471-07d1b699190a@oracle.com>
+ <20170624071855.GD14580@lst.de>
+Message-ID: <1498318616.31581.87.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2017 03:08 PM, Palmer Dabbelt wrote:
-> We wanted to add RISC-V to the list of architectures that used the
-> generic PCI setup-irq.o inside the Makefile and it was suggested that
-> instead we define a Kconfig entry and use that.
+On Sat, 2017-06-24 at 09:18 +0200, Christoph Hellwig wrote:
+> On Wed, Jun 21, 2017 at 12:24:28PM -0700, tndave wrote:
+> > Thanks for doing this.
+> > So archs can still have their own definition for dma_set_mask() if 
+> > HAVE_ARCH_DMA_SET_MASK is y?
+> > (and similarly for dma_set_coherent_mask() when 
+> > CONFIG_ARCH_HAS_DMA_SET_COHERENT_MASK is y)
+> > Any plan to change these?
 > 
-> I've done very minimal testing on this: I just checked to see that
-> an aarch64 defconfig still build setup-irq.o with the patch applied.
-> The intention is that this patch doesn't change the behavior of any
-> build.
-> 
-> Signed-off-by: Palmer Dabbelt<palmer@dabbelt.com>
-> Reviewed-by: James Hogan<james.hogan@imgtec.com>
-> ---
->   arch/alpha/Kconfig     |  1 +
+> Yes, those should go away, but I'm not entirely sure how yet.  We'll
+> need some hook for switching between an IOMMU and a direct mapping
+> (I guess that's what you want to do for sparc as well?), and I need
+> to find the best way to do that.  Reimplementing all of dma_set_mask
+> and dma_set_coherent_mask is something that I want to move away from.
 
-Acked-by: Richard Henderson <rth@twiddle.net>
+I think we still need to do it. For example we have a bunch new "funky"
+cases.
 
+We already have the case where we mix the direct and iommu mappings,
+on some powerpc platforms that translates in an iommu mapping down at
+0 for the 32-bit space and a direct mapping high up in the PCI address
+space (which crops the top bits and thus hits memory at 0 onwards).
 
-r~
+This type of hybrid layout is needed by some adapters, typically
+storage, which want to keep the "coherent" mask at 32-bit but support
+64-bit for streaming masks.
+
+Another one we are trying to deal better with at the moment is devices
+with DMA addressing limitations. Some GPUs typically (but not only)
+have limits that go all accross the gamut, typically I've seen 40 bits,
+44 bits and 47 bits... And of course those are "high peformance"
+adapters so we don't want to limit them to the comparatively small
+iommu mapping with extra overhead.
+
+At the moment, we're looking at a dma_set_mask() hook that will, for
+these guys, re-configure the iommu mapping to create a "compressed"
+linear mapping of system memory (ie, skipping the holes we have between
+chip on P9 for example) using the largest possible iommu page size
+(256M on P8, 1G on P9).
+
+This is made tricky of course because several devices can potentially
+share a DMA domain based on various platform specific reasons. And of
+course we have no way to figure out what's the "common denominator" of
+all those devices before they start doing DMA. A driver can start
+before the neighbour is probed and a driver can start doing DMAs using
+the standard 32-bit mapping without doing dma_set_mask().
+
+So heuristics ... ugh. Better ideas welcome :-) All that to say that we
+are far from being able to get rid of dma_set_mask() custom
+implementations (and coherent mask too).
+
+I was tempted at some point retiring the 32-bit iommu mapping
+completely, just doing that "linear" thing I mentioned above and
+swiotlb for the rest, along with introducing ZONE_DMA32 on powerpc
+(with the real 64-bit bypass still around for non-limited devices but
+that's then just extra speed by bypassing the iommu xlate & cache).
+
+But I worry of the impact on those silly adapters that set the coherent
+mask to 32-bits to keep their microcode & descriptor ring down in 32-
+bit space. I'm not sure how well ZONE_DMA32 behaves in those cases.
+
+Cheers,
+Ben.
