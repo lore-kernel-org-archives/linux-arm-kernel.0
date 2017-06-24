@@ -1,41 +1,42 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 24 Jun 2017 10:11:11 +0100
-Subject: [PATCH v2 0/5] Use ELF_ET_DYN_BASE only for PIE
-In-Reply-To: <1498251600-132458-1-git-send-email-keescook@chromium.org>
-References: <1498251600-132458-1-git-send-email-keescook@chromium.org>
-Message-ID: <20170624091110.GX4902@n2100.armlinux.org.uk>
+Date: Sat, 24 Jun 2017 10:13:28 +0100
+Subject: [PATCH] pci:  Add and use PCI_GENERIC_SETUP Kconfig entry
+In-Reply-To: <20170623214538.25967-1-palmer@dabbelt.com>
+References: <20170623214538.25967-1-palmer@dabbelt.com>
+Message-ID: <20170624091328.GY4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 01:59:55PM -0700, Kees Cook wrote:
-> This is v2 (to refresh the 5 patches in -mm) for moving ELF_ET_DYN_BASE
-> safely lower. Changes are clarifications in the commit logs (suggested
-> by mpe), a compat think-o fix for arm64 (thanks to Ard), and to add
-> Rik and mpe's Acks.
+On Fri, Jun 23, 2017 at 02:45:38PM -0700, Palmer Dabbelt wrote:
+> We wanted to add RISC-V to the list of architectures that used the
+> generic PCI setup-irq.o inside the Makefile and it was suggested that
+> instead we define a Kconfig entry and use that.
 > 
-> Quoting patch 1/5:
+> I've done very minimal testing on this: I just checked to see that
+> an aarch64 defconfig still build setup-irq.o with the patch applied.
+> The intention is that this patch doesn't change the behavior of any
+> build.
 > 
-> The ELF_ET_DYN_BASE position was originally intended to keep loaders
-> away from ET_EXEC binaries. (For example, running "/lib/ld-linux.so.2
-> /bin/cat" might cause the subsequent load of /bin/cat into where the
-> loader had been loaded.) With the advent of PIE (ET_DYN binaries with
-> an INTERP Program Header), ELF_ET_DYN_BASE continued to be used since
-> the kernel was only looking at ET_DYN. However, since ELF_ET_DYN_BASE
-> is traditionally set at the top 1/3rd of the TASK_SIZE, a substantial
-> portion of the address space is unused.
+> Signed-off-by: Palmer Dabbelt <palmer@dabbelt.com>
 
-With existing kernels on ARM:
+Looks fine from an ARM point of view, thanks.
 
-00010000-00017000 r-xp 00000000 08:01 270810     /bin/cat
-00026000-00027000 r--p 00006000 08:01 270810     /bin/cat
-00027000-00028000 rw-p 00007000 08:01 270810     /bin/cat
-7f661000-7f679000 r-xp 00000000 08:01 281659     /lib/arm-linux-gnueabihf/ld-2.23.so
-7f688000-7f689000 r--p 00017000 08:01 281659     /lib/arm-linux-gnueabihf/ld-2.23.so
-7f689000-7f68a000 rw-p 00018000 08:01 281659     /lib/arm-linux-gnueabihf/ld-2.23.so
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-If the loader is loaded at 4MB, this means the size of an ET_EXEC
-program is limited to less than 4MB - and distros aren't yet
-building everything as PIE on ARM.
+> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+> index e0cacb7b8563..658c9f95ab3f 100644
+> --- a/drivers/pci/Kconfig
+> +++ b/drivers/pci/Kconfig
+> @@ -131,6 +131,9 @@ config PCI_HYPERV
+>            The PCI device frontend driver allows the kernel to import arbitrary
+>            PCI devices from a PCI backend to support PCI driver domains.
+>  
+> +config PCI_GENERIC_SETUP
+> +	def_bool n
+
+	bool
+
+would be sufficient here - the default is 'n' for all options.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
