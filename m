@@ -1,33 +1,53 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 24 Jun 2017 10:14:07 +0100
-Subject: [PATCH] pci:  Add and use PCI_GENERIC_SETUP Kconfig entry
-In-Reply-To: <20170623220104.GE31455@jhogan-linux.le.imgtec.org>
-References: <20170623214538.25967-1-palmer@dabbelt.com>
- <20170623220104.GE31455@jhogan-linux.le.imgtec.org>
-Message-ID: <20170624091406.GZ4902@n2100.armlinux.org.uk>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Sat, 24 Jun 2017 20:07:11 +0800
+Subject: [PATCH v1] arm64: kvm: route synchronous external abort exceptions to
+ el2
+Message-ID: <1498306031-23941-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 11:01:04PM +0100, James Hogan wrote:
-> On Fri, Jun 23, 2017 at 02:45:38PM -0700, Palmer Dabbelt wrote:
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 4c1a35f15838..86872246951c 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -96,6 +96,7 @@ config ARM
-> >  	select PERF_USE_VMALLOC
-> >  	select RTC_LIB
-> >  	select SYS_SUPPORTS_APM_EMULATION
-> > +	select PCI_GENERIC_SETUP
-> >  	# Above selects are sorted alphabetically; please add new ones
-> >  	# according to that.  Thanks.
-> 
-> This comment seems to suggest PCI_GENERIC_SETUP should be added a few
-> lines up to preserve the alphabetical sorting.
+In the firmware-first RAS solution, guest OS receives an synchronous external
+abort, then trapped to EL3 by SCR_EL3.EA. Firmware inspects the HCR_EL2.TEA
+and chooses the target to send APEI's SEA notification. If the SCR_EL3.EA is
+set, delegates the error exception to the hypervisor, otherwise it delegates
+to the guest OS kernel
 
-Indeed it should.
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+---
+ arch/arm64/include/asm/kvm_arm.h     | 2 ++
+ arch/arm64/include/asm/kvm_emulate.h | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 61d694c..f44d2ac 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -23,6 +23,8 @@
+ #include <asm/types.h>
+ 
+ /* Hyp Configuration Register (HCR) bits */
++#define HCR_TEA     (UL(1) << 37)
++#define HCR_TERR    (UL(1) << 36)
+ #define HCR_E2H		(UL(1) << 34)
+ #define HCR_ID		(UL(1) << 33)
+ #define HCR_CD		(UL(1) << 32)
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index a3259a9..93dc3d1 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -47,6 +47,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+ 	if (is_kernel_in_hyp_mode())
+ 		vcpu->arch.hcr_el2 |= HCR_E2H;
++	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
++		/* route synchronous external abort exceptions to EL2 */
++		vcpu->arch.hcr_el2 |= HCR_TEA;
++		/* trap error record accesses */
++		vcpu->arch.hcr_el2 |= HCR_TERR;
++	}
++
+ 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
+ 		vcpu->arch.hcr_el2 &= ~HCR_RW;
+ }
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.10.1
