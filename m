@@ -1,50 +1,36 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Sat, 24 Jun 2017 17:42:11 +0200
-Subject: [PATCH] arm64: pass endianness info to sparse
-Message-ID: <20170624154211.61472-1-luc.vanoostenryck@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 24 Jun 2017 18:05:35 +0200
+Subject: [PATCH 01/11] net: phy: Add rockchip phy driver support
+In-Reply-To: <20170624140406.GL4875@lunn.ch>
+References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
+ <2277908.rG2NXdikOp@phil> <20170624140406.GL4875@lunn.ch>
+Message-ID: <8013275.fit4cPZyaE@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 depends on the macro __AARCH64EB__ being defined or not
-to correctly select or define endian-specific macros, structures
-or pieces of code.
+Am Samstag, 24. Juni 2017, 16:04:06 CEST schrieb Andrew Lunn:
+> > hmm, we do have quite a number of non-net phys in the phy subsystem
+> > (DP, PCIe, ...) and given that the above would be CONFIG_ROCKCHIP_PHY
+> > in a global sense, sounds like it could make things confusing.
+> > 
+> > So some addition sounds reasonable ... ROCKCHIP_ETH_PHY or so?
+> 
+> I follow you reasoning, but generic phy is the new kid on the
+> block. It is well established that Ethernet PHYs are called
+> <MANUFACTURER>_PHY.
 
-This macro is predefined by the compiler but sparse knows nothing
-about it and thus may pre-process files differently from what
-gcc would.
+Ok, then without further bikeshedding, let's just go with your
+naming then (ROCKCHIP_PHY) :-) .
 
-Fix this by passing '-D__AARCH64EL__' or '-D__AARCH64EB__' to
-sparse depending of the endianness of the kernel, like defined
-by GCC.
 
-Note: In most case it won't change anything since most arm64 use
-      little-endian (but an allyesconfig would use big-endian!).
+Heiko
 
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
----
- arch/arm64/Makefile | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 15d6c1476..8ed11b94a 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -52,11 +52,13 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
- 
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
-+CHECKFLAGS	+= -D__AARCH64EB__
- AS		+= -EB
- LD		+= -EB
- UTS_MACHINE	:= aarch64_be
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
-+CHECKFLAGS	+= -D__AARCH64EL__
- AS		+= -EL
- LD		+= -EL
- UTS_MACHINE	:= aarch64
--- 
-2.13.0
+> If you do want to consider generic phy, the logical name would be
+> ROCKCHIP_PHY_PHY, since generic phy postfixes with _SATA, _USB, _PCIE,
+> etc. But that does leave an issues when we have an Ethernet PHY which
+> needs a generic PHY. In some sense, SERDES could be considered as
+> something supported by a generic PHY...
+> 
+> 	Andrew
+> 
+> 
