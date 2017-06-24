@@ -1,40 +1,35 @@
-From: techping.chan@gmail.com (Ziping Chen)
-Date: Sat, 24 Jun 2017 10:12:03 +0800
-Subject: [PATCH v2 2/3] dt-bindings: input: Add DT bindings documentation
- for Allwinner A83T R_LRADC
-In-Reply-To: <20170623215131.d5kickxtqdxxm3t4@rob-hp-laptop>
-References: <20170620134445.23097-1-techping.chan@gmail.com>
- <20170620134445.23097-3-techping.chan@gmail.com>
- <20170623215131.d5kickxtqdxxm3t4@rob-hp-laptop>
-Message-ID: <CAAST=9wnvkawt7GmDdkSzi3YOEbG=Afcvj34pJndegGLkFBu3A@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 24 Jun 2017 04:29:54 +0200
+Subject: [PATCH 05/11] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <1498193947-8011-1-git-send-email-david.wu@rock-chips.com>
+References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
+ <1498193947-8011-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20170624022954.GD4875@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Fri, Jun 23, 2017 at 12:59:07PM +0800, David Wu wrote:
+> To make internal phy worked, need to configure the phy_clock,
+> phy cru_reset and related registers.
+> 
+> Change-Id: I6971c0a769754b824b1b908b56080cbaf7867d13
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+>  .../devicetree/bindings/net/rockchip-dwmac.txt     |  3 +
+>  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 82 ++++++++++++++++++++++
+>  2 files changed, 85 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> index 8f42755..0514f69 100644
+> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> @@ -22,6 +22,7 @@ Required properties:
+>  	   <&cru SCLK_MACREF_OUT> clock gate for RMII reference clock output
+>  	   <&cru ACLK_GMAC>: AXI clock gate for GMAC
+>  	   <&cru PCLK_GMAC>: APB clock gate for GMAC
+> +	   <&cru MAC_PHY>: clock for internal macphy
 
-2017-06-24 5:51 GMT+08:00 Rob Herring <robh@kernel.org>:
-> On Tue, Jun 20, 2017 at 09:44:44PM +0800, Ziping Chen wrote:
->> From: Ziping Chen <techping.chan@gmail.com>
->
-> Your subject could be more concise. "DT bindings documentation" is
-> redundant.
->
->>
->> Allwinner A83T SoC has a low res adc like the one
->> in Allwinner A10 SoC.
->>
->> Add binding for it.
->>
->> Signed-off-by: Ziping Chen <techping.chan@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> Otherwise,
->
-> Acked-by: Rob Herring <robh@kernel.org>
+If this is the PHY clock, should it actually be specified in the PHY
+binding? Can you read the PHY ID registers with this clock off?
 
-OK.
-
-Thanks,
-Ziping
+	 Andrew
