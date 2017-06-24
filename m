@@ -1,95 +1,68 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 24 Jun 2017 08:24:18 +0200
-Subject: [PATCH v13 13/14] ASoC: sun4i-codec: Add Left Capture Select,
- Right Capture Select.
+Date: Sat, 24 Jun 2017 08:24:16 +0200
+Subject: [PATCH v13 11/14] ASoC: sun4i-codec: Add Line Right, Line Left,
+ Line Playback Switch.
 In-Reply-To: <20170624062419.23778-1-dannym@scratchpost.org>
 References: <20170624062419.23778-1-dannym@scratchpost.org>
-Message-ID: <20170624062419.23778-14-dannym@scratchpost.org>
+Message-ID: <20170624062419.23778-12-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Left Capture Select and Right Capture Select for Allwinner A10 and
+Add Line Right, Line Left, Line Playback Switch for Allwinner A10 and
 Allwinner A20.
 
 Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 50 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+ sound/soc/sunxi/sun4i-codec.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 085a603..65a4685 100644
+index 564df33..bcd665d 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -676,6 +676,25 @@ static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
- 			    0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
- 			    1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0));
- 
-+static const char * const sun4i_codec_capture_source[] = {
-+	"Line",
-+	"FM",
-+	"Mic1",
-+	"Mic2",
-+	"Mic1,Mic2",
-+	"Mic1+Mic2",
-+	"Output Mixer",
-+	"Line,Mic1",
-+};
-+
-+static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_capture_source,
-+			    SUN4I_CODEC_ADC_ACTL,
-+			    SUN4I_CODEC_ADC_ACTL_ADCIS,
-+			    sun4i_codec_capture_source);
-+
-+static const struct snd_kcontrol_new sun4i_codec_capture_source_controls =
-+	SOC_DAPM_ENUM("Capture Source", sun4i_codec_enum_capture_source);
-+
- static const char * const sun4i_codec_difflinein_source[] = {
- 	"Stereo",
- 	"Differential",
-@@ -808,6 +827,10 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+@@ -67,6 +67,8 @@
+ #define SUN4I_CODEC_DAC_ACTL_LNG			(26)
+ #define SUN4I_CODEC_DAC_ACTL_FMG			(23)
+ #define SUN4I_CODEC_DAC_ACTL_MICG			(20)
++#define SUN4I_CODEC_DAC_ACTL_LLNS			(19)
++#define SUN4I_CODEC_DAC_ACTL_RLNS			(18)
+ #define SUN4I_CODEC_DAC_ACTL_LFMS			(17)
+ #define SUN4I_CODEC_DAC_ACTL_RFMS			(16)
+ #define SUN4I_CODEC_DAC_ACTL_LDACLMIXS			(15)
+@@ -716,6 +718,9 @@ static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
+ 	SOC_DAPM_SINGLE("Right Mixer Left DAC Playback Switch",
+ 			SUN4I_CODEC_DAC_ACTL,
+ 			SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
++	SOC_DAPM_DOUBLE("Line Playback Switch", SUN4I_CODEC_DAC_ACTL,
++			SUN4I_CODEC_DAC_ACTL_LLNS,
++			SUN4I_CODEC_DAC_ACTL_RLNS, 1, 0),
+ 	SOC_DAPM_DOUBLE("FM Playback Switch", SUN4I_CODEC_DAC_ACTL,
+ 			SUN4I_CODEC_DAC_ACTL_LFMS,
+ 			SUN4I_CODEC_DAC_ACTL_RFMS, 1, 0),
+@@ -787,6 +792,8 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+ 	SND_SOC_DAPM_SWITCH("Power Amplifier Mute", SND_SOC_NOPM, 0, 0,
  			    &sun4i_codec_pa_mute),
  
- 	/* MUX */
-+	SND_SOC_DAPM_MUX("Left Capture Select", SND_SOC_NOPM, 0, 0,
-+			 &sun4i_codec_capture_source_controls),
-+	SND_SOC_DAPM_MUX("Right Capture Select", SND_SOC_NOPM, 0, 0,
-+			 &sun4i_codec_capture_source_controls),
- 	SND_SOC_DAPM_MUX("Differential Line Source", SND_SOC_NOPM,
- 			 0, 0,
- 			 &sun4i_codec_difflinein_source_controls),
-@@ -875,6 +898,33 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 	/* LNRDF Routes */
- 	{ "Differential Line Source", "Differential", "Line Left" },
- 	{ "Differential Line Source", "Differential", "Line Right" },
-+
-+	/* Right ADC Input Routes */
-+	{ "Right Capture Select", "Line", "Line Right" },
-+	{ "Right Capture Select", "Line", "Differential Line Capture Switch" },
-+	{ "Right Capture Select", "FM", "FM Right" },
-+	{ "Right Capture Select", "Mic1", "MIC1 Pre-Amplifier" },
-+	{ "Right Capture Select", "Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Right Capture Select", "Mic1,Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Right Capture Select", "Mic1+Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Right Capture Select", "Mic1+Mic2", "MIC1 Pre-Amplifier" },
-+	{ "Right Capture Select", "Output Mixer", "Right Mixer" },
-+	{ "Right Capture Select", "Line,Mic1", "MIC1 Pre-Amplifier" },
-+	{ "Right ADC", NULL, "Right Capture Select" },
-+
-+	/* Left ADC Input Routes */
-+	{ "Left Capture Select", "Line", "Line Left" },
-+	{ "Left Capture Select", "Line", "Differential Line Capture Switch" },
-+	{ "Left Capture Select", "FM", "FM Left" },
-+	{ "Left Capture Select", "Mic1", "MIC1 Pre-Amplifier" },
-+	{ "Left Capture Select", "Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Left Capture Select", "Mic1,Mic2", "MIC1 Pre-Amplifier" },
-+	{ "Left Capture Select", "Mic1+Mic2", "MIC1 Pre-Amplifier" },
-+	{ "Left Capture Select", "Mic1+Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Left Capture Select", "Output Mixer", "Left Mixer" },
-+	{ "Left Capture Select", "Line,Mic1", "Line Left" },
-+	{ "Left Capture Select", "Line,Mic1", "Differential Line Capture Switch" },
-+	{ "Left ADC", NULL, "Left Capture Select" },
- };
- 
- struct sun4i_codec_quirks {
++	SND_SOC_DAPM_INPUT("Line Right"),
++	SND_SOC_DAPM_INPUT("Line Left"),
+ 	SND_SOC_DAPM_INPUT("FM Right"),
+ 	SND_SOC_DAPM_INPUT("FM Left"),
+ 	SND_SOC_DAPM_INPUT("Mic1"),
+@@ -809,6 +816,7 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 	{ "Right Mixer", NULL, "Mixer Enable" },
+ 	{ "Right Mixer", "DAC Playback Switch", "Left DAC" },
+ 	{ "Right Mixer", "Right Mixer Left DAC Playback Switch", "Left DAC" },
++	{ "Right Mixer", "Line Playback Switch", "Line Right" },
+ 	{ "Right Mixer", "FM Playback Switch", "FM Right" },
+ 	{ "Right Mixer", "Mic1 Playback Switch", "MIC1 Pre-Amplifier" },
+ 	{ "Right Mixer", "Mic2 Playback Switch", "MIC2 Pre-Amplifier" },
+@@ -816,6 +824,7 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 	/* Left Mixer Routes */
+ 	{ "Left Mixer", NULL, "Mixer Enable" },
+ 	{ "Left Mixer", "DAC Playback Switch", "Left DAC" },
++	{ "Left Mixer", "Line Playback Switch", "Line Left" },
+ 	{ "Left Mixer", "FM Playback Switch", "FM Left" },
+ 	{ "Left Mixer", "Mic1 Playback Switch", "MIC1 Pre-Amplifier" },
+ 	{ "Left Mixer", "Mic2 Playback Switch", "MIC2 Pre-Amplifier" },
 -- 
 2.1.4
