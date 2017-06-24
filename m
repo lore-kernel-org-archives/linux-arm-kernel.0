@@ -1,47 +1,50 @@
 From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Sat, 24 Jun 2017 17:38:42 +0200
-Subject: [PATCH] arm: pass endianness info to sparse
-Message-ID: <20170624153842.61064-1-luc.vanoostenryck@gmail.com>
+Date: Sat, 24 Jun 2017 17:42:11 +0200
+Subject: [PATCH] arm64: pass endianness info to sparse
+Message-ID: <20170624154211.61472-1-luc.vanoostenryck@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM depends on the macros '__ARMEL__' & '__ARMEB__' being defined
-or not to correctly select or define endian-specific macros,
-structures or pieces of code.
+ARM64 depends on the macro __AARCH64EB__ being defined or not
+to correctly select or define endian-specific macros, structures
+or pieces of code.
 
-These macros are predefined by the compiler but sparse knows
-nothing about them and thus may pre-process files differently
-from what gcc would.
+This macro is predefined by the compiler but sparse knows nothing
+about it and thus may pre-process files differently from what
+gcc would.
 
-Fix this by passing '-D__ARMEL__' or '-D__ARMEB__' to sparse,
-depending of the endianness of the kernel, like defined by GCC.
+Fix this by passing '-D__AARCH64EL__' or '-D__AARCH64EB__' to
+sparse depending of the endianness of the kernel, like defined
+by GCC.
 
-Note: In most case it won't change anything since most ARMs use
+Note: In most case it won't change anything since most arm64 use
       little-endian (but an allyesconfig would use big-endian!).
 
-CC: Russell King <linux@armlinux.org.uk>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
 CC: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 ---
- arch/arm/Makefile | 2 ++
+ arch/arm64/Makefile | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 65f4e2a4e..0fca46d7f 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -44,10 +44,12 @@ endif
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 15d6c1476..8ed11b94a 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -52,11 +52,13 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
  
- ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
  KBUILD_CPPFLAGS	+= -mbig-endian
-+CHECKFLAGS	+= -D__ARMEB__
++CHECKFLAGS	+= -D__AARCH64EB__
  AS		+= -EB
  LD		+= -EB
+ UTS_MACHINE	:= aarch64_be
  else
  KBUILD_CPPFLAGS	+= -mlittle-endian
-+CHECKFLAGS	+= -D__ARMEL__
++CHECKFLAGS	+= -D__AARCH64EL__
  AS		+= -EL
  LD		+= -EL
- endif
+ UTS_MACHINE	:= aarch64
 -- 
 2.13.0
