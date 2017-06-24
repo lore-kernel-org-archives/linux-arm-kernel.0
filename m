@@ -1,74 +1,96 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 24 Jun 2017 20:16:20 +0200
-Subject: [PATCH 1/2] arm64: dts: exynos: Fix wrong label for USB 3.0
- controller node
-In-Reply-To: <1497942745-8607-2-git-send-email-dwoo08.lee@samsung.com>
-References: <1497942745-8607-1-git-send-email-dwoo08.lee@samsung.com>
- <CGME20170620071230epcas5p497144c7ccd8485da9109b8905a5ea36e@epcas5p4.samsung.com>
- <1497942745-8607-2-git-send-email-dwoo08.lee@samsung.com>
-Message-ID: <20170624181620.m3uve2p5mlfhrhss@kozik-lap>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 24 Jun 2017 20:59:43 +0200
+Subject: [PATCH 2/2] rtc: brcmstb-waketimer: Add Broadcom STB wake-timer
+In-Reply-To: <20170615195904.12653-3-f.fainelli@gmail.com>
+References: <20170615195904.12653-1-f.fainelli@gmail.com>
+ <20170615195904.12653-3-f.fainelli@gmail.com>
+Message-ID: <20170624185942.vq656pjxbqnqdhll@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 04:12:23PM +0900, Dongwoo Lee wrote:
-> Exynos5433 has two usb 3.0 controllers: usbhost and usbdrd. usbhost
-> is host-only controller whereas usbdrd supports both peripheral and
-> host mode. "drd" means dual-role device, so usbhost cannot be labeled
-> with the name contains "drd". Howerver, the label usbdrd_dwc3_0 was
+Hi,
 
-Patch looks okay but it is too late for current cycle so I will take it
-for v4.14. In future, please run spell check :)
+This seems mostly good.
 
-Best regards,
-Krzysztof
+On 15/06/2017 at 12:59:04 -0700, Florian Fainelli wrote:
+> +static void wktmr_read(struct brcmstb_waketmr *timer,
+> +		       struct wktmr_time *t)
+> +{
+> +	u32 tmp;
+> +
 
-> used for usbhost's dwc3 node. It seems it obviously fault because TM2
-> and TM2E doesn't use usbhost but dr_mode property is assigned to it.
-> 
-> This patch assigns the proper label for two dwc3 nodes, and apply
-> changes to the related reference
-> 
-> Signed-off-by: Dongwoo Lee <dwoo08.lee@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 2 +-
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi            | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> index 804a270..477c3bc 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> @@ -1202,7 +1202,7 @@
->  	status = "okay";
->  };
->  
-> -&usbdrd_dwc3_0 {
-> +&usbdrd_dwc3 {
->  	dr_mode = "otg";
->  };
->  
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> index 727f36a..7fe994b 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> @@ -1367,7 +1367,7 @@
->  			ranges;
->  			status = "disabled";
->  
-> -			dwc3 at 15400000 {
-> +			usbdrd_dwc3: dwc3 at 15400000 {
->  				compatible = "snps,dwc3";
->  				reg = <0x15400000 0x10000>;
->  				interrupts = <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -1414,7 +1414,7 @@
->  			ranges;
->  			status = "disabled";
->  
-> -			usbdrd_dwc3_0: dwc3 at 15a00000 {
-> +			usbhost_dwc3: dwc3 at 15a00000 {
->  				compatible = "snps,dwc3";
->  				reg = <0x15a00000 0x10000>;
->  				interrupts = <GIC_SPI 244 IRQ_TYPE_LEVEL_HIGH>;
-> -- 
-> 1.9.1
-> 
+To be sure, is this IP always 32bit, even on 64bit platforms?
+
+> +	do {
+> +		t->sec = readl_relaxed(timer->base + BRCMSTB_WKTMR_COUNTER);
+> +		tmp = readl_relaxed(timer->base + BRCMSTB_WKTMR_PRESCALER_VAL);
+> +	} while (tmp >= timer->rate);
+> +
+> +	t->pre = timer->rate - tmp;
+> +}
+> +
+
+[...]
+
+> +static int brcmstb_waketmr_settime(struct device *dev,
+> +				   struct rtc_time *tm)
+> +{
+> +	struct brcmstb_waketmr *timer = dev_get_drvdata(dev);
+> +	unsigned long sec;
+> +	int ret;
+> +
+> +	ret = rtc_valid_tm(tm);
+> +	if (ret)
+> +		return ret;
+> +
+
+There is no way this function can be called without a valid tm. The only
+caller checks before calling.
+
+> +	rtc_tm_to_time(tm, &sec);
+> +
+> +	dev_dbg(dev, "%s: sec=%ld\n", __func__, sec);
+> +	writel_relaxed(sec, timer->base + BRCMSTB_WKTMR_COUNTER);
+> +
+> +	return 0;
+> +}
+> +
+> +static int brcmstb_waketmr_getalarm(struct device *dev,
+> +				    struct rtc_wkalrm *alarm)
+> +{
+> +	struct brcmstb_waketmr *timer = dev_get_drvdata(dev);
+> +	unsigned long sec;
+> +	u32 reg;
+> +
+> +	sec = readl_relaxed(timer->base + BRCMSTB_WKTMR_ALARM);
+> +	if (sec == 0) {
+> +		/* Alarm is disabled */
+> +		alarm->enabled = 0;
+> +		alarm->time.tm_mon = -1;
+> +		alarm->time.tm_mday = -1;
+> +		alarm->time.tm_year = -1;
+> +		alarm->time.tm_hour = -1;
+> +		alarm->time.tm_min = -1;
+> +		alarm->time.tm_sec = -1;
+
+This is not needed since d68778b80dd7
+
+> +		dev_dbg(dev, "%s: alarm is disabled\n", __func__);
+> +	} else {
+> +		/* Alarm is enabled */
+> +		alarm->enabled = 1;
+> +		rtc_time_to_tm(sec, &alarm->time);
+> +		dev_dbg(dev, "%s: alarm is enabled\n", __func__);
+> +	}
+> +
+> +	reg = readl_relaxed(timer->base + BRCMSTB_WKTMR_EVENT);
+> +	alarm->pending = !!(reg & 1);
+> +	dev_dbg(dev, "%s: alarm pending=%d\n", __func__, alarm->pending);
+> +
+> +	return 0;
+> +}
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
