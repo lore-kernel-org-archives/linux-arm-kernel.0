@@ -1,69 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 26 Jun 2017 11:07:59 +0200
-Subject: [PATCH v3 5/9] serial: fsl_lpuart: Use common rs485 device tree
- parsing function
-In-Reply-To: <20170626090803.10981-1-u.kleine-koenig@pengutronix.de>
-References: <20170626090803.10981-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170626090803.10981-6-u.kleine-koenig@pengutronix.de>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 24 Jun 2017 21:02:41 +0100
+Subject: [PATCH 1/3] dt-bindings: adc: mt7622: add binding document
+In-Reply-To: <1498110274-18678-2-git-send-email-zhiyong.tao@mediatek.com>
+References: <1498110274-18678-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1498110274-18678-2-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <20170624210241.361743b3@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On Thu, 22 Jun 2017 13:44:32 +0800
+Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
 
-We just got a common helper for parsing the rs485 specific
-device tree properties. Use it and drop the open coded parser.
-
-As a side effect this adds support for parsing rs485-rts-delay and
-rs485-rx-during-tx. As the driver doesn't support this though, probing
-fails if these are defined.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/tty/serial/fsl_lpuart.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 6e39ef96c6ca..68ac72a5c5fe 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -2049,6 +2049,24 @@ static int lpuart_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	of_get_rs485_mode(np, &sport->port.rs485);
-+
-+	if (sport->port.rs485.flags & SER_RS485_RX_DURING_TX) {
-+		dev_err(&pdev->dev, "driver doesn't support RX during TX\n");
-+		return -ENOSYS;
-+	}
-+
-+	if (sport->port.rs485.delay_rts_before_send ||
-+	    sport->port.rs485.delay_rts_after_send) {
-+		dev_err(&pdev->dev, "driver doesn't support RTS delays\n");
-+		return -ENOSYS;
-+	}
-+
-+	if (sport->port.rs485.flags & SER_RS485_ENABLED) {
-+		sport->port.rs485.flags |= SER_RS485_RTS_ON_SEND;
-+		writeb(UARTMODEM_TXRTSE, sport->port.membase + UARTMODEM);
-+	}
-+
- 	sport->dma_tx_chan = dma_request_slave_channel(sport->port.dev, "tx");
- 	if (!sport->dma_tx_chan)
- 		dev_info(sport->port.dev, "DMA tx channel request failed, "
-@@ -2059,12 +2077,6 @@ static int lpuart_probe(struct platform_device *pdev)
- 		dev_info(sport->port.dev, "DMA rx channel request failed, "
- 				"operating without rx DMA\n");
- 
--	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time")) {
--		sport->port.rs485.flags |= SER_RS485_ENABLED;
--		sport->port.rs485.flags |= SER_RS485_RTS_ON_SEND;
--		writeb(UARTMODEM_TXRTSE, sport->port.membase + UARTMODEM);
--	}
--
- 	return 0;
- }
- 
--- 
-2.11.0
+> The commit adds mt7622 compatible node in binding document.
+> 
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> ---
+>  .../devicetree/bindings/iio/adc/mt6577_auxadc.txt  |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> index 68c45cb..e6aa30a 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> @@ -13,6 +13,7 @@ Required properties:
+>    - compatible: Should be one of:
+>      - "mediatek,mt2701-auxadc": For MT2701 family of SoCs
+>      - "mediatek,mt8173-auxadc": For MT8173 family of SoCs
+> +    - "mediatek,mt7622-auxadc": For MT7622 family of SoCs
+numeric order?
+>    - reg: Address range of the AUXADC unit.
+>    - clocks: Should contain a clock specifier for each entry in clock-names
+>    - clock-names: Should contain "main".
