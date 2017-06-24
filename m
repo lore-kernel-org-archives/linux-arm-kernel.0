@@ -1,68 +1,74 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 24 Jun 2017 08:24:16 +0200
-Subject: [PATCH v13 11/14] ASoC: sun4i-codec: Add Line Right, Line Left,
- Line Playback Switch.
+Date: Sat, 24 Jun 2017 08:24:17 +0200
+Subject: [PATCH v13 12/14] ASoC: sun4i-codec: Add Differential Line Source.
 In-Reply-To: <20170624062419.23778-1-dannym@scratchpost.org>
 References: <20170624062419.23778-1-dannym@scratchpost.org>
-Message-ID: <20170624062419.23778-12-dannym@scratchpost.org>
+Message-ID: <20170624062419.23778-13-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Line Right, Line Left, Line Playback Switch for Allwinner A10 and
-Allwinner A20.
+Add Differential Line Source for Allwinner A10 and Allwinner A20.
 
 Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ sound/soc/sunxi/sun4i-codec.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 564df33..bcd665d 100644
+index bcd665d..085a603 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -67,6 +67,8 @@
- #define SUN4I_CODEC_DAC_ACTL_LNG			(26)
- #define SUN4I_CODEC_DAC_ACTL_FMG			(23)
- #define SUN4I_CODEC_DAC_ACTL_MICG			(20)
-+#define SUN4I_CODEC_DAC_ACTL_LLNS			(19)
-+#define SUN4I_CODEC_DAC_ACTL_RLNS			(18)
- #define SUN4I_CODEC_DAC_ACTL_LFMS			(17)
- #define SUN4I_CODEC_DAC_ACTL_RFMS			(16)
- #define SUN4I_CODEC_DAC_ACTL_LDACLMIXS			(15)
-@@ -716,6 +718,9 @@ static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
- 	SOC_DAPM_SINGLE("Right Mixer Left DAC Playback Switch",
- 			SUN4I_CODEC_DAC_ACTL,
- 			SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
-+	SOC_DAPM_DOUBLE("Line Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_LLNS,
-+			SUN4I_CODEC_DAC_ACTL_RLNS, 1, 0),
- 	SOC_DAPM_DOUBLE("FM Playback Switch", SUN4I_CODEC_DAC_ACTL,
- 			SUN4I_CODEC_DAC_ACTL_LFMS,
- 			SUN4I_CODEC_DAC_ACTL_RFMS, 1, 0),
-@@ -787,6 +792,8 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+@@ -110,6 +110,7 @@
+ #define SUN4I_CODEC_ADC_ACTL_VADCG			(20)
+ #define SUN4I_CODEC_ADC_ACTL_ADCIS			(17)
+ #define SUN4I_CODEC_ADC_ACTL_LNPREG			(13)
++#define SUN4I_CODEC_ADC_ACTL_LNRDF			(16)
+ #define SUN4I_CODEC_ADC_ACTL_PA_EN			(4)
+ #define SUN4I_CODEC_ADC_ACTL_DDE			(3)
+ #define SUN4I_CODEC_ADC_DEBUG			(0x2c)
+@@ -675,6 +676,20 @@ static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
+ 			    0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
+ 			    1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0));
+ 
++static const char * const sun4i_codec_difflinein_source[] = {
++	"Stereo",
++	"Differential",
++};
++
++static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_difflinein_source,
++			    SUN4I_CODEC_ADC_ACTL,
++			    SUN4I_CODEC_ADC_ACTL_LNRDF,
++			    sun4i_codec_difflinein_source);
++
++static const struct snd_kcontrol_new sun4i_codec_difflinein_source_controls =
++	SOC_DAPM_ENUM("Differential Line Source",
++		      sun4i_codec_enum_difflinein_source);
++
+ static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+ 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+ 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+@@ -792,6 +807,11 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
  	SND_SOC_DAPM_SWITCH("Power Amplifier Mute", SND_SOC_NOPM, 0, 0,
  			    &sun4i_codec_pa_mute),
  
-+	SND_SOC_DAPM_INPUT("Line Right"),
-+	SND_SOC_DAPM_INPUT("Line Left"),
++	/* MUX */
++	SND_SOC_DAPM_MUX("Differential Line Source", SND_SOC_NOPM,
++			 0, 0,
++			 &sun4i_codec_difflinein_source_controls),
++
+ 	SND_SOC_DAPM_INPUT("Line Right"),
+ 	SND_SOC_DAPM_INPUT("Line Left"),
  	SND_SOC_DAPM_INPUT("FM Right"),
- 	SND_SOC_DAPM_INPUT("FM Left"),
- 	SND_SOC_DAPM_INPUT("Mic1"),
-@@ -809,6 +816,7 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 	{ "Right Mixer", NULL, "Mixer Enable" },
- 	{ "Right Mixer", "DAC Playback Switch", "Left DAC" },
- 	{ "Right Mixer", "Right Mixer Left DAC Playback Switch", "Left DAC" },
-+	{ "Right Mixer", "Line Playback Switch", "Line Right" },
- 	{ "Right Mixer", "FM Playback Switch", "FM Right" },
- 	{ "Right Mixer", "Mic1 Playback Switch", "MIC1 Pre-Amplifier" },
- 	{ "Right Mixer", "Mic2 Playback Switch", "MIC2 Pre-Amplifier" },
-@@ -816,6 +824,7 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 	/* Left Mixer Routes */
- 	{ "Left Mixer", NULL, "Mixer Enable" },
- 	{ "Left Mixer", "DAC Playback Switch", "Left DAC" },
-+	{ "Left Mixer", "Line Playback Switch", "Line Left" },
- 	{ "Left Mixer", "FM Playback Switch", "FM Left" },
- 	{ "Left Mixer", "Mic1 Playback Switch", "MIC1 Pre-Amplifier" },
- 	{ "Left Mixer", "Mic2 Playback Switch", "MIC2 Pre-Amplifier" },
+@@ -851,6 +871,10 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 	{ "Right ADC", NULL, "MIC2 Pre-Amplifier" },
+ 	{ "MIC2 Pre-Amplifier", NULL, "Mic2"},
+ 	{ "Mic2", NULL, "VMIC" },
++
++	/* LNRDF Routes */
++	{ "Differential Line Source", "Differential", "Line Left" },
++	{ "Differential Line Source", "Differential", "Line Right" },
+ };
+ 
+ struct sun4i_codec_quirks {
 -- 
 2.1.4
