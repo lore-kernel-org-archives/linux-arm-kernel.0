@@ -1,41 +1,47 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 24 Jun 2017 08:24:19 +0200
-Subject: [PATCH v13 14/14] ASoC: sun4i-codec: Add Capture Volume.
+Date: Sat, 24 Jun 2017 08:24:07 +0200
+Subject: [PATCH v13 02/14] ASoC: sun4i-codec: Add Mic Playback Volume.
 In-Reply-To: <20170624062419.23778-1-dannym@scratchpost.org>
 References: <20170624062419.23778-1-dannym@scratchpost.org>
-Message-ID: <20170624062419.23778-15-dannym@scratchpost.org>
+Message-ID: <20170624062419.23778-3-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Capture Volume for Allwinner A10 and Allwinner A20.
+Add Mic Playback Volume for Allwinner A10 and Allwinner A20.
 
 Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ sound/soc/sunxi/sun4i-codec.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 65a4685..a596249 100644
+index f703293..49b9cd1 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -675,6 +675,7 @@ static DECLARE_TLV_DB_RANGE(sun4i_codec_micin_preamp_gain_scale,
- static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
- 			    0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
- 			    1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0));
-+static DECLARE_TLV_DB_SCALE(sun4i_codec_adc_gain_scale, -450, 150, 0);
+@@ -64,6 +64,7 @@
+ #define SUN4I_CODEC_DAC_ACTL_DACAENR			(31)
+ #define SUN4I_CODEC_DAC_ACTL_DACAENL			(30)
+ #define SUN4I_CODEC_DAC_ACTL_MIXEN			(29)
++#define SUN4I_CODEC_DAC_ACTL_MICG			(20)
+ #define SUN4I_CODEC_DAC_ACTL_LDACLMIXS			(15)
+ #define SUN4I_CODEC_DAC_ACTL_RDACRMIXS			(14)
+ #define SUN4I_CODEC_DAC_ACTL_LDACRMIXS			(13)
+@@ -643,11 +644,16 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
+ 			SUN4I_CODEC_DAC_ACTL_PA_MUTE, 1, 0);
  
- static const char * const sun4i_codec_capture_source[] = {
- 	"Line",
-@@ -725,6 +726,10 @@ static const struct snd_kcontrol_new sun4i_codec_controls[] = {
- 	SOC_SINGLE_TLV("Mic Playback Volume", SUN4I_CODEC_DAC_ACTL,
- 		       SUN4I_CODEC_DAC_ACTL_MICG, 7, 0,
- 		       sun4i_codec_micin_loopback_gain_scale),
-+	/* ADC */
-+	SOC_SINGLE_TLV("Capture Volume", SUN4I_CODEC_ADC_ACTL,
-+		       SUN4I_CODEC_ADC_ACTL_VADCG, 4, 0,
-+		       sun4i_codec_adc_gain_scale),
+ static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
++static DECLARE_TLV_DB_SCALE(sun4i_codec_micin_loopback_gain_scale, -450, 150,
++			    0);
+ 
+ static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+ 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+ 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+ 		       sun4i_codec_pa_volume_scale),
++	SOC_SINGLE_TLV("Mic Playback Volume", SUN4I_CODEC_DAC_ACTL,
++		       SUN4I_CODEC_DAC_ACTL_MICG, 7, 0,
++		       sun4i_codec_micin_loopback_gain_scale),
  };
  
- static const struct snd_kcontrol_new sun4i_codec_extra_controls[] = {
+ static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
 -- 
 2.1.4
