@@ -1,46 +1,91 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Sat, 24 Jun 2017 12:16:42 -0700
-Subject: [PATCH v2 1/5] binfmt_elf: Use ELF_ET_DYN_BASE only for PIE
-In-Reply-To: <1498251600-132458-2-git-send-email-keescook@chromium.org>
-References: <1498251600-132458-1-git-send-email-keescook@chromium.org>
- <1498251600-132458-2-git-send-email-keescook@chromium.org>
-Message-ID: <CAGXu5jL7cYJT6n8w8egOuLOH6QHAp8X=+s3B+hB_sdNb8ub=5Q@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 24 Jun 2017 21:00:43 +0100
+Subject: [PATCH 2/3] iio: adc: mt7622: add support for suspend/resume.
+In-Reply-To: <1498110274-18678-3-git-send-email-zhiyong.tao@mediatek.com>
+References: <1498110274-18678-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1498110274-18678-3-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <20170624210043.29569f3a@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 1:59 PM, Kees Cook <keescook@chromium.org> wrote:
-> For 32-bit tasks when RLIMIT_STACK is set to RLIM_INFINITY, programs
-> are loaded below the mmap region. This means they can be made to collide
-> (CVE-2017-1000370) or nearly collide (CVE-2017-1000371) with pathological
-> stack regions. Lowering ELF_ET_DYN_BASE solves both by moving programs
-> above the mmap region in all cases, and will now additionally avoid
-> programs falling back to the mmap region by enforcing MAP_FIXED for
-> program loads (i.e. if it would have collided with the stack, now it
-> will fail to load instead of falling back to the mmap region).
+On Thu, 22 Jun 2017 13:44:33 +0800
+Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
 
-It was pointed out by rmk that I described this inaccurately. I mix up
-my own visualization of the address space (above/below in
-/proc/$pid/maps) with actual value comparisons (above/below
-numerically). This paragraph should read:
+> This patch supports auxadc suspend/resume flow.
+> Disable auxadc clk and power in suspend function.
+> Enable axuadc clk and power in resume function.
+> 
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+Worth handling the cases where power management is not configured into the
+kernel properly.
 
-
-For 32-bit tasks when RLIMIT_STACK is set to RLIM_INFINITY, programs
-are loaded above the mmap region. This means they can be made to collide
-(CVE-2017-1000370) or nearly collide (CVE-2017-1000371) with pathological
-stack regions. Lowering ELF_ET_DYN_BASE solves both by moving programs
-below the mmap region in all cases, and will now additionally avoid
-programs falling back to the mmap region by enforcing MAP_FIXED for
-program loads (i.e. if it would have collided with the stack, now it
-will fail to load instead of falling back to the mmap region).
-
-
-Andrew, are you able to manually adjust this commit log in -mm, or
-should I resend the patch with this paragraph corrected?
-
-Thanks!
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+So a few minor suggestions.  Otherwise looks good to me.
+> ---
+>  drivers/iio/adc/mt6577_auxadc.c |   37 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> diff --git a/drivers/iio/adc/mt6577_auxadc.c b/drivers/iio/adc/mt6577_auxadc.c
+> index 2d104c8..2dd7c74 100644
+> --- a/drivers/iio/adc/mt6577_auxadc.c
+> +++ b/drivers/iio/adc/mt6577_auxadc.c
+> @@ -184,6 +184,37 @@ static int mt6577_auxadc_read_raw(struct iio_dev *indio_dev,
+>  	.read_raw = &mt6577_auxadc_read_raw,
+>  };
+>  
+> +static int mt6577_auxadc_resume(struct device *dev)
+> +{
+> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+> +	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(adc_dev->adc_clk);
+> +	if (ret) {
+> +		pr_err("failed to enable auxadc clock\n");
+> +		return ret;
+> +	}
+> +
+> +	mt6577_auxadc_mod_reg(adc_dev->reg_base + MT6577_AUXADC_MISC,
+> +			      MT6577_AUXADC_PDN_EN, 0);
+> +	mdelay(MT6577_AUXADC_POWER_READY_MS);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mt6577_auxadc_suspend(struct device *dev)
+Mark these __maybe_unused for the CONFIG_PM but not CONFIG_PM_SLEEP case.
+> +{
+> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+> +	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
+> +
+> +	mt6577_auxadc_mod_reg(adc_dev->reg_base + MT6577_AUXADC_MISC,
+> +			      0, MT6577_AUXADC_PDN_EN);
+> +	clk_disable_unprepare(adc_dev->adc_clk);
+> +
+> +	return 0;
+> +}
+> +
+>  static int mt6577_auxadc_probe(struct platform_device *pdev)
+>  {
+>  	struct mt6577_auxadc_device *adc_dev;
+> @@ -269,6 +300,11 @@ static int mt6577_auxadc_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static const struct dev_pm_ops mt6577_auxadc_pm_ops = {
+> +	.suspend = mt6577_auxadc_suspend,
+> +	.resume = mt6577_auxadc_resume,
+> +};
+> +
+Use the SIMPLE_SYSTEM_PM_OPS macro to make these assignments magically go away
+if PM_CONFIG_SLEEP is not defined.
+>  static const struct of_device_id mt6577_auxadc_of_match[] = {
+>  	{ .compatible = "mediatek,mt2701-auxadc", },
+>  	{ .compatible = "mediatek,mt8173-auxadc", },
+> @@ -280,6 +316,7 @@ static int mt6577_auxadc_remove(struct platform_device *pdev)
+>  	.driver = {
+>  		.name   = "mt6577-auxadc",
+>  		.of_match_table = mt6577_auxadc_of_match,
+> +		.pm = &mt6577_auxadc_pm_ops,
+>  	},
+>  	.probe	= mt6577_auxadc_probe,
+>  	.remove	= mt6577_auxadc_remove,
