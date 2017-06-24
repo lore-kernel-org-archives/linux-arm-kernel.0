@@ -1,47 +1,23 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 24 Jun 2017 08:24:07 +0200
-Subject: [PATCH v13 02/14] ASoC: sun4i-codec: Add Mic Playback Volume.
-In-Reply-To: <20170624062419.23778-1-dannym@scratchpost.org>
-References: <20170624062419.23778-1-dannym@scratchpost.org>
-Message-ID: <20170624062419.23778-3-dannym@scratchpost.org>
+From: hch@lst.de (Christoph Hellwig)
+Date: Sat, 24 Jun 2017 09:18:55 +0200
+Subject: clean up and modularize arch dma_mapping interface V2
+In-Reply-To: <162d7932-5766-4c29-5471-07d1b699190a@oracle.com>
+References: <20170616181059.19206-1-hch@lst.de>
+ <162d7932-5766-4c29-5471-07d1b699190a@oracle.com>
+Message-ID: <20170624071855.GD14580@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Mic Playback Volume for Allwinner A10 and Allwinner A20.
+On Wed, Jun 21, 2017 at 12:24:28PM -0700, tndave wrote:
+> Thanks for doing this.
+> So archs can still have their own definition for dma_set_mask() if 
+> HAVE_ARCH_DMA_SET_MASK is y?
+> (and similarly for dma_set_coherent_mask() when 
+> CONFIG_ARCH_HAS_DMA_SET_COHERENT_MASK is y)
+> Any plan to change these?
 
-Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
----
- sound/soc/sunxi/sun4i-codec.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index f703293..49b9cd1 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -64,6 +64,7 @@
- #define SUN4I_CODEC_DAC_ACTL_DACAENR			(31)
- #define SUN4I_CODEC_DAC_ACTL_DACAENL			(30)
- #define SUN4I_CODEC_DAC_ACTL_MIXEN			(29)
-+#define SUN4I_CODEC_DAC_ACTL_MICG			(20)
- #define SUN4I_CODEC_DAC_ACTL_LDACLMIXS			(15)
- #define SUN4I_CODEC_DAC_ACTL_RDACRMIXS			(14)
- #define SUN4I_CODEC_DAC_ACTL_LDACRMIXS			(13)
-@@ -643,11 +644,16 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
- 			SUN4I_CODEC_DAC_ACTL_PA_MUTE, 1, 0);
- 
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
-+static DECLARE_TLV_DB_SCALE(sun4i_codec_micin_loopback_gain_scale, -450, 150,
-+			    0);
- 
- static const struct snd_kcontrol_new sun4i_codec_controls[] = {
- 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
- 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
- 		       sun4i_codec_pa_volume_scale),
-+	SOC_SINGLE_TLV("Mic Playback Volume", SUN4I_CODEC_DAC_ACTL,
-+		       SUN4I_CODEC_DAC_ACTL_MICG, 7, 0,
-+		       sun4i_codec_micin_loopback_gain_scale),
- };
- 
- static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
--- 
-2.1.4
+Yes, those should go away, but I'm not entirely sure how yet.  We'll
+need some hook for switching between an IOMMU and a direct mapping
+(I guess that's what you want to do for sparc as well?), and I need
+to find the best way to do that.  Reimplementing all of dma_set_mask
+and dma_set_coherent_mask is something that I want to move away from.
