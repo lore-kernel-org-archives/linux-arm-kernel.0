@@ -1,35 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 24 Jun 2017 04:29:54 +0200
-Subject: [PATCH 05/11] net: stmmac: dwmac-rk: Add internal phy support
-In-Reply-To: <1498193947-8011-1-git-send-email-david.wu@rock-chips.com>
-References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
- <1498193947-8011-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20170624022954.GD4875@lunn.ch>
+From: srishtishar@gmail.com (srishti sharma)
+Date: Sat, 24 Jun 2017 08:11:53 +0530
+Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
+ Fixed alignment to match open parenthesis
+In-Reply-To: <20170623162055.GB21608@kroah.com>
+References: <1497468895-3061-1-git-send-email-srishtishar@gmail.com>
+ <20170623162055.GB21608@kroah.com>
+Message-ID: <CAB3L5oza-wcxG6T01sCzDiatcUCx1L0uBtJR4C2Y9NLka-LqbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 12:59:07PM +0800, David Wu wrote:
-> To make internal phy worked, need to configure the phy_clock,
-> phy cru_reset and related registers.
-> 
-> Change-Id: I6971c0a769754b824b1b908b56080cbaf7867d13
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> ---
->  .../devicetree/bindings/net/rockchip-dwmac.txt     |  3 +
->  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 82 ++++++++++++++++++++++
->  2 files changed, 85 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> index 8f42755..0514f69 100644
-> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> @@ -22,6 +22,7 @@ Required properties:
->  	   <&cru SCLK_MACREF_OUT> clock gate for RMII reference clock output
->  	   <&cru ACLK_GMAC>: AXI clock gate for GMAC
->  	   <&cru PCLK_GMAC>: APB clock gate for GMAC
-> +	   <&cru MAC_PHY>: clock for internal macphy
+On Fri, Jun 23, 2017 at 9:50 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Thu, Jun 15, 2017 at 01:04:55AM +0530, srishti sharma wrote:
+>> Fixed alignment so that it matched open parenthesis.
+>>
+>> Signed-off-by: srishti sharma <srishtishar@gmail.com>
+>> ---
+>>  .../staging/vc04_services/bcm2835-audio/bcm2835-ctl.c  | 18 +++++++++---------
+>>  1 file changed, 9 insertions(+), 9 deletions(-)
+>
+> What differs from your previous patch?
 
-If this is the PHY clock, should it actually be specified in the PHY
-binding? Can you read the PHY ID registers with this clock off?
+The previous patch had only one check fixed , this has all checks of
+the type = parenthesis_alignment in the file bcm2835-ctl.c fixed .
+Also there was a typo in the description of the previous patch so I
+corrected that .
 
-	 Andrew
+   Always properly version your
+> patch so we know what to take.
+>
+> Please fix and resend.
+>
+> thanks,
+>
+> greg k-h
+
+Regards,
+Srishti
