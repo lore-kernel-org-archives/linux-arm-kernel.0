@@ -1,39 +1,42 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 24 Jun 2017 07:02:34 +0800
-Subject: [arm-platforms:kvm-arm64/gicv4-kvm 43/44] make[2]: *** No rule to
- make target 'arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.o', needed by
- 'arch/arm64/kvm/kvm.o'.
-Message-ID: <201706240733.cJxmM4x8%fengguang.wu@intel.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Fri, 23 Jun 2017 18:56:28 -0600
+Subject: [PATCH] drm: exynos: dsi: release DSI_PORT_OUT node right after
+ of_drm_find_bridge()
+Message-ID: <20170624005628.5896-1-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
-head:   bdab51ab2560539213cf4541763326b0caddbda5
-commit: fa9a010dcb7fa3e34ee10e9aeb0c112bd863f421 [43/44] WIP
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout fa9a010dcb7fa3e34ee10e9aeb0c112bd863f421
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Fix to call of_node_put() right after of_drm_find_bridge() instead of
+holding on to it until exynos_dsi_remove().
 
-Note: the arm-platforms/kvm-arm64/gicv4-kvm HEAD bdab51ab2560539213cf4541763326b0caddbda5 builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
->> make[2]: *** No rule to make target 'arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.o', needed by 'arch/arm64/kvm/kvm.o'.
-   make[2]: Target '__build' not remade because of errors.
-
+Suggested-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 35223 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170624/2fa08fe7/attachment-0001.gz>
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index e337cd2..7513b88 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1689,6 +1689,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
+ 
+ 	if (dsi->bridge_node) {
+ 		bridge = of_drm_find_bridge(dsi->bridge_node);
++		of_node_put(dsi->bridge_node);
+ 		if (bridge)
+ 			drm_bridge_attach(encoder, bridge, NULL);
+ 	}
+@@ -1807,10 +1808,6 @@ static int exynos_dsi_probe(struct platform_device *pdev)
+ 
+ static int exynos_dsi_remove(struct platform_device *pdev)
+ {
+-	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
+-
+-	of_node_put(dsi->bridge_node);
+-
+ 	pm_runtime_disable(&pdev->dev);
+ 
+ 	component_del(&pdev->dev, &exynos_dsi_component_ops);
+-- 
+2.7.4
