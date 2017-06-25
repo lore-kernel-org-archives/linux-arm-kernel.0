@@ -1,124 +1,69 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sun, 25 Jun 2017 22:25:32 +0530
-Subject: [PATCH] ARM: dts: exynos: Exynos5422 Odroid-XU* incomplete
- thermal-zones definition
-In-Reply-To: <20170625152911.kfq7vnxyhcqvfxpu@kozik-lap>
-References: <20170623210913.ugutgop7ratwolfy@inc028000032.lancs.ac.uk>
- <CANAwSgSN5zi72m1td-NAaCPGLUZybSdefrKAo2t9v-gOXn3tGA@mail.gmail.com>
- <20170625133134.g4iinztozsp4p2aa@kozik-lap>
- <CANAwSgQV6rtbx=LqWxRS+_sRctWiU1L=np7cZU8hTYg_V8Fbnw@mail.gmail.com>
- <20170625152911.kfq7vnxyhcqvfxpu@kozik-lap>
-Message-ID: <CANAwSgSZyhf-7BjwqoSAxBg=UDzCwEG=thpASEmZ=p=N5gpFQw@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sun, 25 Jun 2017 19:00:16 +0200
+Subject: [PATCH 1/5] clk: mb86s7x: Suppress build
+In-Reply-To: <20170625170020.11791-1-afaerber@suse.de>
+References: <20170625170020.11791-1-afaerber@suse.de>
+Message-ID: <20170625170020.11791-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof
+It fails to build once we introduce the ARCH_MB86S7X Kconfig symbol:
 
-On 25 June 2017 at 20:59, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Sun, Jun 25, 2017 at 08:48:13PM +0530, Anand Moon wrote:
->> Hi Krzystof,
->> >> 2: We should also increase the tips from 4 to 8 to support different
->> >> cluster of cpu's.
->> >
->> > There are 4 CPU thermal zones on Exynos5422. What do you want to expand?
->>
->> What I meant was to support more trip point to address below.
->> [    2.776320] exynos-tmu 100a0000.tmu: More trip points than
->> supported by this TMU.
->> [    2.782370] exynos-tmu 100a0000.tmu: 2 trip points should be
->> configured in polling mode.
->>
->
-> I do not understand what you want to achieve. I added 2 trip points in
-> polling mode for the CPU cooling mode. Just describe the problem and
-> send the patch - it is the best way to explain one's thought...
->
->> >> 3: To avoid duplication of cooling-maps we can make tmu sensor work
->> >> differently for cluster of cpu's
->> >>       tmu_cpu0: handle pwm-fan control.
->> >>       tmu_cpu1: handle cpu[0-3] cpufreq mapping.
->> >>       tmu_cpu2: handle cpu[4-7] cpufreq mapping.
->> >
->> > I miss the point behind this. Why fan should work only when CPU4
->> > (tmu_cpu0) is heated and not CPU5-7 (rest of cpu tmu's)?
->>
->> Ok fan should work on all the thermal zone. To avoid thermal shutdown.
->>
->> But I want to avoid scaling down of all the cores of cpu to low freq
->> as cooling-maps cross the alert temperature. For below example.
->> ----
->>  map3 {
->>               trip = <&cpu1_alert3>;
->>               cooling-device = <&cpu0 0 2>;
->>  };
->>  map4 {
->>               trip = <&cpu1_alert3>;
->>               cooling-device = <&cpu4 0 2>;
->>  };
->>
->>  map5 {
->>               trip = <&cpu1_alert4>;
->>               cooling-device = <&cpu0 3 7>;
->>  };
->>  map6 {
->>              trip = <&cpu1_alert4>;
->>              cooling-device = <&cpu4 3 12>;
->>  };
->>
->> What I want to configure thermal zone as.
->>
->> cpu0_thermal: cpu0-thermal {
->>      configure cluster of cpu[0-3]
->>      {
->>         tips
->>      }
->>      cooling map
->>      {
->>          device handle cpu[0-3] with frequency scaling at particular
->> alert temperature.
->>      }
->> }
->
-> cpu0_thermal is attached to tmu_cpu0 which is the temperature of CPU4
-> (first big core). I do not see reason behind connecting thermal zone
-> (thus temperature) of CPU4 with frequency of LITTLE cluster (CPU0-3). In
-> case of busy CPU4, you will scale down CPU0-3. Does not make sense.
->
+  drivers/clk/clk-mb86s7x.c:27:10: fatal error: soc/mb86s7x/scb_mhu.h: No such file or directory
+   #include <soc/mb86s7x/scb_mhu.h>
+            ^~~~~~~~~~~~~~~~~~~~~~~
+  compilation terminated.
 
-Both the cpu cluster are independent and have different cpu-freqency scaling.
-that is the reason to for my changes.
+And when commenting out that line, we get:
 
->> cpu1_thermal: cpu1-thermal {
->>      configure cluster of cpu[4-7]
->>      {
->>         tips
->>      }
->>      cooling map
->>      {
->>          device handle cpu[4-7] with frequency scaling at particular
->> alert temperature.
->>      }
->> }
->>
->> We can chose to configure rest of the thermal-zone on this approach.
->> Please share your thoughts.
->
-> I am sorry, I do not understand the idea, the problem nor the solution.
->
-> Best regards,
-> Krzysztof
->
+  drivers/clk/clk-mb86s7x.c: In function 'crg_gate_control':
+  drivers/clk/clk-mb86s7x.c:72:8: error: implicit declaration of function 'mb86s7x_send_packet' [-Werror=implicit-function-declaration]
+    ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
+          ^~~~~~~~~~~~~~~~~~~
+  drivers/clk/clk-mb86s7x.c:72:28: error: 'CMD_PERI_CLOCK_GATE_SET_REQ' undeclared (first use in this function)
+    ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
+                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+  drivers/clk/clk-mb86s7x.c:72:28: note: each undeclared identifier is reported only once for each function it appears in
+  drivers/clk/clk-mb86s7x.c: In function 'crg_rate_control':
+  drivers/clk/clk-mb86s7x.c:116:10: error: 'CMD_PERI_CLOCK_RATE_SET_REQ' undeclared (first use in this function)
+     code = CMD_PERI_CLOCK_RATE_SET_REQ;
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+  drivers/clk/clk-mb86s7x.c:121:10: error: 'CMD_PERI_CLOCK_RATE_GET_REQ' undeclared (first use in this function); did you mean 'CMD_PERI_CLOCK_RATE_SET_REQ'?
+     code = CMD_PERI_CLOCK_RATE_GET_REQ;
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+            CMD_PERI_CLOCK_RATE_SET_REQ
+  drivers/clk/clk-mb86s7x.c: In function 'mhu_cluster_rate':
+  drivers/clk/clk-mb86s7x.c:276:10: error: 'CMD_CPU_CLOCK_RATE_GET_REQ' undeclared (first use in this function)
+     code = CMD_CPU_CLOCK_RATE_GET_REQ;
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~
+  drivers/clk/clk-mb86s7x.c:278:10: error: 'CMD_CPU_CLOCK_RATE_SET_REQ' undeclared (first use in this function); did you mean 'CMD_CPU_CLOCK_RATE_GET_REQ'?
+     code = CMD_CPU_CLOCK_RATE_SET_REQ;
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~
+            CMD_CPU_CLOCK_RATE_GET_REQ
+  cc1: some warnings being treated as errors
+  scripts/Makefile.build:302: recipe for target
+  'drivers/clk/clk-mb86s7x.o' failed
+  make[2]: *** [drivers/clk/clk-mb86s7x.o] Error 1
 
-Sorry for not able to express my self in technical terms.
-my changes are based on exynos5433-tmu at this moment.
-Just attaching small patch to share my point.
+Comment it out in the Makefile for now.
 
-Best Regards
--Anand Moon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: tmu.patch
-Type: application/octet-stream
-Size: 7778 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170625/0815b71c/attachment.obj>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ drivers/clk/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 4f6a812342ed..0f0ab6f03ccd 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -28,7 +28,7 @@ obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
+ obj-$(CONFIG_COMMON_CLK_GEMINI)		+= clk-gemini.o
+ obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
+ obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
+-obj-$(CONFIG_ARCH_MB86S7X)		+= clk-mb86s7x.o
++#obj-$(CONFIG_ARCH_MB86S7X)		+= clk-mb86s7x.o
+ obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
+-- 
+2.12.3
