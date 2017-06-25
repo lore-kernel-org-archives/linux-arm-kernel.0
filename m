@@ -1,92 +1,34 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 26 Jun 2017 08:05:16 +1000
-Subject: [linux-sunxi] [PATCH v4 1/6] clk: sunxi-ng: div: Add support for
- fixed post-divider
-In-Reply-To: <bc043a64775ec8c9cfcfe6d638e348d38e34eba3.1498422562.git-series.plaes@plaes.org>
-References: <cover.24b2b13ec5a68552e186ba1637f1328363c3886e.1498422562.git-series.plaes@plaes.org>
- <bc043a64775ec8c9cfcfe6d638e348d38e34eba3.1498422562.git-series.plaes@plaes.org>
-Message-ID: <CANwerB1q68-PpQ7+-QbgBgZHeWw_4p1ruiwzy7upjLLRTDEG1w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 26 Jun 2017 00:06:06 +0200
+Subject: [GIT PULL 2/2] SoCFPGA update for v4.13
+In-Reply-To: <CAK8P3a2DFrabNdJu3d1V5F_uWRz0C+sPgqm9mnA_Wpzy6FYNDQ@mail.gmail.com>
+References: <1498059352-9483-1-git-send-email-dinguyen@kernel.org>
+ <1498059352-9483-2-git-send-email-dinguyen@kernel.org>
+ <CAK8P3a1vZVQ5MZDU+qp62LCLnF8z-9LFH=c7XYj=ZnPUzVMjOA@mail.gmail.com>
+ <CACRpkdbCrKo7Uvhdyx+4_hMQrPCYaMMijHpYzEY+2MePjpr73g@mail.gmail.com>
+ <CAK8P3a2DFrabNdJu3d1V5F_uWRz0C+sPgqm9mnA_Wpzy6FYNDQ@mail.gmail.com>
+Message-ID: <CACRpkdZeitT8sYui3W8Zqg5EyiGDtgbC5cGFfwYDDLaLR=92Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Priit,
+On Fri, Jun 23, 2017 at 2:38 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-This is showing from clock rate of 171428572 in the output of "cat
-/sys/kernel/debug/clk/clk_summary" for pll-periph-sata.
-The clock rate should be 100000000 (100 MHz) when read from the hardware.
-
-On 26 June 2017 at 06:45, Priit Laes <plaes@plaes.org> wrote:
-> SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
-> 6 is fixed post-divider.
+>> Helping out ridding the kernel of users of the old GPIO global
+>> numberspace ABI is appreciated though.
 >
-> Signed-off-by: Priit Laes <plaes@plaes.org>
-> ---
->  drivers/clk/sunxi-ng/ccu_div.c | 12 ++++++++++--
->  drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
->  2 files changed, 12 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-> index c0e5c10..de30e15 100644
-> --- a/drivers/clk/sunxi-ng/ccu_div.c
-> +++ b/drivers/clk/sunxi-ng/ccu_div.c
+> I guess there is no easy way to figure out which drivers are needed on
+> socfpga and do those first, right?
 
-Missing handling of fixed_post_div in ccu_div_round_rate.
-ccu_div_round_rate should multiply the rate by the postdiv before
-looking up the divider using divider_get_val and divide val by postdiv
-just before returning.
+Nah, we have a few hard cases.
 
-> @@ -62,8 +62,13 @@ static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
->         parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
->                                                   parent_rate);
->
-> -       return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
-> -                                  cd->div.flags);
-> +       val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
-> +                                 cd->div.flags);
-> +
-> +       if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> +               val /= cd->fixed_post_div;
-> +
-> +       return val;
->  }
->
->  static int ccu_div_determine_rate(struct clk_hw *hw,
+The most annoying one is with regulators, those need to grab the
+same GPIO line several times and use in parallel. It is a valid case,
+so we need a way to get GPIO descriptors non-execlusively for these
+so we can deal with it properly.
 
-> @@ -89,6 +94,9 @@ static int ccu_div_set_rate(struct clk_hw *hw, unsigned long rate,
->         val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
->                               cd->div.flags);
->
-> +       if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> +               val *= cd->fixed_post_div;
-> +
->         spin_lock_irqsave(cd->common.lock, flags);
->
->         reg = readl(cd->common.base + cd->common.reg);
+Then there is a bunch of cases where it's simpler, those are low-hanging
+fruit. Like the conversion of backlight on GPIO I sent recently. They just
+need being churned out one by one.
 
-val here is the divider value that is stored in the clock register
-field not the actual rate so this is incorrect. Instead the rate needs
-to be multiplied by postdiv just before divider_get_val.
-
-> diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
-> index 08d0744..f3a5028 100644
-> --- a/drivers/clk/sunxi-ng/ccu_div.h
-> +++ b/drivers/clk/sunxi-ng/ccu_div.h
-> @@ -86,9 +86,10 @@ struct ccu_div_internal {
->  struct ccu_div {
->         u32                     enable;
->
-> -       struct ccu_div_internal         div;
-> +       struct ccu_div_internal div;
->         struct ccu_mux_internal mux;
->         struct ccu_common       common;
-> +       unsigned int            fixed_post_div;
->  };
->
->  #define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,   \
-> --
-> git-series 0.9.1
-
-Thanks.
-
-Regards,
-Jonathan
+Yours,
+Linus Walleij
