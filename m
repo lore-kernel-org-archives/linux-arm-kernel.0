@@ -1,101 +1,155 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 25 Jun 2017 17:29:11 +0200
-Subject: [PATCH] ARM: dts: exynos: Exynos5422 Odroid-XU* incomplete
- thermal-zones definition
-In-Reply-To: <CANAwSgQV6rtbx=LqWxRS+_sRctWiU1L=np7cZU8hTYg_V8Fbnw@mail.gmail.com>
-References: <20170623210913.ugutgop7ratwolfy@inc028000032.lancs.ac.uk>
- <CANAwSgSN5zi72m1td-NAaCPGLUZybSdefrKAo2t9v-gOXn3tGA@mail.gmail.com>
- <20170625133134.g4iinztozsp4p2aa@kozik-lap>
- <CANAwSgQV6rtbx=LqWxRS+_sRctWiU1L=np7cZU8hTYg_V8Fbnw@mail.gmail.com>
-Message-ID: <20170625152911.kfq7vnxyhcqvfxpu@kozik-lap>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun, 25 Jun 2017 10:46:09 -0500
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for ITS
+ tables
+Message-ID: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 25, 2017 at 08:48:13PM +0530, Anand Moon wrote:
-> Hi Krzystof,
-> >> 2: We should also increase the tips from 4 to 8 to support different
-> >> cluster of cpu's.
-> >
-> > There are 4 CPU thermal zones on Exynos5422. What do you want to expand?
-> 
-> What I meant was to support more trip point to address below.
-> [    2.776320] exynos-tmu 100a0000.tmu: More trip points than
-> supported by this TMU.
-> [    2.782370] exynos-tmu 100a0000.tmu: 2 trip points should be
-> configured in polling mode.
-> 
+The NUMA node information is visible to ITS driver but not being used
+other than handling errata. This patch allocates the memory for ITS
+tables from the corresponding NUMA node using the appropriate NUMA
+aware functions.
 
-I do not understand what you want to achieve. I added 2 trip points in
-polling mode for the CPU cooling mode. Just describe the problem and
-send the patch - it is the best way to explain one's thought...
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
+ 1 file changed, 20 insertions(+), 16 deletions(-)
 
-> >> 3: To avoid duplication of cooling-maps we can make tmu sensor work
-> >> differently for cluster of cpu's
-> >>       tmu_cpu0: handle pwm-fan control.
-> >>       tmu_cpu1: handle cpu[0-3] cpufreq mapping.
-> >>       tmu_cpu2: handle cpu[4-7] cpufreq mapping.
-> >
-> > I miss the point behind this. Why fan should work only when CPU4
-> > (tmu_cpu0) is heated and not CPU5-7 (rest of cpu tmu's)?
-> 
-> Ok fan should work on all the thermal zone. To avoid thermal shutdown.
-> 
-> But I want to avoid scaling down of all the cores of cpu to low freq
-> as cooling-maps cross the alert temperature. For below example.
-> ----
->  map3 {
->               trip = <&cpu1_alert3>;
->               cooling-device = <&cpu0 0 2>;
->  };
->  map4 {
->               trip = <&cpu1_alert3>;
->               cooling-device = <&cpu4 0 2>;
->  };
-> 
->  map5 {
->               trip = <&cpu1_alert4>;
->               cooling-device = <&cpu0 3 7>;
->  };
->  map6 {
->              trip = <&cpu1_alert4>;
->              cooling-device = <&cpu4 3 12>;
->  };
-> 
-> What I want to configure thermal zone as.
-> 
-> cpu0_thermal: cpu0-thermal {
->      configure cluster of cpu[0-3]
->      {
->         tips
->      }
->      cooling map
->      {
->          device handle cpu[0-3] with frequency scaling at particular
-> alert temperature.
->      }
-> }
-
-cpu0_thermal is attached to tmu_cpu0 which is the temperature of CPU4
-(first big core). I do not see reason behind connecting thermal zone
-(thus temperature) of CPU4 with frequency of LITTLE cluster (CPU0-3). In
-case of busy CPU4, you will scale down CPU0-3. Does not make sense.
-
-> cpu1_thermal: cpu1-thermal {
->      configure cluster of cpu[4-7]
->      {
->         tips
->      }
->      cooling map
->      {
->          device handle cpu[4-7] with frequency scaling at particular
-> alert temperature.
->      }
-> }
-> 
-> We can chose to configure rest of the thermal-zone on this approach.
-> Please share your thoughts.
-
-I am sorry, I do not understand the idea, the problem nor the solution.
-
-Best regards,
-Krzysztof
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index fed99c5..e45add2 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -860,8 +860,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	u64 val = its_read_baser(its, baser);
+ 	u64 esz = GITS_BASER_ENTRY_SIZE(val);
+ 	u64 type = GITS_BASER_TYPE(val);
++	struct page *page;
+ 	u32 alloc_pages;
+-	void *base;
+ 	u64 tmp;
+ 
+ retry_alloc_baser:
+@@ -874,12 +874,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		order = get_order(GITS_BASER_PAGES_MAX * psz);
+ 	}
+ 
+-	base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+-	if (!base)
++	page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
++	if (!page)
+ 		return -ENOMEM;
+ 
+ retry_baser:
+-	val = (virt_to_phys(base)				 |
++	val = (page_to_phys(page)				 |
+ 		(type << GITS_BASER_TYPE_SHIFT)			 |
+ 		((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)	 |
+ 		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
+@@ -915,7 +915,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+ 		if (!shr) {
+ 			cache = GITS_BASER_nC;
+-			gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
++			gic_flush_dcache_to_poc(page_to_virt(page),
++						PAGE_ORDER_TO_SIZE(order));
+ 		}
+ 		goto retry_baser;
+ 	}
+@@ -926,7 +927,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		 * size and retry. If we reach 4K, then
+ 		 * something is horribly wrong...
+ 		 */
+-		free_pages((unsigned long)base, order);
++		__free_pages(page, order);
+ 		baser->base = NULL;
+ 
+ 		switch (psz) {
+@@ -943,19 +944,19 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
+ 		       &its->phys_base, its_base_type_string[type],
+ 		       val, tmp);
+-		free_pages((unsigned long)base, order);
++		__free_pages(page, order);
+ 		return -ENXIO;
+ 	}
+ 
+ 	baser->order = order;
+-	baser->base = base;
++	baser->base = page_to_virt(page);
+ 	baser->psz = psz;
+ 	tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
+ 
+ 	pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
+ 		&its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
+ 		its_base_type_string[type],
+-		(unsigned long)virt_to_phys(base),
++		(unsigned long)page_to_phys(page),
+ 		indirect ? "indirect" : "flat", (int)esz,
+ 		psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+ 
+@@ -1019,7 +1020,7 @@ static void its_free_tables(struct its_node *its)
+ 
+ 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+ 		if (its->tables[i].base) {
+-			free_pages((unsigned long)its->tables[i].base,
++			__free_pages(virt_to_page(its->tables[i].base),
+ 				   its->tables[i].order);
+ 			its->tables[i].base = NULL;
+ 		}
+@@ -1286,7 +1287,8 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+ 
+ 	/* Allocate memory for 2nd level table */
+ 	if (!table[idx]) {
+-		page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
++		page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
++					get_order(baser->psz));
+ 		if (!page)
+ 			return false;
+ 
+@@ -1332,7 +1334,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+ 	sz = nr_ites * its->ite_size;
+ 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+-	itt = kzalloc(sz, GFP_KERNEL);
++	itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
+ 	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+ 	if (lpi_map)
+ 		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+@@ -1677,6 +1679,7 @@ static int __init its_probe_one(struct resource *res,
+ {
+ 	struct its_node *its;
+ 	void __iomem *its_base;
++	struct page *page;
+ 	u32 val;
+ 	u64 baser, tmp;
+ 	int err;
+@@ -1716,12 +1719,13 @@ static int __init its_probe_one(struct resource *res,
+ 	its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+ 	its->numa_node = numa_node;
+ 
+-	its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+-						get_order(ITS_CMD_QUEUE_SZ));
+-	if (!its->cmd_base) {
++	page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
++				get_order(ITS_CMD_QUEUE_SZ));
++	if (!page) {
+ 		err = -ENOMEM;
+ 		goto out_free_its;
+ 	}
++	its->cmd_base = page_to_virt(page);
+ 	its->cmd_write = its->cmd_base;
+ 
+ 	its_enable_quirks(its);
+@@ -1775,7 +1779,7 @@ static int __init its_probe_one(struct resource *res,
+ out_free_tables:
+ 	its_free_tables(its);
+ out_free_cmd:
+-	free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
++	__free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
+ out_free_its:
+ 	kfree(its);
+ out_unmap:
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
