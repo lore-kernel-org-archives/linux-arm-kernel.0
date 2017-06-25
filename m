@@ -1,38 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 25 Jun 2017 11:18:56 +0200
-Subject: omap3isp camera was Re: [PATCH v1 0/6] Add support of OV9655 camera
-In-Reply-To: <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <385A82AC-CC23-41BD-9F57-0232F713FED9@goldelico.com>
- <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
-Message-ID: <20170625091856.GA22791@amd>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sun, 25 Jun 2017 18:50:33 +0800
+Subject: [xlnx:master 514/710] ERROR: "dwc3_enable_hw_coherency"
+ [drivers/usb/dwc3/dwc3.ko] undefined!
+Message-ID: <201706251831.ku4CfMlj%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Manish,
 
-> * unfortunately we still get no image :(
-> 
-> The latter is likely a setup issue of our camera interface (OMAP3 ISP = Image Signal Processor) which
-> we were not yet able to solve. Oscilloscoping signals on the interface indicated that signals and
-> sync are correct. But we do not know since mplayer only shows a green screen.
+FYI, the error/warning still remains.
 
-What mplayer command line do you use? How did you set up the pipeline
-with media-ctl?
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   ae4bbf82f4b9fdfc85b3fd112696e8bbefff07f2
+commit: 3384f40fd94ebab037bd6bd6853d502bef6e6029 [514/710] usb: dwc3: core: Enable CCI support in dwc3 core driver
+config: arm-omap2plus_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 3384f40fd94ebab037bd6bd6853d502bef6e6029
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-On kernel.org, I have tree called camera-fw5-6 , where camera works
-for me on n900. On gitlab, there's modifed fcam-dev, which can be used
-for testing.
+All errors (new ones prefixed by >>):
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>> ERROR: "dwc3_enable_hw_coherency" [drivers/usb/dwc3/dwc3.ko] undefined!
+   ERROR: "devm_ioremap_release" [drivers/usb/dwc3/dwc3-of-simple.ko] undefined!
+   ERROR: "of_add_property" [drivers/usb/dwc3/dwc3-of-simple.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170625/60b95330/attachment.sig>
+Name: .config.gz
+Type: application/gzip
+Size: 28524 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170625/1dd73322/attachment-0001.gz>
