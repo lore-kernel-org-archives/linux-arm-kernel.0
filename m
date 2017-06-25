@@ -1,20 +1,105 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sun, 25 Jun 2017 16:31:16 +0200
+From: srishtishar@gmail.com (Srishti Sharma)
+Date: Sun, 25 Jun 2017 20:12:08 +0530
 Subject: [PATCH v2] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
  Fixed alignment to match open parenthesis.
-In-Reply-To: <1498274890-3486-1-git-send-email-srishtishar@gmail.com>
-References: <1498274890-3486-1-git-send-email-srishtishar@gmail.com>
-Message-ID: <20170625143116.GA22417@kroah.com>
+Message-ID: <1498401728-2275-1-git-send-email-srishtishar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 24, 2017 at 08:58:10AM +0530, srishti sharma wrote:
-> Fixed alignment so that it matched open parenthesis.
-> 
-> Signed-off-by: srishti sharma <srishtishar@gmail.com>
+Fixed alignment so that it matched open parenthesis.
 
-Does your legal name not have capital letters?  Please fix and resend.
+Signed-off-by: Srishti Sharma <srishtishar@gmail.com>
+---
+Changes in v2:
+ -Fix all checks of the type "alignment should match open parenthesis" for a file in the same patch.
 
-thanks,
+ .../staging/vc04_services/bcm2835-audio/bcm2835-ctl.c  | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-greg k-h
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+index f484bb0..ce8ab36 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+@@ -105,7 +105,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
+ }
+
+ static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
+-				struct snd_ctl_elem_value *ucontrol)
++			       struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+ 	int changed = 0;
+@@ -185,7 +185,7 @@ static struct snd_kcontrol_new snd_bcm2835_ctl[] = {
+ };
+
+ static int snd_bcm2835_spdif_default_info(struct snd_kcontrol *kcontrol,
+-	struct snd_ctl_elem_info *uinfo)
++					  struct snd_ctl_elem_info *uinfo)
+ {
+ 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
+ 	uinfo->count = 1;
+@@ -193,7 +193,7 @@ static int snd_bcm2835_spdif_default_info(struct snd_kcontrol *kcontrol,
+ }
+
+ static int snd_bcm2835_spdif_default_get(struct snd_kcontrol *kcontrol,
+-	struct snd_ctl_elem_value *ucontrol)
++					 struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+ 	int i;
+@@ -210,7 +210,7 @@ static int snd_bcm2835_spdif_default_get(struct snd_kcontrol *kcontrol,
+ }
+
+ static int snd_bcm2835_spdif_default_put(struct snd_kcontrol *kcontrol,
+-	struct snd_ctl_elem_value *ucontrol)
++					 struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+ 	unsigned int val = 0;
+@@ -230,7 +230,7 @@ static int snd_bcm2835_spdif_default_put(struct snd_kcontrol *kcontrol,
+ }
+
+ static int snd_bcm2835_spdif_mask_info(struct snd_kcontrol *kcontrol,
+-	struct snd_ctl_elem_info *uinfo)
++				       struct snd_ctl_elem_info *uinfo)
+ {
+ 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
+ 	uinfo->count = 1;
+@@ -238,7 +238,7 @@ static int snd_bcm2835_spdif_mask_info(struct snd_kcontrol *kcontrol,
+ }
+
+ static int snd_bcm2835_spdif_mask_get(struct snd_kcontrol *kcontrol,
+-	struct snd_ctl_elem_value *ucontrol)
++				      struct snd_ctl_elem_value *ucontrol)
+ {
+ 	/*
+ 	 * bcm2835 supports only consumer mode and sets all other format flags
+@@ -249,7 +249,7 @@ static int snd_bcm2835_spdif_mask_get(struct snd_kcontrol *kcontrol,
+ }
+
+ static int snd_bcm2835_spdif_stream_info(struct snd_kcontrol *kcontrol,
+-	struct snd_ctl_elem_info *uinfo)
++					 struct snd_ctl_elem_info *uinfo)
+ {
+ 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
+ 	uinfo->count = 1;
+@@ -257,7 +257,7 @@ static int snd_bcm2835_spdif_stream_info(struct snd_kcontrol *kcontrol,
+ }
+
+ static int snd_bcm2835_spdif_stream_get(struct snd_kcontrol *kcontrol,
+-	struct snd_ctl_elem_value *ucontrol)
++					struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+ 	int i;
+@@ -274,7 +274,7 @@ static int snd_bcm2835_spdif_stream_get(struct snd_kcontrol *kcontrol,
+ }
+
+ static int snd_bcm2835_spdif_stream_put(struct snd_kcontrol *kcontrol,
+-	struct snd_ctl_elem_value *ucontrol)
++					struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+ 	unsigned int val = 0;
+--
+2.7.4
