@@ -1,27 +1,124 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 26 Jun 2017 00:07:08 +0800
-Subject: [PATCH v1 6/6] [media] ov9650: add support of OV9655 variant
-In-Reply-To: <1498143942-12682-7-git-send-email-hugues.fruchet@st.com>
-Message-ID: <201706252313.0XcqTjb4%fengguang.wu@intel.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Sun, 25 Jun 2017 22:25:32 +0530
+Subject: [PATCH] ARM: dts: exynos: Exynos5422 Odroid-XU* incomplete
+ thermal-zones definition
+In-Reply-To: <20170625152911.kfq7vnxyhcqvfxpu@kozik-lap>
+References: <20170623210913.ugutgop7ratwolfy@inc028000032.lancs.ac.uk>
+ <CANAwSgSN5zi72m1td-NAaCPGLUZybSdefrKAo2t9v-gOXn3tGA@mail.gmail.com>
+ <20170625133134.g4iinztozsp4p2aa@kozik-lap>
+ <CANAwSgQV6rtbx=LqWxRS+_sRctWiU1L=np7cZU8hTYg_V8Fbnw@mail.gmail.com>
+ <20170625152911.kfq7vnxyhcqvfxpu@kozik-lap>
+Message-ID: <CANAwSgSZyhf-7BjwqoSAxBg=UDzCwEG=thpASEmZ=p=N5gpFQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hugues,
+Hi Krzysztof
 
-[auto build test WARNING on linuxtv-media/master]
-[also build test WARNING on v4.12-rc6 next-20170623]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 25 June 2017 at 20:59, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Sun, Jun 25, 2017 at 08:48:13PM +0530, Anand Moon wrote:
+>> Hi Krzystof,
+>> >> 2: We should also increase the tips from 4 to 8 to support different
+>> >> cluster of cpu's.
+>> >
+>> > There are 4 CPU thermal zones on Exynos5422. What do you want to expand?
+>>
+>> What I meant was to support more trip point to address below.
+>> [    2.776320] exynos-tmu 100a0000.tmu: More trip points than
+>> supported by this TMU.
+>> [    2.782370] exynos-tmu 100a0000.tmu: 2 trip points should be
+>> configured in polling mode.
+>>
+>
+> I do not understand what you want to achieve. I added 2 trip points in
+> polling mode for the CPU cooling mode. Just describe the problem and
+> send the patch - it is the best way to explain one's thought...
+>
+>> >> 3: To avoid duplication of cooling-maps we can make tmu sensor work
+>> >> differently for cluster of cpu's
+>> >>       tmu_cpu0: handle pwm-fan control.
+>> >>       tmu_cpu1: handle cpu[0-3] cpufreq mapping.
+>> >>       tmu_cpu2: handle cpu[4-7] cpufreq mapping.
+>> >
+>> > I miss the point behind this. Why fan should work only when CPU4
+>> > (tmu_cpu0) is heated and not CPU5-7 (rest of cpu tmu's)?
+>>
+>> Ok fan should work on all the thermal zone. To avoid thermal shutdown.
+>>
+>> But I want to avoid scaling down of all the cores of cpu to low freq
+>> as cooling-maps cross the alert temperature. For below example.
+>> ----
+>>  map3 {
+>>               trip = <&cpu1_alert3>;
+>>               cooling-device = <&cpu0 0 2>;
+>>  };
+>>  map4 {
+>>               trip = <&cpu1_alert3>;
+>>               cooling-device = <&cpu4 0 2>;
+>>  };
+>>
+>>  map5 {
+>>               trip = <&cpu1_alert4>;
+>>               cooling-device = <&cpu0 3 7>;
+>>  };
+>>  map6 {
+>>              trip = <&cpu1_alert4>;
+>>              cooling-device = <&cpu4 3 12>;
+>>  };
+>>
+>> What I want to configure thermal zone as.
+>>
+>> cpu0_thermal: cpu0-thermal {
+>>      configure cluster of cpu[0-3]
+>>      {
+>>         tips
+>>      }
+>>      cooling map
+>>      {
+>>          device handle cpu[0-3] with frequency scaling at particular
+>> alert temperature.
+>>      }
+>> }
+>
+> cpu0_thermal is attached to tmu_cpu0 which is the temperature of CPU4
+> (first big core). I do not see reason behind connecting thermal zone
+> (thus temperature) of CPU4 with frequency of LITTLE cluster (CPU0-3). In
+> case of busy CPU4, you will scale down CPU0-3. Does not make sense.
+>
 
-url:    https://github.com/0day-ci/linux/commits/Hugues-Fruchet/Add-support-of-OV9655-camera/20170625-201153
-base:   git://linuxtv.org/media_tree.git master
+Both the cpu cluster are independent and have different cpu-freqency scaling.
+that is the reason to for my changes.
 
+>> cpu1_thermal: cpu1-thermal {
+>>      configure cluster of cpu[4-7]
+>>      {
+>>         tips
+>>      }
+>>      cooling map
+>>      {
+>>          device handle cpu[4-7] with frequency scaling at particular
+>> alert temperature.
+>>      }
+>> }
+>>
+>> We can chose to configure rest of the thermal-zone on this approach.
+>> Please share your thoughts.
+>
+> I am sorry, I do not understand the idea, the problem nor the solution.
+>
+> Best regards,
+> Krzysztof
+>
 
-coccinelle warnings: (new ones prefixed by >>)
+Sorry for not able to express my self in technical terms.
+my changes are based on exynos5433-tmu at this moment.
+Just attaching small patch to share my point.
 
->> drivers/media/i2c/ov9650.c:2034:2-3: Unneeded semicolon
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Best Regards
+-Anand Moon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: tmu.patch
+Type: application/octet-stream
+Size: 7778 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170625/0815b71c/attachment.obj>
