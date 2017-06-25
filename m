@@ -1,34 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 26 Jun 2017 00:08:55 +0200
-Subject: [PATCH v8] clk: Add Gemini SoC clock controller
-In-Reply-To: <20170621174540.GB4493@codeaurora.org>
-References: <20170621075952.26387-1-linus.walleij@linaro.org>
- <20170621174540.GB4493@codeaurora.org>
-Message-ID: <CACRpkdbv9L1mwtaBTW93BNkGbPcRjsO5yda+SY2iHUSL41Q2ZQ@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 26 Jun 2017 06:49:56 +0800
+Subject: [arm-platforms:kvm-arm64/gicv4-kvm 45/45]
+ arch/arm/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.c:262:22: error:
+ 'struct its_vpe' has no member named 'vm'
+Message-ID: <201706260654.8gOWq9qa%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 7:45 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/21, Linus Walleij wrote:
->> The Cortina Systems Gemini (SL3516/CS3516) has an on-chip clock
->> controller that derive all clocks from a single crystal, using some
->> documented and some undocumented PLLs, half dividers, counters and
->> gates. This is a best attempt to construct a clock driver for the
->> clocks so at least we can gate off unused hardware and driver the
->> PCI bus clock.
->>
->> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->
-> Applied to clk-next + this fixup
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
+head:   6930e5891d9ee6507e03e79a72d419e48c3f89cc
+commit: 6930e5891d9ee6507e03e79a72d419e48c3f89cc [45/45] KVM: arm/arm64: GICv4: Enable virtual cpuif if VLPIs can be delivered
+config: arm-axm55xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 6930e5891d9ee6507e03e79a72d419e48c3f89cc
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Thanks, and thanks a lot for fixing.
+All errors (new ones prefixed by >>):
 
-Hm, I copied that code from somewhere.
+   arch/arm/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.c: In function '__vgic_v3_save_state':
+>> arch/arm/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.c:262:22: error: 'struct its_vpe' has no member named 'vm'
+          cpu_if->its_vpe.vm)
+                         ^
+   arch/arm/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.c: In function '__vgic_v3_restore_state':
+   arch/arm/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.c:345:22: error: 'struct its_vpe' has no member named 'vm'
+          cpu_if->its_vpe.vm)
+                         ^
 
-Now I need to try to remember where so I can go and
-fix the bad example.
+vim +262 arch/arm/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.c
 
-Yours,
-Linus Walleij
+   256				cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
+   257			default:
+   258				cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
+   259			}
+   260		} else {
+   261			if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+ > 262			    cpu_if->its_vpe.vm)
+   263				write_gicreg(0, ICH_HCR_EL2);
+   264	
+   265			cpu_if->vgic_elrsr = 0xffff;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 20100 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170626/34c31771/attachment-0001.gz>
