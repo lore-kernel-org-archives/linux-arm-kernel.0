@@ -1,175 +1,81 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 26 Jun 2017 17:36:39 +0100
-Subject: [RFC PATCH 0/2] ARM: Fix unparseable signal frame with
- CONFIG_IWMMXT
-In-Reply-To: <20170626144001.GH4902@n2100.armlinux.org.uk>
-References: <1498059983-13438-1-git-send-email-Dave.Martin@arm.com>
- <20170626101304.GG4902@n2100.armlinux.org.uk>
- <20170626133255.GH8543@e103592.cambridge.arm.com>
- <20170626144001.GH4902@n2100.armlinux.org.uk>
-Message-ID: <20170626163634.GI8543@e103592.cambridge.arm.com>
+Date: Mon, 26 Jun 2017 17:38:15 +0100
+Subject: [RFC PATCH] arm64: signal: Make parse_user_sigframe()
+ independent of rt_sigframe layout
+In-Reply-To: <20170626153827.kzraqd3s7gavx3uw@yury-thinkpad>
+References: <1498208859-6099-1-git-send-email-Dave.Martin@arm.com>
+ <20170625150544.2qsh4hpnmxygmcft@yury-thinkpad>
+ <20170626093518.GG8543@e103592.cambridge.arm.com>
+ <20170626153827.kzraqd3s7gavx3uw@yury-thinkpad>
+Message-ID: <20170626163814.GJ8543@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 03:40:01PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 26, 2017 at 02:32:56PM +0100, Dave Martin wrote:
-> > On Mon, Jun 26, 2017 at 11:13:04AM +0100, Russell King - ARM Linux wrote:
-> > > Hmm, I would actually suggest that we poke in a correct size for the
-> > > missing iWMMXt record, and an invalid magic number as the "simple"
-> > > solution for this - that doesn't make any layout changes to the
-> > > data structures, and is probably the safest solution for backporting.
+On Mon, Jun 26, 2017 at 06:38:27PM +0300, Yury Norov wrote:
+> On Mon, Jun 26, 2017 at 10:35:21AM +0100, Dave Martin wrote:
+> > On Sun, Jun 25, 2017 at 06:05:44PM +0300, Yury Norov wrote:
+> > > On Fri, Jun 23, 2017 at 10:07:39AM +0100, Dave Martin wrote:
+> > > > ILP32 support uses the same struct sigcontext as the native ABI
+> > > > (i.e., LP64), but a different layout for the rest of the signal
+> > > > frame (since siginfo_t and ucontext_t are both ABI-dependent).
+> > > > 
+> > > > Since the purpose of parse_user_sigframe() is really to parse
+> > > > sigcontext and not the whole signal frame, the function does not
+> > > > need to depend on the layout of rt_sigframe -- the only purpose of
+> > > > the rt_sigframe pointer is for use as a base to measure the signal
+> > > > frame size.
+> > > > 
+> > > > So, this patch renames the function to parse_user_sigcontext() and
+> > > > makes the sigframe base pointer generic.  ABI-specific parsers that
+> > > > share the same sigcontext definition can then call it.
+> > > > 
+> > > > To minimise churn in this patch, the native LP64 parser is retained
+> > > > under the old name, but becomes a call to parse_user_sigconext().
+> > > > It may make sense instead to fold this into its restore_sigframe(),
+> > > > depending on how ILP32 support is integrated.
+> > > > 
+> > > > Suggested-by: Yury Norov <ynorov@caviumnetworks.com>
+> > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > > ---
+> > > > 
+> > > > This patch depends on [1], which does not appear to be applied yet.
+> > > > 
+> > > > [1] [PATCH] arm64: signal: Allow expansion of the signal frame                  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/514699.html
 > > 
-> > This avoids altering the sigframe layout at all in this case, which
-> > feels less dirsuptive, but overall I'm not sure it's lower-risk.
+> > [...]
 > > 
-> > I'm concerned that there are a some userspace sigframe parsers out there
-> > that work only by accident, especially given that the kernel sigreturn
-> > implementation is the primary example and that doesn't need to be fully
-> > robust (since the kernel lays out the sigframe itself during signal
-> > delivery).
-> 
-> I'd hope that the kernel implementation is not used as an example - it
-> most certainly is not an example, as it does no parsing of the data
-> structures.  As the kernel is responsible for creating the layout, it
-> expects the exact same layout coming back in, and any deviation from
-> that results in the task being forcefully exited.
-
-Unfortunately, things that are not intended as examples do still get
-used.  We can argue that's the userspace folks' fault, but it still
-creates de facto ABI...
-
-> Userspace doesn't have the luxury of prior knowledge of the layout -
-> it doesn't know how the kernel is configured.  It can't assume (eg)
-> that VFP will be at 0xa0 bytes in if IWMMXT but not CRUNCH is enabled.
-
-Agreed
-
-> Basically, the layout that the kernel creates is entirely dependent on
-> the kernel configuration, and any scheme that replicates what the kernel
-> is doing in the restore paths is doomed to failure.  (However, that's
-> not to say userspace isn't, but if it is, userspace breaks if the kernel
-> configuration is changed.  I don't regard that as a kernel-induced
-> userspace regression though - it's a bit like expecting EABI userspace
-> to work with OABI-only supporting kernel.)
-
-I'm actually a little confused by, say,
-
-https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/arm/setcontext.S;h=db6aebfbd4d360e3b7ba525cf2e483f8e3ddfc0d;hb=HEAD
-
-Assuming I'm looking in the right place here, glibc effectively uses its
-own private format for uc_regspace -- maybe there is kernel history
-here I'm not aware of, or maybe it's not even trying to be compatible.
-
-
-Also, libunwind does not appear to attempt to parse uc_regspace:
-
-git.savannah.gnu.org/gitweb/?p=libunwind.git;a=blob;f=src/arm/Gstep.c;h=37e6c12f115173ebbc9ebcf511c53fd7c0a7d9a1;hb=HEAD
-
-
-I've not fully understood the gdb code, but there is a comment in
-arm-linux-tdep.c that suggests that uc_regspace is not processed (nor do
-I see any other mention of uc_regspace or things like VFP_MAGIC:
-
-https://sourceware.org/git/?p=binutils-gdb.git;a=blob;f=gdb/arm-linux-tdep.c;h=95c52608adbb1ff92a9ddb203835d5a1102339bd;hb=HEAD
-
-/* The VFP or iWMMXt registers may be saved on the stack, but there's
-	no reliable way to restore them (yet).  */
-
-
-Do you know of any userspace parser of uc_regspace?
-
-All I have so far is this, from the reporter of the bug:
-
-https://github.com/DynamoRIO/dynamorio/commit/0b75c635033d01ab04f955f5affe14a3ced9ab56
-
-
-> Now, the possibilities for userspace to parse the "broken" kernel layout
-> for VFP information are:
-> 
-> 1. To use a fixed offset from the start (which means it breaks if the
->    kernel is reconfigured.)
-> 
-> 2. userspace checks several fixed offsets for the VFP identifier (at 0,
->    0xa0, 0xc0 or 0x160).  That's risky if the other state happens to
->    contain a word that looks like the VFP identifier.
-> 
-> If userspace is using the proper method that the original code intended,
-> userspace would hit uninitialised memory for the iWMMXT block identifier
-> and size (they'd see stale data on the stack) and if they interpret the
-> "size" field to try and skip over it, they could end up anywhere in
-> memory space.
-> 
-> Fixing it using your approach would mean that the VFP block ends up at
-> a variable location depending on whether the iWMMXT state was saved -
-> which certainly breaks (1) in a way that does not depend on kernel
-> configuration.  (2) survives as they'd find the identifier whatever
-> happens.
-> 
-> My proposal solves all three cases, because userspace ends up with a
-> correct size for what is an unknown block of code, and doesn't involve
-> moving anything around.  It shouldn't break the "correct" parsing that
-> userspace should be doing either, because it should skip over the
-> unknown block.  The only case that it would break is if the identifier
-> were to somehow match, and I think the chances of that are very slim.
-> So I believe (without evidence to the contary) that this would be the
-> lowest risk.
-
-This seems reasonable.
-
-Although I'm concerned that parsers may give up as soon as they see an
-unknown block, that is at least a clean failure, and is better than
-wandering off into the weeds.  I haven't seen evidence of such a parser
-existing, so far -- there will be ones I don't know about.
-
-> > > Going forward, I think something along the lines of your proposal is
-> > > okay.
+> > FYI, [1] above is now merged in arm64 for-next/core, so we shouldn't
+> > have dependency issues with this patch.
 > > 
-> > I'm happy to do either, or propose one approach for stable and the other
-> > for mainline, but it's hard to know which is least likely to break
-> > userspace, or exactly what the ABI is.
+> > > > +static int parse_user_sigframe(struct user_ctxs *user,
+> > > > +			       struct rt_sigframe __user const *sf)
+> > > > +{
+> > > > +	return parse_user_sigcontext(user, &sf->uc.uc_mcontext, sf);
+> > > > +}
+> > > > +
+> > > 
+> > > Hi Dave, 
+> > > 
+> > > Thank you. Seems this is what I need. Only one thing. We can #define
+> > > parse_user_sigframe() as macro, and so bypass type control.
+> > > The macro then will be used both by lp64 and ilp32 without any
+> > > modification.
+> > 
+> > For the reasons you already gave, parse_user_sigframe is probably not
+> > the right name for such a macro.  But it otherwise makes sense as an
+> > interface.  Does [2] look OK for you?
+>  
+> Yes, looks good, thank you.
 > 
-> The intended ABI is a tagged list, where the list headers are made up
-> of an identifier and a size (where the size gives the offset from the
-> start of this block to the next - iow, from the address of the
-> identifer.)  The aux_sigframe structure is there as a convenience to
-> the kernel (which is why it's not in uapi/).
+> > Unless you suggest otherwise, I don't plan to maintain or push this
+> > patch -- I think it makes more sense for you to carry it in the ILP32
+> > series, since that's the only thing that needs it.
 > 
-> The interface was created by Daniel Jacobowitz from Codesourcery, and I
-> believe Daniel was working on the userspace side at the same time, so I
-> would hope that the userspace side does proper parsing - except for one
-> issue - when Daniel was working on it, we weren't saving VFP state
-> across signal handlers.
-> 
-> The issue that you've found looks to have been there since the original
-> design back in 2006.
+> I'll just add it to ilp32 series.
 
-Looks like it.
+OK, thanks
 
-I'll update the patch to preserve the iWMMXt block on signal delivery
-but define a new dummy tag for this case.
-
-
-Should we enforce the same on sigreturn, or be more tolerant?
-
-One issue is that I believe there is software out there (ab)using
-sigreturn to do an atomic siglongjmp type operation.
-
-There is some merit to this, since the effect cannot be achieved 100%
-safely in any other way.  However, it may require the caller to
-manufacture a sigframe from scratch.  If so, it may be natural to
-omit the IWMMXT block (and indeed the VFP block, if the caller
-doesn't care what's in the VFP registers at the destination).
-
-The DynamoRIO example above takes a signal to generate a "template"
-sigframe, which is then modified to produce the desired result.
-Putting aside the issue of whether this is an abuse of sigreturn
-or not (and the question of why they are doing it at all), this
-seems a reasonable approach -- which they also apparently use for
-x86.  So their sigframe will contain the dummy iWMMXt block, but
-it will have a valid tag if we patch the kernel to write one.
-
-Other projects may not be so lucky if they don't use a delivered
-signal as a template in this way.
+Let me know if you have any other questions.
 
 Cheers
 ---Dave
