@@ -1,165 +1,121 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Mon, 26 Jun 2017 11:27:32 +0800
-Subject: [PATCH v2 4/4] arm64: dts: rockchip: use cs-gpios for cros_ec_spi
-In-Reply-To: <CAD=FV=XjW4a9mqH0UtUAmHkj-aAO75bpSXuyy__jBB7YC8PBVg@mail.gmail.com>
-References: <1497331543-8565-1-git-send-email-jeffy.chen@rock-chips.com>
- <1497331543-8565-4-git-send-email-jeffy.chen@rock-chips.com>
- <20170613175043.GC9026@google.com>
- <20170613182225.smahsf3jzvbc7w7z@sirena.org.uk>
- <20170620004739.GA67314@google.com>
- <CAD=FV=UKe5M-M=gXwdjp25vpR0CHtk1APRF0_b4PXQrGOc40+A@mail.gmail.com>
- <594C905E.1040208@rock-chips.com>
- <CAD=FV=VWjbGpY4nj2L0_6xaYY2_tp0pJ5q=BgppL9GWefBUGog@mail.gmail.com>
- <594D0723.7010108@rock-chips.com>
- <CAD=FV=XjW4a9mqH0UtUAmHkj-aAO75bpSXuyy__jBB7YC8PBVg@mail.gmail.com>
-Message-ID: <59507F24.4000309@rock-chips.com>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Mon, 26 Jun 2017 07:01:15 +0200
+Subject: [PATCH 2/3] iio: adc: mt7622: add support for suspend/resume.
+In-Reply-To: <1498445692.844.5.camel@mhfsdcap03>
+References: <1498110274-18678-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1498110274-18678-3-git-send-email-zhiyong.tao@mediatek.com>
+ <20170624210043.29569f3a@kernel.org> <1498445692.844.5.camel@mhfsdcap03>
+Message-ID: <114E2942-6A96-432A-A4E1-6976440D1883@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
 
-On 06/24/2017 12:14 AM, Doug Anderson wrote:
-> Jeffy
+
+On 26 June 2017 04:54:52 CEST, zhiyong tao <zhiyong.tao@mediatek.com> wrote:
+>On Sat, 2017-06-24 at 21:00 +0100, Jonathan Cameron wrote:
+>> On Thu, 22 Jun 2017 13:44:33 +0800
+>> Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
+>> 
+>> > This patch supports auxadc suspend/resume flow.
+>> > Disable auxadc clk and power in suspend function.
+>> > Enable axuadc clk and power in resume function.
+>> > 
+>> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+>> Worth handling the cases where power management is not configured
+>into the
+>> kernel properly.
+>> 
+>> So a few minor suggestions.  Otherwise looks good to me.
+>> > ---
+>> >  drivers/iio/adc/mt6577_auxadc.c |   37
+>+++++++++++++++++++++++++++++++++++++
+>> >  1 file changed, 37 insertions(+)
+>> > 
+>> > diff --git a/drivers/iio/adc/mt6577_auxadc.c
+>b/drivers/iio/adc/mt6577_auxadc.c
+>> > index 2d104c8..2dd7c74 100644
+>> > --- a/drivers/iio/adc/mt6577_auxadc.c
+>> > +++ b/drivers/iio/adc/mt6577_auxadc.c
+>> > @@ -184,6 +184,37 @@ static int mt6577_auxadc_read_raw(struct
+>iio_dev *indio_dev,
+>> >  	.read_raw = &mt6577_auxadc_read_raw,
+>> >  };
+>> >  
+>> > +static int mt6577_auxadc_resume(struct device *dev)
+>> > +{
+>> > +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+>> > +	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
+>> > +	int ret;
+>> > +
+>> > +	ret = clk_prepare_enable(adc_dev->adc_clk);
+>> > +	if (ret) {
+>> > +		pr_err("failed to enable auxadc clock\n");
+>> > +		return ret;
+>> > +	}
+>> > +
+>> > +	mt6577_auxadc_mod_reg(adc_dev->reg_base + MT6577_AUXADC_MISC,
+>> > +			      MT6577_AUXADC_PDN_EN, 0);
+>> > +	mdelay(MT6577_AUXADC_POWER_READY_MS);
+>> > +
+>> > +	return 0;
+>> > +}
+>> > +
+>> > +static int mt6577_auxadc_suspend(struct device *dev)
+>> Mark these __maybe_unused for the CONFIG_PM but not CONFIG_PM_SLEEP
+>case.
+Preferred to mark __maybe_unused and use the macro mentioned below.
 >
-> On Fri, Jun 23, 2017 at 5:18 AM, jeffy <jeffy.chen@rock-chips.com> wrote:
->>>>> So how do we fix this?  IMHO:
->>>>>
->>>>> Add 4 new pinctrl states in rk3399.dtsi:
->>>>>
->>>>>      cs_low_clk_low, cs_low_clk_high, cs_high_clk_low, cs_high_clk_high
->>>>>
->>>>> These would each look something like this:
->>>>>
->>>>> spi5_cs_low_data_low: spi5-cs-low-data-low {
->>>>>      rockchip,pins = <2 22 RK_FUNC_0 &pcfg_output_low>,
->>>>>        <2 23 RK_FUNC_0 &pcfg_output_low>;
->>>>> };
->>>>>
->>>>> Where "pcfg_output_low" would be moved from the existing location in
->>>>> "rk3399-gru.dtsi" to the main "rk3399.dtsi" file.
->>>>>
->>>>>
->>>>> ...now, you'd define runtime_suspend and runtime_resume functions
->>>>> where you'd look at the current state of the chip select and output
->>>>> and select one of these 4 pinmuxes so that things _don't_ change.
->>
+>==> ok, We will add CONFIG_PM_SLEEP for the suspend/resume case in v2.
+>thanks!
 >
-> *** NOTE *** The more I look at this, the more I'm getting convinced
-> that the right thing to do is to just disable Runtime PM while the
-> chip select is asserted.  ...so probably you can just skip the next
-> chunk of text and go straight to "PROPOSAL".
-ok
+>> > +{
+>> > +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+>> > +	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
+>> > +
+>> > +	mt6577_auxadc_mod_reg(adc_dev->reg_base + MT6577_AUXADC_MISC,
+>> > +			      0, MT6577_AUXADC_PDN_EN);
+>> > +	clk_disable_unprepare(adc_dev->adc_clk);
+>> > +
+>> > +	return 0;
+>> > +}
+>> > +
+>> >  static int mt6577_auxadc_probe(struct platform_device *pdev)
+>> >  {
+>> >  	struct mt6577_auxadc_device *adc_dev;
+>> > @@ -269,6 +300,11 @@ static int mt6577_auxadc_remove(struct
+>platform_device *pdev)
+>> >  	return 0;
+>> >  }
+>> >  
+>> > +static const struct dev_pm_ops mt6577_auxadc_pm_ops = {
+>> > +	.suspend = mt6577_auxadc_suspend,
+>> > +	.resume = mt6577_auxadc_resume,
+>> > +};
+>> > +
+>> Use the SIMPLE_SYSTEM_PM_OPS macro to make these assignments
+>magically go away
+>> if PM_CONFIG_SLEEP is not defined.
 >
->> it looks like the clk would be low when spi idle, so do we only need
->> *_clk_low?
->
-> You're only looking at one polarity.  From Wikipedia
-> <https://en.wikipedia.org/wiki/Serial_Peripheral_Interface_Bus>, the
-> source of all that is "true":
->
-> * At CPOL=0 the base value of the clock is zero, i.e. the idle state
-> is 0 and active state is 1.
-> -> For CPHA=0, data are captured and output on the clock's rising edge
-> (low?high transition)
-> -> For CPHA=1, data are captured and output on the clock's falling edge.
->
-> * At CPOL=1 the base value of the clock is one (inversion of CPOL=0),
-> i.e. the idle state is 1 and active state is 0.
-> -> For CPHA=0, data are captured and output on clock's falling edge.
-> -> For CPHA=1, data are captured and output on clock's rising edge.
->
-> If you're adding code to the generic Rockchip SPI driver you need to
-> handle both polarities.
->
->
->> and the rockchip spi supports 2 cs, so should we use cs0_low_cs1_low_clk_low
->> or should we put these pinmux into sub spi device?
->
-> By default the pinctrl for rk3399.dtsi just sets up cs0, so I'd worry
-> about that.  If someone wants to make cs1 work then they'd have to
-> specify the right pinctrl there.
->
->
->>> * You'd want to add the pinmux configs to the main rk3399.dtsi file
->>> and then add code to the rockchip SPI driver to select the right
->>> pinmux (depending on the current state of the chip select and the
->>> current polarity) at runtime suspend.  ...then go back to "default"
->>> mode at runtime resume.
->>
->> i uploaded 2 testonly CLs:
->> remote:   https://chromium-review.googlesource.com/544391 TESTONLY: spi:
->> rockchip: use pinmux to config cs
->> remote:   https://chromium-review.googlesource.com/544392 TESTONLY: dts:
->> bob: only enable ec spi
->>
->> but they are not working well, not sure why, maybe cs still toggled will
->> switching pinmux? will use scope to check it next week.
->
-> Yeah, scope is probably the right thing to do.  One thing you'd have
-> to make sure is that everything is being done glitch free.  In other
-> words, if this is happening:
->
-> A) Pinmux to GPIO
-> B) Set GPIO to output
-> C) Drive GPIO state low
->
-> Then that's bad because:
->
-> After step A but before step B, you might still be an input and pulls
-> might take effect.  Thus you could glitch the line.
->
-> After step B but before step C, you might be outputting something else
-> if the GPIO had previously been configured to output high.
->
->
-> You need to make sure that the sequence is instead:
->
-> A) Drive GPIO state high
-> B) Set GPIO to output
-> C) Pinmux to GPIO
->
->
-> Ensuring things are glitch free and dealing with two chip selects
-> means it might be cleaner would be to do all the GPIO stuff yourself
-> in the driver.  Then you'd have to specify the GPIOs in the device
-> tree.
->
-> ======
->
-> OK, I took a look at your CL and I'm now of the opinion that we should
-> disable Runtime PM when the chip select is asserted.  Maybe just
-> ignore the above and instead look at:
+>==> ok, We will use SIMPLE_DEV_PM_OPS macro to change it in v2. Thanks.
+>>>  static const struct of_device_id mt6577_auxadc_of_match[] = {
+>> >  	{ .compatible = "mediatek,mt2701-auxadc", },
+>> >  	{ .compatible = "mediatek,mt8173-auxadc", },
+>> > @@ -280,6 +316,7 @@ static int mt6577_auxadc_remove(struct
+>platform_device *pdev)
+>> >  	.driver = {
+>> >  		.name   = "mt6577-auxadc",
+>> >  		.of_match_table = mt6577_auxadc_of_match,
+>> > +		.pm = &mt6577_auxadc_pm_ops,
+>> >  	},
+>> >  	.probe	= mt6577_auxadc_probe,
+>> >  	.remove	= mt6577_auxadc_remove,
+>> 
 >
 >
-> PROPOSAL: Disable Runtime PM when chip select is asserted
->
-> I think this proposal will be very easy and is pretty clean.
-> Basically go into "rockchip_spi_set_cs()" and adjust the
-> "pm_runtime_get_sync()" and "pm_runtime_put_sync()" calls.  Only call
-> the "get_sync" at the top of the function if you're asserting the chip
-> select (and it wasn't already asserted).  Only call the "put_sync" at
-> the bottom of the function if you're deasserting the chip select (and
-> it wasn't already deasserted).
-hmm, looks like a better way to solve this, but i think we need to call 
-pm_runtime_get_sync unconditionally to make sure the read ser register safe.
->
-> This should avoid entering PM sleep any time a transaction is midway
-> through happening.
->
-> Secondly, make sure that the chip selects have a pullup on them (they
-> already do).  When you Runtime PM then the SPI part will stop driving
-> the pins and the pull will take effect.  Since we can only Runtime PM
-> when the chip select is deasserted then this pull will always be
-> correct.  Also: since we Runtime PM when the chip select is deasserted
-> then the state of the other pins isn't terribly important (though to
-> avoid leakage it's probably good to choose a sane pull).
->
->
-> How does that sound?  It should only be a few lines of code and only one patch.
->
-sounds good, new patch sent(https://patchwork.kernel.org/patch/9808601)
->
-> -Doug
->
->
->
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
