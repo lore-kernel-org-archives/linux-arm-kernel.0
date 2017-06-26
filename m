@@ -1,63 +1,39 @@
-From: fransklaver@gmail.com (Frans Klaver)
-Date: Mon, 26 Jun 2017 14:36:43 +0200
-Subject: [PATCH v4] crypto: sun4i-ss: support the Security System PRNG
-In-Reply-To: <20170626122055.5253-1-clabbe.montjoie@gmail.com>
-References: <20170626122055.5253-1-clabbe.montjoie@gmail.com>
-Message-ID: <CAH6sp9Nm-hDxNSNNYxonBzSGyM769WoKQwjX2CN-RPRr=Oxu4g@mail.gmail.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Mon, 26 Jun 2017 22:42:49 +1000
+Subject: [PATCH] ARM: dts: sun7i: Add A20 LCD0 RGB888 pins
+Message-ID: <20170626124249.9475-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The LCD0 controller on the A20 can do RGB output up to 8 bits per
+channel. Add the pins for RGB888 output.
 
-On Mon, Jun 26, 2017 at 2:20 PM, Corentin Labbe
-<clabbe.montjoie@gmail.com> wrote:
-> The Security System have a PRNG, this patch add support for it via
-> crypto_rng.
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-s,have,has,
-s,add,adds,
-
->
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->
-> Changes since v3 (note: the v3 miss changes and version tag sorry)
-> - Replaced all len values with bits / BITS_PER_LONG or BITS_PER_BYTE
->
-> Changes since v2
->  - converted to crypto_rng
->
-> Changes since v1:
->  - Replaced all spin_lock_bh by simple spin_lock
->  - Removed handling of size not modulo 4 which will never happen
->  - Added add_random_ready_callback()
->
->  drivers/crypto/Kconfig                  |  8 +++++
->  drivers/crypto/sunxi-ss/Makefile        |  1 +
->  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 30 ++++++++++++++++++
->  drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 56 +++++++++++++++++++++++++++++++++
->  drivers/crypto/sunxi-ss/sun4i-ss.h      | 11 +++++++
->  5 files changed, 106 insertions(+)
->  create mode 100644 drivers/crypto/sunxi-ss/sun4i-ss-prng.c
->
-> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> index ab82536d64e2..bde0b102eb70 100644
-> --- a/drivers/crypto/Kconfig
-> +++ b/drivers/crypto/Kconfig
-> @@ -618,6 +618,14 @@ config CRYPTO_DEV_SUN4I_SS
->           To compile this driver as a module, choose M here: the module
->           will be called sun4i-ss.
->
-> +config CRYPTO_DEV_SUN4I_SS_PRNG
-> +       bool "Support for Allwinner Security System PRNG"
-> +       depends on CRYPTO_DEV_SUN4I_SS
-> +       select CRYPTO_RNG
-> +       help
-> +         Select this option if you to provides kernel-side support for
-> +         the Pseudo-Random Number Generator found in the Security System.
-
-This sentence does not parse. "Select this option if you want to
-provide kernel-side for ...". Alternatively: "This option enables
-kernel-side support for ..."
-
-Frans
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 96bee776e145..09a0e89bed11 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1183,6 +1183,17 @@
+ 				function = "ir1";
+ 			};
+ 
++			lcd0_rgb888_pins: lcd0_rgb888 at 0 {
++				allwinner,pins = "PD0", "PD1", "PD2", "PD3",
++						 "PD4", "PD5", "PD6", "PD7",
++						 "PD8", "PD9", "PD10", "PD11",
++						 "PD12", "PD13", "PD14", "PD15",
++						 "PD16", "PD17", "PD18", "PD19",
++						 "PD20", "PD21", "PD22", "PD23",
++						 "PD24", "PD25", "PD26", "PD27";
++				allwinner,function = "lcd0";
++			};
++
+ 			mmc0_pins_a: mmc0 at 0 {
+ 				pins = "PF0", "PF1", "PF2",
+ 				       "PF3", "PF4", "PF5";
+-- 
+2.13.1
