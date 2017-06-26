@@ -1,193 +1,130 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 26 Jun 2017 21:33:55 +0800
-Subject: [PATCH v6 4/8] mfd: hi6421-pmic: add support for HiSilicon
- Hi6421v530
-In-Reply-To: <20170608220841.26531-5-guodong.xu@linaro.org>
-References: <20170608220841.26531-1-guodong.xu@linaro.org>
- <20170608220841.26531-5-guodong.xu@linaro.org>
-Message-ID: <CAFGCpxzKuT7rTBvwm6bT7LoCbvOZ-DaH95p4sT_=DCp4dkDJRg@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 26 Jun 2017 09:36:24 -0400
+Subject: [PATCH v5] trace: ras: add ARM processor error information
+ trace event
+In-Reply-To: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
+References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <20170626093624.381a25cb@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Lee
+On Sat, 24 Jun 2017 11:38:23 +0800
+Xie XiuQi <xiexiuqi@huawei.com> wrote:
 
-Sorry to disturb. May I get some of your bandwidth on this patch? Does
-it looks good or needs more tweak?
-
-Other patches in this patchset, dts, regulator, have been integrated
-into linux-next. So, only this one and the patch 8/8 of defconfig [1]
-need your special attention.
-
-[1] defconfig: https://lkml.org/lkml/2017/6/8/1077
-
-Thank you.
-
-Best regards,
-Guodong
-
-On Fri, Jun 9, 2017 at 6:08 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
-> Add support for HiSilicon Hi6421v530 PMIC. Hi6421v530 communicates with
-> main SoC via memory-mapped I/O.
->
-> Hi6421v530 and Hi6421 are PMIC chips from the same vendor, HiSilicon,
-> but at different revisions. They share the same memory-mapped I/O
-> design. They differ in integrated devices, such as regulator details,
-> LDO voltage points.
->
-> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/mfd/hi6421-pmic-core.c  | 70 ++++++++++++++++++++++++++++++-----------
->  include/linux/mfd/hi6421-pmic.h |  5 +++
->  2 files changed, 57 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
-> index b1139d4..6fb7ba2 100644
-> --- a/drivers/mfd/hi6421-pmic-core.c
-> +++ b/drivers/mfd/hi6421-pmic-core.c
-> @@ -1,9 +1,9 @@
+> diff --git a/include/linux/cper.h b/include/linux/cper.h
+> index 4c671fc..17546bf 100644
+> --- a/include/linux/cper.h
+> +++ b/include/linux/cper.h
+> @@ -275,6 +275,11 @@ enum {
+>  #define CPER_ARM_INFO_FLAGS_PROPAGATED		BIT(2)
+>  #define CPER_ARM_INFO_FLAGS_OVERFLOW		BIT(3)
+>  
+> +#define CPER_ARM_INFO_TYPE_CACHE		0
+> +#define CPER_ARM_INFO_TYPE_TLB			1
+> +#define CPER_ARM_INFO_TYPE_BUS			2
+> +#define CPER_ARM_INFO_TYPE_UARCH		3
+> +
 >  /*
-> - * Device driver for Hi6421 IC
-> + * Device driver for Hi6421 PMIC
+>   * All tables and structs must be byte-packed to match CPER
+>   * specification, since the tables are provided by the system BIOS
+> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+> index 429f46f..dd91ba8 100644
+> --- a/include/ras/ras_event.h
+> +++ b/include/ras/ras_event.h
+> @@ -206,6 +206,85 @@
+>  		  __entry->running_state, __entry->psci_state)
+>  );
+>  
+> +#define ARM_PROC_ERR_TYPE	\
+> +	EM ( CPER_ARM_INFO_TYPE_CACHE, "cache error" )	\
+> +	EM ( CPER_ARM_INFO_TYPE_TLB,  "TLB error" )	\
+> +	EM ( CPER_ARM_INFO_TYPE_BUS, "bus error" )	\
+> +	EMe ( CPER_ARM_INFO_TYPE_UARCH, "micro-architectural error" )
+
+These are all defines. As the name suggests, the TRACE_DEFINE_ENUM() is
+for use with enums, not defines. You can nuke this part.
+
+> +
+> +/*
+> + * First define the enums in MM_ACTION_RESULT to be exported to userspace
+> + * via TRACE_DEFINE_ENUM().
+> + */
+> +#undef EM
+> +#undef EMe
+> +#define EM(a, b) TRACE_DEFINE_ENUM(a);
+> +#define EMe(a, b)	TRACE_DEFINE_ENUM(a);
+> +
+> +ARM_PROC_ERR_TYPE
+> +
+> +/*
+> + * Now redefine the EM() and EMe() macros to map the enums to the strings
+> + * that will be printed in the output.
+> + */
+> +#undef EM
+> +#undef EMe
+> +#define EM(a, b)		{ a, b },
+> +#define EMe(a, b)	{ a, b }
+
+All the EM* and friends above are not needed. The macro below will
+translate into numbers not names in the format files in tracefs.
+
+-- Steve
+
+
+> +
+> +#define show_proc_err_flags(flags) __print_flags(flags, "|",			\
+> +	{ CPER_ARM_INFO_FLAGS_FIRST,		"First error captured" },	\
+> +	{ CPER_ARM_INFO_FLAGS_LAST,		"Last error captured" },	\
+> +	{ CPER_ARM_INFO_FLAGS_PROPAGATED,	"Propagated" },			\
+> +	{ CPER_ARM_INFO_FLAGS_OVERFLOW,		"Overflow" })
+> +
+> +TRACE_EVENT(arm_err_info_event,
+> +
+> +	TP_PROTO(const struct cper_arm_err_info *err),
+> +
+> +	TP_ARGS(err),
+> +
+> +	TP_STRUCT__entry(
+> +		__field(u8, type)
+> +		__field(u8, flags)
+> +		__field(u16, multiple_error)
+> +		__field(u64, error_info)
+> +		__field(u64, virt_fault_addr)
+> +		__field(u64, physical_fault_addr)
+> +	),
+> +
+> +	TP_fast_assign(
+> +		__entry->type = err->type;
+> +		memset(&__entry->flags, 0,
+> +			sizeof(*__entry) - offsetof(typeof(*__entry), flags));
+> +		__entry->multiple_error = ~0;
+> +
+> +		if (err->validation_bits & CPER_ARM_INFO_VALID_MULTI_ERR)
+> +			__entry->multiple_error = err->multiple_error;
+> +
+> +		if (err->validation_bits & CPER_ARM_INFO_VALID_FLAGS)
+> +			__entry->flags = err->flags;
+> +
+> +		if (err->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
+> +			__entry->error_info = err->error_info;
+> +
+> +		if (err->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
+> +			__entry->virt_fault_addr = err->virt_fault_addr;
+> +
+> +		if (err->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
+> +			__entry->physical_fault_addr = err->physical_fault_addr;
+> +	),
+> +
+> +	TP_printk("type: %s; count: %u; flags: %s;"
+> +		  " error info: %016llx; virtual address: %016llx;"
+> +		  " physical address: %016llx",
+> +		  __print_symbolic(__entry->type, ARM_PROC_ERR_TYPE),
+> +		  __entry->multiple_error,
+> +		  show_proc_err_flags(__entry->flags),
+> +		  __entry->error_info, __entry->virt_fault_addr,
+> +		  __entry->physical_fault_addr)
+> +);
+> +
+>  /*
+>   * Non-Standard Section Report
 >   *
->   * Copyright (c) <2011-2014> HiSilicon Technologies Co., Ltd.
->   *              http://www.hisilicon.com
-> - * Copyright (c) <2013-2014> Linaro Ltd.
-> + * Copyright (c) <2013-2017> Linaro Ltd.
->   *              http://www.linaro.org
->   *
->   * Author: Guodong Xu <guodong.xu@linaro.org>
-> @@ -16,16 +16,20 @@
->  #include <linux/device.h>
->  #include <linux/err.h>
->  #include <linux/mfd/core.h>
-> +#include <linux/mfd/hi6421-pmic.h>
->  #include <linux/module.h>
-> -#include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
-> -#include <linux/mfd/hi6421-pmic.h>
->
->  static const struct mfd_cell hi6421_devs[] = {
->         { .name = "hi6421-regulator", },
->  };
->
-> +static const struct mfd_cell hi6421v530_devs[] = {
-> +       { .name = "hi6421v530-regulator", },
-> +};
-> +
->  static const struct regmap_config hi6421_regmap_config = {
->         .reg_bits = 32,
->         .reg_stride = 4,
-> @@ -33,12 +37,33 @@ static const struct regmap_config hi6421_regmap_config = {
->         .max_register = HI6421_REG_TO_BUS_ADDR(HI6421_REG_MAX),
->  };
->
-> +static const struct of_device_id of_hi6421_pmic_match[] = {
-> +       {
-> +               .compatible = "hisilicon,hi6421-pmic",
-> +               .data = (void *)HI6421
-> +       },
-> +       {
-> +               .compatible = "hisilicon,hi6421v530-pmic",
-> +               .data = (void *)HI6421_V530
-> +       },
-> +       { },
-> +};
-> +MODULE_DEVICE_TABLE(of, of_hi6421_pmic_match);
-> +
->  static int hi6421_pmic_probe(struct platform_device *pdev)
->  {
->         struct hi6421_pmic *pmic;
->         struct resource *res;
-> +       const struct of_device_id *id;
-> +       const struct mfd_cell *subdevs;
-> +       enum hi6421_type type;
->         void __iomem *base;
-> -       int ret;
-> +       int n_subdevs, ret;
-> +
-> +       id = of_match_device(of_hi6421_pmic_match, &pdev->dev);
-> +       if (!id)
-> +               return -EINVAL;
-> +       type = (enum hi6421_type)id->data;
->
->         pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
->         if (!pmic)
-> @@ -57,18 +82,33 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
->                 return PTR_ERR(pmic->regmap);
->         }
->
-> -       /* set over-current protection debounce 8ms */
-> -       regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
-> +       platform_set_drvdata(pdev, pmic);
-> +
-> +       switch (type) {
-> +       case HI6421:
-> +               /* set over-current protection debounce 8ms */
-> +               regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
->                                 (HI6421_OCP_DEB_SEL_MASK
->                                  | HI6421_OCP_EN_DEBOUNCE_MASK
->                                  | HI6421_OCP_AUTO_STOP_MASK),
->                                 (HI6421_OCP_DEB_SEL_8MS
->                                  | HI6421_OCP_EN_DEBOUNCE_ENABLE));
->
-> -       platform_set_drvdata(pdev, pmic);
-> +               subdevs = hi6421_devs;
-> +               n_subdevs = ARRAY_SIZE(hi6421_devs);
-> +               break;
-> +       case HI6421_V530:
-> +               subdevs = hi6421v530_devs;
-> +               n_subdevs = ARRAY_SIZE(hi6421v530_devs);
-> +               break;
-> +       default:
-> +               dev_err(&pdev->dev, "Unknown device type %d\n",
-> +                                               (unsigned int)type);
-> +               return -EINVAL;
-> +       }
->
-> -       ret = devm_mfd_add_devices(&pdev->dev, 0, hi6421_devs,
-> -                                  ARRAY_SIZE(hi6421_devs), NULL, 0, NULL);
-> +       ret = devm_mfd_add_devices(&pdev->dev, PLATFORM_DEVID_NONE,
-> +                                  subdevs, n_subdevs, NULL, 0, NULL);
->         if (ret) {
->                 dev_err(&pdev->dev, "Failed to add child devices: %d\n", ret);
->                 return ret;
-> @@ -77,16 +117,10 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
->         return 0;
->  }
->
-> -static const struct of_device_id of_hi6421_pmic_match_tbl[] = {
-> -       { .compatible = "hisilicon,hi6421-pmic", },
-> -       { },
-> -};
-> -MODULE_DEVICE_TABLE(of, of_hi6421_pmic_match_tbl);
-> -
->  static struct platform_driver hi6421_pmic_driver = {
->         .driver = {
-> -               .name   = "hi6421_pmic",
-> -               .of_match_table = of_hi6421_pmic_match_tbl,
-> +               .name = "hi6421_pmic",
-> +               .of_match_table = of_hi6421_pmic_match,
->         },
->         .probe  = hi6421_pmic_probe,
->  };
-> diff --git a/include/linux/mfd/hi6421-pmic.h b/include/linux/mfd/hi6421-pmic.h
-> index 587273e..2580c08 100644
-> --- a/include/linux/mfd/hi6421-pmic.h
-> +++ b/include/linux/mfd/hi6421-pmic.h
-> @@ -38,4 +38,9 @@ struct hi6421_pmic {
->         struct regmap           *regmap;
->  };
->
-> +enum hi6421_type {
-> +       HI6421 = 0,
-> +       HI6421_V530,
-> +};
-> +
->  #endif         /* __HI6421_PMIC_H */
-> --
-> 2.10.2
->
