@@ -1,33 +1,36 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 24 Jun 2017 21:02:41 +0100
-Subject: [PATCH 1/3] dt-bindings: adc: mt7622: add binding document
-In-Reply-To: <1498110274-18678-2-git-send-email-zhiyong.tao@mediatek.com>
-References: <1498110274-18678-1-git-send-email-zhiyong.tao@mediatek.com>
- <1498110274-18678-2-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <20170624210241.361743b3@kernel.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Jun 2017 10:15:43 +0100
+Subject: [PATCH] arm64: pass endianness info to sparse
+In-Reply-To: <20170624154211.61472-1-luc.vanoostenryck@gmail.com>
+References: <20170624154211.61472-1-luc.vanoostenryck@gmail.com>
+Message-ID: <20170626091542.GA1691@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Jun 2017 13:44:32 +0800
-Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
-
-> The commit adds mt7622 compatible node in binding document.
+On Sat, Jun 24, 2017 at 05:42:11PM +0200, Luc Van Oostenryck wrote:
+> ARM64 depends on the macro __AARCH64EB__ being defined or not
+> to correctly select or define endian-specific macros, structures
+> or pieces of code.
 > 
-> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> This macro is predefined by the compiler but sparse knows nothing
+> about it and thus may pre-process files differently from what
+> gcc would.
+> 
+> Fix this by passing '-D__AARCH64EL__' or '-D__AARCH64EB__' to
+> sparse depending of the endianness of the kernel, like defined
+> by GCC.
+> 
+> Note: In most case it won't change anything since most arm64 use
+>       little-endian (but an allyesconfig would use big-endian!).
+> 
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 > ---
->  .../devicetree/bindings/iio/adc/mt6577_auxadc.txt  |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-> index 68c45cb..e6aa30a 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-> @@ -13,6 +13,7 @@ Required properties:
->    - compatible: Should be one of:
->      - "mediatek,mt2701-auxadc": For MT2701 family of SoCs
->      - "mediatek,mt8173-auxadc": For MT8173 family of SoCs
-> +    - "mediatek,mt7622-auxadc": For MT7622 family of SoCs
-numeric order?
->    - reg: Address range of the AUXADC unit.
->    - clocks: Should contain a clock specifier for each entry in clock-names
->    - clock-names: Should contain "main".
+>  arch/arm64/Makefile | 2 ++
+>  1 file changed, 2 insertions(+)
+
+Thanks, I'll pick this up.
+
+Will
