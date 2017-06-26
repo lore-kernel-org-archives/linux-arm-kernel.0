@@ -1,5 +1,5 @@
 From: jeffy.chen@rock-chips.com (jeffy)
-Date: Mon, 26 Jun 2017 11:26:22 +0800
+Date: Mon, 26 Jun 2017 11:27:32 +0800
 Subject: [PATCH v2 4/4] arm64: dts: rockchip: use cs-gpios for cros_ec_spi
 In-Reply-To: <CAD=FV=XjW4a9mqH0UtUAmHkj-aAO75bpSXuyy__jBB7YC8PBVg@mail.gmail.com>
 References: <1497331543-8565-1-git-send-email-jeffy.chen@rock-chips.com>
@@ -12,7 +12,7 @@ References: <1497331543-8565-1-git-send-email-jeffy.chen@rock-chips.com>
  <CAD=FV=VWjbGpY4nj2L0_6xaYY2_tp0pJ5q=BgppL9GWefBUGog@mail.gmail.com>
  <594D0723.7010108@rock-chips.com>
  <CAD=FV=XjW4a9mqH0UtUAmHkj-aAO75bpSXuyy__jBB7YC8PBVg@mail.gmail.com>
-Message-ID: <59507EDE.2010409@rock-chips.com>
+Message-ID: <59507F24.4000309@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
