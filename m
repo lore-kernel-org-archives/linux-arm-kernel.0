@@ -1,24 +1,35 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Jun 2017 13:46:13 -0500
-Subject: [RESEND PATCH v2 3/7] Documentation: rockchip-dw-mshc: add
- description for rk3228
-In-Reply-To: <1498127402-6705-4-git-send-email-frank.wang@rock-chips.com>
-References: <1498127402-6705-1-git-send-email-frank.wang@rock-chips.com>
- <1498127402-6705-4-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <20170626184613.ns747evnz7lng64h@rob-hp-laptop>
+Date: Mon, 26 Jun 2017 13:49:36 -0500
+Subject: [PATCH V5 1/1] dt-bindings: pinctrl: extend the pinmux property
+ to support integers array
+In-Reply-To: <1498142940-7982-1-git-send-email-aisheng.dong@nxp.com>
+References: <1498046395-30001-2-git-send-email-aisheng.dong@nxp.com>
+ <1498142940-7982-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170626184936.4rg2gfrxksp6vydq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 06:29:58PM +0800, Frank Wang wrote:
-> From: Shawn Lin <shawn.lin@rock-chips.com>
+On Thu, Jun 22, 2017 at 10:49:00PM +0800, Dong Aisheng wrote:
+> Some platforms may need more than one integer to represent a complete
+> pinmux binding, so let's extend the pinmux property to allow to accept
+> integer array instead of only a single integer.
 > 
-> Add "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc" for
-> dwmmc on rk322x platform.
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
->  1 file changed, 1 insertion(+)
+> ChangeLog:
+> v4->v5:
+>  * doc improvement
+> v4:
+>  * new patch
+> ---
+>  .../devicetree/bindings/pinctrl/pinctrl-bindings.txt      | 15 ++++++++-------
+>  1 file changed, 8 insertions(+), 7 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
