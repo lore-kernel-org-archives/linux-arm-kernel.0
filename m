@@ -1,58 +1,50 @@
 From: bich.hemon@st.com (Bich HEMON)
-Date: Mon, 26 Jun 2017 12:49:15 +0000
-Subject: [PATCH 14/20] dt-bindings: serial: document option wake-up interrupt
- for STM32 USART
+Date: Mon, 26 Jun 2017 12:49:12 +0000
+Subject: [PATCH 10/20] serial: stm32: fix dma receive
 In-Reply-To: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
 References: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
-Message-ID: <1498481318-1894-15-git-send-email-bich.hemon@st.com>
+Message-ID: <1498481318-1894-11-git-send-email-bich.hemon@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bich Hemon <bich.hemon@st.com>
 
-Introduce new compatibles for "st,stm32h7-usart" and "st,stm32h7-uart".
-This new compatible allow to use optional wake-up interrupt.
+Two improvements for dma receive in this patch:
+- usart dma receiver (DMAR) is disabled during receive
+- dma receive buffer is sync-ed for cpu before reading
+and given back to the dma just after
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
 ---
- .../devicetree/bindings/serial/st,stm32-usart.txt    | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+ drivers/tty/serial/stm32-usart.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-index a229b14..3b42138 100644
---- a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-@@ -2,11 +2,14 @@
+diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
+index 266dc4f..13fc520 100644
+--- a/drivers/tty/serial/stm32-usart.c
++++ b/drivers/tty/serial/stm32-usart.c
+@@ -393,11 +393,21 @@ static irqreturn_t stm32_threaded_interrupt(int irq, void *ptr)
+ {
+ 	struct uart_port *port = ptr;
+ 	struct stm32_port *stm32_port = to_stm32_port(port);
++	struct stm32_usart_offsets *ofs = &stm32_port->info->ofs;
  
- Required properties:
- - compatible: Can be either "st,stm32-usart", "st,stm32-uart",
--"st,stm32f7-usart" or "st,stm32f7-uart" depending on whether
--the device supports synchronous mode and is compatible with
--stm32(f4) or stm32f7.
-+"st,stm32f7-usart", "st,stm32f7-uart", "st,stm32h7-usart" or
-+st,stm32h7-uart depending on whether the device supports synchronous
-+mode and is compatible with stm32(f4), stm32f7 or stm32h7.
- - reg: The address and length of the peripheral registers space
--- interrupts: The interrupt line of the USART instance
-+- interrupts or interrupts-extended: Must contain first, the interrupt
-+  line specifier for the USART instance. An optional wake-up interrupt
-+  specifier can be added. Then, -extended variant may be needed to specify
-+  interrupts parent controllers.
- - clocks: The input clock of the USART instance
+ 	spin_lock(&port->lock);
  
- Optional properties:
-@@ -53,3 +56,12 @@ usart1: serial at 40011000 {
- 	       <&dma2 7 4 0x414 0x0>;
- 	dma-names = "rx", "tx";
- };
-+
-+uart4: serial at 40010000 {
-+	compatible = "st,stm32h7-uart";
-+	reg = <0x40010000 0x400>;
-+	interrupts-extended = <&intc GIC_SPI 52 IRQ_TYPE_NONE>,
-+			      <&aiec 30 1>;
-+	clocks = <&rcc UART4_K>;
-+	status = "disabled";
-+};
+-	if (stm32_port->rx_ch)
++	if (stm32_port->rx_ch) {
++		stm32_clr_bits(port, ofs->cr3, USART_CR3_DMAR);
++		dma_sync_single_for_cpu(port->dev,
++					stm32_port->rx_dma_buf,
++					RX_BUF_L, DMA_FROM_DEVICE);
+ 		stm32_receive_chars(port, true);
++		dma_sync_single_for_device(port->dev,
++					   stm32_port->rx_dma_buf,
++					   RX_BUF_L, DMA_FROM_DEVICE);
++		stm32_set_bits(port, ofs->cr3, USART_CR3_DMAR);
++	}
+ 
+ 	spin_unlock(&port->lock);
+ 
 -- 
 1.9.1
