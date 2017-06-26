@@ -1,50 +1,45 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Mon, 26 Jun 2017 23:04:58 +1000
-Subject: [PATCH 3/4] powerpc: Reduce ELF_ET_DYN_BASE
-In-Reply-To: <CAGXu5jK7aHHRMZyZyrviBF+cLghWcH_D4PX_vMFOycHuF7EdLA@mail.gmail.com>
-References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
- <1498154792-49952-4-git-send-email-keescook@chromium.org>
- <87podvp4q1.fsf@concordia.ellerman.id.au>
- <CAGXu5jK7aHHRMZyZyrviBF+cLghWcH_D4PX_vMFOycHuF7EdLA@mail.gmail.com>
-Message-ID: <8737amew79.fsf@concordia.ellerman.id.au>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 26 Jun 2017 14:12:52 +0100
+Subject: [PATCH v2 0/8] io-pgtable lock removal
+In-Reply-To: <a75e4c19-e393-f030-6927-debae27957eb@arm.com>
+References: <cover.1498145008.git.robin.murphy@arm.com>
+ <61b7b953-5bf4-eb45-c3e8-b4491e8fdca7@huawei.com>
+ <f694a247-9006-3a3c-8a77-209b158eabf3@arm.com>
+ <9bbf18c7-34ba-6e94-53bd-3f75059c1bb2@huawei.com>
+ <a75e4c19-e393-f030-6927-debae27957eb@arm.com>
+Message-ID: <15e7ce0a-bf4b-cc77-3600-c37ed865a4d7@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kees Cook <keescook@chromium.org> writes:
 
-> On Fri, Jun 23, 2017 at 12:01 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
->> Kees Cook <keescook@chromium.org> writes:
 >>
->>> Now that explicitly executed loaders are loaded in the mmap region,
->>> position PIE binaries lower in the address space to avoid possible
->>> collisions with mmap or stack regions. For 64-bit, align to 4GB to
->>> allow runtimes to use the entire 32-bit address space for 32-bit
->>> pointers.
->>
->> The change log and subject are a bit out of whack with the actual patch
->> because previously we used 512MB.
->>
->> How about?
->>
->>   powerpc: Move ELF_ET_DYN_BASE to 4GB / 4MB
->>
->>   Now that explicitly executed loaders are loaded in the mmap region,
->>   we have more freedom to decide where we position PIE binaries in the
->>   address space to avoid possible collisions with mmap or stack regions.
->>
->>   For 64-bit, align to 4GB to allow runtimes to use the entire 32-bit
->>   address space for 32-bit pointers. On 32-bit use 4MB.
+>> I saw Will has already sent the pull request. But, FWIW, we are seeing
+>> roughly the same performance as v1 patchset. For PCI NIC, Zhou again
+>> found performance drop goes from ~15->8% with SMMU enabled, and for
+>> integrated storage controller [platform device], we still see a drop of
+>> about 50%, depending on datarates (Leizhen has been working on fixing
+>> this).
 >
-> Good idea, thanks. I'll resend the series with the commit logs updated.
->
->> Is there any particular reasoning behind the 4MB value on 32-bit?
->
-> So, I've dug around a bit on this, and I *think* the rationale is to
-> avoid mapping a possible 4MB page table entry when it won't be using
-> at least a portion near the lower end (NULL address area covered
-> blocked by mmap_min_addr). It seems to be mainly tradition, though.
+> Thanks for confirming. Following Joerg's suggestion that the storage
+> workloads may still depend on rbtree performance - it had slipped my
+> mind that even with small block sizes those could well be grouped into
+> scatterlists large enough to trigger a >64-page IOVA allocation - I've
+> taken the liberty of cooking up a simplified version of Leizhen's rbtree
+> optimisation series in the iommu/iova branch of my tree. I'll follow up
+> on that after the merge window, but if anyone wants to play with it in
+> the meantime feel free.
 
-OK, that is obscure, especially for CPUs that don't have a 4MB page
-size. But consistency across arches is probably best regardless.
+Just a reminder that we did also see poor performance with our 
+integrated NIC on your v1 patchset also (I can push for v2 patchset 
+testing, but expect the same).
 
-cheers
+We might be able to now include a LSI 3108 PCI SAS card in our testing 
+also to give a broader set of results.
+
+John
+
+>
+> Robin.
+>
+> .
+>
