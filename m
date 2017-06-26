@@ -1,74 +1,45 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 26 Jun 2017 15:35:26 -0700
-Subject: [PATCH v2 0/4] Broadcom STB S2/S3/S5 support for ARM and MIPS
-In-Reply-To: <20170626223248.14199-1-f.fainelli@gmail.com>
-References: <20170626223248.14199-1-f.fainelli@gmail.com>
-Message-ID: <94d1c634-99fd-e488-0aab-157396c0c86a@gmail.com>
+From: danielmicay@gmail.com (Daniel Micay)
+Date: Mon, 26 Jun 2017 18:52:31 -0400
+Subject: [kernel-hardening] non-x86 per-task stack canaries
+In-Reply-To: <CAGXu5jLCAdPOKZFotaWZ8MjwqW8Eq9_tLc_fgbYsTcbVWv77AQ@mail.gmail.com>
+References: <CAGXu5jLCAdPOKZFotaWZ8MjwqW8Eq9_tLc_fgbYsTcbVWv77AQ@mail.gmail.com>
+Message-ID: <1498517551.22457.7.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2017 03:32 PM, Florian Fainelli wrote:
+On Mon, 2017-06-26 at 14:04 -0700, Kees Cook wrote:
 > Hi,
 > 
-> This patch series adds support for S2/S3/S5 suspend/resume states on
-> ARM and MIPS based Broadcom STB SoCs.
+> The stack protector functionality on x86_64 uses %gs:0x28 (%gs is the
+> percpu area) for __stack_chk_guard, and all other architectures use a
+> global variable instead. This means we never change the stack canary
+> on non-x86 architectures which allows for a leak in one task to expose
+> the canary in another task.
 > 
-> This was submitted a long time ago by Brian, and I am now picking this
-> up and trying to get this included with support for our latest chips.
+> I'm curious what thoughts people may have about how to get this
+> correctly implemented. Teaching the compiler about per-cpu data sounds
+> exciting. :)
 > 
-> Provided that I can collect the necessary Acks from Rob (DT) and other
-> people (Rafael?) I would probably take this via the Broadcom ARM SoC
-> pull requests.
-> 
-> Thank you!
+> -Kees
 
-I managed to get other patches submitted from a related series, please
-disregard those for now.
+arm64 has many integer registers so I don't think reserving one would
+hurt performance, especially in the kernel where hot numeric loops
+barely exist. It would reduce the cost of SSP by getting rid of the
+memory read for the canary value. On the other hand, using per-cpu data
+would likely be higher cost than the global. x86 has segment registers
+but most archs probably need to do something more painful.
 
-> 
-> Changes in v2:
-> 
-> - clarify the first patch's subject (Rob)
-> - removed patch #2 which was creating a bisectability problem (kbuild)
-> - added proper AFLAGS to get s2-arm.S to build properly (kbuild)
-> - improved MIPS power management binding document (Rob)
-> 
-> Brian Norris (1):
->   soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)
-> 
-> Florian Fainelli (2):
->   dt-bindings: ARM: brcmstb: Update Broadcom STB Power Management
->     binding
->   dt-bindings: Document MIPS Broadcom STB power management nodes
-> 
-> Justin Chen (1):
->   soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS)
-> 
->  .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   6 +-
->  .../devicetree/bindings/mips/brcm/soc.txt          | 153 ++++
->  drivers/soc/bcm/Kconfig                            |   2 +
->  drivers/soc/bcm/brcmstb/Kconfig                    |   9 +
->  drivers/soc/bcm/brcmstb/Makefile                   |   1 +
->  drivers/soc/bcm/brcmstb/pm/Makefile                |   3 +
->  drivers/soc/bcm/brcmstb/pm/aon_defs.h              | 113 +++
->  drivers/soc/bcm/brcmstb/pm/pm-arm.c                | 836 +++++++++++++++++++++
->  drivers/soc/bcm/brcmstb/pm/pm-mips.c               | 461 ++++++++++++
->  drivers/soc/bcm/brcmstb/pm/pm.h                    |  89 +++
->  drivers/soc/bcm/brcmstb/pm/s2-arm.S                |  76 ++
->  drivers/soc/bcm/brcmstb/pm/s2-mips.S               | 200 +++++
->  drivers/soc/bcm/brcmstb/pm/s3-mips.S               | 146 ++++
->  13 files changed, 2094 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/Makefile
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/aon_defs.h
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-arm.c
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-mips.c
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm.h
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-arm.S
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-mips.S
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/s3-mips.S
-> 
+It's safe as long as it's a callee-saved register. It should be enforced
+that there's no assembly spilling it and calling into C code without the
+random canary. There's very little assembly using registers like x28 so
+it wouldn't be that bad. It's possible there's one where nothing needs
+to be changed, there only needs to be a check to make sure it stays that
+way.
 
+It would be a step towards making SSP cheap enough to expand it into a
+feature like the StackGuard XOR canaries.
 
--- 
-Florian
+Samsung has a return address XOR feature based on reserving a register
+and while RAP's probabilistic return address mitigation isn't open-
+source, it was stated that it reserves a register on x86_64 where they
+aren't as plentiful as arm64.
