@@ -1,30 +1,35 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 26 Jun 2017 14:39:42 -0700
-Subject: [PATCH 2/2] rtc: brcmstb-waketimer: Add Broadcom STB wake-timer
-In-Reply-To: <20170626213534.jur6rggwbzhk6r4t@piout.net>
-References: <20170615195904.12653-1-f.fainelli@gmail.com>
- <20170615195904.12653-3-f.fainelli@gmail.com>
- <20170624185942.vq656pjxbqnqdhll@piout.net>
- <35c43786-ee58-130c-2ecd-5577197bd5aa@gmail.com>
- <20170626213534.jur6rggwbzhk6r4t@piout.net>
-Message-ID: <9d8f0475-5a52-c7dc-2f39-1b5cbad608e9@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 26 Jun 2017 23:47:41 +0200
+Subject: [PATCH v2 2/2] rtc: brcmstb-waketimer: Add Broadcom STB wake-timer
+In-Reply-To: <20170626211503.7471-3-f.fainelli@gmail.com>
+References: <20170626211503.7471-1-f.fainelli@gmail.com>
+ <20170626211503.7471-3-f.fainelli@gmail.com>
+Message-ID: <20170626214741.vmz3froqcmrlyxds@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2017 02:35 PM, Alexandre Belloni wrote:
-> On 26/06/2017 at 10:15:46 -0700, Florian Fainelli wrote:
->>> This is not needed since d68778b80dd7
->>
->> Great, I will take that out.
->>
->> Do you care whether some dev_dbg() prints are left in the driver or
->> should I remove those in v2?
->>
+On 26/06/2017 at 14:15:03 -0700, Florian Fainelli wrote:
+> From: Brian Norris <computersforpeace@gmail.com>
 > 
-> It could have stayed but it seems you removed it from v2.
+> This adds support for the Broadcom STB wake-timer which is a timer in
+> the chip's 27Mhz clock domain that offers the ability to wake the system
+> (wake-up source) from suspend states (S2, S3, S5). It is supported using
+> the rtc framework allowing us to configure alarms for system wake-up.
 > 
-> I'll applay that but it is ok if you change your mind.
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  drivers/rtc/Kconfig                 |  11 ++
+>  drivers/rtc/Makefile                |   1 +
+>  drivers/rtc/rtc-brcmstb-waketimer.c | 325 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 337 insertions(+)
+>  create mode 100644 drivers/rtc/rtc-brcmstb-waketimer.c
+> 
 
-No, I think they don't really belong in the driver anymore, thanks!
+Both applied, thanks.
+
 -- 
-Florian
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
