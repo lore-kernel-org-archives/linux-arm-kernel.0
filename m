@@ -1,57 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 26 Jun 2017 09:03:39 +0800
-Subject: [PATCH v2] arm64: kvm: route synchronous external abort
- exceptions to el2
-In-Reply-To: <1498306822-2924-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <201706260805.7Bmp3Y1k%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 26 Jun 2017 09:48:59 +0800
+Subject: [PATCH v13 05/14] ASoC: sun4i-codec: Merge
+ sun4i_codec_left_mixer_controls
+ and sun4i_codec_right_mixer_controls into sun4i_codec_mixer_controls.
+In-Reply-To: <20170624062419.23778-6-dannym@scratchpost.org>
+References: <20170624062419.23778-1-dannym@scratchpost.org>
+ <20170624062419.23778-6-dannym@scratchpost.org>
+Message-ID: <CAGb2v64i_S5HCsLHJGg0WbkFodOFFc5masUYQ53JaLTO7N2BMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu,
+On Sat, Jun 24, 2017 at 2:24 PM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> Since it's now possible to have a DAPM mixer control with multiple channels,
+> use it to cut down the total number of controls.
+>
+> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+> ---
+>  sound/soc/sunxi/sun4i-codec.c | 27 ++++++++++++---------------
+>  1 file changed, 12 insertions(+), 15 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index c69b55c..3718137 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -685,15 +685,12 @@ static const struct snd_kcontrol_new sun7i_codec_extra_controls[] = {
+>                        sun7i_codec_micin_preamp_gain_scale),
+>  };
+>
+> -static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
+> -       SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+> -                       SUN4I_CODEC_DAC_ACTL_LDACLMIXS, 1, 0),
+> -};
+> -
+> -static const struct snd_kcontrol_new sun4i_codec_right_mixer_controls[] = {
+> -       SOC_DAPM_SINGLE("Right DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+> +static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
+> +       SOC_DAPM_DOUBLE("DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+> +                       SUN4I_CODEC_DAC_ACTL_LDACLMIXS,
+>                         SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),
 
-[auto build test ERROR on kvm/linux-next]
-[also build test ERROR on v4.12-rc6 next-20170623]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This changes the mixer control names exposed to userspace. While I think
+consolidating mixer controls is nice, giving the user a less cluttered
+view, I'm not sure about the changing a possible userspace ABI.
 
-url:    https://github.com/0day-ci/linux/commits/Dongjiu-Geng/arm64-kvm-route-synchronous-external-abort-exceptions-to-el2/20170626-051545
-base:   https://git.kernel.org/pub/scm/virt/kvm/kvm.git linux-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Maxime, ALSA and ASoC people, any comments about this?
 
-All errors (new ones prefixed by >>):
+ChenYu
 
-   In file included from arch/arm64/kvm/../../../virt/kvm/arm/arm.c:45:0:
-   arch/arm64/include/asm/kvm_emulate.h: In function 'vcpu_reset_hcr':
->> arch/arm64/include/asm/kvm_emulate.h:50:26: error: 'ARM64_HAS_RAS_EXTN' undeclared (first use in this function)
-     if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
-                             ^~~~~~~~~~~~~~~~~~
-   arch/arm64/include/asm/kvm_emulate.h:50:26: note: each undeclared identifier is reported only once for each function it appears in
-
-vim +/ARM64_HAS_RAS_EXTN +50 arch/arm64/include/asm/kvm_emulate.h
-
-    44	
-    45	static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
-    46	{
-    47		vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-    48		if (is_kernel_in_hyp_mode())
-    49			vcpu->arch.hcr_el2 |= HCR_E2H;
-  > 50		if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
-    51			/* route synchronous external abort exceptions to EL2 */
-    52			vcpu->arch.hcr_el2 |= HCR_TEA;
-    53			/* trap error record accesses */
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 35202 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170626/e963afb9/attachment-0001.gz>
+> -       SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+> +       SOC_DAPM_SINGLE("Right Mixer Left DAC Playback Switch",
+> +                       SUN4I_CODEC_DAC_ACTL,
+>                         SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
+>  };
+>
+> @@ -729,11 +726,11 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+>
+>         /* Mixers */
+>         SND_SOC_DAPM_MIXER("Left Mixer", SND_SOC_NOPM, 0, 0,
+> -                          sun4i_codec_left_mixer_controls,
+> -                          ARRAY_SIZE(sun4i_codec_left_mixer_controls)),
+> +                          sun4i_codec_mixer_controls,
+> +                          ARRAY_SIZE(sun4i_codec_mixer_controls)),
+>         SND_SOC_DAPM_MIXER("Right Mixer", SND_SOC_NOPM, 0, 0,
+> -                          sun4i_codec_right_mixer_controls,
+> -                          ARRAY_SIZE(sun4i_codec_right_mixer_controls)),
+> +                          sun4i_codec_mixer_controls,
+> +                          ARRAY_SIZE(sun4i_codec_mixer_controls)),
+>
+>         /* Global Mixer Enable */
+>         SND_SOC_DAPM_SUPPLY("Mixer Enable", SUN4I_CODEC_DAC_ACTL,
+> @@ -775,12 +772,12 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+>
+>         /* Right Mixer Routes */
+>         { "Right Mixer", NULL, "Mixer Enable" },
+> -       { "Right Mixer", "Left DAC Playback Switch", "Left DAC" },
+> -       { "Right Mixer", "Right DAC Playback Switch", "Right DAC" },
+> +       { "Right Mixer", "DAC Playback Switch", "Left DAC" },
+> +       { "Right Mixer", "Right Mixer Left DAC Playback Switch", "Left DAC" },
+>
+>         /* Left Mixer Routes */
+>         { "Left Mixer", NULL, "Mixer Enable" },
+> -       { "Left Mixer", "Left DAC Playback Switch", "Left DAC" },
+> +       { "Left Mixer", "DAC Playback Switch", "Left DAC" },
+>
+>         /* Power Amplifier Routes */
+>         { "Power Amplifier", "Mixer Playback Switch", "Left Mixer" },
+> --
+> 2.1.4
+>
