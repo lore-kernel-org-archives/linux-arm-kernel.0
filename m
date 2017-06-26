@@ -1,68 +1,38 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Mon, 26 Jun 2017 13:22:27 +0800
-Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS
- extension feature
-In-Reply-To: <5908A5BC.1060202@arm.com>
-References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
- <5908A5BC.1060202@arm.com>
-Message-ID: <9e94c06f-f438-7106-ac96-67e021dcf729@huawei.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 26 Jun 2017 13:39:24 +0800
+Subject: [PATCH] pci: Add and use PCI_GENERIC_SETUP Kconfig entry
+In-Reply-To: <20170623220857.28774-2-palmer@dabbelt.com>
+Message-ID: <201706261344.OUjMGlsQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Palmer,
 
-   I have changed the SEA/SEI injection method according you suggestion, but I think this patch may also be needed.
-Now for the  SEI, the virtual ESR value is specified by the userspace. only RAS extension support to set the virtual ESR value. so user space will check it to decide whether pass the virtual ESR value.
-At the same time, reserve this interface for other possible usage by user space. what do you think about this patch?
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.12-rc6]
+[cannot apply to next-20170623]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
+url:    https://github.com/0day-ci/linux/commits/Palmer-Dabbelt/pci-Add-and-use-PCI_GENERIC_SETUP-Kconfig-entry/20170626-043558
+config: m68k-allnoconfig (attached as .config)
+compiler: m68k-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=m68k 
 
+All warnings (new ones prefixed by >>):
 
-On 2017/5/2 23:29, James Morse wrote:
-> Hi Dongjiu Geng,
-> 
-> On 30/04/17 06:37, Dongjiu Geng wrote:
->> Handle kvmtool's detection for RAS extension, because sometimes
->> the APP needs to know the CPU's capacity
-> 
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index d9e9697..1004039 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
->>  	return !!(pfr0 & 0x20);
->>  }
->>  
->> +static bool kvm_arm_support_ras_extension(void)
->> +{
->> +	u64 pfr0;
->> +
->> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
->> +	return !!(pfr0 & 0x10000000);
->> +}
-> 
-> Why are we telling user-space that the CPU has RAS extensions? EL0 can't do
-> anything with this and the guest EL1 can detect it from the id registers.
-> 
-> 
-> Are you using this to decide whether or not to generate a HEST for the guest?
-> 
-> If Qemu/kvmtool supports handling memory-failure notifications from signals you
-> should always generate a HEST. The GHES notification method could be anything
-> Qemu can deliver to the guest using the KVM APIs. Notifications from Qemu to the
-> guest don't depend on the RAS extensions. KVM has APIs for IRQ and SEA (you can
-> use KVM_SET_ONE_REG).
-> 
-> 
-> I think we need a new API for injecting SError for SEI from Qemu/kvmtool, but it
-> shouldn't be related to the RAS extensions. All v8.0 CPUs have HCR_EL2.VSE, so
-> we need to know KVM supports this API.
-> 
-> Your later patch adds code to set VSESR to make virtual RAS SErrors work, I
-> think we need to expose that to user-space.
-> 
-> 
-> Thanks,
-> 
-> James
-> .
-> 
+warning: (M68K) selects PCI_GENERIC_SETUP which has unmet direct dependencies (MMU)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 4487 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170626/d0028190/attachment.gz>
