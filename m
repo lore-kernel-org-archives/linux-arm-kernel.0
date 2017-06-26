@@ -1,34 +1,41 @@
 From: bich.hemon@st.com (Bich HEMON)
-Date: Mon, 26 Jun 2017 12:49:11 +0000
-Subject: [PATCH 06/20] serial: stm32: fix pio transmit timeout
-In-Reply-To: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
-References: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
-Message-ID: <1498481318-1894-7-git-send-email-bich.hemon@st.com>
+Date: Mon, 26 Jun 2017 12:49:08 +0000
+Subject: [PATCH 00/20] Update STM32 usart driver
+Message-ID: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bich Hemon <bich.hemon@st.com>
 
-100?s was too short for low speed transmission
-(9600bps)
+This patchset updates the stm32 usart driver. It mainly adds
+support for fifo, dma, debugfs anf fixes various bugs.
 
-Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
----
- drivers/tty/serial/stm32-usart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Bich Hemon (20):
+  serial: stm32: adding fifo support
+  dt-bindings: serial: each stm32 usart needs an alias
+  serial: stm32: fix multi ports management
+  serial: stm32: make fifoen as property for each port
+  serial: stm32: add debugfs
+  serial: stm32: fix pio transmit timeout
+  serial: stm32: less messages on dma alloc error
+  serial: stm32: timeout interrupt using with dma
+  serial: stm32: fix end of transfer
+  serial: stm32: fix dma receive
+  serial: stm32: add RTS support
+  serial: stm32: fix last_res value
+  serial: stm32: fix error handling in probe
+  dt-bindings: serial: document option wake-up interrupt for STM32 USART
+  serial: stm32: Add wakeup mechanism
+  serial: stm32: fix fifo usage
+  dt-bindings: serial: stm32: add dma using note
+  serial: stm32: update dma buffers length
+  serial: stm32: add dma rx callback
+  serial: stm32: fix rx interrupt handling in startup
 
-diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-index 3ce0f7a..79ac167 100644
---- a/drivers/tty/serial/stm32-usart.c
-+++ b/drivers/tty/serial/stm32-usart.c
-@@ -247,7 +247,7 @@ static void stm32_transmit_chars_pio(struct uart_port *port)
- 	ret = readl_relaxed_poll_timeout_atomic(port->membase + ofs->isr,
- 						isr,
- 						(isr & USART_SR_TXE),
--						10, 100);
-+						10, 100000);
- 
- 	if (ret)
- 		dev_err(port->dev, "tx empty not set\n");
+ .../devicetree/bindings/serial/st,stm32-usart.txt  |  55 +++-
+ drivers/tty/serial/stm32-usart.c                   | 310 ++++++++++++++++++---
+ drivers/tty/serial/stm32-usart.h                   |  51 +++-
+ 3 files changed, 375 insertions(+), 41 deletions(-)
+
 -- 
 1.9.1
