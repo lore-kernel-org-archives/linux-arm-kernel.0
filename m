@@ -1,232 +1,60 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 26 Jun 2017 14:20:55 +0200
-Subject: [PATCH v4] crypto: sun4i-ss: support the Security System PRNG
-Message-ID: <20170626122055.5253-1-clabbe.montjoie@gmail.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Mon, 26 Jun 2017 20:45:43 +0800
+Subject: [PATCH v4 1/3] arm64: kvm: support user space to detect RAS extension
+ feature
+Message-ID: <1498481143-23183-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Security System have a PRNG, this patch add support for it via
-crypto_rng.
+Handle userspace's detection for RAS extension, because sometimes
+the userspace needs to know the CPU's capacity
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
+ arch/arm64/kvm/reset.c   | 11 +++++++++++
+ include/uapi/linux/kvm.h |  1 +
+ 2 files changed, 12 insertions(+)
 
-Changes since v3 (note: the v3 miss changes and version tag sorry)
-- Replaced all len values with bits / BITS_PER_LONG or BITS_PER_BYTE
-
-Changes since v2
- - converted to crypto_rng
-
-Changes since v1:
- - Replaced all spin_lock_bh by simple spin_lock
- - Removed handling of size not modulo 4 which will never happen
- - Added add_random_ready_callback()
-
- drivers/crypto/Kconfig                  |  8 +++++
- drivers/crypto/sunxi-ss/Makefile        |  1 +
- drivers/crypto/sunxi-ss/sun4i-ss-core.c | 30 ++++++++++++++++++
- drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 56 +++++++++++++++++++++++++++++++++
- drivers/crypto/sunxi-ss/sun4i-ss.h      | 11 +++++++
- 5 files changed, 106 insertions(+)
- create mode 100644 drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index ab82536d64e2..bde0b102eb70 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -618,6 +618,14 @@ config CRYPTO_DEV_SUN4I_SS
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called sun4i-ss.
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index d9e9697..1004039 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
+ 	return !!(pfr0 & 0x20);
+ }
  
-+config CRYPTO_DEV_SUN4I_SS_PRNG
-+	bool "Support for Allwinner Security System PRNG"
-+	depends on CRYPTO_DEV_SUN4I_SS
-+	select CRYPTO_RNG
-+	help
-+	  Select this option if you to provides kernel-side support for
-+	  the Pseudo-Random Number Generator found in the Security System.
-+
- config CRYPTO_DEV_ROCKCHIP
- 	tristate "Rockchip's Cryptographic Engine driver"
- 	depends on OF && ARCH_ROCKCHIP
-diff --git a/drivers/crypto/sunxi-ss/Makefile b/drivers/crypto/sunxi-ss/Makefile
-index 8f4c7a273141..ccb893219079 100644
---- a/drivers/crypto/sunxi-ss/Makefile
-+++ b/drivers/crypto/sunxi-ss/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_CRYPTO_DEV_SUN4I_SS) += sun4i-ss.o
- sun4i-ss-y += sun4i-ss-core.o sun4i-ss-hash.o sun4i-ss-cipher.o
-+sun4i-ss-$(CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG) += sun4i-ss-prng.o
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-index 02ad8256e900..1547cbe13dc2 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-@@ -213,6 +213,23 @@ static struct sun4i_ss_alg_template ss_algs[] = {
- 		}
- 	}
- },
-+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG
++static bool kvm_arm_support_ras_extension(void)
 +{
-+	.type = CRYPTO_ALG_TYPE_RNG,
-+	.alg.rng = {
-+		.base = {
-+			.cra_name		= "stdrng",
-+			.cra_driver_name	= "sun4i_ss_rng",
-+			.cra_priority		= 300,
-+			.cra_ctxsize		= 0,
-+			.cra_module		= THIS_MODULE,
-+		},
-+		.generate               = sun4i_ss_prng_generate,
-+		.seed                   = sun4i_ss_prng_seed,
-+		.seedsize               = SS_SEED_LEN / BITS_PER_BYTE,
-+	}
-+},
-+#endif
- };
- 
- static int sun4i_ss_probe(struct platform_device *pdev)
-@@ -355,6 +372,13 @@ static int sun4i_ss_probe(struct platform_device *pdev)
- 				goto error_alg;
- 			}
- 			break;
-+		case CRYPTO_ALG_TYPE_RNG:
-+			err = crypto_register_rng(&ss_algs[i].alg.rng);
-+			if (err) {
-+				dev_err(ss->dev, "Fail to register %s\n",
-+					ss_algs[i].alg.rng.base.cra_name);
-+			}
-+			break;
- 		}
- 	}
- 	platform_set_drvdata(pdev, ss);
-@@ -369,6 +393,9 @@ static int sun4i_ss_probe(struct platform_device *pdev)
- 		case CRYPTO_ALG_TYPE_AHASH:
- 			crypto_unregister_ahash(&ss_algs[i].alg.hash);
- 			break;
-+		case CRYPTO_ALG_TYPE_RNG:
-+			crypto_unregister_rng(&ss_algs[i].alg.rng);
-+			break;
- 		}
- 	}
- 	if (ss->reset)
-@@ -393,6 +420,9 @@ static int sun4i_ss_remove(struct platform_device *pdev)
- 		case CRYPTO_ALG_TYPE_AHASH:
- 			crypto_unregister_ahash(&ss_algs[i].alg.hash);
- 			break;
-+		case CRYPTO_ALG_TYPE_RNG:
-+			crypto_unregister_rng(&ss_algs[i].alg.rng);
-+			break;
- 		}
- 	}
- 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-prng.c b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-new file mode 100644
-index 000000000000..0d01d1624252
---- /dev/null
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-@@ -0,0 +1,56 @@
-+#include "sun4i-ss.h"
++	u64 pfr0;
 +
-+int sun4i_ss_prng_seed(struct crypto_rng *tfm, const u8 *seed,
-+		       unsigned int slen)
-+{
-+	struct sun4i_ss_alg_template *algt;
-+	struct rng_alg *alg = crypto_rng_alg(tfm);
-+
-+	algt = container_of(alg, struct sun4i_ss_alg_template, alg.rng);
-+	memcpy(algt->ss->seed, seed, slen);
-+
-+	return 0;
++	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
++	return !!(pfr0 & 0x10000000);
 +}
 +
-+int sun4i_ss_prng_generate(struct crypto_rng *tfm, const u8 *src,
-+			   unsigned int slen, u8 *dst, unsigned int dlen)
-+{
-+	struct sun4i_ss_alg_template *algt;
-+	struct rng_alg *alg = crypto_rng_alg(tfm);
-+	int i;
-+	u32 v;
-+	u32 *data = (u32 *)dst;
-+	const u32 mode = SS_OP_PRNG | SS_PRNG_CONTINUE | SS_ENABLED;
-+	size_t len;
-+	struct sun4i_ss_ctx *ss;
-+	unsigned int todo = (dlen / 4) * 4;
-+
-+	algt = container_of(alg, struct sun4i_ss_alg_template, alg.rng);
-+	ss = algt->ss;
-+
-+	spin_lock(&ss->slock);
-+
-+	writel(mode, ss->base + SS_CTL);
-+
-+	while (todo > 0) {
-+		/* write the seed */
-+		for (i = 0; i < SS_SEED_LEN / BITS_PER_LONG; i++)
-+			writel(ss->seed[i], ss->base + SS_KEY0 + i * 4);
-+
-+		/* Read the random data */
-+		len = min_t(size_t, SS_DATA_LEN / BITS_PER_BYTE, todo);
-+		readsl(ss->base + SS_TXFIFO, data, len / 4);
-+		data += len / 4;
-+		todo -= len;
-+
-+		/* Update the seed */
-+		for (i = 0; i < SS_SEED_LEN / BITS_PER_LONG; i++) {
-+			v = readl(ss->base + SS_KEY0 + i * 4);
-+			ss->seed[i] = v;
-+		}
-+	}
-+
-+	writel(0, ss->base + SS_CTL);
-+	spin_unlock(&ss->slock);
-+	return dlen;
-+}
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss.h b/drivers/crypto/sunxi-ss/sun4i-ss.h
-index a0e1efc1cb2a..f3ac90692ac6 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss.h
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss.h
-@@ -32,6 +32,7 @@
- #include <crypto/aes.h>
- #include <crypto/des.h>
- #include <crypto/internal/rng.h>
-+#include <crypto/rng.h>
+ /**
+  * kvm_arch_dev_ioctl_check_extension
+  *
+@@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PMU_V3:
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
++	case KVM_CAP_ARM_RAS_EXTENSION:
++		r = kvm_arm_support_ras_extension();
++		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
+ 	case KVM_CAP_VCPU_ATTRIBUTES:
+ 		r = 1;
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index f51d508..27fe556 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_PPC_MMU_RADIX 134
+ #define KVM_CAP_PPC_MMU_HASH_V3 135
+ #define KVM_CAP_IMMEDIATE_EXIT 136
++#define KVM_CAP_ARM_RAS_EXTENSION 137
  
- #define SS_CTL            0x00
- #define SS_KEY0           0x04
-@@ -127,6 +128,9 @@
- #define SS_RXFIFO_EMP_INT_ENABLE	(1 << 2)
- #define SS_TXFIFO_AVA_INT_ENABLE	(1 << 0)
+ #ifdef KVM_CAP_IRQ_ROUTING
  
-+#define SS_SEED_LEN 192
-+#define SS_DATA_LEN 160
-+
- struct sun4i_ss_ctx {
- 	void __iomem *base;
- 	int irq;
-@@ -136,6 +140,9 @@ struct sun4i_ss_ctx {
- 	struct device *dev;
- 	struct resource *res;
- 	spinlock_t slock; /* control the use of the device */
-+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG
-+	u32 seed[SS_SEED_LEN / BITS_PER_LONG];
-+#endif
- };
- 
- struct sun4i_ss_alg_template {
-@@ -144,6 +151,7 @@ struct sun4i_ss_alg_template {
- 	union {
- 		struct skcipher_alg crypto;
- 		struct ahash_alg hash;
-+		struct rng_alg rng;
- 	} alg;
- 	struct sun4i_ss_ctx *ss;
- };
-@@ -201,3 +209,6 @@ int sun4i_ss_des_setkey(struct crypto_skcipher *tfm, const u8 *key,
- 			unsigned int keylen);
- int sun4i_ss_des3_setkey(struct crypto_skcipher *tfm, const u8 *key,
- 			 unsigned int keylen);
-+int sun4i_ss_prng_generate(struct crypto_rng *tfm, const u8 *src,
-+			   unsigned int slen, u8 *dst, unsigned int dlen);
-+int sun4i_ss_prng_seed(struct crypto_rng *tfm, const u8 *seed, unsigned int slen);
 -- 
-2.13.0
+2.10.1
