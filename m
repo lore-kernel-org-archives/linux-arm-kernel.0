@@ -1,150 +1,57 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Mon, 26 Jun 2017 11:53:34 +0200
-Subject: omap3isp camera was Re: [PATCH v1 0/6] Add support of OV9655
- camera
-In-Reply-To: <20170626083927.GB9621@amd>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <385A82AC-CC23-41BD-9F57-0232F713FED9@goldelico.com>
- <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
- <20170625091856.GA22791@amd>
- <EDFD663F-37F9-42C2-92A9-66C2508B361E@goldelico.com>
- <20170626083927.GB9621@amd>
-Message-ID: <5364AD62-5000-451E-B3F7-93D49A91EED5@goldelico.com>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Mon, 26 Jun 2017 09:59:04 +0000
+Subject: [PATCH v1 5/6] [media] ov9650: add multiple variant support (fwd)
+In-Reply-To: <alpine.DEB.2.20.1706251559180.3109@hadrien>
+References: <alpine.DEB.2.20.1706251559180.3109@hadrien>
+Message-ID: <c58a896c-4955-e051-82b6-395174cdbe7e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Ok course, thanks Julia.
 
-> Am 26.06.2017 um 10:39 schrieb Pavel Machek <pavel@ucw.cz>:
+On 06/25/2017 10:00 PM, Julia Lawall wrote:
+> Braces are probably missing aroud lines 1618-1620.
 > 
-> On Mon 2017-06-26 08:05:04, H. Nikolaus Schaller wrote:
->> Hi Pavel,
->> 
->>> Am 25.06.2017 um 11:18 schrieb Pavel Machek <pavel@ucw.cz>:
->>> 
->>> Hi!
->>> 
->>>> * unfortunately we still get no image :(
->>>> 
->>>> The latter is likely a setup issue of our camera interface (OMAP3 ISP = Image Signal Processor) which
->>>> we were not yet able to solve. Oscilloscoping signals on the interface indicated that signals and
->>>> sync are correct. But we do not know since mplayer only shows a green screen.
->>> 
->>> What mplayer command line do you use? How did you set up the pipeline
->>> with media-ctl?
->>> 
->>> On kernel.org, I have tree called camera-fw5-6 , where camera works
->>> for me on n900. On gitlab, there's modifed fcam-dev, which can be used
->>> for testing.
->> 
->> We did have yet another (non-DT) camera driver and media-ctl working in with 3.12.37,
->> but had no success yet to update it to work with modern kernels or drivers. It
->> is either that the (newer) drivers missing something or the media-ctl has changed.
->> 
->> Here is the log of our scripts with Hugues' driver and our latest setup:
->> 
->> root at letux:~# ./camera-demo sxga
->> DISPLAY=:0
->> XAUTHORITY=tcp
->> Camera: /dev/v4l-subdev8
->> Setting mode sxga
->> media-ctl -r
->> media-ctl -l '"ov965x":0 -> "OMAP3 ISP CCDC":0[1]'
->> media-ctl -l '"OMAP3 ISP CCDC":1 -> "OMAP3 ISP CCDC output":0[1]'
->> media-ctl -V '"ov965x":0 [UYVY2X8 1280x1024]'
->> media-ctl -V '"OMAP3 ISP CCDC":0 [UYVY2X8 1280x1024]'
->> media-ctl -V '"OMAP3 ISP CCDC":1 [UYVY 1280x1024]'
+> julia
 > 
-> Ok, so you are using capture, not preview.
-
-Yes.
-
+> ---------- Forwarded message ----------
+> Date: Sun, 25 Jun 2017 23:06:03 +0800
+> From: kbuild test robot <fengguang.wu@intel.com>
+> To: kbuild at 01.org
+> Cc: Julia Lawall <julia.lawall@lip6.fr>
+> Subject: Re: [PATCH v1 5/6] [media] ov9650: add multiple variant support
 > 
-> You may want to try this one:
+> Hi Hugues,
 > 
-> commit 0eae9d2a8f096f703cbc8f9a0ab155cd3cc14cef
-> Author: Pavel <pavel@ucw.cz>
-> Date:   Mon Feb 13 21:26:51 2017 +0100
+> [auto build test WARNING on linuxtv-media/master]
+> [also build test WARNING on v4.12-rc6 next-20170623]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
->    omap3isp: fix VP2SDR bit so capture (not preview) works
+> url:    https://github.com/0day-ci/linux/commits/Hugues-Fruchet/Add-support-of-OV9655-camera/20170625-201153
+> base:   git://linuxtv.org/media_tree.git master
+> :::::: branch date: 3 hours ago
+> :::::: commit date: 3 hours ago
 > 
->    This is neccessary for capture (not preview) to work properly on
->        N900. Why is unknown.
-
-Ah, interesting. I will give it a try.
-
-Do you please have a link to the repo where this commit can be found?
-
-BR and thanks,
-Nikolaus
-
+>>> drivers/media/i2c/ov9650.c:1618:2-44: code aligned with following code on line 1619
 > 
-> 									Pavel
+> git remote add linux-review https://github.com/0day-ci/linux
+> git remote update linux-review
+> git checkout a9fe8c23240a7f8df39c6238d98e41f41fedb641
+> vim +1618 drivers/media/i2c/ov9650.c
 > 
->> ### starting mplayer in sxga mode ###
->> mplayer tv:// -vf rotate=2 -tv driver=v4l2:device=/dev/video2:outfmt=uyvy:width=1280:height=1024:fps=15 -vo x11
->> MPlayer2 2.0-728-g2c378c7-4+b1 (C) 2000-2012 MPlayer Team
->> 
->> Playing tv://.
->> Detected file format: TV
->> Selected driver: v4l2
->> name: Video 4 Linux 2 input
->> author: Martin Olschewski <olschewski@zpr.uni-koeln.de>
->> comment: first try, more to come ;-)
->> v4l2: ioctl get standard failed: Invalid argument
->> Selected device: OMAP3 ISP CCDC output
->> Capabilities:  video capture  video output  streaming
->> supported norms:
->> inputs: 0 = camera;
->> Current input: 0
->> Current format: unknown (0x0)
->> tv.c: norm_from_string(pal): Bogus norm parameter, setting default.
->> v4l2: ioctl enum norm failed: Inappropriate ioctl for device
->> Error: Cannot set norm!
->> Selected input hasn't got a tuner!
->> v4l2: ioctl set mute failed: Inappropriate ioctl for device
->> v4l2: ioctl query control failed: Inappropriate ioctl for device
->> v4l2: ioctl query control failed: Inappropriate ioctl for device
->> v4l2: ioctl query control failed: Inappropriate ioctl for device
->> v4l2: ioctl query control failed: Inappropriate ioctl for device
->> v4l2: ioctl streamon failed: Broken pipe
->> [ass] auto-open
->> Opening video filter: [rotate=2]
->> VIDEO:  1280x1024  15.000 fps    0.0 kbps ( 0.0 kB/s)
->> Could not find matching colorspace - retrying with -vf scale...
->> Opening video filter: [scale]
->> [swscaler @ 0xb5ca9980]using unscaled uyvy422 -> yuv420p special converter
->> VO: [x11] 1024x1280 => 1024x1280 Planar YV12
->> [swscaler @ 0xb5ca9980]No accelerated colorspace conversion found from yuv420p to bgra.
->> Colorspace details not fully supported by selected vo.
->> Selected video codec: RAW UYVY [raw]
->> Audio: no sound
->> Starting playback...
->> V:   0.0  10/ 10 ??% ??% ??,?% 0 0 $<3>
->> 
->> 
->> MPlayer interrupted by signal 2 in module: filter_video
->> V:   0.0  11/ 11 ??% ??% ??,?% 0 0 $<3>
->> v4l2: ioctl set mute failed: Inappropriate ioctl for device
->> v4l2: 0 frames successfully processed, 0 frames dropped.
->> 
->> Exiting... (Quit)
->> root at letux:~#
->> 
->> BR and thanks,
->> Nikolaus
->> 
+> a9fe8c23 Hugues Fruchet     2017-06-22  1612  	ov965x->set_params = __ov965x_set_params;
+> 84a15ded Sylwester Nawrocki 2012-12-26  1613
+> a9fe8c23 Hugues Fruchet     2017-06-22  1614  	ov965x->frame_size = &ov965x->framesizes[0];
+> a9fe8c23 Hugues Fruchet     2017-06-22  1615  	ov965x_get_default_format(ov965x, &ov965x->format);
+> a9fe8c23 Hugues Fruchet     2017-06-22  1616
+> a9fe8c23 Hugues Fruchet     2017-06-22  1617  	if (ov965x->initialize_controls)
+> a9fe8c23 Hugues Fruchet     2017-06-22 @1618  		ret = ov965x->initialize_controls(ov965x);
+> 84a15ded Sylwester Nawrocki 2012-12-26 @1619  		if (ret < 0)
+> 84a15ded Sylwester Nawrocki 2012-12-26  1620  			goto err_ctrls;
+> 84a15ded Sylwester Nawrocki 2012-12-26  1621
+> 84a15ded Sylwester Nawrocki 2012-12-26  1622  	/* Update exposure time min/max to match frame format */
 > 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 > 
-> 
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170626/059822a2/attachment.sig>
