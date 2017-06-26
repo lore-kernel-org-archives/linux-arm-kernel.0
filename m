@@ -1,64 +1,24 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 26 Jun 2017 11:26:59 -0700
-Subject: [PATCH 3/4] powerpc: Reduce ELF_ET_DYN_BASE
-In-Reply-To: <8737amew79.fsf@concordia.ellerman.id.au>
-References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
- <1498154792-49952-4-git-send-email-keescook@chromium.org>
- <87podvp4q1.fsf@concordia.ellerman.id.au>
- <CAGXu5jK7aHHRMZyZyrviBF+cLghWcH_D4PX_vMFOycHuF7EdLA@mail.gmail.com>
- <8737amew79.fsf@concordia.ellerman.id.au>
-Message-ID: <CAGXu5jJKtdgRzdiDhA7XBcsaLQhmFgyQahk1F-zscFQY3pNBUQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 26 Jun 2017 13:36:48 -0500
+Subject: [PATCH 1/6] dt-bindings: mfd: axp20x: Add AXP806 to supported
+ list of chips
+In-Reply-To: <20170622040833.15329-2-wens@csie.org>
+References: <20170622040833.15329-1-wens@csie.org>
+ <20170622040833.15329-2-wens@csie.org>
+Message-ID: <20170626183648.wyrt6ioayhsc6bh2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 6:04 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
-> Kees Cook <keescook@chromium.org> writes:
->
->> On Fri, Jun 23, 2017 at 12:01 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
->>> Kees Cook <keescook@chromium.org> writes:
->>>
->>>> Now that explicitly executed loaders are loaded in the mmap region,
->>>> position PIE binaries lower in the address space to avoid possible
->>>> collisions with mmap or stack regions. For 64-bit, align to 4GB to
->>>> allow runtimes to use the entire 32-bit address space for 32-bit
->>>> pointers.
->>>
->>> The change log and subject are a bit out of whack with the actual patch
->>> because previously we used 512MB.
->>>
->>> How about?
->>>
->>>   powerpc: Move ELF_ET_DYN_BASE to 4GB / 4MB
->>>
->>>   Now that explicitly executed loaders are loaded in the mmap region,
->>>   we have more freedom to decide where we position PIE binaries in the
->>>   address space to avoid possible collisions with mmap or stack regions.
->>>
->>>   For 64-bit, align to 4GB to allow runtimes to use the entire 32-bit
->>>   address space for 32-bit pointers. On 32-bit use 4MB.
->>
->> Good idea, thanks. I'll resend the series with the commit logs updated.
->>
->>> Is there any particular reasoning behind the 4MB value on 32-bit?
->>
->> So, I've dug around a bit on this, and I *think* the rationale is to
->> avoid mapping a possible 4MB page table entry when it won't be using
->> at least a portion near the lower end (NULL address area covered
->> blocked by mmap_min_addr). It seems to be mainly tradition, though.
->
-> OK, that is obscure, especially for CPUs that don't have a 4MB page
-> size. But consistency across arches is probably best regardless.
+On Thu, Jun 22, 2017 at 12:08:28PM +0800, Chen-Yu Tsai wrote:
+> The binding already lists compatibles and regulators for the AXP806,
+> but it is missing from the list of supported chips at the beginning.
+> 
+> Add it.
+> 
+> Fixes: 204ae2963e10 ("mfd: axp20x: Add bindings for AXP806 PMIC")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Yeah, I like being not "close" to the NULL address, though the
-definition of "close" has been various values like 64K (mmap_min_addr)
-and 1M (x86 BIOS junk and new stack-gap size). 4MB is above even that,
-so, I think we're fine there. It's what Windows has used, so it's
-familiar and any new attack methodologies would at least be shared
-across OSes and architectures, so we should "notice" any problem with
-the value, and then we can adjust it if we need to.
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+Acked-by: Rob Herring <robh@kernel.org>
