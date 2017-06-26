@@ -1,71 +1,74 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 26 Jun 2017 16:22:56 +0100
-Subject: [PATCH v2 12/12] coresight: Add support for Coresight SoC 600
- components
-In-Reply-To: <1498490576-1350-1-git-send-email-suzuki.poulose@arm.com>
-References: <1498490576-1350-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1498490576-1350-13-git-send-email-suzuki.poulose@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 26 Jun 2017 18:38:27 +0300
+Subject: [RFC PATCH] arm64: signal: Make parse_user_sigframe()
+ independent of rt_sigframe layout
+In-Reply-To: <20170626093518.GG8543@e103592.cambridge.arm.com>
+References: <1498208859-6099-1-git-send-email-Dave.Martin@arm.com>
+ <20170625150544.2qsh4hpnmxygmcft@yury-thinkpad>
+ <20170626093518.GG8543@e103592.cambridge.arm.com>
+Message-ID: <20170626153827.kzraqd3s7gavx3uw@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the peripheral ids for the Coresight SoC 600 TPIU, replicator
-and funnel.
+On Mon, Jun 26, 2017 at 10:35:21AM +0100, Dave Martin wrote:
+> On Sun, Jun 25, 2017 at 06:05:44PM +0300, Yury Norov wrote:
+> > On Fri, Jun 23, 2017 at 10:07:39AM +0100, Dave Martin wrote:
+> > > ILP32 support uses the same struct sigcontext as the native ABI
+> > > (i.e., LP64), but a different layout for the rest of the signal
+> > > frame (since siginfo_t and ucontext_t are both ABI-dependent).
+> > > 
+> > > Since the purpose of parse_user_sigframe() is really to parse
+> > > sigcontext and not the whole signal frame, the function does not
+> > > need to depend on the layout of rt_sigframe -- the only purpose of
+> > > the rt_sigframe pointer is for use as a base to measure the signal
+> > > frame size.
+> > > 
+> > > So, this patch renames the function to parse_user_sigcontext() and
+> > > makes the sigframe base pointer generic.  ABI-specific parsers that
+> > > share the same sigcontext definition can then call it.
+> > > 
+> > > To minimise churn in this patch, the native LP64 parser is retained
+> > > under the old name, but becomes a call to parse_user_sigconext().
+> > > It may make sense instead to fold this into its restore_sigframe(),
+> > > depending on how ILP32 support is integrated.
+> > > 
+> > > Suggested-by: Yury Norov <ynorov@caviumnetworks.com>
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > ---
+> > > 
+> > > This patch depends on [1], which does not appear to be applied yet.
+> > > 
+> > > [1] [PATCH] arm64: signal: Allow expansion of the signal frame                  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/514699.html
+> 
+> [...]
+> 
+> FYI, [1] above is now merged in arm64 for-next/core, so we shouldn't
+> have dependency issues with this patch.
+> 
+> > > +static int parse_user_sigframe(struct user_ctxs *user,
+> > > +			       struct rt_sigframe __user const *sf)
+> > > +{
+> > > +	return parse_user_sigcontext(user, &sf->uc.uc_mcontext, sf);
+> > > +}
+> > > +
+> > 
+> > Hi Dave, 
+> > 
+> > Thank you. Seems this is what I need. Only one thing. We can #define
+> > parse_user_sigframe() as macro, and so bypass type control.
+> > The macro then will be used both by lp64 and ilp32 without any
+> > modification.
+> 
+> For the reasons you already gave, parse_user_sigframe is probably not
+> the right name for such a macro.  But it otherwise makes sense as an
+> interface.  Does [2] look OK for you?
+ 
+Yes, looks good, thank you.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 5 +++++
- drivers/hwtracing/coresight/coresight-funnel.c             | 5 +++++
- drivers/hwtracing/coresight/coresight-tpiu.c               | 5 +++++
- 3 files changed, 15 insertions(+)
+> Unless you suggest otherwise, I don't plan to maintain or push this
+> patch -- I think it makes more sense for you to carry it in the ILP32
+> series, since that's the only thing that needs it.
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index d2bc1f8..50abf9c 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -201,6 +201,11 @@ static struct amba_id replicator_ids[] = {
- 		.id     = 0x000bb909,
- 		.mask   = 0x000bffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id     = 0x000bb9ec,
-+		.mask   = 0x000fffff,
-+	},
- 	{ 0, 0 },
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 6f7f3d3..df1cf73 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -251,6 +251,11 @@ static struct amba_id funnel_ids[] = {
- 		.id     = 0x000bb908,
- 		.mask   = 0x000fffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id     = 0x000bb9eb,
-+		.mask   = 0x000fffff,
-+	},
- 	{ 0, 0},
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 59c1510..eda5d5a 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -201,6 +201,11 @@ static struct amba_id tpiu_ids[] = {
- 		.id	= 0x0004b912,
- 		.mask	= 0x0007ffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id	= 0x000bb9e7,
-+		.mask	= 0x000fffff,
-+	},
- 	{ 0, 0},
- };
- 
--- 
-2.7.5
+I'll just add it to ilp32 series.
+
+Yury
