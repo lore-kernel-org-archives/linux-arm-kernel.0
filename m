@@ -1,95 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Jun 2017 11:42:42 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.13
-Message-ID: <20170626104241.GE1691@arm.com>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Mon, 26 Jun 2017 18:45:19 +0800
+Subject: [PATCH 1/3] dt-bindings: adc: mt7622: add binding document
+In-Reply-To: <20170624210241.361743b3@kernel.org>
+References: <1498110274-18678-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1498110274-18678-2-git-send-email-zhiyong.tao@mediatek.com>
+ <20170624210241.361743b3@kernel.org>
+Message-ID: <1498473919.844.7.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
-
-Please pull these arm-smmu updates for 4.13. The headline feature is Robin's
-conversion of the page table code to a lockless implementation, which
-significantly closes the DMA performance gap when compared to a system with
-the SMMU in bypass mode. We'll look at improving unmap performance further
-in the next cycle.
-
-Other than that, we have a healthy crop of errata workarounds:
-
-  * Cavium forgot to hook up all the registers in their implementation ...
-  * ... but they did remember to OR all the interrupts together (including
-    across devices!)
-  * Hisilicon forgot to implement the PREFETCH command (we already handled
-    this for DT, but not ACPI)
-
-Due to the interaction with ACPI IORT, there are some IORT changes included
-here that have been acked-by Lorenzo. Note that there's a trivial conflict
-with the kvm-arm tree in linux-next, since both trees add a line to
-silicon-errata.txt.
-
-We also have some minor cleanups and a bump to the CMDQ timeout.
-
-Cheers,
-
-Will
-
---->8
-
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to f935448acf462c26142e8b04f1c8829b28d3b9d8:
-
-  iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126 (2017-06-23 17:58:04 +0100)
-
-----------------------------------------------------------------
-Arvind Yadav (3):
-      iommu/io-pgtable-arm-v7s: constify dummy_tlb_ops.
-      iommu: arm-smmu-v3: make of_device_ids const
-      iommu: arm-smmu: Handle return of iommu_device_register.
-
-Geetha Sowjanya (1):
-      iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
-
-Linu Cherian (2):
-      ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3 model
-      iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #74
-
-Robert Richter (1):
-      iommu/arm-smmu-v3, acpi: Add temporary Cavium SMMU-V3 IORT model number definitions
-
-Robin Murphy (9):
-      iommu/arm-smmu: Plumb in new ACPI identifiers
-      iommu/io-pgtable-arm-v7s: Check table PTEs more precisely
-      iommu/io-pgtable-arm: Improve split_blk_unmap
-      iommu/io-pgtable-arm-v7s: Refactor split_blk_unmap
-      iommu/io-pgtable: Introduce explicit coherency
-      iommu/io-pgtable-arm: Support lockless operation
-      iommu/io-pgtable-arm-v7s: Support lockless operation
-      iommu/arm-smmu: Remove io-pgtable spinlock
-      iommu/arm-smmu-v3: Remove io-pgtable spinlock
-
-Sunil Goutham (1):
-      iommu/arm-smmu-v3: Increase CMDQ drain timeout value
-
-Will Deacon (2):
-      iommu/io-pgtable: depend on !GENERIC_ATOMIC64 when using COMPILE_TEST with LPAE
-      iommu/io-pgtable-arm: Use dma_wmb() instead of wmb() when publishing table
-
-shameer (1):
-      iommu/arm-smmu-v3: Enable ACPI based HiSilicon CMD_PREFETCH quirk(erratum 161010701)
-
- Documentation/arm64/silicon-errata.txt             |   3 +
- .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  12 ++
- drivers/acpi/arm64/iort.c                          |  83 ++++++--
- drivers/iommu/Kconfig                              |   2 +-
- drivers/iommu/arm-smmu-v3.c                        | 229 ++++++++++++++-------
- drivers/iommu/arm-smmu.c                           |  64 +++---
- drivers/iommu/io-pgtable-arm-v7s.c                 | 183 ++++++++++------
- drivers/iommu/io-pgtable-arm.c                     | 189 +++++++++++------
- drivers/iommu/io-pgtable.h                         |   6 +
- 9 files changed, 523 insertions(+), 248 deletions(-)
+On Sat, 2017-06-24 at 21:02 +0100, Jonathan Cameron wrote:
+> On Thu, 22 Jun 2017 13:44:32 +0800
+> Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
+> 
+> > The commit adds mt7622 compatible node in binding document.
+> > 
+> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/iio/adc/mt6577_auxadc.txt  |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> > index 68c45cb..e6aa30a 100644
+> > --- a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> > +++ b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> > @@ -13,6 +13,7 @@ Required properties:
+> >    - compatible: Should be one of:
+> >      - "mediatek,mt2701-auxadc": For MT2701 family of SoCs
+> >      - "mediatek,mt8173-auxadc": For MT8173 family of SoCs
+> > +    - "mediatek,mt7622-auxadc": For MT7622 family of SoCs
+> numeric order?
+==> yes, we have changed it as numeric order in v2. Thanks.
+> >    - reg: Address range of the AUXADC unit.
+> >    - clocks: Should contain a clock specifier for each entry in clock-names
+> >    - clock-names: Should contain "main".
+> 
