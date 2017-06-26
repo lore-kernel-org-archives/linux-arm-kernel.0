@@ -1,139 +1,181 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 26 Jun 2017 15:32:43 -0700
-Subject: [PATCH 2/4] misc: sram-exec: Use aligned fncpy instead of memcpy
+Date: Mon, 26 Jun 2017 15:32:45 -0700
+Subject: [PATCH v2 3/4] dt-bindings: Document MIPS Broadcom STB power
+ management nodes
 In-Reply-To: <20170626223248.14199-1-f.fainelli@gmail.com>
 References: <20170626223248.14199-1-f.fainelli@gmail.com>
-Message-ID: <20170626223248.14199-4-f.fainelli@gmail.com>
+Message-ID: <20170626223248.14199-6-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Gerlach <d-gerlach@ti.com>
+Document the different nodes required for supporting S2/S3/S5 suspend
+states on MIPS-based Broadcom STB SoCs.
 
-Currently the sram-exec functionality, which allows allocation of
-executable memory and provides an API to move code to it, is only
-selected in configs for the ARM architecture. Based on commit
-5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
-function body copying") simply copying a C function pointer address
-using memcpy without consideration of alignment and Thumb is unsafe on
-ARM platforms.
-
-The aforementioned patch introduces the fncpy macro which is a safe way
-to copy executable code on ARM platforms, so let's make use of that here
-rather than the unsafe plain memcpy that was previously used by
-sram_exec_copy. Now sram_exec_copy will move the code to "dst" and
-return an address that is guaranteed to be safely callable.
-
-In the future, architectures hoping to make use of the sram-exec
-functionality must define an fncpy macro just as ARM has done to
-guarantee or check for safe copying to executable memory before allowing
-the arch to select CONFIG_SRAM_EXEC.
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/misc/sram-exec.c | 27 ++++++++++++++++++++-------
- include/linux/sram.h     |  8 ++++----
- 2 files changed, 24 insertions(+), 11 deletions(-)
+ .../devicetree/bindings/mips/brcm/soc.txt          | 153 +++++++++++++++++++++
+ 1 file changed, 153 insertions(+)
 
-diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
-index 3d528a13b8fc..426ad912b441 100644
---- a/drivers/misc/sram-exec.c
-+++ b/drivers/misc/sram-exec.c
-@@ -19,6 +19,7 @@
- #include <linux/mm.h>
- #include <linux/sram.h>
+diff --git a/Documentation/devicetree/bindings/mips/brcm/soc.txt b/Documentation/devicetree/bindings/mips/brcm/soc.txt
+index e4e1cd91fb1f..6bfe217668d6 100644
+--- a/Documentation/devicetree/bindings/mips/brcm/soc.txt
++++ b/Documentation/devicetree/bindings/mips/brcm/soc.txt
+@@ -11,3 +11,156 @@ Required properties:
  
-+#include <asm/fncpy.h>
- #include <asm/set_memory.h>
- 
- #include "sram.h"
-@@ -58,20 +59,32 @@ int sram_add_protect_exec(struct sram_partition *part)
-  * @src: Source address for the data to copy
-  * @size: Size of copy to perform, which starting from dst, must reside in pool
-  *
-+ * Return: Address for copied data that can safely be called through function
-+ *	   pointer, or NULL if problem.
-+ *
-  * This helper function allows sram driver to act as central control location
-  * of 'protect-exec' pools which are normal sram pools but are always set
-  * read-only and executable except when copying data to them, at which point
-  * they are set to read-write non-executable, to make sure no memory is
-  * writeable and executable at the same time. This region must be page-aligned
-  * and is checked during probe, otherwise page attribute manipulation would
-- * not be possible.
-+ * not be possible. Care must be taken to only call the returned address as
-+ * dst address is not guaranteed to be safely callable.
-+ *
-+ * NOTE: This function uses the fncpy macro to move code to the executable
-+ * region. Some architectures have strict requirements for relocating
-+ * executable code, so fncpy is a macro that must be defined by any arch
-+ * making use of this functionality that guarantees a safe copy of exec
-+ * data and returns a safe address that can be called as a C function
-+ * pointer.
-  */
--int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
--		   size_t size)
-+void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
-+		     size_t size)
- {
- 	struct sram_partition *part = NULL, *p;
- 	unsigned long base;
- 	int pages;
-+	void *dst_cpy;
- 
- 	mutex_lock(&exec_pool_list_mutex);
- 	list_for_each_entry(p, &exec_pool_list, list) {
-@@ -81,10 +94,10 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
- 	mutex_unlock(&exec_pool_list_mutex);
- 
- 	if (!part)
--		return -EINVAL;
-+		return NULL;
- 
- 	if (!addr_in_gen_pool(pool, (unsigned long)dst, size))
--		return -EINVAL;
-+		return NULL;
- 
- 	base = (unsigned long)part->base;
- 	pages = PAGE_ALIGN(size) / PAGE_SIZE;
-@@ -94,13 +107,13 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
- 	set_memory_nx((unsigned long)base, pages);
- 	set_memory_rw((unsigned long)base, pages);
- 
--	memcpy(dst, src, size);
-+	dst_cpy = fncpy(dst, src, size);
- 
- 	set_memory_ro((unsigned long)base, pages);
- 	set_memory_x((unsigned long)base, pages);
- 
- 	mutex_unlock(&part->lock);
- 
--	return 0;
-+	return dst_cpy;
- }
- EXPORT_SYMBOL_GPL(sram_exec_copy);
-diff --git a/include/linux/sram.h b/include/linux/sram.h
-index c97dcbe8ce25..4fb405fb0480 100644
---- a/include/linux/sram.h
-+++ b/include/linux/sram.h
-@@ -16,12 +16,12 @@
- struct gen_pool;
- 
- #ifdef CONFIG_SRAM_EXEC
--int sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
-+void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
- #else
--static inline int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
--				 size_t size)
-+static inline void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
-+				   size_t size)
- {
--	return -ENODEV;
-+	return NULL;
- }
- #endif /* CONFIG_SRAM_EXEC */
- #endif /* __LINUX_SRAM_H__ */
+ The experimental -viper variants are for running Linux on the 3384's
+ BMIPS4355 cable modem CPU instead of the BMIPS5000 application processor.
++
++Power management
++----------------
++
++For power management (particularly, S2/S3/S5 system suspend), the following SoC
++components are needed:
++
++= Always-On control block (AON CTRL)
++
++This hardware provides control registers for the "always-on" (even in low-power
++modes) hardware, such as the Power Management State Machine (PMSM).
++
++Required properties:
++- compatible     : should be one of
++		   "brcm,bcm7425-aon-ctrl"
++		   "brcm,bcm7429-aon-ctrl"
++		   "brcm,bcm7435-aon-ctrl" and
++		   "brcm,brcmstb-aon-ctrl"
++- reg            : the register start and length for the AON CTRL block
++
++Example:
++
++syscon at 410000 {
++	compatible = "brcm,bcm7425-aon-ctrl", "brcm,brcmstb-aon-ctrl";
++	reg = <0x410000 0x400>;
++};
++
++= Memory controllers
++
++A Broadcom STB SoC typically has a number of independent memory controllers,
++each of which may have several associated hardware blocks, which are versioned
++independently (control registers, DDR PHYs, etc.). One might consider
++describing these controllers as a parent "memory controllers" block, which
++contains N sub-nodes (one for each controller in the system), each of which is
++associated with a number of hardware register resources (e.g., its PHY.
++
++== MEMC (MEMory Controller)
++
++Represents a single memory controller instance.
++
++Required properties:
++- compatible     : should contain "brcm,brcmstb-memc" and "simple-bus"
++- ranges	 : should contain the child address in the parent address
++		   space, must be 0 here, and the register start and length of
++		   the entire memory controller (including all sub nodes: DDR PHY,
++		   arbiter, etc.)
++- #address-cells : must be 1
++- #size-cells	 : must be 1
++
++Example:
++
++	memory-controller: memc at 0 {
++		compatible = "brcm,brcmstb-memc", "simple-bus";
++		ranges = <0x0 0x0 0xa000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		memc-arb at 1000 {
++			...
++		};
++
++		memc-ddr at 2000 {
++			...
++		};
++
++		ddr-phy at 6000 {
++			...
++		};
++	};
++
++Should contain subnodes for any of the following relevant hardware resources:
++
++== DDR PHY control
++
++Control registers for this memory controller's DDR PHY.
++
++Required properties:
++- compatible     : should contain one of these
++		   "brcm,brcmstb-ddr-phy-v64.5"
++		   "brcm,brcmstb-ddr-phy"
++
++- reg            : the DDR PHY register range and length
++
++Example:
++
++	ddr-phy at 6000 {
++		compatible = "brcm,brcmstb-ddr-phy-v64.5";
++		reg = <0x6000 0xc8>;
++	};
++
++== DDR memory controller sequencer
++
++Control registers for this memory controller's DDR memory sequencer
++
++Required properties:
++- compatible     : should contain one of these
++		   "brcm,bcm7425-memc-ddr"
++		   "brcm,bcm7429-memc-ddr"
++		   "brcm,bcm7435-memc-ddr" and
++		   "brcm,brcmstb-memc-ddr"
++
++- reg            : the DDR sequencer register range and length
++
++Example:
++
++	memc-ddr at 2000 {
++		compatible = "brcm,bcm7425-memc-ddr", "brcm,brcmstb-memc-ddr";
++		reg = <0x2000 0x300>;
++	};
++
++== MEMC Arbiter
++
++The memory controller arbiter is responsible for memory clients allocation
++(bandwidth, priorities etc.) and needs to have its contents restored during
++deep sleep states (S3).
++
++Required properties:
++
++- compatible	: should contain one of these
++		  "brcm,brcmstb-memc-arb-v10.0.0.0"
++		  "brcm,brcmstb-memc-arb"
++
++- reg		: the DDR Arbiter register range and length
++
++Example:
++
++	memc-arb at 1000 {
++		compatible = "brcm,brcmstb-memc-arb-v10.0.0.0";
++		reg = <0x1000 0x248>;
++	};
++
++== Timers
++
++The Broadcom STB chips contain a timer block with several general purpose
++timers that can be used.
++
++Required properties:
++
++- compatible	: should contain one of:
++		  "brcm,bcm7425-timers"
++		  "brcm,bcm7429-timers"
++		  "brcm,bcm7435-timers and
++		  "brcm,brcmstb-timers"
++- reg		: the timers register range
++- interrupts	: the interrupt line for this timer block
++
++Example:
++
++	timers: timers at 4067c0 {
++		compatible = "brcm,bcm7425-timers", "brcm,brcmstb-timers";
++		reg = <0x4067c0 0x40>;
++		interrupts = <&periph_intc 19>;
++	};
 -- 
 2.9.3
