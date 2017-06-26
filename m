@@ -1,72 +1,24 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 26 Jun 2017 10:35:21 +0100
-Subject: [RFC PATCH] arm64: signal: Make parse_user_sigframe()
- independent of rt_sigframe layout
-In-Reply-To: <20170625150544.2qsh4hpnmxygmcft@yury-thinkpad>
-References: <1498208859-6099-1-git-send-email-Dave.Martin@arm.com>
- <20170625150544.2qsh4hpnmxygmcft@yury-thinkpad>
-Message-ID: <20170626093518.GG8543@e103592.cambridge.arm.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Mon, 26 Jun 2017 02:37:51 -0700
+Subject: [PATCH v5 3/7] drivers: dma-coherent: Account dma_pfn_offset
+ when used with device tree
+In-Reply-To: <b04cb1f5-7e5a-04cb-272c-62be2d1ce6fa@arm.com>
+References: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
+ <1495621472-9323-4-git-send-email-vladimir.murzin@arm.com>
+ <20170620134219.GA31496@infradead.org>
+ <b04cb1f5-7e5a-04cb-272c-62be2d1ce6fa@arm.com>
+Message-ID: <20170626093751.GA21570@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 25, 2017 at 06:05:44PM +0300, Yury Norov wrote:
-> On Fri, Jun 23, 2017 at 10:07:39AM +0100, Dave Martin wrote:
-> > ILP32 support uses the same struct sigcontext as the native ABI
-> > (i.e., LP64), but a different layout for the rest of the signal
-> > frame (since siginfo_t and ucontext_t are both ABI-dependent).
-> > 
-> > Since the purpose of parse_user_sigframe() is really to parse
-> > sigcontext and not the whole signal frame, the function does not
-> > need to depend on the layout of rt_sigframe -- the only purpose of
-> > the rt_sigframe pointer is for use as a base to measure the signal
-> > frame size.
-> > 
-> > So, this patch renames the function to parse_user_sigcontext() and
-> > makes the sigframe base pointer generic.  ABI-specific parsers that
-> > share the same sigcontext definition can then call it.
-> > 
-> > To minimise churn in this patch, the native LP64 parser is retained
-> > under the old name, but becomes a call to parse_user_sigconext().
-> > It may make sense instead to fold this into its restore_sigframe(),
-> > depending on how ILP32 support is integrated.
-> > 
-> > Suggested-by: Yury Norov <ynorov@caviumnetworks.com>
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> > 
-> > This patch depends on [1], which does not appear to be applied yet.
-> > 
-> > [1] [PATCH] arm64: signal: Allow expansion of the signal frame                  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/514699.html
-
-[...]
-
-FYI, [1] above is now merged in arm64 for-next/core, so we shouldn't
-have dependency issues with this patch.
-
-> > +static int parse_user_sigframe(struct user_ctxs *user,
-> > +			       struct rt_sigframe __user const *sf)
-> > +{
-> > +	return parse_user_sigcontext(user, &sf->uc.uc_mcontext, sf);
-> > +}
-> > +
+On Tue, Jun 20, 2017 at 02:50:34PM +0100, Robin Murphy wrote:
+> On 20/06/17 14:42, Christoph Hellwig wrote:
+> > Wouldn't the smal patch below solve the same issue in a simple way?
 > 
-> Hi Dave, 
-> 
-> Thank you. Seems this is what I need. Only one thing. We can #define
-> parse_user_sigframe() as macro, and so bypass type control.
-> The macro then will be used both by lp64 and ilp32 without any
-> modification.
+> That assumes that all devices accessing a shared pool will have the same
+>  dma_pfn_offset as the first one, which cannot strictly be relied upon
+> (even if it is highly likely in practice).
 
-For the reasons you already gave, parse_user_sigframe is probably not
-the right name for such a macro.  But it otherwise makes sense as an
-interface.  Does [2] look OK for you?
-
-Unless you suggest otherwise, I don't plan to maintain or push this
-patch -- I think it makes more sense for you to carry it in the ILP32
-series, since that's the only thing that needs it.
-
-Cheers
----Dave
-
-[2] [RFC PATCH v2] arm64: signal: Make parse_user_sigframe() independent of rt_sigframe layout
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/515746.html
+Which seems like another argument why the global pool should be
+a different implementation / interface than the per-device dma
+mapping helpers..
