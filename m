@@ -1,25 +1,86 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Jun 2017 13:04:59 -0500
-Subject: [PATCH v2] gpio: rcar: Add R8A7743 (RZ/G1M) support
-In-Reply-To: <1498055229-42052-1-git-send-email-biju.das@bp.renesas.com>
-References: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
- <1498055229-42052-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170626180459.hhfms6wfezxgxwns@rob-hp-laptop>
+Date: Mon, 26 Jun 2017 13:07:44 -0500
+Subject: [PATCH v2 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
+In-Reply-To: <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+ <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170626180744.fyyzjsu4pmurohap@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 03:27:09PM +0100, Biju Das wrote:
-> Renesas RZ/G1M (R8A7743) SoC GPIO blocks are identical to the R-Car Gen2
-> family. Add support for its GPIO controllers.
+On Wed, Jun 21, 2017 at 04:30:08PM +0200, Fabrice Gasnier wrote:
+> Add documentation for STMicroelectronics STM32 Low-Power Timer binding.
 > 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 > ---
-> v1->v2
-> * Modified the text "RZ-G1M" to "RZ/G1M"
+> Changes in v2:
+> - Lee's comments: s/Low Power/Low-Power/, remove 0x in example, improve
+>   properties descriptions
+> ---
+>  .../devicetree/bindings/mfd/stm32-lptimer.txt      | 48 ++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
 > 
->  Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
->  drivers/gpio/gpio-rcar.c                                     | 4 ++++
->  2 files changed, 5 insertions(+)
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> new file mode 100644
+> index 0000000..af859c8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> @@ -0,0 +1,48 @@
+> +STMicroelectronics STM32 Low-Power Timer
+> +
+> +The STM32 Low-Power Timer (LPTIM) is a 16-bit timer that provides several
+> +functions:
+> +- PWM output (with programmable prescaler, configurable polarity)
+> +- Quadrature encoder, counter
+> +- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
+> +
+> +Required properties:
+> +- compatible:		Must be "st,stm32-lptimer".
+> +- reg:			Offset and length of the device's register set.
+> +- clocks:		Phandle to the clock used by the LP Timer module.
+> +- clock-names:		Must be "mux".
+> +- #address-cells:	Should be '<1>'.
+> +- #size-cells:		Should be '<0>'.
+> +
+> +Optional subnodes:
+> +- pwm:			See ../pwm/pwm-stm32-lp.txt
+> +- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
+> +- trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
+> +
+> +Example:
+> +
+> +	lptimer1: lptimer at 40002400 {
 
-Acked-by: Rob Herring <robh@kernel.org>
+timer at ...
+
+> +		compatible = "st,stm32-lptimer";
+> +		reg = <0x40002400 0x400>;
+> +		clocks = <&timer_clk>;
+> +		clock-names = "mux";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pwm {
+> +			compatible = "st,stm32-pwm-lp";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lppwm1_pins>;
+> +		};
+> +
+> +		trigger at 0 {
+> +			compatible = "st,stm32-lptimer-trigger";
+> +			reg = <0>;
+
+Is there more than 1? 
+
+> +		};
+> +
+> +		counter {
+> +			compatible = "st,stm32-lptimer-counter";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lptim1_in_pins>;
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
