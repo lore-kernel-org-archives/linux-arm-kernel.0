@@ -1,18 +1,21 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 26 Jun 2017 11:47:39 +0200
-Subject: clean up and modularize arch dma_mapping interface V2
-In-Reply-To: <1498318616.31581.87.camel@kernel.crashing.org>
-References: <20170616181059.19206-1-hch@lst.de>
- <162d7932-5766-4c29-5471-07d1b699190a@oracle.com>
- <20170624071855.GD14580@lst.de>
- <1498318616.31581.87.camel@kernel.crashing.org>
-Message-ID: <20170626094739.GB13981@lst.de>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Mon, 26 Jun 2017 11:51:27 +0200
+Subject: [PATCH 0/2] rtc: add support for STM32H7 RTC
+Message-ID: <1498470689-26829-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 24, 2017 at 10:36:56AM -0500, Benjamin Herrenschmidt wrote:
-> I think we still need to do it. For example we have a bunch new "funky"
-> cases.
+Add support for STM32H7 Real Time Clock variant.
+Difference is regarding clocks: there is a 'pclk' clock on STM32H7
+for register access.
 
-I have no plan to do away with the selection - I just want a better
-interface than the current one.
+Amelie Delaunay (2):
+  dt-bindings: rtc: stm32: add support for STM32H7
+  rtc: stm32: add STM32H7 RTC support
+
+ .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 32 ++++++--
+ drivers/rtc/rtc-stm32.c                            | 85 +++++++++++++++++-----
+ 2 files changed, 95 insertions(+), 22 deletions(-)
+
+-- 
+1.9.1
