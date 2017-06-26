@@ -1,93 +1,151 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 26 Jun 2017 11:09:24 -0500
-Subject: [PATCH 4/4] remoteproc/davinci: streamline the interrupt
- management
-In-Reply-To: <20170625211931.GC26155@builder>
-References: <20170518220902.2846-1-s-anna@ti.com>
- <20170518220902.2846-5-s-anna@ti.com> <20170625211931.GC26155@builder>
-Message-ID: <8659b48d-5675-6bc9-aaf2-836ea69738d1@ti.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Mon, 26 Jun 2017 18:28:39 +0200
+Subject: omap3isp camera was Re: [PATCH v1 0/6] Add support of OV9655
+ camera
+In-Reply-To: <e725a457-5efc-22fa-ce97-bb7753185d21@st.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <385A82AC-CC23-41BD-9F57-0232F713FED9@goldelico.com>
+ <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
+ <20170625091856.GA22791@amd>
+ <EDFD663F-37F9-42C2-92A9-66C2508B361E@goldelico.com>
+ <20170626083927.GB9621@amd> <e725a457-5efc-22fa-ce97-bb7753185d21@st.com>
+Message-ID: <E4E1E683-9CD0-4F23-AB03-080C52D0D73B@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Hugues,
 
-On 06/25/2017 04:19 PM, Bjorn Andersson wrote:
-> On Thu 18 May 15:09 PDT 2017, Suman Anna wrote:
+> Am 26.06.2017 um 15:19 schrieb Hugues FRUCHET <hugues.fruchet@st.com>:
 > 
->> The davinci remoteproc driver is currently requesting its interrupt
->> that deals with the virtio kicks in probe, and that too before all
->> the associated variables used by the handler are initialized. This
->> is a lot in advance before the DSP remote processor is even loaded
->> and booted and is not essential. Streamline the interrupt request
->> and freeing operations instead alongside the boot and shutdown of
->> the remote processor.
->>
+> Nikolaus,
+> some comments about pixel format/resolution below:
 > 
-> I do prefer that all resources are acquired at probe() time, rather than
-> handled upon each start/stop. In the current handle_event()
-> implementation the remoteproc code will not find the yet unallocated
-> notify-id's and do nothing. So this seems okay.
+> On 06/26/2017 10:39 AM, Pavel Machek wrote:
+>> On Mon 2017-06-26 08:05:04, H. Nikolaus Schaller wrote:
+>>> Hi Pavel,
+>>> 
+>>>> Am 25.06.2017 um 11:18 schrieb Pavel Machek <pavel@ucw.cz>:
+>>>> 
+>>>> Hi!
+>>>> 
+>>>>> * unfortunately we still get no image :(
+>>>>> 
+>>>>> The latter is likely a setup issue of our camera interface (OMAP3 ISP = Image Signal Processor) which
+>>>>> we were not yet able to solve. Oscilloscoping signals on the interface indicated that signals and
+>>>>> sync are correct. But we do not know since mplayer only shows a green screen.
+>>>> 
+>>>> What mplayer command line do you use? How did you set up the pipeline
+>>>> with media-ctl?
+>>>> 
+>>>> On kernel.org, I have tree called camera-fw5-6 , where camera works
+>>>> for me on n900. On gitlab, there's modifed fcam-dev, which can be used
+>>>> for testing.
+>>> 
+>>> We did have yet another (non-DT) camera driver and media-ctl working in with 3.12.37,
+>>> but had no success yet to update it to work with modern kernels or drivers. It
+>>> is either that the (newer) drivers missing something or the media-ctl has changed.
+>>> 
+>>> Here is the log of our scripts with Hugues' driver and our latest setup:
+>>> 
+>>> root at letux:~# ./camera-demo sxga
+>>> DISPLAY=:0
+>>> XAUTHORITY=tcp
+>>> Camera: /dev/v4l-subdev8
+>>> Setting mode sxga
+>>> media-ctl -r
+>>> media-ctl -l '"ov965x":0 -> "OMAP3 ISP CCDC":0[1]'
+>>> media-ctl -l '"OMAP3 ISP CCDC":1 -> "OMAP3 ISP CCDC output":0[1]'
+>>> media-ctl -V '"ov965x":0 [UYVY2X8 1280x1024]'
+>>> media-ctl -V '"OMAP3 ISP CCDC":0 [UYVY2X8 1280x1024]'
+>>> media-ctl -V '"OMAP3 ISP CCDC":1 [UYVY 1280x1024]'
+>> 
+>> Ok, so you are using capture, not preview.
+>> 
+>> You may want to try this one:
+>> 
+>> commit 0eae9d2a8f096f703cbc8f9a0ab155cd3cc14cef
+>> Author: Pavel <pavel@ucw.cz>
+>> Date:   Mon Feb 13 21:26:51 2017 +0100
+>> 
+>>     omap3isp: fix VP2SDR bit so capture (not preview) works
+>> 
+>>     This is neccessary for capture (not preview) to work properly on
+>>         N900. Why is unknown.
+>> 	
+>> 									Pavel
+>> 
+>>> ### starting mplayer in sxga mode ###
+>>> mplayer tv:// -vf rotate=2 -tv driver=v4l2:device=/dev/video2:outfmt=uyvy:width=1280:height=1024:fps=15 -vo x11
 > 
-> [..]
->> @@ -213,15 +224,6 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->>  
->>  	platform_set_drvdata(pdev, rproc);
->>  
->> -	/* everything the ISR needs is now setup, so hook it up */
->> -	ret = devm_request_threaded_irq(dev, irq, da8xx_rproc_callback,
->> -					handle_event, 0, "da8xx-remoteproc",
->> -					rproc);
->> -	if (ret) {
->> -		dev_err(dev, "devm_request_threaded_irq error: %d\n", ret);
->> -		goto free_rproc;
->> -	}
+> => "outfmt=uyvy:width=1280:height=1024"
 > 
-> In the error paths after this the driver will end up freeing the rproc
-> context before disabling the irq, so these cases need a call to
-> disable_irq().
+> Nikolaus,
+> Be careful that only VGA/RGB565 is coded in this basic version of OV9655,
+> perhaps this explain partly your troubles ?
 
-Hmm, I am not sure I understand why we need disable_irq() when we are
-not even requesting it? This is deleting code, not adding. The IRQ
-request and free are now balanced in the start and stop ops. The only
-call here is a platform_get_irq() which doesn't need any cleanup.
+Ah, I see. The driver should support SXGA and UYVY2X8 (because our 3.12 compatible driver did).
 
-> 
->> -
->>  	/*
->>  	 * rproc_add() can end up enabling the DSP's clk with the DSP
->>  	 * *not* in reset, but da8xx_rproc_start() needs the DSP to be
->> @@ -254,14 +256,6 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->>  static int da8xx_rproc_remove(struct platform_device *pdev)
->>  {
->>  	struct rproc *rproc = platform_get_drvdata(pdev);
->> -	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
->> -
->> -	/*
->> -	 * The devm subsystem might end up releasing things before
->> -	 * freeing the irq, thus allowing an interrupt to sneak in while
->> -	 * the device is being removed.  This should prevent that.
->> -	 */
-> 
-> devres _will not_ disable the IRQ until after remove() returns, making it
-> possible for the interrupt handler to be executed after the rproc
-> context is freed.
-> 
-> So this comment would benefit from an update.
+This very old (but working) non-DT driver for 3.12 kernels
+was not based on the ov9650.c code but mt9p031.c:
 
-Again, this is deleting code, not adding. The remove after this cleanup
-will simply be invoking the rproc_del() and rproc_free() call, and
-rproc_del() does end up calling the stop since we do use auto-boot where
-we free the irq.
+	http://git.goldelico.com/?p=gta04-kernel.git;a=blob;f=drivers/media/i2c/ov9655.c;hb=refs/heads/3.12.37
 
-regards
-Suman
+We abandoned this independent driver because we felt (like you) that extending the existing
+ov9650 driver is a better solution for mainline.
 
-> 
->> -	disable_irq(drproc->irq);
->>  
->>  	rproc_del(rproc);
->>  	rproc_free(rproc);
-> 
-> Regards,
-> Bjorn
-> 
+
+At least in theory. Therefore I assumed your submission supports SXGA and UYVY as well,
+since your work is based on ours.
+
+Nevertheless, VGA resolution doesn't work either.
+
+root at letux:~# ./camera-demo vga
+DISPLAY=:0
+XAUTHORITY=tcp
+Camera: /dev/v4l-subdev8
+Setting mode vga
+media-ctl -r
+media-ctl -l '"ov965x":0 -> "OMAP3 ISP CCDC":0[1]'
+media-ctl -l '"OMAP3 ISP CCDC":1 -> "OMAP3 ISP CCDC output":0[1]'
+media-ctl -V '"ov965x":0 [UYVY2X8 640x480]'
+media-ctl -V '"OMAP3 ISP CCDC":0 [UYVY2X8 640x480]'
+media-ctl -V '"OMAP3 ISP CCDC":1 [UYVY 640x480]'
+### starting mplayer in vga mode ###
+mplayer tv:// -vf rotate=2 -tv driver=v4l2:device=/dev/video2:outfmt=uyvy:width=640:height=480:fps=30 -vo x11
+
+
+A little later it reports a NULL pointer dereference in ccdc_link_validate() / ccdc_is_shiftable().
+
+It appears as if the input format translates into a NULL pointer by
+omap3isp_video_format_info(0x00001008).
+
+This NULL pointer is not catched by ccdc_is_shiftable().
+
+And it indicates that the camera driver is doing a format that is not
+supported by omap3isp...
+
+
+So how should we proceed?
+
+It looks as if your driver supports your scenario (STM32F746G-DISCO) in VGA/RGB565
+and our drivers (basically) support ours (omap3isp) in VGA/SXGA but UYVY.
+
+We certainly need a generic driver that supports all platforms and formats. So
+we somehow need to get all this stuff into a single driver.
+
+Working on two different patch sets doesn't make sense and would be rejected
+my maintainers...
+
+Basically I could work on your basis to add what we need, but this requires your
+basis to be stabilized first. Or I would spend more time rebasing my code than
+fixing things.
+
+Or you implement the missing formats / features and I test and try to pinpoint
+and report issues to you for integration.
+
+So we have to agree on some way to coordinate the work, especially who submits
+patch sets for review here. Since you were faster than us to submit anything,
+so you should continue with this series.
+
+BR and thanks,
+Nikolaus
