@@ -1,109 +1,28 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Mon, 26 Jun 2017 08:05:04 +0200
-Subject: omap3isp camera was Re: [PATCH v1 0/6] Add support of OV9655
- camera
-In-Reply-To: <20170625091856.GA22791@amd>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <385A82AC-CC23-41BD-9F57-0232F713FED9@goldelico.com>
- <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
- <20170625091856.GA22791@amd>
-Message-ID: <EDFD663F-37F9-42C2-92A9-66C2508B361E@goldelico.com>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Mon, 26 Jun 2017 14:11:39 +0800
+Subject: [PATCH v2 0/3] ADC: Mediatek auxadc driver for mt7622 
+Message-ID: <1498457502-3669-1-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+This series includes three patches:
+1.Add mt7622 compatible node in binding document.
+2.Add support for suspend/resume.
+3.Add mt7622 compatible node in auxadc driver.
 
-> Am 25.06.2017 um 11:18 schrieb Pavel Machek <pavel@ucw.cz>:
-> 
-> Hi!
-> 
->> * unfortunately we still get no image :(
->> 
->> The latter is likely a setup issue of our camera interface (OMAP3 ISP = Image Signal Processor) which
->> we were not yet able to solve. Oscilloscoping signals on the interface indicated that signals and
->> sync are correct. But we do not know since mplayer only shows a green screen.
-> 
-> What mplayer command line do you use? How did you set up the pipeline
-> with media-ctl?
-> 
-> On kernel.org, I have tree called camera-fw5-6 , where camera works
-> for me on n900. On gitlab, there's modifed fcam-dev, which can be used
-> for testing.
+Changes in patch v2:
+1).Change compatible node as numeric order perhaps.
+2).Add "CONFIG_PM_SLEEP" and "__maybe_unused" for suspend/resume.
+3).Change "dev_pm_ops" to "SIMPLE_DEV_PM_OPS".
 
-We did have yet another (non-DT) camera driver and media-ctl working in with 3.12.37,
-but had no success yet to update it to work with modern kernels or drivers. It
-is either that the (newer) drivers missing something or the media-ctl has changed.
+Zhiyong Tao (3):
+  dt-bindings: adc: mt7622: add binding document
+  iio: adc: mt7622: add support for suspend/resume.
+  iio: adc: mt7622: Add compatible node for mt7622.
 
-Here is the log of our scripts with Hugues' driver and our latest setup:
+ .../devicetree/bindings/iio/adc/mt6577_auxadc.txt  |    1 +
+ drivers/iio/adc/mt6577_auxadc.c                    |   39 ++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
 
-root at letux:~# ./camera-demo sxga
-DISPLAY=:0
-XAUTHORITY=tcp
-Camera: /dev/v4l-subdev8
-Setting mode sxga
-media-ctl -r
-media-ctl -l '"ov965x":0 -> "OMAP3 ISP CCDC":0[1]'
-media-ctl -l '"OMAP3 ISP CCDC":1 -> "OMAP3 ISP CCDC output":0[1]'
-media-ctl -V '"ov965x":0 [UYVY2X8 1280x1024]'
-media-ctl -V '"OMAP3 ISP CCDC":0 [UYVY2X8 1280x1024]'
-media-ctl -V '"OMAP3 ISP CCDC":1 [UYVY 1280x1024]'
-### starting mplayer in sxga mode ###
-mplayer tv:// -vf rotate=2 -tv driver=v4l2:device=/dev/video2:outfmt=uyvy:width=1280:height=1024:fps=15 -vo x11
-MPlayer2 2.0-728-g2c378c7-4+b1 (C) 2000-2012 MPlayer Team
-
-Playing tv://.
-Detected file format: TV
-Selected driver: v4l2
- name: Video 4 Linux 2 input
- author: Martin Olschewski <olschewski@zpr.uni-koeln.de>
- comment: first try, more to come ;-)
-v4l2: ioctl get standard failed: Invalid argument
-Selected device: OMAP3 ISP CCDC output
- Capabilities:  video capture  video output  streaming
- supported norms:
- inputs: 0 = camera;
- Current input: 0
- Current format: unknown (0x0)
-tv.c: norm_from_string(pal): Bogus norm parameter, setting default.
-v4l2: ioctl enum norm failed: Inappropriate ioctl for device
-Error: Cannot set norm!
-Selected input hasn't got a tuner!
-v4l2: ioctl set mute failed: Inappropriate ioctl for device
-v4l2: ioctl query control failed: Inappropriate ioctl for device
-v4l2: ioctl query control failed: Inappropriate ioctl for device
-v4l2: ioctl query control failed: Inappropriate ioctl for device
-v4l2: ioctl query control failed: Inappropriate ioctl for device
-v4l2: ioctl streamon failed: Broken pipe
-[ass] auto-open
-Opening video filter: [rotate=2]
-VIDEO:  1280x1024  15.000 fps    0.0 kbps ( 0.0 kB/s)
-Could not find matching colorspace - retrying with -vf scale...
-Opening video filter: [scale]
-[swscaler @ 0xb5ca9980]using unscaled uyvy422 -> yuv420p special converter
-VO: [x11] 1024x1280 => 1024x1280 Planar YV12
-[swscaler @ 0xb5ca9980]No accelerated colorspace conversion found from yuv420p to bgra.
-Colorspace details not fully supported by selected vo.
-Selected video codec: RAW UYVY [raw]
-Audio: no sound
-Starting playback...
-V:   0.0  10/ 10 ??% ??% ??,?% 0 0 $<3>
-
-
-MPlayer interrupted by signal 2 in module: filter_video
-V:   0.0  11/ 11 ??% ??% ??,?% 0 0 $<3>
-v4l2: ioctl set mute failed: Inappropriate ioctl for device
-v4l2: 0 frames successfully processed, 0 frames dropped.
-
-Exiting... (Quit)
-root at letux:~#
-
-BR and thanks,
-Nikolaus
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170626/decfce17/attachment.sig>
+--
+1.7.9.5
