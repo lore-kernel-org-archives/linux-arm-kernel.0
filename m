@@ -1,129 +1,72 @@
-From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon, 26 Jun 2017 11:21:25 -0400
-Subject: [RFC 21/55] KVM: arm64: Forward HVC instruction to the guest
- hypervisor
-In-Reply-To: <20170222114758.GM26976@cbox>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-22-git-send-email-jintack@cs.columbia.edu>
- <20170222114758.GM26976@cbox>
-Message-ID: <CAHyh4xjG8_dOOe-eqQmAogDHDnQPCUQ-2Kccz9=6NmL0_+9TAA@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 26 Jun 2017 16:22:44 +0100
+Subject: [PATCHv2 00/12] coresight: Support for ARM Coresight SoC-600
+Message-ID: <1498490576-1350-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 6:47 AM, Christoffer Dall <cdall@linaro.org> wrote:
-> On Mon, Jan 09, 2017 at 01:24:17AM -0500, Jintack Lim wrote:
->> Forward exceptions due to hvc instruction to the guest hypervisor.
->>
->> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->> ---
->>  arch/arm64/include/asm/kvm_nested.h |  5 +++++
->>  arch/arm64/kvm/Makefile             |  1 +
->>  arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
->>  arch/arm64/kvm/handle_exit_nested.c | 27 +++++++++++++++++++++++++++
->>  4 files changed, 44 insertions(+)
->>  create mode 100644 arch/arm64/include/asm/kvm_nested.h
->>  create mode 100644 arch/arm64/kvm/handle_exit_nested.c
->>
->> diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
->> new file mode 100644
->> index 0000000..620b4d3
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/kvm_nested.h
->> @@ -0,0 +1,5 @@
->> +#ifndef __ARM64_KVM_NESTED_H__
->> +#define __ARM64_KVM_NESTED_H__
->> +
->> +int handle_hvc_nested(struct kvm_vcpu *vcpu);
->> +#endif
->> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
->> index b342bdd..9c35e9a 100644
->> --- a/arch/arm64/kvm/Makefile
->> +++ b/arch/arm64/kvm/Makefile
->> @@ -35,4 +35,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
->>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
->>
->> +kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
->>  kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
->> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> index a891684..208be16 100644
->> --- a/arch/arm64/kvm/handle_exit.c
->> +++ b/arch/arm64/kvm/handle_exit.c
->> @@ -29,6 +29,10 @@
->>  #include <asm/kvm_mmu.h>
->>  #include <asm/kvm_psci.h>
->>
->> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
->> +#include <asm/kvm_nested.h>
->> +#endif
->> +
->>  #define CREATE_TRACE_POINTS
->>  #include "trace.h"
->>
->> @@ -42,6 +46,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>                           kvm_vcpu_hvc_get_imm(vcpu));
->>       vcpu->stat.hvc_exit_stat++;
->>
->> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
->> +     ret = handle_hvc_nested(vcpu);
->> +     if (ret < 0 && ret != -EINVAL)
->> +             return ret;
->> +     else if (ret >= 0)
->> +             return ret;
->> +#endif
->>       ret = kvm_psci_call(vcpu);
->>       if (ret < 0) {
->>               kvm_inject_undefined(vcpu);
->> diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
->> new file mode 100644
->> index 0000000..a6ce23b
->> --- /dev/null
->> +++ b/arch/arm64/kvm/handle_exit_nested.c
->> @@ -0,0 +1,27 @@
->> +/*
->> + * Copyright (C) 2016 - Columbia University
->> + * Author: Jintack Lim <jintack@cs.columbia.edu>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/kvm.h>
->> +#include <linux/kvm_host.h>
->> +
->> +#include <asm/kvm_emulate.h>
->> +
->> +/* We forward all hvc instruction to the guest hypervisor. */
->> +int handle_hvc_nested(struct kvm_vcpu *vcpu)
->> +{
->> +     return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
->> +}
->
-> I don't understand the logic here or in the caller above.  Do we really
-> forward *all" hvc calls to the guest hypervisor now, so that we no
-> longer support any hypercalls from the VM?  That seems a little rough
-> and probably requires some more discussions.
+This series adds support for ARM Coresight SoC-600 IP, which implements
+Coresight V3 architecture. It also does some clean up of the replicator
+driver namings used in the driver to prevent confusions to the user.
 
-So I think if we run a VM with the EL2 support, then all hvc calls
-from the VM should be forwarded to the virtual EL2.
+The SoC-600 comes with an improved TMC which supports new features,
+including Save-Restore and Software FIFO2 mode (for streaming the trace
+data over functional I/O like USB/PCI).
+This series only supports Save-Restore feature of the new ETR by reusing
+the driver to perform additional setups required in case we are dealing
+with an IP which supports it. Towards this, we add a capability
+description to the IP listings to make it easier.
 
-I may miss something obvious, so can you (or anyone) come up with some
-cases that the host hypervisor needs to directly handle hvc from the
-VM with the EL2 support?
+Patches 1-8 contains general cleanups, introduction of some helper
+routines.
+Patch 9 introduces the capability tracking for TMCs.
+Patch 10 adds the support for Save-Restore feature in ETR.
+Patch 11 adds support for the Coresight SoC 600 TMC
+Patch 12 adds the support for other components in SoC 600.
 
-Thanks,
-Jintack
+Tested on Juno (with Coresight SoC 400) and an FPGA based system
+for SoC 600. Applies on Mathieu's coresight/next.
 
->
-> Thanks,
-> -Christoffer
->
+Changes since V1
+ - Rename coresight-replicator-qcom.c => coresight-dynamic-replicator.c
+ - Fix PIDR2 codings for ETB-10, ETM3x
+ - Fix cosmetic issues pointed out by  Mathieu
+ - Fix commit description for
+	 "coresight tmc: Handle configuration types properly"
+ - Drop SWFIFO2 from the capability of SoC-600 TMC
+
+
+Suzuki K Poulose (12):
+  coresight replicator: Cleanup programmable replicator naming
+  arm64: dts: juno: Use the new coresight replicator string
+  coresight: Extend the PIDR mask to cover relevant bits in PIDR2
+  coresight: Add support for reading 64bit registers
+  coresight tmc: Add helpers for accessing 64bit registers
+  coresight tmc: Expose DBA and AXICTL
+  coresight replicator: Expose replicator management registers
+  coresight tmc: Handle configuration types properly
+  coresight tmc: Add capability information
+  coresight tmc: Support for save-restore in ETR
+  coresight tmc: Add support for Coresight SoC 600 TMC
+  coresight: Add support for Coresight SoC 600 components
+
+ .../devicetree/bindings/arm/coresight.txt          |  4 +-
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |  2 +-
+ drivers/hwtracing/coresight/Kconfig                | 10 ++--
+ drivers/hwtracing/coresight/Makefile               |  2 +-
+ ...cator-qcom.c => coresight-dynamic-replicator.c} | 35 ++++++++++++--
+ drivers/hwtracing/coresight/coresight-etb10.c      |  4 +-
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 24 +++++-----
+ drivers/hwtracing/coresight/coresight-funnel.c     |  9 +++-
+ drivers/hwtracing/coresight/coresight-priv.h       | 35 ++++++++++++--
+ drivers/hwtracing/coresight/coresight-stm.c        |  8 ++--
+ drivers/hwtracing/coresight/coresight-tmc-etf.c    |  8 ++--
+ drivers/hwtracing/coresight/coresight-tmc-etr.c    | 21 ++++++--
+ drivers/hwtracing/coresight/coresight-tmc.c        | 56 ++++++++++++++++++----
+ drivers/hwtracing/coresight/coresight-tmc.h        | 46 ++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-tpiu.c       |  9 +++-
+ 15 files changed, 215 insertions(+), 58 deletions(-)
+ rename drivers/hwtracing/coresight/{coresight-replicator-qcom.c => coresight-dynamic-replicator.c} (86%)
+
+-- 
+2.7.5
