@@ -1,30 +1,50 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 26 Jun 2017 20:51:47 +0800
-Subject: next-20170626 build: 1 failures 1 warnings (next-20170626)
-In-Reply-To: <20170626115653.e4xs4lk4paibuphx@sirena.org.uk>
-References: <E1dPPgG-0002pe-3A@optimist>
- <20170626115653.e4xs4lk4paibuphx@sirena.org.uk>
-Message-ID: <1498481507.6075.10.camel@mtkswgap22>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Mon, 26 Jun 2017 23:04:58 +1000
+Subject: [PATCH 3/4] powerpc: Reduce ELF_ET_DYN_BASE
+In-Reply-To: <CAGXu5jK7aHHRMZyZyrviBF+cLghWcH_D4PX_vMFOycHuF7EdLA@mail.gmail.com>
+References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
+ <1498154792-49952-4-git-send-email-keescook@chromium.org>
+ <87podvp4q1.fsf@concordia.ellerman.id.au>
+ <CAGXu5jK7aHHRMZyZyrviBF+cLghWcH_D4PX_vMFOycHuF7EdLA@mail.gmail.com>
+Message-ID: <8737amew79.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-06-26 at 12:56 +0100, Mark Brown wrote:
-> On Mon, Jun 26, 2017 at 09:47:36AM +0100, Build bot for Mark Brown wrote:
-> 
-> This build failure is still present in -next:
-> 
-> > 	arm-allmodconfig
-> > ../drivers/pci/host/pcie-mediatek.c:485:8: error: implicit declaration of function 'pci_register_host_bridge' [-Werror=implicit-function-declaration]
-> 
-> and we're at -rc7 now.
+Kees Cook <keescook@chromium.org> writes:
 
-Hi Mark,
- 
-This is due to we are in different branch but merge together...
+> On Fri, Jun 23, 2017 at 12:01 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
+>> Kees Cook <keescook@chromium.org> writes:
+>>
+>>> Now that explicitly executed loaders are loaded in the mmap region,
+>>> position PIE binaries lower in the address space to avoid possible
+>>> collisions with mmap or stack regions. For 64-bit, align to 4GB to
+>>> allow runtimes to use the entire 32-bit address space for 32-bit
+>>> pointers.
+>>
+>> The change log and subject are a bit out of whack with the actual patch
+>> because previously we used 512MB.
+>>
+>> How about?
+>>
+>>   powerpc: Move ELF_ET_DYN_BASE to 4GB / 4MB
+>>
+>>   Now that explicitly executed loaders are loaded in the mmap region,
+>>   we have more freedom to decide where we position PIE binaries in the
+>>   address space to avoid possible collisions with mmap or stack regions.
+>>
+>>   For 64-bit, align to 4GB to allow runtimes to use the entire 32-bit
+>>   address space for 32-bit pointers. On 32-bit use 4MB.
+>
+> Good idea, thanks. I'll resend the series with the commit logs updated.
+>
+>> Is there any particular reasoning behind the 4MB value on 32-bit?
+>
+> So, I've dug around a bit on this, and I *think* the rationale is to
+> avoid mapping a possible 4MB page table entry when it won't be using
+> at least a portion near the lower end (NULL address area covered
+> blocked by mmap_min_addr). It seems to be mainly tradition, though.
 
-Anyway, I could send a critical patch, but I need Bjorn help to apply to
--next. Seems he didn't response these days.
+OK, that is obscure, especially for CPUs that don't have a 4MB page
+size. But consistency across arches is probably best regardless.
 
-Not sure how could I send it?
-
-Ryder.
+cheers
