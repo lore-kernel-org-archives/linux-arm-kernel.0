@@ -1,42 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 Jun 2017 15:07:40 +0100
-Subject: [PATCH v3 0/3] Add support for es8323 and hdmi audio to the
- firefly-rk3288
-In-Reply-To: <98ec8d72-2977-4347-86b0-4b423b55c434@collabora.com>
-References: <20170512132227.24916-1-romain.perier@collabora.com>
- <20170512132227.24916-9-romain.perier@collabora.com>
- <98ec8d72-2977-4347-86b0-4b423b55c434@collabora.com>
-Message-ID: <20170626140740.jlgtwaaivn3bvg2g@sirena.org.uk>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 26 Jun 2017 15:08:41 +0100
+Subject: [PATCH v5 4/7] drivers: dma-coherent: Introduce default DMA pool
+In-Reply-To: <20170626094250.GB21570@infradead.org>
+References: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
+ <1495621472-9323-5-git-send-email-vladimir.murzin@arm.com>
+ <20170620134932.GB31496@infradead.org>
+ <3d5ea779-90a3-f0b5-b9aa-161d4c0855e7@arm.com>
+ <20170626094250.GB21570@infradead.org>
+Message-ID: <40b98143-ef56-de79-06f8-499d9b3fbf8d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 04:00:17PM +0200, Romain Perier wrote:
-> Hello,
+On 26/06/17 10:42, Christoph Hellwig wrote:
+> On Tue, Jun 20, 2017 at 03:24:21PM +0100, Robin Murphy wrote:
+>> True, but the case here is where we need a special piece of coherent
+>> memory for *all* devices, and it was more complicated *not* to reuse the
+>> existing infrastructure. This would already be achievable by specifying
+>> a separate rmem carveout per device, but the shared pool just makes life
+>> easier, and mirrors the functionality dma-contiguous already supports.
 > 
-> ping,
+> ?'m really worried about the code in dma-coherent.c - the original
+> version clearly intends to have a coherent pool per device, declared
+> in the driver.  Then Marek added the reserved_mem interface, and
+> now we get another variant of it.  Conceptually the per-device
+> and global pool are very different, and to me it seems like the
+> reserved mem should be a different interface.
 > 
-> no other feedbacks (for 2/3 and 3/3)?
+>>> If you're allocating out of the global allocator the memory should
+>>> come from the normal dma_ops ->alloc allocator - and also take
+>>> the attrs into account (e.g. for DMA_ATTR_NON_CONSISTENT or
+>>> DMA_ATTR_NO_KERNEL_MAPPING requests you don't need coherent memory)
+>>
+>> The context here is noMMU but with caches - the problem being that the
+>> normal allocator will give back kernel memory, and there's no way to
+>> make that coherent with devices short of not enabling the caches in the
+>> first place, which is obviously undesirable. The trick is that RAM is
+>> aliased (in hardware) at two addresses, one of which makes CPU accesses
+>> non-cacheable, so by only ever accessing the RAM set aside for the
+>> coherent DMA pool using the non-cacheable alias (represented by the
+>> dma_pfn_offset) we can achieve DMA coherency.
+> 
+> Yes, and I think this is something we already have to deal with
+> for example on mips.  A simple genalloc allocator from your pool
+> in the normal dma_ops implementation should do the work just fine.
+> 
 
-Please don't send content free pings and please allow a reasonable time
-for review.  People get busy, go on holiday, attend conferences and so 
-on so unless there is some reason for urgency (like critical bug fixes)
-please allow at least a couple of weeks for review.  If there have been
-review comments then people may be waiting for those to be addressed.
+Are you proposing keeping pool handling under arch?
 
-Sending content free pings adds to the mail volume (if they are seen at
-all) which is often the problem and since they can't be reviewed
-directly if something has gone wrong you'll have to resend the patches
-anyway, though there are some other maintainers who like them - if in
-doubt look at how patches for the subsystem are normally handled.
-
-Please don't top post, reply in line with needed context.  This allows
-readers to readily follow the flow of conversation and understand what
-you are talking about and also helps ensure that everything in the
-discussion is being addressed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170626/91dab9ed/attachment-0001.sig>
+Cheers
+Vladimir
