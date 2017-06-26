@@ -1,41 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Jun 2017 09:26:20 +0200
-Subject: [PATCH] pci: Add and use PCI_GENERIC_SETUP Kconfig entry
-In-Reply-To: <201706261344.OUjMGlsQ%fengguang.wu@intel.com>
-References: <20170623220857.28774-2-palmer@dabbelt.com>
- <201706261344.OUjMGlsQ%fengguang.wu@intel.com>
-Message-ID: <CAMuHMdXSrfbSX2de2q35Hj6vQwi+sr23M1LEg82JL+FyLq4OJw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Jun 2017 00:33:34 -0700
+Subject: [PATCH] multi_v7_defconfig: Enable OMAP MTD and DM816 AHCI
+In-Reply-To: <1498045359-27376-1-git-send-email-trini@konsulko.com>
+References: <1498045359-27376-1-git-send-email-trini@konsulko.com>
+Message-ID: <20170626073333.GR3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 7:39 AM, kbuild test robot <lkp@intel.com> wrote:
-> [auto build test WARNING on linus/master]
-> [also build test WARNING on v4.12-rc6]
-> [cannot apply to next-20170623]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Palmer-Dabbelt/pci-Add-and-use-PCI_GENERIC_SETUP-Kconfig-entry/20170626-043558
-> config: m68k-allnoconfig (attached as .config)
-> compiler: m68k-linux-gcc (GCC) 4.9.0
-> reproduce:
->         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=m68k
->
-> All warnings (new ones prefixed by >>):
->
-> warning: (M68K) selects PCI_GENERIC_SETUP which has unmet direct dependencies (MMU)
+* Tom Rini <trini@konsulko.com> [170621 04:42]:
+> A wide variety of TI platforms support NAND via the
+> CONFIG_MTD_NAND_OMAP2 driver (and related BCH options), so enable this.
+> In addition, multi_v7_defconfig supports the dm8168-evm and that
+> supports root being on a SATA drive, so build the DM816 AHCI driver into
+> the resulting kernel as well.
+> 
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Mihail Grigorov <michael.grigorov@konsulko.com>
+> Signed-off-by: Tom Rini <trini@konsulko.com>
 
-I can't seem to find this dependency of PCI_GENERIC_SETUP on MMU?
+Best that Arnd picks up this one directly:
 
-Gr{oetje,eeting}s,
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 2685e03600b1..69b0b3c0fb6c 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -202,6 +202,8 @@ CONFIG_MTD_BLOCK=y
+>  CONFIG_MTD_M25P80=y
+>  CONFIG_MTD_NAND=y
+>  CONFIG_MTD_NAND_DENALI_DT=y
+> +CONFIG_MTD_NAND_OMAP2=y
+> +CONFIG_MTD_NAND_OMAP_BCH=y
+>  CONFIG_MTD_NAND_ATMEL=y
+>  CONFIG_MTD_NAND_BRCMNAND=y
+>  CONFIG_MTD_NAND_VF610_NFC=y
+> @@ -229,6 +231,7 @@ CONFIG_ATA=y
+>  CONFIG_SATA_AHCI=y
+>  CONFIG_SATA_AHCI_PLATFORM=y
+>  CONFIG_AHCI_BRCM=y
+> +CONFIG_AHCI_DM816=y
+>  CONFIG_AHCI_ST=y
+>  CONFIG_AHCI_IMX=y
+>  CONFIG_AHCI_SUNXI=y
+> -- 
+> 1.9.1
+> 
