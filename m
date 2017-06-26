@@ -1,41 +1,109 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 26 Jun 2017 22:52:43 +0800
-Subject: [PATCH 3/5] ARM: dts: rockchip: add RGA device node for RK3399
-Message-ID: <1498488763-1278-1-git-send-email-jacob-chen@iotwrt.com>
+Date: Mon, 26 Jun 2017 22:53:06 +0800
+Subject: [PATCH 4/5] ARM: dts: rockchip: enable RGA for rk3288 devices
+Message-ID: <1498488786-1344-1-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the RGA dt config of RK3399 SoC.
-
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/rk3288-evb.dtsi                 | 4 ++++
+ arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 4 ++++
+ arch/arm/boot/dts/rk3288-firefly.dtsi             | 4 ++++
+ arch/arm/boot/dts/rk3288-miqi.dts                 | 4 ++++
+ arch/arm/boot/dts/rk3288-popmetal.dts             | 4 ++++
+ arch/arm/boot/dts/rk3288-tinker.dts               | 4 ++++
+ 6 files changed, 24 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 8e6d1bd..fc33ce5 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1056,6 +1056,19 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index 4905760..ec12162 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -379,6 +379,10 @@
  	};
+ };
  
-+	rga: rga at ff680000 {
-+		compatible = "rockchip,rk3399-rga";
-+		reg = <0x0 0xff680000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH 0>;
-+		interrupt-names = "rga";
-+		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA_CORE>;
-+		clock-names = "aclk", "hclk", "sclk";
-+		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
-+		reset-names = "core", "axi", "ahb";
-+		power-domains = <&power RK3399_PD_RGA>;
-+		status = "disabled";
-+	};
++&rga {
++	status = "okay";
++};
 +
- 	efuse0: efuse at ff690000 {
- 		compatible = "rockchip,rk3399-efuse";
- 		reg = <0x0 0xff690000 0x0 0x80>;
+ &usbphy {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+index 8134966..fffa92e2 100644
+--- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+@@ -283,6 +283,10 @@
+ 	};
+ };
+ 
++&rga {
++	status = "okay";
++};
++
+ &tsadc {
+ 	rockchip,hw-tshut-mode = <0>;
+ 	rockchip,hw-tshut-polarity = <0>;
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index f520589..74a6ce5 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -500,6 +500,10 @@
+ 	};
+ };
+ 
++&rga {
++	status = "okay";
++};
++
+ &saradc {
+ 	vref-supply = <&vcc_18>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/rk3288-miqi.dts b/arch/arm/boot/dts/rk3288-miqi.dts
+index 21326f3..dc5e6bd 100644
+--- a/arch/arm/boot/dts/rk3288-miqi.dts
++++ b/arch/arm/boot/dts/rk3288-miqi.dts
+@@ -401,6 +401,10 @@
+ 	};
+ };
+ 
++&rga {
++	status = "okay";
++};
++
+ &saradc {
+ 	vref-supply = <&vcc_18>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
+index aa1f9ec..362e5aa 100644
+--- a/arch/arm/boot/dts/rk3288-popmetal.dts
++++ b/arch/arm/boot/dts/rk3288-popmetal.dts
+@@ -490,6 +490,10 @@
+ 	};
+ };
+ 
++&rga {
++	status = "okay";
++};
++
+ &tsadc {
+ 	rockchip,hw-tshut-mode = <0>;
+ 	rockchip,hw-tshut-polarity = <0>;
+diff --git a/arch/arm/boot/dts/rk3288-tinker.dts b/arch/arm/boot/dts/rk3288-tinker.dts
+index 525b0e5..1a8c149 100644
+--- a/arch/arm/boot/dts/rk3288-tinker.dts
++++ b/arch/arm/boot/dts/rk3288-tinker.dts
+@@ -460,6 +460,10 @@
+ 	status = "okay";
+ };
+ 
++&rga {
++	status = "okay";
++};
++
+ &saradc {
+ 	vref-supply = <&vcc18_ldo1>;
+ 	status ="okay";
 -- 
 2.7.4
