@@ -1,36 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Jun 2017 10:15:43 +0100
-Subject: [PATCH] arm64: pass endianness info to sparse
-In-Reply-To: <20170624154211.61472-1-luc.vanoostenryck@gmail.com>
-References: <20170624154211.61472-1-luc.vanoostenryck@gmail.com>
-Message-ID: <20170626091542.GA1691@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 26 Jun 2017 10:18:56 +0100
+Subject: [PATCH v6 2/7] dma: Add simple dma_noop_mmap
+In-Reply-To: <1498468741-12020-1-git-send-email-vladimir.murzin@arm.com>
+References: <1498468741-12020-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1498468741-12020-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 24, 2017 at 05:42:11PM +0200, Luc Van Oostenryck wrote:
-> ARM64 depends on the macro __AARCH64EB__ being defined or not
-> to correctly select or define endian-specific macros, structures
-> or pieces of code.
-> 
-> This macro is predefined by the compiler but sparse knows nothing
-> about it and thus may pre-process files differently from what
-> gcc would.
-> 
-> Fix this by passing '-D__AARCH64EL__' or '-D__AARCH64EB__' to
-> sparse depending of the endianness of the kernel, like defined
-> by GCC.
-> 
-> Note: In most case it won't change anything since most arm64 use
->       little-endian (but an allyesconfig would use big-endian!).
-> 
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> CC: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
-> ---
->  arch/arm64/Makefile | 2 ++
->  1 file changed, 2 insertions(+)
+This patch adds a simple implementation of mmap to dma_noop_ops.
 
-Thanks, I'll pick this up.
+Cc: Joerg Roedel <jroedel@suse.de>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Andras Szemzo <sza@esh.hu>
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ lib/dma-noop.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Will
+diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+index 1f60c8a..4b43d15 100644
+--- a/lib/dma-noop.c
++++ b/lib/dma-noop.c
+@@ -67,6 +67,29 @@ static int dma_noop_supported(struct device *dev, u64 mask)
+ 	return 1;
+ }
+ 
++static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
++			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
++			 unsigned long attrs)
++{
++	unsigned long user_count = vma_pages(vma);
++	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
++	unsigned long off = vma->vm_pgoff;
++	int ret = -ENXIO;
++
++	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
++		return ret;
++
++	if (off < count && user_count <= (count - off)) {
++		ret = remap_pfn_range(vma, vma->vm_start,
++				      pfn + off,
++				      user_count << PAGE_SHIFT,
++				      vma->vm_page_prot);
++	}
++
++	return ret;
++}
++
+ const struct dma_map_ops dma_noop_ops = {
+ 	.alloc			= dma_noop_alloc,
+ 	.free			= dma_noop_free,
+@@ -74,6 +97,7 @@ const struct dma_map_ops dma_noop_ops = {
+ 	.map_sg			= dma_noop_map_sg,
+ 	.mapping_error		= dma_noop_mapping_error,
+ 	.dma_supported		= dma_noop_supported,
++	.mmap			= dma_noop_mmap,
+ };
+ 
+ EXPORT_SYMBOL(dma_noop_ops);
+-- 
+2.0.0
