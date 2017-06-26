@@ -1,199 +1,58 @@
-From: hugues.fruchet@st.com (Hugues FRUCHET)
-Date: Mon, 26 Jun 2017 14:41:58 +0000
-Subject: [PATCH v1 3/5] [media] stm32-dcmi: crop sensor image to match
- user resolution
-In-Reply-To: <2844ed1a-d310-4381-c4a7-88ab4633f32f@xs4all.nl>
-References: <1498144371-13310-1-git-send-email-hugues.fruchet@st.com>
- <1498144371-13310-4-git-send-email-hugues.fruchet@st.com>
- <ee46bbd4-9343-7060-3c1b-455486eb7a9c@xs4all.nl>
- <8ae4c160-3137-0fa8-3d78-e4e1284521a4@st.com>
- <2844ed1a-d310-4381-c4a7-88ab4633f32f@xs4all.nl>
-Message-ID: <3f04ca80-28cd-c793-72da-e0ea8efdb8a9@st.com>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon, 26 Jun 2017 22:50:42 +0800
+Subject: [PATCH 0/5] Add Rockchip RGA V4l2 support
+Message-ID: <1498488642-27830-1-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series add a v4l2 m2m drvier for rockchip RGA direct rendering based 2d graphics acceleration module. 
 
+Before, my colleague yakir have write a drm RGA drvier and send it to the lists.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416769.html
+I have been asked to find a userspace user("compositor") for it, but after some studys, my conclusion is that unlike exynos g2d,
+rockchip rga are not suitable for compositor. Rockchip RGA have a limited MMU, which means it can only hold several buffers in the same time.
+When it was used in compositor, it will waste a lot of time to import/export/flush buffer, resulting in a bad performance.
 
-On 06/26/2017 12:07 PM, Hans Verkuil wrote:
-> On 26/06/17 11:53, Hugues FRUCHET wrote:
->> Hi Hans, thanks for review.
->>
->> Reply below.
->>
->> BR
->> Hugues.
->>
->> On 06/22/2017 05:19 PM, Hans Verkuil wrote:
->>> On 06/22/2017 05:12 PM, Hugues Fruchet wrote:
->>>> Add flexibility on supported resolutions by cropping sensor
->>>> image to fit user resolution format request.
->>>>
->>>> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
->>>> ---
->>>>     drivers/media/platform/stm32/stm32-dcmi.c | 54 ++++++++++++++++++++++++++++++-
->>>>     1 file changed, 53 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
->>>> index 75d53aa..bc5e052 100644
->>>> --- a/drivers/media/platform/stm32/stm32-dcmi.c
->>>> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
->>>> @@ -131,6 +131,8 @@ struct stm32_dcmi {
->>>>     	struct v4l2_async_notifier	notifier;
->>>>     	struct dcmi_graph_entity	entity;
->>>>     	struct v4l2_format		fmt;
->>>> +	struct v4l2_rect		crop;
->>>> +	bool				do_crop;
->>>>     
->>>>     	const struct dcmi_format	**user_formats;
->>>>     	unsigned int			num_user_formats;
->>>> @@ -538,6 +540,27 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
->>>>     	if (dcmi->bus.flags & V4L2_MBUS_PCLK_SAMPLE_RISING)
->>>>     		val |= CR_PCKPOL;
->>>>     
->>>> +	if (dcmi->do_crop) {
->>>> +		u32 size, start;
->>>> +
->>>> +		/* Crop resolution */
->>>> +		size = ((dcmi->crop.height - 1) << 16) |
->>>> +			((dcmi->crop.width << 1) - 1);
->>>> +		reg_write(dcmi->regs, DCMI_CWSIZE, size);
->>>> +
->>>> +		/* Crop start point */
->>>> +		start = ((dcmi->crop.top) << 16) |
->>>> +			 ((dcmi->crop.left << 1));
->>>> +		reg_write(dcmi->regs, DCMI_CWSTRT, start);
->>>> +
->>>> +		dev_dbg(dcmi->dev, "Cropping to %ux%u@%u:%u\n",
->>>> +			dcmi->crop.width, dcmi->crop.height,
->>>> +			dcmi->crop.left, dcmi->crop.top);
->>>> +
->>>> +		/* Enable crop */
->>>> +		val |= CR_CROP;
->>>> +	};
->>>> +
->>>>     	reg_write(dcmi->regs, DCMI_CR, val);
->>>>     
->>>>     	/* Enable dcmi */
->>>> @@ -707,6 +730,8 @@ static int dcmi_try_fmt(struct stm32_dcmi *dcmi, struct v4l2_format *f,
->>>>     		.which = V4L2_SUBDEV_FORMAT_TRY,
->>>>     	};
->>>>     	int ret;
->>>> +	__u32 width, height;
->>>> +	struct v4l2_mbus_framefmt *mf = &format.format;
->>>>     
->>>>     	dcmi_fmt = find_format_by_fourcc(dcmi, pixfmt->pixelformat);
->>>>     	if (!dcmi_fmt) {
->>>> @@ -724,8 +749,18 @@ static int dcmi_try_fmt(struct stm32_dcmi *dcmi, struct v4l2_format *f,
->>>>     	if (ret < 0)
->>>>     		return ret;
->>>>     
->>>> +	/* Align format on what sensor can do */
->>>> +	width = pixfmt->width;
->>>> +	height = pixfmt->height;
->>>>     	v4l2_fill_pix_format(pixfmt, &format.format);
->>>>     
->>>> +	/* We can do any resolution thanks to crop */
->>>> +	if ((mf->width > width) || (mf->height > height)) {
->>>> +		/* Restore width/height */
->>>> +		pixfmt->width = width;
->>>> +		pixfmt->height = height;
->>>> +	};
->>>> +
->>>>     	pixfmt->field = V4L2_FIELD_NONE;
->>>>     	pixfmt->bytesperline = pixfmt->width * dcmi_fmt->bpp;
->>>>     	pixfmt->sizeimage = pixfmt->bytesperline * pixfmt->height;
->>>> @@ -741,6 +776,8 @@ static int dcmi_set_fmt(struct stm32_dcmi *dcmi, struct v4l2_format *f)
->>>>     	struct v4l2_subdev_format format = {
->>>>     		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
->>>>     	};
->>>> +	struct v4l2_mbus_framefmt *mf = &format.format;
->>>> +	struct v4l2_pix_format *pixfmt = &f->fmt.pix;
->>>>     	const struct dcmi_format *current_fmt;
->>>>     	int ret;
->>>>     
->>>> @@ -748,13 +785,28 @@ static int dcmi_set_fmt(struct stm32_dcmi *dcmi, struct v4l2_format *f)
->>>>     	if (ret)
->>>>     		return ret;
->>>>     
->>>> -	v4l2_fill_mbus_format(&format.format, &f->fmt.pix,
->>>> +	v4l2_fill_mbus_format(&format.format, pixfmt,
->>>>     			      current_fmt->mbus_code);
->>>>     	ret = v4l2_subdev_call(dcmi->entity.subdev, pad,
->>>>     			       set_fmt, NULL, &format);
->>>>     	if (ret < 0)
->>>>     		return ret;
->>>>     
->>>> +	/* Enable crop if sensor resolution is larger than request */
->>>> +	dcmi->do_crop = false;
->>>> +	if ((mf->width > pixfmt->width) || (mf->height > pixfmt->height)) {
->>>> +		dcmi->crop.width = pixfmt->width;
->>>> +		dcmi->crop.height = pixfmt->height;
->>>> +		dcmi->crop.left = (mf->width - pixfmt->width) / 2;
->>>> +		dcmi->crop.top = (mf->height - pixfmt->height) / 2;
->>>> +		dcmi->do_crop = true;
->>>
->>> Why not implement the selection API instead? I assume that you can crop from any
->>> region of the sensor, not just the center part.
->>
->> The point here was to add some flexibility for user in term of
->> resolution and also less memory consumption.
->> For example here I want to make a 480x272 preview:
->> - without this change: S_FMT(480x272) returns VGA (the OV9655 larger
->> discrete resolution), then app has to capture VGA frames then crop to
->> fit 480x272 frame buffer.
->> - with this change: S_FMT(480x272) returns 480x272 (crop done by
->> hardware), app can directly capture 480x272 then copy to framebuffer
->> without any conversion.
->>
->> Implementation of V4L2 crop using SELECTION API could also be used,
->> but I need to change app.
->>
->> More generally, with a given couple ISP+sensor, will S_FMT()
->> return the sensor only supported resolutions ? or the supported
->> resolutions of the couple ISP+sensor (ISP will downscale/upscale/crop
->> the sensor discrete resolution to fit user request) ?
->>
->> Hans, what are your recommendations ?
-> 
-> This is not the way the V4L2 API works.
-> 
-> Sensors report their supported resolutions through the ENUM_FRAMESIZES
-> (and the related ENUM_FRAMEINTERVALS) ioctls.
-> 
-> With S_FMT you pick the resolution you want.
-> 
-> If you then want to crop the driver should implement the selection API
-> (this will also automatically enable the G/S_CROP/CROPCAP ioctls) so the
-> application can select which part of the image should be cropped. Assuming
-> there is no scaler then after cropping the format size will be reduced
-> to the size of the cropped image.
-> 
-> That's in a nutshell how these ioctls relate to one another.
-> 
-> Regards,
-> 
-> 	Hans
-> 
+A few months ago, i saw a discussion in dri-devel at lists.freedesktop.org. 
+It remind that we could write a v4l2 m2m RGA driver, since we usually use RGA for streaming purpose.
+https://patches.linaro.org/cover/97727/
 
-Ok, crystal clear, I'll implement selection API so.
-BR,
-Hugues.
+I have test this driver with gstreamer v4l2transform plugin and it seems work well.
+It could work without any modify in existing plugin and it have no buffer cahce flush problem which we have meet in drm. 
+https://github.com/GStreamer/gst-plugins-good/blob/master/sys/v4l2/gstv4l2transform.c
 
->>
->>>
->>> Regards,
->>>
->>> 	Hans
->>>
->>>> +
->>>> +		dev_dbg(dcmi->dev, "%ux%u cropped to %ux%u@(%u,%u)\n",
->>>> +			mf->width, mf->height,
->>>> +			dcmi->crop.width, dcmi->crop.height,
->>>> +			dcmi->crop.left, dcmi->crop.top);
->>>> +	};
->>>> +
->>>>     	dcmi->fmt = *f;
->>>>     	dcmi->current_fmt = current_fmt;
->>>>     
->>>>
-> 
+Jacob Chen (5):
+  [media] rockchip/rga: v4l2 m2m support
+  ARM: dts: rockchip: add RGA device node for RK3288
+  ARM: dts: rockchip: add RGA device node for RK3399
+  ARM: dts: rockchip: enable RGA for rk3288 devices
+  dt-bindings: Document the Rockchip RGA bindings
+
+ .../devicetree/bindings/media/rockchip-rga.txt     |  36 +
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   4 +
+ arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi  |   4 +
+ arch/arm/boot/dts/rk3288-firefly.dtsi              |   4 +
+ arch/arm/boot/dts/rk3288-miqi.dts                  |   4 +
+ arch/arm/boot/dts/rk3288-popmetal.dts              |   4 +
+ arch/arm/boot/dts/rk3288-tinker.dts                |   4 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  13 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  13 +
+ drivers/media/platform/Kconfig                     |  11 +
+ drivers/media/platform/Makefile                    |   2 +
+ drivers/media/platform/rockchip-rga/Makefile       |   3 +
+ drivers/media/platform/rockchip-rga/rga-buf.c      | 176 ++++
+ drivers/media/platform/rockchip-rga/rga-hw.c       | 456 ++++++++++
+ drivers/media/platform/rockchip-rga/rga-hw.h       | 434 +++++++++
+ drivers/media/platform/rockchip-rga/rga.c          | 979 +++++++++++++++++++++
+ drivers/media/platform/rockchip-rga/rga.h          | 133 +++
+ 17 files changed, 2280 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+ create mode 100644 drivers/media/platform/rockchip-rga/Makefile
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
+ create mode 100644 drivers/media/platform/rockchip-rga/rga.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga.h
+
+-- 
+2.7.4
