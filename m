@@ -1,46 +1,58 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 26 Jun 2017 21:29:04 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: replace writel with writel_relaxed
- in queue_inc_prod
-In-Reply-To: <20170621090803.GB3768@arm.com>
-References: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
- <acafb87c-4ba9-4a44-f868-c8f882717ab1@arm.com> <5949CBB7.1030908@huawei.com>
- <20170621090803.GB3768@arm.com>
-Message-ID: <59510C20.6000300@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Jun 2017 14:31:00 +0100
+Subject: [PATCH] arm64: use readq() instead of readl() to read 64bit
+ entry_point
+In-Reply-To: <20170626131625.79059-1-luc.vanoostenryck@gmail.com>
+References: <20170626131625.79059-1-luc.vanoostenryck@gmail.com>
+Message-ID: <20170626133059.GK1691@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/6/21 17:08, Will Deacon wrote:
-> On Wed, Jun 21, 2017 at 09:28:23AM +0800, Leizhen (ThunderTown) wrote:
->> On 2017/6/20 19:35, Robin Murphy wrote:
->>> On 20/06/17 12:04, Zhen Lei wrote:
->>>> This function is protected by spinlock, and the latter will do memory
->>>> barrier implicitly. So that we can safely use writel_relaxed. In fact, the
->>>> dmb operation will lengthen the time protected by lock, which indirectly
->>>> increase the locking confliction in the stress scene.
->>>
->>> If you remove the DSB between writing the commands (to Normal memory)
->>> and writing the pointer (to Device memory), how can you guarantee that
->>> the complete command is visible to the SMMU and it isn't going to try to
->>> consume stale memory contents? The spinlock is irrelevant since it's
->>> taken *before* the command is written.
->> OK, I see, thanks. Let's me see if there are any other methods. And I think
->> that this may should be done well by hardware.
+On Mon, Jun 26, 2017 at 03:16:25PM +0200, Luc Van Oostenryck wrote:
+> Here the entrypoint, declared as a 64 bit integer, is read from
+> a pointer to 64bit integer but the read is done via readl_relaxed()
+> which is for 32bit quantities.
 > 
-> FWIW, I did use the _relaxed variants wherever I could when I wrote the
-> driver. There might, of course, be bugs, but it's not like the normal case
-> for drivers where the author didn't consider the _relaxed accessors
-> initially.
-A good news. I got a new idea and I will post v2 later.
+> All the high bits will thus be lost which change the meaning
+> of the test against zero done later.
+> 
+> Fix this by using readq_relaxed() instead as it should be for
+> 64bit quantities.
+> 
+> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+> 
+> ---
+> 
+> !!! Warning !!!
+>    I don't have the HW to test this, nor have I read the ACPI specs.
+>    This is only compile tested.
 
-> 
-> Will
-> 
-> .
-> 
+This looks correct to me, but I'd like an Ack from Lorenzo before I take
+it because it's not clear to me what issues can arise if firmware only
+writes zero to the bottom 32 bits of the jump address and leaves the upper
+bits intact. If firmware does this, then this patch will result in a
+WARN, but I can't figure out what this part of the spec is trying to
+achieve.
 
--- 
-Thanks!
-BestRegards
+Will
+
+> ---
+>  arch/arm64/kernel/acpi_parking_protocol.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+> index 1f5655cd9..f35e80aad 100644
+> --- a/arch/arm64/kernel/acpi_parking_protocol.c
+> +++ b/arch/arm64/kernel/acpi_parking_protocol.c
+> @@ -125,7 +125,7 @@ static void acpi_parking_protocol_cpu_postboot(void)
+>  	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
+>  	__le64 entry_point;
+>  
+> -	entry_point = readl_relaxed(&mailbox->entry_point);
+> +	entry_point = readq_relaxed(&mailbox->entry_point);
+>  	/*
+>  	 * Check if firmware has cleared the entry_point as expected
+>  	 * by the protocol specification.
+> -- 
+> 2.13.0
+> 
