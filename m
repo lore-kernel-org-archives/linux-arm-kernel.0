@@ -1,30 +1,83 @@
 From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Mon, 26 Jun 2017 14:11:40 +0800
-Subject: [PATCH v2 1/3] dt-bindings: adc: mt7622: add binding document
+Date: Mon, 26 Jun 2017 14:11:41 +0800
+Subject: [PATCH v2 2/3] iio: adc: mt7622: add support for suspend/resume.
 In-Reply-To: <1498457502-3669-1-git-send-email-zhiyong.tao@mediatek.com>
 References: <1498457502-3669-1-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <1498457502-3669-2-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <1498457502-3669-3-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit adds mt7622 compatible node in binding document.
+This patch supports auxadc suspend/resume flow.
+Disable auxadc clk and power in suspend function.
+Enable axuadc clk and power in resume function.
 
 Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
 ---
- .../devicetree/bindings/iio/adc/mt6577_auxadc.txt  |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/iio/adc/mt6577_auxadc.c |   38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-index 68c45cb..64dc484 100644
---- a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-@@ -12,6 +12,7 @@ for the Thermal Controller which holds a phandle to the AUXADC.
- Required properties:
-   - compatible: Should be one of:
-     - "mediatek,mt2701-auxadc": For MT2701 family of SoCs
-+    - "mediatek,mt7622-auxadc": For MT7622 family of SoCs
-     - "mediatek,mt8173-auxadc": For MT8173 family of SoCs
-   - reg: Address range of the AUXADC unit.
-   - clocks: Should contain a clock specifier for each entry in clock-names
+diff --git a/drivers/iio/adc/mt6577_auxadc.c b/drivers/iio/adc/mt6577_auxadc.c
+index 2d104c8..c174b73 100644
+--- a/drivers/iio/adc/mt6577_auxadc.c
++++ b/drivers/iio/adc/mt6577_auxadc.c
+@@ -184,6 +184,39 @@ static int mt6577_auxadc_read_raw(struct iio_dev *indio_dev,
+ 	.read_raw = &mt6577_auxadc_read_raw,
+ };
+ 
++#ifdef CONFIG_PM_SLEEP
++static int __maybe_unused mt6577_auxadc_resume(struct device *dev)
++{
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
++	int ret;
++
++	ret = clk_prepare_enable(adc_dev->adc_clk);
++	if (ret) {
++		pr_err("failed to enable auxadc clock\n");
++		return ret;
++	}
++
++	mt6577_auxadc_mod_reg(adc_dev->reg_base + MT6577_AUXADC_MISC,
++			      MT6577_AUXADC_PDN_EN, 0);
++	mdelay(MT6577_AUXADC_POWER_READY_MS);
++
++	return 0;
++}
++
++static int __maybe_unused mt6577_auxadc_suspend(struct device *dev)
++{
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
++
++	mt6577_auxadc_mod_reg(adc_dev->reg_base + MT6577_AUXADC_MISC,
++			      0, MT6577_AUXADC_PDN_EN);
++	clk_disable_unprepare(adc_dev->adc_clk);
++
++	return 0;
++}
++#endif
++
+ static int mt6577_auxadc_probe(struct platform_device *pdev)
+ {
+ 	struct mt6577_auxadc_device *adc_dev;
+@@ -269,6 +302,10 @@ static int mt6577_auxadc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static SIMPLE_DEV_PM_OPS(mt6577_auxadc_pm_ops,
++			 mt6577_auxadc_suspend,
++			 mt6577_auxadc_resume);
++
+ static const struct of_device_id mt6577_auxadc_of_match[] = {
+ 	{ .compatible = "mediatek,mt2701-auxadc", },
+ 	{ .compatible = "mediatek,mt8173-auxadc", },
+@@ -280,6 +317,7 @@ static int mt6577_auxadc_remove(struct platform_device *pdev)
+ 	.driver = {
+ 		.name   = "mt6577-auxadc",
+ 		.of_match_table = mt6577_auxadc_of_match,
++		.pm = &mt6577_auxadc_pm_ops,
+ 	},
+ 	.probe	= mt6577_auxadc_probe,
+ 	.remove	= mt6577_auxadc_remove,
 -- 
 1.7.9.5
