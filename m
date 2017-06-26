@@ -1,241 +1,181 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 26 Jun 2017 18:41:36 +0200
-Subject: [PATCH v2 6/8] iio: trigger: Add STM32 LPTimer trigger driver
-In-Reply-To: <20170624211335.680b5b90@kernel.org>
-References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
- <1498055415-31513-7-git-send-email-fabrice.gasnier@st.com>
- <20170624211335.680b5b90@kernel.org>
-Message-ID: <a1368383-8e5e-72ab-32f9-efe9715aaccb@st.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 26 Jun 2017 19:33:30 +0300
+Subject: [PATCH v1 4/6] [media] ov9650: use write_array() for resolution
+ sequences
+In-Reply-To: <1498143942-12682-5-git-send-email-hugues.fruchet@st.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <1498143942-12682-5-git-send-email-hugues.fruchet@st.com>
+Message-ID: <20170626163330.GR12407@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2017 10:13 PM, Jonathan Cameron wrote:
-> On Wed, 21 Jun 2017 16:30:13 +0200
-> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+Hi Hugues,
+
+On Thu, Jun 22, 2017 at 05:05:40PM +0200, Hugues Fruchet wrote:
+> Align resolution sequences on initialization sequence using
+> i2c_rv structure NULL terminated .This add flexibility
+> on resolution sequence size.
+> Document resolution related registers by using corresponding
+> define instead of hexa address/value.
 > 
->> Add support for LPTIMx_OUT triggers that can be found on some STM32
->> devices. These triggers can be used then by ADC or DAC.
->> Typical usage is to configure LPTimer as PWM output (via pwm-stm32-lp)
->> and have synchronised analog conversions with these triggers.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Given this can't be used as a trigger for other devices (no exposed
-> interrupt?) I'd expect to see a validate_device callback provided for
-> the trigger ops.  That would prevent other devices trying to use it.
-
-Hi Jonathan,
-
-This is something I had in mind also earlier. Only thing is...
-Basically, this is limiting: when trigger poll happens on device side
-(e.g. ADC), another device could use same trigger. But I admit this
-looks like corner case.
-
-I'll add it in next version, with additional patch for ADC part to
-validate it's a valid device (No DAC yet).
-I think I'll use INDIO_HARDWARE_TRIGGERED mode:
-- in adc driver: indio_dev->modes |= INDIO_HARDWARE_TRIGGERED;
-- in lptimer: if (indio_dev->modes & INDIO_HARDWARE_TRIGGERED)...
-
+> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+> ---
+>  drivers/media/i2c/ov9650.c | 98 ++++++++++++++++++++++++++++++----------------
+>  1 file changed, 64 insertions(+), 34 deletions(-)
 > 
-> Otherwise, looks good.
+> diff --git a/drivers/media/i2c/ov9650.c b/drivers/media/i2c/ov9650.c
+> index 4311da6..8b283c9 100644
+> --- a/drivers/media/i2c/ov9650.c
+> +++ b/drivers/media/i2c/ov9650.c
+> @@ -227,11 +227,16 @@ struct ov965x_ctrls {
+>  	u8 update;
+>  };
+>  
+> +struct i2c_rv {
+> +	u8 addr;
+> +	u8 value;
+> +};
+> +
+>  struct ov965x_framesize {
+>  	u16 width;
+>  	u16 height;
+>  	u16 max_exp_lines;
+> -	const u8 *regs;
+> +	const struct i2c_rv *regs;
+>  };
+>  
+>  struct ov965x_interval {
+> @@ -280,9 +285,11 @@ struct ov965x {
+>  	u8 apply_frame_fmt;
+>  };
+>  
+> -struct i2c_rv {
+> -	u8 addr;
+> -	u8 value;
+> +struct ov965x_pixfmt {
+> +	u32 code;
+> +	u32 colorspace;
+> +	/* REG_TSLB value, only bits [3:2] may be set. */
+> +	u8 tslb_reg;
+>  };
+>  
+>  static const struct i2c_rv ov965x_init_regs[] = {
+> @@ -342,30 +349,59 @@ struct i2c_rv {
+>  	{ REG_NULL, 0 }
+>  };
+>  
+> -#define NUM_FMT_REGS 14
+> -/*
+> - * COM7,  COM3,  COM4, HSTART, HSTOP, HREF, VSTART, VSTOP, VREF,
+> - * EXHCH, EXHCL, ADC,  OCOM,   OFON
+> - */
+> -static const u8 frame_size_reg_addr[NUM_FMT_REGS] = {
+> -	0x12, 0x0c, 0x0d, 0x17, 0x18, 0x32, 0x19, 0x1a, 0x03,
+> -	0x2a, 0x2b, 0x37, 0x38, 0x39,
+> -};
+> -
+> -static const u8 ov965x_sxga_regs[NUM_FMT_REGS] = {
+> -	0x00, 0x00, 0x00, 0x1e, 0xbe, 0xbf, 0x01, 0x81, 0x12,
+> -	0x10, 0x34, 0x81, 0x93, 0x51,
+> +static const struct i2c_rv ov965x_sxga_regs[] = {
+> +	{ REG_COM7, 0x00 },
+> +	{ REG_COM3, 0x00 },
+> +	{ REG_COM4, 0x00 },
+> +	{ REG_HSTART, 0x1e },
+> +	{ REG_HSTOP, 0xbe },
+> +	{ 0x32, 0xbf },
+> +	{ REG_VSTART, 0x01 },
+> +	{ REG_VSTOP, 0x81 },
+> +	{ REG_VREF, 0x12 },
+> +	{ REG_EXHCH, 0x10 },
+> +	{ REG_EXHCL, 0x34 },
+> +	{ REG_ADC, 0x81 },
+> +	{ REG_ACOM, 0x93 },
+> +	{ REG_OFON, 0x51 },
+> +	{ REG_NULL, 0 },
+>  };
+>  
+> -static const u8 ov965x_vga_regs[NUM_FMT_REGS] = {
+> -	0x40, 0x04, 0x80, 0x26, 0xc6, 0xed, 0x01, 0x3d, 0x00,
+> -	0x10, 0x40, 0x91, 0x12, 0x43,
+> +static const struct i2c_rv ov965x_vga_regs[] = {
+> +	{ REG_COM7, 0x40 },
+> +	{ REG_COM3, 0x04 },
+> +	{ REG_COM4, 0x80 },
+> +	{ REG_HSTART, 0x26 },
+> +	{ REG_HSTOP, 0xc6 },
+> +	{ 0x32, 0xed },
+> +	{ REG_VSTART, 0x01 },
+> +	{ REG_VSTOP, 0x3d },
+> +	{ REG_VREF, 0x00 },
+> +	{ REG_EXHCH, 0x10 },
+> +	{ REG_EXHCL, 0x40 },
+> +	{ REG_ADC, 0x91 },
+> +	{ REG_ACOM, 0x12 },
+> +	{ REG_OFON, 0x43 },
+> +	{ REG_NULL, 0 },
+>  };
+>  
+>  /* Determined empirically. */
+> -static const u8 ov965x_qvga_regs[NUM_FMT_REGS] = {
+> -	0x10, 0x04, 0x80, 0x25, 0xc5, 0xbf, 0x00, 0x80, 0x12,
+> -	0x10, 0x40, 0x91, 0x12, 0x43,
+> +static const struct i2c_rv ov965x_qvga_regs[] = {
+> +	{ REG_COM7, 0x10 },
+> +	{ REG_COM3, 0x04 },
+> +	{ REG_COM4, 0x80 },
+> +	{ REG_HSTART, 0x25 },
+> +	{ REG_HSTOP, 0xc5 },
+> +	{ 0x32, 0xbf },
+> +	{ REG_VSTART, 0x00 },
+> +	{ REG_VSTOP, 0x80 },
+> +	{ REG_VREF, 0x12 },
+> +	{ REG_EXHCH, 0x10 },
+> +	{ REG_EXHCL, 0x40 },
+> +	{ REG_ADC, 0x91 },
+> +	{ REG_ACOM, 0x12 },
+> +	{ REG_OFON, 0x43 },
+> +	{ REG_NULL, 0 },
+>  };
+>  
+>  static const struct ov965x_framesize ov965x_framesizes[] = {
+> @@ -387,13 +423,6 @@ struct i2c_rv {
+>  	},
+>  };
+>  
+> -struct ov965x_pixfmt {
+> -	u32 code;
+> -	u32 colorspace;
+> -	/* REG_TSLB value, only bits [3:2] may be set. */
+> -	u8 tslb_reg;
+> -};
 
-Many thanks for your review.
-Best Regards,
-Fabrice
+Any particular reason for moving struct ov965x_pixfmt definition?
 
-> 
-> Jonathan
->> ---
->> Changes in v2:
->> - s/Low Power/Low-Power
->> - update few comments
->> ---
->>  drivers/iio/trigger/Kconfig                   |  11 +++
->>  drivers/iio/trigger/Makefile                  |   1 +
->>  drivers/iio/trigger/stm32-lptimer-trigger.c   | 110 ++++++++++++++++++++++++++
->>  include/linux/iio/timer/stm32-lptim-trigger.h |  24 ++++++
->>  4 files changed, 146 insertions(+)
->>  create mode 100644 drivers/iio/trigger/stm32-lptimer-trigger.c
->>  create mode 100644 include/linux/iio/timer/stm32-lptim-trigger.h
->>
->> diff --git a/drivers/iio/trigger/Kconfig b/drivers/iio/trigger/Kconfig
->> index e4d4e63..a633d2c 100644
->> --- a/drivers/iio/trigger/Kconfig
->> +++ b/drivers/iio/trigger/Kconfig
->> @@ -24,6 +24,17 @@ config IIO_INTERRUPT_TRIGGER
->>  	  To compile this driver as a module, choose M here: the
->>  	  module will be called iio-trig-interrupt.
->>  
->> +config IIO_STM32_LPTIMER_TRIGGER
->> +	tristate "STM32 Low-Power Timer Trigger"
->> +	depends on MFD_STM32_LPTIMER || COMPILE_TEST
->> +	help
->> +	  Select this option to enable STM32 Low-Power Timer Trigger.
->> +	  This can be used as trigger source for STM32 internal ADC
->> +	  and/or DAC.
->> +
->> +	  To compile this driver as a module, choose M here: the
->> +	  module will be called stm32-lptimer-trigger.
->> +
->>  config IIO_STM32_TIMER_TRIGGER
->>  	tristate "STM32 Timer Trigger"
->>  	depends on (ARCH_STM32 && OF && MFD_STM32_TIMERS) || COMPILE_TEST
->> diff --git a/drivers/iio/trigger/Makefile b/drivers/iio/trigger/Makefile
->> index 5c4ecd3..0a72a2a 100644
->> --- a/drivers/iio/trigger/Makefile
->> +++ b/drivers/iio/trigger/Makefile
->> @@ -6,6 +6,7 @@
->>  
->>  obj-$(CONFIG_IIO_HRTIMER_TRIGGER) += iio-trig-hrtimer.o
->>  obj-$(CONFIG_IIO_INTERRUPT_TRIGGER) += iio-trig-interrupt.o
->> +obj-$(CONFIG_IIO_STM32_LPTIMER_TRIGGER) += stm32-lptimer-trigger.o
->>  obj-$(CONFIG_IIO_STM32_TIMER_TRIGGER) += stm32-timer-trigger.o
->>  obj-$(CONFIG_IIO_SYSFS_TRIGGER) += iio-trig-sysfs.o
->>  obj-$(CONFIG_IIO_TIGHTLOOP_TRIGGER) += iio-trig-loop.o
->> diff --git a/drivers/iio/trigger/stm32-lptimer-trigger.c b/drivers/iio/trigger/stm32-lptimer-trigger.c
->> new file mode 100644
->> index 0000000..bcb9aa2
->> --- /dev/null
->> +++ b/drivers/iio/trigger/stm32-lptimer-trigger.c
->> @@ -0,0 +1,110 @@
->> +/*
->> + * STM32 Low-Power Timer Trigger driver
->> + *
->> + * Copyright (C) STMicroelectronics 2017
->> + *
->> + * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
->> + *
->> + * License terms:  GNU General Public License (GPL), version 2
->> + *
->> + * Inspired by Benjamin Gaignard's stm32-timer-trigger driver
->> + */
->> +
->> +#include <linux/iio/iio.h>
->> +#include <linux/iio/timer/stm32-lptim-trigger.h>
->> +#include <linux/iio/trigger.h>
->> +#include <linux/mfd/stm32-lptimer.h>
->> +#include <linux/module.h>
->> +#include <linux/platform_device.h>
->> +
->> +/* List Low-Power Timer triggers */
->> +static const char * const stm32_lptim_triggers[] = {
->> +	LPTIM1_OUT,
->> +	LPTIM2_OUT,
->> +	LPTIM3_OUT,
->> +};
->> +
->> +struct stm32_lptim_trigger {
->> +	struct device *dev;
->> +	const char *trg;
->> +};
->> +
->> +static const struct iio_trigger_ops stm32_lptim_trigger_ops = {
->> +	.owner = THIS_MODULE,
->> +};
->> +
->> +/**
->> + * is_stm32_lptim_trigger
->> + * @trig: trigger to be checked
->> + *
->> + * return true if the trigger is a valid STM32 IIO Low-Power Timer Trigger
->> + * either return false
->> + */
->> +bool is_stm32_lptim_trigger(struct iio_trigger *trig)
->> +{
->> +	return (trig->ops == &stm32_lptim_trigger_ops);
->> +}
->> +EXPORT_SYMBOL(is_stm32_lptim_trigger);
->> +
->> +static int stm32_lptim_setup_trig(struct stm32_lptim_trigger *priv)
->> +{
->> +	struct iio_trigger *trig;
->> +
->> +	trig = devm_iio_trigger_alloc(priv->dev, "%s", priv->trg);
->> +	if  (!trig)
->> +		return -ENOMEM;
->> +
->> +	trig->dev.parent = priv->dev->parent;
->> +	trig->ops = &stm32_lptim_trigger_ops;
->> +	iio_trigger_set_drvdata(trig, priv);
->> +
->> +	return devm_iio_trigger_register(priv->dev, trig);
->> +}
->> +
->> +static int stm32_lptim_trigger_probe(struct platform_device *pdev)
->> +{
->> +	struct stm32_lptim_trigger *priv;
->> +	u32 index;
->> +	int ret;
->> +
->> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
->> +	if (!priv)
->> +		return -ENOMEM;
->> +
->> +	if (of_property_read_u32(pdev->dev.of_node, "reg", &index))
->> +		return -EINVAL;
->> +
->> +	if (index >= ARRAY_SIZE(stm32_lptim_triggers))
->> +		return -EINVAL;
->> +
->> +	priv->dev = &pdev->dev;
->> +	priv->trg = stm32_lptim_triggers[index];
->> +
->> +	ret = stm32_lptim_setup_trig(priv);
->> +	if (ret)
->> +		return ret;
->> +
->> +	platform_set_drvdata(pdev, priv);
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct of_device_id stm32_lptim_trig_of_match[] = {
->> +	{ .compatible = "st,stm32-lptimer-trigger", },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, stm32_lptim_trig_of_match);
->> +
->> +static struct platform_driver stm32_lptim_trigger_driver = {
->> +	.probe = stm32_lptim_trigger_probe,
->> +	.driver = {
->> +		.name = "stm32-lptimer-trigger",
->> +		.of_match_table = stm32_lptim_trig_of_match,
->> +	},
->> +};
->> +module_platform_driver(stm32_lptim_trigger_driver);
->> +
->> +MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
->> +MODULE_ALIAS("platform:stm32-lptimer-trigger");
->> +MODULE_DESCRIPTION("STMicroelectronics STM32 LPTIM trigger driver");
->> +MODULE_LICENSE("GPL v2");
->> diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
->> new file mode 100644
->> index 0000000..cb795b1
->> --- /dev/null
->> +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
->> @@ -0,0 +1,24 @@
->> +/*
->> + * Copyright (C) STMicroelectronics 2017
->> + *
->> + * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
->> + *
->> + * License terms:  GNU General Public License (GPL), version 2
->> + */
->> +
->> +#ifndef _STM32_LPTIM_TRIGGER_H_
->> +#define _STM32_LPTIM_TRIGGER_H_
->> +
->> +#define LPTIM1_OUT	"lptim1_out"
->> +#define LPTIM2_OUT	"lptim2_out"
->> +#define LPTIM3_OUT	"lptim3_out"
->> +
->> +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
->> +bool is_stm32_lptim_trigger(struct iio_trigger *trig);
->> +#else
->> +static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
->> +{
->> +	return false;
->> +}
->> +#endif
->> +#endif
-> 
+> -
+>  static const struct ov965x_pixfmt ov965x_formats[] = {
+>  	{ MEDIA_BUS_FMT_YUYV8_2X8, V4L2_COLORSPACE_JPEG, 0x00},
+>  	{ MEDIA_BUS_FMT_YVYU8_2X8, V4L2_COLORSPACE_JPEG, 0x04},
+> @@ -1268,11 +1297,12 @@ static int ov965x_set_fmt(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config
+>  
+>  static int ov965x_set_frame_size(struct ov965x *ov965x)
+>  {
+> -	int i, ret = 0;
+> +	int ret = 0;
+> +
+> +	v4l2_dbg(1, debug, ov965x->client, "%s\n", __func__);
+>  
+> -	for (i = 0; ret == 0 && i < NUM_FMT_REGS; i++)
+> -		ret = ov965x_write(ov965x->client, frame_size_reg_addr[i],
+> -				   ov965x->frame_size->regs[i]);
+> +	ret = ov965x_write_array(ov965x->client,
+> +				 ov965x->frame_size->regs);
+>  	return ret;
+>  }
+>  
+
+-- 
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
