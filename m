@@ -1,37 +1,44 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Mon, 26 Jun 2017 19:46:34 +0200
-Subject: [PATCH v1 2/6] [media] ov9650: add device tree support
-In-Reply-To: <20170626163102.GQ12407@valkosipuli.retiisi.org.uk>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <1498143942-12682-3-git-send-email-hugues.fruchet@st.com>
- <20170626163102.GQ12407@valkosipuli.retiisi.org.uk>
-Message-ID: <D780984B-70A1-4E9C-A887-DD2CBAAC7CCA@goldelico.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 26 Jun 2017 13:02:41 -0500
+Subject: [PATCH V4 2/7] dt-bindings: pinctrl: add imx7ulp pinctrl binding
+ doc
+In-Reply-To: <1498046395-30001-3-git-send-email-aisheng.dong@nxp.com>
+References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
+ <1498046395-30001-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170626180241.4453lvcsxw4b7cnp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> Am 26.06.2017 um 18:31 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
+On Wed, Jun 21, 2017 at 07:59:50PM +0800, Dong Aisheng wrote:
+> i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports,
+> IOMUXC1 for A7 ports and IOMUXC DDR for DDR interface.
 > 
-> Hi Hugues,
+> This patch adds the IOMUXC1 support for A7.
 > 
-> On Thu, Jun 22, 2017 at 05:05:38PM +0200, Hugues Fruchet wrote:
->> @@ -1545,15 +1577,22 @@ static int ov965x_remove(struct i2c_client *client)
->> }
->> 
->> static const struct i2c_device_id ov965x_id[] = {
->> -	{ "OV9650", 0 },
->> -	{ "OV9652", 0 },
->> +	{ "OV9650", 0x9650 },
->> +	{ "OV9652", 0x9652 },
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > 
-> This change does not appear to match with the patch description nor it the
-> information is used. How about not changing it, unless there's a reason to?
-> The same for the data field of the of_device_id array below.
+> ---
+> ChangeLog:
+> v3->v4:
+>  * change pad name to IMX7ULP_PAD_X style
+>  * switch to generic pinmux property
+>  * input/output property are removed.
+> v2->v3:
+>  * switch to generic input/output-enable property
+> v1->v2:
+>  * add more descriptions in binding doc
+>  * add missed prefix for private properties.
+>  * move dt-bindings/pinctrl/imx7ulp-pinfunc.h to arch/arm/boot/dts
+> ---
+>  .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       |  61 +++
+>  arch/arm/boot/dts/imx7ulp-pinfunc.h                | 468 +++++++++++++++++++++
+>  2 files changed, 529 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+>  create mode 100644 arch/arm/boot/dts/imx7ulp-pinfunc.h
 
-I think it could/should be used to check if the camera chip that is found
-by reading the product-id and version registers does match what the device
-tree expects and abort probing on a mismatch.
-
-BR,
-Nikolaus
+Acked-by: Rob Herring <robh@kernel.org>
