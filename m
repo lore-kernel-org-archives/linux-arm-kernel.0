@@ -1,113 +1,65 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 26 Jun 2017 03:07:44 +0000
-Subject: [PATCH 1/9] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk
- support
-In-Reply-To: <20170620090815.GA6805@b29396-OptiPlex-7040>
-References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
- <1494856763-6543-2-git-send-email-aisheng.dong@nxp.com>
- <20170620014512.GL4493@codeaurora.org>
- <20170620090815.GA6805@b29396-OptiPlex-7040>
-Message-ID: <AM3PR04MB3062C861BA230ADF68FA4B980DF0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Mon, 26 Jun 2017 11:10:06 +0800
+Subject: [PATCH] spi: rockchip: Keep master alive when CS asserted
+Message-ID: <1498446606-5529-1-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+The cros_ec requires CS line to be active after last message. But the CS
+would be toggled when powering off/on rockchip spi, which breaks ec xfer.
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:dongas86 at gmail.com]
-> Sent: Tuesday, June 20, 2017 5:08 PM
-> To: Stephen Boyd
-> Cc: A.s. Dong; linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> shawnguo at kernel.org; Anson Huang; Jacky Bai
-> Subject: Re: [PATCH 1/9] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk
-> support
-> 
-> Hi Stephen,
-> 
-> On Mon, Jun 19, 2017 at 06:45:12PM -0700, Stephen Boyd wrote:
-> > On 05/15, Dong Aisheng wrote:
-> > > ---
-> > >  drivers/clk/clk-divider.c    | 2 ++
-> > >  include/linux/clk-provider.h | 4 ++++
-> > >  2 files changed, 6 insertions(+)
-> > >
-> > > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> > > index 96386ff..f78ba7a 100644
-> > > --- a/drivers/clk/clk-divider.c
-> > > +++ b/drivers/clk/clk-divider.c
-> > > @@ -125,6 +125,8 @@ unsigned long divider_recalc_rate(struct clk_hw
-> > > *hw, unsigned long parent_rate,
-> > >
-> > >  	div = _get_div(table, val, flags, divider->width);
-> > >  	if (!div) {
-> > > +		if (flags & CLK_DIVIDER_ZERO_GATE)
-> > > +			return 0;
-> > >  		WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
-> >
-> > Why not use the CLK_DIVIDER_ALLOW_ZERO flag? A clk being off doesn't
-> > mean the rate is 0. The divider is just disabled, so we would consider
-> > the rate as whatever the parent is, which is what this code does
-> > before this patch. Similarly, we don't do anything about gate clocks
-> > and return a rate of 0 when they're disabled.
-> >
-> 
-> The semantic of CLK_DIVIDER_ALLOW_ZERO seems a bit different.
-> 
-> See below definition:
-> * CLK_DIVIDER_ALLOW_ZERO - Allow zero divisors.  For dividers which have
-> *      CLK_DIVIDER_ONE_BASED set, it is possible to end up with a zero
-> divisor.
-> *      Some hardware implementations gracefully handle this case and allow
-> a
-> *      zero divisor by not modifying their input clock
-> *      (divide by one / bypass).
-> 
-> zero divisor is simply as divide by one or bypass which is supported by
-> hardware.
-> 
-> But it's not true for this hardware.
-> 
-> If we consider the rate as whatever the parent is if divider is zero, we
-> may got an issue like below:
-> e.g.
-> Assuming spll_bus_clk divider is 0x0 and it may be enabled by users
-> directly without setting a rate first.
-> 
-> Then the clock tree looks like:
-> ...
-> spll_pfd0                    1            1   500210526          0 0
->   spll_pfd_sel              1            1   500210526          0 0
->     spll_sel               1            1   500210526          0 0
->       spll_bus_clk           1            1   500210526          0 0
-> 
-> But the spll_bus_clk clock rate actually is wrong and it's even not
-> enabled, not like CLK_DIVIDER_ALLOW_ZERO which zero divider means simply
-> bypass.
-> 
-> So for this case, we probably can't simply assume zero divider rate as its
-> parent, it is actually set to 0 in hw, although it's something like gate,
-> but a bit different from gate as the normal gate does not affect divider
-> where you can keep the rate.
-> 
-> How would you suggest for this?
-> 
+Keep spi alive after CS asserted to prevent that.
 
-Any suggestions?
+Suggested-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-Regards
-Dong Aisheng
+---
 
-> Regards
-> Dong Aisheng
-> 
-> > >  			"%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
-> > >  			clk_hw_get_name(hw));
-> >
-> > --
-> > Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-> > Linux Foundation Collaborative Project
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-clk"
-> > in the body of a message to majordomo at vger.kernel.org More majordomo
-> > info at  http://vger.kernel.org/majordomo-info.html
+ drivers/spi/spi-rockchip.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index acf31f3..df016a1 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -264,7 +264,7 @@ static inline u32 rx_max(struct rockchip_spi *rs)
+ 
+ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+ {
+-	u32 ser;
++	u32 ser, new_ser;
+ 	struct spi_master *master = spi->master;
+ 	struct rockchip_spi *rs = spi_master_get_devdata(master);
+ 
+@@ -288,13 +288,25 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+ 	 * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
+ 	 */
+ 	if (!enable)
+-		ser |= 1 << spi->chip_select;
++		new_ser = ser | BIT(spi->chip_select);
+ 	else
+-		ser &= ~(1 << spi->chip_select);
++		new_ser = ser & ~BIT(spi->chip_select);
+ 
+-	writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
++	if (new_ser == ser)
++		goto out;
+ 
+-	pm_runtime_put_sync(rs->dev);
++	writel_relaxed(new_ser, rs->regs + ROCKCHIP_SPI_SER);
++
++	/*
++	 * The rockchip spi would stop driving CS when power down.
++	 * So we need to keep it alive after CS asserted
++	 */
++	if (!enable)
++		return;
++	pm_runtime_put(rs->dev);
++
++out:
++	pm_runtime_put(rs->dev);
+ }
+ 
+ static int rockchip_spi_prepare_message(struct spi_master *master,
+-- 
+2.1.4
