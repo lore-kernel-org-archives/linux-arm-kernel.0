@@ -1,143 +1,133 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Mon, 26 Jun 2017 09:28:30 +0100
-Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
- load-tracking support
-In-Reply-To: <20170608075513.12475-3-dietmar.eggemann@arm.com>
-References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
- <20170608075513.12475-3-dietmar.eggemann@arm.com>
-Message-ID: <7c6decdf-42e2-b5f3-6497-8a2d99a95435@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 26 Jun 2017 10:39:27 +0200
+Subject: omap3isp camera was Re: [PATCH v1 0/6] Add support of OV9655
+ camera
+In-Reply-To: <EDFD663F-37F9-42C2-92A9-66C2508B361E@goldelico.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <385A82AC-CC23-41BD-9F57-0232F713FED9@goldelico.com>
+ <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
+ <20170625091856.GA22791@amd>
+ <EDFD663F-37F9-42C2-92A9-66C2508B361E@goldelico.com>
+Message-ID: <20170626083927.GB9621@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/17 08:55, Dietmar Eggemann wrote:
-> Implements an arch-specific frequency-scaling function
-> topology_get_freq_scale() which provides the following frequency
-> scaling factor:
+On Mon 2017-06-26 08:05:04, H. Nikolaus Schaller wrote:
+> Hi Pavel,
 > 
->   current_freq(cpu) << SCHED_CAPACITY_SHIFT / max_supported_freq(cpu)
+> > Am 25.06.2017 um 11:18 schrieb Pavel Machek <pavel@ucw.cz>:
+> > 
+> > Hi!
+> > 
+> >> * unfortunately we still get no image :(
+> >> 
+> >> The latter is likely a setup issue of our camera interface (OMAP3 ISP = Image Signal Processor) which
+> >> we were not yet able to solve. Oscilloscoping signals on the interface indicated that signals and
+> >> sync are correct. But we do not know since mplayer only shows a green screen.
+> > 
+> > What mplayer command line do you use? How did you set up the pipeline
+> > with media-ctl?
+> > 
+> > On kernel.org, I have tree called camera-fw5-6 , where camera works
+> > for me on n900. On gitlab, there's modifed fcam-dev, which can be used
+> > for testing.
+> 
+> We did have yet another (non-DT) camera driver and media-ctl working in with 3.12.37,
+> but had no success yet to update it to work with modern kernels or drivers. It
+> is either that the (newer) drivers missing something or the media-ctl has changed.
+> 
+> Here is the log of our scripts with Hugues' driver and our latest setup:
+> 
+> root at letux:~# ./camera-demo sxga
+> DISPLAY=:0
+> XAUTHORITY=tcp
+> Camera: /dev/v4l-subdev8
+> Setting mode sxga
+> media-ctl -r
+> media-ctl -l '"ov965x":0 -> "OMAP3 ISP CCDC":0[1]'
+> media-ctl -l '"OMAP3 ISP CCDC":1 -> "OMAP3 ISP CCDC output":0[1]'
+> media-ctl -V '"ov965x":0 [UYVY2X8 1280x1024]'
+> media-ctl -V '"OMAP3 ISP CCDC":0 [UYVY2X8 1280x1024]'
+> media-ctl -V '"OMAP3 ISP CCDC":1 [UYVY 1280x1024]'
 
-[...]
+Ok, so you are using capture, not preview.
 
-Frequency and cpu-invariant load tracking are part of the task
-schedulers hot path:
+You may want to try this one:
 
-e.g.:
- 
- __update_load_avg_se()-> ___update_load_avg() -> accumulate_sum()
+commit 0eae9d2a8f096f703cbc8f9a0ab155cd3cc14cef
+Author: Pavel <pavel@ucw.cz>
+Date:   Mon Feb 13 21:26:51 2017 +0100
 
-That's why function calls should be avoided here.
+    omap3isp: fix VP2SDR bit so capture (not preview) works
 
-I would like to fold the following changes into patch 2/6 in v2:
+    This is neccessary for capture (not preview) to work properly on
+        N900. Why is unknown.
+	
+									Pavel
 
-commit 1397770fe47ce5d34511e7062bd3a8bc96a74590
-Author: Dietmar Eggemann <dietmar.eggemann@arm.com>
-Date:   Sat Jun 24 16:46:45 2017 +0100
+> ### starting mplayer in sxga mode ###
+> mplayer tv:// -vf rotate=2 -tv driver=v4l2:device=/dev/video2:outfmt=uyvy:width=1280:height=1024:fps=15 -vo x11
+> MPlayer2 2.0-728-g2c378c7-4+b1 (C) 2000-2012 MPlayer Team
+> 
+> Playing tv://.
+> Detected file format: TV
+> Selected driver: v4l2
+>  name: Video 4 Linux 2 input
+>  author: Martin Olschewski <olschewski@zpr.uni-koeln.de>
+>  comment: first try, more to come ;-)
+> v4l2: ioctl get standard failed: Invalid argument
+> Selected device: OMAP3 ISP CCDC output
+>  Capabilities:  video capture  video output  streaming
+>  supported norms:
+>  inputs: 0 = camera;
+>  Current input: 0
+>  Current format: unknown (0x0)
+> tv.c: norm_from_string(pal): Bogus norm parameter, setting default.
+> v4l2: ioctl enum norm failed: Inappropriate ioctl for device
+> Error: Cannot set norm!
+> Selected input hasn't got a tuner!
+> v4l2: ioctl set mute failed: Inappropriate ioctl for device
+> v4l2: ioctl query control failed: Inappropriate ioctl for device
+> v4l2: ioctl query control failed: Inappropriate ioctl for device
+> v4l2: ioctl query control failed: Inappropriate ioctl for device
+> v4l2: ioctl query control failed: Inappropriate ioctl for device
+> v4l2: ioctl streamon failed: Broken pipe
+> [ass] auto-open
+> Opening video filter: [rotate=2]
+> VIDEO:  1280x1024  15.000 fps    0.0 kbps ( 0.0 kB/s)
+> Could not find matching colorspace - retrying with -vf scale...
+> Opening video filter: [scale]
+> [swscaler @ 0xb5ca9980]using unscaled uyvy422 -> yuv420p special converter
+> VO: [x11] 1024x1280 => 1024x1280 Planar YV12
+> [swscaler @ 0xb5ca9980]No accelerated colorspace conversion found from yuv420p to bgra.
+> Colorspace details not fully supported by selected vo.
+> Selected video codec: RAW UYVY [raw]
+> Audio: no sound
+> Starting playback...
+> V:   0.0  10/ 10 ??% ??% ??,?% 0 0 $<3>
+> 
+> 
+> MPlayer interrupted by signal 2 in module: filter_video
+> V:   0.0  11/ 11 ??% ??% ??,?% 0 0 $<3>
+> v4l2: ioctl set mute failed: Inappropriate ioctl for device
+> v4l2: 0 frames successfully processed, 0 frames dropped.
+> 
+> Exiting... (Quit)
+> root at letux:~#
+> 
+> BR and thanks,
+> Nikolaus
+> 
 
-    drivers base/arch_topology: eliminate function call for cpu and
-    frequency-invariant accounting
-    
-    topology_get_cpu_scale() and topology_get_freq_scale() are the arm/arm64
-    architecture specific implementations to provide cpu-invariant and
-    frequency-invariant accounting support up to the task scheduler.
-    
-    Define them as static inline functions to allow cpu-invariant and
-    frequency-invariant accounting to happen without an extra function call
-    involved.
-    
-    Test results on JUNO (arm64):
-    
-    root at juno:~# grep
-    "__update_load_avg_\|update_group_capacity\|topology_get"
-    available_filter_functions > set_ftrace_filter
-    
-    root at juno:~# echo function_graph > current_tracer
-    
-    root at juno:~# cat trace | tail -50
-    
-    w/ this patch:
-    
-     ...
-     3)   0.700 us    |  __update_load_avg_se.isra.5();
-     ...
-     3)   0.750 us    |  __update_load_avg_cfs_rq();
-     ...
-     3)   0.780 us    |  update_group_capacity();
-     ...
-    
-    w/o this patch:
-    
-     4)               |  __update_load_avg_cfs_rq() {
-     4)   0.380 us    |    topology_get_freq_scale();
-     4)   0.340 us    |    topology_get_cpu_scale();
-     4)   6.420 us    |  }
-     ...
-     4)               |  __update_load_avg_se.isra.4() {
-     4)   0.300 us    |    topology_get_freq_scale();
-     4)   0.260 us    |    topology_get_cpu_scale();
-     4)   5.800 us    |  }
-     ...
-     4)               |  update_group_capacity() {
-     4)   0.260 us    |    topology_get_cpu_scale();
-     4)   3.540 us    |  }
-     ...
-    
-    So these extra function calls cost ~2.5us each (on Cortex A53,
-    cpu0,3,4,5). Since this happens in the task scheduler hot-path,
-    they have to be avoided.
-    
-    Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 
-diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-index d7e130c268fb..8dfa4c3dbfc2 100644
---- a/drivers/base/arch_topology.c
-+++ b/drivers/base/arch_topology.c
-@@ -23,18 +23,8 @@
- #include <linux/sched/topology.h>
- 
- static DEFINE_MUTEX(cpu_scale_mutex);
--static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
--static DEFINE_PER_CPU(unsigned long, freq_scale) = SCHED_CAPACITY_SCALE;
--
--unsigned long topology_get_cpu_scale(struct sched_domain *sd, int cpu)
--{
--       return per_cpu(cpu_scale, cpu);
--}
--
--unsigned long topology_get_freq_scale(struct sched_domain *sd, int cpu)
--{
--       return per_cpu(freq_scale, cpu);
--}
-+DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
-+DEFINE_PER_CPU(unsigned long, freq_scale) = SCHED_CAPACITY_SCALE;
- 
- void topology_set_cpu_scale(unsigned int cpu, unsigned long capacity)
- {
-diff --git a/include/linux/arch_topology.h b/include/linux/arch_topology.h
-index 3fb4d8ccb179..cf22631e6765 100644
---- a/include/linux/arch_topology.h
-+++ b/include/linux/arch_topology.h
-@@ -9,10 +9,21 @@ void topology_normalize_cpu_scale(void);
- struct device_node;
- int topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu);
- 
-+DECLARE_PER_CPU(unsigned long, cpu_scale);
-+DECLARE_PER_CPU(unsigned long, freq_scale);
-+
- struct sched_domain;
--unsigned long topology_get_cpu_scale(struct sched_domain *sd, int cpu);
-+static inline
-+unsigned long topology_get_cpu_scale(struct sched_domain *sd, int cpu)
-+{
-+       return per_cpu(cpu_scale, cpu);
-+}
- 
--unsigned long topology_get_freq_scale(struct sched_domain *sd, int cpu);
-+static inline
-+unsigned long topology_get_freq_scale(struct sched_domain *sd, int cpu)
-+{
-+       return per_cpu(freq_scale, cpu);
-+}
- 
- void topology_set_cpu_scale(unsigned int cpu, unsigned long capacity);
 
-[...]
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170626/60813803/attachment.sig>
