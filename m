@@ -1,46 +1,45 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 26 Jun 2017 16:55:12 +0100
-Subject: [PATCH 8/9] firmware: arm_scmi: add initial support for sensor
- protocol
+Date: Mon, 26 Jun 2017 16:55:10 +0100
+Subject: [PATCH 6/9] firmware: arm_scmi: add initial support for clock protocol
 In-Reply-To: <1498492513-29771-1-git-send-email-sudeep.holla@arm.com>
 References: <1498492513-29771-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1498492513-29771-9-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1498492513-29771-7-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sensor protocol provides functions to manage platform sensors, and
-provides the commands to describe the protocol version and the various
-attribute flags. It also provides commands to discover various sensors
-implemented and managed by the platform, read any sensor synchronously
-or asynchronously as allowed by the platform, program sensor attributes
-and/or configurations, if applicable.
+The clock protocol is intended for management of clocks. It is used to
+enable or disable clocks, and to set and get the clock rates. This
+protocol provides commands to describe the protocol version, discover
+various implementation specific attributes, describe a clock, enable
+and disable a clock and get/set the rate of the clock synchronously or
+asynchronously.
 
-This patch adds support for most of the above features.
+This patch adds initial support for the clock protocol.
 
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scmi/Makefile  |   2 +-
- drivers/firmware/arm_scmi/sensors.c | 286 ++++++++++++++++++++++++++++++++++++
- include/linux/scmi_protocol.h       |  40 +++++
- 3 files changed, 327 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/arm_scmi/sensors.c
+ drivers/firmware/arm_scmi/Makefile |   2 +-
+ drivers/firmware/arm_scmi/clock.c  | 339 +++++++++++++++++++++++++++++++++++++
+ include/linux/scmi_protocol.h      |  40 +++++
+ 3 files changed, 380 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/arm_scmi/clock.c
 
 diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-index 52ecc08556a2..f9dee5ad0aa0 100644
+index 159de726ee45..6836b1f38f7f 100644
 --- a/drivers/firmware/arm_scmi/Makefile
 +++ b/drivers/firmware/arm_scmi/Makefile
 @@ -1,2 +1,2 @@
  obj-$(CONFIG_ARM_SCMI_PROTOCOL)	= arm_scmi.o
--arm_scmi-y = base.o clock.o driver.o perf.o power.o
-+arm_scmi-y = base.o clock.o driver.o perf.o power.o sensors.o
-diff --git a/drivers/firmware/arm_scmi/sensors.c b/drivers/firmware/arm_scmi/sensors.c
+-arm_scmi-y = base.o driver.o perf.o
++arm_scmi-y = base.o clock.o driver.o perf.o
+diff --git a/drivers/firmware/arm_scmi/clock.c b/drivers/firmware/arm_scmi/clock.c
 new file mode 100644
-index 000000000000..9f1e254e7188
+index 000000000000..87d0befab07d
 --- /dev/null
-+++ b/drivers/firmware/arm_scmi/sensors.c
-@@ -0,0 +1,286 @@
++++ b/drivers/firmware/arm_scmi/clock.c
+@@ -0,0 +1,339 @@
 +/*
-+ * System Control and Management Interface (SCMI) Sensor Protocol
++ * System Control and Management Interface (SCMI) Clock Protocol
 + *
 + * Copyright (C) 2017 ARM Ltd.
 + *
@@ -59,82 +58,80 @@ index 000000000000..9f1e254e7188
 +
 +#include "common.h"
 +
-+enum scmi_sensor_protocol_cmd {
-+	SENSOR_DESCRIPTION_GET = 0x3,
-+	SENSOR_CONFIG_SET = 0x4,
-+	SENSOR_TRIP_POINT_SET = 0x5,
-+	SENSOR_READING_GET = 0x6,
++enum scmi_clock_protocol_cmd {
++	CLOCK_ATTRIBUTES = 0x3,
++	CLOCK_DESCRIBE_RATES = 0x4,
++	CLOCK_RATE_SET = 0x5,
++	CLOCK_RATE_GET = 0x6,
++	CLOCK_CONFIG_SET = 0x7,
 +};
 +
-+struct scmi_msg_resp_sensor_attributes {
-+	__le16 num_sensors;
-+	    u8 max_requests;
++struct scmi_msg_resp_clock_protocol_attributes {
++	__le16 num_clocks;
++	    u8 max_async_req;
 +	    u8 reserved;
-+	__le32 reg_addr_low;
-+	__le32 reg_addr_high;
-+	__le32 reg_size;
 +};
 +
-+struct scmi_msg_resp_sensor_description {
-+	__le16 num_returned;
-+	__le16 num_remaining;
++struct scmi_msg_resp_clock_attributes {
++	__le32 attributes;
++#define	CLOCK_ENABLE	BIT(0)
++	    u8 name[SCMI_MAX_STR_SIZE];
++};
++
++struct scmi_clock_set_config {
++	__le32 id;
++	__le32 attributes;
++};
++
++struct scmi_msg_clock_describe_rates {
++	__le32 id;
++	__le32 rate_index;
++};
++
++struct scmi_msg_resp_clock_describe_rates {
++	__le32 num_rates_flags;
++#define NUM_RETURNED(x)		((x) & 0xfff)
++#define RATE_DISCRETE(x)	!((x) & BIT(12))
++#define NUM_REMAINING(x)	((x) >> 16)
 +	struct {
-+		__le32 id;
-+		__le32 attributes_low;
-+#define SUPPORTS_ASYNC_READ(x)	((x) & BIT(31))
-+#define NUM_TRIP_POINTS(x)	(((x) >> 4) & 0xff)
-+		__le32 attributes_high;
-+#define SENSOR_TYPE(x)		((x) & 0xff)
-+#define SENSOR_SCALE(x)		(((x) >> 11) & 0x3f)
-+#define SENSOR_UPDATE_SCALE(x)	(((x) >> 22) & 0x1f)
-+#define SENSOR_UPDATE_BASE(x)	(((x) >> 27) & 0x1f)
-+		    u8 name[SCMI_MAX_STR_SIZE];
-+	} desc[0];
++		__le32 value_low;
++		__le32 value_high;
++	} rate[0];
++#define RATE_TO_U64(X)		\
++({				\
++	typeof(X) x = (X);	\
++	le32_to_cpu((x).value_low) | (u64)le32_to_cpu((x).value_high) << 32; \
++})
 +};
 +
-+struct scmi_msg_set_sensor_config {
++struct scmi_clock_set_rate {
++	__le32 flags;
++#define CLOCK_SET_ASYNC		BIT(0)
++#define CLOCK_SET_DELAYED	BIT(1)
++#define CLOCK_SET_ROUND_UP	BIT(2)
++#define CLOCK_SET_ROUND_AUTO	BIT(3)
 +	__le32 id;
-+	__le32 event_control;
-+};
-+
-+struct scmi_msg_set_sensor_trip_point {
-+	__le32 id;
-+	__le32 event_control;
-+#define SENSOR_TP_EVENT_MASK	(0x3)
-+#define SENSOR_TP_DISABLED	0x0
-+#define SENSOR_TP_POSITIVE	0x1
-+#define SENSOR_TP_NEGATIVE	0x2
-+#define SENSOR_TP_BOTH		0x3
-+#define SENSOR_TP_ID(x)		(((x) & 0xff) << 4)
 +	__le32 value_low;
 +	__le32 value_high;
 +};
 +
-+struct scmi_msg_sensor_reading_get {
-+	__le32 id;
-+	__le32 flags;
-+#define SENSOR_READ_ASYNC	BIT(0)
++struct clock_info {
++	int num_clocks;
++	int max_async_req;
++	struct scmi_clock_info *clk;
 +};
 +
-+struct sensors_info {
-+	int num_sensors;
-+	int max_requests;
-+	u64 reg_addr;
-+	u32 reg_size;
-+	struct scmi_sensor_info *sensors;
-+};
++static struct clock_info clocks;
 +
-+static struct sensors_info sensor_info;
-+
-+static int scmi_sensor_attributes_get(const struct scmi_handle *handle,
-+				      struct sensors_info *sensor_info)
++static int scmi_clock_protocol_attributes_get(const struct scmi_handle *handle,
++					      struct clock_info *clocks)
 +{
 +	int ret;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_resp_sensor_attributes *attr;
++	struct scmi_msg_resp_clock_protocol_attributes *attr;
 +
 +	ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
-+				 SCMI_PROTOCOL_SENSOR, 0, sizeof(*attr), &t);
++				 SCMI_PROTOCOL_CLOCK, 0, sizeof(*attr), &t);
 +	if (ret)
 +		return ret;
 +
@@ -142,135 +139,121 @@ index 000000000000..9f1e254e7188
 +
 +	ret = scmi_do_xfer(handle, t);
 +	if (!ret) {
-+		sensor_info->num_sensors = le16_to_cpu(attr->num_sensors);
-+		sensor_info->max_requests = le16_to_cpu(attr->max_requests);
-+		sensor_info->reg_addr = le32_to_cpu(attr->reg_addr_low) |
-+				(u64)le32_to_cpu(attr->reg_addr_high) << 32;
-+		sensor_info->reg_size = le32_to_cpu(attr->reg_size);
++		clocks->num_clocks = le16_to_cpu(attr->num_clocks);
++		clocks->max_async_req = attr->max_async_req;
 +	}
 +
 +	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
-+static int scmi_sensor_description_get(const struct scmi_handle *handle)
++static int scmi_clock_attributes_get(const struct scmi_handle *handle,
++				     u32 clk_id, struct scmi_clock_info *clk)
 +{
-+	int ret, cnt;
-+	u32 desc_index = 0;
-+	u16 num_returned, num_remaining;
++	int ret;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_resp_sensor_description *buf;
++	struct scmi_msg_resp_clock_attributes *attr;
 +
-+	ret = scmi_one_xfer_init(handle, SENSOR_DESCRIPTION_GET,
-+				 SCMI_PROTOCOL_SENSOR, sizeof(__le32), 0, &t);
++	ret = scmi_one_xfer_init(handle, CLOCK_ATTRIBUTES, SCMI_PROTOCOL_CLOCK,
++				 sizeof(clk_id), sizeof(*attr), &t);
 +	if (ret)
 +		return ret;
 +
-+	buf = t->rx.buf;
++	*(__le32 *)t->tx.buf = cpu_to_le32(clk_id);
++	attr = t->rx.buf;
 +
-+	do {
-+		/* Set the number of sensors to be skipped/already read */
-+		*(__le32 *)t->tx.buf = cpu_to_le32(desc_index);
-+
-+		ret = scmi_do_xfer(handle, t);
-+		if (ret)
-+			break;
-+
-+		num_returned = le16_to_cpu(buf->num_returned);
-+		num_remaining = le16_to_cpu(buf->num_remaining);
-+
-+		if (desc_index + num_returned > sensor_info.num_sensors) {
-+			dev_err(handle->dev, "No. of sensors can't exceed %d",
-+				sensor_info.num_sensors);
-+			break;
-+		}
-+
-+		for (cnt = 0; cnt < num_returned; cnt++) {
-+			u32 attrh;
-+			struct scmi_sensor_info *s;
-+
-+			attrh = le32_to_cpu(buf->desc[cnt].attributes_high);
-+			s = &sensor_info.sensors[desc_index + cnt];
-+			s->id = le32_to_cpu(buf->desc[cnt].id);
-+			s->type = SENSOR_TYPE(attrh);
-+			memcpy(s->name, buf->desc[cnt].name, SCMI_MAX_STR_SIZE);
-+		}
-+
-+		desc_index += num_returned;
-+		/*
-+		 * check for both returned and remaining to avoid infinite
-+		 * loop due to buggy firmware
-+		 */
-+	} while (num_returned && num_remaining);
++	ret = scmi_do_xfer(handle, t);
++	if (!ret)
++		memcpy(clk->name, attr->name, SCMI_MAX_STR_SIZE);
++	else
++		clk->name[0] = '\0';
 +
 +	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
 +static int
-+scmi_sensor_configuration_set(const struct scmi_handle *handle, u32 sensor_id)
++scmi_clock_describe_rates_get(const struct scmi_handle *handle, u32 clk_id,
++			      struct scmi_clock_info *clk)
 +{
-+	int ret;
-+	u32 evt_cntl = BIT(0);
++	u64 *rate;
++	int ret, cnt;
++	bool rate_discrete;
++	u32 tot_rate_cnt = 0, rates_flag;
++	u16 num_returned, num_remaining;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_set_sensor_config *cfg;
++	struct scmi_msg_clock_describe_rates *clk_desc;
++	struct scmi_msg_resp_clock_describe_rates *rlist;
 +
-+	ret = scmi_one_xfer_init(handle, SENSOR_CONFIG_SET,
-+				 SCMI_PROTOCOL_SENSOR, sizeof(*cfg), 0, &t);
++	ret = scmi_one_xfer_init(handle, CLOCK_DESCRIBE_RATES,
++				 SCMI_PROTOCOL_CLOCK, sizeof(*clk_desc), 0, &t);
 +	if (ret)
 +		return ret;
 +
-+	cfg = t->tx.buf;
-+	cfg->id = cpu_to_le32(sensor_id);
-+	cfg->event_control = cpu_to_le32(evt_cntl);
++	clk_desc = t->tx.buf;
++	rlist = t->rx.buf;
 +
-+	ret = scmi_do_xfer(handle, t);
++	do {
++		clk_desc->id = cpu_to_le32(clk_id);
++		/* Set the number of rates to be skipped/already read */
++		clk_desc->rate_index = cpu_to_le32(tot_rate_cnt);
++
++		ret = scmi_do_xfer(handle, t);
++		if (ret)
++			break;
++
++		rates_flag = le32_to_cpu(rlist->num_rates_flags);
++		num_remaining = NUM_REMAINING(rates_flag);
++		rate_discrete = RATE_DISCRETE(rates_flag);
++		num_returned = NUM_RETURNED(rates_flag);
++
++		if (tot_rate_cnt + num_returned > SCMI_MAX_NUM_RATES) {
++			dev_err(handle->dev, "No. of rates > MAX_NUM_RATES");
++			break;
++		}
++
++		if (!rate_discrete) {
++			clk->range.min_rate = RATE_TO_U64(rlist->rate[0]);
++			clk->range.max_rate = RATE_TO_U64(rlist->rate[1]);
++			clk->range.step_size = RATE_TO_U64(rlist->rate[2]);
++			dev_dbg(handle->dev, "Min %llu Max %llu Step %llu Hz\n",
++				clk->range.min_rate, clk->range.max_rate,
++				clk->range.step_size);
++			break;
++		}
++
++		rate = &clk->list.rates[tot_rate_cnt];
++		for (cnt = 0; cnt < num_returned; cnt++, rate++) {
++			*rate = RATE_TO_U64(rlist->rate[cnt]);
++			dev_dbg(handle->dev, "Rate %llu Hz\n", *rate);
++		}
++
++		tot_rate_cnt += num_returned;
++		/*
++		 * check for both returned and remaining to avoid infinite
++		 * loop due to buggy firmware
++		 */
++	} while (num_returned && num_remaining);
++
++	if (rate_discrete)
++		clk->list.num_rates = tot_rate_cnt;
 +
 +	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
-+static int scmi_sensor_trip_point_set(const struct scmi_handle *handle,
-+				      u32 sensor_id, u8 trip_id, u64 trip_value)
-+{
-+	int ret;
-+	u32 evt_cntl = SENSOR_TP_BOTH;
-+	struct scmi_xfer *t;
-+	struct scmi_msg_set_sensor_trip_point *trip;
-+
-+	ret = scmi_one_xfer_init(handle, SENSOR_TRIP_POINT_SET,
-+				 SCMI_PROTOCOL_SENSOR, sizeof(*trip), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	trip = t->tx.buf;
-+	trip->id = cpu_to_le32(sensor_id);
-+	trip->event_control = cpu_to_le32(evt_cntl | SENSOR_TP_ID(trip_id));
-+	trip->value_low = cpu_to_le32(trip_value & 0xffffffff);
-+	trip->value_high = cpu_to_le32(trip_value >> 32);
-+
-+	ret = scmi_do_xfer(handle, t);
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int scmi_sensor_reading_get(const struct scmi_handle *handle,
-+				   u32 sensor_id, bool async, u64 *value)
++static int
++scmi_clock_rate_get(const struct scmi_handle *handle, u32 clk_id, u64 *value)
 +{
 +	int ret;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_sensor_reading_get *sensor;
 +
-+	ret = scmi_one_xfer_init(handle, SENSOR_READING_GET,
-+				 SCMI_PROTOCOL_SENSOR, sizeof(*sensor),
-+				 sizeof(u64), &t);
++	ret = scmi_one_xfer_init(handle, CLOCK_RATE_GET, SCMI_PROTOCOL_CLOCK,
++				 sizeof(__le32), sizeof(u64), &t);
 +	if (ret)
 +		return ret;
 +
-+	sensor = t->tx.buf;
-+	sensor->id = cpu_to_le32(sensor_id);
-+	sensor->flags = cpu_to_le32(async ? SENSOR_READ_ASYNC : 0);
++	*(__le32 *)t->tx.buf = cpu_to_le32(clk_id);
 +
 +	ret = scmi_do_xfer(handle, t);
 +	if (!ret) {
@@ -284,109 +267,186 @@ index 000000000000..9f1e254e7188
 +	return ret;
 +}
 +
-+static const struct scmi_sensor_info *
-+scmi_sensor_info_get(const struct scmi_handle *handle, u32 sensor_id)
++static int scmi_clock_rate_set(const struct scmi_handle *handle, u32 clk_id,
++			       u32 config, u64 rate)
 +{
-+	return sensor_info.sensors + sensor_id;
++	int ret;
++	struct scmi_xfer *t;
++	struct scmi_clock_set_rate *cfg;
++
++	ret = scmi_one_xfer_init(handle, CLOCK_RATE_SET, SCMI_PROTOCOL_CLOCK,
++				 sizeof(*cfg), 0, &t);
++	if (ret)
++		return ret;
++
++	cfg = t->tx.buf;
++	cfg->flags = cpu_to_le32(config);
++	cfg->id = cpu_to_le32(clk_id);
++	cfg->value_low = cpu_to_le32(rate & 0xffffffff);
++	cfg->value_high = cpu_to_le32(rate >> 32);
++
++	ret = scmi_do_xfer(handle, t);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
 +}
 +
-+static int scmi_sensor_count_get(const struct scmi_handle *handle)
++static int
++scmi_clock_config_set(const struct scmi_handle *handle, u32 clk_id, u32 config)
 +{
-+	return sensor_info.num_sensors;
++	int ret;
++	struct scmi_xfer *t;
++	struct scmi_clock_set_config *cfg;
++
++	ret = scmi_one_xfer_init(handle, CLOCK_CONFIG_SET, SCMI_PROTOCOL_CLOCK,
++				 sizeof(*cfg), 0, &t);
++	if (ret)
++		return ret;
++
++	cfg = t->tx.buf;
++	cfg->id = cpu_to_le32(clk_id);
++	cfg->attributes = cpu_to_le32(config);
++
++	ret = scmi_do_xfer(handle, t);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
 +}
 +
-+static struct scmi_sensor_ops sensor_ops = {
-+	.count_get = scmi_sensor_count_get,
-+	.info_get = scmi_sensor_info_get,
-+	.configuration_set = scmi_sensor_configuration_set,
-+	.trip_point_set = scmi_sensor_trip_point_set,
-+	.reading_get = scmi_sensor_reading_get,
++static int scmi_clock_enable(const struct scmi_handle *handle, u32 clk_id)
++{
++	return scmi_clock_config_set(handle, clk_id, CLOCK_ENABLE);
++}
++
++static int scmi_clock_disable(const struct scmi_handle *handle, u32 clk_id)
++{
++	return scmi_clock_config_set(handle, clk_id, 0);
++}
++
++static int scmi_clock_count_get(const struct scmi_handle *handle)
++{
++	return clocks.num_clocks;
++}
++
++static const struct scmi_clock_info *
++scmi_clock_info_get(const struct scmi_handle *handle, u32 clk_id)
++{
++	struct scmi_clock_info *clk = clocks.clk + clk_id;
++
++	if (!clk->name || !clk->name[0])
++		return NULL;
++
++	return clk;
++}
++
++static struct scmi_clk_ops clk_ops = {
++	.count_get = scmi_clock_count_get,
++	.info_get = scmi_clock_info_get,
++	.rate_get = scmi_clock_rate_get,
++	.rate_set = scmi_clock_rate_set,
++	.enable = scmi_clock_enable,
++	.disable = scmi_clock_disable,
 +};
 +
-+int scmi_sensors_protocol_init(struct scmi_handle *handle)
++int scmi_clock_protocol_init(struct scmi_handle *handle)
 +{
++	int clkid, ret;
 +	u32 version;
 +
-+	scmi_version_get(handle, SCMI_PROTOCOL_SENSOR, &version);
++	scmi_version_get(handle, SCMI_PROTOCOL_CLOCK, &version);
 +
-+	dev_dbg(handle->dev, "Sensor Version %d.%d\n",
++	dev_dbg(handle->dev, "Clock Version %d.%d\n",
 +		PROTOCOL_REV_MAJOR(version), PROTOCOL_REV_MINOR(version));
 +
-+	scmi_sensor_attributes_get(handle, &sensor_info);
++	scmi_clock_protocol_attributes_get(handle, &clocks);
 +
-+	sensor_info.sensors = devm_kcalloc(handle->dev, sensor_info.num_sensors,
-+				  sizeof(struct scmi_sensor_info), GFP_KERNEL);
-+	if (!sensor_info.sensors)
++	clocks.clk = devm_kcalloc(handle->dev, clocks.num_clocks,
++				  sizeof(struct scmi_clock_info), GFP_KERNEL);
++	if (!clocks.clk)
 +		return -ENOMEM;
 +
-+	scmi_sensor_description_get(handle);
++	for (clkid = 0; clkid < clocks.num_clocks; clkid++) {
++		struct scmi_clock_info *clk = clocks.clk + clkid;
 +
-+	handle->sensor_ops = &sensor_ops;
++		ret = scmi_clock_attributes_get(handle, clkid, clk);
++		if (!ret)
++			scmi_clock_describe_rates_get(handle, clkid, clk);
++	}
++
++	handle->clk_ops = &clk_ops;
 +
 +	return 0;
 +}
 diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-index e5a80511f88c..d2a34cc9df8b 100644
+index c9f97e69444a..c15f37c86025 100644
 --- a/include/linux/scmi_protocol.h
 +++ b/include/linux/scmi_protocol.h
-@@ -136,6 +136,44 @@ struct scmi_power_ops {
- 	int (*state_notify_enable)(const struct scmi_handle *, u32, bool);
+@@ -18,6 +18,7 @@
+ #include <linux/types.h>
+ 
+ #define SCMI_MAX_STR_SIZE	16
++#define SCMI_MAX_NUM_RATES	16
+ 
+ /**
+  * struct scmi_revision_info - version information structure
+@@ -43,9 +44,46 @@ struct scmi_revision_info {
+ 	char sub_vendor_id[SCMI_MAX_STR_SIZE];
  };
  
-+struct scmi_sensor_info {
-+	u32 id;
-+	u8 type;
++struct scmi_clock_info {
 +	char name[SCMI_MAX_STR_SIZE];
++	bool rate_discrete;
++	union {
++		struct {
++			int num_rates;
++			u64 rates[SCMI_MAX_NUM_RATES];
++		} list;
++		struct {
++			u64 min_rate;
++			u64 max_rate;
++			u64 step_size;
++		} range;
++	};
 +};
 +
-+/*
-+ * Partial list from Distributed Management Task Force (DMTF) specification:
-+ * DSP0249 (Platform Level Data Model specification)
+ struct scmi_handle;
+ 
+ /**
++ * struct scmi_clk_ops - represents the various operations provided
++ *	by SCMI Clock Protocol
++ *
++ * @count_get: get the count of clocks provided by SCMI
++ * @info_get: get the information of the specified clock
++ * @rate_get: request the current clock rate of a clock
++ * @rate_set: set the clock rate of a clock
++ * @enable: enables the specified clock
++ * @disable: disables the specified clock
 + */
-+enum scmi_sensor_class {
-+	TEMPERATURE_C = 0x2,
-+	VOLTAGE = 0x5,
-+	CURRENT = 0x6,
-+	POWER = 0x7,
-+	ENERGY = 0x8,
++struct scmi_clk_ops {
++	int (*count_get)(const struct scmi_handle *);
++	const struct scmi_clock_info *(*info_get)(const struct scmi_handle *,
++						  u32);
++	int (*rate_get)(const struct scmi_handle *, u32, u64*);
++	int (*rate_set)(const struct scmi_handle *, u32, u32, u64);
++	int (*enable)(const struct scmi_handle *, u32);
++	int (*disable)(const struct scmi_handle *, u32);
 +};
 +
 +/**
-+ * struct scmi_sensor_ops - represents the various operations provided
-+ *	by SCMI Sensor Protocol
-+ *
-+ * @count_get: get the count of sensors provided by SCMI
-+ * @info_get: get the information of the specified sensor
-+ * @configuration_set: control notifications on cross-over events for
-+ *	the trip-points
-+ * @trip_point_set: selects and configures a trip-point of interest
-+ * @reading_get: gets the current value of the sensor
-+ */
-+struct scmi_sensor_ops {
-+	int (*count_get)(const struct scmi_handle *);
-+	const struct scmi_sensor_info *(*info_get)(const struct scmi_handle *,
-+						   u32);
-+	int (*configuration_set)(const struct scmi_handle *, u32);
-+	int (*trip_point_set)(const struct scmi_handle *, u32, u8, u64);
-+	int (*reading_get)(const struct scmi_handle *, u32, bool, u64 *);
-+};
-+
- /**
-  * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
+  * struct scmi_perf_ops - represents the various operations provided
+  *	by SCMI Performance Protocol
   *
-@@ -144,6 +182,7 @@ struct scmi_power_ops {
-  * @power_ops: pointer to set of power protocol operations
+@@ -78,11 +116,13 @@ struct scmi_perf_ops {
+  * @dev: pointer to the SCMI device
+  * @version: pointer to the structure containing SCMI version information
   * @perf_ops: pointer to set of performance protocol operations
-  * @clk_ops: pointer to set of clock protocol operations
-+ * @sensor_ops: pointer to set of sensor protocol operations
++ * @clk_ops: pointer to set of clock protocol operations
   */
  struct scmi_handle {
  	struct device *dev;
-@@ -151,6 +190,7 @@ struct scmi_handle {
- 	struct scmi_power_ops *power_ops;
+ 	struct scmi_revision_info *version;
  	struct scmi_perf_ops *perf_ops;
- 	struct scmi_clk_ops *clk_ops;
-+	struct scmi_sensor_ops *sensor_ops;
++	struct scmi_clk_ops *clk_ops;
  };
  
  #if IS_REACHABLE(CONFIG_ARM_SCMI_PROTOCOL)
