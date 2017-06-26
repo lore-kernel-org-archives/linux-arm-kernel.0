@@ -1,81 +1,241 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 26 Jun 2017 17:38:15 +0100
-Subject: [RFC PATCH] arm64: signal: Make parse_user_sigframe()
- independent of rt_sigframe layout
-In-Reply-To: <20170626153827.kzraqd3s7gavx3uw@yury-thinkpad>
-References: <1498208859-6099-1-git-send-email-Dave.Martin@arm.com>
- <20170625150544.2qsh4hpnmxygmcft@yury-thinkpad>
- <20170626093518.GG8543@e103592.cambridge.arm.com>
- <20170626153827.kzraqd3s7gavx3uw@yury-thinkpad>
-Message-ID: <20170626163814.GJ8543@e103592.cambridge.arm.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 26 Jun 2017 18:41:36 +0200
+Subject: [PATCH v2 6/8] iio: trigger: Add STM32 LPTimer trigger driver
+In-Reply-To: <20170624211335.680b5b90@kernel.org>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+ <1498055415-31513-7-git-send-email-fabrice.gasnier@st.com>
+ <20170624211335.680b5b90@kernel.org>
+Message-ID: <a1368383-8e5e-72ab-32f9-efe9715aaccb@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 06:38:27PM +0300, Yury Norov wrote:
-> On Mon, Jun 26, 2017 at 10:35:21AM +0100, Dave Martin wrote:
-> > On Sun, Jun 25, 2017 at 06:05:44PM +0300, Yury Norov wrote:
-> > > On Fri, Jun 23, 2017 at 10:07:39AM +0100, Dave Martin wrote:
-> > > > ILP32 support uses the same struct sigcontext as the native ABI
-> > > > (i.e., LP64), but a different layout for the rest of the signal
-> > > > frame (since siginfo_t and ucontext_t are both ABI-dependent).
-> > > > 
-> > > > Since the purpose of parse_user_sigframe() is really to parse
-> > > > sigcontext and not the whole signal frame, the function does not
-> > > > need to depend on the layout of rt_sigframe -- the only purpose of
-> > > > the rt_sigframe pointer is for use as a base to measure the signal
-> > > > frame size.
-> > > > 
-> > > > So, this patch renames the function to parse_user_sigcontext() and
-> > > > makes the sigframe base pointer generic.  ABI-specific parsers that
-> > > > share the same sigcontext definition can then call it.
-> > > > 
-> > > > To minimise churn in this patch, the native LP64 parser is retained
-> > > > under the old name, but becomes a call to parse_user_sigconext().
-> > > > It may make sense instead to fold this into its restore_sigframe(),
-> > > > depending on how ILP32 support is integrated.
-> > > > 
-> > > > Suggested-by: Yury Norov <ynorov@caviumnetworks.com>
-> > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > > ---
-> > > > 
-> > > > This patch depends on [1], which does not appear to be applied yet.
-> > > > 
-> > > > [1] [PATCH] arm64: signal: Allow expansion of the signal frame                  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/514699.html
-> > 
-> > [...]
-> > 
-> > FYI, [1] above is now merged in arm64 for-next/core, so we shouldn't
-> > have dependency issues with this patch.
-> > 
-> > > > +static int parse_user_sigframe(struct user_ctxs *user,
-> > > > +			       struct rt_sigframe __user const *sf)
-> > > > +{
-> > > > +	return parse_user_sigcontext(user, &sf->uc.uc_mcontext, sf);
-> > > > +}
-> > > > +
-> > > 
-> > > Hi Dave, 
-> > > 
-> > > Thank you. Seems this is what I need. Only one thing. We can #define
-> > > parse_user_sigframe() as macro, and so bypass type control.
-> > > The macro then will be used both by lp64 and ilp32 without any
-> > > modification.
-> > 
-> > For the reasons you already gave, parse_user_sigframe is probably not
-> > the right name for such a macro.  But it otherwise makes sense as an
-> > interface.  Does [2] look OK for you?
->  
-> Yes, looks good, thank you.
+On 06/24/2017 10:13 PM, Jonathan Cameron wrote:
+> On Wed, 21 Jun 2017 16:30:13 +0200
+> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 > 
-> > Unless you suggest otherwise, I don't plan to maintain or push this
-> > patch -- I think it makes more sense for you to carry it in the ILP32
-> > series, since that's the only thing that needs it.
+>> Add support for LPTIMx_OUT triggers that can be found on some STM32
+>> devices. These triggers can be used then by ADC or DAC.
+>> Typical usage is to configure LPTimer as PWM output (via pwm-stm32-lp)
+>> and have synchronised analog conversions with these triggers.
+>>
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Given this can't be used as a trigger for other devices (no exposed
+> interrupt?) I'd expect to see a validate_device callback provided for
+> the trigger ops.  That would prevent other devices trying to use it.
+
+Hi Jonathan,
+
+This is something I had in mind also earlier. Only thing is...
+Basically, this is limiting: when trigger poll happens on device side
+(e.g. ADC), another device could use same trigger. But I admit this
+looks like corner case.
+
+I'll add it in next version, with additional patch for ADC part to
+validate it's a valid device (No DAC yet).
+I think I'll use INDIO_HARDWARE_TRIGGERED mode:
+- in adc driver: indio_dev->modes |= INDIO_HARDWARE_TRIGGERED;
+- in lptimer: if (indio_dev->modes & INDIO_HARDWARE_TRIGGERED)...
+
 > 
-> I'll just add it to ilp32 series.
+> Otherwise, looks good.
 
-OK, thanks
+Many thanks for your review.
+Best Regards,
+Fabrice
 
-Let me know if you have any other questions.
-
-Cheers
----Dave
+> 
+> Jonathan
+>> ---
+>> Changes in v2:
+>> - s/Low Power/Low-Power
+>> - update few comments
+>> ---
+>>  drivers/iio/trigger/Kconfig                   |  11 +++
+>>  drivers/iio/trigger/Makefile                  |   1 +
+>>  drivers/iio/trigger/stm32-lptimer-trigger.c   | 110 ++++++++++++++++++++++++++
+>>  include/linux/iio/timer/stm32-lptim-trigger.h |  24 ++++++
+>>  4 files changed, 146 insertions(+)
+>>  create mode 100644 drivers/iio/trigger/stm32-lptimer-trigger.c
+>>  create mode 100644 include/linux/iio/timer/stm32-lptim-trigger.h
+>>
+>> diff --git a/drivers/iio/trigger/Kconfig b/drivers/iio/trigger/Kconfig
+>> index e4d4e63..a633d2c 100644
+>> --- a/drivers/iio/trigger/Kconfig
+>> +++ b/drivers/iio/trigger/Kconfig
+>> @@ -24,6 +24,17 @@ config IIO_INTERRUPT_TRIGGER
+>>  	  To compile this driver as a module, choose M here: the
+>>  	  module will be called iio-trig-interrupt.
+>>  
+>> +config IIO_STM32_LPTIMER_TRIGGER
+>> +	tristate "STM32 Low-Power Timer Trigger"
+>> +	depends on MFD_STM32_LPTIMER || COMPILE_TEST
+>> +	help
+>> +	  Select this option to enable STM32 Low-Power Timer Trigger.
+>> +	  This can be used as trigger source for STM32 internal ADC
+>> +	  and/or DAC.
+>> +
+>> +	  To compile this driver as a module, choose M here: the
+>> +	  module will be called stm32-lptimer-trigger.
+>> +
+>>  config IIO_STM32_TIMER_TRIGGER
+>>  	tristate "STM32 Timer Trigger"
+>>  	depends on (ARCH_STM32 && OF && MFD_STM32_TIMERS) || COMPILE_TEST
+>> diff --git a/drivers/iio/trigger/Makefile b/drivers/iio/trigger/Makefile
+>> index 5c4ecd3..0a72a2a 100644
+>> --- a/drivers/iio/trigger/Makefile
+>> +++ b/drivers/iio/trigger/Makefile
+>> @@ -6,6 +6,7 @@
+>>  
+>>  obj-$(CONFIG_IIO_HRTIMER_TRIGGER) += iio-trig-hrtimer.o
+>>  obj-$(CONFIG_IIO_INTERRUPT_TRIGGER) += iio-trig-interrupt.o
+>> +obj-$(CONFIG_IIO_STM32_LPTIMER_TRIGGER) += stm32-lptimer-trigger.o
+>>  obj-$(CONFIG_IIO_STM32_TIMER_TRIGGER) += stm32-timer-trigger.o
+>>  obj-$(CONFIG_IIO_SYSFS_TRIGGER) += iio-trig-sysfs.o
+>>  obj-$(CONFIG_IIO_TIGHTLOOP_TRIGGER) += iio-trig-loop.o
+>> diff --git a/drivers/iio/trigger/stm32-lptimer-trigger.c b/drivers/iio/trigger/stm32-lptimer-trigger.c
+>> new file mode 100644
+>> index 0000000..bcb9aa2
+>> --- /dev/null
+>> +++ b/drivers/iio/trigger/stm32-lptimer-trigger.c
+>> @@ -0,0 +1,110 @@
+>> +/*
+>> + * STM32 Low-Power Timer Trigger driver
+>> + *
+>> + * Copyright (C) STMicroelectronics 2017
+>> + *
+>> + * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
+>> + *
+>> + * License terms:  GNU General Public License (GPL), version 2
+>> + *
+>> + * Inspired by Benjamin Gaignard's stm32-timer-trigger driver
+>> + */
+>> +
+>> +#include <linux/iio/iio.h>
+>> +#include <linux/iio/timer/stm32-lptim-trigger.h>
+>> +#include <linux/iio/trigger.h>
+>> +#include <linux/mfd/stm32-lptimer.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +/* List Low-Power Timer triggers */
+>> +static const char * const stm32_lptim_triggers[] = {
+>> +	LPTIM1_OUT,
+>> +	LPTIM2_OUT,
+>> +	LPTIM3_OUT,
+>> +};
+>> +
+>> +struct stm32_lptim_trigger {
+>> +	struct device *dev;
+>> +	const char *trg;
+>> +};
+>> +
+>> +static const struct iio_trigger_ops stm32_lptim_trigger_ops = {
+>> +	.owner = THIS_MODULE,
+>> +};
+>> +
+>> +/**
+>> + * is_stm32_lptim_trigger
+>> + * @trig: trigger to be checked
+>> + *
+>> + * return true if the trigger is a valid STM32 IIO Low-Power Timer Trigger
+>> + * either return false
+>> + */
+>> +bool is_stm32_lptim_trigger(struct iio_trigger *trig)
+>> +{
+>> +	return (trig->ops == &stm32_lptim_trigger_ops);
+>> +}
+>> +EXPORT_SYMBOL(is_stm32_lptim_trigger);
+>> +
+>> +static int stm32_lptim_setup_trig(struct stm32_lptim_trigger *priv)
+>> +{
+>> +	struct iio_trigger *trig;
+>> +
+>> +	trig = devm_iio_trigger_alloc(priv->dev, "%s", priv->trg);
+>> +	if  (!trig)
+>> +		return -ENOMEM;
+>> +
+>> +	trig->dev.parent = priv->dev->parent;
+>> +	trig->ops = &stm32_lptim_trigger_ops;
+>> +	iio_trigger_set_drvdata(trig, priv);
+>> +
+>> +	return devm_iio_trigger_register(priv->dev, trig);
+>> +}
+>> +
+>> +static int stm32_lptim_trigger_probe(struct platform_device *pdev)
+>> +{
+>> +	struct stm32_lptim_trigger *priv;
+>> +	u32 index;
+>> +	int ret;
+>> +
+>> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+>> +	if (!priv)
+>> +		return -ENOMEM;
+>> +
+>> +	if (of_property_read_u32(pdev->dev.of_node, "reg", &index))
+>> +		return -EINVAL;
+>> +
+>> +	if (index >= ARRAY_SIZE(stm32_lptim_triggers))
+>> +		return -EINVAL;
+>> +
+>> +	priv->dev = &pdev->dev;
+>> +	priv->trg = stm32_lptim_triggers[index];
+>> +
+>> +	ret = stm32_lptim_setup_trig(priv);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	platform_set_drvdata(pdev, priv);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id stm32_lptim_trig_of_match[] = {
+>> +	{ .compatible = "st,stm32-lptimer-trigger", },
+>> +	{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, stm32_lptim_trig_of_match);
+>> +
+>> +static struct platform_driver stm32_lptim_trigger_driver = {
+>> +	.probe = stm32_lptim_trigger_probe,
+>> +	.driver = {
+>> +		.name = "stm32-lptimer-trigger",
+>> +		.of_match_table = stm32_lptim_trig_of_match,
+>> +	},
+>> +};
+>> +module_platform_driver(stm32_lptim_trigger_driver);
+>> +
+>> +MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
+>> +MODULE_ALIAS("platform:stm32-lptimer-trigger");
+>> +MODULE_DESCRIPTION("STMicroelectronics STM32 LPTIM trigger driver");
+>> +MODULE_LICENSE("GPL v2");
+>> diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
+>> new file mode 100644
+>> index 0000000..cb795b1
+>> --- /dev/null
+>> +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
+>> @@ -0,0 +1,24 @@
+>> +/*
+>> + * Copyright (C) STMicroelectronics 2017
+>> + *
+>> + * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> + *
+>> + * License terms:  GNU General Public License (GPL), version 2
+>> + */
+>> +
+>> +#ifndef _STM32_LPTIM_TRIGGER_H_
+>> +#define _STM32_LPTIM_TRIGGER_H_
+>> +
+>> +#define LPTIM1_OUT	"lptim1_out"
+>> +#define LPTIM2_OUT	"lptim2_out"
+>> +#define LPTIM3_OUT	"lptim3_out"
+>> +
+>> +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
+>> +bool is_stm32_lptim_trigger(struct iio_trigger *trig);
+>> +#else
+>> +static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
+>> +{
+>> +	return false;
+>> +}
+>> +#endif
+>> +#endif
+> 
