@@ -1,68 +1,51 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 26 Jun 2017 22:47:57 +1000
-Subject: [PATCH] ARM: dts: sun7i: Add A20 LCD0 RGB888 pins
-In-Reply-To: <20170626144540.9af644d8ab6140f7f4718d06@bidouilliste.com>
-References: <20170626124249.9475-1-net147@gmail.com>
- <20170626144540.9af644d8ab6140f7f4718d06@bidouilliste.com>
-Message-ID: <CANwerB33m7JnmE6Ex5rPjXf=TPCp0qV1mvxEeQFpQ8wq2vJQQA@mail.gmail.com>
+From: bich.hemon@st.com (Bich HEMON)
+Date: Mon, 26 Jun 2017 12:49:09 +0000
+Subject: [PATCH 02/20] dt-bindings: serial: each stm32 usart needs an alias
+In-Reply-To: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
+References: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
+Message-ID: <1498481318-1894-3-git-send-email-bich.hemon@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emmanuel,
+From: Bich Hemon <bich.hemon@st.com>
 
-On 26 June 2017 at 22:45, Emmanuel Vadot <manu@bidouilliste.com> wrote:
-> On Mon, 26 Jun 2017 22:42:49 +1000
-> Jonathan Liu <net147@gmail.com> wrote:
->
->> The LCD0 controller on the A20 can do RGB output up to 8 bits per
->> channel. Add the pins for RGB888 output.
->>
->> Signed-off-by: Jonathan Liu <net147@gmail.com>
->> ---
->>  arch/arm/boot/dts/sun7i-a20.dtsi | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
->> index 96bee776e145..09a0e89bed11 100644
->> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
->> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
->> @@ -1183,6 +1183,17 @@
->>                               function = "ir1";
->>                       };
->>
->> +                     lcd0_rgb888_pins: lcd0_rgb888 at 0 {
->> +                             allwinner,pins = "PD0", "PD1", "PD2", "PD3",
->> +                                              "PD4", "PD5", "PD6", "PD7",
->> +                                              "PD8", "PD9", "PD10", "PD11",
->> +                                              "PD12", "PD13", "PD14", "PD15",
->> +                                              "PD16", "PD17", "PD18", "PD19",
->> +                                              "PD20", "PD21", "PD22", "PD23",
->> +                                              "PD24", "PD25", "PD26", "PD27";
->> +                             allwinner,function = "lcd0";
->> +                     };
->> +
->
->  We switch to standard pinctrl bindings so you need to use 'pins' and
-> 'function' (i.e. without the 'allwinner,' prefix).
->
+Each usart controller should have an alias correctly
+numbered in "aliases" node.
 
-Thanks, I will change it for V2.
+Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+---
+ Documentation/devicetree/bindings/serial/st,stm32-usart.txt | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
->>                       mmc0_pins_a: mmc0 at 0 {
->>                               pins = "PF0", "PF1", "PF2",
->>                                      "PF3", "PF4", "PF5";
->> --
->> 2.13.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
-> --
-> Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
-
-Regards,
-Jonathan
+diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+index 85ec5f2..a229b14 100644
+--- a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
++++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+@@ -15,14 +15,23 @@ Optional properties:
+ - dmas: phandle(s) to DMA controller node(s). Refer to stm32-dma.txt
+ - dma-names: "rx" and/or "tx"
+ 
++Note: Each usart controller should have an alias correctly numbered
++in "aliases" node.
++
+ Examples:
+-usart4: serial at 40004c00 {
++aliases {
++	serial0 = &usart1;
++	serial1 = &usart2;
++	serial3 = &uart4;
++};
++
++uart4: serial at 40004c00 {
+ 	compatible = "st,stm32-uart";
+ 	reg = <0x40004c00 0x400>;
+ 	interrupts = <52>;
+ 	clocks = <&clk_pclk1>;
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usart4>;
++	pinctrl-0 = <&pinctrl_uart4>;
+ };
+ 
+ usart2: serial at 40004400 {
+-- 
+1.9.1
