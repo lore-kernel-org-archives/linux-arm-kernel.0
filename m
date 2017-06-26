@@ -1,60 +1,129 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 26 Jun 2017 22:53:22 +0800
-Subject: [PATCH 5/5] dt-bindings: Document the Rockchip RGA bindings
-Message-ID: <1498488802-1439-1-git-send-email-jacob-chen@iotwrt.com>
+From: jintack.lim@linaro.org (Jintack Lim)
+Date: Mon, 26 Jun 2017 11:21:25 -0400
+Subject: [RFC 21/55] KVM: arm64: Forward HVC instruction to the guest
+ hypervisor
+In-Reply-To: <20170222114758.GM26976@cbox>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-22-git-send-email-jintack@cs.columbia.edu>
+ <20170222114758.GM26976@cbox>
+Message-ID: <CAHyh4xjG8_dOOe-eqQmAogDHDnQPCUQ-2Kccz9=6NmL0_+9TAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for Rockchip RGA
+On Wed, Feb 22, 2017 at 6:47 AM, Christoffer Dall <cdall@linaro.org> wrote:
+> On Mon, Jan 09, 2017 at 01:24:17AM -0500, Jintack Lim wrote:
+>> Forward exceptions due to hvc instruction to the guest hypervisor.
+>>
+>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>> ---
+>>  arch/arm64/include/asm/kvm_nested.h |  5 +++++
+>>  arch/arm64/kvm/Makefile             |  1 +
+>>  arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
+>>  arch/arm64/kvm/handle_exit_nested.c | 27 +++++++++++++++++++++++++++
+>>  4 files changed, 44 insertions(+)
+>>  create mode 100644 arch/arm64/include/asm/kvm_nested.h
+>>  create mode 100644 arch/arm64/kvm/handle_exit_nested.c
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
+>> new file mode 100644
+>> index 0000000..620b4d3
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/kvm_nested.h
+>> @@ -0,0 +1,5 @@
+>> +#ifndef __ARM64_KVM_NESTED_H__
+>> +#define __ARM64_KVM_NESTED_H__
+>> +
+>> +int handle_hvc_nested(struct kvm_vcpu *vcpu);
+>> +#endif
+>> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+>> index b342bdd..9c35e9a 100644
+>> --- a/arch/arm64/kvm/Makefile
+>> +++ b/arch/arm64/kvm/Makefile
+>> @@ -35,4 +35,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+>>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+>>
+>> +kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
+>>  kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index a891684..208be16 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -29,6 +29,10 @@
+>>  #include <asm/kvm_mmu.h>
+>>  #include <asm/kvm_psci.h>
+>>
+>> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
+>> +#include <asm/kvm_nested.h>
+>> +#endif
+>> +
+>>  #define CREATE_TRACE_POINTS
+>>  #include "trace.h"
+>>
+>> @@ -42,6 +46,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>                           kvm_vcpu_hvc_get_imm(vcpu));
+>>       vcpu->stat.hvc_exit_stat++;
+>>
+>> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
+>> +     ret = handle_hvc_nested(vcpu);
+>> +     if (ret < 0 && ret != -EINVAL)
+>> +             return ret;
+>> +     else if (ret >= 0)
+>> +             return ret;
+>> +#endif
+>>       ret = kvm_psci_call(vcpu);
+>>       if (ret < 0) {
+>>               kvm_inject_undefined(vcpu);
+>> diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
+>> new file mode 100644
+>> index 0000000..a6ce23b
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/handle_exit_nested.c
+>> @@ -0,0 +1,27 @@
+>> +/*
+>> + * Copyright (C) 2016 - Columbia University
+>> + * Author: Jintack Lim <jintack@cs.columbia.edu>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/kvm.h>
+>> +#include <linux/kvm_host.h>
+>> +
+>> +#include <asm/kvm_emulate.h>
+>> +
+>> +/* We forward all hvc instruction to the guest hypervisor. */
+>> +int handle_hvc_nested(struct kvm_vcpu *vcpu)
+>> +{
+>> +     return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+>> +}
+>
+> I don't understand the logic here or in the caller above.  Do we really
+> forward *all" hvc calls to the guest hypervisor now, so that we no
+> longer support any hypercalls from the VM?  That seems a little rough
+> and probably requires some more discussions.
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
----
- .../devicetree/bindings/media/rockchip-rga.txt     | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+So I think if we run a VM with the EL2 support, then all hvc calls
+from the VM should be forwarded to the virtual EL2.
 
-diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt b/Documentation/devicetree/bindings/media/rockchip-rga.txt
-new file mode 100644
-index 0000000..48a260e5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
-@@ -0,0 +1,36 @@
-+device-tree bindings for rockchip 2D raster graphic acceleration controller (RGA)
-+
-+RGA is a separate 2D raster graphic acceleration unit. It accelerates 2D
-+graphics operations, such as point/line drawing, image scaling, rotation,
-+BitBLT, alpha blending and image blur/sharpness.
-+
-+Required properties:
-+- compatible: value should be one of the following
-+		"rockchip,rk3228-rga";
-+		"rockchip,rk3288-rga";
-+		"rockchip,rk3399-rga";
-+
-+- interrupts: RGA interrupt number.
-+
-+- clocks: phandle to RGA sclk/hclk/aclk clocks
-+
-+- clock-names: should be "aclk" "hclk" and "sclk"
-+
-+- resets: Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names: should be "core" "axi" and "ahb"
-+
-+Example:
-+SoC specific DT entry:
-+	rga: rga at ff680000 {
-+		compatible = "rockchip,rk3399-rga";
-+		reg = <0xff680000 0x10000>;
-+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "rga";
-+		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA_CORE>;
-+		clock-names = "aclk", "hclk", "sclk";
-+
-+		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
-+		reset-names = "core, "axi", "ahb";
-+		status = "disabled";
-+	};
--- 
-2.7.4
+I may miss something obvious, so can you (or anyone) come up with some
+cases that the host hypervisor needs to directly handle hvc from the
+VM with the EL2 support?
+
+Thanks,
+Jintack
+
+>
+> Thanks,
+> -Christoffer
+>
