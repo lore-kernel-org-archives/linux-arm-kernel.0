@@ -1,181 +1,109 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Mon, 26 Jun 2017 19:33:30 +0300
-Subject: [PATCH v1 4/6] [media] ov9650: use write_array() for resolution
- sequences
-In-Reply-To: <1498143942-12682-5-git-send-email-hugues.fruchet@st.com>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <1498143942-12682-5-git-send-email-hugues.fruchet@st.com>
-Message-ID: <20170626163330.GR12407@valkosipuli.retiisi.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 26 Jun 2017 18:49:32 +0200
+Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+In-Reply-To: <CAJZ5v0irHvYXHv1GykatTH+XROZyL0nR0c=KfdSrpH395s6V8g@mail.gmail.com>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+ <20170622104933.GY629@lahna.fi.intel.com> <2842386.AFZiXzV2Sq@aspire.rjw.lan>
+ <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
+ <CAJZ5v0irHvYXHv1GykatTH+XROZyL0nR0c=KfdSrpH395s6V8g@mail.gmail.com>
+Message-ID: <CAPDyKFov=08AQw0PPPgcFbrerTskoPGfLZcJL9gjikfQfZUJpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hugues,
+On 23 June 2017 at 00:01, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Thu, Jun 22, 2017 at 11:37 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 22 June 2017 at 16:41, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>>> On Thursday, June 22, 2017 01:49:33 PM Mika Westerberg wrote:
+>>>> On Thu, Jun 22, 2017 at 01:31:51AM +0200, Rafael J. Wysocki wrote:
+>>>> > On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>> > > The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
+>>>> > > during system suspend"), may suggest to the PM core to try out the so
+>>>> > > called direct_complete path for system sleep. In this path, the PM core
+>>>> > > treats a runtime suspended device as it's already in a proper low power
+>>>> > > state for system sleep, which makes it skip calling the system sleep
+>>>> > > callbacks for the device, except for the ->prepare() and the ->complete()
+>>>> > > callback.
+>>>> > >
+>>>> > > Moreover, under certain circumstances the PM core may unset the
+>>>> > > direct_complete flag for a parent device, in case its child device are
+>>>> > > being system suspended before. In other words, the PM core doesn't skip
+>>>> > > calling the system sleep callbacks, no matter if the device is runtime
+>>>> > > suspended or not.
+>>>> > >
+>>>> > > In cases of an i2c slave device, the above situation is triggered.
+>>>> > > Unfortunate, this also breaks the assumption that the i2c device is always
+>>>> > > runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
+>>>> > > invoked, which then leads to a regression.
+>>>> > >
+>>>> > > More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
+>>>> > > clk_core_unprepare(), for an already disabled/unprepared clock, leading to
+>>>> > > complaints about clocks calls being wrongly balanced.
+>>>> > >
+>>>> > > In cases when the i2c device is attached to the ACPI PM domain, the problem
+>>>> > > doesn't occur. That's because ACPI's ->suspend() callback, assigned to
+>>>> > > acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
+>>>> >
+>>>> > Which really is expected to happen, so direct_complete should only be
+>>>> > used along with the ACPI PM domain in this case.
+>>>> >
+>>>> > Moreover, in the ACPI PM domain case acpi_subsys_prepare() is supposed
+>>>> > to do the right thing without dw_i2c_plat_prepare() and the return
+>>>> > value of the latter will be ignored anyway, so dw_i2c_plat_prepare()
+>>>> > will only have effect without ACPI PM domain AFAICS.
+>>>> >
+>>>> > It looks like commit 8503ff166504 is entirely misguided.
+>>>>
+>>>> Indeed it is. At the time I suggested that change I did not really
+>>>> understand how the direct complete is supposed to be used :-/
+>>>
+>>> So can we go for a full revert, please, and then fix up things properly?
+>>
+>> Unfortunate I think a revert is going to make it worse, for the non ACPI case.
+>>
+>> Because in that case, unless I am reading the code wrong, I think when
+>> the device is runtime suspended during system sleep, then the system
+>> suspend callback will also be called (because the direct_complete
+>> isn't run), again causing clock unbalance issues.
+>>
+>> This makes it worse in that sense, that then you don't even need an
+>> i2c slave to trigger the problem.
+>
+> In that case your changelog is a bit misleading.
 
-On Thu, Jun 22, 2017 at 05:05:40PM +0200, Hugues Fruchet wrote:
-> Align resolution sequences on initialization sequence using
-> i2c_rv structure NULL terminated .This add flexibility
-> on resolution sequence size.
-> Document resolution related registers by using corresponding
-> define instead of hexa address/value.
-> 
-> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
-> ---
->  drivers/media/i2c/ov9650.c | 98 ++++++++++++++++++++++++++++++----------------
->  1 file changed, 64 insertions(+), 34 deletions(-)
-> 
-> diff --git a/drivers/media/i2c/ov9650.c b/drivers/media/i2c/ov9650.c
-> index 4311da6..8b283c9 100644
-> --- a/drivers/media/i2c/ov9650.c
-> +++ b/drivers/media/i2c/ov9650.c
-> @@ -227,11 +227,16 @@ struct ov965x_ctrls {
->  	u8 update;
->  };
->  
-> +struct i2c_rv {
-> +	u8 addr;
-> +	u8 value;
-> +};
-> +
->  struct ov965x_framesize {
->  	u16 width;
->  	u16 height;
->  	u16 max_exp_lines;
-> -	const u8 *regs;
-> +	const struct i2c_rv *regs;
->  };
->  
->  struct ov965x_interval {
-> @@ -280,9 +285,11 @@ struct ov965x {
->  	u8 apply_frame_fmt;
->  };
->  
-> -struct i2c_rv {
-> -	u8 addr;
-> -	u8 value;
-> +struct ov965x_pixfmt {
-> +	u32 code;
-> +	u32 colorspace;
-> +	/* REG_TSLB value, only bits [3:2] may be set. */
-> +	u8 tslb_reg;
->  };
->  
->  static const struct i2c_rv ov965x_init_regs[] = {
-> @@ -342,30 +349,59 @@ struct i2c_rv {
->  	{ REG_NULL, 0 }
->  };
->  
-> -#define NUM_FMT_REGS 14
-> -/*
-> - * COM7,  COM3,  COM4, HSTART, HSTOP, HREF, VSTART, VSTOP, VREF,
-> - * EXHCH, EXHCL, ADC,  OCOM,   OFON
-> - */
-> -static const u8 frame_size_reg_addr[NUM_FMT_REGS] = {
-> -	0x12, 0x0c, 0x0d, 0x17, 0x18, 0x32, 0x19, 0x1a, 0x03,
-> -	0x2a, 0x2b, 0x37, 0x38, 0x39,
-> -};
-> -
-> -static const u8 ov965x_sxga_regs[NUM_FMT_REGS] = {
-> -	0x00, 0x00, 0x00, 0x1e, 0xbe, 0xbf, 0x01, 0x81, 0x12,
-> -	0x10, 0x34, 0x81, 0x93, 0x51,
-> +static const struct i2c_rv ov965x_sxga_regs[] = {
-> +	{ REG_COM7, 0x00 },
-> +	{ REG_COM3, 0x00 },
-> +	{ REG_COM4, 0x00 },
-> +	{ REG_HSTART, 0x1e },
-> +	{ REG_HSTOP, 0xbe },
-> +	{ 0x32, 0xbf },
-> +	{ REG_VSTART, 0x01 },
-> +	{ REG_VSTOP, 0x81 },
-> +	{ REG_VREF, 0x12 },
-> +	{ REG_EXHCH, 0x10 },
-> +	{ REG_EXHCL, 0x34 },
-> +	{ REG_ADC, 0x81 },
-> +	{ REG_ACOM, 0x93 },
-> +	{ REG_OFON, 0x51 },
-> +	{ REG_NULL, 0 },
->  };
->  
-> -static const u8 ov965x_vga_regs[NUM_FMT_REGS] = {
-> -	0x40, 0x04, 0x80, 0x26, 0xc6, 0xed, 0x01, 0x3d, 0x00,
-> -	0x10, 0x40, 0x91, 0x12, 0x43,
-> +static const struct i2c_rv ov965x_vga_regs[] = {
-> +	{ REG_COM7, 0x40 },
-> +	{ REG_COM3, 0x04 },
-> +	{ REG_COM4, 0x80 },
-> +	{ REG_HSTART, 0x26 },
-> +	{ REG_HSTOP, 0xc6 },
-> +	{ 0x32, 0xed },
-> +	{ REG_VSTART, 0x01 },
-> +	{ REG_VSTOP, 0x3d },
-> +	{ REG_VREF, 0x00 },
-> +	{ REG_EXHCH, 0x10 },
-> +	{ REG_EXHCL, 0x40 },
-> +	{ REG_ADC, 0x91 },
-> +	{ REG_ACOM, 0x12 },
-> +	{ REG_OFON, 0x43 },
-> +	{ REG_NULL, 0 },
->  };
->  
->  /* Determined empirically. */
-> -static const u8 ov965x_qvga_regs[NUM_FMT_REGS] = {
-> -	0x10, 0x04, 0x80, 0x25, 0xc5, 0xbf, 0x00, 0x80, 0x12,
-> -	0x10, 0x40, 0x91, 0x12, 0x43,
-> +static const struct i2c_rv ov965x_qvga_regs[] = {
-> +	{ REG_COM7, 0x10 },
-> +	{ REG_COM3, 0x04 },
-> +	{ REG_COM4, 0x80 },
-> +	{ REG_HSTART, 0x25 },
-> +	{ REG_HSTOP, 0xc5 },
-> +	{ 0x32, 0xbf },
-> +	{ REG_VSTART, 0x00 },
-> +	{ REG_VSTOP, 0x80 },
-> +	{ REG_VREF, 0x12 },
-> +	{ REG_EXHCH, 0x10 },
-> +	{ REG_EXHCL, 0x40 },
-> +	{ REG_ADC, 0x91 },
-> +	{ REG_ACOM, 0x12 },
-> +	{ REG_OFON, 0x43 },
-> +	{ REG_NULL, 0 },
->  };
->  
->  static const struct ov965x_framesize ov965x_framesizes[] = {
-> @@ -387,13 +423,6 @@ struct i2c_rv {
->  	},
->  };
->  
-> -struct ov965x_pixfmt {
-> -	u32 code;
-> -	u32 colorspace;
-> -	/* REG_TSLB value, only bits [3:2] may be set. */
-> -	u8 tslb_reg;
-> -};
+Yeah, it is! I didn't realize that until I fully investigated the revert option.
 
-Any particular reason for moving struct ov965x_pixfmt definition?
+>
+> It looks like the commit in question attempted to fix exactly this
+> issue, but it failed, so it should be replaced with something else
+> which is what your patch is effectively doing.
+>
+> IMO you should describe the original problem, explain why that commit
+> is not sufficient to fix it and then describe the final fix.
+>
+> Anyway, after reading the changelog it should be clear that things
+> were broken before the commit in question.
+>
+> And BTW I'm not really sure how the rest of the series is related to this?
 
-> -
->  static const struct ov965x_pixfmt ov965x_formats[] = {
->  	{ MEDIA_BUS_FMT_YUYV8_2X8, V4L2_COLORSPACE_JPEG, 0x00},
->  	{ MEDIA_BUS_FMT_YVYU8_2X8, V4L2_COLORSPACE_JPEG, 0x04},
-> @@ -1268,11 +1297,12 @@ static int ov965x_set_fmt(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config
->  
->  static int ov965x_set_frame_size(struct ov965x *ov965x)
->  {
-> -	int i, ret = 0;
-> +	int ret = 0;
-> +
-> +	v4l2_dbg(1, debug, ov965x->client, "%s\n", __func__);
->  
-> -	for (i = 0; ret == 0 && i < NUM_FMT_REGS; i++)
-> -		ret = ov965x_write(ov965x->client, frame_size_reg_addr[i],
-> -				   ov965x->frame_size->regs[i]);
-> +	ret = ov965x_write_array(ov965x->client,
-> +				 ov965x->frame_size->regs);
->  	return ret;
->  }
->  
+Going back in history, I realize the system sleep support in this
+driver has been broken even before the commit $subject patch intends
+to fix.
+However it has been working fine for the ACPI case, because of how the
+ACPI PM domain manages its devices during system sleep.
 
--- 
-Regards,
+The commit in question, adds an improvement to the driver, because it
+enables the direct_complete path. For ACPI, that was already working,
+but not for the other cases. So to be able to support the similar
+improvement as the direct_complete path offers, as that isn't working
+for this driver, I tried out using the runtime PM centric path
+instead. That is what the rest of the changes in this series takes
+care of.
 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Now, as the system sleep support is broken I wanted to make a simple
+fix for that first, via $subject patch. I guess what makes this a bit
+confusing is that I shouldn't point to a certain commit, but rather
+just add a stable tag and update the changelog accordingly.
+
+Kind regards
+Uffe
