@@ -1,55 +1,63 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 26 Jun 2017 13:31:35 +0100
-Subject: [PATCH v2 0/8] io-pgtable lock removal
-In-Reply-To: <9bbf18c7-34ba-6e94-53bd-3f75059c1bb2@huawei.com>
-References: <cover.1498145008.git.robin.murphy@arm.com>
- <61b7b953-5bf4-eb45-c3e8-b4491e8fdca7@huawei.com>
- <f694a247-9006-3a3c-8a77-209b158eabf3@arm.com>
- <9bbf18c7-34ba-6e94-53bd-3f75059c1bb2@huawei.com>
-Message-ID: <a75e4c19-e393-f030-6927-debae27957eb@arm.com>
+From: fransklaver@gmail.com (Frans Klaver)
+Date: Mon, 26 Jun 2017 14:36:43 +0200
+Subject: [PATCH v4] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <20170626122055.5253-1-clabbe.montjoie@gmail.com>
+References: <20170626122055.5253-1-clabbe.montjoie@gmail.com>
+Message-ID: <CAH6sp9Nm-hDxNSNNYxonBzSGyM769WoKQwjX2CN-RPRr=Oxu4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/17 12:35, John Garry wrote:
-> On 23/06/2017 10:58, Robin Murphy wrote:
->> On 23/06/17 09:47, John Garry wrote:
->>> On 22/06/2017 16:53, Robin Murphy wrote:
->>>> The feedback has been promising, so v2 is just a final update to cover
->>>> a handful of memory ordering and cosmetic tweaks that came up when Will
->>>> and I went through this offline.
->>>>
->>>> Thanks,
->>>> Robin.
->>>
->>> Hi Robin,
->>>
->>> Is it worth us retesting this patchset?
->>>
->>> If yes, as for a branch (for convenience), does this one now match v2:
->>> git://linux-arm.org/linux-rm  iommu/pgtable
->>>
->>> I saw it was rewritten recently.
->>
->> Indeed, I pushed the branch out before posting. Functionally it ought to
->> be identical to v1, so this was more just a heads-up - feel free to
->> double-check I've not broken anything, but I wouldn't say you need to
->> throw the full test lab at it again.
->>
-> 
-> I saw Will has already sent the pull request. But, FWIW, we are seeing
-> roughly the same performance as v1 patchset. For PCI NIC, Zhou again
-> found performance drop goes from ~15->8% with SMMU enabled, and for
-> integrated storage controller [platform device], we still see a drop of
-> about 50%, depending on datarates (Leizhen has been working on fixing
-> this).
+Hi,
 
-Thanks for confirming. Following Joerg's suggestion that the storage
-workloads may still depend on rbtree performance - it had slipped my
-mind that even with small block sizes those could well be grouped into
-scatterlists large enough to trigger a >64-page IOVA allocation - I've
-taken the liberty of cooking up a simplified version of Leizhen's rbtree
-optimisation series in the iommu/iova branch of my tree. I'll follow up
-on that after the merge window, but if anyone wants to play with it in
-the meantime feel free.
+On Mon, Jun 26, 2017 at 2:20 PM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+> The Security System have a PRNG, this patch add support for it via
+> crypto_rng.
 
-Robin.
+s,have,has,
+s,add,adds,
+
+>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>
+> Changes since v3 (note: the v3 miss changes and version tag sorry)
+> - Replaced all len values with bits / BITS_PER_LONG or BITS_PER_BYTE
+>
+> Changes since v2
+>  - converted to crypto_rng
+>
+> Changes since v1:
+>  - Replaced all spin_lock_bh by simple spin_lock
+>  - Removed handling of size not modulo 4 which will never happen
+>  - Added add_random_ready_callback()
+>
+>  drivers/crypto/Kconfig                  |  8 +++++
+>  drivers/crypto/sunxi-ss/Makefile        |  1 +
+>  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 30 ++++++++++++++++++
+>  drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 56 +++++++++++++++++++++++++++++++++
+>  drivers/crypto/sunxi-ss/sun4i-ss.h      | 11 +++++++
+>  5 files changed, 106 insertions(+)
+>  create mode 100644 drivers/crypto/sunxi-ss/sun4i-ss-prng.c
+>
+> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> index ab82536d64e2..bde0b102eb70 100644
+> --- a/drivers/crypto/Kconfig
+> +++ b/drivers/crypto/Kconfig
+> @@ -618,6 +618,14 @@ config CRYPTO_DEV_SUN4I_SS
+>           To compile this driver as a module, choose M here: the module
+>           will be called sun4i-ss.
+>
+> +config CRYPTO_DEV_SUN4I_SS_PRNG
+> +       bool "Support for Allwinner Security System PRNG"
+> +       depends on CRYPTO_DEV_SUN4I_SS
+> +       select CRYPTO_RNG
+> +       help
+> +         Select this option if you to provides kernel-side support for
+> +         the Pseudo-Random Number Generator found in the Security System.
+
+This sentence does not parse. "Select this option if you want to
+provide kernel-side for ...". Alternatively: "This option enables
+kernel-side support for ..."
+
+Frans
