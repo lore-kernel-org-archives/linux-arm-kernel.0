@@ -1,45 +1,90 @@
-From: danielmicay@gmail.com (Daniel Micay)
-Date: Mon, 26 Jun 2017 18:52:31 -0400
-Subject: [kernel-hardening] non-x86 per-task stack canaries
-In-Reply-To: <CAGXu5jLCAdPOKZFotaWZ8MjwqW8Eq9_tLc_fgbYsTcbVWv77AQ@mail.gmail.com>
-References: <CAGXu5jLCAdPOKZFotaWZ8MjwqW8Eq9_tLc_fgbYsTcbVWv77AQ@mail.gmail.com>
-Message-ID: <1498517551.22457.7.camel@gmail.com>
+From: rientjes@google.com (David Rientjes)
+Date: Mon, 26 Jun 2017 16:03:29 -0700 (PDT)
+Subject: [patch resend 4.12] compiler, clang: always inline when
+ CONFIG_OPTIMIZE_INLINING is disabled
+Message-ID: <alpine.DEB.2.10.1706261552200.1075@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-06-26 at 14:04 -0700, Kees Cook wrote:
-> Hi,
-> 
-> The stack protector functionality on x86_64 uses %gs:0x28 (%gs is the
-> percpu area) for __stack_chk_guard, and all other architectures use a
-> global variable instead. This means we never change the stack canary
-> on non-x86 architectures which allows for a leak in one task to expose
-> the canary in another task.
-> 
-> I'm curious what thoughts people may have about how to get this
-> correctly implemented. Teaching the compiler about per-cpu data sounds
-> exciting. :)
-> 
-> -Kees
+The motivation of commit abb2ea7dfd82 ("compiler, clang: suppress warning 
+for unused static inline functions") is to suppress clang's warnings about 
+unused static inline functions.
 
-arm64 has many integer registers so I don't think reserving one would
-hurt performance, especially in the kernel where hot numeric loops
-barely exist. It would reduce the cost of SSP by getting rid of the
-memory read for the canary value. On the other hand, using per-cpu data
-would likely be higher cost than the global. x86 has segment registers
-but most archs probably need to do something more painful.
+For configs without CONFIG_OPTIMIZE_INLINING enabled, such as any non-x86 
+architecture, `inline' in the kernel implies that 
+__attribute__((always_inline)) is used.
 
-It's safe as long as it's a callee-saved register. It should be enforced
-that there's no assembly spilling it and calling into C code without the
-random canary. There's very little assembly using registers like x28 so
-it wouldn't be that bad. It's possible there's one where nothing needs
-to be changed, there only needs to be a check to make sure it stays that
-way.
+Some code depends on that behavior, see 
+https://lkml.org/lkml/2017/6/13/918:
 
-It would be a step towards making SSP cheap enough to expand it into a
-feature like the StackGuard XOR canaries.
+net/built-in.o: In function `__xchg_mb':
+arch/arm64/include/asm/cmpxchg.h:99: undefined reference to `__compiletime_assert_99'
+arch/arm64/include/asm/cmpxchg.h:99: undefined reference to `__compiletime_assert_99
 
-Samsung has a return address XOR feature based on reserving a register
-and while RAP's probabilistic return address mitigation isn't open-
-source, it was stated that it reserves a register on x86_64 where they
-aren't as plentiful as arm64.
+The full fix would be to identify these breakages and annotate the 
+functions with __always_inline instead of `inline'.  But since we are late 
+in the 4.12-rc cycle, simply carry forward the forced inlining behavior 
+and work toward moving arm64, and other architectures, toward 
+CONFIG_OPTIMIZE_INLINING behavior.
+
+Reported-by: Sodagudi Prasad <psodagud@codeaurora.org>
+Tested-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: David Rientjes <rientjes@google.com>
+---
+ Resend of http://marc.info/?l=linux-kernel&m=149681501816319 for 4.12
+ inclusion.
+
+ Prasad, please add your Tested-by.
+
+ include/linux/compiler-clang.h |  8 --------
+ include/linux/compiler-gcc.h   | 18 +++++++++++-------
+ 2 files changed, 11 insertions(+), 15 deletions(-)
+
+diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
+--- a/include/linux/compiler-clang.h
++++ b/include/linux/compiler-clang.h
+@@ -15,11 +15,3 @@
+  * with any version that can compile the kernel
+  */
+ #define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
+-
+-/*
+- * GCC does not warn about unused static inline functions for
+- * -Wunused-function.  This turns out to avoid the need for complex #ifdef
+- * directives.  Suppress the warning in clang as well.
+- */
+-#undef inline
+-#define inline inline __attribute__((unused)) notrace
+diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
+--- a/include/linux/compiler-gcc.h
++++ b/include/linux/compiler-gcc.h
+@@ -66,18 +66,22 @@
+ 
+ /*
+  * Force always-inline if the user requests it so via the .config,
+- * or if gcc is too old:
++ * or if gcc is too old.
++ * GCC does not warn about unused static inline functions for
++ * -Wunused-function.  This turns out to avoid the need for complex #ifdef
++ * directives.  Suppress the warning in clang as well by using "unused"
++ * function attribute, which is redundant but not harmful for gcc.
+  */
+ #if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
+     !defined(CONFIG_OPTIMIZE_INLINING) || (__GNUC__ < 4)
+-#define inline		inline		__attribute__((always_inline)) notrace
+-#define __inline__	__inline__	__attribute__((always_inline)) notrace
+-#define __inline	__inline	__attribute__((always_inline)) notrace
++#define inline inline		__attribute__((always_inline,unused)) notrace
++#define __inline__ __inline__	__attribute__((always_inline,unused)) notrace
++#define __inline __inline	__attribute__((always_inline,unused)) notrace
+ #else
+ /* A lot of inline functions can cause havoc with function tracing */
+-#define inline		inline		notrace
+-#define __inline__	__inline__	notrace
+-#define __inline	__inline	notrace
++#define inline inline		__attribute__((unused)) notrace
++#define __inline__ __inline__	__attribute__((unused)) notrace
++#define __inline __inline	__attribute__((unused)) notrace
+ #endif
+ 
+ #define __always_inline	inline __attribute__((always_inline))
