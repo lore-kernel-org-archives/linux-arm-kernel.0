@@ -1,38 +1,105 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 26 Jun 2017 13:39:24 +0800
-Subject: [PATCH] pci: Add and use PCI_GENERIC_SETUP Kconfig entry
-In-Reply-To: <20170623220857.28774-2-palmer@dabbelt.com>
-Message-ID: <201706261344.OUjMGlsQ%fengguang.wu@intel.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Mon, 26 Jun 2017 05:53:31 +0000
+Subject: [linux-sunxi] [PATCH v4 1/6] clk: sunxi-ng: div: Add support for
+ fixed post-divider
+In-Reply-To: <CANwerB1q68-PpQ7+-QbgBgZHeWw_4p1ruiwzy7upjLLRTDEG1w@mail.gmail.com>
+References: <cover.24b2b13ec5a68552e186ba1637f1328363c3886e.1498422562.git-series.plaes@plaes.org>
+ <bc043a64775ec8c9cfcfe6d638e348d38e34eba3.1498422562.git-series.plaes@plaes.org>
+ <CANwerB1q68-PpQ7+-QbgBgZHeWw_4p1ruiwzy7upjLLRTDEG1w@mail.gmail.com>
+Message-ID: <20170626055331.GB31066@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Palmer,
+On Mon, Jun 26, 2017 at 08:05:16AM +1000, Jonathan Liu wrote:
+> Hi Priit,
+> 
+> This is showing from clock rate of 171428572 in the output of "cat
+> /sys/kernel/debug/clk/clk_summary" for pll-periph-sata.
+> The clock rate should be 100000000 (100 MHz) when read from the hardware.
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.12-rc6]
-[cannot apply to next-20170623]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This is what I see on Cubietruck. Can you check with sunxi-ccu-wip branch?
 
-url:    https://github.com/0day-ci/linux/commits/Palmer-Dabbelt/pci-Add-and-use-PCI_GENERIC_SETUP-Kconfig-entry/20170626-043558
-config: m68k-allnoconfig (attached as .config)
-compiler: m68k-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=m68k 
+$ cat /sys/kernel/debug/clk/clk_summary  |grep -i sata
+          pll-periph-sata                 1            1   100000000          0 0  
+             sata                         1            1   100000000          0 0  
+                ahb-sata                  1            1   300000000          0 0  
 
-All warnings (new ones prefixed by >>):
+> 
+> On 26 June 2017 at 06:45, Priit Laes <plaes@plaes.org> wrote:
+> > SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
+> > 6 is fixed post-divider.
+> >
+> > Signed-off-by: Priit Laes <plaes@plaes.org>
+> > ---
+> >  drivers/clk/sunxi-ng/ccu_div.c | 12 ++++++++++--
+> >  drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
+> >  2 files changed, 12 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
+> > index c0e5c10..de30e15 100644
+> > --- a/drivers/clk/sunxi-ng/ccu_div.c
+> > +++ b/drivers/clk/sunxi-ng/ccu_div.c
+> 
+> Missing handling of fixed_post_div in ccu_div_round_rate.
+> ccu_div_round_rate should multiply the rate by the postdiv before
+> looking up the divider using divider_get_val and divide val by postdiv
+> just before returning.
+> 
+> > @@ -62,8 +62,13 @@ static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
+> >         parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
+> >                                                   parent_rate);
+> >
+> > -       return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+> > -                                  cd->div.flags);
+> > +       val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+> > +                                 cd->div.flags);
+> > +
+> > +       if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> > +               val /= cd->fixed_post_div;
+> > +
+> > +       return val;
+> >  }
+> >
+> >  static int ccu_div_determine_rate(struct clk_hw *hw,
+> 
+> > @@ -89,6 +94,9 @@ static int ccu_div_set_rate(struct clk_hw *hw, unsigned long rate,
+> >         val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
+> >                               cd->div.flags);
+> >
+> > +       if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> > +               val *= cd->fixed_post_div;
+> > +
+> >         spin_lock_irqsave(cd->common.lock, flags);
+> >
+> >         reg = readl(cd->common.base + cd->common.reg);
+> 
+> val here is the divider value that is stored in the clock register
+> field not the actual rate so this is incorrect. Instead the rate needs
+> to be multiplied by postdiv just before divider_get_val.
 
-warning: (M68K) selects PCI_GENERIC_SETUP which has unmet direct dependencies (MMU)
+OK, thanks, this one I wasn't really sure about.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 4487 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170626/d0028190/attachment.gz>
+> 
+> > diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+> > index 08d0744..f3a5028 100644
+> > --- a/drivers/clk/sunxi-ng/ccu_div.h
+> > +++ b/drivers/clk/sunxi-ng/ccu_div.h
+> > @@ -86,9 +86,10 @@ struct ccu_div_internal {
+> >  struct ccu_div {
+> >         u32                     enable;
+> >
+> > -       struct ccu_div_internal         div;
+> > +       struct ccu_div_internal div;
+> >         struct ccu_mux_internal mux;
+> >         struct ccu_common       common;
+> > +       unsigned int            fixed_post_div;
+> >  };
+> >
+> >  #define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,   \
+> > --
+> > git-series 0.9.1
+> 
+> Thanks.
+> 
+> Regards,
+> Jonathan
