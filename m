@@ -1,49 +1,62 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Mon, 26 Jun 2017 11:43:01 +0300
-Subject: [PATCH v2 5/6] pwm: mediatek: add PWM_CLK_DIV_MAX
-In-Reply-To: <1498194505-30930-6-git-send-email-zhi.mao@mediatek.com>
-References: <1498194505-30930-1-git-send-email-zhi.mao@mediatek.com>
- <1498194505-30930-6-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <8eaabcb6-c7b1-efcc-7dae-967a38feb8f1@microchip.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Jun 2017 09:53:11 +0100
+Subject: [PATCH] arm: pass endianness info to sparse
+In-Reply-To: <20170624153842.61064-1-luc.vanoostenryck@gmail.com>
+References: <20170624153842.61064-1-luc.vanoostenryck@gmail.com>
+Message-ID: <20170626085311.GC4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 23.06.2017 08:08, Zhi Mao wrote:
-> Replace "7" with "PWM_CLK_DIV_MAX" in function:mtk_pwm_config()
-> to improve the code readablity.
+On Sat, Jun 24, 2017 at 05:38:42PM +0200, Luc Van Oostenryck wrote:
+> ARM depends on the macros '__ARMEL__' & '__ARMEB__' being defined
+> or not to correctly select or define endian-specific macros,
+> structures or pieces of code.
 > 
-> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+> These macros are predefined by the compiler but sparse knows
+> nothing about them and thus may pre-process files differently
+> from what gcc would.
+> 
+> Fix this by passing '-D__ARMEL__' or '-D__ARMEB__' to sparse,
+> depending of the endianness of the kernel, like defined by GCC.
+> 
+> Note: In most case it won't change anything since most ARMs use
+>       little-endian (but an allyesconfig would use big-endian!).
+
+I wonder if that's a good thing - as this changes the endian conversion
+macros and ifdefs around bitfield declarations, it means that we're not
+testing the "popular" paths with an allyesconfig sparse - but then again,
+I think allyesconfig with sparse is a very bad idea, it needs to be
+targetted to the area being worked in.
+
+> CC: Russell King <linux@armlinux.org.uk>
+> CC: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 > ---
->  drivers/pwm/pwm-mediatek.c |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+>  arch/arm/Makefile | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> index 554a042..e5f6425 100644
-> --- a/drivers/pwm/pwm-mediatek.c
-> +++ b/drivers/pwm/pwm-mediatek.c
-> @@ -30,6 +30,8 @@
->  #define PWMDWIDTH		0x2c
->  #define PWMTHRES		0x30
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 65f4e2a4e..0fca46d7f 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -44,10 +44,12 @@ endif
 >  
-> +#define PWM_CLK_DIV_MAX		7
-> +
->  enum {
->  	MTK_CLK_MAIN = 0,
->  	MTK_CLK_TOP,
-> @@ -130,8 +132,10 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  		clkdiv++;
->  	}
->  
-> -	if (clkdiv > 7)
-> +	if (clkdiv > PWM_CLK_DIV_MAX) {
-You forgot to:
-		mtk_pwm_clk_disable(chip, pwm);
-> +		dev_err(chip->dev, "period %d not supported\n", period_ns);
->  		return -EINVAL;
-> +	}
->  
->  	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
->  	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
+>  ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+>  KBUILD_CPPFLAGS	+= -mbig-endian
+> +CHECKFLAGS	+= -D__ARMEB__
+>  AS		+= -EB
+>  LD		+= -EB
+>  else
+>  KBUILD_CPPFLAGS	+= -mlittle-endian
+> +CHECKFLAGS	+= -D__ARMEL__
+>  AS		+= -EL
+>  LD		+= -EL
+>  endif
+> -- 
+> 2.13.0
 > 
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
