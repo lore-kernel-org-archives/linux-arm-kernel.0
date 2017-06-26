@@ -1,49 +1,30 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Mon, 26 Jun 2017 19:31:02 +0300
-Subject: [PATCH v1 2/6] [media] ov9650: add device tree support
-In-Reply-To: <1498143942-12682-3-git-send-email-hugues.fruchet@st.com>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <1498143942-12682-3-git-send-email-hugues.fruchet@st.com>
-Message-ID: <20170626163102.GQ12407@valkosipuli.retiisi.org.uk>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Mon, 26 Jun 2017 16:27:51 +0000
+Subject: [PATCH v4 2/6] dt-bindings: display: Add Synopsys DW MIPI DSI DRM
+ bridge driver
+In-Reply-To: <20170623212556.aptfelaelxsbc2bd@rob-hp-laptop>
+References: <1497889685-27349-1-git-send-email-philippe.cornu@st.com>
+ <1497889685-27349-3-git-send-email-philippe.cornu@st.com>
+ <20170623212556.aptfelaelxsbc2bd@rob-hp-laptop>
+Message-ID: <3d7168cc-5584-5e09-4887-5ab9522ba16e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hugues,
 
-On Thu, Jun 22, 2017 at 05:05:38PM +0200, Hugues Fruchet wrote:
-> @@ -1545,15 +1577,22 @@ static int ov965x_remove(struct i2c_client *client)
->  }
->  
->  static const struct i2c_device_id ov965x_id[] = {
-> -	{ "OV9650", 0 },
-> -	{ "OV9652", 0 },
-> +	{ "OV9650", 0x9650 },
-> +	{ "OV9652", 0x9652 },
 
-This change does not appear to match with the patch description nor it the
-information is used. How about not changing it, unless there's a reason to?
-The same for the data field of the of_device_id array below.
-
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(i2c, ov965x_id);
->  
-> +static const struct of_device_id ov965x_of_match[] = {
-> +	{ .compatible = "ovti,ov9650", .data = (void *)0x9650 },
-> +	{ .compatible = "ovti,ov9652", .data = (void *)0x9652 },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, ov965x_of_match);
->  static struct i2c_driver ov965x_i2c_driver = {
->  	.driver = {
->  		.name	= DRIVER_NAME,
-> +		.of_match_table = of_match_ptr(ov965x_of_match),
->  	},
->  	.probe		= ov965x_probe,
->  	.remove		= ov965x_remove,
-
--- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+On 06/23/2017 11:25 PM, Rob Herring wrote:
+> On Mon, Jun 19, 2017 at 06:28:01PM +0200, Philippe CORNU wrote:
+>> This patch adds documentation of device tree bindings for the
+>> Synopsys DesignWare MIPI DSI host DRM bridge driver.
+> 
+> You missed Archit's comment on v3. Bindings are for h/w, not drivers.
+> 
+> Rob
+> 
+Dear Rob :-)
+sorry to have miss that ones.
+I have updated all bindings accordingly (including the optional dpi/rgb 
+pixel clock). Everything is now ready for the coming v5 patchset (I am 
+waiting for more comments before sending it).
+Big thanks :-)
+Philippe
