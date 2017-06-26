@@ -1,54 +1,55 @@
 From: bich.hemon@st.com (Bich HEMON)
-Date: Mon, 26 Jun 2017 12:49:16 +0000
-Subject: [PATCH 18/20] serial: stm32: update dma buffers length
+Date: Mon, 26 Jun 2017 12:49:14 +0000
+Subject: [PATCH 13/20] serial: stm32: fix error handling in probe
 In-Reply-To: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
 References: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
-Message-ID: <1498481318-1894-19-git-send-email-bich.hemon@st.com>
+Message-ID: <1498481318-1894-14-git-send-email-bich.hemon@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bich Hemon <bich.hemon@st.com>
 
-When stm32 dma is used alone for rx, meaning that the
-third dmamux property in the device tree is 0x0, then
-the received data are accumulated in dma internal fifo
-until it is full before being transferred to the memory.
-This dma fifo is 16 bytes wide on stm32ap1 so the dma
-buffer is set to 160 bytes (= 16bytes * 10).
-
-When stm32 dma is used combined with mdma, meaning that
-the third dmamux property in the device tree is 0x1, then
-the received data are accumulated per 16 bytes packets
-(cf. explanation above) until the rx dma transfer period
-is reached, so 160 bytes with this patch.
-
-Due to the constraints above, the usart driver should not
-be used in dma mode for rx when received data length is
-unknown, as this is the case with the console.
-
-There is no constraint for dma mode using for tx: this patch
-simply align both rx and tx buffer lengths to the same value.
-
-Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/tty/serial/stm32-usart.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/tty/serial/stm32-usart.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/stm32-usart.h b/drivers/tty/serial/stm32-usart.h
-index 25ed28b..5137e68 100644
---- a/drivers/tty/serial/stm32-usart.h
-+++ b/drivers/tty/serial/stm32-usart.h
-@@ -238,9 +238,9 @@ struct stm32_usart_info stm32h7_info = {
- #define STM32_SERIAL_NAME "ttyS"
- #define STM32_MAX_PORTS 8
+diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
+index c54b89d..a62fc95 100644
+--- a/drivers/tty/serial/stm32-usart.c
++++ b/drivers/tty/serial/stm32-usart.c
+@@ -779,8 +779,10 @@ static int stm32_init_port(struct stm32_port *stm32port,
+ 		return ret;
  
--#define RX_BUF_L 200		 /* dma rx buffer length     */
-+#define RX_BUF_L 160		 /* dma rx buffer length     */
- #define RX_BUF_P RX_BUF_L	 /* dma rx buffer period     */
--#define TX_BUF_L 200		 /* dma tx buffer length     */
-+#define TX_BUF_L RX_BUF_L	 /* dma tx buffer length     */
+ 	stm32port->port.uartclk = clk_get_rate(stm32port->clk);
+-	if (!stm32port->port.uartclk)
++	if (!stm32port->port.uartclk) {
++		clk_disable_unprepare(stm32port->clk);
+ 		ret = -EINVAL;
++	}
  
- struct stm32_port {
- 	struct uart_port port;
+ 	return ret;
+ }
+@@ -964,7 +966,7 @@ static int stm32_serial_probe(struct platform_device *pdev)
+ 
+ 	ret = uart_add_one_port(&stm32_usart_driver, &stm32port->port);
+ 	if (ret)
+-		return ret;
++		goto err_uninit;
+ 
+ 	ret = stm32_of_dma_rx_probe(stm32port, pdev);
+ 	if (ret)
+@@ -977,6 +979,11 @@ static int stm32_serial_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, &stm32port->port);
+ 
+ 	return 0;
++
++err_uninit:
++	clk_disable_unprepare(stm32port->clk);
++
++	return ret;
+ }
+ 
+ static int stm32_serial_remove(struct platform_device *pdev)
 -- 
 1.9.1
