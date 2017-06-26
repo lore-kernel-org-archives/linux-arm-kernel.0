@@ -1,121 +1,68 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Mon, 26 Jun 2017 07:01:15 +0200
-Subject: [PATCH 2/3] iio: adc: mt7622: add support for suspend/resume.
-In-Reply-To: <1498445692.844.5.camel@mhfsdcap03>
-References: <1498110274-18678-1-git-send-email-zhiyong.tao@mediatek.com>
- <1498110274-18678-3-git-send-email-zhiyong.tao@mediatek.com>
- <20170624210043.29569f3a@kernel.org> <1498445692.844.5.camel@mhfsdcap03>
-Message-ID: <114E2942-6A96-432A-A4E1-6976440D1883@jic23.retrosnub.co.uk>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Mon, 26 Jun 2017 13:22:27 +0800
+Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS
+ extension feature
+In-Reply-To: <5908A5BC.1060202@arm.com>
+References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+ <5908A5BC.1060202@arm.com>
+Message-ID: <9e94c06f-f438-7106-ac96-67e021dcf729@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi James,
+
+   I have changed the SEA/SEI injection method according you suggestion, but I think this patch may also be needed.
+Now for the  SEI, the virtual ESR value is specified by the userspace. only RAS extension support to set the virtual ESR value. so user space will check it to decide whether pass the virtual ESR value.
+At the same time, reserve this interface for other possible usage by user space. what do you think about this patch?
 
 
-On 26 June 2017 04:54:52 CEST, zhiyong tao <zhiyong.tao@mediatek.com> wrote:
->On Sat, 2017-06-24 at 21:00 +0100, Jonathan Cameron wrote:
->> On Thu, 22 Jun 2017 13:44:33 +0800
->> Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
->> 
->> > This patch supports auxadc suspend/resume flow.
->> > Disable auxadc clk and power in suspend function.
->> > Enable axuadc clk and power in resume function.
->> > 
->> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
->> Worth handling the cases where power management is not configured
->into the
->> kernel properly.
->> 
->> So a few minor suggestions.  Otherwise looks good to me.
->> > ---
->> >  drivers/iio/adc/mt6577_auxadc.c |   37
->+++++++++++++++++++++++++++++++++++++
->> >  1 file changed, 37 insertions(+)
->> > 
->> > diff --git a/drivers/iio/adc/mt6577_auxadc.c
->b/drivers/iio/adc/mt6577_auxadc.c
->> > index 2d104c8..2dd7c74 100644
->> > --- a/drivers/iio/adc/mt6577_auxadc.c
->> > +++ b/drivers/iio/adc/mt6577_auxadc.c
->> > @@ -184,6 +184,37 @@ static int mt6577_auxadc_read_raw(struct
->iio_dev *indio_dev,
->> >  	.read_raw = &mt6577_auxadc_read_raw,
->> >  };
->> >  
->> > +static int mt6577_auxadc_resume(struct device *dev)
->> > +{
->> > +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
->> > +	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
->> > +	int ret;
->> > +
->> > +	ret = clk_prepare_enable(adc_dev->adc_clk);
->> > +	if (ret) {
->> > +		pr_err("failed to enable auxadc clock\n");
->> > +		return ret;
->> > +	}
->> > +
->> > +	mt6577_auxadc_mod_reg(adc_dev->reg_base + MT6577_AUXADC_MISC,
->> > +			      MT6577_AUXADC_PDN_EN, 0);
->> > +	mdelay(MT6577_AUXADC_POWER_READY_MS);
->> > +
->> > +	return 0;
->> > +}
->> > +
->> > +static int mt6577_auxadc_suspend(struct device *dev)
->> Mark these __maybe_unused for the CONFIG_PM but not CONFIG_PM_SLEEP
->case.
-Preferred to mark __maybe_unused and use the macro mentioned below.
->
->==> ok, We will add CONFIG_PM_SLEEP for the suspend/resume case in v2.
->thanks!
->
->> > +{
->> > +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
->> > +	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
->> > +
->> > +	mt6577_auxadc_mod_reg(adc_dev->reg_base + MT6577_AUXADC_MISC,
->> > +			      0, MT6577_AUXADC_PDN_EN);
->> > +	clk_disable_unprepare(adc_dev->adc_clk);
->> > +
->> > +	return 0;
->> > +}
->> > +
->> >  static int mt6577_auxadc_probe(struct platform_device *pdev)
->> >  {
->> >  	struct mt6577_auxadc_device *adc_dev;
->> > @@ -269,6 +300,11 @@ static int mt6577_auxadc_remove(struct
->platform_device *pdev)
->> >  	return 0;
->> >  }
->> >  
->> > +static const struct dev_pm_ops mt6577_auxadc_pm_ops = {
->> > +	.suspend = mt6577_auxadc_suspend,
->> > +	.resume = mt6577_auxadc_resume,
->> > +};
->> > +
->> Use the SIMPLE_SYSTEM_PM_OPS macro to make these assignments
->magically go away
->> if PM_CONFIG_SLEEP is not defined.
->
->==> ok, We will use SIMPLE_DEV_PM_OPS macro to change it in v2. Thanks.
->>>  static const struct of_device_id mt6577_auxadc_of_match[] = {
->> >  	{ .compatible = "mediatek,mt2701-auxadc", },
->> >  	{ .compatible = "mediatek,mt8173-auxadc", },
->> > @@ -280,6 +316,7 @@ static int mt6577_auxadc_remove(struct
->platform_device *pdev)
->> >  	.driver = {
->> >  		.name   = "mt6577-auxadc",
->> >  		.of_match_table = mt6577_auxadc_of_match,
->> > +		.pm = &mt6577_auxadc_pm_ops,
->> >  	},
->> >  	.probe	= mt6577_auxadc_probe,
->> >  	.remove	= mt6577_auxadc_remove,
->> 
->
->
->--
->To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
--- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+On 2017/5/2 23:29, James Morse wrote:
+> Hi Dongjiu Geng,
+> 
+> On 30/04/17 06:37, Dongjiu Geng wrote:
+>> Handle kvmtool's detection for RAS extension, because sometimes
+>> the APP needs to know the CPU's capacity
+> 
+>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+>> index d9e9697..1004039 100644
+>> --- a/arch/arm64/kvm/reset.c
+>> +++ b/arch/arm64/kvm/reset.c
+>> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
+>>  	return !!(pfr0 & 0x20);
+>>  }
+>>  
+>> +static bool kvm_arm_support_ras_extension(void)
+>> +{
+>> +	u64 pfr0;
+>> +
+>> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+>> +	return !!(pfr0 & 0x10000000);
+>> +}
+> 
+> Why are we telling user-space that the CPU has RAS extensions? EL0 can't do
+> anything with this and the guest EL1 can detect it from the id registers.
+> 
+> 
+> Are you using this to decide whether or not to generate a HEST for the guest?
+> 
+> If Qemu/kvmtool supports handling memory-failure notifications from signals you
+> should always generate a HEST. The GHES notification method could be anything
+> Qemu can deliver to the guest using the KVM APIs. Notifications from Qemu to the
+> guest don't depend on the RAS extensions. KVM has APIs for IRQ and SEA (you can
+> use KVM_SET_ONE_REG).
+> 
+> 
+> I think we need a new API for injecting SError for SEI from Qemu/kvmtool, but it
+> shouldn't be related to the RAS extensions. All v8.0 CPUs have HCR_EL2.VSE, so
+> we need to know KVM supports this API.
+> 
+> Your later patch adds code to set VSESR to make virtual RAS SErrors work, I
+> think we need to expose that to user-space.
+> 
+> 
+> Thanks,
+> 
+> James
+> .
+> 
