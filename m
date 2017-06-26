@@ -1,39 +1,51 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 26 Jun 2017 23:32:37 +1000
-Subject: [PATCH] ARM: dts: sun4i: Add A10 LCD0 RGB888 pins
-Message-ID: <20170626133237.22664-1-net147@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 26 Jun 2017 14:32:56 +0100
+Subject: [RFC PATCH 0/2] ARM: Fix unparseable signal frame with
+ CONFIG_IWMMXT
+In-Reply-To: <20170626101304.GG4902@n2100.armlinux.org.uk>
+References: <1498059983-13438-1-git-send-email-Dave.Martin@arm.com>
+ <20170626101304.GG4902@n2100.armlinux.org.uk>
+Message-ID: <20170626133255.GH8543@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LCD0 controller on the A10 can do RGB output up to 8 bits per
-channel. Add the pins for RGB888 output.
+On Mon, Jun 26, 2017 at 11:13:04AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 21, 2017 at 04:46:01PM +0100, Dave Martin wrote:
+> > In kernels with CONFIG_IWMMXT=y running on non-iWMMXt hardware, the
+> > signal frame can be left partially uninitialised in such a way
+> > that userspace cannot parse uc_regspace[] safely.  In particular,
+> > this means that the VFP registers cannot be located reliably in the
+> > signal frame when a multi_v7_defconfig kernel is run on the
+> > majority of platforms.
+> > 
+> > I don't know whether any userspace has implemented any sort of
+> > workaround for this, but the ABI by itself is insufficient anyway.
+> > 
+> > This series attempts to omit the spurious iWMMXt record when
+> > appropriate.
+> > 
+> > Not extensively tested, and the ABI impact is unknown for now.
+> 
+> Hmm, I would actually suggest that we poke in a correct size for the
+> missing iWMMXt record, and an invalid magic number as the "simple"
+> solution for this - that doesn't make any layout changes to the
+> data structures, and is probably the safest solution for backporting.
 
-Signed-off-by: Jonathan Liu <net147@gmail.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+This avoids altering the sigframe layout at all in this case, which
+feels less dirsuptive, but overall I'm not sure it's lower-risk.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index b63668ece151..6fa2622a78c2 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -1022,6 +1022,17 @@
- 				function = "ir1";
- 			};
- 
-+			lcd0_rgb888_pins: lcd0_rgb888 at 0 {
-+				pins = "PD0", "PD1", "PD2", "PD3",
-+				       "PD4", "PD5", "PD6", "PD7",
-+				       "PD8", "PD9", "PD10", "PD11",
-+				       "PD12", "PD13", "PD14", "PD15",
-+				       "PD16", "PD17", "PD18", "PD19",
-+				       "PD20", "PD21", "PD22", "PD23",
-+				       "PD24", "PD25", "PD26", "PD27";
-+				function = "lcd0";
-+			};
-+
- 			mmc0_pins_a: mmc0 at 0 {
- 				pins = "PF0", "PF1", "PF2",
- 				       "PF3", "PF4", "PF5";
--- 
-2.13.1
+I'm concerned that there are a some userspace sigframe parsers out there
+that work only by accident, especially given that the kernel sigreturn
+implementation is the primary example and that doesn't need to be fully
+robust (since the kernel lays out the sigframe itself during signal
+delivery).
+
+> Going forward, I think something along the lines of your proposal is
+> okay.
+
+I'm happy to do either, or propose one approach for stable and the other
+for mainline, but it's hard to know which is least likely to break
+userspace, or exactly what the ABI is.
+
+Cheers
+---Dave
