@@ -1,57 +1,37 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 26 Jun 2017 19:45:01 +0200
-Subject: [Devel] [PATCH v4 2/2] acpi, gicv3-its, numa: Adding numa node
- mapping for gic-its units
-In-Reply-To: <76d94864-d121-1d7a-bc23-00ac57cd7fb2@arm.com>
-References: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1498111812-17053-3-git-send-email-ganapatrao.kulkarni@cavium.com>
- <2d99c999-8ded-ac3d-57a2-fd81dbadadea@arm.com>
- <20170626173810.GW658@rric.localdomain>
- <76d94864-d121-1d7a-bc23-00ac57cd7fb2@arm.com>
-Message-ID: <20170626174501.GB10237@rric.localdomain>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Mon, 26 Jun 2017 19:46:34 +0200
+Subject: [PATCH v1 2/6] [media] ov9650: add device tree support
+In-Reply-To: <20170626163102.GQ12407@valkosipuli.retiisi.org.uk>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <1498143942-12682-3-git-send-email-hugues.fruchet@st.com>
+ <20170626163102.GQ12407@valkosipuli.retiisi.org.uk>
+Message-ID: <D780984B-70A1-4E9C-A887-DD2CBAAC7CCA@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.06.17 18:43:47, Marc Zyngier wrote:
-> On 26/06/17 18:38, Robert Richter wrote:
-> > On 22.06.17 15:49:25, Marc Zyngier wrote:
-> >> On 22/06/17 07:10, Ganapatrao Kulkarni wrote:
-> >>> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2.
-> >>> Later in per device probe, ITS devices are mapped to numa node using
-> >>> ITS Id to proximity domain mapping.
-> >>>
-> >>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> >>> ---
-> >>>  drivers/irqchip/irq-gic-v3-its.c | 75 +++++++++++++++++++++++++++++++++++++++-
-> >>>  1 file changed, 74 insertions(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> >>> index 45ea1933..1c21e01 100644
-> >>> --- a/drivers/irqchip/irq-gic-v3-its.c
-> >>> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> >>> @@ -1833,6 +1833,77 @@ static int __init its_of_probe(struct device_node *node)
-> >>>  
-> >>>  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
-> >>>  
-> >>> +#ifdef CONFIG_ACPI_NUMA
-> >>
-> >> So given that there is a dependency issue between the irqchip and apcica
-> >> trees, I plan on taking this patch with the following change:
-> >>
-> >> #if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170531)
-> > 
-> > The struct name was changed :/
-> > 
-> >  s/acpi_srat_its_affinity/acpi_srat_gic_its_affinity/
-> > 
-> > You need to update this too.
-> 
-> I changed it when I applied the patch. See
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.13&id=dbd2b826723319eb6e4bee5214f8901e336c06be
-> 
-> Which is also in tip/irq/core.
+Hi,
 
-Great, thanks for the pointer.
+> Am 26.06.2017 um 18:31 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
+> 
+> Hi Hugues,
+> 
+> On Thu, Jun 22, 2017 at 05:05:38PM +0200, Hugues Fruchet wrote:
+>> @@ -1545,15 +1577,22 @@ static int ov965x_remove(struct i2c_client *client)
+>> }
+>> 
+>> static const struct i2c_device_id ov965x_id[] = {
+>> -	{ "OV9650", 0 },
+>> -	{ "OV9652", 0 },
+>> +	{ "OV9650", 0x9650 },
+>> +	{ "OV9652", 0x9652 },
+> 
+> This change does not appear to match with the patch description nor it the
+> information is used. How about not changing it, unless there's a reason to?
+> The same for the data field of the of_device_id array below.
 
--Robert
+I think it could/should be used to check if the camera chip that is found
+by reading the product-id and version registers does match what the device
+tree expects and abort probing on a mismatch.
+
+BR,
+Nikolaus
