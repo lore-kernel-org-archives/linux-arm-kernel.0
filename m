@@ -1,40 +1,58 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Mon, 26 Jun 2017 10:23:15 -0700
-Subject: [PATCH] ARM: memblock limit must be pmd-aligned
-Message-ID: <20170626172315.26369-1-opendmb@gmail.com>
+From: rric@kernel.org (Robert Richter)
+Date: Mon, 26 Jun 2017 19:38:10 +0200
+Subject: [Devel] [PATCH v4 2/2] acpi, gicv3-its, numa: Adding numa node
+ mapping for gic-its units
+In-Reply-To: <2d99c999-8ded-ac3d-57a2-fd81dbadadea@arm.com>
+References: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1498111812-17053-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <2d99c999-8ded-ac3d-57a2-fd81dbadadea@arm.com>
+Message-ID: <20170626173810.GW658@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a path through the adjust_lowmem_bounds() routine where if all
-memory regions start and end on pmd-aligned addresses the memblock_limit
-will be set to arm_lowmem_limit.
+On 22.06.17 15:49:25, Marc Zyngier wrote:
+> On 22/06/17 07:10, Ganapatrao Kulkarni wrote:
+> > Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2.
+> > Later in per device probe, ITS devices are mapped to numa node using
+> > ITS Id to proximity domain mapping.
+> > 
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > ---
+> >  drivers/irqchip/irq-gic-v3-its.c | 75 +++++++++++++++++++++++++++++++++++++++-
+> >  1 file changed, 74 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> > index 45ea1933..1c21e01 100644
+> > --- a/drivers/irqchip/irq-gic-v3-its.c
+> > +++ b/drivers/irqchip/irq-gic-v3-its.c
+> > @@ -1833,6 +1833,77 @@ static int __init its_of_probe(struct device_node *node)
+> >  
+> >  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
+> >  
+> > +#ifdef CONFIG_ACPI_NUMA
+> 
+> So given that there is a dependency issue between the irqchip and apcica
+> trees, I plan on taking this patch with the following change:
+> 
+> #if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170531)
 
-However, since arm_lowmem_limit can be affected by the vmalloc early
-parameter, the value of arm_lowmem_limit may not be pmd-aligned. This
-commit corrects this oversight such that memblock_limit is always rounded
-down to pmd-alignment.
+The struct name was changed :/
 
-The pmd containing arm_lowmem_limit is cleared by prepare_page_table()
-and without this commit it is possible for early_alloc() to allocate
-unmapped memory in that range when mapping the lowmem.
+ s/acpi_srat_its_affinity/acpi_srat_gic_its_affinity/
 
-Signed-off-by: Doug Berger <opendmb@gmail.com>
----
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+You need to update this too.
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 31af3cb59a60..2ae4f9c9d757 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1226,7 +1226,7 @@ void __init adjust_lowmem_bounds(void)
- 	if (memblock_limit)
- 		memblock_limit = round_down(memblock_limit, PMD_SIZE);
- 	if (!memblock_limit)
--		memblock_limit = arm_lowmem_limit;
-+		memblock_limit = round_down(arm_lowmem_limit, PMD_SIZE);
- 
- 	if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
- 		if (memblock_end_of_DRAM() > arm_lowmem_limit) {
--- 
-2.13.0
+-Robert
+
+> 
+> matching what is currently in -next.
+> 
+> Thanks,
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
+> _______________________________________________
+> Devel mailing list
+> Devel at acpica.org
+> https://lists.acpica.org/mailman/listinfo/devel
