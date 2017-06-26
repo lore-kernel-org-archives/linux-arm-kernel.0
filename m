@@ -1,44 +1,135 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Mon, 26 Jun 2017 15:16:25 +0200
-Subject: [PATCH] arm64: use readq() instead of readl() to read 64bit
- entry_point
-Message-ID: <20170626131625.79059-1-luc.vanoostenryck@gmail.com>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Mon, 26 Jun 2017 13:19:27 +0000
+Subject: omap3isp camera was Re: [PATCH v1 0/6] Add support of OV9655
+ camera
+In-Reply-To: <20170626083927.GB9621@amd>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <385A82AC-CC23-41BD-9F57-0232F713FED9@goldelico.com>
+ <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
+ <20170625091856.GA22791@amd>
+ <EDFD663F-37F9-42C2-92A9-66C2508B361E@goldelico.com>
+ <20170626083927.GB9621@amd>
+Message-ID: <e725a457-5efc-22fa-ce97-bb7753185d21@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here the entrypoint, declared as a 64 bit integer, is read from
-a pointer to 64bit integer but the read is done via readl_relaxed()
-which is for 32bit quantities.
+Nikolaus,
+some comments about pixel format/resolution below:
 
-All the high bits will thus be lost which change the meaning
-of the test against zero done later.
+On 06/26/2017 10:39 AM, Pavel Machek wrote:
+> On Mon 2017-06-26 08:05:04, H. Nikolaus Schaller wrote:
+>> Hi Pavel,
+>>
+>>> Am 25.06.2017 um 11:18 schrieb Pavel Machek <pavel@ucw.cz>:
+>>>
+>>> Hi!
+>>>
+>>>> * unfortunately we still get no image :(
+>>>>
+>>>> The latter is likely a setup issue of our camera interface (OMAP3 ISP = Image Signal Processor) which
+>>>> we were not yet able to solve. Oscilloscoping signals on the interface indicated that signals and
+>>>> sync are correct. But we do not know since mplayer only shows a green screen.
+>>>
+>>> What mplayer command line do you use? How did you set up the pipeline
+>>> with media-ctl?
+>>>
+>>> On kernel.org, I have tree called camera-fw5-6 , where camera works
+>>> for me on n900. On gitlab, there's modifed fcam-dev, which can be used
+>>> for testing.
+>>
+>> We did have yet another (non-DT) camera driver and media-ctl working in with 3.12.37,
+>> but had no success yet to update it to work with modern kernels or drivers. It
+>> is either that the (newer) drivers missing something or the media-ctl has changed.
+>>
+>> Here is the log of our scripts with Hugues' driver and our latest setup:
+>>
+>> root at letux:~# ./camera-demo sxga
+>> DISPLAY=:0
+>> XAUTHORITY=tcp
+>> Camera: /dev/v4l-subdev8
+>> Setting mode sxga
+>> media-ctl -r
+>> media-ctl -l '"ov965x":0 -> "OMAP3 ISP CCDC":0[1]'
+>> media-ctl -l '"OMAP3 ISP CCDC":1 -> "OMAP3 ISP CCDC output":0[1]'
+>> media-ctl -V '"ov965x":0 [UYVY2X8 1280x1024]'
+>> media-ctl -V '"OMAP3 ISP CCDC":0 [UYVY2X8 1280x1024]'
+>> media-ctl -V '"OMAP3 ISP CCDC":1 [UYVY 1280x1024]'
+> 
+> Ok, so you are using capture, not preview.
+> 
+> You may want to try this one:
+> 
+> commit 0eae9d2a8f096f703cbc8f9a0ab155cd3cc14cef
+> Author: Pavel <pavel@ucw.cz>
+> Date:   Mon Feb 13 21:26:51 2017 +0100
+> 
+>      omap3isp: fix VP2SDR bit so capture (not preview) works
+> 
+>      This is neccessary for capture (not preview) to work properly on
+>          N900. Why is unknown.
+> 	
+> 									Pavel
+> 
+>> ### starting mplayer in sxga mode ###
+>> mplayer tv:// -vf rotate=2 -tv driver=v4l2:device=/dev/video2:outfmt=uyvy:width=1280:height=1024:fps=15 -vo x11
 
-Fix this by using readq_relaxed() instead as it should be for
-64bit quantities.
+=> "outfmt=uyvy:width=1280:height=1024"
 
-Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+Nikolaus,
+Be careful that only VGA/RGB565 is coded in this basic version of OV9655,
+perhaps this explain partly your troubles ?
 
----
-
-!!! Warning !!!
-   I don't have the HW to test this, nor have I read the ACPI specs.
-   This is only compile tested.
----
- arch/arm64/kernel/acpi_parking_protocol.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
-index 1f5655cd9..f35e80aad 100644
---- a/arch/arm64/kernel/acpi_parking_protocol.c
-+++ b/arch/arm64/kernel/acpi_parking_protocol.c
-@@ -125,7 +125,7 @@ static void acpi_parking_protocol_cpu_postboot(void)
- 	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
- 	__le64 entry_point;
- 
--	entry_point = readl_relaxed(&mailbox->entry_point);
-+	entry_point = readq_relaxed(&mailbox->entry_point);
- 	/*
- 	 * Check if firmware has cleared the entry_point as expected
- 	 * by the protocol specification.
--- 
-2.13.0
+>> MPlayer2 2.0-728-g2c378c7-4+b1 (C) 2000-2012 MPlayer Team
+>>
+>> Playing tv://.
+>> Detected file format: TV
+>> Selected driver: v4l2
+>>   name: Video 4 Linux 2 input
+>>   author: Martin Olschewski <olschewski@zpr.uni-koeln.de>
+>>   comment: first try, more to come ;-)
+>> v4l2: ioctl get standard failed: Invalid argument
+>> Selected device: OMAP3 ISP CCDC output
+>>   Capabilities:  video capture  video output  streaming
+>>   supported norms:
+>>   inputs: 0 = camera;
+>>   Current input: 0
+>>   Current format: unknown (0x0)
+>> tv.c: norm_from_string(pal): Bogus norm parameter, setting default.
+>> v4l2: ioctl enum norm failed: Inappropriate ioctl for device
+>> Error: Cannot set norm!
+>> Selected input hasn't got a tuner!
+>> v4l2: ioctl set mute failed: Inappropriate ioctl for device
+>> v4l2: ioctl query control failed: Inappropriate ioctl for device
+>> v4l2: ioctl query control failed: Inappropriate ioctl for device
+>> v4l2: ioctl query control failed: Inappropriate ioctl for device
+>> v4l2: ioctl query control failed: Inappropriate ioctl for device
+>> v4l2: ioctl streamon failed: Broken pipe
+>> [ass] auto-open
+>> Opening video filter: [rotate=2]
+>> VIDEO:  1280x1024  15.000 fps    0.0 kbps ( 0.0 kB/s)
+>> Could not find matching colorspace - retrying with -vf scale...
+>> Opening video filter: [scale]
+>> [swscaler @ 0xb5ca9980]using unscaled uyvy422 -> yuv420p special converter
+>> VO: [x11] 1024x1280 => 1024x1280 Planar YV12
+>> [swscaler @ 0xb5ca9980]No accelerated colorspace conversion found from yuv420p to bgra.
+>> Colorspace details not fully supported by selected vo.
+>> Selected video codec: RAW UYVY [raw]
+>> Audio: no sound
+>> Starting playback...
+>> V:   0.0  10/ 10 ??% ??% ??,?% 0 0 $<3>
+>>
+>>
+>> MPlayer interrupted by signal 2 in module: filter_video
+>> V:   0.0  11/ 11 ??% ??% ??,?% 0 0 $<3>
+>> v4l2: ioctl set mute failed: Inappropriate ioctl for device
+>> v4l2: 0 frames successfully processed, 0 frames dropped.
+>>
+>> Exiting... (Quit)
+>> root at letux:~#
+>>
+>> BR and thanks,
+>> Nikolaus
+>>
+> 
+> 
+> 
