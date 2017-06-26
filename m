@@ -1,105 +1,65 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Mon, 26 Jun 2017 15:17:37 -0700
-Subject: [PATCH] spi: rockchip: Keep master alive when CS asserted
-In-Reply-To: <1498446606-5529-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1498446606-5529-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <20170626221736.GA126468@google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 26 Jun 2017 15:32:40 -0700
+Subject: [PATCH v2 0/4] Broadcom STB S2/S3/S5 support for ARM and MIPS
+Message-ID: <20170626223248.14199-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
+Hi,
 
-On Mon, Jun 26, 2017 at 11:10:06AM +0800, Jeffy Chen wrote:
-> The cros_ec requires CS line to be active after last message. But the CS
-> would be toggled when powering off/on rockchip spi, which breaks ec xfer.
+This patch series adds support for S2/S3/S5 suspend/resume states on
+ARM and MIPS based Broadcom STB SoCs.
 
-I believe Doug's point was larger than just the CS line. He was
-guessing that you're also stopping driving any of the other pins (e.g.,
-CLK), which could cause more problems. Seems like it'd be good to note
-that in the second sentence here.
+This was submitted a long time ago by Brian, and I am now picking this
+up and trying to get this included with support for our latest chips.
 
-> Keep spi alive after CS asserted to prevent that.
-> 
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> 
-> ---
-> 
->  drivers/spi/spi-rockchip.c | 22 +++++++++++++++++-----
->  1 file changed, 17 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-> index acf31f3..df016a1 100644
-> --- a/drivers/spi/spi-rockchip.c
-> +++ b/drivers/spi/spi-rockchip.c
-> @@ -264,7 +264,7 @@ static inline u32 rx_max(struct rockchip_spi *rs)
->  
->  static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
->  {
-> -	u32 ser;
-> +	u32 ser, new_ser;
->  	struct spi_master *master = spi->master;
->  	struct rockchip_spi *rs = spi_master_get_devdata(master);
->  
-> @@ -288,13 +288,25 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
->  	 * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
->  	 */
->  	if (!enable)
-> -		ser |= 1 << spi->chip_select;
-> +		new_ser = ser | BIT(spi->chip_select);
->  	else
-> -		ser &= ~(1 << spi->chip_select);
-> +		new_ser = ser & ~BIT(spi->chip_select);
->  
-> -	writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
-> +	if (new_ser == ser)
-> +		goto out;
+Provided that I can collect the necessary Acks from Rob (DT) and other
+people (Rafael?) I would probably take this via the Broadcom ARM SoC
+pull requests.
 
-Hmm, this doens't exactly feel like a situation for 'goto'. Personally,
-an indented 'if' block would make this clearer:
+Thank you!
 
-	if (new_ser != ser) {
-		... // all the stuff you do only on CS edges
-	}
+Changes in v2:
 
->  
-> -	pm_runtime_put_sync(rs->dev);
-> +	writel_relaxed(new_ser, rs->regs + ROCKCHIP_SPI_SER);
-> +
-> +	/*
-> +	 * The rockchip spi would stop driving CS when power down.
+- clarify the first patch's subject (Rob)
+- removed patch #2 which was creating a bisectability problem (kbuild)
+- added proper AFLAGS to get s2-arm.S to build properly (kbuild)
+- improved MIPS power management binding document (Rob)
 
-Replace "CS" with "all pins"? And:
-s/power/powered/
+Brian Norris (1):
+  soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)
 
-> +	 * So we need to keep it alive after CS asserted
+Florian Fainelli (2):
+  dt-bindings: ARM: brcmstb: Update Broadcom STB Power Management
+    binding
+  dt-bindings: Document MIPS Broadcom STB power management nodes
 
-To make this clearer, note that we're keeping an unbalanced runtime PM
-reference on purpose. Like instead of "we need to keep it alive after CS
-asserted", maybe "we hold a runtime PM reference as long as CS is
-asserted."?
+Justin Chen (1):
+  soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS)
 
-> +	 */
-> +	if (!enable)
-> +		return;
-> +	pm_runtime_put(rs->dev);
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   6 +-
+ .../devicetree/bindings/mips/brcm/soc.txt          | 153 ++++
+ drivers/soc/bcm/Kconfig                            |   2 +
+ drivers/soc/bcm/brcmstb/Kconfig                    |   9 +
+ drivers/soc/bcm/brcmstb/Makefile                   |   1 +
+ drivers/soc/bcm/brcmstb/pm/Makefile                |   3 +
+ drivers/soc/bcm/brcmstb/pm/aon_defs.h              | 113 +++
+ drivers/soc/bcm/brcmstb/pm/pm-arm.c                | 836 +++++++++++++++++++++
+ drivers/soc/bcm/brcmstb/pm/pm-mips.c               | 461 ++++++++++++
+ drivers/soc/bcm/brcmstb/pm/pm.h                    |  89 +++
+ drivers/soc/bcm/brcmstb/pm/s2-arm.S                |  76 ++
+ drivers/soc/bcm/brcmstb/pm/s2-mips.S               | 200 +++++
+ drivers/soc/bcm/brcmstb/pm/s3-mips.S               | 146 ++++
+ 13 files changed, 2094 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/Makefile
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/aon_defs.h
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-arm.c
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-mips.c
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/pm.h
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-arm.S
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-mips.S
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/s3-mips.S
 
-I still had to read this through a few times to be sure it was right (I
-think it's correct?). Maybe to make this extra clear, a comment like
-"Drop reference from when we first asserted CS" could go above this?
-
-> +
-> +out:
-> +	pm_runtime_put(rs->dev);
-
-You've dropped the "_sync()" that used to be here. I think that's
-probably fine, but I wanted to call it out.
-
-Brian
-
->  
->  static int rockchip_spi_prepare_message(struct spi_master *master,
-> -- 
-> 2.1.4
-> 
-> 
+-- 
+2.9.3
