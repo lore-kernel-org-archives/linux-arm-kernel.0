@@ -1,61 +1,43 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 26 Jun 2017 16:22:52 +0100
-Subject: [PATCH v2 08/12] coresight tmc: Handle configuration types properly
+Date: Mon, 26 Jun 2017 16:22:50 +0100
+Subject: [PATCH v2 06/12] coresight tmc: Expose DBA and AXICTL
 In-Reply-To: <1498490576-1350-1-git-send-email-suzuki.poulose@arm.com>
 References: <1498490576-1350-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1498490576-1350-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1498490576-1350-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coresight SoC 600 defines a new configuration for TMC, Embedded Trace
-Streamer (ETS), indicated by 0x3 in MODE:CONFIG_TYPE. This would break
-the existing driver which will treat anything other than ETR/ETB as an
-ETF. Fix the driver to check the configuration type properly and also
-add a warning if we encounter an unsupported configuration (ETS).
+Expose DBALO,DBAHI and AXICTL registers
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 6bf4170..73184a1 100644
+index ccdc2d3..6bf4170 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -358,11 +358,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 	desc.dev = dev;
- 	desc.groups = coresight_tmc_groups;
+@@ -229,8 +229,10 @@ coresight_tmc_simple_func(ffcr, TMC_FFCR);
+ coresight_tmc_simple_func(mode, TMC_MODE);
+ coresight_tmc_simple_func(pscr, TMC_PSCR);
+ coresight_tmc_simple_func(devid, CORESIGHT_DEVID);
++coresight_tmc_simple_func(axictl, TMC_AXICTL);
+ coresight_simple_reg64(struct tmc_drvdata, rrp, TMC_RRP, TMC_RRPHI);
+ coresight_simple_reg64(struct tmc_drvdata, rwp, TMC_RWP, TMC_RWPHI);
++coresight_simple_reg64(struct tmc_drvdata, dba, TMC_DBALO, TMC_DBAHI);
  
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-+	switch (drvdata->config_type) {
-+	case TMC_CONFIG_TYPE_ETB:
- 		desc.type = CORESIGHT_DEV_TYPE_SINK;
- 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
- 		desc.ops = &tmc_etb_cs_ops;
--	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
-+		break;
-+	case TMC_CONFIG_TYPE_ETR:
- 		desc.type = CORESIGHT_DEV_TYPE_SINK;
- 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
- 		desc.ops = &tmc_etr_cs_ops;
-@@ -373,10 +375,16 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
- 		if (ret)
- 			goto out;
--	} else {
-+		break;
-+	case TMC_CONFIG_TYPE_ETF:
- 		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
- 		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
- 		desc.ops = &tmc_etf_cs_ops;
-+		break;
-+	default:
-+		pr_err("%s: Unsupported TMC config\n", pdata->name);
-+		ret = -EINVAL;
-+		goto out;
- 	}
+ static struct attribute *coresight_tmc_mgmt_attrs[] = {
+ 	&dev_attr_rsz.attr,
+@@ -244,6 +246,8 @@ static struct attribute *coresight_tmc_mgmt_attrs[] = {
+ 	&dev_attr_mode.attr,
+ 	&dev_attr_pscr.attr,
+ 	&dev_attr_devid.attr,
++	&dev_attr_dba.attr,
++	&dev_attr_axictl.attr,
+ 	NULL,
+ };
  
- 	drvdata->csdev = coresight_register(&desc);
 -- 
 2.7.5
