@@ -1,61 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Jun 2017 14:31:13 +0100
-Subject: [PATCH] arm64: use readq() instead of readl() to read 64bit
- entry_point
-In-Reply-To: <20170626131625.79059-1-luc.vanoostenryck@gmail.com>
-References: <20170626131625.79059-1-luc.vanoostenryck@gmail.com>
-Message-ID: <20170626133113.GB28086@leverpostej>
+From: net147@gmail.com (Jonathan Liu)
+Date: Mon, 26 Jun 2017 23:32:37 +1000
+Subject: [PATCH] ARM: dts: sun4i: Add A10 LCD0 RGB888 pins
+Message-ID: <20170626133237.22664-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[resending as I bungled modifying the Cc list]
+The LCD0 controller on the A10 can do RGB output up to 8 bits per
+channel. Add the pins for RGB888 output.
 
-On Mon, Jun 26, 2017 at 03:16:25PM +0200, Luc Van Oostenryck wrote:
-> Here the entrypoint, declared as a 64 bit integer, is read from
-> a pointer to 64bit integer but the read is done via readl_relaxed()
-> which is for 32bit quantities.
-> 
-> All the high bits will thus be lost which change the meaning
-> of the test against zero done later.
-> 
-> Fix this by using readq_relaxed() instead as it should be for
-> 64bit quantities.
-> 
-> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-This looks right per my reading of the spec. FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-It would be good if someone could test this on HW implementing the
-parking protocol. I've Cc'd those who've given Tested-by in the past.
-
-Thanks,
-Mark.
-
-> 
-> ---
-> 
-> !!! Warning !!!
->    I don't have the HW to test this, nor have I read the ACPI specs.
->    This is only compile tested.
-> ---
->  arch/arm64/kernel/acpi_parking_protocol.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
-> index 1f5655cd9..f35e80aad 100644
-> --- a/arch/arm64/kernel/acpi_parking_protocol.c
-> +++ b/arch/arm64/kernel/acpi_parking_protocol.c
-> @@ -125,7 +125,7 @@ static void acpi_parking_protocol_cpu_postboot(void)
->  	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
->  	__le64 entry_point;
->  
-> -	entry_point = readl_relaxed(&mailbox->entry_point);
-> +	entry_point = readq_relaxed(&mailbox->entry_point);
->  	/*
->  	 * Check if firmware has cleared the entry_point as expected
->  	 * by the protocol specification.
-> -- 
-> 2.13.0
-> 
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index b63668ece151..6fa2622a78c2 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -1022,6 +1022,17 @@
+ 				function = "ir1";
+ 			};
+ 
++			lcd0_rgb888_pins: lcd0_rgb888 at 0 {
++				pins = "PD0", "PD1", "PD2", "PD3",
++				       "PD4", "PD5", "PD6", "PD7",
++				       "PD8", "PD9", "PD10", "PD11",
++				       "PD12", "PD13", "PD14", "PD15",
++				       "PD16", "PD17", "PD18", "PD19",
++				       "PD20", "PD21", "PD22", "PD23",
++				       "PD24", "PD25", "PD26", "PD27";
++				function = "lcd0";
++			};
++
+ 			mmc0_pins_a: mmc0 at 0 {
+ 				pins = "PF0", "PF1", "PF2",
+ 				       "PF3", "PF4", "PF5";
+-- 
+2.13.1
