@@ -1,25 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 26 Jun 2017 19:40:26 +0200
-Subject: [PATCH v2] gpio: rcar: Add R8A7743 (RZ/G1M) support
-In-Reply-To: <CAMuHMdVW6gU8GTf5v6xq0sYMgYqCaOaHcu1Ap1FDw14bUJih+A@mail.gmail.com>
-References: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
- <1498055229-42052-1-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdVW6gU8GTf5v6xq0sYMgYqCaOaHcu1Ap1FDw14bUJih+A@mail.gmail.com>
-Message-ID: <20170626174025.GE26156@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 26 Jun 2017 18:43:47 +0100
+Subject: [Devel] [PATCH v4 2/2] acpi, gicv3-its, numa: Adding numa node
+ mapping for gic-its units
+In-Reply-To: <20170626173810.GW658@rric.localdomain>
+References: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1498111812-17053-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <2d99c999-8ded-ac3d-57a2-fd81dbadadea@arm.com>
+ <20170626173810.GW658@rric.localdomain>
+Message-ID: <76d94864-d121-1d7a-bc23-00ac57cd7fb2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 10:13:00AM +0200, Geert Uytterhoeven wrote:
-> On Wed, Jun 21, 2017 at 4:27 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> > Renesas RZ/G1M (R8A7743) SoC GPIO blocks are identical to the R-Car Gen2
-> > family. Add support for its GPIO controllers.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+On 26/06/17 18:38, Robert Richter wrote:
+> On 22.06.17 15:49:25, Marc Zyngier wrote:
+>> On 22/06/17 07:10, Ganapatrao Kulkarni wrote:
+>>> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2.
+>>> Later in per device probe, ITS devices are mapped to numa node using
+>>> ITS Id to proximity domain mapping.
+>>>
+>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>> ---
+>>>  drivers/irqchip/irq-gic-v3-its.c | 75 +++++++++++++++++++++++++++++++++++++++-
+>>>  1 file changed, 74 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>> index 45ea1933..1c21e01 100644
+>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>> @@ -1833,6 +1833,77 @@ static int __init its_of_probe(struct device_node *node)
+>>>  
+>>>  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
+>>>  
+>>> +#ifdef CONFIG_ACPI_NUMA
+>>
+>> So given that there is a dependency issue between the irqchip and apcica
+>> trees, I plan on taking this patch with the following change:
+>>
+>> #if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170531)
 > 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> The struct name was changed :/
 > 
-> Although I think the time has come for family-specific compatible values
-> for R-Car Gen2 and Gen3.
+>  s/acpi_srat_its_affinity/acpi_srat_gic_its_affinity/
+> 
+> You need to update this too.
 
-Yes, agreed.
+I changed it when I applied the patch. See
+
+https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.13&id=dbd2b826723319eb6e4bee5214f8901e336c06be
+
+Which is also in tip/irq/core.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
