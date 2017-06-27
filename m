@@ -1,64 +1,69 @@
-From: techping.chan@gmail.com (Ziping Chen)
-Date: Tue, 27 Jun 2017 23:18:17 +0800
-Subject: [PATCH v3 2/3] dt-bindings: input: Add R_LRADC support for A83T
-In-Reply-To: <20170626171524.cqfyasetpsfr6xfg@flea.lan>
-References: <20170624024515.4669-1-techping.chan@gmail.com>
- <20170624024515.4669-3-techping.chan@gmail.com>
- <20170626171524.cqfyasetpsfr6xfg@flea.lan>
-Message-ID: <CAAST=9x+fS41tznuJ9hQ-cQxecKN751=61YkhEt31DvpeqeEcA@mail.gmail.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Tue, 27 Jun 2017 17:18:01 +0200
+Subject: [Devel] [RESEND PATCH v9 3/3] iommu/arm-smmu-v3: Add workaround
+ for Cavium ThunderX2 erratum #126
+In-Reply-To: <CANHdaibSGtbdQfZ2kv1E9t4eE+JY2wtsDP7=rEw-mj059yhyHA@mail.gmail.com>
+References: <1498224876-5200-1-git-send-email-gakula@caviumnetworks.com>
+ <20170627135610.GX658@rric.localdomain>
+ <20170627140559.GK14041@arm.com>
+ <CANHdaibSGtbdQfZ2kv1E9t4eE+JY2wtsDP7=rEw-mj059yhyHA@mail.gmail.com>
+Message-ID: <20170627151801.GT31368@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-27 1:15 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> On Sat, Jun 24, 2017 at 10:45:14AM +0800, Ziping Chen wrote:
->> From: Ziping Chen <techping.chan@gmail.com>
->>
->> Allwinner A83T SoC has a low res adc like the one
->> in Allwinner A10 SoC.
->>
->> Add binding for it.
->>
->> Signed-off-by: Ziping Chen <techping.chan@gmail.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->>  Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->> index 4357e498ef04..525d85e3043f 100644
->> --- a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->> +++ b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->> @@ -2,12 +2,14 @@ Allwinner sun4i low res adc attached tablet keys
->>  ------------------------------------------------
->>
->>  Required properties:
->> - - compatible: "allwinner,sun4i-a10-lradc-keys"
->> + - compatible: should be one of the following string:
->> +             "allwinner,sun4i-a10-lradc-keys"
->> +             "allwinner,sun8i-a83t-r-lradc-keys"
->
-> This doesn't really have anything related to keys, and can be used
-> purely as an ADC.
->
-> I know this is the compatible that was used for the A10, but I'd
-> rather drop the keys for the the new compatible.
->
+On 27.06.17 20:28:14, Geetha Akula wrote:
+> On Tue, Jun 27, 2017 at 7:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jun 27, 2017 at 03:56:10PM +0200, Robert Richter wrote:
+> >> On 23.06.17 19:04:36, Geetha sowjanya wrote:
+> >> > From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> >> >
+> >> > Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
+> >> > lines for gerror, eventq and cmdq-sync.
+> >> >
+> >> > New named irq "combined" is set as a errata workaround, which allows to
+> >> > share the irq line by register single irq handler for all the interrupts.
+> >> >
+> >> > Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
+> >> > ---
+> >> >  Documentation/arm64/silicon-errata.txt             |    1 +
+> >> >  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    6 +
+> >> >  drivers/acpi/arm64/iort.c                          |   57 ++++++++---
+> >> >  drivers/iommu/arm-smmu-v3.c                        |  100 ++++++++++++++-----
+> >> >  4 files changed, 121 insertions(+), 43 deletions(-)
+> >>
+> >> > +static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+> >> > +{
+> >> > +   int ret, irq;
+> >> > +   u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
+> >> > +
+> >> > +   /* Disable IRQs first */
+> >> > +   ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
+> >> > +                                 ARM_SMMU_IRQ_CTRLACK);
+> >> > +   if (ret) {
+> >> > +           dev_err(smmu->dev, "failed to disable irqs\n");
+> >> > +           return ret;
+> >> > +   }
+> >> > +
+> >> > +   irq = smmu->combined_irq;
+> >> > +   if (irq) {
+> >> > +           /*
+> >> > +            * Cavium ThunderX2 implementation doesn't not support unique
+> >> > +            * irq lines. Use single irq line for all the SMMUv3 interrupts.
+> >> > +            */
+> >> > +           ret = devm_request_threaded_irq(smmu->dev, irq,
+> >> > +                                   arm_smmu_combined_irq_handler,
+> >> > +                                   arm_smmu_combined_irq_thread,
+> >> > +                                   IRQF_ONESHOT,
+> >>
+> >> Without the IRQF_SHARED flag set I see the following on a dual node
+> >> system now:
+> Node1 SMMU interrupts are programmed wrong in the firmware.
+> Node 0 and Node1 SMMU do not share interrupts.
+> I have verified the patch on dual node with correct interrupt numbers
+> programmed in firmware.
 
-Hi,
-LRADC is named KEYADC in some other SoCs' User Manual(such as R40 User
-Manual V1.0), thus LRADC is related to keys.
+Ah, ok, will update to latest fw.
 
-Without keys there is another driver named sun4i-gpadc-iio which is
-located at driver/iio/adc/sun4i-gpadc-iio.c
+Thanks,
 
-Is my understanding right?
-
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+-Robert
