@@ -1,76 +1,38 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 27 Jun 2017 17:41:28 +0300
-Subject: [PATCH v2 08/15] staging: fsl-mc: move irq domain creation prototype
- to public header
+Date: Tue, 27 Jun 2017 17:41:26 +0300
+Subject: [PATCH v2 06/15] staging: fsl-mc: delete prototype of unimplemented
+ function
 In-Reply-To: <20170627144135.15599-1-laurentiu.tudor@nxp.com>
 References: <20170627144135.15599-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170627144135.15599-9-laurentiu.tudor@nxp.com>
+Message-ID: <20170627144135.15599-7-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-fsl_mc_msi_create_irq_domain() will is used from the irqchip glue code
-so it needs to be in the public headers.
+The function fsl_mc_bus_exists() has a prototype but is never
+implemented so delete it from the header file.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
 v2:
  - no changes
 
- drivers/staging/fsl-mc/include/mc-bus.h | 7 -------
- drivers/staging/fsl-mc/include/mc.h     | 7 +++++++
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/staging/fsl-mc/include/mc-bus.h | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/drivers/staging/fsl-mc/include/mc-bus.h b/drivers/staging/fsl-mc/include/mc-bus.h
-index c1df433..0860681 100644
+index 8f9bf8d..aac062e 100644
 --- a/drivers/staging/fsl-mc/include/mc-bus.h
 +++ b/drivers/staging/fsl-mc/include/mc-bus.h
-@@ -14,9 +14,6 @@
- #include "../include/mc.h"
- #include <linux/mutex.h>
+@@ -91,8 +91,6 @@ void fsl_mc_init_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
  
--struct irq_domain;
--struct msi_domain_info;
+ void fsl_mc_cleanup_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
+ 
+-bool fsl_mc_bus_exists(void);
 -
- /**
-  * Maximum number of total IRQs that can be pre-allocated for an MC bus'
-  * IRQ pool
-@@ -70,10 +67,6 @@ struct fsl_mc_bus {
- #define to_fsl_mc_bus(_mc_dev) \
- 	container_of(_mc_dev, struct fsl_mc_bus, mc_dev)
+ void fsl_mc_get_root_dprc(struct device *dev,
+ 			  struct device **root_dprc_dev);
  
--struct irq_domain *fsl_mc_msi_create_irq_domain(struct fwnode_handle *fwnode,
--						struct msi_domain_info *info,
--						struct irq_domain *parent);
--
- int fsl_mc_find_msi_domain(struct device *mc_platform_dev,
- 			   struct irq_domain **mc_msi_domain);
- 
-diff --git a/drivers/staging/fsl-mc/include/mc.h b/drivers/staging/fsl-mc/include/mc.h
-index 60c7067..adb2378 100644
---- a/drivers/staging/fsl-mc/include/mc.h
-+++ b/drivers/staging/fsl-mc/include/mc.h
-@@ -18,6 +18,9 @@
- 
- #define FSL_MC_VENDOR_FREESCALE	0x1957
- 
-+struct irq_domain;
-+struct msi_domain_info;
-+
- struct fsl_mc_device;
- struct fsl_mc_io;
- 
-@@ -233,6 +236,10 @@ int __must_check fsl_mc_object_allocate(struct fsl_mc_device *mc_dev,
- 
- void fsl_mc_object_free(struct fsl_mc_device *mc_adev);
- 
-+struct irq_domain *fsl_mc_msi_create_irq_domain(struct fwnode_handle *fwnode,
-+						struct msi_domain_info *info,
-+						struct irq_domain *parent);
-+
- int __must_check fsl_mc_allocate_irqs(struct fsl_mc_device *mc_dev);
- 
- void fsl_mc_free_irqs(struct fsl_mc_device *mc_dev);
 -- 
 2.9.4
