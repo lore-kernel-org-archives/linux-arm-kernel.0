@@ -1,67 +1,33 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 27 Jun 2017 09:33:38 +0100
-Subject: [PATCH 0/7] ARM: NOMMU: MPU updates
-In-Reply-To: <e0b9c831-f864-934d-b694-aa92374231bf@arm.com>
-References: <1497344707-14446-1-git-send-email-vladimir.murzin@arm.com>
- <e0b9c831-f864-934d-b694-aa92374231bf@arm.com>
-Message-ID: <003cd30f-b39f-c930-ab75-298333c2fa29@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 27 Jun 2017 09:39:13 +0100
+Subject: [PATCH v2 5/8] iommu/io-pgtable-arm: Support lockless operation
+In-Reply-To: <20170627051155.GA9525@virtx40>
+References: <cover.1498145008.git.robin.murphy@arm.com>
+ <af61929e3984a31588cab08ed84a237602b5263e.1498145008.git.robin.murphy@arm.com>
+ <20170623055326.GA2949@virtx40> <20170623085607.GC3718@virtx40>
+ <7a8da378-19e2-2f35-877a-cc6ce389301a@arm.com>
+ <20170623113405.GA5221@virtx40> <20170627051155.GA9525@virtx40>
+Message-ID: <20170627083912.GA5759@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!
+On Tue, Jun 27, 2017 at 10:41:55AM +0530, Linu Cherian wrote:
+> On Fri Jun 23, 2017 at 05:04:05PM +0530, Linu Cherian wrote:
+> > On Fri Jun 23, 2017 at 11:35:25AM +0100, Robin Murphy wrote:
+> > > Note that on a coherent platform like ThunderX that's as good as just
+> > > deleting it, because you'll never execute the case below. However, on
+> > > reflection I think it can at least safely be downgraded to dma_wmb()
+> > > (i.e. DMB) rather than a full DSB - would you be able to test what
+> > > difference that makes?
+> > 
+> > The testing was done on Thunderx 1, which has a non coherent page table walk.
+> > Yes, downgrading to dma_wmb() helps. With this change, performance is back to v1.
+> > 
+> 
+> Should i send a patch for this ?
 
-On 20/06/17 09:30, Vladimir Murzin wrote:
-> Gentle ping...
-> 
-> On 13/06/17 10:05, Vladimir Murzin wrote:
->> Hi,
->>
->> This is an update of the existent MPU code which consist set of
->> clean-ups and enhancements. The most significant changes are in the way
->> how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
->> layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
->> support for M-class has been added (PATCH 6/7).
->>
->> Thanks!
->>
->> Changelog:
->>
->>         RFC v2 -> v1
->>              - dropped RFC tag
->> 	       - Tested-by from Andr?s
->> 	       - rebased on 4.12-rc5
->>
->>            RFC -> RFC v2
->> 	       - fixed MPU enable for v7m (PATCH 6/7)
->>
->> Vladimir Murzin (7):
->>   ARM: NOMMU: Move out MPU setup in separate module
->>   ARM: NOMMU: Update MPU accessors to use cp15 helpers
->>   ARM: NOMMU: Rework MPU to be mostly done in C
->>   ARM: NOMMU: Disallow MPU for XIP
->>   ARM: Kconfig: Kill CONFIG_VECTORS_BASE
->>   ARM: V7M: Add support for MPU to M-class
->>   ARM: NOMMU: Use more MPU regions to cover memory
->>
->>  arch/arm/Kconfig               |   9 -
->>  arch/arm/Kconfig-nommu         |   4 +-
->>  arch/arm/include/asm/cputype.h |  10 +
->>  arch/arm/include/asm/mpu.h     |  23 ++-
->>  arch/arm/include/asm/smp.h     |   2 +-
->>  arch/arm/include/asm/v7m.h     |  10 +
->>  arch/arm/kernel/asm-offsets.c  |  11 +
->>  arch/arm/kernel/head-nommu.S   | 128 +++++++++---
->>  arch/arm/kernel/smp.c          |   2 +-
->>  arch/arm/mm/Makefile           |   1 +
->>  arch/arm/mm/nommu.c            | 254 +----------------------
->>  arch/arm/mm/pmsa-v7.c          | 445 +++++++++++++++++++++++++++++++++++++++++
->>  12 files changed, 598 insertions(+), 301 deletions(-)
->>  create mode 100644 arch/arm/mm/pmsa-v7.c
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+I already did it:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-joerg/arm-smmu/updates&id=77f3445866c39d8866b31d8d9fa47c7c20938e05
+
+Will
