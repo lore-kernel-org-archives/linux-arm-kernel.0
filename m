@@ -1,37 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Jun 2017 12:35:49 +0200
-Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
-In-Reply-To: <20170627091006.GN4902@n2100.armlinux.org.uk>
-References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
- <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
- <20170623152227.GA21989@leverpostej>
- <DB6PR04MB2999E8FFBE0FE708A003637986D80@DB6PR04MB2999.eurprd04.prod.outlook.com>
- <CAK8P3a0mhWTRriGYB6aHS28dm842d-0OeGRmRYzMS4ZYY9=YCQ@mail.gmail.com>
- <20170627081717.GM4902@n2100.armlinux.org.uk>
- <CAK8P3a0N5tiP7RPMg=Q8fsROuYabJjQ5Awd2ekrn686nDqdNwA@mail.gmail.com>
- <20170627091006.GN4902@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a0EXGfkijeQG6OKGHeS8LZsO4YFmRhN9WXTei51rj6G1A@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 27 Jun 2017 10:46:18 +0000
+Subject: [PATCH] ARM: small correction to early_ioremap support
+In-Reply-To: <20170627005731.7869-1-opendmb@gmail.com>
+References: <20170627005731.7869-1-opendmb@gmail.com>
+Message-ID: <CAKv+Gu-GzbbmnWDLFJh6u5jeAfeMtBBFC7X9y+ePVGXhz+JZYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 11:10 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Jun 27, 2017 at 11:05:38AM +0200, Arnd Bergmann wrote:
->> On Tue, Jun 27, 2017 at 10:17 AM, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->>
->> I wonder if doing memcpy_toio on the write-combining mapping
->> will do what Roy wants and and up sending a single bus transaction
->> for one descriptor most of the time, while fitting in with the ioremap_wc()
->> interface and its __iomem pointers.
+On 27 June 2017 at 00:57, Doug Berger <opendmb@gmail.com> wrote:
+> The fixmap pages need to be on the same pmd page for the current
+> implementation of arm early_fixmap.  A build time bug check is
+> used to ensure that.  However, the worst case fixmap range is
+> better represented by __end_of_fixed_addresses than by the value
+> __end_of_early_ioremap_region.
 >
-> Either the CE region needs __iomem pointers and proper accessors, or
-> it needs to be using memremap(offset, size, MEMREMAP_WC) and not use
-> the iomem accessors.
+> Fixes: 2937367b8a4b ("ARM: add support for generic early_ioremap/early_memremap")
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
+> ---
+>  arch/arm/mm/mmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 31af3cb59a60..74c0ed5c3b08 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -392,7 +392,7 @@ void __init early_fixmap_init(void)
+>          * The early fixmap range spans multiple pmds, for which
+>          * we are not prepared:
+>          */
+> -       BUILD_BUG_ON((__fix_to_virt(__end_of_early_ioremap_region) >> PMD_SHIFT)
+> +       BUILD_BUG_ON((__fix_to_virt(__end_of_fixed_addresses) >> PMD_SHIFT)
+>                      != FIXADDR_TOP >> PMD_SHIFT);
+>
+>         pmd = fixmap_pmd(FIXADDR_TOP);
 
-Right, memremap() would work here as well. If there are no other constraints,
-using ioremap_wc and __iomem pointers would have the advantage of giving
-us a little more type safety, but it depends on what operations we actually
-need to do on the data.
-
-        Arnd
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
