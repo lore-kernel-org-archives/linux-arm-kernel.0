@@ -1,38 +1,86 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Tue, 27 Jun 2017 08:22:42 -0700
-Subject: [PATCH v5 4/7] drivers: dma-coherent: Introduce default DMA pool
-In-Reply-To: <9ae32e85-dd35-ea04-5c9f-4dc6d1358a99@arm.com>
-References: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
- <1495621472-9323-5-git-send-email-vladimir.murzin@arm.com>
- <20170620134932.GB31496@infradead.org>
- <3d5ea779-90a3-f0b5-b9aa-161d4c0855e7@arm.com>
- <20170626094250.GB21570@infradead.org>
- <9ae32e85-dd35-ea04-5c9f-4dc6d1358a99@arm.com>
-Message-ID: <20170627152242.GB29664@infradead.org>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Tue, 27 Jun 2017 15:23:08 +0000
+Subject: [PATCH 1/2] dt-bindings: Document the STM32 SPDIFRX interface
+In-Reply-To: <20170623185514.nc3jqq6ikvwwv6sn@rob-hp-laptop>
+References: <1497621452-615-1-git-send-email-olivier.moysan@st.com>
+ <1497621452-615-2-git-send-email-olivier.moysan@st.com>
+ <20170623185514.nc3jqq6ikvwwv6sn@rob-hp-laptop>
+Message-ID: <b74e1d76-de2c-9eb3-4ea1-f63d3e8c82b7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 03:36:16PM +0100, Robin Murphy wrote:
-> I admit I'm almost in agreement, were it not for the fact that
-> dma-contiguous already supports all four combinations of both per-device
-> and global pools, and both reserved mem and direct declarations from
-> arch/platform code, all through the same interface to boot, and nobody's
-> complaining about that. The only real difference for dma-coherent seems
-> to be the way it's baked into the existing API.
-> 
-> If it is just a matter of interfaces, I'd have no objection to exporting
-> a separate e.g. dma_alloc_from_global_coherent() or somesuch as a
-> conceptually separate interface to dma_coherent_default_memory, which
-> the arch code can then call from ->alloc in the same manner they
-> currently call dma_alloc_from_contiguous(). That seems like a reasonable
-> way to keep the per-device and global pools conceptually distinct
-> without needlessly duplicating implementations. In fact, I'm now
-> wondering if the regular arm/arm64 atomic pools couldn't also make use
-> of such a thing as well...
+Hello Rob,
 
-Ok.  I think I'll just go ahead with the current patches, and then
-we'll try to come up with something better later.  I really don't
-want it in actual arch code, but I want it controlled from the
-dma_map_ops instance instead of from generic code.  There will be
-a lot of churn in this area if my plans go ahead, so I think we can
-handle it then.
+On 06/23/2017 08:55 PM, Rob Herring wrote:
+> On Fri, Jun 16, 2017 at 03:57:31PM +0200, olivier moysan wrote:
+>> This adds documentation of device tree bindings for the
+>> STM32 SPDIFRX interface.
+>>
+>> Signed-off-by: olivier moysan <olivier.moysan@st.com>
+>> ---
+>>   .../devicetree/bindings/sound/st,stm32-spdifrx.txt | 56 ++++++++++++++++++++++
+>>   1 file changed, 56 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-spdifrx.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-spdifrx.txt b/Documentation/devicetree/bindings/sound/st,stm32-spdifrx.txt
+>> new file mode 100644
+>> index 0000000..33826f2
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/sound/st,stm32-spdifrx.txt
+>> @@ -0,0 +1,56 @@
+>> +STMicroelectronics STM32 S/PDIF receiver (SPDIFRX).
+>> +
+>> +The SPDIFRX peripheral, is designed to receive an S/PDIF flow compliant with
+>> +IEC-60958 and IEC-61937.
+>> +
+>> +Required properties:
+>> +  - compatible: should be "st,stm32h7-spdifrx"
+>> +  - reg: cpu DAI IP base address and size
+>> +  - clocks: must contain an entry for kclk (used as S/PDIF signal reference)
+>> +  - clock-names: must contain "kclk"
+>> +  - interrupts: cpu DAI interrupt line
+>> +  - dmas: DMA specifiers for audio data DMA and iec control flow DMA
+>> +    See STM32 DMA bindings, Documentation/devicetree/bindings/dma/stm32-dma.txt
+>> +  - dma-names: two dmas have to be defined, "rx" and "rx-ctrl"
+>> +
+>> +Optional properties:
+>> +  - resets: Reference to a reset controller asserting the SPDIFRX
+>> +
+>> +The device node should contain one 'port' child node with one child 'endpoint'
+>> +node, according to the bindings defined in Documentation/devicetree/bindings/
+>> +graph.txt.
+>> +
+>> +Example:
+>> +spdifrx: spdifrx at 40004000 {
+>> +	compatible = "st,stm32h7-spdifrx";
+>> +	reg = <0x40004000 0x400>;
+>> +	clocks = <&rcc SPDIFRX_CK>;
+>> +	clock-names = "kclk";
+>> +	interrupts = <97>;
+>> +	dmas = <&dmamux1 2 93 0x400 0x0>,
+>> +	       <&dmamux1 3 94 0x400 0x0>;
+>> +	dma-names = "rx", "rx-ctrl";
+>> +	pinctrl-0 = <&spdifrx_pins>;
+>> +	pinctrl-names = "default";
+>> +
+>> +	spdifrx_port: port {
+>> +		cpu_endpoint: endpoint {
+>> +			remote-endpoint = <&codec_endpoint>;
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +spdif_in: spdif-in {
+>> +	compatible = "linux,spdif-dir";
+> 
+> What is this? It should go.
+> 
+> Rob
+> 
+
+This is the ASoC spdif stub codec. This is relevant in DT when
+spdif interface is wired to a connector.
+I will remove it from bindings.
+
+BRs
+olivier
