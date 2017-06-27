@@ -1,33 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Jun 2017 09:39:13 +0100
-Subject: [PATCH v2 5/8] iommu/io-pgtable-arm: Support lockless operation
-In-Reply-To: <20170627051155.GA9525@virtx40>
-References: <cover.1498145008.git.robin.murphy@arm.com>
- <af61929e3984a31588cab08ed84a237602b5263e.1498145008.git.robin.murphy@arm.com>
- <20170623055326.GA2949@virtx40> <20170623085607.GC3718@virtx40>
- <7a8da378-19e2-2f35-877a-cc6ce389301a@arm.com>
- <20170623113405.GA5221@virtx40> <20170627051155.GA9525@virtx40>
-Message-ID: <20170627083912.GA5759@arm.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Tue, 27 Jun 2017 17:39:09 +0900
+Subject: [PATCH 1/5] [media] rockchip/rga: v4l2 m2m support
+In-Reply-To: <1498488673-27900-1-git-send-email-jacob-chen@iotwrt.com>
+References: <1498488673-27900-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <CAAFQd5BHAiTq9f4nvwFiy5DzZ0Jep9d4K0saAkoxzaK86a8GJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 10:41:55AM +0530, Linu Cherian wrote:
-> On Fri Jun 23, 2017 at 05:04:05PM +0530, Linu Cherian wrote:
-> > On Fri Jun 23, 2017 at 11:35:25AM +0100, Robin Murphy wrote:
-> > > Note that on a coherent platform like ThunderX that's as good as just
-> > > deleting it, because you'll never execute the case below. However, on
-> > > reflection I think it can at least safely be downgraded to dma_wmb()
-> > > (i.e. DMB) rather than a full DSB - would you be able to test what
-> > > difference that makes?
-> > 
-> > The testing was done on Thunderx 1, which has a non coherent page table walk.
-> > Yes, downgrading to dma_wmb() helps. With this change, performance is back to v1.
-> > 
-> 
-> Should i send a patch for this ?
+Hi Jacob,
 
-I already did it:
+Please see my comments inline.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-joerg/arm-smmu/updates&id=77f3445866c39d8866b31d8d9fa47c7c20938e05
+On Mon, Jun 26, 2017 at 11:51 PM, Jacob Chen <jacob-chen@iotwrt.com> wrote:
+> Rockchip RGA is a separate 2D raster graphic acceleration unit. It
+> accelerates 2D graphics operations, such as point/line drawing, image
+> scaling, rotation, BitBLT, alpha blending and image blur/sharpness.
+[snip]
+> +static int rga_buf_init(struct vb2_buffer *vb)
+> +{
+> +       struct rga_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
+> +       struct rockchip_rga *rga = ctx->rga;
+> +       struct sg_table *sgt;
+> +       struct scatterlist *sgl;
+> +       unsigned int *pages;
+> +       struct rga_buf *buf;
+> +       unsigned int address, len, i, p;
+> +       unsigned int mapped_size = 0;
+> +
+> +       /* Create local MMU table for RGA */
+> +       sgt = vb2_plane_cookie(vb, 0);
+> +
+> +       /*
+> +        * Alloc (2^3 * 4K) = 32K byte for storing pages, those space could
+> +        * cover 32K * 4K = 128M ram address.
 
-Will
+Unless I'm missing something, there is 1024 32-bit values in one 4K
+page, which can point to 4 MB of memory. The code allocates 8 of them,
+which in total allows at most 32 MB per buffer.
+
+> +        */
+> +       pages = (unsigned int *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 3);
+
+This is rather unfortunate and you should expect failures here on
+actively used systems with uptime longer than few hours. Changing this
+to dma_alloc_coherent() and enabling CMA _might_ give you a bit better
+success rate, but...
+
+Normally, this kind of (scatter-gather capable) hardware would allow
+some kind of linking of separate pages, e.g. last entry in the page
+would point to the next page, or something like that. Doesn't this RGA
+block have something similar?
+
+Best regards,
+Tomasz
