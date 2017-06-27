@@ -1,79 +1,48 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 27 Jun 2017 19:35:27 +0200
-Subject: [PATCH] ARM: dts: BCM5301X: Specify USB ports for each controller
-Message-ID: <20170627173527.16682-1-zajec5@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 27 Jun 2017 19:36:31 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 2/3] dt-bindings: input: Add R_LRADC
+ support for A83T
+In-Reply-To: <24845446a80e3542d90a1111a6141415@aosc.io>
+References: <20170624024515.4669-1-techping.chan@gmail.com>
+ <20170624024515.4669-3-techping.chan@gmail.com>
+ <20170626171524.cqfyasetpsfr6xfg@flea.lan>
+ <CAAST=9x+fS41tznuJ9hQ-cQxecKN751=61YkhEt31DvpeqeEcA@mail.gmail.com>
+ <24845446a80e3542d90a1111a6141415@aosc.io>
+Message-ID: <20170627173631.2rjdzgwdwnksqjzm@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+Hi,
 
-Northstar has 3 controllers: OHCI and EHCI (each with 2 ports) and XHCI
-(with just 1 port). Describe them in the DT. In future this will allow
-to reference them as trigger sources.
+On Tue, Jun 27, 2017 at 11:29:10PM +0800, icenowy at aosc.io wrote:
+> Maxime, here's another problem: if we have already a GP LRADC driver,
+> how can we tell the kernel to use it as IIO ADC rather than keys?
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- arch/arm/boot/dts/bcm5301x.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+The GPADC IIO driver is not for the LRADC driver, but the GPADC /
+temperature sensor.
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 98647d22b291..045b9bb857f9 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -272,6 +272,19 @@
- 				reg = <0x00021000 0x1000>;
- 				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
- 				phys = <&usb2_phy>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ehci_port1: port at 1 {
-+					reg = <1>;
-+					#trigger-source-cells = <0>;
-+				};
-+
-+				ehci_port2: port at 2 {
-+					reg = <2>;
-+					#trigger-source-cells = <0>;
-+				};
- 			};
- 
- 			ohci: ohci at 22000 {
-@@ -280,6 +293,19 @@
- 				compatible = "generic-ohci";
- 				reg = <0x00022000 0x1000>;
- 				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ohci_port1: port at 1 {
-+					reg = <1>;
-+					#trigger-source-cells = <0>;
-+				};
-+
-+				ohci_port2: port at 2 {
-+					reg = <2>;
-+					#trigger-source-cells = <0>;
-+				};
- 			};
- 		};
- 
-@@ -300,6 +326,14 @@
- 				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
- 				phys = <&usb3_phy>;
- 				phy-names = "usb";
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				xhci_port1: port at 1 {
-+					reg = <1>;
-+					#trigger-source-cells = <0>;
-+				};
- 			};
- 		};
- 
+We used to have an LRADC IIO driver in the CHIP BSP written by Alex
+(in CC):
+https://github.com/NextThingCo/CHIP-linux/commit/8675b761c54be73dc7cc0113209f02e10cc63a27
+
+But he never mainlined it.
+
+> Should we introduce a new property for this once ready?
+
+We need to keep the current binding. We can just check for the
+presence or not of child nodes to see if it has some keys, and we'd
+need an IIO-to-input driver that is yet to be written.
+
+Maxime
+
 -- 
-2.11.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/a9ba0799/attachment.sig>
