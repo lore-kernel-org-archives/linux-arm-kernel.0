@@ -1,22 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Jun 2017 09:39:58 +0100
-Subject: [PATCH] arm: perf: make of_device_ids const
-In-Reply-To: <3838e744e5fb337a55a047661d682f67442c016a.1498542886.git.arvind.yadav.cs@gmail.com>
-References: <3838e744e5fb337a55a047661d682f67442c016a.1498542886.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170627083958.GB5759@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 27 Jun 2017 01:48:38 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix omap3 prm shared irq
+Message-ID: <20170627084838.30275-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 11:42:21AM +0530, Arvind Yadav wrote:
-> of_device_ids are not supposed to change at runtime. All functions
-> working with of_device_ids provided by <linux/of.h> work with const
-> of_device_ids. So mark the non-const structs as const.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  arch/arm/kernel/perf_event_v6.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Shared interrupts with IRQ_NOAUTOEN got a warning added with commit
+04c848d39879 ("genirq: Warn when IRQ_NOAUTOEN is used with shared
+interrupts").
 
-This is already queued in -next.
+Let's just drop the IRQ_NOAUTOEN use for omap3 PRM shared interrupt as
+it does not seem to cause any other issues based on my testing. We have
+moved a lot of the code to initialize later, and whatever problems the
+legacy booting had seem to be gone now with pinctrl driver and device
+tree based booting.
 
-Will
+Otherwise we will get:
+
+WARNING: CPU: 0 PID: 1 at kernel/irq/manage.c:1348 __setup_irq+0x5d0/0x64c
+[<c01b0260>] (__setup_irq) from [<c01b0480>]
+(request_threaded_irq+0xdc/0x188)
+[<c01b0480>] (request_threaded_irq) from [<c051c780>]
+(pcs_probe+0x6ec/0x8a4)
+[<c051c780>] (pcs_probe) from [<c05a84b8>] (platform_drv_probe+0x50/0xb0)
+[<c05a84b8>] (platform_drv_probe) from [<c05a6288>]
+(driver_probe_device+0x33c/0x478)
+
+Note that we also need to remove the related enable_irq() to avoid
+getting the following:
+
+WARNING: CPU: 0 PID: 1 at kernel/irq/manage.c:529 enable_irq+0x34/0x70
+[<c01afa04>] (enable_irq) from [<c0c0f1fc>] (omap3_pm_init+0x118/0x3f8)
+[<c0c0f1fc>] (omap3_pm_init) from [<c0c0ae7c>] (am35xx_init_late+0x10/0x18)
+
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/pm34xx.c  | 1 -
+ arch/arm/mach-omap2/prm3xxx.c | 7 +------
+ 2 files changed, 1 insertion(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -483,7 +483,6 @@ int __init omap3_pm_init(void)
+ 	ret = request_irq(omap_prcm_event_to_irq("io"),
+ 		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
+ 		omap3_pm_init);
+-	enable_irq(omap_prcm_event_to_irq("io"));
+ 
+ 	if (ret) {
+ 		pr_err("pm: Failed to request pm_io irq\n");
+diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+--- a/arch/arm/mach-omap2/prm3xxx.c
++++ b/arch/arm/mach-omap2/prm3xxx.c
+@@ -692,7 +692,6 @@ static int omap3xxx_prm_late_init(void)
+ {
+ 	struct device_node *np;
+ 	int irq_num;
+-	int ret;
+ 
+ 	if (!(prm_features & PRM_HAS_IO_WAKEUP))
+ 		return 0;
+@@ -712,12 +711,8 @@ static int omap3xxx_prm_late_init(void)
+ 	}
+ 
+ 	omap3xxx_prm_enable_io_wakeup();
+-	ret = omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
+-	if (!ret)
+-		irq_set_status_flags(omap_prcm_event_to_irq("io"),
+-				     IRQ_NOAUTOEN);
+ 
+-	return ret;
++	return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
+ }
+ 
+ static void __exit omap3xxx_prm_exit(void)
+-- 
+2.13.0
