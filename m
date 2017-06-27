@@ -1,37 +1,47 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 27 Jun 2017 20:36:09 +0530
-Subject: [PATCH 0/3] ARM: dts: omap: workarounds for Ethernet PHY strap on
- DRA71 and DRA72 EVMs
-Message-ID: <cover.1498573382.git.nsekhar@ti.com>
+Date: Tue, 27 Jun 2017 20:36:11 +0530
+Subject: [PATCH 2/3] ARM: dts: dra72-evm-revc: workaround incorrect DP83867
+ RX_CTRL pin strap
+In-Reply-To: <cover.1498573382.git.nsekhar@ti.com>
+References: <cover.1498573382.git.nsekhar@ti.com>
+Message-ID: <f534218be6ade8f0f54c9897840116ad8238cdd0.1498573382.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The DRA72 EVM Rev C straps the DP83867 GigaBit Ethernet phy's RX_DV/RX_CTRL
+pin in mode 1. Unfortunately, the phy data manual disallows this.
 
-Here are some patches to overcome incorrect Ethernet PHY strap settings
-on DRA72x EVM Rev C and DRA71 EVM. Both of these boards use TI's DP83867
-PHY.
+Add "ti,dp83867-rxctrl-strap-quirk" property to the phy's device-tree node
+to allow kernel to enable software workaround for this incorrect strap
+setting. This is as suggested by the phy's datamanual and ensures proper
+operation of this PHY.
 
-The incorrect PHY strap settings cause a voilation of PHY specification
-and need to be worked around in software as documented in the commit
-messages. But there is no known issue that these patches fix.
+This needs to be done for both instances of this PHY present on the board.
 
-I did verify that there are no regressions with NFS boot on these boards
-after the patches are applied on v4.12-rc4.
-
-The series itself has been rebased on your omap-for-v4.13/dt branch since
-it has some conflicts with patches you have queued.
-
-Sekhar Nori (3):
-  ARM: dts: dra71-evm: workaround incorrect DP83867 RX_CTRL pin strap
-  ARM: dts: dra72-evm-revc: workaround incorrect DP83867 RX_CTRL pin
-    strap
-  ARM: omap2plus_defconfig: enable DP83867 phy driver
-
- arch/arm/boot/dts/dra71-evm.dts      | 2 ++
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
  arch/arm/boot/dts/dra72-evm-revc.dts | 2 ++
- arch/arm/configs/omap2plus_defconfig | 1 +
- 3 files changed, 5 insertions(+)
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
+index 5532309971ae..9b439851ff79 100644
+--- a/arch/arm/boot/dts/dra72-evm-revc.dts
++++ b/arch/arm/boot/dts/dra72-evm-revc.dts
+@@ -80,6 +80,7 @@
+ 		ti,min-output-impedance;
+ 		interrupt-parent = <&gpio6>;
+ 		interrupts = <16 IRQ_TYPE_EDGE_FALLING>;
++		ti,dp83867-rxctrl-strap-quirk;
+ 	};
+ 
+ 	dp83867_1: ethernet-phy at 3 {
+@@ -90,6 +91,7 @@
+ 		ti,min-output-impedance;
+ 		interrupt-parent = <&gpio6>;
+ 		interrupts = <16 IRQ_TYPE_EDGE_FALLING>;
++		ti,dp83867-rxctrl-strap-quirk;
+ 	};
+ };
+ 
 -- 
 2.9.0
