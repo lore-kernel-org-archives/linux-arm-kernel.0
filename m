@@ -1,168 +1,204 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 27 Jun 2017 02:55:20 +0200
-Subject: [PATCH 6/6] ARM: dts: Add RDA8810PL and Orange Pi 2G-IoT
+Date: Tue, 27 Jun 2017 02:55:19 +0200
+Subject: [PATCH 5/6] tty: serial: Add RDA Micro UART driver
 In-Reply-To: <20170627005520.23731-1-afaerber@suse.de>
 References: <20170627005520.23731-1-afaerber@suse.de>
-Message-ID: <20170627005520.23731-7-afaerber@suse.de>
+Message-ID: <20170627005520.23731-6-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Device Trees for RDA Micro RDA8810PL SoC and Orange Pi 2G-IoT board.
+Add "rda" earlycon driver for RDA8810PL UART.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/Makefile                      |  2 +
- arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts | 27 +++++++
- arch/arm/boot/dts/rda8810pl.dtsi                | 94 +++++++++++++++++++++++++
- 3 files changed, 123 insertions(+)
- create mode 100644 arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts
- create mode 100644 arch/arm/boot/dts/rda8810pl.dtsi
+ Documentation/admin-guide/kernel-parameters.txt |   6 ++
+ drivers/tty/serial/Kconfig                      |  19 ++++
+ drivers/tty/serial/Makefile                     |   1 +
+ drivers/tty/serial/rda-uart.c                   | 117 ++++++++++++++++++++++++
+ 4 files changed, 143 insertions(+)
+ create mode 100644 drivers/tty/serial/rda-uart.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4b17f35dc9a7..d651033db30e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -693,6 +693,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-msm8974-lge-nexus5-hammerhead.dtb \
- 	qcom-msm8974-sony-xperia-honami.dtb \
- 	qcom-mdm9615-wp8548-mangoh-green.dtb
-+dtb-$(CONFIG_ARCH_RDA) += \
-+	rda8810pl-orangepi-2g-iot.dtb
- dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-pb1176.dtb \
- 	arm-realview-pb11mp.dtb \
-diff --git a/arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts b/arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 0e2091c6fa6b..c97f8b64b3f1 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -967,6 +967,12 @@
+ 			specified address. The serial port must already be
+ 			setup and configured. Options are not yet supported.
+ 
++		rda,<addr>
++			Start an early, polled-mode console on a serial port
++			of an RDA Micro SoC, such as RDA8810PL, at the
++			specified address. The serial port must already be
++			setup and configured. Options are not yet supported.
++
+ 		smh	Use ARM semihosting calls for early console.
+ 
+ 		s3c2410,<addr>
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 1f096e2bb398..25e106a62e06 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1707,6 +1707,25 @@ config SERIAL_OWL_CONSOLE
+ 	  Say 'Y' here if you wish to use Actions Semiconductor S500/S900 UART
+ 	  as the system console. Only earlycon is implemented currently.
+ 
++config SERIAL_RDA
++	bool "RDA Micro serial port support"
++	depends on ARCH_RDA || COMPILE_TEST
++	select SERIAL_CORE
++	help
++	  This driver is for RDA8810PL SoC's UART.
++	  Say 'Y' here if you wish to use the on-board serial port.
++	  Otherwise, say 'N'.
++
++config SERIAL_RDA_CONSOLE
++	bool "Console on RDA Micro serial port"
++	depends on SERIAL_RDA=y
++	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
++	default y
++	help
++	  Say 'Y' here if you wish to use the RDA8810PL UART as the system
++	  console. Only earlycon is implemented currently.
++
+ endmenu
+ 
+ config SERIAL_MCTRL_GPIO
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index fe88a75d9a59..87f5a6e1e2d4 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -93,6 +93,7 @@ obj-$(CONFIG_SERIAL_MVEBU_UART)	+= mvebu-uart.o
+ obj-$(CONFIG_SERIAL_PIC32)	+= pic32_uart.o
+ obj-$(CONFIG_SERIAL_MPS2_UART)	+= mps2-uart.o
+ obj-$(CONFIG_SERIAL_OWL)	+= owl-uart.o
++obj-$(CONFIG_SERIAL_RDA)	+= rda-uart.o
+ 
+ # GPIOLIB helpers for modem control lines
+ obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
+diff --git a/drivers/tty/serial/rda-uart.c b/drivers/tty/serial/rda-uart.c
 new file mode 100644
-index 000000000000..4142ecb529c9
+index 000000000000..c3c9cf1df015
 --- /dev/null
-+++ b/arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts
-@@ -0,0 +1,27 @@
++++ b/drivers/tty/serial/rda-uart.c
+@@ -0,0 +1,117 @@
 +/*
++ * RDA8810PL serial console
++ *
++ * Copyright RDA Microelectronics Company Limited
 + * Copyright (c) 2017 Andreas F?rber
 + *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+/dts-v1/;
++#include <linux/console.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/serial.h>
++#include <linux/serial_core.h>
 +
-+#include "rda8810pl.dtsi"
++#define RDA_UART_CTRL		0x00
++#define RDA_UART_STATUS		0x04
++#define RDA_UART_RXTX_BUFFER	0x08
++#define RDA_UART_IRQ_MASK	0x0c
 +
-+/ {
-+	compatible = "xunlong,orangepi-2g-iot", "rda,8810pl";
-+	model = "Orange Pi 2G-IoT";
++#define RDA_UART_STATUS_TX_FIFO_SPACE_MASK	(0x1f << 8)
 +
-+	chosen {
-+		stdout-path = "serial3:921600n8";
-+	};
++static inline void rda_uart_write(struct uart_port *port, u32 val, unsigned int off)
++{
++	writel(val, port->membase + off);
++}
 +
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>;
-+	};
-+};
++static inline u32 rda_uart_read(struct uart_port *port, unsigned int off)
++{
++	return readl(port->membase + off);
++}
 +
-+&uart3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/rda8810pl.dtsi b/arch/arm/boot/dts/rda8810pl.dtsi
-new file mode 100644
-index 000000000000..f066ac7a4ee9
---- /dev/null
-+++ b/arch/arm/boot/dts/rda8810pl.dtsi
-@@ -0,0 +1,94 @@
-+/*
-+ * RDA8810PL SoC
-+ *
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
++#ifdef CONFIG_SERIAL_RDA_CONSOLE
 +
-+/ {
-+	compatible = "rda,8810pl";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
++static void rda_console_putchar(struct uart_port *port, int ch)
++{
++	if (!port->membase)
++		return;
 +
-+	aliases {
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
++	while (!(rda_uart_read(port, RDA_UART_STATUS) & RDA_UART_STATUS_TX_FIFO_SPACE_MASK))
++		cpu_relax();
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	rda_uart_write(port, ch, RDA_UART_RXTX_BUFFER);
++}
 +
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a5";
-+			reg = <0x0>;
-+		};
-+	};
++static void rda_uart_port_write(struct uart_port *port, const char *s,
++				u_int count)
++{
++	u32 old_irq_mask;
++	unsigned long flags;
++	int locked;
 +
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0x0 0x80000000>;
++	local_irq_save(flags);
 +
-+		sram at 100000 {
-+			compatible = "mmio-sram";
-+			reg = <0x100000 0x10000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+		};
++	if (port->sysrq)
++		locked = 0;
++	else if (oops_in_progress)
++		locked = spin_trylock(&port->lock);
++	else {
++		spin_lock(&port->lock);
++		locked = 1;
++	}
 +
-+		apb at 20800000 {
-+			compatible = "simple-bus";
-+			reg = <0x20800000 0x100000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x20800000 0x100000>;
-+		};
++	old_irq_mask = rda_uart_read(port, RDA_UART_IRQ_MASK);
++	rda_uart_write(port, 0, RDA_UART_IRQ_MASK);
 +
-+		apb at 20900000 {
-+			compatible = "simple-bus";
-+			reg = <0x20900000 0x100000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x20900000 0x100000>;
-+		};
++	uart_console_write(port, s, count, rda_console_putchar);
 +
-+		apb at 20a00000 {
-+			compatible = "simple-bus";
-+			reg = <0x20a00000 0x100000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x20a00000 0x100000>;
++	/* wait until all contents have been sent out */
++	while (!(rda_uart_read(port, RDA_UART_STATUS) & RDA_UART_STATUS_TX_FIFO_SPACE_MASK))
++		cpu_relax();
 +
-+			uart1: serial at 0 {
-+				compatible = "rda,8810pl-uart";
-+				reg = <0x0 0x1000>;
-+				status = "disabled";
-+			};
++	rda_uart_write(port, old_irq_mask, RDA_UART_IRQ_MASK);
 +
-+			uart2: serial at 10000 {
-+				compatible = "rda,8810pl-uart";
-+				reg = <0x10000 0x1000>;
-+				status = "disabled";
-+			};
++	if (locked)
++		spin_unlock(&port->lock);
 +
-+			uart3: serial at 90000 {
-+				compatible = "rda,8810pl-uart";
-+				reg = <0x90000 0x1000>;
-+				status = "disabled";
-+			};
-+		};
++	local_irq_restore(flags);
++}
 +
-+		l2: cache-controller at 21100000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x21100000 0x1000>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+};
++static void rda_uart_early_console_write(struct console *co,
++					 const char *s,
++					 u_int count)
++{
++	struct earlycon_device *dev = co->data;
++
++	rda_uart_port_write(&dev->port, s, count);
++}
++
++static int __init
++rda_uart_early_console_setup(struct earlycon_device *device, const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->con->write = rda_uart_early_console_write;
++
++	return 0;
++}
++OF_EARLYCON_DECLARE(rda, "rda,8810pl-uart",
++		    rda_uart_early_console_setup);
++
++#endif /* CONFIG_SERIAL_RDA_CONSOLE */
 -- 
 2.12.3
