@@ -1,394 +1,69 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 27 Jun 2017 17:41:34 +0300
-Subject: [PATCH v2 14/15] staging: fsl-mc: move mc-cmd.h contents in the
- public header
+Date: Tue, 27 Jun 2017 17:41:35 +0300
+Subject: [PATCH v2 15/15] staging: fsl-mc: make dprc.h header private
 In-Reply-To: <20170627144135.15599-1-laurentiu.tudor@nxp.com>
 References: <20170627144135.15599-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170627144135.15599-15-laurentiu.tudor@nxp.com>
+Message-ID: <20170627144135.15599-16-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-mc-cmd.h contains some low level functions used to encode and decode
-commands to the MC. They are used by the drivers so move them to the
-public headers and get rid of the mc-cmd.h header.
+dprc.h is only used in the mc bus driver so move it together with the
+sources thus making it private.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
 v2:
  - no changes
 
- drivers/staging/fsl-dpaa2/ethernet/dpni.c |   1 -
- drivers/staging/fsl-mc/bus/dpbp.c         |   1 -
- drivers/staging/fsl-mc/bus/dpcon.c        |   1 -
- drivers/staging/fsl-mc/bus/dpio/dpio.c    |   1 -
- drivers/staging/fsl-mc/bus/dpmcp.c        |   1 -
- drivers/staging/fsl-mc/bus/dprc.c         |   1 -
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c   |   1 -
- drivers/staging/fsl-mc/bus/fsl-mc-msi.c   |   1 -
- drivers/staging/fsl-mc/bus/mc-sys.c       |   1 -
- drivers/staging/fsl-mc/include/mc-cmd.h   | 130 ------------------------------
- drivers/staging/fsl-mc/include/mc.h       |  95 +++++++++++++++++++++-
- 11 files changed, 94 insertions(+), 140 deletions(-)
- delete mode 100644 drivers/staging/fsl-mc/include/mc-cmd.h
+ drivers/staging/fsl-mc/bus/dprc.c              | 2 +-
+ drivers/staging/fsl-mc/{include => bus}/dprc.h | 0
+ drivers/staging/fsl-mc/bus/fsl-mc-private.h    | 1 +
+ drivers/staging/fsl-mc/include/mc.h            | 1 -
+ 4 files changed, 2 insertions(+), 2 deletions(-)
+ rename drivers/staging/fsl-mc/{include => bus}/dprc.h (100%)
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpni.c b/drivers/staging/fsl-dpaa2/ethernet/dpni.c
-index 160eaf8..5b9d442 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpni.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpni.c
-@@ -33,7 +33,6 @@
- #include <linux/kernel.h>
- #include <linux/errno.h>
- #include "../../fsl-mc/include/mc.h"
--#include "../../fsl-mc/include/mc-cmd.h"
- #include "dpni.h"
- #include "dpni-cmd.h"
- 
-diff --git a/drivers/staging/fsl-mc/bus/dpbp.c b/drivers/staging/fsl-mc/bus/dpbp.c
-index b714673..363730a 100644
---- a/drivers/staging/fsl-mc/bus/dpbp.c
-+++ b/drivers/staging/fsl-mc/bus/dpbp.c
-@@ -31,7 +31,6 @@
-  */
- #include <linux/kernel.h>
- #include "../include/mc.h"
--#include "../include/mc-cmd.h"
- #include "../include/dpbp.h"
- 
- #include "dpbp-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/dpcon.c b/drivers/staging/fsl-mc/bus/dpcon.c
-index 2272a9c..ca1da85 100644
---- a/drivers/staging/fsl-mc/bus/dpcon.c
-+++ b/drivers/staging/fsl-mc/bus/dpcon.c
-@@ -31,7 +31,6 @@
-  */
- #include <linux/kernel.h>
- #include "../include/mc.h"
--#include "../include/mc-cmd.h"
- #include "../include/dpcon.h"
- 
- #include "dpcon-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio.c b/drivers/staging/fsl-mc/bus/dpio/dpio.c
-index 48dce4a..00eb221 100644
---- a/drivers/staging/fsl-mc/bus/dpio/dpio.c
-+++ b/drivers/staging/fsl-mc/bus/dpio/dpio.c
-@@ -32,7 +32,6 @@
-  */
- #include <linux/kernel.h>
- #include "../../include/mc.h"
--#include "../../include/mc-cmd.h"
- 
- #include "dpio.h"
- #include "dpio-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/dpmcp.c b/drivers/staging/fsl-mc/bus/dpmcp.c
-index 7b3dd19..eea42f6 100644
---- a/drivers/staging/fsl-mc/bus/dpmcp.c
-+++ b/drivers/staging/fsl-mc/bus/dpmcp.c
-@@ -31,7 +31,6 @@
-  */
- #include <linux/kernel.h>
- #include "../include/mc.h"
--#include "../include/mc-cmd.h"
- 
- #include "dpmcp.h"
- #include "dpmcp-cmd.h"
 diff --git a/drivers/staging/fsl-mc/bus/dprc.c b/drivers/staging/fsl-mc/bus/dprc.c
-index f93fe00..138fe80 100644
+index 138fe80..6f6c65a 100644
 --- a/drivers/staging/fsl-mc/bus/dprc.c
 +++ b/drivers/staging/fsl-mc/bus/dprc.c
-@@ -31,7 +31,6 @@
+@@ -31,7 +31,7 @@
   */
  #include <linux/kernel.h>
  #include "../include/mc.h"
--#include "../include/mc-cmd.h"
- #include "../include/dprc.h"
+-#include "../include/dprc.h"
++#include "dprc.h"
  
  #include "dprc-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index 166604e..19606e8 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -20,7 +20,6 @@
- #include <linux/bitops.h>
- #include <linux/msi.h>
- #include <linux/dma-mapping.h>
--#include "../include/mc-cmd.h"
  
- #include "fsl-mc-private.h"
- #include "dprc-cmd.h"
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-index 81dca7a..2b64651 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-@@ -16,7 +16,6 @@
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/msi.h>
--#include "../include/mc-cmd.h"
- #include "fsl-mc-private.h"
+diff --git a/drivers/staging/fsl-mc/include/dprc.h b/drivers/staging/fsl-mc/bus/dprc.h
+similarity index 100%
+rename from drivers/staging/fsl-mc/include/dprc.h
+rename to drivers/staging/fsl-mc/bus/dprc.h
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-private.h b/drivers/staging/fsl-mc/bus/fsl-mc-private.h
+index e583999..62d3989 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-private.h
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-private.h
+@@ -11,6 +11,7 @@
+ #define _FSL_MC_PRIVATE_H_
  
- /*
-diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
-index c537bf8..a1704c3 100644
---- a/drivers/staging/fsl-mc/bus/mc-sys.c
-+++ b/drivers/staging/fsl-mc/bus/mc-sys.c
-@@ -37,7 +37,6 @@
- #include <linux/ioport.h>
- #include <linux/device.h>
- #include <linux/io.h>
--#include "../include/mc-cmd.h"
  #include "../include/mc.h"
++#include "dprc.h"
+ #include <linux/mutex.h>
  
- #include "dpmcp.h"
-diff --git a/drivers/staging/fsl-mc/include/mc-cmd.h b/drivers/staging/fsl-mc/include/mc-cmd.h
-deleted file mode 100644
-index 2e08aa3..0000000
---- a/drivers/staging/fsl-mc/include/mc-cmd.h
-+++ /dev/null
-@@ -1,130 +0,0 @@
--/*
-- * Copyright 2013-2016 Freescale Semiconductor Inc.
-- *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- * * Redistributions of source code must retain the above copyright
-- * notice, this list of conditions and the following disclaimer.
-- * * Redistributions in binary form must reproduce the above copyright
-- * notice, this list of conditions and the following disclaimer in the
-- * documentation and/or other materials provided with the distribution.
-- * * Neither the name of the above-listed copyright holders nor the
-- * names of any contributors may be used to endorse or promote products
-- * derived from this software without specific prior written permission.
-- *
-- *
-- * ALTERNATIVELY, this software may be distributed under the terms of the
-- * GNU General Public License ("GPL") as published by the Free Software
-- * Foundation, either version 2 of that License or (at your option) any
-- * later version.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
-- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-- * POSSIBILITY OF SUCH DAMAGE.
-- */
--#ifndef __FSL_MC_CMD_H
--#define __FSL_MC_CMD_H
--
--#define MC_CMD_NUM_OF_PARAMS	7
--
--struct mc_cmd_header {
--	u8 src_id;
--	u8 flags_hw;
--	u8 status;
--	u8 flags_sw;
--	__le16 token;
--	__le16 cmd_id;
--};
--
--struct mc_command {
--	u64 header;
--	u64 params[MC_CMD_NUM_OF_PARAMS];
--};
--
--struct mc_rsp_create {
--	__le32 object_id;
--};
--
--struct mc_rsp_api_ver {
--	__le16 major_ver;
--	__le16 minor_ver;
--};
--
--enum mc_cmd_status {
--	MC_CMD_STATUS_OK = 0x0, /* Completed successfully */
--	MC_CMD_STATUS_READY = 0x1, /* Ready to be processed */
--	MC_CMD_STATUS_AUTH_ERR = 0x3, /* Authentication error */
--	MC_CMD_STATUS_NO_PRIVILEGE = 0x4, /* No privilege */
--	MC_CMD_STATUS_DMA_ERR = 0x5, /* DMA or I/O error */
--	MC_CMD_STATUS_CONFIG_ERR = 0x6, /* Configuration error */
--	MC_CMD_STATUS_TIMEOUT = 0x7, /* Operation timed out */
--	MC_CMD_STATUS_NO_RESOURCE = 0x8, /* No resources */
--	MC_CMD_STATUS_NO_MEMORY = 0x9, /* No memory available */
--	MC_CMD_STATUS_BUSY = 0xA, /* Device is busy */
--	MC_CMD_STATUS_UNSUPPORTED_OP = 0xB, /* Unsupported operation */
--	MC_CMD_STATUS_INVALID_STATE = 0xC /* Invalid state */
--};
--
--/*
-- * MC command flags
-- */
--
--/* High priority flag */
--#define MC_CMD_FLAG_PRI		0x80
--/* Command completion flag */
--#define MC_CMD_FLAG_INTR_DIS	0x01
--
--static inline u64 mc_encode_cmd_header(u16 cmd_id,
--				       u32 cmd_flags,
--				       u16 token)
--{
--	u64 header = 0;
--	struct mc_cmd_header *hdr = (struct mc_cmd_header *)&header;
--
--	hdr->cmd_id = cpu_to_le16(cmd_id);
--	hdr->token  = cpu_to_le16(token);
--	hdr->status = MC_CMD_STATUS_READY;
--	if (cmd_flags & MC_CMD_FLAG_PRI)
--		hdr->flags_hw = MC_CMD_FLAG_PRI;
--	if (cmd_flags & MC_CMD_FLAG_INTR_DIS)
--		hdr->flags_sw = MC_CMD_FLAG_INTR_DIS;
--
--	return header;
--}
--
--static inline u16 mc_cmd_hdr_read_token(struct mc_command *cmd)
--{
--	struct mc_cmd_header *hdr = (struct mc_cmd_header *)&cmd->header;
--	u16 token = le16_to_cpu(hdr->token);
--
--	return token;
--}
--
--static inline u32 mc_cmd_read_object_id(struct mc_command *cmd)
--{
--	struct mc_rsp_create *rsp_params;
--
--	rsp_params = (struct mc_rsp_create *)cmd->params;
--	return le32_to_cpu(rsp_params->object_id);
--}
--
--static inline void mc_cmd_read_api_version(struct mc_command *cmd,
--					   u16 *major_ver,
--					   u16 *minor_ver)
--{
--	struct mc_rsp_api_ver *rsp_params;
--
--	rsp_params = (struct mc_rsp_api_ver *)cmd->params;
--	*major_ver = le16_to_cpu(rsp_params->major_ver);
--	*minor_ver = le16_to_cpu(rsp_params->minor_ver);
--}
--
--#endif /* __FSL_MC_CMD_H */
+ /**
 diff --git a/drivers/staging/fsl-mc/include/mc.h b/drivers/staging/fsl-mc/include/mc.h
-index 33bb3b8..38f8714 100644
+index 38f8714..aafe63a 100644
 --- a/drivers/staging/fsl-mc/include/mc.h
 +++ b/drivers/staging/fsl-mc/include/mc.h
-@@ -23,7 +23,6 @@ struct msi_domain_info;
+@@ -14,7 +14,6 @@
+ #include <linux/device.h>
+ #include <linux/mod_devicetable.h>
+ #include <linux/interrupt.h>
+-#include "../include/dprc.h"
  
- struct fsl_mc_device;
- struct fsl_mc_io;
--struct mc_command;
+ #define FSL_MC_VENDOR_FREESCALE	0x1957
  
- /**
-  * struct fsl_mc_driver - MC object device driver object
-@@ -202,6 +201,100 @@ struct fsl_mc_device {
- #define to_fsl_mc_device(_dev) \
- 	container_of(_dev, struct fsl_mc_device, dev)
- 
-+#define MC_CMD_NUM_OF_PARAMS	7
-+
-+struct mc_cmd_header {
-+	u8 src_id;
-+	u8 flags_hw;
-+	u8 status;
-+	u8 flags_sw;
-+	__le16 token;
-+	__le16 cmd_id;
-+};
-+
-+struct mc_command {
-+	u64 header;
-+	u64 params[MC_CMD_NUM_OF_PARAMS];
-+};
-+
-+enum mc_cmd_status {
-+	MC_CMD_STATUS_OK = 0x0, /* Completed successfully */
-+	MC_CMD_STATUS_READY = 0x1, /* Ready to be processed */
-+	MC_CMD_STATUS_AUTH_ERR = 0x3, /* Authentication error */
-+	MC_CMD_STATUS_NO_PRIVILEGE = 0x4, /* No privilege */
-+	MC_CMD_STATUS_DMA_ERR = 0x5, /* DMA or I/O error */
-+	MC_CMD_STATUS_CONFIG_ERR = 0x6, /* Configuration error */
-+	MC_CMD_STATUS_TIMEOUT = 0x7, /* Operation timed out */
-+	MC_CMD_STATUS_NO_RESOURCE = 0x8, /* No resources */
-+	MC_CMD_STATUS_NO_MEMORY = 0x9, /* No memory available */
-+	MC_CMD_STATUS_BUSY = 0xA, /* Device is busy */
-+	MC_CMD_STATUS_UNSUPPORTED_OP = 0xB, /* Unsupported operation */
-+	MC_CMD_STATUS_INVALID_STATE = 0xC /* Invalid state */
-+};
-+
-+/*
-+ * MC command flags
-+ */
-+
-+/* High priority flag */
-+#define MC_CMD_FLAG_PRI		0x80
-+/* Command completion flag */
-+#define MC_CMD_FLAG_INTR_DIS	0x01
-+
-+static inline u64 mc_encode_cmd_header(u16 cmd_id,
-+				       u32 cmd_flags,
-+				       u16 token)
-+{
-+	u64 header = 0;
-+	struct mc_cmd_header *hdr = (struct mc_cmd_header *)&header;
-+
-+	hdr->cmd_id = cpu_to_le16(cmd_id);
-+	hdr->token  = cpu_to_le16(token);
-+	hdr->status = MC_CMD_STATUS_READY;
-+	if (cmd_flags & MC_CMD_FLAG_PRI)
-+		hdr->flags_hw = MC_CMD_FLAG_PRI;
-+	if (cmd_flags & MC_CMD_FLAG_INTR_DIS)
-+		hdr->flags_sw = MC_CMD_FLAG_INTR_DIS;
-+
-+	return header;
-+}
-+
-+static inline u16 mc_cmd_hdr_read_token(struct mc_command *cmd)
-+{
-+	struct mc_cmd_header *hdr = (struct mc_cmd_header *)&cmd->header;
-+	u16 token = le16_to_cpu(hdr->token);
-+
-+	return token;
-+}
-+
-+struct mc_rsp_create {
-+	__le32 object_id;
-+};
-+
-+struct mc_rsp_api_ver {
-+	__le16 major_ver;
-+	__le16 minor_ver;
-+};
-+
-+static inline u32 mc_cmd_read_object_id(struct mc_command *cmd)
-+{
-+	struct mc_rsp_create *rsp_params;
-+
-+	rsp_params = (struct mc_rsp_create *)cmd->params;
-+	return le32_to_cpu(rsp_params->object_id);
-+}
-+
-+static inline void mc_cmd_read_api_version(struct mc_command *cmd,
-+					   u16 *major_ver,
-+					   u16 *minor_ver)
-+{
-+	struct mc_rsp_api_ver *rsp_params;
-+
-+	rsp_params = (struct mc_rsp_api_ver *)cmd->params;
-+	*major_ver = le16_to_cpu(rsp_params->major_ver);
-+	*minor_ver = le16_to_cpu(rsp_params->minor_ver);
-+}
-+
- /**
-  * Bit masks for a MC I/O object (struct fsl_mc_io) flags
-  */
 -- 
 2.9.4
