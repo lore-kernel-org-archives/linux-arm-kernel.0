@@ -1,131 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 Jun 2017 15:59:00 +0200
-Subject: [PATCH v1] ARM: dts: sun7i: provide ramoops region on BananaPi
-In-Reply-To: <48c81184-3713-31a8-03e8-f55ffaef639c@rempel-privat.de>
-References: <1498065017-30556-1-git-send-email-linux@rempel-privat.de>
- <20170622061617.5guhcyxdthvmiq7j@flea.lan>
- <48c81184-3713-31a8-03e8-f55ffaef639c@rempel-privat.de>
-Message-ID: <20170627135900.smezq4mvdowmhbaz@flea.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 27 Jun 2017 15:06:00 +0100
+Subject: [Devel] [RESEND PATCH v9 3/3] iommu/arm-smmu-v3: Add workaround
+ for Cavium ThunderX2 erratum #126
+In-Reply-To: <20170627135610.GX658@rric.localdomain>
+References: <1498224876-5200-1-git-send-email-gakula@caviumnetworks.com>
+ <20170627135610.GX658@rric.localdomain>
+Message-ID: <20170627140559.GK14041@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 08:40:44AM +0200, Oleksij Rempel wrote:
-> Am 22.06.2017 um 08:16 schrieb Maxime Ripard:
-> > Hi Oleksij,
+On Tue, Jun 27, 2017 at 03:56:10PM +0200, Robert Richter wrote:
+> On 23.06.17 19:04:36, Geetha sowjanya wrote:
+> > From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
 > > 
-> > On Wed, Jun 21, 2017 at 07:10:17PM +0200, Oleksij Rempel wrote:
-> >> This should help provide useful debug information on remote
-> >> targets without UART.
-> >>
-> >> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> >> ---
-> >>  arch/arm/boot/dts/sun7i-a20-bananapi.dts | 16 ++++++++++++++++
-> >>  1 file changed, 16 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> >> index ed2f35a..38923bf 100644
-> >> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> >> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> >> @@ -63,6 +63,22 @@
-> >>  		stdout-path = "serial0:115200n8";
-> >>  	};
-> >>  
-> >> +	reserved-memory {
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <1>;
-> >> +		ranges;
-> >> +
-> >> +		ramoops at 7fb6a000 {
-> >> +			compatible = "ramoops";
-> >> +			reg = <0x7fb6a000 0x100000>;
-> >> +			ecc-size	= <16>;
-> >> +			record-size	= <0x00020000>;
-> >> +			console-size	= <0x00020000>;
-> >> +			ftrace-size	= <0x00020000>;
-> >> +			pmsg-size	= <0x00020000>;
-> >> +		};
-> >> +	};
-> >> +
+> > Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
+> > lines for gerror, eventq and cmdq-sync.
 > > 
-> > I'm a bit skeptical about this one.
+> > New named irq "combined" is set as a errata workaround, which allows to
+> > share the irq line by register single irq handler for all the interrupts.
+> > 
+> > Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
+> > ---
+> >  Documentation/arm64/silicon-errata.txt             |    1 +
+> >  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    6 +
+> >  drivers/acpi/arm64/iort.c                          |   57 ++++++++---
+> >  drivers/iommu/arm-smmu-v3.c                        |  100 ++++++++++++++-----
+> >  4 files changed, 121 insertions(+), 43 deletions(-)
 > 
-> I can understand your concern.
+> > +static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+> > +{
+> > +	int ret, irq;
+> > +	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
+> > +
+> > +	/* Disable IRQs first */
+> > +	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
+> > +				      ARM_SMMU_IRQ_CTRLACK);
+> > +	if (ret) {
+> > +		dev_err(smmu->dev, "failed to disable irqs\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	irq = smmu->combined_irq;
+> > +	if (irq) {
+> > +		/*
+> > +		 * Cavium ThunderX2 implementation doesn't not support unique
+> > +		 * irq lines. Use single irq line for all the SMMUv3 interrupts.
+> > +		 */
+> > +		ret = devm_request_threaded_irq(smmu->dev, irq,
+> > +					arm_smmu_combined_irq_handler,
+> > +					arm_smmu_combined_irq_thread,
+> > +					IRQF_ONESHOT,
 > 
-> > First, there's nothing specific to the bananapi,
-> 
-> It is specific to memory size, bootloader used for the board and in some
-> cases security co processor. Any thing else I forgot?
+> Without the IRQF_SHARED flag set I see the following on a dual node
+> system now:
 
-Ah, right, you end up depending on the memory size...
+We asked about that before:
 
-> > but every one will want to have different sizes here, or different
-> > parameters.
-> 
-> I don't thing every one need different configurations. I assume current
-> parameters are good enough for most users. But if users need some thing
-> different they should be overwritten by kernel boot args.
+https://marc.info/?l=linux-arm-kernel&m=149803613513068&w=2
+https://marc.info/?l=linux-acpi&m=149803744713475&w=2
 
-We're basically stuck between two constraints that are opposing: the
-users that don't care about ramoops want to use all the RAM they can
-and the users that care about ramoops will probably like to have quite
-a big buffer to be able to have as much backlog as possible in case of
-a crash.
+and Geetha didn't reply, but the next version of the patch dropped the flag.
+Is it just that firmware is misprogramming something here, or something
+more fundamental?
 
-And then, we'd need to define how much exactly "big enough" is, which
-is probably going to be subject to debate across the latter population
-:)
-
-> May be, DTS should provide some generic/ramoops area and let
-> distributions decide how to use it? For example compile kernel with
-> some defaults for ramoops.
-
-That would be difficult to achieve, since you don't know where the end
-of the RAM is from one board to another (and even between two variants
-of the same board sold in different memory size variants).
-
-> > Since using the kernel parameters is also an option, I'd rather
-> > document how to do that with the parameters.
-> 
-> Here are my arguments to do this in DTS:
->
-> - some issues are hardly reproducible and it is good to catch it as soon
-> as possible. So it should be enabled before first problem will happen.
-
-You'll probably need some extra step anyway though, for example to
-load the module.
-
-> - my previous experience with pstore was a bit disappointing, it didn't
-> worked on SMP system correctly. So the test coverage seems to be
-> minimal. Probably because it is not enabled by default.
-
-That's not really a good argument to enable it though :)
-
-> - at least barebox can extract some postmortem information from not
-> booting system. Bootloader and Kernel need to use same parameters,
-> devicetree seems to be perfect here.
-
-That could be patched in the DT from bootloaders that are able to do
-that then? That would even work better, since they know what the
-memory size is.
-
-> - distributions should be able to use this per default as soon as this
-> option is available.
-
-This is the issue with defaults, no one agree with them. I can
-probably give you a good number of people that would not want to have
-that memory at waste. And given the number of current users (3), the
-default seems to be of not enabling it.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/9e94d555/attachment-0001.sig>
+Will
