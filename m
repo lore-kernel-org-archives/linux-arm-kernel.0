@@ -1,66 +1,75 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 26 Jun 2017 19:17:46 -0700
-Subject: [PATCH] spmi: pmic-arb: Always allocate ppid_to_apid table
-Message-ID: <20170627021746.22445-1-sboyd@codeaurora.org>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Tue, 27 Jun 2017 10:20:35 +0800
+Subject: [PATCH v2] spi: rockchip: Disable Runtime PM when chip select is
+ asserted
+Message-ID: <1498530035-22070-1-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 7f1d4e58dabb ("spmi: pmic-arb: optimize table
-lookups") we always need the ppid_to_apid table regardless of the
-version of pmic arbiter we have. Otherwise, we will try to deref
-the array when we don't allocate it on v2 hardware like the
-msm8974 SoCs.
+The rockchip spi would stop driving pins when runtime suspended, which
+might break slave's xfer(for example cros_ec).
 
-Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-Cc: Kiran Gunda <kgunda@codeaurora.org>
-Fixes: 7f1d4e58dabb ("spmi: pmic-arb: optimize table lookups")
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Since we have pullups on those pins, we only need to care about the CS
+asserted case.
+
+So let's keep the spi alive when chip select is asserted for that.
+
+Also change use pm_runtime_put instead of pm_runtime_put_sync.
+
+Suggested-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+
 ---
- drivers/spmi/spmi-pmic-arb.c | 17 +++++++----------
- 1 file changed, 7 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
-index 2afe3597982e..f4b7a98a7913 100644
---- a/drivers/spmi/spmi-pmic-arb.c
-+++ b/drivers/spmi/spmi-pmic-arb.c
-@@ -134,7 +134,6 @@ struct apid_data {
-  * @spmic:		SPMI controller object
-  * @ver_ops:		version dependent operations.
-  * @ppid_to_apid	in-memory copy of PPID -> channel (APID) mapping table.
-- *			v2 only.
-  */
- struct spmi_pmic_arb {
- 	void __iomem		*rd_base;
-@@ -1016,6 +1015,13 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
- 		goto err_put_ctrl;
- 	}
+Changes in v2:
+Improve commit message and comments and coding style.
+
+ drivers/spi/spi-rockchip.c | 23 ++++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index acf31f3..ea0edd7 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -264,7 +264,7 @@ static inline u32 rx_max(struct rockchip_spi *rs)
  
-+	pa->ppid_to_apid = devm_kcalloc(&ctrl->dev, PMIC_ARB_MAX_PPID,
-+					sizeof(*pa->ppid_to_apid), GFP_KERNEL);
-+	if (!pa->ppid_to_apid) {
-+		err = -ENOMEM;
-+		goto err_put_ctrl;
+ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+ {
+-	u32 ser;
++	u32 ser, new_ser;
+ 	struct spi_master *master = spi->master;
+ 	struct rockchip_spi *rs = spi_master_get_devdata(master);
+ 
+@@ -288,13 +288,26 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+ 	 * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
+ 	 */
+ 	if (!enable)
+-		ser |= 1 << spi->chip_select;
++		new_ser = ser | BIT(spi->chip_select);
+ 	else
+-		ser &= ~(1 << spi->chip_select);
++		new_ser = ser & ~BIT(spi->chip_select);
+ 
+-	writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
++	if (new_ser != ser) {
++		writel_relaxed(new_ser, rs->regs + ROCKCHIP_SPI_SER);
+ 
+-	pm_runtime_put_sync(rs->dev);
++		/*
++		 * The rockchip spi would stop driving all pins when powered
++		 * down.
++		 * So hold a runtime PM reference as long as CS is asserted.
++		 */
++		if (!enable)
++			return;
++
++		/* Drop reference from when we first asserted CS */
++		pm_runtime_put(rs->dev);
 +	}
 +
- 	hw_ver = readl_relaxed(core + PMIC_ARB_VERSION);
++	pm_runtime_put(rs->dev);
+ }
  
- 	if (hw_ver < PMIC_ARB_VERSION_V2_MIN) {
-@@ -1048,15 +1054,6 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
- 			err = PTR_ERR(pa->wr_base);
- 			goto err_put_ctrl;
- 		}
--
--		pa->ppid_to_apid = devm_kcalloc(&ctrl->dev,
--						PMIC_ARB_MAX_PPID,
--						sizeof(*pa->ppid_to_apid),
--						GFP_KERNEL);
--		if (!pa->ppid_to_apid) {
--			err = -ENOMEM;
--			goto err_put_ctrl;
--		}
- 	}
- 
- 	dev_info(&ctrl->dev, "PMIC arbiter version %s (0x%x)\n",
+ static int rockchip_spi_prepare_message(struct spi_master *master,
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.4
