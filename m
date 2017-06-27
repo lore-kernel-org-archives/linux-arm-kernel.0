@@ -1,85 +1,61 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 27 Jun 2017 11:04:22 +0200
-Subject: [PATCH v2 5/8] dt-bindings: iio: Add STM32 LPTimer trigger binding
-In-Reply-To: <3D30F4CE-048C-4E5E-BDE1-48660B295066@jic23.retrosnub.co.uk>
-References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
- <1498055415-31513-6-git-send-email-fabrice.gasnier@st.com>
- <20170626181416.b7wr6wswuzeasuks@rob-hp-laptop>
- <3D30F4CE-048C-4E5E-BDE1-48660B295066@jic23.retrosnub.co.uk>
-Message-ID: <21a2d75f-8fbe-d3d2-4326-8e506a312d9a@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Jun 2017 11:05:38 +0200
+Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
+In-Reply-To: <20170627081717.GM4902@n2100.armlinux.org.uk>
+References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
+ <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
+ <20170623152227.GA21989@leverpostej>
+ <DB6PR04MB2999E8FFBE0FE708A003637986D80@DB6PR04MB2999.eurprd04.prod.outlook.com>
+ <CAK8P3a0mhWTRriGYB6aHS28dm842d-0OeGRmRYzMS4ZYY9=YCQ@mail.gmail.com>
+ <20170627081717.GM4902@n2100.armlinux.org.uk>
+Message-ID: <CAK8P3a0N5tiP7RPMg=Q8fsROuYabJjQ5Awd2ekrn686nDqdNwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2017 10:38 PM, Jonathan Cameron wrote:
-> 
-> 
-> On 26 June 2017 19:14:16 BST, Rob Herring <robh@kernel.org> wrote:
->> On Wed, Jun 21, 2017 at 04:30:12PM +0200, Fabrice Gasnier wrote:
->>> Add documentation for STMicroelectronics STM32 Low-Power Timer
->> Trigger
->>> binding.
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>> ---
->>> Changes in v2:
->>> - s/Low Power/Low-Power
->>> - remove leading 0x in example (parent node)
->>> - improve reg property description
->>> ---
->>>  .../bindings/iio/timer/stm32-lptimer-trigger.txt   | 23
->> ++++++++++++++++++++++
->>>  1 file changed, 23 insertions(+)
->>>  create mode 100644
->> Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
->>>
->>> diff --git
->> a/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
->> b/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
->>> new file mode 100644
->>> index 0000000..466d99f
->>> --- /dev/null
->>> +++
->> b/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
->>> @@ -0,0 +1,23 @@
->>> +STMicroelectronics STM32 Low-Power Timer Trigger
->>> +
->>> +STM32 Low-Power Timer provides trigger source (LPTIM output) that
->> can be used
->>> +by STM32 internal ADC and/or DAC.
->>> +
->>> +Must be a sub-node of an STM32 Low-Power Timer device tree node.
->>> +See ../mfd/stm32-lptimer.txt for details about the parent node.
->>> +
->>> +Required properties:
->>> +- compatible:		Must be "st,stm32-lptimer-trigger".
->>> +- reg:			Selects trigger hardware block. Must be 0, 1 or 2
->>> +			respectively for lptimer1, lptimer2 or lptimer3
->>> +			trigger output.
->>
->> I guess this answers my question. However, this seems like abuse of the
->>
->> reg prop. This should not be how you select a trigger. The DT should 
->> describe all the h/w blocks and then the adc connection is a separate 
->> property.
-> I think this is miss described. Reg is labelling instances of the hardware block which is providing the trigger.
+On Tue, Jun 27, 2017 at 10:17 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Jun 27, 2017 at 09:17:48AM +0200, Arnd Bergmann wrote:
+>> I'd suggest we start out by converting this to some standard API
+>> first, regardless of performance, to get it working properly with code
+>> that should be maintainable at least, and make progress with your
+>> hardware enablement.
+>
+> I think Roy is rather confused right now about what the driver does
+> and doesn't do.
+>
+> With his patches, two areas are mapped on ARM:
+>
+> 1. The addr.ci area is mapped using ioremap().  This is a device mapping,
+>    and is used by the "Cache-inhibited register access." functions.
+>
+> 2. The addr.ce area is mapped using ioremap_wc(), and all other stuff
+>    including the verb accesses go through this region.  This is a
+>    memory, non-cacheable mapping.
+>
+> The addr.ce region is the area that has a mixture of memset(), MMIO
+> accessors, direct CPU accesses, cache flushes and prefetches used on
+> it.
+>
+> As it is marked non-cacheable, the cache flushes are a pure waste of
+> CPU cycles.  Prefetching to a non-cacheable area doesn't make much
+> sense either.
+>
+> So, I think for ARM: just kill the cache flushing - its doing nothing
+> useful.  The prefetching could also be removed as well to recover a
+> few more CPU cycles.
 
-Hi Rob, Jonathan,
+Right, that sounds good. I wondered about the ioremap_wc() earlier
+and thought I must have missed something as it didn't make any sense
+to me, but apparently that was because the code really doesn't make
+sense ;-).
 
-yes, reg identifies trigger hardware block.
-I'll better describe in v3:
-- reg:         Identify trigger hardware block.
+It would be good to get consistent __iomem annotations on it too,
+so we can see exactly where the MMIO interfaces are used incorrectly,
+and find a fix for that.
 
-Best regards,
-Fabrice
+I wonder if doing memcpy_toio on the write-combining mapping
+will do what Roy wants and and up sending a single bus transaction
+for one descriptor most of the time, while fitting in with the ioremap_wc()
+interface and its __iomem pointers.
 
-> 
-> The connection to an ADC etc is done from userspace.
-> 
-> 
->>
->> Rob
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+       Arnd
