@@ -1,207 +1,189 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 26 Jun 2017 20:53:45 -0700
-Subject: [PATCH V4 6/7] pinctrl: imx: make imx_pmx_ops.gpio_set_direction
- platform specific callbacks
-In-Reply-To: <1498046395-30001-7-git-send-email-aisheng.dong@nxp.com>
-References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
- <1498046395-30001-7-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <f1c34a026406b9e7c2a727ad8de54998@agner.ch>
+From: linu.cherian@cavium.com (Linu Cherian)
+Date: Tue, 27 Jun 2017 10:41:55 +0530
+Subject: [PATCH v2 5/8] iommu/io-pgtable-arm: Support lockless operation
+In-Reply-To: <20170623113405.GA5221@virtx40>
+References: <cover.1498145008.git.robin.murphy@arm.com>
+ <af61929e3984a31588cab08ed84a237602b5263e.1498145008.git.robin.murphy@arm.com>
+ <20170623055326.GA2949@virtx40> <20170623085607.GC3718@virtx40>
+ <7a8da378-19e2-2f35-877a-cc6ce389301a@arm.com>
+ <20170623113405.GA5221@virtx40>
+Message-ID: <20170627051155.GA9525@virtx40>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-06-21 04:59, Dong Aisheng wrote:
-> Various IMX platforms may have different imx_pmx_ops.gpio_set_direction
-> implementations, so let's make it platform specific callbacks instead of
-> the fixed common one.
+On Fri Jun 23, 2017 at 05:04:05PM +0530, Linu Cherian wrote:
+> On Fri Jun 23, 2017 at 11:35:25AM +0100, Robin Murphy wrote:
+> > On 23/06/17 09:56, Linu Cherian wrote:
+> > > On Fri Jun 23, 2017 at 11:23:26AM +0530, Linu Cherian wrote:
+> > >>
+> > >> Robin,
+> > >> Was trying to understand the new changes. Had few questions on 
+> > >> arm_lpae_install_table. 
+> > >>
+> > >> On Thu Jun 22, 2017 at 04:53:54PM +0100, Robin Murphy wrote:
+> > >>> For parallel I/O with multiple concurrent threads servicing the same
+> > >>> device (or devices, if several share a domain), serialising page table
+> > >>> updates becomes a massive bottleneck. On reflection, though, we don't
+> > >>> strictly need to do that - for valid IOMMU API usage, there are in fact
+> > >>> only two races that we need to guard against: multiple map requests for
+> > >>> different blocks within the same region, when the intermediate-level
+> > >>> table for that region does not yet exist; and multiple unmaps of
+> > >>> different parts of the same block entry. Both of those are fairly easily
+> > >>> solved by using a cmpxchg to install the new table, such that if we then
+> > >>> find that someone else's table got there first, we can simply free ours
+> > >>> and continue.
+> > >>>
+> > >>> Make the requisite changes such that we can withstand being called
+> > >>> without the caller maintaining a lock. In theory, this opens up a few
+> > >>> corners in which wildly misbehaving callers making nonsensical
+> > >>> overlapping requests might lead to crashes instead of just unpredictable
+> > >>> results, but correct code really does not deserve to pay a significant
+> > >>> performance cost for the sake of masking bugs in theoretical broken code.
+> > >>>
+> > >>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > >>> ---
+> > >>>
+> > >>> v2:
+> > >>>  - Fix barriers in install_table
+> > >>>  - Make a few more PTE accesses with {READ,WRITE}_ONCE() just in case
+> > >>>  - Minor cosmetics
+> > >>>
+> > >>>  drivers/iommu/io-pgtable-arm.c | 72 +++++++++++++++++++++++++++++++++---------
+> > >>>  1 file changed, 57 insertions(+), 15 deletions(-)
+> > >>>
+> > >>> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> > >>> index 6334f51912ea..52700fa958c2 100644
+> > >>> --- a/drivers/iommu/io-pgtable-arm.c
+> > >>> +++ b/drivers/iommu/io-pgtable-arm.c
+> > >>> @@ -20,6 +20,7 @@
+> > >>>  
+> > >>>  #define pr_fmt(fmt)	"arm-lpae io-pgtable: " fmt
+> > >>>  
+> > >>> +#include <linux/atomic.h>
+> > >>>  #include <linux/iommu.h>
+> > >>>  #include <linux/kernel.h>
+> > >>>  #include <linux/sizes.h>
+> > >>> @@ -99,6 +100,8 @@
+> > >>>  #define ARM_LPAE_PTE_ATTR_HI_MASK	(((arm_lpae_iopte)6) << 52)
+> > >>>  #define ARM_LPAE_PTE_ATTR_MASK		(ARM_LPAE_PTE_ATTR_LO_MASK |	\
+> > >>>  					 ARM_LPAE_PTE_ATTR_HI_MASK)
+> > >>> +/* Software bit for solving coherency races */
+> > >>> +#define ARM_LPAE_PTE_SW_SYNC		(((arm_lpae_iopte)1) << 55)
+> > >>>  
+> > >>>  /* Stage-1 PTE */
+> > >>>  #define ARM_LPAE_PTE_AP_UNPRIV		(((arm_lpae_iopte)1) << 6)
+> > >>> @@ -249,15 +252,20 @@ static void __arm_lpae_free_pages(void *pages, size_t size,
+> > >>>  	free_pages_exact(pages, size);
+> > >>>  }
+> > >>>  
+> > >>> +static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep,
+> > >>> +				struct io_pgtable_cfg *cfg)
+> > >>> +{
+> > >>> +	dma_sync_single_for_device(cfg->iommu_dev, __arm_lpae_dma_addr(ptep),
+> > >>> +				   sizeof(*ptep), DMA_TO_DEVICE);
+> > >>> +}
+> > >>> +
+> > >>>  static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+> > >>>  			       struct io_pgtable_cfg *cfg)
+> > >>>  {
+> > >>>  	*ptep = pte;
+> > >>>  
+> > >>>  	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA))
+> > >>> -		dma_sync_single_for_device(cfg->iommu_dev,
+> > >>> -					   __arm_lpae_dma_addr(ptep),
+> > >>> -					   sizeof(pte), DMA_TO_DEVICE);
+> > >>> +		__arm_lpae_sync_pte(ptep, cfg);
+> > >>>  }
+> > >>>  
+> > >>>  static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+> > >>> @@ -314,16 +322,30 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+> > >>>  
+> > >>>  static arm_lpae_iopte arm_lpae_install_table(arm_lpae_iopte *table,
+> > >>>  					     arm_lpae_iopte *ptep,
+> > >>> +					     arm_lpae_iopte curr,
+> > >>>  					     struct io_pgtable_cfg *cfg)
+> > >>>  {
+> > >>> -	arm_lpae_iopte new;
+> > >>> +	arm_lpae_iopte old, new;
+> > >>>  
+> > >>>  	new = __pa(table) | ARM_LPAE_PTE_TYPE_TABLE;
+> > >>>  	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS)
+> > >>>  		new |= ARM_LPAE_PTE_NSTABLE;
+> > >>>  
+> > >>> -	__arm_lpae_set_pte(ptep, new, cfg);
+> > >>> -	return new;
+> > >>> +	/* Ensure the table itself is visible before its PTE can be */
+> > >>> +	wmb();
+> > >>
+> > >> Could you please give more hints on why this is required.
+> > 
+> > In theory it's possible for the write to ptep to become visible before
+> > the previous writes filling out the PTEs in table - if the IOMMU
+> > happened to speculatively walk ptep while parts of table were still sat
+> > in a write buffer somewhere, it could see the old contents of that page
+> > and potentially allocate bogus TLB entries if the stale data happened to
+> > look like valid PTEs. In the non-coherent case the DMA cache maintenance
+> > is sufficient, but otherwise we need a barrier to order writing the
+> > next-level PTEs strictly before writing the table PTE pointing to them,
+> > such that the IOMMU cannot at any point see a partially-initialised table.
 > 
-> Currently only VF610 platform implements it. No function level changes.
-
-Adds an indirection, but I feel this is necessary since we have platform
-differences how GPIO directions are handled...
-
-So:
-
-Acked-by: Stefan Agner <stefan@agner.ch>
-
---
-Stefan
-
+> Got it. Thanks a lot for explainig that.
 > 
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > 
+> > >>> +
+> > >>> +	old = cmpxchg64_relaxed(ptep, curr, new);
+> > >>> +
+> > >>> +	if ((cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA) ||
+> > >>> +	    (old & ARM_LPAE_PTE_SW_SYNC))
+> > >>> +		return old;
+> > >>> +
+> > >>> +	/* Even if it's not ours, there's no point waiting; just kick it */
+> > >>> +	__arm_lpae_sync_pte(ptep, cfg);
+> > >>> +	if (old == curr)
+> > >>> +		WRITE_ONCE(*ptep, new | ARM_LPAE_PTE_SW_SYNC);
+> > >>
+> > >> How is it ensured that the cache operations are completed before we flag them with
+> > >> 	ARM_LPAE_PTE_SW_SYNC. The previous version had a wmb() after the sync operation.
+> > 
+> > The wmb() here was a silly oversight on my part - as Will reminded me,
+> > dma_sync_*() already has its own barrier to ensure completion, which is
+> > pretty obvious in retrospect because the entire streaming DMA would be
+> > totally broken otherwise.
+> > 
+> > >>> +
+> > >>> +	return old;
+> > >>>  }
+> > >>>
+> > >>
+> > > 
+> > > 
+> > > Observed a performance drop of close to 1G, 
+> > > while testing on the 10G network interface with this patch series compared to v1.
+> > 
+> > Is that consistent over multiple runs? I wouldn't expect many workloads
+> > to be thrashing table and hugepage mappings in the same IOVA region, so
+> > after a point we should tend to reach a fairly steady state where we're
+> > only changing leaf PTEs.
+> > 
+> > > Moving the wmb() as in v1 restores it back.
+> > 
+> > Note that on a coherent platform like ThunderX that's as good as just
+> > deleting it, because you'll never execute the case below. However, on
+> > reflection I think it can at least safely be downgraded to dma_wmb()
+> > (i.e. DMB) rather than a full DSB - would you be able to test what
+> > difference that makes?
 > 
-> ---
-> ChangeLog:
->  * new patch.
-> ---
->  drivers/pinctrl/freescale/pinctrl-imx.c   | 48 +++----------------------------
->  drivers/pinctrl/freescale/pinctrl-imx.h   | 20 +++++++++++++
->  drivers/pinctrl/freescale/pinctrl-vf610.c | 25 ++++++++++++++++
->  3 files changed, 49 insertions(+), 44 deletions(-)
+> The testing was done on Thunderx 1, which has a non coherent page table walk.
+> Yes, downgrading to dma_wmb() helps. With this change, performance is back to v1.
 > 
-> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
-> b/drivers/pinctrl/freescale/pinctrl-imx.c
-> index 505fe79..ad23e39 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> @@ -35,18 +35,6 @@
->  #define IMX_NO_PAD_CTL	0x80000000	/* no pin config need */
->  #define IMX_PAD_SION 0x40000000		/* set SION */
->  
-> -/**
-> - * @dev: a pointer back to containing device
-> - * @base: the offset to the controller in virtual memory
-> - */
-> -struct imx_pinctrl {
-> -	struct device *dev;
-> -	struct pinctrl_dev *pctl;
-> -	void __iomem *base;
-> -	void __iomem *input_sel_base;
-> -	struct imx_pinctrl_soc_info *info;
-> -};
-> -
->  static inline const struct group_desc *imx_pinctrl_find_group_by_name(
->  				struct pinctrl_dev *pctldev,
->  				const char *name)
-> @@ -255,42 +243,11 @@ static int imx_pmx_set(struct pinctrl_dev
-> *pctldev, unsigned selector,
->  	return 0;
->  }
->  
-> -static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-> -	   struct pinctrl_gpio_range *range, unsigned offset, bool input)
-> -{
-> -	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-> -	struct imx_pinctrl_soc_info *info = ipctl->info;
-> -	const struct imx_pin_reg *pin_reg;
-> -	u32 reg;
-> -
-> -	/*
-> -	 * Only Vybrid has the input/output buffer enable flags (IBE/OBE)
-> -	 * They are part of the shared mux/conf register.
-> -	 */
-> -	if (!(info->flags & SHARE_MUX_CONF_REG))
-> -		return 0;
-> -
-> -	pin_reg = &info->pin_regs[offset];
-> -	if (pin_reg->mux_reg == -1)
-> -		return -EINVAL;
-> -
-> -	/* IBE always enabled allows us to read the value "on the wire" */
-> -	reg = readl(ipctl->base + pin_reg->mux_reg);
-> -	if (input)
-> -		reg &= ~0x2;
-> -	else
-> -		reg |= 0x2;
-> -	writel(reg, ipctl->base + pin_reg->mux_reg);
-> -
-> -	return 0;
-> -}
-> -
-> -static const struct pinmux_ops imx_pmx_ops = {
-> +struct pinmux_ops imx_pmx_ops = {
->  	.get_functions_count = pinmux_generic_get_function_count,
->  	.get_function_name = pinmux_generic_get_function_name,
->  	.get_function_groups = pinmux_generic_get_function_groups,
->  	.set_mux = imx_pmx_set,
-> -	.gpio_set_direction = imx_pmx_gpio_set_direction,
->  };
->  
->  /* decode generic config into raw register values */
-> @@ -793,6 +750,9 @@ int imx_pinctrl_probe(struct platform_device *pdev,
->  	imx_pinctrl_desc->custom_params = info->custom_params;
->  	imx_pinctrl_desc->num_custom_params = info->num_custom_params;
->  
-> +	/* platform specific callback */
-> +	imx_pmx_ops.gpio_set_direction = info->gpio_set_direction;
-> +
->  	mutex_init(&info->mutex);
->  
->  	ipctl->info = info;
-> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h
-> b/drivers/pinctrl/freescale/pinctrl-imx.h
-> index 880bba7..5aa22b5 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-imx.h
-> +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
-> @@ -16,9 +16,12 @@
->  #define __DRIVERS_PINCTRL_IMX_H
->  
->  #include <linux/pinctrl/pinconf-generic.h>
-> +#include <linux/pinctrl/pinmux.h>
->  
->  struct platform_device;
->  
-> +extern struct pinmux_ops imx_pmx_ops;
-> +
->  /**
->   * struct imx_pin - describes a single i.MX pin
->   * @pin: the pin_id of this pin
-> @@ -76,6 +79,23 @@ struct imx_pinctrl_soc_info {
->  	unsigned int num_decodes;
->  	void (*fixup)(unsigned long *configs, unsigned int num_configs,
->  		      u32 *raw_config);
-> +
-> +	int (*gpio_set_direction)(struct pinctrl_dev *pctldev,
-> +				  struct pinctrl_gpio_range *range,
-> +				  unsigned offset,
-> +				  bool input);
-> +};
-> +
-> +/**
-> + * @dev: a pointer back to containing device
-> + * @base: the offset to the controller in virtual memory
-> + */
-> +struct imx_pinctrl {
-> +	struct device *dev;
-> +	struct pinctrl_dev *pctl;
-> +	void __iomem *base;
-> +	void __iomem *input_sel_base;
-> +	struct imx_pinctrl_soc_info *info;
->  };
->  
->  #define IMX_CFG_PARAMS_DECODE(p, m, o) \
-> diff --git a/drivers/pinctrl/freescale/pinctrl-vf610.c
-> b/drivers/pinctrl/freescale/pinctrl-vf610.c
-> index 3bd8556..ac18bb6 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-vf610.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
-> @@ -295,10 +295,35 @@ static const struct pinctrl_pin_desc
-> vf610_pinctrl_pads[] = {
->  	IMX_PINCTRL_PIN(VF610_PAD_PTA7),
->  };
->  
-> +static int vf610_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-> +					struct pinctrl_gpio_range *range,
-> +					unsigned offset, bool input)
-> +{
-> +	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-> +	struct imx_pinctrl_soc_info *info = ipctl->info;
-> +	const struct imx_pin_reg *pin_reg;
-> +	u32 reg;
-> +
-> +	pin_reg = &info->pin_regs[offset];
-> +	if (pin_reg->mux_reg == -1)
-> +		return -EINVAL;
-> +
-> +	/* IBE always enabled allows us to read the value "on the wire" */
-> +	reg = readl(ipctl->base + pin_reg->mux_reg);
-> +	if (input)
-> +		reg &= ~0x2;
-> +	else
-> +		reg |= 0x2;
-> +	writel(reg, ipctl->base + pin_reg->mux_reg);
-> +
-> +	return 0;
-> +}
-> +
->  static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
->  	.pins = vf610_pinctrl_pads,
->  	.npins = ARRAY_SIZE(vf610_pinctrl_pads),
->  	.flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
-> +	.gpio_set_direction = vf610_pmx_gpio_set_direction,
->  	.mux_mask = 0x700000,
->  	.mux_shift = 20,
->  };
+> 
+> 
+
+Should i send a patch for this ?
+
+Thanks.
+
+
+
+-- 
+Linu cherian
