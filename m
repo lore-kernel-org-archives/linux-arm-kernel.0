@@ -1,114 +1,123 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Tue, 27 Jun 2017 17:45:17 +0200
-Subject: [PATCHv2 5/9] spi: stm32: use normal conditional statements instead
- of ternary operator
+Date: Tue, 27 Jun 2017 17:45:18 +0200
+Subject: [PATCHv2 6/9] spi: stm32: add runtime PM support
 In-Reply-To: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
 References: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1498578321-13980-6-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1498578321-13980-7-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replace ternary operator use by normal condition statements
-to ease code reading.
-It also removes redundant !!.
+This patch reworks suspend and resume callbacks and add runtime_suspend
+and runtime_resume callbacks.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- drivers/spi/spi-stm32.c | 44 ++++++++++++++++++++++++++++++--------------
- 1 file changed, 30 insertions(+), 14 deletions(-)
+ drivers/spi/spi-stm32.c | 43 ++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 36 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
-index 0997d6d..72efc63 100644
+index 72efc63..209afda 100644
 --- a/drivers/spi/spi-stm32.c
 +++ b/drivers/spi/spi-stm32.c
-@@ -267,7 +267,10 @@ static int stm32_spi_prepare_mbr(struct stm32_spi *spi, u32 speed_hz)
- 		return -EINVAL;
+@@ -27,6 +27,7 @@
+ #include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
++#include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+ #include <linux/spi/spi.h>
  
- 	/* Determine the first power of 2 greater than or equal to div */
--	mbrdiv = (div & (div - 1)) ? fls(div) : fls(div) - 1;
-+	if (div & (div - 1))
-+		mbrdiv = fls(div);
-+	else
-+		mbrdiv = fls(div) - 1;
+@@ -1164,6 +1165,9 @@ static int stm32_spi_probe(struct platform_device *pdev)
+ 	if (spi->dma_tx || spi->dma_rx)
+ 		master->can_dma = stm32_spi_can_dma;
  
- 	spi->cur_speed = spi->clk_rate / (1 << mbrdiv);
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++
+ 	ret = devm_spi_register_master(&pdev->dev, master);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "spi master registration failed: %d\n",
+@@ -1203,6 +1207,8 @@ static int stm32_spi_probe(struct platform_device *pdev)
+ 		dma_release_channel(spi->dma_tx);
+ 	if (spi->dma_rx)
+ 		dma_release_channel(spi->dma_rx);
++
++	pm_runtime_disable(&pdev->dev);
+ err_clk_disable:
+ 	clk_disable_unprepare(spi->clk);
+ err_master_put:
+@@ -1225,23 +1231,42 @@ static int stm32_spi_remove(struct platform_device *pdev)
  
-@@ -285,9 +288,12 @@ static u32 stm32_spi_prepare_fthlv(struct stm32_spi *spi)
- 	/* data packet should not exceed 1/2 of fifo space */
- 	half_fifo = (spi->fifo_size / 2);
+ 	clk_disable_unprepare(spi->clk);
  
--	fthlv = (spi->cur_bpw <= 8) ? half_fifo :
--		(spi->cur_bpw <= 16) ? (half_fifo / 2) :
--		(half_fifo / 4);
-+	if (spi->cur_bpw <= 8)
-+		fthlv = half_fifo;
-+	else if (spi->cur_bpw <= 16)
-+		fthlv = half_fifo / 2;
-+	else
-+		fthlv = half_fifo / 4;
- 
- 	/* align packet size with data registers access */
- 	if (spi->cur_bpw > 8)
-@@ -462,9 +468,9 @@ static bool stm32_spi_can_dma(struct spi_master *master,
- 	struct stm32_spi *spi = spi_master_get_devdata(master);
- 
- 	dev_dbg(spi->dev, "%s: %s\n", __func__,
--		(!!(transfer->len > spi->fifo_size)) ? "true" : "false");
-+		(transfer->len > spi->fifo_size) ? "true" : "false");
- 
--	return !!(transfer->len > spi->fifo_size);
-+	return (transfer->len > spi->fifo_size);
++	pm_runtime_disable(&pdev->dev);
++
+ 	return 0;
  }
  
- /**
-@@ -493,7 +499,8 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
- 	 * Full-Duplex, need to poll RXP event to know if there are remaining
- 	 * data, before disabling SPI.
- 	 */
--	mask |= ((spi->rx_buf && !spi->cur_usedma) ? SPI_SR_RXP : 0);
-+	if (spi->rx_buf && !spi->cur_usedma)
-+		mask |= SPI_SR_RXP;
++#ifdef CONFIG_PM
++static int stm32_spi_runtime_suspend(struct device *dev)
++{
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct stm32_spi *spi = spi_master_get_devdata(master);
++
++	clk_disable_unprepare(spi->clk);
++
++	return 0;
++}
++
++static int stm32_spi_runtime_resume(struct device *dev)
++{
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct stm32_spi *spi = spi_master_get_devdata(master);
++
++	return clk_prepare_enable(spi->clk);
++}
++#endif
++
+ #ifdef CONFIG_PM_SLEEP
+ static int stm32_spi_suspend(struct device *dev)
+ {
+ 	struct spi_master *master = dev_get_drvdata(dev);
+-	struct stm32_spi *spi = spi_master_get_devdata(master);
+ 	int ret;
  
- 	if (!(sr & mask)) {
- 		dev_dbg(spi->dev, "spurious IT (sr=0x%08x, ier=0x%08x)\n",
-@@ -656,12 +663,18 @@ static void stm32_spi_dma_config(struct stm32_spi *spi,
- 	enum dma_slave_buswidth buswidth;
- 	u32 maxburst;
+ 	ret = spi_master_suspend(master);
+ 	if (ret)
+ 		return ret;
  
--	buswidth = (spi->cur_bpw <= 8) ? DMA_SLAVE_BUSWIDTH_1_BYTE :
--		   (spi->cur_bpw <= 16) ? DMA_SLAVE_BUSWIDTH_2_BYTES :
--		   DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	if (spi->cur_bpw <= 8)
-+		buswidth = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	else if (spi->cur_bpw <= 16)
-+		buswidth = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	else
-+		buswidth = DMA_SLAVE_BUSWIDTH_4_BYTES;
+-	clk_disable_unprepare(spi->clk);
+-
+-	return ret;
++	return pm_runtime_force_suspend(dev);
+ }
  
- 	/* Valid for DMA Half or Full Fifo threshold */
--	maxburst = (spi->cur_fthlv == 2) ? 1 : spi->cur_fthlv;
-+	if (spi->cur_fthlv == 2)
-+		maxburst = 1;
-+	else
-+		maxburst = spi->cur_fthlv;
+ static int stm32_spi_resume(struct device *dev)
+@@ -1250,9 +1275,10 @@ static int stm32_spi_resume(struct device *dev)
+ 	struct stm32_spi *spi = spi_master_get_devdata(master);
+ 	int ret;
  
- 	memset(dma_conf, 0, sizeof(struct dma_slave_config));
- 	dma_conf->direction = dir;
-@@ -920,9 +933,12 @@ static int stm32_spi_transfer_one_setup(struct stm32_spi *spi,
- 				~cfg2_clrb) | cfg2_setb,
- 			       spi->base + STM32_SPI_CFG2);
+-	ret = clk_prepare_enable(spi->clk);
++	ret = pm_runtime_force_resume(dev);
+ 	if (ret)
+ 		return ret;
++
+ 	ret = spi_master_resume(master);
+ 	if (ret)
+ 		clk_disable_unprepare(spi->clk);
+@@ -1261,8 +1287,11 @@ static int stm32_spi_resume(struct device *dev)
+ }
+ #endif
  
--	nb_words = DIV_ROUND_UP(transfer->len * 8,
--				(spi->cur_bpw <= 8) ? 8 :
--				(spi->cur_bpw <= 16) ? 16 : 32);
-+	if (spi->cur_bpw <= 8)
-+		nb_words = transfer->len;
-+	else if (spi->cur_bpw <= 16)
-+		nb_words = DIV_ROUND_UP(transfer->len * 8, 16);
-+	else
-+		nb_words = DIV_ROUND_UP(transfer->len * 8, 32);
- 	nb_words <<= SPI_CR2_TSIZE_SHIFT;
+-static SIMPLE_DEV_PM_OPS(stm32_spi_pm_ops,
+-			 stm32_spi_suspend, stm32_spi_resume);
++static const struct dev_pm_ops stm32_spi_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(stm32_spi_suspend, stm32_spi_resume)
++	SET_RUNTIME_PM_OPS(stm32_spi_runtime_suspend,
++			   stm32_spi_runtime_resume, NULL)
++};
  
- 	if (nb_words <= SPI_CR2_TSIZE) {
+ static struct platform_driver stm32_spi_driver = {
+ 	.probe = stm32_spi_probe,
 -- 
 1.9.1
