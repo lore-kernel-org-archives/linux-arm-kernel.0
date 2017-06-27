@@ -1,61 +1,78 @@
-From: karthik@techveda.org (karthik at techveda.org)
-Date: Tue, 27 Jun 2017 12:17:40 +0530
-Subject: [PATCH v2] arm: dts: omap3: Remove needless interrupt-parent property
-In-Reply-To: <41ab5d17-620e-34b6-bd1c-33ae7bb3234c@techveda.org>
-References: <41ab5d17-620e-34b6-bd1c-33ae7bb3234c@techveda.org>
-Message-ID: <1498546060-5742-1-git-send-email-karthik@techveda.org>
+From: bart.vanassche@wdc.com (Bart Van Assche)
+Date: Tue, 27 Jun 2017 08:50:24 +0200
+Subject: [PATCH, RESEND] ARM: Fix rd_size declaration
+Message-ID: <20170627065024.12347-1-bart.vanassche@wdc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Karthik Tummala <karthik@techveda.org>
+The global variable 'rd_size' is declared as 'int' in source file
+arch/arm/kernel/atags_parse.c and as 'unsigned long' in
+drivers/block/brd.c. Fix this inconsistency. Additionally, remove
+the declarations of rd_image_start, rd_prompt and rd_doload from
+parse_tag_ramdisk() since these duplicate existing declarations
+in <linux/initrd.h>.
 
-All nodes inhert "interrupt-parent" property from root
-node. Removed the aforementioned property from usbhsohci,
-usbhsehci, ssi_port1, ssi_port2 nodes to avoid duplication.
-
-Signed-off-by: Karthik Tummala <karthik@techveda.org>
+Signed-off-by: Bart Van Assche <bart.vanassche@sandisk.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Jens Axboe <axboe@kernel.dk>
+Cc: Jan Kara <jack@suse.cz>
+Cc: <yanaijie@huawei.com>
+Cc: <zhaohongjiang@huawei.com>
+Cc: <miaoxie@huawei.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-block at vger.kernel.org
 ---
-Changes for v2:
-- Made changes to subject & description as suggested by
-  Suniel Mahesh.
----
- arch/arm/boot/dts/omap3.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/kernel/atags_parse.c | 3 +--
+ drivers/block/brd.c           | 1 +
+ include/linux/initrd.h        | 3 +++
+ 3 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a3ff493..bdaf30c 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -713,14 +713,12 @@
- 			usbhsohci: ohci at 48064400 {
- 				compatible = "ti,ohci-omap3";
- 				reg = <0x48064400 0x400>;
--				interrupt-parent = <&intc>;
- 				interrupts = <76>;
- 			};
+diff --git a/arch/arm/kernel/atags_parse.c b/arch/arm/kernel/atags_parse.c
+index 68c6ae0b9e4c..98fbfd235ac8 100644
+--- a/arch/arm/kernel/atags_parse.c
++++ b/arch/arm/kernel/atags_parse.c
+@@ -18,6 +18,7 @@
+  */
  
- 			usbhsehci: ehci at 48064800 {
- 				compatible = "ti,ehci-omap";
- 				reg = <0x48064800 0x400>;
--				interrupt-parent = <&intc>;
- 				interrupts = <77>;
- 			};
- 		};
-@@ -831,7 +829,6 @@
- 				reg-names = "tx",
- 					    "rx";
+ #include <linux/init.h>
++#include <linux/initrd.h>
+ #include <linux/kernel.h>
+ #include <linux/fs.h>
+ #include <linux/root_dev.h>
+@@ -91,8 +92,6 @@ __tagtable(ATAG_VIDEOTEXT, parse_tag_videotext);
+ #ifdef CONFIG_BLK_DEV_RAM
+ static int __init parse_tag_ramdisk(const struct tag *tag)
+ {
+-	extern int rd_size, rd_image_start, rd_prompt, rd_doload;
+-
+ 	rd_image_start = tag->u.ramdisk.start;
+ 	rd_doload = (tag->u.ramdisk.flags & 1) == 0;
+ 	rd_prompt = (tag->u.ramdisk.flags & 2) == 0;
+diff --git a/drivers/block/brd.c b/drivers/block/brd.c
+index 57b574f2f66a..f8341918a53a 100644
+--- a/drivers/block/brd.c
++++ b/drivers/block/brd.c
+@@ -9,6 +9,7 @@
+  */
  
--				interrupt-parent = <&intc>;
- 				interrupts = <67>,
- 					     <68>;
- 			};
-@@ -844,7 +841,6 @@
- 				reg-names = "tx",
- 					    "rx";
+ #include <linux/init.h>
++#include <linux/initrd.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/major.h>
+diff --git a/include/linux/initrd.h b/include/linux/initrd.h
+index 55289d261b4f..bc67b767f9ce 100644
+--- a/include/linux/initrd.h
++++ b/include/linux/initrd.h
+@@ -10,6 +10,9 @@ extern int rd_prompt;
+ /* starting block # of image */
+ extern int rd_image_start;
  
--				interrupt-parent = <&intc>;
- 				interrupts = <69>,
- 					     <70>;
- 			};
++/* size of a single RAM disk */
++extern unsigned long rd_size;
++
+ /* 1 if it is not an error if initrd_start < memory_start */
+ extern int initrd_below_start_ok;
+ 
 -- 
-1.9.1
+2.13.1
