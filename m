@@ -1,103 +1,98 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 27 Jun 2017 10:57:32 +0200
-Subject: [PATCH v2 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
-In-Reply-To: <20170626180744.fyyzjsu4pmurohap@rob-hp-laptop>
-References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
- <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
- <20170626180744.fyyzjsu4pmurohap@rob-hp-laptop>
-Message-ID: <a69a61c3-95a8-d0cc-10a6-4a7cf65ff2c5@st.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 27 Jun 2017 10:02:45 +0100
+Subject: [PATCH v6 05/21] net-next: stmmac: Add dwmac-sun8i
+In-Reply-To: <20170627082103.GB2468@Red>
+References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+ <20170531071852.12422-6-clabbe.montjoie@gmail.com>
+ <8e3d73a7-e9ff-d3e2-4bce-bcc79cdf86db@arm.com> <20170627080529.GA2468@Red>
+ <CAGb2v65mhDN9vXe6DE2cZPW1BzgYPwK+D2U5VFgyr0wVVZZqDQ@mail.gmail.com>
+ <20170627082103.GB2468@Red>
+Message-ID: <530f7b3e-247d-2e4d-8174-ce6195bacf5b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2017 08:07 PM, Rob Herring wrote:
-> On Wed, Jun 21, 2017 at 04:30:08PM +0200, Fabrice Gasnier wrote:
->> Add documentation for STMicroelectronics STM32 Low-Power Timer binding.
+Hi,
+
+(CC:ing some people from that Rockchip dmwac series)
+
+On 27/06/17 09:21, Corentin Labbe wrote:
+> On Tue, Jun 27, 2017 at 04:11:21PM +0800, Chen-Yu Tsai wrote:
+>> On Tue, Jun 27, 2017 at 4:05 PM, Corentin Labbe
+>> <clabbe.montjoie@gmail.com> wrote:
+>>> On Mon, Jun 26, 2017 at 01:18:23AM +0100, Andr? Przywara wrote:
+>>>> On 31/05/17 08:18, Corentin Labbe wrote:
+>>>>> The dwmac-sun8i is a heavy hacked version of stmmac hardware by
+>>>>> allwinner.
+>>>>> In fact the only common part is the descriptor management and the first
+>>>>> register function.
+>>>>
+>>>> Hi,
+>>>>
+>>>> I know I am a bit late with this, but while adapting the U-Boot driver
+>>>> to the new binding I was wondering about the internal PHY detection:
+>>>>
+>>>>
+>>>> So here you seem to deduce the usage of the internal PHY by the PHY
+>>>> interface specified in the DT (MII = internal, RGMII = external).
+>>>> I think I raised this question before, but isn't it perfectly legal for
+>>>> a board to use MII with an external PHY even on those SoCs that feature
+>>>> an internal PHY?
+>>>> On the first glance that does not make too much sense, but apart from
+>>>> not being the correct binding to describe all of the SoCs features I see
+>>>> two scenarios:
+>>>> 1) A board vendor might choose to not use the internal PHY because it
+>>>> has bugs, lacks features (configurability) or has other issues. For
+>>>> instance I have heard reports that the internal PHY makes the SoC go
+>>>> rather hot, possibly limiting the CPU frequency. By using an external
+>>>> MII PHY (which are still cheaper than RGMII PHYs) this can be avoided.
+>>>> 2) A PHY does not necessarily need to be directly connected to
+>>>> magnetics. Indeed quite some boards use (RG)MII to connect to a switch
+>>>> IC or some other network circuitry, for instance fibre connectors.
+>>>>
+>>>> So I was wondering if we would need an explicit:
+>>>>       allwinner,use-internal-phy;
+>>>> boolean DT property to signal the usage of the internal PHY?
+>>>> Alternatively we could go with the negative version:
+>>>>       allwinner,disable-internal-phy;
+>>>>
+>>>> Or what about introducing a new "allwinner,internal-mii-phy" compatible
+>>>> string for the *PHY* node and use that?
+>>>>
+>>>> I just want to avoid that we introduce a binding that causes us
+>>>> headaches later. I think we can still fix this with a followup patch
+>>>> before the driver and its binding hit a release kernel.
+>>>>
+>>>> Cheers,
+>>>> Andre.
+>>>>
+>>>
+>>> I just see some patch, where "phy-mode = internal" is valid.
+>>> I will try to find a way to use it
 >>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->> Changes in v2:
->> - Lee's comments: s/Low Power/Low-Power/, remove 0x in example, improve
->>   properties descriptions
->> ---
->>  .../devicetree/bindings/mfd/stm32-lptimer.txt      | 48 ++++++++++++++++++++++
->>  1 file changed, 48 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+>> Can you provide a link?
+> 
+> https://lkml.org/lkml/2017/6/23/479
+> 
 >>
->> diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
->> new file mode 100644
->> index 0000000..af859c8
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
->> @@ -0,0 +1,48 @@
->> +STMicroelectronics STM32 Low-Power Timer
->> +
->> +The STM32 Low-Power Timer (LPTIM) is a 16-bit timer that provides several
->> +functions:
->> +- PWM output (with programmable prescaler, configurable polarity)
->> +- Quadrature encoder, counter
->> +- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
->> +
->> +Required properties:
->> +- compatible:		Must be "st,stm32-lptimer".
->> +- reg:			Offset and length of the device's register set.
->> +- clocks:		Phandle to the clock used by the LP Timer module.
->> +- clock-names:		Must be "mux".
->> +- #address-cells:	Should be '<1>'.
->> +- #size-cells:		Should be '<0>'.
->> +
->> +Optional subnodes:
->> +- pwm:			See ../pwm/pwm-stm32-lp.txt
->> +- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
->> +- trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
->> +
->> +Example:
->> +
->> +	lptimer1: lptimer at 40002400 {
-> 
-> timer at ...
+>> I'm not a fan of using phy-mode for this. There's no guarantee what
+>> mode the internal PHY uses. That's what phy-mode is for.
 
-Hi Rob,
+I can understand Chen-Yu's concerns, but ...
 
-I initially put "lptimer" here to distinguish Low-Power Timer hardware
-from other "timers" hardware that can be found also on stm32 devices.
-I'd prefer to keep it, is it sensible from your point of view ?
-Please advise.
+> For each soc the internal PHY mode is know and setted in emac_variant/internal_phy
+> So its not a problem.
 
-> 
->> +		compatible = "st,stm32-lptimer";
->> +		reg = <0x40002400 0x400>;
->> +		clocks = <&timer_clk>;
->> +		clock-names = "mux";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		pwm {
->> +			compatible = "st,stm32-pwm-lp";
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&lppwm1_pins>;
->> +		};
->> +
->> +		trigger at 0 {
->> +			compatible = "st,stm32-lptimer-trigger";
->> +			reg = <0>;
-> 
-> Is there more than 1? 
+that is true as well, at least for now.
 
-reg identifies trigger hardware block.
+So while I agree that having a separate property to indicate the usage
+of the internal PHY would be nice, I am bit tempted to use this easier
+approach and piggy back on the existing phy-mode property.
 
-Best Regards,
-Thanks,
-Fabrice
+Are there any insights from the people involved with the Rockchip
+internal PHY?
+It is worth to introduce a generic boolean property for an internal PHY?
+Or shall we actually move this more into the PHY code, introducing new
+compatibles for the internal Allwinner and Rockchip Ethernet PHYs?
 
-> 
->> +		};
->> +
->> +		counter {
->> +			compatible = "st,stm32-lptimer-counter";
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&lptim1_in_pins>;
->> +		};
->> +	};
->> -- 
->> 1.9.1
->>
+Cheers,
+Andre.
