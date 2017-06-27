@@ -1,61 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Jun 2017 11:05:38 +0200
-Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
-In-Reply-To: <20170627081717.GM4902@n2100.armlinux.org.uk>
-References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
- <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
- <20170623152227.GA21989@leverpostej>
- <DB6PR04MB2999E8FFBE0FE708A003637986D80@DB6PR04MB2999.eurprd04.prod.outlook.com>
- <CAK8P3a0mhWTRriGYB6aHS28dm842d-0OeGRmRYzMS4ZYY9=YCQ@mail.gmail.com>
- <20170627081717.GM4902@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a0N5tiP7RPMg=Q8fsROuYabJjQ5Awd2ekrn686nDqdNwA@mail.gmail.com>
+From: cyrille.pitchen@microchip.com (Cyrille Pitchen)
+Date: Tue, 27 Jun 2017 11:05:56 +0200
+Subject: Applied "spi: atmel: fix corrupted data issue on SAM9 family
+ SoCs" to the spi tree
+In-Reply-To: <20170623171830.GV4902@n2100.armlinux.org.uk>
+References: <d174da00f48503eba84dd0f4068749b968628bbb.1498231873.git.cyrille.pitchen@microchip.com>
+ <E1dORFW-00037E-N8@debutante> <20170623171830.GV4902@n2100.armlinux.org.uk>
+Message-ID: <f2eb4994-2cea-4ad4-58ee-24a174d53f93@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 10:17 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Jun 27, 2017 at 09:17:48AM +0200, Arnd Bergmann wrote:
->> I'd suggest we start out by converting this to some standard API
->> first, regardless of performance, to get it working properly with code
->> that should be maintainable at least, and make progress with your
->> hardware enablement.
->
-> I think Roy is rather confused right now about what the driver does
-> and doesn't do.
->
-> With his patches, two areas are mapped on ARM:
->
-> 1. The addr.ci area is mapped using ioremap().  This is a device mapping,
->    and is used by the "Cache-inhibited register access." functions.
->
-> 2. The addr.ce area is mapped using ioremap_wc(), and all other stuff
->    including the verb accesses go through this region.  This is a
->    memory, non-cacheable mapping.
->
-> The addr.ce region is the area that has a mixture of memset(), MMIO
-> accessors, direct CPU accesses, cache flushes and prefetches used on
-> it.
->
-> As it is marked non-cacheable, the cache flushes are a pure waste of
-> CPU cycles.  Prefetching to a non-cacheable area doesn't make much
-> sense either.
->
-> So, I think for ARM: just kill the cache flushing - its doing nothing
-> useful.  The prefetching could also be removed as well to recover a
-> few more CPU cycles.
+Hi Russell,
 
-Right, that sounds good. I wondered about the ioremap_wc() earlier
-and thought I must have missed something as it didn't make any sense
-to me, but apparently that was because the code really doesn't make
-sense ;-).
+Le 23/06/2017 ? 19:18, Russell King - ARM Linux a ?crit :
+> On Fri, Jun 23, 2017 at 05:15:58PM +0100, Mark Brown wrote:
+>> +#ifdef CONFIG_SOC_SAM_V4_V5
+>> +	/*
+>> +	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
+>> +	 * since this later function tries to map buffers with dma_map_sg()
+>> +	 * even if they have not been allocated inside DMA-safe areas.
+>> +	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
+>> +	 * those ARM cores, the data cache follows the PIPT model.
+>> +	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
+>> +	 * In case of PIPT caches, there cannot be cache aliases.
+>> +	 * However on ARM9 cores, the data cache follows the VIVT model, hence
+>> +	 * the cache aliases issue can occur when buffers are allocated from
+>> +	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
+>> +	 * not taken into account or at least not handled completely (cache
+>> +	 * lines of aliases are not invalidated).
+> 
+> There is a solution to this - code (iow, callers of functions that perform
+> IO) are expected to use flush_kernel_vmap_range() and
+> invalidate_kernel_vmap_range() as documented in Documentation/cachetlb.txt
+> to ensure that their "special" views are properly handled.
+> 
+> These are no-ops for PIPT caches, but aliasing caches have to implement
+> them.
+> 
 
-It would be good to get consistent __iomem annotations on it too,
-so we can see exactly where the MMIO interfaces are used incorrectly,
-and find a fix for that.
+So if I understand, calling those two functions at the right places, we
+could use DMA transfer again without the need of copying data into a
+bounce buffer? It sounds great, I will study that.
 
-I wonder if doing memcpy_toio on the write-combining mapping
-will do what Roy wants and and up sending a single bus transaction
-for one descriptor most of the time, while fitting in with the ioremap_wc()
-interface and its __iomem pointers.
+Thanks!
 
-       Arnd
+Cyrille
