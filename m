@@ -1,53 +1,25 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Tue, 27 Jun 2017 16:47:25 +0000
-Subject: [PATCH] soc/qman: Sleep instead of stuck hacking jiffies.
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DD002B1A5@AcuExch.aculab.com>
-References: <1498403622-2878-1-git-send-email-karim.eshapa@gmail.com>
- <063D6719AE5E284EB5DD2968C1650D6DD002B1A5@AcuExch.aculab.com>
-Message-ID: <AM4PR0401MB1699119BCAAB631C16D86C2D8FDC0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Jun 2017 17:54:17 +0100
+Subject: [PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <20170627152753.GA29186@lst.de>
+References: <1498468741-12020-1-git-send-email-vladimir.murzin@arm.com>
+ <20170627152753.GA29186@lst.de>
+Message-ID: <20170627165416.GP4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 27, 2017 at 05:27:53PM +0200, Christoph Hellwig wrote:
+> I've applied patches 1, 3 and 4 to the dma-mapping tree.  2 will need
+> a respin for less code duplication.  I'd be happy to take 5,6 and 7 if
+> Russell is fine with that.
 
+If Vladimir is okay with those going in without patch 2, then I'm
+happy - I seem to remember a mail from Vladimir stating that they
+depended on some of the previous patches, but I don't know which.
 
-> -----Original Message-----
-> From: Linuxppc-dev [mailto:linuxppc-dev-
-> bounces+leoli=freescale.com at lists.ozlabs.org] On Behalf Of David Laight
-> Sent: Monday, June 26, 2017 10:55 AM
-> To: 'Karim Eshapa' <karim.eshapa@gmail.com>; oss at buserror.net
-> Cc: Roy Pledge <roy.pledge@nxp.com>; linux-kernel at vger.kernel.org;
-> Claudiu Manoil <claudiu.manoil@nxp.com>; colin.king at canonical.com;
-> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH] soc/qman: Sleep instead of stuck hacking jiffies.
-> 
-> From: Karim Eshapa
-> > Sent: 25 June 2017 16:14
-> > Use msleep() instead of stucking with
-> > long delay will be more efficient.
-> ...
-> > --- a/drivers/soc/fsl/qbman/qman.c
-> > +++ b/drivers/soc/fsl/qbman/qman.c
-> > @@ -1084,11 +1084,7 @@ static int drain_mr_fqrni(struct qm_portal *p)
-> >  		 * entries well before the ring has been fully consumed, so
-> >  		 * we're being *really* paranoid here.
-> >  		 */
-> > -		u64 now, then = jiffies;
-> > -
-> > -		do {
-> > -			now = jiffies;
-> > -		} while ((then + 10000) > now);
-> > +		msleep(1);
-> ...
-> How is that in any way equivalent?
-> If HZ is 1000 the old code loops for 10 seconds.
-> If HZ is 250 (common for some distros) it loops for 40 seconds.
-> 
-> Clearly both are horrid, but it isn't at all clear that a 1ms sleep is performing
-> the same job.
-> 
-> My guess is that this code is never called, and broken if actually called.
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-It was indeed broken.  The intent was to wait for 10000 cycles but mistakenly coded as 10000 jiffies.  I think we choose 1ms as it is not too long and almost guarantees the 10000 cycles delay.
-
-Regards,
-Leo
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
