@@ -1,105 +1,121 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 27 Jun 2017 14:14:59 -0500
-Subject: [PATCH 4/4] remoteproc/davinci: streamline the interrupt
- management
-In-Reply-To: <20170627053845.GI18666@tuxbook>
-References: <20170518220902.2846-1-s-anna@ti.com>
- <20170518220902.2846-5-s-anna@ti.com> <20170625211931.GC26155@builder>
- <8659b48d-5675-6bc9-aaf2-836ea69738d1@ti.com>
- <20170627053845.GI18666@tuxbook>
-Message-ID: <396e16da-830b-ca10-297c-434b5618ca25@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 27 Jun 2017 12:27:43 -0700
+Subject: [PATCH v2] spi: rockchip: Disable Runtime PM when chip select is
+ asserted
+In-Reply-To: <1498530035-22070-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1498530035-22070-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <CAD=FV=WwCiMySpC-SMFQmM_JFCMdcSGQLXut1rUVVe_8E96-ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2017 12:38 AM, Bjorn Andersson wrote:
-> On Mon 26 Jun 09:09 PDT 2017, Suman Anna wrote:
-> 
->> Hi Bjorn,
->>
->> On 06/25/2017 04:19 PM, Bjorn Andersson wrote:
->>> On Thu 18 May 15:09 PDT 2017, Suman Anna wrote:
->>>
->>>> The davinci remoteproc driver is currently requesting its interrupt
->>>> that deals with the virtio kicks in probe, and that too before all
->>>> the associated variables used by the handler are initialized. This
->>>> is a lot in advance before the DSP remote processor is even loaded
->>>> and booted and is not essential. Streamline the interrupt request
->>>> and freeing operations instead alongside the boot and shutdown of
->>>> the remote processor.
->>>>
->>>
->>> I do prefer that all resources are acquired at probe() time, rather than
->>> handled upon each start/stop. In the current handle_event()
->>> implementation the remoteproc code will not find the yet unallocated
->>> notify-id's and do nothing. So this seems okay.
->>>
->>> [..]
->>>> @@ -213,15 +224,6 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->>>>  
->>>>  	platform_set_drvdata(pdev, rproc);
->>>>  
->>>> -	/* everything the ISR needs is now setup, so hook it up */
->>>> -	ret = devm_request_threaded_irq(dev, irq, da8xx_rproc_callback,
->>>> -					handle_event, 0, "da8xx-remoteproc",
->>>> -					rproc);
->>>> -	if (ret) {
->>>> -		dev_err(dev, "devm_request_threaded_irq error: %d\n", ret);
->>>> -		goto free_rproc;
->>>> -	}
->>>
->>> In the error paths after this the driver will end up freeing the rproc
->>> context before disabling the irq, so these cases need a call to
->>> disable_irq().
->>
->> Hmm, I am not sure I understand why we need disable_irq() when we are
->> not even requesting it? This is deleting code, not adding. The IRQ
->> request and free are now balanced in the start and stop ops. The only
->> call here is a platform_get_irq() which doesn't need any cleanup.
->>
-> 
-> I prefer to keep the initialization of the irq at probe time. What I
-> tried to say was that the code is currently broken in regards to the
-> (theoretical?) possibility of the interrupt handler being invoked after
-> "rproc" has been freed.
-> 
->>>
->>>> -
->>>>  	/*
->>>>  	 * rproc_add() can end up enabling the DSP's clk with the DSP
->>>>  	 * *not* in reset, but da8xx_rproc_start() needs the DSP to be
->>>> @@ -254,14 +256,6 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->>>>  static int da8xx_rproc_remove(struct platform_device *pdev)
->>>>  {
->>>>  	struct rproc *rproc = platform_get_drvdata(pdev);
->>>> -	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
->>>> -
->>>> -	/*
->>>> -	 * The devm subsystem might end up releasing things before
->>>> -	 * freeing the irq, thus allowing an interrupt to sneak in while
->>>> -	 * the device is being removed.  This should prevent that.
->>>> -	 */
->>>
->>> devres _will not_ disable the IRQ until after remove() returns, making it
->>> possible for the interrupt handler to be executed after the rproc
->>> context is freed.
->>>
->>> So this comment would benefit from an update.
->>
->> Again, this is deleting code, not adding. The remove after this cleanup
->> will simply be invoking the rproc_del() and rproc_free() call, and
->> rproc_del() does end up calling the stop since we do use auto-boot where
->> we free the irq.
->>
-> 
-> I would like to keep the request_irq in the probe() and as such a
-> disable_irq is needed either in stop() or here. If we leave it here
-> there's room to improve the comment.
+Hi,
 
-Yeah, I did understand your statements after the discussion on the
-keystone remoteproc thread, so ok with dropping this. The code already
-has the disable_irq() in remove before rproc_free(), so just needs a
-comment improvement. I will have to check the other sequences if there
-are some missing dependencies, before revising this patch.
+On Mon, Jun 26, 2017 at 7:20 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> The rockchip spi would stop driving pins when runtime suspended, which
+> might break slave's xfer(for example cros_ec).
+>
+> Since we have pullups on those pins, we only need to care about the CS
+> asserted case.
+>
+> So let's keep the spi alive when chip select is asserted for that.
+>
+> Also change use pm_runtime_put instead of pm_runtime_put_sync.
+>
+> Suggested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>
+> ---
+>
+> Changes in v2:
+> Improve commit message and comments and coding style.
+>
+>  drivers/spi/spi-rockchip.c | 23 ++++++++++++++++++-----
+>  1 file changed, 18 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+> index acf31f3..ea0edd7 100644
+> --- a/drivers/spi/spi-rockchip.c
+> +++ b/drivers/spi/spi-rockchip.c
+> @@ -264,7 +264,7 @@ static inline u32 rx_max(struct rockchip_spi *rs)
+>
+>  static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+>  {
+> -       u32 ser;
+> +       u32 ser, new_ser;
+>         struct spi_master *master = spi->master;
+>         struct rockchip_spi *rs = spi_master_get_devdata(master);
+>
+> @@ -288,13 +288,26 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+>          * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
+>          */
+>         if (!enable)
+> -               ser |= 1 << spi->chip_select;
+> +               new_ser = ser | BIT(spi->chip_select);
+>         else
+> -               ser &= ~(1 << spi->chip_select);
+> +               new_ser = ser & ~BIT(spi->chip_select);
+>
+> -       writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
+> +       if (new_ser != ser) {
 
-regards
-Suman
+IMHO it's not a great idea to use the state of the hardware register
+here.  Using the state of the hardware register probably works OK, but
+it makes me just a little nervous.  If something happened to the state
+of the register (someone used /dev/mem to tweak, or the peripherals
+got reset, or ...) then you could end up with an unbalanced set of PM
+Runtime calls.  I know none of those things are common, but it still
+seems less than great to me.
+
+I'd rather we kept track in "struct rockchip_spi" whether we already
+called pm_runtime_get_sync().  AKA the following (untested):
+
+bool cs_asserted = !enable;
+
+/* Return immediately for no-op */
+if (cs_asserted == rs->cs_asserted)
+  return;
+
+/* Keep things powered as long as CS is asserted */
+if (cs_asserted) {
+  pm_runtime_get_sync(rs->dev);
+  rs->cs_asserted = true;
+}
+
+ser = ...
+...
+...
+
+if (!cs_asserted)
+  pm_runtime_put(rs->dev);
+
+
+NOTE: another advantage of storing the state in 'struct rockchip_spi'
+is that you can access it without pm_runtime_get_sync().
+
+
+> +               writel_relaxed(new_ser, rs->regs + ROCKCHIP_SPI_SER);
+>
+> -       pm_runtime_put_sync(rs->dev);
+> +               /*
+> +                * The rockchip spi would stop driving all pins when powered
+> +                * down.
+> +                * So hold a runtime PM reference as long as CS is asserted.
+> +                */
+> +               if (!enable)
+> +                       return;
+> +
+> +               /* Drop reference from when we first asserted CS */
+> +               pm_runtime_put(rs->dev);
+> +       }
+> +
+> +       pm_runtime_put(rs->dev);
+
+One note is that you should still submit your patch to add
+"SPI_MASTER_GPIO_SS" to spi-rockchip.c.  It's important that the SPI
+driver see the CS transitions so that it can do the PM Runtime get/put
+even when someone uses a GPIO chip select.  Even though the GPIO chip
+select will keep state, we don't want the rest of the lines to stop
+being driven.
+
+
+-Doug
