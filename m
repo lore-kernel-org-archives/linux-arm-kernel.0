@@ -1,32 +1,70 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Tue, 27 Jun 2017 17:45:21 +0200
-Subject: [PATCHv2 9/9] spi: spidev: add Aardvark to device tree compatibility
- list
+Date: Tue, 27 Jun 2017 17:45:20 +0200
+Subject: [PATCHv2 8/9] spi: stm32: fix potential dereference null return value
 In-Reply-To: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
 References: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1498578321-13980-10-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1498578321-13980-9-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an entry for the TotalPhase Aardvark SPI Host Adapter,
-which can operate as an SPI Slave.
+This patch fixes the usage of rx_dma_desc and tx_dma_desc pointers
+returned by dmaengine_prep_slave_sg, which can be null.
 
+Detected by CoverityScan, CID#1446587 ("Dereference null return value")
+
+Reported-by: Colin Ian King <colin.king@canonical.com>
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- drivers/spi/spidev.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/spi/spi-stm32.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/spi/spidev.c b/drivers/spi/spidev.c
-index 9a2a79a..8093885 100644
---- a/drivers/spi/spidev.c
-+++ b/drivers/spi/spidev.c
-@@ -698,6 +698,7 @@ static int spidev_release(struct inode *inode, struct file *filp)
- 	{ .compatible = "lineartechnology,ltc2488" },
- 	{ .compatible = "ge,achc" },
- 	{ .compatible = "semtech,sx1301" },
-+	{ .compatible = "totalphase,aardvark" },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, spidev_dt_ids);
+diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
+index fdbc648..bee74e3 100644
+--- a/drivers/spi/spi-stm32.c
++++ b/drivers/spi/spi-stm32.c
+@@ -775,9 +775,6 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 					xfer->rx_sg.nents,
+ 					rx_dma_conf.direction,
+ 					DMA_PREP_INTERRUPT);
+-
+-		rx_dma_desc->callback = stm32_spi_dma_cb;
+-		rx_dma_desc->callback_param = spi;
+ 	}
+ 
+ 	tx_dma_desc = NULL;
+@@ -790,11 +787,6 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 					xfer->tx_sg.nents,
+ 					tx_dma_conf.direction,
+ 					DMA_PREP_INTERRUPT);
+-
+-		if (spi->cur_comm == SPI_SIMPLEX_TX) {
+-			tx_dma_desc->callback = stm32_spi_dma_cb;
+-			tx_dma_desc->callback_param = spi;
+-		}
+ 	}
+ 
+ 	if ((spi->tx_buf && !tx_dma_desc) ||
+@@ -802,6 +794,9 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 		goto dma_desc_error;
+ 
+ 	if (rx_dma_desc) {
++		rx_dma_desc->callback = stm32_spi_dma_cb;
++		rx_dma_desc->callback_param = spi;
++
+ 		if (dma_submit_error(dmaengine_submit(rx_dma_desc))) {
+ 			dev_err(spi->dev, "Rx DMA submit failed\n");
+ 			goto dma_desc_error;
+@@ -811,6 +806,11 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 	}
+ 
+ 	if (tx_dma_desc) {
++		if (spi->cur_comm == SPI_SIMPLEX_TX) {
++			tx_dma_desc->callback = stm32_spi_dma_cb;
++			tx_dma_desc->callback_param = spi;
++		}
++
+ 		if (dma_submit_error(dmaengine_submit(tx_dma_desc))) {
+ 			dev_err(spi->dev, "Tx DMA submit failed\n");
+ 			goto dma_submit_error;
 -- 
 1.9.1
