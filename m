@@ -1,83 +1,12 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 27 Jun 2017 17:25:59 +0200
-Subject: [PATCH 1/9] i2c: designware: Fix system suspend
-In-Reply-To: <CAJZ5v0i-AgTDTOX+O41abVsnahU9V=NV+HEW0vajhBqGfJuUEg@mail.gmail.com>
-References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
- <20170622104933.GY629@lahna.fi.intel.com> <2842386.AFZiXzV2Sq@aspire.rjw.lan>
- <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
- <CAJZ5v0irHvYXHv1GykatTH+XROZyL0nR0c=KfdSrpH395s6V8g@mail.gmail.com>
- <CAPDyKFov=08AQw0PPPgcFbrerTskoPGfLZcJL9gjikfQfZUJpw@mail.gmail.com>
- <4324e2c8-ab79-5a21-a8ab-c660920cba59@ti.com>
- <CAJZ5v0i-AgTDTOX+O41abVsnahU9V=NV+HEW0vajhBqGfJuUEg@mail.gmail.com>
-Message-ID: <CAJZ5v0i6zEmb1anxL2ge5YqDJ6jMZA2v4W-u65AtoZv8b7Z89w@mail.gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 27 Jun 2017 17:27:53 +0200
+Subject: [PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <1498468741-12020-1-git-send-email-vladimir.murzin@arm.com>
+References: <1498468741-12020-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20170627152753.GA29186@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 11:11 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Mon, Jun 26, 2017 at 9:39 PM, Grygorii Strashko
-> <grygorii.strashko@ti.com> wrote:
->> On 06/26/2017 11:49 AM, Ulf Hansson wrote:
->
-> [cut]
->
->>>>> This makes it worse in that sense, that then you don't even need an
->>>>> i2c slave to trigger the problem.
->>>>
->>>> In that case your changelog is a bit misleading.
->>>
->>> Yeah, it is! I didn't realize that until I fully investigated the revert option.
->>>
->>>>
->>>> It looks like the commit in question attempted to fix exactly this
->>>> issue, but it failed, so it should be replaced with something else
->>>> which is what your patch is effectively doing.
->>>>
->>>> IMO you should describe the original problem, explain why that commit
->>>> is not sufficient to fix it and then describe the final fix.
->>>>
->>>> Anyway, after reading the changelog it should be clear that things
->>>> were broken before the commit in question.
->>>>
->>>> And BTW I'm not really sure how the rest of the series is related to this?
->>>
->>> Going back in history, I realize the system sleep support in this
->>> driver has been broken even before the commit $subject patch intends
->>> to fix.
->>> However it has been working fine for the ACPI case, because of how the
->>> ACPI PM domain manages its devices during system sleep.
->>>
->>> The commit in question, adds an improvement to the driver, because it
->>> enables the direct_complete path. For ACPI, that was already working,
->>> but not for the other cases. So to be able to support the similar
->>> improvement as the direct_complete path offers, as that isn't working
->>> for this driver, I tried out using the runtime PM centric path
->>> instead. That is what the rest of the changes in this series takes
->>> care of.
->>>
->>> Now, as the system sleep support is broken I wanted to make a simple
->>> fix for that first, via $subject patch. I guess what makes this a bit
->>> confusing is that I shouldn't point to a certain commit, but rather
->>> just add a stable tag and update the changelog accordingly.
->
-> I agree, modulo the below.
->
->>
->> Wouldn't it fix suspend for this driver if you will just replace
->> dw_i2c_plat_suspend() with pm_runtime_force_suspend() in SET_SYSTEM_SLEEP_PM_OPS() as
->> you've done in patch 9?
->>
->> And, I think, direct_complete path should still work after this also.
->
-> That's a good point and I was about to mention that.
->
-> In any case, even if the pm_runtime_resume() added by the $subject
-> patch is necessary to start with, it could be added to the ->suspend
-
-I meant ->resume, sorry.
-
-> callback of the driver instead of the ->complete one, in which case
-> the ACPI path would not be affected by this change.
-
-Thanks,
-Rafael
+I've applied patches 1, 3 and 4 to the dma-mapping tree.  2 will need
+a respin for less code duplication.  I'd be happy to take 5,6 and 7 if
+Russell is fine with that.
