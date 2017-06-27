@@ -1,139 +1,33 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 27 Jun 2017 09:40:22 +0200
-Subject: [PATCH v3 3/9] serial: Add common rs485 device tree parsing
- function
-In-Reply-To: <20170626090803.10981-4-u.kleine-koenig@pengutronix.de>
-References: <20170626090803.10981-1-u.kleine-koenig@pengutronix.de>
- <20170626090803.10981-4-u.kleine-koenig@pengutronix.de>
-Message-ID: <6e8bbe02-ce38-4025-73cf-a9ae562ead20@microchip.com>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Tue, 27 Jun 2017 10:33:33 +0300
+Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+In-Reply-To: <CAJZ5v0i-AgTDTOX+O41abVsnahU9V=NV+HEW0vajhBqGfJuUEg@mail.gmail.com>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+ <20170622104933.GY629@lahna.fi.intel.com> <2842386.AFZiXzV2Sq@aspire.rjw.lan>
+ <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
+ <CAJZ5v0irHvYXHv1GykatTH+XROZyL0nR0c=KfdSrpH395s6V8g@mail.gmail.com>
+ <CAPDyKFov=08AQw0PPPgcFbrerTskoPGfLZcJL9gjikfQfZUJpw@mail.gmail.com>
+ <4324e2c8-ab79-5a21-a8ab-c660920cba59@ti.com>
+ <CAJZ5v0i-AgTDTOX+O41abVsnahU9V=NV+HEW0vajhBqGfJuUEg@mail.gmail.com>
+Message-ID: <bca550fd-3821-fb14-c3b0-8f05c7a1fdff@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/2017 at 11:07, Uwe Kleine-K?nig wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Several drivers have the same device tree parsing code. Create
-> a common helper function for it.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> [ukl: implement default <0 0> for rts-delay, unset unspecified flags]
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On 06/27/2017 12:11 AM, Rafael J. Wysocki wrote:
+> On Mon, Jun 26, 2017 at 9:39 PM, Grygorii Strashko
+>> Wouldn't it fix suspend for this driver if you will just replace
+>> dw_i2c_plat_suspend() with pm_runtime_force_suspend() in SET_SYSTEM_SLEEP_PM_OPS() as
+>> you've done in patch 9?
+>>
+>> And, I think, direct_complete path should still work after this also.
+>
+> That's a good point and I was about to mention that.
+>
+Unfortunately it will cause regression to platforms using 
+drivers/acpi/acpi_lpss.c power domain:
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
-> ---
->  drivers/tty/serial/Kconfig  |  4 ++++
->  drivers/tty/serial/Makefile |  2 ++
->  drivers/tty/serial/of.c     | 47 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/serial_core.h | 13 +++++++++++++
->  4 files changed, 66 insertions(+)
->  create mode 100644 drivers/tty/serial/of.c
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 5c8850f7a2a0..8baef5b95bed 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -14,6 +14,10 @@ config SERIAL_EARLYCON
->  	  the console before standard serial driver is probed. The console is
->  	  enabled when early_param is processed.
->  
-> +config OF_SERIAL
-> +	depends on SERIAL_CORE
-> +	def_bool y
-> +
->  source "drivers/tty/serial/8250/Kconfig"
->  
->  comment "Non-8250 serial port support"
-> diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-> index 53c03e005132..0fee8f4e36cb 100644
-> --- a/drivers/tty/serial/Makefile
-> +++ b/drivers/tty/serial/Makefile
-> @@ -7,6 +7,8 @@ obj-$(CONFIG_SERIAL_CORE) += serial_core.o
->  obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
->  obj-$(CONFIG_SERIAL_EARLYCON_ARM_SEMIHOST) += earlycon-arm-semihost.o
->  
-> +obj-$(CONFIG_OF_SERIAL) += of.o
-> +
->  # These Sparc drivers have to appear before others such as 8250
->  # which share ttySx minor node space.  Otherwise console device
->  # names change and other unplesantries.
-> diff --git a/drivers/tty/serial/of.c b/drivers/tty/serial/of.c
-> new file mode 100644
-> index 000000000000..b24e4357661b
-> --- /dev/null
-> +++ b/drivers/tty/serial/of.c
-> @@ -0,0 +1,47 @@
-> +#include <linux/kernel.h>
-> +#include <linux/export.h>
-> +#include <linux/of.h>
-> +#include <linux/serial_core.h>
-> +
-> +/**
-> + * of_get_rs485_mode() - Implement parsing rs485 properties
-> + * @np: uart node
-> + * @rs485conf: output parameter
-> + *
-> + * This function implements the device tree binding described in
-> + * Documentation/devicetree/bindings/serial/rs485.txt.
-> + *
-> + * Return: 0 on success, 1 if the node doesn't contain rs485 stuff.
-> + */
-> +int of_get_rs485_mode(struct device_node *np, struct serial_rs485 *rs485conf)
-> +{
-> +	u32 rs485_delay[2];
-> +	int ret;
-> +
-> +	if (!IS_ENABLED(CONFIG_OF) || !np)
-> +		return 1;
-> +
-> +	ret = of_property_read_u32_array(np, "rs485-rts-delay" rs485_delay, 2);
-> +	if (!ret) {
-> +		rs485conf->delay_rts_before_send = rs485_delay[0];
-> +		rs485conf->delay_rts_after_send = rs485_delay[1];
-> +	} else {
-> +		rs485conf->delay_rts_before_send = 0;
-> +		rs485conf->delay_rts_after_send = 0;
-> +	}
-> +
-> +	/*
-> +	 * clear full-duplex and enabled flags to get to a defined state with
-> +	 * the two following properties.
-> +	 */
-> +	rs485conf->flags &= ~(SER_RS485_RX_DURING_TX | SER_RS485_ENABLED);
-> +
-> +	if (of_property_read_bool(np, "rs485-rx-during-tx"))
-> +		rs485conf->flags |= SER_RS485_RX_DURING_TX;
-> +
-> +	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time"))
-> +		rs485conf->flags |= SER_RS485_ENABLED;
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_get_rs485_mode);
-> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-> index 64d892f1e5cd..5ba00b1be093 100644
-> --- a/include/linux/serial_core.h
-> +++ b/include/linux/serial_core.h
-> @@ -500,4 +500,17 @@ static inline int uart_handle_break(struct uart_port *port)
->  					 (cflag) & CRTSCTS || \
->  					 !((cflag) & CLOCAL))
->  
-> +/*
-> + * Common device tree parsing helpers
-> + */
-> +#ifdef CONFIG_OF_SERIAL
-> +int of_get_rs485_mode(struct device_node *np, struct serial_rs485 *rs485conf);
-> +#else
-> +static inline int of_get_rs485_mode(struct device_node *np,
-> +				    struct serial_rs485 *rs485conf)
-> +{
-> +	return 1;
-> +}
-> +#endif
-> +
->  #endif /* LINUX_SERIAL_CORE_H */
-> 
-
+http://www.spinics.net/lists/linux-i2c/msg29079.html
 
 -- 
-Nicolas Ferre
+Jarkko
