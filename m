@@ -1,121 +1,69 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 27 Jun 2017 12:27:43 -0700
-Subject: [PATCH v2] spi: rockchip: Disable Runtime PM when chip select is
- asserted
-In-Reply-To: <1498530035-22070-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1498530035-22070-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <CAD=FV=WwCiMySpC-SMFQmM_JFCMdcSGQLXut1rUVVe_8E96-ew@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 27 Jun 2017 21:28:56 +0200
+Subject: [PATCH] arm64: dts: rockchip: fix typo in mmc pinctrl
+In-Reply-To: <20170627061904.12128-1-klaus.goger@theobroma-systems.com>
+References: <20170627061904.12128-1-klaus.goger@theobroma-systems.com>
+Message-ID: <1623992.6iPIWFxdC5@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jun 26, 2017 at 7:20 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
-> The rockchip spi would stop driving pins when runtime suspended, which
-> might break slave's xfer(for example cros_ec).
->
-> Since we have pullups on those pins, we only need to care about the CS
-> asserted case.
->
-> So let's keep the spi alive when chip select is asserted for that.
->
-> Also change use pm_runtime_put instead of pm_runtime_put_sync.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->
+Am Dienstag, 27. Juni 2017, 08:19:03 CEST schrieb Klaus Goger:
+> replace all occurrences of sdmcc with sdmmc in the rockchip devicetree
+> files.
+> 
+> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
 > ---
->
-> Changes in v2:
-> Improve commit message and comments and coding style.
->
->  drivers/spi/spi-rockchip.c | 23 ++++++++++++++++++-----
->  1 file changed, 18 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-> index acf31f3..ea0edd7 100644
-> --- a/drivers/spi/spi-rockchip.c
-> +++ b/drivers/spi/spi-rockchip.c
-> @@ -264,7 +264,7 @@ static inline u32 rx_max(struct rockchip_spi *rs)
->
->  static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
->  {
-> -       u32 ser;
-> +       u32 ser, new_ser;
->         struct spi_master *master = spi->master;
->         struct rockchip_spi *rs = spi_master_get_devdata(master);
->
-> @@ -288,13 +288,26 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
->          * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
->          */
->         if (!enable)
-> -               ser |= 1 << spi->chip_select;
-> +               new_ser = ser | BIT(spi->chip_select);
->         else
-> -               ser &= ~(1 << spi->chip_select);
-> +               new_ser = ser & ~BIT(spi->chip_select);
->
-> -       writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
-> +       if (new_ser != ser) {
+> 
+>  arch/arm/boot/dts/rk3036.dtsi                | 2 +-
+>  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 2 +-
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi     | 2 +-
 
-IMHO it's not a great idea to use the state of the hardware register
-here.  Using the state of the hardware register probably works OK, but
-it makes me just a little nervous.  If something happened to the state
-of the register (someone used /dev/mem to tweak, or the peripherals
-got reset, or ...) then you could end up with an unbalanced set of PM
-Runtime calls.  I know none of those things are common, but it still
-seems less than great to me.
+please split arm32/arm64 changes, as they go through different branches
+on their way to mainline.
 
-I'd rather we kept track in "struct rockchip_spi" whether we already
-called pm_runtime_get_sync().  AKA the following (untested):
+Otherwise looks good
+Heiko
 
-bool cs_asserted = !enable;
-
-/* Return immediately for no-op */
-if (cs_asserted == rs->cs_asserted)
-  return;
-
-/* Keep things powered as long as CS is asserted */
-if (cs_asserted) {
-  pm_runtime_get_sync(rs->dev);
-  rs->cs_asserted = true;
-}
-
-ser = ...
-...
-...
-
-if (!cs_asserted)
-  pm_runtime_put(rs->dev);
-
-
-NOTE: another advantage of storing the state in 'struct rockchip_spi'
-is that you can access it without pm_runtime_get_sync().
-
-
-> +               writel_relaxed(new_ser, rs->regs + ROCKCHIP_SPI_SER);
->
-> -       pm_runtime_put_sync(rs->dev);
-> +               /*
-> +                * The rockchip spi would stop driving all pins when powered
-> +                * down.
-> +                * So hold a runtime PM reference as long as CS is asserted.
-> +                */
-> +               if (!enable)
-> +                       return;
-> +
-> +               /* Drop reference from when we first asserted CS */
-> +               pm_runtime_put(rs->dev);
-> +       }
-> +
-> +       pm_runtime_put(rs->dev);
-
-One note is that you should still submit your patch to add
-"SPI_MASTER_GPIO_SS" to spi-rockchip.c.  It's important that the SPI
-driver see the CS transitions so that it can do the PM Runtime get/put
-even when someone uses a GPIO chip select.  Even though the GPIO chip
-select will keep state, we don't want the rest of the lines to stop
-being driven.
-
-
--Doug
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+> index ec91325d3b6e..bc5942023889 100644
+> --- a/arch/arm/boot/dts/rk3036.dtsi
+> +++ b/arch/arm/boot/dts/rk3036.dtsi
+> @@ -599,7 +599,7 @@
+>  				rockchip,pins = <1 15 RK_FUNC_1 &pcfg_pull_default>;
+>  			};
+> 
+> -			sdmmc_cd: sdmcc-cd {
+> +			sdmmc_cd: sdmmc-cd {
+>  				rockchip,pins = <1 17 RK_FUNC_1 &pcfg_pull_default>;
+>  			};
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi index
+> eb5059344023..eddc6eb31286 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> @@ -1031,7 +1031,7 @@ ap_i2c_audio: &i2c8 {
+>  		 * hurt and dw_mmc will ignore it.  We make sure to disable
+>  		 * the pull though so we don't burn needless power.
+>  		 */
+> -		sdmmc_cd: sdmcc-cd {
+> +		sdmmc_cd: sdmmc-cd {
+>  			rockchip,pins =
+>  				<0 7 RK_FUNC_1 &pcfg_pull_none>;
+>  		};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 69c56f7316c4..21f32c42d7db
+> 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -1786,7 +1786,7 @@
+>  					<4 RK_PB5 RK_FUNC_1 &pcfg_pull_up>;
+>  			};
+> 
+> -			sdmmc_cd: sdmcc-cd {
+> +			sdmmc_cd: sdmmc-cd {
+>  				rockchip,pins =
+>  					<0 RK_PA7 RK_FUNC_1 &pcfg_pull_up>;
+>  			};
