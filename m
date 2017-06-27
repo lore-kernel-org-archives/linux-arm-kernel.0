@@ -1,57 +1,77 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 27 Jun 2017 11:12:26 +0100
-Subject: [PATCH 18/20] arm64: ptrace: handle ptrace_request differently
- for aarch32 and ilp32
-In-Reply-To: <20170623222852.hao3gi7ppwexu7wq@yury-thinkpad>
-References: <20170604120009.342-1-ynorov@caviumnetworks.com>
- <20170604120009.342-19-ynorov@caviumnetworks.com> <594D49E9.7090900@arm.com>
- <20170623222852.hao3gi7ppwexu7wq@yury-thinkpad>
-Message-ID: <59522F8A.4010709@arm.com>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Tue, 27 Jun 2017 10:14:46 +0000
+Subject: [PATCH v1 2/6] [media] ov9650: add device tree support
+In-Reply-To: <20170627053642.GW12407@valkosipuli.retiisi.org.uk>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <1498143942-12682-3-git-send-email-hugues.fruchet@st.com>
+ <20170626163102.GQ12407@valkosipuli.retiisi.org.uk>
+ <D780984B-70A1-4E9C-A887-DD2CBAAC7CCA@goldelico.com>
+ <20170627053642.GW12407@valkosipuli.retiisi.org.uk>
+Message-ID: <00c5784a-8e13-be01-5c9e-4747aaa14ae5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury, Zhou,
 
-On 23/06/17 23:28, Yury Norov wrote:
-> On Fri, Jun 23, 2017 at 06:03:37PM +0100, James Morse wrote:
->> Hi Yury,
+
+On 06/27/2017 07:36 AM, Sakari Ailus wrote:
+> On Mon, Jun 26, 2017 at 07:46:34PM +0200, H. Nikolaus Schaller wrote:
+>> Hi,
 >>
->> On 04/06/17 13:00, Yury Norov wrote:
->>> ILP32 has context-related structures different from both aarch32 and
->>> aarch64/lp64. In this patch compat_arch_ptrace() renamed to
->>> compat_a32_ptrace(), and compat_arch_ptrace() only makes choice between
->>> compat_a32_ptrace() and new compat_ilp32_ptrace() handler.
+>>> Am 26.06.2017 um 18:31 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
 >>>
->>> compat_ilp32_ptrace() calls generic compat_ptrace_request() for all
->>> requests except PTRACE_GETSIGMASK and PTRACE_SETSIGMASK, which need
->>> special handling.
+>>> Hi Hugues,
+>>>
+>>> On Thu, Jun 22, 2017 at 05:05:38PM +0200, Hugues Fruchet wrote:
+>>>> @@ -1545,15 +1577,22 @@ static int ov965x_remove(struct i2c_client *client)
+>>>> }
+>>>>
+>>>> static const struct i2c_device_id ov965x_id[] = {
+>>>> -	{ "OV9650", 0 },
+>>>> -	{ "OV9652", 0 },
+>>>> +	{ "OV9650", 0x9650 },
+>>>> +	{ "OV9652", 0x9652 },
+>>>
+>>> This change does not appear to match with the patch description nor it the
+>>> information is used. How about not changing it, unless there's a reason to?
+>>> The same for the data field of the of_device_id array below.
 >>
->> Can you elaborate on this special handling?
->>
->> How come we don't need to wrap PTRACE_{G,S}ETSIGMASK for aarch32 compat?
->> >From kernel/signal32.c that uses compat_sigset_t too.
->>
->> It looks like aarch64, ilp32 and aarch32 all use the same size sigset_t,
->> so doesn't compat_ptrace_request() already do everything we need?
->>
->> ...
->>
->> Is this fixing an endian problem? If so, can we document it as such. Do we
->> already have the same bug for aarch32 compat?
+>> I think it could/should be used to check if the camera chip that is found
+>> by reading the product-id and version registers does match what the device
+>> tree expects and abort probing on a mismatch.
 > 
-> Originally, the problem was found by Zhou Chengming: https://lkml.org/lkml/2016/6/27/18
-> But I think you right, this is the fix for endian.
+> Makes sense. But it should be a separate patch, shouldn't it?
 > 
-> It lookd like aarch32 is buggy, but IIUC to confirm it, the BE arm64
-> machine is needed. I use qemu and AFAIR it has no BE support.
+> You could also put the id to the ops struct, and choose the ops struct that
+> way. Entirely up to you.
 > 
-> Zhou, can you test it on your machine and if the bug will be reproduced,
-> send the patch for aarch32?
 
-I've reproduced this on big endian compat-aarch32: yes its broken. I will respin
-Zhou's patch as a fix.
+I'll suggest to skip the id check between DT compatible string and real 
+device id read from sensor, this is not something I see in other drivers 
+currently.
+But I would suggest to keep in a separate patch the switch of device id 
+names to lower case in order to align with other omnivision cameras and 
+not introduce upper/lower case potential bugs in DT later on (as the one 
+encountered by Nikolaus):
+
+  [media] ov9650: switch i2c device id to lower case
+
+  static const struct i2c_device_id ov965x_id[] = {
+-	{ "OV9650", 0 },
+-	{ "OV9652", 0 },
++	{ "ov9650", 0 },
++	{ "ov9652", 0 },
 
 
-Thanks,
+  [media] ov9650: add device tree support
 
-James
++static const struct of_device_id ov965x_of_match[] = {
++	{ .compatible = "ovti,ov9650", },
++	{ .compatible = "ovti,ov9652", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, ov965x_of_match);
++
+  static struct i2c_driver ov965x_i2c_driver = {
+  	.driver = {
+  		.name	= DRIVER_NAME,
++		.of_match_table = of_match_ptr(ov965x_of_match),
