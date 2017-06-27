@@ -1,72 +1,86 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Jun 2017 10:10:07 +0100
-Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
-In-Reply-To: <CAK8P3a0N5tiP7RPMg=Q8fsROuYabJjQ5Awd2ekrn686nDqdNwA@mail.gmail.com>
-References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
- <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
- <20170623152227.GA21989@leverpostej>
- <DB6PR04MB2999E8FFBE0FE708A003637986D80@DB6PR04MB2999.eurprd04.prod.outlook.com>
- <CAK8P3a0mhWTRriGYB6aHS28dm842d-0OeGRmRYzMS4ZYY9=YCQ@mail.gmail.com>
- <20170627081717.GM4902@n2100.armlinux.org.uk>
- <CAK8P3a0N5tiP7RPMg=Q8fsROuYabJjQ5Awd2ekrn686nDqdNwA@mail.gmail.com>
-Message-ID: <20170627091006.GN4902@n2100.armlinux.org.uk>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 27 Jun 2017 18:13:03 +0900
+Subject: [PATCH] drm: exynos: dsi: release DSI_PORT_OUT node right after
+ of_drm_find_bridge()
+In-Reply-To: <5d308e03-e92a-7bac-f65e-23c2ccbe161a@samsung.com>
+References: <CGME20170626004946epcas4p40785020666ae6d43476822d067604baa@epcas4p4.samsung.com>
+ <20170624005628.5896-1-shuahkh@osg.samsung.com>
+ <5d308e03-e92a-7bac-f65e-23c2ccbe161a@samsung.com>
+Message-ID: <5952219F.1030902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 11:05:38AM +0200, Arnd Bergmann wrote:
-> On Tue, Jun 27, 2017 at 10:17 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Tue, Jun 27, 2017 at 09:17:48AM +0200, Arnd Bergmann wrote:
-> >> I'd suggest we start out by converting this to some standard API
-> >> first, regardless of performance, to get it working properly with code
-> >> that should be maintainable at least, and make progress with your
-> >> hardware enablement.
-> >
-> > I think Roy is rather confused right now about what the driver does
-> > and doesn't do.
-> >
-> > With his patches, two areas are mapped on ARM:
-> >
-> > 1. The addr.ci area is mapped using ioremap().  This is a device mapping,
-> >    and is used by the "Cache-inhibited register access." functions.
-> >
-> > 2. The addr.ce area is mapped using ioremap_wc(), and all other stuff
-> >    including the verb accesses go through this region.  This is a
-> >    memory, non-cacheable mapping.
-> >
-> > The addr.ce region is the area that has a mixture of memset(), MMIO
-> > accessors, direct CPU accesses, cache flushes and prefetches used on
-> > it.
-> >
-> > As it is marked non-cacheable, the cache flushes are a pure waste of
-> > CPU cycles.  Prefetching to a non-cacheable area doesn't make much
-> > sense either.
-> >
-> > So, I think for ARM: just kill the cache flushing - its doing nothing
-> > useful.  The prefetching could also be removed as well to recover a
-> > few more CPU cycles.
-> 
-> Right, that sounds good. I wondered about the ioremap_wc() earlier
-> and thought I must have missed something as it didn't make any sense
-> to me, but apparently that was because the code really doesn't make
-> sense ;-).
-> 
-> It would be good to get consistent __iomem annotations on it too,
-> so we can see exactly where the MMIO interfaces are used incorrectly,
-> and find a fix for that.
-> 
-> I wonder if doing memcpy_toio on the write-combining mapping
-> will do what Roy wants and and up sending a single bus transaction
-> for one descriptor most of the time, while fitting in with the ioremap_wc()
-> interface and its __iomem pointers.
+Hi Andrzej,
 
-Either the CE region needs __iomem pointers and proper accessors, or
-it needs to be using memremap(offset, size, MEMREMAP_WC) and not use
-the iomem accessors.
+2017? 06? 26? 16:02? Andrzej Hajda ?(?) ? ?:
+> Hi Shuah,
+> 
+> 
+> On 24.06.2017 02:56, Shuah Khan wrote:
+>> Fix to call of_node_put() right after of_drm_find_bridge() instead of
+>> holding on to it until exynos_dsi_remove().
+> 
+> I think the current implementation is OK, node is get in probe and put
+> in remove.
+> There could be many bind/unbind during lifetime of the bound driver.
+> For example, there is possible sequence:
+> 1. probe -
+> 2. bind
+> 3. unbind
+> 4. bind
+> 
+> With this patch on 2nd bind (point 4) driver will call
+> of_drm_find_bridge on dsi->bridge_node which was put earlier (point 2.).
+> 
 
-The CI region should definitely have __iomem annotations though.
+Right. This is a problem.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+How about moving of_drm_find_bridge function call to probe and keeping drm_bridge_attach call in bind for cleanup?
+Seems it doesn't need to call of_drm_find_bridge function every time bind callback is called.
+
+Thanks,
+Inki Dae
+
+> Regards
+> Andrzej
+> 
+> 
+>>
+>> Suggested-by: Inki Dae <inki.dae@samsung.com>
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 5 +----
+>>  1 file changed, 1 insertion(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> index e337cd2..7513b88 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> @@ -1689,6 +1689,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
+>>  
+>>  	if (dsi->bridge_node) {
+>>  		bridge = of_drm_find_bridge(dsi->bridge_node);
+>> +		of_node_put(dsi->bridge_node);
+>>  		if (bridge)
+>>  			drm_bridge_attach(encoder, bridge, NULL);
+>>  	}
+>> @@ -1807,10 +1808,6 @@ static int exynos_dsi_probe(struct platform_device *pdev)
+>>  
+>>  static int exynos_dsi_remove(struct platform_device *pdev)
+>>  {
+>> -	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
+>> -
+>> -	of_node_put(dsi->bridge_node);
+>> -
+>>  	pm_runtime_disable(&pdev->dev);
+>>  
+>>  	component_del(&pdev->dev, &exynos_dsi_component_ops);
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
