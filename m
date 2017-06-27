@@ -1,100 +1,54 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 27 Jun 2017 10:11:58 -0400
-Subject: [PATCH v5] trace: ras: add ARM processor error information
- trace event
-In-Reply-To: <918253cf-33ef-3152-a492-14f2b8946e99@huawei.com>
-References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
- <20170626093624.381a25cb@gandalf.local.home>
- <918253cf-33ef-3152-a492-14f2b8946e99@huawei.com>
-Message-ID: <20170627101158.517f329c@gandalf.local.home>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 27 Jun 2017 22:30:36 +0800
+Subject: [arm-platforms:kvm-arm64/gicv4-kvm 27/62]
+ drivers/irqchip/irq-gic-v3-its.c:795:7: error: 'UNMAP_VLPI' undeclared
+Message-ID: <201706272215.VcfwlmKc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Jun 2017 10:41:34 +0800
-Xie XiuQi <xiexiuqi@huawei.com> wrote:
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
+head:   362f13c96426700d3e37a921ef6d551f01491992
+commit: 2a99ea393c9d1e8593bfca5c751031d227ad5cb3 [27/62] irqchip/gic-v3-its: Add VLPI configuration hook
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 2a99ea393c9d1e8593bfca5c751031d227ad5cb3
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-> Hi Steve,
-> 
-> Thanks for your comments.
-> 
-> On 2017/6/26 21:36, Steven Rostedt wrote:
-> > On Sat, 24 Jun 2017 11:38:23 +0800
-> > Xie XiuQi <xiexiuqi@huawei.com> wrote:
-> >   
-> >> diff --git a/include/linux/cper.h b/include/linux/cper.h
-> >> index 4c671fc..17546bf 100644
-> >> --- a/include/linux/cper.h
-> >> +++ b/include/linux/cper.h
-> >> @@ -275,6 +275,11 @@ enum {
-> >>  #define CPER_ARM_INFO_FLAGS_PROPAGATED		BIT(2)
-> >>  #define CPER_ARM_INFO_FLAGS_OVERFLOW		BIT(3)
-> >>  
-> >> +#define CPER_ARM_INFO_TYPE_CACHE		0
-> >> +#define CPER_ARM_INFO_TYPE_TLB			1
-> >> +#define CPER_ARM_INFO_TYPE_BUS			2
-> >> +#define CPER_ARM_INFO_TYPE_UARCH		3
-> >> +
-> >>  /*
-> >>   * All tables and structs must be byte-packed to match CPER
-> >>   * specification, since the tables are provided by the system BIOS
-> >> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-> >> index 429f46f..dd91ba8 100644
-> >> --- a/include/ras/ras_event.h
-> >> +++ b/include/ras/ras_event.h
-> >> @@ -206,6 +206,85 @@
-> >>  		  __entry->running_state, __entry->psci_state)
-> >>  );
-> >>  
-> >> +#define ARM_PROC_ERR_TYPE	\
-> >> +	EM ( CPER_ARM_INFO_TYPE_CACHE, "cache error" )	\
-> >> +	EM ( CPER_ARM_INFO_TYPE_TLB,  "TLB error" )	\
-> >> +	EM ( CPER_ARM_INFO_TYPE_BUS, "bus error" )	\
-> >> +	EMe ( CPER_ARM_INFO_TYPE_UARCH, "micro-architectural error" )  
-> > 
-> > These are all defines. As the name suggests, the TRACE_DEFINE_ENUM() is
-> > for use with enums, not defines. You can nuke this part.
-> >   
-> >> +
-> >> +/*
-> >> + * First define the enums in MM_ACTION_RESULT to be exported to userspace
-> >> + * via TRACE_DEFINE_ENUM().
-> >> + */
-> >> +#undef EM
-> >> +#undef EMe
-> >> +#define EM(a, b) TRACE_DEFINE_ENUM(a);
-> >> +#define EMe(a, b)	TRACE_DEFINE_ENUM(a);
-> >> +
-> >> +ARM_PROC_ERR_TYPE
-> >> +
-> >> +/*
-> >> + * Now redefine the EM() and EMe() macros to map the enums to the strings
-> >> + * that will be printed in the output.
-> >> + */
-> >> +#undef EM
-> >> +#undef EMe
-> >> +#define EM(a, b)		{ a, b },
-> >> +#define EMe(a, b)	{ a, b }  
-> > 
-> > All the EM* and friends above are not needed. The macro below will
-> > translate into numbers not names in the format files in tracefs.  
-> 
-> So, do you mean we just use __print_symbolic like below:
-> 
-> #define show_proc_err_type(type)                                                \
->         __print_symbolic(type,                                                  \
->                 { CPER_ARM_INFO_TYPE_CACHE, "cache error" },                    \
->                 { CPER_ARM_INFO_TYPE_TLB, "TLB error" },                        \
->                 { CPER_ARM_INFO_TYPE_BUS, "bus error" },                        \
->                 { CPER_ARM_INFO_TYPE_UARCH, "micro-architectural error" })
-> 
-> 
-> 
+Note: the arm-platforms/kvm-arm64/gicv4-kvm HEAD 362f13c96426700d3e37a921ef6d551f01491992 builds fine.
+      It only hurts bisectibility.
 
-Correct. If you want to make sure, just boot the kernel and look at the
-format file within the tracepoint:
+All errors (new ones prefixed by >>):
 
- /sys/kernel/debug/tracing/events/ras/arm_err_info_event/format
+   drivers/irqchip/irq-gic-v3-its.c: In function 'its_irq_set_vcpu_affinity':
+>> drivers/irqchip/irq-gic-v3-its.c:795:7: error: 'UNMAP_VLPI' undeclared (first use in this function)
+     case UNMAP_VLPI:
+          ^~~~~~~~~~
+   drivers/irqchip/irq-gic-v3-its.c:795:7: note: each undeclared identifier is reported only once for each function it appears in
 
-And make sure there's no constant names there.
+vim +/UNMAP_VLPI +795 drivers/irqchip/irq-gic-v3-its.c
 
--- Steve
+   789		if (!its_dev->its->is_v4 || !info)
+   790			return -EINVAL;
+   791	
+   792		switch (info->cmd_type) {
+   793		case MAP_VLPI:
+   794	
+ > 795		case UNMAP_VLPI:
+   796	
+   797		case PROP_UPDATE_VLPI:
+   798		case PROP_UPDATE_AND_INV_VLPI:
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 35412 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/afeebbb5/attachment-0001.gz>
