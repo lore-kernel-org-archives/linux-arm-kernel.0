@@ -1,48 +1,37 @@
-From: aravind.thk@gmail.com (Aravind Thokala)
-Date: Tue, 27 Jun 2017 21:37:10 +0530
-Subject: [PATCH] spi/bcm63xx-hspi: Fix checkpatch warnings
-Message-ID: <1498579630-10109-1-git-send-email-aravind.thk@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 Jun 2017 17:07:59 +0100
+Subject: [PATCH v3 0/3] Add support for es8323 and hdmi audio to the
+ firefly-rk3288
+In-Reply-To: <778a96a1-a6b0-ad78-89c1-7928dd50e3c4@collabora.com>
+References: <20170512132227.24916-1-romain.perier@collabora.com>
+ <20170512132227.24916-9-romain.perier@collabora.com>
+ <98ec8d72-2977-4347-86b0-4b423b55c434@collabora.com>
+ <20170626140740.jlgtwaaivn3bvg2g@sirena.org.uk>
+ <778a96a1-a6b0-ad78-89c1-7928dd50e3c4@collabora.com>
+Message-ID: <20170627160759.psg4o2gpfnyb5bx6@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the checkpatch.pl warnings on the driver
-file.
+On Mon, Jun 26, 2017 at 04:19:59PM +0200, Romain Perier wrote:
+> I did not kill a kitten or a puppy, I have just sent a ping 2 weeks
+> later for v3. The v2 was sent on Jan 23 2017... so that's not what I
+> call a top post or a flood ^^
+> 
+> anyway,
+> Have a nice day,
+> Romain
+> 
+> Le 26/06/2017 ? 16:07, Mark Brown a ?crit :
 
-Signed-off-by: Aravind Thokala <aravind.thk@gmail.com>
----
- drivers/spi/spi-bcm63xx-hsspi.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/spi/spi-bcm63xx-hsspi.c b/drivers/spi/spi-bcm63xx-hsspi.c
-index 5514cd0..17306c1 100644
---- a/drivers/spi/spi-bcm63xx-hsspi.c
-+++ b/drivers/spi/spi-bcm63xx-hsspi.c
-@@ -108,7 +108,7 @@ struct bcm63xx_hsspi {
- 	u8 cs_polarity;
- };
- 
--static void bcm63xx_hsspi_set_cs(struct bcm63xx_hsspi *bs, unsigned cs,
-+static void bcm63xx_hsspi_set_cs(struct bcm63xx_hsspi *bs, unsigned int cs,
- 				 bool active)
- {
- 	u32 reg;
-@@ -127,7 +127,7 @@ static void bcm63xx_hsspi_set_cs(struct bcm63xx_hsspi *bs, unsigned cs,
- static void bcm63xx_hsspi_set_clk(struct bcm63xx_hsspi *bs,
- 				  struct spi_device *spi, int hz)
- {
--	unsigned profile = spi->chip_select;
-+	unsigned int profile = spi->chip_select;
- 	u32 reg;
- 
- 	reg = DIV_ROUND_UP(2048, DIV_ROUND_UP(bs->speed_hz, hz));
-@@ -154,7 +154,7 @@ static void bcm63xx_hsspi_set_clk(struct bcm63xx_hsspi *bs,
- static int bcm63xx_hsspi_do_txrx(struct spi_device *spi, struct spi_transfer *t)
- {
- 	struct bcm63xx_hsspi *bs = spi_master_get_devdata(spi->master);
--	unsigned chip_select = spi->chip_select;
-+	unsigned int chip_select = spi->chip_select;
- 	u16 opcode = 0;
- 	int pending = t->len;
- 	int step_size = HSSPI_BUFFER_LEN;
--- 
-2.7.4
+You're top posting *again* in reply to a mail asking you not to do that
+and explaining why.  The mail I sent also explained why I can't really
+do anything with your content free ping and what you should do instead.  
+The text I send for these things is fairly long as it's trying to be
+clear about what needs to be done and why.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/3c78afb5/attachment.sig>
