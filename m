@@ -1,61 +1,76 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 27 Jun 2017 07:49:32 +0200
-Subject: omap3isp camera was Re: [PATCH v1 0/6] Add support of OV9655
- camera
-In-Reply-To: <20170626111621.GC11688@amd>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <385A82AC-CC23-41BD-9F57-0232F713FED9@goldelico.com>
- <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
- <20170625091856.GA22791@amd>
- <EDFD663F-37F9-42C2-92A9-66C2508B361E@goldelico.com>
- <20170626083927.GB9621@amd>
- <5364AD62-5000-451E-B3F7-93D49A91EED5@goldelico.com>
- <20170626111621.GC11688@amd>
-Message-ID: <A9421661-7E24-4B5D-A0FA-10838A0F12BD@goldelico.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 27 Jun 2017 14:09:33 +0800
+Subject: [PATCH v13 08/14] ASoC: sun4i-codec: Add FM Left, FM Right, FM
+ Playback Switch.
+In-Reply-To: <20170624062419.23778-9-dannym@scratchpost.org>
+Message-ID: <201706271441.UxZIRl0Q%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Danny,
 
-> Am 26.06.2017 um 13:16 schrieb Pavel Machek <pavel@ucw.cz>:
-> 
-> Hi!
-> 
->>> You may want to try this one:
->>> 
->>> commit 0eae9d2a8f096f703cbc8f9a0ab155cd3cc14cef
->>> Author: Pavel <pavel@ucw.cz>
->>> Date:   Mon Feb 13 21:26:51 2017 +0100
->>> 
->>>   omap3isp: fix VP2SDR bit so capture (not preview) works
->>> 
->>>   This is neccessary for capture (not preview) to work properly on
->>>       N900. Why is unknown.
->> 
->> Ah, interesting. I will give it a try.
->> 
->> Do you please have a link to the repo where this commit can be
->>> found?
-> 
-> This branch, as mentioned before:
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/pavel/linux-n900.git/log/?h=camera-fw5-6
+[auto build test ERROR on asoc/for-next]
+[also build test ERROR on next-20170626]
+[cannot apply to v4.12-rc7]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thanks.
+url:    https://github.com/0day-ci/linux/commits/Danny-Milosavljevic/ASoC-sun4i-codec-Add-MIC2-Pre-Amplifier-Mic2/20170626-090107
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
+config: blackfin-allmodconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-I have merged this patch but unfortunately, it does not make the green screen go away.
+Note: the linux-review/Danny-Milosavljevic/ASoC-sun4i-codec-Add-MIC2-Pre-Amplifier-Mic2/20170626-090107 HEAD 44ff3730ffe45aa10f8cfeaf31443f0b7a78227f builds fine.
+      It only hurts bisectibility.
 
-Neither with our own driver nor with the new one by Hugues (which turned out to not
-support SXGA at all but I tried VGA).
+All error/warnings (new ones prefixed by >>):
 
-I think we should postpone debugging this until Hugues proposed patches are better reviewed.
+   In file included from sound/soc/sunxi/sun4i-codec.c:39:0:
+>> sound/soc/sunxi/sun4i-codec.c:706:4: error: 'SUN4I_CODEC_DAC_ACTL_LFMS' undeclared here (not in a function)
+       SUN4I_CODEC_DAC_ACTL_LFMS,
+       ^
+   include/sound/soc.h:36:39: note: in definition of macro 'SOC_DOUBLE_VALUE'
+     {.reg = xreg, .rreg = xreg, .shift = shift_left, \
+                                          ^~~~~~~~~~
+>> sound/soc/sunxi/sun4i-codec.c:705:2: note: in expansion of macro 'SOC_DAPM_DOUBLE'
+     SOC_DAPM_DOUBLE("FM Playback Switch", SUN4I_CODEC_DAC_ACTL,
+     ^~~~~~~~~~~~~~~
+>> sound/soc/sunxi/sun4i-codec.c:707:4: error: 'SUN4I_CODEC_DAC_ACTL_RFMS' undeclared here (not in a function)
+       SUN4I_CODEC_DAC_ACTL_RFMS, 1, 0),
+       ^
+   include/sound/soc.h:37:12: note: in definition of macro 'SOC_DOUBLE_VALUE'
+     .rshift = shift_right, .max = xmax, .platform_max = xmax, \
+               ^~~~~~~~~~~
+>> sound/soc/sunxi/sun4i-codec.c:705:2: note: in expansion of macro 'SOC_DAPM_DOUBLE'
+     SOC_DAPM_DOUBLE("FM Playback Switch", SUN4I_CODEC_DAC_ACTL,
+     ^~~~~~~~~~~~~~~
 
-BR and thanks,
-Nikolaus
+vim +/SUN4I_CODEC_DAC_ACTL_LFMS +706 sound/soc/sunxi/sun4i-codec.c
 
+   699		SOC_DAPM_DOUBLE("DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+   700				SUN4I_CODEC_DAC_ACTL_LDACLMIXS,
+   701				SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),
+   702		SOC_DAPM_SINGLE("Right Mixer Left DAC Playback Switch",
+   703				SUN4I_CODEC_DAC_ACTL,
+   704				SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
+ > 705		SOC_DAPM_DOUBLE("FM Playback Switch", SUN4I_CODEC_DAC_ACTL,
+ > 706				SUN4I_CODEC_DAC_ACTL_LFMS,
+ > 707				SUN4I_CODEC_DAC_ACTL_RFMS, 1, 0),
+   708		SOC_DAPM_DOUBLE("Mic1 Playback Switch", SUN4I_CODEC_DAC_ACTL,
+   709				SUN4I_CODEC_DAC_ACTL_MIC1LS,
+   710				SUN4I_CODEC_DAC_ACTL_MIC1RS, 1, 0),
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/d3be0452/attachment-0001.sig>
+Name: .config.gz
+Type: application/gzip
+Size: 44869 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/2387d205/attachment-0001.gz>
