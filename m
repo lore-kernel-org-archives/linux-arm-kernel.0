@@ -1,174 +1,125 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 27 Jun 2017 18:20:04 +0800
-Subject: [linux-sunxi] Re: [PATCH v6 05/21] net-next: stmmac: Add
- dwmac-sun8i
-In-Reply-To: <B87F7AC7-0742-4CA9-AB6B-C86C1598667B@aosc.io>
-References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
- <20170531071852.12422-6-clabbe.montjoie@gmail.com>
- <8e3d73a7-e9ff-d3e2-4bce-bcc79cdf86db@arm.com>
- <20170627080529.GA2468@Red>
- <CAGb2v65mhDN9vXe6DE2cZPW1BzgYPwK+D2U5VFgyr0wVVZZqDQ@mail.gmail.com>
- <20170627082103.GB2468@Red> <530f7b3e-247d-2e4d-8174-ce6195bacf5b@arm.com>
- <20170627094111.supxmzf2k3n3ewec@flea.lan>
- <CAGb2v67btmyoHDDkvA9wp0pPdEHSu7DYN4=02VxskQqC6-qNDQ@mail.gmail.com>
- <B87F7AC7-0742-4CA9-AB6B-C86C1598667B@aosc.io>
-Message-ID: <CAGb2v64XPwXYhwRR=qfGiXssLuRecSdqBJOrvjfBZqidyuqXhg@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 27 Jun 2017 03:56:54 -0700
+Subject: [PATCH] cavium: thunder: Remove duplicate "netdev->name" logging
+ output
+Message-ID: <0ac1a144114eecd8c469027d6c91f453d61e1ade.1498560984.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 6:17 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->
->
-> ? 2017?6?27? GMT+08:00 ??6:11:47, Chen-Yu Tsai <wens@csie.org> ??:
->>On Tue, Jun 27, 2017 at 5:41 PM, Maxime Ripard
->><maxime.ripard@free-electrons.com> wrote:
->>> On Tue, Jun 27, 2017 at 10:02:45AM +0100, Andre Przywara wrote:
->>>> Hi,
->>>>
->>>> (CC:ing some people from that Rockchip dmwac series)
->>>>
->>>> On 27/06/17 09:21, Corentin Labbe wrote:
->>>> > On Tue, Jun 27, 2017 at 04:11:21PM +0800, Chen-Yu Tsai wrote:
->>>> >> On Tue, Jun 27, 2017 at 4:05 PM, Corentin Labbe
->>>> >> <clabbe.montjoie@gmail.com> wrote:
->>>> >>> On Mon, Jun 26, 2017 at 01:18:23AM +0100, Andr? Przywara wrote:
->>>> >>>> On 31/05/17 08:18, Corentin Labbe wrote:
->>>> >>>>> The dwmac-sun8i is a heavy hacked version of stmmac hardware
->>by
->>>> >>>>> allwinner.
->>>> >>>>> In fact the only common part is the descriptor management and
->>the first
->>>> >>>>> register function.
->>>> >>>>
->>>> >>>> Hi,
->>>> >>>>
->>>> >>>> I know I am a bit late with this, but while adapting the U-Boot
->>driver
->>>> >>>> to the new binding I was wondering about the internal PHY
->>detection:
->>>> >>>>
->>>> >>>>
->>>> >>>> So here you seem to deduce the usage of the internal PHY by the
->>PHY
->>>> >>>> interface specified in the DT (MII = internal, RGMII =
->>external).
->>>> >>>> I think I raised this question before, but isn't it perfectly
->>legal for
->>>> >>>> a board to use MII with an external PHY even on those SoCs that
->>feature
->>>> >>>> an internal PHY?
->>>> >>>> On the first glance that does not make too much sense, but
->>apart from
->>>> >>>> not being the correct binding to describe all of the SoCs
->>features I see
->>>> >>>> two scenarios:
->>>> >>>> 1) A board vendor might choose to not use the internal PHY
->>because it
->>>> >>>> has bugs, lacks features (configurability) or has other issues.
->>For
->>>> >>>> instance I have heard reports that the internal PHY makes the
->>SoC go
->>>> >>>> rather hot, possibly limiting the CPU frequency. By using an
->>external
->>>> >>>> MII PHY (which are still cheaper than RGMII PHYs) this can be
->>avoided.
->>>> >>>> 2) A PHY does not necessarily need to be directly connected to
->>>> >>>> magnetics. Indeed quite some boards use (RG)MII to connect to a
->>switch
->>>> >>>> IC or some other network circuitry, for instance fibre
->>connectors.
->>>> >>>>
->>>> >>>> So I was wondering if we would need an explicit:
->>>> >>>>       allwinner,use-internal-phy;
->>>> >>>> boolean DT property to signal the usage of the internal PHY?
->>>> >>>> Alternatively we could go with the negative version:
->>>> >>>>       allwinner,disable-internal-phy;
->>>> >>>>
->>>> >>>> Or what about introducing a new "allwinner,internal-mii-phy"
->>compatible
->>>> >>>> string for the *PHY* node and use that?
->>>> >>>>
->>>> >>>> I just want to avoid that we introduce a binding that causes us
->>>> >>>> headaches later. I think we can still fix this with a followup
->>patch
->>>> >>>> before the driver and its binding hit a release kernel.
->>>> >>>>
->>>> >>>> Cheers,
->>>> >>>> Andre.
->>>> >>>>
->>>> >>>
->>>> >>> I just see some patch, where "phy-mode = internal" is valid.
->>>> >>> I will try to find a way to use it
->>>> >>
->>>> >> Can you provide a link?
->>>> >
->>>> > https://lkml.org/lkml/2017/6/23/479
->>>> >
->>>> >>
->>>> >> I'm not a fan of using phy-mode for this. There's no guarantee
->>what
->>>> >> mode the internal PHY uses. That's what phy-mode is for.
->>>>
->>>> I can understand Chen-Yu's concerns, but ...
->>>>
->>>> > For each soc the internal PHY mode is know and setted in
->>emac_variant/internal_phy
->>>> > So its not a problem.
->>>>
->>>> that is true as well, at least for now.
->>>>
->>>> So while I agree that having a separate property to indicate the
->>usage
->>>> of the internal PHY would be nice, I am bit tempted to use this
->>easier
->>>> approach and piggy back on the existing phy-mode property.
->>>
->>> We're trying to fix an issue that works for now too.
->>>
->>> If we want to consider future weird cases, then we must consider all
->>> of them. And the phy mode changing is definitely not really far
->>> fetched.
->>
->>I guess the issue is whether it's likely that the vendor puts 2
->>internal
->>PHYs in one SoC, and they use different modes and can be switched
->>around.
->>Otherwise it's fixed for a given SoC, and we can just handle that with
->>the per-SoC GMAC compatible.
->>
->>Maybe Florian could tell us if this was one of the intended use cases
->>for the "internal" phy mode.
->>
->>As for Rockchip, AFAIK they have 2 MACs, one is connected to the
->>internal
->>PHY, while the other is connected to the external interface, and there
->>is
->>no muxing involved, unlike Allwinner's solution.
->>
->>> I agree with Chen-Yu, and I really feel like the compatible solution
->>> you suggested would cover both your concerns, and ours.
->>
->>If using a PHY compatible is the solution, we could just use the
->>"ethernet-phy-idAAAA.BBBB" style one, and put in the bogus ID that
->>Allwinner used.
->>
->>Care must be taken to put this at the board level for boards using
->>the internal PHY, or we'd have to delete or override the property
->>in all other boards.
->>
->>Ideally I think the internal PHY device node should _not_ be in
->>the SoC level .dtsi file. If we select the external interface, then
->>there's no connection to the internal PHY, and that device node becomes
->>unusable and bogus. This is something I think should be fixed
->>regardless
->>of the phy-mode discussion above.
->
-> I think it should be in the SoC DTSI, as it's part of the SoC.
->
-> But it makes sense to set status to disabled defaultly.
+Using netdev_<level>(netdev, "%s: ...", netdev->name) duplicates the
+name in the output.  Remove those uses.
 
-Then you end up stepping on it when you add an external PHY
-with the same address, and start wondering why things don't
-work.
+Miscellanea:
 
-ChenYu
+o Use the netif_<level> convenience macros at the same time
+
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 33 ++++++++--------------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  8 ++----
+ 2 files changed, 15 insertions(+), 26 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 573755b0a51b..49b80da51ba7 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -227,15 +227,14 @@ static void  nicvf_handle_mbx_intr(struct nicvf *nic)
+ 		nic->speed = mbx.link_status.speed;
+ 		nic->mac_type = mbx.link_status.mac_type;
+ 		if (nic->link_up) {
+-			netdev_info(nic->netdev, "%s: Link is Up %d Mbps %s\n",
+-				    nic->netdev->name, nic->speed,
++			netdev_info(nic->netdev, "Link is Up %d Mbps %s duplex\n",
++				    nic->speed,
+ 				    nic->duplex == DUPLEX_FULL ?
+-				"Full duplex" : "Half duplex");
++				    "Full" : "Half");
+ 			netif_carrier_on(nic->netdev);
+ 			netif_tx_start_all_queues(nic->netdev);
+ 		} else {
+-			netdev_info(nic->netdev, "%s: Link is Down\n",
+-				    nic->netdev->name);
++			netdev_info(nic->netdev, "Link is Down\n");
+ 			netif_carrier_off(nic->netdev);
+ 			netif_tx_stop_all_queues(nic->netdev);
+ 		}
+@@ -721,8 +720,7 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
+ 		return;
+ 
+ 	if (netif_msg_pktdata(nic)) {
+-		netdev_info(nic->netdev, "%s: skb 0x%p, len=%d\n", netdev->name,
+-			    skb, skb->len);
++		netdev_info(nic->netdev, "skb 0x%p, len=%d\n", skb, skb->len);
+ 		print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1,
+ 			       skb->data, skb->len, true);
+ 	}
+@@ -854,10 +852,8 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
+ 			netif_tx_wake_queue(txq);
+ 			nic = nic->pnicvf;
+ 			this_cpu_inc(nic->drv_stats->txq_wake);
+-			if (netif_msg_tx_err(nic))
+-				netdev_warn(netdev,
+-					    "%s: Transmit queue wakeup SQ%d\n",
+-					    netdev->name, txq_idx);
++			netif_warn(nic, tx_err, netdev,
++				   "Transmit queue wakeup SQ%d\n", txq_idx);
+ 		}
+ 	}
+ 
+@@ -928,9 +924,8 @@ static void nicvf_handle_qs_err(unsigned long data)
+ 
+ static void nicvf_dump_intr_status(struct nicvf *nic)
+ {
+-	if (netif_msg_intr(nic))
+-		netdev_info(nic->netdev, "%s: interrupt status 0x%llx\n",
+-			    nic->netdev->name, nicvf_reg_read(nic, NIC_VF_INT));
++	netif_info(nic, intr, nic->netdev, "interrupt status 0x%llx\n",
++		   nicvf_reg_read(nic, NIC_VF_INT));
+ }
+ 
+ static irqreturn_t nicvf_misc_intr_handler(int irq, void *nicvf_irq)
+@@ -1212,10 +1207,8 @@ static netdev_tx_t nicvf_xmit(struct sk_buff *skb, struct net_device *netdev)
+ 			netif_tx_wake_queue(txq);
+ 		} else {
+ 			this_cpu_inc(nic->drv_stats->txq_stop);
+-			if (netif_msg_tx_err(nic))
+-				netdev_warn(netdev,
+-					    "%s: Transmit ring full, stopping SQ%d\n",
+-					    netdev->name, qid);
++			netif_warn(nic, tx_err, netdev,
++				   "Transmit ring full, stopping SQ%d\n", qid);
+ 		}
+ 		return NETDEV_TX_BUSY;
+ 	}
+@@ -1600,9 +1593,7 @@ static void nicvf_tx_timeout(struct net_device *dev)
+ {
+ 	struct nicvf *nic = netdev_priv(dev);
+ 
+-	if (netif_msg_tx_err(nic))
+-		netdev_warn(dev, "%s: Transmit timed out, resetting\n",
+-			    dev->name);
++	netif_warn(nic, tx_err, dev, "Transmit timed out, resetting\n");
+ 
+ 	this_cpu_inc(nic->drv_stats->tx_timeout);
+ 	schedule_work(&nic->reset_task);
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index 2b181762ad49..d4496e9afcdf 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -1811,11 +1811,9 @@ void nicvf_update_sq_stats(struct nicvf *nic, int sq_idx)
+ /* Check for errors in the receive cmp.queue entry */
+ int nicvf_check_cqe_rx_errs(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
+ {
+-	if (netif_msg_rx_err(nic))
+-		netdev_err(nic->netdev,
+-			   "%s: RX error CQE err_level 0x%x err_opcode 0x%x\n",
+-			   nic->netdev->name,
+-			   cqe_rx->err_level, cqe_rx->err_opcode);
++	netif_err(nic, rx_err, nic->netdev,
++		  "RX error CQE err_level 0x%x err_opcode 0x%x\n",
++		  cqe_rx->err_level, cqe_rx->err_opcode);
+ 
+ 	switch (cqe_rx->err_opcode) {
+ 	case CQ_RX_ERROP_RE_PARTIAL:
+-- 
+2.10.0.rc2.1.g053435c
