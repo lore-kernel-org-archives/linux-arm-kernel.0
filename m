@@ -1,33 +1,82 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Tue, 27 Jun 2017 10:33:33 +0300
-Subject: [PATCH 1/9] i2c: designware: Fix system suspend
-In-Reply-To: <CAJZ5v0i-AgTDTOX+O41abVsnahU9V=NV+HEW0vajhBqGfJuUEg@mail.gmail.com>
-References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
- <20170622104933.GY629@lahna.fi.intel.com> <2842386.AFZiXzV2Sq@aspire.rjw.lan>
- <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
- <CAJZ5v0irHvYXHv1GykatTH+XROZyL0nR0c=KfdSrpH395s6V8g@mail.gmail.com>
- <CAPDyKFov=08AQw0PPPgcFbrerTskoPGfLZcJL9gjikfQfZUJpw@mail.gmail.com>
- <4324e2c8-ab79-5a21-a8ab-c660920cba59@ti.com>
- <CAJZ5v0i-AgTDTOX+O41abVsnahU9V=NV+HEW0vajhBqGfJuUEg@mail.gmail.com>
-Message-ID: <bca550fd-3821-fb14-c3b0-8f05c7a1fdff@linux.intel.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 27 Jun 2017 09:41:23 +0200
+Subject: [PATCH v3 4/9] serial: atmel: Use common rs485 device tree
+ parsing function
+In-Reply-To: <20170626090803.10981-5-u.kleine-koenig@pengutronix.de>
+References: <20170626090803.10981-1-u.kleine-koenig@pengutronix.de>
+ <20170626090803.10981-5-u.kleine-koenig@pengutronix.de>
+Message-ID: <bac50abd-9c55-c9cb-7d10-24ef8efbdb53@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2017 12:11 AM, Rafael J. Wysocki wrote:
-> On Mon, Jun 26, 2017 at 9:39 PM, Grygorii Strashko
->> Wouldn't it fix suspend for this driver if you will just replace
->> dw_i2c_plat_suspend() with pm_runtime_force_suspend() in SET_SYSTEM_SLEEP_PM_OPS() as
->> you've done in patch 9?
->>
->> And, I think, direct_complete path should still work after this also.
->
-> That's a good point and I was about to mention that.
->
-Unfortunately it will cause regression to platforms using 
-drivers/acpi/acpi_lpss.c power domain:
+On 26/06/2017 at 11:07, Uwe Kleine-K?nig wrote:
+> From: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> We just got a common helper for parsing the rs485 specific
+> device tree properties. Use it and drop the open coded parser.
+> 
+> Note that there is a small difference between the removed and the now
+> used implementation: The former cleared flags to 0 if rs485-rts-delay
+> was given, the common helper clears SER_RS485_RX_DURING_TX and
+> SER_RS485_ENABLED only but always which makes more sense.
 
-http://www.spinics.net/lists/linux-i2c/msg29079.html
+Sure:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+Thanks Sasha and Uwe!
+
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> [ukleinek: point out semantic change in commit log]
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 25 +------------------------
+>  1 file changed, 1 insertion(+), 24 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 937d67f22fba..245d9c227ad5 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1684,29 +1684,6 @@ static void atmel_init_property(struct atmel_uart_port *atmel_port,
+>  	}
+>  }
+>  
+> -static void atmel_init_rs485(struct uart_port *port,
+> -				struct platform_device *pdev)
+> -{
+> -	struct device_node *np = pdev->dev.of_node;
+> -
+> -	struct serial_rs485 *rs485conf = &port->rs485;
+> -	u32 rs485_delay[2];
+> -
+> -	/* rs485 properties */
+> -	if (of_property_read_u32_array(np, "rs485-rts-delay",
+> -				       rs485_delay, 2) == 0) {
+> -		rs485conf->delay_rts_before_send = rs485_delay[0];
+> -		rs485conf->delay_rts_after_send = rs485_delay[1];
+> -		rs485conf->flags = 0;
+> -	}
+> -
+> -	if (of_get_property(np, "rs485-rx-during-tx", NULL))
+> -		rs485conf->flags |= SER_RS485_RX_DURING_TX;
+> -
+> -	if (of_get_property(np, "linux,rs485-enabled-at-boot-time", NULL))
+> -		rs485conf->flags |= SER_RS485_ENABLED;
+> -}
+> -
+>  static void atmel_set_ops(struct uart_port *port)
+>  {
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> @@ -2390,7 +2367,7 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
+>  	atmel_init_property(atmel_port, pdev);
+>  	atmel_set_ops(port);
+>  
+> -	atmel_init_rs485(port, pdev);
+> +	of_get_rs485_mode(pdev->dev.of_node, &port->rs485);
+>  
+>  	port->iotype		= UPIO_MEM;
+>  	port->flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP;
+> 
+
 
 -- 
-Jarkko
+Nicolas Ferre
