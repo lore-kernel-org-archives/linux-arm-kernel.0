@@ -1,50 +1,41 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Tue, 27 Jun 2017 09:25:55 +0200
-Subject: [PATCH v5] trace: ras: add ARM processor error information trace
- event
-In-Reply-To: <22ba6506-1031-437b-95ae-c26773ff84b7@huawei.com>
-References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
- <20170626140647.anigiqhk3l6ltet7@pd.tnic>
- <22ba6506-1031-437b-95ae-c26773ff84b7@huawei.com>
-Message-ID: <20170627072555.m5ogmljp7f6lf6fu@pd.tnic>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Jun 2017 09:36:09 +0200
+Subject: next-20170626 build: 1 failures 1 warnings (next-20170626)
+In-Reply-To: <1498481507.6075.10.camel@mtkswgap22>
+References: <E1dPPgG-0002pe-3A@optimist>
+ <20170626115653.e4xs4lk4paibuphx@sirena.org.uk>
+ <1498481507.6075.10.camel@mtkswgap22>
+Message-ID: <CAK8P3a31MDiyhvDhyfRG0EZFG7VfUpsy1J-=cJePHefvtWfadQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 02:51:22PM +0800, Xie XiuQi wrote:
-> How about we report the full info via arm_err_info_event which just for someone
-> who want the detail information, and leave arm_event closed. If someone do not
-> care the error detail, who could just open arm_event.
+On Mon, Jun 26, 2017 at 2:51 PM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> On Mon, 2017-06-26 at 12:56 +0100, Mark Brown wrote:
+>> On Mon, Jun 26, 2017 at 09:47:36AM +0100, Build bot for Mark Brown wrote:
+>>
+>> This build failure is still present in -next:
+>>
+>> >     arm-allmodconfig
+>> > ../drivers/pci/host/pcie-mediatek.c:485:8: error: implicit declaration of function 'pci_register_host_bridge' [-Werror=implicit-function-declaration]
+>>
+>> and we're at -rc7 now.
+>
+> Hi Mark,
+>
+> This is due to we are in different branch but merge together...
+>
+> Anyway, I could send a critical patch, but I need Bjorn help to apply to
+> -next. Seems he didn't response these days.
+>
+> Not sure how could I send it?
 
-So the way I read the spec is, an error event is being described by the
-Processor Error section and then it "may contain multiple instances of
-error information structures associated to a single error event."
+It's really something that Bjorn needs to fix by applying your patch,
+but if he's currently not able to do that for some reason, a possible
+workaround would be for either Stephen Rothwell to apply your fixup
+on linux-next, or Andrew Morton to add it to his mmotm tree, either
+way it will be part of linux-next and on top of the pci-next tree,
+until Bjorn applies it.
 
-So you can't leave the arm_event thing closed because it describes the
-event.
+Please re-send your patch to both of them, with Bjorn on Cc.
 
-If you want to merge the two, then sure, by all means, change arm_event
-to contain some of the processor error info structure.
-
-It wouldn't matter too much as this tracepoint is not fully cast in
-stone yet.
-
-Bottomline is, you want to carry as much information to userspace as
-possible in order to handle the error properly. But not more - you don't
-need redundant information because then that bloats the whole machinery
-around transporting and processing error records and you don't want that
-in critical situations where you want to act as quickly and as lean as
-possible.
-
-And "handle properly" means any and all actions which the kernel or
-user needs to do to prolong the system lifetime or be able to reliably
-schedule maintenance as to replace the faulty hw component. And so on
-and so on...
-
-So it all comes down to what RAS actions you guys wanna do on ARM.
-
--- 
-Regards/Gruss,
-    Boris.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+        Arnd
