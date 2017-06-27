@@ -1,188 +1,37 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 27 Jun 2017 11:33:56 +0100
-Subject: [PATCH v6 05/21] net-next: stmmac: Add dwmac-sun8i
-In-Reply-To: <700A8221-3CEC-4657-900D-183398D25AE7@aosc.io>
-References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
- <20170531071852.12422-6-clabbe.montjoie@gmail.com>
- <8e3d73a7-e9ff-d3e2-4bce-bcc79cdf86db@arm.com> <20170627080529.GA2468@Red>
- <CAGb2v65mhDN9vXe6DE2cZPW1BzgYPwK+D2U5VFgyr0wVVZZqDQ@mail.gmail.com>
- <20170627082103.GB2468@Red> <530f7b3e-247d-2e4d-8174-ce6195bacf5b@arm.com>
- <20170627094111.supxmzf2k3n3ewec@flea.lan>
- <44afb371-44d4-dbb5-0aac-4bbc55269344@arm.com>
- <700A8221-3CEC-4657-900D-183398D25AE7@aosc.io>
-Message-ID: <858b5361-fde5-8ab4-b9ba-aeb7859b9a7d@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Jun 2017 12:35:49 +0200
+Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
+In-Reply-To: <20170627091006.GN4902@n2100.armlinux.org.uk>
+References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
+ <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
+ <20170623152227.GA21989@leverpostej>
+ <DB6PR04MB2999E8FFBE0FE708A003637986D80@DB6PR04MB2999.eurprd04.prod.outlook.com>
+ <CAK8P3a0mhWTRriGYB6aHS28dm842d-0OeGRmRYzMS4ZYY9=YCQ@mail.gmail.com>
+ <20170627081717.GM4902@n2100.armlinux.org.uk>
+ <CAK8P3a0N5tiP7RPMg=Q8fsROuYabJjQ5Awd2ekrn686nDqdNwA@mail.gmail.com>
+ <20170627091006.GN4902@n2100.armlinux.org.uk>
+Message-ID: <CAK8P3a0EXGfkijeQG6OKGHeS8LZsO4YFmRhN9WXTei51rj6G1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 27/06/17 11:23, Icenowy Zheng wrote:
-> 
-> 
-> ? 2017?6?27? GMT+08:00 ??6:15:58, Andre Przywara <andre.przywara@arm.com> ??:
->> Hi,
+On Tue, Jun 27, 2017 at 11:10 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Jun 27, 2017 at 11:05:38AM +0200, Arnd Bergmann wrote:
+>> On Tue, Jun 27, 2017 at 10:17 AM, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
 >>
->> On 27/06/17 10:41, Maxime Ripard wrote:
->>> On Tue, Jun 27, 2017 at 10:02:45AM +0100, Andre Przywara wrote:
->>>> Hi,
->>>>
->>>> (CC:ing some people from that Rockchip dmwac series)
->>>>
->>>> On 27/06/17 09:21, Corentin Labbe wrote:
->>>>> On Tue, Jun 27, 2017 at 04:11:21PM +0800, Chen-Yu Tsai wrote:
->>>>>> On Tue, Jun 27, 2017 at 4:05 PM, Corentin Labbe
->>>>>> <clabbe.montjoie@gmail.com> wrote:
->>>>>>> On Mon, Jun 26, 2017 at 01:18:23AM +0100, Andr? Przywara wrote:
->>>>>>>> On 31/05/17 08:18, Corentin Labbe wrote:
->>>>>>>>> The dwmac-sun8i is a heavy hacked version of stmmac hardware by
->>>>>>>>> allwinner.
->>>>>>>>> In fact the only common part is the descriptor management and
->> the first
->>>>>>>>> register function.
->>>>>>>>
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> I know I am a bit late with this, but while adapting the U-Boot
->> driver
->>>>>>>> to the new binding I was wondering about the internal PHY
->> detection:
->>>>>>>>
->>>>>>>>
->>>>>>>> So here you seem to deduce the usage of the internal PHY by the
->> PHY
->>>>>>>> interface specified in the DT (MII = internal, RGMII =
->> external).
->>>>>>>> I think I raised this question before, but isn't it perfectly
->> legal for
->>>>>>>> a board to use MII with an external PHY even on those SoCs that
->> feature
->>>>>>>> an internal PHY?
->>>>>>>> On the first glance that does not make too much sense, but apart
->> from
->>>>>>>> not being the correct binding to describe all of the SoCs
->> features I see
->>>>>>>> two scenarios:
->>>>>>>> 1) A board vendor might choose to not use the internal PHY
->> because it
->>>>>>>> has bugs, lacks features (configurability) or has other issues.
->> For
->>>>>>>> instance I have heard reports that the internal PHY makes the
->> SoC go
->>>>>>>> rather hot, possibly limiting the CPU frequency. By using an
->> external
->>>>>>>> MII PHY (which are still cheaper than RGMII PHYs) this can be
->> avoided.
->>>>>>>> 2) A PHY does not necessarily need to be directly connected to
->>>>>>>> magnetics. Indeed quite some boards use (RG)MII to connect to a
->> switch
->>>>>>>> IC or some other network circuitry, for instance fibre
->> connectors.
->>>>>>>>
->>>>>>>> So I was wondering if we would need an explicit:
->>>>>>>>       allwinner,use-internal-phy;
->>>>>>>> boolean DT property to signal the usage of the internal PHY?
->>>>>>>> Alternatively we could go with the negative version:
->>>>>>>>       allwinner,disable-internal-phy;
->>>>>>>>
->>>>>>>> Or what about introducing a new "allwinner,internal-mii-phy"
->> compatible
->>>>>>>> string for the *PHY* node and use that?
->>>>>>>>
->>>>>>>> I just want to avoid that we introduce a binding that causes us
->>>>>>>> headaches later. I think we can still fix this with a followup
->> patch
->>>>>>>> before the driver and its binding hit a release kernel.
->>>>>>>>
->>>>>>>> Cheers,
->>>>>>>> Andre.
->>>>>>>>
->>>>>>>
->>>>>>> I just see some patch, where "phy-mode = internal" is valid.
->>>>>>> I will try to find a way to use it
->>>>>>
->>>>>> Can you provide a link?
->>>>>
->>>>> https://lkml.org/lkml/2017/6/23/479
->>>>>
->>>>>>
->>>>>> I'm not a fan of using phy-mode for this. There's no guarantee
->> what
->>>>>> mode the internal PHY uses. That's what phy-mode is for.
->>>>
->>>> I can understand Chen-Yu's concerns, but ...
->>>>
->>>>> For each soc the internal PHY mode is know and setted in
->> emac_variant/internal_phy
->>>>> So its not a problem.
->>>>
->>>> that is true as well, at least for now.
->>>>
->>>> So while I agree that having a separate property to indicate the
->> usage
->>>> of the internal PHY would be nice, I am bit tempted to use this
->> easier
->>>> approach and piggy back on the existing phy-mode property.
->>>
->>> We're trying to fix an issue that works for now too.
->>>
->>> If we want to consider future weird cases, then we must consider all
->>> of them. And the phy mode changing is definitely not really far
->>> fetched.
->>>
->>> I agree with Chen-Yu, and I really feel like the compatible solution
->>> you suggested would cover both your concerns, and ours.
->>
->> So something like this?
->> 	emac: emac at 1c30000 {
->> 	    compatible = "allwinner,sun8i-h3-emac";
->> 	    ...
->> 	    phy-mode = "mii";
->> 	    phy-handle = <&int_mii_phy>;
->> 	    ...
->>
->> 	    mdio: mdio {
->>                #address-cells = <1>;
->>                #size-cells = <0>;
->>                int_mii_phy: ethernet-phy at 1 {
->>                    compatible = "allwinner,sun8i-h3-ephy";
->>                    syscon = <&syscon>;
-> 
-> The MAC still needs to set some bits of syscon register.
+>> I wonder if doing memcpy_toio on the write-combining mapping
+>> will do what Roy wants and and up sending a single bus transaction
+>> for one descriptor most of the time, while fitting in with the ioremap_wc()
+>> interface and its __iomem pointers.
+>
+> Either the CE region needs __iomem pointers and proper accessors, or
+> it needs to be using memremap(offset, size, MEMREMAP_WC) and not use
+> the iomem accessors.
 
-Yes, the syscon property needs also to be in the MAC node, that was
-meant to be somewhere in the second "..." ;-)
+Right, memremap() would work here as well. If there are no other constraints,
+using ioremap_wc and __iomem pointers would have the advantage of giving
+us a little more type safety, but it depends on what operations we actually
+need to do on the data.
 
-But now since Chen-Yu mentioned that we need to set up the PHY *first*
-to make it actually discoverable via MDIO, I wonder if we could change
-this to:
-1) have the DT as described here
-2) Let the dwmac-sun8i driver peek into the node referenced by
-phy-handle and check the compatible string there.
-3) If that matches some allwinner internal PHY name, it sets up the PHY
-to make it respond when the MDIO driver queries its bus.
-
-Or can a PHY driver set itself up (since we have clocks and resets
-properties in there) *before* the MDIO bus gets scanned?
-Chen-Yu's comment in the other mail hints at that this is not easily
-possible.
-
-Cheers,
-Andre.
-
-> 
->>                    reg = <1>;
->>                    clocks = <&ccu CLK_BUS_EPHY>;
->>                    resets = <&ccu RST_BUS_EPHY>;
->>                };
->>            };
->>        };
->>
->> And then move the internal-PHY setup code into a separate PHY driver?
->>
->> That looks like the architecturally best solution to me, but is
->> probably
->> also a bit involved since it would require a separate PHY driver.
->> Or can we make it simpler, but still use this binding?
->>
->> Cheers,
->> Andre.
+        Arnd
