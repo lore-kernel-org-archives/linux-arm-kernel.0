@@ -1,55 +1,45 @@
-From: karthik@techveda.org (karthik at techveda.org)
-Date: Tue, 27 Jun 2017 11:03:10 +0530
-Subject: [PATCH] arm: dts: omap3: Remove interrupt-parent property
-Message-ID: <1498541590-4550-1-git-send-email-karthik@techveda.org>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 27 Jun 2017 08:36:42 +0300
+Subject: [PATCH v1 2/6] [media] ov9650: add device tree support
+In-Reply-To: <D780984B-70A1-4E9C-A887-DD2CBAAC7CCA@goldelico.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <1498143942-12682-3-git-send-email-hugues.fruchet@st.com>
+ <20170626163102.GQ12407@valkosipuli.retiisi.org.uk>
+ <D780984B-70A1-4E9C-A887-DD2CBAAC7CCA@goldelico.com>
+Message-ID: <20170627053642.GW12407@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Karthik Tummala <karthik@techveda.org>
+On Mon, Jun 26, 2017 at 07:46:34PM +0200, H. Nikolaus Schaller wrote:
+> Hi,
+> 
+> > Am 26.06.2017 um 18:31 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
+> > 
+> > Hi Hugues,
+> > 
+> > On Thu, Jun 22, 2017 at 05:05:38PM +0200, Hugues Fruchet wrote:
+> >> @@ -1545,15 +1577,22 @@ static int ov965x_remove(struct i2c_client *client)
+> >> }
+> >> 
+> >> static const struct i2c_device_id ov965x_id[] = {
+> >> -	{ "OV9650", 0 },
+> >> -	{ "OV9652", 0 },
+> >> +	{ "OV9650", 0x9650 },
+> >> +	{ "OV9652", 0x9652 },
+> > 
+> > This change does not appear to match with the patch description nor it the
+> > information is used. How about not changing it, unless there's a reason to?
+> > The same for the data field of the of_device_id array below.
+> 
+> I think it could/should be used to check if the camera chip that is found
+> by reading the product-id and version registers does match what the device
+> tree expects and abort probing on a mismatch.
 
-All nodes inhert "interrupt-parent" property from root
-node. So removed that property from usbhsohci, usbhsehci,
-ssi_port1, ssi_port2 nodes.
+Makes sense. But it should be a separate patch, shouldn't it?
 
-Signed-off-by: Karthik Tummala <karthik@techveda.org>
----
- arch/arm/boot/dts/omap3.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+You could also put the id to the ops struct, and choose the ops struct that
+way. Entirely up to you.
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a3ff493..bdaf30c 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -713,14 +713,12 @@
- 			usbhsohci: ohci at 48064400 {
- 				compatible = "ti,ohci-omap3";
- 				reg = <0x48064400 0x400>;
--				interrupt-parent = <&intc>;
- 				interrupts = <76>;
- 			};
- 
- 			usbhsehci: ehci at 48064800 {
- 				compatible = "ti,ehci-omap";
- 				reg = <0x48064800 0x400>;
--				interrupt-parent = <&intc>;
- 				interrupts = <77>;
- 			};
- 		};
-@@ -831,7 +829,6 @@
- 				reg-names = "tx",
- 					    "rx";
- 
--				interrupt-parent = <&intc>;
- 				interrupts = <67>,
- 					     <68>;
- 			};
-@@ -844,7 +841,6 @@
- 				reg-names = "tx",
- 					    "rx";
- 
--				interrupt-parent = <&intc>;
- 				interrupts = <69>,
- 					     <70>;
- 			};
 -- 
-1.9.1
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
