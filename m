@@ -1,74 +1,127 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 27 Jun 2017 09:40:18 -0600
-Subject: [PATCH v5] trace: ras: add ARM processor error information trace
- event
-In-Reply-To: <20170627072555.m5ogmljp7f6lf6fu@pd.tnic>
-References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
- <20170626140647.anigiqhk3l6ltet7@pd.tnic>
- <22ba6506-1031-437b-95ae-c26773ff84b7@huawei.com>
- <20170627072555.m5ogmljp7f6lf6fu@pd.tnic>
-Message-ID: <3e07b9f0-b2e8-cfd8-9deb-76ed48a8f2c1@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 27 Jun 2017 17:40:04 +0200
+Subject: [PATCH 05/11] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <924d248f-f1c0-7fa2-4b97-c4f753ffe35b@rock-chips.com>
+References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
+ <2805278.mLmlzpUgMM@phil>
+ <924d248f-f1c0-7fa2-4b97-c4f753ffe35b@rock-chips.com>
+Message-ID: <2551050.3LrlfzW890@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/27/2017 1:25 AM, Borislav Petkov wrote:
-> On Tue, Jun 27, 2017 at 02:51:22PM +0800, Xie XiuQi wrote:
->> How about we report the full info via arm_err_info_event which just for someone
->> who want the detail information, and leave arm_event closed. If someone do not
->> care the error detail, who could just open arm_event.
-> So the way I read the spec is, an error event is being described by the
-> Processor Error section and then it "may contain multiple instances of
-> error information structures associated to a single error event."
-Hello Xie,
+Hi David,
 
-I originally included an error information structure in the arm_event, 
-but that won't work
-in the case of multiple error information structures. The spec says the 
-error must contain at
-least 1 error information structure, but it could be several. I'm 
-unaware of a way to represent
-a tracepoint with multiple structures inside of it. I figured the best 
-way to do it would be
-to have the arm_event TP and then a separate TP for the error 
-information structure which
-could be triggered several times for the same arm_event.
+Am Dienstag, 27. Juni 2017, 22:33:20 CEST schrieb David.Wu:
+> ? 2017/6/24 1:19, Heiko Stuebner ??:
+> > Am Freitag, 23. Juni 2017, 12:59:07 CEST schrieb David Wu:
+> >> To make internal phy worked, need to configure the phy_clock,
+> >> phy cru_reset and related registers.
+> >>
+> >> Change-Id: I6971c0a769754b824b1b908b56080cbaf7867d13
+> > 
+> > please remove all Change-Ids from patches before sending upstream.
+> > There were more affected patches in this series.
+> > 
+> >> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> >> ---
+> >>   .../devicetree/bindings/net/rockchip-dwmac.txt     |  3 +
+> >>   drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 82 ++++++++++++++++++++++
+> >>   2 files changed, 85 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> >> index 8f42755..0514f69 100644
+> >> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> >> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> >> @@ -22,6 +22,7 @@ Required properties:
+> >>   	   <&cru SCLK_MACREF_OUT> clock gate for RMII reference clock output
+> >>   	   <&cru ACLK_GMAC>: AXI clock gate for GMAC
+> >>   	   <&cru PCLK_GMAC>: APB clock gate for GMAC
+> >> +	   <&cru MAC_PHY>: clock for internal macphy
+> > 
+> > that clock should not be listed as always "Required" like it is here.
+> > Make it some sort of extra paragraph marking it as required when using
+> > an internal phy.
+> > 
+> 
+> Okay, move it to the option.
+> 
+> >>    - clock-names: One name for each entry in the clocks property.
+> >>    - phy-mode: See ethernet.txt file in the same directory.
+> >>    - pinctrl-names: Names corresponding to the numbered pinctrl states.
+> >> @@ -35,6 +36,8 @@ Required properties:
+> >>    - assigned-clocks: main clock, should be <&cru SCLK_MAC>;
+> >>    - assigned-clock-parents = parent of main clock.
+> >>      can be <&ext_gmac> or <&cru SCLK_MAC_PLL>.
+> >> + - phy-type: For internal phy, it must be "internal"; For external phy, no need
+> >> +   to configure this.
+> >>   
+> >>   Optional properties:
+> >>    - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
+> >> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> >> index a8e8fd5..c1a1413 100644
+> >> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> >> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> >> @@ -41,6 +41,7 @@ struct rk_gmac_ops {
+> >>   	void (*set_to_rmii)(struct rk_priv_data *bsp_priv);
+> >>   	void (*set_rgmii_speed)(struct rk_priv_data *bsp_priv, int speed);
+> >>   	void (*set_rmii_speed)(struct rk_priv_data *bsp_priv, int speed);
+> >> +	void (*internal_phy_powerup)(struct rk_priv_data *bsp_priv);
+> >>   };
+> >>   
+> >>   struct rk_priv_data {
+> >> @@ -52,6 +53,7 @@ struct rk_priv_data {
+> >>   
+> >>   	bool clk_enabled;
+> >>   	bool clock_input;
+> >> +	bool internal_phy;
+> >>   
+> >>   	struct clk *clk_mac;
+> >>   	struct clk *gmac_clkin;
+> >> @@ -61,6 +63,9 @@ struct rk_priv_data {
+> >>   	struct clk *clk_mac_refout;
+> >>   	struct clk *aclk_mac;
+> >>   	struct clk *pclk_mac;
+> >> +	struct clk *clk_macphy;
+> >> +
+> >> +	struct reset_control *macphy_reset;
+> >>   
+> >>   	int tx_delay;
+> >>   	int rx_delay;
+> >> @@ -750,6 +755,48 @@ static void rk3399_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+> >>   	.set_rmii_speed = rk3399_set_rmii_speed,
+> >>   };
+> >>   
+> >> +#define RK_GRF_MACPHY_CON0		0xb00
+> >> +#define RK_GRF_MACPHY_CON1		0xb04
+> >> +#define RK_GRF_MACPHY_CON2		0xb08
+> >> +#define RK_GRF_MACPHY_CON3		0xb0c
+> >> +
+> >> +#define RK_MACPHY_ENABLE		GRF_BIT(0)
+> >> +#define RK_MACPHY_DISABLE		GRF_CLR_BIT(0)
+> >> +#define RK_MACPHY_CFG_CLK_50M		GRF_BIT(14)
+> >> +#define RK_GMAC2PHY_RMII_MODE		(GRF_BIT(6) | GRF_CLR_BIT(7))
+> >> +#define RK_GRF_CON2_MACPHY_ID		HIWORD_UPDATE(0x1234, 0xffff, 0)
+> >> +#define RK_GRF_CON3_MACPHY_ID		HIWORD_UPDATE(0x35, 0x3f, 0)
+> > 
+> > These are primarily registers for the rk3328 and come from the GRF which is
+> > somehow prone to chip-designers moving bits around in registers and also
+> > especially the register offsets (*_CONx) will probably not stay the same
+> > on future socs.
+> > 
+> 
+> I think they should try to keep the same. But what you said is very 
+> reasonable. So let's give rk3228 and rk3328 different 
+> internal_phy_powerup() in the rk_gmac_ops to set their own configuration?
 
-The same thing is true for the context information structure, but there 
-could be 0 or many
-of those structures. There is also an optional vendor information buffer 
-that can be included,
-but there is obviously only one of those. That is something that may be 
-easy to add to the
-arm_event TP...or do that in a separate TP as well.
+I just looked at both the rk3228 and rk3328 GRFs and really this seems
+to be the first time I see GRF-parts that are similar :-) .
 
-Thanks,
-Tyler
->
-> So you can't leave the arm_event thing closed because it describes the
-> event.
->
-> If you want to merge the two, then sure, by all means, change arm_event
-> to contain some of the processor error info structure.
->
-> It wouldn't matter too much as this tracepoint is not fully cast in
-> stone yet.
->
-> Bottomline is, you want to carry as much information to userspace as
-> possible in order to handle the error properly. But not more - you don't
-> need redundant information because then that bloats the whole machinery
-> around transporting and processing error records and you don't want that
-> in critical situations where you want to act as quickly and as lean as
-> possible.
->
-> And "handle properly" means any and all actions which the kernel or
-> user needs to do to prolong the system lifetime or be able to reliably
-> schedule maintenance as to replace the faulty hw component. And so on
-> and so on...
->
-> So it all comes down to what RAS actions you guys wanna do on ARM.
->
+There is no need to duplicate code unnecessarily, if the registers really
+are the same for both. So I guess, just prefix everything with a rk3228_*
+and add a comment that the rk3328 uses the same GRF layout.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+That way future socs, can then add their (likely) changed register setups
+as needed.
+
+
+Heiko
