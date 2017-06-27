@@ -1,72 +1,47 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 27 Jun 2017 16:11:21 +0800
-Subject: [PATCH v6 05/21] net-next: stmmac: Add dwmac-sun8i
-In-Reply-To: <20170627080529.GA2468@Red>
-References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
- <20170531071852.12422-6-clabbe.montjoie@gmail.com>
- <8e3d73a7-e9ff-d3e2-4bce-bcc79cdf86db@arm.com>
- <20170627080529.GA2468@Red>
-Message-ID: <CAGb2v65mhDN9vXe6DE2cZPW1BzgYPwK+D2U5VFgyr0wVVZZqDQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Jun 2017 09:17:17 +0100
+Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
+In-Reply-To: <CAK8P3a0mhWTRriGYB6aHS28dm842d-0OeGRmRYzMS4ZYY9=YCQ@mail.gmail.com>
+References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
+ <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
+ <20170623152227.GA21989@leverpostej>
+ <DB6PR04MB2999E8FFBE0FE708A003637986D80@DB6PR04MB2999.eurprd04.prod.outlook.com>
+ <CAK8P3a0mhWTRriGYB6aHS28dm842d-0OeGRmRYzMS4ZYY9=YCQ@mail.gmail.com>
+Message-ID: <20170627081717.GM4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 4:05 PM, Corentin Labbe
-<clabbe.montjoie@gmail.com> wrote:
-> On Mon, Jun 26, 2017 at 01:18:23AM +0100, Andr? Przywara wrote:
->> On 31/05/17 08:18, Corentin Labbe wrote:
->> > The dwmac-sun8i is a heavy hacked version of stmmac hardware by
->> > allwinner.
->> > In fact the only common part is the descriptor management and the first
->> > register function.
->>
->> Hi,
->>
->> I know I am a bit late with this, but while adapting the U-Boot driver
->> to the new binding I was wondering about the internal PHY detection:
->>
->>
->> So here you seem to deduce the usage of the internal PHY by the PHY
->> interface specified in the DT (MII = internal, RGMII = external).
->> I think I raised this question before, but isn't it perfectly legal for
->> a board to use MII with an external PHY even on those SoCs that feature
->> an internal PHY?
->> On the first glance that does not make too much sense, but apart from
->> not being the correct binding to describe all of the SoCs features I see
->> two scenarios:
->> 1) A board vendor might choose to not use the internal PHY because it
->> has bugs, lacks features (configurability) or has other issues. For
->> instance I have heard reports that the internal PHY makes the SoC go
->> rather hot, possibly limiting the CPU frequency. By using an external
->> MII PHY (which are still cheaper than RGMII PHYs) this can be avoided.
->> 2) A PHY does not necessarily need to be directly connected to
->> magnetics. Indeed quite some boards use (RG)MII to connect to a switch
->> IC or some other network circuitry, for instance fibre connectors.
->>
->> So I was wondering if we would need an explicit:
->>       allwinner,use-internal-phy;
->> boolean DT property to signal the usage of the internal PHY?
->> Alternatively we could go with the negative version:
->>       allwinner,disable-internal-phy;
->>
->> Or what about introducing a new "allwinner,internal-mii-phy" compatible
->> string for the *PHY* node and use that?
->>
->> I just want to avoid that we introduce a binding that causes us
->> headaches later. I think we can still fix this with a followup patch
->> before the driver and its binding hit a release kernel.
->>
->> Cheers,
->> Andre.
->>
->
-> I just see some patch, where "phy-mode = internal" is valid.
-> I will try to find a way to use it
+On Tue, Jun 27, 2017 at 09:17:48AM +0200, Arnd Bergmann wrote:
+> I'd suggest we start out by converting this to some standard API
+> first, regardless of performance, to get it working properly with code
+> that should be maintainable at least, and make progress with your
+> hardware enablement.
 
-Can you provide a link?
+I think Roy is rather confused right now about what the driver does
+and doesn't do.
 
-I'm not a fan of using phy-mode for this. There's no guarantee what
-mode the internal PHY uses. That's what phy-mode is for.
+With his patches, two areas are mapped on ARM:
 
-In any case, we should fix this before 4.13 is released.
+1. The addr.ci area is mapped using ioremap().  This is a device mapping,
+   and is used by the "Cache-inhibited register access." functions.
 
-ChenYu
+2. The addr.ce area is mapped using ioremap_wc(), and all other stuff
+   including the verb accesses go through this region.  This is a
+   memory, non-cacheable mapping.
+
+The addr.ce region is the area that has a mixture of memset(), MMIO
+accessors, direct CPU accesses, cache flushes and prefetches used on
+it.
+
+As it is marked non-cacheable, the cache flushes are a pure waste of
+CPU cycles.  Prefetching to a non-cacheable area doesn't make much
+sense either.
+
+So, I think for ARM: just kill the cache flushing - its doing nothing
+useful.  The prefetching could also be removed as well to recover a
+few more CPU cycles.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
