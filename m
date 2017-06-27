@@ -1,86 +1,69 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Tue, 27 Jun 2017 18:13:03 +0900
-Subject: [PATCH] drm: exynos: dsi: release DSI_PORT_OUT node right after
- of_drm_find_bridge()
-In-Reply-To: <5d308e03-e92a-7bac-f65e-23c2ccbe161a@samsung.com>
-References: <CGME20170626004946epcas4p40785020666ae6d43476822d067604baa@epcas4p4.samsung.com>
- <20170624005628.5896-1-shuahkh@osg.samsung.com>
- <5d308e03-e92a-7bac-f65e-23c2ccbe161a@samsung.com>
-Message-ID: <5952219F.1030902@samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Jun 2017 10:19:43 +0100
+Subject: Applied "spi: atmel: fix corrupted data issue on SAM9 family
+ SoCs" to the spi tree
+In-Reply-To: <f2eb4994-2cea-4ad4-58ee-24a174d53f93@microchip.com>
+References: <d174da00f48503eba84dd0f4068749b968628bbb.1498231873.git.cyrille.pitchen@microchip.com>
+ <E1dORFW-00037E-N8@debutante>
+ <20170623171830.GV4902@n2100.armlinux.org.uk>
+ <f2eb4994-2cea-4ad4-58ee-24a174d53f93@microchip.com>
+Message-ID: <20170627091942.GO4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
+On Tue, Jun 27, 2017 at 11:05:56AM +0200, Cyrille Pitchen wrote:
+> Hi Russell,
+> 
+> Le 23/06/2017 ? 19:18, Russell King - ARM Linux a ?crit :
+> > On Fri, Jun 23, 2017 at 05:15:58PM +0100, Mark Brown wrote:
+> >> +#ifdef CONFIG_SOC_SAM_V4_V5
+> >> +	/*
+> >> +	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
+> >> +	 * since this later function tries to map buffers with dma_map_sg()
+> >> +	 * even if they have not been allocated inside DMA-safe areas.
+> >> +	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
+> >> +	 * those ARM cores, the data cache follows the PIPT model.
+> >> +	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
+> >> +	 * In case of PIPT caches, there cannot be cache aliases.
+> >> +	 * However on ARM9 cores, the data cache follows the VIVT model, hence
+> >> +	 * the cache aliases issue can occur when buffers are allocated from
+> >> +	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
+> >> +	 * not taken into account or at least not handled completely (cache
+> >> +	 * lines of aliases are not invalidated).
+> > 
+> > There is a solution to this - code (iow, callers of functions that perform
+> > IO) are expected to use flush_kernel_vmap_range() and
+> > invalidate_kernel_vmap_range() as documented in Documentation/cachetlb.txt
+> > to ensure that their "special" views are properly handled.
+> > 
+> > These are no-ops for PIPT caches, but aliasing caches have to implement
+> > them.
+> > 
+> 
+> So if I understand, calling those two functions at the right places, we
+> could use DMA transfer again without the need of copying data into a
+> bounce buffer? It sounds great, I will study that.
 
-2017? 06? 26? 16:02? Andrzej Hajda ?(?) ? ?:
-> Hi Shuah,
-> 
-> 
-> On 24.06.2017 02:56, Shuah Khan wrote:
->> Fix to call of_node_put() right after of_drm_find_bridge() instead of
->> holding on to it until exynos_dsi_remove().
-> 
-> I think the current implementation is OK, node is get in probe and put
-> in remove.
-> There could be many bind/unbind during lifetime of the bound driver.
-> For example, there is possible sequence:
-> 1. probe -
-> 2. bind
-> 3. unbind
-> 4. bind
-> 
-> With this patch on 2nd bind (point 4) driver will call
-> of_drm_find_bridge on dsi->bridge_node which was put earlier (point 2.).
-> 
+Yes.  The down-side is that you don't have any idea from the higher
+levels whether the driver used DMA or PIO, and in the case of PIO,
+it's extra work that the CPU ends up doing.
 
-Right. This is a problem.
+These were introduced for XFS, since it does IO and expects to be
+able to see the results via vmalloc space.  Since it's working with
+the block layer, the expectation there is that PIO drivers will
+always ensure that data read by PIO reaches the point of coherence,
+so it can do a cache invalidate after the read in every case without
+losing data.
 
-How about moving of_drm_find_bridge function call to probe and keeping drm_bridge_attach call in bind for cleanup?
-Seems it doesn't need to call of_drm_find_bridge function every time bind callback is called.
+That's not true of SPI, so you need to be extra careful about how
+you're using these - I think you can only use flush_kernel_vmap_range()
+before writes and flush_kernel_vmap_range() both before and after reads.
+You need it before a read to ensure that any dirty cache lines from
+the vmalloc mapping won't overwrite the data you're reading via the
+non-vmalloc mapping, and the one after caters for any speculatively
+prefetching that may have occurred.
 
-Thanks,
-Inki Dae
-
-> Regards
-> Andrzej
-> 
-> 
->>
->> Suggested-by: Inki Dae <inki.dae@samsung.com>
->> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
->> ---
->>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 5 +----
->>  1 file changed, 1 insertion(+), 4 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> index e337cd2..7513b88 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> @@ -1689,6 +1689,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
->>  
->>  	if (dsi->bridge_node) {
->>  		bridge = of_drm_find_bridge(dsi->bridge_node);
->> +		of_node_put(dsi->bridge_node);
->>  		if (bridge)
->>  			drm_bridge_attach(encoder, bridge, NULL);
->>  	}
->> @@ -1807,10 +1808,6 @@ static int exynos_dsi_probe(struct platform_device *pdev)
->>  
->>  static int exynos_dsi_remove(struct platform_device *pdev)
->>  {
->> -	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
->> -
->> -	of_node_put(dsi->bridge_node);
->> -
->>  	pm_runtime_disable(&pdev->dev);
->>  
->>  	component_del(&pdev->dev, &exynos_dsi_component_ops);
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
