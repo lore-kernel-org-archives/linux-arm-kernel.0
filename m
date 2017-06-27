@@ -1,31 +1,61 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue, 27 Jun 2017 11:42:21 +0530
-Subject: [PATCH] arm: perf: make of_device_ids const
-Message-ID: <3838e744e5fb337a55a047661d682f67442c016a.1498542886.git.arvind.yadav.cs@gmail.com>
+From: karthik@techveda.org (karthik at techveda.org)
+Date: Tue, 27 Jun 2017 12:17:40 +0530
+Subject: [PATCH v2] arm: dts: omap3: Remove needless interrupt-parent property
+In-Reply-To: <41ab5d17-620e-34b6-bd1c-33ae7bb3234c@techveda.org>
+References: <41ab5d17-620e-34b6-bd1c-33ae7bb3234c@techveda.org>
+Message-ID: <1498546060-5742-1-git-send-email-karthik@techveda.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_device_ids are not supposed to change at runtime. All functions
-working with of_device_ids provided by <linux/of.h> work with const
-of_device_ids. So mark the non-const structs as const.
+From: Karthik Tummala <karthik@techveda.org>
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+All nodes inhert "interrupt-parent" property from root
+node. Removed the aforementioned property from usbhsohci,
+usbhsehci, ssi_port1, ssi_port2 nodes to avoid duplication.
+
+Signed-off-by: Karthik Tummala <karthik@techveda.org>
 ---
- arch/arm/kernel/perf_event_v6.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes for v2:
+- Made changes to subject & description as suggested by
+  Suniel Mahesh.
+---
+ arch/arm/boot/dts/omap3.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-index 96b7a47..8226d0b 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -552,7 +552,7 @@ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index a3ff493..bdaf30c 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -713,14 +713,12 @@
+ 			usbhsohci: ohci at 48064400 {
+ 				compatible = "ti,ohci-omap3";
+ 				reg = <0x48064400 0x400>;
+-				interrupt-parent = <&intc>;
+ 				interrupts = <76>;
+ 			};
  
--static struct of_device_id armv6_pmu_of_device_ids[] = {
-+static const struct of_device_id armv6_pmu_of_device_ids[] = {
- 	{.compatible = "arm,arm11mpcore-pmu",	.data = armv6mpcore_pmu_init},
- 	{.compatible = "arm,arm1176-pmu",	.data = armv6_1176_pmu_init},
- 	{.compatible = "arm,arm1136-pmu",	.data = armv6_1136_pmu_init},
+ 			usbhsehci: ehci at 48064800 {
+ 				compatible = "ti,ehci-omap";
+ 				reg = <0x48064800 0x400>;
+-				interrupt-parent = <&intc>;
+ 				interrupts = <77>;
+ 			};
+ 		};
+@@ -831,7 +829,6 @@
+ 				reg-names = "tx",
+ 					    "rx";
+ 
+-				interrupt-parent = <&intc>;
+ 				interrupts = <67>,
+ 					     <68>;
+ 			};
+@@ -844,7 +841,6 @@
+ 				reg-names = "tx",
+ 					    "rx";
+ 
+-				interrupt-parent = <&intc>;
+ 				interrupts = <69>,
+ 					     <70>;
+ 			};
 -- 
 1.9.1
