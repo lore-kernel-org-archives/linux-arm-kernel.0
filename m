@@ -1,46 +1,45 @@
-From: cyrille.pitchen@microchip.com (Cyrille Pitchen)
-Date: Tue, 27 Jun 2017 11:05:56 +0200
-Subject: Applied "spi: atmel: fix corrupted data issue on SAM9 family
- SoCs" to the spi tree
-In-Reply-To: <20170623171830.GV4902@n2100.armlinux.org.uk>
-References: <d174da00f48503eba84dd0f4068749b968628bbb.1498231873.git.cyrille.pitchen@microchip.com>
- <E1dORFW-00037E-N8@debutante> <20170623171830.GV4902@n2100.armlinux.org.uk>
-Message-ID: <f2eb4994-2cea-4ad4-58ee-24a174d53f93@microchip.com>
+From: linuc.decode@gmail.com (Linu Cherian)
+Date: Tue, 27 Jun 2017 14:38:24 +0530
+Subject: [PATCH v2 5/8] iommu/io-pgtable-arm: Support lockless operation
+In-Reply-To: <20170627083912.GA5759@arm.com>
+References: <cover.1498145008.git.robin.murphy@arm.com>
+ <af61929e3984a31588cab08ed84a237602b5263e.1498145008.git.robin.murphy@arm.com>
+ <20170623055326.GA2949@virtx40> <20170623085607.GC3718@virtx40>
+ <7a8da378-19e2-2f35-877a-cc6ce389301a@arm.com>
+ <20170623113405.GA5221@virtx40> <20170627051155.GA9525@virtx40>
+ <20170627083912.GA5759@arm.com>
+Message-ID: <20170627090824.GA2758@virtx40>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-Le 23/06/2017 ? 19:18, Russell King - ARM Linux a ?crit :
-> On Fri, Jun 23, 2017 at 05:15:58PM +0100, Mark Brown wrote:
->> +#ifdef CONFIG_SOC_SAM_V4_V5
->> +	/*
->> +	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
->> +	 * since this later function tries to map buffers with dma_map_sg()
->> +	 * even if they have not been allocated inside DMA-safe areas.
->> +	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
->> +	 * those ARM cores, the data cache follows the PIPT model.
->> +	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
->> +	 * In case of PIPT caches, there cannot be cache aliases.
->> +	 * However on ARM9 cores, the data cache follows the VIVT model, hence
->> +	 * the cache aliases issue can occur when buffers are allocated from
->> +	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
->> +	 * not taken into account or at least not handled completely (cache
->> +	 * lines of aliases are not invalidated).
+On Tue Jun 27, 2017 at 09:39:13AM +0100, Will Deacon wrote:
+> On Tue, Jun 27, 2017 at 10:41:55AM +0530, Linu Cherian wrote:
+> > On Fri Jun 23, 2017 at 05:04:05PM +0530, Linu Cherian wrote:
+> > > On Fri Jun 23, 2017 at 11:35:25AM +0100, Robin Murphy wrote:
+> > > > Note that on a coherent platform like ThunderX that's as good as just
+> > > > deleting it, because you'll never execute the case below. However, on
+> > > > reflection I think it can at least safely be downgraded to dma_wmb()
+> > > > (i.e. DMB) rather than a full DSB - would you be able to test what
+> > > > difference that makes?
+> > > 
+> > > The testing was done on Thunderx 1, which has a non coherent page table walk.
+> > > Yes, downgrading to dma_wmb() helps. With this change, performance is back to v1.
+> > > 
+> > 
+> > Should i send a patch for this ?
 > 
-> There is a solution to this - code (iow, callers of functions that perform
-> IO) are expected to use flush_kernel_vmap_range() and
-> invalidate_kernel_vmap_range() as documented in Documentation/cachetlb.txt
-> to ensure that their "special" views are properly handled.
+> I already did it:
 > 
-> These are no-ops for PIPT caches, but aliasing caches have to implement
-> them.
+> https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=for-joerg/arm-smmu/updates&id=77f3445866c39d8866b31d8d9fa47c7c20938e05
 > 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-So if I understand, calling those two functions at the right places, we
-could use DMA transfer again without the need of copying data into a
-bounce buffer? It sounds great, I will study that.
+Thanks Will.
 
-Thanks!
-
-Cyrille
+-- 
+Linu cherian
