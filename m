@@ -1,85 +1,67 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 27 Jun 2017 10:27:25 +0200
-Subject: [PATCH v3 4/9] serial: atmel: Use common rs485 device tree
- parsing function
-In-Reply-To: <bac50abd-9c55-c9cb-7d10-24ef8efbdb53@microchip.com>
-References: <20170626090803.10981-1-u.kleine-koenig@pengutronix.de>
- <20170626090803.10981-5-u.kleine-koenig@pengutronix.de>
- <bac50abd-9c55-c9cb-7d10-24ef8efbdb53@microchip.com>
-Message-ID: <e0d071e6-c5ca-1bda-1a2e-b695463b66ab@gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 27 Jun 2017 09:33:38 +0100
+Subject: [PATCH 0/7] ARM: NOMMU: MPU updates
+In-Reply-To: <e0b9c831-f864-934d-b694-aa92374231bf@arm.com>
+References: <1497344707-14446-1-git-send-email-vladimir.murzin@arm.com>
+ <e0b9c831-f864-934d-b694-aa92374231bf@arm.com>
+Message-ID: <003cd30f-b39f-c930-ab75-298333c2fa29@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/2017 09:41, Nicolas Ferre wrote:
-> On 26/06/2017 at 11:07, Uwe Kleine-K?nig wrote:
->> From: Sascha Hauer <s.hauer@pengutronix.de>
->>
->> We just got a common helper for parsing the rs485 specific
->> device tree properties. Use it and drop the open coded parser.
->>
->> Note that there is a small difference between the removed and the now
->> used implementation: The former cleared flags to 0 if rs485-rts-delay
->> was given, the common helper clears SER_RS485_RX_DURING_TX and
->> SER_RS485_ENABLED only but always which makes more sense.
-> 
-> Sure:
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> 
-> Thanks Sasha and Uwe!
-> 
-Acked-by: Richard Genoud <richard.genoud@gmail.com>
+Ping!
 
-Thanks !
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> [ukleinek: point out semantic change in commit log]
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> ---
->>  drivers/tty/serial/atmel_serial.c | 25 +------------------------
->>  1 file changed, 1 insertion(+), 24 deletions(-)
+On 20/06/17 09:30, Vladimir Murzin wrote:
+> Gentle ping...
+> 
+> On 13/06/17 10:05, Vladimir Murzin wrote:
+>> Hi,
 >>
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index 937d67f22fba..245d9c227ad5 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -1684,29 +1684,6 @@ static void atmel_init_property(struct atmel_uart_port *atmel_port,
->>  	}
->>  }
->>  
->> -static void atmel_init_rs485(struct uart_port *port,
->> -				struct platform_device *pdev)
->> -{
->> -	struct device_node *np = pdev->dev.of_node;
->> -
->> -	struct serial_rs485 *rs485conf = &port->rs485;
->> -	u32 rs485_delay[2];
->> -
->> -	/* rs485 properties */
->> -	if (of_property_read_u32_array(np, "rs485-rts-delay",
->> -				       rs485_delay, 2) == 0) {
->> -		rs485conf->delay_rts_before_send = rs485_delay[0];
->> -		rs485conf->delay_rts_after_send = rs485_delay[1];
->> -		rs485conf->flags = 0;
->> -	}
->> -
->> -	if (of_get_property(np, "rs485-rx-during-tx", NULL))
->> -		rs485conf->flags |= SER_RS485_RX_DURING_TX;
->> -
->> -	if (of_get_property(np, "linux,rs485-enabled-at-boot-time", NULL))
->> -		rs485conf->flags |= SER_RS485_ENABLED;
->> -}
->> -
->>  static void atmel_set_ops(struct uart_port *port)
->>  {
->>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->> @@ -2390,7 +2367,7 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
->>  	atmel_init_property(atmel_port, pdev);
->>  	atmel_set_ops(port);
->>  
->> -	atmel_init_rs485(port, pdev);
->> +	of_get_rs485_mode(pdev->dev.of_node, &port->rs485);
->>  
->>  	port->iotype		= UPIO_MEM;
->>  	port->flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP;
+>> This is an update of the existent MPU code which consist set of
+>> clean-ups and enhancements. The most significant changes are in the way
+>> how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
+>> layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
+>> support for M-class has been added (PATCH 6/7).
+>>
+>> Thanks!
+>>
+>> Changelog:
+>>
+>>         RFC v2 -> v1
+>>              - dropped RFC tag
+>> 	       - Tested-by from Andr?s
+>> 	       - rebased on 4.12-rc5
+>>
+>>            RFC -> RFC v2
+>> 	       - fixed MPU enable for v7m (PATCH 6/7)
+>>
+>> Vladimir Murzin (7):
+>>   ARM: NOMMU: Move out MPU setup in separate module
+>>   ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>>   ARM: NOMMU: Rework MPU to be mostly done in C
+>>   ARM: NOMMU: Disallow MPU for XIP
+>>   ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>>   ARM: V7M: Add support for MPU to M-class
+>>   ARM: NOMMU: Use more MPU regions to cover memory
+>>
+>>  arch/arm/Kconfig               |   9 -
+>>  arch/arm/Kconfig-nommu         |   4 +-
+>>  arch/arm/include/asm/cputype.h |  10 +
+>>  arch/arm/include/asm/mpu.h     |  23 ++-
+>>  arch/arm/include/asm/smp.h     |   2 +-
+>>  arch/arm/include/asm/v7m.h     |  10 +
+>>  arch/arm/kernel/asm-offsets.c  |  11 +
+>>  arch/arm/kernel/head-nommu.S   | 128 +++++++++---
+>>  arch/arm/kernel/smp.c          |   2 +-
+>>  arch/arm/mm/Makefile           |   1 +
+>>  arch/arm/mm/nommu.c            | 254 +----------------------
+>>  arch/arm/mm/pmsa-v7.c          | 445 +++++++++++++++++++++++++++++++++++++++++
+>>  12 files changed, 598 insertions(+), 301 deletions(-)
+>>  create mode 100644 arch/arm/mm/pmsa-v7.c
 >>
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
