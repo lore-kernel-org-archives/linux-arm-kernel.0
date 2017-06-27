@@ -1,162 +1,197 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 27 Jun 2017 18:15:31 +0100
-Subject: [RFC PATCH 0/2] ARM: Fix unparseable signal frame with
- CONFIG_IWMMXT
-In-Reply-To: <20170626181232.GK4902@n2100.armlinux.org.uk>
-References: <1498059983-13438-1-git-send-email-Dave.Martin@arm.com>
- <20170626101304.GG4902@n2100.armlinux.org.uk>
- <20170626133255.GH8543@e103592.cambridge.arm.com>
- <20170626144001.GH4902@n2100.armlinux.org.uk>
- <20170626163634.GI8543@e103592.cambridge.arm.com>
- <20170626181232.GK4902@n2100.armlinux.org.uk>
-Message-ID: <20170627171529.GK8543@e103592.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 27 Jun 2017 19:29:37 +0200
+Subject: [PATCH v6 05/21] net-next: stmmac: Add dwmac-sun8i
+In-Reply-To: <20170627123748.GA8403@Red>
+References: <8e3d73a7-e9ff-d3e2-4bce-bcc79cdf86db@arm.com>
+ <20170627080529.GA2468@Red>
+ <CAGb2v65mhDN9vXe6DE2cZPW1BzgYPwK+D2U5VFgyr0wVVZZqDQ@mail.gmail.com>
+ <20170627082103.GB2468@Red>
+ <530f7b3e-247d-2e4d-8174-ce6195bacf5b@arm.com>
+ <20170627094111.supxmzf2k3n3ewec@flea.lan>
+ <44afb371-44d4-dbb5-0aac-4bbc55269344@arm.com>
+ <700A8221-3CEC-4657-900D-183398D25AE7@aosc.io>
+ <858b5361-fde5-8ab4-b9ba-aeb7859b9a7d@arm.com>
+ <20170627123748.GA8403@Red>
+Message-ID: <20170627172937.qrbcie347wlbo3z3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 07:12:32PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 26, 2017 at 05:36:39PM +0100, Dave Martin wrote:
-> > On Mon, Jun 26, 2017 at 03:40:01PM +0100, Russell King - ARM Linux wrote:
-> > > I'd hope that the kernel implementation is not used as an example - it
-> > > most certainly is not an example, as it does no parsing of the data
-> > > structures.  As the kernel is responsible for creating the layout, it
-> > > expects the exact same layout coming back in, and any deviation from
-> > > that results in the task being forcefully exited.
+On Tue, Jun 27, 2017 at 02:37:48PM +0200, Corentin Labbe wrote:
+> On Tue, Jun 27, 2017 at 11:33:56AM +0100, Andre Przywara wrote:
+> > Hi,
 > > 
-> > Unfortunately, things that are not intended as examples do still get
-> > used.  We can argue that's the userspace folks' fault, but it still
-> > creates de facto ABI...
-> 
-> Given that the contents of the structure depend on kernel configuration
-> symbols, it's impossible for userspace to use it unless they also have
-> some kind of static configuration as well.
-
-Agreed
-
-> > > Basically, the layout that the kernel creates is entirely dependent on
-> > > the kernel configuration, and any scheme that replicates what the kernel
-> > > is doing in the restore paths is doomed to failure.  (However, that's
-> > > not to say userspace isn't, but if it is, userspace breaks if the kernel
-> > > configuration is changed.  I don't regard that as a kernel-induced
-> > > userspace regression though - it's a bit like expecting EABI userspace
-> > > to work with OABI-only supporting kernel.)
-> 
-> The kernel gained the tagged-list approach in 2006, and didn't start
-> preserving the VFP state until 2010.
-> 
-> > I'm actually a little confused by, say,
+> > On 27/06/17 11:23, Icenowy Zheng wrote:
+> > > 
+> > > 
+> > > ? 2017?6?27? GMT+08:00 ??6:15:58, Andre Przywara <andre.przywara@arm.com> ??:
+> > >> Hi,
+> > >>
+> > >> On 27/06/17 10:41, Maxime Ripard wrote:
+> > >>> On Tue, Jun 27, 2017 at 10:02:45AM +0100, Andre Przywara wrote:
+> > >>>> Hi,
+> > >>>>
+> > >>>> (CC:ing some people from that Rockchip dmwac series)
+> > >>>>
+> > >>>> On 27/06/17 09:21, Corentin Labbe wrote:
+> > >>>>> On Tue, Jun 27, 2017 at 04:11:21PM +0800, Chen-Yu Tsai wrote:
+> > >>>>>> On Tue, Jun 27, 2017 at 4:05 PM, Corentin Labbe
+> > >>>>>> <clabbe.montjoie@gmail.com> wrote:
+> > >>>>>>> On Mon, Jun 26, 2017 at 01:18:23AM +0100, Andr? Przywara wrote:
+> > >>>>>>>> On 31/05/17 08:18, Corentin Labbe wrote:
+> > >>>>>>>>> The dwmac-sun8i is a heavy hacked version of stmmac hardware by
+> > >>>>>>>>> allwinner.
+> > >>>>>>>>> In fact the only common part is the descriptor management and
+> > >> the first
+> > >>>>>>>>> register function.
+> > >>>>>>>>
+> > >>>>>>>> Hi,
+> > >>>>>>>>
+> > >>>>>>>> I know I am a bit late with this, but while adapting the U-Boot
+> > >> driver
+> > >>>>>>>> to the new binding I was wondering about the internal PHY
+> > >> detection:
+> > >>>>>>>>
+> > >>>>>>>>
+> > >>>>>>>> So here you seem to deduce the usage of the internal PHY by the
+> > >> PHY
+> > >>>>>>>> interface specified in the DT (MII = internal, RGMII =
+> > >> external).
+> > >>>>>>>> I think I raised this question before, but isn't it perfectly
+> > >> legal for
+> > >>>>>>>> a board to use MII with an external PHY even on those SoCs that
+> > >> feature
+> > >>>>>>>> an internal PHY?
+> > >>>>>>>> On the first glance that does not make too much sense, but apart
+> > >> from
+> > >>>>>>>> not being the correct binding to describe all of the SoCs
+> > >> features I see
+> > >>>>>>>> two scenarios:
+> > >>>>>>>> 1) A board vendor might choose to not use the internal PHY
+> > >> because it
+> > >>>>>>>> has bugs, lacks features (configurability) or has other issues.
+> > >> For
+> > >>>>>>>> instance I have heard reports that the internal PHY makes the
+> > >> SoC go
+> > >>>>>>>> rather hot, possibly limiting the CPU frequency. By using an
+> > >> external
+> > >>>>>>>> MII PHY (which are still cheaper than RGMII PHYs) this can be
+> > >> avoided.
+> > >>>>>>>> 2) A PHY does not necessarily need to be directly connected to
+> > >>>>>>>> magnetics. Indeed quite some boards use (RG)MII to connect to a
+> > >> switch
+> > >>>>>>>> IC or some other network circuitry, for instance fibre
+> > >> connectors.
+> > >>>>>>>>
+> > >>>>>>>> So I was wondering if we would need an explicit:
+> > >>>>>>>>       allwinner,use-internal-phy;
+> > >>>>>>>> boolean DT property to signal the usage of the internal PHY?
+> > >>>>>>>> Alternatively we could go with the negative version:
+> > >>>>>>>>       allwinner,disable-internal-phy;
+> > >>>>>>>>
+> > >>>>>>>> Or what about introducing a new "allwinner,internal-mii-phy"
+> > >> compatible
+> > >>>>>>>> string for the *PHY* node and use that?
+> > >>>>>>>>
+> > >>>>>>>> I just want to avoid that we introduce a binding that causes us
+> > >>>>>>>> headaches later. I think we can still fix this with a followup
+> > >> patch
+> > >>>>>>>> before the driver and its binding hit a release kernel.
+> > >>>>>>>>
+> > >>>>>>>> Cheers,
+> > >>>>>>>> Andre.
+> > >>>>>>>>
+> > >>>>>>>
+> > >>>>>>> I just see some patch, where "phy-mode = internal" is valid.
+> > >>>>>>> I will try to find a way to use it
+> > >>>>>>
+> > >>>>>> Can you provide a link?
+> > >>>>>
+> > >>>>> https://lkml.org/lkml/2017/6/23/479
+> > >>>>>
+> > >>>>>>
+> > >>>>>> I'm not a fan of using phy-mode for this. There's no guarantee
+> > >> what
+> > >>>>>> mode the internal PHY uses. That's what phy-mode is for.
+> > >>>>
+> > >>>> I can understand Chen-Yu's concerns, but ...
+> > >>>>
+> > >>>>> For each soc the internal PHY mode is know and setted in
+> > >> emac_variant/internal_phy
+> > >>>>> So its not a problem.
+> > >>>>
+> > >>>> that is true as well, at least for now.
+> > >>>>
+> > >>>> So while I agree that having a separate property to indicate
+> > >>>> the usage of the internal PHY would be nice, I am bit tempted
+> > >>>> to use this easier approach and piggy back on the existing
+> > >>>> phy-mode property.
+> > >>>
+> > >>> We're trying to fix an issue that works for now too.
+> > >>>
+> > >>> If we want to consider future weird cases, then we must
+> > >>> consider all of them. And the phy mode changing is definitely
+> > >>> not really far fetched.
+> > >>>
+> > >>> I agree with Chen-Yu, and I really feel like the compatible
+> > >>> solution you suggested would cover both your concerns, and
+> > >>> ours.
+> > >>
+> > >> So something like this?
+> > >> 	emac: emac at 1c30000 {
+> > >> 	    compatible = "allwinner,sun8i-h3-emac";
+> > >> 	    ...
+> > >> 	    phy-mode = "mii";
+> > >> 	    phy-handle = <&int_mii_phy>;
+> > >> 	    ...
+> > >>
+> > >> 	    mdio: mdio {
+> > >>                #address-cells = <1>;
+> > >>                #size-cells = <0>;
+> > >>                int_mii_phy: ethernet-phy at 1 {
+> > >>                    compatible = "allwinner,sun8i-h3-ephy";
+> > >>                    syscon = <&syscon>;
+> > > 
+> > > The MAC still needs to set some bits of syscon register.
 > > 
-> > https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/arm/setcontext.S;h=db6aebfbd4d360e3b7ba525cf2e483f8e3ddfc0d;hb=HEAD
+> > Yes, the syscon property needs also to be in the MAC node, that
+> > was meant to be somewhere in the second "..." ;-)
 > > 
-> > Assuming I'm looking in the right place here, glibc effectively uses its
-> > own private format for uc_regspace -- maybe there is kernel history
-> > here I'm not aware of, or maybe it's not even trying to be compatible.
-> 
-> It looks to me like glibc is expecting:
-> 
-> - If the HWCAP includes VFP
->    - 64 bytes of d8-d15 registers
->    - fpscr
-> - If the HWCAP includes iWMMXT
->    - 48 bytes of iWMMXT state
-> 
-> The kernel has never used that (partial!) format - note that it seems
-> to omit d0-d7 from the context.
-> 
-> Given that setcontext()'s man page says:
-> 
->        The  function setcontext() restores the user context pointed at by ucp.
->        A successful call does  not  return.   The  context  should  have  been
->        obtained  by  a  call  of getcontext(), or makecontext(3), or passed as
->        third argument to a signal handler.
-> 
-> it seems that for this to work in the signal handler case, there would
-> have to be some kind of translation from the kernel format to glibc's
-> format when calling into the signal handler - maybe there is... but
-> what you point out is definitely incompatible with the kernel today,
-> and has always been incompatible.
-> 
-> If there's no translation going on, then this has never worked, and so
-> there's no possibility of a regression!
-
-Yes.  Sadly, there's no indication of whether the incompatibility is
-intentional or not.
-
-> > Also, libunwind does not appear to attempt to parse uc_regspace:
+> > But now since Chen-Yu mentioned that we need to set up the PHY *first*
+> > to make it actually discoverable via MDIO, I wonder if we could change
+> > this to:
+> > 1) have the DT as described here
+> > 2) Let the dwmac-sun8i driver peek into the node referenced by
+> > phy-handle and check the compatible string there.
+> > 3) If that matches some allwinner internal PHY name, it sets up the PHY
+> > to make it respond when the MDIO driver queries its bus.
 > > 
-> > git.savannah.gnu.org/gitweb/?p=libunwind.git;a=blob;f=src/arm/Gstep.c;h=37e6c12f115173ebbc9ebcf511c53fd7c0a7d9a1;hb=HEAD
+> > Or can a PHY driver set itself up (since we have clocks and resets
+> > properties in there) *before* the MDIO bus gets scanned?
+> > Chen-Yu's comment in the other mail hints at that this is not easily
+> > possible.
 > 
-> Yea, it's just looking at the integer register set.
+> I think adding phy compatible just make things more complex.
 > 
-> > I've not fully understood the gdb code, but there is a comment in
-> > arm-linux-tdep.c that suggests that uc_regspace is not processed (nor do
-> > I see any other mention of uc_regspace or things like VFP_MAGIC:
-> > 
-> > https://sourceware.org/git/?p=binutils-gdb.git;a=blob;f=gdb/arm-linux-tdep.c;h=95c52608adbb1ff92a9ddb203835d5a1102339bd;hb=HEAD
-> > 
-> > /* The VFP or iWMMXt registers may be saved on the stack, but there's
-> > 	no reliable way to restore them (yet).  */
-> 
-> It sounds like no one implemented the userspace side of this then!
-> 
-> > Do you know of any userspace parser of uc_regspace?
-> > 
-> > All I have so far is this, from the reporter of the bug:
-> > 
-> > https://github.com/DynamoRIO/dynamorio/commit/0b75c635033d01ab04f955f5affe14a3ced9ab56
-> 
-> Hmm, well, it seems like they're the first to test this feature, which
-> is pretty sad.
+> I think the patch series I sent early fix all problems without more
+> complexity since:
+>
+> - it does not add more DT stuff
+> - it use an already used in tree DT phy-mode "internal" (and so phy
+>   mode PHY_INTERFACE_MODE_INTERNAL)
 
-Hmm indeed
+  - it doesn't cover all the concerns we had
+  - it uses an undocumented value, with an unclear implication
 
-> > Should we enforce the same on sigreturn, or be more tolerant?
-> 
-> I've been thinking about that, and haven't come to a decision.  There
-> is the matter that more complex parsing is harder to be correct (think
-> about out of bounds 'size' values, although that can be mitigated by
-> ensuring that size is numerically correct for the magic ID - but then
-> what if we have a wrong ID, or the size is incorrect for the magic ID?)
-> 
-> > There is some merit to this, since the effect cannot be achieved 100%
-> > safely in any other way.  However, it may require the caller to
-> > manufacture a sigframe from scratch.  If so, it may be natural to
-> > omit the IWMMXT block (and indeed the VFP block, if the caller
-> > doesn't care what's in the VFP registers at the destination).
-> 
-> As you can see, the kernel hasn't really catered for manufactured
-> sigframes - it expects to see the same sigframe that it wrote out.
-> Whether that's reasonable or not, I'm not sure, but no one's
-> complained about it yet!
-> 
-> > The DynamoRIO example above takes a signal to generate a "template"
-> > sigframe, which is then modified to produce the desired result.
-> > Putting aside the issue of whether this is an abuse of sigreturn
-> > or not (and the question of why they are doing it at all), this
-> > seems a reasonable approach -- which they also apparently use for
-> > x86.  So their sigframe will contain the dummy iWMMXt block, but
-> > it will have a valid tag if we patch the kernel to write one.
-> 
-> Bear in mind that parsing the data in uc_regspace is going to be
-> hardware specific, it's hard to do it in a generic way.  Debuggers
-> necessarily have to know the intricate hardware details of the
-> system its running on, so it's reasonable for them to poke about
-> in that area.  I'm not so sure about generic applications though.
-> 
-> Anyway, I don't have time this evening to continue this reply... so
-> I'll send it anyway. :)
+Maxime
 
-There's certainly a limit to the portability that userspace can expect
-here.  Returning from a signal is portable; poking about inside
-mcontext_t is not, though we should aim for least surprise.
-
-
-For the RFC v2 I just posted, I've aimed for a halfway house where
-the code is kept a simple as possible without mandating the
-iWMMXt dummy block to be present on non-iWMMXt hardware.
-
-If present, the block must have the same location and size as
-the iwmmxt_sigframe would have.  This should avoid the possibility
-of any runtime overrun when attempting to skip blocks.
-
-Cheers
----Dave
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/1c0a5ddb/attachment.sig>
