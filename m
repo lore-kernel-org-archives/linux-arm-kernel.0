@@ -1,94 +1,39 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Tue, 27 Jun 2017 13:16:01 +0200
-Subject: [PATCH 2/3] clk: WARN_ON about to disable a critical clock
-In-Reply-To: <20160211004327.26445.27416@quark.deferred.io>
-References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
- <1453127331-20616-3-git-send-email-lee.jones@linaro.org>
- <20160211004327.26445.27416@quark.deferred.io>
-Message-ID: <d83d608a-246f-7b18-20d1-10a2060395e1@de.bosch.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Tue, 27 Jun 2017 17:06:17 +0530
+Subject: [PATCH] serial: sirf: make of_device_ids const.
+Message-ID: <c6d28ba7176bc1257d3ca030b8204b930039f255.1498563206.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.02.2016 01:43, Michael Turquette wrote:
-> Quoting Lee Jones (2016-01-18 06:28:50)
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Looks good to me.
-> 
-> Regards,
-> Mike
-> 
->> ---
->>   drivers/clk/clk.c | 6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 835cb85..178b364 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -575,6 +575,9 @@ static void clk_core_unprepare(struct clk_core *core)
->>          if (WARN_ON(core->prepare_count == 0))
->>                  return;
->>   
->> +       if (WARN_ON(core->prepare_count == 1 && core->flags & CLK_IS_CRITICAL))
->> +               return;
->> +
->>          if (--core->prepare_count > 0)
->>                  return;
->>   
->> @@ -680,6 +683,9 @@ static void clk_core_disable(struct clk_core *core)
->>          if (WARN_ON(core->enable_count == 0))
->>                  return;
->>   
->> +       if (WARN_ON(core->enable_count == 1 && core->flags & CLK_IS_CRITICAL))
->> +               return;
->> +
->>          if (--core->enable_count > 0)
->>                  return;
+of_device_ids are not supposed to change at runtime. All functions
+working with of_device_ids provided by <linux/of.h> work with const
+of_device_ids. So mark the non-const structs as const.
 
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+    877	   1864	     88	   2829	    b0d	drivers/tty/serial/sirfsoc_uart.o
 
-I have a question regarding this patch, which is mainline meanwhile [1]:
+File size after constify:
+   text	   data	    bss	    dec	    hex	filename
+   1885	    840	     88	   2813	    afd	drivers/tty/serial/sirfsoc_uart.o
 
-Having the following clock configuration:
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/tty/serial/sirfsoc_uart.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-                                         |--> child clk '1' (crit)
-clk source --> parent clk 'A' (crit) -->|
-                                         |--> child clk '2'
-
-
-Clock '2' might be used, or not. It might be disabled or not. It doesn't 
-matter. Clock '1' is not allowed to be disabled. Therefore its marked as 
-critical.
-
-Parent clock 'A' is marked as critical because its not allowed to be 
-disabled, even if the enable_count of all child clocks is 0. To avoid 
-that by disabling parent clock 'A' the child clock '1' is disabled, too, 
-whats not allowed as its marked as critical.
-
-
-Now, child clock '2' is used and enabled & disabled continuously by a 
-(SPI) driver. What is ok. But:
-
-Disabling child clock '2' results in the attempt to disable parent clock 
-'A', too, which has correct enable_count 1 (from enabling the child 
-'2'). What results
-
-a) in the WARN_ON output
-
-and
-
-b) enable_count of 'A' never decreases to 0. Being off by one after the 
-WARN_ON
-
-
-It sounds like both is wrong for a configuration like above.
-
-Opinions or proposal how to fix/change this?
-
-
-Best regards
-
-Dirk
-
-[1] 
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/clk.c?id=2e20fbf592621b2c2aeddd82e0fa3dad053cce03
+diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+index e03282d..684cb8d 100644
+--- a/drivers/tty/serial/sirfsoc_uart.c
++++ b/drivers/tty/serial/sirfsoc_uart.c
+@@ -1253,7 +1253,7 @@ static int __init sirfsoc_uart_console_init(void)
+ 	return HRTIMER_RESTART;
+ }
+ 
+-static struct of_device_id sirfsoc_uart_ids[] = {
++static const struct of_device_id sirfsoc_uart_ids[] = {
+ 	{ .compatible = "sirf,prima2-uart", .data = &sirfsoc_uart,},
+ 	{ .compatible = "sirf,atlas7-uart", .data = &sirfsoc_uart},
+ 	{ .compatible = "sirf,prima2-usp-uart", .data = &sirfsoc_usp},
+-- 
+1.9.1
