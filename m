@@ -1,45 +1,98 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 27 Jun 2017 08:36:42 +0300
-Subject: [PATCH v1 2/6] [media] ov9650: add device tree support
-In-Reply-To: <D780984B-70A1-4E9C-A887-DD2CBAAC7CCA@goldelico.com>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <1498143942-12682-3-git-send-email-hugues.fruchet@st.com>
- <20170626163102.GQ12407@valkosipuli.retiisi.org.uk>
- <D780984B-70A1-4E9C-A887-DD2CBAAC7CCA@goldelico.com>
-Message-ID: <20170627053642.GW12407@valkosipuli.retiisi.org.uk>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 26 Jun 2017 22:38:45 -0700
+Subject: [PATCH 4/4] remoteproc/davinci: streamline the interrupt
+ management
+In-Reply-To: <8659b48d-5675-6bc9-aaf2-836ea69738d1@ti.com>
+References: <20170518220902.2846-1-s-anna@ti.com>
+ <20170518220902.2846-5-s-anna@ti.com>
+ <20170625211931.GC26155@builder>
+ <8659b48d-5675-6bc9-aaf2-836ea69738d1@ti.com>
+Message-ID: <20170627053845.GI18666@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 07:46:34PM +0200, H. Nikolaus Schaller wrote:
-> Hi,
+On Mon 26 Jun 09:09 PDT 2017, Suman Anna wrote:
+
+> Hi Bjorn,
 > 
-> > Am 26.06.2017 um 18:31 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
+> On 06/25/2017 04:19 PM, Bjorn Andersson wrote:
+> > On Thu 18 May 15:09 PDT 2017, Suman Anna wrote:
 > > 
-> > Hi Hugues,
+> >> The davinci remoteproc driver is currently requesting its interrupt
+> >> that deals with the virtio kicks in probe, and that too before all
+> >> the associated variables used by the handler are initialized. This
+> >> is a lot in advance before the DSP remote processor is even loaded
+> >> and booted and is not essential. Streamline the interrupt request
+> >> and freeing operations instead alongside the boot and shutdown of
+> >> the remote processor.
+> >>
 > > 
-> > On Thu, Jun 22, 2017 at 05:05:38PM +0200, Hugues Fruchet wrote:
-> >> @@ -1545,15 +1577,22 @@ static int ov965x_remove(struct i2c_client *client)
-> >> }
-> >> 
-> >> static const struct i2c_device_id ov965x_id[] = {
-> >> -	{ "OV9650", 0 },
-> >> -	{ "OV9652", 0 },
-> >> +	{ "OV9650", 0x9650 },
-> >> +	{ "OV9652", 0x9652 },
+> > I do prefer that all resources are acquired at probe() time, rather than
+> > handled upon each start/stop. In the current handle_event()
+> > implementation the remoteproc code will not find the yet unallocated
+> > notify-id's and do nothing. So this seems okay.
 > > 
-> > This change does not appear to match with the patch description nor it the
-> > information is used. How about not changing it, unless there's a reason to?
-> > The same for the data field of the of_device_id array below.
+> > [..]
+> >> @@ -213,15 +224,6 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+> >>  
+> >>  	platform_set_drvdata(pdev, rproc);
+> >>  
+> >> -	/* everything the ISR needs is now setup, so hook it up */
+> >> -	ret = devm_request_threaded_irq(dev, irq, da8xx_rproc_callback,
+> >> -					handle_event, 0, "da8xx-remoteproc",
+> >> -					rproc);
+> >> -	if (ret) {
+> >> -		dev_err(dev, "devm_request_threaded_irq error: %d\n", ret);
+> >> -		goto free_rproc;
+> >> -	}
+> > 
+> > In the error paths after this the driver will end up freeing the rproc
+> > context before disabling the irq, so these cases need a call to
+> > disable_irq().
 > 
-> I think it could/should be used to check if the camera chip that is found
-> by reading the product-id and version registers does match what the device
-> tree expects and abort probing on a mismatch.
+> Hmm, I am not sure I understand why we need disable_irq() when we are
+> not even requesting it? This is deleting code, not adding. The IRQ
+> request and free are now balanced in the start and stop ops. The only
+> call here is a platform_get_irq() which doesn't need any cleanup.
+> 
 
-Makes sense. But it should be a separate patch, shouldn't it?
+I prefer to keep the initialization of the irq at probe time. What I
+tried to say was that the code is currently broken in regards to the
+(theoretical?) possibility of the interrupt handler being invoked after
+"rproc" has been freed.
 
-You could also put the id to the ops struct, and choose the ops struct that
-way. Entirely up to you.
+> > 
+> >> -
+> >>  	/*
+> >>  	 * rproc_add() can end up enabling the DSP's clk with the DSP
+> >>  	 * *not* in reset, but da8xx_rproc_start() needs the DSP to be
+> >> @@ -254,14 +256,6 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+> >>  static int da8xx_rproc_remove(struct platform_device *pdev)
+> >>  {
+> >>  	struct rproc *rproc = platform_get_drvdata(pdev);
+> >> -	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
+> >> -
+> >> -	/*
+> >> -	 * The devm subsystem might end up releasing things before
+> >> -	 * freeing the irq, thus allowing an interrupt to sneak in while
+> >> -	 * the device is being removed.  This should prevent that.
+> >> -	 */
+> > 
+> > devres _will not_ disable the IRQ until after remove() returns, making it
+> > possible for the interrupt handler to be executed after the rproc
+> > context is freed.
+> > 
+> > So this comment would benefit from an update.
+> 
+> Again, this is deleting code, not adding. The remove after this cleanup
+> will simply be invoking the rproc_del() and rproc_free() call, and
+> rproc_del() does end up calling the stop since we do use auto-boot where
+> we free the irq.
+> 
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+I would like to keep the request_irq in the probe() and as such a
+disable_irq is needed either in stop() or here. If we leave it here
+there's room to improve the comment.
+
+Regards,
+Bjorn
