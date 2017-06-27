@@ -1,86 +1,83 @@
-From: olivier.moysan@st.com (Olivier MOYSAN)
-Date: Tue, 27 Jun 2017 15:23:08 +0000
-Subject: [PATCH 1/2] dt-bindings: Document the STM32 SPDIFRX interface
-In-Reply-To: <20170623185514.nc3jqq6ikvwwv6sn@rob-hp-laptop>
-References: <1497621452-615-1-git-send-email-olivier.moysan@st.com>
- <1497621452-615-2-git-send-email-olivier.moysan@st.com>
- <20170623185514.nc3jqq6ikvwwv6sn@rob-hp-laptop>
-Message-ID: <b74e1d76-de2c-9eb3-4ea1-f63d3e8c82b7@st.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 27 Jun 2017 17:25:59 +0200
+Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+In-Reply-To: <CAJZ5v0i-AgTDTOX+O41abVsnahU9V=NV+HEW0vajhBqGfJuUEg@mail.gmail.com>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+ <20170622104933.GY629@lahna.fi.intel.com> <2842386.AFZiXzV2Sq@aspire.rjw.lan>
+ <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
+ <CAJZ5v0irHvYXHv1GykatTH+XROZyL0nR0c=KfdSrpH395s6V8g@mail.gmail.com>
+ <CAPDyKFov=08AQw0PPPgcFbrerTskoPGfLZcJL9gjikfQfZUJpw@mail.gmail.com>
+ <4324e2c8-ab79-5a21-a8ab-c660920cba59@ti.com>
+ <CAJZ5v0i-AgTDTOX+O41abVsnahU9V=NV+HEW0vajhBqGfJuUEg@mail.gmail.com>
+Message-ID: <CAJZ5v0i6zEmb1anxL2ge5YqDJ6jMZA2v4W-u65AtoZv8b7Z89w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
-
-On 06/23/2017 08:55 PM, Rob Herring wrote:
-> On Fri, Jun 16, 2017 at 03:57:31PM +0200, olivier moysan wrote:
->> This adds documentation of device tree bindings for the
->> STM32 SPDIFRX interface.
+On Mon, Jun 26, 2017 at 11:11 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Mon, Jun 26, 2017 at 9:39 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>> On 06/26/2017 11:49 AM, Ulf Hansson wrote:
+>
+> [cut]
+>
+>>>>> This makes it worse in that sense, that then you don't even need an
+>>>>> i2c slave to trigger the problem.
+>>>>
+>>>> In that case your changelog is a bit misleading.
+>>>
+>>> Yeah, it is! I didn't realize that until I fully investigated the revert option.
+>>>
+>>>>
+>>>> It looks like the commit in question attempted to fix exactly this
+>>>> issue, but it failed, so it should be replaced with something else
+>>>> which is what your patch is effectively doing.
+>>>>
+>>>> IMO you should describe the original problem, explain why that commit
+>>>> is not sufficient to fix it and then describe the final fix.
+>>>>
+>>>> Anyway, after reading the changelog it should be clear that things
+>>>> were broken before the commit in question.
+>>>>
+>>>> And BTW I'm not really sure how the rest of the series is related to this?
+>>>
+>>> Going back in history, I realize the system sleep support in this
+>>> driver has been broken even before the commit $subject patch intends
+>>> to fix.
+>>> However it has been working fine for the ACPI case, because of how the
+>>> ACPI PM domain manages its devices during system sleep.
+>>>
+>>> The commit in question, adds an improvement to the driver, because it
+>>> enables the direct_complete path. For ACPI, that was already working,
+>>> but not for the other cases. So to be able to support the similar
+>>> improvement as the direct_complete path offers, as that isn't working
+>>> for this driver, I tried out using the runtime PM centric path
+>>> instead. That is what the rest of the changes in this series takes
+>>> care of.
+>>>
+>>> Now, as the system sleep support is broken I wanted to make a simple
+>>> fix for that first, via $subject patch. I guess what makes this a bit
+>>> confusing is that I shouldn't point to a certain commit, but rather
+>>> just add a stable tag and update the changelog accordingly.
+>
+> I agree, modulo the below.
+>
 >>
->> Signed-off-by: olivier moysan <olivier.moysan@st.com>
->> ---
->>   .../devicetree/bindings/sound/st,stm32-spdifrx.txt | 56 ++++++++++++++++++++++
->>   1 file changed, 56 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-spdifrx.txt
+>> Wouldn't it fix suspend for this driver if you will just replace
+>> dw_i2c_plat_suspend() with pm_runtime_force_suspend() in SET_SYSTEM_SLEEP_PM_OPS() as
+>> you've done in patch 9?
 >>
->> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-spdifrx.txt b/Documentation/devicetree/bindings/sound/st,stm32-spdifrx.txt
->> new file mode 100644
->> index 0000000..33826f2
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/sound/st,stm32-spdifrx.txt
->> @@ -0,0 +1,56 @@
->> +STMicroelectronics STM32 S/PDIF receiver (SPDIFRX).
->> +
->> +The SPDIFRX peripheral, is designed to receive an S/PDIF flow compliant with
->> +IEC-60958 and IEC-61937.
->> +
->> +Required properties:
->> +  - compatible: should be "st,stm32h7-spdifrx"
->> +  - reg: cpu DAI IP base address and size
->> +  - clocks: must contain an entry for kclk (used as S/PDIF signal reference)
->> +  - clock-names: must contain "kclk"
->> +  - interrupts: cpu DAI interrupt line
->> +  - dmas: DMA specifiers for audio data DMA and iec control flow DMA
->> +    See STM32 DMA bindings, Documentation/devicetree/bindings/dma/stm32-dma.txt
->> +  - dma-names: two dmas have to be defined, "rx" and "rx-ctrl"
->> +
->> +Optional properties:
->> +  - resets: Reference to a reset controller asserting the SPDIFRX
->> +
->> +The device node should contain one 'port' child node with one child 'endpoint'
->> +node, according to the bindings defined in Documentation/devicetree/bindings/
->> +graph.txt.
->> +
->> +Example:
->> +spdifrx: spdifrx at 40004000 {
->> +	compatible = "st,stm32h7-spdifrx";
->> +	reg = <0x40004000 0x400>;
->> +	clocks = <&rcc SPDIFRX_CK>;
->> +	clock-names = "kclk";
->> +	interrupts = <97>;
->> +	dmas = <&dmamux1 2 93 0x400 0x0>,
->> +	       <&dmamux1 3 94 0x400 0x0>;
->> +	dma-names = "rx", "rx-ctrl";
->> +	pinctrl-0 = <&spdifrx_pins>;
->> +	pinctrl-names = "default";
->> +
->> +	spdifrx_port: port {
->> +		cpu_endpoint: endpoint {
->> +			remote-endpoint = <&codec_endpoint>;
->> +		};
->> +	};
->> +};
->> +
->> +spdif_in: spdif-in {
->> +	compatible = "linux,spdif-dir";
-> 
-> What is this? It should go.
-> 
-> Rob
-> 
+>> And, I think, direct_complete path should still work after this also.
+>
+> That's a good point and I was about to mention that.
+>
+> In any case, even if the pm_runtime_resume() added by the $subject
+> patch is necessary to start with, it could be added to the ->suspend
 
-This is the ASoC spdif stub codec. This is relevant in DT when
-spdif interface is wired to a connector.
-I will remove it from bindings.
+I meant ->resume, sorry.
 
-BRs
-olivier
+> callback of the driver instead of the ->complete one, in which case
+> the ACPI path would not be affected by this change.
+
+Thanks,
+Rafael
