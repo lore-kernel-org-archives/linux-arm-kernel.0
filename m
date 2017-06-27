@@ -1,125 +1,91 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 27 Jun 2017 03:56:54 -0700
-Subject: [PATCH] cavium: thunder: Remove duplicate "netdev->name" logging
- output
-Message-ID: <0ac1a144114eecd8c469027d6c91f453d61e1ade.1498560984.git.joe@perches.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 27 Jun 2017 11:59:12 +0100
+Subject: [PATCH] ARM: memblock limit must be pmd-aligned
+In-Reply-To: <129544df-5461-a877-84c9-9889bd5e9dc0@gmail.com>
+References: <20170626172315.26369-1-opendmb@gmail.com>
+ <48116220-b89b-7413-ea62-c78dfb0594a2@redhat.com>
+ <129544df-5461-a877-84c9-9889bd5e9dc0@gmail.com>
+Message-ID: <20170627105912.GE30002@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using netdev_<level>(netdev, "%s: ...", netdev->name) duplicates the
-name in the output.  Remove those uses.
+On Mon, Jun 26, 2017 at 05:50:03PM -0700, Doug Berger wrote:
+> On 06/26/2017 04:43 PM, Laura Abbott wrote:
+> > On 06/26/2017 10:23 AM, Doug Berger wrote:
+> >> There is a path through the adjust_lowmem_bounds() routine where if all
+> >> memory regions start and end on pmd-aligned addresses the memblock_limit
+> >> will be set to arm_lowmem_limit.
+> >>
+> >> However, since arm_lowmem_limit can be affected by the vmalloc early
+> >> parameter, the value of arm_lowmem_limit may not be pmd-aligned. This
+> >> commit corrects this oversight such that memblock_limit is always rounded
+> >> down to pmd-alignment.
+> >>
+> >> The pmd containing arm_lowmem_limit is cleared by prepare_page_table()
+> >> and without this commit it is possible for early_alloc() to allocate
+> >> unmapped memory in that range when mapping the lowmem.
+> >>
+> > 
+> > Do you have an example system or configuration where you see this
+> > crash?
+> I have observed this crash occur on systems like the bcm7445 when a
+> customer uses the vmalloc boot parameter to specify an odd number of
+> Megabytes of VMALLOC space (e.g. vmalloc=751m).  This seems to be a
+> popular way for them to set the low memory boundary.
+> 
+> As long as vmalloc is a multiple of the pmd (e.g. 2MB) there isn't a
+> problem, so documenting this constraint is another possible solution.
+> However, educating the user is more difficult in this case than working
+> around a questionable value to allow the boot to succeed.
 
-Miscellanea:
+It sounds like this leads to the same issue as we tried to fix in
+commit:
 
-o Use the netif_<level> convenience macros at the same time
+  965278dcb8ab0b1f ("ARM: 8356/1: mm: handle non-pmd-aligned end of RAM")
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 33 ++++++++--------------
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  8 ++----
- 2 files changed, 15 insertions(+), 26 deletions(-)
+... where with !LPAE page tables, we don't map the last section (as we
+can't map the whole PMD containig it), but arm_lowmem_limit doesn't
+account for this, and we try to access memroy from the unmapped section,
+blowing up.
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 573755b0a51b..49b80da51ba7 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -227,15 +227,14 @@ static void  nicvf_handle_mbx_intr(struct nicvf *nic)
- 		nic->speed = mbx.link_status.speed;
- 		nic->mac_type = mbx.link_status.mac_type;
- 		if (nic->link_up) {
--			netdev_info(nic->netdev, "%s: Link is Up %d Mbps %s\n",
--				    nic->netdev->name, nic->speed,
-+			netdev_info(nic->netdev, "Link is Up %d Mbps %s duplex\n",
-+				    nic->speed,
- 				    nic->duplex == DUPLEX_FULL ?
--				"Full duplex" : "Half duplex");
-+				    "Full" : "Half");
- 			netif_carrier_on(nic->netdev);
- 			netif_tx_start_all_queues(nic->netdev);
- 		} else {
--			netdev_info(nic->netdev, "%s: Link is Down\n",
--				    nic->netdev->name);
-+			netdev_info(nic->netdev, "Link is Down\n");
- 			netif_carrier_off(nic->netdev);
- 			netif_tx_stop_all_queues(nic->netdev);
- 		}
-@@ -721,8 +720,7 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
- 		return;
- 
- 	if (netif_msg_pktdata(nic)) {
--		netdev_info(nic->netdev, "%s: skb 0x%p, len=%d\n", netdev->name,
--			    skb, skb->len);
-+		netdev_info(nic->netdev, "skb 0x%p, len=%d\n", skb, skb->len);
- 		print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1,
- 			       skb->data, skb->len, true);
- 	}
-@@ -854,10 +852,8 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
- 			netif_tx_wake_queue(txq);
- 			nic = nic->pnicvf;
- 			this_cpu_inc(nic->drv_stats->txq_wake);
--			if (netif_msg_tx_err(nic))
--				netdev_warn(netdev,
--					    "%s: Transmit queue wakeup SQ%d\n",
--					    netdev->name, txq_idx);
-+			netif_warn(nic, tx_err, netdev,
-+				   "Transmit queue wakeup SQ%d\n", txq_idx);
- 		}
- 	}
- 
-@@ -928,9 +924,8 @@ static void nicvf_handle_qs_err(unsigned long data)
- 
- static void nicvf_dump_intr_status(struct nicvf *nic)
- {
--	if (netif_msg_intr(nic))
--		netdev_info(nic->netdev, "%s: interrupt status 0x%llx\n",
--			    nic->netdev->name, nicvf_reg_read(nic, NIC_VF_INT));
-+	netif_info(nic, intr, nic->netdev, "interrupt status 0x%llx\n",
-+		   nicvf_reg_read(nic, NIC_VF_INT));
- }
- 
- static irqreturn_t nicvf_misc_intr_handler(int irq, void *nicvf_irq)
-@@ -1212,10 +1207,8 @@ static netdev_tx_t nicvf_xmit(struct sk_buff *skb, struct net_device *netdev)
- 			netif_tx_wake_queue(txq);
- 		} else {
- 			this_cpu_inc(nic->drv_stats->txq_stop);
--			if (netif_msg_tx_err(nic))
--				netdev_warn(netdev,
--					    "%s: Transmit ring full, stopping SQ%d\n",
--					    netdev->name, qid);
-+			netif_warn(nic, tx_err, netdev,
-+				   "Transmit ring full, stopping SQ%d\n", qid);
- 		}
- 		return NETDEV_TX_BUSY;
- 	}
-@@ -1600,9 +1593,7 @@ static void nicvf_tx_timeout(struct net_device *dev)
- {
- 	struct nicvf *nic = netdev_priv(dev);
- 
--	if (netif_msg_tx_err(nic))
--		netdev_warn(dev, "%s: Transmit timed out, resetting\n",
--			    dev->name);
-+	netif_warn(nic, tx_err, dev, "Transmit timed out, resetting\n");
- 
- 	this_cpu_inc(nic->drv_stats->tx_timeout);
- 	schedule_work(&nic->reset_task);
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index 2b181762ad49..d4496e9afcdf 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -1811,11 +1811,9 @@ void nicvf_update_sq_stats(struct nicvf *nic, int sq_idx)
- /* Check for errors in the receive cmp.queue entry */
- int nicvf_check_cqe_rx_errs(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
- {
--	if (netif_msg_rx_err(nic))
--		netdev_err(nic->netdev,
--			   "%s: RX error CQE err_level 0x%x err_opcode 0x%x\n",
--			   nic->netdev->name,
--			   cqe_rx->err_level, cqe_rx->err_opcode);
-+	netif_err(nic, rx_err, nic->netdev,
-+		  "RX error CQE err_level 0x%x err_opcode 0x%x\n",
-+		  cqe_rx->err_level, cqe_rx->err_opcode);
- 
- 	switch (cqe_rx->err_opcode) {
- 	case CQ_RX_ERROP_RE_PARTIAL:
--- 
-2.10.0.rc2.1.g053435c
+We're just failing to account for this where we don't have an inital
+memblock_limit.
+
+> 
+> -Doug
+> > 
+> > Thanks,
+> > Laura
+> > 
+> >> Signed-off-by: Doug Berger <opendmb@gmail.com>
+> >> ---
+> >>  arch/arm/mm/mmu.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> >> index 31af3cb59a60..2ae4f9c9d757 100644
+> >> --- a/arch/arm/mm/mmu.c
+> >> +++ b/arch/arm/mm/mmu.c
+> >> @@ -1226,7 +1226,7 @@ void __init adjust_lowmem_bounds(void)
+> >>  	if (memblock_limit)
+> >>  		memblock_limit = round_down(memblock_limit, PMD_SIZE);
+> >>  	if (!memblock_limit)
+> >> -		memblock_limit = arm_lowmem_limit;
+> >> +		memblock_limit = round_down(arm_lowmem_limit, PMD_SIZE);
+> >>  
+
+Given we're always going to do the rounding, how about we move that out
+of the existing conditional, i.e. get rid of the first if, and have:
+
+	if (!memblock_limit)
+		memblock_limit = arm_lowmem_limit;
+
+	/*
+	 * Round the memblock limit down to a pmd size.  This
+	 * helps to ensure that we will allocate memory from the
+	 * last full pmd, which should be mapped.
+	 */
+	memblock_limit = round_down(memblock_limit, PMD_SIZE);
+
+Thanks,
+Mark.
