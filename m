@@ -1,78 +1,41 @@
-From: bart.vanassche@wdc.com (Bart Van Assche)
-Date: Tue, 27 Jun 2017 08:50:24 +0200
-Subject: [PATCH, RESEND] ARM: Fix rd_size declaration
-Message-ID: <20170627065024.12347-1-bart.vanassche@wdc.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 27 Jun 2017 08:53:14 +0200
+Subject: [PATCH linux-next v4 0/4] i.MX ECSPI controller slave mode support
+In-Reply-To: <20170608051603.16070-1-jiada_wang@mentor.com>
+References: <20170608051603.16070-1-jiada_wang@mentor.com>
+Message-ID: <20170627065314.jo63yzikv3cbvi2j@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The global variable 'rd_size' is declared as 'int' in source file
-arch/arm/kernel/atags_parse.c and as 'unsigned long' in
-drivers/block/brd.c. Fix this inconsistency. Additionally, remove
-the declarations of rd_image_start, rd_prompt and rd_doload from
-parse_tag_ramdisk() since these duplicate existing declarations
-in <linux/initrd.h>.
+On Thu, Jun 08, 2017 at 02:15:59PM +0900, Jiada Wang wrote:
+> Changes in v4:
+> * rebased to head of linux-next to resolve conflict
+> * optimized mx53_ecspi_rx_slave()
+> 
+> Changes in v3:
+> * renamed several variables for for better readability
+> * created spi_imx_pio_transfer_slave() for slave pio transfer
+> * added fifo_size, has_dmamode and has_slavemode in spi_imx_devtype_data
+> 
+> Changes in v2:
+> * re-workd i.MX ECSPI controller slave mode support based on Geert's work
+> 
+> Jiada Wang (4):
+>   spi: imx: introduce fifo_size and has_dmamode in spi_imx_devtype_data
+>   spi: imx: add selection for iMX53 and iMX6 controller
+>   ARM: dts: imx: change compatibility for SPI controllers on imx53 later
+>     soc
+>   spi: imx: Add support for SPI Slave mode
 
-Signed-off-by: Bart Van Assche <bart.vanassche@sandisk.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Jens Axboe <axboe@kernel.dk>
-Cc: Jan Kara <jack@suse.cz>
-Cc: <yanaijie@huawei.com>
-Cc: <zhaohongjiang@huawei.com>
-Cc: <miaoxie@huawei.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-block at vger.kernel.org
----
- arch/arm/kernel/atags_parse.c | 3 +--
- drivers/block/brd.c           | 1 +
- include/linux/initrd.h        | 3 +++
- 3 files changed, 5 insertions(+), 2 deletions(-)
+For the series:
 
-diff --git a/arch/arm/kernel/atags_parse.c b/arch/arm/kernel/atags_parse.c
-index 68c6ae0b9e4c..98fbfd235ac8 100644
---- a/arch/arm/kernel/atags_parse.c
-+++ b/arch/arm/kernel/atags_parse.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/initrd.h>
- #include <linux/kernel.h>
- #include <linux/fs.h>
- #include <linux/root_dev.h>
-@@ -91,8 +92,6 @@ __tagtable(ATAG_VIDEOTEXT, parse_tag_videotext);
- #ifdef CONFIG_BLK_DEV_RAM
- static int __init parse_tag_ramdisk(const struct tag *tag)
- {
--	extern int rd_size, rd_image_start, rd_prompt, rd_doload;
--
- 	rd_image_start = tag->u.ramdisk.start;
- 	rd_doload = (tag->u.ramdisk.flags & 1) == 0;
- 	rd_prompt = (tag->u.ramdisk.flags & 2) == 0;
-diff --git a/drivers/block/brd.c b/drivers/block/brd.c
-index 57b574f2f66a..f8341918a53a 100644
---- a/drivers/block/brd.c
-+++ b/drivers/block/brd.c
-@@ -9,6 +9,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/initrd.h>
- #include <linux/module.h>
- #include <linux/moduleparam.h>
- #include <linux/major.h>
-diff --git a/include/linux/initrd.h b/include/linux/initrd.h
-index 55289d261b4f..bc67b767f9ce 100644
---- a/include/linux/initrd.h
-+++ b/include/linux/initrd.h
-@@ -10,6 +10,9 @@ extern int rd_prompt;
- /* starting block # of image */
- extern int rd_image_start;
- 
-+/* size of a single RAM disk */
-+extern unsigned long rd_size;
-+
- /* 1 if it is not an error if initrd_start < memory_start */
- extern int initrd_below_start_ok;
- 
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
+
+
 -- 
-2.13.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
