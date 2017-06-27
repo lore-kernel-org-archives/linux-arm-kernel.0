@@ -1,64 +1,61 @@
 From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 27 Jun 2017 07:48:15 +0200
-Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
-In-Reply-To: <5cd25a47-f3be-8c40-3940-29f26a245076@kernel.org>
+Date: Tue, 27 Jun 2017 07:49:32 +0200
+Subject: omap3isp camera was Re: [PATCH v1 0/6] Add support of OV9655
+ camera
+In-Reply-To: <20170626111621.GC11688@amd>
 References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <1498143942-12682-2-git-send-email-hugues.fruchet@st.com>
- <D5629236-95D8-45B6-9719-E8B9796FEC90@goldelico.com>
- <64e3005d-31df-71f2-762b-2c1b1152fc2d@st.com>
- <5cd25a47-f3be-8c40-3940-29f26a245076@kernel.org>
-Message-ID: <39501C78-7B81-4803-94C1-25DFA06EA526@goldelico.com>
+ <385A82AC-CC23-41BD-9F57-0232F713FED9@goldelico.com>
+ <1E453955-0C1A-414B-BBB2-C64B6D0EF378@goldelico.com>
+ <20170625091856.GA22791@amd>
+ <EDFD663F-37F9-42C2-92A9-66C2508B361E@goldelico.com>
+ <20170626083927.GB9621@amd>
+ <5364AD62-5000-451E-B3F7-93D49A91EED5@goldelico.com>
+ <20170626111621.GC11688@amd>
+Message-ID: <A9421661-7E24-4B5D-A0FA-10838A0F12BD@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> Am 26.06.2017 um 22:04 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+> Am 26.06.2017 um 13:16 schrieb Pavel Machek <pavel@ucw.cz>:
 > 
-> On 06/26/2017 12:35 PM, Hugues FRUCHET wrote:
->>> What I am missing to support the GTA04 camera is the control of the optional "vana-supply".
->>> So the driver does not power up the camera module when needed and therefore probing fails.
+> Hi!
+> 
+>>> You may want to try this one:
 >>> 
->>>    - vana-supply: a regulator to power up the camera module.
+>>> commit 0eae9d2a8f096f703cbc8f9a0ab155cd3cc14cef
+>>> Author: Pavel <pavel@ucw.cz>
+>>> Date:   Mon Feb 13 21:26:51 2017 +0100
 >>> 
->>> Driver code is not complex to add:
+>>>   omap3isp: fix VP2SDR bit so capture (not preview) works
+>>> 
+>>>   This is neccessary for capture (not preview) to work properly on
+>>>       N900. Why is unknown.
+>> 
+>> Ah, interesting. I will give it a try.
+>> 
+>> Do you please have a link to the repo where this commit can be
+>>> found?
 > 
->> Yes, I saw it in your code, but as I don't have any programmable power
->> supply on my setup, I have not pushed this commit.
+> This branch, as mentioned before:
 > 
-> Since you are about to add voltage supplies to the DT binding I'd suggest
-> to include all three voltage supplies of the sensor chip. Looking at the OV9650
-> and the OV9655 datasheet there are following names used for the voltage supply
-> pins:
-> 
-> AVDD - Analog power supply,
-> DVDD - Power supply for digital core logic,
-> DOVDD - Digital power supply for I/O.
+> https://git.kernel.org/pub/scm/linux/kernel/git/pavel/linux-n900.git/log/?h=camera-fw5-6
 
-The latter two are usually not independently switchable from the SoC power
-the module is connected to.
+Thanks.
 
-And sometimes DVDD and DOVDD are connected together.
+I have merged this patch but unfortunately, it does not make the green screen go away.
 
-So the driver can't make much use of knowing or requesting them because the
-1.8V supply is always active, even during suspend.
+Neither with our own driver nor with the new one by Hugues (which turned out to not
+support SXGA at all but I tried VGA).
 
-> 
-> I doubt the sensor can work without any of these voltage supplies, thus
-> regulator_get_optional() should not be used. I would just use the regulator
-> bulk API to handle all three power supplies.
-
-The digital part works with AVDD turned off. So the LDO supplying AVDD should
-be switchable to save power (&vaux3 on the GTA04 device).
-
-But not all designs can switch it off. Hence the idea to define it as an
-/optional/ regulator. If it is not defined by DT, the driver simply assumes
-it is always powered on.
-
-So in summary we only need AVDD switched for the GTA04 - but it does not
-matter if the others are optional properties. We would not use them.
-
-It does matter if they are mandatory because it adds DT complexity (size
-and processing) without added function.
+I think we should postpone debugging this until Hugues proposed patches are better reviewed.
 
 BR and thanks,
 Nikolaus
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: Message signed with OpenPGP using GPGMail
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/d3be0452/attachment-0001.sig>
