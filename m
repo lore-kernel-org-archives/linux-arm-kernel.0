@@ -1,24 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 Jun 2017 02:10:01 +0100
-Subject: Applied "spi: Document the STM32 SPI bindings" to the spi tree
-In-Reply-To: <20170626182240.vcv4wwu7cavgu4na@rob-hp-laptop>
-References: <1498055526-6918-2-git-send-email-amelie.delaunay@st.com>
- <E1dNhMj-0001FC-Ay@debutante>
- <20170626182240.vcv4wwu7cavgu4na@rob-hp-laptop>
-Message-ID: <20170627011001.hnj7nbr6h7fqkxdn@sirena.org.uk>
+From: opendmb@gmail.com (Doug Berger)
+Date: Mon, 26 Jun 2017 17:57:29 -0700
+Subject: [PATCH] ARM: small correction to early_ioremap support
+Message-ID: <20170627005731.7869-1-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 01:22:40PM -0500, Rob Herring wrote:
+The fixmap pages need to be on the same pmd page for the current
+implementation of arm early_fixmap.  A build time bug check is
+used to ensure that.  However, the worst case fixmap range is
+better represented by __end_of_fixed_addresses than by the value
+__end_of_early_ioremap_region.
 
-> A bit quick on the applying as there are several comments...
+Fixes: 2937367b8a4b ("ARM: add support for generic early_ioremap/early_memremap")
+Signed-off-by: Doug Berger <opendmb@gmail.com>
+---
+ arch/arm/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Really trivial things which can easily be fixed incrementally without
-having to repeatedly review the entire driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/e882fc8a/attachment.sig>
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 31af3cb59a60..74c0ed5c3b08 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -392,7 +392,7 @@ void __init early_fixmap_init(void)
+ 	 * The early fixmap range spans multiple pmds, for which
+ 	 * we are not prepared:
+ 	 */
+-	BUILD_BUG_ON((__fix_to_virt(__end_of_early_ioremap_region) >> PMD_SHIFT)
++	BUILD_BUG_ON((__fix_to_virt(__end_of_fixed_addresses) >> PMD_SHIFT)
+ 		     != FIXADDR_TOP >> PMD_SHIFT);
+ 
+ 	pmd = fixmap_pmd(FIXADDR_TOP);
+-- 
+2.13.0
