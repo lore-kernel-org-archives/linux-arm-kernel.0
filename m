@@ -1,46 +1,28 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Tue, 27 Jun 2017 17:45:15 +0200
-Subject: [PATCHv2 3/9] dt-bindings: spi: stm32: fix example with st,
- spi-midi-ns property
-In-Reply-To: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
-References: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1498578321-13980-4-git-send-email-amelie.delaunay@st.com>
+Date: Tue, 27 Jun 2017 17:45:12 +0200
+Subject: [PATCHv2 0/9] STM32 SPI various fixes
+Message-ID: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch aligns example with the optional property description,
-removes status and replace spidev unvalid compatible with
-Aarvark SPI Host Adapter one.
+This patchset answers to the reviews done after STM32 SPI driver introduction.
 
-In slave mode, Aardvark SPI Host Adapter requires 4ms delay
-between the end of byte n and the start of byte n+1, hence the
-use of the optional property st,spi-midi-ns.
+Amelie Delaunay (9):
+  dt-bindings: spi: stm32: use SoC specific compatible
+  spi: stm32: fix compatible to fit with new bindings
+  dt-bindings: spi: stm32: fix example with st,spi-midi-ns property
+  spi: stm32: replace st,spi-midi with st,spi-midi-ns to fit bindings
+  spi: stm32: use normal conditional statements instead of ternary
+    operator
+  spi: stm32: add runtime PM support
+  spi: stm32: enhance DMA error management
+  spi: stm32: fix potential dereference null return value
+  spi: spidev: add Aardvark to device tree compatibility list
 
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
----
- Documentation/devicetree/bindings/spi/spi-stm32.txt | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/spi/spi-stm32.txt          |  11 +-
+ drivers/spi/spi-stm32.c                            | 130 +++++++++++++++------
+ drivers/spi/spidev.c                               |   1 +
+ 3 files changed, 99 insertions(+), 43 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-stm32.txt b/Documentation/devicetree/bindings/spi/spi-stm32.txt
-index 415378b..1b3fa2c1 100644
---- a/Documentation/devicetree/bindings/spi/spi-stm32.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-stm32.txt
-@@ -48,13 +48,12 @@ Example:
- 		dma-names = "rx", "tx";
- 		pinctrl-0 = <&spi2_pins_b>;
- 		pinctrl-names = "default";
--		status = "okay";
- 		cs-gpios = <&gpioa 11 0>;
- 
--		spidev at 0 {
--			compatible = "spidev";
-+		aardvark at 0 {
-+			compatible = "totalphase,aardvark";
- 			reg = <0>;
- 			spi-max-frequency = <4000000>;
--			st,spi-midi = <4000>;
-+			st,spi-midi-ns = <4000>;
- 		};
- 	};
 -- 
 1.9.1
