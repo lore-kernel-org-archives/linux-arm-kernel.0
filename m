@@ -1,52 +1,77 @@
 From: yong.deng@magewell.com (Yong Deng)
-Date: Tue, 27 Jun 2017 19:07:32 +0800
-Subject: [PATCH RFC 0/2] Initial Allwinner V3s CSI Support
-Message-ID: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+Date: Tue, 27 Jun 2017 19:07:34 +0800
+Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for Allwinner
+ CSI
+In-Reply-To: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add initial support for Allwinner V3s CSI.
+Add binding documentation for Allwinner CSI.
 
-Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
-and CSI1 is used for parallel interface. This is not documented in
-datatsheet but by testing and guess.
-
-This patchset implement a v4l2 framework driver and add a binding 
-documentation for it.
-
-Currently, the driver only support the parallel interface. And has been
-tested with a BT1120 signal which generating from FPGA. The following
-fetures are not support with this patchset:
-  - ISP
-  - MIPI-CSI2
-  - Master clock for camera sensor
-  - Power regulator for the front end IC
-
-Yong Deng (2):
-  media: V3s: Add support for Allwinner CSI.
-  dt-bindings: add binding documentation for Allwinner CSI
-
- .../devicetree/bindings/media/sunxi-csi.txt        |  51 ++
- drivers/media/platform/Kconfig                     |   1 +
- drivers/media/platform/Makefile                    |   2 +
- drivers/media/platform/sunxi-csi/Kconfig           |   8 +
- drivers/media/platform/sunxi-csi/Makefile          |   3 +
- drivers/media/platform/sunxi-csi/sunxi_csi.c       | 535 +++++++++++++
- drivers/media/platform/sunxi-csi/sunxi_csi.h       | 203 +++++
- drivers/media/platform/sunxi-csi/sunxi_csi_v3s.c   | 827 +++++++++++++++++++++
- drivers/media/platform/sunxi-csi/sunxi_csi_v3s.h   | 206 +++++
- drivers/media/platform/sunxi-csi/sunxi_video.c     | 667 +++++++++++++++++
- drivers/media/platform/sunxi-csi/sunxi_video.h     |  61 ++
- 11 files changed, 2564 insertions(+)
+Signed-off-by: Yong Deng <yong.deng@magewell.com>
+---
+ .../devicetree/bindings/media/sunxi-csi.txt        | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/media/sunxi-csi.txt
- create mode 100644 drivers/media/platform/sunxi-csi/Kconfig
- create mode 100644 drivers/media/platform/sunxi-csi/Makefile
- create mode 100644 drivers/media/platform/sunxi-csi/sunxi_csi.c
- create mode 100644 drivers/media/platform/sunxi-csi/sunxi_csi.h
- create mode 100644 drivers/media/platform/sunxi-csi/sunxi_csi_v3s.c
- create mode 100644 drivers/media/platform/sunxi-csi/sunxi_csi_v3s.h
- create mode 100644 drivers/media/platform/sunxi-csi/sunxi_video.c
- create mode 100644 drivers/media/platform/sunxi-csi/sunxi_video.h
 
+diff --git a/Documentation/devicetree/bindings/media/sunxi-csi.txt b/Documentation/devicetree/bindings/media/sunxi-csi.txt
+new file mode 100644
+index 0000000..770be0e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/sunxi-csi.txt
+@@ -0,0 +1,51 @@
++Allwinner V3s Camera Sensor Interface
++------------------------------
++
++Required properties:
++  - compatible: value must be "allwinner,sun8i-v3s-csi"
++  - reg: base address and size of the memory-mapped region.
++  - interrupts: interrupt associated to this IP
++  - clocks: phandles to the clocks feeding the CSI
++    * ahb: the CSI interface clock
++    * mod: the CSI module clock
++    * ram: the CSI DRAM clock
++  - clock-names: the clock names mentioned above
++  - resets: phandles to the reset line driving the CSI
++
++- ports: A ports node with endpoint definitions as defined in
++  Documentation/devicetree/bindings/media/video-interfaces.txt. The
++  first port should be the input endpoints, the second one the outputs
++
++Example:
++
++	csi1: csi at 01cb4000 {
++		compatible = "allwinner,sun8i-v3s-csi";
++		reg = <0x01cb4000 0x1000>;
++		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&ccu CLK_BUS_CSI>,
++			 <&ccu CLK_CSI1_SCLK>,
++			 <&ccu CLK_DRAM_CSI>;
++		clock-names = "ahb", "mod", "ram";
++		resets = <&ccu RST_BUS_CSI>;
++
++		port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* Parallel bus endpoint */
++			csi1_0: endpoint at 0 {
++				reg = <0>;
++				remote = <&adv7611_1>;
++				bus-width = <16>;
++				data-shift = <0>;
++
++				/* If hsync-active/vsync-active are missing,
++				   embedded BT.656 sync is used */
++				hsync-active = <0>; /* Active low */
++				vsync-active = <0>; /* Active low */
++				data-active = <1>;  /* Active high */
++				pclk-sample = <1>;  /* Rising */
++			};
++		};
++	};
++
 -- 
 1.8.3.1
