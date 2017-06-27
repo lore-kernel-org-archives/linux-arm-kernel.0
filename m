@@ -1,91 +1,43 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 27 Jun 2017 14:58:15 -0500
-Subject: next-20170621 build: 1 failures 7 warnings (next-20170621)
-In-Reply-To: <20170623094356.GA5337@red-moon>
-References: <E1dNcMp-0005RN-1w@optimist>
- <20170621100440.vcaxagg4yjca2cv4@sirena.org.uk>
- <1498209196.26313.71.camel@mtkswgap22>
- <20170623094356.GA5337@red-moon>
-Message-ID: <20170627195815.GA17844@bhelgaas-glaptop.roam.corp.google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Jun 2017 22:21:29 +0200
+Subject: [PATCH v2 00/15] staging: fsl-mc: clean up header files
+In-Reply-To: <20170627160045.GA9977@kroah.com>
+References: <20170627144135.15599-1-laurentiu.tudor@nxp.com>
+ <CAK8P3a2pD5+kd5NLbkJ_ppDb8jgNE7Cuxm=GLHf-ZgsLgoq9Sg@mail.gmail.com>
+ <20170627160045.GA9977@kroah.com>
+Message-ID: <CAK8P3a2A6-+ceo_gzYQ2Si0k2aUrzj9EupLnp2iiKpT2Dznk+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 10:43:56AM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Jun 23, 2017 at 05:13:16PM +0800, Ryder Lee wrote:
-> > Sorry for late reply, 
-> > 
-> > +Lorenzo
-> > 
-> > On Wed, 2017-06-21 at 18:04 +0800, Mark Brown wrote:
-> > > On Wed, Jun 21, 2017 at 10:56:07AM +0100, Build bot for Mark Brown wrote:
-> > > 
-> > > Today's -next fails to build an arm allmodconfig due to:
-> > > 
-> > > > 	arm-allmodconfig
-> > > > ../drivers/pci/host/pcie-mediatek.c:485:8: error: implicit declaration of function 'pci_register_host_bridge' [-Werror=implicit-function-declaration]
-> > > 
-> > > caused by eaf3023b0498a (PCI: mediatek: Add MediaTek PCIe host
-> > > controller support).
-> > 
-> > 
-> > Hi Lorenzo,
-> > 
-> > I picked up your changes and had some modifications like what you did
-> > for other platforms:
-> > 
-> > 9f8e3a5 PCI: Add devm_pci_alloc_host_bridge() interface 
-> > 35a1a84 PCI: Add pci_free_host_bridge() interface
-> > e33aafd PCI: Initialize bridge release function at bridge allocation
-> > 
-> > ...and it looks Okay.
-> > 
-> > I have also noticed that you continue sending patches for other
-> > platforms but I have not yet had a look in detail. I'm quite busy these
-> > days and don't have time to dig it, hence it is becoming a little
-> > unmanageable for me.
-> 
-> If it is unmanageable you don't add yourself as a maintainer of that
-> PCI host bridge driver, you know, we are all busy.
-> 
-> Your driver in the PCI tree as it stands contains already two bugs:
-> 
-> 1) It leaks memory on the probe failure path
-> 2) pci_fixup_irqs() is broken on configurations with multiple host
->    bridges
-> 
-> And we keep copy'n'pasting that code.
-> 
-> > Did you have a chance to send the same patches for MediaTek?  I
-> > appreciate that and I can help to test it on our platforms.
-> 
-> No, how could I have sent them ? It is not upstream and it is a separate
-> branch in the PCI tree. As I mentioned in another thread it is probably
-> best to drop my pci_fixup_irqs() removal patches since it is impossible
-> to work on them without a stable branch to apply them against, in the
-> interim we keep adding PCI host bridges that use the wrong interfaces by
-> copy'n'pasting code that I have been trying to remove.
-> 
-> I think the best solution is to repost my series when v4.13-rc1 appears
-> and ask all new crop of host bridge drivers to rebase against it.
-> 
-> I won't be able to follow mailing lists till end of next week, which
-> is bad timing.
-> 
-> Bjorn, is the plan above ok ? Please let me know how you want to
-> proceed.
+On Tue, Jun 27, 2017 at 6:00 PM, gregkh <gregkh@linuxfoundation.org> wrote:
+> On Tue, Jun 27, 2017 at 05:33:21PM +0200, Arnd Bergmann wrote:
+>> On Tue, Jun 27, 2017 at 4:41 PM,  <laurentiu.tudor@nxp.com> wrote:
+>> > From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>> >
+>> > This patch series contain mainly clean-ups of the mc-bus header files
+>> > with the final goal of reorganizing them in just 2 files: a public
+>> > and a private one, as per GregKH suggestion [1].
+>> > Here's a summary of the header reorganizing:
+>> >  - existing mc.h used as public header (contained most of the public API)
+>> >  - existing fsl-mc-private.h used for private header
+>> >  - mc-bus.h merged both in public and private header
+>> >  - mc-sys.h and mc-cmd.h merged in public header
+>> >  - dprc.h made private
+>> >  - dpmng.h deleted
+>> >
+>> > [1] https://patchwork.kernel.org/patch/9775683/
+>> >
+>> > version 2 changes
+>> >  - fix compilation issue
+>> >  - reordered a comparison, be consistent when checking strcmp() return
+>> >    (Joe Perches, first two patches)
+>>
+>> It looks like v1 was already merged into staging-next, so the changes would
+>> have to be relative to what's already merged, rather than replacing them.
+>
+> No, I had to revert the whole v1 mess, so this is correct...
 
-Sorry, I was on vacation myself most of last week, and you're
-unavailable most of this week, but I'd still like to try to get this
-into v4.13.
+Ok, sorry for the confusion on my side then. Obviously you can ignore my fixup
+patch too, as that is already part of this series.
 
-We may not get every host tested, but I'm not sure that will happen
-even if we wait for the next cycle.  If we trip over something it will
-likely be something small or for a relatively rare platform, so we can
-fix it up after the fact.
-
-I haven't looked at everything yet, but my plan is to try to
-incorporate the fixes people have posted and keep pushing forward.  If
-that turns out not to work, I'll drop the pci_fixup_irqs() series, but
-I'll at least give it a try.
-
-Bjorn
+       Arnd
