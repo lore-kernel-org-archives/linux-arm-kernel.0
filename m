@@ -1,117 +1,102 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Tue, 27 Jun 2017 14:51:22 +0800
-Subject: [PATCH v5] trace: ras: add ARM processor error information trace
- event
-In-Reply-To: <20170626140647.anigiqhk3l6ltet7@pd.tnic>
-References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
- <20170626140647.anigiqhk3l6ltet7@pd.tnic>
-Message-ID: <22ba6506-1031-437b-95ae-c26773ff84b7@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Jun 2017 09:17:48 +0200
+Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
+In-Reply-To: <DB6PR04MB2999E8FFBE0FE708A003637986D80@DB6PR04MB2999.eurprd04.prod.outlook.com>
+References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
+ <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
+ <20170623152227.GA21989@leverpostej>
+ <DB6PR04MB2999E8FFBE0FE708A003637986D80@DB6PR04MB2999.eurprd04.prod.outlook.com>
+Message-ID: <CAK8P3a0mhWTRriGYB6aHS28dm842d-0OeGRmRYzMS4ZYY9=YCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Fri, Jun 23, 2017 at 8:58 PM, Roy Pledge <roy.pledge@nxp.com> wrote:
+> On 6/23/2017 11:23 AM, Mark Rutland wrote:
+>> On Fri, Jun 23, 2017 at 04:56:10PM +0200, Arnd Bergmann wrote:
+>>> On Tue, Jun 20, 2017 at 7:27 PM, Leo Li <leoyang.li@nxp.com> wrote:
+>>>
+>>> 2. I know we have discussed the unusual way this driver accesses MMIO
+>>> registers in the past, using ioremap_wc() to map them and the manually
+>>> flushing the caches to store the cache contents into the MMIO registers.
+>>> What I don't know is whether there was any conclusion on this topic whether
+>>> this is actually allowed by the architecture or at least the chip, based on
+>>> implementation-specific features that make it work even when the architecture
+>>> doesn't guarantee it.
+>> From prior discussions, my understanding was that the region in question
+>> was memory reserved for the device, rather than MMIO registers.
 
-Thanks for your comments.
+Ok.
 
-On 2017/6/26 22:06, Borislav Petkov wrote:
-> On Sat, Jun 24, 2017 at 11:38:23AM +0800, Xie XiuQi wrote:
->> Add a new trace event for ARM processor error information, so that
->> the user will know what error occurred. With this information the
->> user may take appropriate action.
+>> The prior discussion on that front were largely to do with teh
+>> shareability of that memory, which is an orthogonal concern.
 >>
->> These trace events are consistent with the ARM processor error
->> information table which defined in UEFI 2.6 spec section N.2.4.4.1.
->>
->> ---
->> v5: add trace enabled condition which is lost on v4 back again
->>     put flag after the type to keep multiple_error on a 2 byte boundary
->>
->> v4: use __print_flags instead of __print_symbolic, because ARM_PROC_ERR_FLAGS
->>     might have more than on bit set.
->>     setting up default values for __entry to avoid a lot of else branches.
->>     set flags to 0 by default instead of ~0.
->>     fix a typo
->>     rename arm_proc_err to arm_err_info_event
->>     remove "ARM Processor Error: " prefix
->>     rebase on Tyler's patchset v17 "Add UEFI 2.6 and ACPI 6.1 updates for RAS on ARM64"
->>
->>     https://patchwork.kernel.org/patch/9806267/
->>
->> v3: no change
->>
->> v2: add trace enabled condition as Steven's suggestion.
->>     fix a typo.
->>
->>     https://patchwork.kernel.org/patch/9653767/
->> ---
->>
->> Cc: Steven Rostedt <rostedt@goodmis.org>
->> Cc: Tyler Baicar <tbaicar@codeaurora.org>
->> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
->> ---
->>  drivers/ras/ras.c       | 11 +++++++
->>  include/linux/cper.h    |  5 ++++
->>  include/ras/ras_event.h | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 95 insertions(+)
->>
->> diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
->> index 39701a5..f76ab0f 100644
->> --- a/drivers/ras/ras.c
->> +++ b/drivers/ras/ras.c
->> @@ -22,7 +22,17 @@ void log_non_standard_event(const uuid_le *sec_type, const uuid_le *fru_id,
->>  
->>  void log_arm_hw_error(struct cper_sec_proc_arm *err)
->>  {
->> +	int i;
->> +	struct cper_arm_err_info *err_info;
->> +
->>  	trace_arm_event(err);
->> +
->> +	if (!trace_arm_err_info_event_enabled())
->> +		return;
-> 
-> If we're going to check whether the tracepoint is enabled, you need
-> to do that for arm_event TP too. Because from looking at the spec,
-> arm_event dumps
-> 
-> Table 260. ARM Processor Ejkrror Section
-> 
-> and you're dumping
-> 
-> Table 261. ARM Processor Error Information Structure
-> 
-> which is embedded in the previous table.
-> 
-> So this is basically a single error event and the error info structures
-> can describe different incarnations to that error event.
-> 
-> And you need to mirror exactly that behavior.
-> 
-> Then, when you do that, you need to document somewhere so that userspace
-> knows to open *both* TPs in order to get the full error information.
-> 
-> Alternatively, you can extend arm_event to get issued with *each*
-> cper_arm_err_info but that would mean a lot of redundant information
-> being shuffled out to userspace.
+>> If these are actually MMIO registers, a Device memory type must be used,
+>> rather than a Normal memory type. There are a number of things that
+>> could go wrong due to relaxations permitted for Normal memory, such as
+>> speculative reads, the potential set of access sizes, memory
+>> transactions that the endpoint might not understand, etc.
+> The memory for this device (what we refer to as Software Portals) has 2
+> regions. One region is MMIO registers and we access it using
+> readl()/writel() APIs.
 
-How about we report the full info via arm_err_info_event which just for someone
-who want the detail information, and leave arm_event closed. If someone do not
-care the error detail, who could just open arm_event.
+Ok, good.
 
-It may like this for each err_info in one section:
+> The second region is what we refer to as the cacheable area.  This is
+> memory implemented as part of the QBMan device and the device accepts
+> cacheline sized transactions from the interconnect. This is needed
+> because the descriptors read and written by SW are fairly large (larger
+> that 64 bits/less than a cacheline) and in order to meet the data rates
+> of our high speed ethernet ports and other accelerators we need the CPU
+> to be able to form the descriptor in a CPU cache and flush it safely
+> when the device is read to consume it.  Myself and the system architect
+> have had many discussions with our design counterparts in ARM to ensure
+> that our interaction with the core/interconnect/device are safe for the
+> set of CPU cores and interconnects we integrate into our products.
+>
+> I understand there are concerns regarding our shareablity proposal
+> (which is not enabled in this patch set). We have been collecting some
+> information and talking to ARM and I do intend to address these concerns
+> but I was delaying confusing things more until this basic support gets
+> accepted and merged.
 
-arm_err_info_event: affinity level: 1; MPIDR: 0000001; MIDR: 0000001; running state: 0; PSCI state: 1;
-type: TLB error; count: 65535; flags: First error captured|Last error captured|Propagated|Overflow;
-error info: 0000000005244678; virtual address: 0000000000013579; physical address: 0000000000024680
+Can you summarize what the constraints are that we have for mapping
+this area? E.g. why can't we just have an uncached write-combining
+mapping and skip the flushes?
 
-One problem is that may report some redundant information if we have more than one err_info in a section.
+>>> Can I have an Ack from the architecture maintainers (Russell, Catalin,
+>>> Will) on the use of these architecture specific interfaces?
+>>>
+>>> static inline void dpaa_flush(void *p)
+>>> {
+>>> #ifdef CONFIG_PPC
+>>>         flush_dcache_range((unsigned long)p, (unsigned long)p+64);
+>>> #elif defined(CONFIG_ARM32)
+>>>         __cpuc_flush_dcache_area(p, 64);
+>>> #elif defined(CONFIG_ARM64)
+>>>         __flush_dcache_area(p, 64);
+>>> #endif
+>>> }
+>> Assuming this is memory, why can't the driver use the DMA APIs to handle
+>> this without reaching into arch-internal APIs?
+>
+> I agree this isn't pretty - I think we could use
+> dma_sync_single_for_device() here but I am concerned it will be
+> expensive and hurt performance significantly. The DMA APIs have a lot of
+> branches. At some point we were doing 'dc cvac' here and even switching
+> to the above calls caused a measurable drop in throughput at high frame
+> rates.
 
-Does Tyler have any good idea?
+I'd suggest we start out by converting this to some standard API
+first, regardless of performance, to get it working properly with code
+that should be maintainable at least, and make progress with your
+hardware enablement.
 
-> 
-> So I guess that's ARM folks' call.
-> 
+In parallel, we can discuss what kind of API we actually need and
+how to fit that into the existing frameworks. This may take a while
+as it depends on your other patch set, and perhaps input from
+other parties that may have similar requirements. I could imagine
+that e.g. Marvell, Cavium or Annapurna (Amazon) do something
+similar in their hardware, so if we find that we need a new API,
+we should define it in a way that works for everyone.
 
--- 
-Thanks,
-Xie XiuQi
+        Arnd
