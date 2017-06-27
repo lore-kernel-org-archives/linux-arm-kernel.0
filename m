@@ -1,50 +1,64 @@
-From: surenderp@techveda.org (surenderp at techveda.org)
-Date: Tue, 27 Jun 2017 17:45:35 +0530
-Subject: [PATCH] arm: boot: dts: artpec6: Remove unnecessary interrupt-parent
- property from sub-nodes
-Message-ID: <1498565735-8208-1-git-send-email-surenderp@techveda.org>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 27 Jun 2017 20:15:49 +0800
+Subject: [PATCH v4 2/3] arm64: kvm: route synchronous external abort
+ exceptions to el2
+In-Reply-To: <1498481156-23572-1-git-send-email-gengdongjiu@huawei.com>
+References: <1498481156-23572-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <3862ccaf-a669-17b0-4cfb-ce15fce361a1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Surender Polsani <surenderp@techveda.org>
+correct the commit message:
 
-"interrupt-parent" property is declared in root node, so it is global
-to all nodes. This property is re-declared in few sub-nodes. To avoid
-duplication this property is removed from following sub-nodes:
-pmu, amba at 0, amba at 0/ethernet.
+ In the firmware-first RAS solution, OS receives an synchronous
+ external abort, then trapped to EL3 by SCR_EL3.EA. Firmware inspects
+ the HCR_EL2.TEA and chooses the target to send APEI's SEA notification.
+ If the SCR_EL3.EA is set, delegates the error exception to the hypervisor,
+ otherwise it delegates to the host OS kernel
 
-Signed-off-by: Surender Polsani <surenderp@techveda.org>
----
- arch/arm/boot/dts/artpec6.dtsi | 3 ---
- 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-index 767cbe8..2ed1177 100644
---- a/arch/arm/boot/dts/artpec6.dtsi
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -151,7 +151,6 @@
- 		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
- 			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-affinity = <&cpu0>, <&cpu1>;
--		interrupt-parent = <&intc>;
- 	};
- 
- 	pcie: pcie at f8050000 {
-@@ -185,7 +184,6 @@
- 		compatible = "simple-bus";
- 		#address-cells = <0x1>;
- 		#size-cells = <0x1>;
--		interrupt-parent = <&intc>;
- 		ranges;
- 		dma-ranges = <0x80000000 0x00000000 0x40000000>;
- 		dma-coherent;
-@@ -195,7 +193,6 @@
- 			clocks = <&eth_phy_ref_clk>,
- 				<&clkctrl ARTPEC6_CLK_ETH_ACLK>;
- 			compatible = "snps,dwc-qos-ethernet-4.10";
--			interrupt-parent = <&intc>;
- 			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0xf8010000 0x4000>;
- 
--- 
-1.9.1
+On 2017/6/26 20:45, Dongjiu Geng wrote:
+> In the firmware-first RAS solution, guest OS receives an synchronous
+> external abort, then trapped to EL3 by SCR_EL3.EA. Firmware inspects
+> the HCR_EL2.TEA and chooses the target to send APEI's SEA notification.
+> If the SCR_EL3.EA is set, delegates the error exception to the hypervisor,
+> otherwise it delegates to the guest OS kernel
+> 
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h     | 2 ++
+>  arch/arm64/include/asm/kvm_emulate.h | 7 +++++++
+>  2 files changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 61d694c..1188272 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -23,6 +23,8 @@
+>  #include <asm/types.h>
+>  
+>  /* Hyp Configuration Register (HCR) bits */
+> +#define HCR_TEA		(UL(1) << 37)
+> +#define HCR_TERR	(UL(1) << 36)
+>  #define HCR_E2H		(UL(1) << 34)
+>  #define HCR_ID		(UL(1) << 33)
+>  #define HCR_CD		(UL(1) << 32)
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index f5ea0ba..5f64ab2 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -47,6 +47,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+>  	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+>  	if (is_kernel_in_hyp_mode())
+>  		vcpu->arch.hcr_el2 |= HCR_E2H;
+> +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
+> +		/* route synchronous external abort exceptions to EL2 */
+> +		vcpu->arch.hcr_el2 |= HCR_TEA;
+> +		/* trap error record accesses */
+> +		vcpu->arch.hcr_el2 |= HCR_TERR;
+> +	}
+> +
+>  	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
+>  		vcpu->arch.hcr_el2 &= ~HCR_RW;
+>  }
+> 
