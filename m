@@ -1,120 +1,156 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Tue, 27 Jun 2017 10:22:47 +0800
-Subject: [PATCH] spi: rockchip: Keep master alive when CS asserted
-In-Reply-To: <20170626221736.GA126468@google.com>
-References: <1498446606-5529-1-git-send-email-jeffy.chen@rock-chips.com>
- <20170626221736.GA126468@google.com>
-Message-ID: <5951C177.4000600@rock-chips.com>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Tue, 27 Jun 2017 10:41:34 +0800
+Subject: [PATCH v5] trace: ras: add ARM processor error information trace
+ event
+In-Reply-To: <20170626093624.381a25cb@gandalf.local.home>
+References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
+ <20170626093624.381a25cb@gandalf.local.home>
+Message-ID: <918253cf-33ef-3152-a492-14f2b8946e99@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi brian,
+Hi Steve,
 
-thanx for your comments.
+Thanks for your comments.
 
-On 06/27/2017 06:17 AM, Brian Norris wrote:
-> Hi Jeffy,
->
-> On Mon, Jun 26, 2017 at 11:10:06AM +0800, Jeffy Chen wrote:
->> The cros_ec requires CS line to be active after last message. But the CS
->> would be toggled when powering off/on rockchip spi, which breaks ec xfer.
->
-> I believe Doug's point was larger than just the CS line. He was
-> guessing that you're also stopping driving any of the other pins (e.g.,
-> CLK), which could cause more problems. Seems like it'd be good to note
-> that in the second sentence here.
-right, i need to rewrite this.
->
->> Keep spi alive after CS asserted to prevent that.
->>
->> Suggested-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>
->> ---
->>
->>   drivers/spi/spi-rockchip.c | 22 +++++++++++++++++-----
->>   1 file changed, 17 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
->> index acf31f3..df016a1 100644
->> --- a/drivers/spi/spi-rockchip.c
->> +++ b/drivers/spi/spi-rockchip.c
->> @@ -264,7 +264,7 @@ static inline u32 rx_max(struct rockchip_spi *rs)
->>
->>   static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
->>   {
->> -	u32 ser;
->> +	u32 ser, new_ser;
->>   	struct spi_master *master = spi->master;
->>   	struct rockchip_spi *rs = spi_master_get_devdata(master);
->>
->> @@ -288,13 +288,25 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
->>   	 * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
->>   	 */
->>   	if (!enable)
->> -		ser |= 1 << spi->chip_select;
->> +		new_ser = ser | BIT(spi->chip_select);
->>   	else
->> -		ser &= ~(1 << spi->chip_select);
->> +		new_ser = ser & ~BIT(spi->chip_select);
->>
->> -	writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
->> +	if (new_ser == ser)
->> +		goto out;
->
-> Hmm, this doens't exactly feel like a situation for 'goto'. Personally,
-> an indented 'if' block would make this clearer:
->
-> 	if (new_ser != ser) {
-> 		... // all the stuff you do only on CS edges
-> 	}
->
-ok, will do.
->>
->> -	pm_runtime_put_sync(rs->dev);
->> +	writel_relaxed(new_ser, rs->regs + ROCKCHIP_SPI_SER);
+On 2017/6/26 21:36, Steven Rostedt wrote:
+> On Sat, 24 Jun 2017 11:38:23 +0800
+> Xie XiuQi <xiexiuqi@huawei.com> wrote:
+> 
+>> diff --git a/include/linux/cper.h b/include/linux/cper.h
+>> index 4c671fc..17546bf 100644
+>> --- a/include/linux/cper.h
+>> +++ b/include/linux/cper.h
+>> @@ -275,6 +275,11 @@ enum {
+>>  #define CPER_ARM_INFO_FLAGS_PROPAGATED		BIT(2)
+>>  #define CPER_ARM_INFO_FLAGS_OVERFLOW		BIT(3)
+>>  
+>> +#define CPER_ARM_INFO_TYPE_CACHE		0
+>> +#define CPER_ARM_INFO_TYPE_TLB			1
+>> +#define CPER_ARM_INFO_TYPE_BUS			2
+>> +#define CPER_ARM_INFO_TYPE_UARCH		3
 >> +
->> +	/*
->> +	 * The rockchip spi would stop driving CS when power down.
->
-> Replace "CS" with "all pins"? And:
-> s/power/powered/
-done
->
->> +	 * So we need to keep it alive after CS asserted
->
-> To make this clearer, note that we're keeping an unbalanced runtime PM
-> reference on purpose. Like instead of "we need to keep it alive after CS
-> asserted", maybe "we hold a runtime PM reference as long as CS is
-> asserted."?
-done
->
->> +	 */
->> +	if (!enable)
->> +		return;
->> +	pm_runtime_put(rs->dev);
->
-> I still had to read this through a few times to be sure it was right (I
-> think it's correct?). Maybe to make this extra clear, a comment like
-> "Drop reference from when we first asserted CS" could go above this?
->
-done
+>>  /*
+>>   * All tables and structs must be byte-packed to match CPER
+>>   * specification, since the tables are provided by the system BIOS
+>> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+>> index 429f46f..dd91ba8 100644
+>> --- a/include/ras/ras_event.h
+>> +++ b/include/ras/ras_event.h
+>> @@ -206,6 +206,85 @@
+>>  		  __entry->running_state, __entry->psci_state)
+>>  );
+>>  
+>> +#define ARM_PROC_ERR_TYPE	\
+>> +	EM ( CPER_ARM_INFO_TYPE_CACHE, "cache error" )	\
+>> +	EM ( CPER_ARM_INFO_TYPE_TLB,  "TLB error" )	\
+>> +	EM ( CPER_ARM_INFO_TYPE_BUS, "bus error" )	\
+>> +	EMe ( CPER_ARM_INFO_TYPE_UARCH, "micro-architectural error" )
+> 
+> These are all defines. As the name suggests, the TRACE_DEFINE_ENUM() is
+> for use with enums, not defines. You can nuke this part.
+> 
 >> +
->> +out:
->> +	pm_runtime_put(rs->dev);
->
-> You've dropped the "_sync()" that used to be here. I think that's
-> probably fine, but I wanted to call it out.
-right, i'll mention it in commit message too.
->
-> Brian
->
->>
->>   static int rockchip_spi_prepare_message(struct spi_master *master,
->> --
->> 2.1.4
->>
->>
->
->
->
+>> +/*
+>> + * First define the enums in MM_ACTION_RESULT to be exported to userspace
+>> + * via TRACE_DEFINE_ENUM().
+>> + */
+>> +#undef EM
+>> +#undef EMe
+>> +#define EM(a, b) TRACE_DEFINE_ENUM(a);
+>> +#define EMe(a, b)	TRACE_DEFINE_ENUM(a);
+>> +
+>> +ARM_PROC_ERR_TYPE
+>> +
+>> +/*
+>> + * Now redefine the EM() and EMe() macros to map the enums to the strings
+>> + * that will be printed in the output.
+>> + */
+>> +#undef EM
+>> +#undef EMe
+>> +#define EM(a, b)		{ a, b },
+>> +#define EMe(a, b)	{ a, b }
+> 
+> All the EM* and friends above are not needed. The macro below will
+> translate into numbers not names in the format files in tracefs.
+
+So, do you mean we just use __print_symbolic like below:
+
+#define show_proc_err_type(type)                                                \
+        __print_symbolic(type,                                                  \
+                { CPER_ARM_INFO_TYPE_CACHE, "cache error" },                    \
+                { CPER_ARM_INFO_TYPE_TLB, "TLB error" },                        \
+                { CPER_ARM_INFO_TYPE_BUS, "bus error" },                        \
+                { CPER_ARM_INFO_TYPE_UARCH, "micro-architectural error" })
+
+
+
+> 
+> -- Steve
+> 
+> 
+>> +
+>> +#define show_proc_err_flags(flags) __print_flags(flags, "|",			\
+>> +	{ CPER_ARM_INFO_FLAGS_FIRST,		"First error captured" },	\
+>> +	{ CPER_ARM_INFO_FLAGS_LAST,		"Last error captured" },	\
+>> +	{ CPER_ARM_INFO_FLAGS_PROPAGATED,	"Propagated" },			\
+>> +	{ CPER_ARM_INFO_FLAGS_OVERFLOW,		"Overflow" })
+>> +
+>> +TRACE_EVENT(arm_err_info_event,
+>> +
+>> +	TP_PROTO(const struct cper_arm_err_info *err),
+>> +
+>> +	TP_ARGS(err),
+>> +
+>> +	TP_STRUCT__entry(
+>> +		__field(u8, type)
+>> +		__field(u8, flags)
+>> +		__field(u16, multiple_error)
+>> +		__field(u64, error_info)
+>> +		__field(u64, virt_fault_addr)
+>> +		__field(u64, physical_fault_addr)
+>> +	),
+>> +
+>> +	TP_fast_assign(
+>> +		__entry->type = err->type;
+>> +		memset(&__entry->flags, 0,
+>> +			sizeof(*__entry) - offsetof(typeof(*__entry), flags));
+>> +		__entry->multiple_error = ~0;
+>> +
+>> +		if (err->validation_bits & CPER_ARM_INFO_VALID_MULTI_ERR)
+>> +			__entry->multiple_error = err->multiple_error;
+>> +
+>> +		if (err->validation_bits & CPER_ARM_INFO_VALID_FLAGS)
+>> +			__entry->flags = err->flags;
+>> +
+>> +		if (err->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
+>> +			__entry->error_info = err->error_info;
+>> +
+>> +		if (err->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
+>> +			__entry->virt_fault_addr = err->virt_fault_addr;
+>> +
+>> +		if (err->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
+>> +			__entry->physical_fault_addr = err->physical_fault_addr;
+>> +	),
+>> +
+>> +	TP_printk("type: %s; count: %u; flags: %s;"
+>> +		  " error info: %016llx; virtual address: %016llx;"
+>> +		  " physical address: %016llx",
+>> +		  __print_symbolic(__entry->type, ARM_PROC_ERR_TYPE),
+>> +		  __entry->multiple_error,
+>> +		  show_proc_err_flags(__entry->flags),
+>> +		  __entry->error_info, __entry->virt_fault_addr,
+>> +		  __entry->physical_fault_addr)
+>> +);
+>> +
+>>  /*
+>>   * Non-Standard Section Report
+>>   *
+> 
+> 
+> .
+> 
+
+-- 
+Thanks,
+Xie XiuQi
