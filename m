@@ -1,36 +1,46 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 27 Jun 2017 17:46:07 -0500
-Subject: [PATCH 1/4] rpmsg: Drop VIRTUALIZATION dependency from RPMSG_VIRTIO
-In-Reply-To: <20170627224610.15321-1-s-anna@ti.com>
-References: <20170627224610.15321-1-s-anna@ti.com>
-Message-ID: <20170627224610.15321-2-s-anna@ti.com>
+Date: Tue, 27 Jun 2017 17:46:06 -0500
+Subject: [PATCH 0/4] Some remoteproc/rpmsg Kconfig cleanups
+Message-ID: <20170627224610.15321-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A dependency to VIRTUALIZATION has been added to RPMSG_VIRTIO (back
-when it was named RPMSG) in v3.10 kernel in commit 397944df3290
-("rpmsg: fix kconfig dependencies for VIRTIO") to resolve Kconfig
-warnings due to the inclusion of the virtio configuration file from
-the ARM's KVM config file. The KVM config was fixed properly in the
-subsequent release in commit 8bd4ffd6b3a9 ("ARM: kvm: don't include
-drivers/virtio/Kconfig"). So, drop this unneeded VIRTUALIZATION
-dependency from RPMSG_VIRTIO.
+Hi Bjorn,
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- drivers/rpmsg/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+The following are some Kconfig related cleanups on rpmsg and remoteproc
+to help resolve the current build related warnings reported on linux-next
+after the rpmsg for-next merges. 
 
-diff --git a/drivers/rpmsg/Kconfig b/drivers/rpmsg/Kconfig
-index 2a5d2b446de2..1323a245763b 100644
---- a/drivers/rpmsg/Kconfig
-+++ b/drivers/rpmsg/Kconfig
-@@ -36,6 +36,5 @@ config RPMSG_VIRTIO
- 	tristate
- 	select RPMSG
- 	select VIRTIO
--	select VIRTUALIZATION
- 
- endmenu
+The first 2 patches drop the VIRTUALIZATION dependency (there is never
+a true dependency) that were introduced a long while back to fix a
+dependency issue on VIRTIO, and is no longer needed. This cleanup
+results in the elimination of the ppc64_defconfig warnings against
+the davinci remoteproc driver (davinci is ARMv5, and should have no
+dependency against PPC arch whatsoever, that warning can be seen
+without the keystone remoteproc patches).
+
+The third patch is a pure cleanup patch, and the last patch is an
+alternate fix for the linux-next Kconfig warnings, without your patch
+to change the RPMSG_VIRTIO dependency [1]. Last patch can also go with
+your patch, but feel free to drop it if picking up your patch instead.
+
+Patches are based directly on linux-next 20170627 tag, They also apply
+fine on mainline 4.12-rcs.
+
+regards
+Suman
+
+[1] https://patchwork.kernel.org/patch/9810881/
+
+Suman Anna (4):
+  rpmsg: Drop VIRTUALIZATION dependency from RPMSG_VIRTIO
+  remoteproc: Drop VIRTUALIZATION dependency from REMOTEPROC
+  remoteproc: Drop redundant REMOTEPROC dependency from driver Kconfigs
+  remoteproc/keystone: Fix circular dependencies for ARM configs
+
+ drivers/remoteproc/Kconfig | 11 -----------
+ drivers/rpmsg/Kconfig      |  1 -
+ 2 files changed, 12 deletions(-)
+
 -- 
 2.13.1
