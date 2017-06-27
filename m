@@ -1,165 +1,71 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Tue, 27 Jun 2017 22:33:20 +0800
-Subject: [PATCH 05/11] net: stmmac: dwmac-rk: Add internal phy support
-In-Reply-To: <2805278.mLmlzpUgMM@phil>
-References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
- <1498193947-8011-1-git-send-email-david.wu@rock-chips.com>
- <2805278.mLmlzpUgMM@phil>
-Message-ID: <924d248f-f1c0-7fa2-4b97-c4f753ffe35b@rock-chips.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Jun 2017 15:36:16 +0100
+Subject: [PATCH v5 4/7] drivers: dma-coherent: Introduce default DMA pool
+In-Reply-To: <20170626094250.GB21570@infradead.org>
+References: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
+ <1495621472-9323-5-git-send-email-vladimir.murzin@arm.com>
+ <20170620134932.GB31496@infradead.org>
+ <3d5ea779-90a3-f0b5-b9aa-161d4c0855e7@arm.com>
+ <20170626094250.GB21570@infradead.org>
+Message-ID: <9ae32e85-dd35-ea04-5c9f-4dc6d1358a99@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-? 2017/6/24 1:19, Heiko Stuebner ??:
-> Hi David,
+On 26/06/17 10:42, Christoph Hellwig wrote:
+> On Tue, Jun 20, 2017 at 03:24:21PM +0100, Robin Murphy wrote:
+>> True, but the case here is where we need a special piece of coherent
+>> memory for *all* devices, and it was more complicated *not* to reuse the
+>> existing infrastructure. This would already be achievable by specifying
+>> a separate rmem carveout per device, but the shared pool just makes life
+>> easier, and mirrors the functionality dma-contiguous already supports.
 > 
-> Am Freitag, 23. Juni 2017, 12:59:07 CEST schrieb David Wu:
->> To make internal phy worked, need to configure the phy_clock,
->> phy cru_reset and related registers.
+> ?'m really worried about the code in dma-coherent.c - the original
+> version clearly intends to have a coherent pool per device, declared
+> in the driver.  Then Marek added the reserved_mem interface, and
+> now we get another variant of it.  Conceptually the per-device
+> and global pool are very different, and to me it seems like the
+> reserved mem should be a different interface.
+
+Per-device reserved mem is still a private per-device pool though, it's
+just discovered and declared by common firmware code rather than in some
+device-specific way by driver code - once it's assigned there's no
+distinction. The global/per-device issue is essentially entirely
+orthogonal, and has the dubious pleasure of being a massive conceptual
+difference yet a much smaller implementation difference.
+
+>>> If you're allocating out of the global allocator the memory should
+>>> come from the normal dma_ops ->alloc allocator - and also take
+>>> the attrs into account (e.g. for DMA_ATTR_NON_CONSISTENT or
+>>> DMA_ATTR_NO_KERNEL_MAPPING requests you don't need coherent memory)
 >>
->> Change-Id: I6971c0a769754b824b1b908b56080cbaf7867d13
+>> The context here is noMMU but with caches - the problem being that the
+>> normal allocator will give back kernel memory, and there's no way to
+>> make that coherent with devices short of not enabling the caches in the
+>> first place, which is obviously undesirable. The trick is that RAM is
+>> aliased (in hardware) at two addresses, one of which makes CPU accesses
+>> non-cacheable, so by only ever accessing the RAM set aside for the
+>> coherent DMA pool using the non-cacheable alias (represented by the
+>> dma_pfn_offset) we can achieve DMA coherency.
 > 
-> please remove all Change-Ids from patches before sending upstream.
-> There were more affected patches in this series.
-> 
->> Signed-off-by: David Wu <david.wu@rock-chips.com>
->> ---
->>   .../devicetree/bindings/net/rockchip-dwmac.txt     |  3 +
->>   drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 82 ++++++++++++++++++++++
->>   2 files changed, 85 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
->> index 8f42755..0514f69 100644
->> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
->> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
->> @@ -22,6 +22,7 @@ Required properties:
->>   	   <&cru SCLK_MACREF_OUT> clock gate for RMII reference clock output
->>   	   <&cru ACLK_GMAC>: AXI clock gate for GMAC
->>   	   <&cru PCLK_GMAC>: APB clock gate for GMAC
->> +	   <&cru MAC_PHY>: clock for internal macphy
-> 
-> that clock should not be listed as always "Required" like it is here.
-> Make it some sort of extra paragraph marking it as required when using
-> an internal phy.
-> 
+> Yes, and I think this is something we already have to deal with
+> for example on mips.  A simple genalloc allocator from your pool
+> in the normal dma_ops implementation should do the work just fine.
 
-Okay, move it to the option.
+I admit I'm almost in agreement, were it not for the fact that
+dma-contiguous already supports all four combinations of both per-device
+and global pools, and both reserved mem and direct declarations from
+arch/platform code, all through the same interface to boot, and nobody's
+complaining about that. The only real difference for dma-coherent seems
+to be the way it's baked into the existing API.
 
->>    - clock-names: One name for each entry in the clocks property.
->>    - phy-mode: See ethernet.txt file in the same directory.
->>    - pinctrl-names: Names corresponding to the numbered pinctrl states.
->> @@ -35,6 +36,8 @@ Required properties:
->>    - assigned-clocks: main clock, should be <&cru SCLK_MAC>;
->>    - assigned-clock-parents = parent of main clock.
->>      can be <&ext_gmac> or <&cru SCLK_MAC_PLL>.
->> + - phy-type: For internal phy, it must be "internal"; For external phy, no need
->> +   to configure this.
->>   
->>   Optional properties:
->>    - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
->> index a8e8fd5..c1a1413 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
->> @@ -41,6 +41,7 @@ struct rk_gmac_ops {
->>   	void (*set_to_rmii)(struct rk_priv_data *bsp_priv);
->>   	void (*set_rgmii_speed)(struct rk_priv_data *bsp_priv, int speed);
->>   	void (*set_rmii_speed)(struct rk_priv_data *bsp_priv, int speed);
->> +	void (*internal_phy_powerup)(struct rk_priv_data *bsp_priv);
->>   };
->>   
->>   struct rk_priv_data {
->> @@ -52,6 +53,7 @@ struct rk_priv_data {
->>   
->>   	bool clk_enabled;
->>   	bool clock_input;
->> +	bool internal_phy;
->>   
->>   	struct clk *clk_mac;
->>   	struct clk *gmac_clkin;
->> @@ -61,6 +63,9 @@ struct rk_priv_data {
->>   	struct clk *clk_mac_refout;
->>   	struct clk *aclk_mac;
->>   	struct clk *pclk_mac;
->> +	struct clk *clk_macphy;
->> +
->> +	struct reset_control *macphy_reset;
->>   
->>   	int tx_delay;
->>   	int rx_delay;
->> @@ -750,6 +755,48 @@ static void rk3399_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
->>   	.set_rmii_speed = rk3399_set_rmii_speed,
->>   };
->>   
->> +#define RK_GRF_MACPHY_CON0		0xb00
->> +#define RK_GRF_MACPHY_CON1		0xb04
->> +#define RK_GRF_MACPHY_CON2		0xb08
->> +#define RK_GRF_MACPHY_CON3		0xb0c
->> +
->> +#define RK_MACPHY_ENABLE		GRF_BIT(0)
->> +#define RK_MACPHY_DISABLE		GRF_CLR_BIT(0)
->> +#define RK_MACPHY_CFG_CLK_50M		GRF_BIT(14)
->> +#define RK_GMAC2PHY_RMII_MODE		(GRF_BIT(6) | GRF_CLR_BIT(7))
->> +#define RK_GRF_CON2_MACPHY_ID		HIWORD_UPDATE(0x1234, 0xffff, 0)
->> +#define RK_GRF_CON3_MACPHY_ID		HIWORD_UPDATE(0x35, 0x3f, 0)
-> 
-> These are primarily registers for the rk3328 and come from the GRF which is
-> somehow prone to chip-designers moving bits around in registers and also
-> especially the register offsets (*_CONx) will probably not stay the same
-> on future socs.
-> 
+If it is just a matter of interfaces, I'd have no objection to exporting
+a separate e.g. dma_alloc_from_global_coherent() or somesuch as a
+conceptually separate interface to dma_coherent_default_memory, which
+the arch code can then call from ->alloc in the same manner they
+currently call dma_alloc_from_contiguous(). That seems like a reasonable
+way to keep the per-device and global pools conceptually distinct
+without needlessly duplicating implementations. In fact, I'm now
+wondering if the regular arm/arm64 atomic pools couldn't also make use
+of such a thing as well...
 
-I think they should try to keep the same. But what you said is very 
-reasonable. So let's give rk3228 and rk3328 different 
-internal_phy_powerup() in the rk_gmac_ops to set their own configuration?
-
-> 
->> +static void rk_gmac_internal_phy_powerup(struct rk_priv_data *priv)
->> +{
->> +	if (priv->ops->internal_phy_powerup)
->> +		priv->ops->internal_phy_powerup(priv);
->> +
->> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_CFG_CLK_50M);
->> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_GMAC2PHY_RMII_MODE);
->> +
->> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON2, RK_GRF_CON2_MACPHY_ID);
->> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON3, RK_GRF_CON3_MACPHY_ID);
->> +
->> +	/* disable macphy, the default value is enabled */
-> 
-> that comment is not providing useful information, maybe
-> 	/* macphy needs to be disabled before trying to reset it */
-> 
-> 
->> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_DISABLE);
->> +	if (priv->macphy_reset)
->> +		reset_control_assert(priv->macphy_reset);
->> +	usleep_range(10, 20);
->> +	if (priv->macphy_reset)
->> +		reset_control_deassert(priv->macphy_reset);
->> +	usleep_range(10, 20);
->> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_ENABLE);
->> +	msleep(30);
-> 
-> does this do anything useful if priv->macphy_reset is not set, or could
-> we just change that to
-> 
-
-Okay.
-
-> if (priv->macphy_reset) {
-> 	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_DISABLE);
-> 	reset_control_assert(priv->macphy_reset);
-> 	usleep_range(10, 20);
-> 	reset_control_deassert(priv->macphy_reset);
-> 	usleep_range(10, 20);
-> 	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_ENABLE);
-> 	msleep(30);
-> }
-> 
-> 
-> Heiko
-> 
-> 
-> 
+Robin.
