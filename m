@@ -1,39 +1,20 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue, 27 Jun 2017 17:06:17 +0530
-Subject: [PATCH] serial: sirf: make of_device_ids const.
-Message-ID: <c6d28ba7176bc1257d3ca030b8204b930039f255.1498563206.git.arvind.yadav.cs@gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 27 Jun 2017 14:05:55 +0200
+Subject: [PATCHv5] arm64/cpufeature: don't use mutex in bringup path
+In-Reply-To: <20170517160530.GB18716@e104818-lin.cambridge.arm.com>
+References: <1494944285-12152-1-git-send-email-mark.rutland@arm.com>
+ <20170517160530.GB18716@e104818-lin.cambridge.arm.com>
+Message-ID: <20170627120555.dwcrd52dfstookmh@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_device_ids are not supposed to change at runtime. All functions
-working with of_device_ids provided by <linux/of.h> work with const
-of_device_ids. So mark the non-const structs as const.
+On 2017-05-17 17:05:31 [+0100], Catalin Marinas wrote:
+> > Catalin, can you take this as a fix for v4.12?
+> 
+> I queued it for 4.12-rc2. Thanks.
 
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-    877	   1864	     88	   2829	    b0d	drivers/tty/serial/sirfsoc_uart.o
+I backported a few patches into v4.11-RT and the backtrace popped up
+(which is fixed by this patch). The problem existed before it has been
+made visible. Do you intend to push this patch stable?
 
-File size after constify:
-   text	   data	    bss	    dec	    hex	filename
-   1885	    840	     88	   2813	    afd	drivers/tty/serial/sirfsoc_uart.o
-
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/tty/serial/sirfsoc_uart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-index e03282d..684cb8d 100644
---- a/drivers/tty/serial/sirfsoc_uart.c
-+++ b/drivers/tty/serial/sirfsoc_uart.c
-@@ -1253,7 +1253,7 @@ static int __init sirfsoc_uart_console_init(void)
- 	return HRTIMER_RESTART;
- }
- 
--static struct of_device_id sirfsoc_uart_ids[] = {
-+static const struct of_device_id sirfsoc_uart_ids[] = {
- 	{ .compatible = "sirf,prima2-uart", .data = &sirfsoc_uart,},
- 	{ .compatible = "sirf,atlas7-uart", .data = &sirfsoc_uart},
- 	{ .compatible = "sirf,prima2-usp-uart", .data = &sirfsoc_usp},
--- 
-1.9.1
+Sebastian
