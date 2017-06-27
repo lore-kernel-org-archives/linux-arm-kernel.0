@@ -1,36 +1,41 @@
 From: zhangshaokun@hisilicon.com (Shaokun Zhang)
-Date: Tue, 27 Jun 2017 16:26:41 +0800
-Subject: [PATCH 6/6] arm64: MAINTAINERS: hisi: Add HiSilicon SoC PMU support
-In-Reply-To: <1498552001-182148-1-git-send-email-zhangshaokun@hisilicon.com>
-References: <1498552001-182148-1-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <1498552001-182148-7-git-send-email-zhangshaokun@hisilicon.com>
+Date: Tue, 27 Jun 2017 16:26:35 +0800
+Subject: [PATCH 0/6] Add HiSilicon SoC uncore Performance Monitoring Unit
+ driver
+Message-ID: <1498552001-182148-1-git-send-email-zhangshaokun@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support HiSilicon SoC uncore PMU driver.
+This patchset adds support for HiSilicon SoC uncore PMUs driver. It
+includes L3C, Hydra Home Agent (HHA) and DDRC.
 
-Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+Shaokun Zhang (6):
+  Documentation: perf: hisi: Documentation for HiSilicon SoC PMU driver
+  drivers: perf: hisi: Add support for HiSilicon SoC uncore PMU driver
+  drivers: perf: hisi: Add support for HiSilicon SoC L3C PMU driver
+  drivers: perf: hisi: Add support for HiSilicon SoC HHA PMU driver
+  drivers: perf: hisi: Add support for HiSilicon SoC DDRC PMU driver
+  arm64: MAINTAINERS: hisi: Add HiSilicon SoC PMU support
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c0348bc..fbd664b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6072,6 +6072,13 @@ S:	Maintained
- F:	drivers/net/ethernet/hisilicon/
- F:	Documentation/devicetree/bindings/net/hisilicon*.txt
- 
-+HISILICON PMU DRIVER
-+M:	Shaokun Zhang <zhangshaokun@hisilicon.com>
-+W:	http://www.hisilicon.com
-+S:	Supported
-+F:	drivers/perf/hisilicon/
-+F:	Documentation/perf/hisi-pmu.txt
-+
- HISILICON ROCE DRIVER
- M:	Lijun Ou <oulijun@huawei.com>
- M:	Wei Hu(Xavier) <xavier.huwei@huawei.com>
+ Documentation/perf/hisi-pmu.txt               |  51 +++
+ MAINTAINERS                                   |   7 +
+ drivers/perf/Kconfig                          |   7 +
+ drivers/perf/Makefile                         |   1 +
+ drivers/perf/hisilicon/Makefile               |   1 +
+ drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 435 ++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_hha_pmu.c  | 451 +++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c  | 554 ++++++++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c      | 416 +++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h      | 116 ++++++
+ include/linux/cpuhotplug.h                    |   1 +
+ 11 files changed, 2040 insertions(+)
+ create mode 100644 Documentation/perf/hisi-pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+
 -- 
 1.9.1
