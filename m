@@ -1,63 +1,31 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Mon, 26 Jun 2017 17:50:03 -0700
-Subject: [PATCH] ARM: memblock limit must be pmd-aligned
-In-Reply-To: <48116220-b89b-7413-ea62-c78dfb0594a2@redhat.com>
-References: <20170626172315.26369-1-opendmb@gmail.com>
- <48116220-b89b-7413-ea62-c78dfb0594a2@redhat.com>
-Message-ID: <129544df-5461-a877-84c9-9889bd5e9dc0@gmail.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Tue, 27 Jun 2017 02:55:15 +0200
+Subject: [PATCH 1/6] dt-bindings: Add RDA Micro vendor prefix
+In-Reply-To: <20170627005520.23731-1-afaerber@suse.de>
+References: <20170627005520.23731-1-afaerber@suse.de>
+Message-ID: <20170627005520.23731-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2017 04:43 PM, Laura Abbott wrote:
-> On 06/26/2017 10:23 AM, Doug Berger wrote:
->> There is a path through the adjust_lowmem_bounds() routine where if all
->> memory regions start and end on pmd-aligned addresses the memblock_limit
->> will be set to arm_lowmem_limit.
->>
->> However, since arm_lowmem_limit can be affected by the vmalloc early
->> parameter, the value of arm_lowmem_limit may not be pmd-aligned. This
->> commit corrects this oversight such that memblock_limit is always rounded
->> down to pmd-alignment.
->>
->> The pmd containing arm_lowmem_limit is cleared by prepare_page_table()
->> and without this commit it is possible for early_alloc() to allocate
->> unmapped memory in that range when mapping the lowmem.
->>
-> 
-> Do you have an example system or configuration where you see this
-> crash?
-I have observed this crash occur on systems like the bcm7445 when a
-customer uses the vmalloc boot parameter to specify an odd number of
-Megabytes of VMALLOC space (e.g. vmalloc=751m).  This seems to be a
-popular way for them to set the low memory boundary.
+RDA Microelectronics is a Chinese SoC manufacturer.
 
-As long as vmalloc is a multiple of the pmd (e.g. 2MB) there isn't a
-problem, so documenting this constraint is another possible solution.
-However, educating the user is more difficult in this case than working
-around a questionable value to allow the boot to succeed.
+Cc: service at rdamicro.com
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
--Doug
-> 
-> Thanks,
-> Laura
-> 
->> Signed-off-by: Doug Berger <opendmb@gmail.com>
->> ---
->>  arch/arm/mm/mmu.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index 31af3cb59a60..2ae4f9c9d757 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -1226,7 +1226,7 @@ void __init adjust_lowmem_bounds(void)
->>  	if (memblock_limit)
->>  		memblock_limit = round_down(memblock_limit, PMD_SIZE);
->>  	if (!memblock_limit)
->> -		memblock_limit = arm_lowmem_limit;
->> +		memblock_limit = round_down(arm_lowmem_limit, PMD_SIZE);
->>  
->>  	if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
->>  		if (memblock_end_of_DRAM() > arm_lowmem_limit) {
->>
-> 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index afbb47ce50dd..c54c1e069516 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -270,6 +270,7 @@ ralink	Mediatek/Ralink Technology Corp.
+ ramtron	Ramtron International
+ raspberrypi	Raspberry Pi Foundation
+ raydium	Raydium Semiconductor Corp.
++rda	RDA Microelectronics, Inc.
+ realtek Realtek Semiconductor Corp.
+ renesas	Renesas Electronics Corporation
+ richtek	Richtek Technology Corporation
+-- 
+2.12.3
