@@ -1,94 +1,53 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 28 Jun 2017 02:07:39 +0800
-Subject: [arm-platforms:kvm-arm64/gicv4-kvm 48/62]
- arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:334: undefined reference
- to `vgic_v4_teardown'
-Message-ID: <201706280237.NZifbiqi%fengguang.wu@intel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 27 Jun 2017 20:15:35 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 2/3] dt-bindings: input: Add R_LRADC
+ support for A83T
+In-Reply-To: <20170627173631.2rjdzgwdwnksqjzm@flea>
+References: <20170624024515.4669-1-techping.chan@gmail.com>
+ <20170624024515.4669-3-techping.chan@gmail.com>
+ <20170626171524.cqfyasetpsfr6xfg@flea.lan>
+ <CAAST=9x+fS41tznuJ9hQ-cQxecKN751=61YkhEt31DvpeqeEcA@mail.gmail.com>
+ <24845446a80e3542d90a1111a6141415@aosc.io>
+ <20170627173631.2rjdzgwdwnksqjzm@flea>
+Message-ID: <20170627181535.2nhd3rd542wpryjy@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
-head:   362f13c96426700d3e37a921ef6d551f01491992
-commit: c486d9614d47b1fcace756427f07983c369b9a78 [48/62] KVM: arm/arm64: GICv4: Wire init/teardown of per-VM support
-config: arm-axm55xx_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout c486d9614d47b1fcace756427f07983c369b9a78
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 27/06/2017 at 19:36:31 +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> On Tue, Jun 27, 2017 at 11:29:10PM +0800, icenowy at aosc.io wrote:
+> > Maxime, here's another problem: if we have already a GP LRADC driver,
+> > how can we tell the kernel to use it as IIO ADC rather than keys?
+> 
+> The GPADC IIO driver is not for the LRADC driver, but the GPADC /
+> temperature sensor.
+> 
+> We used to have an LRADC IIO driver in the CHIP BSP written by Alex
+> (in CC):
+> https://github.com/NextThingCo/CHIP-linux/commit/8675b761c54be73dc7cc0113209f02e10cc63a27
+> 
+> But he never mainlined it.
+> 
+> > Should we introduce a new property for this once ready?
+> 
+> We need to keep the current binding. We can just check for the
+> presence or not of child nodes to see if it has some keys, and we'd
+> need an IIO-to-input driver that is yet to be written.
+> 
 
-All errors (new ones prefixed by >>):
+The whole submission is here and can already replace the existing driver
+but it will be polling instead of using interrupts:
 
-   arch/arm/kvm/built-in.o: In function `kvm_vgic_dist_destroy':
->> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:334: undefined reference to `vgic_v4_teardown'
-   arch/arm/kvm/built-in.o: In function `vgic_init':
->> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:291: undefined reference to `vgic_v4_init'
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/440734.html
 
-vim +334 arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-init.c
+It is not upstream because it seems the full replacement was required at
+once instead of doing it incrementally and there was (is) no API for
+in-kernel events consumers.
 
-   285		if (ret)
-   286			goto out;
-   287	
-   288		if (vgic_has_its(kvm)) {
-   289			dist->msis_require_devid = true;
-   290			if (kvm_vgic_global_state.has_gicv4) {
- > 291				ret = vgic_v4_init(kvm);
-   292				if (ret)
-   293					goto out;
-   294			}
-   295		}
-   296	
-   297		kvm_for_each_vcpu(i, vcpu, kvm)
-   298			kvm_vgic_vcpu_enable(vcpu);
-   299	
-   300		ret = kvm_vgic_setup_default_irq_routing(kvm);
-   301		if (ret)
-   302			goto out;
-   303	
-   304		vgic_debug_init(kvm);
-   305	
-   306		dist->initialized = true;
-   307	
-   308		/*
-   309		 * If we're initializing GICv2 on-demand when first running the VCPU
-   310		 * then we need to load the VGIC state onto the CPU.  We can detect
-   311		 * this easily by checking if we are in between vcpu_load and vcpu_put
-   312		 * when we just initialized the VGIC.
-   313		 */
-   314		preempt_disable();
-   315		vcpu = kvm_arm_get_running_vcpu();
-   316		if (vcpu)
-   317			kvm_vgic_load(vcpu);
-   318		preempt_enable();
-   319	out:
-   320		return ret;
-   321	}
-   322	
-   323	static void kvm_vgic_dist_destroy(struct kvm *kvm)
-   324	{
-   325		struct vgic_dist *dist = &kvm->arch.vgic;
-   326	
-   327		dist->ready = false;
-   328		dist->initialized = false;
-   329	
-   330		kfree(dist->spis);
-   331		dist->nr_spis = 0;
-   332	
-   333		if (kvm_vgic_global_state.has_gicv4 && vgic_has_its(kvm))
- > 334			vgic_v4_teardown(kvm);
-   335	}
-   336	
-   337	void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+Also, the DT ABI stuff would have to be solved.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 20100 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170628/4ca1ae85/attachment-0001.gz>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
