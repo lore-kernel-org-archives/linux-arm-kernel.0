@@ -1,1121 +1,282 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 27 Jun 2017 22:51:35 +0200
-Subject: [PATCH v2 3/5] i2c: i2c-stm32f7: add driver
-In-Reply-To: <1497958890-5530-4-git-send-email-pierre-yves.mordret@st.com>
-References: <1497958890-5530-1-git-send-email-pierre-yves.mordret@st.com>
- <1497958890-5530-4-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20170627205135.greh3baskzi4zetk@pengutronix.de>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Tue, 27 Jun 2017 16:07:58 -0500
+Subject: [PATCH v4 0/5] Add support for the ARMv8.2 Statistical
+ Profiling Extension
+In-Reply-To: <20170622183620.GJ15336@arm.com>
+References: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
+ <20170612110823.GA27319@leverpostej>
+ <20170612112048.69561e8d067488e8689de755@arm.com>
+ <20170615105735.b89183a9190a261d3b8d132a@arm.com>
+ <20170621153108.GC6041@arm.com>
+ <20170622105640.c444b8b0f16266ba2c3ce304@arm.com>
+ <20170622183620.GJ15336@arm.com>
+Message-ID: <20170627160758.cdaebc3e7f0cd88455e07763@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, 22 Jun 2017 19:36:20 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-just a quick review as last act in the night. I don't claim to catch
-everything at this time of the day. So don't be surprised if I still
-find something to criticize after you fixed everything. But keeping this
-until I find time to look again seems wrong to me.
+> On Thu, Jun 22, 2017 at 10:56:40AM -0500, Kim Phillips wrote:
+> > On Wed, 21 Jun 2017 16:31:09 +0100
+> > Will Deacon <will.deacon@arm.com> wrote:
+> > 
+> > > On Thu, Jun 15, 2017 at 10:57:35AM -0500, Kim Phillips wrote:
+> > > > On Mon, 12 Jun 2017 11:20:48 -0500
+> > > > Kim Phillips <kim.phillips@arm.com> wrote:
+> > > > 
+> > > > > On Mon, 12 Jun 2017 12:08:23 +0100
+> > > > > Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > > 
+> > > > > > On Mon, Jun 05, 2017 at 04:22:52PM +0100, Will Deacon wrote:
+> > > > > > > This is the sixth posting of the patches previously posted here:
+> > > > ...
+> > > > > > Kim, do you have any version of the userspace side that we could look
+> > > > > > at?
+> > > > > > 
+> > > > > > For review, it would be really helpful to have something that can poke
+> > > > > > the PMU, even if it's incomplete or lacking polish.
+> > > > > 
+> > > > > Here's the latest push, based on a a couple of prior versions of this
+> > > > > driver:
+> > > > > 
+> > > > > http://linux-arm.org/git?p=linux-kp.git;a=shortlog;h=refs/heads/armspev0.1
+> > > > > 
+> > > > > I don't seem to be able to get any SPE data output after rebasing on
+> > > > > this version of the driver.  Still don't know why at the moment...
+> > > > 
+> > > > Bisected to commit e38ba76deef "perf tools: force uncore events to
+> > > > system wide monitoring".  So, using record with specifying a -C
+> > > > <cpu> explicitly now produces SPE data, but only a couple of valid
+> > > > records at the beginning of each buffer; the rest is filled with
+> > > > PADding (0's).
+> > > > 
+> > > > I see Mark's latest comments have found a possible issue in the perf
+> > > > aux buffer handling code in the driver, and that the driver does some
+> > > > memset of padding (0's) itself; could that be responsible for the above
+> > > > behaviour?
+> > > 
+> > > Possibly. Do you know how big you're mapping the aux buffer
+> > 
+> > 4MiB.
+> > 
+> > > and what (if any) value you're passing as aux_watermark?
+> > 
+> > None passed, but it looks like 4KiB was used since the AUXTRACE size
+> > was 4MiB - 4KiB.
+> > 
+> > I'm not seeing the issue with a simple bts-based version I'm
+> > working on...yet.  We can revisit if I'm able to reproduce again; the
+> > problem could have been on the userspace side.
 
-On Tue, Jun 20, 2017 at 01:41:28PM +0200, Pierre-Yves MORDRET wrote:
-> This patch adds initial support for the STM32F7 I2C controller.
+I'm close to finishing the bts version of userspace, and have been
+testing a bit more thoroughly, so now I consistently see the excessive
+PADding when recording a CPU that's idle. I.e., when I taskset the perf
+record to the same CPU I specify to record's -C (taskset -c n perf
+record -C n), I get max. twenty-odd number of PAD bytes at the end of
+the AUX buffers in the perf.data file.  If, OTOH, I taskset -c n perf
+record -C m, where m != n, I get a couple of valid event records in the
+buffer, and the rest of the buffer is filled with PADding.
+
+It wouldn't be a problem except that it's wastes too much space
+sometimes.  Here is a good output buffer sample from a --mmap-pages=,12
+run, with only 4 PADs tacked onto the end:
+
+0xd190 [0x30]: PERF_RECORD_AUXTRACE size: 0x48  offset: 0  ref: 0xe914f7e3ce  idx: 0  tid: -1  cpu: 2
+.
+. ... ARM SPE data: size 72 bytes
+.  00000000:  4a 01                                           B COND
+.  00000002:  b1 00 00 00 00 00 00 00 c0                      TGT 0 el2 ns=1
+.  0000000b:  42 42                                           RETIRED NOT-TAKEN 
+.  0000000d:  b0 f4 4e 10 08 00 00 ff ff                      PC ff000008104ef4 el3 ns=1
+.  00000016:  98 00 00                                        LAT 0 TOT
+.  00000019:  71 a5 39 e1 14 e9 00 00 00                      TS 1001077684645
+.  00000022:  4a 02                                           B IND
+.  00000024:  b1 54 51 11 08 00 00 ff ff                      TGT ff000008115154 el3 ns=1
+.  0000002d:  42 02                                           RETIRED 
+.  0000002f:  b0 68 36 11 08 00 00 ff ff                      PC ff000008113668 el3 ns=1
+.  00000038:  98 00 00                                        LAT 0 TOT
+.  0000003b:  71 a5 39 e1 14 e9 00 00 00                      TS 1001077684645
+.  00000044:  00                                              PAD
+.  00000045:  00                                              PAD
+.  00000046:  00                                              PAD
+.  00000047:  00                                              PAD
+
+whereas this one - from later on in the same run - is over 99% PADs: 
+
+0xd250 [0x30]: PERF_RECORD_AUXTRACE size: 0x5fc0  offset: 0xfffff4ae0044  ref: 0xe91cead1dd  idx: 0  tid: -1  cpu: 2
+.
+. ... ARM SPE data: size 24512 bytes
+.  00000000:  4a 00                                           B
+.  00000002:  b1 cc 4e 10 08 00 00 ff ff                      TGT ff000008104ecc el3 ns=1
+.  0000000b:  42 02                                           RETIRED 
+.  0000000d:  b0 90 4e 10 08 00 00 ff ff                      PC ff000008104e90 el3 ns=1
+.  00000016:  98 00 00                                        LAT 0 TOT
+.  00000019:  71 a5 39 e1 14 e9 00 00 00                      TS 1001077684645
+.  00000022:  49 01                                           ST
+.  00000024:  b2 e0 2e f5 7d 00 80 ff ff                      VA ffff80007df52ee0
+.  0000002d:  b3 e0 2e f5 fd 00 00 00 80                      PA fdf52ee0 ns=1
+.  00000036:  9a 00 00                                        LAT 0 XLAT
+.  00000039:  42 16                                           RETIRED L1D-ACCESS TLB-ACCESS 
+.  0000003b:  b0 e8 41 39 08 00 00 ff ff                      PC ff0000083941e8 el3 ns=1
+.  00000044:  98 00 00                                        LAT 0 TOT
+.  00000047:  71 a5 39 e1 14 e9 00 00 00                      TS 1001077684645
+.  00000050:  4a 00                                           B
+.  00000052:  b1 58 f2 0f 08 00 00 ff ff                      TGT ff0000080ff258 el3 ns=1
+.  0000005b:  42 02                                           RETIRED 
+.  0000005d:  b0 90 de 0d 08 00 00 ff ff                      PC ff0000080dde90 el3 ns=1
+.  00000066:  98 00 00                                        LAT 0 TOT
+.  00000069:  71 8f 4e e1 14 e9 00 00 00                      TS 1001077689999
+.  00000072:  48 00                                           INSN-OTHER
+.  00000074:  42 02                                           RETIRED 
+.  00000076:  b0 f8 16 61 08 00 00 ff ff                      PC ff0000086116f8 el3 ns=1
+.  0000007f:  98 00 00                                        LAT 0 TOT
+.  00000082:  71 8f 4e e1 14 e9 00 00 00                      TS 1001077689999
+.  0000008b:  49 00                                           LD
+.  0000008d:  b2 10 34 ba 7b 00 80 ff ff                      VA ffff80007bba3410
+.  00000096:  b3 10 34 ba fb 00 00 00 80                      PA fbba3410 ns=1
+.  0000009f:  9a 00 00                                        LAT 0 XLAT
+.  000000a2:  42 16                                           RETIRED L1D-ACCESS TLB-ACCESS 
+.  000000a4:  b0 8c be 7a 08 00 00 ff ff                      PC ff0000087abe8c el3 ns=1
+.  000000ad:  98 00 00                                        LAT 0 TOT
+.  000000b0:  71 8f 4e e1 14 e9 00 00 00                      TS 1001077689999
+.  000000b9:  00                                              PAD
+...ALL PADs...ALL PADs...ALL PADs...ALL PADs...ALL PADs...ALL PADs...
+.  00005fbf:  00                                              PAD
+
+So maybe there's an offset counter that isn't being reset properly;
+hopefully the parallel discussion with Mark will help find the problem.
+
+FWIW, there is also this one I saw with mmap-pages set to 5
+(pages), which gets rounded up to 8 pages: the driver started
+memsetting places it shouldn't?:
+
+$ sudo ./perf record -c 512 -C 0 -e arm_spe/branch_filter=0,ts_enable=1,pa_enable=1,event_filter=0,load_filter=0,jitter=1,store_filter=0,min_latency=0/ --mmap-pages=,5 dd if=/dev/urandom of=/dev/null count=10000
+rounding mmap pages size to 32K (8 pages)
+10000+0 records in
+10000+0 records out
+5120000 bytes (5.1 MB) copied, 1.3391 s, 3.8 MB/s
+[ 1885.042803] Unable to handle kernel paging request at virtual address ffff00000adac000
+[ 1885.042873] pgd = ffff00000ad48000
+[ 1885.042899] [ffff00000adac000] *pgd=00000000fdffe003, *pud=00000000fdffd003, *pmd=00000000fdff8003, *pte=0000000000000000
+[ 1885.043083] Internal error: Oops: 96000047 [#1] PREEMPT SMP
+[ 1885.043131] Modules linked in:
+[ 1885.043200] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W       4.12.0-rc5-00039-gf1d4a187881e #34
+[ 1885.043299] Hardware name: FVP_Base_AEMv8A-AEMv8A (DT)
+[ 1885.043364] task: ffff000008c21a80 task.stack: ffff000008c10000
+[ 1885.043436] PC is at __memset+0x1ac/0x1d0
+[ 1885.043499] LR is at __arm_spe_pmu_next_off+0x6c/0xd8
+[ 1885.043600] pc : [<ffff00000837dbac>] lr : [<ffff0000086771e4>] pstate: 204001c9
+[ 1885.043600] sp : ffff80007df22d10
+[ 1885.043733] x29: ffff80007df22d10 x28: ffff000008c21a80 
+[ 1885.043819] x27: ffff000008c37768 x26: ffff80007df30280 
+[ 1885.043910] x25: ffff80007a109800 x24: 0000001d507d1906 
+[ 1885.044012] x23: ffff80007a601018 x22: ffff80007a3ebb00 
+[ 1885.044102] x21: ffff80007df36ab0 x20: ffff80007a3ebb00 
+[ 1885.044196] x19: ffff80007df36ab0 x18: 0000000000000000 
+[ 1885.044253] x17: 0000000000000000 x16: 0000000000000000 
+[ 1885.044339] x15: 0000000000000000 x14: ffff000008c21a80 
+[ 1885.044456] x13: 000080007532d000 x12: 000000003445d91d 
+[ 1885.044557] x11: 0000000000000000 x10: 0000000000001000 
+[ 1885.044600] x9 : 0000000000000000 x8 : ffff00000adac000 
+[ 1885.044729] x7 : 0000000000000000 x6 : 00000000000003ff 
+[ 1885.044800] x5 : 0000000000000400 x4 : 0000000000000000 
+[ 1885.044911] x3 : 0000000000000008 x2 : 0000000000003bff 
+[ 1885.045000] x1 : 0000000000000000 x0 : ffff00000ada8000 
+[ 1885.045100] Process swapper/0 (pid: 0, stack limit = 0xffff000008c10000)
+[ 1885.045179] Stack: (0xffff80007df22d10 to 0xffff000008c14000)
+[ 1885.045239] Call trace:
+[ 1885.045300] Exception stack(0xffff80007df22b40 to 0xffff80007df22c70)
+[ 1885.045400] 2b40: ffff80007df36ab0 0001000000000000 ffff80007df22d10 ffff00000837dbac
+[ 1885.045505] 2b60: 0000000000000000 0000000000000000 ffff80007bb4b520 ffff00000837eac0
+[ 1885.045605] 2b80: ffff80007df22d10 ffff0000080d6b58 0000000100060b21 ffff80007bb4afa8
+[ 1885.045712] 2ba0: ffff80007bb4af20 ffff80007bb4af00 0000000000000000 ffff000008c19f04
+[ 1885.045815] 2bc0: ffff000008bff000 ffff000008c17000 ffff80007bb53f00 000000000002fe89
+[ 1885.045916] 2be0: ffff00000ada8000 0000000000000000 0000000000003bff 0000000000000008
+[ 1885.046013] 2c00: 0000000000000000 0000000000000400 00000000000003ff 0000000000000000
+[ 1885.046126] 2c20: ffff00000adac000 0000000000000000 0000000000001000 0000000000000000
+[ 1885.046224] 2c40: 000000003445d91d 000080007532d000 ffff000008c21a80 0000000000000000
+[ 1885.046326] 2c60: 0000000000000000 0000000000000000
+[ 1885.046408] [<ffff00000837dbac>] __memset+0x1ac/0x1d0
+[ 1885.046499] [<ffff00000867729c>] arm_spe_perf_aux_output_begin+0x4c/0x1b8
+[ 1885.046599] [<ffff000008678424>] arm_spe_pmu_start+0x34/0xf0
+[ 1885.046695] [<ffff000008678548>] arm_spe_pmu_add+0x68/0x98
+[ 1885.046733] [<ffff00000814da54>] event_sched_in.isra.61+0xcc/0x218
+[ 1885.046879] [<ffff00000814dc08>] group_sched_in+0x68/0x1a0
+[ 1885.046981] [<ffff00000814dfd0>] ctx_sched_in+0x290/0x468
+[ 1885.047080] [<ffff00000814e23c>] perf_event_sched_in+0x94/0xa8
+[ 1885.047179] [<ffff00000814e2b4>] ctx_resched+0x64/0xb0
+[ 1885.047268] [<ffff00000814e500>] __perf_event_enable+0x200/0x238
+[ 1885.047366] [<ffff000008147118>] event_function+0x90/0xf0
+[ 1885.047452] [<ffff0000081499e8>] remote_function+0x60/0x70
+[ 1885.047514] [<ffff0000081194fc>] flush_smp_call_function_queue+0x9c/0x168
+[ 1885.047637] [<ffff00000811a2a0>] generic_smp_call_function_single_interrupt+0x10/0x18
+[ 1885.047733] [<ffff00000808e928>] handle_IPI+0xc0/0x1d8
+[ 1885.047799] [<ffff000008081700>] gic_handle_irq+0x80/0x178
+[ 1885.047799] Exception stack(0xffff000008c13d80 to 0xffff000008c13eb0)
+[ 1885.047984] 3d80: 0000000000000000 ffff000008c21a80 00000000000003e8 ffff000008651430
+[ 1885.048087] 3da0: 000000001999999a 0000000000000020 0000002bedec501b 0000000000000000
+[ 1885.048190] 3dc0: 000001b2b5103510 ffff000008081800 0000000000001000 0000000000000000
+[ 1885.048300] 3de0: 000000003445d91d 000080007532d000 ffff000008c21a80 0000000000000000
+[ 1885.048400] 3e00: 0000000000000000 0000000000000000 0000000000000000 000001b6e54dc796
+[ 1885.048505] 3e20: 0000000000000002 ffff80007a983c00 0000000000000002 ffff000008cdc130
+[ 1885.048600] 3e40: 000001b6e5424132 ffff000008c21a80 0000000000000000 00000000fef7c684
+[ 1885.048716] 3e60: 0000000080b10018 ffff000008c13eb0 ffff00000861014c ffff000008c13eb0
+[ 1885.048817] 3e80: ffff00000861018c 0000000040c00149 00000000fef7c684 0000000000000002
+[ 1885.048900] 3ea0: ffffffffffffffff ffff00000861014c
+[ 1885.048900] [<ffff0000080827f4>] el1_irq+0xb4/0x128
+[ 1885.049009] [<ffff00000861018c>] cpuidle_enter_state+0x154/0x200
+[ 1885.049126] [<ffff000008610270>] cpuidle_enter+0x18/0x20
+[ 1885.049207] [<ffff0000080ddd08>] call_cpuidle+0x18/0x30
+[ 1885.049332] [<ffff0000080ddf44>] do_idle+0x19c/0x1d8
+[ 1885.049400] [<ffff0000080de114>] cpu_startup_entry+0x24/0x28
+[ 1885.049453] [<ffff0000087a6b30>] rest_init+0x80/0x90
+[ 1885.049500] [<ffff000008b10b3c>] start_kernel+0x374/0x388
+[ 1885.049617] [<ffff000008b101e0>] __primary_switched+0x64/0x6c
+[ 1885.049699] Code: 91010108 54ffff4a 8b040108 cb050042 (d50b7428) 
+[ 1885.049800] ---[ end trace 31b9a9f27da95f58 ]---
+[ 1885.049900] Kernel panic - not syncing: Fatal exception in interrupt
+[ 1885.050000] SMP: stopping secondary CPUs
+[ 1885.050204] Kernel Offset: disabled
+[ 1885.050240] Memory Limit: none
+[ 1885.050327] ---[ end Kernel panic - not syncing: Fatal exception in interrupt
+
+It's not easily reproduced.
+
+> > Meanwhile, when using fvp-base.dtb, my model setup stops booting the
+> > kernel after "smp: Bringing up secondary CPUs ...".  If I however take
+> > the second SPE node from fvp-base.dts and add it to my working device
+> > tree, I get this during the driver probe:
+> > 
+> > [    1.042063] arm_spe_pmu spe-pmu at 0: probed for CPUs 0-7 [max_record_sz 64, align 1, features 0xf]
+> > [    1.043582] arm_spe_pmu spe-pmu at 1: probed for CPUs 0-7 [max_record_sz 64, align 1, features 0xf]
+> > [    1.043631] genirq: Flags mismatch irq 6. 00004404 (arm_spe_pmu) vs. 00004404 (arm_spe_pmu)
 > 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
-> Changes in V2:
->   * Remove st,i2c-timing binding usage
->   * Implement an I2C timings computation algorithm instead of static
->     values(bindings). Algorithm uses generic I2C SCL Falling/Rising
->     bindings and System clock to compute its timings.
-> ---
->  drivers/i2c/busses/Kconfig       |  10 +
->  drivers/i2c/busses/Makefile      |   1 +
->  drivers/i2c/busses/i2c-stm32f7.c | 968 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 979 insertions(+)
->  create mode 100644 drivers/i2c/busses/i2c-stm32f7.c
+> Looks like you've screwed up your IRQ partitions, so you are effectively
+> registering the same device twice, which then blows up due to lack of shared
+> irqs.
 > 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index ed7106e..a97b987 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -899,6 +899,16 @@ config I2C_STM32F4
->  	  This driver can also be built as module. If so, the module
->  	  will be called i2c-stm32f4.
->  
-> +config I2C_STM32F7
-> +	tristate "STMicroelectronics STM32F7 I2C support"
-> +	depends on ARCH_STM32 || COMPILE_TEST
-> +	help
-> +	  Enable this option to add support for STM32 I2C controller embedded
-> +	  in STM32F7 SoCs.
-> +
-> +	  This driver can also be built as module. If so, the module
-> +	  will be called i2c-stm32f7.
-> +
+> Either remove one of the devices, or use IRQ partitions to restrict them
+> to unique sets of CPUs.
 
-I wonder how similar I2C_STM32F4 and I2C_STM32F7 are. There is hardly
-any code sharing between them. Can this be improved?
+Right, but since I want to get parity with what you're running -
+fvp_base.dtb - I tried to debug the hang after "smp: Bringing up
+secondary CPUs ..." problem, and could only debug it to the PSCI driver
+hitting one of these cases:
 
->  config I2C_STU300
->  	tristate "ST Microelectronics DDC I2C interface"
->  	depends on MACH_U300
-> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> index c89a431..8efa3dd 100644
-> --- a/drivers/i2c/busses/Makefile
-> +++ b/drivers/i2c/busses/Makefile
-> @@ -87,6 +87,7 @@ obj-$(CONFIG_I2C_SIMTEC)	+= i2c-simtec.o
->  obj-$(CONFIG_I2C_SIRF)		+= i2c-sirf.o
->  obj-$(CONFIG_I2C_ST)		+= i2c-st.o
->  obj-$(CONFIG_I2C_STM32F4)	+= i2c-stm32f4.o
-> +obj-$(CONFIG_I2C_STM32F7)	+= i2c-stm32f7.o
->  obj-$(CONFIG_I2C_STU300)	+= i2c-stu300.o
->  obj-$(CONFIG_I2C_SUN6I_P2WI)	+= i2c-sun6i-p2wi.o
->  obj-$(CONFIG_I2C_TEGRA)		+= i2c-tegra.o
-> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-> new file mode 100644
-> index 0000000..9947a9d
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-stm32f7.c
-> @@ -0,0 +1,968 @@
-> +/*
-> + * Driver for STMicroelectronics STM32F7 I2C controller
-> + *
-> + * This I2C controller is described in the STM32F75xxx and STM32F74xxx Soc
-> + * reference manual.
-> + * Please see below a link to the documentation:
-> + * http://www.st.com/resource/en/reference_manual/dm00124865.pdf
-> + *
-> + * Copyright (C) M'boumba Cedric Madianga 2017
-> + * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> + *
-> + * This driver is based on i2c-stm32f4.c
-> + *
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/i2c.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/iopoll.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset.h>
-> +#include <linux/slab.h>
-> +
-> +#include "i2c-stm32.h"
-> +
-> +/* STM32F7 I2C registers */
-> +#define STM32F7_I2C_CR1				0x00
-> +#define STM32F7_I2C_CR2				0x04
-> +#define STM32F7_I2C_TIMINGR			0x10
-> +#define STM32F7_I2C_ISR				0x18
-> +#define STM32F7_I2C_ICR				0x1C
-> +#define STM32F7_I2C_RXDR			0x24
-> +#define STM32F7_I2C_TXDR			0x28
+case PSCI_RET_INVALID_PARAMS:
+case PSCI_RET_INVALID_ADDRESS:
 
-puh, this is really different than the f4 variant. Yet another hw
-engineer that likes keeping the sw guys busy :-|
+Note: it's yet another place I have to manually instrument the error
+path in a kernel driver in lieu of it being more naturally verbose by
+itself; I *implore* you to reconsider adding proper user messaging to
+arm_spe_pmu_event_init().
 
-> +/* STM32F7 I2C control 1 */
-> +#define STM32F7_I2C_CR1_ANFOFF			BIT(12)
-> +#define STM32F7_I2C_CR1_ERRIE			BIT(7)
-> +#define STM32F7_I2C_CR1_TCIE			BIT(6)
-> +#define STM32F7_I2C_CR1_STOPIE			BIT(5)
-> +#define STM32F7_I2C_CR1_NACKIE			BIT(4)
-> +#define STM32F7_I2C_CR1_ADDRIE			BIT(3)
-> +#define STM32F7_I2C_CR1_RXIE			BIT(2)
-> +#define STM32F7_I2C_CR1_TXIE			BIT(1)
-> +#define STM32F7_I2C_CR1_PE			BIT(0)
-> +#define STM32F7_I2C_ALL_IRQ_MASK		(STM32F7_I2C_CR1_ERRIE \
-> +						| STM32F7_I2C_CR1_TCIE \
-> +						| STM32F7_I2C_CR1_STOPIE \
-> +						| STM32F7_I2C_CR1_NACKIE \
-> +						| STM32F7_I2C_CR1_RXIE \
-> +						| STM32F7_I2C_CR1_TXIE)
-> +
-> +/* STM32F7 I2C control 2 */
-> +#define STM32F7_I2C_CR2_RELOAD			BIT(24)
-> +#define STM32F7_I2C_CR2_NBYTES_MASK		GENMASK(23, 16)
-> +#define STM32F7_I2C_CR2_NBYTES(n)		(((n) & 0xff) << 16)
-> +#define STM32F7_I2C_CR2_NACK			BIT(15)
-> +#define STM32F7_I2C_CR2_STOP			BIT(14)
-> +#define STM32F7_I2C_CR2_START			BIT(13)
-> +#define STM32F7_I2C_CR2_RD_WRN			BIT(10)
-> +#define STM32F7_I2C_CR2_SADD7_MASK		GENMASK(7, 1)
-> +#define STM32F7_I2C_CR2_SADD7(n)		(((n) & 0x7f) << 1)
-> +
-> +/* STM32F7 I2C Interrupt Status */
-> +#define STM32F7_I2C_ISR_BUSY			BIT(15)
-> +#define STM32F7_I2C_ISR_ARLO			BIT(9)
-> +#define STM32F7_I2C_ISR_BERR			BIT(8)
-> +#define STM32F7_I2C_ISR_TCR			BIT(7)
-> +#define STM32F7_I2C_ISR_TC			BIT(6)
-> +#define STM32F7_I2C_ISR_STOPF			BIT(5)
-> +#define STM32F7_I2C_ISR_NACKF			BIT(4)
-> +#define STM32F7_I2C_ISR_RXNE			BIT(2)
-> +#define STM32F7_I2C_ISR_TXIS			BIT(1)
-> +
-> +/* STM32F7 I2C Interrupt Clear */
-> +#define STM32F7_I2C_ICR_ARLOCF			BIT(9)
-> +#define STM32F7_I2C_ICR_BERRCF			BIT(8)
-> +#define STM32F7_I2C_ICR_STOPCF			BIT(5)
-> +#define STM32F7_I2C_ICR_NACKCF			BIT(4)
-> +
-> +/* STM32F7 I2C Timing */
-> +#define STM32F7_I2C_TIMINGR_PRESC(n)		(((n) & 0xf) << 28)
-> +#define STM32F7_I2C_TIMINGR_SCLDEL(n)		(((n) & 0xf) << 20)
-> +#define STM32F7_I2C_TIMINGR_SDADEL(n)		(((n) & 0xf) << 16)
-> +#define STM32F7_I2C_TIMINGR_SCLH(n)		(((n) & 0xff) << 8)
-> +#define STM32F7_I2C_TIMINGR_SCLL(n)		((n) & 0xff)
-> +
-> +#define STM32F7_I2C_MAX_LEN			0xff
-> +
-> +#define STM32F7_I2C_DNF_DEFAULT			0
-> +#define STM32F7_I2C_DNF_MAX			16
-> +
-> +#define STM32F7_I2C_ANALOG_FILTER_ENABLE	1
-> +#define STM32F7_I2C_ANALOG_FILTER_DELAY_MIN	50	/* ns */
-> +#define STM32F7_I2C_ANALOG_FILTER_DELAY_MAX	260	/* ns */
-> +
-> +#define STM32F7_I2C_RISE_TIME_DEFAULT		25	/* ns */
-> +#define STM32F7_I2C_FALL_TIME_DEFAULT		10	/* ns */
-> +
-> +#define STM32F7_PRESC_MAX			BIT(4)
-> +#define STM32F7_SCLDEL_MAX			BIT(4)
-> +#define STM32F7_SDADEL_MAX			BIT(4)
-> +#define STM32F7_SCLH_MAX			BIT(8)
-> +#define STM32F7_SCLL_MAX			BIT(8)
-> +
-> +/**
-> + * struct stm32f7_i2c_spec - private i2c specification timing
-> + * @rate: I2C bus speed (Hz)
-> + * @rate_min: 80% of I2C bus speed (Hz)
-> + * @rate_max: 120% of I2C bus speed (Hz)
-> + * @fall_max: Max fall time of both SDA and SCL signals (ns)
-> + * @rise_max: Max rise time of both SDA and SCL signals (ns)
-> + * @hddat_min: Min data hold time (ns)
-> + * @vddat_max: Max data valid time (ns)
-> + * @sudat_min: Min data setup time (ns)
-> + * @l_min: Min low period of the SCL clock (ns)
-> + * @h_min: Min high period of the SCL clock (ns)
-> + */
-> +
+I can't tell which part of the fvp-base device tree is not liked by the
+firmware; I tried different combinations of the PSCI node, different CPU
+enumerations (cpu at 100 vs cpu at 1), removing idle-states properties...any
+hints appreciated.
 
-drop this empty line please.
+Thanks,
 
-> +struct stm32f7_i2c_spec {
-> +	u32			rate;
-> +	u32			rate_min;
-> +	u32			rate_max;
-> +	u32			fall_max;
-> +	u32			rise_max;
-> +	u32			hddat_min;
-> +	u32			vddat_max;
-> +	u32			sudat_min;
-> +	u32			l_min;
-> +	u32			h_min;
-> +};
-> +
-> +/**
-> + * struct stm32f7_i2c_setup - private I2C timing setup parameters
-> + * @speed: I2C speed mode (standard, Fast Plus)
-> + * @speed_freq: I2C speed frequency  (Hz)
-> + * @clock_src: I2C clock source frequency (Hz)
-> + * @rise_time: Rise time (ns)
-> + * @fall_time: Fall time (ns)
-> + * @dnf: Digital filter coefficient (0-16)
-> + * @analog_filter: Analog filter delay (On/Off)
-> + */
-> +struct stm32f7_i2c_setup {
-> +	enum stm32_i2c_speed	speed;
-> +	u32			speed_freq;
-> +	u32			clock_src;
-> +	u32			rise_time;
-> +	u32			fall_time;
-> +	u8			dnf;
-> +	bool			analog_filter;
-> +};
-> +
-> +/**
-> + * struct stm32f7_i2c_timings - private I2C output parameters
-> + * @prec: Prescaler value
-> + * @scldel: Data setup time
-> + * @sdadel: Data hold time
-> + * @sclh: SCL high period (master mode)
-> + * @sclh: SCL low period (master mode)
-> + */
-> +struct stm32f7_i2c_timings {
-> +	struct list_head	node;
-> +	u8			presc;
-> +	u8			scldel;
-> +	u8			sdadel;
-> +	u8			sclh;
-> +	u8			scll;
-> +};
-> +
-> +/**
-> + * struct stm32f7_i2c_msg - client specific data
-> + * @addr: 8-bit slave addr, including r/w bit
-> + * @count: number of bytes to be transferred
-> + * @buf: data buffer
-> + * @result: result of the transfer
-> + * @stop: last I2C msg to be sent, i.e. STOP to be generated
-> + */
-> +struct stm32f7_i2c_msg {
-> +	u8 addr;
-> +	u32 count;
-> +	u8 *buf;
-> +	int result;
-> +	bool stop;
-> +};
-> +
-> +/**
-> + * struct stm32f7_i2c_dev - private data of the controller
-> + * @adap: I2C adapter for this controller
-> + * @dev: device for this controller
-> + * @base: virtual memory area
-> + * @complete: completion of I2C message
-> + * @clk: hw i2c clock
-> + * @speed: I2C clock frequency of the controller. Standard, Fast or Fast+
-> + * @msg: Pointer to data to be written
-> + * @msg_num: number of I2C messages to be executed
-> + * @msg_id: message identifiant
-> + * @f7_msg: customized i2c msg for driver usage
-> + * @setup: I2C timing input setup
-> + * @timing: I2C computed timings
-> + */
-> +struct stm32f7_i2c_dev {
-> +	struct i2c_adapter adap;
-> +	struct device *dev;
-> +	void __iomem *base;
-> +	struct completion complete;
-> +	struct clk *clk;
-> +	int speed;
-> +	struct i2c_msg *msg;
-> +	unsigned int msg_num;
-> +	unsigned int msg_id;
-> +	struct stm32f7_i2c_msg f7_msg;
-> +	struct stm32f7_i2c_setup *setup;
-> +	struct stm32f7_i2c_timings timing;
-> +};
-> +
-> +static struct stm32f7_i2c_spec i2c_specs[] = {
-> +	[STM32_I2C_SPEED_STANDARD] = {
-> +		.rate		= 100000,
-> +		.rate_min	= 8000,
-> +		.rate_max	= 120000,
-> +		.fall_max	= 300,
-> +		.rise_max	= 1000,
-> +		.hddat_min	= 0,
-> +		.vddat_max	= 3450,
-> +		.sudat_min	= 250,
-> +		.l_min		= 4700,
-> +		.h_min		= 4000,
-> +	},
-> +	[STM32_I2C_SPEED_FAST] = {
-> +		.rate		= 400000,
-> +		.rate_min	= 320000,
-> +		.rate_max	= 480000,
-> +		.fall_max	= 300,
-> +		.rise_max	= 300,
-> +		.hddat_min	= 0,
-> +		.vddat_max	= 900,
-> +		.sudat_min	= 100,
-> +		.l_min		= 1300,
-> +		.h_min		= 600,
-> +	},
-> +	[STM32_I2C_SPEED_FAST_PLUS] = {
-> +		.rate		= 1000000,
-> +		.rate_min	= 800000,
-> +		.rate_max	= 1200000,
-> +		.fall_max	= 100,
-> +		.rise_max	= 120,
-> +		.hddat_min	= 0,
-> +		.vddat_max	= 450,
-> +		.sudat_min	= 50,
-> +		.l_min		= 500,
-> +		.h_min		= 260,
-> +	},
-> +};
-
-What is the source of the above table? Maybe mention it in a comment?
-I don't like adding white space to align the =. The next person touching
-this either breaks the alignment or has to modify more than
-syntactically necessary.
-
-> +struct stm32f7_i2c_setup stm32f7_setup = {
-> +	.rise_time		= STM32F7_I2C_RISE_TIME_DEFAULT,
-> +	.fall_time		= STM32F7_I2C_FALL_TIME_DEFAULT,
-> +	.dnf			= STM32F7_I2C_DNF_DEFAULT,
-> +	.analog_filter		= STM32F7_I2C_ANALOG_FILTER_ENABLE,
-> +};
-> +
-> +static inline void stm32f7_i2c_set_bits(void __iomem *reg, u32 mask)
-> +{
-> +	writel_relaxed(readl_relaxed(reg) | mask, reg);
-> +}
-
-this is used three times only. Among these two times
-stm32f7_i2c_hw_config(). I wonder if it would be more robust to assign a
-complete value to the registers there and then drop this function and
-open code it for the last user.
-
-> +
-> +static inline void stm32f7_i2c_clr_bits(void __iomem *reg, u32 mask)
-> +{
-> +	writel_relaxed(readl_relaxed(reg) & ~mask, reg);
-> +}
-
-Two users only, same thoughts as for stm32f7_i2c_set_bits.
-
-> +
-> +static int stm32f7_i2c_compute_timing(struct stm32f7_i2c_dev *i2c_dev,
-> +				      struct stm32f7_i2c_setup *setup,
-> +				      struct stm32f7_i2c_timings *output)
-> +{
-> +	u32 p_prev = STM32F7_PRESC_MAX;
-> +	u32 i2cclk = DIV_ROUND_CLOSEST(NSEC_PER_SEC,
-> +				       setup->clock_src);
-> +	u32 i2cbus = DIV_ROUND_CLOSEST(NSEC_PER_SEC,
-> +				       setup->speed_freq);
-> +	u32 clk_error_prev = i2cbus;
-> +	u32 tsync;
-> +	u32 af_delay_min, af_delay_max;
-> +	u32 dnf_delay;
-> +	u32 clk_min, clk_max;
-> +	int sdadel_min, sdadel_max;
-> +	int scldel_min;
-> +	struct stm32f7_i2c_timings *v, *_v, *s;
-> +	struct list_head solutions;
-> +	u16 p, l, a, h;
-> +	int ret = 0;
-> +
-> +	if (setup->speed >= STM32_I2C_SPEED_END) {
-> +		dev_err(i2c_dev->dev, "speed out of bound {%d/%d}\n",
-> +			setup->speed, STM32_I2C_SPEED_END - 1);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if ((setup->rise_time > i2c_specs[setup->speed].rise_max) ||
-> +	    (setup->fall_time > i2c_specs[setup->speed].fall_max)) {
-> +		dev_err(i2c_dev->dev,
-> +			"timings out of bound Rise{%d>%d}/Fall{%d>%d}\n",
-> +			setup->rise_time, i2c_specs[setup->speed].rise_max,
-> +			setup->fall_time, i2c_specs[setup->speed].fall_max);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (setup->dnf > STM32F7_I2C_DNF_MAX) {
-> +		dev_err(i2c_dev->dev,
-> +			"DNF out of bound %d/%d\n",
-> +			setup->dnf, STM32F7_I2C_DNF_MAX);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (setup->speed_freq > i2c_specs[setup->speed].rate) {
-> +		dev_err(i2c_dev->dev, "ERROR: Freq {%d/%d}\n",
-> +			setup->speed_freq, i2c_specs[setup->speed].rate);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/*  Analog and Digital Filters */
-> +	af_delay_min =
-> +		(setup->analog_filter ?
-> +		 STM32F7_I2C_ANALOG_FILTER_DELAY_MIN : 0);
-> +	af_delay_max =
-> +		(setup->analog_filter ?
-> +		 STM32F7_I2C_ANALOG_FILTER_DELAY_MAX : 0);
-> +	dnf_delay = setup->dnf * i2cclk;
-> +
-> +	sdadel_min = setup->fall_time - i2c_specs[setup->speed].hddat_min -
-> +		af_delay_min - (setup->dnf + 3) * i2cclk;
-> +
-> +	sdadel_max = i2c_specs[setup->speed].vddat_max - setup->rise_time -
-> +		af_delay_max - (setup->dnf + 4) * i2cclk;
-> +
-> +	scldel_min = setup->rise_time + i2c_specs[setup->speed].sudat_min;
-> +
-> +	if (sdadel_min < 0)
-> +		sdadel_min = 0;
-> +	if (sdadel_max < 0)
-> +		sdadel_max = 0;
-> +
-> +	dev_dbg(i2c_dev->dev, "SDADEL(min/max): %i/%i, SCLDEL(Min): %i\n",
-> +		sdadel_min, sdadel_max, scldel_min);
-> +
-> +	INIT_LIST_HEAD(&solutions);
-> +	/* Compute possible values for PRESC, SCLDEL and SDADEL */
-> +	for (p = 0; p < STM32F7_PRESC_MAX; p++) {
-> +		for (l = 0; l < STM32F7_SCLDEL_MAX; l++) {
-> +			u32 scldel = (l + 1) * (p + 1) * i2cclk;
-> +
-> +			if (scldel < scldel_min)
-> +				continue;
-> +
-> +			for (a = 0; a < STM32F7_SDADEL_MAX; a++) {
-> +				u32 sdadel = (a * (p + 1) + 1) * i2cclk;
-> +
-> +				if (((sdadel >= sdadel_min) &&
-> +				     (sdadel <= sdadel_max)) &&
-> +				    (p != p_prev)) {
-> +					v = kmalloc(sizeof(*v), GFP_KERNEL);
-> +					if (!v) {
-> +						ret = -ENOMEM;
-> +						goto exit;
-> +					}
-> +
-> +					v->presc = p;
-> +					v->scldel = l;
-> +					v->sdadel = a;
-> +					p_prev = p;
-> +
-> +					list_add_tail(&v->node,
-> +						      &solutions);
-> +				}
-> +			}
-> +		}
-> +	}
-> +
-> +	if (list_empty(&solutions)) {
-> +		dev_err(i2c_dev->dev, "no Prescaler solution\n");
-> +		ret = -EPERM;
-> +		goto exit;
-> +	}
-> +
-> +	tsync = af_delay_min + dnf_delay + (2 * i2cclk);
-> +	s = NULL;
-> +	clk_max = NSEC_PER_SEC / i2c_specs[setup->speed].rate_min;
-> +	clk_min = NSEC_PER_SEC / i2c_specs[setup->speed].rate_max;
-> +
-> +	/*
-> +	 * Among Prescaler possibilities discovered above figures out SCL Low
-> +	 * and High Period. Provided:
-> +	 * - SCL Low Period has to be higher than Low Period of tehs SCL Clock
-> +	 *   defined by I2C Specification. I2C Clock has to be lower than
-> +	 *   (SCL Low Period - Analog/Digital filters) / 4.
-> +	 * - SCL High Period has to be lower than High Period of the SCL Clock
-> +	 *   defined by I2C Specification
-> +	 * - I2C Clock has to be lower than SCL High Period
-> +	 */
-> +	list_for_each_entry(v, &solutions, node) {
-> +		u32 prescaler = (v->presc + 1) * i2cclk;
-> +
-> +		for (l = 0; l < STM32F7_SCLL_MAX; l++) {
-> +			u32 tscl_l = (l + 1) * prescaler + tsync;
-> +
-> +			if ((tscl_l < i2c_specs[setup->speed].l_min) ||
-> +			    (i2cclk >=
-> +			     ((tscl_l - af_delay_min - dnf_delay) / 4))) {
-> +				continue;
-> +			}
-> +
-> +			for (h = 0; h < STM32F7_SCLH_MAX; h++) {
-> +				u32 tscl_h = (h + 1) * prescaler + tsync;
-> +				u32 tscl = tscl_l + tscl_h +
-> +					setup->rise_time + setup->fall_time;
-> +
-> +				if ((tscl >= clk_min) && (tscl <= clk_max) &&
-> +				    (tscl_h >= i2c_specs[setup->speed].h_min) &&
-> +				    (i2cclk < tscl_h)) {
-> +					int clk_error = tscl - i2cbus;
-> +
-> +					if (clk_error < 0)
-> +						clk_error = -clk_error;
-> +
-> +					if (clk_error < clk_error_prev) {
-> +						clk_error_prev = clk_error;
-> +						v->scll = l;
-> +						v->sclh = h;
-> +						s = v;
-> +					}
-> +				}
-> +			}
-> +		}
-> +	}
-> +
-> +	if (!s) {
-> +		dev_err(i2c_dev->dev, "no solution at all\n");
-> +		ret = -EPERM;
-> +		goto exit;
-> +	}
-> +
-> +	output->presc = s->presc;
-> +	output->scldel = s->scldel;
-> +	output->sdadel = s->sdadel;
-> +	output->scll = s->scll;
-> +	output->sclh = s->sclh;
-> +
-> +	dev_dbg(i2c_dev->dev,
-> +		"Presc: %i, scldel: %i, sdadel: %i, scll: %i, sclh: %i\n",
-> +		output->presc,
-> +		output->scldel, output->sdadel,
-> +		output->scll, output->sclh);
-> +
-> +exit:
-> +	/* Release list and memory */
-> +	list_for_each_entry_safe(v, _v, &solutions, node) {
-> +		list_del(&v->node);
-> +		kfree(v);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int stm32f7_i2c_setup_timing(struct stm32f7_i2c_dev *i2c_dev,
-> +				    struct stm32f7_i2c_setup *setup)
-> +{
-> +	int ret = 0;
-> +
-> +	setup->speed = i2c_dev->speed;
-> +	setup->speed_freq = i2c_specs[setup->speed].rate;
-> +	setup->clock_src = clk_get_rate(i2c_dev->clk);
-> +
-> +	if (!setup->clock_src) {
-> +		dev_err(i2c_dev->dev, "clock rate is 0\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	do {
-> +		ret = stm32f7_i2c_compute_timing(i2c_dev, setup,
-> +						 &i2c_dev->timing);
-> +		if (ret) {
-> +			dev_err(i2c_dev->dev,
-> +				"failed to compute I2C timings.\n");
-> +			if (i2c_dev->speed > STM32_I2C_SPEED_STANDARD) {
-> +				i2c_dev->speed--;
-> +				setup->speed = i2c_dev->speed;
-> +				setup->speed_freq =
-> +					i2c_specs[setup->speed].rate;
-> +				dev_warn(i2c_dev->dev,
-> +					 "downgrade I2C Speed Freq to (%i)\n",
-> +					 i2c_specs[setup->speed].rate);
-> +			} else {
-> +				break;
-> +			}
-> +		}
-> +	} while (ret);
-> +
-> +	if (ret) {
-> +		dev_err(i2c_dev->dev, "Impossible to compute I2C timings.\n");
-> +		return ret;
-> +	}
-> +
-> +	dev_dbg(i2c_dev->dev, "I2C Speed(%i), Freq(%i), Clk Source(%i)\n",
-> +		setup->speed, setup->speed_freq, setup->clock_src);
-> +	dev_dbg(i2c_dev->dev, "I2C Rise(%i) and Fall(%i) Time\n",
-> +		setup->rise_time, setup->fall_time);
-> +	dev_dbg(i2c_dev->dev, "I2C Analog Filter(%s), DNF(%i)\n",
-> +		(setup->analog_filter ? "On" : "Off"), setup->dnf);
-> +
-> +	i2c_dev->setup = setup;
-> +
-> +	return 0;
-> +}
-> +
-> +static void stm32f7_i2c_hw_config(struct stm32f7_i2c_dev *i2c_dev)
-> +{
-> +	struct stm32f7_i2c_timings *t = &i2c_dev->timing;
-> +	u32 timing = 0;
-> +
-> +	/* Timing settings */
-> +	timing |= STM32F7_I2C_TIMINGR_PRESC(t->presc);
-> +	timing |= STM32F7_I2C_TIMINGR_SCLDEL(t->scldel);
-> +	timing |= STM32F7_I2C_TIMINGR_SDADEL(t->sdadel);
-> +	timing |= STM32F7_I2C_TIMINGR_SCLH(t->sclh);
-> +	timing |= STM32F7_I2C_TIMINGR_SCLL(t->scll);
-> +	writel_relaxed(timing, i2c_dev->base + STM32F7_I2C_TIMINGR);
-> +
-> +	/* Enable I2C */
-> +	if (i2c_dev->setup->analog_filter)
-> +		stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
-> +				     STM32F7_I2C_CR1_ANFOFF);
-> +	else
-> +		stm32f7_i2c_set_bits(i2c_dev->base + STM32F7_I2C_CR1,
-> +				     STM32F7_I2C_CR1_ANFOFF);
-> +	stm32f7_i2c_set_bits(i2c_dev->base + STM32F7_I2C_CR1,
-> +			     STM32F7_I2C_CR1_PE);
-> +}
-> +
-> +static void stm32f7_i2c_write_tx_data(struct stm32f7_i2c_dev *i2c_dev)
-> +{
-> +	struct stm32f7_i2c_msg *f7_msg = &i2c_dev->f7_msg;
-> +	void __iomem *base = i2c_dev->base;
-> +
-> +	if (f7_msg->count) {
-> +		writeb_relaxed(*f7_msg->buf++, base + STM32F7_I2C_TXDR);
-> +		f7_msg->count--;
-> +	}
-> +}
-> +
-> +static void stm32f7_i2c_read_rx_data(struct stm32f7_i2c_dev *i2c_dev)
-> +{
-> +	struct stm32f7_i2c_msg *f7_msg = &i2c_dev->f7_msg;
-> +	void __iomem *base = i2c_dev->base;
-> +
-> +	if (f7_msg->count) {
-> +		*f7_msg->buf++ = readb_relaxed(base + STM32F7_I2C_RXDR);
-> +		f7_msg->count--;
-> +	}
-> +}
-> +
-> +static void stm32f7_i2c_reload(struct stm32f7_i2c_dev *i2c_dev)
-> +{
-> +	struct stm32f7_i2c_msg *f7_msg = &i2c_dev->f7_msg;
-> +	u32 cr2;
-> +
-> +	cr2 = readl_relaxed(i2c_dev->base + STM32F7_I2C_CR2);
-> +
-> +	cr2 &= ~STM32F7_I2C_CR2_NBYTES_MASK;
-> +	if (f7_msg->count > STM32F7_I2C_MAX_LEN) {
-> +		cr2 |= STM32F7_I2C_CR2_NBYTES(STM32F7_I2C_MAX_LEN);
-> +	} else {
-> +		cr2 &= ~STM32F7_I2C_CR2_RELOAD;
-> +		cr2 |= STM32F7_I2C_CR2_NBYTES(f7_msg->count);
-> +	}
-> +
-> +	writel_relaxed(cr2, i2c_dev->base + STM32F7_I2C_CR2);
-> +}
-> +
-> +static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
-> +{
-> +	u32 status;
-> +	int ret;
-> +
-> +	ret = readl_relaxed_poll_timeout(i2c_dev->base + STM32F7_I2C_ISR,
-> +					 status,
-> +					 !(status & STM32F7_I2C_ISR_BUSY),
-> +					 10, 1000);
-> +	if (ret) {
-> +		dev_dbg(i2c_dev->dev, "bus busy\n");
-> +		ret = -EBUSY;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
-> +				 struct i2c_msg *msg)
-> +{
-> +	struct stm32f7_i2c_msg *f7_msg = &i2c_dev->f7_msg;
-> +	void __iomem *base = i2c_dev->base;
-> +	u32 cr1, cr2;
-> +
-> +	f7_msg->addr = msg->addr;
-> +	f7_msg->buf = msg->buf;
-> +	f7_msg->count = msg->len;
-> +	f7_msg->result = 0;
-> +	f7_msg->stop = (i2c_dev->msg_id >= i2c_dev->msg_num - 1);
-> +
-> +	reinit_completion(&i2c_dev->complete);
-> +
-> +	cr1 = readl_relaxed(base + STM32F7_I2C_CR1);
-> +	cr2 = readl_relaxed(base + STM32F7_I2C_CR2);
-
-Can you know the content of these registers from the context?
-
-> +	/* Set transfer direction */
-> +	cr2 &= ~STM32F7_I2C_CR2_RD_WRN;
-> +	if (msg->flags & I2C_M_RD)
-> +		cr2 |= STM32F7_I2C_CR2_RD_WRN;
-> +
-> +	/* Set slave address */
-> +	cr2 &= ~STM32F7_I2C_CR2_SADD7_MASK;
-> +	cr2 |= STM32F7_I2C_CR2_SADD7(f7_msg->addr);
-> +
-> +	/* Set nb bytes to transfer and reload if needed */
-> +	cr2 &= ~(STM32F7_I2C_CR2_NBYTES_MASK | STM32F7_I2C_CR2_RELOAD);
-> +	if (f7_msg->count > STM32F7_I2C_MAX_LEN) {
-> +		cr2 |= STM32F7_I2C_CR2_NBYTES(STM32F7_I2C_MAX_LEN);
-> +		cr2 |= STM32F7_I2C_CR2_RELOAD;
-> +	} else {
-> +		cr2 |= STM32F7_I2C_CR2_NBYTES(f7_msg->count);
-> +	}
-> +
-> +	/* Enable NACK, STOP, error and transfer complete interrupts */
-> +	cr1 |= STM32F7_I2C_CR1_ERRIE | STM32F7_I2C_CR1_TCIE |
-> +		STM32F7_I2C_CR1_STOPIE | STM32F7_I2C_CR1_NACKIE;
-> +
-> +	/* Clear TX/RX interrupt */
-> +	cr1 &= ~(STM32F7_I2C_CR1_RXIE | STM32F7_I2C_CR1_TXIE);
-> +
-> +	/* Enable RX/TX interrupt according to msg direction */
-> +	if (msg->flags & I2C_M_RD)
-> +		cr1 |= STM32F7_I2C_CR1_RXIE;
-> +	else
-> +		cr1 |= STM32F7_I2C_CR1_TXIE;
-> +
-> +	/* Configure Start/Repeated Start */
-> +	cr2 |= STM32F7_I2C_CR2_START;
-> +
-> +	/* Write configurations registers */
-> +	writel_relaxed(cr1, base + STM32F7_I2C_CR1);
-> +	writel_relaxed(cr2, base + STM32F7_I2C_CR2);
-> +}
-> +
-> +static void stm32f7_i2c_disable_irq(struct stm32f7_i2c_dev *i2c_dev, u32 mask)
-> +{
-> +	stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1, mask);
-> +}
-
-mask is always STM32F7_I2C_ALL_IRQ_MASK. Maybe use this to simplify?
-
-> +static irqreturn_t stm32f7_i2c_isr_event(int irq, void *data)
-> +{
-> +	struct stm32f7_i2c_dev *i2c_dev = data;
-> +	struct stm32f7_i2c_msg *f7_msg = &i2c_dev->f7_msg;
-> +	void __iomem *base = i2c_dev->base;
-> +	u32 status, mask;
-> +
-> +	status = readl_relaxed(i2c_dev->base + STM32F7_I2C_ISR);
-> +
-> +	/* Tx empty */
-> +	if (status & STM32F7_I2C_ISR_TXIS)
-> +		stm32f7_i2c_write_tx_data(i2c_dev);
-> +
-> +	/* RX not empty */
-> +	if (status & STM32F7_I2C_ISR_RXNE)
-> +		stm32f7_i2c_read_rx_data(i2c_dev);
-> +
-> +	/* NACK received */
-> +	if (status & STM32F7_I2C_ISR_NACKF) {
-> +		dev_dbg(i2c_dev->dev, "<%s>: Receive NACK\n", __func__);
-> +		writel_relaxed(STM32F7_I2C_ICR_NACKCF, base + STM32F7_I2C_ICR);
-> +		f7_msg->result = -EBADE;
-> +	}
-> +
-> +	/* STOP detection flag */
-> +	if (status & STM32F7_I2C_ISR_STOPF) {
-> +		/* Disable interrupts */
-> +		stm32f7_i2c_disable_irq(i2c_dev, STM32F7_I2C_ALL_IRQ_MASK);
-> +
-> +		/* Clear STOP flag */
-> +		writel_relaxed(STM32F7_I2C_ICR_STOPCF, base + STM32F7_I2C_ICR);
-> +
-> +		complete(&i2c_dev->complete);
-> +	}
-> +
-> +	/* Transfer complete */
-> +	if (status & STM32F7_I2C_ISR_TC) {
-> +		if (f7_msg->stop) {
-> +			mask = STM32F7_I2C_CR2_STOP;
-> +			stm32f7_i2c_set_bits(base + STM32F7_I2C_CR2, mask);
-> +		} else {
-> +			i2c_dev->msg_id++;
-> +			i2c_dev->msg++;
-> +			stm32f7_i2c_xfer_msg(i2c_dev, i2c_dev->msg);
-> +		}
-> +	}
-> +
-> +	/*
-> +	 * Transfer Complete Reload: 255 data bytes have been transferred
-> +	 * We have to prepare the I2C controller to transfer the remaining
-> +	 * data
-
-Missing punctuation.
-
-> +	 */
-> +	if (status & STM32F7_I2C_ISR_TCR)
-> +		stm32f7_i2c_reload(i2c_dev);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t stm32f7_i2c_isr_error(int irq, void *data)
-> +{
-> +	struct stm32f7_i2c_dev *i2c_dev = data;
-> +	struct stm32f7_i2c_msg *f7_msg = &i2c_dev->f7_msg;
-> +	void __iomem *base = i2c_dev->base;
-> +	struct device *dev = i2c_dev->dev;
-> +	u32 status;
-> +
-> +	status = readl_relaxed(i2c_dev->base + STM32F7_I2C_ISR);
-> +
-> +	/* Bus error */
-> +	if (status & STM32F7_I2C_ISR_BERR) {
-> +		dev_err(dev, "<%s>: Bus error\n", __func__);
-> +		writel_relaxed(STM32F7_I2C_ICR_BERRCF, base + STM32F7_I2C_ICR);
-> +		f7_msg->result = -EIO;
-> +	}
-> +
-> +	/* Arbitration loss */
-> +	if (status & STM32F7_I2C_ISR_ARLO) {
-> +		dev_err(dev, "<%s>: Arbitration loss\n", __func__);
-
-Drop this. Arbitration loss is not an error and it shouldn't pollute the
-kernel log.
-
-> +		writel_relaxed(STM32F7_I2C_ICR_ARLOCF, base + STM32F7_I2C_ICR);
-> +		f7_msg->result = -EAGAIN;
-> +	}
-> +
-> +	stm32f7_i2c_disable_irq(i2c_dev, STM32F7_I2C_ALL_IRQ_MASK);
-> +
-> +	complete(&i2c_dev->complete);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
-> +			    struct i2c_msg msgs[], int num)
-> +{
-> +	struct stm32f7_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
-> +	struct stm32f7_i2c_msg *f7_msg = &i2c_dev->f7_msg;
-> +	unsigned long timeout;
-> +	int ret;
-> +
-> +	i2c_dev->msg = msgs;
-> +	i2c_dev->msg_num = num;
-> +	i2c_dev->msg_id = 0;
-> +
-> +	ret = clk_enable(i2c_dev->clk);
-> +	if (ret) {
-> +		dev_err(i2c_dev->dev, "Failed to enable clock\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = stm32f7_i2c_wait_free_bus(i2c_dev);
-> +	if (ret)
-> +		goto clk_free;
-> +
-> +	stm32f7_i2c_xfer_msg(i2c_dev, msgs);
-> +
-> +	timeout = wait_for_completion_timeout(&i2c_dev->complete,
-> +					      i2c_dev->adap.timeout);
-> +	ret = f7_msg->result;
-> +
-> +	if (!timeout) {
-> +		dev_dbg(i2c_dev->dev, "Access to slave 0x%x timed out\n",
-> +			i2c_dev->msg->addr);
-> +		ret = -ETIMEDOUT;
-> +	}
-> +
-> +clk_free:
-> +	clk_disable(i2c_dev->clk);
-> +
-> +	return (ret < 0) ? ret : num;
-> +}
-> +
-> +static u32 stm32f7_i2c_func(struct i2c_adapter *adap)
-> +{
-> +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
-> +}
-> +
-> +static struct i2c_algorithm stm32f7_i2c_algo = {
-> +	.master_xfer = stm32f7_i2c_xfer,
-> +	.functionality = stm32f7_i2c_func,
-> +};
-> +
-> +static const struct of_device_id stm32f7_i2c_match[] = {
-> +	{ .compatible = "st,stm32f7-i2c", .data = &stm32f7_setup},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, stm32f7_i2c_match);
-
-I thought the naming to be uncommon and wanted to suggest _ids as
-suffix. But grep proves me wrong here. I'd like to see this further
-down, just above stm32f7_i2c_driver.
-
-> +static int stm32f7_i2c_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	const struct of_device_id *match;
-> +	struct stm32f7_i2c_dev *i2c_dev;
-> +	struct stm32f7_i2c_setup *setup;
-> +	struct resource *res;
-> +	u32 irq_error, irq_event, clk_rate, rise_time, fall_time;
-> +	struct i2c_adapter *adap;
-> +	struct reset_control *rst;
-> +	int ret;
-> +
-> +	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
-> +	if (!i2c_dev)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	i2c_dev->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(i2c_dev->base))
-> +		return PTR_ERR(i2c_dev->base);
-> +
-> +	irq_event = irq_of_parse_and_map(np, 0);
-> +	if (!irq_event) {
-> +		dev_err(&pdev->dev, "IRQ event missing or invalid\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	irq_error = irq_of_parse_and_map(np, 1);
-> +	if (!irq_error) {
-> +		dev_err(&pdev->dev, "IRQ error missing or invalid\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	i2c_dev->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(i2c_dev->clk)) {
-> +		dev_err(&pdev->dev, "Error: Missing controller clock\n");
-> +		return PTR_ERR(i2c_dev->clk);
-> +	}
-> +	ret = clk_prepare_enable(i2c_dev->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to prepare_enable clock\n");
-> +		return ret;
-> +	}
-> +
-> +	rst = devm_reset_control_get(&pdev->dev, NULL);
-> +	if (IS_ERR(rst)) {
-> +		dev_err(&pdev->dev, "Error: Missing controller reset\n");
-> +		ret = PTR_ERR(rst);
-> +		goto clk_free;
-> +	}
-> +	reset_control_assert(rst);
-> +	udelay(2);
-> +	reset_control_deassert(rst);
-> +
-> +	i2c_dev->speed = STM32_I2C_SPEED_STANDARD;
-> +	ret = of_property_read_u32(np, "clock-frequency", &clk_rate);
-> +	if ((!ret) && (clk_rate == 400000))
-> +		i2c_dev->speed = STM32_I2C_SPEED_FAST;
-> +	else if ((!ret) && (clk_rate == 1000000))
-> +		i2c_dev->speed = STM32_I2C_SPEED_FAST_PLUS;
-
-Did you use an early patch of stm32f4 as cut-n-paste source? Better use:
-
-	ret = of_property_read_u32(np, "clock-frequency", &clk_rate);
-	if (!ret && clk_rate >= 1000000) {
-		i2c_dev->speed = STM32_I2C_SPEED_FAST_PLUS;
-	} else if (!ret && clk_rate >= 400000) {
-		i2c_dev->speed = STM32_I2C_SPEED_FAST;
-	} else if (!ret && clk_rate >= 100000)
-		i2c_dev->speed = STM32_I2C_SPEED_STANDARD;
-	else {
-		dev_err(..., "Unsupported clock speed\n");
-		return -EINVAL;
-	}
-
-and I suggest to do this before touching the hardware, i.e. (at least)
-above reset_control_assert().
-
-> +	i2c_dev->dev = &pdev->dev;
-> +
-> +	ret = devm_request_irq(&pdev->dev, irq_event, stm32f7_i2c_isr_event, 0,
-> +			       pdev->name, i2c_dev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to request irq event %i\n",
-> +			irq_event);
-> +		goto clk_free;
-> +	}
-> +
-> +	ret = devm_request_irq(&pdev->dev, irq_error, stm32f7_i2c_isr_error, 0,
-> +			       pdev->name, i2c_dev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to request irq error %i\n",
-> +			irq_error);
-> +		goto clk_free;
-> +	}
-> +
-> +	match = of_match_device(stm32f7_i2c_match, &pdev->dev);
-> +	if (match && match->data)
-> +		setup = (struct stm32f7_i2c_setup *)match->data;
-> +	else
-> +		goto clk_free;
-
-Why do you use this construct if there is only a single compatible that
-is supported? This is open coding of_device_get_match_data, an
-additional benefit of using this one is that you don't need
-stm32f7_i2c_match here which is a precondition to move this down as
-suggested above.
-
-> +
-> +	ret = device_property_read_u32(i2c_dev->dev, "i2c-scl-rising-time-ns",
-> +				       &rise_time);
-> +	if (!ret)
-> +		setup->rise_time = rise_time;
-> +
-> +	ret = device_property_read_u32(i2c_dev->dev, "i2c-scl-falling-time-ns",
-> +				       &fall_time);
-> +	if (!ret)
-> +		setup->fall_time = fall_time;
-> +
-> +	ret = stm32f7_i2c_setup_timing(i2c_dev, setup);
-> +	if (ret)
-> +		goto clk_free;
-> +
-> +	stm32f7_i2c_hw_config(i2c_dev);
-> +
-> +	adap = &i2c_dev->adap;
-> +	i2c_set_adapdata(adap, i2c_dev);
-> +	snprintf(adap->name, sizeof(adap->name), "STM32F7 I2C(%pa)",
-> +		 &res->start);
-> +	adap->owner = THIS_MODULE;
-> +	adap->timeout = 2 * HZ;
-> +	adap->retries = 0;
-> +	adap->algo = &stm32f7_i2c_algo;
-> +	adap->dev.parent = &pdev->dev;
-> +	adap->dev.of_node = pdev->dev.of_node;
-> +
-> +	init_completion(&i2c_dev->complete);
-> +
-> +	ret = i2c_add_adapter(adap);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to add adapter\n");
-> +		goto clk_free;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, i2c_dev);
-
-I'd do this earlier. There is no real problem that is fixed, as the only
-user is stm32f7_i2c_remove that is only called when stm32f7_i2c_probe
-returns success, but it still feels better. Might be subjective, so
-ignore at will.
-
-> +	clk_disable(i2c_dev->clk);
-> +
-> +	dev_info(i2c_dev->dev, "STM32F7 I2C-%d driver registered\n", adap->nr);
-
-This is wrong. The driver is already registered via
-
-	module_platform_driver(stm32f7_i2c_driver);
-
-below. What you want to claim here is, that the driver bound a device.
-
-> +
-> +	return 0;
-> +
-> +clk_free:
-> +	clk_disable_unprepare(i2c_dev->clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static int stm32f7_i2c_remove(struct platform_device *pdev)
-> +{
-> +	struct stm32f7_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
-> +
-> +	i2c_del_adapter(&i2c_dev->adap);
-> +
-> +	clk_unprepare(i2c_dev->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver stm32f7_i2c_driver = {
-> +	.driver = {
-> +		.name = "stm32f7-i2c",
-> +		.of_match_table = stm32f7_i2c_match,
-> +	},
-> +	.probe = stm32f7_i2c_probe,
-> +	.remove = stm32f7_i2c_remove,
-> +};
-> +
-> +module_platform_driver(stm32f7_i2c_driver);
-> +
-> +MODULE_AUTHOR("M'boumba Cedric Madianga <cedric.madianga@gmail.com>");
-> +MODULE_DESCRIPTION("STMicroelectronics STM32F7 I2C driver");
-> +MODULE_LICENSE("GPL v2");
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kim
