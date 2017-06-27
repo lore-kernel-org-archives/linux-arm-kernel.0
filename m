@@ -1,193 +1,94 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Jun 2017 19:01:14 +0100
-Subject: [PATCH v2 2/4] soc: bcm: brcmstb: Add support for S2/S3/S5
- suspend states (ARM)
-In-Reply-To: <20170626223248.14199-5-f.fainelli@gmail.com>
-References: <20170626223248.14199-1-f.fainelli@gmail.com>
- <20170626223248.14199-5-f.fainelli@gmail.com>
-Message-ID: <20170627180113.GB5189@leverpostej>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 28 Jun 2017 02:07:39 +0800
+Subject: [arm-platforms:kvm-arm64/gicv4-kvm 48/62]
+ arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:334: undefined reference
+ to `vgic_v4_teardown'
+Message-ID: <201706280237.NZifbiqi%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 03:32:44PM -0700, Florian Fainelli wrote:
-> From: Brian Norris <computersforpeace@gmail.com>
-> 
-> This commit adds support for the Broadcom STB S2/S3/S5 suspend states on
-> ARM based SoCs.
-> 
-> This requires quite a lot of code in order to deal with the different HW
-> blocks that need to be quiesced during suspend:
-> 
-> - DDR PHY SHIM
-> - DDR memory controller and sequencer
-> - control processor
-> 
-> The final steps of the suspend execute in an on-chip SRAM and there is a
-> little bit of assembly code in order to shut down the DDR PHY PLL and
-> then go into a wfi loop until a wake-up even occurs. Conversely the
-> resume part involves waiting for the DDR PHY PLL to come back up and
-> resume executions where we left.
-> 
-> For S3, because of our memory hashing (actual hashing code not included
-> for simplicity, and is bypassed) we need to relocate the writable
-> variables (stack) into SRAM shortly before suspending in order to leave
-> the DRAM untouched and create a reliable hash of its contents.
-> 
-> This code has been contributed by Brian Norris initially and has been
-> incrementally fixed and updated to support new chips by a lot of people.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
+head:   362f13c96426700d3e37a921ef6d551f01491992
+commit: c486d9614d47b1fcace756427f07983c369b9a78 [48/62] KVM: arm/arm64: GICv4: Wire init/teardown of per-VM support
+config: arm-axm55xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout c486d9614d47b1fcace756427f07983c369b9a78
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-[...]
+All errors (new ones prefixed by >>):
 
-> +static int (*brcmstb_pm_do_s2_sram)(void __iomem *aon_ctrl_base,
-> +		void __iomem *ddr_phy_pll_status);
-> +
-> +static int brcmstb_init_sram(struct device_node *dn)
-> +{
-> +	void __iomem *sram;
-> +	struct resource res;
-> +	int ret;
-> +
-> +	ret = of_address_to_resource(dn, 0, &res);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Cached, executable remapping of SRAM */
-> +#ifdef CONFIG_ARM
-> +	sram = __arm_ioremap_exec(res.start, resource_size(&res), true);
-> +#else
-> +	sram = __ioremap(res.start, resource_size(&res), PAGE_KERNEL_EXEC);
-> +#endif
+   arch/arm/kvm/built-in.o: In function `kvm_vgic_dist_destroy':
+>> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:334: undefined reference to `vgic_v4_teardown'
+   arch/arm/kvm/built-in.o: In function `vgic_init':
+>> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-init.c:291: undefined reference to `vgic_v4_init'
 
-... so we're mapping the SRAM as executable via the page tables (which
-themselves live in memory, and are accessed asynchronously by the MMU) ...
+vim +334 arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-init.c
 
-> +static void *brcmstb_pm_copy_to_sram(void *fn, size_t len)
-> +{
-> +	unsigned int size = ALIGN(len, FNCPY_ALIGN);
-> +
-> +	if (ctrl.boot_sram_len < size) {
-> +		pr_err("standby code will not fit in SRAM\n");
-> +		return NULL;
-> +	}
-> +
-> +	return fncpy(ctrl.boot_sram, fn, size);
-> +}
-> +
-> +/*
-> + * S2 suspend/resume picks up where we left off, so we must execute carefully
-> + * from SRAM, in order to allow DDR to come back up safely before we continue.
-> + */
-> +static int brcmstb_pm_s2(void)
-> +{
-> +	/* A previous S3 can set a value hazardous to S2, so make sure. */
-> +	if (ctrl.s3entry_method == 1) {
-> +		shimphy_set((PWRDWN_SEQ_NO_SEQUENCING <<
-> +			    SHIMPHY_PAD_S3_PWRDWN_SEQ_SHIFT),
-> +			    ~SHIMPHY_PAD_S3_PWRDWN_SEQ_MASK);
-> +		ddr_ctrl_set(false);
-> +	}
-> +
-> +	brcmstb_pm_do_s2_sram = brcmstb_pm_copy_to_sram(&brcmstb_pm_do_s2,
-> +			brcmstb_pm_do_s2_sz);
-> +	if (!brcmstb_pm_do_s2_sram)
-> +		return -EINVAL;
-> +
-> +	return brcmstb_pm_do_s2_sram(ctrl.aon_ctrl_base,
-> +			ctrl.memcs[0].ddr_phy_base +
-> +			ctrl.pll_status_offset);
-> +}
+   285		if (ret)
+   286			goto out;
+   287	
+   288		if (vgic_has_its(kvm)) {
+   289			dist->msis_require_devid = true;
+   290			if (kvm_vgic_global_state.has_gicv4) {
+ > 291				ret = vgic_v4_init(kvm);
+   292				if (ret)
+   293					goto out;
+   294			}
+   295		}
+   296	
+   297		kvm_for_each_vcpu(i, vcpu, kvm)
+   298			kvm_vgic_vcpu_enable(vcpu);
+   299	
+   300		ret = kvm_vgic_setup_default_irq_routing(kvm);
+   301		if (ret)
+   302			goto out;
+   303	
+   304		vgic_debug_init(kvm);
+   305	
+   306		dist->initialized = true;
+   307	
+   308		/*
+   309		 * If we're initializing GICv2 on-demand when first running the VCPU
+   310		 * then we need to load the VGIC state onto the CPU.  We can detect
+   311		 * this easily by checking if we are in between vcpu_load and vcpu_put
+   312		 * when we just initialized the VGIC.
+   313		 */
+   314		preempt_disable();
+   315		vcpu = kvm_arm_get_running_vcpu();
+   316		if (vcpu)
+   317			kvm_vgic_load(vcpu);
+   318		preempt_enable();
+   319	out:
+   320		return ret;
+   321	}
+   322	
+   323	static void kvm_vgic_dist_destroy(struct kvm *kvm)
+   324	{
+   325		struct vgic_dist *dist = &kvm->arch.vgic;
+   326	
+   327		dist->ready = false;
+   328		dist->initialized = false;
+   329	
+   330		kfree(dist->spis);
+   331		dist->nr_spis = 0;
+   332	
+   333		if (kvm_vgic_global_state.has_gicv4 && vgic_has_its(kvm))
+ > 334			vgic_v4_teardown(kvm);
+   335	}
+   336	
+   337	void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
 
-... here we copy the function into that executable SRAM, and then try to
-execute it, with the MMU on ... 
-
-> +#define SWAP_STACK(new_sp, saved_sp) \
-> +	__asm__ __volatile__ ( \
-> +		 "mov	%[save], sp\n" \
-> +		 "mov	sp, %[new]\n" \
-> +		 : [save] "=&r" (saved_sp) \
-> +		 : [new] "r" (new_sp) \
-> +		)
-> +
-> +/*
-> + * S3 mode resume to the bootloader before jumping back to Linux, so we can be
-> + * a little less careful about running from DRAM.
-> + */
-> +static int brcmstb_pm_do_s3(unsigned long sp)
-> +{
-> +	unsigned long save_sp;
-> +	int ret;
-> +
-> +	/* Move to a new stack */
-> +	SWAP_STACK(sp, save_sp);
-> +
-> +	/* should not return */
-> +	ret = brcmstb_pm_s3_finish();
-> +
-> +	SWAP_STACK(save_sp, sp);
-> +
-> +	pr_err("Could not enter S3\n");
-> +
-> +	return ret;
-> +}
-
-The compiler can, and almost certainly will spill stack variables. You
-cannot swap the stack safely with inline asm like this. If you need to
-do this, you need to perform the whole swap-call-swap sequence in a
-single inline asm block.
-
-[...]
-
-> +ENTRY(brcmstb_pm_do_s2)
-> +	stmfd	sp!, {r4-r11, lr}
-> +	mov	AON_CTRL_REG, r0
-> +	mov	DDR_PHY_STATUS_REG, r1
-> +
-> +	/* Flush memory transactions */
-> +	dsb
-> +
-> +	/* Cache DDR_PHY_STATUS_REG translation */
-> +	ldr	r0, [DDR_PHY_STATUS_REG]
-> +
-> +	/* power down request */
-> +	ldr	r0, =PM_S2_COMMAND
-> +	ldr	r1, =0
-> +	str	r1, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-> +	ldr	r1, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-> +	str	r0, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-> +	ldr	r0, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-> +
-> +	/* Wait for interrupt */
-> +	wfi
-> +	nop
-> +
-> +	/* Bring MEMC back up */
-> +1:	ldr	r0, [DDR_PHY_STATUS_REG]
-> +	ands	r0, #1
-> +	beq	1b
-> +
-> +	/* Power-up handshake */
-> +	ldr	r0, =1
-> +	str	r0, [AON_CTRL_REG, #AON_CTRL_HOST_MISC_CMDS]
-> +	ldr	r0, [AON_CTRL_REG, #AON_CTRL_HOST_MISC_CMDS]
-> +
-> +	ldr	r0, =0
-> +	str	r0, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-> +	ldr	r0, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-> +
-> +	/* Return to caller */
-> +	ldr	r0, =0
-> +	ldmfd	sp!, {r4-r11, pc}
-> +
-> +	ENDPROC(brcmstb_pm_do_s2)
-
-What happens to any page table walks or speculative fetches that occur
-in the window where the DDR is off?
-
-If the former can be stalled, the CPU can deadlock. If you can any sort
-of external abort as a result of either, the core will go into nowhere
-land trying to handle it.
-
-I do not think this is safe.
-
-Thanks,
-Mark.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 20100 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170628/4ca1ae85/attachment-0001.gz>
