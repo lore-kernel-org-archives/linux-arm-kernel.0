@@ -1,89 +1,233 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 27 Jun 2017 15:56:10 +0200
-Subject: [Devel] [RESEND PATCH v9 3/3] iommu/arm-smmu-v3: Add workaround
- for Cavium ThunderX2 erratum #126
-In-Reply-To: <1498224876-5200-1-git-send-email-gakula@caviumnetworks.com>
-References: <1498224876-5200-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <20170627135610.GX658@rric.localdomain>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 27 Jun 2017 16:57:10 +0300
+Subject: [PATCH v5 2/2] arm64: dts: renesas: salvator-x: Add ADV7482
+ support
+In-Reply-To: <f1967d99-da16-303f-f3e9-7a3d28ccaf1d@ideasonboard.com>
+References: <cover.90fc3153078e79a3f74af832de923ac675eb29ad.1497469745.git-series.kieran.bingham+renesas@ideasonboard.com>
+ <10057741.K1MBojqRFe@avalon>
+ <f1967d99-da16-303f-f3e9-7a3d28ccaf1d@ideasonboard.com>
+Message-ID: <3381435.LMORAGhIb5@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.06.17 19:04:36, Geetha sowjanya wrote:
-> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+Hi Kieran,
+
+On Tuesday 27 Jun 2017 10:25:39 Kieran Bingham wrote:
+> On 23/06/17 08:43, Laurent Pinchart wrote:
+> > On Wednesday 14 Jun 2017 20:58:13 Kieran Bingham wrote:
+> >> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> >> 
+> >> The Salvator boards use an ADV7482 receiver for HDMI and CVBS inputs.
+> >> 
+> >> Provide ADV7482 node on the i2c4 bus, along with connectors for the
+> >> hdmi and cvbs inputs, and link to the csi20 and csi40 nodes as outputs.
+> >> 
+> >> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> >> 
+> >> v4:
+> >>  - dt: Rebase to dts/renesas/salvator-x.dtsi
+> >>  - dt: Use AIN0-7 rather than AIN1-8
+> >> 
+> >> v5:
+> >>  - dt: Move to salvator-common.dtsi
+> >> 
+> >> ---
+> >> 
+> >>  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 123 ++++++++++++++++-
+> >>  1 file changed, 123 insertions(+)
+> >> 
+> >> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> >> b/arch/arm64/boot/dts/renesas/salvator-common.dtsi index
+> >> aef35e0b685a..d74fb55c38bc 100644
+> >> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> >> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> >> @@ -65,6 +65,27 @@
+> >>  		enable-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
+> >>  	};
+> >> 
+> >> +	cvbs-in {
+> >> +		compatible = "composite-video-connector";
+> >> +		label = "CVBS IN";
+> >> +
+> >> +		port {
+> >> +			cvbs_con: endpoint {
+> >> +			};
+> >> +		};
+> >> +	};
+> >> +
+> >> +	hdmi-in {
+> >> +		compatible = "hdmi-connector";
+> >> +		label = "HDMI IN";
+> >> +		type = "a";
+> >> +
+> >> +		port {
+> >> +			hdmi_in_con: endpoint {
+> >> +			};
+> >> +		};
+> >> +	};
+> >> +
+> >>  	reg_1p8v: regulator0 {
+> >>  		compatible = "regulator-fixed";
+> >>  		regulator-name = "fixed-1.8V";
+> >> @@ -257,6 +278,59 @@
+> >>  	};
+> >>  };
+> >> 
+> >> +&csi20 {
+> >> +	status = "okay";
+> >> +
+> >> +	ports {
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		port at 0 {
+> >> +			reg = <0>;
+> > 
+> > Aren't #address-cells, #size-cells and reg already present in the SoC
+> > .dtsi ? And if they're not, shouldn't they be ? :-)
 > 
-> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
-> lines for gerror, eventq and cmdq-sync.
+> Hrm - I think I added them because I was getting warnings from the DTC.
 > 
-> New named irq "combined" is set as a errata workaround, which allows to
-> share the irq line by register single irq handler for all the interrupts.
+> I've removed them from the csi nodes and no warning returns :)
+> So they're gone.
+
+You need the #address-cells and #size-cells properties in the ports node, but 
+as they're already added by the SoC .dtsi, you don't need to duplicate them 
+here.
+
+> >> +			csi20_in: endpoint {
+> >> +				clock-lanes = <0>;
+> >> +				data-lanes = <1>;
+> >> +				remote-endpoint = <&adv7482_txb>;
+> >> +			};
+> >> +		};
+> >> +	};
+> >> +};
+> >> +
+> >> +&csi40 {
+> >> +	status = "okay";
+> >> +
+> >> +	ports {
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
 > 
-> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
-> ---
->  Documentation/arm64/silicon-errata.txt             |    1 +
->  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    6 +
->  drivers/acpi/arm64/iort.c                          |   57 ++++++++---
->  drivers/iommu/arm-smmu-v3.c                        |  100 ++++++++++++++-----
->  4 files changed, 121 insertions(+), 43 deletions(-)
+> # Removed
+> 
+> >> +
+> >> +		port at 0 {
+> >> +			reg = <0>;
+> >> +
+> >> +			csi40_in: endpoint {
+> >> +				clock-lanes = <0>;
+> >> +				data-lanes = <1 2 3 4>;
+> >> +				remote-endpoint = <&adv7482_txa>;
+> >> +			};
+> >> +		};
+> >> +	};
+> >> +};
+> >> +
+> >> +&cvbs_con {
+> >> +	port {
+> >> +		cvbs_in: endpoint {
+> >> +			remote-endpoint = <&adv7482_ain7>;
+> >> +		};
+> >> +	};
+> >> +};
+> > 
+> > You could merge this with the cvbs_con node above.
+> 
+> What is the distinction that means cvbs_con can be merged where hdmi_in_con
+> would not ?
 
-> +static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
-> +{
-> +	int ret, irq;
-> +	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
-> +
-> +	/* Disable IRQs first */
-> +	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
-> +				      ARM_SMMU_IRQ_CTRLACK);
-> +	if (ret) {
-> +		dev_err(smmu->dev, "failed to disable irqs\n");
-> +		return ret;
-> +	}
-> +
-> +	irq = smmu->combined_irq;
-> +	if (irq) {
-> +		/*
-> +		 * Cavium ThunderX2 implementation doesn't not support unique
-> +		 * irq lines. Use single irq line for all the SMMUv3 interrupts.
-> +		 */
-> +		ret = devm_request_threaded_irq(smmu->dev, irq,
-> +					arm_smmu_combined_irq_handler,
-> +					arm_smmu_combined_irq_thread,
-> +					IRQF_ONESHOT,
+No reason, the same comment applies to HDMI too :-)
 
-Without the IRQF_SHARED flag set I see the following on a dual node
-system now:
+> Similarly, I see that VGA out is 'merged' where hdmi outs are not ... is it
+> just determined by whether the connector is on all boards that inherit
+> salvator-common.dtsi ?
 
-[   17.403260] arm-smmu-v3 arm-smmu-v3.0.auto: option mask 0x2
-[   17.408853] arm-smmu-v3 arm-smmu-v3.0.auto: ias 44-bit, oas 44-bit (features 0x0000172d)
-[   17.417259] arm-smmu-v3 arm-smmu-v3.1.auto: option mask 0x2
-[   17.422856] arm-smmu-v3 arm-smmu-v3.1.auto: ias 44-bit, oas 44-bit (features 0x0000172d)
-[   17.431193] arm-smmu-v3 arm-smmu-v3.2.auto: option mask 0x2
-[   17.436787] arm-smmu-v3 arm-smmu-v3.2.auto: ias 44-bit, oas 44-bit (features 0x0000172d)
-[   17.445123] arm-smmu-v3 arm-smmu-v3.3.auto: option mask 0x2
-[   17.450697] arm-smmu-v3 arm-smmu-v3.3.auto: ias 44-bit, oas 44-bit (features 0x0000172d)
-[   17.458984] genirq: Flags mismatch irq 5. 00002001 (arm-smmu-v3-combined-irq) vs. 00002001 (arm-smmu-v3-combined-irq)
-[   17.610636] arm-smmu-v3 arm-smmu-v3.3.auto: failed to enable combined irq
-[   17.617491] arm-smmu-v3 arm-smmu-v3.4.auto: option mask 0x2
-[   17.623073] arm-smmu-v3 arm-smmu-v3.4.auto: ias 44-bit, oas 44-bit (features 0x0000172d)
-[   17.631339] genirq: Flags mismatch irq 6. 00002001 (arm-smmu-v3-combined-irq) vs. 00002001 (arm-smmu-v3-combined-irq)
-[   17.782944] arm-smmu-v3 arm-smmu-v3.4.auto: failed to enable combined irq
-[   17.789780] arm-smmu-v3 arm-smmu-v3.5.auto: option mask 0x2
-[   17.795367] arm-smmu-v3 arm-smmu-v3.5.auto: ias 44-bit, oas 44-bit (features 0x0000172d)
-[   17.803640] genirq: Flags mismatch irq 7. 00002001 (arm-smmu-v3-combined-irq) vs. 00002001 (arm-smmu-v3-combined-irq)
-[   17.955248] arm-smmu-v3 arm-smmu-v3.5.auto: failed to enable combined irq
+My point was that it seems a bit pointless to define a node and extend it with 
+additional properties in the same file, when you could merge those properties 
+in the node definition. You only need to extend nodes with additional 
+properties when they're defined in one file and extended in another one.
 
-In __setup_irq() in kernel/irq/manage.c there is a check if that flag
-is set which causes the error is shown.
+> > Apart from that the patch looks good to me.
+> > 
+> > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > 
+> >> +&hdmi_in_con {
+> >> +	port {
+> >> +		hdmi_in: endpoint {
+> >> +			remote-endpoint = <&adv7482_hdmi>;
+> >> +		};
+> >> +	};
+> >> +};
+> >> +
+> >>  &du {
+> >>  	pinctrl-0 = <&du_pins>;
+> >>  	pinctrl-names = "default";
+> >> @@ -343,6 +417,55 @@
+> >> 
+> >>  		shunt-resistor-micro-ohms = <5000>;
+> >>  	};
+> >> +
+> >> +	video-receiver at 70 {
+> >> +		compatible = "adi,adv7482";
+> >> +		reg = <0x70>;
+> >> +
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> 
+> But I can't remove these # without generating a warning message ...
 
--Robert
+The properties are needed, why should you remove them ? :-)
 
-> +					"arm-smmu-v3-combined-irq", smmu);
-> +		if (ret < 0)
-> +			dev_warn(smmu->dev, "failed to enable combined irq\n");
-> +	} else
-> +		arm_smmu_setup_unique_irqs(smmu);
-> +
-> +	if (smmu->features & ARM_SMMU_FEAT_PRI)
-> +		irqen_flags |= IRQ_CTRL_PRIQ_IRQEN;
->  
->  	/* Enable interrupt generation on the SMMU */
->  	ret = arm_smmu_write_reg_sync(smmu, irqen_flags,
+> >> +
+> >> +		interrupt-parent = <&gpio6>;
+> >> +		interrupt-names = "intrq1", "intrq2";
+> >> +		interrupts = <30 IRQ_TYPE_LEVEL_LOW>,
+> >> +			     <31 IRQ_TYPE_LEVEL_LOW>;
+> >> +
+> >> +		port at 7 {
+> >> +			reg = <7>;
+> >> +
+> >> +			adv7482_ain7: endpoint {
+> >> +				remote-endpoint = <&cvbs_in>;
+> >> +			};
+> >> +		};
+> >> +
+> >> +		port at 8 {
+> >> +			reg = <8>;
+> >> +
+> >> +			adv7482_hdmi: endpoint {
+> >> +				remote-endpoint = <&hdmi_in>;
+> >> +			};
+> >> +		};
+> >> +
+> >> +		port at 10 {
+> >> +			reg = <10>;
+> >> +
+> >> +			adv7482_txa: endpoint {
+> >> +				clock-lanes = <0>;
+> >> +				data-lanes = <1 2 3 4>;
+> >> +				remote-endpoint = <&csi40_in>;
+> >> +			};
+> >> +		};
+> >> +
+> >> +		port at 11 {
+> >> +			reg = <11>;
+> >> +
+> >> +			adv7482_txb: endpoint {
+> >> +				clock-lanes = <0>;
+> >> +				data-lanes = <1>;
+> >> +				remote-endpoint = <&csi20_in>;
+> >> +			};
+> >> +		};
+> >> +	};
+> >>  };
+> >>  
+> >>  &i2c_dvfs {
+
+-- 
+Regards,
+
+Laurent Pinchart
