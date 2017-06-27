@@ -1,176 +1,149 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 27 Jun 2017 05:27:57 +0000
-Subject: [PATCH V4 5/7] pinctrl: imx: remove gpio_request_enable and
- gpio_disable_free
-In-Reply-To: <804b1d3135af76ed8d26ecd5c3dd1f80@agner.ch>
-References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
- <1498046395-30001-6-git-send-email-aisheng.dong@nxp.com>
- <804b1d3135af76ed8d26ecd5c3dd1f80@agner.ch>
-Message-ID: <AM3PR04MB3065FE9A282899398C35E6B80DC0@AM3PR04MB306.eurprd04.prod.outlook.com>
+Date: Tue, 27 Jun 2017 05:32:00 +0000
+Subject: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k pull-down on
+ USDHCx clock
+In-Reply-To: <c69c5ffb-1142-74fa-4be4-1112c49ae67c@boundarydevices.com>
+References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
+ <20170615033851.GA5902@dragon>
+ <AM3PR04MB306DAC69AE94A872373206280C00@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <c69c5ffb-1142-74fa-4be4-1112c49ae67c@boundarydevices.com>
+Message-ID: <AM3PR04MB306F527858F26C0F686617880DC0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Troy,
+
 > -----Original Message-----
-> From: Stefan Agner [mailto:stefan at agner.ch]
-> Sent: Tuesday, June 27, 2017 11:48 AM
-> To: A.s. Dong
-> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
-> kernel at pengutronix.de; Alexandre Courbot
-> Subject: Re: [PATCH V4 5/7] pinctrl: imx: remove gpio_request_enable and
-> gpio_disable_free
+> From: Troy Kisky [mailto:troy.kisky at boundarydevices.com]
+> Sent: Friday, June 16, 2017 1:46 AM
+> To: A.s. Dong; Shawn Guo; Frank Li
+> Cc: shawn.guo at linaro.org; Fabio Estevam; gary.bisson at boundarydevices.com;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k pull-down
+> on USDHCx clock
 > 
-> On 2017-06-21 04:59, Dong Aisheng wrote:
-> > gpio_request_enable/disable_free actually are not quite necessary as
-> > standard IMX pinctrl binding already sets GPIO mux from device tree,
-> > e.g. VF610_PAD_PTB20__GPIO_42 or MX7D_PAD_SD2_CD_B__GPIO5_IO9 No need
-> > to do it again in gpio_request_enable.
+> On 6/14/2017 9:31 PM, A.s. Dong wrote:
+> > Hi Troy,
 > >
-> > And according to Stefan:
-> > "For all GPIO I checked in upstream device trees we assign a pinctrl
-> > to the same node, so in all cases gpio_request_enable/disable is
-> > really unnecessary."
+> >> -----Original Message-----
+> >> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> >> Sent: Thursday, June 15, 2017 11:39 AM
+> >> To: Troy Kisky; A.s. Dong; Frank Li
+> >> Cc: shawn.guo at linaro.org; Fabio Estevam;
+> >> gary.bisson at boundarydevices.com; linux-arm-kernel at lists.infradead.org
+> >> Subject: Re: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k
+> >> pull-down on USDHCx clock
+> >>
+> >> On Wed, Jun 07, 2017 at 10:45:41AM -0700, Troy Kisky wrote:
+> >>> No i.mx6q board uses a 100k pull-down on clock, why should i.mx7d ?
+> >>>
 > >
-> > So it should be safe to simply remove it.
+> > I saw the mx7d evk clk resistor pull-down is DNP, then why we disable
+> > internal pad pull-down?
 > 
-> Thanks looks good.
 > 
-> I would add a comment that this changes semantics for Vybrid, e.g.
-> 
-> "The two functions have been introduced for Vybrid (through
-> SHARE_MUX_CONF_REG) and mux pins as GPIOs automatically when a GPIO gets
-> requested. The automatic mux is optional by the pinmux/gpio subsystem
-> semantics, and other NXP devices do not use it, instead an explicit
-> pinctrl node is added in the device tree to mux GPIOs where required.
-> Hence this change aligns Vybrid to other NXP (i.MX) devices.
-> 
-> Note that all upstream device tree assign proper pinctrl properties where
-> GPIOs are used so no change is necessary for device trees."
+> That sounds like a very good reason to disable to me.
+> Why rely on a DNP? Also, consistency with imx6 is nice.
 > 
 
-The comments looks ok to me.
+Sorry missed your reply.
 
-Linus,
-Would you help append it when pick the patch?
-
-Stefan,
-Would you help review imx7ulp GPIO patches as well after this pinctrl change?
+Not quite understand your point.
+We would like to pull down the clk signal in default state,
+But due to the board pull-down resistor is DNP (not exist),
+That's why we use internal pull down function instead.
 
 Regards
 Dong Aisheng
 
-> Otherwise:
-> Acked-by: Stefan Agner <stefan@agner.ch>
-> 
-> --
-> Stefan
 > 
 > >
-> > Cc: Stefan Agner <stefan@agner.ch>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Alexandre Courbot <gnurou@gmail.com>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Fugang Duan <fugang.duan@nxp.com>
-> > Cc: Bai Ping <ping.bai@nxp.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > Regards
+> > Dong Aisheng
 > >
-> > ---
-> > ChangeLog:
-> >  * New patch.
-> >    Instead of fixing gpio_request_enable/disable, we decided to remove
-> it
-> >    after dicussion with Stefan (see blow).
-> >    https://www.spinics.net/lists/arm-kernel/msg583154.html
-> > ---
-> >  drivers/pinctrl/freescale/pinctrl-imx.c | 69
-> > ---------------------------------
-> >  1 file changed, 69 deletions(-)
+> >>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> >>
+> >> Add Dong and Frank who may help to confirm.
+> >>
+> >> Shawn
+> >>
+> >>> ---
+> >>>  arch/arm/boot/dts/imx7d-sdb.dts | 14 +++++++-------
+> >>>  1 file changed, 7 insertions(+), 7 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts
+> >>> b/arch/arm/boot/dts/imx7d-sdb.dts index 54c4540..cab9208 100644
+> >>> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+> >>> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+> >>> @@ -591,7 +591,7 @@
+> >>>  		pinctrl_usdhc1: usdhc1grp {
+> >>>  			fsl,pins = <
+> >>>  				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
+> >>> -				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
+> >>> +				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
+> >>>  				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
+> >>>  				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
+> >>>  				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
+> >>> @@ -605,7 +605,7 @@
+> >>>  		pinctrl_usdhc2: usdhc2grp {
+> >>>  			fsl,pins = <
+> >>>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
+> >>> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x19
+> >>> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
+> >>>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
+> >>>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
+> >>>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
+> >>> @@ -616,7 +616,7 @@
+> >>>  		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
+> >>>  			fsl,pins = <
+> >>>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
+> >>> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1a
+> >>> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
+> >>>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
+> >>>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5a
+> >>>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5a
+> >>> @@ -627,7 +627,7 @@
+> >>>  		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
+> >>>  			fsl,pins = <
+> >>>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
+> >>> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1b
+> >>> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0b
+> >>>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5b
+> >>>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5b
+> >>>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5b
+> >>> @@ -639,7 +639,7 @@
+> >>>  		pinctrl_usdhc3: usdhc3grp {
+> >>>  			fsl,pins = <
+> >>>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+> >>> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x19
+> >>> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
+> >>>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
+> >>>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
+> >>>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
+> >>> @@ -655,7 +655,7 @@
+> >>>  		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
+> >>>  			fsl,pins = <
+> >>>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
+> >>> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
+> >>> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
+> >>>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
+> >>>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
+> >>>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
+> >>> @@ -671,7 +671,7 @@
+> >>>  		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
+> >>>  			fsl,pins = <
+> >>>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
+> >>> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
+> >>> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0b
+> >>>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
+> >>>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
+> >>>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
+> >>> --
+> >>> 2.7.4
+> >>>
+> >>>
+> >>> _______________________________________________
+> >>> linux-arm-kernel mailing list
+> >>> linux-arm-kernel at lists.infradead.org
+> >>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > >
-> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > index fc1ba3c..505fe79 100644
-> > --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > @@ -255,73 +255,6 @@ static int imx_pmx_set(struct pinctrl_dev
-> > *pctldev, unsigned selector,
-> >  	return 0;
-> >  }
-> >
-> > -static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
-> > -			struct pinctrl_gpio_range *range, unsigned offset)
-> > -{
-> > -	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-> > -	struct imx_pinctrl_soc_info *info = ipctl->info;
-> > -	const struct imx_pin_reg *pin_reg;
-> > -	struct group_desc *grp;
-> > -	struct imx_pin *imx_pin;
-> > -	unsigned int pin, group;
-> > -	u32 reg;
-> > -
-> > -	/* Currently implementation only for shared mux/conf register */
-> > -	if (!(info->flags & SHARE_MUX_CONF_REG))
-> > -		return 0;
-> > -
-> > -	pin_reg = &info->pin_regs[offset];
-> > -	if (pin_reg->mux_reg == -1)
-> > -		return -EINVAL;
-> > -
-> > -	/* Find the pinctrl config with GPIO mux mode for the requested pin
-> */
-> > -	for (group = 0; group < pctldev->num_groups; group++) {
-> > -		grp = pinctrl_generic_get_group(pctldev, group);
-> > -		if (!grp)
-> > -			continue;
-> > -		for (pin = 0; pin < grp->num_pins; pin++) {
-> > -			imx_pin = &((struct imx_pin *)(grp->data))[pin];
-> > -			if (imx_pin->pin == offset && !imx_pin->mux_mode)
-> > -				goto mux_pin;
-> > -		}
-> > -	}
-> > -
-> > -	return -EINVAL;
-> > -
-> > -mux_pin:
-> > -	reg = readl(ipctl->base + pin_reg->mux_reg);
-> > -	reg &= ~info->mux_mask;
-> > -	reg |= imx_pin->config;
-> > -	writel(reg, ipctl->base + pin_reg->mux_reg);
-> > -
-> > -	return 0;
-> > -}
-> > -
-> > -static void imx_pmx_gpio_disable_free(struct pinctrl_dev *pctldev,
-> > -			struct pinctrl_gpio_range *range, unsigned offset)
-> > -{
-> > -	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-> > -	struct imx_pinctrl_soc_info *info = ipctl->info;
-> > -	const struct imx_pin_reg *pin_reg;
-> > -	u32 reg;
-> > -
-> > -	/*
-> > -	 * Only Vybrid has the input/output buffer enable flags (IBE/OBE)
-> > -	 * They are part of the shared mux/conf register.
-> > -	 */
-> > -	if (!(info->flags & SHARE_MUX_CONF_REG))
-> > -		return;
-> > -
-> > -	pin_reg = &info->pin_regs[offset];
-> > -	if (pin_reg->mux_reg == -1)
-> > -		return;
-> > -
-> > -	/* Clear IBE/OBE/PUE to disable the pin (Hi-Z) */
-> > -	reg = readl(ipctl->base + pin_reg->mux_reg);
-> > -	reg &= ~0x7;
-> > -	writel(reg, ipctl->base + pin_reg->mux_reg);
-> > -}
-> > -
-> >  static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-> >  	   struct pinctrl_gpio_range *range, unsigned offset, bool input)
-> {
-> > @@ -357,8 +290,6 @@ static const struct pinmux_ops imx_pmx_ops = {
-> >  	.get_function_name = pinmux_generic_get_function_name,
-> >  	.get_function_groups = pinmux_generic_get_function_groups,
-> >  	.set_mux = imx_pmx_set,
-> > -	.gpio_request_enable = imx_pmx_gpio_request_enable,
-> > -	.gpio_disable_free = imx_pmx_gpio_disable_free,
-> >  	.gpio_set_direction = imx_pmx_gpio_set_direction,  };
