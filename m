@@ -1,78 +1,70 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 27 Jun 2017 20:30:53 +0300
-Subject: [PATCH v2] arm64: dts: r8a7795: add IMR-LX4 support
-Message-ID: <20170627173152.532417992@cogentembedded.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 27 Jun 2017 19:31:59 +0200
+Subject: [PATCH v3 2/3] dt-bindings: input: Add R_LRADC support for A83T
+In-Reply-To: <CAAST=9x+fS41tznuJ9hQ-cQxecKN751=61YkhEt31DvpeqeEcA@mail.gmail.com>
+References: <20170624024515.4669-1-techping.chan@gmail.com>
+ <20170624024515.4669-3-techping.chan@gmail.com>
+ <20170626171524.cqfyasetpsfr6xfg@flea.lan>
+ <CAAST=9x+fS41tznuJ9hQ-cQxecKN751=61YkhEt31DvpeqeEcA@mail.gmail.com>
+Message-ID: <20170627173159.g3t3rbts3y7z6jf7@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the IMR-LX4 devices in the R8A7795 device tree.
+On Tue, Jun 27, 2017 at 11:18:17PM +0800, Ziping Chen wrote:
+> 2017-06-27 1:15 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> > Hi,
+> >
+> > On Sat, Jun 24, 2017 at 10:45:14AM +0800, Ziping Chen wrote:
+> >> From: Ziping Chen <techping.chan@gmail.com>
+> >>
+> >> Allwinner A83T SoC has a low res adc like the one
+> >> in Allwinner A10 SoC.
+> >>
+> >> Add binding for it.
+> >>
+> >> Signed-off-by: Ziping Chen <techping.chan@gmail.com>
+> >> Acked-by: Rob Herring <robh@kernel.org>
+> >> ---
+> >>  Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt | 6 ++++--
+> >>  1 file changed, 4 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+> >> index 4357e498ef04..525d85e3043f 100644
+> >> --- a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+> >> +++ b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+> >> @@ -2,12 +2,14 @@ Allwinner sun4i low res adc attached tablet keys
+> >>  ------------------------------------------------
+> >>
+> >>  Required properties:
+> >> - - compatible: "allwinner,sun4i-a10-lradc-keys"
+> >> + - compatible: should be one of the following string:
+> >> +             "allwinner,sun4i-a10-lradc-keys"
+> >> +             "allwinner,sun8i-a83t-r-lradc-keys"
+> >
+> > This doesn't really have anything related to keys, and can be used
+> > purely as an ADC.
+> >
+> > I know this is the compatible that was used for the A10, but I'd
+> > rather drop the keys for the the new compatible.
+> >
+> 
+> LRADC is named KEYADC in some other SoCs' User Manual(such as R40 User
+> Manual V1.0), thus LRADC is related to keys.
 
-Based on the original (and large) patch by Konstantin Kozhevnikov
-<Konstantin.Kozhevnikov@cogentembedded.com>.
+It's still called LRADC on the A83T, so we'll use that name. If we
+ever need another compatible for the R40, then yes, keyadc would make
+sense in that case.
 
-Signed-off-by: Konstantin Kozhevnikov <Konstantin.Kozhevnikov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Maxime
 
----
-This patch is against the 'renesas-devel-20170626-v4.12-rc7' tag of Simon
-Horman's 'renesas.git' repo.
-
-The IMR-LX4 bindings were documented in the IMR driver patch and ACK'ed by Rob
-Herring, so I don't expect them to change...
-
-Changes in version 2:
-- added SoC specific "compatible" prop values;
-- refreshed the patch;
-- added Geert's tag.
-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi |   36 +++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1535,6 +1535,42 @@
- 			status = "disabled";
- 		};
- 
-+		imr-lx4 at fe860000 {
-+			compatible = "renesas,r8a7795-imr-lx4",
-+				     "renesas,imr-lx4";
-+			reg = <0 0xfe860000 0 0x2000>;
-+			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 823>;
-+			power-domains = <&sysc R8A7795_PD_A3VC>;
-+		};
-+
-+		imr-lx4 at fe870000 {
-+			compatible = "renesas,r8a7795-imr-lx4",
-+				     "renesas,imr-lx4";
-+			reg = <0 0xfe870000 0 0x2000>;
-+			interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 822>;
-+			power-domains = <&sysc R8A7795_PD_A3VC>;
-+		};
-+
-+		imr-lx4 at fe880000 {
-+			compatible = "renesas,r8a7795-imr-lx4",
-+				     "renesas,imr-lx4";
-+			reg = <0 0xfe880000 0 0x2000>;
-+			interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 821>;
-+			power-domains = <&sysc R8A7795_PD_A3VC>;
-+		};
-+
-+		imr-lx4 at fe890000 {
-+			compatible = "renesas,r8a7795-imr-lx4",
-+				     "renesas,imr-lx4";
-+			reg = <0 0xfe890000 0 0x2000>;
-+			interrupts = <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 820>;
-+			power-domains = <&sysc R8A7795_PD_A3VC>;
-+		};
-+
- 		vspbc: vsp at fe920000 {
- 			compatible = "renesas,vsp2";
- 			reg = <0 0xfe920000 0 0x8000>;
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/5159b6b8/attachment.sig>
