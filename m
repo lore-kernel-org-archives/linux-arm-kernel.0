@@ -1,225 +1,55 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 27 Jun 2017 10:38:59 -0700
-Subject: [PATCH] ARM: dts: BCM5301X: Add support for Linksys EA9500
-In-Reply-To: <CAChtp76sbKjxq03ipSDJN69XeJRU-0aRTeJ75+gCXZfo4D5r0A@mail.gmail.com>
-References: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
- <20170315185214.GF21021@lunn.ch>
- <CAChtp75xk3LN1-DPVvaHT5qEvrdoFFvXEk-daVCcJ=4rYu_vmw@mail.gmail.com>
- <7f5ddeba-6f79-9de5-2c67-a77e6bec0ef9@broadcom.com>
- <CAChtp75mzHkSg4rVh602vaMotqs6NtaPOD4383Gef8tVPO37FQ@mail.gmail.com>
- <2e4ed52f-4134-9b6a-18c9-7c1f28cd7038@broadcom.com>
- <CAChtp76sbKjxq03ipSDJN69XeJRU-0aRTeJ75+gCXZfo4D5r0A@mail.gmail.com>
-Message-ID: <03ba6198-a2cc-da9f-7d7d-f626d53d5717@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 27 Jun 2017 18:38:59 +0100
+Subject: [PATCH 1/4] misc: sram: Allow ARM64 to select SRAM_EXEC
+In-Reply-To: <20170626223248.14199-3-f.fainelli@gmail.com>
+References: <20170626223248.14199-1-f.fainelli@gmail.com>
+ <20170626223248.14199-3-f.fainelli@gmail.com>
+Message-ID: <20170627173859.GA5189@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+On Mon, Jun 26, 2017 at 03:32:42PM -0700, Florian Fainelli wrote:
+> Now that ARM64 also has a fncpy() implementation, allow selection
+> SRAM_EXEC for ARM64 as well.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-On 06/27/2017 10:03 AM, Vivek Unune wrote:
-> On Wed, Mar 15, 2017 at 5:19 PM, Florian Fainelli
-> <florian.fainelli@broadcom.com> wrote:
->> On 03/15/2017 01:18 PM, Vivek Unune wrote:
->>> Thanks Florian.
->>>
->>> Let me try this out. First I'll try to figure out how to add a mdio node.
->>>
->>> Over the weekend I was trying enable DSA driver, but did not see DSA
->>> under network. I'm using LEDE source with kernel 4.9. Nor did I see it
->>> when I tried 'make kernel_menuconfig'
->>
->> (please don't top post on public mailing lists)
->>
->> You need to enable SWITCHDEV to have DSA. AFAIR SWITCHDEV may depend on
->> EXPERT/EXPERIMENTAL as of 4.9 (or that was before).
->>
-> 
-> Florian,
-> 
-> I have managed to use DSA driver and was able detect both internal and
-> external switches. However, I only get packets flowing only through the
-> internal switch. I have used the ip & bridge commands to setup the vlan
-> 101 & 102 for lan and wan respectively.
-> 
-> VLAN101 = lan1 lan2 lan3 lan4 lan5 lan6 lan7 lan8 eth0.101
+Sorr,y but I must NAK this patch.
 
-That looks reasonable although keep in mind that the IMP/CPU interfaces
-of the switch are configured with VLAN tags (see commit [1]), so you may
-need to make sure that port 0 of the internal switch is not accidentally
-configured back to untagged since that would cause problem when
-terminating the VLAN tag on the SW side.
+As mentioned on prior threads regarding fncpy, I do not think it makes
+sense to enable this for arm64. The only use-cases that have been
+described so far for this are power-management stuff that should live in
+PSCI or other secure FW, and have no place in the kernel on arm64.
 
-So here are a few things that you want to check:
+There are no other users of this functionality, and until there are, I
+see no reason to enable this, and risk a proliferation of unnecessary
+platform-specific code.
 
-- read the MIB counters from the "extswitch" interface and see if
-packets flow through in both directions with no errors
+It should be possible to #ifdef-ise the relevant callers of this such
+that they can be built on arm64 without using fncpy or sram_exec
+functionality. AFAICT, there are no users on arm64 introduced by this
+series.
 
-- check the "extswitch" VLAN configuration on both the internal switch
-side (port 0) and on the external switch side ("cpu", port 8, not visible)
+Thanks,
+Mark.
 
-- see if you can get traffic end-to-end from eth0 all the way through
-one of the external switch port. If that's the case, that means that the
-configuration of internal switch port 0, internal switch CPU port, and
-external switch external port is working and operational
-
-[1]:
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=e47112d9d6009bf6b7438cedc0270316d6b0370d
-
-> VLAN102 = wan eth0.102
+> ---
+>  drivers/misc/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Reading configs from the factory firmware, I'm sure that sw0port0 and> sw1port8 are connected. Excerpt from the same:
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index 07bbd4cc1852..ac8779278c0c 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -464,7 +464,7 @@ config SRAM
+>  	bool "Generic on-chip SRAM driver"
+>  	depends on HAS_IOMEM
+>  	select GENERIC_ALLOCATOR
+> -	select SRAM_EXEC if ARM
+> +	select SRAM_EXEC if ARM || ARM64
+>  	help
+>  	  This driver allows you to declare a memory region to be managed by
+>  	  the genalloc API. It is supposed to be used for small on-chip SRAM
+> -- 
+> 2.9.3
 > 
-> port_numbers=0 2 4 2 1 3 1 3
-> port_switch_id=1 1 1 0 1 1 0 0
-> port_names=port0 port1 port2 port3 port4 port5 port6 port7
-
-Is 0 the identifier for the external or internal switch? If 0 is
-internal switch identifier and 1 is the external switch identifier, your
-mapping looks correct to me with one exception below:
-
-> cpu_port_number=5 7 8
-> cpu_port_switch_id=0 0 0
-> hidden_port_numbers=0 8
-> hidden_port_switch_id=0 1
-> 
-> Below is my updated device tree.
-> 
-> Thanks,
-> 
-> Vivek
-> 
-> &srab {
->     compatible = "brcm,bcm53012-srab", "brcm,bcm5301x-srab";
->     status = "okay";
->     dsa,member = <0 0>;
-> 
->     ports {
->         #address-cells = <1>;
->         #size-cells = <0>;
-> 
->         port at 1 {
->             reg = <1>;
->             label = "lan7";
->         };
-> 
->         port at 2 {
->             reg = <2>;
->             label = "lan4";
->         };
-> 
->         port at 3 {
->             reg = <3>;
->             label = "lan8";
->         };
-> 
->         port at 4 {
->             reg = <4>;
->             label = "wan";
->         };
-> 
->         port at 5 {
->             reg = <5>;
->             ethernet = <&gmac0>;
->             label = "cpu";
-> 
->             fixed-link {
-> 
->                 speed = <1000>;
->                 full-duplex;
->             };
->         };
-
-I think this is meant to be port 8 here based on the hidden_port_number
-value. This actually matters for VLAN configuration because B53 is not
-(unfortunately, to be fixed) consistently using dst->cpu_port (whatever
-is configured in Device Tree) vs. dev->cpu_port (hardcoded to 8 for this
-class of switch).
-
-PS: on that front, we will have to rework that when we bring multiple
-CPU port support in DSA/B53/bcm_sf2 and so for now what we could do is
-just check that the configured CPU port in Device Tree is a valid CPU
-port for that switch (typically 5, 7 or 8), and if not, just issue a
-warning.
-
-> 
->         sw0port0: port at 0 {
->             reg = <0>;
->             label = "extswitch";
-> 
->             fixed-link {
->                 speed = <1000>;
->                 full-duplex;
->             };
-
-There might be some additional configuration needed here for this port,
-because by default, the port will most likely try to use its built-in
-PHY and maybe that's what they did, they wired the built-in PHY directly
-to the IMP port of the external switch.
-
->         };
->     };
-> };
-> 
-> &mdiomux {
->     mdio-slave at 0 {
->         reg = <0x00>;
->         address-cells = <1>;
->         size-cells = <0>;
-> 
->         switch at 0  {
->             compatible = "brcm,bcm53125";
->             #address-cells = <1>;
->             #size-cells = <0>;
->             reset-gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
->             reset-names = "robo_reset";
->              reg = <0>;
->              dsa,member = <1 0>;
-> 
->             ports {
->                 #address-cells = <1>;
->                 #size-cells = <0>;
-> 
->                 port at 0 {
->                         reg = <0>;
->                         label = "lan1";
->                 };
-> 
->                 port at 1 {
->                         reg = <1>;
->                         label = "lan5";
->                 };
-> 
->                 port at 2 {
->                         reg = <2>;
->                         label = "lan2";
->                 };
-> 
->                 port at 3 {
->                         reg = <3>;
->                         label = "lan6";
->                 };
-> 
->                 port at 4 {
->                         reg = <4>;
->                         label = "lan3";
->                 };
-> 
->                 sw1port8:port at 8 {
->                         reg = <8>;
->                         ethernet = <&sw0port0>;
->                         label = "cpu";
->                         phy-mode = "rgmii-txid";
-> 
->                         fixed-link {
->                             speed = <1000>;
->                             full-duplex;
->                         };
->                 };
->             };
->         };
->     };
-> };
-> 
-
-
--- 
-Florian
