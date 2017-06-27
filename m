@@ -1,35 +1,50 @@
-From: romeusmeister@gmail.com (Roman Storozhenko)
-Date: Tue, 27 Jun 2017 15:06:26 +0300
-Subject: [PATCH] KVM: Replaces 'unsigned' with 'unsigned int' in the
- codebase
-In-Reply-To: <9b50ee4b-d27a-8872-0cd3-cad8f5f0e0f8@redhat.com>
-References: <20170627095401.GA19864@home>
- <9b50ee4b-d27a-8872-0cd3-cad8f5f0e0f8@redhat.com>
-Message-ID: <20170627120626.GA21666@home>
+From: surenderp@techveda.org (surenderp at techveda.org)
+Date: Tue, 27 Jun 2017 17:45:35 +0530
+Subject: [PATCH] arm: boot: dts: artpec6: Remove unnecessary interrupt-parent
+ property from sub-nodes
+Message-ID: <1498565735-8208-1-git-send-email-surenderp@techveda.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 12:01:25PM +0200, Paolo Bonzini wrote:
-> 
-> 
-> On 27/06/2017 11:54, Roman Storozhenko wrote:
-> > Signed-off-by: Roman Storozhenko <romeusmeister@gmail.com>
-> > ---
-> >  virt/kvm/arm/arm.c        |  2 +-
-> >  virt/kvm/coalesced_mmio.c |  2 +-
-> >  virt/kvm/eventfd.c        | 10 ++++++----
-> >  virt/kvm/irqchip.c        |  7 ++++---
-> >  virt/kvm/kvm_main.c       | 16 ++++++++--------
-> >  5 files changed, 20 insertions(+), 17 deletions(-)
-> 
-> This change is pointless.  Contributors to KVM should know what
-> "unsigned" means.
+From: Surender Polsani <surenderp@techveda.org>
 
-Paolo, thanks that you mentioned this. But I have a question - is this just
-useless or this is an error?
+"interrupt-parent" property is declared in root node, so it is global
+to all nodes. This property is re-declared in few sub-nodes. To avoid
+duplication this property is removed from following sub-nodes:
+pmu, amba at 0, amba at 0/ethernet.
 
-I saw many places in the codebase where 'unsigned int' is used. That why I
-decided to make the codebase more standartized from the style point of
-view.
+Signed-off-by: Surender Polsani <surenderp@techveda.org>
+---
+ arch/arm/boot/dts/artpec6.dtsi | 3 ---
+ 1 file changed, 3 deletions(-)
 
-Thanks, Roman Storozhenko.
+diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+index 767cbe8..2ed1177 100644
+--- a/arch/arm/boot/dts/artpec6.dtsi
++++ b/arch/arm/boot/dts/artpec6.dtsi
+@@ -151,7 +151,6 @@
+ 		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+ 			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-affinity = <&cpu0>, <&cpu1>;
+-		interrupt-parent = <&intc>;
+ 	};
+ 
+ 	pcie: pcie at f8050000 {
+@@ -185,7 +184,6 @@
+ 		compatible = "simple-bus";
+ 		#address-cells = <0x1>;
+ 		#size-cells = <0x1>;
+-		interrupt-parent = <&intc>;
+ 		ranges;
+ 		dma-ranges = <0x80000000 0x00000000 0x40000000>;
+ 		dma-coherent;
+@@ -195,7 +193,6 @@
+ 			clocks = <&eth_phy_ref_clk>,
+ 				<&clkctrl ARTPEC6_CLK_ETH_ACLK>;
+ 			compatible = "snps,dwc-qos-ethernet-4.10";
+-			interrupt-parent = <&intc>;
+ 			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xf8010000 0x4000>;
+ 
+-- 
+1.9.1
