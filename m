@@ -1,31 +1,43 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Tue, 27 Jun 2017 18:27:22 +0200
-Subject: [PATCH v5] trace: ras: add ARM processor error information trace
- event
-In-Reply-To: <3e07b9f0-b2e8-cfd8-9deb-76ed48a8f2c1@codeaurora.org>
-References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
- <20170626140647.anigiqhk3l6ltet7@pd.tnic>
- <22ba6506-1031-437b-95ae-c26773ff84b7@huawei.com>
- <20170627072555.m5ogmljp7f6lf6fu@pd.tnic>
- <3e07b9f0-b2e8-cfd8-9deb-76ed48a8f2c1@codeaurora.org>
-Message-ID: <20170627162722.g3ryqp423d6yfjcj@pd.tnic>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Tue, 27 Jun 2017 16:38:00 +0000
+Subject: [v3] drivers:soc:fsl:qbman:qman.c: Sleep instead of stuck hacking
+ jiffies.
+In-Reply-To: <20170625024638.t6awgp7omzq5dcnk@home.buserror.net>
+References: <1493963118-11064-1-git-send-email-karim.eshapa@gmail.com>
+ <20170625024638.t6awgp7omzq5dcnk@home.buserror.net>
+Message-ID: <AM4PR0401MB1699F4CD65C50361933D2FA48FDC0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 09:40:18AM -0600, Baicar, Tyler wrote:
-> ... but there is obviously only one of those. That is something that may
-> be easy to add to the arm_event TP...or do that in a separate TP as
-> well.
 
-See here:
 
-https://lkml.kernel.org/r/20170626140647.anigiqhk3l6ltet7 at pd.tnic
+> -----Original Message-----
+> From: Scott Wood [mailto:oss at buserror.net]
+> Sent: Saturday, June 24, 2017 9:47 PM
+> To: Karim Eshapa <karim.eshapa@gmail.com>
+> Cc: Roy Pledge <roy.pledge@nxp.com>; linux-kernel at vger.kernel.org;
+> Claudiu Manoil <claudiu.manoil@nxp.com>; colin.king at canonical.com;
+> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; Leo Li
+> <leoyang.li@nxp.com>
+> Subject: Re: [v3] drivers:soc:fsl:qbman:qman.c: Sleep instead of stuck
+> hacking jiffies.
+> 
+> On Fri, May 05, 2017 at 07:45:18AM +0200, Karim Eshapa wrote:
+> > Use msleep() instead of stucking with
+> > long delay will be more efficient.
+> >
+> > Signed-off-by: Karim Eshapa <karim.eshapa@gmail.com>
+> > ---
+> >  drivers/soc/fsl/qbman/qman.c | 6 +-----
+> >  1 file changed, 1 insertion(+), 5 deletions(-)
+> 
+> Acked-by: Scott Wood <oss@buserror.net>
+> 
+> (though the subject line should be "soc/qman: ...")
+> 
+> Leo, are you going to send this patch (and other qman patches) via arm-soc?
 
-for possible things you could do.
+Yes.  I can take it through the pull request for soc/fsl via arm-soc.  As mentioned in the feedback from David in another email, probably we should update the comment and commit message to mention how 10000 cycles becomes 1ms.
 
--- 
-Regards/Gruss,
-    Boris.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+Regards,
+Leo
