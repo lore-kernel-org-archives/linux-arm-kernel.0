@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 27 Jun 2017 11:28:02 +0200
-Subject: [PATCH 2/6] arm: sun8i: orangepipc: use internal phy-mode
+Date: Tue, 27 Jun 2017 11:28:03 +0200
+Subject: [PATCH 3/6] arm: sun8i: orangepi-zero: use internal phy-mode
 In-Reply-To: <20170627092806.28181-1-clabbe.montjoie@gmail.com>
 References: <20170627092806.28181-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170627092806.28181-2-clabbe.montjoie@gmail.com>
+Message-ID: <20170627092806.28181-3-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,14 +11,14 @@ Since the PHY used is internal, simply set phy-mode as internal.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 2 +-
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index f5f0f15a2088..94edeb889e55 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -120,7 +120,7 @@
+diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+index 6713d0f2b3f4..7c154b845baa 100644
+--- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
++++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+@@ -106,7 +106,7 @@
  
  &emac {
  	phy-handle = <&int_mii_phy>;
