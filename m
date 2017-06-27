@@ -1,79 +1,48 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 27 Jun 2017 09:42:06 +0200
-Subject: [PATCH v3 9/9] of: document rs485 bindings for Atmel USART,
- Freescale UARTs and OMAP UART
-In-Reply-To: <20170626090803.10981-10-u.kleine-koenig@pengutronix.de>
-References: <20170626090803.10981-1-u.kleine-koenig@pengutronix.de>
- <20170626090803.10981-10-u.kleine-koenig@pengutronix.de>
-Message-ID: <cf02163a-72d4-5e98-a764-ba5af19a6bf7@microchip.com>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Tue, 27 Jun 2017 09:54:13 +0200
+Subject: [PATCH] arm: pass endianness info to sparse
+In-Reply-To: <20170626085311.GC4902@n2100.armlinux.org.uk>
+References: <20170624153842.61064-1-luc.vanoostenryck@gmail.com>
+ <20170626085311.GC4902@n2100.armlinux.org.uk>
+Message-ID: <20170627075411.hod4skpr6htt4nax@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/2017 at 11:08, Uwe Kleine-K?nig wrote:
-> The drivers support the rs485 binding described in rs485.txt, this commit
-> just makes that explicit.
+On Mon, Jun 26, 2017 at 09:53:11AM +0100, Russell King - ARM Linux wrote:
+> On Sat, Jun 24, 2017 at 05:38:42PM +0200, Luc Van Oostenryck wrote:
+> > ARM depends on the macros '__ARMEL__' & '__ARMEB__' being defined
+> > or not to correctly select or define endian-specific macros,
+> > structures or pieces of code.
+> > 
+> > These macros are predefined by the compiler but sparse knows
+> > nothing about them and thus may pre-process files differently
+> > from what gcc would.
+> > 
+> > Fix this by passing '-D__ARMEL__' or '-D__ARMEB__' to sparse,
+> > depending of the endianness of the kernel, like defined by GCC.
+> > 
+> > Note: In most case it won't change anything since most ARMs use
+> >       little-endian (but an allyesconfig would use big-endian!).
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> I wonder if that's a good thing - as this changes the endian conversion
+> macros and ifdefs around bitfield declarations, it means that we're not
+> testing the "popular" paths with an allyesconfig sparse - but then again,
+> I think allyesconfig with sparse is a very bad idea, it needs to be
+> targetted to the area being worked in.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+The problem is that on any CONFIG_CPU_BIG_ENDIAN config, sparse
+will process the wrong code after a '#if[n]def __ARMEB__'. Same,
+of course with a little-endian config and '#if[n]def __ARMEL__'.
 
-> ---
->  Documentation/devicetree/bindings/serial/atmel-usart.txt  | 1 +
->  Documentation/devicetree/bindings/serial/fsl-imx-uart.txt | 1 +
->  Documentation/devicetree/bindings/serial/fsl-lpuart.txt   | 1 +
->  Documentation/devicetree/bindings/serial/omap_serial.txt  | 1 +
->  4 files changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> index e6e6142e33ac..7c0d6b2f53e4 100644
-> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> @@ -24,6 +24,7 @@ Optional properties:
->  	- dma-names: "rx" for RX channel, "tx" for TX channel.
->  - atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
->    capable USARTs.
-> +- rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
->  
->  <chip> compatible description:
->  - at91rm9200:  legacy USART support
-> diff --git a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-> index 574c3a2c77d5..860a9559839a 100644
-> --- a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-> @@ -9,6 +9,7 @@ Optional properties:
->  - fsl,irda-mode : Indicate the uart supports irda mode
->  - fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
->                    in DCE mode by default.
-> +- rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
->  
->  Please check Documentation/devicetree/bindings/serial/serial.txt
->  for the complete list of generic properties.
-> diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> index c95005efbcb8..4eca15378584 100644
-> --- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> +++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> @@ -14,6 +14,7 @@ Required properties:
->  Optional properties:
->  - dmas: A list of two dma specifiers, one for each entry in dma-names.
->  - dma-names: should contain "tx" and "rx".
-> +- rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
->  
->  Note: Optional properties for DMA support. Write them both or both not.
->  
-> diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
-> index 7a71b5de77d6..43eac675f21f 100644
-> --- a/Documentation/devicetree/bindings/serial/omap_serial.txt
-> +++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
-> @@ -19,6 +19,7 @@ Optional properties:
->  - dmas : DMA specifier, consisting of a phandle to the DMA controller
->           node and a DMA channel number.
->  - dma-names : "rx" for receive channel, "tx" for transmit channel.
-> +- rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
->  
->  Example:
->  
-> 
+Since only two files test after __ARMEL__ :
+- crypto/sha1-armv4-large.S
+- crypto/sha512-core.S
+most of the code are checked correctly for a little-endian config.
+The same is not true for a big endian config since all the others
+tests are made against __ARMEB__.
 
+In short no big-endian config have never been sparse-checked for
+endiannness problems on ARM. Worse, they are wrongly checked.
 
--- 
-Nicolas Ferre
+ 
+-- Luc Van Oostenryck
