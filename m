@@ -1,47 +1,33 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 27 Jun 2017 20:36:10 +0530
-Subject: [PATCH 1/3] ARM: dts: dra71-evm: workaround incorrect DP83867 RX_CTRL
- pin strap
+Date: Tue, 27 Jun 2017 20:36:12 +0530
+Subject: [PATCH 3/3] ARM: omap2plus_defconfig: enable DP83867 phy driver
 In-Reply-To: <cover.1498573382.git.nsekhar@ti.com>
 References: <cover.1498573382.git.nsekhar@ti.com>
-Message-ID: <d283da02e13907f87d9b05a605f4114a95524255.1498573382.git.nsekhar@ti.com>
+Message-ID: <3e141e778cedc0cc6168a9f9a3787a49042681c5.1498573382.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DRA71 EVM straps the DP83867 GigaBit Ethernet phy's RX_DV/RX_CTRL pin
-in mode 1. Unfortunately, the phy data manual disallows this.
+TI's DP83867 phy is used on DRA72x EVM rev C and DRA71x
+EVMs. Enable support for it in omap2plus_defconfig.
 
-Add "ti,dp83867-rxctrl-strap-quirk" property to the phy's device-tree node
-to allow kernel to enable software workaround for this incorrect strap
-setting. This is as suggested by the phy's datamanual and ensures proper
-operation of this PHY.
-
-This needs to be done for both instances of this PHY present on the board.
+The driver is built into the kernel to help NFS booting.
 
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/boot/dts/dra71-evm.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/omap2plus_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/dra71-evm.dts b/arch/arm/boot/dts/dra71-evm.dts
-index 570f06e4f71f..c1a7ee09218f 100644
---- a/arch/arm/boot/dts/dra71-evm.dts
-+++ b/arch/arm/boot/dts/dra71-evm.dts
-@@ -205,6 +205,7 @@
- 		ti,tx-internal-delay = <DP83867_RGMIIDCTL_250_PS>;
- 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
- 		ti,min-output-impedance;
-+		ti,dp83867-rxctrl-strap-quirk;
- 	};
- 
- 	dp83867_1: ethernet-phy at 3 {
-@@ -213,6 +214,7 @@
- 		ti,tx-internal-delay = <DP83867_RGMIIDCTL_250_PS>;
- 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
- 		ti,min-output-impedance;
-+		ti,dp83867-rxctrl-strap-quirk;
- 	};
- };
- 
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index a120ae816260..d4afa2ca2537 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -170,6 +170,7 @@ CONFIG_TI_CPTS=y
+ # CONFIG_NET_VENDOR_WIZNET is not set
+ CONFIG_AT803X_PHY=y
+ CONFIG_DP83848_PHY=y
++CONFIG_DP83867_PHY=y
+ CONFIG_MICREL_PHY=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_PPP=m
 -- 
 2.9.0
