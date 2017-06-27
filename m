@@ -1,48 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 Jun 2017 19:36:31 +0200
-Subject: [linux-sunxi] Re: [PATCH v3 2/3] dt-bindings: input: Add R_LRADC
- support for A83T
-In-Reply-To: <24845446a80e3542d90a1111a6141415@aosc.io>
-References: <20170624024515.4669-1-techping.chan@gmail.com>
- <20170624024515.4669-3-techping.chan@gmail.com>
- <20170626171524.cqfyasetpsfr6xfg@flea.lan>
- <CAAST=9x+fS41tznuJ9hQ-cQxecKN751=61YkhEt31DvpeqeEcA@mail.gmail.com>
- <24845446a80e3542d90a1111a6141415@aosc.io>
-Message-ID: <20170627173631.2rjdzgwdwnksqjzm@flea>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 27 Jun 2017 19:36:40 +0200
+Subject: [PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <20170627165416.GP4902@n2100.armlinux.org.uk>
+References: <1498468741-12020-1-git-send-email-vladimir.murzin@arm.com>
+ <20170627152753.GA29186@lst.de> <20170627165416.GP4902@n2100.armlinux.org.uk>
+Message-ID: <20170627173640.GA375@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jun 27, 2017 at 05:54:17PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 27, 2017 at 05:27:53PM +0200, Christoph Hellwig wrote:
+> > I've applied patches 1, 3 and 4 to the dma-mapping tree.  2 will need
+> > a respin for less code duplication.  I'd be happy to take 5,6 and 7 if
+> > Russell is fine with that.
+> 
+> If Vladimir is okay with those going in without patch 2, then I'm
+> happy - I seem to remember a mail from Vladimir stating that they
+> depended on some of the previous patches, but I don't know which.
+> 
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-On Tue, Jun 27, 2017 at 11:29:10PM +0800, icenowy at aosc.io wrote:
-> Maxime, here's another problem: if we have already a GP LRADC driver,
-> how can we tell the kernel to use it as IIO ADC rather than keys?
-
-The GPADC IIO driver is not for the LRADC driver, but the GPADC /
-temperature sensor.
-
-We used to have an LRADC IIO driver in the CHIP BSP written by Alex
-(in CC):
-https://github.com/NextThingCo/CHIP-linux/commit/8675b761c54be73dc7cc0113209f02e10cc63a27
-
-But he never mainlined it.
-
-> Should we introduce a new property for this once ready?
-
-We need to keep the current binding. We can just check for the
-presence or not of child nodes to see if it has some keys, and we'd
-need an IIO-to-input driver that is yet to be written.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/a9ba0799/attachment.sig>
+Thanks, I'll add them.  Patch 2 only adds optional mmap functionality,
+so it's not really required.  Although I'd really like to see a fixed
+up version that I can merge anyway.
