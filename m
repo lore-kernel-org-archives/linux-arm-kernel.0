@@ -1,54 +1,165 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 27 Jun 2017 22:30:36 +0800
-Subject: [arm-platforms:kvm-arm64/gicv4-kvm 27/62]
- drivers/irqchip/irq-gic-v3-its.c:795:7: error: 'UNMAP_VLPI' undeclared
-Message-ID: <201706272215.VcfwlmKc%fengguang.wu@intel.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Tue, 27 Jun 2017 22:33:20 +0800
+Subject: [PATCH 05/11] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <2805278.mLmlzpUgMM@phil>
+References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
+ <1498193947-8011-1-git-send-email-david.wu@rock-chips.com>
+ <2805278.mLmlzpUgMM@phil>
+Message-ID: <924d248f-f1c0-7fa2-4b97-c4f753ffe35b@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
-head:   362f13c96426700d3e37a921ef6d551f01491992
-commit: 2a99ea393c9d1e8593bfca5c751031d227ad5cb3 [27/62] irqchip/gic-v3-its: Add VLPI configuration hook
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 2a99ea393c9d1e8593bfca5c751031d227ad5cb3
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Hi Heiko,
 
-Note: the arm-platforms/kvm-arm64/gicv4-kvm HEAD 362f13c96426700d3e37a921ef6d551f01491992 builds fine.
-      It only hurts bisectibility.
+? 2017/6/24 1:19, Heiko Stuebner ??:
+> Hi David,
+> 
+> Am Freitag, 23. Juni 2017, 12:59:07 CEST schrieb David Wu:
+>> To make internal phy worked, need to configure the phy_clock,
+>> phy cru_reset and related registers.
+>>
+>> Change-Id: I6971c0a769754b824b1b908b56080cbaf7867d13
+> 
+> please remove all Change-Ids from patches before sending upstream.
+> There were more affected patches in this series.
+> 
+>> Signed-off-by: David Wu <david.wu@rock-chips.com>
+>> ---
+>>   .../devicetree/bindings/net/rockchip-dwmac.txt     |  3 +
+>>   drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 82 ++++++++++++++++++++++
+>>   2 files changed, 85 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>> index 8f42755..0514f69 100644
+>> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>> @@ -22,6 +22,7 @@ Required properties:
+>>   	   <&cru SCLK_MACREF_OUT> clock gate for RMII reference clock output
+>>   	   <&cru ACLK_GMAC>: AXI clock gate for GMAC
+>>   	   <&cru PCLK_GMAC>: APB clock gate for GMAC
+>> +	   <&cru MAC_PHY>: clock for internal macphy
+> 
+> that clock should not be listed as always "Required" like it is here.
+> Make it some sort of extra paragraph marking it as required when using
+> an internal phy.
+> 
 
-All errors (new ones prefixed by >>):
+Okay, move it to the option.
 
-   drivers/irqchip/irq-gic-v3-its.c: In function 'its_irq_set_vcpu_affinity':
->> drivers/irqchip/irq-gic-v3-its.c:795:7: error: 'UNMAP_VLPI' undeclared (first use in this function)
-     case UNMAP_VLPI:
-          ^~~~~~~~~~
-   drivers/irqchip/irq-gic-v3-its.c:795:7: note: each undeclared identifier is reported only once for each function it appears in
+>>    - clock-names: One name for each entry in the clocks property.
+>>    - phy-mode: See ethernet.txt file in the same directory.
+>>    - pinctrl-names: Names corresponding to the numbered pinctrl states.
+>> @@ -35,6 +36,8 @@ Required properties:
+>>    - assigned-clocks: main clock, should be <&cru SCLK_MAC>;
+>>    - assigned-clock-parents = parent of main clock.
+>>      can be <&ext_gmac> or <&cru SCLK_MAC_PLL>.
+>> + - phy-type: For internal phy, it must be "internal"; For external phy, no need
+>> +   to configure this.
+>>   
+>>   Optional properties:
+>>    - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
+>> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+>> index a8e8fd5..c1a1413 100644
+>> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+>> @@ -41,6 +41,7 @@ struct rk_gmac_ops {
+>>   	void (*set_to_rmii)(struct rk_priv_data *bsp_priv);
+>>   	void (*set_rgmii_speed)(struct rk_priv_data *bsp_priv, int speed);
+>>   	void (*set_rmii_speed)(struct rk_priv_data *bsp_priv, int speed);
+>> +	void (*internal_phy_powerup)(struct rk_priv_data *bsp_priv);
+>>   };
+>>   
+>>   struct rk_priv_data {
+>> @@ -52,6 +53,7 @@ struct rk_priv_data {
+>>   
+>>   	bool clk_enabled;
+>>   	bool clock_input;
+>> +	bool internal_phy;
+>>   
+>>   	struct clk *clk_mac;
+>>   	struct clk *gmac_clkin;
+>> @@ -61,6 +63,9 @@ struct rk_priv_data {
+>>   	struct clk *clk_mac_refout;
+>>   	struct clk *aclk_mac;
+>>   	struct clk *pclk_mac;
+>> +	struct clk *clk_macphy;
+>> +
+>> +	struct reset_control *macphy_reset;
+>>   
+>>   	int tx_delay;
+>>   	int rx_delay;
+>> @@ -750,6 +755,48 @@ static void rk3399_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+>>   	.set_rmii_speed = rk3399_set_rmii_speed,
+>>   };
+>>   
+>> +#define RK_GRF_MACPHY_CON0		0xb00
+>> +#define RK_GRF_MACPHY_CON1		0xb04
+>> +#define RK_GRF_MACPHY_CON2		0xb08
+>> +#define RK_GRF_MACPHY_CON3		0xb0c
+>> +
+>> +#define RK_MACPHY_ENABLE		GRF_BIT(0)
+>> +#define RK_MACPHY_DISABLE		GRF_CLR_BIT(0)
+>> +#define RK_MACPHY_CFG_CLK_50M		GRF_BIT(14)
+>> +#define RK_GMAC2PHY_RMII_MODE		(GRF_BIT(6) | GRF_CLR_BIT(7))
+>> +#define RK_GRF_CON2_MACPHY_ID		HIWORD_UPDATE(0x1234, 0xffff, 0)
+>> +#define RK_GRF_CON3_MACPHY_ID		HIWORD_UPDATE(0x35, 0x3f, 0)
+> 
+> These are primarily registers for the rk3328 and come from the GRF which is
+> somehow prone to chip-designers moving bits around in registers and also
+> especially the register offsets (*_CONx) will probably not stay the same
+> on future socs.
+> 
 
-vim +/UNMAP_VLPI +795 drivers/irqchip/irq-gic-v3-its.c
+I think they should try to keep the same. But what you said is very 
+reasonable. So let's give rk3228 and rk3328 different 
+internal_phy_powerup() in the rk_gmac_ops to set their own configuration?
 
-   789		if (!its_dev->its->is_v4 || !info)
-   790			return -EINVAL;
-   791	
-   792		switch (info->cmd_type) {
-   793		case MAP_VLPI:
-   794	
- > 795		case UNMAP_VLPI:
-   796	
-   797		case PROP_UPDATE_VLPI:
-   798		case PROP_UPDATE_AND_INV_VLPI:
+> 
+>> +static void rk_gmac_internal_phy_powerup(struct rk_priv_data *priv)
+>> +{
+>> +	if (priv->ops->internal_phy_powerup)
+>> +		priv->ops->internal_phy_powerup(priv);
+>> +
+>> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_CFG_CLK_50M);
+>> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_GMAC2PHY_RMII_MODE);
+>> +
+>> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON2, RK_GRF_CON2_MACPHY_ID);
+>> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON3, RK_GRF_CON3_MACPHY_ID);
+>> +
+>> +	/* disable macphy, the default value is enabled */
+> 
+> that comment is not providing useful information, maybe
+> 	/* macphy needs to be disabled before trying to reset it */
+> 
+> 
+>> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_DISABLE);
+>> +	if (priv->macphy_reset)
+>> +		reset_control_assert(priv->macphy_reset);
+>> +	usleep_range(10, 20);
+>> +	if (priv->macphy_reset)
+>> +		reset_control_deassert(priv->macphy_reset);
+>> +	usleep_range(10, 20);
+>> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_ENABLE);
+>> +	msleep(30);
+> 
+> does this do anything useful if priv->macphy_reset is not set, or could
+> we just change that to
+> 
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 35412 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/afeebbb5/attachment-0001.gz>
+Okay.
+
+> if (priv->macphy_reset) {
+> 	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_DISABLE);
+> 	reset_control_assert(priv->macphy_reset);
+> 	usleep_range(10, 20);
+> 	reset_control_deassert(priv->macphy_reset);
+> 	usleep_range(10, 20);
+> 	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_ENABLE);
+> 	msleep(30);
+> }
+> 
+> 
+> Heiko
+> 
+> 
+> 
