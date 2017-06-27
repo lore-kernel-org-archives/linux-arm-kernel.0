@@ -1,37 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 Jun 2017 17:07:59 +0100
-Subject: [PATCH v3 0/3] Add support for es8323 and hdmi audio to the
- firefly-rk3288
-In-Reply-To: <778a96a1-a6b0-ad78-89c1-7928dd50e3c4@collabora.com>
-References: <20170512132227.24916-1-romain.perier@collabora.com>
- <20170512132227.24916-9-romain.perier@collabora.com>
- <98ec8d72-2977-4347-86b0-4b423b55c434@collabora.com>
- <20170626140740.jlgtwaaivn3bvg2g@sirena.org.uk>
- <778a96a1-a6b0-ad78-89c1-7928dd50e3c4@collabora.com>
-Message-ID: <20170627160759.psg4o2gpfnyb5bx6@sirena.org.uk>
+From: bp@suse.de (Borislav Petkov)
+Date: Tue, 27 Jun 2017 18:27:22 +0200
+Subject: [PATCH v5] trace: ras: add ARM processor error information trace
+ event
+In-Reply-To: <3e07b9f0-b2e8-cfd8-9deb-76ed48a8f2c1@codeaurora.org>
+References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
+ <20170626140647.anigiqhk3l6ltet7@pd.tnic>
+ <22ba6506-1031-437b-95ae-c26773ff84b7@huawei.com>
+ <20170627072555.m5ogmljp7f6lf6fu@pd.tnic>
+ <3e07b9f0-b2e8-cfd8-9deb-76ed48a8f2c1@codeaurora.org>
+Message-ID: <20170627162722.g3ryqp423d6yfjcj@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 04:19:59PM +0200, Romain Perier wrote:
-> I did not kill a kitten or a puppy, I have just sent a ping 2 weeks
-> later for v3. The v2 was sent on Jan 23 2017... so that's not what I
-> call a top post or a flood ^^
-> 
-> anyway,
-> Have a nice day,
-> Romain
-> 
-> Le 26/06/2017 ? 16:07, Mark Brown a ?crit :
+On Tue, Jun 27, 2017 at 09:40:18AM -0600, Baicar, Tyler wrote:
+> ... but there is obviously only one of those. That is something that may
+> be easy to add to the arm_event TP...or do that in a separate TP as
+> well.
 
-You're top posting *again* in reply to a mail asking you not to do that
-and explaining why.  The mail I sent also explained why I can't really
-do anything with your content free ping and what you should do instead.  
-The text I send for these things is fairly long as it's trying to be
-clear about what needs to be done and why.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170627/3c78afb5/attachment.sig>
+See here:
+
+https://lkml.kernel.org/r/20170626140647.anigiqhk3l6ltet7 at pd.tnic
+
+for possible things you could do.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
