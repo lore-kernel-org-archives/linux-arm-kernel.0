@@ -1,131 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 27 Jun 2017 18:11:47 +0800
-Subject: [PATCH v6 05/21] net-next: stmmac: Add dwmac-sun8i
-In-Reply-To: <20170627094111.supxmzf2k3n3ewec@flea.lan>
-References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
- <20170531071852.12422-6-clabbe.montjoie@gmail.com>
- <8e3d73a7-e9ff-d3e2-4bce-bcc79cdf86db@arm.com>
- <20170627080529.GA2468@Red>
- <CAGb2v65mhDN9vXe6DE2cZPW1BzgYPwK+D2U5VFgyr0wVVZZqDQ@mail.gmail.com>
- <20170627082103.GB2468@Red> <530f7b3e-247d-2e4d-8174-ce6195bacf5b@arm.com>
- <20170627094111.supxmzf2k3n3ewec@flea.lan>
-Message-ID: <CAGb2v67btmyoHDDkvA9wp0pPdEHSu7DYN4=02VxskQqC6-qNDQ@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 27 Jun 2017 11:12:26 +0100
+Subject: [PATCH 18/20] arm64: ptrace: handle ptrace_request differently
+ for aarch32 and ilp32
+In-Reply-To: <20170623222852.hao3gi7ppwexu7wq@yury-thinkpad>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-19-ynorov@caviumnetworks.com> <594D49E9.7090900@arm.com>
+ <20170623222852.hao3gi7ppwexu7wq@yury-thinkpad>
+Message-ID: <59522F8A.4010709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 5:41 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Jun 27, 2017 at 10:02:45AM +0100, Andre Przywara wrote:
->> Hi,
+Hi Yury, Zhou,
+
+On 23/06/17 23:28, Yury Norov wrote:
+> On Fri, Jun 23, 2017 at 06:03:37PM +0100, James Morse wrote:
+>> Hi Yury,
 >>
->> (CC:ing some people from that Rockchip dmwac series)
+>> On 04/06/17 13:00, Yury Norov wrote:
+>>> ILP32 has context-related structures different from both aarch32 and
+>>> aarch64/lp64. In this patch compat_arch_ptrace() renamed to
+>>> compat_a32_ptrace(), and compat_arch_ptrace() only makes choice between
+>>> compat_a32_ptrace() and new compat_ilp32_ptrace() handler.
+>>>
+>>> compat_ilp32_ptrace() calls generic compat_ptrace_request() for all
+>>> requests except PTRACE_GETSIGMASK and PTRACE_SETSIGMASK, which need
+>>> special handling.
 >>
->> On 27/06/17 09:21, Corentin Labbe wrote:
->> > On Tue, Jun 27, 2017 at 04:11:21PM +0800, Chen-Yu Tsai wrote:
->> >> On Tue, Jun 27, 2017 at 4:05 PM, Corentin Labbe
->> >> <clabbe.montjoie@gmail.com> wrote:
->> >>> On Mon, Jun 26, 2017 at 01:18:23AM +0100, Andr? Przywara wrote:
->> >>>> On 31/05/17 08:18, Corentin Labbe wrote:
->> >>>>> The dwmac-sun8i is a heavy hacked version of stmmac hardware by
->> >>>>> allwinner.
->> >>>>> In fact the only common part is the descriptor management and the first
->> >>>>> register function.
->> >>>>
->> >>>> Hi,
->> >>>>
->> >>>> I know I am a bit late with this, but while adapting the U-Boot driver
->> >>>> to the new binding I was wondering about the internal PHY detection:
->> >>>>
->> >>>>
->> >>>> So here you seem to deduce the usage of the internal PHY by the PHY
->> >>>> interface specified in the DT (MII = internal, RGMII = external).
->> >>>> I think I raised this question before, but isn't it perfectly legal for
->> >>>> a board to use MII with an external PHY even on those SoCs that feature
->> >>>> an internal PHY?
->> >>>> On the first glance that does not make too much sense, but apart from
->> >>>> not being the correct binding to describe all of the SoCs features I see
->> >>>> two scenarios:
->> >>>> 1) A board vendor might choose to not use the internal PHY because it
->> >>>> has bugs, lacks features (configurability) or has other issues. For
->> >>>> instance I have heard reports that the internal PHY makes the SoC go
->> >>>> rather hot, possibly limiting the CPU frequency. By using an external
->> >>>> MII PHY (which are still cheaper than RGMII PHYs) this can be avoided.
->> >>>> 2) A PHY does not necessarily need to be directly connected to
->> >>>> magnetics. Indeed quite some boards use (RG)MII to connect to a switch
->> >>>> IC or some other network circuitry, for instance fibre connectors.
->> >>>>
->> >>>> So I was wondering if we would need an explicit:
->> >>>>       allwinner,use-internal-phy;
->> >>>> boolean DT property to signal the usage of the internal PHY?
->> >>>> Alternatively we could go with the negative version:
->> >>>>       allwinner,disable-internal-phy;
->> >>>>
->> >>>> Or what about introducing a new "allwinner,internal-mii-phy" compatible
->> >>>> string for the *PHY* node and use that?
->> >>>>
->> >>>> I just want to avoid that we introduce a binding that causes us
->> >>>> headaches later. I think we can still fix this with a followup patch
->> >>>> before the driver and its binding hit a release kernel.
->> >>>>
->> >>>> Cheers,
->> >>>> Andre.
->> >>>>
->> >>>
->> >>> I just see some patch, where "phy-mode = internal" is valid.
->> >>> I will try to find a way to use it
->> >>
->> >> Can you provide a link?
->> >
->> > https://lkml.org/lkml/2017/6/23/479
->> >
->> >>
->> >> I'm not a fan of using phy-mode for this. There's no guarantee what
->> >> mode the internal PHY uses. That's what phy-mode is for.
+>> Can you elaborate on this special handling?
 >>
->> I can understand Chen-Yu's concerns, but ...
+>> How come we don't need to wrap PTRACE_{G,S}ETSIGMASK for aarch32 compat?
+>> >From kernel/signal32.c that uses compat_sigset_t too.
 >>
->> > For each soc the internal PHY mode is know and setted in emac_variant/internal_phy
->> > So its not a problem.
+>> It looks like aarch64, ilp32 and aarch32 all use the same size sigset_t,
+>> so doesn't compat_ptrace_request() already do everything we need?
 >>
->> that is true as well, at least for now.
+>> ...
 >>
->> So while I agree that having a separate property to indicate the usage
->> of the internal PHY would be nice, I am bit tempted to use this easier
->> approach and piggy back on the existing phy-mode property.
->
-> We're trying to fix an issue that works for now too.
->
-> If we want to consider future weird cases, then we must consider all
-> of them. And the phy mode changing is definitely not really far
-> fetched.
+>> Is this fixing an endian problem? If so, can we document it as such. Do we
+>> already have the same bug for aarch32 compat?
+> 
+> Originally, the problem was found by Zhou Chengming: https://lkml.org/lkml/2016/6/27/18
+> But I think you right, this is the fix for endian.
+> 
+> It lookd like aarch32 is buggy, but IIUC to confirm it, the BE arm64
+> machine is needed. I use qemu and AFAIR it has no BE support.
+> 
+> Zhou, can you test it on your machine and if the bug will be reproduced,
+> send the patch for aarch32?
 
-I guess the issue is whether it's likely that the vendor puts 2 internal
-PHYs in one SoC, and they use different modes and can be switched around.
-Otherwise it's fixed for a given SoC, and we can just handle that with
-the per-SoC GMAC compatible.
+I've reproduced this on big endian compat-aarch32: yes its broken. I will respin
+Zhou's patch as a fix.
 
-Maybe Florian could tell us if this was one of the intended use cases
-for the "internal" phy mode.
 
-As for Rockchip, AFAIK they have 2 MACs, one is connected to the internal
-PHY, while the other is connected to the external interface, and there is
-no muxing involved, unlike Allwinner's solution.
+Thanks,
 
-> I agree with Chen-Yu, and I really feel like the compatible solution
-> you suggested would cover both your concerns, and ours.
-
-If using a PHY compatible is the solution, we could just use the
-"ethernet-phy-idAAAA.BBBB" style one, and put in the bogus ID that
-Allwinner used.
-
-Care must be taken to put this at the board level for boards using
-the internal PHY, or we'd have to delete or override the property
-in all other boards.
-
-Ideally I think the internal PHY device node should _not_ be in
-the SoC level .dtsi file. If we select the external interface, then
-there's no connection to the internal PHY, and that device node becomes
-unusable and bogus. This is something I think should be fixed regardless
-of the phy-mode discussion above.
-
-ChenYu
+James
