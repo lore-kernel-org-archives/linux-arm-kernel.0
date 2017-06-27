@@ -1,53 +1,79 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 27 Jun 2017 20:33:44 +0300
-Subject: [PATCH v2] arm64: dts: r8a7796: add IMR-LX4 support
-Message-ID: <20170627173400.581660959@cogentembedded.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 27 Jun 2017 19:35:27 +0200
+Subject: [PATCH] ARM: dts: BCM5301X: Specify USB ports for each controller
+Message-ID: <20170627173527.16682-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the IMR-LX4 devices in the R8A7796 device tree.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Northstar has 3 controllers: OHCI and EHCI (each with 2 ports) and XHCI
+(with just 1 port). Describe them in the DT. In future this will allow
+to reference them as trigger sources.
 
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
-This patch is against the 'renesas-devel-20170626-v4.12-rc7' tag of Simon
-Horman's 'renesas.git' repo.
+ arch/arm/boot/dts/bcm5301x.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-The IMR-LX4 bindings were documented in the IMR driver patch and ACK'ed by Rob
-Herring, so I don't expect them to change...
-
-Changes in version 2:
-- added SoC specific "compatible" prop values;
-- refreshed the patch.
-
- arch/arm64/boot/dts/renesas/r8a7796.dtsi |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1454,5 +1454,23 @@
- 				};
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 98647d22b291..045b9bb857f9 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -272,6 +272,19 @@
+ 				reg = <0x00021000 0x1000>;
+ 				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+ 				phys = <&usb2_phy>;
++
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				ehci_port1: port at 1 {
++					reg = <1>;
++					#trigger-source-cells = <0>;
++				};
++
++				ehci_port2: port at 2 {
++					reg = <2>;
++					#trigger-source-cells = <0>;
++				};
+ 			};
+ 
+ 			ohci: ohci at 22000 {
+@@ -280,6 +293,19 @@
+ 				compatible = "generic-ohci";
+ 				reg = <0x00022000 0x1000>;
+ 				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
++
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				ohci_port1: port at 1 {
++					reg = <1>;
++					#trigger-source-cells = <0>;
++				};
++
++				ohci_port2: port at 2 {
++					reg = <2>;
++					#trigger-source-cells = <0>;
++				};
  			};
  		};
+ 
+@@ -300,6 +326,14 @@
+ 				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+ 				phys = <&usb3_phy>;
+ 				phy-names = "usb";
 +
-+		imr-lx4 at fe860000 {
-+			compatible = "renesas,r8a7796-imr-lx4",
-+				     "renesas,imr-lx4";
-+			reg = <0 0xfe860000 0 0x2000>;
-+			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 823>;
-+			power-domains = <&sysc R8A7796_PD_A3VC>;
-+		};
++				#address-cells = <1>;
++				#size-cells = <0>;
 +
-+		imr-lx4 at fe870000 {
-+			compatible = "renesas,r8a7796-imr-lx4",
-+				     "renesas,imr-lx4";
-+			reg = <0 0xfe870000 0 0x2000>;
-+			interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 822>;
-+			power-domains = <&sysc R8A7796_PD_A3VC>;
-+		};
- 	};
- };
++				xhci_port1: port at 1 {
++					reg = <1>;
++					#trigger-source-cells = <0>;
++				};
+ 			};
+ 		};
+ 
+-- 
+2.11.0
