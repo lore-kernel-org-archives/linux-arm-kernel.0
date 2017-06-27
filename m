@@ -1,81 +1,103 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Jun 2017 01:48:38 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix omap3 prm shared irq
-Message-ID: <20170627084838.30275-1-tony@atomide.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 27 Jun 2017 10:57:32 +0200
+Subject: [PATCH v2 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
+In-Reply-To: <20170626180744.fyyzjsu4pmurohap@rob-hp-laptop>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+ <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
+ <20170626180744.fyyzjsu4pmurohap@rob-hp-laptop>
+Message-ID: <a69a61c3-95a8-d0cc-10a6-4a7cf65ff2c5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shared interrupts with IRQ_NOAUTOEN got a warning added with commit
-04c848d39879 ("genirq: Warn when IRQ_NOAUTOEN is used with shared
-interrupts").
+On 06/26/2017 08:07 PM, Rob Herring wrote:
+> On Wed, Jun 21, 2017 at 04:30:08PM +0200, Fabrice Gasnier wrote:
+>> Add documentation for STMicroelectronics STM32 Low-Power Timer binding.
+>>
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> ---
+>> Changes in v2:
+>> - Lee's comments: s/Low Power/Low-Power/, remove 0x in example, improve
+>>   properties descriptions
+>> ---
+>>  .../devicetree/bindings/mfd/stm32-lptimer.txt      | 48 ++++++++++++++++++++++
+>>  1 file changed, 48 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+>> new file mode 100644
+>> index 0000000..af859c8
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+>> @@ -0,0 +1,48 @@
+>> +STMicroelectronics STM32 Low-Power Timer
+>> +
+>> +The STM32 Low-Power Timer (LPTIM) is a 16-bit timer that provides several
+>> +functions:
+>> +- PWM output (with programmable prescaler, configurable polarity)
+>> +- Quadrature encoder, counter
+>> +- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
+>> +
+>> +Required properties:
+>> +- compatible:		Must be "st,stm32-lptimer".
+>> +- reg:			Offset and length of the device's register set.
+>> +- clocks:		Phandle to the clock used by the LP Timer module.
+>> +- clock-names:		Must be "mux".
+>> +- #address-cells:	Should be '<1>'.
+>> +- #size-cells:		Should be '<0>'.
+>> +
+>> +Optional subnodes:
+>> +- pwm:			See ../pwm/pwm-stm32-lp.txt
+>> +- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
+>> +- trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
+>> +
+>> +Example:
+>> +
+>> +	lptimer1: lptimer at 40002400 {
+> 
+> timer at ...
 
-Let's just drop the IRQ_NOAUTOEN use for omap3 PRM shared interrupt as
-it does not seem to cause any other issues based on my testing. We have
-moved a lot of the code to initialize later, and whatever problems the
-legacy booting had seem to be gone now with pinctrl driver and device
-tree based booting.
+Hi Rob,
 
-Otherwise we will get:
+I initially put "lptimer" here to distinguish Low-Power Timer hardware
+from other "timers" hardware that can be found also on stm32 devices.
+I'd prefer to keep it, is it sensible from your point of view ?
+Please advise.
 
-WARNING: CPU: 0 PID: 1 at kernel/irq/manage.c:1348 __setup_irq+0x5d0/0x64c
-[<c01b0260>] (__setup_irq) from [<c01b0480>]
-(request_threaded_irq+0xdc/0x188)
-[<c01b0480>] (request_threaded_irq) from [<c051c780>]
-(pcs_probe+0x6ec/0x8a4)
-[<c051c780>] (pcs_probe) from [<c05a84b8>] (platform_drv_probe+0x50/0xb0)
-[<c05a84b8>] (platform_drv_probe) from [<c05a6288>]
-(driver_probe_device+0x33c/0x478)
+> 
+>> +		compatible = "st,stm32-lptimer";
+>> +		reg = <0x40002400 0x400>;
+>> +		clocks = <&timer_clk>;
+>> +		clock-names = "mux";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		pwm {
+>> +			compatible = "st,stm32-pwm-lp";
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&lppwm1_pins>;
+>> +		};
+>> +
+>> +		trigger at 0 {
+>> +			compatible = "st,stm32-lptimer-trigger";
+>> +			reg = <0>;
+> 
+> Is there more than 1? 
 
-Note that we also need to remove the related enable_irq() to avoid
-getting the following:
+reg identifies trigger hardware block.
 
-WARNING: CPU: 0 PID: 1 at kernel/irq/manage.c:529 enable_irq+0x34/0x70
-[<c01afa04>] (enable_irq) from [<c0c0f1fc>] (omap3_pm_init+0x118/0x3f8)
-[<c0c0f1fc>] (omap3_pm_init) from [<c0c0ae7c>] (am35xx_init_late+0x10/0x18)
+Best Regards,
+Thanks,
+Fabrice
 
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/pm34xx.c  | 1 -
- arch/arm/mach-omap2/prm3xxx.c | 7 +------
- 2 files changed, 1 insertion(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -483,7 +483,6 @@ int __init omap3_pm_init(void)
- 	ret = request_irq(omap_prcm_event_to_irq("io"),
- 		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
- 		omap3_pm_init);
--	enable_irq(omap_prcm_event_to_irq("io"));
- 
- 	if (ret) {
- 		pr_err("pm: Failed to request pm_io irq\n");
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -692,7 +692,6 @@ static int omap3xxx_prm_late_init(void)
- {
- 	struct device_node *np;
- 	int irq_num;
--	int ret;
- 
- 	if (!(prm_features & PRM_HAS_IO_WAKEUP))
- 		return 0;
-@@ -712,12 +711,8 @@ static int omap3xxx_prm_late_init(void)
- 	}
- 
- 	omap3xxx_prm_enable_io_wakeup();
--	ret = omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
--	if (!ret)
--		irq_set_status_flags(omap_prcm_event_to_irq("io"),
--				     IRQ_NOAUTOEN);
- 
--	return ret;
-+	return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
- }
- 
- static void __exit omap3xxx_prm_exit(void)
--- 
-2.13.0
+> 
+>> +		};
+>> +
+>> +		counter {
+>> +			compatible = "st,stm32-lptimer-counter";
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&lptim1_in_pins>;
+>> +		};
+>> +	};
+>> -- 
+>> 1.9.1
+>>
