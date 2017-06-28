@@ -1,54 +1,35 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 28 Jun 2017 09:30:58 +0200
-Subject: [RESEND PATCH v6 2/8] mfd: retu: Drop -mfd suffix from I2C device
- ID name
-In-Reply-To: <20170619145423.w7zaeboy7iq2usmt@dell>
-References: <20170615184928.12007-1-javier@dowhile0.org>
- <20170615184928.12007-3-javier@dowhile0.org>
- <20170619145423.w7zaeboy7iq2usmt@dell>
-Message-ID: <CABxcv=nmP=JYmwCnRDzMS1BnFwfSNyRtyf8BdZLgGJUqqJCH3A@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 28 Jun 2017 09:33:33 +0200
+Subject: [PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <20170627173640.GA375@lst.de>
+References: <1498468741-12020-1-git-send-email-vladimir.murzin@arm.com>
+ <20170627152753.GA29186@lst.de> <20170627165416.GP4902@n2100.armlinux.org.uk>
+ <20170627173640.GA375@lst.de>
+Message-ID: <CA+M3ks6zBzh6oZ-LoVoFEu81vEeH_q=bhWnGrYAgDSpB+kfxyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
-
-On Mon, Jun 19, 2017 at 4:54 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 15 Jun 2017, Javier Martinez Canillas wrote:
+2017-06-27 19:36 GMT+02:00 Christoph Hellwig <hch@lst.de>:
+> On Tue, Jun 27, 2017 at 05:54:17PM +0100, Russell King - ARM Linux wrote:
+>> On Tue, Jun 27, 2017 at 05:27:53PM +0200, Christoph Hellwig wrote:
+>> > I've applied patches 1, 3 and 4 to the dma-mapping tree.  2 will need
+>> > a respin for less code duplication.  I'd be happy to take 5,6 and 7 if
+>> > Russell is fine with that.
+>>
+>> If Vladimir is okay with those going in without patch 2, then I'm
+>> happy - I seem to remember a mail from Vladimir stating that they
+>> depended on some of the previous patches, but I don't know which.
+>>
+>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 >
->> It's not correct to encode the subsystem in the I2C device name, so
->> drop the -mfd suffix. To maintain bisect-ability, change driver and
->> platform code / DTS users in the same patch.
->>
->> Suggested-by: Lee Jones <lee.jones@linaro.org>
->> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
->> Acked-by: Tony Lindgren <tony@atomide.com>
->> Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
->>
->> ---
->>
->> Changes in v6:
->> - Add Wolfram Sang's Reviewed-by tag.
->>
->> Changes in v5:
->> - Add Rob Herring's Acked-by tag.
->> - Add Aaro Koskinen's Acked-by tag.
->> - Add Tony Lindgren's Acked-by tag.
->>
->> Changes in v4: None
->> Changes in v3: None
->> Changes in v2: None
->>
->>  arch/arm/boot/dts/omap2420-n8x0-common.dtsi | 4 ++--
->>  arch/arm/mach-omap1/board-nokia770.c        | 4 ++--
->>  drivers/mfd/retu-mfd.c                      | 4 ++--
->>  3 files changed, 6 insertions(+), 6 deletions(-)
->
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Thanks, I'll add them.  Patch 2 only adds optional mmap functionality,
+> so it's not really required.  Although I'd really like to see a fixed
+> up version that I can merge anyway.
 
-Thanks for the ack, but the idea is you to take the whole series since
-the platform maintainers have already acked the patches :)
+Without mmap we will have a regression for nommu platform which are using
+dma_alloc_coherent and specialy in drm/kms where dumb buffer are allocated
+like that.
+Even with this problem I think the patches should be merged but we should have
+a quick fix for mmap.
 
-Best regards,
-Javier
+Benjamin
