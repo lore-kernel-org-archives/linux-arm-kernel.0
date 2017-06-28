@@ -1,54 +1,58 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 28 Jun 2017 10:52:55 -0700
-Subject: [PATCH v10 1/3] x86/syscalls: Check address limit on user-mode
- return
-In-Reply-To: <CAGXu5j+byHUn_rb9jOTZqMYrc4ngmDj=a3k8QRTYrZYNSjhCkw@mail.gmail.com>
-References: <20170615011203.144108-1-thgarnie@google.com>
- <CAGXu5j+byHUn_rb9jOTZqMYrc4ngmDj=a3k8QRTYrZYNSjhCkw@mail.gmail.com>
-Message-ID: <CAGXu5jKrJv0y70e5JiafKGcGzWoJPZM_HruZ=Y0rM1m0J4tZAA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 28 Jun 2017 18:53:52 +0100
+Subject: [PATCH v2 03/12] coresight: Extend the PIDR mask to cover
+ relevant bits in PIDR2
+In-Reply-To: <CANLsYkwHvxZmRSRYvkAoq2JMnrJ8OVcRdtt0s8YYQmN6gT1jKw@mail.gmail.com>
+References: <1498490576-1350-1-git-send-email-suzuki.poulose@arm.com>
+ <1498490576-1350-4-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkwHvxZmRSRYvkAoq2JMnrJ8OVcRdtt0s8YYQmN6gT1jKw@mail.gmail.com>
+Message-ID: <1629d248-2b4d-8c1f-f30b-30c02709b63b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 1:24 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Jun 14, 2017 at 6:12 PM, Thomas Garnier <thgarnie@google.com> wrote:
->> Ensure the address limit is a user-mode segment before returning to
->> user-mode. Otherwise a process can corrupt kernel-mode memory and elevate
->> privileges [1].
+On 28/06/17 18:35, Mathieu Poirier wrote:
+> On 26 June 2017 at 09:22, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> As per coresight standards, PIDR2 register has the following format :
 >>
->> The set_fs function sets the TIF_SETFS flag to force a slow path on
->> return. In the slow path, the address limit is checked to be USER_DS if
->> needed.
+>>  [2-0]  - JEP106_bits6to4
+>>  [3]    - JEDEC, designer ID is specified by JEDEC.
 >>
->> The addr_limit_user_check function is added as a cross-architecture
->> function to check the address limit.
+>> However some of the drivers only use mask of 0x3 for the PIDR2 leaving
+>> bits [3-2] unchecked, which could potentially match the component for
+>> a different device altogether. This patch fixes the mask and the
+>> corresponding id bits for the existing devices.
 >>
->> [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> I have not touched the TPIU ids for Ux500 (see commit: 4339b699),
+>> as I don't have a platform to fix/correct the ids.
+>> ---
+>>  .../coresight/coresight-dynamic-replicator.c       |  4 ++--
+>>  drivers/hwtracing/coresight/coresight-etb10.c      |  4 ++--
+>>  drivers/hwtracing/coresight/coresight-etm3x.c      | 24 +++++++++++-----------
+>>  drivers/hwtracing/coresight/coresight-funnel.c     |  4 ++--
+>>  drivers/hwtracing/coresight/coresight-stm.c        |  8 ++++----
+>>  drivers/hwtracing/coresight/coresight-tmc.c        |  4 ++--
+>>  drivers/hwtracing/coresight/coresight-tpiu.c       |  4 ++--
+>>  7 files changed, 26 insertions(+), 26 deletions(-)
 >>
->> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+>> diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+>> index 1675031..57babd8 100644
+>> --- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+>> +++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+>> @@ -177,8 +177,8 @@ static const struct dev_pm_ops replicator_dev_pm_ops = {
+>>
+>>  static struct amba_id replicator_ids[] = {
+>>         {
+>> -               .id     = 0x0003b909,
+>> -               .mask   = 0x0003ffff,
+>> +               .id     = 0x000bb909,
+>> +               .mask   = 0x000bffff,
 >
-> Thanks for reworking this series!
->
-> The bad state correctly BUGs under the LKDTM test:
->
-> [   21.171586] lkdtm: Performing direct entry CORRUPT_USER_DS
-> [   21.172791] lkdtm: setting bad task size limit
-> [   21.173742] ------------[ cut here ]------------
-> [   21.174641] kernel BUG at ./include/linux/syscalls.h:220!
-> ...
-> [   21.193166] Call Trace:
-> [   21.193617]  ? trace_hardirqs_on_thunk+0x1a/0x1c
-> [   21.194443]  entry_SYSCALL64_slow_path+0x25/0x25
->
->
-> Tested-by: Kees Cook <keescook@chromium.org>
+> Shouldn't this be 0x000fffff rather than 0x000bffff?
 
-Is everyone happy with this patch for x86? Does this need anything
-more/different?
+Yes, you're right. Thanks for spotting the typo. Will fix it.
 
-Thanks!
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+Suzuki
