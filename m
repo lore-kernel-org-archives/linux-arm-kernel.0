@@ -1,83 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:04:03 +0100
-Subject: [PATCH v2 44/52] KVM: arm/arm64: GICv4: Handle MOVALL applied to a vPE
-In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
-References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-45-marc.zyngier@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 28 Jun 2017 16:11:05 +0100
+Subject: arm64 lockdep splat
+In-Reply-To: <1498661397.15177.12.camel@redhat.com>
+References: <1498661397.15177.12.camel@redhat.com>
+Message-ID: <20170628151105.GC8252@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of MOVALL doesn't allow us to call
-into the core ITS code as we hold a number of spinlocks.
+On Wed, Jun 28, 2017 at 10:49:57AM -0400, Mark Salter wrote:
+> Hi Mark.
 
-Let's try a method used in other parts of the code, were we copy
-the intids of the candicate interrupts, and then do whatever
-we need to do with them outside of the critical section.
+Hi Mark,
 
-This allows us to move the interrupts one by one, at the expense
-of a bit of CPU time. Who cares? MOVALL is such a stupid command
-anyway...
+> I'm seeing this with lock debugging turned on and booting with ACPI:
+> 
+> [????0.137762] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))?
+> [????0.137773] ------------[ cut here ]------------?
+> [????0.137785] WARNING: CPU: 0 PID: 12 at kernel/locking/lockdep.c:2881 lockdep_trace_alloc+0xb4/0xbc?
+> [????0.137788] Modules linked in:?
+> [????0.137793]??
+> [????0.137797] CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.11.0-10.el7a.aarch64.debug #1?
+> [????0.137800] Hardware name: HPE ProLiant m400 Server/ProLiant m400 Server, BIOS U02 08/19/2016?
+> [????0.137803] task: ffff800fc656d000 task.stack: ffff800fc65c8000?
+> [????0.137807] PC is at lockdep_trace_alloc+0xb4/0xbc?
+> [????0.137810] LR is at lockdep_trace_alloc+0xb4/0xbc?
+> ...
+> [????0.137939] [<ffff00000814559c>] lockdep_trace_alloc+0xb4/0xbc?
+> [????0.137944] [<ffff0000082b4fa0>] kmem_cache_alloc_trace+0x48/0x400?
+> [????0.137949] [<ffff000008737ac8>] armpmu_alloc+0x38/0x1e4?
+> [????0.137954] [<ffff000008738588>] arm_pmu_acpi_cpu_starting+0x170/0x1c4?
+> [????0.137958] [<ffff0000080d5f6c>] cpuhp_invoke_callback+0x100/0xcc0?
+> [????0.137961] [<ffff0000080d758c>] cpuhp_thread_fun+0xd8/0x12c?
+> [????0.137966] [<ffff000008104670>] smpboot_thread_fn+0x170/0x27c?
+> [????0.137970] [<ffff0000080fe910>] kthread+0x114/0x140?
+> [????0.137975] [<ffff0000080833d0>] ret_from_fork+0x10/0x40?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-its.c | 27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+Sorry about this; I have a partial fix for this, but nothing complete
+yet.
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 21a7b3f00107..b40f46e5a79d 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1147,11 +1147,12 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
- 				      u64 *its_cmd)
- {
--	struct vgic_dist *dist = &kvm->arch.vgic;
- 	u32 target1_addr = its_cmd_get_target_addr(its_cmd);
- 	u32 target2_addr = its_cmd_mask_field(its_cmd, 3, 16, 32);
- 	struct kvm_vcpu *vcpu1, *vcpu2;
- 	struct vgic_irq *irq;
-+	u32 *intids;
-+	int irq_count, i;
- 
- 	if (target1_addr >= atomic_read(&kvm->online_vcpus) ||
- 	    target2_addr >= atomic_read(&kvm->online_vcpus))
-@@ -1163,19 +1164,31 @@ static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
- 	vcpu1 = kvm_get_vcpu(kvm, target1_addr);
- 	vcpu2 = kvm_get_vcpu(kvm, target2_addr);
- 
--	spin_lock(&dist->lpi_list_lock);
-+	irq_count = vgic_copy_lpi_list(vcpu1, &intids);
-+	if (irq_count < 0)
-+		return irq_count;
- 
--	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
--		spin_lock(&irq->irq_lock);
-+	for (i = 0; i < irq_count; i++) {
-+		irq = vgic_get_irq(kvm, NULL, intids[i]);
-+		if (!irq)
-+			continue;
- 
- 		if (irq->target_vcpu == vcpu1)
- 			irq->target_vcpu = vcpu2;
- 
--		spin_unlock(&irq->irq_lock);
--	}
-+		if (irq->hw) {
-+			struct its_vlpi_map map;
- 
--	spin_unlock(&dist->lpi_list_lock);
-+			if (!its_get_vlpi(irq->host_irq, &map)) {
-+				map.vpe_idx = vcpu2->vcpu_id;
-+				its_map_vlpi(irq->host_irq, &map);
-+			}
-+		}
- 
-+		vgic_put_irq(kvm, irq);
-+	}
-+
-+	kfree(intids);
- 	return 0;
- }
- 
--- 
-2.11.0
+> Specifically, warning about possible __GFP_FS reclaim with interrupts off.
+> Interrupts are disabled for cpuhp startup threads before CPUHP_AP_ONLINE, Is
+> there any reason why CPUHP_AP_PERF_ARM_ACPI_STARTING can't be moved after
+> CPUHP_AP_ONLINE? 
+
+I'll need to go digging into this. I can't immediately recall why
+CPUHP_AP_PERF_ARM_ACPI_STARTING and CPUHP_AP_PERF_ARM_STARTING need to
+be prior to CPUHP_AP_ONLINE.
+
+I'm confused by the relationship with CPUHP_AP_PERF_ONLINE, and I think
+we might have other subtle breakage here in other perf drivers.
+
+Thanks for pointing this out -- this isn't an avenue I'd considered for
+fixing this.
+
+> Or we could enabled irqs in arm_pmu_acpi_cpu_starting()?
+
+I don't beleive that this is safe, given the CPU isn't fully up yet.
+Interrupts are presumably disabled with good reason.
+
+> Or change the alloc flags?
+
+Doing that's a first step, but we'll subsequently hit similar issues
+when fiddling with the irqs, and I haven't yet found a way to make that
+work.
+
+Thanks,
+Mark.
