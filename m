@@ -1,43 +1,30 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 Jun 2017 19:12:05 +0100
-Subject: [PATCH v13 05/14] ASoC: sun4i-codec: Merge
- sun4i_codec_left_mixer_controls and sun4i_codec_right_mixer_controls into
- sun4i_codec_mixer_controls.
-In-Reply-To: <CAGb2v64i_S5HCsLHJGg0WbkFodOFFc5masUYQ53JaLTO7N2BMw@mail.gmail.com>
-References: <20170624062419.23778-1-dannym@scratchpost.org>
- <20170624062419.23778-6-dannym@scratchpost.org>
- <CAGb2v64i_S5HCsLHJGg0WbkFodOFFc5masUYQ53JaLTO7N2BMw@mail.gmail.com>
-Message-ID: <20170628181205.sfagsnuqmfrqhoen@sirena.org.uk>
+Date: Wed, 28 Jun 2017 19:42:28 +0100
+Subject: [PATCH v3 2/2] spi: rockchip: Disable Runtime PM when chip
+ select is asserted
+In-Reply-To: <CAD=FV=UzDHfTNJgs8vvbKGd0RpY__Q9V27aSQiR5ugv6ff5gfQ@mail.gmail.com>
+References: <1498624723-17332-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1498624723-17332-2-git-send-email-jeffy.chen@rock-chips.com>
+ <CAD=FV=UzDHfTNJgs8vvbKGd0RpY__Q9V27aSQiR5ugv6ff5gfQ@mail.gmail.com>
+Message-ID: <20170628184228.qdj7oslnljv6e2iy@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 09:48:59AM +0800, Chen-Yu Tsai wrote:
-> On Sat, Jun 24, 2017 at 2:24 PM, Danny Milosavljevic
+On Tue, Jun 27, 2017 at 10:30:10PM -0700, Doug Anderson wrote:
+> Jeffy,
+> 
+> On Tue, Jun 27, 2017 at 9:38 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> > The rockchip spi would stop driving pins when runtime suspended, which
+> > might break slave's xfer(for example cros_ec).
 
-> > +static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
-> > +       SOC_DAPM_DOUBLE("DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> > +                       SUN4I_CODEC_DAC_ACTL_LDACLMIXS,
-> >                         SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),
-
-> This changes the mixer control names exposed to userspace. While I think
-> consolidating mixer controls is nice, giving the user a less cluttered
-> view, I'm not sure about the changing a possible userspace ABI.
-
-> Maxime, ALSA and ASoC people, any comments about this?
-
-It's better not to change things but on the other hand it really depends
-if there's any users who will notice - if nobody notices it doesn't
-matter.
-
-Can we *please* get some review of the rest of this series?  It's
-enormous, we're on version *13* and the first review on this version
-here is on patch 5.  If the first four patches are fine then please says
-so, if they're not then let's have some review comments so things can
-move towards merging them.
+Please delete unneeded context from mails when replying.  Doing this
+makes it much easier to find your reply in the message, helping ensure
+it won't be missed by people scrolling through the irrelevant quoted
+material.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170628/8c305584/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170628/1913af90/attachment.sig>
