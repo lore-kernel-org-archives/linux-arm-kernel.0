@@ -1,188 +1,173 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:42 +0100
-Subject: [PATCH v2 23/52] irqchip/gic-v3-its: Add VPE scheduling
+Date: Wed, 28 Jun 2017 16:03:44 +0100
+Subject: [PATCH v2 25/52] irqchip/gic-v3-its: Add VPE affinity changes
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-24-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-26-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a VPE is scheduled to run, the corresponding redistributor must
-be told so, by setting VPROPBASER to the VM's property table, and
-VPENDBASER to the vcpu's pending table.
+When we're about to run a vcpu, it is crucial that the redistributor
+associated with the physical CPU is being told about the new residency.
 
-When scheduled out, we preserve the IDAI and PendingLast bits. The
-latter is specially important, as it tells the hypervisor that
-there are pending interrupts for this vcpu.
+This is abstracted by hijacking the irq_set_affinity method for the
+doorbell interrupt associated with the VPE. It is expected that the
+hypervisor will call this method before scheduling the VPE.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 73 ++++++++++++++++++++++++++++++++++++++
- include/linux/irqchip/arm-gic-v3.h | 58 ++++++++++++++++++++++++++++++
- 2 files changed, 131 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 96 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 276602efdfa0..be8598354d5a 100644
+index 0eda36dc84b4..281eed031e01 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -154,6 +154,7 @@ static DEFINE_IDA(its_vpeid_ida);
+@@ -150,6 +150,9 @@ static struct irq_domain *its_parent;
+ #define ITS_LIST_MAX		16
+ 
+ static unsigned long its_list_map;
++static u16 vmovp_seq_num;
++static DEFINE_RAW_SPINLOCK(vmovp_lock);
++
+ static DEFINE_IDA(its_vpeid_ida);
  
  #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
- #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
-+#define gic_data_rdist_vlpi_base()	(gic_data_rdist_rd_base() + SZ_128K)
+@@ -240,6 +243,13 @@ struct its_cmd_desc {
+ 			u32 event_id;
+ 			bool db_enabled;
+ 		} its_vmovi_cmd;
++
++		struct {
++			struct its_vpe *vpe;
++			struct its_collection *col;
++			u16 seq_num;
++			u16 its_list;
++		} its_vmovp_cmd;
+ 	};
+ };
  
- static struct its_collection *dev_event_to_col(struct its_device *its_dev,
- 					       u32 event)
-@@ -2144,8 +2145,80 @@ static const struct irq_domain_ops its_domain_ops = {
+@@ -331,6 +341,16 @@ static void its_encode_db_valid(struct its_cmd_block *cmd, bool db_valid)
+ 	its_mask_encode(&cmd->raw_cmd[2], db_valid, 0, 0);
+ }
+ 
++static void its_encode_seq_num(struct its_cmd_block *cmd, u16 seq_num)
++{
++	its_mask_encode(&cmd->raw_cmd[0], seq_num, 47, 32);
++}
++
++static void its_encode_its_list(struct its_cmd_block *cmd, u16 its_list)
++{
++	its_mask_encode(&cmd->raw_cmd[1], its_list, 15, 0);
++}
++
+ static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
+ {
+ 	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
+@@ -573,6 +593,20 @@ static struct its_vpe *its_build_vmovi_cmd(struct its_cmd_block *cmd,
+ 	return desc->its_vmovi_cmd.vpe;
+ }
+ 
++static struct its_vpe *its_build_vmovp_cmd(struct its_cmd_block *cmd,
++					   struct its_cmd_desc *desc)
++{
++	its_encode_cmd(cmd, GITS_CMD_VMOVP);
++	its_encode_seq_num(cmd, desc->its_vmovp_cmd.seq_num);
++	its_encode_its_list(cmd, desc->its_vmovp_cmd.its_list);
++	its_encode_vpeid(cmd, desc->its_vmovp_cmd.vpe->vpe_id);
++	its_encode_target(cmd, desc->its_vmovp_cmd.col->target_address);
++
++	its_fixup_cmd(cmd);
++
++	return desc->its_vmovp_cmd.vpe;
++}
++
+ static u64 its_cmd_ptr_to_offset(struct its_node *its,
+ 				 struct its_cmd_block *ptr)
+ {
+@@ -867,6 +901,48 @@ static void its_send_vmapp(struct its_vpe *vpe, bool valid)
+ 	}
+ }
+ 
++static void its_send_vmovp(struct its_vpe *vpe)
++{
++	struct its_cmd_desc desc;
++	struct its_node *its;
++	unsigned long flags;
++	int col_id = vpe->col_idx;
++
++	desc.its_vmovp_cmd.vpe = vpe;
++	desc.its_vmovp_cmd.its_list = (u16)its_list_map;
++
++	if (!its_list_map) {
++		its = list_first_entry(&its_nodes, struct its_node, entry);
++		desc.its_vmovp_cmd.seq_num = 0;
++		desc.its_vmovp_cmd.col = &its->collections[col_id];
++		its_send_single_vcommand(its, its_build_vmovp_cmd, &desc);
++		return;
++	}
++
++	/*
++	 * Yet another marvel of the architecture. If using the
++	 * its_list "feature", we need to make sure that all ITSs
++	 * receive all VMOVP commands in the same order. The only way
++	 * to guarantee this is to make vmovp a serialization point.
++	 *
++	 * Wall <-- Head.
++	 */
++	raw_spin_lock_irqsave(&vmovp_lock, flags);
++
++	desc.its_vmovp_cmd.seq_num = vmovp_seq_num++;
++
++	/* Emit VMOVPs */
++	list_for_each_entry(its, &its_nodes, entry) {
++		if (!its->is_v4)
++			continue;
++
++		desc.its_vmovp_cmd.col = &its->collections[col_id];
++		its_send_single_vcommand(its, its_build_vmovp_cmd, &desc);
++	}
++
++	raw_spin_unlock_irqrestore(&vmovp_lock, flags);
++}
++
+ static void its_send_vinvall(struct its_vpe *vpe)
+ {
+ 	struct its_cmd_desc desc;
+@@ -2145,6 +2221,25 @@ static const struct irq_domain_ops its_domain_ops = {
  	.deactivate		= its_irq_domain_deactivate,
  };
  
-+static void its_vpe_schedule(struct its_vpe *vpe)
-+{
-+	void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
-+	u64 val;
-+
-+	/* Schedule the VPE */
-+	val  = virt_to_phys(page_address(vpe->its_vm->vprop_page)) &
-+		GENMASK_ULL(51, 12);
-+	val |= (LPI_NRBITS - 1) & GICR_VPROPBASER_IDBITS_MASK;
-+	val |= GICR_VPROPBASER_RaWb;
-+	val |= GICR_VPROPBASER_InnerShareable;
-+	gits_write_vpropbaser(val, vlpi_base + GICR_VPROPBASER);
-+
-+	val  = virt_to_phys(page_address(vpe->vpt_page)) &
-+		GENMASK_ULL(51, 16);
-+	val |= GICR_VPENDBASER_RaWaWb;
-+	val |= GICR_VPENDBASER_NonShareable;
-+	/*
-+	 * There is no good way of finding out if the pending table is
-+	 * empty as we can race against the doorbell interrupt very
-+	 * easily. So in the end, vpe->pending_last is only an
-+	 * indication that the vcpu has something pending, not one
-+	 * that the pending table is empty. A good implementation
-+	 * would be able to read its coarse map pretty quickly anyway,
-+	 * making this a tolerable issue.
-+	 */
-+	val |= GICR_VPENDBASER_PendingLast;
-+	val |= vpe->idai ? GICR_VPENDBASER_IDAI : 0;
-+	val |= GICR_VPENDBASER_Valid;
-+	gits_write_vpendbaser(val, vlpi_base + GICR_VPENDBASER);
-+}
-+
-+static void its_vpe_deschedule(struct its_vpe *vpe)
-+{
-+	void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
-+	u64 val;
-+
-+	/* We're being scheduled out */
-+	val = gits_read_vpendbaser(vlpi_base + GICR_VPENDBASER);
-+	val &= ~GICR_VPENDBASER_Valid;
-+	gits_write_vpendbaser(val, vlpi_base + GICR_VPENDBASER);
-+
-+	val = gits_read_vpendbaser(vlpi_base + GICR_VPENDBASER);
-+	while (val & GICR_VPENDBASER_Dirty) {
-+		cpu_relax();
-+		val = gits_read_vpendbaser(vlpi_base + GICR_VPENDBASER);
-+	}
-+
-+	vpe->idai = !!(val & GICR_VPENDBASER_IDAI);
-+	vpe->pending_last = !!(val & GICR_VPENDBASER_PendingLast);
-+}
-+
-+static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
++static int its_vpe_set_affinity(struct irq_data *d,
++				const struct cpumask *mask_val,
++				bool force)
 +{
 +	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
-+	struct its_cmd_info *info = vcpu_info;
++	int cpu = cpumask_first(mask_val);
 +
-+	switch (info->cmd_type) {
-+	case SCHEDULE_VPE:
-+		its_vpe_schedule(vpe);
-+		return 0;
-+
-+	case DESCHEDULE_VPE:
-+		its_vpe_deschedule(vpe);
-+		return 0;
-+
-+	default:
-+		return -EINVAL;
++	/*
++	 * Changing affinity is mega expensive, so let's be as lazy as
++	 * we can and only do it if we really have to.
++	 */
++	if (vpe->col_idx != cpu) {
++		vpe->col_idx = cpu;
++		its_send_vmovp(vpe);
 +	}
++
++	return IRQ_SET_MASK_OK_DONE;
 +}
 +
+ static void its_vpe_schedule(struct its_vpe *vpe)
+ {
+ 	void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
+@@ -2222,6 +2317,7 @@ static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
+ 
  static struct irq_chip its_vpe_irq_chip = {
  	.name			= "GICv4-vpe",
-+	.irq_set_vcpu_affinity	= its_vpe_set_vcpu_affinity,
++	.irq_set_affinity	= its_vpe_set_affinity,
+ 	.irq_set_vcpu_affinity	= its_vpe_set_vcpu_affinity,
  };
  
- static int its_vpe_id_alloc(void)
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 17ba0d732f12..6bc142cfa616 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -212,6 +212,64 @@
- #define LPI_PROP_GROUP1			(1 << 1)
- #define LPI_PROP_ENABLED		(1 << 0)
- 
-+/*
-+ * Re-Distributor registers, offsets from VLPI_base
-+ */
-+#define GICR_VPROPBASER			0x0070
-+
-+#define GICR_VPROPBASER_IDBITS_MASK	0x1f
-+
-+#define GICR_VPROPBASER_SHAREABILITY_SHIFT		(10)
-+#define GICR_VPROPBASER_INNER_CACHEABILITY_SHIFT	(7)
-+#define GICR_VPROPBASER_OUTER_CACHEABILITY_SHIFT	(56)
-+
-+#define GICR_VPROPBASER_SHAREABILITY_MASK				\
-+	GIC_BASER_SHAREABILITY(GICR_VPROPBASER, SHAREABILITY_MASK)
-+#define GICR_VPROPBASER_INNER_CACHEABILITY_MASK				\
-+	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, MASK)
-+#define GICR_VPROPBASER_OUTER_CACHEABILITY_MASK				\
-+	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, OUTER, MASK)
-+#define GICR_VPROPBASER_CACHEABILITY_MASK				\
-+	GICR_VPROPBASER_INNER_CACHEABILITY_MASK
-+
-+#define GICR_VPROPBASER_InnerShareable					\
-+	GIC_BASER_SHAREABILITY(GICR_VPROPBASER, InnerShareable)
-+
-+#define GICR_VPROPBASER_nCnB	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, nCnB)
-+#define GICR_VPROPBASER_nC 	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, nC)
-+#define GICR_VPROPBASER_RaWt	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, RaWt)
-+#define GICR_VPROPBASER_RaWb	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, RaWt)
-+#define GICR_VPROPBASER_WaWt	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, WaWt)
-+#define GICR_VPROPBASER_WaWb	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, WaWb)
-+#define GICR_VPROPBASER_RaWaWt	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, RaWaWt)
-+#define GICR_VPROPBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, RaWaWb)
-+
-+#define GICR_VPENDBASER			0x0078
-+
-+#define GICR_VPENDBASER_SHAREABILITY_SHIFT		(10)
-+#define GICR_VPENDBASER_INNER_CACHEABILITY_SHIFT	(7)
-+#define GICR_VPENDBASER_OUTER_CACHEABILITY_SHIFT	(56)
-+#define GICR_VPENDBASER_SHAREABILITY_MASK				\
-+	GIC_BASER_SHAREABILITY(GICR_VPENDBASER, SHAREABILITY_MASK)
-+#define GICR_VPENDBASER_INNER_CACHEABILITY_MASK				\
-+	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, MASK)
-+#define GICR_VPENDBASER_OUTER_CACHEABILITY_MASK				\
-+	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, OUTER, MASK)
-+#define GICR_VPENDBASER_CACHEABILITY_MASK				\
-+	GICR_VPENDBASER_INNER_CACHEABILITY_MASK
-+
-+#define GICR_VPENDBASER_NonShareable					\
-+	GIC_BASER_SHAREABILITY(GICR_VPENDBASER, NonShareable)
-+
-+#define GICR_VPENDBASER_nCnB	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, nCnB)
-+#define GICR_VPENDBASER_nC 	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, nC)
-+#define GICR_VPENDBASER_RaWt	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, RaWt)
-+#define GICR_VPENDBASER_RaWb	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, RaWt)
-+#define GICR_VPENDBASER_WaWt	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, WaWt)
-+#define GICR_VPENDBASER_WaWb	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, WaWb)
-+#define GICR_VPENDBASER_RaWaWt	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, RaWaWt)
-+#define GICR_VPENDBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, RaWaWb)
-+
- #define GICR_VPENDBASER_Dirty		(1ULL << 60)
- #define GICR_VPENDBASER_PendingLast	(1ULL << 61)
- #define GICR_VPENDBASER_IDAI		(1ULL << 62)
 -- 
 2.11.0
