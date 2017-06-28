@@ -1,27 +1,20 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 28 Jun 2017 17:45:03 +0200
-Subject: [PATCH 3/3] arm64: dts: rockchip: set rk3399 dynamic CPU power
- coefficients
-In-Reply-To: <20170623170737.46265-3-briannorris@chromium.org>
-References: <20170623170737.46265-1-briannorris@chromium.org>
- <20170623170737.46265-3-briannorris@chromium.org>
-Message-ID: <3456973.xqkASENUTq@phil>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 28 Jun 2017 08:46:31 -0700
+Subject: [RFC 4/5] drivers: boot_constraint: Add debugfs support
+In-Reply-To: <58dbcc2e397fc679af814a9752efa1829885d7f3.1498642745.git.viresh.kumar@linaro.org>
+References: <cover.1498642745.git.viresh.kumar@linaro.org>
+ <58dbcc2e397fc679af814a9752efa1829885d7f3.1498642745.git.viresh.kumar@linaro.org>
+Message-ID: <ac877900-52bb-fc97-12cf-3f6099090623@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 23. Juni 2017, 10:07:37 CEST schrieb Brian Norris:
-> Provide the dynamic power coefficient of the big and little CPU
-> clusters. These numbers are currently in use on the Samsung Chromebook
-> Plus ("Kevin").
+On 06/28/2017 03:26 AM, Viresh Kumar wrote:
+> This patch adds debugfs support for boot constraints. This is how it
+> looks for a "vmmc-supply" constraint for the MMC device.
 > 
-> The power allocator thermal governor doesn't know how to do anything if
-> it doesn't get power parameters from its cooling devices (in this case,
-> CPUfreq). So this effectively enables the power-allocator governor.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
 
-applied for 4.14 after extending the property to all cpu cores.
+Hi,
+Does this build OK when DEBUG_FS is not enabled in kernel .config?
 
-
-Thanks
-Heiko
+-- 
+~Randy
