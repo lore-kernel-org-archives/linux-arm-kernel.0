@@ -1,127 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:25 +0100
-Subject: [PATCH v2 06/52] irqchip/gic-v3-its: Macro-ize its_send_single_command
-In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
-References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-7-marc.zyngier@arm.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 28 Jun 2017 08:51:10 -0700
+Subject: [RFC 3/5] drivers: boot_constraint: Add boot_constraints_disable
+ kernel parameter
+In-Reply-To: <f2fff03550bd14e1334de3faa1a79c0f8651b09d.1498642745.git.viresh.kumar@linaro.org>
+References: <cover.1498642745.git.viresh.kumar@linaro.org>
+ <f2fff03550bd14e1334de3faa1a79c0f8651b09d.1498642745.git.viresh.kumar@linaro.org>
+Message-ID: <04d6732a-3a2e-2f04-1d6e-a4ac51470db5@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most ITS commands do operate on a collection object, and require
-a SYNC command to be performed on that collection in order to
-guarantee the execution of the first command.
+On 06/28/2017 03:26 AM, Viresh Kumar wrote:
+> Users must be given an option to discard any constraints set by
+> bootloaders. For example, consider that a constraint is set for the LCD
+> controller's supply and the LCD driver isn't loaded by the kernel. If
+> the user doesn't need to use the LCD device, then he shouldn't be forced
+> to honour the constraint.
+> 
+> We can also think about finer control of such constraints with help of
+> some sysfs files, but a kernel parameter is fine to begin with.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  Documentation/admin-guide/kernel-parameters.txt |  2 ++
+>  drivers/base/boot_constraint.c                  | 17 +++++++++++++++++
+>  2 files changed, 19 insertions(+)
+> 
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index 7737ab5d04b2..35e8a298bfc1 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -426,6 +426,8 @@
+>  			embedded devices based on command line input.
+>  			See Documentation/block/cmdline-partition.txt
+>  
+> +	boot_constraints_disable = Do not set any boot constraints for devices.
+> +
 
-With GICv4 ITS, another set of commands perform similar operations
-on a VPE object, and a VSYNC operations must be executed to guarantee
-their execution.
+No '=' sign.  That is only used when there is a following parameter value.
 
-Given the similarities (post a command, perform a synchronization
-operation on a sync object), it makes sense to reuse the same
-mechanism for both class of commands.
 
-Let's start with turning its_send_single_command into a huge macro
-that performs the bulk of the work, and a set of helpers that
-make this macro usable for the GICv3 ITS commands.
+>  	boot_delay=	Milliseconds to delay each printk during boot.
+>  			Values larger than 10 seconds (10000) are changed to
+>  			no delay (0).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 84 ++++++++++++++++++++++------------------
- 1 file changed, 47 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 006a5259609d..bbf7bb89aa62 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -490,43 +490,53 @@ static void its_wait_for_range_completion(struct its_node *its,
- 	}
- }
- 
--static void its_send_single_command(struct its_node *its,
--				    its_cmd_builder_t builder,
--				    struct its_cmd_desc *desc)
--{
--	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
--	struct its_collection *sync_col;
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&its->lock, flags);
--
--	cmd = its_allocate_entry(its);
--	if (!cmd) {		/* We're soooooo screewed... */
--		pr_err_ratelimited("ITS can't allocate, dropping command\n");
--		raw_spin_unlock_irqrestore(&its->lock, flags);
--		return;
--	}
--	sync_col = builder(cmd, desc);
--	its_flush_cmd(its, cmd);
--
--	if (sync_col) {
--		sync_cmd = its_allocate_entry(its);
--		if (!sync_cmd) {
--			pr_err_ratelimited("ITS can't SYNC, skipping\n");
--			goto post;
--		}
--		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
--		its_encode_target(sync_cmd, sync_col->target_address);
--		its_fixup_cmd(sync_cmd);
--		its_flush_cmd(its, sync_cmd);
--	}
--
--post:
--	next_cmd = its_post_commands(its);
--	raw_spin_unlock_irqrestore(&its->lock, flags);
--
--	its_wait_for_range_completion(its, cmd, next_cmd);
--}
-+/* Warning, macro hell follows */
-+#define BUILD_SINGLE_CMD_FUNC(name, buildtype, synctype, buildfn)	\
-+void name(struct its_node *its,						\
-+	  buildtype builder,						\
-+	  struct its_cmd_desc *desc)					\
-+{									\
-+	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;		\
-+	synctype *sync_obj;						\
-+	unsigned long flags;						\
-+									\
-+	raw_spin_lock_irqsave(&its->lock, flags);			\
-+									\
-+	cmd = its_allocate_entry(its);					\
-+	if (!cmd) {		/* We're soooooo screewed... */		\
-+		raw_spin_unlock_irqrestore(&its->lock, flags);		\
-+		return;							\
-+	}								\
-+	sync_obj = builder(cmd, desc);					\
-+	its_flush_cmd(its, cmd);					\
-+									\
-+	if (sync_obj) {							\
-+		sync_cmd = its_allocate_entry(its);			\
-+		if (!sync_cmd)						\
-+			goto post;					\
-+									\
-+		buildfn(sync_cmd, sync_obj);				\
-+		its_flush_cmd(its, sync_cmd);				\
-+	}								\
-+									\
-+post:									\
-+	next_cmd = its_post_commands(its);				\
-+	raw_spin_unlock_irqrestore(&its->lock, flags);			\
-+									\
-+	its_wait_for_range_completion(its, cmd, next_cmd);		\
-+}
-+
-+static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
-+			       struct its_collection *sync_col)
-+{
-+	its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
-+	its_encode_target(sync_cmd, sync_col->target_address);
-+
-+	its_fixup_cmd(sync_cmd);
-+}
-+
-+static BUILD_SINGLE_CMD_FUNC(its_send_single_command, its_cmd_builder_t,
-+			     struct its_collection, its_build_sync_cmd)
- 
- static void its_send_inv(struct its_device *dev, u32 event_id)
- {
 -- 
-2.11.0
+~Randy
