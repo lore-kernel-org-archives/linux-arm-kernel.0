@@ -1,98 +1,112 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 28 Jun 2017 11:55:44 +0100
-Subject: [PATCH 4/6] drivers: perf: hisi: Add support for HiSilicon SoC
- HHA PMU driver
-In-Reply-To: <201706281706.O4jmBQ6k%fengguang.wu@intel.com>
-References: <201706281706.O4jmBQ6k%fengguang.wu@intel.com>
-Message-ID: <b9e7ef7f-518c-b2db-a704-a808a712fb26@huawei.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 28 Jun 2017 13:24:57 +0200
+Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
+In-Reply-To: <5bcc7ec0-4ae5-3703-3cee-ed644eef710a@samsung.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <1498143942-12682-2-git-send-email-hugues.fruchet@st.com>
+ <D5629236-95D8-45B6-9719-E8B9796FEC90@goldelico.com>
+ <64e3005d-31df-71f2-762b-2c1b1152fc2d@st.com>
+ <5cd25a47-f3be-8c40-3940-29f26a245076@kernel.org>
+ <39501C78-7B81-4803-94C1-25DFA06EA526@goldelico.com>
+ <e2a9df8b-00f8-ae36-f4f3-63dcc98dea50@kernel.org>
+ <CGME20170628091334epcas5p2071ae52aa3f9312b1099e37ffac20eb1@epcas5p2.samsung.com>
+ <6F68CD33-70E6-47C1-9E89-5E2AA776879F@goldelico.com>
+ <5bcc7ec0-4ae5-3703-3cee-ed644eef710a@samsung.com>
+Message-ID: <9D51AC4C-6CB7-46A5-B363-2AD6DA6C497F@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/06/2017 10:56, kbuild test robot wrote:
-> Hi Shaokun,
->
-> [auto build test ERROR on next-20170619]
-> [also build test ERROR on v4.12-rc7]
-> [cannot apply to linus/master linux/master arm64/for-next/core v4.12-rc6 v4.12-rc5 v4.12-rc4]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Shaokun-Zhang/Add-HiSilicon-SoC-uncore-Performance-Monitoring-Unit-driver/20170628-070841
-> config: i386-allmodconfig (attached as .config)
-> compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=i386
->
-> All errors (new ones prefixed by >>):
->
->    drivers/perf/hisilicon/hisi_uncore_hha_pmu.c: In function 'hisi_hha_pmu_read_counter':
->>> drivers/perf/hisilicon/hisi_uncore_hha_pmu.c:71:9: error: implicit declaration of function 'readq' [-Werror=implicit-function-declaration]
->      return readq(hha_pmu->base + reg);
->             ^~~~~
->    drivers/perf/hisilicon/hisi_uncore_hha_pmu.c: In function 'hisi_hha_pmu_write_counter':
->>> drivers/perf/hisilicon/hisi_uncore_hha_pmu.c:87:2: error: implicit declaration of function 'writeq' [-Werror=implicit-function-declaration]
->      writeq(val, hha_pmu->base + reg);
->      ^~~~~~
->    cc1: some warnings being treated as errors
 
-I think that these will not reappear for v2 series since you have 
-removed COMPILE_TEST in the Kconfig
+> Am 28.06.2017 um 12:50 schrieb Sylwester Nawrocki <s.nawrocki@samsung.com>:
+> 
+> On 06/28/2017 11:12 AM, H. Nikolaus Schaller wrote:
+>>> Am 28.06.2017 um 00:57 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+>>> On 06/27/2017 07:48 AM, H. Nikolaus Schaller wrote:
+>>>>> Am 26.06.2017 um 22:04 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+>>>>> On 06/26/2017 12:35 PM, Hugues FRUCHET wrote:
+>>>>>>> What I am missing to support the GTA04 camera is the control of the optional "vana-supply".
+>>>>>>> So the driver does not power up the camera module when needed and therefore probing fails.
+>>>>>>> 
+>>>>>>>    - vana-supply: a regulator to power up the camera module.
+>>>>>>> 
+>>>>>>> Driver code is not complex to add:
+>>>>> 
+>>>>>> Yes, I saw it in your code, but as I don't have any programmable power
+>>>>>> supply on my setup, I have not pushed this commit.
+>>>>> 
+>>>>> Since you are about to add voltage supplies to the DT binding I'd suggest
+>>>>> to include all three voltage supplies of the sensor chip. Looking at the OV9650
+>>>>> and the OV9655 datasheet there are following names used for the voltage supply
+>>>>> pins:
+>>>>> 
+>>>>> AVDD - Analog power supply,
+>>>>> DVDD - Power supply for digital core logic,
+>>>>> DOVDD - Digital power supply for I/O.
+>>>> 
+>>>> The latter two are usually not independently switchable from the SoC power
+>>>> the module is connected to.
+>>>> 
+>>>> And sometimes DVDD and DOVDD are connected together.
+>>>> 
+>>>> So the driver can't make much use of knowing or requesting them because the
+>>>> 1.8V supply is always active, even during suspend.
+>>>> 
+>>>>> 
+>>>>> I doubt the sensor can work without any of these voltage supplies, thus
+>>>>> regulator_get_optional() should not be used. I would just use the regulator
+>>>>> bulk API to handle all three power supplies.
+>>>> 
+>>>> The digital part works with AVDD turned off. So the LDO supplying AVDD should
+>>>> be switchable to save power (&vaux3 on the GTA04 device).>
+>>>> But not all designs can switch it off. Hence the idea to define it as an
+>>>> /optional/ regulator. If it is not defined by DT, the driver simply assumes
+>>>> it is always powered on.
+>>> 
+>>> I didn't say we can't define regulator supply properties as optional in the DT
+>>> binding.  If we define them as such and any of these *-supply properties is
+>>> missing in DT with regulator_get() the regulator core will use dummy regulator
+>>> for that particular voltage supply.  While with regulator_get_optional()
+>>> -ENODEV is returned when the regulator cannot be found.
+>> 
+>> Ah, ok. I see.
+>> 
+>> I had thought that it is the right thing to do like devm_gpiod_get_optional().
+>> 
+>> That one it is described as:
+>> 
+>> "* This is equivalent to gpiod_get(), except that when no GPIO was assigned to
+>>  * the requested function it will return NULL. This is convenient for drivers
+>>  * that need to handle optional GPIOs."
+>> 
+>> Seems to be inconsistent definition of what "optional" means.
+> 
+> Indeed, this commit explains it further:
+> 
+> commit de1dd9fd2156874b45803299b3b27e65d5defdd9
+> regulator: core: Provide hints to the core about optional supplies
+> 
+>> So we indeed should use devm_regulator_get() in this case. Thanks for > pointing out!
+> 
+>>>> So in summary we only need AVDD switched for the GTA04 - but it does not
+>>>> matter if the others are optional properties. We would not use them.
+>>>> 
+>>>> It does matter if they are mandatory because it adds DT complexity (size
+>>>> and processing) without added function.
+>>> 
+>>> We should not be defining DT binding only with selected use cases/board
+>>> designs in mind.  IMO all three voltage supplies should be listed in the
+>>> binding, presumably all can be made optional, with an assumption that when
+>>> the property is missing selected pin is hooked up to a fixed regulator.
+>> 
+>> Ok, then it should just be defined in the bindings but not used by 
+>> the driver?
+> 
+> Yes, I think so. So we have a possibly complete binding right from the 
+> beginning. I someone needs handling other supplies than AVDD they could
+> update the driver in future.
 
->
-> coccinelle warnings: (new ones prefixed by >>)
->
->>> drivers/perf/hisilicon/hisi_uncore_hha_pmu.c:272:1-3: WARNING: PTR_ERR_OR_ZERO can be used
+Fine! I have sent some patches to Hughues so that he can integrate it in
+his next version of the patch series.
 
-I think coccinelle is recommending this:
-
-     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-     hha_pmu->base = devm_ioremap_resource(dev, res);
-     return PTR_ERR_OR_ZERO(hha_pmu->base);
-}
-
-However you could leave as is with the IS_ERR check and add a print for 
-ioremap error'ing
-
->
-> Please review and possibly fold the followup patch.
->
-> vim +/readq +71 drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->
->     65			return 0;
->     66		}
->     67	
->     68		reg = get_counter_reg_off(idx);
->     69	
->     70		/* Read 64 bits and like L3C, top 16 bits are RAZ */
->   > 71		return readq(hha_pmu->base + reg);
->     72	}
->     73	
->     74	static void hisi_hha_pmu_write_counter(struct hisi_pmu *hha_pmu,
->     75					       struct hw_perf_event *hwc, u64 val)
->     76	{
->     77		u32 idx = hwc->idx;
->     78		u32 reg;
->     79	
->     80		if (!hisi_uncore_pmu_counter_valid(hha_pmu, idx)) {
->     81			dev_err(hha_pmu->dev, "Unsupported event index:%d!\n", idx);
->     82			return;
->     83		}
->     84	
->     85		reg = get_counter_reg_off(idx);
->     86		/* Write 64 bits and like L3C, top 16 bits are WI */
->   > 87		writeq(val, hha_pmu->base + reg);
->     88	}
->     89	
->     90	static void hisi_hha_pmu_write_evtype(struct hisi_pmu *hha_pmu, int idx,
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
->
->
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
->
+BR and thanks,
+Nikolaus
