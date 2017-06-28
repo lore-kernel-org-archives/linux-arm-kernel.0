@@ -1,38 +1,42 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 28 Jun 2017 10:49:57 -0400
-Subject: arm64 lockdep splat
-Message-ID: <1498661397.15177.12.camel@redhat.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 28 Jun 2017 07:53:43 -0700
+Subject: [PATCH] dt-bindings: amlogic: add unstable statement
+Message-ID: <20170628145343.25443-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark.
+Due to the lack of documentation on this SoC family, discovery of new
+features, and correcting of previous misunderstandings is expected, so
+it's unrealistic to expect any form of stable bindings for this SoC
+family.  Make that clear inthe binding documentation.
 
-I'm seeing this with lock debugging turned on and booting with ACPI:
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ Documentation/devicetree/bindings/arm/amlogic.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-[????0.137762] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))?
-[????0.137773] ------------[ cut here ]------------?
-[????0.137785] WARNING: CPU: 0 PID: 12 at kernel/locking/lockdep.c:2881 lockdep_trace_alloc+0xb4/0xbc?
-[????0.137788] Modules linked in:?
-[????0.137793]??
-[????0.137797] CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.11.0-10.el7a.aarch64.debug #1?
-[????0.137800] Hardware name: HPE ProLiant m400 Server/ProLiant m400 Server, BIOS U02 08/19/2016?
-[????0.137803] task: ffff800fc656d000 task.stack: ffff800fc65c8000?
-[????0.137807] PC is at lockdep_trace_alloc+0xb4/0xbc?
-[????0.137810] LR is at lockdep_trace_alloc+0xb4/0xbc?
-...
-[????0.137939] [<ffff00000814559c>] lockdep_trace_alloc+0xb4/0xbc?
-[????0.137944] [<ffff0000082b4fa0>] kmem_cache_alloc_trace+0x48/0x400?
-[????0.137949] [<ffff000008737ac8>] armpmu_alloc+0x38/0x1e4?
-[????0.137954] [<ffff000008738588>] arm_pmu_acpi_cpu_starting+0x170/0x1c4?
-[????0.137958] [<ffff0000080d5f6c>] cpuhp_invoke_callback+0x100/0xcc0?
-[????0.137961] [<ffff0000080d758c>] cpuhp_thread_fun+0xd8/0x12c?
-[????0.137966] [<ffff000008104670>] smpboot_thread_fn+0x170/0x27c?
-[????0.137970] [<ffff0000080fe910>] kthread+0x114/0x140?
-[????0.137975] [<ffff0000080833d0>] ret_from_fork+0x10/0x40?
-
-The lock warning is triggered by GFP_KERNEL allocation with interrupts disabled.
-Specifically, warning about possible __GFP_FS reclaim with interrupts off.
-Interrupts are disabled for cpuhp startup threads before CPUHP_AP_ONLINE, Is
-there any reason why CPUHP_AP_PERF_ARM_ACPI_STARTING can't be moved after
-CPUHP_AP_ONLINE? Or we could enabled irqs in arm_pmu_acpi_cpu_starting()? Or
-change the alloc flags?
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index bfd5b558477d..9be902b4656d 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -1,6 +1,18 @@
+ Amlogic MesonX device tree bindings
+ -------------------------------------------
+ 
++Work in progress statement:
++
++Device tree files and bindings applying to Amlogic SoCs and boards are
++considered "unstable". Any Amlogic device tree binding may change at
++any time. Be sure to use a device tree binary and a kernel image
++generated from the same source tree.
++
++Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
++stable binding/ABI.
++
++---------------------------------------------------------------
++
+ Boards with the Amlogic Meson6 SoC shall have the following properties:
+   Required root node property:
+     compatible: "amlogic,meson6"
+-- 
+2.9.3
