@@ -1,76 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:04:07 +0100
-Subject: [PATCH v2 48/52] KVM: arm/arm64: GICv4: Add doorbell interrupt
- handling
+Date: Wed, 28 Jun 2017 16:03:57 +0100
+Subject: [PATCH v2 38/52] KVM: arm/arm64: GICv4: Wire init/teardown of per-VM
+ support
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-49-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-39-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a vPE is not running, the delivery of a VLPI results in a
-doorbell interrupt to be delivered. Let's handle this interrupt
-and update the pending_last flag that indicates that VLPIs are
-pending.
+Should the HW support GICv4 and an ITS being associated with this
+VM, let's init the its_vm and its_vpe structures.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v4.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ virt/kvm/arm/vgic/vgic-init.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index a2d1a6db0490..fe0d0a8ed469 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -21,6 +21,14 @@
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 3a0b8999f011..0de1f0d986d4 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -285,8 +285,14 @@ int vgic_init(struct kvm *kvm)
+ 	if (ret)
+ 		goto out;
  
- #include "vgic.h"
- 
-+static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
-+{
-+	struct kvm_vcpu *vcpu = info;
-+
-+	vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
-+	return IRQ_HANDLED;
-+}
-+
- int vgic_v4_init(struct kvm *kvm)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
-@@ -47,12 +55,34 @@ int vgic_v4_init(struct kvm *kvm)
- 		return ret;
- 	}
- 
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		int irq = dist->its_vm.vpes[i]->irq;
-+
-+		ret = request_irq(irq, vgic_v4_doorbell_handler,
-+				  0, "vcpu", vcpu);
-+		if (ret) {
-+			kvm_err("failed to allocate vcpu IRQ%d\n", irq);
-+			dist->its_vm.nr_vpes = i;
-+			break;
+-	if (vgic_has_its(kvm))
++	if (vgic_has_its(kvm)) {
+ 		dist->msis_require_devid = true;
++		if (kvm_vgic_global_state.has_gicv4) {
++			ret = vgic_v4_init(kvm);
++			if (ret)
++				goto out;
 +		}
 +	}
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		kvm_vgic_vcpu_enable(vcpu);
+@@ -323,6 +329,9 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+ 
+ 	kfree(dist->spis);
+ 	dist->nr_spis = 0;
 +
-+	if (ret)
++	if (kvm_vgic_global_state.has_gicv4 && vgic_has_its(kvm))
 +		vgic_v4_teardown(kvm);
-+
- 	return ret;
  }
  
- void vgic_v4_teardown(struct kvm *kvm)
- {
- 	struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
-+	struct kvm_vcpu *vcpu;
-+	int i;
-+
-+	for (i = 0; i < its_vm->nr_vpes; i++) {
-+		vcpu = kvm_get_vcpu(kvm, i);
-+		free_irq(its_vm->vpes[i]->irq, vcpu);
-+	}
- 
- 	its_free_vcpu_irqs(its_vm);
- 	kfree(its_vm->vpes);
+ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
 -- 
 2.11.0
