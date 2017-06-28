@@ -1,44 +1,42 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 28 Jun 2017 11:54:46 -0500
-Subject: [PATCH 3/3] ARM: omap2plus_defconfig: enable DP83867 phy driver
-In-Reply-To: <3e141e778cedc0cc6168a9f9a3787a49042681c5.1498573382.git.nsekhar@ti.com>
-References: <cover.1498573382.git.nsekhar@ti.com>
- <3e141e778cedc0cc6168a9f9a3787a49042681c5.1498573382.git.nsekhar@ti.com>
-Message-ID: <8b0c4fb9-978b-0d67-85e2-af994f1a66e8@ti.com>
+From: bp@suse.de (Borislav Petkov)
+Date: Wed, 28 Jun 2017 18:55:14 +0200
+Subject: [PATCH v5] trace: ras: add ARM processor error information trace
+ event
+In-Reply-To: <5953DC82.2000602@arm.com>
+References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
+ <20170626140647.anigiqhk3l6ltet7@pd.tnic>
+ <5953DC82.2000602@arm.com>
+Message-ID: <20170628165514.kltemqgaxxhgw5as@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/27/2017 10:06 AM, Sekhar Nori wrote:
-> TI's DP83867 phy is used on DRA72x EVM rev C and DRA71x
-> EVMs. Enable support for it in omap2plus_defconfig.
+On Wed, Jun 28, 2017 at 05:42:42PM +0100, James Morse wrote:
+> > Alternatively, you can extend arm_event to get issued with *each*
+> > cper_arm_err_info but that would mean a lot of redundant information
+> > being shuffled out to userspace.
 > 
-> The driver is built into the kernel to help NFS booting.
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> I think this is what we should do,
 
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Yes, that should be easier for userspace.
 
-this can go alone I think.
-> ---
->   arch/arm/configs/omap2plus_defconfig | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index a120ae816260..d4afa2ca2537 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -170,6 +170,7 @@ CONFIG_TI_CPTS=y
->   # CONFIG_NET_VENDOR_WIZNET is not set
->   CONFIG_AT803X_PHY=y
->   CONFIG_DP83848_PHY=y
-> +CONFIG_DP83867_PHY=y
->   CONFIG_MICREL_PHY=y
->   CONFIG_SMSC_PHY=y
->   CONFIG_PPP=m
-> 
+> but only keep the number of fields we export to a minimum. If we
+> always use the names in the spec, and user-space always parses the
+> 'format' file, we should be able to add more fields when they turn out
+> to be necessary. (looks like the trace infrastructure makes inventing
+> a new format easy!)
+
+Right, except if you have userspace consumers already using them, you're
+potentially breaking them. Unless you teach them all to parse the format
+file first, from the very beginning. But in general, we try to be very
+wary when touching tracepoints as they become an ABI of sorts.
+
+Also, do try to shovel only the really needed info to userspace - not
+everything the spec dumps but maybe just the fields that are really
+necessary for doing hw error recovery.
 
 -- 
-regards,
--grygorii
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
