@@ -1,28 +1,22 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 28 Jun 2017 16:14:56 -0700
-Subject: [PATCH] rtc: brcmstb-waketimer: fix settime function
-In-Reply-To: <20170628200839.3114345-1-arnd@arndb.de>
-References: <20170628200839.3114345-1-arnd@arndb.de>
-Message-ID: <e8c1c77c-dd16-afa8-509a-417e0ab7535c@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 28 Jun 2017 18:23:44 -0500
+Subject: [PATCH v2 1/4] dt-bindings: ARM: brcmstb: Update Broadcom STB
+ Power Management binding
+In-Reply-To: <20170626223248.14199-2-f.fainelli@gmail.com>
+References: <20170626223248.14199-1-f.fainelli@gmail.com>
+ <20170626223248.14199-2-f.fainelli@gmail.com>
+Message-ID: <20170628232344.rb4jus266yeq5yoj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2017 01:07 PM, Arnd Bergmann wrote:
-> gcc warns about an unused variable in the new driver:
+On Mon, Jun 26, 2017 at 03:32:41PM -0700, Florian Fainelli wrote:
+> Update the Broadcom STB Power Management binding document with new
+> compatible strings for the DDR PHY and memory controller found on newer
+> chips.
 > 
-> drivers/rtc/rtc-brcmstb-waketimer.c: In function 'brcmstb_waketmr_settime':
-> drivers/rtc/rtc-brcmstb-waketimer.c:142:6: error: unused variable 'ret' [-Werror=unused-variable]
-> 
-> The same function also doesn't handle overflow correctly, this makes
-> it return -EINVAL when passed a time that doesn't fit within the
-> range of the register.
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-Yes, thanks for doing that.
-
-> 
-> Fixes: 9f4ad359c801 ("rtc: brcmstb-waketimer: Add Broadcom STB wake-timer")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
--- 
-Florian
+Acked-by: Rob Herring <robh@kernel.org>
