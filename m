@@ -1,103 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:45 +0100
-Subject: [PATCH v2 26/52] irqchip/gic-v3-its: Add VPE interrupt masking
+Date: Wed, 28 Jun 2017 16:03:29 +0100
+Subject: [PATCH v2 10/52] irqchip/gic-v3-its: Split out pending table
+ allocation
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-27-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When masking/unmasking a doorbell interrupt, it is necessary
-to issue an invalidation to the corresponding redistributor.
-We use the DirectLPI feature by writting directly to the corresponding
-redistributor.
+Just as for the property table, let's move the pending table
+allocation to a separate function.
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/arch_gicv3.h   |  5 +++++
- arch/arm64/include/asm/arch_gicv3.h |  1 +
- drivers/irqchip/irq-gic-v3-its.c    | 26 +++++++++++++++++++++++++-
- 3 files changed, 31 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-gic-v3-its.c | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index 8d45e88feac9..0735888fe42e 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -276,6 +276,11 @@ static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
- #define gicr_write_pendbaser(v, c)	__gic_writeq_nonatomic(v, c)
- 
- /*
-+ * GICR_INVLPIR - only the lower bits are significant
-+ */
-+#define gic_write_invlpir(v, c)		writel_relaxed(lower_32_bits(v), c)
-+
-+/*
-  * GITS_TYPER is an ID register and doesn't need atomicity.
-  */
- #define gits_read_typer(c)		__gic_readq_nonatomic(c)
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 0d2a53457c30..019128dd37e4 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -116,6 +116,7 @@ static inline void gic_write_bpr1(u32 val)
- 
- #define gic_read_typer(c)		readq_relaxed(c)
- #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
-+#define gic_write_invlpir(v, c)		writeq_relaxed(v, c)
- 
- #define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
- 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 281eed031e01..64893f0427f2 100644
+index 27f57c528026..d6f9ccb36f4d 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -969,12 +969,12 @@ static inline u32 its_get_event_id(struct irq_data *d)
- 
- static void lpi_write_config(struct irq_data *d, u8 clr, u8 set)
- {
--	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	irq_hw_number_t hwirq;
- 	struct page *prop_page;
- 	u8 *cfg;
- 
- 	if (irqd_is_forwarded_to_vcpu(d)) {
-+		struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 		u32 event = its_get_event_id(d);
- 
- 		prop_page = its_dev->event_map.vm->vprop_page;
-@@ -2315,8 +2315,32 @@ static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
- 	}
+@@ -1199,6 +1199,24 @@ static int its_alloc_collections(struct its_node *its)
+ 	return 0;
  }
  
-+static void its_vpe_send_inv(struct irq_data *d)
++static struct page *its_allocate_pending_table(gfp_t gfp_flags)
 +{
-+	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
-+	void __iomem *rdbase;
++	struct page *pend_page;
++	/*
++	 * The pending pages have to be at least 64kB aligned,
++	 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
++	 */
++	pend_page = alloc_pages(gfp_flags | __GFP_ZERO,
++				get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
++	if (!pend_page)
++		return NULL;
 +
-+	rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
-+	gic_write_invlpir(d->hwirq, rdbase + GICR_INVLPIR);
++	/* Make sure the GIC will observe the zero-ed page */
++	gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
++
++	return pend_page;
 +}
 +
-+static void its_vpe_mask_irq(struct irq_data *d)
-+{
-+	lpi_write_config(d, LPI_PROP_ENABLED, 0);
-+	its_vpe_send_inv(d);
-+}
+ static void its_cpu_init_lpis(void)
+ {
+ 	void __iomem *rbase = gic_data_rdist_rd_base();
+@@ -1209,21 +1227,14 @@ static void its_cpu_init_lpis(void)
+ 	pend_page = gic_data_rdist()->pend_page;
+ 	if (!pend_page) {
+ 		phys_addr_t paddr;
+-		/*
+-		 * The pending pages have to be at least 64kB aligned,
+-		 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
+-		 */
+-		pend_page = alloc_pages(GFP_NOWAIT | __GFP_ZERO,
+-					get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
 +
-+static void its_vpe_unmask_irq(struct irq_data *d)
-+{
-+	lpi_write_config(d, 0, LPI_PROP_ENABLED);
-+	its_vpe_send_inv(d);
-+}
-+
- static struct irq_chip its_vpe_irq_chip = {
- 	.name			= "GICv4-vpe",
-+	.irq_mask		= its_vpe_mask_irq,
-+	.irq_unmask		= its_vpe_unmask_irq,
-+	.irq_eoi		= irq_chip_eoi_parent,
- 	.irq_set_affinity	= its_vpe_set_affinity,
- 	.irq_set_vcpu_affinity	= its_vpe_set_vcpu_affinity,
- };
++		pend_page = its_allocate_pending_table(GFP_NOWAIT);
+ 		if (!pend_page) {
+ 			pr_err("Failed to allocate PENDBASE for CPU%d\n",
+ 			       smp_processor_id());
+ 			return;
+ 		}
+ 
+-		/* Make sure the GIC will observe the zero-ed page */
+-		gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
+-
+ 		paddr = page_to_phys(pend_page);
+ 		pr_info("CPU%d: using LPI pending table @%pa\n",
+ 			smp_processor_id(), &paddr);
 -- 
 2.11.0
