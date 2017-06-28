@@ -1,128 +1,139 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:46 +0100
-Subject: [PATCH v2 27/52] irqchip/gic-v3-its: Support VPE doorbell
- invalidation even when !DirectLPI
+Date: Wed, 28 Jun 2017 16:03:26 +0100
+Subject: [PATCH v2 07/52] irqchip/gic-v3-its: Implement irq_set_irqchip_state
+ for pending state
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-28-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we don't have the DirectLPI feature, we must work around the
-architecture shortcomings to be able to perform the required
-invalidation.
-
-For this, we create a fake device whose sole purpose is to
-provide a way to issue a map/inv/unmap sequence (and the corresponding
-sync operations). That's 6 commands and a full serialization point
-to be able to do this.
-
-You just have to hope the hypervisor won't do that too often...
+Allow the pending state of an LPI to be set or cleared via
+irq_set_irqchip_state.
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 66 ++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 63 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 78 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 64893f0427f2..4979916cd3d7 100644
+index bbf7bb89aa62..391b87572549 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -138,6 +138,9 @@ struct its_device {
- 	u32			device_id;
+@@ -169,6 +169,11 @@ struct its_cmd_desc {
+ 		struct {
+ 			struct its_device *dev;
+ 			u32 event_id;
++		} its_clear_cmd;
++
++		struct {
++			struct its_device *dev;
++			u32 event_id;
+ 		} its_int_cmd;
+ 
+ 		struct {
+@@ -382,6 +387,40 @@ static struct its_collection *its_build_inv_cmd(struct its_cmd_block *cmd,
+ 	return col;
+ }
+ 
++static struct its_collection *its_build_int_cmd(struct its_cmd_block *cmd,
++						struct its_cmd_desc *desc)
++{
++	struct its_collection *col;
++
++	col = dev_event_to_col(desc->its_int_cmd.dev,
++			       desc->its_int_cmd.event_id);
++
++	its_encode_cmd(cmd, GITS_CMD_INT);
++	its_encode_devid(cmd, desc->its_int_cmd.dev->device_id);
++	its_encode_event_id(cmd, desc->its_int_cmd.event_id);
++
++	its_fixup_cmd(cmd);
++
++	return col;
++}
++
++static struct its_collection *its_build_clear_cmd(struct its_cmd_block *cmd,
++						  struct its_cmd_desc *desc)
++{
++	struct its_collection *col;
++
++	col = dev_event_to_col(desc->its_clear_cmd.dev,
++			       desc->its_clear_cmd.event_id);
++
++	its_encode_cmd(cmd, GITS_CMD_CLEAR);
++	its_encode_devid(cmd, desc->its_clear_cmd.dev->device_id);
++	its_encode_event_id(cmd, desc->its_clear_cmd.event_id);
++
++	its_fixup_cmd(cmd);
++
++	return col;
++}
++
+ static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
+ 						   struct its_cmd_desc *desc)
+ {
+@@ -538,6 +577,26 @@ static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
+ static BUILD_SINGLE_CMD_FUNC(its_send_single_command, its_cmd_builder_t,
+ 			     struct its_collection, its_build_sync_cmd)
+ 
++static void its_send_int(struct its_device *dev, u32 event_id)
++{
++	struct its_cmd_desc desc;
++
++	desc.its_int_cmd.dev = dev;
++	desc.its_int_cmd.event_id = event_id;
++
++	its_send_single_command(dev->its, its_build_int_cmd, &desc);
++}
++
++static void its_send_clear(struct its_device *dev, u32 event_id)
++{
++	struct its_cmd_desc desc;
++
++	desc.its_clear_cmd.dev = dev;
++	desc.its_clear_cmd.event_id = event_id;
++
++	its_send_single_command(dev->its, its_build_clear_cmd, &desc);
++}
++
+ static void its_send_inv(struct its_device *dev, u32 event_id)
+ {
+ 	struct its_cmd_desc desc;
+@@ -701,6 +760,24 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+ 	iommu_dma_map_msi_msg(d->irq, msg);
+ }
+ 
++static int its_irq_set_irqchip_state(struct irq_data *d,
++				     enum irqchip_irq_state which,
++				     bool state)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	u32 event = its_get_event_id(d);
++
++	if (which != IRQCHIP_STATE_PENDING)
++		return -EINVAL;
++
++	if (state)
++		its_send_int(its_dev, event);
++	else
++		its_send_clear(its_dev, event);
++
++	return 0;
++}
++
+ static struct irq_chip its_irq_chip = {
+ 	.name			= "ITS",
+ 	.irq_mask		= its_mask_irq,
+@@ -708,6 +785,7 @@ static struct irq_chip its_irq_chip = {
+ 	.irq_eoi		= irq_chip_eoi_parent,
+ 	.irq_set_affinity	= its_set_affinity,
+ 	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
++	.irq_set_irqchip_state	= its_irq_set_irqchip_state,
  };
  
-+static struct its_device *vpe_proxy_dev;
-+static DEFINE_RAW_SPINLOCK(vpe_proxy_dev_lock);
-+
- static LIST_HEAD(its_nodes);
- static DEFINE_SPINLOCK(its_lock);
- static struct rdists *gic_rdists;
-@@ -2074,6 +2077,14 @@ static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
- 	msi_info = msi_get_domain_info(domain);
- 	its = msi_info->data;
- 
-+	if (its->is_v4 && !gic_rdists->has_direct_lpi &&
-+	    dev_id == vpe_proxy_dev->device_id) {
-+		/* Bad luck. Get yourself a better implementation */
-+		WARN_ONCE(1, "DevId %x clashes with GICv4 VPE proxy device\n",
-+			  dev_id);
-+		return -EINVAL;
-+	}
-+
- 	its_dev = its_find_device(its, dev_id);
- 	if (its_dev) {
- 		/*
-@@ -2318,10 +2329,38 @@ static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
- static void its_vpe_send_inv(struct irq_data *d)
- {
- 	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
--	void __iomem *rdbase;
- 
--	rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
--	gic_write_invlpir(d->hwirq, rdbase + GICR_INVLPIR);
-+	if (gic_rdists->has_direct_lpi) {
-+		void __iomem *rdbase;
-+
-+		rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
-+		gic_write_invlpir(d->hwirq, rdbase + GICR_INVLPIR);
-+	} else {
-+		/*
-+		 * This is insane.
-+		 *
-+		 * If a GICv4 doesn't implement Direct LPIs, the only
-+		 * way to perform an invalidate is to use a fake
-+		 * device to issue a MAP/INV/UNMAP sequence. Since
-+		 * each of these commands has a sync operation, this
-+		 * is really fast. Not.
-+		 *
-+		 * We always use event 0, and thus serialize all VPE
-+		 * invalidations in the system.
-+		 *
-+		 * Broken by design(tm).
-+		 */
-+		unsigned long flags;
-+
-+		raw_spin_lock_irqsave(&vpe_proxy_dev_lock, flags);
-+
-+		vpe_proxy_dev->event_map.col_map[0] = vpe->col_idx;
-+		its_send_mapti(vpe_proxy_dev, vpe->vpe_db_lpi, 0);
-+		its_send_inv(vpe_proxy_dev, 0);
-+		its_send_discard(vpe_proxy_dev, 0);
-+
-+		raw_spin_unlock_irqrestore(&vpe_proxy_dev_lock, flags);
-+	}
- }
- 
- static void its_vpe_mask_irq(struct irq_data *d)
-@@ -2616,6 +2655,27 @@ static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
- 
- static int its_init_vpe_domain(void)
- {
-+	struct its_node *its;
-+	u32 devid;
-+
-+	if (gic_rdists->has_direct_lpi) {
-+		pr_info("ITS: Using DirectLPI for VPE invalidation\n");
-+		return 0;
-+	}
-+
-+	/* Any ITS will do, even if not v4 */
-+	its = list_first_entry(&its_nodes, struct its_node, entry);
-+
-+	/* Use the last possible DevID */
-+	devid = GENMASK(its->device_ids - 1, 0);
-+	vpe_proxy_dev = its_create_device(its, devid, 1);
-+	if (!vpe_proxy_dev) {
-+		pr_err("ITS: Can't allocate GICv4 proxy device\n");
-+		return -ENODEV;
-+	}
-+
-+	pr_info("ITS: Allocated DevID %x as GICv4 proxy device\n", devid);
-+
- 	return 0;
- }
- 
+ /*
 -- 
 2.11.0
