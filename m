@@ -1,25 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 28 Jun 2017 17:19:50 -0300
-Subject: [PATCH] Modified imx7d-sdb.dts file so that VLDO4 provides 2.8V
- for MIPI CSI/DSI
-In-Reply-To: <20170628174518.5950-1-mindentropy@gmail.com>
-References: <20170628174518.5950-1-mindentropy@gmail.com>
-Message-ID: <CAOMZO5A41QFoJsC2ST1kvpCOs3-unzHDrqXshHa=2ShWWCOyZg@mail.gmail.com>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Wed, 28 Jun 2017 22:30:27 +0200
+Subject: [PATCH v4 0/9] mtd: sharpslpart partition parser
+Message-ID: <1498681836-3765-1-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gautam,
+This patchset introduces a simple partition parser for the Sharp SL
+Series PXA handhelds. More details in the commit text.
 
-On Wed, Jun 28, 2017 at 2:45 PM, mindentropy <mindentropy@gmail.com> wrote:
-> From: Gautam Bhat <mindentropy@gmail.com>
->
->  * According to mx7sabresd schematics the MIPI CSI/DSI voltage rails
->    should be 2.8V but the voltage provided is a maximum of 3.3V and
->    minimum of 1.8V. Providing such a higher voltage might damage the
->    peripherals and violates the schematic settings.
->
-> Signed-off-by: Gautam Bhat <mindentropy@gmail.com>
+I have set in cc the ARM PXA maintainers because this is the MTD part of
+a planned wider patchset cleaning the Zaurus board files. The MFD maintainers
+are also in cc (tmio.h change).
 
-Patch looks good, but the Subject could be improved to something like:
+Changelog:
+v1 initial import of 2.4 sources [1]
+v2 refactor applying many suggested fixes [2]
+v3 put the partition parser types in the platform data [3]
+v4 refactor after ML review [4]
 
-ARM: dts: imx7d-sdb: Set LDO4 to 2.8V
+[1] http://support.ezaurus.com/developer/source/source_dl.asp
+[2] https://github.com/LinuxPDA/linux/commits/sharpslpart_v2
+[3] https://github.com/LinuxPDA/linux/commits/sharpslpart_v3
+[4] https://github.com/LinuxPDA/linux/commits/sharpslpart_v4
+
+Andrea Adami (9):
+  mtd: sharpslpart: add sharpslpart MTD partition parser
+  mtd: nand: sharpsl.h: support partition parser types
+  mfd: tmio.h: support partition parser types
+  mtd: nand: sharpsl.c: take in account partition parser types
+  mtd: nand: tmio_nand.c: take in account partition parser types
+  ARM: pxa: corgi.c: remove hardcoded partitioning, use sharpslpart
+    parser
+  ARM: pxa: tosa.c: remove hardcoded partitioning, use sharpslpart
+    parser
+  ARM: pxa: spitz.c: remove hardcoded partitioning, use sharpslpart
+    parser
+  ARM: pxa: poodle.c: remove hardcoded partitioning, use sharpslpart
+    parser
+
+ arch/arm/mach-pxa/corgi.c    |  31 +---
+ arch/arm/mach-pxa/poodle.c   |  28 +---
+ arch/arm/mach-pxa/spitz.c    |  34 +---
+ arch/arm/mach-pxa/tosa.c     |  28 +---
+ drivers/mtd/Kconfig          |   8 +
+ drivers/mtd/Makefile         |   1 +
+ drivers/mtd/nand/sharpsl.c   |   2 +-
+ drivers/mtd/nand/tmio_nand.c |   4 +-
+ drivers/mtd/sharpslpart.c    | 391 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/tmio.h     |   1 +
+ include/linux/mtd/sharpsl.h  |   1 +
+ 11 files changed, 439 insertions(+), 90 deletions(-)
+ create mode 100644 drivers/mtd/sharpslpart.c
+
+-- 
+2.7.4
