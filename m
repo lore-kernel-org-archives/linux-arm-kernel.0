@@ -1,68 +1,81 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Wed, 28 Jun 2017 13:20:15 +0530
-Subject: [PATCH] clocksource: timer-prima2: Unmap region and unprepare clk
- obtained by of_iomap/clk_prepare_enable
-Message-ID: <69a66a7f59cdee90d01e30d3f8274576c1a51e27.1498636084.git.arvind.yadav.cs@gmail.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Wed, 28 Jun 2017 10:25:20 +0200
+Subject: [linux-sunxi] Re: [PATCH v13 05/14] ASoC: sun4i-codec: Merge
+ sun4i_codec_left_mixer_controls and sun4i_codec_right_mixer_controls into
+ sun4i_codec_mixer_controls.
+In-Reply-To: <20170626192100.h5o366tawcnkqosx@flea.lan>
+References: <20170624062419.23778-1-dannym@scratchpost.org>
+ <20170624062419.23778-6-dannym@scratchpost.org>
+ <CAGb2v64i_S5HCsLHJGg0WbkFodOFFc5masUYQ53JaLTO7N2BMw@mail.gmail.com>
+ <20170626192100.h5o366tawcnkqosx@flea.lan>
+Message-ID: <20170628102520.29c50592@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of error at init time, rollback iomapping and unprepare clk.
+Hi,
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/clocksource/timer-prima2.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+> > > -static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
+> > > -       SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+> > > -                       SUN4I_CODEC_DAC_ACTL_LDACLMIXS, 1, 0),
+> > > -};
+> > > -
+> > > -static const struct snd_kcontrol_new sun4i_codec_right_mixer_controls[] = {
+> > > -       SOC_DAPM_SINGLE("Right DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+> > > +static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
+> > > +       SOC_DAPM_DOUBLE("DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+> > > +                       SUN4I_CODEC_DAC_ACTL_LDACLMIXS,
+> > >                         SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),  
+> > 
+> > This changes the mixer control names exposed to userspace. While I think
+> > consolidating mixer controls is nice, giving the user a less cluttered
+> > view, I'm not sure about the changing a possible userspace ABI.
+> > 
+> > Maxime, ALSA and ASoC people, any comments about this?  
 
-diff --git a/drivers/clocksource/timer-prima2.c b/drivers/clocksource/timer-prima2.c
-index b4122ed..46d40b3 100644
---- a/drivers/clocksource/timer-prima2.c
-+++ b/drivers/clocksource/timer-prima2.c
-@@ -210,13 +210,15 @@ static int __init sirfsoc_prima2_timer_init(struct device_node *np)
- 
- 	if (rate < PRIMA2_CLOCK_FREQ || rate % PRIMA2_CLOCK_FREQ) {
- 		pr_err("Invalid clock rate\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto err_unprepare;
- 	}
- 
- 	sirfsoc_timer_base = of_iomap(np, 0);
- 	if (!sirfsoc_timer_base) {
- 		pr_err("unable to map timer cpu registers\n");
--		return -ENXIO;
-+		ret = -ENXIO;
-+		goto err_unprepare;
- 	}
- 
- 	sirfsoc_timer_irq.irq = irq_of_parse_and_map(np, 0);
-@@ -230,7 +232,7 @@ static int __init sirfsoc_prima2_timer_init(struct device_node *np)
- 	ret = clocksource_register_hz(&sirfsoc_clocksource, PRIMA2_CLOCK_FREQ);
- 	if (ret) {
- 		pr_err("Failed to register clocksource\n");
--		return ret;
-+		goto err_iounmap;
- 	}
- 
- 	sched_clock_register(sirfsoc_read_sched_clock, 64, PRIMA2_CLOCK_FREQ);
-@@ -238,12 +240,18 @@ static int __init sirfsoc_prima2_timer_init(struct device_node *np)
- 	ret = setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq);
- 	if (ret) {
- 		pr_err("Failed to setup irq\n");
--		return ret;
-+		goto err_iounmap;
- 	}
- 
- 	sirfsoc_clockevent_init();
- 
- 	return 0;
-+
-+err_iounmap:
-+	iounmap(sirfsoc_timer_base);
-+err_unprepare:
-+	clk_disable_unprepare(clk);
-+	return ret;
- }
- CLOCKSOURCE_OF_DECLARE(sirfsoc_prima2_timer,
- 	"sirf,prima2-tick", sirfsoc_prima2_timer_init);
--- 
-1.9.1
+>Yeah, breaking userspace is definitely not ok.
+
+Okay.  I can restore DAC Playback Switch as two different controls with the same
+names as before.
+
+Is the mixer itself (SND_SOC_DAPM_MIXER) - not talking about its controls -
+exposed to userspace?
+
+Because if not, I can still merge the left mixer and right mixer and just fix up
+the control names for DAC Playback Switch to be the same as before, something
+like this:
+
+static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
+        SOC_DAPM_SINGLE("Left Mixer Left DAC Playback Switch", // !!!
+                        SUN4I_CODEC_DAC_ACTL,
+                        SUN4I_CODEC_DAC_ACTL_LDACLMIXS, 1, 0),
+        SOC_DAPM_SINGLE("Right Mixer Right DAC Playback Switch", // !!!
+                        SUN4I_CODEC_DAC_ACTL,
+                        SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),
+        SOC_DAPM_SINGLE("Right Mixer Left DAC Playback Switch",
+                        SUN4I_CODEC_DAC_ACTL,
+                        SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
+        SOC_DAPM_DOUBLE("Line Playback Switch", SUN4I_CODEC_DAC_ACTL,
+                        SUN4I_CODEC_DAC_ACTL_LLNS,
+                        SUN4I_CODEC_DAC_ACTL_RLNS, 1, 0),
+        SOC_DAPM_DOUBLE("FM Playback Switch", SUN4I_CODEC_DAC_ACTL,
+                        SUN4I_CODEC_DAC_ACTL_LFMS,
+                        SUN4I_CODEC_DAC_ACTL_RFMS, 1, 0),
+        SOC_DAPM_DOUBLE("Mic1 Playback Switch", SUN4I_CODEC_DAC_ACTL,
+                        SUN4I_CODEC_DAC_ACTL_MIC1LS,
+                        SUN4I_CODEC_DAC_ACTL_MIC1RS, 1, 0),
+        SOC_DAPM_DOUBLE("Mic2 Playback Switch", SUN4I_CODEC_DAC_ACTL,
+                        SUN4I_CODEC_DAC_ACTL_MIC2LS,
+                        SUN4I_CODEC_DAC_ACTL_MIC2RS, 1, 0),
+};
+
+static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+...
+        SND_SOC_DAPM_MIXER("Left Mixer", SND_SOC_NOPM, 0, 0,
+                           sun4i_codec_mixer_controls,
+                           ARRAY_SIZE(sun4i_codec_mixer_controls)), // !!!
+        SND_SOC_DAPM_MIXER("Right Mixer", SND_SOC_NOPM, 0, 0,
+                           sun4i_codec_mixer_controls,
+                           ARRAY_SIZE(sun4i_codec_mixer_controls)), // !!!
+};
+
+Would this be a good way?
