@@ -1,37 +1,28 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 28 Jun 2017 14:53:26 -0500
-Subject: [PATCH v5 1/2] PCI: mediatek: Add Mediatek PCIe host controller
- support
-In-Reply-To: <1495338145-9384-2-git-send-email-ryder.lee@mediatek.com>
-References: <1495338145-9384-1-git-send-email-ryder.lee@mediatek.com>
- <1495338145-9384-2-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <20170628195325.GR17844@bhelgaas-glaptop.roam.corp.google.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 Jun 2017 20:53:49 +0100
+Subject: [alsa-devel] [PATCH v2 12/12] ASoC: Fix use-after-free at card
+ unregistration
+In-Reply-To: <87injstckf.fsf@belgarion.home>
+References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
+ <1497857229-12049-13-git-send-email-robert.jarzmik@free.fr>
+ <s5hefug72iu.wl-tiwai@suse.de> <87injstckf.fsf@belgarion.home>
+Message-ID: <20170628195349.pqeb3dceddxar75s@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 21, 2017 at 11:42:24AM +0800, Ryder Lee wrote:
-> Add support for the Mediatek PCIe Gen2 controller which can
-> be found on MT7623 series SoCs.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/pci/host/Kconfig         |  11 +
->  drivers/pci/host/Makefile        |   1 +
->  drivers/pci/host/pcie-mediatek.c | 553 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 565 insertions(+)
->  create mode 100644 drivers/pci/host/pcie-mediatek.c
->...
+On Mon, Jun 19, 2017 at 01:57:20PM +0200, Robert Jarzmik wrote:
 
-> +static int mtk_pcie_register_host(struct pci_host_bridge *host)
-> +{
-> +	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
-> +	struct pci_bus *child;
-> +	int err;
-> +
-> +	pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
+> My serie shifted by one, so the very first of the serie is therefore missing,
+> formerly "ALSA: ac97: split out the generic ac97 registers" in
+> https://patchwork.kernel.org/patch/9398143/, and the shift triggered the
+> inclusion of the last patch of my tree, ie. yours :)
 
-Do you really need the PCI_REASSIGN_ALL_RSRC and PCI_REASSIGN_ALL_BUS
-flags?  I'd like to get rid of them because we should automatically
-assign resources if the firmware hasn't done it.
-
-Bjorn
+Based on the missing first patch I was expecting the series to get
+reposted?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170628/5132af47/attachment.sig>
