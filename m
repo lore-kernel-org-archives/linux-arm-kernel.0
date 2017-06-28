@@ -1,59 +1,46 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Wed, 28 Jun 2017 16:55:57 +0200
-Subject: [PATCH] arm64: fix endianness annotation for
- __apply_alternatives()/get_alt_insn()
-Message-ID: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 28 Jun 2017 15:55:59 +0100
+Subject: [PATCH v3 4/4] misc: sram: Allow ARM64 to select SRAM_EXEC
+In-Reply-To: <20170617000744.22158-5-f.fainelli@gmail.com>
+References: <20170617000744.22158-1-f.fainelli@gmail.com>
+ <20170617000744.22158-5-f.fainelli@gmail.com>
+Message-ID: <20170628145558.GA8252@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_alt_insn() is used to read and create ARM instructions, which
-are always stored in memory in little-endian order. These values
-are thus correctly converted to/from native order when processed
-but the pointers used to hold the address of these instructions
-are declared as for native order values.
+On Fri, Jun 16, 2017 at 05:07:44PM -0700, Florian Fainelli wrote:
+> Now that ARM64 also has a fncpy() implementation, allow selection
+> SRAM_EXEC for ARM64 as well.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  drivers/misc/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index 07bbd4cc1852..ac8779278c0c 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -464,7 +464,7 @@ config SRAM
+>  	bool "Generic on-chip SRAM driver"
+>  	depends on HAS_IOMEM
+>  	select GENERIC_ALLOCATOR
+> -	select SRAM_EXEC if ARM
+> +	select SRAM_EXEC if ARM || ARM64
+>  	help
+>  	  This driver allows you to declare a memory region to be managed by
+>  	  the genalloc API. It is supposed to be used for small on-chip SRAM
 
-Fix this by declaring the pointers as __le32* instead of u32* and
-make the few appropriate needed changes.
+As stated in another thread [1], NAK to this patch.
 
-Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
----
- arch/arm64/kernel/alternative.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Currently there are no users of this interface that we wish to enable
+for arm64, and this is liable to be abused to add platform-specific
+stuff that we expect to live in PSCI or other secure FW.
 
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 8840c109c..56bfda8cb 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -60,7 +60,7 @@ static bool branch_insn_requires_update(struct alt_instr *alt, unsigned long pc)
- 
- #define align_down(x, a)	((unsigned long)(x) & ~(((unsigned long)(a)) - 1))
- 
--static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
-+static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnptr)
- {
- 	u32 insn;
- 
-@@ -109,7 +109,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
- {
- 	struct alt_instr *alt;
- 	struct alt_region *region = alt_region;
--	u32 *origptr, *replptr, *updptr;
-+	__le32 *origptr, *replptr, *updptr;
- 
- 	for (alt = region->begin; alt < region->end; alt++) {
- 		u32 insn;
-@@ -122,9 +122,9 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
- 
- 		pr_info_once("patching kernel code\n");
- 
--		origptr = ALT_ORIG_PTR(alt);
--		replptr = ALT_REPL_PTR(alt);
--		updptr = use_linear_alias ? (u32 *)lm_alias(origptr) : origptr;
-+		origptr = (__le32 __force *) ALT_ORIG_PTR(alt);
-+		replptr = (__le32 __force *) ALT_REPL_PTR(alt);
-+		updptr = use_linear_alias ? (__le32 *)lm_alias(origptr) : origptr;
- 		nr_inst = alt->alt_len / sizeof(insn);
- 
- 		for (i = 0; i < nr_inst; i++) {
--- 
-2.13.0
+Until we have a user that does not fall into that bucket, I see no
+reason to enable this for arm64.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/516161.html
