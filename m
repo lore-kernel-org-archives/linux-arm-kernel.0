@@ -1,54 +1,77 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 28 Jun 2017 14:09:18 +0100
-Subject: [RFC PATCH v2 2/2] ARM: signal: Fix unparseable iwmmxt_sigframe
- in uc_regspace[]
-In-Reply-To: <20170627220812.GT4902@n2100.armlinux.org.uk>
-References: <1498583067-14178-1-git-send-email-Dave.Martin@arm.com>
- <1498583067-14178-3-git-send-email-Dave.Martin@arm.com>
- <20170627220812.GT4902@n2100.armlinux.org.uk>
-Message-ID: <20170628130916.GM8543@e103592.cambridge.arm.com>
+From: maarten.lankhorst@linux.intel.com (Maarten Lankhorst)
+Date: Wed, 28 Jun 2017 15:28:12 +0200
+Subject: [PATCH 2/2] drm/atomic: Wait indefinitely and interruptibly for
+ hw_done.
+In-Reply-To: <20170628132812.14927-1-maarten.lankhorst@linux.intel.com>
+References: <20170628132812.14927-1-maarten.lankhorst@linux.intel.com>
+Message-ID: <20170628132812.14927-2-maarten.lankhorst@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 11:08:12PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 27, 2017 at 06:04:07PM +0100, Dave Martin wrote:
-> > In kernels with CONFIG_IWMMXT=y running on non-iWMMXt hardware, the
-> > signal frame can be left partially uninitialised in such a way
-> > that userspace cannot parse uc_regspace[] safely.  In particular,
-> > this means that the VFP registers cannot be located reliably in the
-> > signal frame when a multi_v7_defconfig kernel is run on the
-> > majority of platforms.
-> > 
-> > The cause is that the uc_regspace[] is laid out statically based on
-> > the kernel config, but the decision of whether to save/restore the
-> > iWMMXt registers must be a runtime decision.
-> > 
-> > To minimise breakage of software that may assume a fixed layout,
-> > this patch emits a dummy block of the same size as iwmmxt_sigframe,
-> > for non-iWMMXt threads.  However, the magic and size of this block
-> > are now filled in to help parsers skip over it.  A new DUMMY_MAGIC
-> > is defined for this purpose.
-> > 
-> > It is probably legitimate (if non-portable) for userspace to
-> > manufacture its own sigframe for sigreturn, and there is no obvious
-> > reason why userspace should be required to insert a DUMMY_MAGIC
-> > block when running on non-iWMMXt hardware, when omitting it has
-> > worked just fine forever in other configurations.  So in this case,
-> > sigreturn does not require this block to be present.
-> > 
-> > Reported-by: Edmund Grimley-Evans <Edmund.Grimley-Evans@arm.com>
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> This looks fine to me.  Please drop it in the patch system, thanks.
+Without waiting for hw_done, previous atomic updates may dereference
+the wrong state and cause a lot of confusion. The real fix is fixing
+all obj->state to use the accessor macros, but for now wait
+indefinitely and interruptibly.
 
-Do you have a view on whether I should Cc-stable on this?
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: David Airlie <airlied@linux.ie>
+Cc: Daniel Vetter <daniel.vetter@intel.com>
+Cc: Jani Nikula <jani.nikula@linux.intel.com>
+Cc: Sean Paul <seanpaul@chromium.org>
+Cc: CK Hu <ck.hu@mediatek.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Rob Clark <robdclark@gmail.com>
+Cc: Ben Skeggs <bskeggs@redhat.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Jonathan Hunter <jonathanh@nvidia.com>
+Cc: Jyri Sarha <jsarha@ti.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-kernel at vger.kernel.org
+Cc: intel-gfx at lists.freedesktop.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+Cc: freedreno at lists.freedesktop.org
+Cc: nouveau at lists.freedesktop.org
+Cc: linux-tegra at vger.kernel.org
+Signed-off-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+---
+ drivers/gpu/drm/drm_atomic_helper.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-The patches seem to apply cleanly back to v3.4, but I'm not in a
-position to test that far back easily.
-
-As a reference point, Debian stretch seems to use v4.9.x for its
-multiplatform distro kernel, so it may be worth going at least that
-far back.  (jessie uses v3.16.x.)
-
-Cheers
----Dave
+diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+index f66b6c45cdd0..56e7729d993d 100644
+--- a/drivers/gpu/drm/drm_atomic_helper.c
++++ b/drivers/gpu/drm/drm_atomic_helper.c
+@@ -2144,8 +2144,7 @@ EXPORT_SYMBOL(drm_atomic_helper_cleanup_planes);
+ int drm_atomic_helper_swap_state(struct drm_atomic_state *state,
+ 				  bool stall)
+ {
+-	int i;
+-	long ret;
++	int i, ret;
+ 	struct drm_connector *connector;
+ 	struct drm_connector_state *old_conn_state, *new_conn_state;
+ 	struct drm_crtc *crtc;
+@@ -2168,12 +2167,11 @@ int drm_atomic_helper_swap_state(struct drm_atomic_state *state,
+ 			if (!commit)
+ 				continue;
+ 
+-			ret = wait_for_completion_timeout(&commit->hw_done,
+-							  10*HZ);
+-			if (ret == 0)
+-				DRM_ERROR("[CRTC:%d:%s] hw_done timed out\n",
+-					  crtc->base.id, crtc->name);
++			ret = wait_for_completion_interruptible(&commit->hw_done);
+ 			drm_crtc_commit_put(commit);
++
++			if (ret)
++				return ret;
+ 		}
+ 	}
+ 
+-- 
+2.11.0
