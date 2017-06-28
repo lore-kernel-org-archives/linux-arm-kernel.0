@@ -1,38 +1,49 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 28 Jun 2017 15:59:36 +0200
-Subject: [PATCH RESEND] serial: imx: Enable RTSD only when needed
-Message-ID: <20170628135936.30537-1-romain.perier@collabora.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 28 Jun 2017 16:01:39 +0200
+Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+In-Reply-To: <a7881812-0da6-478c-7eed-faf8a6e30891@linux.intel.com>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+ <20170622104933.GY629@lahna.fi.intel.com>
+ <5540bae1-b1bf-0e15-1fa0-977076fa0753@linux.intel.com>
+ <a7881812-0da6-478c-7eed-faf8a6e30891@linux.intel.com>
+Message-ID: <CAPDyKFqShg+9rYfjMwKU6ri7nWt3nAqv_A+N-hHitRLwDi0_5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nandor Han <nandor.han@ge.com>
+On 27 June 2017 at 09:55, Jarkko Nikula <jarkko.nikula@linux.intel.com> wrote:
+> On 06/22/2017 02:16 PM, Jarkko Nikula wrote:
+>>
+>> On 06/22/2017 01:49 PM, Mika Westerberg wrote:
+>>>
+>>> On Thu, Jun 22, 2017 at 01:31:51AM +0200, Rafael J. Wysocki wrote:
+>>>>
+>>>> On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org>
+>>>> wrote:
+>>>
+>>> Thanks Ulf for taking care of this!
+>>>
+>> Indeed!
+>>
+>>> I tested this series on Dell XPS 9350 which has touch panel connected to
+>>> I2C and suspend/resume still works fine and I can see the controller
+>>> going to D3 when the touch panel is idle.
+>>>
+>>> I can perform more comprehensive testing next week.
+>>>
+>> Unfortunately I'm seeing interrupt storm during suspend/resume on
+>> platform using PM domain from drivers/acpi/acpi_lpss.c straight after
+>> this patch. Maybe some timing related as I see it only if I have debug
+>> messages on (i2c_designware_core.dyndbg=+p). But it occurs only after
+>> this patch.
+>>
+> Sorry the noise, this was bogus. That platform is doing this interrupt storm
+> randomly and it occurs also without the patch.
 
-Currently, this IRQ is always enabled. Some devices might mux these pins
-to other I/Os, like I2C. This could lead to spurious interrupts.
 
-This commit makes this IRQ optional, by using the field have_rtscts.
+Okay, then it seems like we should go with $subject patch, although
+allow me to update the changelog and post a new version.
 
-Signed-off-by: Nandor Han <nandor.han@ge.com>
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- drivers/tty/serial/imx.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 7327477..5437b34 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1302,7 +1302,9 @@ static int imx_startup(struct uart_port *port)
- 		imx_enable_dma(sport);
- 
- 	temp = readl(sport->port.membase + UCR1);
--	temp |= UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN;
-+	temp |= UCR1_RRDYEN | UCR1_UARTEN;
-+	if (sport->have_rtscts)
-+			temp |= UCR1_RTSDEN;
- 
- 	writel(temp, sport->port.membase + UCR1);
- 
--- 
-1.8.3.1
+Kind regards
+Uffe
