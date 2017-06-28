@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 Jun 2017 20:24:59 +0100
-Subject: Applied "spi: sirf: fix spelling mistake: "registerred" ->
- "registered"" to the spi tree
-In-Reply-To: <20170626133912.23808-1-colin.king@canonical.com>
-Message-ID: <E1dQIaB-0004ZE-0m@finisterre>
+Date: Wed, 28 Jun 2017 20:25:04 +0100
+Subject: Applied "spi: stm32: fix potential dereference null return value" to
+ the spi tree
+In-Reply-To: <1498222550-19092-9-git-send-email-amelie.delaunay@st.com>
+Message-ID: <E1dQIaG-0004aF-4V@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: sirf: fix spelling mistake: "registerred" -> "registered"
+   spi: stm32: fix potential dereference null return value
 
 has been applied to the spi tree at
 
@@ -34,32 +34,70 @@ to this mail.
 Thanks,
 Mark
 
->From 2d781e89e2b2f2195a8ef06fdc5325e46f26c8eb Mon Sep 17 00:00:00 2001
-From: Colin Ian King <colin.king@canonical.com>
-Date: Mon, 26 Jun 2017 14:39:12 +0100
-Subject: [PATCH] spi: sirf: fix spelling mistake: "registerred" ->
- "registered"
+>From 7b821a6485c943edc752a94260a29116237f9153 Mon Sep 17 00:00:00 2001
+From: Amelie Delaunay <amelie.delaunay@st.com>
+Date: Tue, 27 Jun 2017 17:45:20 +0200
+Subject: [PATCH] spi: stm32: fix potential dereference null return value
 
-Trivial fix to spelling mistake in dev_info message
+This patch fixes the usage of rx_dma_desc and tx_dma_desc pointers
+returned by dmaengine_prep_slave_sg, which can be null.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Detected by CoverityScan, CID#1446587 ("Dereference null return value")
+
+Reported-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-sirf.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/spi/spi-stm32.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index 7072276ad354..bbb1a275f718 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -1158,7 +1158,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
- 	ret = spi_bitbang_start(&sspi->bitbang);
- 	if (ret)
- 		goto free_clk;
--	dev_info(&pdev->dev, "registerred, bus number = %d\n", master->bus_num);
-+	dev_info(&pdev->dev, "registered, bus number = %d\n", master->bus_num);
+diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
+index 8a6bff379b21..75644bcd938b 100644
+--- a/drivers/spi/spi-stm32.c
++++ b/drivers/spi/spi-stm32.c
+@@ -775,9 +775,6 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 					xfer->rx_sg.nents,
+ 					rx_dma_conf.direction,
+ 					DMA_PREP_INTERRUPT);
+-
+-		rx_dma_desc->callback = stm32_spi_dma_cb;
+-		rx_dma_desc->callback_param = spi;
+ 	}
  
- 	return 0;
- free_clk:
+ 	tx_dma_desc = NULL;
+@@ -790,11 +787,6 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 					xfer->tx_sg.nents,
+ 					tx_dma_conf.direction,
+ 					DMA_PREP_INTERRUPT);
+-
+-		if (spi->cur_comm == SPI_SIMPLEX_TX) {
+-			tx_dma_desc->callback = stm32_spi_dma_cb;
+-			tx_dma_desc->callback_param = spi;
+-		}
+ 	}
+ 
+ 	if ((spi->tx_buf && !tx_dma_desc) ||
+@@ -802,6 +794,9 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 		goto dma_desc_error;
+ 
+ 	if (rx_dma_desc) {
++		rx_dma_desc->callback = stm32_spi_dma_cb;
++		rx_dma_desc->callback_param = spi;
++
+ 		if (dma_submit_error(dmaengine_submit(rx_dma_desc))) {
+ 			dev_err(spi->dev, "Rx DMA submit failed\n");
+ 			goto dma_desc_error;
+@@ -811,6 +806,11 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 	}
+ 
+ 	if (tx_dma_desc) {
++		if (spi->cur_comm == SPI_SIMPLEX_TX) {
++			tx_dma_desc->callback = stm32_spi_dma_cb;
++			tx_dma_desc->callback_param = spi;
++		}
++
+ 		if (dma_submit_error(dmaengine_submit(tx_dma_desc))) {
+ 			dev_err(spi->dev, "Tx DMA submit failed\n");
+ 			goto dma_submit_error;
 -- 
 2.13.2
