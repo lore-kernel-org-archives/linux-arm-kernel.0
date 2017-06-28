@@ -1,42 +1,113 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Wed, 28 Jun 2017 18:55:14 +0200
-Subject: [PATCH v5] trace: ras: add ARM processor error information trace
- event
-In-Reply-To: <5953DC82.2000602@arm.com>
-References: <1498275503-137890-1-git-send-email-xiexiuqi@huawei.com>
- <20170626140647.anigiqhk3l6ltet7@pd.tnic>
- <5953DC82.2000602@arm.com>
-Message-ID: <20170628165514.kltemqgaxxhgw5as@pd.tnic>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 28 Jun 2017 10:02:35 -0700
+Subject: [PATCH 0/8] io-pgtable lock removal
+In-Reply-To: <20170628114609.GD11053@arm.com>
+References: <cover.1496921366.git.robin.murphy@arm.com>
+ <458ad41d-6679-eeca-3c0f-13ccb6c933b6@codeaurora.org>
+ <b7830be1-9a78-e29f-a29c-4798aaa28c0a@broadcom.com>
+ <cdc1799b-f142-09ed-a7e5-d7fd2e70268f@arm.com>
+ <e43ba1fe-696e-fabb-a800-52fadaa2fa93@broadcom.com>
+ <20170628114609.GD11053@arm.com>
+Message-ID: <87d53115-3d80-5a3d-6632-c31986cb7018@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 28, 2017 at 05:42:42PM +0100, James Morse wrote:
-> > Alternatively, you can extend arm_event to get issued with *each*
-> > cper_arm_err_info but that would mean a lot of redundant information
-> > being shuffled out to userspace.
+Hi Will/Robin,
+
+On 6/28/17 4:46 AM, Will Deacon wrote:
+> Hi Ray,
 > 
-> I think this is what we should do,
+> Robin and I have been bashing our heads against the tlb_sync_pending flag
+> this morning, and we reckon it could have something to do with your timeouts
+> on MMU-500.
+> 
+> On Tue, Jun 27, 2017 at 09:43:19AM -0700, Ray Jui wrote:
+>>>> Also, in a few occasions, I observed the following message during the
+>>>> test, when multiple cores are involved:
+>>>>
+>>>> arm-smmu 64000000.mmu: TLB sync timed out -- SMMU may be deadlocked
+> 
+> The tlb_sync_pending logic was written under the assumption of a global
+> page-table lock, so it assumes that it only has to care about syncing
+> flushes from the current CPU/context. That's not true anymore, and the
+> current code can accidentally skip syncs and (what I think is happening in
+> your case) allow concurrent syncs, which will potentially lead to timeouts
+> if a CPU is unlucky enough to keep missing the Ack.
+> 
+> Please can you try the diff below and see if it fixes things for you?
+> This applies on top of my for-joerg/arm-smmu/updates branch, but note
+> that I've only shown it to the compiler. Not tested at all.
+> 
+> Will
+> 
 
-Yes, that should be easier for userspace.
+Thanks for looking into this. I'm a bit busy at work but will certainly
+find time to test the diff below. I hopefully will get to it later this
+week.
 
-> but only keep the number of fields we export to a minimum. If we
-> always use the names in the spec, and user-space always parses the
-> 'format' file, we should be able to add more fields when they turn out
-> to be necessary. (looks like the trace infrastructure makes inventing
-> a new format easy!)
+Thanks,
 
-Right, except if you have userspace consumers already using them, you're
-potentially breaking them. Unless you teach them all to parse the format
-file first, from the very beginning. But in general, we try to be very
-wary when touching tracepoints as they become an ABI of sorts.
+Ray
 
-Also, do try to shovel only the really needed info to userspace - not
-everything the spec dumps but maybe just the fields that are really
-necessary for doing hw error recovery.
-
--- 
-Regards/Gruss,
-    Boris.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+> --->8
+> 
+> diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+> index 127558d83667..cd8d7aaec161 100644
+> --- a/drivers/iommu/io-pgtable.c
+> +++ b/drivers/iommu/io-pgtable.c
+> @@ -59,6 +59,7 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
+>  	iop->cookie	= cookie;
+>  	iop->cfg	= *cfg;
+>  
+> +	atomic_set(&iop->tlb_sync_pending, 0);
+>  	return &iop->ops;
+>  }
+>  
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index 524263a7ae6f..b64580c9d03d 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -1,5 +1,7 @@
+>  #ifndef __IO_PGTABLE_H
+>  #define __IO_PGTABLE_H
+> +
+> +#include <linux/atomic.h>
+>  #include <linux/bitops.h>
+>  
+>  /*
+> @@ -165,7 +167,7 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops);
+>  struct io_pgtable {
+>  	enum io_pgtable_fmt	fmt;
+>  	void			*cookie;
+> -	bool			tlb_sync_pending;
+> +	atomic_t		tlb_sync_pending;
+>  	struct io_pgtable_cfg	cfg;
+>  	struct io_pgtable_ops	ops;
+>  };
+> @@ -175,22 +177,20 @@ struct io_pgtable {
+>  static inline void io_pgtable_tlb_flush_all(struct io_pgtable *iop)
+>  {
+>  	iop->cfg.tlb->tlb_flush_all(iop->cookie);
+> -	iop->tlb_sync_pending = true;
+> +	atomic_set_release(&iop->tlb_sync_pending, 1);
+>  }
+>  
+>  static inline void io_pgtable_tlb_add_flush(struct io_pgtable *iop,
+>  		unsigned long iova, size_t size, size_t granule, bool leaf)
+>  {
+>  	iop->cfg.tlb->tlb_add_flush(iova, size, granule, leaf, iop->cookie);
+> -	iop->tlb_sync_pending = true;
+> +	atomic_set_release(&iop->tlb_sync_pending, 1);
+>  }
+>  
+>  static inline void io_pgtable_tlb_sync(struct io_pgtable *iop)
+>  {
+> -	if (iop->tlb_sync_pending) {
+> +	if (atomic_xchg_relaxed(&iop->tlb_sync_pending, 0))
+>  		iop->cfg.tlb->tlb_sync(iop->cookie);
+> -		iop->tlb_sync_pending = false;
+> -	}
+>  }
+>  
+>  /**
+> 
