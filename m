@@ -1,53 +1,119 @@
-From: chen.zhong@mediatek.com (chen.zhong)
-Date: Wed, 28 Jun 2017 20:10:06 +0800
-Subject: [PATCH] soc: mtk-pmic-wrap: make of_device_ids const.
-In-Reply-To: <ec7445881f9cbd7d7e6a29126dce6e62f9e6b3f1.1498625812.git.arvind.yadav.cs@gmail.com>
-References: <ec7445881f9cbd7d7e6a29126dce6e62f9e6b3f1.1498625812.git.arvind.yadav.cs@gmail.com>
-Message-ID: <1498651806.6668.2.camel@mhfsdcap03>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Wed, 28 Jun 2017 12:28:31 +0000
+Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
+In-Reply-To: <9D51AC4C-6CB7-46A5-B363-2AD6DA6C497F@goldelico.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <1498143942-12682-2-git-send-email-hugues.fruchet@st.com>
+ <D5629236-95D8-45B6-9719-E8B9796FEC90@goldelico.com>
+ <64e3005d-31df-71f2-762b-2c1b1152fc2d@st.com>
+ <5cd25a47-f3be-8c40-3940-29f26a245076@kernel.org>
+ <39501C78-7B81-4803-94C1-25DFA06EA526@goldelico.com>
+ <e2a9df8b-00f8-ae36-f4f3-63dcc98dea50@kernel.org>
+ <CGME20170628091334epcas5p2071ae52aa3f9312b1099e37ffac20eb1@epcas5p2.samsung.com>
+ <6F68CD33-70E6-47C1-9E89-5E2AA776879F@goldelico.com>
+ <5bcc7ec0-4ae5-3703-3cee-ed644eef710a@samsung.com>
+ <9D51AC4C-6CB7-46A5-B363-2AD6DA6C497F@goldelico.com>
+Message-ID: <2d916065-fd81-6f52-5d32-a46331e0c5ed@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Wed, 2017-06-28 at 10:28 +0530, Arvind Yadav wrote:
-> of_device_ids are not supposed to change at runtime. All functions
-> working with of_device_ids provided by <linux/of.h> work with const
-> of_device_ids. So mark the non-const structs as const.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index a5f1093..1205a671 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -1067,7 +1067,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
->  	.init_soc_specific = pwrap_mt2701_init_soc_specific,
->  };
->  
-> -static struct pmic_wrapper_type pwrap_mt8135 = {
-> +static const struct pmic_wrapper_type pwrap_mt8135 = {
->  	.regs = mt8135_regs,
->  	.type = PWRAP_MT8135,
->  	.arb_en_all = 0x1ff,
-> @@ -1079,7 +1079,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
->  	.init_soc_specific = pwrap_mt8135_init_soc_specific,
->  };
->  
-> -static struct pmic_wrapper_type pwrap_mt8173 = {
-> +static const struct pmic_wrapper_type pwrap_mt8173 = {
->  	.regs = mt8173_regs,
->  	.type = PWRAP_MT8173,
->  	.arb_en_all = 0x3f,
-> @@ -1091,7 +1091,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
->  	.init_soc_specific = pwrap_mt8173_init_soc_specific,
->  };
->  
-> -static struct of_device_id of_pwrap_match_tbl[] = {
-> +static const struct of_device_id of_pwrap_match_tbl[] = {
->  	{
->  		.compatible = "mediatek,mt2701-pwrap",
->  		.data = &pwrap_mt2701,
 
-Acked-by: Chen Zhong <chen.zhong@mediatek.com>
+
+On 06/28/2017 01:24 PM, H. Nikolaus Schaller wrote:
+> 
+>> Am 28.06.2017 um 12:50 schrieb Sylwester Nawrocki <s.nawrocki@samsung.com>:
+>>
+>> On 06/28/2017 11:12 AM, H. Nikolaus Schaller wrote:
+>>>> Am 28.06.2017 um 00:57 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+>>>> On 06/27/2017 07:48 AM, H. Nikolaus Schaller wrote:
+>>>>>> Am 26.06.2017 um 22:04 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+>>>>>> On 06/26/2017 12:35 PM, Hugues FRUCHET wrote:
+>>>>>>>> What I am missing to support the GTA04 camera is the control of the optional "vana-supply".
+>>>>>>>> So the driver does not power up the camera module when needed and therefore probing fails.
+>>>>>>>>
+>>>>>>>>     - vana-supply: a regulator to power up the camera module.
+>>>>>>>>
+>>>>>>>> Driver code is not complex to add:
+>>>>>>
+>>>>>>> Yes, I saw it in your code, but as I don't have any programmable power
+>>>>>>> supply on my setup, I have not pushed this commit.
+>>>>>>
+>>>>>> Since you are about to add voltage supplies to the DT binding I'd suggest
+>>>>>> to include all three voltage supplies of the sensor chip. Looking at the OV9650
+>>>>>> and the OV9655 datasheet there are following names used for the voltage supply
+>>>>>> pins:
+>>>>>>
+>>>>>> AVDD - Analog power supply,
+>>>>>> DVDD - Power supply for digital core logic,
+>>>>>> DOVDD - Digital power supply for I/O.
+>>>>>
+>>>>> The latter two are usually not independently switchable from the SoC power
+>>>>> the module is connected to.
+>>>>>
+>>>>> And sometimes DVDD and DOVDD are connected together.
+>>>>>
+>>>>> So the driver can't make much use of knowing or requesting them because the
+>>>>> 1.8V supply is always active, even during suspend.
+>>>>>
+>>>>>>
+>>>>>> I doubt the sensor can work without any of these voltage supplies, thus
+>>>>>> regulator_get_optional() should not be used. I would just use the regulator
+>>>>>> bulk API to handle all three power supplies.
+>>>>>
+>>>>> The digital part works with AVDD turned off. So the LDO supplying AVDD should
+>>>>> be switchable to save power (&vaux3 on the GTA04 device).>
+>>>>> But not all designs can switch it off. Hence the idea to define it as an
+>>>>> /optional/ regulator. If it is not defined by DT, the driver simply assumes
+>>>>> it is always powered on.
+>>>>
+>>>> I didn't say we can't define regulator supply properties as optional in the DT
+>>>> binding.  If we define them as such and any of these *-supply properties is
+>>>> missing in DT with regulator_get() the regulator core will use dummy regulator
+>>>> for that particular voltage supply.  While with regulator_get_optional()
+>>>> -ENODEV is returned when the regulator cannot be found.
+>>>
+>>> Ah, ok. I see.
+>>>
+>>> I had thought that it is the right thing to do like devm_gpiod_get_optional().
+>>>
+>>> That one it is described as:
+>>>
+>>> "* This is equivalent to gpiod_get(), except that when no GPIO was assigned to
+>>>   * the requested function it will return NULL. This is convenient for drivers
+>>>   * that need to handle optional GPIOs."
+>>>
+>>> Seems to be inconsistent definition of what "optional" means.
+>>
+>> Indeed, this commit explains it further:
+>>
+>> commit de1dd9fd2156874b45803299b3b27e65d5defdd9
+>> regulator: core: Provide hints to the core about optional supplies
+>>
+>>> So we indeed should use devm_regulator_get() in this case. Thanks for > pointing out!
+>>
+>>>>> So in summary we only need AVDD switched for the GTA04 - but it does not
+>>>>> matter if the others are optional properties. We would not use them.
+>>>>>
+>>>>> It does matter if they are mandatory because it adds DT complexity (size
+>>>>> and processing) without added function.
+>>>>
+>>>> We should not be defining DT binding only with selected use cases/board
+>>>> designs in mind.  IMO all three voltage supplies should be listed in the
+>>>> binding, presumably all can be made optional, with an assumption that when
+>>>> the property is missing selected pin is hooked up to a fixed regulator.
+>>>
+>>> Ok, then it should just be defined in the bindings but not used by
+>>> the driver?
+>>
+>> Yes, I think so. So we have a possibly complete binding right from the
+>> beginning. I someone needs handling other supplies than AVDD they could
+>> update the driver in future.
+> 
+> Fine! I have sent some patches to Hughues so that he can integrate it in
+> his next version of the patch series.
+> 
+> BR and thanks,
+> Nikolaus
+> 
+
+OK got it, I'll push in v2.
