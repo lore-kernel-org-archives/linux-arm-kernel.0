@@ -1,53 +1,47 @@
 From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Wed, 28 Jun 2017 16:58:11 +0200
-Subject: [PATCH] arm64: fix endianness annotation for aarch64_insn_write()
-Message-ID: <20170628145811.24719-1-luc.vanoostenryck@gmail.com>
+Date: Wed, 28 Jun 2017 16:58:16 +0200
+Subject: [PATCH] arm64: fix missing __user in compat_vfp_{get,set}()
+Message-ID: <20170628145816.24807-1-luc.vanoostenryck@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-aarch64_insn_write() is used to write an instruction.
-As on ARM64 in-memory instructions are always stored
-in little-endian order, this function, taking the instruction
-opcode in native order, correctly convert it to little-endian
-before sending it to an helper function __aarch64_insn_write()
-which will do the effective write.
+compat_vfp_get() & compat_vfp_set() are two helpers reading
+or writting some values via {get,put}_user() which need a
+pointer annotated with '__user'.
+The buffers used by the two helpers are correctly '__user'
+annotated but need to be casted to a real type before being
+given to {get,put}_user().
 
-This is all good, but the variable and argument holding the
-converted value are not annotated for a little-endian value
-but left for native values.
+The problem is that this cast lack a '__user' annotation.
 
-Fix this by adjusting the prototype of the helper and
-directly using the result of cpu_to_le32() without passing
-by an intermediate variable (which was not a distinct one
-but the same as the one holding the native value).
+Fix this by adding the missing '__user'.
 
 Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 ---
- arch/arm64/kernel/insn.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/ptrace.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index d4d80b32c..60a2f03d7 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -126,7 +126,7 @@ int __kprobes aarch64_insn_read(void *addr, u32 *insnp)
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index c142459a8..c77f425c7 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -908,7 +908,7 @@ static int compat_vfp_get(struct task_struct *target,
+ 	if (count && !ret) {
+ 		fpscr = (uregs->fpsr & VFP_FPSCR_STAT_MASK) |
+ 			(uregs->fpcr & VFP_FPSCR_CTRL_MASK);
+-		ret = put_user(fpscr, (compat_ulong_t *)ubuf);
++		ret = put_user(fpscr, (compat_ulong_t __user *)ubuf);
+ 	}
+ 
  	return ret;
- }
+@@ -932,7 +932,7 @@ static int compat_vfp_set(struct task_struct *target,
+ 				 VFP_STATE_SIZE - sizeof(compat_ulong_t));
  
--static int __kprobes __aarch64_insn_write(void *addr, u32 insn)
-+static int __kprobes __aarch64_insn_write(void *addr, __le32 insn)
- {
- 	void *waddr = addr;
- 	unsigned long flags = 0;
-@@ -145,8 +145,7 @@ static int __kprobes __aarch64_insn_write(void *addr, u32 insn)
- 
- int __kprobes aarch64_insn_write(void *addr, u32 insn)
- {
--	insn = cpu_to_le32(insn);
--	return __aarch64_insn_write(addr, insn);
-+	return __aarch64_insn_write(addr, cpu_to_le32(insn));
- }
- 
- static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+ 	if (count && !ret) {
+-		ret = get_user(fpscr, (compat_ulong_t *)ubuf);
++		ret = get_user(fpscr, (compat_ulong_t __user *)ubuf);
+ 		uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
+ 		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
+ 	}
 -- 
 2.13.0
