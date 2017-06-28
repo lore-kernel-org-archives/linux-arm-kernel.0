@@ -1,99 +1,165 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:48 +0100
-Subject: [PATCH v2 29/52] irqchip/gic-v4: Add per-VM VPE domain creation
+Date: Wed, 28 Jun 2017 16:03:40 +0100
+Subject: [PATCH v2 21/52] irqchip/gic-v3-its: Add VPE irq domain [de]activation
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-30-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-22-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When creating a VM, it is very convenient to have an irq domain
-containing all the doorbell interrupts associated with that VM
-(each interrupt representing a VPE).
+On activation, a VPE is mapped using the VMAPP command, followed
+by a VINVALL for a good measure. On deactivation, the VPE is
+simply unmapped.
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v4.c       | 58 ++++++++++++++++++++++++++++++++++++++
- include/linux/irqchip/arm-gic-v4.h |  3 ++
- 2 files changed, 61 insertions(+)
- create mode 100644 drivers/irqchip/irq-gic-v4.c
+ drivers/irqchip/irq-gic-v3-its.c | 102 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-new file mode 100644
-index 000000000000..2ea12baf2e53
---- /dev/null
-+++ b/drivers/irqchip/irq-gic-v4.c
-@@ -0,0 +1,58 @@
-+/*
-+ * Copyright (C) 2016 ARM Limited, All Rights Reserved.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 58f3b19ec462..276602efdfa0 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -217,6 +217,16 @@ struct its_cmd_desc {
+ 
+ 		struct {
+ 			struct its_vpe *vpe;
++		} its_vinvall_cmd;
 +
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/msi.h>
++		struct {
++			struct its_vpe *vpe;
++			struct its_collection *col;
++			bool valid;
++		} its_vmapp_cmd;
 +
-+#include <linux/irqchip/arm-gic-v4.h>
-+
-+static struct irq_domain *gic_domain;
-+static const struct irq_domain_ops *vpe_domain_ops;
-+
-+int its_alloc_vcpu_irqs(struct its_vm *vm)
++		struct {
++			struct its_vpe *vpe;
+ 			struct its_device *dev;
+ 			u32 virt_id;
+ 			u32 event_id;
+@@ -320,6 +330,16 @@ static void its_encode_db_valid(struct its_cmd_block *cmd, bool db_valid)
+ 	its_mask_encode(&cmd->raw_cmd[2], db_valid, 0, 0);
+ }
+ 
++static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
 +{
-+	int vpe_base_irq, i;
++	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
++}
 +
-+	vm->domain = irq_domain_create_hierarchy(gic_domain, 0, vm->nr_vpes,
-+						 NULL, vpe_domain_ops, vm);
-+	if (!vm->domain)
-+		return -ENOMEM;
++static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
++{
++	its_mask_encode(&cmd->raw_cmd[3], vpt_size, 4, 0);
++}
 +
-+	for (i = 0; i < vm->nr_vpes; i++) {
-+		vm->vpes[i]->its_vm = vm;
-+		vm->vpes[i]->idai = true;
+ static inline void its_fixup_cmd(struct its_cmd_block *cmd)
+ {
+ 	/* Let's fixup BE commands */
+@@ -478,6 +498,36 @@ static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
+ 	return NULL;
+ }
+ 
++static struct its_vpe *its_build_vinvall_cmd(struct its_cmd_block *cmd,
++					     struct its_cmd_desc *desc)
++{
++	its_encode_cmd(cmd, GITS_CMD_VINVALL);
++	its_encode_vpeid(cmd, desc->its_vinvall_cmd.vpe->vpe_id);
++
++	its_fixup_cmd(cmd);
++
++	return desc->its_vinvall_cmd.vpe;
++}
++
++static struct its_vpe *its_build_vmapp_cmd(struct its_cmd_block *cmd,
++					   struct its_cmd_desc *desc)
++{
++	unsigned long vpt_addr;
++
++	vpt_addr = virt_to_phys(page_address(desc->its_vmapp_cmd.vpe->vpt_page));
++
++	its_encode_cmd(cmd, GITS_CMD_VMAPP);
++	its_encode_vpeid(cmd, desc->its_vmapp_cmd.vpe->vpe_id);
++	its_encode_valid(cmd, desc->its_vmapp_cmd.valid);
++	its_encode_target(cmd, desc->its_vmapp_cmd.col->target_address);
++	its_encode_vpt_addr(cmd, vpt_addr);
++	its_encode_vpt_size(cmd, LPI_NRBITS - 1);
++
++	its_fixup_cmd(cmd);
++
++	return desc->its_vmapp_cmd.vpe;
++}
++
+ static struct its_vpe *its_build_vmapti_cmd(struct its_cmd_block *cmd,
+ 					    struct its_cmd_desc *desc)
+ {
+@@ -799,6 +849,37 @@ static void its_send_vmovi(struct its_device *dev, u32 id)
+ 	its_send_single_vcommand(dev->its, its_build_vmovi_cmd, &desc);
+ }
+ 
++static void its_send_vmapp(struct its_vpe *vpe, bool valid)
++{
++	struct its_cmd_desc desc;
++	struct its_node *its;
++
++	desc.its_vmapp_cmd.vpe = vpe;
++	desc.its_vmapp_cmd.valid = valid;
++
++	list_for_each_entry(its, &its_nodes, entry) {
++		if (!its->is_v4)
++			continue;
++
++		desc.its_vmapp_cmd.col = &its->collections[vpe->col_idx];
++		its_send_single_vcommand(its, its_build_vmapp_cmd, &desc);
 +	}
-+
-+	vpe_base_irq = __irq_domain_alloc_irqs(vm->domain, -1, vm->nr_vpes,
-+					       NUMA_NO_NODE, vm,
-+					       false, NULL);
-+	if (vpe_base_irq <= 0)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < vm->nr_vpes; i++)
-+		vm->vpes[i]->irq = vpe_base_irq + i;
-+
-+	return 0;
 +}
 +
-+void its_free_vcpu_irqs(struct its_vm *vm)
++static void its_send_vinvall(struct its_vpe *vpe)
 +{
-+	irq_domain_free_irqs(vm->vpes[0]->irq, vm->nr_vpes);
-+	irq_domain_remove(vm->domain);
++	struct its_cmd_desc desc;
++	struct its_node *its;
++
++	desc.its_vinvall_cmd.vpe = vpe;
++
++	list_for_each_entry(its, &its_nodes, entry) {
++		if (!its->is_v4)
++			continue;
++		its_send_single_vcommand(its, its_build_vinvall_cmd, &desc);
++	}
 +}
-diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-index 4cac48e220da..7474a981ed6d 100644
---- a/include/linux/irqchip/arm-gic-v4.h
-+++ b/include/linux/irqchip/arm-gic-v4.h
-@@ -88,4 +88,7 @@ struct its_cmd_info {
- 	};
++
+ /*
+  * irqchip functions - assumes MSI, mostly.
+  */
+@@ -2194,9 +2275,30 @@ static int its_vpe_irq_domain_alloc(struct irq_domain *domain, unsigned int virq
+ 	return err;
+ }
+ 
++static void its_vpe_irq_domain_activate(struct irq_domain *domain,
++					struct irq_data *d)
++{
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++
++	/* Map the VPE to the first possible CPU */
++	vpe->col_idx = cpumask_first(cpu_online_mask);
++	its_send_vmapp(vpe, true);
++	its_send_vinvall(vpe);
++}
++
++static void its_vpe_irq_domain_deactivate(struct irq_domain *domain,
++					  struct irq_data *d)
++{
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++
++	its_send_vmapp(vpe, false);
++}
++
+ static const struct irq_domain_ops its_vpe_domain_ops = {
+ 	.alloc			= its_vpe_irq_domain_alloc,
+ 	.free			= its_vpe_irq_domain_free,
++	.activate		= its_vpe_irq_domain_activate,
++	.deactivate		= its_vpe_irq_domain_deactivate,
  };
  
-+int its_alloc_vcpu_irqs(struct its_vm *vm);
-+void its_free_vcpu_irqs(struct its_vm *vm);
-+
- #endif
+ static int its_force_quiescent(void __iomem *base)
 -- 
 2.11.0
