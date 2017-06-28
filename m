@@ -1,153 +1,96 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Jun 2017 17:10:22 +0800
-Subject: [PATCH v13 00/14] ASoC: sun4i-codec: Add Line-In, FM-In, Mic 2,
- Capture Source, Differential Line-In
-In-Reply-To: <20170624062419.23778-1-dannym@scratchpost.org>
-References: <20170624062419.23778-1-dannym@scratchpost.org>
-Message-ID: <CAGb2v64esTh1FLNQi9n_bVsTY0-zcs6ueEA4MQVQyMn3wnG_aA@mail.gmail.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 28 Jun 2017 11:12:38 +0200
+Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
+In-Reply-To: <e2a9df8b-00f8-ae36-f4f3-63dcc98dea50@kernel.org>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <1498143942-12682-2-git-send-email-hugues.fruchet@st.com>
+ <D5629236-95D8-45B6-9719-E8B9796FEC90@goldelico.com>
+ <64e3005d-31df-71f2-762b-2c1b1152fc2d@st.com>
+ <5cd25a47-f3be-8c40-3940-29f26a245076@kernel.org>
+ <39501C78-7B81-4803-94C1-25DFA06EA526@goldelico.com>
+ <e2a9df8b-00f8-ae36-f4f3-63dcc98dea50@kernel.org>
+Message-ID: <6F68CD33-70E6-47C1-9E89-5E2AA776879F@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Sat, Jun 24, 2017 at 2:24 PM, Danny Milosavljevic
-<dannym@scratchpost.org> wrote:
-> This patchset adds some mixer controls to sun4i-codec for the Allwinner A10
-> and the Allwinner A20.
->
-> It also adds a mux for the capture source and the PGA for the MIC2 preamp.
->
-> Where possible, it uses SOC_DAPM_DOUBLE in order to cut down on the number
-> of distinct controls in alsamixer.
->
-> v13 changes compared to v12 are:
->  - Added my "Signed-off-by".
->  - Clarified some commit message text.
->
-> v12 changes compared to v11 are:
->  - Split up patchset in another way.
->  - Renamed "Mic1 Capture Volume" to "Mic1 Boost Volume".
->  - Renamed "Mic2 Capture Volume" to "Mic2 Boost Volume".
->  - Renamed "Line Capture Volume" to "Line Boost Volume".
->  - Renamed "Differential Line Capture Switch" to "Differential Line Source".
->
-> v11 changes compared to v10 are:
->  - Split up patchset.
->  - Fixed typo in Differential Line Capture Switch.
->  - Renamed "Non-Differential" value to "Stereo".
->  - Removed duplicate PA Volume mixer control.
->
-> v10 changes compared to v9 are:
->  - Use SOC_DAPM_DOUBLE where possible and it makes sense in order to cut
->    down on the number of controls.
->
-> v9 changes compared to v8 are:
->  - added Line Differential Capture Switch.
->  - split Capture Source into Left Capture Select, Right Capture Select.
->  - added Line Capture Volume.
->  - rename "sun4i_codec_widgets" to "sun4i_codec_controls" for
->    consistency with the struct field it's used in.
->  - rename "Line-In" to "Line".
->  - rename "Power Amplifier Playback Volume" to "Headphone Playback Volume".
->
-> v8 changes compared to v7 are:
->  - fixed the routes for line and mic capturing.
->
-> v7 changes compared to v6 are:
->  - preparation for different A20, A10 controls is now in an extra patch.
->  - all register definitions are now at the top.
->  - sun7i-specific things (A20-specific things) are now less
->    grouped-together.
->  - rename "Power Amplifier Volume" to "Power Amplifier Playback Volume".
->
-> v6 changes compared to v5 are:
->  - Mic preamplifier special cases for A20 and A10 now are now not
->    icky: There are two different _widget arrays and the probe() function
->    now selects the right one to pass to snd_soc_register_codec() unmodified.
->  - sun7i-specific things (A20-specific things) are now grouped together.
->
-> v5 changes compared to v4 are:
->  - Mic preamplifier controls have more common names now.
->  - Mic preamplifier scale has a 0 dB entry as well now, as documented in the
->    A20 user manual.
->  - Mic preamplifier has special cases for A20 and A10 now.
->  - Gain controls have "Gain" in the name now.
->
-> v4 changes compared to v3 are:
->  - names of the input are not uppercase anymore.
->  - bit index constants are now named as in the A20 user manual v1.4.
->  - added Mic1-In, Mac2-In.
->  - added Mic1 and Mic2 Pre-Amplifiers.
->
-> v3 changes compared to v2 are:
->  - added DAPM routes.
->
-> v2 changes compared to v1 are:
->  - moved Line-In and FM-In playback switches to their respective
->    sun4i_codec_*_mixer_controls.
->
-> v1 changes:
->  - added linein, fmin output volumes and switches.
->
-> Danny Milosavljevic (14):
->   sun4i-codec: Add MIC2 Pre-Amplifier, Mic2 input, Mic2 routes.
->   sun4i-codec: Add Mic Playback Volume.
->   sun4i-codec: Add support for extra controls to struct
->     sun4i_codec_quirks and use them.
->   sun4i-codec: Add Mic1 Boost Volume, Mic2 Boost Volume.
->   sun4i-codec: Merge sun4i_codec_left_mixer_controls and
->     sun4i_codec_right_mixer_controls into sun4i_codec_mixer_controls.
->   sun4i-codec: Add Mic1 Playback Switch, Mic2 Playback Switch.
->   sun4i-codec: Add FM Playback Volume.
->   sun4i-codec: Add FM Left, FM Right, FM Playback Switch.
->   sun4i-codec: Add Line Playback Volume.
->   sun4i-codec: Add Line Boost Volume.
->   sun4i-codec: Add Line Right, Line Left, Line Playback Switch.
->   sun4i-codec: Add Differential Line Source.
->   sun4i-codec: Add Left Capture Select, Right Capture Select.
->   sun4i-codec: Add Capture Volume.
+> Am 28.06.2017 um 00:57 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+> 
+> On 06/27/2017 07:48 AM, H. Nikolaus Schaller wrote:
+>>> Am 26.06.2017 um 22:04 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+>>> 
+>>> On 06/26/2017 12:35 PM, Hugues FRUCHET wrote:
+>>>>> What I am missing to support the GTA04 camera is the control of the optional "vana-supply".
+>>>>> So the driver does not power up the camera module when needed and therefore probing fails.
+>>>>> 
+>>>>>    - vana-supply: a regulator to power up the camera module.
+>>>>> 
+>>>>> Driver code is not complex to add:
+>>> 
+>>>> Yes, I saw it in your code, but as I don't have any programmable power
+>>>> supply on my setup, I have not pushed this commit.
+>>> 
+>>> Since you are about to add voltage supplies to the DT binding I'd suggest
+>>> to include all three voltage supplies of the sensor chip. Looking at the OV9650
+>>> and the OV9655 datasheet there are following names used for the voltage supply
+>>> pins:
+>>> 
+>>> AVDD - Analog power supply,
+>>> DVDD - Power supply for digital core logic,
+>>> DOVDD - Digital power supply for I/O.
+>> 
+>> The latter two are usually not independently switchable from the SoC power
+>> the module is connected to.
+>> 
+>> And sometimes DVDD and DOVDD are connected together.
+>> 
+>> So the driver can't make much use of knowing or requesting them because the
+>> 1.8V supply is always active, even during suspend.
+>> 
+>>> 
+>>> I doubt the sensor can work without any of these voltage supplies, thus
+>>> regulator_get_optional() should not be used. I would just use the regulator
+>>> bulk API to handle all three power supplies.
+>> 
+>> The digital part works with AVDD turned off. So the LDO supplying AVDD should
+>> be switchable to save power (&vaux3 on the GTA04 device).>
+>> But not all designs can switch it off. Hence the idea to define it as an
+>> /optional/ regulator. If it is not defined by DT, the driver simply assumes
+>> it is always powered on.
+> 
+> I didn't say we can't define regulator supply properties as optional in the DT 
+> binding.  If we define them as such and any of these *-supply properties is 
+> missing in DT with regulator_get() the regulator core will use dummy regulator 
+> for that particular voltage supply.  While with regulator_get_optional() 
+> -ENODEV is returned when the regulator cannot be found. 
 
-I think there's still room for improvement regarding the structure
-of this patch series.
+Ah, ok. I see.
 
-What I would like to see is one patch for each new feature or rework
-of existing code. One major guideline is each patch should be
-independently verifiable. If you add controls related to Mic2 across
-multiple patches, and only the last one enables Mic2 playback, you
-can't really verify if your "Mic2 Boost Volume" or "Mic2 routes"
-were implemented correctly.
+I had thought that it is the right thing to do like devm_gpiod_get_optional().
 
-Also I suggest doing rework first, then adding controls that are
-missing for widgets that already exist (such as Mic Playback Volume),
-and adding new stuff last.
+That one it is described as:
 
-So something like the following, one patch per item:
+"* This is equivalent to gpiod_get(), except that when no GPIO was assigned to
+ * the requested function it will return NULL. This is convenient for drivers
+ * that need to handle optional GPIOs."
 
-* Add missing Mic1 Playback Switch
-* Add missing Mic Playback Volume
-* Add extra controls to sun4i_codec_quirks
-* Add missing Mic1 Boost Volume
-* Merge/rework left/right mixer controls
-* Add Mic2 playback support (including pre-amp, input, routes, boost
-  volume, playback switch)
-* Add FM playback support (widgets, routes, volume, switch)
-* Add Line playback support (widgets, routes, volume, switch,
-  boost volume, differential)
-* Add Capture Source mux widget and controls
-* Add Capture Volume control
+Seems to be inconsistent definition of what "optional" means.
 
-For each new item added, you can immediately test if all the controls
-and routes work as intended by toggling them and listening to the
-output and looking at DAPM debugfs output.
+So we indeed should use devm_regulator_get() in this case. Thanks for pointing out!
 
-Thanks
-ChenYu
+> 
+>> So in summary we only need AVDD switched for the GTA04 - but it does not
+>> matter if the others are optional properties. We would not use them.
+>> 
+>> It does matter if they are mandatory because it adds DT complexity (size
+>> and processing) without added function.
+> 
+> We should not be defining DT binding only with selected use cases/board
+> designs in mind.  IMO all three voltage supplies should be listed in the
+> binding, presumably all can be made optional, with an assumption that when
+> the property is missing selected pin is hooked up to a fixed regulator.
 
+Ok, then it should just be defined in the bindings but not used by the driver?
 
->
->  sound/soc/sunxi/sun4i-codec.c | 233 +++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 210 insertions(+), 23 deletions(-)
->
-> --
-> 2.1.4
->
+BR and thanks,
+Nikolaus
