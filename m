@@ -1,76 +1,92 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Wed, 28 Jun 2017 13:50:28 +0800
-Subject: [PATCH 2/6] drivers: perf: hisi: Add support for HiSilicon SoC
- uncore PMU driver
-In-Reply-To: <201706280909.xG39IHY4%fengguang.wu@intel.com>
-References: <201706280909.xG39IHY4%fengguang.wu@intel.com>
-Message-ID: <59d9ca29-6e57-3a9c-f6dc-fca3619dfacc@hisilicon.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 28 Jun 2017 16:07:11 +1000
+Subject: arm64: build is broken on next-20170609 with merge-commit
+ 9afca2c4e379 (arm64: allwinner: sun50i-a64: add dwmac-sun8i Ethernet
+ driver)
+In-Reply-To: <20170610092944.4022d550@canb.auug.org.au>
+References: <20170609124325.p7b6fhdbwtki4w2z@yury-thinkpad>
+ <20170610092944.4022d550@canb.auug.org.au>
+Message-ID: <20170628160711.08763ee7@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On 2017/6/28 9:49, kbuild test robot wrote:
-> Hi Shaokun,
-> 
-> [auto build test ERROR on next-20170619]
-> [also build test ERROR on v4.12-rc7]
-> [cannot apply to linus/master linux/master arm64/for-next/core v4.12-rc6 v4.12-rc5 v4.12-rc4]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Shaokun-Zhang/Add-HiSilicon-SoC-uncore-Performance-Monitoring-Unit-driver/20170628-070841
-> config: x86_64-allmodconfig (attached as .config)
-> compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=x86_64 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    drivers/perf/hisilicon/hisi_uncore_pmu.c: In function 'hisi_read_scl_and_ccl_id':
->>> drivers/perf/hisilicon/hisi_uncore_pmu.c:72:10: error: implicit declaration of function 'read_cpuid_mpidr' [-Werror=implicit-function-declaration]
->      mpidr = read_cpuid_mpidr();
->              ^~~~~~~~~~~~~~~~
->>> drivers/perf/hisilicon/hisi_uncore_pmu.c:73:14: error: 'MPIDR_MT_BITMASK' undeclared (first use in this function)
->      if (mpidr & MPIDR_MT_BITMASK) {
->                  ^~~~~~~~~~~~~~~~
->    drivers/perf/hisilicon/hisi_uncore_pmu.c:73:14: note: each undeclared identifier is reported only once for each function it appears in
->>> drivers/perf/hisilicon/hisi_uncore_pmu.c:75:14: error: implicit declaration of function 'MPIDR_AFFINITY_LEVEL' [-Werror=implicit-function-declaration]
->        *scl_id = MPIDR_AFFINITY_LEVEL(mpidr, 3);
->                  ^~~~~~~~~~~~~~~~~~~~
->    cc1: some warnings being treated as errors
-> 
+[Yes, top posted :-)]
 
-Apologies for my modified drivers/perf/Kconfig for HISI_PMU.
-It depends on ARM64 and i shall remove COMPILE_TEST to fix it.
+With the merge window approaching, this is just a reminder that this
+merge problem still exists.  I assume that the sunxi tree will be
+merged into the arm-soc tree before going to Linus.
 
-Thanks.
-Shaokun
-
-> vim +/read_cpuid_mpidr +72 drivers/perf/hisilicon/hisi_uncore_pmu.c
+On Sat, 10 Jun 2017 09:29:44 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> On Fri, 9 Jun 2017 15:43:25 +0300 Yury Norov <ynorov@caviumnetworks.com> wrote:
+> >
+> > Today's linux-next breaks build with:
+> >   DTC     arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb
+> > arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb: ERROR (duplicate_node_names): Duplicate node name /soc/ethernet at 1c30000
+> > ERROR: Input tree has errors, aborting (use -f to force output)
+> > scripts/Makefile.lib:325: recipe for target 'arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb' failed
+> > make[2]: *** [arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb] Error 2
+> > scripts/Makefile.build:561: recipe for target 'arch/arm64/boot/dts/allwinner' failed
+> > make[1]: *** [arch/arm64/boot/dts/allwinner] Error 2 arch/arm64/Makefile:130: recipe for target 'dtbs' failed
+> > make: *** [dtbs] Error 2
+> > 
+> > It seems, it's due to duplication error in merge-commit 9afca2c4e379.
+> > Removing it fixes the build.  
 > 
->     66	
->     67	/* Read Super CPU cluster and CPU cluster ID from MPIDR_EL1 */
->     68	void hisi_read_scl_and_ccl_id(u32 *scl_id, u32 *ccl_id)
->     69	{
->     70		u64 mpidr;
->     71	
->   > 72		mpidr = read_cpuid_mpidr();
->   > 73		if (mpidr & MPIDR_MT_BITMASK) {
->     74			if (scl_id)
->   > 75				*scl_id = MPIDR_AFFINITY_LEVEL(mpidr, 3);
->     76			if (ccl_id)
->     77				*ccl_id = MPIDR_AFFINITY_LEVEL(mpidr, 2);
->     78		} else {
+> Thanks for the reports Yury and Sumit.  I will apply the following
+> merge fixup patch when I next build linux-next (unless one of the
+> patches is removed in the mean time).
 > 
+> From: Stephen Rothwell <sfr@canb.auug.org.au>
+> Date: Sat, 10 Jun 2017 09:18:14 +1000
+> Subject: [PATCH] remove duplicate ethernet noce intruduced by merge
+> 
+> caused by patch "arm64: allwinner: sun50i-a64: add dwmac-sun8i Ethernet
+> driver" being merged into the sunxi and net-next trees as different
+> commits (e53f67e981bc and 103aefa01c1b respectively). Presumably the
+> former will turn up in the arm-soc tree before being sent to Linus.
+> 
+> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
 > ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 --------------------
+>  1 file changed, 20 deletions(-)
 > 
-> 
-> 
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
-> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 1b36aab5afb6..9d00622ce845 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -469,26 +469,6 @@
+>  			};
+>  		};
+>  
+> -		emac: ethernet at 1c30000 {
+> -			compatible = "allwinner,sun50i-a64-emac";
+> -			syscon = <&syscon>;
+> -			reg = <0x01c30000 0x100>;
+> -			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> -			interrupt-names = "macirq";
+> -			resets = <&ccu RST_BUS_EMAC>;
+> -			reset-names = "stmmaceth";
+> -			clocks = <&ccu CLK_BUS_EMAC>;
+> -			clock-names = "stmmaceth";
+> -			status = "disabled";
+> -			#address-cells = <1>;
+> -			#size-cells = <0>;
+> -
+> -			mdio: mdio {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -			};
+> -		};
+> -
+>  		gic: interrupt-controller at 1c81000 {
+>  			compatible = "arm,gic-400";
+>  			reg = <0x01c81000 0x1000>,
+> -- 
+> 2.11.0
+
+-- 
+Cheers,
+Stephen Rothwell
