@@ -1,34 +1,68 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 29 Jun 2017 00:03:58 +0200
-Subject: [alsa-devel] [PATCH v2 12/12] ASoC: Fix use-after-free at card
- unregistration
-In-Reply-To: <20170628195349.pqeb3dceddxar75s@sirena.org.uk> (Mark Brown's
- message of "Wed, 28 Jun 2017 20:53:49 +0100")
-References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
- <1497857229-12049-13-git-send-email-robert.jarzmik@free.fr>
- <s5hefug72iu.wl-tiwai@suse.de> <87injstckf.fsf@belgarion.home>
- <20170628195349.pqeb3dceddxar75s@sirena.org.uk>
-Message-ID: <87o9t7u5v5.fsf@belgarion.home>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 29 Jun 2017 06:06:47 +0800
+Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <20170627143652.13075-1-net147@gmail.com>
+Message-ID: <201706290511.fnS8VkKo%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+Hi Jonathan,
 
-> On Mon, Jun 19, 2017 at 01:57:20PM +0200, Robert Jarzmik wrote:
->
->> My serie shifted by one, so the very first of the serie is therefore missing,
->> formerly "ALSA: ac97: split out the generic ac97 registers" in
->> https://patchwork.kernel.org/patch/9398143/, and the shift triggered the
->> inclusion of the last patch of my tree, ie. yours :)
->
-> Based on the missing first patch I was expecting the series to get
-> reposted?
-Hi Mark,
+[auto build test WARNING on next-20170627]
+[cannot apply to v4.12-rc7 v4.12-rc6 v4.12-rc5 v4.12-rc7]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-The first patch is only moving around a .h file. I was expecting a review before
-reposting a v3.
+url:    https://github.com/0day-ci/linux/commits/Jonathan-Liu/drm-sun4i-hdmi-Implement-I2C-adapter-for-A10s-DDC-bus/20170629-001335
+config: arm-sunxi_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Cheers.
+All warnings (new ones prefixed by >>):
 
--- 
-Robert
+   drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c: In function 'fifo_transfer':
+>> drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c:65:2: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     int level = (int)(fifo_status & SUN4I_HDMI_DDC_FIFO_STATUS_LEVEL_MASK);
+     ^~~
+
+vim +65 drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+
+    49		int ret;
+    50	
+    51		/* Wait until error or FIFO ready */
+    52		ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+    53					 int_status,
+    54					 is_err_status(int_status) ||
+    55					 is_fifo_flag_unset(hdmi, &fifo_status, flag),
+    56					 min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
+    57					 100000);
+    58	
+    59		if (is_err_status(int_status))
+    60			return -EIO;
+    61		if (ret)
+    62			return -ETIMEDOUT;
+    63	
+    64		/* Read FIFO level */
+  > 65		int level = (int)(fifo_status & SUN4I_HDMI_DDC_FIFO_STATUS_LEVEL_MASK);
+    66	
+    67		/* Limit transfer length using FIFO level to avoid underflow/overflow */
+    68		len = min(len, read ? level : (SUN4I_HDMI_DDC_FIFO_SIZE - level));
+    69	
+    70		if (read)
+    71			readsb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
+    72		else
+    73			writesb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 21231 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170629/d6760e51/attachment-0001.gz>
