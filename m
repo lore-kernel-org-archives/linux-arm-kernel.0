@@ -1,74 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:28 +0100
-Subject: [PATCH v2 09/52] irqchip/gic-v3-its: Allow use of indirect VCPU tables
+Date: Wed, 28 Jun 2017 16:03:41 +0100
+Subject: [PATCH v2 22/52] irqchip/gic-v3-its: Add VPENDBASER/VPROPBASER
+ accessors
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-10-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-23-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VCPU tables can be quite sparse as well, and it makes sense
-to use indirect tables as well if possible.
+V{PEND,PROP}BASER being 64bit registers, they need some ad-hoc
+accessors on 32bit, specially given that VPENDBASER contains
+a Valid bit, making the access a bit convoluted.
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/arch_gicv3.h   | 28 ++++++++++++++++++++++++++++
+ arch/arm64/include/asm/arch_gicv3.h |  5 +++++
+ include/linux/irqchip/arm-gic-v3.h  |  5 +++++
+ 3 files changed, 38 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 2feecdf40216..27f57c528026 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1068,10 +1068,13 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 	return 0;
- }
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 27475904e096..8d45e88feac9 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -291,5 +291,33 @@ static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
+  */
+ #define gits_write_cwriter(v, c)	__gic_writeq_nonatomic(v, c)
  
--static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser,
--				   u32 psz, u32 *order)
-+static bool its_parse_indirect_baser(struct its_node *its,
-+				     struct its_baser *baser,
-+				     u32 psz, u32 *order)
- {
--	u64 esz = GITS_BASER_ENTRY_SIZE(its_read_baser(its, baser));
-+	u64 tmp = its_read_baser(its, baser);
-+	u64 type = GITS_BASER_TYPE(tmp);
-+	u64 esz = GITS_BASER_ENTRY_SIZE(tmp);
- 	u64 val = GITS_BASER_InnerShareable | GITS_BASER_RaWaWb;
- 	u32 ids = its->device_ids;
- 	u32 new_order = *order;
-@@ -1110,8 +1113,9 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
- 	if (new_order >= MAX_ORDER) {
- 		new_order = MAX_ORDER - 1;
- 		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
--		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
--			&its->phys_base, its->device_ids, ids);
-+		pr_warn("ITS@%pa: %s Table too large, reduce ids %u->%u\n",
-+			&its->phys_base, its_base_type_string[type],
-+			its->device_ids, ids);
- 	}
++/*
++ * GITS_VPROPBASER - hi and lo bits may be accessed independently.
++ */
++#define gits_write_vpropbaser(v, c)	__gic_writeq_nonatomic(v, c)
++
++/*
++ * GITS_VPENDBASER - the Valid bit must be cleared before changing
++ * anything else.
++ */
++static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
++{
++	u32 tmp;
++
++	tmp = readl_relaxed(addr + 4);
++	if (tmp & (GICR_VPENDBASER_Valid >> 32)) {
++		tmp &= ~(GICR_VPENDBASER_Valid >> 32);
++		writel_relaxed(tmp, addr + 4);
++	}
++
++	/*
++	 * Use the fact that __gic_writeq_nonatomic writes the second
++	 * half of the 64bit quantity after the first.
++	 */
++	__gic_writeq_nonatomic(val, addr);
++}
++
++#define gits_read_vpendbaser(c)		__gic_readq_nonatomic(c)
++
+ #endif /* !__ASSEMBLY__ */
+ #endif /* !__ASM_ARCH_GICV3_H */
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 8cef47fa2218..0d2a53457c30 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -133,5 +133,10 @@ static inline void gic_write_bpr1(u32 val)
+ #define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
+ #define gicr_read_pendbaser(c)		readq_relaxed(c)
  
- 	*order = new_order;
-@@ -1159,11 +1163,16 @@ static int its_alloc_tables(struct its_node *its)
- 		u32 order = get_order(psz);
- 		bool indirect = false;
++#define gits_write_vpropbaser(v, c)	writeq_relaxed(v, c)
++
++#define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
++#define gits_read_vpendbaser(c)		readq_relaxed(c)
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 7c6fd8f3e36c..17ba0d732f12 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -212,6 +212,11 @@
+ #define LPI_PROP_GROUP1			(1 << 1)
+ #define LPI_PROP_ENABLED		(1 << 0)
  
--		if (type == GITS_BASER_TYPE_NONE)
-+		switch (type) {
-+		case GITS_BASER_TYPE_NONE:
- 			continue;
- 
--		if (type == GITS_BASER_TYPE_DEVICE)
--			indirect = its_parse_baser_device(its, baser, psz, &order);
-+		case GITS_BASER_TYPE_DEVICE:
-+		case GITS_BASER_TYPE_VCPU:
-+			indirect = its_parse_indirect_baser(its, baser,
-+							    psz, &order);
-+			break;
-+		}
- 
- 		err = its_setup_baser(its, baser, cache, shr, psz, order, indirect);
- 		if (err < 0) {
++#define GICR_VPENDBASER_Dirty		(1ULL << 60)
++#define GICR_VPENDBASER_PendingLast	(1ULL << 61)
++#define GICR_VPENDBASER_IDAI		(1ULL << 62)
++#define GICR_VPENDBASER_Valid		(1ULL << 63)
++
+ /*
+  * ITS registers, offsets from ITS_base
+  */
 -- 
 2.11.0
