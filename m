@@ -1,24 +1,24 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 28 Jun 2017 15:33:34 -0700
-Subject: [PATCH] clk: scpi: error when clock fails to register
-In-Reply-To: <3e77fd3c-9807-10d4-3a8c-cab8b5562f6c@arm.com>
-References: <20170628135345.9337-1-jbrunet@baylibre.com>
- <c7123c06-b75b-5209-5817-230c63c1bf49@arm.com>
- <1498664332.2337.6.camel@baylibre.com>
- <76efd418-9fd5-6ac5-b4c9-c75c5df69df0@arm.com>
- <1498668381.2337.10.camel@baylibre.com>
- <3e77fd3c-9807-10d4-3a8c-cab8b5562f6c@arm.com>
-Message-ID: <20170628223334.GD5316@codeaurora.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 28 Jun 2017 17:38:38 -0500
+Subject: [PATCH] pinctrl: qcom: qdf2xxx: expose only some GPIO pins
+In-Reply-To: <20170628191204.GP18666@tuxbook>
+References: <1498164850-4738-1-git-send-email-timur@codeaurora.org>
+ <CACRpkdZeDjS_g27=1e7uCmFpjnqX+sDSu5G2VAuwFr_GJW1mug@mail.gmail.com>
+ <20170628191204.GP18666@tuxbook>
+Message-ID: <d4ed2a91-5f19-fa04-42ed-02b94dde1b6e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28, Sudeep Holla wrote:
-> everything if some piece of firmware is not yet ready or broken.
-> But again, we can get it working later, for now, I am fine with you patch.
-> 
+On 06/28/2017 02:12 PM, Bjorn Andersson wrote:
+> It seems that if we extend the msm_pingroup with a flag to carry the XPU
+> lock information and then implement pinmux_ops->request() and deny any
+> requests on the locked pins, we should cover all[*] the normal GPIO code
+> paths.
 
-So that's an acked-by, reviewed-by tag for the original patch?
+I managed to get this to work, so I'll post a patchset by tomorrow that 
+implements this.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
