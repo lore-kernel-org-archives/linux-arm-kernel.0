@@ -1,110 +1,97 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 28 Jun 2017 16:52:36 +0100
-Subject: [PATCH] clk: scpi: error when clock fails to register
-In-Reply-To: <1498664332.2337.6.camel@baylibre.com>
-References: <20170628135345.9337-1-jbrunet@baylibre.com>
- <c7123c06-b75b-5209-5817-230c63c1bf49@arm.com>
- <1498664332.2337.6.camel@baylibre.com>
-Message-ID: <76efd418-9fd5-6ac5-b4c9-c75c5df69df0@arm.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 28 Jun 2017 08:55:08 -0700
+Subject: [RFC 1/5] drivers: Add boot constraints core
+In-Reply-To: <24921f2a6a86cb9b2b3a1cae86649180bc116a62.1498642745.git.viresh.kumar@linaro.org>
+References: <cover.1498642745.git.viresh.kumar@linaro.org>
+ <24921f2a6a86cb9b2b3a1cae86649180bc116a62.1498642745.git.viresh.kumar@linaro.org>
+Message-ID: <78941b27-c233-837d-9709-b11c01f1ab1f@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 28/06/17 16:38, Jerome Brunet wrote:
-> On Wed, 2017-06-28 at 16:04 +0100, Sudeep Holla wrote:
->>
->> On 28/06/17 14:53, Jerome Brunet wrote:
->>> Current implementation of scpi_clk_add just print a warning when clock
->>> fails to register but then keep going as if nothing happened. The
->>> provider is then registered with bogus data.
->>>
->>> This may latter lead to an Oops in __clk_create_clk when
->>> hlist_add_head(&clk->clks_node, &hw->core->clks) is called.
->>>
->> What's the path of this call ? I see one in devm_clk_hw_register
->> but that's one which failed.
->>
+On 06/28/2017 03:26 AM, Viresh Kumar wrote:
+> Some devices are powered ON by the bootloaders before the bootloader
+> handovers control to Linux. It maybe important for those devices to keep
+> working until the time a Linux device driver probes the device and
+> reconfigure its resources.
 > 
-> bL cpu freq driver requesting the cpu clock, which failed to register. Here the
-> Oops call trace:
+> A typical example of that can be the LCD controller, which is used by
+> the bootloaders to show image(s) while the device is booting into Linux.
+> The LCD controller can be using some resources, like clk, regulators,
+> etc, that are shared between several devices. These shared resources
+> should be programmed so that all the users of them are satisfied. If
+> some user (X) driver gets probed before the LCD controller driver in
+> this case, then it may end up reconfiguring these resources to ranges
+> satisfying the current users (only user X) and that can make the LCD
+> screen unstable.
 > 
-> [    2.202284] [<ffff00000849a058>] __clk_create_clk.part.18+0x68/0xb0
-> [    2.208494] [<ffff00000849ac2c>] __of_clk_get_from_provider+0xfc/0x140
-> [    2.214962] [<ffff000008496c28>] __of_clk_get_by_name+0x100/0x118
-> [    2.220999] [<ffff000008496c94>] clk_get+0x2c/0x78
-> [    2.225744] [<ffff000008570110>] dev_pm_opp_get_opp_table+0xb0/0x118
-> [    2.232039] [<ffff000008570940>] dev_pm_opp_add+0x20/0x68
-> [    2.237388] [<ffff0000087a0f30>] scpi_init_opp_table+0xa8/0x188
-> [    2.243252] [<ffff0000087a0558>] _get_cluster_clk_and_freq_table+0x80/0x180
-> [    2.250151] [<ffff0000087a0a48>] bL_cpufreq_init+0x3f0/0x480
-> [    2.255758] [<ffff00000879eed8>] cpufreq_online+0xc0/0x658
-> [    2.261191] [<ffff00000879f500>] cpufreq_add_dev+0x78/0x88
-> [    2.266625] [<ffff00000855c2c4>] subsys_interface_register+0x84/0xc8
-> [    2.272922] [<ffff00000879e330>] cpufreq_register_driver+0x138/0x1b8
-> [    2.279218] [<ffff0000087a0b4c>] bL_cpufreq_register+0x74/0x120
-> [    2.285083] [<ffff0000087a1038>] scpi_cpufreq_probe+0x28/0x38
-> [    2.290776] [<ffff00000855fbf0>] platform_drv_probe+0x50/0xb8
-> [    2.296468] [<ffff00000855dd84>] driver_probe_device+0x21c/0x2d8
+> This patch introduces the concept of boot-constraints, which will be set
+> by the bootloaders and the kernel will satisfy them until the time
+> driver for such a device is probed (successfully or unsuccessfully).
 > 
-
-Thanks for this stack. I just worked out the same path now. I did come
-up with the patch as below. That should work if my understanding is correct.
-
-> But that's not the point. The point is there is path in clk-scpi driver which
-> registers uninitialized data in the clock provider. That's not good. 
+> The list of boot constraint types is empty for now, and will be added by
+> a later patch.
 > 
->> Also one of the reason for keeping it continuing is, if firmware fails
->> on some non-critical clock, that's fine rather than punishing the entire
->> set of clocks and may even fail the boot.
+> Only two routines are exposed by the boot constraints core for now:
 > 
-> I understand, but you have no way to know whether a clock is critical or not so 
-> this explanation looks a bit weak, plus it does not keep the boot from failing
-> ... not for me at least.
+> - boot_constraint_add(): This will be called by parts of the kernel
+>   (before the device is probed) to set the constraints.
 > 
-> As explained this approach is registering corrupt data in the provider when
-> failing. It makes the kernel Oops, it shall be fixed.
+> - boot_constraints_remove(): This is called only by the driver core
+>   after a device is probed successfully or unsuccessfully. Special
+>   handling is done here for deffered probing.
 > 
-
-Agreed, I want to look at ways to fix that, hence requested you more data.
-
-> If you have a better solution later on, I don't think there would be any problem
-> to revert this patch.
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/base/Kconfig            |  11 +++
+>  drivers/base/Makefile           |   1 +
+>  drivers/base/boot_constraint.c  | 210 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/base/dd.c               |  20 ++--
+>  include/linux/boot_constraint.h |  28 ++++++
+>  5 files changed, 263 insertions(+), 7 deletions(-)
+>  create mode 100644 drivers/base/boot_constraint.c
+>  create mode 100644 include/linux/boot_constraint.h
 > 
+> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+> index d718ae4b907a..d71217a91793 100644
+> --- a/drivers/base/Kconfig
+> +++ b/drivers/base/Kconfig
+> @@ -339,4 +339,15 @@ config CMA_ALIGNMENT
+>  
+>  endif
+>  
+> +config BOOT_CONSTRAINTS
+> +	bool "Boot constraints for devices"
+> +	default y
 
-Sure I am not against the patch as a fix. I was just trying to better
-understand the problem. I had seen the usefulness of skipping on Juno
-platforms
-in earlier days. Also I am now working on the new SCMI[1] specification
-and just want to cover this.
+Why default y?
 
----
+As Linus just wrote yesterday:
 
-diff --git i/drivers/clk/clk-scpi.c w/drivers/clk/clk-scpi.c
-index 96d37175d0ad..d83c0b84798d 100644
---- i/drivers/clk/clk-scpi.c
-+++ w/drivers/clk/clk-scpi.c
-@@ -245,11 +245,14 @@ static int scpi_clk_add(struct device *dev, struct
-device_node *np,
-                sclk->id = val;
+No. We've tried. The only sensible default (and that I try to enforce)
+is "new featrures default to 'n'"
 
-                err = scpi_clk_ops_init(dev, match, sclk, name);
--               if (err)
-+               if (err) {
-                        dev_err(dev, "failed to register clock '%s'\n",
-name);
--               else
-+                       clk_data->clk[idx] = NULL;
-+                       devm_kfree(dev, sclk);
-+               } else {
-                        dev_dbg(dev, "Registered clock '%s'\n", name);
--               clk_data->clk[idx] = sclk;
-+                       clk_data->clk[idx] = sclk;
-+               }
-        }
+> +	help
+> +	  This enables boot constraints detection for devices. These constraints
+> +	  are (normally) set by the Bootloader and must be satisfied by the
+> +	  kernel until the relevant device driver is probed. Once the driver is
+> +	  probed, the constraint is dropped.
+> +
+> +	  If unsure, say Y.
+> +
+>  endmenu
+> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+> index f2816f6ff76a..6094b3b75184 100644
+> --- a/drivers/base/Makefile
+> +++ b/drivers/base/Makefile
+> @@ -5,6 +5,7 @@ obj-y			:= component.o core.o bus.o dd.o syscore.o \
+>  			   cpu.o firmware.o init.o map.o devres.o \
+>  			   attribute_container.o transport_class.o \
+>  			   topology.o container.o property.o cacheinfo.o
+> +obj-$(CONFIG_BOOT_CONSTRAINTS) += boot_constraint.o
+>  obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
+>  obj-$(CONFIG_DMA_CMA) += dma-contiguous.o
+>  obj-y			+= power/
 
-        return of_clk_add_hw_provider(np, scpi_of_clk_src_get, clk_data);
 
 -- 
-Regards,
-Sudeep
+~Randy
