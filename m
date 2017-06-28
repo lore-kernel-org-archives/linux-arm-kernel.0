@@ -1,99 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Jun 2017 12:46:09 +0100
-Subject: [PATCH 0/8] io-pgtable lock removal
-In-Reply-To: <e43ba1fe-696e-fabb-a800-52fadaa2fa93@broadcom.com>
-References: <cover.1496921366.git.robin.murphy@arm.com>
- <458ad41d-6679-eeca-3c0f-13ccb6c933b6@codeaurora.org>
- <b7830be1-9a78-e29f-a29c-4798aaa28c0a@broadcom.com>
- <cdc1799b-f142-09ed-a7e5-d7fd2e70268f@arm.com>
- <e43ba1fe-696e-fabb-a800-52fadaa2fa93@broadcom.com>
-Message-ID: <20170628114609.GD11053@arm.com>
+From: chen.zhong@mediatek.com (chen.zhong)
+Date: Wed, 28 Jun 2017 20:10:06 +0800
+Subject: [PATCH] soc: mtk-pmic-wrap: make of_device_ids const.
+In-Reply-To: <ec7445881f9cbd7d7e6a29126dce6e62f9e6b3f1.1498625812.git.arvind.yadav.cs@gmail.com>
+References: <ec7445881f9cbd7d7e6a29126dce6e62f9e6b3f1.1498625812.git.arvind.yadav.cs@gmail.com>
+Message-ID: <1498651806.6668.2.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ray,
+Hi,
+On Wed, 2017-06-28 at 10:28 +0530, Arvind Yadav wrote:
+> of_device_ids are not supposed to change at runtime. All functions
+> working with of_device_ids provided by <linux/of.h> work with const
+> of_device_ids. So mark the non-const structs as const.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index a5f1093..1205a671 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -1067,7 +1067,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
+>  	.init_soc_specific = pwrap_mt2701_init_soc_specific,
+>  };
+>  
+> -static struct pmic_wrapper_type pwrap_mt8135 = {
+> +static const struct pmic_wrapper_type pwrap_mt8135 = {
+>  	.regs = mt8135_regs,
+>  	.type = PWRAP_MT8135,
+>  	.arb_en_all = 0x1ff,
+> @@ -1079,7 +1079,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
+>  	.init_soc_specific = pwrap_mt8135_init_soc_specific,
+>  };
+>  
+> -static struct pmic_wrapper_type pwrap_mt8173 = {
+> +static const struct pmic_wrapper_type pwrap_mt8173 = {
+>  	.regs = mt8173_regs,
+>  	.type = PWRAP_MT8173,
+>  	.arb_en_all = 0x3f,
+> @@ -1091,7 +1091,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
+>  	.init_soc_specific = pwrap_mt8173_init_soc_specific,
+>  };
+>  
+> -static struct of_device_id of_pwrap_match_tbl[] = {
+> +static const struct of_device_id of_pwrap_match_tbl[] = {
+>  	{
+>  		.compatible = "mediatek,mt2701-pwrap",
+>  		.data = &pwrap_mt2701,
 
-Robin and I have been bashing our heads against the tlb_sync_pending flag
-this morning, and we reckon it could have something to do with your timeouts
-on MMU-500.
-
-On Tue, Jun 27, 2017 at 09:43:19AM -0700, Ray Jui wrote:
-> >> Also, in a few occasions, I observed the following message during the
-> >> test, when multiple cores are involved:
-> >>
-> >> arm-smmu 64000000.mmu: TLB sync timed out -- SMMU may be deadlocked
-
-The tlb_sync_pending logic was written under the assumption of a global
-page-table lock, so it assumes that it only has to care about syncing
-flushes from the current CPU/context. That's not true anymore, and the
-current code can accidentally skip syncs and (what I think is happening in
-your case) allow concurrent syncs, which will potentially lead to timeouts
-if a CPU is unlucky enough to keep missing the Ack.
-
-Please can you try the diff below and see if it fixes things for you?
-This applies on top of my for-joerg/arm-smmu/updates branch, but note
-that I've only shown it to the compiler. Not tested at all.
-
-Will
-
---->8
-
-diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
-index 127558d83667..cd8d7aaec161 100644
---- a/drivers/iommu/io-pgtable.c
-+++ b/drivers/iommu/io-pgtable.c
-@@ -59,6 +59,7 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
- 	iop->cookie	= cookie;
- 	iop->cfg	= *cfg;
- 
-+	atomic_set(&iop->tlb_sync_pending, 0);
- 	return &iop->ops;
- }
- 
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index 524263a7ae6f..b64580c9d03d 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -1,5 +1,7 @@
- #ifndef __IO_PGTABLE_H
- #define __IO_PGTABLE_H
-+
-+#include <linux/atomic.h>
- #include <linux/bitops.h>
- 
- /*
-@@ -165,7 +167,7 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops);
- struct io_pgtable {
- 	enum io_pgtable_fmt	fmt;
- 	void			*cookie;
--	bool			tlb_sync_pending;
-+	atomic_t		tlb_sync_pending;
- 	struct io_pgtable_cfg	cfg;
- 	struct io_pgtable_ops	ops;
- };
-@@ -175,22 +177,20 @@ struct io_pgtable {
- static inline void io_pgtable_tlb_flush_all(struct io_pgtable *iop)
- {
- 	iop->cfg.tlb->tlb_flush_all(iop->cookie);
--	iop->tlb_sync_pending = true;
-+	atomic_set_release(&iop->tlb_sync_pending, 1);
- }
- 
- static inline void io_pgtable_tlb_add_flush(struct io_pgtable *iop,
- 		unsigned long iova, size_t size, size_t granule, bool leaf)
- {
- 	iop->cfg.tlb->tlb_add_flush(iova, size, granule, leaf, iop->cookie);
--	iop->tlb_sync_pending = true;
-+	atomic_set_release(&iop->tlb_sync_pending, 1);
- }
- 
- static inline void io_pgtable_tlb_sync(struct io_pgtable *iop)
- {
--	if (iop->tlb_sync_pending) {
-+	if (atomic_xchg_relaxed(&iop->tlb_sync_pending, 0))
- 		iop->cfg.tlb->tlb_sync(iop->cookie);
--		iop->tlb_sync_pending = false;
--	}
- }
- 
- /**
+Acked-by: Chen Zhong <chen.zhong@mediatek.com>
