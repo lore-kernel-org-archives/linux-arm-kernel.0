@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 Jun 2017 20:25:52 +0100
-Subject: Applied "spi: stm32: use SoC specific compatible" to the spi tree
-In-Reply-To: <1498222550-19092-2-git-send-email-amelie.delaunay@st.com>
-Message-ID: <E1dQIb2-0004hK-Sr@finisterre>
+Date: Wed, 28 Jun 2017 20:25:43 +0100
+Subject: Applied "spi: stm32: fix example with st,
+ spi-midi-ns property" to the spi tree
+In-Reply-To: <1498578321-13980-4-git-send-email-amelie.delaunay@st.com>
+Message-ID: <E1dQIat-0004fK-1x@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: stm32: use SoC specific compatible
+   spi: stm32: fix example with st, spi-midi-ns property
 
 has been applied to the spi tree at
 
@@ -33,42 +34,45 @@ to this mail.
 Thanks,
 Mark
 
->From 567300d11ef54f7779aa7324510fd4dbd470f73e Mon Sep 17 00:00:00 2001
+>From 5fd3d9433217908e1e8e1c2f841c3b28c75509d6 Mon Sep 17 00:00:00 2001
 From: Amelie Delaunay <amelie.delaunay@st.com>
-Date: Tue, 27 Jun 2017 17:45:13 +0200
-Subject: [PATCH] spi: stm32: use SoC specific compatible
+Date: Tue, 27 Jun 2017 17:45:15 +0200
+Subject: [PATCH] spi: stm32: fix example with st, spi-midi-ns property
 
-This patch replaces st,stm32-spi compatible with st,stm32h7-spi SoC
-specific compatible and updates the example accondingly.
+This patch aligns example with the optional property description,
+removes status and replace spidev unvalid compatible with
+Aarvark SPI Host Adapter one.
+
+In slave mode, Aardvark SPI Host Adapter requires 4ms delay
+between the end of byte n and the start of byte n+1, hence the
+use of the optional property st,spi-midi-ns.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/spi/spi-stm32.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/spi/spi-stm32.txt | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/spi/spi-stm32.txt b/Documentation/devicetree/bindings/spi/spi-stm32.txt
-index 3958bf6e8b37..415378bca480 100644
+index 415378bca480..1b3fa2c119d5 100644
 --- a/Documentation/devicetree/bindings/spi/spi-stm32.txt
 +++ b/Documentation/devicetree/bindings/spi/spi-stm32.txt
-@@ -7,7 +7,7 @@ from 4 to 32-bit data size. Although it can be configured as master or slave,
- only master is supported by the driver.
+@@ -48,13 +48,12 @@ Example:
+ 		dma-names = "rx", "tx";
+ 		pinctrl-0 = <&spi2_pins_b>;
+ 		pinctrl-names = "default";
+-		status = "okay";
+ 		cs-gpios = <&gpioa 11 0>;
  
- Required properties:
--- compatible: Must be "st,stm32-spi".
-+- compatible: Must be "st,stm32h7-spi".
- - reg: Offset and length of the device's register set.
- - interrupts: Must contain the interrupt id.
- - clocks: Must contain an entry for spiclk (which feeds the internal clock
-@@ -38,7 +38,7 @@ Example:
- 	spi2: spi at 40003800 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "st,stm32-spi";
-+		compatible = "st,stm32h7-spi";
- 		reg = <0x40003800 0x400>;
- 		interrupts = <36>;
- 		clocks = <&rcc SPI2_CK>;
+-		spidev at 0 {
+-			compatible = "spidev";
++		aardvark at 0 {
++			compatible = "totalphase,aardvark";
+ 			reg = <0>;
+ 			spi-max-frequency = <4000000>;
+-			st,spi-midi = <4000>;
++			st,spi-midi-ns = <4000>;
+ 		};
+ 	};
 -- 
 2.13.2
