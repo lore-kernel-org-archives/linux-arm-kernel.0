@@ -1,62 +1,44 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:47 +0100
-Subject: [PATCH v2 28/52] irqchip/gic-v3-its: Set implementation defined bit
- to enable VLPIs
+Date: Wed, 28 Jun 2017 16:03:34 +0100
+Subject: [PATCH v2 15/52] irqchip/gic-v3-its: Add GICv4 ITS command definitions
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-29-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A long time ago, GITS_CTLR[1] used to be called GITC_CTLR.EnableVLPI.
-It has been subsequently deprecated and is now an "Implementation
-Defined" bit that may ot may not be set for GICv4. Brilliant.
+Add the new GICv4 ITS command definitions, most of them, being
+defined in terms of their physical counterparts.
 
-And the current crop of the FastModel requires that bit for VLPIs
-to be enabled. Oh well... Let's set it and find out what breaks.
-
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 7 +++++--
- include/linux/irqchip/arm-gic-v3.h | 1 +
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 4979916cd3d7..3784bea2b994 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2552,7 +2552,7 @@ static int its_force_quiescent(void __iomem *base)
- 		return 0;
- 
- 	/* Disable the generation of all interrupts to this ITS */
--	val &= ~GITS_CTLR_ENABLE;
-+	val &= ~(GITS_CTLR_ENABLE | GITS_CTLR_ImDe);
- 	writel_relaxed(val, base + GITS_CTLR);
- 
- 	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
-@@ -2818,7 +2818,10 @@ static int __init its_probe_one(struct resource *res,
- 
- 	gits_write_cwriter(0, its->base + GITS_CWRITER);
- 	ctlr = readl_relaxed(its->base + GITS_CTLR);
--	writel_relaxed(ctlr | GITS_CTLR_ENABLE, its->base + GITS_CTLR);
-+	ctlr |= GITS_CTLR_ENABLE;
-+	if (its->is_v4)
-+		ctlr |= GITS_CTLR_ImDe;
-+	writel_relaxed(ctlr, its->base + GITS_CTLR);
- 
- 	err = its_init_domain(handle, its);
- 	if (err)
 diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 6bc142cfa616..1ea576c8126f 100644
+index af8c55105fc2..7c6fd8f3e36c 100644
 --- a/include/linux/irqchip/arm-gic-v3.h
 +++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -298,6 +298,7 @@
- #define GITS_TRANSLATER			0x10040
+@@ -348,6 +348,18 @@
+ #define GITS_CMD_SYNC			0x05
  
- #define GITS_CTLR_ENABLE		(1U << 0)
-+#define GITS_CTLR_ImDe			(1U << 1)
- #define	GITS_CTLR_ITS_NUMBER_SHIFT	4
- #define	GITS_CTLR_ITS_NUMBER		(0xFU << GITS_CTLR_ITS_NUMBER_SHIFT)
- #define GITS_CTLR_QUIESCENT		(1U << 31)
+ /*
++ * GICv4 ITS specific commands
++ */
++#define GITS_CMD_GICv4(x)		((x) | 0x20)
++#define GITS_CMD_VINVALL		GITS_CMD_GICv4(GITS_CMD_INVALL)
++#define GITS_CMD_VMAPP			GITS_CMD_GICv4(GITS_CMD_MAPC)
++#define GITS_CMD_VMAPTI			GITS_CMD_GICv4(GITS_CMD_MAPTI)
++#define GITS_CMD_VMOVI			GITS_CMD_GICv4(GITS_CMD_MOVI)
++#define GITS_CMD_VSYNC			GITS_CMD_GICv4(GITS_CMD_SYNC)
++/* VMOVP is the odd one, as it doesn't have a physical counterpart */
++#define GITS_CMD_VMOVP			GITS_CMD_GICv4(2)
++
++/*
+  * ITS error numbers
+  */
+ #define E_ITS_MOVI_UNMAPPED_INTERRUPT		0x010107
 -- 
 2.11.0
