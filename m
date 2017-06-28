@@ -1,22 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 28 Jun 2017 13:04:52 -0500
-Subject: [PATCH 1/2] dt-bindings: rtc: stm32: add support for STM32H7
-In-Reply-To: <1498470689-26829-2-git-send-email-amelie.delaunay@st.com>
-References: <1498470689-26829-1-git-send-email-amelie.delaunay@st.com>
- <1498470689-26829-2-git-send-email-amelie.delaunay@st.com>
-Message-ID: <20170628180452.rdvnul7cifxglu7f@rob-hp-laptop>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 28 Jun 2017 19:05:57 +0100
+Subject: [PATCH v2 02/12] arm64: dts: juno: Use the new coresight
+ replicator string
+In-Reply-To: <CANLsYkwYttnpVgvGVFThqN0F+sHj2up61gk3itBAbhW92TTSgg@mail.gmail.com>
+References: <1498490576-1350-1-git-send-email-suzuki.poulose@arm.com>
+ <1498490576-1350-3-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkwYttnpVgvGVFThqN0F+sHj2up61gk3itBAbhW92TTSgg@mail.gmail.com>
+Message-ID: <a016375e-9513-f18d-af9d-151d37b0feb8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 11:51:28AM +0200, Amelie Delaunay wrote:
-> This patch documents support for STM32H7 Real Time Clock.
-> It introduces a new compatible and rework clock definitions.
-> On STM32H7 we have a 'pclk' clock for register access, in addition to
-> the 'rtc_ck' clock.
-> 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> ---
->  .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 32 ++++++++++++++++++----
->  1 file changed, 27 insertions(+), 5 deletions(-)
+On 28/06/17 19:00, Mathieu Poirier wrote:
+> On 26 June 2017 at 09:22, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> Use the new compatible for ATB programmable replicator in Juno.
+>>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Mike Leach <mike.leach@linaro.org>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>  arch/arm64/boot/dts/arm/juno-base.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+>> index bfe7d68..c82c706 100644
+>> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+>> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+>> @@ -373,7 +373,7 @@
+>>         };
+>>
+>>         replicator at 20120000 {
+>> -               compatible = "qcom,coresight-replicator1x", "arm,primecell";
+>> +               compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
+>>                 reg = <0 0x20120000 0 0x1000>;
+>
+> Since we are getting rid of the qcom string entirely please fix it in
+> the msm DT files as well.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Sure, will do.
+
+Thanks
+Suzuki
