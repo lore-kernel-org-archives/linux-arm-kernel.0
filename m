@@ -1,77 +1,65 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 28 Jun 2017 17:29:37 -0500
-Subject: [PATCH 5/5] dt-bindings: Document the Rockchip RGA bindings
-In-Reply-To: <1498488802-1439-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1498488802-1439-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <20170628222937.jscrixi5uo2vasnk@rob-hp-laptop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 28 Jun 2017 15:33:03 -0700
+Subject: [PATCH] ARM: qcom_defconfig: Enable configs for USB on apq8064/msm8974
+Message-ID: <20170628223303.21809-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 10:53:22PM +0800, Jacob Chen wrote:
-> Add DT bindings documentation for Rockchip RGA
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> ---
->  .../devicetree/bindings/media/rockchip-rga.txt     | 36 ++++++++++++++++++++++
+Enable the regulator driver, usb phy drivers, and hsic hub driver
+to support USB devices on apq8064 and msm8974.
 
-Should be under bindings/gpu/
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
->  1 file changed, 36 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt b/Documentation/devicetree/bindings/media/rockchip-rga.txt
-> new file mode 100644
-> index 0000000..48a260e5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
-> @@ -0,0 +1,36 @@
-> +device-tree bindings for rockchip 2D raster graphic acceleration controller (RGA)
-> +
-> +RGA is a separate 2D raster graphic acceleration unit. It accelerates 2D
-> +graphics operations, such as point/line drawing, image scaling, rotation,
-> +BitBLT, alpha blending and image blur/sharpness.
-> +
-> +Required properties:
-> +- compatible: value should be one of the following
-> +		"rockchip,rk3228-rga";
-> +		"rockchip,rk3288-rga";
-> +		"rockchip,rk3399-rga";
-> +
-> +- interrupts: RGA interrupt number.
-> +
-> +- clocks: phandle to RGA sclk/hclk/aclk clocks
-> +
-> +- clock-names: should be "aclk" "hclk" and "sclk"
-> +
-> +- resets: Must contain an entry for each entry in reset-names.
-> +  See ../reset/reset.txt for details.
-> +- reset-names: should be "core" "axi" and "ahb"
-> +
-> +Example:
-> +SoC specific DT entry:
-> +	rga: rga at ff680000 {
+Patch generated against next-20170628.
 
-gpu at ...
+ arch/arm/configs/qcom_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> +		compatible = "rockchip,rk3399-rga";
-> +		reg = <0xff680000 0x10000>;
-> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-names = "rga";
-> +		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA_CORE>;
-> +		clock-names = "aclk", "hclk", "sclk";
-> +
-> +		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
-> +		reset-names = "core, "axi", "ahb";
-> +		status = "disabled";
-
-Don't show status in examples.
-
-> +	};
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 36b58d41c52d..89aedc8094d2 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -135,6 +135,7 @@ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_QCOM_RPM=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
++CONFIG_REGULATOR_QCOM_SPMI=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_FB=y
+ CONFIG_SOUND=y
+@@ -155,11 +156,14 @@ CONFIG_USB_ACM=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_UDC=y
+ CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_USB_CHIPIDEA_ULPI=y
+ CONFIG_USB_SERIAL=y
++CONFIG_USB_HSIC_USB4604=y
+ CONFIG_USB_MSM_OTG=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_GADGET_DEBUG_FILES=y
+ CONFIG_USB_GADGET_VBUS_DRAW=500
++CONFIG_USB_ULPI_BUS=y
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_ARMMMCI=y
+@@ -203,6 +207,7 @@ CONFIG_QCOM_SMD_RPM=y
+ CONFIG_QCOM_SMP2P=y
+ CONFIG_QCOM_SMSM=y
+ CONFIG_QCOM_WCNSS_CTRL=y
++CONFIG_EXTCON_QCOM_SPMI_MISC=y
+ CONFIG_IIO=y
+ CONFIG_IIO_BUFFER_CB=y
+ CONFIG_IIO_SW_TRIGGER=y
+@@ -213,6 +218,8 @@ CONFIG_IIO_HRTIMER_TRIGGER=y
+ CONFIG_BMP280=y
+ CONFIG_PHY_QCOM_APQ8064_SATA=y
+ CONFIG_PHY_QCOM_IPQ806X_SATA=y
++CONFIG_PHY_QCOM_USB_HS=y
++CONFIG_PHY_QCOM_USB_HSIC=y
+ CONFIG_NVMEM=y
+ CONFIG_QCOM_QFPROM=y
+ CONFIG_EXT2_FS=y
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
