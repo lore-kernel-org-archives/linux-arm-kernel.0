@@ -1,81 +1,54 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:52 +0100
-Subject: [PATCH v2 33/52] irqchip/gic-v4: Enable low-level GICv4 operations
+Date: Wed, 28 Jun 2017 16:03:53 +0100
+Subject: [PATCH v2 34/52] irqchip/gic-v3: Advertise GICv4 support to KVM
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-34-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-35-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get the show on the road...
+As KVM needs to know about the availability of GICv4 to enable
+direct injection of interrupts, let's advertise the feature in
+the gic_kvm_info structure.
 
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/Makefile           |  2 +-
- drivers/irqchip/irq-gic-v3-its.c   |  3 ++-
- drivers/irqchip/irq-gic-v4.c       | 13 +++++++++++++
- include/linux/irqchip/arm-gic-v4.h |  2 ++
- 4 files changed, 18 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3.c           | 2 ++
+ include/linux/irqchip/arm-gic-common.h | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index b64c59b838a0..4ca95310254b 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -28,7 +28,7 @@ obj-$(CONFIG_ARM_GIC_PM)		+= irq-gic-pm.o
- obj-$(CONFIG_ARCH_REALVIEW)		+= irq-gic-realview.o
- obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
- obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
--obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-+obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o irq-gic-v4.o
- obj-$(CONFIG_PARTITION_PERCPU)		+= irq-partition-percpu.o
- obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 3784bea2b994..284e6e6785cf 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2970,7 +2970,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 		has_v4 |= its->is_v4;
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index efbd998baa9c..7ce88148da1f 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -1156,6 +1156,7 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
+ 	if (!ret)
+ 		gic_v3_kvm_info.vcpu = r;
  
- 	if (has_v4 & rdists->has_vlpis) {
--		if (its_init_vpe_domain()) {
-+		if (its_init_vpe_domain() ||
-+		    its_init_v4(parent_domain, &its_vpe_domain_ops)) {
- 			rdists->has_vlpis = false;
- 			pr_err("ITS: Disabling GICv4 support\n");
- 		}
-diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-index 4ce5fdd1db15..7f573d65f440 100644
---- a/drivers/irqchip/irq-gic-v4.c
-+++ b/drivers/irqchip/irq-gic-v4.c
-@@ -194,3 +194,16 @@ int its_prop_update_vlpi(int irq, u8 config, bool inv)
- 
- 	return irq_set_vcpu_affinity(irq, &info);
++	gic_v3_kvm_info.has_v4 = gic_data.rdists.has_vlpis;
+ 	gic_set_kvm_info(&gic_v3_kvm_info);
  }
-+
-+int its_init_v4(struct irq_domain *domain, const struct irq_domain_ops *ops)
-+{
-+	if (domain) {
-+		pr_info("ITS: Enabling GICv4 support\n");
-+		gic_domain = domain;
-+		vpe_domain_ops = ops;
-+		return 0;
-+	}
-+
-+	pr_err("ITS: No GICv4 VPE domain allocated\n");
-+	return -ENODEV;
-+}
-diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-index 843c9ff29269..862d20ab67d0 100644
---- a/include/linux/irqchip/arm-gic-v4.h
-+++ b/include/linux/irqchip/arm-gic-v4.h
-@@ -97,4 +97,6 @@ int its_get_vlpi(int irq, struct its_vlpi_map *map);
- int its_unmap_vlpi(int irq);
- int its_prop_update_vlpi(int irq, u8 config, bool inv);
  
-+int its_init_v4(struct irq_domain *domain, const struct irq_domain_ops *ops);
-+
- #endif
+@@ -1452,6 +1453,7 @@ static void __init gic_acpi_setup_kvm_info(void)
+ 		vcpu->end = vcpu->start + ACPI_GICV2_VCPU_MEM_SIZE - 1;
+ 	}
+ 
++	gic_v3_kvm_info.has_v4 = gic_data.rdists.has_vlpis;
+ 	gic_set_kvm_info(&gic_v3_kvm_info);
+ }
+ 
+diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
+index c647b0547bcd..0a83b4379f34 100644
+--- a/include/linux/irqchip/arm-gic-common.h
++++ b/include/linux/irqchip/arm-gic-common.h
+@@ -27,6 +27,8 @@ struct gic_kvm_info {
+ 	unsigned int	maint_irq;
+ 	/* Virtual control interface */
+ 	struct resource vctrl;
++	/* vlpi support */
++	bool		has_v4;
+ };
+ 
+ const struct gic_kvm_info *gic_get_kvm_info(void);
 -- 
 2.11.0
