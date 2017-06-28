@@ -1,35 +1,49 @@
 From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Wed, 28 Jun 2017 16:58:05 +0200
-Subject: [PATCH] arm64: fix endianness annotation in get_kaslr_seed()
-Message-ID: <20170628145805.24587-1-luc.vanoostenryck@gmail.com>
+Date: Wed, 28 Jun 2017 16:58:07 +0200
+Subject: [PATCH] arm64: fix endianness annotation in acpi_parking_protocol.c
+Message-ID: <20170628145807.24631-1-luc.vanoostenryck@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the flattened device tree format, all integer properties are
-in big-endian order.
-Here the property "kaslr-seed" is read from the fdt and then
-correctly converted to native order (via fdt64_to_cpu()) but the
-pointer used for this is not annotated as being for big-endian.
+Here both variables 'cpu_id' and 'entry_point' are read via
+read[lq]_relaxed(), from a little-endian annotated pointer
+and then used as a native endian value.
 
-Fix this by declaring the pointer as __be64 instead of u64.
+This is correct since the read[lq]() family of function
+internally do a little-to-native endian conversion.
+
+But in this case, it is wrong to declare these variable as
+little-endian since there are native ones.
+
+Fix this by changing the declaration of these variables
+as 'u32' or 'u64' instead of '__le32' / '__le64'.
 
 Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 ---
- arch/arm64/kernel/kaslr.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/acpi_parking_protocol.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-index d7e90d97f..b9f0ec99e 100644
---- a/arch/arm64/kernel/kaslr.c
-+++ b/arch/arm64/kernel/kaslr.c
-@@ -27,7 +27,7 @@ u16 __initdata memstart_offset_seed;
- static __init u64 get_kaslr_seed(void *fdt)
+diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+index f35e80aad..98a20e587 100644
+--- a/arch/arm64/kernel/acpi_parking_protocol.c
++++ b/arch/arm64/kernel/acpi_parking_protocol.c
+@@ -71,7 +71,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
  {
- 	int node, len;
--	u64 *prop;
-+	__be64 *prop;
- 	u64 ret;
+ 	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+ 	struct parking_protocol_mailbox __iomem *mailbox;
+-	__le32 cpu_id;
++	u32 cpu_id;
  
- 	node = fdt_path_offset(fdt, "/chosen");
+ 	/*
+ 	 * Map mailbox memory with attribute device nGnRE (ie ioremap -
+@@ -123,7 +123,7 @@ static void acpi_parking_protocol_cpu_postboot(void)
+ 	int cpu = smp_processor_id();
+ 	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+ 	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
+-	__le64 entry_point;
++	u64 entry_point;
+ 
+ 	entry_point = readq_relaxed(&mailbox->entry_point);
+ 	/*
 -- 
 2.13.0
