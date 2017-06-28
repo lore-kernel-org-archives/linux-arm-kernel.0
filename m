@@ -1,29 +1,34 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 28 Jun 2017 23:49:01 +0300
-Subject: [PATCH 1/2] ARM: dts: r8a7792: add IMR-L[S]X3 clocks
-In-Reply-To: <20170329080417.GD6512@verge.net.au>
-References: <20170321200443.078095898@cogentembedded.com>
- <34050114-752a-08b6-700e-697e78102af7@cogentembedded.com>
- <a802018c-9943-22e5-0f78-28b8ab9689d9@cogentembedded.com>
- <20170329080417.GD6512@verge.net.au>
-Message-ID: <fbd0e4c2-746c-8f74-a8e5-ab971a087aed@cogentembedded.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 29 Jun 2017 00:03:58 +0200
+Subject: [alsa-devel] [PATCH v2 12/12] ASoC: Fix use-after-free at card
+ unregistration
+In-Reply-To: <20170628195349.pqeb3dceddxar75s@sirena.org.uk> (Mark Brown's
+ message of "Wed, 28 Jun 2017 20:53:49 +0100")
+References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
+ <1497857229-12049-13-git-send-email-robert.jarzmik@free.fr>
+ <s5hefug72iu.wl-tiwai@suse.de> <87injstckf.fsf@belgarion.home>
+ <20170628195349.pqeb3dceddxar75s@sirena.org.uk>
+Message-ID: <87o9t7u5v5.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Mark Brown <broonie@kernel.org> writes:
 
-On 03/29/2017 11:04 AM, Simon Horman wrote:
-
->>> Still not cover letter but I think it's better now, so I won't retry...
->>> The patches are against Simon Horman's 'renesas.git' repo,
->>> 'renesas-devel-20170321-v4.11-rc3' tag.
->>
->>    The patches depend on the IMR driver patches adding the IMR-L[S]X3
->> support for the "compatible" values.
+> On Mon, Jun 19, 2017 at 01:57:20PM +0200, Robert Jarzmik wrote:
 >
-> I have marked these patches as deferred accordingly.
+>> My serie shifted by one, so the very first of the serie is therefore missing,
+>> formerly "ALSA: ac97: split out the generic ac97 registers" in
+>> https://patchwork.kernel.org/patch/9398143/, and the shift triggered the
+>> inclusion of the last patch of my tree, ie. yours :)
+>
+> Based on the missing first patch I was expecting the series to get
+> reposted?
+Hi Mark,
 
-    Actually, the 1st patch in htis series doesn't depend on anything and 
-should still apply (with offsets).
+The first patch is only moving around a .h file. I was expecting a review before
+reposting a v3.
 
-WBR, Sergei
+Cheers.
+
+-- 
+Robert
