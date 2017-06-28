@@ -1,24 +1,95 @@
-From: qiaozhou@asrmicro.com (Qiao Zhou)
-Date: Wed, 28 Jun 2017 17:04:11 +0800
-Subject: [PATCH] *** arm64: traps: disable irq in die() ***
-Message-ID: <1498640652-23338-1-git-send-email-qiaozhou@asrmicro.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 28 Jun 2017 11:20:24 +0200
+Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <20170627143652.13075-1-net147@gmail.com>
+References: <20170627143652.13075-1-net147@gmail.com>
+Message-ID: <20170628092024.ejxy6itqj3hx6yew@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I met several cases that die() is interrupted once irq is unlocked, on
-our platform which has multiple cpus, and enables panic_on_oops. It deadlock
-in some schedule related code, and hard-lockup is triggered. So the first
-criminal field is gone.
+On Wed, Jun 28, 2017 at 12:36:52AM +1000, Jonathan Liu wrote:
+> +#define SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK ( \
+> +	SUN4I_HDMI_DDC_INT_STATUS_ILLEGAL_FIFO_OPERATION | \
+> +	SUN4I_HDMI_DDC_INT_STATUS_DDC_RX_FIFO_UNDERFLOW | \
+> +	SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW | \
+> +	SUN4I_HDMI_DDC_INT_STATUS_ARBITRATION_ERROR | \
+> +	SUN4I_HDMI_DDC_INT_STATUS_ACK_ERROR | \
+> +	SUN4I_HDMI_DDC_INT_STATUS_BUS_ERROR \
+> +)
+> +
+> +static bool is_err_status(u32 int_status)
+> +{
+> +	return !!(int_status & SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK);
+> +}
+> +
+> +static bool is_fifo_flag_unset(struct sun4i_hdmi *hdmi, u32 *fifo_status,
+> +			       u32 flag)
+> +{
+> +	*fifo_status = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG);
+> +	return !(*fifo_status & flag);
+> +}
+> +
+> +static int fifo_transfer(struct sun4i_hdmi *hdmi, u8 *buf, int len, bool read)
+> +{
+> +	/* 1 byte takes 9 clock cycles (8 bits + 1 ACK) */
+> +	unsigned long byte_time = DIV_ROUND_UP(USEC_PER_SEC,
+> +					       clk_get_rate(hdmi->ddc_clk)) * 9;
 
-So I want to protect the whole flow of die() from irq, and let the panic
-flow execute correctly. Not sure this patch is suitable or there is better
-way to solve it. Please help to give some comments. Thanks in advance.
+There's no real need for it to be dynamic. The clock rate will not
+change, and the order of magnitude is roughly 100us, so let's just use
+that (and make a comment).
 
-Qiao Zhou (1):
-  arm64: traps: disable irq in die()
+> +	u32 int_status;
+> +	u32 fifo_status;
+> +	/* Read needs empty flag unset, write needs full flag unset */
+> +	u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
+> +			  SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
+> +	int ret;
+> +
+> +	/* Wait until error or FIFO ready */
+> +	ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+> +				 int_status,
+> +				 is_err_status(int_status) ||
+> +				 is_fifo_flag_unset(hdmi, &fifo_status, flag),
+> +				 min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
+> +				 100000);
+> +
+> +	if (is_err_status(int_status))
+> +		return -EIO;
+> +	if (ret)
+> +		return -ETIMEDOUT;
 
- arch/arm64/kernel/traps.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Why not just have
+ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
+			 !(reg & flag), 100, 100000);
+
+if (ret < 0)
+	if (is_err_status())
+		return -EIO;
+	return ret;
+
+
+> +
+> +	/* Read FIFO level */
+> +	int level = (int)(fifo_status & SUN4I_HDMI_DDC_FIFO_STATUS_LEVEL_MASK);
+
+and explicitly read the fifo status here. That will make you remove
+that function that does two things while claiming that it does only
+one, and it will be more obvious.
+
+You can also just use reg at this point, instead of reading it once
+again.
+
+Maxime
 
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170628/52598f2f/attachment.sig>
