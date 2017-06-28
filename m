@@ -1,67 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 28 Jun 2017 15:57:08 +0100
-Subject: [PATCH 1/4] misc: sram: Allow ARM64 to select SRAM_EXEC
-In-Reply-To: <171ae8ff-2af2-65e3-9796-308b21976876@gmail.com>
-References: <20170626223248.14199-1-f.fainelli@gmail.com>
- <20170626223248.14199-3-f.fainelli@gmail.com>
- <20170627173859.GA5189@leverpostej>
- <171ae8ff-2af2-65e3-9796-308b21976876@gmail.com>
-Message-ID: <20170628145707.GB8252@leverpostej>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Wed, 28 Jun 2017 16:56:00 +0200
+Subject: [PATCH] arm64: fix endianness annotation for reloc_insn_movw() &
+ reloc_insn_imm()
+Message-ID: <20170628145600.24498-1-luc.vanoostenryck@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 11:21:17AM -0700, Florian Fainelli wrote:
-> On 06/27/2017 10:38 AM, Mark Rutland wrote:
-> > On Mon, Jun 26, 2017 at 03:32:42PM -0700, Florian Fainelli wrote:
-> >> Now that ARM64 also has a fncpy() implementation, allow selection
-> >> SRAM_EXEC for ARM64 as well.
-> >>
-> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> > 
-> > Sorr,y but I must NAK this patch.
-> > 
-> > As mentioned on prior threads regarding fncpy, I do not think it makes
-> > sense to enable this for arm64. The only use-cases that have been
-> > described so far for this are power-management stuff that should live in
-> > PSCI or other secure FW, and have no place in the kernel on arm64
-> 
-> This is a valid reason, but this is only one use case presented, the
-> only thing is that we need to make sure, as patch reviewers and you guys
-> as architecture maintainers, that this is not used as a means to bypass
-> PSCI for suspend/resume operation, which I now agree with.
-> 
-> Still, the general use case remains: you have a piece of addressable
-> memory which can be used to allocate space from and relocate code to be
-> it for security, performance, predictability, isolation, or anything,
-> and that should be possible given standard kernel facilities offered by
-> the SRAM driver.
+Here the functions reloc_insn_movw() & reloc_insn_imm() are used
+to read, modify and write back ARM instructions, which are always
+stored in memory in little-endian order. These values are thus
+correctly converted to/from native order but the pointers used to
+hold their addresses are declared as for native order values.
 
-While I agree that these are *theoretically* possible use cases, they
-aren't *real* cases today. 
+Fix this by declaring the pointers as __le32* and remove the
+casts that are now unneeded.
 
-If someone comes by with code that needs this (which doesn't fall into
-one of those NAK'd cases above), then I'm happy for this to be enabled
-for that feature.
+Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+---
+ arch/arm64/kernel/module.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-Until such time, I see no reason to enable this. Given it comes with
-strong the potential for abuse, I'd rather it remained disabled.
-
-> > > There are no other users of this functionality, and until there are, I
-> > see no reason to enable this, and risk a proliferation of unnecessary
-> > platform-specific code.
-> > 
-> > It should be possible to #ifdef-ise the relevant callers of this such
-> > that they can be built on arm64 without using fncpy or sram_exec
-> > functionality. AFAICT, there are no users on arm64 introduced by this
-> > series.
-> 
-> I sent this patch accidentally as part of this patch series anyway, so
-> if you want to keep the discussion alive, reply here:
-> 
-> https://patchwork.kernel.org/patch/9793745/
-
-That appears to be v2 of the series, and there's a v3 afterwards, so
-I've replied on v3.
-
-Thanks,
-Mark.
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index f035ff6fb..864725d9e 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -74,7 +74,7 @@ enum aarch64_reloc_op {
+ 	RELOC_OP_PAGE,
+ };
+ 
+-static u64 do_reloc(enum aarch64_reloc_op reloc_op, void *place, u64 val)
++static u64 do_reloc(enum aarch64_reloc_op reloc_op, __le32 *place, u64 val)
+ {
+ 	switch (reloc_op) {
+ 	case RELOC_OP_ABS:
+@@ -121,12 +121,12 @@ enum aarch64_insn_movw_imm_type {
+ 	AARCH64_INSN_IMM_MOVKZ,
+ };
+ 
+-static int reloc_insn_movw(enum aarch64_reloc_op op, void *place, u64 val,
++static int reloc_insn_movw(enum aarch64_reloc_op op, __le32 *place, u64 val,
+ 			   int lsb, enum aarch64_insn_movw_imm_type imm_type)
+ {
+ 	u64 imm;
+ 	s64 sval;
+-	u32 insn = le32_to_cpu(*(u32 *)place);
++	u32 insn = le32_to_cpu(*place);
+ 
+ 	sval = do_reloc(op, place, val);
+ 	imm = sval >> lsb;
+@@ -154,7 +154,7 @@ static int reloc_insn_movw(enum aarch64_reloc_op op, void *place, u64 val,
+ 
+ 	/* Update the instruction with the new encoding. */
+ 	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_16, insn, imm);
+-	*(u32 *)place = cpu_to_le32(insn);
++	*place = cpu_to_le32(insn);
+ 
+ 	if (imm > U16_MAX)
+ 		return -ERANGE;
+@@ -162,12 +162,12 @@ static int reloc_insn_movw(enum aarch64_reloc_op op, void *place, u64 val,
+ 	return 0;
+ }
+ 
+-static int reloc_insn_imm(enum aarch64_reloc_op op, void *place, u64 val,
++static int reloc_insn_imm(enum aarch64_reloc_op op, __le32 *place, u64 val,
+ 			  int lsb, int len, enum aarch64_insn_imm_type imm_type)
+ {
+ 	u64 imm, imm_mask;
+ 	s64 sval;
+-	u32 insn = le32_to_cpu(*(u32 *)place);
++	u32 insn = le32_to_cpu(*place);
+ 
+ 	/* Calculate the relocation value. */
+ 	sval = do_reloc(op, place, val);
+@@ -179,7 +179,7 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, void *place, u64 val,
+ 
+ 	/* Update the instruction's immediate field. */
+ 	insn = aarch64_insn_encode_immediate(imm_type, insn, imm);
+-	*(u32 *)place = cpu_to_le32(insn);
++	*place = cpu_to_le32(insn);
+ 
+ 	/*
+ 	 * Extract the upper value bits (including the sign bit) and
+-- 
+2.13.0
