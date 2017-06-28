@@ -1,78 +1,29 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Wed, 28 Jun 2017 22:30:35 +0200
-Subject: [PATCH v4 8/9] ARM: pxa: spitz.c: remove hardcoded partitioning,
- use sharpslpart parser
-In-Reply-To: <1498681836-3765-1-git-send-email-andrea.adami@gmail.com>
-References: <1498681836-3765-1-git-send-email-andrea.adami@gmail.com>
-Message-ID: <1498681836-3765-9-git-send-email-andrea.adami@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 28 Jun 2017 23:49:01 +0300
+Subject: [PATCH 1/2] ARM: dts: r8a7792: add IMR-L[S]X3 clocks
+In-Reply-To: <20170329080417.GD6512@verge.net.au>
+References: <20170321200443.078095898@cogentembedded.com>
+ <34050114-752a-08b6-700e-697e78102af7@cogentembedded.com>
+ <a802018c-9943-22e5-0f78-28b8ab9689d9@cogentembedded.com>
+ <20170329080417.GD6512@verge.net.au>
+Message-ID: <fbd0e4c2-746c-8f74-a8e5-ab971a087aed@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
----
- arch/arm/mach-pxa/spitz.c | 34 +++++++++-------------------------
- 1 file changed, 9 insertions(+), 25 deletions(-)
+Hello!
 
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 67d66c7..21a2e42 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -739,21 +739,6 @@ static inline void spitz_lcd_init(void) {}
-  * NAND Flash
-  ******************************************************************************/
- #if defined(CONFIG_MTD_NAND_SHARPSL) || defined(CONFIG_MTD_NAND_SHARPSL_MODULE)
--static struct mtd_partition spitz_nand_partitions[] = {
--	{
--		.name = "System Area",
--		.offset = 0,
--		.size = 7 * 1024 * 1024,
--	}, {
--		.name = "Root Filesystem",
--		.offset = 7 * 1024 * 1024,
--	}, {
--		.name = "Home Filesystem",
--		.offset = MTDPART_OFS_APPEND,
--		.size = MTDPART_SIZ_FULL,
--	},
--};
--
- static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
- 
- static struct nand_bbt_descr spitz_nand_bbt = {
-@@ -808,10 +793,16 @@ static const struct mtd_ooblayout_ops akita_ooblayout_ops = {
- 	.free = akita_ooblayout_free,
- };
- 
-+static const char * const probes[] = {
-+	"cmdlinepart",
-+	"ofpart",
-+	"sharpslpart",
-+	NULL,
-+};
-+
- static struct sharpsl_nand_platform_data spitz_nand_pdata = {
- 	.badblock_pattern	= &spitz_nand_bbt,
--	.partitions		= spitz_nand_partitions,
--	.nr_partitions		= ARRAY_SIZE(spitz_nand_partitions),
-+	.types			= probes,
- };
- 
- static struct resource spitz_nand_resources[] = {
-@@ -834,14 +825,7 @@ static struct platform_device spitz_nand_device = {
- 
- static void __init spitz_nand_init(void)
- {
--	if (machine_is_spitz()) {
--		spitz_nand_partitions[1].size = 5 * 1024 * 1024;
--	} else if (machine_is_akita()) {
--		spitz_nand_partitions[1].size = 58 * 1024 * 1024;
--		spitz_nand_bbt.len = 1;
--		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
--	} else if (machine_is_borzoi()) {
--		spitz_nand_partitions[1].size = 32 * 1024 * 1024;
-+	if (machine_is_akita() || machine_is_borzoi()) {
- 		spitz_nand_bbt.len = 1;
- 		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
- 	}
--- 
-2.7.4
+On 03/29/2017 11:04 AM, Simon Horman wrote:
+
+>>> Still not cover letter but I think it's better now, so I won't retry...
+>>> The patches are against Simon Horman's 'renesas.git' repo,
+>>> 'renesas-devel-20170321-v4.11-rc3' tag.
+>>
+>>    The patches depend on the IMR driver patches adding the IMR-L[S]X3
+>> support for the "compatible" values.
+>
+> I have marked these patches as deferred accordingly.
+
+    Actually, the 1st patch in htis series doesn't depend on anything and 
+should still apply (with offsets).
+
+WBR, Sergei
