@@ -1,134 +1,132 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 28 Jun 2017 12:38:43 +0800
-Subject: [PATCH v3 2/2] spi: rockchip: Disable Runtime PM when chip select is
- asserted
-In-Reply-To: <1498624723-17332-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1498624723-17332-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1498624723-17332-2-git-send-email-jeffy.chen@rock-chips.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Wed, 28 Jun 2017 12:41:09 +0800
+Subject: [PATCH v2] spi: rockchip: Disable Runtime PM when chip select
+ is asserted
+In-Reply-To: <CAD=FV=WwCiMySpC-SMFQmM_JFCMdcSGQLXut1rUVVe_8E96-ew@mail.gmail.com>
+References: <1498530035-22070-1-git-send-email-jeffy.chen@rock-chips.com>
+ <CAD=FV=WwCiMySpC-SMFQmM_JFCMdcSGQLXut1rUVVe_8E96-ew@mail.gmail.com>
+Message-ID: <59533365.60003@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rockchip spi would stop driving pins when runtime suspended, which
-might break slave's xfer(for example cros_ec).
+Hi doug,
 
-Since we have pullups on those pins, we only need to care about this
-when the CS asserted.
+thanx for your comments.
 
-So let's keep the spi alive when chip select is asserted.
-
-Also use pm_runtime_put instead of pm_runtime_put_sync.
-
-Suggested-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-
----
-
-Changes in v3:
-Store cs states in struct rockchip_spi, and use it to detect cs state
-instead of hw register.
-
-Changes in v2:
-Improve commit message and comments and coding style.
-
- drivers/spi/spi-rockchip.c | 51 +++++++++++++++++++++++-----------------------
- 1 file changed, 26 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 52ea160..0b4a52b 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -25,6 +25,11 @@
- 
- #define DRIVER_NAME "rockchip-spi"
- 
-+#define ROCKCHIP_SPI_CLR_BITS(reg, bits) \
-+		writel_relaxed(readl_relaxed(reg) & ~(bits), reg)
-+#define ROCKCHIP_SPI_SET_BITS(reg, bits) \
-+		writel_relaxed(readl_relaxed(reg) | (bits), reg)
-+
- /* SPI register offsets */
- #define ROCKCHIP_SPI_CTRLR0			0x0000
- #define ROCKCHIP_SPI_CTRLR1			0x0004
-@@ -149,6 +154,8 @@
-  */
- #define ROCKCHIP_SPI_MAX_TRANLEN		0xffff
- 
-+#define ROCKCHIP_SPI_MAX_CS_NUM			2
-+
- enum rockchip_ssi_type {
- 	SSI_MOTO_SPI = 0,
- 	SSI_TI_SSP,
-@@ -193,6 +200,8 @@ struct rockchip_spi {
- 	/* protect state */
- 	spinlock_t lock;
- 
-+	bool cs_asserted[ROCKCHIP_SPI_MAX_CS_NUM];
-+
- 	u32 use_dma;
- 	struct sg_table tx_sg;
- 	struct sg_table rx_sg;
-@@ -264,37 +273,29 @@ static inline u32 rx_max(struct rockchip_spi *rs)
- 
- static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
- {
--	u32 ser;
- 	struct spi_master *master = spi->master;
- 	struct rockchip_spi *rs = spi_master_get_devdata(master);
-+	bool cs_asserted = !enable;
- 
--	pm_runtime_get_sync(rs->dev);
-+	/* Return immediately for no-op */
-+	if (cs_asserted == rs->cs_asserted[spi->chip_select])
-+		return;
- 
--	ser = readl_relaxed(rs->regs + ROCKCHIP_SPI_SER) & SER_MASK;
-+	if (cs_asserted) {
-+		/* Keep things powered as long as CS is asserted */
-+		pm_runtime_get_sync(rs->dev);
- 
--	/*
--	 * drivers/spi/spi.c:
--	 * static void spi_set_cs(struct spi_device *spi, bool enable)
--	 * {
--	 *		if (spi->mode & SPI_CS_HIGH)
--	 *			enable = !enable;
--	 *
--	 *		if (spi->cs_gpio >= 0)
--	 *			gpio_set_value(spi->cs_gpio, !enable);
--	 *		else if (spi->master->set_cs)
--	 *		spi->master->set_cs(spi, !enable);
--	 * }
--	 *
--	 * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
--	 */
--	if (!enable)
--		ser |= 1 << spi->chip_select;
--	else
--		ser &= ~(1 << spi->chip_select);
-+		ROCKCHIP_SPI_SET_BITS(rs->regs + ROCKCHIP_SPI_SER,
-+				      BIT(spi->chip_select));
-+	} else {
-+		ROCKCHIP_SPI_CLR_BITS(rs->regs + ROCKCHIP_SPI_SER,
-+				      BIT(spi->chip_select));
- 
--	writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
-+		/* Drop reference from when we first asserted CS */
-+		pm_runtime_put(rs->dev);
-+	}
- 
--	pm_runtime_put_sync(rs->dev);
-+	rs->cs_asserted[spi->chip_select] = cs_asserted;
- }
- 
- static int rockchip_spi_prepare_message(struct spi_master *master,
-@@ -739,7 +740,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
- 	master->auto_runtime_pm = true;
- 	master->bus_num = pdev->id;
- 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP;
--	master->num_chipselect = 2;
-+	master->num_chipselect = ROCKCHIP_SPI_MAX_CS_NUM;
- 	master->dev.of_node = pdev->dev.of_node;
- 	master->bits_per_word_mask = SPI_BPW_MASK(16) | SPI_BPW_MASK(8);
- 
--- 
-2.1.4
+On 06/28/2017 03:27 AM, Doug Anderson wrote:
+> Hi,
+>
+> On Mon, Jun 26, 2017 at 7:20 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+>> The rockchip spi would stop driving pins when runtime suspended, which
+>> might break slave's xfer(for example cros_ec).
+>>
+>> Since we have pullups on those pins, we only need to care about the CS
+>> asserted case.
+>>
+>> So let's keep the spi alive when chip select is asserted for that.
+>>
+>> Also change use pm_runtime_put instead of pm_runtime_put_sync.
+>>
+>> Suggested-by: Doug Anderson <dianders@chromium.org>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>
+>> ---
+>>
+>> Changes in v2:
+>> Improve commit message and comments and coding style.
+>>
+>>   drivers/spi/spi-rockchip.c | 23 ++++++++++++++++++-----
+>>   1 file changed, 18 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+>> index acf31f3..ea0edd7 100644
+>> --- a/drivers/spi/spi-rockchip.c
+>> +++ b/drivers/spi/spi-rockchip.c
+>> @@ -264,7 +264,7 @@ static inline u32 rx_max(struct rockchip_spi *rs)
+>>
+>>   static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+>>   {
+>> -       u32 ser;
+>> +       u32 ser, new_ser;
+>>          struct spi_master *master = spi->master;
+>>          struct rockchip_spi *rs = spi_master_get_devdata(master);
+>>
+>> @@ -288,13 +288,26 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+>>           * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
+>>           */
+>>          if (!enable)
+>> -               ser |= 1 << spi->chip_select;
+>> +               new_ser = ser | BIT(spi->chip_select);
+>>          else
+>> -               ser &= ~(1 << spi->chip_select);
+>> +               new_ser = ser & ~BIT(spi->chip_select);
+>>
+>> -       writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
+>> +       if (new_ser != ser) {
+>
+> IMHO it's not a great idea to use the state of the hardware register
+> here.  Using the state of the hardware register probably works OK, but
+> it makes me just a little nervous.  If something happened to the state
+> of the register (someone used /dev/mem to tweak, or the peripherals
+> got reset, or ...) then you could end up with an unbalanced set of PM
+> Runtime calls.  I know none of those things are common, but it still
+> seems less than great to me.
+>
+> I'd rather we kept track in "struct rockchip_spi" whether we already
+> called pm_runtime_get_sync().  AKA the following (untested):
+>
+> bool cs_asserted = !enable;
+>
+> /* Return immediately for no-op */
+> if (cs_asserted == rs->cs_asserted)
+>    return;
+>
+> /* Keep things powered as long as CS is asserted */
+> if (cs_asserted) {
+>    pm_runtime_get_sync(rs->dev);
+>    rs->cs_asserted = true;
+> }
+>
+> ser = ...
+> ...
+> ...
+>
+> if (!cs_asserted)
+>    pm_runtime_put(rs->dev);
+>
+>
+> NOTE: another advantage of storing the state in 'struct rockchip_spi'
+> is that you can access it without pm_runtime_get_sync().
+>
+ok, that make sense :)
+>
+>> +               writel_relaxed(new_ser, rs->regs + ROCKCHIP_SPI_SER);
+>>
+>> -       pm_runtime_put_sync(rs->dev);
+>> +               /*
+>> +                * The rockchip spi would stop driving all pins when powered
+>> +                * down.
+>> +                * So hold a runtime PM reference as long as CS is asserted.
+>> +                */
+>> +               if (!enable)
+>> +                       return;
+>> +
+>> +               /* Drop reference from when we first asserted CS */
+>> +               pm_runtime_put(rs->dev);
+>> +       }
+>> +
+>> +       pm_runtime_put(rs->dev);
+>
+> One note is that you should still submit your patch to add
+> "SPI_MASTER_GPIO_SS" to spi-rockchip.c.  It's important that the SPI
+> driver see the CS transitions so that it can do the PM Runtime get/put
+> even when someone uses a GPIO chip select.  Even though the GPIO chip
+> select will keep state, we don't want the rest of the lines to stop
+> being driven.
+ok, will do.
+>
+>
+> -Doug
+>
+>
+>
