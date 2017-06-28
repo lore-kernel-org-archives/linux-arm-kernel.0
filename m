@@ -1,165 +1,106 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 28 Jun 2017 12:49:10 +0200
-Subject: [PATCH 4/4] arm64: dts: add RK3399-Q7 (Puma) SoM
-In-Reply-To: <3F2C0996-F298-4628-BCF3-DE721F3B818D@theobroma-systems.com>
-References: <20170626191854.58253-1-klaus.goger@theobroma-systems.com>
- <2336478.rsaXP0O2Er@diego>
- <3F2C0996-F298-4628-BCF3-DE721F3B818D@theobroma-systems.com>
-Message-ID: <3683842.NarJoYnXid@phil>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 28 Jun 2017 12:50:39 +0200
+Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
+In-Reply-To: <6F68CD33-70E6-47C1-9E89-5E2AA776879F@goldelico.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <1498143942-12682-2-git-send-email-hugues.fruchet@st.com>
+ <D5629236-95D8-45B6-9719-E8B9796FEC90@goldelico.com>
+ <64e3005d-31df-71f2-762b-2c1b1152fc2d@st.com>
+ <5cd25a47-f3be-8c40-3940-29f26a245076@kernel.org>
+ <39501C78-7B81-4803-94C1-25DFA06EA526@goldelico.com>
+ <e2a9df8b-00f8-ae36-f4f3-63dcc98dea50@kernel.org>
+ <CGME20170628091334epcas5p2071ae52aa3f9312b1099e37ffac20eb1@epcas5p2.samsung.com>
+ <6F68CD33-70E6-47C1-9E89-5E2AA776879F@goldelico.com>
+Message-ID: <5bcc7ec0-4ae5-3703-3cee-ed644eef710a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 28. Juni 2017, 12:40:01 CEST schrieb Dr. Philipp Tomsich:
+On 06/28/2017 11:12 AM, H. Nikolaus Schaller wrote:
+>> Am 28.06.2017 um 00:57 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+>> On 06/27/2017 07:48 AM, H. Nikolaus Schaller wrote:
+>>>> Am 26.06.2017 um 22:04 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
+>>>> On 06/26/2017 12:35 PM, Hugues FRUCHET wrote:
+>>>>>> What I am missing to support the GTA04 camera is the control of the optional "vana-supply".
+>>>>>> So the driver does not power up the camera module when needed and therefore probing fails.
+>>>>>>
+>>>>>>     - vana-supply: a regulator to power up the camera module.
+>>>>>>
+>>>>>> Driver code is not complex to add:
+>>>>
+>>>>> Yes, I saw it in your code, but as I don't have any programmable power
+>>>>> supply on my setup, I have not pushed this commit.
+>>>>
+>>>> Since you are about to add voltage supplies to the DT binding I'd suggest
+>>>> to include all three voltage supplies of the sensor chip. Looking at the OV9650
+>>>> and the OV9655 datasheet there are following names used for the voltage supply
+>>>> pins:
+>>>>
+>>>> AVDD - Analog power supply,
+>>>> DVDD - Power supply for digital core logic,
+>>>> DOVDD - Digital power supply for I/O.
+>>>
+>>> The latter two are usually not independently switchable from the SoC power
+>>> the module is connected to.
+>>>
+>>> And sometimes DVDD and DOVDD are connected together.
+>>>
+>>> So the driver can't make much use of knowing or requesting them because the
+>>> 1.8V supply is always active, even during suspend.
+>>>
+>>>>
+>>>> I doubt the sensor can work without any of these voltage supplies, thus
+>>>> regulator_get_optional() should not be used. I would just use the regulator
+>>>> bulk API to handle all three power supplies.
+>>>
+>>> The digital part works with AVDD turned off. So the LDO supplying AVDD should
+>>> be switchable to save power (&vaux3 on the GTA04 device).>
+>>> But not all designs can switch it off. Hence the idea to define it as an
+>>> /optional/ regulator. If it is not defined by DT, the driver simply assumes
+>>> it is always powered on.
+>>
+>> I didn't say we can't define regulator supply properties as optional in the DT
+>> binding.  If we define them as such and any of these *-supply properties is
+>> missing in DT with regulator_get() the regulator core will use dummy regulator
+>> for that particular voltage supply.  While with regulator_get_optional()
+>> -ENODEV is returned when the regulator cannot be found.
 > 
-> > On 28 Jun 2017, at 12:26, Heiko St?bner <heiko@sntech.de> wrote:
-> > 
-> > Hi Klaus,
-> > 
-> > [added Kever from Rockchip concerning the cluster1-opps below]
-> > 
-> > 
-> > Am Montag, 26. Juni 2017, 21:18:54 CEST schrieb Klaus Goger:
-> >> The RK3399-Q7 SoM is a Qseven-compatible (70mm x 70mm, MXM-230
-> >> connector) system-on-module from Theobroma Systems, featuring the
-> >> Rockchip RK3399.
-> >> 
-> >> It provides the following feature set:
-> >> * up to 4GB DDR3
-> >> * on-module SPI-NOR flash
-> >> * on-module eMMC (with 8-bit 1.8V interface)
-> >> * SD card (on a baseboad) via edge connector
-> >> * Gigabit Ethernet with on-module Micrel KSZ9031 GbE PHY
-> >> * HDMI/eDP/2x MIPI-DSI
-> >> * 2x MIPI-CSI
-> >> * USB
-> >>   - 1x USB 3.0 dual-role (direct connection)
-> >>   - 2x USB 3.0 host + 1x USB 2.0 (on-module USB 3.0 hub)
-> >> * on-module STM32 Cortex-M0 companion controller, implementing:
-> >>   - low-power RTC functionality (ISL1208 emulation)
-> >>   - fan controller (AMC6821 emulation)
-> >>   - USB<->CAN bridge controller
-> >> 
-> >> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
-> >> 
-> >> ---
-> > 
-> > [...]
-> > 
-> >> +	leds {
-> >> +		compatible = "gpio-leds";
-> >> +		pinctrl-names = "default";
-> >> +
-> >> +		module_led {
-> > 
-> > phandles use underscores, node names are supposed to use dashes "-"
-> > 
-> >> +			label = "module_led";
-> >> +			gpios = <&gpio2 RK_PD1 GPIO_ACTIVE_HIGH>;
-> >> +			linux,default-trigger = "heartbeat";
-> >> +			panic-indicator;
-> >> +		};
-> >> +
-> >> +		sd_card_led {
-> >> +			label = "sd_card_led";
-> >> +			gpios = <&gpio1 RK_PA2 GPIO_ACTIVE_HIGH>;
-> >> +			linux,default-trigger = "mmc0";
-> >> +		};
-> >> +	};
-> >> +
-> >> +	cluster1_opp: opp-table1 {
-> >> +		compatible = "operating-points-v2";
-> >> +		opp-shared;
-> >> +
-> >> +		opp00 {
-> >> +			opp-hz = /bits/ 64 <408000000>;
-> >> +			opp-microvolt = <800000>;
-> >> +			clock-latency-ns = <40000>;
-> >> +		};
-> >> +		opp01 {
-> >> +			opp-hz = /bits/ 64 <600000000>;
-> >> +			opp-microvolt = <800000>;
-> >> +		};
-> >> +		opp02 {
-> >> +			opp-hz = /bits/ 64 <816000000>;
-> >> +			opp-microvolt = <830000>;
-> > 
-> > this is 5mV higher than the "official" OPPs used by Rockchip, so
-> > I'd like to know its background :-) . Especially as I really would like
-> > to keep the number of per-board OPPs minimal.
+> Ah, ok. I see.
 > 
-> The on-board regulators differ and can?t hit the voltages specified
-> in the original OPP table? this is the next closest value we can
-> set and is at least what Rockchip uses in the ref-design.
+> I had thought that it is the right thing to do like devm_gpiod_get_optional().
 > 
-> > So does this make the board run more stable or something else?
-> > And might this be applicable for all "standard" rk3399 boards?
-> > Especially as other OPPs in your list use the regular voltages.
+> That one it is described as:
 > 
-> It avoids ugly issues with OPPs being deactivated due to the the
-> exact voltage used in the ?official? OPPs not being supported by
-> our regulator.
+> "* This is equivalent to gpiod_get(), except that when no GPIO was assigned to
+>   * the requested function it will return NULL. This is convenient for drivers
+>   * that need to handle optional GPIOs."
 > 
-> We decided against reusing the original OPP table and modifying it
-> (to use ranges) as that was likely to cause even more harm in the
-> long term.
+> Seems to be inconsistent definition of what "optional" means.
 
-ok, thanks for that explanation, which also satisfies my reservations :-) .
+Indeed, this commit explains it further:
 
-When fixing the other things, please also add a comment above opp-table
-with the above explanation, so future changers don't need to remember
-this mail thread :-) .
+commit de1dd9fd2156874b45803299b3b27e65d5defdd9
+regulator: core: Provide hints to the core about optional supplies
 
-Also, you might want to add something like
+> So we indeed should use devm_regulator_get() in this case. Thanks for > pointing out!
 
-/delete-node/ opp-table1;
-
-before defining your new opp table to prevent the subnode changes
-from interfering with your new table.
-
-
-> >> +			opp-suspend;
-> >> +		};
-> >> +		opp03 {
-> >> +			opp-hz = /bits/ 64 <1008000000>;
-> >> +			opp-microvolt = <880000>;
-> > 
-> > same as above
-> > 
-> >> +		};
-> >> +		opp04 {
-> >> +			opp-hz = /bits/ 64 <1200000000>;
-> >> +			opp-microvolt = <950000>;
-> >> +		};
-> >> +		opp05 {
-> >> +			opp-hz = /bits/ 64 <1416000000>;
-> >> +			opp-microvolt = <1030000>;
-> > 
-> > same as above
-> > 
-> >> +		};
-> >> +		opp06 {
-> >> +			opp-hz = /bits/ 64 <1608000000>;
-> >> +			opp-microvolt = <1100000>;
-> >> +		};
-> >> +		opp07 {
-> >> +			opp-hz = /bits/ 64 <1800000000>;
-> >> +			opp-microvolt = <1200000>;
-> >> +		};
-> >> +		opp08 {
-> >> +			opp-hz = /bits/ 64 <1992000000>;
-> >> +			opp-microvolt = <1230000>;
-> >> +			turbo-mode;
-> > 
-> > Is this part of the soc-spec or more like wishful thinking? :-)
-> > Again with the question in mind if this applies to all rk3399.
+>>> So in summary we only need AVDD switched for the GTA04 - but it does not
+>>> matter if the others are optional properties. We would not use them.
+>>>
+>>> It does matter if they are mandatory because it adds DT complexity (size
+>>> and processing) without added function.
+>>
+>> We should not be defining DT binding only with selected use cases/board
+>> designs in mind.  IMO all three voltage supplies should be listed in the
+>> binding, presumably all can be made optional, with an assumption that when
+>> the property is missing selected pin is hooked up to a fixed regulator.
 > 
-> Tested in our lab on a decent population of boards using various
-> forms of stress-testing (incl. a 6-way and 8-way SPEC).
-> 
-> This one is marked ?turbo-mode? as we do recommend to only
-> enable it if a (Qseven-style) heat-sink is mounted.
+> Ok, then it should just be defined in the bindings but not used by 
+> the driver?
 
-ok then.
+Yes, I think so. So we have a possibly complete binding right from the 
+beginning. I someone needs handling other supplies than AVDD they could
+update the driver in future.
 
 
-Heiko
+Regards,
+Sylwester
