@@ -1,89 +1,69 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:22 +0100
-Subject: [PATCH v2 03/52] irqchip/gic-v3: Add VLPI/DirectLPI discovery
+Date: Wed, 28 Jun 2017 16:03:23 +0100
+Subject: [PATCH v2 04/52] irqchip/gic-v3-its: Move LPI definitions around
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-4-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helper functions that probe for VLPI and DirectLPI properties.
+The various LPI definitions are in the middle of the code, and
+would be better placed at the beginning, given that we're going
+to use some of them much earlier.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c       | 22 ++++++++++++++++++++++
- include/linux/irqchip/arm-gic-v3.h |  3 +++
- 2 files changed, 25 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index bc58a4339a97..efbd998baa9c 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -504,6 +504,24 @@ static int gic_populate_rdist(void)
- 	return -ENODEV;
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 45ea193325d2..335bd21c6f41 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -49,6 +49,21 @@
+ #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+ 
+ /*
++ * We allocate 64kB for PROPBASE. That gives us@most 64K LPIs to
++ * deal with (one configuration byte per interrupt). PENDBASE has to
++ * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
++ */
++#define LPI_PROPBASE_SZ		SZ_64K
++#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
++
++/*
++ * This is how many bits of ID we need, including the useless ones.
++ */
++#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
++
++#define LPI_PROP_DEFAULT_PRIO	0xa0
++
++/*
+  * Collection structure - just an ID, and a redistributor address to
+  * ping. We use one per CPU as a bag of interrupts assigned to this
+  * CPU.
+@@ -785,20 +800,8 @@ static void its_lpi_free(struct event_lpi_map *map)
+ 	kfree(map->col_map);
  }
  
-+static int __gic_update_vlpi_properties(struct redist_region *region,
-+					void __iomem *ptr)
-+{
-+	u64 typer = gic_read_typer(ptr + GICR_TYPER);
-+	gic_data.rdists.has_vlpis &= !!(typer & GICR_TYPER_VLPIS);
-+	gic_data.rdists.has_direct_lpi &= !!(typer & GICR_TYPER_DirectLPIS);
-+
-+	return 1;
-+}
-+
-+static void gic_update_vlpi_properties(void)
-+{
-+	gic_iterate_rdists(__gic_update_vlpi_properties);
-+	pr_info("%sVLPI support, %sdirect LPI support\n",
-+		!gic_data.rdists.has_vlpis ? "no " : "",
-+		!gic_data.rdists.has_direct_lpi ? "no " : "");
-+}
-+
- static void gic_cpu_sys_reg_init(void)
+-/*
+- * We allocate 64kB for PROPBASE. That gives us at most 64K LPIs to
+- * deal with (one configuration byte per interrupt). PENDBASE has to
+- * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
+- */
+-#define LPI_PROPBASE_SZ		SZ_64K
+-#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
+ 
+-/*
+- * This is how many bits of ID we need, including the useless ones.
+- */
+-#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
+ 
+-#define LPI_PROP_DEFAULT_PRIO	0xa0
+ 
+ static int __init its_alloc_lpi_tables(void)
  {
- 	/*
-@@ -965,6 +983,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 	gic_data.domain = irq_domain_create_tree(handle, &gic_irq_domain_ops,
- 						 &gic_data);
- 	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
-+	gic_data.rdists.has_vlpis = true;
-+	gic_data.rdists.has_direct_lpi = true;
- 
- 	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
- 		err = -ENOMEM;
-@@ -973,6 +993,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 
- 	set_handle_irq(gic_handle_irq);
- 
-+	gic_update_vlpi_properties();
-+
- 	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
- 		its_init(handle, &gic_data.rdists, gic_data.domain);
- 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 6a1f87ff94e2..20a553423ac7 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -204,6 +204,7 @@
- 
- #define GICR_TYPER_PLPIS		(1U << 0)
- #define GICR_TYPER_VLPIS		(1U << 1)
-+#define GICR_TYPER_DirectLPIS		(1U << 3)
- #define GICR_TYPER_LAST			(1U << 4)
- 
- #define GIC_V3_REDIST_SIZE		0x20000
-@@ -487,6 +488,8 @@ struct rdists {
- 	struct page		*prop_page;
- 	int			id_bits;
- 	u64			flags;
-+	bool			has_vlpis;
-+	bool			has_direct_lpi;
- };
- 
- struct irq_domain;
 -- 
 2.11.0
