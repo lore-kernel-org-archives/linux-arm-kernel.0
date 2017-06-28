@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 Jun 2017 20:25:36 +0100
-Subject: Applied "spi: stm32: replace st, spi-midi with st,
- spi-midi-ns to fit bindings" to the spi tree
-In-Reply-To: <1498222550-19092-5-git-send-email-amelie.delaunay@st.com>
-Message-ID: <E1dQIam-0004eK-Tq@finisterre>
+Date: Wed, 28 Jun 2017 20:25:52 +0100
+Subject: Applied "spi: stm32: use SoC specific compatible" to the spi tree
+In-Reply-To: <1498222550-19092-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <E1dQIb2-0004hK-Sr@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: stm32: replace st, spi-midi with st, spi-midi-ns to fit bindings
+   spi: stm32: use SoC specific compatible
 
 has been applied to the spi tree at
 
@@ -34,33 +33,42 @@ to this mail.
 Thanks,
 Mark
 
->From 042c1c60df7b85488de28574e7917b7977be3b00 Mon Sep 17 00:00:00 2001
+>From 567300d11ef54f7779aa7324510fd4dbd470f73e Mon Sep 17 00:00:00 2001
 From: Amelie Delaunay <amelie.delaunay@st.com>
-Date: Tue, 27 Jun 2017 17:45:16 +0200
-Subject: [PATCH] spi: stm32: replace st, spi-midi with st, spi-midi-ns to fit
- bindings
+Date: Tue, 27 Jun 2017 17:45:13 +0200
+Subject: [PATCH] spi: stm32: use SoC specific compatible
 
-This patch fixes the optional dt property used to set master inter-data
-idleness.
+This patch replaces st,stm32-spi compatible with st,stm32h7-spi SoC
+specific compatible and updates the example accondingly.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-stm32.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/spi/spi-stm32.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
-index 1eb07bef043e..3df4baa68d63 100644
---- a/drivers/spi/spi-stm32.c
-+++ b/drivers/spi/spi-stm32.c
-@@ -582,7 +582,7 @@ static int stm32_spi_prepare_msg(struct spi_master *master,
+diff --git a/Documentation/devicetree/bindings/spi/spi-stm32.txt b/Documentation/devicetree/bindings/spi/spi-stm32.txt
+index 3958bf6e8b37..415378bca480 100644
+--- a/Documentation/devicetree/bindings/spi/spi-stm32.txt
++++ b/Documentation/devicetree/bindings/spi/spi-stm32.txt
+@@ -7,7 +7,7 @@ from 4 to 32-bit data size. Although it can be configured as master or slave,
+ only master is supported by the driver.
  
- 	/* SPI slave device may need time between data frames */
- 	spi->cur_midi = 0;
--	if (np && !of_property_read_u32(np, "st,spi-midi", &spi->cur_midi))
-+	if (np && !of_property_read_u32(np, "st,spi-midi-ns", &spi->cur_midi))
- 		dev_dbg(spi->dev, "%dns inter-data idleness\n", spi->cur_midi);
- 
- 	if (spi_dev->mode & SPI_CPOL)
+ Required properties:
+-- compatible: Must be "st,stm32-spi".
++- compatible: Must be "st,stm32h7-spi".
+ - reg: Offset and length of the device's register set.
+ - interrupts: Must contain the interrupt id.
+ - clocks: Must contain an entry for spiclk (which feeds the internal clock
+@@ -38,7 +38,7 @@ Example:
+ 	spi2: spi at 40003800 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "st,stm32-spi";
++		compatible = "st,stm32h7-spi";
+ 		reg = <0x40003800 0x400>;
+ 		interrupts = <36>;
+ 		clocks = <&rcc SPI2_CK>;
 -- 
 2.13.2
