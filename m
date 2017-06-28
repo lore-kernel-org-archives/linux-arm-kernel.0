@@ -1,562 +1,350 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Wed, 28 Jun 2017 20:52:24 +1000
-Subject: [PATCH v7] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
-Message-ID: <20170628105224.6619-1-net147@gmail.com>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 28 Jun 2017 12:40:01 +0200
+Subject: [PATCH 4/4] arm64: dts: add RK3399-Q7 (Puma) SoM
+In-Reply-To: <2336478.rsaXP0O2Er@diego>
+References: <20170626191854.58253-1-klaus.goger@theobroma-systems.com>
+ <20170626191854.58253-5-klaus.goger@theobroma-systems.com>
+ <2336478.rsaXP0O2Er@diego>
+Message-ID: <3F2C0996-F298-4628-BCF3-DE721F3B818D@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The documentation for drm_do_get_edid in drivers/gpu/drm/drm_edid.c states:
-"As in the general case the DDC bus is accessible by the kernel at the I2C
-level, drivers must make all reasonable efforts to expose it as an I2C
-adapter and use drm_get_edid() instead of abusing this function."
 
-Exposing the DDC bus as an I2C adapter is more beneficial as it can be used
-for purposes other than reading the EDID such as modifying the EDID or
-using the HDMI DDC pins as an I2C bus through the I2C dev interface from
-userspace (e.g. i2c-tools).
+> On 28 Jun 2017, at 12:26, Heiko St?bner <heiko@sntech.de> wrote:
+> 
+> Hi Klaus,
+> 
+> [added Kever from Rockchip concerning the cluster1-opps below]
+> 
+> 
+> Am Montag, 26. Juni 2017, 21:18:54 CEST schrieb Klaus Goger:
+>> The RK3399-Q7 SoM is a Qseven-compatible (70mm x 70mm, MXM-230
+>> connector) system-on-module from Theobroma Systems, featuring the
+>> Rockchip RK3399.
+>> 
+>> It provides the following feature set:
+>> * up to 4GB DDR3
+>> * on-module SPI-NOR flash
+>> * on-module eMMC (with 8-bit 1.8V interface)
+>> * SD card (on a baseboad) via edge connector
+>> * Gigabit Ethernet with on-module Micrel KSZ9031 GbE PHY
+>> * HDMI/eDP/2x MIPI-DSI
+>> * 2x MIPI-CSI
+>> * USB
+>>   - 1x USB 3.0 dual-role (direct connection)
+>>   - 2x USB 3.0 host + 1x USB 2.0 (on-module USB 3.0 hub)
+>> * on-module STM32 Cortex-M0 companion controller, implementing:
+>>   - low-power RTC functionality (ISL1208 emulation)
+>>   - fan controller (AMC6821 emulation)
+>>   - USB<->CAN bridge controller
+>> 
+>> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
+>> 
+>> ---
+> 
+> [...]
+> 
+>> +	leds {
+>> +		compatible = "gpio-leds";
+>> +		pinctrl-names = "default";
+>> +
+>> +		module_led {
+> 
+> phandles use underscores, node names are supposed to use dashes "-"
+> 
+>> +			label = "module_led";
+>> +			gpios = <&gpio2 RK_PD1 GPIO_ACTIVE_HIGH>;
+>> +			linux,default-trigger = "heartbeat";
+>> +			panic-indicator;
+>> +		};
+>> +
+>> +		sd_card_led {
+>> +			label = "sd_card_led";
+>> +			gpios = <&gpio1 RK_PA2 GPIO_ACTIVE_HIGH>;
+>> +			linux,default-trigger = "mmc0";
+>> +		};
+>> +	};
+>> +
+>> +	cluster1_opp: opp-table1 {
+>> +		compatible = "operating-points-v2";
+>> +		opp-shared;
+>> +
+>> +		opp00 {
+>> +			opp-hz = /bits/ 64 <408000000>;
+>> +			opp-microvolt = <800000>;
+>> +			clock-latency-ns = <40000>;
+>> +		};
+>> +		opp01 {
+>> +			opp-hz = /bits/ 64 <600000000>;
+>> +			opp-microvolt = <800000>;
+>> +		};
+>> +		opp02 {
+>> +			opp-hz = /bits/ 64 <816000000>;
+>> +			opp-microvolt = <830000>;
+> 
+> this is 5mV higher than the "official" OPPs used by Rockchip, so
+> I'd like to know its background :-) . Especially as I really would like
+> to keep the number of per-board OPPs minimal.
 
-Implement this for A10s.
+The on-board regulators differ and can?t hit the voltages specified
+in the original OPP table? this is the next closest value we can
+set and is at least what Rockchip uses in the ref-design.
 
-Signed-off-by: Jonathan Liu <net147@gmail.com>
----
-Changes for v7:
- - Fix mixed declarations and code compiler warning for level variable
+> So does this make the board run more stable or something else?
+> And might this be applicable for all "standard" rk3399 boards?
+> Especially as other OPPs in your list use the regular voltages.
 
-Changes for v6:
- - Use fixed byte time of 100 us instead of dynamically calculating from DDC
-   clock that is set to a fixed 100 MHz rate anyway
- - Change is_fifo_flag_unset to not read the status register as well to be
-   more consistent with is_err_status
+It avoids ugly issues with OPPs being deactivated due to the the
+exact voltage used in the ?official? OPPs not being supported by
+our regulator.
 
-Changes for v5:
- - Use devm_kzalloc instead of devm_kmemdup and remove const struct i2c_adapter
- - Rework to use readl_poll_timeout for checking FIFO status
+We decided against reusing the original OPP table and modifying it
+(to use ranges) as that was likely to cause even more harm in the
+long term.
 
-Changes for v4:
- - Carry over copyright from initial I2C code into sun4i_hdmi_i2c.c
- - Clean up indentation in sun4i_hdmi.h
- - Rename SUN4I_HDMI_DDC_MAX_TRANSFER_SIZE to SUN4I_HDMI_DDC_BYTE_COUNT_MAX
-   and group it under the SUN4I_HDMI_DDC_BYTE_COUNT_REG define, changing the
-   value to use the GENMASK macro to make it clear that it is derived from
-   the width of the field in the register
- - Fix SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_UNDERFLOW typo which should be
-   SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW
- - Remove redundant rewriting of SUN4I_HDMI_DDC_INT_STATUS_REG register
- - Change struct i2c_adapter to be const by using devm_kmemdup on creation
- - Return -ETIMEDOUT instead of -EIO if there is timeout while transferring an
-   I2C message
- - Instead of waiting for 1-2 bytes to transfer, wait for the time it would
-   take for remaining bytes to transfer (limited by FIFO size)
- - Add additional comments
+>> +			opp-suspend;
+>> +		};
+>> +		opp03 {
+>> +			opp-hz = /bits/ 64 <1008000000>;
+>> +			opp-microvolt = <880000>;
+> 
+> same as above
+> 
+>> +		};
+>> +		opp04 {
+>> +			opp-hz = /bits/ 64 <1200000000>;
+>> +			opp-microvolt = <950000>;
+>> +		};
+>> +		opp05 {
+>> +			opp-hz = /bits/ 64 <1416000000>;
+>> +			opp-microvolt = <1030000>;
+> 
+> same as above
+> 
+>> +		};
+>> +		opp06 {
+>> +			opp-hz = /bits/ 64 <1608000000>;
+>> +			opp-microvolt = <1100000>;
+>> +		};
+>> +		opp07 {
+>> +			opp-hz = /bits/ 64 <1800000000>;
+>> +			opp-microvolt = <1200000>;
+>> +		};
+>> +		opp08 {
+>> +			opp-hz = /bits/ 64 <1992000000>;
+>> +			opp-microvolt = <1230000>;
+>> +			turbo-mode;
+> 
+> Is this part of the soc-spec or more like wishful thinking? :-)
+> Again with the question in mind if this applies to all rk3399.
 
-Changes for v3:
- - Explain why drm_do_get_edid should be used and why it's better to expose it
-   as an I2C adapter in commit message
- - Reorder bit defines in descending order for consistency
- - Keep old unused macros instead of removing them
- - The v2 algorithm split large transfers into 16 byte transfers but this may
-   cause a large single write to be treated as multiple writes causing data
-   corruption. The algorithm has been reworked to not split larger transfers
-   and make more use of the FIFO to avoid this.
- - Moved the creation of the DDC clock from sun4i_hdmi_enc.c to
-   sun4i_hdmi_i2c.c
- - Reformatted code
- - Instead of masking bits that we don't want to check for errors, explicitly
-   check the error bits
- - Clear error bits at start of transfer in case of error from previous transfer
- - Poll for completion of FIFO clear after setting FIFO clear bit
+Tested in our lab on a decent population of boards using various
+forms of stress-testing (incl. a 6-way and 8-way SPEC).
 
-Changes for v2:
- - Rebased against Maxime's sunxi-drm/for-next branch
- - Fix up error paths in sun4i_hdmi_bind so that the I2C adapter is deleted if
-   any of the calls after the I2C adapter is created fails
- - Remove unnecessary includes in sun4i_hdmi_i2c.c
+This one is marked ?turbo-mode? as we do recommend to only
+enable it if a (Qseven-style) heat-sink is mounted.
 
- drivers/gpu/drm/sun4i/Makefile         |   1 +
- drivers/gpu/drm/sun4i/sun4i_hdmi.h     |  23 ++++
- drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 101 ++------------
- drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c | 234 +++++++++++++++++++++++++++++++++
- 4 files changed, 269 insertions(+), 90 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
-
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index e29fd3a2ba9c..43c753cafc88 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -2,6 +2,7 @@ sun4i-drm-y += sun4i_drv.o
- sun4i-drm-y += sun4i_framebuffer.o
- 
- sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
-+sun4i-drm-hdmi-y += sun4i_hdmi_i2c.o
- sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
- sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-index 2f2f2ff1ea63..eaff92fe236c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-@@ -96,6 +96,7 @@
- #define SUN4I_HDMI_DDC_CTRL_ENABLE		BIT(31)
- #define SUN4I_HDMI_DDC_CTRL_START_CMD		BIT(30)
- #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK	BIT(8)
-+#define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE	(1 << 8)
- #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ	(0 << 8)
- #define SUN4I_HDMI_DDC_CTRL_RESET		BIT(0)
- 
-@@ -105,14 +106,33 @@
- #define SUN4I_HDMI_DDC_ADDR_OFFSET(off)		(((off) & 0xff) << 8)
- #define SUN4I_HDMI_DDC_ADDR_SLAVE(addr)		((addr) & 0xff)
- 
-+#define SUN4I_HDMI_DDC_INT_STATUS_REG		0x50c
-+#define SUN4I_HDMI_DDC_INT_STATUS_ILLEGAL_FIFO_OPERATION	BIT(7)
-+#define SUN4I_HDMI_DDC_INT_STATUS_DDC_RX_FIFO_UNDERFLOW		BIT(6)
-+#define SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW		BIT(5)
-+#define SUN4I_HDMI_DDC_INT_STATUS_FIFO_REQUEST			BIT(4)
-+#define SUN4I_HDMI_DDC_INT_STATUS_ARBITRATION_ERROR		BIT(3)
-+#define SUN4I_HDMI_DDC_INT_STATUS_ACK_ERROR			BIT(2)
-+#define SUN4I_HDMI_DDC_INT_STATUS_BUS_ERROR			BIT(1)
-+#define SUN4I_HDMI_DDC_INT_STATUS_TRANSFER_COMPLETE		BIT(0)
-+
- #define SUN4I_HDMI_DDC_FIFO_CTRL_REG	0x510
- #define SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR		BIT(31)
- 
-+#define SUN4I_HDMI_DDC_FIFO_STATUS_REG	0x514
-+#define SUN4I_HDMI_DDC_FIFO_STATUS_FULL		BIT(6)
-+#define SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY	BIT(5)
-+#define SUN4I_HDMI_DDC_FIFO_STATUS_LEVEL_MASK	GENMASK(4, 0)
-+
- #define SUN4I_HDMI_DDC_FIFO_DATA_REG	0x518
-+
- #define SUN4I_HDMI_DDC_BYTE_COUNT_REG	0x51c
-+#define SUN4I_HDMI_DDC_BYTE_COUNT_MAX		GENMASK(9, 0)
- 
- #define SUN4I_HDMI_DDC_CMD_REG		0x520
- #define SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ	6
-+#define SUN4I_HDMI_DDC_CMD_IMPLICIT_READ	5
-+#define SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE	3
- 
- #define SUN4I_HDMI_DDC_CLK_REG		0x528
- #define SUN4I_HDMI_DDC_CLK_M(m)			(((m) & 0x7) << 3)
-@@ -146,6 +166,8 @@ struct sun4i_hdmi {
- 	struct clk		*ddc_clk;
- 	struct clk		*tmds_clk;
- 
-+	struct i2c_adapter	*i2c;
-+
- 	struct sun4i_drv	*drv;
- 
- 	bool			hdmi_monitor;
-@@ -153,5 +175,6 @@ struct sun4i_hdmi {
- 
- int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
- int sun4i_tmds_create(struct sun4i_hdmi *hdmi);
-+int sun4i_hdmi_i2c_create(struct device *dev, struct sun4i_hdmi *hdmi);
- 
- #endif /* _SUN4I_HDMI_H_ */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-index d3398f6250ef..b74607feb35c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-@@ -29,8 +29,6 @@
- #include "sun4i_hdmi.h"
- #include "sun4i_tcon.h"
- 
--#define DDC_SEGMENT_ADDR	0x30
--
- static inline struct sun4i_hdmi *
- drm_encoder_to_sun4i_hdmi(struct drm_encoder *encoder)
- {
-@@ -184,93 +182,13 @@ static const struct drm_encoder_funcs sun4i_hdmi_funcs = {
- 	.destroy	= drm_encoder_cleanup,
- };
- 
--static int sun4i_hdmi_read_sub_block(struct sun4i_hdmi *hdmi,
--				     unsigned int blk, unsigned int offset,
--				     u8 *buf, unsigned int count)
--{
--	unsigned long reg;
--	int i;
--
--	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--	reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
--	writel(reg | SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ,
--	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--
--	writel(SUN4I_HDMI_DDC_ADDR_SEGMENT(offset >> 8) |
--	       SUN4I_HDMI_DDC_ADDR_EDDC(DDC_SEGMENT_ADDR << 1) |
--	       SUN4I_HDMI_DDC_ADDR_OFFSET(offset) |
--	       SUN4I_HDMI_DDC_ADDR_SLAVE(DDC_ADDR),
--	       hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
--
--	reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
--	writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
--	       hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
--
--	writel(count, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
--	writel(SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ,
--	       hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
--
--	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--	writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
--	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--
--	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
--			       !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
--			       100, 100000))
--		return -EIO;
--
--	for (i = 0; i < count; i++)
--		buf[i] = readb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG);
--
--	return 0;
--}
--
--static int sun4i_hdmi_read_edid_block(void *data, u8 *buf, unsigned int blk,
--				      size_t length)
--{
--	struct sun4i_hdmi *hdmi = data;
--	int retry = 2, i;
--
--	do {
--		for (i = 0; i < length; i += SUN4I_HDMI_DDC_FIFO_SIZE) {
--			unsigned char offset = blk * EDID_LENGTH + i;
--			unsigned int count = min((unsigned int)SUN4I_HDMI_DDC_FIFO_SIZE,
--						 length - i);
--			int ret;
--
--			ret = sun4i_hdmi_read_sub_block(hdmi, blk, offset,
--							buf + i, count);
--			if (ret)
--				return ret;
--		}
--	} while (!drm_edid_block_valid(buf, blk, true, NULL) && (retry--));
--
--	return 0;
--}
--
- static int sun4i_hdmi_get_modes(struct drm_connector *connector)
- {
- 	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
--	unsigned long reg;
- 	struct edid *edid;
- 	int ret;
- 
--	/* Reset i2c controller */
--	writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
--	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
--			       !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
--			       100, 2000))
--		return -EIO;
--
--	writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
--	       SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
--	       hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
--
--	clk_prepare_enable(hdmi->ddc_clk);
--	clk_set_rate(hdmi->ddc_clk, 100000);
--
--	edid = drm_do_get_edid(connector, sun4i_hdmi_read_edid_block, hdmi);
-+	edid = drm_get_edid(connector, hdmi->i2c);
- 	if (!edid)
- 		return 0;
- 
-@@ -282,8 +200,6 @@ static int sun4i_hdmi_get_modes(struct drm_connector *connector)
- 	ret = drm_add_edid_modes(connector, edid);
- 	kfree(edid);
- 
--	clk_disable_unprepare(hdmi->ddc_clk);
--
- 	return ret;
- }
- 
-@@ -407,9 +323,9 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
- 		SUN4I_HDMI_PLL_CTRL_PLL_EN;
- 	writel(reg, hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
- 
--	ret = sun4i_ddc_create(hdmi, hdmi->tmds_clk);
-+	ret = sun4i_hdmi_i2c_create(dev, hdmi);
- 	if (ret) {
--		dev_err(dev, "Couldn't create the DDC clock\n");
-+		dev_err(dev, "Couldn't create the HDMI I2C adapter\n");
- 		return ret;
- 	}
- 
-@@ -422,13 +338,15 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
- 			       NULL);
- 	if (ret) {
- 		dev_err(dev, "Couldn't initialise the HDMI encoder\n");
--		return ret;
-+		goto err_del_i2c_adapter;
- 	}
- 
- 	hdmi->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm,
- 								  dev->of_node);
--	if (!hdmi->encoder.possible_crtcs)
--		return -EPROBE_DEFER;
-+	if (!hdmi->encoder.possible_crtcs) {
-+		ret = -EPROBE_DEFER;
-+		goto err_del_i2c_adapter;
-+	}
- 
- 	drm_connector_helper_add(&hdmi->connector,
- 				 &sun4i_hdmi_connector_helper_funcs);
-@@ -451,6 +369,8 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
- 
- err_cleanup_connector:
- 	drm_encoder_cleanup(&hdmi->encoder);
-+err_del_i2c_adapter:
-+	i2c_del_adapter(hdmi->i2c);
- 	return ret;
- }
- 
-@@ -461,6 +381,7 @@ static void sun4i_hdmi_unbind(struct device *dev, struct device *master,
- 
- 	drm_connector_cleanup(&hdmi->connector);
- 	drm_encoder_cleanup(&hdmi->encoder);
-+	i2c_del_adapter(hdmi->i2c);
- }
- 
- static const struct component_ops sun4i_hdmi_ops = {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
-new file mode 100644
-index 000000000000..ce954ee25ae4
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
-@@ -0,0 +1,234 @@
-+/*
-+ * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
-+ * Copyright (C) 2017 Jonathan Liu <net147@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/i2c.h>
-+#include <linux/iopoll.h>
-+#include <linux/ktime.h>
-+
-+#include "sun4i_hdmi.h"
-+
-+#define SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK ( \
-+	SUN4I_HDMI_DDC_INT_STATUS_ILLEGAL_FIFO_OPERATION | \
-+	SUN4I_HDMI_DDC_INT_STATUS_DDC_RX_FIFO_UNDERFLOW | \
-+	SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW | \
-+	SUN4I_HDMI_DDC_INT_STATUS_ARBITRATION_ERROR | \
-+	SUN4I_HDMI_DDC_INT_STATUS_ACK_ERROR | \
-+	SUN4I_HDMI_DDC_INT_STATUS_BUS_ERROR \
-+)
-+
-+static u32 read_fifo_status(struct sun4i_hdmi *hdmi)
-+{
-+	return readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG);
-+}
-+
-+static bool is_err_status(u32 int_status)
-+{
-+	return !!(int_status & SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK);
-+}
-+
-+static bool is_fifo_flag_unset(u32 fifo_status, u32 flag)
-+{
-+	return !(fifo_status & flag);
-+}
-+
-+static int fifo_transfer(struct sun4i_hdmi *hdmi, u8 *buf, int len, bool read)
-+{
-+	/*
-+	 * 1 byte takes 9 clock cycles (8 bits + 1 ACK) = 90 us for 100 MHz
-+	 * clock. As clock rate is fixed, just round it up to 100 us.
-+	 */
-+	const unsigned long byte_time_ns = 100;
-+	u32 int_status;
-+	u32 fifo_status;
-+	/* Read needs empty flag unset, write needs full flag unset */
-+	u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
-+			  SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
-+	int level;
-+	int ret;
-+
-+	/* Wait until error or FIFO ready */
-+	ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
-+				 int_status,
-+				 is_err_status(int_status) ||
-+				 is_fifo_flag_unset(fifo_status =
-+						    read_fifo_status(hdmi),
-+						    flag),
-+				 min(len, SUN4I_HDMI_DDC_FIFO_SIZE) *
-+				 byte_time_ns, 100000);
-+
-+	if (is_err_status(int_status))
-+		return -EIO;
-+	if (ret)
-+		return -ETIMEDOUT;
-+
-+	/* Read FIFO level */
-+	level = (int)(fifo_status & SUN4I_HDMI_DDC_FIFO_STATUS_LEVEL_MASK);
-+
-+	/* Limit transfer length using FIFO level to avoid underflow/overflow */
-+	len = min(len, read ? level : (SUN4I_HDMI_DDC_FIFO_SIZE - level));
-+
-+	if (read)
-+		readsb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
-+	else
-+		writesb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
-+
-+	return len;
-+}
-+
-+static int xfer_msg(struct sun4i_hdmi *hdmi, struct i2c_msg *msg)
-+{
-+	int i, len;
-+	u32 reg;
-+
-+	/* Clear errors */
-+	reg = readl(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
-+	reg &= ~SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK;
-+	writel(reg, hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
-+
-+	/* Set FIFO direction */
-+	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+	reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
-+	reg |= (msg->flags & I2C_M_RD) ?
-+	       SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ :
-+	       SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE;
-+	writel(reg, hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+
-+	/* Set I2C address */
-+	writel(SUN4I_HDMI_DDC_ADDR_SLAVE(msg->addr),
-+	       hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
-+
-+	/* Clear FIFO */
-+	reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
-+	writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
-+	       hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
-+	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG,
-+			       reg,
-+			       !(reg & SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR),
-+			       100, 100000))
-+		return -EIO;
-+
-+	/* Set transfer length */
-+	writel(msg->len, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
-+
-+	/* Set command */
-+	writel(msg->flags & I2C_M_RD ?
-+	       SUN4I_HDMI_DDC_CMD_IMPLICIT_READ :
-+	       SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE,
-+	       hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
-+
-+	/* Start command */
-+	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+	writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
-+	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+
-+	/* Transfer bytes */
-+	for (i = 0; i < msg->len; i += len) {
-+		len = fifo_transfer(hdmi, msg->buf + i, msg->len - i,
-+				    msg->flags & I2C_M_RD);
-+		if (len <= 0)
-+			return len;
-+	}
-+
-+	/* Wait for command to finish */
-+	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG,
-+			       reg,
-+			       !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
-+			       100, 100000))
-+		return -EIO;
-+
-+	/* Check for errors */
-+	reg = readl(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
-+	if ((reg & SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK) ||
-+	    !(reg & SUN4I_HDMI_DDC_INT_STATUS_TRANSFER_COMPLETE)) {
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static int sun4i_hdmi_i2c_xfer(struct i2c_adapter *adap,
-+			       struct i2c_msg *msgs, int num)
-+{
-+	struct sun4i_hdmi *hdmi = i2c_get_adapdata(adap);
-+	u32 reg;
-+	int err, i, ret = num;
-+
-+	for (i = 0; i < num; i++) {
-+		if (!msgs[i].len)
-+			return -EINVAL;
-+		if (msgs[i].len > SUN4I_HDMI_DDC_BYTE_COUNT_MAX)
-+			return -EINVAL;
-+	}
-+
-+	/* Reset I2C controller */
-+	writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
-+	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
-+			       !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
-+			       100, 2000))
-+		return -EIO;
-+
-+	writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
-+	       SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
-+	       hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
-+
-+	clk_prepare_enable(hdmi->ddc_clk);
-+	clk_set_rate(hdmi->ddc_clk, 100000);
-+
-+	for (i = 0; i < num; i++) {
-+		err = xfer_msg(hdmi, &msgs[i]);
-+		if (err) {
-+			ret = err;
-+			break;
-+		}
-+	}
-+
-+	clk_disable_unprepare(hdmi->ddc_clk);
-+	return ret;
-+}
-+
-+static u32 sun4i_hdmi_i2c_func(struct i2c_adapter *adap)
-+{
-+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
-+}
-+
-+static const struct i2c_algorithm sun4i_hdmi_i2c_algorithm = {
-+	.master_xfer	= sun4i_hdmi_i2c_xfer,
-+	.functionality	= sun4i_hdmi_i2c_func,
-+};
-+
-+int sun4i_hdmi_i2c_create(struct device *dev, struct sun4i_hdmi *hdmi)
-+{
-+	struct i2c_adapter *adap;
-+	int ret = 0;
-+
-+	ret = sun4i_ddc_create(hdmi, hdmi->tmds_clk);
-+	if (ret)
-+		return ret;
-+
-+	adap = devm_kzalloc(dev, sizeof(*adap), GFP_KERNEL);
-+	if (!adap)
-+		return -ENOMEM;
-+
-+	adap->owner = THIS_MODULE;
-+	adap->class = I2C_CLASS_DDC;
-+	adap->algo = &sun4i_hdmi_i2c_algorithm;
-+	strlcpy(adap->name, "sun4i_hdmi_i2c adapter", sizeof(adap->name));
-+	i2c_set_adapdata(adap, hdmi);
-+
-+	ret = i2c_add_adapter(adap);
-+	if (ret)
-+		return ret;
-+
-+	hdmi->i2c = adap;
-+
-+	return ret;
-+}
--- 
-2.13.1
+>> +		};
+>> +	};
+>> +
+>> +	clkin_gmac: external-gmac-clock {
+>> +		compatible = "fixed-clock";
+>> +		clock-frequency = <125000000>;
+>> +		clock-output-names = "clkin_gmac";
+>> +		#clock-cells = <0>;
+>> +	};
+>> +
+>> +	vcc3v3_sys: vcc3v3-sys {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc3v3_sys";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +	};
+>> +
+>> +	vcc5v0_otg: vcc5v0-otg-regulator {
+>> +		compatible = "regulator-fixed";
+>> +		enable-active-high;
+>> +		gpio = <&gpio0 RK_PA2 GPIO_ACTIVE_HIGH>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&otg_vbus_drv>;
+> 
+> gpio pinctrl names should generally follow the pin names
+> in schematics. For example on the rk3399-firefly it also
+> had a pinctrl named host_vbus_drv while the pin in the
+> schematics was named vcc5v0_host_en.
+> 
+> Following the schematic names makes it easier in the
+> long run to find and fix things as they occur.
+> 
+> This of course applies to all gpio-pinctrls in this dts.
+> 
+> 
+>> +		regulator-name = "vcc5v0_otg";
+>> +		regulator-always-on;
+>> +	};
+>> +
+>> +	vcc5v0_host: vcc5v0-host-regulator {
+>> +		compatible = "regulator-fixed";
+>> +		enable-active-high;
+>> +		gpio = <&gpio4 RK_PA3 GPIO_ACTIVE_HIGH>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&vcc5v0_host_en>;
+>> +		regulator-name = "vcc5v0_host";
+>> +		vin-supply = <&vcc5v0_sys>;
+>> +	};
+>> +
+>> +	vcc5v0_sys: vcc5v0-sys {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc5v0_sys";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +	};
+>> +
+>> +	vcc_phy: vcc-phy-regulator {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc_phy";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +	};
+> 
+> This looks suspiciously copy-pasted from a vendor devicetree.
+> The firefly used a similar "nonsense"-regulator which I fixed
+> together with other regulators in
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=12335ebaac8639a2745245e5d179f44f3c70fed1
+> 
+> Similar to other regulators above, which also follow naming I fixed
+> on the firefly. Regulators should generally follow the schematics
+> in their naming and also hierarchy.
+> 
+> (debugsfs/regulator/regulator_summary shows a nice graph of them)
+> 
+> This of course applies to all defined regulators.
+> 
+> If your regulator setup actually follows your own schematics then
+> nevermind this comment ;-) .
+> 
+> 
+>> +
+>> +	vdd_log: vdd-log {
+>> +		compatible = "pwm-regulator";
+>> +		pwms = <&pwm2 0 25000 0>;
+>> +		regulator-name = "vdd_log";
+>> +		regulator-min-microvolt = <800000>;
+>> +		regulator-max-microvolt = <1400000>;
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		status = "okay";
+>> +	};
+>> +};
+> 
+>> +&i2c0 {
+>> +	status = "okay";
+>> +	i2c-scl-rising-time-ns = <168>;
+>> +	i2c-scl-falling-time-ns = <4>;
+>> +	clock-frequency = <400000>;
+>> +
+>> +	vdd_gpu: fan535555 at 60 {
+> 
+> vdd_gpu: regulator at 60 {
+> 
+> node names should be generic (aka device category)
+> 
+>> +		compatible = "fcs,fan53555";
+>> +		reg = <0x60>;
+>> +		vsel-gpios = <&gpio1 RK_PB6 GPIO_ACTIVE_HIGH>;
+> 
+> not part of the binding right now. While it may be nice to teach
+> the fan53555 to handle the vsel gpio if it is controllable [similar to
+> how the rk808 can do this], this hasn't been implemented yet.
+> 
+> Also applies to vdd_cpu_b below.
+> 
+> 
+>> +		vin-supply = <&vcc5v0_sys>;
+>> +		regulator-compatible = "fan53555-reg";
+> 
+> deprecated property and not really needed.
+> 
+> 
+>> +		regulator-name = "vdd_gpu";
+>> +		regulator-min-microvolt = <600000>;
+>> +		regulator-max-microvolt = <1230000>;
+>> +		regulator-ramp-delay = <1000>;
+>> +		fcs,suspend-voltage-selector = <1>;
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +};
+> 
+> 
+> [...]
+> 
+>> +&pcie0 {
+>> +	ep-gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
+>> +	num-lanes = <4>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pcie_clkreqn>;
+>> +	status = "okay";
+> 
+> vpcie{3v3, 1v8, 0v9}-supply properties? 
+> 
+> 
+>> +};
+>> +
+> 
+> [...]
+> 
+>> +&sdmmc {
+>> +	clock-frequency = <150000000>;
+>> +	bus-width = <4>;
+>> +	cap-mmc-highspeed;
+>> +	cap-sd-highspeed;
+>> +	cd-gpios = <&gpio0 RK_PA7 GPIO_ACTIVE_LOW>;
+>> +	wp-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_LOW>;
+>> +	num-slots = <1>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_gpio &sdmmc_bus4>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +
+> 
+> double empty line
+> 
+> 
+>> +&spi1 {
+>> +	status = "okay";
+>> +
+>> +	flash: norflash at 0 {
+> 
+> norflash: flash at 0 maybe?
+> 
+> You reference the phandle and at the position it gets referenced
+> the specific name might be more helpful.
+> 
+> 
+>> +		compatible = "jedec,spi-nor";
+>> +		reg = <0>;
+>> +		spi-max-frequency = <50000000>;
+>> +	};
+>> +};
+> 
+> 
+> 
+>> +&pinctrl {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&puma_pin_hog>;
+>> +
+>> +	hog {
+>> +			puma_pin_hog: puma_pin_hog {
+> 
+> puma_pin_hog: puma-pin-hog
+> 
+> Same for more defined pinctrl nodes below that.
+> 
+> 
+> Heiko
