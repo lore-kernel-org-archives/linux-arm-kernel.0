@@ -1,96 +1,139 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 28 Jun 2017 11:12:38 +0200
-Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
-In-Reply-To: <e2a9df8b-00f8-ae36-f4f3-63dcc98dea50@kernel.org>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <1498143942-12682-2-git-send-email-hugues.fruchet@st.com>
- <D5629236-95D8-45B6-9719-E8B9796FEC90@goldelico.com>
- <64e3005d-31df-71f2-762b-2c1b1152fc2d@st.com>
- <5cd25a47-f3be-8c40-3940-29f26a245076@kernel.org>
- <39501C78-7B81-4803-94C1-25DFA06EA526@goldelico.com>
- <e2a9df8b-00f8-ae36-f4f3-63dcc98dea50@kernel.org>
-Message-ID: <6F68CD33-70E6-47C1-9E89-5E2AA776879F@goldelico.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 28 Jun 2017 10:16:57 +0100
+Subject: [PATCH 1/2] drivers: dma-mapping: allow dma_common_mmap() for NOMMU
+In-Reply-To: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
+References: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1498641418-3554-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently, internals of dma_common_mmap() is compiled out if build is
+done for either NOMMU or target which explicitly says it does not
+have/want coherent DMA mmap. It turned out that dma_common_mmap() can
+be handy in NOMMU setup (at least for ARM).
 
-> Am 28.06.2017 um 00:57 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
-> 
-> On 06/27/2017 07:48 AM, H. Nikolaus Schaller wrote:
->>> Am 26.06.2017 um 22:04 schrieb Sylwester Nawrocki <snawrocki@kernel.org>:
->>> 
->>> On 06/26/2017 12:35 PM, Hugues FRUCHET wrote:
->>>>> What I am missing to support the GTA04 camera is the control of the optional "vana-supply".
->>>>> So the driver does not power up the camera module when needed and therefore probing fails.
->>>>> 
->>>>>    - vana-supply: a regulator to power up the camera module.
->>>>> 
->>>>> Driver code is not complex to add:
->>> 
->>>> Yes, I saw it in your code, but as I don't have any programmable power
->>>> supply on my setup, I have not pushed this commit.
->>> 
->>> Since you are about to add voltage supplies to the DT binding I'd suggest
->>> to include all three voltage supplies of the sensor chip. Looking at the OV9650
->>> and the OV9655 datasheet there are following names used for the voltage supply
->>> pins:
->>> 
->>> AVDD - Analog power supply,
->>> DVDD - Power supply for digital core logic,
->>> DOVDD - Digital power supply for I/O.
->> 
->> The latter two are usually not independently switchable from the SoC power
->> the module is connected to.
->> 
->> And sometimes DVDD and DOVDD are connected together.
->> 
->> So the driver can't make much use of knowing or requesting them because the
->> 1.8V supply is always active, even during suspend.
->> 
->>> 
->>> I doubt the sensor can work without any of these voltage supplies, thus
->>> regulator_get_optional() should not be used. I would just use the regulator
->>> bulk API to handle all three power supplies.
->> 
->> The digital part works with AVDD turned off. So the LDO supplying AVDD should
->> be switchable to save power (&vaux3 on the GTA04 device).>
->> But not all designs can switch it off. Hence the idea to define it as an
->> /optional/ regulator. If it is not defined by DT, the driver simply assumes
->> it is always powered on.
-> 
-> I didn't say we can't define regulator supply properties as optional in the DT 
-> binding.  If we define them as such and any of these *-supply properties is 
-> missing in DT with regulator_get() the regulator core will use dummy regulator 
-> for that particular voltage supply.  While with regulator_get_optional() 
-> -ENODEV is returned when the regulator cannot be found. 
+This patch converts exitent NOMMU targets to use ARCH_NO_COHERENT_DMA_MMAP,
+thus when CONFIG_MMU is gone from dma_common_mmap() their behaviour stays
+unchanged.
 
-Ah, ok. I see.
+ARM is not converted to ARCH_NO_COHERENT_DMA_MMAP because it 1)
+already has mmap callback which can handle (at some extent) NOMMU 2)
+already defines dummy pgprot_noncached() for NOMMU build.
 
-I had thought that it is the right thing to do like devm_gpiod_get_optional().
+c6x and frv stay untouched since they already have ARCH_NO_COHERENT_DMA_MMAP.
 
-That one it is described as:
+Cc: Steven Miao <realmz6@gmail.com>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: Michal Simek <monstr@monstr.eu>
+Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+Cc: Rich Felker <dalias@libc.org>
+Cc: Chris Zankel <chris@zankel.net>
+Cc: Max Filippov <jcmvbkbc@gmail.com>
+Suggested-by: Christoph Hellwig <hch@lst.de>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/blackfin/Kconfig      | 1 +
+ arch/m32r/Kconfig          | 1 +
+ arch/m68k/Kconfig          | 1 +
+ arch/microblaze/Kconfig    | 1 +
+ arch/sh/Kconfig            | 1 +
+ arch/xtensa/Kconfig        | 1 +
+ drivers/base/dma-mapping.c | 4 ++--
+ 7 files changed, 8 insertions(+), 2 deletions(-)
 
-"* This is equivalent to gpiod_get(), except that when no GPIO was assigned to
- * the requested function it will return NULL. This is convenient for drivers
- * that need to handle optional GPIOs."
-
-Seems to be inconsistent definition of what "optional" means.
-
-So we indeed should use devm_regulator_get() in this case. Thanks for pointing out!
-
-> 
->> So in summary we only need AVDD switched for the GTA04 - but it does not
->> matter if the others are optional properties. We would not use them.
->> 
->> It does matter if they are mandatory because it adds DT complexity (size
->> and processing) without added function.
-> 
-> We should not be defining DT binding only with selected use cases/board
-> designs in mind.  IMO all three voltage supplies should be listed in the
-> binding, presumably all can be made optional, with an assumption that when
-> the property is missing selected pin is hooked up to a fixed regulator.
-
-Ok, then it should just be defined in the bindings but not used by the driver?
-
-BR and thanks,
-Nikolaus
+diff --git a/arch/blackfin/Kconfig b/arch/blackfin/Kconfig
+index 3c1bd64..89bdb82 100644
+--- a/arch/blackfin/Kconfig
++++ b/arch/blackfin/Kconfig
+@@ -41,6 +41,7 @@ config BLACKFIN
+ 	select MODULES_USE_ELF_RELA
+ 	select HAVE_DEBUG_STACKOVERFLOW
+ 	select HAVE_NMI
++	select ARCH_NO_COHERENT_DMA_MMAP
+ 
+ config GENERIC_CSUM
+ 	def_bool y
+diff --git a/arch/m32r/Kconfig b/arch/m32r/Kconfig
+index 9547446..87cde1e 100644
+--- a/arch/m32r/Kconfig
++++ b/arch/m32r/Kconfig
+@@ -19,6 +19,7 @@ config M32R
+ 	select HAVE_DEBUG_STACKOVERFLOW
+ 	select CPU_NO_EFFICIENT_FFS
+ 	select DMA_NOOP_OPS
++	select ARCH_NO_COHERENT_DMA_MMAP if !MMU
+ 
+ config SBUS
+ 	bool
+diff --git a/arch/m68k/Kconfig b/arch/m68k/Kconfig
+index d140206..5abb548 100644
+--- a/arch/m68k/Kconfig
++++ b/arch/m68k/Kconfig
+@@ -2,6 +2,7 @@ config M68K
+ 	bool
+ 	default y
+ 	select ARCH_MIGHT_HAVE_PC_PARPORT if ISA
++	select ARCH_NO_COHERENT_DMA_MMAP if !MMU
+ 	select HAVE_IDE
+ 	select HAVE_AOUT if MMU
+ 	select HAVE_DEBUG_BUGVERBOSE
+diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
+index 85885a5..8ba7b7c 100644
+--- a/arch/microblaze/Kconfig
++++ b/arch/microblaze/Kconfig
+@@ -2,6 +2,7 @@ config MICROBLAZE
+ 	def_bool y
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+ 	select ARCH_MIGHT_HAVE_PC_PARPORT
++	select ARCH_NO_COHERENT_DMA_MMAP if !MMU
+ 	select ARCH_WANT_IPC_PARSE_VERSION
+ 	select BUILDTIME_EXTABLE_SORT
+ 	select CLKSRC_OF
+diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+index ee08695..640a859 100644
+--- a/arch/sh/Kconfig
++++ b/arch/sh/Kconfig
+@@ -2,6 +2,7 @@ config SUPERH
+ 	def_bool y
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_MIGHT_HAVE_PC_PARPORT
++	select ARCH_NO_COHERENT_DMA_MMAP if !MMU
+ 	select HAVE_PATA_PLATFORM
+ 	select CLKDEV_LOOKUP
+ 	select HAVE_IDE if HAS_IOPORT_MAP
+diff --git a/arch/xtensa/Kconfig b/arch/xtensa/Kconfig
+index f4126cf..7ad6d77 100644
+--- a/arch/xtensa/Kconfig
++++ b/arch/xtensa/Kconfig
+@@ -3,6 +3,7 @@ config ZONE_DMA
+ 
+ config XTENSA
+ 	def_bool y
++	select ARCH_NO_COHERENT_DMA_MMAP if !MMU
+ 	select ARCH_WANT_FRAME_POINTERS
+ 	select ARCH_WANT_IPC_PARSE_VERSION
+ 	select BUILDTIME_EXTABLE_SORT
+diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+index 10e7c02..ce1e02b 100644
+--- a/drivers/base/dma-mapping.c
++++ b/drivers/base/dma-mapping.c
+@@ -227,7 +227,7 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+ 		    void *cpu_addr, dma_addr_t dma_addr, size_t size)
+ {
+ 	int ret = -ENXIO;
+-#if defined(CONFIG_MMU) && !defined(CONFIG_ARCH_NO_COHERENT_DMA_MMAP)
++#ifndef CONFIG_ARCH_NO_COHERENT_DMA_MMAP
+ 	unsigned long user_count = vma_pages(vma);
+ 	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
+@@ -244,7 +244,7 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+ 				      user_count << PAGE_SHIFT,
+ 				      vma->vm_page_prot);
+ 	}
+-#endif	/* CONFIG_MMU && !CONFIG_ARCH_NO_COHERENT_DMA_MMAP */
++#endif	/* !CONFIG_ARCH_NO_COHERENT_DMA_MMAP */
+ 
+ 	return ret;
+ }
+-- 
+2.0.0
