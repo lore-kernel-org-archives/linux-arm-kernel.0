@@ -1,72 +1,54 @@
-From: kgunda@codeaurora.org (kgunda at codeaurora.org)
-Date: Wed, 28 Jun 2017 12:28:50 +0530
-Subject: [PATCH] spmi: pmic-arb: Always allocate ppid_to_apid table
-In-Reply-To: <20170627021746.22445-1-sboyd@codeaurora.org>
-References: <20170627021746.22445-1-sboyd@codeaurora.org>
-Message-ID: <50b43f2e54cb0b2260a249ed07fe21ce@codeaurora.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 28 Jun 2017 09:30:58 +0200
+Subject: [RESEND PATCH v6 2/8] mfd: retu: Drop -mfd suffix from I2C device
+ ID name
+In-Reply-To: <20170619145423.w7zaeboy7iq2usmt@dell>
+References: <20170615184928.12007-1-javier@dowhile0.org>
+ <20170615184928.12007-3-javier@dowhile0.org>
+ <20170619145423.w7zaeboy7iq2usmt@dell>
+Message-ID: <CABxcv=nmP=JYmwCnRDzMS1BnFwfSNyRtyf8BdZLgGJUqqJCH3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-06-27 07:47, Stephen Boyd wrote:
-> After commit 7f1d4e58dabb ("spmi: pmic-arb: optimize table
-> lookups") we always need the ppid_to_apid table regardless of the
-> version of pmic arbiter we have. Otherwise, we will try to deref
-> the array when we don't allocate it on v2 hardware like the
-> msm8974 SoCs.
-> 
-> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> Cc: Kiran Gunda <kgunda@codeaurora.org>
-> Fixes: 7f1d4e58dabb ("spmi: pmic-arb: optimize table lookups")
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Kiran Gunda <kgunda@codeaurora.org>
-> ---
->  drivers/spmi/spmi-pmic-arb.c | 17 +++++++----------
->  1 file changed, 7 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/spmi/spmi-pmic-arb.c 
-> b/drivers/spmi/spmi-pmic-arb.c
-> index 2afe3597982e..f4b7a98a7913 100644
-> --- a/drivers/spmi/spmi-pmic-arb.c
-> +++ b/drivers/spmi/spmi-pmic-arb.c
-> @@ -134,7 +134,6 @@ struct apid_data {
->   * @spmic:		SPMI controller object
->   * @ver_ops:		version dependent operations.
->   * @ppid_to_apid	in-memory copy of PPID -> channel (APID) mapping 
-> table.
-> - *			v2 only.
->   */
->  struct spmi_pmic_arb {
->  	void __iomem		*rd_base;
-> @@ -1016,6 +1015,13 @@ static int spmi_pmic_arb_probe(struct
-> platform_device *pdev)
->  		goto err_put_ctrl;
->  	}
-> 
-> +	pa->ppid_to_apid = devm_kcalloc(&ctrl->dev, PMIC_ARB_MAX_PPID,
-> +					sizeof(*pa->ppid_to_apid), GFP_KERNEL);
-> +	if (!pa->ppid_to_apid) {
-> +		err = -ENOMEM;
-> +		goto err_put_ctrl;
-> +	}
-> +
->  	hw_ver = readl_relaxed(core + PMIC_ARB_VERSION);
-> 
->  	if (hw_ver < PMIC_ARB_VERSION_V2_MIN) {
-> @@ -1048,15 +1054,6 @@ static int spmi_pmic_arb_probe(struct
-> platform_device *pdev)
->  			err = PTR_ERR(pa->wr_base);
->  			goto err_put_ctrl;
->  		}
-> -
-> -		pa->ppid_to_apid = devm_kcalloc(&ctrl->dev,
-> -						PMIC_ARB_MAX_PPID,
-> -						sizeof(*pa->ppid_to_apid),
-> -						GFP_KERNEL);
-> -		if (!pa->ppid_to_apid) {
-> -			err = -ENOMEM;
-> -			goto err_put_ctrl;
-> -		}
->  	}
-> 
->  	dev_info(&ctrl->dev, "PMIC arbiter version %s (0x%x)\n",
-Thanks for the fix !
+Hello Lee,
+
+On Mon, Jun 19, 2017 at 4:54 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 15 Jun 2017, Javier Martinez Canillas wrote:
+>
+>> It's not correct to encode the subsystem in the I2C device name, so
+>> drop the -mfd suffix. To maintain bisect-ability, change driver and
+>> platform code / DTS users in the same patch.
+>>
+>> Suggested-by: Lee Jones <lee.jones@linaro.org>
+>> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
+>> Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
+>>
+>> ---
+>>
+>> Changes in v6:
+>> - Add Wolfram Sang's Reviewed-by tag.
+>>
+>> Changes in v5:
+>> - Add Rob Herring's Acked-by tag.
+>> - Add Aaro Koskinen's Acked-by tag.
+>> - Add Tony Lindgren's Acked-by tag.
+>>
+>> Changes in v4: None
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>  arch/arm/boot/dts/omap2420-n8x0-common.dtsi | 4 ++--
+>>  arch/arm/mach-omap1/board-nokia770.c        | 4 ++--
+>>  drivers/mfd/retu-mfd.c                      | 4 ++--
+>>  3 files changed, 6 insertions(+), 6 deletions(-)
+>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+
+Thanks for the ack, but the idea is you to take the whole series since
+the platform maintainers have already acked the patches :)
+
+Best regards,
+Javier
