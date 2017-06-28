@@ -1,259 +1,138 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Wed, 28 Jun 2017 10:36:51 +0530
-Subject: [Patch v5 04/12] [media] s5p-mfc: Support MFCv10.10 buffer
- requirements
-In-Reply-To: <CAP3TMiE=gCDJ3q8G1JKiziAdfd33ca59koRaOz3myz6M-KLbvA@mail.gmail.com>
-References: <CGME20170619052502epcas1p41e0ba072755ca63278f2d4cfdc03ed06@epcas1p4.samsung.com>
- <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <1497849055-26583-5-git-send-email-smitha.t@samsung.com>
- <CAP3TMiE=gCDJ3q8G1JKiziAdfd33ca59koRaOz3myz6M-KLbvA@mail.gmail.com>
-Message-ID: <1498626411.22203.13.camel@smitha-fedora>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 27 Jun 2017 22:30:10 -0700
+Subject: [PATCH v3 2/2] spi: rockchip: Disable Runtime PM when chip select
+ is asserted
+In-Reply-To: <1498624723-17332-2-git-send-email-jeffy.chen@rock-chips.com>
+References: <1498624723-17332-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1498624723-17332-2-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <CAD=FV=UzDHfTNJgs8vvbKGd0RpY__Q9V27aSQiR5ugv6ff5gfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-06-27 at 22:30 +0200, Kamil Debski wrote:
-> Hi,
-> 
-> Please find my comments inline.
-> 
-> On 19 June 2017 at 07:10, Smitha T Murthy <smitha.t@samsung.com> wrote:
-> > Aligning the luma_dpb_size, chroma_dpb_size, mv_size and me_buffer_size
-> > for MFCv10.10.
-> >
-> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> > ---
-> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h   | 19 +++++
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 95 +++++++++++++++++++------
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |  2 +
-> >  3 files changed, 95 insertions(+), 21 deletions(-)
-> >
-> > diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> > index 1ca09d6..3f0dab3 100644
-> > --- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> > +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> > @@ -32,5 +32,24 @@
-> >  #define MFC_VERSION_V10                0xA0
-> >  #define MFC_NUM_PORTS_V10      1
-> >
-> > +/* MFCv10 codec defines*/
-> > +#define S5P_FIMV_CODEC_HEVC_ENC         26
-> > +
-> > +/* Encoder buffer size for MFC v10.0 */
-> > +#define ENC_V100_BASE_SIZE(x, y) \
-> > +       (((x + 3) * (y + 3) * 8) \
-> > +       +  ((y * 64) + 1280) * DIV_ROUND_UP(x, 8))
-> > +
-> > +#define ENC_V100_H264_ME_SIZE(x, y) \
-> > +       (ENC_V100_BASE_SIZE(x, y) \
-> > +       + (DIV_ROUND_UP(x * y, 64) * 32))
-> > +
-> > +#define ENC_V100_MPEG4_ME_SIZE(x, y) \
-> > +       (ENC_V100_BASE_SIZE(x, y) \
-> > +       + (DIV_ROUND_UP(x * y, 128) * 16))
-> > +
-> > +#define ENC_V100_VP8_ME_SIZE(x, y) \
-> > +       ENC_V100_BASE_SIZE(x, y)
-> > +
-> >  #endif /*_REGS_MFC_V10_H*/
-> >
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > index f1a8c53..83ea733 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > @@ -64,6 +64,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >  {
-> >         struct s5p_mfc_dev *dev = ctx->dev;
-> >         unsigned int mb_width, mb_height;
-> > +       unsigned int lcu_width = 0, lcu_height = 0;
-> >         int ret;
-> >
-> >         mb_width = MB_WIDTH(ctx->img_width);
-> > @@ -74,7 +75,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >                           ctx->luma_size, ctx->chroma_size, ctx->mv_size);
-> >                 mfc_debug(2, "Totals bufs: %d\n", ctx->total_dpb_count);
-> >         } else if (ctx->type == MFCINST_ENCODER) {
-> > -               if (IS_MFCV8_PLUS(dev))
-> > +               if (IS_MFCV10(dev)) {IZE_V10  (15 * SZ_1K)
-> > +                       ctx->tmv_buffer_size = 0;
-> 
-> It would look much better to surround the above with braces, even
-> though it's only a single line.
-> 
-I will add the braces in the next version.
+Jeffy,
 
-> > +               } else if (IS_MFCV8_PLUS(dev))
-> >                         ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
-> >                         ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V8(mb_width, mb_height),
-> >                         S5P_FIMV_TMV_BUFFER_ALIGN_V6);
-> > @@ -82,13 +85,36 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >                         ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
-> >                         ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V6(mb_width, mb_height),
-> >                         S5P_FIMV_TMV_BUFFER_ALIGN_V6);
-> > -
-> > -               ctx->luma_dpb_size = ALIGN((mb_width * mb_height) *
-> > -                               S5P_FIMV_LUMA_MB_TO_PIXEL_V6,
-> > -                               S5P_FIMV_LUMA_DPB_BUFFER_ALIGN_V6);
-> > -               ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
-> > -                               S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
-> > -                               S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
-> > +               if (IS_MFCV10(dev)) {
-> > +                       lcu_width = enc_lcu_width(ctx->img_width);
-> > +                       lcu_height = enc_lcu_height(ctx->img_height);
-> > +                       if (ctx->codec_mode != S5P_FIMV_CODEC_HEVC_ENC) {
-> > +                               ctx->luma_dpb_size =
-> > +                                       ALIGN((mb_width * 16), 64)
-> > +                                       * ALIGN((mb_height * 16), 32)
-> > +                                               + 64;
-> > +                               ctx->chroma_dpb_size =
-> > +                                       ALIGN((mb_width * 16), 64)
-> > +                                                       * (mb_height * 8)
-> > +                                                       + 64;
-> > +                       } else {
-> > +                               ctx->luma_dpb_size =
-> > +                                       ALIGN((lcu_width * 32), 64)
-> > +                                       * ALIGN((lcu_height * 32), 32)
-> > +                                               + 64;
-> > +                               ctx->chroma_dpb_size =
-> > +                                       ALIGN((lcu_width * 32), 64)
-> > +                                                       * (lcu_height * 16)
-> > +                                                       + 64;
-> > +                       }
-> > +               } else {
-> > +                       ctx->luma_dpb_size = ALIGN((mb_width * mb_height) *
-> > +                                       S5P_FIMV_LUMA_MB_TO_PIXEL_V6,
-> > +                                       S5P_FIMV_LUMA_DPB_BUFFER_ALIGN_V6);
-> > +                       ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
-> > +                                       S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
-> > +                                       S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
-> > +               }
-> >                 if (IS_MFCV8_PLUS(dev))
-> >                         ctx->me_buffer_size = ALIGN(S5P_FIMV_ME_BUFFER_SIZE_V8(
-> >                                                 ctx->img_width, ctx->img_height,
-> > @@ -197,6 +223,8 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >         case S5P_MFC_CODEC_H264_ENC:
-> >                 if (IS_MFCV10(dev)) {
-> >                         mfc_debug(2, "Use min scratch buffer size\n");
-> > +                       ctx->me_buffer_size =
-> > +                       ALIGN(ENC_V100_H264_ME_SIZE(mb_width, mb_height), 16);
-> >                 } else if (IS_MFCV8_PLUS(dev))
-> >                         ctx->scratch_buf_size =
-> >                                 S5P_FIMV_SCRATCH_BUF_SIZE_H264_ENC_V8(
-> > @@ -219,6 +247,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >         case S5P_MFC_CODEC_H263_ENC:
-> >                 if (IS_MFCV10(dev)) {
-> >                         mfc_debug(2, "Use min scratch buffer size\n");
-> > +                       ctx->me_buffer_size =
-> > +                               ALIGN(ENC_V100_MPEG4_ME_SIZE(mb_width,
-> > +                                                       mb_height), 16);
-> >                 } else
-> >                         ctx->scratch_buf_size =
-> >                                 S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_ENC_V6(
-> > @@ -235,7 +266,10 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >         case S5P_MFC_CODEC_VP8_ENC:
-> >                 if (IS_MFCV10(dev)) {
-> >                         mfc_debug(2, "Use min scratch buffer size\n");
-> > -                       } else if (IS_MFCV8_PLUS(dev))
-> > +                       ctx->me_buffer_size =
-> > +                               ALIGN(ENC_V100_VP8_ME_SIZE(mb_width, mb_height),
-> > +                                               16);
-> > +               } else if (IS_MFCV8_PLUS(dev))
-> >                         ctx->scratch_buf_size =
-> >                                 S5P_FIMV_SCRATCH_BUF_SIZE_VP8_ENC_V8(
-> >                                         mb_width,
-> > @@ -393,13 +427,13 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
-> >
-> >         if (ctx->codec_mode == S5P_MFC_CODEC_H264_DEC ||
-> >                         ctx->codec_mode == S5P_MFC_CODEC_H264_MVC_DEC) {
-> > -               if (IS_MFCV10(dev))
-> > +               if (IS_MFCV10(dev)) {
-> >                         ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V10(ctx->img_width,
-> >                                         ctx->img_height);
-> > -               else
-> > +               } else {
-> >                         ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V6(ctx->img_width,
-> >                                         ctx->img_height);
-> > -               ctx->mv_size = ALIGN(ctx->mv_size, 16);
-> > +               }
-> >         } else {
-> >                 ctx->mv_size = 0;
-> >         }
-> > @@ -596,15 +630,34 @@ static int s5p_mfc_set_enc_ref_buffer_v6(struct s5p_mfc_ctx *ctx)
-> >
-> >         mfc_debug(2, "Buf1: %p (%d)\n", (void *)buf_addr1, buf_size1);
-> >
-> > -       for (i = 0; i < ctx->pb_count; i++) {
-> > -               writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
-> > -               buf_addr1 += ctx->luma_dpb_size;
-> > -               writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
-> > -               buf_addr1 += ctx->chroma_dpb_size;
-> > -               writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
-> > -               buf_addr1 += ctx->me_buffer_size;
-> > -               buf_size1 -= (ctx->luma_dpb_size + ctx->chroma_dpb_size +
-> > -                       ctx->me_buffer_size);
-> > +       if (IS_MFCV10(dev)) {
-> > +               /* start address of per buffer is aligned */
-> > +               for (i = 0; i < ctx->pb_count; i++) {
-> > +                       writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
-> > +                       buf_addr1 += ctx->luma_dpb_size;
-> > +                       buf_size1 -= ctx->luma_dpb_size;
-> > +               }
-> > +               for (i = 0; i < ctx->pb_count; i++) {
-> > +                       writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
-> > +                       buf_addr1 += ctx->chroma_dpb_size;
-> > +                       buf_size1 -= ctx->chroma_dpb_size;
-> > +               }
-> > +               for (i = 0; i < ctx->pb_count; i++) {
-> > +                       writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
-> > +                       buf_addr1 += ctx->me_buffer_size;
-> > +                       buf_size1 -= ctx->me_buffer_size;
-> > +               }
-> > +       } else {
-> > +               for (i = 0; i < ctx->pb_count; i++) {
-> > +                       writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
-> > +                       buf_addr1 += ctx->luma_dpb_size;
-> > +                       writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
-> > +                       buf_addr1 += ctx->chroma_dpb_size;
-> > +                       writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
-> > +                       buf_addr1 += ctx->me_buffer_size;
-> > +                       buf_size1 -= (ctx->luma_dpb_size + ctx->chroma_dpb_size
-> > +                                       + ctx->me_buffer_size);
-> > +               }
-> >         }
-> >
-> >         writel(buf_addr1, mfc_regs->e_scratch_buffer_addr);
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-> > index 021b8db..975bbc5 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-> > @@ -26,6 +26,8 @@
-> >                                         (((MB_HEIGHT(y)+1)/2)*2) * 64 + 128)
-> >  #define S5P_MFC_DEC_MV_SIZE_V10(x, y)  (MB_WIDTH(x) * \
-> >                                         (((MB_HEIGHT(y)+1)/2)*2) * 64 + 512)
-> > +#define enc_lcu_width(x_size)          DIV_ROUND_UP(x_size, 32)
-> > +#define enc_lcu_height(y_size)         DIV_ROUND_UP(y_size, 32)
-> 
-> Why is this in lower case? Maybe S5P_MFC_LCU_WIDTH/HEIGHT would be better?
-> 
-I will change the name to S5P_MFC_LCU_WIDTH and S5P_MFC_LCU_HEIGHT in
-the next patch series.
+On Tue, Jun 27, 2017 at 9:38 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> The rockchip spi would stop driving pins when runtime suspended, which
+> might break slave's xfer(for example cros_ec).
+>
+> Since we have pullups on those pins, we only need to care about this
+> when the CS asserted.
+>
+> So let's keep the spi alive when chip select is asserted.
+>
+> Also use pm_runtime_put instead of pm_runtime_put_sync.
+>
+> Suggested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>
+> ---
+>
+> Changes in v3:
+> Store cs states in struct rockchip_spi, and use it to detect cs state
+> instead of hw register.
+>
+> Changes in v2:
+> Improve commit message and comments and coding style.
+>
+>  drivers/spi/spi-rockchip.c | 51 +++++++++++++++++++++++-----------------------
+>  1 file changed, 26 insertions(+), 25 deletions(-)
+>
+> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+> index 52ea160..0b4a52b 100644
+> --- a/drivers/spi/spi-rockchip.c
+> +++ b/drivers/spi/spi-rockchip.c
+> @@ -25,6 +25,11 @@
+>
+>  #define DRIVER_NAME "rockchip-spi"
+>
+> +#define ROCKCHIP_SPI_CLR_BITS(reg, bits) \
+> +               writel_relaxed(readl_relaxed(reg) & ~(bits), reg)
+> +#define ROCKCHIP_SPI_SET_BITS(reg, bits) \
+> +               writel_relaxed(readl_relaxed(reg) | (bits), reg)
+> +
+>  /* SPI register offsets */
+>  #define ROCKCHIP_SPI_CTRLR0                    0x0000
+>  #define ROCKCHIP_SPI_CTRLR1                    0x0004
+> @@ -149,6 +154,8 @@
+>   */
+>  #define ROCKCHIP_SPI_MAX_TRANLEN               0xffff
+>
+> +#define ROCKCHIP_SPI_MAX_CS_NUM                        2
+> +
+>  enum rockchip_ssi_type {
+>         SSI_MOTO_SPI = 0,
+>         SSI_TI_SSP,
+> @@ -193,6 +200,8 @@ struct rockchip_spi {
+>         /* protect state */
+>         spinlock_t lock;
+>
+> +       bool cs_asserted[ROCKCHIP_SPI_MAX_CS_NUM];
+> +
+>         u32 use_dma;
+>         struct sg_table tx_sg;
+>         struct sg_table rx_sg;
+> @@ -264,37 +273,29 @@ static inline u32 rx_max(struct rockchip_spi *rs)
+>
+>  static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+>  {
+> -       u32 ser;
+>         struct spi_master *master = spi->master;
+>         struct rockchip_spi *rs = spi_master_get_devdata(master);
+> +       bool cs_asserted = !enable;
+>
+> -       pm_runtime_get_sync(rs->dev);
+> +       /* Return immediately for no-op */
+> +       if (cs_asserted == rs->cs_asserted[spi->chip_select])
+> +               return;
+>
+> -       ser = readl_relaxed(rs->regs + ROCKCHIP_SPI_SER) & SER_MASK;
+> +       if (cs_asserted) {
+> +               /* Keep things powered as long as CS is asserted */
+> +               pm_runtime_get_sync(rs->dev);
+>
+> -       /*
+> -        * drivers/spi/spi.c:
+> -        * static void spi_set_cs(struct spi_device *spi, bool enable)
+> -        * {
+> -        *              if (spi->mode & SPI_CS_HIGH)
+> -        *                      enable = !enable;
+> -        *
+> -        *              if (spi->cs_gpio >= 0)
+> -        *                      gpio_set_value(spi->cs_gpio, !enable);
+> -        *              else if (spi->master->set_cs)
+> -        *              spi->master->set_cs(spi, !enable);
+> -        * }
+> -        *
+> -        * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
+> -        */
+> -       if (!enable)
+> -               ser |= 1 << spi->chip_select;
+> -       else
+> -               ser &= ~(1 << spi->chip_select);
+> +               ROCKCHIP_SPI_SET_BITS(rs->regs + ROCKCHIP_SPI_SER,
+> +                                     BIT(spi->chip_select));
+> +       } else {
+> +               ROCKCHIP_SPI_CLR_BITS(rs->regs + ROCKCHIP_SPI_SER,
+> +                                     BIT(spi->chip_select));
+>
+> -       writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
+> +               /* Drop reference from when we first asserted CS */
+> +               pm_runtime_put(rs->dev);
+> +       }
+>
+> -       pm_runtime_put_sync(rs->dev);
+> +       rs->cs_asserted[spi->chip_select] = cs_asserted;
 
-> >
-> >  /* Definition */
-> >  #define ENC_MULTI_SLICE_MB_MAX         ((1 << 30) - 1)
-> > --
-> > 2.7.4
-> >
-> 
-> Apart from the above, it looks good to me.
-> 
-> Acked-by: Kamil Debski <kamil@wypas.org>
-> 
-> Best wishes,
-> Kamil Debski
-> 
-> 
-Thank you for the review.
+Looks great!
 
-Regards,
-Smitha
+>  }
+>
+>  static int rockchip_spi_prepare_message(struct spi_master *master,
+> @@ -739,7 +740,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+>         master->auto_runtime_pm = true;
+>         master->bus_num = pdev->id;
+>         master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP;
+> -       master->num_chipselect = 2;
+> +       master->num_chipselect = ROCKCHIP_SPI_MAX_CS_NUM;
+
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
