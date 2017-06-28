@@ -1,84 +1,80 @@
-From: kamil@wypas.org (Kamil Debski)
-Date: Wed, 28 Jun 2017 22:04:05 +0200
-Subject: [Patch v5 12/12] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <1497849055-26583-13-git-send-email-smitha.t@samsung.com>
-References: <CGME20170619052521epcas5p36a0bc384d10809dcfe775e6da87ed37b@epcas5p3.samsung.com>
- <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <1497849055-26583-13-git-send-email-smitha.t@samsung.com>
-Message-ID: <CAP3TMiG4PtiqeHhCGkHhdX_uvOhPKd=gTyckczyFKDJwnGfwYA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Jun 2017 22:07:34 +0200
+Subject: [PATCH] rtc: brcmstb-waketimer: fix settime function
+Message-ID: <20170628200839.3114345-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+gcc warns about an unused variable in the new driver:
 
-Please find my comments inline.
+drivers/rtc/rtc-brcmstb-waketimer.c: In function 'brcmstb_waketmr_settime':
+drivers/rtc/rtc-brcmstb-waketimer.c:142:6: error: unused variable 'ret' [-Werror=unused-variable]
 
-On 19 June 2017 at 07:10, Smitha T Murthy <smitha.t@samsung.com> wrote:
-> Added V4l2 controls for HEVC encoder
->
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> ---
->  Documentation/media/uapi/v4l/extended-controls.rst | 364 +++++++++++++++++++++
->  1 file changed, 364 insertions(+)
->
-> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-> index abb1057..7767c70 100644
-> --- a/Documentation/media/uapi/v4l/extended-controls.rst
-> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
-> @@ -1960,6 +1960,370 @@ enum v4l2_vp8_golden_frame_sel -
->      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
->
->
+The same function also doesn't handle overflow correctly, this makes
+it return -EINVAL when passed a time that doesn't fit within the
+range of the register.
 
-[snip]
+Fixes: 9f4ad359c801 ("rtc: brcmstb-waketimer: Add Broadcom STB wake-timer")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/rtc/rtc-brcmstb-waketimer.c | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
 
-> +
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER (integer)``
-> +    Selects the hierarchical coding layer. In normal encoding
-> +    (non-hierarchial coding), it should be zero. Possible values are 0 ~ 6.
-> +    0 indicates HIERARCHICAL CODING LAYER 0, 1 indicates HIERARCHICAL CODING
-> +    LAYER 1 and so on.
-
-I would like the above to be more consistent. If HIER is in the name
-then HIER in the description should be used as well. Aside from that,
-I would recommend using full HIERARCHICAL instead of HIER in the name
-of the control. Why? Because it is HIERARCHICAL in controls already
-present in V4L2, such as
-V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_QP.
-
-[snip]
-
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_LF (boolean)``
-> +    Indicates loop filtering. Control value 1 indicates loop filtering
-> +    is enabled and when set to 0 indicates loop filtering is disabled.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY (boolean)``
-> +    Selects whether to apply the loop filter across the slice boundary or not.
-> +    If the value is 0, loop filter will not be applied across the slice boundary.
-> +    If the value is 1, loop filter will be applied across the slice boundary.
-
-Just a thought. Pretty much the same fucntionality is achieved via the
-V4L2_CID_MPEG_VIDEO_H264_LOOP_FILTER_MODE control. It's an enum having
-three states: enabled, disabled and disabled at slice boundary. Maybe
-a single control could be introduced? With another legacy define for
-API compatibility. Also, I don't like that controls are not consistent
-between H264 and HEVC. I would opt for the enum option.
-
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2 (integer)``
-> +    Selects HEVC loop filter beta offset. The valid range is [-6, +6].
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2 (integer)``
-> +    Selects HEVC loop filter tc offset. The valid range is [-6, +6].
-> +
-> +.. _v4l2-hevc-refresh-type:
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE``
-> +    (enum)
-> +
-[snip]
-
-Best wishes,
-Kamil
+diff --git a/drivers/rtc/rtc-brcmstb-waketimer.c b/drivers/rtc/rtc-brcmstb-waketimer.c
+index 5dea6d0627d8..796ac792a381 100644
+--- a/drivers/rtc/rtc-brcmstb-waketimer.c
++++ b/drivers/rtc/rtc-brcmstb-waketimer.c
+@@ -138,10 +138,12 @@ static int brcmstb_waketmr_settime(struct device *dev,
+ 				   struct rtc_time *tm)
+ {
+ 	struct brcmstb_waketmr *timer = dev_get_drvdata(dev);
+-	unsigned long sec;
+-	int ret;
++	time64_t sec;
++
++	sec = rtc_tm_to_time64(tm);
+ 
+-	rtc_tm_to_time(tm, &sec);
++	if (sec > U32_MAX || sec < 0)
++		return -EINVAL;
+ 
+ 	writel_relaxed(sec, timer->base + BRCMSTB_WKTMR_COUNTER);
+ 
+@@ -152,14 +154,14 @@ static int brcmstb_waketmr_getalarm(struct device *dev,
+ 				    struct rtc_wkalrm *alarm)
+ {
+ 	struct brcmstb_waketmr *timer = dev_get_drvdata(dev);
+-	unsigned long sec;
++	time64_t sec;
+ 	u32 reg;
+ 
+ 	sec = readl_relaxed(timer->base + BRCMSTB_WKTMR_ALARM);
+ 	if (sec != 0) {
+ 		/* Alarm is enabled */
+ 		alarm->enabled = 1;
+-		rtc_time_to_tm(sec, &alarm->time);
++		rtc_time64_to_tm(sec, &alarm->time);
+ 	}
+ 
+ 	reg = readl_relaxed(timer->base + BRCMSTB_WKTMR_EVENT);
+@@ -172,13 +174,16 @@ static int brcmstb_waketmr_setalarm(struct device *dev,
+ 				     struct rtc_wkalrm *alarm)
+ {
+ 	struct brcmstb_waketmr *timer = dev_get_drvdata(dev);
+-	unsigned long sec;
++	time64_t sec;
+ 
+ 	if (alarm->enabled)
+-		rtc_tm_to_time(&alarm->time, &sec);
++		sec = rtc_tm_to_time64(&alarm->time);
+ 	else
+ 		sec = 0;
+ 
++	if (sec > U32_MAX || sec < 0)
++		return -EINVAL;
++
+ 	brcmstb_waketmr_set_alarm(timer, sec);
+ 
+ 	return 0;
+-- 
+2.9.0
