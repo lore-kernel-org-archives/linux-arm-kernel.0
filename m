@@ -1,67 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 28 Jun 2017 13:10:13 -0500
-Subject: [PATCH 14/20] dt-bindings: serial: document option wake-up
- interrupt for STM32 USART
-In-Reply-To: <1498481318-1894-15-git-send-email-bich.hemon@st.com>
-References: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
- <1498481318-1894-15-git-send-email-bich.hemon@st.com>
-Message-ID: <20170628181013.pv2f7acbckgnsnhg@rob-hp-laptop>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 Jun 2017 19:12:05 +0100
+Subject: [PATCH v13 05/14] ASoC: sun4i-codec: Merge
+ sun4i_codec_left_mixer_controls and sun4i_codec_right_mixer_controls into
+ sun4i_codec_mixer_controls.
+In-Reply-To: <CAGb2v64i_S5HCsLHJGg0WbkFodOFFc5masUYQ53JaLTO7N2BMw@mail.gmail.com>
+References: <20170624062419.23778-1-dannym@scratchpost.org>
+ <20170624062419.23778-6-dannym@scratchpost.org>
+ <CAGb2v64i_S5HCsLHJGg0WbkFodOFFc5masUYQ53JaLTO7N2BMw@mail.gmail.com>
+Message-ID: <20170628181205.sfagsnuqmfrqhoen@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 12:49:15PM +0000, Bich HEMON wrote:
-> From: Bich Hemon <bich.hemon@st.com>
-> 
-> Introduce new compatibles for "st,stm32h7-usart" and "st,stm32h7-uart".
-> This new compatible allow to use optional wake-up interrupt.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  .../devicetree/bindings/serial/st,stm32-usart.txt    | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-> index a229b14..3b42138 100644
-> --- a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-> +++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-> @@ -2,11 +2,14 @@
->  
->  Required properties:
->  - compatible: Can be either "st,stm32-usart", "st,stm32-uart",
-> -"st,stm32f7-usart" or "st,stm32f7-uart" depending on whether
-> -the device supports synchronous mode and is compatible with
-> -stm32(f4) or stm32f7.
-> +"st,stm32f7-usart", "st,stm32f7-uart", "st,stm32h7-usart" or
-> +st,stm32h7-uart depending on whether the device supports synchronous
-> +mode and is compatible with stm32(f4), stm32f7 or stm32h7.
+On Mon, Jun 26, 2017 at 09:48:59AM +0800, Chen-Yu Tsai wrote:
+> On Sat, Jun 24, 2017 at 2:24 PM, Danny Milosavljevic
 
-Please reformat as 1 valid set of compatibles per line.
+> > +static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
+> > +       SOC_DAPM_DOUBLE("DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+> > +                       SUN4I_CODEC_DAC_ACTL_LDACLMIXS,
+> >                         SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),
 
->  - reg: The address and length of the peripheral registers space
-> -- interrupts: The interrupt line of the USART instance
-> +- interrupts or interrupts-extended: Must contain first, the interrupt
-> +  line specifier for the USART instance. An optional wake-up interrupt
-> +  specifier can be added. Then, -extended variant may be needed to specify
-> +  interrupts parent controllers.
+> This changes the mixer control names exposed to userspace. While I think
+> consolidating mixer controls is nice, giving the user a less cluttered
+> view, I'm not sure about the changing a possible userspace ABI.
 
-Just describe the interrupts property and what the interrupts are. 
-interrupts-extended is implied if it is necessary.
+> Maxime, ALSA and ASoC people, any comments about this?
 
->  - clocks: The input clock of the USART instance
->  
->  Optional properties:
-> @@ -53,3 +56,12 @@ usart1: serial at 40011000 {
->  	       <&dma2 7 4 0x414 0x0>;
->  	dma-names = "rx", "tx";
->  };
-> +
-> +uart4: serial at 40010000 {
-> +	compatible = "st,stm32h7-uart";
-> +	reg = <0x40010000 0x400>;
-> +	interrupts-extended = <&intc GIC_SPI 52 IRQ_TYPE_NONE>,
-> +			      <&aiec 30 1>;
-> +	clocks = <&rcc UART4_K>;
-> +	status = "disabled";
-> +};
-> -- 
-> 1.9.1
+It's better not to change things but on the other hand it really depends
+if there's any users who will notice - if nobody notices it doesn't
+matter.
+
+Can we *please* get some review of the rest of this series?  It's
+enormous, we're on version *13* and the first review on this version
+here is on patch 5.  If the first four patches are fine then please says
+so, if they're not then let's have some review comments so things can
+move towards merging them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170628/8c305584/attachment.sig>
