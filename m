@@ -1,93 +1,171 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 28 Jun 2017 15:56:38 +0530
-Subject: [RFC 5/5] drivers: Code to test boot constraints
+Date: Wed, 28 Jun 2017 15:56:37 +0530
+Subject: [RFC 4/5] drivers: boot_constraint: Add debugfs support
 In-Reply-To: <cover.1498642745.git.viresh.kumar@linaro.org>
 References: <cover.1498642745.git.viresh.kumar@linaro.org>
-Message-ID: <f87b40d4607e2d4169fdaba117cb76cac733e0d0.1498642745.git.viresh.kumar@linaro.org>
+Message-ID: <58dbcc2e397fc679af814a9752efa1829885d7f3.1498642745.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NOT FOR MERGE
+This patch adds debugfs support for boot constraints. This is how it
+looks for a "vmmc-supply" constraint for the MMC device.
 
-This is test code to show how this is tested for now on the hikey
-platform with the MMC device.
+$ ls -R /sys/kernel/debug/boot_constraints/
+/sys/kernel/debug/boot_constraints/:
+f723d000.dwmmc0
 
-Not-signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0:
+supply-vmmc
+
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmc:
+enable  u_volt_max  u_volt_min
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/base/Makefile                    |  2 +-
- drivers/base/test_plat_boot_constraint.c | 51 ++++++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+), 1 deletion(-)
- create mode 100644 drivers/base/test_plat_boot_constraint.c
+ drivers/base/boot_constraint.c | 83 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
 
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 6094b3b75184..a1ffa9f1a0b6 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -5,7 +5,7 @@ obj-y			:= component.o core.o bus.o dd.o syscore.o \
- 			   cpu.o firmware.o init.o map.o devres.o \
- 			   attribute_container.o transport_class.o \
- 			   topology.o container.o property.o cacheinfo.o
--obj-$(CONFIG_BOOT_CONSTRAINTS) += boot_constraint.o
-+obj-$(CONFIG_BOOT_CONSTRAINTS) += boot_constraint.o test_plat_boot_constraint.o
- obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
- obj-$(CONFIG_DMA_CMA) += dma-contiguous.o
- obj-y			+= power/
-diff --git a/drivers/base/test_plat_boot_constraint.c b/drivers/base/test_plat_boot_constraint.c
-new file mode 100644
-index 000000000000..498f87056409
---- /dev/null
-+++ b/drivers/base/test_plat_boot_constraint.c
-@@ -0,0 +1,51 @@
-+#include <linux/boot_constraint.h>
-+#include <linux/device.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
+diff --git a/drivers/base/boot_constraint.c b/drivers/base/boot_constraint.c
+index ab766d60191a..ff1c63b34458 100644
+--- a/drivers/base/boot_constraint.c
++++ b/drivers/base/boot_constraint.c
+@@ -10,6 +10,7 @@
+ #define pr_fmt(fmt) "Boot Constraints: " fmt
+ 
+ #include <linux/boot_constraint.h>
++#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
+ #include <linux/export.h>
+@@ -22,6 +23,7 @@ struct constraint {
+ 	struct constraint_dev *cdev;
+ 	struct list_head node;
+ 	enum boot_constraint_type type;
++	struct dentry *dentry;
+ 
+ 	int (*add)(struct constraint *constraint, void *data);
+ 	void (*remove)(struct constraint *constraint);
+@@ -32,6 +34,7 @@ struct constraint_dev {
+ 	struct device *dev;
+ 	struct list_head node;
+ 	struct list_head constraints;
++	struct dentry *dentry;
+ };
+ 
+ #define for_each_constraint(_constraint, _temp, _cdev)		\
+@@ -57,6 +60,71 @@ static int __init constraints_disable(char *str)
+ early_param("boot_constraints_disable", constraints_disable);
+ 
+ 
++/* Debugfs */
 +
-+static int test_constraints_probe(struct platform_device *platform_dev)
++static struct dentry *rootdir;
++
++static void constraint_device_add_debugfs(struct constraint_dev *cdev)
 +{
-+	struct device_node *np;
-+	struct boot_constraint_supply_info info = {
-+		.enable = true,
-+		.name = "vmmc",
-+		.u_volt_min = 1800000,
-+		.u_volt_max = 3000000,
-+	};
-+	struct platform_device *pdev;
-+	int ret;
++	struct device *dev = cdev->dev;
 +
-+	np = of_find_compatible_node(NULL, NULL, "hisilicon,hi6220-dw-mshc");
-+	if (!np)
-+		return -ENODEV;
++	cdev->dentry = debugfs_create_dir(dev_name(dev), rootdir);
++	if (!cdev->dentry)
++		dev_err(dev, "Failed to create constraint dev debugfs dir\n");
++}
 +
-+	pdev = of_find_device_by_node(np);
-+	of_node_put(np);
++static void constraint_device_remove_debugfs(struct constraint_dev *cdev)
++{
++	debugfs_remove_recursive(cdev->dentry);
++}
 +
-+	if (!pdev) {
-+		pr_err("%s: device not found\n", __func__);
-+		return -ENODEV;
++static void constraint_add_debugfs(struct constraint *constraint,
++				   const char *suffix)
++{
++	struct device *dev = constraint->cdev->dev;
++	const char *prefix;
++	char name[NAME_MAX];
++
++	switch (constraint->type) {
++	case BOOT_CONSTRAINT_SUPPLY:
++		prefix = "supply";
++		break;
++	default:
++		dev_err(dev, "%s: Constraint type (%d) not supported\n",
++			__func__, constraint->type);
++		return;
 +	}
 +
-+	ret = boot_constraint_add(&pdev->dev, BOOT_CONSTRAINT_SUPPLY, &info);
-+	if (ret)
-+		return ret;
++	snprintf(name, NAME_MAX, "%s-%s", prefix, suffix);
 +
-+	return ret;
++	constraint->dentry = debugfs_create_dir(name, constraint->cdev->dentry);
++	if (!constraint->dentry)
++		dev_err(dev, "Failed to create constraint (%s) debugfs dir\n",
++			name);
 +}
 +
-+static struct platform_driver test_constraints_driver = {
-+	.driver = {
-+		.name	= "test-constraints",
-+	},
-+	.probe	= test_constraints_probe,
-+};
-+
-+static int __init test_constraints_init(void)
++static void constraint_remove_debugfs(struct constraint *constraint)
 +{
-+	platform_device_register_data(NULL, "test-constraints", -1, NULL, 0);
-+
-+	return platform_driver_register(&test_constraints_driver);
++	debugfs_remove_recursive(constraint->dentry);
 +}
-+subsys_initcall(test_constraints_init);
++
++static int __init constraint_debugfs_init(void)
++{
++	if (constraints_disabled)
++		return -ENODEV;
++
++	/* Create /sys/kernel/debug/opp directory */
++	rootdir = debugfs_create_dir("boot_constraints", NULL);
++	if (!rootdir) {
++		pr_err("Failed to create root directory\n");
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++core_initcall(constraint_debugfs_init);
++
++
+ /* Boot constraints core */
+ 
+ static struct constraint_dev *constraint_device_find(struct device *dev)
+@@ -84,12 +152,14 @@ static struct constraint_dev *constraint_device_allocate(struct device *dev)
+ 	INIT_LIST_HEAD(&cdev->constraints);
+ 
+ 	list_add(&cdev->node, &constraint_devices);
++	constraint_device_add_debugfs(cdev);
+ 
+ 	return cdev;
+ }
+ 
+ static void constraint_device_free(struct constraint_dev *cdev)
+ {
++	constraint_device_remove_debugfs(cdev);
+ 	list_del(&cdev->node);
+ 	kfree(cdev);
+ }
+@@ -285,6 +355,18 @@ static int constraint_supply_add(struct constraint *constraint, void *data)
+ 	csupply->supply.name = kstrdup_const(supply->name, GFP_KERNEL);
+ 	constraint->private = csupply;
+ 
++	/* Debugfs */
++	constraint_add_debugfs(constraint, supply->name);
++
++	debugfs_create_ulong("u_volt_min", 0444, constraint->dentry,
++			     &csupply->supply.u_volt_min);
++
++	debugfs_create_ulong("u_volt_max", 0444, constraint->dentry,
++			     &csupply->supply.u_volt_max);
++
++	debugfs_create_bool("enable", 0444, constraint->dentry,
++			    &csupply->supply.enable);
++
+ 	return 0;
+ 
+ remove_voltage:
+@@ -314,6 +396,7 @@ static void constraint_supply_remove(struct constraint *constraint)
+ 		dev_err(dev, "regulator_set_voltage failed (%d)\n", ret);
+ 
+ 	regulator_put(csupply->reg);
++	constraint_remove_debugfs(constraint);
+ 	kfree_const(csupply->supply.name);
+ 	kfree(csupply);
+ }
 -- 
 2.13.0.71.gd7076ec9c9cb
