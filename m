@@ -1,117 +1,54 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Wed, 28 Jun 2017 19:47:50 +0200
-Subject: [PATCH v3 2/2] acpi/iort: numa: Add numa node mapping for smmuv3
- devices
-In-Reply-To: <20170615134603.GA16292@red-moon>
-References: <1496897059-8272-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1496897059-8272-3-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170615134603.GA16292@red-moon>
-Message-ID: <20170628174750.GY658@rric.localdomain>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 28 Jun 2017 10:52:55 -0700
+Subject: [PATCH v10 1/3] x86/syscalls: Check address limit on user-mode
+ return
+In-Reply-To: <CAGXu5j+byHUn_rb9jOTZqMYrc4ngmDj=a3k8QRTYrZYNSjhCkw@mail.gmail.com>
+References: <20170615011203.144108-1-thgarnie@google.com>
+ <CAGXu5j+byHUn_rb9jOTZqMYrc4ngmDj=a3k8QRTYrZYNSjhCkw@mail.gmail.com>
+Message-ID: <CAGXu5jKrJv0y70e5JiafKGcGzWoJPZM_HruZ=Y0rM1m0J4tZAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.06.17 14:46:03, Lorenzo Pieralisi wrote:
-> On Thu, Jun 08, 2017 at 10:14:19AM +0530, Ganapatrao Kulkarni wrote:
-> > Add code to parse proximity domain in SMMUv3 IORT table to
-> > set numa node mapping for smmuv3 devices.
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > ---
-> >  drivers/acpi/arm64/iort.c | 28 ++++++++++++++++++++++++++--
-> >  1 file changed, 26 insertions(+), 2 deletions(-)
-> 
-> I am happy to take this but I want to know what we shall do with
-> patch 1 and related ACPICA changes first.
+On Tue, Jun 20, 2017 at 1:24 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Wed, Jun 14, 2017 at 6:12 PM, Thomas Garnier <thgarnie@google.com> wrote:
+>> Ensure the address limit is a user-mode segment before returning to
+>> user-mode. Otherwise a process can corrupt kernel-mode memory and elevate
+>> privileges [1].
+>>
+>> The set_fs function sets the TIF_SETFS flag to force a slow path on
+>> return. In the slow path, the address limit is checked to be USER_DS if
+>> needed.
+>>
+>> The addr_limit_user_check function is added as a cross-architecture
+>> function to check the address limit.
+>>
+>> [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+>>
+>> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+>
+> Thanks for reworking this series!
+>
+> The bad state correctly BUGs under the LKDTM test:
+>
+> [   21.171586] lkdtm: Performing direct entry CORRUPT_USER_DS
+> [   21.172791] lkdtm: setting bad task size limit
+> [   21.173742] ------------[ cut here ]------------
+> [   21.174641] kernel BUG at ./include/linux/syscalls.h:220!
+> ...
+> [   21.193166] Call Trace:
+> [   21.193617]  ? trace_hardirqs_on_thunk+0x1a/0x1c
+> [   21.194443]  entry_SYSCALL64_slow_path+0x25/0x25
+>
+>
+> Tested-by: Kees Cook <keescook@chromium.org>
 
-The change is now in acpica:
+Is everyone happy with this patch for x86? Does this need anything
+more/different?
 
- https://github.com/acpica/acpica/commit/8cadc4fb500e2aa52241e367c87a0f95d9760c58
+Thanks!
 
-So we could guard the code with an #ifdef until that patch is pulled
-in via acpica tree:
+-Kees
 
-> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > index bba2b59..e804386 100644
-> > --- a/drivers/acpi/arm64/iort.c
-> > +++ b/drivers/acpi/arm64/iort.c
-> > @@ -882,6 +882,23 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
-> >  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
-> >  }
-> >  
-> > +/*
-> > + * set numa proximity domain for smmuv3 device
-> > + */
-> > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
-> > +		struct device *dev)
-> > +{
-
-#ifdef ACPI_IORT_SMMU_V3_PXM_VALID
-
-> > +	struct acpi_iort_smmu_v3 *smmu;
-> > +
-> > +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-> > +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
-> > +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
-> > +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
-> > +			smmu->base_address,
-> > +			smmu->pxm);
-> > +	}
-
-#endif
-
-> > +}
-> > +
-
-Could the patch be applied with this change?
-
-Thanks,
-
--Robert
-
-> >  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
-> >  {
-> >  	struct acpi_iort_smmu *smmu;
-> > @@ -951,20 +968,24 @@ struct iort_iommu_config {
-> >  	int (*iommu_count_resources)(struct acpi_iort_node *node);
-> >  	void (*iommu_init_resources)(struct resource *res,
-> >  				     struct acpi_iort_node *node);
-> > +	void (*iommu_set_proximity)(struct acpi_iort_node *node,
-> > +				     struct device *dev);
-> >  };
-> >  
-> >  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
-> >  	.name = "arm-smmu-v3",
-> >  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
-> >  	.iommu_count_resources = arm_smmu_v3_count_resources,
-> > -	.iommu_init_resources = arm_smmu_v3_init_resources
-> > +	.iommu_init_resources = arm_smmu_v3_init_resources,
-> > +	.iommu_set_proximity = arm_smmu_v3_set_proximity
-> >  };
-> >  
-> >  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
-> >  	.name = "arm-smmu",
-> >  	.iommu_is_coherent = arm_smmu_is_coherent,
-> >  	.iommu_count_resources = arm_smmu_count_resources,
-> > -	.iommu_init_resources = arm_smmu_init_resources
-> > +	.iommu_init_resources = arm_smmu_init_resources,
-> > +	.iommu_set_proximity = NULL
-> >  };
-> >  
-> >  static __init
-> > @@ -1002,6 +1023,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
-> >  	if (!pdev)
-> >  		return -ENOMEM;
-> >  
-> > +	if (ops->iommu_set_proximity)
-> > +		ops->iommu_set_proximity(node, &pdev->dev);
-> > +
-> >  	count = ops->iommu_count_resources(node);
-> >  
-> >  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
-> > -- 
-> > 1.8.1.4
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Kees Cook
+Pixel Security
