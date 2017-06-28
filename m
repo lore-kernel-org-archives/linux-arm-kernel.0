@@ -1,71 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 28 Jun 2017 15:29:29 -0700
-Subject: [PATCH 1/5] clk: mb86s7x: Suppress build
-In-Reply-To: <CAJe_ZhdkfK1wB88hrMP=kmMNBfqxGtHDxseuyUXHToq77bzQ+g@mail.gmail.com>
-References: <20170625170020.11791-1-afaerber@suse.de>
- <20170625170020.11791-2-afaerber@suse.de>
- <20170628161354.GB5316@codeaurora.org>
- <CAJe_ZhdkfK1wB88hrMP=kmMNBfqxGtHDxseuyUXHToq77bzQ+g@mail.gmail.com>
-Message-ID: <20170628222929.GC5316@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 28 Jun 2017 17:29:37 -0500
+Subject: [PATCH 5/5] dt-bindings: Document the Rockchip RGA bindings
+In-Reply-To: <1498488802-1439-1-git-send-email-jacob-chen@iotwrt.com>
+References: <1498488802-1439-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <20170628222937.jscrixi5uo2vasnk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28, Jassi Brar wrote:
-> On 28 June 2017 at 21:43, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 06/25, Andreas F?rber wrote:
-> >> It fails to build once we introduce the ARCH_MB86S7X Kconfig symbol:
-> >>
-> >>   drivers/clk/clk-mb86s7x.c:27:10: fatal error: soc/mb86s7x/scb_mhu.h: No such file or directory
-> >>    #include <soc/mb86s7x/scb_mhu.h>
-> >>             ^~~~~~~~~~~~~~~~~~~~~~~
-> >>   compilation terminated.
-> >>
-> >> And when commenting out that line, we get:
-> >>
-> >>   drivers/clk/clk-mb86s7x.c: In function 'crg_gate_control':
-> >>   drivers/clk/clk-mb86s7x.c:72:8: error: implicit declaration of function 'mb86s7x_send_packet' [-Werror=implicit-function-declaration]
-> >>     ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
-> >>           ^~~~~~~~~~~~~~~~~~~
-> >>   drivers/clk/clk-mb86s7x.c:72:28: error: 'CMD_PERI_CLOCK_GATE_SET_REQ' undeclared (first use in this function)
-> >>     ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
-> >>                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >>   drivers/clk/clk-mb86s7x.c:72:28: note: each undeclared identifier is reported only once for each function it appears in
-> >>   drivers/clk/clk-mb86s7x.c: In function 'crg_rate_control':
-> >>   drivers/clk/clk-mb86s7x.c:116:10: error: 'CMD_PERI_CLOCK_RATE_SET_REQ' undeclared (first use in this function)
-> >>      code = CMD_PERI_CLOCK_RATE_SET_REQ;
-> >>             ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >>   drivers/clk/clk-mb86s7x.c:121:10: error: 'CMD_PERI_CLOCK_RATE_GET_REQ' undeclared (first use in this function); did you mean 'CMD_PERI_CLOCK_RATE_SET_REQ'?
-> >>      code = CMD_PERI_CLOCK_RATE_GET_REQ;
-> >>             ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >>             CMD_PERI_CLOCK_RATE_SET_REQ
-> >>   drivers/clk/clk-mb86s7x.c: In function 'mhu_cluster_rate':
-> >>   drivers/clk/clk-mb86s7x.c:276:10: error: 'CMD_CPU_CLOCK_RATE_GET_REQ' undeclared (first use in this function)
-> >>      code = CMD_CPU_CLOCK_RATE_GET_REQ;
-> >>             ^~~~~~~~~~~~~~~~~~~~~~~~~~
-> >>   drivers/clk/clk-mb86s7x.c:278:10: error: 'CMD_CPU_CLOCK_RATE_SET_REQ' undeclared (first use in this function); did you mean 'CMD_CPU_CLOCK_RATE_GET_REQ'?
-> >>      code = CMD_CPU_CLOCK_RATE_SET_REQ;
-> >>             ^~~~~~~~~~~~~~~~~~~~~~~~~~
-> >>             CMD_CPU_CLOCK_RATE_GET_REQ
-> >>   cc1: some warnings being treated as errors
-> >>   scripts/Makefile.build:302: recipe for target
-> >>   'drivers/clk/clk-mb86s7x.o' failed
-> >>   make[2]: *** [drivers/clk/clk-mb86s7x.o] Error 1
-> >>
-> >> Comment it out in the Makefile for now.
-> >>
-> >
-> > Why not delete the whole driver instead? It's been two years and
-> > the driver has never compiled.
-> >
-> I won't complain. The interest of moving powers evaporated in the
-> midst of upstreaming. Though some next platform is supposed to reuse
-> the IPs, but I can't say when will that be upstreamed and by whom.
+On Mon, Jun 26, 2017 at 10:53:22PM +0800, Jacob Chen wrote:
+> Add DT bindings documentation for Rockchip RGA
 > 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> ---
+>  .../devicetree/bindings/media/rockchip-rga.txt     | 36 ++++++++++++++++++++++
 
-Thanks for the info.
+Should be under bindings/gpu/
 
-Andreas, can you send a deletion patch instead?
+>  1 file changed, 36 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt b/Documentation/devicetree/bindings/media/rockchip-rga.txt
+> new file mode 100644
+> index 0000000..48a260e5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
+> @@ -0,0 +1,36 @@
+> +device-tree bindings for rockchip 2D raster graphic acceleration controller (RGA)
+> +
+> +RGA is a separate 2D raster graphic acceleration unit. It accelerates 2D
+> +graphics operations, such as point/line drawing, image scaling, rotation,
+> +BitBLT, alpha blending and image blur/sharpness.
+> +
+> +Required properties:
+> +- compatible: value should be one of the following
+> +		"rockchip,rk3228-rga";
+> +		"rockchip,rk3288-rga";
+> +		"rockchip,rk3399-rga";
+> +
+> +- interrupts: RGA interrupt number.
+> +
+> +- clocks: phandle to RGA sclk/hclk/aclk clocks
+> +
+> +- clock-names: should be "aclk" "hclk" and "sclk"
+> +
+> +- resets: Must contain an entry for each entry in reset-names.
+> +  See ../reset/reset.txt for details.
+> +- reset-names: should be "core" "axi" and "ahb"
+> +
+> +Example:
+> +SoC specific DT entry:
+> +	rga: rga at ff680000 {
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+gpu at ...
+
+> +		compatible = "rockchip,rk3399-rga";
+> +		reg = <0xff680000 0x10000>;
+> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "rga";
+> +		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA_CORE>;
+> +		clock-names = "aclk", "hclk", "sclk";
+> +
+> +		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
+> +		reset-names = "core, "axi", "ahb";
+> +		status = "disabled";
+
+Don't show status in examples.
+
+> +	};
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
