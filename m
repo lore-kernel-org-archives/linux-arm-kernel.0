@@ -1,123 +1,89 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:21 +0100
-Subject: [PATCH v2 02/52] irqchip/gic-v3: Add redistributor iterator
+Date: Wed, 28 Jun 2017 16:03:22 +0100
+Subject: [PATCH v2 03/52] irqchip/gic-v3: Add VLPI/DirectLPI discovery
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-3-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to discover the VLPI properties, we need to iterate over
-the redistributor regions. As we already have code that does this,
-let's factor it out and make it slightly more generic.
+Add helper functions that probe for VLPI and DirectLPI properties.
 
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 69 ++++++++++++++++++++++++++++++--------------
- 1 file changed, 47 insertions(+), 22 deletions(-)
+ drivers/irqchip/irq-gic-v3.c       | 22 ++++++++++++++++++++++
+ include/linux/irqchip/arm-gic-v3.h |  3 +++
+ 2 files changed, 25 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index c132f29322cc..bc58a4339a97 100644
+index bc58a4339a97..efbd998baa9c 100644
 --- a/drivers/irqchip/irq-gic-v3.c
 +++ b/drivers/irqchip/irq-gic-v3.c
-@@ -421,24 +421,14 @@ static void __init gic_dist_init(void)
- 		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
- }
- 
--static int gic_populate_rdist(void)
-+static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
- {
--	unsigned long mpidr = cpu_logical_map(smp_processor_id());
--	u64 typer;
--	u32 aff;
-+	int ret = -ENODEV;
- 	int i;
- 
--	/*
--	 * Convert affinity to a 32bit value that can be matched to
--	 * GICR_TYPER bits [63:32].
--	 */
--	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
--	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
--	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
--	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
--
- 	for (i = 0; i < gic_data.nr_redist_regions; i++) {
- 		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
-+		u64 typer;
- 		u32 reg;
- 
- 		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
-@@ -450,15 +440,9 @@ static int gic_populate_rdist(void)
- 
- 		do {
- 			typer = gic_read_typer(ptr + GICR_TYPER);
--			if ((typer >> 32) == aff) {
--				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
--				gic_data_rdist_rd_base() = ptr;
--				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
--				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
--					smp_processor_id(), mpidr, i,
--					&gic_data_rdist()->phys_base);
-+			ret = fn(gic_data.redist_regions + i, ptr);
-+			if (!ret)
- 				return 0;
--			}
- 
- 			if (gic_data.redist_regions[i].single_redist)
- 				break;
-@@ -473,9 +457,50 @@ static int gic_populate_rdist(void)
- 		} while (!(typer & GICR_TYPER_LAST));
- 	}
- 
-+	return ret ? -ENODEV : 0;
-+}
-+
-+static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
-+{
-+	unsigned long mpidr = cpu_logical_map(smp_processor_id());
-+	u64 typer;
-+	u32 aff;
-+
-+	/*
-+	 * Convert affinity to a 32bit value that can be matched to
-+	 * GICR_TYPER bits [63:32].
-+	 */
-+	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
-+	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
-+	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
-+	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
-+
-+	typer = gic_read_typer(ptr + GICR_TYPER);
-+	if ((typer >> 32) == aff) {
-+		u64 offset = ptr - region->redist_base;
-+		gic_data_rdist_rd_base() = ptr;
-+		gic_data_rdist()->phys_base = region->phys_base + offset;
-+
-+		pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
-+			smp_processor_id(), mpidr,
-+			(int)(region - gic_data.redist_regions),
-+			&gic_data_rdist()->phys_base);
-+		return 0;
-+	}
-+
-+	/* Try next one */
-+	return 1;
-+}
-+
-+static int gic_populate_rdist(void)
-+{
-+	if (gic_iterate_rdists(__gic_populate_rdist) == 0)
-+		return 0;
-+
- 	/* We couldn't even deal with ourselves... */
- 	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
--	     smp_processor_id(), mpidr);
-+	     smp_processor_id(),
-+	     (unsigned long)cpu_logical_map(smp_processor_id()));
+@@ -504,6 +504,24 @@ static int gic_populate_rdist(void)
  	return -ENODEV;
  }
  
++static int __gic_update_vlpi_properties(struct redist_region *region,
++					void __iomem *ptr)
++{
++	u64 typer = gic_read_typer(ptr + GICR_TYPER);
++	gic_data.rdists.has_vlpis &= !!(typer & GICR_TYPER_VLPIS);
++	gic_data.rdists.has_direct_lpi &= !!(typer & GICR_TYPER_DirectLPIS);
++
++	return 1;
++}
++
++static void gic_update_vlpi_properties(void)
++{
++	gic_iterate_rdists(__gic_update_vlpi_properties);
++	pr_info("%sVLPI support, %sdirect LPI support\n",
++		!gic_data.rdists.has_vlpis ? "no " : "",
++		!gic_data.rdists.has_direct_lpi ? "no " : "");
++}
++
+ static void gic_cpu_sys_reg_init(void)
+ {
+ 	/*
+@@ -965,6 +983,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
+ 	gic_data.domain = irq_domain_create_tree(handle, &gic_irq_domain_ops,
+ 						 &gic_data);
+ 	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
++	gic_data.rdists.has_vlpis = true;
++	gic_data.rdists.has_direct_lpi = true;
+ 
+ 	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
+ 		err = -ENOMEM;
+@@ -973,6 +993,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
+ 
+ 	set_handle_irq(gic_handle_irq);
+ 
++	gic_update_vlpi_properties();
++
+ 	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+ 		its_init(handle, &gic_data.rdists, gic_data.domain);
+ 
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 6a1f87ff94e2..20a553423ac7 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -204,6 +204,7 @@
+ 
+ #define GICR_TYPER_PLPIS		(1U << 0)
+ #define GICR_TYPER_VLPIS		(1U << 1)
++#define GICR_TYPER_DirectLPIS		(1U << 3)
+ #define GICR_TYPER_LAST			(1U << 4)
+ 
+ #define GIC_V3_REDIST_SIZE		0x20000
+@@ -487,6 +488,8 @@ struct rdists {
+ 	struct page		*prop_page;
+ 	int			id_bits;
+ 	u64			flags;
++	bool			has_vlpis;
++	bool			has_direct_lpi;
+ };
+ 
+ struct irq_domain;
 -- 
 2.11.0
