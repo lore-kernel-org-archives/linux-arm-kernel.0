@@ -1,46 +1,86 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 28 Jun 2017 12:00:16 -0600
-Subject: [PATCH v2 02/12] arm64: dts: juno: Use the new coresight
- replicator string
-In-Reply-To: <1498490576-1350-3-git-send-email-suzuki.poulose@arm.com>
-References: <1498490576-1350-1-git-send-email-suzuki.poulose@arm.com>
- <1498490576-1350-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkwYttnpVgvGVFThqN0F+sHj2up61gk3itBAbhW92TTSgg@mail.gmail.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Wed, 28 Jun 2017 17:59:49 +0000
+Subject: [PATCH v4 1/6] clk: sunxi-ng: div: Add support for fixed
+ post-divider
+In-Reply-To: <20170627094607.2hkgzkycclboemvu@flea.lan>
+References: <cover.24b2b13ec5a68552e186ba1637f1328363c3886e.1498422562.git-series.plaes@plaes.org>
+ <bc043a64775ec8c9cfcfe6d638e348d38e34eba3.1498422562.git-series.plaes@plaes.org>
+ <20170627094607.2hkgzkycclboemvu@flea.lan>
+Message-ID: <20170628175949.GA3706@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 June 2017 at 09:22, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> Use the new compatible for ATB programmable replicator in Juno.
->
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Mike Leach <mike.leach@linaro.org>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/boot/dts/arm/juno-base.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index bfe7d68..c82c706 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> @@ -373,7 +373,7 @@
->         };
->
->         replicator at 20120000 {
-> -               compatible = "qcom,coresight-replicator1x", "arm,primecell";
-> +               compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
->                 reg = <0 0x20120000 0 0x1000>;
+On Tue, Jun 27, 2017 at 11:46:07AM +0200, Maxime Ripard wrote:
+> Hi!
+> 
+> On Sun, Jun 25, 2017 at 11:45:42PM +0300, Priit Laes wrote:
+> > SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
+> > 6 is fixed post-divider.
+> > 
+> > Signed-off-by: Priit Laes <plaes@plaes.org>
+> > ---
+> >  drivers/clk/sunxi-ng/ccu_div.c | 12 ++++++++++--
+> >  drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
+> >  2 files changed, 12 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
+> > index c0e5c10..de30e15 100644
+> > --- a/drivers/clk/sunxi-ng/ccu_div.c
+> > +++ b/drivers/clk/sunxi-ng/ccu_div.c
+> > @@ -62,8 +62,13 @@ static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
+> >  	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
+> >  						  parent_rate);
+> >  
+> > -	return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+> > -				   cd->div.flags);
+> > +	val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+> > +				  cd->div.flags);
+> > +
+> > +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> > +		val /= cd->fixed_post_div;
+> > +
+> > +	return val;
+> >  }
+> >  
+> >  static int ccu_div_determine_rate(struct clk_hw *hw,
+> > @@ -89,6 +94,9 @@ static int ccu_div_set_rate(struct clk_hw *hw, unsigned long rate,
+> >  	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
+> >  			      cd->div.flags);
+> >  
+> > +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> > +		val *= cd->fixed_post_div;
+> > +
+> >  	spin_lock_irqsave(cd->common.lock, flags);
+> >  
+> >  	reg = readl(cd->common.base + cd->common.reg);
+> 
+> You also need to adjust the round rate call back to take into account
+> the post divider before calling divider_round_rate_parent, and after
+> since that function can modify the parent_rate.
 
-Since we are getting rid of the qcom string entirely please fix it in
-the msm DT files as well.
+Is there a way to trigger this function? I don't see it getting called.
 
-Thanks,
-Mathieu
+> > diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+> > index 08d0744..f3a5028 100644
+> > --- a/drivers/clk/sunxi-ng/ccu_div.h
+> > +++ b/drivers/clk/sunxi-ng/ccu_div.h
+> > @@ -86,9 +86,10 @@ struct ccu_div_internal {
+> >  struct ccu_div {
+> >  	u32			enable;
+> >  
+> > -	struct ccu_div_internal		div;
+> > +	struct ccu_div_internal	div;
+> 
+> Spurious change?
 
->
->                 clocks = <&soc_smc50mhz>;
-> --
-> 2.7.5
->
+Nope, it was not indented the same way as other variables.
+Should I send it as separate patch?
+
+> 
+> Thanks!
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
