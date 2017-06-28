@@ -1,76 +1,69 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:03:27 +0100
-Subject: [PATCH v2 08/52] irqchip/gic-v3-its: Split out property table
- allocation
-In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
-References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-9-marc.zyngier@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 28 Jun 2017 16:22:22 +0100
+Subject: [PATCH] arm64: fix missing __user in compat_vfp_{get,set}()
+In-Reply-To: <20170628145816.24807-1-luc.vanoostenryck@gmail.com>
+References: <20170628145816.24807-1-luc.vanoostenryck@gmail.com>
+Message-ID: <20170628152221.GN8543@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the LPI property table allocation into its own function, as
-this is going to be required for those associated with VMs in
-the future.
+On Wed, Jun 28, 2017 at 04:58:16PM +0200, Luc Van Oostenryck wrote:
+> compat_vfp_get() & compat_vfp_set() are two helpers reading
+> or writting some values via {get,put}_user() which need a
+> pointer annotated with '__user'.
+> The buffers used by the two helpers are correctly '__user'
+> annotated but need to be casted to a real type before being
+> given to {get,put}_user().
+> 
+> The problem is that this cast lack a '__user' annotation.
+> 
+> Fix this by adding the missing '__user'.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
+Casting __user off is something that sparse certainly should be warning
+about (and it was, by the looks of it).
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 391b87572549..2feecdf40216 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -897,15 +897,31 @@ static void its_lpi_free(struct event_lpi_map *map)
- 	kfree(map->col_map);
- }
- 
-+static struct page *its_allocate_prop_table(gfp_t gfp_flags)
-+{
-+	struct page *prop_page;
-+
-+	prop_page = alloc_pages(gfp_flags, get_order(LPI_PROPBASE_SZ));
-+	if (!prop_page)
-+		return NULL;
-+
-+	/* Priority 0xa0, Group-1, disabled */
-+	memset(page_address(prop_page),
-+	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
-+	       LPI_PROPBASE_SZ);
-+
-+	/* Make sure the GIC will observe the written configuration */
-+	gic_flush_dcache_to_poc(page_address(prop_page), LPI_PROPBASE_SZ);
- 
-+	return prop_page;
-+}
- 
- 
- static int __init its_alloc_lpi_tables(void)
- {
- 	phys_addr_t paddr;
- 
--	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT,
--					   get_order(LPI_PROPBASE_SZ));
-+	gic_rdists->prop_page = its_allocate_prop_table(GFP_NOWAIT);
- 	if (!gic_rdists->prop_page) {
- 		pr_err("Failed to allocate PROPBASE\n");
- 		return -ENOMEM;
-@@ -914,14 +930,6 @@ static int __init its_alloc_lpi_tables(void)
- 	paddr = page_to_phys(gic_rdists->prop_page);
- 	pr_info("GIC: using LPI property table @%pa\n", &paddr);
- 
--	/* Priority 0xa0, Group-1, disabled */
--	memset(page_address(gic_rdists->prop_page),
--	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
--	       LPI_PROPBASE_SZ);
--
--	/* Make sure the GIC will observe the written configuration */
--	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
--
- 	return 0;
- }
- 
--- 
-2.11.0
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+(There remains a sparse warning in compat_ptrace_write_user(), where we
+pass implicitly cast __user onto a pointer, under set_fs(KERNEL_DS).
+I'm not sure what the most correct fix is there.)
+
+Cheers
+---Dave
+
+> 
+> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+> ---
+>  arch/arm64/kernel/ptrace.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index c142459a8..c77f425c7 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -908,7 +908,7 @@ static int compat_vfp_get(struct task_struct *target,
+>  	if (count && !ret) {
+>  		fpscr = (uregs->fpsr & VFP_FPSCR_STAT_MASK) |
+>  			(uregs->fpcr & VFP_FPSCR_CTRL_MASK);
+> -		ret = put_user(fpscr, (compat_ulong_t *)ubuf);
+> +		ret = put_user(fpscr, (compat_ulong_t __user *)ubuf);
+>  	}
+>  
+>  	return ret;
+> @@ -932,7 +932,7 @@ static int compat_vfp_set(struct task_struct *target,
+>  				 VFP_STATE_SIZE - sizeof(compat_ulong_t));
+>  
+>  	if (count && !ret) {
+> -		ret = get_user(fpscr, (compat_ulong_t *)ubuf);
+> +		ret = get_user(fpscr, (compat_ulong_t __user *)ubuf);
+>  		uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
+>  		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
+>  	}
+> -- 
+> 2.13.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
