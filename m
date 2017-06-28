@@ -1,49 +1,56 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 28 Jun 2017 10:16:56 +0100
-Subject: [PATCH 0/2] Follow-up on "ARM: Fix dma_alloc_coherent() and friends
- for NOMMU"
-Message-ID: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
+Date: Wed, 28 Jun 2017 10:16:58 +0100
+Subject: [PATCH 2/2] fixup: ARM: NOMMU: Introduce dma operations for noMMU
+In-Reply-To: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
+References: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1498641418-3554-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two patches are folloups on "[PATCH v6 0/7] ARM: Fix
-dma_alloc_coherent() and friends for NOMMU" which has been partly
-merged in [1]. PATCH 1/2 is done per Christoph's suggestion [2] to
-eliminate duplication in dma-noop.c.  PATCH 2/2 is fixup for ARM's dma
-operations for NOMMU due to aforementioned change.
+dma_common_mmap() is already available for NOMMU, so there is no point
+to carry own version. Moreover, existent implementation relies on
+dma-noop provides mmap, but it is not true anymore.
 
-@Benjamin, your Tested-by for ARM bits would be very appretiated!
-
-@Christoph, in case you decide to queue PATCH 1/2, can you put it
-before "ARM: NOMMU: Introduce dma operations for noMMU", so transition
-to the new dma operations won't break bisectability.
-
-[1] git://git.infradead.org/users/hch/dma-mapping.git for-next
-[2] https://www.spinics.net/lists/arm-kernel/msg590587.html
-
-Cc: Steven Miao <realmz6@gmail.com>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Michal Simek <monstr@monstr.eu>
-Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-Cc: Rich Felker <dalias@libc.org>
-Cc: Chris Zankel <chris@zankel.net>
-Cc: Max Filippov <jcmvbkbc@gmail.com>
-
-Thanks!
-
-Vladimir Murzin (2):
-  drivers: dma-mapping: allow dma_common_mmap() for NOMMU
-  fixup: ARM: NOMMU: Introduce dma operations for noMMU
-
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
  arch/arm/mm/dma-mapping-nommu.c | 18 ------------------
- arch/blackfin/Kconfig           |  1 +
- arch/m32r/Kconfig               |  1 +
- arch/m68k/Kconfig               |  1 +
- arch/microblaze/Kconfig         |  1 +
- arch/sh/Kconfig                 |  1 +
- arch/xtensa/Kconfig             |  1 +
- drivers/base/dma-mapping.c      |  4 ++--
- 8 files changed, 8 insertions(+), 20 deletions(-)
+ 1 file changed, 18 deletions(-)
 
+diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
+index 6adc02f..90ee354 100644
+--- a/arch/arm/mm/dma-mapping-nommu.c
++++ b/arch/arm/mm/dma-mapping-nommu.c
+@@ -71,23 +71,6 @@ static void arm_nommu_dma_free(struct device *dev, size_t size,
+ 	return;
+ }
+ 
+-static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+-			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-			      unsigned long attrs)
+-{
+-	const struct dma_map_ops *ops = &dma_noop_ops;
+-	int ret;
+-
+-	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+-		return ret;
+-
+-	if (attrs & DMA_ATTR_NON_CONSISTENT)
+-		return ops->mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
+-
+-	WARN_ON_ONCE(1);
+-	return -ENXIO;
+-}
+-
+ static void __dma_page_cpu_to_dev(phys_addr_t paddr, size_t size,
+ 				  enum dma_data_direction dir)
+ {
+@@ -190,7 +173,6 @@ static void arm_nommu_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist
+ const struct dma_map_ops arm_nommu_dma_ops = {
+ 	.alloc			= arm_nommu_dma_alloc,
+ 	.free			= arm_nommu_dma_free,
+-	.mmap			= arm_nommu_dma_mmap,
+ 	.map_page		= arm_nommu_dma_map_page,
+ 	.unmap_page		= arm_nommu_dma_unmap_page,
+ 	.map_sg			= arm_nommu_dma_map_sg,
 -- 
 2.0.0
