@@ -1,86 +1,173 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Jun 2017 16:04:05 +0100
-Subject: [PATCH v2 46/52] KVM: arm/arm64: GICv4: Handle INVALL applied to a vPE
+Date: Wed, 28 Jun 2017 16:03:55 +0100
+Subject: [PATCH v2 36/52] KVM: arm/arm64: vITS: Add MSI translation helpers
 In-Reply-To: <20170628150411.15846-1-marc.zyngier@arm.com>
 References: <20170628150411.15846-1-marc.zyngier@arm.com>
-Message-ID: <20170628150411.15846-47-marc.zyngier@arm.com>
+Message-ID: <20170628150411.15846-37-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since when updating the properties one LPI at a time, there is no
-need to perform an INV each time we read one. Instead, we rely
-on the final VINVALL that gets sent to the ITS to do the work.
+The whole MSI injection process is fairly monolithic. An MSI write
+gets turned into an injected LPI in one swift go. But this is actually
+a more fine-grained process:
+
+- First, a virtual ITS gets selected using the doorbell address
+- Then the DevID/EventID pair gets translated into an LPI
+- Finally the LPI is injected
+
+Since the GICv4 code needs the first two steps in order to match
+an IRQ routing entry to an LPI, let's expose them as helpers,
+and refactor the existing code to use them
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 93 +++++++++++++++++++++++++-------------------
+ virt/kvm/arm/vgic/vgic.h     |  4 ++
+ 2 files changed, 57 insertions(+), 40 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2015246ab9f9..b0790ca5e933 100644
+index 2dff288b3a66..5fbcf9ea8886 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -38,7 +38,7 @@ static int vgic_its_save_tables_v0(struct vgic_its *its);
- static int vgic_its_restore_tables_v0(struct vgic_its *its);
- static int vgic_its_commit_v0(struct vgic_its *its);
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu);
-+			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
+@@ -504,15 +504,8 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+ 	return 0;
+ }
  
- /*
-  * Creates a new (reference to a) struct vgic_irq for a given LPI.
-@@ -106,7 +106,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	 * However we only have those structs for mapped IRQs, so we read in
- 	 * the respective config data from memory here upon mapping the LPI.
- 	 */
--	ret = update_lpi_config(kvm, irq, NULL);
-+	ret = update_lpi_config(kvm, irq, NULL, false);
- 	if (ret)
- 		return ERR_PTR(ret);
- 
-@@ -274,7 +274,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
-  * VCPU. Unconditionally applies if filter_vcpu is NULL.
-  */
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu)
-+			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
+-/*
+- * Find the target VCPU and the LPI number for a given devid/eventid pair
+- * and make this IRQ pending, possibly injecting it.
+- * Must be called with the its_lock mutex held.
+- * Returns 0 on success, a positive error value for any ITS mapping
+- * related errors and negative error values for generic errors.
+- */
+-static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+-				u32 devid, u32 eventid)
++int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
++			 u32 devid, u32 eventid, struct vgic_irq **irq)
  {
- 	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
- 	u8 prop;
-@@ -298,7 +298,7 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 	}
+ 	struct kvm_vcpu *vcpu;
+ 	struct its_ite *ite;
+@@ -531,26 +524,60 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+ 	if (!vcpu->arch.vgic_cpu.lpis_enabled)
+ 		return -EBUSY;
  
- 	if (irq->hw)
--		return its_prop_update_vlpi(irq->host_irq, prop, true);
-+		return its_prop_update_vlpi(irq->host_irq, prop, needs_inv);
- 
+-	spin_lock(&ite->irq->irq_lock);
+-	ite->irq->pending_latch = true;
+-	vgic_queue_irq_unlock(kvm, ite->irq);
+-
++	*irq = ite->irq;
  	return 0;
  }
-@@ -1095,7 +1095,7 @@ static int vgic_its_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
- 	if (!ite)
- 		return E_ITS_INV_UNMAPPED_INTERRUPT;
  
--	return update_lpi_config(kvm, ite->irq, NULL);
-+	return update_lpi_config(kvm, ite->irq, NULL, true);
+-static struct vgic_io_device *vgic_get_its_iodev(struct kvm_io_device *dev)
++struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi)
+ {
++	u64 address;
++	struct kvm_io_device *kvm_io_dev;
+ 	struct vgic_io_device *iodev;
+ 
+-	if (dev->ops != &kvm_io_gic_ops)
+-		return NULL;
++	if (!vgic_has_its(kvm))
++		return ERR_PTR(-ENODEV);
+ 
+-	iodev = container_of(dev, struct vgic_io_device, dev);
++	if (!(msi->flags & KVM_MSI_VALID_DEVID))
++		return ERR_PTR(-EINVAL);
++
++	address = (u64)msi->address_hi << 32 | msi->address_lo;
++
++	kvm_io_dev = kvm_io_bus_get_dev(kvm, KVM_MMIO_BUS, address);
++	if (!kvm_io_dev)
++		return ERR_PTR(-EINVAL);
+ 
++	if (kvm_io_dev->ops != &kvm_io_gic_ops)
++		return ERR_PTR(-EINVAL);
++
++	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
+ 	if (iodev->iodev_type != IODEV_ITS)
+-		return NULL;
++		return ERR_PTR(-EINVAL);
+ 
+-	return iodev;
++	return iodev->its;
++}
++
++/*
++ * Find the target VCPU and the LPI number for a given devid/eventid pair
++ * and make this IRQ pending, possibly injecting it.
++ * Must be called with the its_lock mutex held.
++ * Returns 0 on success, a positive error value for any ITS mapping
++ * related errors and negative error values for generic errors.
++ */
++static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
++				u32 devid, u32 eventid)
++{
++	struct vgic_irq *irq = NULL;
++	int err;
++
++	err = vgic_its_resolve_lpi(kvm, its, devid, eventid, &irq);
++	if (err)
++		return err;
++
++	spin_lock(&irq->irq_lock);
++	irq->pending_latch = true;
++	vgic_queue_irq_unlock(kvm, irq);
++
++	return 0;
  }
  
  /*
-@@ -1130,12 +1130,15 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- 		irq = vgic_get_irq(kvm, NULL, intids[i]);
- 		if (!irq)
- 			continue;
--		update_lpi_config(kvm, irq, vcpu);
-+		update_lpi_config(kvm, irq, vcpu, false);
- 		vgic_put_irq(kvm, irq);
- 	}
+@@ -561,30 +588,16 @@ static struct vgic_io_device *vgic_get_its_iodev(struct kvm_io_device *dev)
+  */
+ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+ {
+-	u64 address;
+-	struct kvm_io_device *kvm_io_dev;
+-	struct vgic_io_device *iodev;
++	struct vgic_its *its;
+ 	int ret;
  
- 	kfree(intids);
+-	if (!vgic_has_its(kvm))
+-		return -ENODEV;
+-
+-	if (!(msi->flags & KVM_MSI_VALID_DEVID))
+-		return -EINVAL;
+-
+-	address = (u64)msi->address_hi << 32 | msi->address_lo;
+-
+-	kvm_io_dev = kvm_io_bus_get_dev(kvm, KVM_MMIO_BUS, address);
+-	if (!kvm_io_dev)
+-		return -EINVAL;
++	its = vgic_msi_to_its(kvm, msi);
++	if (IS_ERR(its))
++		return PTR_ERR(its);
  
-+	if (vcpu->arch.vgic_cpu.vgic_v3.its_vpe.its_vm)
-+		its_invall_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe);
+-	iodev = vgic_get_its_iodev(kvm_io_dev);
+-	if (!iodev)
+-		return -EINVAL;
+-
+-	mutex_lock(&iodev->its->its_lock);
+-	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
+-	mutex_unlock(&iodev->its->its_lock);
++	mutex_lock(&its->its_lock);
++	ret = vgic_its_trigger_msi(kvm, its, msi->devid, msi->data);
++	mutex_unlock(&its->its_lock);
+ 
+ 	if (ret < 0)
+ 		return ret;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index da254ae29aec..3002b72d938b 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -225,4 +225,8 @@ int vgic_debug_destroy(struct kvm *kvm);
+ bool lock_all_vcpus(struct kvm *kvm);
+ void unlock_all_vcpus(struct kvm *kvm);
+ 
++int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
++			 u32 devid, u32 eventid, struct vgic_irq **irq);
++struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
 +
- 	return 0;
- }
- 
+ #endif
 -- 
 2.11.0
