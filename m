@@ -1,62 +1,155 @@
-From: jacobchen110@gmail.com (Jacob Chen)
-Date: Wed, 28 Jun 2017 08:29:09 +0800
-Subject: [PATCH 1/5] [media] rockchip/rga: v4l2 m2m support
-In-Reply-To: <CAAFQd5BHAiTq9f4nvwFiy5DzZ0Jep9d4K0saAkoxzaK86a8GJg@mail.gmail.com>
-References: <1498488673-27900-1-git-send-email-jacob-chen@iotwrt.com>
- <CAAFQd5BHAiTq9f4nvwFiy5DzZ0Jep9d4K0saAkoxzaK86a8GJg@mail.gmail.com>
-Message-ID: <CAFLEztT7urS_VAJ5h3dUgyCyJwfeAFezwcAr8QpRHAEEbsGSWQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 27 Jun 2017 20:46:25 -0400
+Subject: [PATCH 1/2] dmaengine: qcom_hidma: introduce memset support
+Message-ID: <1498610786-6090-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+HIDMA HW supports memset operation in addition to memcpy.
+Since the memset API is present on the kernel now, bring the
+memset feature into life.
 
-2017-06-27 16:39 GMT+08:00 Tomasz Figa <tfiga@chromium.org>:
-> Hi Jacob,
->
-> Please see my comments inline.
->
-> On Mon, Jun 26, 2017 at 11:51 PM, Jacob Chen <jacob-chen@iotwrt.com> wrote:
->> Rockchip RGA is a separate 2D raster graphic acceleration unit. It
->> accelerates 2D graphics operations, such as point/line drawing, image
->> scaling, rotation, BitBLT, alpha blending and image blur/sharpness.
-> [snip]
->> +static int rga_buf_init(struct vb2_buffer *vb)
->> +{
->> +       struct rga_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
->> +       struct rockchip_rga *rga = ctx->rga;
->> +       struct sg_table *sgt;
->> +       struct scatterlist *sgl;
->> +       unsigned int *pages;
->> +       struct rga_buf *buf;
->> +       unsigned int address, len, i, p;
->> +       unsigned int mapped_size = 0;
->> +
->> +       /* Create local MMU table for RGA */
->> +       sgt = vb2_plane_cookie(vb, 0);
->> +
->> +       /*
->> +        * Alloc (2^3 * 4K) = 32K byte for storing pages, those space could
->> +        * cover 32K * 4K = 128M ram address.
->
-> Unless I'm missing something, there is 1024 32-bit values in one 4K
-> page, which can point to 4 MB of memory. The code allocates 8 of them,
-> which in total allows at most 32 MB per buffer.
->
->> +        */
->> +       pages = (unsigned int *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 3);
->
-> This is rather unfortunate and you should expect failures here on
-> actively used systems with uptime longer than few hours. Changing this
-> to dma_alloc_coherent() and enabling CMA _might_ give you a bit better
-> success rate, but...
->
+The descriptor format is the same for both memcpy and memset.
+Type of the descriptor is 4 when memset is requested.
+The lowest 8 bits of the source DMA argument is used as a
+fill pattern.
 
-I decide to alloc a page pool when driver probe and get page from that poll.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/qcom/hidma.c    | 37 ++++++++++++++++++++++++++++++++++++-
+ drivers/dma/qcom/hidma.h    |  7 ++++++-
+ drivers/dma/qcom/hidma_ll.c | 11 ++++-------
+ 3 files changed, 46 insertions(+), 9 deletions(-)
 
-> Normally, this kind of (scatter-gather capable) hardware would allow
-> some kind of linking of separate pages, e.g. last entry in the page
-> would point to the next page, or something like that. Doesn't this RGA
-> block have something similar?
->
-> Best regards,
-> Tomasz
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index 8ed29bd..e185872 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -410,7 +410,40 @@ static int hidma_alloc_chan_resources(struct dma_chan *dmach)
+ 		return NULL;
+ 
+ 	hidma_ll_set_transfer_params(mdma->lldev, mdesc->tre_ch,
+-				     src, dest, len, flags);
++				     src, dest, len, flags,
++				     HIDMA_TRE_MEMCPY);
++
++	/* Place descriptor in prepared list */
++	spin_lock_irqsave(&mchan->lock, irqflags);
++	list_add_tail(&mdesc->node, &mchan->prepared);
++	spin_unlock_irqrestore(&mchan->lock, irqflags);
++
++	return &mdesc->desc;
++}
++
++static struct dma_async_tx_descriptor *
++hidma_prep_dma_memset(struct dma_chan *dmach, dma_addr_t dest, int value,
++		size_t len, unsigned long flags)
++{
++	struct hidma_chan *mchan = to_hidma_chan(dmach);
++	struct hidma_desc *mdesc = NULL;
++	struct hidma_dev *mdma = mchan->dmadev;
++	unsigned long irqflags;
++
++	/* Get free descriptor */
++	spin_lock_irqsave(&mchan->lock, irqflags);
++	if (!list_empty(&mchan->free)) {
++		mdesc = list_first_entry(&mchan->free, struct hidma_desc, node);
++		list_del(&mdesc->node);
++	}
++	spin_unlock_irqrestore(&mchan->lock, irqflags);
++
++	if (!mdesc)
++		return NULL;
++
++	hidma_ll_set_transfer_params(mdma->lldev, mdesc->tre_ch,
++				     value, dest, len, flags,
++				     HIDMA_TRE_MEMSET);
+ 
+ 	/* Place descriptor in prepared list */
+ 	spin_lock_irqsave(&mchan->lock, irqflags);
+@@ -775,6 +808,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 	pm_runtime_get_sync(dmadev->ddev.dev);
+ 
+ 	dma_cap_set(DMA_MEMCPY, dmadev->ddev.cap_mask);
++	dma_cap_set(DMA_MEMSET, dmadev->ddev.cap_mask);
+ 	if (WARN_ON(!pdev->dev.dma_mask)) {
+ 		rc = -ENXIO;
+ 		goto dmafree;
+@@ -785,6 +819,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 	dmadev->dev_trca = trca;
+ 	dmadev->trca_resource = trca_resource;
+ 	dmadev->ddev.device_prep_dma_memcpy = hidma_prep_dma_memcpy;
++	dmadev->ddev.device_prep_dma_memset = hidma_prep_dma_memset;
+ 	dmadev->ddev.device_alloc_chan_resources = hidma_alloc_chan_resources;
+ 	dmadev->ddev.device_free_chan_resources = hidma_free_chan_resources;
+ 	dmadev->ddev.device_tx_status = hidma_tx_status;
+diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
+index 41e0aa2..5f9966e 100644
+--- a/drivers/dma/qcom/hidma.h
++++ b/drivers/dma/qcom/hidma.h
+@@ -28,6 +28,11 @@
+ #define HIDMA_TRE_DEST_LOW_IDX		4
+ #define HIDMA_TRE_DEST_HI_IDX		5
+ 
++enum tre_type {
++	HIDMA_TRE_MEMCPY = 3,
++	HIDMA_TRE_MEMSET = 4,
++};
++
+ struct hidma_tre {
+ 	atomic_t allocated;		/* if this channel is allocated	    */
+ 	bool queued;			/* flag whether this is pending     */
+@@ -150,7 +155,7 @@ int hidma_ll_request(struct hidma_lldev *llhndl, u32 dev_id,
+ int hidma_ll_disable(struct hidma_lldev *lldev);
+ int hidma_ll_enable(struct hidma_lldev *llhndl);
+ void hidma_ll_set_transfer_params(struct hidma_lldev *llhndl, u32 tre_ch,
+-	dma_addr_t src, dma_addr_t dest, u32 len, u32 flags);
++	dma_addr_t src, dma_addr_t dest, u32 len, u32 flags, u32 txntype);
+ void hidma_ll_setup_irq(struct hidma_lldev *lldev, bool msi);
+ int hidma_ll_setup(struct hidma_lldev *lldev);
+ struct hidma_lldev *hidma_ll_init(struct device *dev, u32 max_channels,
+diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
+index 1530a66..4999e26 100644
+--- a/drivers/dma/qcom/hidma_ll.c
++++ b/drivers/dma/qcom/hidma_ll.c
+@@ -105,10 +105,6 @@ enum ch_state {
+ 	HIDMA_CH_STOPPED = 4,
+ };
+ 
+-enum tre_type {
+-	HIDMA_TRE_MEMCPY = 3,
+-};
+-
+ enum err_code {
+ 	HIDMA_EVRE_STATUS_COMPLETE = 1,
+ 	HIDMA_EVRE_STATUS_ERROR = 4,
+@@ -174,8 +170,7 @@ int hidma_ll_request(struct hidma_lldev *lldev, u32 sig, const char *dev_name,
+ 	tre->err_info = 0;
+ 	tre->lldev = lldev;
+ 	tre_local = &tre->tre_local[0];
+-	tre_local[HIDMA_TRE_CFG_IDX] = HIDMA_TRE_MEMCPY;
+-	tre_local[HIDMA_TRE_CFG_IDX] |= (lldev->chidx & 0xFF) << 8;
++	tre_local[HIDMA_TRE_CFG_IDX] = (lldev->chidx & 0xFF) << 8;
+ 	tre_local[HIDMA_TRE_CFG_IDX] |= BIT(16);	/* set IEOB */
+ 	*tre_ch = i;
+ 	if (callback)
+@@ -607,7 +602,7 @@ int hidma_ll_disable(struct hidma_lldev *lldev)
+ 
+ void hidma_ll_set_transfer_params(struct hidma_lldev *lldev, u32 tre_ch,
+ 				  dma_addr_t src, dma_addr_t dest, u32 len,
+-				  u32 flags)
++				  u32 flags, u32 txntype)
+ {
+ 	struct hidma_tre *tre;
+ 	u32 *tre_local;
+@@ -626,6 +621,8 @@ void hidma_ll_set_transfer_params(struct hidma_lldev *lldev, u32 tre_ch,
+ 	}
+ 
+ 	tre_local = &tre->tre_local[0];
++	tre_local[HIDMA_TRE_CFG_IDX] &= ~GENMASK(7, 0);
++	tre_local[HIDMA_TRE_CFG_IDX] |= txntype;
+ 	tre_local[HIDMA_TRE_LEN_IDX] = len;
+ 	tre_local[HIDMA_TRE_SRC_LOW_IDX] = lower_32_bits(src);
+ 	tre_local[HIDMA_TRE_SRC_HI_IDX] = upper_32_bits(src);
+-- 
+1.9.1
