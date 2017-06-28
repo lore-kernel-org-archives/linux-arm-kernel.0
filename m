@@ -1,39 +1,38 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 28 Jun 2017 16:35:04 +0200
-Subject: [PATCH][iio-next] iio: adc: stm32: make array
- stm32h7_adc_ckmodes_spec static
-In-Reply-To: <20170628130650.21872-1-colin.king@canonical.com>
-References: <20170628130650.21872-1-colin.king@canonical.com>
-Message-ID: <29afb806-8634-0938-081b-dfab4efa04bf@st.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 28 Jun 2017 10:49:57 -0400
+Subject: arm64 lockdep splat
+Message-ID: <1498661397.15177.12.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2017 03:06 PM, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> The array stm32h7_adc_ckmodes_spec does not need to be in global scope, so
-> make it static.
-> 
-> Cleans up sparse warning:
-> "symbol 'stm32h7_adc_ckmodes_spec' was not declared. Should it be static?"
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/iio/adc/stm32-adc-core.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-> index e09233b03c05..9d083c2338f9 100644
-> --- a/drivers/iio/adc/stm32-adc-core.c
-> +++ b/drivers/iio/adc/stm32-adc-core.c
-> @@ -172,7 +172,7 @@ struct stm32h7_adc_ck_spec {
->  	int div;
->  };
->  
-> -const struct stm32h7_adc_ck_spec stm32h7_adc_ckmodes_spec[] = {
-> +static const struct stm32h7_adc_ck_spec stm32h7_adc_ckmodes_spec[] = {
->  	/* 00: CK_ADC[1..3]: Asynchronous clock modes */
->  	{ 0, 0, 1 },
->  	{ 0, 1, 2 },
-> 
-Acked-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Hi Mark.
+
+I'm seeing this with lock debugging turned on and booting with ACPI:
+
+[????0.137762] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))?
+[????0.137773] ------------[ cut here ]------------?
+[????0.137785] WARNING: CPU: 0 PID: 12 at kernel/locking/lockdep.c:2881 lockdep_trace_alloc+0xb4/0xbc?
+[????0.137788] Modules linked in:?
+[????0.137793]??
+[????0.137797] CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.11.0-10.el7a.aarch64.debug #1?
+[????0.137800] Hardware name: HPE ProLiant m400 Server/ProLiant m400 Server, BIOS U02 08/19/2016?
+[????0.137803] task: ffff800fc656d000 task.stack: ffff800fc65c8000?
+[????0.137807] PC is at lockdep_trace_alloc+0xb4/0xbc?
+[????0.137810] LR is at lockdep_trace_alloc+0xb4/0xbc?
+...
+[????0.137939] [<ffff00000814559c>] lockdep_trace_alloc+0xb4/0xbc?
+[????0.137944] [<ffff0000082b4fa0>] kmem_cache_alloc_trace+0x48/0x400?
+[????0.137949] [<ffff000008737ac8>] armpmu_alloc+0x38/0x1e4?
+[????0.137954] [<ffff000008738588>] arm_pmu_acpi_cpu_starting+0x170/0x1c4?
+[????0.137958] [<ffff0000080d5f6c>] cpuhp_invoke_callback+0x100/0xcc0?
+[????0.137961] [<ffff0000080d758c>] cpuhp_thread_fun+0xd8/0x12c?
+[????0.137966] [<ffff000008104670>] smpboot_thread_fn+0x170/0x27c?
+[????0.137970] [<ffff0000080fe910>] kthread+0x114/0x140?
+[????0.137975] [<ffff0000080833d0>] ret_from_fork+0x10/0x40?
+
+The lock warning is triggered by GFP_KERNEL allocation with interrupts disabled.
+Specifically, warning about possible __GFP_FS reclaim with interrupts off.
+Interrupts are disabled for cpuhp startup threads before CPUHP_AP_ONLINE, Is
+there any reason why CPUHP_AP_PERF_ARM_ACPI_STARTING can't be moved after
+CPUHP_AP_ONLINE? Or we could enabled irqs in arm_pmu_acpi_cpu_starting()? Or
+change the alloc flags?
