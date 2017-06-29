@@ -1,41 +1,48 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Thu, 29 Jun 2017 15:26:47 +0200
-Subject: [PATCH] arm64: fix endianness annotation for
- __apply_alternatives()/get_alt_insn()
-In-Reply-To: <20170629102851.GF14607@arm.com>
-References: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
- <20170629102851.GF14607@arm.com>
-Message-ID: <20170629132645.difv6xdjrkp5qvlh@ltop.local>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 29 Jun 2017 21:26:37 +0800
+Subject: [PATCH 1/2] ASoC: audio-graph-card: update bindings for amplifier
+ support
+In-Reply-To: <1498742798-3128-1-git-send-email-shawnguo@kernel.org>
+References: <1498742798-3128-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <1498742798-3128-2-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 11:28:51AM +0100, Will Deacon wrote:
-> On Wed, Jun 28, 2017 at 04:55:57PM +0200, Luc Van Oostenryck wrote:
-> > get_alt_insn() is used to read and create ARM instructions, which
-> > are always stored in memory in little-endian order. These values
-> > are thus correctly converted to/from native order when processed
-> > but the pointers used to hold the address of these instructions
-> > are declared as for native order values.
-> > 
-> > Fix this by declaring the pointers as __le32* instead of u32* and
-> > make the few appropriate needed changes.
-> > 
-> > +		origptr = (__le32 __force *) ALT_ORIG_PTR(alt);
-> > +		replptr = (__le32 __force *) ALT_REPL_PTR(alt);
-> 
-> Why is the __force needed here?
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Because of the cast to u32* in:
-	#define ALT_ORIG_PTR(a)         __ALT_PTR(a, orig_offset)
-	#define ALT_REPL_PTR(a)         __ALT_PTR(a, alt_offset)
-	#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
+The audio-graph-card should be able to support widgets and routing in
+the same way as what simple-audio-card does.  The patch adds the
+properties into audio-graph-card bindings.  Then an optional property
+'pa-gpios' for controlling external amplifier, which depends on DAPM
+widgets and routing, is added.
 
-Of course, if this (u32*) is not really needed, then the __force
-is also not needed.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ Documentation/devicetree/bindings/sound/audio-graph-card.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-And since, it seems indeed to be the case, I'll gladly sent a patch:
-	-#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
-	+#define __ALT_PTR(a,f)          ((void *)&(a)->f + (a)->f)
-if it suits you.
-
--- Luc
+diff --git a/Documentation/devicetree/bindings/sound/audio-graph-card.txt b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
+index bac4b1b1060f..6e6720aa33f1 100644
+--- a/Documentation/devicetree/bindings/sound/audio-graph-card.txt
++++ b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
+@@ -10,6 +10,8 @@ see ${LINUX}/Documentation/devicetree/bindings/sound/simple-card.txt
+ Below are same as Simple-Card.
+ 
+ - label
++- widgets
++- routing
+ - dai-format
+ - frame-master
+ - bitclock-master
+@@ -24,6 +26,9 @@ Required properties:
+ - compatible				: "audio-graph-card";
+ - dais					: list of CPU DAI port{s}
+ 
++Optional properties:
++- pa-gpios: GPIO used to control external amplifier.
++
+ Example: Single DAI case
+ 
+ 	sound_card {
+-- 
+1.9.1
