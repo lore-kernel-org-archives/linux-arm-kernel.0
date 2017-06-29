@@ -1,34 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 29 Jun 2017 13:56:18 +0200
-Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
- cpg-mssr: Add interface for critical core clocks)
-In-Reply-To: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
-References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
-Message-ID: <CAMuHMdWRadUCZUycUW3dKJhS__aRRVbV1tXo0umUQ7KHOYQMoQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 29 Jun 2017 14:59:31 +0300
+Subject: [PATCH 5/5] ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK
+ support
+In-Reply-To: <1498736674-9233-6-git-send-email-claudiu.beznea@microchip.com>
+References: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
+ <1498736674-9233-6-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20170629115931.yki2xbehyicbtx3w@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+Hi Claudiu,
 
-On Thu, Jun 29, 2017 at 11:27 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> CC clock, ARM, DT, PM people
->
-> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
-> disables them as being unused.
+On Thu, Jun 29, 2017 at 02:44:34PM +0300, Claudiu Beznea wrote:
+> Add specifig DTS files and bindings for sama5d27 SoM1 EK board.
 
-> Of course this is not limited to clocks, but also to e.g. PM domains.
+Is there any publicly available information on this SoM?
 
-BTW, how do you prevent Linux from powering down the CR7 PM domain,
-which contains the Cortex R7?
+One more comment below.
 
-Gr{oetje,eeting}s,
+> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+> ---
 
-                        Geert
+[snip]
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> +	memory {
+> +		reg = <0x20000000 0x20000>;
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Are you sure this SoM has 132KB RAM?
+
+Since you seem to rely on the bootloader to fill in the right size value, you 
+can just drop this node and rely on sama5d2.dtsi that provides a stub node.
+
+> +	};
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
