@@ -1,39 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jun 2017 17:18:33 +0200
-Subject: [GIT PULL] ARM: actions: dt for v4.13
-In-Reply-To: <20170623172556.12618-2-afaerber@suse.de>
-References: <20170623172556.12618-1-afaerber@suse.de>
- <20170623172556.12618-2-afaerber@suse.de>
-Message-ID: <CAK8P3a2ftCC0cMvJOk1Fsh3BUzT+BU66NLe5SM5rGPFWt+P-+A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Jun 2017 16:20:17 +0100
+Subject: [PATCH] arm64: fix endianness annotation for
+ __apply_alternatives()/get_alt_insn()
+In-Reply-To: <CAExDi1SxbM41MRuEUF0WSwzbs9yJNLGTtNfJySvAm6LSn9_mEQ@mail.gmail.com>
+References: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
+ <20170629102851.GF14607@arm.com>
+ <20170629132645.difv6xdjrkp5qvlh@ltop.local>
+ <20170629141323.GH11040@leverpostej>
+ <20170629141944.GD18630@arm.com>
+ <20170629142233.GJ11040@leverpostej>
+ <20170629142628.GE18630@arm.com>
+ <CAExDi1SxbM41MRuEUF0WSwzbs9yJNLGTtNfJySvAm6LSn9_mEQ@mail.gmail.com>
+Message-ID: <20170629152017.GA21883@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 7:25 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Arnd and Olof,
->
-> This is the initial dt pull for Actions Semi.
-> The Kconfig symbol is introduced in the arm pull.
->
-> Regards,
-> Andreas
->
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
->
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm-dt-for-4.13
->
-> for you to fetch changes up to 740f6beb57b579ee69a3793dff1462a4020ec500:
->
->   ARM: dts: owl-s500: Add SPS node (2017-06-19 18:36:44 +0200)
->
-> ----------------------------------------------------------------
-> Actions Semi ARM based SoC DT for v4.13
->
-> This adds an initial DT for the S500 SoC and a devboard based on it.
+On Thu, Jun 29, 2017 at 05:15:19PM +0200, Luc Van Oostenryck wrote:
+> On Thu, Jun 29, 2017 at 4:26 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Jun 29, 2017 at 03:22:34PM +0100, Mark Rutland wrote:
+> >> On Thu, Jun 29, 2017 at 03:19:44PM +0100, Will Deacon wrote:
+> >> > On Thu, Jun 29, 2017 at 03:13:23PM +0100, Mark Rutland wrote:
+> >> > > On Thu, Jun 29, 2017 at 03:26:47PM +0200, Luc Van Oostenryck wrote:
+> >> > > > On Thu, Jun 29, 2017 at 11:28:51AM +0100, Will Deacon wrote:
+> >> > > > > > +           origptr = (__le32 __force *) ALT_ORIG_PTR(alt);
+> >> > > > > > +           replptr = (__le32 __force *) ALT_REPL_PTR(alt);
+> >> > > > >
+> >> > > > > Why is the __force needed here?
+> >> > > >
+> >> > > > Because of the cast to u32* in:
+> >> > > >         #define ALT_ORIG_PTR(a)         __ALT_PTR(a, orig_offset)
+> >> > > >         #define ALT_REPL_PTR(a)         __ALT_PTR(a, alt_offset)
+> >> > > >         #define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
+> >> > > >
+> >> > > > Of course, if this (u32*) is not really needed, then the __force
+> >> > > > is also not needed.
+> >> > > >
+> >> > > > And since, it seems indeed to be the case, I'll gladly sent a patch:
+> >> > > >         -#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
+> >> > > >         +#define __ALT_PTR(a,f)          ((void *)&(a)->f + (a)->f)
+> >> > > > if it suits you.
+> >> > >
+> >> > > Given __ALT_PTR is intended to give a pointer to A64 instructions, which
+> >> > > are in le32 format, wouldn't it make more sense for __ALT_PTR to cast to
+> >> > > __le32 * ?
+> 
+> Yes, it could.
+> 
+> >> > Might be a bit weird for ALT_REPL_PTR, which is cast to unsigned long.
+> >>
+> >> Maybe, but that's one cast, rather than two, and matches other similar
+> >> casts from a pointer to unsigned long (e.g. the the addr cast in
+> >> __range_ok()).
+> >
+> > Sure, but isn't it a __force cast? I'd like to avoid that if we can.
+> 
+> No, once you cast to an integer all the specificities of pointers are
+> thrown away,
+> like for a const pointer and here the __bitwise underlying the __le32.
+> It's exactly the same fro cast from/to void*, the reasoning behind it
+> is something
+> like : "it's OK to drop all the qualifiers and such because you will anyway need
+> to cast the result to another pointer before being able to dereference it".
 
-Pulled into next/dt, thanks!
+Ok, so does that mean that the __force cast in __range_ok is not needed?
 
-      Arnd
+> I already sent a version leaving the type as void*, without having seen your
+> replies here, but if you wish I can, of course, resend something for __le32*.
+
+I'm happy with the patch you sent, so no need to resend.
+
+Will
