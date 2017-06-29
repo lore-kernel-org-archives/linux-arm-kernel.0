@@ -1,34 +1,94 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 29 Jun 2017 15:10:51 -0500
-Subject: [PATCH 4/6] dt-bindings: serial: Document RDA Micro UART
-In-Reply-To: <20170627005520.23731-5-afaerber@suse.de>
-References: <20170627005520.23731-1-afaerber@suse.de>
- <20170627005520.23731-5-afaerber@suse.de>
-Message-ID: <20170629201051.cfr37kh2gozompqo@rob-hp-laptop>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 29 Jun 2017 13:53:49 -0700
+Subject: [PATCH 2/3] arm64: dts: rockchip: Use vctrl regulators for
+ dynamic CPU voltages on Gru/Kevin
+In-Reply-To: <5828446.D2497T5ZTs@phil>
+References: <20170623170737.46265-1-briannorris@chromium.org>
+ <20170623170737.46265-2-briannorris@chromium.org>
+ <5828446.D2497T5ZTs@phil>
+Message-ID: <20170629205348.GB127431@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 02:55:18AM +0200, Andreas F?rber wrote:
-> Add an initial binding for the RDA8810PL UART.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  Documentation/devicetree/bindings/serial/rda-uart.txt | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/rda-uart.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/rda-uart.txt b/Documentation/devicetree/bindings/serial/rda-uart.txt
-> new file mode 100644
-> index 000000000000..6840a8aee035
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/rda-uart.txt
-> @@ -0,0 +1,13 @@
-> +RDA Micro UART
-> +
-> +Required properties:
-> +- compatible :  "rda,8810pl-uart" for RDA8810PL
-> +- reg        :  Offset and length of the register set for the device.
+Hi Heiko,
 
-No clocks or interrupts?
+On Wed, Jun 28, 2017 at 05:44:27PM +0200, Heiko Stuebner wrote:
+> Am Freitag, 23. Juni 2017, 10:07:36 CEST schrieb Brian Norris:
+> > From: Matthias Kaehlcke <mka@chromium.org>
+> > 
+> > The Gru device tree currently contains entries for the regulators
+> > ppvar_bigcpu, ppvar_litcpu, ppvar_gpu and ppvar_centerlogic; however,
+> > the regulators have not been made, due to the lack of binding and driver
+> > support for keeping the over-voltage protection (OVP) at bay and
+> > preventing unintended regulator shutdowns on voltage downshifts.
+> > 
+> > Now, the vctrl regulator driver has been merged, along with new bindings
+> > for asymmetric settling time. The driver is OVP aware, it splits larger
+> > voltage decreases in multiple steps when necessary and adds required
+> > delays.
+> > 
+> > This change renames each of the aforementioned regulators to
+> > <orig_name>_pwm and adds a new vctrl regulator named <orig_name>.
+> > The vctrl regulators use the voltage of their corresponding PWM regulator
+> > as control voltage. The OVP related values are empirical and stem from
+> > the Chrome OS kernel tree.
+> > 
+> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> > Signed-off-by: Brian Norris <briannorris@chromium.org>
+> 
+> Running this on Kevin resulted in gpu+centerlogic being
+> children of litcpu, so applied for 4.14 with the diff below.
 
-Rob
+Oops, don't know where that cropped up. Between the two of us (Matthias
+and me) this got rebased and reworked a few times.
+
+Wouldn't have much effect, since the DMC and GPU aren't hooked up yet
+upstream yet.
+
+> Please holler if something looks wrong
+> Heiko
+> 
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> index 2f1ba5ba27c8..90259cf63bb6 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> @@ -164,7 +164,7 @@
+>  		vin-supply = <&ppvar_sys>;
+>  	};
+>  
+> -	ppvar_bigcpu_pwm: ppvar-bigcpu_pwm {
+> +	ppvar_bigcpu_pwm: ppvar-bigcpu-pwm {
+>  		compatible = "pwm-regulator";
+>  		regulator-name = "ppvar_bigcpu_pwm";
+>  
+> @@ -195,7 +195,7 @@
+>  		ovp-threshold-percent = <16>;
+>  	};
+>  
+> -	ppvar_litcpu_pwm: ppvar-litcpu_pwm {
+> +	ppvar_litcpu_pwm: ppvar-litcpu-pwm {
+>  		compatible = "pwm-regulator";
+>  		regulator-name = "ppvar_litcpu_pwm";
+>  
+> @@ -249,7 +249,7 @@
+>  		regulator-min-microvolt = <786384>;
+>  		regulator-max-microvolt = <1217747>;
+>  
+> -		ctrl-supply = <&ppvar_litcpu_pwm>;
+> +		ctrl-supply = <&ppvar_gpu_pwm>;
+>  		ctrl-voltage-range = <786384 1217747>;
+>  
+>  		regulator-settling-time-up-us = <390>;
+> @@ -280,7 +280,7 @@
+>  		regulator-min-microvolt = <799434>;
+>  		regulator-max-microvolt = <1049925>;
+>  
+> -		ctrl-supply = <&ppvar_litcpu_pwm>;
+> +		ctrl-supply = <&ppvar_centerlogic_pwm>;
+>  		ctrl-voltage-range = <799434 1049925>;
+>  
+>  		regulator-settling-time-up-us = <378>;
+> 
+
+Acked, LGTM, and tests fine. Thanks for fixing up all of this.
