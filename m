@@ -1,84 +1,49 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 29 Jun 2017 13:47:23 +0800
-Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
-References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <43e01fca-a746-90d2-fdfa-c63f1d56ef5f@huawei.com>
+From: rafalo@cadence.com (Rafal Ozieblo)
+Date: Thu, 29 Jun 2017 07:08:46 +0100
+Subject: [PATCH v4 0/4] PTP support for macb driver
+Message-ID: <1498716526-1372-1-git-send-email-rafalo@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+This patch series adds support for PTP synchronization protocol
+in Cadence GEM driver based on PHC.
 
-On 2017/6/22 20:15, Ding Tianhong wrote:
-> Some devices have problems with Transaction Layer Packets with the Relaxed
-> Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
-> PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
-> devices with Relaxed Ordering issues, and a use of this new flag by the
-> cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
-> Ports.
-> 
-> It's been years since I've submitted kernel.org patches, I appolgise for the
-> almost certain submission errors.
-> 
-> v2: Alexander point out that the v1 was only a part of the whole solution,
->     some platform which has some issues could use the new flag to indicate
->     that it is not safe to enable relaxed ordering attribute, then we need
->     to clear the relaxed ordering enable bits in the PCI configuration when
->     initializing the device. So add a new second patch to modify the PCI
->     initialization code to clear the relaxed ordering enable bit in the
->     event that the root complex doesn't want relaxed ordering enabled.
-> 
->     The third patch was base on the v1's second patch and only be changed
->     to query the relaxed ordering enable bit in the PCI configuration space
->     to allow the Chelsio NIC to send TLPs with the relaxed ordering attributes
->     set.
-> 
->     This version didn't plan to drop the defines for Intel Drivers to use the
->     new checking way to enable relaxed ordering because it is not the hardest
->     part of the moment, we could fix it in next patchset when this patches
->     reach the goal.  
-> 
-> v3: Redesigned the logic for pci_configure_relaxed_ordering when configuration,
->     If a PCIe device didn't enable the relaxed ordering attribute default,
->     we should not do anything in the PCIe configuration, otherwise we
->     should check if any of the devices above us do not support relaxed
->     ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
->     the result if we get a return that indicate that the relaxed ordering
->     is not supported we should update our device to disable relaxed ordering
->     in configuration space. If the device above us doesn't exist or isn't
->     the PCIe device, we shouldn't do anything and skip updating relaxed ordering
->     because we are probably running in a guest.
-> 
-> v4: Rename the functions pcie_get_relaxed_ordering and pcie_disable_relaxed_ordering
->     according John's suggestion, and modify the description, use the true/false
->     as the return value.
-> 
->     We shouldn't enable relaxed ordering attribute by the setting in the root
->     complex configuration space for PCIe device, so fix it for cxgb4.
-> 
->     Fix some format issues.
-> 
-> v5: Removed the unnecessary code for some function which only return the bool
->     value, and add the check for VF device.
-> 
->     Make this patch set base on 4.12-rc5.
-> 
-> v6: Fix the logic error in the need to enable the relaxed ordering attribute for cxgb4.
->  
-> Casey Leedom (2):
->   PCI: Add new PCIe Fabric End Node flag,
->     PCI_DEV_FLAGS_NO_RELAXED_ORDERING
->   net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-> 
-> Ding Tianhong (1):
->   PCI: Enable PCIe Relaxed Ordering if supported
-> 
->  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
->  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 ++++++++++
->  drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +--
->  drivers/pci/pci.c                               | 32 +++++++++++++++++++
->  drivers/pci/probe.c                             | 41 +++++++++++++++++++++++++
->  drivers/pci/quirks.c                            | 38 +++++++++++++++++++++++
->  include/linux/pci.h                             |  4 +++
->  7 files changed, 136 insertions(+), 2 deletions(-)
-> 
+v2 changes:
+* removed alarm's support
+* removed external time stamp support
+* removed PTP event interrupt handling
+* removed ptp_hw_support flag
+* removed all extra sanity checks
+* removed unnecessary #ifdef
+* fixed coding style and alligment issues
+* renamed macb.c to macb_main.c
+
+v3 changes:
+* added checking NULL ptr from ptp_clock_register()
+* fixed error codes return
+* locals list in "upside down Christmas tree" style
+* fixed some other issues from review
+
+v4 changes:
+* respin to the newest next-next (28 Jun 2017)
+ 
+Rafal Ozieblo (4):
+  net: macb: Add support for PTP timestamps in DMA descriptors
+  net: macb: Add tsu_clk to device tree
+  net: macb: macb.c changed to macb_main.c
+  net: macb: Add hardware PTP support
+
+ Documentation/devicetree/bindings/net/macb.txt |    1 +
+ drivers/net/ethernet/cadence/Kconfig           |   10 +-
+ drivers/net/ethernet/cadence/Makefile          |    5 +
+ drivers/net/ethernet/cadence/macb.c            | 3529 -----------------------
+ drivers/net/ethernet/cadence/macb.h            |  158 +-
+ drivers/net/ethernet/cadence/macb_main.c       | 3666 ++++++++++++++++++++++++
+ drivers/net/ethernet/cadence/macb_ptp.c        |  518 ++++
+ 7 files changed, 4350 insertions(+), 3537 deletions(-)
+ delete mode 100644 drivers/net/ethernet/cadence/macb.c
+ create mode 100644 drivers/net/ethernet/cadence/macb_main.c
+ create mode 100755 drivers/net/ethernet/cadence/macb_ptp.c
+
+-- 
+2.4.5
