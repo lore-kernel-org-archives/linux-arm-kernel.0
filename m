@@ -1,84 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 29 Jun 2017 12:16:45 +0100
-Subject: [PATCH v2] ARM: memblock limit must be pmd-aligned
-In-Reply-To: <20170627173330.13804-1-opendmb@gmail.com>
-References: <20170627173330.13804-1-opendmb@gmail.com>
-Message-ID: <20170629111645.GC11040@leverpostej>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 29 Jun 2017 13:17:37 +0200
+Subject: [PATCH 1/5] clk: mb86s7x: Suppress build
+In-Reply-To: <20170628222929.GC5316@codeaurora.org>
+References: <20170625170020.11791-1-afaerber@suse.de>
+ <20170625170020.11791-2-afaerber@suse.de>
+ <20170628161354.GB5316@codeaurora.org>
+ <CAJe_ZhdkfK1wB88hrMP=kmMNBfqxGtHDxseuyUXHToq77bzQ+g@mail.gmail.com>
+ <20170628222929.GC5316@codeaurora.org>
+Message-ID: <90983570-ba4d-d58e-b136-de0a1fa1d0c2@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 10:33:29AM -0700, Doug Berger wrote:
-> The pmd containing memblock_limit is cleared by prepare_page_table()
-> which creates the opportunity for early_alloc() to allocate unmapped
-> memory if memblock_limit is not pmd aligned causing a boot-time hang.
-> 
-> Commit 965278dcb8ab ("ARM: 8356/1: mm: handle non-pmd-aligned end of RAM")
-> attempted to resolve this problem, but there is a path through the
-> adjust_lowmem_bounds() routine where if all memory regions start and
-> end on pmd-aligned addresses the memblock_limit will be set to
-> arm_lowmem_limit.
-> 
-> Since arm_lowmem_limit can be affected by the vmalloc early parameter,
-> the value of arm_lowmem_limit may not be pmd-aligned. This commit
-> corrects this oversight such that memblock_limit is always rounded
-> down to pmd-alignment.
-> 
-> Fixes: 965278dcb8ab ("ARM: 8356/1: mm: handle non-pmd-aligned end of RAM")
-> Signed-off-by: Doug Berger <opendmb@gmail.com>
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Am 29.06.2017 um 00:29 schrieb Stephen Boyd:
+> On 06/28, Jassi Brar wrote:
+>> On 28 June 2017 at 21:43, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> On 06/25, Andreas F?rber wrote:
+>>>> It fails to build once we introduce the ARCH_MB86S7X Kconfig symbol:
+>>>>
+>>>>   drivers/clk/clk-mb86s7x.c:27:10: fatal error: soc/mb86s7x/scb_mhu.h: No such file or directory
+>>>>    #include <soc/mb86s7x/scb_mhu.h>
+>>>>             ^~~~~~~~~~~~~~~~~~~~~~~
+>>>>   compilation terminated.
+[...]
+>>>> Comment it out in the Makefile for now.
+>>>>
+>>>
+>>> Why not delete the whole driver instead? It's been two years and
+>>> the driver has never compiled.
+>>>
+>> I won't complain. The interest of moving powers evaporated in the
+>> midst of upstreaming. Though some next platform is supposed to reuse
+>> the IPs, but I can't say when will that be upstreamed and by whom.
 
-As a minor nit, it would be better for the title to be something like
-"ARM: ensure memblock-limit is pmd-aligned", but either way:
+Satoru-san is in CC to comment on that aspect. :)
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Assuming Russell doesn't have any furhter comments, this looks good to
-drop into the patch system. See:
-
-  http://www.arm.linux.org.uk/developer/patches/info.php
-
-... for instructions on how to send patches there.
-
-Thanks,
-Mark.
-
-> ---
-> Changes for v2:
->  - Cleaner equivalent implementation suggested by Mark Rutland
->  - Revised description to better capture the history
+> Thanks for the info.
 > 
->  arch/arm/mm/mmu.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 31af3cb59a60..e46a6a446cdd 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1218,15 +1218,15 @@ void __init adjust_lowmem_bounds(void)
->  
->  	high_memory = __va(arm_lowmem_limit - 1) + 1;
->  
-> +	if (!memblock_limit)
-> +		memblock_limit = arm_lowmem_limit;
-> +
->  	/*
->  	 * Round the memblock limit down to a pmd size.  This
->  	 * helps to ensure that we will allocate memory from the
->  	 * last full pmd, which should be mapped.
->  	 */
-> -	if (memblock_limit)
-> -		memblock_limit = round_down(memblock_limit, PMD_SIZE);
-> -	if (!memblock_limit)
-> -		memblock_limit = arm_lowmem_limit;
-> +	memblock_limit = round_down(memblock_limit, PMD_SIZE);
->  
->  	if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
->  		if (memblock_end_of_DRAM() > arm_lowmem_limit) {
-> -- 
-> 2.13.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Andreas, can you send a deletion patch instead?
+
+I can.
+
+But obviously the idea is to follow-up on this initial series with an
+scb mailbox driver (which is blocking both clk and PM domains drivers)
+and to either resolve the compilation failure by adding the expected
+symbols or to update the clk driver to build against a new driver.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
