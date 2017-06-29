@@ -1,42 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 29 Jun 2017 20:05:23 +0530
-Subject: cpufreq: frequency scaling spec in DT node
-In-Reply-To: <136334fe-c2a7-875b-91e0-329a0d7a2304@free.fr>
-References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
- <20170629100459.GL29665@vireshk-i7>
- <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
- <136334fe-c2a7-875b-91e0-329a0d7a2304@free.fr>
-Message-ID: <20170629143523.GN29665@vireshk-i7>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Thu, 29 Jun 2017 16:35:29 +0200
+Subject: [PATCH v2] arm64: fix endianness annotation in get_kaslr_seed()
+In-Reply-To: <20170629095929.GB14607@arm.com>
+References: <20170628145805.24587-1-luc.vanoostenryck@gmail.com>
+ <20170629095929.GB14607@arm.com>
+Message-ID: <20170629143528.feomz4qwwdytpclx@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-06-17, 15:01, Mason wrote:
-> On 29/06/2017 13:41, Mason wrote:
-> 
-> > On 29/06/2017 12:04, Viresh Kumar wrote:
-> > 
-> >> There is one thing you can do to avoid adding OPP entries in the DT.
-> >> You can rather add them dynamically with help of: dev_pm_opp_add() and
-> >> cpufreq-dt will continue to work with that too.
-> > 
-> > In what driver should I call these... the clk driver?
-> > (drivers/clk/tegra/cvb.c seems to be doind that)
-> 
-> The problem I run into is that calling get_cpu_device(0) from the
-> clk driver returns NULL, because topology_init() has not run yet
-> (to initialize the cpu_sys_devices).
-> 
-> So the OPP table needs to be built *after* topology_init() but
-> *before* dt_cpufreq_probe().
-> 
-> subsys_initcall(topology_init);
-> device_initcall(cpufreq_dt_platdev_init);
-> 
-> I'm not sure how to proceed.
+In the flattened device tree format, all integer properties are
+in big-endian order.
+Here the property "kaslr-seed" is read from the fdt and then
+correctly converted to native order (via fdt64_to_cpu()) but the
+pointer used for this is not annotated as being for big-endian.
 
-As we discussed over IRC, you can control the creation of cpufreq-dt
-platform device and hence when the cpufreq-dt driver gets probed. Your
-own cpufreq driver is the way to go here.
+Fix this by declaring the pointer as fdt64_t instead of u64
+(fdt64_t being itself typedefed to __be64).
 
+Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+---
+Change since v1:
+- use 'fdt64_t' instead of a plain '__be64'.
+
+ arch/arm64/kernel/kaslr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index d7e90d97f..a9710efb8 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -27,7 +27,7 @@ u16 __initdata memstart_offset_seed;
+ static __init u64 get_kaslr_seed(void *fdt)
+ {
+ 	int node, len;
+-	u64 *prop;
++	fdt64_t *prop;
+ 	u64 ret;
+ 
+ 	node = fdt_path_offset(fdt, "/chosen");
 -- 
-viresh
+2.13.0
