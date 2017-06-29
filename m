@@ -1,30 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Jun 2017 11:04:19 +0100
-Subject: [PATCH] arm64: fix missing __user in compat_vfp_{get,set}()
-In-Reply-To: <20170628145816.24807-1-luc.vanoostenryck@gmail.com>
-References: <20170628145816.24807-1-luc.vanoostenryck@gmail.com>
-Message-ID: <20170629100418.GC14607@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 29 Jun 2017 15:34:59 +0530
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+Message-ID: <20170629100459.GL29665@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 28, 2017 at 04:58:16PM +0200, Luc Van Oostenryck wrote:
-> compat_vfp_get() & compat_vfp_set() are two helpers reading
-> or writting some values via {get,put}_user() which need a
-> pointer annotated with '__user'.
-> The buffers used by the two helpers are correctly '__user'
-> annotated but need to be casted to a real type before being
-> given to {get,put}_user().
+On 29-06-17, 11:48, Mason wrote:
+> Hello,
 > 
-> The problem is that this cast lack a '__user' annotation.
+> I have two similar, but slightly different SoCs.
 > 
-> Fix this by adding the missing '__user'.
-> 
-> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
-> ---
->  arch/arm64/kernel/ptrace.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Firmware/bootloader sets the "nominal" CPU frequency to
 
-This doesn't apply against the arm64 for-next/core branch, due to
-changes from Dave reworking this to use user_regset_copyout.
+So nominal here is MAX cpu frequency.
 
-Will
+> - 1215 MHz on SoC A
+> - 1206 MHz on SoC B
+> 
+> On both systems, software can reduce the CPU frequency by
+> writing an 8-bit integer divider to an MMIO register.
+> 
+> Originally, I wanted to define a small number of operating points,
+> defined only by the divider value, and compute the actual OPP freq
+> at init.
+> 
+> For example, use { 1, 2, 3, 5, 9 } for dividers =>
+> 1215, 607.5, 405, 243, 135 on SoC A
+> 1206, 603, 402, 241.2, 134 on Soc B
+> 
+> I'm using the generic cpufreq driver.
+> 
+> Binding for the generic cpufreq driver:
+> https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
+> 
+> I don't think there's a way to do what I want with the
+> existing driver, right?
+
+No, you should rather use actual target frequency values.
+
+> It's not a big deal, I can write the actual target frequencies
+> in the DT.
+
+Right.
+
+> (BTW, the OPPs are more SW than HW desc, right?)
+
+Hmm, I wouldn't say that exactly :)
+
+What OPP contains is mostly defined by hardware, apart from the
+frequency values we are talking about. And those are decided by the
+boot loaders and they are like hardware to the kernel really. They
+define hardware capabilities IOW.
+
+If you want, you can actually try implementing a ->target() type
+cpufreq driver instead of ->target_index() and you will be able to
+select any frequency you want. But with the above example, what you
+can select is Max divided by integer value and so you can have 9
+different OPPs and reuse cpufreq-dt.
+
+> But my problem is: what happens if firmware/bootloader is
+> changed without me knowing, and they change the nominal
+> frequency?
+
+The kernel doesn't have any authority over what frequencies we are
+allowed to use and we depend on the boot loader for that. If someone
+changes that, screw him :)
+
+> Because of the rounding, if the nominal freq
+> is slightly increased, the SoC will start working at
+
+              decreased ?
+
+> *slower* speeds.
+> 
+> For example, if nominal is 1215, and I request 603, I will
+> actually get 405.
+
+No, you will normally get a frequency >= requested frequency with the
+cpufreq governors we have.
+
+> This effect can be seen if I define SoC B OPPs on SoC A:
+> 
+> $ cat scaling_available_frequencies
+> 134000 241200 402000 603000 1206000 
+> /sys/devices/system/cpu/cpu0/cpufreq$ echo 603000 > scaling_max_freq
+
+Wow. This is not how you request a frequency. What you said here is
+that the MAX frequency allowed now is 603000 instead of 1206000. And
+because 603000 isn't a valid frequency, we go down to 405000.
+
+So, you should try using the userspace governor and play with
+scaling_setspeed sysfs file.
+
+> [   60.401883] set_target: index=3
+> [   60.405118] clk_divider_set_rate: rate=405000000 parent_rate=1215000000 div=3
+> 
+> 
+> What can I do against that?
+> 
+> Should I check the nominal frequency in my clk driver?
+> (I'm not sure reading properties of unrelated nodes is acceptable practice.)
+
+We rely on the boot loader to get these details.
+
+There is one thing you can do to avoid adding OPP entries in the DT.
+You can rather add them dynamically with help of: dev_pm_opp_add() and
+cpufreq-dt will continue to work with that too.
+
+But you should understand how to use the sysfs interface first and
+make sure you are doing the right thing.
+
+-- 
+viresh
