@@ -1,23 +1,34 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 29 Jun 2017 15:09:55 -0500
-Subject: [PATCH 2/6] dt-bindings: arm: Document RDA8810PL and Orange Pi
- 2G-IoT
-In-Reply-To: <20170627005520.23731-3-afaerber@suse.de>
+Date: Thu, 29 Jun 2017 15:10:51 -0500
+Subject: [PATCH 4/6] dt-bindings: serial: Document RDA Micro UART
+In-Reply-To: <20170627005520.23731-5-afaerber@suse.de>
 References: <20170627005520.23731-1-afaerber@suse.de>
- <20170627005520.23731-3-afaerber@suse.de>
-Message-ID: <20170629200955.wzl6jg4ffuiwamie@rob-hp-laptop>
+ <20170627005520.23731-5-afaerber@suse.de>
+Message-ID: <20170629201051.cfr37kh2gozompqo@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 02:55:16AM +0200, Andreas F?rber wrote:
-> Add bindings for RDA Micro RDA8810PL SoC and Orange Pi 2G-IoT board.
+On Tue, Jun 27, 2017 at 02:55:18AM +0200, Andreas F?rber wrote:
+> Add an initial binding for the RDA8810PL UART.
 > 
-> Cc: service at rdamicro.com
-> Cc: zhao_steven at 263.net
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  Documentation/devicetree/bindings/arm/rda.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/rda.txt
+>  Documentation/devicetree/bindings/serial/rda-uart.txt | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/serial/rda-uart.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/rda-uart.txt b/Documentation/devicetree/bindings/serial/rda-uart.txt
+> new file mode 100644
+> index 000000000000..6840a8aee035
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/rda-uart.txt
+> @@ -0,0 +1,13 @@
+> +RDA Micro UART
+> +
+> +Required properties:
+> +- compatible :  "rda,8810pl-uart" for RDA8810PL
+> +- reg        :  Offset and length of the register set for the device.
 
-Acked-by: Rob Herring <robh@kernel.org>
+No clocks or interrupts?
+
+Rob
