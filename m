@@ -1,63 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Jun 2017 16:43:53 +0100
-Subject: [RFC 0/5] drivers: Add boot constraints core
-In-Reply-To: <20170629145808.GQ29665@vireshk-i7>
-References: <cover.1498642745.git.viresh.kumar@linaro.org>
- <20170629124908.GV4902@n2100.armlinux.org.uk>
- <20170629145808.GQ29665@vireshk-i7>
-Message-ID: <20170629154353.GX4902@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Jun 2017 17:50:15 +0200
+Subject: [PATCH v4 20/28] ARM: owl: Implement CPU enable-method for S500
+In-Reply-To: <6d9d0d63-113e-b050-a54e-62746ebc6013@suse.de>
+References: <20170606005426.26446-1-afaerber@suse.de>
+ <20170606005426.26446-21-afaerber@suse.de>
+ <CAK8P3a1fLABzSc7kej6uw751uoZma1Qvpm7c3mkLB45rcBNQTA@mail.gmail.com>
+ <CAK8P3a3Pg2rm8nSPUm_E61F7+zSr3gWV6sNqhC0Et3Zh2xPtmA@mail.gmail.com>
+ <6d9d0d63-113e-b050-a54e-62746ebc6013@suse.de>
+Message-ID: <CAK8P3a1vCKkZ8i=MLQXHX5ZowWQGbqiMo3gQz1E9RV+8sSGfpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 08:28:08PM +0530, Viresh Kumar wrote:
-> On 29-06-17, 13:49, Russell King - ARM Linux wrote:
-> > The thing that concerns me most about this is that typically the LCD
-> > controller will be performing DMA to system RAM.
-> > 
-> > The location of the frame buffer is unknown to the decompressor - and
-> > as the decompressor self-relocates itself (using purely assembly code),
-> > it could relocate itself on top of the frame buffer, causing the "nice"
-> > image to become very colourful.
-> > 
-> > The decompressor doesn't have the information from DT at that point to
-> > know what are safe locations, so it's up to the boot loader to place
-> > the frame buffer somewhere out of the way.  (If people want to write
-> > a DT parser in position independent ARM assembly code that may change.)
-> > 
-> > As long as people realise this, then it's not a problem, but given the
-> > number of problems that we've already encountered with boot loaders and
-> > memory space layout, I don't trust them to get this right.
-> > 
-> > Right now, the ARM kernel booting document requires:
-> > 
-> > - Quiesce all DMA capable devices so that memory does not get
-> >   corrupted by bogus network packets or disk data. This will save
-> >   you many hours of debug.
-> > 
-> > so we would need to modify that to make an exception for LCD controllers.
-> > However, we definitely can't have devices left enabled which are capable
-> > of writing to system memory, or which changing system memory is likely
-> > to cause bad effects (eg, packet ring buffers, USB buffers etc, which is
-> > really what the above requirement is about.)
-> 
-> Well, LCD was just an example here. But yeah, it is one of the most
-> probable case we have.
-> 
-> So, this thing is already working for sure, of course with some out of
-> tree hacks. Every smart phone shows their company's logo (some kind of
-> flash) while the phone boots. How do they get around such issues?
+On Thu, Jun 29, 2017 at 5:22 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Am 29.06.2017 um 17:07 schrieb Arnd Bergmann:
+>>
+>> It seems you missed my question here. Can you please follow up, and
+>> if possible send a patch to remove the pen_release logic that appears
+>> to be unnecessary here?
+>
+> I do not have any documentation on these registers, only the downstream
+> code that I forward-ported here. If you tell me what you mean exactly, I
+> can do some testing and if it still works submit a patch to simplify it.
+>
+> Comments from the so far quiet Actions Semi side would help, too.
 
-As far as the memory being used goes, they probably locate the frame
-buffer well away from the kernel or any area that the kernel is likely
-to use during decompression.
+IIRC, there are two ways to implement SMP bootup: either you have
+registers to tell the secondary CPU how to start up out of reset or they
+get put into a holding pen during early boot where they spin waiting
+for a variable to get written.
 
-It's probably also marked as a reserved memory region in DT to avoid
-the kernel touching it during boot, or _maybe_ they just locate it
-somewhere in memory that they've tested that the kernel doesn't touch
-until after their kernel has initialised the LCD controller (thereby
-avoiding the memory being permanently consumed.)
+However, doing both is not necessary. See for example mach-sunxi
+for an example without the holding pen. I think you can just delete
+half of your file to do the same.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+        Arnd
