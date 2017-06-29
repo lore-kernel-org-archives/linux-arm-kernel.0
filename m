@@ -1,304 +1,316 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 29 Jun 2017 10:54:34 +0800
-Subject: [PATCH 2/2] pwm: add ZTE ZX PWM device driver
-In-Reply-To: <1498704874-14599-1-git-send-email-shawnguo@kernel.org>
-References: <1498704874-14599-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1498704874-14599-3-git-send-email-shawnguo@kernel.org>
+From: net147@gmail.com (Jonathan Liu)
+Date: Thu, 29 Jun 2017 13:49:10 +1000
+Subject: [PATCH v7] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <CAGb2v651r+ksbZGLATOdrh5RyuCeR-vp06D246A+QXferLH=4g@mail.gmail.com>
+References: <20170628105224.6619-1-net147@gmail.com>
+ <CAGb2v651r+ksbZGLATOdrh5RyuCeR-vp06D246A+QXferLH=4g@mail.gmail.com>
+Message-ID: <CANwerB1qKcauc=eUZ1PNNJFGzp+wfZ7gNii8HmkcP6KsJtYyWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+Hi Chen-Yu,
 
-It adds PWM device driver for ZTE ZX family SoCs.  The PWM controller
-supports 4 devices with polarity configuration.
+On 29 June 2017 at 12:47, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi,
+>
+> On Wed, Jun 28, 2017 at 6:52 PM, Jonathan Liu <net147@gmail.com> wrote:
+>> The documentation for drm_do_get_edid in drivers/gpu/drm/drm_edid.c states:
+>> "As in the general case the DDC bus is accessible by the kernel at the I2C
+>> level, drivers must make all reasonable efforts to expose it as an I2C
+>> adapter and use drm_get_edid() instead of abusing this function."
+>>
+>> Exposing the DDC bus as an I2C adapter is more beneficial as it can be used
+>> for purposes other than reading the EDID such as modifying the EDID or
+>> using the HDMI DDC pins as an I2C bus through the I2C dev interface from
+>> userspace (e.g. i2c-tools).
+>>
+>> Implement this for A10s.
+>>
+>> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>> ---
+>> Changes for v7:
+>>  - Fix mixed declarations and code compiler warning for level variable
+>>
+>> Changes for v6:
+>>  - Use fixed byte time of 100 us instead of dynamically calculating from DDC
+>>    clock that is set to a fixed 100 MHz rate anyway
+>>  - Change is_fifo_flag_unset to not read the status register as well to be
+>>    more consistent with is_err_status
+>>
+>> Changes for v5:
+>>  - Use devm_kzalloc instead of devm_kmemdup and remove const struct i2c_adapter
+>>  - Rework to use readl_poll_timeout for checking FIFO status
+>>
+>> Changes for v4:
+>>  - Carry over copyright from initial I2C code into sun4i_hdmi_i2c.c
+>>  - Clean up indentation in sun4i_hdmi.h
+>>  - Rename SUN4I_HDMI_DDC_MAX_TRANSFER_SIZE to SUN4I_HDMI_DDC_BYTE_COUNT_MAX
+>>    and group it under the SUN4I_HDMI_DDC_BYTE_COUNT_REG define, changing the
+>>    value to use the GENMASK macro to make it clear that it is derived from
+>>    the width of the field in the register
+>>  - Fix SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_UNDERFLOW typo which should be
+>>    SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW
+>>  - Remove redundant rewriting of SUN4I_HDMI_DDC_INT_STATUS_REG register
+>>  - Change struct i2c_adapter to be const by using devm_kmemdup on creation
+>>  - Return -ETIMEDOUT instead of -EIO if there is timeout while transferring an
+>>    I2C message
+>>  - Instead of waiting for 1-2 bytes to transfer, wait for the time it would
+>>    take for remaining bytes to transfer (limited by FIFO size)
+>>  - Add additional comments
+>>
+>> Changes for v3:
+>>  - Explain why drm_do_get_edid should be used and why it's better to expose it
+>>    as an I2C adapter in commit message
+>>  - Reorder bit defines in descending order for consistency
+>>  - Keep old unused macros instead of removing them
+>>  - The v2 algorithm split large transfers into 16 byte transfers but this may
+>>    cause a large single write to be treated as multiple writes causing data
+>>    corruption. The algorithm has been reworked to not split larger transfers
+>>    and make more use of the FIFO to avoid this.
+>>  - Moved the creation of the DDC clock from sun4i_hdmi_enc.c to
+>>    sun4i_hdmi_i2c.c
+>>  - Reformatted code
+>>  - Instead of masking bits that we don't want to check for errors, explicitly
+>>    check the error bits
+>>  - Clear error bits at start of transfer in case of error from previous transfer
+>>  - Poll for completion of FIFO clear after setting FIFO clear bit
+>>
+>> Changes for v2:
+>>  - Rebased against Maxime's sunxi-drm/for-next branch
+>>  - Fix up error paths in sun4i_hdmi_bind so that the I2C adapter is deleted if
+>>    any of the calls after the I2C adapter is created fails
+>>  - Remove unnecessary includes in sun4i_hdmi_i2c.c
+>>
+>>  drivers/gpu/drm/sun4i/Makefile         |   1 +
+>>  drivers/gpu/drm/sun4i/sun4i_hdmi.h     |  23 ++++
+>>  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 101 ++------------
+>>  drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c | 234 +++++++++++++++++++++++++++++++++
+>>  4 files changed, 269 insertions(+), 90 deletions(-)
+>>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+>>
+>
+> [...]
+>
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+>> new file mode 100644
+>> index 000000000000..ce954ee25ae4
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+>> @@ -0,0 +1,234 @@
+>
+> [...]
+>
+>> +static int fifo_transfer(struct sun4i_hdmi *hdmi, u8 *buf, int len, bool read)
+>> +{
+>> +       /*
+>> +        * 1 byte takes 9 clock cycles (8 bits + 1 ACK) = 90 us for 100 MHz
+>> +        * clock. As clock rate is fixed, just round it up to 100 us.
+>
+> This looks fishy. I2C busses are never that fast. Maybe kHz?
+>
+> ChenYu
+>
 
-The driver has been tested with pwm-regulator support to scale core
-voltage via cpufreq.
+You're right it should be 100 kHz. I will fix that.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/pwm/Kconfig  |   9 ++
- drivers/pwm/Makefile |   1 +
- drivers/pwm/pwm-zx.c | 244 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 254 insertions(+)
- create mode 100644 drivers/pwm/pwm-zx.c
+>> +        */
+>> +       const unsigned long byte_time_ns = 100;
+>> +       u32 int_status;
+>> +       u32 fifo_status;
+>> +       /* Read needs empty flag unset, write needs full flag unset */
+>> +       u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
+>> +                         SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
+>> +       int level;
+>> +       int ret;
+>> +
+>> +       /* Wait until error or FIFO ready */
+>> +       ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+>> +                                int_status,
+>> +                                is_err_status(int_status) ||
+>> +                                is_fifo_flag_unset(fifo_status =
+>> +                                                   read_fifo_status(hdmi),
+>> +                                                   flag),
+>> +                                min(len, SUN4I_HDMI_DDC_FIFO_SIZE) *
+>> +                                byte_time_ns, 100000);
+>> +
+>> +       if (is_err_status(int_status))
+>> +               return -EIO;
+>> +       if (ret)
+>> +               return -ETIMEDOUT;
+>> +
+>> +       /* Read FIFO level */
+>> +       level = (int)(fifo_status & SUN4I_HDMI_DDC_FIFO_STATUS_LEVEL_MASK);
+>> +
+>> +       /* Limit transfer length using FIFO level to avoid underflow/overflow */
+>> +       len = min(len, read ? level : (SUN4I_HDMI_DDC_FIFO_SIZE - level));
+>> +
+>> +       if (read)
+>> +               readsb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
+>> +       else
+>> +               writesb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
+>> +
+>> +       return len;
+>> +}
+>> +
+>> +static int xfer_msg(struct sun4i_hdmi *hdmi, struct i2c_msg *msg)
+>> +{
+>> +       int i, len;
+>> +       u32 reg;
+>> +
+>> +       /* Clear errors */
+>> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
+>> +       reg &= ~SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK;
+>> +       writel(reg, hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
+>> +
+>> +       /* Set FIFO direction */
+>> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +       reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
+>> +       reg |= (msg->flags & I2C_M_RD) ?
+>> +              SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ :
+>> +              SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE;
+>> +       writel(reg, hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +
+>> +       /* Set I2C address */
+>> +       writel(SUN4I_HDMI_DDC_ADDR_SLAVE(msg->addr),
+>> +              hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
+>> +
+>> +       /* Clear FIFO */
+>> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+>> +       writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
+>> +              hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+>> +       if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG,
+>> +                              reg,
+>> +                              !(reg & SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR),
+>> +                              100, 100000))
+>> +               return -EIO;
+>> +
+>> +       /* Set transfer length */
+>> +       writel(msg->len, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
+>> +
+>> +       /* Set command */
+>> +       writel(msg->flags & I2C_M_RD ?
+>> +              SUN4I_HDMI_DDC_CMD_IMPLICIT_READ :
+>> +              SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE,
+>> +              hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
+>> +
+>> +       /* Start command */
+>> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +       writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
+>> +              hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +
+>> +       /* Transfer bytes */
+>> +       for (i = 0; i < msg->len; i += len) {
+>> +               len = fifo_transfer(hdmi, msg->buf + i, msg->len - i,
+>> +                                   msg->flags & I2C_M_RD);
+>> +               if (len <= 0)
+>> +                       return len;
+>> +       }
+>> +
+>> +       /* Wait for command to finish */
+>> +       if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG,
+>> +                              reg,
+>> +                              !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
+>> +                              100, 100000))
+>> +               return -EIO;
+>> +
+>> +       /* Check for errors */
+>> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
+>> +       if ((reg & SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK) ||
+>> +           !(reg & SUN4I_HDMI_DDC_INT_STATUS_TRANSFER_COMPLETE)) {
+>> +               return -EIO;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int sun4i_hdmi_i2c_xfer(struct i2c_adapter *adap,
+>> +                              struct i2c_msg *msgs, int num)
+>> +{
+>> +       struct sun4i_hdmi *hdmi = i2c_get_adapdata(adap);
+>> +       u32 reg;
+>> +       int err, i, ret = num;
+>> +
+>> +       for (i = 0; i < num; i++) {
+>> +               if (!msgs[i].len)
+>> +                       return -EINVAL;
+>> +               if (msgs[i].len > SUN4I_HDMI_DDC_BYTE_COUNT_MAX)
+>> +                       return -EINVAL;
+>> +       }
+>> +
+>> +       /* Reset I2C controller */
+>> +       writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
+>> +              hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +       if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
+>> +                              !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
+>> +                              100, 2000))
+>> +               return -EIO;
+>> +
+>> +       writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
+>> +              SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
+>> +              hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
+>> +
+>> +       clk_prepare_enable(hdmi->ddc_clk);
+>> +       clk_set_rate(hdmi->ddc_clk, 100000);
+>
+> Indeed the clock rate is 100 kHz.
+>
+> ChenYu
+>
+>> +
+>> +       for (i = 0; i < num; i++) {
+>> +               err = xfer_msg(hdmi, &msgs[i]);
+>> +               if (err) {
+>> +                       ret = err;
+>> +                       break;
+>> +               }
+>> +       }
+>> +
+>> +       clk_disable_unprepare(hdmi->ddc_clk);
+>> +       return ret;
+>> +}
+>> +
+>> +static u32 sun4i_hdmi_i2c_func(struct i2c_adapter *adap)
+>> +{
+>> +       return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+>> +}
+>> +
+>> +static const struct i2c_algorithm sun4i_hdmi_i2c_algorithm = {
+>> +       .master_xfer    = sun4i_hdmi_i2c_xfer,
+>> +       .functionality  = sun4i_hdmi_i2c_func,
+>> +};
+>> +
+>> +int sun4i_hdmi_i2c_create(struct device *dev, struct sun4i_hdmi *hdmi)
+>> +{
+>> +       struct i2c_adapter *adap;
+>> +       int ret = 0;
+>> +
+>> +       ret = sun4i_ddc_create(hdmi, hdmi->tmds_clk);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       adap = devm_kzalloc(dev, sizeof(*adap), GFP_KERNEL);
+>> +       if (!adap)
+>> +               return -ENOMEM;
+>> +
+>> +       adap->owner = THIS_MODULE;
+>> +       adap->class = I2C_CLASS_DDC;
+>> +       adap->algo = &sun4i_hdmi_i2c_algorithm;
+>> +       strlcpy(adap->name, "sun4i_hdmi_i2c adapter", sizeof(adap->name));
+>> +       i2c_set_adapdata(adap, hdmi);
+>> +
+>> +       ret = i2c_add_adapter(adap);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       hdmi->i2c = adap;
+>> +
+>> +       return ret;
+>> +}
+>> --
+>> 2.13.1
+>>
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 313c10789ca2..e98175331a69 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -500,4 +500,13 @@ config PWM_VT8500
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-vt8500.
- 
-+config PWM_ZX
-+	tristate "ZTE ZX PWM support"
-+	depends on ARCH_ZX
-+	help
-+	  Generic PWM framework driver for ZTE ZX family SoCs.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-zx.
-+
- endif
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 93da1f79a3b8..75ab74094d7b 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -49,3 +49,4 @@ obj-$(CONFIG_PWM_TIPWMSS)	+= pwm-tipwmss.o
- obj-$(CONFIG_PWM_TWL)		+= pwm-twl.o
- obj-$(CONFIG_PWM_TWL_LED)	+= pwm-twl-led.o
- obj-$(CONFIG_PWM_VT8500)	+= pwm-vt8500.o
-+obj-$(CONFIG_PWM_ZX)		+= pwm-zx.o
-diff --git a/drivers/pwm/pwm-zx.c b/drivers/pwm/pwm-zx.c
-new file mode 100644
-index 000000000000..5c81c2ddc0a9
---- /dev/null
-+++ b/drivers/pwm/pwm-zx.c
-@@ -0,0 +1,244 @@
-+/*
-+ * Copyright (C) 2017 Sanechips Technology Co., Ltd.
-+ * Copyright 2017 Linaro Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/slab.h>
-+
-+#define ZX_PWM_MODE		0x0
-+#define ZX_PWM_CLKDIV_MASK	GENMASK(11, 2)
-+#define ZX_PWM_CLKDIV(x)	(((x) << 8) & ZX_PWM_CLKDIV_MASK)
-+#define ZX_PWM_POLAR		BIT(1)
-+#define ZX_PWM_EN		BIT(0)
-+#define ZX_PWM_PERIOD		0x4
-+#define ZX_PWM_DUTY		0x8
-+
-+#define ZX_PWM_CLKDIV_MAX	1023
-+#define ZX_PWM_PERIOD_MAX	65535
-+
-+struct zx_pwm_chip {
-+	struct pwm_chip chip;
-+	struct clk *pclk;
-+	struct clk *wclk;
-+	void __iomem *base;
-+};
-+
-+#define to_zx_pwm_chip(_chip) container_of(_chip, struct zx_pwm_chip, chip)
-+
-+static inline u32 zx_pwm_readl(struct zx_pwm_chip *zpc, unsigned int hwpwm,
-+			       unsigned int offset)
-+{
-+	return readl(zpc->base + (hwpwm + 1) * 0x10 + offset);
-+}
-+
-+static inline void zx_pwm_writel(struct zx_pwm_chip *zpc, unsigned int hwpwm,
-+				 unsigned int offset, u32 val)
-+{
-+	writel(val, zpc->base + (hwpwm + 1) * 0x10 + offset);
-+}
-+
-+static int zx_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+			 int duty_ns, int period_ns)
-+{
-+	struct zx_pwm_chip *zpc = to_zx_pwm_chip(chip);
-+	unsigned int period_cycles;
-+	unsigned int duty_cycles;
-+	unsigned long long c;
-+	unsigned long rate;
-+	int div = 1;
-+	u32 val;
-+
-+	/* Find out the best divider */
-+	rate = clk_get_rate(zpc->wclk);
-+	while (1) {
-+		c = rate / div;
-+		c = c * period_ns;
-+		do_div(c, NSEC_PER_SEC);
-+		if (c < ZX_PWM_PERIOD_MAX)
-+			break;
-+		div++;
-+		if (div > ZX_PWM_CLKDIV_MAX)
-+			return -ERANGE;
-+	}
-+
-+	/* Calculate duty cycles */
-+	period_cycles = c;
-+	c *= duty_ns;
-+	do_div(c, period_ns);
-+	duty_cycles = c;
-+
-+	/*
-+	 * If the pwm is being enabled, we have to temporarily disable it
-+	 * before configuring the registers.
-+	 */
-+	if (pwm_is_enabled(pwm)) {
-+		val = zx_pwm_readl(zpc, pwm->hwpwm, ZX_PWM_MODE);
-+		val &= ~ZX_PWM_EN;
-+		zx_pwm_writel(zpc, pwm->hwpwm, ZX_PWM_MODE, val);
-+	}
-+
-+	/* Set up registers */
-+	val = zx_pwm_readl(zpc, pwm->hwpwm, ZX_PWM_MODE);
-+	val &= ZX_PWM_CLKDIV_MASK;
-+	val |= ZX_PWM_CLKDIV(div);
-+	zx_pwm_writel(zpc, pwm->hwpwm, ZX_PWM_MODE, val);
-+
-+	zx_pwm_writel(zpc, pwm->hwpwm, ZX_PWM_PERIOD, period_cycles);
-+	zx_pwm_writel(zpc, pwm->hwpwm, ZX_PWM_DUTY, duty_cycles);
-+
-+	/* Re-enable the pwm if needed */
-+	if (pwm_is_enabled(pwm)) {
-+		val = zx_pwm_readl(zpc, pwm->hwpwm, ZX_PWM_MODE);
-+		val |= ZX_PWM_EN;
-+		zx_pwm_writel(zpc, pwm->hwpwm, ZX_PWM_MODE, val);
-+	}
-+
-+	return 0;
-+}
-+
-+static int zx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct zx_pwm_chip *zpc = to_zx_pwm_chip(chip);
-+	u32 val;
-+	int ret;
-+
-+	ret = clk_prepare_enable(zpc->wclk);
-+	if (ret)
-+		return ret;
-+
-+	/* Enable the pwm */
-+	val = zx_pwm_readl(zpc, pwm->hwpwm, ZX_PWM_MODE);
-+	val |= ZX_PWM_EN;
-+	zx_pwm_writel(zpc, pwm->hwpwm, ZX_PWM_MODE, val);
-+
-+	return 0;
-+}
-+
-+static void zx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct zx_pwm_chip *zpc = to_zx_pwm_chip(chip);
-+	u32 val;
-+
-+	/* Disable the pwm */
-+	val = zx_pwm_readl(zpc, pwm->hwpwm, ZX_PWM_MODE);
-+	val &= ~ZX_PWM_EN;
-+	zx_pwm_writel(zpc, pwm->hwpwm, ZX_PWM_MODE, val);
-+
-+	clk_disable_unprepare(zpc->wclk);
-+}
-+
-+static int zx_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-+			       enum pwm_polarity polarity)
-+{
-+	struct zx_pwm_chip *zpc = to_zx_pwm_chip(chip);
-+	u32 val;
-+
-+	val = zx_pwm_readl(zpc, pwm->hwpwm, ZX_PWM_MODE);
-+
-+	if (polarity == PWM_POLARITY_INVERSED)
-+		val &= ~ZX_PWM_POLAR;
-+	else
-+		val |= ZX_PWM_POLAR;
-+
-+	zx_pwm_writel(zpc, pwm->hwpwm, ZX_PWM_MODE, val);
-+
-+	return 0;
-+}
-+
-+static const struct pwm_ops zx_pwm_ops = {
-+	.config = zx_pwm_config,
-+	.enable = zx_pwm_enable,
-+	.disable = zx_pwm_disable,
-+	.set_polarity = zx_pwm_set_polarity,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int zx_pwm_probe(struct platform_device *pdev)
-+{
-+	struct zx_pwm_chip *zpc;
-+	struct resource *res;
-+	int ret;
-+
-+	zpc = devm_kzalloc(&pdev->dev, sizeof(*zpc), GFP_KERNEL);
-+	if (!zpc)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	zpc->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(zpc->base))
-+		return PTR_ERR(zpc->base);
-+
-+	zpc->pclk = devm_clk_get(&pdev->dev, "pclk");
-+	if (IS_ERR(zpc->pclk))
-+		return PTR_ERR(zpc->pclk);
-+
-+	zpc->wclk = devm_clk_get(&pdev->dev, "wclk");
-+	if (IS_ERR(zpc->wclk))
-+		return PTR_ERR(zpc->wclk);
-+
-+	zpc->chip.dev = &pdev->dev;
-+	zpc->chip.ops = &zx_pwm_ops;
-+	zpc->chip.base = -1;
-+	zpc->chip.npwm = 4;
-+	zpc->chip.of_xlate = of_pwm_xlate_with_flags;
-+	zpc->chip.of_pwm_n_cells = 3;
-+
-+	ret = pwmchip_add(&zpc->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, zpc);
-+
-+	ret = clk_prepare_enable(zpc->pclk);
-+	if (ret)
-+		goto pwm_remove;
-+
-+	return 0;
-+
-+pwm_remove:
-+	pwmchip_remove(&zpc->chip);
-+	return ret;
-+}
-+
-+static int zx_pwm_remove(struct platform_device *pdev)
-+{
-+	struct zx_pwm_chip *zpc = platform_get_drvdata(pdev);
-+
-+	clk_disable_unprepare(zpc->pclk);
-+
-+	return pwmchip_remove(&zpc->chip);
-+}
-+
-+static const struct of_device_id zx_pwm_dt_ids[] = {
-+	{ .compatible = "zte,zx296718-pwm", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, zx_pwm_dt_ids);
-+
-+static struct platform_driver zx_pwm_driver = {
-+	.driver = {
-+		.name = "zx-pwm",
-+		.of_match_table = zx_pwm_dt_ids,
-+	},
-+	.probe = zx_pwm_probe,
-+	.remove = zx_pwm_remove,
-+};
-+module_platform_driver(zx_pwm_driver);
-+
-+MODULE_ALIAS("platform:zx-pwm");
-+MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
-+MODULE_DESCRIPTION("ZTE ZX PWM Driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+Any other comments?
+
+Regards,
+Jonathan
