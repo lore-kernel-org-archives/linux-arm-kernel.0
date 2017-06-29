@@ -1,33 +1,35 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Thu, 29 Jun 2017 14:58:43 +0200
-Subject: [PATCHv2 9/9] spi: spidev: add Aardvark to device tree
- compatibility list
-In-Reply-To: <20170628185445.fsnqs2tlqqeqzl57@sirena.org.uk>
-References: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
- <1498578321-13980-10-git-send-email-amelie.delaunay@st.com>
- <20170628185445.fsnqs2tlqqeqzl57@sirena.org.uk>
-Message-ID: <67764839-889b-e398-16eb-de583d82cbf3@st.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 29 Jun 2017 15:01:11 +0200
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+Message-ID: <136334fe-c2a7-875b-91e0-329a0d7a2304@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 29/06/2017 13:41, Mason wrote:
 
-
-On 06/28/2017 08:54 PM, Mark Brown wrote:
-> On Tue, Jun 27, 2017 at 05:45:21PM +0200, Amelie Delaunay wrote:
->> This patch adds an entry for the TotalPhase Aardvark SPI Host Adapter,
->> which can operate as an SPI Slave.
+> On 29/06/2017 12:04, Viresh Kumar wrote:
 > 
-> What does this device actually do and why is spidev a sensible fit for
-> it?
+>> There is one thing you can do to avoid adding OPP entries in the DT.
+>> You can rather add them dynamically with help of: dev_pm_opp_add() and
+>> cpufreq-dt will continue to work with that too.
 > 
-This device is actually a debugging tool [1] which can work on SPI bus 
-(and also I2C). Connected via USB on a PC, it can either acts as an SPI 
-master or SPI slave and it can transmit/receive serial data using SPI 
-protocol. Polarity, Phase, Bit Order, Frequency can be configured. So 
-this tool is really useful during SPI driver development to 
-troubleshoot. And that's why spidev driver totally fit for it when used 
-as an SPI slave, for the reason described in spidev Documentation: 
-"Developing simple protocols used to talk to" Aardvark "acting as SPI 
-slaves, which you may need to change quite often".
+> In what driver should I call these... the clk driver?
+> (drivers/clk/tegra/cvb.c seems to be doind that)
 
-[1] https://www.totalphase.com/products/aardvark-i2cspi/
+The problem I run into is that calling get_cpu_device(0) from the
+clk driver returns NULL, because topology_init() has not run yet
+(to initialize the cpu_sys_devices).
+
+So the OPP table needs to be built *after* topology_init() but
+*before* dt_cpufreq_probe().
+
+subsys_initcall(topology_init);
+device_initcall(cpufreq_dt_platdev_init);
+
+I'm not sure how to proceed.
+
+Regards.
