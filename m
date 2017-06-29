@@ -1,21 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jun 2017 17:02:40 +0200
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v3.14 (round 2)
-In-Reply-To: <7h60fnae1p.fsf@baylibre.com>
-References: <7h60fnae1p.fsf@baylibre.com>
-Message-ID: <CAK8P3a0xzX+1VovJNq4p0w3KP8Et-prZcB-jzTxpD1LP-yTCNQ@mail.gmail.com>
+Date: Thu, 29 Jun 2017 17:04:06 +0200
+Subject: [GIT PULL] Qualcomm Defconfig updates for 4.13 - Part 2
+In-Reply-To: <1498244541-9138-1-git-send-email-andy.gross@linaro.org>
+References: <1498244541-9138-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAK8P3a2FCSVRHsa5GEiRnQ30S7RmP12J6jyikeK4bvGr-xkYkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 11:49 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Olof, Arnd,
+On Fri, Jun 23, 2017 at 9:02 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> The following changes since commit 0a932693c95ed5ed22506f09af084d8d3c299393:
 >
-> Here's a small, second round of 64-bit DT changes for v4.13.  This ws
-> waiting for the clock dependencies finalize and  arrive in clk-next,
-> which they are now.
+>   Merge tag 'qcom-defconfig-for-4.13' into defconfig-for-4.13-2 (2017-06-23 13:29:31 -0500)
 >
-> The clock header dependencies are also merged into this branch.
+> are available in the git repository at:
+>
 
-Pulled into next/dt64, thanks!
+Pulled into next/defconfig, thanks!
 
-        Arnd
+      Arnd
