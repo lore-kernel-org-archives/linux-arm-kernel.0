@@ -1,590 +1,97 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 29 Jun 2017 14:44:34 +0300
-Subject: [PATCH 5/5] ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support
-In-Reply-To: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1498736674-9233-6-git-send-email-claudiu.beznea@microchip.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 29 Jun 2017 13:49:05 +0200
+Subject: [linux-sunxi] [PATCH v4 5/6] ARM: sun7i: Convert to CCU
+In-Reply-To: <a08cbe0d-dad4-7d0c-9845-452e0d6e3f03@arm.com>
+References: <cover.24b2b13ec5a68552e186ba1637f1328363c3886e.1498422562.git-series.plaes@plaes.org>
+ <ac9cc7f0a67d3e9e5edd0d5eb21cc60820c2b457.1498422562.git-series.plaes@plaes.org>
+ <a08cbe0d-dad4-7d0c-9845-452e0d6e3f03@arm.com>
+Message-ID: <20170629114905.hr6icycjcn2fekfd@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add specifig DTS files and bindings for sama5d27 SoM1 EK board.
+On Thu, Jun 29, 2017 at 11:57:05AM +0100, Andre Przywara wrote:
+> Hi,
+> 
+> On 25/06/17 21:45, Priit Laes wrote:
+> > Convert sun7i-a20.dtsi to new CCU driver.
+> 
+> I know that some people hat^Wget annoyed by me asking this, but anyway:
+> 
+> Why do we actually need this?
+> 
+> This ultimately makes the DT incompatible with older kernels (as
+> actually shipped by distros today).
+>
+> So if we for instance use UEFI boot or otherwise just use "one golden
+> DT" to drive all kernels (like using the DT from U-Boot), we now don't
+> have one good DT that fits all.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
----
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 551 ++++++++++++++++++++++++++++
- 2 files changed, 552 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+What is broken exactly?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9449493..3396f73 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -46,6 +46,7 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
- 	at91sam9x35ek.dtb
- dtb-$(CONFIG_SOC_SAM_V7) += \
- 	at91-kizbox2.dtb \
-+	at91-sama5d27_som1_ek.dtb \
- 	at91-sama5d2_xplained.dtb \
- 	at91-sama5d3_xplained.dtb \
- 	at91-tse850-3.dtb \
-diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-new file mode 100644
-index 0000000..a87125e
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-@@ -0,0 +1,551 @@
-+/*
-+ * at91-sama5d27_som1_ek.dts - Device Tree file for SAMA5D27-SOM1-EK board
-+ *
-+ *  Copyright (c) 2017, Microchip Technology Inc.
-+ *                2016 Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *                2017 Cristian Birsan <cristian.birsan@microchip.com>
-+ *                2017 Claudiu Beznea <claudiu.beznea@microchip.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+/dts-v1/;
-+#include "at91-sama5d27_som1.dtsi"
-+#include <dt-bindings/mfd/atmel-flexcom.h>
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Atmel SAMA5D27 SOM1 EK";
-+	compatible = "atmel,sama5d27-som1-ek", "atmel,sama5d27-som1", "atmel,sama5d27", "atmel,sama5d2", "atmel,sama5";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x20000>;
-+	};
-+
-+	ahb {
-+		usb0: gadget at 00300000 {
-+			atmel,vbus-gpio = <&pioA 116 GPIO_ACTIVE_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usba_vbus>;
-+			status = "okay";
-+		};
-+
-+		usb1: ohci at 00400000 {
-+			num-ports = <3>;
-+			atmel,vbus-gpio = <&pioA 10 GPIO_ACTIVE_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb_default>;
-+			status = "okay";
-+		};
-+
-+		usb2: ehci at 00500000 {
-+			status = "okay";
-+		};
-+
-+		sdmmc0: sdio-host at a0000000 {
-+			bus-width = <8>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_sdmmc0_default>;
-+			status = "okay";
-+		};
-+
-+		sdmmc1: sdio-host at b0000000 {
-+			bus-width = <4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_sdmmc1_default>;
-+			status = "okay";
-+		};
-+
-+		apb {
-+			isc: isc at f0008000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_isc_base &pinctrl_isc_data_8bit &pinctrl_isc_data_9_10 &pinctrl_isc_data_11_12>;
-+				status = "okay";
-+			};
-+
-+			spi0: spi at f8000000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0_default>;
-+				status = "okay";
-+			};
-+
-+			macb0: ethernet at f8008000 {
-+				status = "okay";
-+			};
-+
-+			uart1: serial at f8020000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1_default>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "okay";
-+			};
-+
-+			uart2: serial at f8024000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_mikrobus2_uart>;
-+				atmel,use-dma-rx;
-+				atmel-use-dma-tx;
-+				status = "okay";
-+			};
-+
-+			pwm0: pwm at f802c000 {
-+				status = "okay";
-+			};
-+
-+			flx1: flexcom at f8038000 {
-+				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
-+				status = "disabled";
-+
-+				i2c2: i2c at 600 {
-+					compatible = "atmel,sama5d2-i2c";
-+					reg = <0x600 0x200>;
-+					interrupts = <20 IRQ_TYPE_LEVEL_HIGH 7>;
-+					dmas = <0>, <0>;
-+					dma-names = "tx", "rx";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					clocks = <&flx1_clk>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_mikrobus_i2c>;
-+					atmel,fifo-size = <16>;
-+					status = "disabled";
-+				};
-+			};
-+
-+			shdwc at f8048010 {
-+				atmel,shdwc-debouncer = <976>;
-+				atmel,wakeup-rtc-timer;
-+
-+				input at 0 {
-+					reg = <0>;
-+					atmel,wakeup-type = "low";
-+				};
-+			};
-+
-+			watchdog at f8048040 {
-+				status = "okay";
-+			};
-+
-+			can0: can at f8054000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can0_default>;
-+			};
-+
-+			uart3: serial at fc008000 {
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart3_default>;
-+				status = "disabled";
-+			};
-+
-+			uart4: serial at fc00c000 {
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-name = "default";
-+				pinctrl-0 = <&pinctrl_mikrobus1_uart>;
-+				status = "okay";
-+			};
-+
-+			flx3: flexcom at fc014000 {
-+				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
-+				status = "disabled";
-+
-+				uart7: serial at 200 {
-+					compatible = "atmel,at91sam9260-usart";
-+					reg = <0x200 0x200>;
-+					interrupts = <22 IRQ_TYPE_LEVEL_HIGH 7>;
-+					clocks = <&flx3_clk>;
-+					clock-names = "usart";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_flx3_default>;
-+					atmel,fifo-size = <32>;
-+					status = "disabled";
-+				};
-+
-+				spi2: spi at 400 {
-+					compatible = "atmel,at91rm9200-spi";
-+					reg = <0x400 0x200>;
-+					interrupts = <22 IRQ_TYPE_LEVEL_HIGH 7>;
-+					clocks = <&flx3_clk>;
-+					clock-names = "spi_clk";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_flx3_default>;
-+					atmel,fifo-size = <16>;
-+					status = "disabled";
-+				};
-+			};
-+
-+			flx4: flexcom at fc018000 {
-+				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
-+				status = "okay";
-+
-+				uart6: serial at 200 {
-+					compatible = "atmel,at91sam9260-usart";
-+					reg = <0x200 0x200>;
-+					interrupts = <23 IRQ_TYPE_LEVEL_HIGH 7>;
-+					clocks = <&flx4_clk>;
-+					clock-names = "usart";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_flx4_default>;
-+					atmel,fifo-size = <32>;
-+					status = "disabled";
-+				};
-+
-+				spi3: spi at 400 {
-+					compatible = "atmel,at91rm9200-spi";
-+					reg = <0x400 0x200>;
-+					interrupts = <23 IRQ_TYPE_LEVEL_HIGH 7>;
-+					clocks = <&flx4_clk>;
-+					clock-names = "spi_clk";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_mikrobus_spi &pinctrl_mikrobus1_spi_cs &pinctrl_mikrobus2_spi_cs>;
-+					atmel,fifo-size = <16>;
-+					status = "okay";
-+				};
-+
-+				i2c3: i2c at 600 {
-+					compatible = "atmel,sama5d2-i2c";
-+					reg = <0x600 0x200>;
-+					interrupts = <23 IRQ_TYPE_LEVEL_HIGH 7>;
-+					dmas = <0>, <0>;
-+					dma-names = "tx", "rx";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					clocks = <&flx4_clk>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_flx4_default>;
-+					atmel,fifo-size = <16>;
-+					status = "disabled";
-+				};
-+			};
-+
-+			i2c1: i2c at fc028000 {
-+				dmas = <0>, <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c1_default>;
-+				status = "okay";
-+			};
-+
-+			pinctrl at fc038000 {
-+
-+				pinctrl_can0_default: can0_default {
-+					pinmux = <PIN_PC10__CANTX0>,
-+						 <PIN_PC11__CANRX0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_can1_default: can1_default {
-+					pinmux = <PIN_PC26__CANTX1>,
-+						 <PIN_PC27__CANRX1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_flx3_default: flx3_default {
-+					pinmux = <PIN_PC20__FLEXCOM3_IO0>,
-+						 <PIN_PC19__FLEXCOM3_IO1>,
-+						 <PIN_PC18__FLEXCOM3_IO2>,
-+						 <PIN_PC21__FLEXCOM3_IO3>,
-+						 <PIN_PC22__FLEXCOM3_IO4>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_i2c1_default: i2c1_default {
-+					pinmux = <PIN_PD4__TWD1>,
-+						 <PIN_PD5__TWCK1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_isc_base: isc_base {
-+					pinmux = <PIN_PC21__ISC_PCK>,
-+						 <PIN_PC22__ISC_VSYNC>,
-+						 <PIN_PC23__ISC_HSYNC>,
-+						 <PIN_PC24__ISC_MCK>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_isc_data_8bit: isc_data_8bit {
-+					pinmux = <PIN_PC20__ISC_D11>,
-+						 <PIN_PC19__ISC_D10>,
-+						 <PIN_PC18__ISC_D9>,
-+						 <PIN_PC17__ISC_D8>,
-+						 <PIN_PC16__ISC_D7>,
-+						 <PIN_PC15__ISC_D6>,
-+						 <PIN_PC14__ISC_D5>,
-+						 <PIN_PC13__ISC_D4>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_isc_data_9_10: isc_data_9_10 {
-+					pinmux = <PIN_PC12__ISC_D3>,
-+						 <PIN_PC11__ISC_D2>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_isc_data_11_12: isc_data_11_12 {
-+					pinmux = <PIN_PC10__ISC_D1>,
-+						 <PIN_PC9__ISC_D0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_key_gpio_default: key_gpio_default {
-+					pinmux = <PIN_PA29__GPIO>;
-+					bias-pull-up;
-+				};
-+
-+				pinctrl_led_gpio_default: led_gpio_default {
-+					pinmux = <PIN_PA27__GPIO>,
-+						 <PIN_PB1__GPIO>,
-+						 <PIN_PA31__GPIO>;
-+					bias-pull-up;
-+				};
-+
-+				pinctrl_sdmmc0_default: sdmmc0_default {
-+					cmd_data {
-+						pinmux = <PIN_PA1__SDMMC0_CMD>,
-+							 <PIN_PA2__SDMMC0_DAT0>,
-+							 <PIN_PA3__SDMMC0_DAT1>,
-+							 <PIN_PA4__SDMMC0_DAT2>,
-+							 <PIN_PA5__SDMMC0_DAT3>,
-+							 <PIN_PA6__SDMMC0_DAT4>,
-+							 <PIN_PA7__SDMMC0_DAT5>,
-+							 <PIN_PA8__SDMMC0_DAT6>,
-+							 <PIN_PA9__SDMMC0_DAT7>;
-+						bias-pull-up;
-+					};
-+
-+					ck_cd_vddsel {
-+						pinmux = <PIN_PA0__SDMMC0_CK>,
-+							 <PIN_PA11__SDMMC0_VDDSEL>,
-+							 <PIN_PA13__SDMMC0_CD>;
-+						bias-disable;
-+					};
-+				};
-+
-+				pinctrl_sdmmc1_default: sdmmc1_default {
-+					cmd_data {
-+						pinmux = <PIN_PA28__SDMMC1_CMD>,
-+							 <PIN_PA18__SDMMC1_DAT0>,
-+							 <PIN_PA19__SDMMC1_DAT1>,
-+							 <PIN_PA20__SDMMC1_DAT2>,
-+							 <PIN_PA21__SDMMC1_DAT3>;
-+						bias-pull-up;
-+					};
-+
-+					conf-ck_cd {
-+						pinmux = <PIN_PA22__SDMMC1_CK>,
-+							 <PIN_PA30__SDMMC1_CD>;
-+						bias-disable;
-+					};
-+				};
-+
-+				pinctrl_sensor_power: sensor_power {
-+					pinmux = <PIN_PB12__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_sensor_reset: sensor_reset {
-+					pinmux = <PIN_PB11__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_spi0_default: spi0_default {
-+					pinmux = <PIN_PA14__SPI0_SPCK>,
-+						 <PIN_PA15__SPI0_MOSI>,
-+						 <PIN_PA16__SPI0_MISO>,
-+						 <PIN_PA17__SPI0_NPCS0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_uart1_default: uart1_default {
-+					pinmux = <PIN_PD2__URXD1>,
-+						 <PIN_PD3__UTXD1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_uart3_default: uart3_default {
-+					pinmux = <PIN_PC12__URXD3>,
-+						 <PIN_PC13__UTXD3>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_usb_default: usb_default {
-+					pinmux = <PIN_PA10__GPIO>,
-+						 <PIN_PD19__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_usba_vbus: usba_vbus {
-+					pinmux = <PIN_PD20__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus1_an: mikrobus1_an {
-+					pinmux = <PIN_PD25__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus2_an: mikrobus2_an {
-+					pinmux = <PIN_PD26__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus1_rst: mikrobus1_rst {
-+					pinmux = <PIN_PB2__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus2_rst: mikrobus2_rst {
-+					pinmux = <PIN_PA26__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus1_spi_cs: mikrobus1_spi_cs {
-+					pinmux = <PIN_PD0__FLEXCOM4_IO4>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus2_spi_cs: mikrobus2_spi_cs {
-+					pinmux = <PIN_PC31__FLEXCOM4_IO3>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus_spi: mikrobus_spi {
-+					pinmux = <PIN_PC28__FLEXCOM4_IO0>,
-+						 <PIN_PC29__FLEXCOM4_IO1>,
-+						 <PIN_PC30__FLEXCOM4_IO2>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus1_pwm: mikrobus1_pwm {
-+					pinmux = <PIN_PB1__PWML1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus2_pwm: mikrobus2_pwm {
-+					pinmux = <PIN_PA31__PWML0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus1_int: mikrobus1_int {
-+					pinmux = <PIN_PB0__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus2_int: mikrobus2_int {
-+					pinmux = <PIN_PA25__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus1_uart: mikrobus1_uart {
-+					pinmux = <PIN_PB3__URXD4>,
-+						 <PIN_PB4__UTXD4>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus2_uart: mikrobus2_uart {
-+					pinmux = <PIN_PD23__URXD2>,
-+						 <PIN_PD24__UTXD2>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_mikrobus_i2c: mikrobus1_i2c {
-+					pinmux = <PIN_PA24__FLEXCOM1_IO0>,
-+						 <PIN_PA23__FLEXCOM1_IO1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_flx4_default: flx4_uart_default {
-+					pinmux = <PIN_PC28__FLEXCOM4_IO0>,
-+						 <PIN_PC29__FLEXCOM4_IO1>,
-+						 <PIN_PC30__FLEXCOM4_IO2>,
-+						 <PIN_PC31__FLEXCOM4_IO3>,
-+						 <PIN_PD0__FLEXCOM4_IO4>;
-+					bias-disable;
-+				};
-+			};
-+
-+			can1: can at fc050000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can1_default>;
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_key_gpio_default>;
-+
-+		bp1 {
-+			label = "USER";
-+			gpios = <&pioA 29 GPIO_ACTIVE_LOW>;
-+			linux,code = <0x104>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_led_gpio_default>;
-+		status = "okay";
-+
-+		red {
-+			label = "red";
-+			gpios = <&pioA 27 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		green {
-+			label = "green";
-+			gpios = <&pioA 33 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		blue {
-+			label = "blue";
-+			gpios = <&pioA 31 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
+> This is really a showstopper for boards which ship a DT in firmware
+> (in SPI flash, for instance, or on some eMMC).
+>
+> So:
+> - Do we actually need to change the .dtsi? The old .dtsi should still work.
+
+It does.
+
+> - Is there anything that the new and fancy clocks gives us over the
+> existing clocks? If yes, that should be a  stated in the commit message
+> or cover letter.
+
+Yes, support for all the clocks used in the SoC, and not a single
+fraction of them (which will reduce the number of additions of new
+bindings and drivers, which will in turn make the DT have less
+changes, which will make it far more easier for distros and / or
+firmwares to ship an immutable DT).
+
+> - Why do we change the clocks for those older SoCs in the first place?
+> Can't we just keep on using what worked for years?
+
+Please tell me where the displays clocks, CSI or HDMI clocks are in
+the old code.
+
+> I think we really can't remove the old code anyway.
+
+We don't.
+
+> The new clock driver moves information from the DT into the kernel. That
+> means it is no longer available for a DT consumer and the SoC details
+> (which clocks is located where, for instance), have to be replicated to
+> other DT users (U-Boot, *BSD, you-name-it). We already came across this
+> issue when looking at converting U-Boot over to use DT clocks.
+> Also it ultimately requires kernel changes for each new SoC, even if it
+> only differs in some detail which could be perfectly modelled in DT
+> (think of H3 vs. H5).
+
+Doing otherwise would also assume that you have a perfect
+understanding of all the clocks interactions, relationship and
+computations from day one, which is something the old code proved that
+it was unreasonable.
+
+The new binding also makes it easier to add SCPI that you're
+interested in iirc, where you basically just have to change the CCU
+compatible, and be done with it as long as you use the same IDs.
+
+It also lowers the barrier of entry for people that would want to
+write new drivers, since the first thing you'd need to do otherwise
+would be to create a clock driver for that, which is yet another thing
+to learn.
+
+The reduced duplication is also neat and reduces the number of similar
+bugs in each and every clock, even though it's not related to clocks.
+
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170629/b3e8c529/attachment.sig>
