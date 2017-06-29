@@ -1,73 +1,29 @@
-From: techping.chan@gmail.com (Ziping Chen)
-Date: Thu, 29 Jun 2017 12:35:30 +0800
-Subject: [PATCH v3 2/3] dt-bindings: input: Add R_LRADC support for A83T
-In-Reply-To: <20170627173159.g3t3rbts3y7z6jf7@flea>
-References: <20170624024515.4669-1-techping.chan@gmail.com>
- <20170624024515.4669-3-techping.chan@gmail.com>
- <20170626171524.cqfyasetpsfr6xfg@flea.lan>
- <CAAST=9x+fS41tznuJ9hQ-cQxecKN751=61YkhEt31DvpeqeEcA@mail.gmail.com>
- <20170627173159.g3t3rbts3y7z6jf7@flea>
-Message-ID: <CAAST=9wKRA=EiU6U85N7k9mtnbkfDwa-N5DyfkF88zYk5-EDiQ@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 28 Jun 2017 21:43:21 -0700
+Subject: [PATCH v6 5/6] arm64: dts: Add ipq8074 SoC and HK01 board support
+In-Reply-To: <1497001319-30353-6-git-send-email-varada@codeaurora.org>
+References: <1497001319-30353-1-git-send-email-varada@codeaurora.org>
+ <1497001319-30353-6-git-send-email-varada@codeaurora.org>
+Message-ID: <20170629044321.GU18666@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-28 1:31 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> On Tue, Jun 27, 2017 at 11:18:17PM +0800, Ziping Chen wrote:
->> 2017-06-27 1:15 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
->> > Hi,
->> >
->> > On Sat, Jun 24, 2017 at 10:45:14AM +0800, Ziping Chen wrote:
->> >> From: Ziping Chen <techping.chan@gmail.com>
->> >>
->> >> Allwinner A83T SoC has a low res adc like the one
->> >> in Allwinner A10 SoC.
->> >>
->> >> Add binding for it.
->> >>
->> >> Signed-off-by: Ziping Chen <techping.chan@gmail.com>
->> >> Acked-by: Rob Herring <robh@kernel.org>
->> >> ---
->> >>  Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt | 6 ++++--
->> >>  1 file changed, 4 insertions(+), 2 deletions(-)
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->> >> index 4357e498ef04..525d85e3043f 100644
->> >> --- a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->> >> +++ b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->> >> @@ -2,12 +2,14 @@ Allwinner sun4i low res adc attached tablet keys
->> >>  ------------------------------------------------
->> >>
->> >>  Required properties:
->> >> - - compatible: "allwinner,sun4i-a10-lradc-keys"
->> >> + - compatible: should be one of the following string:
->> >> +             "allwinner,sun4i-a10-lradc-keys"
->> >> +             "allwinner,sun8i-a83t-r-lradc-keys"
->> >
->> > This doesn't really have anything related to keys, and can be used
->> > purely as an ADC.
->> >
->> > I know this is the compatible that was used for the A10, but I'd
->> > rather drop the keys for the the new compatible.
->> >
->>
->> LRADC is named KEYADC in some other SoCs' User Manual(such as R40 User
->> Manual V1.0), thus LRADC is related to keys.
->
-> It's still called LRADC on the A83T, so we'll use that name. If we
-> ever need another compatible for the R40, then yes, keyadc would make
-> sense in that case.
+On Fri 09 Jun 02:41 PDT 2017, Varadarajan Narayanan wrote:
+> diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+[..]
+> +
+> +	chosen {
+> +		bootargs = "root=/dev/ram0 rw init=/init";
 
-Hi,
+As far as I know you can omit both root= and init= from this.
 
-So... whether to use "sun4i-lradc" to replace "sun4i-lradc-keys"?
+> +		stdout-path = "serial0";
+> +	};
+> +
 
-I think it should be separated, one is the input subsystem, the other
-is the iio subsystem.
+Apart from that,
 
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
