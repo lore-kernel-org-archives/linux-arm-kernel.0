@@ -1,163 +1,304 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 29 Jun 2017 10:13:12 +0800
-Subject: [arm-platforms:kvm-arm64/gicv4-kvm 50/66]
- arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:115: undefined reference
- to `its_map_vlpi'
-Message-ID: <201706291001.jj1xvxdc%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 29 Jun 2017 10:47:53 +0800
+Subject: [PATCH v7] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <20170628105224.6619-1-net147@gmail.com>
+References: <20170628105224.6619-1-net147@gmail.com>
+Message-ID: <CAGb2v651r+ksbZGLATOdrh5RyuCeR-vp06D246A+QXferLH=4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
-head:   bcbe1ce47109136fda5a06bdc6c87fc5209defdc
-commit: 72adc31604df8cf73af0e6981b87ac9f249257d4 [50/66] KVM: arm/arm64: GICv4: Wire mapping/unmapping of VLPIs in VFIO irq bypass
-config: arm-axm55xx_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 72adc31604df8cf73af0e6981b87ac9f249257d4
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Hi,
 
-All errors (new ones prefixed by >>):
+On Wed, Jun 28, 2017 at 6:52 PM, Jonathan Liu <net147@gmail.com> wrote:
+> The documentation for drm_do_get_edid in drivers/gpu/drm/drm_edid.c states:
+> "As in the general case the DDC bus is accessible by the kernel at the I2C
+> level, drivers must make all reasonable efforts to expose it as an I2C
+> adapter and use drm_get_edid() instead of abusing this function."
+>
+> Exposing the DDC bus as an I2C adapter is more beneficial as it can be used
+> for purposes other than reading the EDID such as modifying the EDID or
+> using the HDMI DDC pins as an I2C bus through the I2C dev interface from
+> userspace (e.g. i2c-tools).
+>
+> Implement this for A10s.
+>
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> ---
+> Changes for v7:
+>  - Fix mixed declarations and code compiler warning for level variable
+>
+> Changes for v6:
+>  - Use fixed byte time of 100 us instead of dynamically calculating from DDC
+>    clock that is set to a fixed 100 MHz rate anyway
+>  - Change is_fifo_flag_unset to not read the status register as well to be
+>    more consistent with is_err_status
+>
+> Changes for v5:
+>  - Use devm_kzalloc instead of devm_kmemdup and remove const struct i2c_adapter
+>  - Rework to use readl_poll_timeout for checking FIFO status
+>
+> Changes for v4:
+>  - Carry over copyright from initial I2C code into sun4i_hdmi_i2c.c
+>  - Clean up indentation in sun4i_hdmi.h
+>  - Rename SUN4I_HDMI_DDC_MAX_TRANSFER_SIZE to SUN4I_HDMI_DDC_BYTE_COUNT_MAX
+>    and group it under the SUN4I_HDMI_DDC_BYTE_COUNT_REG define, changing the
+>    value to use the GENMASK macro to make it clear that it is derived from
+>    the width of the field in the register
+>  - Fix SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_UNDERFLOW typo which should be
+>    SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW
+>  - Remove redundant rewriting of SUN4I_HDMI_DDC_INT_STATUS_REG register
+>  - Change struct i2c_adapter to be const by using devm_kmemdup on creation
+>  - Return -ETIMEDOUT instead of -EIO if there is timeout while transferring an
+>    I2C message
+>  - Instead of waiting for 1-2 bytes to transfer, wait for the time it would
+>    take for remaining bytes to transfer (limited by FIFO size)
+>  - Add additional comments
+>
+> Changes for v3:
+>  - Explain why drm_do_get_edid should be used and why it's better to expose it
+>    as an I2C adapter in commit message
+>  - Reorder bit defines in descending order for consistency
+>  - Keep old unused macros instead of removing them
+>  - The v2 algorithm split large transfers into 16 byte transfers but this may
+>    cause a large single write to be treated as multiple writes causing data
+>    corruption. The algorithm has been reworked to not split larger transfers
+>    and make more use of the FIFO to avoid this.
+>  - Moved the creation of the DDC clock from sun4i_hdmi_enc.c to
+>    sun4i_hdmi_i2c.c
+>  - Reformatted code
+>  - Instead of masking bits that we don't want to check for errors, explicitly
+>    check the error bits
+>  - Clear error bits at start of transfer in case of error from previous transfer
+>  - Poll for completion of FIFO clear after setting FIFO clear bit
+>
+> Changes for v2:
+>  - Rebased against Maxime's sunxi-drm/for-next branch
+>  - Fix up error paths in sun4i_hdmi_bind so that the I2C adapter is deleted if
+>    any of the calls after the I2C adapter is created fails
+>  - Remove unnecessary includes in sun4i_hdmi_i2c.c
+>
+>  drivers/gpu/drm/sun4i/Makefile         |   1 +
+>  drivers/gpu/drm/sun4i/sun4i_hdmi.h     |  23 ++++
+>  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 101 ++------------
+>  drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c | 234 +++++++++++++++++++++++++++++++++
+>  4 files changed, 269 insertions(+), 90 deletions(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+>
 
-   arch/arm/kvm/built-in.o: In function `vgic_v4_init':
-   arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:42: undefined reference to `its_alloc_vcpu_irqs'
-   arch/arm/kvm/built-in.o: In function `vgic_v4_teardown':
-   arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:57: undefined reference to `its_free_vcpu_irqs'
-   arch/arm/kvm/built-in.o: In function `kvm_vgic_v4_set_forwarding':
->> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:115: undefined reference to `its_map_vlpi'
-   arch/arm/kvm/built-in.o: In function `kvm_vgic_v4_unset_forwarding':
->> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:150: undefined reference to `its_unmap_vlpi'
+[...]
 
-vim +115 arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+> new file mode 100644
+> index 000000000000..ce954ee25ae4
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+> @@ -0,0 +1,234 @@
 
-    36	
-    37		dist->its_vm.nr_vpes = nr_vcpus;
-    38	
-    39		kvm_for_each_vcpu(i, vcpu, kvm)
-    40			dist->its_vm.vpes[i] = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
-    41	
-  > 42		ret = its_alloc_vcpu_irqs(&dist->its_vm);
-    43		if (ret < 0) {
-    44			kvm_err("VPE IRQ allocation failure\n");
-    45			dist->its_vm.nr_vpes = 0;
-    46			kfree(dist->its_vm.vpes);
-    47			return ret;
-    48		}
-    49	
-    50		return ret;
-    51	}
-    52	
-    53	void vgic_v4_teardown(struct kvm *kvm)
-    54	{
-    55		struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
-    56	
-    57		its_free_vcpu_irqs(its_vm);
-    58		kfree(its_vm->vpes);
-    59	}
-    60	
-    61	static struct vgic_its *vgic_get_its(struct kvm *kvm,
-    62					     struct kvm_kernel_irq_routing_entry *irq_entry)
-    63	{
-    64		struct kvm_msi msi  = (struct kvm_msi) {
-    65			.address_lo	= irq_entry->msi.address_lo,
-    66			.address_hi	= irq_entry->msi.address_hi,
-    67			.data		= irq_entry->msi.data,
-    68			.flags		= irq_entry->msi.flags,
-    69			.devid		= irq_entry->msi.devid,
-    70		};
-    71	
-    72		/*
-    73		 * Get a reference on the LPI. If NULL, this is not a valid
-    74		 * translation for any of our vITSs.
-    75		 */
-    76		return vgic_msi_to_its(kvm, &msi);
-    77	}
-    78	
-    79	int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int virq,
-    80				       struct kvm_kernel_irq_routing_entry *irq_entry)
-    81	{
-    82		struct vgic_its *its;
-    83		struct vgic_irq *irq;
-    84		struct its_vlpi_map map;
-    85		int ret;
-    86	
-    87		/*
-    88		 * Get the LPI. If NULL, this is not a valid translation for
-    89		 * any of our vITSs.
-    90		 */
-    91		its = vgic_get_its(kvm, irq_entry);
-    92		if (!its)
-    93			return 0;
-    94	
-    95		mutex_lock(&its->its_lock);
-    96	
-    97		ret = vgic_its_resolve_lpi(kvm, its, irq_entry->msi.devid,
-    98					   irq_entry->msi.data, &irq);
-    99		if (ret)
-   100			goto out;
-   101	
-   102		/*
-   103		 * Emit the mapping request. If it fails, the ITS probably
-   104		 * isn't v4 compatible, so let's silently bail out. Holding
-   105		 * the ITS lock should ensure that nothing can modify the
-   106		 * target vcpu.
-   107		 */
-   108		map = (struct its_vlpi_map) {
-   109			.vm		= &kvm->arch.vgic.its_vm,
-   110			.vintid		= irq->intid,
-   111			.db_enabled	= true,
-   112			.vpe_idx	= irq->target_vcpu->vcpu_id,
-   113		};
-   114	
- > 115		if (its_map_vlpi(virq, &map))
-   116			goto out;
-   117	
-   118		irq->hw		= true;
-   119		irq->host_irq	= virq;
-   120	
-   121	out:
-   122		mutex_unlock(&its->its_lock);
-   123		return 0;
-   124	}
-   125	
-   126	int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int virq,
-   127					 struct kvm_kernel_irq_routing_entry *irq_entry)
-   128	{
-   129		struct vgic_its *its;
-   130		struct vgic_irq *irq;
-   131		int ret;
-   132	
-   133		/*
-   134		 * Get the LPI. If NULL, this is not a valid translation for
-   135		 * any of our vITSs.
-   136		 */
-   137		its = vgic_get_its(kvm, irq_entry);
-   138		if (!its)
-   139			return 0;
-   140	
-   141		mutex_lock(&its->its_lock);
-   142	
-   143		ret = vgic_its_resolve_lpi(kvm, its, irq_entry->msi.devid,
-   144					   irq_entry->msi.data, &irq);
-   145		if (ret)
-   146			goto out;
-   147	
-   148		WARN_ON(!(irq->hw && irq->host_irq == virq));
-   149		irq->hw = false;
- > 150		ret = its_unmap_vlpi(virq);
-   151	
-   152	out:
-   153		mutex_unlock(&its->its_lock);
+[...]
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 20100 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170629/87c779b4/attachment-0001.gz>
+> +static int fifo_transfer(struct sun4i_hdmi *hdmi, u8 *buf, int len, bool read)
+> +{
+> +       /*
+> +        * 1 byte takes 9 clock cycles (8 bits + 1 ACK) = 90 us for 100 MHz
+> +        * clock. As clock rate is fixed, just round it up to 100 us.
+
+This looks fishy. I2C busses are never that fast. Maybe kHz?
+
+ChenYu
+
+> +        */
+> +       const unsigned long byte_time_ns = 100;
+> +       u32 int_status;
+> +       u32 fifo_status;
+> +       /* Read needs empty flag unset, write needs full flag unset */
+> +       u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
+> +                         SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
+> +       int level;
+> +       int ret;
+> +
+> +       /* Wait until error or FIFO ready */
+> +       ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+> +                                int_status,
+> +                                is_err_status(int_status) ||
+> +                                is_fifo_flag_unset(fifo_status =
+> +                                                   read_fifo_status(hdmi),
+> +                                                   flag),
+> +                                min(len, SUN4I_HDMI_DDC_FIFO_SIZE) *
+> +                                byte_time_ns, 100000);
+> +
+> +       if (is_err_status(int_status))
+> +               return -EIO;
+> +       if (ret)
+> +               return -ETIMEDOUT;
+> +
+> +       /* Read FIFO level */
+> +       level = (int)(fifo_status & SUN4I_HDMI_DDC_FIFO_STATUS_LEVEL_MASK);
+> +
+> +       /* Limit transfer length using FIFO level to avoid underflow/overflow */
+> +       len = min(len, read ? level : (SUN4I_HDMI_DDC_FIFO_SIZE - level));
+> +
+> +       if (read)
+> +               readsb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
+> +       else
+> +               writesb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
+> +
+> +       return len;
+> +}
+> +
+> +static int xfer_msg(struct sun4i_hdmi *hdmi, struct i2c_msg *msg)
+> +{
+> +       int i, len;
+> +       u32 reg;
+> +
+> +       /* Clear errors */
+> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
+> +       reg &= ~SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK;
+> +       writel(reg, hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
+> +
+> +       /* Set FIFO direction */
+> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+> +       reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
+> +       reg |= (msg->flags & I2C_M_RD) ?
+> +              SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ :
+> +              SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE;
+> +       writel(reg, hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+> +
+> +       /* Set I2C address */
+> +       writel(SUN4I_HDMI_DDC_ADDR_SLAVE(msg->addr),
+> +              hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
+> +
+> +       /* Clear FIFO */
+> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+> +       writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
+> +              hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+> +       if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG,
+> +                              reg,
+> +                              !(reg & SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR),
+> +                              100, 100000))
+> +               return -EIO;
+> +
+> +       /* Set transfer length */
+> +       writel(msg->len, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
+> +
+> +       /* Set command */
+> +       writel(msg->flags & I2C_M_RD ?
+> +              SUN4I_HDMI_DDC_CMD_IMPLICIT_READ :
+> +              SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE,
+> +              hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
+> +
+> +       /* Start command */
+> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+> +       writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
+> +              hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+> +
+> +       /* Transfer bytes */
+> +       for (i = 0; i < msg->len; i += len) {
+> +               len = fifo_transfer(hdmi, msg->buf + i, msg->len - i,
+> +                                   msg->flags & I2C_M_RD);
+> +               if (len <= 0)
+> +                       return len;
+> +       }
+> +
+> +       /* Wait for command to finish */
+> +       if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG,
+> +                              reg,
+> +                              !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
+> +                              100, 100000))
+> +               return -EIO;
+> +
+> +       /* Check for errors */
+> +       reg = readl(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
+> +       if ((reg & SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK) ||
+> +           !(reg & SUN4I_HDMI_DDC_INT_STATUS_TRANSFER_COMPLETE)) {
+> +               return -EIO;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int sun4i_hdmi_i2c_xfer(struct i2c_adapter *adap,
+> +                              struct i2c_msg *msgs, int num)
+> +{
+> +       struct sun4i_hdmi *hdmi = i2c_get_adapdata(adap);
+> +       u32 reg;
+> +       int err, i, ret = num;
+> +
+> +       for (i = 0; i < num; i++) {
+> +               if (!msgs[i].len)
+> +                       return -EINVAL;
+> +               if (msgs[i].len > SUN4I_HDMI_DDC_BYTE_COUNT_MAX)
+> +                       return -EINVAL;
+> +       }
+> +
+> +       /* Reset I2C controller */
+> +       writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
+> +              hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+> +       if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
+> +                              !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
+> +                              100, 2000))
+> +               return -EIO;
+> +
+> +       writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
+> +              SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
+> +              hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
+> +
+> +       clk_prepare_enable(hdmi->ddc_clk);
+> +       clk_set_rate(hdmi->ddc_clk, 100000);
+
+Indeed the clock rate is 100 kHz.
+
+ChenYu
+
+> +
+> +       for (i = 0; i < num; i++) {
+> +               err = xfer_msg(hdmi, &msgs[i]);
+> +               if (err) {
+> +                       ret = err;
+> +                       break;
+> +               }
+> +       }
+> +
+> +       clk_disable_unprepare(hdmi->ddc_clk);
+> +       return ret;
+> +}
+> +
+> +static u32 sun4i_hdmi_i2c_func(struct i2c_adapter *adap)
+> +{
+> +       return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+> +}
+> +
+> +static const struct i2c_algorithm sun4i_hdmi_i2c_algorithm = {
+> +       .master_xfer    = sun4i_hdmi_i2c_xfer,
+> +       .functionality  = sun4i_hdmi_i2c_func,
+> +};
+> +
+> +int sun4i_hdmi_i2c_create(struct device *dev, struct sun4i_hdmi *hdmi)
+> +{
+> +       struct i2c_adapter *adap;
+> +       int ret = 0;
+> +
+> +       ret = sun4i_ddc_create(hdmi, hdmi->tmds_clk);
+> +       if (ret)
+> +               return ret;
+> +
+> +       adap = devm_kzalloc(dev, sizeof(*adap), GFP_KERNEL);
+> +       if (!adap)
+> +               return -ENOMEM;
+> +
+> +       adap->owner = THIS_MODULE;
+> +       adap->class = I2C_CLASS_DDC;
+> +       adap->algo = &sun4i_hdmi_i2c_algorithm;
+> +       strlcpy(adap->name, "sun4i_hdmi_i2c adapter", sizeof(adap->name));
+> +       i2c_set_adapdata(adap, hdmi);
+> +
+> +       ret = i2c_add_adapter(adap);
+> +       if (ret)
+> +               return ret;
+> +
+> +       hdmi->i2c = adap;
+> +
+> +       return ret;
+> +}
+> --
+> 2.13.1
+>
