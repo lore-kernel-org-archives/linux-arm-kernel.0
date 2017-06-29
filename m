@@ -1,99 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Jun 2017 08:18:49 +0000
-Subject: [PATCH v2 7/7] arm: efi: add PE/COFF debug table to EFI header
-In-Reply-To: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
-References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170629081849.15081-8-ard.biesheuvel@linaro.org>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Thu, 29 Jun 2017 13:51:35 +0530
+Subject: [PATCH] media: exynos4-is: fimc-is-i2c: constify dev_pm_ops
+ structures.
+Message-ID: <82b48f71d328c24e7b526e6bbdff15d03229217a.1498724254.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the PE/COFF header to emit the absolute path to the
-decompressor vmlinux ELF file into a so-called NB10 Codeview entry.
-This is hugely helpful when debugging the firmware->stub handover.
+dev_pm_ops are not supposed to change at runtime. All functions
+working with dev_pm_ops provided by <linux/device.h> work with const
+dev_pm_ops. So mark the non-const structs as const.
 
-Cc: Russell King <linux@armlinux.org.uk>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+   1195	    376	      0	   1571	    623	drivers/media/platform/exynos4-is/fimc-is-i2c.o
+
+File size After adding 'const':
+   text	   data	    bss	    dec	    hex	filename
+   1403	    176	      0	   1579	    62b	drivers/media/platform/exynos4-is/fimc-is-i2c.o
+
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- arch/arm/boot/compressed/Makefile     |  4 ++
- arch/arm/boot/compressed/efi-header.S | 47 ++++++++++++++++++++
- 2 files changed, 51 insertions(+)
+ drivers/media/platform/exynos4-is/fimc-is-i2c.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index d50430c40045..6b978bdbac3e 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -196,3 +196,7 @@ AFLAGS_hyp-stub.o := -Wa,-march=armv7-a
+diff --git a/drivers/media/platform/exynos4-is/fimc-is-i2c.c b/drivers/media/platform/exynos4-is/fimc-is-i2c.c
+index 2f55966..70dd485 100644
+--- a/drivers/media/platform/exynos4-is/fimc-is-i2c.c
++++ b/drivers/media/platform/exynos4-is/fimc-is-i2c.c
+@@ -130,7 +130,7 @@ static int fimc_is_i2c_resume(struct device *dev)
+ }
+ #endif
  
- $(obj)/hyp-stub.S: $(srctree)/arch/$(SRCARCH)/kernel/hyp-stub.S
- 	$(call cmd,shipped)
-+
-+ifeq ($(CONFIG_EFI)$(CONFIG_DEBUG_INFO),yy)
-+AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(obj)/vmlinux)\""
-+endif
-diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-index a14516f7a27e..e902414e90b6 100644
---- a/arch/arm/boot/compressed/efi-header.S
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -98,6 +98,11 @@ extra_header_fields:
- 		.quad	0				@ CertificationTable
- 		.quad	0				@ BaseRelocationTable
- 
-+#ifdef CONFIG_DEBUG_INFO
-+		.long	efi_debug_table - start		@ DebugTable
-+		.long	efi_debug_table_size
-+#endif
-+
- section_table:
- 		.ascii	".text\0\0\0"
- 		.long	__pecoff_code_size		@ VirtualSize
-@@ -127,6 +132,48 @@ section_table:
- 
- 		.set	section_count, (. - section_table) / 40
- 
-+#ifdef CONFIG_DEBUG_INFO
-+		/*
-+		 * The debug table is referenced via its Relative Virtual
-+		 * Address (RVA), which is only defined for those parts of
-+		 * the image that are covered by a section declaration. Since
-+		 * this header is not covered by any section, the debug table
-+		 * must be emitted elsewhere. So stick it in the .rodata
-+		 * section instead.
-+		 *
-+		 * Note that the EFI debug entry itself may legally have a
-+		 * zero RVA, which means we can simply put it right after the
-+		 * section headers.
-+		 */
-+		.section	".rodata", #alloc
-+
-+		.align	2
-+efi_debug_table:
-+		// EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
-+		.long	0				@ Characteristics
-+		.long	0				@ TimeDateStamp
-+		.short	0				@ MajorVersion
-+		.short	0				@ MinorVersion
-+		.long	IMAGE_DEBUG_TYPE_CODEVIEW	@ Type
-+		.long	efi_debug_entry_size		@ SizeOfData
-+		.long	0				@ RVA
-+		.long	efi_debug_entry - start		@ FileOffset
-+
-+		.set	efi_debug_table_size, . - efi_debug_table
-+		.previous
-+
-+efi_debug_entry:
-+		// EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
-+		.ascii	"NB10"				@ Signature
-+		.long	0				@ Unknown
-+		.long	0				@ Unknown2
-+		.long	0				@ Unknown3
-+
-+		.asciz	VMLINUX_PATH
-+
-+		.set	efi_debug_entry_size, . - efi_debug_entry
-+#endif
-+
- 		.align	12
- __efi_start:
- 		.text
+-static struct dev_pm_ops fimc_is_i2c_pm_ops = {
++static const struct dev_pm_ops fimc_is_i2c_pm_ops = {
+ 	SET_RUNTIME_PM_OPS(fimc_is_i2c_runtime_suspend,
+ 					fimc_is_i2c_runtime_resume, NULL)
+ 	SET_SYSTEM_SLEEP_PM_OPS(fimc_is_i2c_suspend, fimc_is_i2c_resume)
 -- 
-2.9.3
+1.9.1
