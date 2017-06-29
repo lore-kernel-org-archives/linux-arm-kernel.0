@@ -1,42 +1,72 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 29 Jun 2017 21:54:38 +0100
-Subject: [RESEND PATCH] drm/hisilicon: Ensure LDI regs are properly configured.
-Message-ID: <1498769678-12155-1-git-send-email-peter.griffin@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 29 Jun 2017 14:00:02 -0700
+Subject: [RFC 0/5] drivers: Add boot constraints core
+In-Reply-To: <20170629154353.GX4902@n2100.armlinux.org.uk>
+References: <cover.1498642745.git.viresh.kumar@linaro.org>
+ <20170629124908.GV4902@n2100.armlinux.org.uk>
+ <20170629145808.GQ29665@vireshk-i7>
+ <20170629154353.GX4902@n2100.armlinux.org.uk>
+Message-ID: <20170629210002.GB22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following soft lockup:
-  BUG: soft lockup - CPU#0 stuck for 23s! [weston:307]
+On 06/29, Russell King - ARM Linux wrote:
+> On Thu, Jun 29, 2017 at 08:28:08PM +0530, Viresh Kumar wrote:
+> > On 29-06-17, 13:49, Russell King - ARM Linux wrote:
+> > > The thing that concerns me most about this is that typically the LCD
+> > > controller will be performing DMA to system RAM.
+> > > 
+> > > The location of the frame buffer is unknown to the decompressor - and
+> > > as the decompressor self-relocates itself (using purely assembly code),
+> > > it could relocate itself on top of the frame buffer, causing the "nice"
+> > > image to become very colourful.
+> > > 
+> > > The decompressor doesn't have the information from DT at that point to
+> > > know what are safe locations, so it's up to the boot loader to place
+> > > the frame buffer somewhere out of the way.  (If people want to write
+> > > a DT parser in position independent ARM assembly code that may change.)
+> > > 
+> > > As long as people realise this, then it's not a problem, but given the
+> > > number of problems that we've already encountered with boot loaders and
+> > > memory space layout, I don't trust them to get this right.
+> > > 
+> > > Right now, the ARM kernel booting document requires:
+> > > 
+> > > - Quiesce all DMA capable devices so that memory does not get
+> > >   corrupted by bogus network packets or disk data. This will save
+> > >   you many hours of debug.
+> > > 
+> > > so we would need to modify that to make an exception for LCD controllers.
+> > > However, we definitely can't have devices left enabled which are capable
+> > > of writing to system memory, or which changing system memory is likely
+> > > to cause bad effects (eg, packet ring buffers, USB buffers etc, which is
+> > > really what the above requirement is about.)
+> > 
+> > Well, LCD was just an example here. But yeah, it is one of the most
+> > probable case we have.
+> > 
+> > So, this thing is already working for sure, of course with some out of
+> > tree hacks. Every smart phone shows their company's logo (some kind of
+> > flash) while the phone boots. How do they get around such issues?
+> 
+> As far as the memory being used goes, they probably locate the frame
+> buffer well away from the kernel or any area that the kernel is likely
+> to use during decompression.
+> 
+> It's probably also marked as a reserved memory region in DT to avoid
+> the kernel touching it during boot, or _maybe_ they just locate it
+> somewhere in memory that they've tested that the kernel doesn't touch
+> until after their kernel has initialised the LCD controller (thereby
+> avoiding the memory being permanently consumed.)
+> 
 
-On weston idle-timeout the IP is powered down and reset
-asserted. On weston resume we get a massive vblank
-IRQ storm due to the LDI registers having lost some state.
+Yes. The display controller is typically pointed to a memory
+carveout that we treat as reserved in the kernel. I'm fairly
+certain that we avoid the "permanently consumed" problem by
+making it a carveout for the display controller, so that when the
+display controller probes it can take ownership of the memory
+from the bootloader.
 
-This state loss is caused by ade_crtc_atomic_begin() not
-calling ade_ldi_set_mode(). With this patch applied
-resuming from Weston idle-timeout works well.
-
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
-index c96c228..72c6357 100644
---- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
-+++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
-@@ -519,9 +519,12 @@ static void ade_crtc_atomic_begin(struct drm_crtc *crtc,
- {
- 	struct ade_crtc *acrtc = to_ade_crtc(crtc);
- 	struct ade_hw_ctx *ctx = acrtc->ctx;
-+	struct drm_display_mode *mode = &crtc->state->mode;
-+	struct drm_display_mode *adj_mode = &crtc->state->adjusted_mode;
- 
- 	if (!ctx->power_on)
- 		(void)ade_power_up(ctx);
-+	ade_ldi_set_mode(acrtc, mode, adj_mode);
- }
- 
- static void ade_crtc_atomic_flush(struct drm_crtc *crtc,
 -- 
-2.7.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
