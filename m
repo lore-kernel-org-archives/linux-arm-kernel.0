@@ -1,66 +1,33 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 29 Jun 2017 14:55:14 +0200
-Subject: Clocks used by another OS/CPU
-In-Reply-To: <CAMuHMdXedexq_jGq+y3Hbmph1_1N_LjT7dhYJ=rC0Q2oK_Xjug@mail.gmail.com>
-References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
- <CAMuHMdWRadUCZUycUW3dKJhS__aRRVbV1tXo0umUQ7KHOYQMoQ@mail.gmail.com>
- <50911172-8fa1-8341-0ed0-d40f00d9392c@de.bosch.com>
- <CAMuHMdXedexq_jGq+y3Hbmph1_1N_LjT7dhYJ=rC0Q2oK_Xjug@mail.gmail.com>
-Message-ID: <d1ee0f5b-d9ef-96c0-b698-a4a1cef58428@de.bosch.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Thu, 29 Jun 2017 14:58:43 +0200
+Subject: [PATCHv2 9/9] spi: spidev: add Aardvark to device tree
+ compatibility list
+In-Reply-To: <20170628185445.fsnqs2tlqqeqzl57@sirena.org.uk>
+References: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
+ <1498578321-13980-10-git-send-email-amelie.delaunay@st.com>
+ <20170628185445.fsnqs2tlqqeqzl57@sirena.org.uk>
+Message-ID: <67764839-889b-e398-16eb-de583d82cbf3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.06.2017 14:45, Geert Uytterhoeven wrote:
-> Hi Dirk,
+
+
+On 06/28/2017 08:54 PM, Mark Brown wrote:
+> On Tue, Jun 27, 2017 at 05:45:21PM +0200, Amelie Delaunay wrote:
+>> This patch adds an entry for the TotalPhase Aardvark SPI Host Adapter,
+>> which can operate as an SPI Slave.
 > 
-> On Thu, Jun 29, 2017 at 2:07 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->> On 29.06.2017 13:56, Geert Uytterhoeven wrote:
->>> On Thu, Jun 29, 2017 at 11:27 AM, Geert Uytterhoeven
->>> <geert@linux-m68k.org> wrote:
->>>> CC clock, ARM, DT, PM people
->>>>
->>>> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
->>>> disables them as being unused.
->>>
->>>> Of course this is not limited to clocks, but also to e.g. PM domains.
->>>
->>> BTW, how do you prevent Linux from powering down the CR7 PM domain,
->>> which contains the Cortex R7?
->>
->> The idea is
->>
->> --- a/drivers/soc/renesas/r8a7795-sysc.c
->> +++ b/drivers/soc/renesas/r8a7795-sysc.c
->> @@ -38,7 +38,8 @@ static const struct rcar_sysc_area r8a7795_areas[]
->> __initconst = {
->>          { "ca53-cpu3",  0x200, 3, R8A7795_PD_CA53_CPU3, R8A7795_PD_CA53_SCU,
->>            PD_CPU_NOCR },
->>          { "a3vp",       0x340, 0, R8A7795_PD_A3VP,      R8A7795_PD_ALWAYS_ON
->> },
->> -       { "cr7",        0x240, 0, R8A7795_PD_CR7,       R8A7795_PD_ALWAYS_ON
->> },
->> +       { "cr7",        0x240, 0, R8A7795_PD_CR7,
->> R8A7795_PD_ALWAYS_ON,
->> +         PD_CPU_NOCR },
->>          { "a3vc",       0x380, 0, R8A7795_PD_A3VC,      R8A7795_PD_ALWAYS_ON
->> },
->>          { "a2vc0",      0x3c0, 0, R8A7795_PD_A2VC0,     R8A7795_PD_A3VC },
->>          { "a2vc1",      0x3c0, 1, R8A7795_PD_A2VC1,     R8A7795_PD_A3VC },
->>
->>
->> Not finally tested, though.
+> What does this device actually do and why is spidev a sensible fit for
+> it?
 > 
-> Pretending the CR7 PM Domain can only be controlled through WFI/APMU only should
-> work.
-> But IMHO it is a hack, just like your solution for the CANFD clock.
+This device is actually a debugging tool [1] which can work on SPI bus 
+(and also I2C). Connected via USB on a PC, it can either acts as an SPI 
+master or SPI slave and it can transmit/receive serial data using SPI 
+protocol. Polarity, Phase, Bit Order, Frequency can be configured. So 
+this tool is really useful during SPI driver development to 
+troubleshoot. And that's why spidev driver totally fit for it when used 
+as an SPI slave, for the reason described in spidev Documentation: 
+"Developing simple protocols used to talk to" Aardvark "acting as SPI 
+slaves, which you may need to change quite often".
 
-
-Well, it seems to be the best solution recent mainline gives us and 
-seems to work ;)
-
-And for me it looks at least better than the other solution I've seen so 
-far: Remove the 'cr7', 'canfd' etc lines completely from the kernel.
-
-Best regards
-
-Dirk
+[1] https://www.totalphase.com/products/aardvark-i2cspi/
