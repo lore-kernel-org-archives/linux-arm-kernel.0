@@ -1,51 +1,73 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Jun 2017 08:18:43 +0000
-Subject: [PATCH v2 1/7] arm: efi: remove forbidden values from the PE/COFF
- header
+Date: Thu, 29 Jun 2017 08:18:44 +0000
+Subject: [PATCH v2 2/7] arm: efi: remove pointless dummy .reloc section
 In-Reply-To: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
 References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170629081849.15081-2-ard.biesheuvel@linaro.org>
+Message-ID: <20170629081849.15081-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring the PE/COFF header in line with the PE/COFF spec, by setting
-NumberOfSymbols to 0, and removing the section alignment flags.
+The kernel's EFI PE/COFF header contains a dummy .reloc section, and
+an explanatory comment that claims that this is required for the EFI
+application loader to accept the Image as a relocatable image (i.e.,
+one that can be loaded at any offset and fixed up in place)
+
+This was inherited from the x86 implementation, which has elaborate host
+tooling to mangle the PE/COFF header post-link time, and which populates
+the .reloc section with a single dummy base relocation. On ARM, no such
+tooling exists, and the .reloc section remains empty, and is never even
+exposed via the BaseRelocationTable directory entry, which is where the
+PE/COFF loader looks for it.
+
+The PE/COFF spec is unclear about relocatable images that do not require
+any fixups, but the EDK2 implementation, which is the de facto reference
+for PE/COFF in the UEFI space, clearly does not care, and explicitly
+mentions (in a comment) that relocatable images with no base relocations
+are perfectly fine, as long as they don't have the RELOCS_STRIPPED
+attribute set (which is not the case for our PE/COFF image)
+
+So simply remove the .reloc section altogether.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/boot/compressed/efi-header.S | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/compressed/efi-header.S | 18 +-----------------
+ 1 file changed, 1 insertion(+), 17 deletions(-)
 
 diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-index a17ca8d78656..4169b900d9d4 100644
+index 4169b900d9d4..309d6198d335 100644
 --- a/arch/arm/boot/compressed/efi-header.S
 +++ b/arch/arm/boot/compressed/efi-header.S
-@@ -44,7 +44,7 @@ coff_header:
- 		.short	2			@ nr_sections
+@@ -41,7 +41,7 @@ pe_header:
+ 
+ coff_header:
+ 		.short	0x01c2			@ ARM or Thumb
+-		.short	2			@ nr_sections
++		.short	1			@ nr_sections
  		.long	0 			@ TimeDateStamp
  		.long	0			@ PointerToSymbolTable
--		.long	1			@ NumberOfSymbols
-+		.long	0			@ NumberOfSymbols
- 		.short	section_table - optional_header
- 						@ SizeOfOptionalHeader
- 		.short	0x306			@ Characteristics.
-@@ -110,7 +110,7 @@ section_table:
- 		.long	0			@ PointerToLineNumbers
- 		.short	0			@ NumberOfRelocations
- 		.short	0			@ NumberOfLineNumbers
--		.long	0x42100040		@ Characteristics
-+		.long	0x42000040		@ Characteristics
+ 		.long	0			@ NumberOfSymbols
+@@ -96,22 +96,6 @@ extra_header_fields:
+ 		.quad	0			@ BaseRelocationTable
  
+ section_table:
+-		@
+-		@ The EFI application loader requires a relocation section
+-		@ because EFI applications must be relocatable. This is a
+-		@ dummy section as far as we are concerned.
+-		@
+-		.ascii	".reloc\0\0"
+-		.long	0			@ VirtualSize
+-		.long	0			@ VirtualAddress
+-		.long	0			@ SizeOfRawData
+-		.long	0			@ PointerToRawData
+-		.long	0			@ PointerToRelocations
+-		.long	0			@ PointerToLineNumbers
+-		.short	0			@ NumberOfRelocations
+-		.short	0			@ NumberOfLineNumbers
+-		.long	0x42000040		@ Characteristics
+-
  		.ascii	".text\0\0\0"
  		.long	_end - __efi_start	@ VirtualSize
-@@ -121,7 +121,7 @@ section_table:
- 		.long	0			@ PointerToLineNumbers
- 		.short	0			@ NumberOfRelocations
- 		.short	0			@ NumberOfLineNumbers
--		.long	0xe0500020		@ Characteristics
-+		.long	0xe0000020		@ Characteristics
- 
- 		.align	9
- __efi_start:
+ 		.long	__efi_start		@ VirtualAddress
 -- 
 2.9.3
