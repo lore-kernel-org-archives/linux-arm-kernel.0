@@ -1,48 +1,44 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 29 Jun 2017 14:07:38 +0200
-Subject: Clocks used by another OS/CPU
-In-Reply-To: <CAMuHMdWRadUCZUycUW3dKJhS__aRRVbV1tXo0umUQ7KHOYQMoQ@mail.gmail.com>
-References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
- <CAMuHMdWRadUCZUycUW3dKJhS__aRRVbV1tXo0umUQ7KHOYQMoQ@mail.gmail.com>
-Message-ID: <50911172-8fa1-8341-0ed0-d40f00d9392c@de.bosch.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 29 Jun 2017 14:16:55 +0200
+Subject: [PATCH 5/5] ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK
+ support
+In-Reply-To: <20170629115931.yki2xbehyicbtx3w@tarshish>
+References: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
+ <1498736674-9233-6-git-send-email-claudiu.beznea@microchip.com>
+ <20170629115931.yki2xbehyicbtx3w@tarshish>
+Message-ID: <20170629121655.37pq7cnabvv4wh7z@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.06.2017 13:56, Geert Uytterhoeven wrote:
-> Hi Dirk,
+On 29/06/2017 at 14:59:31 +0300, Baruch Siach wrote:
+> Hi Claudiu,
 > 
-> On Thu, Jun 29, 2017 at 11:27 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> CC clock, ARM, DT, PM people
->>
->> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
->> disables them as being unused.
+> On Thu, Jun 29, 2017 at 02:44:34PM +0300, Claudiu Beznea wrote:
+> > Add specifig DTS files and bindings for sama5d27 SoM1 EK board.
 > 
->> Of course this is not limited to clocks, but also to e.g. PM domains.
+> Is there any publicly available information on this SoM?
 > 
-> BTW, how do you prevent Linux from powering down the CR7 PM domain,
-> which contains the Cortex R7?
+> One more comment below.
+> 
+> > Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> > Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+> > ---
+> 
+> [snip]
+> 
+> > +	memory {
+> > +		reg = <0x20000000 0x20000>;
+> 
+> Are you sure this SoM has 132KB RAM?
+> 
+> Since you seem to rely on the bootloader to fill in the right size value, you 
+> can just drop this node and rely on sama5d2.dtsi that provides a stub node.
+> 
+
+Yeah, that is what I would do too.
 
 
-The idea is
-
---- a/drivers/soc/renesas/r8a7795-sysc.c
-+++ b/drivers/soc/renesas/r8a7795-sysc.c
-@@ -38,7 +38,8 @@ static const struct rcar_sysc_area r8a7795_areas[] 
-__initconst = {
-  	{ "ca53-cpu3",	0x200, 3, R8A7795_PD_CA53_CPU3,	R8A7795_PD_CA53_SCU,
-  	  PD_CPU_NOCR },
-  	{ "a3vp",	0x340, 0, R8A7795_PD_A3VP,	R8A7795_PD_ALWAYS_ON },
--	{ "cr7",	0x240, 0, R8A7795_PD_CR7,	R8A7795_PD_ALWAYS_ON },
-+	{ "cr7",	0x240, 0, R8A7795_PD_CR7,	R8A7795_PD_ALWAYS_ON,
-+	  PD_CPU_NOCR },
-  	{ "a3vc",	0x380, 0, R8A7795_PD_A3VC,	R8A7795_PD_ALWAYS_ON },
-  	{ "a2vc0",	0x3c0, 0, R8A7795_PD_A2VC0,	R8A7795_PD_A3VC },
-  	{ "a2vc1",	0x3c0, 1, R8A7795_PD_A2VC1,	R8A7795_PD_A3VC },
-
-
-Not finally tested, though.
-
-Best regards
-
-Dirk
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
