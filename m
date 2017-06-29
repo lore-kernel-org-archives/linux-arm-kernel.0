@@ -1,38 +1,165 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Jun 2017 08:18:46 +0000
-Subject: [PATCH v2 4/7] arm: compressed: discard ksymtab/kcrctab sections
+Date: Thu, 29 Jun 2017 08:18:47 +0000
+Subject: [PATCH v2 5/7] arm: efi: split zImage code and data into separate
+ PE/COFF sections
 In-Reply-To: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
 References: <20170629081849.15081-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170629081849.15081-5-ard.biesheuvel@linaro.org>
+Message-ID: <20170629081849.15081-6-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With UEFI support added to the decompressor, we may end up including
-C code that is part of the kernel proper, but is rebuilt for the
-decompressor. This may result in ksymtab/kcrctab metadata being
-duplicated into the decompressor, so discard such regions explicitly.
+To prevent unintended modifications to the kernel text (malicious or
+otherwise) while running the EFI stub, describe the kernel image as
+two separate sections: a .text section with read-execute permissions,
+covering .text, .rodata, .piggytext and the GOT sections (which the
+stub does not care about anyway), and a .data section with read-write
+permissions, covering .data and .bss.
+
+This relies on the firmware to actually take the section permission
+flags into account, but this is something that is currently being
+implemented in EDK2, which means we will likely start seeing it in
+the wild between one and two years from now.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/boot/compressed/vmlinux.lds.S | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/compressed/efi-header.S  | 32 ++++++++++++++------
+ arch/arm/boot/compressed/vmlinux.lds.S | 30 +++++++++++++-----
+ 2 files changed, 46 insertions(+), 16 deletions(-)
 
+diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+index 542e1ad432ae..c94a88ae834d 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -54,20 +54,22 @@ coff_header:
+ 			IMAGE_FILE_EXECUTABLE_IMAGE | \
+ 			IMAGE_FILE_LINE_NUMS_STRIPPED	@ Characteristics
+ 
++#define __pecoff_code_size (__pecoff_data_start - __efi_start)
++
+ optional_header:
+ 		.short	PE_OPT_MAGIC_PE32		@ PE32 format
+ 		.byte	0x02				@ MajorLinkerVersion
+ 		.byte	0x14				@ MinorLinkerVersion
+-		.long	_end - __efi_start		@ SizeOfCode
+-		.long	0				@ SizeOfInitializedData
++		.long	__pecoff_code_size		@ SizeOfCode
++		.long	__pecoff_data_size		@ SizeOfInitializedData
+ 		.long	0				@ SizeOfUninitializedData
+ 		.long	efi_stub_entry - start		@ AddressOfEntryPoint
+ 		.long	start_offset			@ BaseOfCode
+-		.long	0				@ BaseOfData
++		.long	__pecoff_data_start - start	@ BaseOfData
+ 
+ extra_header_fields:
+ 		.long	0				@ ImageBase
+-		.long	SZ_512				@ SectionAlignment
++		.long	SZ_4K				@ SectionAlignment
+ 		.long	SZ_512				@ FileAlignment
+ 		.short	0				@ MajorOsVersion
+ 		.short	0				@ MinorOsVersion
+@@ -77,7 +79,7 @@ extra_header_fields:
+ 		.short	0				@ MinorSubsystemVersion
+ 		.long	0				@ Win32VersionValue
+ 
+-		.long	_end - start			@ SizeOfImage
++		.long	__pecoff_end - start		@ SizeOfImage
+ 		.long	start_offset			@ SizeOfHeaders
+ 		.long	0				@ CheckSum
+ 		.short	IMAGE_SUBSYSTEM_EFI_APPLICATION	@ Subsystem
+@@ -98,9 +100,9 @@ extra_header_fields:
+ 
+ section_table:
+ 		.ascii	".text\0\0\0"
+-		.long	_end - __efi_start		@ VirtualSize
++		.long	__pecoff_code_size		@ VirtualSize
+ 		.long	__efi_start			@ VirtualAddress
+-		.long	_edata - __efi_start		@ SizeOfRawData
++		.long	__pecoff_code_size		@ SizeOfRawData
+ 		.long	__efi_start			@ PointerToRawData
+ 		.long	0				@ PointerToRelocations
+ 		.long	0				@ PointerToLineNumbers
+@@ -108,12 +110,24 @@ section_table:
+ 		.short	0				@ NumberOfLineNumbers
+ 		.long	IMAGE_SCN_CNT_CODE | \
+ 			IMAGE_SCN_MEM_READ | \
+-			IMAGE_SCN_MEM_WRITE | \
+ 			IMAGE_SCN_MEM_EXECUTE		@ Characteristics
+ 
++		.ascii	".data\0\0\0"
++		.long	__pecoff_data_size		@ VirtualSize
++		.long	__pecoff_data_start - start	@ VirtualAddress
++		.long	__pecoff_data_rawsize		@ SizeOfRawData
++		.long	__pecoff_data_start - start	@ PointerToRawData
++		.long	0				@ PointerToRelocations
++		.long	0				@ PointerToLineNumbers
++		.short	0				@ NumberOfRelocations
++		.short	0				@ NumberOfLineNumbers
++		.long	IMAGE_SCN_CNT_INITIALIZED_DATA | \
++			IMAGE_SCN_MEM_READ | \
++			IMAGE_SCN_MEM_WRITE		@ Characteristics
++
+ 		.set	section_count, (. - section_table) / 40
+ 
+-		.align	9
++		.align	12
+ __efi_start:
+ #endif
+ 		.endm
 diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-index 81c493156ce8..1fa62432e283 100644
+index 1fa62432e283..dfcc2baa0077 100644
 --- a/arch/arm/boot/compressed/vmlinux.lds.S
 +++ b/arch/arm/boot/compressed/vmlinux.lds.S
-@@ -29,6 +29,11 @@ SECTIONS
-      * of the text/got segments.
-      */
-     *(.data)
-+    /*
-+     * C code that is shared with the kernel proper (but rebuilt for the
-+     * decompressor) may contain exports that we have no use for here.
-+     */
-+    *(*ksymtab* *kcrctab*)
+@@ -53,13 +53,6 @@ SECTIONS
+     *(.rodata)
+     *(.rodata.*)
    }
+-  .data : {
+-    /*
+-     * The EFI stub always executes from RAM, and runs strictly before the
+-     * decompressor, so we can make an exception for its r/w data, and keep it
+-     */
+-    *(.data.efistub)
+-  }
+   .piggydata : {
+     *(.piggydata)
+   }
+@@ -75,6 +68,26 @@ SECTIONS
+   /* ensure the zImage file size is always a multiple of 64 bits */
+   /* (without a dummy byte, ld just ignores the empty section) */
+   .pad			: { BYTE(0); . = ALIGN(8); }
++
++#ifdef CONFIG_EFI_STUB
++  .data : ALIGN(4096) {
++    __pecoff_data_start = .;
++    /*
++     * The EFI stub always executes from RAM, and runs strictly before the
++     * decompressor, so we can make an exception for its r/w data, and keep it
++     */
++    *(.data.efistub)
++    __pecoff_data_end = .;
++
++    /*
++     * PE/COFF mandates a file size which is a multiple of 512 bytes if the
++     * section size equals or exceeds 4 KB
++     */
++    . = ALIGN(512);
++  }
++  __pecoff_data_rawsize = . - ADDR(.data);
++#endif
++
+   _edata = .;
  
-   . = TEXT_START;
+   _magic_sig = ZIMAGE_MAGIC(0x016f2818);
+@@ -89,6 +102,9 @@ SECTIONS
+   . = ALIGN(8);		/* the stack must be 64-bit aligned */
+   .stack		: { *(.stack) }
+ 
++  PROVIDE(__pecoff_data_size = ALIGN(512) - ADDR(.data));
++  PROVIDE(__pecoff_end = ALIGN(512));
++
+   .stab 0		: { *(.stab) }
+   .stabstr 0		: { *(.stabstr) }
+   .stab.excl 0		: { *(.stab.excl) }
 -- 
 2.9.3
