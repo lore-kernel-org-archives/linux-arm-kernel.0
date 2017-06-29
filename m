@@ -1,35 +1,21 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 29 Jun 2017 15:01:11 +0200
-Subject: cpufreq: frequency scaling spec in DT node
-In-Reply-To: <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
-References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
- <20170629100459.GL29665@vireshk-i7>
- <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
-Message-ID: <136334fe-c2a7-875b-91e0-329a0d7a2304@free.fr>
+From: enrico.weigelt@gr13.net (Enrico Weigelt, metux IT consult)
+Date: Thu, 29 Jun 2017 13:05:42 +0000
+Subject: [RFC 0/5] drivers: Add boot constraints core
+In-Reply-To: <20170629124908.GV4902@n2100.armlinux.org.uk>
+References: <cover.1498642745.git.viresh.kumar@linaro.org>
+ <20170629124908.GV4902@n2100.armlinux.org.uk>
+Message-ID: <7ff5fe0b-72fa-7a23-44df-59761cc6dd1c@gr13.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/2017 13:41, Mason wrote:
+On 29.06.2017 12:49, Russell King - ARM Linux wrote:
 
-> On 29/06/2017 12:04, Viresh Kumar wrote:
-> 
->> There is one thing you can do to avoid adding OPP entries in the DT.
->> You can rather add them dynamically with help of: dev_pm_opp_add() and
->> cpufreq-dt will continue to work with that too.
-> 
-> In what driver should I call these... the clk driver?
-> (drivers/clk/tegra/cvb.c seems to be doind that)
+> The location of the frame buffer is unknown to the decompressor - and
+> as the decompressor self-relocates itself (using purely assembly code),
+> it could relocate itself on top of the frame buffer, causing the "nice"
+> image to become very colourful.
 
-The problem I run into is that calling get_cpu_device(0) from the
-clk driver returns NULL, because topology_init() has not run yet
-(to initialize the cpu_sys_devices).
+Could the bootloader pass safe (or blocked) memory regions to the
+decompressor ?
 
-So the OPP table needs to be built *after* topology_init() but
-*before* dt_cpufreq_probe().
-
-subsys_initcall(topology_init);
-device_initcall(cpufreq_dt_platdev_init);
-
-I'm not sure how to proceed.
-
-Regards.
+--mtx
