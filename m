@@ -1,568 +1,250 @@
-From: rric@kernel.org (Robert Richter)
-Date: Thu, 29 Jun 2017 12:14:52 +0200
-Subject: [PATCH] EDAC: Get rid of mci->mod_ver
-In-Reply-To: <20170629100311.vmdq6fojpo5ye4ne@pd.tnic>
-References: <20170629100311.vmdq6fojpo5ye4ne@pd.tnic>
-Message-ID: <20170629101452.GC10237@rric.localdomain>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 29 Jun 2017 12:28:11 +0200
+Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
+ cpg-mssr: Add interface for critical core clocks)
+In-Reply-To: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+Message-ID: <b2328038-64ac-f7e0-d8a9-434f2f0b0300@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.06.17 12:03:11, Borislav Petkov wrote:
-> Hi,
+On 29.06.2017 11:27, Geert Uytterhoeven wrote:
+> Hi Dirk,
 > 
-> any objections?
+> CC clock, ARM, DT, PM people
 > 
-> ---
-> It is a write-only variable so get rid of it.
+> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
+> disables them as being unused.
 > 
-> Signed-off-by: Borislav Petkov <bp@suse.de>
-> Cc: Thor Thayer <thor.thayer@linux.intel.com>
-> Cc: Mark Gross <mark.gross@intel.com>
-> Cc: Robert Richter <rric@kernel.org>
-> Cc: Tim Small <tim@buttersideup.com>
-> Cc: Ranganathan Desikan <ravi@jetztechnologies.com>
-> Cc: "Arvind R." <arvino55@gmail.com>
-> Cc: Jason Baron <jbaron@akamai.com>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: David Daney <david.daney@cavium.com>
-> Cc: Loc Ho <lho@apm.com>
-> Cc: linux-edac at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-mips at linux-mips.org
-> ---
->  drivers/edac/altera_edac.c      | 2 --
->  drivers/edac/amd64_edac.c       | 1 -
->  drivers/edac/amd76x_edac.c      | 2 --
->  drivers/edac/cpc925_edac.c      | 1 -
->  drivers/edac/e752x_edac.c       | 2 --
->  drivers/edac/e7xxx_edac.c       | 2 --
->  drivers/edac/ghes_edac.c        | 3 ---
->  drivers/edac/highbank_mc_edac.c | 1 -
->  drivers/edac/i3000_edac.c       | 3 ---
->  drivers/edac/i3200_edac.c       | 3 ---
->  drivers/edac/i5000_edac.c       | 1 -
->  drivers/edac/i5100_edac.c       | 1 -
->  drivers/edac/i5400_edac.c       | 1 -
->  drivers/edac/i7300_edac.c       | 1 -
->  drivers/edac/i7core_edac.c      | 1 -
->  drivers/edac/i82443bxgx_edac.c  | 3 ---
->  drivers/edac/i82860_edac.c      | 2 --
->  drivers/edac/i82875p_edac.c     | 2 --
->  drivers/edac/i82975x_edac.c     | 2 --
->  drivers/edac/ie31200_edac.c     | 2 --
->  drivers/edac/mv64x60_edac.c     | 1 -
->  drivers/edac/ppc4xx_edac.c      | 1 -
->  drivers/edac/r82600_edac.c      | 2 --
->  drivers/edac/sb_edac.c          | 1 -
->  drivers/edac/skx_edac.c         | 3 ---
->  drivers/edac/synopsys_edac.c    | 1 -
->  drivers/edac/thunderx_edac.c    | 1 -
->  drivers/edac/x38_edac.c         | 3 ---
->  drivers/edac/xgene_edac.c       | 1 -
->  include/linux/edac.h            | 1 -
->  30 files changed, 51 deletions(-)
+> On Mon, Jun 26, 2017 at 1:30 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>> With commit 72f5df2c2bbb6 ("clk: renesas: cpg-mssr: Migrate to
+>> CLK_IS_CRITICAL") we are able to handle critical module clocks.
+>> Introduce the same logic for critical core clocks.
+>>
+>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>> ---
+>> Commit
+>>
+>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/renesas?id=72f5df2c2bbb66d4a555cb51eb9f412abf1af77f
+>>
+>> is quite nice to avoid *module* clocks being disabled. Unfortunately,
+>> there are *core* clocks, too. E.g. using an other OS on the Cortex R7
+>> core of the r8a7795, the 'canfd' is a quite popular core clock which
+>> shouldn't be disabled by Linux.
+>>
+>> Therefore, this patch is a proposal to use the same 'mark clocks as
+>> critical' logic implemented for the module clocks for the core
+>> clocks, too.
+>>
+>> Opinions?
+> 
+> On r8a7795, there are several Cortex A cores running Linux, and a Cortex R7
+> core which may run another OS.
+> This is an interesting issue, and relevant to other SoCs, too.
+> 
+> In this particular case, the "canfd" clock is a core clock used as an
+> auxiliary clock for the CAN0, CAN1, and CANFD interfaces.  This can lead
+> to three scenarios:
+>    1. Linux controls all CAN interfaces
+>       => no issue,
+>    2. The OS on the RT CPU controls all CAN interfaces
+>       => issue, Linux disables the clock
+>    3. Mix of 1 and 2
+>       => More issues.
+> Of course this is not limited to clocks, but also to e.g. PM domains.
+> 
+> How can this be handled?
+> I believe just marking the "canfd" clock critical is not the right solution,
+> as about any clock could be used by the RT CPU.
+> 
+> Still, Linux needs to be made aware that devices (clocks and PM domains) are
+> controlled by another CPU/OS.
+> 
+> Should this be described in DT? It feels like software policy to me.
+> 
+> Note that we (mainline) currently don't describe the Cortex R7 core in DT.
+> Dirk: do you describe it?
 
-Looks sane to me. For Highbank and ThunderX:
 
-Acked-by: Robert Richter <rric@kernel.org>
+No, we don't describe anything R7 related in DT, too.
 
-> 
-> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-> index db75d4b614f7..fa2e5db56d24 100644
-> --- a/drivers/edac/altera_edac.c
-> +++ b/drivers/edac/altera_edac.c
-> @@ -38,7 +38,6 @@
->  #include "edac_module.h"
->  
->  #define EDAC_MOD_STR		"altera_edac"
-> -#define EDAC_VERSION		"1"
->  #define EDAC_DEVICE		"Altera"
->  
->  static const struct altr_sdram_prv_data c5_data = {
-> @@ -392,7 +391,6 @@ static int altr_sdram_probe(struct platform_device *pdev)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = EDAC_VERSION;
->  	mci->ctl_name = dev_name(&pdev->dev);
->  	mci->scrub_mode = SCRUB_SW_SRC;
->  	mci->dev_name = dev_name(&pdev->dev);
-> diff --git a/drivers/edac/amd64_edac.c b/drivers/edac/amd64_edac.c
-> index 3aea55698165..ac2f30295efe 100644
-> --- a/drivers/edac/amd64_edac.c
-> +++ b/drivers/edac/amd64_edac.c
-> @@ -3130,7 +3130,6 @@ static void setup_mci_misc_attrs(struct mem_ctl_info *mci,
->  
->  	mci->edac_cap		= determine_edac_cap(pvt);
->  	mci->mod_name		= EDAC_MOD_STR;
-> -	mci->mod_ver		= EDAC_AMD64_VERSION;
->  	mci->ctl_name		= fam->ctl_name;
->  	mci->dev_name		= pci_name(pvt->F3);
->  	mci->ctl_page_to_phys	= NULL;
-> diff --git a/drivers/edac/amd76x_edac.c b/drivers/edac/amd76x_edac.c
-> index a7450275ad28..9c6e326b4c14 100644
-> --- a/drivers/edac/amd76x_edac.c
-> +++ b/drivers/edac/amd76x_edac.c
-> @@ -19,7 +19,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define AMD76X_REVISION	" Ver: 2.0.2"
->  #define EDAC_MOD_STR	"amd76x_edac"
->  
->  #define amd76x_printk(level, fmt, arg...) \
-> @@ -263,7 +262,6 @@ static int amd76x_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_cap = ems_mode ?
->  		(EDAC_FLAG_EC | EDAC_FLAG_SECDED) : EDAC_FLAG_NONE;
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = AMD76X_REVISION;
->  	mci->ctl_name = amd76x_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = amd76x_check;
-> diff --git a/drivers/edac/cpc925_edac.c b/drivers/edac/cpc925_edac.c
-> index 837b62c4993d..cba8ee14a067 100644
-> --- a/drivers/edac/cpc925_edac.c
-> +++ b/drivers/edac/cpc925_edac.c
-> @@ -999,7 +999,6 @@ static int cpc925_probe(struct platform_device *pdev)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  	mci->mod_name = CPC925_EDAC_MOD_STR;
-> -	mci->mod_ver = CPC925_EDAC_REVISION;
->  	mci->ctl_name = pdev->name;
->  
->  	if (edac_op_state == EDAC_OPSTATE_POLL)
-> diff --git a/drivers/edac/e752x_edac.c b/drivers/edac/e752x_edac.c
-> index 1a352cae1f52..b5de9a13ea3f 100644
-> --- a/drivers/edac/e752x_edac.c
-> +++ b/drivers/edac/e752x_edac.c
-> @@ -26,7 +26,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define E752X_REVISION	" Ver: 2.0.2"
->  #define EDAC_MOD_STR	"e752x_edac"
->  
->  static int report_non_memory_errors;
-> @@ -1303,7 +1302,6 @@ static int e752x_probe1(struct pci_dev *pdev, int dev_idx)
->  		(EDAC_FLAG_NONE | EDAC_FLAG_SECDED | EDAC_FLAG_S4ECD4ED);
->  	/* FIXME - what if different memory types are in different csrows? */
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = E752X_REVISION;
->  	mci->pdev = &pdev->dev;
->  
->  	edac_dbg(3, "init pvt\n");
-> diff --git a/drivers/edac/e7xxx_edac.c b/drivers/edac/e7xxx_edac.c
-> index 67ef07aed923..75d7ce62b3be 100644
-> --- a/drivers/edac/e7xxx_edac.c
-> +++ b/drivers/edac/e7xxx_edac.c
-> @@ -32,7 +32,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define	E7XXX_REVISION " Ver: 2.0.2"
->  #define	EDAC_MOD_STR	"e7xxx_edac"
->  
->  #define e7xxx_printk(level, fmt, arg...) \
-> @@ -458,7 +457,6 @@ static int e7xxx_probe1(struct pci_dev *pdev, int dev_idx)
->  		EDAC_FLAG_S4ECD4ED;
->  	/* FIXME - what if different memory types are in different csrows? */
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = E7XXX_REVISION;
->  	mci->pdev = &pdev->dev;
->  	edac_dbg(3, "init pvt\n");
->  	pvt = (struct e7xxx_pvt *)mci->pvt_info;
-> diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
-> index 4e61a6229dd2..6f80eb65c26c 100644
-> --- a/drivers/edac/ghes_edac.c
-> +++ b/drivers/edac/ghes_edac.c
-> @@ -17,8 +17,6 @@
->  #include "edac_module.h"
->  #include <ras/ras_event.h>
->  
-> -#define GHES_EDAC_REVISION " Ver: 1.0.0"
-> -
->  struct ghes_edac_pvt {
->  	struct list_head list;
->  	struct ghes *ghes;
-> @@ -451,7 +449,6 @@ int ghes_edac_register(struct ghes *ghes, struct device *dev)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE;
->  	mci->edac_cap = EDAC_FLAG_NONE;
->  	mci->mod_name = "ghes_edac.c";
-> -	mci->mod_ver = GHES_EDAC_REVISION;
->  	mci->ctl_name = "ghes_edac";
->  	mci->dev_name = "ghes";
->  
-> diff --git a/drivers/edac/highbank_mc_edac.c b/drivers/edac/highbank_mc_edac.c
-> index 0e7e0a404d89..6092e61be605 100644
-> --- a/drivers/edac/highbank_mc_edac.c
-> +++ b/drivers/edac/highbank_mc_edac.c
-> @@ -224,7 +224,6 @@ static int highbank_mc_probe(struct platform_device *pdev)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  	mci->mod_name = pdev->dev.driver->name;
-> -	mci->mod_ver = "1";
->  	mci->ctl_name = id->compatible;
->  	mci->dev_name = dev_name(&pdev->dev);
->  	mci->scrub_mode = SCRUB_SW_SRC;
-> diff --git a/drivers/edac/i3000_edac.c b/drivers/edac/i3000_edac.c
-> index 5306240570d7..8085a32ec3bd 100644
-> --- a/drivers/edac/i3000_edac.c
-> +++ b/drivers/edac/i3000_edac.c
-> @@ -16,8 +16,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define I3000_REVISION		"1.1"
-> -
->  #define EDAC_MOD_STR		"i3000_edac"
->  
->  #define I3000_RANKS		8
-> @@ -375,7 +373,6 @@ static int i3000_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = I3000_REVISION;
->  	mci->ctl_name = i3000_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = i3000_check;
-> diff --git a/drivers/edac/i3200_edac.c b/drivers/edac/i3200_edac.c
-> index 77c58d201a30..d92d56cee101 100644
-> --- a/drivers/edac/i3200_edac.c
-> +++ b/drivers/edac/i3200_edac.c
-> @@ -17,8 +17,6 @@
->  
->  #include <linux/io-64-nonatomic-lo-hi.h>
->  
-> -#define I3200_REVISION        "1.1"
-> -
->  #define EDAC_MOD_STR        "i3200_edac"
->  
->  #define PCI_DEVICE_ID_INTEL_3200_HB    0x29f0
-> @@ -375,7 +373,6 @@ static int i3200_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = I3200_REVISION;
->  	mci->ctl_name = i3200_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = i3200_check;
-> diff --git a/drivers/edac/i5000_edac.c b/drivers/edac/i5000_edac.c
-> index 8f5a56e25bd2..53f24b18cd61 100644
-> --- a/drivers/edac/i5000_edac.c
-> +++ b/drivers/edac/i5000_edac.c
-> @@ -1430,7 +1430,6 @@ static int i5000_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE;
->  	mci->edac_cap = EDAC_FLAG_NONE;
->  	mci->mod_name = "i5000_edac.c";
-> -	mci->mod_ver = I5000_REVISION;
->  	mci->ctl_name = i5000_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->ctl_page_to_phys = NULL;
-> diff --git a/drivers/edac/i5100_edac.c b/drivers/edac/i5100_edac.c
-> index a8334c4acea7..b506eef6b146 100644
-> --- a/drivers/edac/i5100_edac.c
-> +++ b/drivers/edac/i5100_edac.c
-> @@ -1108,7 +1108,6 @@ static int i5100_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
->  	mci->edac_ctl_cap = EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  	mci->mod_name = "i5100_edac.c";
-> -	mci->mod_ver = "not versioned";
->  	mci->ctl_name = "i5100";
->  	mci->dev_name = pci_name(pdev);
->  	mci->ctl_page_to_phys = NULL;
-> diff --git a/drivers/edac/i5400_edac.c b/drivers/edac/i5400_edac.c
-> index cd889edc8516..6f8bcdb9256a 100644
-> --- a/drivers/edac/i5400_edac.c
-> +++ b/drivers/edac/i5400_edac.c
-> @@ -1315,7 +1315,6 @@ static int i5400_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE;
->  	mci->edac_cap = EDAC_FLAG_NONE;
->  	mci->mod_name = "i5400_edac.c";
-> -	mci->mod_ver = I5400_REVISION;
->  	mci->ctl_name = i5400_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->ctl_page_to_phys = NULL;
-> diff --git a/drivers/edac/i7300_edac.c b/drivers/edac/i7300_edac.c
-> index e391f5a716be..6b5a554ba8e4 100644
-> --- a/drivers/edac/i7300_edac.c
-> +++ b/drivers/edac/i7300_edac.c
-> @@ -1077,7 +1077,6 @@ static int i7300_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE;
->  	mci->edac_cap = EDAC_FLAG_NONE;
->  	mci->mod_name = "i7300_edac.c";
-> -	mci->mod_ver = I7300_REVISION;
->  	mci->ctl_name = i7300_devs[0].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->ctl_page_to_phys = NULL;
-> diff --git a/drivers/edac/i7core_edac.c b/drivers/edac/i7core_edac.c
-> index 75ad847593b7..98998ef58647 100644
-> --- a/drivers/edac/i7core_edac.c
-> +++ b/drivers/edac/i7core_edac.c
-> @@ -2159,7 +2159,6 @@ static int i7core_register_mci(struct i7core_dev *i7core_dev)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE;
->  	mci->edac_cap = EDAC_FLAG_NONE;
->  	mci->mod_name = "i7core_edac.c";
-> -	mci->mod_ver = I7CORE_REVISION;
->  	mci->ctl_name = kasprintf(GFP_KERNEL, "i7 core #%d",
->  				  i7core_dev->socket);
->  	mci->dev_name = pci_name(i7core_dev->pdev[0]);
-> diff --git a/drivers/edac/i82443bxgx_edac.c b/drivers/edac/i82443bxgx_edac.c
-> index cb61a5b7d080..a2ca929e2168 100644
-> --- a/drivers/edac/i82443bxgx_edac.c
-> +++ b/drivers/edac/i82443bxgx_edac.c
-> @@ -31,8 +31,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define I82443_REVISION	"0.1"
-> -
->  #define EDAC_MOD_STR    "i82443bxgx_edac"
->  
->  /* The 82443BX supports SDRAM, or EDO (EDO for mobile only), "Memory
-> @@ -320,7 +318,6 @@ static int i82443bxgx_edacmc_probe1(struct pci_dev *pdev, int dev_idx)
->  				I82443BXGX_EAP_OFFSET_MBE));
->  
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = I82443_REVISION;
->  	mci->ctl_name = "I82443BXGX";
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = i82443bxgx_edacmc_check;
-> diff --git a/drivers/edac/i82860_edac.c b/drivers/edac/i82860_edac.c
-> index 236c813227fc..3e3a80ffb322 100644
-> --- a/drivers/edac/i82860_edac.c
-> +++ b/drivers/edac/i82860_edac.c
-> @@ -16,7 +16,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define  I82860_REVISION " Ver: 2.0.2"
->  #define EDAC_MOD_STR	"i82860_edac"
->  
->  #define i82860_printk(level, fmt, arg...) \
-> @@ -216,7 +215,6 @@ static int i82860_probe1(struct pci_dev *pdev, int dev_idx)
->  	/* I"m not sure about this but I think that all RDRAM is SECDED */
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = I82860_REVISION;
->  	mci->ctl_name = i82860_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = i82860_check;
-> diff --git a/drivers/edac/i82875p_edac.c b/drivers/edac/i82875p_edac.c
-> index e286b7e74c7a..ceac925af38c 100644
-> --- a/drivers/edac/i82875p_edac.c
-> +++ b/drivers/edac/i82875p_edac.c
-> @@ -20,7 +20,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define I82875P_REVISION	" Ver: 2.0.2"
->  #define EDAC_MOD_STR		"i82875p_edac"
->  
->  #define i82875p_printk(level, fmt, arg...) \
-> @@ -423,7 +422,6 @@ static int i82875p_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_UNKNOWN;
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = I82875P_REVISION;
->  	mci->ctl_name = i82875p_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = i82875p_check;
-> diff --git a/drivers/edac/i82975x_edac.c b/drivers/edac/i82975x_edac.c
-> index 9dcdab28f665..892815eaa97b 100644
-> --- a/drivers/edac/i82975x_edac.c
-> +++ b/drivers/edac/i82975x_edac.c
-> @@ -16,7 +16,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define I82975X_REVISION	" Ver: 1.0.0"
->  #define EDAC_MOD_STR		"i82975x_edac"
->  
->  #define i82975x_printk(level, fmt, arg...) \
-> @@ -564,7 +563,6 @@ static int i82975x_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = I82975X_REVISION;
->  	mci->ctl_name = i82975x_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = i82975x_check;
-> diff --git a/drivers/edac/ie31200_edac.c b/drivers/edac/ie31200_edac.c
-> index 4260579e6901..aac9b9b360b8 100644
-> --- a/drivers/edac/ie31200_edac.c
-> +++ b/drivers/edac/ie31200_edac.c
-> @@ -45,7 +45,6 @@
->  #include <linux/io-64-nonatomic-lo-hi.h>
->  #include "edac_module.h"
->  
-> -#define IE31200_REVISION "1.0"
->  #define EDAC_MOD_STR "ie31200_edac"
->  
->  #define ie31200_printk(level, fmt, arg...) \
-> @@ -420,7 +419,6 @@ static int ie31200_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_ctl_cap = EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = IE31200_REVISION;
->  	mci->ctl_name = ie31200_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = ie31200_check;
-> diff --git a/drivers/edac/mv64x60_edac.c b/drivers/edac/mv64x60_edac.c
-> index d3650df94fe8..ec5d695bbb72 100644
-> --- a/drivers/edac/mv64x60_edac.c
-> +++ b/drivers/edac/mv64x60_edac.c
-> @@ -766,7 +766,6 @@ static int mv64x60_mc_err_probe(struct platform_device *pdev)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = MV64x60_REVISION;
->  	mci->ctl_name = mv64x60_ctl_name;
->  
->  	if (edac_op_state == EDAC_OPSTATE_POLL)
-> diff --git a/drivers/edac/ppc4xx_edac.c b/drivers/edac/ppc4xx_edac.c
-> index e55e92590106..98d6dc7ef8e8 100644
-> --- a/drivers/edac/ppc4xx_edac.c
-> +++ b/drivers/edac/ppc4xx_edac.c
-> @@ -1063,7 +1063,6 @@ static int ppc4xx_edac_mc_init(struct mem_ctl_info *mci,
->  	/* Initialize strings */
->  
->  	mci->mod_name		= PPC4XX_EDAC_MODULE_NAME;
-> -	mci->mod_ver		= PPC4XX_EDAC_MODULE_REVISION;
->  	mci->ctl_name		= ppc4xx_edac_match->compatible,
->  	mci->dev_name		= np->full_name;
->  
-> diff --git a/drivers/edac/r82600_edac.c b/drivers/edac/r82600_edac.c
-> index 978916625ced..851e53e122aa 100644
-> --- a/drivers/edac/r82600_edac.c
-> +++ b/drivers/edac/r82600_edac.c
-> @@ -22,7 +22,6 @@
->  #include <linux/edac.h>
->  #include "edac_module.h"
->  
-> -#define R82600_REVISION	" Ver: 2.0.2"
->  #define EDAC_MOD_STR	"r82600_edac"
->  
->  #define r82600_printk(level, fmt, arg...) \
-> @@ -316,7 +315,6 @@ static int r82600_probe1(struct pci_dev *pdev, int dev_idx)
->  		mci->edac_cap = EDAC_FLAG_NONE;
->  
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = R82600_REVISION;
->  	mci->ctl_name = "R82600";
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = r82600_check;
-> diff --git a/drivers/edac/sb_edac.c b/drivers/edac/sb_edac.c
-> index 80d860cb0746..687d0f23b9cc 100644
-> --- a/drivers/edac/sb_edac.c
-> +++ b/drivers/edac/sb_edac.c
-> @@ -3125,7 +3125,6 @@ static int sbridge_register_mci(struct sbridge_dev *sbridge_dev, enum type type)
->  	mci->edac_ctl_cap = EDAC_FLAG_NONE;
->  	mci->edac_cap = EDAC_FLAG_NONE;
->  	mci->mod_name = "sb_edac.c";
-> -	mci->mod_ver = SBRIDGE_REVISION;
->  	mci->dev_name = pci_name(pdev);
->  	mci->ctl_page_to_phys = NULL;
->  
-> diff --git a/drivers/edac/skx_edac.c b/drivers/edac/skx_edac.c
-> index 64bef6c9cfb4..16dea97568a1 100644
-> --- a/drivers/edac/skx_edac.c
-> +++ b/drivers/edac/skx_edac.c
-> @@ -31,8 +31,6 @@
->  
->  #include "edac_module.h"
->  
-> -#define SKX_REVISION    " Ver: 1.0 "
-> -
->  /*
->   * Debug macros
->   */
-> @@ -473,7 +471,6 @@ static int skx_register_mci(struct skx_imc *imc)
->  	mci->edac_cap = EDAC_FLAG_NONE;
->  	mci->mod_name = "skx_edac.c";
->  	mci->dev_name = pci_name(imc->chan[0].cdev);
-> -	mci->mod_ver = SKX_REVISION;
->  	mci->ctl_page_to_phys = NULL;
->  
->  	rc = skx_get_dimm_config(mci);
-> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
-> index 1c01dec78ec3..0c9c59e2b5a3 100644
-> --- a/drivers/edac/synopsys_edac.c
-> +++ b/drivers/edac/synopsys_edac.c
-> @@ -413,7 +413,6 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
->  	mci->ctl_name = "synps_ddr_controller";
->  	mci->dev_name = SYNPS_EDAC_MOD_STRING;
->  	mci->mod_name = SYNPS_EDAC_MOD_VER;
-> -	mci->mod_ver = "1";
->  
->  	edac_op_state = EDAC_OPSTATE_POLL;
->  	mci->edac_check = synps_edac_check;
-> diff --git a/drivers/edac/thunderx_edac.c b/drivers/edac/thunderx_edac.c
-> index 2d352b40ae1c..c8e8b9fd4772 100644
-> --- a/drivers/edac/thunderx_edac.c
-> +++ b/drivers/edac/thunderx_edac.c
-> @@ -732,7 +732,6 @@ static int thunderx_lmc_probe(struct pci_dev *pdev,
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  
->  	mci->mod_name = "thunderx-lmc";
-> -	mci->mod_ver = "1";
->  	mci->ctl_name = "thunderx-lmc";
->  	mci->dev_name = dev_name(&pdev->dev);
->  	mci->scrub_mode = SCRUB_NONE;
-> diff --git a/drivers/edac/x38_edac.c b/drivers/edac/x38_edac.c
-> index 03c97a4bf590..cc779f3f9e2d 100644
-> --- a/drivers/edac/x38_edac.c
-> +++ b/drivers/edac/x38_edac.c
-> @@ -18,8 +18,6 @@
->  #include <linux/io-64-nonatomic-lo-hi.h>
->  #include "edac_module.h"
->  
-> -#define X38_REVISION		"1.1"
-> -
->  #define EDAC_MOD_STR		"x38_edac"
->  
->  #define PCI_DEVICE_ID_INTEL_X38_HB	0x29e0
-> @@ -357,7 +355,6 @@ static int x38_probe1(struct pci_dev *pdev, int dev_idx)
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = X38_REVISION;
->  	mci->ctl_name = x38_devs[dev_idx].ctl_name;
->  	mci->dev_name = pci_name(pdev);
->  	mci->edac_check = x38_check;
-> diff --git a/drivers/edac/xgene_edac.c b/drivers/edac/xgene_edac.c
-> index 669246056812..e8b81d7ef61f 100644
-> --- a/drivers/edac/xgene_edac.c
-> +++ b/drivers/edac/xgene_edac.c
-> @@ -415,7 +415,6 @@ static int xgene_edac_mc_add(struct xgene_edac *edac, struct device_node *np)
->  	mci->edac_ctl_cap = EDAC_FLAG_SECDED;
->  	mci->edac_cap = EDAC_FLAG_SECDED;
->  	mci->mod_name = EDAC_MOD_STR;
-> -	mci->mod_ver = "0.1";
->  	mci->ctl_page_to_phys = NULL;
->  	mci->scrub_cap = SCRUB_FLAG_HW_SRC;
->  	mci->scrub_mode = SCRUB_HW_SRC;
-> diff --git a/include/linux/edac.h b/include/linux/edac.h
-> index 8ae0f45fafd6..cd75c173fd00 100644
-> --- a/include/linux/edac.h
-> +++ b/include/linux/edac.h
-> @@ -619,7 +619,6 @@ struct mem_ctl_info {
->  	 */
->  	struct device *pdev;
->  	const char *mod_name;
-> -	const char *mod_ver;
->  	const char *ctl_name;
->  	const char *dev_name;
->  	void *pvt_info;
-> -- 
-> 2.13.0
-> 
-> 
-> -- 
-> Regards/Gruss,
->     Boris.
-> 
-> Good mailing practices for 400: avoid top-posting and trim the reply.
+
+> Summary:
+>    1. Core/module clocks are described in the clock driver (not in DT),
+>    2. Unused clocks are disabled by CCF,
+>    3. Clocks may be in use by the Real-Time CPU core, running another OS,
+>    4. How to communicate to Linux which clocks are under control of the RT CPU?
+ >
+> Thanks for your comments!
+
+
+While I appreciated that the overall issue is discussed, I'm not sure if 
+there is anything really special we don't support generally, yet.
+
+We have an infrastructure to mark clocks enabled anywhere else to be not 
+disabled by Linux kernel (CLK_IS_CRITICAL). From my point of view, for 
+this infrastructure, it doesn't matter, where this 'anywhere else' is. 
+To take some concrete Renesas RCar3 examples, from my point of view it 
+doesn't matter if its a GIC-400 clock enabled in the boot loader 
+(U-Boot) or a CAN clock enabled by the R7. In both cases marking them as 
+critical on Linux side does the trick.
+
+The issue I just want to address (discuss) with this RFC patch is that 
+for Renesas RCar3 we have CLK_IS_CRITICAL support for module clocks, but 
+not for core clocks. From my point of view, this is a completely Renesas 
+implementation specific discussion.
+
+So I would rephrase the initial sentence above
+
+"Clocks may be in use by another CPU not running Linux, while Linux 
+disables them as being unused."
+
+to anything like
+
+"Clocks may be enabled (used) by others (U-Boot/CPUs/Hypervisors), while 
+Linux disables them as being unused"
+
+And I think this is completely addressed by CLK_IS_CRITICAL, as far as I 
+can see :)
+
+Best regards
+
+Dirk
+
+>>   drivers/clk/renesas/clk-div6.c         | 17 +++++++++++++++--
+>>   drivers/clk/renesas/clk-div6.h         |  4 +++-
+>>   drivers/clk/renesas/r8a7795-cpg-mssr.c |  7 +++++++
+>>   drivers/clk/renesas/renesas-cpg-mssr.c |  3 ++-
+>>   drivers/clk/renesas/renesas-cpg-mssr.h |  8 ++++++++
+>>   5 files changed, 35 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/clk/renesas/clk-div6.c b/drivers/clk/renesas/clk-div6.c
+>> index 0627860..5917e05 100644
+>> --- a/drivers/clk/renesas/clk-div6.c
+>> +++ b/drivers/clk/renesas/clk-div6.c
+>> @@ -18,6 +18,7 @@
+>>   #include <linux/of_address.h>
+>>   #include <linux/slab.h>
+>>
+>> +#include "renesas-cpg-mssr.h"
+>>   #include "clk-div6.h"
+>>
+>>   #define CPG_DIV6_CKSTP         BIT(8)
+>> @@ -184,7 +185,9 @@ static const struct clk_ops cpg_div6_clock_ops = {
+>>   struct clk * __init cpg_div6_register(const char *name,
+>>                                        unsigned int num_parents,
+>>                                        const char **parent_names,
+>> -                                     void __iomem *reg)
+>> +                                     void __iomem *reg,
+>> +                                     const struct cpg_mssr_info *info,
+>> +                                     unsigned int id)
+>>   {
+>>          unsigned int valid_parents;
+>>          struct clk_init_data init;
+>> @@ -246,6 +249,15 @@ struct clk * __init cpg_div6_register(const char *name,
+>>          init.name = name;
+>>          init.ops = &cpg_div6_clock_ops;
+>>          init.flags = CLK_IS_BASIC;
+>> +       if (info) {
+>> +               for (i = 0; i < info->num_crit_core_clks; i++)
+>> +                       if (id == info->crit_core_clks[i]) {
+>> +                               pr_devel("DIV6 %s setting CLK_IS_CRITICAL\n",
+>> +                                        name);
+>> +                               init.flags |= CLK_IS_CRITICAL;
+>> +                               break;
+>> +                       }
+>> +       }
+>>          init.parent_names = parent_names;
+>>          init.num_parents = valid_parents;
+>>
+>> @@ -298,7 +310,8 @@ static void __init cpg_div6_clock_init(struct device_node *np)
+>>          for (i = 0; i < num_parents; i++)
+>>                  parent_names[i] = of_clk_get_parent_name(np, i);
+>>
+>> -       clk = cpg_div6_register(clk_name, num_parents, parent_names, reg);
+>> +       clk = cpg_div6_register(clk_name, num_parents, parent_names, reg,
+>> +                               NULL, 0);
+>>          if (IS_ERR(clk)) {
+>>                  pr_err("%s: failed to register %s DIV6 clock (%ld)\n",
+>>                         __func__, np->name, PTR_ERR(clk));
+>> diff --git a/drivers/clk/renesas/clk-div6.h b/drivers/clk/renesas/clk-div6.h
+>> index 567b31d..b619d6b4 100644
+>> --- a/drivers/clk/renesas/clk-div6.h
+>> +++ b/drivers/clk/renesas/clk-div6.h
+>> @@ -2,6 +2,8 @@
+>>   #define __RENESAS_CLK_DIV6_H__
+>>
+>>   struct clk *cpg_div6_register(const char *name, unsigned int num_parents,
+>> -                             const char **parent_names, void __iomem *reg);
+>> +                             const char **parent_names, void __iomem *reg,
+>> +                             const struct cpg_mssr_info *info,
+>> +                             unsigned int id);
+>>
+>>   #endif
+>> diff --git a/drivers/clk/renesas/r8a7795-cpg-mssr.c b/drivers/clk/renesas/r8a7795-cpg-mssr.c
+>> index eaa98b4..a54fed6 100644
+>> --- a/drivers/clk/renesas/r8a7795-cpg-mssr.c
+>> +++ b/drivers/clk/renesas/r8a7795-cpg-mssr.c
+>> @@ -114,6 +114,9 @@ static struct cpg_core_clk r8a7795_core_clks[] __initdata = {
+>>          DEF_BASE("r",           R8A7795_CLK_R,     CLK_TYPE_GEN3_R, CLK_RINT),
+>>   };
+>>
+>> +static const unsigned int r8a7795_crit_core_clks[] __initconst = {
+>> +};
+>> +
+>>   static struct mssr_mod_clk r8a7795_mod_clks[] __initdata = {
+>>          DEF_MOD("fdp1-2",                117,   R8A7795_CLK_S2D1), /* ES1.x */
+>>          DEF_MOD("fdp1-1",                118,   R8A7795_CLK_S0D1),
+>> @@ -441,6 +444,10 @@ const struct cpg_mssr_info r8a7795_cpg_mssr_info __initconst = {
+>>          .last_dt_core_clk = LAST_DT_CORE_CLK,
+>>          .num_total_core_clks = MOD_CLK_BASE,
+>>
+>> +       /* Critical Core Clocks */
+>> +       .crit_core_clks = r8a7795_crit_core_clks,
+>> +       .num_crit_core_clks = ARRAY_SIZE(r8a7795_crit_core_clks),
+>> +
+>>          /* Module Clocks */
+>>          .mod_clks = r8a7795_mod_clks,
+>>          .num_mod_clks = ARRAY_SIZE(r8a7795_mod_clks),
+>> diff --git a/drivers/clk/renesas/renesas-cpg-mssr.c b/drivers/clk/renesas/renesas-cpg-mssr.c
+>> index 99eeec6..80be019 100644
+>> --- a/drivers/clk/renesas/renesas-cpg-mssr.c
+>> +++ b/drivers/clk/renesas/renesas-cpg-mssr.c
+>> @@ -293,7 +293,8 @@ static void __init cpg_mssr_register_core_clk(const struct cpg_core_clk *core,
+>>
+>>                  if (core->type == CLK_TYPE_DIV6P1) {
+>>                          clk = cpg_div6_register(core->name, 1, &parent_name,
+>> -                                               priv->base + core->offset);
+>> +                                               priv->base + core->offset, info,
+>> +                                               core->id);
+>>                  } else {
+>>                          clk = clk_register_fixed_factor(NULL, core->name,
+>>                                                          parent_name, 0,
+>> diff --git a/drivers/clk/renesas/renesas-cpg-mssr.h b/drivers/clk/renesas/renesas-cpg-mssr.h
+>> index 148f4f0a..a723fdd 100644
+>> --- a/drivers/clk/renesas/renesas-cpg-mssr.h
+>> +++ b/drivers/clk/renesas/renesas-cpg-mssr.h
+>> @@ -86,6 +86,10 @@ struct device_node;
+>>        * @last_dt_core_clk: ID of the last Core Clock exported to DT
+>>        * @num_total_core_clks: Total number of Core Clocks (exported + internal)
+>>        *
+>> +     * @crit_core_clks: Array with Core Clock IDs of critical clocks that
+>> +     *                  should not be disabled without a knowledgeable driver
+>> +     * @num_core_mod_clks: Number of entries in crit_core_clks[]
+>> +     *
+>>        * @mod_clks: Array of Module Clock definitions
+>>        * @num_mod_clks: Number of entries in mod_clks[]
+>>        * @num_hw_mod_clks: Number of Module Clocks supported by the hardware
+>> @@ -109,6 +113,10 @@ struct cpg_mssr_info {
+>>          unsigned int last_dt_core_clk;
+>>          unsigned int num_total_core_clks;
+>>
+>> +       /* Critical Core Clocks that should not be disabled */
+>> +       const unsigned int *crit_core_clks;
+>> +       unsigned int num_crit_core_clks;
+>> +
+>>          /* Module Clocks */
+>>          const struct mssr_mod_clk *mod_clks;
+>>          unsigned int num_mod_clks;
+>> --
+>> 2.8.0
