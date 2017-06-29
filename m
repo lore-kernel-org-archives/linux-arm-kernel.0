@@ -1,77 +1,205 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 29 Jun 2017 14:44:32 +0300
-Subject: [PATCH 3/5] drivers: soc: atmel: Add basic support for new sama5d2
- SiPs
+Date: Thu, 29 Jun 2017 14:44:33 +0300
+Subject: [PATCH 4/5] ARM: dts: at91: at91-sama5d27_som1: add sama5d27 SoM1
+ support
 In-Reply-To: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1498736674-9233-4-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1498736674-9233-5-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cristian Birsan <cristian.birsan@microchip.com>
+Add specific DTS file and bindings for sama5d27 SoM1 board.
 
-Add basic support for new sama5d2 System in a Package chips.
-
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
-[claudiu.beznea at microchip.com: use MiB instead of MB]
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
 ---
- drivers/soc/atmel/soc.c | 8 ++++++++
- drivers/soc/atmel/soc.h | 4 ++++
- 2 files changed, 12 insertions(+)
+ arch/arm/boot/dts/at91-sama5d27_som1.dtsi | 178 ++++++++++++++++++++++++++++++
+ 1 file changed, 178 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
 
-diff --git a/drivers/soc/atmel/soc.c b/drivers/soc/atmel/soc.c
-index c1363c8..af053af 100644
---- a/drivers/soc/atmel/soc.c
-+++ b/drivers/soc/atmel/soc.c
-@@ -72,6 +72,8 @@ static const struct at91_soc __initconst socs[] = {
- 		 "sama5d21", "sama5d2"),
- 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D22CU_EXID_MATCH,
- 		 "sama5d22", "sama5d2"),
-+	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D225C_D1M_EXID_MATCH,
-+		 "sama5d225c 16MiB SiP", "sama5d2"),
- 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D23CU_EXID_MATCH,
- 		 "sama5d23", "sama5d2"),
- 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D24CX_EXID_MATCH,
-@@ -84,10 +86,16 @@ static const struct at91_soc __initconst socs[] = {
- 		 "sama5d27", "sama5d2"),
- 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27CN_EXID_MATCH,
- 		 "sama5d27", "sama5d2"),
-+	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27C_D1G_EXID_MATCH,
-+		 "sama5d27c 128MiB SiP", "sama5d2"),
-+	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27C_D5M_EXID_MATCH,
-+		 "sama5d27c 64MiB SiP", "sama5d2"),
- 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D28CU_EXID_MATCH,
- 		 "sama5d28", "sama5d2"),
- 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D28CN_EXID_MATCH,
- 		 "sama5d28", "sama5d2"),
-+	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D28C_D1G_EXID_MATCH,
-+		 "sama5d28c 128MiB SiP", "sama5d2"),
- 	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D31_EXID_MATCH,
- 		 "sama5d31", "sama5d3"),
- 	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D33_EXID_MATCH,
-diff --git a/drivers/soc/atmel/soc.h b/drivers/soc/atmel/soc.h
-index a90bd5b..94cd5d1 100644
---- a/drivers/soc/atmel/soc.h
-+++ b/drivers/soc/atmel/soc.h
-@@ -64,14 +64,18 @@ at91_soc_init(const struct at91_soc *socs);
- 
- #define SAMA5D2_CIDR_MATCH		0x0a5c08c0
- #define SAMA5D21CU_EXID_MATCH		0x0000005a
-+#define SAMA5D225C_D1M_EXID_MATCH	0x00000053
- #define SAMA5D22CU_EXID_MATCH		0x00000059
- #define SAMA5D22CN_EXID_MATCH		0x00000069
- #define SAMA5D23CU_EXID_MATCH		0x00000058
- #define SAMA5D24CX_EXID_MATCH		0x00000004
- #define SAMA5D24CU_EXID_MATCH		0x00000014
- #define SAMA5D26CU_EXID_MATCH		0x00000012
-+#define SAMA5D27C_D1G_EXID_MATCH	0x00000033
-+#define SAMA5D27C_D5M_EXID_MATCH	0x00000032
- #define SAMA5D27CU_EXID_MATCH		0x00000011
- #define SAMA5D27CN_EXID_MATCH		0x00000021
-+#define SAMA5D28C_D1G_EXID_MATCH	0x00000013
- #define SAMA5D28CU_EXID_MATCH		0x00000010
- #define SAMA5D28CN_EXID_MATCH		0x00000020
- 
+diff --git a/arch/arm/boot/dts/at91-sama5d27_som1.dtsi b/arch/arm/boot/dts/at91-sama5d27_som1.dtsi
+new file mode 100644
+index 0000000..b3af4d4
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-sama5d27_som1.dtsi
+@@ -0,0 +1,178 @@
++/*
++ * at91-sama5d27_som1.dtsi - Device Tree file for SAMA5D27 SoM1 board
++ *
++ *  Copyright (c) 2017, Microchip Technology Inc.
++ *                2017 Cristian Birsan <cristian.birsan@microchip.com>
++ *                2017 Claudiu Beznea <claudiu.beznea@microchip.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++#include "sama5d2.dtsi"
++#include "sama5d2-pinfunc.h"
++
++/ {
++	model = "Atmel SAMA5D27 SoM1";
++	compatible = "atmel,sama5d27-som1", "atmel,sama5d27", "atmel,sama5d2", "atmel,sama5";
++
++	clocks {
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <24000000>;
++		};
++	};
++
++	ahb {
++		apb {
++			qspi1: spi at f0024000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_qspi1_default>;
++				flash at 0 {
++					#address-cells = <1>;
++					#size-cells = <1>;
++					compatible = "jedec,spi-nor";
++					reg = <0>;
++					spi-max-frequency = <83000000>;
++					m25p,fast-read;
++
++					at91bootstrap at 00000000 {
++						label = "at91bootstrap";
++						reg = <0x00000000 0x00010000>;
++					};
++
++					bootloaderenv at 00010000 {
++						label = "bootloader env";
++						reg = <0x00010000 0x00010000>;
++					};
++
++					bootloader at 00020000 {
++						label = "bootloader";
++						reg = <0x00020000 0x00050000>;
++					};
++
++					dtb at 00070000 {
++						label = "device tree";
++						reg = <0x00070000 0x00010000>;
++					};
++
++					kernel at 00080000 {
++						label = "kernel";
++						reg = <0x00080000 0x00380000>;
++					};
++				};
++			};
++
++			macb0: ethernet at f8008000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_macb0_default>;
++				phy-mode = "rmii";
++
++				ethernet-phy at 1 {
++					reg = <0x1>;
++					interrupt-parent = <&pioA>;
++					interrupts = <73 IRQ_TYPE_LEVEL_LOW>;
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_macb0_phy_irq>;
++				};
++			};
++
++			i2c0: i2c at f8028000 {
++				dmas = <0>, <0>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c0_default>;
++				i2c-sda-hold-time-ns = <350>;
++				status = "disabled";
++
++				24aa at 50 {
++					compatible = "24mac602";
++					reg = <0x50>;
++					pagesize = <8>;
++					start-offset = /bits/ 8 <0xf8>;
++					read-only;
++				};
++			};
++
++			pinctrl at fc038000 {
++
++				pinctrl_i2c0_default: i2c0_default {
++					pinmux = <PIN_PD21__TWD0>,
++						 <PIN_PD22__TWCK0>;
++					bias-disable;
++				};
++
++				pinctrl_macb0_default: macb0_default {
++					pinmux = <PIN_PD9__GTXCK>,
++						 <PIN_PD10__GTXEN>,
++						 <PIN_PD11__GRXDV>,
++						 <PIN_PD12__GRXER>,
++						 <PIN_PD13__GRX0>,
++						 <PIN_PD14__GRX1>,
++						 <PIN_PD15__GTX0>,
++						 <PIN_PD16__GTX1>,
++						 <PIN_PD17__GMDC>,
++						 <PIN_PD18__GMDIO>;
++					bias-disable;
++				};
++
++				pinctrl_macb0_phy_irq: macb0_phy_irq {
++					pinmux = <PIN_PD31__GPIO>;
++					bias-disable;
++				};
++
++				pinctrl_qspi1_default: qspi1_default {
++					sck_cs {
++						pinmux = <PIN_PB5__QSPI1_SCK>,
++							 <PIN_PB6__QSPI1_CS>;
++						bias-disable;
++					};
++
++					data {
++						pinmux = <PIN_PB7__QSPI1_IO0>,
++							 <PIN_PB8__QSPI1_IO1>,
++							 <PIN_PB9__QSPI1_IO2>,
++							 <PIN_PB10__QSPI1_IO3>;
++						bias-pull-up;
++					};
++				};
++			};
++		};
++	};
++};
 -- 
 2.7.4
