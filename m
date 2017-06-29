@@ -1,37 +1,27 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Thu, 29 Jun 2017 18:23:36 +0200
-Subject: [PATCH v2] arm64: fix missing __user in compat_vfp_set()
-In-Reply-To: <20170629142943.GA3966@e103592.cambridge.arm.com>
-References: <20170628145816.24807-1-luc.vanoostenryck@gmail.com>
- <20170629100418.GC14607@arm.com>
- <20170629142447.juiwwut4yhfsdbmo@ltop.local>
- <20170629142943.GA3966@e103592.cambridge.arm.com>
-Message-ID: <20170629162335.kce53hnwdbk3xyvq@ltop.local>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 29 Jun 2017 12:23:49 -0400 (EDT)
+Subject: [PATCH 1/6] net: stmmac: support future possible different
+ internal phy mode
+In-Reply-To: <20170627092806.28181-1-clabbe.montjoie@gmail.com>
+References: <20170627092806.28181-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170629.122349.2265868886957558079.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 03:34:06PM +0100, Dave Martin wrote:
-> On Thu, Jun 29, 2017 at 04:24:48PM +0200, Luc Van Oostenryck wrote:
-> > compat_vfp_set() is a helper writting some values via put_user()
-> > and put_user() need a pointer annotated with '__user'.
-> > The buffer used by the helper is correctly annotated with '__user'
-> > but need to be casted to a real type before being given to
-> > put_user().
-> > 
-> > The problem is that this cast lack a '__user' annotation.
-> > 
-> > Fix this by adding the missing '__user'.
-> > 
-> > Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+From: Corentin Labbe <clabbe.montjoie@gmail.com>
+Date: Tue, 27 Jun 2017 11:28:01 +0200
+
+> The current way to find if the phy is internal is to compare DT phy-mode
+> and emac_variant/internal_phy.
+> But it will negate a possible future SoC where an external PHY use the
+> same phy mode than the internal one.
 > 
-> Apologies, I has half a reply written and then realised this issue was
-> less straightforward that I first thought.  I have an alternate patch,
-> see [1].
+> By using phy-mode = "internal" we permit to have an external PHY with
+> the same mode than the internal one.
+> 
+> Reported-by: Andr? Przywara <andre.przywara@arm.com>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
-Ah yes.
-I saw the now asymmetry between the set/copyout and the set/copyin
-and I was a bit surprised by it.
+Series applied.
 
-Your new version look better (but I can't judge more than the look).
-
--- Luc
+Please provide a proper "[PATCH 0/n] " header posting next time.
