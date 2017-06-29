@@ -1,58 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Jun 2017 16:37:09 +0100
-Subject: [PATCH 1/3] arm64: ptrace: Avoid setting compat FP[SC]R to
- garbage if get_user fails
-In-Reply-To: <1498746379-27340-2-git-send-email-Dave.Martin@arm.com>
-References: <1498746379-27340-1-git-send-email-Dave.Martin@arm.com>
- <1498746379-27340-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170629153709.GC21883@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 29 Jun 2017 17:56:20 +0200
+Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
+References: <20170627143652.13075-1-net147@gmail.com>
+ <20170628092024.ejxy6itqj3hx6yew@flea>
+ <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
+Message-ID: <20170629155620.4keqi4cumbtvv63u@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 03:25:47PM +0100, Dave Martin wrote:
-> If get_user() fails when reading the new FPSCR value from userspace
-> in compat_vfp_get(), then garbage* will be written to the task's
-> FPSR and FPCR registers.
+On Wed, Jun 28, 2017 at 08:39:33PM +1000, Jonathan Liu wrote:
+> >> +     u32 int_status;
+> >> +     u32 fifo_status;
+> >> +     /* Read needs empty flag unset, write needs full flag unset */
+> >> +     u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
+> >> +                       SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
+> >> +     int ret;
+> >> +
+> >> +     /* Wait until error or FIFO ready */
+> >> +     ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+> >> +                              int_status,
+> >> +                              is_err_status(int_status) ||
+> >> +                              is_fifo_flag_unset(hdmi, &fifo_status, flag),
+> >> +                              min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
+> >> +                              100000);
+> >> +
+> >> +     if (is_err_status(int_status))
+> >> +             return -EIO;
+> >> +     if (ret)
+> >> +             return -ETIMEDOUT;
+> >
+> > Why not just have
+> > ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
+> >                          !(reg & flag), 100, 100000);
+> >
+> > if (ret < 0)
+> >         if (is_err_status())
+> >                 return -EIO;
+> >         return ret;
+> >
+> >
 > 
-> This patch prevents this by checking the return from get_user()
-> first.
-> 
-> [*] Actually, zero, due to the behaviour of get_user() on error, but
-> that's still not what userspace expects.
+> If I check error status after readl_poll_timeout and there is an error
+> (e.g. the I2C address does not have a corresponding device connected
+> or nothing connected to HDMI port) it will keep checking the fifo
+> status even though error bit is set in the int status and then timeout
+> after 100 ms. If it checks the int status register at the same time,
+> it will error after 100 nanoseconds. I don't want to introduce
+> unnecessary delays considering part of the reason for adding this
+> driver to make it more usable for non-standard use cases.
 
-On the other hand, I don't think userspace can expect that if ptrace returns
-an error then none of the state has been updated, can it?
+Well, polling for 100ms doesn't seem great either. What was the
+rationale behind that timeout?
 
-Given that we don't propagate the return value from __copy_from_user,
-I don't see what we're really fixing here and what userspace can now rely
-on that it couldn't rely on before.
+And we can also reverse the check and look at the INT_STATUS
+register. The errors will be there, and we can program the threshold
+we want in both directions and use the
+DDC_FIFO_Request_Interrupt_Status bit.
 
-Will
+Maxime
 
-> 
-> Fixes: 478fcb2cdb23 ("arm64: Debugging support")
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/kernel/ptrace.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 35846f1..4c068dc 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -947,8 +947,10 @@ static int compat_vfp_set(struct task_struct *target,
->  
->  	if (count && !ret) {
->  		ret = get_user(fpscr, (compat_ulong_t *)ubuf);
-> -		uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
-> -		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
-> +		if (!ret) {
-> +			uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
-> +			uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
-> +		}
->  	}
->  
->  	fpsimd_flush_task_state(target);
-> -- 
-> 2.1.4
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170629/6b2dc932/attachment.sig>
