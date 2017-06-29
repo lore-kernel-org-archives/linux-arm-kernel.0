@@ -1,12 +1,12 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Jun 2017 15:11:52 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 29 Jun 2017 15:13:23 +0100
 Subject: [PATCH] arm64: fix endianness annotation for
  __apply_alternatives()/get_alt_insn()
 In-Reply-To: <20170629132645.difv6xdjrkp5qvlh@ltop.local>
 References: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
  <20170629102851.GF14607@arm.com>
  <20170629132645.difv6xdjrkp5qvlh@ltop.local>
-Message-ID: <20170629141151.GC18630@arm.com>
+Message-ID: <20170629141323.GH11040@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -40,6 +40,9 @@ On Thu, Jun 29, 2017 at 03:26:47PM +0200, Luc Van Oostenryck wrote:
 > 	+#define __ALT_PTR(a,f)          ((void *)&(a)->f + (a)->f)
 > if it suits you.
 
-Yes, please!
+Given __ALT_PTR is intended to give a pointer to A64 instructions, which
+are in le32 format, wouldn't it make more sense for __ALT_PTR to cast to
+__le32 * ?
 
-Will
+Thanks,
+Mark.
