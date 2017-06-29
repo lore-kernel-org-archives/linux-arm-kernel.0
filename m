@@ -1,21 +1,23 @@
-From: enrico.weigelt@gr13.net (Enrico Weigelt, metux IT consult)
-Date: Thu, 29 Jun 2017 13:05:42 +0000
-Subject: [RFC 0/5] drivers: Add boot constraints core
-In-Reply-To: <20170629124908.GV4902@n2100.armlinux.org.uk>
-References: <cover.1498642745.git.viresh.kumar@linaro.org>
- <20170629124908.GV4902@n2100.armlinux.org.uk>
-Message-ID: <7ff5fe0b-72fa-7a23-44df-59761cc6dd1c@gr13.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Jun 2017 15:14:28 +0200
+Subject: [PATCH v5 1/6] pinctrl: qcom: Add ipq8074 pinctrl driver
+In-Reply-To: <1497000783-27916-2-git-send-email-varada@codeaurora.org>
+References: <1497000783-27916-1-git-send-email-varada@codeaurora.org>
+ <1497000783-27916-2-git-send-email-varada@codeaurora.org>
+Message-ID: <CACRpkdZ=+tD8sR9brTqftxmKbyCq4gv_j8J=e3XsRzHx9kveFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.06.2017 12:49, Russell King - ARM Linux wrote:
+On Fri, Jun 9, 2017 at 11:32 AM, Varadarajan Narayanan
+<varada@codeaurora.org> wrote:
 
-> The location of the frame buffer is unknown to the decompressor - and
-> as the decompressor self-relocates itself (using purely assembly code),
-> it could relocate itself on top of the frame buffer, causing the "nice"
-> image to become very colourful.
+> Add initial pinctrl driver to support pin configuration with
+> pinctrl framework for ipq8074.
+>
+> Signed-off-by: Manoharan Vijaya Raghavan <mraghava@codeaurora.org>
+> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
 
-Could the bootloader pass safe (or blocked) memory regions to the
-decompressor ?
+Patch applied for v4.13 with Rob's and Bj?rn's ACKs.
 
---mtx
+Yours,
+Linus Walleij
