@@ -1,44 +1,41 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 29 Jun 2017 14:16:55 +0200
-Subject: [PATCH 5/5] ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK
- support
-In-Reply-To: <20170629115931.yki2xbehyicbtx3w@tarshish>
-References: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
- <1498736674-9233-6-git-send-email-claudiu.beznea@microchip.com>
- <20170629115931.yki2xbehyicbtx3w@tarshish>
-Message-ID: <20170629121655.37pq7cnabvv4wh7z@piout.net>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 29 Jun 2017 21:18:12 +0900
+Subject: [PATCH 3/5] dt-bindings: arm: Document Socionext MB86S71 and
+ Fujitsu F-Cue
+In-Reply-To: <20170628164605.2gnvrv4g7jluzyrm@rob-hp-laptop>
+References: <20170625170020.11791-1-afaerber@suse.de>
+ <20170625170020.11791-4-afaerber@suse.de>
+ <20170628164605.2gnvrv4g7jluzyrm@rob-hp-laptop>
+Message-ID: <CAK7LNATqjOMUajUCYVq=L6wWVTUEc1M7Po+KQ3M3Z=A7+FHX5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/2017 at 14:59:31 +0300, Baruch Siach wrote:
-> Hi Claudiu,
-> 
-> On Thu, Jun 29, 2017 at 02:44:34PM +0300, Claudiu Beznea wrote:
-> > Add specifig DTS files and bindings for sama5d27 SoM1 EK board.
-> 
-> Is there any publicly available information on this SoM?
-> 
-> One more comment below.
-> 
-> > Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> > Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
-> > ---
-> 
-> [snip]
-> 
-> > +	memory {
-> > +		reg = <0x20000000 0x20000>;
-> 
-> Are you sure this SoM has 132KB RAM?
-> 
-> Since you seem to rely on the bootloader to fill in the right size value, you 
-> can just drop this node and rely on sama5d2.dtsi that provides a stub node.
-> 
+2017-06-29 1:46 GMT+09:00 Rob Herring <robh@kernel.org>:
+> On Sun, Jun 25, 2017 at 07:00:18PM +0200, Andreas F?rber wrote:
+>> For consistency with existing SoC bindings, use "fujitsu,mb86s71" but
+>> socionext.txt.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  Documentation/devicetree/bindings/arm/socionext.txt | 17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/socionext.txt
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+> --
 
-Yeah, that is what I would do too.
+I do not mind this, but
+please note there are multiple product lines in Socionext
+because Socionext merged LSI divisions from Panasonic and Fujitsu.
+
+I maintain documents for Socionext UniPhier SoC family
+(which inherits SoC architecture of Panasonic)
+in Documentation/devicetree/bindings/arm/uniphier/.
+
+
+
 
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best Regards
+Masahiro Yamada
