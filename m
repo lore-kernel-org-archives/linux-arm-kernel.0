@@ -1,64 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 29 Jun 2017 14:45:39 +0200
-Subject: Clocks used by another OS/CPU
-In-Reply-To: <50911172-8fa1-8341-0ed0-d40f00d9392c@de.bosch.com>
-References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
- <CAMuHMdWRadUCZUycUW3dKJhS__aRRVbV1tXo0umUQ7KHOYQMoQ@mail.gmail.com>
- <50911172-8fa1-8341-0ed0-d40f00d9392c@de.bosch.com>
-Message-ID: <CAMuHMdXedexq_jGq+y3Hbmph1_1N_LjT7dhYJ=rC0Q2oK_Xjug@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Jun 2017 13:49:09 +0100
+Subject: [RFC 0/5] drivers: Add boot constraints core
+In-Reply-To: <cover.1498642745.git.viresh.kumar@linaro.org>
+References: <cover.1498642745.git.viresh.kumar@linaro.org>
+Message-ID: <20170629124908.GV4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+On Wed, Jun 28, 2017 at 03:56:33PM +0530, Viresh Kumar wrote:
+> A typical example of that can be the LCD controller, which is used by
+> the bootloaders to show image(s) while the machine is booting into
+> Linux. The LCD controller can be using some resources, like clk,
+> regulators, etc, that are shared between several devices. These shared
+> resources should be programmed so that all the users of them are
+> satisfied. If a user (X) driver gets probed before the LCD controller
+> driver in this case, then it may end up reconfiguring these resources to
+> ranges satisfying the current users (only user X) and that can make the
+> LCD screen unstable.
 
-On Thu, Jun 29, 2017 at 2:07 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> On 29.06.2017 13:56, Geert Uytterhoeven wrote:
->> On Thu, Jun 29, 2017 at 11:27 AM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> CC clock, ARM, DT, PM people
->>>
->>> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
->>> disables them as being unused.
->>
->>> Of course this is not limited to clocks, but also to e.g. PM domains.
->>
->> BTW, how do you prevent Linux from powering down the CR7 PM domain,
->> which contains the Cortex R7?
->
-> The idea is
->
-> --- a/drivers/soc/renesas/r8a7795-sysc.c
-> +++ b/drivers/soc/renesas/r8a7795-sysc.c
-> @@ -38,7 +38,8 @@ static const struct rcar_sysc_area r8a7795_areas[]
-> __initconst = {
->         { "ca53-cpu3",  0x200, 3, R8A7795_PD_CA53_CPU3, R8A7795_PD_CA53_SCU,
->           PD_CPU_NOCR },
->         { "a3vp",       0x340, 0, R8A7795_PD_A3VP,      R8A7795_PD_ALWAYS_ON
-> },
-> -       { "cr7",        0x240, 0, R8A7795_PD_CR7,       R8A7795_PD_ALWAYS_ON
-> },
-> +       { "cr7",        0x240, 0, R8A7795_PD_CR7,
-> R8A7795_PD_ALWAYS_ON,
-> +         PD_CPU_NOCR },
->         { "a3vc",       0x380, 0, R8A7795_PD_A3VC,      R8A7795_PD_ALWAYS_ON
-> },
->         { "a2vc0",      0x3c0, 0, R8A7795_PD_A2VC0,     R8A7795_PD_A3VC },
->         { "a2vc1",      0x3c0, 1, R8A7795_PD_A2VC1,     R8A7795_PD_A3VC },
->
->
-> Not finally tested, though.
+The thing that concerns me most about this is that typically the LCD
+controller will be performing DMA to system RAM.
 
-Pretending the CR7 PM Domain can only be controlled through WFI/APMU only should
-work.
-But IMHO it is a hack, just like your solution for the CANFD clock.
+The location of the frame buffer is unknown to the decompressor - and
+as the decompressor self-relocates itself (using purely assembly code),
+it could relocate itself on top of the frame buffer, causing the "nice"
+image to become very colourful.
 
-Gr{oetje,eeting}s,
+The decompressor doesn't have the information from DT at that point to
+know what are safe locations, so it's up to the boot loader to place
+the frame buffer somewhere out of the way.  (If people want to write
+a DT parser in position independent ARM assembly code that may change.)
 
-                        Geert
+As long as people realise this, then it's not a problem, but given the
+number of problems that we've already encountered with boot loaders and
+memory space layout, I don't trust them to get this right.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Right now, the ARM kernel booting document requires:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+- Quiesce all DMA capable devices so that memory does not get
+  corrupted by bogus network packets or disk data. This will save
+  you many hours of debug.
+
+so we would need to modify that to make an exception for LCD controllers.
+However, we definitely can't have devices left enabled which are capable
+of writing to system memory, or which changing system memory is likely
+to cause bad effects (eg, packet ring buffers, USB buffers etc, which is
+really what the above requirement is about.)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
