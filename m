@@ -1,41 +1,25 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 29 Jun 2017 21:18:12 +0900
-Subject: [PATCH 3/5] dt-bindings: arm: Document Socionext MB86S71 and
- Fujitsu F-Cue
-In-Reply-To: <20170628164605.2gnvrv4g7jluzyrm@rob-hp-laptop>
-References: <20170625170020.11791-1-afaerber@suse.de>
- <20170625170020.11791-4-afaerber@suse.de>
- <20170628164605.2gnvrv4g7jluzyrm@rob-hp-laptop>
-Message-ID: <CAK7LNATqjOMUajUCYVq=L6wWVTUEc1M7Po+KQ3M3Z=A7+FHX5w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Jun 2017 14:23:38 +0200
+Subject: [PATCH v2] gpio: rcar: Add R8A7743 (RZ/G1M) support
+In-Reply-To: <1498055229-42052-1-git-send-email-biju.das@bp.renesas.com>
+References: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
+ <1498055229-42052-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CACRpkdaHb8GnwTc0D0B9TtYC=LUa0ZdDK90xKwydg=s4z-VxMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-29 1:46 GMT+09:00 Rob Herring <robh@kernel.org>:
-> On Sun, Jun 25, 2017 at 07:00:18PM +0200, Andreas F?rber wrote:
->> For consistency with existing SoC bindings, use "fujitsu,mb86s71" but
->> socionext.txt.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  Documentation/devicetree/bindings/arm/socionext.txt | 17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/socionext.txt
+On Wed, Jun 21, 2017 at 4:27 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+
+> Renesas RZ/G1M (R8A7743) SoC GPIO blocks are identical to the R-Car Gen2
+> family. Add support for its GPIO controllers.
 >
-> Acked-by: Rob Herring <robh@kernel.org>
-> --
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> ---
+> v1->v2
+> * Modified the text "RZ-G1M" to "RZ/G1M"
 
-I do not mind this, but
-please note there are multiple product lines in Socionext
-because Socionext merged LSI divisions from Panasonic and Fujitsu.
+Patch applied with the ACKs.
 
-I maintain documents for Socionext UniPhier SoC family
-(which inherits SoC architecture of Panasonic)
-in Documentation/devicetree/bindings/arm/uniphier/.
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Yours,
+Linus Walleij
