@@ -1,60 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 29 Jun 2017 15:22:51 +0200
-Subject: Clocks used by another OS/CPU
-In-Reply-To: <b42a6818-4bc1-6556-5adf-c74a205b745b@de.bosch.com>
-References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
- <b2328038-64ac-f7e0-d8a9-434f2f0b0300@de.bosch.com>
- <CAMuHMdVD3i0YhGCf-HSS+y+4SHvXi9sW3V4-ScQX=7R+DX=kEQ@mail.gmail.com>
- <b42a6818-4bc1-6556-5adf-c74a205b745b@de.bosch.com>
-Message-ID: <CAMuHMdV7onyF3o0POVh0v0O-Zp_bmGK3zyadg1SHa4r6k-P_2g@mail.gmail.com>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Thu, 29 Jun 2017 15:26:47 +0200
+Subject: [PATCH] arm64: fix endianness annotation for
+ __apply_alternatives()/get_alt_insn()
+In-Reply-To: <20170629102851.GF14607@arm.com>
+References: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
+ <20170629102851.GF14607@arm.com>
+Message-ID: <20170629132645.difv6xdjrkp5qvlh@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+On Thu, Jun 29, 2017 at 11:28:51AM +0100, Will Deacon wrote:
+> On Wed, Jun 28, 2017 at 04:55:57PM +0200, Luc Van Oostenryck wrote:
+> > get_alt_insn() is used to read and create ARM instructions, which
+> > are always stored in memory in little-endian order. These values
+> > are thus correctly converted to/from native order when processed
+> > but the pointers used to hold the address of these instructions
+> > are declared as for native order values.
+> > 
+> > Fix this by declaring the pointers as __le32* instead of u32* and
+> > make the few appropriate needed changes.
+> > 
+> > +		origptr = (__le32 __force *) ALT_ORIG_PTR(alt);
+> > +		replptr = (__le32 __force *) ALT_REPL_PTR(alt);
+> 
+> Why is the __force needed here?
 
-On Thu, Jun 29, 2017 at 3:18 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> On 29.06.2017 13:18, Geert Uytterhoeven wrote:
->> On Thu, Jun 29, 2017 at 12:28 PM, Dirk Behme <dirk.behme@de.bosch.com>
->> wrote:
->>> On 29.06.2017 11:27, Geert Uytterhoeven wrote:
->>>> TL;DR: Clocks may be in use by another CPU not running Linux, while
->>>> Linux
->>>> disables them as being unused.
+Because of the cast to u32* in:
+	#define ALT_ORIG_PTR(a)         __ALT_PTR(a, orig_offset)
+	#define ALT_REPL_PTR(a)         __ALT_PTR(a, alt_offset)
+	#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
 
->>>> On r8a7795, there are several Cortex A cores running Linux, and a Cortex
->>>> R7
->>>> core which may run another OS.
->>>> This is an interesting issue, and relevant to other SoCs, too.
+Of course, if this (u32*) is not really needed, then the __force
+is also not needed.
 
-> First of all, just the clocks we know (*) are used by the R7 side *and* are
-> disabled by the kernel (for a practical demo this are e.g. ~7 clocks).
->
-> (*) Yes, this is board (and R7 software) related. And yes, this might result
-> in board specific r8a7795_crit_mod_clks/r8a7795_crit_core_clks[] tables. So
-> yes, most probably device tree would be an option. While there is
->
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/clk/clk.c#n3402
->
-> unfortunately
->
-> a) its marked as "Do not use this function"
->
-> and
->
-> b) even if we would ignore (a) we couldn't figure how to use this for the
-> RCar3 clocks (being no clock expert)
+And since, it seems indeed to be the case, I'll gladly sent a patch:
+	-#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
+	+#define __ALT_PTR(a,f)          ((void *)&(a)->f + (a)->f)
+if it suits you.
 
-You cannot, as it only supports the legacy one-clock-per-node style.
-You can use it on e.g. sd2_clk in arch/arm/boot/dts/r8a7791.dtsi, until R-Car
-Gen2 is switched to the new CPG/MSSR driver.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- Luc
