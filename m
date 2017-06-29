@@ -1,51 +1,91 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Thu, 29 Jun 2017 13:40:15 -0400
-Subject: [PATCH] iommu/arm-smmu-v3: Implement shutdown method
-Message-ID: <1498758015-7072-1-git-send-email-nwatters@codeaurora.org>
+From: opendmb@gmail.com (Doug Berger)
+Date: Thu, 29 Jun 2017 10:56:56 -0700
+Subject: [PATCH] ARM: ensure memblock-limit is pmd-aligned
+In-Reply-To: <20170629111645.GC11040@leverpostej>
+References: <20170627173330.13804-1-opendmb@gmail.com>
+ <20170629111645.GC11040@leverpostej>
+Message-ID: <c261c49e-fb32-7dd7-59e6-2cf29fda6501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The shutdown method disables the SMMU and its interrupts to avoid
-potentially corrupting a new kernel started with kexec.
+On 06/29/2017 04:16 AM, Mark Rutland wrote:
+> On Tue, Jun 27, 2017 at 10:33:29AM -0700, Doug Berger wrote:
+>> The pmd containing memblock_limit is cleared by prepare_page_table()
+>> which creates the opportunity for early_alloc() to allocate unmapped
+>> memory if memblock_limit is not pmd aligned causing a boot-time hang.
+>>
+>> Commit 965278dcb8ab ("ARM: 8356/1: mm: handle non-pmd-aligned end of RAM")
+>> attempted to resolve this problem, but there is a path through the
+>> adjust_lowmem_bounds() routine where if all memory regions start and
+>> end on pmd-aligned addresses the memblock_limit will be set to
+>> arm_lowmem_limit.
+>>
+>> Since arm_lowmem_limit can be affected by the vmalloc early parameter,
+>> the value of arm_lowmem_limit may not be pmd-aligned. This commit
+>> corrects this oversight such that memblock_limit is always rounded
+>> down to pmd-alignment.
+>>
+>> Fixes: 965278dcb8ab ("ARM: 8356/1: mm: handle non-pmd-aligned end of RAM")
+>> Signed-off-by: Doug Berger <opendmb@gmail.com>
+>> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> As a minor nit, it would be better for the title to be something like
+> "ARM: ensure memblock-limit is pmd-aligned", but either way:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Assuming Russell doesn't have any furhter comments, this looks good to
+> drop into the patch system. See:
+> 
+>   http://www.arm.linux.org.uk/developer/patches/info.php
+> 
+> ... for instructions on how to send patches there.
+> 
+> Thanks,
+> Mark.
+> 
 
-Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
----
- drivers/iommu/arm-smmu-v3.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+I modified the title as suggested and it has been submitted as 8685/1.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 380969a..907d576 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2765,9 +2765,19 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
- 
- 	arm_smmu_device_disable(smmu);
-+
-+	/* Disable IRQs */
-+	arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
-+				ARM_SMMU_IRQ_CTRLACK);
-+
- 	return 0;
- }
- 
-+static void arm_smmu_device_shutdown(struct platform_device *pdev)
-+{
-+	arm_smmu_device_remove(pdev);
-+}
-+
- static struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,smmu-v3", },
- 	{ },
-@@ -2781,6 +2791,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	},
- 	.probe	= arm_smmu_device_probe,
- 	.remove	= arm_smmu_device_remove,
-+	.shutdown = arm_smmu_device_shutdown,
- };
- module_platform_driver(arm_smmu_driver);
- 
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
-Foundation Collaborative Project.
+Thanks!
+
+>> ---
+>> Changes for v2:
+>>  - Cleaner equivalent implementation suggested by Mark Rutland
+>>  - Revised description to better capture the history
+>>
+>>  arch/arm/mm/mmu.c | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index 31af3cb59a60..e46a6a446cdd 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -1218,15 +1218,15 @@ void __init adjust_lowmem_bounds(void)
+>>  
+>>  	high_memory = __va(arm_lowmem_limit - 1) + 1;
+>>  
+>> +	if (!memblock_limit)
+>> +		memblock_limit = arm_lowmem_limit;
+>> +
+>>  	/*
+>>  	 * Round the memblock limit down to a pmd size.  This
+>>  	 * helps to ensure that we will allocate memory from the
+>>  	 * last full pmd, which should be mapped.
+>>  	 */
+>> -	if (memblock_limit)
+>> -		memblock_limit = round_down(memblock_limit, PMD_SIZE);
+>> -	if (!memblock_limit)
+>> -		memblock_limit = arm_lowmem_limit;
+>> +	memblock_limit = round_down(memblock_limit, PMD_SIZE);
+>>  
+>>  	if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
+>>  		if (memblock_end_of_DRAM() > arm_lowmem_limit) {
+>> -- 
+>> 2.13.0
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
