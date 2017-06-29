@@ -1,60 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Jun 2017 11:28:51 +0100
-Subject: [PATCH] arm64: fix endianness annotation for
- __apply_alternatives()/get_alt_insn()
-In-Reply-To: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
-References: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
-Message-ID: <20170629102851.GF14607@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 29 Jun 2017 12:29:16 +0200
+Subject: [PATCH] EDAC: Get rid of mci->mod_ver
+In-Reply-To: <20170629100311.vmdq6fojpo5ye4ne@pd.tnic>
+References: <20170629100311.vmdq6fojpo5ye4ne@pd.tnic>
+Message-ID: <36769669-866d-8bb1-a9ac-399ed56066bf@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 28, 2017 at 04:55:57PM +0200, Luc Van Oostenryck wrote:
-> get_alt_insn() is used to read and create ARM instructions, which
-> are always stored in memory in little-endian order. These values
-> are thus correctly converted to/from native order when processed
-> but the pointers used to hold the address of these instructions
-> are declared as for native order values.
+On 29.6.2017 12:03, Borislav Petkov wrote:
+> Hi,
 > 
-> Fix this by declaring the pointers as __le32* instead of u32* and
-> make the few appropriate needed changes.
+> any objections?
 > 
-> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 > ---
->  arch/arm64/kernel/alternative.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+> It is a write-only variable so get rid of it.
 > 
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index 8840c109c..56bfda8cb 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -60,7 +60,7 @@ static bool branch_insn_requires_update(struct alt_instr *alt, unsigned long pc)
->  
->  #define align_down(x, a)	((unsigned long)(x) & ~(((unsigned long)(a)) - 1))
->  
-> -static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
-> +static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnptr)
->  {
->  	u32 insn;
->  
-> @@ -109,7 +109,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
->  {
->  	struct alt_instr *alt;
->  	struct alt_region *region = alt_region;
-> -	u32 *origptr, *replptr, *updptr;
-> +	__le32 *origptr, *replptr, *updptr;
->  
->  	for (alt = region->begin; alt < region->end; alt++) {
->  		u32 insn;
-> @@ -122,9 +122,9 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
->  
->  		pr_info_once("patching kernel code\n");
->  
-> -		origptr = ALT_ORIG_PTR(alt);
-> -		replptr = ALT_REPL_PTR(alt);
-> -		updptr = use_linear_alias ? (u32 *)lm_alias(origptr) : origptr;
-> +		origptr = (__le32 __force *) ALT_ORIG_PTR(alt);
-> +		replptr = (__le32 __force *) ALT_REPL_PTR(alt);
+> Signed-off-by: Borislav Petkov <bp@suse.de>
+> Cc: Thor Thayer <thor.thayer@linux.intel.com>
+> Cc: Mark Gross <mark.gross@intel.com>
+> Cc: Robert Richter <rric@kernel.org>
+> Cc: Tim Small <tim@buttersideup.com>
+> Cc: Ranganathan Desikan <ravi@jetztechnologies.com>
+> Cc: "Arvind R." <arvino55@gmail.com>
+> Cc: Jason Baron <jbaron@akamai.com>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: David Daney <david.daney@cavium.com>
+> Cc: Loc Ho <lho@apm.com>
+> Cc: linux-edac at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mips at linux-mips.org
+> ---
+>  drivers/edac/altera_edac.c      | 2 --
+>  drivers/edac/amd64_edac.c       | 1 -
+>  drivers/edac/amd76x_edac.c      | 2 --
+>  drivers/edac/cpc925_edac.c      | 1 -
+>  drivers/edac/e752x_edac.c       | 2 --
+>  drivers/edac/e7xxx_edac.c       | 2 --
+>  drivers/edac/ghes_edac.c        | 3 ---
+>  drivers/edac/highbank_mc_edac.c | 1 -
+>  drivers/edac/i3000_edac.c       | 3 ---
+>  drivers/edac/i3200_edac.c       | 3 ---
+>  drivers/edac/i5000_edac.c       | 1 -
+>  drivers/edac/i5100_edac.c       | 1 -
+>  drivers/edac/i5400_edac.c       | 1 -
+>  drivers/edac/i7300_edac.c       | 1 -
+>  drivers/edac/i7core_edac.c      | 1 -
+>  drivers/edac/i82443bxgx_edac.c  | 3 ---
+>  drivers/edac/i82860_edac.c      | 2 --
+>  drivers/edac/i82875p_edac.c     | 2 --
+>  drivers/edac/i82975x_edac.c     | 2 --
+>  drivers/edac/ie31200_edac.c     | 2 --
+>  drivers/edac/mv64x60_edac.c     | 1 -
+>  drivers/edac/ppc4xx_edac.c      | 1 -
+>  drivers/edac/r82600_edac.c      | 2 --
+>  drivers/edac/sb_edac.c          | 1 -
+>  drivers/edac/skx_edac.c         | 3 ---
+>  drivers/edac/synopsys_edac.c    | 1 -
 
-Why is the __force needed here?
+No problem with this change.
 
-Will
+Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+Thanks,
+Michal
