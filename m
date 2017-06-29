@@ -1,42 +1,93 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 29 Jun 2017 14:59:31 +0300
-Subject: [PATCH 5/5] ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK
- support
-In-Reply-To: <1498736674-9233-6-git-send-email-claudiu.beznea@microchip.com>
-References: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
- <1498736674-9233-6-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20170629115931.yki2xbehyicbtx3w@tarshish>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 29 Jun 2017 15:05:58 +0300
+Subject: [PATCH V2 2/2] dmaengine: dmatest: add support for memset test
+In-Reply-To: <1498701116-9787-2-git-send-email-okaya@codeaurora.org>
+References: <1498701116-9787-1-git-send-email-okaya@codeaurora.org>
+ <1498701116-9787-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAHp75VfJ=nq4Ycd7SDiXbW4hXNZ3o_6VEiF7JM3J=vrwVcUnYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Claudiu,
+On Thu, Jun 29, 2017 at 4:51 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Introducing memset test into dmatest. It allows us to test memset capable
+> HW using the dmatest suite. The new dmatest value is 2 and it is
+> changeable through sysfs.
+>
+> Memset shares the same code path as the other dmatest code. The only
+> difference is that the first value inside the source buffer is used
+> to fill in the destination address space.
+>
+> Source/destination buffers are initialized with the 1 counter value
+> prior to test so that we can do pattern check against a known expected
+> value.
+>
+> An example run us as follows:
+>
+> echo dma0chan0 > /sys/module/dmatest/parameters/channel
+> echo 2 >  /sys/module/dmatest/parameters/dmatest
+> echo 2000 >  /sys/module/dmatest/parameters/timeout
+> echo 10 >  /sys/module/dmatest/parameters/iterations
+> echo 1 >  /sys/module/dmatest/parameters/run
+>
 
-On Thu, Jun 29, 2017 at 02:44:34PM +0300, Claudiu Beznea wrote:
-> Add specifig DTS files and bindings for sama5d27 SoM1 EK board.
+See my comments below.
+After addressing them,
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-Is there any publicly available information on this SoM?
+> +static inline u8 gen_inv_idx(u8 index, bool is_memset)
+> +{
+> +       u8 val = is_memset ? PATTERN_MEMSET_IDX : index;
+> +
 
-One more comment below.
+> +       return (~val & PATTERN_COUNT_MASK);
 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
-> ---
+Redundant parens.
 
-[snip]
+> +}
 
-> +	memory {
-> +		reg = <0x20000000 0x20000>;
+> +                       buf[i] = gen_src_value(i, is_memset);
+> +
 
-Are you sure this SoM has 132KB RAM?
+Please, remove this new empty lines which doesn't belong to the patch.
 
-Since you seem to rely on the bootloader to fill in the right size value, you 
-can just drop this node and rely on sama5d2.dtsi that provides a stub node.
+> +                       buf[i] = gen_src_value(i, is_memset) | PATTERN_COPY;
+> +
 
-> +	};
+Ditto.
 
-baruch
+> +                       buf[i] = gen_dst_value(i, is_memset);
+> +
+
+Ditto.
+
+> +                       buf[i] = gen_dst_value(i, is_memset) |
+> +                                               PATTERN_OVERWRITE;
+> +
+
+Ditoo.
+
+> +                               0, PATTERN_DST, false, is_memset);
+> +
+
+Ditto.
+
+> +                               PATTERN_SRC | PATTERN_COPY, false, is_memset);
+> +
+
+Ditto.
+
+> +       if (dma_has_cap(DMA_MEMSET, dma_dev->cap_mask)) {
+> +               if (dmatest == 2) {
+
+Double if is effectively && in this case. Though it looks like the
+pattern already in use in the module.
+So, for now we might leave it untouched.
+
+> +                       cnt = dmatest_add_threads(info, dtc, DMA_MEMSET);
+> +                       thread_count += cnt > 0 ? cnt : 0;
+> +               }
+> +       }
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+With Best Regards,
+Andy Shevchenko
