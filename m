@@ -1,89 +1,32 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 29 Jun 2017 09:33:56 +0200
-Subject: [PATCH v4 1/6] clk: sunxi-ng: div: Add support for fixed
- post-divider
-In-Reply-To: <20170628175949.GA3706@plaes.org>
-References: <cover.24b2b13ec5a68552e186ba1637f1328363c3886e.1498422562.git-series.plaes@plaes.org>
- <bc043a64775ec8c9cfcfe6d638e348d38e34eba3.1498422562.git-series.plaes@plaes.org>
- <20170627094607.2hkgzkycclboemvu@flea.lan>
- <20170628175949.GA3706@plaes.org>
-Message-ID: <20170629073356.nljcjiqw35t3y4t2@flea>
+Date: Thu, 29 Jun 2017 09:48:25 +0200
+Subject: arm64: build is broken on next-20170609 with merge-commit
+ 9afca2c4e379 (arm64: allwinner: sun50i-a64: add dwmac-sun8i Ethernet driver)
+In-Reply-To: <20170628160711.08763ee7@canb.auug.org.au>
+References: <20170609124325.p7b6fhdbwtki4w2z@yury-thinkpad>
+ <20170610092944.4022d550@canb.auug.org.au>
+ <20170628160711.08763ee7@canb.auug.org.au>
+Message-ID: <20170629074825.pgeg2ut3nb3tj36u@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 28, 2017 at 05:59:49PM +0000, Priit Laes wrote:
-> On Tue, Jun 27, 2017 at 11:46:07AM +0200, Maxime Ripard wrote:
-> > Hi!
-> > 
-> > On Sun, Jun 25, 2017 at 11:45:42PM +0300, Priit Laes wrote:
-> > > SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
-> > > 6 is fixed post-divider.
-> > > 
-> > > Signed-off-by: Priit Laes <plaes@plaes.org>
-> > > ---
-> > >  drivers/clk/sunxi-ng/ccu_div.c | 12 ++++++++++--
-> > >  drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
-> > >  2 files changed, 12 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-> > > index c0e5c10..de30e15 100644
-> > > --- a/drivers/clk/sunxi-ng/ccu_div.c
-> > > +++ b/drivers/clk/sunxi-ng/ccu_div.c
-> > > @@ -62,8 +62,13 @@ static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
-> > >  	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
-> > >  						  parent_rate);
-> > >  
-> > > -	return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
-> > > -				   cd->div.flags);
-> > > +	val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
-> > > +				  cd->div.flags);
-> > > +
-> > > +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> > > +		val /= cd->fixed_post_div;
-> > > +
-> > > +	return val;
-> > >  }
-> > >  
-> > >  static int ccu_div_determine_rate(struct clk_hw *hw,
-> > > @@ -89,6 +94,9 @@ static int ccu_div_set_rate(struct clk_hw *hw, unsigned long rate,
-> > >  	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
-> > >  			      cd->div.flags);
-> > >  
-> > > +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> > > +		val *= cd->fixed_post_div;
-> > > +
-> > >  	spin_lock_irqsave(cd->common.lock, flags);
-> > >  
-> > >  	reg = readl(cd->common.base + cd->common.reg);
-> > 
-> > You also need to adjust the round rate call back to take into account
-> > the post divider before calling divider_round_rate_parent, and after
-> > since that function can modify the parent_rate.
+Hi,
+
+On Wed, Jun 28, 2017 at 04:07:11PM +1000, Stephen Rothwell wrote:
+> Hi all,
 > 
-> Is there a way to trigger this function? I don't see it getting called.
-
-yep, clk_round_rate will call it, and it's also in the code path of
-clk_set_rate.
-
-> > > diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
-> > > index 08d0744..f3a5028 100644
-> > > --- a/drivers/clk/sunxi-ng/ccu_div.h
-> > > +++ b/drivers/clk/sunxi-ng/ccu_div.h
-> > > @@ -86,9 +86,10 @@ struct ccu_div_internal {
-> > >  struct ccu_div {
-> > >  	u32			enable;
-> > >  
-> > > -	struct ccu_div_internal		div;
-> > > +	struct ccu_div_internal	div;
-> > 
-> > Spurious change?
+> [Yes, top posted :-)]
 > 
-> Nope, it was not indented the same way as other variables.
-> Should I send it as separate patch?
+> With the merge window approaching, this is just a reminder that this
+> merge problem still exists.  I assume that the sunxi tree will be
+> merged into the arm-soc tree before going to Linus.
 
-Hmmm, not really, leave it there.
+It's already been merged in arm-soc. I haven't had any news from Dave
+on this despite my mails, so I don't really know how to solve this.
 
-Thanks!
+Those patches really should never have been in net-next in the first
+place.
+
 Maxime
 
 -- 
@@ -96,4 +39,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170629/7a07e69e/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170629/bba04f9e/attachment.sig>
