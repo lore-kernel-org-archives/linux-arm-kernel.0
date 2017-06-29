@@ -1,26 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 29 Jun 2017 20:18:29 +0200
-Subject: [PATCH RESEND] serial: imx: Enable RTSD only when needed
-In-Reply-To: <20170628135936.30537-1-romain.perier@collabora.com>
-References: <20170628135936.30537-1-romain.perier@collabora.com>
-Message-ID: <20170629181829.7ig6ze3virfbp67e@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Jun 2017 19:34:39 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Implement shutdown method
+In-Reply-To: <1498758015-7072-1-git-send-email-nwatters@codeaurora.org>
+References: <1498758015-7072-1-git-send-email-nwatters@codeaurora.org>
+Message-ID: <20170629183438.GF5592@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Jun 29, 2017 at 01:40:15PM -0400, Nate Watterson wrote:
+> The shutdown method disables the SMMU and its interrupts to avoid
+> potentially corrupting a new kernel started with kexec.
+> 
+> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 
-On Wed, Jun 28, 2017 at 03:59:36PM +0200, Romain Perier wrote:
-> +	temp |= UCR1_RRDYEN | UCR1_UARTEN;
-> +	if (sport->have_rtscts)
-> +			temp |= UCR1_RTSDEN;
+We should update arm-smmu.c as well.
 
-There is a tab too much.
- 
->  	writel(temp, sport->port.membase + UCR1);
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 380969a..907d576 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2765,9 +2765,19 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+>  	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+>  
+>  	arm_smmu_device_disable(smmu);
+> +
+> +	/* Disable IRQs */
+> +	arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
+> +				ARM_SMMU_IRQ_CTRLACK);
+> +
 
-Other than that:
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Can you justify the need for this? If we actually need to disable
+interrupts, then I'd like to understand why so that we can make sure we
+get the ordering right with respect to disabling the device. Also, do we
+need to clear the MSI registers too?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+My understanding is that kexec will mask irqs at the GIC, so there's not
+actually an issue here.
+
+Will
