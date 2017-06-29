@@ -1,17 +1,34 @@
-From: tony.luck@intel.com (Luck, Tony)
-Date: Thu, 29 Jun 2017 16:55:46 +0000
-Subject: [PATCH] EDAC: Get rid of mci->mod_ver
-In-Reply-To: <20170629100311.vmdq6fojpo5ye4ne@pd.tnic>
-References: <20170629100311.vmdq6fojpo5ye4ne@pd.tnic>
-Message-ID: <3908561D78D1C84285E8C5FCA982C28F612E6E02@ORSMSX114.amr.corp.intel.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 29 Jun 2017 19:02:38 +0200
+Subject: [PATCH 1/6] net: stmmac: support future possible different
+ internal phy mode
+In-Reply-To: <20170629.122349.2265868886957558079.davem@davemloft.net>
+References: <20170627092806.28181-1-clabbe.montjoie@gmail.com>
+ <20170629.122349.2265868886957558079.davem@davemloft.net>
+Message-ID: <20170629170238.GA2606@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> any objections?
->
-> ---
-> It is a write-only variable so get rid of it.
+On Thu, Jun 29, 2017 at 12:23:49PM -0400, David Miller wrote:
+> From: Corentin Labbe <clabbe.montjoie@gmail.com>
+> Date: Tue, 27 Jun 2017 11:28:01 +0200
+> 
+> > The current way to find if the phy is internal is to compare DT phy-mode
+> > and emac_variant/internal_phy.
+> > But it will negate a possible future SoC where an external PHY use the
+> > same phy mode than the internal one.
+> > 
+> > By using phy-mode = "internal" we permit to have an external PHY with
+> > the same mode than the internal one.
+> > 
+> > Reported-by: Andr? Przywara <andre.przywara@arm.com>
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> 
+> Series applied.
+> 
+> Please provide a proper "[PATCH 0/n] " header posting next time.
 
-Nope.  Zap it.
+Sorry could you wait for applying, there are a parallel thread (http://www.spinics.net/lists/devicetree/msg183520.html) and it seems finaly that internal could not be the good way to do it.
 
-Acked-by: Tony Luck <tony.luck@intel.com>
+Regards
+Sorry again, I should have sent a comment for waiting.
