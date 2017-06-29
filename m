@@ -1,141 +1,163 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 29 Jun 2017 10:08:15 +0800
-Subject: [PATCH 1/5] iommu/arm-smmu-v3: put off the execution of TLBI* to
- reduce lock confliction
-In-Reply-To: <20170628093207.GB11053@arm.com>
-References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
- <1498484330-10840-2-git-send-email-thunder.leizhen@huawei.com>
- <20170628093207.GB11053@arm.com>
-Message-ID: <5954610F.9020807@huawei.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 29 Jun 2017 10:13:12 +0800
+Subject: [arm-platforms:kvm-arm64/gicv4-kvm 50/66]
+ arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:115: undefined reference
+ to `its_map_vlpi'
+Message-ID: <201706291001.jj1xvxdc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
+head:   bcbe1ce47109136fda5a06bdc6c87fc5209defdc
+commit: 72adc31604df8cf73af0e6981b87ac9f249257d4 [50/66] KVM: arm/arm64: GICv4: Wire mapping/unmapping of VLPIs in VFIO irq bypass
+config: arm-axm55xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 72adc31604df8cf73af0e6981b87ac9f249257d4
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
+All errors (new ones prefixed by >>):
 
-On 2017/6/28 17:32, Will Deacon wrote:
-> Hi Zhen Lei,
-> 
-> Nate (CC'd), Robin and I have been working on something very similar to
-> this series, but this patch is different to what we had planned. More below.
-> 
-> On Mon, Jun 26, 2017 at 09:38:46PM +0800, Zhen Lei wrote:
->> Because all TLBI commands should be followed by a SYNC command, to make
->> sure that it has been completely finished. So we can just add the TLBI
->> commands into the queue, and put off the execution until meet SYNC or
->> other commands. To prevent the followed SYNC command waiting for a long
->> time because of too many commands have been delayed, restrict the max
->> delayed number.
->>
->> According to my test, I got the same performance data as I replaced writel
->> with writel_relaxed in queue_inc_prod.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 42 +++++++++++++++++++++++++++++++++++++-----
->>  1 file changed, 37 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 291da5f..4481123 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -337,6 +337,7 @@
->>  /* Command queue */
->>  #define CMDQ_ENT_DWORDS			2
->>  #define CMDQ_MAX_SZ_SHIFT		8
->> +#define CMDQ_MAX_DELAYED		32
->>  
->>  #define CMDQ_ERR_SHIFT			24
->>  #define CMDQ_ERR_MASK			0x7f
->> @@ -472,6 +473,7 @@ struct arm_smmu_cmdq_ent {
->>  			};
->>  		} cfgi;
->>  
->> +		#define CMDQ_OP_TLBI_NH_ALL	0x10
->>  		#define CMDQ_OP_TLBI_NH_ASID	0x11
->>  		#define CMDQ_OP_TLBI_NH_VA	0x12
->>  		#define CMDQ_OP_TLBI_EL2_ALL	0x20
->> @@ -499,6 +501,7 @@ struct arm_smmu_cmdq_ent {
->>  
->>  struct arm_smmu_queue {
->>  	int				irq; /* Wired interrupt */
->> +	u32				nr_delay;
->>  
->>  	__le64				*base;
->>  	dma_addr_t			base_dma;
->> @@ -722,11 +725,16 @@ static int queue_sync_prod(struct arm_smmu_queue *q)
->>  	return ret;
->>  }
->>  
->> -static void queue_inc_prod(struct arm_smmu_queue *q)
->> +static void queue_inc_swprod(struct arm_smmu_queue *q)
->>  {
->> -	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
->> +	u32 prod = q->prod + 1;
->>  
->>  	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
->> +}
->> +
->> +static void queue_inc_prod(struct arm_smmu_queue *q)
->> +{
->> +	queue_inc_swprod(q);
->>  	writel(q->prod, q->prod_reg);
->>  }
->>  
->> @@ -761,13 +769,24 @@ static void queue_write(__le64 *dst, u64 *src, size_t n_dwords)
->>  		*dst++ = cpu_to_le64(*src++);
->>  }
->>  
->> -static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent)
->> +static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent, int optimize)
->>  {
->>  	if (queue_full(q))
->>  		return -ENOSPC;
->>  
->>  	queue_write(Q_ENT(q, q->prod), ent, q->ent_dwords);
->> -	queue_inc_prod(q);
->> +
->> +	/*
->> +	 * We don't want too many commands to be delayed, this may lead the
->> +	 * followed sync command to wait for a long time.
->> +	 */
->> +	if (optimize && (++q->nr_delay < CMDQ_MAX_DELAYED)) {
->> +		queue_inc_swprod(q);
->> +	} else {
->> +		queue_inc_prod(q);
->> +		q->nr_delay = 0;
->> +	}
->> +
-> 
-> So here, you're effectively putting invalidation commands into the command
-> queue without updating PROD. Do you actually see a performance advantage
-> from doing so? Another side of the argument would be that we should be
-Yes, my sas ssd performance test showed that it can improve about 100-150K/s(the same to I directly replace
-writel with writel_relaxed). And the average execution time of iommu_unmap(which called by iommu_dma_unmap_sg)
-dropped from 10us to 5us.
+   arch/arm/kvm/built-in.o: In function `vgic_v4_init':
+   arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:42: undefined reference to `its_alloc_vcpu_irqs'
+   arch/arm/kvm/built-in.o: In function `vgic_v4_teardown':
+   arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:57: undefined reference to `its_free_vcpu_irqs'
+   arch/arm/kvm/built-in.o: In function `kvm_vgic_v4_set_forwarding':
+>> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:115: undefined reference to `its_map_vlpi'
+   arch/arm/kvm/built-in.o: In function `kvm_vgic_v4_unset_forwarding':
+>> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:150: undefined reference to `its_unmap_vlpi'
 
-> moving PROD as soon as we can, so that the SMMU can process invalidation
-> commands in the background and reduce the cost of the final SYNC operation
-> when the high-level unmap operation is complete.
-There maybe that __iowmb() is more expensive than wait for tlbi complete. Except the time of __iowmb()
-itself, it also protected by spinlock, lock confliction will rise rapidly in the stress scene. __iowmb()
-average cost 300-500ns(Sorry, I forget the exact value).
+vim +115 arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c
 
-In addition, after applied this patcheset and Robin's v2, and my earlier dma64 iova optimization patchset.
-Our net performance test got the same data to global bypass. But sas ssd still have more than 20% dropped.
-Maybe we should still focus at map/unamp, because the average execution time of iova alloc/free is only
-about 400ns.
+    36	
+    37		dist->its_vm.nr_vpes = nr_vcpus;
+    38	
+    39		kvm_for_each_vcpu(i, vcpu, kvm)
+    40			dist->its_vm.vpes[i] = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
+    41	
+  > 42		ret = its_alloc_vcpu_irqs(&dist->its_vm);
+    43		if (ret < 0) {
+    44			kvm_err("VPE IRQ allocation failure\n");
+    45			dist->its_vm.nr_vpes = 0;
+    46			kfree(dist->its_vm.vpes);
+    47			return ret;
+    48		}
+    49	
+    50		return ret;
+    51	}
+    52	
+    53	void vgic_v4_teardown(struct kvm *kvm)
+    54	{
+    55		struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
+    56	
+    57		its_free_vcpu_irqs(its_vm);
+    58		kfree(its_vm->vpes);
+    59	}
+    60	
+    61	static struct vgic_its *vgic_get_its(struct kvm *kvm,
+    62					     struct kvm_kernel_irq_routing_entry *irq_entry)
+    63	{
+    64		struct kvm_msi msi  = (struct kvm_msi) {
+    65			.address_lo	= irq_entry->msi.address_lo,
+    66			.address_hi	= irq_entry->msi.address_hi,
+    67			.data		= irq_entry->msi.data,
+    68			.flags		= irq_entry->msi.flags,
+    69			.devid		= irq_entry->msi.devid,
+    70		};
+    71	
+    72		/*
+    73		 * Get a reference on the LPI. If NULL, this is not a valid
+    74		 * translation for any of our vITSs.
+    75		 */
+    76		return vgic_msi_to_its(kvm, &msi);
+    77	}
+    78	
+    79	int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int virq,
+    80				       struct kvm_kernel_irq_routing_entry *irq_entry)
+    81	{
+    82		struct vgic_its *its;
+    83		struct vgic_irq *irq;
+    84		struct its_vlpi_map map;
+    85		int ret;
+    86	
+    87		/*
+    88		 * Get the LPI. If NULL, this is not a valid translation for
+    89		 * any of our vITSs.
+    90		 */
+    91		its = vgic_get_its(kvm, irq_entry);
+    92		if (!its)
+    93			return 0;
+    94	
+    95		mutex_lock(&its->its_lock);
+    96	
+    97		ret = vgic_its_resolve_lpi(kvm, its, irq_entry->msi.devid,
+    98					   irq_entry->msi.data, &irq);
+    99		if (ret)
+   100			goto out;
+   101	
+   102		/*
+   103		 * Emit the mapping request. If it fails, the ITS probably
+   104		 * isn't v4 compatible, so let's silently bail out. Holding
+   105		 * the ITS lock should ensure that nothing can modify the
+   106		 * target vcpu.
+   107		 */
+   108		map = (struct its_vlpi_map) {
+   109			.vm		= &kvm->arch.vgic.its_vm,
+   110			.vintid		= irq->intid,
+   111			.db_enabled	= true,
+   112			.vpe_idx	= irq->target_vcpu->vcpu_id,
+   113		};
+   114	
+ > 115		if (its_map_vlpi(virq, &map))
+   116			goto out;
+   117	
+   118		irq->hw		= true;
+   119		irq->host_irq	= virq;
+   120	
+   121	out:
+   122		mutex_unlock(&its->its_lock);
+   123		return 0;
+   124	}
+   125	
+   126	int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int virq,
+   127					 struct kvm_kernel_irq_routing_entry *irq_entry)
+   128	{
+   129		struct vgic_its *its;
+   130		struct vgic_irq *irq;
+   131		int ret;
+   132	
+   133		/*
+   134		 * Get the LPI. If NULL, this is not a valid translation for
+   135		 * any of our vITSs.
+   136		 */
+   137		its = vgic_get_its(kvm, irq_entry);
+   138		if (!its)
+   139			return 0;
+   140	
+   141		mutex_lock(&its->its_lock);
+   142	
+   143		ret = vgic_its_resolve_lpi(kvm, its, irq_entry->msi.devid,
+   144					   irq_entry->msi.data, &irq);
+   145		if (ret)
+   146			goto out;
+   147	
+   148		WARN_ON(!(irq->hw && irq->host_irq == virq));
+   149		irq->hw = false;
+ > 150		ret = its_unmap_vlpi(virq);
+   151	
+   152	out:
+   153		mutex_unlock(&its->its_lock);
 
-By the way, patch2-5 is more effective than this one, it can improve more than 350K/s. And with it, we can
-got about 100-150K/s improvement of Robin's v2. Otherwise, I saw non effective of Robin's v2. Sorry, I have
-not tested how about this patch without patch2-5. Further more, I got the same performance data to global
-bypass for the traditional mechanical hard disk with only patch2-5(without this patch and Robin's).
-
-> 
-> Will
-> 
-> .
-> 
-
--- 
-Thanks!
-BestRegards
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 20100 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170629/87c779b4/attachment-0001.gz>
