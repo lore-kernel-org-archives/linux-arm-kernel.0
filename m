@@ -1,30 +1,23 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 29 Jun 2017 10:03:07 +0100
-Subject: [PATCH] clk: scpi: error when clock fails to register
-In-Reply-To: <20170628135345.9337-1-jbrunet@baylibre.com>
-References: <20170628135345.9337-1-jbrunet@baylibre.com>
-Message-ID: <7eb946bf-6958-daf9-fd75-f1e23c1f2154@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Jun 2017 11:05:33 +0200
+Subject: [PATCH] pinctrl: bcm2835: Avoid warning from __irq_do_set_handler
+In-Reply-To: <1498069204-28154-1-git-send-email-stefan.wahren@i2se.com>
+References: <1498069204-28154-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CACRpkdapvL7NLP-mXyrb0W5t08rQRqqiZj7tqRF3zhbEM0L0JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
+On Wed, Jun 21, 2017 at 8:20 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-Thanks for the fix.
+> We get a warning during boot with enabled EARLY_PRINTK that
+> we try to set a irq_chip without data. This is caused by ignoring
+> the return value of irq_of_parse_and_map(). So avoid calling
+> gpiochip_set_chained_irqchip() in error case.
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Fixes: 85ae9e512f43 ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
 
-On 28/06/17 14:53, Jerome Brunet wrote:
-> Current implementation of scpi_clk_add just print a warning when clock
-> fails to register but then keep going as if nothing happened. The
-> provider is then registered with bogus data.
-> 
-> This may latter lead to an Oops in __clk_create_clk when
-> hlist_add_head(&clk->clks_node, &hw->core->clks) is called.
-> 
-> This patch fixes the issue and errors if a clock fails to register.
-> 
-> Fixes: cd52c2a4b5c4 ("clk: add support for clocks provided by SCP(System Control Processor)")
+Patch applied.
 
-Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
-
--- 
-Regards,
-Sudeep
+Yours,
+Linus Walleij
