@@ -1,55 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jun 2017 17:07:35 +0200
-Subject: [PATCH v4 20/28] ARM: owl: Implement CPU enable-method for S500
-In-Reply-To: <CAK8P3a1fLABzSc7kej6uw751uoZma1Qvpm7c3mkLB45rcBNQTA@mail.gmail.com>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-21-afaerber@suse.de>
- <CAK8P3a1fLABzSc7kej6uw751uoZma1Qvpm7c3mkLB45rcBNQTA@mail.gmail.com>
-Message-ID: <CAK8P3a3Pg2rm8nSPUm_E61F7+zSr3gWV6sNqhC0Et3Zh2xPtmA@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 29 Jun 2017 17:09:21 +0200
+Subject: [PATCH 00/20] Update STM32 usart driver
+In-Reply-To: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
+References: <1498481318-1894-1-git-send-email-bich.hemon@st.com>
+Message-ID: <3eaff22e-4a7b-d491-4d84-aeccbd444d0d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
->> +{
->> +       unsigned long timeout;
->> +       int ret;
->> +
->> +       ret = s500_wakeup_secondary(cpu);
->> +       if (ret)
->> +               return ret;
->> +
->> +       udelay(10);
->> +
->> +       spin_lock(&boot_lock);
->> +
->> +       /*
->> +        * The secondary processor is waiting to be released from
->> +        * the holding pen - release it, then wait for it to flag
->> +        * that it has been released by resetting pen_release.
->> +        */
->> +       write_pen_release(cpu_logical_map(cpu));
->> +       smp_send_reschedule(cpu);
->> +
->> +       timeout = jiffies + (1 * HZ);
->> +       while (time_before(jiffies, timeout)) {
->> +               if (pen_release == -1)
->> +                       break;
->> +       }
->> +
->> +       writel(0, timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
->> +       writel(0, timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
->> +
->> +       spin_unlock(&boot_lock);
->> +
->> +       return pen_release != -1 ? -ENOSYS : 0;
->> +}
->
-> This looks more complicated than necessary. Why do you need the holding
-> pen when you have a register to start up the CPU?
->
+Greg, Rob
 
-It seems you missed my question here. Can you please follow up, and
-if possible send a patch to remove the pen_release logic that appears
-to be unnecessary here?
+On 06/26/2017 02:49 PM, Bich HEMON wrote:
+> From: Bich Hemon <bich.hemon@st.com>
+> 
+> This patchset updates the stm32 usart driver. It mainly adds
+> support for fifo, dma, debugfs anf fixes various bugs.
+> 
+> Bich Hemon (20):
+>    serial: stm32: adding fifo support
+>    dt-bindings: serial: each stm32 usart needs an alias
+>    serial: stm32: fix multi ports management
+>    serial: stm32: make fifoen as property for each port
+>    serial: stm32: add debugfs
+>    serial: stm32: fix pio transmit timeout
+>    serial: stm32: less messages on dma alloc error
+>    serial: stm32: timeout interrupt using with dma
+>    serial: stm32: fix end of transfer
+>    serial: stm32: fix dma receive
+>    serial: stm32: add RTS support
+>    serial: stm32: fix last_res value
+>    serial: stm32: fix error handling in probe
+>    dt-bindings: serial: document option wake-up interrupt for STM32 USART
+>    serial: stm32: Add wakeup mechanism
+>    serial: stm32: fix fifo usage
+>    dt-bindings: serial: stm32: add dma using note
+>    serial: stm32: update dma buffers length
+>    serial: stm32: add dma rx callback
+>    serial: stm32: fix rx interrupt handling in startup
+> 
+>   .../devicetree/bindings/serial/st,stm32-usart.txt  |  55 +++-
+>   drivers/tty/serial/stm32-usart.c                   | 310 ++++++++++++++++++---
+>   drivers/tty/serial/stm32-usart.h                   |  51 +++-
+>   3 files changed, 375 insertions(+), 41 deletions(-)
+> 
 
-        Arnd
+This series have been abandoned (maybe not in correct way). Don't waste 
+your time with that. New patches will be sent in several series and 
+patches will be reworked.
+
+Thanks
+Alex
