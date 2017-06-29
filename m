@@ -1,81 +1,78 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Thu, 29 Jun 2017 18:34:05 -0400
-Subject: [PATCH v2] iommu/arm-smmu-v3: Implement shutdown method
-In-Reply-To: <1498774696-16037-1-git-send-email-nwatters@codeaurora.org>
-References: <1498774696-16037-1-git-send-email-nwatters@codeaurora.org>
-Message-ID: <f341a982-9ef3-d907-7254-f1e39ae3b1da@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 30 Jun 2017 01:00:58 +0200
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <20170623010837.11199-2-f.fainelli@gmail.com>
+References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+ <20170623010837.11199-1-f.fainelli@gmail.com>
+ <20170623010837.11199-2-f.fainelli@gmail.com>
+Message-ID: <6613228.WfFrGvAy1X@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I should have removed the '-v3' since this revision of the patch adds
-shutdown to arm-smmu.c as well. I'll fix that in a subsequent version
-after waiting to see if there are additional changes that need to be
-made.
-
-On 6/29/2017 6:18 PM, Nate Watterson wrote:
-> The shutdown method disables the SMMU to avoid corrupting a new kernel
-> started with kexec.
+On Thursday, June 22, 2017 06:08:36 PM Florian Fainelli wrote:
+> Add an optional platform_suspend_ops callback: target_state, and a
+> helper function globally visible to get this called:
+> platform_suspend_target_state().
 > 
-> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+> This is useful for platform specific drivers that may need to take a
+> slightly different suspend/resume path based on the system's
+> suspend/resume state being entered.
+> 
+> Although this callback is optional and documented as such, it requires
+> a platform_suspend_ops::begin callback to be implemented in order to
+> provide an accurate suspend/resume state within the driver that
+> implements this platform_suspend_ops.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
->   drivers/iommu/arm-smmu-v3.c | 7 +++++++
->   drivers/iommu/arm-smmu.c    | 6 ++++++
->   2 files changed, 13 insertions(+)
+>  include/linux/suspend.h | 12 ++++++++++++
+>  kernel/power/suspend.c  | 15 +++++++++++++++
+>  2 files changed, 27 insertions(+)
 > 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 380969a..3d8ac29 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -2765,9 +2765,15 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
->   	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
->   
->   	arm_smmu_device_disable(smmu);
-> +
->   	return 0;
->   }
->   
-> +static void arm_smmu_device_shutdown(struct platform_device *pdev)
-> +{
-> +	arm_smmu_device_remove(pdev);
-> +}
-> +
->   static struct of_device_id arm_smmu_of_match[] = {
->   	{ .compatible = "arm,smmu-v3", },
->   	{ },
-> @@ -2781,6 +2787,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
->   	},
->   	.probe	= arm_smmu_device_probe,
->   	.remove	= arm_smmu_device_remove,
-> +	.shutdown = arm_smmu_device_shutdown,
->   };
->   module_platform_driver(arm_smmu_driver);
->   
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 7ec30b0..af50bab 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -2319,6 +2319,11 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
->   	return 0;
->   }
->   
-> +static void arm_smmu_device_shutdown(struct platform_device *pdev)
-> +{
-> +	arm_smmu_device_remove(pdev);
-> +}
-> +
->   static struct platform_driver arm_smmu_driver = {
->   	.driver	= {
->   		.name		= "arm-smmu",
-> @@ -2326,6 +2331,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
->   	},
->   	.probe	= arm_smmu_device_probe,
->   	.remove	= arm_smmu_device_remove,
-> +	.shutdown = arm_smmu_device_shutdown,
->   };
->   module_platform_driver(arm_smmu_driver);
->   
-> 
+> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+> index d9718378a8be..d998a04a90a2 100644
+> --- a/include/linux/suspend.h
+> +++ b/include/linux/suspend.h
+> @@ -172,6 +172,15 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
+>   *	Called by the PM core if the suspending of devices fails.
+>   *	This callback is optional and should only be implemented by platforms
+>   *	which require special recovery actions in that situation.
+> + *
+> + * @target_state: Returns the suspend state the suspend_ops will be entering.
+> + * 	Called by device drivers that need to know the platform specific suspend
+> + * 	state the system is about to enter.
+> + * 	This callback is optional and should only be implemented by platforms
+> + * 	which require special handling of power management states within
+> + * 	drivers. It does require @begin to be implemented to provide the suspend
+> + * 	state. Return value is platform_suspend_ops specific, and may be a 1:1
+> + * 	mapping to suspend_state_t when relevant.
+>   */
+>  struct platform_suspend_ops {
+>  	int (*valid)(suspend_state_t state);
+> @@ -184,6 +193,7 @@ struct platform_suspend_ops {
+>  	bool (*suspend_again)(void);
+>  	void (*end)(void);
+>  	void (*recover)(void);
+> +	int (*target_state)(void);
 
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+I would use unsigned int (the sign should not matter).
+
+>  };
+
+That's almost what I was thinking about except that the values returned by
+->target_state should be unique, so it would be good to do something to
+ensure that.
+
+The concern is as follows.
+
+Say you have a driver develped for platform X where ->target_state returns
+A for "mem" and B for "standby".  Then, the same IP is re-used on platform Y
+returning B for "mem" and C for "standby" and now the driver cannot
+distinguish between them.
+
+Moreover, even if they both returned A for "mem" there might be differences
+in how "mem" was defined by each of them and therefore in what the driver was
+expected to do to handle "mem" on X and Y.
+
+Thanks,
+Rafael
