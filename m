@@ -1,81 +1,43 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Thu, 29 Jun 2017 17:56:37 +0200
-Subject: [PATCH] arm64: fix endianness annotation for
- __apply_alternatives()/get_alt_insn()
-In-Reply-To: <20170629152017.GA21883@arm.com>
-References: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
- <20170629102851.GF14607@arm.com>
- <20170629132645.difv6xdjrkp5qvlh@ltop.local>
- <20170629141323.GH11040@leverpostej>
- <20170629141944.GD18630@arm.com>
- <20170629142233.GJ11040@leverpostej>
- <20170629142628.GE18630@arm.com>
- <CAExDi1SxbM41MRuEUF0WSwzbs9yJNLGTtNfJySvAm6LSn9_mEQ@mail.gmail.com>
- <20170629152017.GA21883@arm.com>
-Message-ID: <20170629155635.nqwyxdyoqjt2nktn@ltop.local>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 29 Jun 2017 17:57:46 +0200
+Subject: [PATCH v7] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <20170628105224.6619-1-net147@gmail.com>
+References: <20170628105224.6619-1-net147@gmail.com>
+Message-ID: <20170629155746.ux5embr7tdo7k4xr@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 04:20:17PM +0100, Will Deacon wrote:
-> On Thu, Jun 29, 2017 at 05:15:19PM +0200, Luc Van Oostenryck wrote:
-> > On Thu, Jun 29, 2017 at 4:26 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Thu, Jun 29, 2017 at 03:22:34PM +0100, Mark Rutland wrote:
-> > >> On Thu, Jun 29, 2017 at 03:19:44PM +0100, Will Deacon wrote:
-> > >> > On Thu, Jun 29, 2017 at 03:13:23PM +0100, Mark Rutland wrote:
-> > >> > > On Thu, Jun 29, 2017 at 03:26:47PM +0200, Luc Van Oostenryck wrote:
-> > >> > > > On Thu, Jun 29, 2017 at 11:28:51AM +0100, Will Deacon wrote:
-> > >> > > > > > +           origptr = (__le32 __force *) ALT_ORIG_PTR(alt);
-> > >> > > > > > +           replptr = (__le32 __force *) ALT_REPL_PTR(alt);
-> > >> > > > >
-> > >> > > > > Why is the __force needed here?
-> > >> > > >
-> > >> > > > Because of the cast to u32* in:
-> > >> > > >         #define ALT_ORIG_PTR(a)         __ALT_PTR(a, orig_offset)
-> > >> > > >         #define ALT_REPL_PTR(a)         __ALT_PTR(a, alt_offset)
-> > >> > > >         #define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
-> > >> > > >
-> > >> > > > Of course, if this (u32*) is not really needed, then the __force
-> > >> > > > is also not needed.
-> > >> > > >
-> > >> > > > And since, it seems indeed to be the case, I'll gladly sent a patch:
-> > >> > > >         -#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
-> > >> > > >         +#define __ALT_PTR(a,f)          ((void *)&(a)->f + (a)->f)
-> > >> > > > if it suits you.
-> > >> > >
-> > >> > > Given __ALT_PTR is intended to give a pointer to A64 instructions, which
-> > >> > > are in le32 format, wouldn't it make more sense for __ALT_PTR to cast to
-> > >> > > __le32 * ?
-> > 
-> > Yes, it could.
-> > 
-> > >> > Might be a bit weird for ALT_REPL_PTR, which is cast to unsigned long.
-> > >>
-> > >> Maybe, but that's one cast, rather than two, and matches other similar
-> > >> casts from a pointer to unsigned long (e.g. the the addr cast in
-> > >> __range_ok()).
-> > >
-> > > Sure, but isn't it a __force cast? I'd like to avoid that if we can.
-> > 
-> > No, once you cast to an integer all the specificities of pointers are
-> > thrown away,
-> > like for a const pointer and here the __bitwise underlying the __le32.
-> > It's exactly the same fro cast from/to void*, the reasoning behind it
-> > is something
-> > like : "it's OK to drop all the qualifiers and such because you will anyway need
-> > to cast the result to another pointer before being able to dereference it".
+Hi,
+
+On Wed, Jun 28, 2017 at 08:52:24PM +1000, Jonathan Liu wrote:
+> The documentation for drm_do_get_edid in drivers/gpu/drm/drm_edid.c states:
+> "As in the general case the DDC bus is accessible by the kernel at the I2C
+> level, drivers must make all reasonable efforts to expose it as an I2C
+> adapter and use drm_get_edid() instead of abusing this function."
 > 
-> Ok, so does that mean that the __force cast in __range_ok is not needed?
-
-Indeed. 
-
-And I just verified this with a quick check with sparse only on arch/arm64/
-with and without the __force.
-
-> > I already sent a version leaving the type as void*, without having seen your
-> > replies here, but if you wish I can, of course, resend something for __le32*.
+> Exposing the DDC bus as an I2C adapter is more beneficial as it can be used
+> for purposes other than reading the EDID such as modifying the EDID or
+> using the HDMI DDC pins as an I2C bus through the I2C dev interface from
+> userspace (e.g. i2c-tools).
 > 
-> I'm happy with the patch you sent, so no need to resend.
+> Implement this for A10s.
+> 
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
 
-OK.
+Please wait before the discussion stops before sending the new
+version. We still have one ongoing on the v5, and you sent v6 and v7
+in between.
 
--- Luc 
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170629/9448c258/attachment.sig>
