@@ -1,94 +1,42 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 29 Jun 2017 13:53:49 -0700
-Subject: [PATCH 2/3] arm64: dts: rockchip: Use vctrl regulators for
- dynamic CPU voltages on Gru/Kevin
-In-Reply-To: <5828446.D2497T5ZTs@phil>
-References: <20170623170737.46265-1-briannorris@chromium.org>
- <20170623170737.46265-2-briannorris@chromium.org>
- <5828446.D2497T5ZTs@phil>
-Message-ID: <20170629205348.GB127431@google.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 29 Jun 2017 21:54:38 +0100
+Subject: [RESEND PATCH] drm/hisilicon: Ensure LDI regs are properly configured.
+Message-ID: <1498769678-12155-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+This patch fixes the following soft lockup:
+  BUG: soft lockup - CPU#0 stuck for 23s! [weston:307]
 
-On Wed, Jun 28, 2017 at 05:44:27PM +0200, Heiko Stuebner wrote:
-> Am Freitag, 23. Juni 2017, 10:07:36 CEST schrieb Brian Norris:
-> > From: Matthias Kaehlcke <mka@chromium.org>
-> > 
-> > The Gru device tree currently contains entries for the regulators
-> > ppvar_bigcpu, ppvar_litcpu, ppvar_gpu and ppvar_centerlogic; however,
-> > the regulators have not been made, due to the lack of binding and driver
-> > support for keeping the over-voltage protection (OVP) at bay and
-> > preventing unintended regulator shutdowns on voltage downshifts.
-> > 
-> > Now, the vctrl regulator driver has been merged, along with new bindings
-> > for asymmetric settling time. The driver is OVP aware, it splits larger
-> > voltage decreases in multiple steps when necessary and adds required
-> > delays.
-> > 
-> > This change renames each of the aforementioned regulators to
-> > <orig_name>_pwm and adds a new vctrl regulator named <orig_name>.
-> > The vctrl regulators use the voltage of their corresponding PWM regulator
-> > as control voltage. The OVP related values are empirical and stem from
-> > the Chrome OS kernel tree.
-> > 
-> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> > Signed-off-by: Brian Norris <briannorris@chromium.org>
-> 
-> Running this on Kevin resulted in gpu+centerlogic being
-> children of litcpu, so applied for 4.14 with the diff below.
+On weston idle-timeout the IP is powered down and reset
+asserted. On weston resume we get a massive vblank
+IRQ storm due to the LDI registers having lost some state.
 
-Oops, don't know where that cropped up. Between the two of us (Matthias
-and me) this got rebased and reworked a few times.
+This state loss is caused by ade_crtc_atomic_begin() not
+calling ade_ldi_set_mode(). With this patch applied
+resuming from Weston idle-timeout works well.
 
-Wouldn't have much effect, since the DMC and GPU aren't hooked up yet
-upstream yet.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> Please holler if something looks wrong
-> Heiko
-> 
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> index 2f1ba5ba27c8..90259cf63bb6 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> @@ -164,7 +164,7 @@
->  		vin-supply = <&ppvar_sys>;
->  	};
->  
-> -	ppvar_bigcpu_pwm: ppvar-bigcpu_pwm {
-> +	ppvar_bigcpu_pwm: ppvar-bigcpu-pwm {
->  		compatible = "pwm-regulator";
->  		regulator-name = "ppvar_bigcpu_pwm";
->  
-> @@ -195,7 +195,7 @@
->  		ovp-threshold-percent = <16>;
->  	};
->  
-> -	ppvar_litcpu_pwm: ppvar-litcpu_pwm {
-> +	ppvar_litcpu_pwm: ppvar-litcpu-pwm {
->  		compatible = "pwm-regulator";
->  		regulator-name = "ppvar_litcpu_pwm";
->  
-> @@ -249,7 +249,7 @@
->  		regulator-min-microvolt = <786384>;
->  		regulator-max-microvolt = <1217747>;
->  
-> -		ctrl-supply = <&ppvar_litcpu_pwm>;
-> +		ctrl-supply = <&ppvar_gpu_pwm>;
->  		ctrl-voltage-range = <786384 1217747>;
->  
->  		regulator-settling-time-up-us = <390>;
-> @@ -280,7 +280,7 @@
->  		regulator-min-microvolt = <799434>;
->  		regulator-max-microvolt = <1049925>;
->  
-> -		ctrl-supply = <&ppvar_litcpu_pwm>;
-> +		ctrl-supply = <&ppvar_centerlogic_pwm>;
->  		ctrl-voltage-range = <799434 1049925>;
->  
->  		regulator-settling-time-up-us = <378>;
-> 
-
-Acked, LGTM, and tests fine. Thanks for fixing up all of this.
+diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+index c96c228..72c6357 100644
+--- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
++++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+@@ -519,9 +519,12 @@ static void ade_crtc_atomic_begin(struct drm_crtc *crtc,
+ {
+ 	struct ade_crtc *acrtc = to_ade_crtc(crtc);
+ 	struct ade_hw_ctx *ctx = acrtc->ctx;
++	struct drm_display_mode *mode = &crtc->state->mode;
++	struct drm_display_mode *adj_mode = &crtc->state->adjusted_mode;
+ 
+ 	if (!ctx->power_on)
+ 		(void)ade_power_up(ctx);
++	ade_ldi_set_mode(acrtc, mode, adj_mode);
+ }
+ 
+ static void ade_crtc_atomic_flush(struct drm_crtc *crtc,
+-- 
+2.7.4
