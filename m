@@ -1,69 +1,66 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 29 Jun 2017 14:53:21 +0200
-Subject: [PATCH 3/5] dt-bindings: arm: Document Socionext MB86S71 and
- Fujitsu F-Cue
-In-Reply-To: <CAK7LNATqjOMUajUCYVq=L6wWVTUEc1M7Po+KQ3M3Z=A7+FHX5w@mail.gmail.com>
-References: <20170625170020.11791-1-afaerber@suse.de>
- <20170625170020.11791-4-afaerber@suse.de>
- <20170628164605.2gnvrv4g7jluzyrm@rob-hp-laptop>
- <CAK7LNATqjOMUajUCYVq=L6wWVTUEc1M7Po+KQ3M3Z=A7+FHX5w@mail.gmail.com>
-Message-ID: <51221840-b08e-45f1-5601-937fb15f3947@suse.de>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 29 Jun 2017 14:55:14 +0200
+Subject: Clocks used by another OS/CPU
+In-Reply-To: <CAMuHMdXedexq_jGq+y3Hbmph1_1N_LjT7dhYJ=rC0Q2oK_Xjug@mail.gmail.com>
+References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+ <CAMuHMdWRadUCZUycUW3dKJhS__aRRVbV1tXo0umUQ7KHOYQMoQ@mail.gmail.com>
+ <50911172-8fa1-8341-0ed0-d40f00d9392c@de.bosch.com>
+ <CAMuHMdXedexq_jGq+y3Hbmph1_1N_LjT7dhYJ=rC0Q2oK_Xjug@mail.gmail.com>
+Message-ID: <d1ee0f5b-d9ef-96c0-b698-a4a1cef58428@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro-san,
-
-Am 29.06.2017 um 14:18 schrieb Masahiro Yamada:
-> 2017-06-29 1:46 GMT+09:00 Rob Herring <robh@kernel.org>:
->> On Sun, Jun 25, 2017 at 07:00:18PM +0200, Andreas F?rber wrote:
->>> For consistency with existing SoC bindings, use "fujitsu,mb86s71" but
->>> socionext.txt.
+On 29.06.2017 14:45, Geert Uytterhoeven wrote:
+> Hi Dirk,
+> 
+> On Thu, Jun 29, 2017 at 2:07 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>> On 29.06.2017 13:56, Geert Uytterhoeven wrote:
+>>> On Thu, Jun 29, 2017 at 11:27 AM, Geert Uytterhoeven
+>>> <geert@linux-m68k.org> wrote:
+>>>> CC clock, ARM, DT, PM people
+>>>>
+>>>> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
+>>>> disables them as being unused.
 >>>
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>>  Documentation/devicetree/bindings/arm/socionext.txt | 17 +++++++++++++++++
->>>  1 file changed, 17 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/socionext.txt
+>>>> Of course this is not limited to clocks, but also to e.g. PM domains.
+>>>
+>>> BTW, how do you prevent Linux from powering down the CR7 PM domain,
+>>> which contains the Cortex R7?
 >>
->> Acked-by: Rob Herring <robh@kernel.org>
->> --
+>> The idea is
+>>
+>> --- a/drivers/soc/renesas/r8a7795-sysc.c
+>> +++ b/drivers/soc/renesas/r8a7795-sysc.c
+>> @@ -38,7 +38,8 @@ static const struct rcar_sysc_area r8a7795_areas[]
+>> __initconst = {
+>>          { "ca53-cpu3",  0x200, 3, R8A7795_PD_CA53_CPU3, R8A7795_PD_CA53_SCU,
+>>            PD_CPU_NOCR },
+>>          { "a3vp",       0x340, 0, R8A7795_PD_A3VP,      R8A7795_PD_ALWAYS_ON
+>> },
+>> -       { "cr7",        0x240, 0, R8A7795_PD_CR7,       R8A7795_PD_ALWAYS_ON
+>> },
+>> +       { "cr7",        0x240, 0, R8A7795_PD_CR7,
+>> R8A7795_PD_ALWAYS_ON,
+>> +         PD_CPU_NOCR },
+>>          { "a3vc",       0x380, 0, R8A7795_PD_A3VC,      R8A7795_PD_ALWAYS_ON
+>> },
+>>          { "a2vc0",      0x3c0, 0, R8A7795_PD_A2VC0,     R8A7795_PD_A3VC },
+>>          { "a2vc1",      0x3c0, 1, R8A7795_PD_A2VC1,     R8A7795_PD_A3VC },
+>>
+>>
+>> Not finally tested, though.
 > 
-> I do not mind this, but
-> please note there are multiple product lines in Socionext
-> because Socionext merged LSI divisions from Panasonic and Fujitsu.
-> 
-> I maintain documents for Socionext UniPhier SoC family
-> (which inherits SoC architecture of Panasonic)
-> in Documentation/devicetree/bindings/arm/uniphier/.
+> Pretending the CR7 PM Domain can only be controlled through WFI/APMU only should
+> work.
+> But IMHO it is a hack, just like your solution for the CANFD clock.
 
-Actually you seemed to be lacking bindings beyond the cache controller
-for Uniphier:
 
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/arm/uniphier
+Well, it seems to be the best solution recent mainline gives us and 
+seems to work ;)
 
-The SoC compatible, e.g. "socionext,uniphier-ld11", needs to be defined
-somewhere too, as done here. A git-grep for that particular compatible
-only finds derived clk and reset bindings.
+And for me it looks at least better than the other solution I've seen so 
+far: Remove the 'cr7', 'canfd' etc lines completely from the kernel.
 
-Using socionext.txt allows you to add those bindings to a shared file;
-if you prefer to host them separately below uniphier/ or as uniphier.txt
-do you have a better name suggestion for this one? I was trying to keep
-our options open to later add SC2A11 in socionext.txt, and I also saw
-some mb8ac300 or so (MB86S7x predecessor?) in downstream sources, so I
-don't know a good common name for the non-Panasonic parts. And if we
-take fujitsu.txt for MB86S7x to match the vendor prefix then we will
-need a separate file for the new SC2A11 IIUC.
+Best regards
 
-Also if you can tell us where the cut between Fujitsu and Socionext
-should be done, we can certainly adapt. NXP is still adding all their
-new SoCs in fsl.txt, it seems.
-(A similar naming issue exists for my not-yet-submitted FM4 patches,
-where it changed owners from Fujitsu to Spansion and then to Cypress.)
-
-Best regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Dirk
