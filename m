@@ -1,72 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Jun 2017 16:20:17 +0100
-Subject: [PATCH] arm64: fix endianness annotation for
- __apply_alternatives()/get_alt_insn()
-In-Reply-To: <CAExDi1SxbM41MRuEUF0WSwzbs9yJNLGTtNfJySvAm6LSn9_mEQ@mail.gmail.com>
-References: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
- <20170629102851.GF14607@arm.com>
- <20170629132645.difv6xdjrkp5qvlh@ltop.local>
- <20170629141323.GH11040@leverpostej>
- <20170629141944.GD18630@arm.com>
- <20170629142233.GJ11040@leverpostej>
- <20170629142628.GE18630@arm.com>
- <CAExDi1SxbM41MRuEUF0WSwzbs9yJNLGTtNfJySvAm6LSn9_mEQ@mail.gmail.com>
-Message-ID: <20170629152017.GA21883@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Jun 2017 17:20:36 +0200
+Subject: [GIT PULL] ARM: actions: arm64 for v4.13
+In-Reply-To: <CAK8P3a3vB9J5nDWB5TU54Xxa9upc61iKtxcoSYagyMMAyn-WkA@mail.gmail.com>
+References: <20170623172556.12618-1-afaerber@suse.de>
+ <20170623172556.12618-3-afaerber@suse.de>
+ <CAK8P3a3vB9J5nDWB5TU54Xxa9upc61iKtxcoSYagyMMAyn-WkA@mail.gmail.com>
+Message-ID: <CAK8P3a1OX-wLD1pxyUo7s3KcBws13Gzvsghtv+uAXkqQdpZjfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 05:15:19PM +0200, Luc Van Oostenryck wrote:
-> On Thu, Jun 29, 2017 at 4:26 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Jun 29, 2017 at 03:22:34PM +0100, Mark Rutland wrote:
-> >> On Thu, Jun 29, 2017 at 03:19:44PM +0100, Will Deacon wrote:
-> >> > On Thu, Jun 29, 2017 at 03:13:23PM +0100, Mark Rutland wrote:
-> >> > > On Thu, Jun 29, 2017 at 03:26:47PM +0200, Luc Van Oostenryck wrote:
-> >> > > > On Thu, Jun 29, 2017 at 11:28:51AM +0100, Will Deacon wrote:
-> >> > > > > > +           origptr = (__le32 __force *) ALT_ORIG_PTR(alt);
-> >> > > > > > +           replptr = (__le32 __force *) ALT_REPL_PTR(alt);
-> >> > > > >
-> >> > > > > Why is the __force needed here?
-> >> > > >
-> >> > > > Because of the cast to u32* in:
-> >> > > >         #define ALT_ORIG_PTR(a)         __ALT_PTR(a, orig_offset)
-> >> > > >         #define ALT_REPL_PTR(a)         __ALT_PTR(a, alt_offset)
-> >> > > >         #define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
-> >> > > >
-> >> > > > Of course, if this (u32*) is not really needed, then the __force
-> >> > > > is also not needed.
-> >> > > >
-> >> > > > And since, it seems indeed to be the case, I'll gladly sent a patch:
-> >> > > >         -#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
-> >> > > >         +#define __ALT_PTR(a,f)          ((void *)&(a)->f + (a)->f)
-> >> > > > if it suits you.
-> >> > >
-> >> > > Given __ALT_PTR is intended to give a pointer to A64 instructions, which
-> >> > > are in le32 format, wouldn't it make more sense for __ALT_PTR to cast to
-> >> > > __le32 * ?
-> 
-> Yes, it could.
-> 
-> >> > Might be a bit weird for ALT_REPL_PTR, which is cast to unsigned long.
-> >>
-> >> Maybe, but that's one cast, rather than two, and matches other similar
-> >> casts from a pointer to unsigned long (e.g. the the addr cast in
-> >> __range_ok()).
-> >
-> > Sure, but isn't it a __force cast? I'd like to avoid that if we can.
-> 
-> No, once you cast to an integer all the specificities of pointers are
-> thrown away,
-> like for a const pointer and here the __bitwise underlying the __le32.
-> It's exactly the same fro cast from/to void*, the reasoning behind it
-> is something
-> like : "it's OK to drop all the qualifiers and such because you will anyway need
-> to cast the result to another pointer before being able to dereference it".
+On Thu, Jun 29, 2017 at 5:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Jun 23, 2017 at 7:25 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>
+>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+>>
+>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-soc-for-4.13
+>>
+>> for you to fetch changes up to c88cc3ee1b2045ccff904f1187d62fdc3895a532:
+>>
+>>   arm64: Prepare Actions Semi S900 (2017-06-19 03:14:48 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Actions Semi ARM64 SoC for v4.13
+>>
+>> This adds a Kconfig symbol for DTs and drivers being added.
+>>
+>
+> Pulled into next/dt64, thanks,
 
-Ok, so does that mean that the __force cast in __range_ok is not needed?
+Sorry, replied to the wrong mail at first. I merged you
+actions-arm64-dt branch into
+next/dt64 earlier, and have now merged this one into next/arm64.
 
-> I already sent a version leaving the type as void*, without having seen your
-> replies here, but if you wish I can, of course, resend something for __le32*.
-
-I'm happy with the patch you sent, so no need to resend.
-
-Will
+       Arnd
