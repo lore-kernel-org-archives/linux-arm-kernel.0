@@ -1,61 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Jun 2017 15:26:28 +0100
-Subject: [PATCH] arm64: fix endianness annotation for
- __apply_alternatives()/get_alt_insn()
-In-Reply-To: <20170629142233.GJ11040@leverpostej>
-References: <20170628145557.24454-1-luc.vanoostenryck@gmail.com>
- <20170629102851.GF14607@arm.com>
- <20170629132645.difv6xdjrkp5qvlh@ltop.local>
- <20170629141323.GH11040@leverpostej>
- <20170629141944.GD18630@arm.com>
- <20170629142233.GJ11040@leverpostej>
-Message-ID: <20170629142628.GE18630@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 29 Jun 2017 15:25:46 +0100
+Subject: [PATCH 0/3] Miscellaneous minor compat ptrace fixes
+Message-ID: <1498746379-27340-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 03:22:34PM +0100, Mark Rutland wrote:
-> On Thu, Jun 29, 2017 at 03:19:44PM +0100, Will Deacon wrote:
-> > On Thu, Jun 29, 2017 at 03:13:23PM +0100, Mark Rutland wrote:
-> > > On Thu, Jun 29, 2017 at 03:26:47PM +0200, Luc Van Oostenryck wrote:
-> > > > On Thu, Jun 29, 2017 at 11:28:51AM +0100, Will Deacon wrote:
-> > > > > On Wed, Jun 28, 2017 at 04:55:57PM +0200, Luc Van Oostenryck wrote:
-> > > > > > get_alt_insn() is used to read and create ARM instructions, which
-> > > > > > are always stored in memory in little-endian order. These values
-> > > > > > are thus correctly converted to/from native order when processed
-> > > > > > but the pointers used to hold the address of these instructions
-> > > > > > are declared as for native order values.
-> > > > > > 
-> > > > > > Fix this by declaring the pointers as __le32* instead of u32* and
-> > > > > > make the few appropriate needed changes.
-> > > > > > 
-> > > > > > +		origptr = (__le32 __force *) ALT_ORIG_PTR(alt);
-> > > > > > +		replptr = (__le32 __force *) ALT_REPL_PTR(alt);
-> > > > > 
-> > > > > Why is the __force needed here?
-> > > > 
-> > > > Because of the cast to u32* in:
-> > > > 	#define ALT_ORIG_PTR(a)         __ALT_PTR(a, orig_offset)
-> > > > 	#define ALT_REPL_PTR(a)         __ALT_PTR(a, alt_offset)
-> > > > 	#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
-> > > > 
-> > > > Of course, if this (u32*) is not really needed, then the __force
-> > > > is also not needed.
-> > > > 
-> > > > And since, it seems indeed to be the case, I'll gladly sent a patch:
-> > > > 	-#define __ALT_PTR(a,f)          (u32 *)((void *)&(a)->f + (a)->f)
-> > > > 	+#define __ALT_PTR(a,f)          ((void *)&(a)->f + (a)->f)
-> > > > if it suits you.
-> > > 
-> > > Given __ALT_PTR is intended to give a pointer to A64 instructions, which
-> > > are in le32 format, wouldn't it make more sense for __ALT_PTR to cast to
-> > > __le32 * ?
-> > 
-> > Might be a bit weird for ALT_REPL_PTR, which is cast to unsigned long.
-> 
-> Maybe, but that's one cast, rather than two, and matches other similar
-> casts from a pointer to unsigned long (e.g. the the addr cast in
-> __range_ok()).
+Responding to a patch from Luc [1] to fix some sparse warnings, Will
+reported conflicts with the arm64 tree, and looking into this I noticed
+that I had introduced an inconsistency [2] into the FP{,S,C}R handling
+in the compat VFP regset accessors.
 
-Sure, but isn't it a __force cast? I'd like to avoid that if we can.
+In this case, the sparse warnings are actually alerting us to a real
+issue, which is why [2] squashes one of those warnings, why [1]
+conflicts and why the fix by [1] to the second warning is arguably
+incorrect (though on initial shallow inspection of the patch it looked
+fine).
 
-Will
+These issues arise from the way the regset API handles user versus
+kernel source/destination pointers, as explained in more detail in [2].
+
+
+Patch 3 of this series fixes the outstanding sparse warning in a manner
+more consistent with [2].
+
+Patches 1-2 fix other minor issues that I noticed along the way, but
+which are not directly related.
+
+To avoid unintentional conflicts, the patches are based on
+git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+3edb1dd13ce6 ("Merge branch 'aarch64/for-next/ras-apei' into aarch64/for-next/core")
+
+Cheers
+---Dave
+
+[1] [PATCH] arm64: fix missing __user in compat_vfp_{get,set}()
+lists.infradead.org/pipermail/linux-arm-kernel/2017-June/516315.html
+
+[2] [PATCH 1/3] arm64: ptrace: Fix VFP register dumping in compat coredumps
+lists.infradead.org/pipermail/linux-arm-kernel/2017-June/514916.html
+
+Dave Martin (3):
+  arm64: ptrace: Avoid setting compat FP[SC]R to garbage if get_user
+    fails
+  arm64: ptrace: Remove redundant overrun check from compat_vfp_set()
+  arm64: ptrace: Fix incorrect get_user() use in compat_vfp_set()
+
+ arch/arm64/kernel/ptrace.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
+
+-- 
+2.1.4
