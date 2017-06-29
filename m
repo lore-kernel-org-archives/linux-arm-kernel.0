@@ -1,57 +1,61 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 30 Jun 2017 00:11:18 +0200
-Subject: [PATCH 2/6] clk: at91: add audio pll clock driver
-In-Reply-To: <20170629214758.7a55wtssikekjjh4@rob-hp-laptop>
-References: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
- <20170623090059.8371-3-quentin.schulz@free-electrons.com>
- <20170629214758.7a55wtssikekjjh4@rob-hp-laptop>
-Message-ID: <20170629221118.fwnwe7k7ykx2acr3@piout.net>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Thu, 29 Jun 2017 18:20:00 -0400
+Subject: [PATCH] iommu/arm-smmu-v3: Implement shutdown method
+In-Reply-To: <20170629183438.GF5592@arm.com>
+References: <1498758015-7072-1-git-send-email-nwatters@codeaurora.org>
+ <20170629183438.GF5592@arm.com>
+Message-ID: <5f655f54-a843-af16-e9e3-0e0d84565994@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 29/06/2017 at 16:47:58 -0500, Rob Herring wrote:
-> On Fri, Jun 23, 2017 at 11:00:55AM +0200, Quentin Schulz wrote:
-> > From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > 
-> > This new clock driver set allows to have a fractional divided clock that
-> > would generate a precise clock particularly suitable for audio
-> > applications.
-> > 
-> > The main audio pll clock has two children clocks: one that is connected
-> > to the PMC, the other that can directly drive a pad. As these two routes
-> > have different enable bits and different dividers and divider formula,
-> > they are handled by two different drivers. Each of them could modify the
-> > rate of the main audio pll parent.
-> > The main audio pll clock can output 620MHz to 700MHz.
-> > 
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > ---
-> >  .../devicetree/bindings/clock/at91-clock.txt       |  10 +
+On 6/29/2017 2:34 PM, Will Deacon wrote:
+> On Thu, Jun 29, 2017 at 01:40:15PM -0400, Nate Watterson wrote:
+>> The shutdown method disables the SMMU and its interrupts to avoid
+>> potentially corrupting a new kernel started with kexec.
+>>
+>> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+>> ---
+>>   drivers/iommu/arm-smmu-v3.c | 11 +++++++++++
+>>   1 file changed, 11 insertions(+)
 > 
-> It would be nice to see at91 to transition away from a node per clock to 
-> just clock controller nodes. In any case:
+> We should update arm-smmu.c as well.
 > 
-
-Yes, that is exactly our plan.
-
-> Acked-by: Rob Herring <robh@kernel.org>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 380969a..907d576 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -2765,9 +2765,19 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+>>   	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+>>   
+>>   	arm_smmu_device_disable(smmu);
+>> +
+>> +	/* Disable IRQs */
+>> +	arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
+>> +				ARM_SMMU_IRQ_CTRLACK);
+>> +
 > 
-> >  arch/arm/mach-at91/Kconfig                         |   4 +
-> >  drivers/clk/at91/Makefile                          |   2 +
-> >  drivers/clk/at91/clk-audio-pll-pad.c               | 204 ++++++++++++++++++
-> >  drivers/clk/at91/clk-audio-pll-pmc.c               | 175 +++++++++++++++
-> >  drivers/clk/at91/clk-audio-pll.c                   | 237 +++++++++++++++++++++
-> >  include/linux/clk/at91_pmc.h                       |  25 +++
-> >  sound/soc/atmel/atmel-classd.c                     |  20 +-
-> >  8 files changed, 658 insertions(+), 19 deletions(-)
-> >  create mode 100644 drivers/clk/at91/clk-audio-pll-pad.c
-> >  create mode 100644 drivers/clk/at91/clk-audio-pll-pmc.c
-> >  create mode 100644 drivers/clk/at91/clk-audio-pll.c
+> Can you justify the need for this? If we actually need to disable
+> interrupts, then I'd like to understand why so that we can make sure we
+> get the ordering right with respect to disabling the device. Also, do we
+> need to clear the MSI registers too?
+
+I have no justification. Based on the number of drivers that take care
+to prevent their HW from generating an interrupt, I thought it would be
+required, but I can't find any such requirement explicitly laid out in
+the documentation.
+
+When you mention the MSI registers do you mean, for instance,
+SMMU_GERROR_IRQ_CFG0? It looks like those are always cleared while
+initializing the SMMU so the case where an SMMU transitions from using
+MSIs to using wired interrupts between kernels will be handled properly.
+
+> 
+> My understanding is that kexec will mask irqs at the GIC, so there's not
+> actually an issue here.
+> 
+> Will
+> 
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
