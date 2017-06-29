@@ -1,25 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jun 2017 17:22:52 +0200
-Subject: [PATCH] multi_v7_defconfig: Enable OMAP MTD and DM816 AHCI
-In-Reply-To: <20170626073333.GR3730@atomide.com>
-References: <1498045359-27376-1-git-send-email-trini@konsulko.com>
- <20170626073333.GR3730@atomide.com>
-Message-ID: <CAK8P3a1qN79DhoQ-SCNaF8i+60N0RDMOGpfWQ+gRLBdjKcXoPg@mail.gmail.com>
+Date: Thu, 29 Jun 2017 17:34:38 +0200
+Subject: [GIT PULL] ARM: actions: arm+sps for v4.13
+In-Reply-To: <20170623172556.12618-6-afaerber@suse.de>
+References: <20170623172556.12618-1-afaerber@suse.de>
+ <20170623172556.12618-6-afaerber@suse.de>
+Message-ID: <CAK8P3a3wbgQ9gTYKgF+q5Mtsw3DjtoRWEqJLXOKMXcCQeOXciQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 9:33 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Tom Rini <trini@konsulko.com> [170621 04:42]:
->> A wide variety of TI platforms support NAND via the
->> CONFIG_MTD_NAND_OMAP2 driver (and related BCH options), so enable this.
->> In addition, multi_v7_defconfig supports the dm8168-evm and that
->> supports root being on a SATA drive, so build the DM816 AHCI driver into
->> the resulting kernel as well.
+> ----------------------------------------------------------------
+> Actions Semi ARM SoC for v4.13 #2
 >
-> Best that Arnd picks up this one directly:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> This adds SMP code to bring up the remaining S500 CPU cores
+> by reusing a helper factored out of the SPS power domains driver.
 
-Pulled into next/defconfig, thanks!
+Pulled into next/soc. Thanks for splitting it up this way, that really helps!
 
         Arnd
