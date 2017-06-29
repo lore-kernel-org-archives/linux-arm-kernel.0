@@ -1,36 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Jun 2017 17:50:15 +0200
-Subject: [PATCH v4 20/28] ARM: owl: Implement CPU enable-method for S500
-In-Reply-To: <6d9d0d63-113e-b050-a54e-62746ebc6013@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-21-afaerber@suse.de>
- <CAK8P3a1fLABzSc7kej6uw751uoZma1Qvpm7c3mkLB45rcBNQTA@mail.gmail.com>
- <CAK8P3a3Pg2rm8nSPUm_E61F7+zSr3gWV6sNqhC0Et3Zh2xPtmA@mail.gmail.com>
- <6d9d0d63-113e-b050-a54e-62746ebc6013@suse.de>
-Message-ID: <CAK8P3a1vCKkZ8i=MLQXHX5ZowWQGbqiMo3gQz1E9RV+8sSGfpA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Jun 2017 16:37:09 +0100
+Subject: [PATCH 1/3] arm64: ptrace: Avoid setting compat FP[SC]R to
+ garbage if get_user fails
+In-Reply-To: <1498746379-27340-2-git-send-email-Dave.Martin@arm.com>
+References: <1498746379-27340-1-git-send-email-Dave.Martin@arm.com>
+ <1498746379-27340-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170629153709.GC21883@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 5:22 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 29.06.2017 um 17:07 schrieb Arnd Bergmann:
->>
->> It seems you missed my question here. Can you please follow up, and
->> if possible send a patch to remove the pen_release logic that appears
->> to be unnecessary here?
->
-> I do not have any documentation on these registers, only the downstream
-> code that I forward-ported here. If you tell me what you mean exactly, I
-> can do some testing and if it still works submit a patch to simplify it.
->
-> Comments from the so far quiet Actions Semi side would help, too.
+On Thu, Jun 29, 2017 at 03:25:47PM +0100, Dave Martin wrote:
+> If get_user() fails when reading the new FPSCR value from userspace
+> in compat_vfp_get(), then garbage* will be written to the task's
+> FPSR and FPCR registers.
+> 
+> This patch prevents this by checking the return from get_user()
+> first.
+> 
+> [*] Actually, zero, due to the behaviour of get_user() on error, but
+> that's still not what userspace expects.
 
-IIRC, there are two ways to implement SMP bootup: either you have
-registers to tell the secondary CPU how to start up out of reset or they
-get put into a holding pen during early boot where they spin waiting
-for a variable to get written.
+On the other hand, I don't think userspace can expect that if ptrace returns
+an error then none of the state has been updated, can it?
 
-However, doing both is not necessary. See for example mach-sunxi
-for an example without the holding pen. I think you can just delete
-half of your file to do the same.
+Given that we don't propagate the return value from __copy_from_user,
+I don't see what we're really fixing here and what userspace can now rely
+on that it couldn't rely on before.
 
-        Arnd
+Will
+
+> 
+> Fixes: 478fcb2cdb23 ("arm64: Debugging support")
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/kernel/ptrace.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 35846f1..4c068dc 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -947,8 +947,10 @@ static int compat_vfp_set(struct task_struct *target,
+>  
+>  	if (count && !ret) {
+>  		ret = get_user(fpscr, (compat_ulong_t *)ubuf);
+> -		uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
+> -		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
+> +		if (!ret) {
+> +			uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
+> +			uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
+> +		}
+>  	}
+>  
+>  	fpsimd_flush_task_state(target);
+> -- 
+> 2.1.4
+> 
