@@ -1,25 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Jun 2017 14:23:38 +0200
-Subject: [PATCH v2] gpio: rcar: Add R8A7743 (RZ/G1M) support
-In-Reply-To: <1498055229-42052-1-git-send-email-biju.das@bp.renesas.com>
-References: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
- <1498055229-42052-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CACRpkdaHb8GnwTc0D0B9TtYC=LUa0ZdDK90xKwydg=s4z-VxMQ@mail.gmail.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Thu, 29 Jun 2017 20:27:46 +0800
+Subject: [PATCH 0/5] Add rk3328 pwm support
+Message-ID: <1498739271-27431-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 4:27 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+There are two features of rk3328 pwm module.
+ - PWM APB and function clocks are different.
+ - Add pwm atomic hardware update
 
-> Renesas RZ/G1M (R8A7743) SoC GPIO blocks are identical to the R-Car Gen2
-> family. Add support for its GPIO controllers.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-> ---
-> v1->v2
-> * Modified the text "RZ-G1M" to "RZ/G1M"
+David Wu (5):
+  pwm: rockchip: Add APB and function both clocks support
+  pwm: rockchip: Remove the judge from return value of pwm_config
+  pwm: rockchip: Move the configuration of polarity from pwm_enable() to
+    pwm_config()
+  pwm: rockchip: Add atomic updated feature for rk3328
+  Arm64: dts: rockchip: Add pwm nodes for rk3328
 
-Patch applied with the ACKs.
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |   9 +-
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  45 +++++
+ drivers/pwm/pwm-rockchip.c                         | 184 ++++++++++++++++-----
+ 3 files changed, 197 insertions(+), 41 deletions(-)
 
-Yours,
-Linus Walleij
+-- 
+1.9.1
