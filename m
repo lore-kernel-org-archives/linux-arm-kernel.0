@@ -1,27 +1,23 @@
 From: davem@davemloft.net (David Miller)
-Date: Thu, 29 Jun 2017 12:23:49 -0400 (EDT)
-Subject: [PATCH 1/6] net: stmmac: support future possible different
- internal phy mode
-In-Reply-To: <20170627092806.28181-1-clabbe.montjoie@gmail.com>
-References: <20170627092806.28181-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170629.122349.2265868886957558079.davem@davemloft.net>
+Date: Thu, 29 Jun 2017 12:25:58 -0400 (EDT)
+Subject: [PATCH] cavium: thunder: Remove duplicate "netdev->name"
+ logging output
+In-Reply-To: <0ac1a144114eecd8c469027d6c91f453d61e1ade.1498560984.git.joe@perches.com>
+References: <0ac1a144114eecd8c469027d6c91f453d61e1ade.1498560984.git.joe@perches.com>
+Message-ID: <20170629.122558.2257692860243246268.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Corentin Labbe <clabbe.montjoie@gmail.com>
-Date: Tue, 27 Jun 2017 11:28:01 +0200
+From: Joe Perches <joe@perches.com>
+Date: Tue, 27 Jun 2017 03:56:54 -0700
 
-> The current way to find if the phy is internal is to compare DT phy-mode
-> and emac_variant/internal_phy.
-> But it will negate a possible future SoC where an external PHY use the
-> same phy mode than the internal one.
+> Using netdev_<level>(netdev, "%s: ...", netdev->name) duplicates the
+> name in the output.  Remove those uses.
 > 
-> By using phy-mode = "internal" we permit to have an external PHY with
-> the same mode than the internal one.
+> Miscellanea:
 > 
-> Reported-by: Andr? Przywara <andre.przywara@arm.com>
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> o Use the netif_<level> convenience macros at the same time
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-Series applied.
-
-Please provide a proper "[PATCH 0/n] " header posting next time.
+Applied to net-next.
