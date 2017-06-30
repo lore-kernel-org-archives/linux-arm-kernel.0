@@ -1,102 +1,177 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Jun 2017 11:34:22 +0200
-Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
-In-Reply-To: <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
-References: <20170627143652.13075-1-net147@gmail.com>
- <20170628092024.ejxy6itqj3hx6yew@flea>
- <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
- <20170629155620.4keqi4cumbtvv63u@flea>
- <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
-Message-ID: <20170630093422.om7b75q5wyuby6r7@flea>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 30 Jun 2017 12:10:52 +0300
+Subject: [PATCH] arm64: dts: renesas: Move CPG_AUDIO_CLK_I from board to
+ soc files
+In-Reply-To: <1498810948-17910-1-git-send-email-geert+renesas@glider.be>
+References: <1498810948-17910-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1587046.f3YfXb5MdT@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Geert,
 
-On Fri, Jun 30, 2017 at 08:22:13AM +1000, Jonathan Liu wrote:
-> Hi Maxime,
+Thank you for the patch.
+
+On Friday 30 Jun 2017 10:22:28 Geert Uytterhoeven wrote:
+> The definition of CPG_AUDIO_CLK_I is SoC-specific, not board-specific.
+> Hence move it from the board-specific .dts files to the SoC-specific
+> .dtsi files.
 > 
-> On 30 June 2017 at 01:56, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Wed, Jun 28, 2017 at 08:39:33PM +1000, Jonathan Liu wrote:
-> >> >> +     u32 int_status;
-> >> >> +     u32 fifo_status;
-> >> >> +     /* Read needs empty flag unset, write needs full flag unset */
-> >> >> +     u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
-> >> >> +                       SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
-> >> >> +     int ret;
-> >> >> +
-> >> >> +     /* Wait until error or FIFO ready */
-> >> >> +     ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
-> >> >> +                              int_status,
-> >> >> +                              is_err_status(int_status) ||
-> >> >> +                              is_fifo_flag_unset(hdmi, &fifo_status, flag),
-> >> >> +                              min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
-> >> >> +                              100000);
-> >> >> +
-> >> >> +     if (is_err_status(int_status))
-> >> >> +             return -EIO;
-> >> >> +     if (ret)
-> >> >> +             return -ETIMEDOUT;
-> >> >
-> >> > Why not just have
-> >> > ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
-> >> >                          !(reg & flag), 100, 100000);
-> >> >
-> >> > if (ret < 0)
-> >> >         if (is_err_status())
-> >> >                 return -EIO;
-> >> >         return ret;
-> >> >
-> >> >
-> >>
-> >> If I check error status after readl_poll_timeout and there is an error
-> >> (e.g. the I2C address does not have a corresponding device connected
-> >> or nothing connected to HDMI port) it will keep checking the fifo
-> >> status even though error bit is set in the int status and then timeout
-> >> after 100 ms. If it checks the int status register at the same time,
-> >> it will error after 100 nanoseconds. I don't want to introduce
-> >> unnecessary delays considering part of the reason for adding this
-> >> driver to make it more usable for non-standard use cases.
-> >
-> > Well, polling for 100ms doesn't seem great either. What was the
-> > rationale behind that timeout?
-> >
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> I don't think it's worth adding Fixes tags.
 > 
-> When an error occurs one of the error bits will be set in the
-> INT_STATUS register so this is detected very quickly if I check the
-> INT_STATUS and FIFO_STATUS at the same time. The 100 ms timeout is in
-> case the I2C slave does clock stretching in which case the transfer
-> may take longer than the predicted time.
-
-100ms isn't stretching anymore, it's worse than that.
-
-> > And we can also reverse the check and look at the INT_STATUS
-> > register. The errors will be there, and we can program the threshold
-> > we want in both directions and use the
-> > DDC_FIFO_Request_Interrupt_Status bit.
-> >
+> If you disagree, feel free to add:
 > 
-> I did try that when I was doing the v3 patch but I couldn't get it to
-> work as mentioned previously in the v3 patch discussion. I programmed
-> the FIFO_RX_TRIGGER_THRES and FIFO_TX_TRIGGER_THRES in DDC_FIFO_Ctrl
-> register at the same time as setting FIFO_Address_Clear but the
-> request interrupt status bit did not get updated to the appropriate
-> state that is consistent with the FIFO level and the thresholds. I did
-> try this several times for subsequent patch versions without success.
-
-What values did you set it to?
-
-Maxime
+> Fixes: 79e3b5cf035e4734 ("arm64: dts: renesas: Add support for Salvator-XS
+> with R-Car H3 ES2.0") Fixes: fb5202dbebfd8fbf ("arm64: dts: r8a7795:
+> h3ulcb: Add support for R-Car H3 ES2.0") Fixes: 0b03c32db03d63de ("arm64:
+> dts: r8a7795: salvator-x: Add support for R-Car H3 ES2.0") Fixes:
+> 253ed045a34d16d9 ("arm64: dts: renesas: Extract common ULCB board support")
+> Fixes: d25e8ff0d5aaf8b1 ("arm64: dts: renesas: Extract common Salvator-X
+> board support") ---
+>  arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts     | 2 --
+>  arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts | 2 --
+>  arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts         | 2 --
+>  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts     | 2 --
+>  arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts    | 2 --
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi               | 2 ++
+>  arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts         | 2 --
+>  arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts     | 2 --
+>  arch/arm64/boot/dts/renesas/r8a7796.dtsi               | 2 ++
+>  9 files changed, 4 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
+> b/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts index
+> 95fe207cb6a3fd2f..dd4f9b6a42546def 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
+> @@ -9,8 +9,6 @@
+>   * kind, whether express or implied.
+>   */
+> 
+> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
+> -
+>  /dts-v1/;
+>  #include "r8a7795-es1.dtsi"
+>  #include "ulcb.dtsi"
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+> b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts index
+> b84c156ed6969947..3f7d5f51e42878cb 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+> @@ -8,8 +8,6 @@
+>   * kind, whether express or implied.
+>   */
+> 
+> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
+> -
+>  /dts-v1/;
+>  #include "r8a7795-es1.dtsi"
+>  #include "salvator-x.dtsi"
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+> b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts index
+> 0426f41765f0bc68..27d4b1a4c4754732 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+> @@ -9,8 +9,6 @@
+>   * kind, whether express or implied.
+>   */
+> 
+> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
+> -
+>  /dts-v1/;
+>  #include "r8a7795.dtsi"
+>  #include "ulcb.dtsi"
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+> b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts index
+> 684fb3b9d154559e..17953070f38dff8d 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+> @@ -8,8 +8,6 @@
+>   * kind, whether express or implied.
+>   */
+> 
+> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
+> -
+>  /dts-v1/;
+>  #include "r8a7795.dtsi"
+>  #include "salvator-x.dtsi"
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
+> b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts index
+> de354957144b4822..6a7d1b22d0fecc9c 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
+> @@ -8,8 +8,6 @@
+>   * kind, whether express or implied.
+>   */
+> 
+> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
+> -
+>  /dts-v1/;
+>  #include "r8a7795.dtsi"
+>  #include "salvator-xs.dtsi"
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi index
+> 5ec03641d9873f22..6b75d4b9ce7efa49 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> @@ -12,6 +12,8 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/power/r8a7795-sysc.h>
+> 
+> +#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
+> +
+>  / {
+>  	compatible = "renesas,r8a7795";
+>  	#address-cells = <2>;
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+> b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts index
+> 38b58b7fca4bf0e9..1ff9dffae4618a5a 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+> @@ -9,8 +9,6 @@
+>   * kind, whether express or implied.
+>   */
+> 
+> -#define CPG_AUDIO_CLK_I		R8A7796_CLK_S0D4
+> -
+>  /dts-v1/;
+>  #include "r8a7796.dtsi"
+>  #include "ulcb.dtsi"
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+> b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts index
+> db4f162d6bdd2c42..b35b15914771af86 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+> @@ -8,8 +8,6 @@
+>   * kind, whether express or implied.
+>   */
+> 
+> -#define CPG_AUDIO_CLK_I		R8A7796_CLK_S0D4
+> -
+>  /dts-v1/;
+>  #include "r8a7796.dtsi"
+>  #include "salvator-x.dtsi"
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> b/arch/arm64/boot/dts/renesas/r8a7796.dtsi index
+> cfb37d4bd65914b4..49b9f2c05f71cd05 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> @@ -12,6 +12,8 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/power/r8a7796-sysc.h>
+> 
+> +#define CPG_AUDIO_CLK_I		R8A7796_CLK_S0D4
+> +
+>  / {
+>  	compatible = "renesas,r8a7796";
+>  	#address-cells = <2>;
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170630/0a1813b0/attachment.sig>
+Regards,
+
+Laurent Pinchart
