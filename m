@@ -1,94 +1,112 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 31 Jul 2017 12:55:48 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170731120908.00002e28@huawei.com>
-References: <20170726.095432.169004918437663011.davem@davemloft.net>
- <20170726175013.GT3730@linux.vnet.ibm.com>
- <20170726223658.GA27617@linux.vnet.ibm.com>
- <20170726.154540.150558937277891719.davem@davemloft.net>
- <20170726231505.GG3730@linux.vnet.ibm.com>
- <20170731120908.00002e28@huawei.com>
-Message-ID: <20170731125548.00007b68@huawei.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Sat, 1 Jul 2017 00:14:44 +1000
+Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <CAGb2v67CTXayDm4rhoJ4CNx9J=u+U+2_kh9xYsjHjCE8YnJ=ow@mail.gmail.com>
+References: <20170627143652.13075-1-net147@gmail.com>
+ <20170628092024.ejxy6itqj3hx6yew@flea>
+ <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
+ <20170629155620.4keqi4cumbtvv63u@flea>
+ <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
+ <CAGb2v67CTXayDm4rhoJ4CNx9J=u+U+2_kh9xYsjHjCE8YnJ=ow@mail.gmail.com>
+Message-ID: <CANwerB2RHQwZgZc37+dkh9np-SSFks3tZxqFzDPVwQP5oP48hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 31 Jul 2017 12:09:08 +0100
-Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+Hi Chen-Yu and Maxime,
 
-> On Wed, 26 Jul 2017 16:15:05 -0700
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> 
-> > On Wed, Jul 26, 2017 at 03:45:40PM -0700, David Miller wrote:  
-> > > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> > > Date: Wed, 26 Jul 2017 15:36:58 -0700
-> > >     
-> > > > And without CONFIG_SOFTLOCKUP_DETECTOR, I see five runs of 24 with RCU
-> > > > CPU stall warnings.  So it seems likely that CONFIG_SOFTLOCKUP_DETECTOR
-> > > > really is having an effect.    
-> > > 
-> > > Thanks for all of the info Paul, I'll digest this and scan over the
-> > > code myself.
-> > > 
-> > > Just out of curiousity, what x86 idle method is your machine using?
-> > > The mwait one or the one which simply uses 'halt'?  The mwait variant
-> > > might mask this bug, and halt would be a lot closer to how sparc64 and
-> > > Jonathan's system operates.    
-> > 
-> > My kernel builds with CONFIG_INTEL_IDLE=n, which I believe means that
-> > I am not using the mwait one.  Here is a grep for IDLE in my .config:
-> > 
-> > 	CONFIG_NO_HZ_IDLE=y
-> > 	CONFIG_GENERIC_SMP_IDLE_THREAD=y
-> > 	# CONFIG_IDLE_PAGE_TRACKING is not set
-> > 	CONFIG_ACPI_PROCESSOR_IDLE=y
-> > 	CONFIG_CPU_IDLE=y
-> > 	# CONFIG_CPU_IDLE_GOV_LADDER is not set
-> > 	CONFIG_CPU_IDLE_GOV_MENU=y
-> > 	# CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED is not set
-> > 	# CONFIG_INTEL_IDLE is not set
-> >   
-> > > On sparc64 the cpu yield we do in the idle loop sleeps the cpu.  It's
-> > > local TICK register keeps advancing, and the local timer therefore
-> > > will still trigger.  Also, any externally generated interrupts
-> > > (including cross calls) will wake up the cpu as well.
-> > > 
-> > > The tick-sched code is really tricky wrt. NO_HZ even in the NO_HZ_IDLE
-> > > case.  One of my running theories is that we miss scheduling a tick
-> > > due to a race.  That would be consistent with the behavior we see
-> > > in the RCU dumps, I think.    
-> > 
-> > But wouldn't you have to miss a -lot- of ticks to get an RCU CPU stall
-> > warning?  By default, your grace period needs to extend for more than
-> > 21 seconds (more than one-third of a -minute-) to get one.  Or do
-> > you mean that the ticks get shut off now and forever, as opposed to
-> > just losing one of them?
-> >   
-> > > Anyways, just a theory, and that's why I keep mentioning that commit
-> > > about the revert of the revert (specifically
-> > > 411fe24e6b7c283c3a1911450cdba6dd3aaea56e).
-> > > 
-> > > :-)    
-> > 
-> > I am running an overnight test in preparation for attempting to push
-> > some fixes for regressions into 4.12, but will try reverting this
-> > and enabling CONFIG_HZ_PERIODIC tomorrow.
-> > 
-> > Jonathan, might the commit that Dave points out above be what reduces
-> > the probability of occurrence as you test older releases?  
-> I just got around to trying this out of curiosity.  Superficially it did
-> appear to possibly make the issue harder to hit took over 30 minutes
-> but the issue otherwise looks much the same with or without that patch.
-> 
-> Just out of curiosity, next thing on my list is to disable hrtimers entirely
-> and see what happens.
-> 
-> Jonathan
-> > 
-> > 							Thanx, Paul
-> >   
-> 
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+On 30 June 2017 at 13:16, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Fri, Jun 30, 2017 at 6:22 AM, Jonathan Liu <net147@gmail.com> wrote:
+>> Hi Maxime,
+>>
+>> On 30 June 2017 at 01:56, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>> On Wed, Jun 28, 2017 at 08:39:33PM +1000, Jonathan Liu wrote:
+>>>> >> +     u32 int_status;
+>>>> >> +     u32 fifo_status;
+>>>> >> +     /* Read needs empty flag unset, write needs full flag unset */
+>>>> >> +     u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
+>>>> >> +                       SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
+>>>> >> +     int ret;
+>>>> >> +
+>>>> >> +     /* Wait until error or FIFO ready */
+>>>> >> +     ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+>>>> >> +                              int_status,
+>>>> >> +                              is_err_status(int_status) ||
+>>>> >> +                              is_fifo_flag_unset(hdmi, &fifo_status, flag),
+>>>> >> +                              min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
+>>>> >> +                              100000);
+>>>> >> +
+>>>> >> +     if (is_err_status(int_status))
+>>>> >> +             return -EIO;
+>>>> >> +     if (ret)
+>>>> >> +             return -ETIMEDOUT;
+>>>> >
+>>>> > Why not just have
+>>>> > ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
+>>>> >                          !(reg & flag), 100, 100000);
+>>>> >
+>>>> > if (ret < 0)
+>>>> >         if (is_err_status())
+>>>> >                 return -EIO;
+>>>> >         return ret;
+>>>> >
+>>>> >
+>>>>
+>>>> If I check error status after readl_poll_timeout and there is an error
+>>>> (e.g. the I2C address does not have a corresponding device connected
+>>>> or nothing connected to HDMI port) it will keep checking the fifo
+>>>> status even though error bit is set in the int status and then timeout
+>>>> after 100 ms. If it checks the int status register at the same time,
+>>>> it will error after 100 nanoseconds. I don't want to introduce
+>>>> unnecessary delays considering part of the reason for adding this
+>>>> driver to make it more usable for non-standard use cases.
+>>>
+>>> Well, polling for 100ms doesn't seem great either. What was the
+>>> rationale behind that timeout?
+>>>
+>>
+>> When an error occurs one of the error bits will be set in the
+>> INT_STATUS register so this is detected very quickly if I check the
+>> INT_STATUS and FIFO_STATUS at the same time. The 100 ms timeout is in
+>> case the I2C slave does clock stretching in which case the transfer
+>> may take longer than the predicted time.
+>>
+>>> And we can also reverse the check and look at the INT_STATUS
+>>> register. The errors will be there, and we can program the threshold
+>>> we want in both directions and use the
+>>> DDC_FIFO_Request_Interrupt_Status bit.
+>>>
+>>
+>> I did try that when I was doing the v3 patch but I couldn't get it to
+>> work as mentioned previously in the v3 patch discussion. I programmed
+>> the FIFO_RX_TRIGGER_THRES and FIFO_TX_TRIGGER_THRES in DDC_FIFO_Ctrl
+>> register at the same time as setting FIFO_Address_Clear but the
+>> request interrupt status bit did not get updated to the appropriate
+>> state that is consistent with the FIFO level and the thresholds. I did
+>> try this several times for subsequent patch versions without success.
+>
+> The manual says "When FIFO level is above this value in read mode, DMA
+> request and FIFO request interrupt are asserted if relative enable is on."
+>
+> Perhaps try enabling the interrupts? But if that were the case, wouldn't
+> using interrupts instead of polling be better?
+>
+> ChenYu
+>
+
+I managed to get the thresholds working so switching to using
+interrupts instead of polling will be my next goal.
+
+>>
+>>> Maxime
+>>>
+>>> --
+>>> Maxime Ripard, Free Electrons
+>>> Embedded Linux and Kernel engineering
+>>> http://free-electrons.com
+>>
+>> Regards,
+>> Jonathan
+
+Regards,
+Jonathan
