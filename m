@@ -1,89 +1,90 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:45:04 +0100
-Subject: [PATCH 48/58] KVM: arm64: vgic-v3: Add ICV_CTLR_EL1 handler
+Date: Fri, 30 Jun 2017 09:44:53 +0100
+Subject: [PATCH 37/58] KVM: arm64: vgic-v3: Enable trapping of Group-1 system
+ registers
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-49-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-38-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for reading/writing the guest's view of the ICV_CTLR_EL1
-register. only EOIMode and CBPR are of interest here, as all the other
-bits directly come from ICH_VTR_EL2 and are Read-Only.
+In order to be able to trap Group-1 GICv3 system registers, we need to
+set ICH_HCR_EL2.TALL1 before entering the guest. This is conditionally
+done after having restored the guest's state, and cleared on exit.
 
 Tested-by: Alexander Graf <agraf@suse.de>
 Acked-by: David Daney <david.daney@cavium.com>
 Acked-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 46 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ virt/kvm/arm/hyp/vgic-v3-sr.c      | 11 +++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c        |  4 ++++
+ 3 files changed, 16 insertions(+)
 
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 1f458ac6f494..6b05d2ac8c54 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -417,6 +417,7 @@
+ 
+ #define ICH_HCR_EN			(1 << 0)
+ #define ICH_HCR_UIE			(1 << 1)
++#define ICH_HCR_TALL1			(1 << 12)
+ #define ICH_HCR_EOIcount_SHIFT		27
+ #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
+ 
 diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 406da9c667ff..a8a58dedc38e 100644
+index f031e8f088ae..a2a62f030341 100644
 --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
 +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -891,6 +891,46 @@ static void __hyp_text __vgic_v3_read_rpr(struct kvm_vcpu *vcpu,
- 	vcpu_set_reg(vcpu, rt, val);
+@@ -258,6 +258,9 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
+ 		}
+ 	} else {
++		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
++			write_gicreg(0, ICH_HCR_EL2);
++
+ 		cpu_if->vgic_elrsr = 0xffff;
+ 		cpu_if->vgic_ap0r[0] = 0;
+ 		cpu_if->vgic_ap0r[1] = 0;
+@@ -330,6 +333,14 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 
+ 		for (i = 0; i < used_lrs; i++)
+ 			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
++	} else {
++		/*
++		 * If we need to trap system registers, we must write
++		 * ICH_HCR_EL2 anyway, even if no interrupts are being
++		 * injected,
++		 */
++		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
++			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+ 	}
+ 
+ 	/*
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index fac6e23cd0b3..722bdebdfbb5 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -21,6 +21,8 @@
+ 
+ #include "vgic.h"
+ 
++static bool group1_trap;
++
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
+@@ -258,6 +260,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 
+ 	/* Get the show on the road... */
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
++	if (group1_trap)
++		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
  }
  
-+static void __hyp_text __vgic_v3_read_ctlr(struct kvm_vcpu *vcpu,
-+					   u32 vmcr, int rt)
-+{
-+	u32 vtr, val;
-+
-+	vtr = read_gicreg(ICH_VTR_EL2);
-+	/* PRIbits */
-+	val = ((vtr >> 29) & 7) << ICC_CTLR_EL1_PRI_BITS_SHIFT;
-+	/* IDbits */
-+	val |= ((vtr >> 23) & 7) << ICC_CTLR_EL1_ID_BITS_SHIFT;
-+	/* SEIS */
-+	val |= ((vtr >> 22) & 1) << ICC_CTLR_EL1_SEIS_SHIFT;
-+	/* A3V */
-+	val |= ((vtr >> 21) & 1) << ICC_CTLR_EL1_A3V_SHIFT;
-+	/* EOImode */
-+	val |= ((vmcr & ICH_VMCR_EOIM_MASK) >> ICH_VMCR_EOIM_SHIFT) << ICC_CTLR_EL1_EOImode_SHIFT;
-+	/* CBPR */
-+	val |= (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
-+
-+	vcpu_set_reg(vcpu, rt, val);
-+}
-+
-+static void __hyp_text __vgic_v3_write_ctlr(struct kvm_vcpu *vcpu,
-+					    u32 vmcr, int rt)
-+{
-+	u32 val = vcpu_get_reg(vcpu, rt);
-+
-+	if (val & ICC_CTLR_EL1_CBPR_MASK)
-+		vmcr |= ICH_VMCR_CBPR_MASK;
-+	else
-+		vmcr &= ~ICH_VMCR_CBPR_MASK;
-+
-+	if (val & ICC_CTLR_EL1_EOImode_MASK)
-+		vmcr |= ICH_VMCR_EOIM_MASK;
-+	else
-+		vmcr &= ~ICH_VMCR_EOIM_MASK;
-+
-+	write_gicreg(vmcr, ICH_VMCR_EL2);
-+}
-+
- int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- {
- 	int rt;
-@@ -983,6 +1023,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 	case SYS_ICC_RPR_EL1:
- 		fn = __vgic_v3_read_rpr;
- 		break;
-+	case SYS_ICC_CTLR_EL1:
-+		if (is_read)
-+			fn = __vgic_v3_read_ctlr;
-+		else
-+			fn = __vgic_v3_write_ctlr;
-+		break;
- 	default:
- 		return 0;
- 	}
+ int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
 -- 
 2.11.0
