@@ -1,43 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:45 +0100
-Subject: [PATCH 29/58] KVM: arm64: Make kvm_condition_valid32() accessible
- from EL2
+Date: Fri, 30 Jun 2017 09:44:43 +0100
+Subject: [PATCH 27/58] arm64: Add a facility to turn an ESR syndrome into a
+ sysreg encoding
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-30-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-28-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to trap CP15 accesses and handle them at EL2, we
-need to evaluate whether or not the condition flags are valid,
-as an implementation is allowed to trap despite the condition
-not being met.
+It is often useful to compare an ESR syndrome reporting the trapping
+of a system register with a value matching that system register.
 
-Tagging the function as __hyp_text allows this. We still rely on
-the cc_map array to be mapped at EL2 by virtue of being "const",
-and the linker to only emit relative references.
+Since encoding both the sysreg and the ESR version seem to be a bit
+overkill, let's add a set of macros that convert an ESR value into
+the corresponding sysreg encoding.
+
+We handle both AArch32 and AArch64, taking advantage of identical
+encodings between system registers and CP15 accessors.
 
 Tested-by: Alexander Graf <agraf@suse.de>
 Acked-by: David Daney <david.daney@cavium.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/aarch32.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/esr.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/virt/kvm/arm/aarch32.c b/virt/kvm/arm/aarch32.c
-index 528af4b2d09e..79c7c357804b 100644
---- a/virt/kvm/arm/aarch32.c
-+++ b/virt/kvm/arm/aarch32.c
-@@ -60,7 +60,7 @@ static const unsigned short cc_map[16] = {
- /*
-  * Check if a trapped instruction should have been executed or not.
-  */
--bool kvm_condition_valid32(const struct kvm_vcpu *vcpu)
-+bool __hyp_text kvm_condition_valid32(const struct kvm_vcpu *vcpu)
- {
- 	unsigned long cpsr;
- 	u32 cpsr_cond;
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 85997c0e5443..e7d8e281ff62 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -19,6 +19,7 @@
+ #define __ASM_ESR_H
+ 
+ #include <asm/memory.h>
++#include <asm/sysreg.h>
+ 
+ #define ESR_ELx_EC_UNKNOWN	(0x00)
+ #define ESR_ELx_EC_WFx		(0x01)
+@@ -181,6 +182,29 @@
+ #define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 0, 14, 0) | \
+ 					 ESR_ELx_SYS64_ISS_DIR_READ)
+ 
++#define esr_sys64_to_sysreg(e)					\
++	sys_reg((((e) & ESR_ELx_SYS64_ISS_OP0_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP0_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
++
++#define esr_cp15_to_sysreg(e)					\
++	sys_reg(3,						\
++		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
 -- 
 2.11.0
