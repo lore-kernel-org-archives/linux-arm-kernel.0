@@ -1,42 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Jun 2017 14:12:12 +0200
-Subject: [patch 1/5] pinctrl: samsung: Remove bogus irq_[un]mask from
- resource management
-In-Reply-To: <20170629214343.882576048@linutronix.de>
-References: <20170629213334.375848050@linutronix.de>
- <20170629214343.882576048@linutronix.de>
-Message-ID: <CACRpkdYO2bRT8104AbT_w9-=eXDNAr=csYUtmkYKE7bM+BsV9A@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 30 Jun 2017 14:13:29 +0200
+Subject: [PATCH 3/7] serial: imx: init dma_is_{rx|tx}ing variables
+In-Reply-To: <20170630120446.13994-4-romain.perier@collabora.com>
+References: <20170630120446.13994-1-romain.perier@collabora.com>
+ <20170630120446.13994-4-romain.perier@collabora.com>
+Message-ID: <20170630141329.6144cddd@karo-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 11:33 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+Hi,
 
-> The irq chip callbacks irq_request/release_resources() have absolutely no
-> business with masking and unmasking the irq.
->
-> The core code unmasks the interrupt after complete setup and masks it
-> before invoking irq_release_resources().
->
-> The unmask is actually harmful as it happens before the interrupt is
-> completely initialized in __setup_irq().
->
-> Remove it.
->
-> Fixes: f6a8249f9e55 ("pinctrl: exynos: Lock GPIOs as interrupts when used as EINTs")
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-gpio at vger.kernel.org
+On Fri, 30 Jun 2017 14:04:42 +0200 Romain Perier wrote:
+> From: Nandor Han <nandor.han@ge.com>
+> 
+> Initialize both dma_is_{rx|tx}ing variables when DMA is enabled to avoid
+> checking uninitialized variables if port shutdown is requested before
+> DMA channels get a chance to start.
+> 
+> Signed-off-by: Nandor Han <nandor.han@ge.com>
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> ---
+>  drivers/tty/serial/imx.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 188063d..81fb413 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -1225,6 +1225,9 @@ static void imx_enable_dma(struct imx_port *sport)
+>  
+>  	imx_setup_ufcr(sport, TXTL_DMA, RXTL_DMA);
+>  
+> +	sport->dma_is_rxing = 0;
+> +	sport->dma_is_txing = 0;
+> +
+>  	sport->dma_is_enabled = 1;
+>  }
+>  
+sport is devm_kzalloc()ed, so the variables are initialized to 0 anyway.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Does this patch have a dependency on the rest of the series or should
-I just apply it as-is?
-
-Yours,
-Linus Walleij
+Lothar Wa?mann
