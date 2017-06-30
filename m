@@ -1,47 +1,61 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Fri, 30 Jun 2017 16:51:00 +0200
-Subject: [PATCH 2/8] ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+Date: Fri, 30 Jun 2017 16:51:03 +0200
+Subject: [PATCH 5/8] EDAC: Add missing debugfs_create_x32 wrapper
 In-Reply-To: <20170630145106.29820-1-jlu@pengutronix.de>
 References: <20170630145106.29820-1-jlu@pengutronix.de>
-Message-ID: <20170630145106.29820-3-jlu@pengutronix.de>
+Message-ID: <20170630145106.29820-6-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macro name is too generic, so add a AURORA_ prefix.
+We already have wrappers for x8 and x16, so add the missing x32 one.
 
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 ---
- arch/arm/include/asm/hardware/cache-aurora-l2.h | 2 +-
- arch/arm/mm/cache-l2x0.c                        | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/edac/debugfs.c     | 11 +++++++++++
+ drivers/edac/edac_module.h |  5 +++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-index c86124769831..dc5c479ec4c3 100644
---- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
-+++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-@@ -41,7 +41,7 @@
- #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
- 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
+diff --git a/drivers/edac/debugfs.c b/drivers/edac/debugfs.c
+index 92dbb7e2320c..268ede7a60b2 100644
+--- a/drivers/edac/debugfs.c
++++ b/drivers/edac/debugfs.c
+@@ -161,3 +161,14 @@ struct dentry *edac_debugfs_create_x16(const char *name, umode_t mode,
+ 	return debugfs_create_x16(name, mode, parent, value);
+ }
+ EXPORT_SYMBOL_GPL(edac_debugfs_create_x16);
++
++/* Wrapper for debugfs_create_x32() */
++struct dentry *edac_debugfs_create_x32(const char *name, umode_t mode,
++				       struct dentry *parent, u32 *value)
++{
++	if (!parent)
++		parent = edac_debugfs;
++
++	return debugfs_create_x32(name, mode, parent, value);
++}
++EXPORT_SYMBOL_GPL(edac_debugfs_create_x32);
+diff --git a/drivers/edac/edac_module.h b/drivers/edac/edac_module.h
+index 014871e169cc..3d87cb15ab45 100644
+--- a/drivers/edac/edac_module.h
++++ b/drivers/edac/edac_module.h
+@@ -81,6 +81,8 @@ struct dentry *
+ edac_debugfs_create_x8(const char *name, umode_t mode, struct dentry *parent, u8 *value);
+ struct dentry *
+ edac_debugfs_create_x16(const char *name, umode_t mode, struct dentry *parent, u16 *value);
++struct dentry *
++edac_debugfs_create_x32(const char *name, umode_t mode, struct dentry *parent, u32 *value);
+ #else
+ static inline int edac_debugfs_init(void)					{ return -ENODEV; }
+ static inline void edac_debugfs_exit(void)					{ }
+@@ -97,6 +99,9 @@ edac_debugfs_create_x8(const char *name, umode_t mode,
+ static inline struct dentry *
+ edac_debugfs_create_x16(const char *name, umode_t mode,
+ 		       struct dentry *parent, u16 *value)			{ return NULL; }
++static inline struct dentry *
++edac_debugfs_create_x32(const char *name, umode_t mode,
++		       struct dentry *parent, u32 *value)			{ return NULL; }
+ #endif
  
--#define MAX_RANGE_SIZE		1024
-+#define AURORA_MAX_RANGE_SIZE	1024
- 
- #define AURORA_WAY_SIZE_SHIFT	2
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index a00d6f7fd34c..7d2d2a3c67d0 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1364,8 +1364,8 @@ static unsigned long aurora_range_end(unsigned long start, unsigned long end)
- 	 * since cache range operations stall the CPU pipeline
- 	 * until completion.
- 	 */
--	if (end > start + MAX_RANGE_SIZE)
--		end = start + MAX_RANGE_SIZE;
-+	if (end > start + AURORA_MAX_RANGE_SIZE)
-+		end = start + AURORA_MAX_RANGE_SIZE;
- 
- 	/*
- 	 * Cache range operations can't straddle a page boundary.
+ /*
 -- 
 2.11.0
