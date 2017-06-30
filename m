@@ -1,95 +1,106 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:32 +0100
-Subject: [PATCH 16/58] KVM: arm/arm64: PMU: remove request-less vcpu kick
+Date: Fri, 30 Jun 2017 09:44:35 +0100
+Subject: [PATCH 19/58] KVM: arm: Handle VCPU device attributes in guest.c
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-17-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-20-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Jones <drjones@redhat.com>
+From: Christoffer Dall <cdall@linaro.org>
 
-Refactor PMU overflow handling in order to remove the request-less
-vcpu kick.  Now, since kvm_vgic_inject_irq() uses vcpu requests,
-there should be no chance that a kick sent at just the wrong time
-(between the VCPU's call to kvm_pmu_flush_hwstate() and before it
-enters guest mode) results in a failure for the guest to see updated
-GIC state until its next exit some time later for some other reason.
+As we are about to support VCPU attributes to set the timer IRQ numbers
+in guest.c, move the static inlines for the VCPU attributes handlers
+from the header file to guest.c.
 
-Signed-off-by: Andrew Jones <drjones@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/pmu.c | 40 +++++++++++++++++++---------------------
- 1 file changed, 19 insertions(+), 21 deletions(-)
+ arch/arm/include/asm/kvm_host.h | 22 +++++++--------------
+ arch/arm/kvm/guest.c            | 42 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 15 deletions(-)
 
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 4b43e7f3b158..2451607dc25e 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -203,6 +203,23 @@ static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
- 	return reg;
- }
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 00ad56ee6455..127e2dd2e21c 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -291,20 +291,12 @@ static inline void kvm_arm_init_debug(void) {}
+ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+-static inline int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
+-static inline int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
+-static inline int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
++
++int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
++int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
++int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
  
-+static void kvm_pmu_check_overflow(struct kvm_vcpu *vcpu)
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index fa6182a40941..acea05e9db4e 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -301,3 +301,45 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ {
+ 	return -EINVAL;
+ }
++
++int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
 +{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	bool overflow = !!kvm_pmu_overflow_status(vcpu);
++	int ret;
 +
-+	if (pmu->irq_level == overflow)
-+		return;
-+
-+	pmu->irq_level = overflow;
-+
-+	if (likely(irqchip_in_kernel(vcpu->kvm))) {
-+		int ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-+					      pmu->irq_num, overflow);
-+		WARN_ON(ret);
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
 +	}
++
++	return ret;
 +}
 +
- /**
-  * kvm_pmu_overflow_set - set PMU overflow interrupt
-  * @vcpu: The vcpu pointer
-@@ -210,37 +227,18 @@ static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
-  */
- void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
- {
--	u64 reg;
--
- 	if (val == 0)
- 		return;
- 
- 	vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= val;
--	reg = kvm_pmu_overflow_status(vcpu);
--	if (reg != 0)
--		kvm_vcpu_kick(vcpu);
-+	kvm_pmu_check_overflow(vcpu);
- }
- 
- static void kvm_pmu_update_state(struct kvm_vcpu *vcpu)
- {
--	struct kvm_pmu *pmu = &vcpu->arch.pmu;
--	bool overflow;
--
- 	if (!kvm_arm_pmu_v3_ready(vcpu))
- 		return;
--
--	overflow = !!kvm_pmu_overflow_status(vcpu);
--	if (pmu->irq_level == overflow)
--		return;
--
--	pmu->irq_level = overflow;
--
--	if (likely(irqchip_in_kernel(vcpu->kvm))) {
--		int ret;
--		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
--					  pmu->irq_num, overflow);
--		WARN_ON(ret);
--	}
-+	kvm_pmu_check_overflow(vcpu);
- }
- 
- bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
++int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
++{
++	int ret;
++
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
++	}
++
++	return ret;
++}
++
++int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
++{
++	int ret;
++
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
++	}
++
++	return ret;
++}
 -- 
 2.11.0
