@@ -1,111 +1,149 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:26 +0100
-Subject: [PATCH 10/58] KVM: arm/arm64: properly use vcpu requests
+Date: Fri, 30 Jun 2017 09:44:24 +0100
+Subject: [PATCH 08/58] KVM: add kvm_request_pending
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-11-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-9-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Jones <drjones@redhat.com>
+From: Radim Kr?m?? <rkrcmar@redhat.com>
 
-arm/arm64 already has one VCPU request used when setting pause,
-but it doesn't properly check requests in VCPU RUN. Check it
-and also make sure we set vcpu->mode at the appropriate time
-(before the check) and with the appropriate barriers. See
-Documentation/virtual/kvm/vcpu-requests.rst. Also make sure we
-don't leave any vcpu requests we don't intend to handle later
-set in the request bitmap. If we don't clear them, then
-kvm_request_pending() may return true when it shouldn't.
+A first step in vcpu->requests encapsulation.  Additionally, we now
+use READ_ONCE() when accessing vcpu->requests, which ensures we
+always load vcpu->requests when it's accessed.  This is important as
+other threads can change it any time.  Also, READ_ONCE() documents
+that vcpu->requests is used with other threads, likely requiring
+memory barriers, which it does.
 
-Using VCPU requests properly fixes a small race where pause
-could get set just as a VCPU was entering guest mode.
-
+Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
+[ Documented the new use of READ_ONCE() and converted another check
+  in arch/mips/kvm/vz.c ]
 Signed-off-by: Andrew Jones <drjones@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/kvm/handle_exit.c   |  1 +
- arch/arm64/kvm/handle_exit.c |  1 +
- virt/kvm/arm/arm.c           | 14 ++++++++++++--
- virt/kvm/arm/psci.c          |  1 +
- 4 files changed, 15 insertions(+), 2 deletions(-)
+ arch/mips/kvm/trap_emul.c  | 2 +-
+ arch/mips/kvm/vz.c         | 2 +-
+ arch/powerpc/kvm/booke.c   | 2 +-
+ arch/powerpc/kvm/powerpc.c | 5 ++---
+ arch/s390/kvm/kvm-s390.c   | 2 +-
+ arch/x86/kvm/x86.c         | 4 ++--
+ include/linux/kvm_host.h   | 5 +++++
+ 7 files changed, 13 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 5fd7968cdae9..a2b4f7b82356 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -72,6 +72,7 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		trace_kvm_wfx(*vcpu_pc(vcpu), false);
- 		vcpu->stat.wfi_exit_stat++;
- 		kvm_vcpu_block(vcpu);
-+		kvm_clear_request(KVM_REQ_UNHALT, vcpu);
- 	}
+diff --git a/arch/mips/kvm/trap_emul.c b/arch/mips/kvm/trap_emul.c
+index a563759fd142..6a0d7040d882 100644
+--- a/arch/mips/kvm/trap_emul.c
++++ b/arch/mips/kvm/trap_emul.c
+@@ -1094,7 +1094,7 @@ static void kvm_trap_emul_check_requests(struct kvm_vcpu *vcpu, int cpu,
+ 	struct mm_struct *mm;
+ 	int i;
  
- 	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index fa1b18e364fc..17d8a1677a0b 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -89,6 +89,7 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		trace_kvm_wfx_arm64(*vcpu_pc(vcpu), false);
- 		vcpu->stat.wfi_exit_stat++;
- 		kvm_vcpu_block(vcpu);
-+		kvm_clear_request(KVM_REQ_UNHALT, vcpu);
- 	}
+-	if (likely(!vcpu->requests))
++	if (likely(!kvm_request_pending(vcpu)))
+ 		return;
  
- 	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 3c387fdc4a9e..138212605ad9 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -546,6 +546,7 @@ void kvm_arm_resume_guest(struct kvm *kvm)
+ 	if (kvm_check_request(KVM_REQ_TLB_FLUSH, vcpu)) {
+diff --git a/arch/mips/kvm/vz.c b/arch/mips/kvm/vz.c
+index 71d8856ade64..74805035edc8 100644
+--- a/arch/mips/kvm/vz.c
++++ b/arch/mips/kvm/vz.c
+@@ -2337,7 +2337,7 @@ static int kvm_vz_check_requests(struct kvm_vcpu *vcpu, int cpu)
+ 	int ret = 0;
+ 	int i;
  
- 	kvm_for_each_vcpu(i, vcpu, kvm) {
- 		vcpu->arch.pause = false;
-+		kvm_clear_request(KVM_REQ_VCPU_EXIT, vcpu);
- 		swake_up(kvm_arch_vcpu_wq(vcpu));
+-	if (!vcpu->requests)
++	if (!kvm_request_pending(vcpu))
+ 		return 0;
+ 
+ 	if (kvm_check_request(KVM_REQ_TLB_FLUSH, vcpu)) {
+diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
+index 3eaac3809977..071b87ee682f 100644
+--- a/arch/powerpc/kvm/booke.c
++++ b/arch/powerpc/kvm/booke.c
+@@ -687,7 +687,7 @@ int kvmppc_core_prepare_to_enter(struct kvm_vcpu *vcpu)
+ 
+ 	kvmppc_core_check_exceptions(vcpu);
+ 
+-	if (vcpu->requests) {
++	if (kvm_request_pending(vcpu)) {
+ 		/* Exception delivery raised request; start over */
+ 		return 1;
  	}
+diff --git a/arch/powerpc/kvm/powerpc.c b/arch/powerpc/kvm/powerpc.c
+index f7cf2cd564ef..fd64f087737c 100644
+--- a/arch/powerpc/kvm/powerpc.c
++++ b/arch/powerpc/kvm/powerpc.c
+@@ -55,8 +55,7 @@ EXPORT_SYMBOL_GPL(kvmppc_pr_ops);
+ 
+ int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
+ {
+-	return !!(v->arch.pending_exceptions) ||
+-	       v->requests;
++	return !!(v->arch.pending_exceptions) || kvm_request_pending(v);
  }
-@@ -638,8 +639,18 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			run->exit_reason = KVM_EXIT_INTR;
- 		}
  
-+		/*
-+		 * Ensure we set mode to IN_GUEST_MODE after we disable
-+		 * interrupts and before the final VCPU requests check.
-+		 * See the comment in kvm_vcpu_exiting_guest_mode() and
-+		 * Documentation/virtual/kvm/vcpu-requests.rst
-+		 */
-+		smp_store_mb(vcpu->mode, IN_GUEST_MODE);
-+
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
--			vcpu->arch.power_off || vcpu->arch.pause) {
-+		    kvm_request_pending(vcpu) ||
-+		    vcpu->arch.power_off || vcpu->arch.pause) {
-+			vcpu->mode = OUTSIDE_GUEST_MODE;
- 			local_irq_enable();
- 			kvm_pmu_sync_hwstate(vcpu);
- 			kvm_timer_sync_hwstate(vcpu);
-@@ -655,7 +666,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
+@@ -108,7 +107,7 @@ int kvmppc_prepare_to_enter(struct kvm_vcpu *vcpu)
  		 */
- 		trace_kvm_entry(*vcpu_pc(vcpu));
- 		guest_enter_irqoff();
--		vcpu->mode = IN_GUEST_MODE;
+ 		smp_mb();
  
- 		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+-		if (vcpu->requests) {
++		if (kvm_request_pending(vcpu)) {
+ 			/* Make sure we process requests preemptable */
+ 			local_irq_enable();
+ 			trace_kvm_check_requests(vcpu);
+diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+index 689ac48361c6..ad41e0fa3a21 100644
+--- a/arch/s390/kvm/kvm-s390.c
++++ b/arch/s390/kvm/kvm-s390.c
+@@ -2440,7 +2440,7 @@ static int kvm_s390_handle_requests(struct kvm_vcpu *vcpu)
+ {
+ retry:
+ 	kvm_s390_vcpu_request_handled(vcpu);
+-	if (!vcpu->requests)
++	if (!kvm_request_pending(vcpu))
+ 		return 0;
+ 	/*
+ 	 * We use MMU_RELOAD just to re-arm the ipte notifier for the
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 464da936c53d..f81060518635 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -6710,7 +6710,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
  
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index a08d7a93aebb..f68be2cc6256 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -57,6 +57,7 @@ static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
- 	 * for KVM will preserve the register state.
- 	 */
- 	kvm_vcpu_block(vcpu);
-+	kvm_clear_request(KVM_REQ_UNHALT, vcpu);
+ 	bool req_immediate_exit = false;
  
- 	return PSCI_RET_SUCCESS;
+-	if (vcpu->requests) {
++	if (kvm_request_pending(vcpu)) {
+ 		if (kvm_check_request(KVM_REQ_MMU_RELOAD, vcpu))
+ 			kvm_mmu_unload(vcpu);
+ 		if (kvm_check_request(KVM_REQ_MIGRATE_TIMER, vcpu))
+@@ -6874,7 +6874,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
+ 			kvm_x86_ops->sync_pir_to_irr(vcpu);
+ 	}
+ 
+-	if (vcpu->mode == EXITING_GUEST_MODE || vcpu->requests
++	if (vcpu->mode == EXITING_GUEST_MODE || kvm_request_pending(vcpu)
+ 	    || need_resched() || signal_pending(current)) {
+ 		vcpu->mode = OUTSIDE_GUEST_MODE;
+ 		smp_wmb();
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 3724b51aab64..0b50e7b35ed4 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -1105,6 +1105,11 @@ static inline void kvm_make_request(int req, struct kvm_vcpu *vcpu)
+ 	set_bit(req & KVM_REQUEST_MASK, &vcpu->requests);
  }
+ 
++static inline bool kvm_request_pending(struct kvm_vcpu *vcpu)
++{
++	return READ_ONCE(vcpu->requests);
++}
++
+ static inline bool kvm_test_request(int req, struct kvm_vcpu *vcpu)
+ {
+ 	return test_bit(req & KVM_REQUEST_MASK, &vcpu->requests);
 -- 
 2.11.0
