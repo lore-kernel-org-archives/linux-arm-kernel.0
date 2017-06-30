@@ -1,92 +1,43 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 30 Jun 2017 14:01:53 +0800
-Subject: arm64: dts: rockchip: add SdioAudio pd control for rk3399
-Message-ID: <1498802513-535-1-git-send-email-wxt@rock-chips.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 30 Jun 2017 08:02:20 +0200
+Subject: [patch 1/5] pinctrl: samsung: Remove bogus irq_[un]mask from
+ resource management
+In-Reply-To: <CA+Ln22GyEDZidAWkMonjLYF0etxNjZ0btwYkQ5raAPsnk1bJFg@mail.gmail.com>
+References: <20170629213334.375848050@linutronix.de>
+ <20170629214343.882576048@linutronix.de>
+ <CA+Ln22GyEDZidAWkMonjLYF0etxNjZ0btwYkQ5raAPsnk1bJFg@mail.gmail.com>
+Message-ID: <CAJKOXPd+ir1+036jmN+Pd6WWvTcTES2xV9LLsh-W=DYvc2LoEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SdioAudio power domain includes the i2s/spdif/spi5/sdio.
+On Fri, Jun 30, 2017 at 4:47 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Thomas,
+>
+> 2017-06-30 6:33 GMT+09:00 Thomas Gleixner <tglx@linutronix.de>:
+>> The irq chip callbacks irq_request/release_resources() have absolutely no
+>> business with masking and unmasking the irq.
+>>
+>> The core code unmasks the interrupt after complete setup and masks it
+>> before invoking irq_release_resources().
+>>
+>> The unmask is actually harmful as it happens before the interrupt is
+>> completely initialized in __setup_irq().
+>>
+>> Remove it.
+>
+> Good catch, thanks! (Note that the original patch of mine [1] did that
+> in .irq_startup()/.irq_shutdown(), which was for some reason changed
+> later, but I don't remember the exact story.)
+>
+> [1] https://patchwork.kernel.org/patch/4466431/
+>
+> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+>
+> Sylwester, Krzysztof, would you be able to do some basic test?
 
-So this patch adds the pd control for rk3399 i2s/spdif/spi5/sdio, in order
-to save more power consumption.
+I suppose this was not tested so yes - I have platforms do this. I
+understand that checking any non-shared GPIO interrupt should be
+sufficient to test, right?
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
-
-Changes note:
-- As the Jeffy fixes the spi'cs issue recently as follows:
-aa09938 spi: rockchip: Disable Runtime PM when chip select is asserted
-c863795 spi: rockchip: Set GPIO_SS flag to enable Slave Select with GPIO CS
-c351587 spi: rockchip: fix error handling when probe
-- Posted this CL to support the SdioAudio power domain as commnets on
-  https://chromium-review.googlesource.com/#/c/378562/
-
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 33e17d7..a1dd0da 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -289,6 +289,7 @@
- 		fifo-depth = <0x100>;
- 		resets = <&cru SRST_SDIO0>;
- 		reset-names = "reset";
-+		power-domains = <&power RK3399_PD_SDIOAUDIO>;
- 		status = "disabled";
- 	};
- 
-@@ -678,6 +679,7 @@
- 		pinctrl-0 = <&spi5_clk &spi5_tx &spi5_rx &spi5_cs0>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		power-domains = <&power RK3399_PD_SDIOAUDIO>;
- 		status = "disabled";
- 	};
- 
-@@ -952,6 +954,11 @@
- 					 <&cru SCLK_SDMMC>;
- 				pm_qos = <&qos_sd>;
- 			};
-+			pd_sdioaudio at RK3399_PD_SDIOAUDIO {
-+				reg = <RK3399_PD_SDIOAUDIO>;
-+				clocks = <&cru HCLK_SDIO>;
-+				pm_qos = <&qos_sdioaudio>;
-+			};
- 			pd_vio at RK3399_PD_VIO {
- 				reg = <RK3399_PD_VIO>;
- 				#address-cells = <1>;
-@@ -1372,6 +1379,7 @@
- 		clocks = <&cru SCLK_SPDIF_8CH>, <&cru HCLK_SPDIF>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&spdif_bus>;
-+		power-domains = <&power RK3399_PD_SDIOAUDIO>;
- 		status = "disabled";
- 	};
- 
-@@ -1386,6 +1394,7 @@
- 		clocks = <&cru SCLK_I2S0_8CH>, <&cru HCLK_I2S0_8CH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s0_8ch_bus>;
-+		power-domains = <&power RK3399_PD_SDIOAUDIO>;
- 		status = "disabled";
- 	};
- 
-@@ -1399,6 +1408,7 @@
- 		clocks = <&cru SCLK_I2S1_8CH>, <&cru HCLK_I2S1_8CH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s1_2ch_bus>;
-+		power-domains = <&power RK3399_PD_SDIOAUDIO>;
- 		status = "disabled";
- 	};
- 
-@@ -1410,6 +1420,7 @@
- 		dma-names = "tx", "rx";
- 		clock-names = "i2s_clk", "i2s_hclk";
- 		clocks = <&cru SCLK_I2S2_8CH>, <&cru HCLK_I2S2_8CH>;
-+		power-domains = <&power RK3399_PD_SDIOAUDIO>;
- 		status = "disabled";
- 	};
- 
--- 
-2.7.4
+Best regards,
+Krzysztof
