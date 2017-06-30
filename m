@@ -1,207 +1,101 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 30 Jun 2017 08:31:45 +0530
-Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-In-Reply-To: <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
-References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
- <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
-Message-ID: <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 30 Jun 2017 11:16:06 +0800
+Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
+References: <20170627143652.13075-1-net147@gmail.com>
+ <20170628092024.ejxy6itqj3hx6yew@flea>
+ <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
+ <20170629155620.4keqi4cumbtvv63u@flea>
+ <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
+Message-ID: <CAGb2v67CTXayDm4rhoJ4CNx9J=u+U+2_kh9xYsjHjCE8YnJ=ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
-<gpkulkarni@gmail.com> wrote:
-> Hi Shanker,
+On Fri, Jun 30, 2017 at 6:22 AM, Jonathan Liu <net147@gmail.com> wrote:
+> Hi Maxime,
 >
-> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
-> <shankerd@codeaurora.org> wrote:
->> The NUMA node information is visible to ITS driver but not being used
->> other than handling errata. This patch allocates the memory for ITS
->> tables from the corresponding NUMA node using the appropriate NUMA
->> aware functions.
+> On 30 June 2017 at 01:56, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Wed, Jun 28, 2017 at 08:39:33PM +1000, Jonathan Liu wrote:
+>>> >> +     u32 int_status;
+>>> >> +     u32 fifo_status;
+>>> >> +     /* Read needs empty flag unset, write needs full flag unset */
+>>> >> +     u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
+>>> >> +                       SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
+>>> >> +     int ret;
+>>> >> +
+>>> >> +     /* Wait until error or FIFO ready */
+>>> >> +     ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+>>> >> +                              int_status,
+>>> >> +                              is_err_status(int_status) ||
+>>> >> +                              is_fifo_flag_unset(hdmi, &fifo_status, flag),
+>>> >> +                              min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
+>>> >> +                              100000);
+>>> >> +
+>>> >> +     if (is_err_status(int_status))
+>>> >> +             return -EIO;
+>>> >> +     if (ret)
+>>> >> +             return -ETIMEDOUT;
+>>> >
+>>> > Why not just have
+>>> > ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
+>>> >                          !(reg & flag), 100, 100000);
+>>> >
+>>> > if (ret < 0)
+>>> >         if (is_err_status())
+>>> >                 return -EIO;
+>>> >         return ret;
+>>> >
+>>> >
+>>>
+>>> If I check error status after readl_poll_timeout and there is an error
+>>> (e.g. the I2C address does not have a corresponding device connected
+>>> or nothing connected to HDMI port) it will keep checking the fifo
+>>> status even though error bit is set in the int status and then timeout
+>>> after 100 ms. If it checks the int status register at the same time,
+>>> it will error after 100 nanoseconds. I don't want to introduce
+>>> unnecessary delays considering part of the reason for adding this
+>>> driver to make it more usable for non-standard use cases.
+>>
+>> Well, polling for 100ms doesn't seem great either. What was the
+>> rationale behind that timeout?
+>>
+>
+> When an error occurs one of the error bits will be set in the
+> INT_STATUS register so this is detected very quickly if I check the
+> INT_STATUS and FIFO_STATUS at the same time. The 100 ms timeout is in
+> case the I2C slave does clock stretching in which case the transfer
+> may take longer than the predicted time.
+>
+>> And we can also reverse the check and look at the INT_STATUS
+>> register. The errors will be there, and we can program the threshold
+>> we want in both directions and use the
+>> DDC_FIFO_Request_Interrupt_Status bit.
+>>
+>
+> I did try that when I was doing the v3 patch but I couldn't get it to
+> work as mentioned previously in the v3 patch discussion. I programmed
+> the FIFO_RX_TRIGGER_THRES and FIFO_TX_TRIGGER_THRES in DDC_FIFO_Ctrl
+> register at the same time as setting FIFO_Address_Clear but the
+> request interrupt status bit did not get updated to the appropriate
+> state that is consistent with the FIFO level and the thresholds. I did
+> try this several times for subsequent patch versions without success.
 
-IMHO, the description would have been more constructive?
+The manual says "When FIFO level is above this value in read mode, DMA
+request and FIFO request interrupt are asserted if relative enable is on."
 
-"All ITS tables are mapped by default to NODE 0 memory.
-Adding changes to allocate memory from respective NUMA NODES of ITS devices.
-This will optimize tables access and avoids unnecessary inter-node traffic."
+Perhaps try enabling the interrupts? But if that were the case, wouldn't
+using interrupts instead of polling be better?
 
+ChenYu
+
+>
+>> Maxime
 >>
->> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->> ---
->>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
->>  1 file changed, 20 insertions(+), 16 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index fed99c5..e45add2 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -860,8 +860,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>         u64 val = its_read_baser(its, baser);
->>         u64 esz = GITS_BASER_ENTRY_SIZE(val);
->>         u64 type = GITS_BASER_TYPE(val);
->> +       struct page *page;
->>         u32 alloc_pages;
->> -       void *base;
->>         u64 tmp;
->>
->>  retry_alloc_baser:
->> @@ -874,12 +874,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>                 order = get_order(GITS_BASER_PAGES_MAX * psz);
->>         }
->>
->> -       base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
->> -       if (!base)
->> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
->
-> the changes would have been minimal, if you converted page to base
-> address after allocation here itself?
->
->  page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
->  base =  page_address(page);
->
->> +       if (!page)
->>                 return -ENOMEM;
->>
->>  retry_baser:
->> -       val = (virt_to_phys(base)                                |
->> +       val = (page_to_phys(page)
->
-> no change required.
->
->>                 (type << GITS_BASER_TYPE_SHIFT)                  |
->>                 ((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)       |
->>                 ((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)    |
->> @@ -915,7 +915,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>                 shr = tmp & GITS_BASER_SHAREABILITY_MASK;
->>                 if (!shr) {
->>                         cache = GITS_BASER_nC;
->> -                       gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
->> +                       gic_flush_dcache_to_poc(page_to_virt(page),
->> +                                               PAGE_ORDER_TO_SIZE(order));
->
-> no change needed, if base is used still.
->>                 }
->>                 goto retry_baser;
->>         }
->> @@ -926,7 +927,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>                  * size and retry. If we reach 4K, then
->>                  * something is horribly wrong...
->>                  */
->> -               free_pages((unsigned long)base, order);
->> +               __free_pages(page, order);
->
-> no change required.
->>                 baser->base = NULL;
->>
->>                 switch (psz) {
->> @@ -943,19 +944,19 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>                 pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
->>                        &its->phys_base, its_base_type_string[type],
->>                        val, tmp);
->> -               free_pages((unsigned long)base, order);
->> +               __free_pages(page, order);
->
-> no change required.
->
->>                 return -ENXIO;
->>         }
->>
->>         baser->order = order;
->> -       baser->base = base;
->> +       baser->base = page_to_virt(page);
->
-> no change required.
->>         baser->psz = psz;
->>         tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
->>
->>         pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
->>                 &its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
->>                 its_base_type_string[type],
->> -               (unsigned long)virt_to_phys(base),
->> +               (unsigned long)page_to_phys(page),
->
-> no change required.
->>                 indirect ? "indirect" : "flat", (int)esz,
->>                 psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
->>
->> @@ -1019,7 +1020,7 @@ static void its_free_tables(struct its_node *its)
->>
->>         for (i = 0; i < GITS_BASER_NR_REGS; i++) {
->>                 if (its->tables[i].base) {
->> -                       free_pages((unsigned long)its->tables[i].base,
->> +                       __free_pages(virt_to_page(its->tables[i].base),
->
-> ditto
->>                                    its->tables[i].order);
->>                         its->tables[i].base = NULL;
->>                 }
->> @@ -1286,7 +1287,8 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
->>
->>         /* Allocate memory for 2nd level table */
->>         if (!table[idx]) {
->> -               page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
->> +               page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
->> +                                       get_order(baser->psz));
->>                 if (!page)
->>                         return false;
->>
->> @@ -1332,7 +1334,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->>         nr_ites = max(2UL, roundup_pow_of_two(nvecs));
->>         sz = nr_ites * its->ite_size;
->>         sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
->> -       itt = kzalloc(sz, GFP_KERNEL);
->> +       itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
->>         lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
->>         if (lpi_map)
->>                 col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
->> @@ -1677,6 +1679,7 @@ static int __init its_probe_one(struct resource *res,
->>  {
->>         struct its_node *its;
->>         void __iomem *its_base;
->> +       struct page *page;
->>         u32 val;
->>         u64 baser, tmp;
->>         int err;
->> @@ -1716,12 +1719,13 @@ static int __init its_probe_one(struct resource *res,
->>         its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
->>         its->numa_node = numa_node;
->>
->> -       its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
->> -                                               get_order(ITS_CMD_QUEUE_SZ));
->> -       if (!its->cmd_base) {
->> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
->> +                               get_order(ITS_CMD_QUEUE_SZ));
->> +       if (!page) {
->>                 err = -ENOMEM;
->>                 goto out_free_its;
->>         }
->> +       its->cmd_base = page_to_virt(page);
->
-> same here, this would have been,
-> its->cmd_base = page_address(page);
->
->>         its->cmd_write = its->cmd_base;
->>
->>         its_enable_quirks(its);
->> @@ -1775,7 +1779,7 @@ static int __init its_probe_one(struct resource *res,
->>  out_free_tables:
->>         its_free_tables(its);
->>  out_free_cmd:
->> -       free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
->> +       __free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
->
-> no change required.
->>  out_free_its:
->>         kfree(its);
->>  out_unmap:
 >> --
->> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
->> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
->>
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux and Kernel engineering
+>> http://free-electrons.com
 >
-> thanks
-> Ganapat
-
-thanks
-Ganapat
+> Regards,
+> Jonathan
