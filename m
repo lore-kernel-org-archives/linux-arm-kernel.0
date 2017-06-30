@@ -1,118 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Jun 2017 18:01:06 +0200
-Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
-In-Reply-To: <CANwerB2RHQwZgZc37+dkh9np-SSFks3tZxqFzDPVwQP5oP48hg@mail.gmail.com>
-References: <20170627143652.13075-1-net147@gmail.com>
- <20170628092024.ejxy6itqj3hx6yew@flea>
- <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
- <20170629155620.4keqi4cumbtvv63u@flea>
- <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
- <CAGb2v67CTXayDm4rhoJ4CNx9J=u+U+2_kh9xYsjHjCE8YnJ=ow@mail.gmail.com>
- <CANwerB2RHQwZgZc37+dkh9np-SSFks3tZxqFzDPVwQP5oP48hg@mail.gmail.com>
-Message-ID: <20170630160106.qtm3hdaoalxqu37c@flea>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Jun 2017 18:03:59 +0200
+Subject: [PATCH v2] ARM: fix randomized task_struct
+Message-ID: <20170630160450.4093529-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 01, 2017 at 12:14:44AM +1000, Jonathan Liu wrote:
-> Hi Chen-Yu and Maxime,
-> 
-> On 30 June 2017 at 13:16, Chen-Yu Tsai <wens@csie.org> wrote:
-> > On Fri, Jun 30, 2017 at 6:22 AM, Jonathan Liu <net147@gmail.com> wrote:
-> >> Hi Maxime,
-> >>
-> >> On 30 June 2017 at 01:56, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >>> On Wed, Jun 28, 2017 at 08:39:33PM +1000, Jonathan Liu wrote:
-> >>>> >> +     u32 int_status;
-> >>>> >> +     u32 fifo_status;
-> >>>> >> +     /* Read needs empty flag unset, write needs full flag unset */
-> >>>> >> +     u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
-> >>>> >> +                       SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
-> >>>> >> +     int ret;
-> >>>> >> +
-> >>>> >> +     /* Wait until error or FIFO ready */
-> >>>> >> +     ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
-> >>>> >> +                              int_status,
-> >>>> >> +                              is_err_status(int_status) ||
-> >>>> >> +                              is_fifo_flag_unset(hdmi, &fifo_status, flag),
-> >>>> >> +                              min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
-> >>>> >> +                              100000);
-> >>>> >> +
-> >>>> >> +     if (is_err_status(int_status))
-> >>>> >> +             return -EIO;
-> >>>> >> +     if (ret)
-> >>>> >> +             return -ETIMEDOUT;
-> >>>> >
-> >>>> > Why not just have
-> >>>> > ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
-> >>>> >                          !(reg & flag), 100, 100000);
-> >>>> >
-> >>>> > if (ret < 0)
-> >>>> >         if (is_err_status())
-> >>>> >                 return -EIO;
-> >>>> >         return ret;
-> >>>> >
-> >>>> >
-> >>>>
-> >>>> If I check error status after readl_poll_timeout and there is an error
-> >>>> (e.g. the I2C address does not have a corresponding device connected
-> >>>> or nothing connected to HDMI port) it will keep checking the fifo
-> >>>> status even though error bit is set in the int status and then timeout
-> >>>> after 100 ms. If it checks the int status register at the same time,
-> >>>> it will error after 100 nanoseconds. I don't want to introduce
-> >>>> unnecessary delays considering part of the reason for adding this
-> >>>> driver to make it more usable for non-standard use cases.
-> >>>
-> >>> Well, polling for 100ms doesn't seem great either. What was the
-> >>> rationale behind that timeout?
-> >>>
-> >>
-> >> When an error occurs one of the error bits will be set in the
-> >> INT_STATUS register so this is detected very quickly if I check the
-> >> INT_STATUS and FIFO_STATUS at the same time. The 100 ms timeout is in
-> >> case the I2C slave does clock stretching in which case the transfer
-> >> may take longer than the predicted time.
-> >>
-> >>> And we can also reverse the check and look at the INT_STATUS
-> >>> register. The errors will be there, and we can program the threshold
-> >>> we want in both directions and use the
-> >>> DDC_FIFO_Request_Interrupt_Status bit.
-> >>>
-> >>
-> >> I did try that when I was doing the v3 patch but I couldn't get it to
-> >> work as mentioned previously in the v3 patch discussion. I programmed
-> >> the FIFO_RX_TRIGGER_THRES and FIFO_TX_TRIGGER_THRES in DDC_FIFO_Ctrl
-> >> register at the same time as setting FIFO_Address_Clear but the
-> >> request interrupt status bit did not get updated to the appropriate
-> >> state that is consistent with the FIFO level and the thresholds. I did
-> >> try this several times for subsequent patch versions without success.
-> >
-> > The manual says "When FIFO level is above this value in read mode, DMA
-> > request and FIFO request interrupt are asserted if relative enable is on."
-> >
-> > Perhaps try enabling the interrupts? But if that were the case, wouldn't
-> > using interrupts instead of polling be better?
-> >
-> > ChenYu
-> >
-> 
-> I managed to get the thresholds working so switching to using
-> interrupts instead of polling will be my next goal.
+With the new task struct randomization, we can run into a build
+failure for certain random seeds:
 
-I'd say that we can do it using polling first, and then move to
-interrupts if needed. And that should definitely be part of a separate
-patch. This one is already pretty invasive.
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:803: Error: bad immediate value for offset (4096)
 
-Maxime
+Only two constants in asm-offset.h are affected, and I'm changing
+both of them here to work correctly in all configurations.
 
+One more macro has the problem, but is currently unused, so this
+removes it instead of adding complexity.
+
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Fixes: c33d8b12fbbd ("task_struct: Allow randomized layout")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: define a more appropriate macro instead of PAGE_MASK,
+    fix always-true comparison to test the right thing
+---
+ arch/arm/include/asm/assembler.h |  2 ++
+ arch/arm/kernel/entry-armv.S     |  5 ++++-
+ arch/arm/mm/proc-macros.S        | 10 ++++------
+ 3 files changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 68b06f9c65de..ad301f107dd2 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -87,6 +87,8 @@
+ #define CALGN(code...)
+ #endif
+ 
++#define IMM12_MASK 0xfff
++
+ /*
+  * Enable and disable interrupts
+  */
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9f157e7c51e7..c731f0d2b2af 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -797,7 +797,10 @@ ENTRY(__switch_to)
+ #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+ 	ldr	r7, [r2, #TI_TASK]
+ 	ldr	r8, =__stack_chk_guard
+-	ldr	r7, [r7, #TSK_STACK_CANARY]
++	.if (TSK_STACK_CANARY > IMM12_MASK)
++	add	r7, r7, #TSK_STACK_CANARY & ~IMM12_MASK
++	.endif
++	ldr	r7, [r7, #TSK_STACK_CANARY & IMM12_MASK]
+ #endif
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index 0d40c285bd86..f944836da8a2 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -25,11 +25,6 @@
+ 	ldr	\rd, [\rn, #VMA_VM_FLAGS]
+ 	.endm
+ 
+-	.macro	tsk_mm, rd, rn
+-	ldr	\rd, [\rn, #TI_TASK]
+-	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
+-	.endm
+-
+ /*
+  * act_mm - get current->active_mm
+  */
+@@ -37,7 +32,10 @@
+ 	bic	\rd, sp, #8128
+ 	bic	\rd, \rd, #63
+ 	ldr	\rd, [\rd, #TI_TASK]
+-	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
++	.if (TSK_ACTIVE_MM > IMM12_MASK)
++	add	\rd, \rd, #TSK_ACTIVE_MM & ~IMM12_MASK
++	.endif
++	ldr	\rd, [\rd, #TSK_ACTIVE_MM & IMM12_MASK]
+ 	.endm
+ 
+ /*
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170630/4ea810e2/attachment-0001.sig>
+2.9.0
