@@ -1,98 +1,49 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Fri, 30 Jun 2017 08:54:20 +0530
-Subject: [Patch v5 12/12] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <CAP3TMiG4PtiqeHhCGkHhdX_uvOhPKd=gTyckczyFKDJwnGfwYA@mail.gmail.com>
-References: <CGME20170619052521epcas5p36a0bc384d10809dcfe775e6da87ed37b@epcas5p3.samsung.com>
- <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <1497849055-26583-13-git-send-email-smitha.t@samsung.com>
- <CAP3TMiG4PtiqeHhCGkHhdX_uvOhPKd=gTyckczyFKDJwnGfwYA@mail.gmail.com>
-Message-ID: <1498793060.22203.1034.camel@smitha-fedora>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 30 Jun 2017 11:16:21 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.13
+Message-ID: <cover.1498814088.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-06-28 at 22:04 +0200, Kamil Debski wrote:
-> Hi,
-> 
-> Please find my comments inline.
-> 
-> On 19 June 2017 at 07:10, Smitha T Murthy <smitha.t@samsung.com> wrote:
-> > Added V4l2 controls for HEVC encoder
-> >
-> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> > ---
-> >  Documentation/media/uapi/v4l/extended-controls.rst | 364 +++++++++++++++++++++
-> >  1 file changed, 364 insertions(+)
-> >
-> > diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-> > index abb1057..7767c70 100644
-> > --- a/Documentation/media/uapi/v4l/extended-controls.rst
-> > +++ b/Documentation/media/uapi/v4l/extended-controls.rst
-> > @@ -1960,6 +1960,370 @@ enum v4l2_vp8_golden_frame_sel -
-> >      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
-> >
-> >
-> 
-> [snip]
-> 
-> > +
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER (integer)``
-> > +    Selects the hierarchical coding layer. In normal encoding
-> > +    (non-hierarchial coding), it should be zero. Possible values are 0 ~ 6.
-> > +    0 indicates HIERARCHICAL CODING LAYER 0, 1 indicates HIERARCHICAL CODING
-> > +    LAYER 1 and so on.
-> 
-> I would like the above to be more consistent. If HIER is in the name
-> then HIER in the description should be used as well. Aside from that,
-> I would recommend using full HIERARCHICAL instead of HIER in the name
-> of the control. Why? Because it is HIERARCHICAL in controls already
-> present in V4L2, such as
-> V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_QP.
-> 
-I had changed it from HIERARCHICAL to HIER as per suggestion by
-Sylwester Nawrocki. Here
-https://patchwork.kernel.org/patch/9666129/
+Hi Olof, Hi Kevin, Hi Arnd,
 
-> [snip]
-> 
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_LF (boolean)``
-> > +    Indicates loop filtering. Control value 1 indicates loop filtering
-> > +    is enabled and when set to 0 indicates loop filtering is disabled.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY (boolean)``
-> > +    Selects whether to apply the loop filter across the slice boundary or not.
-> > +    If the value is 0, loop filter will not be applied across the slice boundary.
-> > +    If the value is 1, loop filter will be applied across the slice boundary.
-> 
-> Just a thought. Pretty much the same fucntionality is achieved via the
-> V4L2_CID_MPEG_VIDEO_H264_LOOP_FILTER_MODE control. It's an enum having
-> three states: enabled, disabled and disabled at slice boundary. Maybe
-> a single control could be introduced? With another legacy define for
-> API compatibility. Also, I don't like that controls are not consistent
-> between H264 and HEVC. I would opt for the enum option.
-> 
-I will add enum options for the above control.
+Please consider this Renesas ARM based SoC fix for v4.13.
 
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2 (integer)``
-> > +    Selects HEVC loop filter beta offset. The valid range is [-6, +6].
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2 (integer)``
-> > +    Selects HEVC loop filter tc offset. The valid range is [-6, +6].
-> > +
-> > +.. _v4l2-hevc-refresh-type:
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE``
-> > +    (enum)
-> > +
-> [snip]
-> 
-> Best wishes,
-> Kamil
-> 
-> 
-Thank you for the review.
+This pull request is based on
+"[GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for v4.13",
+tagged as renesas-arm64-dt2-for-v4.13, which you have already pulled.
 
-Regards,
-Smitha
+It is my understanding that the problem fixed was introduced
+earlier in the v4.13 development cycle. So I don't think consideration
+needs to be given to merging for to v4.12 or back-porting to -stable.
+
+
+The following changes since commit 4d1255ebefb6838eab4f652107433438bea0051f:
+
+  arm64: dts: r8a7796: Add reset control properties for audio (2017-06-14 11:00:29 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.13
+
+for you to fetch changes up to 5e2feac330953fe75197aecb20c781400e2bf606:
+
+  arm64: renesas: salvator-common: sound clock-frequency needs descending order (2017-06-19 11:18:33 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v4.13
+
+Correct order of sound clock frequencies for Salvator boards
+used by r8a7795 and r8a7796 SoCs.
+
+These sounds clock frequencies are used as the ADG clock (output clocks
+for audio module) initial setting and sound codec's initial system clock
+which needs the maximum clock frequency. Thus, descending order is
+required.
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      arm64: renesas: salvator-common: sound clock-frequency needs descending order
+
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
