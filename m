@@ -1,129 +1,208 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:30 +0100
-Subject: [PATCH 14/58] KVM: arm/arm64: change exit request to sleep request
+Date: Fri, 30 Jun 2017 09:44:37 +0100
+Subject: [PATCH 21/58] KVM: arm/arm64: Move timer IRQ default init to
+ arch_timer.c
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-15-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-22-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Jones <drjones@redhat.com>
+From: Christoffer Dall <cdall@linaro.org>
 
-A request called EXIT is too generic. All requests are meant to cause
-exits, but different requests have different flags. Let's not make
-it difficult to decide if the EXIT request is correct for some case
-by just always providing unique requests for each case. This patch
-changes EXIT to SLEEP, because that's what the request is asking the
-VCPU to do.
+We currently initialize the arch timer IRQ numbers from the reset code,
+presumably because we once intended to model multiple CPU or SoC types
+from within the kernel and have hard-coded reset values in the reset
+code.
 
-Signed-off-by: Andrew Jones <drjones@redhat.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
+As we are moving towards userspace being in charge of more fine-grained
+CPU emulation and stitching together the pieces needed to emulate a
+particular type of CPU, we should no longer have a tight coupling
+between resetting a VCPU and setting IRQ numbers.
+
+Therefore, move the logic to define and use the default IRQ numbers to
+the timer code and set the IRQ number immediately when creating the
+VCPU.
+
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |  2 +-
- arch/arm64/include/asm/kvm_host.h |  2 +-
- virt/kvm/arm/arm.c                | 12 ++++++------
- virt/kvm/arm/psci.c               |  4 ++--
- 4 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/kvm/reset.c         | 16 +---------------
+ arch/arm64/kvm/reset.c       | 16 +---------------
+ include/kvm/arm_arch_timer.h |  4 +---
+ virt/kvm/arm/arch_timer.c    | 28 ++++++++++++++++------------
+ 4 files changed, 19 insertions(+), 45 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index c556babe467c..fdd644c01c89 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -44,7 +44,7 @@
- #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
- #endif
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index 1da8b2d14550..5ed0c3ee33d6 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -37,16 +37,6 @@ static struct kvm_regs cortexa_regs_reset = {
+ 	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+ };
  
--#define KVM_REQ_VCPU_EXIT \
-+#define KVM_REQ_SLEEP \
- 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+-static const struct kvm_irq_level cortexa_ptimer_irq = {
+-	{ .irq = 30 },
+-	.level = 1,
+-};
+-
+-static const struct kvm_irq_level cortexa_vtimer_irq = {
+-	{ .irq = 27 },
+-	.level = 1,
+-};
+-
  
- u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 0ff991c9c66e..9bd0d1040de9 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -41,7 +41,7 @@
- 
- #define KVM_VCPU_MAX_FEATURES 4
- 
--#define KVM_REQ_VCPU_EXIT \
-+#define KVM_REQ_SLEEP \
- 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
- 
- int __attribute_const__ kvm_target_cpu(void);
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 9379b1d75ad3..ddc833987dfb 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -371,7 +371,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- static void vcpu_power_off(struct kvm_vcpu *vcpu)
+ /*******************************************************************************
+  * Exported reset function
+@@ -62,16 +52,12 @@ static const struct kvm_irq_level cortexa_vtimer_irq = {
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
  {
- 	vcpu->arch.power_off = true;
--	kvm_make_request(KVM_REQ_VCPU_EXIT, vcpu);
-+	kvm_make_request(KVM_REQ_SLEEP, vcpu);
- 	kvm_vcpu_kick(vcpu);
+ 	struct kvm_regs *reset_regs;
+-	const struct kvm_irq_level *cpu_vtimer_irq;
+-	const struct kvm_irq_level *cpu_ptimer_irq;
+ 
+ 	switch (vcpu->arch.target) {
+ 	case KVM_ARM_TARGET_CORTEX_A7:
+ 	case KVM_ARM_TARGET_CORTEX_A15:
+ 		reset_regs = &cortexa_regs_reset;
+ 		vcpu->arch.midr = read_cpuid_id();
+-		cpu_vtimer_irq = &cortexa_vtimer_irq;
+-		cpu_ptimer_irq = &cortexa_ptimer_irq;
+ 		break;
+ 	default:
+ 		return -ENODEV;
+@@ -84,5 +70,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	kvm_reset_coprocs(vcpu);
+ 
+ 	/* Reset arch_timer context */
+-	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
++	return kvm_timer_vcpu_reset(vcpu);
  }
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 561badf93de8..3256b9228e75 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -46,16 +46,6 @@ static const struct kvm_regs default_regs_reset32 = {
+ 			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
+ };
  
-@@ -543,7 +543,7 @@ void kvm_arm_halt_guest(struct kvm *kvm)
+-static const struct kvm_irq_level default_ptimer_irq = {
+-	.irq	= 30,
+-	.level	= 1,
+-};
+-
+-static const struct kvm_irq_level default_vtimer_irq = {
+-	.irq	= 27,
+-	.level	= 1,
+-};
+-
+ static bool cpu_has_32bit_el1(void)
+ {
+ 	u64 pfr0;
+@@ -108,8 +98,6 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+  */
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ {
+-	const struct kvm_irq_level *cpu_vtimer_irq;
+-	const struct kvm_irq_level *cpu_ptimer_irq;
+ 	const struct kvm_regs *cpu_reset;
  
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		vcpu->arch.pause = true;
--	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
-+	kvm_make_all_cpus_request(kvm, KVM_REQ_SLEEP);
- }
+ 	switch (vcpu->arch.target) {
+@@ -122,8 +110,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 			cpu_reset = &default_regs_reset;
+ 		}
  
- void kvm_arm_resume_guest(struct kvm *kvm)
-@@ -557,7 +557,7 @@ void kvm_arm_resume_guest(struct kvm *kvm)
+-		cpu_vtimer_irq = &default_vtimer_irq;
+-		cpu_ptimer_irq = &default_ptimer_irq;
+ 		break;
  	}
- }
  
--static void vcpu_sleep(struct kvm_vcpu *vcpu)
-+static void vcpu_req_sleep(struct kvm_vcpu *vcpu)
+@@ -137,5 +123,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	kvm_pmu_vcpu_reset(vcpu);
+ 
+ 	/* Reset timer */
+-	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
++	return kvm_timer_vcpu_reset(vcpu);
+ }
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 295584f31a4e..f1c967a4f603 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -57,9 +57,7 @@ struct arch_timer_cpu {
+ 
+ int kvm_timer_hyp_init(void);
+ int kvm_timer_enable(struct kvm_vcpu *vcpu);
+-int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-			 const struct kvm_irq_level *virt_irq,
+-			 const struct kvm_irq_level *phys_irq);
++int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 7933b1f8f7b7..72d5aa7d4c64 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -35,6 +35,16 @@ static struct timecounter *timecounter;
+ static unsigned int host_vtimer_irq;
+ static u32 host_vtimer_irq_flags;
+ 
++static const struct kvm_irq_level default_ptimer_irq = {
++	.irq	= 30,
++	.level	= 1,
++};
++
++static const struct kvm_irq_level default_vtimer_irq = {
++	.irq	= 27,
++	.level	= 1,
++};
++
+ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
  {
- 	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
- 
-@@ -566,7 +566,7 @@ static void vcpu_sleep(struct kvm_vcpu *vcpu)
- 
- 	if (vcpu->arch.power_off || vcpu->arch.pause) {
- 		/* Awaken to handle a signal, request we sleep again later. */
--		kvm_make_request(KVM_REQ_VCPU_EXIT, vcpu);
-+		kvm_make_request(KVM_REQ_SLEEP, vcpu);
- 	}
+ 	vcpu_vtimer(vcpu)->active_cleared_last = false;
+@@ -445,23 +455,12 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	kvm_timer_update_state(vcpu);
  }
  
-@@ -578,8 +578,8 @@ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
- static void check_vcpu_requests(struct kvm_vcpu *vcpu)
+-int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-			 const struct kvm_irq_level *virt_irq,
+-			 const struct kvm_irq_level *phys_irq)
++int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
  {
- 	if (kvm_request_pending(vcpu)) {
--		if (kvm_check_request(KVM_REQ_VCPU_EXIT, vcpu))
--			vcpu_sleep(vcpu);
-+		if (kvm_check_request(KVM_REQ_SLEEP, vcpu))
-+			vcpu_req_sleep(vcpu);
- 	}
- }
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
  
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index 4a436685c552..f1e363bab5e8 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -65,7 +65,7 @@ static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
- static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+ 	/*
+-	 * The vcpu timer irq number cannot be determined in
+-	 * kvm_timer_vcpu_init() because it is called much before
+-	 * kvm_vcpu_set_target(). To handle this, we determine
+-	 * vcpu timer irq number when the vcpu is reset.
+-	 */
+-	vtimer->irq.irq = virt_irq->irq;
+-	ptimer->irq.irq = phys_irq->irq;
+-
+-	/*
+ 	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
+ 	 * and to 0 for ARMv7.  We provide an implementation that always
+ 	 * resets the timer to be disabled and unmasked and is compliant with
+@@ -496,6 +495,8 @@ static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
  {
- 	vcpu->arch.power_off = true;
--	kvm_make_request(KVM_REQ_VCPU_EXIT, vcpu);
-+	kvm_make_request(KVM_REQ_SLEEP, vcpu);
- 	kvm_vcpu_kick(vcpu);
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+ 	/* Synchronize cntvoff across all vtimers of a VM. */
+ 	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
+@@ -504,6 +505,9 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+ 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
+ 	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+ 	timer->timer.function = kvm_timer_expire;
++
++	vtimer->irq.irq = default_vtimer_irq.irq;
++	ptimer->irq.irq = default_ptimer_irq.irq;
  }
  
-@@ -183,7 +183,7 @@ static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
- 	 */
- 	kvm_for_each_vcpu(i, tmp, vcpu->kvm)
- 		tmp->arch.power_off = true;
--	kvm_make_all_cpus_request(vcpu->kvm, KVM_REQ_VCPU_EXIT);
-+	kvm_make_all_cpus_request(vcpu->kvm, KVM_REQ_SLEEP);
- 
- 	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
- 	vcpu->run->system_event.type = type;
+ static void kvm_timer_init_interrupt(void *info)
 -- 
 2.11.0
