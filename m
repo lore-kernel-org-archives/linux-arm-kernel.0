@@ -1,37 +1,54 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 30 Jun 2017 22:41:28 +0200
-Subject: arm64: dts: rockchip: add SdioAudio pd control for rk3399
-In-Reply-To: <1498802513-535-1-git-send-email-wxt@rock-chips.com>
-References: <1498802513-535-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <4239199.7DEpkIs6Fd@phil>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 30 Jun 2017 17:43:02 -0300
+Subject: [PATCH 1/4] ARM: dts: imx7d-sdb: Put pinctrl_spi4 in the correct
+ location
+Message-ID: <1498855385-9690-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Am Freitag, 30. Juni 2017, 14:01:53 CEST schrieb Caesar Wang:
+pinctrl_spi4 pin group is not part of the low power iomux controller,
+so move it under the normal iomuxc node.
 
-subject was missing the "[PATCH]" prefix. While not necessary for applying,
-having it makes it easier to find stuff in an inbox :-) .
+Fixes: 184f39b57cab6 ("ARM: dts: imx7d-sdb: Add GPIO expander node")
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx7d-sdb.dts | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-
-> The SdioAudio power domain includes the i2s/spdif/spi5/sdio.
-> 
-> So this patch adds the pd control for rk3399 i2s/spdif/spi5/sdio, in order
-> to save more power consumption.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
-> 
-> Changes note:
-> - As the Jeffy fixes the spi'cs issue recently as follows:
-> aa09938 spi: rockchip: Disable Runtime PM when chip select is asserted
-> c863795 spi: rockchip: Set GPIO_SS flag to enable Slave Select with GPIO CS
-> c351587 spi: rockchip: fix error handling when probe
-
-as these are in Mark's tree for 4.13, I've now applied your patch for 4.14
-but moved the power-domains property for sdio and spi5 to a better sort
-position.
-
-
-Heiko
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 54c4540..0a24d1b 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -557,6 +557,14 @@
+ 			>;
+ 		};
+ 
++		pinctrl_spi4: spi4grp {
++			fsl,pins = <
++				MX7D_PAD_GPIO1_IO09__GPIO1_IO9	0x59
++				MX7D_PAD_GPIO1_IO12__GPIO1_IO12	0x59
++				MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x59
++			>;
++		};
++
+ 		pinctrl_tsc2046_pendown: tsc2046_pendown {
+ 			fsl,pins = <
+ 				MX7D_PAD_EPDC_BDR1__GPIO2_IO29		0x59
+@@ -697,13 +705,5 @@
+ 		fsl,pins = <
+ 			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x110b0
+ 		>;
+-
+-		pinctrl_spi4: spi4grp {
+-			fsl,pins = <
+-				MX7D_PAD_GPIO1_IO09__GPIO1_IO9	0x59
+-				MX7D_PAD_GPIO1_IO12__GPIO1_IO12	0x59
+-				MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x59
+-			>;
+-		};
+ 	};
+ };
+-- 
+2.7.4
