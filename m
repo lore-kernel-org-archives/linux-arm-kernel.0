@@ -1,49 +1,105 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 29 Jun 2017 18:29:31 -0700
-Subject: [RFC PATCH] pinctrl: rockchip: add irq_shutdown
-In-Reply-To: <5955A866.20308@rock-chips.com>
-References: <1498223019-9123-1-git-send-email-jeffy.chen@rock-chips.com>
- <20170629220532.GA54678@google.com> <5955A866.20308@rock-chips.com>
-Message-ID: <20170630012930.GA99272@google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 29 Jun 2017 18:41:17 -0700
+Subject: [PATCH V1 8/9] clk: sprd: add clocks support for SC9860
+In-Reply-To: <CAAfSe-s5oPB_G=sSAqVpYkgxhD=AE3nxv-V7-t0v+qw_AtxH3g@mail.gmail.com>
+References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+ <20170618015855.27738-9-chunyan.zhang@spreadtrum.com>
+ <20170620014137.GK4493@codeaurora.org>
+ <CAAfSe-s5oPB_G=sSAqVpYkgxhD=AE3nxv-V7-t0v+qw_AtxH3g@mail.gmail.com>
+Message-ID: <20170630014117.GJ22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 09:24:54AM +0800, Jeffy Chen wrote:
-> On 06/30/2017 06:05 AM, Brian Norris wrote:
-> >On Fri, Jun 23, 2017 at 09:03:39PM +0800, Jeffy Chen wrote:
-> >>Currently the rockchip pinctrl driver would try to enable/disable the
-> >>gpio bank clk when enable/disable an irq.
-> >>
-> >>So when the irq core trying to shutdown an already disabled irq, it
-> >>would result in unbalanced clk disable request:
-> >>[   35.911955] WARNING: at drivers/clk/clk.c:680
-> >>...
-> >>[   37.272271] Call trace:
-> >>[   37.274729] [<ffffffc0007ac270>] clk_core_disable+0x28/0x194
-> >>[   37.280395] [<ffffffc0007ac6a8>] clk_disable+0x34/0x48
-> >>[   37.285544] [<ffffffc0004f3bf0>] rockchip_irq_disable+0x30/0x3c
-> >>[   37.291472] [<ffffffc00027a7e0>] __irq_disable+0x40/0x64
-> >>[   37.296791] [<ffffffc00027a86c>] irq_shutdown+0x68/0x8c
-> >>[   37.302023] [<ffffffc0002777fc>] __free_irq+0x110/0x218
-> >>[   37.307254] [<ffffffc0002779a8>] free_irq+0x54/0x64
-> >>[   37.312138] [<ffffffc00027ba24>] devm_irq_release+0x24/0x30
-> >>
-> >>Add an irq_shutdown callback, and do a sanity check for irq state to
-> >>prevent that.
-> >
-> >IMO, this patch is completely the wrong approach. Either we:
-> >
-> >(a) follow the current semantics of the irqchip core handling (which
-> >tglx described more or less as "no refcounting; no guarantee that
-> >enable/disable are balanced") or
-> >
-> >(b) fix the irqchip core to provide the above guarantee
-> right, since we have:
-> bf22ff45 genirq: Avoid unnecessary low level irq function calls
-> d829b8f genirq: Set irq masked state when initializing irq_desc
+On 06/22, Chunyan Zhang wrote:
+> Hi Stephen,
 > 
-> this issue should be fixed now.
+> On 20 June 2017 at 09:41, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 06/18, Chunyan Zhang wrote:
+> >> +++ b/include/dt-bindings/clock/sc9860-ccu.h
+> >> @@ -0,0 +1,19 @@
+> >> +/*
+> >> + * Spreadtrum SC9860 platform clocks
+> >> + *
+> >> + * Copyright (C) 2017, Spreadtrum Communications Inc.
+> >> + *
+> >> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> >> + */
+> >> +
+> >> +#ifndef _DT_BINDINGS_CLK_SC9860_CCU_H_
+> >> +#define _DT_BINDINGS_CLK_SC9860_CCU_H_
+> >> +
+> >> +#define CLK_FAC_1M   2
+> >> +#define CLK_EMMC_2X_EN       29
+> >> +#define CLK_L0_409M6 60
+> >> +#define CLK_EMMC_2X  88
+> >> +#define CLK_EMMC_EB  158
+> >
+> > Why are only a handful exposed in the header file? Not exposing
+> > everything is mostly a maintenance nightmare right now.
+> 
+> No special reason here, my thought simply was that there's no much
+> Spreadtrum's device driver in mainline at present, so most of the
+> clocks wouldn't be needed for now, I planned to expose only those when
+> the device driver they provide clock to, that's saying when we add a
+> new device driver we'll expose the clocks this device needs.
 
-Oh, I didn't notice Thomas applied those. I'll have to take a look.
+Please no. I don't want to get the one-off patch in my inbox to
+add more and more ids here "just because" nobody was using the
+numbers before. I really don't care that someone has added the
+driver for some random device on their SoC now and so they need
+to expose the number into a header file. I know some people are
+doing this, and it's really not meaningful. I'm much happier if
+we're exposing every single clk number to DT and reducing churn
+in the include/dt-bindings/ directory. And really, the raw number
+could be used in dt, so the enforcement of any sort of ABI needs
+to be in the clk driver anyway.
 
-Brian
+Now if a clk was left out of the clk driver implementation, then
+the number could be left out of the header file, but even then it
+doesn't really need to be. The clk driver could be implemented in
+a way to return an error if the number doesn't map to a clk_hw
+structure in the driver. In the future, the clk could be added to
+the driver, and then DT wouldn't need to change and consumer
+drivers would start to work when various branches are merged
+together.
+
+Also, sometimes clk driver authors don't know about all the clks
+that they have on their hardware (I doubt this includes you
+because you work at the company making the SoC here). In this
+case, it's OK to leave out the ids that aren't known to the
+binding author because we can't expect more from these people.
+And if you know for a fact that a certain clk will never need to
+be exposed in the binding, like some random internal clk that
+nobody will care to use, then it's also OK to leave that out from
+the binding.
+
+> 
+> Another reason is, I'm not sure if there are still some clocks I
+> haven't listed for SC9860 , so if we need to add a clock in the
+> feature, the value of these macros defined in
+> "include/dt-bindings/clock/sc9860-ccu.h" may be changed, that means I
+> need to change the index of all clocks following the clock inserted
+> into.
+
+When modifying a dt-bindings header file to add more clk ids you
+should _never_ modify existing numbers. That would be a backwards
+incompatible change of the DT binding. If anything, just keep
+adding more numbers to the end of the number space. If something
+needs to be removed, make that number map to an error or some
+no-op clk_hw structure in the clk driver.
+
+> 
+> But why will not exposing everything bring trouble to maintenance? :)
+> 
+
+Mostly it's because I spend too much time worrying about these
+include/dt-bindings files and how they're going to land in Linus'
+tree and not enough time reviewing driver and core framework
+patches. I'm trying to reduce the time spent worrying about these
+header files to a manageable amount.
+
+Hopefully that's helpful. Sorry for the long email.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
