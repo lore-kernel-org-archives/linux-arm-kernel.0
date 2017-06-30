@@ -1,45 +1,39 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 30 Jun 2017 10:56:08 +0100
-Subject: [PATCH 8/8] arm64: dts: allwinner: a64: add (unused) MMC clock node
+Date: Fri, 30 Jun 2017 10:56:07 +0100
+Subject: [PATCH 7/8] arm64: dts: allwinner: a64: add SCPI power domain support
 In-Reply-To: <20170630095608.24943-1-andre.przywara@arm.com>
 References: <20170630095608.24943-1-andre.przywara@arm.com>
-Message-ID: <20170630095608.24943-9-andre.przywara@arm.com>
+Message-ID: <20170630095608.24943-8-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-More of a demo than to be really useful as it this adds a clock producer
-node for the MMC clock.
-This can be used instead of the existing clock driver for driving a clock.
-Use cases include providing clock control by hypervisors or driving new
-SoCs which don't have an appropriate clock driver in the kernel.
-The number here is made explicitly compatible with the in-kernel CCF
-numbering, so any consumer can be switched over by just exchaning the
-phandle.
+The SCPI protocol allows controlling device power domains, which
+abstracts the various ways of providing voltage to devices like Ethernet
+PHYs or on-board WiFi chips.
+Provide the power domain provider DT node, which can be referenced by
+a power domain consumer device.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 30cad44..6949a70 100644
+index 7cb1b04..30cad44 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -162,6 +162,15 @@
- 				clock-indices = <0>;
- 				clock-output-names = "cpu_clk";
- 			};
-+
-+			scpi_clk: scpi_clocks {
-+				compatible = "arm,scpi-variable-clocks";
-+				#clock-cells = <1>;
-+				clock-indices = <75>, <76>,
-+						<77>;
-+				clock-output-names = "mmc0_clk", "mmc1_clk",
-+						     "mmc2_clk";
-+			};
+@@ -168,6 +168,12 @@
+ 			compatible = "arm,scpi-sensors";
+ 			#thermal-sensor-cells = <1>;
  		};
++
++		scpi_devpd: scpi-power-domains {
++			compatible = "arm,scpi-power-domains";
++			num-domains = <2>;
++			#power-domain-cells = <1>;
++		};
+ 	};
  
- 		scpi_sensors0: sensors {
+ 	soc {
 -- 
 2.9.0
