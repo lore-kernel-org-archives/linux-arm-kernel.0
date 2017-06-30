@@ -1,115 +1,59 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 30 Jun 2017 15:52:13 +0300
-Subject: [PATCH v1 1/3] interconnect: Add generic interconnect controller
- API
-In-Reply-To: <CAKfTPtCLf-JAKM5MD-pe-az3xUF_4nYtYvnsZpztmtaqk0C4PQ@mail.gmail.com>
-References: <20170627174903.27978-1-georgi.djakov@linaro.org>
- <20170627174903.27978-2-georgi.djakov@linaro.org>
- <CAKfTPtCLf-JAKM5MD-pe-az3xUF_4nYtYvnsZpztmtaqk0C4PQ@mail.gmail.com>
-Message-ID: <93a7ab62-8b64-a757-1b5f-9a8bdd1751a4@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 30 Jun 2017 13:56:04 +0100
+Subject: [PATCH 0/8] mailbox: arm/arm64: introduce smc triggered mailbox
+In-Reply-To: <20170630122529.upjigip4hztrq67h@flea>
+References: <20170630095608.24943-1-andre.przywara@arm.com>
+ <20170630122529.upjigip4hztrq67h@flea>
+Message-ID: <7a58855c-7481-320e-19f0-83bd113ef2c0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+Hi,
 
-On 06/28/2017 08:45 PM, Vincent Guittot wrote:
-> Hi Georgi,
-> 
-> On 27 June 2017 at 19:49, Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> 
-> [snip]
-> 
->> +
->> +static int interconnect_aggregate(struct interconnect_node *node,
->> +                                 struct interconnect_creq *creq)
->> +{
->> +       int ret = 0;
->> +
->> +       mutex_lock(&node->icp->lock);
->> +
->> +       if (node->icp->ops->aggregate) {
->> +               ret = node->icp->ops->aggregate(node, creq);
->> +               if (ret) {
->> +                       pr_info("%s: error (%d)\n", __func__, ret);
->> +                       goto out;
->> +               }
->> +       } else {
->> +               /* do not aggregate by default */
->> +               struct icp *icp = node->icp;
->> +
->> +               icp->creq.avg_bw = creq->avg_bw;
->> +               icp->creq.peak_bw = creq->peak_bw;
-> 
-> Does it means that by default the last caller defines the bandwidth
-> for everybody ?
-> IMHO, having a default aggregation policy that sums the avg_bw of all
-> request of the node
-> and that gets the max of peak_bw of all request of a node is better
-> 
+thanks for having a look!
 
-Yes, i had this in one of the previous versions, but then i removed the
-aggregation by default. Will put it back. Thanks!
-
->> +       }
->> +
->> +out:
->> +       mutex_unlock(&node->icp->lock);
->> +       return ret;
->> +}
->> +
->> +/**
->> + * interconnect_set() - set constraints on a path between two endpoints
->> + * @path: reference to the path returned by interconnect_get()
->> + * @creq: request from the consumer, containing its requirements
->> + *
->> + * This function is used by an interconnect consumer to express its own needs
->> + * in term of bandwidth and QoS for a previously requested path between two
->> + * endpoints. The requests are aggregated and each node is updated accordingly.
->> + *
->> + * Returns 0 on success, or an approproate error code otherwise.
->> + */
->> +int interconnect_set(struct interconnect_path *path,
->> +                    struct interconnect_creq *creq)
->> +{
->> +       struct interconnect_node *next, *prev = NULL;
->> +       size_t i;
->> +       int ret = 0;
->> +
->> +       for (i = 0; i < path->num_nodes; i++, prev = next) {
->> +               next = path->reqs[i].node;
->> +
->> +               if (!next || !prev)
+On 30/06/17 13:25, Maxime Ripard wrote:
+> Hi,
 > 
-> This needs a comment with an explanation about why you don't do
-> anything in this case
-
-Ok.
-
+> On Fri, Jun 30, 2017 at 10:56:00AM +0100, Andre Przywara wrote:
+>> The remaining patches demonstrate usage of this feature to drive SCPI services
+>> implemented as part of the ARM Trusted Firmware implementation used for
+>> AArch64 based Allwinner SoCs, the Allwinner A64 in this example.
+>> It allows to provide DVFS services, sensors support, device power domains
+>> and potentially other services like clocks or regulators.
+>> This allows to abstract those features in firmware, without the need to
+>> implement explicit Linux support for each variant of some SoC design.
+>> Those DT changes are not necessarily meant to be merged at this point.
+>> I started implementing the firmware side of those services and put a WIP
+>> branch on my ATF Github repo [1]. With this branch and these patches here
+>> you get DVFS and temperature sensor support for the A64, just with this
+>> driver and the generic SCPI support.
 > 
->> +                       continue;
->> +
->> +               if (next->icp != prev->icp)
+> I would go even further, and say that these changes should be done by
+> the bootloader itself once it installed the proper monitor.
 > 
-> This needs a comment with an explanation about why you don't do
-> anything in this case
+> These patches represent not a state of the hardware itself, but the
+> state the bootloader let the hardware in, and that state will change
+> from one bootloader to the other, and one version to the other
+> (obviously). This is already what we do for the other things the
+> bootloader initializes (like simplefb, or PSCI). It just feels natural
+> to do the same thing here.
 
-Ok.
+Yes, indeed that was my thinking as well. I just put those DT changes in
+here to demonstrate how it would look like.
 
-> 
->> +                       continue;
->> +
->> +               /* aggregate requests from consumers */
-> 
-> you should update the path->reqs[i].avg_bw and path->reqs[i].peak_bw
-> with creq values
-> before aggregating the requests from the different consumer of a node ?
-> 
->               path->reqs[i].avg_bw = creq->avg_bw
->               path->reqs[i].peak_bw = creq->peak_bw
+Technically ATF (as the provider for the SCPI services) should do the DT
+change. That would also assure that those changes are always in sync
+with what's implemented. Mainline ATF seems to include libfdt now, but I
+haven't checked in detail how much this covers and how easy it is to
+use. Also that would mean that the base DT has to be somewhere
+accessible by the ATF. So while this is eventually feasible to do (since
+the dtb is loaded by U-Boot's SPL, for instance), it's just not trivial
+or already implemented, that's why I would revert to provide some static
+DT and match that up in some firmware image for the time being.
 
-I am updating them currently in the vendor implementation of the
-aggregate() function, but this was probably not the right place,
-so i will move it here instead. Thanks for the comments!
+So indeed this makes those DT change not subject to Linux' concerns -
+and might trigger more discussions on the future of DTs in the kernel ;-)
 
-BR,
-Georgi
+Cheers,
+Andre.
