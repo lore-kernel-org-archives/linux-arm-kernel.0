@@ -1,24 +1,16 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Jun 2017 18:11:57 +0100
-Subject: [PATCH v2] iommu/arm-smmu-v3: Implement shutdown method
-In-Reply-To: <1498774696-16037-1-git-send-email-nwatters@codeaurora.org>
-References: <1498774696-16037-1-git-send-email-nwatters@codeaurora.org>
-Message-ID: <20170630171156.GB15682@arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 30 Jun 2017 13:12:15 -0400 (EDT)
+Subject: [PATCH v4 0/4] PTP support for macb driver
+In-Reply-To: <1498716526-1372-1-git-send-email-rafalo@cadence.com>
+References: <1498716526-1372-1-git-send-email-rafalo@cadence.com>
+Message-ID: <20170630.131215.2230779928789809487.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 06:18:15PM -0400, Nate Watterson wrote:
-> The shutdown method disables the SMMU to avoid corrupting a new kernel
-> started with kexec.
-> 
-> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 7 +++++++
->  drivers/iommu/arm-smmu.c    | 6 ++++++
->  2 files changed, 13 insertions(+)
+From: Rafal Ozieblo <rafalo@cadence.com>
+Date: Thu, 29 Jun 2017 07:08:46 +0100
 
-Aha, I didn't see you'd dropped the IRQ changes here :)
+> This patch series adds support for PTP synchronization protocol
+> in Cadence GEM driver based on PHC.
 
-In which case, this looks fine to me, thanks!
-
-Will
+Series applied, thanks Rafal.
