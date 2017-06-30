@@ -1,73 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Jun 2017 17:34:43 +0200
-Subject: [PATCH] ARM: fix randomized task_struct
-Message-ID: <20170630153502.3327030-1-arnd@arndb.de>
+Date: Fri, 30 Jun 2017 17:38:39 +0200
+Subject: [PATCH] ARM: decompressor: add a memcmp() declaration
+Message-ID: <20170630153908.3439707-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new task struct randomization, we can run into a build
-failure for certain random seeds:
+A reference to memcmp() was added to bitmap.h, which causes another
+build warning in the decompressor due to the incompatibility with the
+regular kernel string functions:
 
-arch/arm/kernel/entry-armv.S: Assembler messages:
-arch/arm/kernel/entry-armv.S:803: Error: bad immediate value for offset (4096)
+In file included from /git/arm-soc/include/linux/nodemask.h:94:0,
+                 from /git/arm-soc/include/linux/mmzone.h:16,
+                 from /git/arm-soc/include/linux/gfp.h:5,
+                 from /git/arm-soc/include/linux/kmod.h:22,
+                 from /git/arm-soc/include/linux/module.h:13,
+                 from /git/arm-soc/arch/arm/boot/compressed/../../../../lib/lz4/lz4_decompress.c:39,
+                 from /git/arm-soc/arch/arm/boot/compressed/../../../../lib/decompress_unlz4.c:13,
+                 from /git/arm-soc/arch/arm/boot/compressed/decompress.c:56:
+include/linux/bitmap.h: In function 'bitmap_equal':
+include/linux/bitmap.h:270:11: error: implicit declaration of function 'memcmp'; did you mean 'memchr'? [-Werror=implicit-function-declaration]
 
-Only two constants in asm-offset.h are affected, and I'm changing
-both of them here to work correctly in all configurations.
+This adds one more declaration along with the existing ones.
+It would be nice to find a more generic solution here so we don't
+have to do this again the next time, but I couldn't think of a good
+way to do that.
 
-One more macro has the problem, but is currently unused, so this
-removes it instead of adding complexity.
-
-Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Fixes: c33d8b12fbbd ("task_struct: Allow randomized layout")
+Fixes: 2118d3a701a8 ("bitmap: Use memcmp optimisation in more situations")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/kernel/entry-armv.S |  5 ++++-
- arch/arm/mm/proc-macros.S    | 10 ++++------
- 2 files changed, 8 insertions(+), 7 deletions(-)
+The patch causing it is currently in linux-next through mmotm,
+so I'd expect the fix to go through the same tree, provided
+Russell is ok with it.
+---
+ arch/arm/boot/compressed/decompress.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 9f157e7c51e7..db6d22b23bd8 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -797,7 +797,10 @@ ENTRY(__switch_to)
- #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
- 	ldr	r7, [r2, #TI_TASK]
- 	ldr	r8, =__stack_chk_guard
--	ldr	r7, [r7, #TSK_STACK_CANARY]
-+	.if (TSK_STACK_CANARY > PAGE_MASK)
-+	add	r7, r7, #TSK_STACK_CANARY & PAGE_MASK
-+	.endif
-+	ldr	r7, [r7, #TSK_STACK_CANARY & ~PAGE_MASK]
- #endif
- #ifdef CONFIG_CPU_USE_DOMAINS
- 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 0d40c285bd86..2c5f2a0a708b 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -25,11 +25,6 @@
- 	ldr	\rd, [\rn, #VMA_VM_FLAGS]
- 	.endm
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index ea7832702a8f..f3a4bedd1afc 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -33,6 +33,7 @@ extern void error(char *);
+ /* Not needed, but used in some headers pulled in by decompressors */
+ extern char * strstr(const char * s1, const char *s2);
+ extern size_t strlen(const char *s);
++extern int memcmp(const void *cs, const void *ct, size_t count);
  
--	.macro	tsk_mm, rd, rn
--	ldr	\rd, [\rn, #TI_TASK]
--	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
--	.endm
--
- /*
-  * act_mm - get current->active_mm
-  */
-@@ -37,7 +32,10 @@
- 	bic	\rd, sp, #8128
- 	bic	\rd, \rd, #63
- 	ldr	\rd, [\rd, #TI_TASK]
--	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
-+	.if (TSK_ACTIVE_MM > PAGE_MASK)
-+	add	\rd, \rd, #TSK_ACTIVE_MM & PAGE_MASK
-+	.endif
-+	ldr	\rd, [\rd, #TSK_ACTIVE_MM & ~PAGE_MASK]
- 	.endm
- 
- /*
+ #ifdef CONFIG_KERNEL_GZIP
+ #include "../../../../lib/decompress_inflate.c"
 -- 
 2.9.0
