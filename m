@@ -1,68 +1,69 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Jun 2017 16:55:14 +0100
-Subject: [PATCH] ARM: fix randomized task_struct
-In-Reply-To: <9291740E-3BD1-454C-A3EB-46E35F073D0E@linaro.org>
-References: <20170630153502.3327030-1-arnd@arndb.de>
- <9291740E-3BD1-454C-A3EB-46E35F073D0E@linaro.org>
-Message-ID: <20170630155513.GA4902@n2100.armlinux.org.uk>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 30 Jun 2017 10:58:26 -0500
+Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
+ cpg-mssr: Add interface for critical core clocks)
+In-Reply-To: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+Message-ID: <CAL_JsqKGrZeR7z80beY_XEjqd5fEQQwPxusJ1FADoALgNE3fEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 03:49:41PM +0000, Ard Biesheuvel wrote:
-> 
-> 
-> > On 30 Jun 2017, at 15:34, Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > With the new task struct randomization, we can run into a build
-> > failure for certain random seeds:
-> > 
-> > arch/arm/kernel/entry-armv.S: Assembler messages:
-> > arch/arm/kernel/entry-armv.S:803: Error: bad immediate value for offset (4096)
-> > 
-> > Only two constants in asm-offset.h are affected, and I'm changing
-> > both of them here to work correctly in all configurations.
-> > 
-> > One more macro has the problem, but is currently unused, so this
-> > removes it instead of adding complexity.
-> > 
-> > Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Fixes: c33d8b12fbbd ("task_struct: Allow randomized layout")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > arch/arm/kernel/entry-armv.S |  5 ++++-
-> > arch/arm/mm/proc-macros.S    | 10 ++++------
-> > 2 files changed, 8 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> > index 9f157e7c51e7..db6d22b23bd8 100644
-> > --- a/arch/arm/kernel/entry-armv.S
-> > +++ b/arch/arm/kernel/entry-armv.S
-> > @@ -797,7 +797,10 @@ ENTRY(__switch_to)
-> > #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
-> >    ldr    r7, [r2, #TI_TASK]
-> >    ldr    r8, =__stack_chk_guard
-> > -    ldr    r7, [r7, #TSK_STACK_CANARY]
-> > +    .if (TSK_STACK_CANARY > PAGE_MASK)
-> 
-> Shouldn't this be ~PAGE_MASK?
-> 
-> I think 
-> 
-> .if (TSK_STACK_CANARY & PAGE_MASK) != 0
-> 
-> is better and clearer as well
+On Thu, Jun 29, 2017 at 4:27 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Dirk,
+>
+> CC clock, ARM, DT, PM people
+>
+> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
+> disables them as being unused.
+>
+> On Mon, Jun 26, 2017 at 1:30 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>> With commit 72f5df2c2bbb6 ("clk: renesas: cpg-mssr: Migrate to
+>> CLK_IS_CRITICAL") we are able to handle critical module clocks.
+>> Introduce the same logic for critical core clocks.
+>>
+>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>> ---
+>> Commit
+>>
+>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/renesas?id=72f5df2c2bbb66d4a555cb51eb9f412abf1af77f
+>>
+>> is quite nice to avoid *module* clocks being disabled. Unfortunately,
+>> there are *core* clocks, too. E.g. using an other OS on the Cortex R7
+>> core of the r8a7795, the 'canfd' is a quite popular core clock which
+>> shouldn't be disabled by Linux.
+>>
+>> Therefore, this patch is a proposal to use the same 'mark clocks as
+>> critical' logic implemented for the module clocks for the core
+>> clocks, too.
+>>
+>> Opinions?
+>
+> On r8a7795, there are several Cortex A cores running Linux, and a Cortex R7
+> core which may run another OS.
+> This is an interesting issue, and relevant to other SoCs, too.
+>
+> In this particular case, the "canfd" clock is a core clock used as an
+> auxiliary clock for the CAN0, CAN1, and CANFD interfaces.  This can lead
+> to three scenarios:
+>   1. Linux controls all CAN interfaces
+>      => no issue,
+>   2. The OS on the RT CPU controls all CAN interfaces
+>      => issue, Linux disables the clock
+>   3. Mix of 1 and 2
+>      => More issues.
+> Of course this is not limited to clocks, but also to e.g. PM domains.
+>
+> How can this be handled?
+> I believe just marking the "canfd" clock critical is not the right solution,
+> as about any clock could be used by the RT CPU.
+>
+> Still, Linux needs to be made aware that devices (clocks and PM domains) are
+> controlled by another CPU/OS.
+>
+> Should this be described in DT? It feels like software policy to me.
 
-It's not really that much clearer - what has any of this got to do with
-the size of a page?  Just because a definition appears to be numerically
-the same, it doesn't mean it should be used!
+No, it shouldn't. It is Linux policy to disable all unused clocks, so
+Linux gets to deal with the consequences.
 
-The LDR instruction takes a maximum of a 12-bit constant.  This 12-bit
-constant has nothing to do with the page size; it's been that way since
-the early ARMs that knew nothing about page tables.
-
-Please instead create a LDR_IMM12_MASK or similar definition for this.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Rob
