@@ -1,44 +1,149 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:45:00 +0100
-Subject: [PATCH 44/58] arm64: Add MIDR values for Cavium cn83XX SoCs
+Date: Fri, 30 Jun 2017 09:44:51 +0100
+Subject: [PATCH 35/58] KVM: arm64: vgic-v3: Add ICV_AP1Rn_EL1 handler
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-45-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-36-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Add a handler for reading/writing the guest's view of the ICV_AP1Rn_EL1
+registers. We just map them to the corresponding ICH_AP1Rn_EL2 registers.
 
 Tested-by: Alexander Graf <agraf@suse.de>
 Acked-by: David Daney <david.daney@cavium.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: David Daney <david.daney@cavium.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/include/asm/cputype.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/include/asm/sysreg.h |  1 +
+ virt/kvm/arm/hyp/vgic-v3-sr.c   | 94 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 95 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 0984d1b3a8f2..235e77d98261 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -86,6 +86,7 @@
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index b4d13d9267ff..563bba108442 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -180,6 +180,7 @@
  
- #define CAVIUM_CPU_PART_THUNDERX	0x0A1
- #define CAVIUM_CPU_PART_THUNDERX_81XX	0x0A2
-+#define CAVIUM_CPU_PART_THUNDERX_83XX	0x0A3
+ #define SYS_VBAR_EL1			sys_reg(3, 0, 12, 0, 0)
  
- #define BRCM_CPU_PART_VULCAN		0x516
++#define SYS_ICC_AP1Rn_EL1(n)		sys_reg(3, 0, 12, 9, n)
+ #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
+ #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
+ #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index e9ff99112c4d..1c85a6df22d9 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -720,6 +720,76 @@ static void __hyp_text __vgic_v3_write_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int
+ 	__vgic_v3_write_vmcr(vmcr);
+ }
  
-@@ -96,6 +97,7 @@
- #define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
- #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
- #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
-+#define MIDR_THUNDERX_83XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_83XX)
- #define MIDR_QCOM_FALKOR_V1 MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_FALKOR_V1)
- 
- #ifndef __ASSEMBLY__
++static void __hyp_text __vgic_v3_read_apxrn(struct kvm_vcpu *vcpu, int rt, int n)
++{
++	u32 val;
++
++	if (!__vgic_v3_get_group(vcpu))
++		val = __vgic_v3_read_ap0rn(n);
++	else
++		val = __vgic_v3_read_ap1rn(n);
++
++	vcpu_set_reg(vcpu, rt, val);
++}
++
++static void __hyp_text __vgic_v3_write_apxrn(struct kvm_vcpu *vcpu, int rt, int n)
++{
++	u32 val = vcpu_get_reg(vcpu, rt);
++
++	if (!__vgic_v3_get_group(vcpu))
++		__vgic_v3_write_ap0rn(val, n);
++	else
++		__vgic_v3_write_ap1rn(val, n);
++}
++
++static void __hyp_text __vgic_v3_read_apxr0(struct kvm_vcpu *vcpu,
++					    u32 vmcr, int rt)
++{
++	__vgic_v3_read_apxrn(vcpu, rt, 0);
++}
++
++static void __hyp_text __vgic_v3_read_apxr1(struct kvm_vcpu *vcpu,
++					    u32 vmcr, int rt)
++{
++	__vgic_v3_read_apxrn(vcpu, rt, 1);
++}
++
++static void __hyp_text __vgic_v3_read_apxr2(struct kvm_vcpu *vcpu,
++					    u32 vmcr, int rt)
++{
++	__vgic_v3_read_apxrn(vcpu, rt, 2);
++}
++
++static void __hyp_text __vgic_v3_read_apxr3(struct kvm_vcpu *vcpu,
++					    u32 vmcr, int rt)
++{
++	__vgic_v3_read_apxrn(vcpu, rt, 3);
++}
++
++static void __hyp_text __vgic_v3_write_apxr0(struct kvm_vcpu *vcpu,
++					     u32 vmcr, int rt)
++{
++	__vgic_v3_write_apxrn(vcpu, rt, 0);
++}
++
++static void __hyp_text __vgic_v3_write_apxr1(struct kvm_vcpu *vcpu,
++					     u32 vmcr, int rt)
++{
++	__vgic_v3_write_apxrn(vcpu, rt, 1);
++}
++
++static void __hyp_text __vgic_v3_write_apxr2(struct kvm_vcpu *vcpu,
++					     u32 vmcr, int rt)
++{
++	__vgic_v3_write_apxrn(vcpu, rt, 2);
++}
++
++static void __hyp_text __vgic_v3_write_apxr3(struct kvm_vcpu *vcpu,
++					     u32 vmcr, int rt)
++{
++	__vgic_v3_write_apxrn(vcpu, rt, 3);
++}
++
+ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ {
+ 	int rt;
+@@ -760,6 +830,30 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		else
+ 			fn = __vgic_v3_write_bpr1;
+ 		break;
++	case SYS_ICC_AP1Rn_EL1(0):
++		if (is_read)
++			fn = __vgic_v3_read_apxr0;
++		else
++			fn = __vgic_v3_write_apxr0;
++		break;
++	case SYS_ICC_AP1Rn_EL1(1):
++		if (is_read)
++			fn = __vgic_v3_read_apxr1;
++		else
++			fn = __vgic_v3_write_apxr1;
++		break;
++	case SYS_ICC_AP1Rn_EL1(2):
++		if (is_read)
++			fn = __vgic_v3_read_apxr2;
++		else
++			fn = __vgic_v3_write_apxr2;
++		break;
++	case SYS_ICC_AP1Rn_EL1(3):
++		if (is_read)
++			fn = __vgic_v3_read_apxr3;
++		else
++			fn = __vgic_v3_write_apxr3;
++		break;
+ 	default:
+ 		return 0;
+ 	}
 -- 
 2.11.0
