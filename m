@@ -1,48 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Jun 2017 14:25:29 +0200
-Subject: [PATCH 0/8] mailbox: arm/arm64: introduce smc triggered mailbox
-In-Reply-To: <20170630095608.24943-1-andre.przywara@arm.com>
-References: <20170630095608.24943-1-andre.przywara@arm.com>
-Message-ID: <20170630122529.upjigip4hztrq67h@flea>
+From: Claudiu.Beznea@microchip.com (m18063)
+Date: Fri, 30 Jun 2017 15:28:51 +0300
+Subject: [PATCH 5/5] ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK
+ support
+In-Reply-To: <20170629121655.37pq7cnabvv4wh7z@piout.net>
+References: <1498736674-9233-1-git-send-email-claudiu.beznea@microchip.com>
+ <1498736674-9233-6-git-send-email-claudiu.beznea@microchip.com>
+ <20170629115931.yki2xbehyicbtx3w@tarshish>
+ <20170629121655.37pq7cnabvv4wh7z@piout.net>
+Message-ID: <f204f169-1939-31cc-05af-8a715b86e082@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Baruch, Alexandre
 
-On Fri, Jun 30, 2017 at 10:56:00AM +0100, Andre Przywara wrote:
-> The remaining patches demonstrate usage of this feature to drive SCPI services
-> implemented as part of the ARM Trusted Firmware implementation used for
-> AArch64 based Allwinner SoCs, the Allwinner A64 in this example.
-> It allows to provide DVFS services, sensors support, device power domains
-> and potentially other services like clocks or regulators.
-> This allows to abstract those features in firmware, without the need to
-> implement explicit Linux support for each variant of some SoC design.
-> Those DT changes are not necessarily meant to be merged at this point.
-> I started implementing the firmware side of those services and put a WIP
-> branch on my ATF Github repo [1]. With this branch and these patches here
-> you get DVFS and temperature sensor support for the A64, just with this
-> driver and the generic SCPI support.
+On 29.06.2017 15:16, Alexandre Belloni wrote:
+> On 29/06/2017 at 14:59:31 +0300, Baruch Siach wrote:
+>> Hi Claudiu,
+>>
+>> On Thu, Jun 29, 2017 at 02:44:34PM +0300, Claudiu Beznea wrote:
+>>> Add specifig DTS files and bindings for sama5d27 SoM1 EK board.
+>>
+>> Is there any publicly available information on this SoM?
+>>
+>> One more comment below.
+>>
+>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>>> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+>>> ---
+>>
+>> [snip]
+>>
+>>> +	memory {
+>>> +		reg = <0x20000000 0x20000>;
+>>
+>> Are you sure this SoM has 132KB RAM?
+Yes, here is a mistake, the size is 128MB. Sorry for the noise.
+>>
+>> Since you seem to rely on the bootloader to fill in the right size value, you 
+>> can just drop this node and rely on sama5d2.dtsi that provides a stub node.
+>>
+> 
+> Yeah, that is what I would do too.
+Ok, I will do it so in v2.
 
-I would go even further, and say that these changes should be done by
-the bootloader itself once it installed the proper monitor.
-
-These patches represent not a state of the hardware itself, but the
-state the bootloader let the hardware in, and that state will change
-from one bootloader to the other, and one version to the other
-(obviously). This is already what we do for the other things the
-bootloader initializes (like simplefb, or PSCI). It just feels natural
-to do the same thing here.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170630/0c9a1661/attachment.sig>
+Thank you,
+Claudiu
+> 
+> 
