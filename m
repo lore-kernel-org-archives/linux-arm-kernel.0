@@ -1,28 +1,73 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 30 Jun 2017 14:03:03 +0800
-Subject: [PATCH v1 0/4] media: rc: add support for IR receiver on MT7622 SoC
-Message-ID: <cover.1498794408.git.sean.wang@mediatek.com>
+Date: Fri, 30 Jun 2017 14:03:06 +0800
+Subject: [PATCH v1 3/4] media: rc: mtk-cir: add support for MediaTek MT7622 SoC
+In-Reply-To: <cover.1498794408.git.sean.wang@mediatek.com>
+References: <cover.1498794408.git.sean.wang@mediatek.com>
+Message-ID: <37ff7a2deabfddfd899613caf13209754e9ac68a.1498794408.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-This patchset introduces Consumer IR (CIR) support for MT7622 SoC
-implements raw mode for more compatibility with different protocols
-as previously SoC did. Before adding support to MT7622 SoC, extra
-code refactor is done since there're major differences in register and
-field definition from the previous SoC.
+This patch adds driver for CIR controller on MT7622 SoC. It has similar
+handling logic as the previously MT7623 does, but there are some
+differences in the register and field definition. So for ease portability
+and maintenance, those differences all are being kept inside the platform
+data as other drivers usually do. Currently testing successfully on NEC
+and SONY remote controller.
 
-Sean Wang (4):
-  dt-bindings: media: mtk-cir: Add support for MT7622 SoC
-  media: rc: mtk-cir: add platform data to adapt into various hardware
-  media: rc: mtk-cir: add support for MediaTek MT7622 SoC
-  MAINTAINERS: add entry for MediaTek CIR driver
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ drivers/media/rc/mtk-cir.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
- .../devicetree/bindings/media/mtk-cir.txt          |   8 +-
- MAINTAINERS                                        |   5 +
- drivers/media/rc/mtk-cir.c                         | 242 ++++++++++++++++-----
- 3 files changed, 197 insertions(+), 58 deletions(-)
-
+diff --git a/drivers/media/rc/mtk-cir.c b/drivers/media/rc/mtk-cir.c
+index 32b1031..6672772 100644
+--- a/drivers/media/rc/mtk-cir.c
++++ b/drivers/media/rc/mtk-cir.c
+@@ -84,6 +84,13 @@ static const u32 mt7623_regs[] = {
+ 	[MTK_IRINT_CLR_REG] =	0xd0,
+ };
+ 
++static const u32 mt7622_regs[] = {
++	[MTK_IRCLR_REG] =	0x18,
++	[MTK_CHKDATA_REG] =	0x30,
++	[MTK_IRINT_EN_REG] =	0x1c,
++	[MTK_IRINT_CLR_REG] =	0x20,
++};
++
+ struct mtk_field_type {
+ 	u32 reg;
+ 	u8 offset;
+@@ -113,6 +120,11 @@ static const struct mtk_field_type mt7623_fields[] = {
+ 	[MTK_HW_PERIOD] = {0x10, 0, GENMASK(7, 0)},
+ };
+ 
++static const struct mtk_field_type mt7622_fields[] = {
++	[MTK_CHK_PERIOD] = {0x24, 0, GENMASK(24, 0)},
++	[MTK_HW_PERIOD] = {0x10, 0, GENMASK(24, 0)},
++};
++
+ /*
+  * struct mtk_ir -	This is the main datasructure for holding the state
+  *			of the driver
+@@ -268,8 +280,17 @@ static const struct mtk_ir_data mt7623_data = {
+ 	.div	= 4,
+ };
+ 
++static const struct mtk_ir_data mt7622_data = {
++	.regs = mt7622_regs,
++	.fields = mt7622_fields,
++	.ok_count = 0xf,
++	.hw_period = 0xffff,
++	.div	= 32,
++};
++
+ static const struct of_device_id mtk_ir_match[] = {
+ 	{ .compatible = "mediatek,mt7623-cir", .data = &mt7623_data},
++	{ .compatible = "mediatek,mt7622-cir", .data = &mt7622_data},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, mtk_ir_match);
 -- 
 2.7.4
