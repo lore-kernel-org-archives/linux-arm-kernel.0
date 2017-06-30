@@ -1,76 +1,45 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 30 Jun 2017 10:56:05 +0100
-Subject: [PATCH 5/8] arm64: dts: allwinner: a64: add SCPI DVFS nodes
+Date: Fri, 30 Jun 2017 10:56:08 +0100
+Subject: [PATCH 8/8] arm64: dts: allwinner: a64: add (unused) MMC clock node
 In-Reply-To: <20170630095608.24943-1-andre.przywara@arm.com>
 References: <20170630095608.24943-1-andre.przywara@arm.com>
-Message-ID: <20170630095608.24943-6-andre.przywara@arm.com>
+Message-ID: <20170630095608.24943-9-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One functionality provided by the SCPI handler is frequency scaling,
-which allows to switch the one CPU cluster between several operating
-points, each specifying a matching frequency and CPU voltage.
-The actual table is specified in firmware and can be queried by Linux
-using standardised SCPI calls.
+More of a demo than to be really useful as it this adds a clock producer
+node for the MMC clock.
+This can be used instead of the existing clock driver for driving a clock.
+Use cases include providing clock control by hypervisors or driving new
+SoCs which don't have an appropriate clock driver in the kernel.
+The number here is made explicitly compatible with the in-kernel CCF
+numbering, so any consumer can be switched over by just exchaning the
+phandle.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index ef6f10e..58c3675 100644
+index 30cad44..6949a70 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -61,6 +61,7 @@
- 			device_type = "cpu";
- 			reg = <0>;
- 			enable-method = "psci";
-+			clocks = <&scpi_dvfs 0>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -68,6 +69,7 @@
- 			device_type = "cpu";
- 			reg = <1>;
- 			enable-method = "psci";
-+			clocks = <&scpi_dvfs 0>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -75,6 +77,7 @@
- 			device_type = "cpu";
- 			reg = <2>;
- 			enable-method = "psci";
-+			clocks = <&scpi_dvfs 0>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -82,6 +85,7 @@
- 			device_type = "cpu";
- 			reg = <3>;
- 			enable-method = "psci";
-+			clocks = <&scpi_dvfs 0>;
- 		};
- 	};
- 
-@@ -148,6 +152,17 @@
- 		compatible = "arm,scpi";
- 		mboxes = <&mailbox 0>;
- 		shmem = <&cpu_scp_mem>;
+@@ -162,6 +162,15 @@
+ 				clock-indices = <0>;
+ 				clock-output-names = "cpu_clk";
+ 			};
 +
-+		scpi-clocks {
-+			compatible = "arm,scpi-clocks";
-+
-+			scpi_dvfs: scpi_dvfs_clocks {
-+				compatible = "arm,scpi-dvfs-clocks";
++			scpi_clk: scpi_clocks {
++				compatible = "arm,scpi-variable-clocks";
 +				#clock-cells = <1>;
-+				clock-indices = <0>;
-+				clock-output-names = "cpu_clk";
++				clock-indices = <75>, <76>,
++						<77>;
++				clock-output-names = "mmc0_clk", "mmc1_clk",
++						     "mmc2_clk";
 +			};
-+		};
- 	};
+ 		};
  
- 	soc {
+ 		scpi_sensors0: sensors {
 -- 
 2.9.0
