@@ -1,181 +1,95 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:44 +0100
-Subject: [PATCH 28/58] KVM: arm/arm64: vgic-v3: Add accessors for the
- ICH_APxRn_EL2 registers
+Date: Fri, 30 Jun 2017 09:44:32 +0100
+Subject: [PATCH 16/58] KVM: arm/arm64: PMU: remove request-less vcpu kick
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-29-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-17-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to access the Active Priority registers a lot more,
-let's define accessors that take the register number as a parameter.
+From: Andrew Jones <drjones@redhat.com>
 
-Tested-by: Alexander Graf <agraf@suse.de>
-Acked-by: David Daney <david.daney@cavium.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Refactor PMU overflow handling in order to remove the request-less
+vcpu kick.  Now, since kvm_vgic_inject_irq() uses vcpu requests,
+there should be no chance that a kick sent at just the wrong time
+(between the VCPU's call to kvm_pmu_flush_hwstate() and before it
+enters guest mode) results in a failure for the guest to see updated
+GIC state until its next exit some time later for some other reason.
+
+Signed-off-by: Andrew Jones <drjones@redhat.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 116 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 100 insertions(+), 16 deletions(-)
+ virt/kvm/arm/pmu.c | 40 +++++++++++++++++++---------------------
+ 1 file changed, 19 insertions(+), 21 deletions(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 87940364570b..3dd8f0c4419e 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -118,6 +118,90 @@ static void __hyp_text __gic_v3_set_lr(u64 val, int lr)
- 	}
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 4b43e7f3b158..2451607dc25e 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -203,6 +203,23 @@ static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
+ 	return reg;
  }
  
-+static void __hyp_text __vgic_v3_write_ap0rn(u32 val, int n)
++static void kvm_pmu_check_overflow(struct kvm_vcpu *vcpu)
 +{
-+	switch (n) {
-+	case 0:
-+		write_gicreg(val, ICH_AP0R0_EL2);
-+		break;
-+	case 1:
-+		write_gicreg(val, ICH_AP0R1_EL2);
-+		break;
-+	case 2:
-+		write_gicreg(val, ICH_AP0R2_EL2);
-+		break;
-+	case 3:
-+		write_gicreg(val, ICH_AP0R3_EL2);
-+		break;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	bool overflow = !!kvm_pmu_overflow_status(vcpu);
++
++	if (pmu->irq_level == overflow)
++		return;
++
++	pmu->irq_level = overflow;
++
++	if (likely(irqchip_in_kernel(vcpu->kvm))) {
++		int ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
++					      pmu->irq_num, overflow);
++		WARN_ON(ret);
 +	}
 +}
 +
-+static void __hyp_text __vgic_v3_write_ap1rn(u32 val, int n)
-+{
-+	switch (n) {
-+	case 0:
-+		write_gicreg(val, ICH_AP1R0_EL2);
-+		break;
-+	case 1:
-+		write_gicreg(val, ICH_AP1R1_EL2);
-+		break;
-+	case 2:
-+		write_gicreg(val, ICH_AP1R2_EL2);
-+		break;
-+	case 3:
-+		write_gicreg(val, ICH_AP1R3_EL2);
-+		break;
-+	}
-+}
-+
-+static u32 __hyp_text __vgic_v3_read_ap0rn(int n)
-+{
-+	u32 val;
-+
-+	switch (n) {
-+	case 0:
-+		val = read_gicreg(ICH_AP0R0_EL2);
-+		break;
-+	case 1:
-+		val = read_gicreg(ICH_AP0R1_EL2);
-+		break;
-+	case 2:
-+		val = read_gicreg(ICH_AP0R2_EL2);
-+		break;
-+	case 3:
-+		val = read_gicreg(ICH_AP0R3_EL2);
-+		break;
-+	default:
-+		unreachable();
-+	}
-+
-+	return val;
-+}
-+
-+static u32 __hyp_text __vgic_v3_read_ap1rn(int n)
-+{
-+	u32 val;
-+
-+	switch (n) {
-+	case 0:
-+		val = read_gicreg(ICH_AP1R0_EL2);
-+		break;
-+	case 1:
-+		val = read_gicreg(ICH_AP1R1_EL2);
-+		break;
-+	case 2:
-+		val = read_gicreg(ICH_AP1R2_EL2);
-+		break;
-+	case 3:
-+		val = read_gicreg(ICH_AP1R3_EL2);
-+		break;
-+	default:
-+		unreachable();
-+	}
-+
-+	return val;
-+}
-+
- void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ /**
+  * kvm_pmu_overflow_set - set PMU overflow interrupt
+  * @vcpu: The vcpu pointer
+@@ -210,37 +227,18 @@ static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
+  */
+ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
  {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -154,22 +238,22 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+-	u64 reg;
+-
+ 	if (val == 0)
+ 		return;
  
- 		switch (nr_pre_bits) {
- 		case 7:
--			cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
--			cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
-+			cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
-+			cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
- 		case 6:
--			cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
-+			cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
- 		default:
--			cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
-+			cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
- 		}
+ 	vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= val;
+-	reg = kvm_pmu_overflow_status(vcpu);
+-	if (reg != 0)
+-		kvm_vcpu_kick(vcpu);
++	kvm_pmu_check_overflow(vcpu);
+ }
  
- 		switch (nr_pre_bits) {
- 		case 7:
--			cpu_if->vgic_ap1r[3] = read_gicreg(ICH_AP1R3_EL2);
--			cpu_if->vgic_ap1r[2] = read_gicreg(ICH_AP1R2_EL2);
-+			cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
-+			cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
- 		case 6:
--			cpu_if->vgic_ap1r[1] = read_gicreg(ICH_AP1R1_EL2);
-+			cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
- 		default:
--			cpu_if->vgic_ap1r[0] = read_gicreg(ICH_AP1R0_EL2);
-+			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
- 		}
- 	} else {
- 		cpu_if->vgic_elrsr = 0xffff;
-@@ -224,22 +308,22 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ static void kvm_pmu_update_state(struct kvm_vcpu *vcpu)
+ {
+-	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+-	bool overflow;
+-
+ 	if (!kvm_arm_pmu_v3_ready(vcpu))
+ 		return;
+-
+-	overflow = !!kvm_pmu_overflow_status(vcpu);
+-	if (pmu->irq_level == overflow)
+-		return;
+-
+-	pmu->irq_level = overflow;
+-
+-	if (likely(irqchip_in_kernel(vcpu->kvm))) {
+-		int ret;
+-		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+-					  pmu->irq_num, overflow);
+-		WARN_ON(ret);
+-	}
++	kvm_pmu_check_overflow(vcpu);
+ }
  
- 		switch (nr_pre_bits) {
- 		case 7:
--			write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
--			write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
-+			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[3], 3);
-+			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[2], 2);
- 		case 6:
--			write_gicreg(cpu_if->vgic_ap0r[1], ICH_AP0R1_EL2);
-+			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[1], 1);
- 		default:
--			write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
-+			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[0], 0);
- 		}
- 
- 		switch (nr_pre_bits) {
- 		case 7:
--			write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
--			write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
-+			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[3], 3);
-+			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[2], 2);
- 		case 6:
--			write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
-+			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[1], 1);
- 		default:
--			write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
-+			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[0], 0);
- 		}
- 
- 		for (i = 0; i < used_lrs; i++)
+ bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
 -- 
 2.11.0
