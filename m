@@ -1,129 +1,38 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Fri, 30 Jun 2017 16:51:04 +0200
-Subject: [PATCH 6/8] EDAC: Add devres helpers for
- edac_mc_alloc/edac_mc_add_mc(_with_groups)
+Date: Fri, 30 Jun 2017 16:50:59 +0200
+Subject: [PATCH 1/8] ARM: l2c: move cache-aurora-l2.h to asm/hardware
 In-Reply-To: <20170630145106.29820-1-jlu@pengutronix.de>
 References: <20170630145106.29820-1-jlu@pengutronix.de>
-Message-ID: <20170630145106.29820-7-jlu@pengutronix.de>
+Message-ID: <20170630145106.29820-2-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These helpers simplify error handling in the _probe functions and automate
-deallocation in the _remove functions.
+This include file will be used by the AURORA EDAC code.
 
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 ---
- drivers/edac/edac_mc.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/edac/edac_mc.h | 26 +++++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
+ arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h | 0
+ arch/arm/mm/cache-l2x0.c                                | 2 +-
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h (100%)
 
-diff --git a/drivers/edac/edac_mc.c b/drivers/edac/edac_mc.c
-index 480072139b7a..4d6759222592 100644
---- a/drivers/edac/edac_mc.c
-+++ b/drivers/edac/edac_mc.c
-@@ -517,6 +517,33 @@ void edac_mc_free(struct mem_ctl_info *mci)
- }
- EXPORT_SYMBOL_GPL(edac_mc_free);
+diff --git a/arch/arm/mm/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+similarity index 100%
+rename from arch/arm/mm/cache-aurora-l2.h
+rename to arch/arm/include/asm/hardware/cache-aurora-l2.h
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 808efbb89b88..a00d6f7fd34c 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -30,8 +30,8 @@
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/hardware/cache-aurora-l2.h>
+ #include "cache-tauros3.h"
+-#include "cache-aurora-l2.h"
  
-+/**
-+ * devm_edac_mc_free() - Internal helper to call edac_mc_free from a devres
-+ *	action.
-+ */
-+static void devm_edac_mc_free(void *mci)
-+{
-+	edac_mc_free((struct mem_ctl_info *)mci);
-+}
-+
-+struct mem_ctl_info *devm_edac_mc_alloc(struct device *dev,
-+                                        unsigned mc_num,
-+                                        unsigned n_layers,
-+                                        struct edac_mc_layer *layers,
-+                                        unsigned sz_pvt)
-+{
-+	struct mem_ctl_info *mci;
-+	mci = edac_mc_alloc(mc_num, n_layers, layers, sz_pvt);
-+	if (!mci)
-+		return mci;
-+
-+	if (devm_add_action_or_reset(dev, devm_edac_mc_free, mci))
-+		return NULL;
-+
-+	return mci;
-+}
-+EXPORT_SYMBOL_GPL(devm_edac_mc_alloc);
-+
- bool edac_has_mcs(void)
- {
- 	bool ret;
-@@ -828,6 +855,32 @@ struct mem_ctl_info *edac_mc_del_mc(struct device *dev)
- }
- EXPORT_SYMBOL_GPL(edac_mc_del_mc);
- 
-+/**
-+ * devm_edac_mc_del_mc() - Internal helper to call edac_mc_del_mc from a devres
-+ *	action.
-+ */
-+static void devm_edac_mc_del_mc(void *dev)
-+{
-+	edac_mc_del_mc((struct device *)dev);
-+}
-+
-+int devm_edac_mc_add_mc_with_groups(struct device *dev,
-+                                    struct mem_ctl_info *mci,
-+                                    const struct attribute_group **groups)
-+{
-+	int ret;
-+
-+	ret = edac_mc_add_mc_with_groups(mci, groups);
-+	if (ret)
-+		return ret;
-+
-+	if (devm_add_action_or_reset(dev, devm_edac_mc_del_mc, dev))
-+		return 1;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(devm_edac_mc_add_mc_with_groups);
-+
- static void edac_mc_scrub_block(unsigned long page, unsigned long offset,
- 				u32 size)
- {
-diff --git a/drivers/edac/edac_mc.h b/drivers/edac/edac_mc.h
-index 5357800e418d..c89f4301ed3f 100644
---- a/drivers/edac/edac_mc.h
-+++ b/drivers/edac/edac_mc.h
-@@ -149,6 +149,32 @@ extern int edac_mc_add_mc_with_groups(struct mem_ctl_info *mci,
- extern void edac_mc_free(struct mem_ctl_info *mci);
- 
- /**
-+ * devm_edac_mc_alloc() - Helper to call edac_mc_alloc() and register it for
-+ *	cleanup with devres.
-+ *
-+ * Returns:
-+ *	On success, return a pointer to struct mem_ctl_info pointer;
-+ *	%NULL otherwise
-+ */
-+struct mem_ctl_info *devm_edac_mc_alloc(struct device *dev,
-+                                        unsigned mc_num,
-+                                        unsigned n_layers,
-+                                        struct edac_mc_layer *layers,
-+                                        unsigned sz_pvt);
-+
-+/**
-+ * devm_edac_mc_add_mc_with_groups() - Helper to call
-+ *	edac_mc_add_mc_with_groups() and register it for cleanup with devres.
-+ *
-+ * Returns:
-+ *	0 on Success, or an error code on failure
-+ */
-+int devm_edac_mc_add_mc_with_groups(struct device *dev,
-+                                    struct mem_ctl_info *mci,
-+                                    const struct attribute_group **groups);
-+#define devm_edac_mc_add_mc(dev, mci)	devm_edac_mc_add_mc_with_groups(dev, mci, NULL)
-+
-+/**
-  * edac_has_mcs() - Check if any MCs have been allocated.
-  *
-  * Returns:
+ struct l2c_init_data {
+ 	const char *type;
 -- 
 2.11.0
