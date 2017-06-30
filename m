@@ -1,97 +1,37 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:45:06 +0100
-Subject: [PATCH 50/58] KVM: arm64: Enable GICv3 common sysreg trapping via
- command-line
+Date: Fri, 30 Jun 2017 09:45:14 +0100
+Subject: [PATCH 58/58] arm64: Remove a redundancy in sysreg.h
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-51-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-59-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we're able to safely handle common sysreg access, let's
-give the user the opportunity to enable it by passing a specific
-command-line option (vgic_v3.common_trap).
+From: Stefan Traby <stefan@hello-penguin.com>
 
-Tested-by: Alexander Graf <agraf@suse.de>
-Acked-by: David Daney <david.daney@cavium.com>
+This is really trivial; there is a dup (1 << 16) in the code
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Stefan Traby <stefan@hello-penguin.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- Documentation/admin-guide/kernel-parameters.txt |  4 ++++
- include/linux/irqchip/arm-gic-v3.h              |  1 +
- virt/kvm/arm/vgic/vgic-v3.c                     | 11 ++++++++++-
- 3 files changed, 15 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/sysreg.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 88bdc421351f..aa8341e73b35 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1837,6 +1837,10 @@
- 			[KVM,ARM] Trap guest accesses to GICv3 group-1
- 			system registers
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 040b607cb682..16e44fa9b3b6 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -304,8 +304,8 @@
+ #define SCTLR_ELx_M	1
  
-+	kvm-arm.vgic_v3_common_trap=
-+			[KVM,ARM] Trap guest accesses to GICv3 common
-+			system registers
-+
- 	kvm-intel.ept=	[KVM,Intel] Disable extended page tables
- 			(virtualized MMU) support on capable Intel chips.
- 			Default is 1 (enabled)
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index c7f31a962cfc..6a1f87ff94e2 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -417,6 +417,7 @@
+ #define SCTLR_EL2_RES1	((1 << 4)  | (1 << 5)  | (1 << 11) | (1 << 16) | \
+-			 (1 << 16) | (1 << 18) | (1 << 22) | (1 << 23) | \
+-			 (1 << 28) | (1 << 29))
++			 (1 << 18) | (1 << 22) | (1 << 23) | (1 << 28) | \
++			 (1 << 29))
  
- #define ICH_HCR_EN			(1 << 0)
- #define ICH_HCR_UIE			(1 << 1)
-+#define ICH_HCR_TC			(1 << 10)
- #define ICH_HCR_TALL0			(1 << 11)
- #define ICH_HCR_TALL1			(1 << 12)
- #define ICH_HCR_EOIcount_SHIFT		27
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 35c00efc110b..91cf8b4f01f1 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -23,6 +23,7 @@
- 
- static bool group0_trap;
- static bool group1_trap;
-+static bool common_trap;
- 
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
- {
-@@ -265,6 +266,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 		vgic_v3->vgic_hcr |= ICH_HCR_TALL0;
- 	if (group1_trap)
- 		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
-+	if (common_trap)
-+		vgic_v3->vgic_hcr |= ICH_HCR_TC;
- }
- 
- int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
-@@ -450,6 +453,12 @@ static int __init early_group1_trap_cfg(char *buf)
- }
- early_param("kvm-arm.vgic_v3_group1_trap", early_group1_trap_cfg);
- 
-+static int __init early_common_trap_cfg(char *buf)
-+{
-+	return strtobool(buf, &common_trap);
-+}
-+early_param("kvm-arm.vgic_v3_common_trap", early_common_trap_cfg);
-+
- /**
-  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-@@ -508,7 +517,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 	}
- #endif
- 
--	if (group0_trap || group1_trap) {
-+	if (group0_trap || group1_trap || common_trap) {
- 		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
- 		static_branch_enable(&vgic_v3_cpuif_trap);
- 	}
+ #define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
+ 			 SCTLR_ELx_SA | SCTLR_ELx_I)
 -- 
 2.11.0
