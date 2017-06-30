@@ -1,45 +1,47 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 30 Jun 2017 07:14:23 +0000
-Subject: [RESEND PATCH v4] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <20170630002008.GD22780@codeaurora.org>
-References: <1496818794-14771-1-git-send-email-gabriel.fernandez@st.com>
- <20170621220703.GI4493@codeaurora.org>
- <110cf67f-e1d6-1f99-953c-6b9639bb4910@st.com>
- <20170628155956.GA5316@codeaurora.org>
- <7c0c3861-cf61-a9e2-cd5d-2ae30b8f32fa@st.com>
- <20170630002008.GD22780@codeaurora.org>
-Message-ID: <d325071a-5da5-4ff1-89b9-fc1bbe10e223@st.com>
+From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
+Date: Fri, 30 Jun 2017 07:19:24 +0000
+Subject: [PATCH] staging: fsl-dpaa2/eth: Remove dead code
+In-Reply-To: <20170629162546.10372-1-ruxandra.radulescu@nxp.com>
+References: <20170629162546.10372-1-ruxandra.radulescu@nxp.com>
+Message-ID: <DB5PR04MB1240A5870E15A372E3FEE3FBEAD30@DB5PR04MB1240.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Ioana Radulescu [mailto:ruxandra.radulescu at nxp.com]
+> Sent: Thursday, June 29, 2017 7:26 PM
+> To: gregkh at linuxfoundation.org
+> Cc: devel at driverdev.osuosl.org; linux-kernel at vger.kernel.org;
+> agraf at suse.de; arnd at arndb.de; linux-arm-kernel at lists.infradead.org; Bogdan
+> Purcareata <bogdan.purcareata@nxp.com>; stuyoder at gmail.com; Laurentiu Tudor
+> <laurentiu.tudor@nxp.com>
+> Subject: [PATCH] staging: fsl-dpaa2/eth: Remove dead code
+> 
+> All possible values of the switch statement are explicitly
+> handled, so there's no need to have a default branch.
+> 
+> Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 
+Acked-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
 
-On 06/30/2017 02:20 AM, Stephen Boyd wrote:
-> On 06/29, Gabriel FERNANDEZ wrote:
->>
->> On 06/28/2017 05:59 PM, Stephen Boyd wrote:
->>> On 06/27, Gabriel FERNANDEZ wrote:
->>>> On 06/22/2017 12:07 AM, Stephen Boyd wrote:
->>>>> readl_poll_timeout?
->>>>>
->>>> if i use readl_poll_timeout (wich use 'ktime_get()') it can be
->>>> operational only after the selection of clocksource ? (device_initcall).
->>>> And then if a driver turn on a clock before, it could blocked the linux
->>>> console ?
->>>>
->>> Ok. I wonder if we could add some sort of starting check to
->>> readl_poll_timeout() that tests system_state for booting vs.
->>> scheduling? That should be sufficient to handle this case?
->>>
->> Oops i think i understood my problem...
->> i used readl_poll_timeout in atomic context.
->> I have to move my code in the .prepare ops.
->>
->> If you are ok with that i will send a v5
->>
-> There's readl_poll_timeout_atomic() for those modes.
->
-yes it's exactly the test i made (use 'readl_poll_timeout()_atomic' in 
-.enable ops) but i'm blocked.
-
-if i do the same in .prepare ops with 'readl_poll_timeout()' it's ok.
+> ---
+>  drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+> b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+> index 5312edc26f01..031179ab3a22 100644
+> --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+> +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+> @@ -217,8 +217,6 @@ static void dpaa2_eth_get_ethtool_stats(struct
+> net_device *net_dev,
+>  		case 2:
+>  			num_cnt = sizeof(dpni_stats.page_2) / sizeof(u64);
+>  			break;
+> -		default:
+> -			break;
+>  		}
+>  		for (k = 0; k < num_cnt; k++)
+>  			*(data + i++) = dpni_stats.raw.counter[k];
+> --
+> 2.11.0
