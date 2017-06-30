@@ -1,97 +1,42 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Fri, 30 Jun 2017 14:04:46 +0200
-Subject: [PATCH 7/7] serial: imx: Fix imx_shutdown procedure
-In-Reply-To: <20170630120446.13994-1-romain.perier@collabora.com>
-References: <20170630120446.13994-1-romain.perier@collabora.com>
-Message-ID: <20170630120446.13994-8-romain.perier@collabora.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Jun 2017 14:12:12 +0200
+Subject: [patch 1/5] pinctrl: samsung: Remove bogus irq_[un]mask from
+ resource management
+In-Reply-To: <20170629214343.882576048@linutronix.de>
+References: <20170629213334.375848050@linutronix.de>
+ <20170629214343.882576048@linutronix.de>
+Message-ID: <CACRpkdYO2bRT8104AbT_w9-=eXDNAr=csYUtmkYKE7bM+BsV9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nandor Han <nandor.han@ge.com>
+On Thu, Jun 29, 2017 at 11:33 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
 
-In some cases, It looks that interrupts can happen after the dma was
-disabled and port was not yet shutdown. This will result in interrupts
-handled by imx_rxint.
+> The irq chip callbacks irq_request/release_resources() have absolutely no
+> business with masking and unmasking the irq.
+>
+> The core code unmasks the interrupt after complete setup and masks it
+> before invoking irq_release_resources().
+>
+> The unmask is actually harmful as it happens before the interrupt is
+> completely initialized in __setup_irq().
+>
+> Remove it.
+>
+> Fixes: f6a8249f9e55 ("pinctrl: exynos: Lock GPIOs as interrupts when used as EINTs")
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-gpio at vger.kernel.org
 
-This commits updates the shutdown function to ensure that underlying
-components are disabled in the right order. This disables RX and TX
-blocks, then it disabled interrupts. In case DMA is enabled, it disables
-DMA and free corresponding resources. It disables UART port and stop
-clocks.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Nandor Han <nandor.han@ge.com>
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- drivers/tty/serial/imx.c | 38 +++++++++++++++++++-------------------
- 1 file changed, 19 insertions(+), 19 deletions(-)
+Does this patch have a dependency on the rest of the series or should
+I just apply it as-is?
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index d5b6e09..7dc6f0c 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1404,44 +1404,44 @@ static void imx_shutdown(struct uart_port *port)
- 	unsigned long temp;
- 	unsigned long flags;
- 
--	if (sport->dma_is_enabled) {
--		sport->dma_is_rxing = 0;
--		sport->dma_is_txing = 0;
--		dmaengine_terminate_sync(sport->dma_chan_tx);
--		dmaengine_terminate_sync(sport->dma_chan_rx);
--
-+	if (!sport->port.suspended) {
- 		spin_lock_irqsave(&sport->port.lock, flags);
- 		imx_stop_tx(port);
- 		imx_stop_rx(port);
--		imx_disable_dma(sport);
- 		spin_unlock_irqrestore(&sport->port.lock, flags);
--		imx_uart_dma_exit(sport);
- 	}
- 
--	mctrl_gpio_disable_ms(sport->gpios);
-+	if (sport->dma_is_inited) {
-+		if (sport->dma_is_enabled) {
-+			spin_lock_irqsave(&sport->port.lock, flags);
-+			imx_disable_dma(sport);
-+			spin_unlock_irqrestore(&sport->port.lock, flags);
-+		}
-+		imx_uart_dma_exit(sport);
-+	}
- 
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 	temp = readl(sport->port.membase + UCR2);
--	temp &= ~(UCR2_TXEN);
-+	temp &= ~(UCR2_TXEN | UCR2_RXEN);
- 	writel(temp, sport->port.membase + UCR2);
-+	temp = readl(sport->port.membase + UCR4);
-+	temp &= ~UCR4_OREN;
-+	writel(temp, sport->port.membase + UCR4);
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
--	/*
--	 * Stop our timer.
--	 */
--	del_timer_sync(&sport->timer);
-+	mctrl_gpio_disable_ms(sport->gpios);
- 
--	/*
--	 * Disable all interrupts, port and break condition.
--	 */
-+	/* Stop our timer. */
-+	del_timer_sync(&sport->timer);
- 
-+	/* Disable port. */
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 	temp = readl(sport->port.membase + UCR1);
--	temp &= ~(UCR1_TXMPTYEN | UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN);
--
-+	temp &= ~UCR1_UARTEN;
- 	writel(temp, sport->port.membase + UCR1);
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
-+	/* Disable clocks. */
- 	clk_disable_unprepare(sport->clk_per);
- 	clk_disable_unprepare(sport->clk_ipg);
- }
--- 
-1.8.3.1
+Yours,
+Linus Walleij
