@@ -1,61 +1,102 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 30 Jun 2017 10:28:36 +0100
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
- before scanning
-In-Reply-To: <20170630090515.GU629@lahna.fi.intel.com>
-References: <20170612155700.GA31930@red-moon>
- <20170613084831.GP3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
- <20170613200339.GX3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
- <20170616083313.GY3187@lahna.fi.intel.com>
- <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
- <808a7db0-7844-b263-0216-1fe943ac819a@huawei.com>
- <20170630090515.GU629@lahna.fi.intel.com>
-Message-ID: <b2bc9134-9944-bd6a-2daf-8f1a1ff49a62@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 30 Jun 2017 11:34:22 +0200
+Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
+References: <20170627143652.13075-1-net147@gmail.com>
+ <20170628092024.ejxy6itqj3hx6yew@flea>
+ <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
+ <20170629155620.4keqi4cumbtvv63u@flea>
+ <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
+Message-ID: <20170630093422.om7b75q5wyuby6r7@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/2017 10:05, Mika Westerberg wrote:
-> On Thu, Jun 29, 2017 at 05:16:15PM +0100, John Garry wrote:
->> On 16/06/2017 12:24, Rafael J. Wysocki wrote:
->>>>>>>>>
->>>>>>>>> It causes acpi_default_enumeration() to be called but it should be fine
->>>>>>>>> as we are dealing with platform device anyway.
->>>>>>>
->>>>>>> I do not quite understand how declaring such MFD cell above would make sure
->>>>>>> that the LPC probe is called before the IPMI device is enumerated...
->>>>>
->>>>> In fact it may be that it is not sufficient in this case because the
->>>>> ACPI core might enumerate child devices before the LPC driver even gets
->>>>> a chance to probe so you would need to add also scan handler to the
->>>>> child devices and mark them already enumerated or something like that.
->>> Or extend the special I2C/SPI handling to them.
->>>
->>
->> For this, is it possible to just configure the ACPI table so we spoof that
->> the LPC slave (IPI0001), is an i2c/spi slave? Could we just add a resource
->> of type ACPI_RESOURCE_TYPE_SERIAL_BUS, and common serial bus type i2c/spi to
->> solve this?
->
-> But is the device connected to a I2C or SPI bus? If not, then it does
-> not make much sense to declare it as I2C or SPI slave. Instead it should
-> be platform device which is the type we use when there is no explicit
-> bus specified in ACPI.
->
+Hi,
 
-No, it's not a SPI nor an I2C bus. I actually would say that my idea is 
-generally wrong, as the ACPI definition is not a real reflection of the 
-bus/slave.
+On Fri, Jun 30, 2017 at 08:22:13AM +1000, Jonathan Liu wrote:
+> Hi Maxime,
+> 
+> On 30 June 2017 at 01:56, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Wed, Jun 28, 2017 at 08:39:33PM +1000, Jonathan Liu wrote:
+> >> >> +     u32 int_status;
+> >> >> +     u32 fifo_status;
+> >> >> +     /* Read needs empty flag unset, write needs full flag unset */
+> >> >> +     u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
+> >> >> +                       SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
+> >> >> +     int ret;
+> >> >> +
+> >> >> +     /* Wait until error or FIFO ready */
+> >> >> +     ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+> >> >> +                              int_status,
+> >> >> +                              is_err_status(int_status) ||
+> >> >> +                              is_fifo_flag_unset(hdmi, &fifo_status, flag),
+> >> >> +                              min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
+> >> >> +                              100000);
+> >> >> +
+> >> >> +     if (is_err_status(int_status))
+> >> >> +             return -EIO;
+> >> >> +     if (ret)
+> >> >> +             return -ETIMEDOUT;
+> >> >
+> >> > Why not just have
+> >> > ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
+> >> >                          !(reg & flag), 100, 100000);
+> >> >
+> >> > if (ret < 0)
+> >> >         if (is_err_status())
+> >> >                 return -EIO;
+> >> >         return ret;
+> >> >
+> >> >
+> >>
+> >> If I check error status after readl_poll_timeout and there is an error
+> >> (e.g. the I2C address does not have a corresponding device connected
+> >> or nothing connected to HDMI port) it will keep checking the fifo
+> >> status even though error bit is set in the int status and then timeout
+> >> after 100 ms. If it checks the int status register at the same time,
+> >> it will error after 100 nanoseconds. I don't want to introduce
+> >> unnecessary delays considering part of the reason for adding this
+> >> driver to make it more usable for non-standard use cases.
+> >
+> > Well, polling for 100ms doesn't seem great either. What was the
+> > rationale behind that timeout?
+> >
+> 
+> When an error occurs one of the error bits will be set in the
+> INT_STATUS register so this is detected very quickly if I check the
+> INT_STATUS and FIFO_STATUS at the same time. The 100 ms timeout is in
+> case the I2C slave does clock stretching in which case the transfer
+> may take longer than the predicted time.
 
-However, Rafael did suggest extending special I2C/SPI handling to them. 
-In this case, I don't see how the LPC slave can be identified like an 
-I2C or SPI slave is.
+100ms isn't stretching anymore, it's worse than that.
 
-Thanks,
-John
+> > And we can also reverse the check and look at the INT_STATUS
+> > register. The errors will be there, and we can program the threshold
+> > we want in both directions and use the
+> > DDC_FIFO_Request_Interrupt_Status bit.
+> >
+> 
+> I did try that when I was doing the v3 patch but I couldn't get it to
+> work as mentioned previously in the v3 patch discussion. I programmed
+> the FIFO_RX_TRIGGER_THRES and FIFO_TX_TRIGGER_THRES in DDC_FIFO_Ctrl
+> register at the same time as setting FIFO_Address_Clear but the
+> request interrupt status bit did not get updated to the appropriate
+> state that is consistent with the FIFO level and the thresholds. I did
+> try this several times for subsequent patch versions without success.
 
-> .
->
+What values did you set it to?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170630/0a1813b0/attachment.sig>
