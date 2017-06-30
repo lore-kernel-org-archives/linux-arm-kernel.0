@@ -1,155 +1,270 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 29 Jun 2017 22:30:57 -0400
-Subject: [PATCH V3 1/2] dmaengine: qcom_hidma: introduce memset support
-Message-ID: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
+Date: Thu, 29 Jun 2017 22:30:58 -0400
+Subject: [PATCH V3 2/2] dmaengine: dmatest: add support for memset test
+In-Reply-To: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
+References: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1498789858-18583-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HIDMA HW supports memset operation in addition to memcpy.
-Since the memset API is present on the kernel now, bring the
-memset feature into life.
+Introducing memset test into dmatest. This change allows us to test
+memset capable HW using the dmatest test procedure. The new dmatest
+value for memset is 2 and it is not the default value.
 
-The descriptor format is the same for both memcpy and memset.
-Type of the descriptor is 4 when memset is requested.
-The lowest 8 bits of the source DMA argument is used as a
-fill pattern.
+Memset support patch shares the same code path as the other dmatest
+code to reuse as much as we can.
 
+The first value inside the source buffer is used as a pattern
+to fill in the destination buffer space.
+
+Prior to running the test, source/destination buffers are initialized
+in the current code.
+
+"The remaining bits are the inverse of a counter which increments by
+ one for each byte address."
+
+Memset test will fill in the upper bits of pattern with the inverse of
+fixed counter value 1 as opposed to an incrementing value in a loop.
+
+An example run is as follows:
+
+echo dma0chan0 > /sys/module/dmatest/parameters/channel
+echo 2 >  /sys/module/dmatest/parameters/dmatest
+echo 2000 >  /sys/module/dmatest/parameters/timeout
+echo 10 >  /sys/module/dmatest/parameters/iterations
+echo 1 >  /sys/module/dmatest/parameters/run
+
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma.c    | 37 ++++++++++++++++++++++++++++++++++++-
- drivers/dma/qcom/hidma.h    |  7 ++++++-
- drivers/dma/qcom/hidma_ll.c | 11 ++++-------
- 3 files changed, 46 insertions(+), 9 deletions(-)
+ drivers/dma/dmatest.c | 88 +++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 64 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 8ed29bd..e185872 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -410,7 +410,40 @@ static int hidma_alloc_chan_resources(struct dma_chan *dmach)
- 		return NULL;
+diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+index a07ef3d..35cb83b 100644
+--- a/drivers/dma/dmatest.c
++++ b/drivers/dma/dmatest.c
+@@ -60,7 +60,7 @@
+ static unsigned int dmatest;
+ module_param(dmatest, uint, S_IRUGO | S_IWUSR);
+ MODULE_PARM_DESC(dmatest,
+-		"dmatest 0-memcpy 1-slave_sg (default: 0)");
++		"dmatest 0-memcpy 1-slave_sg 2-memset (default: 0)");
  
- 	hidma_ll_set_transfer_params(mdma->lldev, mdesc->tre_ch,
--				     src, dest, len, flags);
-+				     src, dest, len, flags,
-+				     HIDMA_TRE_MEMCPY);
+ static unsigned int xor_sources = 3;
+ module_param(xor_sources, uint, S_IRUGO | S_IWUSR);
+@@ -158,6 +158,7 @@ struct dmatest_params {
+ #define PATTERN_COPY		0x40
+ #define PATTERN_OVERWRITE	0x20
+ #define PATTERN_COUNT_MASK	0x1f
++#define PATTERN_MEMSET_IDX	0x01
+ 
+ struct dmatest_thread {
+ 	struct list_head	node;
+@@ -239,46 +240,62 @@ static unsigned long dmatest_random(void)
+ 	return buf;
+ }
+ 
++static inline u8 gen_inv_idx(u8 index, bool is_memset)
++{
++	u8 val = is_memset ? PATTERN_MEMSET_IDX : index;
 +
-+	/* Place descriptor in prepared list */
-+	spin_lock_irqsave(&mchan->lock, irqflags);
-+	list_add_tail(&mdesc->node, &mchan->prepared);
-+	spin_unlock_irqrestore(&mchan->lock, irqflags);
-+
-+	return &mdesc->desc;
++	return ~val & PATTERN_COUNT_MASK;
 +}
 +
-+static struct dma_async_tx_descriptor *
-+hidma_prep_dma_memset(struct dma_chan *dmach, dma_addr_t dest, int value,
-+		size_t len, unsigned long flags)
++static inline u8 gen_src_value(u8 index, bool is_memset)
 +{
-+	struct hidma_chan *mchan = to_hidma_chan(dmach);
-+	struct hidma_desc *mdesc = NULL;
-+	struct hidma_dev *mdma = mchan->dmadev;
-+	unsigned long irqflags;
++	return PATTERN_SRC | gen_inv_idx(index, is_memset);
++}
 +
-+	/* Get free descriptor */
-+	spin_lock_irqsave(&mchan->lock, irqflags);
-+	if (!list_empty(&mchan->free)) {
-+		mdesc = list_first_entry(&mchan->free, struct hidma_desc, node);
-+		list_del(&mdesc->node);
-+	}
-+	spin_unlock_irqrestore(&mchan->lock, irqflags);
++static inline u8 gen_dst_value(u8 index, bool is_memset)
++{
++	return PATTERN_DST | gen_inv_idx(index, is_memset);
++}
 +
-+	if (!mdesc)
-+		return NULL;
-+
-+	hidma_ll_set_transfer_params(mdma->lldev, mdesc->tre_ch,
-+				     value, dest, len, flags,
-+				     HIDMA_TRE_MEMSET);
- 
- 	/* Place descriptor in prepared list */
- 	spin_lock_irqsave(&mchan->lock, irqflags);
-@@ -775,6 +808,7 @@ static int hidma_probe(struct platform_device *pdev)
- 	pm_runtime_get_sync(dmadev->ddev.dev);
- 
- 	dma_cap_set(DMA_MEMCPY, dmadev->ddev.cap_mask);
-+	dma_cap_set(DMA_MEMSET, dmadev->ddev.cap_mask);
- 	if (WARN_ON(!pdev->dev.dma_mask)) {
- 		rc = -ENXIO;
- 		goto dmafree;
-@@ -785,6 +819,7 @@ static int hidma_probe(struct platform_device *pdev)
- 	dmadev->dev_trca = trca;
- 	dmadev->trca_resource = trca_resource;
- 	dmadev->ddev.device_prep_dma_memcpy = hidma_prep_dma_memcpy;
-+	dmadev->ddev.device_prep_dma_memset = hidma_prep_dma_memset;
- 	dmadev->ddev.device_alloc_chan_resources = hidma_alloc_chan_resources;
- 	dmadev->ddev.device_free_chan_resources = hidma_free_chan_resources;
- 	dmadev->ddev.device_tx_status = hidma_tx_status;
-diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
-index 41e0aa2..5f9966e 100644
---- a/drivers/dma/qcom/hidma.h
-+++ b/drivers/dma/qcom/hidma.h
-@@ -28,6 +28,11 @@
- #define HIDMA_TRE_DEST_LOW_IDX		4
- #define HIDMA_TRE_DEST_HI_IDX		5
- 
-+enum tre_type {
-+	HIDMA_TRE_MEMCPY = 3,
-+	HIDMA_TRE_MEMSET = 4,
-+};
-+
- struct hidma_tre {
- 	atomic_t allocated;		/* if this channel is allocated	    */
- 	bool queued;			/* flag whether this is pending     */
-@@ -150,7 +155,7 @@ int hidma_ll_request(struct hidma_lldev *llhndl, u32 dev_id,
- int hidma_ll_disable(struct hidma_lldev *lldev);
- int hidma_ll_enable(struct hidma_lldev *llhndl);
- void hidma_ll_set_transfer_params(struct hidma_lldev *llhndl, u32 tre_ch,
--	dma_addr_t src, dma_addr_t dest, u32 len, u32 flags);
-+	dma_addr_t src, dma_addr_t dest, u32 len, u32 flags, u32 txntype);
- void hidma_ll_setup_irq(struct hidma_lldev *lldev, bool msi);
- int hidma_ll_setup(struct hidma_lldev *lldev);
- struct hidma_lldev *hidma_ll_init(struct device *dev, u32 max_channels,
-diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index 1530a66..4999e26 100644
---- a/drivers/dma/qcom/hidma_ll.c
-+++ b/drivers/dma/qcom/hidma_ll.c
-@@ -105,10 +105,6 @@ enum ch_state {
- 	HIDMA_CH_STOPPED = 4,
- };
- 
--enum tre_type {
--	HIDMA_TRE_MEMCPY = 3,
--};
--
- enum err_code {
- 	HIDMA_EVRE_STATUS_COMPLETE = 1,
- 	HIDMA_EVRE_STATUS_ERROR = 4,
-@@ -174,8 +170,7 @@ int hidma_ll_request(struct hidma_lldev *lldev, u32 sig, const char *dev_name,
- 	tre->err_info = 0;
- 	tre->lldev = lldev;
- 	tre_local = &tre->tre_local[0];
--	tre_local[HIDMA_TRE_CFG_IDX] = HIDMA_TRE_MEMCPY;
--	tre_local[HIDMA_TRE_CFG_IDX] |= (lldev->chidx & 0xFF) << 8;
-+	tre_local[HIDMA_TRE_CFG_IDX] = (lldev->chidx & 0xFF) << 8;
- 	tre_local[HIDMA_TRE_CFG_IDX] |= BIT(16);	/* set IEOB */
- 	*tre_ch = i;
- 	if (callback)
-@@ -607,7 +602,7 @@ int hidma_ll_disable(struct hidma_lldev *lldev)
- 
- void hidma_ll_set_transfer_params(struct hidma_lldev *lldev, u32 tre_ch,
- 				  dma_addr_t src, dma_addr_t dest, u32 len,
--				  u32 flags)
-+				  u32 flags, u32 txntype)
+ static void dmatest_init_srcs(u8 **bufs, unsigned int start, unsigned int len,
+-		unsigned int buf_size)
++		unsigned int buf_size, bool is_memset)
  {
- 	struct hidma_tre *tre;
- 	u32 *tre_local;
-@@ -626,6 +621,8 @@ void hidma_ll_set_transfer_params(struct hidma_lldev *lldev, u32 tre_ch,
+ 	unsigned int i;
+ 	u8 *buf;
+ 
+ 	for (; (buf = *bufs); bufs++) {
+ 		for (i = 0; i < start; i++)
+-			buf[i] = PATTERN_SRC | (~i & PATTERN_COUNT_MASK);
++			buf[i] = gen_src_value(i, is_memset);
+ 		for ( ; i < start + len; i++)
+-			buf[i] = PATTERN_SRC | PATTERN_COPY
+-				| (~i & PATTERN_COUNT_MASK);
++			buf[i] = gen_src_value(i, is_memset) | PATTERN_COPY;
+ 		for ( ; i < buf_size; i++)
+-			buf[i] = PATTERN_SRC | (~i & PATTERN_COUNT_MASK);
++			buf[i] = gen_src_value(i, is_memset);
+ 		buf++;
+ 	}
+ }
+ 
+ static void dmatest_init_dsts(u8 **bufs, unsigned int start, unsigned int len,
+-		unsigned int buf_size)
++		unsigned int buf_size, bool is_memset)
+ {
+ 	unsigned int i;
+ 	u8 *buf;
+ 
+ 	for (; (buf = *bufs); bufs++) {
+ 		for (i = 0; i < start; i++)
+-			buf[i] = PATTERN_DST | (~i & PATTERN_COUNT_MASK);
++			buf[i] = gen_dst_value(i, is_memset);
+ 		for ( ; i < start + len; i++)
+-			buf[i] = PATTERN_DST | PATTERN_OVERWRITE
+-				| (~i & PATTERN_COUNT_MASK);
++			buf[i] = gen_dst_value(i, is_memset) |
++						PATTERN_OVERWRITE;
+ 		for ( ; i < buf_size; i++)
+-			buf[i] = PATTERN_DST | (~i & PATTERN_COUNT_MASK);
++			buf[i] = gen_dst_value(i, is_memset);
+ 	}
+ }
+ 
+ static void dmatest_mismatch(u8 actual, u8 pattern, unsigned int index,
+-		unsigned int counter, bool is_srcbuf)
++		unsigned int counter, bool is_srcbuf, bool is_memset)
+ {
+ 	u8		diff = actual ^ pattern;
+-	u8		expected = pattern | (~counter & PATTERN_COUNT_MASK);
++	u8		expected = pattern | gen_inv_idx(counter, is_memset);
+ 	const char	*thread_name = current->comm;
+ 
+ 	if (is_srcbuf)
+@@ -298,7 +315,7 @@ static void dmatest_mismatch(u8 actual, u8 pattern, unsigned int index,
+ 
+ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
+ 		unsigned int end, unsigned int counter, u8 pattern,
+-		bool is_srcbuf)
++		bool is_srcbuf, bool is_memset)
+ {
+ 	unsigned int i;
+ 	unsigned int error_count = 0;
+@@ -311,11 +328,12 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
+ 		counter = counter_orig;
+ 		for (i = start; i < end; i++) {
+ 			actual = buf[i];
+-			expected = pattern | (~counter & PATTERN_COUNT_MASK);
++			expected = pattern | gen_inv_idx(counter, is_memset);
+ 			if (actual != expected) {
+ 				if (error_count < MAX_ERROR_COUNT)
+ 					dmatest_mismatch(actual, pattern, i,
+-							 counter, is_srcbuf);
++							 counter, is_srcbuf,
++							 is_memset);
+ 				error_count++;
+ 			}
+ 			counter++;
+@@ -435,6 +453,7 @@ static int dmatest_func(void *data)
+ 	s64			runtime = 0;
+ 	unsigned long long	total_len = 0;
+ 	u8			align = 0;
++	bool			is_memset = false;
+ 
+ 	set_freezable();
+ 
+@@ -448,6 +467,10 @@ static int dmatest_func(void *data)
+ 	if (thread->type == DMA_MEMCPY) {
+ 		align = dev->copy_align;
+ 		src_cnt = dst_cnt = 1;
++	} else if (thread->type == DMA_MEMSET) {
++		align = dev->fill_align;
++		src_cnt = dst_cnt = 1;
++		is_memset = true;
+ 	} else if (thread->type == DMA_SG) {
+ 		align = dev->copy_align;
+ 		src_cnt = dst_cnt = sg_buffers;
+@@ -571,9 +594,9 @@ static int dmatest_func(void *data)
+ 			dst_off = (dst_off >> align) << align;
+ 
+ 			dmatest_init_srcs(thread->srcs, src_off, len,
+-					  params->buf_size);
++					  params->buf_size, is_memset);
+ 			dmatest_init_dsts(thread->dsts, dst_off, len,
+-					  params->buf_size);
++					  params->buf_size, is_memset);
+ 
+ 			diff = ktime_sub(ktime_get(), start);
+ 			filltime = ktime_add(filltime, diff);
+@@ -640,6 +663,11 @@ static int dmatest_func(void *data)
+ 			tx = dev->device_prep_dma_memcpy(chan,
+ 							 dsts[0] + dst_off,
+ 							 srcs[0], len, flags);
++		else if (thread->type == DMA_MEMSET)
++			tx = dev->device_prep_dma_memset(chan,
++						dsts[0] + dst_off,
++						*(thread->srcs[0] + src_off),
++						len, flags);
+ 		else if (thread->type == DMA_SG)
+ 			tx = dev->device_prep_dma_sg(chan, tx_sg, src_cnt,
+ 						     rx_sg, src_cnt, flags);
+@@ -722,23 +750,25 @@ static int dmatest_func(void *data)
+ 		start = ktime_get();
+ 		pr_debug("%s: verifying source buffer...\n", current->comm);
+ 		error_count = dmatest_verify(thread->srcs, 0, src_off,
+-				0, PATTERN_SRC, true);
++				0, PATTERN_SRC, true, is_memset);
+ 		error_count += dmatest_verify(thread->srcs, src_off,
+ 				src_off + len, src_off,
+-				PATTERN_SRC | PATTERN_COPY, true);
++				PATTERN_SRC | PATTERN_COPY, true, is_memset);
+ 		error_count += dmatest_verify(thread->srcs, src_off + len,
+ 				params->buf_size, src_off + len,
+-				PATTERN_SRC, true);
++				PATTERN_SRC, true, is_memset);
+ 
+ 		pr_debug("%s: verifying dest buffer...\n", current->comm);
+ 		error_count += dmatest_verify(thread->dsts, 0, dst_off,
+-				0, PATTERN_DST, false);
++				0, PATTERN_DST, false, is_memset);
++
+ 		error_count += dmatest_verify(thread->dsts, dst_off,
+ 				dst_off + len, src_off,
+-				PATTERN_SRC | PATTERN_COPY, false);
++				PATTERN_SRC | PATTERN_COPY, false, is_memset);
++
+ 		error_count += dmatest_verify(thread->dsts, dst_off + len,
+ 				params->buf_size, dst_off + len,
+-				PATTERN_DST, false);
++				PATTERN_DST, false, is_memset);
+ 
+ 		diff = ktime_sub(ktime_get(), start);
+ 		comparetime = ktime_add(comparetime, diff);
+@@ -821,6 +851,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
+ 
+ 	if (type == DMA_MEMCPY)
+ 		op = "copy";
++	else if (type == DMA_MEMSET)
++		op = "set";
+ 	else if (type == DMA_SG)
+ 		op = "sg";
+ 	else if (type == DMA_XOR)
+@@ -883,6 +915,13 @@ static int dmatest_add_channel(struct dmatest_info *info,
+ 		}
  	}
  
- 	tre_local = &tre->tre_local[0];
-+	tre_local[HIDMA_TRE_CFG_IDX] &= ~GENMASK(7, 0);
-+	tre_local[HIDMA_TRE_CFG_IDX] |= txntype;
- 	tre_local[HIDMA_TRE_LEN_IDX] = len;
- 	tre_local[HIDMA_TRE_SRC_LOW_IDX] = lower_32_bits(src);
- 	tre_local[HIDMA_TRE_SRC_HI_IDX] = upper_32_bits(src);
++	if (dma_has_cap(DMA_MEMSET, dma_dev->cap_mask)) {
++		if (dmatest == 2) {
++			cnt = dmatest_add_threads(info, dtc, DMA_MEMSET);
++			thread_count += cnt > 0 ? cnt : 0;
++		}
++	}
++
+ 	if (dma_has_cap(DMA_SG, dma_dev->cap_mask)) {
+ 		if (dmatest == 1) {
+ 			cnt = dmatest_add_threads(info, dtc, DMA_SG);
+@@ -961,6 +1000,7 @@ static void run_threaded_test(struct dmatest_info *info)
+ 	params->noverify = noverify;
+ 
+ 	request_channels(info, DMA_MEMCPY);
++	request_channels(info, DMA_MEMSET);
+ 	request_channels(info, DMA_XOR);
+ 	request_channels(info, DMA_SG);
+ 	request_channels(info, DMA_PQ);
 -- 
 1.9.1
