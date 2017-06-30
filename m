@@ -1,40 +1,68 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 30 Jun 2017 12:24:30 -0700
-Subject: [GIT PULL] Update binding documentation for CP110 and AP806
-In-Reply-To: <87h8yyvu7t.fsf@free-electrons.com>
-References: <87h8yyvu7t.fsf@free-electrons.com>
-Message-ID: <20170630192430.GP22780@codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 30 Jun 2017 21:43:59 +0200
+Subject: [PATCH v3 03/12] ASoC: add new ac97 bus support
+In-Reply-To: <20170630194408.24978-1-robert.jarzmik@free.fr>
+References: <20170630194408.24978-1-robert.jarzmik@free.fr>
+Message-ID: <20170630194408.24978-4-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30, Gregory CLEMENT wrote:
-> 
-> Hi Stephen,
-> 
-> As seen on Tuesday this is the pull request for the remaining binding
-> documentation which depends on the documentation already applied in your
-> tree.
-> 
-> Thanks for taking care of it,
-> 
-> Gregory
-> 
-> The following changes since commit 7e5b11afecc0f558c5a6723970770f92f2529d4e:
-> 
->   dt-bindings: ap806: introduce a new binding (2017-06-01 12:02:01 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git binding-doc-cp110-ap806
-> 
-> for you to fetch changes up to 1fa67c675f6477ceb670f087a6f6739f7b3cb099:
-> 
->   gpio: dt-bindings: Add documentation for gpio controllers on Armada 7K/8K (2017-06-27 09:07:17 +0200)
-> 
-> ----------------------------------------------------------------
+Add the new ac97 bus support, with ac97 bus automatic probing.
 
-Pulled into clk-next.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+---
+ sound/Kconfig     | 2 ++
+ sound/Makefile    | 1 +
+ sound/soc/Kconfig | 4 ++++
+ 3 files changed, 7 insertions(+)
 
+diff --git a/sound/Kconfig b/sound/Kconfig
+index ee2e69a9ecd1..141b145c4195 100644
+--- a/sound/Kconfig
++++ b/sound/Kconfig
+@@ -80,6 +80,8 @@ source "sound/hda/Kconfig"
+ 
+ source "sound/ppc/Kconfig"
+ 
++source "sound/ac97/Kconfig"
++
+ source "sound/aoa/Kconfig"
+ 
+ source "sound/arm/Kconfig"
+diff --git a/sound/Makefile b/sound/Makefile
+index 6de45d2c32f7..c03b0bed65d5 100644
+--- a/sound/Makefile
++++ b/sound/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_SND_AOA) += aoa/
+ 
+ # This one must be compilable even if sound is configured out
+ obj-$(CONFIG_AC97_BUS) += ac97_bus.o
++obj-$(CONFIG_AC97_BUS_NEW) += ac97/
+ 
+ ifeq ($(CONFIG_SND),y)
+   obj-y += last.o
+diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+index 182d92efc7c8..5ad0a0422054 100644
+--- a/sound/soc/Kconfig
++++ b/sound/soc/Kconfig
+@@ -6,6 +6,7 @@ menuconfig SND_SOC
+ 	tristate "ALSA for SoC audio support"
+ 	select SND_PCM
+ 	select AC97_BUS if SND_SOC_AC97_BUS
++	select AC97_BUS_NEW if SND_SOC_AC97_BUS_NEW
+ 	select SND_JACK
+ 	select REGMAP_I2C if I2C
+ 	select REGMAP_SPI if SPI_MASTER
+@@ -25,6 +26,9 @@ if SND_SOC
+ config SND_SOC_AC97_BUS
+ 	bool
+ 
++config SND_SOC_AC97_BUS_NEW
++	bool
++
+ config SND_SOC_GENERIC_DMAENGINE_PCM
+ 	bool
+ 	select SND_DMAENGINE_PCM
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.11.0
