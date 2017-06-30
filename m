@@ -1,64 +1,40 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Jun 2017 16:00:14 +0100
-Subject: [PATCH 3/8] ARM: l2x0: support parity-enable/disable on aurora
-In-Reply-To: <20170630145106.29820-4-jlu@pengutronix.de>
+Date: Fri, 30 Jun 2017 16:00:51 +0100
+Subject: [PATCH 4/8] ARM: l2x0: add arm,ecc-enable property for aurora
+In-Reply-To: <20170630145106.29820-5-jlu@pengutronix.de>
 References: <20170630145106.29820-1-jlu@pengutronix.de>
- <20170630145106.29820-4-jlu@pengutronix.de>
-Message-ID: <20170630150013.GY4902@n2100.armlinux.org.uk>
+ <20170630145106.29820-5-jlu@pengutronix.de>
+Message-ID: <20170630150051.GZ4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 04:51:01PM +0200, Jan Luebbe wrote:
+On Fri, Jun 30, 2017 at 04:51:02PM +0200, Jan Luebbe wrote:
 > From: Chris Packham <chris.packham@alliedtelesis.co.nz>
 > 
-> The aurora cache on the Marvell Armada-XP SoC supports the same tag
-> parity features as the other l2x0 cache implementations.
+> The aurora cache on the Marvell Armada-XP SoC supports ECC protection
+> for the L2 data arrays. Add a "arm,ecc-enable" device tree property
+> which can be used to enable this.
 > 
 > Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> [jlu at pengutronix.de: use aurora specific define AURORA_ACR_PARITY_EN]
-
-As far as I can see, there is no definition of AURORA_ACR_PARITY_EN in
-mainline kernels at the moment, and your patch series (to this point)
-does not add it.
-
-The definition for this, and the ECC bit appears to be in patch 8.
-This breaks bisection.  Please ensure that definitions are added in
-patches either before or with the patch that makes use of the new
-definition, never afterwards.
-
-Thanks.
-
+> [jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
 > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 > ---
->  arch/arm/mm/cache-l2x0.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
+>  arch/arm/mm/cache-l2x0.c                         | 7 +++++++
+>  2 files changed, 9 insertions(+)
 > 
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 7d2d2a3c67d0..b70bee74750d 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
->  		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
->  	}
->  
-> +	if (of_property_read_bool(np, "arm,parity-enable")) {
-> +		mask |= AURORA_ACR_PARITY_EN;
-> +		val |= AURORA_ACR_PARITY_EN;
-> +	} else if (of_property_read_bool(np, "arm,parity-disable")) {
-> +		mask |= AURORA_ACR_PARITY_EN;
-> +	}
-> +
->  	*aux_val &= ~mask;
->  	*aux_val |= val;
->  	*aux_mask &= ~mask;
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> index d9650c1788f4..6316e673307a 100644
+> --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+> @@ -76,6 +76,8 @@ Optional properties:
+>    specified to indicate that such transforms are precluded.
+>  - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+>  - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
+> +- arm,ecc-enable : enable ECC protection on the L2 cache
+> +- arm,ecc-disable : disable ECC protection on the L2 cache
+
+Why should this be prefixed by a vendor of "arm" ?
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
