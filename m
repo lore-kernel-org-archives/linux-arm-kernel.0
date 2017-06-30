@@ -1,104 +1,278 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 30 Jun 2017 21:43:56 +0200
-Subject: [PATCH v3 00/12] AC97 device/driver model revamp
-Message-ID: <20170630194408.24978-1-robert.jarzmik@free.fr>
+Date: Fri, 30 Jun 2017 21:44:01 +0200
+Subject: [PATCH v3 05/12] Input: wm97xx: split out touchscreen registering
+In-Reply-To: <20170630194408.24978-1-robert.jarzmik@free.fr>
+References: <20170630194408.24978-1-robert.jarzmik@free.fr>
+Message-ID: <20170630194408.24978-6-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars, Mark, Charles, Lee,
+wm97xx-core does several things in it initialization :
+ - touchscreen input device setup
+ - battery device creation
 
-This is a resend of the v2, with patch 1 added (forgotten in v2). Patch 12 was
-slightly modified after module unloading tests, and Dmitry acks were added.
+As the wm97xx is actually a multi-function device handling an audio
+codec, a touchscreen, a gpio block and an ADC, reshape the probing to
+isolate what is truly input/touchscreen specific from the remaining
+part.
 
-This serie has been stalled for almost one year, as I wasn't feeling that
-well lately. I'm quite better now, so let's get back to it.
+This is only code shuffling, there is no functional change.
 
-The following sentences is a what was already said in v2.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+Since v1:
+ - took into account Charles's comment
+---
+ drivers/input/touchscreen/wm97xx-core.c | 196 +++++++++++++++++++-------------
+ 1 file changed, 115 insertions(+), 81 deletions(-)
 
-As it's been so long since the last review, I basically withdrew all my former
-objections and took into account all remarks regardless of my own
-judgement. This is especially the case with Lars's review on the bus code, where
-I tried to address all his comments.
-
-For this next round, let's sum up what happened :
- - I rebased against latest Linus's tree
-   => as Lars had made ports to regmap of several impacted wm97xx drivers, all
-   the better for me.
-   
- - ALSA: ac97: add an ac97 bus
-   => this addresses Lars's comments
-   => history : https://patchwork.kernel.org/patch/9398229/
-   => there is one remark which was left out, the drop of the table
-      ac97_controller->codecs. The reason is that there are traversals required
-      in the bus scan and controller removal, and the code is way simpler with a
-      table, and the data structure very compact.
-   
- - Input: wm97xx: split out touchscreen registering
-   => Charles's comment taken into account
-   => history: http://https://patchwork.kernel.org/patch/9398223/
-
-Have a happy review.
-
---
-Robert
-
-Robert Jarzmik (12):
-  ALSA: ac97: split out the generic ac97 registers
-  ALSA: ac97: add an ac97 bus
-  ASoC: add new ac97 bus support
-  ASoC: arm: make pxa2xx-ac97-lib ac97 codec agnostic
-  Input: wm97xx: split out touchscreen registering
-  mfd: wm97xx-core: core support for wm97xx Codec
-  Input: wm97xx: add new AC97 bus support
-  ASoC: wm9713: add ac97 new bus support
-  ASoC: wm9712: add ac97 new bus support
-  ASoC: wm9705: add private structure
-  ASoC: wm9705: add ac97 new bus support
-  ASoC: pxa: switch to new ac97 bus support
-
- drivers/input/touchscreen/Kconfig       |   2 +-
- drivers/input/touchscreen/wm97xx-core.c | 252 ++++++++++-----
- drivers/mfd/Kconfig                     |  14 +
- drivers/mfd/Makefile                    |   1 +
- drivers/mfd/wm97xx-core.c               | 282 +++++++++++++++++
- include/linux/mfd/wm97xx.h              |  31 ++
- include/sound/ac97/codec.h              | 118 +++++++
- include/sound/ac97/compat.h             |  21 ++
- include/sound/ac97/controller.h         |  85 ++++++
- include/sound/ac97/regs.h               | 262 ++++++++++++++++
- include/sound/ac97_codec.h              | 239 +--------------
- include/sound/pxa2xx-lib.h              |  15 +-
- sound/Kconfig                           |   2 +
- sound/Makefile                          |   1 +
- sound/ac97/Kconfig                      |  19 ++
- sound/ac97/Makefile                     |   8 +
- sound/ac97/ac97_core.h                  |  10 +
- sound/ac97/bus.c                        | 526 ++++++++++++++++++++++++++++++++
- sound/ac97/codec.c                      |  15 +
- sound/ac97/snd_ac97_compat.c            | 105 +++++++
- sound/arm/Kconfig                       |   1 -
- sound/arm/pxa2xx-ac97-lib.c             |  37 ++-
- sound/arm/pxa2xx-ac97.c                 |  35 ++-
- sound/soc/Kconfig                       |   4 +
- sound/soc/codecs/Kconfig                |   9 +-
- sound/soc/codecs/wm9705.c               |  59 ++--
- sound/soc/codecs/wm9712.c               |  37 ++-
- sound/soc/codecs/wm9713.c               |  39 ++-
- sound/soc/pxa/Kconfig                   |   5 +-
- sound/soc/pxa/pxa2xx-ac97.c             |  46 ++-
- 30 files changed, 1866 insertions(+), 414 deletions(-)
- create mode 100644 drivers/mfd/wm97xx-core.c
- create mode 100644 include/linux/mfd/wm97xx.h
- create mode 100644 include/sound/ac97/codec.h
- create mode 100644 include/sound/ac97/compat.h
- create mode 100644 include/sound/ac97/controller.h
- create mode 100644 include/sound/ac97/regs.h
- create mode 100644 sound/ac97/Kconfig
- create mode 100644 sound/ac97/Makefile
- create mode 100644 sound/ac97/ac97_core.h
- create mode 100644 sound/ac97/bus.c
- create mode 100644 sound/ac97/codec.c
- create mode 100644 sound/ac97/snd_ac97_compat.c
-
+diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
+index c9d1c91e1887..39869ffdc4fa 100644
+--- a/drivers/input/touchscreen/wm97xx-core.c
++++ b/drivers/input/touchscreen/wm97xx-core.c
+@@ -581,27 +581,85 @@ static void wm97xx_ts_input_close(struct input_dev *idev)
+ 		wm->codec->acc_enable(wm, 0);
+ }
+ 
+-static int wm97xx_probe(struct device *dev)
++static int wm97xx_register_touch(struct wm97xx *wm)
+ {
+-	struct wm97xx *wm;
+-	struct wm97xx_pdata *pdata = dev_get_platdata(dev);
+-	int ret = 0, id = 0;
++	struct wm97xx_pdata *pdata = dev_get_platdata(wm->dev);
++	int ret;
+ 
+-	wm = kzalloc(sizeof(struct wm97xx), GFP_KERNEL);
+-	if (!wm)
++	wm->input_dev = devm_input_allocate_device(wm->dev);
++	if (wm->input_dev == NULL)
+ 		return -ENOMEM;
+-	mutex_init(&wm->codec_mutex);
+ 
+-	wm->dev = dev;
+-	dev_set_drvdata(dev, wm);
+-	wm->ac97 = to_ac97_t(dev);
++	/* set up touch configuration */
++	wm->input_dev->name = "wm97xx touchscreen";
++	wm->input_dev->phys = "wm97xx";
++	wm->input_dev->open = wm97xx_ts_input_open;
++	wm->input_dev->close = wm97xx_ts_input_close;
++
++	__set_bit(EV_ABS, wm->input_dev->evbit);
++	__set_bit(EV_KEY, wm->input_dev->evbit);
++	__set_bit(BTN_TOUCH, wm->input_dev->keybit);
++
++	input_set_abs_params(wm->input_dev, ABS_X, abs_x[0], abs_x[1],
++			     abs_x[2], 0);
++	input_set_abs_params(wm->input_dev, ABS_Y, abs_y[0], abs_y[1],
++			     abs_y[2], 0);
++	input_set_abs_params(wm->input_dev, ABS_PRESSURE, abs_p[0], abs_p[1],
++			     abs_p[2], 0);
++
++	input_set_drvdata(wm->input_dev, wm);
++	wm->input_dev->dev.parent = wm->dev;
++
++	ret = input_register_device(wm->input_dev);
++	if (ret)
++		return ret;
++
++	/*
++	 * register our extended touch device (for machine specific
++	 * extensions)
++	 */
++	wm->touch_dev = platform_device_alloc("wm97xx-touch", -1);
++	if (!wm->touch_dev) {
++		ret = -ENOMEM;
++		goto touch_err;
++	}
++	platform_set_drvdata(wm->touch_dev, wm);
++	wm->touch_dev->dev.parent = wm->dev;
++	wm->touch_dev->dev.platform_data = pdata;
++	ret = platform_device_add(wm->touch_dev);
++	if (ret < 0)
++		goto touch_reg_err;
++
++	return 0;
++touch_reg_err:
++	platform_device_put(wm->touch_dev);
++touch_err:
++	input_unregister_device(wm->input_dev);
++	wm->input_dev = NULL;
++
++	return ret;
++}
++
++static void wm97xx_unregister_touch(struct wm97xx *wm)
++{
++	platform_device_unregister(wm->touch_dev);
++	input_unregister_device(wm->input_dev);
++	wm->input_dev = NULL;
++}
++
++static int _wm97xx_probe(struct wm97xx *wm)
++{
++	int id = 0;
++
++	mutex_init(&wm->codec_mutex);
++	dev_set_drvdata(wm->dev, wm);
+ 
+ 	/* check that we have a supported codec */
+ 	id = wm97xx_reg_read(wm, AC97_VENDOR_ID1);
+ 	if (id != WM97XX_ID1) {
+-		dev_err(dev, "Device with vendor %04x is not a wm97xx\n", id);
+-		ret = -ENODEV;
+-		goto alloc_err;
++		dev_err(wm->dev,
++			"Device with vendor %04x is not a wm97xx\n", id);
++		return -ENODEV;
+ 	}
+ 
+ 	wm->id = wm97xx_reg_read(wm, AC97_VENDOR_ID2);
+@@ -629,8 +687,7 @@ static int wm97xx_probe(struct device *dev)
+ 	default:
+ 		dev_err(wm->dev, "Support for wm97%02x not compiled in.\n",
+ 			wm->id & 0xff);
+-		ret = -ENODEV;
+-		goto alloc_err;
++		return -ENODEV;
+ 	}
+ 
+ 	/* set up physical characteristics */
+@@ -644,79 +701,58 @@ static int wm97xx_probe(struct device *dev)
+ 	wm->gpio[4] = wm97xx_reg_read(wm, AC97_GPIO_STATUS);
+ 	wm->gpio[5] = wm97xx_reg_read(wm, AC97_MISC_AFE);
+ 
+-	wm->input_dev = input_allocate_device();
+-	if (wm->input_dev == NULL) {
+-		ret = -ENOMEM;
+-		goto alloc_err;
+-	}
+-
+-	/* set up touch configuration */
+-	wm->input_dev->name = "wm97xx touchscreen";
+-	wm->input_dev->phys = "wm97xx";
+-	wm->input_dev->open = wm97xx_ts_input_open;
+-	wm->input_dev->close = wm97xx_ts_input_close;
+-
+-	__set_bit(EV_ABS, wm->input_dev->evbit);
+-	__set_bit(EV_KEY, wm->input_dev->evbit);
+-	__set_bit(BTN_TOUCH, wm->input_dev->keybit);
+-
+-	input_set_abs_params(wm->input_dev, ABS_X, abs_x[0], abs_x[1],
+-			     abs_x[2], 0);
+-	input_set_abs_params(wm->input_dev, ABS_Y, abs_y[0], abs_y[1],
+-			     abs_y[2], 0);
+-	input_set_abs_params(wm->input_dev, ABS_PRESSURE, abs_p[0], abs_p[1],
+-			     abs_p[2], 0);
++	return wm97xx_register_touch(wm);
++}
+ 
+-	input_set_drvdata(wm->input_dev, wm);
+-	wm->input_dev->dev.parent = dev;
++static void wm97xx_remove_battery(struct wm97xx *wm)
++{
++	platform_device_unregister(wm->battery_dev);
++}
+ 
+-	ret = input_register_device(wm->input_dev);
+-	if (ret < 0)
+-		goto dev_alloc_err;
++static int wm97xx_add_battery(struct wm97xx *wm,
++			      struct wm97xx_batt_pdata *pdata)
++{
++	int ret;
+ 
+-	/* register our battery device */
+ 	wm->battery_dev = platform_device_alloc("wm97xx-battery", -1);
+-	if (!wm->battery_dev) {
+-		ret = -ENOMEM;
+-		goto batt_err;
+-	}
++	if (!wm->battery_dev)
++		return -ENOMEM;
++
+ 	platform_set_drvdata(wm->battery_dev, wm);
+-	wm->battery_dev->dev.parent = dev;
+-	wm->battery_dev->dev.platform_data = pdata ? pdata->batt_pdata : NULL;
++	wm->battery_dev->dev.parent = wm->dev;
++	wm->battery_dev->dev.platform_data = pdata;
+ 	ret = platform_device_add(wm->battery_dev);
+-	if (ret < 0)
+-		goto batt_reg_err;
++	if (ret)
++		platform_device_put(wm->battery_dev);
+ 
+-	/* register our extended touch device (for machine specific
+-	 * extensions) */
+-	wm->touch_dev = platform_device_alloc("wm97xx-touch", -1);
+-	if (!wm->touch_dev) {
+-		ret = -ENOMEM;
+-		goto touch_err;
+-	}
+-	platform_set_drvdata(wm->touch_dev, wm);
+-	wm->touch_dev->dev.parent = dev;
+-	wm->touch_dev->dev.platform_data = pdata;
+-	ret = platform_device_add(wm->touch_dev);
++	return ret;
++}
++
++static int wm97xx_probe(struct device *dev)
++{
++	struct wm97xx *wm;
++	int ret;
++	struct wm97xx_pdata *pdata = dev_get_platdata(dev);
++
++	wm = devm_kzalloc(dev, sizeof(struct wm97xx), GFP_KERNEL);
++	if (!wm)
++		return -ENOMEM;
++
++	wm->dev = dev;
++	wm->ac97 = to_ac97_t(dev);
++
++	ret =  _wm97xx_probe(wm);
++	if (ret)
++		return ret;
++
++	ret = wm97xx_add_battery(wm, pdata ? pdata->batt_pdata : NULL);
+ 	if (ret < 0)
+-		goto touch_reg_err;
++		goto batt_err;
+ 
+ 	return ret;
+ 
+- touch_reg_err:
+-	platform_device_put(wm->touch_dev);
+- touch_err:
+-	platform_device_del(wm->battery_dev);
+- batt_reg_err:
+-	platform_device_put(wm->battery_dev);
+- batt_err:
+-	input_unregister_device(wm->input_dev);
+-	wm->input_dev = NULL;
+- dev_alloc_err:
+-	input_free_device(wm->input_dev);
+- alloc_err:
+-	kfree(wm);
+-
++batt_err:
++	wm97xx_unregister_touch(wm);
+ 	return ret;
+ }
+ 
+@@ -724,10 +760,8 @@ static int wm97xx_remove(struct device *dev)
+ {
+ 	struct wm97xx *wm = dev_get_drvdata(dev);
+ 
+-	platform_device_unregister(wm->battery_dev);
+-	platform_device_unregister(wm->touch_dev);
+-	input_unregister_device(wm->input_dev);
+-	kfree(wm);
++	wm97xx_remove_battery(wm);
++	wm97xx_unregister_touch(wm);
+ 
+ 	return 0;
+ }
 -- 
 2.11.0
