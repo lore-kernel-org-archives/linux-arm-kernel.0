@@ -1,64 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 30 Jun 2017 12:17:20 +0200
-Subject: [PATCH] arm64: dts: r8a7796: Add DRIF support
-In-Reply-To: <20170627125438.44491-1-ramesh.shanmugasundaram@bp.renesas.com>
-References: <20170627125438.44491-1-ramesh.shanmugasundaram@bp.renesas.com>
-Message-ID: <20170630101720.GH26710@verge.net.au>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 30 Jun 2017 11:24:03 +0100
+Subject: [PATCH 1/9] Documentation: dt-bindings: add support for mailbox
+ client shared memory
+In-Reply-To: <20170628225633.rvfwc4s6rfqwo2jb@rob-hp-laptop>
+References: <1498492513-29771-1-git-send-email-sudeep.holla@arm.com>
+ <1498492513-29771-2-git-send-email-sudeep.holla@arm.com>
+ <20170628225633.rvfwc4s6rfqwo2jb@rob-hp-laptop>
+Message-ID: <6ca6f182-ca0d-2f89-690c-ed0041ccb498@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 27, 2017 at 01:54:38PM +0100, Ramesh Shanmugasundaram wrote:
-> Adds the DRIF controller nodes for r8a7796.
-> 
-> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-> ---
-> Hi Simon,
-> 
->    This patch is based on renesas-devel-20170626-v4.12-rc7 tag.
->    It is verified on M3 ES1.0. I also verified there are no regression issues
->    with this addition.
-> 
->    The driver[1] is pushed into the media_tree. The bindings[2] are ACK'ed
->    by Geert & Rob and in the media_tree queue.
-> 
->    [1] https://git.linuxtv.org/media_tree.git/commit/?id=7625ee981af166ddb569e2e6c0006e2af471326f
->    [2] https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg15602.html
-> 
-> Thanks,
-> Ramesh.
-> 
->  arch/arm64/boot/dts/renesas/r8a7796.dtsi | 120 +++++++++++++++++++++++++++++++
->  1 file changed, 120 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> index 1f6710912045..df04d132a127 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> @@ -639,6 +639,126 @@
->  			};
->  		};
->  
-> +		drif00: rif at e6f40000 {
-> +			compatible = "renesas,r8a7796-drif",
-> +				     "renesas,rcar-gen3-drif";
-> +			reg = <0 0xe6f40000 0 0x64>;
-> +			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 515>;
-> +			clock-names = "fck";
-> +			dmas = <&dmac1 0x20>, <&dmac2 0x20>;
-
-The dmas property seems a little strange. I would have expected to allow
-ether dmac1 or dmac2 to be used for both tx and rx:
-
-			dmas = <&dmac1 0x20>, <&dmac1 0x20>,
-			       <&dmac2 0x20>, <&dmac2 0x20>;
 
 
-> +			dma-names = "rx", "rx";
-> +			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-> +			resets = <&cpg 515>;
-> +			renesas,bonding = <&drif01>;
-> +			status = "disabled";
-> +		};
+On 28/06/17 23:56, Rob Herring wrote:
+> On Mon, Jun 26, 2017 at 04:55:05PM +0100, Sudeep Holla wrote:
+>> Many users of the mailbox controllers depend on the shared memory between the
+>> two end points to exchange the main data while using simple doorbell mechanism
+>> to alert the end points of the presence of a message.
+> 
+> "dt-bindings: mailbox: ..." for the subject.
+> 
 
-...
+Fixed locally now.
+
+>>
+>> This patch defines device tree bindings to represent such shared memory in a
+>> generic way.
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  .../devicetree/bindings/mailbox/mailbox.txt        | 28 ++++++++++++++++++++++
+>>  1 file changed, 28 insertions(+)
+> 
+> Otherwise,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
+
+Thanks
+
+-- 
+Regards,
+Sudeep
