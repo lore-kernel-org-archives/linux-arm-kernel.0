@@ -1,69 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 30 Jun 2017 17:34:18 +0000
-Subject: [PATCH] ARM: fix randomized task_struct
-In-Reply-To: <20170630155513.GA4902@n2100.armlinux.org.uk>
-References: <20170630153502.3327030-1-arnd@arndb.de>
- <9291740E-3BD1-454C-A3EB-46E35F073D0E@linaro.org>
- <20170630155513.GA4902@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu8=qubUV9q7LKEN6BCXro9UGa7=_9_f810-DSbzx4ysmw@mail.gmail.com>
+From: aravind.thk@gmail.com (Aravind Thokala)
+Date: Fri, 30 Jun 2017 23:08:15 +0530
+Subject: [PATCH] spi/bcm63xx-hspi: Fix checkpatch warnings
+In-Reply-To: <20170628184507.tnl7jc4wvtt5op5q@sirena.org.uk>
+References: <1498579630-10109-1-git-send-email-aravind.thk@gmail.com>
+ <20170628184507.tnl7jc4wvtt5op5q@sirena.org.uk>
+Message-ID: <CAAUiYHf6n+C9Q7TdApG_7mOdc7fJyTKq9To=4PvgXARQ5eOAOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2017 at 15:55, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Fri, Jun 30, 2017 at 03:49:41PM +0000, Ard Biesheuvel wrote:
->>
->>
->> > On 30 Jun 2017, at 15:34, Arnd Bergmann <arnd@arndb.de> wrote:
->> >
->> > With the new task struct randomization, we can run into a build
->> > failure for certain random seeds:
->> >
->> > arch/arm/kernel/entry-armv.S: Assembler messages:
->> > arch/arm/kernel/entry-armv.S:803: Error: bad immediate value for offset (4096)
->> >
->> > Only two constants in asm-offset.h are affected, and I'm changing
->> > both of them here to work correctly in all configurations.
->> >
->> > One more macro has the problem, but is currently unused, so this
->> > removes it instead of adding complexity.
->> >
->> > Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > Fixes: c33d8b12fbbd ("task_struct: Allow randomized layout")
->> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> > ---
->> > arch/arm/kernel/entry-armv.S |  5 ++++-
->> > arch/arm/mm/proc-macros.S    | 10 ++++------
->> > 2 files changed, 8 insertions(+), 7 deletions(-)
->> >
->> > diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
->> > index 9f157e7c51e7..db6d22b23bd8 100644
->> > --- a/arch/arm/kernel/entry-armv.S
->> > +++ b/arch/arm/kernel/entry-armv.S
->> > @@ -797,7 +797,10 @@ ENTRY(__switch_to)
->> > #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
->> >    ldr    r7, [r2, #TI_TASK]
->> >    ldr    r8, =__stack_chk_guard
->> > -    ldr    r7, [r7, #TSK_STACK_CANARY]
->> > +    .if (TSK_STACK_CANARY > PAGE_MASK)
->>
->> Shouldn't this be ~PAGE_MASK?
->>
->> I think
->>
->> .if (TSK_STACK_CANARY & PAGE_MASK) != 0
->>
->> is better and clearer as well
->
-> It's not really that much clearer - what has any of this got to do with
-> the size of a page?  Just because a definition appears to be numerically
-> the same, it doesn't mean it should be used!
->
-> The LDR instruction takes a maximum of a 12-bit constant.  This 12-bit
-> constant has nothing to do with the page size; it's been that way since
-> the early ARMs that knew nothing about page tables.
->
-> Please instead create a LDR_IMM12_MASK or similar definition for this.
->
+Hello Mark,
 
-Yes, good point.
+Thank you for reviewing the patch. I've used the checkpatch tool and
+fixed the warnings provided by the tool. The warnings are in the
+function definitions:
+
+1) static void bcm63xx_hsspi_set_cs(struct bcm63xx_hsspi *bs, unsigned
+ cs, bool active)
+
+2) static void bcm63xx_hsspi_set_clk(struct bcm63xx_hsspi *bs,
+                                  struct spi_device *spi, int hz)
+{
+        unsigned profile = spi->chip_select;
+
+3) static int bcm63xx_hsspi_do_txrx(struct spi_device *spi, struct
+spi_transfer *t)
+{
+        struct bcm63xx_hsspi *bs = spi_master_get_devdata(spi->master);
+        unsigned chip_select = spi->chip_select;
+
+These warnings looked straightforward for me so I've fixed those and
+sent the patch.
+
+Kindly let me know if you want to record the warnings in the patch so
+that I could send v2 patch as soon as possible.
+
+Thank you,
+
+Aravind.
+
+
+On 29 June 2017 at 00:15, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Jun 27, 2017 at 09:37:10PM +0530, Aravind Thokala wrote:
+>> This patch fixes the checkpatch.pl warnings on the driver
+>> file.
+>
+> This isn't a good changelog, what are the warnings and why are we fixing
+> them?  The fact that checkpatch complains isn't meaningful in and of
+> itself - it's OK to say that checkpatch helped identify issues but it's
+> not perfect and we need to understand what is being changed and why.
