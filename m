@@ -1,50 +1,32 @@
-From: aravind.thk@gmail.com (Aravind Thokala)
-Date: Fri, 30 Jun 2017 23:08:15 +0530
-Subject: [PATCH] spi/bcm63xx-hspi: Fix checkpatch warnings
-In-Reply-To: <20170628184507.tnl7jc4wvtt5op5q@sirena.org.uk>
-References: <1498579630-10109-1-git-send-email-aravind.thk@gmail.com>
- <20170628184507.tnl7jc4wvtt5op5q@sirena.org.uk>
-Message-ID: <CAAUiYHf6n+C9Q7TdApG_7mOdc7fJyTKq9To=4PvgXARQ5eOAOg@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 30 Jun 2017 11:41:54 -0600
+Subject: [PATCH 0/5] coresight: Miscellaneous fixes 
+Message-ID: <1498844519-8845-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+These 5 patches address a few issues we've seen with the drivers as
+we keep adding new features.  The first 3 patches address a
+synchronisation problem when trace buffers overflow while the latter
+two fix a couple of problems when working ETMv3 tracers.
 
-Thank you for reviewing the patch. I've used the checkpatch tool and
-fixed the warnings provided by the tool. The warnings are in the
-function definitions:
+Regards,
+Mathieu
 
-1) static void bcm63xx_hsspi_set_cs(struct bcm63xx_hsspi *bs, unsigned
- cs, bool active)
+Mathieu Poirier (5):
+  coresight: Correct buffer lost increment
+  coresight: etb10: Remove useless conversion to LE
+  coresight: Add barrier packet for synchronisation
+  coresight: etb10: Move etb_disable_hw() outside of lock
+  coresight: etm3x: Set synchronisation frequencty to TRM default
 
-2) static void bcm63xx_hsspi_set_clk(struct bcm63xx_hsspi *bs,
-                                  struct spi_device *spi, int hz)
-{
-        unsigned profile = spi->chip_select;
+ drivers/hwtracing/coresight/coresight-etb10.c   | 46 +++++++++++++++++--------
+ drivers/hwtracing/coresight/coresight-etm3x.c   |  2 ++
+ drivers/hwtracing/coresight/coresight-priv.h    |  2 ++
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 34 ++++++++++++++++--
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 12 +++++++
+ drivers/hwtracing/coresight/coresight.c         |  8 +++++
+ 6 files changed, 87 insertions(+), 17 deletions(-)
 
-3) static int bcm63xx_hsspi_do_txrx(struct spi_device *spi, struct
-spi_transfer *t)
-{
-        struct bcm63xx_hsspi *bs = spi_master_get_devdata(spi->master);
-        unsigned chip_select = spi->chip_select;
-
-These warnings looked straightforward for me so I've fixed those and
-sent the patch.
-
-Kindly let me know if you want to record the warnings in the patch so
-that I could send v2 patch as soon as possible.
-
-Thank you,
-
-Aravind.
-
-
-On 29 June 2017 at 00:15, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Jun 27, 2017 at 09:37:10PM +0530, Aravind Thokala wrote:
->> This patch fixes the checkpatch.pl warnings on the driver
->> file.
->
-> This isn't a good changelog, what are the warnings and why are we fixing
-> them?  The fact that checkpatch complains isn't meaningful in and of
-> itself - it's OK to say that checkpatch helped identify issues but it's
-> not perfect and we need to understand what is being changed and why.
+-- 
+2.7.4
