@@ -1,41 +1,56 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 30 Jun 2017 01:04:35 +0200
-Subject: [RFC 2/2] soc: bcm: brcmstb: PM: Implement target_state callback
-In-Reply-To: <20170623010837.11199-3-f.fainelli@gmail.com>
-References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
- <20170623010837.11199-1-f.fainelli@gmail.com>
- <20170623010837.11199-3-f.fainelli@gmail.com>
-Message-ID: <48358346.FqHa0fcY05@aspire.rjw.lan>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 29 Jun 2017 17:01:19 -0700
+Subject: [PATCH RFC 11/26] arm: Remove spin_unlock_wait() arch-specific
+ definitions
+In-Reply-To: <20170629235918.GA6445@linux.vnet.ibm.com>
+References: <20170629235918.GA6445@linux.vnet.ibm.com>
+Message-ID: <1498780894-8253-11-git-send-email-paulmck@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 22, 2017 06:08:37 PM Florian Fainelli wrote:
-> Provide a target_state callback implementation which just returns the
-> suspend_state_t the system is about to enter. Broadcom STB drivers can
-> utilize platform_suspend_target_state() to retrieve that and take
-> appropriate actions (e.g: full vs. partial re-initialization).
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  drivers/soc/bcm/brcmstb/pm/pm-arm.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/soc/bcm/brcmstb/pm/pm-arm.c b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-> index 4b7e6c297b23..7d4695734093 100644
-> --- a/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-> +++ b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-> @@ -104,6 +104,7 @@ struct brcmstb_pm_control {
->  	u32 phy_b_standby_ctrl_offs;
->  	bool needs_ddr_pad;
->  	struct platform_device *pdev;
-> +	suspend_state_t pm_state;
+There is no agreed-upon definition of spin_unlock_wait()'s semantics,
+and it appears that all callers could do just as well with a lock/unlock
+pair.  This commit therefore removes the underlying arch-specific
+arch_spin_unlock_wait().
 
-I wouldn't use suspend_state_t here, because the mapping between those
-things and real platform power states is somewhat arbitrary and totally
-platform-specific.
+Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Andrea Parri <parri.andrea@gmail.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ arch/arm/include/asm/spinlock.h | 16 ----------------
+ 1 file changed, 16 deletions(-)
 
-It's better to define symbols representing platform power states for your
-platform (or use an enum) and then use those symbols in the drivers IMO.
-
-Thanks,
-Rafael
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index 4bec45442072..c030143c18c6 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -52,22 +52,6 @@ static inline void dsb_sev(void)
+  * memory.
+  */
+ 
+-static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
+-{
+-	u16 owner = READ_ONCE(lock->tickets.owner);
+-
+-	for (;;) {
+-		arch_spinlock_t tmp = READ_ONCE(*lock);
+-
+-		if (tmp.tickets.owner == tmp.tickets.next ||
+-		    tmp.tickets.owner != owner)
+-			break;
+-
+-		wfe();
+-	}
+-	smp_acquire__after_ctrl_dep();
+-}
+-
+ #define arch_spin_lock_flags(lock, flags) arch_spin_lock(lock)
+ 
+ static inline void arch_spin_lock(arch_spinlock_t *lock)
+-- 
+2.5.2
