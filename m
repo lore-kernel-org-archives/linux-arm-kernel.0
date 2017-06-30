@@ -1,49 +1,129 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:36 +0100
-Subject: [PATCH 20/58] KVM: arm/arm64: Move irq_is_ppi() to header file
+Date: Fri, 30 Jun 2017 09:44:30 +0100
+Subject: [PATCH 14/58] KVM: arm/arm64: change exit request to sleep request
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-21-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <cdall@linaro.org>
+From: Andrew Jones <drjones@redhat.com>
 
-We are about to need this define in the arch timer code as well so move
-it to a common location.
+A request called EXIT is too generic. All requests are meant to cause
+exits, but different requests have different flags. Let's not make
+it difficult to decide if the EXIT request is correct for some case
+by just always providing unique requests for each case. This patch
+changes EXIT to SLEEP, because that's what the request is asking the
+VCPU to do.
 
+Signed-off-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h | 2 ++
- virt/kvm/arm/pmu.c     | 2 --
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  2 +-
+ arch/arm64/include/asm/kvm_host.h |  2 +-
+ virt/kvm/arm/arm.c                | 12 ++++++------
+ virt/kvm/arm/psci.c               |  4 ++--
+ 4 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 97b8d3728b31..dde59fbc5f80 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -38,6 +38,8 @@
- #define VGIC_MIN_LPI		8192
- #define KVM_IRQCHIP_NUM_PINS	(1020 - 32)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index c556babe467c..fdd644c01c89 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -44,7 +44,7 @@
+ #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
+ #endif
  
-+#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
-+
- enum vgic_type {
- 	VGIC_V2,		/* Good ol' GICv2 */
- 	VGIC_V3,		/* New fancy GICv3 */
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 96a9cab39982..574feff55a6c 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -496,8 +496,6 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
- 	return 0;
+-#define KVM_REQ_VCPU_EXIT \
++#define KVM_REQ_SLEEP \
+ 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+ 
+ u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 0ff991c9c66e..9bd0d1040de9 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -41,7 +41,7 @@
+ 
+ #define KVM_VCPU_MAX_FEATURES 4
+ 
+-#define KVM_REQ_VCPU_EXIT \
++#define KVM_REQ_SLEEP \
+ 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+ 
+ int __attribute_const__ kvm_target_cpu(void);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 9379b1d75ad3..ddc833987dfb 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -371,7 +371,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ static void vcpu_power_off(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu->arch.power_off = true;
+-	kvm_make_request(KVM_REQ_VCPU_EXIT, vcpu);
++	kvm_make_request(KVM_REQ_SLEEP, vcpu);
+ 	kvm_vcpu_kick(vcpu);
  }
  
--#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
--
- /*
-  * For one VM the interrupt type must be same for each vcpu.
-  * As a PPI, the interrupt number is the same for all vcpus,
+@@ -543,7 +543,7 @@ void kvm_arm_halt_guest(struct kvm *kvm)
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		vcpu->arch.pause = true;
+-	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
++	kvm_make_all_cpus_request(kvm, KVM_REQ_SLEEP);
+ }
+ 
+ void kvm_arm_resume_guest(struct kvm *kvm)
+@@ -557,7 +557,7 @@ void kvm_arm_resume_guest(struct kvm *kvm)
+ 	}
+ }
+ 
+-static void vcpu_sleep(struct kvm_vcpu *vcpu)
++static void vcpu_req_sleep(struct kvm_vcpu *vcpu)
+ {
+ 	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+ 
+@@ -566,7 +566,7 @@ static void vcpu_sleep(struct kvm_vcpu *vcpu)
+ 
+ 	if (vcpu->arch.power_off || vcpu->arch.pause) {
+ 		/* Awaken to handle a signal, request we sleep again later. */
+-		kvm_make_request(KVM_REQ_VCPU_EXIT, vcpu);
++		kvm_make_request(KVM_REQ_SLEEP, vcpu);
+ 	}
+ }
+ 
+@@ -578,8 +578,8 @@ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
+ {
+ 	if (kvm_request_pending(vcpu)) {
+-		if (kvm_check_request(KVM_REQ_VCPU_EXIT, vcpu))
+-			vcpu_sleep(vcpu);
++		if (kvm_check_request(KVM_REQ_SLEEP, vcpu))
++			vcpu_req_sleep(vcpu);
+ 	}
+ }
+ 
+diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+index 4a436685c552..f1e363bab5e8 100644
+--- a/virt/kvm/arm/psci.c
++++ b/virt/kvm/arm/psci.c
+@@ -65,7 +65,7 @@ static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
+ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu->arch.power_off = true;
+-	kvm_make_request(KVM_REQ_VCPU_EXIT, vcpu);
++	kvm_make_request(KVM_REQ_SLEEP, vcpu);
+ 	kvm_vcpu_kick(vcpu);
+ }
+ 
+@@ -183,7 +183,7 @@ static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+ 	 */
+ 	kvm_for_each_vcpu(i, tmp, vcpu->kvm)
+ 		tmp->arch.power_off = true;
+-	kvm_make_all_cpus_request(vcpu->kvm, KVM_REQ_VCPU_EXIT);
++	kvm_make_all_cpus_request(vcpu->kvm, KVM_REQ_SLEEP);
+ 
+ 	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
+ 	vcpu->run->system_event.type = type;
 -- 
 2.11.0
