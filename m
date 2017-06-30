@@ -1,57 +1,69 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:59 +0100
-Subject: [PATCH 43/58] KVM: arm64: Enable GICv3 Group-0 sysreg trapping via
- command-line
+Date: Fri, 30 Jun 2017 09:44:58 +0100
+Subject: [PATCH 42/58] KVM: arm64: vgic-v3: Enable trapping of Group-0 system
+ registers
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-44-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-43-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we're able to safely handle Group-0 sysreg access, let's
-give the user the opportunity to enable it by passing a specific
-command-line option (vgic_v3.group0_trap).
+In order to be able to trap Group-0 GICv3 system registers, we need to
+set ICH_HCR_EL2.TALL0 begore entering the guest. This is conditionnaly
+done after having restored the guest's state, and cleared on exit.
 
 Tested-by: Alexander Graf <agraf@suse.de>
 Acked-by: David Daney <david.daney@cavium.com>
+Acked-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- Documentation/admin-guide/kernel-parameters.txt | 4 ++++
- virt/kvm/arm/vgic/vgic-v3.c                     | 6 ++++++
- 2 files changed, 10 insertions(+)
+ include/linux/irqchip/arm-gic-v3.h | 1 +
+ virt/kvm/arm/vgic/vgic-v3.c        | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 42fe395be6c8..88bdc421351f 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1829,6 +1829,10 @@
- 			for all guests.
- 			Default is 1 (enabled) if in 64-bit or 32-bit PAE mode.
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 6b05d2ac8c54..c7f31a962cfc 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -417,6 +417,7 @@
  
-+	kvm-arm.vgic_v3_group0_trap=
-+			[KVM,ARM] Trap guest accesses to GICv3 group-0
-+			system registers
-+
- 	kvm-arm.vgic_v3_group1_trap=
- 			[KVM,ARM] Trap guest accesses to GICv3 group-1
- 			system registers
+ #define ICH_HCR_EN			(1 << 0)
+ #define ICH_HCR_UIE			(1 << 1)
++#define ICH_HCR_TALL0			(1 << 11)
+ #define ICH_HCR_TALL1			(1 << 12)
+ #define ICH_HCR_EOIcount_SHIFT		27
+ #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
 diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 39046ee5be25..828ca7f9a060 100644
+index 4b2b62b73470..39046ee5be25 100644
 --- a/virt/kvm/arm/vgic/vgic-v3.c
 +++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -438,6 +438,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
+@@ -21,6 +21,7 @@
  
- DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
+ #include "vgic.h"
  
-+static int __init early_group0_trap_cfg(char *buf)
-+{
-+	return strtobool(buf, &group0_trap);
-+}
-+early_param("kvm-arm.vgic_v3_group0_trap", early_group0_trap_cfg);
-+
- static int __init early_group1_trap_cfg(char *buf)
- {
- 	return strtobool(buf, &group1_trap);
++static bool group0_trap;
+ static bool group1_trap;
+ 
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+@@ -260,6 +261,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 
+ 	/* Get the show on the road... */
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
++	if (group0_trap)
++		vgic_v3->vgic_hcr |= ICH_HCR_TALL0;
+ 	if (group1_trap)
+ 		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
+ }
+@@ -492,7 +495,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	if (kvm_vgic_global_state.vcpu_base == 0)
+ 		kvm_info("disabling GICv2 emulation\n");
+ 
+-	if (group1_trap) {
++	if (group0_trap || group1_trap) {
+ 		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
+ 		static_branch_enable(&vgic_v3_cpuif_trap);
+ 	}
 -- 
 2.11.0
