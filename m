@@ -1,112 +1,27 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Sat, 1 Jul 2017 00:14:44 +1000
-Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
-In-Reply-To: <CAGb2v67CTXayDm4rhoJ4CNx9J=u+U+2_kh9xYsjHjCE8YnJ=ow@mail.gmail.com>
-References: <20170627143652.13075-1-net147@gmail.com>
- <20170628092024.ejxy6itqj3hx6yew@flea>
- <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
- <20170629155620.4keqi4cumbtvv63u@flea>
- <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
- <CAGb2v67CTXayDm4rhoJ4CNx9J=u+U+2_kh9xYsjHjCE8YnJ=ow@mail.gmail.com>
-Message-ID: <CANwerB2RHQwZgZc37+dkh9np-SSFks3tZxqFzDPVwQP5oP48hg@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 01 Jul 2017 00:02:52 +0200
+Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
+ rk3228
+In-Reply-To: <8439045.hRh8SXquWF@phil>
+References: <1497000974-12696-1-git-send-email-david.wu@rock-chips.com>
+ <8439045.hRh8SXquWF@phil>
+Message-ID: <1525287.LZSCgZlMQ2@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu and Maxime,
+Am Freitag, 9. Juni 2017, 12:45:46 CEST schrieb Heiko Stuebner:
+> Am Freitag, 9. Juni 2017, 17:36:14 CEST schrieb David Wu:
+> > This adds the necessary data for handling io voltage domains on the rk3228.
+> > 
+> > Signed-off-by: David Wu <david.wu@rock-chips.com>
+> 
+> matches the manual, so
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-On 30 June 2017 at 13:16, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Fri, Jun 30, 2017 at 6:22 AM, Jonathan Liu <net147@gmail.com> wrote:
->> Hi Maxime,
->>
->> On 30 June 2017 at 01:56, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>> On Wed, Jun 28, 2017 at 08:39:33PM +1000, Jonathan Liu wrote:
->>>> >> +     u32 int_status;
->>>> >> +     u32 fifo_status;
->>>> >> +     /* Read needs empty flag unset, write needs full flag unset */
->>>> >> +     u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
->>>> >> +                       SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
->>>> >> +     int ret;
->>>> >> +
->>>> >> +     /* Wait until error or FIFO ready */
->>>> >> +     ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
->>>> >> +                              int_status,
->>>> >> +                              is_err_status(int_status) ||
->>>> >> +                              is_fifo_flag_unset(hdmi, &fifo_status, flag),
->>>> >> +                              min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
->>>> >> +                              100000);
->>>> >> +
->>>> >> +     if (is_err_status(int_status))
->>>> >> +             return -EIO;
->>>> >> +     if (ret)
->>>> >> +             return -ETIMEDOUT;
->>>> >
->>>> > Why not just have
->>>> > ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
->>>> >                          !(reg & flag), 100, 100000);
->>>> >
->>>> > if (ret < 0)
->>>> >         if (is_err_status())
->>>> >                 return -EIO;
->>>> >         return ret;
->>>> >
->>>> >
->>>>
->>>> If I check error status after readl_poll_timeout and there is an error
->>>> (e.g. the I2C address does not have a corresponding device connected
->>>> or nothing connected to HDMI port) it will keep checking the fifo
->>>> status even though error bit is set in the int status and then timeout
->>>> after 100 ms. If it checks the int status register at the same time,
->>>> it will error after 100 nanoseconds. I don't want to introduce
->>>> unnecessary delays considering part of the reason for adding this
->>>> driver to make it more usable for non-standard use cases.
->>>
->>> Well, polling for 100ms doesn't seem great either. What was the
->>> rationale behind that timeout?
->>>
->>
->> When an error occurs one of the error bits will be set in the
->> INT_STATUS register so this is detected very quickly if I check the
->> INT_STATUS and FIFO_STATUS at the same time. The 100 ms timeout is in
->> case the I2C slave does clock stretching in which case the transfer
->> may take longer than the predicted time.
->>
->>> And we can also reverse the check and look at the INT_STATUS
->>> register. The errors will be there, and we can program the threshold
->>> we want in both directions and use the
->>> DDC_FIFO_Request_Interrupt_Status bit.
->>>
->>
->> I did try that when I was doing the v3 patch but I couldn't get it to
->> work as mentioned previously in the v3 patch discussion. I programmed
->> the FIFO_RX_TRIGGER_THRES and FIFO_TX_TRIGGER_THRES in DDC_FIFO_Ctrl
->> register at the same time as setting FIFO_Address_Clear but the
->> request interrupt status bit did not get updated to the appropriate
->> state that is consistent with the FIFO level and the thresholds. I did
->> try this several times for subsequent patch versions without success.
->
-> The manual says "When FIFO level is above this value in read mode, DMA
-> request and FIFO request interrupt are asserted if relative enable is on."
->
-> Perhaps try enabling the interrupts? But if that were the case, wouldn't
-> using interrupts instead of polling be better?
->
-> ChenYu
->
+Kevin, Rafael,
 
-I managed to get the thresholds working so switching to using
-interrupts instead of polling will be my next goal.
+any thoughts on this?
 
->>
->>> Maxime
->>>
->>> --
->>> Maxime Ripard, Free Electrons
->>> Embedded Linux and Kernel engineering
->>> http://free-electrons.com
->>
->> Regards,
->> Jonathan
 
-Regards,
-Jonathan
+Thanks
+Heiko
