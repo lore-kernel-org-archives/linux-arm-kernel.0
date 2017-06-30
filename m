@@ -1,70 +1,54 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:54 +0100
-Subject: [PATCH 38/58] KVM: arm64: Enable GICv3 Group-1 sysreg trapping via
- command-line
+Date: Fri, 30 Jun 2017 09:45:12 +0100
+Subject: [PATCH 56/58] KVM: ARM64: fix phy counter access failure in guest.
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-39-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-57-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we're able to safely handle Group-1 sysreg access, let's
-give the user the opportunity to enable it by passing a specific
-command-line option (vgic_v3.group1_trap).
+From: Hu Huajun <huhuajun@huawei.com>
 
-Tested-by: Alexander Graf <agraf@suse.de>
-Acked-by: David Daney <david.daney@cavium.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
+When reading the cntpct_el0 in guest with VHE (Virtual Host Extension)
+enabled in host, the "Unsupported guest sys_reg access" error reported.
+The reason is cnthctl_el2.EL1PCTEN is not enabled, which is expected
+to be done in kvm_timer_init_vhe(). The problem is kvm_timer_init_vhe
+is called by cpu_init_hyp_mode, and which is called when VHE is disabled.
+This patch remove the incorrect call to kvm_timer_init_vhe() from
+cpu_init_hyp_mode(), and calls kvm_timer_init_vhe() to enable
+cnthctl_el2.EL1PCTEN in cpu_hyp_reinit().
+
+Fixes: 488f94d7212b ("KVM: arm64: Access CNTHCTL_EL2 bit fields correctly on VHE systems")
+Cc: stable at vger.kernel.org
+Signed-off-by: Hu Huajun <huhuajun@huawei.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- Documentation/admin-guide/kernel-parameters.txt |  4 ++++
- virt/kvm/arm/vgic/vgic-v3.c                     | 11 +++++++++++
- 2 files changed, 15 insertions(+)
+ virt/kvm/arm/arm.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 15f79c27748d..42fe395be6c8 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1829,6 +1829,10 @@
- 			for all guests.
- 			Default is 1 (enabled) if in 64-bit or 32-bit PAE mode.
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index a265acc53e39..a39a1e161e63 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1141,9 +1141,6 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 	__cpu_init_stage2();
  
-+	kvm-arm.vgic_v3_group1_trap=
-+			[KVM,ARM] Trap guest accesses to GICv3 group-1
-+			system registers
-+
- 	kvm-intel.ept=	[KVM,Intel] Disable extended page tables
- 			(virtualized MMU) support on capable Intel chips.
- 			Default is 1 (enabled)
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 722bdebdfbb5..4b2b62b73470 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -435,6 +435,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
+-	if (is_kernel_in_hyp_mode())
+-		kvm_timer_init_vhe();
+-
+ 	kvm_arm_init_debug();
+ }
  
- DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
- 
-+static int __init early_group1_trap_cfg(char *buf)
-+{
-+	return strtobool(buf, &group1_trap);
-+}
-+early_param("kvm-arm.vgic_v3_group1_trap", early_group1_trap_cfg);
-+
- /**
-  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-@@ -486,6 +492,11 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 	if (kvm_vgic_global_state.vcpu_base == 0)
- 		kvm_info("disabling GICv2 emulation\n");
- 
-+	if (group1_trap) {
-+		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
-+		static_branch_enable(&vgic_v3_cpuif_trap);
-+	}
-+
- 	kvm_vgic_global_state.vctrl_base = NULL;
- 	kvm_vgic_global_state.type = VGIC_V3;
- 	kvm_vgic_global_state.max_gic_vcpus = VGIC_V3_MAX_CPUS;
+@@ -1163,6 +1160,7 @@ static void cpu_hyp_reinit(void)
+ 		 * event was cancelled before the CPU was reset.
+ 		 */
+ 		__cpu_init_stage2();
++		kvm_timer_init_vhe();
+ 	} else {
+ 		cpu_init_hyp_mode(NULL);
+ 	}
 -- 
 2.11.0
