@@ -1,71 +1,39 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 30 Jun 2017 13:36:54 +0200
-Subject: [PATCH 0/2] Follow-up on "ARM: Fix dma_alloc_coherent() and
- friends for NOMMU"
-In-Reply-To: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
-References: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CA+M3ks5OqDwdmz6dTR87zX+OH_F+dJgXwfo96EWBg8XbvhmY4g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 30 Jun 2017 13:51:08 +0200
+Subject: [PATCH] arm64: dts: renesas: Move CPG_AUDIO_CLK_I from board to
+ soc files
+In-Reply-To: <1587046.f3YfXb5MdT@avalon>
+References: <1498810948-17910-1-git-send-email-geert+renesas@glider.be>
+ <1587046.f3YfXb5MdT@avalon>
+Message-ID: <20170630115107.GJ26710@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-28 11:16 GMT+02:00 Vladimir Murzin <vladimir.murzin@arm.com>:
-> These two patches are folloups on "[PATCH v6 0/7] ARM: Fix
-> dma_alloc_coherent() and friends for NOMMU" which has been partly
-> merged in [1]. PATCH 1/2 is done per Christoph's suggestion [2] to
-> eliminate duplication in dma-noop.c.  PATCH 2/2 is fixup for ARM's dma
-> operations for NOMMU due to aforementioned change.
->
-> @Benjamin, your Tested-by for ARM bits would be very appretiated!
+On Fri, Jun 30, 2017 at 12:10:52PM +0300, Laurent Pinchart wrote:
+> Hi Geert,
+> 
+> Thank you for the patch.
+> 
+> On Friday 30 Jun 2017 10:22:28 Geert Uytterhoeven wrote:
+> > The definition of CPG_AUDIO_CLK_I is SoC-specific, not board-specific.
+> > Hence move it from the board-specific .dts files to the SoC-specific
+> > .dtsi files.
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> > ---
+> > I don't think it's worth adding Fixes tags.
+> > 
+> > If you disagree, feel free to add:
+> > 
+> > Fixes: 79e3b5cf035e4734 ("arm64: dts: renesas: Add support for Salvator-XS
+> > with R-Car H3 ES2.0") Fixes: fb5202dbebfd8fbf ("arm64: dts: r8a7795:
+> > h3ulcb: Add support for R-Car H3 ES2.0") Fixes: 0b03c32db03d63de ("arm64:
+> > dts: r8a7795: salvator-x: Add support for R-Car H3 ES2.0") Fixes:
+> > 253ed045a34d16d9 ("arm64: dts: renesas: Extract common ULCB board support")
+> > Fixes: d25e8ff0d5aaf8b1 ("arm64: dts: renesas: Extract common Salvator-X
+> > board support") ---
 
-I have been able to test on stm32f4 with drm/kms drivers which is
-calling dma_alloc_coherent
-and modetest doing mmap and it is working fine.
-
-tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-
->
-> @Christoph, in case you decide to queue PATCH 1/2, can you put it
-> before "ARM: NOMMU: Introduce dma operations for noMMU", so transition
-> to the new dma operations won't break bisectability.
->
-> [1] git://git.infradead.org/users/hch/dma-mapping.git for-next
-> [2] https://www.spinics.net/lists/arm-kernel/msg590587.html
->
-> Cc: Steven Miao <realmz6@gmail.com>
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> Cc: Rich Felker <dalias@libc.org>
-> Cc: Chris Zankel <chris@zankel.net>
-> Cc: Max Filippov <jcmvbkbc@gmail.com>
->
-> Thanks!
->
-> Vladimir Murzin (2):
->   drivers: dma-mapping: allow dma_common_mmap() for NOMMU
->   fixup: ARM: NOMMU: Introduce dma operations for noMMU
->
->  arch/arm/mm/dma-mapping-nommu.c | 18 ------------------
->  arch/blackfin/Kconfig           |  1 +
->  arch/m32r/Kconfig               |  1 +
->  arch/m68k/Kconfig               |  1 +
->  arch/microblaze/Kconfig         |  1 +
->  arch/sh/Kconfig                 |  1 +
->  arch/xtensa/Kconfig             |  1 +
->  drivers/base/dma-mapping.c      |  4 ++--
->  8 files changed, 8 insertions(+), 20 deletions(-)
->
-> --
-> 2.0.0
->
-
-
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+I agree. I've applied this for v4.14 without the fixes tags.
