@@ -1,205 +1,174 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Fri, 30 Jun 2017 15:55:42 +0800
-Subject: [PATCH V1 7/9] clk: sprd: add adjustable pll support
-In-Reply-To: <20170630014452.GL22780@codeaurora.org>
-References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
- <20170618015855.27738-8-chunyan.zhang@spreadtrum.com>
- <20170620013710.GJ4493@codeaurora.org>
- <CAAfSe-sMy3aM9=LwpVivvHKy4hVw3GEd3U-hZe17pXM5fJRxPg@mail.gmail.com>
- <20170630014452.GL22780@codeaurora.org>
-Message-ID: <CAAfSe-smKqgd42jDAGDA=NtYvRZExNanU7fHrRkT4W-WH-2=ug@mail.gmail.com>
+From: yong.deng@magewell.com (Yong)
+Date: Fri, 30 Jun 2017 15:55:58 +0800
+Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for
+ Allwinner CSI
+In-Reply-To: <CAGb2v66+xHR7xfBX_mPigZE_nvcRQfnpr4QAcKYEUhSGN7h61w@mail.gmail.com>
+References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+ <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
+ <20170629211957.uz7jijkuoxr2vohc@rob-hp-laptop>
+ <CAGb2v66+xHR7xfBX_mPigZE_nvcRQfnpr4QAcKYEUhSGN7h61w@mail.gmail.com>
+Message-ID: <20170630155558.929bcdc7805a88bb2c467436@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Fri, 30 Jun 2017 11:41:50 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-On 30 June 2017 at 09:44, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/22, Chunyan Zhang wrote:
->> On 20 June 2017 at 09:37, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> > On 06/18, Chunyan Zhang wrote:
->> >> diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
->> >> index 83232e5..c593a93 100644
->> >> --- a/drivers/clk/sprd/Makefile
->> >> +++ b/drivers/clk/sprd/Makefile
->> >> @@ -1,3 +1,3 @@
->> >>  ifneq ($(CONFIG_OF),)
->> >> -obj-y        += ccu_common.o ccu_gate.o ccu_mux.o ccu_div.o ccu_composite.o
->> >> +obj-y        += ccu_common.o ccu_gate.o ccu_mux.o ccu_div.o ccu_composite.o ccu_pll.o
->> >>  endif
->> >> diff --git a/drivers/clk/sprd/ccu_pll.c b/drivers/clk/sprd/ccu_pll.c
->> >> new file mode 100644
->> >> index 0000000..6c908e4
->> >> --- /dev/null
->> >> +++ b/drivers/clk/sprd/ccu_pll.c
->> >> @@ -0,0 +1,241 @@
->> >> +/*
->> >> + * Spreadtrum pll clock driver
->> >> + *
->> >> + * Copyright (C) 2015~2017 Spreadtrum, Inc.
->> >> + *
->> >> + * SPDX-License-Identifier: GPL-2.0
->> >> + */
->> >> +
->> >> +#include <linux/delay.h>
->> >> +#include <linux/clk.h>
->> >
->> > Is this include used? Should be clk-provider?
->>
->> Right, will remove it.
->>
->> >
->> >> +#include <linux/err.h>
->> >> +#include <linux/slab.h>
->> >> +
->> >> +#include "ccu_pll.h"
->> >> +
->> >> +#define CCU_PLL_1M   1000000
->> >> +#define CCU_PLL_10M  (CCU_PLL_1M * 10)
->> >> +
->> >> +#define pindex(pll, member)          \
->> >> +     (pll->factors[member].shift / (8 * sizeof(pll->regs[0])))
->> >> +
->> >> +#define pshift(pll, member)          \
->> >> +     (pll->factors[member].shift % (8 * sizeof(pll->regs[0])))
->> >> +
->> >> +#define pwidth(pll, member)          \
->> >> +     pll->factors[member].width
->> >> +
->> >> +#define pmask(pll, member)                                   \
->> >> +     ((pwidth(pll, member)) ?                                \
->> >> +     GENMASK(pwidth(pll, member) + pshift(pll, member) - 1,  \
->> >> +     pshift(pll, member)) : 0)
->> >> +
->> >> +#define pinternal(pll, cfg, member)  \
->> >> +     (cfg[pindex(pll, member)] & pmask(pll, member))
->> >> +
->> >> +#define pinternal_val(pll, cfg, member)      \
->> >> +     (pinternal(pll, cfg, member) >> pshift(pll, member))
->> >> +
->> >> +static unsigned long pll_get_refin_rate(struct ccu_pll *pll)
->> >
->> > pll could be const?
->>
->> What this function returns is a factor used to calculate the pll rate
->> later, I will rename this function in the next iterator.
->>
->
-> Rename is fine, but pll can still be marked const?
+> On Fri, Jun 30, 2017 at 5:19 AM, Rob Herring <robh@kernel.org> wrote:
+> > On Tue, Jun 27, 2017 at 07:07:34PM +0800, Yong Deng wrote:
+> >> Add binding documentation for Allwinner CSI.
+> >
+> > For the subject:
+> >
+> > dt-bindings: media: Add Allwinner Camera Sensor Interface (CSI)
+> >
+> > "binding documentation" is redundant.
 
-Oh, sorry I misunderstood :)
-You mean mark the input parameter "pll" const, right?
+OK.
 
->>
->> >
->> >> +             nint = pinternal_val(pll, cfg, PLL_NINT);
->> >> +             if (pinternal(pll, cfg, PLL_SDM_EN))
->> >> +                     kint = pinternal_val(pll, cfg, PLL_KINT);
->> >> +
->> >> +             mask = pmask(pll, PLL_KINT);
->> >> +#ifdef CONFIG_64BIT
->> >> +             k1 = 1000;
->> >> +             k2 = 1000;
->> >> +             rate = DIV_ROUND_CLOSEST(refin * kint * k1,
->> >> +                                      ((mask >> __ffs(mask)) + 1)) *
->> >> +                                      k2 + refin * nint * CCU_PLL_1M;
->> >> +#else
->> >> +             k1 = 100;
->> >> +             k2 = 10000;
->> >> +             i = pwidth(pll, PLL_KINT);
->> >> +             i = i < 21 ? 0 : i - 21;
->> >> +             rate = DIV_ROUND_CLOSEST(refin * (kint >> i) * k1,
->> >> +                                      ((mask >> (__ffs(mask) + i)) + 1)) *
->> >> +                                      k2 + refin * nint * CCU_PLL_1M;
->> >> +#endif
->> >> +     }
->> >> +
->> >> +     return rate;
->> >> +}
->> >> +
->> >> +static int ccu_pll_helper_set_rate(struct ccu_pll *pll,
->> >> +                                unsigned long rate,
->> >> +                                unsigned long parent_rate)
->> >> +{
->> >> +     u32 mask, shift, width, ibias_val, index, kint, nint;
->> >> +     u32 reg_num = pll->regs[0], i = 0;
->> >> +     unsigned long refin, fvco = rate;
->> >> +     struct reg_cfg *cfg;
->> >> +
->> >> +     cfg = kcalloc(reg_num, sizeof(*cfg), GFP_KERNEL);
->> >> +     if (!cfg)
->> >> +             return -ENOMEM;
->> >> +
->> >> +     refin = pll_get_refin_rate(pll);
->> >> +
->> >> +     mask = pmask(pll, PLL_PREDIV);
->> >> +     index = pindex(pll, PLL_PREDIV);
->> >> +     width = pwidth(pll, PLL_PREDIV);
->> >> +     if (width && (ccu_pll_readl(pll, index) & mask))
->> >> +             refin = refin * 2;
->> >> +
->> >> +     mask = pmask(pll, PLL_POSTDIV);
->> >> +     index = pindex(pll, PLL_POSTDIV);
->> >> +     width = pwidth(pll, PLL_POSTDIV);
->> >> +     cfg[index].msk = mask;
->> >> +     if (width && ((pll->fflag == 1 && fvco <= pll->fvco) ||
->> >> +                   (pll->fflag == 0 && fvco > pll->fvco)))
->> >> +             cfg[index].val |= mask;
->> >> +
->> >> +     if (width && fvco <= pll->fvco)
->> >> +             fvco = fvco * 2;
->> >> +
->> >> +     mask = pmask(pll, PLL_DIV_S);
->> >> +     index = pindex(pll, PLL_DIV_S);
->> >> +     cfg[index].val |= mask;
->> >> +     cfg[index].msk |= mask;
->> >> +
->> >> +     mask = pmask(pll, PLL_SDM_EN);
->> >> +     index = pindex(pll, PLL_SDM_EN);
->> >> +     cfg[index].val |= mask;
->> >> +     cfg[index].msk |= mask;
->> >> +
->> >> +     nint  = fvco/(refin * CCU_PLL_1M);
->> >> +
->> >> +     mask = pmask(pll, PLL_NINT);
->> >> +     index = pindex(pll, PLL_NINT);
->> >> +     shift = pshift(pll, PLL_NINT);
->> >> +     cfg[index].val |= (nint << shift) & mask;
->> >> +     cfg[index].msk |= mask;
->> >> +
->> >> +     mask = pmask(pll, PLL_KINT);
->> >> +     index = pindex(pll, PLL_KINT);
->> >> +     width = pwidth(pll, PLL_KINT);
->> >> +     shift = pshift(pll, PLL_KINT);
->> >> +#ifndef CONFIG_64BIT
->> >> +     i = width < 21 ? 0 : i - 21;
->> >> +#endif
->> >
->> > What's this? Why do we depend on CONFIG_64BIT?
->>
->> On 32-bit SoCs, the largest width we can support is limited due to the
->> limitation of calculation precision.
->
-> Does the hardware width change? Still not clear to me what's
-> going on here.
+> >
+> >>
+> >> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> >> ---
+> >>  .../devicetree/bindings/media/sunxi-csi.txt        | 51 ++++++++++++++++++++++
+> >>  1 file changed, 51 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/media/sunxi-csi.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/media/sunxi-csi.txt b/Documentation/devicetree/bindings/media/sunxi-csi.txt
+> >> new file mode 100644
+> >> index 0000000..770be0e
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/media/sunxi-csi.txt
+> >> @@ -0,0 +1,51 @@
+> >> +Allwinner V3s Camera Sensor Interface
+> >> +------------------------------
+> >> +
+> >> +Required properties:
+> >> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> >> +  - reg: base address and size of the memory-mapped region.
+> >> +  - interrupts: interrupt associated to this IP
+> >> +  - clocks: phandles to the clocks feeding the CSI
+> >> +    * ahb: the CSI interface clock
+> >> +    * mod: the CSI module clock
+> >> +    * ram: the CSI DRAM clock
+> >> +  - clock-names: the clock names mentioned above
+> >> +  - resets: phandles to the reset line driving the CSI
+> >> +
+> >> +- ports: A ports node with endpoint definitions as defined in
+> >> +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> >> +  first port should be the input endpoints, the second one the outputs
+> >
+> > Is there more than one endpoint for each port? If so, need to define
+> > that numbering too.
 
-I heard from my colleague, that because the calculation precision on
-Spreadtrum's 32-bit SoCs is different from on 64-bit SoCs,  when the
-width of the value of PLL_KINT is larger than 21, the value is too
-large to be multiplied on 32-bit Spreadtrum's SoCs.
+I made a mistake here.
+"The first port should be the input endpoints, the second one the outputs"
+is wrong and redundant.
 
-i = width < 21 ? 0 : i - 21;
+> 
+> It is possible to have multiple camera sensors connected to the same
+> bus. Think front and back cameras on a cell phone or tablet.
+> 
+> I don't think any kind of numbering makes much sense though. The
+> system is free to use just one sensor at a time, or use many with
+> some time multiplexing scheme. What might matter to the end user
+> is where the camera is placed. But using the position or orientation
+> as a numbering scheme might not work well either. Someone may end
+> up using two sensors with the same orientation for stereoscopic
+> vision.
 
-Here ' i ' is used to adjust 'shift' rather than 'width'  like below (
-wrote the code back for convenience of understanding)
+It is! But multiple sensors can't be working on the same bus 
+simultaneously. So, the driver should have capability to switch
+input device. But my driver does not support switching between 
+multiple camera sensors for now! The driver only pickup the first
+valid one. Maybe it's a feature to implement in the future.
 
-+       kint = DIV_ROUND_CLOSEST(((fvco - refin * nint * CCU_PLL_1M)/10000) *
-+       ((mask >> (shift + i)) + 1), refin * 100) << i;
+Maybe like this:
+- port: A port node with endpoint definitions as defined in
+  Documentation/devicetree/bindings/media/video-interfaces.txt.
+  A CSI have only one port. But you can define multiple endpoint
+  under the port. The driver will pick up the first valid one.
 
+> 
+> >
+> >> +
+> >> +Example:
+> >> +
+> >> +     csi1: csi at 01cb4000 {
+> >> +             compatible = "allwinner,sun8i-v3s-csi";
+> >> +             reg = <0x01cb4000 0x1000>;
+> 
+> Yong, the address range size is 0x4000, including the CCI (I2C)
+> controller at offset 0x3000. You should also consider this in
+> the device tree binding, and the driver.
+> 
+> ChenYu
 
-Thanks for your review,
-Chunyan
+For V3s, the reg range <0x01cb0000 0x4000> of CSI0 have 4 module:
+  * <0x01cb0000 0x1000>	-- CSI0
+  * <0x01cb1000 0x1000>	-- MIPI-CSI
+  * <0x01cb2000 0x1000>	-- MIPI-DPHY
+  * <0x01cb3000 0x1000>	-- CCI
+the reg range <0x01cb4000 0x4000> of CSI1 have 1 module:
+  * <0x01cb4000 0x1000>	-- CSI1
 
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+And, I think the CCI, MIPI-CSI, MIPI-DPHY should have their own
+device tree binding and driver.
+
+> 
+> >> +             interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> >> +             clocks = <&ccu CLK_BUS_CSI>,
+> >> +                      <&ccu CLK_CSI1_SCLK>,
+> >> +                      <&ccu CLK_DRAM_CSI>;
+> >> +             clock-names = "ahb", "mod", "ram";
+> >> +             resets = <&ccu RST_BUS_CSI>;
+> >> +
+> >> +             port {
+> >> +                     #address-cells = <1>;
+> >> +                     #size-cells = <0>;
+> >> +
+> >> +                     /* Parallel bus endpoint */
+> >> +                     csi1_0: endpoint at 0 {
+> >> +                             reg = <0>;
+> >
+> > Don't need this and everything associated with it for a single endpoint.
+
+Like this?
+            csi1_ep: endpoint {
+                remote-endpoint = <&adv7611_ep>;
+                bus-width = <16>;
+                data-shift = <0>;
+    
+                /* If hsync-active/vsync-active are missing,
+                   embedded BT.656 sync is used */
+                hsync-active = <0>; /* Active low */
+                vsync-active = <0>; /* Active low */
+                data-active = <1>;  /* Active high */
+                pclk-sample = <1>;  /* Rising */
+            };
+
+The property "remote" should be "remote-endpoint".
+Is there a mistake in video-interfaces.txt's example?
+
+> >
+> >> +                             remote = <&adv7611_1>;
+> >> +                             bus-width = <16>;
+> >> +                             data-shift = <0>;
+> >> +
+> >> +                             /* If hsync-active/vsync-active are missing,
+> >> +                                embedded BT.656 sync is used */
+> >> +                             hsync-active = <0>; /* Active low */
+> >> +                             vsync-active = <0>; /* Active low */
+> >> +                             data-active = <1>;  /* Active high */
+> >> +                             pclk-sample = <1>;  /* Rising */
+> >> +                     };
+> >> +             };
+> >> +     };
+> >> +
+> >> --
+> >> 1.8.3.1
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
