@@ -1,177 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 30 Jun 2017 12:10:52 +0300
-Subject: [PATCH] arm64: dts: renesas: Move CPG_AUDIO_CLK_I from board to
- soc files
-In-Reply-To: <1498810948-17910-1-git-send-email-geert+renesas@glider.be>
-References: <1498810948-17910-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1587046.f3YfXb5MdT@avalon>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 30 Jun 2017 11:47:57 +0200
+Subject: [PATCH 1/2] ARM: dts: r8a7792: add IMR-L[S]X3 clocks
+In-Reply-To: <fbd0e4c2-746c-8f74-a8e5-ab971a087aed@cogentembedded.com>
+References: <20170321200443.078095898@cogentembedded.com>
+ <34050114-752a-08b6-700e-697e78102af7@cogentembedded.com>
+ <a802018c-9943-22e5-0f78-28b8ab9689d9@cogentembedded.com>
+ <20170329080417.GD6512@verge.net.au>
+ <fbd0e4c2-746c-8f74-a8e5-ab971a087aed@cogentembedded.com>
+Message-ID: <20170630094757.GC26710@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Wed, Jun 28, 2017 at 11:49:01PM +0300, Sergei Shtylyov wrote:
+> Hello!
+> 
+> On 03/29/2017 11:04 AM, Simon Horman wrote:
+> 
+> >>>Still not cover letter but I think it's better now, so I won't retry...
+> >>>The patches are against Simon Horman's 'renesas.git' repo,
+> >>>'renesas-devel-20170321-v4.11-rc3' tag.
+> >>
+> >>   The patches depend on the IMR driver patches adding the IMR-L[S]X3
+> >>support for the "compatible" values.
+> >
+> >I have marked these patches as deferred accordingly.
+> 
+>    Actually, the 1st patch in htis series doesn't depend on anything and
+> should still apply (with offsets).
 
-Thank you for the patch.
-
-On Friday 30 Jun 2017 10:22:28 Geert Uytterhoeven wrote:
-> The definition of CPG_AUDIO_CLK_I is SoC-specific, not board-specific.
-> Hence move it from the board-specific .dts files to the SoC-specific
-> .dtsi files.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> I don't think it's worth adding Fixes tags.
-> 
-> If you disagree, feel free to add:
-> 
-> Fixes: 79e3b5cf035e4734 ("arm64: dts: renesas: Add support for Salvator-XS
-> with R-Car H3 ES2.0") Fixes: fb5202dbebfd8fbf ("arm64: dts: r8a7795:
-> h3ulcb: Add support for R-Car H3 ES2.0") Fixes: 0b03c32db03d63de ("arm64:
-> dts: r8a7795: salvator-x: Add support for R-Car H3 ES2.0") Fixes:
-> 253ed045a34d16d9 ("arm64: dts: renesas: Extract common ULCB board support")
-> Fixes: d25e8ff0d5aaf8b1 ("arm64: dts: renesas: Extract common Salvator-X
-> board support") ---
->  arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts     | 2 --
->  arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts | 2 --
->  arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts         | 2 --
->  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts     | 2 --
->  arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts    | 2 --
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi               | 2 ++
->  arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts         | 2 --
->  arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts     | 2 --
->  arch/arm64/boot/dts/renesas/r8a7796.dtsi               | 2 ++
->  9 files changed, 4 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
-> b/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts index
-> 95fe207cb6a3fd2f..dd4f9b6a42546def 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
-> @@ -9,8 +9,6 @@
->   * kind, whether express or implied.
->   */
-> 
-> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
-> -
->  /dts-v1/;
->  #include "r8a7795-es1.dtsi"
->  #include "ulcb.dtsi"
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-> b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts index
-> b84c156ed6969947..3f7d5f51e42878cb 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-> @@ -8,8 +8,6 @@
->   * kind, whether express or implied.
->   */
-> 
-> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
-> -
->  /dts-v1/;
->  #include "r8a7795-es1.dtsi"
->  #include "salvator-x.dtsi"
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-> b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts index
-> 0426f41765f0bc68..27d4b1a4c4754732 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-> @@ -9,8 +9,6 @@
->   * kind, whether express or implied.
->   */
-> 
-> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
-> -
->  /dts-v1/;
->  #include "r8a7795.dtsi"
->  #include "ulcb.dtsi"
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts index
-> 684fb3b9d154559e..17953070f38dff8d 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> @@ -8,8 +8,6 @@
->   * kind, whether express or implied.
->   */
-> 
-> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
-> -
->  /dts-v1/;
->  #include "r8a7795.dtsi"
->  #include "salvator-x.dtsi"
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
-> b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts index
-> de354957144b4822..6a7d1b22d0fecc9c 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
-> @@ -8,8 +8,6 @@
->   * kind, whether express or implied.
->   */
-> 
-> -#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
-> -
->  /dts-v1/;
->  #include "r8a7795.dtsi"
->  #include "salvator-xs.dtsi"
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi index
-> 5ec03641d9873f22..6b75d4b9ce7efa49 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -12,6 +12,8 @@
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/power/r8a7795-sysc.h>
-> 
-> +#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
-> +
->  / {
->  	compatible = "renesas,r8a7795";
->  	#address-cells = <2>;
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-> b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts index
-> 38b58b7fca4bf0e9..1ff9dffae4618a5a 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-> @@ -9,8 +9,6 @@
->   * kind, whether express or implied.
->   */
-> 
-> -#define CPG_AUDIO_CLK_I		R8A7796_CLK_S0D4
-> -
->  /dts-v1/;
->  #include "r8a7796.dtsi"
->  #include "ulcb.dtsi"
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-> b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts index
-> db4f162d6bdd2c42..b35b15914771af86 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-> @@ -8,8 +8,6 @@
->   * kind, whether express or implied.
->   */
-> 
-> -#define CPG_AUDIO_CLK_I		R8A7796_CLK_S0D4
-> -
->  /dts-v1/;
->  #include "r8a7796.dtsi"
->  #include "salvator-x.dtsi"
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> b/arch/arm64/boot/dts/renesas/r8a7796.dtsi index
-> cfb37d4bd65914b4..49b9f2c05f71cd05 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> @@ -12,6 +12,8 @@
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/power/r8a7796-sysc.h>
-> 
-> +#define CPG_AUDIO_CLK_I		R8A7796_CLK_S0D4
-> +
->  / {
->  	compatible = "renesas,r8a7796";
->  	#address-cells = <2>;
-
--- 
-Regards,
-
-Laurent Pinchart
+I'd prefer to take both patches at the same time unless there is a strong
+motivation to just take the first one.
