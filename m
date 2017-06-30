@@ -1,70 +1,78 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 30 Jun 2017 12:59:06 +0100
-Subject: [PATCH 0/2] Follow-up on "ARM: Fix dma_alloc_coherent() and
- friends for NOMMU"
-In-Reply-To: <CA+M3ks5OqDwdmz6dTR87zX+OH_F+dJgXwfo96EWBg8XbvhmY4g@mail.gmail.com>
-References: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
- <CA+M3ks5OqDwdmz6dTR87zX+OH_F+dJgXwfo96EWBg8XbvhmY4g@mail.gmail.com>
-Message-ID: <ad020e7b-9f4b-3f34-f8b6-cfcde158915c@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 30 Jun 2017 12:58:57 +0100
+Subject: Applied "ASoC: audio-graph-card: update bindings for amplifier
+ support" to the asoc tree
+In-Reply-To: <1498742798-3128-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <E1dQuZd-0007yL-PG@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/17 12:36, Benjamin Gaignard wrote:
-> 2017-06-28 11:16 GMT+02:00 Vladimir Murzin <vladimir.murzin@arm.com>:
->> These two patches are folloups on "[PATCH v6 0/7] ARM: Fix
->> dma_alloc_coherent() and friends for NOMMU" which has been partly
->> merged in [1]. PATCH 1/2 is done per Christoph's suggestion [2] to
->> eliminate duplication in dma-noop.c.  PATCH 2/2 is fixup for ARM's dma
->> operations for NOMMU due to aforementioned change.
->>
->> @Benjamin, your Tested-by for ARM bits would be very appretiated!
-> 
-> I have been able to test on stm32f4 with drm/kms drivers which is
-> calling dma_alloc_coherent
-> and modetest doing mmap and it is working fine.
-> 
-> tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> 
+The patch
 
-Great thanks!
+   ASoC: audio-graph-card: update bindings for amplifier support
 
-Vladimir
+has been applied to the asoc tree at
 
->>
->> @Christoph, in case you decide to queue PATCH 1/2, can you put it
->> before "ARM: NOMMU: Introduce dma operations for noMMU", so transition
->> to the new dma operations won't break bisectability.
->>
->> [1] git://git.infradead.org/users/hch/dma-mapping.git for-next
->> [2] https://www.spinics.net/lists/arm-kernel/msg590587.html
->>
->> Cc: Steven Miao <realmz6@gmail.com>
->> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
->> Cc: Michal Simek <monstr@monstr.eu>
->> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
->> Cc: Rich Felker <dalias@libc.org>
->> Cc: Chris Zankel <chris@zankel.net>
->> Cc: Max Filippov <jcmvbkbc@gmail.com>
->>
->> Thanks!
->>
->> Vladimir Murzin (2):
->>   drivers: dma-mapping: allow dma_common_mmap() for NOMMU
->>   fixup: ARM: NOMMU: Introduce dma operations for noMMU
->>
->>  arch/arm/mm/dma-mapping-nommu.c | 18 ------------------
->>  arch/blackfin/Kconfig           |  1 +
->>  arch/m32r/Kconfig               |  1 +
->>  arch/m68k/Kconfig               |  1 +
->>  arch/microblaze/Kconfig         |  1 +
->>  arch/sh/Kconfig                 |  1 +
->>  arch/xtensa/Kconfig             |  1 +
->>  drivers/base/dma-mapping.c      |  4 ++--
->>  8 files changed, 8 insertions(+), 20 deletions(-)
->>
->> --
->> 2.0.0
->>
-> 
-> 
-> 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From a0c683d734e0b3589892c17d0e1187f20d2c3a54 Mon Sep 17 00:00:00 2001
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Thu, 29 Jun 2017 21:26:37 +0800
+Subject: [PATCH] ASoC: audio-graph-card: update bindings for amplifier support
+
+The audio-graph-card should be able to support widgets and routing in
+the same way as what simple-audio-card does.  The patch adds the
+properties into audio-graph-card bindings.  Then an optional property
+'pa-gpios' for controlling external amplifier, which depends on DAPM
+widgets and routing, is added.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/sound/audio-graph-card.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/sound/audio-graph-card.txt b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
+index bac4b1b1060f..6e6720aa33f1 100644
+--- a/Documentation/devicetree/bindings/sound/audio-graph-card.txt
++++ b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
+@@ -10,6 +10,8 @@ see ${LINUX}/Documentation/devicetree/bindings/sound/simple-card.txt
+ Below are same as Simple-Card.
+ 
+ - label
++- widgets
++- routing
+ - dai-format
+ - frame-master
+ - bitclock-master
+@@ -24,6 +26,9 @@ Required properties:
+ - compatible				: "audio-graph-card";
+ - dais					: list of CPU DAI port{s}
+ 
++Optional properties:
++- pa-gpios: GPIO used to control external amplifier.
++
+ Example: Single DAI case
+ 
+ 	sound_card {
+-- 
+2.13.2
