@@ -1,87 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 30 Jun 2017 10:17:50 -0700
-Subject: [PATCH] dts: ipq4019: Move xo and timer nodes to SoC dtsi
-In-Reply-To: <1498817281-30608-1-git-send-email-varada@codeaurora.org>
-References: <1498817281-30608-1-git-send-email-varada@codeaurora.org>
-Message-ID: <20170630171750.GM22780@codeaurora.org>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 30 Jun 2017 10:29:43 -0700
+Subject: [PATCH RFC 12/26] arm64: Remove spin_unlock_wait() arch-specific
+ definitions
+In-Reply-To: <20170630092057.GD9726@arm.com>
+References: <20170629235918.GA6445@linux.vnet.ibm.com>
+ <1498780894-8253-12-git-send-email-paulmck@linux.vnet.ibm.com>
+ <20170630092057.GD9726@arm.com>
+Message-ID: <20170630172943.GY2393@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30, Varadarajan Narayanan wrote:
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-> index b9457dd..b74c113 100644
-> --- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-> @@ -20,26 +20,7 @@
->  	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
->  	compatible = "qcom,ipq4019";
->  
-> -	clocks {
-> -                xo: xo {
-> -                        compatible = "fixed-clock";
-> -                        clock-frequency = <48000000>;
-> -                        #clock-cells = <0>;
-> -                };
-> -	};
-> -
->  	soc {
-> -
-> -
-> -		timer {
-> -			compatible = "arm,armv7-timer";
-> -			interrupts = <1 2 0xf08>,
-> -				     <1 3 0xf08>,
-> -				     <1 4 0xf08>,
-> -				     <1 1 0xf08>;
-> -			clock-frequency = <48000000>;
-> -		};
-> -
->  		pinctrl at 0x01000000 {
+On Fri, Jun 30, 2017 at 10:20:57AM +0100, Will Deacon wrote:
+> On Thu, Jun 29, 2017 at 05:01:20PM -0700, Paul E. McKenney wrote:
+> > There is no agreed-upon definition of spin_unlock_wait()'s semantics,
+> > and it appears that all callers could do just as well with a lock/unlock
+> > pair.  This commit therefore removes the underlying arch-specific
+> > arch_spin_unlock_wait().
+> > 
+> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: <linux-arm-kernel@lists.infradead.org>
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Cc: Alan Stern <stern@rowland.harvard.edu>
+> > Cc: Andrea Parri <parri.andrea@gmail.com>
+> > Cc: Linus Torvalds <torvalds@linux-foundation.org>
+> > ---
+> >  arch/arm64/include/asm/spinlock.h | 58 ++++-----------------------------------
+> >  1 file changed, 5 insertions(+), 53 deletions(-)
+> 
+> I'm going to miss this code.
 
-This should be pinctrl at 1000000 { and fixed in another patch.
+;-) ;-) ;-)
 
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
->  			serial_pins: serial_pinmux {
->  				mux {
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-> index b7a24af..e8ab1e1 100644
-> --- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
-> +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-> @@ -96,6 +96,11 @@
->  			clock-frequency = <32768>;
->  			#clock-cells = <0>;
->  		};
-> +		xo: xo {
+Applied, thank you!
 
-Please add a newline so it isn't right next to the previous node.
-
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <48000000>;
-> +			#clock-cells = <0>;
-> +		};
->  	};
->  
->  	soc {
-> @@ -104,6 +109,15 @@
->  		ranges;
->  		compatible = "simple-bus";
->  
-> +		timer {
-> +			compatible = "arm,armv7-timer";
-> +			interrupts = <1 2 0xf08>,
-> +				     <1 3 0xf08>,
-> +				     <1 4 0xf08>,
-> +				     <1 1 0xf08>;
-> +			clock-frequency = <48000000>;
-> +		};
-
-This should be outside of the soc node.
-
-> +
->  		intc: interrupt-controller at b000000 {
->  			compatible = "qcom,msm-qgic2";
->  			interrupt-controller;
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+							Thanx, Paul
