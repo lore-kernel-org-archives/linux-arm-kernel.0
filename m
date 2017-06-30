@@ -1,47 +1,84 @@
-From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
-Date: Fri, 30 Jun 2017 07:19:24 +0000
-Subject: [PATCH] staging: fsl-dpaa2/eth: Remove dead code
-In-Reply-To: <20170629162546.10372-1-ruxandra.radulescu@nxp.com>
-References: <20170629162546.10372-1-ruxandra.radulescu@nxp.com>
-Message-ID: <DB5PR04MB1240A5870E15A372E3FEE3FBEAD30@DB5PR04MB1240.eurprd04.prod.outlook.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Fri, 30 Jun 2017 15:37:29 +0800
+Subject: [PATCH V1 9/9] arm64: dts: add ccu for SC9860
+In-Reply-To: <20170630005708.GI22780@codeaurora.org>
+References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+ <20170618015855.27738-10-chunyan.zhang@spreadtrum.com>
+ <20170620012411.GF4493@codeaurora.org>
+ <CAAfSe-tBtcsyocumaDAyUP674ey1z+xmfAOR7cqnakM_+MOtfQ@mail.gmail.com>
+ <20170630005708.GI22780@codeaurora.org>
+Message-ID: <CAAfSe-vsj8SsdB+kVOyNLALM8SkS5KJKbeDN6CHHWL4SjdrbdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ioana Radulescu [mailto:ruxandra.radulescu at nxp.com]
-> Sent: Thursday, June 29, 2017 7:26 PM
-> To: gregkh at linuxfoundation.org
-> Cc: devel at driverdev.osuosl.org; linux-kernel at vger.kernel.org;
-> agraf at suse.de; arnd at arndb.de; linux-arm-kernel at lists.infradead.org; Bogdan
-> Purcareata <bogdan.purcareata@nxp.com>; stuyoder at gmail.com; Laurentiu Tudor
-> <laurentiu.tudor@nxp.com>
-> Subject: [PATCH] staging: fsl-dpaa2/eth: Remove dead code
-> 
-> All possible values of the switch statement are explicitly
-> handled, so there's no need to have a default branch.
-> 
-> Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+Hi Stephen,
 
-Acked-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
+Thanks for your every so clear and detailed answer, thank you.
 
-> ---
->  drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-> b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-> index 5312edc26f01..031179ab3a22 100644
-> --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-> +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-> @@ -217,8 +217,6 @@ static void dpaa2_eth_get_ethtool_stats(struct
-> net_device *net_dev,
->  		case 2:
->  			num_cnt = sizeof(dpni_stats.page_2) / sizeof(u64);
->  			break;
-> -		default:
-> -			break;
->  		}
->  		for (k = 0; k < num_cnt; k++)
->  			*(data + i++) = dpni_stats.raw.counter[k];
+On 30 June 2017 at 08:57, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/22, Chunyan Zhang wrote:
+>> Hi Stephen,
+>>
+>> On 20 June 2017 at 09:24, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> > On 06/18, Chunyan Zhang wrote:
+>>
+>> >
+>> >> +             compatible = "sprd,sc9860-ccu";
+>> >> +             #clock-cells = <1>;
+>> >> +             reg = <0 0x20000000 0 0x400>,
+>> >> +                   <0 0x20210000 0 0x3000>,
+>> >> +                   <0 0x402b0000 0 0x4000>,
+>> >> +                   <0 0x402d0000 0 0x400>,
+>> >> +                   <0 0x402e0000 0 0x4000>,
+>> >> +                   <0 0x40400000 0 0x400>,
+>> >> +                   <0 0x40880000 0 0x400>,
+>> >> +                   <0 0x415e0000 0 0x400>,
+>> >> +                   <0 0x60200000 0 0x400>,
+>> >> +                   <0 0x61000000 0 0x400>,
+>> >> +                   <0 0x61100000 0 0x3000>,
+>> >> +                   <0 0x62000000 0 0x4000>,
+>> >> +                   <0 0x62100000 0 0x4000>,
+>> >> +                   <0 0x63000000 0 0x400>,
+>> >> +                   <0 0x63100000 0 0x3000>,
+>> >> +                   <0 0x70b00000 0 0x3000>;
+>> >
+>> > There are a lot of reg properties here. Perhaps there needs to be
+>> > different nodes for the different clock controllers in this SoC?
+>> >
+>>
+>> On Spreadtrum's platform, clocks are basically located in a few
+>> address areas due to some hardware design issue, that says there're
+>> more than one kinds of clocks in one address range, and one kind of
+>> clocks have more than one physical address bases, except ccu_pll and
+>> ccu_div in this patchset.
+>>
+>> We're planning to map the whole device area at one time before
+>> initializing each of them, once that has been done and upstreamed, I
+>> will remove these lists of addressed.
+>
+> Ok. Does this mean we need to wait for those patches to be sent
+
+I don't think that would come out for review in the near future, so I
+have to keep these ranges of the address listed here for the time
+being.
+
+> out for review? Is it more like certain clks are embedded inside
+> other devices like display controllers, i2c controllers, etc? Is
+
+>From what I understand, that's just something like you said.
+
+> there any more information I can get on this SoC?
+
+I think you may get more information from our dts files [1], if you
+would like to :)
+
+
+Thanks again,
+Chunyan
+
+[1] https://github.com/sprdlinux/kernel/blob/sp9860g-1h10/arch/arm64/boot/dts/sprd/whale.dtsi
+
+>
 > --
-> 2.11.0
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
