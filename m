@@ -1,69 +1,191 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:58 +0100
-Subject: [PATCH 42/58] KVM: arm64: vgic-v3: Enable trapping of Group-0 system
- registers
+Date: Fri, 30 Jun 2017 09:44:50 +0100
+Subject: [PATCH 34/58] KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-43-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-35-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to trap Group-0 GICv3 system registers, we need to
-set ICH_HCR_EL2.TALL0 begore entering the guest. This is conditionnaly
-done after having restored the guest's state, and cleared on exit.
+Add a handler for writing the guest's view of the ICC_EOIR1_EL1
+register. This involves dropping the priority of the interrupt,
+and deactivating it if required (EOImode == 0).
 
 Tested-by: Alexander Graf <agraf@suse.de>
 Acked-by: David Daney <david.daney@cavium.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- include/linux/irqchip/arm-gic-v3.h | 1 +
- virt/kvm/arm/vgic/vgic-v3.c        | 5 ++++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ include/linux/irqchip/arm-gic-v3.h |   2 +
+ virt/kvm/arm/hyp/vgic-v3-sr.c      | 120 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 122 insertions(+)
 
 diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 6b05d2ac8c54..c7f31a962cfc 100644
+index d70668fae003..1f458ac6f494 100644
 --- a/include/linux/irqchip/arm-gic-v3.h
 +++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -417,6 +417,7 @@
+@@ -417,6 +417,8 @@
  
  #define ICH_HCR_EN			(1 << 0)
  #define ICH_HCR_UIE			(1 << 1)
-+#define ICH_HCR_TALL0			(1 << 11)
- #define ICH_HCR_TALL1			(1 << 12)
- #define ICH_HCR_EOIcount_SHIFT		27
- #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 4b2b62b73470..39046ee5be25 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -21,6 +21,7 @@
++#define ICH_HCR_EOIcount_SHIFT		27
++#define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
  
- #include "vgic.h"
- 
-+static bool group0_trap;
- static bool group1_trap;
- 
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
-@@ -260,6 +261,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 
- 	/* Get the show on the road... */
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
-+	if (group0_trap)
-+		vgic_v3->vgic_hcr |= ICH_HCR_TALL0;
- 	if (group1_trap)
- 		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
+ #define ICH_VMCR_ACK_CTL_SHIFT		2
+ #define ICH_VMCR_ACK_CTL_MASK		(1 << ICH_VMCR_ACK_CTL_SHIFT)
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 5a20f8d5bada..e9ff99112c4d 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -432,6 +432,26 @@ static int __hyp_text __vgic_v3_highest_priority_lr(struct kvm_vcpu *vcpu,
+ 	return lr;
  }
-@@ -492,7 +495,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 	if (kvm_vgic_global_state.vcpu_base == 0)
- 		kvm_info("disabling GICv2 emulation\n");
  
--	if (group1_trap) {
-+	if (group0_trap || group1_trap) {
- 		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
- 		static_branch_enable(&vgic_v3_cpuif_trap);
++static int __hyp_text __vgic_v3_find_active_lr(struct kvm_vcpu *vcpu,
++					       int intid, u64 *lr_val)
++{
++	unsigned int used_lrs = vcpu->arch.vgic_cpu.used_lrs;
++	int i;
++
++	for (i = 0; i < used_lrs; i++) {
++		u64 val = __gic_v3_get_lr(i);
++
++		if ((val & ICH_LR_VIRTUAL_ID_MASK) == intid &&
++		    (val & ICH_LR_ACTIVE_BIT)) {
++			*lr_val = val;
++			return i;
++		}
++	}
++
++	*lr_val = ICC_IAR1_EL1_SPURIOUS;
++	return -1;
++}
++
+ static int __hyp_text __vgic_v3_get_highest_active_priority(void)
+ {
+ 	u8 nr_apr_regs = vtr_to_nr_apr_regs(read_gicreg(ICH_VTR_EL2));
+@@ -525,6 +545,44 @@ static void __hyp_text __vgic_v3_set_active_priority(u8 pri, u32 vmcr, int grp)
  	}
+ }
+ 
++static int __hyp_text __vgic_v3_clear_highest_active_priority(void)
++{
++	u8 nr_apr_regs = vtr_to_nr_apr_regs(read_gicreg(ICH_VTR_EL2));
++	u32 hap = 0;
++	int i;
++
++	for (i = 0; i < nr_apr_regs; i++) {
++		u32 ap0, ap1;
++		int c0, c1;
++
++		ap0 = __vgic_v3_read_ap0rn(i);
++		ap1 = __vgic_v3_read_ap1rn(i);
++		if (!ap0 && !ap1) {
++			hap += 32;
++			continue;
++		}
++
++		c0 = ap0 ? __ffs(ap0) : 32;
++		c1 = ap1 ? __ffs(ap1) : 32;
++
++		/* Always clear the LSB, which is the highest priority */
++		if (c0 < c1) {
++			ap0 &= ~BIT(c0);
++			__vgic_v3_write_ap0rn(ap0, i);
++			hap += c0;
++		} else {
++			ap1 &= ~BIT(c1);
++			__vgic_v3_write_ap1rn(ap1, i);
++			hap += c1;
++		}
++
++		/* Rescale to 8 bits of priority */
++		return hap << __vgic_v3_bpr_min();
++	}
++
++	return GICv3_IDLE_PRIORITY;
++}
++
+ static void __hyp_text __vgic_v3_read_iar(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+ {
+ 	u64 lr_val;
+@@ -561,6 +619,65 @@ static void __hyp_text __vgic_v3_read_iar(struct kvm_vcpu *vcpu, u32 vmcr, int r
+ 	vcpu_set_reg(vcpu, rt, ICC_IAR1_EL1_SPURIOUS);
+ }
+ 
++static void __hyp_text __vgic_v3_clear_active_lr(int lr, u64 lr_val)
++{
++	lr_val &= ~ICH_LR_ACTIVE_BIT;
++	if (lr_val & ICH_LR_HW) {
++		u32 pid;
++
++		pid = (lr_val & ICH_LR_PHYS_ID_MASK) >> ICH_LR_PHYS_ID_SHIFT;
++		gic_write_dir(pid);
++	}
++
++	__gic_v3_set_lr(lr_val, lr);
++}
++
++static void __hyp_text __vgic_v3_bump_eoicount(void)
++{
++	u32 hcr;
++
++	hcr = read_gicreg(ICH_HCR_EL2);
++	hcr += 1 << ICH_HCR_EOIcount_SHIFT;
++	write_gicreg(hcr, ICH_HCR_EL2);
++}
++
++static void __hyp_text __vgic_v3_write_eoir(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
++{
++	u32 vid = vcpu_get_reg(vcpu, rt);
++	u64 lr_val;
++	u8 lr_prio, act_prio;
++	int lr, grp;
++
++	grp = __vgic_v3_get_group(vcpu);
++
++	/* Drop priority in any case */
++	act_prio = __vgic_v3_clear_highest_active_priority();
++
++	/* If EOIing an LPI, no deactivate to be performed */
++	if (vid >= VGIC_MIN_LPI)
++		return;
++
++	/* EOImode == 1, nothing to be done here */
++	if (vmcr & ICH_VMCR_EOIM_MASK)
++		return;
++
++	lr = __vgic_v3_find_active_lr(vcpu, vid, &lr_val);
++	if (lr == -1) {
++		__vgic_v3_bump_eoicount();
++		return;
++	}
++
++	lr_prio = (lr_val & ICH_LR_PRIORITY_MASK) >> ICH_LR_PRIORITY_SHIFT;
++
++	/* If priorities or group do not match, the guest has fscked-up. */
++	if (grp != !!(lr_val & ICH_LR_GROUP) ||
++	    __vgic_v3_pri_to_pre(lr_prio, vmcr, grp) != act_prio)
++		return;
++
++	/* Let's now perform the deactivation */
++	__vgic_v3_clear_active_lr(lr, lr_val);
++}
++
+ static void __hyp_text __vgic_v3_read_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+ {
+ 	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG1_MASK));
+@@ -628,6 +745,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 	case SYS_ICC_IAR1_EL1:
+ 		fn = __vgic_v3_read_iar;
+ 		break;
++	case SYS_ICC_EOIR1_EL1:
++		fn = __vgic_v3_write_eoir;
++		break;
+ 	case SYS_ICC_GRPEN1_EL1:
+ 		if (is_read)
+ 			fn = __vgic_v3_read_igrpen1;
 -- 
 2.11.0
