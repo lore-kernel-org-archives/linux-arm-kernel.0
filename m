@@ -1,47 +1,31 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 30 Jun 2017 13:12:33 +0200
-Subject: [PATCH 4/6] dt-bindings: serial: Document RDA Micro UART
-In-Reply-To: <20170629201051.cfr37kh2gozompqo@rob-hp-laptop>
-References: <20170627005520.23731-1-afaerber@suse.de>
- <20170627005520.23731-5-afaerber@suse.de>
- <20170629201051.cfr37kh2gozompqo@rob-hp-laptop>
-Message-ID: <e8b8eb0c-0362-0cfb-4d18-3e1ab2b77412@suse.de>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Fri, 30 Jun 2017 17:00:20 +0530
+Subject: [PATCH] arm64: cpuinfo: constify attribute_group structures.
+Message-ID: <8be91a9f9295fcbe8ec9cdcfd7c2e0b7e0e58ec3.1498821973.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 29.06.2017 um 22:10 schrieb Rob Herring:
-> On Tue, Jun 27, 2017 at 02:55:18AM +0200, Andreas F?rber wrote:
->> Add an initial binding for the RDA8810PL UART.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  Documentation/devicetree/bindings/serial/rda-uart.txt | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/serial/rda-uart.txt
->>
->> diff --git a/Documentation/devicetree/bindings/serial/rda-uart.txt b/Documentation/devicetree/bindings/serial/rda-uart.txt
->> new file mode 100644
->> index 000000000000..6840a8aee035
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/serial/rda-uart.txt
->> @@ -0,0 +1,13 @@
->> +RDA Micro UART
->> +
->> +Required properties:
->> +- compatible :  "rda,8810pl-uart" for RDA8810PL
->> +- reg        :  Offset and length of the register set for the device.
-> 
-> No clocks or interrupts?
+attribute_groups are not supposed to change at runtime. All functions
+working with attribute_groups provided by <linux/sysfs.h> work with const
+attribute_group. So mark the non-const structs as const.
 
-Not yet. I've only pieced together an earlycon driver so far, no full
-serial driver. The .dtsi doesn't even have an interrupt-controller node
-yet - wasn't clear to me whether this SoC even has a GIC and, if so,
-where, from the downstream pre-DT code.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ arch/arm64/kernel/cpuinfo.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-Andreas
-
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 68b1f36..f495ee5 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -227,7 +227,7 @@ static void c_stop(struct seq_file *m, void *v)
+ 	NULL
+ };
+ 
+-static struct attribute_group cpuregs_attr_group = {
++static const struct attribute_group cpuregs_attr_group = {
+ 	.attrs = cpuregs_id_attrs,
+ 	.name = "identification"
+ };
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+1.9.1
