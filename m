@@ -1,137 +1,289 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 30 Jun 2017 21:44:03 +0200
-Subject: [PATCH v3 07/12] Input: wm97xx: add new AC97 bus support
+Date: Fri, 30 Jun 2017 21:44:00 +0200
+Subject: [PATCH v3 04/12] ASoC: arm: make pxa2xx-ac97-lib ac97 codec agnostic
 In-Reply-To: <20170630194408.24978-1-robert.jarzmik@free.fr>
 References: <20170630194408.24978-1-robert.jarzmik@free.fr>
-Message-ID: <20170630194408.24978-8-robert.jarzmik@free.fr>
+Message-ID: <20170630194408.24978-5-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the new AC97 bus code, which discovers the devices
-rather than uses platform data.
-
-As part of this discovery, it enables a multi-function device wm97xx,
-which supports touchscreen, battery, ADC and an audio codec. This patch
-adds the code to bind the touchscreen "cell" as the touchscreen driver.
-
-This was tested on the pxa architecture with a pxa270 + wm9713 + the
-mioa701 touchscreen.
+All pxa library functions don't use the input parameters for nothing but
+slot number. This simplifies their prototypes, and makes them usable by
+both the legacy ac97 bus and the new ac97 bus.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
- drivers/input/touchscreen/Kconfig       |  2 +-
- drivers/input/touchscreen/wm97xx-core.c | 56 ++++++++++++++++++++++++++++++++-
- 2 files changed, 56 insertions(+), 2 deletions(-)
+ include/sound/pxa2xx-lib.h  | 15 +++++++++------
+ sound/arm/pxa2xx-ac97-lib.c | 37 +++++++++++++++++++++----------------
+ sound/arm/pxa2xx-ac97.c     | 35 +++++++++++++++++++++++++++--------
+ sound/soc/pxa/pxa2xx-ac97.c | 32 ++++++++++++++++++++++++++------
+ 4 files changed, 83 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-index 033599777651..22257f3e1059 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -725,7 +725,7 @@ config TOUCHSCREEN_WM831X
+diff --git a/include/sound/pxa2xx-lib.h b/include/sound/pxa2xx-lib.h
+index 6ef629bde164..85352becec7c 100644
+--- a/include/sound/pxa2xx-lib.h
++++ b/include/sound/pxa2xx-lib.h
+@@ -1,10 +1,13 @@
+ #ifndef PXA2XX_LIB_H
+ #define PXA2XX_LIB_H
  
- config TOUCHSCREEN_WM97XX
- 	tristate "Support for WM97xx AC97 touchscreen controllers"
--	depends on AC97_BUS
-+	depends on AC97_BUS || AC97_BUS_NEW
- 	help
- 	  Say Y here if you have a Wolfson Microelectronics WM97xx
- 	  touchscreen connected to your system. Note that this option
-diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
-index 39869ffdc4fa..fd714ee881f7 100644
---- a/drivers/input/touchscreen/wm97xx-core.c
-+++ b/drivers/input/touchscreen/wm97xx-core.c
-@@ -44,6 +44,7 @@
- #include <linux/pm.h>
- #include <linux/interrupt.h>
- #include <linux/bitops.h>
-+#include <linux/mfd/wm97xx.h>
- #include <linux/workqueue.h>
- #include <linux/wm97xx.h>
- #include <linux/uaccess.h>
-@@ -766,6 +767,39 @@ static int wm97xx_remove(struct device *dev)
- 	return 0;
++#include <uapi/sound/asound.h>
+ #include <linux/platform_device.h>
+-#include <sound/ac97_codec.h>
+ 
+ /* PCM */
++struct snd_pcm_substream;
++struct snd_pcm_hw_params;
++struct snd_pcm;
+ 
+ extern int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
+ 				struct snd_pcm_hw_params *params);
+@@ -21,12 +24,12 @@ extern void pxa2xx_pcm_free_dma_buffers(struct snd_pcm *pcm);
+ 
+ /* AC97 */
+ 
+-extern unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg);
+-extern void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg, unsigned short val);
++extern int pxa2xx_ac97_read(int slot, unsigned short reg);
++extern int pxa2xx_ac97_write(int slot, unsigned short reg, unsigned short val);
+ 
+-extern bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97);
+-extern bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97);
+-extern void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97);
++extern bool pxa2xx_ac97_try_warm_reset(void);
++extern bool pxa2xx_ac97_try_cold_reset(void);
++extern void pxa2xx_ac97_finish_reset(void);
+ 
+ extern int pxa2xx_ac97_hw_suspend(void);
+ extern int pxa2xx_ac97_hw_resume(void);
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 39c3969ac1c7..5950a9e218d9 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -20,7 +20,6 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ 
+-#include <sound/ac97_codec.h>
+ #include <sound/pxa2xx-lib.h>
+ 
+ #include <mach/irqs.h>
+@@ -46,38 +45,41 @@ extern void pxa27x_configure_ac97reset(int reset_gpio, bool to_gpio);
+  * 1 jiffy timeout if interrupt never comes).
+  */
+ 
+-unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
++int pxa2xx_ac97_read(int slot, unsigned short reg)
+ {
+-	unsigned short val = -1;
++	int val = -ENODEV;
+ 	volatile u32 *reg_addr;
+ 
++	if (slot > 0)
++		return -ENODEV;
++
+ 	mutex_lock(&car_mutex);
+ 
+ 	/* set up primary or secondary codec space */
+ 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
+-		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
++		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
+ 	else
+-		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
++		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
+ 	reg_addr += (reg >> 1);
+ 
+ 	/* start read access across the ac97 link */
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+-	val = *reg_addr;
++	val = (*reg_addr & 0xffff);
+ 	if (reg == AC97_GPIO_STATUS)
+ 		goto out;
+ 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1) <= 0 &&
+ 	    !((GSR | gsr_bits) & GSR_SDONE)) {
+ 		printk(KERN_ERR "%s: read error (ac97_reg=%d GSR=%#lx)\n",
+ 				__func__, reg, GSR | gsr_bits);
+-		val = -1;
++		val = -ETIMEDOUT;
+ 		goto out;
+ 	}
+ 
+ 	/* valid data now */
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+-	val = *reg_addr;
++	val = (*reg_addr & 0xffff);
+ 	/* but we've just started another cycle... */
+ 	wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1);
+ 
+@@ -86,29 +88,32 @@ out:	mutex_unlock(&car_mutex);
  }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_read);
  
-+static int wm97xx_mfd_probe(struct platform_device *pdev)
+-void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
+-			unsigned short val)
++int pxa2xx_ac97_write(int slot, unsigned short reg, unsigned short val)
+ {
+ 	volatile u32 *reg_addr;
++	int ret = 0;
+ 
+ 	mutex_lock(&car_mutex);
+ 
+ 	/* set up primary or secondary codec space */
+ 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
+-		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
++		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
+ 	else
+-		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
++		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
+ 	reg_addr += (reg >> 1);
+ 
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+ 	*reg_addr = val;
+ 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_CDONE, 1) <= 0 &&
+-	    !((GSR | gsr_bits) & GSR_CDONE))
++	    !((GSR | gsr_bits) & GSR_CDONE)) {
+ 		printk(KERN_ERR "%s: write error (ac97_reg=%d GSR=%#lx)\n",
+ 				__func__, reg, GSR | gsr_bits);
++		ret = -EIO;
++	}
+ 
+ 	mutex_unlock(&car_mutex);
++	return ret;
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_write);
+ 
+@@ -188,7 +193,7 @@ static inline void pxa_ac97_cold_pxa3xx(void)
+ }
+ #endif
+ 
+-bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
++bool pxa2xx_ac97_try_warm_reset(void)
+ {
+ 	unsigned long gsr;
+ 	unsigned int timeout = 100;
+@@ -225,7 +230,7 @@ bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_warm_reset);
+ 
+-bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
++bool pxa2xx_ac97_try_cold_reset(void)
+ {
+ 	unsigned long gsr;
+ 	unsigned int timeout = 1000;
+@@ -263,7 +268,7 @@ bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_cold_reset);
+ 
+ 
+-void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97)
++void pxa2xx_ac97_finish_reset(void)
+ {
+ 	GCR &= ~(GCR_PRIRDY_IEN|GCR_SECRDY_IEN);
+ 	GCR |= GCR_SDONE_IE|GCR_CDONE_IE;
+diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
+index fbd5dad0c484..4bc244c40f80 100644
+--- a/sound/arm/pxa2xx-ac97.c
++++ b/sound/arm/pxa2xx-ac97.c
+@@ -29,19 +29,38 @@
+ 
+ #include "pxa2xx-pcm.h"
+ 
+-static void pxa2xx_ac97_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_legacy_reset(struct snd_ac97 *ac97)
+ {
+-	if (!pxa2xx_ac97_try_cold_reset(ac97)) {
+-		pxa2xx_ac97_try_warm_reset(ac97);
+-	}
++	if (!pxa2xx_ac97_try_cold_reset())
++		pxa2xx_ac97_try_warm_reset();
++
++	pxa2xx_ac97_finish_reset();
++}
++
++static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
++					      unsigned short reg)
 +{
-+	struct wm97xx *wm;
-+	struct wm97xx_platform_data *mfd_pdata = dev_get_platdata(&pdev->dev);
 +	int ret;
 +
-+	wm = devm_kzalloc(&pdev->dev, sizeof(struct wm97xx), GFP_KERNEL);
-+	if (!wm)
-+		return -ENOMEM;
-+
-+	wm->dev = &pdev->dev;
-+	wm->ac97 = mfd_pdata->ac97;
-+
-+	ret =  _wm97xx_probe(wm);
-+	if (ret)
-+		return ret;
-+
-+	ret = wm97xx_add_battery(wm, mfd_pdata->batt_pdata);
++	ret = pxa2xx_ac97_read(ac97->num, reg);
 +	if (ret < 0)
-+		goto batt_err;
-+
-+	return ret;
-+
-+batt_err:
-+	wm97xx_unregister_touch(wm);
-+	return ret;
++		return 0;
++	else
++		return (unsigned short)(ret & 0xffff);
 +}
 +
-+static int wm97xx_mfd_remove(struct platform_device *pdev)
++static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
++				     unsigned short reg, unsigned short val)
 +{
-+	return wm97xx_remove(&pdev->dev);
-+}
-+
- static int __maybe_unused wm97xx_suspend(struct device *dev)
- {
- 	struct wm97xx *wm = dev_get_drvdata(dev);
-@@ -862,21 +896,41 @@ EXPORT_SYMBOL_GPL(wm97xx_unregister_mach_ops);
++	int __always_unused ret;
  
- static struct device_driver wm97xx_driver = {
- 	.name =		"wm97xx-ts",
-+#ifdef CONFIG_AC97_BUS
- 	.bus =		&ac97_bus_type,
-+#endif
- 	.owner =	THIS_MODULE,
- 	.probe =	wm97xx_probe,
- 	.remove =	wm97xx_remove,
- 	.pm =		&wm97xx_pm_ops,
+-	pxa2xx_ac97_finish_reset(ac97);
++	ret = pxa2xx_ac97_write(ac97->num, reg, val);
+ }
+ 
+ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+-	.read	= pxa2xx_ac97_read,
+-	.write	= pxa2xx_ac97_write,
+-	.reset	= pxa2xx_ac97_reset,
++	.read	= pxa2xx_ac97_legacy_read,
++	.write	= pxa2xx_ac97_legacy_write,
++	.reset	= pxa2xx_ac97_legacy_reset,
  };
  
-+static struct platform_driver wm97xx_mfd_driver = {
-+	.driver = {
-+		.name =		"wm97xx-ts",
-+		.pm =		&wm97xx_pm_ops,
-+	},
-+	.probe =	wm97xx_mfd_probe,
-+	.remove =	wm97xx_mfd_remove,
-+};
-+
- static int __init wm97xx_init(void)
+ static struct pxad_param pxa2xx_ac97_pcm_out_req = {
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index 2e2fb1838ec2..b07d64ef49ba 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -29,21 +29,41 @@
+ 
+ static void pxa2xx_ac97_warm_reset(struct snd_ac97 *ac97)
  {
--	return driver_register(&wm97xx_driver);
+-	pxa2xx_ac97_try_warm_reset(ac97);
++	pxa2xx_ac97_try_warm_reset();
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	pxa2xx_ac97_finish_reset();
+ }
+ 
+ static void pxa2xx_ac97_cold_reset(struct snd_ac97 *ac97)
+ {
+-	pxa2xx_ac97_try_cold_reset(ac97);
++	pxa2xx_ac97_try_cold_reset();
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	pxa2xx_ac97_finish_reset();
++}
++
++static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
++					      unsigned short reg)
++{
 +	int ret;
 +
-+	ret = platform_driver_register(&wm97xx_mfd_driver);
-+	if (ret)
-+		return ret;
++	ret = pxa2xx_ac97_read(ac97->num, reg);
++	if (ret < 0)
++		return 0;
++	else
++		return (unsigned short)(ret & 0xffff);
++}
 +
-+	if (IS_BUILTIN(CONFIG_AC97_BUS))
-+		ret =  driver_register(&wm97xx_driver);
-+	return ret;
++static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
++				     unsigned short reg, unsigned short val)
++{
++	int ret;
++
++	ret = pxa2xx_ac97_write(ac97->num, reg, val);
  }
  
- static void __exit wm97xx_exit(void)
- {
- 	driver_unregister(&wm97xx_driver);
-+	platform_driver_unregister(&wm97xx_mfd_driver);
- }
- 
- module_init(wm97xx_init);
+ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+-	.read	= pxa2xx_ac97_read,
+-	.write	= pxa2xx_ac97_write,
++	.read	= pxa2xx_ac97_legacy_read,
++	.write	= pxa2xx_ac97_legacy_write,
+ 	.warm_reset	= pxa2xx_ac97_warm_reset,
+ 	.reset	= pxa2xx_ac97_cold_reset,
+ };
 -- 
 2.11.0
