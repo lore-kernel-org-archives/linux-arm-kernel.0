@@ -1,180 +1,100 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:16 +0100
-Subject: [GIT PULL] KVM/ARM updates for 4.13
-Message-ID: <20170630084514.6779-1-marc.zyngier@arm.com>
+Date: Fri, 30 Jun 2017 09:44:19 +0100
+Subject: [PATCH 03/58] KVM: arm/arm64: Allow GICv2 to supply a uaccess
+ register function
+In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
+References: <20170630084514.6779-1-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paolo, Radim,
+From: Christoffer Dall <cdall@linaro.org>
 
-This is the pull request for the 4.13 edition of KVM/ARM. Among the
-changes this time around, a rework of the vcpu request infrastructure
-and its adoption on ARM, a was for userspace to define which
-interrupts get assigned to timer and PMU, a workaround for a nasty
-erratum on Cavium HW, and a bit more. Some of the patches touch core
-arm64 code, and are acked by the maintainers.
+We are about to differentiate between writes from a VCPU and from
+userspace to the GIC's GICD_ISACTIVER and GICD_ICACTIVER registers due
+to different synchronization requirements.
 
-There will be a small clash with the s390 tree, as mentionned by
-Stephen Rothwell, as well as with the arm64 tree. Both conflicts are
-trivial to resolve, and linux-next got it right (as usual).
+Expand the macro to define a register description for the GIC to take
+uaccess functions as well.
 
-Please pull.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 22 +++++++++++-----------
+ virt/kvm/arm/vgic/vgic-mmio.h    |  4 +++-
+ 2 files changed, 14 insertions(+), 12 deletions(-)
 
-       M.
-
-The following changes since commit 33b5c38852b29736f3b472dd095c9a18ec22746f:
-
-  arm: KVM: Allow unaligned accesses at HYP (2017-06-06 22:20:02 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvmarm-for-4.13
-
-for you to fetch changes up to d38338e396ee0571b3502962fd2fbaec4d2d9a8f:
-
-  arm64: Remove a redundancy in sysreg.h (2017-06-22 17:38:42 +0100)
-
-----------------------------------------------------------------
-KVM/ARM updates for 4.13
-
-- vcpu request overhaul
-- allow timer and PMU to have their interrupt number
-  selected from userspace
-- workaround for Cavium erratum 30115
-- handling of memory poisonning
-- the usual crop of fixes and cleanups
-
-----------------------------------------------------------------
-Andrew Jones (10):
-      KVM: improve arch vcpu request defining
-      KVM: Add documentation for VCPU requests
-      KVM: arm/arm64: properly use vcpu requests
-      KVM: arm/arm64: replace pause checks with vcpu request checks
-      KVM: arm/arm64: use vcpu requests for power_off
-      KVM: arm/arm64: optimize VCPU RUN
-      KVM: arm/arm64: change exit request to sleep request
-      KVM: arm/arm64: use vcpu requests for irq injection
-      KVM: arm/arm64: PMU: remove request-less vcpu kick
-      KVM: arm/arm64: timer: remove request-less vcpu kick
-
-Christoffer Dall (13):
-      KVM: arm/arm64: Allow GICv2 to supply a uaccess register function
-      KVM: arm/arm64: Separate guest and uaccess writes to dist {sc}active
-      KVM: arm/arm64: Simplify active_change_prepare and plug race
-      KVM: arm/arm64: Use uaccess functions for GICv3 {sc}active
-      KVM: arm64: Allow creating the PMU without the in-kernel GIC
-      KVM: arm: Handle VCPU device attributes in guest.c
-      KVM: arm/arm64: Move irq_is_ppi() to header file
-      KVM: arm/arm64: Move timer IRQ default init to arch_timer.c
-      KVM: arm/arm64: Allow setting the timer IRQ numbers from userspace
-      KVM: arm/arm64: Introduce an allocator for in-kernel irq lines
-      KVM: arm/arm64: Check if irq lines to the GIC are already used
-      KVM: arm/arm64: Disallow userspace control of in-kernel IRQ lines
-      KVM: arm/arm64: Don't assume initialized vgic when setting PMU IRQ
-
-David Daney (2):
-      arm64: Add MIDR values for Cavium cn83XX SoCs
-      arm64: Add workaround for Cavium Thunder erratum 30115
-
-Hu Huajun (1):
-      KVM: ARM64: fix phy counter access failure in guest.
-
-James Morse (3):
-      KVM: arm: Restore banked registers and physical timer access on hyp_panic()
-      KVM: arm64: Restore host physical timer access on hyp_panic()
-      KVM: arm/arm64: Signal SIGBUS when stage2 discovers hwpoison memory
-
-Marc Zyngier (26):
-      Merge branch 'kvmarm-master/master' into HEAD
-      arm64: Add a facility to turn an ESR syndrome into a sysreg encoding
-      KVM: arm/arm64: vgic-v3: Add accessors for the ICH_APxRn_EL2 registers
-      KVM: arm64: Make kvm_condition_valid32() accessible from EL2
-      KVM: arm64: vgic-v3: Add hook to handle guest GICv3 sysreg accesses at EL2
-      KVM: arm64: vgic-v3: Add ICV_BPR1_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_IGRPEN1_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_IAR1_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_AP1Rn_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_HPPIR1_EL1 handler
-      KVM: arm64: vgic-v3: Enable trapping of Group-1 system registers
-      KVM: arm64: Enable GICv3 Group-1 sysreg trapping via command-line
-      KVM: arm64: vgic-v3: Add ICV_BPR0_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_IGNREN0_EL1 handler
-      KVM: arm64: vgic-v3: Add misc Group-0 handlers
-      KVM: arm64: vgic-v3: Enable trapping of Group-0 system registers
-      KVM: arm64: Enable GICv3 Group-0 sysreg trapping via command-line
-      KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_RPR_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_CTLR_EL1 handler
-      KVM: arm64: vgic-v3: Add ICV_PMR_EL1 handler
-      KVM: arm64: Enable GICv3 common sysreg trapping via command-line
-      KVM: arm64: vgic-v3: Log which GICv3 system registers are trapped
-      KVM: arm64: Log an error if trapping a read-from-write-only GICv3 access
-      KVM: arm64: Log an error if trapping a write-to-read-only GICv3 access
-
-Mark Rutland (2):
-      arm64/kvm: sysreg: fix typo'd SYS_ICC_IGRPEN*_EL1
-      arm64/kvm: vgic: use SYS_DESC()
-
-Radim Kr?m?? (1):
-      KVM: add kvm_request_pending
-
-Stefan Traby (1):
-      arm64: Remove a redundancy in sysreg.h
-
- Documentation/admin-guide/kernel-parameters.txt |  12 +
- Documentation/arm64/silicon-errata.txt          |   1 +
- Documentation/virtual/kvm/devices/vcpu.txt      |  41 +-
- Documentation/virtual/kvm/vcpu-requests.rst     | 307 +++++++++
- arch/arm/include/asm/kvm_host.h                 |  28 +-
- arch/arm/include/uapi/asm/kvm.h                 |   8 +
- arch/arm/kvm/guest.c                            |  51 ++
- arch/arm/kvm/handle_exit.c                      |   1 +
- arch/arm/kvm/hyp/switch.c                       |   2 +
- arch/arm/kvm/reset.c                            |  16 +-
- arch/arm64/Kconfig                              |  11 +
- arch/arm64/include/asm/arch_gicv3.h             |   2 +-
- arch/arm64/include/asm/cpucaps.h                |   3 +-
- arch/arm64/include/asm/cputype.h                |   2 +
- arch/arm64/include/asm/esr.h                    |  24 +
- arch/arm64/include/asm/kvm_host.h               |   6 +-
- arch/arm64/include/asm/kvm_hyp.h                |   1 +
- arch/arm64/include/asm/sysreg.h                 |  23 +-
- arch/arm64/include/uapi/asm/kvm.h               |   3 +
- arch/arm64/kernel/cpu_errata.c                  |  21 +
- arch/arm64/kvm/guest.c                          |   9 +
- arch/arm64/kvm/handle_exit.c                    |   1 +
- arch/arm64/kvm/hyp/switch.c                     |  15 +
- arch/arm64/kvm/reset.c                          |  16 +-
- arch/arm64/kvm/sys_regs.c                       |  27 +-
- arch/arm64/kvm/vgic-sys-reg-v3.c                |  45 +-
- arch/mips/kvm/trap_emul.c                       |   2 +-
- arch/mips/kvm/vz.c                              |   2 +-
- arch/powerpc/include/asm/kvm_host.h             |   4 +-
- arch/powerpc/kvm/booke.c                        |   2 +-
- arch/powerpc/kvm/powerpc.c                      |   5 +-
- arch/s390/include/asm/kvm_host.h                |   6 +-
- arch/s390/kvm/kvm-s390.c                        |   2 +-
- arch/x86/include/asm/kvm_host.h                 |  47 +-
- arch/x86/kvm/x86.c                              |   4 +-
- include/kvm/arm_arch_timer.h                    |   8 +-
- include/kvm/arm_pmu.h                           |   6 +
- include/kvm/arm_vgic.h                          |  14 +-
- include/linux/irqchip/arm-gic-v3.h              |   6 +
- include/linux/kvm_host.h                        |  12 +
- virt/kvm/arm/aarch32.c                          |   2 +-
- virt/kvm/arm/arch_timer.c                       | 139 +++-
- virt/kvm/arm/arm.c                              |  82 ++-
- virt/kvm/arm/hyp/vgic-v3-sr.c                   | 823 +++++++++++++++++++++++-
- virt/kvm/arm/mmu.c                              |  23 +
- virt/kvm/arm/pmu.c                              | 117 ++--
- virt/kvm/arm/psci.c                             |   8 +-
- virt/kvm/arm/vgic/vgic-irqfd.c                  |   2 +-
- virt/kvm/arm/vgic/vgic-mmio-v2.c                |  24 +-
- virt/kvm/arm/vgic/vgic-mmio-v3.c                |  22 +-
- virt/kvm/arm/vgic/vgic-mmio.c                   |  68 +-
- virt/kvm/arm/vgic/vgic-mmio.h                   |  12 +-
- virt/kvm/arm/vgic/vgic-v3.c                     |  45 ++
- virt/kvm/arm/vgic/vgic.c                        |  68 +-
- 54 files changed, 1945 insertions(+), 286 deletions(-)
- create mode 100644 Documentation/virtual/kvm/vcpu-requests.rst
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index 0a4283ed9aa7..95543a20513a 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -296,34 +296,34 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+-		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+-		vgic_mmio_read_enable, vgic_mmio_write_senable, 1,
++		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
+-		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1,
++		vgic_mmio_read_enable, vgic_mmio_write_cenable, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
+-		vgic_mmio_read_pending, vgic_mmio_write_spending, 1,
++		vgic_mmio_read_pending, vgic_mmio_write_spending, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
+-		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1,
++		vgic_mmio_read_pending, vgic_mmio_write_cpending, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
+-		vgic_mmio_read_active, vgic_mmio_write_sactive, 1,
++		vgic_mmio_read_active, vgic_mmio_write_sactive, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
+-		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
++		vgic_mmio_read_active, vgic_mmio_write_cactive, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+-		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
+-		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
++		vgic_mmio_read_priority, vgic_mmio_write_priority, NULL, NULL,
++		8, VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+-		vgic_mmio_read_target, vgic_mmio_write_target, 8,
++		vgic_mmio_read_target, vgic_mmio_write_target, NULL, NULL, 8,
+ 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+-		vgic_mmio_read_config, vgic_mmio_write_config, 2,
++		vgic_mmio_read_config, vgic_mmio_write_config, NULL, NULL, 2,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+ 		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index ea4171acdef3..27924a3d8769 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -75,7 +75,7 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+  * The _WITH_LENGTH version instantiates registers with a fixed length
+  * and is mutually exclusive with the _PER_IRQ version.
+  */
+-#define REGISTER_DESC_WITH_BITS_PER_IRQ(off, rd, wr, bpi, acc)		\
++#define REGISTER_DESC_WITH_BITS_PER_IRQ(off, rd, wr, ur, uw, bpi, acc)	\
+ 	{								\
+ 		.reg_offset = off,					\
+ 		.bits_per_irq = bpi,					\
+@@ -83,6 +83,8 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+ 		.access_flags = acc,					\
+ 		.read = rd,						\
+ 		.write = wr,						\
++		.uaccess_read = ur,					\
++		.uaccess_write = uw,					\
+ 	}
+ 
+ #define REGISTER_DESC_WITH_LENGTH(off, rd, wr, length, acc)		\
+-- 
+2.11.0
