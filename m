@@ -1,39 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 30 Jun 2017 13:51:08 +0200
-Subject: [PATCH] arm64: dts: renesas: Move CPG_AUDIO_CLK_I from board to
- soc files
-In-Reply-To: <1587046.f3YfXb5MdT@avalon>
-References: <1498810948-17910-1-git-send-email-geert+renesas@glider.be>
- <1587046.f3YfXb5MdT@avalon>
-Message-ID: <20170630115107.GJ26710@verge.net.au>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 30 Jun 2017 12:51:50 +0100
+Subject: [PATCHv2 9/9] spi: spidev: add Aardvark to device tree
+ compatibility list
+In-Reply-To: <67764839-889b-e398-16eb-de583d82cbf3@st.com>
+References: <1498578321-13980-1-git-send-email-amelie.delaunay@st.com>
+ <1498578321-13980-10-git-send-email-amelie.delaunay@st.com>
+ <20170628185445.fsnqs2tlqqeqzl57@sirena.org.uk>
+ <67764839-889b-e398-16eb-de583d82cbf3@st.com>
+Message-ID: <20170630115150.zea5iaoih4alqibm@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 12:10:52PM +0300, Laurent Pinchart wrote:
-> Hi Geert,
-> 
-> Thank you for the patch.
-> 
-> On Friday 30 Jun 2017 10:22:28 Geert Uytterhoeven wrote:
-> > The definition of CPG_AUDIO_CLK_I is SoC-specific, not board-specific.
-> > Hence move it from the board-specific .dts files to the SoC-specific
-> > .dtsi files.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> > ---
-> > I don't think it's worth adding Fixes tags.
-> > 
-> > If you disagree, feel free to add:
-> > 
-> > Fixes: 79e3b5cf035e4734 ("arm64: dts: renesas: Add support for Salvator-XS
-> > with R-Car H3 ES2.0") Fixes: fb5202dbebfd8fbf ("arm64: dts: r8a7795:
-> > h3ulcb: Add support for R-Car H3 ES2.0") Fixes: 0b03c32db03d63de ("arm64:
-> > dts: r8a7795: salvator-x: Add support for R-Car H3 ES2.0") Fixes:
-> > 253ed045a34d16d9 ("arm64: dts: renesas: Extract common ULCB board support")
-> > Fixes: d25e8ff0d5aaf8b1 ("arm64: dts: renesas: Extract common Salvator-X
-> > board support") ---
+On Thu, Jun 29, 2017 at 02:58:43PM +0200, Amelie DELAUNAY wrote:
+> On 06/28/2017 08:54 PM, Mark Brown wrote:
 
-I agree. I've applied this for v4.14 without the fixes tags.
+> > What does this device actually do and why is spidev a sensible fit for
+> > it?
+
+> This device is actually a debugging tool [1] which can work on SPI bus (and
+> also I2C). Connected via USB on a PC, it can either acts as an SPI master or
+> SPI slave and it can transmit/receive serial data using SPI protocol.
+> Polarity, Phase, Bit Order, Frequency can be configured. So this tool is
+> really useful during SPI driver development to troubleshoot. And that's why
+> spidev driver totally fit for it when used as an SPI slave, for the reason
+> described in spidev Documentation: "Developing simple protocols used to talk
+> to" Aardvark "acting as SPI slaves, which you may need to change quite
+> often".
+
+This doesn't seem like something that should be in DT, it's a tool used
+to implement or emulate other things and is no more specific than spidev
+itself is.  Whatever it is implementing or emulating should be in DT
+instead.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170630/05df9ffb/attachment.sig>
