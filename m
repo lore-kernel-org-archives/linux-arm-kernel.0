@@ -1,40 +1,69 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 30 Jun 2017 10:29:43 -0700
-Subject: [PATCH RFC 12/26] arm64: Remove spin_unlock_wait() arch-specific
- definitions
-In-Reply-To: <20170630092057.GD9726@arm.com>
-References: <20170629235918.GA6445@linux.vnet.ibm.com>
- <1498780894-8253-12-git-send-email-paulmck@linux.vnet.ibm.com>
- <20170630092057.GD9726@arm.com>
-Message-ID: <20170630172943.GY2393@linux.vnet.ibm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 30 Jun 2017 17:34:18 +0000
+Subject: [PATCH] ARM: fix randomized task_struct
+In-Reply-To: <20170630155513.GA4902@n2100.armlinux.org.uk>
+References: <20170630153502.3327030-1-arnd@arndb.de>
+ <9291740E-3BD1-454C-A3EB-46E35F073D0E@linaro.org>
+ <20170630155513.GA4902@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu8=qubUV9q7LKEN6BCXro9UGa7=_9_f810-DSbzx4ysmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 10:20:57AM +0100, Will Deacon wrote:
-> On Thu, Jun 29, 2017 at 05:01:20PM -0700, Paul E. McKenney wrote:
-> > There is no agreed-upon definition of spin_unlock_wait()'s semantics,
-> > and it appears that all callers could do just as well with a lock/unlock
-> > pair.  This commit therefore removes the underlying arch-specific
-> > arch_spin_unlock_wait().
-> > 
-> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: <linux-arm-kernel@lists.infradead.org>
-> > Cc: Peter Zijlstra <peterz@infradead.org>
-> > Cc: Alan Stern <stern@rowland.harvard.edu>
-> > Cc: Andrea Parri <parri.andrea@gmail.com>
-> > Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> > ---
-> >  arch/arm64/include/asm/spinlock.h | 58 ++++-----------------------------------
-> >  1 file changed, 5 insertions(+), 53 deletions(-)
-> 
-> I'm going to miss this code.
+On 30 June 2017 at 15:55, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Fri, Jun 30, 2017 at 03:49:41PM +0000, Ard Biesheuvel wrote:
+>>
+>>
+>> > On 30 Jun 2017, at 15:34, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >
+>> > With the new task struct randomization, we can run into a build
+>> > failure for certain random seeds:
+>> >
+>> > arch/arm/kernel/entry-armv.S: Assembler messages:
+>> > arch/arm/kernel/entry-armv.S:803: Error: bad immediate value for offset (4096)
+>> >
+>> > Only two constants in asm-offset.h are affected, and I'm changing
+>> > both of them here to work correctly in all configurations.
+>> >
+>> > One more macro has the problem, but is currently unused, so this
+>> > removes it instead of adding complexity.
+>> >
+>> > Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > Fixes: c33d8b12fbbd ("task_struct: Allow randomized layout")
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> > ---
+>> > arch/arm/kernel/entry-armv.S |  5 ++++-
+>> > arch/arm/mm/proc-macros.S    | 10 ++++------
+>> > 2 files changed, 8 insertions(+), 7 deletions(-)
+>> >
+>> > diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+>> > index 9f157e7c51e7..db6d22b23bd8 100644
+>> > --- a/arch/arm/kernel/entry-armv.S
+>> > +++ b/arch/arm/kernel/entry-armv.S
+>> > @@ -797,7 +797,10 @@ ENTRY(__switch_to)
+>> > #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+>> >    ldr    r7, [r2, #TI_TASK]
+>> >    ldr    r8, =__stack_chk_guard
+>> > -    ldr    r7, [r7, #TSK_STACK_CANARY]
+>> > +    .if (TSK_STACK_CANARY > PAGE_MASK)
+>>
+>> Shouldn't this be ~PAGE_MASK?
+>>
+>> I think
+>>
+>> .if (TSK_STACK_CANARY & PAGE_MASK) != 0
+>>
+>> is better and clearer as well
+>
+> It's not really that much clearer - what has any of this got to do with
+> the size of a page?  Just because a definition appears to be numerically
+> the same, it doesn't mean it should be used!
+>
+> The LDR instruction takes a maximum of a 12-bit constant.  This 12-bit
+> constant has nothing to do with the page size; it's been that way since
+> the early ARMs that knew nothing about page tables.
+>
+> Please instead create a LDR_IMM12_MASK or similar definition for this.
+>
 
-;-) ;-) ;-)
-
-> Acked-by: Will Deacon <will.deacon@arm.com>
-
-Applied, thank you!
-
-							Thanx, Paul
+Yes, good point.
