@@ -1,36 +1,73 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 30 Jun 2017 17:06:01 +0200
-Subject: [alsa-devel] [PATCH v2 12/12] ASoC: Fix use-after-free at card
- unregistration
-In-Reply-To: <20170630115600.btemrql3aso4s45z@sirena.org.uk> (Mark Brown's
- message of "Fri, 30 Jun 2017 12:56:00 +0100")
-References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
- <1497857229-12049-13-git-send-email-robert.jarzmik@free.fr>
- <s5hefug72iu.wl-tiwai@suse.de> <87injstckf.fsf@belgarion.home>
- <20170628195349.pqeb3dceddxar75s@sirena.org.uk>
- <87o9t7u5v5.fsf@belgarion.home>
- <20170630115600.btemrql3aso4s45z@sirena.org.uk>
-Message-ID: <87k23ttt0m.fsf@belgarion.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Jun 2017 17:34:43 +0200
+Subject: [PATCH] ARM: fix randomized task_struct
+Message-ID: <20170630153502.3327030-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+With the new task struct randomization, we can run into a build
+failure for certain random seeds:
 
-> On Thu, Jun 29, 2017 at 12:03:58AM +0200, Robert Jarzmik wrote:
->> Mark Brown <broonie@kernel.org> writes:
->
->> > Based on the missing first patch I was expecting the series to get
->> > reposted?
->
->> The first patch is only moving around a .h file. I was expecting a review before
->> reposting a v3.
->
-> I can't tell what's in the first patch if you didn't send it.... :(
-> In general it's best to resend for things like this, I know I focus my
-> review on things that can progress as-is.
-OK, no problem, I'll resend a v2 resend in the following hours.
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:803: Error: bad immediate value for offset (4096)
 
-Cheers.
+Only two constants in asm-offset.h are affected, and I'm changing
+both of them here to work correctly in all configurations.
 
+One more macro has the problem, but is currently unused, so this
+removes it instead of adding complexity.
+
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Fixes: c33d8b12fbbd ("task_struct: Allow randomized layout")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/kernel/entry-armv.S |  5 ++++-
+ arch/arm/mm/proc-macros.S    | 10 ++++------
+ 2 files changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9f157e7c51e7..db6d22b23bd8 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -797,7 +797,10 @@ ENTRY(__switch_to)
+ #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+ 	ldr	r7, [r2, #TI_TASK]
+ 	ldr	r8, =__stack_chk_guard
+-	ldr	r7, [r7, #TSK_STACK_CANARY]
++	.if (TSK_STACK_CANARY > PAGE_MASK)
++	add	r7, r7, #TSK_STACK_CANARY & PAGE_MASK
++	.endif
++	ldr	r7, [r7, #TSK_STACK_CANARY & ~PAGE_MASK]
+ #endif
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index 0d40c285bd86..2c5f2a0a708b 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -25,11 +25,6 @@
+ 	ldr	\rd, [\rn, #VMA_VM_FLAGS]
+ 	.endm
+ 
+-	.macro	tsk_mm, rd, rn
+-	ldr	\rd, [\rn, #TI_TASK]
+-	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
+-	.endm
+-
+ /*
+  * act_mm - get current->active_mm
+  */
+@@ -37,7 +32,10 @@
+ 	bic	\rd, sp, #8128
+ 	bic	\rd, \rd, #63
+ 	ldr	\rd, [\rd, #TI_TASK]
+-	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
++	.if (TSK_ACTIVE_MM > PAGE_MASK)
++	add	\rd, \rd, #TSK_ACTIVE_MM & PAGE_MASK
++	.endif
++	ldr	\rd, [\rd, #TSK_ACTIVE_MM & ~PAGE_MASK]
+ 	.endm
+ 
+ /*
 -- 
-Robert
+2.9.0
