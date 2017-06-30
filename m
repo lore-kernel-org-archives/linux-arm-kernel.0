@@ -1,31 +1,29 @@
-From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Fri, 30 Jun 2017 14:05:16 +0800
-Subject: [PATCH v3 1/6] pwm: kconfig: modify mediatek information
-In-Reply-To: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <1498802721-32455-2-git-send-email-zhi.mao@mediatek.com>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Fri, 30 Jun 2017 01:24:54 -0500
+Subject: [PATCH] crypto: mediatek: fix error return code in mtk_crypto_probe()
+Message-ID: <20170630062454.GA9699@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-modify mediatek information
+Propagate the return value of platform_get_irq on failure.
 
-Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 ---
- drivers/pwm/Kconfig |    2 +-
+ drivers/crypto/mediatek/mtk-platform.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 313c107..45cdf2a 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -300,7 +300,7 @@ config PWM_MEDIATEK
- 	  Generic PWM framework driver for Mediatek ARM SoC.
+diff --git a/drivers/crypto/mediatek/mtk-platform.c b/drivers/crypto/mediatek/mtk-platform.c
+index 000b650..b182e94 100644
+--- a/drivers/crypto/mediatek/mtk-platform.c
++++ b/drivers/crypto/mediatek/mtk-platform.c
+@@ -500,7 +500,7 @@ static int mtk_crypto_probe(struct platform_device *pdev)
+ 		cryp->irq[i] = platform_get_irq(pdev, i);
+ 		if (cryp->irq[i] < 0) {
+ 			dev_err(cryp->dev, "no IRQ:%d resource info\n", i);
+-			return -ENXIO;
++			return cryp->irq[i];
+ 		}
+ 	}
  
- 	  To compile this driver as a module, choose M here: the module
--	  will be called pwm-mxs.
-+	  will be called pwm-mediatek.
- 
- config PWM_MXS
- 	tristate "Freescale MXS PWM support"
 -- 
-1.7.9.5
+2.5.0
