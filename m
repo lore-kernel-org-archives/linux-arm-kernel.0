@@ -1,44 +1,98 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Fri, 30 Jun 2017 12:05:15 +0300
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
- before scanning
-In-Reply-To: <808a7db0-7844-b263-0216-1fe943ac819a@huawei.com>
-References: <20170612155700.GA31930@red-moon>
- <20170613084831.GP3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
- <20170613200339.GX3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
- <20170616083313.GY3187@lahna.fi.intel.com>
- <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
- <808a7db0-7844-b263-0216-1fe943ac819a@huawei.com>
-Message-ID: <20170630090515.GU629@lahna.fi.intel.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Fri, 30 Jun 2017 08:54:20 +0530
+Subject: [Patch v5 12/12] Documention: v4l: Documentation for HEVC CIDs
+In-Reply-To: <CAP3TMiG4PtiqeHhCGkHhdX_uvOhPKd=gTyckczyFKDJwnGfwYA@mail.gmail.com>
+References: <CGME20170619052521epcas5p36a0bc384d10809dcfe775e6da87ed37b@epcas5p3.samsung.com>
+ <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
+ <1497849055-26583-13-git-send-email-smitha.t@samsung.com>
+ <CAP3TMiG4PtiqeHhCGkHhdX_uvOhPKd=gTyckczyFKDJwnGfwYA@mail.gmail.com>
+Message-ID: <1498793060.22203.1034.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 05:16:15PM +0100, John Garry wrote:
-> On 16/06/2017 12:24, Rafael J. Wysocki wrote:
-> > > > > >> >
-> > > > > >> > It causes acpi_default_enumeration() to be called but it should be fine
-> > > > > >> > as we are dealing with platform device anyway.
-> > > > >>
-> > > > >> I do not quite understand how declaring such MFD cell above would make sure
-> > > > >> that the LPC probe is called before the IPMI device is enumerated...
-> > > >
-> > > > In fact it may be that it is not sufficient in this case because the
-> > > > ACPI core might enumerate child devices before the LPC driver even gets
-> > > > a chance to probe so you would need to add also scan handler to the
-> > > > child devices and mark them already enumerated or something like that.
-> > Or extend the special I2C/SPI handling to them.
-> > 
+On Wed, 2017-06-28 at 22:04 +0200, Kamil Debski wrote:
+> Hi,
 > 
-> For this, is it possible to just configure the ACPI table so we spoof that
-> the LPC slave (IPI0001), is an i2c/spi slave? Could we just add a resource
-> of type ACPI_RESOURCE_TYPE_SERIAL_BUS, and common serial bus type i2c/spi to
-> solve this?
+> Please find my comments inline.
+> 
+> On 19 June 2017 at 07:10, Smitha T Murthy <smitha.t@samsung.com> wrote:
+> > Added V4l2 controls for HEVC encoder
+> >
+> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> > ---
+> >  Documentation/media/uapi/v4l/extended-controls.rst | 364 +++++++++++++++++++++
+> >  1 file changed, 364 insertions(+)
+> >
+> > diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+> > index abb1057..7767c70 100644
+> > --- a/Documentation/media/uapi/v4l/extended-controls.rst
+> > +++ b/Documentation/media/uapi/v4l/extended-controls.rst
+> > @@ -1960,6 +1960,370 @@ enum v4l2_vp8_golden_frame_sel -
+> >      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
+> >
+> >
+> 
+> [snip]
+> 
+> > +
+> > +
+> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER (integer)``
+> > +    Selects the hierarchical coding layer. In normal encoding
+> > +    (non-hierarchial coding), it should be zero. Possible values are 0 ~ 6.
+> > +    0 indicates HIERARCHICAL CODING LAYER 0, 1 indicates HIERARCHICAL CODING
+> > +    LAYER 1 and so on.
+> 
+> I would like the above to be more consistent. If HIER is in the name
+> then HIER in the description should be used as well. Aside from that,
+> I would recommend using full HIERARCHICAL instead of HIER in the name
+> of the control. Why? Because it is HIERARCHICAL in controls already
+> present in V4L2, such as
+> V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_QP.
+> 
+I had changed it from HIERARCHICAL to HIER as per suggestion by
+Sylwester Nawrocki. Here
+https://patchwork.kernel.org/patch/9666129/
 
-But is the device connected to a I2C or SPI bus? If not, then it does
-not make much sense to declare it as I2C or SPI slave. Instead it should
-be platform device which is the type we use when there is no explicit
-bus specified in ACPI.
+> [snip]
+> 
+> > +
+> > +``V4L2_CID_MPEG_VIDEO_HEVC_LF (boolean)``
+> > +    Indicates loop filtering. Control value 1 indicates loop filtering
+> > +    is enabled and when set to 0 indicates loop filtering is disabled.
+> > +
+> > +``V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY (boolean)``
+> > +    Selects whether to apply the loop filter across the slice boundary or not.
+> > +    If the value is 0, loop filter will not be applied across the slice boundary.
+> > +    If the value is 1, loop filter will be applied across the slice boundary.
+> 
+> Just a thought. Pretty much the same fucntionality is achieved via the
+> V4L2_CID_MPEG_VIDEO_H264_LOOP_FILTER_MODE control. It's an enum having
+> three states: enabled, disabled and disabled at slice boundary. Maybe
+> a single control could be introduced? With another legacy define for
+> API compatibility. Also, I don't like that controls are not consistent
+> between H264 and HEVC. I would opt for the enum option.
+> 
+I will add enum options for the above control.
+
+> > +
+> > +``V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2 (integer)``
+> > +    Selects HEVC loop filter beta offset. The valid range is [-6, +6].
+> > +
+> > +``V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2 (integer)``
+> > +    Selects HEVC loop filter tc offset. The valid range is [-6, +6].
+> > +
+> > +.. _v4l2-hevc-refresh-type:
+> > +
+> > +``V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE``
+> > +    (enum)
+> > +
+> [snip]
+> 
+> Best wishes,
+> Kamil
+> 
+> 
+Thank you for the review.
+
+Regards,
+Smitha
