@@ -1,49 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 30 Jun 2017 08:57:10 +0200
-Subject: [GIT PULL] Update binding documentation for CP110 and AP806
-Message-ID: <87h8yyvu7t.fsf@free-electrons.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Fri, 30 Jun 2017 07:14:23 +0000
+Subject: [RESEND PATCH v4] clk: stm32h7: Add stm32h743 clock driver
+In-Reply-To: <20170630002008.GD22780@codeaurora.org>
+References: <1496818794-14771-1-git-send-email-gabriel.fernandez@st.com>
+ <20170621220703.GI4493@codeaurora.org>
+ <110cf67f-e1d6-1f99-953c-6b9639bb4910@st.com>
+ <20170628155956.GA5316@codeaurora.org>
+ <7c0c3861-cf61-a9e2-cd5d-2ae30b8f32fa@st.com>
+ <20170630002008.GD22780@codeaurora.org>
+Message-ID: <d325071a-5da5-4ff1-89b9-fc1bbe10e223@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Stephen,
 
-As seen on Tuesday this is the pull request for the remaining binding
-documentation which depends on the documentation already applied in your
-tree.
+On 06/30/2017 02:20 AM, Stephen Boyd wrote:
+> On 06/29, Gabriel FERNANDEZ wrote:
+>>
+>> On 06/28/2017 05:59 PM, Stephen Boyd wrote:
+>>> On 06/27, Gabriel FERNANDEZ wrote:
+>>>> On 06/22/2017 12:07 AM, Stephen Boyd wrote:
+>>>>> readl_poll_timeout?
+>>>>>
+>>>> if i use readl_poll_timeout (wich use 'ktime_get()') it can be
+>>>> operational only after the selection of clocksource ? (device_initcall).
+>>>> And then if a driver turn on a clock before, it could blocked the linux
+>>>> console ?
+>>>>
+>>> Ok. I wonder if we could add some sort of starting check to
+>>> readl_poll_timeout() that tests system_state for booting vs.
+>>> scheduling? That should be sufficient to handle this case?
+>>>
+>> Oops i think i understood my problem...
+>> i used readl_poll_timeout in atomic context.
+>> I have to move my code in the .prepare ops.
+>>
+>> If you are ok with that i will send a v5
+>>
+> There's readl_poll_timeout_atomic() for those modes.
+>
+yes it's exactly the test i made (use 'readl_poll_timeout()_atomic' in 
+.enable ops) but i'm blocked.
 
-Thanks for taking care of it,
-
-Gregory
-
-The following changes since commit 7e5b11afecc0f558c5a6723970770f92f2529d4e:
-
-  dt-bindings: ap806: introduce a new binding (2017-06-01 12:02:01 +0900)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git binding-doc-cp110-ap806
-
-for you to fetch changes up to 1fa67c675f6477ceb670f087a6f6739f7b3cb099:
-
-  gpio: dt-bindings: Add documentation for gpio controllers on Armada 7K/8K (2017-06-27 09:07:17 +0200)
-
-----------------------------------------------------------------
-Gregory CLEMENT (6):
-      dt-bindings: cp110: do not depend anymore of the *-clock-output-names
-      dt-bindings: cp110: introduce a new binding
-      dt-bindings: cp110: add sdio clock to cp-110 system controller
-      pinctrl: dt-bindings: add documentation for AP806 pin controllers
-      pinctrl: dt-bindings: add documentation for CP110 pin controllers
-      gpio: dt-bindings: Add documentation for gpio controllers on Armada 7K/8K
-
- Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt  |  73 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------
- Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 144 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------
- Documentation/devicetree/bindings/gpio/gpio-mvebu.txt                      |  24 +++++++++++++++++-------
- 3 files changed, 208 insertions(+), 33 deletions(-)
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+if i do the same in .prepare ops with 'readl_poll_timeout()' it's ok.
