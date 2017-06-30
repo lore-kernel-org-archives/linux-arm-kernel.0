@@ -1,59 +1,49 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 30 Jun 2017 10:56:04 +0100
-Subject: [PATCH 4/8] arm64: dts: allwinner: a64: add SCPI support
+Date: Fri, 30 Jun 2017 10:56:06 +0100
+Subject: [PATCH 6/8] arm64: dts: allwinner: a64: add SCPI sensors support
 In-Reply-To: <20170630095608.24943-1-andre.przywara@arm.com>
 References: <20170630095608.24943-1-andre.przywara@arm.com>
-Message-ID: <20170630095608.24943-5-andre.przywara@arm.com>
+Message-ID: <20170630095608.24943-7-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the SCPI protocol using an SMC mailbox and some
-shared memory in SRAM.
-The SCPI provider is implemented in the ARM Trusted Firmware layer
-(running in EL3 on the application processor cores), triggered by an smc
-call.
+The SCPI protocol allows various sensors to be exposed to the OS. The
+list of supported sensors (and their kind) is provided by the SCPI
+provider, which is in ARM Trusted Firmware. The current implementation
+exports the temperature sensors, for instance.
+Since the temperature sensor requires a clock to be running, we set
+a fixed clock rate for this particular clock to prevent the Linux driver
+from turning it off.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 9d00622..ef6f10e 100644
+index 58c3675..7cb1b04 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -124,6 +124,32 @@
- 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+@@ -163,6 +163,11 @@
+ 				clock-output-names = "cpu_clk";
+ 			};
+ 		};
++
++		scpi_sensors0: sensors {
++			compatible = "arm,scpi-sensors";
++			#thermal-sensor-cells = <1>;
++		};
  	};
  
-+	mailbox: mbox at 0 {
-+		compatible = "arm,smc-mbox";
-+		#mbox-cells = <1>;
-+		arm,smc-func-ids = <0x82000001>;
-+	};
-+
-+	sram: sram at 10000{
-+		compatible = "mmio-sram";
-+		reg = <0x10000 0x8000>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x10000 0x8000>;
-+
-+		cpu_scp_mem: scp-shmem at 7e00 {
-+			compatible = "mmio-sram";
-+			reg = <0x7e00 0x200>;
-+		};
-+	};
-+
-+	scpi {
-+		compatible = "arm,scpi";
-+		mboxes = <&mailbox 0>;
-+		shmem = <&cpu_scp_mem>;
-+	};
-+
  	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+@@ -307,6 +312,8 @@
+ 			clock-names = "hosc", "losc";
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
++			assigned-clocks = <&ccu CLK_THS>;
++			assigned-clock-rates = <4000000>;
+ 		};
+ 
+ 		pio: pinctrl at 1c20800 {
 -- 
 2.9.0
