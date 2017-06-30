@@ -1,182 +1,89 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:21 +0100
-Subject: [PATCH 05/58] KVM: arm/arm64: Simplify active_change_prepare and plug
- race
+Date: Fri, 30 Jun 2017 09:44:27 +0100
+Subject: [PATCH 11/58] KVM: arm/arm64: replace pause checks with vcpu request
+ checks
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-6-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-12-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <cdall@linaro.org>
+From: Andrew Jones <drjones@redhat.com>
 
-We don't need to stop a specific VCPU when changing the active state,
-because private IRQs can only be modified by a running VCPU for the
-VCPU itself and it is therefore already stopped.
+The current use of KVM_REQ_VCPU_EXIT for pause is fine.  Even the
+requester clearing the request is OK, as this is the special case
+where the sole requesting thread and receiving VCPU are executing
+synchronously (see "Clearing Requests" in
+Documentation/virtual/kvm/vcpu-requests.rst) However, that's about
+to change, so let's ensure only the receiving VCPU clears the
+request. Additionally, by guaranteeing KVM_REQ_VCPU_EXIT is always
+set when pause is, we can avoid checking pause directly in VCPU RUN.
 
-However, it is also possible for two VCPUs to be modifying the active
-state of SPIs at the same time, which can cause the thread being stuck
-in the loop that checks other VCPU threads for a potentially very long
-time, or to modify the active state of a running VCPU.  Fix this by
-serializing all accesses to setting and clearing the active state of
-interrupts using the KVM mutex.
-
-Reported-by: Andrew Jones <drjones@redhat.com>
+Signed-off-by: Andrew Jones <drjones@redhat.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |  2 --
- arch/arm64/include/asm/kvm_host.h |  2 --
- virt/kvm/arm/arm.c                | 20 ++++----------------
- virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
- virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
- 5 files changed, 20 insertions(+), 33 deletions(-)
+ virt/kvm/arm/arm.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index f0e66577ce05..12274d46df70 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
- void kvm_arm_halt_guest(struct kvm *kvm);
- void kvm_arm_resume_guest(struct kvm *kvm);
--void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
--void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
- 
- int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
- unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 5e19165c5fa8..32cbe8a3bb0d 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
- void kvm_arm_halt_guest(struct kvm *kvm);
- void kvm_arm_resume_guest(struct kvm *kvm);
--void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
--void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
- 
- u64 __kvm_call_hyp(void *hypfn, ...);
- #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
 diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 3417e184c8e1..3c387fdc4a9e 100644
+index 138212605ad9..21a4db90073f 100644
 --- a/virt/kvm/arm/arm.c
 +++ b/virt/kvm/arm/arm.c
-@@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
- 	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
+@@ -546,7 +546,6 @@ void kvm_arm_resume_guest(struct kvm *kvm)
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm) {
+ 		vcpu->arch.pause = false;
+-		kvm_clear_request(KVM_REQ_VCPU_EXIT, vcpu);
+ 		swake_up(kvm_arch_vcpu_wq(vcpu));
+ 	}
  }
+@@ -557,6 +556,11 @@ static void vcpu_sleep(struct kvm_vcpu *vcpu)
  
--void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
--{
--	vcpu->arch.pause = true;
--	kvm_vcpu_kick(vcpu);
--}
--
--void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
--{
--	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
--
--	vcpu->arch.pause = false;
--	swake_up(wq);
--}
--
- void kvm_arm_resume_guest(struct kvm *kvm)
- {
- 	int i;
- 	struct kvm_vcpu *vcpu;
- 
--	kvm_for_each_vcpu(i, vcpu, kvm)
--		kvm_arm_resume_vcpu(vcpu);
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		vcpu->arch.pause = false;
-+		swake_up(kvm_arch_vcpu_wq(vcpu));
+ 	swait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
+ 				       (!vcpu->arch.pause)));
++
++	if (vcpu->arch.pause) {
++		/* Awaken to handle a signal, request we sleep again later. */
++		kvm_make_request(KVM_REQ_VCPU_EXIT, vcpu);
 +	}
  }
  
- static void vcpu_sleep(struct kvm_vcpu *vcpu)
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 64cbcb4c47d0..c1e4bdd66131 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-  * be migrated while we don't hold the IRQ locks and we don't want to be
-  * chasing moving targets.
-  *
-- * For private interrupts, we only have to make sure the single and only VCPU
-- * that can potentially queue the IRQ is stopped.
-+ * For private interrupts we don't have to do anything because userspace
-+ * accesses to the VGIC state already require all VCPUs to be stopped, and
-+ * only the VCPU itself can modify its private interrupts active state, which
-+ * guarantees that the VCPU is not running.
-  */
- static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
- {
--	if (intid < VGIC_NR_PRIVATE_IRQS)
--		kvm_arm_halt_vcpu(vcpu);
--	else
-+	if (intid > VGIC_NR_PRIVATE_IRQS)
- 		kvm_arm_halt_guest(vcpu->kvm);
+ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+@@ -564,6 +568,14 @@ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+ 	return vcpu->arch.target >= 0;
  }
  
- /* See vgic_change_active_prepare */
- static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
- {
--	if (intid < VGIC_NR_PRIVATE_IRQS)
--		kvm_arm_resume_vcpu(vcpu);
--	else
-+	if (intid > VGIC_NR_PRIVATE_IRQS)
- 		kvm_arm_resume_guest(vcpu->kvm);
- }
++static void check_vcpu_requests(struct kvm_vcpu *vcpu)
++{
++	if (kvm_request_pending(vcpu)) {
++		if (kvm_check_request(KVM_REQ_VCPU_EXIT, vcpu))
++			vcpu_sleep(vcpu);
++	}
++}
++
+ /**
+  * kvm_arch_vcpu_ioctl_run - the main VCPU run function to execute guest code
+  * @vcpu:	The VCPU pointer
+@@ -609,7 +621,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
-@@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+ 		update_vttbr(vcpu->kvm);
  
-+	mutex_lock(&vcpu->kvm->lock);
- 	vgic_change_active_prepare(vcpu, intid);
+-		if (vcpu->arch.power_off || vcpu->arch.pause)
++		check_vcpu_requests(vcpu);
++
++		if (vcpu->arch.power_off)
+ 			vcpu_sleep(vcpu);
  
- 	__vgic_mmio_write_cactive(vcpu, addr, len, val);
+ 		/*
+@@ -649,7 +663,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
- 	vgic_change_active_finish(vcpu, intid);
-+	mutex_unlock(&vcpu->kvm->lock);
- }
- 
- void vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
-@@ -305,11 +305,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
- 
-+	mutex_lock(&vcpu->kvm->lock);
- 	vgic_change_active_prepare(vcpu, intid);
- 
- 	__vgic_mmio_write_sactive(vcpu, addr, len, val);
- 
- 	vgic_change_active_finish(vcpu, intid);
-+	mutex_unlock(&vcpu->kvm->lock);
- }
- 
- void vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 83b24d20ff8f..aea080a2c443 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -35,11 +35,12 @@ struct vgic_global kvm_vgic_global_state __ro_after_init = {
- 
- /*
-  * Locking order is always:
-- * its->cmd_lock (mutex)
-- *   its->its_lock (mutex)
-- *     vgic_cpu->ap_list_lock
-- *       kvm->lpi_list_lock
-- *         vgic_irq->irq_lock
-+ * kvm->lock (mutex)
-+ *   its->cmd_lock (mutex)
-+ *     its->its_lock (mutex)
-+ *       vgic_cpu->ap_list_lock
-+ *         kvm->lpi_list_lock
-+ *           vgic_irq->irq_lock
-  *
-  * If you need to take multiple locks, always take the upper lock first,
-  * then the lower ones, e.g. first take the its_lock, then the irq_lock.
+ 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
+ 		    kvm_request_pending(vcpu) ||
+-		    vcpu->arch.power_off || vcpu->arch.pause) {
++		    vcpu->arch.power_off) {
+ 			vcpu->mode = OUTSIDE_GUEST_MODE;
+ 			local_irq_enable();
+ 			kvm_pmu_sync_hwstate(vcpu);
 -- 
 2.11.0
