@@ -1,69 +1,118 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 30 Jun 2017 10:58:26 -0500
-Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
- cpg-mssr: Add interface for critical core clocks)
-In-Reply-To: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
-References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
-Message-ID: <CAL_JsqKGrZeR7z80beY_XEjqd5fEQQwPxusJ1FADoALgNE3fEg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 30 Jun 2017 18:01:06 +0200
+Subject: [PATCH v5] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <CANwerB2RHQwZgZc37+dkh9np-SSFks3tZxqFzDPVwQP5oP48hg@mail.gmail.com>
+References: <20170627143652.13075-1-net147@gmail.com>
+ <20170628092024.ejxy6itqj3hx6yew@flea>
+ <CANwerB0aTAbEoK3zrjZ0802+QEBiZ8tuuPovLsV+KWYtNzd3ig@mail.gmail.com>
+ <20170629155620.4keqi4cumbtvv63u@flea>
+ <CANwerB3bKWYhTsD7Jh1r6r-+AP_96y5rOtU6mCwpY1_jFZC8yg@mail.gmail.com>
+ <CAGb2v67CTXayDm4rhoJ4CNx9J=u+U+2_kh9xYsjHjCE8YnJ=ow@mail.gmail.com>
+ <CANwerB2RHQwZgZc37+dkh9np-SSFks3tZxqFzDPVwQP5oP48hg@mail.gmail.com>
+Message-ID: <20170630160106.qtm3hdaoalxqu37c@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 4:27 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Dirk,
->
-> CC clock, ARM, DT, PM people
->
-> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
-> disables them as being unused.
->
-> On Mon, Jun 26, 2017 at 1:30 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->> With commit 72f5df2c2bbb6 ("clk: renesas: cpg-mssr: Migrate to
->> CLK_IS_CRITICAL") we are able to handle critical module clocks.
->> Introduce the same logic for critical core clocks.
->>
->> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
->> ---
->> Commit
->>
->> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/renesas?id=72f5df2c2bbb66d4a555cb51eb9f412abf1af77f
->>
->> is quite nice to avoid *module* clocks being disabled. Unfortunately,
->> there are *core* clocks, too. E.g. using an other OS on the Cortex R7
->> core of the r8a7795, the 'canfd' is a quite popular core clock which
->> shouldn't be disabled by Linux.
->>
->> Therefore, this patch is a proposal to use the same 'mark clocks as
->> critical' logic implemented for the module clocks for the core
->> clocks, too.
->>
->> Opinions?
->
-> On r8a7795, there are several Cortex A cores running Linux, and a Cortex R7
-> core which may run another OS.
-> This is an interesting issue, and relevant to other SoCs, too.
->
-> In this particular case, the "canfd" clock is a core clock used as an
-> auxiliary clock for the CAN0, CAN1, and CANFD interfaces.  This can lead
-> to three scenarios:
->   1. Linux controls all CAN interfaces
->      => no issue,
->   2. The OS on the RT CPU controls all CAN interfaces
->      => issue, Linux disables the clock
->   3. Mix of 1 and 2
->      => More issues.
-> Of course this is not limited to clocks, but also to e.g. PM domains.
->
-> How can this be handled?
-> I believe just marking the "canfd" clock critical is not the right solution,
-> as about any clock could be used by the RT CPU.
->
-> Still, Linux needs to be made aware that devices (clocks and PM domains) are
-> controlled by another CPU/OS.
->
-> Should this be described in DT? It feels like software policy to me.
+On Sat, Jul 01, 2017 at 12:14:44AM +1000, Jonathan Liu wrote:
+> Hi Chen-Yu and Maxime,
+> 
+> On 30 June 2017 at 13:16, Chen-Yu Tsai <wens@csie.org> wrote:
+> > On Fri, Jun 30, 2017 at 6:22 AM, Jonathan Liu <net147@gmail.com> wrote:
+> >> Hi Maxime,
+> >>
+> >> On 30 June 2017 at 01:56, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >>> On Wed, Jun 28, 2017 at 08:39:33PM +1000, Jonathan Liu wrote:
+> >>>> >> +     u32 int_status;
+> >>>> >> +     u32 fifo_status;
+> >>>> >> +     /* Read needs empty flag unset, write needs full flag unset */
+> >>>> >> +     u32 flag = read ? SUN4I_HDMI_DDC_FIFO_STATUS_EMPTY :
+> >>>> >> +                       SUN4I_HDMI_DDC_FIFO_STATUS_FULL;
+> >>>> >> +     int ret;
+> >>>> >> +
+> >>>> >> +     /* Wait until error or FIFO ready */
+> >>>> >> +     ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG,
+> >>>> >> +                              int_status,
+> >>>> >> +                              is_err_status(int_status) ||
+> >>>> >> +                              is_fifo_flag_unset(hdmi, &fifo_status, flag),
+> >>>> >> +                              min(len, SUN4I_HDMI_DDC_FIFO_SIZE) * byte_time,
+> >>>> >> +                              100000);
+> >>>> >> +
+> >>>> >> +     if (is_err_status(int_status))
+> >>>> >> +             return -EIO;
+> >>>> >> +     if (ret)
+> >>>> >> +             return -ETIMEDOUT;
+> >>>> >
+> >>>> > Why not just have
+> >>>> > ret = readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_STATUS_REG, reg,
+> >>>> >                          !(reg & flag), 100, 100000);
+> >>>> >
+> >>>> > if (ret < 0)
+> >>>> >         if (is_err_status())
+> >>>> >                 return -EIO;
+> >>>> >         return ret;
+> >>>> >
+> >>>> >
+> >>>>
+> >>>> If I check error status after readl_poll_timeout and there is an error
+> >>>> (e.g. the I2C address does not have a corresponding device connected
+> >>>> or nothing connected to HDMI port) it will keep checking the fifo
+> >>>> status even though error bit is set in the int status and then timeout
+> >>>> after 100 ms. If it checks the int status register at the same time,
+> >>>> it will error after 100 nanoseconds. I don't want to introduce
+> >>>> unnecessary delays considering part of the reason for adding this
+> >>>> driver to make it more usable for non-standard use cases.
+> >>>
+> >>> Well, polling for 100ms doesn't seem great either. What was the
+> >>> rationale behind that timeout?
+> >>>
+> >>
+> >> When an error occurs one of the error bits will be set in the
+> >> INT_STATUS register so this is detected very quickly if I check the
+> >> INT_STATUS and FIFO_STATUS at the same time. The 100 ms timeout is in
+> >> case the I2C slave does clock stretching in which case the transfer
+> >> may take longer than the predicted time.
+> >>
+> >>> And we can also reverse the check and look at the INT_STATUS
+> >>> register. The errors will be there, and we can program the threshold
+> >>> we want in both directions and use the
+> >>> DDC_FIFO_Request_Interrupt_Status bit.
+> >>>
+> >>
+> >> I did try that when I was doing the v3 patch but I couldn't get it to
+> >> work as mentioned previously in the v3 patch discussion. I programmed
+> >> the FIFO_RX_TRIGGER_THRES and FIFO_TX_TRIGGER_THRES in DDC_FIFO_Ctrl
+> >> register at the same time as setting FIFO_Address_Clear but the
+> >> request interrupt status bit did not get updated to the appropriate
+> >> state that is consistent with the FIFO level and the thresholds. I did
+> >> try this several times for subsequent patch versions without success.
+> >
+> > The manual says "When FIFO level is above this value in read mode, DMA
+> > request and FIFO request interrupt are asserted if relative enable is on."
+> >
+> > Perhaps try enabling the interrupts? But if that were the case, wouldn't
+> > using interrupts instead of polling be better?
+> >
+> > ChenYu
+> >
+> 
+> I managed to get the thresholds working so switching to using
+> interrupts instead of polling will be my next goal.
 
-No, it shouldn't. It is Linux policy to disable all unused clocks, so
-Linux gets to deal with the consequences.
+I'd say that we can do it using polling first, and then move to
+interrupts if needed. And that should definitely be part of a separate
+patch. This one is already pretty invasive.
 
-Rob
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170630/4ea810e2/attachment-0001.sig>
