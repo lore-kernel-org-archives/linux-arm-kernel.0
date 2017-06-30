@@ -1,159 +1,84 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:41 +0100
-Subject: [PATCH 25/58] KVM: arm/arm64: Disallow userspace control of in-kernel
- IRQ lines
+Date: Fri, 30 Jun 2017 09:44:42 +0100
+Subject: [PATCH 26/58] KVM: arm/arm64: Don't assume initialized vgic when
+ setting PMU IRQ
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-26-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-27-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-When injecting an IRQ to the VGIC, you now have to present an owner
-token for that IRQ line to show that you are the owner of that line.
+The PMU IRQ number is set through the VCPU device's KVM_SET_DEVICE_ATTR
+ioctl handler for the KVM_ARM_VCPU_PMU_V3_IRQ attribute, but there is no
+enforced or stated requirement that this must happen after initializing
+the VGIC.  As a result, calling vgic_valid_spi() which relies on the
+nr_spis being set during the VGIC init can incorrectly fail.
 
-IRQ lines driven from userspace or via an irqfd do not have an owner and
-will simply pass a NULL pointer.
-
-Also get rid of the unused kvm_vgic_inject_mapped_irq prototype.
+Introduce irq_is_spi, which determines if an IRQ number is within the
+SPI range without verifying it against the actual VGIC properties.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h         |  4 +---
- virt/kvm/arm/arch_timer.c      |  3 ++-
- virt/kvm/arm/arm.c             |  4 ++--
- virt/kvm/arm/pmu.c             |  3 ++-
- virt/kvm/arm/vgic/vgic-irqfd.c |  2 +-
- virt/kvm/arm/vgic/vgic.c       | 15 +++++++++++----
- 6 files changed, 19 insertions(+), 12 deletions(-)
+ include/kvm/arm_vgic.h |  2 ++
+ virt/kvm/arm/pmu.c     | 22 ++++++++++++++++++----
+ 2 files changed, 20 insertions(+), 4 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 5d5b34534ce9..131668f8599c 100644
+index 131668f8599c..a2ae9d2de21f 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -300,9 +300,7 @@ int kvm_vgic_hyp_init(void);
- void kvm_vgic_init_cpu_hardware(void);
+@@ -39,6 +39,8 @@
+ #define KVM_IRQCHIP_NUM_PINS	(1020 - 32)
  
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
--			bool level);
--int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
--			       bool level);
-+			bool level, void *owner);
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
- bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 07f6f9bfc1f2..8e89d63005c7 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -226,7 +226,8 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- 	if (likely(irqchip_in_kernel(vcpu->kvm))) {
- 		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
- 					  timer_ctx->irq.irq,
--					  timer_ctx->irq.level);
-+					  timer_ctx->irq.level,
-+					  timer_ctx);
- 		WARN_ON(ret);
- 	}
- }
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 72816d3f23a7..a265acc53e39 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -832,7 +832,7 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level,
- 		if (irq_num < VGIC_NR_SGIS || irq_num >= VGIC_NR_PRIVATE_IRQS)
- 			return -EINVAL;
+ #define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
++#define irq_is_spi(irq) ((irq) >= VGIC_NR_PRIVATE_IRQS && \
++			 (irq) <= VGIC_MAX_SPI)
  
--		return kvm_vgic_inject_irq(kvm, vcpu->vcpu_id, irq_num, level);
-+		return kvm_vgic_inject_irq(kvm, vcpu->vcpu_id, irq_num, level, NULL);
- 	case KVM_ARM_IRQ_TYPE_SPI:
- 		if (!irqchip_in_kernel(kvm))
- 			return -ENXIO;
-@@ -840,7 +840,7 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level,
- 		if (irq_num < VGIC_NR_PRIVATE_IRQS)
- 			return -EINVAL;
- 
--		return kvm_vgic_inject_irq(kvm, 0, irq_num, level);
-+		return kvm_vgic_inject_irq(kvm, 0, irq_num, level, NULL);
- 	}
- 
- 	return -EINVAL;
+ enum vgic_type {
+ 	VGIC_V2,		/* Good ol' GICv2 */
 diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 3f0866925b6b..9923eb90cdc7 100644
+index 9923eb90cdc7..fc8a723ff387 100644
 --- a/virt/kvm/arm/pmu.c
 +++ b/virt/kvm/arm/pmu.c
-@@ -215,7 +215,8 @@ static void kvm_pmu_check_overflow(struct kvm_vcpu *vcpu)
- 
- 	if (likely(irqchip_in_kernel(vcpu->kvm))) {
- 		int ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
--					      pmu->irq_num, overflow);
-+					      pmu->irq_num, overflow,
-+					      &vcpu->arch.pmu);
- 		WARN_ON(ret);
- 	}
- }
-diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
-index f138ed2e9c63..b7baf581611a 100644
---- a/virt/kvm/arm/vgic/vgic-irqfd.c
-+++ b/virt/kvm/arm/vgic/vgic-irqfd.c
-@@ -34,7 +34,7 @@ static int vgic_irqfd_set_irq(struct kvm_kernel_irq_routing_entry *e,
- 
- 	if (!vgic_valid_spi(kvm, spi_id))
- 		return -EINVAL;
--	return kvm_vgic_inject_irq(kvm, 0, spi_id, level);
-+	return kvm_vgic_inject_irq(kvm, 0, spi_id, level, NULL);
- }
- 
- /**
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 9628945234e4..fed717e07938 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -235,10 +235,14 @@ static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
- 
- /*
-  * Only valid injection if changing level for level-triggered IRQs or for a
-- * rising edge.
-+ * rising edge, and in-kernel connected IRQ lines can only be controlled by
-+ * their owner.
-  */
--static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
-+static bool vgic_validate_injection(struct vgic_irq *irq, bool level, void *owner)
- {
-+	if (irq->owner != owner)
-+		return false;
+@@ -458,10 +458,24 @@ int kvm_arm_pmu_v3_enable(struct kvm_vcpu *vcpu)
+ 	/*
+ 	 * A valid interrupt configuration for the PMU is either to have a
+ 	 * properly configured interrupt number and using an in-kernel
+-	 * irqchip, or to neither set an IRQ nor create an in-kernel irqchip.
++	 * irqchip, or to not have an in-kernel GIC and not set an IRQ.
+ 	 */
+-	if (kvm_arm_pmu_irq_initialized(vcpu) != irqchip_in_kernel(vcpu->kvm))
+-		return -EINVAL;
++	if (irqchip_in_kernel(vcpu->kvm)) {
++		int irq = vcpu->arch.pmu.irq_num;
++		if (!kvm_arm_pmu_irq_initialized(vcpu))
++			return -EINVAL;
 +
- 	switch (irq->config) {
- 	case VGIC_CONFIG_LEVEL:
- 		return irq->line_level != level;
-@@ -350,13 +354,16 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
-  *			      false: to ignore the call
-  *	     Level-sensitive  true:  raise the input signal
-  *			      false: lower the input signal
-+ * @owner:   The opaque pointer to the owner of the IRQ being raised to verify
-+ *           that the caller is allowed to inject this IRQ.  Userspace
-+ *           injections will have owner == NULL.
-  *
-  * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-  * level-sensitive interrupts.  You can think of the level parameter as 1
-  * being HIGH and 0 being LOW and all devices being active-HIGH.
-  */
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
--			bool level)
-+			bool level, void *owner)
- {
- 	struct kvm_vcpu *vcpu;
- 	struct vgic_irq *irq;
-@@ -378,7 +385,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
++		/*
++		 * If we are using an in-kernel vgic, at this point we know
++		 * the vgic will be initialized, so we can check the PMU irq
++		 * number against the dimensions of the vgic and make sure
++		 * it's valid.
++		 */
++		if (!irq_is_ppi(irq) && !vgic_valid_spi(vcpu->kvm, irq))
++			return -EINVAL;
++	} else if (kvm_arm_pmu_irq_initialized(vcpu)) {
++		   return -EINVAL;
++	}
  
- 	spin_lock(&irq->irq_lock);
+ 	kvm_pmu_vcpu_reset(vcpu);
+ 	vcpu->arch.pmu.ready = true;
+@@ -547,7 +561,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ 			return -EFAULT;
  
--	if (!vgic_validate_injection(irq, level)) {
-+	if (!vgic_validate_injection(irq, level, owner)) {
- 		/* Nothing to see here, move along... */
- 		spin_unlock(&irq->irq_lock);
- 		vgic_put_irq(kvm, irq);
+ 		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
+-		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
++		if (!(irq_is_ppi(irq) || irq_is_spi(irq)))
+ 			return -EINVAL;
+ 
+ 		if (!pmu_irq_is_valid(vcpu->kvm, irq))
 -- 
 2.11.0
