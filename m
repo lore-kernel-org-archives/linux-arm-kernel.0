@@ -1,54 +1,33 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 30 Jun 2017 17:43:02 -0300
-Subject: [PATCH 1/4] ARM: dts: imx7d-sdb: Put pinctrl_spi4 in the correct
- location
-Message-ID: <1498855385-9690-1-git-send-email-festevam@gmail.com>
+Date: Fri, 30 Jun 2017 17:43:04 -0300
+Subject: [PATCH 3/4] ARM: imx_v6_v7_defconfig: Enable SPI_GPIO
+In-Reply-To: <1498855385-9690-1-git-send-email-festevam@gmail.com>
+References: <1498855385-9690-1-git-send-email-festevam@gmail.com>
+Message-ID: <1498855385-9690-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-pinctrl_spi4 pin group is not part of the low power iomux controller,
-so move it under the normal iomuxc node.
+Some boards like imx7d-sdb provide SPIO functionality via GPIOs,
+so enable the CONFIG_SPI_GPIO option.
 
-Fixes: 184f39b57cab6 ("ARM: dts: imx7d-sdb: Add GPIO expander node")
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx7d-sdb.dts | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 54c4540..0a24d1b 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -557,6 +557,14 @@
- 			>;
- 		};
- 
-+		pinctrl_spi4: spi4grp {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO09__GPIO1_IO9	0x59
-+				MX7D_PAD_GPIO1_IO12__GPIO1_IO12	0x59
-+				MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x59
-+			>;
-+		};
-+
- 		pinctrl_tsc2046_pendown: tsc2046_pendown {
- 			fsl,pins = <
- 				MX7D_PAD_EPDC_BDR1__GPIO2_IO29		0x59
-@@ -697,13 +705,5 @@
- 		fsl,pins = <
- 			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x110b0
- 		>;
--
--		pinctrl_spi4: spi4grp {
--			fsl,pins = <
--				MX7D_PAD_GPIO1_IO09__GPIO1_IO9	0x59
--				MX7D_PAD_GPIO1_IO12__GPIO1_IO12	0x59
--				MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x59
--			>;
--		};
- 	};
- };
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index e74de69..b043caf 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -193,6 +193,7 @@ CONFIG_I2C_ALGOPCA=m
+ CONFIG_I2C_GPIO=y
+ CONFIG_I2C_IMX=y
+ CONFIG_SPI=y
++CONFIG_SPI_GPIO=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_FSL_DSPI=y
+ CONFIG_GPIO_SYSFS=y
 -- 
 2.7.4
