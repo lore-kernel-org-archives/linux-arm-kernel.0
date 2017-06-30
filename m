@@ -1,65 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:48 +0100
-Subject: [PATCH 32/58] KVM: arm64: vgic-v3: Add ICV_IGRPEN1_EL1 handler
-In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
-References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-33-marc.zyngier@arm.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Fri, 30 Jun 2017 12:05:15 +0300
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
+ before scanning
+In-Reply-To: <808a7db0-7844-b263-0216-1fe943ac819a@huawei.com>
+References: <20170612155700.GA31930@red-moon>
+ <20170613084831.GP3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+ <20170613151013.GT3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
+ <20170613200339.GX3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
+ <20170616083313.GY3187@lahna.fi.intel.com>
+ <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
+ <808a7db0-7844-b263-0216-1fe943ac819a@huawei.com>
+Message-ID: <20170630090515.GU629@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for reading/writing the guest's view of the ICC_IGRPEN1_EL1
-register, which is located in the ICH_VMCR_EL2.VENG1 field.
+On Thu, Jun 29, 2017 at 05:16:15PM +0100, John Garry wrote:
+> On 16/06/2017 12:24, Rafael J. Wysocki wrote:
+> > > > > >> >
+> > > > > >> > It causes acpi_default_enumeration() to be called but it should be fine
+> > > > > >> > as we are dealing with platform device anyway.
+> > > > >>
+> > > > >> I do not quite understand how declaring such MFD cell above would make sure
+> > > > >> that the LPC probe is called before the IPMI device is enumerated...
+> > > >
+> > > > In fact it may be that it is not sufficient in this case because the
+> > > > ACPI core might enumerate child devices before the LPC driver even gets
+> > > > a chance to probe so you would need to add also scan handler to the
+> > > > child devices and mark them already enumerated or something like that.
+> > Or extend the special I2C/SPI handling to them.
+> > 
+> 
+> For this, is it possible to just configure the ACPI table so we spoof that
+> the LPC slave (IPI0001), is an i2c/spi slave? Could we just add a resource
+> of type ACPI_RESOURCE_TYPE_SERIAL_BUS, and common serial bus type i2c/spi to
+> solve this?
 
-Tested-by: Alexander Graf <agraf@suse.de>
-Acked-by: David Daney <david.daney@cavium.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
----
- virt/kvm/arm/hyp/vgic-v3-sr.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index fe021abc8b51..25f09721241f 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -401,6 +401,23 @@ static unsigned int __hyp_text __vgic_v3_get_bpr1(u32 vmcr)
- 	return bpr;
- }
- 
-+static void __hyp_text __vgic_v3_read_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
-+{
-+	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG1_MASK));
-+}
-+
-+static void __hyp_text __vgic_v3_write_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
-+{
-+	u64 val = vcpu_get_reg(vcpu, rt);
-+
-+	if (val & 1)
-+		vmcr |= ICH_VMCR_ENG1_MASK;
-+	else
-+		vmcr &= ~ICH_VMCR_ENG1_MASK;
-+
-+	__vgic_v3_write_vmcr(vmcr);
-+}
-+
- static void __hyp_text __vgic_v3_read_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
- {
- 	vcpu_set_reg(vcpu, rt, __vgic_v3_get_bpr1(vmcr));
-@@ -448,6 +465,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 	is_read = (esr & ESR_ELx_SYS64_ISS_DIR_MASK) == ESR_ELx_SYS64_ISS_DIR_READ;
- 
- 	switch (sysreg) {
-+	case SYS_ICC_GRPEN1_EL1:
-+		if (is_read)
-+			fn = __vgic_v3_read_igrpen1;
-+		else
-+			fn = __vgic_v3_write_igrpen1;
-+		break;
- 	case SYS_ICC_BPR1_EL1:
- 		if (is_read)
- 			fn = __vgic_v3_read_bpr1;
--- 
-2.11.0
+But is the device connected to a I2C or SPI bus? If not, then it does
+not make much sense to declare it as I2C or SPI slave. Instead it should
+be platform device which is the type we use when there is no explicit
+bus specified in ACPI.
