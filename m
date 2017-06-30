@@ -1,270 +1,194 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 29 Jun 2017 22:30:58 -0400
-Subject: [PATCH V3 2/2] dmaengine: dmatest: add support for memset test
-In-Reply-To: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
-References: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1498789858-18583-2-git-send-email-okaya@codeaurora.org>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 30 Jun 2017 08:04:31 +0530
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introducing memset test into dmatest. This change allows us to test
-memset capable HW using the dmatest test procedure. The new dmatest
-value for memset is 2 and it is not the default value.
+Hi Shanker,
 
-Memset support patch shares the same code path as the other dmatest
-code to reuse as much as we can.
+On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+<shankerd@codeaurora.org> wrote:
+> The NUMA node information is visible to ITS driver but not being used
+> other than handling errata. This patch allocates the memory for ITS
+> tables from the corresponding NUMA node using the appropriate NUMA
+> aware functions.
+>
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
+>  1 file changed, 20 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index fed99c5..e45add2 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -860,8 +860,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>         u64 val = its_read_baser(its, baser);
+>         u64 esz = GITS_BASER_ENTRY_SIZE(val);
+>         u64 type = GITS_BASER_TYPE(val);
+> +       struct page *page;
+>         u32 alloc_pages;
+> -       void *base;
+>         u64 tmp;
+>
+>  retry_alloc_baser:
+> @@ -874,12 +874,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>                 order = get_order(GITS_BASER_PAGES_MAX * psz);
+>         }
+>
+> -       base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+> -       if (!base)
+> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
 
-The first value inside the source buffer is used as a pattern
-to fill in the destination buffer space.
+the changes would have been minimal, if you converted page to base
+address after allocation here itself?
 
-Prior to running the test, source/destination buffers are initialized
-in the current code.
+ page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
+ base =  page_address(page);
 
-"The remaining bits are the inverse of a counter which increments by
- one for each byte address."
+> +       if (!page)
+>                 return -ENOMEM;
+>
+>  retry_baser:
+> -       val = (virt_to_phys(base)                                |
+> +       val = (page_to_phys(page)
 
-Memset test will fill in the upper bits of pattern with the inverse of
-fixed counter value 1 as opposed to an incrementing value in a loop.
+no change required.
 
-An example run is as follows:
+>                 (type << GITS_BASER_TYPE_SHIFT)                  |
+>                 ((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)       |
+>                 ((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)    |
+> @@ -915,7 +915,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>                 shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+>                 if (!shr) {
+>                         cache = GITS_BASER_nC;
+> -                       gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
+> +                       gic_flush_dcache_to_poc(page_to_virt(page),
+> +                                               PAGE_ORDER_TO_SIZE(order));
 
-echo dma0chan0 > /sys/module/dmatest/parameters/channel
-echo 2 >  /sys/module/dmatest/parameters/dmatest
-echo 2000 >  /sys/module/dmatest/parameters/timeout
-echo 10 >  /sys/module/dmatest/parameters/iterations
-echo 1 >  /sys/module/dmatest/parameters/run
+no change needed, if base is used still.
+>                 }
+>                 goto retry_baser;
+>         }
+> @@ -926,7 +927,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>                  * size and retry. If we reach 4K, then
+>                  * something is horribly wrong...
+>                  */
+> -               free_pages((unsigned long)base, order);
+> +               __free_pages(page, order);
 
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/dmatest.c | 88 +++++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 64 insertions(+), 24 deletions(-)
+no change required.
+>                 baser->base = NULL;
+>
+>                 switch (psz) {
+> @@ -943,19 +944,19 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>                 pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
+>                        &its->phys_base, its_base_type_string[type],
+>                        val, tmp);
+> -               free_pages((unsigned long)base, order);
+> +               __free_pages(page, order);
 
-diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
-index a07ef3d..35cb83b 100644
---- a/drivers/dma/dmatest.c
-+++ b/drivers/dma/dmatest.c
-@@ -60,7 +60,7 @@
- static unsigned int dmatest;
- module_param(dmatest, uint, S_IRUGO | S_IWUSR);
- MODULE_PARM_DESC(dmatest,
--		"dmatest 0-memcpy 1-slave_sg (default: 0)");
-+		"dmatest 0-memcpy 1-slave_sg 2-memset (default: 0)");
- 
- static unsigned int xor_sources = 3;
- module_param(xor_sources, uint, S_IRUGO | S_IWUSR);
-@@ -158,6 +158,7 @@ struct dmatest_params {
- #define PATTERN_COPY		0x40
- #define PATTERN_OVERWRITE	0x20
- #define PATTERN_COUNT_MASK	0x1f
-+#define PATTERN_MEMSET_IDX	0x01
- 
- struct dmatest_thread {
- 	struct list_head	node;
-@@ -239,46 +240,62 @@ static unsigned long dmatest_random(void)
- 	return buf;
- }
- 
-+static inline u8 gen_inv_idx(u8 index, bool is_memset)
-+{
-+	u8 val = is_memset ? PATTERN_MEMSET_IDX : index;
-+
-+	return ~val & PATTERN_COUNT_MASK;
-+}
-+
-+static inline u8 gen_src_value(u8 index, bool is_memset)
-+{
-+	return PATTERN_SRC | gen_inv_idx(index, is_memset);
-+}
-+
-+static inline u8 gen_dst_value(u8 index, bool is_memset)
-+{
-+	return PATTERN_DST | gen_inv_idx(index, is_memset);
-+}
-+
- static void dmatest_init_srcs(u8 **bufs, unsigned int start, unsigned int len,
--		unsigned int buf_size)
-+		unsigned int buf_size, bool is_memset)
- {
- 	unsigned int i;
- 	u8 *buf;
- 
- 	for (; (buf = *bufs); bufs++) {
- 		for (i = 0; i < start; i++)
--			buf[i] = PATTERN_SRC | (~i & PATTERN_COUNT_MASK);
-+			buf[i] = gen_src_value(i, is_memset);
- 		for ( ; i < start + len; i++)
--			buf[i] = PATTERN_SRC | PATTERN_COPY
--				| (~i & PATTERN_COUNT_MASK);
-+			buf[i] = gen_src_value(i, is_memset) | PATTERN_COPY;
- 		for ( ; i < buf_size; i++)
--			buf[i] = PATTERN_SRC | (~i & PATTERN_COUNT_MASK);
-+			buf[i] = gen_src_value(i, is_memset);
- 		buf++;
- 	}
- }
- 
- static void dmatest_init_dsts(u8 **bufs, unsigned int start, unsigned int len,
--		unsigned int buf_size)
-+		unsigned int buf_size, bool is_memset)
- {
- 	unsigned int i;
- 	u8 *buf;
- 
- 	for (; (buf = *bufs); bufs++) {
- 		for (i = 0; i < start; i++)
--			buf[i] = PATTERN_DST | (~i & PATTERN_COUNT_MASK);
-+			buf[i] = gen_dst_value(i, is_memset);
- 		for ( ; i < start + len; i++)
--			buf[i] = PATTERN_DST | PATTERN_OVERWRITE
--				| (~i & PATTERN_COUNT_MASK);
-+			buf[i] = gen_dst_value(i, is_memset) |
-+						PATTERN_OVERWRITE;
- 		for ( ; i < buf_size; i++)
--			buf[i] = PATTERN_DST | (~i & PATTERN_COUNT_MASK);
-+			buf[i] = gen_dst_value(i, is_memset);
- 	}
- }
- 
- static void dmatest_mismatch(u8 actual, u8 pattern, unsigned int index,
--		unsigned int counter, bool is_srcbuf)
-+		unsigned int counter, bool is_srcbuf, bool is_memset)
- {
- 	u8		diff = actual ^ pattern;
--	u8		expected = pattern | (~counter & PATTERN_COUNT_MASK);
-+	u8		expected = pattern | gen_inv_idx(counter, is_memset);
- 	const char	*thread_name = current->comm;
- 
- 	if (is_srcbuf)
-@@ -298,7 +315,7 @@ static void dmatest_mismatch(u8 actual, u8 pattern, unsigned int index,
- 
- static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
- 		unsigned int end, unsigned int counter, u8 pattern,
--		bool is_srcbuf)
-+		bool is_srcbuf, bool is_memset)
- {
- 	unsigned int i;
- 	unsigned int error_count = 0;
-@@ -311,11 +328,12 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
- 		counter = counter_orig;
- 		for (i = start; i < end; i++) {
- 			actual = buf[i];
--			expected = pattern | (~counter & PATTERN_COUNT_MASK);
-+			expected = pattern | gen_inv_idx(counter, is_memset);
- 			if (actual != expected) {
- 				if (error_count < MAX_ERROR_COUNT)
- 					dmatest_mismatch(actual, pattern, i,
--							 counter, is_srcbuf);
-+							 counter, is_srcbuf,
-+							 is_memset);
- 				error_count++;
- 			}
- 			counter++;
-@@ -435,6 +453,7 @@ static int dmatest_func(void *data)
- 	s64			runtime = 0;
- 	unsigned long long	total_len = 0;
- 	u8			align = 0;
-+	bool			is_memset = false;
- 
- 	set_freezable();
- 
-@@ -448,6 +467,10 @@ static int dmatest_func(void *data)
- 	if (thread->type == DMA_MEMCPY) {
- 		align = dev->copy_align;
- 		src_cnt = dst_cnt = 1;
-+	} else if (thread->type == DMA_MEMSET) {
-+		align = dev->fill_align;
-+		src_cnt = dst_cnt = 1;
-+		is_memset = true;
- 	} else if (thread->type == DMA_SG) {
- 		align = dev->copy_align;
- 		src_cnt = dst_cnt = sg_buffers;
-@@ -571,9 +594,9 @@ static int dmatest_func(void *data)
- 			dst_off = (dst_off >> align) << align;
- 
- 			dmatest_init_srcs(thread->srcs, src_off, len,
--					  params->buf_size);
-+					  params->buf_size, is_memset);
- 			dmatest_init_dsts(thread->dsts, dst_off, len,
--					  params->buf_size);
-+					  params->buf_size, is_memset);
- 
- 			diff = ktime_sub(ktime_get(), start);
- 			filltime = ktime_add(filltime, diff);
-@@ -640,6 +663,11 @@ static int dmatest_func(void *data)
- 			tx = dev->device_prep_dma_memcpy(chan,
- 							 dsts[0] + dst_off,
- 							 srcs[0], len, flags);
-+		else if (thread->type == DMA_MEMSET)
-+			tx = dev->device_prep_dma_memset(chan,
-+						dsts[0] + dst_off,
-+						*(thread->srcs[0] + src_off),
-+						len, flags);
- 		else if (thread->type == DMA_SG)
- 			tx = dev->device_prep_dma_sg(chan, tx_sg, src_cnt,
- 						     rx_sg, src_cnt, flags);
-@@ -722,23 +750,25 @@ static int dmatest_func(void *data)
- 		start = ktime_get();
- 		pr_debug("%s: verifying source buffer...\n", current->comm);
- 		error_count = dmatest_verify(thread->srcs, 0, src_off,
--				0, PATTERN_SRC, true);
-+				0, PATTERN_SRC, true, is_memset);
- 		error_count += dmatest_verify(thread->srcs, src_off,
- 				src_off + len, src_off,
--				PATTERN_SRC | PATTERN_COPY, true);
-+				PATTERN_SRC | PATTERN_COPY, true, is_memset);
- 		error_count += dmatest_verify(thread->srcs, src_off + len,
- 				params->buf_size, src_off + len,
--				PATTERN_SRC, true);
-+				PATTERN_SRC, true, is_memset);
- 
- 		pr_debug("%s: verifying dest buffer...\n", current->comm);
- 		error_count += dmatest_verify(thread->dsts, 0, dst_off,
--				0, PATTERN_DST, false);
-+				0, PATTERN_DST, false, is_memset);
-+
- 		error_count += dmatest_verify(thread->dsts, dst_off,
- 				dst_off + len, src_off,
--				PATTERN_SRC | PATTERN_COPY, false);
-+				PATTERN_SRC | PATTERN_COPY, false, is_memset);
-+
- 		error_count += dmatest_verify(thread->dsts, dst_off + len,
- 				params->buf_size, dst_off + len,
--				PATTERN_DST, false);
-+				PATTERN_DST, false, is_memset);
- 
- 		diff = ktime_sub(ktime_get(), start);
- 		comparetime = ktime_add(comparetime, diff);
-@@ -821,6 +851,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
- 
- 	if (type == DMA_MEMCPY)
- 		op = "copy";
-+	else if (type == DMA_MEMSET)
-+		op = "set";
- 	else if (type == DMA_SG)
- 		op = "sg";
- 	else if (type == DMA_XOR)
-@@ -883,6 +915,13 @@ static int dmatest_add_channel(struct dmatest_info *info,
- 		}
- 	}
- 
-+	if (dma_has_cap(DMA_MEMSET, dma_dev->cap_mask)) {
-+		if (dmatest == 2) {
-+			cnt = dmatest_add_threads(info, dtc, DMA_MEMSET);
-+			thread_count += cnt > 0 ? cnt : 0;
-+		}
-+	}
-+
- 	if (dma_has_cap(DMA_SG, dma_dev->cap_mask)) {
- 		if (dmatest == 1) {
- 			cnt = dmatest_add_threads(info, dtc, DMA_SG);
-@@ -961,6 +1000,7 @@ static void run_threaded_test(struct dmatest_info *info)
- 	params->noverify = noverify;
- 
- 	request_channels(info, DMA_MEMCPY);
-+	request_channels(info, DMA_MEMSET);
- 	request_channels(info, DMA_XOR);
- 	request_channels(info, DMA_SG);
- 	request_channels(info, DMA_PQ);
--- 
-1.9.1
+no change required.
+
+>                 return -ENXIO;
+>         }
+>
+>         baser->order = order;
+> -       baser->base = base;
+> +       baser->base = page_to_virt(page);
+
+no change required.
+>         baser->psz = psz;
+>         tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
+>
+>         pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
+>                 &its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
+>                 its_base_type_string[type],
+> -               (unsigned long)virt_to_phys(base),
+> +               (unsigned long)page_to_phys(page),
+
+no change required.
+>                 indirect ? "indirect" : "flat", (int)esz,
+>                 psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+>
+> @@ -1019,7 +1020,7 @@ static void its_free_tables(struct its_node *its)
+>
+>         for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+>                 if (its->tables[i].base) {
+> -                       free_pages((unsigned long)its->tables[i].base,
+> +                       __free_pages(virt_to_page(its->tables[i].base),
+
+ditto
+>                                    its->tables[i].order);
+>                         its->tables[i].base = NULL;
+>                 }
+> @@ -1286,7 +1287,8 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+>
+>         /* Allocate memory for 2nd level table */
+>         if (!table[idx]) {
+> -               page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
+> +               page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
+> +                                       get_order(baser->psz));
+>                 if (!page)
+>                         return false;
+>
+> @@ -1332,7 +1334,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>         nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>         sz = nr_ites * its->ite_size;
+>         sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+> -       itt = kzalloc(sz, GFP_KERNEL);
+> +       itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
+>         lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+>         if (lpi_map)
+>                 col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+> @@ -1677,6 +1679,7 @@ static int __init its_probe_one(struct resource *res,
+>  {
+>         struct its_node *its;
+>         void __iomem *its_base;
+> +       struct page *page;
+>         u32 val;
+>         u64 baser, tmp;
+>         int err;
+> @@ -1716,12 +1719,13 @@ static int __init its_probe_one(struct resource *res,
+>         its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+>         its->numa_node = numa_node;
+>
+> -       its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+> -                                               get_order(ITS_CMD_QUEUE_SZ));
+> -       if (!its->cmd_base) {
+> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
+> +                               get_order(ITS_CMD_QUEUE_SZ));
+> +       if (!page) {
+>                 err = -ENOMEM;
+>                 goto out_free_its;
+>         }
+> +       its->cmd_base = page_to_virt(page);
+
+same here, this would have been,
+its->cmd_base = page_address(page);
+
+>         its->cmd_write = its->cmd_base;
+>
+>         its_enable_quirks(its);
+> @@ -1775,7 +1779,7 @@ static int __init its_probe_one(struct resource *res,
+>  out_free_tables:
+>         its_free_tables(its);
+>  out_free_cmd:
+> -       free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
+> +       __free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
+
+no change required.
+>  out_free_its:
+>         kfree(its);
+>  out_unmap:
+> --
+> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+
+thanks
+Ganapat
