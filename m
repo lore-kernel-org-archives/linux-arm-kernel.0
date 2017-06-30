@@ -1,112 +1,161 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 30 Jun 2017 21:44:06 +0200
-Subject: [PATCH v3 10/12] ASoC: wm9705: add private structure
+Date: Fri, 30 Jun 2017 21:44:08 +0200
+Subject: [PATCH v3 12/12] ASoC: pxa: switch to new ac97 bus support
 In-Reply-To: <20170630194408.24978-1-robert.jarzmik@free.fr>
 References: <20170630194408.24978-1-robert.jarzmik@free.fr>
-Message-ID: <20170630194408.24978-11-robert.jarzmik@free.fr>
+Message-ID: <20170630194408.24978-13-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a private data structure. This is a preparation for a codec which
-would need an another data on top of snd_ac97, which will be the case
-when an MFD wm97xx device will probe wm9705.
+Switch to the new ac97 bus support in sound/ac97 instead of the legacy
+snd_ac97 one.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- sound/soc/codecs/wm9705.c | 36 ++++++++++++++++++++++++------------
- 1 file changed, 24 insertions(+), 12 deletions(-)
+Since v1: split into 2 patches, the former being XXX ac97 codec agnostic
+Since v2: fix driver unregistration
+---
+ sound/arm/Kconfig           |  1 -
+ sound/soc/pxa/Kconfig       |  5 ++---
+ sound/soc/pxa/pxa2xx-ac97.c | 46 ++++++++++++++++++++++-----------------------
+ 3 files changed, 25 insertions(+), 27 deletions(-)
 
-diff --git a/sound/soc/codecs/wm9705.c b/sound/soc/codecs/wm9705.c
-index f6d5c0f2aea5..08477d040028 100644
---- a/sound/soc/codecs/wm9705.c
-+++ b/sound/soc/codecs/wm9705.c
-@@ -24,6 +24,10 @@
- #define WM9705_VENDOR_ID 0x574d4c05
- #define WM9705_VENDOR_ID_MASK 0xffffffff
+diff --git a/sound/arm/Kconfig b/sound/arm/Kconfig
+index 65171f6657a2..f1f25704fe52 100644
+--- a/sound/arm/Kconfig
++++ b/sound/arm/Kconfig
+@@ -36,7 +36,6 @@ endif	# SND_ARM
  
-+struct wm9705_priv {
-+	struct snd_ac97 *ac97;
-+};
-+
- static const struct reg_default wm9705_reg_defaults[] = {
- 	{ 0x02, 0x8000 },
- 	{ 0x04, 0x8000 },
-@@ -292,10 +296,10 @@ static int wm9705_soc_suspend(struct snd_soc_codec *codec)
+ config SND_PXA2XX_LIB
+ 	tristate
+-	select SND_AC97_CODEC if SND_PXA2XX_LIB_AC97
+ 	select SND_DMAENGINE_PCM
  
- static int wm9705_soc_resume(struct snd_soc_codec *codec)
+ config SND_PXA2XX_LIB_AC97
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index 823b5a236d8d..72d652572269 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -19,13 +19,12 @@ config SND_MMP_SOC
+ 
+ config SND_PXA2XX_AC97
+ 	tristate
+-	select SND_AC97_CODEC
+ 
+ config SND_PXA2XX_SOC_AC97
+ 	tristate
+-	select AC97_BUS
++	select AC97_BUS_NEW
+ 	select SND_PXA2XX_LIB_AC97
+-	select SND_SOC_AC97_BUS
++	select SND_SOC_AC97_BUS_NEW
+ 
+ config SND_PXA2XX_SOC_I2S
+ 	tristate
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index b07d64ef49ba..6f0ea3bf9f75 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -17,6 +17,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/dma/pxa-dma.h>
+ 
++#include <sound/ac97/controller.h>
+ #include <sound/core.h>
+ #include <sound/ac97_codec.h>
+ #include <sound/soc.h>
+@@ -27,43 +28,35 @@
+ #include <mach/regs-ac97.h>
+ #include <mach/audio.h>
+ 
+-static void pxa2xx_ac97_warm_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_warm_reset(struct ac97_controller *adrv)
  {
--	struct snd_ac97 *ac97 = snd_soc_codec_get_drvdata(codec);
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 	int ret;
+ 	pxa2xx_ac97_try_warm_reset();
  
--	ret = snd_ac97_reset(ac97, true, WM9705_VENDOR_ID,
-+	ret = snd_ac97_reset(wm9705->ac97, true, WM9705_VENDOR_ID,
- 		WM9705_VENDOR_ID_MASK);
- 	if (ret < 0)
+ 	pxa2xx_ac97_finish_reset();
+ }
+ 
+-static void pxa2xx_ac97_cold_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_cold_reset(struct ac97_controller *adrv)
+ {
+ 	pxa2xx_ac97_try_cold_reset();
+ 
+ 	pxa2xx_ac97_finish_reset();
+ }
+ 
+-static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
+-					      unsigned short reg)
++static int pxa2xx_ac97_read_actrl(struct ac97_controller *adrv, int slot,
++				  unsigned short reg)
+ {
+-	int ret;
+-
+-	ret = pxa2xx_ac97_read(ac97->num, reg);
+-	if (ret < 0)
+-		return 0;
+-	else
+-		return (unsigned short)(ret & 0xffff);
++	return pxa2xx_ac97_read(slot, reg);
+ }
+ 
+-static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
+-				     unsigned short reg, unsigned short val)
++static int pxa2xx_ac97_write_actrl(struct ac97_controller *adrv, int slot,
++				   unsigned short reg, unsigned short val)
+ {
+-	int ret;
+-
+-	ret = pxa2xx_ac97_write(ac97->num, reg, val);
++	return pxa2xx_ac97_write(slot, reg, val);
+ }
+ 
+-static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+-	.read	= pxa2xx_ac97_legacy_read,
+-	.write	= pxa2xx_ac97_legacy_write,
++static struct ac97_controller_ops pxa2xx_ac97_ops = {
++	.read	= pxa2xx_ac97_read_actrl,
++	.write	= pxa2xx_ac97_write_actrl,
+ 	.warm_reset	= pxa2xx_ac97_warm_reset,
+ 	.reset	= pxa2xx_ac97_cold_reset,
+ };
+@@ -242,6 +235,8 @@ static const struct snd_soc_component_driver pxa_ac97_component = {
+ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ {
+ 	int ret;
++	struct ac97_controller *ctrl;
++	pxa2xx_audio_ops_t *pdata = pdev->dev.platform_data;
+ 
+ 	if (pdev->id != -1) {
+ 		dev_err(&pdev->dev, "PXA2xx has only one AC97 port.\n");
+@@ -254,10 +249,13 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
  		return ret;
-@@ -311,38 +315,38 @@ static int wm9705_soc_resume(struct snd_soc_codec *codec)
- 
- static int wm9705_soc_probe(struct snd_soc_codec *codec)
- {
--	struct snd_ac97 *ac97;
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 	struct regmap *regmap;
- 	int ret;
- 
--	ac97 = snd_soc_new_ac97_codec(codec, WM9705_VENDOR_ID,
--		WM9705_VENDOR_ID_MASK);
--	if (IS_ERR(ac97)) {
-+	wm9705->ac97 = snd_soc_new_ac97_codec(codec, WM9705_VENDOR_ID,
-+					      WM9705_VENDOR_ID_MASK);
-+	if (IS_ERR(wm9705->ac97)) {
- 		dev_err(codec->dev, "Failed to register AC97 codec\n");
--		return PTR_ERR(ac97);
-+		return PTR_ERR(wm9705->ac97);
  	}
  
--	regmap = regmap_init_ac97(ac97, &wm9705_regmap_config);
-+	regmap = regmap_init_ac97(wm9705->ac97, &wm9705_regmap_config);
- 	if (IS_ERR(regmap)) {
- 		ret = PTR_ERR(regmap);
- 		goto err_free_ac97_codec;
- 	}
+-	ret = snd_soc_set_ac97_ops(&pxa2xx_ac97_ops);
+-	if (ret != 0)
+-		return ret;
++	ctrl = snd_ac97_controller_register(&pxa2xx_ac97_ops, &pdev->dev,
++					    AC97_SLOTS_AVAILABLE_ALL,
++					    pdata->codec_pdata);
++	if (IS_ERR(ctrl))
++		return PTR_ERR(ctrl);
  
--	snd_soc_codec_set_drvdata(codec, ac97);
-+	snd_soc_codec_set_drvdata(codec, wm9705->ac97);
- 	snd_soc_codec_init_regmap(codec, regmap);
++	platform_set_drvdata(pdev, ctrl);
+ 	/* Punt most of the init to the SoC probe; we may need the machine
+ 	 * driver to do interesting things with the clocking to get us up
+ 	 * and running.
+@@ -268,8 +266,10 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
  
- 	return 0;
- err_free_ac97_codec:
--	snd_soc_free_ac97_codec(ac97);
-+	snd_soc_free_ac97_codec(wm9705->ac97);
- 	return ret;
- }
- 
- static int wm9705_soc_remove(struct snd_soc_codec *codec)
+ static int pxa2xx_ac97_dev_remove(struct platform_device *pdev)
  {
--	struct snd_ac97 *ac97 = snd_soc_codec_get_drvdata(codec);
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 
- 	snd_soc_codec_exit_regmap(codec);
--	snd_soc_free_ac97_codec(ac97);
-+	snd_soc_free_ac97_codec(wm9705->ac97);
++	struct ac97_controller *ctrl = platform_get_drvdata(pdev);
++
+ 	snd_soc_unregister_component(&pdev->dev);
+-	snd_soc_set_ac97_ops(NULL);
++	snd_ac97_controller_unregister(ctrl);
+ 	pxa2xx_ac97_hw_remove(pdev);
  	return 0;
- }
- 
-@@ -364,6 +368,14 @@ static const struct snd_soc_codec_driver soc_codec_dev_wm9705 = {
- 
- static int wm9705_probe(struct platform_device *pdev)
- {
-+	struct wm9705_priv *wm9705;
-+
-+	wm9705 = devm_kzalloc(&pdev->dev, sizeof(*wm9705), GFP_KERNEL);
-+	if (wm9705 == NULL)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, wm9705);
-+
- 	return snd_soc_register_codec(&pdev->dev,
- 			&soc_codec_dev_wm9705, wm9705_dai, ARRAY_SIZE(wm9705_dai));
  }
 -- 
 2.11.0
