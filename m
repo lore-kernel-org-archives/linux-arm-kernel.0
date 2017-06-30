@@ -1,53 +1,23 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 30 Jun 2017 15:20:41 +0900
-Subject: [patch 1/5] pinctrl: samsung: Remove bogus irq_[un]mask from
- resource management
-In-Reply-To: <CAJKOXPd+ir1+036jmN+Pd6WWvTcTES2xV9LLsh-W=DYvc2LoEQ@mail.gmail.com>
-References: <20170629213334.375848050@linutronix.de>
- <20170629214343.882576048@linutronix.de>
- <CA+Ln22GyEDZidAWkMonjLYF0etxNjZ0btwYkQ5raAPsnk1bJFg@mail.gmail.com>
- <CAJKOXPd+ir1+036jmN+Pd6WWvTcTES2xV9LLsh-W=DYvc2LoEQ@mail.gmail.com>
-Message-ID: <CA+Ln22Esc-1P6bcMeXuTVztiyFMXsOV1O0V=tZOj4YEwLZJSuQ@mail.gmail.com>
+From: zhi.mao@mediatek.com (Zhi Mao)
+Date: Fri, 30 Jun 2017 14:05:15 +0800
+Subject: [PATCH v3 0/6] mediatek: pwm driver add MT2712/MT7622 support 
+Message-ID: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-30 15:02 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
-> On Fri, Jun 30, 2017 at 4:47 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Thomas,
->>
->> 2017-06-30 6:33 GMT+09:00 Thomas Gleixner <tglx@linutronix.de>:
->>> The irq chip callbacks irq_request/release_resources() have absolutely no
->>> business with masking and unmasking the irq.
->>>
->>> The core code unmasks the interrupt after complete setup and masks it
->>> before invoking irq_release_resources().
->>>
->>> The unmask is actually harmful as it happens before the interrupt is
->>> completely initialized in __setup_irq().
->>>
->>> Remove it.
->>
->> Good catch, thanks! (Note that the original patch of mine [1] did that
->> in .irq_startup()/.irq_shutdown(), which was for some reason changed
->> later, but I don't remember the exact story.)
->>
->> [1] https://patchwork.kernel.org/patch/4466431/
->>
->> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
->>
->> Sylwester, Krzysztof, would you be able to do some basic test?
->
-> I suppose this was not tested so yes - I have platforms do this. I
-> understand that checking any non-shared GPIO interrupt should be
-> sufficient to test, right?
+change in v3:
+1. add pwm clk disable in function:mtk_pwm_config()
+   for error parameter checking case
 
-I think any interrupt from the Exynos pin controller should work, even
-shared one. I'd expect irq_request_resources() to be invoked for
-shared interrupts as well, otherwise we have a problem... (I quickly
-looked through kernel/irq/manage.c and it seems to be invoked for the
-first __setup_irq() call even for shared interrupts.)
+Zhi Mao (6):
+  pwm: kconfig: modify mediatek information
+  pwm: mediatek: fix pwm source clock selection
+  pwm: mediatek: fix clock control issue
+  pwm: bindings: add MT2712/MT7622 information
+  pwm: mediatek: add PWM_CLK_DIV_MAX
+  pwm: mediatek: add MT2712/MT7622 support
 
-Thanks.
-
-Best regards,
-Tomasz
+ .../devicetree/bindings/pwm/pwm-mediatek.txt       |    6 +-
+ drivers/pwm/Kconfig                                |    2 +-
+ drivers/pwm/pwm-mediatek.c                         |  133 ++++++++++++++------
+ 3 files changed, 104 insertions(+), 37 deletions(-)
