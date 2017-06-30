@@ -1,54 +1,39 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:45:12 +0100
-Subject: [PATCH 56/58] KVM: ARM64: fix phy counter access failure in guest.
-In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
-References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-57-marc.zyngier@arm.com>
+Date: Fri, 30 Jun 2017 09:51:40 +0100
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+ <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+ <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+Message-ID: <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hu Huajun <huhuajun@huawei.com>
+On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
+> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
+> <gpkulkarni@gmail.com> wrote:
+>> Hi Shanker,
+>>
+>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+>> <shankerd@codeaurora.org> wrote:
+>>> The NUMA node information is visible to ITS driver but not being used
+>>> other than handling errata. This patch allocates the memory for ITS
+>>> tables from the corresponding NUMA node using the appropriate NUMA
+>>> aware functions.
+> 
+> IMHO, the description would have been more constructive?
+> 
+> "All ITS tables are mapped by default to NODE 0 memory.
+> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
+> This will optimize tables access and avoids unnecessary inter-node traffic."
 
-When reading the cntpct_el0 in guest with VHE (Virtual Host Extension)
-enabled in host, the "Unsupported guest sys_reg access" error reported.
-The reason is cnthctl_el2.EL1PCTEN is not enabled, which is expected
-to be done in kvm_timer_init_vhe(). The problem is kvm_timer_init_vhe
-is called by cpu_init_hyp_mode, and which is called when VHE is disabled.
-This patch remove the incorrect call to kvm_timer_init_vhe() from
-cpu_init_hyp_mode(), and calls kvm_timer_init_vhe() to enable
-cnthctl_el2.EL1PCTEN in cpu_hyp_reinit().
+But more importantly, I'd like to see figures showing the actual benefit
+of this per-node allocation. Given that both of you guys have access to
+such platforms, please show me the numbers!
 
-Fixes: 488f94d7212b ("KVM: arm64: Access CNTHCTL_EL2 bit fields correctly on VHE systems")
-Cc: stable at vger.kernel.org
-Signed-off-by: Hu Huajun <huhuajun@huawei.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
----
- virt/kvm/arm/arm.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Thanks,
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a265acc53e39..a39a1e161e63 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1141,9 +1141,6 @@ static void cpu_init_hyp_mode(void *dummy)
- 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
- 	__cpu_init_stage2();
- 
--	if (is_kernel_in_hyp_mode())
--		kvm_timer_init_vhe();
--
- 	kvm_arm_init_debug();
- }
- 
-@@ -1163,6 +1160,7 @@ static void cpu_hyp_reinit(void)
- 		 * event was cancelled before the CPU was reset.
- 		 */
- 		__cpu_init_stage2();
-+		kvm_timer_init_vhe();
- 	} else {
- 		cpu_init_hyp_mode(NULL);
- 	}
+	M.
 -- 
-2.11.0
+Jazz is not dead. It just smells funny...
