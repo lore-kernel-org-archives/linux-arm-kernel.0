@@ -1,72 +1,51 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Fri, 30 Jun 2017 14:04:43 +0200
-Subject: [PATCH 4/7] serial: imx: Simplify DMA disablement
+Date: Fri, 30 Jun 2017 14:04:44 +0200
+Subject: [PATCH 5/7] serial: imx: umap sg buffers when DMA channel is released
 In-Reply-To: <20170630120446.13994-1-romain.perier@collabora.com>
 References: <20170630120446.13994-1-romain.perier@collabora.com>
-Message-ID: <20170630120446.13994-5-romain.perier@collabora.com>
+Message-ID: <20170630120446.13994-6-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nandor Han <nandor.han@ge.com>
 
-This commits simplify the function imx_disable_dma() by moving
-the code for disabling RX and TX DMAs to dedicated functions.
-Also move away CTSC and CTS as this is not related to DMA.
+This commits unmaps sg buffers when the DMA channel is released
 
 Signed-off-by: Nandor Han <nandor.han@ge.com>
 Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
- drivers/tty/serial/imx.c | 31 ++++++++++++++++++++-----------
- 1 file changed, 20 insertions(+), 11 deletions(-)
+ drivers/tty/serial/imx.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 81fb413..e8cf7cf 100644
+index e8cf7cf..58d6b1c 100644
 --- a/drivers/tty/serial/imx.c
 +++ b/drivers/tty/serial/imx.c
-@@ -1208,6 +1208,24 @@ static int imx_uart_dma_init(struct imx_port *sport)
- 	return ret;
+@@ -1215,6 +1215,12 @@ static void imx_stop_tx_dma(struct imx_port *sport)
+ 	temp = readl(sport->port.membase + UCR1);
+ 	temp &= ~UCR1_TDMAEN;
+ 	writel(temp, sport->port.membase + UCR1);
++
++	if (sport->dma_is_txing) {
++		dma_unmap_sg(sport->port.dev, &sport->tx_sgl[0],
++		sport->dma_tx_nents, DMA_TO_DEVICE);
++		sport->dma_is_txing = 0;
++	}
  }
  
-+static void imx_stop_tx_dma(struct imx_port *sport)
-+{
-+	unsigned long temp;
+ static void imx_stop_rx_dma(struct imx_port *sport)
+@@ -1224,6 +1230,12 @@ static void imx_stop_rx_dma(struct imx_port *sport)
+ 	temp = readl(sport->port.membase + UCR1);
+ 	temp &= ~(UCR1_RDMAEN | UCR1_ATDMAEN);
+ 	writel(temp, sport->port.membase + UCR1);
 +
-+	temp = readl(sport->port.membase + UCR1);
-+	temp &= ~UCR1_TDMAEN;
-+	writel(temp, sport->port.membase + UCR1);
-+}
-+
-+static void imx_stop_rx_dma(struct imx_port *sport)
-+{
-+	unsigned long temp;
-+
-+	temp = readl(sport->port.membase + UCR1);
-+	temp &= ~(UCR1_RDMAEN | UCR1_ATDMAEN);
-+	writel(temp, sport->port.membase + UCR1);
-+}
-+
++	if (sport->dma_is_rxing) {
++		dma_unmap_sg(sport->port.dev, &sport->rx_sgl, 1,
++			DMA_FROM_DEVICE);
++		sport->dma_is_rxing = 0;
++	}
+ }
+ 
  static void imx_enable_dma(struct imx_port *sport)
- {
- 	unsigned long temp;
-@@ -1233,17 +1251,8 @@ static void imx_enable_dma(struct imx_port *sport)
- 
- static void imx_disable_dma(struct imx_port *sport)
- {
--	unsigned long temp;
--
--	/* clear UCR1 */
--	temp = readl(sport->port.membase + UCR1);
--	temp &= ~(UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN);
--	writel(temp, sport->port.membase + UCR1);
--
--	/* clear UCR2 */
--	temp = readl(sport->port.membase + UCR2);
--	temp &= ~(UCR2_CTSC | UCR2_CTS | UCR2_ATEN);
--	writel(temp, sport->port.membase + UCR2);
-+	imx_stop_rx_dma(sport);
-+	imx_stop_tx_dma(sport);
- 
- 	imx_setup_ufcr(sport, TXTL_DEFAULT, RXTL_DEFAULT);
- 
 -- 
 1.8.3.1
