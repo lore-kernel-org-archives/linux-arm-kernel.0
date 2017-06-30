@@ -1,75 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Jun 2017 09:44:43 +0100
-Subject: [PATCH 27/58] arm64: Add a facility to turn an ESR syndrome into a
- sysreg encoding
+Date: Fri, 30 Jun 2017 09:44:54 +0100
+Subject: [PATCH 38/58] KVM: arm64: Enable GICv3 Group-1 sysreg trapping via
+ command-line
 In-Reply-To: <20170630084514.6779-1-marc.zyngier@arm.com>
 References: <20170630084514.6779-1-marc.zyngier@arm.com>
-Message-ID: <20170630084514.6779-28-marc.zyngier@arm.com>
+Message-ID: <20170630084514.6779-39-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is often useful to compare an ESR syndrome reporting the trapping
-of a system register with a value matching that system register.
-
-Since encoding both the sysreg and the ESR version seem to be a bit
-overkill, let's add a set of macros that convert an ESR value into
-the corresponding sysreg encoding.
-
-We handle both AArch32 and AArch64, taking advantage of identical
-encodings between system registers and CP15 accessors.
+Now that we're able to safely handle Group-1 sysreg access, let's
+give the user the opportunity to enable it by passing a specific
+command-line option (vgic_v3.group1_trap).
 
 Tested-by: Alexander Graf <agraf@suse.de>
 Acked-by: David Daney <david.daney@cavium.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/include/asm/esr.h | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ Documentation/admin-guide/kernel-parameters.txt |  4 ++++
+ virt/kvm/arm/vgic/vgic-v3.c                     | 11 +++++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index 85997c0e5443..e7d8e281ff62 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -19,6 +19,7 @@
- #define __ASM_ESR_H
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 15f79c27748d..42fe395be6c8 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1829,6 +1829,10 @@
+ 			for all guests.
+ 			Default is 1 (enabled) if in 64-bit or 32-bit PAE mode.
  
- #include <asm/memory.h>
-+#include <asm/sysreg.h>
- 
- #define ESR_ELx_EC_UNKNOWN	(0x00)
- #define ESR_ELx_EC_WFx		(0x01)
-@@ -181,6 +182,29 @@
- #define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 0, 14, 0) | \
- 					 ESR_ELx_SYS64_ISS_DIR_READ)
- 
-+#define esr_sys64_to_sysreg(e)					\
-+	sys_reg((((e) & ESR_ELx_SYS64_ISS_OP0_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_OP0_SHIFT),			\
-+		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
-+		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
-+		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
-+		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
++	kvm-arm.vgic_v3_group1_trap=
++			[KVM,ARM] Trap guest accesses to GICv3 group-1
++			system registers
 +
-+#define esr_cp15_to_sysreg(e)					\
-+	sys_reg(3,						\
-+		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
-+		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
-+		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
-+		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
-+		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
-+
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
+ 	kvm-intel.ept=	[KVM,Intel] Disable extended page tables
+ 			(virtualized MMU) support on capable Intel chips.
+ 			Default is 1 (enabled)
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 722bdebdfbb5..4b2b62b73470 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -435,6 +435,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
  
+ DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
+ 
++static int __init early_group1_trap_cfg(char *buf)
++{
++	return strtobool(buf, &group1_trap);
++}
++early_param("kvm-arm.vgic_v3_group1_trap", early_group1_trap_cfg);
++
+ /**
+  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+  * @node:	pointer to the DT node
+@@ -486,6 +492,11 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	if (kvm_vgic_global_state.vcpu_base == 0)
+ 		kvm_info("disabling GICv2 emulation\n");
+ 
++	if (group1_trap) {
++		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
++		static_branch_enable(&vgic_v3_cpuif_trap);
++	}
++
+ 	kvm_vgic_global_state.vctrl_base = NULL;
+ 	kvm_vgic_global_state.type = VGIC_V3;
+ 	kvm_vgic_global_state.max_gic_vcpus = VGIC_V3_MAX_CPUS;
 -- 
 2.11.0
