@@ -1,175 +1,94 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 29 Jun 2017 19:42:19 -0500
-Subject: [PATCH 2/2] [v2] pinctrl: qcom: qdf2xxx: expose only some GPIO pins
-In-Reply-To: <1498783339-749-1-git-send-email-timur@codeaurora.org>
-References: <1498783339-749-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1498783339-749-2-git-send-email-timur@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 29 Jun 2017 17:45:53 -0700
+Subject: [PATCH V1 0/9] add clock driver for Spreadtrum platforms
+In-Reply-To: <CAAfSe-uTzgz0kyhQQzqpYKnYxDLv+3gG_9MfdrBTY-AUC549Gg@mail.gmail.com>
+References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+ <20170620012530.GG4493@codeaurora.org>
+ <CAAfSe-uTzgz0kyhQQzqpYKnYxDLv+3gG_9MfdrBTY-AUC549Gg@mail.gmail.com>
+Message-ID: <20170630004553.GH22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Qualcomm Technologies QDF2xxx platforms, only a subset of the GPIOs
-are actually available to the HLOS.  The others are blocked by the XPU,
-and any attempt to access them will cause an XPU violation that halts
-the system.
+On 06/22, Chunyan Zhang wrote:
+> Hi Stephen,
+> 
+> On 20 June 2017 at 09:25, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 06/18, Chunyan Zhang wrote:
+> >> In the last cycle, the patches support Whale2 sc9860 mobile chip have been
+> >> merged. This patchset adds clock driver which is used on almost all
+> >> Spreadtrum SoCs.
+> >>
+> >> This is a rewrite of Spreadtrum's original clock driver[1] according to the
+> >> comments[2] from Stephen Boyd.
+> >>
+> >> This series also adds Spreadtrum clock binding documentation and devicetree
+> >> data.
+> >>
+> >> Any comments would be greatly appreciated.
+> >
+> > Overall it seems to copy quite a bit of code from sunxi-ng, which
+> > is OK, but if that's just copy/paste + replace some names then
+> > perhaps we should consolidate the two implementations into one
+> > that both SoCs can use.
+> >
+> 
+> OK, will try.
 
-Instead, the ACPI table now lists only specific GPIOs that are exposed
-externally as generic GPIO pins.  The full list of GPIOs is still
-registered, but the pin count for the unavailable GPIOs is set to zero.
-The pinctrl-msm driver will block those unavailable GPIOs from being
-accessed.
+Ok. Please don't spend too much time on it though. 
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 112 +++++++++++++++++++++------------
- 1 file changed, 73 insertions(+), 39 deletions(-)
+> 
+> > Also, is there any reason why we can't use a platform device
+> > driver for this instead of the DT probing mechanism? That is more
+> > preferred method of probing clk controllers.
+> 
+> From what I have known on ARM platforms, device drivers cannot
+> recognize out which SoC the driver is running on, assume that the
+> device on different SoC has some differences.  To make one only kernel
+> Image can be used on all SoCs of Spreadtrum, we selected the way of
+> loading different dtb for each SoC.
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-index bb3ce5c..106e6c1 100644
---- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-+++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-@@ -43,68 +43,102 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- 	struct pinctrl_pin_desc *pins;
- 	struct msm_pingroup *groups;
- 	char (*names)[NAME_SIZE];
--	unsigned int i;
--	u32 num_gpios;
-+	unsigned int i, num_gpios, max_gpios;
-+	u32 *gpios;
- 	int ret;
- 
--	/* Query the number of GPIOs from ACPI */
--	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
-+	/* The total number of GPIOs that exist */
-+	ret = device_property_read_u32(&pdev->dev, "num-gpios", &max_gpios);
- 	if (ret < 0) {
--		dev_warn(&pdev->dev, "missing num-gpios property\n");
-+		dev_err(&pdev->dev, "missing num-gpios property\n");
- 		return ret;
- 	}
-+	if (!max_gpios || max_gpios > MAX_GPIOS) {
-+		dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
-+		return -EINVAL;
-+	}
- 
--	if (!num_gpios || num_gpios > MAX_GPIOS) {
--		dev_warn(&pdev->dev, "invalid num-gpios property\n");
-+	/* The number of GPIOs in the approved list */
-+	num_gpios = ret = device_property_read_u32_array(&pdev->dev, "gpios",
-+							 NULL, 0);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev,
-+			"missing or invalid 'gpios' property (ret=%i)\n", ret);
-+		return ret;
-+	}
-+	if (ret == 0) {
-+		dev_warn(&pdev->dev, "no GPIOs defined\n");
- 		return -ENODEV;
- 	}
- 
--	pins = devm_kcalloc(&pdev->dev, num_gpios,
-+	gpios = devm_kcalloc(&pdev->dev, num_gpios, sizeof(u32), GFP_KERNEL);
-+	if (!gpios)
-+		return -ENOMEM;
-+
-+	ret = device_property_read_u32_array(&pdev->dev, "gpios", gpios,
-+					     num_gpios);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev,
-+			"could not read list of GPIOs (ret=%i)\n", ret);
-+		return ret;
-+	}
-+
-+	pins = devm_kcalloc(&pdev->dev, max_gpios,
- 		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
--	groups = devm_kcalloc(&pdev->dev, num_gpios,
-+	groups = devm_kcalloc(&pdev->dev, max_gpios,
- 		sizeof(struct msm_pingroup), GFP_KERNEL);
- 	names = devm_kcalloc(&pdev->dev, num_gpios, NAME_SIZE, GFP_KERNEL);
- 
- 	if (!pins || !groups || !names)
- 		return -ENOMEM;
- 
--	for (i = 0; i < num_gpios; i++) {
--		snprintf(names[i], NAME_SIZE, "gpio%u", i);
--
-+	/*
-+	 * Initialize the array.  GPIOs not listed in the 'gpios' array
-+	 * still need a number and a name, but nothing else.
-+	 */
-+	for (i = 0; i < max_gpios; i++) {
- 		pins[i].number = i;
--		pins[i].name = names[i];
--
--		groups[i].npins = 1;
--		groups[i].name = names[i];
- 		groups[i].pins = &pins[i].number;
-+	}
- 
--		groups[i].ctl_reg = 0x10000 * i;
--		groups[i].io_reg = 0x04 + 0x10000 * i;
--		groups[i].intr_cfg_reg = 0x08 + 0x10000 * i;
--		groups[i].intr_status_reg = 0x0c + 0x10000 * i;
--		groups[i].intr_target_reg = 0x08 + 0x10000 * i;
--
--		groups[i].mux_bit = 2;
--		groups[i].pull_bit = 0;
--		groups[i].drv_bit = 6;
--		groups[i].oe_bit = 9;
--		groups[i].in_bit = 0;
--		groups[i].out_bit = 1;
--		groups[i].intr_enable_bit = 0;
--		groups[i].intr_status_bit = 0;
--		groups[i].intr_target_bit = 5;
--		groups[i].intr_target_kpss_val = 1;
--		groups[i].intr_raw_status_bit = 4;
--		groups[i].intr_polarity_bit = 1;
--		groups[i].intr_detection_bit = 2;
--		groups[i].intr_detection_width = 2;
-+	/* Populate the entries that are meant to be exposes as GPIOs. */
-+	for (i = 0; i < num_gpios; i++) {
-+		unsigned int gpio = gpios[i];
-+
-+		groups[gpio].npins = 1;
-+		snprintf(names[i], NAME_SIZE, "gpio%u", gpio);
-+		pins[gpio].name = names[i];
-+		groups[gpio].name = names[i];
-+
-+		groups[gpio].ctl_reg = 0x10000 * gpio;
-+		groups[gpio].io_reg = 0x04 + 0x10000 * gpio;
-+		groups[gpio].intr_cfg_reg = 0x08 + 0x10000 * gpio;
-+		groups[gpio].intr_status_reg = 0x0c + 0x10000 * gpio;
-+		groups[gpio].intr_target_reg = 0x08 + 0x10000 * gpio;
-+
-+		groups[gpio].mux_bit = 2;
-+		groups[gpio].pull_bit = 0;
-+		groups[gpio].drv_bit = 6;
-+		groups[gpio].oe_bit = 9;
-+		groups[gpio].in_bit = 0;
-+		groups[gpio].out_bit = 1;
-+		groups[gpio].intr_enable_bit = 0;
-+		groups[gpio].intr_status_bit = 0;
-+		groups[gpio].intr_target_bit = 5;
-+		groups[gpio].intr_target_kpss_val = 1;
-+		groups[gpio].intr_raw_status_bit = 4;
-+		groups[gpio].intr_polarity_bit = 1;
-+		groups[gpio].intr_detection_bit = 2;
-+		groups[gpio].intr_detection_width = 2;
- 	}
- 
-+	devm_kfree(&pdev->dev, gpios);
-+
- 	qdf2xxx_pinctrl.pins = pins;
- 	qdf2xxx_pinctrl.groups = groups;
--	qdf2xxx_pinctrl.npins = num_gpios;
--	qdf2xxx_pinctrl.ngroups = num_gpios;
--	qdf2xxx_pinctrl.ngpios = num_gpios;
-+	qdf2xxx_pinctrl.npins = max_gpios;
-+	qdf2xxx_pinctrl.ngroups = max_gpios;
-+	qdf2xxx_pinctrl.ngpios = max_gpios;
- 
- 	return msm_pinctrl_probe(pdev, &qdf2xxx_pinctrl);
- }
+Device drivers can figure out what device the driver is bound to
+based on the compatible string of the node. Typically, the clk
+driver binds to a device node with a compatible indicating the
+clock controller it is, like spd,soc-name-clk-controller-name.
+Then that can be used to determine what sort of associated data
+there is.
+
+> 
+> Actually, I haven't understood the merits of moving more clk things to
+> driver from DT, could you please introduce more about that?
+> 
+> 
+
+Some mailing list digging may be helpful, but I admit I need to
+have some sort of canned response here that I can just repeat
+each time this comes up. Here it goes.
+
+We really only need CLK_OF_DECLARE() if a clk needs to be
+available for timers or interrupt controllers. Otherwise, its
+possible to put the rest of the clk tree registration in the
+normal device driver path.
+
+Reasons (in no particular order):
+
+  1. We get a dev pointer to use with clk_hw_register()
+
+  2. We can handle probe defer if some resource is not available
+
+  3. Using device model gets us a hook into power management frameworks
+     like runtime PM and system PM for things like suspend and hibernate
+
+  4. It encourages a single DT node clk controller style binding
+     instead of a single node per clk style binding
+
+  5. We can use non-DT specific functions like devm_ioremap_resource() to map
+     registers and acquire other resources, leading to more portable and
+     generic code
+
+  6. We may be able to make the device driver a module, which will
+     make distros happy if we don't have to compile in all
+     these clk drivers to the resulting vmlinux
+
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
