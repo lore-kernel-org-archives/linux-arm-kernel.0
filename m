@@ -1,105 +1,56 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 30 Jun 2017 10:43:05 -0400
-Subject: [PATCH V2] dmaengine: qcom_hidma: correct API violation for submit
-Message-ID: <1498833785-22632-1-git-send-email-okaya@codeaurora.org>
+From: jlu@pengutronix.de (Jan Luebbe)
+Date: Fri, 30 Jun 2017 16:51:02 +0200
+Subject: [PATCH 4/8] ARM: l2x0: add arm,ecc-enable property for aurora
+In-Reply-To: <20170630145106.29820-1-jlu@pengutronix.de>
+References: <20170630145106.29820-1-jlu@pengutronix.de>
+Message-ID: <20170630145106.29820-5-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code is violating the DMA Engine API by putting the submitted
-requests directly into the HW queue. This causes queued transactions
-to be started by another thread as soon as the first one finishes.
+From: Chris Packham <chris.packham@alliedtelesis.co.nz>
 
-The DMA Engine document clearly states this.
+The aurora cache on the Marvell Armada-XP SoC supports ECC protection
+for the L2 data arrays. Add a "arm,ecc-enable" device tree property
+which can be used to enable this.
 
-"dmaengine_submit() will not start the DMA operation".
-
-Move HW queuing of the requests into the issue_pending() routine
-to comply with API requirements also create a new queued state for
-temporarily holding the requests.
-
-A descriptor goes through these transitions now.
-
-free->prepared->queued->active->completed->free
-
-as opposed to
-
-free->prepared->active->completed->free
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+[jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 ---
- drivers/dma/qcom/hidma.c | 15 ++++++++++++---
- drivers/dma/qcom/hidma.h |  1 +
- 2 files changed, 13 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
+ arch/arm/mm/cache-l2x0.c                         | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 84e3699..34fb6af 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -210,6 +210,7 @@ static int hidma_chan_init(struct hidma_dev *dmadev, u32 dma_sig)
- 	INIT_LIST_HEAD(&mchan->prepared);
- 	INIT_LIST_HEAD(&mchan->active);
- 	INIT_LIST_HEAD(&mchan->completed);
-+	INIT_LIST_HEAD(&mchan->queued);
+diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+index d9650c1788f4..6316e673307a 100644
+--- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
++++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+@@ -76,6 +76,8 @@ Optional properties:
+   specified to indicate that such transforms are precluded.
+ - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+ - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
++- arm,ecc-enable : enable ECC protection on the L2 cache
++- arm,ecc-disable : disable ECC protection on the L2 cache
+ - arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
+   Some core tiles, especially ARM PB11MPCore have a faulty L220 cache that
+   will randomly hang unless outer sync operations are disabled.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b70bee74750d..ea2a3dcc75a9 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
+ 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
+ 	}
  
- 	spin_lock_init(&mchan->lock);
- 	list_add_tail(&mchan->chan.device_node, &ddev->channels);
-@@ -230,9 +231,15 @@ static void hidma_issue_pending(struct dma_chan *dmach)
- 	struct hidma_chan *mchan = to_hidma_chan(dmach);
- 	struct hidma_dev *dmadev = mchan->dmadev;
- 	unsigned long flags;
-+	struct hidma_desc *qdesc, *next;
- 	int status;
- 
- 	spin_lock_irqsave(&mchan->lock, flags);
-+	list_for_each_entry_safe(qdesc, next, &mchan->queued, node) {
-+		hidma_ll_queue_request(dmadev->lldev, qdesc->tre_ch);
-+		list_move_tail(&qdesc->node, &mchan->active);
++	if (of_property_read_bool(np, "arm,ecc-enable")) {
++		mask |= AURORA_ACR_ECC_EN;
++		val |= AURORA_ACR_ECC_EN;
++	} else if (of_property_read_bool(np, "arm,ecc-disable")) {
++		mask |= AURORA_ACR_ECC_EN;
 +	}
 +
- 	if (!mchan->running) {
- 		struct hidma_desc *desc = list_first_entry(&mchan->active,
- 							   struct hidma_desc,
-@@ -315,17 +322,18 @@ static dma_cookie_t hidma_tx_submit(struct dma_async_tx_descriptor *txd)
- 		pm_runtime_put_autosuspend(dmadev->ddev.dev);
- 		return -ENODEV;
- 	}
-+	pm_runtime_mark_last_busy(dmadev->ddev.dev);
-+	pm_runtime_put_autosuspend(dmadev->ddev.dev);
- 
- 	mdesc = container_of(txd, struct hidma_desc, desc);
- 	spin_lock_irqsave(&mchan->lock, irqflags);
- 
--	/* Move descriptor to active */
--	list_move_tail(&mdesc->node, &mchan->active);
-+	/* Move descriptor to queued */
-+	list_move_tail(&mdesc->node, &mchan->queued);
- 
- 	/* Update cookie */
- 	cookie = dma_cookie_assign(txd);
- 
--	hidma_ll_queue_request(dmadev->lldev, mdesc->tre_ch);
- 	spin_unlock_irqrestore(&mchan->lock, irqflags);
- 
- 	return cookie;
-@@ -431,6 +439,7 @@ static int hidma_terminate_channel(struct dma_chan *chan)
- 	list_splice_init(&mchan->active, &list);
- 	list_splice_init(&mchan->prepared, &list);
- 	list_splice_init(&mchan->completed, &list);
-+	list_splice_init(&mchan->queued, &list);
- 	spin_unlock_irqrestore(&mchan->lock, irqflags);
- 
- 	/* this suspends the existing transfer */
-diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
-index c7d0142..41e0aa2 100644
---- a/drivers/dma/qcom/hidma.h
-+++ b/drivers/dma/qcom/hidma.h
-@@ -104,6 +104,7 @@ struct hidma_chan {
- 	struct dma_chan			chan;
- 	struct list_head		free;
- 	struct list_head		prepared;
-+	struct list_head		queued;
- 	struct list_head		active;
- 	struct list_head		completed;
- 
+ 	if (of_property_read_bool(np, "arm,parity-enable")) {
+ 		mask |= AURORA_ACR_PARITY_EN;
+ 		val |= AURORA_ACR_PARITY_EN;
 -- 
-1.9.1
+2.11.0
