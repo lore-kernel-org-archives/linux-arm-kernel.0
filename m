@@ -1,66 +1,79 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 01 Jul 2017 13:06:12 +0200
-Subject: [PATCH 4/5] ARM: dts: rockchip: enable saradc for rk3288-evb
-In-Reply-To: <1498874567-11219-5-git-send-email-jacob-chen@iotwrt.com>
-References: <1498874567-11219-1-git-send-email-jacob-chen@iotwrt.com>
- <1498874567-11219-5-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <10342435.5c883YxTZd@phil>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 1 Jul 2017 20:12:54 +0800
+Subject: [xlnx:master 585/710]
+ drivers/net/ethernet/xilinx/xilinx_axienet.h:675:9: error: implicit
+ declaration of function 'in_be32'
+Message-ID: <201707012047.r8SlIyQ4%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   ae4bbf82f4b9fdfc85b3fd112696e8bbefff07f2
+commit: 87223be758604b2eee18af6546cb695a2a846723 [585/710] drivers: net: ethernet: TSN: Kconfig and Makefile
+config: mips-allyesconfig (attached as .config)
+compiler: mips-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 87223be758604b2eee18af6546cb695a2a846723
+        # save the attached .config to linux build tree
+        make.cross ARCH=mips 
 
-Am Samstag, 1. Juli 2017, 10:02:46 CEST schrieb Jacob Chen:
-> saradc in rk3288-evb use 1.8v ref.
-> 
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> ---
->  arch/arm/boot/dts/rk3288-evb.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-> index f226ca7..9cee856 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -129,6 +129,15 @@
->  		};
->  	};
->  
-> +	vccadc_ref: vccadc-ref {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc1v8_sys";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +	};
+All errors (new ones prefixed by >>):
 
-this looks wrong. Regulators should always be named with the name
-used in schematics and also, according to the rk3288-evb schematics
-I have here, the saradc uses vcc_18 directly which comes from either
-the rk808 or act8846 pmics (depending on the board version).
+   In file included from drivers/net/ethernet/xilinx/xilinx_tsn_switch.h:21:0,
+                    from drivers/net/ethernet/xilinx/xilinx_tsn_qci.c:18:
+   drivers/net/ethernet/xilinx/xilinx_axienet.h: In function 'axienet_ior':
+>> drivers/net/ethernet/xilinx/xilinx_axienet.h:675:9: error: implicit declaration of function 'in_be32' [-Werror=implicit-function-declaration]
+     return in_be32(lp->regs + offset);
+            ^~~~~~~
+   drivers/net/ethernet/xilinx/xilinx_axienet.h: In function 'axienet_iow':
+>> drivers/net/ethernet/xilinx/xilinx_axienet.h:690:2: error: implicit declaration of function 'out_be32' [-Werror=implicit-function-declaration]
+     out_be32((lp->regs + offset), value);
+     ^~~~~~~~
+   cc1: some warnings being treated as errors
 
-> +
->  	/* This turns on USB vbus for both host0 (ehci) and host1 (dwc2) */
->  	vcc_host: vcc-host-regulator {
->  		compatible = "regulator-fixed";
-> @@ -218,6 +227,11 @@
->  	status = "okay";
->  };
->  
-> +&saradc {
-> +	vref-supply = <&vccadc_ref>;
+vim +/in_be32 +675 drivers/net/ethernet/xilinx/xilinx_axienet.h
 
-So taking the above into account
-	vref-supply = <&vcc_18>; ?
+f03af9e4 Michal Simek              2015-05-07  669   * Return: The contents of the Axi Ethernet register
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  670   *
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  671   * This function returns the contents of the corresponding register.
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  672   */
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  673  static inline u32 axienet_ior(struct axienet_local *lp, off_t offset)
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  674  {
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19 @675  	return in_be32(lp->regs + offset);
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  676  }
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  677  
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  678  /**
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  679   * axienet_iow - Memory mapped Axi Ethernet register write
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  680   * @lp:         Pointer to axienet local structure
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  681   * @offset:     Address offset from the base address of Axi Ethernet core
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  682   * @value:      Value to be written into the Axi Ethernet register
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  683   *
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  684   * This function writes the desired value into the corresponding Axi Ethernet
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  685   * register.
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  686   */
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  687  static inline void axienet_iow(struct axienet_local *lp, off_t offset,
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  688  			       u32 value)
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  689  {
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19 @690  	out_be32((lp->regs + offset), value);
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  691  }
+8a3b7a25 danborkmann at iogearbox.net 2012-01-19  692  
+c18bf66f Kedareswara rao Appana    2015-09-10  693  #ifdef CONFIG_XILINX_AXI_EMAC_HWTSTAMP
 
+:::::: The code at line 675 was first introduced by commit
+:::::: 8a3b7a252dca9fb28c23b5bf76c49180a2b60d3b drivers/net/ethernet/xilinx: added Xilinx AXI Ethernet driver
 
-Heiko
+:::::: TO: danborkmann at iogearbox.net <danborkmann@iogearbox.net>
+:::::: CC: David S. Miller <davem@davemloft.net>
 
-> +	status = "okay";
-> +};
-> +
->  &sdmmc {
->  	bus-width = <4>;
->  	cap-mmc-highspeed;
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 44219 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170701/9b065e7b/attachment-0001.gz>
