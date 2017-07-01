@@ -1,89 +1,117 @@
-From: liuwei@actions-semi.com (=?utf-8?B?5YiY54Kc?=)
-Date: Sat, 1 Jul 2017 12:42:56 +0800
-Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggdjQgMjAvMjhdIEFSTTogb3dsOiBJ?=
- =?utf-8?B?bXBsZW1lbnQgQ1BVIGVuYWJsZS1tZXRob2QgZm9yIFM=?=
- =?utf-8?B?NTAw?=
-In-Reply-To: <6d9d0d63-113e-b050-a54e-62746ebc6013@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-21-afaerber@suse.de>
- <CAK8P3a1fLABzSc7kej6uw751uoZma1Qvpm7c3mkLB45rcBNQTA@mail.gmail.com>
- <CAK8P3a3Pg2rm8nSPUm_E61F7+zSr3gWV6sNqhC0Et3Zh2xPtmA@mail.gmail.com>
- <6d9d0d63-113e-b050-a54e-62746ebc6013@suse.de>
-Message-ID: <DC4E6E803E914F4B8AFE57F1456019F1035B7C89@srv-mail-02.actions.com.cn>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sat, 1 Jul 2017 07:02:48 +0200
+Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
+ cpg-mssr: Add interface for critical core clocks)
+In-Reply-To: <20170630202453.eh6vaehkap3as4np@pengutronix.de>
+References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+ <CAL_JsqKGrZeR7z80beY_XEjqd5fEQQwPxusJ1FADoALgNE3fEg@mail.gmail.com>
+ <20170630202453.eh6vaehkap3as4np@pengutronix.de>
+Message-ID: <8d86a9aa-1928-6b52-1487-d5fb9dae17f4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Andrea
-
-OWL_CPUx_ADDR is the physical address of CPUx wakeup function.
-OWL_CPUx_FLAG is a valid flag of OWL_CPUx_ADDR. 
-
-After CPUxs are wakeuped by SEV instruction, they will check their own OWL_CPUx_FLAG register. If the register vlaue is 0x55aa, CPUx will jump to OWL_CPUx_ADDR to boot up, otherwize go to sleep by WFE.
-
-So the pen release staff is not necessary, you can remove these code safely.
-
-BTW: CPU2/3 must exit the power gate state before wakeup, and CPU1 is always power on and has no power gate control.
-
-Best Regards,
-David Liu
-
------????-----
-???: Andreas F?rber [mailto:afaerber at suse.de] 
-????: 2017?6?29? 23:22
-???: Arnd Bergmann; Thomas Liau
-??: Linux ARM; mp-cs; ???; ??; ???; 96boards at ucrobotics.com; support at lemaker.org; Linux Kernel Mailing List; Russell King
-??: Re: [PATCH v4 20/28] ARM: owl: Implement CPU enable-method for S500
-
-Am 29.06.2017 um 17:07 schrieb Arnd Bergmann:
->>> +static int s500_smp_boot_secondary(unsigned int cpu, struct 
->>> +task_struct *idle) {
->>> +       unsigned long timeout;
->>> +       int ret;
->>> +
->>> +       ret = s500_wakeup_secondary(cpu);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       udelay(10);
->>> +
->>> +       spin_lock(&boot_lock);
->>> +
->>> +       /*
->>> +        * The secondary processor is waiting to be released from
->>> +        * the holding pen - release it, then wait for it to flag
->>> +        * that it has been released by resetting pen_release.
->>> +        */
->>> +       write_pen_release(cpu_logical_map(cpu));
->>> +       smp_send_reschedule(cpu);
->>> +
->>> +       timeout = jiffies + (1 * HZ);
->>> +       while (time_before(jiffies, timeout)) {
->>> +               if (pen_release == -1)
->>> +                       break;
->>> +       }
->>> +
->>> +       writel(0, timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
->>> +       writel(0, timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
->>> +
->>> +       spin_unlock(&boot_lock);
->>> +
->>> +       return pen_release != -1 ? -ENOSYS : 0; }
->>
->> This looks more complicated than necessary. Why do you need the 
->> holding pen when you have a register to start up the CPU?
->>
+On 30.06.2017 22:24, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> It seems you missed my question here. Can you please follow up, and if 
-> possible send a patch to remove the pen_release logic that appears to 
-> be unnecessary here?
+> On Fri, Jun 30, 2017 at 10:58:26AM -0500, Rob Herring wrote:
+>>> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
+>>> disables them as being unused.
+> 
+> not long ago I thought with a few colleagues about this. The scenario is
+> to start a Linux kernel on a Cortex-M companion to a Cortex-A.
+> 
+>>> On Mon, Jun 26, 2017 at 1:30 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>>>> With commit 72f5df2c2bbb6 ("clk: renesas: cpg-mssr: Migrate to
+>>>> CLK_IS_CRITICAL") we are able to handle critical module clocks.
+>>>> Introduce the same logic for critical core clocks.
+>>>>
+>>>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>>>> ---
+>>>> Commit
+>>>>
+>>>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/renesas?id=72f5df2c2bbb66d4a555cb51eb9f412abf1af77f
+>>>>
+>>>> is quite nice to avoid *module* clocks being disabled. Unfortunately,
+>>>> there are *core* clocks, too. E.g. using an other OS on the Cortex R7
+>>>> core of the r8a7795, the 'canfd' is a quite popular core clock which
+>>>> shouldn't be disabled by Linux.
+>>>>
+>>>> Therefore, this patch is a proposal to use the same 'mark clocks as
+>>>> critical' logic implemented for the module clocks for the core
+>>>> clocks, too.
+>>>>
+>>>> Opinions?
+>>>
+>>> On r8a7795, there are several Cortex A cores running Linux, and a Cortex R7
+>>> core which may run another OS.
+>>> This is an interesting issue, and relevant to other SoCs, too.
+>>>
+>>> In this particular case, the "canfd" clock is a core clock used as an
+>>> auxiliary clock for the CAN0, CAN1, and CANFD interfaces.  This can lead
+>>> to three scenarios:
+>>>    1. Linux controls all CAN interfaces
+>>>       => no issue,
+>>>    2. The OS on the RT CPU controls all CAN interfaces
+>>>       => issue, Linux disables the clock
+>>>    3. Mix of 1 and 2
+>>>       => More issues.
+>>> Of course this is not limited to clocks, but also to e.g. PM domains.
+>>>
+>>> How can this be handled?
+>>> I believe just marking the "canfd" clock critical is not the right solution,
+>>> as about any clock could be used by the RT CPU.
+>>>
+>>> Still, Linux needs to be made aware that devices (clocks and PM domains) are
+>>> controlled by another CPU/OS.
+>>>
+>>> Should this be described in DT? It feels like software policy to me.
+>>
+>> No, it shouldn't. It is Linux policy to disable all unused clocks, so
+>> Linux gets to deal with the consequences.
+> 
+> The ideal solution I imagine is to make the other CPU's OS a consumer of
+> the Linux clock driver. This would require a generic device driver on the
+> companion CPU that forwards clk requests via inter-cpu communication to
+> the Linux clk driver. It could be feed with the necessary information by
+> the rproc glue. So when the companion cpu is supposed to care for the
+> can0 device, the steps that should happen are:
+> 
+>   - make sure can0 isn't occupied by the Linux Host
+>   - reroute the can irq to the companion cpu (if necessary)
+>   - create a dtb containing something like this for the companion CPU:
+> 
+>   	clks: virtclk {
+> 		compatible = ???
+> 		#clock-cells = <1>;
+> 		...
+> 	};
+> 
+> 	can@$address {
+> 		compatible = ...
+> 		regs = ...
+> 		clocks = <&clks 3>;
+> 		clock-names = ...
+> 		...
+> 	};
+> 
+>     where the driver binding to the virtclk device just forwards clk
+>     requests to the Linux host side which then knows that clk 3 is the
+>     can clock and does the necessary stuff.
+> 
+> This way the can clock doesn't need special handling in the host's dtb
+> and no clock necessary for the companion is disabled as unused because
+> it is requested and enabled.
+> 
+> The only problem I see is that implementing such a driver/protocol
+> probably is time consuming.
 
-I do not have any documentation on these registers, only the downstream code that I forward-ported here. If you tell me what you mean exactly, I can do some testing and if it still works submit a patch to simplify it.
 
-Comments from the so far quiet Actions Semi side would help, too.
+The other problem is security related. If, at all, you have to do it 
+the other way around, then:
 
-Regards,
-Andreas
+Make Linux a consumer of the other CPU's (trusted/trustzone/whatever 
+secured) OS clock driver.
 
---
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton HRB 21284 (AG N?rnberg)
+Best regards
+
+Dirk
