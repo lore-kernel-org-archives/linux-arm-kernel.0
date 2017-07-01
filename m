@@ -1,22 +1,121 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 01 Jul 2017 14:18:31 -0700 (PDT)
-Subject: [PATCH] arm: sunxi: Revert changes merged through net-next.
-In-Reply-To: <20170630074617.20288-1-maxime.ripard@free-electrons.com>
-References: <20170630074617.20288-1-maxime.ripard@free-electrons.com>
-Message-ID: <20170701.141831.777812052121454399.davem@davemloft.net>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sat,  1 Jul 2017 23:29:30 +0200
+Subject: [PATCH] ARM: owl: smp: Drop bogus holding pen
+In-Reply-To: <CAK8P3a1vCKkZ8i=MLQXHX5ZowWQGbqiMo3gQz1E9RV+8sSGfpA@mail.gmail.com>
+References: <CAK8P3a1vCKkZ8i=MLQXHX5ZowWQGbqiMo3gQz1E9RV+8sSGfpA@mail.gmail.com>
+Message-ID: <20170701212930.606-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
-Date: Fri, 30 Jun 2017 09:46:17 +0200
+The S500 SoC can start secondary CPUs without busy-looping for pen_release,
+so simplify the SMP code compared to the LeMaker kernel tree.
 
-> This reverts commits 2c0cba482e79 ("arm: sun8i: sunxi-h3-h5: Add dt node
-> for the syscon control module") to 2428fd0fe550 ("arm64: defconfig: Enable
-> dwmac-sun8i driver on defconfig") and 3432a86e641c ("arm: sun8i:
-> orangepipc: use internal phy-mode") to 5a79b4f2a5e7 ("arm: sun8i:
-> orangepi-2: use internal phy-mode") that should be merged
-> through the arm-soc tree, and end up in merge conflicts and build failures.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Fixes: 172067e0bc87 ("ARM: owl: Implement CPU enable-method for S500")
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Cc: David Liu <liuwei@actions-semi.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm/mach-actions/headsmp.S | 20 ++------------------
+ arch/arm/mach-actions/platsmp.c | 29 +----------------------------
+ 2 files changed, 3 insertions(+), 46 deletions(-)
 
-Applied to net-next, thanks.
+diff --git a/arch/arm/mach-actions/headsmp.S b/arch/arm/mach-actions/headsmp.S
+index dc4832fc101a..65f53bdb69e7 100644
+--- a/arch/arm/mach-actions/headsmp.S
++++ b/arch/arm/mach-actions/headsmp.S
+@@ -2,6 +2,8 @@
+  * Copyright 2012 Actions Semi Inc.
+  * Author: Actions Semi, Inc.
+  *
++ * Copyright (c) 2017 Andreas F?rber
++ *
+  * This program is free software; you can redistribute  it and/or modify it
+  * under  the terms of  the GNU General  Public License as published by the
+  * Free Software Foundation;  either version 2 of the  License, or (at your
+@@ -46,23 +48,5 @@ ENTRY(owl_v7_invalidate_l1)
+ ENDPROC(owl_v7_invalidate_l1)
+ 
+ ENTRY(owl_secondary_startup)
+-	mrc	p15, 0, r0, c0, c0, 5
+-	and	r0, r0, #0xf
+-	adr	r4, 1f
+-	ldmia	r4, {r5, r6}
+-	sub	r4, r4, r5
+-	add	r6, r6, r4
+-pen:
+-	ldr	r7, [r6]
+-	cmp	r7, r0
+-	bne	pen
+-
+-	/*
+-	 * we've been released from the holding pen: secondary_stack
+-	 * should now contain the SVC stack for this core
+-	 */
+ 	bl	owl_v7_invalidate_l1
+ 	b	secondary_startup
+-
+-1:	.long	.
+-	.long	pen_release
+diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
+index b4806ce0e9bb..12a9e331b432 100644
+--- a/arch/arm/mach-actions/platsmp.c
++++ b/arch/arm/mach-actions/platsmp.c
+@@ -41,26 +41,6 @@ static int ncores;
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+-static void write_pen_release(int val)
+-{
+-	pen_release = val;
+-	smp_wmb();
+-	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
+-	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+-}
+-
+-static void s500_smp_secondary_init(unsigned int cpu)
+-{
+-	/*
+-	 * let the primary processor know we're out of the
+-	 * pen, then head off into the C entry point
+-	 */
+-	write_pen_release(-1);
+-
+-	spin_lock(&boot_lock);
+-	spin_unlock(&boot_lock);
+-}
+-
+ void owl_secondary_startup(void);
+ 
+ static int s500_wakeup_secondary(unsigned int cpu)
+@@ -115,12 +95,6 @@ static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ 	spin_lock(&boot_lock);
+ 
+-	/*
+-	 * The secondary processor is waiting to be released from
+-	 * the holding pen - release it, then wait for it to flag
+-	 * that it has been released by resetting pen_release.
+-	 */
+-	write_pen_release(cpu_logical_map(cpu));
+ 	smp_send_reschedule(cpu);
+ 
+ 	timeout = jiffies + (1 * HZ);
+@@ -134,7 +108,7 @@ static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ 	spin_unlock(&boot_lock);
+ 
+-	return pen_release != -1 ? -ENOSYS : 0;
++	return 0;
+ }
+ 
+ static void __init s500_smp_prepare_cpus(unsigned int max_cpus)
+@@ -192,7 +166,6 @@ static void __init s500_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ static const struct smp_operations s500_smp_ops __initconst = {
+ 	.smp_prepare_cpus = s500_smp_prepare_cpus,
+-	.smp_secondary_init = s500_smp_secondary_init,
+ 	.smp_boot_secondary = s500_smp_boot_secondary,
+ };
+ CPU_METHOD_OF_DECLARE(s500_smp, "actions,s500-smp", &s500_smp_ops);
+-- 
+2.12.3
