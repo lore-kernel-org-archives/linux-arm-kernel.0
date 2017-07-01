@@ -1,86 +1,40 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 30 Jun 2017 17:35:11 -0700
-Subject: [PATCH 9/9] clk: imx: add imx7ulp clk driver
-In-Reply-To: <AM3PR04MB3068D246A722A3EAA6652C280DA0@AM3PR04MB306.eurprd04.prod.outlook.com>
+Date: Fri, 30 Jun 2017 17:36:42 -0700
+Subject: [PATCH 4/9] clk: imx: add pllv4 support
+In-Reply-To: <20170620093143.GD6805@b29396-OptiPlex-7040>
 References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
- <1494856763-6543-10-git-send-email-aisheng.dong@nxp.com>
- <20170620020119.GQ4493@codeaurora.org>
- <20170620094256.GF6805@b29396-OptiPlex-7040>
- <20170620204152.GS4493@codeaurora.org>
- <AM3PR04MB3068D246A722A3EAA6652C280DA0@AM3PR04MB306.eurprd04.prod.outlook.com>
-Message-ID: <20170701003511.GR22780@codeaurora.org>
+ <1494856763-6543-5-git-send-email-aisheng.dong@nxp.com>
+ <20170620015917.GO4493@codeaurora.org>
+ <20170620093143.GD6805@b29396-OptiPlex-7040>
+Message-ID: <20170701003642.GS22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21, A.s. Dong wrote:
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd at codeaurora.org]
-> > Sent: Wednesday, June 21, 2017 4:42 AM
-> > To: Dong Aisheng
-> > Cc: A.s. Dong; linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> > linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> > shawnguo at kernel.org; Anson Huang; Jacky Bai
-> > Subject: Re: [PATCH 9/9] clk: imx: add imx7ulp clk driver
+On 06/20, Dong Aisheng wrote:
+> On Mon, Jun 19, 2017 at 06:59:17PM -0700, Stephen Boyd wrote:
+> > On 05/15, Dong Aisheng wrote:
+> > > +
+> > > +	if (clk_pllv4_is_enabled(hw)) {
+> > > +		WARN(1, "clk_pllv4: can't change rate when pll is enabled");
+> > > +		return -EINVAL;
 > > 
-> > On 06/20, Dong Aisheng wrote:
-> > > On Mon, Jun 19, 2017 at 07:01:19PM -0700, Stephen Boyd wrote:
-> > > >
-> > > > Any reason why it can't be a platform driver? If not, please add
-> > > > some comment explaining why.
-> > > >
-> > >
-> > > Timer is using it at early stage. GIC seems not although standard
-> > > binding claim possible clock requirement.
-> > > Others still not sure.
-> > >
-> > > What your suggestion?
-> > > Convert timer to platform driver and make clock as platform driver as
-> > well?
-> > >
-> > 
-> > The timer can't be a platform driver because it would be too late. The
-> > clock driver could register whatever clks are required for the timer/GIC
-> > in a CLK_OF_DECLARE_DRIVER hook, and then leave the rest to a platform
-> > driver. This way we get some of the device driver framework in this code.
+> > Sad, CLK_SET_RATE_GATE isn't working for you I suppose?
 > > 
 > 
-> Okay, I could try it. Thanks.
+> CLK_SET_RATE_GATE can't work in early stage before running clk_disable_unused.
+> At that point, the clock tree state is still not consistent with HW.
+> e.g. prepare/enable count is still zero but it's actually enabled due to
+> reset state or bootloader.
 > 
-> One thing is that TPM clock has a lot parents and parents having parents,
-> as well as PIT timer. So I may need enable more than half clocks in
-> CLK_OF_DECLARE_DRIVER hook.
-
-That's fine.
-
+> The code here is adding a double check in case user sets rate in early stage.
 > 
-> BTW, What's benefit to convert into two parts of probe?
-> I'm not quite if I already get it all, can you help clarify it?
+> However, probably it could also be moved into clock core as it's not platform
+> dependant behavior?
 > 
 
-The benefit is that we still get a platform driver and we can
-associate a device pointer with the clock controller eventually.
-Here's a reply I sent yesterday on the same topic:
-
-Reasons (in no particular order):
-
-  1. We get a dev pointer to use with clk_hw_register()
-
-  2. We can handle probe defer if some resource is not available
-
-  3. Using device model gets us a hook into power management frameworks
-     like runtime PM and system PM for things like suspend and hibernate
-
-  4. It encourages a single DT node clk controller style binding
-     instead of a single node per clk style binding
-
-  5. We can use non-DT specific functions like devm_ioremap_resource() to map
-     registers and acquire other resources, leading to more portable and
-     generic code
-
-  6. We may be able to make the device driver a module, which will
-     make distros happy if we don't have to compile in all
-     these clk drivers to the resulting vmlinux (this one doesn't
-     apply here)
+Ok. It would be good to fix the core framework to synchronize the
+prepared/enabled state at registration time so we don't need this
+check in the driver.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
