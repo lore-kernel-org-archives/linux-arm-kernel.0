@@ -1,65 +1,87 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Fri, 30 Jun 2017 19:59:24 -0400
-Subject: [PATCH] kbuild: modpost: Warn about references from rodata to
- __init text
-In-Reply-To: <20170630225822.25349-1-sboyd@codeaurora.org>
-References: <20170630225822.25349-1-sboyd@codeaurora.org>
-Message-ID: <CAF6AEGuSwgyqf7pb15M0Pg1SJrQu9TVX76FV9jL=i5LNjFcdtA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 30 Jun 2017 17:35:11 -0700
+Subject: [PATCH 9/9] clk: imx: add imx7ulp clk driver
+In-Reply-To: <AM3PR04MB3068D246A722A3EAA6652C280DA0@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
+ <1494856763-6543-10-git-send-email-aisheng.dong@nxp.com>
+ <20170620020119.GQ4493@codeaurora.org>
+ <20170620094256.GF6805@b29396-OptiPlex-7040>
+ <20170620204152.GS4493@codeaurora.org>
+ <AM3PR04MB3068D246A722A3EAA6652C280DA0@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <20170701003511.GR22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 6:58 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> If we have a structure that's marked const it will be placed
-> into the .rodata section but it could reference an init section
-> function. Include the read only data section in the check we have
-> for read/write data sections referencing init sections so we can
-> find this class of problems. This exposes quite a few places
-> where const marked structures are referencing __init functions and
-> __init data that we were previously ignoring.
->
-> Cc: Rob Clark <robdclark@gmail.com>
-> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->
-> Making this change leads to quite a few other errors even on the
-> multi_v7_defconfig for ARM[1]. I still need to do a build of the
-> allmodconfig to see how many other errors there, but it seems to
-> be quite a few. I suppose those will need to be fixed before we can
-> merge this?
+On 06/21, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Stephen Boyd [mailto:sboyd at codeaurora.org]
+> > Sent: Wednesday, June 21, 2017 4:42 AM
+> > To: Dong Aisheng
+> > Cc: A.s. Dong; linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
+> > linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
+> > shawnguo at kernel.org; Anson Huang; Jacky Bai
+> > Subject: Re: [PATCH 9/9] clk: imx: add imx7ulp clk driver
+> > 
+> > On 06/20, Dong Aisheng wrote:
+> > > On Mon, Jun 19, 2017 at 07:01:19PM -0700, Stephen Boyd wrote:
+> > > >
+> > > > Any reason why it can't be a platform driver? If not, please add
+> > > > some comment explaining why.
+> > > >
+> > >
+> > > Timer is using it at early stage. GIC seems not although standard
+> > > binding claim possible clock requirement.
+> > > Others still not sure.
+> > >
+> > > What your suggestion?
+> > > Convert timer to platform driver and make clock as platform driver as
+> > well?
+> > >
+> > 
+> > The timer can't be a platform driver because it would be too late. The
+> > clock driver could register whatever clks are required for the timer/GIC
+> > in a CLK_OF_DECLARE_DRIVER hook, and then leave the rest to a platform
+> > driver. This way we get some of the device driver framework in this code.
+> > 
+> 
+> Okay, I could try it. Thanks.
+> 
+> One thing is that TPM clock has a lot parents and parents having parents,
+> as well as PIT timer. So I may need enable more than half clocks in
+> CLK_OF_DECLARE_DRIVER hook.
 
-thanks.. the explosions you get with these mistakes when building
-drivers as modules in a distro kernel config are quite "fun" to
-debug..
+That's fine.
 
-I'm not quite sure about the rules for whether merging this would
-count as a regression, but I would argue those drivers are already
-broken, just no one noticed yet.  Similar to when a new gcc gets more
-clever about detecting bugs.  So I wouldn't be against merging this
-first to force drivers to fix their crap ;-)
+> 
+> BTW, What's benefit to convert into two parts of probe?
+> I'm not quite if I already get it all, can you help clarify it?
+> 
 
-BR,
--R
+The benefit is that we still get a platform driver and we can
+associate a device pointer with the clock controller eventually.
+Here's a reply I sent yesterday on the same topic:
 
-> [1] https://www.irccloud.com/pastebin/zzqfWGQY/
->
->  scripts/mod/modpost.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
-> index 48397feb08fb..4f2be5c6727d 100644
-> --- a/scripts/mod/modpost.c
-> +++ b/scripts/mod/modpost.c
-> @@ -903,7 +903,7 @@ static void check_section(const char *modname, struct elf_info *elf,
->  #define ALL_INIT_SECTIONS INIT_SECTIONS, ALL_XXXINIT_SECTIONS
->  #define ALL_EXIT_SECTIONS EXIT_SECTIONS, ALL_XXXEXIT_SECTIONS
->
-> -#define DATA_SECTIONS ".data", ".data.rel"
-> +#define DATA_SECTIONS ".rodata", ".data", ".data.rel"
->  #define TEXT_SECTIONS ".text", ".text.unlikely", ".sched.text", \
->                 ".kprobes.text", ".cpuidle.text"
->  #define OTHER_TEXT_SECTIONS ".ref.text", ".head.text", ".spinlock.text", \
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
+Reasons (in no particular order):
+
+  1. We get a dev pointer to use with clk_hw_register()
+
+  2. We can handle probe defer if some resource is not available
+
+  3. Using device model gets us a hook into power management frameworks
+     like runtime PM and system PM for things like suspend and hibernate
+
+  4. It encourages a single DT node clk controller style binding
+     instead of a single node per clk style binding
+
+  5. We can use non-DT specific functions like devm_ioremap_resource() to map
+     registers and acquire other resources, leading to more portable and
+     generic code
+
+  6. We may be able to make the device driver a module, which will
+     make distros happy if we don't have to compile in all
+     these clk drivers to the resulting vmlinux (this one doesn't
+     apply here)
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
