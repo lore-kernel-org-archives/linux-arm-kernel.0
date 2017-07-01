@@ -1,23 +1,21 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 01 Jul 2017 21:26:18 +0200
-Subject: [PATCH 0/5] some devicetree changes for rk3288 boards
-In-Reply-To: <1498874567-11219-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1498874567-11219-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <10271838.b6AgH4ZSYx@phil>
+Date: Sat, 01 Jul 2017 21:31:14 +0200
+Subject: [RESEND PATCH v2 2/7] ARM: dts: rockchip: add basic dtsi file for
+ RK3229 SoC
+In-Reply-To: <1498127402-6705-3-git-send-email-frank.wang@rock-chips.com>
+References: <1498127402-6705-1-git-send-email-frank.wang@rock-chips.com>
+ <1498127402-6705-3-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <11624815.k5Pp5InCUx@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 1. Juli 2017, 10:02:42 CEST schrieb Jacob Chen:
-> Since Guillaume have send patches for mali gpu node, let's enable it in more boards.
+Am Donnerstag, 22. Juni 2017, 18:29:57 CEST schrieb Frank Wang:
+> Due to some tiny differences between RK3228 and RK3229, this patch adds
+> a basic dtsi file which first includes a new CPU opp table for RK3229.
 > 
-> Jacob Chen (5):
->   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-tinker
->   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-evb
->   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-fennec
->   ARM: dts: rockchip: enable saradc for rk3288-evb
->   ARM: dts: rockchip: enable adc key for rk3288-evb
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
 
-applied for 4.14, with the saradc patch replaced with your v2
+applied for 4.14
 
-
+Thanks
 Heiko
