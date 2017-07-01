@@ -1,23 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 Jul 2017 15:06:34 +0100
-Subject: ARM: sunxi: "Unbalanced enable for IRQ 0" warning on A20
-In-Reply-To: <aa19551d-c0dc-07c0-313a-d55dbda4d5ad@suse.de>
-References: <aa19551d-c0dc-07c0-313a-d55dbda4d5ad@suse.de>
-Message-ID: <20170701140634.GC4902@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat,  1 Jul 2017 15:16:35 +0100
+Subject: [PATCH 3/5] ARM64: dts: marvell: armada37xx: Enable memory-mapped GIC
+ CPU interface
+In-Reply-To: <20170701141637.24719-1-marc.zyngier@arm.com>
+References: <20170701141637.24719-1-marc.zyngier@arm.com>
+Message-ID: <20170701141637.24719-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 01, 2017 at 12:51:57PM +0200, Andreas F?rber wrote:
-> [   33.683928] thermal thermal_zone0: failed to read out thermal zone (-110)
-> [   33.690870] ------------[ cut here ]------------
-> [   33.690901] WARNING: CPU: 0 PID: 161 at ../kernel/irq/manage.c:529
-> __enable_irq+0x54/0x88
-> [   33.690905] Unbalanced enable for IRQ 0
+The Cortex-A53s that power the Armada-37xx SoCs are equipped with
+a GIC CPU interface that gets enabled when coupled with a GICv3
+interrupt controller, such as the GIC-500 on the this SoC.
 
-Why do we have new platforms using IRQ number 0 ?  0 for modern platforms
-is supposed to mean "no IRQ".
+Advertise the MMIO ranges provided by the CPUs, which enables
+(among other things) GICv2 guests to run under a hypervisor such
+as KVM.
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 506aee2e796b..2dfc09501f9f 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -322,7 +322,10 @@
+ 				#interrupt-cells = <3>;
+ 				interrupt-controller;
+ 				reg = <0x1d00000 0x10000>, /* GICD */
+-				      <0x1d40000 0x40000>; /* GICR */
++				      <0x1d40000 0x40000>, /* GICR */
++				      <0x1d80000 0x2000>,  /* GICC */
++				      <0x1d90000 0x2000>,  /* GICH */
++				      <0x1da0000 0x20000>; /* GICV */
+ 				interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.11.0
