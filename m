@@ -1,66 +1,35 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Sat,  1 Jul 2017 20:56:09 +0800
-Subject: [PATCH 2/3] arm64: dts: rockchip: add gpu opp table for rk3399
+Date: Sat,  1 Jul 2017 20:56:10 +0800
+Subject: [PATCH 3/3] arm64: dts: rockchip: enable ARM Mali GPU on
+ rk3399-firefly
 In-Reply-To: <1498913770-16519-1-git-send-email-jacob-chen@iotwrt.com>
 References: <1498913770-16519-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1498913770-16519-2-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1498913770-16519-3-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-midgard-t860 gpu in rk3399 support run in 800MHz.
+Add reference to the Mali GPU device tree node on rk3399-firefly
 
 Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi | 33 ++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
-index c83460d..3d88ba2 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
-@@ -110,6 +110,35 @@
- 			opp-microvolt = <1200000>;
- 		};
- 	};
-+
-+	gpu_opp_table: opp-table2 {
-+		compatible = "operating-points-v2";
-+
-+		opp-200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+			opp-microvolt = <800000>;
-+		};
-+		opp-297000000 {
-+			opp-hz = /bits/ 64 <297000000>;
-+			opp-microvolt = <800000>;
-+		};
-+		opp-400000000 {
-+			opp-hz = /bits/ 64 <400000000>;
-+			opp-microvolt = <825000>;
-+		};
-+		opp-500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			opp-microvolt = <875000>;
-+		};
-+		opp-600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <925000>;
-+		};
-+		opp-800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = <1100000>;
-+		};
-+	};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+index ba1d981..601f62e 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+@@ -254,6 +254,11 @@
+ 	status = "okay";
  };
  
- &cpu_l0 {
-@@ -135,3 +164,7 @@
- &cpu_b1 {
- 	operating-points-v2 = <&cluster1_opp>;
- };
-+
 +&gpu {
-+	operating-points-v2 = <&gpu_opp_table>;
++	mali-supply = <&vdd_gpu>;
++	status = "okay";
 +};
++
+ &i2c0 {
+ 	clock-frequency = <400000>;
+ 	i2c-scl-rising-time-ns = <168>;
 -- 
 2.7.4
