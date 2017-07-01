@@ -1,66 +1,52 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Sat,  1 Jul 2017 10:02:47 +0800
-Subject: [PATCH 5/5] ARM: dts: rockchip: enable adc key for rk3288-evb
-In-Reply-To: <1498874567-11219-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1498874567-11219-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1498874567-11219-6-git-send-email-jacob-chen@iotwrt.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat,  1 Jul 2017 11:45:36 +0800
+Subject: [PATCH] pinctrl: zte: fix dereference of 'data' in zx_set_mux()
+Message-ID: <1498880736-18143-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rk3288-evb have many tablet-used adc buttons.
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+It fixes the following Smatch complaint:
+
+drivers/pinctrl/zte/pinctrl-zx.c:76 zx_set_mux()
+warn: variable dereferenced before check 'data' (see line 67)
+
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Fixes: cbff0c4d27f4 ("pinctrl: add ZTE ZX pinctrl driver support")
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/rk3288-evb.dtsi | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/pinctrl/zte/pinctrl-zx.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 9cee856..835ddb8 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -48,6 +48,43 @@
- 		reg = <0x0 0x80000000>;
- 	};
+diff --git a/drivers/pinctrl/zte/pinctrl-zx.c b/drivers/pinctrl/zte/pinctrl-zx.c
+index 787e3967bd5c..f828ee340a98 100644
+--- a/drivers/pinctrl/zte/pinctrl-zx.c
++++ b/drivers/pinctrl/zte/pinctrl-zx.c
+@@ -64,10 +64,8 @@ static int zx_set_mux(struct pinctrl_dev *pctldev, unsigned int func_selector,
+ 	struct zx_pinctrl_soc_info *info = zpctl->info;
+ 	const struct pinctrl_pin_desc *pindesc = info->pins + group_selector;
+ 	struct zx_pin_data *data = pindesc->drv_data;
+-	struct zx_mux_desc *mux = data->muxes;
+-	u32 mask = (1 << data->width) - 1;
+-	u32 offset = data->offset;
+-	u32 bitpos = data->bitpos;
++	struct zx_mux_desc *mux;
++	u32 mask, offset, bitpos;
+ 	struct function_desc *func;
+ 	unsigned long flags;
+ 	u32 val, mval;
+@@ -76,6 +74,11 @@ static int zx_set_mux(struct pinctrl_dev *pctldev, unsigned int func_selector,
+ 	if (!data)
+ 		return -EINVAL;
  
-+	adc-keys {
-+		compatible = "adc-keys";
-+		io-channels = <&saradc 1>;
-+		io-channel-names = "buttons";
-+		keyup-threshold-microvolt = <1800000>;
++	mux = data->muxes;
++	mask = (1 << data->width) - 1;
++	offset = data->offset;
++	bitpos = data->bitpos;
 +
-+		button-up {
-+			label = "Volume Up";
-+			linux,code = <KEY_VOLUMEUP>;
-+			press-threshold-microvolt = <100000>;
-+		};
-+
-+		button-down {
-+			label = "Volume Down";
-+			linux,code = <KEY_VOLUMEDOWN>;
-+			press-threshold-microvolt = <300000>;
-+		};
-+
-+		menu {
-+			label = "Menu";
-+			linux,code = <KEY_MENU>;
-+			press-threshold-microvolt = <640000>;
-+		};
-+
-+		esc {
-+			label = "Esc";
-+			linux,code = <KEY_ESC>;
-+			press-threshold-microvolt = <1000000>;
-+		};
-+
-+		home  {
-+			label = "Home";
-+			linux,code = <KEY_HOME>;
-+			press-threshold-microvolt = <1300000>;
-+		};
-+	};
-+
- 	backlight: backlight {
- 		compatible = "pwm-backlight";
- 		brightness-levels = <
+ 	func = pinmux_generic_get_function(pctldev, func_selector);
+ 	if (!func)
+ 		return -EINVAL;
 -- 
-2.7.4
+1.9.1
