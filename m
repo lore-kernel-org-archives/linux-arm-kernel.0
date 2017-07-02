@@ -1,143 +1,255 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sun, 2 Jul 2017 07:48:41 +0200
-Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
- cpg-mssr: Add interface for critical core clocks)
-In-Reply-To: <20170701181408.yuocymwtj5dgt74d@pengutronix.de>
-References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
- <CAL_JsqKGrZeR7z80beY_XEjqd5fEQQwPxusJ1FADoALgNE3fEg@mail.gmail.com>
- <20170630202453.eh6vaehkap3as4np@pengutronix.de>
- <8d86a9aa-1928-6b52-1487-d5fb9dae17f4@gmail.com>
- <20170701181408.yuocymwtj5dgt74d@pengutronix.de>
-Message-ID: <6098d579-f206-5a23-bbfc-ac13e0448479@gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sun, 2 Jul 2017 11:25:50 +0530
+Subject: [PATCH 1/8] mailbox: introduce ARM SMC based mailbox
+In-Reply-To: <20170630095608.24943-2-andre.przywara@arm.com>
+References: <20170630095608.24943-1-andre.przywara@arm.com>
+ <20170630095608.24943-2-andre.przywara@arm.com>
+Message-ID: <CABb+yY18Aye3wr2A9-+jemqc=VSRyUA+xzKGo9s0G4KCt1ovyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.07.2017 20:14, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Sat, Jul 01, 2017 at 07:02:48AM +0200, Dirk Behme wrote:
->> On 30.06.2017 22:24, Uwe Kleine-K?nig wrote:
->>> Hello,
->>>
->>> On Fri, Jun 30, 2017 at 10:58:26AM -0500, Rob Herring wrote:
->>>>> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
->>>>> disables them as being unused.
->>>
->>> not long ago I thought with a few colleagues about this. The scenario is
->>> to start a Linux kernel on a Cortex-M companion to a Cortex-A.
->>>
->>>>> On Mon, Jun 26, 2017 at 1:30 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->>>>>> With commit 72f5df2c2bbb6 ("clk: renesas: cpg-mssr: Migrate to
->>>>>> CLK_IS_CRITICAL") we are able to handle critical module clocks.
->>>>>> Introduce the same logic for critical core clocks.
->>>>>>
->>>>>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
->>>>>> ---
->>>>>> Commit
->>>>>>
->>>>>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/renesas?id=72f5df2c2bbb66d4a555cb51eb9f412abf1af77f
->>>>>>
->>>>>> is quite nice to avoid *module* clocks being disabled. Unfortunately,
->>>>>> there are *core* clocks, too. E.g. using an other OS on the Cortex R7
->>>>>> core of the r8a7795, the 'canfd' is a quite popular core clock which
->>>>>> shouldn't be disabled by Linux.
->>>>>>
->>>>>> Therefore, this patch is a proposal to use the same 'mark clocks as
->>>>>> critical' logic implemented for the module clocks for the core
->>>>>> clocks, too.
->>>>>>
->>>>>> Opinions?
->>>>>
->>>>> On r8a7795, there are several Cortex A cores running Linux, and a Cortex R7
->>>>> core which may run another OS.
->>>>> This is an interesting issue, and relevant to other SoCs, too.
->>>>>
->>>>> In this particular case, the "canfd" clock is a core clock used as an
->>>>> auxiliary clock for the CAN0, CAN1, and CANFD interfaces.  This can lead
->>>>> to three scenarios:
->>>>>     1. Linux controls all CAN interfaces
->>>>>        => no issue,
->>>>>     2. The OS on the RT CPU controls all CAN interfaces
->>>>>        => issue, Linux disables the clock
->>>>>     3. Mix of 1 and 2
->>>>>        => More issues.
->>>>> Of course this is not limited to clocks, but also to e.g. PM domains.
->>>>>
->>>>> How can this be handled?
->>>>> I believe just marking the "canfd" clock critical is not the right solution,
->>>>> as about any clock could be used by the RT CPU.
->>>>>
->>>>> Still, Linux needs to be made aware that devices (clocks and PM domains) are
->>>>> controlled by another CPU/OS.
->>>>>
->>>>> Should this be described in DT? It feels like software policy to me.
->>>>
->>>> No, it shouldn't. It is Linux policy to disable all unused clocks, so
->>>> Linux gets to deal with the consequences.
->>>
->>> The ideal solution I imagine is to make the other CPU's OS a consumer of
->>> the Linux clock driver. This would require a generic device driver on the
->>> companion CPU that forwards clk requests via inter-cpu communication to
->>> the Linux clk driver. It could be feed with the necessary information by
->>> the rproc glue. So when the companion cpu is supposed to care for the
->>> can0 device, the steps that should happen are:
->>>
->>>    - make sure can0 isn't occupied by the Linux Host
->>>    - reroute the can irq to the companion cpu (if necessary)
->>>    - create a dtb containing something like this for the companion CPU:
->>>
->>>    	clks: virtclk {
->>> 		compatible = ???
->>> 		#clock-cells = <1>;
->>> 		...
->>> 	};
->>>
->>> 	can@$address {
->>> 		compatible = ...
->>> 		regs = ...
->>> 		clocks = <&clks 3>;
->>> 		clock-names = ...
->>> 		...
->>> 	};
->>>
->>>      where the driver binding to the virtclk device just forwards clk
->>>      requests to the Linux host side which then knows that clk 3 is the
->>>      can clock and does the necessary stuff.
->>>
->>> This way the can clock doesn't need special handling in the host's dtb
->>> and no clock necessary for the companion is disabled as unused because
->>> it is requested and enabled.
->>>
->>> The only problem I see is that implementing such a driver/protocol
->>> probably is time consuming.
->>
->>
->> The other problem is security related. If, at all, you have to do it the
->> other way around, then:
->>
->> Make Linux a consumer of the other CPU's (trusted/trustzone/whatever
->> secured) OS clock driver.
-> 
-> That doesn't matter much. Either way the first CPU has to provide the
-> master side of this device (as it needs clks for booting up) and the 2nd
-> gets this virtual clk device that forwards clk requests to the first
-> CPU.
-> 
-> On my machine (Udoo Neo, A9 + M4) the A9 is the primary CPU that is
-> started by the bootrom. If I want the M4 being the primary device I'd
-> need support in the bootloader to wait long enough (i.e. until the M4 is
-> up) before letting the A9 jump into Linux. Managable I'd say. This way
-> would even make sense if the M4 runs a rt critical OS that shouldn't be
-> forced to wait on the non-rt A9 to enable a clk.
+On Fri, Jun 30, 2017 at 3:26 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> This mailbox driver implements a mailbox which signals transmitted data
+> via an ARM smc (secure monitor call) instruction. The mailbox receiver
+> is implemented in firmware and can synchronously return data when it
+> returns execution to the non-secure world again.
+> An asynchronous receive path is not implemented.
+> This allows the usage of a mailbox to trigger firmware actions on SoCs
+> which either don't have a separate management processor or on which such
+> a core is not available. A user of this mailbox could be the SCP
+> interface.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  drivers/mailbox/Kconfig           |   8 ++
+>  drivers/mailbox/Makefile          |   2 +
+>  drivers/mailbox/arm-smc-mailbox.c | 172 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 182 insertions(+)
+>  create mode 100644 drivers/mailbox/arm-smc-mailbox.c
+>
+> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+> index c5731e5..5664b7f 100644
+> --- a/drivers/mailbox/Kconfig
+> +++ b/drivers/mailbox/Kconfig
+> @@ -170,4 +170,12 @@ config BCM_FLEXRM_MBOX
+>           Mailbox implementation of the Broadcom FlexRM ring manager,
+>           which provides access to various offload engines on Broadcom
+>           SoCs. Say Y here if you want to use the Broadcom FlexRM.
+> +
+> +config ARM_SMC_MBOX
+> +       tristate "Generic ARM smc mailbox"
+> +       depends on OF && HAVE_ARM_SMCCC
+> +       help
+> +         Generic mailbox driver which uses ARM smc calls to call into
+> +         firmware for triggering mailboxes.
+> +
+>  endif
+> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+> index d54e412..8ec6869 100644
+> --- a/drivers/mailbox/Makefile
+> +++ b/drivers/mailbox/Makefile
+> @@ -35,3 +35,5 @@ obj-$(CONFIG_BCM_FLEXRM_MBOX) += bcm-flexrm-mailbox.o
+>  obj-$(CONFIG_QCOM_APCS_IPC)    += qcom-apcs-ipc-mailbox.o
+>
+>  obj-$(CONFIG_TEGRA_HSP_MBOX)   += tegra-hsp.o
+> +
+> +obj-$(CONFIG_ARM_SMC_MBOX)     += arm-smc-mailbox.o
+> diff --git a/drivers/mailbox/arm-smc-mailbox.c b/drivers/mailbox/arm-smc-mailbox.c
+> new file mode 100644
+> index 0000000..578aed2
+> --- /dev/null
+> +++ b/drivers/mailbox/arm-smc-mailbox.c
+> @@ -0,0 +1,172 @@
+> +/*
+> + *  Copyright (C) 2016,2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This device provides a mechanism for emulating a mailbox by using
+> + * smc calls, allowing a "mailbox" consumer to sit in firmware running
+> + * on the same core.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/err.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mailbox_controller.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/arm-smccc.h>
+> +
+Please have relook at what headers are really needed.
 
+> +#define ARM_SMC_MBOX_SMC               (0 << 0)
+> +#define ARM_SMC_MBOX_HVC               (1 << 0)
+> +#define ARM_SMC_MBOX_METHOD_MASK       (1 << 0)
+> +
+Maybe have only
+   #define ARM_SMC_MBOX_HVC    BIT(0)
 
-Overall, assuming that the issue we are discussing here can be solved 
-quite easily in hardware (a set of clock registers for each CPU/OS 
-domain, connected cleverly to effectively control each clock, with 
-access protection for each set of registers) I tend to think that for 
-a SoC supposed to run different OS on different cores this is a 
-missing hardware feature (bug?).
+> +struct arm_smc_chan_data {
+> +       u32 function_id;
+> +       u32 flags;
+> +};
+> +
+> +static int arm_smc_send_data(struct mbox_chan *link, void *data)
+> +{
+> +       struct arm_smc_chan_data *chan_data = link->con_priv;
+> +       u32 function_id = chan_data->function_id;
+> +       struct arm_smccc_res res;
+> +       u32 msg = *(u32 *)data;
+> +
+> +       if ((chan_data->flags & ARM_SMC_MBOX_METHOD_MASK) == ARM_SMC_MBOX_SMC)
+> +               arm_smccc_smc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
+> +       else
+> +               arm_smccc_hvc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
+> +
+       if (chan_data->flags & ARM_SMC_MBOX_HVC)
+               arm_smccc_hvc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
+       else
+               arm_smccc_smc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
 
-Best regards
+is simpler.
 
-Dirk
+> +       mbox_chan_received_data(link, (void *)res.a0);
+> +
+Or you can update the 'data' with value from 'a0' ?
+
+> +       return 0;
+> +}
+> +
+> +static int arm_smc_startup(struct mbox_chan *link)
+> +{
+> +       return 0;
+> +}
+> +
+> +static void arm_smc_shutdown(struct mbox_chan *link)
+> +{
+> +}
+> +
+startup and shutdown can be omitted now.
+
+> +/* This mailbox is synchronous, so we are always done. */
+> +static bool arm_smc_last_tx_done(struct mbox_chan *link)
+> +{
+> +       return true;
+> +}
+> +
+> +static const struct mbox_chan_ops arm_smc_mbox_chan_ops = {
+> +       .send_data      = arm_smc_send_data,
+> +       .startup        = arm_smc_startup,
+> +       .shutdown       = arm_smc_shutdown,
+> +       .last_tx_done   = arm_smc_last_tx_done
+> +};
+> +
+> +static int arm_smc_mbox_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct mbox_controller *mbox;
+> +       struct arm_smc_chan_data *chan_data;
+> +       const char *method;
+> +       bool use_hvc = false;
+> +       int ret = 0, i;
+> +
+No need to initialise 'ret'
+
+> +       ret = of_property_count_elems_of_size(dev->of_node, "arm,smc-func-ids",
+> +                                             sizeof(u32));
+> +       if (ret < 0)
+> +               return ret;
+> +
+> +       if (!of_property_read_string(dev->of_node, "method", &method)) {
+> +               if (!strcmp("hvc", method)) {
+> +                       use_hvc = true;
+> +               } else if (!strcmp("smc", method)) {
+> +                       use_hvc = false;
+> +               } else {
+> +                       dev_warn(dev, "invalid \"method\" property: %s\n",
+> +                                method);
+> +
+> +                       return -EINVAL;
+> +               }
+> +       }
+> +
+> +       mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
+> +       if (!mbox)
+> +               return -ENOMEM;
+> +
+> +       mbox->num_chans = ret;
+> +       mbox->chans = devm_kcalloc(dev, mbox->num_chans, sizeof(*mbox->chans),
+> +                                  GFP_KERNEL);
+> +       if (!mbox->chans)
+> +               return -ENOMEM;
+> +
+> +       chan_data = devm_kcalloc(dev, mbox->num_chans, sizeof(*chan_data),
+> +                                GFP_KERNEL);
+> +       if (!chan_data)
+> +               return -ENOMEM;
+> +
+> +       for (i = 0; i < mbox->num_chans; i++) {
+> +               u32 function_id;
+> +
+> +               ret = of_property_read_u32_index(dev->of_node,
+> +                                                "arm,smc-func-ids", i,
+> +                                                &function_id);
+> +               if (ret)
+> +                       return ret;
+> +
+> +               chan_data[i].function_id = function_id;
+> +               if (use_hvc)
+> +                       chan_data[i].flags |= ARM_SMC_MBOX_HVC;
+> +               mbox->chans[i].con_priv = &chan_data[i];
+> +       }
+> +
+> +       mbox->txdone_poll = true;
+> +       mbox->txdone_irq = false;
+> +       mbox->txpoll_period = 1;
+> +       mbox->ops = &arm_smc_mbox_chan_ops;
+> +       mbox->dev = dev;
+> +
+> +       ret = mbox_controller_register(mbox);
+> +       if (ret)
+> +               return ret;
+> +
+> +       platform_set_drvdata(pdev, mbox);
+> +       dev_info(dev, "ARM SMC mailbox enabled with %d chan%s.\n",
+> +                mbox->num_chans, mbox->num_chans == 1 ? "" : "s");
+> +
+> +       return ret;
+> +}
+> +
+> +static int arm_smc_mbox_remove(struct platform_device *pdev)
+> +{
+> +       struct mbox_controller *mbox = platform_get_drvdata(pdev);
+> +
+> +       mbox_controller_unregister(mbox);
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id arm_smc_mbox_of_match[] = {
+> +       { .compatible = "arm,smc-mbox", },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, arm_smc_mbox_of_match);
+> +
+> +static struct platform_driver arm_smc_mbox_driver = {
+> +       .driver = {
+> +               .name = "arm-smc-mbox",
+> +               .of_match_table = arm_smc_mbox_of_match,
+> +       },
+> +       .probe          = arm_smc_mbox_probe,
+> +       .remove         = arm_smc_mbox_remove,
+> +};
+> +module_platform_driver(arm_smc_mbox_driver);
+> +
+> +MODULE_AUTHOR("Andre Przywara <andre.przywara@arm.com>");
+> +MODULE_DESCRIPTION("Generic ARM smc mailbox driver");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 2.9.0
+>
