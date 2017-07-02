@@ -1,40 +1,143 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 2 Jul 2017 11:39:29 +0800
-Subject: [xlnx:master 560/710] ERROR: "dwc3_set_phydata"
- [drivers/usb/dwc3/dwc3.ko] undefined!
-Message-ID: <201707021126.dZHx9N6N%fengguang.wu@intel.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sun, 2 Jul 2017 07:48:41 +0200
+Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
+ cpg-mssr: Add interface for critical core clocks)
+In-Reply-To: <20170701181408.yuocymwtj5dgt74d@pengutronix.de>
+References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+ <CAL_JsqKGrZeR7z80beY_XEjqd5fEQQwPxusJ1FADoALgNE3fEg@mail.gmail.com>
+ <20170630202453.eh6vaehkap3as4np@pengutronix.de>
+ <8d86a9aa-1928-6b52-1487-d5fb9dae17f4@gmail.com>
+ <20170701181408.yuocymwtj5dgt74d@pengutronix.de>
+Message-ID: <6098d579-f206-5a23-bbfc-ac13e0448479@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anurag,
+On 01.07.2017 20:14, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Sat, Jul 01, 2017 at 07:02:48AM +0200, Dirk Behme wrote:
+>> On 30.06.2017 22:24, Uwe Kleine-K?nig wrote:
+>>> Hello,
+>>>
+>>> On Fri, Jun 30, 2017 at 10:58:26AM -0500, Rob Herring wrote:
+>>>>> TL;DR: Clocks may be in use by another CPU not running Linux, while Linux
+>>>>> disables them as being unused.
+>>>
+>>> not long ago I thought with a few colleagues about this. The scenario is
+>>> to start a Linux kernel on a Cortex-M companion to a Cortex-A.
+>>>
+>>>>> On Mon, Jun 26, 2017 at 1:30 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>>>>>> With commit 72f5df2c2bbb6 ("clk: renesas: cpg-mssr: Migrate to
+>>>>>> CLK_IS_CRITICAL") we are able to handle critical module clocks.
+>>>>>> Introduce the same logic for critical core clocks.
+>>>>>>
+>>>>>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>>>>>> ---
+>>>>>> Commit
+>>>>>>
+>>>>>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/renesas?id=72f5df2c2bbb66d4a555cb51eb9f412abf1af77f
+>>>>>>
+>>>>>> is quite nice to avoid *module* clocks being disabled. Unfortunately,
+>>>>>> there are *core* clocks, too. E.g. using an other OS on the Cortex R7
+>>>>>> core of the r8a7795, the 'canfd' is a quite popular core clock which
+>>>>>> shouldn't be disabled by Linux.
+>>>>>>
+>>>>>> Therefore, this patch is a proposal to use the same 'mark clocks as
+>>>>>> critical' logic implemented for the module clocks for the core
+>>>>>> clocks, too.
+>>>>>>
+>>>>>> Opinions?
+>>>>>
+>>>>> On r8a7795, there are several Cortex A cores running Linux, and a Cortex R7
+>>>>> core which may run another OS.
+>>>>> This is an interesting issue, and relevant to other SoCs, too.
+>>>>>
+>>>>> In this particular case, the "canfd" clock is a core clock used as an
+>>>>> auxiliary clock for the CAN0, CAN1, and CANFD interfaces.  This can lead
+>>>>> to three scenarios:
+>>>>>     1. Linux controls all CAN interfaces
+>>>>>        => no issue,
+>>>>>     2. The OS on the RT CPU controls all CAN interfaces
+>>>>>        => issue, Linux disables the clock
+>>>>>     3. Mix of 1 and 2
+>>>>>        => More issues.
+>>>>> Of course this is not limited to clocks, but also to e.g. PM domains.
+>>>>>
+>>>>> How can this be handled?
+>>>>> I believe just marking the "canfd" clock critical is not the right solution,
+>>>>> as about any clock could be used by the RT CPU.
+>>>>>
+>>>>> Still, Linux needs to be made aware that devices (clocks and PM domains) are
+>>>>> controlled by another CPU/OS.
+>>>>>
+>>>>> Should this be described in DT? It feels like software policy to me.
+>>>>
+>>>> No, it shouldn't. It is Linux policy to disable all unused clocks, so
+>>>> Linux gets to deal with the consequences.
+>>>
+>>> The ideal solution I imagine is to make the other CPU's OS a consumer of
+>>> the Linux clock driver. This would require a generic device driver on the
+>>> companion CPU that forwards clk requests via inter-cpu communication to
+>>> the Linux clk driver. It could be feed with the necessary information by
+>>> the rproc glue. So when the companion cpu is supposed to care for the
+>>> can0 device, the steps that should happen are:
+>>>
+>>>    - make sure can0 isn't occupied by the Linux Host
+>>>    - reroute the can irq to the companion cpu (if necessary)
+>>>    - create a dtb containing something like this for the companion CPU:
+>>>
+>>>    	clks: virtclk {
+>>> 		compatible = ???
+>>> 		#clock-cells = <1>;
+>>> 		...
+>>> 	};
+>>>
+>>> 	can@$address {
+>>> 		compatible = ...
+>>> 		regs = ...
+>>> 		clocks = <&clks 3>;
+>>> 		clock-names = ...
+>>> 		...
+>>> 	};
+>>>
+>>>      where the driver binding to the virtclk device just forwards clk
+>>>      requests to the Linux host side which then knows that clk 3 is the
+>>>      can clock and does the necessary stuff.
+>>>
+>>> This way the can clock doesn't need special handling in the host's dtb
+>>> and no clock necessary for the companion is disabled as unused because
+>>> it is requested and enabled.
+>>>
+>>> The only problem I see is that implementing such a driver/protocol
+>>> probably is time consuming.
+>>
+>>
+>> The other problem is security related. If, at all, you have to do it the
+>> other way around, then:
+>>
+>> Make Linux a consumer of the other CPU's (trusted/trustzone/whatever
+>> secured) OS clock driver.
+> 
+> That doesn't matter much. Either way the first CPU has to provide the
+> master side of this device (as it needs clks for booting up) and the 2nd
+> gets this virtual clk device that forwards clk requests to the first
+> CPU.
+> 
+> On my machine (Udoo Neo, A9 + M4) the A9 is the primary CPU that is
+> started by the bootrom. If I want the M4 being the primary device I'd
+> need support in the bootloader to wait long enough (i.e. until the M4 is
+> up) before letting the A9 jump into Linux. Managable I'd say. This way
+> would even make sense if the M4 runs a rt critical OS that shouldn't be
+> forced to wait on the non-rt A9 to enable a clk.
 
-FYI, the error/warning still remains.
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   ae4bbf82f4b9fdfc85b3fd112696e8bbefff07f2
-commit: 68e6869cfb8154b80ee9ffafd64932971e9d1d07 [560/710] dwc3: Add support for setting USB control registers as phy platform data
-config: arm-omap2plus_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 68e6869cfb8154b80ee9ffafd64932971e9d1d07
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Overall, assuming that the issue we are discussing here can be solved 
+quite easily in hardware (a set of clock registers for each CPU/OS 
+domain, connected cleverly to effectively control each clock, with 
+access protection for each set of registers) I tend to think that for 
+a SoC supposed to run different OS on different cores this is a 
+missing hardware feature (bug?).
 
-All errors (new ones prefixed by >>):
+Best regards
 
->> ERROR: "dwc3_set_phydata" [drivers/usb/dwc3/dwc3.ko] undefined!
-   ERROR: "dwc3_enable_hw_coherency" [drivers/usb/dwc3/dwc3.ko] undefined!
-   ERROR: "of_add_property" [drivers/usb/dwc3/dwc3-of-simple.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 28524 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170702/c59f98bf/attachment-0001.gz>
+Dirk
