@@ -1,92 +1,80 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 2 Jul 2017 09:35:18 +0800
-Subject: [PATCH] kbuild: modpost: Warn about references from rodata to
- __init text
-In-Reply-To: <20170630225822.25349-1-sboyd@codeaurora.org>
-Message-ID: <201707020906.fmYIPkji%fengguang.wu@intel.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 2 Jul 2017 03:52:39 +0200
+Subject: [PATCH 4/6] dt-bindings: serial: Document RDA Micro UART
+In-Reply-To: <CAL_JsqLatRUwdA6GeWCHXFTHMUYY27pdmUpPEoHwCCFMg2F21Q@mail.gmail.com>
+References: <20170627005520.23731-1-afaerber@suse.de>
+ <20170627005520.23731-5-afaerber@suse.de>
+ <20170629201051.cfr37kh2gozompqo@rob-hp-laptop>
+ <e8b8eb0c-0362-0cfb-4d18-3e1ab2b77412@suse.de>
+ <CAL_JsqLatRUwdA6GeWCHXFTHMUYY27pdmUpPEoHwCCFMg2F21Q@mail.gmail.com>
+Message-ID: <d9b00fd8-2e9e-fb01-9056-db0d32b3e80b@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Am 30.06.2017 um 16:27 schrieb Rob Herring:
+> On Fri, Jun 30, 2017 at 6:12 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Am 29.06.2017 um 22:10 schrieb Rob Herring:
+>>> On Tue, Jun 27, 2017 at 02:55:18AM +0200, Andreas F?rber wrote:
+>>>> Add an initial binding for the RDA8810PL UART.
+>>>>
+>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/serial/rda-uart.txt | 13 +++++++++++++
+>>>>  1 file changed, 13 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/serial/rda-uart.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/serial/rda-uart.txt b/Documentation/devicetree/bindings/serial/rda-uart.txt
+>>>> new file mode 100644
+>>>> index 000000000000..6840a8aee035
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/serial/rda-uart.txt
+>>>> @@ -0,0 +1,13 @@
+>>>> +RDA Micro UART
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible :  "rda,8810pl-uart" for RDA8810PL
+>>>> +- reg        :  Offset and length of the register set for the device.
+>>>
+>>> No clocks or interrupts?
+>>
+>> Not yet. I've only pieced together an earlycon driver so far, no full
+>> serial driver. The .dtsi doesn't even have an interrupt-controller node
+>> yet - wasn't clear to me whether this SoC even has a GIC and, if so,
+>> where, from the downstream pre-DT code.
+> 
+> How far can you boot with no interrupts?
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.12-rc7 next-20170630]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+That was described in the cover letter, as usual.
 
-url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/kbuild-modpost-Warn-about-references-from-rodata-to-__init-text/20170702-074024
-config: blackfin-allmodconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
+> DT bindings shouldn't unnecessarily evolve. Really, anything added
+> should be optional to maintain compatibility. Sometimes that's
+> unavoidable, but this isn't one of those cases.
 
-All warnings (new ones prefixed by >>):
+Makes sense. Maybe this series should've been marked RFC. It's too late
+for 4.13 anyway, so there's lots of time left to extend the bindings.
 
->> WARNING: drivers/ata/libata.o(.rodata+0xbb4): Section mismatch in reference from the variable ___param_string_force to the variable .init.data:_ata_force_param_buf
-   The variable ___param_string_force references
-   the variable __initdata _ata_force_param_buf
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
---
->> WARNING: net/built-in.o(.rodata+0x5d08): Section mismatch in reference from the variable _msstab to the (unknown reference) .init.text:(unknown)
-   The variable _msstab references
-   the (unknown reference) __init (unknown)
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
---
->> WARNING: drivers/tty/built-in.o(.rodata+0x1790): Section mismatch in reference from the variable _uart_proc_fops to the (unknown reference) .init.text:(unknown)
-   The variable _uart_proc_fops references
-   the (unknown reference) __init (unknown)
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
---
->> WARNING: drivers/thermal/qcom/qcom_tsens.o(.rodata+0x434): Section mismatch in reference from the variable _ops_8916 to the function .init.text:_init_common()
-   The variable _ops_8916 references
-   the function __init _init_common()
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
---
->> WARNING: drivers/thermal/qcom/qcom_tsens.o(.rodata+0x460): Section mismatch in reference from the variable _ops_8974 to the function .init.text:_init_common()
-   The variable _ops_8974 references
-   the function __init _init_common()
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
---
->> WARNING: drivers/thermal/qcom/qcom_tsens.o(.rodata+0x4b8): Section mismatch in reference from the variable _ops_8996 to the function .init.text:_init_common()
-   The variable _ops_8996 references
-   the function __init _init_common()
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
---
->> WARNING: drivers/of/built-in.o(.rodata+0x714): Section mismatch in reference from the variable _CSWTCH.7 to the (unknown reference) .init.text:(unknown)
-   The variable _CSWTCH.7 references
-   the (unknown reference) __init (unknown)
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
---
->> WARNING: kernel/built-in.o(.rodata+0x28d8): Section mismatch in reference from the variable _param.25627 to the (unknown reference) .init.text:(unknown)
-   The variable _param.25627 references
-   the (unknown reference) __init (unknown)
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
+BTW I saw that Kevin was adding a disclaimer to the Amlogic bindings
+that they are not stable. Is that required here, too?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 44809 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170702/bbdbcdca/attachment-0001.gz>
+> So submit this when
+> you have something more complete.
+
+Negative. I worked weeks and months towards perfect STM32 drivers, and
+despite showing it to ST and at a LinuxCon Japan, someone else sent less
+sophisticated patches (e.g., fixed-clocks) and took all the credit. Same
+with Turris Omnia. Therefore I am now submitting my new patches early,
+not just when everything is complete.
+
+It took weeks just to get any earlycon output on the 2G-IoT at all - not
+my serial driver or my DT was broken, but the vendor's U-Boot just
+wasn't passing the .dtb to the kernel properly, as it turned out. Now
+that we know how to boot a DT-based kernel and get serial output, it
+becomes much easier for me and potential contributors to add drivers.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
