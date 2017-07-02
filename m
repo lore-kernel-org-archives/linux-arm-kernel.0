@@ -1,51 +1,73 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sun, 2 Jul 2017 16:49:32 -0500
-Subject: [PATCH] PCI: xilinx: make of_device_ids const.
-In-Reply-To: <5e1534021d712fa92cc0178313daeeb22e34798d.1497937235.git.arvind.yadav.cs@gmail.com>
-References: <5e1534021d712fa92cc0178313daeeb22e34798d.1497937235.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170702214932.GI18324@bhelgaas-glaptop.roam.corp.google.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Sun, 2 Jul 2017 21:59:12 +0000
+Subject: [PATCH 0/8] EDAC drivers for Armada XP L2 and DDR
+References: <20170630145106.29820-1-jlu@pengutronix.de>
+Message-ID: <d90e273237974dc69762cf630e9a43d7@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 11:17:48AM +0530, Arvind Yadav wrote:
-> of_device_ids are not supposed to change at runtime. All functions
-> working with of_device_ids provided by <linux/of.h> work with const
-> of_device_ids. So mark the non-const structs as const.
+On 01/07/17 02:51, Jan Luebbe wrote:
+> This series adds drivers for the L2 cache and DDR RAM ECC functionality as
+> found on the MV78230/MV78x60 SoCs. I've tested these changes with the MV78460
+> (on a custom board with a DDR3 ECC DIMM).
 > 
-> File size before:
->    text	   data	    bss	    dec	    hex	filename
->     195	    600	      0	    795	    31b	drivers/pci/host/pcie-xilinx.o
+> Also contained in this series are an additional debugfs wrapper and devm_
+> helpers for edac_mc_/edac_device_ allocation and registration, which make error
+> handing and cleanup simpler.
 > 
-> File size after constify xilinx_pcie_of_match:
->    text	   data	    bss	    dec	    hex	filename
->     595	    184	      0	    779	    30b	drivers/pci/host/pcie-xilinx.o
+> Compared to the previous RFC series, the following changes have been made:
+> - Integrated Chris' patches for parity and ECC configuration via DT
+> - Merged the DDR RAM and L2 cache drivers (as requested by Borislav, analogous
+>    to fsl_ddr_edac.c and mpc85xx_edac.c)
+> - Added myself to MAINTAINERS (requested by Borislav)
+> - L2 cache: Track the msg size and use snprintf (review comment by Chris)
+> - L2 cache: Split error injection from the check function (review comment by
+>    Chris)
+> - DDR RAM: Allow 16 bit width in addition to 32 and 64 bit (review comment by
+>    Chris)
+> - Use of_match_ptr() (review comments by Chris)
+> - Minor checkpatch cleanups
 > 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> Chris: To actually make use of this with 16 bit width, you'd need to add a new
+> DT compatible, which could be done in a follow up patch. Is your SoC considered
+> a armada-xp variant?
 
-Applied to pci/host-xilinx for v4.13, thanks!
+By Marvell's marketing department yes. The truth is a little murkier, 
+I'd say the Armada-XP and Armada-XP-98dx3236 share a common ancestor. 
+For the SDRAM controller saying it's a variant with a 16-bit bus is 
+appropriate.
 
-> ---
->  drivers/pci/host/pcie-xilinx.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index 2fe2df5..b621cb5 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -696,7 +696,7 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
->  	return err;
->  }
->  
-> -static struct of_device_id xilinx_pcie_of_match[] = {
-> +static const struct of_device_id xilinx_pcie_of_match[] = {
->  	{ .compatible = "xlnx,axi-pcie-host-1.00.a", },
->  	{}
->  };
-> -- 
-> 1.9.1
+> Chris Packham (2):
+>    ARM: l2x0: support parity-enable/disable on aurora
+>    ARM: l2x0: add arm,ecc-enable property for aurora
 > 
+> Jan Luebbe (6):
+>    ARM: l2c: move cache-aurora-l2.h to asm/hardware
+>    ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+>    EDAC: Add missing debugfs_create_x32 wrapper
+>    EDAC: Add devres helpers for
+>      edac_mc_alloc/edac_mc_add_mc(_with_groups)
+>    EDAC: Add devres helpers for
+>      edac_device_alloc_ctl_info/edac_device_add_device
+>    EDAC: Add driver for the Marvell Armada XP SDRAM and L2 cache ECC
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   Documentation/devicetree/bindings/arm/l2c2x0.txt |   2 +
+>   MAINTAINERS                                      |   6 +
+>   arch/arm/include/asm/hardware/cache-aurora-l2.h  | 103 ++++
+>   arch/arm/mm/cache-aurora-l2.h                    |  55 --
+>   arch/arm/mm/cache-l2x0.c                         |  20 +-
+>   drivers/edac/Kconfig                             |   7 +
+>   drivers/edac/Makefile                            |   1 +
+>   drivers/edac/armada_xp_edac.c                    | 639 +++++++++++++++++++++++
+>   drivers/edac/debugfs.c                           |  11 +
+>   drivers/edac/edac_device.c                       |  59 +++
+>   drivers/edac/edac_device.h                       |  29 +
+>   drivers/edac/edac_mc.c                           |  53 ++
+>   drivers/edac/edac_mc.h                           |  26 +
+>   drivers/edac/edac_module.h                       |   5 +
+>   14 files changed, 958 insertions(+), 58 deletions(-)
+>   create mode 100644 arch/arm/include/asm/hardware/cache-aurora-l2.h
+>   delete mode 100644 arch/arm/mm/cache-aurora-l2.h
+>   create mode 100644 drivers/edac/armada_xp_edac.c
+> 
