@@ -1,51 +1,35 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Sun,  2 Jul 2017 17:41:47 +0300
-Subject: [PATCH v3 05/28] crypto: mediatek: use -EIOCBQUEUED for backlog
- indication
-In-Reply-To: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
-References: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1499006535-19760-6-git-send-email-gilad@benyossef.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 3 Jul 2017 01:28:13 +0800
+Subject: [xlnx:master 560/710] core.c:undefined reference to `dwc3_set_phydata'
+Message-ID: <201707030112.KgI8MADZ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace -EBUSY with -EIOCBQUEUED for backlog queueing indication
-as part of new API.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   ae4bbf82f4b9fdfc85b3fd112696e8bbefff07f2
+commit: 68e6869cfb8154b80ee9ffafd64932971e9d1d07 [560/710] dwc3: Add support for setting USB control registers as phy platform data
+config: i386-randconfig-s1-07012130 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 68e6869cfb8154b80ee9ffafd64932971e9d1d07
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `dwc3_core_init':
+   core.c:(.text+0x1481e4): undefined reference to `dwc3_enable_hw_coherency'
+   drivers/built-in.o: In function `dwc3_probe':
+>> core.c:(.text+0x149373): undefined reference to `dwc3_set_phydata'
+   core.c:(.text+0x1493d5): undefined reference to `dwc3_set_phydata'
+
 ---
-
-This patch should be squashed with the first patch in the series
-when applied.
-
- drivers/crypto/mediatek/mtk-aes.c | 2 +-
- drivers/crypto/mediatek/mtk-sha.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/crypto/mediatek/mtk-aes.c b/drivers/crypto/mediatek/mtk-aes.c
-index 9e845e8..5254e13 100644
---- a/drivers/crypto/mediatek/mtk-aes.c
-+++ b/drivers/crypto/mediatek/mtk-aes.c
-@@ -1012,7 +1012,7 @@ static int mtk_aes_gcm_setkey(struct crypto_aead *aead, const u8 *key,
- 				   AES_BLOCK_SIZE, data->iv);
- 
- 	err = crypto_skcipher_encrypt(&data->req);
--	if (err == -EINPROGRESS || err == -EBUSY) {
-+	if (err == -EINPROGRESS || err == -EIOCBQUEUED) {
- 		err = wait_for_completion_interruptible(
- 			&data->result.completion);
- 		if (!err)
-diff --git a/drivers/crypto/mediatek/mtk-sha.c b/drivers/crypto/mediatek/mtk-sha.c
-index 5f4f845..5c75b50 100644
---- a/drivers/crypto/mediatek/mtk-sha.c
-+++ b/drivers/crypto/mediatek/mtk-sha.c
-@@ -782,7 +782,7 @@ static int mtk_sha_finup(struct ahash_request *req)
- 	ctx->flags |= SHA_FLAGS_FINUP;
- 
- 	err1 = mtk_sha_update(req);
--	if (err1 == -EINPROGRESS || err1 == -EBUSY)
-+	if (err1 == -EINPROGRESS || err1 == -EIOCBQUEUED)
- 		return err1;
- 	/*
- 	 * final() has to be always called to cleanup resources
--- 
-2.1.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 26386 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170703/94e5195f/attachment-0001.gz>
