@@ -1,10 +1,9 @@
 From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Sun,  2 Jul 2017 17:41:50 +0300
-Subject: [PATCH v3 08/28] crypto: talitos: use -EIOCBQUEUED for backlog
- indication
+Date: Sun,  2 Jul 2017 17:41:51 +0300
+Subject: [PATCH v3 09/28] dm: verity: use -EIOCBQUEUED for backlog indication
 In-Reply-To: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
 References: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1499006535-19760-9-git-send-email-gilad@benyossef.com>
+Message-ID: <1499006535-19760-10-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +16,21 @@ Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 This patch should be squashed with the first patch in the series
 when applied.
 
- drivers/crypto/talitos.c | 2 +-
+ drivers/md/dm-verity-target.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/crypto/talitos.c b/drivers/crypto/talitos.c
-index 79791c6..0ab3c4d 100644
---- a/drivers/crypto/talitos.c
-+++ b/drivers/crypto/talitos.c
-@@ -2082,7 +2082,7 @@ static int keyhash(struct crypto_ahash *tfm, const u8 *key, unsigned int keylen,
- 	case 0:
+diff --git a/drivers/md/dm-verity-target.c b/drivers/md/dm-verity-target.c
+index b46705e..4fe7d18 100644
+--- a/drivers/md/dm-verity-target.c
++++ b/drivers/md/dm-verity-target.c
+@@ -116,7 +116,7 @@ static inline int verity_complete_op(struct verity_result *res, int ret)
  		break;
+ 
  	case -EINPROGRESS:
 -	case -EBUSY:
 +	case -EIOCBQUEUED:
- 		ret = wait_for_completion_interruptible(
- 			&hresult.completion);
+ 		ret = wait_for_completion_interruptible(&res->completion);
  		if (!ret)
+ 			ret = res->err;
 -- 
 2.1.4
