@@ -1,9 +1,9 @@
 From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Sun,  2 Jul 2017 17:41:52 +0300
-Subject: [PATCH v3 10/28] fscrypt: use -EIOCBQUEUED for backlog indication
+Date: Sun,  2 Jul 2017 17:41:48 +0300
+Subject: [PATCH v3 06/28] crypto: omap: use -EIOCBQUEUED for backlog indication
 In-Reply-To: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
 References: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1499006535-19760-11-git-send-email-gilad@benyossef.com>
+Message-ID: <1499006535-19760-7-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,21 +16,21 @@ Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 This patch should be squashed with the first patch in the series
 when applied.
 
- fs/crypto/crypto.c | 2 +-
+ drivers/crypto/omap-sham.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/fs/crypto/crypto.c b/fs/crypto/crypto.c
-index c7835df..c5c89ed 100644
---- a/fs/crypto/crypto.c
-+++ b/fs/crypto/crypto.c
-@@ -190,7 +190,7 @@ int fscrypt_do_page_crypto(const struct inode *inode, fscrypt_direction_t rw,
- 		res = crypto_skcipher_decrypt(req);
- 	else
- 		res = crypto_skcipher_encrypt(req);
--	if (res == -EINPROGRESS || res == -EBUSY) {
-+	if (res == -EINPROGRESS || res == -EIOCBQUEUED) {
- 		BUG_ON(req->base.data != &ecr);
- 		wait_for_completion(&ecr.completion);
- 		res = ecr.res;
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index 9ad9d39..dfac821 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -1279,7 +1279,7 @@ static int omap_sham_finup(struct ahash_request *req)
+ 	ctx->flags |= BIT(FLAGS_FINUP);
+ 
+ 	err1 = omap_sham_update(req);
+-	if (err1 == -EINPROGRESS || err1 == -EBUSY)
++	if (err1 == -EINPROGRESS || err1 == -EIOCBQUEUED)
+ 		return err1;
+ 	/*
+ 	 * final() has to be always called to cleanup resources
 -- 
 2.1.4
