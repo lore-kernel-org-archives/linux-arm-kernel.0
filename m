@@ -1,33 +1,26 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sun,  2 Jul 2017 14:31:58 +0200
-Subject: [PATCH 5/6] arm: sun8i: orangepipc: revert "use internal phy-mode"
-In-Reply-To: <20170702123159.6939-1-clabbe.montjoie@gmail.com>
-References: <20170702123159.6939-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170702123159.6939-6-clabbe.montjoie@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 2 Jul 2017 10:43:06 -0300
+Subject: [PATCH] ARM: dts: imx: Correct B850v3 clock assignment
+In-Reply-To: <20170630134337.18245-1-romain.perier@collabora.com>
+References: <20170630134337.18245-1-romain.perier@collabora.com>
+Message-ID: <CAOMZO5BeovjoheauMXJigKjPRCcf3H6hz73duwGPVCKS3qY6vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since internal phy-mode is reserved for non-xMII protocol we cannot use
-it with dwmac-sun8i
-This reverts commit 3432a86e641c ("arm: sun8i: orangepipc: use internal phy-mode")
+On Fri, Jun 30, 2017 at 10:43 AM, Romain Perier
+<romain.perier@collabora.com> wrote:
+> From: Martyn Welch <martyn.welch@collabora.co.uk>
+>
+> The IPU that drives HDMI must have its pre_sel set to pll2_pfd_396m
+> to avoid stepping on the LVDS output's toes, as the PLL can't be clocked
+> to the pixel clock and to the LVDS serial clock (3.5*pixel clock) at the
+> same time.
+>
+> As we are using ipu1_di0 and ipu2_di0, ensure both are switched to
+> to pll2_pfd2_396m to avoid issues. The LDB driver will switch the
+> required IPU to ldb_di1 when it uses it to drive LVDS.
+>
+> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index 94edeb889e55..f5f0f15a2088 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -120,7 +120,7 @@
- 
- &emac {
- 	phy-handle = <&int_mii_phy>;
--	phy-mode = "internal";
-+	phy-mode = "mii";
- 	allwinner,leds-active-low;
- 	status = "okay";
- };
--- 
-2.13.0
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
