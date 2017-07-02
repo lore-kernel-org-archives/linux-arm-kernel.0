@@ -1,57 +1,81 @@
-From: clemens.gruber@pqgruber.com (Clemens Gruber)
-Date: Sun, 2 Jul 2017 22:17:15 +0200
-Subject: [PATCH] serial: imx: disable DMA for RS-485 on i.MX6 SMP
-In-Reply-To: <CAOMZO5A-fF5V4obGD-XEnSbt8TB2wsCTJRjvKXfxM_SjKXdQXQ@mail.gmail.com>
-References: <20170620153701.12626-1-clemens.gruber@pqgruber.com>
- <CAOMZO5Djf8OsqF=jUBo1Dkm2mw7pObxmkC=qq0U0RLZsYonXgQ@mail.gmail.com>
- <20170621140556.GA766@archie.localdomain>
- <CAOMZO5DXxaJ6PveJb9912rog8xvfqgsg3O3u3a-ffWUj9ZnpCg@mail.gmail.com>
- <CAOMZO5A-fF5V4obGD-XEnSbt8TB2wsCTJRjvKXfxM_SjKXdQXQ@mail.gmail.com>
-Message-ID: <20170702201715.GA26018@archie.localdomain>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 2 Jul 2017 22:27:22 +0200
+Subject: [PATCH v4 16/28] tty: serial: owl: Implement console driver
+In-Reply-To: <20170606143407.56d15c3c@lxorguk.ukuu.org.uk>
+References: <20170606005426.26446-1-afaerber@suse.de>
+ <20170606005426.26446-17-afaerber@suse.de>
+ <20170606143407.56d15c3c@lxorguk.ukuu.org.uk>
+Message-ID: <d3c107f3-5df6-a771-2510-ef5578216d0f@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio, Hi Romain,
-
-On Fri, Jun 30, 2017 at 09:15:31AM -0300, Fabio Estevam wrote:
-> Hi Clemens,
+Am 06.06.2017 um 15:34 schrieb Alan Cox:
+>> +static void owl_uart_set_termios(struct uart_port *port,
+>> +				 struct ktermios *termios,
+>> +				 struct ktermios *old)
+>> +{
+>> +	struct owl_uart_port *owl_port = to_owl_uart_port(port);
+>> +	unsigned int baud;
+>> +	u32 ctl;
+>> +	unsigned long flags;
+>> +
+>> +	spin_lock_irqsave(&port->lock, flags);
+>> +
+>> +	/* We don't support modem control lines. */
+>> +	termios->c_cflag &= ~(HUPCL | CMSPAR);
+>> +	termios->c_cflag |= CLOCAL;
 > 
-> On Wed, Jun 21, 2017 at 11:12 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> CLOCAL and HUPCL are software not hardware properties so are probably
+> best not forced (it'll confuse some apps if you do)
+>> +
+>> +	/* We don't support BREAK character recognition. */
+>> +	termios->c_iflag &= ~(IGNBRK | BRKINT);
 > 
-> >> I'd also prefer fixing the underlying problem.
-> >
-> > Yes, that would be much better.
+> Ditto these
+
+Fixed. These were obviously forward-ported from the vendor tree.
+
+https://github.com/LeMaker/linux-actions/blob/linux-3.10.y/arch/arm/mach-owl/serial-owl.c
+
+> You do clear CMSPAR which is right if not supported but then later on we
+> have:
 > 
-> Just saw Romain's patch series that addresses several imx uart DMA issues:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/516845.html
+>> +	if (termios->c_cflag & PARENB) {
+>> +		if (termios->c_cflag & CMSPAR) {
+>> +			if (termios->c_cflag & PARODD)
+>> +				ctl |= OWL_UART_CTL_PRS_MARK;
+>> +			else
+>> +				ctl |= OWL_UART_CTL_PRS_SPACE;
+>> +		} else if (termios->c_cflag & PARODD)
+>> +			ctl |= OWL_UART_CTL_PRS_ODD;
+>> +		else
+>> +			ctl |= OWL_UART_CTL_PRS_EVEN;
+>> +	} else
+>> +		ctl |= OWL_UART_CTL_PRS_NONE;
 > 
-> If you have a chance, please give it a try to see if it helps on the
-> RS485 DMA case.
+> 
+> Which seems to indicate you do support CMSPAR so shouldn't be clearing it.
 
-Thanks, I just finished my first tests with Romain's patch series:
+Again that's what the original code was like.
 
-It looks like these patches fixed some of the bugs, causing this
-behavior, but not all: The behavior changed, the rest of the circular
-buffer is no longer sent out as seen in the previous bug report
-(https://pqgruber.com/rs485_results.png)
+Since these register values do exist, I would rather not rip the code
+out, unless it's wrong. In my testing, not clearing CMSPAR works so far.
 
-But now, with the patch series applied, if I transmit "Test", the logic
-analyzer records the following:
-https://pqgruber.com/rs485txtest.png
+>> +	baud = uart_get_baud_rate(port, termios, old, 9600, 3200000);
+>> +	owl_uart_change_baudrate(owl_port, baud);
+> 
+> You should re-encode the resulting baud rate into the termios
+> 
+>         /* Don't rewrite B0 */
+>         if (tty_termios_baud_rate(termios))
+>                 tty_termios_encode_baud_rate(termios, baud, baud);
 
-Most of the time it looked like this (T e T e s s t t LF LF), but in a
-few cases I observed another pattern (T e T s e s t t LF LF) when
-transmitting "Test" by calling echo Test > /dev/ttymxc4.
-
-If I do a echo A > /dev/ttymxc4 as in my first bug report, now I always
-see the pattern A LF A LF on the TX line, but no longer A LF A LF 0 0 ..
-
-Interestingly, the bug does not appear the first time I try echo A after
-a reboot.
-
-Romain: What board did you use to test your patch series?
-The RS485 bug, I reported, only appears on i.MX6D and i.MX6Q, but not on
-single-core / non-SMP systems. Would be great if you could reproduce it!
+Added, thanks.
 
 Regards,
-Clemens
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
