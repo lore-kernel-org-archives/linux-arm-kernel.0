@@ -1,297 +1,310 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 3 Jul 2017 00:36:28 +0200
-Subject: [PATCH v4 16/28] tty: serial: owl: Implement console driver
-In-Reply-To: <CAHp75VcYtdxknAw5b1zp+qLi1MT3ktwm99rOJEivcBrc+9B-cg@mail.gmail.com>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-17-afaerber@suse.de>
- <CAHp75VcYtdxknAw5b1zp+qLi1MT3ktwm99rOJEivcBrc+9B-cg@mail.gmail.com>
-Message-ID: <223d7807-fd46-6bf7-1211-1ad5223e75c3@suse.de>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Sun, 2 Jul 2017 18:18:11 -0500
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+Message-ID: <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.06.2017 um 16:37 schrieb Andy Shevchenko:
-> On Tue, Jun 6, 2017 at 3:54 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> Implement serial console driver to complement earlycon.
->>
->> Based on LeMaker linux-actions tree.
+On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:
+> This driver is required to work around several hardware bugs
+> in the PCIe controller.
 > 
->> +#define OWL_UART_CTL_DWLS_MASK         (0x3 << 0)
-> 
-> GENMASK() ?
-> 
->> +#define OWL_UART_CTL_PRS_MASK          (0x7 << 4)
-> 
-> Ditto.
-> 
->>  #define OWL_UART_STAT_TRFL_MASK                (0x1f << 11)
-> 
-> Ditto.
+> NB: Revision 1 does not support legacy interrupts, or IO space.
 
-Changed.
+I had to apply these manually because of conflicts in Kconfig and
+Makefile.  What are these based on?  Easiest for me is if you base
+them on the current -rc1 tag.
 
->> +static struct owl_uart_port *owl_uart_ports[OWL_UART_PORT_NUM];
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+>  drivers/pci/host/Kconfig      |   8 +++
+>  drivers/pci/host/Makefile     |   1 +
+>  drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci_ids.h       |   2 +
+>  4 files changed, 175 insertions(+)
+>  create mode 100644 drivers/pci/host/pcie-tango.c
 > 
-> And this is needed for...?
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index d7e7c0a827c3..5183d9095c3a 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -285,6 +285,14 @@ config PCIE_ROCKCHIP
+>  	  There is 1 internal PCIe port available to support GEN2 with
+>  	  4 slots.
+>  
+> +config PCIE_TANGO
+> +	bool "Tango PCIe controller"
+> +	depends on ARCH_TANGO && PCI_MSI && OF
+> +	select PCI_HOST_COMMON
+> +	help
+> +	  Say Y here to enable PCIe controller support for Sigma Designs
+> +	  Tango systems, such as SMP8759 and later chips.
+> +
+>  config VMD
+>  	depends on PCI_MSI && X86_64
+>  	tristate "Intel Volume Management Device Driver"
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> index 084cb4983645..fc7ea90196f3 100644
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
+> @@ -32,4 +32,5 @@ obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
+>  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
+>  obj-$(CONFIG_PCIE_ROCKCHIP) += pcie-rockchip.o
+> +obj-$(CONFIG_PCIE_TANGO) += pcie-tango.o
+>  obj-$(CONFIG_VMD) += vmd.o
+> diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
+> new file mode 100644
+> index 000000000000..67aaadcc1c5e
+> --- /dev/null
+> +++ b/drivers/pci/host/pcie-tango.c
+> @@ -0,0 +1,164 @@
+> +#include <linux/pci-ecam.h>
+> +#include <linux/delay.h>
+> +#include <linux/of.h>
+> +
+> +#define MSI_MAX 256
+> +
+> +#define SMP8759_MUX		0x48
+> +#define SMP8759_TEST_OUT	0x74
+> +
+> +struct tango_pcie {
+> +	void __iomem *mux;
+> +};
+> +
+> +/*** HOST BRIDGE SUPPORT ***/
+> +
+> +static int smp8759_config_read(struct pci_bus *bus,
+> +		unsigned int devfn, int where, int size, u32 *val)
 
-That's what both the downstream driver and several in-tree drivers are
-doing. See `git grep '_ports\[' -- drivers/tty/serial/`.
+Wrap these with as much as possible on the first line, e.g.,
 
-If you feel this is wrong, --verbose explanation please.
+  static int smp8759_config_read(struct pci_bus *bus, unsigned int devfn,
+                                 int where, int size, u32 *val)
 
->> +static void owl_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
->> +{
->> +}
-> 
-> Do we need an empty stub?
 
-The only flag I have found in the CTL register is AFE for automatic
-RTS/CTS flow-control - RTS and CTS can only be read in STAT, not set.
+> +{
+> +	int ret;
+> +	struct pci_config_window *cfg = bus->sysdata;
+> +	struct tango_pcie *pcie = dev_get_drvdata(cfg->parent);
 
-And yes, if I drop this empty callback function, I get no serial output.
+Reorder as:
 
->> +static void owl_uart_send_chars(struct uart_port *port)
->> +{
-> 
->> +               xmit->tail = (xmit->tail + 1) & (SERIAL_XMIT_SIZE - 1);
-> 
-> % SERIAL_XMIT_SIZE shorter (I hope it's a power of 2), but it's up to you.
+        struct pci_config_window *cfg = bus->sysdata;
+        struct tango_pcie *pcie = dev_get_drvdata(cfg->parent);
+        int ret;
 
-crisv10 and meson_uart have it this way, modulo normalized whitespace.
-No serial driver uses % for it.
+> +
+> +	/*
+> +	 * QUIRK #1
 
->> +}
-> 
->> +static irqreturn_t owl_uart_irq(int irq, void *dev_id)
->> +{
->> +       struct uart_port *port = (struct uart_port *)dev_id;
-> 
-> Useless casting.
+Omit "QUIRK #1", "QUIRK #2", etc unless they're actual references to an errata
+document.
 
-Fixed.
+> +	 * Reads in configuration space outside devfn 0 return garbage.
+> +	 */
+> +	if (devfn != 0)
+> +		return PCIBIOS_FUNC_NOT_SUPPORTED;
+> +
+> +	/*
+> +	 * QUIRK #2
+> +	 * Unfortunately, config and mem spaces are muxed.
+> +	 * Linux does not support such a setting, since drivers are free
+> +	 * to access mem space directly, at any time.
+> +	 * Therefore, we can only PRAY that config and mem space accesses
+> +	 * NEVER occur concurrently.
+> +	 */
+> +	writel_relaxed(1, pcie->mux);
+> +	ret = pci_generic_config_read(bus, devfn, where, size, val);
+> +	writel_relaxed(0, pcie->mux);
 
->> +       spin_lock(&port->lock);
-> 
-> spin_lock_irqsave() ?
+I'm very hesitant about this.  When people stress this, we're going to
+get reports of data corruption.  Even with the disclaimer below, I
+don't feel good about this.  Adding the driver is an implicit claim
+that we support the device, but we know it can't be made reliable.
 
-Fixed, with matching _irqrestore().
+What is the benefit of adding this driver?  How many units are in the
+field?  Are you hoping to have support in distros like RHEL?  Are
+these running self-built kernels straight from kernel.org?  Is it
+feasible for you to distribute this driver separately from the
+upstream kernel?
 
-> Consider the kernel command option that switches all IRQ handlers to
-> be threaded.
-> 
->> +}
-> 
->> +static void owl_uart_change_baudrate(struct owl_uart_port *owl_port,
->> +                                    unsigned long baud)
->> +{
->> +       clk_set_rate(owl_port->clk, baud * 8);
->> +}
-> 
->> +static void owl_uart_release_port(struct uart_port *port)
->> +{
->> +       struct platform_device *pdev = to_platform_device(port->dev);
->> +       struct resource *res;
->> +
-> 
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       if (!res)
->> +               return;
->> +
->> +       if (port->flags & UPF_IOREMAP) {
->> +               devm_release_mem_region(port->dev, port->mapbase,
->> +                       resource_size(res));
->> +               devm_iounmap(port->dev, port->membase);
->> +               port->membase = NULL;
->> +       }
-> 
-> Above is entirely redundant.
+> +	return ret;
+> +}
+> +
+> +static int smp8759_config_write(struct pci_bus *bus,
+> +		unsigned int devfn, int where, int size, u32 val)
+> +{
+> +	int ret;
+> +	struct pci_config_window *cfg = bus->sysdata;
+> +	struct tango_pcie *pcie = dev_get_drvdata(cfg->parent);
+> +
+> +	writel_relaxed(1, pcie->mux);
+> +	ret = pci_generic_config_write(bus, devfn, where, size, val);
+> +	writel_relaxed(0, pcie->mux);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct pci_ecam_ops smp8759_ecam_ops = {
+> +	.bus_shift	= 20,
+> +	.pci_ops	= {
+> +		.map_bus	= pci_ecam_map_bus,
+> +		.read		= smp8759_config_read,
+> +		.write		= smp8759_config_write,
+> +	}
+> +};
+> +
+> +static const struct of_device_id tango_pcie_ids[] = {
+> +	{ .compatible = "sigma,smp8759-pcie" },
+> +	{ /* sentinel */ },
+> +};
 
-Can you explain what this flag is used for and why some other drivers
-implement it? That word alone is not helping.
+Move table down to point where it's needed.
 
->> +}
->> +
->> +static int owl_uart_request_port(struct uart_port *port)
->> +{
->> +       struct platform_device *pdev = to_platform_device(port->dev);
->> +       struct resource *res;
->> +
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       if (!res)
->> +               return -ENXIO;
->> +
->> +       if (!devm_request_mem_region(port->dev, port->mapbase,
->> +                       resource_size(res), dev_name(port->dev)))
->> +               return -EBUSY;
->> +
->> +       if (port->flags & UPF_IOREMAP) {
->> +               port->membase = devm_ioremap_nocache(port->dev, port->mapbase,
->> +                               resource_size(res));
->> +               if (!port->membase)
->> +                       return -EBUSY;
->> +       }
->> +
->> +       return 0;
->> +}
-> 
->> +static void owl_uart_config_port(struct uart_port *port, int flags)
->> +{
-> 
->> +       if (flags & UART_CONFIG_TYPE) {
-> 
-> if (!(...))
->  return;
-> 
-> ?
+> +static int tango_check_pcie_link(void __iomem *test_out)
 
-Not a single serial driver does it that way.
-I guess it prepares for handling other flags.
+I think this is checking for link up.  Rename to tango_pcie_link_up()
+to follow the convention of other drivers.  Take a struct tango_pcie *
+instead of an address, if possible.
 
->> +               port->type = PORT_OWL;
->> +               owl_uart_request_port(port);
->> +       }
->> +}
-> 
-> 
->> +static int owl_uart_probe(struct platform_device *pdev)
->> +{
->> +       struct resource *res_mem, *res_irq;
->> +       struct owl_uart_port *owl_port;
->> +       int ret;
->> +
->> +       if (pdev->dev.of_node)
->> +               pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
->> +
->> +       if (pdev->id < 0 || pdev->id >= OWL_UART_PORT_NUM) {
->> +               dev_err(&pdev->dev, "id %d out of range\n", pdev->id);
->> +               return -EINVAL;
->> +       }
->> +
-> 
-> 
->> +       res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       if (!res_mem) {
->> +               dev_err(&pdev->dev, "could not get mem\n");
->> +               return -ENODEV;
->> +       }
-> 
-> You can use
-> 
-> struct resource *mem;
-> 
-> mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> x = devm_ioremap_resource();
-> if (IS_ERR(x))
->  return PTR_ERR(x);
-> 
-> and remote IOREMAP flag below.
+> +{
+> +	int i;
+> +
+> +	writel_relaxed(16, test_out);
+> +	for (i = 0; i < 10; ++i) {
+> +		u32 ltssm_state = readl_relaxed(test_out) >> 8;
+> +		if ((ltssm_state & 0x1f) == 0xf) /* L0 */
+> +			return 0;
+> +		usleep_range(3000, 4000);
+> +	}
+> +
+> +	return -ENODEV;
+> +}
+> +
+> +static int smp8759_init(struct tango_pcie *pcie, void __iomem *base)
+> +{
+> +	pcie->mux		= base + SMP8759_MUX;
+> +
+> +	return tango_check_pcie_link(base + SMP8759_TEST_OUT);
+> +}
+> +
+> +static int tango_pcie_probe(struct platform_device *pdev)
+> +{
+> +	int ret = -EINVAL;
+> +	void __iomem *base;
+> +	struct resource *res;
+> +	struct tango_pcie *pcie;
+> +	struct device *dev = &pdev->dev;
 
->> +       res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->> +       if (!res_irq) {
->> +               dev_err(&pdev->dev, "could not get irq\n");
->> +               return -ENODEV;
->> +       }
-> 
-> platform_get_irq()
+Reverse declaration order.  Then they'll be declared in order of use.
 
-Adopted.
+> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
+> +	pr_err("Tainting kernel... Use driver at your own risk\n");
 
->> +       if (owl_uart_ports[pdev->id]) {
->> +               dev_err(&pdev->dev, "port %d already allocated\n", pdev->id);
->> +               return -EBUSY;
->> +       }
-> 
-> I guess it's redundant. It should be conflicting by resource (for example, IRQ).
+These should be dev_err().
 
-No, currently not. Memory resources are allocated on request_port, IRQ
-is requested on startup.
+> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
+> +
+> +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
+> +	if (!pcie)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, pcie);
 
->> +       owl_port->clk = clk_get(&pdev->dev, NULL);
-> 
-> devm_ ?
+Minor style: move this down to the end, so we're not associating an
+uninitialized drvdata structure with the pdev.  Better to wait until
+it's fully initialized.
 
-Changed.
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	base = devm_ioremap_resource(&pdev->dev, res);
 
->> +       owl_port->port.iotype = UPIO_MEM;
->> +       owl_port->port.mapbase = res_mem->start;
->> +       owl_port->port.irq = res_irq->start;
-> 
-> 
->> +       owl_port->port.uartclk = clk_get_rate(owl_port->clk);
-> 
-> You need to check if it's 0 and use device property instead or bail out.
+Use "dev", not "&pdev->dev".
 
-Fixed. Since this is a new driver, I'd rather not fall back to
-clock-frequency property here. The binding has clocks property as required.
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	if (of_device_is_compatible(dev->of_node, "sigma,smp8759-pcie"))
 
->> +       owl_port->port.flags = UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_LOW_LATENCY;
->> +       owl_port->port.x_char = 0;
->> +       owl_port->port.fifosize = 16;
->> +       owl_port->port.ops = &owl_uart_ops;
->> +
->> +       owl_uart_ports[pdev->id] = owl_port;
-> 
->> +       platform_set_drvdata(pdev, owl_port);
-> 
-> It should be just before return 0, right?..
+Not necessary, since tango_pcie_ids[] only contains
+"sigma,smp8759-pcie".  If/when you need different init for different
+versions, you can add something like this back, and it will be obvious
+why it's needed.  Right now, there's no need for this, so it looks out
+of place.
 
-Does it matter?
+> +		ret = smp8759_init(pcie, base);
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	return pci_host_common_probe(pdev, &smp8759_ecam_ops);
+> +}
+> +
+> +static struct platform_driver tango_pcie_driver = {
+> +	.probe	= tango_pcie_probe,
+> +	.driver	= {
+> +		.name = KBUILD_MODNAME,
+> +		.of_match_table = tango_pcie_ids,
 
->> +
->> +       ret = uart_add_one_port(&owl_uart_driver, &owl_port->port);
->> +       if (ret)
->> +               owl_uart_ports[pdev->id] = NULL;
-> 
-> ...and thus, taking into consideration redundancy of that global var:
-> 
->       ret = uart_add_one_port(&owl_uart_driver, &owl_port->port);
->       if (ret)
->           retrun ret;
-> 
->       platform_set_drvdata(pdev, owl_port);
->       return 0;
-> 
->> +       return ret;
->> +}
-> 
->> +
->> +static int owl_uart_remove(struct platform_device *pdev)
->> +{
-> 
->> +       struct owl_uart_port *owl_port;
->> +
->> +       owl_port = platform_get_drvdata(pdev);
-> 
-> Do above in one line.
+I think you need ".suppress_bind_attrs = true" here to prevent issues
+when unbinding driver.  See
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a5f40e8098fe
 
-Done.
+> +	},
+> +};
+> +
 
->> +       uart_remove_one_port(&owl_uart_driver, &owl_port->port);
-> 
->> +       owl_uart_ports[pdev->id] = NULL;
-> 
-> Redundant.
-> 
->> +
->> +       return 0;
->> +}
-> 
->> +/* Actions Semi Owl UART */
->> +#define PORT_OWL       117
-> 
-> We can use holes for now IIUC.
-> 
-> See 36 or alike
+Remove blank line.
 
-Okay. 36 works, too.
+> +builtin_platform_driver(tango_pcie_driver);
+> +
+> +/*
+> + * QUIRK #3
+> + * The root complex advertizes the wrong device class.
 
-Please point to a good example of a serial driver that is not
-"redundant" in your view. That will help also with other pending serial
-drivers of mine. Thanks.
+s/advertizes/advertises/
 
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> + * Header Type 1 is for PCI-to-PCI bridges.
+> + */
+> +static void tango_fixup_class(struct pci_dev *dev)
+> +{
+> +	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> +}
+> +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SIGMA, 0x24, tango_fixup_class);
+> +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SIGMA, 0x28, tango_fixup_class);
+> +
+> +/*
+> + * QUIRK #4
+> + * The root complex exposes a "fake" BAR, which is used to filter
+> + * bus-to-system accesses. Only accesses within the range defined
+> + * by this BAR are forwarded to the host, others are ignored.
+> + *
+> + * By default, the DMA framework expects an identity mapping,
+> + * and DRAM0 is mapped at 0x80000000.
+> + */
+> +static void tango_fixup_bar(struct pci_dev *dev)
+> +{
+> +	dev->non_compliant_bars = true;
+> +	pci_write_config_dword(dev, PCI_BASE_ADDRESS_0, 0x80000000);
+> +}
+> +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SIGMA, 0x24, tango_fixup_bar);
+> +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SIGMA, 0x28, tango_fixup_bar);
+> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> index f020ab4079d3..b577dbe46f8f 100644
+> --- a/include/linux/pci_ids.h
+> +++ b/include/linux/pci_ids.h
+> @@ -1369,6 +1369,8 @@
+>  #define PCI_DEVICE_ID_TTI_HPT374	0x0008
+>  #define PCI_DEVICE_ID_TTI_HPT372N	0x0009	/* apparently a 372N variant? */
+>  
+> +#define PCI_VENDOR_ID_SIGMA		0x1105
+> +
+>  #define PCI_VENDOR_ID_VIA		0x1106
+>  #define PCI_DEVICE_ID_VIA_8763_0	0x0198
+>  #define PCI_DEVICE_ID_VIA_8380_0	0x0204
+> -- 
+> 2.11.0
+> 
