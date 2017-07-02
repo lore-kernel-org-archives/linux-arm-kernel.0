@@ -1,103 +1,131 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sun, 2 Jul 2017 16:12:14 -0500
-Subject: [PATCH 2/4] ARM/PCI: mv78xx0: pass pci_ops correctly again
-In-Reply-To: <20170701135457.GB8977@red-moon>
-References: <20170621215323.3921382-1-arnd@arndb.de>
- <20170621215323.3921382-2-arnd@arndb.de>
- <20170622093855.GA23310@red-moon>
- <20170627231143.GI17844@bhelgaas-glaptop.roam.corp.google.com>
- <20170701135457.GB8977@red-moon>
-Message-ID: <20170702211214.GC18324@bhelgaas-glaptop.roam.corp.google.com>
+Date: Sun, 2 Jul 2017 16:19:50 -0500
+Subject: [RFT PATCH v2 29/42] ARM: PCI: Remove pci_fixup_irqs() call for
+ bios32 host controllers
+In-Reply-To: <20170701140629.GC8977@red-moon>
+References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+ <20170608141342.2018-30-lorenzo.pieralisi@arm.com>
+ <20170701140629.GC8977@red-moon>
+Message-ID: <20170702211950.GD18324@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 01, 2017 at 02:54:57PM +0100, Lorenzo Pieralisi wrote:
+On Sat, Jul 01, 2017 at 03:06:30PM +0100, Lorenzo Pieralisi wrote:
 > Hi Bjorn,
 > 
-> On Tue, Jun 27, 2017 at 06:11:43PM -0500, Bjorn Helgaas wrote:
-> > On Thu, Jun 22, 2017 at 10:38:55AM +0100, Lorenzo Pieralisi wrote:
-> > > On Wed, Jun 21, 2017 at 11:53:00PM +0200, Arnd Bergmann wrote:
-> > > > We used to pass the operations when calling pci_scan_root_bus, but
-> > > > that argument was removed:
-> > > > 
-> > > > arch/arm/mach-mv78xx0/pcie.c:175:23: error: 'pcie_ops' defined but not used [-Werror=unused-variable]
-> > > > 
-> > > > Setting it in pci_hw should address this.
-> > > 
-> > > No unfortunately it does not. The way I structured the code the
-> > > bridge set-up is carried out in the struct hw_pci.scan() callback and
-> > > for mv78xx0 it was not done properly.
-> > > 
-> > > As said in the other thread we need a pci_fixup_irqs() removal v3 to
-> > > address these issues, given that on some host bridges v2 it is still
-> > > untested.
-> > > 
-> > > Lorenzo
-> > > 
-> > > > Fixes: ace27646da8e ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
-> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > > ---
-> > > >  arch/arm/mach-mv78xx0/pcie.c | 1 +
-> > > >  1 file changed, 1 insertion(+)
-> > > > 
-> > > > diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-> > > > index 2b406e909a43..cb7f95c9d8eb 100644
-> > > > --- a/arch/arm/mach-mv78xx0/pcie.c
-> > > > +++ b/arch/arm/mach-mv78xx0/pcie.c
-> > > > @@ -214,6 +214,7 @@ static int __init mv78xx0_pcie_map_irq(const struct pci_dev *dev, u8 slot,
-> > > >  }
-> > > >  
-> > > >  static struct hw_pci mv78xx0_pci __initdata = {
-> > > > +	.ops		= &pcie_ops,
-> > > >  	.nr_controllers	= 8,
-> > > >  	.preinit	= mv78xx0_pcie_preinit,
-> > > >  	.setup		= mv78xx0_pcie_setup,
+> On Thu, Jun 08, 2017 at 03:13:29PM +0100, Lorenzo Pieralisi wrote:
+> > Legacy PCI host controllers (ie host controllers that set-up the PCI bus
+> > through the ARM pci_common_init() API) are currently relying on
+> > pci_fixup_irqs() to assign legacy PCI irqs to devices. This is not ideal
+> > in that pci_fixup_irqs() assign IRQs for all PCI devices present in a
+> > given system some of which may well be enabled by the time
+> > pci_fixup_irqs() is called (ie a system with multiple host controllers).
+> > With the introduction of struct pci_host_bridge.(*map_irq) pointer it is
+> > possible to assign IRQs for all devices originating from a PCI host
+> > bridge at probe time; this is implemented through pci_assign_irq() that
+> > relies on the struct pci_host_bridge.map_irq pointer to map IRQ for a
+> > given device.
 > > 
-> > I provisionally made the following change for mv78xx0, based on similar
-> > hunks for dove, iop13xx, and orion5x.
+> > The benefits this brings are twofold:
 > > 
-> > This is on my pci/enumeration branch:
+> > - the IRQ for a device is assigned once at probe time
+> > - the IRQ assignment works also for hotplugged devices
 > > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/commit/?h=pci/enumeration&id=31ddd0eab68e19cf3dfc14321c99ff0b95cda4ad
+> > Remove pci_fixup_irqs() call from bios32 code and rely on
+> > pci_assign_irq() to carry out the IRQ mapping at device probe
+> > time.
 > > 
-> > Please take a look and see if it makes sense.
+> > The map_irq() and swizzle_irq() struct pci_host_bridge callbacks are
+> > set-up in the struct pci_host_bridge created in the bios32
+> > pcibios_init_hw() function and mach-* code paths (for PCI mach
+> > implementations that require a specific struct hw_pci.(*scan) function
+> > callback).
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Russell King <linux@armlinux.org.uk>
+> > Cc: Andrew Lunn <andrew@lunn.ch>
+> > ---
+> >  arch/arm/kernel/bios32.c    |  4 ++--
+> >  arch/arm/mach-dove/pcie.c   | 18 ++++++++++--------
+> >  arch/arm/mach-iop13xx/pci.c |  2 ++
+> >  arch/arm/mach-orion5x/pci.c | 28 +++++++++++++++-------------
+> >  4 files changed, 29 insertions(+), 23 deletions(-)
 > 
-> It makes code compile but it is missing some initializations.
+> As I mentioned to you, this patch is incomplete and needs an upgrade
+> (ie I misread how Orion and the gazillions board file that go with
+> it to map irqs - apologies but it is very hard to untangle).
 > 
-> Patch below, to be folded in commit
+> I am inlining below an incremental patch to be folded in commit:
 > 
-> e592c4a52cb8 ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
+> feaec00e757a ("ARM/PCI: Remove pci_fixup_irqs() call for bios32 host
+> controllers")
 > 
-> in your pci/irq-fixups branch, I did that and recompiled (I can't test
-> this code) and everything seems fine.
+> in your pci/irq-fixups branch, or if you prefer I can send you the
+> resulting squashed-in patch to replace this one, as you prefer.
 
-Folded into pci/irq-fixups, thanks!
+Thanks, I folded this into pci/irq-fixups.  The resulting patch is
+merely this:
 
-> -- >8 --
-> diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-> index f793ebb..636d84b 100644
-> --- a/arch/arm/mach-mv78xx0/pcie.c
-> +++ b/arch/arm/mach-mv78xx0/pcie.c
-> @@ -196,12 +196,19 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, rc_pci_fixup);
->  
->  static int __init mv78xx0_pcie_scan_bus(int nr, struct pci_host_bridge *bridge)
->  {
-> +	struct pci_sys_data *sys = pci_host_bridge_priv(bridge);
-> +
->  	if (nr >= num_pcie_ports) {
->  		BUG();
->  		return -EINVAL;
->  	}
->  
-> +	list_splice_init(&sys->resources, &bridge->windows);
-> +	bridge->dev.parent = NULL;
-> +	bridge->sysdata = sys;
-> +	bridge->busnr = sys->busnr;
->  	bridge->ops = &pcie_ops;
-> +
->  	return pci_scan_root_bus_bridge(bridge);
->  }
->  
-> -- 
-> 2.10.0
-> 
+commit 16508469c0f3198a63923aaec08efa1c63f5fbcc
+Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Date:   Wed Jun 28 15:14:04 2017 -0500
+
+    ARM/PCI: Remove pci_fixup_irqs() call for bios32 host controllers
+    
+    Legacy PCI host controllers (ie host controllers that set-up the PCI bus
+    through the ARM pci_common_init() API) are currently relying on
+    pci_fixup_irqs() to assign legacy PCI irqs to devices.  This is not ideal
+    in that pci_fixup_irqs() assigns IRQs for all PCI devices present in a given
+    system some of which may well be enabled by the time pci_fixup_irqs() is
+    called (ie a system with multiple host controllers).  With the introduction
+    of struct pci_host_bridge.(*map_irq) pointer it is possible to assign IRQs
+    for all devices originating from a PCI host bridge at probe time; this is
+    implemented through pci_assign_irq() that relies on the struct
+    pci_host_bridge.map_irq pointer to map IRQ for a given device.
+    
+    The benefits this brings are twofold:
+    
+      - the IRQ for a device is assigned once at probe time
+      - the IRQ assignment works also for hotplugged devices
+    
+    Remove pci_fixup_irqs() call from bios32 code and rely on pci_assign_irq()
+    to carry out the IRQ mapping at device probe time.
+    
+    The map_irq() and swizzle_irq() struct pci_host_bridge callbacks are set-up
+    in the struct pci_host_bridge created in the bios32 pcibios_init_hw()
+    function and mach-* code paths (for PCI mach implementations that require a
+    specific struct hw_pci.(*scan) function callback).
+    
+    Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+    [bhelgaas: folded in fixes from Lorenzo:
+    http://lkml.kernel.org/r/20170701140629.GC8977 at red-moon]
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Cc: Jason Cooper <jason@lakedaemon.net>
+    Cc: Russell King <linux@armlinux.org.uk>
+    Cc: Andrew Lunn <andrew@lunn.ch>
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 4c7621ac389c..56dc1a3a33b4 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -484,6 +484,9 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 				break;
+ 			}
+ 
++			bridge->map_irq = pcibios_map_irq;
++			bridge->swizzle_irq = pcibios_swizzle;
++
+ 			if (hw->scan)
+ 				ret = hw->scan(nr, bridge);
+ 			else {
+@@ -530,8 +533,6 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+ 	if (hw->postinit)
+ 		hw->postinit();
+ 
+-	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
+-
+ 	list_for_each_entry(sys, &head, node) {
+ 		struct pci_bus *bus = sys->bus;
+ 
