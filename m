@@ -1,81 +1,103 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 2 Jul 2017 22:27:22 +0200
-Subject: [PATCH v4 16/28] tty: serial: owl: Implement console driver
-In-Reply-To: <20170606143407.56d15c3c@lxorguk.ukuu.org.uk>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-17-afaerber@suse.de>
- <20170606143407.56d15c3c@lxorguk.ukuu.org.uk>
-Message-ID: <d3c107f3-5df6-a771-2510-ef5578216d0f@suse.de>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Sun, 2 Jul 2017 16:12:14 -0500
+Subject: [PATCH 2/4] ARM/PCI: mv78xx0: pass pci_ops correctly again
+In-Reply-To: <20170701135457.GB8977@red-moon>
+References: <20170621215323.3921382-1-arnd@arndb.de>
+ <20170621215323.3921382-2-arnd@arndb.de>
+ <20170622093855.GA23310@red-moon>
+ <20170627231143.GI17844@bhelgaas-glaptop.roam.corp.google.com>
+ <20170701135457.GB8977@red-moon>
+Message-ID: <20170702211214.GC18324@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.06.2017 um 15:34 schrieb Alan Cox:
->> +static void owl_uart_set_termios(struct uart_port *port,
->> +				 struct ktermios *termios,
->> +				 struct ktermios *old)
->> +{
->> +	struct owl_uart_port *owl_port = to_owl_uart_port(port);
->> +	unsigned int baud;
->> +	u32 ctl;
->> +	unsigned long flags;
->> +
->> +	spin_lock_irqsave(&port->lock, flags);
->> +
->> +	/* We don't support modem control lines. */
->> +	termios->c_cflag &= ~(HUPCL | CMSPAR);
->> +	termios->c_cflag |= CLOCAL;
+On Sat, Jul 01, 2017 at 02:54:57PM +0100, Lorenzo Pieralisi wrote:
+> Hi Bjorn,
 > 
-> CLOCAL and HUPCL are software not hardware properties so are probably
-> best not forced (it'll confuse some apps if you do)
->> +
->> +	/* We don't support BREAK character recognition. */
->> +	termios->c_iflag &= ~(IGNBRK | BRKINT);
+> On Tue, Jun 27, 2017 at 06:11:43PM -0500, Bjorn Helgaas wrote:
+> > On Thu, Jun 22, 2017 at 10:38:55AM +0100, Lorenzo Pieralisi wrote:
+> > > On Wed, Jun 21, 2017 at 11:53:00PM +0200, Arnd Bergmann wrote:
+> > > > We used to pass the operations when calling pci_scan_root_bus, but
+> > > > that argument was removed:
+> > > > 
+> > > > arch/arm/mach-mv78xx0/pcie.c:175:23: error: 'pcie_ops' defined but not used [-Werror=unused-variable]
+> > > > 
+> > > > Setting it in pci_hw should address this.
+> > > 
+> > > No unfortunately it does not. The way I structured the code the
+> > > bridge set-up is carried out in the struct hw_pci.scan() callback and
+> > > for mv78xx0 it was not done properly.
+> > > 
+> > > As said in the other thread we need a pci_fixup_irqs() removal v3 to
+> > > address these issues, given that on some host bridges v2 it is still
+> > > untested.
+> > > 
+> > > Lorenzo
+> > > 
+> > > > Fixes: ace27646da8e ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
+> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > > ---
+> > > >  arch/arm/mach-mv78xx0/pcie.c | 1 +
+> > > >  1 file changed, 1 insertion(+)
+> > > > 
+> > > > diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
+> > > > index 2b406e909a43..cb7f95c9d8eb 100644
+> > > > --- a/arch/arm/mach-mv78xx0/pcie.c
+> > > > +++ b/arch/arm/mach-mv78xx0/pcie.c
+> > > > @@ -214,6 +214,7 @@ static int __init mv78xx0_pcie_map_irq(const struct pci_dev *dev, u8 slot,
+> > > >  }
+> > > >  
+> > > >  static struct hw_pci mv78xx0_pci __initdata = {
+> > > > +	.ops		= &pcie_ops,
+> > > >  	.nr_controllers	= 8,
+> > > >  	.preinit	= mv78xx0_pcie_preinit,
+> > > >  	.setup		= mv78xx0_pcie_setup,
+> > 
+> > I provisionally made the following change for mv78xx0, based on similar
+> > hunks for dove, iop13xx, and orion5x.
+> > 
+> > This is on my pci/enumeration branch:
+> > 
+> > https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/commit/?h=pci/enumeration&id=31ddd0eab68e19cf3dfc14321c99ff0b95cda4ad
+> > 
+> > Please take a look and see if it makes sense.
 > 
-> Ditto these
-
-Fixed. These were obviously forward-ported from the vendor tree.
-
-https://github.com/LeMaker/linux-actions/blob/linux-3.10.y/arch/arm/mach-owl/serial-owl.c
-
-> You do clear CMSPAR which is right if not supported but then later on we
-> have:
+> It makes code compile but it is missing some initializations.
 > 
->> +	if (termios->c_cflag & PARENB) {
->> +		if (termios->c_cflag & CMSPAR) {
->> +			if (termios->c_cflag & PARODD)
->> +				ctl |= OWL_UART_CTL_PRS_MARK;
->> +			else
->> +				ctl |= OWL_UART_CTL_PRS_SPACE;
->> +		} else if (termios->c_cflag & PARODD)
->> +			ctl |= OWL_UART_CTL_PRS_ODD;
->> +		else
->> +			ctl |= OWL_UART_CTL_PRS_EVEN;
->> +	} else
->> +		ctl |= OWL_UART_CTL_PRS_NONE;
+> Patch below, to be folded in commit
 > 
+> e592c4a52cb8 ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
 > 
-> Which seems to indicate you do support CMSPAR so shouldn't be clearing it.
+> in your pci/irq-fixups branch, I did that and recompiled (I can't test
+> this code) and everything seems fine.
 
-Again that's what the original code was like.
+Folded into pci/irq-fixups, thanks!
 
-Since these register values do exist, I would rather not rip the code
-out, unless it's wrong. In my testing, not clearing CMSPAR works so far.
-
->> +	baud = uart_get_baud_rate(port, termios, old, 9600, 3200000);
->> +	owl_uart_change_baudrate(owl_port, baud);
+> -- >8 --
+> diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
+> index f793ebb..636d84b 100644
+> --- a/arch/arm/mach-mv78xx0/pcie.c
+> +++ b/arch/arm/mach-mv78xx0/pcie.c
+> @@ -196,12 +196,19 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, rc_pci_fixup);
+>  
+>  static int __init mv78xx0_pcie_scan_bus(int nr, struct pci_host_bridge *bridge)
+>  {
+> +	struct pci_sys_data *sys = pci_host_bridge_priv(bridge);
+> +
+>  	if (nr >= num_pcie_ports) {
+>  		BUG();
+>  		return -EINVAL;
+>  	}
+>  
+> +	list_splice_init(&sys->resources, &bridge->windows);
+> +	bridge->dev.parent = NULL;
+> +	bridge->sysdata = sys;
+> +	bridge->busnr = sys->busnr;
+>  	bridge->ops = &pcie_ops;
+> +
+>  	return pci_scan_root_bus_bridge(bridge);
+>  }
+>  
+> -- 
+> 2.10.0
 > 
-> You should re-encode the resulting baud rate into the termios
-> 
->         /* Don't rewrite B0 */
->         if (tty_termios_baud_rate(termios))
->                 tty_termios_encode_baud_rate(termios, baud, baud);
-
-Added, thanks.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
