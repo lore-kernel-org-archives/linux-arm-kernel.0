@@ -1,80 +1,40 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 2 Jul 2017 03:52:39 +0200
-Subject: [PATCH 4/6] dt-bindings: serial: Document RDA Micro UART
-In-Reply-To: <CAL_JsqLatRUwdA6GeWCHXFTHMUYY27pdmUpPEoHwCCFMg2F21Q@mail.gmail.com>
-References: <20170627005520.23731-1-afaerber@suse.de>
- <20170627005520.23731-5-afaerber@suse.de>
- <20170629201051.cfr37kh2gozompqo@rob-hp-laptop>
- <e8b8eb0c-0362-0cfb-4d18-3e1ab2b77412@suse.de>
- <CAL_JsqLatRUwdA6GeWCHXFTHMUYY27pdmUpPEoHwCCFMg2F21Q@mail.gmail.com>
-Message-ID: <d9b00fd8-2e9e-fb01-9056-db0d32b3e80b@suse.de>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sun, 2 Jul 2017 11:39:29 +0800
+Subject: [xlnx:master 560/710] ERROR: "dwc3_set_phydata"
+ [drivers/usb/dwc3/dwc3.ko] undefined!
+Message-ID: <201707021126.dZHx9N6N%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 30.06.2017 um 16:27 schrieb Rob Herring:
-> On Fri, Jun 30, 2017 at 6:12 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> Am 29.06.2017 um 22:10 schrieb Rob Herring:
->>> On Tue, Jun 27, 2017 at 02:55:18AM +0200, Andreas F?rber wrote:
->>>> Add an initial binding for the RDA8810PL UART.
->>>>
->>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>>> ---
->>>>  Documentation/devicetree/bindings/serial/rda-uart.txt | 13 +++++++++++++
->>>>  1 file changed, 13 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/serial/rda-uart.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/serial/rda-uart.txt b/Documentation/devicetree/bindings/serial/rda-uart.txt
->>>> new file mode 100644
->>>> index 000000000000..6840a8aee035
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/serial/rda-uart.txt
->>>> @@ -0,0 +1,13 @@
->>>> +RDA Micro UART
->>>> +
->>>> +Required properties:
->>>> +- compatible :  "rda,8810pl-uart" for RDA8810PL
->>>> +- reg        :  Offset and length of the register set for the device.
->>>
->>> No clocks or interrupts?
->>
->> Not yet. I've only pieced together an earlycon driver so far, no full
->> serial driver. The .dtsi doesn't even have an interrupt-controller node
->> yet - wasn't clear to me whether this SoC even has a GIC and, if so,
->> where, from the downstream pre-DT code.
-> 
-> How far can you boot with no interrupts?
+Hi Anurag,
 
-That was described in the cover letter, as usual.
+FYI, the error/warning still remains.
 
-> DT bindings shouldn't unnecessarily evolve. Really, anything added
-> should be optional to maintain compatibility. Sometimes that's
-> unavoidable, but this isn't one of those cases.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   ae4bbf82f4b9fdfc85b3fd112696e8bbefff07f2
+commit: 68e6869cfb8154b80ee9ffafd64932971e9d1d07 [560/710] dwc3: Add support for setting USB control registers as phy platform data
+config: arm-omap2plus_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 68e6869cfb8154b80ee9ffafd64932971e9d1d07
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Makes sense. Maybe this series should've been marked RFC. It's too late
-for 4.13 anyway, so there's lots of time left to extend the bindings.
+All errors (new ones prefixed by >>):
 
-BTW I saw that Kevin was adding a disclaimer to the Amlogic bindings
-that they are not stable. Is that required here, too?
+>> ERROR: "dwc3_set_phydata" [drivers/usb/dwc3/dwc3.ko] undefined!
+   ERROR: "dwc3_enable_hw_coherency" [drivers/usb/dwc3/dwc3.ko] undefined!
+   ERROR: "of_add_property" [drivers/usb/dwc3/dwc3-of-simple.ko] undefined!
 
-> So submit this when
-> you have something more complete.
-
-Negative. I worked weeks and months towards perfect STM32 drivers, and
-despite showing it to ST and at a LinuxCon Japan, someone else sent less
-sophisticated patches (e.g., fixed-clocks) and took all the credit. Same
-with Turris Omnia. Therefore I am now submitting my new patches early,
-not just when everything is complete.
-
-It took weeks just to get any earlycon output on the 2G-IoT at all - not
-my serial driver or my DT was broken, but the vendor's U-Boot just
-wasn't passing the .dtb to the kernel properly, as it turned out. Now
-that we know how to boot a DT-based kernel and get serial output, it
-becomes much easier for me and potential contributors to add drivers.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 28524 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170702/c59f98bf/attachment-0001.gz>
