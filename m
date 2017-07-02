@@ -1,73 +1,42 @@
 From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Sun, 2 Jul 2017 21:59:12 +0000
-Subject: [PATCH 0/8] EDAC drivers for Armada XP L2 and DDR
+Date: Sun, 2 Jul 2017 22:02:05 +0000
+Subject: [PATCH 4/8] ARM: l2x0: add arm,ecc-enable property for aurora
 References: <20170630145106.29820-1-jlu@pengutronix.de>
-Message-ID: <d90e273237974dc69762cf630e9a43d7@svr-chch-ex1.atlnz.lc>
+ <20170630145106.29820-5-jlu@pengutronix.de>
+ <20170630150051.GZ4902@n2100.armlinux.org.uk>
+Message-ID: <dab7ef10fce7419e87f70145a960e287@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/17 02:51, Jan Luebbe wrote:
-> This series adds drivers for the L2 cache and DDR RAM ECC functionality as
-> found on the MV78230/MV78x60 SoCs. I've tested these changes with the MV78460
-> (on a custom board with a DDR3 ECC DIMM).
+On 01/07/17 03:01, Russell King - ARM Linux wrote:
+> On Fri, Jun 30, 2017 at 04:51:02PM +0200, Jan Luebbe wrote:
+>> From: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>>
+>> The aurora cache on the Marvell Armada-XP SoC supports ECC protection
+>> for the L2 data arrays. Add a "arm,ecc-enable" device tree property
+>> which can be used to enable this.
+>>
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>> [jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
+>> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+>> ---
+>>   Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
+>>   arch/arm/mm/cache-l2x0.c                         | 7 +++++++
+>>   2 files changed, 9 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> index d9650c1788f4..6316e673307a 100644
+>> --- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> +++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+>> @@ -76,6 +76,8 @@ Optional properties:
+>>     specified to indicate that such transforms are precluded.
+>>   - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+>>   - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
+>> +- arm,ecc-enable : enable ECC protection on the L2 cache
+>> +- arm,ecc-disable : disable ECC protection on the L2 cache
 > 
-> Also contained in this series are an additional debugfs wrapper and devm_
-> helpers for edac_mc_/edac_device_ allocation and registration, which make error
-> handing and cleanup simpler.
+> Why should this be prefixed by a vendor of "arm" ?
 > 
-> Compared to the previous RFC series, the following changes have been made:
-> - Integrated Chris' patches for parity and ECC configuration via DT
-> - Merged the DDR RAM and L2 cache drivers (as requested by Borislav, analogous
->    to fsl_ddr_edac.c and mpc85xx_edac.c)
-> - Added myself to MAINTAINERS (requested by Borislav)
-> - L2 cache: Track the msg size and use snprintf (review comment by Chris)
-> - L2 cache: Split error injection from the check function (review comment by
->    Chris)
-> - DDR RAM: Allow 16 bit width in addition to 32 and 64 bit (review comment by
->    Chris)
-> - Use of_match_ptr() (review comments by Chris)
-> - Minor checkpatch cleanups
-> 
-> Chris: To actually make use of this with 16 bit width, you'd need to add a new
-> DT compatible, which could be done in a follow up patch. Is your SoC considered
-> a armada-xp variant?
 
-By Marvell's marketing department yes. The truth is a little murkier, 
-I'd say the Armada-XP and Armada-XP-98dx3236 share a common ancestor. 
-For the SDRAM controller saying it's a variant with a 16-bit bus is 
-appropriate.
-
-> 
-> Chris Packham (2):
->    ARM: l2x0: support parity-enable/disable on aurora
->    ARM: l2x0: add arm,ecc-enable property for aurora
-> 
-> Jan Luebbe (6):
->    ARM: l2c: move cache-aurora-l2.h to asm/hardware
->    ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
->    EDAC: Add missing debugfs_create_x32 wrapper
->    EDAC: Add devres helpers for
->      edac_mc_alloc/edac_mc_add_mc(_with_groups)
->    EDAC: Add devres helpers for
->      edac_device_alloc_ctl_info/edac_device_add_device
->    EDAC: Add driver for the Marvell Armada XP SDRAM and L2 cache ECC
-> 
->   Documentation/devicetree/bindings/arm/l2c2x0.txt |   2 +
->   MAINTAINERS                                      |   6 +
->   arch/arm/include/asm/hardware/cache-aurora-l2.h  | 103 ++++
->   arch/arm/mm/cache-aurora-l2.h                    |  55 --
->   arch/arm/mm/cache-l2x0.c                         |  20 +-
->   drivers/edac/Kconfig                             |   7 +
->   drivers/edac/Makefile                            |   1 +
->   drivers/edac/armada_xp_edac.c                    | 639 +++++++++++++++++++++++
->   drivers/edac/debugfs.c                           |  11 +
->   drivers/edac/edac_device.c                       |  59 +++
->   drivers/edac/edac_device.h                       |  29 +
->   drivers/edac/edac_mc.c                           |  53 ++
->   drivers/edac/edac_mc.h                           |  26 +
->   drivers/edac/edac_module.h                       |   5 +
->   14 files changed, 958 insertions(+), 58 deletions(-)
->   create mode 100644 arch/arm/include/asm/hardware/cache-aurora-l2.h
->   delete mode 100644 arch/arm/mm/cache-aurora-l2.h
->   create mode 100644 drivers/edac/armada_xp_edac.c
-> 
+I was following the parity-enable example. But I'm guessing this should 
+either be "aurora" or "marvell" any preference?
