@@ -1,255 +1,562 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sun, 2 Jul 2017 11:25:50 +0530
-Subject: [PATCH 1/8] mailbox: introduce ARM SMC based mailbox
-In-Reply-To: <20170630095608.24943-2-andre.przywara@arm.com>
-References: <20170630095608.24943-1-andre.przywara@arm.com>
- <20170630095608.24943-2-andre.przywara@arm.com>
-Message-ID: <CABb+yY18Aye3wr2A9-+jemqc=VSRyUA+xzKGo9s0G4KCt1ovyA@mail.gmail.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Sun,  2 Jul 2017 17:27:10 +1000
+Subject: [PATCH v8] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+Message-ID: <20170702072710.29988-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 3:26 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> This mailbox driver implements a mailbox which signals transmitted data
-> via an ARM smc (secure monitor call) instruction. The mailbox receiver
-> is implemented in firmware and can synchronously return data when it
-> returns execution to the non-secure world again.
-> An asynchronous receive path is not implemented.
-> This allows the usage of a mailbox to trigger firmware actions on SoCs
-> which either don't have a separate management processor or on which such
-> a core is not available. A user of this mailbox could be the SCP
-> interface.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  drivers/mailbox/Kconfig           |   8 ++
->  drivers/mailbox/Makefile          |   2 +
->  drivers/mailbox/arm-smc-mailbox.c | 172 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 182 insertions(+)
->  create mode 100644 drivers/mailbox/arm-smc-mailbox.c
->
-> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-> index c5731e5..5664b7f 100644
-> --- a/drivers/mailbox/Kconfig
-> +++ b/drivers/mailbox/Kconfig
-> @@ -170,4 +170,12 @@ config BCM_FLEXRM_MBOX
->           Mailbox implementation of the Broadcom FlexRM ring manager,
->           which provides access to various offload engines on Broadcom
->           SoCs. Say Y here if you want to use the Broadcom FlexRM.
-> +
-> +config ARM_SMC_MBOX
-> +       tristate "Generic ARM smc mailbox"
-> +       depends on OF && HAVE_ARM_SMCCC
-> +       help
-> +         Generic mailbox driver which uses ARM smc calls to call into
-> +         firmware for triggering mailboxes.
-> +
->  endif
-> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-> index d54e412..8ec6869 100644
-> --- a/drivers/mailbox/Makefile
-> +++ b/drivers/mailbox/Makefile
-> @@ -35,3 +35,5 @@ obj-$(CONFIG_BCM_FLEXRM_MBOX) += bcm-flexrm-mailbox.o
->  obj-$(CONFIG_QCOM_APCS_IPC)    += qcom-apcs-ipc-mailbox.o
->
->  obj-$(CONFIG_TEGRA_HSP_MBOX)   += tegra-hsp.o
-> +
-> +obj-$(CONFIG_ARM_SMC_MBOX)     += arm-smc-mailbox.o
-> diff --git a/drivers/mailbox/arm-smc-mailbox.c b/drivers/mailbox/arm-smc-mailbox.c
-> new file mode 100644
-> index 0000000..578aed2
-> --- /dev/null
-> +++ b/drivers/mailbox/arm-smc-mailbox.c
-> @@ -0,0 +1,172 @@
-> +/*
-> + *  Copyright (C) 2016,2017 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This device provides a mechanism for emulating a mailbox by using
-> + * smc calls, allowing a "mailbox" consumer to sit in firmware running
-> + * on the same core.
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mailbox_controller.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/arm-smccc.h>
-> +
-Please have relook at what headers are really needed.
+The documentation for drm_do_get_edid in drivers/gpu/drm/drm_edid.c states:
+"As in the general case the DDC bus is accessible by the kernel at the I2C
+level, drivers must make all reasonable efforts to expose it as an I2C
+adapter and use drm_get_edid() instead of abusing this function."
 
-> +#define ARM_SMC_MBOX_SMC               (0 << 0)
-> +#define ARM_SMC_MBOX_HVC               (1 << 0)
-> +#define ARM_SMC_MBOX_METHOD_MASK       (1 << 0)
-> +
-Maybe have only
-   #define ARM_SMC_MBOX_HVC    BIT(0)
+Exposing the DDC bus as an I2C adapter is more beneficial as it can be used
+for purposes other than reading the EDID such as modifying the EDID or
+using the HDMI DDC pins as an I2C bus through the I2C dev interface from
+userspace (e.g. i2c-tools).
 
-> +struct arm_smc_chan_data {
-> +       u32 function_id;
-> +       u32 flags;
-> +};
-> +
-> +static int arm_smc_send_data(struct mbox_chan *link, void *data)
-> +{
-> +       struct arm_smc_chan_data *chan_data = link->con_priv;
-> +       u32 function_id = chan_data->function_id;
-> +       struct arm_smccc_res res;
-> +       u32 msg = *(u32 *)data;
-> +
-> +       if ((chan_data->flags & ARM_SMC_MBOX_METHOD_MASK) == ARM_SMC_MBOX_SMC)
-> +               arm_smccc_smc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
-> +       else
-> +               arm_smccc_hvc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
-> +
-       if (chan_data->flags & ARM_SMC_MBOX_HVC)
-               arm_smccc_hvc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
-       else
-               arm_smccc_smc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
+Implement this for A10s.
 
-is simpler.
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+---
+Changes for v8:
+ - Fix clock rate in comment being 100 MHz when it is actually 100 kHz
+ - Fix clearing of bits in interrupt status register as they are cleared by
+   writing 1 to the bit rather than 0
+ - Set FIFO RX/TX thresholds so interrupt status register can be used to
+   check if FIFO is ready instead of having to additionally check the FIFO
+   status register
+ - Remove unused linux/ktime.h include in sun4i_hdmi_i2c.c
+ - Reduce timeout for clearing FIFO from 100 ms to 2 ms
+ - Use BIT macro instead of GENMASK for SUN4I_HDMI_DDC_BYTE_COUNT_MAX to
+   make it clearer that the maximum is derived from the field bit width rather
+   than its position in the register
 
-> +       mbox_chan_received_data(link, (void *)res.a0);
-> +
-Or you can update the 'data' with value from 'a0' ?
+Changes for v7:
+ - Fix mixed declarations and code compiler warning for level variable
 
-> +       return 0;
-> +}
-> +
-> +static int arm_smc_startup(struct mbox_chan *link)
-> +{
-> +       return 0;
-> +}
-> +
-> +static void arm_smc_shutdown(struct mbox_chan *link)
-> +{
-> +}
-> +
-startup and shutdown can be omitted now.
+Changes for v6:
+ - Use fixed byte time of 100 us instead of dynamically calculating from DDC
+   clock that is set to a fixed 100 MHz rate anyway
+ - Change is_fifo_flag_unset to not read the status register as well to be
+   more consistent with is_err_status
 
-> +/* This mailbox is synchronous, so we are always done. */
-> +static bool arm_smc_last_tx_done(struct mbox_chan *link)
-> +{
-> +       return true;
-> +}
-> +
-> +static const struct mbox_chan_ops arm_smc_mbox_chan_ops = {
-> +       .send_data      = arm_smc_send_data,
-> +       .startup        = arm_smc_startup,
-> +       .shutdown       = arm_smc_shutdown,
-> +       .last_tx_done   = arm_smc_last_tx_done
-> +};
-> +
-> +static int arm_smc_mbox_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct mbox_controller *mbox;
-> +       struct arm_smc_chan_data *chan_data;
-> +       const char *method;
-> +       bool use_hvc = false;
-> +       int ret = 0, i;
-> +
-No need to initialise 'ret'
+Changes for v5:
+ - Use devm_kzalloc instead of devm_kmemdup and remove const struct i2c_adapter
+ - Rework to use readl_poll_timeout for checking FIFO status
 
-> +       ret = of_property_count_elems_of_size(dev->of_node, "arm,smc-func-ids",
-> +                                             sizeof(u32));
-> +       if (ret < 0)
-> +               return ret;
-> +
-> +       if (!of_property_read_string(dev->of_node, "method", &method)) {
-> +               if (!strcmp("hvc", method)) {
-> +                       use_hvc = true;
-> +               } else if (!strcmp("smc", method)) {
-> +                       use_hvc = false;
-> +               } else {
-> +                       dev_warn(dev, "invalid \"method\" property: %s\n",
-> +                                method);
-> +
-> +                       return -EINVAL;
-> +               }
-> +       }
-> +
-> +       mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
-> +       if (!mbox)
-> +               return -ENOMEM;
-> +
-> +       mbox->num_chans = ret;
-> +       mbox->chans = devm_kcalloc(dev, mbox->num_chans, sizeof(*mbox->chans),
-> +                                  GFP_KERNEL);
-> +       if (!mbox->chans)
-> +               return -ENOMEM;
-> +
-> +       chan_data = devm_kcalloc(dev, mbox->num_chans, sizeof(*chan_data),
-> +                                GFP_KERNEL);
-> +       if (!chan_data)
-> +               return -ENOMEM;
-> +
-> +       for (i = 0; i < mbox->num_chans; i++) {
-> +               u32 function_id;
-> +
-> +               ret = of_property_read_u32_index(dev->of_node,
-> +                                                "arm,smc-func-ids", i,
-> +                                                &function_id);
-> +               if (ret)
-> +                       return ret;
-> +
-> +               chan_data[i].function_id = function_id;
-> +               if (use_hvc)
-> +                       chan_data[i].flags |= ARM_SMC_MBOX_HVC;
-> +               mbox->chans[i].con_priv = &chan_data[i];
-> +       }
-> +
-> +       mbox->txdone_poll = true;
-> +       mbox->txdone_irq = false;
-> +       mbox->txpoll_period = 1;
-> +       mbox->ops = &arm_smc_mbox_chan_ops;
-> +       mbox->dev = dev;
-> +
-> +       ret = mbox_controller_register(mbox);
-> +       if (ret)
-> +               return ret;
-> +
-> +       platform_set_drvdata(pdev, mbox);
-> +       dev_info(dev, "ARM SMC mailbox enabled with %d chan%s.\n",
-> +                mbox->num_chans, mbox->num_chans == 1 ? "" : "s");
-> +
-> +       return ret;
-> +}
-> +
-> +static int arm_smc_mbox_remove(struct platform_device *pdev)
-> +{
-> +       struct mbox_controller *mbox = platform_get_drvdata(pdev);
-> +
-> +       mbox_controller_unregister(mbox);
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id arm_smc_mbox_of_match[] = {
-> +       { .compatible = "arm,smc-mbox", },
-> +       {},
-> +};
-> +MODULE_DEVICE_TABLE(of, arm_smc_mbox_of_match);
-> +
-> +static struct platform_driver arm_smc_mbox_driver = {
-> +       .driver = {
-> +               .name = "arm-smc-mbox",
-> +               .of_match_table = arm_smc_mbox_of_match,
-> +       },
-> +       .probe          = arm_smc_mbox_probe,
-> +       .remove         = arm_smc_mbox_remove,
-> +};
-> +module_platform_driver(arm_smc_mbox_driver);
-> +
-> +MODULE_AUTHOR("Andre Przywara <andre.przywara@arm.com>");
-> +MODULE_DESCRIPTION("Generic ARM smc mailbox driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.9.0
->
+Changes for v4:
+ - Carry over copyright from initial I2C code into sun4i_hdmi_i2c.c
+ - Clean up indentation in sun4i_hdmi.h
+ - Rename SUN4I_HDMI_DDC_MAX_TRANSFER_SIZE to SUN4I_HDMI_DDC_BYTE_COUNT_MAX
+   and group it under the SUN4I_HDMI_DDC_BYTE_COUNT_REG define, changing the
+   value to use the GENMASK macro to make it clear that it is derived from
+   the width of the field in the register
+ - Fix SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_UNDERFLOW typo which should be
+   SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW
+ - Remove redundant rewriting of SUN4I_HDMI_DDC_INT_STATUS_REG register
+ - Change struct i2c_adapter to be const by using devm_kmemdup on creation
+ - Return -ETIMEDOUT instead of -EIO if there is timeout while transferring an
+   I2C message
+ - Instead of waiting for 1-2 bytes to transfer, wait for the time it would
+   take for remaining bytes to transfer (limited by FIFO size)
+ - Add additional comments
+
+Changes for v3:
+ - Explain why drm_do_get_edid should be used and why it's better to expose it
+   as an I2C adapter in commit message
+ - Reorder bit defines in descending order for consistency
+ - Keep old unused macros instead of removing them
+ - The v2 algorithm split large transfers into 16 byte transfers but this may
+   cause a large single write to be treated as multiple writes causing data
+   corruption. The algorithm has been reworked to not split larger transfers
+   and make more use of the FIFO to avoid this.
+ - Moved the creation of the DDC clock from sun4i_hdmi_enc.c to
+   sun4i_hdmi_i2c.c
+ - Reformatted code
+ - Instead of masking bits that we don't want to check for errors, explicitly
+   check the error bits
+ - Clear error bits at start of transfer in case of error from previous transfer
+ - Poll for completion of FIFO clear after setting FIFO clear bit
+
+Changes for v2:
+ - Rebased against Maxime's sunxi-drm/for-next branch
+ - Fix up error paths in sun4i_hdmi_bind so that the I2C adapter is deleted if
+   any of the calls after the I2C adapter is created fails
+ - Remove unnecessary includes in sun4i_hdmi_i2c.c
+
+ drivers/gpu/drm/sun4i/Makefile         |   1 +
+ drivers/gpu/drm/sun4i/sun4i_hdmi.h     |  24 ++++
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 101 ++-------------
+ drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c | 220 +++++++++++++++++++++++++++++++++
+ 4 files changed, 256 insertions(+), 90 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index e29fd3a2ba9c..43c753cafc88 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -2,6 +2,7 @@ sun4i-drm-y += sun4i_drv.o
+ sun4i-drm-y += sun4i_framebuffer.o
+ 
+ sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
++sun4i-drm-hdmi-y += sun4i_hdmi_i2c.o
+ sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
+ sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+index 2f2f2ff1ea63..0957ff2076ac 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+@@ -96,6 +96,7 @@
+ #define SUN4I_HDMI_DDC_CTRL_ENABLE		BIT(31)
+ #define SUN4I_HDMI_DDC_CTRL_START_CMD		BIT(30)
+ #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK	BIT(8)
++#define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE	(1 << 8)
+ #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ	(0 << 8)
+ #define SUN4I_HDMI_DDC_CTRL_RESET		BIT(0)
+ 
+@@ -105,14 +106,34 @@
+ #define SUN4I_HDMI_DDC_ADDR_OFFSET(off)		(((off) & 0xff) << 8)
+ #define SUN4I_HDMI_DDC_ADDR_SLAVE(addr)		((addr) & 0xff)
+ 
++#define SUN4I_HDMI_DDC_INT_STATUS_REG		0x50c
++#define SUN4I_HDMI_DDC_INT_STATUS_ILLEGAL_FIFO_OPERATION	BIT(7)
++#define SUN4I_HDMI_DDC_INT_STATUS_DDC_RX_FIFO_UNDERFLOW		BIT(6)
++#define SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW		BIT(5)
++#define SUN4I_HDMI_DDC_INT_STATUS_FIFO_REQUEST			BIT(4)
++#define SUN4I_HDMI_DDC_INT_STATUS_ARBITRATION_ERROR		BIT(3)
++#define SUN4I_HDMI_DDC_INT_STATUS_ACK_ERROR			BIT(2)
++#define SUN4I_HDMI_DDC_INT_STATUS_BUS_ERROR			BIT(1)
++#define SUN4I_HDMI_DDC_INT_STATUS_TRANSFER_COMPLETE		BIT(0)
++
+ #define SUN4I_HDMI_DDC_FIFO_CTRL_REG	0x510
+ #define SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR		BIT(31)
++#define SUN4I_HDMI_DDC_FIFO_CTRL_RX_THRES(n)	(((n) & 0xf) << 4)
++#define SUN4I_HDMI_DDC_FIFO_CTRL_RX_THRES_MASK	GENMASK(7, 4)
++#define SUN4I_HDMI_DDC_FIFO_CTRL_RX_THRES_MAX	(BIT(4) - 1)
++#define SUN4I_HDMI_DDC_FIFO_CTRL_TX_THRES(n)	((n) & 0xf)
++#define SUN4I_HDMI_DDC_FIFO_CTRL_TX_THRES_MASK	GENMASK(3, 0)
++#define SUN4I_HDMI_DDC_FIFO_CTRL_TX_THRES_MAX	(BIT(4) - 1)
+ 
+ #define SUN4I_HDMI_DDC_FIFO_DATA_REG	0x518
++
+ #define SUN4I_HDMI_DDC_BYTE_COUNT_REG	0x51c
++#define SUN4I_HDMI_DDC_BYTE_COUNT_MAX		(BIT(10) - 1)
+ 
+ #define SUN4I_HDMI_DDC_CMD_REG		0x520
+ #define SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ	6
++#define SUN4I_HDMI_DDC_CMD_IMPLICIT_READ	5
++#define SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE	3
+ 
+ #define SUN4I_HDMI_DDC_CLK_REG		0x528
+ #define SUN4I_HDMI_DDC_CLK_M(m)			(((m) & 0x7) << 3)
+@@ -146,6 +167,8 @@ struct sun4i_hdmi {
+ 	struct clk		*ddc_clk;
+ 	struct clk		*tmds_clk;
+ 
++	struct i2c_adapter	*i2c;
++
+ 	struct sun4i_drv	*drv;
+ 
+ 	bool			hdmi_monitor;
+@@ -153,5 +176,6 @@ struct sun4i_hdmi {
+ 
+ int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
+ int sun4i_tmds_create(struct sun4i_hdmi *hdmi);
++int sun4i_hdmi_i2c_create(struct device *dev, struct sun4i_hdmi *hdmi);
+ 
+ #endif /* _SUN4I_HDMI_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+index d3398f6250ef..b74607feb35c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+@@ -29,8 +29,6 @@
+ #include "sun4i_hdmi.h"
+ #include "sun4i_tcon.h"
+ 
+-#define DDC_SEGMENT_ADDR	0x30
+-
+ static inline struct sun4i_hdmi *
+ drm_encoder_to_sun4i_hdmi(struct drm_encoder *encoder)
+ {
+@@ -184,93 +182,13 @@ static const struct drm_encoder_funcs sun4i_hdmi_funcs = {
+ 	.destroy	= drm_encoder_cleanup,
+ };
+ 
+-static int sun4i_hdmi_read_sub_block(struct sun4i_hdmi *hdmi,
+-				     unsigned int blk, unsigned int offset,
+-				     u8 *buf, unsigned int count)
+-{
+-	unsigned long reg;
+-	int i;
+-
+-	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+-	reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
+-	writel(reg | SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ,
+-	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+-
+-	writel(SUN4I_HDMI_DDC_ADDR_SEGMENT(offset >> 8) |
+-	       SUN4I_HDMI_DDC_ADDR_EDDC(DDC_SEGMENT_ADDR << 1) |
+-	       SUN4I_HDMI_DDC_ADDR_OFFSET(offset) |
+-	       SUN4I_HDMI_DDC_ADDR_SLAVE(DDC_ADDR),
+-	       hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
+-
+-	reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+-	writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
+-	       hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+-
+-	writel(count, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
+-	writel(SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ,
+-	       hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
+-
+-	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+-	writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
+-	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+-
+-	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
+-			       !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
+-			       100, 100000))
+-		return -EIO;
+-
+-	for (i = 0; i < count; i++)
+-		buf[i] = readb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG);
+-
+-	return 0;
+-}
+-
+-static int sun4i_hdmi_read_edid_block(void *data, u8 *buf, unsigned int blk,
+-				      size_t length)
+-{
+-	struct sun4i_hdmi *hdmi = data;
+-	int retry = 2, i;
+-
+-	do {
+-		for (i = 0; i < length; i += SUN4I_HDMI_DDC_FIFO_SIZE) {
+-			unsigned char offset = blk * EDID_LENGTH + i;
+-			unsigned int count = min((unsigned int)SUN4I_HDMI_DDC_FIFO_SIZE,
+-						 length - i);
+-			int ret;
+-
+-			ret = sun4i_hdmi_read_sub_block(hdmi, blk, offset,
+-							buf + i, count);
+-			if (ret)
+-				return ret;
+-		}
+-	} while (!drm_edid_block_valid(buf, blk, true, NULL) && (retry--));
+-
+-	return 0;
+-}
+-
+ static int sun4i_hdmi_get_modes(struct drm_connector *connector)
+ {
+ 	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
+-	unsigned long reg;
+ 	struct edid *edid;
+ 	int ret;
+ 
+-	/* Reset i2c controller */
+-	writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
+-	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+-	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
+-			       !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
+-			       100, 2000))
+-		return -EIO;
+-
+-	writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
+-	       SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
+-	       hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
+-
+-	clk_prepare_enable(hdmi->ddc_clk);
+-	clk_set_rate(hdmi->ddc_clk, 100000);
+-
+-	edid = drm_do_get_edid(connector, sun4i_hdmi_read_edid_block, hdmi);
++	edid = drm_get_edid(connector, hdmi->i2c);
+ 	if (!edid)
+ 		return 0;
+ 
+@@ -282,8 +200,6 @@ static int sun4i_hdmi_get_modes(struct drm_connector *connector)
+ 	ret = drm_add_edid_modes(connector, edid);
+ 	kfree(edid);
+ 
+-	clk_disable_unprepare(hdmi->ddc_clk);
+-
+ 	return ret;
+ }
+ 
+@@ -407,9 +323,9 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 		SUN4I_HDMI_PLL_CTRL_PLL_EN;
+ 	writel(reg, hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
+ 
+-	ret = sun4i_ddc_create(hdmi, hdmi->tmds_clk);
++	ret = sun4i_hdmi_i2c_create(dev, hdmi);
+ 	if (ret) {
+-		dev_err(dev, "Couldn't create the DDC clock\n");
++		dev_err(dev, "Couldn't create the HDMI I2C adapter\n");
+ 		return ret;
+ 	}
+ 
+@@ -422,13 +338,15 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 			       NULL);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't initialise the HDMI encoder\n");
+-		return ret;
++		goto err_del_i2c_adapter;
+ 	}
+ 
+ 	hdmi->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm,
+ 								  dev->of_node);
+-	if (!hdmi->encoder.possible_crtcs)
+-		return -EPROBE_DEFER;
++	if (!hdmi->encoder.possible_crtcs) {
++		ret = -EPROBE_DEFER;
++		goto err_del_i2c_adapter;
++	}
+ 
+ 	drm_connector_helper_add(&hdmi->connector,
+ 				 &sun4i_hdmi_connector_helper_funcs);
+@@ -451,6 +369,8 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 
+ err_cleanup_connector:
+ 	drm_encoder_cleanup(&hdmi->encoder);
++err_del_i2c_adapter:
++	i2c_del_adapter(hdmi->i2c);
+ 	return ret;
+ }
+ 
+@@ -461,6 +381,7 @@ static void sun4i_hdmi_unbind(struct device *dev, struct device *master,
+ 
+ 	drm_connector_cleanup(&hdmi->connector);
+ 	drm_encoder_cleanup(&hdmi->encoder);
++	i2c_del_adapter(hdmi->i2c);
+ }
+ 
+ static const struct component_ops sun4i_hdmi_ops = {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+new file mode 100644
+index 000000000000..2e42d09ab42e
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+@@ -0,0 +1,220 @@
++/*
++ * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
++ * Copyright (C) 2017 Jonathan Liu <net147@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#include <linux/clk.h>
++#include <linux/i2c.h>
++#include <linux/iopoll.h>
++
++#include "sun4i_hdmi.h"
++
++#define SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK ( \
++	SUN4I_HDMI_DDC_INT_STATUS_ILLEGAL_FIFO_OPERATION | \
++	SUN4I_HDMI_DDC_INT_STATUS_DDC_RX_FIFO_UNDERFLOW | \
++	SUN4I_HDMI_DDC_INT_STATUS_DDC_TX_FIFO_OVERFLOW | \
++	SUN4I_HDMI_DDC_INT_STATUS_ARBITRATION_ERROR | \
++	SUN4I_HDMI_DDC_INT_STATUS_ACK_ERROR | \
++	SUN4I_HDMI_DDC_INT_STATUS_BUS_ERROR \
++)
++
++/* FIFO request bit is set when FIFO level is above RX_THRESHOLD during read */
++#define RX_THRESHOLD SUN4I_HDMI_DDC_FIFO_CTRL_RX_THRES_MAX
++/* FIFO request bit is set when FIFO level is below TX_THRESHOLD during write */
++#define TX_THRESHOLD 1
++
++static int fifo_transfer(struct sun4i_hdmi *hdmi, u8 *buf, int len, bool read)
++{
++	/*
++	 * 1 byte takes 9 clock cycles (8 bits + 1 ACK) = 90 us for 100 kHz
++	 * clock. As clock rate is fixed, just round it up to 100 us.
++	 */
++	const unsigned long byte_time_ns = 100;
++	const u32 mask = SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK |
++			 SUN4I_HDMI_DDC_INT_STATUS_FIFO_REQUEST |
++			 SUN4I_HDMI_DDC_INT_STATUS_TRANSFER_COMPLETE;
++	u32 reg;
++
++	/* Limit transfer length by FIFO threshold */
++	len = min_t(int, len, read ? (RX_THRESHOLD + 1) :
++			      (SUN4I_HDMI_DDC_FIFO_SIZE - TX_THRESHOLD + 1));
++
++	/* Wait until error, FIFO request bit set or transfer complete */
++	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG, reg,
++			       reg & mask, len * byte_time_ns, 100000))
++		return -ETIMEDOUT;
++
++	if (reg & SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK)
++		return -EIO;
++
++	if (read)
++		readsb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
++	else
++		writesb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG, buf, len);
++
++	/* Clear FIFO request bit */
++	writel(SUN4I_HDMI_DDC_INT_STATUS_FIFO_REQUEST,
++	       hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
++
++	return len;
++}
++
++static int xfer_msg(struct sun4i_hdmi *hdmi, struct i2c_msg *msg)
++{
++	int i, len;
++	u32 reg;
++
++	/* Set FIFO direction */
++	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
++	reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
++	reg |= (msg->flags & I2C_M_RD) ?
++	       SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ :
++	       SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE;
++	writel(reg, hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
++
++	/* Set I2C address */
++	writel(SUN4I_HDMI_DDC_ADDR_SLAVE(msg->addr),
++	       hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
++
++	/* Set FIFO RX/TX thresholds and clear FIFO */
++	reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
++	reg |= SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR;
++	reg &= ~SUN4I_HDMI_DDC_FIFO_CTRL_RX_THRES_MASK;
++	reg |= SUN4I_HDMI_DDC_FIFO_CTRL_RX_THRES(RX_THRESHOLD);
++	reg &= ~SUN4I_HDMI_DDC_FIFO_CTRL_TX_THRES_MASK;
++	reg |= SUN4I_HDMI_DDC_FIFO_CTRL_TX_THRES(TX_THRESHOLD);
++	writel(reg, hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
++	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG,
++			       reg,
++			       !(reg & SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR),
++			       100, 2000))
++		return -EIO;
++
++	/* Set transfer length */
++	writel(msg->len, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
++
++	/* Set command */
++	writel(msg->flags & I2C_M_RD ?
++	       SUN4I_HDMI_DDC_CMD_IMPLICIT_READ :
++	       SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE,
++	       hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
++
++	/* Clear interrupt status bits */
++	writel(SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK |
++	       SUN4I_HDMI_DDC_INT_STATUS_FIFO_REQUEST |
++	       SUN4I_HDMI_DDC_INT_STATUS_TRANSFER_COMPLETE,
++	       hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
++
++	/* Start command */
++	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
++	writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
++	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
++
++	/* Transfer bytes */
++	for (i = 0; i < msg->len; i += len) {
++		len = fifo_transfer(hdmi, msg->buf + i, msg->len - i,
++				    msg->flags & I2C_M_RD);
++		if (len <= 0)
++			return len;
++	}
++
++	/* Wait for command to finish */
++	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG,
++			       reg,
++			       !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
++			       100, 100000))
++		return -EIO;
++
++	/* Check for errors */
++	reg = readl(hdmi->base + SUN4I_HDMI_DDC_INT_STATUS_REG);
++	if ((reg & SUN4I_HDMI_DDC_INT_STATUS_ERROR_MASK) ||
++	    !(reg & SUN4I_HDMI_DDC_INT_STATUS_TRANSFER_COMPLETE)) {
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static int sun4i_hdmi_i2c_xfer(struct i2c_adapter *adap,
++			       struct i2c_msg *msgs, int num)
++{
++	struct sun4i_hdmi *hdmi = i2c_get_adapdata(adap);
++	u32 reg;
++	int err, i, ret = num;
++
++	for (i = 0; i < num; i++) {
++		if (!msgs[i].len)
++			return -EINVAL;
++		if (msgs[i].len > SUN4I_HDMI_DDC_BYTE_COUNT_MAX)
++			return -EINVAL;
++	}
++
++	/* Reset I2C controller */
++	writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
++	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
++	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
++			       !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
++			       100, 2000))
++		return -EIO;
++
++	writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
++	       SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
++	       hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
++
++	clk_prepare_enable(hdmi->ddc_clk);
++	clk_set_rate(hdmi->ddc_clk, 100000);
++
++	for (i = 0; i < num; i++) {
++		err = xfer_msg(hdmi, &msgs[i]);
++		if (err) {
++			ret = err;
++			break;
++		}
++	}
++
++	clk_disable_unprepare(hdmi->ddc_clk);
++	return ret;
++}
++
++static u32 sun4i_hdmi_i2c_func(struct i2c_adapter *adap)
++{
++	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
++}
++
++static const struct i2c_algorithm sun4i_hdmi_i2c_algorithm = {
++	.master_xfer	= sun4i_hdmi_i2c_xfer,
++	.functionality	= sun4i_hdmi_i2c_func,
++};
++
++int sun4i_hdmi_i2c_create(struct device *dev, struct sun4i_hdmi *hdmi)
++{
++	struct i2c_adapter *adap;
++	int ret = 0;
++
++	ret = sun4i_ddc_create(hdmi, hdmi->tmds_clk);
++	if (ret)
++		return ret;
++
++	adap = devm_kzalloc(dev, sizeof(*adap), GFP_KERNEL);
++	if (!adap)
++		return -ENOMEM;
++
++	adap->owner = THIS_MODULE;
++	adap->class = I2C_CLASS_DDC;
++	adap->algo = &sun4i_hdmi_i2c_algorithm;
++	strlcpy(adap->name, "sun4i_hdmi_i2c adapter", sizeof(adap->name));
++	i2c_set_adapdata(adap, hdmi);
++
++	ret = i2c_add_adapter(adap);
++	if (ret)
++		return ret;
++
++	hdmi->i2c = adap;
++
++	return ret;
++}
+-- 
+2.13.1
