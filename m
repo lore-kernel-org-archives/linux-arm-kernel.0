@@ -1,37 +1,114 @@
 From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Sun,  2 Jul 2017 17:41:55 +0300
-Subject: [PATCH v3 13/28] crypto: adapt api sample to -EIOCBQUEUED as backlog
- indication
+Date: Sun,  2 Jul 2017 17:41:56 +0300
+Subject: [PATCH v3 14/28] crypto: introduce crypto wait for async op
 In-Reply-To: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
 References: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1499006535-19760-14-git-send-email-gilad@benyossef.com>
+Message-ID: <1499006535-19760-15-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace -EBUSY with -EIOCBQUEUED for backlog queueing indication
-as part of new API.
+Invoking a possibly async. crypto op and waiting for completion
+while correctly handling backlog processing is a common task
+in the crypto API implementation and outside users of it.
+
+This patch adds a generic implementation for doing so in
+preparation for using it across the board instead of hand
+rolled versions.
 
 Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+CC: Eric Biggers <ebiggers3@gmail.com>
 ---
+ crypto/api.c           | 13 +++++++++++++
+ include/linux/crypto.h | 40 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 53 insertions(+)
 
-This patch should be squashed with the first patch in the series
-when applied.
-
- Documentation/crypto/api-samples.rst | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/Documentation/crypto/api-samples.rst b/Documentation/crypto/api-samples.rst
-index 2531948..c6aa4ba 100644
---- a/Documentation/crypto/api-samples.rst
-+++ b/Documentation/crypto/api-samples.rst
-@@ -47,7 +47,7 @@ Code Example For Symmetric Key Cipher Operation
-         case 0:
-             break;
-         case -EINPROGRESS:
--        case -EBUSY:
-+        case -EIOCBQUEUED:
-             rc = wait_for_completion_interruptible(
-                 &sk->result.completion);
-             if (!rc && !sk->result.err) {
+diff --git a/crypto/api.c b/crypto/api.c
+index 941cd4c..2a2479d 100644
+--- a/crypto/api.c
++++ b/crypto/api.c
+@@ -24,6 +24,7 @@
+ #include <linux/sched/signal.h>
+ #include <linux/slab.h>
+ #include <linux/string.h>
++#include <linux/completion.h>
+ #include "internal.h"
+ 
+ LIST_HEAD(crypto_alg_list);
+@@ -595,5 +596,17 @@ int crypto_has_alg(const char *name, u32 type, u32 mask)
+ }
+ EXPORT_SYMBOL_GPL(crypto_has_alg);
+ 
++void crypto_req_done(struct crypto_async_request *req, int err)
++{
++	struct crypto_wait *wait = req->data;
++
++	if (err == -EINPROGRESS)
++		return;
++
++	wait->err = err;
++	complete(&wait->completion);
++}
++EXPORT_SYMBOL_GPL(crypto_req_done);
++
+ MODULE_DESCRIPTION("Cryptographic core API");
+ MODULE_LICENSE("GPL");
+diff --git a/include/linux/crypto.h b/include/linux/crypto.h
+index 84da997..47e884a 100644
+--- a/include/linux/crypto.h
++++ b/include/linux/crypto.h
+@@ -24,6 +24,7 @@
+ #include <linux/slab.h>
+ #include <linux/string.h>
+ #include <linux/uaccess.h>
++#include <linux/completion.h>
+ 
+ /*
+  * Autoloaded crypto modules should only use a prefixed name to avoid allowing
+@@ -468,6 +469,45 @@ struct crypto_alg {
+ } CRYPTO_MINALIGN_ATTR;
+ 
+ /*
++ * A helper struct for waiting for completion of async crypto ops
++ */
++struct crypto_wait {
++	struct completion completion;
++	int err;
++};
++
++/*
++ * Macro for declaring a crypto op async wait object on stack
++ */
++#define DECLARE_CRYPTO_WAIT(_wait) \
++	struct crypto_wait _wait = { \
++		COMPLETION_INITIALIZER_ONSTACK((_wait).completion), 0 }
++
++/*
++ * Async ops completion helper functioons
++ */
++void crypto_req_done(struct crypto_async_request *req, int err);
++
++static inline int crypto_wait_req(int err, struct crypto_wait *wait)
++{
++	switch (err) {
++	case -EINPROGRESS:
++	case -EIOCBQUEUED:
++		wait_for_completion(&wait->completion);
++		reinit_completion(&wait->completion);
++		err = wait->err;
++		break;
++	};
++
++	return err;
++}
++
++static inline void crypto_init_wait(struct crypto_wait *wait)
++{
++	init_completion(&wait->completion);
++}
++
++/*
+  * Algorithm registration interface.
+  */
+ int crypto_register_alg(struct crypto_alg *alg);
 -- 
 2.1.4
