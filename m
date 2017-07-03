@@ -1,42 +1,29 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Jul 2017 23:19:45 +0200
-Subject: [PATCH] iio: adc: sun4i-gpadc-iio: fix unbalanced irq
- enable/disable
-In-Reply-To: <20170703130926.32315-1-quentin.schulz@free-electrons.com>
-References: <20170703130926.32315-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170703211945.4vjnnjwl2lkcfr7u@flea>
+Date: Mon, 3 Jul 2017 23:29:43 +0200
+Subject: [PATCH] drm/sun4i : constify drm_plane_helper_funcs
+In-Reply-To: <bcf0c7481aa8bc4731ea3fc7e71815fbb7703681.1499097717.git.arvind.yadav.cs@gmail.com>
+References: <bcf0c7481aa8bc4731ea3fc7e71815fbb7703681.1499097717.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170703212943.g2i2c2x5w5jwva4c@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 03, 2017 at 03:09:26PM +0200, Quentin Schulz wrote:
-> When initializing interrupts, the devm_request_any_context_irq will
-> enable them right away. An atomic flag was set in sun4i_irq_init and read
-> in the interrupt handler to make sure no unwanted interrupts were
-> handled. If an unwanted interrupt occurred, the handler would disable
-> the irq and return IRQ_HANDLED. However, at the end of sun4i_irq_init,
-> the irq would be disabled as well, resulting in an unbalanced enable
-> (since there are more disables than enables, the code enabling the
-> interrupt would never be called).
+On Mon, Jul 03, 2017 at 09:35:20PM +0530, Arvind Yadav wrote:
+> drm_plane_helper_funcs are not supposed to change at runtime.
+> All functions working with drm_plane_helper_funcs provided by
+> <drm/drm_plane_helper.h> work with const drm_plane_helper_funcs.
+> So mark the non-const structs as const.
 > 
-> When reading the ADC or the temperature, the respective irq would be
-> enabled in the read function and disabled in the irq handler. In the
-> read function, we would wait for a completion (with a timeout) that will
-> be set in the irq handler. However, if the completion is never set or if
-> the wait for completion times out, the irq would not be disabled in the
-> read function resulting in an unbalanced enable once the read function
-> is called again (since there are 2+ enables for no disable).
+> File size before:
+>    text	   data	    bss	    dec	    hex	filename
+>     981	     40	      0	   1021	    3fd drivers/gpu/drm/sun4i/sun4i_layer.o
 > 
-> Moving disable_irq from the irq handler to the read function get rid of
-> these two cases of unbalanced enable.
+> File size After adding 'const':
+>    text	   data	    bss	    dec	    hex	filename
+>    1021	      0	      0	   1021	    3fd drivers/gpu/drm/sun4i/sun4i_layer.o
 > 
-> Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
-> 
-> Reported-by: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Thanks!
+Queued for 4.14, thanks!
 Maxime
 
 -- 
@@ -49,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170703/0ae0b230/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170703/0d3cc400/attachment.sig>
