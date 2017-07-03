@@ -1,38 +1,30 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 3 Jul 2017 09:54:04 +0100
-Subject: [PATCH 0/2] Follow-up on "ARM: Fix dma_alloc_coherent() and
- friends for NOMMU"
-In-Reply-To: <00015e40-416e-b87c-79ce-52dff5792aa6@arm.com>
-References: <1498641418-3554-1-git-send-email-vladimir.murzin@arm.com>
- <20170628135225.GA1268@lst.de> <00015e40-416e-b87c-79ce-52dff5792aa6@arm.com>
-Message-ID: <8ff752eb-4c69-103c-6c76-73432f75fff9@arm.com>
+From: ckeepax@opensource.cirrus.com (Charles Keepax)
+Date: Mon, 3 Jul 2017 09:58:17 +0100
+Subject: [PATCH v3 05/12] Input: wm97xx: split out touchscreen registering
+In-Reply-To: <20170630194408.24978-6-robert.jarzmik@free.fr>
+References: <20170630194408.24978-1-robert.jarzmik@free.fr>
+ <20170630194408.24978-6-robert.jarzmik@free.fr>
+Message-ID: <20170703085817.fajdhhgamngxfnwp@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/17 09:49, Vladimir Murzin wrote:
-> On 28/06/17 14:52, Christoph Hellwig wrote:
->> Thanks Vlad,
->>
->> these look fine to me.  I'll wait another day or two for comments
->> (especially if other nommu archs actually want this code), and
->> if nothing shows up will apply them.
->>
+On Fri, Jun 30, 2017 at 09:44:01PM +0200, Robert Jarzmik wrote:
+> wm97xx-core does several things in it initialization :
+>  - touchscreen input device setup
+>  - battery device creation
 > 
-> Gentle remainder to make sure this follow-up is not lost ;)
-
-I should have checked the dma-mapping repo first. I see it was applied two
-days ago..
-
-Thanks a lot!.. and sorry for the noise!
-
-Vladimir
-
+> As the wm97xx is actually a multi-function device handling an audio
+> codec, a touchscreen, a gpio block and an ADC, reshape the probing to
+> isolate what is truly input/touchscreen specific from the remaining
+> part.
 > 
-> Cheers
-> Vladimir
+> This is only code shuffling, there is no functional change.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> ---
+
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+
+Thanks,
+Charles
