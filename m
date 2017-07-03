@@ -1,65 +1,74 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon,  3 Jul 2017 15:09:26 +0200
-Subject: [PATCH] iio: adc: sun4i-gpadc-iio: fix unbalanced irq enable/disable
-Message-ID: <20170703130926.32315-1-quentin.schulz@free-electrons.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Mon, 3 Jul 2017 16:23:18 +0300
+Subject: [PATCH v3 01/28] crypto: change backlog return code to
+ -EIOCBQUEUED
+In-Reply-To: <20170703123515.GC30067@gondor.apana.org.au>
+References: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
+ <1499006535-19760-2-git-send-email-gilad@benyossef.com>
+ <20170703123515.GC30067@gondor.apana.org.au>
+Message-ID: <CAOtvUMdoMfrpZPuRfD_cQo4=FDp5Vn4uv51Vzc-0Gitmvr2V6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When initializing interrupts, the devm_request_any_context_irq will
-enable them right away. An atomic flag was set in sun4i_irq_init and read
-in the interrupt handler to make sure no unwanted interrupts were
-handled. If an unwanted interrupt occurred, the handler would disable
-the irq and return IRQ_HANDLED. However, at the end of sun4i_irq_init,
-the irq would be disabled as well, resulting in an unbalanced enable
-(since there are more disables than enables, the code enabling the
-interrupt would never be called).
+On Mon, Jul 3, 2017 at 3:35 PM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> On Sun, Jul 02, 2017 at 05:41:43PM +0300, Gilad Ben-Yossef wrote:
+>> The crypto API was using the -EBUSY return value to indicate
+>> both a hard failure to submit a crypto operation into a
+>> transformation provider when the latter was busy and the backlog
+>> mechanism was not enabled as well as a notification that the operation
+>> was queued into the backlog when the backlog mechanism was enabled.
+>>
+>> Having the same return code indicate two very different conditions
+>> depending on a flag is both error prone and requires extra runtime
+>> check like the following to discern between the cases:
+>>
+>>       if (err == -EINPROGRESS ||
+>>           (err == -EBUSY && (ahash_request_flags(req) &
+>>                              CRYPTO_TFM_REQ_MAY_BACKLOG)))
+>>
+>> This patch changes the return code used to indicate a crypto op
+>> was queued in the backlog to -EIOCBQUEUED, thus resolving both
+>> issues.
+>>
+>> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+>
+> So you're changing the success case from EBUSY to EIOCBQUEUED.
+> This results in a lot of churn as you have to change every single
+> driver and caller.
+>
+> How about changing the error case to use something other than
+> EBUSY instead?
 
-When reading the ADC or the temperature, the respective irq would be
-enabled in the read function and disabled in the irq handler. In the
-read function, we would wait for a completion (with a timeout) that will
-be set in the irq handler. However, if the completion is never set or if
-the wait for completion times out, the irq would not be disabled in the
-read function resulting in an unbalanced enable once the read function
-is called again (since there are 2+ enables for no disable).
+That was indeed my first thought - I wanted to change EBUSY to EAGAIN.
+It might even be a more descriptive error message since the failure is
+transient.
 
-Moving disable_irq from the irq handler to the read function get rid of
-these two cases of unbalanced enable.
+What stopped me was that I saw the algif interface passes this EBUSY value
+to user space. I don't know of any software that depends on this value but
+I'm really averse to changing user space API.
 
-Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
+Of course, we can just plant a (ret != AGAIN : ? EBUSY) in the algif interface
+return to user space code path but that felt like a kludge to me.
 
-Reported-by: Andreas F?rber <afaerber@suse.de>
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
- drivers/iio/adc/sun4i-gpadc-iio.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+And it doesn't really save any churn, I think - I'd still have to
+visit all the places that
+use the flags value to distinguish between the two EBUSY use cases and  I need
+to visit most places that check for EBUSY as backlog indication because I'm
+replacing the check with the generic replacement, so it doesn't look
+like in the end
+it will be a smaller change.
 
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index 81d4c39e414a..137f577d9432 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -256,6 +256,7 @@ static int sun4i_gpadc_read(struct iio_dev *indio_dev, int channel, int *val,
- 
- err:
- 	pm_runtime_put_autosuspend(indio_dev->dev.parent);
-+	disable_irq(irq);
- 	mutex_unlock(&info->mutex);
- 
- 	return ret;
-@@ -365,7 +366,6 @@ static irqreturn_t sun4i_gpadc_temp_data_irq_handler(int irq, void *dev_id)
- 		complete(&info->completion);
- 
- out:
--	disable_irq_nosync(info->temp_data_irq);
- 	return IRQ_HANDLED;
- }
- 
-@@ -380,7 +380,6 @@ static irqreturn_t sun4i_gpadc_fifo_data_irq_handler(int irq, void *dev_id)
- 		complete(&info->completion);
- 
- out:
--	disable_irq_nosync(info->fifo_data_irq);
- 	return IRQ_HANDLED;
- }
- 
+Having said that, if you prefer me to replace the error case I'd
+happily do that.
+
+Thanks,
+Gilad
+
+
 -- 
-2.11.0
+Gilad Ben-Yossef
+Chief Coffee Drinker
+
+"If you take a class in large-scale robotics, can you end up in a
+situation where the homework eats your dog?"
+ -- Jean-Baptiste Queru
