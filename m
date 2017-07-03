@@ -1,57 +1,118 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 3 Jul 2017 09:24:59 -0500
-Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-In-Reply-To: <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
-References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
- <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
- <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
- <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
-Message-ID: <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Jul 2017 15:25:17 +0100
+Subject: [PATCH 2/3] clk: WARN_ON about to disable a critical clock
+In-Reply-To: <c5f6efac-df9f-10d5-1e74-5b8743214b44@de.bosch.com>
+References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
+ <1453127331-20616-3-git-send-email-lee.jones@linaro.org>
+ <20160211004327.26445.27416@quark.deferred.io>
+ <d83d608a-246f-7b18-20d1-10a2060395e1@de.bosch.com>
+ <20170703115324.5re2d32bd3slutcb@dell>
+ <c5f6efac-df9f-10d5-1e74-5b8743214b44@de.bosch.com>
+Message-ID: <20170703142517.tyojzmzofvyiicsn@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Mon, 03 Jul 2017, Dirk Behme wrote:
 
-On 06/30/2017 03:51 AM, Marc Zyngier wrote:
-> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
->> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
->> <gpkulkarni@gmail.com> wrote:
->>> Hi Shanker,
->>>
->>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
->>> <shankerd@codeaurora.org> wrote:
->>>> The NUMA node information is visible to ITS driver but not being used
->>>> other than handling errata. This patch allocates the memory for ITS
->>>> tables from the corresponding NUMA node using the appropriate NUMA
->>>> aware functions.
->>
->> IMHO, the description would have been more constructive?
->>
->> "All ITS tables are mapped by default to NODE 0 memory.
->> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
->> This will optimize tables access and avoids unnecessary inter-node traffic."
+> On 03.07.2017 13:53, Lee Jones wrote:
+> > On Tue, 27 Jun 2017, Dirk Behme wrote:
+> > 
+> > > On 11.02.2016 01:43, Michael Turquette wrote:
+> > > > Quoting Lee Jones (2016-01-18 06:28:50)
+> > > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > > 
+> > > > Looks good to me.
+> > > > 
+> > > > Regards,
+> > > > Mike
+> > > > 
+> > > > > ---
+> > > > >    drivers/clk/clk.c | 6 ++++++
+> > > > >    1 file changed, 6 insertions(+)
+> > > > > 
+> > > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > > > index 835cb85..178b364 100644
+> > > > > --- a/drivers/clk/clk.c
+> > > > > +++ b/drivers/clk/clk.c
+> > > > > @@ -575,6 +575,9 @@ static void clk_core_unprepare(struct clk_core *core)
+> > > > >           if (WARN_ON(core->prepare_count == 0))
+> > > > >                   return;
+> > > > > +       if (WARN_ON(core->prepare_count == 1 && core->flags & CLK_IS_CRITICAL))
+> > > > > +               return;
+> > > > > +
+> > > > >           if (--core->prepare_count > 0)
+> > > > >                   return;
+> > > > > @@ -680,6 +683,9 @@ static void clk_core_disable(struct clk_core *core)
+> > > > >           if (WARN_ON(core->enable_count == 0))
+> > > > >                   return;
+> > > > > +       if (WARN_ON(core->enable_count == 1 && core->flags & CLK_IS_CRITICAL))
+> > > > > +               return;
+> > > > > +
+> > > > >           if (--core->enable_count > 0)
+> > > > >                   return;
+> > > 
+> > > 
+> > > I have a question regarding this patch, which is mainline meanwhile [1]:
+> > > 
+> > > Having the following clock configuration:
+> > > 
+> > >                                          |--> child clk '1' (crit)
+> > > clk source --> parent clk 'A' (crit) -->|
+> > >                                          |--> child clk '2'
+> > > 
+> > > 
+> > > Clock '2' might be used, or not. It might be disabled or not. It doesn't
+> > > matter. Clock '1' is not allowed to be disabled. Therefore its marked as
+> > > critical.
+> > > 
+> > > Parent clock 'A' is marked as critical because its not allowed to be
+> > > disabled, even if the enable_count of all child clocks is 0. To avoid that
+> > > by disabling parent clock 'A' the child clock '1' is disabled, too, whats
+> > > not allowed as its marked as critical.
+> > > 
+> > > 
+> > > Now, child clock '2' is used and enabled & disabled continuously by a (SPI)
+> > > driver. What is ok. But:
+> > > 
+> > > Disabling child clock '2' results in the attempt to disable parent clock
+> > > 'A', too, which has correct enable_count 1 (from enabling the child '2').
+> > > What results
+> > > 
+> > > a) in the WARN_ON output
+> > > 
+> > > and
+> > > 
+> > > b) enable_count of 'A' never decreases to 0. Being off by one after the
+> > > WARN_ON
+> > > 
+> > > 
+> > > It sounds like both is wrong for a configuration like above.
+> > 
+> > Clock A still has one user, Clock 1.
+> > 
+> > Why is that wrong?
 > 
-> But more importantly, I'd like to see figures showing the actual benefit
-> of this per-node allocation. Given that both of you guys have access to
-> such platforms, please show me the numbers!
 > 
+> Because clock 1 is not a (Linux kernel clock framework) used clock. Its
+> enable count is 0. So from Linux kernel (clock framework) point of view
+> clock 1 is unused.
 
-I'll share the actual results which shows the improvement whenever 
-available on our next chips. Current version of Qualcomm qdf2400 doesn't 
-support multi socket configuration to capture results and share with you. 
+All critical clocks are 'used'.  That's the point of critical clocks.
 
-Do you see any other issues with this patch apart from the performance 
-improvements. I strongly believe this brings the noticeable improvement 
-in numbers on systems where it has multi node memory/CPU configuration.
-
-
-> Thanks,
+> The increase/decrease of enable count of parent clock A is only driven by
+> the Linux kernel usage of clock 2.
 > 
-> 	M.
-> 
+> > > Opinions or proposal how to fix/change this?
+> > > 
+> > > 
+> > > Best regards
+> > > 
+> > > Dirk
+> > > 
+> > > [1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/clk.c?id=2e20fbf592621b2c2aeddd82e0fa3dad053cce03
 
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
