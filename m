@@ -1,67 +1,92 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 3 Jul 2017 15:58:34 +0200
-Subject: [PATCH 1/6] clk: at91: clk-generated: remove useless divisor loop
-In-Reply-To: <20170623090059.8371-2-quentin.schulz@free-electrons.com>
+Date: Mon, 3 Jul 2017 16:01:40 +0200
+Subject: [PATCH 2/6] clk: at91: add audio pll clock driver
+In-Reply-To: <20170623090059.8371-3-quentin.schulz@free-electrons.com>
 References: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
- <20170623090059.8371-2-quentin.schulz@free-electrons.com>
-Message-ID: <20170703155834.4de2a304@bbrezillon>
+ <20170623090059.8371-3-quentin.schulz@free-electrons.com>
+Message-ID: <20170703160140.6959bad8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Jun 2017 11:00:54 +0200
+On Fri, 23 Jun 2017 11:00:55 +0200
 Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
 
-> The driver requests the current clk rate of each of its parent clocks to
-> decide whether a clock rate is suitable or not. It does not request
-> determine_rate from a parent clock which could request a rate change in
-> parent clock (i.e. there is no parent rate propagation).
+> From: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
-> We know the rate we want (passed along req argument of the function) and
-> the parent clock rate, thus we know the closest rounded divisor, we
-> don't need to iterate over the available divisors to find the best one
-> for a given clock.
+> This new clock driver set allows to have a fractional divided clock that
+> would generate a precise clock particularly suitable for audio
+> applications.
 > 
+> The main audio pll clock has two children clocks: one that is connected
+> to the PMC, the other that can directly drive a pad. As these two routes
+> have different enable bits and different dividers and divider formula,
+> they are handled by two different drivers. Each of them could modify the
+> rate of the main audio pll parent.
+> The main audio pll clock can output 620MHz to 700MHz.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
 > ---
->  drivers/clk/at91/clk-generated.c | 25 ++++++++++++-------------
->  1 file changed, 12 insertions(+), 13 deletions(-)
+>  .../devicetree/bindings/clock/at91-clock.txt       |  10 +
+
+As already mentioned by Alex, DT bindings should go in a separate patch
+
+>  arch/arm/mach-at91/Kconfig                         |   4 +
+>  drivers/clk/at91/Makefile                          |   2 +
+>  drivers/clk/at91/clk-audio-pll-pad.c               | 204 ++++++++++++++++++
+>  drivers/clk/at91/clk-audio-pll-pmc.c               | 175 +++++++++++++++
+>  drivers/clk/at91/clk-audio-pll.c                   | 237 +++++++++++++++++++++
+>  include/linux/clk/at91_pmc.h                       |  25 +++
+>  sound/soc/atmel/atmel-classd.c                     |  20 +-
+
+Same goes for the atmel-classd changes.
+
+>  8 files changed, 658 insertions(+), 19 deletions(-)
+>  create mode 100644 drivers/clk/at91/clk-audio-pll-pad.c
+>  create mode 100644 drivers/clk/at91/clk-audio-pll-pmc.c
+>  create mode 100644 drivers/clk/at91/clk-audio-pll.c
 > 
-> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-> index 07c8f701e51c..dab7002937e6 100644
-> --- a/drivers/clk/at91/clk-generated.c
-> +++ b/drivers/clk/at91/clk-generated.c
-> @@ -124,19 +124,18 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
->  		    (gck->range.max && min_rate > gck->range.max))
->  			continue;
->  
-> -		for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
-> -			tmp_rate = DIV_ROUND_CLOSEST(parent_rate, div);
-> -			tmp_diff = abs(req->rate - tmp_rate);
-> -
-> -			if (best_diff < 0 || best_diff > tmp_diff) {
-> -				best_rate = tmp_rate;
-> -				best_diff = tmp_diff;
-> -				req->best_parent_rate = parent_rate;
-> -				req->best_parent_hw = parent;
-> -			}
-> -
-> -			if (!best_diff || tmp_rate < req->rate)
-> -				break;
-> +		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
-> +		if (!div)
-> +			tmp_rate = parent_rate;
-> +		else
-> +			tmp_rate = parent_rate / div;
-> +		tmp_diff = abs(req->rate - tmp_rate);
+
+[...]
+
+> diff --git a/drivers/clk/at91/clk-audio-pll-pmc.c b/drivers/clk/at91/clk-audio-pll-pmc.c
+> new file mode 100644
+> index 000000000000..208d0b59eb4e
+> --- /dev/null
+> +++ b/drivers/clk/at91/clk-audio-pll-pmc.c
+> @@ -0,0 +1,175 @@
+> +/*
+> + *  Copyright (C) 2016 Atmel Corporation,
+> + *                     Nicolas Ferre <nicolas.ferre@atmel.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk/at91_pmc.h>
+> +#include <linux/of.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
 > +
-> +		if (best_diff < 0 || best_diff > tmp_diff) {
-> +			best_rate = tmp_rate;
-> +			best_diff = tmp_diff;
-> +			req->best_parent_rate = parent_rate;
-> +			req->best_parent_hw = parent;
->  		}
->  
->  		if (!best_diff)
+> +#include "pmc.h"
+> +
+> +/*
+> + * DOC: PMC output for fractional PLL clock for audio
+> + *
+> + * Traits of this clock:
+> + * enable - clk_enable writes qdpmc, and enables PMC output
+> + * rate - rate is adjustable.
+> + *        clk->rate = parent->rate / (qdpmc + 1)
+> + * parent - fixed parent.  No clk_set_parent support
+> + */
+> +
+> +#define AUDIO_PLL_FOUT_MIN		620000000
+> +#define AUDIO_PLL_FOUT_MAX		700000000
+> +#define AUDIO_PLL_REFERENCE_FOUT	660000000
+
+These 3 macros are not unused, you can drop them.
