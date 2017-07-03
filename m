@@ -1,31 +1,28 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 3 Jul 2017 09:42:56 +0200
-Subject: ARM: sunxi: "Unbalanced enable for IRQ 0" warning on A20
-In-Reply-To: <20170701140634.GC4902@n2100.armlinux.org.uk>
-References: <aa19551d-c0dc-07c0-313a-d55dbda4d5ad@suse.de>
- <20170701140634.GC4902@n2100.armlinux.org.uk>
-Message-ID: <514bab9a-e414-7635-65e2-d2a604f7011a@free-electrons.com>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Mon,  3 Jul 2017 13:17:11 +0530
+Subject: [PATCH v3 0/2] IPQ4019 dts fixes
+Message-ID: <1499068033-24000-1-git-send-email-varada@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+v3:
+  * Fix commit subject for
+	dts: ipq4019: Move xo and timer nodes to SoC dtsi
 
-On 01/07/2017 16:06, Russell King - ARM Linux wrote:
-> On Sat, Jul 01, 2017 at 12:51:57PM +0200, Andreas F?rber wrote:
->> [   33.683928] thermal thermal_zone0: failed to read out thermal zone (-110)
->> [   33.690870] ------------[ cut here ]------------
->> [   33.690901] WARNING: CPU: 0 PID: 161 at ../kernel/irq/manage.c:529
->> __enable_irq+0x54/0x88
->> [   33.690905] Unbalanced enable for IRQ 0
-> 
-> Why do we have new platforms using IRQ number 0 ?  0 for modern platforms
-> is supposed to mean "no IRQ".
-> 
+v2:
+  * Incorporate Stephen Boyd's comment as a separate patch
+    (i.e. fix pinctrl node name)
 
-Thanks for reporting, I'll look into it.
+v1:
+  * Moved the xo and timer nodes to SoC dts file from board dts file.
 
-Quentin
+Varadarajan Narayanan (2):
+  dts: ipq4019: Fix pinctrl node name
+  dts: ipq4019: Move xo and timer nodes to SoC dtsi
+
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 21 +--------------------
+ arch/arm/boot/dts/qcom-ipq4019.dtsi           | 17 ++++++++++++++++-
+ 2 files changed, 17 insertions(+), 21 deletions(-)
+
 -- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
