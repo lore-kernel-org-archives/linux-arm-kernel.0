@@ -1,86 +1,227 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 03 Jul 2017 15:35:05 +0200
-Subject: [PATCH] ARM64: dts: marvell: armada37xx: Fix timer interrupt
- specifiers
-In-Reply-To: <871sqazxc3.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Fri, 23 Jun 2017 14:45:48 +0200")
-References: <20170621214508.7810-1-marc.zyngier@arm.com>
- <871sqazxc3.fsf@free-electrons.com>
-Message-ID: <877ezpve2e.fsf@free-electrons.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 3 Jul 2017 08:37:26 -0500
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+ <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+ <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+Message-ID: <88a2a78f-6a5b-1b80-5dcf-0821b9fd81d9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On ven., juin 23 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Hi Ganapatraoo,
 
-> Hi Marc,
->  
->  On mer., juin 21 2017, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
->> Contrary to popular belief, PPIs connected to a GICv3 to not have
->> an affinity field similar to that of GICv2. That is consistent
->> with the fact that GICv3 is designed to accomodate thousands of
->> CPUs, and fitting them as a bitmap in a byte is... difficult.
+On 06/29/2017 10:01 PM, Ganapatrao Kulkarni wrote:
+> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
+> <gpkulkarni@gmail.com> wrote:
+>> Hi Shanker,
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->
-> Applied on mvebu/fixes
+>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+>> <shankerd@codeaurora.org> wrote:
+>>> The NUMA node information is visible to ITS driver but not being used
+>>> other than handling errata. This patch allocates the memory for ITS
+>>> tables from the corresponding NUMA node using the appropriate NUMA
+>>> aware functions.
+> 
+> IMHO, the description would have been more constructive?
+> 
+> "All ITS tables are mapped by default to NODE 0 memory.
+> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
+> This will optimize tables access and avoids unnecessary inter-node traffic."
+> 
 
-As I missed the end of the merge window for 4.12, I've just moved this
-patch on mvebu/dt64 wit the hope that it can be applied on a late dt
-branch on arm-soc for 4.13.
+I don't understand why you are saying 'All ITS tables are mapped by default to NODE 0 memory'? Kernel runtime memory allocation comes from the corresponding NUMA node of the CPU that being called. 
 
-I also added the "Fixes" and "CC: stable" tags in order to propagate the
-fix on older kernel.
+Please explain if you don't agree on this.
 
-Gregory
-
->
->> ---
->>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 12 ++++--------
->>  1 file changed, 4 insertions(+), 8 deletions(-)
+>>>
+>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>>> ---
+>>>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
+>>>  1 file changed, 20 insertions(+), 16 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>> index fed99c5..e45add2 100644
+>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>> @@ -860,8 +860,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>         u64 val = its_read_baser(its, baser);
+>>>         u64 esz = GITS_BASER_ENTRY_SIZE(val);
+>>>         u64 type = GITS_BASER_TYPE(val);
+>>> +       struct page *page;
+>>>         u32 alloc_pages;
+>>> -       void *base;
+>>>         u64 tmp;
+>>>
+>>>  retry_alloc_baser:
+>>> @@ -874,12 +874,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>                 order = get_order(GITS_BASER_PAGES_MAX * psz);
+>>>         }
+>>>
+>>> -       base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+>>> -       if (!base)
+>>> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
 >>
->> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> index 4d495ec39202..bc179efb10ef 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> @@ -75,14 +75,10 @@
->>  
->>  	timer {
->>  		compatible = "arm,armv8-timer";
->> -		interrupts = <GIC_PPI 13
->> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
->> -			     <GIC_PPI 14
->> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
->> -			     <GIC_PPI 11
->> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
->> -			     <GIC_PPI 10
->> -			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
->> +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>,
->> +			     <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>,
->> +			     <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>,
->> +			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
->>  	};
->>  
->>  	soc {
->> -- 
->> 2.11.0
+>> the changes would have been minimal, if you converted page to base
+>> address after allocation here itself?
 >>
->
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
->
+>>  page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
+>>  base =  page_address(page);
+>>
+>>> +       if (!page)
+>>>                 return -ENOMEM;
+>>>
+>>>  retry_baser:
+>>> -       val = (virt_to_phys(base)                                |
+>>> +       val = (page_to_phys(page)
+>>
+>> no change required.
+>>
+>>>                 (type << GITS_BASER_TYPE_SHIFT)                  |
+>>>                 ((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)       |
+>>>                 ((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)    |
+>>> @@ -915,7 +915,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>                 shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+>>>                 if (!shr) {
+>>>                         cache = GITS_BASER_nC;
+>>> -                       gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
+>>> +                       gic_flush_dcache_to_poc(page_to_virt(page),
+>>> +                                               PAGE_ORDER_TO_SIZE(order));
+>>
+>> no change needed, if base is used still.
+>>>                 }
+>>>                 goto retry_baser;
+>>>         }
+>>> @@ -926,7 +927,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>                  * size and retry. If we reach 4K, then
+>>>                  * something is horribly wrong...
+>>>                  */
+>>> -               free_pages((unsigned long)base, order);
+>>> +               __free_pages(page, order);
+>>
+>> no change required.
+>>>                 baser->base = NULL;
+>>>
+>>>                 switch (psz) {
+>>> @@ -943,19 +944,19 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>                 pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
+>>>                        &its->phys_base, its_base_type_string[type],
+>>>                        val, tmp);
+>>> -               free_pages((unsigned long)base, order);
+>>> +               __free_pages(page, order);
+>>
+>> no change required.
+>>
+>>>                 return -ENXIO;
+>>>         }
+>>>
+>>>         baser->order = order;
+>>> -       baser->base = base;
+>>> +       baser->base = page_to_virt(page);
+>>
+>> no change required.
+>>>         baser->psz = psz;
+>>>         tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
+>>>
+>>>         pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
+>>>                 &its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
+>>>                 its_base_type_string[type],
+>>> -               (unsigned long)virt_to_phys(base),
+>>> +               (unsigned long)page_to_phys(page),
+>>
+>> no change required.
+>>>                 indirect ? "indirect" : "flat", (int)esz,
+>>>                 psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+>>>
+>>> @@ -1019,7 +1020,7 @@ static void its_free_tables(struct its_node *its)
+>>>
+>>>         for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+>>>                 if (its->tables[i].base) {
+>>> -                       free_pages((unsigned long)its->tables[i].base,
+>>> +                       __free_pages(virt_to_page(its->tables[i].base),
+>>
+>> ditto
+>>>                                    its->tables[i].order);
+>>>                         its->tables[i].base = NULL;
+>>>                 }
+>>> @@ -1286,7 +1287,8 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+>>>
+>>>         /* Allocate memory for 2nd level table */
+>>>         if (!table[idx]) {
+>>> -               page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
+>>> +               page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
+>>> +                                       get_order(baser->psz));
+>>>                 if (!page)
+>>>                         return false;
+>>>
+>>> @@ -1332,7 +1334,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>>         nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>>>         sz = nr_ites * its->ite_size;
+>>>         sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+>>> -       itt = kzalloc(sz, GFP_KERNEL);
+>>> +       itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
+>>>         lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+>>>         if (lpi_map)
+>>>                 col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+>>> @@ -1677,6 +1679,7 @@ static int __init its_probe_one(struct resource *res,
+>>>  {
+>>>         struct its_node *its;
+>>>         void __iomem *its_base;
+>>> +       struct page *page;
+>>>         u32 val;
+>>>         u64 baser, tmp;
+>>>         int err;
+>>> @@ -1716,12 +1719,13 @@ static int __init its_probe_one(struct resource *res,
+>>>         its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+>>>         its->numa_node = numa_node;
+>>>
+>>> -       its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+>>> -                                               get_order(ITS_CMD_QUEUE_SZ));
+>>> -       if (!its->cmd_base) {
+>>> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
+>>> +                               get_order(ITS_CMD_QUEUE_SZ));
+>>> +       if (!page) {
+>>>                 err = -ENOMEM;
+>>>                 goto out_free_its;
+>>>         }
+>>> +       its->cmd_base = page_to_virt(page);
+>>
+>> same here, this would have been,
+>> its->cmd_base = page_address(page);
+>>
+>>>         its->cmd_write = its->cmd_base;
+>>>
+>>>         its_enable_quirks(its);
+>>> @@ -1775,7 +1779,7 @@ static int __init its_probe_one(struct resource *res,
+>>>  out_free_tables:
+>>>         its_free_tables(its);
+>>>  out_free_cmd:
+>>> -       free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
+>>> +       __free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
+>>
+>> no change required.
+>>>  out_free_its:
+>>>         kfree(its);
+>>>  out_unmap:
+>>> --
+>>> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+>>> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>>>
+>>
+>> thanks
+>> Ganapat
+> 
+> thanks
+> Ganapat
+> 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
