@@ -1,66 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 3 Jul 2017 15:53:49 +0100
-Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-In-Reply-To: <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
-References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
- <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
- <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
- <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
- <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
-Message-ID: <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 3 Jul 2017 16:07:33 +0100
+Subject: [RFC 0/5] drivers: Add boot constraints core
+In-Reply-To: <20170703061552.GB3532@vireshk-i7>
+References: <CAGb2v64UabHPN79-zFzgxhsJwPF=fe_dM8jwnbxj_XR4LzsnwQ@mail.gmail.com>
+ <20170630035533.GV29665@vireshk-i7>
+ <CAGb2v67hxVciKFLD=8pgfm+UJ1i2Zb0aByTEa556O5uGcX7Oug@mail.gmail.com>
+ <20170630041211.GX29665@vireshk-i7>
+ <CAGb2v641UyXS5ccmo0j9Dvty8soB+DqwF2w8zKHsM78oK7b1aw@mail.gmail.com>
+ <20170630051203.GY29665@vireshk-i7>
+ <CAGb2v64CE2cUKgFuXd0f+FEdzQqmpOgMWqk76RndjeOz98=H0A@mail.gmail.com>
+ <20170630084330.GB29665@vireshk-i7>
+ <20170630121026.azppihjqls5i6bbr@sirena.org.uk>
+ <20170703061552.GB3532@vireshk-i7>
+Message-ID: <20170703150733.sop6yrrpfl3ne32g@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shanker,
+On Mon, Jul 03, 2017 at 11:45:52AM +0530, Viresh Kumar wrote:
+> On 30-06-17, 13:10, Mark Brown wrote:
+> > On Fri, Jun 30, 2017 at 02:13:30PM +0530, Viresh Kumar wrote:
+> > > On 30-06-17, 14:36, Chen-Yu Tsai wrote:
 
-On 03/07/17 15:24, Shanker Donthineni wrote:
-> Hi Marc,
-> 
-> On 06/30/2017 03:51 AM, Marc Zyngier wrote:
->> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
->>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
->>> <gpkulkarni@gmail.com> wrote:
->>>> Hi Shanker,
->>>>
->>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
->>>> <shankerd@codeaurora.org> wrote:
->>>>> The NUMA node information is visible to ITS driver but not being used
->>>>> other than handling errata. This patch allocates the memory for ITS
->>>>> tables from the corresponding NUMA node using the appropriate NUMA
->>>>> aware functions.
->>>
->>> IMHO, the description would have been more constructive?
->>>
->>> "All ITS tables are mapped by default to NODE 0 memory.
->>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
->>> This will optimize tables access and avoids unnecessary inter-node traffic."
->>
->> But more importantly, I'd like to see figures showing the actual benefit
->> of this per-node allocation. Given that both of you guys have access to
->> such platforms, please show me the numbers!
->>
-> 
-> I'll share the actual results which shows the improvement whenever 
-> available on our next chips. Current version of Qualcomm qdf2400 doesn't 
-> support multi socket configuration to capture results and share with you. 
-> 
-> Do you see any other issues with this patch apart from the performance 
-> improvements. I strongly believe this brings the noticeable improvement 
-> in numbers on systems where it has multi node memory/CPU configuration.
+> > > And so the DT node shall have this:
 
-I agree that it *could* show an improvement, but it very much depends on
-how often the ITS misses in its caches. For this kind of patches, I want
-to see two things:
+> > >         regulator-min-microvolt = <1800000>;
+> > >         regulator-max-microvolt = <3000000>;
 
-1) It brings a measurable benefit on NUMA platforms
-2) it doesn't adversely impact non-NUMA systems
+> > > Isn't it ?
 
-I can deal with (2), but I have no way of evaluating (1), mostly for the
-lack of an infrastructure exercising multiple ITSs at the same time.
+> > If the DMA can't tolerate more than 2.5V then why would the constraints
+> > allow the voltage to float that far?  Similarly on the low end?
 
-Thanks,
+> The above regulator-min/max-microvolt values I mentioned were for the regulator
+> device and not what the consumers would request. Yes, DMA will request something
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+If you're putting the maximum possible range that the physical regulator
+can supply into machine constraints then you really haven't understood
+what machine constraints are at all.
+
+> > Please remember that devices shouldn't be managing their voltages unless
+> > they are actively changing them at runtime, simply setting them at
+> > startup is the job of the constraints.  I would be very surprised to see
+> > a DMA controller doing anything like DVFS.
+
+> Sure, DMA would most likely set a constraint from probe. Maybe I could have used
+
+No, it really shouldn't.  Please read what I wrote.
+
+> MMC in the above example, which may actually do DVFS at runtime.
+
+Yes, MMC does vary voltage.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170703/deb26cc4/attachment-0001.sig>
