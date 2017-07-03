@@ -1,74 +1,67 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Mon, 3 Jul 2017 16:23:18 +0300
-Subject: [PATCH v3 01/28] crypto: change backlog return code to
- -EIOCBQUEUED
-In-Reply-To: <20170703123515.GC30067@gondor.apana.org.au>
-References: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
- <1499006535-19760-2-git-send-email-gilad@benyossef.com>
- <20170703123515.GC30067@gondor.apana.org.au>
-Message-ID: <CAOtvUMdoMfrpZPuRfD_cQo4=FDp5Vn4uv51Vzc-0Gitmvr2V6g@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 3 Jul 2017 08:27:04 -0500
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <CAKv+Gu_zAXTNYoWt+nMj_8tdDA8bcs86vepPJL1=zHfed2n-DA@mail.gmail.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_zAXTNYoWt+nMj_8tdDA8bcs86vepPJL1=zHfed2n-DA@mail.gmail.com>
+Message-ID: <20170703132704.GF13824@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 3, 2017 at 3:35 PM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Sun, Jul 02, 2017 at 05:41:43PM +0300, Gilad Ben-Yossef wrote:
->> The crypto API was using the -EBUSY return value to indicate
->> both a hard failure to submit a crypto operation into a
->> transformation provider when the latter was busy and the backlog
->> mechanism was not enabled as well as a notification that the operation
->> was queued into the backlog when the backlog mechanism was enabled.
->>
->> Having the same return code indicate two very different conditions
->> depending on a flag is both error prone and requires extra runtime
->> check like the following to discern between the cases:
->>
->>       if (err == -EINPROGRESS ||
->>           (err == -EBUSY && (ahash_request_flags(req) &
->>                              CRYPTO_TFM_REQ_MAY_BACKLOG)))
->>
->> This patch changes the return code used to indicate a crypto op
->> was queued in the backlog to -EIOCBQUEUED, thus resolving both
->> issues.
->>
->> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
->
-> So you're changing the success case from EBUSY to EIOCBQUEUED.
-> This results in a lot of churn as you have to change every single
-> driver and caller.
->
-> How about changing the error case to use something other than
-> EBUSY instead?
+[+cc Jingoo, Joao]
 
-That was indeed my first thought - I wanted to change EBUSY to EAGAIN.
-It might even be a more descriptive error message since the failure is
-transient.
+On Mon, Jul 03, 2017 at 10:35:50AM +0100, Ard Biesheuvel wrote:
+> On 3 July 2017 at 00:18, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:
+> >> This driver is required to work around several hardware bugs
+> >> in the PCIe controller.
+> >>
+> >> NB: Revision 1 does not support legacy interrupts, or IO space.
+> >
+> > I had to apply these manually because of conflicts in Kconfig and
+> > Makefile.  What are these based on?  Easiest for me is if you base
+> > them on the current -rc1 tag.
+> >
+> >> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> >> ---
+> >>  drivers/pci/host/Kconfig      |   8 +++
+> >>  drivers/pci/host/Makefile     |   1 +
+> >>  drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
+> >>  include/linux/pci_ids.h       |   2 +
+> >>  4 files changed, 175 insertions(+)
+> >>  create mode 100644 drivers/pci/host/pcie-tango.c
+> >>
+> [..]
+> >> +     /*
+> >> +      * QUIRK #2
+> >> +      * Unfortunately, config and mem spaces are muxed.
+> >> +      * Linux does not support such a setting, since drivers are free
+> >> +      * to access mem space directly, at any time.
+> >> +      * Therefore, we can only PRAY that config and mem space accesses
+> >> +      * NEVER occur concurrently.
+> >> +      */
+> >> +     writel_relaxed(1, pcie->mux);
+> >> +     ret = pci_generic_config_read(bus, devfn, where, size, val);
+> >> +     writel_relaxed(0, pcie->mux);
+> >
+> > I'm very hesitant about this.  When people stress this, we're going to
+> > get reports of data corruption.  Even with the disclaimer below, I
+> > don't feel good about this.  Adding the driver is an implicit claim
+> > that we support the device, but we know it can't be made reliable.
+> 
+> I noticed that the Synopsys driver suffers from a similar issue: in
+> dw_pcie_rd_other_conf(), it happily reprograms the outbound I/O window
+> to perform a config space access, and switches it back to I/O space
+> afterwards (unless it has more than 2 viewports, in which case it uses
+> dedicated windows for I/O space and config space)
 
-What stopped me was that I saw the algif interface passes this EBUSY value
-to user space. I don't know of any software that depends on this value but
-I'm really averse to changing user space API.
+That doesn't sound good.  Jingoo, Joao?  I remember some discussion
+about this, but not the details.
 
-Of course, we can just plant a (ret != AGAIN : ? EBUSY) in the algif interface
-return to user space code path but that felt like a kludge to me.
+I/O accesses use wrappers (inb(), etc), so there's at least the
+possibility of a mutex to serialize them with respect to config
+accesses.
 
-And it doesn't really save any churn, I think - I'd still have to
-visit all the places that
-use the flags value to distinguish between the two EBUSY use cases and  I need
-to visit most places that check for EBUSY as backlog indication because I'm
-replacing the check with the generic replacement, so it doesn't look
-like in the end
-it will be a smaller change.
-
-Having said that, if you prefer me to replace the error case I'd
-happily do that.
-
-Thanks,
-Gilad
-
-
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
-
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+Bjorn
