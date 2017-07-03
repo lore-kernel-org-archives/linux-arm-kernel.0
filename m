@@ -1,83 +1,167 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 3 Jul 2017 09:40:21 +0200
-Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
- cpg-mssr: Add interface for critical core clocks)
-In-Reply-To: <20170702092336.uxwl23kyd4koxclj@pengutronix.de>
-References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
- <CAL_JsqKGrZeR7z80beY_XEjqd5fEQQwPxusJ1FADoALgNE3fEg@mail.gmail.com>
- <20170630202453.eh6vaehkap3as4np@pengutronix.de>
- <8d86a9aa-1928-6b52-1487-d5fb9dae17f4@gmail.com>
- <20170701181408.yuocymwtj5dgt74d@pengutronix.de>
- <6098d579-f206-5a23-bbfc-ac13e0448479@gmail.com>
- <20170702092336.uxwl23kyd4koxclj@pengutronix.de>
-Message-ID: <CAMuHMdVgDNEf8Pe2HsqFpgFiTupVBa-7dvmSR6fJ4eS1LnzRxg@mail.gmail.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Mon, 3 Jul 2017 15:41:33 +0800
+Subject: [PATCH V1 7/9] clk: sprd: add adjustable pll support
+In-Reply-To: <20170630192228.GO22780@codeaurora.org>
+References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+ <20170618015855.27738-8-chunyan.zhang@spreadtrum.com>
+ <20170620013710.GJ4493@codeaurora.org>
+ <CAAfSe-sMy3aM9=LwpVivvHKy4hVw3GEd3U-hZe17pXM5fJRxPg@mail.gmail.com>
+ <20170630014452.GL22780@codeaurora.org>
+ <CAAfSe-smKqgd42jDAGDA=NtYvRZExNanU7fHrRkT4W-WH-2=ug@mail.gmail.com>
+ <20170630192228.GO22780@codeaurora.org>
+Message-ID: <CAAfSe-sw669n2ZwpWpeCDw0S46Pg94xaWZFcSbEE6TYKg2JbLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-On Sun, Jul 2, 2017 at 11:23 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Sun, Jul 02, 2017 at 07:48:41AM +0200, Dirk Behme wrote:
->> > On my machine (Udoo Neo, A9 + M4) the A9 is the primary CPU that is
->> > started by the bootrom. If I want the M4 being the primary device I'd
->> > need support in the bootloader to wait long enough (i.e. until the M4 is
->> > up) before letting the A9 jump into Linux. Managable I'd say. This way
->> > would even make sense if the M4 runs a rt critical OS that shouldn't be
->> > forced to wait on the non-rt A9 to enable a clk.
+On 1 July 2017 at 03:22, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/30, Chunyan Zhang wrote:
+>> Hi Stephen,
 >>
->> Overall, assuming that the issue we are discussing here can be solved quite
->> easily in hardware (a set of clock registers for each CPU/OS domain,
->> connected cleverly to effectively control each clock, with access protection
->> for each set of registers) I tend to think that for a SoC supposed to run
->> different OS on different cores this is a missing hardware feature (bug?).
+>> On 30 June 2017 at 09:44, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> > On 06/22, Chunyan Zhang wrote:
+>> >> On 20 June 2017 at 09:37, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> >> > On 06/18, Chunyan Zhang wrote:
+>> >> >> +     pll->factors[member].width
+>> >> >> +
+>> >> >> +#define pmask(pll, member)                                   \
+>> >> >> +     ((pwidth(pll, member)) ?                                \
+>> >> >> +     GENMASK(pwidth(pll, member) + pshift(pll, member) - 1,  \
+>> >> >> +     pshift(pll, member)) : 0)
+>> >> >> +
+>> >> >> +#define pinternal(pll, cfg, member)  \
+>> >> >> +     (cfg[pindex(pll, member)] & pmask(pll, member))
+>> >> >> +
+>> >> >> +#define pinternal_val(pll, cfg, member)      \
+>> >> >> +     (pinternal(pll, cfg, member) >> pshift(pll, member))
+>> >> >> +
+>> >> >> +static unsigned long pll_get_refin_rate(struct ccu_pll *pll)
+>> >> >
+>> >> > pll could be const?
+>> >>
+>> >> What this function returns is a factor used to calculate the pll rate
+>> >> later, I will rename this function in the next iterator.
+>> >>
+>> >
+>> > Rename is fine, but pll can still be marked const?
+>>
+>> Oh, sorry I misunderstood :)
+>> You mean mark the input parameter "pll" const, right?
 >
-> So you want to enable bits for your CAN clock, one in each cpu's domain.
+> Yes.
 >
-> I'd say that is a nice idea that a hardware engineer might be proud to
-> pick up but that results in more headache than fun for the software
-> colleague.
+>> >> >> +
+>> >> >> +static int ccu_pll_helper_set_rate(struct ccu_pll *pll,
+>> >> >> +                                unsigned long rate,
+>> >> >> +                                unsigned long parent_rate)
+>> >> >> +{
+>> >> >> +     u32 mask, shift, width, ibias_val, index, kint, nint;
+>> >> >> +     u32 reg_num = pll->regs[0], i = 0;
+>> >> >> +     unsigned long refin, fvco = rate;
+>> >> >> +     struct reg_cfg *cfg;
+>> >> >> +
+>> >> >> +     cfg = kcalloc(reg_num, sizeof(*cfg), GFP_KERNEL);
+>> >> >> +     if (!cfg)
+>> >> >> +             return -ENOMEM;
+>> >> >> +
+>> >> >> +     refin = pll_get_refin_rate(pll);
+>> >> >> +
+>> >> >> +     mask = pmask(pll, PLL_PREDIV);
+>> >> >> +     index = pindex(pll, PLL_PREDIV);
+>> >> >> +     width = pwidth(pll, PLL_PREDIV);
+>> >> >> +     if (width && (ccu_pll_readl(pll, index) & mask))
+>> >> >> +             refin = refin * 2;
+>> >> >> +
+>> >> >> +     mask = pmask(pll, PLL_POSTDIV);
+>> >> >> +     index = pindex(pll, PLL_POSTDIV);
+>> >> >> +     width = pwidth(pll, PLL_POSTDIV);
+>> >> >> +     cfg[index].msk = mask;
+>> >> >> +     if (width && ((pll->fflag == 1 && fvco <= pll->fvco) ||
+>> >> >> +                   (pll->fflag == 0 && fvco > pll->fvco)))
+>> >> >> +             cfg[index].val |= mask;
+>> >> >> +
+>> >> >> +     if (width && fvco <= pll->fvco)
+>> >> >> +             fvco = fvco * 2;
+>> >> >> +
+>> >> >> +     mask = pmask(pll, PLL_DIV_S);
+>> >> >> +     index = pindex(pll, PLL_DIV_S);
+>> >> >> +     cfg[index].val |= mask;
+>> >> >> +     cfg[index].msk |= mask;
+>> >> >> +
+>> >> >> +     mask = pmask(pll, PLL_SDM_EN);
+>> >> >> +     index = pindex(pll, PLL_SDM_EN);
+>> >> >> +     cfg[index].val |= mask;
+>> >> >> +     cfg[index].msk |= mask;
+>> >> >> +
+>> >> >> +     nint  = fvco/(refin * CCU_PLL_1M);
+>> >> >> +
+>> >> >> +     mask = pmask(pll, PLL_NINT);
+>> >> >> +     index = pindex(pll, PLL_NINT);
+>> >> >> +     shift = pshift(pll, PLL_NINT);
+>> >> >> +     cfg[index].val |= (nint << shift) & mask;
+>> >> >> +     cfg[index].msk |= mask;
+>> >> >> +
+>> >> >> +     mask = pmask(pll, PLL_KINT);
+>> >> >> +     index = pindex(pll, PLL_KINT);
+>> >> >> +     width = pwidth(pll, PLL_KINT);
+>> >> >> +     shift = pshift(pll, PLL_KINT);
+>> >> >> +#ifndef CONFIG_64BIT
+>> >> >> +     i = width < 21 ? 0 : i - 21;
+>> >> >> +#endif
+>> >> >
+>> >> > What's this? Why do we depend on CONFIG_64BIT?
+>> >>
+>> >> On 32-bit SoCs, the largest width we can support is limited due to the
+>> >> limitation of calculation precision.
+>> >
+>> > Does the hardware width change? Still not clear to me what's
+>> > going on here.
+>>
+>> I heard from my colleague, that because the calculation precision on
+>> Spreadtrum's 32-bit SoCs is different from on 64-bit SoCs,  when the
+>> width of the value of PLL_KINT is larger than 21, the value is too
+>> large to be multiplied on 32-bit Spreadtrum's SoCs.
 >
-> There are several problems that come immediately to mind:
+> It sounds like you're saying that the clk hardware is not
+> changing, but the sizeof(long) is different on 64-bit and 32-bit
+> CPUs so you've added this ifndef here for that.
 >
->  - You can switch of a clk because you don't need it on, or because you
->    need it off. I guess you want to have the clock on if at least one
->    cpu wants it on. So you take away the freedom from the other cpu to
->    force the clock off. (Yeah, the currently available clk framework
->    doesn't allow that either.)
->  - What if cpu 0 sets the parent of the can clk to pll2 but cpu 1 wants
->    it set to pll1? How does cpu 1 notice the change?
->  - On off might be relatively easy, what about clk dividers? cpu 0 sets
->    2 which cpu 1 sets 6.
+
+I finally figure out that this #ifndef is indeed not needed, thanks to
+your querying :)
+
+They told me that on Spreadtrum's 32-bit SoCs, only 20-bit of PLL_KINT
+is used and 3-bit is reserved in order to keep in line with the PLLs
+on 64-bit SoC.
+And we can get the same effect only if we define PLL with the specific
+'width' and 'shift' for PLL_KINT.
+
+I'll remove this statement and 'i' from here and
+sprd_pll_helper_recalc_rate() function.
+
+>>
+>> i = width < 21 ? 0 : i - 20;
+>>
+>> Here ' i ' is used to adjust 'shift' rather than 'width'  like below (
+>> wrote the code back for convenience of understanding)
+>>
+>> +       kint = DIV_ROUND_CLOSEST(((fvco - refin * nint * CCU_PLL_1M)/10000) *
+>> +       ((mask >> (shift + i)) + 1), refin * 100) << i;
+>>
 >
-> That convinces me that the disadvantages of having two views on the clk
-> core have more weight and you really want a single view and share that
-> by software.
+> Having the types for all these variables would also be helpful.
+>
+>   u32 mask, shift, width, kint, nint;
+>   unsigned long refin, fvco;
+>
+> Why don't we do 64-bit math here instead of 32-bit math? And use
+> DIV_ROUND_CLOSEST_ULL?
 
-Renesas ARM SoCs already implement (parts of) that.
+Agree, we should use 64-bit math, will address this.
 
-There are separate sets of the Module SToP register bits for each set of
-CPUs. Only if all sets agree the clock supply to a module will be stopped,
-which can be monitored using the status Registers.
-So for the CAN modules itself there is no issue, as the clock supply to the
-modules will not be stopped as long as the RT CPU keeps it enabled.
-There must be more to it (secure mode?), as some R-Car Gen3 module clocks
-cannot seem to be disabled by disabling them for all documented CPU sets.
+Thanks,
+Chunyan
 
-There's also a global bit to prevent modifying any clock register.
-This could be used to prevent changing the CAN parent clock (changing
-its divider and/or stopping it). However, as this is a global bit, it would
-affect the full Linux clock driver.
-
-Again, probably there's more to it when using secure mode...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
