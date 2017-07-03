@@ -1,34 +1,56 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 3 Jul 2017 10:40:22 +0530
-Subject: [PATCH V2] dmaengine: qcom_hidma: correct API violation for submit
-In-Reply-To: <1498833785-22632-1-git-send-email-okaya@codeaurora.org>
-References: <1498833785-22632-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170703051022.GZ19154@localhost>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 3 Jul 2017 11:45:52 +0530
+Subject: [RFC 0/5] drivers: Add boot constraints core
+In-Reply-To: <20170630121026.azppihjqls5i6bbr@sirena.org.uk>
+References: <20170630031648.GR29665@vireshk-i7>
+ <CAGb2v64UabHPN79-zFzgxhsJwPF=fe_dM8jwnbxj_XR4LzsnwQ@mail.gmail.com>
+ <20170630035533.GV29665@vireshk-i7>
+ <CAGb2v67hxVciKFLD=8pgfm+UJ1i2Zb0aByTEa556O5uGcX7Oug@mail.gmail.com>
+ <20170630041211.GX29665@vireshk-i7>
+ <CAGb2v641UyXS5ccmo0j9Dvty8soB+DqwF2w8zKHsM78oK7b1aw@mail.gmail.com>
+ <20170630051203.GY29665@vireshk-i7>
+ <CAGb2v64CE2cUKgFuXd0f+FEdzQqmpOgMWqk76RndjeOz98=H0A@mail.gmail.com>
+ <20170630084330.GB29665@vireshk-i7>
+ <20170630121026.azppihjqls5i6bbr@sirena.org.uk>
+Message-ID: <20170703061552.GB3532@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 10:43:05AM -0400, Sinan Kaya wrote:
-> Current code is violating the DMA Engine API by putting the submitted
-> requests directly into the HW queue. This causes queued transactions
-> to be started by another thread as soon as the first one finishes.
+On 30-06-17, 13:10, Mark Brown wrote:
+> On Fri, Jun 30, 2017 at 02:13:30PM +0530, Viresh Kumar wrote:
+> > On 30-06-17, 14:36, Chen-Yu Tsai wrote:
 > 
-> The DMA Engine document clearly states this.
+> > Operable ranges of the regulator: 1.8 - 3.0 V
+> > Range required by LCD: 2.0 - 3.0 V
+> > Range required by DMA: 1.8 - 2.5 V
 > 
-> "dmaengine_submit() will not start the DMA operation".
+> > Here DMA can't work with regulator voltages > 2.5 V, but regulator can
+> > go max to 3.0 V. Of course if the DMA driver has done
+> > regulator_set_voltage(), then we will be within 2.5 V range. But that
+> > doesn't force us to have regulator-max-microvolt set to 2.5 V.
 > 
-> Move HW queuing of the requests into the issue_pending() routine
-> to comply with API requirements also create a new queued state for
-> temporarily holding the requests.
+> > And so the DT node shall have this:
 > 
-> A descriptor goes through these transitions now.
+> >         regulator-min-microvolt = <1800000>;
+> >         regulator-max-microvolt = <3000000>;
 > 
-> free->prepared->queued->active->completed->free
+> > Isn't it ?
 > 
-> as opposed to
-> 
-> free->prepared->active->completed->free
+> If the DMA can't tolerate more than 2.5V then why would the constraints
+> allow the voltage to float that far?  Similarly on the low end?
 
-Applied, thanks
+The above regulator-min/max-microvolt values I mentioned were for the regulator
+device and not what the consumers would request. Yes, DMA will request something
+between 1.8 to 2.5 V, but in the above example LCD can request from 2.0 to 3.0 V
+and so I had those limits for the regulator device (in DT).
+
+> Please remember that devices shouldn't be managing their voltages unless
+> they are actively changing them at runtime, simply setting them at
+> startup is the job of the constraints.  I would be very surprised to see
+> a DMA controller doing anything like DVFS.
+
+Sure, DMA would most likely set a constraint from probe. Maybe I could have used
+MMC in the above example, which may actually do DVFS at runtime.
 
 -- 
-~Vinod
+viresh
