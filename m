@@ -1,147 +1,34 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 3 Jul 2017 03:46:47 +0000
-Subject: [PATCH 1/9] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk
- support
-In-Reply-To: <20170701005542.GT22780@codeaurora.org>
-References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
- <1494856763-6543-2-git-send-email-aisheng.dong@nxp.com>
- <20170620014512.GL4493@codeaurora.org>
- <20170620090815.GA6805@b29396-OptiPlex-7040>
- <20170701005542.GT22780@codeaurora.org>
-Message-ID: <AM3PR04MB306CF3A71C1A9ED0A2427BF80D60@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 3 Jul 2017 10:40:22 +0530
+Subject: [PATCH V2] dmaengine: qcom_hidma: correct API violation for submit
+In-Reply-To: <1498833785-22632-1-git-send-email-okaya@codeaurora.org>
+References: <1498833785-22632-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170703051022.GZ19154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
-> Sent: Saturday, July 01, 2017 8:56 AM
-> To: Dong Aisheng
-> Cc: A.s. Dong; linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> shawnguo at kernel.org; Anson Huang; Jacky Bai
-> Subject: Re: [PATCH 1/9] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk
-> support
+On Fri, Jun 30, 2017 at 10:43:05AM -0400, Sinan Kaya wrote:
+> Current code is violating the DMA Engine API by putting the submitted
+> requests directly into the HW queue. This causes queued transactions
+> to be started by another thread as soon as the first one finishes.
 > 
-> On 06/20, Dong Aisheng wrote:
-> > Hi Stephen,
-> >
-> > On Mon, Jun 19, 2017 at 06:45:12PM -0700, Stephen Boyd wrote:
-> > > On 05/15, Dong Aisheng wrote:
-> > > > ---
-> > > >  drivers/clk/clk-divider.c    | 2 ++
-> > > >  include/linux/clk-provider.h | 4 ++++
-> > > >  2 files changed, 6 insertions(+)
-> > > >
-> > > > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> > > > index 96386ff..f78ba7a 100644
-> > > > --- a/drivers/clk/clk-divider.c
-> > > > +++ b/drivers/clk/clk-divider.c
-> > > > @@ -125,6 +125,8 @@ unsigned long divider_recalc_rate(struct
-> > > > clk_hw *hw, unsigned long parent_rate,
-> > > >
-> > > >  	div = _get_div(table, val, flags, divider->width);
-> > > >  	if (!div) {
-> > > > +		if (flags & CLK_DIVIDER_ZERO_GATE)
-> > > > +			return 0;
-> > > >  		WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
-> > >
-> > > Why not use the CLK_DIVIDER_ALLOW_ZERO flag? A clk being off doesn't
-> > > mean the rate is 0. The divider is just disabled, so we would
-> > > consider the rate as whatever the parent is, which is what this code
-> > > does before this patch. Similarly, we don't do anything about gate
-> > > clocks and return a rate of 0 when they're disabled.
-> > >
-> >
-> > The semantic of CLK_DIVIDER_ALLOW_ZERO seems a bit different.
-> >
-> > See below definition:
-> > * CLK_DIVIDER_ALLOW_ZERO - Allow zero divisors.  For dividers which
-> have
-> > *      CLK_DIVIDER_ONE_BASED set, it is possible to end up with a zero
-> divisor.
-> > *      Some hardware implementations gracefully handle this case and
-> allow a
-> > *      zero divisor by not modifying their input clock
-> > *      (divide by one / bypass).
-> >
-> > zero divisor is simply as divide by one or bypass which is supported
-> > by hardware.
-> >
-> > But it's not true for this hardware.
-> >
-> > If we consider the rate as whatever the parent is if divider is zero,
-> > we may got an issue like below:
-> > e.g.
-> > Assuming spll_bus_clk divider is 0x0 and it may be enabled by users
-> > directly without setting a rate first.
-> >
-> > Then the clock tree looks like:
-> > ...
-> > spll_pfd0                    1            1   500210526          0 0
-> >   spll_pfd_sel              1            1   500210526          0 0
-> >     spll_sel               1            1   500210526          0 0
-> >       spll_bus_clk           1            1   500210526          0 0
-> >
-> > But the spll_bus_clk clock rate actually is wrong and it's even not
-> > enabled, not like CLK_DIVIDER_ALLOW_ZERO which zero divider means
-> simply bypass.
-> >
-> > So for this case, we probably can't simply assume zero divider rate as
-> > its parent, it is actually set to 0 in hw, although it's something
-> > like gate, but a bit different from gate as the normal gate does not
-> > affect divider where you can keep the rate.
-> >
-> > How would you suggest for this?
-> >
+> The DMA Engine document clearly states this.
 > 
-> It seems that set_rate() and enable/disable are conflated here.
-> From what you describe, it sounds like the clk is considered off when the
-> divider value is zero, and it's on when the divider value is non-zero.
+> "dmaengine_submit() will not start the DMA operation".
 > 
-> I'd suggest you make it so this clk supports enable/disable and set_rate
-> with the same register. Something like, set rate when the clk is disabled
-> will cache the rate request and only when the clk is enabled will the
-> driver actually program the hardware to have the requested divider value.
-> Similarly, when the clk is disabled we'll write a 0 there, but when the
-> clk is enabled we'll restore whatever rate (divider) was chosen last.
+> Move HW queuing of the requests into the issue_pending() routine
+> to comply with API requirements also create a new queued state for
+> temporarily holding the requests.
 > 
-> It does mean that recalc rate will be sort of odd, because when the clk
-> is off it will return 0, and when the clk is on it will return the right
-> rate. So to make things work, we'll need to return the cached rate in
-> recalc rate when the clk is off and read the hardware when the clk is on.
-> Probably an if register ==
-> 0 then lookup in cache, otherwise do normal division.
+> A descriptor goes through these transitions now.
 > 
+> free->prepared->queued->active->completed->free
+> 
+> as opposed to
+> 
+> free->prepared->active->completed->free
 
-Well, good suggestions to me.
-It makes the implementation of this clock type more comprehensive.
+Applied, thanks
 
-It seems we still need keep CLK_DIVIDER_ZERO_GATE to distinguish with others.
-
-The change for recacle_rate may looks like:
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index f78ba7a..7364ac4 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -125,8 +125,9 @@ unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
- 
-        div = _get_div(table, val, flags, divider->width);
-        if (!div) {
-+               if ((flags & CLK_DIVIDER_ZERO_GATE) && clk_hw_is_enabled(hw))
-+                       return divider->cached_rate;
-+
-                WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
-                        "%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
-                        clk_hw_get_name(hw));
-
-And for the initial disabled state (div = 0), the calc_rate will still return
-0 rate as there's still no set_rate happened.
-
-If any issue, please let me know.
-
-Regards
-Dong Aisheng
-
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-> Linux Foundation Collaborative Project
+-- 
+~Vinod
