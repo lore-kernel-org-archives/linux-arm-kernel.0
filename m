@@ -1,30 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 3 Jul 2017 12:14:16 +0100
-Subject: [STABLE REQ] mm/vmalloc.c: huge-vmap: fail gracefully on
- unexpected huge vmap mappings
-In-Reply-To: <20170703084439.GC11757@kroah.com>
-References: <CAKv+Gu8yGfECvJj8NhvfqRzDGZ5FrATeQDJAcASot+u+hq31zw@mail.gmail.com>
- <20170703084439.GC11757@kroah.com>
-Message-ID: <CAKv+Gu-TGm5ghzMQ=bYubnyoi-s7H-L+o73NShoCO3JUHdCxQw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Jul 2017 13:25:21 +0200
+Subject: [PATCH RFC 1/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170703185952.18a97e9b7b05cbe321cb1268@magewell.com>
+References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+ <1498561654-14658-2-git-send-email-yong.deng@magewell.com>
+ <667c858b-2655-88c5-6bbc-9d70d06c1ff1@xs4all.nl>
+ <20170703185952.18a97e9b7b05cbe321cb1268@magewell.com>
+Message-ID: <20170703112521.ca253erguut5v7se@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 July 2017 at 09:44, Greg KH <greg@kroah.com> wrote:
-> On Tue, Jun 27, 2017 at 02:36:46PM +0000, Ard Biesheuvel wrote:
->> Please consider
->>
->> 029c54b09599 mm/vmalloc.c: huge-vmap: fail gracefully on unexpected
->> huge vmap mappings
->>
->> for inclusion into the v4.9 and v4.11 stable trees. It prevents
->> crashes on arm64 that may occur after commit 324420bf91f6 ("arm64: add
->> support for ioremap() block mappings") was merged for v4.6.
->
-> Does not apply to the 4.9-stable tree, can you provide a backport for it
-> there?
->
+Hi,
 
-Done.
+On Mon, Jul 03, 2017 at 06:59:52PM +0800, Yong wrote:
+> > > +	select VIDEOBUF2_DMA_CONTIG
+> > > +	select REGMAP_MMIO
+> > > +	---help---
+> > > +	   Support for the Allwinner Camera Sensor Interface Controller.
+> > 
+> > This controller is the same for all Allwinner SoC models?
+> 
+> No.
+> I will change the Kconfig and Makefile.
 
-Regards,
-Ard.
+This is basically a design that has been introduced in the A31 (sun6i
+family). I guess we should just call the driver and Kconfig symbols
+sun6i_csi (even though we don't support it yet). It also used on the
+A23, A33, A80, A83T, H3, and probably the H5 and A64.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170703/3cc08dfb/attachment.sig>
