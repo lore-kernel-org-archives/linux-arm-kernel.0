@@ -1,135 +1,98 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 3 Jul 2017 11:54:27 +0200
-Subject: [RFC 06/55] KVM: arm64: Add EL2 execution context for nesting
-In-Reply-To: <9714b524-eb95-d9af-f394-5a71b3eb7f75@arm.com>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-7-git-send-email-jintack@cs.columbia.edu>
- <20170222111017.GB26976@cbox>
- <CAHyh4xjOvAgqQ+WLD3SHyNHXOFSuoKGu4sV+GaFm-LdEcoGYwA@mail.gmail.com>
- <20170703090344.GF4066@cbox>
- <9714b524-eb95-d9af-f394-5a71b3eb7f75@arm.com>
-Message-ID: <20170703095427.GI4066@cbox>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 3 Jul 2017 11:54:20 +0200
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 03, 2017 at 10:32:45AM +0100, Marc Zyngier wrote:
-> On 03/07/17 10:03, Christoffer Dall wrote:
-> > On Mon, Jun 26, 2017 at 10:33:23AM -0400, Jintack Lim wrote:
-> >> Hi Christoffer,
-> >>
-> >> On Wed, Feb 22, 2017 at 6:10 AM, Christoffer Dall <cdall@linaro.org> wrote:
-> >>> On Mon, Jan 09, 2017 at 01:24:02AM -0500, Jintack Lim wrote:
-> >>>> With the nested virtualization support, the context of the guest
-> >>>> includes EL2 register states. The host manages a set of virtual EL2
-> >>>> registers.  In addition to that, the guest hypervisor supposed to run in
-> >>>> EL2 is now deprivilaged and runs in EL1. So, the host also manages a set
-> >>>> of shadow system registers to be able to run the guest hypervisor in
-> >>>> EL1.
-> >>>>
-> >>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> >>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>> ---
-> >>>>  arch/arm64/include/asm/kvm_host.h | 54 +++++++++++++++++++++++++++++++++++++++
-> >>>>  1 file changed, 54 insertions(+)
-> >>>>
-> >>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >>>> index c0c8b02..ed78d73 100644
-> >>>> --- a/arch/arm64/include/asm/kvm_host.h
-> >>>> +++ b/arch/arm64/include/asm/kvm_host.h
-> >>>> @@ -146,6 +146,42 @@ enum vcpu_sysreg {
-> >>>>       NR_SYS_REGS     /* Nothing after this line! */
-> >>>>  };
-> >>>>
-> >>>> +enum el2_regs {
-> >>>> +     ELR_EL2,
-> >>>> +     SPSR_EL2,
-> >>>> +     SP_EL2,
-> >>>> +     AMAIR_EL2,
-> >>>> +     MAIR_EL2,
-> >>>> +     TCR_EL2,
-> >>>> +     TTBR0_EL2,
-> >>>> +     VTCR_EL2,
-> >>>> +     VTTBR_EL2,
-> >>>> +     VMPIDR_EL2,
-> >>>> +     VPIDR_EL2,      /* 10 */
-> >>>> +     MDCR_EL2,
-> >>>> +     CNTHCTL_EL2,
-> >>>> +     CNTHP_CTL_EL2,
-> >>>> +     CNTHP_CVAL_EL2,
-> >>>> +     CNTHP_TVAL_EL2,
-> >>>> +     CNTVOFF_EL2,
-> >>>> +     ACTLR_EL2,
-> >>>> +     AFSR0_EL2,
-> >>>> +     AFSR1_EL2,
-> >>>> +     CPTR_EL2,       /* 20 */
-> >>>> +     ESR_EL2,
-> >>>> +     FAR_EL2,
-> >>>> +     HACR_EL2,
-> >>>> +     HCR_EL2,
-> >>>> +     HPFAR_EL2,
-> >>>> +     HSTR_EL2,
-> >>>> +     RMR_EL2,
-> >>>> +     RVBAR_EL2,
-> >>>> +     SCTLR_EL2,
-> >>>> +     TPIDR_EL2,      /* 30 */
-> >>>> +     VBAR_EL2,
-> >>>> +     NR_EL2_REGS     /* Nothing after this line! */
-> >>>> +};
-> >>>
-> >>> Why do we have a separate enum and array for the EL2 regs and not simply
-> >>> expand vcpu_sysreg ?
-> >>
-> >> We can expand vcpu_sysreg for the EL2 system registers. For SP_EL2,
-> >> SPSR_EL2, and ELR_EL2, where is the good place to locate them?.
-> >> SP_EL1, SPSR_EL1, and ELR_EL1 registers are saved in the kvm_regs
-> >> structure instead of sysregs[], so I wonder it's better to put them in
-> >> kvm_regs, too.
-> >>
-> >> BTW, what's the reason that those EL1 registers are in kvm_regs
-> >> instead of sysregs[] in the first place?
-> >>
-> > 
-> > This has mostly to do with the way we export things to userspace, and
-> > for historical reasons.
-> > 
-> > So we should either expand kvm_regs with the non-sysregs EL2 registers
-> > and expand sys_regs with the EL2 sysregs, or we should put everything
-> > EL2 into an EL2 array.  I feel like the first solution will fit more
-> > nicely into the current design, but I don't have a very strong
-> > preference.
-> > 
-> > You should look at the KVM_{GET,SET}_ONE_REG API definition and think
-> > about how your choice will fit with this.
-> > 
-> > Marc, any preference?
+Hello Bjorn,
+
+On 03/07/2017 01:18, Bjorn Helgaas wrote:
+
+> On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:
 > 
-> My worry is that by changing kvm_regs, we're touching a userspace
-> visible structure. I'm not sure we can avoid it, but I'd like to avoid
-> putting too much there (SPSR_EL2 and ELR_EL2 should be enough). I just
-> had a panic moment when realizing that this structure is not versioned,
-> but the whole ONE_REG API seems to save us from a complete disaster.
+>> This driver is required to work around several hardware bugs
+>> in the PCIe controller.
+>
+> [ Snip style issues ]
+
+I wish you had pointed these out in your May 23 review, or in
+my March 29 version (or even just alluded to them). I would
+have fixed them in time for 2.13.
+
+
+>> +	/*
+>> +	 * QUIRK #2
+>> +	 * Unfortunately, config and mem spaces are muxed.
+>> +	 * Linux does not support such a setting, since drivers are free
+>> +	 * to access mem space directly, at any time.
+>> +	 * Therefore, we can only PRAY that config and mem space accesses
+>> +	 * NEVER occur concurrently.
+>> +	 */
+>> +	writel_relaxed(1, pcie->mux);
+>> +	ret = pci_generic_config_read(bus, devfn, where, size, val);
+>> +	writel_relaxed(0, pcie->mux);
 > 
-> Overall, having kvm_regs as a UAPI visible thing retrospectively strikes
-> me as a dangerous design, as we cannot easily expand it. Maybe we should
-> consider having a kvm_regs_v2 that embeds kvm_regs, and not directly
-> expose it to userspace (but instead expose the indexes in that
-> structure)? Userspace that knows how to deal with EL2 will use the new
-> indexes, while existing SW will carry on using the EL1/EL0 version.
+> I'm very hesitant about this.  When people stress this, we're going to
+> get reports of data corruption.  Even with the disclaimer below, I
+> don't feel good about this.  Adding the driver is an implicit claim
+> that we support the device, but we know it can't be made reliable.
 
-We definitely cannot expand kvm_regs, that would lead to all sorts of
-potential errors, as you correctly point out.
+I can't say I didn't see this coming (I had taken your long silence
+as a sign of your reluctance) but back in May, I thought you implied
+that a warning + tainting the kernel would be sufficient.
 
-So we probably need something like that, or simply let it stay the way
-it is for now, and add el2_core_regs as a separate thing to the vcpu and
-only expose the indexes and encoding for those registers?
+Mark Rutland points out stop_machine. I will test this solution.
+Would you find that acceptable?
 
+
+> What is the benefit of adding this driver?  How many units are in the
+> field?  Are you hoping to have support in distros like RHEL?  Are
+> these running self-built kernels straight from kernel.org?  Is it
+> feasible for you to distribute this driver separately from the
+> upstream kernel?
+
+The benefit of upstreaming (for me) is making kernel maintainers
+aware that one is using specific internal APIs. Then one may be
+notified when these APIs are about to change.
+
+I'm told we have sold ~100k units. Though I don't know how many
+are in the field and using PCIe.
+
+There are no plans to use "full-blown" distros, we use embedded
+oriented distros, such as buildroot.
+
+Maintaining out-of-tree drivers is what we've been doing for
+~15 years, and there are many pain-points involved. Ask Greg
+what he thinks of OOT drivers.
+
+
+>> +static int tango_check_pcie_link(void __iomem *test_out)
 > 
-> sysregs are easier to deal with, as they are visible through their
-> encoding, and we can place the anywhere we want. sys_regs is as good a
-> location as any.
+> I think this is checking for link up.  Rename to tango_pcie_link_up()
+> to follow the convention of other drivers.  Take a struct tango_pcie *
+> instead of an address, if possible.
+
+Anything's possible. NB: if I pass the struct, then I have to store
+the address in the struct, which isn't the case now, since I never
+need the address later. If you don't mind adding an unnecessary
+field to the struct, I can do it. What do you say?
+
+
+>> +static struct platform_driver tango_pcie_driver = {
+>> +	.probe	= tango_pcie_probe,
+>> +	.driver	= {
+>> +		.name = KBUILD_MODNAME,
+>> +		.of_match_table = tango_pcie_ids,
 > 
+> I think you need ".suppress_bind_attrs = true" here to prevent issues
+> when unbinding driver.  See
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a5f40e8098fe
 
-Agreed.
+Will do. In that case, I can drop tango_pcie_remove() right?
 
-Thanks,
--Christoffer
+Regards.
