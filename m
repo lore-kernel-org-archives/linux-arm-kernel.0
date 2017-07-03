@@ -1,141 +1,107 @@
 From: philippe.cornu@st.com (Philippe CORNU)
-Date: Mon, 3 Jul 2017 10:41:26 +0200
-Subject: [PATCH v5 6/7] dt-bindings: display: stm32: Add DSI controller
-In-Reply-To: <1499071287-10414-1-git-send-email-philippe.cornu@st.com>
-References: <1499071287-10414-1-git-send-email-philippe.cornu@st.com>
-Message-ID: <1499071287-10414-7-git-send-email-philippe.cornu@st.com>
+Date: Mon, 3 Jul 2017 10:41:20 +0200
+Subject: [PATCH v5 0/7] STM32 DSI HOST
+Message-ID: <1499071287-10414-1-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation of device tree bindings for the STM32 DSI
-controller based on the Synopsys DesignWare MIPI DSI host controller.
+Version 5:
+- bridge/synopsis/dw-mipi-dsi.c: Improve the direct call to panel
+  bridge post_disable() & related comments (Archit Taneja)
+- stm/ltdc.c: fix leak of pixel clock enable in some error
+  paths (Eric Anholt)
+- bindings/display/bridge/dw_mipi_dsi.txt: add pixel clock & remove
+  "driver" (Rob Herring, Archit Taneja)
+- bindings/display/st,stm32-ltdc.txt: remove "driver" (Rob Herring,
+  Archit Taneja)
 
-Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/display/st,stm32-ltdc.txt  | 104 ++++++++++++++++++++-
- 1 file changed, 103 insertions(+), 1 deletion(-)
+Version 4:
+- bridge/synopsis/dw-mipi-dsi.c: Add panel-bridge support (-45 lines,
+  but no so easy to do) and is_panel_bridge for a better clean up, add
+  stm copyright/remove dpms_mode/remove drm_of.h/improve clk
+  management/add mode_valid (thanks to comments of Archit Taneja), use
+  "DesignWare" instead of "Designware (thanks to comments of Neil
+  Armstrong)
+- bridge/synopsis/Kconfig: Remove help section to hide it in menuconfig
+  (thanks to comments of Archit Taneja)
+- include/drm/bridge/dw_mipi_dsi.h: Remove drmP.h (thanks to comments
+  of Archit Taneja)
+- bindings/display/bridge/dw_mipi_dsi.txt: Improve optional property
+  explanations (thanks to comments of Neil Armstrong)
+- stm/ltdc.c: Add is_panel_bridge for a better clean up/remove
+  drm_encoder_helper_add() (thanks to comments of Eric Anholt)
+- stm/dw_mipi_dsi-stm.c: remove math64.h/use DRM_WARN/remove warnings
+  (thanks to comments of Archit Taneja), minor alignment fix (thanks to
+  comments of Neil Armstrong)
+- bindings/display/st,stm32-ltdc.txt: use graph binding in the 
+  example/improve ports usage doc (thanks to comments of Rob Herring),
+  use "DSI" instead of "dsi" where relevant (thanks to comments of Neil
+  Armstrong)
 
-diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-index 90a8459..74b5ac7 100644
---- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-+++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-@@ -12,8 +12,40 @@
-   Required nodes:
-     - Video port for RGB output.
- 
--Example:
-+* STMicroelectronics STM32 DSI controller specific extensions to Synopsys
-+  DesignWare MIPI DSI host controller
- 
-+The STMicroelectronics STM32 DSI controller uses the Synopsys DesignWare MIPI
-+DSI host controller. For all mandatory properties & nodes, please refer
-+to the related documentation in [5].
-+
-+Mandatory properties specific to STM32 DSI:
-+- #address-cells: Should be <1>.
-+- #size-cells: Should be <0>.
-+- compatible: "st,stm32-dsi".
-+- clock-names:
-+  - phy pll reference clock string name, must be "ref".
-+- resets: see [5].
-+- reset-names: see [5].
-+
-+Mandatory nodes specific to STM32 DSI:
-+- ports: A node containing DSI input & output port nodes with endpoint
-+  definitions as documented in [3] & [4].
-+  - port at 0: DSI input port node, connected to the ltdc rgb output port.
-+  - port at 1: DSI output port node, connected to a panel or a bridge input port.
-+- panel or bridge node: A node containing the panel or bridge description as
-+  documented in [6].
-+  - port: panel or bridge port node, connected to the DSI output port (port at 1).
-+
-+Note: You can find more documentation in the following references
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+[2] Documentation/devicetree/bindings/reset/reset.txt
-+[3] Documentation/devicetree/bindings/media/video-interfaces.txt
-+[4] Documentation/devicetree/bindings/graph.txt
-+[5] Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
-+[6] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
-+
-+Example 1: RGB panel
- / {
- 	...
- 	soc {
-@@ -33,3 +65,73 @@ Example:
- 		};
- 	};
- };
-+
-+Example 2: DSI panel
-+
-+/ {
-+	...
-+	soc {
-+	...
-+		ltdc: display-controller at 40016800 {
-+			compatible = "st,stm32-ltdc";
-+			reg = <0x40016800 0x200>;
-+			interrupts = <88>, <89>;
-+			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
-+			clocks = <&rcc 1 CLK_LCD>;
-+			clock-names = "lcd";
-+
-+			port {
-+				ltdc_out_dsi: endpoint {
-+					remote-endpoint = <&dsi_in>;
-+				};
-+			};
-+		};
-+
-+
-+		dsi: dsi at 40016c00 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-dsi";
-+			reg = <0x40016c00 0x800>;
-+			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
-+			clock-names = "ref", "pclk";
-+			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
-+			reset-names = "apb";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					dsi_in: endpoint {
-+						remote-endpoint = <&ltdc_out_dsi>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					dsi_out: endpoint {
-+						remote-endpoint = <&dsi_in_panel>;
-+					};
-+				};
-+
-+			};
-+
-+			panel-dsi at 0 {
-+				reg = <0>; /* dsi virtual channel (0..3) */
-+				compatible = ...;
-+				enable-gpios = ...;
-+
-+				port {
-+					dsi_in_panel: endpoint {
-+						remote-endpoint = <&dsi_out>;
-+					};
-+				};
-+
-+			};
-+
-+		};
-+
-+	};
-+};
+Version 3:
+- stm/ltdc: Use panel-bridge (-170 lines), thanks to comments of Eric Anholt,
+  Boris Brezillon, Archit Taneja & Andrzej Hajda.
+- Synopsys dsi: Add dw_mipi_dsi.h (forgotten in v2), thanks to comments of
+  Neil Armstrong.
+- Synopsys dsi/dw-mipi-dsi.c: add dw_mipi_dsi_dphy_init() &
+  dw_mipi_dsi_dphy_enable() to better manage DW phy-dedicated regs, remove
+  dw_mipi_dsi_mode enum, remove stm32 patch for lpm, remove pllref (manage in
+  the vendor phy) thanks to comments of Archit Taneja. Add mode_flags to phy
+  parameters to better adjust lane mbps according to dsi burst and non burst
+  modes todos in caps.
+- stm/dw_mipi_dsi-stm.c: Add pllref management.
+- dt-bindings/display/stm: Split dt-bindings patch in two (parent node
+  removal/ dsi), add required nodes (port & panel/bridge), updates thanks to
+  comments of Rob Herring.
+- dt-bindings/display/Synopsys dsi: remove port as part of the vendor
+  documentation, add panel/bridge node, update dt-bindings thanks to comments
+  of Rob Herring.
+- Add more people from Hisilicon & Rockchip.
+
+Version 2:
+- Add a generic Synopsys DesignWare MIPI DSI bridge driver following
+  comments from Neil Armstrong & Archit Taneja.
+- Use drm_of_find_panel_or_bridge() thanks to Eric Anholt comments
+- Update dt-bindings thanks to Rob Herring comments
+
+Version 1:
+- Initial commit
+
+The purpose of this set of patches is to add the mipi dsi host driver
+to the stm32 family.
+
+This mipi dsi host driver is based on the Rockchip version of the
+Synopsys Designware mipi dsi driver (rockchip/dw-mipi-dsi.c)
+modified for the stm32 family:
+    - replace Rockchip digital & phy specific extensions with stm32's ones.
+    - add a bridge
+
+Philippe CORNU (7):
+  drm/stm: ltdc: Fix leak of px clk enable in some error paths
+  drm/stm: ltdc: Add panel-bridge support
+  dt-bindings: display: Add Synopsys DW MIPI DSI host controller
+  drm/bridge/synopsys: Add MIPI DSI host controller bridge
+  dt-bindings: display: stm32: remove st-display-subsystem parent node
+    requirement
+  dt-bindings: display: stm32: Add DSI controller
+  drm/stm: Add STM32 DSI controller driver
+
+ .../bindings/display/bridge/dw_mipi_dsi.txt        |  32 +
+ .../devicetree/bindings/display/st,stm32-ltdc.txt  | 105 ++-
+ drivers/gpu/drm/bridge/synopsys/Kconfig            |   6 +
+ drivers/gpu/drm/bridge/synopsys/Makefile           |   2 +
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c      | 979 +++++++++++++++++++++
+ drivers/gpu/drm/stm/Kconfig                        |   9 +-
+ drivers/gpu/drm/stm/Makefile                       |   2 +
+ drivers/gpu/drm/stm/dw_mipi_dsi-stm.c              | 352 ++++++++
+ drivers/gpu/drm/stm/ltdc.c                         | 220 +----
+ drivers/gpu/drm/stm/ltdc.h                         |   3 +-
+ include/drm/bridge/dw_mipi_dsi.h                   |  39 +
+ 11 files changed, 1566 insertions(+), 183 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+ create mode 100644 drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+ create mode 100644 drivers/gpu/drm/stm/dw_mipi_dsi-stm.c
+ create mode 100644 include/drm/bridge/dw_mipi_dsi.h
+
 -- 
 1.9.1
