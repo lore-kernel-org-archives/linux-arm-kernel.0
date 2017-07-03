@@ -1,141 +1,119 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Jul 2017 17:06:23 +0100
-Subject: [PATCH 2/3] clk: WARN_ON about to disable a critical clock
-In-Reply-To: <3544e773-7006-81a8-aaf7-638c987ed3fa@gmail.com>
-References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
- <1453127331-20616-3-git-send-email-lee.jones@linaro.org>
- <20160211004327.26445.27416@quark.deferred.io>
- <d83d608a-246f-7b18-20d1-10a2060395e1@de.bosch.com>
- <20170703115324.5re2d32bd3slutcb@dell>
- <c5f6efac-df9f-10d5-1e74-5b8743214b44@de.bosch.com>
- <20170703142517.tyojzmzofvyiicsn@dell>
- <3544e773-7006-81a8-aaf7-638c987ed3fa@gmail.com>
-Message-ID: <20170703160623.hbtzz7kmlwkmf5hl@dell>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 3 Jul 2017 16:08:02 +0000
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
+ devices before scanning
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40ACFC3D@FRAEML521-MBX.china.huawei.com>
+References: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+ <20170613151013.GT3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
+ <20170613200339.GX3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
+ <20170616083313.GY3187@lahna.fi.intel.com>
+ <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
+ <20170616120048.GC629@lahna.fi.intel.com>
+ <CAJZ5v0g+qVui6RU=Hy3c_3qAAWngqaAu6B3JxGOpqF06kitbzA@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
+ <20170619100209.GC629@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFC3D@FRAEML521-MBX.china.huawei.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B10487@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 03 Jul 2017, Dirk Behme wrote:
+Hi Mika
 
-> On 03.07.2017 16:25, Lee Jones wrote:
-> > On Mon, 03 Jul 2017, Dirk Behme wrote:
-> > 
-> > > On 03.07.2017 13:53, Lee Jones wrote:
-> > > > On Tue, 27 Jun 2017, Dirk Behme wrote:
-> > > > 
-> > > > > On 11.02.2016 01:43, Michael Turquette wrote:
-> > > > > > Quoting Lee Jones (2016-01-18 06:28:50)
-> > > > > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > > > 
-> > > > > > Looks good to me.
-> > > > > > 
-> > > > > > Regards,
-> > > > > > Mike
-> > > > > > 
-> > > > > > > ---
-> > > > > > >     drivers/clk/clk.c | 6 ++++++
-> > > > > > >     1 file changed, 6 insertions(+)
-> > > > > > > 
-> > > > > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > > > > > index 835cb85..178b364 100644
-> > > > > > > --- a/drivers/clk/clk.c
-> > > > > > > +++ b/drivers/clk/clk.c
-> > > > > > > @@ -575,6 +575,9 @@ static void clk_core_unprepare(struct clk_core *core)
-> > > > > > >            if (WARN_ON(core->prepare_count == 0))
-> > > > > > >                    return;
-> > > > > > > +       if (WARN_ON(core->prepare_count == 1 && core->flags & CLK_IS_CRITICAL))
-> > > > > > > +               return;
-> > > > > > > +
-> > > > > > >            if (--core->prepare_count > 0)
-> > > > > > >                    return;
-> > > > > > > @@ -680,6 +683,9 @@ static void clk_core_disable(struct clk_core *core)
-> > > > > > >            if (WARN_ON(core->enable_count == 0))
-> > > > > > >                    return;
-> > > > > > > +       if (WARN_ON(core->enable_count == 1 && core->flags & CLK_IS_CRITICAL))
-> > > > > > > +               return;
-> > > > > > > +
-> > > > > > >            if (--core->enable_count > 0)
-> > > > > > >                    return;
-> > > > > 
-> > > > > 
-> > > > > I have a question regarding this patch, which is mainline meanwhile [1]:
-> > > > > 
-> > > > > Having the following clock configuration:
-> > > > > 
-> > > > >                                           |--> child clk '1' (crit)
-> > > > > clk source --> parent clk 'A' (crit) -->|
-> > > > >                                           |--> child clk '2'
-> > > > > 
-> > > > > 
-> > > > > Clock '2' might be used, or not. It might be disabled or not. It doesn't
-> > > > > matter. Clock '1' is not allowed to be disabled. Therefore its marked as
-> > > > > critical.
-> > > > > 
-> > > > > Parent clock 'A' is marked as critical because its not allowed to be
-> > > > > disabled, even if the enable_count of all child clocks is 0. To avoid that
-> > > > > by disabling parent clock 'A' the child clock '1' is disabled, too, whats
-> > > > > not allowed as its marked as critical.
-> > > > > 
-> > > > > 
-> > > > > Now, child clock '2' is used and enabled & disabled continuously by a (SPI)
-> > > > > driver. What is ok. But:
-> > > > > 
-> > > > > Disabling child clock '2' results in the attempt to disable parent clock
-> > > > > 'A', too, which has correct enable_count 1 (from enabling the child '2').
-> > > > > What results
-> > > > > 
-> > > > > a) in the WARN_ON output
-> > > > > 
-> > > > > and
-> > > > > 
-> > > > > b) enable_count of 'A' never decreases to 0. Being off by one after the
-> > > > > WARN_ON
-> > > > > 
-> > > > > 
-> > > > > It sounds like both is wrong for a configuration like above.
-> > > > 
-> > > > Clock A still has one user, Clock 1.
-> > > > 
-> > > > Why is that wrong?
-> > > 
-> > > 
-> > > Because clock 1 is not a (Linux kernel clock framework) used clock. Its
-> > > enable count is 0. So from Linux kernel (clock framework) point of view
-> > > clock 1 is unused.
-> > 
-> > All critical clocks are 'used'.  That's the point of critical clocks.
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> owner at vger.kernel.org] On Behalf Of Gabriele Paoloni
+> Sent: 19 June 2017 11:05
+> To: Mika Westerberg
+> Cc: Rafael J. Wysocki; Lorenzo Pieralisi; Rafael J. Wysocki;
+> catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+> frowand.list at gmail.com; bhelgaas at google.com; arnd at arndb.de; linux-arm-
+> kernel at lists.infradead.org; mark.rutland at arm.com;
+> brian.starkey at arm.com; olof at lixom.net; benh at kernel.crashing.org; linux-
+> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Linuxarm; linux-
+> pci at vger.kernel.org; minyard at acm.org; John Garry; xuwei (O)
+> Subject: RE: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
+> devices before scanning
 > 
-> Could you translate 'used' to enable_count? Whats valid enable_count numbers
-> for critical clocks?
-
-'used' == 'currently in use' == 'enabled'
-
-Here's the piece of the puzzle you're probably missing:
-
-	if (core->flags & CLK_IS_CRITICAL) {
-		clk_core_prepare(core);
-		clk_core_enable(core);
-	}
-
-Any clock that is identified as critical is prepared and enabled.
-
-Thus your use_count of 1 is actually correct.
-
-> > > The increase/decrease of enable count of parent clock A is only driven by
-> > > the Linux kernel usage of clock 2.
-> > > 
-> > > > > Opinions or proposal how to fix/change this?
-> > > > > 
-> > > > > 
-> > > > > Best regards
-> > > > > 
-> > > > > Dirk
-> > > > > 
-> > > > > [1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/clk.c?id=2e20fbf592621b2c2aeddd82e0fa3dad053cce03
-> > 
+> Hi Mika
 > 
+> > -----Original Message-----
+> > From: Mika Westerberg [mailto:mika.westerberg at linux.intel.com]
+> > Sent: 19 June 2017 11:02
+> > To: Gabriele Paoloni
+> > Cc: Rafael J. Wysocki; Lorenzo Pieralisi; Rafael J. Wysocki;
+> > catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+> > frowand.list at gmail.com; bhelgaas at google.com; arnd at arndb.de; linux-
+> arm-
+> > kernel at lists.infradead.org; mark.rutland at arm.com;
+> > brian.starkey at arm.com; olof at lixom.net; benh at kernel.crashing.org;
+> linux-
+> > kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Linuxarm; linux-
+> > pci at vger.kernel.org; minyard at acm.org; John Garry; xuwei (O)
+> > Subject: Re: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
+> > devices before scanning
+> >
+> > On Mon, Jun 19, 2017 at 09:50:49AM +0000, Gabriele Paoloni wrote:
+> > > Many thanks for your response and your help here.
+> > >
+> > > I guess that as conclusion with respect to the current v9 patchset
+> we
+> > can
+> > > disregard the idea of MFD and modify the current v9 so that it
+> > doesn't
+> > > touch directly ACPI resources.
+> > > Instead as I proposed before we can have the scan handler to
+> > enumerate
+> > > the children devices and translate its addresses filling dev-
+> > >resources[] and
+> > > at the same time we can modify acpi_default_enumeration to check
+> > > acpi_device_enumerated() before continuing with device
+> > enumeration...?
+> > >
+> > > Do you think it as a viable solution?
+> >
+> > No, I think MFD + scan handler inside the MFD driver is the way to
+> go.
+> > We don't want to trash ACPI core with stuff that does not belong
+> there
+> > IMHO.
+> 
+> Ok Many thanks I will investigate this direction
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I had a look into the MFD framework. If my understanding is correct the mfd
+framework create a platform device for each declared mfd_cell that is passed
+to mfd_add_devices().
+However there is something that I do not quite understand:
+from
+http://elixir.free-electrons.com/linux/latest/source/drivers/mfd/mfd-core.c#L207
+it seems that mfd_add_device() will create the platform device using the
+resources that are statically declared in the respective mfd_cell.
+
+In my case I'd like to have a platform device using the resources that are
+parsed from the ACPI table (i.e. as it is done now by 
+acpi_create_platform_device()).
+
+If my understanding is correct, if I declared an mfd_cell for my IPMI child
+the mfd subsystem would create a platform device for such child and
+therefore acpi_create_platform_device() would fail to create a new platform
+device as adev->physical_node_count will be non zero.
+However as things stand now mfd_cell devices can only use the resources
+that are statically defined in the code (and therefore not the ones in the
+ACPI nodes)...am I right?
+
+Thanks
+Gab
+
+> 
+> >
+> > Also you don't need to modify acpi_default_enumeration() because you
+> > can
+> > mark your device enumerated in the MFD driver. So all the dirty
+> details
+> > will be in the MFD driver and not in ACPI core.
+> 
+> Ok got it :)
+> 
+> Cheers
+> Gab
