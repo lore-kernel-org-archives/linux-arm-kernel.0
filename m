@@ -1,69 +1,140 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 3 Jul 2017 12:18:28 +0200 (CEST)
-Subject: [PATCH 1/1] futex: remove duplicated code and fix UB
-In-Reply-To: <80af8d81-4522-de2d-8289-1ab46565505a@suse.cz>
-References: <20170621115318.2781-1-jslaby@suse.cz>
- <alpine.DEB.2.20.1706230017520.2221@nanos>
- <80af8d81-4522-de2d-8289-1ab46565505a@suse.cz>
-Message-ID: <alpine.DEB.2.20.1707031211120.2188@nanos>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 3 Jul 2017 11:26:19 +0100
+Subject: [RFT PATCH v2 29/42] ARM: PCI: Remove pci_fixup_irqs() call for
+ bios32 host controllers
+In-Reply-To: <20170702211950.GD18324@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+ <20170608141342.2018-30-lorenzo.pieralisi@arm.com>
+ <20170701140629.GC8977@red-moon>
+ <20170702211950.GD18324@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170703102619.GE19119@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Jun 2017, Jiri Slaby wrote:
-> On 06/23/2017, 09:51 AM, Thomas Gleixner wrote:
-> > On Wed, 21 Jun 2017, Jiri Slaby wrote:
-> >> diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-> >> index f32b42e8725d..5bb2fd4674e7 100644
-> >> --- a/arch/arm64/include/asm/futex.h
-> >> +++ b/arch/arm64/include/asm/futex.h
-> >> @@ -48,20 +48,10 @@ do {									\
-> >>  } while (0)
-> >>  
-> >>  static inline int
-> >> -futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
+On Sun, Jul 02, 2017 at 04:19:50PM -0500, Bjorn Helgaas wrote:
+> On Sat, Jul 01, 2017 at 03:06:30PM +0100, Lorenzo Pieralisi wrote:
+> > Hi Bjorn,
 > > 
-> > That unsigned int seems to be a change from the arm64 tree in next. It's
-> > not upstream and it'll cause a (easy to resolve) conflict.
+> > On Thu, Jun 08, 2017 at 03:13:29PM +0100, Lorenzo Pieralisi wrote:
+> > > Legacy PCI host controllers (ie host controllers that set-up the PCI bus
+> > > through the ARM pci_common_init() API) are currently relying on
+> > > pci_fixup_irqs() to assign legacy PCI irqs to devices. This is not ideal
+> > > in that pci_fixup_irqs() assign IRQs for all PCI devices present in a
+> > > given system some of which may well be enabled by the time
+> > > pci_fixup_irqs() is called (ie a system with multiple host controllers).
+> > > With the introduction of struct pci_host_bridge.(*map_irq) pointer it is
+> > > possible to assign IRQs for all devices originating from a PCI host
+> > > bridge at probe time; this is implemented through pci_assign_irq() that
+> > > relies on the struct pci_host_bridge.map_irq pointer to map IRQ for a
+> > > given device.
+> > > 
+> > > The benefits this brings are twofold:
+> > > 
+> > > - the IRQ for a device is assigned once at probe time
+> > > - the IRQ assignment works also for hotplugged devices
+> > > 
+> > > Remove pci_fixup_irqs() call from bios32 code and rely on
+> > > pci_assign_irq() to carry out the IRQ mapping at device probe
+> > > time.
+> > > 
+> > > The map_irq() and swizzle_irq() struct pci_host_bridge callbacks are
+> > > set-up in the struct pci_host_bridge created in the bios32
+> > > pcibios_init_hw() function and mach-* code paths (for PCI mach
+> > > implementations that require a specific struct hw_pci.(*scan) function
+> > > callback).
+> > > 
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Jason Cooper <jason@lakedaemon.net>
+> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > Cc: Russell King <linux@armlinux.org.uk>
+> > > Cc: Andrew Lunn <andrew@lunn.ch>
+> > > ---
+> > >  arch/arm/kernel/bios32.c    |  4 ++--
+> > >  arch/arm/mach-dove/pcie.c   | 18 ++++++++++--------
+> > >  arch/arm/mach-iop13xx/pci.c |  2 ++
+> > >  arch/arm/mach-orion5x/pci.c | 28 +++++++++++++++-------------
+> > >  4 files changed, 29 insertions(+), 23 deletions(-)
+> > 
+> > As I mentioned to you, this patch is incomplete and needs an upgrade
+> > (ie I misread how Orion and the gazillions board file that go with
+> > it to map irqs - apologies but it is very hard to untangle).
+> > 
+> > I am inlining below an incremental patch to be folded in commit:
+> > 
+> > feaec00e757a ("ARM/PCI: Remove pci_fixup_irqs() call for bios32 host
+> > controllers")
+> > 
+> > in your pci/irq-fixups branch, or if you prefer I can send you the
+> > resulting squashed-in patch to replace this one, as you prefer.
 > 
-> Ugh, I thought the arm64 is in upstream already. Note that this patch
-> just takes what is in this arm64 fix and makes it effective for all
-> architectures. So I will wait with v2 until it merges upstream.
+> Thanks, I folded this into pci/irq-fixups.  The resulting patch is
+> merely this:
 
-Ok.
+Yes that's what I expected, we remove pci_fixup_irqs() and add the
+hooks into the host bridge structure that should cover all host
+bridges initialized via pci_common_init_dev().
 
-> > Yes, we probably can't change that anymore, but at least we should make it
-> > very explicit and add a comment to that effect.
+Thanks !
+Lorenzo
+
+> commit 16508469c0f3198a63923aaec08efa1c63f5fbcc
+> Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Date:   Wed Jun 28 15:14:04 2017 -0500
 > 
-> Something like this or do you want a comment yet?
->         unsigned int op =         (encoded_op & 0x70000000) >> 28;
->         unsigned int cmp =        (encoded_op & 0x0f000000) >> 24;
->         int oparg = sign_extend32((encoded_op & 0x00fff000) >> 12, 12);
->         int cmparg = sign_extend32(encoded_op & 0x00000fff, 12);
-
-Yes, that makes sense.
-
-There is also the issue with the shift. See this thread for further
-reference:
-
-  http://lkml.kernel.org/r/alpine.DEB.2.20.1706282353190.1890 at nanos
-
-The gist is:
-
-  "Anything using a shift value < 0 or > 31 will get crap as a
-   result. Rightfully so because it's just undefined.
-
-   Yes I know that the insanity of user space is unlimited, but anything
-   attempting this is so broken that we cannot break it further by making
-   that shift arg unsigned and actually limit it to 0-31"
-
-So we should make that case explicit as well.
-
-        if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28)) {
-		if (oparg < 0 || oparg > 31)
-			return -EINVAL;
-                oparg = 1 << oparg;
-	}
-
-Thanks,
-
-	tglx
+>     ARM/PCI: Remove pci_fixup_irqs() call for bios32 host controllers
+>     
+>     Legacy PCI host controllers (ie host controllers that set-up the PCI bus
+>     through the ARM pci_common_init() API) are currently relying on
+>     pci_fixup_irqs() to assign legacy PCI irqs to devices.  This is not ideal
+>     in that pci_fixup_irqs() assigns IRQs for all PCI devices present in a given
+>     system some of which may well be enabled by the time pci_fixup_irqs() is
+>     called (ie a system with multiple host controllers).  With the introduction
+>     of struct pci_host_bridge.(*map_irq) pointer it is possible to assign IRQs
+>     for all devices originating from a PCI host bridge at probe time; this is
+>     implemented through pci_assign_irq() that relies on the struct
+>     pci_host_bridge.map_irq pointer to map IRQ for a given device.
+>     
+>     The benefits this brings are twofold:
+>     
+>       - the IRQ for a device is assigned once at probe time
+>       - the IRQ assignment works also for hotplugged devices
+>     
+>     Remove pci_fixup_irqs() call from bios32 code and rely on pci_assign_irq()
+>     to carry out the IRQ mapping at device probe time.
+>     
+>     The map_irq() and swizzle_irq() struct pci_host_bridge callbacks are set-up
+>     in the struct pci_host_bridge created in the bios32 pcibios_init_hw()
+>     function and mach-* code paths (for PCI mach implementations that require a
+>     specific struct hw_pci.(*scan) function callback).
+>     
+>     Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>     [bhelgaas: folded in fixes from Lorenzo:
+>     http://lkml.kernel.org/r/20170701140629.GC8977 at red-moon]
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>     Cc: Jason Cooper <jason@lakedaemon.net>
+>     Cc: Russell King <linux@armlinux.org.uk>
+>     Cc: Andrew Lunn <andrew@lunn.ch>
+> 
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 4c7621ac389c..56dc1a3a33b4 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -484,6 +484,9 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  				break;
+>  			}
+>  
+> +			bridge->map_irq = pcibios_map_irq;
+> +			bridge->swizzle_irq = pcibios_swizzle;
+> +
+>  			if (hw->scan)
+>  				ret = hw->scan(nr, bridge);
+>  			else {
+> @@ -530,8 +533,6 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>  	if (hw->postinit)
+>  		hw->postinit();
+>  
+> -	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
+> -
+>  	list_for_each_entry(sys, &head, node) {
+>  		struct pci_bus *bus = sys->bus;
+>  
