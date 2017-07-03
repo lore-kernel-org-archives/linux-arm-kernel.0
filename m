@@ -1,67 +1,62 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 3 Jul 2017 20:31:41 +0200
-Subject: [PATCH v4] crypto: sun4i-ss: support the Security System PRNG
-In-Reply-To: <CAH6sp9Nm-hDxNSNNYxonBzSGyM769WoKQwjX2CN-RPRr=Oxu4g@mail.gmail.com>
-References: <20170626122055.5253-1-clabbe.montjoie@gmail.com>
- <CAH6sp9Nm-hDxNSNNYxonBzSGyM769WoKQwjX2CN-RPRr=Oxu4g@mail.gmail.com>
-Message-ID: <20170703183141.GA9516@Red>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 3 Jul 2017 20:31:57 +0200
+Subject: [PATCH 2/5] pwm: rockchip: Remove the judge from return value
+ of rockchip_pwm_config()
+In-Reply-To: <1498739271-27431-3-git-send-email-david.wu@rock-chips.com>
+References: <1498739271-27431-1-git-send-email-david.wu@rock-chips.com>
+ <1498739271-27431-3-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20170703203157.7fa28975@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 02:36:43PM +0200, Frans Klaver wrote:
-> Hi,
-> 
-> On Mon, Jun 26, 2017 at 2:20 PM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > The Security System have a PRNG, this patch add support for it via
-> > crypto_rng.
-> 
-> s,have,has,
-> s,add,adds,
-> 
-> >
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >
-> > Changes since v3 (note: the v3 miss changes and version tag sorry)
-> > - Replaced all len values with bits / BITS_PER_LONG or BITS_PER_BYTE
-> >
-> > Changes since v2
-> >  - converted to crypto_rng
-> >
-> > Changes since v1:
-> >  - Replaced all spin_lock_bh by simple spin_lock
-> >  - Removed handling of size not modulo 4 which will never happen
-> >  - Added add_random_ready_callback()
-> >
-> >  drivers/crypto/Kconfig                  |  8 +++++
-> >  drivers/crypto/sunxi-ss/Makefile        |  1 +
-> >  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 30 ++++++++++++++++++
-> >  drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 56 +++++++++++++++++++++++++++++++++
-> >  drivers/crypto/sunxi-ss/sun4i-ss.h      | 11 +++++++
-> >  5 files changed, 106 insertions(+)
-> >  create mode 100644 drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-> >
-> > diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> > index ab82536d64e2..bde0b102eb70 100644
-> > --- a/drivers/crypto/Kconfig
-> > +++ b/drivers/crypto/Kconfig
-> > @@ -618,6 +618,14 @@ config CRYPTO_DEV_SUN4I_SS
-> >           To compile this driver as a module, choose M here: the module
-> >           will be called sun4i-ss.
-> >
-> > +config CRYPTO_DEV_SUN4I_SS_PRNG
-> > +       bool "Support for Allwinner Security System PRNG"
-> > +       depends on CRYPTO_DEV_SUN4I_SS
-> > +       select CRYPTO_RNG
-> > +       help
-> > +         Select this option if you to provides kernel-side support for
-> > +         the Pseudo-Random Number Generator found in the Security System.
-> 
-> This sentence does not parse. "Select this option if you want to
-> provide kernel-side for ...". Alternatively: "This option enables
-> kernel-side support for ..."
-> 
-> Frans
+On Thu, 29 Jun 2017 20:27:48 +0800
+David Wu <david.wu@rock-chips.com> wrote:
 
-Thanks, I will change it.
+> It seems the rockchip_pwm_config always returns the result 0,
+> so remove the judge.
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  drivers/pwm/pwm-rockchip.c | 12 ++----------
+>  1 file changed, 2 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+> index 617824c..cd45f17 100644
+> --- a/drivers/pwm/pwm-rockchip.c
+> +++ b/drivers/pwm/pwm-rockchip.c
+> @@ -165,7 +165,7 @@ static void rockchip_pwm_get_state(struct pwm_chip *chip,
+>  	clk_disable(pc->pclk);
+>  }
+>  
+> -static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> +static void rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  			       int duty_ns, int period_ns)
+>  {
+>  	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+> @@ -188,8 +188,6 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  
+>  	writel(period, pc->base + pc->data->regs.period);
+>  	writel(duty, pc->base + pc->data->regs.duty);
+> -
+> -	return 0;
+>  }
+>  
+>  static int rockchip_pwm_enable(struct pwm_chip *chip,
+> @@ -236,13 +234,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+>  		enabled = false;
+>  	}
+>  
+> -	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
+> -	if (ret) {
+> -		if (enabled != curstate.enabled)
+> -			rockchip_pwm_enable(chip, pwm, !enabled,
+> -				      state->polarity);
+> -		goto out;
+> -	}
+> +	rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
+>  
+>  	if (state->enabled != enabled) {
+>  		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
