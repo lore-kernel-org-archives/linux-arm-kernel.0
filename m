@@ -1,23 +1,54 @@
 From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Mon,  3 Jul 2017 13:04:42 +0530
-Subject: [PATCH v2 0/2] IPQ4019 dts fixes
-Message-ID: <1499067284-21008-1-git-send-email-varada@codeaurora.org>
+Date: Mon,  3 Jul 2017 13:04:43 +0530
+Subject: [PATCH v2 1/2] dts: ipq4019: Fix pinctrl node name
+In-Reply-To: <1499067284-21008-1-git-send-email-varada@codeaurora.org>
+References: <1499067284-21008-1-git-send-email-varada@codeaurora.org>
+Message-ID: <1499067284-21008-2-git-send-email-varada@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2:
-  * Incorporate Stephen Boyd's comment as a separate patch
+Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 13 +------------
+ arch/arm/boot/dts/qcom-ipq4019.dtsi           |  2 +-
+ 2 files changed, 2 insertions(+), 13 deletions(-)
 
-v1:
-  * Moved the xo and timer nodes to SoC dts file from board dts file.
-
-Varadarajan Narayanan (2):
-  dts: ipq4019: Fix pinctrl node name
-  Subject: [PATCH] dts: ipq4019: Move xo and timer nodes to SoC dtsi
-
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 21 +--------------------
- arch/arm/boot/dts/qcom-ipq4019.dtsi           | 17 ++++++++++++++++-
- 2 files changed, 17 insertions(+), 21 deletions(-)
-
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+index b9457dd..de83bc9 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+@@ -29,18 +29,7 @@
+ 	};
+ 
+ 	soc {
+-
+-
+-		timer {
+-			compatible = "arm,armv7-timer";
+-			interrupts = <1 2 0xf08>,
+-				     <1 3 0xf08>,
+-				     <1 4 0xf08>,
+-				     <1 1 0xf08>;
+-			clock-frequency = <48000000>;
+-		};
+-
+-		pinctrl at 0x01000000 {
++		pinctrl at 1000000 {
+ 			serial_pins: serial_pinmux {
+ 				mux {
+ 					pins = "gpio60", "gpio61";
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index b7a24af..6defd0e 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -119,7 +119,7 @@
+ 			reg = <0x1800000 0x60000>;
+ 		};
+ 
+-		tlmm: pinctrl at 0x01000000 {
++		tlmm: pinctrl at 1000000 {
+ 			compatible = "qcom,ipq4019-pinctrl";
+ 			reg = <0x01000000 0x300000>;
+ 			gpio-controller;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
