@@ -1,94 +1,244 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 3 Jul 2017 18:35:01 +0200
-Subject: [Intel-gfx] [PATCH 1/2] drm/atomic: Change
- drm_atomic_helper_swap_state to return an error.
-In-Reply-To: <76319124-3497-f941-73c7-ce6abf084551@linux.intel.com>
-References: <20170628132812.14927-1-maarten.lankhorst@linux.intel.com>
- <20170630135621.c2xlunjaepne2vqt@phenom.ffwll.local>
- <76319124-3497-f941-73c7-ce6abf084551@linux.intel.com>
-Message-ID: <20170703163501.cklhozsbj4v5ftev@phenom.ffwll.local>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 3 Jul 2017 22:21:59 +0530
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <88a2a78f-6a5b-1b80-5dcf-0821b9fd81d9@codeaurora.org>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+ <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+ <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+ <88a2a78f-6a5b-1b80-5dcf-0821b9fd81d9@codeaurora.org>
+Message-ID: <CAFpQJXWQiePwNDV9rxjKALPf_XXMbhQcZM1RwJLkDXTyJxjjiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 03, 2017 at 01:01:55PM +0200, Maarten Lankhorst wrote:
-> Op 30-06-17 om 15:56 schreef Daniel Vetter:
-> > On Wed, Jun 28, 2017 at 03:28:11PM +0200, Maarten Lankhorst wrote:
-> >> We want to change swap_state to wait indefinitely, but to do this
-> >> swap_state should wait interruptibly. This requires propagating
-> >> the error to each driver. All drivers have changes to deal with the
-> >> clean up. In order to allow easy reverting, the commit that changes
-> >> behavior is separate so someone only has to revert that for testing.
-> >>
-> >> Nouveau has a small bugfix, if drm_atomic_helper_wait_for_fences
-> >> failed cleanup_planes was not called.
-> >>
-> >> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> >> Cc: David Airlie <airlied@linux.ie>
-> >> Cc: Daniel Vetter <daniel.vetter@intel.com>
-> >> Cc: Jani Nikula <jani.nikula@linux.intel.com>
-> >> Cc: Sean Paul <seanpaul@chromium.org>
-> >> Cc: CK Hu <ck.hu@mediatek.com>
-> >> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> >> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> >> Cc: Rob Clark <robdclark@gmail.com>
-> >> Cc: Ben Skeggs <bskeggs@redhat.com>
-> >> Cc: Thierry Reding <thierry.reding@gmail.com>
-> >> Cc: Jonathan Hunter <jonathanh@nvidia.com>
-> >> Cc: Jyri Sarha <jsarha@ti.com>
-> >> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> >> Cc: Eric Anholt <eric@anholt.net>
-> >> Cc: dri-devel at lists.freedesktop.org
-> >> Cc: linux-kernel at vger.kernel.org
-> >> Cc: intel-gfx at lists.freedesktop.org
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Cc: linux-mediatek at lists.infradead.org
-> >> Cc: linux-arm-msm at vger.kernel.org
-> >> Cc: freedreno at lists.freedesktop.org
-> >> Cc: nouveau at lists.freedesktop.org
-> >> Cc: linux-tegra at vger.kernel.org
-> >> Signed-off-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
-> > We kinda need to backport this to older kernels, but I don't really see
-> > how :( Maybe we should split this up:
-> > patch 1: Change to int return type
-> > patches 2-(n-1): Driver conversions
-> > patch n: __must_check addition
-> >
-> > That would at least somewhat make this backportable ...
-> >
-> >> ---
-> >>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 14 ++++++++++++--
-> >>  drivers/gpu/drm/drm_atomic_helper.c          | 18 ++++++++++++------
-> >>  drivers/gpu/drm/i915/intel_display.c         | 10 +++++++++-
-> >>  drivers/gpu/drm/mediatek/mtk_drm_drv.c       |  7 ++++++-
-> >>  drivers/gpu/drm/msm/msm_atomic.c             | 14 +++++++++-----
-> >>  drivers/gpu/drm/nouveau/nv50_display.c       | 10 ++++++++--
-> >>  drivers/gpu/drm/tegra/drm.c                  |  7 ++++++-
-> >>  drivers/gpu/drm/tilcdc/tilcdc_drv.c          |  6 +++++-
-> >>  drivers/gpu/drm/vc4/vc4_kms.c                | 21 +++++++++++++--------
-> >>  include/drm/drm_atomic_helper.h              |  4 ++--
-> >>  10 files changed, 82 insertions(+), 29 deletions(-)
-> >>
-> >> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >> index 516d9547d331..d4f787bf1d4a 100644
-> >> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >> @@ -544,9 +544,11 @@ static int atmel_hlcdc_dc_atomic_commit(struct drm_device *dev,
-> >>  		goto error;
-> >>  	}
-> >>  
-> >> -	/* Swap the state, this is the point of no return. */
-> >> -	drm_atomic_helper_swap_state(state, true);
-> > Push the swap_state up over the commit setup (but after the allocation)
-> > and there's no more a problem with unrolling.
-> This can't be done higher up because of the interruptible wait.
-> 
-> Unless we change the patch series to move the waiting for hw_done to a separate step and get rid of the stall argument to swap_state once everything is converted. This could be useful for all drivers that have some kind of setup, because we could move the wait up slightly to suit the drivers needs.
+On Mon, Jul 3, 2017 at 7:07 PM, Shanker Donthineni
+<shankerd@codeaurora.org> wrote:
+> Hi Ganapatraoo,
+>
+> On 06/29/2017 10:01 PM, Ganapatrao Kulkarni wrote:
+>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
+>> <gpkulkarni@gmail.com> wrote:
+>>> Hi Shanker,
+>>>
+>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+>>> <shankerd@codeaurora.org> wrote:
+>>>> The NUMA node information is visible to ITS driver but not being used
+>>>> other than handling errata. This patch allocates the memory for ITS
+>>>> tables from the corresponding NUMA node using the appropriate NUMA
+>>>> aware functions.
+>>
+>> IMHO, the description would have been more constructive?
+>>
+>> "All ITS tables are mapped by default to NODE 0 memory.
+>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
+>> This will optimize tables access and avoids unnecessary inter-node traffic."
+>>
+>
+> I don't understand why you are saying 'All ITS tables are mapped by default to NODE 0 memory'? Kernel runtime memory allocation comes from the corresponding NUMA node of the CPU that being called.
 
-right, swap_state (well the swapping part, not the stalling part) must be
-done as the last step and can't fail. Might be a reason do split them, but
-not sure that's a good idea either. Please disregard my comment ...
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+IIRC, ITT tables can be on any cpu, if drivers are not built-in and
+msi-x vectors are not initialised in init/probe, etc
+however Device table and Collection table are allocated from node 0
+memory during ITS driver init by boot-cpu/cpu0.
+
+>
+> Please explain if you don't agree on this.
+>
+>>>>
+>>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>>>> ---
+>>>>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
+>>>>  1 file changed, 20 insertions(+), 16 deletions(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>>> index fed99c5..e45add2 100644
+>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>>> @@ -860,8 +860,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>>         u64 val = its_read_baser(its, baser);
+>>>>         u64 esz = GITS_BASER_ENTRY_SIZE(val);
+>>>>         u64 type = GITS_BASER_TYPE(val);
+>>>> +       struct page *page;
+>>>>         u32 alloc_pages;
+>>>> -       void *base;
+>>>>         u64 tmp;
+>>>>
+>>>>  retry_alloc_baser:
+>>>> @@ -874,12 +874,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>>                 order = get_order(GITS_BASER_PAGES_MAX * psz);
+>>>>         }
+>>>>
+>>>> -       base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+>>>> -       if (!base)
+>>>> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
+>>>
+>>> the changes would have been minimal, if you converted page to base
+>>> address after allocation here itself?
+>>>
+>>>  page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
+>>>  base =  page_address(page);
+>>>
+>>>> +       if (!page)
+>>>>                 return -ENOMEM;
+>>>>
+>>>>  retry_baser:
+>>>> -       val = (virt_to_phys(base)                                |
+>>>> +       val = (page_to_phys(page)
+>>>
+>>> no change required.
+>>>
+>>>>                 (type << GITS_BASER_TYPE_SHIFT)                  |
+>>>>                 ((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)       |
+>>>>                 ((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)    |
+>>>> @@ -915,7 +915,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>>                 shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+>>>>                 if (!shr) {
+>>>>                         cache = GITS_BASER_nC;
+>>>> -                       gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
+>>>> +                       gic_flush_dcache_to_poc(page_to_virt(page),
+>>>> +                                               PAGE_ORDER_TO_SIZE(order));
+>>>
+>>> no change needed, if base is used still.
+>>>>                 }
+>>>>                 goto retry_baser;
+>>>>         }
+>>>> @@ -926,7 +927,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>>                  * size and retry. If we reach 4K, then
+>>>>                  * something is horribly wrong...
+>>>>                  */
+>>>> -               free_pages((unsigned long)base, order);
+>>>> +               __free_pages(page, order);
+>>>
+>>> no change required.
+>>>>                 baser->base = NULL;
+>>>>
+>>>>                 switch (psz) {
+>>>> @@ -943,19 +944,19 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>>>                 pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
+>>>>                        &its->phys_base, its_base_type_string[type],
+>>>>                        val, tmp);
+>>>> -               free_pages((unsigned long)base, order);
+>>>> +               __free_pages(page, order);
+>>>
+>>> no change required.
+>>>
+>>>>                 return -ENXIO;
+>>>>         }
+>>>>
+>>>>         baser->order = order;
+>>>> -       baser->base = base;
+>>>> +       baser->base = page_to_virt(page);
+>>>
+>>> no change required.
+>>>>         baser->psz = psz;
+>>>>         tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
+>>>>
+>>>>         pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
+>>>>                 &its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
+>>>>                 its_base_type_string[type],
+>>>> -               (unsigned long)virt_to_phys(base),
+>>>> +               (unsigned long)page_to_phys(page),
+>>>
+>>> no change required.
+>>>>                 indirect ? "indirect" : "flat", (int)esz,
+>>>>                 psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+>>>>
+>>>> @@ -1019,7 +1020,7 @@ static void its_free_tables(struct its_node *its)
+>>>>
+>>>>         for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+>>>>                 if (its->tables[i].base) {
+>>>> -                       free_pages((unsigned long)its->tables[i].base,
+>>>> +                       __free_pages(virt_to_page(its->tables[i].base),
+>>>
+>>> ditto
+>>>>                                    its->tables[i].order);
+>>>>                         its->tables[i].base = NULL;
+>>>>                 }
+>>>> @@ -1286,7 +1287,8 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+>>>>
+>>>>         /* Allocate memory for 2nd level table */
+>>>>         if (!table[idx]) {
+>>>> -               page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
+>>>> +               page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
+>>>> +                                       get_order(baser->psz));
+>>>>                 if (!page)
+>>>>                         return false;
+>>>>
+>>>> @@ -1332,7 +1334,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>>>         nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>>>>         sz = nr_ites * its->ite_size;
+>>>>         sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+>>>> -       itt = kzalloc(sz, GFP_KERNEL);
+>>>> +       itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
+>>>>         lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+>>>>         if (lpi_map)
+>>>>                 col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+>>>> @@ -1677,6 +1679,7 @@ static int __init its_probe_one(struct resource *res,
+>>>>  {
+>>>>         struct its_node *its;
+>>>>         void __iomem *its_base;
+>>>> +       struct page *page;
+>>>>         u32 val;
+>>>>         u64 baser, tmp;
+>>>>         int err;
+>>>> @@ -1716,12 +1719,13 @@ static int __init its_probe_one(struct resource *res,
+>>>>         its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+>>>>         its->numa_node = numa_node;
+>>>>
+>>>> -       its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+>>>> -                                               get_order(ITS_CMD_QUEUE_SZ));
+>>>> -       if (!its->cmd_base) {
+>>>> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
+>>>> +                               get_order(ITS_CMD_QUEUE_SZ));
+>>>> +       if (!page) {
+>>>>                 err = -ENOMEM;
+>>>>                 goto out_free_its;
+>>>>         }
+>>>> +       its->cmd_base = page_to_virt(page);
+>>>
+>>> same here, this would have been,
+>>> its->cmd_base = page_address(page);
+>>>
+>>>>         its->cmd_write = its->cmd_base;
+>>>>
+>>>>         its_enable_quirks(its);
+>>>> @@ -1775,7 +1779,7 @@ static int __init its_probe_one(struct resource *res,
+>>>>  out_free_tables:
+>>>>         its_free_tables(its);
+>>>>  out_free_cmd:
+>>>> -       free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
+>>>> +       __free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
+>>>
+>>> no change required.
+>>>>  out_free_its:
+>>>>         kfree(its);
+>>>>  out_unmap:
+>>>> --
+>>>> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+>>>> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>>>>
+>>>
+>>> thanks
+>>> Ganapat
+>>
+>> thanks
+>> Ganapat
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> --
+> Shanker Donthineni
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+thanks
+Ganapat
