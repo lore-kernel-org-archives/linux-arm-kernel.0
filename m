@@ -1,61 +1,52 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 3 Jul 2017 23:22:45 +0300
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
- before scanning
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40B10487@FRAEML521-MBX.china.huawei.com>
-References: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
- <20170613200339.GX3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
- <20170616083313.GY3187@lahna.fi.intel.com>
- <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
- <20170616120048.GC629@lahna.fi.intel.com>
- <CAJZ5v0g+qVui6RU=Hy3c_3qAAWngqaAu6B3JxGOpqF06kitbzA@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
- <20170619100209.GC629@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40ACFC3D@FRAEML521-MBX.china.huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B10487@FRAEML521-MBX.china.huawei.com>
-Message-ID: <CAHp75VevOno613gk8QHDA7kmLZJj9TLZRiu7oJUs_xaRzcbpnw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Jul 2017 23:19:45 +0200
+Subject: [PATCH] iio: adc: sun4i-gpadc-iio: fix unbalanced irq
+ enable/disable
+In-Reply-To: <20170703130926.32315-1-quentin.schulz@free-electrons.com>
+References: <20170703130926.32315-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170703211945.4vjnnjwl2lkcfr7u@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 3, 2017 at 7:08 PM, Gabriele Paoloni
-<gabriele.paoloni@huawei.com> wrote:
+On Mon, Jul 03, 2017 at 03:09:26PM +0200, Quentin Schulz wrote:
+> When initializing interrupts, the devm_request_any_context_irq will
+> enable them right away. An atomic flag was set in sun4i_irq_init and read
+> in the interrupt handler to make sure no unwanted interrupts were
+> handled. If an unwanted interrupt occurred, the handler would disable
+> the irq and return IRQ_HANDLED. However, at the end of sun4i_irq_init,
+> the irq would be disabled as well, resulting in an unbalanced enable
+> (since there are more disables than enables, the code enabling the
+> interrupt would never be called).
+> 
+> When reading the ADC or the temperature, the respective irq would be
+> enabled in the read function and disabled in the irq handler. In the
+> read function, we would wait for a completion (with a timeout) that will
+> be set in the irq handler. However, if the completion is never set or if
+> the wait for completion times out, the irq would not be disabled in the
+> read function resulting in an unbalanced enable once the read function
+> is called again (since there are 2+ enables for no disable).
+> 
+> Moving disable_irq from the irq handler to the read function get rid of
+> these two cases of unbalanced enable.
+> 
+> Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
+> 
+> Reported-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-JFYI: Mika on vacation.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> I had a look into the MFD framework. If my understanding is correct the mfd
-> framework create a platform device for each declared mfd_cell that is passed
-> to mfd_add_devices().
-
-Right.
-
-> However there is something that I do not quite understand:
-> from
-> http://elixir.free-electrons.com/linux/latest/source/drivers/mfd/mfd-core.c#L207
-> it seems that mfd_add_device() will create the platform device using the
-> resources that are statically declared in the respective mfd_cell.
-
-It's one possibility.
-
-> In my case I'd like to have a platform device using the resources that are
-> parsed from the ACPI table (i.e. as it is done now by
-> acpi_create_platform_device()).
-
-So far so good. Nothing prevents you to do that.
-
-> If my understanding is correct, if I declared an mfd_cell for my IPMI child
-> the mfd subsystem would create a platform device for such child and
-> therefore acpi_create_platform_device() would fail to create a new platform
-> device as adev->physical_node_count will be non zero.
-> However as things stand now mfd_cell devices can only use the resources
-> that are statically defined in the code (and therefore not the ones in the
-> ACPI nodes)...am I right?
-
-You may file resources first and then register MFD cells. See many
-existing examples in the kernel.
+Thanks!
+Maxime
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170703/0ae0b230/attachment.sig>
