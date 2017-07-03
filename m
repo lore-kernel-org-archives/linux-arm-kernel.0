@@ -1,244 +1,231 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 3 Jul 2017 22:21:59 +0530
-Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-In-Reply-To: <88a2a78f-6a5b-1b80-5dcf-0821b9fd81d9@codeaurora.org>
-References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
- <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
- <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
- <88a2a78f-6a5b-1b80-5dcf-0821b9fd81d9@codeaurora.org>
-Message-ID: <CAFpQJXWQiePwNDV9rxjKALPf_XXMbhQcZM1RwJLkDXTyJxjjiA@mail.gmail.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Mon, 3 Jul 2017 18:54:19 +0200
+Subject: [PATCH v2 4/5] soc: ti: Add pm33xx driver for basic suspend
+ support
+In-Reply-To: <20170519200438.9502-5-d-gerlach@ti.com>
+References: <20170519200438.9502-1-d-gerlach@ti.com>
+ <20170519200438.9502-5-d-gerlach@ti.com>
+Message-ID: <20170703165419.GC27842@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 3, 2017 at 7:07 PM, Shanker Donthineni
-<shankerd@codeaurora.org> wrote:
-> Hi Ganapatraoo,
->
-> On 06/29/2017 10:01 PM, Ganapatrao Kulkarni wrote:
->> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
->> <gpkulkarni@gmail.com> wrote:
->>> Hi Shanker,
->>>
->>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
->>> <shankerd@codeaurora.org> wrote:
->>>> The NUMA node information is visible to ITS driver but not being used
->>>> other than handling errata. This patch allocates the memory for ITS
->>>> tables from the corresponding NUMA node using the appropriate NUMA
->>>> aware functions.
->>
->> IMHO, the description would have been more constructive?
->>
->> "All ITS tables are mapped by default to NODE 0 memory.
->> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
->> This will optimize tables access and avoids unnecessary inter-node traffic."
->>
->
-> I don't understand why you are saying 'All ITS tables are mapped by default to NODE 0 memory'? Kernel runtime memory allocation comes from the corresponding NUMA node of the CPU that being called.
+On Fri, May 19, 2017 at 03:04:37PM -0500, Dave Gerlach wrote:
+> AM335x and AM437x support various low power modes as documented
+> in section 8.1.4.3 of the AM335x Technical Reference Manual and
+> section 6.4.3 of the AM437x Technical Reference Manual.
+> 
+> DeepSleep0 mode offers the lowest power mode with limited
+> wakeup sources without a system reboot and is mapped as
+> the suspend state in the kernel. In this state, MPU and
+> PER domains are turned off with the internal RAM held in
+> retention to facilitate the resume process. As part of
+> the boot process, the assembly code is copied over to OCMCRAM
+> so it can be executed to turn of the EMIF and put DDR into self
+> refresh.
+> 
+> Both platforms have a Cortex-M3 (WKUP_M3) which assists the MPU
+> in DeepSleep0 entry and exit. WKUP_M3 takes care
+> of the clockdomain and powerdomain transitions based on the
+> intended low power state. MPU needs to load the appropriate
+> WKUP_M3 binary onto the WKUP_M3 memory space before it can
+> leverage any of the PM features like DeepSleep. This loading
+> is handled by the remoteproc driver wkup_m3_rproc.
+> 
+> Communication with the WKUP_M3 is handled by a wkup_m3_ipc
+> driver that exposes the specific PM functionality to be used
+> the PM code.
 
-IIRC, ITT tables can be on any cpu, if drivers are not built-in and
-msi-x vectors are not initialised in init/probe, etc
-however Device table and Collection table are allocated from node 0
-memory during ITS driver init by boot-cpu/cpu0.
+> +static void am33xx_pm_free_sram(void)
+> +{
+> +	gen_pool_free(sram_pool, ocmcram_location, *pm_sram->do_wfi_sz);
+> +	gen_pool_free(sram_pool_data, ocmcram_location_data,
+> +		      sizeof(struct am33xx_pm_ro_sram_data));
+> +}
+> +
+> +/*
+> + * Push the minimal suspend-resume code to SRAM
+> + */
+> +static int am33xx_prepare_push_sram_idle(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "ti,omap3-mpu");
+> +
 
->
-> Please explain if you don't agree on this.
->
->>>>
->>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->>>> ---
->>>>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
->>>>  1 file changed, 20 insertions(+), 16 deletions(-)
->>>>
->>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->>>> index fed99c5..e45add2 100644
->>>> --- a/drivers/irqchip/irq-gic-v3-its.c
->>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
->>>> @@ -860,8 +860,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>>>         u64 val = its_read_baser(its, baser);
->>>>         u64 esz = GITS_BASER_ENTRY_SIZE(val);
->>>>         u64 type = GITS_BASER_TYPE(val);
->>>> +       struct page *page;
->>>>         u32 alloc_pages;
->>>> -       void *base;
->>>>         u64 tmp;
->>>>
->>>>  retry_alloc_baser:
->>>> @@ -874,12 +874,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>>>                 order = get_order(GITS_BASER_PAGES_MAX * psz);
->>>>         }
->>>>
->>>> -       base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
->>>> -       if (!base)
->>>> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
->>>
->>> the changes would have been minimal, if you converted page to base
->>> address after allocation here itself?
->>>
->>>  page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
->>>  base =  page_address(page);
->>>
->>>> +       if (!page)
->>>>                 return -ENOMEM;
->>>>
->>>>  retry_baser:
->>>> -       val = (virt_to_phys(base)                                |
->>>> +       val = (page_to_phys(page)
->>>
->>> no change required.
->>>
->>>>                 (type << GITS_BASER_TYPE_SHIFT)                  |
->>>>                 ((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)       |
->>>>                 ((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)    |
->>>> @@ -915,7 +915,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>>>                 shr = tmp & GITS_BASER_SHAREABILITY_MASK;
->>>>                 if (!shr) {
->>>>                         cache = GITS_BASER_nC;
->>>> -                       gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
->>>> +                       gic_flush_dcache_to_poc(page_to_virt(page),
->>>> +                                               PAGE_ORDER_TO_SIZE(order));
->>>
->>> no change needed, if base is used still.
->>>>                 }
->>>>                 goto retry_baser;
->>>>         }
->>>> @@ -926,7 +927,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>>>                  * size and retry. If we reach 4K, then
->>>>                  * something is horribly wrong...
->>>>                  */
->>>> -               free_pages((unsigned long)base, order);
->>>> +               __free_pages(page, order);
->>>
->>> no change required.
->>>>                 baser->base = NULL;
->>>>
->>>>                 switch (psz) {
->>>> @@ -943,19 +944,19 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->>>>                 pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
->>>>                        &its->phys_base, its_base_type_string[type],
->>>>                        val, tmp);
->>>> -               free_pages((unsigned long)base, order);
->>>> +               __free_pages(page, order);
->>>
->>> no change required.
->>>
->>>>                 return -ENXIO;
->>>>         }
->>>>
->>>>         baser->order = order;
->>>> -       baser->base = base;
->>>> +       baser->base = page_to_virt(page);
->>>
->>> no change required.
->>>>         baser->psz = psz;
->>>>         tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
->>>>
->>>>         pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
->>>>                 &its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
->>>>                 its_base_type_string[type],
->>>> -               (unsigned long)virt_to_phys(base),
->>>> +               (unsigned long)page_to_phys(page),
->>>
->>> no change required.
->>>>                 indirect ? "indirect" : "flat", (int)esz,
->>>>                 psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
->>>>
->>>> @@ -1019,7 +1020,7 @@ static void its_free_tables(struct its_node *its)
->>>>
->>>>         for (i = 0; i < GITS_BASER_NR_REGS; i++) {
->>>>                 if (its->tables[i].base) {
->>>> -                       free_pages((unsigned long)its->tables[i].base,
->>>> +                       __free_pages(virt_to_page(its->tables[i].base),
->>>
->>> ditto
->>>>                                    its->tables[i].order);
->>>>                         its->tables[i].base = NULL;
->>>>                 }
->>>> @@ -1286,7 +1287,8 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
->>>>
->>>>         /* Allocate memory for 2nd level table */
->>>>         if (!table[idx]) {
->>>> -               page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
->>>> +               page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
->>>> +                                       get_order(baser->psz));
->>>>                 if (!page)
->>>>                         return false;
->>>>
->>>> @@ -1332,7 +1334,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->>>>         nr_ites = max(2UL, roundup_pow_of_two(nvecs));
->>>>         sz = nr_ites * its->ite_size;
->>>>         sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
->>>> -       itt = kzalloc(sz, GFP_KERNEL);
->>>> +       itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
->>>>         lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
->>>>         if (lpi_map)
->>>>                 col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
->>>> @@ -1677,6 +1679,7 @@ static int __init its_probe_one(struct resource *res,
->>>>  {
->>>>         struct its_node *its;
->>>>         void __iomem *its_base;
->>>> +       struct page *page;
->>>>         u32 val;
->>>>         u64 baser, tmp;
->>>>         int err;
->>>> @@ -1716,12 +1719,13 @@ static int __init its_probe_one(struct resource *res,
->>>>         its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
->>>>         its->numa_node = numa_node;
->>>>
->>>> -       its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
->>>> -                                               get_order(ITS_CMD_QUEUE_SZ));
->>>> -       if (!its->cmd_base) {
->>>> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
->>>> +                               get_order(ITS_CMD_QUEUE_SZ));
->>>> +       if (!page) {
->>>>                 err = -ENOMEM;
->>>>                 goto out_free_its;
->>>>         }
->>>> +       its->cmd_base = page_to_virt(page);
->>>
->>> same here, this would have been,
->>> its->cmd_base = page_address(page);
->>>
->>>>         its->cmd_write = its->cmd_base;
->>>>
->>>>         its_enable_quirks(its);
->>>> @@ -1775,7 +1779,7 @@ static int __init its_probe_one(struct resource *res,
->>>>  out_free_tables:
->>>>         its_free_tables(its);
->>>>  out_free_cmd:
->>>> -       free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
->>>> +       __free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
->>>
->>> no change required.
->>>>  out_free_its:
->>>>         kfree(its);
->>>>  out_unmap:
->>>> --
->>>> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
->>>> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
->>>>
->>>
->>> thanks
->>> Ganapat
->>
->> thanks
->> Ganapat
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> --
-> Shanker Donthineni
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Stray newline.
 
-thanks
-Ganapat
+> +	if (!np) {
+> +		np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
+> +		if (!np) {
+> +			pr_warn("PM: %s: Unable to find device node for mpu\n",
+> +				__func__);
+> +			return -ENODEV;
+> +		}
+> +	}
+
+You never put the reference to np you acquire here.
+
+[snip] 
+
+> +static int am33xx_push_sram_idle(void)
+> +{
+> +	struct am33xx_pm_ro_sram_data ro_sram_data;
+> +	int ret;
+> +	void *copy_addr;
+> +
+> +	ro_sram_data.amx3_pm_sram_data_virt = ocmcram_location_data;
+> +	ro_sram_data.amx3_pm_sram_data_phys =
+> +		gen_pool_virt_to_phys(sram_pool_data, ocmcram_location_data);
+> +
+> +	/* Save physical address to calculate resume offset during pm init */
+> +	am33xx_do_wfi_sram_phys = gen_pool_virt_to_phys(sram_pool,
+> +							ocmcram_location);
+> +
+> +	am33xx_do_wfi_sram = sram_exec_copy(sram_pool, (void *)ocmcram_location,
+> +					    pm_sram->do_wfi,
+> +					    *pm_sram->do_wfi_sz);
+> +	if (!am33xx_do_wfi_sram) {
+> +		pr_err("PM: %s: am33xx_do_wfi copy to sram failed\n", __func__);
+> +		return -ENODEV;
+> +	}
+> +
+> +	ret = ti_emif_copy_pm_function_table(sram_pool,
+> +			(void *)sram_suspend_address((unsigned long)pm_sram->emif_sram_table));
+> +	if (ret) {
+> +		pr_warn("PM: %s: EMIF function copy failed\n", __func__);
+> +		return -EPROBE_DEFER;
+> +	}
+
+Here's the dependency to the emif device I commented on earlier (and
+below).
+
+> +
+> +	copy_addr = sram_exec_copy(sram_pool,
+> +			(void *)sram_suspend_address((unsigned long)pm_sram->ro_sram_data),
+> +			&ro_sram_data,
+> +			sizeof(ro_sram_data));
+> +	if (!copy_addr) {
+> +		pr_err("PM: %s: ro_sram_data copy to sram failed\n", __func__);
+> +		return -ENODEV;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int am33xx_pm_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	int ret;
+> +
+> +	if (!of_machine_is_compatible("ti,am33xx") &&
+> +	    !of_machine_is_compatible("ti,am43"))
+> +		return -ENODEV;
+> +
+> +	pm_ops = dev->platform_data;
+> +	if (!pm_ops) {
+> +		pr_err("PM: Cannot get core PM ops!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	pm_sram = pm_ops->get_sram_addrs();
+> +	if (!pm_sram) {
+> +		pr_err("PM: Cannot get PM asm function addresses!!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	ret = am33xx_prepare_push_sram_idle();
+
+Perhaps calling this one am33xx_pm_alloc_sram() would be more
+descriptive (and match the release function)?
+
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = am33xx_push_sram_idle();
+> +	if (ret)
+> +		goto err_free_sram;
+
+As I mentioned in my comments to the emif-sram driver, you may need to
+create device link to the emif-sram device to prevent it from going away
+under you here.
+
+> +
+> +	m3_ipc = wkup_m3_ipc_get();
+> +	if (!m3_ipc) {
+> +		pr_err("PM: Cannot get wkup_m3_ipc handle\n");
+
+You shouldn't log this as an error when probe is being deferred. 
+
+Why not use dev_err and friends for logging now that you have a struct
+device?
+
+And similarly to the emif-sram device, you may need to create a
+device-link also to the ipc device to prevent its driver from being
+unbound.
+
+> +		ret = -EPROBE_DEFER;
+> +		goto err_free_sram;
+> +	}
+> +
+> +	am33xx_pm_set_ipc_ops();
+> +
+> +#ifdef CONFIG_SUSPEND
+> +	suspend_set_ops(&am33xx_pm_ops);
+> +#endif /* CONFIG_SUSPEND */
+
+This renders a lockdep splash about a circular locking dependency when
+suspending since we're taking the pm_mutex in suspend_set_ops here, and
+during suspend we flush any deferred probes while already holding the
+mutex:
+
+ ======================================================
+ WARNING: possible circular locking dependency detected
+ 4.12.0-rc7 #11 Not tainted
+ ------------------------------------------------------
+ bash/404 is trying to acquire lock:
+  (deferred_probe_work){+.+.+.}, at: [<c014cf3c>] flush_work+0x30/0x27c
+ 
+ but task is already holding lock:
+  (pm_mutex){+.+...}, at: [<c01792dc>] pm_suspend+0x190/0xc94
+ 
+ which lock already depends on the new lock.
+ 
+ 
+ the existing dependency chain (in reverse order) is:
+ 
+ -> #1 (pm_mutex){+.+...}:
+        __mutex_lock+0x80/0x694
+        mutex_lock_nested+0x2c/0x34
+        suspend_set_ops+0x4c/0x128
+        am33xx_pm_probe+0x1fc/0x3a8
+        platform_drv_probe+0x5c/0xc0
+        driver_probe_device+0x37c/0x490
+        __device_attach_driver+0xac/0x128
+        bus_for_each_drv+0x74/0xa8
+        __device_attach+0xc4/0x154
+        device_initial_probe+0x1c/0x20
+        bus_probe_device+0x98/0xa0
+        deferred_probe_work_func+0x4c/0xe4
+        process_one_work+0x1f4/0x758
+        worker_thread+0x1e0/0x514
+        kthread+0x128/0x158
+        ret_from_fork+0x14/0x24
+ 
+ -> #0 (deferred_probe_work){+.+.+.}:
+        lock_acquire+0x108/0x264
+        flush_work+0x60/0x27c
+        wait_for_device_probe+0x24/0xa4
+        dpm_prepare+0xd0/0x91c
+        dpm_suspend_start+0x1c/0x70
+        suspend_devices_and_enter+0xc4/0xeac
+        pm_suspend+0x890/0xc94
+        state_store+0x80/0xdc
+        kobj_attr_store+0x1c/0x28
+        sysfs_kf_write+0x5c/0x60
+        kernfs_fop_write+0x128/0x254
+        __vfs_write+0x38/0x128
+        vfs_write+0xb4/0x174
+        SyS_write+0x54/0xb0
+        ret_fast_syscall+0x0/0x1c
+
+Johan
