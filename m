@@ -1,38 +1,65 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 3 Jul 2017 21:04:56 +0800
-Subject: [PATCH v11 0/3]add PCIe driver for Kirin PCIe
-In-Reply-To: <20170703104727.GB1573@arm.com>
-References: <20170619102349.50652-1-songxiaowei@hisilicon.com>
- <20170702233657.GA13507@bhelgaas-glaptop.roam.corp.google.com>
- <20170703104727.GB1573@arm.com>
-Message-ID: <CAFGCpxx+92PSs1VaryFOXau7CjBYEP4H6wT-o=bNMwkSznjQuw@mail.gmail.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon,  3 Jul 2017 15:09:26 +0200
+Subject: [PATCH] iio: adc: sun4i-gpadc-iio: fix unbalanced irq enable/disable
+Message-ID: <20170703130926.32315-1-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Xu Wei
+When initializing interrupts, the devm_request_any_context_irq will
+enable them right away. An atomic flag was set in sun4i_irq_init and read
+in the interrupt handler to make sure no unwanted interrupts were
+handled. If an unwanted interrupt occurred, the handler would disable
+the irq and return IRQ_HANDLED. However, at the end of sun4i_irq_init,
+the irq would be disabled as well, resulting in an unbalanced enable
+(since there are more disables than enables, the code enabling the
+interrupt would never be called).
 
+When reading the ADC or the temperature, the respective irq would be
+enabled in the read function and disabled in the irq handler. In the
+read function, we would wait for a completion (with a timeout) that will
+be set in the irq handler. However, if the completion is never set or if
+the wait for completion times out, the irq would not be disabled in the
+read function resulting in an unbalanced enable once the read function
+is called again (since there are 2+ enables for no disable).
 
+Moving disable_irq from the irq handler to the read function get rid of
+these two cases of unbalanced enable.
 
-On Mon, Jul 3, 2017 at 6:47 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Sun, Jul 02, 2017 at 06:36:57PM -0500, Bjorn Helgaas wrote:
->> [+cc Catalin, Will, linux-arm-kernel]
->>
->> Applied patches 2 & 3 to pci/host-kirin for v4.13.
->>
->> I would like a MAINTAINERS update, too.  If you send me that, I'll
->> squash it into the driver patch.
->>
->> Catalin, Will, how do you want to handle the
->> arch/arm64/configs/defconfig change (patch 3)?  It's currently on my
->> branch, but I'm happy to drop it if another route is better.
->
-> defconfig updates usually go through arm-soc, via the relevant platform
-> maintainer, so it would be best to follow that route here too otherwise
-> you'll probably see conflicts in -next.
->
+Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
 
-Is it ok for you to pick up the arch/arm64/configs/defconfig change (patch 3)?
+Reported-by: Andreas F?rber <afaerber@suse.de>
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+ drivers/iio/adc/sun4i-gpadc-iio.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
--Guodong
-
-> Will
+diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+index 81d4c39e414a..137f577d9432 100644
+--- a/drivers/iio/adc/sun4i-gpadc-iio.c
++++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+@@ -256,6 +256,7 @@ static int sun4i_gpadc_read(struct iio_dev *indio_dev, int channel, int *val,
+ 
+ err:
+ 	pm_runtime_put_autosuspend(indio_dev->dev.parent);
++	disable_irq(irq);
+ 	mutex_unlock(&info->mutex);
+ 
+ 	return ret;
+@@ -365,7 +366,6 @@ static irqreturn_t sun4i_gpadc_temp_data_irq_handler(int irq, void *dev_id)
+ 		complete(&info->completion);
+ 
+ out:
+-	disable_irq_nosync(info->temp_data_irq);
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -380,7 +380,6 @@ static irqreturn_t sun4i_gpadc_fifo_data_irq_handler(int irq, void *dev_id)
+ 		complete(&info->completion);
+ 
+ out:
+-	disable_irq_nosync(info->fifo_data_irq);
+ 	return IRQ_HANDLED;
+ }
+ 
+-- 
+2.11.0
