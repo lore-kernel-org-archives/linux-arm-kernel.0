@@ -1,65 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 3 Jul 2017 18:23:26 +0100
-Subject: [PATCH v4 4/5] drivers/perf: Add support for ARMv8.2 Statistical
- Profiling Extension
-In-Reply-To: <1496676177-29356-5-git-send-email-will.deacon@arm.com>
-References: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
- <1496676177-29356-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20170703172326.GA13732@leverpostej>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jul 2017 19:11:28 +0100
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <20170703134031.GG13824@bhelgaas-glaptop.roam.corp.google.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
+ <20170703134031.GG13824@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170703181128.GD4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 04:22:56PM +0100, Will Deacon wrote:
-> +static const struct of_device_id arm_spe_pmu_of_match[] = {
-> +	{ .compatible = "arm,statistical-profiling-extension-v1", .data = (void *)1 },
-> +};
+On Mon, Jul 03, 2017 at 08:40:31AM -0500, Bjorn Helgaas wrote:
+> The problem is serializing vs. memory accesses, since they don't use
+> any wrappers.  However, they are ioremapped(), so it's at least
+> conceivable that another solution would be to use VM to trap those
+> accesses.  I'm not a VM person, so I don't know whether that's
+> feasible in Linux.
 
-I just noticed that we're missing a sentinel entry here. Please could
-you append one for v5?
+Bjorn,
 
-Somehow we've been getting lucky with subsequent memory being zero, but
-KASAN screams when it sees us accessing said memory:
+You're forgetting that MMIO (iow, memory returned by ioremap()) must
+be accessed through the appropriate accessors, and must not be
+directly dereferenced in C.  (We do have buggy drivers that do that
+but they are buggy, and in many cases are getting attention to fix
+that.)
 
-[    5.451190] ==================================================================
-[    5.459186] BUG: KASAN: global-out-of-bounds in __of_match_node+0x140/0x158
-[    5.466595] Read of size 1 at addr ffff20000a504788 by task swapper/0/1
-[    5.473615] 
-[    5.475388] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.12.0-rc4-00010-g35b026e #2
-[    5.483547] Hardware name: ARM Juno development board (r1) (DT)
-[    5.489856] Call trace:
-[    5.492629] [<ffff200008094540>] dump_backtrace+0x0/0x560
-[    5.498445] [<ffff200008094ac0>] show_stack+0x20/0x30
-[    5.503910] [<ffff200008ba4280>] dump_stack+0x11c/0x184
-[    5.509555] [<ffff200008546a18>] print_address_description+0x40/0x388
-[    5.516446] [<ffff200008547080>] kasan_report+0x138/0x398
-[    5.522266] [<ffff2000085472f8>] __asan_report_load1_noabort+0x18/0x20
-[    5.529238] [<ffff200009a90f00>] __of_match_node+0x140/0x158
-[    5.535312] [<ffff200009a90f54>] of_match_node+0x3c/0x60
-[    5.541032] [<ffff200009a95fa4>] of_match_device+0x54/0x98
-[    5.546939] [<ffff2000091b39ac>] platform_match+0xc4/0x2e8
-[    5.552841] [<ffff2000091ada40>] __driver_attach+0x70/0x218
-[    5.558831] [<ffff2000091a7c2c>] bus_for_each_dev+0x13c/0x1d0
-[    5.564999] [<ffff2000091ac590>] driver_attach+0x48/0x78
-[    5.570720] [<ffff2000091ab514>] bus_add_driver+0x26c/0x5e0
-[    5.576712] [<ffff2000091af86c>] driver_register+0x16c/0x398
-[    5.582802] [<ffff2000091b33f8>] __platform_driver_register+0xd8/0x128
-[    5.589775] [<ffff20000a89a18c>] arm_spe_pmu_init+0x60/0x8c
-[    5.595766] [<ffff200008084acc>] do_one_initcall+0xcc/0x370
-[    5.601762] [<ffff20000a7e1d3c>] kernel_init_freeable+0x5f8/0x6c4
-[    5.608294] [<ffff200009f8f7a8>] kernel_init+0x18/0x190
-[    5.613924] [<ffff200008084710>] ret_from_fork+0x10/0x40
-[    5.619604] 
-[    5.621346] The buggy address belongs to the variable:
-[    5.626893]  arm_spe_pmu_of_match+0xc8/0x4c0
-[    5.631496] 
-[    5.633235] Memory state around the buggy address:
-[    5.638413]  ffff20000a504680: 00 01 fa fa fa fa fa fa 00 00 00 00 00 00 00 00
-[    5.646235]  ffff20000a504700: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-[    5.654057] >ffff20000a504780: 00 fa fa fa fa fa fa fa 00 fa fa fa fa fa fa fa
-[    5.661852]                       ^
-[    5.665683]  ffff20000a504800: 07 fa fa fa fa fa fa fa 00 04 fa fa fa fa fa fa
-[    5.673506]  ffff20000a504880: 00 05 fa fa fa fa fa fa 00 06 fa fa fa fa fa fa
-[    5.681302] ==================================================================
+However, adding a spinlock into them is really not nice, because it
+adds extra overhead that's only necessary for rare cases like Sigma
+Designs - especially when you consider that these accessors are used
+for all MMIO accesses, not just PCI.  It would effectively mean that
+we end up serialising all MMIO accesses throughout the kernel when
+Sigma Designs SoCs are enabled, destroying some of the SMP benefit.
 
-Thanks,
-Mark.
+I don't think we can sanely use the MMU to trap those accesses either,
+that would mean sending IPIs to tell other CPUs to do something, and
+waiting for them to respond - which can deadlock if we're already in
+an IRQ-protected region (iirc, config accesses are made with IRQs
+off.)
+
+I don't think there's an easy solution to this problem - and I'm not
+sure that stop_machine() can be made to work in this path (which
+needs a process context).  I have a suspicion that the Sigma Designs
+PCI implementation is just soo insane that it's never going to work
+reliably in a multi-SoC kernel without introducing severe performance
+issues for everyone else.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
