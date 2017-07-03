@@ -1,55 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 3 Jul 2017 10:35:50 +0100
-Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
- <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAKv+Gu_zAXTNYoWt+nMj_8tdDA8bcs86vepPJL1=zHfed2n-DA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 3 Jul 2017 10:44:39 +0100
+Subject: [PATCH] arm64: use readq() instead of readl() to read 64bit
+ entry_point
+In-Reply-To: <20170626131625.79059-1-luc.vanoostenryck@gmail.com>
+References: <20170626131625.79059-1-luc.vanoostenryck@gmail.com>
+Message-ID: <20170703094439.GA19119@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 July 2017 at 00:18, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:
->> This driver is required to work around several hardware bugs
->> in the PCIe controller.
->>
->> NB: Revision 1 does not support legacy interrupts, or IO space.
->
-> I had to apply these manually because of conflicts in Kconfig and
-> Makefile.  What are these based on?  Easiest for me is if you base
-> them on the current -rc1 tag.
->
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->> ---
->>  drivers/pci/host/Kconfig      |   8 +++
->>  drivers/pci/host/Makefile     |   1 +
->>  drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/pci_ids.h       |   2 +
->>  4 files changed, 175 insertions(+)
->>  create mode 100644 drivers/pci/host/pcie-tango.c
->>
-[..]
->> +     /*
->> +      * QUIRK #2
->> +      * Unfortunately, config and mem spaces are muxed.
->> +      * Linux does not support such a setting, since drivers are free
->> +      * to access mem space directly, at any time.
->> +      * Therefore, we can only PRAY that config and mem space accesses
->> +      * NEVER occur concurrently.
->> +      */
->> +     writel_relaxed(1, pcie->mux);
->> +     ret = pci_generic_config_read(bus, devfn, where, size, val);
->> +     writel_relaxed(0, pcie->mux);
->
-> I'm very hesitant about this.  When people stress this, we're going to
-> get reports of data corruption.  Even with the disclaimer below, I
-> don't feel good about this.  Adding the driver is an implicit claim
-> that we support the device, but we know it can't be made reliable.
->
+On Mon, Jun 26, 2017 at 03:16:25PM +0200, Luc Van Oostenryck wrote:
+> Here the entrypoint, declared as a 64 bit integer, is read from
+> a pointer to 64bit integer but the read is done via readl_relaxed()
+> which is for 32bit quantities.
+> 
+> All the high bits will thus be lost which change the meaning
+> of the test against zero done later.
+> 
+> Fix this by using readq_relaxed() instead as it should be for
+> 64bit quantities.
+> 
+> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+> 
+> ---
+> 
+> !!! Warning !!!
+>    I don't have the HW to test this, nor have I read the ACPI specs.
+>    This is only compile tested.
+> ---
+>  arch/arm64/kernel/acpi_parking_protocol.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-I noticed that the Synopsys driver suffers from a similar issue: in
-dw_pcie_rd_other_conf(), it happily reprograms the outbound I/O window
-to perform a config space access, and switches it back to I/O space
-afterwards (unless it has more than 2 viewports, in which case it uses
-dedicated windows for I/O space and config space)
+Patch is correct but as Mark already mentioned I would like some testing
+done on systems that rely on the parking protocol (hopefully FW clears
+the entry point correctly but I want to understand if this patch would
+trigger regressions that would force us to add quirks around it - even
+if we know this patch does the right thing from a kernel perspective).
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+> index 1f5655cd9..f35e80aad 100644
+> --- a/arch/arm64/kernel/acpi_parking_protocol.c
+> +++ b/arch/arm64/kernel/acpi_parking_protocol.c
+> @@ -125,7 +125,7 @@ static void acpi_parking_protocol_cpu_postboot(void)
+>  	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
+>  	__le64 entry_point;
+>  
+> -	entry_point = readl_relaxed(&mailbox->entry_point);
+> +	entry_point = readq_relaxed(&mailbox->entry_point);
+>  	/*
+>  	 * Check if firmware has cleared the entry_point as expected
+>  	 * by the protocol specification.
+> -- 
+> 2.13.0
+> 
