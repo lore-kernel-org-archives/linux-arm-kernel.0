@@ -1,132 +1,107 @@
-From: randy.li@rock-chips.com (Randy Li)
-Date: Mon, 3 Jul 2017 10:17:13 +0800
-Subject: [PATCH 1/5] [media] rockchip/rga: v4l2 m2m support
-In-Reply-To: <1498578582.25964.5.camel@ndufresne.ca>
-References: <1498488673-27900-1-git-send-email-jacob-chen@iotwrt.com>
- <1498492189.3710.4.camel@ndufresne.ca>
- <CAFLEztT4z81P8c5pce0zZtaJc+UDsAdXWGp8Rvmq5VL+TsWNNg@mail.gmail.com>
- <1498578582.25964.5.camel@ndufresne.ca>
-Message-ID: <8adf331a-d466-9d2e-010a-4701cc10da56@rock-chips.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 3 Jul 2017 03:18:35 +0000
+Subject: [PATCH 9/9] clk: imx: add imx7ulp clk driver
+In-Reply-To: <20170701003511.GR22780@codeaurora.org>
+References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
+ <1494856763-6543-10-git-send-email-aisheng.dong@nxp.com>
+ <20170620020119.GQ4493@codeaurora.org>
+ <20170620094256.GF6805@b29396-OptiPlex-7040>
+ <20170620204152.GS4493@codeaurora.org>
+ <AM3PR04MB3068D246A722A3EAA6652C280DA0@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <20170701003511.GR22780@codeaurora.org>
+Message-ID: <AM3PR04MB306DEAD1B58902F94C7F79380D60@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/27/2017 11:49 PM, Nicolas Dufresne wrote:
-> Le mardi 27 juin 2017 ? 23:11 +0800, Jacob Chen a ?crit :
->> Hi Nicolas.
->>
->> 2017-06-26 23:49 GMT+08:00 Nicolas Dufresne <nicolas@ndufresne.ca>:
->>>
->>> Le lundi 26 juin 2017 ? 22:51 +0800, Jacob Chen a ?crit :
->>>> Rockchip RGA is a separate 2D raster graphic acceleration unit.
->>>> It
->>>> accelerates 2D graphics operations, such as point/line drawing,
->>>> image
->>>> scaling, rotation, BitBLT, alpha blending and image
->>>> blur/sharpness.
->>>>
->>>> The drvier is mostly based on s5p-g2d v4l2 m2m driver.
->>>> And supports various operations from the rendering pipeline.
->>>>   - copy
->>>>   - fast solid color fill
->>>>   - rotation
->>>>   - flip
->>>>   - alpha blending
->>>>
->>>> The code in rga-hw.c is used to configure regs accroding to
->>>> operations.
->>>>
->>>> The code in rga-buf.c is used to create private mmu table for
->>>> RGA.
->>>> The tables is stored in a list, and be removed when buffer is
->>>> cleanup.
->>>>
->>>> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
->>>> ---
->>>>   drivers/media/platform/Kconfig                |  11 +
->>>>   drivers/media/platform/Makefile               |   2 +
->>>>   drivers/media/platform/rockchip-rga/Makefile  |   3 +
->>>>   drivers/media/platform/rockchip-rga/rga-buf.c | 176 +++++
->>>>   drivers/media/platform/rockchip-rga/rga-hw.c  | 456 ++++++++++++
->>>>   drivers/media/platform/rockchip-rga/rga-hw.h  | 434 ++++++++++++
->>>>   drivers/media/platform/rockchip-rga/rga.c     | 979
->>>> ++++++++++++++++++++++++++
->>>>   drivers/media/platform/rockchip-rga/rga.h     | 133 ++++
->>>>   8 files changed, 2194 insertions(+)
->>>>   create mode 100644 drivers/media/platform/rockchip-rga/Makefile
->>>>   create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
->>>>   create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
->>>>   create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
->>>>   create mode 100644 drivers/media/platform/rockchip-rga/rga.c
->>>>   create mode 100644 drivers/media/platform/rockchip-rga/rga.h
->>>>
->>>
->>> Could be nice to generalize. We could setup a control and fill the
->>> values base on porter duff operations, then drivers can implement a
->>> subset. Right now, there is no generic way for userspace to know if
->>> a
->>> driver is just doing copies with some transformations, or if it can
->>> actually do alpha blending hence used for composting streams. Note
->>> that
->>> I haven't looked at all possibilities, Freescale IMX.6 seems to
->>> have a
->>> similar driver, which has been wrapped in GStreamer with this
->>> proposed
->>> elements:
->>>
->>> https://bugzilla.gnome.org/show_bug.cgi?id=772766
->>>
->>
->> Yeah, i also want it use a generic api.
->> "porter duff operations" looks good, i will look at it.
->>
->>>> +#define V4L2_CID_RGA_ALHPA_REG0 (V4L2_CID_USER_BASE | 0x1002)
->>>> +#define V4L2_CID_RGA_ALHPA_REG1 (V4L2_CID_USER_BASE | 0x1003)
->>>
->>> It's not obvious why there is two CID, and how this differ from
->>> existing V4L2_CID_ALPHA (the global alpha control).
->>
->> They are used to calculate factors for below formulas.
->>
->>      dst alpha = Factor1 * src alpha + Factor2 * dst alpha
->>      dst color = Factor3 * src color + Factor4 * dst color
->>
->> I have no idea how to generalize it, and there is no upstream
->> application need it,
->> so i just simply exposed the reg.
-In my memory, it is is used for convert AYUV to ARGB.
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
+> Sent: Saturday, July 01, 2017 8:35 AM
+> To: A.s. Dong
+> Cc: Dong Aisheng; linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
+> shawnguo at kernel.org; Anson Huang; Jacky Bai
+> Subject: Re: [PATCH 9/9] clk: imx: add imx7ulp clk driver
 > 
-> Then maybe it's better to just not expose it in the public API in the
-> initial patch (nothing forces you to enable everything). The idea is
-> that it can be added later as needed, taking the time to figure-out a
-> new API or to figure-out how this matches anything that exist.
+> On 06/21, A.s. Dong wrote:
+> > > -----Original Message-----
+> > > From: Stephen Boyd [mailto:sboyd at codeaurora.org]
+> > > Sent: Wednesday, June 21, 2017 4:42 AM
+> > > To: Dong Aisheng
+> > > Cc: A.s. Dong; linux-clk at vger.kernel.org;
+> > > linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > > mturquette at baylibre.com; shawnguo at kernel.org; Anson Huang; Jacky Bai
+> > > Subject: Re: [PATCH 9/9] clk: imx: add imx7ulp clk driver
+> > >
+> > > On 06/20, Dong Aisheng wrote:
+> > > > On Mon, Jun 19, 2017 at 07:01:19PM -0700, Stephen Boyd wrote:
+> > > > >
+> > > > > Any reason why it can't be a platform driver? If not, please add
+> > > > > some comment explaining why.
+> > > > >
+> > > >
+> > > > Timer is using it at early stage. GIC seems not although standard
+> > > > binding claim possible clock requirement.
+> > > > Others still not sure.
+> > > >
+> > > > What your suggestion?
+> > > > Convert timer to platform driver and make clock as platform driver
+> > > > as
+> > > well?
+> > > >
+> > >
+> > > The timer can't be a platform driver because it would be too late.
+> > > The clock driver could register whatever clks are required for the
+> > > timer/GIC in a CLK_OF_DECLARE_DRIVER hook, and then leave the rest
+> > > to a platform driver. This way we get some of the device driver
+> framework in this code.
+> > >
+> >
+> > Okay, I could try it. Thanks.
+> >
+> > One thing is that TPM clock has a lot parents and parents having
+> > parents, as well as PIT timer. So I may need enable more than half
+> > clocks in CLK_OF_DECLARE_DRIVER hook.
 > 
->>
->>>> +
->>>> +/* Operation values */
->>>> +#define OP_COPY 0
->>>> +#define OP_SOLID_FILL 1
->>>> +#define OP_ALPHA_BLEND 2
->>>> +
->>>> +struct rga_frame *rga_get_frame(struct rga_ctx *ctx, enum
->>>> v4l2_buf_type type);
->>>> +
->>>> +/* RGA Buffers Manage Part */
->>>> +extern const struct vb2_ops rga_qops;
->>>> +void *rga_buf_find_page(struct vb2_buffer *vb);
->>>> +void rga_buf_clean(struct rga_ctx *ctx);
->>>> +
->>>> +/* RGA Hardware Part */
->>>> +void rga_write(struct rockchip_rga *rga, u32 reg, u32 value);
->>>> +u32 rga_read(struct rockchip_rga *rga, u32 reg);
->>>> +void rga_mod(struct rockchip_rga *rga, u32 reg, u32 val, u32
->>>> mask);
->>>> +void rga_start(struct rockchip_rga *rga);
->>>> +void rga_cmd_set(struct rga_ctx *ctx, void *src_mmu_pages, void
->>>> *dst_mmu_pages);
->>>> +
->>>> +#endif
+> That's fine.
+> 
+> >
+> > BTW, What's benefit to convert into two parts of probe?
+> > I'm not quite if I already get it all, can you help clarify it?
+> >
+> 
+> The benefit is that we still get a platform driver and we can associate a
+> device pointer with the clock controller eventually.
+> Here's a reply I sent yesterday on the same topic:
+> 
+> Reasons (in no particular order):
+> 
+>   1. We get a dev pointer to use with clk_hw_register()
+> 
+>   2. We can handle probe defer if some resource is not available
+> 
+>   3. Using device model gets us a hook into power management frameworks
+>      like runtime PM and system PM for things like suspend and hibernate
+> 
+>   4. It encourages a single DT node clk controller style binding
+>      instead of a single node per clk style binding
+> 
+>   5. We can use non-DT specific functions like devm_ioremap_resource() to
+> map
+>      registers and acquire other resources, leading to more portable and
+>      generic code
+> 
+>   6. We may be able to make the device driver a module, which will
+>      make distros happy if we don't have to compile in all
+>      these clk drivers to the resulting vmlinux (this one doesn't
+>      apply here)
+> 
 
--- 
-Randy Li
+Very clear.
+Thanks for the great explanation.
+
+Regards
+Dong Aisheng
+
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+> Linux Foundation Collaborative Project
