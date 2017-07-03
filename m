@@ -1,29 +1,71 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 3 Jul 2017 11:03:23 +0200
-Subject: [PATCH] arm64: dts: r8a7795: Add DRIF support
-In-Reply-To: <20170623091320.12664-1-ramesh.shanmugasundaram@bp.renesas.com>
-References: <20170623091320.12664-1-ramesh.shanmugasundaram@bp.renesas.com>
-Message-ID: <20170703090323.GA15426@verge.net.au>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 3 Jul 2017 10:13:26 +0100
+Subject: Tegra baseline test results for v4.12-rc5
+Message-ID: <a5a964e5-1aba-a1ab-bd84-574645f560a2@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 10:13:20AM +0100, Ramesh Shanmugasundaram wrote:
-> Adds the DRIF controller nodes for r8a7795.
-> 
-> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-> ---
-> Hi Simon,
-> 
->    This patch is based on renesas-devel-20170622-v4.12-rc6 tag.
->    It is verified on both H3 ES1.1 and ES2.0 SoC revisions.
-> 
->    The bindings[1] and the driver[2] were pushed into the media_tree.
-> 
->    [1] https://git.linuxtv.org/media_tree.git/commit/?id=54a707ea011601f06cc5ef7fe6d0daac71ab0622
->    [2] https://git.linuxtv.org/media_tree.git/commit/?id=7625ee981af166ddb569e2e6c0006e2af471326f
-> 
-> Thanks,
-> Ramesh.
+Here are some basic Tegra test results for Linux v4.12-rc5.
+Logs and other details at:
 
-Thanks for the reminder and sorry for letting this slip through.
-I have queued this up for v4.14.
+    https://nvtb.github.io//linux/test_v4.12-rc5/20170611170104/
+
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.12-rc4 (3c2993b8c6143d8a5793746a54eba8f86f95240f)):
+   text     data      bss    total  kernel
+ +15764   +10136        0   +25900  defconfig
+  +1158      -64        0    +1094  multi_v7_defconfig
+    +62        0        0      +62  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.12-rc4 (3c2993b8c6143d8a5793746a54eba8f86f95240f))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
