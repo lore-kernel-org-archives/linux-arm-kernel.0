@@ -1,30 +1,103 @@
-From: ckeepax@opensource.cirrus.com (Charles Keepax)
-Date: Mon, 3 Jul 2017 09:58:17 +0100
-Subject: [PATCH v3 05/12] Input: wm97xx: split out touchscreen registering
-In-Reply-To: <20170630194408.24978-6-robert.jarzmik@free.fr>
-References: <20170630194408.24978-1-robert.jarzmik@free.fr>
- <20170630194408.24978-6-robert.jarzmik@free.fr>
-Message-ID: <20170703085817.fajdhhgamngxfnwp@localhost.localdomain>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 3 Jul 2017 11:03:44 +0200
+Subject: [RFC 06/55] KVM: arm64: Add EL2 execution context for nesting
+In-Reply-To: <CAHyh4xjOvAgqQ+WLD3SHyNHXOFSuoKGu4sV+GaFm-LdEcoGYwA@mail.gmail.com>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-7-git-send-email-jintack@cs.columbia.edu>
+ <20170222111017.GB26976@cbox>
+ <CAHyh4xjOvAgqQ+WLD3SHyNHXOFSuoKGu4sV+GaFm-LdEcoGYwA@mail.gmail.com>
+Message-ID: <20170703090344.GF4066@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 09:44:01PM +0200, Robert Jarzmik wrote:
-> wm97xx-core does several things in it initialization :
->  - touchscreen input device setup
->  - battery device creation
+On Mon, Jun 26, 2017 at 10:33:23AM -0400, Jintack Lim wrote:
+> Hi Christoffer,
 > 
-> As the wm97xx is actually a multi-function device handling an audio
-> codec, a touchscreen, a gpio block and an ADC, reshape the probing to
-> isolate what is truly input/touchscreen specific from the remaining
-> part.
+> On Wed, Feb 22, 2017 at 6:10 AM, Christoffer Dall <cdall@linaro.org> wrote:
+> > On Mon, Jan 09, 2017 at 01:24:02AM -0500, Jintack Lim wrote:
+> >> With the nested virtualization support, the context of the guest
+> >> includes EL2 register states. The host manages a set of virtual EL2
+> >> registers.  In addition to that, the guest hypervisor supposed to run in
+> >> EL2 is now deprivilaged and runs in EL1. So, the host also manages a set
+> >> of shadow system registers to be able to run the guest hypervisor in
+> >> EL1.
+> >>
+> >> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> ---
+> >>  arch/arm64/include/asm/kvm_host.h | 54 +++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 54 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> >> index c0c8b02..ed78d73 100644
+> >> --- a/arch/arm64/include/asm/kvm_host.h
+> >> +++ b/arch/arm64/include/asm/kvm_host.h
+> >> @@ -146,6 +146,42 @@ enum vcpu_sysreg {
+> >>       NR_SYS_REGS     /* Nothing after this line! */
+> >>  };
+> >>
+> >> +enum el2_regs {
+> >> +     ELR_EL2,
+> >> +     SPSR_EL2,
+> >> +     SP_EL2,
+> >> +     AMAIR_EL2,
+> >> +     MAIR_EL2,
+> >> +     TCR_EL2,
+> >> +     TTBR0_EL2,
+> >> +     VTCR_EL2,
+> >> +     VTTBR_EL2,
+> >> +     VMPIDR_EL2,
+> >> +     VPIDR_EL2,      /* 10 */
+> >> +     MDCR_EL2,
+> >> +     CNTHCTL_EL2,
+> >> +     CNTHP_CTL_EL2,
+> >> +     CNTHP_CVAL_EL2,
+> >> +     CNTHP_TVAL_EL2,
+> >> +     CNTVOFF_EL2,
+> >> +     ACTLR_EL2,
+> >> +     AFSR0_EL2,
+> >> +     AFSR1_EL2,
+> >> +     CPTR_EL2,       /* 20 */
+> >> +     ESR_EL2,
+> >> +     FAR_EL2,
+> >> +     HACR_EL2,
+> >> +     HCR_EL2,
+> >> +     HPFAR_EL2,
+> >> +     HSTR_EL2,
+> >> +     RMR_EL2,
+> >> +     RVBAR_EL2,
+> >> +     SCTLR_EL2,
+> >> +     TPIDR_EL2,      /* 30 */
+> >> +     VBAR_EL2,
+> >> +     NR_EL2_REGS     /* Nothing after this line! */
+> >> +};
+> >
+> > Why do we have a separate enum and array for the EL2 regs and not simply
+> > expand vcpu_sysreg ?
 > 
-> This is only code shuffling, there is no functional change.
+> We can expand vcpu_sysreg for the EL2 system registers. For SP_EL2,
+> SPSR_EL2, and ELR_EL2, where is the good place to locate them?.
+> SP_EL1, SPSR_EL1, and ELR_EL1 registers are saved in the kvm_regs
+> structure instead of sysregs[], so I wonder it's better to put them in
+> kvm_regs, too.
 > 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> ---
+> BTW, what's the reason that those EL1 registers are in kvm_regs
+> instead of sysregs[] in the first place?
+> 
 
-Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+This has mostly to do with the way we export things to userspace, and
+for historical reasons.
+
+So we should either expand kvm_regs with the non-sysregs EL2 registers
+and expand sys_regs with the EL2 sysregs, or we should put everything
+EL2 into an EL2 array.  I feel like the first solution will fit more
+nicely into the current design, but I don't have a very strong
+preference.
+
+You should look at the KVM_{GET,SET}_ONE_REG API definition and think
+about how your choice will fit with this.
+
+Marc, any preference?
 
 Thanks,
-Charles
+-Christoffer
