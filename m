@@ -1,154 +1,212 @@
-From: jintack.lim@linaro.org (Jintack Lim)
-Date: Mon, 3 Jul 2017 09:29:29 -0400
-Subject: [RFC 21/55] KVM: arm64: Forward HVC instruction to the guest
- hypervisor
-In-Reply-To: <20170703090850.GG4066@cbox>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-22-git-send-email-jintack@cs.columbia.edu>
- <20170222114758.GM26976@cbox>
- <CAHyh4xjG8_dOOe-eqQmAogDHDnQPCUQ-2Kccz9=6NmL0_+9TAA@mail.gmail.com>
- <20170703090850.GG4066@cbox>
-Message-ID: <CAHyh4xjML+wMK_NAmDXV0w+4v+xmYxJscNvPOeYA3Bvz+F3X5g@mail.gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 3 Jul 2017 08:30:10 -0500
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+ <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+Message-ID: <4e8bc883-4fa1-d819-6668-ccb570d44d38@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 3, 2017 at 5:08 AM, Christoffer Dall <cdall@linaro.org> wrote:
-> On Mon, Jun 26, 2017 at 11:21:25AM -0400, Jintack Lim wrote:
->> On Wed, Feb 22, 2017 at 6:47 AM, Christoffer Dall <cdall@linaro.org> wrote:
->> > On Mon, Jan 09, 2017 at 01:24:17AM -0500, Jintack Lim wrote:
->> >> Forward exceptions due to hvc instruction to the guest hypervisor.
->> >>
->> >> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->> >> ---
->> >>  arch/arm64/include/asm/kvm_nested.h |  5 +++++
->> >>  arch/arm64/kvm/Makefile             |  1 +
->> >>  arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
->> >>  arch/arm64/kvm/handle_exit_nested.c | 27 +++++++++++++++++++++++++++
->> >>  4 files changed, 44 insertions(+)
->> >>  create mode 100644 arch/arm64/include/asm/kvm_nested.h
->> >>  create mode 100644 arch/arm64/kvm/handle_exit_nested.c
->> >>
->> >> diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
->> >> new file mode 100644
->> >> index 0000000..620b4d3
->> >> --- /dev/null
->> >> +++ b/arch/arm64/include/asm/kvm_nested.h
->> >> @@ -0,0 +1,5 @@
->> >> +#ifndef __ARM64_KVM_NESTED_H__
->> >> +#define __ARM64_KVM_NESTED_H__
->> >> +
->> >> +int handle_hvc_nested(struct kvm_vcpu *vcpu);
->> >> +#endif
->> >> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
->> >> index b342bdd..9c35e9a 100644
->> >> --- a/arch/arm64/kvm/Makefile
->> >> +++ b/arch/arm64/kvm/Makefile
->> >> @@ -35,4 +35,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
->> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
->> >>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
->> >>
->> >> +kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
->> >>  kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
->> >> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> >> index a891684..208be16 100644
->> >> --- a/arch/arm64/kvm/handle_exit.c
->> >> +++ b/arch/arm64/kvm/handle_exit.c
->> >> @@ -29,6 +29,10 @@
->> >>  #include <asm/kvm_mmu.h>
->> >>  #include <asm/kvm_psci.h>
->> >>
->> >> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
->> >> +#include <asm/kvm_nested.h>
->> >> +#endif
->> >> +
->> >>  #define CREATE_TRACE_POINTS
->> >>  #include "trace.h"
->> >>
->> >> @@ -42,6 +46,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->> >>                           kvm_vcpu_hvc_get_imm(vcpu));
->> >>       vcpu->stat.hvc_exit_stat++;
->> >>
->> >> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
->> >> +     ret = handle_hvc_nested(vcpu);
->> >> +     if (ret < 0 && ret != -EINVAL)
->> >> +             return ret;
->> >> +     else if (ret >= 0)
->> >> +             return ret;
->> >> +#endif
->> >>       ret = kvm_psci_call(vcpu);
->> >>       if (ret < 0) {
->> >>               kvm_inject_undefined(vcpu);
->> >> diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
->> >> new file mode 100644
->> >> index 0000000..a6ce23b
->> >> --- /dev/null
->> >> +++ b/arch/arm64/kvm/handle_exit_nested.c
->> >> @@ -0,0 +1,27 @@
->> >> +/*
->> >> + * Copyright (C) 2016 - Columbia University
->> >> + * Author: Jintack Lim <jintack@cs.columbia.edu>
->> >> + *
->> >> + * This program is free software; you can redistribute it and/or modify
->> >> + * it under the terms of the GNU General Public License version 2 as
->> >> + * published by the Free Software Foundation.
->> >> + *
->> >> + * This program is distributed in the hope that it will be useful,
->> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> >> + * GNU General Public License for more details.
->> >> + *
->> >> + * You should have received a copy of the GNU General Public License
->> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> >> + */
->> >> +
->> >> +#include <linux/kvm.h>
->> >> +#include <linux/kvm_host.h>
->> >> +
->> >> +#include <asm/kvm_emulate.h>
->> >> +
->> >> +/* We forward all hvc instruction to the guest hypervisor. */
->> >> +int handle_hvc_nested(struct kvm_vcpu *vcpu)
->> >> +{
->> >> +     return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
->> >> +}
->> >
->> > I don't understand the logic here or in the caller above.  Do we really
->> > forward *all" hvc calls to the guest hypervisor now, so that we no
->> > longer support any hypercalls from the VM?  That seems a little rough
->> > and probably requires some more discussions.
+Hi Ganapatrao,
+
+On 06/29/2017 09:34 PM, Ganapatrao Kulkarni wrote:
+> Hi Shanker,
+> 
+> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+> <shankerd@codeaurora.org> wrote:
+>> The NUMA node information is visible to ITS driver but not being used
+>> other than handling errata. This patch allocates the memory for ITS
+>> tables from the corresponding NUMA node using the appropriate NUMA
+>> aware functions.
 >>
->> So I think if we run a VM with the EL2 support, then all hvc calls
->> from the VM should be forwarded to the virtual EL2.
->
-> But do we actually check if the guest has EL2 here?  It seems you cann
-> handle_hvc_nested unconditionally when you have
-> OCNFIG_KVM_ARM_NESTED_HYP.  I think that's what threw me off when first
-> reading your patch.
-
-You're right. We should check it first.
-
->
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
+>>  1 file changed, 20 insertions(+), 16 deletions(-)
 >>
->> I may miss something obvious, so can you (or anyone) come up with some
->> cases that the host hypervisor needs to directly handle hvc from the
->> VM with the EL2 support?
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index fed99c5..e45add2 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -860,8 +860,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>         u64 val = its_read_baser(its, baser);
+>>         u64 esz = GITS_BASER_ENTRY_SIZE(val);
+>>         u64 type = GITS_BASER_TYPE(val);
+>> +       struct page *page;
+>>         u32 alloc_pages;
+>> -       void *base;
+>>         u64 tmp;
 >>
->
-> So I'm a little unsure what to say here.  On one hand you are absolutely
-> correct, that architecturally if we emulated virtual EL2, then all
-> hypercalls are handled by the virtual EL2 (even hypercalls from virtual
-> EL2 which should become self-hypercalls).
->
-> On the other hand, an enlightened guest may want to use hypercalls to
-> the hypervisor for some reason, but that would require some numbering
-> scheme to separate the two concepts.
->
-> Do we currently have support for the guest to use SMC calls for PSCI
-> when it has virtual EL2?
+>>  retry_alloc_baser:
+>> @@ -874,12 +874,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>                 order = get_order(GITS_BASER_PAGES_MAX * psz);
+>>         }
+>>
+>> -       base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+>> -       if (!base)
+>> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
+> 
+> the changes would have been minimal, if you converted page to base
+> address after allocation here itself?
+> 
 
-Yes, we do in "[RFC,22/55] KVM: arm64: Handle PSCI call from the
-guest" as you figured out.
+Yes, but it doesn't make any sense to keep the two variables to server the same purpose and covert the page pointer to (unsigned long) when freeing it. 
+ 
+>  page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
+>  base =  page_address(page);
+> 
+>> +       if (!page)
+>>                 return -ENOMEM;
+>>
+>>  retry_baser:
+>> -       val = (virt_to_phys(base)                                |
+>> +       val = (page_to_phys(page)
+> 
+> no change required.
+> 
+>>                 (type << GITS_BASER_TYPE_SHIFT)                  |
+>>                 ((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)       |
+>>                 ((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)    |
+>> @@ -915,7 +915,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>                 shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+>>                 if (!shr) {
+>>                         cache = GITS_BASER_nC;
+>> -                       gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
+>> +                       gic_flush_dcache_to_poc(page_to_virt(page),
+>> +                                               PAGE_ORDER_TO_SIZE(order));
+> 
+> no change needed, if base is used still.
+>>                 }
+>>                 goto retry_baser;
+>>         }
+>> @@ -926,7 +927,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>                  * size and retry. If we reach 4K, then
+>>                  * something is horribly wrong...
+>>                  */
+>> -               free_pages((unsigned long)base, order);
+>> +               __free_pages(page, order);
+> 
+> no change required.
+>>                 baser->base = NULL;
+>>
+>>                 switch (psz) {
+>> @@ -943,19 +944,19 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>>                 pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
+>>                        &its->phys_base, its_base_type_string[type],
+>>                        val, tmp);
+>> -               free_pages((unsigned long)base, order);
+>> +               __free_pages(page, order);
+> 
+> no change required.
+> 
+>>                 return -ENXIO;
+>>         }
+>>
+>>         baser->order = order;
+>> -       baser->base = base;
+>> +       baser->base = page_to_virt(page);
+> 
+> no change required.
+>>         baser->psz = psz;
+>>         tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
+>>
+>>         pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
+>>                 &its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
+>>                 its_base_type_string[type],
+>> -               (unsigned long)virt_to_phys(base),
+>> +               (unsigned long)page_to_phys(page),
+> 
+> no change required.
+>>                 indirect ? "indirect" : "flat", (int)esz,
+>>                 psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+>>
+>> @@ -1019,7 +1020,7 @@ static void its_free_tables(struct its_node *its)
+>>
+>>         for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+>>                 if (its->tables[i].base) {
+>> -                       free_pages((unsigned long)its->tables[i].base,
+>> +                       __free_pages(virt_to_page(its->tables[i].base),
+> 
+> ditto
+>>                                    its->tables[i].order);
+>>                         its->tables[i].base = NULL;
+>>                 }
+>> @@ -1286,7 +1287,8 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+>>
+>>         /* Allocate memory for 2nd level table */
+>>         if (!table[idx]) {
+>> -               page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
+>> +               page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
+>> +                                       get_order(baser->psz));
+>>                 if (!page)
+>>                         return false;
+>>
+>> @@ -1332,7 +1334,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>         nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>>         sz = nr_ites * its->ite_size;
+>>         sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+>> -       itt = kzalloc(sz, GFP_KERNEL);
+>> +       itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
+>>         lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+>>         if (lpi_map)
+>>                 col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+>> @@ -1677,6 +1679,7 @@ static int __init its_probe_one(struct resource *res,
+>>  {
+>>         struct its_node *its;
+>>         void __iomem *its_base;
+>> +       struct page *page;
+>>         u32 val;
+>>         u64 baser, tmp;
+>>         int err;
+>> @@ -1716,12 +1719,13 @@ static int __init its_probe_one(struct resource *res,
+>>         its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+>>         its->numa_node = numa_node;
+>>
+>> -       its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+>> -                                               get_order(ITS_CMD_QUEUE_SZ));
+>> -       if (!its->cmd_base) {
+>> +       page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
+>> +                               get_order(ITS_CMD_QUEUE_SZ));
+>> +       if (!page) {
+>>                 err = -ENOMEM;
+>>                 goto out_free_its;
+>>         }
+>> +       its->cmd_base = page_to_virt(page);
+> 
+> same here, this would have been,
+> its->cmd_base = page_address(page);
+> 
+>>         its->cmd_write = its->cmd_base;
+>>
+>>         its_enable_quirks(its);
+>> @@ -1775,7 +1779,7 @@ static int __init its_probe_one(struct resource *res,
+>>  out_free_tables:
+>>         its_free_tables(its);
+>>  out_free_cmd:
+>> -       free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
+>> +       __free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
+> 
+> no change required.
+>>  out_free_its:
+>>         kfree(its);
+>>  out_unmap:
+>> --
+>> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+>> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>>
+> 
+> thanks
+> Ganapat
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
->
-> Thanks,
-> -Christoffer
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
