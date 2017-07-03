@@ -1,235 +1,135 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Jul 2017 20:48:48 +0200
-Subject: [PATCH v5] crypto: sun4i-ss: support the Security System PRNG
-Message-ID: <20170703184848.23699-1-clabbe.montjoie@gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue,  4 Jul 2017 00:40:27 +0530
+Subject: [PATCH 2/2] arm64: disable irq between breakpoint and step exception
+In-Reply-To: <cover.1499107909.git.panand@redhat.com>
+References: <cover.1499107909.git.panand@redhat.com>
+Message-ID: <082c1ea9eebfd3e08bae5f26c2ba70f15c361664.1499107909.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Security System has a PRNG, this patch adds support for it via
-crypto_rng.
+If an interrupt is generated between breakpoint and step handler then
+step handler can not get correct step address. This situation can easily
+be invoked by samples/hw_breakpoint/data_breakpoint.c. It can also be
+reproduced if we insert any printk() statement or dump_stack() in perf
+overflow_handler. So, it seems that perf is working fine just luckily.
+If the CPU which is handling perf breakpoint handler receives any
+interrupt then, perf step handler will not execute sanely.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+This patch improves do_debug_exception() handling, which enforces now,
+that exception handler function:
+- should return 0 for any software breakpoint and hw
+breakpoint/watchpoint handler if it does not expect a single step stage
+- should return 1 if it expects single step.
+- A single step handler should always return 0.
+- All handler should return a -ve error in any other case.
+
+Now, we can know in do_debug_exception() that whether a step exception
+will be followed or not. If there will a step exception then disable
+irq. Re-enable it after single step handling.
+
+Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
+ arch/arm64/kernel/debug-monitors.c |  3 +++
+ arch/arm64/kernel/hw_breakpoint.c  |  4 ++--
+ arch/arm64/mm/fault.c              | 22 ++++++++++++++++++----
+ 3 files changed, 23 insertions(+), 6 deletions(-)
 
-Change since v4
-- Fixed some spelling issue in Kconfig and patch description
-
-Changes since v3 (note: the v3 miss changes and version tag sorry)
-- Replaced all len values with bits / BITS_PER_LONG or BITS_PER_BYTE
-
-Changes since v2
- - converted to crypto_rng
-
-Changes since v1:
- - Replaced all spin_lock_bh by simple spin_lock
- - Removed handling of size not modulo 4 which will never happen
- - Added add_random_ready_callback()
-
- drivers/crypto/Kconfig                  |  8 +++++
- drivers/crypto/sunxi-ss/Makefile        |  1 +
- drivers/crypto/sunxi-ss/sun4i-ss-core.c | 30 ++++++++++++++++++
- drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 56 +++++++++++++++++++++++++++++++++
- drivers/crypto/sunxi-ss/sun4i-ss.h      | 11 +++++++
- 5 files changed, 106 insertions(+)
- create mode 100644 drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index ab82536d64e2..99245f9c9d58 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -618,6 +618,14 @@ config CRYPTO_DEV_SUN4I_SS
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called sun4i-ss.
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index d618e25c3de1..16f29f853b54 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -325,6 +325,9 @@ static int brk_handler(unsigned long addr, unsigned int esr,
+ 		return -EFAULT;
+ 	}
  
-+config CRYPTO_DEV_SUN4I_SS_PRNG
-+	bool "Support for Allwinner Security System PRNG"
-+	depends on CRYPTO_DEV_SUN4I_SS
-+	select CRYPTO_RNG
-+	help
-+	  Select this option if you want to provide kernel-side support for
-+	  the Pseudo-Random Number Generator found in the Security System.
++	if (kernel_active_single_step() || test_thread_flag(TIF_SINGLESTEP))
++		return 1;
 +
- config CRYPTO_DEV_ROCKCHIP
- 	tristate "Rockchip's Cryptographic Engine driver"
- 	depends on OF && ARCH_ROCKCHIP
-diff --git a/drivers/crypto/sunxi-ss/Makefile b/drivers/crypto/sunxi-ss/Makefile
-index 8f4c7a273141..ccb893219079 100644
---- a/drivers/crypto/sunxi-ss/Makefile
-+++ b/drivers/crypto/sunxi-ss/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_CRYPTO_DEV_SUN4I_SS) += sun4i-ss.o
- sun4i-ss-y += sun4i-ss-core.o sun4i-ss-hash.o sun4i-ss-cipher.o
-+sun4i-ss-$(CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG) += sun4i-ss-prng.o
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-index 02ad8256e900..1547cbe13dc2 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-@@ -213,6 +213,23 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 	return 0;
+ }
+ NOKPROBE_SYMBOL(brk_handler);
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index 46dbbf94f72d..cb0d6cbdb767 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -698,7 +698,7 @@ static int breakpoint_handler(unsigned long unused, unsigned int esr,
  		}
  	}
- },
-+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG
-+{
-+	.type = CRYPTO_ALG_TYPE_RNG,
-+	.alg.rng = {
-+		.base = {
-+			.cra_name		= "stdrng",
-+			.cra_driver_name	= "sun4i_ss_rng",
-+			.cra_priority		= 300,
-+			.cra_ctxsize		= 0,
-+			.cra_module		= THIS_MODULE,
-+		},
-+		.generate               = sun4i_ss_prng_generate,
-+		.seed                   = sun4i_ss_prng_seed,
-+		.seedsize               = SS_SEED_LEN / BITS_PER_BYTE,
-+	}
-+},
-+#endif
+ 
+-	return 0;
++	return 1;
+ }
+ NOKPROBE_SYMBOL(breakpoint_handler);
+ 
+@@ -843,7 +843,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+ 		}
+ 	}
+ 
+-	return 0;
++	return 1;
+ }
+ NOKPROBE_SYMBOL(watchpoint_handler);
+ 
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 37b95dff0b07..ce5290dacba3 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -653,6 +653,13 @@ static struct fault_info __refdata debug_fault_info[] = {
+ 	{ do_bad,	SIGBUS,		0,		"unknown 7"		},
  };
  
- static int sun4i_ss_probe(struct platform_device *pdev)
-@@ -355,6 +372,13 @@ static int sun4i_ss_probe(struct platform_device *pdev)
- 				goto error_alg;
- 			}
- 			break;
-+		case CRYPTO_ALG_TYPE_RNG:
-+			err = crypto_register_rng(&ss_algs[i].alg.rng);
-+			if (err) {
-+				dev_err(ss->dev, "Fail to register %s\n",
-+					ss_algs[i].alg.rng.base.cra_name);
-+			}
-+			break;
- 		}
++/*
++ * fn should return 0 from any software breakpoint and hw
++ * breakpoint/watchpoint handler if it does not expect a single step stage
++ * and 1 if it expects single step followed by its execution. A single step
++ * handler should always return 0. All handler should return a -ve error in
++ * any other case.
++ */
+ void __init hook_debug_fault_code(int nr,
+ 				  int (*fn)(unsigned long, unsigned int, struct pt_regs *),
+ 				  int sig, int code, const char *name)
+@@ -665,6 +672,8 @@ void __init hook_debug_fault_code(int nr,
+ 	debug_fault_info[nr].name	= name;
+ }
+ 
++static DEFINE_PER_CPU(bool, irq_enable_needed);
++
+ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 					      unsigned int esr,
+ 					      struct pt_regs *regs)
+@@ -672,6 +681,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
+ 	struct siginfo info;
+ 	int rv;
++	bool *irq_en_needed = this_cpu_ptr(&irq_enable_needed);
+ 
+ 	/*
+ 	 * Tell lockdep we disabled irqs in entry.S. Do nothing if they were
+@@ -680,9 +690,8 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 	if (interrupts_enabled(regs))
+ 		trace_hardirqs_off();
+ 
+-	if (!inf->fn(addr, esr, regs)) {
+-		rv = 1;
+-	} else {
++	rv = inf->fn(addr, esr, regs);
++	if (rv < 0) {
+ 		pr_alert("Unhandled debug exception: %s (0x%08x)@0x%016lx\n",
+ 			 inf->name, esr, addr);
+ 
+@@ -691,7 +700,12 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 		info.si_code  = inf->code;
+ 		info.si_addr  = (void __user *)addr;
+ 		arm64_notify_die("", regs, &info, 0);
+-		rv = 0;
++	} else if (rv == 1 && interrupts_enabled(regs)) {
++		regs->pstate |= PSR_I_BIT;
++		*irq_en_needed = true;
++	} else if (rv == 0 && *irq_en_needed) {
++		regs->pstate &= ~PSR_I_BIT;
++		*irq_en_needed = false;
  	}
- 	platform_set_drvdata(pdev, ss);
-@@ -369,6 +393,9 @@ static int sun4i_ss_probe(struct platform_device *pdev)
- 		case CRYPTO_ALG_TYPE_AHASH:
- 			crypto_unregister_ahash(&ss_algs[i].alg.hash);
- 			break;
-+		case CRYPTO_ALG_TYPE_RNG:
-+			crypto_unregister_rng(&ss_algs[i].alg.rng);
-+			break;
- 		}
- 	}
- 	if (ss->reset)
-@@ -393,6 +420,9 @@ static int sun4i_ss_remove(struct platform_device *pdev)
- 		case CRYPTO_ALG_TYPE_AHASH:
- 			crypto_unregister_ahash(&ss_algs[i].alg.hash);
- 			break;
-+		case CRYPTO_ALG_TYPE_RNG:
-+			crypto_unregister_rng(&ss_algs[i].alg.rng);
-+			break;
- 		}
- 	}
  
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-prng.c b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-new file mode 100644
-index 000000000000..0d01d1624252
---- /dev/null
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-@@ -0,0 +1,56 @@
-+#include "sun4i-ss.h"
-+
-+int sun4i_ss_prng_seed(struct crypto_rng *tfm, const u8 *seed,
-+		       unsigned int slen)
-+{
-+	struct sun4i_ss_alg_template *algt;
-+	struct rng_alg *alg = crypto_rng_alg(tfm);
-+
-+	algt = container_of(alg, struct sun4i_ss_alg_template, alg.rng);
-+	memcpy(algt->ss->seed, seed, slen);
-+
-+	return 0;
-+}
-+
-+int sun4i_ss_prng_generate(struct crypto_rng *tfm, const u8 *src,
-+			   unsigned int slen, u8 *dst, unsigned int dlen)
-+{
-+	struct sun4i_ss_alg_template *algt;
-+	struct rng_alg *alg = crypto_rng_alg(tfm);
-+	int i;
-+	u32 v;
-+	u32 *data = (u32 *)dst;
-+	const u32 mode = SS_OP_PRNG | SS_PRNG_CONTINUE | SS_ENABLED;
-+	size_t len;
-+	struct sun4i_ss_ctx *ss;
-+	unsigned int todo = (dlen / 4) * 4;
-+
-+	algt = container_of(alg, struct sun4i_ss_alg_template, alg.rng);
-+	ss = algt->ss;
-+
-+	spin_lock(&ss->slock);
-+
-+	writel(mode, ss->base + SS_CTL);
-+
-+	while (todo > 0) {
-+		/* write the seed */
-+		for (i = 0; i < SS_SEED_LEN / BITS_PER_LONG; i++)
-+			writel(ss->seed[i], ss->base + SS_KEY0 + i * 4);
-+
-+		/* Read the random data */
-+		len = min_t(size_t, SS_DATA_LEN / BITS_PER_BYTE, todo);
-+		readsl(ss->base + SS_TXFIFO, data, len / 4);
-+		data += len / 4;
-+		todo -= len;
-+
-+		/* Update the seed */
-+		for (i = 0; i < SS_SEED_LEN / BITS_PER_LONG; i++) {
-+			v = readl(ss->base + SS_KEY0 + i * 4);
-+			ss->seed[i] = v;
-+		}
-+	}
-+
-+	writel(0, ss->base + SS_CTL);
-+	spin_unlock(&ss->slock);
-+	return dlen;
-+}
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss.h b/drivers/crypto/sunxi-ss/sun4i-ss.h
-index a0e1efc1cb2a..f3ac90692ac6 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss.h
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss.h
-@@ -32,6 +32,7 @@
- #include <crypto/aes.h>
- #include <crypto/des.h>
- #include <crypto/internal/rng.h>
-+#include <crypto/rng.h>
- 
- #define SS_CTL            0x00
- #define SS_KEY0           0x04
-@@ -127,6 +128,9 @@
- #define SS_RXFIFO_EMP_INT_ENABLE	(1 << 2)
- #define SS_TXFIFO_AVA_INT_ENABLE	(1 << 0)
- 
-+#define SS_SEED_LEN 192
-+#define SS_DATA_LEN 160
-+
- struct sun4i_ss_ctx {
- 	void __iomem *base;
- 	int irq;
-@@ -136,6 +140,9 @@ struct sun4i_ss_ctx {
- 	struct device *dev;
- 	struct resource *res;
- 	spinlock_t slock; /* control the use of the device */
-+#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG
-+	u32 seed[SS_SEED_LEN / BITS_PER_LONG];
-+#endif
- };
- 
- struct sun4i_ss_alg_template {
-@@ -144,6 +151,7 @@ struct sun4i_ss_alg_template {
- 	union {
- 		struct skcipher_alg crypto;
- 		struct ahash_alg hash;
-+		struct rng_alg rng;
- 	} alg;
- 	struct sun4i_ss_ctx *ss;
- };
-@@ -201,3 +209,6 @@ int sun4i_ss_des_setkey(struct crypto_skcipher *tfm, const u8 *key,
- 			unsigned int keylen);
- int sun4i_ss_des3_setkey(struct crypto_skcipher *tfm, const u8 *key,
- 			 unsigned int keylen);
-+int sun4i_ss_prng_generate(struct crypto_rng *tfm, const u8 *src,
-+			   unsigned int slen, u8 *dst, unsigned int dlen);
-+int sun4i_ss_prng_seed(struct crypto_rng *tfm, const u8 *seed, unsigned int slen);
+ 	if (interrupts_enabled(regs))
 -- 
-2.13.0
+2.9.3
