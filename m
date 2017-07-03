@@ -1,59 +1,67 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 3 Jul 2017 13:25:25 -0500
-Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-In-Reply-To: <CAFpQJXWQiePwNDV9rxjKALPf_XXMbhQcZM1RwJLkDXTyJxjjiA@mail.gmail.com>
-References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
- <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
- <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
- <88a2a78f-6a5b-1b80-5dcf-0821b9fd81d9@codeaurora.org>
- <CAFpQJXWQiePwNDV9rxjKALPf_XXMbhQcZM1RwJLkDXTyJxjjiA@mail.gmail.com>
-Message-ID: <90f6d20d-b996-308e-b612-4352d9eceabb@codeaurora.org>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Mon, 3 Jul 2017 20:31:41 +0200
+Subject: [PATCH v4] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <CAH6sp9Nm-hDxNSNNYxonBzSGyM769WoKQwjX2CN-RPRr=Oxu4g@mail.gmail.com>
+References: <20170626122055.5253-1-clabbe.montjoie@gmail.com>
+ <CAH6sp9Nm-hDxNSNNYxonBzSGyM769WoKQwjX2CN-RPRr=Oxu4g@mail.gmail.com>
+Message-ID: <20170703183141.GA9516@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ganapatrao,
-
-On 07/03/2017 11:51 AM, Ganapatrao Kulkarni wrote:
-> On Mon, Jul 3, 2017 at 7:07 PM, Shanker Donthineni
-> <shankerd@codeaurora.org> wrote:
->> Hi Ganapatraoo,
->>
->> On 06/29/2017 10:01 PM, Ganapatrao Kulkarni wrote:
->>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
->>> <gpkulkarni@gmail.com> wrote:
->>>> Hi Shanker,
->>>>
->>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
->>>> <shankerd@codeaurora.org> wrote:
->>>>> The NUMA node information is visible to ITS driver but not being used
->>>>> other than handling errata. This patch allocates the memory for ITS
->>>>> tables from the corresponding NUMA node using the appropriate NUMA
->>>>> aware functions.
->>>
->>> IMHO, the description would have been more constructive?
->>>
->>> "All ITS tables are mapped by default to NODE 0 memory.
->>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
->>> This will optimize tables access and avoids unnecessary inter-node traffic."
->>>
->>
->> I don't understand why you are saying 'All ITS tables are mapped by default to NODE 0 memory'? Kernel runtime memory allocation comes from the corresponding NUMA node of the CPU that being called.
+On Mon, Jun 26, 2017 at 02:36:43PM +0200, Frans Klaver wrote:
+> Hi,
 > 
-> IIRC, ITT tables can be on any cpu, if drivers are not built-in and
-> msi-x vectors are not initialised in init/probe, etc
-> however Device table and Collection table are allocated from node 0
-> memory during ITS driver init by boot-cpu/cpu0.
+> On Mon, Jun 26, 2017 at 2:20 PM, Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> > The Security System have a PRNG, this patch add support for it via
+> > crypto_rng.
 > 
+> s,have,has,
+> s,add,adds,
+> 
+> >
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >
+> > Changes since v3 (note: the v3 miss changes and version tag sorry)
+> > - Replaced all len values with bits / BITS_PER_LONG or BITS_PER_BYTE
+> >
+> > Changes since v2
+> >  - converted to crypto_rng
+> >
+> > Changes since v1:
+> >  - Replaced all spin_lock_bh by simple spin_lock
+> >  - Removed handling of size not modulo 4 which will never happen
+> >  - Added add_random_ready_callback()
+> >
+> >  drivers/crypto/Kconfig                  |  8 +++++
+> >  drivers/crypto/sunxi-ss/Makefile        |  1 +
+> >  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 30 ++++++++++++++++++
+> >  drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 56 +++++++++++++++++++++++++++++++++
+> >  drivers/crypto/sunxi-ss/sun4i-ss.h      | 11 +++++++
+> >  5 files changed, 106 insertions(+)
+> >  create mode 100644 drivers/crypto/sunxi-ss/sun4i-ss-prng.c
+> >
+> > diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> > index ab82536d64e2..bde0b102eb70 100644
+> > --- a/drivers/crypto/Kconfig
+> > +++ b/drivers/crypto/Kconfig
+> > @@ -618,6 +618,14 @@ config CRYPTO_DEV_SUN4I_SS
+> >           To compile this driver as a module, choose M here: the module
+> >           will be called sun4i-ss.
+> >
+> > +config CRYPTO_DEV_SUN4I_SS_PRNG
+> > +       bool "Support for Allwinner Security System PRNG"
+> > +       depends on CRYPTO_DEV_SUN4I_SS
+> > +       select CRYPTO_RNG
+> > +       help
+> > +         Select this option if you to provides kernel-side support for
+> > +         the Pseudo-Random Number Generator found in the Security System.
+> 
+> This sentence does not parse. "Select this option if you want to
+> provide kernel-side for ...". Alternatively: "This option enables
+> kernel-side support for ..."
+> 
+> Frans
 
-Don't confuse boot-cpu aka logical cpu0 and NUMA node 0, these is no requirement that 
-says boot cpu has to tied to NUMA node 0. The memory for first level device table, 
-prop and collection tables are allocated from the boot cpu's NUMA node not NUMA node 0.
-
-All other memory allocation inside the ITS driver can be done from any NUMA node depends 
-on which CPU calls the memory allocation functions during runtime. 
-
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks, I will change it.
