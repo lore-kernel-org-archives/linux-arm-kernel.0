@@ -1,43 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Jul 2017 13:25:21 +0200
-Subject: [PATCH RFC 1/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20170703185952.18a97e9b7b05cbe321cb1268@magewell.com>
-References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
- <1498561654-14658-2-git-send-email-yong.deng@magewell.com>
- <667c858b-2655-88c5-6bbc-9d70d06c1ff1@xs4all.nl>
- <20170703185952.18a97e9b7b05cbe321cb1268@magewell.com>
-Message-ID: <20170703112521.ca253erguut5v7se@flea>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Jul 2017 12:26:21 +0100
+Subject: [PATCH v4 3/9] mfd: tmio.h: support partition parser types
+In-Reply-To: <1498681836-3765-4-git-send-email-andrea.adami@gmail.com>
+References: <1498681836-3765-1-git-send-email-andrea.adami@gmail.com>
+ <1498681836-3765-4-git-send-email-andrea.adami@gmail.com>
+Message-ID: <20170703112621.rd3ija3efqlq57rg@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Please use the $SUBJECT line expected by the subsystem.
 
-On Mon, Jul 03, 2017 at 06:59:52PM +0800, Yong wrote:
-> > > +	select VIDEOBUF2_DMA_CONTIG
-> > > +	select REGMAP_MMIO
-> > > +	---help---
-> > > +	   Support for the Allwinner Camera Sensor Interface Controller.
-> > 
-> > This controller is the same for all Allwinner SoC models?
+`git log --oneline -- $SUBSYSTEM` can help with this.
+
+You also need a commit log.
+
+> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+> ---
+>  include/linux/mfd/tmio.h | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> No.
-> I will change the Kconfig and Makefile.
+> diff --git a/include/linux/mfd/tmio.h b/include/linux/mfd/tmio.h
+> index a1520d8..23bb069 100644
+> --- a/include/linux/mfd/tmio.h
+> +++ b/include/linux/mfd/tmio.h
+> @@ -139,6 +139,7 @@ struct tmio_nand_data {
+>  	struct nand_bbt_descr	*badblock_pattern;
+>  	struct mtd_partition	*partition;
+>  	unsigned int		num_partitions;
+> +	const char *const	*types;	/* names of parsers to use if any */
 
-This is basically a design that has been introduced in the A31 (sun6i
-family). I guess we should just call the driver and Kconfig symbols
-sun6i_csi (even though we don't support it yet). It also used on the
-A23, A33, A80, A83T, H3, and probably the H5 and A64.
+I'm okay with this if it's suits the MTD folk.
 
-Maxime
+>  };
+>  
+>  #define FBIO_TMIO_ACC_WRITE	0x7C639300
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170703/3cc08dfb/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
