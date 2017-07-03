@@ -1,72 +1,66 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 3 Jul 2017 10:18:07 +0100
-Subject: Tegra baseline test results for v4.12
-Message-ID: <a58b7c21-ee98-fcd3-a787-b6203f38114d@nvidia.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 3 Jul 2017 10:17:22 +0100
+Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk: renesas:
+ cpg-mssr: Add interface for critical core clocks)
+In-Reply-To: <20170701181408.yuocymwtj5dgt74d@pengutronix.de>
+References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+ <CAL_JsqKGrZeR7z80beY_XEjqd5fEQQwPxusJ1FADoALgNE3fEg@mail.gmail.com>
+ <20170630202453.eh6vaehkap3as4np@pengutronix.de>
+ <8d86a9aa-1928-6b52-1487-d5fb9dae17f4@gmail.com>
+ <20170701181408.yuocymwtj5dgt74d@pengutronix.de>
+Message-ID: <8d255a76-babe-312d-15b3-3474969f2410@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.12.
-Logs and other details at:
-
-    https://nvtb.github.io//linux/test_v4.12/20170702163102/
 
 
-Test summary
-------------
+On 01/07/17 19:14, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Sat, Jul 01, 2017 at 07:02:48AM +0200, Dirk Behme wrote:
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+[...]
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
+>>
+>>
+>> The other problem is security related. If, at all, you have to do it the
+>> other way around, then:
+>>
+>> Make Linux a consumer of the other CPU's (trusted/trustzone/whatever
+>> secured) OS clock driver.
 
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
+Yes, that's better and is getting common on newer platforms. They have
+separate M-class(or even low A-class e.g. A5/A7) processors to handle
+all the system management.
 
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+The new ARM SCMI specification[0][1] is designed to standardize the
+interface. It covers the clocks in clock protocol.
 
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> 
+> That doesn't matter much. Either way the first CPU has to provide the
+> master side of this device (as it needs clks for booting up) and the 2nd
+> gets this virtual clk device that forwards clk requests to the first
+> CPU.
+> 
+> On my machine (Udoo Neo, A9 + M4) the A9 is the primary CPU that is
+> started by the bootrom. If I want the M4 being the primary device I'd
+> need support in the bootloader to wait long enough (i.e. until the M4 is
+> up) before letting the A9 jump into Linux.
 
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+I think that is platform specific. On few platforms I have seen
+recently, it's M4 or whatever core that handles system power management
+boots first and is responsible to even boot secondaries.
 
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> Managable I'd say. This way would even make sense if the M4 runs a
+> rt critical OS that shouldn't be forced to wait on the non-rt A9 to> enable a clk.
+> 
 
+Exactly.
 
-vmlinux object size
-(delta in bytes from test_v4.12-rc7 (c0bc126f97fb929b3ae02c1c62322645d70eb408)):
-   text     data      bss    total  kernel
-    +71    -2096        0    -2025  defconfig
-   +531    -1216        0     -685  multi_v7_defconfig
-   +671        0        0     +671  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.12-rc7 (c0bc126f97fb929b3ae02c1c62322645d70eb408))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-       4k      -4k        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+Regards,
+Sudeep
 
 
---
-nvpublic
+[0] http://infocenter.arm.com/help/topic/com.arm.doc.den0056a/index.html
+[1] https://marc.info/?l=devicetree&m=149849482623492&w=2
