@@ -1,100 +1,183 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Jul 2017 12:53:24 +0100
-Subject: [PATCH 2/3] clk: WARN_ON about to disable a critical clock
-In-Reply-To: <d83d608a-246f-7b18-20d1-10a2060395e1@de.bosch.com>
-References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
- <1453127331-20616-3-git-send-email-lee.jones@linaro.org>
- <20160211004327.26445.27416@quark.deferred.io>
- <d83d608a-246f-7b18-20d1-10a2060395e1@de.bosch.com>
-Message-ID: <20170703115324.5re2d32bd3slutcb@dell>
+Date: Mon, 3 Jul 2017 13:00:02 +0100
+Subject: [PATCH v6 4/8] mfd: hi6421-pmic: add support for HiSilicon
+ Hi6421v530
+In-Reply-To: <20170608220841.26531-5-guodong.xu@linaro.org>
+References: <20170608220841.26531-1-guodong.xu@linaro.org>
+ <20170608220841.26531-5-guodong.xu@linaro.org>
+Message-ID: <20170703120002.vlegc4d5fgbsf4vn@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Jun 2017, Dirk Behme wrote:
+On Fri, 09 Jun 2017, Guodong Xu wrote:
 
-> On 11.02.2016 01:43, Michael Turquette wrote:
-> > Quoting Lee Jones (2016-01-18 06:28:50)
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Looks good to me.
-> > 
-> > Regards,
-> > Mike
-> > 
-> > > ---
-> > >   drivers/clk/clk.c | 6 ++++++
-> > >   1 file changed, 6 insertions(+)
-> > > 
-> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > index 835cb85..178b364 100644
-> > > --- a/drivers/clk/clk.c
-> > > +++ b/drivers/clk/clk.c
-> > > @@ -575,6 +575,9 @@ static void clk_core_unprepare(struct clk_core *core)
-> > >          if (WARN_ON(core->prepare_count == 0))
-> > >                  return;
-> > > +       if (WARN_ON(core->prepare_count == 1 && core->flags & CLK_IS_CRITICAL))
-> > > +               return;
-> > > +
-> > >          if (--core->prepare_count > 0)
-> > >                  return;
-> > > @@ -680,6 +683,9 @@ static void clk_core_disable(struct clk_core *core)
-> > >          if (WARN_ON(core->enable_count == 0))
-> > >                  return;
-> > > +       if (WARN_ON(core->enable_count == 1 && core->flags & CLK_IS_CRITICAL))
-> > > +               return;
-> > > +
-> > >          if (--core->enable_count > 0)
-> > >                  return;
+> Add support for HiSilicon Hi6421v530 PMIC. Hi6421v530 communicates with
+> main SoC via memory-mapped I/O.
 > 
+> Hi6421v530 and Hi6421 are PMIC chips from the same vendor, HiSilicon,
+> but at different revisions. They share the same memory-mapped I/O
+> design. They differ in integrated devices, such as regulator details,
+> LDO voltage points.
 > 
-> I have a question regarding this patch, which is mainline meanwhile [1]:
-> 
-> Having the following clock configuration:
-> 
->                                         |--> child clk '1' (crit)
-> clk source --> parent clk 'A' (crit) -->|
->                                         |--> child clk '2'
-> 
-> 
-> Clock '2' might be used, or not. It might be disabled or not. It doesn't
-> matter. Clock '1' is not allowed to be disabled. Therefore its marked as
-> critical.
-> 
-> Parent clock 'A' is marked as critical because its not allowed to be
-> disabled, even if the enable_count of all child clocks is 0. To avoid that
-> by disabling parent clock 'A' the child clock '1' is disabled, too, whats
-> not allowed as its marked as critical.
-> 
-> 
-> Now, child clock '2' is used and enabled & disabled continuously by a (SPI)
-> driver. What is ok. But:
-> 
-> Disabling child clock '2' results in the attempt to disable parent clock
-> 'A', too, which has correct enable_count 1 (from enabling the child '2').
-> What results
-> 
-> a) in the WARN_ON output
-> 
-> and
-> 
-> b) enable_count of 'A' never decreases to 0. Being off by one after the
-> WARN_ON
-> 
-> 
-> It sounds like both is wrong for a configuration like above.
+> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/mfd/hi6421-pmic-core.c  | 70 ++++++++++++++++++++++++++++++-----------
+>  include/linux/mfd/hi6421-pmic.h |  5 +++
+>  2 files changed, 57 insertions(+), 18 deletions(-)
 
-Clock A still has one user, Clock 1.
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-Why is that wrong?
+Plan is to apply this set after the merge-window closes.
 
-> Opinions or proposal how to fix/change this?
-> 
-> 
-> Best regards
-> 
-> Dirk
-> 
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/clk.c?id=2e20fbf592621b2c2aeddd82e0fa3dad053cce03
+> diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
+> index b1139d4..6fb7ba2 100644
+> --- a/drivers/mfd/hi6421-pmic-core.c
+> +++ b/drivers/mfd/hi6421-pmic-core.c
+> @@ -1,9 +1,9 @@
+>  /*
+> - * Device driver for Hi6421 IC
+> + * Device driver for Hi6421 PMIC
+>   *
+>   * Copyright (c) <2011-2014> HiSilicon Technologies Co., Ltd.
+>   *              http://www.hisilicon.com
+> - * Copyright (c) <2013-2014> Linaro Ltd.
+> + * Copyright (c) <2013-2017> Linaro Ltd.
+>   *              http://www.linaro.org
+>   *
+>   * Author: Guodong Xu <guodong.xu@linaro.org>
+> @@ -16,16 +16,20 @@
+>  #include <linux/device.h>
+>  #include <linux/err.h>
+>  #include <linux/mfd/core.h>
+> +#include <linux/mfd/hi6421-pmic.h>
+>  #include <linux/module.h>
+> -#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> -#include <linux/mfd/hi6421-pmic.h>
+>  
+>  static const struct mfd_cell hi6421_devs[] = {
+>  	{ .name = "hi6421-regulator", },
+>  };
+>  
+> +static const struct mfd_cell hi6421v530_devs[] = {
+> +	{ .name = "hi6421v530-regulator", },
+> +};
+> +
+>  static const struct regmap_config hi6421_regmap_config = {
+>  	.reg_bits = 32,
+>  	.reg_stride = 4,
+> @@ -33,12 +37,33 @@ static const struct regmap_config hi6421_regmap_config = {
+>  	.max_register = HI6421_REG_TO_BUS_ADDR(HI6421_REG_MAX),
+>  };
+>  
+> +static const struct of_device_id of_hi6421_pmic_match[] = {
+> +	{
+> +		.compatible = "hisilicon,hi6421-pmic",
+> +		.data = (void *)HI6421
+> +	},
+> +	{
+> +		.compatible = "hisilicon,hi6421v530-pmic",
+> +		.data = (void *)HI6421_V530
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, of_hi6421_pmic_match);
+> +
+>  static int hi6421_pmic_probe(struct platform_device *pdev)
+>  {
+>  	struct hi6421_pmic *pmic;
+>  	struct resource *res;
+> +	const struct of_device_id *id;
+> +	const struct mfd_cell *subdevs;
+> +	enum hi6421_type type;
+>  	void __iomem *base;
+> -	int ret;
+> +	int n_subdevs, ret;
+> +
+> +	id = of_match_device(of_hi6421_pmic_match, &pdev->dev);
+> +	if (!id)
+> +		return -EINVAL;
+> +	type = (enum hi6421_type)id->data;
+>  
+>  	pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
+>  	if (!pmic)
+> @@ -57,18 +82,33 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
+>  		return PTR_ERR(pmic->regmap);
+>  	}
+>  
+> -	/* set over-current protection debounce 8ms */
+> -	regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
+> +	platform_set_drvdata(pdev, pmic);
+> +
+> +	switch (type) {
+> +	case HI6421:
+> +		/* set over-current protection debounce 8ms */
+> +		regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
+>  				(HI6421_OCP_DEB_SEL_MASK
+>  				 | HI6421_OCP_EN_DEBOUNCE_MASK
+>  				 | HI6421_OCP_AUTO_STOP_MASK),
+>  				(HI6421_OCP_DEB_SEL_8MS
+>  				 | HI6421_OCP_EN_DEBOUNCE_ENABLE));
+>  
+> -	platform_set_drvdata(pdev, pmic);
+> +		subdevs = hi6421_devs;
+> +		n_subdevs = ARRAY_SIZE(hi6421_devs);
+> +		break;
+> +	case HI6421_V530:
+> +		subdevs = hi6421v530_devs;
+> +		n_subdevs = ARRAY_SIZE(hi6421v530_devs);
+> +		break;
+> +	default:
+> +		dev_err(&pdev->dev, "Unknown device type %d\n",
+> +						(unsigned int)type);
+> +		return -EINVAL;
+> +	}
+>  
+> -	ret = devm_mfd_add_devices(&pdev->dev, 0, hi6421_devs,
+> -				   ARRAY_SIZE(hi6421_devs), NULL, 0, NULL);
+> +	ret = devm_mfd_add_devices(&pdev->dev, PLATFORM_DEVID_NONE,
+> +				   subdevs, n_subdevs, NULL, 0, NULL);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "Failed to add child devices: %d\n", ret);
+>  		return ret;
+> @@ -77,16 +117,10 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id of_hi6421_pmic_match_tbl[] = {
+> -	{ .compatible = "hisilicon,hi6421-pmic", },
+> -	{ },
+> -};
+> -MODULE_DEVICE_TABLE(of, of_hi6421_pmic_match_tbl);
+> -
+>  static struct platform_driver hi6421_pmic_driver = {
+>  	.driver = {
+> -		.name	= "hi6421_pmic",
+> -		.of_match_table = of_hi6421_pmic_match_tbl,
+> +		.name = "hi6421_pmic",
+> +		.of_match_table = of_hi6421_pmic_match,
+>  	},
+>  	.probe	= hi6421_pmic_probe,
+>  };
+> diff --git a/include/linux/mfd/hi6421-pmic.h b/include/linux/mfd/hi6421-pmic.h
+> index 587273e..2580c08 100644
+> --- a/include/linux/mfd/hi6421-pmic.h
+> +++ b/include/linux/mfd/hi6421-pmic.h
+> @@ -38,4 +38,9 @@ struct hi6421_pmic {
+>  	struct regmap		*regmap;
+>  };
+>  
+> +enum hi6421_type {
+> +	HI6421 = 0,
+> +	HI6421_V530,
+> +};
+> +
+>  #endif		/* __HI6421_PMIC_H */
 
 -- 
 Lee Jones
