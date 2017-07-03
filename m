@@ -1,14 +1,14 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 3 Jul 2017 10:14:50 +0100
-Subject: Tegra baseline test results for v4.12-rc6
-Message-ID: <11db6676-7696-b071-be4c-7b48e5e8de5c@nvidia.com>
+Date: Mon, 3 Jul 2017 10:16:13 +0100
+Subject: Tegra baseline test results for v4.12-rc7
+Message-ID: <46443966-6d65-0d3e-5aa7-6e848adfd3c1@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.12-rc6.
+Here are some basic Tegra test results for Linux v4.12-rc7.
 Logs and other details at:
 
-    https://nvtb.github.io//linux/test_v4.12-rc6/20170619083104/
+    https://nvtb.github.io//linux/test_v4.12-rc7/20170626023103/
 
 
 Test summary
@@ -42,15 +42,15 @@ PM: System suspend: tegra_defconfig:
 
 
 vmlinux object size
-(delta in bytes from test_v4.12-rc5 (32c1431eea4881a6b17bd7c639315010aeefa452)):
+(delta in bytes from test_v4.12-rc6 (41f1830f5a7af77cf5c86359aba3cbd706687e52)):
    text     data      bss    total  kernel
-  +4260    -4056        0     +204  defconfig
-  +4512    -4048        0     +464  multi_v7_defconfig
-   +296    -4056        0    -3760  tegra_defconfig
+   -240     +448     -128      +80  defconfig
+   +676      +96        0     +772  multi_v7_defconfig
+   +580      +64        0     +644  tegra_defconfig
 
 
 Boot-time memory difference
-(delta in bytes from test_v4.12-rc5 (32c1431eea4881a6b17bd7c639315010aeefa452))
+(delta in bytes from test_v4.12-rc6 (41f1830f5a7af77cf5c86359aba3cbd706687e52))
     avail    rsrvd     high    freed                board              kconfig                  dtb
         .        .        .        .      qemu-vexpress64            defconfig           __internal
         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
@@ -66,7 +66,6 @@ Boot-time memory difference
         .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
 
 --
 nvpublic
