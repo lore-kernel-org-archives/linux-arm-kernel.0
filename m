@@ -1,72 +1,67 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  3 Jul 2017 14:52:24 +0100
-Subject: [PATCH] iommu/io-pgtable: Sanitise map/unmap addresses
-Message-ID: <6ba078ad1dfbdb6e74256d533c0feaf4f56e8cf4.1499089895.git.robin.murphy@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 3 Jul 2017 15:58:34 +0200
+Subject: [PATCH 1/6] clk: at91: clk-generated: remove useless divisor loop
+In-Reply-To: <20170623090059.8371-2-quentin.schulz@free-electrons.com>
+References: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
+ <20170623090059.8371-2-quentin.schulz@free-electrons.com>
+Message-ID: <20170703155834.4de2a304@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It may be an egregious error to attempt to use addresses outside the
-range of the pagetable format, but that still doesn't mean we should
-merrily wreak havoc by silently mapping/unmapping whatever truncated
-portions of them might happen to correspond to real addresses.
+On Fri, 23 Jun 2017 11:00:54 +0200
+Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
 
-Add some up-front checks to sanitise our inputs so that buggy callers
-don't invite potential memory corruption.
+> The driver requests the current clk rate of each of its parent clocks to
+> decide whether a clock rate is suitable or not. It does not request
+> determine_rate from a parent clock which could request a rate change in
+> parent clock (i.e. there is no parent rate propagation).
+> 
+> We know the rate we want (passed along req argument of the function) and
+> the parent clock rate, thus we know the closest rounded divisor, we
+> don't need to iterate over the available divisors to find the best one
+> for a given clock.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/io-pgtable-arm-v7s.c | 6 ++++++
- drivers/iommu/io-pgtable-arm.c     | 7 +++++++
- 2 files changed, 13 insertions(+)
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 7753b33d041d..e0bfe8ba4c9d 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -475,6 +475,9 @@ static int arm_v7s_map(struct io_pgtable_ops *ops, unsigned long iova,
- 	if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
- 		return 0;
- 
-+	if (WARN_ON(upper_32_bits(iova) || upper_32_bits(paddr)))
-+		return -ERANGE;
-+
- 	ret = __arm_v7s_map(data, iova, paddr, size, prot, 1, data->pgd);
- 	/*
- 	 * Synchronise all PTE updates for the new mapping before there's
-@@ -655,6 +658,9 @@ static int arm_v7s_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 	struct arm_v7s_io_pgtable *data = io_pgtable_ops_to_data(ops);
- 	size_t unmapped;
- 
-+	if (WARN_ON(upper_32_bits(iova)))
-+		return 0;
-+
- 	unmapped = __arm_v7s_unmap(data, iova, size, 1, data->pgd);
- 	if (unmapped)
- 		io_pgtable_tlb_sync(&data->iop);
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index f73120f2cfbc..ebf9152c2422 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -448,6 +448,10 @@ static int arm_lpae_map(struct io_pgtable_ops *ops, unsigned long iova,
- 	if (!(iommu_prot & (IOMMU_READ | IOMMU_WRITE)))
- 		return 0;
- 
-+	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias) ||
-+		    paddr >= (1ULL << data->iop.cfg.oas)))
-+		return -ERANGE;
-+
- 	prot = arm_lpae_prot_to_pte(data, iommu_prot);
- 	ret = __arm_lpae_map(data, iova, paddr, size, prot, lvl, ptep);
- 	/*
-@@ -606,6 +610,9 @@ static int arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 	arm_lpae_iopte *ptep = data->pgd;
- 	int lvl = ARM_LPAE_START_LVL(data);
- 
-+	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
-+		return 0;
-+
- 	unmapped = __arm_lpae_unmap(data, iova, size, lvl, ptep);
- 	if (unmapped)
- 		io_pgtable_tlb_sync(&data->iop);
--- 
-2.12.2.dirty
+> ---
+>  drivers/clk/at91/clk-generated.c | 25 ++++++++++++-------------
+>  1 file changed, 12 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+> index 07c8f701e51c..dab7002937e6 100644
+> --- a/drivers/clk/at91/clk-generated.c
+> +++ b/drivers/clk/at91/clk-generated.c
+> @@ -124,19 +124,18 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
+>  		    (gck->range.max && min_rate > gck->range.max))
+>  			continue;
+>  
+> -		for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
+> -			tmp_rate = DIV_ROUND_CLOSEST(parent_rate, div);
+> -			tmp_diff = abs(req->rate - tmp_rate);
+> -
+> -			if (best_diff < 0 || best_diff > tmp_diff) {
+> -				best_rate = tmp_rate;
+> -				best_diff = tmp_diff;
+> -				req->best_parent_rate = parent_rate;
+> -				req->best_parent_hw = parent;
+> -			}
+> -
+> -			if (!best_diff || tmp_rate < req->rate)
+> -				break;
+> +		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
+> +		if (!div)
+> +			tmp_rate = parent_rate;
+> +		else
+> +			tmp_rate = parent_rate / div;
+> +		tmp_diff = abs(req->rate - tmp_rate);
+> +
+> +		if (best_diff < 0 || best_diff > tmp_diff) {
+> +			best_rate = tmp_rate;
+> +			best_diff = tmp_diff;
+> +			req->best_parent_rate = parent_rate;
+> +			req->best_parent_hw = parent;
+>  		}
+>  
+>  		if (!best_diff)
