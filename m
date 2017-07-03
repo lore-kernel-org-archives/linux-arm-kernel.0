@@ -1,75 +1,100 @@
 From: adriana.reus@nxp.com (Adriana Reus)
-Date: Mon,  3 Jul 2017 17:28:01 +0300
-Subject: [RFC 0/2] clk: imx7d: Uart clock set-up conflict if clk needs gating
- on set rate or re-parent
-Message-ID: <1499092083-2852-1-git-send-email-adriana.reus@nxp.com>
+Date: Mon,  3 Jul 2017 17:28:02 +0300
+Subject: [RFC 1/2] clk: imx: Add CLK_SET_RATE_GATE for imx7d clocks
+In-Reply-To: <1499092083-2852-1-git-send-email-adriana.reus@nxp.com>
+References: <1499092083-2852-1-git-send-email-adriana.reus@nxp.com>
+Message-ID: <1499092083-2852-2-git-send-email-adriana.reus@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-I am currently trying to fix an issue occurring when trying to set the
-CLK_SET_RATE_GATE flag for the uart root clks. This causes the imx serial
-driver to fail when setting up devicetree specified frequency or parent because
-the uart clk is already in use by the ccm driver that starts up all uart clocks
-for earlycon.
-
-Some context:
-
-There are three main types of clock slices on imx7d ccm: "Core clock slice",
-"Bus clock slice (AXI/AHB)", and "Peripheral clock slice". Vast majority of
-clock roots fall in the peripheral slice category:
+There are three main types of clock slices on imx7d ccm:
+"Core clock slice", "Bus clock slice (AXI/AHB)", and "Peripheral clock
+slice".
+Documentation and general overview: [0]
+Vast majority of clock roots fall in the peripheral slice category:
 
     8:1 mux -> gate -> div -> div -> gate
 
 The root clocks that derive from peripheral slices are expected to be
-gated when changing frequency [0].
+gated when changing frequency.[1]
 
-The first patch of this series sets this up. (It is only a reference point for
-this conversation, not to be merged as it WIP and needs more testing).
-
-When setting this up, the imx serial driver
-(platform_driver_register -> of_clk_set_defaults) will fail
-to set the rate or parent specified in the devicetree:
-
-    imx-uart 30a70000.serial: clk_set_rate() failed
-    imx-uart: probe of 30a70000.serial failed with error -16
-
-The reason for this is that the uart clks are already prepared and enabled in
-imx7d_clocks_init by the imx_register_uart_clocks function if earlycon is
-enabled. Functionality added in patches:
-'commit 55adc61c568af99419be1dc0412f8eae019c71f2
-("clk: imx: add common logic to detect early UART usage")'
-'commit 1b9af68f325cb91ac9fc691f52d69dfb0826afd7
-("clk: imx7d: retain early UART clocks during kernel init")'
-
-One option is to remove the imx_register_uart_clocks from the ccm driver and
-leave the uart clock set up and enable entirely to the serial driver and DT.
-The second RFC patch does this for imx7d.
-That would mean that we would rely on the bootloader to enable these clocks for
-earlycon. This is what other platforms seem to do, so it seems like
-a reasonable asumption that the bootloader would set it up (on my tested
-u-boot + imx7d setup, it works).
-The topic was also briefly addressed in this thread [1] and as it is stated by
-Lucas Stach in the thread, earlycon must work before the clock driver is
-initialized anyway.
-
-If it is agreed that it's best to remove it I can add a patch to remove it from
-all imx platforms, otherwise I am open to any other alternatives.
-
-Any feedback is apreciated and thanks for reading thus far.
+Introduce imx_clk_gate2_flags for clocks where it is not necessary to
+set RATE_GATE and add the CLK_SET_RATE flag to imx_clk_gate4 for the
+rest of the clocks.
 
 [0]: http://www.nxp.com/docs/en/reference-manual/IMX7DRM.pdf
-Relevant sections:  5.2.4; 5.1.3.5.3; 5.2.6.4 [5.2.6.4.3]
-[1]: https://patchwork.kernel.org/patch/8979421/
+     Relevant sections: 5.2.4
+[1]: Relevant sections: 5.1.3.5.3; 5.2.6.4 [5.2.6.4.3]
 
-Adriana Reus (2):
-  clk: imx: Add CLK_SET_RATE_GATE for imx7d clocks
-  clk: imx: Remove enabling uart clocks from ccm driver.
-
- drivers/clk/imx/clk-imx7d.c | 32 +++++++++++---------------------
+Signed-off-by: Anson Huang <b20788@freescale.com>
+Signed-off-by: Adriana Reus <adriana.reus@nxp.com>
+---
+ drivers/clk/imx/clk-imx7d.c | 16 +++++++++++-----
  drivers/clk/imx/clk.h       | 18 +++++++++++++-----
- 2 files changed, 24 insertions(+), 26 deletions(-)
+ 2 files changed, 24 insertions(+), 10 deletions(-)
 
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 3da1218..e1c31f5 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -791,11 +791,17 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_CLKO1_ROOT_DIV] = imx_clk_divider2("clko1_post_div", "clko1_pre_div", base + 0xbd80, 0, 6);
+ 	clks[IMX7D_CLKO2_ROOT_DIV] = imx_clk_divider2("clko2_post_div", "clko2_pre_div", base + 0xbe00, 0, 6);
+ 
+-	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0);
+-	clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0);
+-	clks[IMX7D_ARM_M0_ROOT_CLK] = imx_clk_gate4("arm_m0_root_clk", "arm_m0_div", base + 0x4020, 0);
+-	clks[IMX7D_MAIN_AXI_ROOT_CLK] = imx_clk_gate4("main_axi_root_clk", "axi_post_div", base + 0x4040, 0);
+-	clks[IMX7D_DISP_AXI_ROOT_CLK] = imx_clk_gate4("disp_axi_root_clk", "disp_axi_post_div", base + 0x4050, 0);
++	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate2_flags("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0,
++							  CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
++	clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate2_flags("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0,
++							  CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
++	clks[IMX7D_ARM_M0_ROOT_CLK] = imx_clk_gate2_flags("arm_m0_root_clk", "arm_m0_div", base + 0x4020, 0,
++							  CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
++	clks[IMX7D_MAIN_AXI_ROOT_CLK] = imx_clk_gate2_flags("main_axi_root_clk", "axi_post_div", base + 0x4040, 0,
++							    CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
++	clks[IMX7D_DISP_AXI_ROOT_CLK] = imx_clk_gate2_flags("disp_axi_root_clk", "disp_axi_post_div",
++							    base + 0x4050, 0,
++							    CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
+ 	clks[IMX7D_ENET_AXI_ROOT_CLK] = imx_clk_gate4("enet_axi_root_clk", "enet_axi_post_div", base + 0x4060, 0);
+ 	clks[IMX7D_OCRAM_CLK] = imx_clk_gate4("ocram_clk", "axi_post_div", base + 0x4110, 0);
+ 	clks[IMX7D_OCRAM_S_CLK] = imx_clk_gate4("ocram_s_clk", "ahb_root_clk", base + 0x4120, 0);
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index d54f072..d0bc094 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -149,8 +149,9 @@ static inline struct clk *imx_clk_gate2_shared2(const char *name,
+ 		unsigned int *share_count)
+ {
+ 	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT |
+-				  CLK_OPS_PARENT_ENABLE, reg, shift, 0x3, 0,
+-				  &imx_ccm_lock, share_count);
++				  CLK_OPS_PARENT_ENABLE | CLK_SET_RATE_GATE,
++				  reg, shift, 0x3, 0, &imx_ccm_lock,
++				  share_count);
+ }
+ 
+ static inline struct clk *imx_clk_gate2_cgr(const char *name,
+@@ -171,9 +172,16 @@ static inline struct clk *imx_clk_gate3(const char *name, const char *parent,
+ static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
+ {
+-	return clk_register_gate2(NULL, name, parent,
+-			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
+-			reg, shift, 0x3, 0, &imx_ccm_lock, NULL);
++	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT |
++				  CLK_OPS_PARENT_ENABLE | CLK_SET_RATE_GATE,
++				  reg, shift, 0x3, 0, &imx_ccm_lock, NULL);
++}
++
++static inline struct clk *imx_clk_gate2_flags(const char *name, const char *parent,
++               void __iomem *reg, u8 shift, unsigned long flags)
++{
++        return clk_register_gate2(NULL, name, parent, flags, reg, shift, 0x3,
++				  0, &imx_ccm_lock, NULL);
+ }
+ 
+ static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
 -- 
 2.7.4
