@@ -1,116 +1,53 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 3 Jul 2017 08:40:31 -0500
-Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
- <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
- <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
-Message-ID: <20170703134031.GG13824@bhelgaas-glaptop.roam.corp.google.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 3 Jul 2017 14:32:24 +0100
+Subject: [PATCH v11 0/3]add PCIe driver for Kirin PCIe
+In-Reply-To: <CAFGCpxx+92PSs1VaryFOXau7CjBYEP4H6wT-o=bNMwkSznjQuw@mail.gmail.com>
+References: <20170619102349.50652-1-songxiaowei@hisilicon.com>
+ <20170702233657.GA13507@bhelgaas-glaptop.roam.corp.google.com>
+ <20170703104727.GB1573@arm.com>
+ <CAFGCpxx+92PSs1VaryFOXau7CjBYEP4H6wT-o=bNMwkSznjQuw@mail.gmail.com>
+Message-ID: <595A4768.20404@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 03, 2017 at 11:54:20AM +0200, Marc Gonzalez wrote:
-> Hello Bjorn,
-> 
-> On 03/07/2017 01:18, Bjorn Helgaas wrote:
-> 
-> > On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:
-> > 
-> >> This driver is required to work around several hardware bugs
-> >> in the PCIe controller.
-> >
-> > [ Snip style issues ]
-> 
-> I wish you had pointed these out in your May 23 review, or in
-> my March 29 version (or even just alluded to them). I would
-> have fixed them in time for 2.13.
+Hi Guodong,
 
-They're trivial, and if they were the only issues I would have just
-done them myself while merging.
+On 2017/7/3 14:04, Guodong Xu wrote:
+> Hi, Xu Wei
+> 
+> 
+> 
+> On Mon, Jul 3, 2017 at 6:47 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Sun, Jul 02, 2017 at 06:36:57PM -0500, Bjorn Helgaas wrote:
+>>> [+cc Catalin, Will, linux-arm-kernel]
+>>>
+>>> Applied patches 2 & 3 to pci/host-kirin for v4.13.
+>>>
+>>> I would like a MAINTAINERS update, too.  If you send me that, I'll
+>>> squash it into the driver patch.
+>>>
+>>> Catalin, Will, how do you want to handle the
+>>> arch/arm64/configs/defconfig change (patch 3)?  It's currently on my
+>>> branch, but I'm happy to drop it if another route is better.
+>>
+>> defconfig updates usually go through arm-soc, via the relevant platform
+>> maintainer, so it would be best to follow that route here too otherwise
+>> you'll probably see conflicts in -next.
+>>
+> 
+> Is it ok for you to pick up the arch/arm64/configs/defconfig change (patch 3)?
 
-> >> +	/*
-> >> +	 * QUIRK #2
-> >> +	 * Unfortunately, config and mem spaces are muxed.
-> >> +	 * Linux does not support such a setting, since drivers are free
-> >> +	 * to access mem space directly, at any time.
-> >> +	 * Therefore, we can only PRAY that config and mem space accesses
-> >> +	 * NEVER occur concurrently.
-> >> +	 */
-> >> +	writel_relaxed(1, pcie->mux);
-> >> +	ret = pci_generic_config_read(bus, devfn, where, size, val);
-> >> +	writel_relaxed(0, pcie->mux);
-> > 
-> > I'm very hesitant about this.  When people stress this, we're going to
-> > get reports of data corruption.  Even with the disclaimer below, I
-> > don't feel good about this.  Adding the driver is an implicit claim
-> > that we support the device, but we know it can't be made reliable.
-> 
-> I can't say I didn't see this coming (I had taken your long silence
-> as a sign of your reluctance) but back in May, I thought you implied
-> that a warning + tainting the kernel would be sufficient.
-> 
-> Mark Rutland points out stop_machine. I will test this solution.
-> Would you find that acceptable?
+Since it is already 4.12-rc7, I will pick up it and queue for the v4.14.
+Are you fine about that?
+Thanks!
 
-Sounds possible, though I can't say for sure without seeing the code.
+Best Regards,
+Wei
 
-The problem is serializing vs. memory accesses, since they don't use
-any wrappers.  However, they are ioremapped(), so it's at least
-conceivable that another solution would be to use VM to trap those
-accesses.  I'm not a VM person, so I don't know whether that's
-feasible in Linux.
-
-> > What is the benefit of adding this driver?  How many units are in the
-> > field?  Are you hoping to have support in distros like RHEL?  Are
-> > these running self-built kernels straight from kernel.org?  Is it
-> > feasible for you to distribute this driver separately from the
-> > upstream kernel?
 > 
-> The benefit of upstreaming (for me) is making kernel maintainers
-> aware that one is using specific internal APIs. Then one may be
-> notified when these APIs are about to change.
+> -Guodong
 > 
-> I'm told we have sold ~100k units. Though I don't know how many
-> are in the field and using PCIe.
+>> Will
 > 
-> There are no plans to use "full-blown" distros, we use embedded
-> oriented distros, such as buildroot.
+> .
 > 
-> Maintaining out-of-tree drivers is what we've been doing for
-> ~15 years, and there are many pain-points involved. Ask Greg
-> what he thinks of OOT drivers.
-> 
-> 
-> >> +static int tango_check_pcie_link(void __iomem *test_out)
-> > 
-> > I think this is checking for link up.  Rename to tango_pcie_link_up()
-> > to follow the convention of other drivers.  Take a struct tango_pcie *
-> > instead of an address, if possible.
-> 
-> Anything's possible. NB: if I pass the struct, then I have to store
-> the address in the struct, which isn't the case now, since I never
-> need the address later. If you don't mind adding an unnecessary
-> field to the struct, I can do it. What do you say?
-
-The benefit of following the same formula as other drivers is pretty
-large.  Most drivers save the equivalent of "base" in the struct.  If
-you did that, you wouldn't need an extra pointer; you would just use
-"base + SMP8759_MUX" in the config accessors and "base +
-SMP8759_TEST_OUT" in tango_pcie_link_up().
-
-> >> +static struct platform_driver tango_pcie_driver = {
-> >> +	.probe	= tango_pcie_probe,
-> >> +	.driver	= {
-> >> +		.name = KBUILD_MODNAME,
-> >> +		.of_match_table = tango_pcie_ids,
-> > 
-> > I think you need ".suppress_bind_attrs = true" here to prevent issues
-> > when unbinding driver.  See
-> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a5f40e8098fe
-> 
-> Will do. In that case, I can drop tango_pcie_remove() right?
-
-I think so; I don't think there would be any way to remove the driver.
-
-Bjorn
