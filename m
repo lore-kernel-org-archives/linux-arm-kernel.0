@@ -1,94 +1,72 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 3 Jul 2017 16:02:45 +0200
-Subject: [PATCH 4/6] clk: at91: clk-generated: create function to find
- best_diff
-In-Reply-To: <20170623090059.8371-5-quentin.schulz@free-electrons.com>
-References: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
- <20170623090059.8371-5-quentin.schulz@free-electrons.com>
-Message-ID: <20170703160245.1481942e@bbrezillon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 03 Jul 2017 16:06:53 +0200
+Subject: [PATCH 0/5] ARM64: dts: marvell: armada37xx: DT fixes and
+ enablements
+In-Reply-To: <20170701141637.24719-1-marc.zyngier@arm.com> (Marc Zyngier's
+ message of "Sat, 1 Jul 2017 15:16:32 +0100")
+References: <20170701141637.24719-1-marc.zyngier@arm.com>
+Message-ID: <871spxvcle.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Jun 2017 11:00:57 +0200
-Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
+Hi Marc,
+ 
+ On sam., juil. 01 2017, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-> The way to find the best_diff and do the appropriate process afterwards
-> can be re-used.
-> 
-> This patch prepares the driver for an upcoming patch that will allow
-> clk_generated to determine the rate of the audio_pll.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> I finally got a chance to spend some time with an Armada-3720-based
+> Espressobin, and immediately faced a number of issues which would make
+> the system of limited use for me. Fortunately, these are pretty easy
+> to fix:
+>
+> - The first patch (already posted a couple of weeks ago, and included
+>   here for completeness) fixes what is probably a copy-paste issue
+>   between GICv2 and GICv3-based platforms, where a cpu-mask is wrongly
+>   applied to PPIs.
+>
+> - The following two patches add missing properties that are required
+>   for enabling virtualisation support (GIC maintenance interrupt, MMIO
+>   regions for GICv2 guest compatibility). KVM now runs correctly on
+>   this HW.
+>
+> - The following patch exposes the CPUs' PMUv3, making perf work. Hey,
+>   for once it is wired correctly, without anything funky breaking the
+>   interrupt routing! Let's not miss this once in a lifetime
+>   opportunity!
+>
+> - The last patch enables the USB2 interface on the Espressobin. OK,
+>   not very useful, but since it works...
+>
+> This has been tested on -next as of this yesterday.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-> ---
->  drivers/clk/at91/clk-generated.c | 41 ++++++++++++++++++++++++++--------------
->  1 file changed, 27 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-> index dab7002937e6..6530a2e7e84d 100644
-> --- a/drivers/clk/at91/clk-generated.c
-> +++ b/drivers/clk/at91/clk-generated.c
-> @@ -99,15 +99,36 @@ clk_generated_recalc_rate(struct clk_hw *hw,
->  	return DIV_ROUND_CLOSEST(parent_rate, gck->gckdiv + 1);
->  }
->  
-> +static void clk_generated_best_diff(struct clk_rate_request *req,
-> +				    struct clk_hw *parent,
-> +				    unsigned long parent_rate, u32 div,
-> +				    int *best_diff, long *best_rate)
-> +{
-> +	unsigned long tmp_rate;
-> +	int tmp_diff;
-> +
-> +	if (!div)
-> +		tmp_rate = parent_rate;
-> +	else
-> +		tmp_rate = parent_rate / div;
-> +	tmp_diff = abs(req->rate - tmp_rate);
-> +
-> +	if (*best_diff < 0 || *best_diff > tmp_diff) {
-> +		*best_rate = tmp_rate;
-> +		*best_diff = tmp_diff;
-> +		req->best_parent_rate = parent_rate;
-> +		req->best_parent_hw = parent;
-> +	}
-> +}
-> +
->  static int clk_generated_determine_rate(struct clk_hw *hw,
->  					struct clk_rate_request *req)
->  {
->  	struct clk_generated *gck = to_clk_generated(hw);
->  	struct clk_hw *parent = NULL;
->  	long best_rate = -EINVAL;
-> -	unsigned long tmp_rate, min_rate;
-> +	unsigned long min_rate;
->  	int best_diff = -1;
-> -	int tmp_diff;
->  	int i;
->  
->  	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
-> @@ -125,18 +146,10 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
->  			continue;
->  
->  		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
-> -		if (!div)
-> -			tmp_rate = parent_rate;
-> -		else
-> -			tmp_rate = parent_rate / div;
-> -		tmp_diff = abs(req->rate - tmp_rate);
-> -
-> -		if (best_diff < 0 || best_diff > tmp_diff) {
-> -			best_rate = tmp_rate;
-> -			best_diff = tmp_diff;
-> -			req->best_parent_rate = parent_rate;
-> -			req->best_parent_hw = parent;
-> -		}
-> +
-> +		clk_generated_best_diff(req, parent, parent_rate, div,
-> +					&best_diff, &best_rate);
-> +
->  
->  		if (!best_diff)
->  			break;
+All applied on mvebu/dt64-for-4.14
+
+Thanks,
+
+Gregory
+
+
+>
+> 	M.
+>
+> Marc Zyngier (5):
+>   ARM64: dts: marvell: armada37xx: Fix timer interrupt specifiers
+>   ARM64: dts: marvell: armada37xx: Fix GIC maintenance interrupt
+>   ARM64: dts: marvell: armada37xx: Enable memory-mapped GIC CPU
+>     interface
+>   ARM64: dts: marvell: armada37xx: Wire PMUv3
+>   ARM64: dts: marvell: armada37xx: Enable USB2 on espressobin
+>
+>  .../boot/dts/marvell/armada-3720-espressobin.dts   |  5 +++++
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 23 +++++++++++++---------
+>  2 files changed, 19 insertions(+), 9 deletions(-)
+>
+> -- 
+> 2.11.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
