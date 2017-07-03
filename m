@@ -1,196 +1,76 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Mon, 3 Jul 2017 08:18:45 +0000
-Subject: [PATCH v3 1/2] acpi:iort: Add an IORT helper function to
- reserve HW ITS address regions for IOMMU drivers
-In-Reply-To: <20170623165406.GA6412@red-moon>
-References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
- <20170623145801.325244-2-shameerali.kolothum.thodi@huawei.com>
- <20170623165406.GA6412@red-moon>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA838399F10@FRAEML521-MBX.china.huawei.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 3 Jul 2017 10:21:26 +0200
+Subject: [PATCH v4 1/3] arm64: kvm: support user space to detect RAS
+ extension feature
+In-Reply-To: <1498481143-23183-1-git-send-email-gengdongjiu@huawei.com>
+References: <1498481143-23183-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <20170703082126.GC4066@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 26, 2017 at 08:45:43PM +0800, Dongjiu Geng wrote:
+> Handle userspace's detection for RAS extension, because sometimes
+> the userspace needs to know the CPU's capacity
 
+Why?  Can you please provide some more rationale.
 
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: Friday, June 23, 2017 5:54 PM
-> To: Shameerali Kolothum Thodi
-> Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
-> robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
-> Garry; iommu at lists.linux-foundation.org; linux-arm-
-> kernel at lists.infradead.org; linux-acpi at vger.kernel.org; devel at acpica.org;
-> Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
-> Subject: Re: [PATCH v3 1/2] acpi:iort: Add an IORT helper function to reserve
-> HW ITS address regions for IOMMU drivers
 > 
-> On Fri, Jun 23, 2017 at 03:58:00PM +0100, shameer wrote:
-> > The helper function retrieves ITS address regions through IORT device
-> > <-> ITS mappings and reserves it so that these regions will not be
-> > translated by IOMMU and will be excluded from IOVA allocations. IOMMU
-> > drivers can use this to implement their .get_resv_regions callback.
-> >
-> > Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> > ---
-> >  drivers/acpi/arm64/iort.c        | 91
-> ++++++++++++++++++++++++++++++++++++++--
-> >  drivers/irqchip/irq-gic-v3-its.c |  3 +-
-> >  include/linux/acpi_iort.h        |  7 +++-
-> >  3 files changed, 96 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > index c5fecf9..cf0a6b8 100644
-> > --- a/drivers/acpi/arm64/iort.c
-> > +++ b/drivers/acpi/arm64/iort.c
-> > @@ -34,6 +34,7 @@
-> >  struct iort_its_msi_chip {
-> >  	struct list_head	list;
-> >  	struct fwnode_handle	*fw_node;
-> > +	phys_addr_t		base_addr;
-> >  	u32			translation_id;
-> >  };
-> >
-> > @@ -131,14 +132,16 @@ typedef acpi_status (*iort_find_node_callback)
-> > static DEFINE_SPINLOCK(iort_msi_chip_lock);
-> >
-> >  /**
-> > - * iort_register_domain_token() - register domain token and related
-> > ITS ID
-> > - * to the list from where we can get it back later on.
-> > + * iort_register_domain_token() - register domain token along with
-> > + related
-> > + * ITS ID and base address to the list from where we can get it back later
-> on.
-> >   * @trans_id: ITS ID.
-> > + * @base: ITS base address.
-> >   * @fw_node: Domain token.
-> >   *
-> >   * Returns: 0 on success, -ENOMEM if no memory when allocating list
-> element
-> >   */
-> > -int iort_register_domain_token(int trans_id, struct fwnode_handle
-> > *fw_node)
-> > +int iort_register_domain_token(int trans_id, phys_addr_t base,
-> > +			       struct fwnode_handle *fw_node)
-> >  {
-> >  	struct iort_its_msi_chip *its_msi_chip;
-> >
-> > @@ -148,6 +151,7 @@ int iort_register_domain_token(int trans_id,
-> > struct fwnode_handle *fw_node)
-> >
-> >  	its_msi_chip->fw_node = fw_node;
-> >  	its_msi_chip->translation_id = trans_id;
-> > +	its_msi_chip->base_addr = base;
-> >
-> >  	spin_lock(&iort_msi_chip_lock);
-> >  	list_add(&its_msi_chip->list, &iort_msi_chip_list); @@ -491,6
-> > +495,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
-> >  	return -ENODEV;
-> >  }
-> >
-> > +static int iort_find_its_base(u32 its_id, phys_addr_t *base) {
-> > +	struct iort_its_msi_chip *its_msi_chip;
-> > +	bool match = false;
-> > +
-> > +	spin_lock(&iort_msi_chip_lock);
-> > +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-> > +		if (its_msi_chip->translation_id == its_id) {
-> > +			*base = its_msi_chip->base_addr;
-> > +			match = true;
-> > +			break;
-> > +		}
-> > +	}
-> > +	spin_unlock(&iort_msi_chip_lock);
-> > +
-> > +	return match ? 0 : -ENODEV;
-> > +}
-> > +
-> >  /**
-> >   * iort_dev_find_its_id() - Find the ITS identifier for a device
-> >   * @dev: The device.
-> > @@ -649,6 +671,67 @@ int iort_add_device_replay(const struct
-> iommu_ops
-> > *ops, struct device *dev)
-> >
-> >  	return err;
-> >  }
-> > +
-> > +/**
-> > + * iort_iommu_its_get_resv_regions - Reserved region driver helper
-> > + * @dev: Device from iommu_get_resv_regions()
-> > + * @list: Reserved region list from iommu_get_resv_regions()
-> > + *
-> > + * Returns: Number of reserved regions on success(0 if no associated ITS),
-> > + *          appropriate error value otherwise.
-> > + *
-> > + * IOMMU drivers can use this to implement their .get_resv_regions
-> > +callback
-> > + * for reserving the HW ITS address regions.
-> > + */
-> > +int iort_iommu_its_get_resv_regions(struct device *dev, struct
-> > +list_head *head) {
-> > +	int i;
-> > +	struct acpi_iort_its_group *its;
-> > +	struct acpi_iort_node *node, *its_node = NULL;
-> > +	int resv = 0;
-> > +
-> > +	node = iort_find_dev_node(dev);
-> > +	if (!node)
-> > +		return -ENODEV;
-> > +
-> > +	if (dev_is_pci(dev)) {
-> > +		u32 rid;
-> > +
-> > +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
-> &rid);
-> > +		its_node = iort_node_map_id(node, rid, NULL,
-> IORT_MSI_TYPE);
-> > +	} else {
-> > +		for (i = 0; i < node->mapping_count; i++) {
-> > +			its_node = iort_node_map_platform_id(node, NULL,
-> > +							 IORT_MSI_TYPE, i);
-> > +			if (its_node)
-> > +				break;
-> > +		}
-> > +	}
-> > +
-> > +	if (!its_node)
-> > +		return 0;
-> > +
-> > +	/* Move to ITS specific data */
-> > +	its = (struct acpi_iort_its_group *)its_node->node_data;
-> > +
-> > +	for (i = 0; i < its->its_count; i++) {
-> > +		phys_addr_t base;
-> > +
-> > +		if (!iort_find_its_base(its->identifiers[i], &base)) {
-> > +			int prot = IOMMU_WRITE | IOMMU_NOEXEC |
-> IOMMU_MMIO;
-> > +			struct iommu_resv_region *region;
-> > +
-> > +			region = iommu_alloc_resv_region(base, SZ_128K,
-> prot,
-> > +							 IOMMU_RESV_MSI);
-> > +			if (region) {
-> > +				list_add_tail(&region->list, head);
-> > +				resv++;
-> > +			}
-> > +		}
-> > +	}
-> > +
-> > +	return resv ? : -ENODEV;
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> ---
+>  arch/arm64/kvm/reset.c   | 11 +++++++++++
+>  include/uapi/linux/kvm.h |  1 +
+>  2 files changed, 12 insertions(+)
 > 
-> IIUC I think this is not right (ie resv < its_count should count as a failure).
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index d9e9697..1004039 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
+>  	return !!(pfr0 & 0x20);
+>  }
+>  
+> +static bool kvm_arm_support_ras_extension(void)
+> +{
+> +	u64 pfr0;
+> +
+> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+> +	return !!(pfr0 & 0x10000000);
+> +}
 
-Yes, that is a valid error.
+Why is this specific to KVM?  This seems to reveal information about the
+underlying physical CPU, not specific to KVM at all, surely if userspace
+is really supposed to be able to figure this out, it should not be KVM
+specific.
 
-> This should be easy to fix-up but I am not sure there is still time for these
-> patches to be merged for this merge window, I take the blame since I am the
-> cause of the delay but I thought the logic in the SMMU driver should have
-> been clarified and this version does it IMO.
+Thanks,
+-Christoffer
 
-No problem and thanks for your support. I could rebase this on  rc1 and send
-the next version. Please let me know.
-
-Shameer
- 
+> +
+>  /**
+>   * kvm_arch_dev_ioctl_check_extension
+>   *
+> @@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_ARM_PMU_V3:
+>  		r = kvm_arm_support_pmu_v3();
+>  		break;
+> +	case KVM_CAP_ARM_RAS_EXTENSION:
+> +		r = kvm_arm_support_ras_extension();
+> +		break;
+>  	case KVM_CAP_SET_GUEST_DEBUG:
+>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>  		r = 1;
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index f51d508..27fe556 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
+>  #define KVM_CAP_PPC_MMU_RADIX 134
+>  #define KVM_CAP_PPC_MMU_HASH_V3 135
+>  #define KVM_CAP_IMMEDIATE_EXIT 136
+> +#define KVM_CAP_ARM_RAS_EXTENSION 137
+>  
+>  #ifdef KVM_CAP_IRQ_ROUTING
+>  
+> -- 
+> 2.10.1
+> 
