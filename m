@@ -1,80 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 3 Jul 2017 13:35:37 +0100
-Subject: [RFC 21/55] KVM: arm64: Forward HVC instruction to the guest
- hypervisor
-In-Reply-To: <20170703120350.GC1573@arm.com>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-22-git-send-email-jintack@cs.columbia.edu>
- <20170222114758.GM26976@cbox>
- <CAHyh4xjG8_dOOe-eqQmAogDHDnQPCUQ-2Kccz9=6NmL0_+9TAA@mail.gmail.com>
- <20170703090850.GG4066@cbox>
- <20170703093156.m3ds2orbjcyooaag@kamzik.brq.redhat.com>
- <20170703095126.GH4066@cbox> <20170703120350.GC1573@arm.com>
-Message-ID: <55f84930-184a-c484-e3d5-21522d6a8cc9@arm.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 3 Jul 2017 20:35:15 +0800
+Subject: [PATCH v3 01/28] crypto: change backlog return code to
+ -EIOCBQUEUED
+In-Reply-To: <1499006535-19760-2-git-send-email-gilad@benyossef.com>
+References: <1499006535-19760-1-git-send-email-gilad@benyossef.com>
+ <1499006535-19760-2-git-send-email-gilad@benyossef.com>
+Message-ID: <20170703123515.GC30067@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/17 13:03, Will Deacon wrote:
-> On Mon, Jul 03, 2017 at 11:51:26AM +0200, Christoffer Dall wrote:
->> On Mon, Jul 03, 2017 at 11:31:56AM +0200, Andrew Jones wrote:
->>> On Mon, Jul 03, 2017 at 11:08:50AM +0200, Christoffer Dall wrote:
->>>> On Mon, Jun 26, 2017 at 11:21:25AM -0400, Jintack Lim wrote:
->>>>> On Wed, Feb 22, 2017 at 6:47 AM, Christoffer Dall <cdall@linaro.org> wrote:
->>>>>> On Mon, Jan 09, 2017 at 01:24:17AM -0500, Jintack Lim wrote:
->>>>>>> +/* We forward all hvc instruction to the guest hypervisor. */
->>>>>>> +int handle_hvc_nested(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +     return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
->>>>>>> +}
->>>>>>
->>>>>> I don't understand the logic here or in the caller above.  Do we really
->>>>>> forward *all" hvc calls to the guest hypervisor now, so that we no
->>>>>> longer support any hypercalls from the VM?  That seems a little rough
->>>>>> and probably requires some more discussions.
->>>>>
->>>>> So I think if we run a VM with the EL2 support, then all hvc calls
->>>>> from the VM should be forwarded to the virtual EL2.
->>>>
->>>> But do we actually check if the guest has EL2 here?  It seems you cann
->>>> handle_hvc_nested unconditionally when you have
->>>> OCNFIG_KVM_ARM_NESTED_HYP.  I think that's what threw me off when first
->>>> reading your patch.
->>>>
->>>>>
->>>>> I may miss something obvious, so can you (or anyone) come up with some
->>>>> cases that the host hypervisor needs to directly handle hvc from the
->>>>> VM with the EL2 support?
->>>>>
->>>>
->>>> So I'm a little unsure what to say here.  On one hand you are absolutely
->>>> correct, that architecturally if we emulated virtual EL2, then all
->>>> hypercalls are handled by the virtual EL2 (even hypercalls from virtual
->>>> EL2 which should become self-hypercalls).
->>>>
->>>> On the other hand, an enlightened guest may want to use hypercalls to
->>>> the hypervisor for some reason, but that would require some numbering
->>>> scheme to separate the two concepts.
->>>
->>> Yes, I've been thinking that a KVM generic vcpu needs to be enlightened,
->>> and to use a hypercall to get the host cpu's errata. If we head down that
->>> road, then even a vcpu emulating EL2 would need to be able to this.
->>>
->>
->> We could use SMC calls here a well, as the "conduit" as I believe the
->> ARM folks are calling it.  We just need to agree somewhere (across
->> hypervisors preferably), that when you have virtual EL2, everything is
->> via SMC (even upcalls to a host hypervisor), and otherwise it's via HVC.
+On Sun, Jul 02, 2017 at 05:41:43PM +0300, Gilad Ben-Yossef wrote:
+> The crypto API was using the -EBUSY return value to indicate
+> both a hard failure to submit a crypto operation into a
+> transformation provider when the latter was busy and the backlog
+> mechanism was not enabled as well as a notification that the operation
+> was queued into the backlog when the backlog mechanism was enabled.
 > 
-> Does that mean you require the CPU to implement EL3 if you want to use
-> nested virtualisation?
+> Having the same return code indicate two very different conditions
+> depending on a flag is both error prone and requires extra runtime
+> check like the following to discern between the cases:
+> 
+> 	if (err == -EINPROGRESS ||
+> 	    (err == -EBUSY && (ahash_request_flags(req) &
+> 			       CRYPTO_TFM_REQ_MAY_BACKLOG)))
+> 
+> This patch changes the return code used to indicate a crypto op
+> was queued in the backlog to -EIOCBQUEUED, thus resolving both
+> issues.
+> 
+> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 
-The 8.3 spec has relaxed the use of SMC for the non-root hypervisor,
-where the top-level hypervisor can trap SMCs from nested hypervisors,
-irrespective of EL3 being implemented. It still cannot SMCs from an EL1
-guest if EL3 is not implemented though...
+So you're changing the success case from EBUSY to EIOCBQUEUED.
+This results in a lot of churn as you have to change every single
+driver and caller.
+
+How about changing the error case to use something other than
+EBUSY instead?
 
 Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
