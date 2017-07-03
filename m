@@ -1,347 +1,1079 @@
 From: philippe.cornu@st.com (Philippe CORNU)
-Date: Mon, 3 Jul 2017 10:41:22 +0200
-Subject: [PATCH v5 2/7] drm/stm: ltdc: Add panel-bridge support
+Date: Mon, 3 Jul 2017 10:41:24 +0200
+Subject: [PATCH v5 4/7] drm/bridge/synopsys: Add MIPI DSI host controller
+ bridge
 In-Reply-To: <1499071287-10414-1-git-send-email-philippe.cornu@st.com>
 References: <1499071287-10414-1-git-send-email-philippe.cornu@st.com>
-Message-ID: <1499071287-10414-3-git-send-email-philippe.cornu@st.com>
+Message-ID: <1499071287-10414-5-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the panel-bridge support for both panels & bridges (used by DSI host &
-HDMI/LVDS bridges).
+Add a Synopsys Designware MIPI DSI host DRM bridge driver, based on the
+Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
 
 Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
-Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
- drivers/gpu/drm/stm/Kconfig |   2 +-
- drivers/gpu/drm/stm/ltdc.c  | 210 ++++++++------------------------------------
- drivers/gpu/drm/stm/ltdc.h  |   3 +-
- 3 files changed, 38 insertions(+), 177 deletions(-)
+ drivers/gpu/drm/bridge/synopsys/Kconfig       |   6 +
+ drivers/gpu/drm/bridge/synopsys/Makefile      |   2 +
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 979 ++++++++++++++++++++++++++
+ include/drm/bridge/dw_mipi_dsi.h              |  39 +
+ 4 files changed, 1026 insertions(+)
+ create mode 100644 drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+ create mode 100644 include/drm/bridge/dw_mipi_dsi.h
 
-diff --git a/drivers/gpu/drm/stm/Kconfig b/drivers/gpu/drm/stm/Kconfig
-index 2c4817f..4b88223 100644
---- a/drivers/gpu/drm/stm/Kconfig
-+++ b/drivers/gpu/drm/stm/Kconfig
-@@ -4,7 +4,7 @@ config DRM_STM
- 	select DRM_KMS_HELPER
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_KMS_CMA_HELPER
--	select DRM_PANEL
+diff --git a/drivers/gpu/drm/bridge/synopsys/Kconfig b/drivers/gpu/drm/bridge/synopsys/Kconfig
+index 40d2827..f00ee26 100644
+--- a/drivers/gpu/drm/bridge/synopsys/Kconfig
++++ b/drivers/gpu/drm/bridge/synopsys/Kconfig
+@@ -21,3 +21,9 @@ config DRM_DW_HDMI_I2S_AUDIO
+ 	help
+ 	  Support the I2S Audio interface which is part of the Synopsys
+ 	  Designware HDMI block.
++
++config DRM_DW_MIPI_DSI
++	tristate
++	select DRM_KMS_HELPER
++	select DRM_MIPI_DSI
 +	select DRM_PANEL_BRIDGE
- 	select VIDEOMODE_HELPERS
- 	select FB_PROVIDE_GET_FB_UNMAPPED_AREA
- 	default y
-diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
-index 7f64d5a..e46b427 100644
---- a/drivers/gpu/drm/stm/ltdc.c
-+++ b/drivers/gpu/drm/stm/ltdc.c
-@@ -21,7 +21,7 @@
- #include <drm/drm_fb_cma_helper.h>
- #include <drm/drm_gem_cma_helper.h>
- #include <drm/drm_of.h>
--#include <drm/drm_panel.h>
+diff --git a/drivers/gpu/drm/bridge/synopsys/Makefile b/drivers/gpu/drm/bridge/synopsys/Makefile
+index 17aa7a6..5f57d36 100644
+--- a/drivers/gpu/drm/bridge/synopsys/Makefile
++++ b/drivers/gpu/drm/bridge/synopsys/Makefile
+@@ -3,3 +3,5 @@
+ obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+ obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+ obj-$(CONFIG_DRM_DW_HDMI_I2S_AUDIO) += dw-hdmi-i2s-audio.o
++
++obj-$(CONFIG_DRM_DW_MIPI_DSI) += dw-mipi-dsi.o
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+new file mode 100644
+index 0000000..406000e
+--- /dev/null
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -0,0 +1,979 @@
++/*
++ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
++ * Copyright (C) STMicroelectronics SA 2017
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * Modified by Philippe Cornu <philippe.cornu@st.com>
++ * This generic Synopsys DesignWare MIPI DSI host driver is based on the
++ * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
++ */
++
++#include <linux/clk.h>
++#include <linux/component.h>
++#include <linux/iopoll.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/reset.h>
++#include <drm/drmP.h>
++#include <drm/drm_atomic_helper.h>
 +#include <drm/drm_bridge.h>
- #include <drm/drm_plane_helper.h>
- 
- #include <video/videomode.h>
-@@ -269,11 +269,6 @@ static inline struct ltdc_device *encoder_to_ltdc(struct drm_encoder *enc)
- 	return (struct ltdc_device *)enc->dev->dev_private;
- }
- 
--static inline struct ltdc_device *connector_to_ltdc(struct drm_connector *con)
--{
--	return (struct ltdc_device *)con->dev->dev_private;
--}
--
- static inline enum ltdc_pix_fmt to_ltdc_pixelformat(u32 drm_fmt)
- {
- 	enum ltdc_pix_fmt pf;
-@@ -815,130 +810,35 @@ static int ltdc_crtc_init(struct drm_device *ddev, struct drm_crtc *crtc)
-  * DRM_ENCODER
-  */
- 
--static void ltdc_rgb_encoder_enable(struct drm_encoder *encoder)
--{
--	struct ltdc_device *ldev = encoder_to_ltdc(encoder);
--
--	DRM_DEBUG_DRIVER("\n");
--
--	drm_panel_prepare(ldev->panel);
--	drm_panel_enable(ldev->panel);
--}
--
--static void ltdc_rgb_encoder_disable(struct drm_encoder *encoder)
--{
--	struct ltdc_device *ldev = encoder_to_ltdc(encoder);
--
--	DRM_DEBUG_DRIVER("\n");
--
--	drm_panel_disable(ldev->panel);
--	drm_panel_unprepare(ldev->panel);
--}
--
--static const struct drm_encoder_helper_funcs ltdc_rgb_encoder_helper_funcs = {
--	.enable = ltdc_rgb_encoder_enable,
--	.disable = ltdc_rgb_encoder_disable,
--};
--
--static const struct drm_encoder_funcs ltdc_rgb_encoder_funcs = {
-+static const struct drm_encoder_funcs ltdc_encoder_funcs = {
- 	.destroy = drm_encoder_cleanup,
- };
- 
--static struct drm_encoder *ltdc_rgb_encoder_create(struct drm_device *ddev)
-+static int ltdc_encoder_init(struct drm_device *ddev)
- {
-+	struct ltdc_device *ldev = ddev->dev_private;
- 	struct drm_encoder *encoder;
-+	int ret;
- 
- 	encoder = devm_kzalloc(ddev->dev, sizeof(*encoder), GFP_KERNEL);
- 	if (!encoder)
--		return NULL;
-+		return -ENOMEM;
- 
- 	encoder->possible_crtcs = CRTC_MASK;
- 	encoder->possible_clones = 0; /* No cloning support */
- 
--	drm_encoder_init(ddev, encoder, &ltdc_rgb_encoder_funcs,
-+	drm_encoder_init(ddev, encoder, &ltdc_encoder_funcs,
- 			 DRM_MODE_ENCODER_DPI, NULL);
- 
--	drm_encoder_helper_add(encoder, &ltdc_rgb_encoder_helper_funcs);
--
--	DRM_DEBUG_DRIVER("RGB encoder:%d created\n", encoder->base.id);
--
--	return encoder;
--}
--
--/*
-- * DRM_CONNECTOR
-- */
--
--static int ltdc_rgb_connector_get_modes(struct drm_connector *connector)
--{
--	struct drm_device *ddev = connector->dev;
--	struct ltdc_device *ldev = ddev->dev_private;
--	int ret = 0;
--
--	DRM_DEBUG_DRIVER("\n");
--
--	if (ldev->panel)
--		ret = drm_panel_get_modes(ldev->panel);
--
--	return ret < 0 ? 0 : ret;
--}
--
--static struct drm_connector_helper_funcs ltdc_rgb_connector_helper_funcs = {
--	.get_modes = ltdc_rgb_connector_get_modes,
--};
--
--static enum drm_connector_status
--ltdc_rgb_connector_detect(struct drm_connector *connector, bool force)
--{
--	struct ltdc_device *ldev = connector_to_ltdc(connector);
--
--	return ldev->panel ? connector_status_connected :
--	       connector_status_disconnected;
--}
--
--static void ltdc_rgb_connector_destroy(struct drm_connector *connector)
--{
--	DRM_DEBUG_DRIVER("\n");
--
--	drm_connector_unregister(connector);
--	drm_connector_cleanup(connector);
--}
--
--static const struct drm_connector_funcs ltdc_rgb_connector_funcs = {
--	.dpms = drm_atomic_helper_connector_dpms,
--	.fill_modes = drm_helper_probe_single_connector_modes,
--	.detect = ltdc_rgb_connector_detect,
--	.destroy = ltdc_rgb_connector_destroy,
--	.reset = drm_atomic_helper_connector_reset,
--	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
--	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
--};
--
--struct drm_connector *ltdc_rgb_connector_create(struct drm_device *ddev)
--{
--	struct drm_connector *connector;
--	int err;
--
--	connector = devm_kzalloc(ddev->dev, sizeof(*connector), GFP_KERNEL);
--	if (!connector) {
--		DRM_ERROR("Failed to allocate connector\n");
--		return NULL;
--	}
--
--	connector->polled = DRM_CONNECTOR_POLL_HPD;
--
--	err = drm_connector_init(ddev, connector, &ltdc_rgb_connector_funcs,
--				 DRM_MODE_CONNECTOR_DPI);
--	if (err) {
--		DRM_ERROR("Failed to initialize connector\n");
--		return NULL;
-+	ret = drm_bridge_attach(encoder, ldev->bridge, NULL);
-+	if (ret) {
-+		drm_encoder_cleanup(encoder);
-+		return -EINVAL;
- 	}
- 
--	drm_connector_helper_add(connector, &ltdc_rgb_connector_helper_funcs);
--
--	DRM_DEBUG_DRIVER("RGB connector:%d created\n", connector->base.id);
-+	DRM_DEBUG_DRIVER("Bridge encoder:%d created\n", encoder->base.id);
- 
--	return connector;
-+	return 0;
- }
- 
- static int ltdc_get_caps(struct drm_device *ddev)
-@@ -974,49 +874,14 @@ static int ltdc_get_caps(struct drm_device *ddev)
- 	return 0;
- }
- 
--static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
--{
--	struct device *dev = ddev->dev;
--	struct device_node *np = dev->of_node;
--	struct device_node *entity, *port = NULL;
--	struct drm_panel *panel = NULL;
--
--	DRM_DEBUG_DRIVER("\n");
--
--	/*
--	 * Parse ltdc node to get remote port and find RGB panel / HDMI slave
--	 * If a dsi or a bridge (hdmi, lvds...) is connected to ltdc,
--	 * a remote port & RGB panel will not be found.
--	 */
--	for_each_endpoint_of_node(np, entity) {
--		if (!of_device_is_available(entity))
--			continue;
--
--		port = of_graph_get_remote_port_parent(entity);
--		if (port) {
--			panel = of_drm_find_panel(port);
--			of_node_put(port);
--			if (panel) {
--				DRM_DEBUG_DRIVER("remote panel %s\n",
--						 port->full_name);
--			} else {
--				DRM_DEBUG_DRIVER("panel missing\n");
--				of_node_put(entity);
--			}
--		}
--	}
--
--	return panel;
--}
--
- int ltdc_load(struct drm_device *ddev)
- {
- 	struct platform_device *pdev = to_platform_device(ddev->dev);
- 	struct ltdc_device *ldev = ddev->dev_private;
- 	struct device *dev = ddev->dev;
- 	struct device_node *np = dev->of_node;
--	struct drm_encoder *encoder;
--	struct drm_connector *connector = NULL;
++#include <drm/drm_crtc.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_mipi_dsi.h>
++#include <drm/drm_of.h>
++#include <drm/bridge/dw_mipi_dsi.h>
++#include <video/mipi_display.h>
++
++#define DSI_VERSION			0x00
++#define DSI_PWR_UP			0x04
++#define RESET				0
++#define POWERUP				BIT(0)
++
++#define DSI_CLKMGR_CFG			0x08
++#define TO_CLK_DIVIDSION(div)		(((div) & 0xff) << 8)
++#define TX_ESC_CLK_DIVIDSION(div)	(((div) & 0xff) << 0)
++
++#define DSI_DPI_VCID			0x0c
++#define DPI_VID(vid)			(((vid) & 0x3) << 0)
++
++#define DSI_DPI_COLOR_CODING		0x10
++#define EN18_LOOSELY			BIT(8)
++#define DPI_COLOR_CODING_16BIT_1	0x0
++#define DPI_COLOR_CODING_16BIT_2	0x1
++#define DPI_COLOR_CODING_16BIT_3	0x2
++#define DPI_COLOR_CODING_18BIT_1	0x3
++#define DPI_COLOR_CODING_18BIT_2	0x4
++#define DPI_COLOR_CODING_24BIT		0x5
++
++#define DSI_DPI_CFG_POL			0x14
++#define COLORM_ACTIVE_LOW		BIT(4)
++#define SHUTD_ACTIVE_LOW		BIT(3)
++#define HSYNC_ACTIVE_LOW		BIT(2)
++#define VSYNC_ACTIVE_LOW		BIT(1)
++#define DATAEN_ACTIVE_LOW		BIT(0)
++
++#define DSI_DPI_LP_CMD_TIM		0x18
++#define OUTVACT_LPCMD_TIME(p)		(((p) & 0xff) << 16)
++#define INVACT_LPCMD_TIME(p)		((p) & 0xff)
++
++#define DSI_DBI_CFG			0x20
++#define DSI_DBI_CMDSIZE			0x28
++
++#define DSI_PCKHDL_CFG			0x2c
++#define EN_CRC_RX			BIT(4)
++#define EN_ECC_RX			BIT(3)
++#define EN_BTA				BIT(2)
++#define EN_EOTP_RX			BIT(1)
++#define EN_EOTP_TX			BIT(0)
++
++#define DSI_MODE_CFG			0x34
++#define ENABLE_VIDEO_MODE		0
++#define ENABLE_CMD_MODE			BIT(0)
++
++#define DSI_VID_MODE_CFG		0x38
++#define FRAME_BTA_ACK			BIT(14)
++#define ENABLE_LOW_POWER		(0x3f << 8)
++#define ENABLE_LOW_POWER_MASK		(0x3f << 8)
++#define VID_MODE_TYPE_NON_BURST_SYNC_PULSES	0x0
++#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
++#define VID_MODE_TYPE_BURST			0x2
++#define VID_MODE_TYPE_MASK			0x3
++
++#define DSI_VID_PKT_SIZE		0x3c
++#define VID_PKT_SIZE(p)			(((p) & 0x3fff) << 0)
++#define VID_PKT_MAX_SIZE		0x3fff
++
++#define DSI_VID_HSA_TIME		0x48
++#define DSI_VID_HBP_TIME		0x4c
++#define DSI_VID_HLINE_TIME		0x50
++#define DSI_VID_VSA_LINES		0x54
++#define DSI_VID_VBP_LINES		0x58
++#define DSI_VID_VFP_LINES		0x5c
++#define DSI_VID_VACTIVE_LINES		0x60
++#define DSI_CMD_MODE_CFG		0x68
++#define MAX_RD_PKT_SIZE_LP		BIT(24)
++#define DCS_LW_TX_LP			BIT(19)
++#define DCS_SR_0P_TX_LP			BIT(18)
++#define DCS_SW_1P_TX_LP			BIT(17)
++#define DCS_SW_0P_TX_LP			BIT(16)
++#define GEN_LW_TX_LP			BIT(14)
++#define GEN_SR_2P_TX_LP			BIT(13)
++#define GEN_SR_1P_TX_LP			BIT(12)
++#define GEN_SR_0P_TX_LP			BIT(11)
++#define GEN_SW_2P_TX_LP			BIT(10)
++#define GEN_SW_1P_TX_LP			BIT(9)
++#define GEN_SW_0P_TX_LP			BIT(8)
++#define EN_ACK_RQST			BIT(1)
++#define EN_TEAR_FX			BIT(0)
++
++#define CMD_MODE_ALL_LP			(MAX_RD_PKT_SIZE_LP | \
++					 DCS_LW_TX_LP | \
++					 DCS_SR_0P_TX_LP | \
++					 DCS_SW_1P_TX_LP | \
++					 DCS_SW_0P_TX_LP | \
++					 GEN_LW_TX_LP | \
++					 GEN_SR_2P_TX_LP | \
++					 GEN_SR_1P_TX_LP | \
++					 GEN_SR_0P_TX_LP | \
++					 GEN_SW_2P_TX_LP | \
++					 GEN_SW_1P_TX_LP | \
++					 GEN_SW_0P_TX_LP)
++
++#define DSI_GEN_HDR			0x6c
++#define GEN_HDATA(data)			(((data) & 0xffff) << 8)
++#define GEN_HDATA_MASK			(0xffff << 8)
++#define GEN_HTYPE(type)			(((type) & 0xff) << 0)
++#define GEN_HTYPE_MASK			0xff
++
++#define DSI_GEN_PLD_DATA		0x70
++
++#define DSI_CMD_PKT_STATUS		0x74
++#define GEN_CMD_EMPTY			BIT(0)
++#define GEN_CMD_FULL			BIT(1)
++#define GEN_PLD_W_EMPTY			BIT(2)
++#define GEN_PLD_W_FULL			BIT(3)
++#define GEN_PLD_R_EMPTY			BIT(4)
++#define GEN_PLD_R_FULL			BIT(5)
++#define GEN_RD_CMD_BUSY			BIT(6)
++
++#define DSI_TO_CNT_CFG			0x78
++#define HSTX_TO_CNT(p)			(((p) & 0xffff) << 16)
++#define LPRX_TO_CNT(p)			((p) & 0xffff)
++
++#define DSI_BTA_TO_CNT			0x8c
++#define DSI_LPCLK_CTRL			0x94
++#define AUTO_CLKLANE_CTRL		BIT(1)
++#define PHY_TXREQUESTCLKHS		BIT(0)
++
++#define DSI_PHY_TMR_LPCLK_CFG		0x98
++#define PHY_CLKHS2LP_TIME(lbcc)		(((lbcc) & 0x3ff) << 16)
++#define PHY_CLKLP2HS_TIME(lbcc)		((lbcc) & 0x3ff)
++
++#define DSI_PHY_TMR_CFG			0x9c
++#define PHY_HS2LP_TIME(lbcc)		(((lbcc) & 0xff) << 24)
++#define PHY_LP2HS_TIME(lbcc)		(((lbcc) & 0xff) << 16)
++#define MAX_RD_TIME(lbcc)		((lbcc) & 0x7fff)
++
++#define DSI_PHY_RSTZ			0xa0
++#define PHY_DISFORCEPLL			0
++#define PHY_ENFORCEPLL			BIT(3)
++#define PHY_DISABLECLK			0
++#define PHY_ENABLECLK			BIT(2)
++#define PHY_RSTZ			0
++#define PHY_UNRSTZ			BIT(1)
++#define PHY_SHUTDOWNZ			0
++#define PHY_UNSHUTDOWNZ			BIT(0)
++
++#define DSI_PHY_IF_CFG			0xa4
++#define N_LANES(n)			((((n) - 1) & 0x3) << 0)
++#define PHY_STOP_WAIT_TIME(cycle)	(((cycle) & 0xff) << 8)
++
++#define DSI_PHY_STATUS			0xb0
++#define LOCK				BIT(0)
++#define STOP_STATE_CLK_LANE		BIT(2)
++
++#define DSI_PHY_TST_CTRL0		0xb4
++#define PHY_TESTCLK			BIT(1)
++#define PHY_UNTESTCLK			0
++#define PHY_TESTCLR			BIT(0)
++#define PHY_UNTESTCLR			0
++
++#define DSI_PHY_TST_CTRL1		0xb8
++#define PHY_TESTEN			BIT(16)
++#define PHY_UNTESTEN			0
++#define PHY_TESTDOUT(n)			(((n) & 0xff) << 8)
++#define PHY_TESTDIN(n)			(((n) & 0xff) << 0)
++
++#define DSI_INT_ST0			0xbc
++#define DSI_INT_ST1			0xc0
++#define DSI_INT_MSK0			0xc4
++#define DSI_INT_MSK1			0xc8
++
++#define PHY_STATUS_TIMEOUT_US		10000
++#define CMD_PKT_STATUS_TIMEOUT_US	20000
++
++struct dw_mipi_dsi {
++	struct drm_bridge bridge;
++	struct mipi_dsi_host dsi_host;
++	struct drm_bridge *panel_bridge;
++	bool is_panel_bridge;
++	struct device *dev;
++	void __iomem *base;
++
++	struct clk *pclk;
++
++	unsigned int lane_mbps; /* per lane */
++	u32 channel;
++	u32 lanes;
++	u32 format;
++	unsigned long mode_flags;
++
++	const struct dw_mipi_dsi_plat_data *plat_data;
++};
++
++/*
++ * The controller should generate 2 frames before
++ * preparing the peripheral.
++ */
++static void dw_mipi_dsi_wait_for_two_frames(struct drm_display_mode *mode)
++{
++	int refresh, two_frames;
++
++	refresh = drm_mode_vrefresh(mode);
++	two_frames = DIV_ROUND_UP(MSEC_PER_SEC, refresh) * 2;
++	msleep(two_frames);
++}
++
++static inline struct dw_mipi_dsi *host_to_dsi(struct mipi_dsi_host *host)
++{
++	return container_of(host, struct dw_mipi_dsi, dsi_host);
++}
++
++static inline struct dw_mipi_dsi *bridge_to_dsi(struct drm_bridge *bridge)
++{
++	return container_of(bridge, struct dw_mipi_dsi, bridge);
++}
++
++static inline void dsi_write(struct dw_mipi_dsi *dsi, u32 reg, u32 val)
++{
++	writel(val, dsi->base + reg);
++}
++
++static inline u32 dsi_read(struct dw_mipi_dsi *dsi, u32 reg)
++{
++	return readl(dsi->base + reg);
++}
++
++static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
++				   struct mipi_dsi_device *device)
++{
++	struct dw_mipi_dsi *dsi = host_to_dsi(host);
 +	struct drm_bridge *bridge;
 +	struct drm_panel *panel;
- 	struct drm_crtc *crtc;
- 	struct reset_control *rstc;
- 	struct resource res;
-@@ -1024,9 +889,9 @@ int ltdc_load(struct drm_device *ddev)
- 
- 	DRM_DEBUG_DRIVER("\n");
- 
--	ldev->panel = ltdc_get_panel(ddev);
--	if (!ldev->panel)
--		return -EPROBE_DEFER;
-+	ret = drm_of_find_panel_or_bridge(np, 0, 0, &panel, &bridge);
++	int ret;
++
++	if (device->lanes > dsi->plat_data->max_data_lanes) {
++		dev_err(dsi->dev, "the number of data lanes(%u) is too many\n",
++			device->lanes);
++		return -EINVAL;
++	}
++
++	dsi->lanes = device->lanes;
++	dsi->channel = device->channel;
++	dsi->format = device->format;
++	dsi->mode_flags = device->mode_flags;
++
++	ret = drm_of_find_panel_or_bridge(host->dev->of_node, 1, 0,
++					  &panel, &bridge);
 +	if (ret)
 +		return ret;
- 
- 	rstc = of_reset_control_get(np, NULL);
- 
-@@ -1086,28 +951,22 @@ int ltdc_load(struct drm_device *ddev)
- 
- 	DRM_INFO("ltdc hw version 0x%08x - ready\n", ldev->caps.hw_version);
- 
--	if (ldev->panel) {
--		encoder = ltdc_rgb_encoder_create(ddev);
--		if (!encoder) {
--			DRM_ERROR("Failed to create RGB encoder\n");
--			ret = -EINVAL;
--			goto err;
--		}
--
--		connector = ltdc_rgb_connector_create(ddev);
--		if (!connector) {
--			DRM_ERROR("Failed to create RGB connector\n");
--			ret = -EINVAL;
-+	if (panel) {
-+		bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_DPI);
-+		if (IS_ERR(bridge)) {
-+			DRM_ERROR("Failed to create panel-bridge\n");
-+			ret = PTR_ERR(bridge);
- 			goto err;
- 		}
-+		ldev->is_panel_bridge = true;
-+	}
- 
--		ret = drm_mode_connector_attach_encoder(connector, encoder);
--		if (ret) {
--			DRM_ERROR("Failed to attach connector to encoder\n");
--			goto err;
--		}
-+	ldev->bridge = bridge;
- 
--		drm_panel_attach(ldev->panel, connector);
-+	ret = ltdc_encoder_init(ddev);
-+	if (ret) {
-+		DRM_ERROR("Failed to init encoder\n");
-+		goto err;
- 	}
- 
- 	crtc = devm_kzalloc(dev, sizeof(*crtc), GFP_KERNEL);
-@@ -1133,9 +992,10 @@ int ltdc_load(struct drm_device *ddev)
- 	ddev->irq_enabled = 1;
- 
- 	return 0;
 +
- err:
--	if (ldev->panel)
--		drm_panel_detach(ldev->panel);
-+	if (ldev->is_panel_bridge)
-+		drm_panel_bridge_remove(bridge);
- 
- 	clk_disable_unprepare(ldev->pixel_clk);
- 
-@@ -1148,8 +1008,8 @@ void ltdc_unload(struct drm_device *ddev)
- 
- 	DRM_DEBUG_DRIVER("\n");
- 
--	if (ldev->panel)
--		drm_panel_detach(ldev->panel);
-+	if (ldev->is_panel_bridge)
-+		drm_panel_bridge_remove(ldev->bridge);
- 
- 	clk_disable_unprepare(ldev->pixel_clk);
- }
-diff --git a/drivers/gpu/drm/stm/ltdc.h b/drivers/gpu/drm/stm/ltdc.h
-index d7a9c73..d9e899d 100644
---- a/drivers/gpu/drm/stm/ltdc.h
-+++ b/drivers/gpu/drm/stm/ltdc.h
-@@ -24,7 +24,8 @@ struct ltdc_device {
- 	struct drm_fbdev_cma *fbdev;
- 	void __iomem *regs;
- 	struct clk *pixel_clk;	/* lcd pixel clock */
--	struct drm_panel *panel;
-+	struct drm_bridge *bridge;
-+	bool is_panel_bridge;
- 	struct mutex err_lock;	/* protecting error_status */
- 	struct ltdc_caps caps;
- 	u32 clut[256];		/* color look up table */
++	if (panel) {
++		bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_DSI);
++		if (IS_ERR(bridge))
++			return PTR_ERR(bridge);
++		dsi->is_panel_bridge = true;
++	}
++
++	dsi->panel_bridge = bridge;
++
++	return drm_bridge_add(&dsi->bridge);
++}
++
++static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
++				   struct mipi_dsi_device *device)
++{
++	struct dw_mipi_dsi *dsi = host_to_dsi(host);
++
++	if (dsi->is_panel_bridge)
++		drm_panel_bridge_remove(dsi->panel_bridge);
++
++	drm_bridge_remove(&dsi->bridge);
++
++	return 0;
++}
++
++static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
++				   const struct mipi_dsi_msg *msg)
++{
++	bool lpm = msg->flags & MIPI_DSI_MSG_USE_LPM;
++	u32 val = 0;
++
++	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
++		val |= EN_ACK_RQST;
++	if (lpm)
++		val |= CMD_MODE_ALL_LP;
++
++	dsi_write(dsi, DSI_LPCLK_CTRL, lpm ? 0 : PHY_TXREQUESTCLKHS);
++	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
++}
++
++static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
++{
++	int ret;
++	u32 val, mask;
++
++	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
++				 val, !(val & GEN_CMD_FULL), 1000,
++				 CMD_PKT_STATUS_TIMEOUT_US);
++	if (ret < 0) {
++		dev_err(dsi->dev, "failed to get available command FIFO\n");
++		return ret;
++	}
++
++	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
++
++	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
++	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
++				 val, (val & mask) == mask,
++				 1000, CMD_PKT_STATUS_TIMEOUT_US);
++	if (ret < 0) {
++		dev_err(dsi->dev, "failed to write command FIFO\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
++				       const struct mipi_dsi_msg *msg)
++{
++	const u8 *tx_buf = msg->tx_buf;
++	u16 data = 0;
++	u32 val;
++
++	if (msg->tx_len > 0)
++		data |= tx_buf[0];
++	if (msg->tx_len > 1)
++		data |= tx_buf[1] << 8;
++
++	if (msg->tx_len > 2) {
++		dev_err(dsi->dev, "too long tx buf length %zu for short write\n",
++			msg->tx_len);
++		return -EINVAL;
++	}
++
++	val = GEN_HDATA(data) | GEN_HTYPE(msg->type);
++	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
++}
++
++static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
++				      const struct mipi_dsi_msg *msg)
++{
++	const u8 *tx_buf = msg->tx_buf;
++	int len = msg->tx_len, pld_data_bytes = sizeof(u32), ret;
++	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
++	u32 remainder;
++	u32 val;
++
++	if (msg->tx_len < 3) {
++		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
++			msg->tx_len);
++		return -EINVAL;
++	}
++
++	while (DIV_ROUND_UP(len, pld_data_bytes)) {
++		if (len < pld_data_bytes) {
++			remainder = 0;
++			memcpy(&remainder, tx_buf, len);
++			dsi_write(dsi, DSI_GEN_PLD_DATA, remainder);
++			len = 0;
++		} else {
++			memcpy(&remainder, tx_buf, pld_data_bytes);
++			dsi_write(dsi, DSI_GEN_PLD_DATA, remainder);
++			tx_buf += pld_data_bytes;
++			len -= pld_data_bytes;
++		}
++
++		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
++					 val, !(val & GEN_PLD_W_FULL), 1000,
++					 CMD_PKT_STATUS_TIMEOUT_US);
++		if (ret < 0) {
++			dev_err(dsi->dev,
++				"failed to get available write payload FIFO\n");
++			return ret;
++		}
++	}
++
++	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
++}
++
++static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
++					 const struct mipi_dsi_msg *msg)
++{
++	struct dw_mipi_dsi *dsi = host_to_dsi(host);
++	int ret;
++
++	/*
++	 * TODO dw drv improvements
++	 * use mipi_dsi_create_packet() instead of all following
++	 * functions and code (no switch cases, no
++	 * dw_mipi_dsi_dcs_short_write(), only the loop in long_write...)
++	 * and use packet.header...
++	 */
++	dw_mipi_message_config(dsi, msg);
++
++	switch (msg->type) {
++	case MIPI_DSI_DCS_SHORT_WRITE:
++	case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
++	case MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE:
++		ret = dw_mipi_dsi_dcs_short_write(dsi, msg);
++		break;
++	case MIPI_DSI_DCS_LONG_WRITE:
++		ret = dw_mipi_dsi_dcs_long_write(dsi, msg);
++		break;
++	default:
++		dev_err(dsi->dev, "unsupported message type 0x%02x\n",
++			msg->type);
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
++	.attach = dw_mipi_dsi_host_attach,
++	.detach = dw_mipi_dsi_host_detach,
++	.transfer = dw_mipi_dsi_host_transfer,
++};
++
++static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
++{
++	u32 val;
++
++	/*
++	 * TODO dw drv improvements
++	 * enabling low power is panel-dependent, we should use the
++	 * panel configuration here...
++	 */
++	val = ENABLE_LOW_POWER;
++
++	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
++		val |= VID_MODE_TYPE_BURST;
++	else if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
++		val |= VID_MODE_TYPE_NON_BURST_SYNC_PULSES;
++	else
++		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
++
++	dsi_write(dsi, DSI_VID_MODE_CFG, val);
++}
++
++static void dw_mipi_dsi_set_mode(struct dw_mipi_dsi *dsi,
++				 unsigned long mode_flags)
++{
++	dsi_write(dsi, DSI_PWR_UP, RESET);
++
++	if (mode_flags & MIPI_DSI_MODE_VIDEO) {
++		dsi_write(dsi, DSI_MODE_CFG, ENABLE_VIDEO_MODE);
++		dw_mipi_dsi_video_mode_config(dsi);
++		dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
++	} else {
++		dsi_write(dsi, DSI_MODE_CFG, ENABLE_CMD_MODE);
++	}
++
++	dsi_write(dsi, DSI_PWR_UP, POWERUP);
++}
++
++static void dw_mipi_dsi_disable(struct dw_mipi_dsi *dsi)
++{
++	dsi_write(dsi, DSI_PWR_UP, RESET);
++	dsi_write(dsi, DSI_PHY_RSTZ, PHY_RSTZ);
++}
++
++static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
++{
++	/*
++	 * The maximum permitted escape clock is 20MHz and it is derived from
++	 * lanebyteclk, which is running at "lane_mbps / 8".  Thus we want:
++	 *
++	 *     (lane_mbps >> 3) / esc_clk_division < 20
++	 * which is:
++	 *     (lane_mbps >> 3) / 20 > esc_clk_division
++	 */
++	u32 esc_clk_division = (dsi->lane_mbps >> 3) / 20 + 1;
++
++	dsi_write(dsi, DSI_PWR_UP, RESET);
++
++	/*
++	 * TODO dw drv improvements
++	 * timeout clock division should be computed with the
++	 * high speed transmission counter timeout and byte lane...
++	 */
++	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
++		  TX_ESC_CLK_DIVIDSION(esc_clk_division));
++}
++
++static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
++				   struct drm_display_mode *mode)
++{
++	u32 val = 0, color = 0;
++
++	switch (dsi->format) {
++	case MIPI_DSI_FMT_RGB888:
++		color = DPI_COLOR_CODING_24BIT;
++		break;
++	case MIPI_DSI_FMT_RGB666:
++		color = DPI_COLOR_CODING_18BIT_2 | EN18_LOOSELY;
++		break;
++	case MIPI_DSI_FMT_RGB666_PACKED:
++		color = DPI_COLOR_CODING_18BIT_1;
++		break;
++	case MIPI_DSI_FMT_RGB565:
++		color = DPI_COLOR_CODING_16BIT_1;
++		break;
++	}
++
++	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
++		val |= VSYNC_ACTIVE_LOW;
++	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
++		val |= HSYNC_ACTIVE_LOW;
++
++	dsi_write(dsi, DSI_DPI_VCID, DPI_VID(dsi->channel));
++	dsi_write(dsi, DSI_DPI_COLOR_CODING, color);
++	dsi_write(dsi, DSI_DPI_CFG_POL, val);
++	/*
++	 * TODO dw drv improvements
++	 * largest packet sizes during hfp or during vsa/vpb/vfp
++	 * should be computed according to byte lane, lane number and only
++	 * if sending lp cmds in high speed is enable (PHY_TXREQUESTCLKHS)
++	 */
++	dsi_write(dsi, DSI_DPI_LP_CMD_TIM, OUTVACT_LPCMD_TIME(4)
++		  | INVACT_LPCMD_TIME(4));
++}
++
++static void dw_mipi_dsi_packet_handler_config(struct dw_mipi_dsi *dsi)
++{
++	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
++}
++
++static void dw_mipi_dsi_video_packet_config(struct dw_mipi_dsi *dsi,
++					    struct drm_display_mode *mode)
++{
++	/*
++	 * TODO dw drv improvements
++	 * only burst mode is supported here. For non-burst video modes,
++	 * we should compute DSI_VID_PKT_SIZE, DSI_VCCR.NUMC &
++	 * DSI_VNPCR.NPSIZE... especially because this driver supports
++	 * non-burst video modes, see dw_mipi_dsi_video_mode_config()...
++	 */
++	dsi_write(dsi, DSI_VID_PKT_SIZE, VID_PKT_SIZE(mode->hdisplay));
++}
++
++static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
++{
++	/*
++	 * TODO dw drv improvements
++	 * compute high speed transmission counter timeout according
++	 * to the timeout clock division (TO_CLK_DIVIDSION) and byte lane...
++	 */
++	dsi_write(dsi, DSI_TO_CNT_CFG, HSTX_TO_CNT(1000) | LPRX_TO_CNT(1000));
++	/*
++	 * TODO dw drv improvements
++	 * the Bus-Turn-Around Timeout Counter should be computed
++	 * according to byte lane...
++	 */
++	dsi_write(dsi, DSI_BTA_TO_CNT, 0xd00);
++	dsi_write(dsi, DSI_MODE_CFG, ENABLE_CMD_MODE);
++}
++
++/* Get lane byte clock cycles. */
++static u32 dw_mipi_dsi_get_hcomponent_lbcc(struct dw_mipi_dsi *dsi,
++					   struct drm_display_mode *mode,
++					   u32 hcomponent)
++{
++	u32 frac, lbcc;
++
++	lbcc = hcomponent * dsi->lane_mbps * MSEC_PER_SEC / 8;
++
++	frac = lbcc % mode->clock;
++	lbcc = lbcc / mode->clock;
++	if (frac)
++		lbcc++;
++
++	return lbcc;
++}
++
++static void dw_mipi_dsi_line_timer_config(struct dw_mipi_dsi *dsi,
++					  struct drm_display_mode *mode)
++{
++	u32 htotal, hsa, hbp, lbcc;
++
++	htotal = mode->htotal;
++	hsa = mode->hsync_end - mode->hsync_start;
++	hbp = mode->htotal - mode->hsync_end;
++
++	/*
++	 * TODO dw drv improvements
++	 * computations below may be improved...
++	 */
++	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, htotal);
++	dsi_write(dsi, DSI_VID_HLINE_TIME, lbcc);
++
++	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, hsa);
++	dsi_write(dsi, DSI_VID_HSA_TIME, lbcc);
++
++	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, hbp);
++	dsi_write(dsi, DSI_VID_HBP_TIME, lbcc);
++}
++
++static void dw_mipi_dsi_vertical_timing_config(struct dw_mipi_dsi *dsi,
++					       struct drm_display_mode *mode)
++{
++	u32 vactive, vsa, vfp, vbp;
++
++	vactive = mode->vdisplay;
++	vsa = mode->vsync_end - mode->vsync_start;
++	vfp = mode->vsync_start - mode->vdisplay;
++	vbp = mode->vtotal - mode->vsync_end;
++
++	dsi_write(dsi, DSI_VID_VACTIVE_LINES, vactive);
++	dsi_write(dsi, DSI_VID_VSA_LINES, vsa);
++	dsi_write(dsi, DSI_VID_VFP_LINES, vfp);
++	dsi_write(dsi, DSI_VID_VBP_LINES, vbp);
++}
++
++static void dw_mipi_dsi_dphy_timing_config(struct dw_mipi_dsi *dsi)
++{
++	/*
++	 * TODO dw drv improvements
++	 * data & clock lane timers should be computed according to panel
++	 * blankings and to the automatic clock lane control mode...
++	 * note: DSI_PHY_TMR_CFG.MAX_RD_TIME should be in line with
++	 * DSI_CMD_MODE_CFG.MAX_RD_PKT_SIZE_LP (see CMD_MODE_ALL_LP)
++	 */
++	dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME(0x40)
++		  | PHY_LP2HS_TIME(0x40) | MAX_RD_TIME(10000));
++
++	dsi_write(dsi, DSI_PHY_TMR_LPCLK_CFG, PHY_CLKHS2LP_TIME(0x40)
++		  | PHY_CLKLP2HS_TIME(0x40));
++}
++
++static void dw_mipi_dsi_dphy_interface_config(struct dw_mipi_dsi *dsi)
++{
++	/*
++	 * TODO dw drv improvements
++	 * stop wait time should be the maximum between host dsi
++	 * and panel stop wait times
++	 */
++	dsi_write(dsi, DSI_PHY_IF_CFG, PHY_STOP_WAIT_TIME(0x20) |
++		  N_LANES(dsi->lanes));
++}
++
++static void dw_mipi_dsi_dphy_init(struct dw_mipi_dsi *dsi)
++{
++	/* Clear PHY state */
++	dsi_write(dsi, DSI_PHY_RSTZ, PHY_DISFORCEPLL | PHY_DISABLECLK
++		  | PHY_RSTZ | PHY_SHUTDOWNZ);
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLR);
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
++}
++
++static void dw_mipi_dsi_dphy_enable(struct dw_mipi_dsi *dsi)
++{
++	u32 val;
++	int ret;
++
++	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
++		  PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
++
++	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
++				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
++	if (ret < 0)
++		DRM_DEBUG_DRIVER("failed to wait phy lock state\n");
++
++	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
++				 val, val & STOP_STATE_CLK_LANE, 1000,
++				 PHY_STATUS_TIMEOUT_US);
++	if (ret < 0)
++		DRM_DEBUG_DRIVER("failed to wait phy clk lane stop state\n");
++}
++
++static void dw_mipi_dsi_clear_err(struct dw_mipi_dsi *dsi)
++{
++	dsi_read(dsi, DSI_INT_ST0);
++	dsi_read(dsi, DSI_INT_ST1);
++	dsi_write(dsi, DSI_INT_MSK0, 0);
++	dsi_write(dsi, DSI_INT_MSK1, 0);
++}
++
++static void dw_mipi_dsi_bridge_post_disable(struct drm_bridge *bridge)
++{
++	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
++
++	/*
++	 * Switch to command mode before panel-bridge post_disable &
++	 * panel unprepare.
++	 * Note: panel-bridge disable & panel disable has been called
++	 * before by the drm framework.
++	 */
++	dw_mipi_dsi_set_mode(dsi, 0);
++
++	/*
++	 * TODO Only way found to call panel-bridge post_disable &
++	 * panel unprepare before the dsi "final" disable...
++	 * This needs to be fixed in the drm_bridge framework and the API
++	 * needs to be updated to manage our own call chains...
++	 */
++	dsi->panel_bridge->funcs->post_disable(dsi->panel_bridge);
++
++	dw_mipi_dsi_disable(dsi);
++	clk_disable_unprepare(dsi->pclk);
++	pm_runtime_put(dsi->dev);
++}
++
++void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
++				 struct drm_display_mode *mode,
++				 struct drm_display_mode *adjusted_mode)
++{
++	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
++	const struct dw_mipi_dsi_phy_ops *phy_ops = dsi->plat_data->phy_ops;
++	void *priv_data = dsi->plat_data->priv_data;
++	int ret;
++
++	clk_prepare_enable(dsi->pclk);
++
++	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
++				     dsi->lanes, dsi->format, &dsi->lane_mbps);
++	if (ret)
++		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
++
++	pm_runtime_get_sync(dsi->dev);
++	dw_mipi_dsi_init(dsi);
++	dw_mipi_dsi_dpi_config(dsi, mode);
++	dw_mipi_dsi_packet_handler_config(dsi);
++	dw_mipi_dsi_video_mode_config(dsi);
++	dw_mipi_dsi_video_packet_config(dsi, mode);
++	dw_mipi_dsi_command_mode_config(dsi);
++	dw_mipi_dsi_line_timer_config(dsi, mode);
++	dw_mipi_dsi_vertical_timing_config(dsi, mode);
++
++	dw_mipi_dsi_dphy_init(dsi);
++	dw_mipi_dsi_dphy_timing_config(dsi);
++	dw_mipi_dsi_dphy_interface_config(dsi);
++
++	dw_mipi_dsi_clear_err(dsi);
++
++	ret = phy_ops->init(priv_data);
++	if (ret)
++		DRM_DEBUG_DRIVER("Phy init() failed\n");
++
++	dw_mipi_dsi_dphy_enable(dsi);
++
++	dw_mipi_dsi_wait_for_two_frames(mode);
++
++	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
++	dw_mipi_dsi_set_mode(dsi, 0);
++}
++
++static void dw_mipi_dsi_bridge_enable(struct drm_bridge *bridge)
++{
++	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
++
++	/* Switch to video mode for panel-bridge enable & panel enable */
++	dw_mipi_dsi_set_mode(dsi, MIPI_DSI_MODE_VIDEO);
++}
++
++static enum drm_mode_status
++dw_mipi_dsi_bridge_mode_valid(struct drm_bridge *bridge,
++			      const struct drm_display_mode *mode)
++{
++	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
++	const struct dw_mipi_dsi_plat_data *pdata = dsi->plat_data;
++	enum drm_mode_status mode_status = MODE_OK;
++
++	if (pdata->mode_valid)
++		mode_status = pdata->mode_valid(pdata->priv_data, mode);
++
++	return mode_status;
++}
++
++static int dw_mipi_dsi_bridge_attach(struct drm_bridge *bridge)
++{
++	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
++
++	if (!bridge->encoder) {
++		DRM_ERROR("Parent encoder object not found\n");
++		return -ENODEV;
++	}
++
++	/* Set the encoder type as caller does not know it */
++	bridge->encoder->encoder_type = DRM_MODE_ENCODER_DSI;
++
++	/* Attach the panel-bridge to the dsi bridge */
++	return drm_bridge_attach(bridge->encoder, dsi->panel_bridge, bridge);
++}
++
++static struct drm_bridge_funcs dw_mipi_dsi_bridge_funcs = {
++	.mode_set     = dw_mipi_dsi_bridge_mode_set,
++	.enable	      = dw_mipi_dsi_bridge_enable,
++	.post_disable = dw_mipi_dsi_bridge_post_disable,
++	.mode_valid   = dw_mipi_dsi_bridge_mode_valid,
++	.attach	      = dw_mipi_dsi_bridge_attach,
++};
++
++static struct dw_mipi_dsi *
++__dw_mipi_dsi_probe(struct platform_device *pdev,
++		    const struct dw_mipi_dsi_plat_data *plat_data)
++{
++	struct device *dev = &pdev->dev;
++	struct reset_control *apb_rst;
++	struct dw_mipi_dsi *dsi;
++	struct resource *res;
++	int ret;
++
++	dsi = devm_kzalloc(dev, sizeof(*dsi), GFP_KERNEL);
++	if (!dsi)
++		return ERR_PTR(-ENOMEM);
++
++	dsi->dev = dev;
++	dsi->plat_data = plat_data;
++
++	if (!plat_data->phy_ops->init || !plat_data->phy_ops->get_lane_mbps) {
++		DRM_ERROR("Phy not properly configured\n");
++		return ERR_PTR(-ENODEV);
++	}
++
++	if (!plat_data->base) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++		if (!res)
++			return ERR_PTR(-ENODEV);
++
++		dsi->base = devm_ioremap_resource(dev, res);
++		if (IS_ERR(dsi->base))
++			return ERR_PTR(-ENODEV);
++
++	} else {
++		dsi->base = plat_data->base;
++	}
++
++	dsi->pclk = devm_clk_get(dev, "pclk");
++	if (IS_ERR(dsi->pclk)) {
++		ret = PTR_ERR(dsi->pclk);
++		dev_err(dev, "Unable to get pclk: %d\n", ret);
++		return ERR_PTR(ret);
++	}
++
++	/*
++	 * Note that the reset was not defined in the initial device tree, so
++	 * we have to be prepared for it not being found.
++	 */
++	apb_rst = devm_reset_control_get(dev, "apb");
++	if (IS_ERR(apb_rst)) {
++		ret = PTR_ERR(apb_rst);
++		if (ret == -ENOENT) {
++			apb_rst = NULL;
++		} else {
++			dev_err(dev, "Unable to get reset control: %d\n", ret);
++			return ERR_PTR(ret);
++		}
++	}
++
++	if (apb_rst) {
++		ret = clk_prepare_enable(dsi->pclk);
++		if (ret) {
++			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
++			return ERR_PTR(ret);
++		}
++
++		reset_control_assert(apb_rst);
++		usleep_range(10, 20);
++		reset_control_deassert(apb_rst);
++
++		clk_disable_unprepare(dsi->pclk);
++	}
++
++	pm_runtime_enable(dev);
++
++	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
++	dsi->dsi_host.dev = dev;
++	ret = mipi_dsi_host_register(&dsi->dsi_host);
++	if (ret) {
++		dev_err(dev, "Failed to register MIPI host: %d\n", ret);
++		return ERR_PTR(ret);
++	}
++
++	dsi->bridge.driver_private = dsi;
++	dsi->bridge.funcs = &dw_mipi_dsi_bridge_funcs;
++#ifdef CONFIG_OF
++	dsi->bridge.of_node = pdev->dev.of_node;
++#endif
++
++	dev_set_drvdata(dev, dsi);
++
++	return dsi;
++}
++
++static void __dw_mipi_dsi_remove(struct dw_mipi_dsi *dsi)
++{
++	pm_runtime_disable(dsi->dev);
++}
++
++/*
++ * Probe/remove API, used from platforms based on the DRM bridge API.
++ */
++int dw_mipi_dsi_probe(struct platform_device *pdev,
++		      const struct dw_mipi_dsi_plat_data *plat_data)
++{
++	struct dw_mipi_dsi *dsi;
++
++	dsi = __dw_mipi_dsi_probe(pdev, plat_data);
++	if (IS_ERR(dsi))
++		return PTR_ERR(dsi);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(dw_mipi_dsi_probe);
++
++void dw_mipi_dsi_remove(struct platform_device *pdev)
++{
++	struct dw_mipi_dsi *dsi = platform_get_drvdata(pdev);
++
++	mipi_dsi_host_unregister(&dsi->dsi_host);
++
++	__dw_mipi_dsi_remove(dsi);
++}
++EXPORT_SYMBOL_GPL(dw_mipi_dsi_remove);
++
++/*
++ * Bind/unbind API, used from platforms based on the component framework.
++ */
++int dw_mipi_dsi_bind(struct platform_device *pdev, struct drm_encoder *encoder,
++		     const struct dw_mipi_dsi_plat_data *plat_data)
++{
++	struct dw_mipi_dsi *dsi;
++	int ret;
++
++	dsi = __dw_mipi_dsi_probe(pdev, plat_data);
++	if (IS_ERR(dsi))
++		return PTR_ERR(dsi);
++
++	ret = drm_bridge_attach(encoder, &dsi->bridge, NULL);
++	if (ret) {
++		dw_mipi_dsi_remove(pdev);
++		DRM_ERROR("Failed to initialize bridge with drm\n");
++		return ret;
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(dw_mipi_dsi_bind);
++
++void dw_mipi_dsi_unbind(struct device *dev)
++{
++	struct dw_mipi_dsi *dsi = dev_get_drvdata(dev);
++
++	__dw_mipi_dsi_remove(dsi);
++}
++EXPORT_SYMBOL_GPL(dw_mipi_dsi_unbind);
++
++MODULE_AUTHOR("Chris Zhong <zyw@rock-chips.com>");
++MODULE_AUTHOR("Philippe Cornu <philippe.cornu@st.com>");
++MODULE_DESCRIPTION("DW MIPI DSI host controller driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:dw-mipi-dsi");
+diff --git a/include/drm/bridge/dw_mipi_dsi.h b/include/drm/bridge/dw_mipi_dsi.h
+new file mode 100644
+index 0000000..9b30fec
+--- /dev/null
++++ b/include/drm/bridge/dw_mipi_dsi.h
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (C) STMicroelectronics SA 2017
++ *
++ * Authors: Philippe Cornu <philippe.cornu@st.com>
++ *          Yannick Fertre <yannick.fertre@st.com>
++ *
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++#ifndef __DW_MIPI_DSI__
++#define __DW_MIPI_DSI__
++
++struct dw_mipi_dsi_phy_ops {
++	int (*init)(void *priv_data);
++	int (*get_lane_mbps)(void *priv_data, struct drm_display_mode *mode,
++			     unsigned long mode_flags, u32 lanes, u32 format,
++			     unsigned int *lane_mbps);
++};
++
++struct dw_mipi_dsi_plat_data {
++	void __iomem *base;
++	unsigned int max_data_lanes;
++
++	enum drm_mode_status (*mode_valid)(void *priv_data,
++					   const struct drm_display_mode *mode);
++
++	const struct dw_mipi_dsi_phy_ops *phy_ops;
++
++	void *priv_data;
++};
++
++int dw_mipi_dsi_probe(struct platform_device *pdev,
++		      const struct dw_mipi_dsi_plat_data *plat_data);
++void dw_mipi_dsi_remove(struct platform_device *pdev);
++int dw_mipi_dsi_bind(struct platform_device *pdev, struct drm_encoder *encoder,
++		     const struct dw_mipi_dsi_plat_data *plat_data);
++void dw_mipi_dsi_unbind(struct device *dev);
++
++#endif /* __DW_MIPI_DSI__ */
 -- 
 1.9.1
