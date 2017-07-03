@@ -1,124 +1,146 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Mon, 3 Jul 2017 17:24:09 +0200
-Subject: [PATCH 2/3] clk: WARN_ON about to disable a critical clock
-In-Reply-To: <20170703142517.tyojzmzofvyiicsn@dell>
-References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
- <1453127331-20616-3-git-send-email-lee.jones@linaro.org>
- <20160211004327.26445.27416@quark.deferred.io>
- <d83d608a-246f-7b18-20d1-10a2060395e1@de.bosch.com>
- <20170703115324.5re2d32bd3slutcb@dell>
- <c5f6efac-df9f-10d5-1e74-5b8743214b44@de.bosch.com>
- <20170703142517.tyojzmzofvyiicsn@dell>
-Message-ID: <3544e773-7006-81a8-aaf7-638c987ed3fa@gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 3 Jul 2017 17:30:01 +0200
+Subject: [RFC 06/55] KVM: arm64: Add EL2 execution context for nesting
+In-Reply-To: <CAHyh4xhCsEONTyTd1NQj_2O3uGjZUnsK-TJQPTGXx=aqzdmBiw@mail.gmail.com>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-7-git-send-email-jintack@cs.columbia.edu>
+ <20170222111017.GB26976@cbox>
+ <CAHyh4xjOvAgqQ+WLD3SHyNHXOFSuoKGu4sV+GaFm-LdEcoGYwA@mail.gmail.com>
+ <20170703090344.GF4066@cbox>
+ <9714b524-eb95-d9af-f394-5a71b3eb7f75@arm.com>
+ <20170703095427.GI4066@cbox>
+ <CAHyh4xhCsEONTyTd1NQj_2O3uGjZUnsK-TJQPTGXx=aqzdmBiw@mail.gmail.com>
+Message-ID: <20170703153001.GJ4066@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.07.2017 16:25, Lee Jones wrote:
-> On Mon, 03 Jul 2017, Dirk Behme wrote:
+On Mon, Jul 03, 2017 at 10:44:51AM -0400, Jintack Lim wrote:
+> Thanks Christoffer and Marc,
 > 
->> On 03.07.2017 13:53, Lee Jones wrote:
->>> On Tue, 27 Jun 2017, Dirk Behme wrote:
->>>
->>>> On 11.02.2016 01:43, Michael Turquette wrote:
->>>>> Quoting Lee Jones (2016-01-18 06:28:50)
->>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>>>
->>>>> Looks good to me.
->>>>>
->>>>> Regards,
->>>>> Mike
->>>>>
->>>>>> ---
->>>>>>     drivers/clk/clk.c | 6 ++++++
->>>>>>     1 file changed, 6 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->>>>>> index 835cb85..178b364 100644
->>>>>> --- a/drivers/clk/clk.c
->>>>>> +++ b/drivers/clk/clk.c
->>>>>> @@ -575,6 +575,9 @@ static void clk_core_unprepare(struct clk_core *core)
->>>>>>            if (WARN_ON(core->prepare_count == 0))
->>>>>>                    return;
->>>>>> +       if (WARN_ON(core->prepare_count == 1 && core->flags & CLK_IS_CRITICAL))
->>>>>> +               return;
->>>>>> +
->>>>>>            if (--core->prepare_count > 0)
->>>>>>                    return;
->>>>>> @@ -680,6 +683,9 @@ static void clk_core_disable(struct clk_core *core)
->>>>>>            if (WARN_ON(core->enable_count == 0))
->>>>>>                    return;
->>>>>> +       if (WARN_ON(core->enable_count == 1 && core->flags & CLK_IS_CRITICAL))
->>>>>> +               return;
->>>>>> +
->>>>>>            if (--core->enable_count > 0)
->>>>>>                    return;
->>>>
->>>>
->>>> I have a question regarding this patch, which is mainline meanwhile [1]:
->>>>
->>>> Having the following clock configuration:
->>>>
->>>>                                           |--> child clk '1' (crit)
->>>> clk source --> parent clk 'A' (crit) -->|
->>>>                                           |--> child clk '2'
->>>>
->>>>
->>>> Clock '2' might be used, or not. It might be disabled or not. It doesn't
->>>> matter. Clock '1' is not allowed to be disabled. Therefore its marked as
->>>> critical.
->>>>
->>>> Parent clock 'A' is marked as critical because its not allowed to be
->>>> disabled, even if the enable_count of all child clocks is 0. To avoid that
->>>> by disabling parent clock 'A' the child clock '1' is disabled, too, whats
->>>> not allowed as its marked as critical.
->>>>
->>>>
->>>> Now, child clock '2' is used and enabled & disabled continuously by a (SPI)
->>>> driver. What is ok. But:
->>>>
->>>> Disabling child clock '2' results in the attempt to disable parent clock
->>>> 'A', too, which has correct enable_count 1 (from enabling the child '2').
->>>> What results
->>>>
->>>> a) in the WARN_ON output
->>>>
->>>> and
->>>>
->>>> b) enable_count of 'A' never decreases to 0. Being off by one after the
->>>> WARN_ON
->>>>
->>>>
->>>> It sounds like both is wrong for a configuration like above.
->>>
->>> Clock A still has one user, Clock 1.
->>>
->>> Why is that wrong?
->>
->>
->> Because clock 1 is not a (Linux kernel clock framework) used clock. Its
->> enable count is 0. So from Linux kernel (clock framework) point of view
->> clock 1 is unused.
+> On Mon, Jul 3, 2017 at 5:54 AM, Christoffer Dall <cdall@linaro.org> wrote:
+> > On Mon, Jul 03, 2017 at 10:32:45AM +0100, Marc Zyngier wrote:
+> >> On 03/07/17 10:03, Christoffer Dall wrote:
+> >> > On Mon, Jun 26, 2017 at 10:33:23AM -0400, Jintack Lim wrote:
+> >> >> Hi Christoffer,
+> >> >>
+> >> >> On Wed, Feb 22, 2017 at 6:10 AM, Christoffer Dall <cdall@linaro.org> wrote:
+> >> >>> On Mon, Jan 09, 2017 at 01:24:02AM -0500, Jintack Lim wrote:
+> >> >>>> With the nested virtualization support, the context of the guest
+> >> >>>> includes EL2 register states. The host manages a set of virtual EL2
+> >> >>>> registers.  In addition to that, the guest hypervisor supposed to run in
+> >> >>>> EL2 is now deprivilaged and runs in EL1. So, the host also manages a set
+> >> >>>> of shadow system registers to be able to run the guest hypervisor in
+> >> >>>> EL1.
+> >> >>>>
+> >> >>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> >> >>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> >>>> ---
+> >> >>>>  arch/arm64/include/asm/kvm_host.h | 54 +++++++++++++++++++++++++++++++++++++++
+> >> >>>>  1 file changed, 54 insertions(+)
+> >> >>>>
+> >> >>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> >> >>>> index c0c8b02..ed78d73 100644
+> >> >>>> --- a/arch/arm64/include/asm/kvm_host.h
+> >> >>>> +++ b/arch/arm64/include/asm/kvm_host.h
+> >> >>>> @@ -146,6 +146,42 @@ enum vcpu_sysreg {
+> >> >>>>       NR_SYS_REGS     /* Nothing after this line! */
+> >> >>>>  };
+> >> >>>>
+> >> >>>> +enum el2_regs {
+> >> >>>> +     ELR_EL2,
+> >> >>>> +     SPSR_EL2,
+> >> >>>> +     SP_EL2,
+> >> >>>> +     AMAIR_EL2,
+> >> >>>> +     MAIR_EL2,
+> >> >>>> +     TCR_EL2,
+> >> >>>> +     TTBR0_EL2,
+> >> >>>> +     VTCR_EL2,
+> >> >>>> +     VTTBR_EL2,
+> >> >>>> +     VMPIDR_EL2,
+> >> >>>> +     VPIDR_EL2,      /* 10 */
+> >> >>>> +     MDCR_EL2,
+> >> >>>> +     CNTHCTL_EL2,
+> >> >>>> +     CNTHP_CTL_EL2,
+> >> >>>> +     CNTHP_CVAL_EL2,
+> >> >>>> +     CNTHP_TVAL_EL2,
+> >> >>>> +     CNTVOFF_EL2,
+> >> >>>> +     ACTLR_EL2,
+> >> >>>> +     AFSR0_EL2,
+> >> >>>> +     AFSR1_EL2,
+> >> >>>> +     CPTR_EL2,       /* 20 */
+> >> >>>> +     ESR_EL2,
+> >> >>>> +     FAR_EL2,
+> >> >>>> +     HACR_EL2,
+> >> >>>> +     HCR_EL2,
+> >> >>>> +     HPFAR_EL2,
+> >> >>>> +     HSTR_EL2,
+> >> >>>> +     RMR_EL2,
+> >> >>>> +     RVBAR_EL2,
+> >> >>>> +     SCTLR_EL2,
+> >> >>>> +     TPIDR_EL2,      /* 30 */
+> >> >>>> +     VBAR_EL2,
+> >> >>>> +     NR_EL2_REGS     /* Nothing after this line! */
+> >> >>>> +};
+> >> >>>
+> >> >>> Why do we have a separate enum and array for the EL2 regs and not simply
+> >> >>> expand vcpu_sysreg ?
+> >> >>
+> >> >> We can expand vcpu_sysreg for the EL2 system registers. For SP_EL2,
+> >> >> SPSR_EL2, and ELR_EL2, where is the good place to locate them?.
+> >> >> SP_EL1, SPSR_EL1, and ELR_EL1 registers are saved in the kvm_regs
+> >> >> structure instead of sysregs[], so I wonder it's better to put them in
+> >> >> kvm_regs, too.
+> >> >>
+> >> >> BTW, what's the reason that those EL1 registers are in kvm_regs
+> >> >> instead of sysregs[] in the first place?
+> >> >>
+> >> >
+> >> > This has mostly to do with the way we export things to userspace, and
+> >> > for historical reasons.
+> >> >
+> >> > So we should either expand kvm_regs with the non-sysregs EL2 registers
+> >> > and expand sys_regs with the EL2 sysregs, or we should put everything
+> >> > EL2 into an EL2 array.  I feel like the first solution will fit more
+> >> > nicely into the current design, but I don't have a very strong
+> >> > preference.
+> >> >
+> >> > You should look at the KVM_{GET,SET}_ONE_REG API definition and think
+> >> > about how your choice will fit with this.
+> >> >
+> >> > Marc, any preference?
+> >>
+> >> My worry is that by changing kvm_regs, we're touching a userspace
+> >> visible structure. I'm not sure we can avoid it, but I'd like to avoid
+> >> putting too much there (SPSR_EL2 and ELR_EL2 should be enough). I just
+> >> had a panic moment when realizing that this structure is not versioned,
+> >> but the whole ONE_REG API seems to save us from a complete disaster.
+> >>
+> >> Overall, having kvm_regs as a UAPI visible thing retrospectively strikes
+> >> me as a dangerous design, as we cannot easily expand it. Maybe we should
+> >> consider having a kvm_regs_v2 that embeds kvm_regs, and not directly
+> >> expose it to userspace (but instead expose the indexes in that
+> >> structure)? Userspace that knows how to deal with EL2 will use the new
+> >> indexes, while existing SW will carry on using the EL1/EL0 version.
+> >
+> > We definitely cannot expand kvm_regs, that would lead to all sorts of
+> > potential errors, as you correctly point out.
 > 
-> All critical clocks are 'used'.  That's the point of critical clocks.
-
-
-Could you translate 'used' to enable_count? Whats valid enable_count 
-numbers for critical clocks?
-
-Best regards
-
-Dirk
-
-
->> The increase/decrease of enable count of parent clock A is only driven by
->> the Linux kernel usage of clock 2.
->>
->>>> Opinions or proposal how to fix/change this?
->>>>
->>>>
->>>> Best regards
->>>>
->>>> Dirk
->>>>
->>>> [1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clk/clk.c?id=2e20fbf592621b2c2aeddd82e0fa3dad053cce03
+> Ok. I didn't know that kvm_regs are exposed to the user space.
 > 
+> >
+> > So we probably need something like that, or simply let it stay the way
+> > it is for now, and add el2_core_regs as a separate thing to the vcpu and
+> > only expose the indexes and encoding for those registers?
+> >
+> 
+> Sounds good to me.
+> 
+> So, expand sys_regs with the EL2 sysregs and put the special purpose
+> registers, which is the term used in ARM ARM, such as SPSR_EL2,
+> ELR_EL2 and SP_EL2 into el2_core_regs or el2_special_regs, right?
+> 
+
+el2_special_regs, yes.
+
+Thanks,
+-Christoffer
