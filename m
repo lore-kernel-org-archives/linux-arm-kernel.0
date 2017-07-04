@@ -1,96 +1,84 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 4 Jul 2017 15:04:54 +0800
-Subject: [PATCH v4 1/3] arm64: kvm: support user space to detect RAS
- extension feature
-In-Reply-To: <20170703082126.GC4066@cbox>
-References: <1498481143-23183-1-git-send-email-gengdongjiu@huawei.com>
- <20170703082126.GC4066@cbox>
-Message-ID: <dd9cf101-2ca9-f349-292e-f48204abe929@huawei.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 4 Jul 2017 09:09:58 +0200
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <baf9866b-04ba-698c-3012-a957ec0123d1@sigmadesigns.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
+ <e57debab-3457-1d9c-a72e-ecdf7d4f742e@sigmadesigns.com>
+ <baf9866b-04ba-698c-3012-a957ec0123d1@sigmadesigns.com>
+Message-ID: <20170704070958.oolhapyx7uy2fly4@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Mon, Jul 03, 2017 at 05:30:28PM +0200, Marc Gonzalez wrote:
 
-On 2017/7/3 16:21, Christoffer Dall wrote:
-> On Mon, Jun 26, 2017 at 08:45:43PM +0800, Dongjiu Geng wrote:
->> Handle userspace's detection for RAS extension, because sometimes
->> the userspace needs to know the CPU's capacity
+> And at the end of smp8759_config_read:
 > 
-> Why?  Can you please provide some more rationale.
+> 	printk("in_atomic_preempt_off = %d\n", in_atomic_preempt_off());
 
-userspace mainly want to know whether CPU has RAS extension capability to decide whether need to specify the syndrome value.
-if have, userspace specify the syndrome value. otherwise, not specify the value.
+That's confused...
 
-James ever suggest not want userspace to know the capability, and let KVM to judge the RAS extension capability.
+> 	stop_machine(do_nothing, NULL, NULL);
+> 	panic("STOP HERE FOR NOW\n");
+> 
+> The kernel outputs:
+> 
+> [    1.022725] in_atomic_preempt_off = 0
+> [    1.026568] BUG: scheduling while atomic: swapper/0/1/0x00000002
+> [    1.032625] 5 locks held by swapper/0/1:
+> [    1.036575]  #0:  (&dev->mutex){......}, at: [<c038c684>] __driver_attach+0x50/0xd0
+> [    1.044319]  #1:  (&dev->mutex){......}, at: [<c038c694>] __driver_attach+0x60/0xd0
+> [    1.052050]  #2:  (pci_lock){+.+...}, at: [<c03309d8>] pci_bus_read_config_dword+0x44/0x94
 
-but I consider it again, userspace know the RAS extension capability may be better, which can avoid KVM return error if
-CPU does not support RAS extension.
+This is a raw_spinlock_t, that disables preemption
 
-could you give me some suggestion that whether let userspace to know the RAS extension capability?
+> [    1.060398]  #3:  (cpu_hotplug.dep_map){++++++}, at: [<c0119db0>] get_online_cpus+0x2c/0xa0
+> [    1.068843]  #4:  (stop_cpus_mutex){+.+...}, at: [<c01a1184>] stop_cpus+0x20/0x48
 
-> 
->>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> ---
->>  arch/arm64/kvm/reset.c   | 11 +++++++++++
->>  include/uapi/linux/kvm.h |  1 +
->>  2 files changed, 12 insertions(+)
->>
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index d9e9697..1004039 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
->>  	return !!(pfr0 & 0x20);
->>  }
->>  
->> +static bool kvm_arm_support_ras_extension(void)
->> +{
->> +	u64 pfr0;
->> +
->> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
->> +	return !!(pfr0 & 0x10000000);
->> +}
-> 
-> Why is this specific to KVM?  This seems to reveal information about the
-> underlying physical CPU, not specific to KVM at all, surely if userspace
-> is really supposed to be able to figure this out, it should not be KVM
-> specific.
-  you are right. it should not be KVM specific, thanks for pointing it out.
+> [    1.076404] Modules linked in:
+> [    1.079483] Preemption disabled at:[    1.082820] [<  (null)>]   (null)
+> [    1.086165] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.23-1-rc4 #13
+> [    1.092723] Hardware name: Sigma Tango DT
+> [    1.096765] [<c010f600>] (unwind_backtrace) from [<c010b568>] (show_stack+0x10/0x14)
+> [    1.104558] [<c010b568>] (show_stack) from [<c0304830>] (dump_stack+0x98/0xc4)
+> [    1.111823] [<c0304830>] (dump_stack) from [<c013eee0>] (__schedule_bug+0x94/0xec)
+> [    1.119436] [<c013eee0>] (__schedule_bug) from [<c0516364>] (__schedule+0x4a4/0x5f0)
+> [    1.127220] [<c0516364>] (__schedule) from [<c05164fc>] (schedule+0x4c/0xac)
 
+
+And here you try and schedule with preemption disabled.
+
+> [    1.134308] [<c05164fc>] (schedule) from [<c051b010>] (schedule_timeout+0x1f4/0x30c)
+> [    1.142093] [<c051b010>] (schedule_timeout) from [<c051702c>] (wait_for_common+0x8c/0x13c)
+> [    1.150401] [<c051702c>] (wait_for_common) from [<c05170ec>] (wait_for_completion+0x10/0x14)
+> [    1.158886] [<c05170ec>] (wait_for_completion) from [<c01a0d74>] (__stop_cpus+0x50/0x64)
+> [    1.167021] [<c01a0d74>] (__stop_cpus) from [<c01a1194>] (stop_cpus+0x30/0x48)
+> [    1.174282] [<c01a1194>] (stop_cpus) from [<c01a1230>] (stop_machine+0x84/0x118)
+> [    1.181719] [<c01a1230>] (stop_machine) from [<c034c070>] (smp8759_config_read+0x84/0x90)
+> [    1.189942] [<c034c070>] (smp8759_config_read) from [<c0330a00>] (pci_bus_read_config_dword+0x6c/0x94)
+> [    1.199301] [<c0330a00>] (pci_bus_read_config_dword) from [<c0332920>] (pci_bus_read_dev_vendor_id+0x24/0xe8)
+> [    1.209270] [<c0332920>] (pci_bus_read_dev_vendor_id) from [<c033413c>] (pci_scan_single_device+0x40/0xb0)
+> [    1.218977] [<c033413c>] (pci_scan_single_device) from [<c0334204>] (pci_scan_slot+0x58/0x100)
+> [    1.227636] [<c0334204>] (pci_scan_slot) from [<c033511c>] (pci_scan_child_bus+0x20/0xf8)
+> [    1.235858] [<c033511c>] (pci_scan_child_bus) from [<c03353ec>] (pci_scan_root_bus_msi+0xcc/0xd8)
+> [    1.244779] [<c03353ec>] (pci_scan_root_bus_msi) from [<c0335410>] (pci_scan_root_bus+0x18/0x20)
+> [    1.253612] [<c0335410>] (pci_scan_root_bus) from [<c034bc5c>] (pci_host_common_probe+0xc8/0x314)
+> [    1.262533] [<c034bc5c>] (pci_host_common_probe) from [<c034c444>] (tango_pcie_probe+0x148/0x350)
+> [    1.271455] [<c034c444>] (tango_pcie_probe) from [<c038dbc8>] (platform_drv_probe+0x34/0x6c)
+
+> The panic call stack looks suspicious.
 > 
-> Thanks,
-> -Christoffer
+> smp8759_config_read() never calls tango_check_pcie_link().
 > 
->> +
->>  /**
->>   * kvm_arch_dev_ioctl_check_extension
->>   *
->> @@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->>  	case KVM_CAP_ARM_PMU_V3:
->>  		r = kvm_arm_support_pmu_v3();
->>  		break;
->> +	case KVM_CAP_ARM_RAS_EXTENSION:
->> +		r = kvm_arm_support_ras_extension();
->> +		break;
->>  	case KVM_CAP_SET_GUEST_DEBUG:
->>  	case KVM_CAP_VCPU_ATTRIBUTES:
->>  		r = 1;
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index f51d508..27fe556 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
->>  #define KVM_CAP_PPC_MMU_RADIX 134
->>  #define KVM_CAP_PPC_MMU_HASH_V3 135
->>  #define KVM_CAP_IMMEDIATE_EXIT 136
->> +#define KVM_CAP_ARM_RAS_EXTENSION 137
->>  
->>  #ifdef KVM_CAP_IRQ_ROUTING
->>  
->> -- 
->> 2.10.1
->>
+> (I compile with -fno-optimize-sibling-calls to get more accurate
+> call stacks.)
 > 
-> .
-> 
+> in_atomic_preempt_off is false before calling stop_machine()
+
+Yes, but that's a pointless statement.
+
+> I suppose I'm doing something wrong, but I'm not sure what yet.
+
+Using stop_machine() is per definition doing it wrong ;-) But see above.
