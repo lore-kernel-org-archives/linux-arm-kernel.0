@@ -1,53 +1,97 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 4 Jul 2017 13:35:11 +0100
-Subject: [PATCH 1/2] arm64: dts: add Spreadtrum's fm support
-In-Reply-To: <20170704101508.30946-2-chunyan.zhang@spreadtrum.com>
-References: <20170704101508.30946-1-chunyan.zhang@spreadtrum.com>
- <20170704101508.30946-2-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170704123510.GC21587@leverpostej>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue,  4 Jul 2017 14:37:03 +0200
+Subject: [PATCH v3] phy: allwinner: phy-sun4i-usb: Add log when probing
+Message-ID: <20170704123703.18916-1-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 06:15:07PM +0800, Chunyan Zhang wrote:
-> Added FM support for Spreadtrum's SP9860 board.
-> 
-> Signed-off-by: Songhe Wei <songhe.wei@spreadtrum.com>
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  arch/arm64/boot/dts/sprd/sp9860g-1h10.dts | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-> index 0362ecd..6fe052d 100644
-> --- a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-> +++ b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-> @@ -39,6 +39,10 @@
->  		#size-cells = <2>;
->  		ranges;
->  	};
-> +
-> +	sprd-fm {
-> +		compatible  = "sprd,marlin2-fm";
-> +	};
+When phy-sun4i-usb's probing fails, it does not print the reason in
+kernel log, forcing the developer to edit this driver to add info logs.
+This commit makes the kernel print the reason of phy-sun4i-usb's probing
+failure or a success message.
 
-What kind of device is this? MMIO?
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
 
-It seems to be sitting directly under the root node, but has no reg or
-relationship with another bus defined, so something is missing.
+Nothing new in v3, the driver has just been moved to the directory
+allwinner so updating the patch to reflect this change. Sorry for the
+delay, completely forgot it hadn't been merged/acked back then.
 
-This will need binding documentation.
+v2:
+  - removing (from v1) debug message when devm_ioremap_resource fails,
+  - changing dev_info to dev_dbg when driver is successfully loaded,
 
-Thanks,
-Mark.
+ drivers/phy/allwinner/phy-sun4i-usb.c | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-
->  };
->  
->  &uart0 {
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
+index bbf06cfe5898..3bea17b9405a 100644
+--- a/drivers/phy/allwinner/phy-sun4i-usb.c
++++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+@@ -653,19 +653,25 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 
+ 	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
+ 						    GPIOD_IN);
+-	if (IS_ERR(data->id_det_gpio))
++	if (IS_ERR(data->id_det_gpio)) {
++		dev_err(dev, "Couldn't request ID GPIO\n");
+ 		return PTR_ERR(data->id_det_gpio);
++	}
+ 
+ 	data->vbus_det_gpio = devm_gpiod_get_optional(dev, "usb0_vbus_det",
+ 						      GPIOD_IN);
+-	if (IS_ERR(data->vbus_det_gpio))
++	if (IS_ERR(data->vbus_det_gpio)) {
++		dev_err(dev, "Couldn't request VBUS detect GPIO\n");
+ 		return PTR_ERR(data->vbus_det_gpio);
++	}
+ 
+ 	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
+ 		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
+ 						     "usb0_vbus_power-supply");
+-		if (IS_ERR(data->vbus_power_supply))
++		if (IS_ERR(data->vbus_power_supply)) {
++			dev_err(dev, "Couldn't get the VBUS power supply\n");
+ 			return PTR_ERR(data->vbus_power_supply);
++		}
+ 
+ 		if (!data->vbus_power_supply)
+ 			return -EPROBE_DEFER;
+@@ -674,8 +680,10 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
+ 
+ 	data->extcon = devm_extcon_dev_allocate(dev, sun4i_usb_phy0_cable);
+-	if (IS_ERR(data->extcon))
++	if (IS_ERR(data->extcon)) {
++		dev_err(dev, "Couldn't allocate our extcon device\n");
+ 		return PTR_ERR(data->extcon);
++	}
+ 
+ 	ret = devm_extcon_dev_register(dev, data->extcon);
+ 	if (ret) {
+@@ -690,8 +698,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		snprintf(name, sizeof(name), "usb%d_vbus", i);
+ 		phy->vbus = devm_regulator_get_optional(dev, name);
+ 		if (IS_ERR(phy->vbus)) {
+-			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
++			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER) {
++				dev_err(dev,
++					"Couldn't get regulator %s... Deferring probe\n",
++					name);
+ 				return -EPROBE_DEFER;
++			}
++
+ 			phy->vbus = NULL;
+ 		}
+ 
+@@ -775,6 +788,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(phy_provider);
+ 	}
+ 
++	dev_dbg(dev, "successfully loaded\n");
++
+ 	return 0;
+ }
+ 
+-- 
+2.11.0
