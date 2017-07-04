@@ -1,27 +1,37 @@
 From: frank.wang@rock-chips.com (Frank Wang)
-Date: Tue,  4 Jul 2017 16:12:41 +0800
-Subject: [PATCH 0/6] add and enable some device nodes for rk3229-evb board
-Message-ID: <1499155967-26090-1-git-send-email-frank.wang@rock-chips.com>
+Date: Tue,  4 Jul 2017 16:12:43 +0800
+Subject: [PATCH 2/6] ARM: dts: rockchip: add cpu-supply property for cpu node
+ of rk3229-evb
+In-Reply-To: <1499155967-26090-1-git-send-email-frank.wang@rock-chips.com>
+References: <1499155967-26090-1-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1499155967-26090-3-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These series add and enable regulators, gpio-keys, eMMC and other device
-nodes support for rk3229-evb board.
+From: Finley Xiao <finley.xiao@rock-chips.com>
 
-David Wu (1):
-  ARM: dts: rockchip: enable io-domain for rk3229-evb
+This patch adds the cpu-supply property so that cpu can do dvfs
+on rk3229-evb board.
 
-Finley Xiao (1):
-  ARM: dts: rockchip: add cpu-supply property for cpu node of rk3229-evb
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+---
+ arch/arm/boot/dts/rk3229-evb.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Frank Wang (4):
-  ARM: dts: rockchip: add regulator nodes for rk3229-evb
-  ARM: dts: rockchip: enable eMMC for rk3229-evb
-  ARM: dts: rockchip: enable tsadc for rk3229-evb
-  ARM: dts: rockchip: add gpio power-key for rk3229-evb
-
- arch/arm/boot/dts/rk3229-evb.dts | 106 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
-
+diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
+index 8b10c64..cfa7baa 100644
+--- a/arch/arm/boot/dts/rk3229-evb.dts
++++ b/arch/arm/boot/dts/rk3229-evb.dts
+@@ -126,6 +126,10 @@
+ 	};
+ };
+ 
++&cpu0 {
++	cpu-supply = <&vdd_arm>;
++};
++
+ &gmac {
+ 	assigned-clocks = <&cru SCLK_MAC_EXTCLK>, <&cru SCLK_MAC>;
+ 	assigned-clock-parents = <&ext_gmac>, <&cru SCLK_MAC_EXTCLK>;
 -- 
 2.0.0
