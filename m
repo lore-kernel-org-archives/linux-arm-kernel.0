@@ -1,43 +1,55 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 04 Jul 2017 10:35:44 +0200
-Subject: [PATCH 4/6] ARM: dts: rockchip: enable eMMC for rk3229-evb
-In-Reply-To: <1499155967-26090-5-git-send-email-frank.wang@rock-chips.com>
-References: <1499155967-26090-1-git-send-email-frank.wang@rock-chips.com>
- <1499155967-26090-5-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <4792016.SK4QvSrg4n@diego>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 4 Jul 2017 10:40:57 +0200
+Subject: [PATCH v4 1/3] arm64: kvm: support user space to detect RAS
+ extension feature
+In-Reply-To: <dd9cf101-2ca9-f349-292e-f48204abe929@huawei.com>
+References: <1498481143-23183-1-git-send-email-gengdongjiu@huawei.com>
+ <20170703082126.GC4066@cbox>
+ <dd9cf101-2ca9-f349-292e-f48204abe929@huawei.com>
+Message-ID: <20170704084057.GL4066@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 4. Juli 2017, 16:12:45 CEST schrieb Frank Wang:
-> This patch enables eMMC support for rk3229-evb board.
-> 
-> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
-> ---
->  arch/arm/boot/dts/rk3229-evb.dts | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3229-evb.dts
-> b/arch/arm/boot/dts/rk3229-evb.dts index b64f86c..bae0dbf 100644
-> --- a/arch/arm/boot/dts/rk3229-evb.dts
-> +++ b/arch/arm/boot/dts/rk3229-evb.dts
-> @@ -130,6 +130,17 @@
->  	cpu-supply = <&vdd_arm>;
->  };
-> 
-> +&emmc {
-> +	broken-cd;
-> +	bus-width = <8>;
-> +	cap-mmc-highspeed;
-> +	supports-emmc;
-> +	disable-wp;
-> +	non-removable;
+Hi Dongjiu,
 
-non-removable should be enough, so you shouldn't need the broken-cd above?
+On Tue, Jul 04, 2017 at 03:04:54PM +0800, gengdongjiu wrote:
+> Hi Christoffer,
+> 
+> On 2017/7/3 16:21, Christoffer Dall wrote:
+> > On Mon, Jun 26, 2017 at 08:45:43PM +0800, Dongjiu Geng wrote:
+> >> Handle userspace's detection for RAS extension, because sometimes
+> >> the userspace needs to know the CPU's capacity
+> > 
+> > Why?  Can you please provide some more rationale.
+> 
+> userspace mainly want to know whether CPU has RAS extension capability to decide whether need to specify the syndrome value.
+> if have, userspace specify the syndrome value. otherwise, not specify the value.
+> 
+> James ever suggest not want userspace to know the capability, and let KVM to judge the RAS extension capability.
+> 
+> but I consider it again, userspace know the RAS extension capability may be better, which can avoid KVM return error if
+> CPU does not support RAS extension.
 
-> +	num-slots = <1>;
-> +	status = "okay";
-> +};
-> +
->  &gmac {
->  	assigned-clocks = <&cru SCLK_MAC_EXTCLK>, <&cru SCLK_MAC>;
->  	assigned-clock-parents = <&ext_gmac>, <&cru SCLK_MAC_EXTCLK>;
+So first of all, while I appreciate your efforts to explain your
+rationale here, I am also asking you to provide a more comprehensive
+commit message for the next version of the patch.
+
+> 
+> could you give me some suggestion that whether let userspace to know the RAS extension capability?
+> 
+
+I haven't thought much about it, but there are unanswered questions to
+me.  For example, does the type and capabilities of the guest in any way
+affect whether or not this features should be available?  Are there any
+concerns with respect to migration?
+
+And then the point I raised below, which is that this KVM-specific ioctl
+is returning a hardware property of the CPU (the one the ioctl happens
+to run on - what happens on a heterogeneous system?), but not really
+what KVM can and cannot do.  At the very least this should be based on
+a more generic in-kernel functionality, which reports the capabilities
+of a system to KVM, and KVM could then tell userspace if it has a
+certain capability.
+
+Hope this helps,
+-Christoffer
