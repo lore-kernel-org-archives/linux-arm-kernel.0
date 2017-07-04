@@ -1,29 +1,32 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Tue,  4 Jul 2017 15:25:40 +0200
-Subject: [PATCH 0/2] ARM: add missing includes to header files
-Message-ID: <20170704132542.27644-1-johan@kernel.org>
+Date: Tue,  4 Jul 2017 15:25:42 +0200
+Subject: [PATCH 2/2] ARM: pm: add missing types include
+In-Reply-To: <20170704132542.27644-1-johan@kernel.org>
+References: <20170704132542.27644-1-johan@kernel.org>
+Message-ID: <20170704132542.27644-3-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two missing include directives to two header files to avoid
-compile breakage when the required symbols have not already been
-defined.
+Add missing types.h include to make the suspend header self-contained
+and avoid compilation breakage due to include-directive ordering.
 
-The missing SCU include broke compilation of the (not-yet-merged)
-suspend support for am335x when !CONFIG_HAVE_ARM_SCU for example:
-
-	https://lkml.kernel.org/r/20170704131441.GH27842 at localhost
-
-Johan
-
-
-Johan Hovold (2):
-  ARM: scu: add missing errno include
-  ARM: pm: add missing types include
-
- arch/arm/include/asm/smp_scu.h | 1 +
+Signed-off-by: Johan Hovold <johan@kernel.org>
+---
  arch/arm/include/asm/suspend.h | 2 ++
- 2 files changed, 3 insertions(+)
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/include/asm/suspend.h b/arch/arm/include/asm/suspend.h
+index 6c7182f32cef..a61905c86732 100644
+--- a/arch/arm/include/asm/suspend.h
++++ b/arch/arm/include/asm/suspend.h
+@@ -1,6 +1,8 @@
+ #ifndef __ASM_ARM_SUSPEND_H
+ #define __ASM_ARM_SUSPEND_H
+ 
++#include <linux/types.h>
++
+ struct sleep_save_sp {
+ 	u32 *save_ptr_stash;
+ 	u32 save_ptr_stash_phys;
 -- 
 2.13.2
