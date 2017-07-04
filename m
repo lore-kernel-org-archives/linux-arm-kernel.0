@@ -1,124 +1,53 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue,  4 Jul 2017 13:59:24 +0200
-Subject: [PATCH v2 6/9] clk: at91: clk-generated: make gclk determine
- audio_pll rate
-In-Reply-To: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
-References: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170704115927.32662-7-quentin.schulz@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 4 Jul 2017 13:35:11 +0100
+Subject: [PATCH 1/2] arm64: dts: add Spreadtrum's fm support
+In-Reply-To: <20170704101508.30946-2-chunyan.zhang@spreadtrum.com>
+References: <20170704101508.30946-1-chunyan.zhang@spreadtrum.com>
+ <20170704101508.30946-2-chunyan.zhang@spreadtrum.com>
+Message-ID: <20170704123510.GC21587@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows gclk to determine audio_pll rate and set the parent rate
-accordingly.
+On Tue, Jul 04, 2017 at 06:15:07PM +0800, Chunyan Zhang wrote:
+> Added FM support for Spreadtrum's SP9860 board.
+> 
+> Signed-off-by: Songhe Wei <songhe.wei@spreadtrum.com>
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>  arch/arm64/boot/dts/sprd/sp9860g-1h10.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+> index 0362ecd..6fe052d 100644
+> --- a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+> +++ b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+> @@ -39,6 +39,10 @@
+>  		#size-cells = <2>;
+>  		ranges;
+>  	};
+> +
+> +	sprd-fm {
+> +		compatible  = "sprd,marlin2-fm";
+> +	};
 
-However, there are multiple children clocks that could technically
-change the rate of audio_pll (via gck). With the rate locking, the first
-consumer to enable the clock will be the one definitely setting the rate
-of the clock.
+What kind of device is this? MMIO?
 
-Since audio IPs are most likely to request the same rate, we enforce
-that the only clks able to modify gck rate are those of audio IPs.
+It seems to be sitting directly under the root node, but has no reg or
+relationship with another bus defined, so something is missing.
 
-To remain consistent, we deny other clocks to be children of audio_pll.
+This will need binding documentation.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
+Thanks,
+Mark.
 
-v2:
-  - added conditions for audio pll rate setting restriction for SSC and
-I2S,
 
- drivers/clk/at91/clk-generated.c | 48 +++++++++++++++++++++++++++++++++++-----
- 1 file changed, 42 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index 6530a2e7e84d..87866786a6ab 100644
---- a/drivers/clk/at91/clk-generated.c
-+++ b/drivers/clk/at91/clk-generated.c
-@@ -26,6 +26,13 @@
- #define GENERATED_SOURCE_MAX	6
- #define GENERATED_MAX_DIV	255
- 
-+#define GCK_ID_SSC0		43
-+#define GCK_ID_SSC1		44
-+#define GCK_ID_I2S0		54
-+#define GCK_ID_I2S1		55
-+#define GCK_ID_CLASSD		59
-+#define GCK_INDEX_DT_AUDIO_PLL	5
-+
- struct clk_generated {
- 	struct clk_hw hw;
- 	struct regmap *regmap;
-@@ -126,15 +133,14 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- {
- 	struct clk_generated *gck = to_clk_generated(hw);
- 	struct clk_hw *parent = NULL;
-+	struct clk_rate_request req_parent = *req;
- 	long best_rate = -EINVAL;
--	unsigned long min_rate;
-+	unsigned long min_rate, parent_rate;
- 	int best_diff = -1;
- 	int i;
-+	u32 div;
- 
--	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
--		u32 div;
--		unsigned long parent_rate;
--
-+	for (i = 0; i < clk_hw_get_num_parents(hw) - 1; i++) {
- 		parent = clk_hw_get_parent_by_index(hw, i);
- 		if (!parent)
- 			continue;
-@@ -150,11 +156,40 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- 		clk_generated_best_diff(req, parent, parent_rate, div,
- 					&best_diff, &best_rate);
- 
-+		if (!best_diff)
-+			break;
-+	}
-+
-+	/*
-+	 * The audio_pll rate can be modified, unlike the five others clocks
-+	 * that should never be altered.
-+	 * The audio_pll can technically be used by multiple consumers. However,
-+	 * with the rate locking, the first consumer to enable to clock will be
-+	 * the one definitely setting the rate of the clock.
-+	 * Since audio IPs are most likely to request the same rate, we enforce
-+	 * that the only clks able to modify gck rate are those of audio IPs.
-+	 */
-+
-+	if (gck->id != GCK_ID_SSC0 && gck->id != GCK_ID_SSC1 &&
-+	    gck->id != GCK_ID_I2S0 && gck->id != GCK_ID_I2S1 &&
-+	    gck->id != GCK_ID_CLASSD)
-+		goto end;
-+
-+	parent = clk_hw_get_parent_by_index(hw, GCK_INDEX_DT_AUDIO_PLL);
-+	if (!parent)
-+		goto end;
-+
-+	for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
-+		req_parent.rate = req->rate * div;
-+		__clk_determine_rate(parent, &req_parent);
-+		clk_generated_best_diff(req, parent, req_parent.rate, div,
-+					&best_diff, &best_rate);
- 
- 		if (!best_diff)
- 			break;
- 	}
- 
-+end:
- 	pr_debug("GCLK: %s, best_rate = %ld, parent clk: %s @ %ld\n",
- 		 __func__, best_rate,
- 		 __clk_get_name((req->best_parent_hw)->clk),
-@@ -264,7 +299,8 @@ at91_clk_register_generated(struct regmap *regmap, spinlock_t *lock,
- 	init.ops = &generated_ops;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
--	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
-+	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE |
-+		CLK_SET_RATE_PARENT;
- 
- 	gck->id = id;
- 	gck->hw.init = &init;
--- 
-2.11.0
+>  };
+>  
+>  &uart0 {
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
