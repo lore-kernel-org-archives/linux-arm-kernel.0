@@ -1,18 +1,56 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 4 Jul 2017 14:53:01 -0700
-Subject: [GIT PULL 5/7] ARM: SoC driver updates
-In-Reply-To: <CAK8P3a0Pizf3ZBjG7Sn2BB_g+wtewz-CtJnOU5voONGvWS=EGA@mail.gmail.com>
-References: <CAK8P3a0Pizf3ZBjG7Sn2BB_g+wtewz-CtJnOU5voONGvWS=EGA@mail.gmail.com>
-Message-ID: <CA+55aFyn0QFR3DYYaP2tOgxwYPzRgHfCmJ2fVXinZKsx_F8fBQ@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 5 Jul 2017 00:55:37 +0200
+Subject: [PATCH v9 0/3] Tango PCIe controller support
+In-Reply-To: <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 4, 2017 at 7:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->  create mode 100644 drivers/soc/actions/Kconfig
->  create mode 100644 drivers/soc/actions/Makefile
->  create mode 100644 drivers/soc/actions/owl-sps-helper.c
->  create mode 100644 drivers/soc/actions/owl-sps.c
+On 04/07/2017 22:24, Bjorn Helgaas wrote:
 
-You already had these in the platform updates.
+> On Tue, Jun 20, 2017 at 10:12:57AM +0200, Marc Gonzalez wrote:
+>
+>> Marc Z pointed out that posting partial series is not ideal.
+>> Collect last-minute fixups into a single patch series.
+>>
+>> - Bump series to v9 to avoid any ambiguity
+>> - Add Rob's Ack on patch 1
+>>
+>> Marc Gonzalez (3):
+>>   PCI: Add DT binding for tango PCIe controller
+>>   PCI: Add tango PCIe host bridge support
+>>   PCI: Add tango MSI controller support
+>>
+>>  .../devicetree/bindings/pci/tango-pcie.txt         |  29 ++
+>>  drivers/pci/host/Kconfig                           |   8 +
+>>  drivers/pci/host/Makefile                          |   1 +
+>>  drivers/pci/host/pcie-tango.c                      | 390 +++++++++++++++++++++
+>>  include/linux/pci_ids.h                            |   2 +
+>>  5 files changed, 430 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/tango-pcie.txt
+>>  create mode 100644 drivers/pci/host/pcie-tango.c
+> 
+> I made the trivial changes I mentioned, added a dependency on
+> CONFIG_BROKEN (for the config/MMIO muxing issue), and put these on
+> pci/host-tango.  I can't build or test this, so I probably broke
+> something in the process.  I think the combination of the boot-time
+> warning, the taint, and CONFIG_BROKEN is a reasonable amount of
+> warning that a user should expect issues.
+> 
+> Can you take a look and see if it works for you?
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-tango
 
-               Linus
+Thanks. I'll take it for a spin ASAP.
+
+TAINT_CRAP... Smirk. I didn't see that one in the docs:
+https://www.kernel.org/doc/html/latest/admin-guide/tainted-kernels.html
+
+Oh wait... TAINT_CRAP is "C" => a staging driver has been loaded
+
+The one issue I anticipate with "depends on BROKEN" is
+when I add support for revision 2, which isn't broken.
+
+Regards.
