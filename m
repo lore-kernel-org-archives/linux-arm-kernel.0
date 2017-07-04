@@ -1,58 +1,57 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue,  4 Jul 2017 13:59:25 +0200
-Subject: [PATCH v2 7/9] ASoC: atmel-classd: remove aclk clock from DT binding
+Date: Tue,  4 Jul 2017 13:59:27 +0200
+Subject: [PATCH v2 9/9] ARM: dts: at91: sama5d2_xplained: add pin muxing and
+ enable classd
 In-Reply-To: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
 References: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170704115927.32662-8-quentin.schulz@free-electrons.com>
+Message-ID: <20170704115927.32662-10-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since gclk (generated-clk) is now able to determine the rate of the
-audio_pll, there is no need for classd to have a direct phandle to the
-audio_pll while already having a phandle to gclk.
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-This binding is used by no board in mainline so it is safe to be
-modified.
+This patch adds the pin muxing for classd and enables it.
 
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-added in v2
-
- Documentation/devicetree/bindings/sound/atmel-classd.txt | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/sound/atmel-classd.txt b/Documentation/devicetree/bindings/sound/atmel-classd.txt
-index 549e701cb7a1..898551076382 100644
---- a/Documentation/devicetree/bindings/sound/atmel-classd.txt
-+++ b/Documentation/devicetree/bindings/sound/atmel-classd.txt
-@@ -13,13 +13,11 @@ Required properties:
- 	Must be "tx".
- - clock-names
- 	Tuple listing input clock names.
--	Required elements: "pclk", "gclk" and "aclk".
-+	Required elements: "pclk" and "gclk".
- - clocks
- 	Please refer to clock-bindings.txt.
- - assigned-clocks
- 	Should be <&classd_gclk>.
--- assigned-clock-parents
--	Should be <&audio_pll_pmc>.
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 2e2c3d1a1fa2..e92b030ca45a 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -355,6 +355,14 @@
+ 					bias-pull-up;
+ 				};
  
- Optional properties:
- - pinctrl-names, pinctrl-0
-@@ -45,10 +43,9 @@ classd: classd at fc048000 {
- 			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
- 			| AT91_XDMAC_DT_PERID(47))>;
- 		dma-names = "tx";
--		clocks = <&classd_clk>, <&classd_gclk>, <&audio_pll_pmc>;
--		clock-names = "pclk", "gclk", "aclk";
-+		clocks = <&classd_clk>, <&classd_gclk>;
-+		clock-names = "pclk", "gclk";
- 		assigned-clocks = <&classd_gclk>;
--		assigned-clock-parents = <&audio_pll_pmc>;
++				pinctrl_classd_default: classd_default {
++					pinmux = <PIN_PB1__CLASSD_R0>,
++						 <PIN_PB2__CLASSD_R1>,
++						 <PIN_PB3__CLASSD_R2>,
++						 <PIN_PB4__CLASSD_R3>;
++					bias-pull-up;
++				};
++
+ 				pinctrl_flx0_default: flx0_default {
+ 					pinmux = <PIN_PB28__FLEXCOM0_IO0>,
+ 						 <PIN_PB29__FLEXCOM0_IO1>;
+@@ -488,6 +496,14 @@
  
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_classd_default>;
+ 			};
+ 
++			classd: classd at fc048000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_classd_default>;
++				atmel,pwm-type = "diff";
++				atmel,non-overlap-time = <10>;
++				status = "okay";
++			};
++
+ 			can1: can at fc050000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_can1_default>;
 -- 
 2.11.0
