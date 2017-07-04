@@ -1,100 +1,260 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 4 Jul 2017 20:29:38 +0200
-Subject: Architecture Timer on R-Car Gen2
-Message-ID: <CAMuHMdWaQLDoOLYjPNkwXNcam-UCCngyaY3D2yZctJrfGg27Xw@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 4 Jul 2017 11:54:03 -0700
+Subject: [PATCH] thermal: imx: interpret fsl,tempmon-data through nvmem
+In-Reply-To: <d1a8ec1ef73aefe6018f6a4923bd04b3ac34a5d4.1497879110.git.leonard.crestez@nxp.com>
+References: <d1a8ec1ef73aefe6018f6a4923bd04b3ac34a5d4.1497879110.git.leonard.crestez@nxp.com>
+Message-ID: <20170704185400.GB18084@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-        Hi Magnus, Mar[ck], Simon,
+On Mon, Jun 19, 2017 at 04:40:43PM +0300, Leonard Crestez wrote:
+> On imx6sx accessing the ocotp memory area directly is wrong because the
+> ocotp clock needs to be enabled first. Fix this by reinterpreting the
+> fsl,tempmon-data phandle as a reference to a nvmem_device and doing all
+> the read through that.
+> 
+> This clock requirement does not apply to older imx6qdl chips because
+> there the ocotp access clock (clk_ipg_s) is always enabled.
+> 
+> This is visible by comparing the "System Clocks, Gating, and Override"
+> tables (OCOTP rows) in the 6DQ and 6SX manuals:
+> http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6SXRM.pdf
+> http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
+> 
+> This happens to work right now without this patch because the ocotp
+> clock might be enabled for some other reason. In particular it might be
+> enabled from the bootloader and it only gets disabled late during boot
+> in clk_disable_unused, after imx-thermal has completed probing.
+> 
+> If imx-thermal is compiled as a module then the system can hang on
+> probe.
+> 
+> This makes IMX_THERMAL depend on NVMEM_IMX_OCOTP but that driver seems
+> be already available for all chips that contain tempmon so it's
+> acceptable.
+> 
+> Reported-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> 
+> ---
+> 
+> This was reported as a comment to a patch adding tempmon support for
+> imx6ul (which is very similar to imx6sx). Since it already affects a
+> supported chip this patch is sent as a separate bugfix.
+> 
+> Link: https://lkml.org/lkml/2017/6/9/578
+> 
+> There are various other ways to fix this problem. The main advantage of
+> this solution is that it does not add a new binding but rather preserves
+> compatibility with old DTBs. It also aligns with the idea that
+> devicetree describes hardware relationships rather than a specific linux
+> implementation.
+> 
+> An alternative would have been to add a nvmem-cells binding to imx-thermal and
+> use that if available instead of fsl,tempmon-data. It might not be good to
+> sidestep the official nvmem bindings, the devicetree people were added so that
+> they have an opportunity to object.
+> 
+> In theory the "thermal grade" is a two-bit quantity and might be a
+> candidate for using a cell with a "bits" binding. However this causes
+> the nvmem core to issue reads of length and alignment less than 4 to the
+> imx-ocotp driver so additional fixes might be required.
+> 
+>  drivers/nvmem/core.c           | 15 ++++++++++++
+>  drivers/thermal/Kconfig        |  2 +-
+>  drivers/thermal/imx_thermal.c  | 53 ++++++++++++++++++++++++++----------------
+>  include/linux/nvmem-consumer.h |  6 +++++
+>  4 files changed, 55 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> index 8c830a8..66502ca 100644
+> --- a/drivers/nvmem/core.c
+> +++ b/drivers/nvmem/core.c
+> @@ -630,6 +630,21 @@ struct nvmem_device *of_nvmem_device_get(struct device_node *np, const char *id)
+>  	return __nvmem_device_get(nvmem_np, NULL, NULL);
+>  }
+>  EXPORT_SYMBOL_GPL(of_nvmem_device_get);
+> +
+> +/**
+> + * of_nvmem_device_phandle_get() - Get nvmem device from a given phandle
+> + *
+> + * @nvmem_np: Device tree node for the nvmem device
+> + *
+> + * Return: ERR_PTR() on error or a valid pointer to a struct nvmem_device
+> + * on success.
+> + */
+> +struct nvmem_device *of_nvmem_device_phandle_get(struct device_node *nvmem_np)
+> +{
+> +
+> +	return __nvmem_device_get(nvmem_np, NULL, NULL);
+> +}
+> +EXPORT_SYMBOL_GPL(of_nvmem_device_phandle_get);
+>  #endif
+>  
+>  /**
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index b5b5fac..a427936 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -206,7 +206,7 @@ config HISI_THERMAL
+>  config IMX_THERMAL
+>  	tristate "Temperature sensor driver for Freescale i.MX SoCs"
+>  	depends on (ARCH_MXC && CPU_THERMAL) || COMPILE_TEST
+> -	depends on MFD_SYSCON
+> +	depends on NVMEM_IMX_OCOTP
+>  	depends on OF
+>  	help
+>  	  Support for Temperature Monitor (TEMPMON) found on Freescale i.MX SoCs.
+> diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+> index fb648a4..1cf35bd 100644
+> --- a/drivers/thermal/imx_thermal.c
+> +++ b/drivers/thermal/imx_thermal.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/thermal.h>
+>  #include <linux/types.h>
+> +#include <linux/nvmem-consumer.h>
+>  
+>  #define REG_SET		0x4
+>  #define REG_CLR		0x8
+> @@ -55,8 +56,8 @@
+>  #define TEMPSENSE2_PANIC_VALUE_SHIFT	16
+>  #define TEMPSENSE2_PANIC_VALUE_MASK	0xfff0000
+>  
+> -#define OCOTP_MEM0			0x0480
+> -#define OCOTP_ANA1			0x04e0
+> +#define OCOTP_MEM0_OFFSET		32
+> +#define OCOTP_ANA1_OFFSET    		56
+>  
+>  /* The driver supports 1 passive trip point and 1 critical trip point */
+>  enum imx_thermal_trip {
+> @@ -347,29 +348,39 @@ static struct thermal_zone_device_ops imx_tz_ops = {
+>  static int imx_get_sensor_data(struct platform_device *pdev)
+>  {
+>  	struct imx_thermal_data *data = platform_get_drvdata(pdev);
+> -	struct regmap *map;
+> +	struct device_node *ocotp_np;
+> +	struct nvmem_device *ocotp;
+>  	int t1, n1;
+>  	int ret;
+>  	u32 val;
+>  	u64 temp64;
+>  
+> -	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> -					      "fsl,tempmon-data");
+> -	if (IS_ERR(map)) {
+> -		ret = PTR_ERR(map);
+> -		dev_err(&pdev->dev, "failed to get sensor regmap: %d\n", ret);
+> +	ocotp_np = of_parse_phandle(pdev->dev.of_node, "fsl,tempmon-data", 0);
+> +	if (IS_ERR(ocotp_np)) {
+> +		ret = PTR_ERR(ocotp_np);
+> +		dev_err(&pdev->dev, "failed to parse fsl,tempmon-data phandle: %d\n", ret);
+> +		return ret;
+> +	}
+> +	ocotp = of_nvmem_device_phandle_get(ocotp_np);
+> +	of_node_put(ocotp_np);
+> +	if (IS_ERR(ocotp)) {
+> +		ret = PTR_ERR(ocotp);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(&pdev->dev, "failed to get fsl,tempmon-data nvmem device: %d\n", ret);
+>  		return ret;
+>  	}
+>  
+> -	ret = regmap_read(map, OCOTP_ANA1, &val);
+> -	if (ret) {
+> +	ret = nvmem_device_read(ocotp, OCOTP_ANA1_OFFSET, sizeof(val), &val);
+> +	if (ret != sizeof(val)) {
+>  		dev_err(&pdev->dev, "failed to read sensor data: %d\n", ret);
+> -		return ret;
+> +		ret = -EIO;
+> +		goto out;
+>  	}
+>  
+>  	if (val == 0 || val == ~0) {
+>  		dev_err(&pdev->dev, "invalid sensor calibration data\n");
+> -		return -EINVAL;
+> +		ret = -EINVAL;
+> +		goto out;
+>  	}
+>  
+>  	/*
+> @@ -404,10 +415,11 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+>  	data->c2 = n1 * data->c1 + 1000 * t1;
+>  
+>  	/* use OTP for thermal grade */
+> -	ret = regmap_read(map, OCOTP_MEM0, &val);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "failed to read temp grade: %d\n", ret);
+> -		return ret;
 
-We're (finally) getting close to the point where Renesas R-Car Gen2
-platform code no longer relies on hardcoded addresses.
+I see a few other occurences of regmap_read() in this driver, for
+example, inside imx_get_temp(). Do they also get affect by the reported
+bug? Should they be replaced with nvmem_device_read() too?
 
-The remaining parts are related to the ARM Architecture Timer / Generic
-Timer / Generic Counter.  More specifically the code in
-rcar_gen2_timer_init() in arch/arm/mach-shmobile/setup-rcar-gen2.c,
-quoted below.  According to historical information, the issues being
-solved here are (1) non-running timers, and (2) wrong frequencies,
-leading to (m)sleep() not sleeping for the expected period.
-But it's far from clear to me what's really going on...
 
->   void __iomem *base;
->   u32 freq;
->
->   /*
->    * Determine frequency.  Depending on SoC-type, it's either
->    *   - Crystal / 2 => (usually) 10 MHz (calculated from extal in DT)
->    *   - ZS clock / 8 => (always) 32.5 MHz (hardcoded)
->    */
->   freq = ...
->
->   /* Remap "armgcnt address map" space */
->   base = ioremap(0xe6080000, PAGE_SIZE);
-
-I believe this region corresponds to the Generic Counter, which is not
-the same, but related to the Architecture timer?
-It seems no DT bindings exist for the Generic Counter?
-
-(for a moment I thought this might correspond to "arm,armv7-timer-mem", but
- I no longer believe that's true)
-
->   /*
->    * Update the timer if it is either not running, or is not at the
->    * right frequency. The timer is only configurable in secure mode
->    * so this avoids an abort if the loader started the timer and
->    * entered the kernel in non-secure mode.
->    */
->
->   if ((ioread32(base + CNTCR) & 1) == 0 ||
->       ioread32(base + CNTFID0) != freq) {
-
-On all SoC/board combos I checked (r8a7790/lager, r8a7791/koelsch,
-r8a7791/porter, r8a7792/blanche, r8a7793/gose, r8a7794/alt), both
-conditions are true, i.e.
-  - The timer (counter?) is not running,
-  - The configured frequency is 13 MHz, which is wrong.
-
->           /* Update registers with correct frequency */
->           iowrite32(freq, base + CNTFID0);
-
-This doesn't seem to be needed?
-With or without, both msleep() (kernel) and sleep() (userspace) sleep
-for the expected amount of time.
-
->           asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
-
-This is an open-coded implementation of arch_timer_set_cntfrq(), which
-is not provided by arch/arm/include/asm/arch_timer.h (should it?).
-Without this, the arch_timer driver complains:
-
-    arch_timer: frequency not available
-
-leading to failures (e.g. division by zero) later.
-
-However, adding the proper "clock-frequency" property to the
-"arm,armv7-timer" device node in DT fixes that.
-Probably adding this property is a better way to work around broken(?)
-firmware not setting CNTFRQ, than checking the SoC type and using
-hardcoded values in platform code?
-
->           /* make sure arch timer is started by setting bit 0 of CNTCR */
->           iowrite32(1, base + CNTCR);
-
-This is definitely needed.  Else the timer doesn't run.
-
->   }
->
->   iounmap(base);
-
-Thanks for your time!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +	ret = nvmem_device_read(ocotp, OCOTP_MEM0_OFFSET, sizeof(val), &val);
+> +	if (ret != sizeof(val)) {
+> +		dev_err(&pdev->dev, "failed to read sensor data: %d\n", ret);
+> +		ret = -EIO;
+> +		goto out;
+>  	}
+>  
+>  	/* The maximum die temp is specified by the Temperature Grade */
+> @@ -437,7 +449,10 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+>  	data->temp_critical = data->temp_max - (1000 * 5);
+>  	data->temp_passive = data->temp_max - (1000 * 10);
+>  
+> -	return 0;
+> +	ret = 0;
+> +out:
+> +	nvmem_device_put(ocotp);
+> +	return ret;
+>  }
+>  
+>  static irqreturn_t imx_thermal_alarm_irq(int irq, void *dev)
+> @@ -513,10 +528,8 @@ static int imx_thermal_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, data);
+>  
+>  	ret = imx_get_sensor_data(pdev);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "failed to get sensor data\n");
+> +	if (ret)
+>  		return ret;
+> -	}
+>  
+>  	/* Make sure sensor is in known good state for measurements */
+>  	regmap_write(map, TEMPSENSE0 + REG_CLR, TEMPSENSE0_POWER_DOWN);
+> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+> index c2256d7..3606167 100644
+> --- a/include/linux/nvmem-consumer.h
+> +++ b/include/linux/nvmem-consumer.h
+> @@ -140,6 +140,7 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>  				     const char *name);
+>  struct nvmem_device *of_nvmem_device_get(struct device_node *np,
+>  					 const char *name);
+> +struct nvmem_device *of_nvmem_device_phandle_get(struct device_node *nvmem_np);
+>  #else
+>  static inline struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>  				     const char *name)
+> @@ -152,6 +153,11 @@ static inline struct nvmem_device *of_nvmem_device_get(struct device_node *np,
+>  {
+>  	return ERR_PTR(-ENOSYS);
+>  }
+> +
+> +static inline struct nvmem_device *of_nvmem_device_phandle_get(struct device_node *nvmem_np)
+> +{
+> +	return ERR_PTR(-ENOSYS);
+> +}
+>  #endif /* CONFIG_NVMEM && CONFIG_OF */
+>  
+>  #endif  /* ifndef _LINUX_NVMEM_CONSUMER_H */
+> -- 
+> 2.7.4
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170704/07e7daea/attachment-0001.sig>
