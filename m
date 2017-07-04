@@ -1,72 +1,63 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 4 Jul 2017 13:51:57 +0200
-Subject: [PATCH v2 0/3] rtc: make st-lpc robust against y2038/2106 bug
-In-Reply-To: <cea926b2-5d84-18a9-9713-52d1495d550f@kernel.org>
-References: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
- <47b45b70-91da-ce41-535d-89d92f380274@kernel.org>
- <20170623220907.kxhkwkl6gt7bho5r@piout.net>
- <cea926b2-5d84-18a9-9713-52d1495d550f@kernel.org>
-Message-ID: <CA+M3ks7ybavMZHxJ_sx_H7S6jis+F2Ye0Zi8eE4okY-W-ysbZg@mail.gmail.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue,  4 Jul 2017 13:59:19 +0200
+Subject: [PATCH v2 1/9] clk: at91: clk-generated: remove useless divisor loop
+In-Reply-To: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
+References: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170704115927.32662-2-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-24 0:34 GMT+02:00 Shuah Khan <shuah@kernel.org>:
-> Hi Alexandre,
->
-> On 06/23/2017 04:09 PM, Alexandre Belloni wrote:
->> On 23/06/2017 at 13:40:41 -0600, Shuah Khan wrote:
->>> On 06/19/2017 03:36 AM, Benjamin Gaignard wrote:
->>>> On 32bits platforms "struct timeval" or "time_t" are using u32 to code the
->>>> date, this cause tools like "date" or "hwclock" failed even before setting
->>>> the RTC device if the date is superior to year 2038 (or 2106).
->>>>
->>>> To avoid this problem I add one RTC test file which directly use RTC ioctl
->>>> to set and read RTC time and alarm values.
->>>> rtctest_setdate allow to set any date/time given in the command line.
->>>>
->>>> On this version 2 I add check of problematics years in rtctest like suggest
->>>> by Alexandre.
->>>>
->>>> Finally that had allowed me to test and fix rtc-st-lpc driver.
->>>>
->>>> Benjamin Gaignard (3):
->>>>   tools: timer: add rtctest_setdate
->>>>   tool: timer: rtctest add check for problematic dates
->>>>   rtc: st-lpc: make it robust against y2038/2106 bug
->>>>
->>>>  drivers/rtc/rtc-st-lpc.c                         |  19 ++--
->>>>  tools/testing/selftests/timers/Makefile          |   2 +-
->>>>  tools/testing/selftests/timers/rtctest.c         | 121 ++++++++++++++++++++++-
->>>>  tools/testing/selftests/timers/rtctest_setdate.c |  86 ++++++++++++++++
->>>>  4 files changed, 212 insertions(+), 16 deletions(-)
->>>>  create mode 100644 tools/testing/selftests/timers/rtctest_setdate.c
->>>>
->>>
->>> Hi Thomas/John,
->>>
->>> I can take the first two patches in this series through linux-kselftest
->>> with your or John's Ack. Please review and let me know one way or the
->>> other.
->>>>
->> Well, I'm the maintainer for rtctest.c and I'll make sure to also be the
->> one for rtctest_setdate.c>
->>> The third one is a rtc driver patch. Please let me know how do you want
->>> to handle this series soon we can get this into 4.13-rc1.
->>>
->>
->> I'll take the three patches but I still have comment I didn't have time
->> to give yet.
+The driver requests the current clk rate of each of its parent clocks to
+decide whether a clock rate is suitable or not. It does not request
+determine_rate from a parent clock which could request a rate change in
+parent clock (i.e. there is no parent rate propagation).
 
-Alexandre, may you had time to give me feedback on this ?
+We know the rate we want (passed along req argument of the function) and
+the parent clock rate, thus we know the closest rounded divisor, we
+don't need to iterate over the available divisors to find the best one
+for a given clock.
 
-Regards,
-Benjamin
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/clk/at91/clk-generated.c | 25 ++++++++++++-------------
+ 1 file changed, 12 insertions(+), 13 deletions(-)
 
->>
->>
->
-> Okay. I will drop this off my radar then :)
->
-> thanks,
-> -- Shuah
->
+diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+index 07c8f701e51c..dab7002937e6 100644
+--- a/drivers/clk/at91/clk-generated.c
++++ b/drivers/clk/at91/clk-generated.c
+@@ -124,19 +124,18 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
+ 		    (gck->range.max && min_rate > gck->range.max))
+ 			continue;
+ 
+-		for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
+-			tmp_rate = DIV_ROUND_CLOSEST(parent_rate, div);
+-			tmp_diff = abs(req->rate - tmp_rate);
+-
+-			if (best_diff < 0 || best_diff > tmp_diff) {
+-				best_rate = tmp_rate;
+-				best_diff = tmp_diff;
+-				req->best_parent_rate = parent_rate;
+-				req->best_parent_hw = parent;
+-			}
+-
+-			if (!best_diff || tmp_rate < req->rate)
+-				break;
++		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
++		if (!div)
++			tmp_rate = parent_rate;
++		else
++			tmp_rate = parent_rate / div;
++		tmp_diff = abs(req->rate - tmp_rate);
++
++		if (best_diff < 0 || best_diff > tmp_diff) {
++			best_rate = tmp_rate;
++			best_diff = tmp_diff;
++			req->best_parent_rate = parent_rate;
++			req->best_parent_hw = parent;
+ 		}
+ 
+ 		if (!best_diff)
+-- 
+2.11.0
