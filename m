@@ -1,46 +1,44 @@
-From: yong.deng@magewell.com (Yong)
-Date: Tue, 4 Jul 2017 15:25:45 +0800
-Subject: [PATCH RFC 1/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20170703112521.ca253erguut5v7se@flea>
-References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
- <1498561654-14658-2-git-send-email-yong.deng@magewell.com>
- <667c858b-2655-88c5-6bbc-9d70d06c1ff1@xs4all.nl>
- <20170703185952.18a97e9b7b05cbe321cb1268@magewell.com>
- <20170703112521.ca253erguut5v7se@flea>
-Message-ID: <20170704152545.4a70f04db2c984d4d54bf9dd@magewell.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 4 Jul 2017 10:31:37 +0300
+Subject: Clocks used by another OS/CPU (was: Re: [RFC PATCH] clk:
+ renesas: cpg-mssr: Add interface for critical core clocks)
+In-Reply-To: <8d255a76-babe-312d-15b3-3474969f2410@arm.com>
+References: <CAMuHMdW9+CNTTOVO4SRRUxuz3ajLbY2j1uG8b_RpHX52NPwXrQ@mail.gmail.com>
+ <CAL_JsqKGrZeR7z80beY_XEjqd5fEQQwPxusJ1FADoALgNE3fEg@mail.gmail.com>
+ <20170630202453.eh6vaehkap3as4np@pengutronix.de>
+ <8d86a9aa-1928-6b52-1487-d5fb9dae17f4@gmail.com>
+ <20170701181408.yuocymwtj5dgt74d@pengutronix.de>
+ <8d255a76-babe-312d-15b3-3474969f2410@arm.com>
+Message-ID: <20170704073137.GG14819@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Jul 2017 13:25:21 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> Hi,
+On Mon, Jul 03, 2017 at 10:17:22AM +0100, Sudeep Holla wrote:
 > 
-> On Mon, Jul 03, 2017 at 06:59:52PM +0800, Yong wrote:
-> > > > +	select VIDEOBUF2_DMA_CONTIG
-> > > > +	select REGMAP_MMIO
-> > > > +	---help---
-> > > > +	   Support for the Allwinner Camera Sensor Interface Controller.
-> > > 
-> > > This controller is the same for all Allwinner SoC models?
+> 
+> On 01/07/17 19:14, Uwe Kleine-K?nig wrote:
+> > Hello,
 > > 
-> > No.
-> > I will change the Kconfig and Makefile.
+> > On Sat, Jul 01, 2017 at 07:02:48AM +0200, Dirk Behme wrote:
 > 
-> This is basically a design that has been introduced in the A31 (sun6i
-> family). I guess we should just call the driver and Kconfig symbols
-> sun6i_csi (even though we don't support it yet). It also used on the
-> A23, A33, A80, A83T, H3, and probably the H5 and A64.
+> [...]
 > 
-> Maxime
+> >>
+> >>
+> >> The other problem is security related. If, at all, you have to do it the
+> >> other way around, then:
+> >>
+> >> Make Linux a consumer of the other CPU's (trusted/trustzone/whatever
+> >> secured) OS clock driver.
 > 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Yes, that's better and is getting common on newer platforms. They have
+> separate M-class(or even low A-class e.g. A5/A7) processors to handle
+> all the system management.
+> 
+> The new ARM SCMI specification[0][1] is designed to standardize the
+> interface. It covers the clocks in clock protocol.
+> 
 
-Thanks for the advice. That's good.
-My purpose is to make the code reusable. People working on other
-Allwinner SoC could easily make their CSI working by just filling the
-SoC specific code. But I'm not familiar with other Allwinner SoCs 
-except V3s. I hope to get more advice.
+Yes, however this doesn't exist on older SoCs which still have multiple CPU's
+
+Peter.
