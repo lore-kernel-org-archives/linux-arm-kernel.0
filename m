@@ -1,114 +1,59 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Tue, 04 Jul 2017 09:51:38 +0900
-Subject: [PATCH v2 2/2] thermal: uniphier: add UniPhier thermal driver
-In-Reply-To: <20170701031630.GA11743@localhost.localdomain>
-References: <1498644719-25611-3-git-send-email-hayashi.kunihiko@socionext.com>
- <20170701031630.GA11743@localhost.localdomain>
-Message-ID: <20170704095138.62E8.4A936039@socionext.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue, 4 Jul 2017 10:03:08 +0800
+Subject: [PATCH v11 0/3]add PCIe driver for Kirin PCIe
+In-Reply-To: <595A4768.20404@hisilicon.com>
+References: <20170619102349.50652-1-songxiaowei@hisilicon.com>
+ <20170702233657.GA13507@bhelgaas-glaptop.roam.corp.google.com>
+ <20170703104727.GB1573@arm.com>
+ <CAFGCpxx+92PSs1VaryFOXau7CjBYEP4H6wT-o=bNMwkSznjQuw@mail.gmail.com>
+ <595A4768.20404@hisilicon.com>
+Message-ID: <CAFGCpxy-Rn4aeRs6GwGu7kaXvk5ftQxSpho8D2kQ4OG5MgCA8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
-Thank you for your comment.
+On Mon, Jul 3, 2017 at 9:32 PM, Wei Xu <xuwei5@hisilicon.com> wrote:
+> Hi Guodong,
+>
+> On 2017/7/3 14:04, Guodong Xu wrote:
+>> Hi, Xu Wei
+>>
+>>
+>>
+>> On Mon, Jul 3, 2017 at 6:47 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Sun, Jul 02, 2017 at 06:36:57PM -0500, Bjorn Helgaas wrote:
+>>>> [+cc Catalin, Will, linux-arm-kernel]
+>>>>
+>>>> Applied patches 2 & 3 to pci/host-kirin for v4.13.
+>>>>
+>>>> I would like a MAINTAINERS update, too.  If you send me that, I'll
+>>>> squash it into the driver patch.
+>>>>
+>>>> Catalin, Will, how do you want to handle the
+>>>> arch/arm64/configs/defconfig change (patch 3)?  It's currently on my
+>>>> branch, but I'm happy to drop it if another route is better.
+>>>
+>>> defconfig updates usually go through arm-soc, via the relevant platform
+>>> maintainer, so it would be best to follow that route here too otherwise
+>>> you'll probably see conflicts in -next.
+>>>
+>>
+>> Is it ok for you to pick up the arch/arm64/configs/defconfig change (patch 3)?
+>
+> Since it is already 4.12-rc7, I will pick up it and queue for the v4.14.
+> Are you fine about that?
+> Thanks!
 
-On Fri, 30 Jun 2017 20:16:33 -0700 <edubezval@gmail.com> wrote:
+Sure.
 
-> Hey,
-> 
-> On Wed, Jun 28, 2017 at 07:11:59PM +0900, Kunihiko Hayashi wrote:
-> > Add a thermal driver for on-chip PVT (Process, Voltage and Temperature)
-> > monitoring unit implemented on UniPhier SoCs. This driver supports
-> > temperature monitoring and alert function.
-> > 
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > ---
-> >  drivers/thermal/Kconfig            |   8 +
-> >  drivers/thermal/Makefile           |   1 +
-> >  drivers/thermal/uniphier_thermal.c | 391 +++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 400 insertions(+)
-> >  create mode 100644 drivers/thermal/uniphier_thermal.c
-
-(snip)
-
-> > +static void uniphier_tm_enable_sensor(struct uniphier_tm_dev *tdev)
-> > +{
-> > +	struct regmap *map = tdev->regmap;
-> > +	int i;
-> > +	u32 bits = 0;
-> > +
-> > +	for (i = 0; i < ALERT_CH_NUM; i++)
-> > +		if (tdev->alert_en[i])
-> > +			bits |= PMALERTINTCTL_EN(i);
-> > +
-> > +	/* enable alert interrupt */
-> > +	regmap_write_bits(map, tdev->data->map_base + PMALERTINTCTL,
-> > +			  PMALERTINTCTL_MASK, bits);
-> > +
-> > +	/* start PVT */
-> > +	regmap_write_bits(map, tdev->data->block_base + PVTCTLEN,
-> > +			  PVTCTLEN_EN, PVTCTLEN_EN);
-> 
-> Do we need to wait some time after starting PVT and before reading the
-> first temperature?
-
-Thanks for your pointing out.
-
-According to the spec sheet, we can read first temperature
-with waiting 700us after starting PVT. And after disabling PVT,
-we must wait 1ms until next access.
-
-I'll add "nsleep" after accessing PVTCTLEN in
-uniphier_tm_{enable,disable}_sensor().
-
-> > +}
-> > +
-> > +static void uniphier_tm_disable_sensor(struct uniphier_tm_dev *tdev)
-> > +{
-> > +	struct regmap *map = tdev->regmap;
-> > +
-> > +	/* disable alert interrupt */
-> > +	regmap_write_bits(map, tdev->data->map_base + PMALERTINTCTL,
-> > +			  PMALERTINTCTL_MASK, 0);
-> > +
-> > +	/* stop PVT */
-> > +	regmap_write_bits(map, tdev->data->block_base + PVTCTLEN,
-> > +			  PVTCTLEN_EN, 0);
-> > +}
-> > +
-> > +static int uniphier_tm_get_temp(void *data, int *out_temp)
-> > +{
-> > +	struct uniphier_tm_dev *tdev = data;
-> > +	struct regmap *map = tdev->regmap;
-> > +	int ret;
-> > +	u32 temp;
-> > +
-> > +	ret = regmap_read(map, tdev->data->map_base + TMOD, &temp);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	/*
-> > +	 * Since MSB of TMOD_MASK in TMOD represents signed bit,
-> > +	 * if the register value is bigger than or equal to
-> > +	 * ((TMOD_MASK + 1) / 2), it represents a negative value
-> > +	 * of temperature.
-> > +	 */
-> > +	temp &= TMOD_MASK;
-> > +	if (temp >= ((TMOD_MASK + 1) / 2))
-> > +		*out_temp = (temp - (TMOD_MASK + 1)) * 1000;
-> 
-> But, why do you mask negative values? Are you considering them invalid?
-> should this be reported? Why simply silently transforming into positive?
-
-My explanation comment is insufficient.
-The whole TMOD register doesn't represent temperature value.
-
-TMOD[31:9] has always 0 as reserved bits.
-TMOD[8:0] has 2's complement value of temperature (Celsius)
-represented by 9bits.
-For example, when we read 0x1ff from the TMOD, it means -1.
-
-Then according to linux/bitops.h,
-it can be replaced with "*out_temp = sign_extend32(temp, 9)" simply.
-
-Best Regards,
-Kunihiko Hayashi
+>
+> Best Regards,
+> Wei
+>
+>>
+>> -Guodong
+>>
+>>> Will
+>>
+>> .
+>>
+>
