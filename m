@@ -1,50 +1,44 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 4 Jul 2017 20:30:05 +0100
-Subject: [PATCH] iio: adc: sun4i-gpadc-iio: fix unbalanced irq
- enable/disable
-In-Reply-To: <20170703211945.4vjnnjwl2lkcfr7u@flea>
-References: <20170703130926.32315-1-quentin.schulz@free-electrons.com>
- <20170703211945.4vjnnjwl2lkcfr7u@flea>
-Message-ID: <20170704203005.49d9887e@kernel.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 04 Jul 2017 21:37:48 +0200
+Subject: [PATCH v3 02/12] ALSA: ac97: add an ac97 bus
+In-Reply-To: <s5hpodhc28v.wl-tiwai@suse.de> (Takashi Iwai's message of "Mon,
+ 03 Jul 2017 11:13:04 +0200")
+References: <20170630194408.24978-1-robert.jarzmik@free.fr>
+ <20170630194408.24978-3-robert.jarzmik@free.fr>
+ <s5hpodhc28v.wl-tiwai@suse.de>
+Message-ID: <87bmp0t2lv.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Jul 2017 23:19:45 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Takashi Iwai <tiwai@suse.de> writes:
 
-> On Mon, Jul 03, 2017 at 03:09:26PM +0200, Quentin Schulz wrote:
-> > When initializing interrupts, the devm_request_any_context_irq will
-> > enable them right away. An atomic flag was set in sun4i_irq_init and read
-> > in the interrupt handler to make sure no unwanted interrupts were
-> > handled. If an unwanted interrupt occurred, the handler would disable
-> > the irq and return IRQ_HANDLED. However, at the end of sun4i_irq_init,
-> > the irq would be disabled as well, resulting in an unbalanced enable
-> > (since there are more disables than enables, the code enabling the
-> > interrupt would never be called).
-> > 
-> > When reading the ADC or the temperature, the respective irq would be
-> > enabled in the read function and disabled in the irq handler. In the
-> > read function, we would wait for a completion (with a timeout) that will
-> > be set in the irq handler. However, if the completion is never set or if
-> > the wait for completion times out, the irq would not be disabled in the
-> > read function resulting in an unbalanced enable once the read function
-> > is called again (since there are 2+ enables for no disable).
-> > 
-> > Moving disable_irq from the irq handler to the read function get rid of
-> > these two cases of unbalanced enable.
-> > 
-> > Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
-> > 
-> > Reported-by: Andreas F?rber <afaerber@suse.de>
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>  
-> 
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Nice detailed explanation - thanks.
+> On Fri, 30 Jun 2017 21:43:58 +0200,
+> Robert Jarzmik wrote:
+>> +static struct bus_type ac97_bus_type = {
+>> +	.name		= "ac97",
+>
+> Name-conflict with the old ac97 bus?
+Yeah, fair point. So what should I choose for this new one ?
+ - ac97new
+ - ac97bis
+ - ac97_2
+ - ac97reborn
 
-Applied to the fixes-togreg branch of iio.git.
+>> +static int __init ac97_bus_init(void)
+>> +{
+>> +	return bus_register(&ac97_bus_type);
+>> +}
+>> +subsys_initcall(ac97_bus_init);
+>> +
+>> +MODULE_LICENSE("GPL");
+>> +MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
+>
+> No bus_unregister() at exit?
+Mmmh, that's because I used subsys_initcall(), which doesn't look good in a
+module compilation setup. That will require a module_init(), and I will think
+about how to implement it and test it for next iteration.
 
-Jonathan
-> 
-> Thanks!
-> Maxime
-> 
+Cheers.
+
+-- 
+Robert
