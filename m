@@ -1,91 +1,92 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 4 Jul 2017 20:20:45 +0200
-Subject: [PATCH 1/2] ARM: shmobile: Add CA7 arch_timer initialization for
- secondary CPUs
-In-Reply-To: <2f7ef764-c511-9598-c136-13966f810c95@arm.com>
-References: <1499187733-1430-1-git-send-email-geert+renesas@glider.be>
- <1499187733-1430-2-git-send-email-geert+renesas@glider.be>
- <2f7ef764-c511-9598-c136-13966f810c95@arm.com>
-Message-ID: <CAMuHMdXFAZ2Gvgk7oJhkQo7ygCKE_MPqtypccwqj9NTW30q57A@mail.gmail.com>
+Date: Tue, 4 Jul 2017 20:29:38 +0200
+Subject: Architecture Timer on R-Car Gen2
+Message-ID: <CAMuHMdWaQLDoOLYjPNkwXNcam-UCCngyaY3D2yZctJrfGg27Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+        Hi Magnus, Mar[ck], Simon,
 
-On Tue, Jul 4, 2017 at 7:32 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 04/07/17 18:02, Geert Uytterhoeven wrote:
->> On Cortex-A7, the arch timer CNTVOFF register is uninitialized.
->> Hence when enabling SMP on r8a7794, the kernel log is spammed with:
->>
->>     WARNING: Underflow in clocksource 'arch_sys_counter' observed, time update ignored.
->>            Please report this, consider using a different clocksource, if possible.
->>            Your kernel is probably still fine.
->>
->> To fix this, wrap the standard secondary_startup routine inside a
->> routine which initializes CNTVOFF when running on a Cortex-A7.
->> As the only possibilities are Cortex-A7 or Cortex-A15, checking the low
->> nibble of the Primary Part Number is sufficient.
->>
->> The initialization is identical to what is already done for the boot CPU
->> since commit 9ce3fa6816c2fb59 ("ARM: shmobile: rcar-gen2: Add CA7
->> arch_timer initialization for r8a7794").
+We're (finally) getting close to the point where Renesas R-Car Gen2
+platform code no longer relies on hardcoded addresses.
+
+The remaining parts are related to the ARM Architecture Timer / Generic
+Timer / Generic Counter.  More specifically the code in
+rcar_gen2_timer_init() in arch/arm/mach-shmobile/setup-rcar-gen2.c,
+quoted below.  According to historical information, the issues being
+solved here are (1) non-running timers, and (2) wrong frequencies,
+leading to (m)sleep() not sleeping for the expected period.
+But it's far from clear to me what's really going on...
+
+>   void __iomem *base;
+>   u32 freq;
 >
-> Humfff... Pretty horrible. Comments below.
-
-I know.  I suppose this should be done by the firmware/boot loader?
-But we have to live with firmware/boot loaders in the wild...
-
->> --- /dev/null
->> +++ b/arch/arm/mach-shmobile/headsmp-apmu.S
->> @@ -0,0 +1,38 @@
->> +/*
->> + * SMP support for APMU based systems
->> + *
->> + * Copyright (C) 2014  Renesas Electronics Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/linkage.h>
->> +
->> +ENTRY(shmobile_boot_apmu)
->> +     mrc     p15, 0, r0, c0, c0, 0           /* Get Main ID */
->> +     ubfx    r1, r0, #4, #4                  /* r1=Lo 4bit of Primary Part */
->> +     cmp     r1, #0x7                        /* 0x7 = CA7, 0xf = CA15 */
->> +     bne     1f
+>   /*
+>    * Determine frequency.  Depending on SoC-type, it's either
+>    *   - Crystal / 2 => (usually) 10 MHz (calculated from extal in DT)
+>    *   - ZS clock / 8 => (always) 32.5 MHz (hardcoded)
+>    */
+>   freq = ...
 >
-> Why don't you deal with the A15 parts as well? And TBH, you'd be better
-> off checking ID_PFR1 for both Generic Timers and Virtualization Extensions.
+>   /* Remap "armgcnt address map" space */
+>   base = ioremap(0xe6080000, PAGE_SIZE);
 
-Do we have to deal with the A15 parts here?
-We're not having issues with the A15 parts, so that's why I left it out.
+I believe this region corresponds to the Generic Counter, which is not
+the same, but related to the Architecture timer?
+It seems no DT bindings exist for the Generic Counter?
 
-I'm trying to understand what's different between A15 and A7, and why A7
-needs this code, while A15 apparently doesn't.
-I'm not seeing any obvious differences in the U-Boot sources handling
-e.g. r8a7791/koelsch (dual A15) vs. r8a7794/alt (dual A7).
+(for a moment I thought this might correspond to "arm,armv7-timer-mem", but
+ I no longer believe that's true)
 
-> off checking ID_PFR1 for both Generic Timers and Virtualization Extensions.
-
-Thank, I'll have a look at that...
-
->> +     /*
->> +      * CA7 setup
->> +      * CNTVOFF has to be initialized either from non-secure Hypervisor
->> +      * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
->> +      * then it should be handled by the secure code
->> +      */
->> +     cps     0x16
+>   /*
+>    * Update the timer if it is either not running, or is not at the
+>    * right frequency. The timer is only configurable in secure mode
+>    * so this avoids an abort if the loader started the timer and
+>    * entered the kernel in non-secure mode.
+>    */
 >
-> It'd be worth adding a MONITOR_MODE macro instead of this raw value.
+>   if ((ioread32(base + CNTCR) & 1) == 0 ||
+>       ioread32(base + CNTFID0) != freq) {
 
->> +     cps     0x13
+On all SoC/board combos I checked (r8a7790/lager, r8a7791/koelsch,
+r8a7791/porter, r8a7792/blanche, r8a7793/gose, r8a7794/alt), both
+conditions are true, i.e.
+  - The timer (counter?) is not running,
+  - The configured frequency is 13 MHz, which is wrong.
+
+>           /* Update registers with correct frequency */
+>           iowrite32(freq, base + CNTFID0);
+
+This doesn't seem to be needed?
+With or without, both msleep() (kernel) and sleep() (userspace) sleep
+for the expected amount of time.
+
+>           asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+
+This is an open-coded implementation of arch_timer_set_cntfrq(), which
+is not provided by arch/arm/include/asm/arch_timer.h (should it?).
+Without this, the arch_timer driver complains:
+
+    arch_timer: frequency not available
+
+leading to failures (e.g. division by zero) later.
+
+However, adding the proper "clock-frequency" property to the
+"arm,armv7-timer" device node in DT fixes that.
+Probably adding this property is a better way to work around broken(?)
+firmware not setting CNTFRQ, than checking the SoC type and using
+hardcoded values in platform code?
+
+>           /* make sure arch timer is started by setting bit 0 of CNTCR */
+>           iowrite32(1, base + CNTCR);
+
+This is definitely needed.  Else the timer doesn't run.
+
+>   }
 >
-> and use SVC_MODE here.
+>   iounmap(base);
 
-Thanks, I'll have a look at those, too.
+Thanks for your time!
 
 Gr{oetje,eeting}s,
 
