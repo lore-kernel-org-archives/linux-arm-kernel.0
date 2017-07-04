@@ -1,73 +1,136 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 4 Jul 2017 14:27:39 +0000
-Subject: [PATCH V3 2/2] timer: imx-tpm: add imx tpm timer support
-In-Reply-To: <alpine.DEB.2.20.1707041603571.9000@nanos>
-References: <1499176823-4421-1-git-send-email-aisheng.dong@nxp.com>
- <1499176823-4421-3-git-send-email-aisheng.dong@nxp.com>
- <alpine.DEB.2.20.1707041603571.9000@nanos>
-Message-ID: <AM3PR04MB3061653B4CF496CD1A4FAE280D70@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 4 Jul 2017 16:27:58 +0200
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <c80ce48f-5a7d-48d2-fd60-0d87eb0fcc0a@free.fr>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
+ <e57debab-3457-1d9c-a72e-ecdf7d4f742e@sigmadesigns.com>
+ <baf9866b-04ba-698c-3012-a957ec0123d1@sigmadesigns.com>
+ <20170704070958.oolhapyx7uy2fly4@hirez.programming.kicks-ass.net>
+ <c80ce48f-5a7d-48d2-fd60-0d87eb0fcc0a@free.fr>
+Message-ID: <20170704142758.GB7287@worktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: Tuesday, July 04, 2017 10:10 PM
-> To: A.s. Dong
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> daniel.lezcano at linaro.org; shawnguo at kernel.org; Jacky Bai; Anson Huang;
-> dongas86 at gmail.com; kernel at pengutronix.de; Arnd Bergmann; Anson Huang
-> Subject: Re: [PATCH V3 2/2] timer: imx-tpm: add imx tpm timer support
+On Tue, Jul 04, 2017 at 03:08:43PM +0200, Mason wrote:
+> On 04/07/2017 09:09, Peter Zijlstra wrote:
 > 
-> On Tue, 4 Jul 2017, Dong Aisheng wrote:
+> > On Mon, Jul 03, 2017 at 05:30:28PM +0200, Marc Gonzalez wrote:
+> > 
+> >> And at the end of smp8759_config_read:
+> >>
+> >> 	printk("in_atomic_preempt_off = %d\n", in_atomic_preempt_off());
+> > 
+> > That's confused...
 > 
-> > IMX Timer/PWM Module (TPM) supports both timer and pwm function while
-> > this patch only adds the timer support. PWM would be added later.
-> >
-> > The TPM counter, compare and capture registers are clocked by an
-> > asynchronous clock that can remain enabled in low power modes.
-> >
-> > Due to the possible bus fabric contention, the CNT write may take a
-> > few more cycles and we need add ETIME check in case current delta
-> > event program gets missed.
-> >
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Anson Huang <Anson.Huang@nxp.com>
-> > Cc: Bai Ping <ping.bai@nxp.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> >
-> > ---
-> > ChangeLog:
-> > v2->v3:
-> >  * address all comments from Daniel Lezcano
-> >  * add more explaination on ETIME check in commit message
+> That much is certain. I am indeed grasping at straws.
 > 
-> Actually the logic wants to be explained in a comment inside the function
-> as well.
+> I grepped "scheduling while atomic", found __schedule_bug()
+> in kernel/sched/core.c and saw
 > 
+> 	if (IS_ENABLED(CONFIG_DEBUG_PREEMPT) && in_atomic_preempt_off()) {
+> 		pr_err("Preemption disabled at:");
+> 		print_ip_sym(preempt_disable_ip);
+> 		pr_cont("\n");
+> 	}
+> 
+> I thought printing the value of in_atomic_preempt_off()
+> in the callback would indicate whether preemption had
+> already been turned off at that point.
 
-Good suggestion, will add them inside function as well.
+in_atomic_preempt_off() is a 'weird' construct. It basically checks to
+see if preempt_count != 1. So calling it while holding a single preempt,
+will return false (like in your case).
 
-> I'm really impressed, that 10 years after we discovered the HPET disaster
-> (See comment in arch/x86/kernel/hpet.c::hpet_next_event) the same
-> hardware idiocy comes around again....
+> It doesn't work like that?
+
+Not really, you want to just print preempt_count.
+
+> BTW, why didn't print_ip_sym(preempt_disable_ip); say
+> where preemption had been disabled?
+
+It does, but it might be non-obvious. We only store the first 0->!0
+transition IP in there.
+
+So if you have chains like:
+
+	preempt_disable();		// 0 -> 1
+	spin_lock();			// 1 -> 2
+	preempt_enable();		// 2 -> 1
+	preempt_disable();		// 1 -> 2
+	spin_unlock();			// 2 -> 1
+
+	mutex_lock();
+	  might_sleep();		*SPLAT* report the IP of 0 -> 1
+
+	preempt_enable():		// 1 -> 0
+
+
+That IP might not even be part of the current callchain.
+
+> >> [    1.026568] BUG: scheduling while atomic: swapper/0/1/0x00000002
+> >> [    1.032625] 5 locks held by swapper/0/1:
+> >> [    1.036575]  #0:  (&dev->mutex){......}, at: [<c038c684>] __driver_attach+0x50/0xd0
+> >> [    1.044319]  #1:  (&dev->mutex){......}, at: [<c038c694>] __driver_attach+0x60/0xd0
+> >> [    1.052050]  #2:  (pci_lock){+.+...}, at: [<c03309d8>] pci_bus_read_config_dword+0x44/0x94
+> > 
+> > This is a raw_spinlock_t, that disables preemption
 > 
-
-Not quite sure but seems a bit different issue.
-The issue is still uncertain but the test shows it's related to fabric priority
-Configuration, if increase the A7 core priority higher than GPU, the issue
-is very hard to be seen. But we don't want to change the default priority,
-we use ETIME check to fix it.
-
-Probably I would be better add a FIXME prefix before the comments in code
-as well because it's still uncertain.
-
-Regards
-Dong Aisheng
-
-> Thanks,
+> drivers/pci/access.c
 > 
-> 	tglx
+> /*
+>  * This interrupt-safe spinlock protects all accesses to PCI
+>  * configuration space.
+>  */
+> DEFINE_RAW_SPINLOCK(pci_lock);
 > 
+> 
+> 	raw_spin_lock_irqsave(&pci_lock, flags);
+> 	res = bus->ops->read(bus, devfn, pos, len, &data);
+> 
+> 
+> IIUC, it's not possible to call stop_machine() while holding
+> a raw spinlock?
+
+Correct. You cannot call blocking primitives while holding a spinlock.
+
+> What about regular spinlocks? IIUC, in RT,
+> regular spinlocks may sleep?
+
+Still not, your code should not depend on CONFIG_PREEMPT*.
+
+> I didn't find "preempt" or "schedul" in the spinlock doc.
+> https://www.kernel.org/doc/Documentation/locking/spinlocks.txt
+
+Correct... as per usual the documentation is somewhat terse.
+
+But once you think about it, its 'obvious' a spinlock needs to disable
+preemption. If you don't you get into heaps of trouble (one of the
+reasons userspace spinlocks are an absolute trainwreck).
+
+> > Using stop_machine() is per definition doing it wrong ;-)
+> 
+> Here's the high-level view. My HW is borked and muxes
+> config space and mem space. So I need a way to freeze
+> the entire system, make the config space access, and
+> then return the system to normal. (AFAICT, config space
+> accesses are rare, so if I kill performance for these
+> accesses, the system might remain usable.)
+> 
+> Is there a way to do this? Mark suggested stop_machine
+> but it seems using it in my situation is not quite
+> straight-forward.
+
+*groan*... so yeah, broken hardware demands crazy stuff... stop machine
+is tricky here because I'm not sure we can demand all PCI accessors to
+allow sleeping.
+
+And given that PCI lock is irqsave, we can't even assume IRQs are
+enabled.
+
+Does your platform have NMIs? If so, you can do yuck things like the
+kgdb sync. NMI IPI all other CPUs and have them spin-wait on your state.
+
+Then be careful not to deadlock when two CPUs do that concurrently.
