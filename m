@@ -1,20 +1,79 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Tue, 4 Jul 2017 14:46:29 +0800
-Subject: [PATCH 3/5] pwm: rockchip: Move the configuration of polarity
- from rockchip_pwm_set_enable() to rockchip_pwm_config()
-In-Reply-To: <20170703203640.697b8286@bbrezillon>
-References: <1498739271-27431-1-git-send-email-david.wu@rock-chips.com>
- <1498739271-27431-4-git-send-email-david.wu@rock-chips.com>
- <20170703203640.697b8286@bbrezillon>
-Message-ID: <681d6ce3-aae4-7d4f-2fec-e8af8f4f9436@rock-chips.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 4 Jul 2017 14:58:40 +0800
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <20170703132704.GF13824@bhelgaas-glaptop.roam.corp.google.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_zAXTNYoWt+nMj_8tdDA8bcs86vepPJL1=zHfed2n-DA@mail.gmail.com>
+ <20170703132704.GF13824@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170704145840.69e53f58@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Mon, 3 Jul 2017 08:27:04 -0500 wrote:
 
-? 2017/7/4 2:36, Boris Brezillon ??:
-> Hm, maybe it's time to drop these custom hooks and implement
-> pwm_apply_v1 and pwm_apply_v2 instead.
+> [+cc Jingoo, Joao]
+> 
+> On Mon, Jul 03, 2017 at 10:35:50AM +0100, Ard Biesheuvel wrote:
+> > On 3 July 2017 at 00:18, Bjorn Helgaas <helgaas@kernel.org> wrote:  
+> > > On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:  
+> > >> This driver is required to work around several hardware bugs
+> > >> in the PCIe controller.
+> > >>
+> > >> NB: Revision 1 does not support legacy interrupts, or IO space.  
+> > >
+> > > I had to apply these manually because of conflicts in Kconfig and
+> > > Makefile.  What are these based on?  Easiest for me is if you base
+> > > them on the current -rc1 tag.
+> > >  
+> > >> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> > >> ---
+> > >>  drivers/pci/host/Kconfig      |   8 +++
+> > >>  drivers/pci/host/Makefile     |   1 +
+> > >>  drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
+> > >>  include/linux/pci_ids.h       |   2 +
+> > >>  4 files changed, 175 insertions(+)
+> > >>  create mode 100644 drivers/pci/host/pcie-tango.c
+> > >>  
+> > [..]  
+> > >> +     /*
+> > >> +      * QUIRK #2
+> > >> +      * Unfortunately, config and mem spaces are muxed.
+> > >> +      * Linux does not support such a setting, since drivers are free
+> > >> +      * to access mem space directly, at any time.
+> > >> +      * Therefore, we can only PRAY that config and mem space accesses
+> > >> +      * NEVER occur concurrently.
+> > >> +      */
+> > >> +     writel_relaxed(1, pcie->mux);
+> > >> +     ret = pci_generic_config_read(bus, devfn, where, size, val);
+> > >> +     writel_relaxed(0, pcie->mux);  
+> > >
+> > > I'm very hesitant about this.  When people stress this, we're going to
+> > > get reports of data corruption.  Even with the disclaimer below, I
+> > > don't feel good about this.  Adding the driver is an implicit claim
+> > > that we support the device, but we know it can't be made reliable.  
+> > 
+> > I noticed that the Synopsys driver suffers from a similar issue: in
+> > dw_pcie_rd_other_conf(), it happily reprograms the outbound I/O window
+> > to perform a config space access, and switches it back to I/O space
+> > afterwards (unless it has more than 2 viewports, in which case it uses
+> > dedicated windows for I/O space and config space)  
+> 
+> That doesn't sound good.  Jingoo, Joao?  I remember some discussion
+> about this, but not the details.
+> 
+> I/O accesses use wrappers (inb(), etc), so there's at least the
+> possibility of a mutex to serialize them with respect to config
+> accesses.
+> 
 
-Okay, drop the enable and config hooks, only use the apply hook to 
-instead them.
+IIRC, for 2 viewports, we don't need to worry about the config space
+access, because config space access is serialized by pci_lock; We
+do have race between config space and io space. But the accessing config
+space and io space at the same time is rare. And the PCIe EPs which
+has io space are rare too, supporting these EPs are not the potential
+target of those platforms with 2 viewports.
+
+Thanks,
+Jisheng
