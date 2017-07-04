@@ -1,30 +1,30 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 04 Jul 2017 19:10:08 +0900
-Subject: [PATCH v1 0/4] media: rc: add support for IR receiver on MT7622
- SoC
-In-Reply-To: <cover.1498794408.git.sean.wang@mediatek.com>
-References: <CGME20170630060312epcas4p351a77795e8469640d5177039f6b1955d@epcas4p3.samsung.com>
- <cover.1498794408.git.sean.wang@mediatek.com>
-Message-ID: <20170704101008.pgnjacbsk3twadzo@gangnam.samsung>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 4 Jul 2017 11:12:27 +0100
+Subject: [PATCH 0/3] irqchip: Miscellaneous fixes for GIC/GICv3
+In-Reply-To: <1499162195-5126-1-git-send-email-suzuki.poulose@arm.com>
+References: <1499162195-5126-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <a3f2e4f2-bea1-5abc-ae17-3fa4822acd2e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
-
-> This patchset introduces Consumer IR (CIR) support for MT7622 SoC
-> implements raw mode for more compatibility with different protocols
-> as previously SoC did. Before adding support to MT7622 SoC, extra
-> code refactor is done since there're major differences in register and
-> field definition from the previous SoC.
+On 04/07/17 10:56, Suzuki K Poulose wrote:
+> This series contains some fixes for GIC/GIC-v3 to behave as expected
+> by the generic management layer.
 > 
-> Sean Wang (4):
->   dt-bindings: media: mtk-cir: Add support for MT7622 SoC
->   media: rc: mtk-cir: add platform data to adapt into various hardware
->   media: rc: mtk-cir: add support for MediaTek MT7622 SoC
->   MAINTAINERS: add entry for MediaTek CIR driver
+> Suzuki K Poulose (3):
+>   irqchip: gic-v3: Report failures in gic_irq_domain_alloc
+>   irqchip: gic-v2: Report failures in gic_irq_domain_alloc
+>   irq: gic-v3: Honor forced affinity setting
+> 
+>  drivers/irqchip/irq-gic-v3.c | 14 +++++++++++---
+>  drivers/irqchip/irq-gic.c    |  7 +++++--
+>  2 files changed, 16 insertions(+), 5 deletions(-)
+> 
 
-for the whole patchset:
+All 3 patches queued for post -rc1.
 
-Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+Thanks,
 
-Andi
+	M.
+-- 
+Jazz is not dead. It just smells funny...
