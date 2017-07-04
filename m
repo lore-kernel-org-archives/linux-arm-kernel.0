@@ -1,113 +1,119 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Tue, 4 Jul 2017 17:37:19 +0800
-Subject: [PATCH 1/6] ARM: dts: rockchip: add regulator nodes for rk3229-evb
-In-Reply-To: <8062361.VWy3dYvDhe@diego>
-References: <1499155967-26090-1-git-send-email-frank.wang@rock-chips.com>
- <1499155967-26090-2-git-send-email-frank.wang@rock-chips.com>
- <8062361.VWy3dYvDhe@diego>
-Message-ID: <49a73ff1-ec3b-846a-9b6c-1e7edb85a275@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 4 Jul 2017 10:38:30 +0100
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <20170704161913.4935b16a@xhacker>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_zAXTNYoWt+nMj_8tdDA8bcs86vepPJL1=zHfed2n-DA@mail.gmail.com>
+ <20170703132704.GF13824@bhelgaas-glaptop.roam.corp.google.com>
+ <20170704145840.69e53f58@xhacker>
+ <CAKv+Gu9gi1W2Ex1hchMdob9PqkQ94uYspQW31W2+RG_sgsEV4Q@mail.gmail.com>
+ <20170704161913.4935b16a@xhacker>
+Message-ID: <CAKv+Gu9ASLzBpJNN2eddw4K=g6+be8amH_7ZdZ0Qj+s_p+EuRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 2017/7/4 16:34, Heiko St?bner wrote:
-> Hi Frank,
+On 4 July 2017 at 09:19, Jisheng Zhang <jszhang@marvell.com> wrote:
+> On Tue, 4 Jul 2017 09:02:06 +0100 Ard Biesheuvel wrote:
 >
-> Am Dienstag, 4. Juli 2017, 16:12:42 CEST schrieb Frank Wang:
->> This patch adds vcc_io, vdd_arm and vdd_log regulator nodes
->> for rk3229-evb board.
+>> On 4 July 2017 at 07:58, Jisheng Zhang <jszhang@marvell.com> wrote:
+>> > On Mon, 3 Jul 2017 08:27:04 -0500 wrote:
+>> >
+>> >> [+cc Jingoo, Joao]
+>> >>
+>> >> On Mon, Jul 03, 2017 at 10:35:50AM +0100, Ard Biesheuvel wrote:
+>> >> > On 3 July 2017 at 00:18, Bjorn Helgaas <helgaas@kernel.org> wrote:
+>> >> > > On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:
+>> >> > >> This driver is required to work around several hardware bugs
+>> >> > >> in the PCIe controller.
+>> >> > >>
+>> >> > >> NB: Revision 1 does not support legacy interrupts, or IO space.
+>> >> > >
+>> >> > > I had to apply these manually because of conflicts in Kconfig and
+>> >> > > Makefile.  What are these based on?  Easiest for me is if you base
+>> >> > > them on the current -rc1 tag.
+>> >> > >
+>> >> > >> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> >> > >> ---
+>> >> > >>  drivers/pci/host/Kconfig      |   8 +++
+>> >> > >>  drivers/pci/host/Makefile     |   1 +
+>> >> > >>  drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
+>> >> > >>  include/linux/pci_ids.h       |   2 +
+>> >> > >>  4 files changed, 175 insertions(+)
+>> >> > >>  create mode 100644 drivers/pci/host/pcie-tango.c
+>> >> > >>
+>> >> > [..]
+>> >> > >> +     /*
+>> >> > >> +      * QUIRK #2
+>> >> > >> +      * Unfortunately, config and mem spaces are muxed.
+>> >> > >> +      * Linux does not support such a setting, since drivers are free
+>> >> > >> +      * to access mem space directly, at any time.
+>> >> > >> +      * Therefore, we can only PRAY that config and mem space accesses
+>> >> > >> +      * NEVER occur concurrently.
+>> >> > >> +      */
+>> >> > >> +     writel_relaxed(1, pcie->mux);
+>> >> > >> +     ret = pci_generic_config_read(bus, devfn, where, size, val);
+>> >> > >> +     writel_relaxed(0, pcie->mux);
+>> >> > >
+>> >> > > I'm very hesitant about this.  When people stress this, we're going to
+>> >> > > get reports of data corruption.  Even with the disclaimer below, I
+>> >> > > don't feel good about this.  Adding the driver is an implicit claim
+>> >> > > that we support the device, but we know it can't be made reliable.
+>> >> >
+>> >> > I noticed that the Synopsys driver suffers from a similar issue: in
+>> >> > dw_pcie_rd_other_conf(), it happily reprograms the outbound I/O window
+>> >> > to perform a config space access, and switches it back to I/O space
+>> >> > afterwards (unless it has more than 2 viewports, in which case it uses
+>> >> > dedicated windows for I/O space and config space)
+>> >>
+>> >> That doesn't sound good.  Jingoo, Joao?  I remember some discussion
+>> >> about this, but not the details.
+>> >>
+>> >> I/O accesses use wrappers (inb(), etc), so there's at least the
+>> >> possibility of a mutex to serialize them with respect to config
+>> >> accesses.
+>> >>
+>> >
+>> > IIRC, for 2 viewports, we don't need to worry about the config space
+>> > access, because config space access is serialized by pci_lock; We
+>> > do have race between config space and io space. But the accessing config
+>> > space and io space at the same time is rare.
 >>
->> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
->> ---
->>   arch/arm/boot/dts/rk3229-evb.dts | 54
->> ++++++++++++++++++++++++++++++++++++++++ 1 file changed, 54 insertions(+)
+>> Being 'rare' is not sufficient, unfortunately. In the current
+>> situation, I/O space accesses may occur when the outbound window is
+>> directed to the config space of a potentially completely unrelated
+>> device. This is bad.
+>
+> Yep, I agree with you.
+>
 >>
->> diff --git a/arch/arm/boot/dts/rk3229-evb.dts
->> b/arch/arm/boot/dts/rk3229-evb.dts index 82e8a53..8b10c64 100644
->> --- a/arch/arm/boot/dts/rk3229-evb.dts
->> +++ b/arch/arm/boot/dts/rk3229-evb.dts
->> @@ -78,6 +78,52 @@
->>   		regulator-always-on;
->>   		regulator-boot-on;
->>   	};
->> +
->> +	vdd_arm: vdd-arm-regulator {
->> +		compatible = "pwm-regulator";
->> +		rockchip,pwm_id = <1>;
->> +		rockchip,pwm_voltage = <1100000>;
-> This doesn't look like a part of the mainline pwm-regulator binding
-> (both rockchip,* properties)
+>> > And the PCIe EPs which
+>> > has io space are rare too, supporting these EPs are not the potential
+>> > target of those platforms with 2 viewports.
+>> >
+>>
+>> I am not sure EP mode is relevant here. What I do know is that boards
 >
->> +		pwms = <&pwm1 0 25000 1>;
->> +		regulator-name = "vdd_arm";
->> +		regulator-min-microvolt = <950000>;
->> +		regulator-max-microvolt = <1400000>;
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +	};
-> please also add supplies for regulators. Information on supplies
-> should be easily extractable from the board schematics.
+> I mean those PCIe EP cards which have IO space, but that doesn't matter.
 >
-> This not only results in a nice tree in debugfs (regulator/regulator_summary)
-> but also makes sure supplying regulators are not accidentially turned off.
-> (pwm-supply for pwm-regulators, vin-supply for fixed regulators)
->
->
->> +
->> +	vdd_log: vdd-log-regulator {
->> +		compatible = "pwm-regulator";
->> +		rockchip,pwm_id = <2>;
->> +		rockchip,pwm_voltage = <1200000>;
->> +		pwms = <&pwm2 0 25000 1>;
->> +		regulator-name = "vdd_log";
->> +		regulator-min-microvolt = <1000000>;
->> +		regulator-max-microvolt = <1300000>;
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +	};
->> +
->> +	regulators {
->> +		compatible = "simple-bus";
-> don't create a subnode/bus for regulators. Just add them
-> regularly. Take a look at all the other boards (like rk3399-firefly,
-> gru, veyron) for reference.
->
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		vccio_1v8_reg: regulator at 0 {
-> Same here, no regulator at 0 please, just name this one
-> 	vccio_1v8: vccio-1v8-regulator {
->
-> (removed _reg from phandle and changed node name)
->
->> +			compatible = "regulator-fixed";
->> +			regulator-name = "vccio_1v8";
->> +			regulator-min-microvolt = <1800000>;
->> +			regulator-max-microvolt = <1800000>;
->> +			regulator-always-on;
->> +		};
->> +
->> +		vccio_3v3_reg: regulator at 1 {
->> +			compatible = "regulator-fixed";
->> +			regulator-name = "vccio_3v3";
->> +			regulator-min-microvolt = <3300000>;
->> +			regulator-max-microvolt = <3300000>;
->> +			regulator-always-on;
->> +		};
->> +	};
->>   };
 
-Thanks and noted your comments above. I will fix them (also include 
-another comment about eMMC in PATCH 4/6 ) and resend these series soon.
+Ah, ok. But if such EP cards are so rare, why expose I/O space at all
+if we cannot do it safely?
 
+>> like the Marvell 8040 based MacchiatoBin uses this IP in RC mode, and
+>> exposes config, MMIO and IO space windows using only 2 viewports. Note
+>> that this is essentially a bug in the DT description, given that its
+>> version of the IP supports 8 viewports. But the driver needs to be
+>> fixed as well.
+>
+> To fix for 2 viewports situation, we need to serialize access of the io
+> and config space. In internal repo, we can achieve it by modifying the
+> io access helper functions such as inl/outl, but this won't be accepted
+> by the mainline IMHO. Except fixing the HW, any elegant solution?
+>
+> Suggestions are appreciated.
+>
 
-BR.
-Frank
-
->
-> Thanks
-> Heiko
->
->
+I think the safe and upstreamable approach is to disable the I/O
+window completely if num-viewports <= 2.
