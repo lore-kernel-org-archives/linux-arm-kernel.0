@@ -1,76 +1,99 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Jul 2017 19:17:37 +0100
-Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <20170704151502.GH13824@bhelgaas-glaptop.roam.corp.google.com>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
- <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
- <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
- <20170703134031.GG13824@bhelgaas-glaptop.roam.corp.google.com>
- <20170703181128.GD4902@n2100.armlinux.org.uk>
- <20170704151502.GH13824@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170704181737.GF4902@n2100.armlinux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 4 Jul 2017 20:20:45 +0200
+Subject: [PATCH 1/2] ARM: shmobile: Add CA7 arch_timer initialization for
+ secondary CPUs
+In-Reply-To: <2f7ef764-c511-9598-c136-13966f810c95@arm.com>
+References: <1499187733-1430-1-git-send-email-geert+renesas@glider.be>
+ <1499187733-1430-2-git-send-email-geert+renesas@glider.be>
+ <2f7ef764-c511-9598-c136-13966f810c95@arm.com>
+Message-ID: <CAMuHMdXFAZ2Gvgk7oJhkQo7ygCKE_MPqtypccwqj9NTW30q57A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 10:15:02AM -0500, Bjorn Helgaas wrote:
-> On Mon, Jul 03, 2017 at 07:11:28PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jul 03, 2017 at 08:40:31AM -0500, Bjorn Helgaas wrote:
-> > > The problem is serializing vs. memory accesses, since they don't use
-> > > any wrappers.  However, they are ioremapped(), so it's at least
-> > > conceivable that another solution would be to use VM to trap those
-> > > accesses.  I'm not a VM person, so I don't know whether that's
-> > > feasible in Linux.
-> > 
-> > Bjorn,
-> > 
-> > You're forgetting that MMIO (iow, memory returned by ioremap()) must
-> > be accessed through the appropriate accessors, and must not be
-> > directly dereferenced in C.  (We do have buggy drivers that do that
-> > but they are buggy, and in many cases are getting attention to fix
-> > that.)
-> 
-> Oh, you're right, thank you!  I guess you're referring to readb()
-> and friends.  I haven't found an actual prohibition on directly
-> dereferencing addresses returned from ioremap(), but
-> Documentation/driver-api/device-io.rst is clear that they're
-> suitable for passing to readb(), etc.
+Hi Marc,
 
-There was a strong suggestion years ago that what is returned from
-ioremap() is a cookie that must not be dereferenced by drivers, and
-that there was a suggestion that having ioremap() return the virtual
-address with an offset (which read*() and friends would undo) would
-be a good idea.  However, even back then, we had some cases where
-drivers would directly dereference the pointer.  We have sparse today
-which helps point these places out (provided drivers stay away from
-__force, but unfortunately, I think we've ended up with people who
-think that silencing sparse warnings with __force is more preferable
-than leaving them there to point out where things are actually wrong.)
+On Tue, Jul 4, 2017 at 7:32 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 04/07/17 18:02, Geert Uytterhoeven wrote:
+>> On Cortex-A7, the arch timer CNTVOFF register is uninitialized.
+>> Hence when enabling SMP on r8a7794, the kernel log is spammed with:
+>>
+>>     WARNING: Underflow in clocksource 'arch_sys_counter' observed, time update ignored.
+>>            Please report this, consider using a different clocksource, if possible.
+>>            Your kernel is probably still fine.
+>>
+>> To fix this, wrap the standard secondary_startup routine inside a
+>> routine which initializes CNTVOFF when running on a Cortex-A7.
+>> As the only possibilities are Cortex-A7 or Cortex-A15, checking the low
+>> nibble of the Primary Part Number is sufficient.
+>>
+>> The initialization is identical to what is already done for the boot CPU
+>> since commit 9ce3fa6816c2fb59 ("ARM: shmobile: rcar-gen2: Add CA7
+>> arch_timer initialization for r8a7794").
+>
+> Humfff... Pretty horrible. Comments below.
 
-So, imho, unfortunately sparse has lost its usefulness in this regard.
+I know.  I suppose this should be done by the firmware/boot loader?
+But we have to live with firmware/boot loaders in the wild...
 
-> I recently told someone else my mistaken idea that ioremap() must
-> return a valid virtual address.  I wish I remembered who it was, so I
-> could correct that.  Documentation/DMA-API-HOWTO.txt also suggests
-> that ioremap() returns a virtual address -- I think I wrote that, and
-> maybe that virtual address reference should be tweaked a bit.
+>> --- /dev/null
+>> +++ b/arch/arm/mach-shmobile/headsmp-apmu.S
+>> @@ -0,0 +1,38 @@
+>> +/*
+>> + * SMP support for APMU based systems
+>> + *
+>> + * Copyright (C) 2014  Renesas Electronics Corporation
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/linkage.h>
+>> +
+>> +ENTRY(shmobile_boot_apmu)
+>> +     mrc     p15, 0, r0, c0, c0, 0           /* Get Main ID */
+>> +     ubfx    r1, r0, #4, #4                  /* r1=Lo 4bit of Primary Part */
+>> +     cmp     r1, #0x7                        /* 0x7 = CA7, 0xf = CA15 */
+>> +     bne     1f
+>
+> Why don't you deal with the A15 parts as well? And TBH, you'd be better
+> off checking ID_PFR1 for both Generic Timers and Virtualization Extensions.
 
-For most implementations, ioremap() does indeed return a virtual address,
-but that was never how the API was defined in the first place - it was
-always referred to as returning a cookie.
+Do we have to deal with the A15 parts here?
+We're not having issues with the A15 parts, so that's why I left it out.
 
-> Another wrinkle is that the pci_mmap_resource() interface is exposed
-> via sysfs and allows direct userspace mmap of PCI MMIO resources.  In
-> that case, there is no accessor available.  I wonder if we need some
-> way to disable this mmap when readb() is non-trivial.
+I'm trying to understand what's different between A15 and A7, and why A7
+needs this code, while A15 apparently doesn't.
+I'm not seeing any obvious differences in the U-Boot sources handling
+e.g. r8a7791/koelsch (dual A15) vs. r8a7794/alt (dual A7).
 
-Hmm, no comment, except that while the PCI MMIO space is available to
-userspace, and userspace is capable of running that thread on any CPU,
-PCI MMIO space can't be switched to config space.
+> off checking ID_PFR1 for both Generic Timers and Virtualization Extensions.
 
-That's another nail in this coffin...
+Thank, I'll have a look at that...
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>> +     /*
+>> +      * CA7 setup
+>> +      * CNTVOFF has to be initialized either from non-secure Hypervisor
+>> +      * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
+>> +      * then it should be handled by the secure code
+>> +      */
+>> +     cps     0x16
+>
+> It'd be worth adding a MONITOR_MODE macro instead of this raw value.
+
+>> +     cps     0x13
+>
+> and use SVC_MODE here.
+
+Thanks, I'll have a look at those, too.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
