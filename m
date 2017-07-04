@@ -1,7 +1,7 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue,  4 Jul 2017 17:31:17 +0800
-Subject: [PATCH] ARM: dts: zte: remove num-slots from zx296702-ad1
-Message-ID: <1499160677-78463-1-git-send-email-shawn.lin@rock-chips.com>
+Date: Tue,  4 Jul 2017 17:34:22 +0800
+Subject: [PATCH] ARM: dts: lpc18xx: remove num-slots from lpc18xx
+Message-ID: <1499160862-87345-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,28 +12,20 @@ Cc: Jaehoon Chung <jh80.chung@samsung.com>
 Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 ---
 
- arch/arm/boot/dts/zx296702-ad1.dts | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/lpc18xx.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/zx296702-ad1.dts b/arch/arm/boot/dts/zx296702-ad1.dts
-index 081f980..b0183c3 100644
---- a/arch/arm/boot/dts/zx296702-ad1.dts
-+++ b/arch/arm/boot/dts/zx296702-ad1.dts
-@@ -18,7 +18,6 @@
- };
- 
- &mmc0 {
--	num-slots = <1>;
- 	supports-highspeed;
- 	non-removable;
- 	disable-wp;
-@@ -31,7 +30,6 @@
- };
- 
- &mmc1 {
--	num-slots = <1>;
- 	supports-highspeed;
- 	non-removable;
- 	disable-wp;
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+index 7cae9c5..10b8249 100644
+--- a/arch/arm/boot/dts/lpc18xx.dtsi
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -115,7 +115,6 @@
+ 			compatible = "snps,dw-mshc";
+ 			reg = <0x40004000 0x1000>;
+ 			interrupts = <6>;
+-			num-slots = <1>;
+ 			clocks = <&ccu2 CLK_SDIO>, <&ccu1 CLK_CPU_SDIO>;
+ 			clock-names = "ciu", "biu";
+ 			resets = <&rgu 20>;
 -- 
 1.9.1
