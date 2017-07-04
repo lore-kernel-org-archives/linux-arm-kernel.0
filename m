@@ -1,36 +1,20 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 4 Jul 2017 12:15:36 +0530
-Subject: [RFC 0/5] drivers: Add boot constraints core
-In-Reply-To: <20170703150733.sop6yrrpfl3ne32g@sirena.org.uk>
-References: <20170630035533.GV29665@vireshk-i7>
- <CAGb2v67hxVciKFLD=8pgfm+UJ1i2Zb0aByTEa556O5uGcX7Oug@mail.gmail.com>
- <20170630041211.GX29665@vireshk-i7>
- <CAGb2v641UyXS5ccmo0j9Dvty8soB+DqwF2w8zKHsM78oK7b1aw@mail.gmail.com>
- <20170630051203.GY29665@vireshk-i7>
- <CAGb2v64CE2cUKgFuXd0f+FEdzQqmpOgMWqk76RndjeOz98=H0A@mail.gmail.com>
- <20170630084330.GB29665@vireshk-i7>
- <20170630121026.azppihjqls5i6bbr@sirena.org.uk>
- <20170703061552.GB3532@vireshk-i7>
- <20170703150733.sop6yrrpfl3ne32g@sirena.org.uk>
-Message-ID: <20170704064536.GG3532@vireshk-i7>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Tue, 4 Jul 2017 14:46:29 +0800
+Subject: [PATCH 3/5] pwm: rockchip: Move the configuration of polarity
+ from rockchip_pwm_set_enable() to rockchip_pwm_config()
+In-Reply-To: <20170703203640.697b8286@bbrezillon>
+References: <1498739271-27431-1-git-send-email-david.wu@rock-chips.com>
+ <1498739271-27431-4-git-send-email-david.wu@rock-chips.com>
+ <20170703203640.697b8286@bbrezillon>
+Message-ID: <681d6ce3-aae4-7d4f-2fec-e8af8f4f9436@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-07-17, 16:07, Mark Brown wrote:
-> On Mon, Jul 03, 2017 at 11:45:52AM +0530, Viresh Kumar wrote:
-> > The above regulator-min/max-microvolt values I mentioned were for the regulator
-> > device and not what the consumers would request. Yes, DMA will request something
-> 
-> If you're putting the maximum possible range that the physical regulator
-> can supply into machine constraints then you really haven't understood
-> what machine constraints are at all.
+Hi Boris,
 
-I wasn't referring to the limits of the physical regulators but the min/max that
-the consumers can set on a particular platform.
+? 2017/7/4 2:36, Boris Brezillon ??:
+> Hm, maybe it's time to drop these custom hooks and implement
+> pwm_apply_v1 and pwm_apply_v2 instead.
 
-> No, it really shouldn't.  Please read what I wrote.
-
-Sorry about that. Understood it now.
-
--- 
-viresh
+Okay, drop the enable and config hooks, only use the apply hook to 
+instead them.
