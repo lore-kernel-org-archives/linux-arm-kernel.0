@@ -1,101 +1,95 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 4 Jul 2017 15:15:17 +0000
-Subject: [PATCH V3 2/2] timer: imx-tpm: add imx tpm timer support
-In-Reply-To: <alpine.DEB.2.20.1707041636050.9000@nanos>
-References: <1499176823-4421-1-git-send-email-aisheng.dong@nxp.com>
- <1499176823-4421-3-git-send-email-aisheng.dong@nxp.com>
- <alpine.DEB.2.20.1707041603571.9000@nanos>
- <AM3PR04MB3061653B4CF496CD1A4FAE280D70@AM3PR04MB306.eurprd04.prod.outlook.com>
- <alpine.DEB.2.20.1707041636050.9000@nanos>
-Message-ID: <AM3PR04MB3066C526C5AB6138684393C80D70@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 4 Jul 2017 15:14:42 +0000
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
+ devices before scanning
+In-Reply-To: <CAHp75VevOno613gk8QHDA7kmLZJj9TLZRiu7oJUs_xaRzcbpnw@mail.gmail.com>
+References: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+ <20170613151013.GT3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
+ <20170613200339.GX3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
+ <20170616083313.GY3187@lahna.fi.intel.com>
+ <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
+ <20170616120048.GC629@lahna.fi.intel.com>
+ <CAJZ5v0g+qVui6RU=Hy3c_3qAAWngqaAu6B3JxGOpqF06kitbzA@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
+ <20170619100209.GC629@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFC3D@FRAEML521-MBX.china.huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B10487@FRAEML521-MBX.china.huawei.com>
+ <CAHp75VevOno613gk8QHDA7kmLZJj9TLZRiu7oJUs_xaRzcbpnw@mail.gmail.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B15AA2@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: Tuesday, July 04, 2017 10:43 PM
-> To: A.s. Dong
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> daniel.lezcano at linaro.org; shawnguo at kernel.org; Jacky Bai; Anson Huang;
-> dongas86 at gmail.com; kernel at pengutronix.de; Arnd Bergmann; Anson Huang
-> Subject: RE: [PATCH V3 2/2] timer: imx-tpm: add imx tpm timer support
-> 
-> On Tue, 4 Jul 2017, A.s. Dong wrote:
-> > > From: Thomas Gleixner [mailto:tglx at linutronix.de] I'm really
-> > > impressed, that 10 years after we discovered the HPET disaster (See
-> > > comment in arch/x86/kernel/hpet.c::hpet_next_event) the same
-> > > hardware idiocy comes around again....
-> > >
-> >
-> > Not quite sure but seems a bit different issue.
-> > The issue is still uncertain but the test shows it's related to fabric
-> > priority Configuration, if increase the A7 core priority higher than
-> > GPU, the issue is very hard to be seen. But we don't want to change
-> > the default priority, we use ETIME check to fix it.
-> 
-> Well, whether it's hard to be observed or not is not the question. The
-> point is, that with match equal registers you always have:
-> 
->       now = read_counter();
->       match = now + delta;
->       write_match(match);
-> 
-> If the counter advanced past match before the write hits the match
-> register, then the next interrupt will come after the wrap around of the
-> counter, which might be close to eternity depending on the counter
-> frequency and bit width.
-> 
+Hi Andy
 
-Yes we did observe that.
-TPM CNT is 32 bit width and working at 3Mhz, it takes about 23 seconds
-to wrap around to trigger the next event.
-And due to it's single core, RCU stall can't trap it. The kernel
-Seems have no idea about the wrap around and just resume and keep run.
+[...]
 
-> This advancement can be caused by a gazillion of reasons:
 > 
->      - Fabric delays
->      - TLB/cache misses
->      - .....
+> JFYI: Mika on vacation.
+
+Thanks for letting me know
+
 > 
-> The probability might be low, but this can and will happen. And there is
-> nothing you can do about it. No FIXME in the world will change that
-> behaviour except that the FIXME actually changes the hardware.
+> > I had a look into the MFD framework. If my understanding is correct
+> the mfd
+> > framework create a platform device for each declared mfd_cell that is
+> passed
+> > to mfd_add_devices().
 > 
-
-That's Right.
-
-> Match equal registers are simply crap in such a context and should never
-> be used for timers. That's not a new finding, that's well known since 40+
-> years. But sure, hardware folks are always smarter.
+> Right.
 > 
-
-Thanks for the detailed explanation.
-
-I planned to add the following explanation in function for this issue.
-diff --git a/drivers/clocksource/timer-imx-tpm.c b/drivers/clocksource/timer-imx-tpm.c
-index 4716746..c13a8de 100644
---- a/drivers/clocksource/timer-imx-tpm.c
-+++ b/drivers/clocksource/timer-imx-tpm.c
-@@ -99,6 +99,12 @@ static int tpm_set_next_event(unsigned long delta,
-        writel(next, timer_base + TPM_C0V);
-        now = tpm_read_counter();
- 
-+       /*
-+        * NOTE: We observed in a very small probability, the bus fabric
-+        * contention between GPU and A7 may results a few cycles delay
-+        * of writing CNT registers which may cause the min_delta event got
-+        * missed, so we need add a ETIME check here in case it happened.
-+        */
-        return (int)((next - now) <= 0) ? -ETIME : 0;
- }
-
-Do you think it's ok?
-
-Regards
-Dong Aisheng
-
-> Thanks,
+> > However there is something that I do not quite understand:
+> > from
+> > http://elixir.free-electrons.com/linux/latest/source/drivers/mfd/mfd-
+> core.c#L207
+> > it seems that mfd_add_device() will create the platform device using
+> the
+> > resources that are statically declared in the respective mfd_cell.
 > 
-> 	tglx
+> It's one possibility.
 > 
+> > In my case I'd like to have a platform device using the resources
+> that are
+> > parsed from the ACPI table (i.e. as it is done now by
+> > acpi_create_platform_device()).
+> 
+> So far so good. Nothing prevents you to do that.
+> 
+> > If my understanding is correct, if I declared an mfd_cell for my IPMI
+> child
+> > the mfd subsystem would create a platform device for such child and
+> > therefore acpi_create_platform_device() would fail to create a new
+> platform
+> > device as adev->physical_node_count will be non zero.
+> > However as things stand now mfd_cell devices can only use the
+> resources
+> > that are statically defined in the code (and therefore not the ones
+> in the
+> > ACPI nodes)...am I right?
+> 
+> You may file resources first and then register MFD cells. See many
+> existing examples in the kernel.
+
+Well I had a look around the Kernel I have seen no mfd cells using
+Resources that are not statically defined:
+i.e. cell->resources in mfd_add_device() always points to statically
+defined resource structures.
+
+Usually for ACPI devices first you need to parse the ACPI resources
+from the table calling acpi_dev_get_resources(), then you iterate 
+over the resource list and fill the resource array by calling
+acpi_platform_fill_resurces() (as in acpi_create_platform_device())
+
+With respect to my case are you suggesting dynamically allocate a
+resource array and fill it using the same fashion as 
+acpi_create_platform_device(), then point cell->resources to such
+array before calling mfd_add_device() ?
+
+Thanks
+Gab
+
+> 
+> --
+> With Best Regards,
+> Andy Shevchenko
