@@ -1,335 +1,86 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Jul 2017 10:49:52 +0200
-Subject: [PATCH v4 3/3] arm64: kvm: inject SError with user space
- specified syndrome
-In-Reply-To: <429e4a67-3795-1449-f0b1-12df3012629a@huawei.com>
-References: <1498481199-24118-1-git-send-email-gengdongjiu@huawei.com>
- <20170703083903.GE4066@cbox>
- <429e4a67-3795-1449-f0b1-12df3012629a@huawei.com>
-Message-ID: <20170704084952.GN4066@cbox>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Tue, 4 Jul 2017 10:55:45 +0200
+Subject: [PATCH 1/7] serial: imx: only set DMA rx-ing when DMA starts
+In-Reply-To: <20170703064840.pttfudcv7xsnbki3@pengutronix.de>
+References: <20170630120446.13994-1-romain.perier@collabora.com>
+ <20170630120446.13994-2-romain.perier@collabora.com>
+ <20170703064840.pttfudcv7xsnbki3@pengutronix.de>
+Message-ID: <709d972a-aae5-e487-958f-48abefd06ebc@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu,
+Hello,
 
-On Tue, Jul 04, 2017 at 12:46:23PM +0800, gengdongjiu wrote:
-> Hi Christoffer,
->   thanks for the review.
-> 
-> 
-> On 2017/7/3 16:39, Christoffer Dall wrote:
-> > Hi Dongjiu,
-> > 
-> > On Mon, Jun 26, 2017 at 08:46:39PM +0800, Dongjiu Geng wrote:
-> >> when SError happen, kvm notifies user space to record the CPER,
-> >> user space specifies and passes the contents of ESR_EL1 on taking
-> >> a virtual SError interrupt to KVM, KVM enables virtual system
-> >> error or asynchronous abort with this specifies syndrome. This
-> >> patch modify the world-switch to restore VSESR_EL2, VSESR_EL2
-> >> saves the virtual SError syndrome, it becomes the ESR_EL1 value when
-> >> HCR_EL2.VSE injects an SError. This register is added by the
-> >> RAS Extensions.
-> > 
-> > This commit message is confusing and doesn't help me understand the
-> > patch.
-> (1) what is the rationale for the guest OS SError interrupt(SEI) handling in the RAS solution?
->   you can refer to document: "RAS_Extension_PRD03-PRDC-010953-32-0, 6.5.3 Example software sequences"
->   a). In the firmware-first RAS solution, when guest OS happen a SError interrupt (SEI), it will firstly trap to EL3(SCR_EL3.EA = 1);
->   b). The firmware logs, triages, and delegates the error exception to the hypervisor. As the error came from guest OS  EL1, firmware
->       does by faking an SError interrupt exception entry to EL2.
->   c). Control transfers to the hypervisor's delegated error recovery agent.Because HCR_EL2.AMO is set to 1, the hypervisor can use a
->       Virtual SError interrupt to delegate an asynchronous abort to EL1, by setting HCR_EL2.VSE to 1 and using VESR_EL2 to pass syndrome.
-> 
-> (2) what is this patch mainly do?
->   As mentioned above, the hypervisor needs to enable virtual SError and pass the virtual syndrome to the guest OS.
-> 
->   a). when Control transfers to the hypervisor from firmware by faking an SError interrupt, the hypervisor delivered the syndrome_info(esr_el2) and
->       host VA address( Qemu translate this VA address to the virtual machine physical address(IPA)) using below new added "serror_intr" struct.
->   		/* KVM_EXIT_SERROR_INTR */
->  		struct {
-> 			__u32 syndrome_info;
-> 			__u64 address;
-> 		} serror_intr;
-> 
->   b). Qemu gets the address(host VA) delivered by KVM, translate this host VA address to virtual machine physical address(IPA), and runtime record this virtual
->      machine physical address(IPA) to the guest OS's APEI table.
-> 
->   c). Qemu gets the syndrome_info delivered by KVM, it refers to this syndrome value(but can be different from it) to specify the virtual SError interrupt's syndrome through setting VESR_EL2.
-> 
->         the vsesr_el2 is armv8.2 register, its explanation can be found in "RAS_Extension_PRD03-PRDC-010953-33-0, 5.6.18 VSESR_EL2, Virtual SError Exception Syndrome Register"
-> 
-> 	>>The VSESR_EL2 characteristics are:
-> 	>>Purpose:
-> 	>>Provides the syndrome value reported to software on taking a virtual SError interrupt exception:
-> 	>>	? If the virtual SError interrupt is taken to EL1 using AArch64 then VSESR_EL2 provides the
-> 	>>syndrome value reported in ESR_EL1.
-> 	>>	? If the virtual SError interrupt is taken to EL1 using AArch32 then VSESR_EL2 provides the
-> 	>>	  syndrome values reported in DFSR.{AET, ExT} and the remainder of the DFSR is set as
-> 	>>	 defined by VMSAv8-32.
-> 
->      so in the KVM, I added a new IOCTL(#define KVM_ARM_SEI  _IO(KVMIO,  0xb8)) to pass the virtual SError syndrome value specified by Qemu and enable a virtual System Error.
-> 
-> 
->  d). when world switch to guest OS, guest OS will happen virtual SError(this virtual SError can not be route to EL3 firmware), guest OS uses the specified syndrome value to do the recovery and
->      parses the guest OS CPER which is dynamically recorded by the Qemu in the APEI table .
-> 
-> 
 
-Please format the text nicely, and try to simplify the message when
-resubmitting these patches.  I hope it will be easier for you to write
-a meaningful commit message if you split these patches into multiple
-ones.
+Le 03/07/2017 ? 08:48, Uwe Kleine-K?nig a ?crit :
+> Hello,
+>
+> On Fri, Jun 30, 2017 at 02:04:40PM +0200, Romain Perier wrote:
+>> From: Nandor Han <nandor.han@ge.com>
+>>
+>> Avoid the situation when `dma_is_rxing` could incorrectly signal that
+>> DMA RX channel is receiving data in case DMA preparation or sg mapping
+>> fails.
+> Just from reading the commit log and the patch I didn't understand the
+> problem that is supposed to be fixed here. After looking at it for some
+> I understood. I don't suggest a new commit log here as it has to look
+> different if you pick up my comment below.
+>
+>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+>> index 5437b34..1d35293 100644
+>> --- a/drivers/tty/serial/imx.c
+>> +++ b/drivers/tty/serial/imx.c
+>> @@ -725,11 +725,11 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
+>>  	return IRQ_HANDLED;
+>>  }
+>>  
+>> -static void imx_disable_rx_int(struct imx_port *sport)
+>> +static void imx_disable_rx_int(struct imx_port *sport, bool is_rxing)
+>>  {
+>>  	unsigned long temp;
+>>  
+>> -	sport->dma_is_rxing = 1;
+>> +	sport->dma_is_rxing = is_rxing;
+>>  
+>>  	/* disable the receiver ready and aging timer interrupts */
+>>  	temp = readl(sport->port.membase + UCR1);
+>> @@ -762,7 +762,7 @@ static void imx_dma_rxint(struct imx_port *sport)
+>>  	temp = readl(sport->port.membase + USR2);
+>>  	if ((temp & USR2_RDR) && !sport->dma_is_rxing) {
+>>  
+>> -		imx_disable_rx_int(sport);
+>> +		imx_disable_rx_int(sport, false);
+>>  
+>>  		/* tell the DMA to receive the data. */
+>>  		start_rx_dma(sport);
+>> @@ -1083,6 +1083,7 @@ static int start_rx_dma(struct imx_port *sport)
+>>  	desc->callback_param = sport;
+>>  
+>>  	dev_dbg(dev, "RX: prepare for the DMA.\n");
+>> +	sport->dma_is_rxing = 1;
+>>  	sport->rx_cookie = dmaengine_submit(desc);
+>>  	dma_async_issue_pending(chan);
+>>  	return 0;
+>> @@ -1362,7 +1363,7 @@ static int imx_startup(struct uart_port *port)
+>>  		spin_unlock(&tty->files_lock);
+>>  
+>>  		if (readcnt > 0) {
+>> -			imx_disable_rx_int(sport);
+>> +			imx_disable_rx_int(sport, true);
+> I wonder if it would be saner to not assign to dma_is_rxing in
+> imx_disable_rx_int() at all but do this only in start_rx_dma() and
+> imx_dma_rxint().
 
-One specific thing currently lacking from the commit message is a
-discussion of why this API is needed in the first place - why can't we
-reuse KVM_SET_ONE_REG, for example.
+It was "mostly" done, in 4.11 in fact.  dma_is_rxing was set to 0 from
+imx_dma_rxint() and was not set
+at all from start_rx_dma(), resulting to the same issue. We could move
+assignment of dma_is_rxing out of imx_disable_rx_int()
+and set it to one from start_rx_dma() only. What do you think ?
 
-> 
-> > 
-> > I think this patch is trying to do too many things.  I suggest you split
-> > the patch into (at least) one patch that captures exception information
-> > from the world-switch path, one patch that deals with the new exit
-> > reason, and finally a patch with the new ioctl.  That way you can write
-> > a commit message for each patch describing first what the patch does,
-> > and then why this is a good idea.
->   Ok, thanks for the good suggestion.
-> 
-> > 
-> > Neverthess, I added some random comments below.
-> > 
-> >>
-> >> Changes since v3:
-> >> (1) Move restore VSESR_EL2 value logic to a helper method
-> >> (2) In the world-switch, not save VSESR_EL2, because no one cares the
-> >>     old VSESR_EL2 value
-> >> (3) Add a new KVM_ARM_SEI ioctl to set the VSESR_EL2 value and pend
-> >>     a virtual system error
-> >>
-> >> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> >> Signed-off-by: Quanming Wu <wuquanming@huawei.com>
-> >> ---
-> >>  Documentation/virtual/kvm/api.txt    | 10 ++++++++++
-> >>  arch/arm/include/asm/kvm_host.h      |  1 +
-> >>  arch/arm/kvm/arm.c                   |  7 +++++++
-> >>  arch/arm/kvm/guest.c                 |  5 +++++
-> >>  arch/arm64/include/asm/esr.h         |  2 ++
-> >>  arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
-> >>  arch/arm64/include/asm/kvm_host.h    |  2 ++
-> >>  arch/arm64/include/asm/sysreg.h      |  3 +++
-> >>  arch/arm64/kvm/guest.c               | 14 ++++++++++++++
-> >>  arch/arm64/kvm/handle_exit.c         | 25 +++++++++++++++++++------
-> >>  arch/arm64/kvm/hyp/switch.c          | 14 ++++++++++++++
-> >>  include/uapi/linux/kvm.h             |  8 ++++++++
-> >>  12 files changed, 95 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> >> index 3c248f7..852ac55 100644
-> >> --- a/Documentation/virtual/kvm/api.txt
-> >> +++ b/Documentation/virtual/kvm/api.txt
-> >> @@ -3377,6 +3377,16 @@ struct kvm_ppc_resize_hpt {
-> >>  	__u32 pad;
-> >>  };
-> >>  
-> >> +4.104 KVM_ARM_SEI
-> >> +
-> >> +Capability: KVM_EXIT_SERROR_INTR
-> >> +Architectures: arm/arm64
-> >> +Type: vcpu ioctl
-> >> +Parameters: u64 (syndrome)
-> >> +Returns: 0 in case of success
-> >> +
-> >> +Pend an virtual system error or asynchronous abort with user space specified.
-> >> +
-> > 
-> > I don't understand enough about what this ioctl does by just reading
-> > this text.  Did you mean to say something like "Record that userspace
-> > wishes to inject a pending virtual system error to the VCPU.  Next time
-> > the VCPU is run, th
-> Christoffer, sorry to confuse you.
-> This IOCTL mainly do two things:
-> 
-> (1) set the VCPU struct's vsesr_el2 to pass the virtual SError's syndrome value that Qemu specified.
-> (2) enable virtual SError
-> 
->  +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome)
->  +{
->  +	u64 reg = *syndrome;
->  +
->  +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && reg)
->  +		/* set vsesr_el2[24:0] with value that user space specified */
->  +		kvm_vcpu_set_vsesr(vcpu, reg & VSESR_ELx_IDS_ISS_MASK);
-> 
->  +
->  +	/* inject virtual system Error or asynchronous abort */
->  +	kvm_inject_vabt(vcpu);
->  +
->  +	return 0;
->  +}
-> 
+Best Regards,
+Romain
 
-Dongjiu, I can read the code, of course.  My comment was to tell you
-that the text you add to the api.txt file should be meaningful and
-explanatory on its own; that's the whole point of having such a file.
-
-> > 
-> >>  5. The kvm_run structure
-> >>  ------------------------
-> >>  
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index 31ee468..566292a 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -244,6 +244,7 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
-> >>  
-> >>  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> >>  		int exception_index);
-> >> +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome);
-> >>  
-> >>  static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
-> >>  				       unsigned long hyp_stack_ptr,
-> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >> index 96dba7c..583294f 100644
-> >> --- a/arch/arm/kvm/arm.c
-> >> +++ b/arch/arm/kvm/arm.c
-> >> @@ -987,6 +987,13 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-> >>  			return -EFAULT;
-> >>  		return kvm_arm_vcpu_has_attr(vcpu, &attr);
-> >>  	}
-> >> +	case KVM_ARM_SEI: {
-> >> +		u64 syndrome;
-> >> +
-> >> +		if (copy_from_user(&syndrome, argp, sizeof(syndrome)))
-> >> +			return -EFAULT;
-> >> +		return kvm_vcpu_ioctl_sei(vcpu, &syndrome);
-> >> +	}
-> >>  	default:
-> >>  		return -EINVAL;
-> >>  	}
-> >> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-> >> index fa6182a..72505bf 100644
-> >> --- a/arch/arm/kvm/guest.c
-> >> +++ b/arch/arm/kvm/guest.c
-> >> @@ -248,6 +248,11 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
-> >>  	return -EINVAL;
-> >>  }
-> >>  
-> >> +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome)
-> >> +{
-> >> +	return 0;
-> >> +}
-> >> +
-> >>  int __attribute_const__ kvm_target_cpu(void)
-> >>  {
-> >>  	switch (read_cpuid_part()) {
-> >> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> >> index 22f9c90..d009c99 100644
-> >> --- a/arch/arm64/include/asm/esr.h
-> >> +++ b/arch/arm64/include/asm/esr.h
-> >> @@ -127,6 +127,8 @@
-> >>  #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
-> >>  #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
-> >>  
-> >> +#define VSESR_ELx_IDS_ISS_MASK    ((1UL << 25) - 1)
-> >> +
-> >>  /* ESR value templates for specific events */
-> >>  
-> >>  /* BRK instruction trap from AArch64 state */
-> >> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> >> index 5f64ab2..93dc3d1 100644
-> >> --- a/arch/arm64/include/asm/kvm_emulate.h
-> >> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> >> @@ -155,6 +155,16 @@ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
-> >>  	return vcpu->arch.fault.esr_el2;
-> >>  }
-> >>  
-> >> +static inline u32 kvm_vcpu_get_vsesr(const struct kvm_vcpu *vcpu)
-> >> +{
-> >> +		return vcpu->arch.fault.vsesr_el2;
-> >> +}
-> >> +
-> >> +static inline void kvm_vcpu_set_vsesr(struct kvm_vcpu *vcpu, unsigned long val)
-> >> +{
-> >> +		vcpu->arch.fault.vsesr_el2 = val;
-> >> +}
-> >> +
-> >>  static inline int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
-> >>  {
-> >>  	u32 esr = kvm_vcpu_get_hsr(vcpu);
-> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >> index e7705e7..b6242fb 100644
-> >> --- a/arch/arm64/include/asm/kvm_host.h
-> >> +++ b/arch/arm64/include/asm/kvm_host.h
-> >> @@ -86,6 +86,7 @@ struct kvm_vcpu_fault_info {
-> >>  	u32 esr_el2;		/* Hyp Syndrom Register */
-> >>  	u64 far_el2;		/* Hyp Fault Address Register */
-> >>  	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
-> >> +	u32 vsesr_el2;		/* Virtual SError Exception Syndrome Register */
-> >>  };
-> >>  
-> >>  /*
-> >> @@ -385,6 +386,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-> >>  			       struct kvm_device_attr *attr);
-> >>  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-> >>  			       struct kvm_device_attr *attr);
-> >> +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome);
-> >>  
-> >>  static inline void __cpu_init_stage2(void)
-> >>  {
-> >> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> >> index 32964c7..3af6907 100644
-> >> --- a/arch/arm64/include/asm/sysreg.h
-> >> +++ b/arch/arm64/include/asm/sysreg.h
-> >> @@ -125,6 +125,9 @@
-> >>  #define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
-> >>  #define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
-> >>  
-> >> +/* virtual SError exception syndrome register in armv8.2 */
-> >> +#define REG_VSESR_EL2			sys_reg(3, 4, 5, 2, 3)
-> >> +
-> >>  #define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
-> >>  				      (!!x)<<8 | 0x1f)
-> >>  #define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
-> >> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> >> index b37446a..21c20b0 100644
-> >> --- a/arch/arm64/kvm/guest.c
-> >> +++ b/arch/arm64/kvm/guest.c
-> >> @@ -277,6 +277,20 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
-> >>  	return -EINVAL;
-> >>  }
-> >>  
-> >> +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome)
-> >> +{
-> >> +	u64 reg = *syndrome;
-> >> +
-> >> +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && reg)
-> >> +		/* set vsesr_el2[24:0] with value that user space specified */
-> >> +		kvm_vcpu_set_vsesr(vcpu, reg & VSESR_ELx_IDS_ISS_MASK);
-> > 
-> > Are you really supposed to fail silently here if trying to do this on a
-> > system that doesn't have RAS ?
-> This register vsesr_el2 is only introduced by armv8.2.
-> so if system does not have RAS, the setting will be failed because this register does not exist. I need to "return -EINVAL"
-> for this case. thank you for pointing that.
-> 
-> 
-> > 
-> > Why can you not set reg to 0 here?  That doesn't seem to be documented
-> > anywhere, and shouldn't the function return -EINVAL in this case?
-> Because the default value is 0. if want to set to 0, it can not call this API.
-> zero is meaningless syndrome value. no one care the zero value.
-> 
-
-What if userspace wants to drive a CPU reset of some form.  Is there any
-mechanism for resetting the register then?
-
-> 
-> > 
-> > Also, if you do this, but don't run the VCPU, then migrate the VM, and
-> > run the VCPU on the new destination, isn't this information lost?
-> > 
-> > 
-
-Please consider the migration point for your next version as well.
-
-Thanks,
--Christoffer
+>
+> Best regards
+> Uwe
+>
