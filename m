@@ -1,37 +1,73 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  4 Jul 2017 17:41:41 +0200
-Subject: [PATCH 7/9] ARM: dts: r8a7792: Reserve SRAM for the SMP jump stub
-In-Reply-To: <1499182903-31339-1-git-send-email-geert+renesas@glider.be>
-References: <1499182903-31339-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1499182903-31339-8-git-send-email-geert+renesas@glider.be>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 4 Jul 2017 18:46:59 +0300
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
+ before scanning
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40B15AA2@FRAEML521-MBX.china.huawei.com>
+References: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+ <20170613151013.GT3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
+ <20170613200339.GX3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
+ <20170616083313.GY3187@lahna.fi.intel.com>
+ <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
+ <20170616120048.GC629@lahna.fi.intel.com>
+ <CAJZ5v0g+qVui6RU=Hy3c_3qAAWngqaAu6B3JxGOpqF06kitbzA@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
+ <20170619100209.GC629@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFC3D@FRAEML521-MBX.china.huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B10487@FRAEML521-MBX.china.huawei.com>
+ <CAHp75VevOno613gk8QHDA7kmLZJj9TLZRiu7oJUs_xaRzcbpnw@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B15AA2@FRAEML521-MBX.china.huawei.com>
+Message-ID: <CAHp75VccwpesvDxMcxZ+349rhrAq8QxNoau9XmquMnv9DBLBfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reserve SRAM for the jump stub for CPU core bringup.
+On Tue, Jul 4, 2017 at 6:14 PM, Gabriele Paoloni
+<gabriele.paoloni@huawei.com> wrote:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7792.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+>> > In my case I'd like to have a platform device using the resources
+>> that are
+>> > parsed from the ACPI table (i.e. as it is done now by
+>> > acpi_create_platform_device()).
+>>
+>> So far so good. Nothing prevents you to do that.
+>>
+>> > If my understanding is correct, if I declared an mfd_cell for my IPMI
+>> child
+>> > the mfd subsystem would create a platform device for such child and
+>> > therefore acpi_create_platform_device() would fail to create a new
+>> platform
+>> > device as adev->physical_node_count will be non zero.
+>> > However as things stand now mfd_cell devices can only use the
+>> resources
+>> > that are statically defined in the code (and therefore not the ones
+>> in the
+>> > ACPI nodes)...am I right?
+>>
+>> You may file resources first and then register MFD cells. See many
+>> existing examples in the kernel.
+>
+> Well I had a look around the Kernel I have seen no mfd cells using
+> Resources that are not statically defined:
+> i.e. cell->resources in mfd_add_device() always points to statically
+> defined resource structures.
+>
+> Usually for ACPI devices first you need to parse the ACPI resources
+> from the table calling acpi_dev_get_resources(), then you iterate
+> over the resource list and fill the resource array by calling
+> acpi_platform_fill_resurces() (as in acpi_create_platform_device())
+>
+> With respect to my case are you suggesting dynamically allocate a
+> resource array and fill it using the same fashion as
+> acpi_create_platform_device(), then point cell->resources to such
+> array before calling mfd_add_device() ?
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 136a86ac64974adb..2623f39bed2b73bb 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -473,6 +473,14 @@
- 		icram1:	sram at e63c0000 {
- 			compatible = "mmio-sram";
- 			reg = <0 0xe63c0000 0 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0 0xe63c0000 0x1000>;
-+
-+			smp-sram at 0 {
-+				compatible = "renesas,smp-sram";
-+				reg = <0 0x10>;
-+			};
- 		};
- 
- 		sdhi0: sd at ee100000 {
+You may do it on stack. Define your cell statically (but not const)
+and apply resources just before mfd_add_devices() call.
+There are examples in the existing drivers. Intel LPC comes to my mind
+and perhaps PMC (Broxton), though latter has too much other stuff
+around.
+
 -- 
-2.7.4
+With Best Regards,
+Andy Shevchenko
