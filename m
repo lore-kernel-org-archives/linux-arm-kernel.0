@@ -1,123 +1,84 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Jul 2017 16:17:50 +0200
-Subject: [GIT PULL 0/7] ARM: SoC specific changes for 4.13
-Message-ID: <CAK8P3a34OjrwzK5saNz=nq2qkm1kqJD8rb6Qz67R+Lt6jKa=7Q@mail.gmail.com>
+Date: Tue, 4 Jul 2017 16:19:02 +0200
+Subject: [GIT PULL 1/7] ARM: SoC non-urgent fixes for merge window
+Message-ID: <CAK8P3a2jsvGy8tQn2q=c0TTGPR6iH2mHWGbq-+iK2Y-RPHOBUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+The following changes since commit 5ed02dbb497422bf225783f46e6eadd237d23d6b:
 
-Here is the full set of patches for arm-soc for this merge window.
-We have 764 non-merge changesets from 81 contributors this time,
-in 101 pull requests and 20 separate patches.
+  Linux 4.12-rc3 (2017-05-28 17:20:53 -0700)
 
-The top contributors this time are
+are available in the git repository at:
 
-     54 Andreas F?rber
-     29 Chen-Yu Tsai
-     22 Geert Uytterhoeven
-     21 Martin Blumenstingl
-     18 Fabio Estevam
-     17 Krzysztof Kozlowski
-     17 Corentin Labbe
-     16 Neil Armstrong
-     16 Icenowy Zheng
-     14 Tony Lindgren
-     14 Simon Horman
-     14 Markus Elfring
-     13 Ralph Sennhauser
-     12 Sean Wang
-     12 Linus Walleij
-     12 Gregory CLEMENT
-     11 Suman Anna
-     11 Antoine Tenart
-     11 Alexandre Belloni
-     10 Kuninori Morimoto
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/armsoc-fixes-nc
 
-Andreas F?rber adds three new SoC platforms (Action Semi on 32-bit
-and 64-bit as well as Realtek RTL1295), the other contributors are more
-or less the same as always, and the most active platforms remain
-Allwinner, Renesas, Amlogic, NXP/Freescale, OMAP, AT91 and
-Samsung, but there are also a lot patches for the smaller ones.
+for you to fetch changes up to ff9e0e3b091291a6694c52074940c5fabd693467:
 
-Overall, the devicetree changes dominate the overall contents, but
-in particular the ARM64 device trees are growing faster these days,
-with more new boards getting added there. Split out into three
-separate chunks, these are the overall size stats:
+  Merge tag 'mvebu-fixes-4.12-2' of
+git://git.infradead.org/linux-mvebu into next/fixes-non-critical
+(2017-07-03 14:09:06 +0200)
 
-a) ARM32 device tree files:
-  100% arch/arm64/boot/dts/
- 316 patches, 404 files changed, 11156 insertions(+), 4068 deletions(-)
+----------------------------------------------------------------
+ARM: SoC non-urgent fixes for merge window
 
-b) ARM64 device tree files:
-   1.5% arch/arm64/boot/dts/actions/
-   8.9% arch/arm64/boot/dts/allwinner/
-   6.1% arch/arm64/boot/dts/amlogic/
-   0.7% arch/arm64/boot/dts/arm/
-  12.0% arch/arm64/boot/dts/broadcom/stingray/
-   0.2% arch/arm64/boot/dts/broadcom/
-   8.6% arch/arm64/boot/dts/freescale/
-  13.4% arch/arm64/boot/dts/hisilicon/
-   6.8% arch/arm64/boot/dts/marvell/
-   3.9% arch/arm64/boot/dts/mediatek/
-   0.1% arch/arm64/boot/dts/nvidia/
-   1.2% arch/arm64/boot/dts/qcom/
-   1.2% arch/arm64/boot/dts/realtek/
-  22.5% arch/arm64/boot/dts/renesas/
-   8.3% arch/arm64/boot/dts/rockchip/
-   3.8% arch/arm64/boot/dts/socionext/
- 217 patches, 152 files changed, 11045 insertions(+), 2362 deletions(-)
+Smaller patches that didn't seem to find a home in other branches, and
+low-priority fixes from late in the merge window.
 
-c) Everything else:
-   0.7% Documentation/arm/Atmel/
-  10.7% arch/arm/configs/
-   3.7% arch/arm/mach-actions/
-   5.2% arch/arm/mach-at91/
-   0.0% arch/arm/mach-bcm/
-   0.1% arch/arm/mach-davinci/include/mach/
-   0.7% arch/arm/mach-davinci/
-   0.3% arch/arm/mach-imx/
-   0.0% arch/arm/mach-meson/
-   0.2% arch/arm/mach-omap1/
-  30.0% arch/arm/mach-omap2/
-   0.0% arch/arm/mach-prima2/
-   0.0% arch/arm/mach-pxa/include/mach/
-   1.5% arch/arm/mach-pxa/
-   0.0% arch/arm/mach-rockchip/
-   0.0% arch/arm/mach-s3c64xx/
-   0.3% arch/arm/mach-shmobile/
-   0.0% arch/arm/mach-stm32/
-   1.0% arch/arm/
-   0.3% arch/arm64/configs/
-   0.3% arch/arm64/
-   0.1% drivers/base/power/
-   2.3% drivers/bus/
-   0.6% drivers/clk/meson/
-   2.9% drivers/clocksource/
-   0.6% drivers/cpufreq/
-   0.3% drivers/firmware/tegra/
-   0.9% drivers/firmware/
-   0.2% drivers/memory/
-   0.1% drivers/reset/sti/
-   8.2% drivers/reset/
-   4.3% drivers/soc/actions/
-   1.2% drivers/soc/atmel/
-   0.0% drivers/soc/bcm/
-   0.0% drivers/soc/imx/
-   2.9% drivers/soc/mediatek/
-   0.2% drivers/soc/qcom/
-   2.9% drivers/soc/renesas/
-   5.8% drivers/soc/tegra/
-   0.1% drivers/soc/
-   0.5% include/linux/platform_data/
-   0.1% include/linux/soc/actions/
-   0.1% include/linux/soc/renesas/
-   0.1% include/linux/
-   8.0% include/soc/tegra/
-178 patches,  217 files changed, 3700 insertions(+), 1974 deletions(-)
+- Lee Jones retires as bcm2835 (raspberry pi) co-maintainer.
 
-The parts sticking out here are a defconfig cleanup by Krzysztof Koz?owski,
-omap2 code cleanup, reset subsystem changes and a new power
-management driver for tegra.
+- A couple of bugfixes for the ARM CCN bus driver that were
+  regarded not important enough
 
-     Arnd
+- minor device tree fixes for the Renesas and Marvell platforms,
+  that came a little late or did not justify have another
+  pull request after the last -rc.
+
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      Merge tag 'ccn/fixes-for-4.13-v2' of
+git://git.linaro.org/people/pawel.moll/linux into
+next/fixes-non-critical
+      Merge tag 'mvebu-fixes-4.12-2' of
+git://git.infradead.org/linux-mvebu into next/fixes-non-critical
+
+Eric Anholt (1):
+      MAINTAINERS: Remove Lee Jones from bcm2835.
+
+Florian Fainelli (1):
+      Merge tag 'bcm2835-maintainers-next-2017-06-08' into maintainers/next
+
+Geert Uytterhoeven (1):
+      ARM: dts: armadillo800eva: Split LCD mux and gpio
+
+Heiko Stuebner (1):
+      MAINTAINERS: add RV1108 Rockchip soc to maintained files
+
+Javier Martinez Canillas (1):
+      bus: arm-ccn: Fix module autoload
+
+Markus Elfring (1):
+      bus: arm-ccn: Use devm_kcalloc() in arm_ccn_probe()
+
+Olof Johansson (2):
+      Merge tag 'renesas-fixes2-for-v4.12' of
+https://git.kernel.org/.../horms/renesas into next/fixes-non-critical
+      Merge tag 'arm-soc/for-4.13/maintainers' of
+http://github.com/Broadcom/stblinux into next/fixes-non-critical
+
+Peter Korsgaard (1):
+      ARM: dts: kirkwood: Fix Openblock A6 nand partition overlap
+
+Velibor Markovski (2):
+      dt-bindings: arm-ccn: Add bindings info for CCN-502 compatible string
+      bus: arm-ccn: Enable stats for CCN-502 interconnect
+
+ Documentation/devicetree/bindings/arm/ccn.txt        |  1 +
+ MAINTAINERS                                          |  2 +-
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts         |  2 +-
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts        |  2 ++
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi |  3 +--
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  |  3 +--
+ drivers/bus/arm-ccn.c                                | 10 ++++++----
+ 7 files changed, 13 insertions(+), 10 deletions(-)
