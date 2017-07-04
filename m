@@ -1,316 +1,73 @@
-From: kevin.wangtao@hisilicon.com (Wangtao (Kevin, Kirin))
-Date: Tue, 4 Jul 2017 11:24:06 +0000
-Subject: [Patch v2 2/3] thermal: hisilicon: add thermal sensor driver
- for Hi3660
-In-Reply-To: <20170701030426.GA11424@localhost.localdomain>
-References: <1497930035-60894-3-git-send-email-kevin.wangtao@hisilicon.com>
- <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1498102923-68481-2-git-send-email-kevin.wangtao@hisilicon.com>
- <20170701030426.GA11424@localhost.localdomain>
-Message-ID: <68C6844FB78C6946B9DB8EACE2D237B0985B5A55@dggeml507-mbx.china.huawei.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 4 Jul 2017 14:51:18 +0300
+Subject: [PATCH] thermal: imx: interpret fsl,tempmon-data through nvmem
+In-Reply-To: <d1a8ec1ef73aefe6018f6a4923bd04b3ac34a5d4.1497879110.git.leonard.crestez@nxp.com>
+References: <d1a8ec1ef73aefe6018f6a4923bd04b3ac34a5d4.1497879110.git.leonard.crestez@nxp.com>
+Message-ID: <1499169078.16068.26.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 2017/7/1 11:06, "Eduardo Valentin" <edubezval@gmail.com> wrote:> 
-> Hey Tao,
+On Mon, 2017-06-19 at 16:40 +0300, Leonard Crestez wrote:
+> On imx6sx accessing the ocotp memory area directly is wrong because the
+> ocotp clock needs to be enabled first. Fix this by reinterpreting the
+> fsl,tempmon-data phandle as a reference to a nvmem_device and doing all
+> the read through that.
 > 
-> On Thu, Jun 22, 2017 at 11:42:02AM +0800, Tao Wang wrote:
-> > This patch adds the support for thermal sensor of Hi3660 SoC.
-> > this will register sensors for thermal framework and use device
-> > tree to bind cooling device.
-> >
-> > Signed-off-by: Tao Wang <kevin.wangtao@hisilicon.com>
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> > Changes in v2:
-> > - correct alphabet order
-> > - correct compatible name
-> >
-> >  drivers/thermal/Kconfig          |   10 ++
-> >  drivers/thermal/Makefile         |    1 +
-> >  drivers/thermal/hi3660_thermal.c |  198
-> ++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 209 insertions(+)
-> >  create mode 100644 drivers/thermal/hi3660_thermal.c
-> >
-> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> > index b5b5fac..ed22a90 100644
-> > --- a/drivers/thermal/Kconfig
-> > +++ b/drivers/thermal/Kconfig
-> > @@ -192,6 +192,16 @@ config THERMAL_EMULATION
-> >  	  because userland can easily disable the thermal policy by simply
-> >  	  flooding this sysfs node with low temperature values.
-> >
-> > +config HI3660_THERMAL
-> > +	tristate "Hi3660 thermal driver"
-> > +	depends on ARCH_HISI || COMPILE_TEST
-> > +	depends on HAS_IOMEM
-> > +	depends on OF
-> > +	default y
-> > +	help
-> > +	  Enable this to plug Hi3660 thermal driver into the Linux thermal
-> > +	  framework.
-> > +
-> >  config HISI_THERMAL
-> >  	tristate "Hisilicon thermal driver"
-> >  	depends on ARCH_HISI || COMPILE_TEST
-> > diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> > index 094d703..f29d0a5 100644
-> > --- a/drivers/thermal/Makefile
-> > +++ b/drivers/thermal/Makefile
-> > @@ -55,6 +55,7 @@ obj-$(CONFIG_INTEL_PCH_THERMAL)	+=
-> intel_pch_thermal.o
-> >  obj-$(CONFIG_ST_THERMAL)	+= st/
-> >  obj-$(CONFIG_QCOM_TSENS)	+= qcom/
-> >  obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra/
-> > +obj-$(CONFIG_HI3660_THERMAL)	+= hi3660_thermal.o
-> >  obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
-> >  obj-$(CONFIG_MTK_THERMAL)	+= mtk_thermal.o
-> >  obj-$(CONFIG_GENERIC_ADC_THERMAL)	+= thermal-generic-adc.o
-> > diff --git a/drivers/thermal/hi3660_thermal.c
-> b/drivers/thermal/hi3660_thermal.c
-> > new file mode 100644
-> > index 0000000..68fa9018
-> > --- /dev/null
-> > +++ b/drivers/thermal/hi3660_thermal.c
-> > @@ -0,0 +1,198 @@
-> > +/*
-> > + *  linux/drivers/thermal/hi3660_thermal.c
-> > + *
-> > + *  Copyright (c) 2017 Hisilicon Limited.
-> > + *  Copyright (c) 2017 Linaro Limited.
-> > + *
-> > + *  Author: Tao Wang <kevin.wangtao@hisilicon.com>
-> > + *  Author: Leo Yan <leo.yan@linaro.org>
-> > + *
-> > + *  This program is free software; you can redistribute it and/or modify
-> > + *  it under the terms of the GNU General Public License as published by
-> > + *  the Free Software Foundation; version 2 of the License.
-> > + *
-> > + *  This program is distributed in the hope that it will be useful,
-> > + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + *  GNU General Public License for more details.
-> > + *
-> > + *  You should have received a copy of the GNU General Public License
-> > + *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/device.h>
-> > +#include <linux/err.h>
-> > +#include <linux/io.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/of.h>
-> > +#include <linux/module.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/thermal.h>
-> > +
-> > +#include "thermal_core.h"
-> > +
-> > +#define HW_MAX_SENSORS			4
-> > +#define HISI_MAX_SENSORS		6
-> > +#define SENSOR_MAX			4
-> > +#define SENSOR_AVG			5
-> > +
-> > +#define ADC_MIN		116
-> > +#define ADC_MAX		922
-> > +
-> > +/* hi3660 Thermal Sensor Dev Structure */
-> > +struct hi3660_thermal_sensor {
-> > +	struct hi3660_thermal_data *thermal;
-> > +	struct thermal_zone_device *tzd;
-> > +
-> > +	uint32_t id;
-> > +};
-> > +
-> > +struct hi3660_thermal_data {
-> > +	struct platform_device *pdev;
-> > +	struct hi3660_thermal_sensor sensors[HISI_MAX_SENSORS];
-> > +	void __iomem *thermal_base;
-> > +};
-> > +
-> > +unsigned int sensor_reg_offset[HW_MAX_SENSORS] = { 0x1c, 0x5c, 0x9c,
-> 0xdc };
-> > +
-> > +
-> > +static int hi3660_thermal_get_temp(void *_sensor, int *temp)
-> > +{
-> > +	struct hi3660_thermal_sensor *sensor = _sensor;
-> > +	struct hi3660_thermal_data *data = sensor->thermal;
-> > +	unsigned int idx;
-> > +	int val, average = 0, max = 0;
-> > +
-> > +	if (sensor->id < HW_MAX_SENSORS) {
-> > +		val = readl(data->thermal_base + sensor_reg_offset[sensor-
-> >id]);
-> > +		val = clamp_val(val, ADC_MIN, ADC_MAX);
-> > +	} else {
-> > +		for (idx = 0; idx < HW_MAX_SENSORS; idx++) {
-> > +			val = readl(data->thermal_base
-> > +					+ sensor_reg_offset[idx]);
-> > +			val = clamp_val(val, ADC_MIN, ADC_MAX);
-> > +			average += val;
-> > +			if (val > max)
-> > +				max = val;
-> > +		}
-> > +
-> > +		if (sensor->id == SENSOR_MAX)
-> > +			val = max;
-> > +		else if (sensor->id == SENSOR_AVG)
-> > +			val = average / HW_MAX_SENSORS;
-> > +	}
-> > +
-> > +	*temp = ((val - ADC_MIN) * 165000) / (ADC_MAX - ADC_MIN) -
-> 40000;
+> This clock requirement does not apply to older imx6qdl chips because
+> there the ocotp access clock (clk_ipg_s) is always enabled.
 > 
-> Where do these constants come from (165000 and 40000) can these some
-
-The sensor's temperature range is -40 to 125, that's the source of the constants.
-
-> how
-> be rearranged and described in DT (coefficients) and using the offset and
-> slope fields?
-
-That make sense, I will reconsider about it.
-
+> This is visible by comparing the "System Clocks, Gating, and Override"
+> tables (OCOTP rows) in the 6DQ and 6SX manuals:
+> http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6SXRM.pdf
+> http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
 > 
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct thermal_zone_of_device_ops hi3660_of_thermal_ops = {
-> > +	.get_temp = hi3660_thermal_get_temp,
-> > +};
-> > +
-> > +static int hi3660_thermal_register_sensor(struct platform_device *pdev,
-> > +		struct hi3660_thermal_data *data,
-> > +		struct hi3660_thermal_sensor *sensor,
-> > +		int index)
-> > +{
-> > +	int ret = 0;
-> > +
-> > +	sensor->id = index;
-> > +	sensor->thermal = data;
-> > +
-> > +	sensor->tzd = devm_thermal_zone_of_sensor_register(&pdev-
-> >dev,
-> > +				sensor->id, sensor,
-> &hi3660_of_thermal_ops);
-> > +	if (IS_ERR(sensor->tzd)) {
-> > +		ret = PTR_ERR(sensor->tzd);
-> > +		sensor->tzd = NULL;
-> > +	}
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static void hi3660_thermal_toggle_sensor(struct hi3660_thermal_sensor
-> *sensor,
-> > +				       bool on)
-> > +{
-> > +	struct thermal_zone_device *tzd = sensor->tzd;
-> > +
-> > +	tzd->ops->set_mode(tzd,
-> > +		on ? THERMAL_DEVICE_ENABLED :
-> THERMAL_DEVICE_DISABLED);
-> > +}
-> > +
-> > +static int hi3660_thermal_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct hi3660_thermal_data *data;
-> > +	struct resource *res;
-> > +	int ret = 0;
-> > +	int i;
-> > +
-> > +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-> > +	if (!data)
-> > +		return -ENOMEM;
-> > +
-> > +	data->pdev = pdev;
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	data->thermal_base = devm_ioremap_resource(dev, res);
-> > +	if (IS_ERR(data->thermal_base)) {
-> > +		dev_err(dev, "failed get reg base\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	platform_set_drvdata(pdev, data);
-> > +
-> > +	for (i = 0; i < HISI_MAX_SENSORS; ++i) {
-> > +		ret = hi3660_thermal_register_sensor(pdev, data,
-> > +						     &data->sensors[i], i);
-> > +		if (ret)
-> > +			dev_err(&pdev->dev,
-> > +				"failed to register thermal sensor%d: %d\n",
-> > +				i, ret);
+> This happens to work right now without this patch because the ocotp
+> clock might be enabled for some other reason. In particular it might be
+> enabled from the bootloader and it only gets disabled late during boot
+> in clk_disable_unused, after imx-thermal has completed probing.
 > 
-> Do you really want to continue if some of the sensors fail to register?
-
-Yes,  because currently we only use one of these sensors, the others will register fail 
-
+> If imx-thermal is compiled as a module then the system can hang on
+> probe.
 > 
-> > +		else
-> > +			hi3660_thermal_toggle_sensor(&data->sensors[i],
-> true);
-> > +	}
-> > +
-> > +	dev_info(&pdev->dev, "Thermal Sensor Loaded\n");
+> This makes IMX_THERMAL depend on NVMEM_IMX_OCOTP but that driver seems
+> be already available for all chips that contain tempmon so it's
+> acceptable.
 > 
-> Do you really need the above info in the kernel log?
-
-That should be unnecessary, I will remove it.
-
+> Reported-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 > 
-> > +	return 0;
-> > +}
-> > +
-> > +static int hi3660_thermal_exit(struct platform_device *pdev)
-> > +{
-> > +	struct hi3660_thermal_data *data = platform_get_drvdata(pdev);
-> > +	int i;
-> > +
-> > +	for (i = 0; i < HISI_MAX_SENSORS; i++) {
-> > +		struct hi3660_thermal_sensor *sensor = &data->sensors[i];
-> > +
-> > +		if (!sensor->tzd)
-> > +			continue;
+> ---
 > 
-> Why are you considering a valid case of not registering all expected
-> sensors?
+> This was reported as a comment to a patch adding tempmon support for
+> imx6ul (which is very similar to imx6sx). Since it already affects a
+> supported chip this patch is sent as a separate bugfix.
+> 
+> Link: https://lkml.org/lkml/2017/6/9/578
+> 
+> There are various other ways to fix this problem. The main advantage of
+> this solution is that it does not add a new binding but rather preserves
+> compatibility with old DTBs. It also aligns with the idea that
+> devicetree describes hardware relationships rather than a specific linux
+> implementation.
+> 
+> An alternative would have been to add a nvmem-cells binding to imx-thermal and
+> use that if available instead of fsl,tempmon-data. It might not be good to
+> sidestep the official nvmem bindings, the devicetree people were added so that
+> they have an opportunity to object.
+> 
+> In theory the "thermal grade" is a two-bit quantity and might be a
+> candidate for using a cell with a "bits" binding. However this causes
+> the nvmem core to issue reads of length and alignment less than 4 to the
+> imx-ocotp driver so additional fixes might be required.
+> 
 
-Because currently we only use one of these sensors.
+It's been two weeks without a reply, any advice on how to proceed?
+Since the original message is quite long I will summarize the main
+question:
 
-> > +
-> > +		hi3660_thermal_toggle_sensor(sensor, false);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id hi3660_thermal_id_table[] = {
-> > +	{ .compatible = "hisilicon,hi3660-thermal" },
-> > +	{}
-> > +};
-> > +MODULE_DEVICE_TABLE(of, hi3660_thermal_id_table);
-> > +
-> > +static struct platform_driver hi3660_thermal_driver = {
-> > +	.probe = hi3660_thermal_probe,
-> > +	.remove = hi3660_thermal_exit,
-> > +	.driver = {
-> > +		.name = "hi3660_thermal",
-> > +		.of_match_table = hi3660_thermal_id_table,
-> > +	},
-> > +};
-> > +
-> > +module_platform_driver(hi3660_thermal_driver);
-> > +
-> > +MODULE_AUTHOR("Tao Wang <kevin.wangtao@hisilicon.com>");
-> > +MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
-> > +MODULE_DESCRIPTION("hi3660 thermal driver");
-> > +MODULE_LICENSE("GPL v2");
-> > --
-> > 1.7.9.5
-> >
+Is it OK to reinterpret the fsl,tempmon-data property as a nvmem
+reference instead of a "raw" syscon regmap?
+
+--
+Regards,
+Leonard
