@@ -1,35 +1,104 @@
-From: ckeepax@opensource.cirrus.com (Charles Keepax)
-Date: Tue, 4 Jul 2017 09:30:45 +0100
-Subject: [PATCH] gpio: drop unnecessary includes from
- include/linux/gpio/driver.h
-In-Reply-To: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170704083045.fqruqn6i5sxhfhu6@localhost.localdomain>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 04 Jul 2017 10:34:05 +0200
+Subject: [PATCH 1/6] ARM: dts: rockchip: add regulator nodes for rk3229-evb
+In-Reply-To: <1499155967-26090-2-git-send-email-frank.wang@rock-chips.com>
+References: <1499155967-26090-1-git-send-email-frank.wang@rock-chips.com>
+ <1499155967-26090-2-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <8062361.VWy3dYvDhe@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 12:53:34PM +0900, Masahiro Yamada wrote:
-> Some of include directives in include/linux/gpio/driver.h are
-> unneeded because the header does not need to know the content of
-> struct device, irq_chip, etc.  Just declare they are structures.
+Hi Frank,
+
+Am Dienstag, 4. Juli 2017, 16:12:42 CEST schrieb Frank Wang:
+> This patch adds vcc_io, vdd_arm and vdd_log regulator nodes
+> for rk3229-evb board.
 > 
-> On the other hand, <linux/irqhandler.h> and <linux/spinlock_types.h>
-> turned out to be necessary for irq_flow_handler_t and spinlock_t,
-> respectively.
-> 
-> Each driver should include what it needs without relying on what is
-> implicitly included from <linux/gpio/driver.h>.  This will cut down
-> unnecessary header parsing.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
 > ---
+>  arch/arm/boot/dts/rk3229-evb.dts | 54
+> ++++++++++++++++++++++++++++++++++++++++ 1 file changed, 54 insertions(+)
 > 
->  drivers/gpio/gpio-wm831x.c       |  1 +
->  drivers/gpio/gpio-wm8994.c       |  1 +
+> diff --git a/arch/arm/boot/dts/rk3229-evb.dts
+> b/arch/arm/boot/dts/rk3229-evb.dts index 82e8a53..8b10c64 100644
+> --- a/arch/arm/boot/dts/rk3229-evb.dts
+> +++ b/arch/arm/boot/dts/rk3229-evb.dts
+> @@ -78,6 +78,52 @@
+>  		regulator-always-on;
+>  		regulator-boot-on;
+>  	};
+> +
+> +	vdd_arm: vdd-arm-regulator {
+> +		compatible = "pwm-regulator";
+> +		rockchip,pwm_id = <1>;
+> +		rockchip,pwm_voltage = <1100000>;
 
-For the Wolfson Micro bits:
+This doesn't look like a part of the mainline pwm-regulator binding
+(both rockchip,* properties)
 
-Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+> +		pwms = <&pwm1 0 25000 1>;
+> +		regulator-name = "vdd_arm";
+> +		regulator-min-microvolt = <950000>;
+> +		regulator-max-microvolt = <1400000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
 
-Thanks,
-Charles
+please also add supplies for regulators. Information on supplies
+should be easily extractable from the board schematics.
+
+This not only results in a nice tree in debugfs (regulator/regulator_summary)
+but also makes sure supplying regulators are not accidentially turned off.
+(pwm-supply for pwm-regulators, vin-supply for fixed regulators)
+
+
+> +
+> +	vdd_log: vdd-log-regulator {
+> +		compatible = "pwm-regulator";
+> +		rockchip,pwm_id = <2>;
+> +		rockchip,pwm_voltage = <1200000>;
+> +		pwms = <&pwm2 0 25000 1>;
+> +		regulator-name = "vdd_log";
+> +		regulator-min-microvolt = <1000000>;
+> +		regulator-max-microvolt = <1300000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+
+don't create a subnode/bus for regulators. Just add them
+regularly. Take a look at all the other boards (like rk3399-firefly,
+gru, veyron) for reference.
+
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		vccio_1v8_reg: regulator at 0 {
+
+Same here, no regulator at 0 please, just name this one
+	vccio_1v8: vccio-1v8-regulator {
+
+(removed _reg from phandle and changed node name)
+
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "vccio_1v8";
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		vccio_3v3_reg: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "vccio_3v3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +	};
+>  };
+
+
+Thanks
+Heiko
