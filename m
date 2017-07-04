@@ -1,37 +1,35 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Tue,  4 Jul 2017 16:14:34 +0800
-Subject: [PATCH 5/6] ARM: dts: rockchip: enable tsadc for rk3229-evb
-In-Reply-To: <1499155967-26090-1-git-send-email-frank.wang@rock-chips.com>
-References: <1499155967-26090-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1499156074-26355-1-git-send-email-frank.wang@rock-chips.com>
+From: ckeepax@opensource.cirrus.com (Charles Keepax)
+Date: Tue, 4 Jul 2017 09:30:45 +0100
+Subject: [PATCH] gpio: drop unnecessary includes from
+ include/linux/gpio/driver.h
+In-Reply-To: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170704083045.fqruqn6i5sxhfhu6@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the tsadc for rk3229-evb board.
+On Tue, Jul 04, 2017 at 12:53:34PM +0900, Masahiro Yamada wrote:
+> Some of include directives in include/linux/gpio/driver.h are
+> unneeded because the header does not need to know the content of
+> struct device, irq_chip, etc.  Just declare they are structures.
+> 
+> On the other hand, <linux/irqhandler.h> and <linux/spinlock_types.h>
+> turned out to be necessary for irq_flow_handler_t and spinlock_t,
+> respectively.
+> 
+> Each driver should include what it needs without relying on what is
+> implicitly included from <linux/gpio/driver.h>.  This will cut down
+> unnecessary header parsing.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  drivers/gpio/gpio-wm831x.c       |  1 +
+>  drivers/gpio/gpio-wm8994.c       |  1 +
 
-The rk3229 evb board uses the CRU to reset the chip since it has not
-the PMIC to connect it, and TSHUT is low active on evb board.
+For the Wolfson Micro bits:
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- arch/arm/boot/dts/rk3229-evb.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 
-diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
-index bae0dbf..43c3ad2 100644
---- a/arch/arm/boot/dts/rk3229-evb.dts
-+++ b/arch/arm/boot/dts/rk3229-evb.dts
-@@ -181,6 +181,11 @@
- 	status = "okay";
- };
- 
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-+	status = "okay";
-+};
-+
- &uart2 {
- 	status = "okay";
- };
--- 
-2.0.0
+Thanks,
+Charles
