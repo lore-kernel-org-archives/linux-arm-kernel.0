@@ -1,63 +1,55 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue,  4 Jul 2017 13:59:19 +0200
-Subject: [PATCH v2 1/9] clk: at91: clk-generated: remove useless divisor loop
+Date: Tue,  4 Jul 2017 13:59:20 +0200
+Subject: [PATCH v2 2/9] clk: at91: add audio plls to the compatible list in DT
+ binding
 In-Reply-To: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
 References: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170704115927.32662-2-quentin.schulz@free-electrons.com>
+Message-ID: <20170704115927.32662-3-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver requests the current clk rate of each of its parent clocks to
-decide whether a clock rate is suitable or not. It does not request
-determine_rate from a parent clock which could request a rate change in
-parent clock (i.e. there is no parent rate propagation).
+This new clock driver set allows to have a fractional divided clock that
+would generate a precise clock particularly suitable for audio
+applications.
 
-We know the rate we want (passed along req argument of the function) and
-the parent clock rate, thus we know the closest rounded divisor, we
-don't need to iterate over the available divisors to find the best one
-for a given clock.
+The main audio pll clock has two children clocks: one that is connected
+to the PMC, the other that can directly drive a pad. As these two routes
+have different enable bits and different dividers and divider formulas,
+they are handled by two different drivers.
+
+This adds the audio plls (frac, pad and pmc) to the compatible list of
+at91 clocks in DT binding.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/clk/at91/clk-generated.c | 25 ++++++++++++-------------
- 1 file changed, 12 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index 07c8f701e51c..dab7002937e6 100644
---- a/drivers/clk/at91/clk-generated.c
-+++ b/drivers/clk/at91/clk-generated.c
-@@ -124,19 +124,18 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- 		    (gck->range.max && min_rate > gck->range.max))
- 			continue;
+added in v2:
+  - split from big patch with pll drivers and dt-binding
+
+ Documentation/devicetree/bindings/clock/at91-clock.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+index 5f3ad65daf69..51c259a92d02 100644
+--- a/Documentation/devicetree/bindings/clock/at91-clock.txt
++++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+@@ -81,6 +81,16 @@ Required properties:
+ 	"atmel,sama5d2-clk-generated":
+ 		at91 generated clock
  
--		for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
--			tmp_rate = DIV_ROUND_CLOSEST(parent_rate, div);
--			tmp_diff = abs(req->rate - tmp_rate);
--
--			if (best_diff < 0 || best_diff > tmp_diff) {
--				best_rate = tmp_rate;
--				best_diff = tmp_diff;
--				req->best_parent_rate = parent_rate;
--				req->best_parent_hw = parent;
--			}
--
--			if (!best_diff || tmp_rate < req->rate)
--				break;
-+		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
-+		if (!div)
-+			tmp_rate = parent_rate;
-+		else
-+			tmp_rate = parent_rate / div;
-+		tmp_diff = abs(req->rate - tmp_rate);
++	"atmel,sama5d2-clk-audio-pll-frac":
++		at91 audio fractional pll
 +
-+		if (best_diff < 0 || best_diff > tmp_diff) {
-+			best_rate = tmp_rate;
-+			best_diff = tmp_diff;
-+			req->best_parent_rate = parent_rate;
-+			req->best_parent_hw = parent;
- 		}
- 
- 		if (!best_diff)
++	"atmel,sama5d2-clk-audio-pll-pad":
++		at91 audio pll CLK_AUDIO output pin
++
++	"atmel,sama5d2-clk-audio-pll-pmc"
++		at91 audio pll output on AUDIOPLLCLK that feeds the PMC
++		and can be used by peripheral clock or generic clock
++
+ Required properties for SCKC node:
+ - reg : defines the IO memory reserved for the SCKC.
+ - #size-cells : shall be 0 (reg is used to encode clk id).
 -- 
 2.11.0
