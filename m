@@ -1,89 +1,148 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 4 Jul 2017 15:08:43 +0200
-Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <20170704070958.oolhapyx7uy2fly4@hirez.programming.kicks-ass.net>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
- <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
- <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
- <e57debab-3457-1d9c-a72e-ecdf7d4f742e@sigmadesigns.com>
- <baf9866b-04ba-698c-3012-a957ec0123d1@sigmadesigns.com>
- <20170704070958.oolhapyx7uy2fly4@hirez.programming.kicks-ass.net>
-Message-ID: <c80ce48f-5a7d-48d2-fd60-0d87eb0fcc0a@free.fr>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 4 Jul 2017 15:14:41 +0200
+Subject: [PATCH v2 3/5] ARM: OMAP2+: pm33xx-core: Add platform code
+ needed for PM
+In-Reply-To: <20170519200438.9502-4-d-gerlach@ti.com>
+References: <20170519200438.9502-1-d-gerlach@ti.com>
+ <20170519200438.9502-4-d-gerlach@ti.com>
+Message-ID: <20170704131441.GH27842@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2017 09:09, Peter Zijlstra wrote:
-
-> On Mon, Jul 03, 2017 at 05:30:28PM +0200, Marc Gonzalez wrote:
+On Fri, May 19, 2017 at 03:04:36PM -0500, Dave Gerlach wrote:
+> Most of the PM code needed for am335x and am437x can be moved into a
+> module under drivers but some core code must remain in mach-omap2 at the
+> moment. This includes some internal clockdomain APIs and low-level ARM
+> APIs which are also not exported for use by modules.
 > 
->> And at the end of smp8759_config_read:
->>
->> 	printk("in_atomic_preempt_off = %d\n", in_atomic_preempt_off());
+> Implement a few functions that handle these low-level platform
+> operations can be passed to the pm33xx module through the use of
+> platform data.
 > 
-> That's confused...
-
-That much is certain. I am indeed grasping at straws.
-
-I grepped "scheduling while atomic", found __schedule_bug()
-in kernel/sched/core.c and saw
-
-	if (IS_ENABLED(CONFIG_DEBUG_PREEMPT) && in_atomic_preempt_off()) {
-		pr_err("Preemption disabled at:");
-		print_ip_sym(preempt_disable_ip);
-		pr_cont("\n");
-	}
-
-I thought printing the value of in_atomic_preempt_off()
-in the callback would indicate whether preemption had
-already been turned off at that point.
-
-It doesn't work like that?
-
-BTW, why didn't print_ip_sym(preempt_disable_ip); say
-where preemption had been disabled?
-
-
->> [    1.026568] BUG: scheduling while atomic: swapper/0/1/0x00000002
->> [    1.032625] 5 locks held by swapper/0/1:
->> [    1.036575]  #0:  (&dev->mutex){......}, at: [<c038c684>] __driver_attach+0x50/0xd0
->> [    1.044319]  #1:  (&dev->mutex){......}, at: [<c038c694>] __driver_attach+0x60/0xd0
->> [    1.052050]  #2:  (pci_lock){+.+...}, at: [<c03309d8>] pci_bus_read_config_dword+0x44/0x94
+> In addition to this, to be able to share data structures between C and
+> the sleep33xx and sleep43xx assembly code, we can automatically generate
+> all of the C struct member offsets and sizes as macros by making use of
+> the ARM asm-offsets file. In the same header that we define our data
+> structures in we also define all the macros in an inline function and by
+> adding a call to this in the asm_offsets file all macros are properly
+> generated and available to the assembly code without cluttering up the
+> asm-offsets file.
 > 
-> This is a raw_spinlock_t, that disables preemption
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
 
-drivers/pci/access.c
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index b668719b9b25..2f9649b89053 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -81,6 +81,11 @@ extern unsigned int omap3_do_wfi_sz;
+>  /* ... and its pointer from SRAM after copy */
+>  extern void (*omap3_do_wfi_sram)(void);
+>  
+> +struct am33xx_pm_platform_data *am33xx_pm_get_pdata(void);
 
-/*
- * This interrupt-safe spinlock protects all accesses to PCI
- * configuration space.
- */
-DEFINE_RAW_SPINLOCK(pci_lock);
+This one is not used outside of pm33xx-core.c so can now be static, and
+this declaration can be dropped.
 
+> diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
+> new file mode 100644
+> index 000000000000..c84ffc4de2e9
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/pm33xx-core.c
+> @@ -0,0 +1,181 @@
+> +/*
+> + * AM33XX Arch Power Management Routines
+> + *
+> + * Copyright (C) 2016-2017 Texas Instruments Incorporated - http://www.ti.com/
+> + *	Dave Gerlach
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <asm/smp_scu.h>
 
-	raw_spin_lock_irqsave(&pci_lock, flags);
-	res = bus->ops->read(bus, devfn, pos, len, &data);
+I get a compilation error here when compiling for am335x without
+CONFIG_HAVE_ARM_SCU due to a missing errno.h include:
 
+In file included from /home/johan/work/omicron/src/linux/arch/arm/mach-omap2/pm33xx-core.c:17:0:
+/home/johan/work/omicron/src/linux/arch/arm/include/asm/smp_scu.h: In function 'scu_power_mode':
+/home/johan/work/omicron/src/linux/arch/arm/include/asm/smp_scu.h:36:10: error: 'EINVAL' undeclared (first use in this function)
+  return -EINVAL;
+          ^
+/home/johan/work/omicron/src/linux/arch/arm/include/asm/smp_scu.h:36:10: note: each undeclared identifier is reported only once for each function it appears in
 
-IIUC, it's not possible to call stop_machine() while holding
-a raw spinlock? What about regular spinlocks? IIUC, in RT,
-regular spinlocks may sleep?
+This is arguably a bug in the header, which I'm submitting a fix for,
+but you should include errno.h above anyway as you use its definitions
+below as well.
 
-I didn't find "preempt" or "schedul" in the spinlock doc.
-https://www.kernel.org/doc/Documentation/locking/spinlocks.txt
+> +#include <asm/suspend.h>
+> +#include <linux/platform_data/pm33xx.h>
 
+<snip>
 
-> Using stop_machine() is per definition doing it wrong ;-)
+> diff --git a/include/linux/platform_data/pm33xx.h b/include/linux/platform_data/pm33xx.h
+> new file mode 100644
+> index 000000000000..c191ab681093
+> --- /dev/null
+> +++ b/include/linux/platform_data/pm33xx.h
+> @@ -0,0 +1,69 @@
+> +/*
+> + * TI pm33xx platform data
+> + *
+> + * Copyright (C) 2016-2017 Texas Instruments, Inc.
+> + *	Dave Gerlach <d-gerlach@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _LINUX_PLATFORM_DATA_PM33XX_H
+> +#define _LINUX_PLATFORM_DATA_PM33XX_H
+> +
 
-Here's the high-level view. My HW is borked and muxes
-config space and mem space. So I need a way to freeze
-the entire system, make the config space access, and
-then return the system to normal. (AFAICT, config space
-accesses are rare, so if I kill performance for these
-accesses, the system might remain usable.)
+And here you should add a linux/types.h include to make this header
+self-contained. Right now you are depending on the scu header to pull in
+the types for pm33xx-core.c above.
 
-Is there a way to do this? Mark suggested stop_machine
-but it seems using it in my situation is not quite
-straight-forward.
+> +#include <linux/kbuild.h>
+> +
+> +#ifndef __ASSEMBLER__
+> +struct am33xx_pm_sram_addr {
+> +	void (*do_wfi)(void);
+> +	unsigned long *do_wfi_sz;
+> +	unsigned long *resume_offset;
+> +	unsigned long *emif_sram_table;
+> +	unsigned long *ro_sram_data;
+> +};
+> +
+> +struct am33xx_pm_platform_data {
+> +	int	(*init)(void);
+> +	int	(*soc_suspend)(unsigned int state, int (*fn)(unsigned long));
+> +	struct  am33xx_pm_sram_addr *(*get_sram_addrs)(void);
+> +};
+> +
+> +struct am33xx_pm_sram_data {
+> +	u32 wfi_flags;
+> +	u32 l2_aux_ctrl_val;
+> +	u32 l2_prefetch_ctrl_val;
+> +};
+> +
+> +struct am33xx_pm_ro_sram_data {
+> +	u32 amx3_pm_sram_data_virt;
+> +	u32 amx3_pm_sram_data_phys;
+> +};
 
-Regards.
+Johan
