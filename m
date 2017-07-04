@@ -1,98 +1,49 @@
-From: m.niestroj@grinn-global.com (Marcin Niestroj)
-Date: Tue,  4 Jul 2017 18:19:12 +0200
-Subject: [RESEND PATCH] ARM: dts: imx: update snvs-poweroff mask
-Message-ID: <20170704161912.29618-1-m.niestroj@grinn-global.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 4 Jul 2017 16:22:11 +0000
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
+ devices before scanning
+In-Reply-To: <CAHp75VccwpesvDxMcxZ+349rhrAq8QxNoau9XmquMnv9DBLBfA@mail.gmail.com>
+References: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+ <20170613151013.GT3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
+ <20170613200339.GX3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
+ <20170616083313.GY3187@lahna.fi.intel.com>
+ <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
+ <20170616120048.GC629@lahna.fi.intel.com>
+ <CAJZ5v0g+qVui6RU=Hy3c_3qAAWngqaAu6B3JxGOpqF06kitbzA@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
+ <20170619100209.GC629@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFC3D@FRAEML521-MBX.china.huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B10487@FRAEML521-MBX.china.huawei.com>
+ <CAHp75VevOno613gk8QHDA7kmLZJj9TLZRiu7oJUs_xaRzcbpnw@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B15AA2@FRAEML521-MBX.china.huawei.com>
+ <CAHp75VccwpesvDxMcxZ+349rhrAq8QxNoau9XmquMnv9DBLBfA@mail.gmail.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B16310@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guy Shapiro <guy.shapiro@mobi-wize.com>
+Hi Andy
 
-Make the syscon-poweroff driver change only the shutdown bits on the
-SNVS_LP control register.
+[...]
 
-This change fixes an issue with the RTC wakeup alarm, that was
-previously disabled during power off.
+> 
+> You may do it on stack. Define your cell statically (but not const)
+> and apply resources just before mfd_add_devices() call.
 
-Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
-Reviewed-by: Marcin Niestroj <m.niestroj@grinn-global.com>
----
-Hi,
+Ok thanks got it
 
-This is a resend of second patch from patch series [1]. First patch is already
-in v4.12, but this one was not applied.
+> There are examples in the existing drivers. Intel LPC comes to my mind
+> and perhaps PMC (Broxton), though latter has too much other stuff
+> around.
 
-Tested on imx6ul board. Without that patch RTC time is "frozen" during
-power-down state. With that patch RTC shows proper time after exiting
-from power-down.
+Uh yes I see now in lpc_ich.c (base address is read from PCI config space
+and resources are set accordingly).
 
-[1] https://www.spinics.net/lists/arm-kernel/msg561152.html
+Cheers
+Gab
 
- arch/arm/boot/dts/imx6qdl.dtsi | 1 +
- arch/arm/boot/dts/imx6sl.dtsi  | 1 +
- arch/arm/boot/dts/imx6sx.dtsi  | 1 +
- arch/arm/boot/dts/imx6ul.dtsi  | 1 +
- arch/arm/boot/dts/imx7s.dtsi   | 1 +
- 5 files changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e426faa9c243..f81f38700c88 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -766,6 +766,7 @@
- 					compatible = "syscon-poweroff";
- 					regmap = <&snvs>;
- 					offset = <0x38>;
-+					value = <0x60>;
- 					mask = <0x60>;
- 					status = "disabled";
- 				};
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index cc9572ea2860..2c2a90f2c8fc 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -652,6 +652,7 @@
- 					compatible = "syscon-poweroff";
- 					regmap = <&snvs>;
- 					offset = <0x38>;
-+					value = <0x60>;
- 					mask = <0x60>;
- 					status = "disabled";
- 				};
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 3f1416be4c36..a7c6ca1638c6 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -707,6 +707,7 @@
- 					compatible = "syscon-poweroff";
- 					regmap = <&snvs>;
- 					offset = <0x38>;
-+					value = <0x60>;
- 					mask = <0x60>;
- 					status = "disabled";
- 				};
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index b9d7d2d09402..d3431a796716 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -613,6 +613,7 @@
- 					compatible = "syscon-poweroff";
- 					regmap = <&snvs>;
- 					offset = <0x38>;
-+					value = <0x60>;
- 					mask = <0x60>;
- 					status = "disabled";
- 				};
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index c4f12fd2e044..216fbcb13bf5 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -535,6 +535,7 @@
- 					compatible = "syscon-poweroff";
- 					regmap = <&snvs>;
- 					offset = <0x38>;
-+					value = <0x60>;
- 					mask = <0x60>;
- 				};
- 
--- 
-2.13.2
+> 
+> --
+> With Best Regards,
+> Andy Shevchenko
