@@ -1,24 +1,24 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  4 Jul 2017 17:23:18 +0200
-Subject: [PATCH 7/7] ARM: dts: r8a7794: Add Inter Connect RAM
+Date: Tue,  4 Jul 2017 17:23:17 +0200
+Subject: [PATCH 6/7] ARM: dts: r8a7793: Add Inter Connect RAM
 In-Reply-To: <1499181798-28859-1-git-send-email-geert+renesas@glider.be>
 References: <1499181798-28859-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1499181798-28859-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <1499181798-28859-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Car E2 has 2 regions of Inter Connect RAM (72 + 4 KiB).
+R-Car M2-N has 2 regions of Inter Connect RAM (72 + 4 KiB).
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 10 ++++++++++
+ arch/arm/boot/dts/r8a7793.dtsi | 10 ++++++++++
  1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 7d9a81d970d87c6b..78973cee7185ffe6 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -588,6 +588,16 @@
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 13b980f27bbc885f..bc6a44272f555215 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -848,6 +848,16 @@
  		status = "disabled";
  	};
  
@@ -33,7 +33,7 @@ index 7d9a81d970d87c6b..78973cee7185ffe6 100644
 +	};
 +
  	ether: ethernet at ee700000 {
- 		compatible = "renesas,ether-r8a7794";
+ 		compatible = "renesas,ether-r8a7793";
  		reg = <0 0xee700000 0 0x400>;
 -- 
 2.7.4
