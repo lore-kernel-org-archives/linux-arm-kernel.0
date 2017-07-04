@@ -1,112 +1,36 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 4 Jul 2017 14:30:21 +0800
-Subject: [PATCH v4 2/3] arm64: kvm: route synchronous external abort
- exceptions to el2
-In-Reply-To: <20170703082345.GD4066@cbox>
-References: <1498481156-23572-1-git-send-email-gengdongjiu@huawei.com>
- <3862ccaf-a669-17b0-4cfb-ce15fce361a1@huawei.com>
- <20170703082345.GD4066@cbox>
-Message-ID: <8ce52b7e-e5bd-8a4e-bc4e-bb046d19c2f5@huawei.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 4 Jul 2017 12:15:36 +0530
+Subject: [RFC 0/5] drivers: Add boot constraints core
+In-Reply-To: <20170703150733.sop6yrrpfl3ne32g@sirena.org.uk>
+References: <20170630035533.GV29665@vireshk-i7>
+ <CAGb2v67hxVciKFLD=8pgfm+UJ1i2Zb0aByTEa556O5uGcX7Oug@mail.gmail.com>
+ <20170630041211.GX29665@vireshk-i7>
+ <CAGb2v641UyXS5ccmo0j9Dvty8soB+DqwF2w8zKHsM78oK7b1aw@mail.gmail.com>
+ <20170630051203.GY29665@vireshk-i7>
+ <CAGb2v64CE2cUKgFuXd0f+FEdzQqmpOgMWqk76RndjeOz98=H0A@mail.gmail.com>
+ <20170630084330.GB29665@vireshk-i7>
+ <20170630121026.azppihjqls5i6bbr@sirena.org.uk>
+ <20170703061552.GB3532@vireshk-i7>
+ <20170703150733.sop6yrrpfl3ne32g@sirena.org.uk>
+Message-ID: <20170704064536.GG3532@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 2017/7/3 16:23, Christoffer Dall wrote:
-> On Tue, Jun 27, 2017 at 08:15:49PM +0800, gengdongjiu wrote:
->> correct the commit message:
->>
->>  In the firmware-first RAS solution, OS receives an synchronous
->>  external abort, then trapped to EL3 by SCR_EL3.EA. Firmware inspects
->>  the HCR_EL2.TEA and chooses the target to send APEI's SEA notification.
->>  If the SCR_EL3.EA is set, delegates the error exception to the hypervisor,
->>  otherwise it delegates to the host OS kernel
+On 03-07-17, 16:07, Mark Brown wrote:
+> On Mon, Jul 03, 2017 at 11:45:52AM +0530, Viresh Kumar wrote:
+> > The above regulator-min/max-microvolt values I mentioned were for the regulator
+> > device and not what the consumers would request. Yes, DMA will request something
 > 
-> This commit text has nothing (directly) to do with the content of the
-> patch.  Whether or not seting these bits are used by firmware to emulate
-> injecting an exception or by the CPU raising a an exception is not the
-> core of the issue.
-> 
-> Please describe your change, then provide rationale.
+> If you're putting the maximum possible range that the physical regulator
+> can supply into machine constraints then you really haven't understood
+> what machine constraints are at all.
 
-(1)Below hcr_el2.TEA/TERR two field is introduced by armv8.2, RAS extension.
+I wasn't referring to the limits of the physical regulators but the min/max that
+the consumers can set on a particular platform.
 
-TEA, bit [37]
-	Route synchronous External Abort exceptions to EL2. The possible values of this bit are:
-	0 Do not route synchronous External Abort exceptions from Non-secure EL0 and EL1 to EL2.
-	1 Route synchronous External Abort exceptions from Non-secure EL0 and EL1 to EL2, if not routed
-	to EL3.
-	This bit is RES0 if the RAS extension is not implemented.
-TERR, bit [36]
-	Trap Error record accesses. The possible values of this bit are:
-	0 Do not trap accesses to error record registers from Non-secure EL1 to EL2.
-	1 Accesses to the ER* registers from Non-secure EL1 generate a Trap exception to EL2.
-	This bit is RES0 if the RAS extension is not implemented.
+> No, it really shouldn't.  Please read what I wrote.
 
-(2) when synchronous External Abort(SEA) OS happen SEA, it trap to EL3 firmware.
-then the firmware needs to do by faking an exception entry to  hypervisor EL2; or
-by faking an exception entry to EL1
-so if the hcr_el2.TEA is set, firmware will eret to EL2; otherwise, eret to EL1.
-hcr_el2.TEA is only set for the guest OS.
-not set for the host OS.
+Sorry about that. Understood it now.
 
-
-(3) setting hcr_el2.HCR_TERR want to trap the EL1 error record access to EL2.
-
-
-> 
-> Thanks,
-> -Christoffer
-> 
-> 
->>
->>
->> On 2017/6/26 20:45, Dongjiu Geng wrote:
->>> In the firmware-first RAS solution, guest OS receives an synchronous
->>> external abort, then trapped to EL3 by SCR_EL3.EA. Firmware inspects
->>> the HCR_EL2.TEA and chooses the target to send APEI's SEA notification.
->>> If the SCR_EL3.EA is set, delegates the error exception to the hypervisor,
->>> otherwise it delegates to the guest OS kernel
->>>
->>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->>> ---
->>>  arch/arm64/include/asm/kvm_arm.h     | 2 ++
->>>  arch/arm64/include/asm/kvm_emulate.h | 7 +++++++
->>>  2 files changed, 9 insertions(+)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->>> index 61d694c..1188272 100644
->>> --- a/arch/arm64/include/asm/kvm_arm.h
->>> +++ b/arch/arm64/include/asm/kvm_arm.h
->>> @@ -23,6 +23,8 @@
->>>  #include <asm/types.h>
->>>  
->>>  /* Hyp Configuration Register (HCR) bits */
->>> +#define HCR_TEA		(UL(1) << 37)
->>> +#define HCR_TERR	(UL(1) << 36)
->>>  #define HCR_E2H		(UL(1) << 34)
->>>  #define HCR_ID		(UL(1) << 33)
->>>  #define HCR_CD		(UL(1) << 32)
->>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
->>> index f5ea0ba..5f64ab2 100644
->>> --- a/arch/arm64/include/asm/kvm_emulate.h
->>> +++ b/arch/arm64/include/asm/kvm_emulate.h
->>> @@ -47,6 +47,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
->>>  	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
->>>  	if (is_kernel_in_hyp_mode())
->>>  		vcpu->arch.hcr_el2 |= HCR_E2H;
->>> +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
->>> +		/* route synchronous external abort exceptions to EL2 */
->>> +		vcpu->arch.hcr_el2 |= HCR_TEA;
->>> +		/* trap error record accesses */
->>> +		vcpu->arch.hcr_el2 |= HCR_TERR;
->>> +	}
->>> +
->>>  	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
->>>  		vcpu->arch.hcr_el2 &= ~HCR_RW;
->>>  }
->>>
->>
-> 
-> .
-> 
+-- 
+viresh
