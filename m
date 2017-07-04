@@ -1,201 +1,128 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 4 Jul 2017 11:16:39 +0100
-Subject: [PATCH v3 1/2] acpi:iort: Add an IORT helper function to reserve
- HW ITS address regions for IOMMU drivers
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838399F10@FRAEML521-MBX.china.huawei.com>
-References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
- <20170623145801.325244-2-shameerali.kolothum.thodi@huawei.com>
- <20170623165406.GA6412@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA838399F10@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20170704101638.GB17491@red-moon>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 04 Jul 2017 11:14:34 +0100
+Subject: [PATCH v4 3/3] arm64: kvm: inject SError with user space specified
+ syndrome
+In-Reply-To: <429e4a67-3795-1449-f0b1-12df3012629a@huawei.com>
+References: <1498481199-24118-1-git-send-email-gengdongjiu@huawei.com>
+ <20170703083903.GE4066@cbox>
+ <429e4a67-3795-1449-f0b1-12df3012629a@huawei.com>
+Message-ID: <595B6A8A.1050809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 03, 2017 at 08:18:45AM +0000, Shameerali Kolothum Thodi wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > Sent: Friday, June 23, 2017 5:54 PM
-> > To: Shameerali Kolothum Thodi
-> > Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
-> > robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
-> > Garry; iommu at lists.linux-foundation.org; linux-arm-
-> > kernel at lists.infradead.org; linux-acpi at vger.kernel.org; devel at acpica.org;
-> > Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
-> > Subject: Re: [PATCH v3 1/2] acpi:iort: Add an IORT helper function to reserve
-> > HW ITS address regions for IOMMU drivers
-> > 
-> > On Fri, Jun 23, 2017 at 03:58:00PM +0100, shameer wrote:
-> > > The helper function retrieves ITS address regions through IORT device
-> > > <-> ITS mappings and reserves it so that these regions will not be
-> > > translated by IOMMU and will be excluded from IOVA allocations. IOMMU
-> > > drivers can use this to implement their .get_resv_regions callback.
-> > >
-> > > Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> > > ---
-> > >  drivers/acpi/arm64/iort.c        | 91
-> > ++++++++++++++++++++++++++++++++++++++--
-> > >  drivers/irqchip/irq-gic-v3-its.c |  3 +-
-> > >  include/linux/acpi_iort.h        |  7 +++-
-> > >  3 files changed, 96 insertions(+), 5 deletions(-)
-> > >
-> > > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > > index c5fecf9..cf0a6b8 100644
-> > > --- a/drivers/acpi/arm64/iort.c
-> > > +++ b/drivers/acpi/arm64/iort.c
-> > > @@ -34,6 +34,7 @@
-> > >  struct iort_its_msi_chip {
-> > >  	struct list_head	list;
-> > >  	struct fwnode_handle	*fw_node;
-> > > +	phys_addr_t		base_addr;
-> > >  	u32			translation_id;
-> > >  };
-> > >
-> > > @@ -131,14 +132,16 @@ typedef acpi_status (*iort_find_node_callback)
-> > > static DEFINE_SPINLOCK(iort_msi_chip_lock);
-> > >
-> > >  /**
-> > > - * iort_register_domain_token() - register domain token and related
-> > > ITS ID
-> > > - * to the list from where we can get it back later on.
-> > > + * iort_register_domain_token() - register domain token along with
-> > > + related
-> > > + * ITS ID and base address to the list from where we can get it back later
-> > on.
-> > >   * @trans_id: ITS ID.
-> > > + * @base: ITS base address.
-> > >   * @fw_node: Domain token.
-> > >   *
-> > >   * Returns: 0 on success, -ENOMEM if no memory when allocating list
-> > element
-> > >   */
-> > > -int iort_register_domain_token(int trans_id, struct fwnode_handle
-> > > *fw_node)
-> > > +int iort_register_domain_token(int trans_id, phys_addr_t base,
-> > > +			       struct fwnode_handle *fw_node)
-> > >  {
-> > >  	struct iort_its_msi_chip *its_msi_chip;
-> > >
-> > > @@ -148,6 +151,7 @@ int iort_register_domain_token(int trans_id,
-> > > struct fwnode_handle *fw_node)
-> > >
-> > >  	its_msi_chip->fw_node = fw_node;
-> > >  	its_msi_chip->translation_id = trans_id;
-> > > +	its_msi_chip->base_addr = base;
-> > >
-> > >  	spin_lock(&iort_msi_chip_lock);
-> > >  	list_add(&its_msi_chip->list, &iort_msi_chip_list); @@ -491,6
-> > > +495,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
-> > >  	return -ENODEV;
-> > >  }
-> > >
-> > > +static int iort_find_its_base(u32 its_id, phys_addr_t *base) {
-> > > +	struct iort_its_msi_chip *its_msi_chip;
-> > > +	bool match = false;
-> > > +
-> > > +	spin_lock(&iort_msi_chip_lock);
-> > > +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-> > > +		if (its_msi_chip->translation_id == its_id) {
-> > > +			*base = its_msi_chip->base_addr;
-> > > +			match = true;
-> > > +			break;
-> > > +		}
-> > > +	}
-> > > +	spin_unlock(&iort_msi_chip_lock);
-> > > +
-> > > +	return match ? 0 : -ENODEV;
-> > > +}
-> > > +
-> > >  /**
-> > >   * iort_dev_find_its_id() - Find the ITS identifier for a device
-> > >   * @dev: The device.
-> > > @@ -649,6 +671,67 @@ int iort_add_device_replay(const struct
-> > iommu_ops
-> > > *ops, struct device *dev)
-> > >
-> > >  	return err;
-> > >  }
-> > > +
-> > > +/**
-> > > + * iort_iommu_its_get_resv_regions - Reserved region driver helper
-> > > + * @dev: Device from iommu_get_resv_regions()
-> > > + * @list: Reserved region list from iommu_get_resv_regions()
-> > > + *
-> > > + * Returns: Number of reserved regions on success(0 if no associated ITS),
-> > > + *          appropriate error value otherwise.
-> > > + *
-> > > + * IOMMU drivers can use this to implement their .get_resv_regions
-> > > +callback
-> > > + * for reserving the HW ITS address regions.
-> > > + */
-> > > +int iort_iommu_its_get_resv_regions(struct device *dev, struct
-> > > +list_head *head) {
-> > > +	int i;
-> > > +	struct acpi_iort_its_group *its;
-> > > +	struct acpi_iort_node *node, *its_node = NULL;
-> > > +	int resv = 0;
-> > > +
-> > > +	node = iort_find_dev_node(dev);
-> > > +	if (!node)
-> > > +		return -ENODEV;
-> > > +
-> > > +	if (dev_is_pci(dev)) {
-> > > +		u32 rid;
-> > > +
-> > > +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
-> > &rid);
-> > > +		its_node = iort_node_map_id(node, rid, NULL,
-> > IORT_MSI_TYPE);
-> > > +	} else {
-> > > +		for (i = 0; i < node->mapping_count; i++) {
-> > > +			its_node = iort_node_map_platform_id(node, NULL,
-> > > +							 IORT_MSI_TYPE, i);
-> > > +			if (its_node)
-> > > +				break;
-> > > +		}
-> > > +	}
-> > > +
-> > > +	if (!its_node)
-> > > +		return 0;
-> > > +
-> > > +	/* Move to ITS specific data */
-> > > +	its = (struct acpi_iort_its_group *)its_node->node_data;
-> > > +
-> > > +	for (i = 0; i < its->its_count; i++) {
-> > > +		phys_addr_t base;
-> > > +
-> > > +		if (!iort_find_its_base(its->identifiers[i], &base)) {
-> > > +			int prot = IOMMU_WRITE | IOMMU_NOEXEC |
-> > IOMMU_MMIO;
-> > > +			struct iommu_resv_region *region;
-> > > +
-> > > +			region = iommu_alloc_resv_region(base, SZ_128K,
-> > prot,
-> > > +							 IOMMU_RESV_MSI);
-> > > +			if (region) {
-> > > +				list_add_tail(&region->list, head);
-> > > +				resv++;
-> > > +			}
-> > > +		}
-> > > +	}
-> > > +
-> > > +	return resv ? : -ENODEV;
-> > 
-> > IIUC I think this is not right (ie resv < its_count should count as a failure).
-> 
-> Yes, that is a valid error.
-> 
-> > This should be easy to fix-up but I am not sure there is still time for these
-> > patches to be merged for this merge window, I take the blame since I am the
-> > cause of the delay but I thought the logic in the SMMU driver should have
-> > been clarified and this version does it IMO.
-> 
-> No problem and thanks for your support. I could rebase this on  rc1 and send
-> the next version. Please let me know.
+Hi gengdongjiu,
 
-Yes, that will work, please resend the final version at -rc1 and if
-Will and Robin are ok with SMMU changes we can queue it for 4.14.
+Can you give us a specific example of an error you are trying to handle?
+How would a non-KVM user space process handle the error?
+
+KVM-users should be regular user space processes, we should not have a KVM-way
+and everyone-else-way of handling errors.
+
+
+On 04/07/17 05:46, gengdongjiu wrote:
+> On 2017/7/3 16:39, Christoffer Dall wrote:
+>> On Mon, Jun 26, 2017 at 08:46:39PM +0800, Dongjiu Geng wrote:
+>>> when SError happen, kvm notifies user space to record the CPER,
+>>> user space specifies and passes the contents of ESR_EL1 on taking
+>>> a virtual SError interrupt to KVM, KVM enables virtual system
+>>> error or asynchronous abort with this specifies syndrome. This
+>>> patch modify the world-switch to restore VSESR_EL2, VSESR_EL2
+>>> saves the virtual SError syndrome, it becomes the ESR_EL1 value when
+>>> HCR_EL2.VSE injects an SError. This register is added by the
+>>> RAS Extensions.
+>>
+>> This commit message is confusing and doesn't help me understand the
+>> patch.
+> (1) what is the rationale for the guest OS SError interrupt(SEI) handling in the RAS solution?
+
+>   a). In the firmware-first RAS solution, when guest OS happen a SError interrupt (SEI), it will firstly trap to EL3(SCR_EL3.EA = 1);
+>   b). The firmware logs, triages, and delegates the error exception to the hypervisor. As the error came from guest OS  EL1, firmware
+>       does by faking an SError interrupt exception entry to EL2.
+>   c). Control transfers to the hypervisor's delegated error recovery agent.Because HCR_EL2.AMO is set to 1, the hypervisor can use a
+>       Virtual SError interrupt to delegate an asynchronous abort to EL1, by setting HCR_EL2.VSE to 1 and using VESR_EL2 to pass syndrome.
+
+So (a): a physical-CPU hardware error occurs, and then (c) we tell Qemu/kvmtool
+via a KVM-specific API.
+
+Don't do this, it doesn't work for non-KVM users. You are exposing host-specific
+implementation details to user space. What if I discover the same error via a
+Polling GHES, or one of the IRQ flavours?
+
+User space should not have to know, or care, how linux is notified about APEI
+RAS errors.
+
+
+> (2) what is this patch mainly do?
+>   As mentioned above, the hypervisor needs to enable virtual SError and pass the virtual syndrome to the guest OS.
+> 
+>   a). when Control transfers to the hypervisor from firmware by faking an SError interrupt, the hypervisor delivered the syndrome_info(esr_el2) and
+>       host VA address( Qemu translate this VA address to the virtual machine physical address(IPA)) using below new added "serror_intr" struct.
+>   		/* KVM_EXIT_SERROR_INTR */
+>  		struct {
+> 			__u32 syndrome_info;
+> 			__u64 address;
+> 		} serror_intr;
+
+This is for a guest exit to host user-space. Here you are telling Qemu that a
+physical CPU hardware error occurred. Qemu/kvmtool should not be expected to
+parse the ESR, this is the job of the operating system.
+
+When you're using ACPI firmware-first, SError/SEI is just a notification, the
+important data is in the CPER records, which Qemu can't access, (and should be
+processed by Linux APEI code).
+
+
+It looks like you've calculated an address from FAR_EL2/HPFAR_EL2. For an
+SError, these are meaningless.
+
+(These registers hold real values for Synchronous External Abort, but for
+ firmware-first we should prefer the CPER records.)
+
+
+>   b). Qemu gets the address(host VA) delivered by KVM, translate this host VA address to virtual machine physical address(IPA), and runtime record this virtual
+>      machine physical address(IPA) to the guest OS's APEI table.
+
+I agree with this step, but you're acting on the wrong data. (You're converting
+fault_ipa -> virtual address -> fault_ipa, something isn't right ...)
+
+Qemu should react to a signal like BUS_MCEERR_A{R,O} from memory_failure(). This
+mechanism serves all user space processes, not just kvm users. This is where the
+user-space virtual address should come from. Qemu/kvmtool have to generate the
+guest IPA once they discover the affected memory was presented to the guest
+through KVM.
+
+
+Your KVM-specific mechanism exposes too much raw information (raw ESR values to
+user space), and only serves applications using KVM.
+
+If there is another type of CPER record where we should notify userspace, please
+do it from mm/memory-failure.c, drivers/acpi/apei/ghes.c or
+drivers/firmware/efi/cper.c. These should consider all user-space applications,
+not just users of KVM, and not just on arm64.
+
+
+>   c). Qemu gets the syndrome_info delivered by KVM, it refers to this syndrome value(but can be different from it) to specify the virtual SError interrupt's syndrome through setting VESR_EL2.
+
+'but can be different from it' is because a classification step is required, the
+operating system should do this. We should only signal Qemu/kvmtool for errors
+that can actually be handled. Some APEI notifications may be for corrected
+errors, (I would hope these always come through a polled GHES), Linux shouldn't
+interrupt user space for a corrected error.
+
+For memory errors we already have BUS_MCEERR_AR - action-required, and
+BUS_MCEERR_AO - action-optional.
+
+For a TLB error, (Table 250 of UEFI 2.6), what is Qemu expected to do? Linux has
+to classify the error and handle it as far as possible. In most cases the error
+is either handled (no notification required), or fatal. Memory errors are the
+only example I've found so far where an application can do additional work to
+handle the error.
+
+Can you give us a specific example of an error you are trying to handle?
+How would a non-KVM user space process handle the error?
+
+
 
 Thanks,
-Lorenzo
+
+James
