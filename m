@@ -1,67 +1,102 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 5 Jul 2017 00:43:08 +0900
-Subject: [PATCH] gpio: drop unnecessary includes from
- include/linux/gpio/driver.h
-In-Reply-To: <20170704125851.GA20504@sophia>
-References: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
- <20170704125851.GA20504@sophia>
-Message-ID: <CAK7LNATRrngmVFPDSKmUm3Td7RXnSZSPGNF9Ds_y+DU=i7mRag@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 4 Jul 2017 10:58:55 -0500
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <16622817-8ccd-107b-be08-676b576f6e8a@sigmadesigns.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
+ <20170703134031.GG13824@bhelgaas-glaptop.roam.corp.google.com>
+ <16622817-8ccd-107b-be08-676b576f6e8a@sigmadesigns.com>
+Message-ID: <20170704155855.GI13824@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-07-04 21:58 GMT+09:00 William Breathitt Gray <vilhelm.gray@gmail.com>:
-> On Tue, Jul 04, 2017 at 12:53:34PM +0900, Masahiro Yamada wrote:
->>Some of include directives in include/linux/gpio/driver.h are
->>unneeded because the header does not need to know the content of
->>struct device, irq_chip, etc.  Just declare they are structures.
->>
->>On the other hand, <linux/irqhandler.h> and <linux/spinlock_types.h>
->>turned out to be necessary for irq_flow_handler_t and spinlock_t,
->>respectively.
->>
->>Each driver should include what it needs without relying on what is
->>implicitly included from <linux/gpio/driver.h>.  This will cut down
->>unnecessary header parsing.
->>
->>Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>---
->>
->> drivers/gpio/gpio-104-dio-48e.c  |  1 +
->> drivers/gpio/gpio-104-idi-48.c   |  1 +
->> drivers/gpio/gpio-104-idio-16.c  |  1 +
->> drivers/gpio/gpio-pci-idio-16.c  |  2 ++
->> drivers/gpio/gpio-ws16c48.c      |  1 +
->
-> The changes to the above drivers look fine to me:
->
-> Acked-by: William Breathitt Gray <vilhelm.gray@gmail.com>
->
-> However, this patch as a whole does too many things; I'd like to see it
-> split-up logically similar to how Andy Shevchenko suggested in his
-> reply. That should allow ACKs by respective driver maintainers to be
-> accounted more properly.
->
-> William Breathitt Gray
+On Mon, Jul 03, 2017 at 04:34:29PM +0200, Marc Gonzalez wrote:
+> Bjorn Helgaas wrote:
+> 
+> > Marc Gonzalez wrote:
+> >
+> >> On 03/07/2017 01:18, Bjorn Helgaas wrote:
+> >>
+> >>> On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:
+> >>>
+> >>>> +static int tango_check_pcie_link(void __iomem *test_out)
+> >>>
+> >>> I think this is checking for link up.  Rename to tango_pcie_link_up()
+> >>> to follow the convention of other drivers.  Take a struct tango_pcie *
+> >>> instead of an address, if possible.
+> >>
+> >> Anything's possible. NB: if I pass the struct, then I have to store
+> >> the address in the struct, which isn't the case now, since I never
+> >> need the address later. If you don't mind adding an unnecessary
+> >> field to the struct, I can do it. What do you say?
+> > 
+> > The benefit of following the same formula as other drivers is pretty
+> > large.  Most drivers save the equivalent of "base" in the struct.  If
+> > you did that, you wouldn't need an extra pointer; you would just use
+> > "base + SMP8759_MUX" in the config accessors and "base + SMP8759_TEST_OUT"
+> > in tango_pcie_link_up().
+> 
+> The problem is that TEST_OUT is at 0x74 on SMP8759, but at 0x138
+> on my other chip. In fact, all registers have been "reshuffled",
+> and none have the same offsets on the two chips.
+> 
+> My solution was to define specific registers in the struct.
+> 
+> In my [RFC PATCH v0.2] posted March 23, I tried illustrating
+> the issue:
+> 
+> +static const struct of_device_id tango_pcie_ids[] = {
+> +	{ .compatible = "sigma,smp8759-pcie" },
+> +	{ .compatible = "sigma,rev2-pcie" },
+> +	{ /* sentinel */ },
+> +};
+> +
+> +static void smp8759_init(struct tango_pcie *pcie, void __iomem *base)
+> +{
+> +	pcie->mux		= base + 0x48;
+> +	pcie->msi_status	= base + 0x80;
+> +	pcie->msi_mask		= base + 0xa0;
+> +	pcie->msi_doorbell	= 0xa0000000 + 0x2e07c;
+> +}
+> +
+> +static void rev2_init(struct tango_pcie *pcie, void __iomem *base)
+> +{
+> +	void __iomem *misc_irq	= base + 0x40;
+> +	void __iomem *doorbell	= base + 0x8c;
+> +
+> +	pcie->mux		= base + 0x2c;
+> +	pcie->msi_status	= base + 0x4c;
+> +	pcie->msi_mask		= base + 0x6c;
+> +	pcie->msi_doorbell	= 0x80000000;
+> +
+> +	writel(lower_32_bits(pcie->msi_doorbell), doorbell + 0);
+> +	writel(upper_32_bits(pcie->msi_doorbell), doorbell + 4);
+> +
+> +	/* Enable legacy PCI interrupts */
+> +	writel(BIT(15), misc_irq);
+> +	writel(0xf << 4, misc_irq + 4);
+> +}
+> 
+> 
+> Do you agree that the 'base + OFFSET' idiom does not work in
+> this specific situation? Would you handle it differently?
 
+It's definitely a hassle to support chips with different register
+layouts.  Your hardware guys are really making your life hard :)
 
-I was missing a very important thing.
+drivers/pci/host/pcie-iproc.c is one strategy.  It has
+iproc_pcie_reg_paxb[] and iproc_pcie_reg_paxb_v2[] with register
+offsets for different chip versions.
 
-<linux/gpio/driver.h> is used in various subsystems.
+It saves a table of register offsets per controller, which is similar
+to saving a set of pointers per controller.  Saving the pointers as
+you suggest above is marginally more storage but probably easier to
+read.
 
-I tested only under drivers/gpio/, but
-drivers/pinctrl/ is one of the biggest source of compile errors.
+If the chips are fundamentally different, i.e., if they *operate*
+differently in addition to having a different register layout, you
+could make two separate drivers.
 
-(Probably I will get reports from kbuild test robot.)
-
-
-So, I need to think about how to merge this (if the basic idea of this is OK).
-
-Maybe,
-
-[1] Send patches to subsystems (gpio, pinctrl, etc.) for v4.14
-[2] Drop unneeded includes from linux/gpio/driver.h for v4.15
-
-
--- 
-Best Regards
-Masahiro Yamada
+Bjorn
