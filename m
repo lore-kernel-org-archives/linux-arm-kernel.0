@@ -1,108 +1,36 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed,  5 Jul 2017 01:32:18 +0200
-Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
-In-Reply-To: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
-References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
-Message-ID: <20170704233219.18790-1-afaerber@suse.de>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 5 Jul 2017 01:42:47 +0200
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <20170704155855.GI13824@bhelgaas-glaptop.roam.corp.google.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
+ <20170703134031.GG13824@bhelgaas-glaptop.roam.corp.google.com>
+ <16622817-8ccd-107b-be08-676b576f6e8a@sigmadesigns.com>
+ <20170704155855.GI13824@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <877fefdf-969d-bc46-3233-f988ccfe4c74@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
-bogus holding pen") simplified the S500 SMP code by removing a loop for
-pen_release in owl_secondary_boot(). Since then it is only calling
-owl_v7_invalidate_l1() before branching to secondary_startup().
+On 04/07/2017 17:58, Bjorn Helgaas wrote:
 
-The owl_v7_invalidate_l1() assembler function is superfluous, too.
-Therefore drop owl_secondary_boot() and use secondary_boot() directly.
+> It's definitely a hassle to support chips with different register
+> layouts.  Your hardware guys are really making your life hard :)
 
-Cc: David Liu <liuwei@actions-semi.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- arch/arm/mach-actions/Makefile  |  4 +---
- arch/arm/mach-actions/headsmp.S | 52 -----------------------------------------
- arch/arm/mach-actions/platsmp.c |  2 +-
- 3 files changed, 2 insertions(+), 56 deletions(-)
- delete mode 100644 arch/arm/mach-actions/headsmp.S
+Now where did I put my foam bat...
 
-diff --git a/arch/arm/mach-actions/Makefile b/arch/arm/mach-actions/Makefile
-index c0f116241da7..13831037d8cd 100644
---- a/arch/arm/mach-actions/Makefile
-+++ b/arch/arm/mach-actions/Makefile
-@@ -1,3 +1 @@
--obj-${CONFIG_SMP} += platsmp.o headsmp.o
--
--AFLAGS_headsmp.o := -Wa,-march=armv7-a
-+obj-${CONFIG_SMP} += platsmp.o
-diff --git a/arch/arm/mach-actions/headsmp.S b/arch/arm/mach-actions/headsmp.S
-deleted file mode 100644
-index 65f53bdb69e7..000000000000
---- a/arch/arm/mach-actions/headsmp.S
-+++ /dev/null
-@@ -1,52 +0,0 @@
--/*
-- * Copyright 2012 Actions Semi Inc.
-- * Author: Actions Semi, Inc.
-- *
-- * Copyright (c) 2017 Andreas F?rber
-- *
-- * This program is free software; you can redistribute  it and/or modify it
-- * under  the terms of  the GNU General  Public License as published by the
-- * Free Software Foundation;  either version 2 of the  License, or (at your
-- * option) any later version.
-- */
--
--#include <linux/linkage.h>
--#include <linux/init.h>
--
--ENTRY(owl_v7_invalidate_l1)
--	mov	r0, #0
--	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
--	mcr	p15, 2, r0, c0, c0, 0
--	mrc	p15, 1, r0, c0, c0, 0
--
--	ldr	r1, =0x7fff
--	and	r2, r1, r0, lsr #13
--
--	ldr	r1, =0x3ff
--
--	and	r3, r1, r0, lsr #3	@ NumWays - 1
--	add	r2, r2, #1		@ NumSets
--
--	and	r0, r0, #0x7
--	add	r0, r0, #4	@ SetShift
--
--	clz	r1, r3		@ WayShift
--	add	r4, r3, #1	@ NumWays
--1:	sub	r2, r2, #1	@ NumSets--
--	mov	r3, r4		@ Temp = NumWays
--2:	subs	r3, r3, #1	@ Temp--
--	mov	r5, r3, lsl r1
--	mov	r6, r2, lsl r0
--	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
--	mcr	p15, 0, r5, c7, c6, 2
--	bgt	2b
--	cmp	r2, #0
--	bgt	1b
--	dsb
--	isb
--	mov	pc, lr
--ENDPROC(owl_v7_invalidate_l1)
--
--ENTRY(owl_secondary_startup)
--	bl	owl_v7_invalidate_l1
--	b	secondary_startup
-diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
-index 12a9e331b432..506ba32f235d 100644
---- a/arch/arm/mach-actions/platsmp.c
-+++ b/arch/arm/mach-actions/platsmp.c
-@@ -71,7 +71,7 @@ static int s500_wakeup_secondary(unsigned int cpu)
- 	/* wait for CPUx to run to WFE instruction */
- 	udelay(200);
- 
--	writel(virt_to_phys(owl_secondary_startup),
-+	writel(virt_to_phys(secondary_startup),
- 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
- 	writel(OWL_CPUx_FLAG_BOOT,
- 	       timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
--- 
-2.12.3
+> If the chips are fundamentally different, i.e., if they *operate*
+> differently in addition to having a different register layout, you
+> could make two separate drivers.
+
+It's the exact same underlying IP. Revision 2 is only a
+bug fix rev. IIUC, some of the fixes lead to adding a
+register here, removing a register there... and I don't
+think the HW dev ever considered the pain of supporting
+both revs within a single driver.
+
+This dual support explains some of the peculiarities
+you noted in my submission.
+
+Regards.
