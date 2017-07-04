@@ -1,97 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Jul 2017 16:26:22 +0200
-Subject: [GIT PULL 7/7] ARM: SoC 64-bit changes
-Message-ID: <CAK8P3a3wjv1QQvOetzEm7oF0iduFbJctRvktJeZh-_YPP5LUxQ@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 4 Jul 2017 14:27:39 +0000
+Subject: [PATCH V3 2/2] timer: imx-tpm: add imx tpm timer support
+In-Reply-To: <alpine.DEB.2.20.1707041603571.9000@nanos>
+References: <1499176823-4421-1-git-send-email-aisheng.dong@nxp.com>
+ <1499176823-4421-3-git-send-email-aisheng.dong@nxp.com>
+ <alpine.DEB.2.20.1707041603571.9000@nanos>
+Message-ID: <AM3PR04MB3061653B4CF496CD1A4FAE280D70@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5ed02dbb497422bf225783f46e6eadd237d23d6b:
+> -----Original Message-----
+> From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> Sent: Tuesday, July 04, 2017 10:10 PM
+> To: A.s. Dong
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> daniel.lezcano at linaro.org; shawnguo at kernel.org; Jacky Bai; Anson Huang;
+> dongas86 at gmail.com; kernel at pengutronix.de; Arnd Bergmann; Anson Huang
+> Subject: Re: [PATCH V3 2/2] timer: imx-tpm: add imx tpm timer support
+> 
+> On Tue, 4 Jul 2017, Dong Aisheng wrote:
+> 
+> > IMX Timer/PWM Module (TPM) supports both timer and pwm function while
+> > this patch only adds the timer support. PWM would be added later.
+> >
+> > The TPM counter, compare and capture registers are clocked by an
+> > asynchronous clock that can remain enabled in low power modes.
+> >
+> > Due to the possible bus fabric contention, the CNT write may take a
+> > few more cycles and we need add ETIME check in case current delta
+> > event program gets missed.
+> >
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Anson Huang <Anson.Huang@nxp.com>
+> > Cc: Bai Ping <ping.bai@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >
+> > ---
+> > ChangeLog:
+> > v2->v3:
+> >  * address all comments from Daniel Lezcano
+> >  * add more explaination on ETIME check in commit message
+> 
+> Actually the logic wants to be explained in a comment inside the function
+> as well.
+> 
 
-  Linux 4.12-rc3 (2017-05-28 17:20:53 -0700)
+Good suggestion, will add them inside function as well.
 
-are available in the git repository at:
+> I'm really impressed, that 10 years after we discovered the HPET disaster
+> (See comment in arch/x86/kernel/hpet.c::hpet_next_event) the same
+> hardware idiocy comes around again....
+> 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/armsoc-arm64
+Not quite sure but seems a bit different issue.
+The issue is still uncertain but the test shows it's related to fabric priority
+Configuration, if increase the A7 core priority higher than GPU, the issue
+is very hard to be seen. But we don't want to change the default priority,
+we use ETIME check to fix it.
 
-for you to fetch changes up to 96f630279ad49402fa394e145a2c28bd97d6e3c4:
+Probably I would be better add a FIXME prefix before the comments in code
+as well because it's still uncertain.
 
-  Merge tag 'actions-arm64-soc-for-4.13' of
-git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions
-into next/arm64 (2017-06-29 17:19:27 +0200)
+Regards
+Dong Aisheng
 
-----------------------------------------------------------------
-ARM: SoC 64-bit changes
-
-Changes to platform code for 64-bit ARM platforms.
-
-Andreas F?rber adds two new platforms with initial code: Realtek RTD1295
-and Action Semi S900. Both are fairly similar chips, used mainly in
-set-top-boxes, but with other possible applications, and additional
-members in the respective product families that could be added in the
-future. The code here is fairly minimal, as all the interesting parts
-are in device drivers and dts files.
-
-The Broadcom Vulcan platform gets dropped, as no products ever became
-available, and Cavium integrated the platform under a new name.
-
-Among some other defconfig changes, Timur Tabi enables a number of
-options that are typically required for server platforms.
-
-----------------------------------------------------------------
-Andreas F?rber (3):
-      ARM64: Prepare Realtek RTD1295
-      MAINTAINERS: Add Realtek section
-      arm64: Prepare Actions Semi S900
-
-Arnd Bergmann (3):
-      Merge tag 'mvebu-arm64-4.13-1' of
-git://git.infradead.org/linux-mvebu into next/arm64
-      arm64: defconfig: remove duplicate entry
-      Merge tag 'actions-arm64-soc-for-4.13' of
-git://git.kernel.org/.../afaerber/linux-actions into next/arm64
-
-Florian Fainelli (1):
-      arm64: defconfig: Enable ARCH_BRCMSTB
-
-Gregory CLEMENT (1):
-      arm64: marvell: enable the Armada 7K/8K pinctrl driver
-
-Jayachandran C (2):
-      arm64: disable Broadcom Vulcan platform
-      arm64: defconfig: drop ARCH_VULCAN
-
-Kuninori Morimoto (1):
-      arm64: defconfig: enable Simple Sound Card support
-
-Neil Armstrong (2):
-      ARM64: defconfig: enable IR core, decoders and Meson IR device
-      ARM64: defconfig: enable meson SPICC as module
-
-Olof Johansson (4):
-      Merge tag 'realtek-arm64-soc-for-4.12' of
-git://github.com/afaerber/linux into next/arm64
-      Merge tag 'arm-soc/for-4.13/defconfig-arm64' of
-http://github.com/Broadcom/stblinux into next/arm64
-      Merge tag 'amlogic-defconfig' of
-git://git.kernel.org/.../khilman/linux-amlogic into next/arm64
-      Merge tag 'renesas-arm64-defconfig-for-v4.13' of
-https://git.kernel.org/.../horms/renesas into next/arm64
-
-Thomas Petazzoni (1):
-      arm64: marvell: enable ICU and GICP drivers
-
-Timur Tabi (8):
-      arm64: defconfig: enable ACPI_CPPC_CPUFREQ
-      arm64: defconfig: enable BLK_DEV_NVME
-      arm64: defconfig: enable EFI_CAPSULE_LOADER
-      arm64: defconfig: enable support for PCIe hotplug
-      arm64: defconfig: enable APEI and GHES features
-      arm64: defconfig: enable EDAC options
-      arm64: defconfig: enable QCOM_L2_PMU and QCOM_L3_PMU
-      arm64: defconfig: enable Qualcomm Technologies EMAC and some PHY drivers
-
- MAINTAINERS                  |  7 +++++++
- arch/arm64/Kconfig.platforms | 21 +++++++++++++++++----
- arch/arm64/configs/defconfig | 26 ++++++++++++++++++++++++--
- 3 files changed, 48 insertions(+), 6 deletions(-)
+> Thanks,
+> 
+> 	tglx
+> 
