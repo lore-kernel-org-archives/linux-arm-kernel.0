@@ -1,49 +1,36 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 4 Jul 2017 16:22:11 +0000
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
- devices before scanning
-In-Reply-To: <CAHp75VccwpesvDxMcxZ+349rhrAq8QxNoau9XmquMnv9DBLBfA@mail.gmail.com>
-References: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
- <20170613200339.GX3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
- <20170616083313.GY3187@lahna.fi.intel.com>
- <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
- <20170616120048.GC629@lahna.fi.intel.com>
- <CAJZ5v0g+qVui6RU=Hy3c_3qAAWngqaAu6B3JxGOpqF06kitbzA@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
- <20170619100209.GC629@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40ACFC3D@FRAEML521-MBX.china.huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B10487@FRAEML521-MBX.china.huawei.com>
- <CAHp75VevOno613gk8QHDA7kmLZJj9TLZRiu7oJUs_xaRzcbpnw@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B15AA2@FRAEML521-MBX.china.huawei.com>
- <CAHp75VccwpesvDxMcxZ+349rhrAq8QxNoau9XmquMnv9DBLBfA@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B16310@FRAEML521-MBX.china.huawei.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Tue, 4 Jul 2017 18:30:02 +0200
+Subject: [PATCH v1 0/3] Add support for the otm8009a dsi panel
+Message-ID: <1499185805-23354-1-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy
+Hi all,
 
-[...]
+The purpose of this patch is to add support for the Orise Tech
+otm8009a 3.97" 480x800 TFT LCD panel (MIPI-DSI video mode).
+This LCD panel is used in several STM32 boards.
 
-> 
-> You may do it on stack. Define your cell statically (but not const)
-> and apply resources just before mfd_add_devices() call.
+Version 1:
+- Initial commit
 
-Ok thanks got it
+Best regards,
+Philippe
 
-> There are examples in the existing drivers. Intel LPC comes to my mind
-> and perhaps PMC (Broxton), though latter has too much other stuff
-> around.
+Philippe CORNU (3):
+  dt-bindings: Add vendor prefix for Orise Technology
+  dt-bindings: display: panel: Add support for Orise Tech otm8009a dsi
+    panel
+  drm/panel: Add support for otm8009a panel driver
 
-Uh yes I see now in lpc_ich.c (base address is read from PCI config space
-and resources are set accordingly).
+ .../bindings/display/panel/orisetech,otm8009a.txt  |  20 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ drivers/gpu/drm/panel/Kconfig                      |   9 +
+ drivers/gpu/drm/panel/Makefile                     |   1 +
+ drivers/gpu/drm/panel/panel-orisetech-otm8009a.c   | 517 +++++++++++++++++++++
+ 5 files changed, 548 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+ create mode 100755 drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
 
-Cheers
-Gab
-
-> 
-> --
-> With Best Regards,
-> Andy Shevchenko
+-- 
+1.9.1
