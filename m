@@ -1,95 +1,85 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 4 Jul 2017 15:14:42 +0000
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
- devices before scanning
-In-Reply-To: <CAHp75VevOno613gk8QHDA7kmLZJj9TLZRiu7oJUs_xaRzcbpnw@mail.gmail.com>
-References: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
- <20170613200339.GX3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
- <20170616083313.GY3187@lahna.fi.intel.com>
- <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
- <20170616120048.GC629@lahna.fi.intel.com>
- <CAJZ5v0g+qVui6RU=Hy3c_3qAAWngqaAu6B3JxGOpqF06kitbzA@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
- <20170619100209.GC629@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40ACFC3D@FRAEML521-MBX.china.huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B10487@FRAEML521-MBX.china.huawei.com>
- <CAHp75VevOno613gk8QHDA7kmLZJj9TLZRiu7oJUs_xaRzcbpnw@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B15AA2@FRAEML521-MBX.china.huawei.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 4 Jul 2017 17:18:33 +0200
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <20170704142758.GB7287@worktop>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
+ <e57debab-3457-1d9c-a72e-ecdf7d4f742e@sigmadesigns.com>
+ <baf9866b-04ba-698c-3012-a957ec0123d1@sigmadesigns.com>
+ <20170704070958.oolhapyx7uy2fly4@hirez.programming.kicks-ass.net>
+ <c80ce48f-5a7d-48d2-fd60-0d87eb0fcc0a@free.fr>
+ <20170704142758.GB7287@worktop>
+Message-ID: <d64a48bd-c593-2f0e-e4e9-8863fba38176@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy
+On 04/07/2017 16:27, Peter Zijlstra wrote:
 
-[...]
+> Mason wrote:
+>
+>> 	if (IS_ENABLED(CONFIG_DEBUG_PREEMPT) && in_atomic_preempt_off()) {
+>> 		pr_err("Preemption disabled at:");
+>> 		print_ip_sym(preempt_disable_ip);
+>> 		pr_cont("\n");
+>> 	}
+>>
+>> BTW, why didn't print_ip_sym(preempt_disable_ip); say
+>> where preemption had been disabled?
+> 
+> It does, but it might be non-obvious. We only store the first 0->!0
+> transition IP in there.
 
-> 
-> JFYI: Mika on vacation.
+The output was:
 
-Thanks for letting me know
+[    1.079483] Preemption disabled at:[    1.082820] [<  (null)>]   (null)
 
-> 
-> > I had a look into the MFD framework. If my understanding is correct
-> the mfd
-> > framework create a platform device for each declared mfd_cell that is
-> passed
-> > to mfd_add_devices().
-> 
-> Right.
-> 
-> > However there is something that I do not quite understand:
-> > from
-> > http://elixir.free-electrons.com/linux/latest/source/drivers/mfd/mfd-
-> core.c#L207
-> > it seems that mfd_add_device() will create the platform device using
-> the
-> > resources that are statically declared in the respective mfd_cell.
-> 
-> It's one possibility.
-> 
-> > In my case I'd like to have a platform device using the resources
-> that are
-> > parsed from the ACPI table (i.e. as it is done now by
-> > acpi_create_platform_device()).
-> 
-> So far so good. Nothing prevents you to do that.
-> 
-> > If my understanding is correct, if I declared an mfd_cell for my IPMI
-> child
-> > the mfd subsystem would create a platform device for such child and
-> > therefore acpi_create_platform_device() would fail to create a new
-> platform
-> > device as adev->physical_node_count will be non zero.
-> > However as things stand now mfd_cell devices can only use the
-> resources
-> > that are statically defined in the code (and therefore not the ones
-> in the
-> > ACPI nodes)...am I right?
-> 
-> You may file resources first and then register MFD cells. See many
-> existing examples in the kernel.
+so preempt_disable_ip was NULL, right?
 
-Well I had a look around the Kernel I have seen no mfd cells using
-Resources that are not statically defined:
-i.e. cell->resources in mfd_add_device() always points to statically
-defined resource structures.
+Has it been already clobbered?
 
-Usually for ACPI devices first you need to parse the ACPI resources
-from the table calling acpi_dev_get_resources(), then you iterate 
-over the resource list and fill the resource array by calling
-acpi_platform_fill_resurces() (as in acpi_create_platform_device())
 
-With respect to my case are you suggesting dynamically allocate a
-resource array and fill it using the same fashion as 
-acpi_create_platform_device(), then point cell->resources to such
-array before calling mfd_add_device() ?
-
-Thanks
-Gab
-
+>> Here's the high-level view. My HW is borked and muxes
+>> config space and mem space. So I need a way to freeze
+>> the entire system, make the config space access, and
+>> then return the system to normal. (AFAICT, config space
+>> accesses are rare, so if I kill performance for these
+>> accesses, the system might remain usable.)
+>>
+>> Is there a way to do this? Mark suggested stop_machine
+>> but it seems using it in my situation is not quite
+>> straight-forward.
 > 
-> --
-> With Best Regards,
-> Andy Shevchenko
+> *groan*... so yeah, broken hardware demands crazy stuff... stop machine
+> is tricky here because I'm not sure we can demand all PCI accessors to
+> allow sleeping.
+> 
+> And given that PCI lock is irqsave, we can't even assume IRQs are
+> enabled.
+> 
+> Does your platform have NMIs? If so, you can do yuck things like the
+> kgdb sync. NMI IPI all other CPUs and have them spin-wait on your state.
+> 
+> Then be careful not to deadlock when two CPUs do that concurrently.
+
+My platform is arch/arm/mach-tango (Cortex A9, ARMv7-A)
+
+This looks similar to what you described:
+https://www.linaro.org/blog/core-dump/debugging-arm-kernels-using-nmifiq/
+(I CCed Daniel Thompson)
+
+Quote article:
+
+> Note: On ARMv7-A devices that have security extensions (TrustZone)
+> FIQ can only be used by the kernel if it is possible to run Linux in
+> secure mode. It is therefore not possible to exploit FIQ for
+> debugging and run a secure monitor simultaneously. At the end of this
+> blog post we will discuss potential future work to mitigate this
+> problem.
+
+On my platform, Linux runs in non-secure mode...
+
+Sounds like I don't have many options left for this driver :-(
+
+Regards.
