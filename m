@@ -1,142 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 4 Jul 2017 18:32:35 +0100
-Subject: [PATCH 1/2] ARM: shmobile: Add CA7 arch_timer initialization for
- secondary CPUs
-In-Reply-To: <1499187733-1430-2-git-send-email-geert+renesas@glider.be>
-References: <1499187733-1430-1-git-send-email-geert+renesas@glider.be>
- <1499187733-1430-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <2f7ef764-c511-9598-c136-13966f810c95@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Jul 2017 18:38:21 +0100
+Subject: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <20170623145801.325244-3-shameerali.kolothum.thodi@huawei.com>
+References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
+ <20170623145801.325244-3-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170704173820.GO22175@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On 04/07/17 18:02, Geert Uytterhoeven wrote:
-> On Cortex-A7, the arch timer CNTVOFF register is uninitialized.
-> Hence when enabling SMP on r8a7794, the kernel log is spammed with:
+On Fri, Jun 23, 2017 at 03:58:01PM +0100, shameer wrote:
+> The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+> platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
 > 
->     WARNING: Underflow in clocksource 'arch_sys_counter' observed, time update ignored.
-> 	     Please report this, consider using a different clocksource, if possible.
-> 	     Your kernel is probably still fine.
+> On these platforms GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the
+> MSI payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI.
 > 
-> To fix this, wrap the standard secondary_startup routine inside a
-> routine which initializes CNTVOFF when running on a Cortex-A7.
-> As the only possibilities are Cortex-A7 or Cortex-A15, checking the low
-> nibble of the Primary Part Number is sufficient.
+> This patch implements a ACPI table based quirk to reserve the hw msi
+> regions in the smmu-v3 driver which means these address regions will
+> not be translated and will be excluded from iova allocations.
 > 
-> The initialization is identical to what is already done for the boot CPU
-> since commit 9ce3fa6816c2fb59 ("ARM: shmobile: rcar-gen2: Add CA7
-> arch_timer initialization for r8a7794").
-
-Humfff... Pretty horrible. Comments below.
-
-> 
-> Based on patches by Hisashi Nakamura in the BSP.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
 > ---
->  arch/arm/mach-shmobile/Makefile       |  1 +
->  arch/arm/mach-shmobile/common.h       |  1 +
->  arch/arm/mach-shmobile/headsmp-apmu.S | 38 +++++++++++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/platsmp-apmu.c |  2 +-
->  4 files changed, 41 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-shmobile/headsmp-apmu.S
+>  drivers/iommu/arm-smmu-v3.c | 30 ++++++++++++++++++++++++++----
+>  1 file changed, 26 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-> index 64611a1b4276517b..de735444e9f715fd 100644
-> --- a/arch/arm/mach-shmobile/Makefile
-> +++ b/arch/arm/mach-shmobile/Makefile
-> @@ -28,6 +28,7 @@ obj-$(CONFIG_ARCH_R8A7793)	+= regulator-quirk-rcar-gen2.o
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index abe4b88..c9346f2 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -597,6 +597,7 @@ struct arm_smmu_device {
+>  	u32				features;
 >  
->  # SMP objects
->  smp-y				:= $(cpu-y)
-> +smp-$(CONFIG_ARCH_RCAR_GEN2)	+= headsmp-apmu.o
->  smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
->  smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
->  smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
-> diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-> index 1a8f7b3ab449db56..6792a07bce761aab 100644
-> --- a/arch/arm/mach-shmobile/common.h
-> +++ b/arch/arm/mach-shmobile/common.h
-> @@ -11,6 +11,7 @@ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
->  			      unsigned long arg);
->  extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
->  extern bool shmobile_smp_init_fallback_ops(void);
-> +extern void shmobile_boot_apmu(void);
->  extern void shmobile_boot_scu(void);
->  extern void shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
->  					  unsigned int max_cpus);
-> diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
-> new file mode 100644
-> index 0000000000000000..52516d81ce98384c
-> --- /dev/null
-> +++ b/arch/arm/mach-shmobile/headsmp-apmu.S
-> @@ -0,0 +1,38 @@
-> +/*
-> + * SMP support for APMU based systems
-> + *
-> + * Copyright (C) 2014  Renesas Electronics Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +
-> +ENTRY(shmobile_boot_apmu)
-> +	mrc	p15, 0, r0, c0, c0, 0		/* Get Main ID */
-> +	ubfx	r1, r0, #4, #4			/* r1=Lo 4bit of Primary Part */
-> +	cmp	r1, #0x7			/* 0x7 = CA7, 0xf = CA15 */
-> +	bne	1f
-
-Why don't you deal with the A15 parts as well? And TBH, you'd be better
-off checking ID_PFR1 for both Generic Timers and Virtualization Extensions.
-
-> +	/*
-> +	 * CA7 setup
-> +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
-> +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
-> +	 * then it should be handled by the secure code
-> +	 */
-> +	cps	0x16
-
-It'd be worth adding a MONITOR_MODE macro instead of this raw value.
-
-> +	mrc	p15, 0, r1, c1, c1, 0		/* get Secure Config */
-> +	orr	r0, r1, #1
-> +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
-> +	isb
-> +	mov	r0, #0
-> +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
-> +	isb
-> +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
-> +	isb
-> +	cps	0x13
-
-and use SVC_MODE here.
-
-> +1:
-> +
-> +	b	secondary_startup
-> +ENDPROC(shmobile_boot_apmu)
-> diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-> index 3ca2c13346f0cbc3..4422b615a6ee6045 100644
-> --- a/arch/arm/mach-shmobile/platsmp-apmu.c
-> +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-> @@ -204,7 +204,7 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
->  int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
+>  	u32				options;
+>  
+>  	struct arm_smmu_cmdq		cmdq;
+> @@ -1904,14 +1905,34 @@ static void arm_smmu_get_resv_regions(struct device *dev,
+>  				      struct list_head *head)
 >  {
->  	/* For this particular CPU register boot vector */
-> -	shmobile_smp_hook(cpu, __pa_symbol(secondary_startup), 0);
-> +	shmobile_smp_hook(cpu, __pa_symbol(shmobile_boot_apmu), 0);
+>  	struct iommu_resv_region *region;
+> +	struct arm_smmu_device *smmu;
+> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+>  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +	int resv = 0;
 >  
->  	return apmu_wrap(cpu, apmu_power_on);
->  }
-> 
+> -	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
+> -					 prot, IOMMU_RESV_SW_MSI);
+> -	if (!region)
+> +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
 
-Thanks,
+Does this callback actually get called without a prior ->add_device callback
+for the master in question? If not, then we can already claw the structure
+out via the iommu_priv field in the fwspec.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +	if (WARN_ON(!smmu))
+
+Again, how does this trigger?
+
+>  		return;
+>  
+> -	list_add_tail(&region->list, head);
+> +	if ((smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)) {
+> +
+> +		if (!is_of_node(smmu->dev->fwnode))
+> +			resv = iort_iommu_its_get_resv_regions(dev, head);
+
+How does this work when we're not using ACPI? Shouldn't of vs ACPI be
+abstracted from the driver?
+
+Will
