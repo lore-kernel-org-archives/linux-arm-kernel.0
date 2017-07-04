@@ -1,21 +1,94 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  4 Jul 2017 10:56:32 +0100
-Subject: [PATCH 0/3] irqchip: Miscellaneous fixes for GIC/GICv3
-Message-ID: <1499162195-5126-1-git-send-email-suzuki.poulose@arm.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 4 Jul 2017 15:31:43 +0530
+Subject: [PATCH 1/2] arm64: hw_breakpoint: Allow stepping if a kernel mode
+ overflow handler exists
+In-Reply-To: <20170704094008.GA20062@leverpostej>
+References: <cover.1499107909.git.panand@redhat.com>
+ <dbbac1fa86f7da197e26245e20b1c8da572ca7fd.1499107909.git.panand@redhat.com>
+ <20170704094008.GA20062@leverpostej>
+Message-ID: <92a7d7e1-9796-ecb4-5993-c45111c79ac3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains some fixes for GIC/GIC-v3 to behave as expected
-by the generic management layer.
+Hi Mark,
 
-Suzuki K Poulose (3):
-  irqchip: gic-v3: Report failures in gic_irq_domain_alloc
-  irqchip: gic-v2: Report failures in gic_irq_domain_alloc
-  irq: gic-v3: Honor forced affinity setting
+On Tuesday 04 July 2017 03:10 PM, Mark Rutland wrote:
+> On Tue, Jul 04, 2017 at 12:40:26AM +0530, Pratyush Anand wrote:
+>> Currently we allow to single step only for the perf user. However, we
+>> have a kernel sample test (samples/hw_breakpoint/data_breakpoint.c)
+>> which implements its own overflow handler. Therefore, additionally
+>> allow single stepping if there exists a overflow handler in kernel mode.
+>>
+>> We still have issues with test, which causes kernel to go into an
+>> infinite loop of overflow_handler being called, and that reveals a
+>> corner case bug with perf breakpoint implementation as well. See
+>> the next patch, which talks more about it and attempts to resolve it.
+>>
+>> Signed-off-by: Pratyush Anand <panand@redhat.com>
+>> ---
+>>  arch/arm64/kernel/hw_breakpoint.c | 9 ++++++---
+>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+>> index 749f81779420..46dbbf94f72d 100644
+>> --- a/arch/arm64/kernel/hw_breakpoint.c
+>> +++ b/arch/arm64/kernel/hw_breakpoint.c
+>> @@ -661,7 +661,8 @@ static int breakpoint_handler(unsigned long unused, unsigned int esr,
+>>  		perf_bp_event(bp, regs);
+>>
+>>  		/* Do we need to handle the stepping? */
+>> -		if (is_default_overflow_handler(bp))
+>> +		if (is_default_overflow_handler(bp) ||
+>> +				(!user_mode(regs) && bp->overflow_handler))
+>
+> I don't think it makes sense to do this differently dependent on the
+> regs.
+>
+> If common code needs a particular single-stepping behaviour that we can
+> provide, the best thing would be to have a flag on the event, so that we
+> can do something like:
+>
+> 	if (event_needs_single_step(bp))
+>
+> Then we can ensure that the events used by GDB *don't* have that flag
+> set, so we don't step unexpectedly.
+>
 
- drivers/irqchip/irq-gic-v3.c | 14 +++++++++++---
- drivers/irqchip/irq-gic.c    |  7 +++++--
- 2 files changed, 16 insertions(+), 5 deletions(-)
+I think, that would be doable. I can send another version with these 
+modification. I will wait for some more time for other review comments for 2/2 
+(if any).
 
--- 
-2.7.5
+Thanks for your feedback.
+
+
+Pratyush
+
+> Thanks,
+> Mark.
+>
+>>  			step = 1;
+>>  unlock:
+>>  		rcu_read_unlock();
+>> @@ -789,7 +790,8 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>>  		perf_bp_event(wp, regs);
+>>
+>>  		/* Do we need to handle the stepping? */
+>> -		if (is_default_overflow_handler(wp))
+>> +		if (is_default_overflow_handler(wp) ||
+>> +				(!user_mode(regs) && wp->overflow_handler))
+>>  			step = 1;
+>>  	}
+>>  	if (min_dist > 0 && min_dist != -1) {
+>> @@ -800,7 +802,8 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>>  		perf_bp_event(wp, regs);
+>>
+>>  		/* Do we need to handle the stepping? */
+>> -		if (is_default_overflow_handler(wp))
+>> +		if (is_default_overflow_handler(wp) ||
+>> +				(!user_mode(regs) && wp->overflow_handler))
+>>  			step = 1;
+>>  	}
+>>  	rcu_read_unlock();
+>> --
+>> 2.9.3
+>>
