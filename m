@@ -1,7 +1,7 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue,  4 Jul 2017 17:11:45 +0800
-Subject: [PATCH] arm64: dts: hi3660: remove num-slots from DT
-Message-ID: <1499159505-65972-1-git-send-email-shawn.lin@rock-chips.com>
+Date: Tue,  4 Jul 2017 17:17:39 +0800
+Subject: [PATCH] arm64: dts: exynos: remove num-slots from exynos platforms
+Message-ID: <1499159859-67028-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,32 +9,52 @@ dwmmc driver deprecated num-slots and plan to get rid
 of it finally. Just move a step to cleanup it from DT.
 
 Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Li Wei <liwei213@huawei.com>
 Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 ---
 
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 2 --
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts       | 2 --
+ 2 files changed, 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index c6a1961..70794fc 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -797,7 +797,6 @@
- 			#size-cells = <0>;
- 			cd-inverted;
- 			compatible = "hisilicon,hi3660-dw-mshc";
--			num-slots = <1>;
- 			bus-width = <0x4>;
- 			disable-wp;
- 			cap-sd-highspeed;
-@@ -834,7 +833,6 @@
- 			compatible = "hisilicon,hi3660-dw-mshc";
- 			reg = <0x0 0xff3ff000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>;
--			num-slots = <1>;
- 			clocks = <&crg_ctrl HI3660_CLK_GATE_SDIO0>,
- 				 <&crg_ctrl HI3660_HCLK_GATE_SDIO0>;
- 			clock-names = "ciu", "biu";
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+index e2b0da2..7f693ae 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+@@ -846,7 +846,6 @@
+ 
+ &mshc_0 {
+ 	status = "okay";
+-	num-slots = <1>;
+ 	mmc-hs200-1_8v;
+ 	mmc-hs400-1_8v;
+ 	cap-mmc-highspeed;
+@@ -868,7 +867,6 @@
+ 
+ &mshc_2 {
+ 	status = "okay";
+-	num-slots = <1>;
+ 	cap-sd-highspeed;
+ 	disable-wp;
+ 	cd-gpios = <&gpa2 4 GPIO_ACTIVE_HIGH>;
+diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+index e5892bb..4a8b1fb 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
++++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+@@ -359,7 +359,6 @@
+ 
+ &mmc_0 {
+ 	status = "okay";
+-	num-slots = <1>;
+ 	cap-mmc-highspeed;
+ 	mmc-hs200-1_8v;
+ 	non-removable;
+@@ -375,7 +374,6 @@
+ 
+ &mmc_2 {
+ 	status = "okay";
+-	num-slots = <1>;
+ 	cap-sd-highspeed;
+ 	card-detect-delay = <200>;
+ 	clock-frequency = <400000000>;
 -- 
 1.9.1
