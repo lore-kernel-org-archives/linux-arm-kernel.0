@@ -1,84 +1,46 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 4 Jul 2017 15:16:33 +0800
-Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <20170704145840.69e53f58@xhacker>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
- <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_zAXTNYoWt+nMj_8tdDA8bcs86vepPJL1=zHfed2n-DA@mail.gmail.com>
- <20170703132704.GF13824@bhelgaas-glaptop.roam.corp.google.com>
- <20170704145840.69e53f58@xhacker>
-Message-ID: <20170704151633.0a7701b7@xhacker>
+From: yong.deng@magewell.com (Yong)
+Date: Tue, 4 Jul 2017 15:25:45 +0800
+Subject: [PATCH RFC 1/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170703112521.ca253erguut5v7se@flea>
+References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+ <1498561654-14658-2-git-send-email-yong.deng@magewell.com>
+ <667c858b-2655-88c5-6bbc-9d70d06c1ff1@xs4all.nl>
+ <20170703185952.18a97e9b7b05cbe321cb1268@magewell.com>
+ <20170703112521.ca253erguut5v7se@flea>
+Message-ID: <20170704152545.4a70f04db2c984d4d54bf9dd@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Jul 2017 14:58:40 +0800 Jisheng Zhang wrote:
+On Mon, 3 Jul 2017 13:25:21 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> On Mon, 3 Jul 2017 08:27:04 -0500 wrote:
+> Hi,
 > 
-> > [+cc Jingoo, Joao]
-> > 
-> > On Mon, Jul 03, 2017 at 10:35:50AM +0100, Ard Biesheuvel wrote:  
-> > > On 3 July 2017 at 00:18, Bjorn Helgaas <helgaas@kernel.org> wrote:    
-> > > > On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:    
-> > > >> This driver is required to work around several hardware bugs
-> > > >> in the PCIe controller.
-> > > >>
-> > > >> NB: Revision 1 does not support legacy interrupts, or IO space.    
-> > > >
-> > > > I had to apply these manually because of conflicts in Kconfig and
-> > > > Makefile.  What are these based on?  Easiest for me is if you base
-> > > > them on the current -rc1 tag.
-> > > >    
-> > > >> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> > > >> ---
-> > > >>  drivers/pci/host/Kconfig      |   8 +++
-> > > >>  drivers/pci/host/Makefile     |   1 +
-> > > >>  drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
-> > > >>  include/linux/pci_ids.h       |   2 +
-> > > >>  4 files changed, 175 insertions(+)
-> > > >>  create mode 100644 drivers/pci/host/pcie-tango.c
-> > > >>    
-> > > [..]    
-> > > >> +     /*
-> > > >> +      * QUIRK #2
-> > > >> +      * Unfortunately, config and mem spaces are muxed.
-> > > >> +      * Linux does not support such a setting, since drivers are free
-> > > >> +      * to access mem space directly, at any time.
-> > > >> +      * Therefore, we can only PRAY that config and mem space accesses
-> > > >> +      * NEVER occur concurrently.
-> > > >> +      */
-> > > >> +     writel_relaxed(1, pcie->mux);
-> > > >> +     ret = pci_generic_config_read(bus, devfn, where, size, val);
-> > > >> +     writel_relaxed(0, pcie->mux);    
-> > > >
-> > > > I'm very hesitant about this.  When people stress this, we're going to
-> > > > get reports of data corruption.  Even with the disclaimer below, I
-> > > > don't feel good about this.  Adding the driver is an implicit claim
-> > > > that we support the device, but we know it can't be made reliable.    
+> On Mon, Jul 03, 2017 at 06:59:52PM +0800, Yong wrote:
+> > > > +	select VIDEOBUF2_DMA_CONTIG
+> > > > +	select REGMAP_MMIO
+> > > > +	---help---
+> > > > +	   Support for the Allwinner Camera Sensor Interface Controller.
 > > > 
-> > > I noticed that the Synopsys driver suffers from a similar issue: in
-> > > dw_pcie_rd_other_conf(), it happily reprograms the outbound I/O window
-> > > to perform a config space access, and switches it back to I/O space
-> > > afterwards (unless it has more than 2 viewports, in which case it uses
-> > > dedicated windows for I/O space and config space)    
+> > > This controller is the same for all Allwinner SoC models?
 > > 
-> > That doesn't sound good.  Jingoo, Joao?  I remember some discussion
-> > about this, but not the details.
-> > 
-> > I/O accesses use wrappers (inb(), etc), so there's at least the
-> > possibility of a mutex to serialize them with respect to config
-> > accesses.
-> >   
+> > No.
+> > I will change the Kconfig and Makefile.
 > 
-> IIRC, for 2 viewports, we don't need to worry about the config space
-> access, because config space access is serialized by pci_lock; We
-> do have race between config space and io space. But the accessing config
-> space and io space at the same time is rare. And the PCIe EPs which
-> has io space are rare too, supporting these EPs are not the potential
-> target of those platforms with 2 viewports.
+> This is basically a design that has been introduced in the A31 (sun6i
+> family). I guess we should just call the driver and Kconfig symbols
+> sun6i_csi (even though we don't support it yet). It also used on the
+> A23, A33, A80, A83T, H3, and probably the H5 and A64.
 > 
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-PS: I think most platforms choose 2 pcie designware viewports just because
-it's the default setting. And I have send a feature request to ASIC people
-to increase the viewports to 3 for future marvell berlin SoCs.
+Thanks for the advice. That's good.
+My purpose is to make the code reusable. People working on other
+Allwinner SoC could easily make their CSI working by just filling the
+SoC specific code. But I'm not familiar with other Allwinner SoCs 
+except V3s. I hope to get more advice.
