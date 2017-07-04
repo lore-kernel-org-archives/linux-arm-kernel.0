@@ -1,42 +1,44 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  4 Jul 2017 10:56:34 +0100
-Subject: [PATCH 2/3] irqchip: gic-v2: Report failures in gic_irq_domain_alloc
+Date: Tue,  4 Jul 2017 10:56:35 +0100
+Subject: [PATCH 3/3] irq: gic-v3: Honor forced affinity setting
 In-Reply-To: <1499162195-5126-1-git-send-email-suzuki.poulose@arm.com>
 References: <1499162195-5126-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1499162195-5126-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1499162195-5126-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the GIC cannot map an IRQ via irq_domain_ops->alloc(), it doesn't
-return an error code.  This can cause a problem with drivers, where
-it thinks it has successfully got an IRQ for the device, but requesting
-the same ends up failure with -ENOSYS (as the IRQ's chip is not set).
+Honor the 'force' flag for set_affinity, by selecting a CPU
+from the given mask (which may not be reported "online" by
+the cpu_online_mask). Some drivers, like ARM PMU, rely on it.
 
-Fixes: commit 9a1091ef0017c ("irqchip: gic: Support hierarchy irq domain.")
-Cc: Yingjoe Chen <yingjoe.chen@mediatek.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Reported-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/irqchip/irq-gic.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 1b1df4f..940c162 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1027,8 +1027,11 @@ static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 	if (ret)
- 		return ret;
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index ea82342..883597f 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -642,11 +642,16 @@ static void gic_smp_init(void)
+ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 			    bool force)
+ {
+-	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
++	unsigned int cpu;
+ 	void __iomem *reg;
+ 	int enabled;
+ 	u64 val;
  
--	for (i = 0; i < nr_irqs; i++)
--		gic_irq_domain_map(domain, virq + i, hwirq + i);
-+	for (i = 0; i < nr_irqs; i++) {
-+		ret = gic_irq_domain_map(domain, virq + i, hwirq + i);
-+		if (ret)
-+			return ret;
-+	}
++	if (force)
++		cpu = cpumask_first(mask_val);
++	else
++		cpu = cpumask_any_and(mask_val, cpu_online_mask);
++
+ 	if (cpu >= nr_cpu_ids)
+ 		return -EINVAL;
  
- 	return 0;
- }
 -- 
 2.7.5
