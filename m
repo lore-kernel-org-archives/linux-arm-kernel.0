@@ -1,84 +1,84 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 4 Jul 2017 09:09:58 +0200
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 4 Jul 2017 15:16:33 +0800
 Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <baf9866b-04ba-698c-3012-a957ec0123d1@sigmadesigns.com>
+In-Reply-To: <20170704145840.69e53f58@xhacker>
 References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
  <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
  <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
- <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
- <e57debab-3457-1d9c-a72e-ecdf7d4f742e@sigmadesigns.com>
- <baf9866b-04ba-698c-3012-a957ec0123d1@sigmadesigns.com>
-Message-ID: <20170704070958.oolhapyx7uy2fly4@hirez.programming.kicks-ass.net>
+ <CAKv+Gu_zAXTNYoWt+nMj_8tdDA8bcs86vepPJL1=zHfed2n-DA@mail.gmail.com>
+ <20170703132704.GF13824@bhelgaas-glaptop.roam.corp.google.com>
+ <20170704145840.69e53f58@xhacker>
+Message-ID: <20170704151633.0a7701b7@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 03, 2017 at 05:30:28PM +0200, Marc Gonzalez wrote:
+On Tue, 4 Jul 2017 14:58:40 +0800 Jisheng Zhang wrote:
 
-> And at the end of smp8759_config_read:
+> On Mon, 3 Jul 2017 08:27:04 -0500 wrote:
 > 
-> 	printk("in_atomic_preempt_off = %d\n", in_atomic_preempt_off());
-
-That's confused...
-
-> 	stop_machine(do_nothing, NULL, NULL);
-> 	panic("STOP HERE FOR NOW\n");
+> > [+cc Jingoo, Joao]
+> > 
+> > On Mon, Jul 03, 2017 at 10:35:50AM +0100, Ard Biesheuvel wrote:  
+> > > On 3 July 2017 at 00:18, Bjorn Helgaas <helgaas@kernel.org> wrote:    
+> > > > On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:    
+> > > >> This driver is required to work around several hardware bugs
+> > > >> in the PCIe controller.
+> > > >>
+> > > >> NB: Revision 1 does not support legacy interrupts, or IO space.    
+> > > >
+> > > > I had to apply these manually because of conflicts in Kconfig and
+> > > > Makefile.  What are these based on?  Easiest for me is if you base
+> > > > them on the current -rc1 tag.
+> > > >    
+> > > >> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> > > >> ---
+> > > >>  drivers/pci/host/Kconfig      |   8 +++
+> > > >>  drivers/pci/host/Makefile     |   1 +
+> > > >>  drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
+> > > >>  include/linux/pci_ids.h       |   2 +
+> > > >>  4 files changed, 175 insertions(+)
+> > > >>  create mode 100644 drivers/pci/host/pcie-tango.c
+> > > >>    
+> > > [..]    
+> > > >> +     /*
+> > > >> +      * QUIRK #2
+> > > >> +      * Unfortunately, config and mem spaces are muxed.
+> > > >> +      * Linux does not support such a setting, since drivers are free
+> > > >> +      * to access mem space directly, at any time.
+> > > >> +      * Therefore, we can only PRAY that config and mem space accesses
+> > > >> +      * NEVER occur concurrently.
+> > > >> +      */
+> > > >> +     writel_relaxed(1, pcie->mux);
+> > > >> +     ret = pci_generic_config_read(bus, devfn, where, size, val);
+> > > >> +     writel_relaxed(0, pcie->mux);    
+> > > >
+> > > > I'm very hesitant about this.  When people stress this, we're going to
+> > > > get reports of data corruption.  Even with the disclaimer below, I
+> > > > don't feel good about this.  Adding the driver is an implicit claim
+> > > > that we support the device, but we know it can't be made reliable.    
+> > > 
+> > > I noticed that the Synopsys driver suffers from a similar issue: in
+> > > dw_pcie_rd_other_conf(), it happily reprograms the outbound I/O window
+> > > to perform a config space access, and switches it back to I/O space
+> > > afterwards (unless it has more than 2 viewports, in which case it uses
+> > > dedicated windows for I/O space and config space)    
+> > 
+> > That doesn't sound good.  Jingoo, Joao?  I remember some discussion
+> > about this, but not the details.
+> > 
+> > I/O accesses use wrappers (inb(), etc), so there's at least the
+> > possibility of a mutex to serialize them with respect to config
+> > accesses.
+> >   
 > 
-> The kernel outputs:
+> IIRC, for 2 viewports, we don't need to worry about the config space
+> access, because config space access is serialized by pci_lock; We
+> do have race between config space and io space. But the accessing config
+> space and io space at the same time is rare. And the PCIe EPs which
+> has io space are rare too, supporting these EPs are not the potential
+> target of those platforms with 2 viewports.
 > 
-> [    1.022725] in_atomic_preempt_off = 0
-> [    1.026568] BUG: scheduling while atomic: swapper/0/1/0x00000002
-> [    1.032625] 5 locks held by swapper/0/1:
-> [    1.036575]  #0:  (&dev->mutex){......}, at: [<c038c684>] __driver_attach+0x50/0xd0
-> [    1.044319]  #1:  (&dev->mutex){......}, at: [<c038c694>] __driver_attach+0x60/0xd0
-> [    1.052050]  #2:  (pci_lock){+.+...}, at: [<c03309d8>] pci_bus_read_config_dword+0x44/0x94
 
-This is a raw_spinlock_t, that disables preemption
-
-> [    1.060398]  #3:  (cpu_hotplug.dep_map){++++++}, at: [<c0119db0>] get_online_cpus+0x2c/0xa0
-> [    1.068843]  #4:  (stop_cpus_mutex){+.+...}, at: [<c01a1184>] stop_cpus+0x20/0x48
-
-> [    1.076404] Modules linked in:
-> [    1.079483] Preemption disabled at:[    1.082820] [<  (null)>]   (null)
-> [    1.086165] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.23-1-rc4 #13
-> [    1.092723] Hardware name: Sigma Tango DT
-> [    1.096765] [<c010f600>] (unwind_backtrace) from [<c010b568>] (show_stack+0x10/0x14)
-> [    1.104558] [<c010b568>] (show_stack) from [<c0304830>] (dump_stack+0x98/0xc4)
-> [    1.111823] [<c0304830>] (dump_stack) from [<c013eee0>] (__schedule_bug+0x94/0xec)
-> [    1.119436] [<c013eee0>] (__schedule_bug) from [<c0516364>] (__schedule+0x4a4/0x5f0)
-> [    1.127220] [<c0516364>] (__schedule) from [<c05164fc>] (schedule+0x4c/0xac)
-
-
-And here you try and schedule with preemption disabled.
-
-> [    1.134308] [<c05164fc>] (schedule) from [<c051b010>] (schedule_timeout+0x1f4/0x30c)
-> [    1.142093] [<c051b010>] (schedule_timeout) from [<c051702c>] (wait_for_common+0x8c/0x13c)
-> [    1.150401] [<c051702c>] (wait_for_common) from [<c05170ec>] (wait_for_completion+0x10/0x14)
-> [    1.158886] [<c05170ec>] (wait_for_completion) from [<c01a0d74>] (__stop_cpus+0x50/0x64)
-> [    1.167021] [<c01a0d74>] (__stop_cpus) from [<c01a1194>] (stop_cpus+0x30/0x48)
-> [    1.174282] [<c01a1194>] (stop_cpus) from [<c01a1230>] (stop_machine+0x84/0x118)
-> [    1.181719] [<c01a1230>] (stop_machine) from [<c034c070>] (smp8759_config_read+0x84/0x90)
-> [    1.189942] [<c034c070>] (smp8759_config_read) from [<c0330a00>] (pci_bus_read_config_dword+0x6c/0x94)
-> [    1.199301] [<c0330a00>] (pci_bus_read_config_dword) from [<c0332920>] (pci_bus_read_dev_vendor_id+0x24/0xe8)
-> [    1.209270] [<c0332920>] (pci_bus_read_dev_vendor_id) from [<c033413c>] (pci_scan_single_device+0x40/0xb0)
-> [    1.218977] [<c033413c>] (pci_scan_single_device) from [<c0334204>] (pci_scan_slot+0x58/0x100)
-> [    1.227636] [<c0334204>] (pci_scan_slot) from [<c033511c>] (pci_scan_child_bus+0x20/0xf8)
-> [    1.235858] [<c033511c>] (pci_scan_child_bus) from [<c03353ec>] (pci_scan_root_bus_msi+0xcc/0xd8)
-> [    1.244779] [<c03353ec>] (pci_scan_root_bus_msi) from [<c0335410>] (pci_scan_root_bus+0x18/0x20)
-> [    1.253612] [<c0335410>] (pci_scan_root_bus) from [<c034bc5c>] (pci_host_common_probe+0xc8/0x314)
-> [    1.262533] [<c034bc5c>] (pci_host_common_probe) from [<c034c444>] (tango_pcie_probe+0x148/0x350)
-> [    1.271455] [<c034c444>] (tango_pcie_probe) from [<c038dbc8>] (platform_drv_probe+0x34/0x6c)
-
-> The panic call stack looks suspicious.
-> 
-> smp8759_config_read() never calls tango_check_pcie_link().
-> 
-> (I compile with -fno-optimize-sibling-calls to get more accurate
-> call stacks.)
-> 
-> in_atomic_preempt_off is false before calling stop_machine()
-
-Yes, but that's a pointless statement.
-
-> I suppose I'm doing something wrong, but I'm not sure what yet.
-
-Using stop_machine() is per definition doing it wrong ;-) But see above.
+PS: I think most platforms choose 2 pcie designware viewports just because
+it's the default setting. And I have send a feature request to ASIC people
+to increase the viewports to 3 for future marvell berlin SoCs.
