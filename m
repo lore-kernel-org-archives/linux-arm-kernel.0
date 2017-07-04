@@ -1,32 +1,67 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 4 Jul 2017 18:51:36 +0300
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 5 Jul 2017 00:43:08 +0900
 Subject: [PATCH] gpio: drop unnecessary includes from
  include/linux/gpio/driver.h
-In-Reply-To: <CAK7LNATRrngmVFPDSKmUm3Td7RXnSZSPGNF9Ds_y+DU=i7mRag@mail.gmail.com>
+In-Reply-To: <20170704125851.GA20504@sophia>
 References: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
  <20170704125851.GA20504@sophia>
- <CAK7LNATRrngmVFPDSKmUm3Td7RXnSZSPGNF9Ds_y+DU=i7mRag@mail.gmail.com>
-Message-ID: <CAHp75VcfDdSCoU=DZyF1BD0YX9KfmLnptnHU9fgBQY3g-NW7PQ@mail.gmail.com>
+Message-ID: <CAK7LNATRrngmVFPDSKmUm3Td7RXnSZSPGNF9Ds_y+DU=i7mRag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 4, 2017 at 6:43 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2017-07-04 21:58 GMT+09:00 William Breathitt Gray <vilhelm.gray@gmail.com>:
-
-> So, I need to think about how to merge this (if the basic idea of this is OK).
+2017-07-04 21:58 GMT+09:00 William Breathitt Gray <vilhelm.gray@gmail.com>:
+> On Tue, Jul 04, 2017 at 12:53:34PM +0900, Masahiro Yamada wrote:
+>>Some of include directives in include/linux/gpio/driver.h are
+>>unneeded because the header does not need to know the content of
+>>struct device, irq_chip, etc.  Just declare they are structures.
+>>
+>>On the other hand, <linux/irqhandler.h> and <linux/spinlock_types.h>
+>>turned out to be necessary for irq_flow_handler_t and spinlock_t,
+>>respectively.
+>>
+>>Each driver should include what it needs without relying on what is
+>>implicitly included from <linux/gpio/driver.h>.  This will cut down
+>>unnecessary header parsing.
+>>
+>>Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>---
+>>
+>> drivers/gpio/gpio-104-dio-48e.c  |  1 +
+>> drivers/gpio/gpio-104-idi-48.c   |  1 +
+>> drivers/gpio/gpio-104-idio-16.c  |  1 +
+>> drivers/gpio/gpio-pci-idio-16.c  |  2 ++
+>> drivers/gpio/gpio-ws16c48.c      |  1 +
 >
-> Maybe,
+> The changes to the above drivers look fine to me:
 >
-> [1] Send patches to subsystems (gpio, pinctrl, etc.) for v4.14
-> [2] Drop unneeded includes from linux/gpio/driver.h for v4.15
+> Acked-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+>
+> However, this patch as a whole does too many things; I'd like to see it
+> split-up logically similar to how Andy Shevchenko suggested in his
+> reply. That should allow ACKs by respective driver maintainers to be
+> accounted more properly.
+>
+> William Breathitt Gray
 
-Perhaps, fixing users (drivers!) first. then frameworks / libraries,
-at last header itself (in each case perhaps follow the split I
-proposed earlier).
 
-My wish is to get gpiolib-acpi patch completely separate from the bunch.
+I was missing a very important thing.
+
+<linux/gpio/driver.h> is used in various subsystems.
+
+I tested only under drivers/gpio/, but
+drivers/pinctrl/ is one of the biggest source of compile errors.
+
+(Probably I will get reports from kbuild test robot.)
+
+
+So, I need to think about how to merge this (if the basic idea of this is OK).
+
+Maybe,
+
+[1] Send patches to subsystems (gpio, pinctrl, etc.) for v4.14
+[2] Drop unneeded includes from linux/gpio/driver.h for v4.15
+
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Best Regards
+Masahiro Yamada
