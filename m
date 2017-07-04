@@ -1,60 +1,61 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 04 Jul 2017 22:10:28 +0200
-Subject: [PATCH v3 02/12] ALSA: ac97: add an ac97 bus
-In-Reply-To: <87bmp0t2lv.fsf@belgarion.home>
-References: <20170630194408.24978-1-robert.jarzmik@free.fr>
- <20170630194408.24978-3-robert.jarzmik@free.fr>
- <s5hpodhc28v.wl-tiwai@suse.de> <87bmp0t2lv.fsf@belgarion.home>
-Message-ID: <s5hbmp0c6a3.wl-tiwai@suse.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Jul 2017 22:17:55 +0200
+Subject: [PATCH RFC 1/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170704152545.4a70f04db2c984d4d54bf9dd@magewell.com>
+References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+ <1498561654-14658-2-git-send-email-yong.deng@magewell.com>
+ <667c858b-2655-88c5-6bbc-9d70d06c1ff1@xs4all.nl>
+ <20170703185952.18a97e9b7b05cbe321cb1268@magewell.com>
+ <20170703112521.ca253erguut5v7se@flea>
+ <20170704152545.4a70f04db2c984d4d54bf9dd@magewell.com>
+Message-ID: <20170704201755.fuktyr2nyrhvndas@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Jul 2017 21:37:48 +0200,
-Robert Jarzmik wrote:
+On Tue, Jul 04, 2017 at 03:25:45PM +0800, Yong wrote:
+> On Mon, 3 Jul 2017 13:25:21 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> Takashi Iwai <tiwai@suse.de> writes:
+> > Hi,
+> > 
+> > On Mon, Jul 03, 2017 at 06:59:52PM +0800, Yong wrote:
+> > > > > +	select VIDEOBUF2_DMA_CONTIG
+> > > > > +	select REGMAP_MMIO
+> > > > > +	---help---
+> > > > > +	   Support for the Allwinner Camera Sensor Interface Controller.
+> > > > 
+> > > > This controller is the same for all Allwinner SoC models?
+> > > 
+> > > No.
+> > > I will change the Kconfig and Makefile.
+> > 
+> > This is basically a design that has been introduced in the A31 (sun6i
+> > family). I guess we should just call the driver and Kconfig symbols
+> > sun6i_csi (even though we don't support it yet). It also used on the
+> > A23, A33, A80, A83T, H3, and probably the H5 and A64.
 > 
-> > On Fri, 30 Jun 2017 21:43:58 +0200,
-> > Robert Jarzmik wrote:
-> >> +static struct bus_type ac97_bus_type = {
-> >> +	.name		= "ac97",
-> >
-> > Name-conflict with the old ac97 bus?
-> Yeah, fair point. So what should I choose for this new one ?
->  - ac97new
->  - ac97bis
->  - ac97_2
->  - ac97reborn
+> Thanks for the advice. That's good.
+> My purpose is to make the code reusable. People working on other
+> Allwinner SoC could easily make their CSI working by just filling the
+> SoC specific code. But I'm not familiar with other Allwinner SoCs 
+> except V3s. I hope to get more advice.
 
-ac97bus
-ac97_episode_5
-ac98
-...
+Right, of course we don't expect you to do all that work, and we
+should definitely focus on the V3s that you have for now. My comment
+was only about the driver name and Kconfig option.
 
-I have no opinion on it.
+For the rest of the code, see the other comments :)
 
+Maxime
 
-> >> +static int __init ac97_bus_init(void)
-> >> +{
-> >> +	return bus_register(&ac97_bus_type);
-> >> +}
-> >> +subsys_initcall(ac97_bus_init);
-> >> +
-> >> +MODULE_LICENSE("GPL");
-> >> +MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
-> >
-> > No bus_unregister() at exit?
-> Mmmh, that's because I used subsys_initcall(), which doesn't look good in a
-> module compilation setup. That will require a module_init(), and I will think
-> about how to implement it and test it for next iteration.
-
-You can use subsys_init() for modules, it's no problem.
-When it's built for a module, all xxx_init() is handled as equivalent
-with module_init().  See linux/module.h.
-
-It's just the lack of module_exit() in your case.
-
-
-thanks,
-
-Takashi
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170704/4a45be41/attachment.sig>
