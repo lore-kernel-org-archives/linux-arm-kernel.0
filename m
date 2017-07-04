@@ -1,79 +1,96 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 4 Jul 2017 14:58:40 +0800
-Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <20170703132704.GF13824@bhelgaas-glaptop.roam.corp.google.com>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
- <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_zAXTNYoWt+nMj_8tdDA8bcs86vepPJL1=zHfed2n-DA@mail.gmail.com>
- <20170703132704.GF13824@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170704145840.69e53f58@xhacker>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 4 Jul 2017 15:04:54 +0800
+Subject: [PATCH v4 1/3] arm64: kvm: support user space to detect RAS
+ extension feature
+In-Reply-To: <20170703082126.GC4066@cbox>
+References: <1498481143-23183-1-git-send-email-gengdongjiu@huawei.com>
+ <20170703082126.GC4066@cbox>
+Message-ID: <dd9cf101-2ca9-f349-292e-f48204abe929@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Jul 2017 08:27:04 -0500 wrote:
+Hi Christoffer,
 
-> [+cc Jingoo, Joao]
+On 2017/7/3 16:21, Christoffer Dall wrote:
+> On Mon, Jun 26, 2017 at 08:45:43PM +0800, Dongjiu Geng wrote:
+>> Handle userspace's detection for RAS extension, because sometimes
+>> the userspace needs to know the CPU's capacity
 > 
-> On Mon, Jul 03, 2017 at 10:35:50AM +0100, Ard Biesheuvel wrote:
-> > On 3 July 2017 at 00:18, Bjorn Helgaas <helgaas@kernel.org> wrote:  
-> > > On Tue, Jun 20, 2017 at 10:17:40AM +0200, Marc Gonzalez wrote:  
-> > >> This driver is required to work around several hardware bugs
-> > >> in the PCIe controller.
-> > >>
-> > >> NB: Revision 1 does not support legacy interrupts, or IO space.  
-> > >
-> > > I had to apply these manually because of conflicts in Kconfig and
-> > > Makefile.  What are these based on?  Easiest for me is if you base
-> > > them on the current -rc1 tag.
-> > >  
-> > >> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> > >> ---
-> > >>  drivers/pci/host/Kconfig      |   8 +++
-> > >>  drivers/pci/host/Makefile     |   1 +
-> > >>  drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
-> > >>  include/linux/pci_ids.h       |   2 +
-> > >>  4 files changed, 175 insertions(+)
-> > >>  create mode 100644 drivers/pci/host/pcie-tango.c
-> > >>  
-> > [..]  
-> > >> +     /*
-> > >> +      * QUIRK #2
-> > >> +      * Unfortunately, config and mem spaces are muxed.
-> > >> +      * Linux does not support such a setting, since drivers are free
-> > >> +      * to access mem space directly, at any time.
-> > >> +      * Therefore, we can only PRAY that config and mem space accesses
-> > >> +      * NEVER occur concurrently.
-> > >> +      */
-> > >> +     writel_relaxed(1, pcie->mux);
-> > >> +     ret = pci_generic_config_read(bus, devfn, where, size, val);
-> > >> +     writel_relaxed(0, pcie->mux);  
-> > >
-> > > I'm very hesitant about this.  When people stress this, we're going to
-> > > get reports of data corruption.  Even with the disclaimer below, I
-> > > don't feel good about this.  Adding the driver is an implicit claim
-> > > that we support the device, but we know it can't be made reliable.  
-> > 
-> > I noticed that the Synopsys driver suffers from a similar issue: in
-> > dw_pcie_rd_other_conf(), it happily reprograms the outbound I/O window
-> > to perform a config space access, and switches it back to I/O space
-> > afterwards (unless it has more than 2 viewports, in which case it uses
-> > dedicated windows for I/O space and config space)  
-> 
-> That doesn't sound good.  Jingoo, Joao?  I remember some discussion
-> about this, but not the details.
-> 
-> I/O accesses use wrappers (inb(), etc), so there's at least the
-> possibility of a mutex to serialize them with respect to config
-> accesses.
-> 
+> Why?  Can you please provide some more rationale.
 
-IIRC, for 2 viewports, we don't need to worry about the config space
-access, because config space access is serialized by pci_lock; We
-do have race between config space and io space. But the accessing config
-space and io space at the same time is rare. And the PCIe EPs which
-has io space are rare too, supporting these EPs are not the potential
-target of those platforms with 2 viewports.
+userspace mainly want to know whether CPU has RAS extension capability to decide whether need to specify the syndrome value.
+if have, userspace specify the syndrome value. otherwise, not specify the value.
 
-Thanks,
-Jisheng
+James ever suggest not want userspace to know the capability, and let KVM to judge the RAS extension capability.
+
+but I consider it again, userspace know the RAS extension capability may be better, which can avoid KVM return error if
+CPU does not support RAS extension.
+
+could you give me some suggestion that whether let userspace to know the RAS extension capability?
+
+> 
+>>
+>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+>> ---
+>>  arch/arm64/kvm/reset.c   | 11 +++++++++++
+>>  include/uapi/linux/kvm.h |  1 +
+>>  2 files changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+>> index d9e9697..1004039 100644
+>> --- a/arch/arm64/kvm/reset.c
+>> +++ b/arch/arm64/kvm/reset.c
+>> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
+>>  	return !!(pfr0 & 0x20);
+>>  }
+>>  
+>> +static bool kvm_arm_support_ras_extension(void)
+>> +{
+>> +	u64 pfr0;
+>> +
+>> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+>> +	return !!(pfr0 & 0x10000000);
+>> +}
+> 
+> Why is this specific to KVM?  This seems to reveal information about the
+> underlying physical CPU, not specific to KVM at all, surely if userspace
+> is really supposed to be able to figure this out, it should not be KVM
+> specific.
+  you are right. it should not be KVM specific, thanks for pointing it out.
+
+> 
+> Thanks,
+> -Christoffer
+> 
+>> +
+>>  /**
+>>   * kvm_arch_dev_ioctl_check_extension
+>>   *
+>> @@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>>  	case KVM_CAP_ARM_PMU_V3:
+>>  		r = kvm_arm_support_pmu_v3();
+>>  		break;
+>> +	case KVM_CAP_ARM_RAS_EXTENSION:
+>> +		r = kvm_arm_support_ras_extension();
+>> +		break;
+>>  	case KVM_CAP_SET_GUEST_DEBUG:
+>>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>>  		r = 1;
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index f51d508..27fe556 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
+>>  #define KVM_CAP_PPC_MMU_RADIX 134
+>>  #define KVM_CAP_PPC_MMU_HASH_V3 135
+>>  #define KVM_CAP_IMMEDIATE_EXIT 136
+>> +#define KVM_CAP_ARM_RAS_EXTENSION 137
+>>  
+>>  #ifdef KVM_CAP_IRQ_ROUTING
+>>  
+>> -- 
+>> 2.10.1
+>>
+> 
+> .
+> 
