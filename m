@@ -1,155 +1,142 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Jul 2017 18:31:56 +0100
-Subject: [PATCH 0/8] io-pgtable lock removal
-In-Reply-To: <87d53115-3d80-5a3d-6632-c31986cb7018@broadcom.com>
-References: <cover.1496921366.git.robin.murphy@arm.com>
- <458ad41d-6679-eeca-3c0f-13ccb6c933b6@codeaurora.org>
- <b7830be1-9a78-e29f-a29c-4798aaa28c0a@broadcom.com>
- <cdc1799b-f142-09ed-a7e5-d7fd2e70268f@arm.com>
- <e43ba1fe-696e-fabb-a800-52fadaa2fa93@broadcom.com>
- <20170628114609.GD11053@arm.com>
- <87d53115-3d80-5a3d-6632-c31986cb7018@broadcom.com>
-Message-ID: <20170704173155.GN22175@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 4 Jul 2017 18:32:35 +0100
+Subject: [PATCH 1/2] ARM: shmobile: Add CA7 arch_timer initialization for
+ secondary CPUs
+In-Reply-To: <1499187733-1430-2-git-send-email-geert+renesas@glider.be>
+References: <1499187733-1430-1-git-send-email-geert+renesas@glider.be>
+ <1499187733-1430-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <2f7ef764-c511-9598-c136-13966f810c95@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ray,
+Hi Geert,
 
-On Wed, Jun 28, 2017 at 10:02:35AM -0700, Ray Jui wrote:
-> On 6/28/17 4:46 AM, Will Deacon wrote:
-> > Robin and I have been bashing our heads against the tlb_sync_pending flag
-> > this morning, and we reckon it could have something to do with your timeouts
-> > on MMU-500.
-> > 
-> > On Tue, Jun 27, 2017 at 09:43:19AM -0700, Ray Jui wrote:
-> >>>> Also, in a few occasions, I observed the following message during the
-> >>>> test, when multiple cores are involved:
-> >>>>
-> >>>> arm-smmu 64000000.mmu: TLB sync timed out -- SMMU may be deadlocked
-> > 
-> > The tlb_sync_pending logic was written under the assumption of a global
-> > page-table lock, so it assumes that it only has to care about syncing
-> > flushes from the current CPU/context. That's not true anymore, and the
-> > current code can accidentally skip syncs and (what I think is happening in
-> > your case) allow concurrent syncs, which will potentially lead to timeouts
-> > if a CPU is unlucky enough to keep missing the Ack.
-> > 
-> > Please can you try the diff below and see if it fixes things for you?
-> > This applies on top of my for-joerg/arm-smmu/updates branch, but note
-> > that I've only shown it to the compiler. Not tested at all.
-> > 
-> > Will
-> > 
+On 04/07/17 18:02, Geert Uytterhoeven wrote:
+> On Cortex-A7, the arch timer CNTVOFF register is uninitialized.
+> Hence when enabling SMP on r8a7794, the kernel log is spammed with:
 > 
-> Thanks for looking into this. I'm a bit busy at work but will certainly
-> find time to test the diff below. I hopefully will get to it later this
-> week.
+>     WARNING: Underflow in clocksource 'arch_sys_counter' observed, time update ignored.
+> 	     Please report this, consider using a different clocksource, if possible.
+> 	     Your kernel is probably still fine.
+> 
+> To fix this, wrap the standard secondary_startup routine inside a
+> routine which initializes CNTVOFF when running on a Cortex-A7.
+> As the only possibilities are Cortex-A7 or Cortex-A15, checking the low
+> nibble of the Primary Part Number is sufficient.
+> 
+> The initialization is identical to what is already done for the boot CPU
+> since commit 9ce3fa6816c2fb59 ("ARM: shmobile: rcar-gen2: Add CA7
+> arch_timer initialization for r8a7794").
 
-It would be really handy if you could test this, since I think it could
-cause some nasty problems if we don't get it fixed. Updated patch (with
-commit message) below.
+Humfff... Pretty horrible. Comments below.
 
-Will
+> 
+> Based on patches by Hisashi Nakamura in the BSP.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  arch/arm/mach-shmobile/Makefile       |  1 +
+>  arch/arm/mach-shmobile/common.h       |  1 +
+>  arch/arm/mach-shmobile/headsmp-apmu.S | 38 +++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/platsmp-apmu.c |  2 +-
+>  4 files changed, 41 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-shmobile/headsmp-apmu.S
+> 
+> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+> index 64611a1b4276517b..de735444e9f715fd 100644
+> --- a/arch/arm/mach-shmobile/Makefile
+> +++ b/arch/arm/mach-shmobile/Makefile
+> @@ -28,6 +28,7 @@ obj-$(CONFIG_ARCH_R8A7793)	+= regulator-quirk-rcar-gen2.o
+>  
+>  # SMP objects
+>  smp-y				:= $(cpu-y)
+> +smp-$(CONFIG_ARCH_RCAR_GEN2)	+= headsmp-apmu.o
+>  smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+>  smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+>  smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
+> diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+> index 1a8f7b3ab449db56..6792a07bce761aab 100644
+> --- a/arch/arm/mach-shmobile/common.h
+> +++ b/arch/arm/mach-shmobile/common.h
+> @@ -11,6 +11,7 @@ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+>  			      unsigned long arg);
+>  extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
+>  extern bool shmobile_smp_init_fallback_ops(void);
+> +extern void shmobile_boot_apmu(void);
+>  extern void shmobile_boot_scu(void);
+>  extern void shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
+>  					  unsigned int max_cpus);
+> diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
+> new file mode 100644
+> index 0000000000000000..52516d81ce98384c
+> --- /dev/null
+> +++ b/arch/arm/mach-shmobile/headsmp-apmu.S
+> @@ -0,0 +1,38 @@
+> +/*
+> + * SMP support for APMU based systems
+> + *
+> + * Copyright (C) 2014  Renesas Electronics Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +
+> +ENTRY(shmobile_boot_apmu)
+> +	mrc	p15, 0, r0, c0, c0, 0		/* Get Main ID */
+> +	ubfx	r1, r0, #4, #4			/* r1=Lo 4bit of Primary Part */
+> +	cmp	r1, #0x7			/* 0x7 = CA7, 0xf = CA15 */
+> +	bne	1f
 
---->8
+Why don't you deal with the A15 parts as well? And TBH, you'd be better
+off checking ID_PFR1 for both Generic Timers and Virtualization Extensions.
 
->From eeb11dab63fcdd698b671a3a8c63516005caa9ec Mon Sep 17 00:00:00 2001
-From: Will Deacon <will.deacon@arm.com>
-Date: Thu, 29 Jun 2017 15:08:09 +0100
-Subject: [PATCH] iommu/io-pgtable: Fix tlb_sync_pending flag access from
- concurrent CPUs
+> +	/*
+> +	 * CA7 setup
+> +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
+> +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
+> +	 * then it should be handled by the secure code
+> +	 */
+> +	cps	0x16
 
-The tlb_sync_pending flag is used to elide back-to-back TLB sync operations
-for two reasons:
+It'd be worth adding a MONITOR_MODE macro instead of this raw value.
 
-  1. TLB sync operations can be expensive, and so avoiding them where we
-     can is a good idea.
+> +	mrc	p15, 0, r1, c1, c1, 0		/* get Secure Config */
+> +	orr	r0, r1, #1
+> +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
+> +	isb
+> +	mov	r0, #0
+> +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
+> +	isb
+> +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
+> +	isb
+> +	cps	0x13
 
-  2. Some hardware (mtk_iommu) locks up if it sees a TLB sync without an
-     unsync'd TLB flush preceding it
+and use SVC_MODE here.
 
-The flag is set on an ->add_flush callback and cleared on a ->sync callback,
-which worked nicely when all map/unmap operations where protected by a
-global lock.
+> +1:
+> +
+> +	b	secondary_startup
+> +ENDPROC(shmobile_boot_apmu)
+> diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+> index 3ca2c13346f0cbc3..4422b615a6ee6045 100644
+> --- a/arch/arm/mach-shmobile/platsmp-apmu.c
+> +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+> @@ -204,7 +204,7 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
+>  int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  {
+>  	/* For this particular CPU register boot vector */
+> -	shmobile_smp_hook(cpu, __pa_symbol(secondary_startup), 0);
+> +	shmobile_smp_hook(cpu, __pa_symbol(shmobile_boot_apmu), 0);
+>  
+>  	return apmu_wrap(cpu, apmu_power_on);
+>  }
+> 
 
-Unfortunately, moving to a lockless implementation means that we suddenly
-have races on the flag: updates can go missing and we can end up with
-back-to-back syncs once again.
+Thanks,
 
-This patch resolves the problem by making the tlb_sync_pending flag an
-atomic_t and sorts out the ordering with respect to TLB callbacks.
-Now, the flag is set with release semantics after adding a flush and
-checked with an xchg operation (and subsequent control dependency) when
-performing the sync. We could consider using a cmpxchg here, but we'll
-likely just hit our local update to the flag anyway.
-
-Cc: Ray Jui <ray.jui@broadcom.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Fixes: 2c3d273eabe8 ("iommu/io-pgtable-arm: Support lockless operation")
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/io-pgtable.c |  1 +
- drivers/iommu/io-pgtable.h | 12 ++++++------
- 2 files changed, 7 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
-index 127558d83667..cd8d7aaec161 100644
---- a/drivers/iommu/io-pgtable.c
-+++ b/drivers/iommu/io-pgtable.c
-@@ -59,6 +59,7 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
- 	iop->cookie	= cookie;
- 	iop->cfg	= *cfg;
- 
-+	atomic_set(&iop->tlb_sync_pending, 0);
- 	return &iop->ops;
- }
- 
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index 524263a7ae6f..b64580c9d03d 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -1,5 +1,7 @@
- #ifndef __IO_PGTABLE_H
- #define __IO_PGTABLE_H
-+
-+#include <linux/atomic.h>
- #include <linux/bitops.h>
- 
- /*
-@@ -165,7 +167,7 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops);
- struct io_pgtable {
- 	enum io_pgtable_fmt	fmt;
- 	void			*cookie;
--	bool			tlb_sync_pending;
-+	atomic_t		tlb_sync_pending;
- 	struct io_pgtable_cfg	cfg;
- 	struct io_pgtable_ops	ops;
- };
-@@ -175,22 +177,20 @@ struct io_pgtable {
- static inline void io_pgtable_tlb_flush_all(struct io_pgtable *iop)
- {
- 	iop->cfg.tlb->tlb_flush_all(iop->cookie);
--	iop->tlb_sync_pending = true;
-+	atomic_set_release(&iop->tlb_sync_pending, 1);
- }
- 
- static inline void io_pgtable_tlb_add_flush(struct io_pgtable *iop,
- 		unsigned long iova, size_t size, size_t granule, bool leaf)
- {
- 	iop->cfg.tlb->tlb_add_flush(iova, size, granule, leaf, iop->cookie);
--	iop->tlb_sync_pending = true;
-+	atomic_set_release(&iop->tlb_sync_pending, 1);
- }
- 
- static inline void io_pgtable_tlb_sync(struct io_pgtable *iop)
- {
--	if (iop->tlb_sync_pending) {
-+	if (atomic_xchg_relaxed(&iop->tlb_sync_pending, 0))
- 		iop->cfg.tlb->tlb_sync(iop->cookie);
--		iop->tlb_sync_pending = false;
--	}
- }
- 
- /**
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
