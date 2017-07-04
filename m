@@ -1,698 +1,450 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  4 Jul 2017 12:53:34 +0900
-Subject: [PATCH] gpio: drop unnecessary includes from
- include/linux/gpio/driver.h
-Message-ID: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 4 Jul 2017 12:46:23 +0800
+Subject: [PATCH v4 3/3] arm64: kvm: inject SError with user space
+ specified syndrome
+In-Reply-To: <20170703083903.GE4066@cbox>
+References: <1498481199-24118-1-git-send-email-gengdongjiu@huawei.com>
+ <20170703083903.GE4066@cbox>
+Message-ID: <429e4a67-3795-1449-f0b1-12df3012629a@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of include directives in include/linux/gpio/driver.h are
-unneeded because the header does not need to know the content of
-struct device, irq_chip, etc.  Just declare they are structures.
+Hi Christoffer,
+  thanks for the review.
 
-On the other hand, <linux/irqhandler.h> and <linux/spinlock_types.h>
-turned out to be necessary for irq_flow_handler_t and spinlock_t,
-respectively.
 
-Each driver should include what it needs without relying on what is
-implicitly included from <linux/gpio/driver.h>.  This will cut down
-unnecessary header parsing.
+On 2017/7/3 16:39, Christoffer Dall wrote:
+> Hi Dongjiu,
+> 
+> On Mon, Jun 26, 2017 at 08:46:39PM +0800, Dongjiu Geng wrote:
+>> when SError happen, kvm notifies user space to record the CPER,
+>> user space specifies and passes the contents of ESR_EL1 on taking
+>> a virtual SError interrupt to KVM, KVM enables virtual system
+>> error or asynchronous abort with this specifies syndrome. This
+>> patch modify the world-switch to restore VSESR_EL2, VSESR_EL2
+>> saves the virtual SError syndrome, it becomes the ESR_EL1 value when
+>> HCR_EL2.VSE injects an SError. This register is added by the
+>> RAS Extensions.
+> 
+> This commit message is confusing and doesn't help me understand the
+> patch.
+(1) what is the rationale for the guest OS SError interrupt(SEI) handling in the RAS solution?
+  you can refer to document: "RAS_Extension_PRD03-PRDC-010953-32-0, 6.5.3 Example software sequences"
+  a). In the firmware-first RAS solution, when guest OS happen a SError interrupt (SEI), it will firstly trap to EL3(SCR_EL3.EA = 1);
+  b). The firmware logs, triages, and delegates the error exception to the hypervisor. As the error came from guest OS  EL1, firmware
+      does by faking an SError interrupt exception entry to EL2.
+  c). Control transfers to the hypervisor's delegated error recovery agent.Because HCR_EL2.AMO is set to 1, the hypervisor can use a
+      Virtual SError interrupt to delegate an asynchronous abort to EL1, by setting HCR_EL2.VSE to 1 and using VESR_EL2 to pass syndrome.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+(2) what is this patch mainly do?
+  As mentioned above, the hypervisor needs to enable virtual SError and pass the virtual syndrome to the guest OS.
 
- drivers/gpio/gpio-104-dio-48e.c  |  1 +
- drivers/gpio/gpio-104-idi-48.c   |  1 +
- drivers/gpio/gpio-104-idio-16.c  |  1 +
- drivers/gpio/gpio-altera-a10sr.c |  2 ++
- drivers/gpio/gpio-altera.c       |  3 +++
- drivers/gpio/gpio-aspeed.c       |  5 +++++
- drivers/gpio/gpio-ath79.c        |  2 ++
- drivers/gpio/gpio-bcm-kona.c     |  1 +
- drivers/gpio/gpio-clps711x.c     |  1 +
- drivers/gpio/gpio-crystalcove.c  |  2 ++
- drivers/gpio/gpio-dln2.c         |  1 +
- drivers/gpio/gpio-dwapb.c        |  1 +
- drivers/gpio/gpio-etraxfs.c      |  1 +
- drivers/gpio/gpio-f7188x.c       |  1 +
- drivers/gpio/gpio-ftgpio010.c    |  3 +++
- drivers/gpio/gpio-ingenic.c      |  1 +
- drivers/gpio/gpio-intel-mid.c    |  2 ++
- drivers/gpio/gpio-lp873x.c       |  1 +
- drivers/gpio/gpio-lynxpoint.c    |  2 ++
- drivers/gpio/gpio-max732x.c      |  1 +
- drivers/gpio/gpio-max77620.c     |  1 +
- drivers/gpio/gpio-menz127.c      |  1 +
- drivers/gpio/gpio-merrifield.c   |  4 ++++
- drivers/gpio/gpio-omap.c         |  3 +++
- drivers/gpio/gpio-pca953x.c      |  1 +
- drivers/gpio/gpio-pci-idio-16.c  |  2 ++
- drivers/gpio/gpio-pisosr.c       |  1 +
- drivers/gpio/gpio-pl061.c        |  1 +
- drivers/gpio/gpio-rcar.c         |  1 +
- drivers/gpio/gpio-stmpe.c        |  2 ++
- drivers/gpio/gpio-tc3589x.c      |  3 +++
- drivers/gpio/gpio-tegra.c        |  1 +
- drivers/gpio/gpio-tps65218.c     |  1 +
- drivers/gpio/gpio-vf610.c        |  3 +++
- drivers/gpio/gpio-vx855.c        |  1 +
- drivers/gpio/gpio-wcove.c        |  2 ++
- drivers/gpio/gpio-wm831x.c       |  1 +
- drivers/gpio/gpio-wm8994.c       |  1 +
- drivers/gpio/gpio-ws16c48.c      |  1 +
- drivers/gpio/gpio-xgene-sb.c     |  2 ++
- drivers/gpio/gpio-xlp.c          |  1 +
- drivers/gpio/gpio-zx.c           |  1 +
- drivers/gpio/gpio-zynq.c         |  3 +++
- drivers/gpio/gpiolib-acpi.c      |  1 +
- drivers/gpio/gpiolib.c           |  2 ++
- include/linux/gpio/driver.h      | 11 ++++++-----
- 46 files changed, 80 insertions(+), 5 deletions(-)
+  a). when Control transfers to the hypervisor from firmware by faking an SError interrupt, the hypervisor delivered the syndrome_info(esr_el2) and
+      host VA address( Qemu translate this VA address to the virtual machine physical address(IPA)) using below new added "serror_intr" struct.
+  		/* KVM_EXIT_SERROR_INTR */
+ 		struct {
+			__u32 syndrome_info;
+			__u64 address;
+		} serror_intr;
 
-diff --git a/drivers/gpio/gpio-104-dio-48e.c b/drivers/gpio/gpio-104-dio-48e.c
-index 598e209efa2d..bdc52be7902a 100644
---- a/drivers/gpio/gpio-104-dio-48e.c
-+++ b/drivers/gpio/gpio-104-dio-48e.c
-@@ -22,6 +22,7 @@
- #include <linux/ioport.h>
- #include <linux/interrupt.h>
- #include <linux/irqdesc.h>
-+#include <linux/irqdomain.h>
- #include <linux/isa.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-diff --git a/drivers/gpio/gpio-104-idi-48.c b/drivers/gpio/gpio-104-idi-48.c
-index 51f046e29ff7..7bbb0e8573d1 100644
---- a/drivers/gpio/gpio-104-idi-48.c
-+++ b/drivers/gpio/gpio-104-idi-48.c
-@@ -22,6 +22,7 @@
- #include <linux/ioport.h>
- #include <linux/interrupt.h>
- #include <linux/irqdesc.h>
-+#include <linux/irqdomain.h>
- #include <linux/isa.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-diff --git a/drivers/gpio/gpio-104-idio-16.c b/drivers/gpio/gpio-104-idio-16.c
-index ec2ce34ff473..7e3fc0bf3398 100644
---- a/drivers/gpio/gpio-104-idio-16.c
-+++ b/drivers/gpio/gpio-104-idio-16.c
-@@ -22,6 +22,7 @@
- #include <linux/ioport.h>
- #include <linux/interrupt.h>
- #include <linux/irqdesc.h>
-+#include <linux/irqdomain.h>
- #include <linux/isa.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-diff --git a/drivers/gpio/gpio-altera-a10sr.c b/drivers/gpio/gpio-altera-a10sr.c
-index 16a8951b2bed..4cdca9332043 100644
---- a/drivers/gpio/gpio-altera-a10sr.c
-+++ b/drivers/gpio/gpio-altera-a10sr.c
-@@ -21,6 +21,8 @@
- #include <linux/gpio/driver.h>
- #include <linux/mfd/altera-a10sr.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
- 
- /**
-  * struct altr_a10sr_gpio - Altera Max5 GPIO device private data structure
-diff --git a/drivers/gpio/gpio-altera.c b/drivers/gpio/gpio-altera.c
-index 17485dc20384..40b26274acaf 100644
---- a/drivers/gpio/gpio-altera.c
-+++ b/drivers/gpio/gpio-altera.c
-@@ -17,6 +17,9 @@
-  */
- 
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/module.h>
- #include <linux/of_gpio.h>
- #include <linux/platform_device.h>
-diff --git a/drivers/gpio/gpio-aspeed.c b/drivers/gpio/gpio-aspeed.c
-index 4ca436e66bdb..a9d575e215da 100644
---- a/drivers/gpio/gpio-aspeed.c
-+++ b/drivers/gpio/gpio-aspeed.c
-@@ -15,9 +15,14 @@
- #include <linux/hashtable.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/string.h>
-diff --git a/drivers/gpio/gpio-ath79.c b/drivers/gpio/gpio-ath79.c
-index f33d4a5fe671..1249ab0f8f4f 100644
---- a/drivers/gpio/gpio-ath79.c
-+++ b/drivers/gpio/gpio-ath79.c
-@@ -17,6 +17,8 @@
- #include <linux/interrupt.h>
- #include <linux/module.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- 
- #define AR71XX_GPIO_REG_OE		0x00
- #define AR71XX_GPIO_REG_IN		0x04
-diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-index dfcf56ee3c61..937d646d184b 100644
---- a/drivers/gpio/gpio-bcm-kona.c
-+++ b/drivers/gpio/gpio-bcm-kona.c
-@@ -23,6 +23,7 @@
- #include <linux/init.h>
- #include <linux/irqdomain.h>
- #include <linux/irqchip/chained_irq.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- 
- #define BCM_GPIO_PASSWD				0x00a5a501
- #define GPIO_PER_BANK				32
-diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
-index 52fd63f02134..1f499b5e7f91 100644
---- a/drivers/gpio/gpio-clps711x.c
-+++ b/drivers/gpio/gpio-clps711x.c
-@@ -12,6 +12,7 @@
- #include <linux/err.h>
- #include <linux/module.h>
- #include <linux/gpio/driver.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- 
- static int clps711x_gpio_probe(struct platform_device *pdev)
-diff --git a/drivers/gpio/gpio-crystalcove.c b/drivers/gpio/gpio-crystalcove.c
-index e60156ec0c18..0f66ae796d4a 100644
---- a/drivers/gpio/gpio-crystalcove.c
-+++ b/drivers/gpio/gpio-crystalcove.c
-@@ -16,6 +16,8 @@
-  */
- 
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
-diff --git a/drivers/gpio/gpio-dln2.c b/drivers/gpio/gpio-dln2.c
-index aecb847166f5..d524f3390196 100644
---- a/drivers/gpio/gpio-dln2.c
-+++ b/drivers/gpio/gpio-dln2.c
-@@ -17,6 +17,7 @@
- #include <linux/irqchip/chained_irq.h>
- #include <linux/gpio.h>
- #include <linux/gpio/driver.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/mfd/dln2.h>
- 
-diff --git a/drivers/gpio/gpio-dwapb.c b/drivers/gpio/gpio-dwapb.c
-index c07ada9c7af6..350454b9359e 100644
---- a/drivers/gpio/gpio-dwapb.c
-+++ b/drivers/gpio/gpio-dwapb.c
-@@ -23,6 +23,7 @@
- #include <linux/of_address.h>
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/property.h>
- #include <linux/spinlock.h>
-diff --git a/drivers/gpio/gpio-etraxfs.c b/drivers/gpio/gpio-etraxfs.c
-index 14c6aac26780..ef518aacbeac 100644
---- a/drivers/gpio/gpio-etraxfs.c
-+++ b/drivers/gpio/gpio-etraxfs.c
-@@ -4,6 +4,7 @@
- #include <linux/of_gpio.h>
- #include <linux/io.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/platform_device.h>
- 
- #define ETRAX_FS_rw_pa_dout	0
-diff --git a/drivers/gpio/gpio-f7188x.c b/drivers/gpio/gpio-f7188x.c
-index 13350c9d7f5e..08604a76d543 100644
---- a/drivers/gpio/gpio-f7188x.c
-+++ b/drivers/gpio/gpio-f7188x.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/gpio/driver.h>
- #include <linux/bitops.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- 
- #define DRVNAME "gpio-f7188x"
- 
-diff --git a/drivers/gpio/gpio-ftgpio010.c b/drivers/gpio/gpio-ftgpio010.c
-index e9386f8b67f5..699a3709e357 100644
---- a/drivers/gpio/gpio-ftgpio010.c
-+++ b/drivers/gpio/gpio-ftgpio010.c
-@@ -12,6 +12,9 @@
- #include <linux/gpio/driver.h>
- #include <linux/io.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/platform_device.h>
- #include <linux/of_gpio.h>
- #include <linux/bitops.h>
-diff --git a/drivers/gpio/gpio-ingenic.c b/drivers/gpio/gpio-ingenic.c
-index 254780730b95..7ec8de5ee926 100644
---- a/drivers/gpio/gpio-ingenic.c
-+++ b/drivers/gpio/gpio-ingenic.c
-@@ -9,6 +9,7 @@
- #include <linux/gpio/driver.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-diff --git a/drivers/gpio/gpio-intel-mid.c b/drivers/gpio/gpio-intel-mid.c
-index b76ecee82c3f..af6b7d27ee41 100644
---- a/drivers/gpio/gpio-intel-mid.c
-+++ b/drivers/gpio/gpio-intel-mid.c
-@@ -23,6 +23,8 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/gpio/driver.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-diff --git a/drivers/gpio/gpio-lp873x.c b/drivers/gpio/gpio-lp873x.c
-index df0ad2cef0d2..1cd5e7e08ad9 100644
---- a/drivers/gpio/gpio-lp873x.c
-+++ b/drivers/gpio/gpio-lp873x.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/gpio.h>
- #include <linux/module.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- 
-diff --git a/drivers/gpio/gpio-lynxpoint.c b/drivers/gpio/gpio-lynxpoint.c
-index fbd393b46ce0..9adbbac2ba5b 100644
---- a/drivers/gpio/gpio-lynxpoint.c
-+++ b/drivers/gpio/gpio-lynxpoint.c
-@@ -25,6 +25,8 @@
- #include <linux/types.h>
- #include <linux/bitops.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/gpio.h>
- #include <linux/slab.h>
- #include <linux/acpi.h>
-diff --git a/drivers/gpio/gpio-max732x.c b/drivers/gpio/gpio-max732x.c
-index 7f4d26ce5f23..c277278af532 100644
---- a/drivers/gpio/gpio-max732x.c
-+++ b/drivers/gpio/gpio-max732x.c
-@@ -20,6 +20,7 @@
- #include <linux/gpio/driver.h>
- #include <linux/interrupt.h>
- #include <linux/i2c.h>
-+#include <linux/irq.h>
- #include <linux/platform_data/max732x.h>
- #include <linux/of.h>
- 
-diff --git a/drivers/gpio/gpio-max77620.c b/drivers/gpio/gpio-max77620.c
-index 743459d9477d..35dd0f133028 100644
---- a/drivers/gpio/gpio-max77620.c
-+++ b/drivers/gpio/gpio-max77620.c
-@@ -12,6 +12,7 @@
- #include <linux/interrupt.h>
- #include <linux/mfd/max77620.h>
- #include <linux/module.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- 
-diff --git a/drivers/gpio/gpio-menz127.c b/drivers/gpio/gpio-menz127.c
-index e1037582e34d..f265a841f787 100644
---- a/drivers/gpio/gpio-menz127.c
-+++ b/drivers/gpio/gpio-menz127.c
-@@ -15,6 +15,7 @@
- #include <linux/mcb.h>
- #include <linux/bitops.h>
- #include <linux/gpio/driver.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- 
- #define MEN_Z127_CTRL	0x00
- #define MEN_Z127_PSR	0x04
-diff --git a/drivers/gpio/gpio-merrifield.c b/drivers/gpio/gpio-merrifield.c
-index ec8560298805..2d84fcbe060f 100644
---- a/drivers/gpio/gpio-merrifield.c
-+++ b/drivers/gpio/gpio-merrifield.c
-@@ -14,8 +14,12 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/module.h>
- #include <linux/pci.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/pinctrl/consumer.h>
- 
- #define GCCR		0x000	/* controller configuration */
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index f8c550de6c72..7ef062e14777 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -19,6 +19,8 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/device.h>
- #include <linux/pm_runtime.h>
- #include <linux/pm.h>
-@@ -26,6 +28,7 @@
- #include <linux/of_device.h>
- #include <linux/gpio.h>
- #include <linux/bitops.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_data/gpio-omap.h>
- 
- #define OFF_MODE	1
-diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
-index 4c9e21300a26..58a68ba8311f 100644
---- a/drivers/gpio/gpio-pca953x.c
-+++ b/drivers/gpio/gpio-pca953x.c
-@@ -17,6 +17,7 @@
- #include <linux/i2c.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/module.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/pca953x.h>
-diff --git a/drivers/gpio/gpio-pci-idio-16.c b/drivers/gpio/gpio-pci-idio-16.c
-index 7de4f6a2cb49..313da56389f4 100644
---- a/drivers/gpio/gpio-pci-idio-16.c
-+++ b/drivers/gpio/gpio-pci-idio-16.c
-@@ -16,7 +16,9 @@
- #include <linux/errno.h>
- #include <linux/gpio/driver.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/irqdesc.h>
-+#include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/pci.h>
-diff --git a/drivers/gpio/gpio-pisosr.c b/drivers/gpio/gpio-pisosr.c
-index f5545049c187..4cca0c4dd85a 100644
---- a/drivers/gpio/gpio-pisosr.c
-+++ b/drivers/gpio/gpio-pisosr.c
-@@ -17,6 +17,7 @@
- #include <linux/gpio/driver.h>
- #include <linux/module.h>
- #include <linux/mutex.h>
-+#include <linux/of.h>
- #include <linux/spi/spi.h>
- 
- #define DEFAULT_NGPIO 8
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index 3d3d6b6645a7..8d502a83babc 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/bitops.h>
- #include <linux/gpio.h>
- #include <linux/device.h>
-diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
-index 4a1536a050bc..9b2b00974163 100644
---- a/drivers/gpio/gpio-rcar.c
-+++ b/drivers/gpio/gpio-rcar.c
-@@ -22,6 +22,7 @@
- #include <linux/io.h>
- #include <linux/ioport.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/pinctrl/consumer.h>
-diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
-index 16cbc5702865..0e6fae84c759 100644
---- a/drivers/gpio/gpio-stmpe.c
-+++ b/drivers/gpio/gpio-stmpe.c
-@@ -10,6 +10,8 @@
- #include <linux/slab.h>
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/of.h>
- #include <linux/mfd/stmpe.h>
- #include <linux/seq_file.h>
-diff --git a/drivers/gpio/gpio-tc3589x.c b/drivers/gpio/gpio-tc3589x.c
-index 433b45ef332e..d0ec9902d9c1 100644
---- a/drivers/gpio/gpio-tc3589x.c
-+++ b/drivers/gpio/gpio-tc3589x.c
-@@ -12,8 +12,11 @@
- #include <linux/gpio/driver.h>
- #include <linux/of.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/mfd/tc3589x.h>
- #include <linux/bitops.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- 
- /*
-  * These registers are modified under the irq bus lock and cached to avoid
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 88529d3c06c9..5e012377be1e 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -29,6 +29,7 @@
- #include <linux/irqdomain.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/pm.h>
- 
- #define GPIO_BANK(x)		((x) >> 5)
-diff --git a/drivers/gpio/gpio-tps65218.c b/drivers/gpio/gpio-tps65218.c
-index a379bba57d31..97dca93b0529 100644
---- a/drivers/gpio/gpio-tps65218.c
-+++ b/drivers/gpio/gpio-tps65218.c
-@@ -15,6 +15,7 @@
- #include <linux/module.h>
- #include <linux/errno.h>
- #include <linux/gpio/driver.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/mfd/tps65218.h>
-diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-index 521fbe338589..844bf591268b 100644
---- a/drivers/gpio/gpio-vf610.c
-+++ b/drivers/gpio/gpio-vf610.c
-@@ -23,6 +23,9 @@
- #include <linux/io.h>
- #include <linux/ioport.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-diff --git a/drivers/gpio/gpio-vx855.c b/drivers/gpio/gpio-vx855.c
-index 98a6f1fcc561..96331a43c2c1 100644
---- a/drivers/gpio/gpio-vx855.c
-+++ b/drivers/gpio/gpio-vx855.c
-@@ -28,6 +28,7 @@
- #include <linux/gpio.h>
- #include <linux/slab.h>
- #include <linux/device.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/pci.h>
- #include <linux/io.h>
-diff --git a/drivers/gpio/gpio-wcove.c b/drivers/gpio/gpio-wcove.c
-index 37c103e50ebf..78161e22a859 100644
---- a/drivers/gpio/gpio-wcove.c
-+++ b/drivers/gpio/gpio-wcove.c
-@@ -18,8 +18,10 @@
- #include <linux/bitops.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
-+#include <linux/irqdomain.h>
- #include <linux/gpio/driver.h>
- #include <linux/mfd/intel_soc_pmic.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/seq_file.h>
-diff --git a/drivers/gpio/gpio-wm831x.c b/drivers/gpio/gpio-wm831x.c
-index 938bbe3f831c..b9f2f95a1309 100644
---- a/drivers/gpio/gpio-wm831x.c
-+++ b/drivers/gpio/gpio-wm831x.c
-@@ -17,6 +17,7 @@
- #include <linux/module.h>
- #include <linux/gpio.h>
- #include <linux/mfd/core.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/seq_file.h>
- 
-diff --git a/drivers/gpio/gpio-wm8994.c b/drivers/gpio/gpio-wm8994.c
-index 1e35756ac55b..f2708fa3eefb 100644
---- a/drivers/gpio/gpio-wm8994.c
-+++ b/drivers/gpio/gpio-wm8994.c
-@@ -17,6 +17,7 @@
- #include <linux/module.h>
- #include <linux/gpio.h>
- #include <linux/mfd/core.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/platform_device.h>
- #include <linux/seq_file.h>
- #include <linux/regmap.h>
-diff --git a/drivers/gpio/gpio-ws16c48.c b/drivers/gpio/gpio-ws16c48.c
-index 5037974ac063..9eb42b983c75 100644
---- a/drivers/gpio/gpio-ws16c48.c
-+++ b/drivers/gpio/gpio-ws16c48.c
-@@ -19,6 +19,7 @@
- #include <linux/ioport.h>
- #include <linux/interrupt.h>
- #include <linux/irqdesc.h>
-+#include <linux/irqdomain.h>
- #include <linux/isa.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-diff --git a/drivers/gpio/gpio-xgene-sb.c b/drivers/gpio/gpio-xgene-sb.c
-index 033258634b8c..f0929da6c385 100644
---- a/drivers/gpio/gpio-xgene-sb.c
-+++ b/drivers/gpio/gpio-xgene-sb.c
-@@ -22,6 +22,8 @@
- 
- #include <linux/module.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/platform_device.h>
- #include <linux/of_gpio.h>
- #include <linux/gpio/driver.h>
-diff --git a/drivers/gpio/gpio-xlp.c b/drivers/gpio/gpio-xlp.c
-index d857e1d8e731..646856127aa6 100644
---- a/drivers/gpio/gpio-xlp.c
-+++ b/drivers/gpio/gpio-xlp.c
-@@ -17,6 +17,7 @@
- #include <linux/of_device.h>
- #include <linux/module.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/acpi.h>
-diff --git a/drivers/gpio/gpio-zx.c b/drivers/gpio/gpio-zx.c
-index be3a87da8438..4259ae6ff44c 100644
---- a/drivers/gpio/gpio-zx.c
-+++ b/drivers/gpio/gpio-zx.c
-@@ -14,6 +14,7 @@
- #include <linux/errno.h>
- #include <linux/gpio/driver.h>
- #include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/pinctrl/consumer.h>
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index df0851464006..e0a83e32caef 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -15,6 +15,9 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-diff --git a/drivers/gpio/gpiolib-acpi.c b/drivers/gpio/gpiolib-acpi.c
-index c9b42dd12dfa..2695a8cc3b71 100644
---- a/drivers/gpio/gpiolib-acpi.c
-+++ b/drivers/gpio/gpiolib-acpi.c
-@@ -18,6 +18,7 @@
- #include <linux/export.h>
- #include <linux/acpi.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/mutex.h>
- #include <linux/pinctrl/pinctrl.h>
- 
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 9568708a550b..b81269c00381 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -3,6 +3,7 @@
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/spinlock.h>
- #include <linux/list.h>
- #include <linux/device.h>
-@@ -17,6 +18,7 @@
- #include <linux/gpio/driver.h>
- #include <linux/gpio/machine.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/cdev.h>
- #include <linux/fs.h>
- #include <linux/uaccess.h>
-diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
-index af20369ec8e7..07b595e24695 100644
---- a/include/linux/gpio/driver.h
-+++ b/include/linux/gpio/driver.h
-@@ -1,21 +1,22 @@
- #ifndef __LINUX_GPIO_DRIVER_H
- #define __LINUX_GPIO_DRIVER_H
- 
--#include <linux/device.h>
- #include <linux/types.h>
--#include <linux/irq.h>
--#include <linux/irqchip/chained_irq.h>
--#include <linux/irqdomain.h>
-+#include <linux/irqhandler.h>
- #include <linux/lockdep.h>
- #include <linux/pinctrl/pinctrl.h>
--#include <linux/pinctrl/pinconf-generic.h>
-+#include <linux/spinlock_types.h>
- 
- struct gpio_desc;
- struct of_phandle_args;
-+struct device;
- struct device_node;
-+struct irq_chip;
-+struct irq_domain;
- struct seq_file;
- struct gpio_device;
- struct module;
-+struct pinctrl_dev;
- 
- #ifdef CONFIG_GPIOLIB
- 
--- 
-2.7.4
+  b). Qemu gets the address(host VA) delivered by KVM, translate this host VA address to virtual machine physical address(IPA), and runtime record this virtual
+     machine physical address(IPA) to the guest OS's APEI table.
+
+  c). Qemu gets the syndrome_info delivered by KVM, it refers to this syndrome value(but can be different from it) to specify the virtual SError interrupt's syndrome through setting VESR_EL2.
+
+        the vsesr_el2 is armv8.2 register, its explanation can be found in "RAS_Extension_PRD03-PRDC-010953-33-0, 5.6.18 VSESR_EL2, Virtual SError Exception Syndrome Register"
+
+	>>The VSESR_EL2 characteristics are:
+	>>Purpose:
+	>>Provides the syndrome value reported to software on taking a virtual SError interrupt exception:
+	>>	? If the virtual SError interrupt is taken to EL1 using AArch64 then VSESR_EL2 provides the
+	>>syndrome value reported in ESR_EL1.
+	>>	? If the virtual SError interrupt is taken to EL1 using AArch32 then VSESR_EL2 provides the
+	>>	  syndrome values reported in DFSR.{AET, ExT} and the remainder of the DFSR is set as
+	>>	 defined by VMSAv8-32.
+
+     so in the KVM, I added a new IOCTL(#define KVM_ARM_SEI  _IO(KVMIO,  0xb8)) to pass the virtual SError syndrome value specified by Qemu and enable a virtual System Error.
+
+
+ d). when world switch to guest OS, guest OS will happen virtual SError(this virtual SError can not be route to EL3 firmware), guest OS uses the specified syndrome value to do the recovery and
+     parses the guest OS CPER which is dynamically recorded by the Qemu in the APEI table .
+
+
+
+> 
+> I think this patch is trying to do too many things.  I suggest you split
+> the patch into (at least) one patch that captures exception information
+> from the world-switch path, one patch that deals with the new exit
+> reason, and finally a patch with the new ioctl.  That way you can write
+> a commit message for each patch describing first what the patch does,
+> and then why this is a good idea.
+  Ok, thanks for the good suggestion.
+
+> 
+> Neverthess, I added some random comments below.
+> 
+>>
+>> Changes since v3:
+>> (1) Move restore VSESR_EL2 value logic to a helper method
+>> (2) In the world-switch, not save VSESR_EL2, because no one cares the
+>>     old VSESR_EL2 value
+>> (3) Add a new KVM_ARM_SEI ioctl to set the VSESR_EL2 value and pend
+>>     a virtual system error
+>>
+>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+>> Signed-off-by: Quanming Wu <wuquanming@huawei.com>
+>> ---
+>>  Documentation/virtual/kvm/api.txt    | 10 ++++++++++
+>>  arch/arm/include/asm/kvm_host.h      |  1 +
+>>  arch/arm/kvm/arm.c                   |  7 +++++++
+>>  arch/arm/kvm/guest.c                 |  5 +++++
+>>  arch/arm64/include/asm/esr.h         |  2 ++
+>>  arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
+>>  arch/arm64/include/asm/kvm_host.h    |  2 ++
+>>  arch/arm64/include/asm/sysreg.h      |  3 +++
+>>  arch/arm64/kvm/guest.c               | 14 ++++++++++++++
+>>  arch/arm64/kvm/handle_exit.c         | 25 +++++++++++++++++++------
+>>  arch/arm64/kvm/hyp/switch.c          | 14 ++++++++++++++
+>>  include/uapi/linux/kvm.h             |  8 ++++++++
+>>  12 files changed, 95 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index 3c248f7..852ac55 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -3377,6 +3377,16 @@ struct kvm_ppc_resize_hpt {
+>>  	__u32 pad;
+>>  };
+>>  
+>> +4.104 KVM_ARM_SEI
+>> +
+>> +Capability: KVM_EXIT_SERROR_INTR
+>> +Architectures: arm/arm64
+>> +Type: vcpu ioctl
+>> +Parameters: u64 (syndrome)
+>> +Returns: 0 in case of success
+>> +
+>> +Pend an virtual system error or asynchronous abort with user space specified.
+>> +
+> 
+> I don't understand enough about what this ioctl does by just reading
+> this text.  Did you mean to say something like "Record that userspace
+> wishes to inject a pending virtual system error to the VCPU.  Next time
+> the VCPU is run, th
+Christoffer, sorry to confuse you.
+This IOCTL mainly do two things:
+
+(1) set the VCPU struct's vsesr_el2 to pass the virtual SError's syndrome value that Qemu specified.
+(2) enable virtual SError
+
+ +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome)
+ +{
+ +	u64 reg = *syndrome;
+ +
+ +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && reg)
+ +		/* set vsesr_el2[24:0] with value that user space specified */
+ +		kvm_vcpu_set_vsesr(vcpu, reg & VSESR_ELx_IDS_ISS_MASK);
+
+ +
+ +	/* inject virtual system Error or asynchronous abort */
+ +	kvm_inject_vabt(vcpu);
+ +
+ +	return 0;
+ +}
+
+> 
+>>  5. The kvm_run structure
+>>  ------------------------
+>>  
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 31ee468..566292a 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -244,6 +244,7 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
+>>  
+>>  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  		int exception_index);
+>> +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome);
+>>  
+>>  static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>>  				       unsigned long hyp_stack_ptr,
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 96dba7c..583294f 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -987,6 +987,13 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>>  			return -EFAULT;
+>>  		return kvm_arm_vcpu_has_attr(vcpu, &attr);
+>>  	}
+>> +	case KVM_ARM_SEI: {
+>> +		u64 syndrome;
+>> +
+>> +		if (copy_from_user(&syndrome, argp, sizeof(syndrome)))
+>> +			return -EFAULT;
+>> +		return kvm_vcpu_ioctl_sei(vcpu, &syndrome);
+>> +	}
+>>  	default:
+>>  		return -EINVAL;
+>>  	}
+>> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+>> index fa6182a..72505bf 100644
+>> --- a/arch/arm/kvm/guest.c
+>> +++ b/arch/arm/kvm/guest.c
+>> @@ -248,6 +248,11 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+>>  	return -EINVAL;
+>>  }
+>>  
+>> +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome)
+>> +{
+>> +	return 0;
+>> +}
+>> +
+>>  int __attribute_const__ kvm_target_cpu(void)
+>>  {
+>>  	switch (read_cpuid_part()) {
+>> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+>> index 22f9c90..d009c99 100644
+>> --- a/arch/arm64/include/asm/esr.h
+>> +++ b/arch/arm64/include/asm/esr.h
+>> @@ -127,6 +127,8 @@
+>>  #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+>>  #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+>>  
+>> +#define VSESR_ELx_IDS_ISS_MASK    ((1UL << 25) - 1)
+>> +
+>>  /* ESR value templates for specific events */
+>>  
+>>  /* BRK instruction trap from AArch64 state */
+>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+>> index 5f64ab2..93dc3d1 100644
+>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>> @@ -155,6 +155,16 @@ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+>>  	return vcpu->arch.fault.esr_el2;
+>>  }
+>>  
+>> +static inline u32 kvm_vcpu_get_vsesr(const struct kvm_vcpu *vcpu)
+>> +{
+>> +		return vcpu->arch.fault.vsesr_el2;
+>> +}
+>> +
+>> +static inline void kvm_vcpu_set_vsesr(struct kvm_vcpu *vcpu, unsigned long val)
+>> +{
+>> +		vcpu->arch.fault.vsesr_el2 = val;
+>> +}
+>> +
+>>  static inline int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
+>>  {
+>>  	u32 esr = kvm_vcpu_get_hsr(vcpu);
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index e7705e7..b6242fb 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -86,6 +86,7 @@ struct kvm_vcpu_fault_info {
+>>  	u32 esr_el2;		/* Hyp Syndrom Register */
+>>  	u64 far_el2;		/* Hyp Fault Address Register */
+>>  	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
+>> +	u32 vsesr_el2;		/* Virtual SError Exception Syndrome Register */
+>>  };
+>>  
+>>  /*
+>> @@ -385,6 +386,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>>  			       struct kvm_device_attr *attr);
+>>  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>>  			       struct kvm_device_attr *attr);
+>> +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome);
+>>  
+>>  static inline void __cpu_init_stage2(void)
+>>  {
+>> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+>> index 32964c7..3af6907 100644
+>> --- a/arch/arm64/include/asm/sysreg.h
+>> +++ b/arch/arm64/include/asm/sysreg.h
+>> @@ -125,6 +125,9 @@
+>>  #define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
+>>  #define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
+>>  
+>> +/* virtual SError exception syndrome register in armv8.2 */
+>> +#define REG_VSESR_EL2			sys_reg(3, 4, 5, 2, 3)
+>> +
+>>  #define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
+>>  				      (!!x)<<8 | 0x1f)
+>>  #define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
+>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+>> index b37446a..21c20b0 100644
+>> --- a/arch/arm64/kvm/guest.c
+>> +++ b/arch/arm64/kvm/guest.c
+>> @@ -277,6 +277,20 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+>>  	return -EINVAL;
+>>  }
+>>  
+>> +int kvm_vcpu_ioctl_sei(struct kvm_vcpu *vcpu, u64 *syndrome)
+>> +{
+>> +	u64 reg = *syndrome;
+>> +
+>> +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && reg)
+>> +		/* set vsesr_el2[24:0] with value that user space specified */
+>> +		kvm_vcpu_set_vsesr(vcpu, reg & VSESR_ELx_IDS_ISS_MASK);
+> 
+> Are you really supposed to fail silently here if trying to do this on a
+> system that doesn't have RAS ?
+This register vsesr_el2 is only introduced by armv8.2.
+so if system does not have RAS, the setting will be failed because this register does not exist. I need to "return -EINVAL"
+for this case. thank you for pointing that.
+
+
+> 
+> Why can you not set reg to 0 here?  That doesn't seem to be documented
+> anywhere, and shouldn't the function return -EINVAL in this case?
+Because the default value is 0. if want to set to 0, it can not call this API.
+zero is meaningless syndrome value. no one care the zero value.
+
+
+> 
+> Also, if you do this, but don't run the VCPU, then migrate the VM, and
+> run the VCPU on the new destination, isn't this information lost?
+> 
+> 
+>> +
+>> +	/* inject virtual system Error or asynchronous abort */
+>> +	kvm_inject_vabt(vcpu);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  int __attribute_const__ kvm_target_cpu(void)
+>>  {
+>>  	unsigned long implementor = read_cpuid_implementor();
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index c89d83a..23c02c2 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -180,7 +180,11 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+>>  
+>>  static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  {
+>> -	unsigned long fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+>> +	unsigned long hva, fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+>> +	struct kvm_memory_slot *memslot;
+>> +	int hsr, ret = 1;
+>> +	bool writable;
+>> +	gfn_t gfn;
+>>  
+>>  	if (handle_guest_sei((unsigned long)fault_ipa,
+>>  				kvm_vcpu_get_hsr(vcpu))) {
+>> @@ -190,9 +194,20 @@ static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+>>  
+>>  		kvm_inject_vabt(vcpu);
+>> +	} else {
+>> +		hsr = kvm_vcpu_get_hsr(vcpu);
+>> +
+>> +		gfn = fault_ipa >> PAGE_SHIFT;
+>> +		memslot = gfn_to_memslot(vcpu->kvm, gfn);
+>> +		hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
+>> +
+>> +		run->exit_reason = KVM_EXIT_SERROR_INTR;
+>> +		run->serror_intr.syndrome_info = hsr;
+>> +		run->serror_intr.address = hva;
+>> +		ret = 0;
+>>  	}
+>>  
+>> -	return 0;
+>> +	return ret;
+>>  }
+>>  
+>>  /*
+>> @@ -218,8 +233,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  			*vcpu_pc(vcpu) -= adj;
+>>  		}
+>>  
+>> -		kvm_handle_guest_sei(vcpu, run);
+>> -		return 1;
+>> +		return kvm_handle_guest_sei(vcpu, run);
+>>  	}
+>>  
+>>  	exception_index = ARM_EXCEPTION_CODE(exception_index);
+>> @@ -228,8 +242,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  	case ARM_EXCEPTION_IRQ:
+>>  		return 1;
+>>  	case ARM_EXCEPTION_EL1_SERROR:
+>> -		kvm_handle_guest_sei(vcpu, run);
+>> -		return 1;
+>> +		return kvm_handle_guest_sei(vcpu, run);
+>>  	case ARM_EXCEPTION_TRAP:
+>>  		/*
+>>  		 * See ARM ARM B1.14.1: "Hyp traps on instructions
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index aede165..6d17c97 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -67,6 +67,13 @@ static hyp_alternate_select(__activate_traps_arch,
+>>  			    __activate_traps_nvhe, __activate_traps_vhe,
+>>  			    ARM64_HAS_VIRT_HOST_EXTN);
+>>  
+>> +static void __hyp_text __sysreg_set_vsesr(struct kvm_vcpu *vcpu)
+>> +{
+>> +	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) &&
+>> +			(vcpu->arch.hcr_el2 & HCR_VSE))
+>> +		write_sysreg_s(vcpu->arch.fault.vsesr_el2, REG_VSESR_EL2);
+>> +}
+>> +
+>>  static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>>  {
+>>  	u64 val;
+>> @@ -86,6 +93,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>>  		isb();
+>>  	}
+>>  	write_sysreg(val, hcr_el2);
+>> +
+>> +	/*
+>> +	 * If the virtual SError interrupt is taken to EL1 using AArch64,
+>> +	 * then VSESR_EL2 provides the syndrome value reported in ESR_EL1.
+>> +	 */
+>> +	__sysreg_set_vsesr(vcpu);
+>> +
+>>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+>>  	write_sysreg(1 << 15, hstr_el2);
+>>  	/*
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index 27fe556..ab91fe3 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -205,6 +205,7 @@ struct kvm_hyperv_exit {
+>>  #define KVM_EXIT_S390_STSI        25
+>>  #define KVM_EXIT_IOAPIC_EOI       26
+>>  #define KVM_EXIT_HYPERV           27
+>> +#define KVM_EXIT_SERROR_INTR      28
+>>  
+>>  /* For KVM_EXIT_INTERNAL_ERROR */
+>>  /* Emulate instruction failed. */
+>> @@ -360,6 +361,11 @@ struct kvm_run {
+>>  		struct {
+>>  			__u8 vector;
+>>  		} eoi;
+>> +		/* KVM_EXIT_SERROR_INTR */
+>> +		struct {
+>> +			__u32 syndrome_info;
+>> +			__u64 address;
+>> +		} serror_intr;
+>>  		/* KVM_EXIT_HYPERV */
+>>  		struct kvm_hyperv_exit hyperv;
+>>  		/* Fix the size of the union. */
+>> @@ -1301,6 +1307,8 @@ struct kvm_s390_ucas_mapping {
+>>  #define KVM_S390_GET_IRQ_STATE	  _IOW(KVMIO, 0xb6, struct kvm_s390_irq_state)
+>>  /* Available with KVM_CAP_X86_SMM */
+>>  #define KVM_SMI                   _IO(KVMIO,   0xb7)
+>> +/* Available with KVM_EXIT_SERROR_INTR */
+>> +#define KVM_ARM_SEI               _IO(KVMIO,   0xb8)
+>>  
+>>  #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
+>>  #define KVM_DEV_ASSIGN_PCI_2_3		(1 << 1)
+>> -- 
+>> 2.10.1
+>>
+> 
+> Thanks,
+> -Christoffer
+> 
+> .
+> 
