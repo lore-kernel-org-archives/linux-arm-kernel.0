@@ -1,52 +1,97 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 05 Jul 2017 22:21:39 +0200
-Subject: [PATCH v3 02/12] ALSA: ac97: add an ac97 bus
-In-Reply-To: <s5hbmp0c6a3.wl-tiwai@suse.de> (Takashi Iwai's message of "Tue,
- 04 Jul 2017 22:10:28 +0200")
-References: <20170630194408.24978-1-robert.jarzmik@free.fr>
- <20170630194408.24978-3-robert.jarzmik@free.fr>
- <s5hpodhc28v.wl-tiwai@suse.de> <87bmp0t2lv.fsf@belgarion.home>
- <s5hbmp0c6a3.wl-tiwai@suse.de>
-Message-ID: <877ezmtz1o.fsf@belgarion.home>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 5 Jul 2017 22:39:19 +0200
+Subject: [PATCH v9 0/3] Tango PCIe controller support
+In-Reply-To: <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
+ <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
+ <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <5a1207cb-31fd-6b85-86af-8c37bd57ad4f@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Takashi Iwai <tiwai@suse.de> writes:
+On 05/07/2017 20:03, Bjorn Helgaas wrote:
 
-> On Tue, 04 Jul 2017 21:37:48 +0200,
-> Robert Jarzmik wrote:
->> 
->> Takashi Iwai <tiwai@suse.de> writes:
->> 
->> > On Fri, 30 Jun 2017 21:43:58 +0200,
->> > Robert Jarzmik wrote:
->> >> +static struct bus_type ac97_bus_type = {
->> >> +	.name		= "ac97",
->> >
->> > Name-conflict with the old ac97 bus?
->> Yeah, fair point. So what should I choose for this new one ?
->>  - ac97new
->>  - ac97bis
->>  - ac97_2
->>  - ac97reborn
+> On Wed, Jul 05, 2017 at 12:55:37AM +0200, Mason wrote:
 >
-> ac97bus
-> ac97_episode_5
-> ac98
-> ...
->
-> I have no opinion on it.
-Ah clone wars one is really tempting :)
-But let's have ac97bus actually.
+>> On 04/07/2017 22:24, Bjorn Helgaas wrote:
+>>
+>>> I made the trivial changes I mentioned, added a dependency on
+>>> CONFIG_BROKEN (for the config/MMIO muxing issue), and put these on
+>>> pci/host-tango.  I can't build or test this, so I probably broke
+>>> something in the process.  I think the combination of the boot-time
+>>> warning, the taint, and CONFIG_BROKEN is a reasonable amount of
+>>> warning that a user should expect issues.
+>>>
+>>> Can you take a look and see if it works for you?
+>>>
+>>> https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-tango
+>>
+>> Thanks. I'll take it for a spin ASAP.
+>>
+>> TAINT_CRAP... Smirk. I didn't see that one in the docs:
+>> https://www.kernel.org/doc/html/latest/admin-guide/tainted-kernels.html
+>>
+>> Oh wait... TAINT_CRAP is "C" => a staging driver has been loaded
+> 
+> I wish it had a less pejorative, more descriptive name.  But it seems like
+> the closest to this situation.
 
-> You can use subsys_init() for modules, it's no problem.
-> When it's built for a module, all xxx_init() is handled as equivalent
-> with module_init().  See linux/module.h.
->
-> It's just the lack of module_exit() in your case.
-Got it, I'll add it for v4.
+Maybe it is not too late to submit a patch to Linus
+renaming TAINT_CRAP?
 
-Cheers.
+Here are a few candidates, off the top of my head:
 
--- 
-Robert
+TAINT_STAGING
+TAINT_STAGING_DRIVER
+TAINT_BROKEN_HW
+TAINT_BROKEN_HARDWARE
+TAINT_USE_AT_YOUR_OWN_RISK
+
+>> The one issue I anticipate with "depends on BROKEN" is
+>> when I add support for revision 2, which isn't broken.
+> 
+> How about this:
+> 
+>   - Rename PCIE_TANGO to PCIE_TANGO_REV1
+>   - PCIE_TANGO_REV1 depends on BROKEN
+>   - Add rev2 support later, enabled by PCIE_TANGO
+>   - PCIE_TANGO_REV1 depends on PCIE_TANGO && BROKEN
+> 
+> I updated pci/host-tango along these lines (without rev2 support,
+> obviously).
+
+And support for REV1 wouldn't be compiled in, unless
+BROKEN is selected? Yes, I think that could fly.
+
+Don't you think the naming should follow the DT
+convention of using the first SoC embedding the
+IP (for the compatible string) ?
+
+PCIE_TANGO_REV1 vs PCIE_TANGO_SMP8759
+
+> I forgot to ask for a MAINTAINERS update.  Can you send that, too,
+> please?
+
+There's a "catch-all" rule for everything tango-related:
+
+ARM/TANGO ARCHITECTURE
+M:	Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+L:	linux-arm-kernel at lists.infradead.org
+S:	Maintained
+N:	tango
+
+Is that enough?
+
+> Which reminds me -- are these two addreses
+> 
+>   Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>   Mason <slash.tmp@free.fr>
+> 
+> different names for the same person?  Conversations are easier for me
+> if I can keep who's who straight :)
+
+Well, there are many voices inside my head, but yes,
+respectively professional and personal addresses.
+
+Regards.
