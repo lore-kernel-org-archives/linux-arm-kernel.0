@@ -1,51 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Jul 2017 21:32:54 +0200
-Subject: [PATCH] dt-bindings: amlogic: add unstable statement
-In-Reply-To: <20170705142015.tmlmes5lobadndsy@rob-hp-laptop>
-References: <20170628145343.25443-1-khilman@baylibre.com>
- <20170705142015.tmlmes5lobadndsy@rob-hp-laptop>
-Message-ID: <20170705193254.ulpoduoqlqf4ttkj@flea>
+From: joe@perches.com (Joe Perches)
+Date: Wed,  5 Jul 2017 13:02:11 -0700
+Subject: [PATCH 02/18] ARM: KVM: Move asmlinkage before type
+In-Reply-To: <cover.1499284835.git.joe@perches.com>
+References: <cover.1499284835.git.joe@perches.com>
+Message-ID: <005b8e120650c6a13b541e420f4e3605603fe9e6.1499284835.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 09:20:15AM -0500, Rob Herring wrote:
-> On Wed, Jun 28, 2017 at 07:53:43AM -0700, Kevin Hilman wrote:
-> > Due to the lack of documentation on this SoC family, discovery of new
-> > features, and correcting of previous misunderstandings is expected, so
-> > it's unrealistic to expect any form of stable bindings for this SoC
-> > family.  Make that clear inthe binding documentation.
-> 
-> s/inthe/in the/
-> 
-> > 
-> > Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/amlogic.txt | 12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
-> 
-> I've yet to see anyone remove an unstable tag and I'd rather see these 
-> for individual bindings than for the platform as a whole. In the end, 
-> it's a platform maintainers decision whether to accept compatibility 
-> breakage regardless of some text that probably no one reads.
+asmlinkage is either 'extern "C"' or blank.
 
-So what is the policy exactly to decide whether this statement can be
-merged or not?
+Move the uses of asmlinkage before the return types to be similar
+to the rest of the kernel.
 
-We have all the issues mentionned above, no backing from the vendor,
-and yet, we were forced last year to bow down to one single "user"
-without a clear usage into supporting a stable ABI that we never
-really anticipated. How does that work exactly?
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/include/asm/kvm_hyp.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Maxime
-
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index 58508900c4bb..14b5903f0224 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -110,8 +110,8 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+ 
+-void asmlinkage __vfp_save_state(struct vfp_hard_struct *vfp);
+-void asmlinkage __vfp_restore_state(struct vfp_hard_struct *vfp);
++asmlinkage void __vfp_save_state(struct vfp_hard_struct *vfp);
++asmlinkage void __vfp_restore_state(struct vfp_hard_struct *vfp);
+ static inline bool __vfp_enabled(void)
+ {
+ 	return !(read_sysreg(HCPTR) & (HCPTR_TCP(11) | HCPTR_TCP(10)));
+@@ -120,8 +120,8 @@ static inline bool __vfp_enabled(void)
+ void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt);
+ void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
+ 
+-int asmlinkage __guest_enter(struct kvm_vcpu *vcpu,
++asmlinkage int __guest_enter(struct kvm_vcpu *vcpu,
+ 			     struct kvm_cpu_context *host);
+-int asmlinkage __hyp_do_panic(const char *, int, u32);
++asmlinkage int __hyp_do_panic(const char *, int, u32);
+ 
+ #endif /* __ARM_KVM_HYP_H__ */
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170705/3a5d9b5e/attachment.sig>
+2.10.0.rc2.1.g053435c
