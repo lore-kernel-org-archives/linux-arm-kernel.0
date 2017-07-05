@@ -1,41 +1,59 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 5 Jul 2017 15:29:10 +0200
-Subject: [PATCH v2 1/6] serial: imx: only set DMA rx-ing when DMA starts
-In-Reply-To: <20170705130706.10388-2-romain.perier@collabora.com>
+Date: Wed, 5 Jul 2017 15:38:45 +0200
+Subject: [PATCH v2 3/6] serial: imx: remove CTSC and CTS handling
+In-Reply-To: <20170705130706.10388-4-romain.perier@collabora.com>
 References: <20170705130706.10388-1-romain.perier@collabora.com>
- <20170705130706.10388-2-romain.perier@collabora.com>
-Message-ID: <20170705132910.nmixhnh4l6h2hlga@pengutronix.de>
+ <20170705130706.10388-4-romain.perier@collabora.com>
+Message-ID: <20170705133845.32ov37meqcea3wtz@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Cc += Clemens Gruber + Fabio Estevam
 
-On Wed, Jul 05, 2017 at 03:07:01PM +0200, Romain Perier wrote:
+On Wed, Jul 05, 2017 at 03:07:03PM +0200, Romain Perier wrote:
 > From: Nandor Han <nandor.han@ge.com>
 > 
-> Avoid the situation when `dma_is_rxing` could incorrectly signal that
-> DMA RX channel is receiving data in case DMA preparation or sg mapping
-> fails.
+> CTSC and CTS are not related to DMA and might add
+> disruption in some cases.
 > 
-> This commit fixes the issues by moving the assignment of dma_is_rxing
-> out of imx_disable_rx_int(), then the variable is set to 1 from
-> start_rx_dma() only when the preparation is correctly done.
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
 
-I'd write:
+If it was Nandor Han who created this patch, it would be great to get
+his sob. If it was you, drop the From: line above.
 
-	There are a few issues with setting dma_is_rxing to 1 in
-	imx_disable_rx_int:
+> ---
+>  drivers/tty/serial/imx.c | 5 -----
+>  1 file changed, 5 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 5291b86..dd3ebb4 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -1249,11 +1249,6 @@ static void imx_disable_dma(struct imx_port *sport)
+>  	imx_stop_rx_dma(sport);
+>  	imx_stop_tx_dma(sport);
+>  
+> -	/* clear UCR2 */
+> -	temp = readl(sport->port.membase + UCR2);
+> -	temp &= ~(UCR2_CTSC | UCR2_CTS | UCR2_ATEN);
+> -	writel(temp, sport->port.membase + UCR2);
+> -
 
-	 - Currently always after imx_disable_rx_int() the function
-	   start_rx_dma() is called. This dependency isn't obvious though.
-	 - start_rx_dma() does error checking and might exit without enabling
-	   DMA but keeping dma_is_rxing 1.
+Before this patch imx_disable_dma resulted in the #CTS pin being high
+(inactive).
 
-	So the more natural place for setting dma_is_rxing to 1 is in
-	start_rx_dma after all errors are checked.
+Does this qualify as a fix? If so, you should sort this patch to the
+beginning of the series. Did you do test this patch and its effects
+separately?
 
-If you use this, there is nothing left of Nandor Han's patch and you can
-drop his authorship.
+@Clemens: maybe this patch makes a relevant difference when the port is
+operated in rs485 mode. Do you care to test?
+
+>  	imx_setup_ufcr(sport, TXTL_DEFAULT, RXTL_DEFAULT);
+>  
+>  	sport->dma_is_enabled = 0;
+> -- 
+> 1.8.3.1
 
 Best regards
 Uwe
