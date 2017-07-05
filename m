@@ -1,31 +1,42 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 04 Jul 2017 19:36:32 -0700
-Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
-In-Reply-To: <20170704233219.18790-1-afaerber@suse.de>
-References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
- <20170704233219.18790-1-afaerber@suse.de>
-Message-ID: <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 5 Jul 2017 10:35:10 +0800
+Subject: [PATCH V4 0/2] timer: add imx tpm timer support
+Message-ID: <1499222112-9988-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
->Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
->bogus holding pen") simplified the S500 SMP code by removing a loop for
->pen_release in owl_secondary_boot(). Since then it is only calling
->owl_v7_invalidate_l1() before branching to secondary_startup().
->
->The owl_v7_invalidate_l1() assembler function is superfluous, too.
->Therefore drop owl_secondary_boot() and use secondary_boot() directly.
->
->Cc: David Liu <liuwei@actions-semi.com>
->Signed-off-by: Andreas F?rber <afaerber@suse.de>
->---
+The Timer/PWM Module (TPM) supports input capture, output compare,
+and the generation of PWM signals to control electric motor and power
+management applications. The counter, compare and capture registers
+are clocked by an asynchronous clock that can remain enabled in low
+power modes. TPM can support global counter bus where one TPM drives
+the counter bus for the others, provided bit width is the same.
 
->-	writel(virt_to_phys(owl_secondary_startup),
->+	writel(virt_to_phys(secondary_startup),
-> 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
+This patch only adds the timer support. PWM would be added later.
 
-This is a kernel symbol so please use __pa_symbol() here, also you might want to build with CONFIG_DEBUG_VIRTUAL and see if you get other warnings about using virt_to_phys() in the owl platform code (I did not check if there are other uses)
+ChangeLog:
+v3->v4:
+ * also add ETIME explanation in function
+v2->v3:
+ * address a few minor comments from Daniel Lezcano
+ * add more explaination on ETIME check in commit message
+v1->v2:
+ * change to readl/writel from __raw_readl/writel according to Arnd's
+   suggestion to avoid endian issue
+ * add help information in Kconfig
+ * add more error checking
+
+Dong Aisheng (2):
+  dt-bindings: timer: add nxp tpm timer binding doc
+  timer: imx-tpm: add imx tpm timer support
+
+ .../devicetree/bindings/timer/nxp,tpm-timer.txt    |  28 +++
+ drivers/clocksource/Kconfig                        |   8 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-imx-tpm.c                | 239 +++++++++++++++++++++
+ 4 files changed, 276 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/nxp,tpm-timer.txt
+ create mode 100644 drivers/clocksource/timer-imx-tpm.c
 
 -- 
-Florian
+2.7.4
