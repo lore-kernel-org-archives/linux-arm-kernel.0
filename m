@@ -1,114 +1,84 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 5 Jul 2017 23:59:33 +0200
-Subject: [PATCH v9 0/3] Tango PCIe controller support
-In-Reply-To: <20170705213419.GD25063@bhelgaas-glaptop.roam.corp.google.com>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
- <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
- <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
- <5a1207cb-31fd-6b85-86af-8c37bd57ad4f@free.fr>
- <20170705213419.GD25063@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <8dcab663-245b-880a-be3a-2965fd12d663@free.fr>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 5 Jul 2017 18:07:53 -0400
+Subject: [RFC 0/5] drivers: Add boot constraints core
+In-Reply-To: <20170629210002.GB22780@codeaurora.org>
+References: <cover.1498642745.git.viresh.kumar@linaro.org>
+ <20170629124908.GV4902@n2100.armlinux.org.uk>
+ <20170629145808.GQ29665@vireshk-i7>
+ <20170629154353.GX4902@n2100.armlinux.org.uk>
+ <20170629210002.GB22780@codeaurora.org>
+Message-ID: <CAF6AEGvH3Vivi8d=MyXsv3x9J9AenAdLN9pr9RtucQ+AwZTO=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2017 23:34, Bjorn Helgaas wrote:
-
-> On Wed, Jul 05, 2017 at 10:39:19PM +0200, Mason wrote:
+On Thu, Jun 29, 2017 at 5:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/29, Russell King - ARM Linux wrote:
+>> On Thu, Jun 29, 2017 at 08:28:08PM +0530, Viresh Kumar wrote:
+>> > On 29-06-17, 13:49, Russell King - ARM Linux wrote:
+>> > > The thing that concerns me most about this is that typically the LCD
+>> > > controller will be performing DMA to system RAM.
+>> > >
+>> > > The location of the frame buffer is unknown to the decompressor - and
+>> > > as the decompressor self-relocates itself (using purely assembly code),
+>> > > it could relocate itself on top of the frame buffer, causing the "nice"
+>> > > image to become very colourful.
+>> > >
+>> > > The decompressor doesn't have the information from DT at that point to
+>> > > know what are safe locations, so it's up to the boot loader to place
+>> > > the frame buffer somewhere out of the way.  (If people want to write
+>> > > a DT parser in position independent ARM assembly code that may change.)
+>> > >
+>> > > As long as people realise this, then it's not a problem, but given the
+>> > > number of problems that we've already encountered with boot loaders and
+>> > > memory space layout, I don't trust them to get this right.
+>> > >
+>> > > Right now, the ARM kernel booting document requires:
+>> > >
+>> > > - Quiesce all DMA capable devices so that memory does not get
+>> > >   corrupted by bogus network packets or disk data. This will save
+>> > >   you many hours of debug.
+>> > >
+>> > > so we would need to modify that to make an exception for LCD controllers.
+>> > > However, we definitely can't have devices left enabled which are capable
+>> > > of writing to system memory, or which changing system memory is likely
+>> > > to cause bad effects (eg, packet ring buffers, USB buffers etc, which is
+>> > > really what the above requirement is about.)
+>> >
+>> > Well, LCD was just an example here. But yeah, it is one of the most
+>> > probable case we have.
+>> >
+>> > So, this thing is already working for sure, of course with some out of
+>> > tree hacks. Every smart phone shows their company's logo (some kind of
+>> > flash) while the phone boots. How do they get around such issues?
+>>
+>> As far as the memory being used goes, they probably locate the frame
+>> buffer well away from the kernel or any area that the kernel is likely
+>> to use during decompression.
+>>
+>> It's probably also marked as a reserved memory region in DT to avoid
+>> the kernel touching it during boot, or _maybe_ they just locate it
+>> somewhere in memory that they've tested that the kernel doesn't touch
+>> until after their kernel has initialised the LCD controller (thereby
+>> avoiding the memory being permanently consumed.)
+>>
 >
->> On 05/07/2017 20:03, Bjorn Helgaas wrote:
->>
->>> On Wed, Jul 05, 2017 at 12:55:37AM +0200, Mason wrote:
->>>
->>>> On 04/07/2017 22:24, Bjorn Helgaas wrote:
->>>>
->>>>> I made the trivial changes I mentioned, added a dependency on
->>>>> CONFIG_BROKEN (for the config/MMIO muxing issue), and put these on
->>>>> pci/host-tango.  I can't build or test this, so I probably broke
->>>>> something in the process.  I think the combination of the boot-time
->>>>> warning, the taint, and CONFIG_BROKEN is a reasonable amount of
->>>>> warning that a user should expect issues.
->>>>>
->>>>> Can you take a look and see if it works for you?
->>>>>
->>>>> https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-tango
->>>>
->>>> Thanks. I'll take it for a spin ASAP.
->>>>
->>>> TAINT_CRAP... Smirk. I didn't see that one in the docs:
->>>> https://www.kernel.org/doc/html/latest/admin-guide/tainted-kernels.html
->>>>
->>>> Oh wait... TAINT_CRAP is "C" => a staging driver has been loaded
->>>
->>> I wish it had a less pejorative, more descriptive name.  But it seems like
->>> the closest to this situation.
->>
->> Maybe it is not too late to submit a patch to Linus
->> renaming TAINT_CRAP?
->>
->> Here are a few candidates, off the top of my head:
->>
->> TAINT_STAGING
->> TAINT_STAGING_DRIVER
->> TAINT_BROKEN_HW
->> TAINT_BROKEN_HARDWARE
->> TAINT_USE_AT_YOUR_OWN_RISK
-> 
-> I personally wouldn't object, but it's not a PCI thing so that can all
-> be separate from this driver.
+> Yes. The display controller is typically pointed to a memory
+> carveout that we treat as reserved in the kernel. I'm fairly
+> certain that we avoid the "permanently consumed" problem by
+> making it a carveout for the display controller, so that when the
+> display controller probes it can take ownership of the memory
+> from the bootloader.
+>
 
-Yes, of course. I was just asking for your (and anyone's)
-opinion, as a Linux dev.
+For aarch64/arm64 booting with EFI, the bootloader passes info about
+memory layout to the kernel (including the fact that the framebuffer
+is carved out) so kernel doesn't clobber the scanout buffer.  The
+non-EFI case, the bootloader should (not that lk does) patch up the
+fdt reserved memory node w/ correct address/size.  I think
+lk+downstream just relies on luck.
 
->>>> The one issue I anticipate with "depends on BROKEN" is
->>>> when I add support for revision 2, which isn't broken.
->>>
->>> How about this:
->>>
->>>   - Rename PCIE_TANGO to PCIE_TANGO_REV1
->>>   - PCIE_TANGO_REV1 depends on BROKEN
->>>   - Add rev2 support later, enabled by PCIE_TANGO
->>>   - PCIE_TANGO_REV1 depends on PCIE_TANGO && BROKEN
->>>
->>> I updated pci/host-tango along these lines (without rev2 support,
->>> obviously).
->>
->> And support for REV1 wouldn't be compiled in, unless
->> BROKEN is selected? Yes, I think that could fly.
-> 
-> Right.
-> 
->> Don't you think the naming should follow the DT
->> convention of using the first SoC embedding the
->> IP (for the compatible string) ?
->>
->> PCIE_TANGO_REV1 vs PCIE_TANGO_SMP8759
-> 
-> Sounds reasonable.  So v2 will be something other than SMP8759?
-> I renamed it to CONFIG_PCIE_TANGO_SMP8759.
+(I have a patch that makes lk insert a framebuffer-simple node, which
+I think should also solve it in the non-bootefi case)
 
-Right, HW bugs are fixed in newer chips. Old chips rarely
-get bug fixes, apparently.
-
-> If you confirm that
-> https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-tango&id=d752a8b29345
-> works for you, I'll include it in my v4.13 pull request.
-
-There were a few nits I wanted to address:
-
-- Since we added suppress_bind_attrs = true, probe()
-can only be called at init, so I wanted to mark __init
-all the probe functions, to save space.
-
-- I left the definition of MSI_MAX in the wrong patch
-
-- You put a pointer to the pdev in the struct tango_pcie.
-I think this is redundant, since the pdev already has a
-pointer to the struct, as drvdata.
-So I wanted to change tango_msi_probe() to take a pdev
-as argument (to make it more like an actual probe function)
-and derive pcie from pdev, instead of the other way around.
-
-Can I send you a patch series with these changes on Friday?
-
-Regards.
+BR,
+-R
