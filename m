@@ -1,55 +1,48 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 5 Jul 2017 17:29:52 +0200
-Subject: [PATCH v2 4/5] ARM: dts: at91: at91-sama5d27_som1: add sama5d27
- SoM1 support
-In-Reply-To: <20170705152343.b735on6edg3vfsp3@rfolt0960.corp.atmel.com>
-References: <1499086572-6083-1-git-send-email-claudiu.beznea@microchip.com>
- <1499086572-6083-5-git-send-email-claudiu.beznea@microchip.com>
- <20170705152343.b735on6edg3vfsp3@rfolt0960.corp.atmel.com>
-Message-ID: <a74f9110-ced4-5412-8ed2-f57f65557f7e@microchip.com>
+Date: Wed, 5 Jul 2017 17:36:16 +0200
+Subject: [PATCH] net: macb: Adding Support for Jumbo Frames up to 10240 Bytes
+ in SAMA5D3
+Message-ID: <20170705153616.15965-1-nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2017 at 17:23, Ludovic Desroches wrote:
-> On Mon, Jul 03, 2017 at 03:56:11PM +0300, Claudiu Beznea wrote:
->> Add specific DTS file and bindings for sama5d27 SoM1 board.
->>
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
->> ---
->>  arch/arm/boot/dts/at91-sama5d27_som1.dtsi | 178 ++++++++++++++++++++++++++++++
->>  1 file changed, 178 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
->>
->> diff --git a/arch/arm/boot/dts/at91-sama5d27_som1.dtsi b/arch/arm/boot/dts/at91-sama5d27_som1.dtsi
->> new file mode 100644
->> index 0000000..c3a1dc8
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/at91-sama5d27_som1.dtsi
-> 
-> [...]
-> 
->> +
->> +			i2c0: i2c at f8028000 {
->> +				dmas = <0>, <0>;
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_i2c0_default>;
->> +				i2c-sda-hold-time-ns = <350>;
->> +				status = "disabled";
->> +
->> +				24aa at 50 {
->> +					compatible = "24mac602";
->> +					reg = <0x50>;
->> +					pagesize = <8>;
->> +					start-offset = /bits/ 8 <0xf8>;
-> 
-> Are you sure about the offset? I thought it was 0xfa but maybe I am
-> wrong.
+From: vishnuvardhan <vardhanraj4143@gmail.com>
 
-Moreover, as the binding for this is not yet accepted I would advice to
-remove this part for now. It will be easier for synchronization with i2c
-eeprom.
+As per the SAMA5D3 device specification it supports Jumbo frames.
+But the suggested flag and length of bytes it supports was not updated
+in this driver config_structure.
+The maximum jumbo frames the device supports :
+10240 bytes as per the device spec.
 
-Best regards,
+While changing the MTU value greater than 1500, it threw error:
+sudo ifconfig eth1 mtu 9000
+SIOCSIFMTU: Invalid argument
+
+Add this support to driver so that it works as expected and designed.
+
+Signed-off-by: vishnuvardhan <vardhanraj4143@gmail.com>
+[nicolas.ferre at microchip.com: modify slightly commit msg]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
+ drivers/net/ethernet/cadence/macb_main.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/cadence/macb_main.c b/drivers/net/ethernet/cadence/macb_main.c
+index e69ebdd65658..26d25749c3e4 100644
+--- a/drivers/net/ethernet/cadence/macb_main.c
++++ b/drivers/net/ethernet/cadence/macb_main.c
+@@ -3314,10 +3314,11 @@ static const struct macb_config sama5d2_config = {
+ 
+ static const struct macb_config sama5d3_config = {
+ 	.caps = MACB_CAPS_SG_DISABLED | MACB_CAPS_GIGABIT_MODE_AVAILABLE
+-	      | MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
++	      | MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII | MACB_CAPS_JUMBO,
+ 	.dma_burst_length = 16,
+ 	.clk_init = macb_clk_init,
+ 	.init = macb_init,
++	.jumbo_max_len = 10240,
+ };
+ 
+ static const struct macb_config sama5d4_config = {
 -- 
-Nicolas Ferre
+2.9.0
