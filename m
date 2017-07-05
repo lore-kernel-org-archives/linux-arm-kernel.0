@@ -1,42 +1,27 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Wed,  5 Jul 2017 11:57:35 +0100
-Subject: [PATCH][RESEND] ARM: dts: iwg20d-q7: Add pinctl support for scif0
-Message-ID: <1499252255-35283-1-git-send-email-biju.das@bp.renesas.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 5 Jul 2017 13:13:01 +0200
+Subject: [PATCH] ARM: dts: r8a7743: Add GPIO support
+In-Reply-To: <1499185095-20904-1-git-send-email-biju.das@bp.renesas.com>
+References: <1499185095-20904-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdUgm2omipHm=FUZUvEJa7Td1JxHhh1WG5omrWFJuE42bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding pinctrl support for scif0 interface.
+On Tue, Jul 4, 2017 at 6:18 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> Describe GPIO blocks in the R8A7743 device tree.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-v1-->v1-resend
-This patch is been tested against linux-next tag next-20170704.
-It is reposting,since the PFC depedencies now has been accepted.
-https://www.spinics.net/lists/arm-kernel/msg592332.html
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Gr{oetje,eeting}s,
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index 9b54783..497aec0 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -20,6 +20,16 @@
- 	};
- };
- 
-+&pfc {
-+	scif0_pins: scif0 {
-+		groups = "scif0_data_d";
-+		function = "scif0";
-+	};
-+};
-+
- &scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
- 	status = "okay";
- };
--- 
-1.9.1
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
