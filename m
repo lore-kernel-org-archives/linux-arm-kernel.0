@@ -1,255 +1,77 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 5 Jul 2017 19:54:00 +0800
-Subject: [PATCH v16 2/7] power: add power sequence library
-In-Reply-To: <1868803.ffQpiaMTN5@aspire.rjw.lan>
-References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
- <1498027328-25078-3-git-send-email-peter.chen@nxp.com>
- <1868803.ffQpiaMTN5@aspire.rjw.lan>
-Message-ID: <20170705115400.GA17226@b29397-desktop>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 5 Jul 2017 13:58:47 +0200
+Subject: [PATCH 3/7] serial: imx: init dma_is_{rx|tx}ing variables
+In-Reply-To: <91cc9a48-58e9-98a9-58aa-1a949b9b5552@collabora.com>
+References: <20170630120446.13994-1-romain.perier@collabora.com>
+ <20170630120446.13994-4-romain.perier@collabora.com>
+ <20170630141329.6144cddd@karo-electronics.de>
+ <20170703065221.imbpbybsrd3of4ec@pengutronix.de>
+ <91cc9a48-58e9-98a9-58aa-1a949b9b5552@collabora.com>
+Message-ID: <20170705115847.nxgznbv5xacnbjqg@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 02:44:56AM +0200, Rafael J. Wysocki wrote:
-> On Wednesday, June 21, 2017 02:42:03 PM Peter Chen wrote:
-> > We have an well-known problem that the device needs to do some power
-> > sequence before it can be recognized by related host, the typical
-> > example like hard-wired mmc devices and usb devices.
-> > 
-> > This power sequence is hard to be described at device tree and handled by
-> > related host driver, so we have created a common power sequence
-> > library to cover this requirement. The core code has supplied
-> > some common helpers for host driver, and individual power sequence
-> > libraries handle kinds of power sequence for devices. The pwrseq
-> > librares always need to allocate extra instance for compatible
-> > string match.
-> > 
-> > pwrseq_generic is intended for general purpose of power sequence, which
-> > handles gpios and clocks currently, and can cover other controls in
-> > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > if only one power sequence is needed, else call of_pwrseq_on_list
-> > /of_pwrseq_off_list instead (eg, USB hub driver).
-> > 
-> > For new power sequence library, it needs to add its compatible string
-> > and allocation function at pwrseq_match_table_list, then the pwrseq
-> > core will match it with DT's, and choose this library at runtime.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> > Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> 
-> The executive summary here is that I'm not going to apply this patch (and the
-> following series depending on it), because in my opinion it is misguided and
-> I quite fundamentally disagree with the basic concept.
-> 
-> The code has problems too, but we first need to agree on the basics.
-> 
+Hello Romain,
 
-Thanks for valuable comments, let's agree on the concept and design
-first.
+On Wed, Jul 05, 2017 at 12:14:57PM +0200, Romain Perier wrote:
+> Le 03/07/2017 ? 08:52, Uwe Kleine-K?nig a ?crit :
+> > On Fri, Jun 30, 2017 at 02:13:29PM +0200, Lothar Wa?mann wrote:
+> >> On Fri, 30 Jun 2017 14:04:42 +0200 Romain Perier wrote:
+> >>> From: Nandor Han <nandor.han@ge.com>
+> >>>
+> >>> Initialize both dma_is_{rx|tx}ing variables when DMA is enabled to avoid
+> >>> checking uninitialized variables if port shutdown is requested before
+> >>> DMA channels get a chance to start.
+> >>>
+> >>> Signed-off-by: Nandor Han <nandor.han@ge.com>
+> >>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> >>> ---
+> >>>  drivers/tty/serial/imx.c | 3 +++
+> >>>  1 file changed, 3 insertions(+)
+> >>>
+> >>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> >>> index 188063d..81fb413 100644
+> >>> --- a/drivers/tty/serial/imx.c
+> >>> +++ b/drivers/tty/serial/imx.c
+> >>> @@ -1225,6 +1225,9 @@ static void imx_enable_dma(struct imx_port *sport)
+> >>>  
+> >>>  	imx_setup_ufcr(sport, TXTL_DMA, RXTL_DMA);
+> >>>  
+> >>> +	sport->dma_is_rxing = 0;
+> >>> +	sport->dma_is_txing = 0;
+> >>> +
+> >>>  	sport->dma_is_enabled = 1;
+> >>>  }
+> >>>  
+> >> sport is devm_kzalloc()ed, so the variables are initialized to 0 anyway.
+> > I'd agree to Lothar's statement. Did you find this issue by inspection,
+> > or does it fix a compiler warning? Do you think there is an actual
+> > problem?
+> >
+> > Best regards
+> > Uwe
+> >
+> What does happen if the UART port is shutdown and then re-enabled ? I
+> don't think that kzalloc will work in this case
 
-> > ---
-> >  Documentation/power/power-sequence/design.rst |  54 +++++
-> >  MAINTAINERS                                   |   9 +
-> >  drivers/power/Kconfig                         |   1 +
-> >  drivers/power/Makefile                        |   1 +
-> >  drivers/power/pwrseq/Kconfig                  |  20 ++
-> >  drivers/power/pwrseq/Makefile                 |   2 +
-> >  drivers/power/pwrseq/core.c                   | 293 ++++++++++++++++++++++++++
-> >  drivers/power/pwrseq/pwrseq_generic.c         | 210 ++++++++++++++++++
-> >  include/linux/power/pwrseq.h                  |  84 ++++++++
-> >  9 files changed, 674 insertions(+)
-> >  create mode 100644 Documentation/power/power-sequence/design.rst
-> >  create mode 100644 drivers/power/pwrseq/Kconfig
-> >  create mode 100644 drivers/power/pwrseq/Makefile
-> >  create mode 100644 drivers/power/pwrseq/core.c
-> >  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
-> >  create mode 100644 include/linux/power/pwrseq.h
-> > 
-> > diff --git a/Documentation/power/power-sequence/design.rst b/Documentation/power/power-sequence/design.rst
-> > new file mode 100644
-> > index 0000000..554608e
-> > --- /dev/null
-> > +++ b/Documentation/power/power-sequence/design.rst
-> > @@ -0,0 +1,54 @@
-> > +====================================
-> > +Power Sequence Library
-> > +====================================
-> > +
-> > +:Date: Feb, 2017
-> > +:Author: Peter Chen <peter.chen@nxp.com>
-> > +
-> > +
-> > +Introduction
-> > +============
-> > +
-> > +We have an well-known problem that the device needs to do a power
-> > +sequence before it can be recognized by related host, the typical
-> > +examples are hard-wired mmc devices and usb devices. The host controller
-> > +can't know what kinds of this device is in its bus if the power
-> > +sequence has not done, since the related devices driver's probe calling
-> > +is determined by runtime according to eunumeration results. Besides,
-> > +the devices may have custom power sequence, so the power sequence library
-> > +which is independent with the devices is needed.
-> 
-> In other words, devices can be in different power states and there are power
-> states in which they are not accessible to software.  In order to be accessed
-> by software, they need to be put into power states in which that is actually
-> possible.
-> 
-> That has been known for over 20 years and by no means it is limited to MMC
-> or USB.
-> 
-> Moreover, power states of devices generally depend on the platform and if
-> the same IP block is used in two different platforms (or even in two different
-> SoCs for that matter), the power states of it can be defined differently in
-> each case.
-> 
-> It also is quite well known how to define a power state of a device.  There
-> usually is a list of power resources (clocks, regulators, etc) that have to
-> be "on" for the device to be in the given power state.  In addition to that,
-> it may be necessary to carry out some operations after turning those
-> power resources "on" in order to trigger the power state change (like
-> toggling a GPIO or writing to a specific register etc).
-> 
-> Now, of course, it is not generally guaranteed that devices will be in
-> software-accessible power states initially, so it is necessary to put them
-> into those power states before trying to access them.
-> 
-> Again, this isn't anything new, but it has always been about power states.
-> 
-> By defining a "power sequence" you generally define two power states for
-> the device, say "on" and "off", and a way to switch between them, but what
-> about simply treating power states as the primary concept in the first place?
-> 
-> That would be more general, because there are platforms with more than
-> two power states per device.  In those cases, the power state choice may
-> depend on additional factors, like say during system suspend it may matter
-> whether or not the device is a wakeup one (and it may not be able to
-> generate wakeup signals from certain power states).  Using a single "power
-> sequence" would not be sufficient then.
+imx_shutdown has:
 
-I agree on the concept of "power state" for it,
-but I have several questions for above:
+        if (sport->dma_is_enabled) {
+		sport->dma_is_rxing = 0;
+		sport->dma_is_txing = 0;
 
-- Can I write new code for it or I need to depend on something?
-I find there is already "power state" concept at documentation.
-Documentation/ABI/testing/sysfs-devices-power_state
-- If I can write the new code for it, except the problems I want
-to fix, are there any other use cases I need to consider?
-> 
-> > +
-> > +Design
-> > +============
-> > +
-> > +The power sequence library includes the core file and customer power
-> > +sequence library. The core file exports interfaces are called by
-> > +host controller driver for power sequence and customer power sequence
-> > +library files to register its power sequence instance to global
-> > +power sequence list. The custom power sequence library creates power
-> > +sequence instance and implement custom power sequence.
-> 
-> The above paragraph is really hard to decode.
-> 
-> There is no explanation of basic concepts at all.  What exactly do you mean by
-> "power sequence"?  What is a "power sequence instance"?  What do you mean
-> by "custom power sequence"?
+which might be good enough. Can dma_is_[rt]xing be != 0 if
+dma_is_enabled is false? It seems it cannot, the only place where
+dma_is_enabled is set to 0 (apart from the kzalloc where dma_is_[rt]xing
+is set to zero) is imx_disable_dma(). The only caller sets both
+dma_is_[rt]xing to zero before.
 
-"power sequence" means the sequence for power on/off device
-"power sequence instance" means when carry out power on, it
-need to allocate one "power sequence" structure, and this structure
-includes all operations during power on/off sequence.
-"custom power sequence" means different devices need different
-power on sequence, eg, one may need to open regulator before
-toggle gpio, but another may need opposite sequence.
+So this patch should be dropped or its commit log improved to point out
+the actual problem.
 
-> 
-> > +
-> > +Since the power sequence describes hardware design, the description is
-> > +located at board description file, eg, device tree dts file. And
-> > +a specific power sequence belongs to device, so its description
-> > +is under the device node, please refer to:
-> > +Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> 
-> This, again, is really difficult to understand, especially the difference between
-> "the power sequence" and "a specific power sequence" is quite unclear.
-> 
-
-"a specific power sequence" for one custom power sequence
-
-> > +
-> > +Custom power sequence library allocates one power sequence instance at
-> > +bootup periods using postcore_initcall, this static allocated instance is
-> > +used to compare with device-tree (DT) node to see if this library can be
-> > +used for the node or not.
-> 
-> Same here.
-> 
-> > When the result is matched, the core API will
-> > +try to get resourses (->get, implemented at each library) for power
-> > +sequence, if all resources are got, it will try to allocate another
-> > +instance for next possible request from host driver.
-> > +
-> > +Then, the host controller driver can carry out power sequence on for this
-> > +DT node, the library will do corresponding operations, like open clocks,
-> > +toggle gpio, etc. The power sequence off routine will close and free the
-> > +resources, and is called when the parent is removed. And the power
-> > +sequence suspend and resume routine can be called at host driver's
-> > +suspend and resume routine if needed.
-> 
-> Let me try to say what I understood from this.
-> 
-> If there is a DT node with a matching "compatible" string, the initialization
-> code will try to acquire resources needed for "power sequencing" of the
-> corresponding device.  It is expected that host controller drivers will
-> then use the provided helper functions to turn the subordinate devices
-> "on" during enumeration and "off" on the (host controller) driver removal.
-> They also are expected to use the "suspend" and "resume" helpers when
-> the host controller is suspended or resumed, respectively.
-> 
-> If the above is what you intended, then it is not the right model IMO.
-> 
-> In particular, I don't see why the controller driver suspend and resume
-> should operate "power sequences" of subordinate devices directly as the
-> subordinate devices are expected to be suspended (in which case they
-> also should have been turned "off" already) when the controller is
-> suspending and the controller resume need not affect the subordinate
-> devices at all.
-
-For example, one device's clock needs to be opened before it can be
-seen by the controller, but the device's clock isn't controlled by
-controller driver, controller driver only operate its own clocks.
-So, after the controller suspends the device, it can turn off
-device's clock for power consumption, and when the controller
-resumes, it needs to turn on the device's clock before talking
-to device.
-> 
-> Moreover, it assumes that all of the platforms including the IP block driven
-> by the controller driver in question will use the "power sequences" model,
-> but what if there are more generally defined power domains on them?
-
-No, the IP block doesn't need this "power sequence", the power stuffs
-(clock, gpio, regulator) are described at firmware (eg, DT), and power
-operations are carried out during the probe, the device and driver match
-happens before power operation.
-
-But for devices on the bus (bus is controlled by controller), the match
-information (eg, product id/vendor id) is stored at device's firmware, the
-controller device needs to talk with its child first to get the match
-information before the child device's probe.
-
-> 
-> It looks like the power management should really be carried out by an
-> additional layer of code to avoid imposing platform dependencies on
-> controller drivers.
-> 
-> Further, what if there are "power sequences" for the host controllers
-> themselves?  Who's expected to operate those "power sequences" then?
-
-See above.
+Best regards
+Uwe
 
 -- 
-
-Best Regards,
-Peter Chen
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
