@@ -1,31 +1,87 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 5 Jul 2017 09:20:15 -0500
-Subject: [PATCH] dt-bindings: amlogic: add unstable statement
-In-Reply-To: <20170628145343.25443-1-khilman@baylibre.com>
-References: <20170628145343.25443-1-khilman@baylibre.com>
-Message-ID: <20170705142015.tmlmes5lobadndsy@rob-hp-laptop>
+From: clemens.gruber@pqgruber.com (Clemens Gruber)
+Date: Wed, 5 Jul 2017 16:42:37 +0200
+Subject: [PATCH v2 3/6] serial: imx: remove CTSC and CTS handling
+In-Reply-To: <20170705133845.32ov37meqcea3wtz@pengutronix.de>
+References: <20170705130706.10388-1-romain.perier@collabora.com>
+ <20170705130706.10388-4-romain.perier@collabora.com>
+ <20170705133845.32ov37meqcea3wtz@pengutronix.de>
+Message-ID: <20170705144237.GA8892@archie.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 28, 2017 at 07:53:43AM -0700, Kevin Hilman wrote:
-> Due to the lack of documentation on this SoC family, discovery of new
-> features, and correcting of previous misunderstandings is expected, so
-> it's unrealistic to expect any form of stable bindings for this SoC
-> family.  Make that clear inthe binding documentation.
+Hi,
 
-s/inthe/in the/
-
+On Wed, Jul 05, 2017 at 03:38:45PM +0200, Uwe Kleine-K?nig wrote:
+> Cc += Clemens Gruber + Fabio Estevam
 > 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/arm/amlogic.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> On Wed, Jul 05, 2017 at 03:07:03PM +0200, Romain Perier wrote:
+> > From: Nandor Han <nandor.han@ge.com>
+> > 
+> > CTSC and CTS are not related to DMA and might add
+> > disruption in some cases.
+> > 
+> > Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> 
+> If it was Nandor Han who created this patch, it would be great to get
+> his sob. If it was you, drop the From: line above.
+> 
+> > ---
+> >  drivers/tty/serial/imx.c | 5 -----
+> >  1 file changed, 5 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> > index 5291b86..dd3ebb4 100644
+> > --- a/drivers/tty/serial/imx.c
+> > +++ b/drivers/tty/serial/imx.c
+> > @@ -1249,11 +1249,6 @@ static void imx_disable_dma(struct imx_port *sport)
+> >  	imx_stop_rx_dma(sport);
+> >  	imx_stop_tx_dma(sport);
+> >  
+> > -	/* clear UCR2 */
+> > -	temp = readl(sport->port.membase + UCR2);
+> > -	temp &= ~(UCR2_CTSC | UCR2_CTS | UCR2_ATEN);
+> > -	writel(temp, sport->port.membase + UCR2);
+> > -
+> 
+> Before this patch imx_disable_dma resulted in the #CTS pin being high
+> (inactive).
+> 
+> Does this qualify as a fix? If so, you should sort this patch to the
+> beginning of the series. Did you do test this patch and its effects
+> separately?
+> 
+> @Clemens: maybe this patch makes a relevant difference when the port is
+> operated in rs485 mode. Do you care to test?
 
-I've yet to see anyone remove an unstable tag and I'd rather see these 
-for individual bindings than for the platform as a whole. In the end, 
-it's a platform maintainers decision whether to accept compatibility 
-breakage regardless of some text that probably no one reads.
+I just finished testing it. The results are about the same as with v1 of
+this patch series:
 
-In any case,
+Applying v2 of patch 1/6, 2/6 and 3/6 (or even 3/6 alone) does not fix
+the RS-485 DMA bug. It behaves exactly the same as without these
+patches, meaning the whole xmit circ_buf (UART_XMIT_SIZE bytes) is sent
+out, as seen in the logic analyzer screenshots from my first bug report:
+https://pqgruber.com/rs485_results.png
 
-Acked-by: Rob Herring <robh@kernel.org>
+Applying the whole series does make a (small) difference though:
+The first few transmissions after a fresh boot work correctly! However,
+after a few transmissions, characters are sent out twice and longer
+transmissions are garbled, although not in the same way as before. The
+whole circ_buf is no longer sent out.
+
+With all patches from this series applied, I see the following on the
+logic analyzer, when calling "echo Test > /dev/ttymxc4":
+https://pqgruber.com/rs485txtest.png
+(This pattern is not always the same, sometimes it is TeTesstt\n\n,
+sometimes TeTesst\nt\n or TeTsestt\n\n and so on)
+
+This behavior is reproducible on i.MX6Q and i.MX6D, not on i.MX6S/etc.,
+I therefore assume that it is a SMP-/locking-related problem.
+
+I will try to debug this further, and verify if - with this series
+applied - xmit->tail is still jumping over xmit->head. And when exactly
+this is happening.
+
+Help is much appreciated!
+
+Best regards,
+Clemens
