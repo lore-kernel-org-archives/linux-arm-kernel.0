@@ -1,55 +1,42 @@
 From: joe@perches.com (Joe Perches)
-Date: Wed,  5 Jul 2017 13:02:09 -0700
-Subject: [PATCH 00/18] treewide: Move storage class before return type
-Message-ID: <cover.1499284835.git.joe@perches.com>
+Date: Wed,  5 Jul 2017 13:02:12 -0700
+Subject: [PATCH 03/18] ARM: HP Jornada 7XX: Move inline before return type
+In-Reply-To: <cover.1499284835.git.joe@perches.com>
+References: <cover.1499284835.git.joe@perches.com>
+Message-ID: <5bd3b2bf39c6c9caf773949f18158f8f5ec08582.1499284835.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the inline/asmlinkage keywords before the return types
-Add a checkpatch test for this too.
+Convert 'u8 inline' to 'inline u8' to be the same style used
+by the rest of the kernel.
 
-Joe Perches (18):
-  checkpatch: improve the STORAGE_CLASS test
-  ARM: KVM: Move asmlinkage before type
-  ARM: HP Jornada 7XX: Move inline before return type
-  CRIS: gpio: Move inline before return type
-  FRV: tlbflush: Move asmlinkage before return type
-  ia64: Move inline before return type
-  ia64: sn: pci: Move inline before type
-  m68k: coldfire: Move inline before return type
-  MIPS: SMP: Move asmlinkage before return type
-  sh: Move inline before return type
-  x86/efi: Move asmlinkage before return type
-  drivers: s390: Move static and inline before return type
-  drivers: tty: serial: Move inline before return type
-  USB: serial: safe_serial: Move __inline__ before return type
-  video: fbdev: intelfb: Move inline before return type
-  video: fbdev: omap: Move inline before return type
-  ARM: samsung: usb-ohci: Move inline before return type
-  ALSA: opl4: Move inline before return type
+Miscellanea:
 
- arch/arm/include/asm/kvm_hyp.h                 |  8 ++++----
- arch/arm/mach-sa1100/jornada720_ssp.c          |  2 +-
- arch/cris/arch-v10/drivers/gpio.c              |  4 ++--
- arch/frv/include/asm/tlbflush.h                |  8 ++++----
- arch/ia64/kernel/mca.c                         |  2 +-
- arch/ia64/sn/pci/pcibr/pcibr_ate.c             |  2 +-
- arch/ia64/sn/pci/tioce_provider.c              |  4 ++--
- arch/m68k/coldfire/intc-simr.c                 |  4 ++--
- arch/mips/include/asm/smp.h                    |  2 +-
- arch/sh/mm/cache-sh5.c                         |  2 +-
- arch/x86/include/asm/efi.h                     |  4 ++--
- drivers/s390/net/ctcm_main.c                   |  2 +-
- drivers/s390/net/qeth_l3_main.c                |  2 +-
- drivers/tty/serial/ioc3_serial.c               |  4 ++--
- drivers/tty/serial/ioc4_serial.c               |  4 ++--
- drivers/usb/serial/safe_serial.c               |  2 +-
- drivers/video/fbdev/intelfb/intelfbdrv.c       |  2 +-
- drivers/video/fbdev/omap/lcdc.c                |  6 +++---
- include/linux/platform_data/usb-ohci-s3c2410.h |  2 +-
- scripts/checkpatch.pl                          | 12 ++++++++++--
- sound/drivers/opl4/opl4_lib.c                  |  2 +-
- 21 files changed, 44 insertions(+), 36 deletions(-)
+jornada_ssp_reverse is an odd function.
+It is declared inline but is also EXPORT_SYMBOL.
+It is also apparently only used by jornada720_ssp.c
+Likely the EXPORT_SYMBOL could be removed and the function
+converted to static.
 
+The addition of static and removal of EXPORT_SYMBOL was not done.
+
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/mach-sa1100/jornada720_ssp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-sa1100/jornada720_ssp.c b/arch/arm/mach-sa1100/jornada720_ssp.c
+index b143c4659346..7fc11a3c17b4 100644
+--- a/arch/arm/mach-sa1100/jornada720_ssp.c
++++ b/arch/arm/mach-sa1100/jornada720_ssp.c
+@@ -33,7 +33,7 @@ static unsigned long jornada_ssp_flags;
+  * we need to reverse all data we receive from the mcu due to its physical location
+  * returns : 01110111 -> 11101110
+  */
+-u8 inline jornada_ssp_reverse(u8 byte)
++inline u8 jornada_ssp_reverse(u8 byte)
+ {
+ 	return
+ 		((0x80 & byte) >> 7) |
 -- 
 2.10.0.rc2.1.g053435c
