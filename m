@@ -1,169 +1,38 @@
-From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
-Date: Wed, 5 Jul 2017 14:59:03 +0800
-Subject: [PATCHv4 9/9] irqchip/ls-scfg-msi: add MSI affinity support
-In-Reply-To: <1499237943-24203-1-git-send-email-Zhiqiang.Hou@nxp.com>
-References: <1499237943-24203-1-git-send-email-Zhiqiang.Hou@nxp.com>
-Message-ID: <1499237943-24203-9-git-send-email-Zhiqiang.Hou@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 5 Jul 2017 15:22:29 +0800
+Subject: [PATCH 00/10] irqchip: sunxi-nmi: Cleanups and fix A31 R_INTC
+ register offset
+In-Reply-To: <20170606184713.4qxvap65o33rkzwz@flea.lan>
+References: <20170606055932.22548-1-wens@csie.org>
+ <20170606184713.4qxvap65o33rkzwz@flea.lan>
+Message-ID: <CAGb2v67p_ncLZACMrcPoYSgCxe2m5n1JK+HhT-XLUNA+atk4yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Minghuan Lian <Minghuan.Lian@nxp.com>
+On Wed, Jun 7, 2017 at 2:47 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jun 06, 2017 at 01:59:22PM +0800, Chen-Yu Tsai wrote:
+>> Hi everyone,
+>>
+>> This is an alternative to Icenowy's recent A64 R_INTC patches.
+>>
+>> This is a two part series. The first four patches clean up the existing
+>> sunxi-nmi driver. Patches five and six add a new "sun6i-a31-r-intc"
+>> compatible, which mainly adjusts or removes the awkward register region
+>> offset the old "sun6i-a31-sc-nmi" compatible needed. The remaining
+>> patches fix or add device nodes for SoC's having this hardware.
+>>
+>> Using "sun6i-a31-r-intc" introduced in this series, instead of Icenowy's
+>> "sun50i-a64-r-intc" is preferred. This follows our policy of naming
+>> hardware blocks and compatibles after their first occurrence.
+>>
+>> The first six patches should go through the irqchip tree, while we
+>> (sunxi) can take the device tree changes after the driver has been
+>> merged, to avoid breaking linux-next as a whole.
+>
+> For the whole serie:
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-For LS1046a and LS1043a v1.1, the MSI controller has 4 MSIRs and 4 GIC
-SPI interrupts which can be associated with different Core.
-So we can support affinity to improve the performance.
-The MSI message data is a byte for Layerscape MSI.
-  7    6   5  4  3  2   1   0
-| - |       IBS       |  SRS |
-SRS bit0-1 is to select a MSIR which is associated with a CPU.
-IBS bit2-6 of ls1046, bit2-4 of ls1043a v1.1 is to select bit of the
-MSIR. With affinity, only bits of MSIR0(srs=0 cpu0) are available.
-All other bits of the MSIR1-3(cpu1-3) are reserved. The MSI hwirq
-always equals bit index of the MSIR0. When changing affinity, MSI
-message data will be appended corresponding SRS then MSI will be
-moved to the corresponding core.
-But in affinity mode, there is only 8 MSI interrupts for a controller
-of LS1043a v1.1. It cannot meet the requirement of the some PCIe
-devices such as 4 ports Ethernet card. In contrast, without affinity,
-all MSIRs can be used for core 0, the MSI interrupts can up to 32.
-So the parameter is added to control affinity mode.
-"lsmsi=no-affinity" will disable affinity and increase MSI
-interrupt number.
+Queued the remaining 4 device tree patches for 4.14.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
-v4:
- - None
-v3-v2:
- - 1. update the description
- - 2. remove unnecessary msir_index checking
-v2-v1:
- - None
-
-
- drivers/irqchip/irq-ls-scfg-msi.c | 68 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 63 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/irqchip/irq-ls-scfg-msi.c b/drivers/irqchip/irq-ls-scfg-msi.c
-index 8d57a59..119f4ef 100644
---- a/drivers/irqchip/irq-ls-scfg-msi.c
-+++ b/drivers/irqchip/irq-ls-scfg-msi.c
-@@ -40,6 +40,7 @@ struct ls_scfg_msir {
- 	unsigned int gic_irq;
- 	unsigned int bit_start;
- 	unsigned int bit_end;
-+	unsigned int srs; /* Shared interrupt register select */
- 	void __iomem *reg;
- };
- 
-@@ -70,6 +71,19 @@ static struct msi_domain_info ls_scfg_msi_domain_info = {
- 	.chip	= &ls_scfg_msi_irq_chip,
- };
- 
-+static int msi_affinity_flag = 1;
-+
-+static int __init early_parse_ls_scfg_msi(char *p)
-+{
-+	if (p && strncmp(p, "no-affinity", 11) == 0)
-+		msi_affinity_flag = 0;
-+	else
-+		msi_affinity_flag = 1;
-+
-+	return 0;
-+}
-+early_param("lsmsi", early_parse_ls_scfg_msi);
-+
- static void ls_scfg_msi_compose_msg(struct irq_data *data, struct msi_msg *msg)
- {
- 	struct ls_scfg_msi *msi_data = irq_data_get_irq_chip_data(data);
-@@ -77,12 +91,36 @@ static void ls_scfg_msi_compose_msg(struct irq_data *data, struct msi_msg *msg)
- 	msg->address_hi = upper_32_bits(msi_data->msiir_addr);
- 	msg->address_lo = lower_32_bits(msi_data->msiir_addr);
- 	msg->data = data->hwirq;
-+
-+	if (msi_affinity_flag)
-+		msg->data |= cpumask_first(data->common->affinity);
- }
- 
- static int ls_scfg_msi_set_affinity(struct irq_data *irq_data,
- 				    const struct cpumask *mask, bool force)
- {
--	return -EINVAL;
-+	struct ls_scfg_msi *msi_data = irq_data_get_irq_chip_data(irq_data);
-+	u32 cpu;
-+
-+	if (!msi_affinity_flag)
-+		return -EINVAL;
-+
-+	if (!force)
-+		cpu = cpumask_any_and(mask, cpu_online_mask);
-+	else
-+		cpu = cpumask_first(mask);
-+
-+	if (cpu >= msi_data->msir_num)
-+		return -EINVAL;
-+
-+	if (msi_data->msir[cpu].gic_irq <= 0) {
-+		pr_warn("cannot bind the irq to cpu%d\n", cpu);
-+		return -EINVAL;
-+	}
-+
-+	cpumask_copy(irq_data->common->affinity, mask);
-+
-+	return IRQ_SET_MASK_OK;
- }
- 
- static struct irq_chip ls_scfg_msi_parent_chip = {
-@@ -158,7 +196,7 @@ static void ls_scfg_msi_irq_handler(struct irq_desc *desc)
- 
- 	for_each_set_bit_from(pos, &val, size) {
- 		hwirq = ((msir->bit_end - pos) << msi_data->cfg->ibs_shift) |
--			msir->index;
-+			msir->srs;
- 		virq = irq_find_mapping(msi_data->parent, hwirq);
- 		if (virq)
- 			generic_handle_irq(virq);
-@@ -221,10 +259,19 @@ static int ls_scfg_msi_setup_hwirq(struct ls_scfg_msi *msi_data, int index)
- 					 ls_scfg_msi_irq_handler,
- 					 msir);
- 
-+	if (msi_affinity_flag) {
-+		/* Associate MSIR interrupt to the cpu */
-+		irq_set_affinity(msir->gic_irq, get_cpu_mask(index));
-+		msir->srs = 0; /* This value is determined by the CPU */
-+	} else
-+		msir->srs = index;
-+
- 	/* Release the hwirqs corresponding to this MSIR */
--	for (i = 0; i < msi_data->cfg->msir_irqs; i++) {
--		hwirq = i << msi_data->cfg->ibs_shift | msir->index;
--		bitmap_clear(msi_data->used, hwirq, 1);
-+	if (!msi_affinity_flag || msir->index == 0) {
-+		for (i = 0; i < msi_data->cfg->msir_irqs; i++) {
-+			hwirq = i << msi_data->cfg->ibs_shift | msir->index;
-+			bitmap_clear(msi_data->used, hwirq, 1);
-+		}
- 	}
- 
- 	return 0;
-@@ -320,6 +367,17 @@ static int ls_scfg_msi_probe(struct platform_device *pdev)
- 	bitmap_set(msi_data->used, 0, msi_data->irqs_num);
- 
- 	msi_data->msir_num = of_irq_count(pdev->dev.of_node);
-+
-+	if (msi_affinity_flag) {
-+		u32 cpu_num;
-+
-+		cpu_num = num_possible_cpus();
-+		if (msi_data->msir_num >= cpu_num)
-+			msi_data->msir_num = cpu_num;
-+		else
-+			msi_affinity_flag = 0;
-+	}
-+
- 	msi_data->msir = devm_kcalloc(&pdev->dev, msi_data->msir_num,
- 				      sizeof(*msi_data->msir),
- 				      GFP_KERNEL);
--- 
-2.1.0.27.g96db324
+ChenYu
