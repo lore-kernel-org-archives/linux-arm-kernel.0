@@ -1,24 +1,73 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 5 Jul 2017 07:21:48 +0200
-Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <0cd65cda-9a3d-8c1b-1ee9-c48f63959140@free.fr>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
- <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
- <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
- <20170703134031.GG13824@bhelgaas-glaptop.roam.corp.google.com>
- <20170703181128.GD4902@n2100.armlinux.org.uk>
- <0cd65cda-9a3d-8c1b-1ee9-c48f63959140@free.fr>
-Message-ID: <20170705052148.GA6213@kroah.com>
+From: hiroh@chromium.org (Hirokazu Honda)
+Date: Wed,  5 Jul 2017 14:33:48 +0900
+Subject: [PATCH v3] [media] mtk-vcodec: Show mtk driver error without DEBUG
+ definition
+Message-ID: <20170705053348.2865-1-hiroh@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 01:59:55AM +0200, Mason wrote:
-> Do larger SoC vendors have HW devs working closely with
-> Linux devs, to avoid these design bloopers?
+A driver error message is shown without DEBUG definition
+to find an error and debug easily.
 
-Yes they generally do, as they have learned from their prior mistakes :)
+Signed-off-by: Hirokazu Honda <hiroh@chromium.org>
+---
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
 
-good luck!
-
-greg k-h
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+index 237e144c194f..c1378c1b402c 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+@@ -32,6 +32,15 @@ extern int mtk_v4l2_dbg_level;
+ extern bool mtk_vcodec_dbg;
+ 
+ 
++#define mtk_v4l2_err(fmt, args...)					\
++	pr_err("[MTK_V4L2][ERROR] %s:%d: " fmt "\n", __func__, __LINE__, \
++	       ##args)
++
++#define mtk_vcodec_err(h, fmt, args...)					\
++	pr_err("[MTK_VCODEC][ERROR][%d]: %s() " fmt "\n",		\
++	       ((struct mtk_vcodec_ctx *)h->ctx)->id, __func__, ##args)
++
++
+ #if defined(DEBUG)
+ 
+ #define mtk_v4l2_debug(level, fmt, args...)				 \
+@@ -41,11 +50,6 @@ extern bool mtk_vcodec_dbg;
+ 				level, __func__, __LINE__, ##args);	 \
+ 	} while (0)
+ 
+-#define mtk_v4l2_err(fmt, args...)                \
+-	pr_err("[MTK_V4L2][ERROR] %s:%d: " fmt "\n", __func__, __LINE__, \
+-	       ##args)
+-
+-
+ #define mtk_v4l2_debug_enter()  mtk_v4l2_debug(3, "+")
+ #define mtk_v4l2_debug_leave()  mtk_v4l2_debug(3, "-")
+ 
+@@ -57,22 +61,16 @@ extern bool mtk_vcodec_dbg;
+ 				__func__, ##args);			\
+ 	} while (0)
+ 
+-#define mtk_vcodec_err(h, fmt, args...)					\
+-	pr_err("[MTK_VCODEC][ERROR][%d]: %s() " fmt "\n",		\
+-	       ((struct mtk_vcodec_ctx *)h->ctx)->id, __func__, ##args)
+-
+ #define mtk_vcodec_debug_enter(h)  mtk_vcodec_debug(h, "+")
+ #define mtk_vcodec_debug_leave(h)  mtk_vcodec_debug(h, "-")
+ 
+ #else
+ 
+ #define mtk_v4l2_debug(level, fmt, args...) {}
+-#define mtk_v4l2_err(fmt, args...) {}
+ #define mtk_v4l2_debug_enter() {}
+ #define mtk_v4l2_debug_leave() {}
+ 
+ #define mtk_vcodec_debug(h, fmt, args...) {}
+-#define mtk_vcodec_err(h, fmt, args...) {}
+ #define mtk_vcodec_debug_enter(h) {}
+ #define mtk_vcodec_debug_leave(h) {}
+ 
+-- 
+2.13.2.725.g09c95d1e9-goog
