@@ -1,118 +1,38 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed,  5 Jul 2017 09:19:08 -0400
-Subject: [PATCH] PCI: Do not enable extended tags on pre-dated (v1.x) systems
-Message-ID: <1499260748-21860-1-git-send-email-okaya@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 5 Jul 2017 16:20:48 +0300
+Subject: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
+In-Reply-To: <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
+References: <1499259711-56175-1-git-send-email-biju.das@bp.renesas.com>
+ <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <afcd181c-c805-8f3c-955f-652d001a03d4@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to extended tags ECN document, all PCIe receivers are expected
-to support extended tags support. It should be safe to enable extended
-tags on endpoints without checking compatibility.
+Hello!
 
-This assumption seems to be working fine except for the legacy systems.
-The ECN has been written against PCIE spec version 2.0. Therefore, we need
-to exclude all version 1.0 devices from this change as there is HW out
-there that can't handle extended tags.
+On 07/05/2017 04:01 PM, Biju Das wrote:
 
-Note that the default value of Extended Tags Enable bit is implementation
-specific. Therefore, we are clearing the bit by default when incompatible
-HW is found without assuming that value is zero.
+> Add support for Gigabit Ethernet E-MAC on r8a7743 (RZ/G1M) SoC.
+> Renesas RZ/G1M (R8A7743) SoC Ethernet AVB IP is identical to the R-Car Gen2
+> family.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+[...]
+> diff --git a/drivers/net/ethernet/renesas/ravb_main.c b/drivers/net/ethernet/renesas/ravb_main.c
+> index 5931e85..e35b30f 100644
+> --- a/drivers/net/ethernet/renesas/ravb_main.c
+> +++ b/drivers/net/ethernet/renesas/ravb_main.c
+> @@ -1869,6 +1869,7 @@ static int ravb_mdio_release(struct ravb_private *priv)
+>  }
+>
+>  static const struct of_device_id ravb_match_table[] = {
+> +	{ .compatible = "renesas,etheravb-r8a7743", .data = (void *)RCAR_GEN2 },
 
-Reported-by: Wim ten Have <wim.ten.have@oracle.com>
-Link: https://pcisig.com/sites/default/files/specification_documents/ECN_Extended_Tag_Enable_Default_05Sept2008_final.pdf
-Link: https://bugzilla.redhat.com/show_bug.cgi?id=1467674
-Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
-Tested-by: Wim ten Have <wim.ten.have@oracle.com>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/probe.c | 52 +++++++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 45 insertions(+), 7 deletions(-)
+    No, this shouldn't be needed if you specify "renesas,etheravb-rcar-gen2".
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 19c8950..5e39013 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1684,21 +1684,58 @@ static void program_hpp_type2(struct pci_dev *dev, struct hpp_type2 *hpp)
- 	 */
- }
- 
--static void pci_configure_extended_tags(struct pci_dev *dev)
-+static bool pcie_bus_exttags_supported(struct pci_bus *bus)
-+{
-+	bool exttags_supported = true;
-+	struct pci_dev *bridge;
-+	int rc;
-+	u16 flags;
-+
-+	bridge = bus->self;
-+	while (bridge) {
-+		if (pci_is_pcie(bridge)) {
-+			rc = pcie_capability_read_word(bridge, PCI_EXP_FLAGS,
-+						       &flags);
-+			if (!rc && ((flags & PCI_EXP_FLAGS_VERS) < 2)) {
-+				exttags_supported = false;
-+				break;
-+			}
-+		}
-+		if (!bridge->bus->parent)
-+			break;
-+		bridge = bridge->bus->parent->self;
-+	}
-+
-+	return exttags_supported;
-+}
-+
-+static int pcie_bus_configure_exttags(struct pci_dev *dev, void *data)
- {
- 	u32 dev_cap;
- 	int ret;
-+	bool supported;
- 
- 	if (!pci_is_pcie(dev))
--		return;
-+		return 0;
- 
- 	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &dev_cap);
- 	if (ret)
--		return;
-+		return 0;
- 
--	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
--		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
--					 PCI_EXP_DEVCTL_EXT_TAG);
-+	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG) {
-+		supported = pcie_bus_exttags_supported(dev->bus);
-+
-+		if (supported) {
-+			dev_dbg(&dev->dev, "setting extended tags capability\n");
-+			pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
-+						 PCI_EXP_DEVCTL_EXT_TAG);
-+		} else {
-+			dev_dbg(&dev->dev, "clearing extended tags capability\n");
-+			pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
-+						   PCI_EXP_DEVCTL_EXT_TAG);
-+		}
-+	}
-+	return 0;
- }
- 
- static void pci_configure_device(struct pci_dev *dev)
-@@ -1707,7 +1744,6 @@ static void pci_configure_device(struct pci_dev *dev)
- 	int ret;
- 
- 	pci_configure_mps(dev);
--	pci_configure_extended_tags(dev);
- 
- 	memset(&hpp, 0, sizeof(hpp));
- 	ret = pci_get_hp_params(dev, &hpp);
-@@ -2224,6 +2260,8 @@ void pcie_bus_configure_settings(struct pci_bus *bus)
- 
- 	pcie_bus_configure_set(bus->self, &smpss);
- 	pci_walk_bus(bus, pcie_bus_configure_set, &smpss);
-+
-+	pci_walk_bus(bus, pcie_bus_configure_exttags, NULL);
- }
- EXPORT_SYMBOL_GPL(pcie_bus_configure_settings);
- 
--- 
-1.9.1
+>  	{ .compatible = "renesas,etheravb-r8a7790", .data = (void *)RCAR_GEN2 },
+>  	{ .compatible = "renesas,etheravb-r8a7794", .data = (void *)RCAR_GEN2 },
+>  	{ .compatible = "renesas,etheravb-rcar-gen2", .data = (void *)RCAR_GEN2 },
+
+MBR, Sergei
