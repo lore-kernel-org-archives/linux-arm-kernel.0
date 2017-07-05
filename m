@@ -1,45 +1,42 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 5 Jul 2017 13:09:44 +0200
-Subject: [PATCH v3 2/6] pwm: mediatek: fix pwm source clock selection
-In-Reply-To: <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
- <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <d009712e-f0a2-2dc7-2f64-ad8cfa21f98d@gmail.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Wed,  5 Jul 2017 11:57:35 +0100
+Subject: [PATCH][RESEND] ARM: dts: iwg20d-q7: Add pinctl support for scif0
+Message-ID: <1499252255-35283-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Adding pinctrl support for scif0 interface.
 
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+v1-->v1-resend
+This patch is been tested against linux-next tag next-20170704.
+It is reposting,since the PFC depedencies now has been accepted.
+https://www.spinics.net/lists/arm-kernel/msg592332.html
 
-On 06/30/2017 08:05 AM, Zhi Mao wrote:
-> In original code, the pwm output frequency is not correct
-> when set bit<3>=1 to PWMCON register.
-> 
-> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-> ---
->   drivers/pwm/pwm-mediatek.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> index 5c11bc7..d08b5b3 100644
-> --- a/drivers/pwm/pwm-mediatek.c
-> +++ b/drivers/pwm/pwm-mediatek.c
-> @@ -91,7 +91,7 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->   	if (clkdiv > 7)
->   		return -EINVAL;
->   
-> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | clkdiv);
-> +	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+ arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Just for clarification, BIT(15) enables old PWM mode, which ignores 
-CLKSEL (BIT(3)). Therefore setting BIT(3) does not have any effect and 
-can be discarded.
-
-Am I correct? I took mt7623n datasheet for reference.
-
-Regards,
-Matthias
-
->   	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
->   	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
->   
-> 
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+index 9b54783..497aec0 100644
+--- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
++++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+@@ -20,6 +20,16 @@
+ 	};
+ };
+ 
++&pfc {
++	scif0_pins: scif0 {
++		groups = "scif0_data_d";
++		function = "scif0";
++	};
++};
++
+ &scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
+-- 
+1.9.1
