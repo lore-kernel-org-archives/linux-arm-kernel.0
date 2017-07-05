@@ -1,43 +1,31 @@
 From: frank.wang@rock-chips.com (Frank Wang)
-Date: Wed,  5 Jul 2017 16:30:18 +0800
-Subject: [PATCH v2 3/6] ARM: dts: rockchip: enable io-domain for rk3229-evb
-In-Reply-To: <1499243421-21460-1-git-send-email-frank.wang@rock-chips.com>
-References: <1499243421-21460-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1499243421-21460-4-git-send-email-frank.wang@rock-chips.com>
+Date: Wed,  5 Jul 2017 16:30:15 +0800
+Subject: [PATCH v2 0/6] add and enable some device nodes for rk3229-evb board
+Message-ID: <1499243421-21460-1-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Wu <david.wu@rock-chips.com>
+These series add and enable regulators, gpio-keys, eMMC and other device
+nodes support for rk3229-evb board.
 
-This patch enables io-domain support for rk3229-evb board.
+Changes from v1:
+ - Fixed the name and supply for regulator nodes in [PATCH 1/6].
+ - Deleted some redundant properties of eMMC in [PATCH 4/6].
 
-The power domain of VCCIO3 is selected from maskrom, so we do not
-need to configure it.
+David Wu (1):
+  ARM: dts: rockchip: enable io-domain for rk3229-evb
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- arch/arm/boot/dts/rk3229-evb.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Finley Xiao (1):
+  ARM: dts: rockchip: add cpu-supply property for cpu node of rk3229-evb
 
-diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
-index 17385d8..78a3ea1 100644
---- a/arch/arm/boot/dts/rk3229-evb.dts
-+++ b/arch/arm/boot/dts/rk3229-evb.dts
-@@ -161,6 +161,14 @@
- 	status = "okay";
- };
- 
-+&io_domains {
-+	status = "okay";
-+
-+	vccio1-supply = <&vccio_3v3>;
-+	vccio2-supply = <&vccio_1v8>;
-+	vccio4-supply = <&vccio_3v3>;
-+};
-+
- &pinctrl {
- 	usb {
- 		host_vbus_drv: host-vbus-drv {
+Frank Wang (4):
+  ARM: dts: rockchip: add regulator nodes for rk3229-evb
+  ARM: dts: rockchip: enable eMMC for rk3229-evb
+  ARM: dts: rockchip: enable tsadc for rk3229-evb
+  ARM: dts: rockchip: add gpio power-key for rk3229-evb
+
+ arch/arm/boot/dts/rk3229-evb.dts | 117 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 117 insertions(+)
+
 -- 
 2.0.0
