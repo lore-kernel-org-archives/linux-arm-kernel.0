@@ -1,33 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 5 Jul 2017 23:37:46 +0200
-Subject: [PATCH 2/2] rtc: stm32: add STM32H7 RTC support
-In-Reply-To: <1498470689-26829-3-git-send-email-amelie.delaunay@st.com>
-References: <1498470689-26829-1-git-send-email-amelie.delaunay@st.com>
- <1498470689-26829-3-git-send-email-amelie.delaunay@st.com>
-Message-ID: <20170705213746.6hf5af57ty6wsfgs@piout.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 5 Jul 2017 14:52:46 -0700
+Subject: [PATCH] rtc: brcmstb-waketimer: fix settime function
+In-Reply-To: <20170705211327.guccztud22hcmfjy@piout.net>
+References: <20170628200839.3114345-1-arnd@arndb.de>
+ <20170705211327.guccztud22hcmfjy@piout.net>
+Message-ID: <aa080524-e532-6f72-f81b-35a0d3e919fb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/05/2017 02:13 PM, Alexandre Belloni wrote:
+> Hi,
+> 
+> On 28/06/2017 at 22:07:34 +0200, Arnd Bergmann wrote:
+>> gcc warns about an unused variable in the new driver:
+>>
+>> drivers/rtc/rtc-brcmstb-waketimer.c: In function 'brcmstb_waketmr_settime':
+>> drivers/rtc/rtc-brcmstb-waketimer.c:142:6: error: unused variable 'ret' [-Werror=unused-variable]
+>>
+>> The same function also doesn't handle overflow correctly, this makes
+>> it return -EINVAL when passed a time that doesn't fit within the
+>> range of the register.
+>>
+>> Fixes: 9f4ad359c801 ("rtc: brcmstb-waketimer: Add Broadcom STB wake-timer")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>  drivers/rtc/rtc-brcmstb-waketimer.c | 19 ++++++++++++-------
+>>  1 file changed, 12 insertions(+), 7 deletions(-)
+>>
+> 
+> I've squashed it in the original commit, I hope this is fine for you.
 
-This is mostly fine, even if I'm not too happy with the
-s/ck_rtc/rtc_ck/.
-
-On 26/06/2017 at 11:51:29 +0200, Amelie Delaunay wrote:
-> -	rtc->ck_rtc = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(rtc->ck_rtc)) {
-> -		dev_err(&pdev->dev, "no ck_rtc clock");
-> -		return PTR_ERR(rtc->ck_rtc);
-> +	match = of_match_device(stm32_rtc_of_match, &pdev->dev);
-> +	if (match && match->data)
-> +		rtc->data = (struct stm32_rtc_data *)match->data;
-> +	else
-> +		return -EINVAL;
-
-This will never happen, you can remove that test.
-
-
+Works for me, thanks Alexandre!
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Florian
