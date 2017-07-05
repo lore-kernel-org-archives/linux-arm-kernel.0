@@ -1,44 +1,69 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 5 Jul 2017 18:39:57 +0200
-Subject: [PATCH] ARM: dts: exynos: remove num-slots from exynos platforms
-In-Reply-To: <f42e6cc1-bac4-6ab7-70a7-323d4734837d@rock-chips.com>
-References: <1499160322-73008-1-git-send-email-shawn.lin@rock-chips.com>
- <20170705045126.GA2360@kozik-book>
- <f42e6cc1-bac4-6ab7-70a7-323d4734837d@rock-chips.com>
-Message-ID: <20170705163957.GA2233@kozik-book>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jul 2017 18:16:07 +0100
+Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
+In-Reply-To: <20170705161333.9315-1-gregory.clement@free-electrons.com>
+References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
+Message-ID: <20170705171607.GG4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 03:02:26PM +0800, Shawn Lin wrote:
-> Hi Krzystof,
+On Wed, Jul 05, 2017 at 06:13:33PM +0200, Gregory CLEMENT wrote:
+> Enable the PCIe interface on the MACCHIATOBin board. It is located on
+> CON12 and is 4 lanes capable.
 > 
-> On 2017/7/5 12:51, Krzysztof Kozlowski wrote:
-> >On Tue, Jul 04, 2017 at 05:25:22PM +0800, Shawn Lin wrote:
-> >>dwmmc driver deprecated num-slots and plan to get rid
-> >>of it finally. Just move a step to cleanup it from DT.
-> >>
-> >>Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> >>Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> >
-> >I do not see this property deprecated here (yesterday's next):
-> >Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> >Something is not merged yet?
-> 
-> The patch for dwmmc was queued for v4.13 already but the changes for Doc
-> was missing somehow. Will fix this later. Thanks for catching this.
-> 
-> >
-> >Also in separate patch, please update example here:
-> >Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> 
-> Ok.
-> 
-> BTW, will you pick this up now or you want me to resend
-> these two patches appending a new patch for exynos-dw-mshc.txt?
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Thanks for explanation. I will pick up both (ARM and ARM64) after
-current merge window. No need to resend, from my point of view. I just
-wanted to be sure that this is really deprecated.
+Why do you folk at free-electrons like doing half a job all the friggin
+time?
 
-Best regards,
-Krzysztof
+You know I have complete patches for mcbin, but you pointedly won't look
+at them at all - except when you have a problem and want to test my tree.
+And even then, you ignore my work (despite testing that it works), and
+you still recreate my patches.
+
+This is really frustrating and insane behaviour on your part.
+
+Here's what I have:
+
++&cpm_pcie0 {
++       pinctrl-names = "default";
++       pinctrl-0 = <&cpm_pcie_pins>;
++       num-lanes = <4>;
++       reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
++       status = "okay";
++};
++
+
++       cpm_pcie_pins: pcie-pins {
++               marvell,pins = "mpp52";
++               marvell,function = "gpio";
++       };
+
+Since you have merged GPIO and pinmux support for the v4.13 window,
+there's absolutely no reason not to include the GPIO bits.  In fact,
+there's no reason not to consider using my bloody patches.
+
+Except your stupid idiotic NiH problem that you seem to have.
+
+I know that your behaviour in regard of this has been discussed within
+Marvell, and people are getting unhappy with free electron's attitude
+over this.  You need to change, and start working _with_ people instead
+of constantly screwing people over.
+
+So, NAK on your patch.
+
+Once v4.13-rc1 is out, I'll update my patch series for the screw-over
+free-electrons has already done, and post some patches.  I can't do it
+sooner, your work is scattered all over the place which makes it
+impossible to build upon, and afaics you've not published a
+consolidated tree.
+
+Maybe the whole plan here is to "screw rmk" - that's exactly the message
+that I'm getting from you guys.  You've no interest in working with
+others, you seem to want to out-right own everything Marvell and sod
+everyone else.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
