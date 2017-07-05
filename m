@@ -1,93 +1,24 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Wed,  5 Jul 2017 15:07:06 +0200
-Subject: [PATCH v2 6/6] serial: imx: Fix imx_shutdown procedure
-In-Reply-To: <20170705130706.10388-1-romain.perier@collabora.com>
-References: <20170705130706.10388-1-romain.perier@collabora.com>
-Message-ID: <20170705130706.10388-7-romain.perier@collabora.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Wed,  5 Jul 2017 14:01:49 +0100
+Subject: [PATCH v 0/2] Add RZ/G1M (R8A7743) Ethernet AVB support
+Message-ID: <1499259711-56175-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nandor Han <nandor.han@ge.com>
+This series aims to add Gigabit Ethernet E-MAC support on r8a7743 (RZ/G1M) SoC.
+The iWave RZ/G1M Qseven SOM supports Gigabit Ethernet Phy from Micrel(KSZ9031MNX).
+Gigabit Ethernet support is available in Renesas AVB driver.
 
-In some cases, it looks that interrupts can happen after the dma was
-disabled and port was not yet shutdown. This will result in interrupts
-handled by imx_rxint.
+This series has been tested against linux-next tag next-20170704.
 
-This commits updates the shutdown function to ensure that underlying
-components are disabled in the right order. This disables RX and TX
-blocks, then it disabled interrupts. In case DMA is enabled, it disables
-DMA and free corresponding resources. It disables UART port and stop
-clocks.
+Biju Das (2):
+  ravb: Add support for r8a7743 SoC
+  ARM: shmobile: defconfig: Enable Ethernet AVB
 
-Signed-off-by: Nandor Han <nandor.han@ge.com>
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- drivers/tty/serial/imx.c | 34 +++++++++++++++-------------------
- 1 file changed, 15 insertions(+), 19 deletions(-)
+ Documentation/devicetree/bindings/net/renesas,ravb.txt | 3 ++-
+ arch/arm/configs/shmobile_defconfig                    | 1 +
+ drivers/net/ethernet/renesas/ravb_main.c               | 1 +
+ 3 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index d35112f..bfe7180 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1396,44 +1396,40 @@ static void imx_shutdown(struct uart_port *port)
- 	unsigned long temp;
- 	unsigned long flags;
- 
--	if (sport->dma_is_enabled) {
--		sport->dma_is_rxing = 0;
--		sport->dma_is_txing = 0;
--		dmaengine_terminate_sync(sport->dma_chan_tx);
--		dmaengine_terminate_sync(sport->dma_chan_rx);
--
-+	if (!sport->port.suspended) {
- 		spin_lock_irqsave(&sport->port.lock, flags);
- 		imx_stop_tx(port);
- 		imx_stop_rx(port);
--		imx_disable_dma(sport);
-+
-+		if (sport->dma_is_inited && sport->dma_is_enabled)
-+			imx_disable_dma(sport);
-+
- 		spin_unlock_irqrestore(&sport->port.lock, flags);
- 		imx_uart_dma_exit(sport);
- 	}
- 
--	mctrl_gpio_disable_ms(sport->gpios);
--
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 	temp = readl(sport->port.membase + UCR2);
--	temp &= ~(UCR2_TXEN);
-+	temp &= ~(UCR2_TXEN | UCR2_RXEN);
- 	writel(temp, sport->port.membase + UCR2);
-+	temp = readl(sport->port.membase + UCR4);
-+	temp &= ~UCR4_OREN;
-+	writel(temp, sport->port.membase + UCR4);
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
--	/*
--	 * Stop our timer.
--	 */
--	del_timer_sync(&sport->timer);
-+	mctrl_gpio_disable_ms(sport->gpios);
- 
--	/*
--	 * Disable all interrupts, port and break condition.
--	 */
-+	/* Stop our timer. */
-+	del_timer_sync(&sport->timer);
- 
-+	/* Disable port. */
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 	temp = readl(sport->port.membase + UCR1);
--	temp &= ~(UCR1_TXMPTYEN | UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN);
--
-+	temp &= ~UCR1_UARTEN;
- 	writel(temp, sport->port.membase + UCR1);
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
-+	/* Disable clocks. */
- 	clk_disable_unprepare(sport->clk_per);
- 	clk_disable_unprepare(sport->clk_ipg);
- }
 -- 
-1.8.3.1
+1.9.1
