@@ -1,19 +1,57 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Jul 2017 13:53:10 +0100
-Subject: [PATCH][RESEND] ARM: dts: iwg20d-q7: Add pinctl support for scif0
-In-Reply-To: <CAMuHMdXV86iApm9kvkLJP96T1OY1-41H2J8e7QOfpfKN=mDHCw@mail.gmail.com>
-References: <1499252255-35283-1-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdXV86iApm9kvkLJP96T1OY1-41H2J8e7QOfpfKN=mDHCw@mail.gmail.com>
-Message-ID: <20170705125307.GF24043@verge.net.au>
+Date: Wed, 5 Jul 2017 14:04:58 +0100
+Subject: [PATCH v2] arm64: dts: r8a7796: add IMR-LX4 support
+In-Reply-To: <e901ed94-c937-23cd-c43c-f2530dedd50f@cogentembedded.com>
+References: <20170627173400.581660959@cogentembedded.com>
+ <CAMuHMdXxcbkPV+Jt7Xo5emQ4fyDHm1p1RgD9nsRfR78va4XFSA@mail.gmail.com>
+ <e901ed94-c937-23cd-c43c-f2530dedd50f@cogentembedded.com>
+Message-ID: <20170705130458.GG24043@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 01:18:30PM +0200, Geert Uytterhoeven wrote:
-> On Wed, Jul 5, 2017 at 12:57 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> > Adding pinctrl support for scif0 interface.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+On Wed, Jul 05, 2017 at 03:03:37PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> On 07/05/2017 12:54 PM, Geert Uytterhoeven wrote:
+> 
+> >>Describe the IMR-LX4 devices in the R8A7796 device tree.
+> >>
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >
+> >>--- renesas.orig/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> >>+++ renesas/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> >>@@ -1454,5 +1454,23 @@
+> >>                                };
+> >>                        };
+> >>                };
+> >>+
+> >>+               imr-lx4 at fe860000 {
+> >>+                       compatible = "renesas,r8a7796-imr-lx4",
+> >>+                                    "renesas,imr-lx4";
+> >>+                       reg = <0 0xfe860000 0 0x2000>;
+> >>+                       interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
+> >>+                       clocks = <&cpg CPG_MOD 823>;
+> >>+                       power-domains = <&sysc R8A7796_PD_A3VC>;
+> >
+> >resets = <&cpg 823>;
+> >
+> >>+               };
+> >>+
+> >>+               imr-lx4 at fe870000 {
+> >>+                       compatible = "renesas,r8a7796-imr-lx4",
+> >>+                                    "renesas,imr-lx4";
+> >>+                       reg = <0 0xfe870000 0 0x2000>;
+> >>+                       interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
+> >>+                       clocks = <&cpg CPG_MOD 822>;
+> >>+                       power-domains = <&sysc R8A7796_PD_A3VC>;
+> >
+> >resets = <&cpg 822>;
+> >
+> >With the issues above fixed:
+> >
+> >Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+>    I'm afraid it's already merged by Simon...
 
-Thanks, applied for v4.14.
+I've gone through and added Geert's tags to patches that I merged recently.
+I'm planning to push the updated patches later today.
