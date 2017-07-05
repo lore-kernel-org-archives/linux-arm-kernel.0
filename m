@@ -1,625 +1,457 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 05 Jul 2017 11:28:46 +0200
-Subject: [PATCH v1 3/3] drm/panel: Add support for otm8009a panel driver
-In-Reply-To: <1499185805-23354-4-git-send-email-philippe.cornu@st.com>
-References: <1499185805-23354-1-git-send-email-philippe.cornu@st.com>
- <CGME20170704163055epcas5p39a3795c24eff9e451a89c7da5d16805d@epcas5p3.samsung.com>
- <1499185805-23354-4-git-send-email-philippe.cornu@st.com>
-Message-ID: <57bff5e0-fb02-a599-ecb4-983a2d110ba5@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 5 Jul 2017 10:30:13 +0100
+Subject: [GIT PULL] arm64: updates for 4.13
+Message-ID: <20170705093012.GB10112@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.07.2017 18:30, Philippe CORNU wrote:
-> This patch adds Orise Tech otm8009a 3.97" 480x800 TFT LCD
-> panel driver (MIPI-DSI video mode). The panel backlight is
-> managed through the DSI link. This panel driver is used in
-> several STM32 boards.
->
-> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
-> ---
->  drivers/gpu/drm/panel/Kconfig                    |   9 +
->  drivers/gpu/drm/panel/Makefile                   |   1 +
->  drivers/gpu/drm/panel/panel-orisetech-otm8009a.c | 517 +++++++++++++++++++++++
->  3 files changed, 527 insertions(+)
->  create mode 100755 drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
->
-> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-> index d84a031..c1c9291 100644
-> --- a/drivers/gpu/drm/panel/Kconfig
-> +++ b/drivers/gpu/drm/panel/Kconfig
-> @@ -117,4 +117,13 @@ config DRM_PANEL_SITRONIX_ST7789V
->  	  Say Y here if you want to enable support for the Sitronix
->  	  ST7789V controller for 240x320 LCD panels
->  
-> +config DRM_PANEL_ORISETECH_OTM8009A
-> +	tristate "Orise Tech otm8009a 480p dsi 2dl video mode panel"
-> +	depends on OF
-> +	depends on DRM_MIPI_DSI
-> +	depends on BACKLIGHT_CLASS_DEVICE
-> +	help
-> +	  Say Y here if you want to enable support for Orise Tech OTM8009A
-> +	  480x800 DSI panel
-> +
->  endmenu
-> diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
-> index 9f6610d..ac798f3 100644
-> --- a/drivers/gpu/drm/panel/Makefile
-> +++ b/drivers/gpu/drm/panel/Makefile
-> @@ -10,3 +10,4 @@ obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0) += panel-samsung-s6e8aa0.o
->  obj-$(CONFIG_DRM_PANEL_SHARP_LQ101R1SX01) += panel-sharp-lq101r1sx01.o
->  obj-$(CONFIG_DRM_PANEL_SHARP_LS043T1LE01) += panel-sharp-ls043t1le01.o
->  obj-$(CONFIG_DRM_PANEL_SITRONIX_ST7789V) += panel-sitronix-st7789v.o
-> +obj-$(CONFIG_DRM_PANEL_ORISETECH_OTM8009A) += panel-orisetech-otm8009a.o
-> \ No newline at end of file
-> diff --git a/drivers/gpu/drm/panel/panel-orisetech-otm8009a.c b/drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
-> new file mode 100755
-> index 0000000..7aefc09
-> --- /dev/null
-> +++ b/drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
-> @@ -0,0 +1,517 @@
-> +/*
-> + * Copyright (C) STMicroelectronics SA 2017
-> + *
-> + * Authors: Philippe Cornu <philippe.cornu@st.com>
-> + *          Yannick Fertre <yannick.fertre@st.com>
-> + *
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +#include <drm/drmP.h>
-> +#include <drm/drm_mipi_dsi.h>
-> +#include <drm/drm_panel.h>
-> +#include <linux/backlight.h>
-> +#include <linux/gpio/consumer.h>
-> +#include <video/mipi_display.h>
-> +
-> +#define DRV_NAME "orisetech_otm8009a"
-> +
-> +#define OTM8009A_BACKLIGHT_DEFAULT	240
-> +#define OTM8009A_BACKLIGHT_MAX		255
-> +
-> +struct otm8009a {
-> +	struct device *dev;
-> +	struct drm_panel panel;
-> +	struct backlight_device *bl_dev;
-> +	struct gpio_desc *reset_gpio;
-> +	bool prepared;
-> +	bool enabled;
-> +};
-> +
-> +static const struct drm_display_mode default_mode = {
-> +	.clock = 32729,
-> +	.hdisplay = 480,
-> +	.hsync_start = 480 + 120,
-> +	.hsync_end = 480 + 120 + 63,
-> +	.htotal = 480 + 120 + 63 + 120,
-> +	.vdisplay = 800,
-> +	.vsync_start = 800 + 12,
-> +	.vsync_end = 800 + 12 + 12,
-> +	.vtotal = 800 + 12 + 12 + 12,
-> +	.vrefresh = 50,
-> +	.flags = 0,
-> +	.width_mm = 52,
-> +	.height_mm = 86,
-> +};
-> +
-> +static inline struct otm8009a *panel_to_otm8009a(struct drm_panel *panel)
-> +{
-> +	return container_of(panel, struct otm8009a, panel);
-> +}
-> +
-> +static void otm8009a_dcs_write_buf(struct otm8009a *ctx, const void *data,
-> +				   size_t len)
-> +{
-> +	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
-> +
-> +	if (mipi_dsi_dcs_write_buffer(dsi, data, len) < 0)
-> +		DRM_WARN("mipi dsi dcs write buffer failed");
+Hi Linus,
 
-New line at the end of string.
+Please pull the following arm64 updates for 4.13. The summary is in the tag,
+but note that the RAS changes are based on Christoph's uuid-types branch [1]
+(which you've already pulled) to avoid conflicts in the ACPI core.
 
-I see another way of fighting with error handling, its drawback is that
-failure does not prevent further execution.
-Since I am lost what error handling pattern is currently accepted in
-panels subsystem, I cannot advice if this should be changed.
+There is a trivial conflict in drivers/acpi/apei/ghes.c, and the correct
+resolution is just to add the new ACPI_HEST_NOTIFY_SEA cases to the
+three switch statements [2].
 
-> +}
-> +
-> +#define dcs_write_seq(seq...)					\
-> +	do {							\
-> +		static const u8 d[] = { seq };			\
-> +		otm8009a_dcs_write_buf(ctx, d, ARRAY_SIZE(d));	\
-> +	} while (0)
+Cheers,
 
-It is up to your preferences, but I think "do {} while(0)" construct is
-kind of workaround and is obsoleted in favor of ({ ... }) statement
-expressions[1].
-More serious issue is that you are using ctx implicitly, it should be
-added as macro argument.
+Will
 
-[1]: https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
+[1] http://git.infradead.org/users/hch/uuid.git/shortlog/refs/heads/uuid-types
+[2]
 
-> +
-> +static int otm8009a_init_sequence(struct otm8009a *ctx)
-> +{
-> +	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
-> +	int ret;
-> +
-> +	/*
-> +	 * CMD2_ENA1: Enter in Command 2 mode, enable write function of
-> +	 * Command 2 & enable parameter shift function.
-> +	 * The 3 following sequences allow to enable ORISE command mode.
-> +	 */
-> +	dcs_write_seq(0xFF, 0x80, 0x09, 0x01);
+diff --cc drivers/acpi/apei/ghes.c
+index 0968816,bb83044..0000000
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@@ -718,10 -809,59 +809,59 @@@ static int ghes_notify_hed(struct notif
+  	return ret;
+  }
+  
+ -static struct notifier_block ghes_notifier_sci = {
+ -	.notifier_call = ghes_notify_sci,
+ +static struct notifier_block ghes_notifier_hed = {
+ +	.notifier_call = ghes_notify_hed,
+  };
+  
++ #ifdef CONFIG_ACPI_APEI_SEA
++ static LIST_HEAD(ghes_sea);
++ 
++ /*
++  * Return 0 only if one of the SEA error sources successfully reported an error
++  * record sent from the firmware.
++  */
++ int ghes_notify_sea(void)
++ {
++ 	struct ghes *ghes;
++ 	int ret = -ENOENT;
++ 
++ 	rcu_read_lock();
++ 	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
++ 		if (!ghes_proc(ghes))
++ 			ret = 0;
++ 	}
++ 	rcu_read_unlock();
++ 	return ret;
++ }
++ 
++ static void ghes_sea_add(struct ghes *ghes)
++ {
++ 	mutex_lock(&ghes_list_mutex);
++ 	list_add_rcu(&ghes->list, &ghes_sea);
++ 	mutex_unlock(&ghes_list_mutex);
++ }
++ 
++ static void ghes_sea_remove(struct ghes *ghes)
++ {
++ 	mutex_lock(&ghes_list_mutex);
++ 	list_del_rcu(&ghes->list);
++ 	mutex_unlock(&ghes_list_mutex);
++ 	synchronize_rcu();
++ }
++ #else /* CONFIG_ACPI_APEI_SEA */
++ static inline void ghes_sea_add(struct ghes *ghes)
++ {
++ 	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
++ 	       ghes->generic->header.source_id);
++ }
++ 
++ static inline void ghes_sea_remove(struct ghes *ghes)
++ {
++ 	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
++ 	       ghes->generic->header.source_id);
++ }
++ #endif /* CONFIG_ACPI_APEI_SEA */
++ 
+  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+  /*
+   * printk is not safe in NMI context.  So in NMI handler, we allocate
+@@@ -966,10 -1095,15 +1095,17 @@@ static int ghes_probe(struct platform_d
+  	case ACPI_HEST_NOTIFY_POLLED:
+  	case ACPI_HEST_NOTIFY_EXTERNAL:
+  	case ACPI_HEST_NOTIFY_SCI:
+ +	case ACPI_HEST_NOTIFY_GSIV:
+ +	case ACPI_HEST_NOTIFY_GPIO:
+  		break;
+- 
++ 	case ACPI_HEST_NOTIFY_SEA:
++ 		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
++ 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
++ 				generic->header.source_id);
++ 			rc = -ENOTSUPP;
++ 			goto err;
++ 		}
++ 		break;
+  	case ACPI_HEST_NOTIFY_NMI:
+  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+  			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+@@@ -1027,17 -1161,16 +1163,19 @@@
+  			goto err_edac_unreg;
+  		}
+  		break;
+ +
+  	case ACPI_HEST_NOTIFY_SCI:
+ +	case ACPI_HEST_NOTIFY_GSIV:
+ +	case ACPI_HEST_NOTIFY_GPIO:
+  		mutex_lock(&ghes_list_mutex);
+ -		if (list_empty(&ghes_sci))
+ -			register_acpi_hed_notifier(&ghes_notifier_sci);
+ -		list_add_rcu(&ghes->list, &ghes_sci);
+ +		if (list_empty(&ghes_hed))
+ +			register_acpi_hed_notifier(&ghes_notifier_hed);
+ +		list_add_rcu(&ghes->list, &ghes_hed);
+  		mutex_unlock(&ghes_list_mutex);
+  		break;
+- 
++ 	case ACPI_HEST_NOTIFY_SEA:
++ 		ghes_sea_add(ghes);
++ 		break;
+  	case ACPI_HEST_NOTIFY_NMI:
+  		ghes_nmi_add(ghes);
+  		break;
 
-I think it would be more readable if you use defines for DCS and MCS
-(Manufacturer Command Set), for example:
-#define MCS_CMD2 0xff
-...
-    dcs_write_seq(ctx, MCS_CMD2, 0x80, 0x09, 0x01);
+--->8
 
-> +	dcs_write_seq(0x00, 0x80);
-> +	dcs_write_seq(0xFF, 0x80, 0x09);
+The following changes since commit 3c2993b8c6143d8a5793746a54eba8f86f95240f:
 
-Since the patterns with address shifting is repeated multiple times
-maybe better would be to define helper for it, for example:
-#define MCS_ADRSFT 0x00
-#define dcs_write_cmd_at(ctx, cmd, addr, seq...) ({\
-    dcs_write_seq(ctx, MCS_ADRSFT, addr);\
-    dcs_write_seq(ctx, cmd, seq);\
-})
+  Linux 4.12-rc4 (2017-06-04 16:47:43 -0700)
 
-And use it this way:
-    dcs_write_cmd_at(MCS_CMD2, 0x80, 0x80, 0x09);
+are available in the git repository at:
 
-> +
-> +	/*
-> +	 * Starting from here, address shift needs to be set before sending
-> +	 * a new command. You can find an example in the next sequence...
-> +	 * SD_PCH_CTRL (0xC480) Source Driver Precharge Control (SD_PT=GND)
-> +	 */
-> +	dcs_write_seq(0x00, 0x80); /* address shift set to 0x80 */
-> +	dcs_write_seq(0xC4, 0x30); /* 0xC480 parameter 1 is 0x30 */
-> +	mdelay(10);
-> +
-> +	/* Not documented (0xC48A) */
-> +	dcs_write_seq(0x00, 0x8A);
-> +	dcs_write_seq(0xC4, 0x40);
-> +	mdelay(10);
-> +
-> +	/* PWR_CTRL4 (0xC5B0) Power Control Setting 4 for DC Voltage */
-> +	dcs_write_seq(0x00, 0xB1); /* 178th parameter */
-> +	dcs_write_seq(0xC5, 0xA9);
-> +
-> +	/* PWR_CTRL2 (0xC590) Power Control Setting 2 for Normal Mode */
-> +	dcs_write_seq(0x00, 0x91); /* 146th parameter */
-> +	dcs_write_seq(0xC5, 0x34);
-> +
-> +	/* P_DRV_M (0xC0B4) Panel Driving Mode */
-> +	dcs_write_seq(0x00, 0xB4);
-> +	dcs_write_seq(0xC0, 0x50);
-> +
-> +	/* VCOMDC (0xD900) VCOM Voltage Setting */
-> +	dcs_write_seq(0x00, 0x00);
-> +	dcs_write_seq(0xD9, 0x4E);
-> +
-> +	/* OSC_ADJ (0xC181) Oscillator Adjustment for Idle/Normal mode */
-> +	dcs_write_seq(0x00, 0x81);
-> +	dcs_write_seq(0xC1, 0x66); /* 65Hz */
-> +
-> +	/* RGB_VIDEO_SET (0xC1A1) RGB Video Mode Setting */
-> +	dcs_write_seq(0x00, 0xA1);
-> +	dcs_write_seq(0xC1, 0x08);
-> +
-> +	/* PWR_CTRL2 (0xC590) Power Control Setting 2 for Normal Mode */
-> +	dcs_write_seq(0x00, 0x92); /* 147th parameter */
-> +	dcs_write_seq(0xC5, 0x01);
-> +	dcs_write_seq(0x00, 0x95); /* 150th parameter */
-> +	dcs_write_seq(0xC5, 0x34);
-> +	dcs_write_seq(0x00, 0x94); /* 149th parameter */
-> +	dcs_write_seq(0xC5, 0x33);
-> +
-> +	/* GVDD/NGVDD (0xD800) */
-> +	dcs_write_seq(0x00, 0x00);
-> +	dcs_write_seq(0xD8, 0x79, 0x79);
-> +
-> +	/* SD_CTRL (0xC0A2) Source Driver Timing Setting */
-> +	dcs_write_seq(0x00, 0xA3); /* 164th parameter */
-> +	dcs_write_seq(0xC0, 0x1B);
-> +
-> +	/* PWR_CTRL1 (0xC580) Power Control Setting 1 */
-> +	dcs_write_seq(0x00, 0x82); /* 131st parameter */
-> +	dcs_write_seq(0xC5, 0x83);
-> +
-> +	/* SD_PCH_CTRL (0xC480) Source Driver Precharge Control */
-> +	dcs_write_seq(0x00, 0x81); /* 130th parameter */
-> +	dcs_write_seq(0xC4, 0x83);
-> +
-> +	/* RGB_VIDEO_SET (0xC1A1) RGB Video Mode Setting */
-> +	dcs_write_seq(0x00, 0xA1);
-> +	dcs_write_seq(0xC1, 0x0E); /* todo previously we wrote 0x08... */
-> +
-> +	/* PANSET (0xB3A6) Panel Type Setting */
-> +	dcs_write_seq(0x00, 0xA6);
-> +	dcs_write_seq(0xB3, 0x00, 0x01);
-> +
-> +	/* GOAVST (0xCE80) GOA VST Setting */
-> +	dcs_write_seq(0x00, 0x80);
-> +	dcs_write_seq(0xCE, 0x85, 0x01, 0x00, 0x84, 0x01, 0x00);
-> +
-> +	/* GOACLKA1 (0xCEA0) GOA CLKA1 Setting */
-> +	dcs_write_seq(0x00, 0xA0);
-> +	dcs_write_seq(0xCE, 0x18, 0x04, 0x03, 0x39, 0x00, 0x00, 0x00, 0x18,
-> +		      0x03, 0x03, 0x3A, 0x00, 0x00, 0x00);
-> +
-> +	/* GOACLKA3 (0xCEB0) GOA CLKA3 Setting */
-> +	dcs_write_seq(0x00, 0xB0);
-> +	dcs_write_seq(0xCE, 0x18, 0x02, 0x03, 0x3B, 0x00, 0x00, 0x00, 0x18,
-> +		      0x01, 0x03, 0x3C, 0x00, 0x00, 0x00);
-> +
-> +	/* GOAECLK (0xCFC0) GOA ECLK Setting */
-> +	dcs_write_seq(0x00, 0xC0);
-> +	dcs_write_seq(0xCF, 0x01, 0x01, 0x20, 0x20, 0x00, 0x00, 0x01, 0x02,
-> +		      0x00, 0x00);
-> +
-> +	/* Not documented */
-> +	dcs_write_seq(0x00, 0xD0);
-> +	dcs_write_seq(0xCF, 0x00);
-> +
-> +	/* PANCTRLSET1-8 (0xCB80-0xCBF0) Panel Control Setting 1-8 */
-> +	dcs_write_seq(0x00, 0x80);
-> +	dcs_write_seq(0xCB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00);
-> +	dcs_write_seq(0x00, 0x90);
-> +	dcs_write_seq(0xCB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
-> +	dcs_write_seq(0x00, 0xA0);
-> +	dcs_write_seq(0xCB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
-> +	dcs_write_seq(0x00, 0xB0);
-> +	dcs_write_seq(0xCB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00);
-> +	dcs_write_seq(0x00, 0xC0);
-> +	dcs_write_seq(0xCB, 0x00, 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x00,
-> +		      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
-> +	dcs_write_seq(0x00, 0xD0);
-> +	dcs_write_seq(0xCB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x04,
-> +		      0x04, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00);
-> +	dcs_write_seq(0x00, 0xE0);
-> +	dcs_write_seq(0xCB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00);
-> +	dcs_write_seq(0x00, 0xF0);
-> +	dcs_write_seq(0xCB, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-> +		      0xFF, 0xFF);
-> +
-> +	/* PANU2D1-3 (0xCC80-0xCCA0) Panel U2D Setting 1-3 */
-> +	dcs_write_seq(0x00, 0x80);
-> +	dcs_write_seq(0xCC, 0x00, 0x26, 0x09, 0x0B, 0x01, 0x25, 0x00, 0x00,
-> +		      0x00, 0x00);
-> +	dcs_write_seq(0x00, 0x90);
-> +	dcs_write_seq(0xCC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00, 0x00, 0x26, 0x0A, 0x0C, 0x02);
-> +	dcs_write_seq(0x00, 0xA0);
-> +	dcs_write_seq(0xCC, 0x25, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
-> +
-> +	/* PAND2U1-3 (0xCCB0-0xCCD0) Panel D2U Setting 1-3 */
-> +	dcs_write_seq(0x00, 0xB0);
-> +	dcs_write_seq(0xCC, 0x00, 0x25, 0x0C, 0x0A, 0x02, 0x26, 0x00, 0x00,
-> +		      0x00, 0x00);
-> +	dcs_write_seq(0x00, 0xC0);
-> +	dcs_write_seq(0xCC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00, 0x00, 0x25, 0x0B, 0x09, 0x01);
-> +	dcs_write_seq(0x00, 0xD0);
-> +	dcs_write_seq(0xCC, 0x26, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-> +		      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
-> +
-> +	/* PWR_CTRL1 (0xC580) Power Control Setting 1 */
-> +	dcs_write_seq(0x00, 0x81); /* 130th parameter */
-> +	dcs_write_seq(0xC5, 0x66);
-> +
-> +	/* Not documented */
-> +	dcs_write_seq(0x00, 0xB6);
-> +	dcs_write_seq(0xF5, 0x06);
-> +
-> +	/* GMCT2.2P (0xE100) Gamma Correction 2.2+ Setting */
-> +	dcs_write_seq(0x00, 0x00);
-> +	dcs_write_seq(0xE1, 0x00, 0x09, 0x0F, 0x0E, 0x07, 0x10, 0x0B, 0x0A,
-> +		      0x04, 0x07, 0x0B, 0x08, 0x0F, 0x10, 0x0A, 0x01);
-> +
-> +	/* GMCT2.2N (0xE100) Gamma Correction 2.2- Setting */
-> +	dcs_write_seq(0x00, 0x00);
-> +	dcs_write_seq(0xE2, 0x00, 0x09, 0x0F, 0x0E, 0x07, 0x10, 0x0B, 0x0A,
-> +		      0x04, 0x07, 0x0B, 0x08, 0x0F, 0x10, 0x0A, 0x01);
-> +
-> +	/* Exit CMD2 mode */
-> +	dcs_write_seq(0x00, 0x00);
-> +	dcs_write_seq(0xFF, 0xFF, 0xFF, 0xFF);
-> +
-> +	/* OTM8009a NOP */
-> +	dcs_write_seq(0x00, 0x00);
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-upstream
 
-It looks more like resetting shift address, not NOP command.
+for you to fetch changes up to 425e1ed73e6574e4fe186ec82fd37213cbd47df0:
 
-> +
-> +	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Wait for sleep out exit */
-> +	mdelay(120);
-> +
-> +	/* Default portrait 480x800 rgb24 */
-> +	dcs_write_seq(MIPI_DCS_SET_ADDRESS_MODE, 0x00);
-> +	dcs_write_seq(MIPI_DCS_SET_COLUMN_ADDRESS, 0x00, 0x00, 0x01, 0xDF);
-> +	dcs_write_seq(MIPI_DCS_SET_PAGE_ADDRESS, 0x00, 0x00, 0x03, 0x1F);
-> +	dcs_write_seq(MIPI_DCS_SET_PIXEL_FORMAT, 0x77);
+  arm64: fix endianness annotation for 'struct jit_ctx' and friends (2017-06-30 17:11:28 +0100)
 
-I think some of above DCS commands have corresponding helper functions.
+----------------------------------------------------------------
+arm64 updates for 4.13:
 
-> +
-> +	/* Disable CABC feature */
-> +	dcs_write_seq(0x55, 0x00);
-> +
-> +	ret = mipi_dsi_dcs_set_display_on(dsi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* OTM8009a NOP */
-> +	dcs_write_seq(0x00, 0x00);
-> +
-> +	/* Send Command GRAM memory write (no parameters) */
-> +	dcs_write_seq(MIPI_DCS_WRITE_MEMORY_START);
-> +
-> +	return 0;
-> +}
-> +
-> +static int otm8009a_disable(struct drm_panel *panel)
-> +{
-> +	struct otm8009a *ctx = panel_to_otm8009a(panel);
-> +	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
-> +	int ret;
-> +
-> +	if (!ctx->enabled)
-> +		return 0; /* This is not an issue so we return 0 here */
-> +
-> +	/* Power off the backlight. Note: end-user still controls brightness */
-> +	ctx->bl_dev->props.power = FB_BLANK_POWERDOWN;
-> +	ret = backlight_update_status(ctx->bl_dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = mipi_dsi_dcs_set_display_off(dsi);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	msleep(120);
-> +
-> +	ctx->enabled = false;
-> +
-> +	return 0;
-> +}
-> +
-> +static int otm8009a_unprepare(struct drm_panel *panel)
-> +{
-> +	struct otm8009a *ctx = panel_to_otm8009a(panel);
-> +
-> +	if (!ctx->prepared)
-> +		return 0;
-> +
-> +	if (ctx->reset_gpio) {
-> +		gpiod_set_value_cansleep(ctx->reset_gpio, 0);
-> +		msleep(20);
-> +	}
-> +
-> +	ctx->prepared = false;
-> +
-> +	return 0;
-> +}
-> +
-> +static int otm8009a_prepare(struct drm_panel *panel)
-> +{
-> +	struct otm8009a *ctx = panel_to_otm8009a(panel);
-> +	int ret;
-> +
-> +	if (ctx->prepared)
-> +		return 0;
-> +
-> +	if (ctx->reset_gpio) {
-> +		gpiod_set_value_cansleep(ctx->reset_gpio, 0);
-> +		msleep(20);
-> +		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
-> +		msleep(20);
+- RAS reporting via GHES/APEI (ACPI)
+- Indirect ftrace trampolines for modules
+- Improvements to kernel fault reporting
+- Page poisoning
+- Sigframe cleanups and preparation for SVE context
+- Core dump fixes
+- Sparse fixes (mainly relating to endianness)
+- xgene SoC PMU v3 driver
+- Misc cleanups and non-critical fixes
 
-Specs says reset gpio is active low, so I guess it should be fixed in
-bindings, dts and in driver.
+----------------------------------------------------------------
+Amir Goldstein (4):
+      xfs: use uuid_copy() helper to abstract uuid_t
+      md: namespace private helper names
+      xfs: use the common helper uuid_is_null()
+      tmpfs: generate random sb->s_uuid
 
-Regards
-Andrzej
+Andy Shevchenko (6):
+      acpi, nfit: Switch to use new generic UUID API
+      ACPI / APEI: Switch to use new generic UUID API
+      ACPI / bus: Switch to use new generic UUID API
+      ACPI / extlog: Switch to use new generic UUID API
+      ACPI: Switch to use generic guid_t in acpi_evaluate_dsm()
+      thermal: int340x_thermal: Switch to use new generic UUID API
 
-> +	}
-> +
-> +	ret = otm8009a_init_sequence(ctx);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ctx->prepared = true;
-> +
-> +	/* Power on the backlight. Note: end-user still controls brightness */
-> +	ctx->bl_dev->props.power = FB_BLANK_UNBLANK;
-> +	backlight_update_status(ctx->bl_dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int otm8009a_enable(struct drm_panel *panel)
-> +{
-> +	struct otm8009a *ctx = panel_to_otm8009a(panel);
-> +
-> +	ctx->enabled = true;
-> +
-> +	return 0;
-> +}
-> +
-> +static int otm8009a_get_modes(struct drm_panel *panel)
-> +{
-> +	struct drm_display_mode *mode;
-> +
-> +	mode = drm_mode_duplicate(panel->drm, &default_mode);
-> +	if (!mode) {
-> +		DRM_ERROR("failed to add mode %ux%ux@%u\n",
-> +			  default_mode.hdisplay, default_mode.vdisplay,
-> +			  default_mode.vrefresh);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	drm_mode_set_name(mode);
-> +
-> +	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-> +	drm_mode_probed_add(panel->connector, mode);
-> +
-> +	panel->connector->display_info.width_mm = mode->width_mm;
-> +	panel->connector->display_info.height_mm = mode->height_mm;
-> +
-> +	return 1;
-> +}
-> +
-> +static const struct drm_panel_funcs otm8009a_drm_funcs = {
-> +	.disable   = otm8009a_disable,
-> +	.unprepare = otm8009a_unprepare,
-> +	.prepare   = otm8009a_prepare,
-> +	.enable    = otm8009a_enable,
-> +	.get_modes = otm8009a_get_modes,
-> +};
-> +
-> +/*
-> + * DSI-BASED BACKLIGHT
-> + */
-> +
-> +static int otm8009a_backlight_update_status(struct backlight_device *bd)
-> +{
-> +	struct otm8009a *ctx = bl_get_data(bd);
-> +	u8 data[2];
-> +
-> +	if (!ctx->prepared) {
-> +		DRM_WARN("lcd not ready yet for setting its backlight!\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (bd->props.power <= FB_BLANK_NORMAL) {
-> +		/* Power on the backlight with the requested brightness */
-> +		data[0] = MIPI_DCS_SET_DISPLAY_BRIGHTNESS;
-> +		data[1] = bd->props.brightness;
-> +		otm8009a_dcs_write_buf(ctx, data, ARRAY_SIZE(data));
-> +		/* set Brightness Control & Backlight on */
-> +		data[1] = 0x24;
-> +	} else {
-> +		/* Power off the backlight: set Brightness Control & Bl off */
-> +		data[1] = 0;
-> +	}
-> +
-> +	/* Update Brightness Control & Backlight */
-> +	data[0] = MIPI_DCS_WRITE_CONTROL_DISPLAY;
-> +	otm8009a_dcs_write_buf(ctx, data, ARRAY_SIZE(data));
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct backlight_ops otm8009a_backlight_ops = {
-> +	.update_status = otm8009a_backlight_update_status,
-> +};
-> +
-> +static int otm8009a_probe(struct mipi_dsi_device *dsi)
-> +{
-> +	struct device *dev = &dsi->dev;
-> +	struct otm8009a *ctx;
-> +	int ret;
-> +
-> +	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
-> +	if (!ctx)
-> +		return -ENOMEM;
-> +
-> +	ctx->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
-> +	if (IS_ERR(ctx->reset_gpio)) {
-> +		dev_err(dev, "cannot get reset-gpio\n");
-> +		return PTR_ERR(ctx->reset_gpio);
-> +	}
-> +
-> +	mipi_dsi_set_drvdata(dsi, ctx);
-> +
-> +	ctx->dev = dev;
-> +
-> +	dsi->lanes = 2;
-> +	dsi->format = MIPI_DSI_FMT_RGB888;
-> +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
-> +			  MIPI_DSI_MODE_LPM;
-> +
-> +	drm_panel_init(&ctx->panel);
-> +	ctx->panel.dev = dev;
-> +	ctx->panel.funcs = &otm8009a_drm_funcs;
-> +
-> +	ctx->bl_dev = backlight_device_register(DRV_NAME "_backlight", dev, ctx,
-> +						&otm8009a_backlight_ops, NULL);
-> +	if (IS_ERR(ctx->bl_dev)) {
-> +		dev_err(dev, "failed to register backlight device\n");
-> +		return PTR_ERR(ctx->bl_dev);
-> +	}
-> +
-> +	ctx->bl_dev->props.max_brightness = OTM8009A_BACKLIGHT_MAX;
-> +	ctx->bl_dev->props.brightness = OTM8009A_BACKLIGHT_DEFAULT;
-> +	ctx->bl_dev->props.power = FB_BLANK_POWERDOWN;
-> +	ctx->bl_dev->props.type = BACKLIGHT_RAW;
-> +
-> +	drm_panel_add(&ctx->panel);
-> +
-> +	ret = mipi_dsi_attach(dsi);
-> +	if (ret < 0) {
-> +		dev_err(dev, "mipi_dsi_attach failed. Is host ready?\n");
-> +		drm_panel_remove(&ctx->panel);
-> +		backlight_device_unregister(ctx->bl_dev);
-> +		return ret;
-> +	}
-> +
-> +	DRM_INFO(DRV_NAME "_panel %ux%u@%u %ubpp dsi %udl - ready\n",
-> +		 default_mode.hdisplay, default_mode.vdisplay,
-> +		 default_mode.vrefresh,
-> +		 mipi_dsi_pixel_format_to_bpp(dsi->format), dsi->lanes);
-> +
-> +	return 0;
-> +}
-> +
-> +static int otm8009a_remove(struct mipi_dsi_device *dsi)
-> +{
-> +	struct otm8009a *ctx = mipi_dsi_get_drvdata(dsi);
-> +
-> +	mipi_dsi_detach(dsi);
-> +	drm_panel_remove(&ctx->panel);
-> +
-> +	backlight_device_unregister(ctx->bl_dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id orisetech_otm8009a_of_match[] = {
-> +	{ .compatible = "orisetech,otm8009a" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, orisetech_otm8009a_of_match);
-> +
-> +static struct mipi_dsi_driver orisetech_otm8009a_driver = {
-> +	.probe  = otm8009a_probe,
-> +	.remove = otm8009a_remove,
-> +	.driver = {
-> +		.name = DRV_NAME "_panel",
-> +		.of_match_table = orisetech_otm8009a_of_match,
-> +	},
-> +};
-> +module_mipi_dsi_driver(orisetech_otm8009a_driver);
-> +
-> +MODULE_AUTHOR("Philippe Cornu <philippe.cornu@st.com>");
-> +MODULE_AUTHOR("Yannick Fertre <yannick.fertre@st.com>");
-> +MODULE_DESCRIPTION("DRM driver for Orise Tech OTM8009A MIPI DSI panel");
-> +MODULE_LICENSE("GPL v2");
+Ard Biesheuvel (6):
+      arm64: kernel: restrict /dev/mem read() calls to linear region
+      arm64: ftrace: don't validate branch via PLT in ftrace_make_nop()
+      arm64: ftrace: add support for far branches to dynamic ftrace
+      drivers/char: kmem: disable on arm64
+      fs/proc: kcore: use kcore_list type to check for vmalloc/module address
+      arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
+
+Arnd Bergmann (1):
+      ras: mark stub functions as 'inline'
+
+Arvind Yadav (2):
+      arm: perf: make of_device_ids const
+      arm64: cpuinfo: constify attribute_group structures.
+
+Christoph Hellwig (21):
+      uuid,afs: move struct uuid_v1 back into afs
+      xfs: use uuid_be to implement the uuid_t type
+      nfsd: namespace-prefix uuid_parse
+      uuid: remove uuid_be defintions from the uapi header
+      uuid: rename uuid types
+      uuid: don't export guid_index and uuid_index
+      uuid: hoist helpers uuid_equal() and uuid_copy() from xfs
+      uuid: hoist uuid_is_null() helper from libnvdimm
+      S390/sysinfo: use uuid_is_null instead of opencoding it
+      xfs: remove uuid_getnodeuniq and xfs_uu_t
+      block: remove blk_part_pack_uuid
+      ima/policy: switch to use uuid_t
+      fs: switch ->s_uuid to uuid_t
+      overlayfs: use uuid_t instead of uuid_be
+      partitions/ldm: switch to use uuid_t
+      sysctl: switch to use uuid_t
+      nvme: switch to uuid_t
+      scsi_debug: switch to uuid_t
+      MAINTAINERS: add uuid entry
+      acpi: always include uuid.h
+      thermal: int340x_thermal: fix compile after the UUID API switch
+
+Dave Martin (11):
+      arm64: signal: split frame link record from sigcontext structure
+      arm64: signal: Refactor sigcontext parsing in rt_sigreturn
+      arm64: signal: factor frame layout and population into separate passes
+      arm64: signal: factor out signal frame record allocation
+      arm64: ptrace: Fix VFP register dumping in compat coredumps
+      arm64: ptrace: Flush FPSIMD regs back to thread_struct before reading
+      arm64: ptrace: Flush user-RW TLS reg to thread_struct before reading
+      arm64: signal: Allow expansion of the signal frame
+      arm64: ptrace: Avoid setting compat FP[SC]R to garbage if get_user fails
+      arm64: ptrace: Remove redundant overrun check from compat_vfp_set()
+      arm64: ptrace: Fix incorrect get_user() use in compat_vfp_set()
+
+Dong Bo (1):
+      arm64: Preventing READ_IMPLIES_EXEC propagation
+
+Dustin Brown (1):
+      arm64: Export save_stack_trace_tsk()
+
+Hoan Tran (3):
+      perf: xgene: Parse PMU subnode from the match table
+      perf: xgene: Move PMU leaf functions into function pointer structure
+      perf: xgene: Add support for SoC PMU version 3
+
+Jonathan (Zhixiong) Zhang (3):
+      arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
+      arm64: kconfig: allow support for memory failure handling
+      acpi: apei: panic OS with fatal error status block
+
+Kees Cook (1):
+      arm64, vdso: Define vdso_{start,end} as array
+
+Kefeng Wang (3):
+      arm64: Call __show_regs directly
+      arm64: Add dump_backtrace() in show_regs
+      arm64: check return value of of_flat_dt_get_machine_name
+
+Kristina Martsenko (3):
+      arm64: mm: print out correct page table entries
+      arm64: mm: don't print out page table entries on EL0 faults
+      arm64: mm: print file name of faulting vma
+
+Lorenzo Pieralisi (3):
+      ARM64/PCI: Set root bus NUMA node on ACPI systems
+      ARM64/irqchip: Update ACPI_IORT symbol selection logic
+      ACPI/IORT: Remove iort_node_match()
+
+Luc Van Oostenryck (13):
+      arm64: pass machine size to sparse
+      arm64: pass endianness info to sparse
+      arm64: fix endianness annotation for debug-monitors.c
+      arm64: fix endianness annotation in call_undef_hook()
+      arm64: fix endianness annotation in aarch64_insn_read()
+      arm64: fix endianness annotation for aarch64_insn_write()
+      arm64: fix endianness annotation for reloc_insn_movw() & reloc_insn_imm()
+      arm64: use readq() instead of readl() to read 64bit entry_point
+      arm64: fix endianness annotation in acpi_parking_protocol.c
+      arm64: add missing conversion to __wsum in ip_fast_csum()
+      arm64: fix endianness annotation in get_kaslr_seed()
+      arm64: fix endianness annotation for __apply_alternatives()/get_alt_insn()
+      arm64: fix endianness annotation for 'struct jit_ctx' and friends
+
+Mark Rutland (3):
+      drivers/perf: commonise PERF_EVENTS dependency
+      arm64: dump cpu_hwcaps at panic time
+      arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
+
+Olav Haugan (1):
+      arm64/dma-mapping: Remove extraneous null-pointer checks
+
+Punit Agrawal (2):
+      arm64: hugetlb: Fix huge_pte_offset to return poisoned page table entries
+      arm64: mm: Update perf accounting to handle poison faults
+
+Shaokun Zhang (1):
+      arm64: perf: Extend event config for ARMv8.1
+
+Tobias Klauser (1):
+      arm64: mm: explicity include linux/vmalloc.h
+
+Tyler Baicar (11):
+      acpi: apei: read ack upon ghes record consumption
+      ras: acpi/apei: cper: add support for generic data v3 structure
+      cper: add timestamp print to CPER status printing
+      efi: parse ARM processor error
+      arm64: exception: handle Synchronous External Abort
+      acpi: apei: handle SEA notification type for ARMv8
+      efi: print unrecognized CPER section
+      ras: acpi / apei: generate trace event for unrecognized CPER section
+      trace, ras: add ARM processor error trace event
+      arm/arm64: KVM: add guest SEA support
+      acpi: apei: check for pending errors when probing GHES entries
+
+Will Deacon (8):
+      arm64: cpufeature: Don't dump useless backtrace on CPU_OUT_OF_SPEC
+      arm64: futex: Fix undefined behaviour with FUTEX_OP_OPARG_SHIFT usage
+      arm64: cpufeature: Fix CPU_OUT_OF_SPEC taint for uniform systems
+      arm64: fault: Print info about page table structure when dumping pte
+      arm64: ftrace: fix building without CONFIG_MODULES
+      Merge branch 'uuid-types' of git://git.infradead.org/users/hch/uuid into aarch64/for-next/ras-apei
+      Merge branch 'perf/updates' into aarch64/for-next/core
+      Merge branch 'aarch64/for-next/ras-apei' into aarch64/for-next/core
+
+ MAINTAINERS                                        |  11 +
+ arch/arm/include/asm/kvm_arm.h                     |  10 +
+ arch/arm/include/asm/system_misc.h                 |   5 +
+ arch/arm/kernel/perf_event_v6.c                    |   2 +-
+ arch/arm64/Kconfig                                 |   9 +-
+ arch/arm64/Makefile                                |   7 +-
+ arch/arm64/include/asm/checksum.h                  |   2 +-
+ arch/arm64/include/asm/dma-mapping.h               |   2 -
+ arch/arm64/include/asm/elf.h                       |   6 +
+ arch/arm64/include/asm/esr.h                       |   1 +
+ arch/arm64/include/asm/futex.h                     |   8 +-
+ arch/arm64/include/asm/kvm_arm.h                   |  10 +
+ arch/arm64/include/asm/module.h                    |   3 +
+ arch/arm64/include/asm/pgtable.h                   |   2 +-
+ arch/arm64/include/asm/processor.h                 |   3 +
+ arch/arm64/include/asm/stacktrace.h                |   1 +
+ arch/arm64/include/asm/system_misc.h               |   4 +-
+ arch/arm64/include/uapi/asm/sigcontext.h           |  55 ++
+ arch/arm64/kernel/Makefile                         |   3 +
+ arch/arm64/kernel/acpi_parking_protocol.c          |   6 +-
+ arch/arm64/kernel/alternative.c                    |   8 +-
+ arch/arm64/kernel/cpufeature.c                     |  25 +-
+ arch/arm64/kernel/cpuinfo.c                        |   2 +-
+ arch/arm64/kernel/debug-monitors.c                 |  14 +-
+ arch/arm64/kernel/ftrace-mod.S                     |  18 +
+ arch/arm64/kernel/ftrace.c                         | 103 +++-
+ arch/arm64/kernel/insn.c                           |   7 +-
+ arch/arm64/kernel/kaslr.c                          |   2 +-
+ arch/arm64/kernel/module.c                         |  20 +-
+ arch/arm64/kernel/pci.c                            |   3 +
+ arch/arm64/kernel/perf_event.c                     |   2 +-
+ arch/arm64/kernel/probes/kprobes.c                 |   4 +-
+ arch/arm64/kernel/process.c                        |   9 +-
+ arch/arm64/kernel/ptrace.c                         |  39 +-
+ arch/arm64/kernel/setup.c                          |   3 +
+ arch/arm64/kernel/signal.c                         | 413 +++++++++++--
+ arch/arm64/kernel/stacktrace.c                     |   1 +
+ arch/arm64/kernel/traps.c                          |  18 +-
+ arch/arm64/kernel/vdso.c                           |  10 +-
+ arch/arm64/mm/dma-mapping.c                        |   9 -
+ arch/arm64/mm/fault.c                              | 215 +++++--
+ arch/arm64/mm/hugetlbpage.c                        |  29 +-
+ arch/arm64/mm/mmap.c                               |  19 +-
+ arch/arm64/mm/mmu.c                                |   1 +
+ arch/arm64/net/bpf_jit_comp.c                      |   6 +-
+ arch/s390/include/asm/sysinfo.h                    |   4 +-
+ arch/s390/kernel/sysinfo.c                         |   2 +-
+ block/partitions/ldm.c                             |  10 +-
+ block/partitions/ldm.h                             |   6 +-
+ drivers/acpi/acpi_extlog.c                         |  20 +-
+ drivers/acpi/apei/Kconfig                          |  15 +
+ drivers/acpi/apei/ghes.c                           | 214 ++++++-
+ drivers/acpi/apei/hest.c                           |   7 +-
+ drivers/acpi/arm64/iort.c                          |  15 -
+ drivers/acpi/bus.c                                 |  29 +-
+ drivers/acpi/nfit/core.c                           |  54 +-
+ drivers/acpi/nfit/nfit.h                           |   3 +-
+ drivers/acpi/utils.c                               |  16 +-
+ drivers/char/Kconfig                               |   2 +
+ drivers/char/tpm/tpm_crb.c                         |   9 +-
+ drivers/char/tpm/tpm_ppi.c                         |  20 +-
+ drivers/firmware/efi/cper.c                        | 204 +++++-
+ drivers/gpu/drm/i915/intel_acpi.c                  |  14 +-
+ drivers/gpu/drm/nouveau/nouveau_acpi.c             |  20 +-
+ drivers/gpu/drm/nouveau/nvkm/subdev/mxm/base.c     |   9 +-
+ drivers/hid/i2c-hid/i2c-hid.c                      |   9 +-
+ drivers/iommu/dmar.c                               |  11 +-
+ drivers/irqchip/Kconfig                            |   1 -
+ drivers/md/md.c                                    |   8 +-
+ drivers/mmc/host/sdhci-pci-core.c                  |   9 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |  15 +-
+ drivers/nvdimm/btt_devs.c                          |   9 +-
+ drivers/nvme/host/fabrics.c                        |   8 +-
+ drivers/nvme/host/fabrics.h                        |   2 +-
+ drivers/nvme/host/fc.c                             |   3 +-
+ drivers/nvme/target/nvmet.h                        |   1 +
+ drivers/pci/pci-acpi.c                             |  13 +-
+ drivers/pci/pci-label.c                            |   4 +-
+ drivers/perf/Kconfig                               |   9 +-
+ drivers/perf/xgene_pmu.c                           | 684 +++++++++++++++++++--
+ drivers/ras/ras.c                                  |  16 +-
+ drivers/scsi/scsi_debug.c                          |  10 +-
+ drivers/thermal/int340x_thermal/int3400_thermal.c  |   8 +-
+ drivers/usb/dwc3/dwc3-pci.c                        |  10 +-
+ drivers/usb/host/xhci-pci.c                        |   9 +-
+ drivers/usb/misc/ucsi.c                            |   6 +-
+ drivers/usb/typec/typec_wcove.c                    |   8 +-
+ drivers/xen/tmem.c                                 |   6 +-
+ fs/afs/cmservice.c                                 |  16 +-
+ fs/afs/internal.h                                  |  11 +-
+ fs/afs/main.c                                      |   2 +-
+ fs/ext4/super.c                                    |   2 +-
+ fs/f2fs/super.c                                    |   2 +-
+ fs/gfs2/ops_fstype.c                               |   2 +-
+ fs/gfs2/sys.c                                      |  22 +-
+ fs/nfsd/export.c                                   |   4 +-
+ fs/ocfs2/super.c                                   |   2 +-
+ fs/overlayfs/copy_up.c                             |   7 +-
+ fs/overlayfs/namei.c                               |   2 +-
+ fs/overlayfs/overlayfs.h                           |   2 +-
+ fs/proc/kcore.c                                    |   2 +-
+ fs/xfs/Makefile                                    |   3 +-
+ fs/xfs/uuid.c                                      |  63 --
+ fs/xfs/uuid.h                                      |  35 --
+ fs/xfs/xfs_inode_item.c                            |   8 +-
+ fs/xfs/xfs_linux.h                                 |   2 +-
+ fs/xfs/xfs_log_recover.c                           |   6 +-
+ fs/xfs/xfs_mount.c                                 |  16 +-
+ include/acpi/acpi_bus.h                            |  11 +-
+ include/acpi/ghes.h                                |  48 +-
+ include/linux/acpi.h                               |   4 +-
+ include/linux/acpi_iort.h                          |   2 -
+ include/linux/cleancache.h                         |   2 +-
+ include/linux/cper.h                               |  54 ++
+ include/linux/fs.h                                 |   5 +-
+ include/linux/genhd.h                              |  11 -
+ include/linux/nvme-fc.h                            |   3 +-
+ include/linux/nvme.h                               |   3 +-
+ include/linux/pci-acpi.h                           |   2 +-
+ include/linux/ras.h                                |  17 +
+ include/linux/uuid.h                               | 101 ++-
+ include/ras/ras_event.h                            |  90 +++
+ include/uapi/linux/uuid.h                          |  28 +-
+ kernel/sysctl_binary.c                             |   4 +-
+ lib/test_uuid.c                                    |  36 +-
+ lib/uuid.c                                         |  33 +-
+ lib/vsprintf.c                                     |   4 +-
+ mm/cleancache.c                                    |   2 +-
+ mm/shmem.c                                         |   2 +
+ security/integrity/evm/evm_crypto.c                |   2 +-
+ security/integrity/ima/ima_policy.c                |  12 +-
+ sound/soc/intel/skylake/skl-nhlt.c                 |   7 +-
+ tools/testing/nvdimm/test/iomap.c                  |   6 +-
+ tools/testing/nvdimm/test/nfit.c                   |   2 +-
+ tools/testing/nvdimm/test/nfit_test.h              |   4 +-
+ virt/kvm/arm/mmu.c                                 |  36 +-
+ 136 files changed, 2562 insertions(+), 840 deletions(-)
+ create mode 100644 arch/arm64/kernel/ftrace-mod.S
+ delete mode 100644 fs/xfs/uuid.c
+ delete mode 100644 fs/xfs/uuid.h
