@@ -1,77 +1,31 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 5 Jul 2017 15:33:05 +0300
-Subject: [PATCH] thermal: imx: interpret fsl,tempmon-data through nvmem
-In-Reply-To: <20170704185400.GB18084@localhost.localdomain>
-References: <d1a8ec1ef73aefe6018f6a4923bd04b3ac34a5d4.1497879110.git.leonard.crestez@nxp.com>
- <20170704185400.GB18084@localhost.localdomain>
-Message-ID: <1499257985.23291.7.camel@nxp.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Jul 2017 13:33:04 +0100
+Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <0cd65cda-9a3d-8c1b-1ee9-c48f63959140@free.fr>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+ <20170702231811.GJ18324@bhelgaas-glaptop.roam.corp.google.com>
+ <79382219-c730-da78-3e5f-5abf3173d7ac@sigmadesigns.com>
+ <20170703134031.GG13824@bhelgaas-glaptop.roam.corp.google.com>
+ <20170703181128.GD4902@n2100.armlinux.org.uk>
+ <0cd65cda-9a3d-8c1b-1ee9-c48f63959140@free.fr>
+Message-ID: <20170705123304.extc5iswhwjepwyp@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-07-04 at 11:54 -0700, Eduardo Valentin wrote:
-> On Mon, Jun 19, 2017 at 04:40:43PM +0300, Leonard Crestez wrote:
-> > 
-> > On imx6sx accessing the ocotp memory area directly is wrong because the
-> > ocotp clock needs to be enabled first. Fix this by reinterpreting the
-> > fsl,tempmon-data phandle as a reference to a nvmem_device and doing all
-> > the read through that.
-> > 
-> > @@ -347,29 +348,39 @@ static struct thermal_zone_device_ops imx_tz_ops = {
-> > ?static int imx_get_sensor_data(struct platform_device *pdev)
-> > ?{
-> > ?	struct imx_thermal_data *data = platform_get_drvdata(pdev);
-> > -	struct regmap *map;
-> > +	struct device_node *ocotp_np;
-> > +	struct nvmem_device *ocotp;
-> > ?	int t1, n1;
-> > ?	int ret;
-> > ?	u32 val;
-> > ?	u64 temp64;
-> > ?
-> > -	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-> > -					??????"fsl,tempmon-data");
-> > -	if (IS_ERR(map)) {
-> > -		ret = PTR_ERR(map);
-> > -		dev_err(&pdev->dev, "failed to get sensor regmap: %d\n", ret);
-> > +	ocotp_np = of_parse_phandle(pdev->dev.of_node, "fsl,tempmon-data", 0);
-> > +	if (IS_ERR(ocotp_np)) {
-> > +		ret = PTR_ERR(ocotp_np);
-> > +		dev_err(&pdev->dev, "failed to parse fsl,tempmon-data phandle: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +	ocotp = of_nvmem_device_phandle_get(ocotp_np);
-> > +	of_node_put(ocotp_np);
-> > +	if (IS_ERR(ocotp)) {
-> > +		ret = PTR_ERR(ocotp);
-> > +		if (ret != -EPROBE_DEFER)
-> > +			dev_err(&pdev->dev, "failed to get fsl,tempmon-data nvmem device: %d\n", ret);
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -404,10 +415,11 @@ static int imx_get_sensor_data(struct platform_device *pdev)
-> > ?	data->c2 = n1 * data->c1 + 1000 * t1;
-> > ?
-> > ?	/* use OTP for thermal grade */
-> > -	ret = regmap_read(map, OCOTP_MEM0, &val);
-> > -	if (ret) {
-> > -		dev_err(&pdev->dev, "failed to read temp grade: %d\n", ret);
-> > -		return ret;
+On Wed, Jul 05, 2017 at 01:59:55AM +0200, Mason wrote:
 
-> I see a few other occurences of regmap_read() in this driver, for
-> example, inside imx_get_temp(). Do they also get affect by the reported
-> bug? Should they be replaced with nvmem_device_read() too?
+> Do larger SoC vendors have HW devs working closely with
+> Linux devs, to avoid these design bloopers?
 
-No, most of the code uses regmap to read from the tempmon device
-itself.
-
-It is only imx_get_sensor_data which uses syscon_regmap_lookup to fetch
-the regmap for another device (ocotp) in order to read calibration data
-and thermal grading at probe time. Perhaps this function should be
-renamed to something like imx_tempmon_init_calib.
-
-The problem is that on newer imx SOCs reading directly from OCOTP like
-that doesn't work if the ocotp clock is not enabled.
-
---
-Regards,
-Leonard
+Yes, or just internal software teams in general - hardware designs tend
+to be a lot more usable if there's good dialogue with users about what's
+useful and what isn't.  It's going to happen at some point anyway when
+people can't get the chip working well.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170705/c86058d6/attachment-0001.sig>
