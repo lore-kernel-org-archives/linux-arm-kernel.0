@@ -1,37 +1,31 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 05 Jul 2017 11:26:34 +0900
-Subject: [PATCH] ARM: dts: lpc18xx: remove num-slots from lpc18xx
-In-Reply-To: <1499160862-87345-1-git-send-email-shawn.lin@rock-chips.com>
-References: <CGME20170704093434epcas5p304d945fe8950a0a7adfbac3cea942d57@epcas5p3.samsung.com>
- <1499160862-87345-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <c28884cc-95c9-4c84-8af5-12f3c1623926@samsung.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 04 Jul 2017 19:36:32 -0700
+Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
+In-Reply-To: <20170704233219.18790-1-afaerber@suse.de>
+References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
+ <20170704233219.18790-1-afaerber@suse.de>
+Message-ID: <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2017 06:34 PM, Shawn Lin wrote:
-> dwmmc driver deprecated num-slots and plan to get rid
-> of it finally. Just move a step to cleanup it from DT.
-> 
-> Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
+>Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
+>bogus holding pen") simplified the S500 SMP code by removing a loop for
+>pen_release in owl_secondary_boot(). Since then it is only calling
+>owl_v7_invalidate_l1() before branching to secondary_startup().
+>
+>The owl_v7_invalidate_l1() assembler function is superfluous, too.
+>Therefore drop owl_secondary_boot() and use secondary_boot() directly.
+>
+>Cc: David Liu <liuwei@actions-semi.com>
+>Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>---
 
-Reviewed-by: Jaehoon Chung <jh80.chung@samsung.com>
+>-	writel(virt_to_phys(owl_secondary_startup),
+>+	writel(virt_to_phys(secondary_startup),
+> 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
 
-> ---
-> 
->  arch/arm/boot/dts/lpc18xx.dtsi | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
-> index 7cae9c5..10b8249 100644
-> --- a/arch/arm/boot/dts/lpc18xx.dtsi
-> +++ b/arch/arm/boot/dts/lpc18xx.dtsi
-> @@ -115,7 +115,6 @@
->  			compatible = "snps,dw-mshc";
->  			reg = <0x40004000 0x1000>;
->  			interrupts = <6>;
-> -			num-slots = <1>;
->  			clocks = <&ccu2 CLK_SDIO>, <&ccu1 CLK_CPU_SDIO>;
->  			clock-names = "ciu", "biu";
->  			resets = <&rgu 20>;
-> 
+This is a kernel symbol so please use __pa_symbol() here, also you might want to build with CONFIG_DEBUG_VIRTUAL and see if you get other warnings about using virt_to_phys() in the owl platform code (I did not check if there are other uses)
+
+-- 
+Florian
