@@ -1,77 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Jul 2017 11:45:47 +0100
-Subject: [PATCH v2] arm64: dts: r8a7795: add IMR-LX4 support
-In-Reply-To: <CAMuHMdV9o0HhZgJS2cyWPmsdqgRmXpjSfKrKQMN=x5VTpXZoUw@mail.gmail.com>
-References: <20170627173152.532417992@cogentembedded.com>
- <CAMuHMdV9o0HhZgJS2cyWPmsdqgRmXpjSfKrKQMN=x5VTpXZoUw@mail.gmail.com>
-Message-ID: <20170705104547.GE24043@verge.net.au>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 5 Jul 2017 13:09:44 +0200
+Subject: [PATCH v3 2/6] pwm: mediatek: fix pwm source clock selection
+In-Reply-To: <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
+References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
+ <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
+Message-ID: <d009712e-f0a2-2dc7-2f64-ad8cfa21f98d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 12:18:01PM +0200, Geert Uytterhoeven wrote:
-> Hi Sergei,
-> 
-> On Tue, Jun 27, 2017 at 7:30 PM, Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com> wrote:
-> > Describe the IMR-LX4 devices in the R8A7795 device tree.
-> >
-> > Based on the original (and large) patch by Konstantin Kozhevnikov
-> > <Konstantin.Kozhevnikov@cogentembedded.com>.
-> >
-> > Signed-off-by: Konstantin Kozhevnikov <Konstantin.Kozhevnikov@cogentembedded.com>
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >
-> > ---
-> > This patch is against the 'renesas-devel-20170626-v4.12-rc7' tag of Simon
-> > Horman's 'renesas.git' repo.
-> >
-> > The IMR-LX4 bindings were documented in the IMR driver patch and ACK'ed by Rob
-> > Herring, so I don't expect them to change...
-> >
-> > Changes in version 2:
-> > - added SoC specific "compatible" prop values;
-> > - refreshed the patch;
-> > - added Geert's tag.
-> 
-> In the mean time, r8a7795.dtsi gained reset controller support, so
-> you should add "resets" properties were appropriate.
 
-Thanks, I have squashed-in the following.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index f76cb360e110..31d1ba586ec2 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1542,6 +1542,7 @@
- 			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 823>;
- 			power-domains = <&sysc R8A7795_PD_A3VC>;
-+			resets = <&cpg 823>;
- 		};
- 
- 		imr-lx4 at fe870000 {
-@@ -1551,6 +1552,7 @@
- 			interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 822>;
- 			power-domains = <&sysc R8A7795_PD_A3VC>;
-+			resets = <&cpg 822>;
- 		};
- 
- 		imr-lx4 at fe880000 {
-@@ -1560,6 +1562,7 @@
- 			interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 821>;
- 			power-domains = <&sysc R8A7795_PD_A3VC>;
-+			resets = <&cpg 821>;
- 		};
- 
- 		imr-lx4 at fe890000 {
-@@ -1569,6 +1572,7 @@
- 			interrupts = <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 820>;
- 			power-domains = <&sysc R8A7795_PD_A3VC>;
-+			resets = <&cpg 820>;
- 		};
- 
- 		vspbc: vsp at fe920000 {
+On 06/30/2017 08:05 AM, Zhi Mao wrote:
+> In original code, the pwm output frequency is not correct
+> when set bit<3>=1 to PWMCON register.
+> 
+> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+> ---
+>   drivers/pwm/pwm-mediatek.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> index 5c11bc7..d08b5b3 100644
+> --- a/drivers/pwm/pwm-mediatek.c
+> +++ b/drivers/pwm/pwm-mediatek.c
+> @@ -91,7 +91,7 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>   	if (clkdiv > 7)
+>   		return -EINVAL;
+>   
+> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | clkdiv);
+> +	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+
+Just for clarification, BIT(15) enables old PWM mode, which ignores 
+CLKSEL (BIT(3)). Therefore setting BIT(3) does not have any effect and 
+can be discarded.
+
+Am I correct? I took mt7623n datasheet for reference.
+
+Regards,
+Matthias
+
+>   	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
+>   	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
+>   
+> 
