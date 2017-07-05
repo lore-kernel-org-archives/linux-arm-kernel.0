@@ -1,42 +1,52 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed,  5 Jul 2017 13:02:12 -0700
-Subject: [PATCH 03/18] ARM: HP Jornada 7XX: Move inline before return type
-In-Reply-To: <cover.1499284835.git.joe@perches.com>
-References: <cover.1499284835.git.joe@perches.com>
-Message-ID: <5bd3b2bf39c6c9caf773949f18158f8f5ec08582.1499284835.git.joe@perches.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 05 Jul 2017 22:21:39 +0200
+Subject: [PATCH v3 02/12] ALSA: ac97: add an ac97 bus
+In-Reply-To: <s5hbmp0c6a3.wl-tiwai@suse.de> (Takashi Iwai's message of "Tue,
+ 04 Jul 2017 22:10:28 +0200")
+References: <20170630194408.24978-1-robert.jarzmik@free.fr>
+ <20170630194408.24978-3-robert.jarzmik@free.fr>
+ <s5hpodhc28v.wl-tiwai@suse.de> <87bmp0t2lv.fsf@belgarion.home>
+ <s5hbmp0c6a3.wl-tiwai@suse.de>
+Message-ID: <877ezmtz1o.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert 'u8 inline' to 'inline u8' to be the same style used
-by the rest of the kernel.
+Takashi Iwai <tiwai@suse.de> writes:
 
-Miscellanea:
+> On Tue, 04 Jul 2017 21:37:48 +0200,
+> Robert Jarzmik wrote:
+>> 
+>> Takashi Iwai <tiwai@suse.de> writes:
+>> 
+>> > On Fri, 30 Jun 2017 21:43:58 +0200,
+>> > Robert Jarzmik wrote:
+>> >> +static struct bus_type ac97_bus_type = {
+>> >> +	.name		= "ac97",
+>> >
+>> > Name-conflict with the old ac97 bus?
+>> Yeah, fair point. So what should I choose for this new one ?
+>>  - ac97new
+>>  - ac97bis
+>>  - ac97_2
+>>  - ac97reborn
+>
+> ac97bus
+> ac97_episode_5
+> ac98
+> ...
+>
+> I have no opinion on it.
+Ah clone wars one is really tempting :)
+But let's have ac97bus actually.
 
-jornada_ssp_reverse is an odd function.
-It is declared inline but is also EXPORT_SYMBOL.
-It is also apparently only used by jornada720_ssp.c
-Likely the EXPORT_SYMBOL could be removed and the function
-converted to static.
+> You can use subsys_init() for modules, it's no problem.
+> When it's built for a module, all xxx_init() is handled as equivalent
+> with module_init().  See linux/module.h.
+>
+> It's just the lack of module_exit() in your case.
+Got it, I'll add it for v4.
 
-The addition of static and removal of EXPORT_SYMBOL was not done.
+Cheers.
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/mach-sa1100/jornada720_ssp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-sa1100/jornada720_ssp.c b/arch/arm/mach-sa1100/jornada720_ssp.c
-index b143c4659346..7fc11a3c17b4 100644
---- a/arch/arm/mach-sa1100/jornada720_ssp.c
-+++ b/arch/arm/mach-sa1100/jornada720_ssp.c
-@@ -33,7 +33,7 @@ static unsigned long jornada_ssp_flags;
-  * we need to reverse all data we receive from the mcu due to its physical location
-  * returns : 01110111 -> 11101110
-  */
--u8 inline jornada_ssp_reverse(u8 byte)
-+inline u8 jornada_ssp_reverse(u8 byte)
- {
- 	return
- 		((0x80 & byte) >> 7) |
 -- 
-2.10.0.rc2.1.g053435c
+Robert
