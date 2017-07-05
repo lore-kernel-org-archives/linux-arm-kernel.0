@@ -1,70 +1,36 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 5 Jul 2017 21:27:57 +0900
-Subject: [PATCH v3 2/2] thermal: uniphier: add UniPhier thermal driver
-In-Reply-To: <CAK7LNASfco5oj8pLDykqq_xFsx4P0qjR1CuXsbF0n-1v0PBGKg@mail.gmail.com>
-References: <1499255419-31684-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1499255419-31684-3-git-send-email-hayashi.kunihiko@socionext.com>
- <CAK7LNASfco5oj8pLDykqq_xFsx4P0qjR1CuXsbF0n-1v0PBGKg@mail.gmail.com>
-Message-ID: <CAK7LNAQgPEoNDTL-Er0bKSVwmNmjyvwz2BcVSvNONFj9-6499Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 5 Jul 2017 14:31:38 +0200
+Subject: [GIT PULL 5/7] ARM: SoC driver updates
+In-Reply-To: <CA+55aFyn0QFR3DYYaP2tOgxwYPzRgHfCmJ2fVXinZKsx_F8fBQ@mail.gmail.com>
+References: <CAK8P3a0Pizf3ZBjG7Sn2BB_g+wtewz-CtJnOU5voONGvWS=EGA@mail.gmail.com>
+ <CA+55aFyn0QFR3DYYaP2tOgxwYPzRgHfCmJ2fVXinZKsx_F8fBQ@mail.gmail.com>
+Message-ID: <CAK8P3a0FhDgP8foc2EEmgA3g69SSXgPaZmt3bCW538gWKwWrBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-07-05 21:20 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> 2017-07-05 20:50 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+On Tue, Jul 4, 2017 at 11:53 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Tue, Jul 4, 2017 at 7:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>  create mode 100644 drivers/soc/actions/Kconfig
+>>  create mode 100644 drivers/soc/actions/Makefile
+>>  create mode 100644 drivers/soc/actions/owl-sps-helper.c
+>>  create mode 100644 drivers/soc/actions/owl-sps.c
 >
->> +
->> +#define TMOD                           0x0928
->> +#define TMOD_MASK                      GENMASK(9, 0)
->> +
->  [ snip ]
->> +
->> +       /*
->> +        * The bit[8:0] of TMOD register represents 2's complement value
->> +        * of temperature in Celsius. Since bit8 of TMOD shows a sign bit,
->> +        * 32bit temperature value is obtained by sign extension.
->> +        */
->
->
-> Apparently, this comment does not match your code:
->
->      #define TMOD_MASK                      GENMASK(9, 0)
->
->
-> TMOD_MASK is indicating bit[9:0].
->
->
->
-> Digging into the patch history, now I understood what happened.
->
->
->
-> In v1, you described
-> #define TMOD_MASK         0x1ff
->
-> This was correct.
->
->
-> In v2, you converted it into
-> #define TMOD_MASK          GENMASK(9, 0)
->
-> This was misconversion.  It should be GENMASK(8, 0)
->
->
->
-> Anyway, TMOD_MASK is not used any more.
->
->
->> +       *out_temp = sign_extend32(temp, 8) * 1000;
->
->
-> Why magic number here?
->
->    /* MSB of the TMOD field is a sign bit */
->    *out_temp = sign_extend32(temp, TMOD_WIDTH) * 1000;
+> You already had these in the platform updates.
 
-No.    sign_extend32(temp, TMOD_WIDTH - 1) or
-       sign_extend32(temp, TMOD_MSB)  or whatever.
+Yes, that was intentional. We had not originally decided which branch to send
+first, so I asked Andreas to include the same commits in both branches.
 
--- 
-Best Regards
-Masahiro Yamada
+The SMP support in arch/arm/mach-actions has a build-time dependency
+on the code, so it needed to be in there, and the drivers branch simply
+includes all the drivers/*/ changes.
+
+In the past I sometimes generated the log in the pull request to match what
+you are expected to see in the real merge, instead of the diff against mainline,
+but now I only do that in case we have to do a backmerge for some reason
+(most of the time we can avoid those, I think this time one of the pull requests
+had a backmerge of 4.12-rc1..4.12-rc2).
+
+Let me know if you would rather have us handle this differently.
+
+      Arnd
