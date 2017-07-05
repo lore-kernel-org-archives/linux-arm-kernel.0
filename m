@@ -1,97 +1,94 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 5 Jul 2017 22:39:19 +0200
-Subject: [PATCH v9 0/3] Tango PCIe controller support
-In-Reply-To: <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
- <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
- <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <5a1207cb-31fd-6b85-86af-8c37bd57ad4f@free.fr>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 5 Jul 2017 23:13:27 +0200
+Subject: [PATCH] rtc: brcmstb-waketimer: fix settime function
+In-Reply-To: <20170628200839.3114345-1-arnd@arndb.de>
+References: <20170628200839.3114345-1-arnd@arndb.de>
+Message-ID: <20170705211327.guccztud22hcmfjy@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2017 20:03, Bjorn Helgaas wrote:
+Hi,
 
-> On Wed, Jul 05, 2017 at 12:55:37AM +0200, Mason wrote:
->
->> On 04/07/2017 22:24, Bjorn Helgaas wrote:
->>
->>> I made the trivial changes I mentioned, added a dependency on
->>> CONFIG_BROKEN (for the config/MMIO muxing issue), and put these on
->>> pci/host-tango.  I can't build or test this, so I probably broke
->>> something in the process.  I think the combination of the boot-time
->>> warning, the taint, and CONFIG_BROKEN is a reasonable amount of
->>> warning that a user should expect issues.
->>>
->>> Can you take a look and see if it works for you?
->>>
->>> https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-tango
->>
->> Thanks. I'll take it for a spin ASAP.
->>
->> TAINT_CRAP... Smirk. I didn't see that one in the docs:
->> https://www.kernel.org/doc/html/latest/admin-guide/tainted-kernels.html
->>
->> Oh wait... TAINT_CRAP is "C" => a staging driver has been loaded
+On 28/06/2017 at 22:07:34 +0200, Arnd Bergmann wrote:
+> gcc warns about an unused variable in the new driver:
 > 
-> I wish it had a less pejorative, more descriptive name.  But it seems like
-> the closest to this situation.
-
-Maybe it is not too late to submit a patch to Linus
-renaming TAINT_CRAP?
-
-Here are a few candidates, off the top of my head:
-
-TAINT_STAGING
-TAINT_STAGING_DRIVER
-TAINT_BROKEN_HW
-TAINT_BROKEN_HARDWARE
-TAINT_USE_AT_YOUR_OWN_RISK
-
->> The one issue I anticipate with "depends on BROKEN" is
->> when I add support for revision 2, which isn't broken.
+> drivers/rtc/rtc-brcmstb-waketimer.c: In function 'brcmstb_waketmr_settime':
+> drivers/rtc/rtc-brcmstb-waketimer.c:142:6: error: unused variable 'ret' [-Werror=unused-variable]
 > 
-> How about this:
+> The same function also doesn't handle overflow correctly, this makes
+> it return -EINVAL when passed a time that doesn't fit within the
+> range of the register.
 > 
->   - Rename PCIE_TANGO to PCIE_TANGO_REV1
->   - PCIE_TANGO_REV1 depends on BROKEN
->   - Add rev2 support later, enabled by PCIE_TANGO
->   - PCIE_TANGO_REV1 depends on PCIE_TANGO && BROKEN
+> Fixes: 9f4ad359c801 ("rtc: brcmstb-waketimer: Add Broadcom STB wake-timer")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/rtc/rtc-brcmstb-waketimer.c | 19 ++++++++++++-------
+>  1 file changed, 12 insertions(+), 7 deletions(-)
 > 
-> I updated pci/host-tango along these lines (without rev2 support,
-> obviously).
 
-And support for REV1 wouldn't be compiled in, unless
-BROKEN is selected? Yes, I think that could fly.
+I've squashed it in the original commit, I hope this is fine for you.
 
-Don't you think the naming should follow the DT
-convention of using the first SoC embedding the
-IP (for the compatible string) ?
-
-PCIE_TANGO_REV1 vs PCIE_TANGO_SMP8759
-
-> I forgot to ask for a MAINTAINERS update.  Can you send that, too,
-> please?
-
-There's a "catch-all" rule for everything tango-related:
-
-ARM/TANGO ARCHITECTURE
-M:	Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-L:	linux-arm-kernel at lists.infradead.org
-S:	Maintained
-N:	tango
-
-Is that enough?
-
-> Which reminds me -- are these two addreses
+> diff --git a/drivers/rtc/rtc-brcmstb-waketimer.c b/drivers/rtc/rtc-brcmstb-waketimer.c
+> index 5dea6d0627d8..796ac792a381 100644
+> --- a/drivers/rtc/rtc-brcmstb-waketimer.c
+> +++ b/drivers/rtc/rtc-brcmstb-waketimer.c
+> @@ -138,10 +138,12 @@ static int brcmstb_waketmr_settime(struct device *dev,
+>  				   struct rtc_time *tm)
+>  {
+>  	struct brcmstb_waketmr *timer = dev_get_drvdata(dev);
+> -	unsigned long sec;
+> -	int ret;
+> +	time64_t sec;
+> +
+> +	sec = rtc_tm_to_time64(tm);
+>  
+> -	rtc_tm_to_time(tm, &sec);
+> +	if (sec > U32_MAX || sec < 0)
+> +		return -EINVAL;
+>  
+>  	writel_relaxed(sec, timer->base + BRCMSTB_WKTMR_COUNTER);
+>  
+> @@ -152,14 +154,14 @@ static int brcmstb_waketmr_getalarm(struct device *dev,
+>  				    struct rtc_wkalrm *alarm)
+>  {
+>  	struct brcmstb_waketmr *timer = dev_get_drvdata(dev);
+> -	unsigned long sec;
+> +	time64_t sec;
+>  	u32 reg;
+>  
+>  	sec = readl_relaxed(timer->base + BRCMSTB_WKTMR_ALARM);
+>  	if (sec != 0) {
+>  		/* Alarm is enabled */
+>  		alarm->enabled = 1;
+> -		rtc_time_to_tm(sec, &alarm->time);
+> +		rtc_time64_to_tm(sec, &alarm->time);
+>  	}
+>  
+>  	reg = readl_relaxed(timer->base + BRCMSTB_WKTMR_EVENT);
+> @@ -172,13 +174,16 @@ static int brcmstb_waketmr_setalarm(struct device *dev,
+>  				     struct rtc_wkalrm *alarm)
+>  {
+>  	struct brcmstb_waketmr *timer = dev_get_drvdata(dev);
+> -	unsigned long sec;
+> +	time64_t sec;
+>  
+>  	if (alarm->enabled)
+> -		rtc_tm_to_time(&alarm->time, &sec);
+> +		sec = rtc_tm_to_time64(&alarm->time);
+>  	else
+>  		sec = 0;
+>  
+> +	if (sec > U32_MAX || sec < 0)
+> +		return -EINVAL;
+> +
+>  	brcmstb_waketmr_set_alarm(timer, sec);
+>  
+>  	return 0;
+> -- 
+> 2.9.0
 > 
->   Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->   Mason <slash.tmp@free.fr>
-> 
-> different names for the same person?  Conversations are easier for me
-> if I can keep who's who straight :)
 
-Well, there are many voices inside my head, but yes,
-respectively professional and personal addresses.
-
-Regards.
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
