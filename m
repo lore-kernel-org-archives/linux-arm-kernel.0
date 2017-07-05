@@ -1,15 +1,15 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 5 Jul 2017 11:41:37 +0200
-Subject: [PATCH] arm64: dts: r8a7795: Add DRIF support
-In-Reply-To: <20170623091320.12664-1-ramesh.shanmugasundaram@bp.renesas.com>
-References: <20170623091320.12664-1-ramesh.shanmugasundaram@bp.renesas.com>
-Message-ID: <CAMuHMdXL8jFmBqV7kro60uXc9gn_d4hr=W8CZ23OSmxDBEUkiA@mail.gmail.com>
+Date: Wed, 5 Jul 2017 11:41:54 +0200
+Subject: [PATCH] arm64: dts: r8a7796: Add DRIF support
+In-Reply-To: <20170627125438.44491-1-ramesh.shanmugasundaram@bp.renesas.com>
+References: <20170627125438.44491-1-ramesh.shanmugasundaram@bp.renesas.com>
+Message-ID: <CAMuHMdX4T8p0rNzN8_tuobJ3AkQyrbJ9jh3uLr6Bx4wA=01tSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 11:13 AM, Ramesh Shanmugasundaram
+On Tue, Jun 27, 2017 at 2:54 PM, Ramesh Shanmugasundaram
 <ramesh.shanmugasundaram@bp.renesas.com> wrote:
-> Adds the DRIF controller nodes for r8a7795.
+> Adds the DRIF controller nodes for r8a7796.
 >
 > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 
