@@ -1,64 +1,68 @@
-From: hugues.fruchet@st.com (Hugues FRUCHET)
-Date: Wed, 5 Jul 2017 14:48:15 +0000
-Subject: [PATCH v2 1/7] DT bindings: add bindings for ov965x camera module
-In-Reply-To: <20170705140305.pixlhd65xu6g3nlf@rob-hp-laptop>
-References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
- <1499073368-31905-2-git-send-email-hugues.fruchet@st.com>
- <20170705140305.pixlhd65xu6g3nlf@rob-hp-laptop>
-Message-ID: <6fa2e20e-ac19-0296-d481-f0cb4aa4a231@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 5 Jul 2017 16:55:53 +0200
+Subject: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
+In-Reply-To: <TY1PR06MB0702B8D1C817F6C3CBD93D99B7D40@TY1PR06MB0702.apcprd06.prod.outlook.com>
+References: <1499259711-56175-1-git-send-email-biju.das@bp.renesas.com>
+ <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdVMunZ0trcNmMg4KkEd+d88foep7C0kU=yLQNk5JojosA@mail.gmail.com>
+ <TY1PR06MB0702B8D1C817F6C3CBD93D99B7D40@TY1PR06MB0702.apcprd06.prod.outlook.com>
+Message-ID: <CAMuHMdUXxHU8JaO0riJ7h7hJpCwAw27titTfo3Ox6CqO3i8E9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chris,
 
-On 07/05/2017 04:03 PM, Rob Herring wrote:
-> On Mon, Jul 03, 2017 at 11:16:02AM +0200, Hugues Fruchet wrote:
->> From: "H. Nikolaus Schaller" <hns@goldelico.com>
+On Wed, Jul 5, 2017 at 3:51 PM, Chris Paterson
+<Chris.Paterson2@renesas.com> wrote:
+>> From: geert.uytterhoeven at gmail.com
+>> [mailto:geert.uytterhoeven at gmail.com] On Behalf Of Geert Uytterhoeven
+>> Sent: 05 July 2017 14:47
+>> On Wed, Jul 5, 2017 at 3:01 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+>> > Add support for Gigabit Ethernet E-MAC on r8a7743 (RZ/G1M) SoC.
+>> > Renesas RZ/G1M (R8A7743) SoC Ethernet AVB IP is identical to the R-Car
+>> > Gen2 family.
+>> >
+>> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+>> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 >>
->> This adds documentation of device tree bindings
->> for the OV965X family camera sensor module.
+>> Thanks for your patch!
 >>
->> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
->> ---
->>   .../devicetree/bindings/media/i2c/ov965x.txt       | 45 ++++++++++++++++++++++
->>   1 file changed, 45 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/media/i2c/ov965x.txt
+>> > --- a/drivers/net/ethernet/renesas/ravb_main.c
+>> > +++ b/drivers/net/ethernet/renesas/ravb_main.c
+>> > @@ -1869,6 +1869,7 @@ static int ravb_mdio_release(struct ravb_private
+>> > *priv)  }
+>> >
+>> >  static const struct of_device_id ravb_match_table[] = {
+>> > +       { .compatible = "renesas,etheravb-r8a7743", .data = (void
+>> > + *)RCAR_GEN2 },
+>> >         { .compatible = "renesas,etheravb-r8a7790", .data = (void
+>> *)RCAR_GEN2 },
+>> >         { .compatible = "renesas,etheravb-r8a7794", .data = (void
+>> *)RCAR_GEN2 },
+>> >         { .compatible = "renesas,etheravb-rcar-gen2", .data = (void
+>> > *)RCAR_GEN2 },
 >>
->> diff --git a/Documentation/devicetree/bindings/media/i2c/ov965x.txt b/Documentation/devicetree/bindings/media/i2c/ov965x.txt
->> new file mode 100644
->> index 0000000..4ceb727
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/media/i2c/ov965x.txt
->> @@ -0,0 +1,45 @@
->> +* Omnivision OV9650/9652/9655 CMOS sensor
->> +
->> +The Omnivision OV965x sensor support multiple resolutions output, such as
->> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
->> +output format.
->> +
->> +Required Properties:
->> +- compatible: should be one of
->> +	"ovti,ov9650"
->> +	"ovti,ov9652"
->> +	"ovti,ov9655"
->> +- clocks: reference to the mclk input clock.
->> +
->> +Optional Properties:
->> +- resetb-gpios: reference to the GPIO connected to the RESETB pin, if any,
->> +		polarity is active low.
-> 
-> reset-gpios
-> 
->> +- pwdn-gpios: reference to the GPIO connected to the PWDN pin, if any,
->> +		polarity is active high.
-> 
-> powerdown-gpios
-> 
-> Both are standardish names for such signals.
-> 
-> Rob
+>> As Sergei already mentioned, a driver update is not needed due to the
+>> presence of family-specific compatible values.
+>> Please drop that part, and you can add my:
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Should the other compatible values (r8a7790, 94 etc) be removed then? Or are they needed for backwards compatibility?
 
-Thanks Rob, I will fix,
-Hugues.
+The other compatible values in DT bindings and DTS files should be kept,
+to allow handling of SoC-specific quirks if/when they are ever detected.
 
-> 
+The other compatible values in the driver should be kept for
+backwards-compatibility with old DTB files that lack the (newer)
+family-specific compatible values.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
