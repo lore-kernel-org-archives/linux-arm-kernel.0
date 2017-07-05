@@ -1,47 +1,55 @@
 From: joe@perches.com (Joe Perches)
-Date: Wed,  5 Jul 2017 13:02:11 -0700
-Subject: [PATCH 02/18] ARM: KVM: Move asmlinkage before type
-In-Reply-To: <cover.1499284835.git.joe@perches.com>
-References: <cover.1499284835.git.joe@perches.com>
-Message-ID: <005b8e120650c6a13b541e420f4e3605603fe9e6.1499284835.git.joe@perches.com>
+Date: Wed,  5 Jul 2017 13:02:09 -0700
+Subject: [PATCH 00/18] treewide: Move storage class before return type
+Message-ID: <cover.1499284835.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asmlinkage is either 'extern "C"' or blank.
+Move the inline/asmlinkage keywords before the return types
+Add a checkpatch test for this too.
 
-Move the uses of asmlinkage before the return types to be similar
-to the rest of the kernel.
+Joe Perches (18):
+  checkpatch: improve the STORAGE_CLASS test
+  ARM: KVM: Move asmlinkage before type
+  ARM: HP Jornada 7XX: Move inline before return type
+  CRIS: gpio: Move inline before return type
+  FRV: tlbflush: Move asmlinkage before return type
+  ia64: Move inline before return type
+  ia64: sn: pci: Move inline before type
+  m68k: coldfire: Move inline before return type
+  MIPS: SMP: Move asmlinkage before return type
+  sh: Move inline before return type
+  x86/efi: Move asmlinkage before return type
+  drivers: s390: Move static and inline before return type
+  drivers: tty: serial: Move inline before return type
+  USB: serial: safe_serial: Move __inline__ before return type
+  video: fbdev: intelfb: Move inline before return type
+  video: fbdev: omap: Move inline before return type
+  ARM: samsung: usb-ohci: Move inline before return type
+  ALSA: opl4: Move inline before return type
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/include/asm/kvm_hyp.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/kvm_hyp.h                 |  8 ++++----
+ arch/arm/mach-sa1100/jornada720_ssp.c          |  2 +-
+ arch/cris/arch-v10/drivers/gpio.c              |  4 ++--
+ arch/frv/include/asm/tlbflush.h                |  8 ++++----
+ arch/ia64/kernel/mca.c                         |  2 +-
+ arch/ia64/sn/pci/pcibr/pcibr_ate.c             |  2 +-
+ arch/ia64/sn/pci/tioce_provider.c              |  4 ++--
+ arch/m68k/coldfire/intc-simr.c                 |  4 ++--
+ arch/mips/include/asm/smp.h                    |  2 +-
+ arch/sh/mm/cache-sh5.c                         |  2 +-
+ arch/x86/include/asm/efi.h                     |  4 ++--
+ drivers/s390/net/ctcm_main.c                   |  2 +-
+ drivers/s390/net/qeth_l3_main.c                |  2 +-
+ drivers/tty/serial/ioc3_serial.c               |  4 ++--
+ drivers/tty/serial/ioc4_serial.c               |  4 ++--
+ drivers/usb/serial/safe_serial.c               |  2 +-
+ drivers/video/fbdev/intelfb/intelfbdrv.c       |  2 +-
+ drivers/video/fbdev/omap/lcdc.c                |  6 +++---
+ include/linux/platform_data/usb-ohci-s3c2410.h |  2 +-
+ scripts/checkpatch.pl                          | 12 ++++++++++--
+ sound/drivers/opl4/opl4_lib.c                  |  2 +-
+ 21 files changed, 44 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index 58508900c4bb..14b5903f0224 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -110,8 +110,8 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
- void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
- 
--void asmlinkage __vfp_save_state(struct vfp_hard_struct *vfp);
--void asmlinkage __vfp_restore_state(struct vfp_hard_struct *vfp);
-+asmlinkage void __vfp_save_state(struct vfp_hard_struct *vfp);
-+asmlinkage void __vfp_restore_state(struct vfp_hard_struct *vfp);
- static inline bool __vfp_enabled(void)
- {
- 	return !(read_sysreg(HCPTR) & (HCPTR_TCP(11) | HCPTR_TCP(10)));
-@@ -120,8 +120,8 @@ static inline bool __vfp_enabled(void)
- void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt);
- void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
- 
--int asmlinkage __guest_enter(struct kvm_vcpu *vcpu,
-+asmlinkage int __guest_enter(struct kvm_vcpu *vcpu,
- 			     struct kvm_cpu_context *host);
--int asmlinkage __hyp_do_panic(const char *, int, u32);
-+asmlinkage int __hyp_do_panic(const char *, int, u32);
- 
- #endif /* __ARM_KVM_HYP_H__ */
 -- 
 2.10.0.rc2.1.g053435c
