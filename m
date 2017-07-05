@@ -1,36 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 5 Jul 2017 14:31:38 +0200
-Subject: [GIT PULL 5/7] ARM: SoC driver updates
-In-Reply-To: <CA+55aFyn0QFR3DYYaP2tOgxwYPzRgHfCmJ2fVXinZKsx_F8fBQ@mail.gmail.com>
-References: <CAK8P3a0Pizf3ZBjG7Sn2BB_g+wtewz-CtJnOU5voONGvWS=EGA@mail.gmail.com>
- <CA+55aFyn0QFR3DYYaP2tOgxwYPzRgHfCmJ2fVXinZKsx_F8fBQ@mail.gmail.com>
-Message-ID: <CAK8P3a0FhDgP8foc2EEmgA3g69SSXgPaZmt3bCW538gWKwWrBw@mail.gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 5 Jul 2017 15:33:05 +0300
+Subject: [PATCH] thermal: imx: interpret fsl,tempmon-data through nvmem
+In-Reply-To: <20170704185400.GB18084@localhost.localdomain>
+References: <d1a8ec1ef73aefe6018f6a4923bd04b3ac34a5d4.1497879110.git.leonard.crestez@nxp.com>
+ <20170704185400.GB18084@localhost.localdomain>
+Message-ID: <1499257985.23291.7.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 4, 2017 at 11:53 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Tue, Jul 4, 2017 at 7:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>  create mode 100644 drivers/soc/actions/Kconfig
->>  create mode 100644 drivers/soc/actions/Makefile
->>  create mode 100644 drivers/soc/actions/owl-sps-helper.c
->>  create mode 100644 drivers/soc/actions/owl-sps.c
->
-> You already had these in the platform updates.
+On Tue, 2017-07-04 at 11:54 -0700, Eduardo Valentin wrote:
+> On Mon, Jun 19, 2017 at 04:40:43PM +0300, Leonard Crestez wrote:
+> > 
+> > On imx6sx accessing the ocotp memory area directly is wrong because the
+> > ocotp clock needs to be enabled first. Fix this by reinterpreting the
+> > fsl,tempmon-data phandle as a reference to a nvmem_device and doing all
+> > the read through that.
+> > 
+> > @@ -347,29 +348,39 @@ static struct thermal_zone_device_ops imx_tz_ops = {
+> > ?static int imx_get_sensor_data(struct platform_device *pdev)
+> > ?{
+> > ?	struct imx_thermal_data *data = platform_get_drvdata(pdev);
+> > -	struct regmap *map;
+> > +	struct device_node *ocotp_np;
+> > +	struct nvmem_device *ocotp;
+> > ?	int t1, n1;
+> > ?	int ret;
+> > ?	u32 val;
+> > ?	u64 temp64;
+> > ?
+> > -	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> > -					??????"fsl,tempmon-data");
+> > -	if (IS_ERR(map)) {
+> > -		ret = PTR_ERR(map);
+> > -		dev_err(&pdev->dev, "failed to get sensor regmap: %d\n", ret);
+> > +	ocotp_np = of_parse_phandle(pdev->dev.of_node, "fsl,tempmon-data", 0);
+> > +	if (IS_ERR(ocotp_np)) {
+> > +		ret = PTR_ERR(ocotp_np);
+> > +		dev_err(&pdev->dev, "failed to parse fsl,tempmon-data phandle: %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +	ocotp = of_nvmem_device_phandle_get(ocotp_np);
+> > +	of_node_put(ocotp_np);
+> > +	if (IS_ERR(ocotp)) {
+> > +		ret = PTR_ERR(ocotp);
+> > +		if (ret != -EPROBE_DEFER)
+> > +			dev_err(&pdev->dev, "failed to get fsl,tempmon-data nvmem device: %d\n", ret);
+> > ?		return ret;
+> > ?	}
+> > ?
+> > @@ -404,10 +415,11 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+> > ?	data->c2 = n1 * data->c1 + 1000 * t1;
+> > ?
+> > ?	/* use OTP for thermal grade */
+> > -	ret = regmap_read(map, OCOTP_MEM0, &val);
+> > -	if (ret) {
+> > -		dev_err(&pdev->dev, "failed to read temp grade: %d\n", ret);
+> > -		return ret;
 
-Yes, that was intentional. We had not originally decided which branch to send
-first, so I asked Andreas to include the same commits in both branches.
+> I see a few other occurences of regmap_read() in this driver, for
+> example, inside imx_get_temp(). Do they also get affect by the reported
+> bug? Should they be replaced with nvmem_device_read() too?
 
-The SMP support in arch/arm/mach-actions has a build-time dependency
-on the code, so it needed to be in there, and the drivers branch simply
-includes all the drivers/*/ changes.
+No, most of the code uses regmap to read from the tempmon device
+itself.
 
-In the past I sometimes generated the log in the pull request to match what
-you are expected to see in the real merge, instead of the diff against mainline,
-but now I only do that in case we have to do a backmerge for some reason
-(most of the time we can avoid those, I think this time one of the pull requests
-had a backmerge of 4.12-rc1..4.12-rc2).
+It is only imx_get_sensor_data which uses syscon_regmap_lookup to fetch
+the regmap for another device (ocotp) in order to read calibration data
+and thermal grading at probe time. Perhaps this function should be
+renamed to something like imx_tempmon_init_calib.
 
-Let me know if you would rather have us handle this differently.
+The problem is that on newer imx SOCs reading directly from OCOTP like
+that doesn't work if the ocotp clock is not enabled.
 
-      Arnd
+--
+Regards,
+Leonard
