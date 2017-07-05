@@ -1,61 +1,66 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Wed, 05 Jul 2017 16:09:43 +0900
-Subject: [PATCH v4] drm/exynos/dsi: Remove error handling for
- bridge_node DT parsing
-In-Reply-To: <1498042303-5673-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <CGME20170621105143epcas5p4b5c7fbbc0263c6190e69df6822e63699@epcas5p4.samsung.com>
- <1498042303-5673-1-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <f27e4099-ee20-9a2c-6f71-02c209aa18d1@samsung.com>
+From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
+Date: Wed, 5 Jul 2017 14:58:55 +0800
+Subject: [PATCHv4 1/9] irqchip/ls-scfg-msi: fix typo of MSI compatible strings
+Message-ID: <1499237943-24203-1-git-send-email-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Inki,
+From: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-Could you check this patch? :D
+The patch is to fix typo of the Layerscape SCFG MSI dts compatible
+strings. "1" is replaced by "l".
 
-Best regards,
-Hoegeun
+Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+---
+v4-v1:
+ - None
 
-On 06/21/2017 07:51 PM, Hoegeun Kwon wrote:
-> Remove the error handling of bridge_node because the bridge_node is
-> optional.
->
-> For example, In case of Exynos SoC, a bridge device such as mDNIe and
-> MIC could be placed between Display Controller and MIPI DSI device but
-> the bridge device is optional.
->
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-> ---
->
-> Hi all,
->
-> Thanks for Krzysztof's advice.
->
-> Changes for V4:
-> - Fixed the word('optional') from commit message.
->
-> Changes for V3:
-> - Removed the word('required') from commit message.
->
-> Changes for V2:
-> - Modified the commit message in more detail than before.
->
-> Best regards,
-> Hoegeun
->
->   drivers/gpu/drm/exynos/exynos_drm_dsi.c | 2 --
->   1 file changed, 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> index a11b795..6ee0dac 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> @@ -1651,8 +1651,6 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
->   		return ret;
->   
->   	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
-> -	if (!dsi->bridge_node)
-> -		return -EINVAL;
->   
->   	return 0;
->   }
+ .../devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt    | 6 +++---
+ drivers/irqchip/irq-ls-scfg-msi.c                                   | 6 ++++--
+ 2 files changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+index 9e38949..2755cd1 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+@@ -4,8 +4,8 @@ Required properties:
+ 
+ - compatible: should be "fsl,<soc-name>-msi" to identify
+ 	      Layerscape PCIe MSI controller block such as:
+-              "fsl,1s1021a-msi"
+-              "fsl,1s1043a-msi"
++              "fsl,ls1021a-msi"
++              "fsl,ls1043a-msi"
+ - msi-controller: indicates that this is a PCIe MSI controller node
+ - reg: physical base address of the controller and length of memory mapped.
+ - interrupts: an interrupt to the parent interrupt controller.
+@@ -23,7 +23,7 @@ MSI controller node
+ Examples:
+ 
+ 	msi1: msi-controller at 1571000 {
+-		compatible = "fsl,1s1043a-msi";
++		compatible = "fsl,ls1043a-msi";
+ 		reg = <0x0 0x1571000 0x0 0x8>,
+ 		msi-controller;
+ 		interrupts = <0 116 0x4>;
+diff --git a/drivers/irqchip/irq-ls-scfg-msi.c b/drivers/irqchip/irq-ls-scfg-msi.c
+index 02cca74c..cef67cc 100644
+--- a/drivers/irqchip/irq-ls-scfg-msi.c
++++ b/drivers/irqchip/irq-ls-scfg-msi.c
+@@ -219,8 +219,10 @@ static int ls_scfg_msi_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id ls_scfg_msi_id[] = {
+-	{ .compatible = "fsl,1s1021a-msi", },
+-	{ .compatible = "fsl,1s1043a-msi", },
++	{ .compatible = "fsl,1s1021a-msi", }, /* a typo */
++	{ .compatible = "fsl,1s1043a-msi", }, /* a typo */
++	{ .compatible = "fsl,ls1021a-msi", },
++	{ .compatible = "fsl,ls1043a-msi", },
+ 	{},
+ };
+ 
+-- 
+2.1.0.27.g96db324
