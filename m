@@ -1,47 +1,51 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 5 Jul 2017 12:18:01 +0200
-Subject: [PATCH v2] arm64: dts: r8a7795: add IMR-LX4 support
-In-Reply-To: <20170627173152.532417992@cogentembedded.com>
-References: <20170627173152.532417992@cogentembedded.com>
-Message-ID: <CAMuHMdV9o0HhZgJS2cyWPmsdqgRmXpjSfKrKQMN=x5VTpXZoUw@mail.gmail.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Wed, 5 Jul 2017 18:18:56 +0800
+Subject: [PATCH 2/2] misc: added Spreadtrum's radio driver
+In-Reply-To: <CAK8P3a0i-H=uU=9DNJbtK2EMX2GJ5cL_TW0roSHpa6tHTcZ2sg@mail.gmail.com>
+References: <20170704101508.30946-1-chunyan.zhang@spreadtrum.com>
+ <20170704101508.30946-3-chunyan.zhang@spreadtrum.com>
+ <CAK8P3a0i-H=uU=9DNJbtK2EMX2GJ5cL_TW0roSHpa6tHTcZ2sg@mail.gmail.com>
+Message-ID: <CAAfSe-vj76psYw2uzC2w0pASRT-FGHqXph0zWE_3tmMVzMHKvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On 4 July 2017 at 18:51, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tue, Jul 4, 2017 at 12:15 PM, Chunyan Zhang
+> <chunyan.zhang@spreadtrum.com> wrote:
+>> This patch added FM radio driver for Spreadtrum's SC2342, which's
+>> a WCN SoC, also added a new directory for Spreadtrum's WCN SoCs.
+>>
+>> Signed-off-by: Songhe Wei <songhe.wei@spreadtrum.com>
+>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>
+> (adding linux-media folks to Cc)
 
-On Tue, Jun 27, 2017 at 7:30 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Describe the IMR-LX4 devices in the R8A7795 device tree.
+(You forgot to add them in :))
+
 >
-> Based on the original (and large) patch by Konstantin Kozhevnikov
-> <Konstantin.Kozhevnikov@cogentembedded.com>.
+> Hi Chunyan,
+
+Hi Arnd,
+
 >
-> Signed-off-by: Konstantin Kozhevnikov <Konstantin.Kozhevnikov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Thanks for posting this for inclusion as Greg asked for. I'm not sure what
+> the policy is for new radio drivers, but I assume this would have to go
+> to drivers/staging/media/ as it is a driver for hardware that fits into
+> drivers/media/radio but doesn't use the respective APIs.
+
+Ok, I agree to let it go to drivers/staging/media/.
+
+Like I mentioned, SC2342 includes many functions, this patch is only
+adding FM radio function included in SC2342 to the kernel tree.  So I
+figure that its lifetime probably will not be too long, will remove it
+from the kernel tree when we have a clean enough version of the whole
+SC2342 drivers for the official upstreaming.
+
+Thanks,
+Chunyan
+
 >
+>         Arnd
 > ---
-> This patch is against the 'renesas-devel-20170626-v4.12-rc7' tag of Simon
-> Horman's 'renesas.git' repo.
+> end of message, full patch quoted for reference below
 >
-> The IMR-LX4 bindings were documented in the IMR driver patch and ACK'ed by Rob
-> Herring, so I don't expect them to change...
->
-> Changes in version 2:
-> - added SoC specific "compatible" prop values;
-> - refreshed the patch;
-> - added Geert's tag.
-
-In the mean time, r8a7795.dtsi gained reset controller support, so
-you should add "resets" properties were appropriate.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
