@@ -1,82 +1,51 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 5 Jul 2017 13:03:59 -0500
-Subject: [PATCH v9 0/3] Tango PCIe controller support
-In-Reply-To: <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
- <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
-Message-ID: <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Jul 2017 21:32:54 +0200
+Subject: [PATCH] dt-bindings: amlogic: add unstable statement
+In-Reply-To: <20170705142015.tmlmes5lobadndsy@rob-hp-laptop>
+References: <20170628145343.25443-1-khilman@baylibre.com>
+ <20170705142015.tmlmes5lobadndsy@rob-hp-laptop>
+Message-ID: <20170705193254.ulpoduoqlqf4ttkj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 12:55:37AM +0200, Mason wrote:
-> On 04/07/2017 22:24, Bjorn Helgaas wrote:
+On Wed, Jul 05, 2017 at 09:20:15AM -0500, Rob Herring wrote:
+> On Wed, Jun 28, 2017 at 07:53:43AM -0700, Kevin Hilman wrote:
+> > Due to the lack of documentation on this SoC family, discovery of new
+> > features, and correcting of previous misunderstandings is expected, so
+> > it's unrealistic to expect any form of stable bindings for this SoC
+> > family.  Make that clear inthe binding documentation.
 > 
-> > On Tue, Jun 20, 2017 at 10:12:57AM +0200, Marc Gonzalez wrote:
-> >
-> >> Marc Z pointed out that posting partial series is not ideal.
-> >> Collect last-minute fixups into a single patch series.
-> >>
-> >> - Bump series to v9 to avoid any ambiguity
-> >> - Add Rob's Ack on patch 1
-> >>
-> >> Marc Gonzalez (3):
-> >>   PCI: Add DT binding for tango PCIe controller
-> >>   PCI: Add tango PCIe host bridge support
-> >>   PCI: Add tango MSI controller support
-> >>
-> >>  .../devicetree/bindings/pci/tango-pcie.txt         |  29 ++
-> >>  drivers/pci/host/Kconfig                           |   8 +
-> >>  drivers/pci/host/Makefile                          |   1 +
-> >>  drivers/pci/host/pcie-tango.c                      | 390 +++++++++++++++++++++
-> >>  include/linux/pci_ids.h                            |   2 +
-> >>  5 files changed, 430 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/pci/tango-pcie.txt
-> >>  create mode 100644 drivers/pci/host/pcie-tango.c
+> s/inthe/in the/
+> 
 > > 
-> > I made the trivial changes I mentioned, added a dependency on
-> > CONFIG_BROKEN (for the config/MMIO muxing issue), and put these on
-> > pci/host-tango.  I can't build or test this, so I probably broke
-> > something in the process.  I think the combination of the boot-time
-> > warning, the taint, and CONFIG_BROKEN is a reasonable amount of
-> > warning that a user should expect issues.
-> > 
-> > Can you take a look and see if it works for you?
-> > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-tango
+> > Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/amlogic.txt | 12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
 > 
-> Thanks. I'll take it for a spin ASAP.
-> 
-> TAINT_CRAP... Smirk. I didn't see that one in the docs:
-> https://www.kernel.org/doc/html/latest/admin-guide/tainted-kernels.html
-> 
-> Oh wait... TAINT_CRAP is "C" => a staging driver has been loaded
+> I've yet to see anyone remove an unstable tag and I'd rather see these 
+> for individual bindings than for the platform as a whole. In the end, 
+> it's a platform maintainers decision whether to accept compatibility 
+> breakage regardless of some text that probably no one reads.
 
-I wish it had a less pejorative, more descriptive name.  But it seems like
-the closest to this situation.
+So what is the policy exactly to decide whether this statement can be
+merged or not?
 
-> The one issue I anticipate with "depends on BROKEN" is
-> when I add support for revision 2, which isn't broken.
+We have all the issues mentionned above, no backing from the vendor,
+and yet, we were forced last year to bow down to one single "user"
+without a clear usage into supporting a stable ABI that we never
+really anticipated. How does that work exactly?
 
-How about this:
+Maxime
 
-  - Rename PCIE_TANGO to PCIE_TANGO_REV1
-  - PCIE_TANGO_REV1 depends on BROKEN
-  - Add rev2 support later, enabled by PCIE_TANGO
-  - PCIE_TANGO_REV1 depends on PCIE_TANGO && BROKEN
-
-I updated pci/host-tango along these lines (without rev2 support,
-obviously).
-
-I forgot to ask for a MAINTAINERS update.  Can you send that, too,
-please?
-
-Which reminds me -- are these two addreses
-
-  Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-  Mason <slash.tmp@free.fr>
-
-different names for the same person?  Conversations are easier for me
-if I can keep who's who straight :)
-
-Bjorn
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170705/3a5d9b5e/attachment.sig>
