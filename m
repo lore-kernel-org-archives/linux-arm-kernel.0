@@ -1,51 +1,27 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Wed, 5 Jul 2017 18:25:02 +0800
-Subject: [PATCH 0/2] add support for Spreadtrum's FM driver
-In-Reply-To: <20170704101508.30946-1-chunyan.zhang@spreadtrum.com>
-References: <20170704101508.30946-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170705102502.2295-1-chunyan.zhang@spreadtrum.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 5 Jul 2017 11:33:08 +0100
+Subject: [PATCH v2 0/3] Add R8A7743/SK-RZG1M PFC support
+In-Reply-To: <20170424061217.GC14843@verge.net.au>
+References: <20170420185132.258111787@cogentembedded.com>
+ <20170424061217.GC14843@verge.net.au>
+Message-ID: <20170705103308.GA29876@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[add linux-media list and Mauro Carvalho Chehab]
+On Mon, Apr 24, 2017 at 08:12:18AM +0200, Simon Horman wrote:
+> On Thu, Apr 20, 2017 at 09:51:32PM +0300, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> >    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+> > 'renesas-devel-20170420-v4.11-rc7' tag.  We're adding the R8A7743 PFC node
+> > and then describing the pins for SCIF0 and Ether devices declared earlier.
+> > These patches depend on the R8A7743 PFC suport in order to work properly.
+> 
+> Thanks. I have marked these as deferred pending acceptance of the PFC
+> driver changes. Please repost or otherwise let me know when dependency
+> is satisfied.
 
-According to GregKH's suggestion [1], we tried to simply sort out the
-FM driver source code which has been using in the internal projects.
+It appears that the driver changes have been acceptedi[1] so
+I have queued these up for v4.14.
 
-Hopes it can help for fixing the problem raised in [1].
-
-[1] https://lkml.org/lkml/2017/6/28/222
-
-Chunyan Zhang (2):
-  arm64: dts: add Spreadtrum's fm support
-  misc: added Spreadtrum's radio driver
-
- arch/arm64/boot/dts/sprd/sp9860g-1h10.dts      |    4 +
- drivers/misc/Kconfig                           |    1 +
- drivers/misc/Makefile                          |    1 +
- drivers/misc/sprd-wcn/Kconfig                  |   14 +
- drivers/misc/sprd-wcn/Makefile                 |    1 +
- drivers/misc/sprd-wcn/radio/Kconfig            |    8 +
- drivers/misc/sprd-wcn/radio/Makefile           |    2 +
- drivers/misc/sprd-wcn/radio/fmdrv.h            |  595 +++++++++++
- drivers/misc/sprd-wcn/radio/fmdrv_main.c       | 1245 ++++++++++++++++++++++++
- drivers/misc/sprd-wcn/radio/fmdrv_main.h       |  117 +++
- drivers/misc/sprd-wcn/radio/fmdrv_ops.c        |  447 +++++++++
- drivers/misc/sprd-wcn/radio/fmdrv_ops.h        |   17 +
- drivers/misc/sprd-wcn/radio/fmdrv_rds_parser.c |  753 ++++++++++++++
- drivers/misc/sprd-wcn/radio/fmdrv_rds_parser.h |  103 ++
- 14 files changed, 3308 insertions(+)
- create mode 100644 drivers/misc/sprd-wcn/Kconfig
- create mode 100644 drivers/misc/sprd-wcn/Makefile
- create mode 100644 drivers/misc/sprd-wcn/radio/Kconfig
- create mode 100644 drivers/misc/sprd-wcn/radio/Makefile
- create mode 100644 drivers/misc/sprd-wcn/radio/fmdrv.h
- create mode 100644 drivers/misc/sprd-wcn/radio/fmdrv_main.c
- create mode 100644 drivers/misc/sprd-wcn/radio/fmdrv_main.h
- create mode 100644 drivers/misc/sprd-wcn/radio/fmdrv_ops.c
- create mode 100644 drivers/misc/sprd-wcn/radio/fmdrv_ops.h
- create mode 100644 drivers/misc/sprd-wcn/radio/fmdrv_rds_parser.c
- create mode 100644 drivers/misc/sprd-wcn/radio/fmdrv_rds_parser.h
-
--- 
-2.7.4
+[1] https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg15744.html
