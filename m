@@ -1,58 +1,59 @@
-From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
-Date: Thu, 6 Jul 2017 17:39:44 +0800
-Subject: [PATCH] PCI: layerscape: Add support for ls2088a and ls1088a
-Message-ID: <1499333984-17668-1-git-send-email-Zhiqiang.Hou@nxp.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 6 Jul 2017 12:02:27 +0200
+Subject: [PATCH v2 1/6] serial: imx: only set DMA rx-ing when DMA starts
+In-Reply-To: <49bfa666-b036-3ed9-8209-9ea59468371b@collabora.com>
+References: <20170705130706.10388-1-romain.perier@collabora.com>
+ <20170705130706.10388-2-romain.perier@collabora.com>
+ <20170705132910.nmixhnh4l6h2hlga@pengutronix.de>
+ <49bfa666-b036-3ed9-8209-9ea59468371b@collabora.com>
+Message-ID: <20170706100227.gn3acq2ppdlofuj7@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On Thu, Jul 06, 2017 at 10:31:38AM +0200, Romain Perier wrote:
+> Hello,
+> 
+> 
+> Le 05/07/2017 ? 15:29, Uwe Kleine-K?nig a ?crit :
+> > Hello,
+> >
+> > On Wed, Jul 05, 2017 at 03:07:01PM +0200, Romain Perier wrote:
+> >> From: Nandor Han <nandor.han@ge.com>
+> >>
+> >> Avoid the situation when `dma_is_rxing` could incorrectly signal that
+> >> DMA RX channel is receiving data in case DMA preparation or sg mapping
+> >> fails.
+> >>
+> >> This commit fixes the issues by moving the assignment of dma_is_rxing
+> >> out of imx_disable_rx_int(), then the variable is set to 1 from
+> >> start_rx_dma() only when the preparation is correctly done.
+> > I'd write:
+> >
+> > 	There are a few issues with setting dma_is_rxing to 1 in
+> > 	imx_disable_rx_int:
+> >
+> > 	 - Currently always after imx_disable_rx_int() the function
+> > 	   start_rx_dma() is called. This dependency isn't obvious though.
+> > 	 - start_rx_dma() does error checking and might exit without enabling
+> > 	   DMA but keeping dma_is_rxing 1.
+> >
+> > 	So the more natural place for setting dma_is_rxing to 1 is in
+> > 	start_rx_dma after all errors are checked.
+> >
+> > If you use this, there is nothing left of Nandor Han's patch and you can
+> > drop his authorship.
+> >
+> > Best regards
+> > Uwe
+> >
+> Ok, will do. No other feedback for the rest of the series ? (just to
+> know if I send a v3 or If I wait a bit...)
 
-The ls1088a and ls2088a has the same PCIe controller, so the ls1088a
-will reuse the ls2088a's pcie compatible.
+I didn't come around looking in the patches I didn't comment yet.
 
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
- Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
- drivers/pci/dwc/pci-layerscape.c                         | 9 +++++++++
- 2 files changed, 10 insertions(+)
+Best regards
+Uwe
 
-diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-index ee1c72d5..cb735e1 100644
---- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-@@ -15,6 +15,7 @@ Required properties:
- - compatible: should contain the platform identifier such as:
-         "fsl,ls1021a-pcie", "snps,dw-pcie"
-         "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
-+        "fsl,ls2088a-pcie", "fsl,ls1088a-pcie"
-         "fsl,ls1046a-pcie"
- - reg: base addresses and lengths of the PCIe controller
- - interrupts: A list of interrupt outputs of the controller. Must contain an
-diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
-index 9bed3cd..0df8189 100644
---- a/drivers/pci/dwc/pci-layerscape.c
-+++ b/drivers/pci/dwc/pci-layerscape.c
-@@ -239,12 +239,21 @@ static struct ls_pcie_drvdata ls2080_drvdata = {
- 	.dw_pcie_ops = &dw_ls_pcie_ops,
- };
- 
-+static struct ls_pcie_drvdata ls2088_drvdata = {
-+	.lut_offset = 0x80000,
-+	.ltssm_shift = 0,
-+	.lut_dbg = 0x407fc,
-+	.ops = &ls_pcie_host_ops,
-+	.dw_pcie_ops = &dw_ls_pcie_ops,
-+};
-+
- static const struct of_device_id ls_pcie_of_match[] = {
- 	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
- 	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
- 	{ .compatible = "fsl,ls1046a-pcie", .data = &ls1046_drvdata },
- 	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
- 	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
-+	{ .compatible = "fsl,ls2088a-pcie", .data = &ls2088_drvdata },
- 	{ },
- };
- 
 -- 
-2.1.0.27.g96db324
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
