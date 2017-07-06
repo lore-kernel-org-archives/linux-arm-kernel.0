@@ -1,103 +1,179 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 6 Jul 2017 20:03:37 +0200
-Subject: v4.13-rc0 on nokia n900: spinlock bad magic
-Message-ID: <20170706180337.GA26875@amd>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Thu, 6 Jul 2017 11:14:00 -0700
+Subject: [PATCH 0/8] io-pgtable lock removal
+In-Reply-To: <20170706150838.GB15574@arm.com>
+References: <b7830be1-9a78-e29f-a29c-4798aaa28c0a@broadcom.com>
+ <cdc1799b-f142-09ed-a7e5-d7fd2e70268f@arm.com>
+ <e43ba1fe-696e-fabb-a800-52fadaa2fa93@broadcom.com>
+ <20170628114609.GD11053@arm.com>
+ <87d53115-3d80-5a3d-6632-c31986cb7018@broadcom.com>
+ <20170704173155.GN22175@arm.com>
+ <6814b246-22f0-bfaa-5002-a269b2735116@broadcom.com>
+ <2d5f5ef3-32b1-76c6-6869-ff980557f8e8@broadcom.com>
+ <20170705084143.GA9378@arm.com>
+ <5149280b-a214-249c-c5e2-3712b1f941d2@broadcom.com>
+ <20170706150838.GB15574@arm.com>
+Message-ID: <94ba5d4a-0dae-9394-79ef-90da86e49c86@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Will,
 
-I don't think this is new in v4.13, but perhaps someone knows how to
-debug it?
+On 7/6/17 8:08 AM, Will Deacon wrote:
+> Hi Ray,
+> 
+> Thanks for testing this, and sorry it didn't help.
+> 
+> On Wed, Jul 05, 2017 at 04:24:22PM -0700, Ray Jui wrote:
+>> On 7/5/17 1:41 AM, Will Deacon wrote:
+>>> On Tue, Jul 04, 2017 at 06:45:17PM -0700, Ray Jui wrote:
+>>>> Has anything functionally changed between PATCH v2 and v1? I'm seeing a
+>>>> very different L2 throughput with v2 (in general a lot worse with v2 vs.
+>>>> v1); however, I'm currently unable to reproduce the TLB sync timed out
+>>>> issue with v2 (without the patch from Will's email).
+>>>>
+>>>> It could also be something else that has changed in my setup, but so far
+>>>> I have not yet been able to spot anything wrong in the setup.
+>>>
+>>> There were fixes, and that initially involved a DSB that was found to be
+>>> expensive. The patches queued in -next should have that addressed, so please
+>>> use those (or my for-joerg/arm-smmu/updates branch).
+>>>
+>>
+>> That was my bad yesterday. I was in a rush and the setup was incorrect.
+>>
+>> I redo my Ethernet performance test with both PATCH v1 and v2 today, and
+>> can confirm the performance is consistent between v1 and v2 as expected.
+>>
+>> I also made sure the following message can still be reproduced with
+>> patch set v2:
+>>
+>> arm-smmu 64000000.mmu: TLB sync timed out -- SMMU may be deadlocked
+>>
+>> Then I proceeded to apply your patch that attempt to fix the deadlock
+>> issue.
+> 
+> [...]
+> 
+>> However, with the fix patch, I can still see the deadlock message when I
+>> have > 32 iperf TX threads active in the system:
+> 
+> Damn. We've been going over this today and the only plausible theory seems
+> to be that concurrent TLB syncs are causing the completion to be pushed out,
+> resulting in timeouts.
+> 
+> Can you try this patch below, instead of the one I sent before, please?
+> 
+> Thanks,
+> 
+> Will
+> 
+> --->8
 
-[ 5611.801147] g_ether gadget: packet filter 0e
-[ 5611.801177] g_ether gadget: ecm req21.43 v000e i0000 l0
-[ 5668.771453] BUG: spinlock bad magic on CPU#0, kworker/u2:3/9745
-[ 5668.771850]  lock: 0xce63ef20, .magic: 00000000, .owner: <none>/-1,
-.owner_cpu: 0
-[ 5668.772277] CPU: 0 PID: 9745 Comm: kworker/u2:3 Tainted: G        W
-4.12.0-03002-gec979a4-dirty #40
-[ 5668.772796] Hardware name: Nokia RX-51 board
-[ 5668.773071] Workqueue: phy1 wl1251_irq_work
-[ 5668.773345] [<c010c9e4>] (unwind_backtrace) from [<c010a274>]
-(show_stack+0x10/0x14)
-[ 5668.773803] [<c010a274>] (show_stack) from [<c01545a4>]
-(do_raw_spin_lock+0x6c/0xa0)
-[ 5668.774230] [<c01545a4>] (do_raw_spin_lock) from [<c06ca578>]
-(_raw_spin_lock_irqsave+0x10/0x18)
-[ 5668.774658] [<c06ca578>] (_raw_spin_lock_irqsave) from [<c048c010>]
-(wl1251_op_tx+0x38/0x5c)
-[ 5668.775115] [<c048c010>] (wl1251_op_tx) from [<c06a12e8>]
-(ieee80211_tx_frags+0x188/0x1c0)
-[ 5668.775543] [<c06a12e8>] (ieee80211_tx_frags) from [<c06a138c>]
-(__ieee80211_tx+0x6c/0x130)
-[ 5668.775970] [<c06a138c>] (__ieee80211_tx) from [<c06a3dbc>]
-(ieee80211_tx+0xdc/0x104)
-[ 5668.776367] [<c06a3dbc>] (ieee80211_tx) from [<c06a4af0>]
-(__ieee80211_subif_start_xmit+0x454/0x8c8)
-[ 5668.776824] [<c06a4af0>] (__ieee80211_subif_start_xmit) from
-[<c06a4f94>] (ieee80211_subif_start_xmit+0x30/0x2fc)
-[ 5668.777343] [<c06a4f94>] (ieee80211_subif_start_xmit) from
-[<c0578848>] (dev_hard_start_xmit+0x80/0x118)
-[ 5668.777832] [<c0578848>] (dev_hard_start_xmit) from [<c059a114>]
-(sch_direct_xmit+0xf4/0x18c)
-[ 5668.778259] [<c059a114>] (sch_direct_xmit) from [<c0579b50>]
-(__dev_queue_xmit+0x2c8/0x5d4)
-[ 5668.778656] [<c0579b50>] (__dev_queue_xmit) from [<c05bdd2c>]
-(ip_finish_output2+0x1c8/0x36c)
-[ 5668.779083] [<c05bdd2c>] (ip_finish_output2) from [<c05bec40>]
-(ip_output+0xec/0xfc)
-[ 5668.779479] [<c05bec40>] (ip_output) from [<c05be3d4>]
-(ip_local_out+0x38/0x3c)
-[ 5668.779876] [<c05be3d4>] (ip_local_out) from [<c05d6628>]
-(tcp_transmit_skb+0x488/0x8b0)
-[ 5668.780273] [<c05d6628>] (tcp_transmit_skb) from [<c05d2f40>]
-(tcp_rcv_established+0x208/0x720)
-[ 5668.780700] [<c05d2f40>] (tcp_rcv_established) from [<c05dbe4c>]
-(tcp_v4_do_rcv+0x110/0x174)
-[ 5668.781127] [<c05dbe4c>] (tcp_v4_do_rcv) from [<c05de030>]
-(tcp_v4_rcv+0xacc/0xb0c)
-[ 5668.790191] [<c05de030>] (tcp_v4_rcv) from [<c05b9490>]
-(ip_local_deliver_finish+0x94/0x28c)
-[ 5668.799346] [<c05b9490>] (ip_local_deliver_finish) from
-[<c05b985c>] (ip_local_deliver+0xb8/0xc4)
-[ 5668.808563] [<c05b985c>] (ip_local_deliver) from [<c05b92a0>]
-(ip_rcv_finish+0x244/0x3a0)
-[ 5668.817749] [<c05b92a0>] (ip_rcv_finish) from [<c05b9b4c>]
-(ip_rcv+0x2e4/0x484)
-[ 5668.826843] [<c05b9b4c>] (ip_rcv) from [<c0573534>]
-(__netif_receive_skb_core+0x2bc/0x8b8)
-[ 5668.835906] [<c0573534>] (__netif_receive_skb_core) from
-[<c05789d4>] (netif_receive_skb_internal+0x30/0x2ac)
-[ 5668.854187] [<c05789d4>] (netif_receive_skb_internal) from
-[<c069a1dc>] (ieee80211_deliver_skb+0x160/0x1a8)
-[ 5668.873046] [<c069a1dc>] (ieee80211_deliver_skb) from [<c069b568>]
-(ieee80211_rx_handlers+0xeec/0x20cc)
-[ 5668.892242] [<c069b568>] (ieee80211_rx_handlers) from [<c069ce24>]
-(ieee80211_prepare_and_rx_handle+0x6dc/0xff4)
-[ 5668.911804] [<c069ce24>] (ieee80211_prepare_and_rx_handle) from
-[<c069df48>] (ieee80211_rx_napi+0x80c/0x934)
-[ 5668.931762] [<c069df48>] (ieee80211_rx_napi) from [<c048e1b4>]
-(wl1251_rx+0x31c/0x494)
-[ 5668.941925] [<c048e1b4>] (wl1251_rx) from [<c048c734>]
-(wl1251_irq_work+0x144/0x1b0)
-[ 5668.951965] [<c048c734>] (wl1251_irq_work) from [<c013a70c>]
-(process_one_work+0x10c/0x330)
-[ 5668.961914] [<c013a70c>] (process_one_work) from [<c013aad0>]
-(worker_thread+0x168/0x498)
-[ 5668.971740] [<c013aad0>] (worker_thread) from [<c013fca0>]
-(kthread+0x10c/0x148)
-[ 5668.981445] [<c013fca0>] (kthread) from [<c01076d8>]
-(ret_from_fork+0x14/0x3c)
+Good news! I can confirm that with the new patch below, the error log of
+"TLB sync timed out" is now gone. I ran 20 iterations of the iperf
+client test with 64 threads spread across 8 CPUs. The error message used
+to coming out very quickly with just one iteration. But now it's
+completely gone.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/2df23ab1/attachment-0001.sig>
+At the same time, I do seem to observe a slight impact on performance
+when multiple threads are used, but I guess that is expected, given that
+a spin lock is added to protect the TLB sync.
+
+Great work and thanks for the fix!
+
+Ray
+
+> 
+> From bbf3737c29e3d18f539998a66f42878ac91cde97 Mon Sep 17 00:00:00 2001
+> From: Will Deacon <will.deacon@arm.com>
+> Date: Thu, 6 Jul 2017 15:55:48 +0100
+> Subject: [PATCH] iommu/arm-smmu: Reintroduce locking around TLB sync
+>  operations
+> 
+> Commit 523d7423e21b ("iommu/arm-smmu: Remove io-pgtable spinlock")
+> removed the locking used to serialise map/unmap calls into the io-pgtable
+> code from the ARM SMMU driver. This is good for performance, but opens
+> us up to a nasty race with TLB syncs because the TLB sync register is
+> shared within a context bank (or even globally for stage-2 on SMMUv1).
+> 
+> There are two cases to consider:
+> 
+>   1. A CPU can be spinning on the completion of a TLB sync, take an
+>      interrupt which issues a subsequent TLB sync, and then report a
+>      timeout on return from the interrupt.
+> 
+>   2. A CPU can be spinning on the completion of a TLB sync, but other
+>      CPUs can continuously issue additional TLB syncs in such a way that
+>      the backoff logic reports a timeout.
+> 
+> Rather than fix this by spinning for completion of prior TLB syncs before
+> issuing a new one (which may suffer from fairness issues on large systems),
+> instead reintroduce locking around TLB sync operations in the ARM SMMU
+> driver.
+> 
+> Fixes: 523d7423e21b ("iommu/arm-smmu: Remove io-pgtable spinlock")
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Reported-by: Ray Jui <ray.jui@broadcom.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index b446183b3015..770abd247f40 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -400,6 +400,8 @@ struct arm_smmu_device {
+>  
+>  	u32				cavium_id_base; /* Specific to Cavium */
+>  
+> +	spinlock_t			global_sync_lock;
+> +
+>  	/* IOMMU core code handle */
+>  	struct iommu_device		iommu;
+>  };
+> @@ -436,7 +438,7 @@ struct arm_smmu_domain {
+>  	struct arm_smmu_cfg		cfg;
+>  	enum arm_smmu_domain_stage	stage;
+>  	struct mutex			init_mutex; /* Protects smmu pointer */
+> -	spinlock_t			cb_lock; /* Serialises ATS1* ops */
+> +	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
+>  	struct iommu_domain		domain;
+>  };
+>  
+> @@ -602,9 +604,12 @@ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
+>  static void arm_smmu_tlb_sync_global(struct arm_smmu_device *smmu)
+>  {
+>  	void __iomem *base = ARM_SMMU_GR0(smmu);
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&smmu->global_sync_lock, flags);
+>  	__arm_smmu_tlb_sync(smmu, base + ARM_SMMU_GR0_sTLBGSYNC,
+>  			    base + ARM_SMMU_GR0_sTLBGSTATUS);
+> +	spin_unlock_irqrestore(&smmu->global_sync_lock, flags);
+>  }
+>  
+>  static void arm_smmu_tlb_sync_context(void *cookie)
+> @@ -612,9 +617,12 @@ static void arm_smmu_tlb_sync_context(void *cookie)
+>  	struct arm_smmu_domain *smmu_domain = cookie;
+>  	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>  	void __iomem *base = ARM_SMMU_CB(smmu, smmu_domain->cfg.cbndx);
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&smmu_domain->cb_lock, flags);
+>  	__arm_smmu_tlb_sync(smmu, base + ARM_SMMU_CB_TLBSYNC,
+>  			    base + ARM_SMMU_CB_TLBSTATUS);
+> +	spin_unlock_irqrestore(&smmu_domain->cb_lock, flags);
+>  }
+>  
+>  static void arm_smmu_tlb_sync_vmid(void *cookie)
+> @@ -1925,6 +1933,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>  
+>  	smmu->num_mapping_groups = size;
+>  	mutex_init(&smmu->stream_map_mutex);
+> +	spin_lock_init(&smmu->global_sync_lock);
+>  
+>  	if (smmu->version < ARM_SMMU_V2 || !(id & ID0_PTFS_NO_AARCH32)) {
+>  		smmu->features |= ARM_SMMU_FEAT_FMT_AARCH32_L;
+> 
