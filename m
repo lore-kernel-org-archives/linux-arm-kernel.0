@@ -1,87 +1,87 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 6 Jul 2017 14:38:07 +0200
-Subject: [PATCH v3 0/5] Add SoM1 support
-In-Reply-To: <d8ce4321-90eb-06b3-bed4-50bf3885f58d@microchip.com>
-References: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
- <d8ce4321-90eb-06b3-bed4-50bf3885f58d@microchip.com>
-Message-ID: <20170706123807.gzhmjnt6n3gjqvuy@rfolt0960.corp.atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 6 Jul 2017 13:40:37 +0100
+Subject: [PATCH v9 0/3] Tango PCIe controller support
+In-Reply-To: <d04e1632-17b8-85f9-31c4-b789d55cc853@free.fr>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
+ <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
+ <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
+ <5a1207cb-31fd-6b85-86af-8c37bd57ad4f@free.fr>
+ <20170705213419.GD25063@bhelgaas-glaptop.roam.corp.google.com>
+ <8dcab663-245b-880a-be3a-2965fd12d663@free.fr>
+ <20170706033946.GO13824@bhelgaas-glaptop.roam.corp.google.com>
+ <d04e1632-17b8-85f9-31c4-b789d55cc853@free.fr>
+Message-ID: <37d9f990-c037-5ccd-c162-786ca2bd07b5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 02:29:36PM +0200, Nicolas Ferre wrote:
-> On 06/07/2017 at 10:35, Claudiu Beznea wrote:
-> > Hi all,
-> > 
-> > This series adds support for sama5d2 SoM1 devices.
-> > 
-> > The at91-sama5d27_som1.dtsi add specific bindings for SoM1 board.
-> > The at91-sama5d27_som1_ek.dts add specific bindings for SoM1 EK board.
-> > 
-> > Thank you,
-> > Claudiu
+On 06/07/17 13:26, Mason wrote:
+> On 06/07/2017 05:39, Bjorn Helgaas wrote:
 > 
-> You can add my:
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>> On Wed, Jul 05, 2017 at 11:59:33PM +0200, Mason wrote:
+>>
+>>> There were a few nits I wanted to address:
+>>>
+>>> - Since we added suppress_bind_attrs = true, probe()
+>>> can only be called at init, so I wanted to mark __init
+>>> all the probe functions, to save space.
+>>>
+>>> - I left the definition of MSI_MAX in the wrong patch
+>>>
+>>> - You put a pointer to the pdev in the struct tango_pcie.
+>>> I think this is redundant, since the pdev already has a
+>>> pointer to the struct, as drvdata.
+>>> So I wanted to change tango_msi_probe() to take a pdev
+>>> as argument (to make it more like an actual probe function)
+>>> and derive pcie from pdev, instead of the other way around.
+>>
+>> I don't think tango_msi_probe() is really a "probe" function.  It's
+>> all part of the tango driver, and it's not claiming a separate piece
+>> of hardware.
 > 
-> for the whole series.
-> (I remember that we also had Ludovic's one as well).
+> I agree that tango_msi_probe() is not a probe function;
+> it is merely a piece of the actual probe function (static
+> with single call site). I split the probe function in two,
+> because it seemed to make sense at the time.
+> 
+> Perhaps it's better to inline tango_msi_probe? That would
+> avoid the issues of that function's name and parameters.
+> 
+> If you think it's better to keep the two pieces separate,
+> I can rename the MSI part to tango_msi_init() or some such.
+> But I'd like to avoid adding unnecessary fields to the struct.
+> 
+>>  So I would keep the name and structure similar to these:
+>>
+>>   advk_pcie_init_msi_irq_domain()
+>>   nwl_pcie_init_msi_irq_domain()
+>>
+>> BTW, those functions use irq_domain_add_linear(), while you are one of
+>> the very few callers of irq_domain_create_linear().  Why the difference?
+>> If your code does basically the same thing, it's very helpful to me if
+>> it *looks* basically the same.
 
-Yes, the only comment was about the mac-offset but it has been removed
-from this series and I had the technical explanation so still
+irq_domain_add_linear() can only take an of_node as the identifier for
+the domain, while the _create_ variants use a fwnode. Given that an
+of+node is also a fwnode, the former is now deprecated in favour of the
+latter.
 
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> 
+> It was a suggestion from Marc Z on 2017-03-23.
+> 
+> <QUOTE>
+> + irq_dom = irq_domain_add_linear(NULL, MSI_COUNT, &msi_domain_ops, pcie);
+> 
+> Use irq_domain_create_linear, pass the same fwnode.
+> </QUOTE>
+> 
+> It seems odd to pass NULL as the first argument.
+> (As I had first done, when copying the Altera driver.)
 
-> 
-> Regards,
-> 
-> > Changes in v3:
-> > - remove qspi flash mapping for the moment
-> > - remove at24 and i2c bindings; this will be introduced when
-> > "Add at24 functionality to read form different EEPROM offsets" patch will
-> > be accepted
-> > - change the title of patch 5 from this series from
-> > "ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
-> > "ARM: dts: at91: at91-sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
-> > match the desired prefix
-> > 
-> > Changes in v2:
-> > o in at91-sama5d27_som1.dtsi:
-> > - increase bootloader and kernel size in flash map (with bootloader
-> > flash offset the dtb and kernel flash offsets were changed)
-> > - use right pin for ethernet-phy interrupt
-> > 
-> > o in at91-sama5d27_som1_ek.dts:
-> > - removed memory tag and rely on bootloader to fill the right value
-> > - use pin macros (from arch/arm/boot/dts/sama5d2-pinfunc.h) wherever
-> > posible instead of pin numbers
-> > - remove pinctrl_sensor_power and pinctrl_sensor_reset pin muxing
-> > since they are not of intereset for this board
-> > - use "pb4" label for user button instead of "bp1"
-> > 
-> > Claudiu Beznea (2):
-> >   ARM: dts: at91: at91-sama5d27_som1: add sama5d27 SoM1 support
-> >   ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support
-> > 
-> > Cristian Birsan (1):
-> >   drivers: soc: atmel: Add basic support for new sama5d2 SiPs
-> > 
-> > Cyrille Pitchen (1):
-> >   ARM: dts: at91: sama5d2: add QSPI nodes
-> > 
-> > Songjun Wu (1):
-> >   ARM: dts: at91: sama5d2: add isc node
-> > 
-> >  arch/arm/boot/dts/Makefile                  |   1 +
-> >  arch/arm/boot/dts/at91-sama5d27_som1.dtsi   | 178 +++++++++
-> >  arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 551 ++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/sama5d2.dtsi              |  38 ++
-> >  drivers/soc/atmel/soc.c                     |   8 +
-> >  drivers/soc/atmel/soc.h                     |   4 +
-> >  6 files changed, 780 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
-> >  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-> > 
-> 
-> 
-> -- 
-> Nicolas Ferre
+Indeed, as it creates a "default" domain, which is almost always wrong.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
