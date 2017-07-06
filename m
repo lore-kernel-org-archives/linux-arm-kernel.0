@@ -1,31 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 6 Jul 2017 08:56:59 +0200
-Subject: [PATCH] ARM: sun7i: dts: enable battery power supply subnode on
- cubietruck
-In-Reply-To: <20170705083020.14865-1-alex@asyring.de>
-References: <20170705083020.14865-1-alex@asyring.de>
-Message-ID: <20170706065659.puglaluedfbrb3ei@flea>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu,  6 Jul 2017 02:08:27 -0700
+Subject: [GIT PULL] omap fixes for v4.13 merge window
+Message-ID: <pull-1499328836-332983>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 10:30:20AM +0200, Alexander Syring wrote:
-> The Cubietruck has an AXP209 PMIC with battery connector.
-> 
-> This enables the battery power supply subnode.
-> 
-> Signed-off-by: Alexander Syring <alex@asyring.de>
+The following changes since commit 1df5eaa6bced2d8a9de305d4a5f587adf57ddf35:
 
-Queued for 4.14, thanks!
-Maxime
+  ARM: OMAP4: hwmod_data: add SHAM crypto accelerator (2017-06-14 00:53:51 -0700)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/bcae5457/attachment.sig>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.13/fixes-merge-window
+
+for you to fetch changes up to ff570a01b1bd15cf8a87c9ea774fc9c52ea07f15:
+
+  ARM: dts: dra71-evm: mdio: Fix impedance values (2017-07-05 00:54:52 -0700)
+
+----------------------------------------------------------------
+Few fixes for omaps for issues found recently:
+
+- Fix disable_irq related shared IRQ warnings for omap3 PRM
+
+- Fix omap4 legacy code regression that accidentally removed code that
+  we still need for PRM interrupts
+
+- Fix dm8168-evm NAND pins and MMC write protect pin direction
+
+- Fix dra71-evm mdio impedance values
+
+----------------------------------------------------------------
+Lokesh Vutla (1):
+      ARM: dts: dra71-evm: mdio: Fix impedance values
+
+Mihail Grigorov (1):
+      ARM: dts: dm816x: Correct the state of the write protect pin
+
+Tom Rini (1):
+      ARM: dts: dm816x: Correct NAND support nodes
+
+Tony Lindgren (2):
+      ARM: OMAP2+: Fix omap3 prm shared irq
+      ARM: OMAP4: Fix legacy code clean-up regression
+
+ arch/arm/boot/dts/dm8168-evm.dts | 34 ++++++++++++++++++++++++-
+ arch/arm/boot/dts/dm816x.dtsi    |  2 +-
+ arch/arm/boot/dts/dra71-evm.dts  |  4 +--
+ arch/arm/mach-omap2/pm34xx.c     |  1 -
+ arch/arm/mach-omap2/prm3xxx.c    |  7 +----
+ arch/arm/mach-omap2/prm44xx.c    | 55 ++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 92 insertions(+), 11 deletions(-)
