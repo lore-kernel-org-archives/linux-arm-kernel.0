@@ -1,39 +1,39 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 6 Jul 2017 14:47:50 +0800
-Subject: [PATCH v2 3/6] ARM: dts: rockchip: enable io-domain for rk3229-evb
-In-Reply-To: <1499243421-21460-4-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <201707061400.5K7lBcIR%fengguang.wu@intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 6 Jul 2017 08:49:22 +0200
+Subject: [PATCH v2 0/3] pwm: sun4i: switch to atomic PWM
+In-Reply-To: <20170530193209.19247-1-alexandre.belloni@free-electrons.com>
+References: <20170530193209.19247-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170706064922.GI16144@ulmo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Tue, May 30, 2017 at 09:32:06PM +0200, Alexandre Belloni wrote:
+> Switch to atomic PWM. The main goal is to properly wait for a period before
+> disabling a channel to ensure the correct level is set on the output.
+> 
+> Changes in v2:
+>  - fixed remaining checkpatch warnings
+>  - split the series to ease reviews
+>  - changed the delay handling to ensure the proper amount of time has elapsed
+>    before disabling a channel
+>  - dropped RDY bit handling as it doesn't have any real effect.
+> 
+> Alexandre Belloni (3):
+>   pwm: sun4i: improve hardware read out
+>   pwm: sun4i: switch to atomic PWM
+>   pwm: sun4i: drop legacy callbacks
+> 
+>  drivers/pwm/pwm-sun4i.c | 263 +++++++++++++++++++++++++++---------------------
+>  1 file changed, 148 insertions(+), 115 deletions(-)
 
-[auto build test ERROR on rockchip/for-next]
-[cannot apply to v4.12]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Series applied, though you could've just squashed together patches 2 and
+3 because they don't make sense apart.
 
-url:    https://github.com/0day-ci/linux/commits/Frank-Wang/ARM-dts-rockchip-add-regulator-nodes-for-rk3229-evb/20170706-094621
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/rk3229-evb.dts:164.1-12 Label or path io_domains not found
-   FATAL ERROR: Syntax error parsing input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 22761 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/fe182922/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/9b5fb1ba/attachment.sig>
