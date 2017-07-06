@@ -1,45 +1,46 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Thu,  6 Jul 2017 14:45:02 +0530
-Subject: [PATCH] input: coresight: Fix redefinition error on compilation.
-Message-ID: <6333cde19a5c0adc8faf41531c2ae431cd79e7a6.1499332268.git.arvind.yadav.cs@gmail.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Thu,  6 Jul 2017 15:07:00 +0530
+Subject: [PATCH V4 1/6] iommu/arm-smmu: Fix the error path in
+ arm_smmu_add_device
+In-Reply-To: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <1499333825-7658-2-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_CORESIGHT is disable, it'll through compilation error.
+fwspec->iommu_priv is available only after arm_smmu_master_cfg
+instance has been allocated. We shouldn't free it before that.
+Also it's logical to free the master cfg itself without
+checking for fwspec.
 
-drivers/hwtracing/coresight/coresight-etm-perf.c:462:5: error: redefinition of ?etm_perf_symlink?
- int etm_perf_symlink(struct coresight_device *csdev, bool link)
-     ^
-In file included from drivers/hwtracing/coresight/coresight-etm-perf.c:30:0:
-drivers/hwtracing/coresight/coresight-etm-perf.h:61:19: note: previous definition of ?etm_perf_symlink? was here
- static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
-
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/iommu/arm-smmu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index e97775d..74ce6a5 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -458,7 +458,7 @@ static void etm_addr_filters_sync(struct perf_event *event)
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 9a45117d90de..61b1f8729a7c 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1349,15 +1349,15 @@ static int arm_smmu_add_device(struct device *dev)
  
- 	filters->nr_filters = i;
- }
--
-+#ifdef CONFIG_CORESIGHT
- int etm_perf_symlink(struct coresight_device *csdev, bool link)
- {
- 	char entry[sizeof("cpu9999999")];
-@@ -483,7 +483,7 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+ 	ret = arm_smmu_master_alloc_smes(dev);
+ 	if (ret)
+-		goto out_free;
++		goto out_cfg_free;
+ 
+ 	iommu_device_link(&smmu->iommu, dev);
  
  	return 0;
+ 
++out_cfg_free:
++	kfree(cfg);
+ out_free:
+-	if (fwspec)
+-		kfree(fwspec->iommu_priv);
+ 	iommu_fwspec_free(dev);
+ 	return ret;
  }
--
-+#endif
- static int __init etm_perf_init(void)
- {
- 	int ret;
 -- 
-1.9.1
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
