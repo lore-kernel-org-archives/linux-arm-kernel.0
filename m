@@ -1,33 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jul 2017 10:01:43 +0100
-Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
-In-Reply-To: <874luqf2ym.fsf@free-electrons.com>
-References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
- <20170705171607.GG4902@n2100.armlinux.org.uk>
- <874luqf2ym.fsf@free-electrons.com>
-Message-ID: <20170706090143.GI4902@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 6 Jul 2017 08:56:59 +0200
+Subject: [PATCH] ARM: sun7i: dts: enable battery power supply subnode on
+ cubietruck
+In-Reply-To: <20170705083020.14865-1-alex@asyring.de>
+References: <20170705083020.14865-1-alex@asyring.de>
+Message-ID: <20170706065659.puglaluedfbrb3ei@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 09:18:25AM +0200, Gregory CLEMENT wrote:
-> Hi Russell King,
->
-> Actually everything is available in the linux-next branch since one or
-> two weeks. So you can rebase and send your series right now.
+On Wed, Jul 05, 2017 at 10:30:20AM +0200, Alexander Syring wrote:
+> The Cubietruck has an AXP209 PMIC with battery connector.
+> 
+> This enables the battery power supply subnode.
+> 
+> Signed-off-by: Alexander Syring <alex@asyring.de>
 
-As there are multiple trees, just specifying a branch is not helpful.
-The Xenon SDHCI and ethernet changes were being published through the
-MISL tree, but that tree has no for-next branch.
-
-There is no git tree specified in MAINTAINERS either.
-
-So, sorry, I've no idea which tree you're referring to.
-
-And no, I do _not_ want to grab a copy of linux-next to rebase my
-changes on and publish back to SolidRun for their use, that would be
-insane.
+Queued for 4.14, thanks!
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/bcae5457/attachment.sig>
