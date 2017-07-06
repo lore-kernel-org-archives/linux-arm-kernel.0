@@ -1,66 +1,50 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Thu, 6 Jul 2017 13:38:19 -0700
-Subject: [PATCH v10 1/3] x86/syscalls: Check address limit on user-mode
- return
-In-Reply-To: <CAGXu5jKrJv0y70e5JiafKGcGzWoJPZM_HruZ=Y0rM1m0J4tZAA@mail.gmail.com>
-References: <20170615011203.144108-1-thgarnie@google.com>
- <CAGXu5j+byHUn_rb9jOTZqMYrc4ngmDj=a3k8QRTYrZYNSjhCkw@mail.gmail.com>
- <CAGXu5jKrJv0y70e5JiafKGcGzWoJPZM_HruZ=Y0rM1m0J4tZAA@mail.gmail.com>
-Message-ID: <CAJcbSZE6Og4gwhFwhy_-Jaq6GovwN3y1B6O89JmkpXHtVfDLBA@mail.gmail.com>
+From: xiyou.wangcong@gmail.com (Cong Wang)
+Date: Thu, 6 Jul 2017 13:45:32 -0700
+Subject: v4.13-rc0 on nokia n900: spinlock bad magic
+In-Reply-To: <20170706180337.GA26875@amd>
+References: <20170706180337.GA26875@amd>
+Message-ID: <CAM_iQpXm8y55p-PVB2wqWxCGeOsMmLZrGgg-ZbozDTxXeSQOCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 28, 2017 at 10:52 AM, Kees Cook <keescook@chromium.org> wrote:
+On Thu, Jul 6, 2017 at 11:03 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
 >
-> On Tue, Jun 20, 2017 at 1:24 PM, Kees Cook <keescook@chromium.org> wrote:
-> > On Wed, Jun 14, 2017 at 6:12 PM, Thomas Garnier <thgarnie@google.com> wrote:
-> >> Ensure the address limit is a user-mode segment before returning to
-> >> user-mode. Otherwise a process can corrupt kernel-mode memory and elevate
-> >> privileges [1].
-> >>
-> >> The set_fs function sets the TIF_SETFS flag to force a slow path on
-> >> return. In the slow path, the address limit is checked to be USER_DS if
-> >> needed.
-> >>
-> >> The addr_limit_user_check function is added as a cross-architecture
-> >> function to check the address limit.
-> >>
-> >> [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
-> >>
-> >> Signed-off-by: Thomas Garnier <thgarnie@google.com>
-> >
-> > Thanks for reworking this series!
-> >
-> > The bad state correctly BUGs under the LKDTM test:
-> >
-> > [   21.171586] lkdtm: Performing direct entry CORRUPT_USER_DS
-> > [   21.172791] lkdtm: setting bad task size limit
-> > [   21.173742] ------------[ cut here ]------------
-> > [   21.174641] kernel BUG at ./include/linux/syscalls.h:220!
-> > ...
-> > [   21.193166] Call Trace:
-> > [   21.193617]  ? trace_hardirqs_on_thunk+0x1a/0x1c
-> > [   21.194443]  entry_SYSCALL64_slow_path+0x25/0x25
-> >
-> >
-> > Tested-by: Kees Cook <keescook@chromium.org>
+> I don't think this is new in v4.13, but perhaps someone knows how to
+> debug it?
 >
-> Is everyone happy with this patch for x86? Does this need anything
-> more/different?
+> [ 5611.801147] g_ether gadget: packet filter 0e
+> [ 5611.801177] g_ether gadget: ecm req21.43 v000e i0000 l0
+> [ 5668.771453] BUG: spinlock bad magic on CPU#0, kworker/u2:3/9745
+> [ 5668.771850]  lock: 0xce63ef20, .magic: 00000000, .owner: <none>/-1,
+> .owner_cpu: 0
+> [ 5668.772277] CPU: 0 PID: 9745 Comm: kworker/u2:3 Tainted: G        W
+> 4.12.0-03002-gec979a4-dirty #40
+> [ 5668.772796] Hardware name: Nokia RX-51 board
+> [ 5668.773071] Workqueue: phy1 wl1251_irq_work
+> [ 5668.773345] [<c010c9e4>] (unwind_backtrace) from [<c010a274>]
+> (show_stack+0x10/0x14)
+> [ 5668.773803] [<c010a274>] (show_stack) from [<c01545a4>]
+> (do_raw_spin_lock+0x6c/0xa0)
+> [ 5668.774230] [<c01545a4>] (do_raw_spin_lock) from [<c06ca578>]
+> (_raw_spin_lock_irqsave+0x10/0x18)
+> [ 5668.774658] [<c06ca578>] (_raw_spin_lock_irqsave) from [<c048c010>]
+> (wl1251_op_tx+0x38/0x5c)
+> [ 5668.775115] [<c048c010>] (wl1251_op_tx) from [<c06a12e8>]
+> (ieee80211_tx_frags+0x188/0x1c0)
 
-Asking again. Additional feedback? Anyone wants to pick-it up?
+The following one-line fix should work.
 
->
-> Thanks!
->
-> -Kees
->
-> --
-> Kees Cook
-> Pixel Security
+diff --git a/drivers/net/wireless/ti/wl1251/main.c
+b/drivers/net/wireless/ti/wl1251/main.c
+index bbf7604..1c539c8 100644
+--- a/drivers/net/wireless/ti/wl1251/main.c
++++ b/drivers/net/wireless/ti/wl1251/main.c
+@@ -1571,6 +1571,7 @@ struct ieee80211_hw *wl1251_alloc_hw(void)
 
+        wl->state = WL1251_STATE_OFF;
+        mutex_init(&wl->mutex);
++       spin_lock_init(&wl->wl_lock);
 
-
-
--- 
-Thomas
+        wl->tx_mgmt_frm_rate = DEFAULT_HW_GEN_TX_RATE;
+        wl->tx_mgmt_frm_mod = DEFAULT_HW_GEN_MODULATION_TYPE;
