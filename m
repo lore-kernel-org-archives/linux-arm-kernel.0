@@ -1,55 +1,56 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 6 Jul 2017 11:35:25 +0300
-Subject: [PATCH v3 1/5] ARM: dts: at91: sama5d2: add QSPI nodes
+Date: Thu, 6 Jul 2017 11:35:26 +0300
+Subject: [PATCH v3 2/5] ARM: dts: at91: sama5d2: add isc node
 In-Reply-To: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1499330129-29319-2-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1499330129-29319-3-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+From: Songjun Wu <songjun.wu@microchip.com>
 
-This patch adds DT nodes for sama5d2 QSPI controllers.
+Add isc node, it conflicts with pdmic and uart3.
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-[claudiu.beznea at microchip.com: change subject to match the desired prefix]
+Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+[claudiu.beznea at microchip.com: place isc node after hlcdc node]
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/sama5d2.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index cc06da3..71e9d83 100644
+index 71e9d83..9d13b55 100644
 --- a/arch/arm/boot/dts/sama5d2.dtsi
 +++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -954,6 +954,28 @@
+@@ -416,6 +416,17 @@
  				};
  			};
  
-+			qspi0: spi at f0020000 {
-+				compatible = "atmel,sama5d2-qspi";
-+				reg = <0xf0020000 0x100>, <0xd0000000 0x08000000>;
-+				reg-names = "qspi_base", "qspi_mmap";
-+				interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&qspi0_clk>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++			isc: isc at f0008000 {
++				compatible = "atmel,sama5d2-isc";
++				reg = <0xf0008000 0x4000>;
++				interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
++				clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
++				clock-names = "hclock", "iscck", "gck";
++				#clock-cells = <0>;
++				clock-output-names = "isc-mck";
 +				status = "disabled";
 +			};
 +
-+			qspi1: spi at f0024000 {
-+				compatible = "atmel,sama5d2-qspi";
-+				reg = <0xf0024000 0x100>, <0xd8000000 0x08000000>;
-+				reg-names = "qspi_base", "qspi_mmap";
-+				interrupts = <53 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&qspi1_clk>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
+ 			ramc0: ramc at f000c000 {
+ 				compatible = "atmel,sama5d3-ddramc";
+ 				reg = <0xf000c000 0x200>;
+@@ -925,6 +936,11 @@
+ 						atmel,clk-output-range = <0 83000000>;
+ 					};
+ 
++					isc_gclk: isc_gclk {
++						#clock-cells = <0>;
++						reg = <46>;
++					};
 +
- 			sha at f0028000 {
- 				compatible = "atmel,at91sam9g46-sha";
- 				reg = <0xf0028000 0x100>;
+ 					pdmic_gclk: pdmic_gclk {
+ 						#clock-cells = <0>;
+ 						reg = <48>;
 -- 
 2.7.4
