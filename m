@@ -1,117 +1,41 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Thu, 6 Jul 2017 14:20:22 +0200
-Subject: [PATCH v3 4/5] dmaengine: stm32-dma: Add support for STM32 DMAMUX
-In-Reply-To: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1499343623-5964-5-git-send-email-pierre-yves.mordret@st.com>
+Date: Thu, 6 Jul 2017 14:20:18 +0200
+Subject: [PATCH v3 0/5] Add STM32 DMAMUX support
+Message-ID: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for STM32 DMAMUX.
-When the STM32 DMA controller is behind a STM32 DMAMUX the request line
-number has not to be handled by DMA but DMAMUX.
+This patchset adds support for the STM32 DMA multiplexer.
+It allows to map any peripheral DMA request to any channel of the product
+DMAs.
+This IP has been introduced with STM32H7 SoC.
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
  Version history:
-    V3:
-        * None
-    v2:
-        * Use DMAMUX Configuration API's
-        * DMAXMUX(if used) provides ChannelID
+    v3:
+        * change compatible to st,stm32h7-dmamux to be mode Soc specific
+        * add verbosity in dma-cells
 ---
----
- drivers/dma/stm32-dma.c | 44 +++++++++++++++++++++++++++++++-------------
- 1 file changed, 31 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index 786fc8f..a9e5884 100644
---- a/drivers/dma/stm32-dma.c
-+++ b/drivers/dma/stm32-dma.c
-@@ -13,6 +13,7 @@
- #include <linux/delay.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dma/stm32-dmamux.h>
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/jiffies.h>
-@@ -179,6 +180,7 @@ struct stm32_dma_device {
- 	struct clk *clk;
- 	struct reset_control *rst;
- 	bool mem2mem;
-+	bool dmamux;
- 	struct stm32_dma_chan chan[STM32_DMA_MAX_CHANNELS];
- };
- 
-@@ -272,12 +274,18 @@ static int stm32_dma_slave_config(struct dma_chan *c,
- 				  struct dma_slave_config *config)
- {
- 	struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
-+	int ret = 0;
- 
- 	memcpy(&chan->dma_sconfig, config, sizeof(*config));
- 
--	chan->config_init = true;
-+	if (c->router)
-+		ret = stm32_dmamux_set_config(c->router->dev, c->route_data,
-+					      c->chan_id);
- 
--	return 0;
-+	if (!ret)
-+		chan->config_init = true;
-+
-+	return ret;
- }
- 
- static u32 stm32_dma_irq_status(struct stm32_dma_chan *chan)
-@@ -998,18 +1006,26 @@ static struct dma_chan *stm32_dma_of_xlate(struct of_phandle_args *dma_spec,
- 	cfg.stream_config = dma_spec->args[2];
- 	cfg.threshold = dma_spec->args[3];
- 
--	if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
--	    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
--		dev_err(dev, "Bad channel and/or request id\n");
--		return NULL;
--	}
--
--	chan = &dmadev->chan[cfg.channel_id];
-+	if (dmadev->dmamux) {
-+		c = dma_get_any_slave_channel(&dmadev->ddev);
-+		if (!c) {
-+			dev_err(dev, "No more channel avalaible\n");
-+			return NULL;
-+		}
-+		chan = &dmadev->chan[c->chan_id];
-+	} else {
-+		if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
-+		    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
-+			dev_err(dev, "Bad channel and/or request id\n");
-+			return NULL;
-+		}
- 
--	c = dma_get_slave_channel(&chan->vchan.chan);
--	if (!c) {
--		dev_err(dev, "No more channels available\n");
--		return NULL;
-+		chan = &dmadev->chan[cfg.channel_id];
-+		c = dma_get_slave_channel(&chan->vchan.chan);
-+		if (!c) {
-+			dev_err(dev, "No more channel avalaible\n");
-+			return NULL;
-+		}
- 	}
- 
- 	stm32_dma_set_config(chan, &cfg);
-@@ -1058,6 +1074,8 @@ static int stm32_dma_probe(struct platform_device *pdev)
- 	dmadev->mem2mem = of_property_read_bool(pdev->dev.of_node,
- 						"st,mem2mem");
- 
-+	dmadev->dmamux = of_property_read_bool(pdev->dev.of_node, "st,dmamux");
-+
- 	dmadev->rst = devm_reset_control_get(&pdev->dev, NULL);
- 	if (!IS_ERR(dmadev->rst)) {
- 		reset_control_assert(dmadev->rst);
+Pierre-Yves MORDRET (5):
+  dt-bindings: Document the STM32 DMAMUX bindings
+  dmaengine: Add STM32 DMAMUX driver
+  dt-bindings: stm32-dma: Add property to handle STM32 DMAMUX
+  dmaengine: stm32-dma: Add support for STM32 DMAMUX
+  ARM: configs: stm32: Add DMAMUX support in STM32 defconfig
+
+ .../devicetree/bindings/dma/stm32-dma.txt          |   5 +-
+ .../devicetree/bindings/dma/stm32-dmamux.txt       |  60 +++++
+ arch/arm/configs/stm32_defconfig                   |   1 +
+ drivers/dma/Kconfig                                |   9 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/stm32-dma.c                            |  44 ++--
+ drivers/dma/stm32-dmamux.c                         | 253 +++++++++++++++++++++
+ include/linux/dma/stm32-dmamux.h                   |  21 ++
+ 8 files changed, 380 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+ create mode 100644 drivers/dma/stm32-dmamux.c
+ create mode 100644 include/linux/dma/stm32-dmamux.h
+
 -- 
 2.7.4
