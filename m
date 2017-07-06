@@ -1,52 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu,  6 Jul 2017 02:08:27 -0700
-Subject: [GIT PULL] omap fixes for v4.13 merge window
-Message-ID: <pull-1499328836-332983>
+From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
+Date: Thu, 6 Jul 2017 16:55:28 +0800
+Subject: [PATCH 1/3] dts: ls2088a: add pcie support
+Message-ID: <1499331330-38362-1-git-send-email-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1df5eaa6bced2d8a9de305d4a5f587adf57ddf35:
+From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-  ARM: OMAP4: hwmod_data: add SHAM crypto accelerator (2017-06-14 00:53:51 -0700)
+The physical memory map address and CCSR registers map address are
+different between LS2088A and other LS2080A series SoCs.
 
-are available in the git repository at:
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.13/fixes-merge-window
-
-for you to fetch changes up to ff570a01b1bd15cf8a87c9ea774fc9c52ea07f15:
-
-  ARM: dts: dra71-evm: mdio: Fix impedance values (2017-07-05 00:54:52 -0700)
-
-----------------------------------------------------------------
-Few fixes for omaps for issues found recently:
-
-- Fix disable_irq related shared IRQ warnings for omap3 PRM
-
-- Fix omap4 legacy code regression that accidentally removed code that
-  we still need for PRM interrupts
-
-- Fix dm8168-evm NAND pins and MMC write protect pin direction
-
-- Fix dra71-evm mdio impedance values
-
-----------------------------------------------------------------
-Lokesh Vutla (1):
-      ARM: dts: dra71-evm: mdio: Fix impedance values
-
-Mihail Grigorov (1):
-      ARM: dts: dm816x: Correct the state of the write protect pin
-
-Tom Rini (1):
-      ARM: dts: dm816x: Correct NAND support nodes
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Fix omap3 prm shared irq
-      ARM: OMAP4: Fix legacy code clean-up regression
-
- arch/arm/boot/dts/dm8168-evm.dts | 34 ++++++++++++++++++++++++-
- arch/arm/boot/dts/dm816x.dtsi    |  2 +-
- arch/arm/boot/dts/dra71-evm.dts  |  4 +--
- arch/arm/mach-omap2/pm34xx.c     |  1 -
- arch/arm/mach-omap2/prm3xxx.c    |  7 +----
- arch/arm/mach-omap2/prm44xx.c    | 55 ++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 92 insertions(+), 11 deletions(-)
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+index 5c695c6..7d26531 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+@@ -134,6 +134,7 @@
+ };
+ 
+ &pcie1 {
++	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
+ 	reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+ 	       0x20 0x00000000 0x0 0x00002000>; /* configuration space */
+ 
+@@ -142,6 +143,7 @@
+ };
+ 
+ &pcie2 {
++	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
+ 	reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+ 	       0x28 0x00000000 0x0 0x00002000>; /* configuration space */
+ 
+@@ -150,6 +152,7 @@
+ };
+ 
+ &pcie3 {
++	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
+ 	reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+ 	       0x30 0x00000000 0x0 0x00002000>; /* configuration space */
+ 
+@@ -158,6 +161,7 @@
+ };
+ 
+ &pcie4 {
++	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
+ 	reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
+ 	       0x38 0x00000000 0x0 0x00002000>; /* configuration space */
+ 
+-- 
+2.1.0.27.g96db324
