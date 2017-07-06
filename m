@@ -1,45 +1,115 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 6 Jul 2017 20:49:33 +0800
-Subject: [PATCH] arm64: arch_timer: fix the infinite recursion when enable
- ftrace and erratum workaround
-Message-ID: <43ec809d-b8f2-eb73-8ad6-9966cf67625f@huawei.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 06 Jul 2017 14:55:39 +0200
+Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
+In-Reply-To: <CAKv+Gu-MRXXEvDHuWfbRJ=if6sGGOScTCe8a97CCRp97O15RkQ@mail.gmail.com>
+ (Ard Biesheuvel's message of "Thu, 6 Jul 2017 13:41:38 +0100")
+References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
+ <20170705171607.GG4902@n2100.armlinux.org.uk>
+ <CAKv+Gu9DXFDDdx3Vrmo20cRtMcbS-MUa4MF5r-Odje68FinGOw@mail.gmail.com>
+ <20170705174403.GH4902@n2100.armlinux.org.uk>
+ <20170706143151.26e485fa@xhacker>
+ <CAKv+Gu-uU7SqcDZdoBfcJHjNMYYVtoH_QfQa7sffcLLOY=iQHQ@mail.gmail.com>
+ <87r2xtepfq.fsf@free-electrons.com>
+ <CAKv+Gu-MRXXEvDHuWfbRJ=if6sGGOScTCe8a97CCRp97O15RkQ@mail.gmail.com>
+Message-ID: <87inj5enck.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When enable preempt and ftrace, and perform the following steps, the system will hang:
-mount -t debugfs nodev /sys/kernel/debug/
-cd /sys/kernel/debug/tracing/
-echo function_graph > current_tracer
+Hi Ard,
+ 
+ On jeu., juil. 06 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-This is because the preempt_disable and preempt_enable calls would cause infinite
-recursion for some chips which needs the timer erratum workaround and the system
-will hang, so use the preempt_disable/enable_notrace calls to prevent recursion.
+> On 6 July 2017 at 13:10, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+>> Hi Ard,
+>>
+>>  On jeu., juil. 06 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>
+>>> On 6 July 2017 at 07:31, Jisheng Zhang <jszhang@marvell.com> wrote:
+>>>> On Wed, 5 Jul 2017 18:44:03 +0100 Russell King - ARM Linux wrote:
+>>>>
+>>>>> On Wed, Jul 05, 2017 at 06:36:53PM +0100, Ard Biesheuvel wrote:
+>>>>> > On 5 July 2017 at 18:16, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+>>>>> > > On Wed, Jul 05, 2017 at 06:13:33PM +0200, Gregory CLEMENT wrote:
+>>>>> > >> Enable the PCIe interface on the MACCHIATOBin board. It is located on
+>>>>> > >> CON12 and is 4 lanes capable.
+>>>>> > >>
+>>>>> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>>> > >
+>>>>> > > Why do you folk at free-electrons like doing half a job all the friggin
+>>>>> > > time?
+>>>>> > >
+>>>>> > > You know I have complete patches for mcbin, but you pointedly won't look
+>>>>> > > at them at all - except when you have a problem and want to test my tree.
+>>>>> > > And even then, you ignore my work (despite testing that it works), and
+>>>>> > > you still recreate my patches.
+>>>>> > >
+>>>>> > > This is really frustrating and insane behaviour on your part.
+>>>>> > >
+>>>>> > > Here's what I have:
+>>>>> > >
+>>>>> > > +&cpm_pcie0 {
+>>>>> > > +       pinctrl-names = "default";
+>>>>> > > +       pinctrl-0 = <&cpm_pcie_pins>;
+>>>>> > > +       num-lanes = <4>;
+>>>>> > > +       reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
+>>>>> > > +       status = "okay";
+>>>>> >
+>>>>> > This needs 'num-viewport = <8>' as well, or the crazy Synopsys DWC
+>>>>
+>>>> IMHO, maybe putting this property into dtsi is better.
+>>>>
+>>>
+>>> Good point. Do all instances of this IP that live on the SoC have 8
+>>> viewports?
+>>
+>> In the Armada 80x0 datasheet there is no mention of viewport. However 2
+>> days ago you said that "What I do know is that boards like the Marvell
+>> 8040 based MacchiatoBin uses this IP in RC mode, and exposes config,
+>> MMIO and IO space windows using only 2 viewports. Note that this is
+>> essentially a bug in the DT description, given that its version of the
+>> IP supports 8 viewports."[1]
+>>
+>> So you seem to know that the version of the IP used support the 8
+>> viewports!
+>>
+>> What I can also say is that the in the datasheet there is no mention of
+>> difference between the instance. The only thing that can differ is the
+>> number of lane for each PCIe Port.
+>>
+>
+> I am sure I found it in the datasheet somewhere. It is the number of
+> ATU windows.
 
-Fixes: 6acc71ccac71 ("arm64: arch_timer: Allows a CPU-specific erratum to only affect a subset of CPUs")
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- arch/arm64/include/asm/arch_timer.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Under the "Outbound iATU Features" and "Inbound iATU Features" I have
+the following point:
+"Up to 8 address regions programmable for location and size."
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 74d08e4..67bb7a4 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -65,13 +65,13 @@ struct arch_timer_erratum_workaround {
- 	u64 _val;							\
- 	if (needs_unstable_timer_counter_workaround()) {		\
- 		const struct arch_timer_erratum_workaround *wa;		\
--		preempt_disable();					\
-+		preempt_disable_notrace();				\
- 		wa = __this_cpu_read(timer_unstable_counter_workaround); \
- 		if (wa && wa->read_##reg)				\
- 			_val = wa->read_##reg();			\
- 		else							\
- 			_val = read_sysreg(reg);			\
--		preempt_enable();					\
-+		preempt_enable_notrace();				\
- 	} else {							\
- 		_val = read_sysreg(reg);				\
- 	}								\
+Is that what you think about ?
+
+>
+> In any case, I implemented ACPI firmware for the MacchiatoBin, which
+> also involves programming the PCIe RC in a mode that is compatible
+> with ECAM. This turns out to be impossible (which means you cannot
+> implement a SBSA compatible platform with this SoC), but in attempting
+> to do so, I used five different windows, for type 0 config cycles,
+> type 1 config cycles, IO space, MMIO32 space and MMIO64 space (which
+> the Synopsys DW PCIe controller does not even implement,
+> unfortunately)
+>
+> Note that this also involved reprogramming all the memory translation
+> windows from the secure firmware, to free up the region 0xc000_0000 -
+> 0xefff_ffff for use by PCIe (config and MMIO32 space), and assigning a
+> window 0x8_0000_0000 - 0x8_ffff_ffff for 64-bit MMIO BARs.
+
+Currently for the driver the only important information is having a
+num-viewport greater than 2. So given all this we are OK if we add the
+'num-viewport = <8>' in all the PCIe port node in the dtsi file.
+
+Gregory
+
 -- 
-1.9.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
