@@ -1,60 +1,61 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Thu, 6 Jul 2017 15:51:27 -0500
-Subject: [PATCH] mediatek: constify vb2_ops structure
-Message-ID: <20170706205127.GA20926@embeddedgus>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu,  6 Jul 2017 17:07:14 -0400
+Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
+Message-ID: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for vb2_ops structures that are only stored in the ops field of a
-vb2_queue structure. That field is declared const, so vb2_ops structures
-that have this property can be declared as const also.
+An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+following a Function Level Reset (FLR) request to indicate that it is not
+ready to accept new requests.
 
-This issue was detected using Coccinelle and the following semantic patch:
+Seen a timeout message with Intel 750 NVMe drive and FLR reset.
 
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct vb2_ops i at p = { ... };
+Kernel enables CRS visibility in pci_enable_crs() function for each bridge
+it discovers. The OS observes a special vendor ID read value of 0xFFFF0001
+in this case. We need to keep polling until this special read value
+disappears. pci_bus_read_dev_vendor_id() takes care of CRS handling for a
+given vendor id read request under the covers.
 
-@ok@
-identifier r.i;
-struct vb2_queue e;
-position p;
-@@
-e.ops = &i at p;
+Adding a vendor ID read if this is a physical function before attempting
+to read any other registers on the endpoint. A CRS indication will only
+be given if the address to be read is vendor ID register.
 
-@bad@
-position p != {r.p,ok.p};
-identifier r.i;
-struct vb2_ops e;
-@@
-e at i@p
+Note that virtual functions report their vendor ID through another
+mechanism.
 
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-static
-+const
-struct vb2_ops i = { ... };
+The spec is calling to wait up to 1 seconds if the device is sending CRS.
+The NVMe device seems to be requiring more. Relax this up to 60 seconds.
 
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/pci.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-index 451a540..f17a86b 100644
---- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-+++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-@@ -756,7 +756,7 @@ static void mtk_jpeg_stop_streaming(struct vb2_queue *q)
- 	pm_runtime_put_sync(ctx->jpeg->dev);
- }
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index aab9d51..83a9784 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3723,10 +3723,16 @@ static void pci_flr_wait(struct pci_dev *dev)
+ 	int i = 0;
+ 	u32 id;
  
--static struct vb2_ops mtk_jpeg_qops = {
-+static const struct vb2_ops mtk_jpeg_qops = {
- 	.queue_setup        = mtk_jpeg_queue_setup,
- 	.buf_prepare        = mtk_jpeg_buf_prepare,
- 	.buf_queue          = mtk_jpeg_buf_queue,
+-	do {
+-		msleep(100);
+-		pci_read_config_dword(dev, PCI_COMMAND, &id);
+-	} while (i++ < 10 && id == ~0);
++	if (dev->is_virtfn) {
++		do {
++			msleep(100);
++			pci_read_config_dword(dev, PCI_COMMAND, &id);
++		} while (i++ < 10 && id == ~0);
++	} else {
++		if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
++						60*1000))
++			id = ~0;
++	}
+ 
+ 	if (id == ~0)
+ 		dev_warn(&dev->dev, "Failed to return from FLR\n");
 -- 
-2.5.0
+1.9.1
