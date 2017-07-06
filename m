@@ -1,79 +1,87 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Thu, 6 Jul 2017 14:29:36 +0200
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Thu, 6 Jul 2017 14:38:07 +0200
 Subject: [PATCH v3 0/5] Add SoM1 support
-In-Reply-To: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
+In-Reply-To: <d8ce4321-90eb-06b3-bed4-50bf3885f58d@microchip.com>
 References: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <d8ce4321-90eb-06b3-bed4-50bf3885f58d@microchip.com>
+ <d8ce4321-90eb-06b3-bed4-50bf3885f58d@microchip.com>
+Message-ID: <20170706123807.gzhmjnt6n3gjqvuy@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2017 at 10:35, Claudiu Beznea wrote:
-> Hi all,
+On Thu, Jul 06, 2017 at 02:29:36PM +0200, Nicolas Ferre wrote:
+> On 06/07/2017 at 10:35, Claudiu Beznea wrote:
+> > Hi all,
+> > 
+> > This series adds support for sama5d2 SoM1 devices.
+> > 
+> > The at91-sama5d27_som1.dtsi add specific bindings for SoM1 board.
+> > The at91-sama5d27_som1_ek.dts add specific bindings for SoM1 EK board.
+> > 
+> > Thank you,
+> > Claudiu
 > 
-> This series adds support for sama5d2 SoM1 devices.
+> You can add my:
+> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > 
-> The at91-sama5d27_som1.dtsi add specific bindings for SoM1 board.
-> The at91-sama5d27_som1_ek.dts add specific bindings for SoM1 EK board.
-> 
-> Thank you,
-> Claudiu
+> for the whole series.
+> (I remember that we also had Ludovic's one as well).
 
-You can add my:
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Yes, the only comment was about the mac-offset but it has been removed
+from this series and I had the technical explanation so still
 
-for the whole series.
-(I remember that we also had Ludovic's one as well).
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-Regards,
-
-> Changes in v3:
-> - remove qspi flash mapping for the moment
-> - remove at24 and i2c bindings; this will be introduced when
-> "Add at24 functionality to read form different EEPROM offsets" patch will
-> be accepted
-> - change the title of patch 5 from this series from
-> "ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
-> "ARM: dts: at91: at91-sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
-> match the desired prefix
 > 
-> Changes in v2:
-> o in at91-sama5d27_som1.dtsi:
-> - increase bootloader and kernel size in flash map (with bootloader
-> flash offset the dtb and kernel flash offsets were changed)
-> - use right pin for ethernet-phy interrupt
+> Regards,
 > 
-> o in at91-sama5d27_som1_ek.dts:
-> - removed memory tag and rely on bootloader to fill the right value
-> - use pin macros (from arch/arm/boot/dts/sama5d2-pinfunc.h) wherever
-> posible instead of pin numbers
-> - remove pinctrl_sensor_power and pinctrl_sensor_reset pin muxing
-> since they are not of intereset for this board
-> - use "pb4" label for user button instead of "bp1"
+> > Changes in v3:
+> > - remove qspi flash mapping for the moment
+> > - remove at24 and i2c bindings; this will be introduced when
+> > "Add at24 functionality to read form different EEPROM offsets" patch will
+> > be accepted
+> > - change the title of patch 5 from this series from
+> > "ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
+> > "ARM: dts: at91: at91-sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
+> > match the desired prefix
+> > 
+> > Changes in v2:
+> > o in at91-sama5d27_som1.dtsi:
+> > - increase bootloader and kernel size in flash map (with bootloader
+> > flash offset the dtb and kernel flash offsets were changed)
+> > - use right pin for ethernet-phy interrupt
+> > 
+> > o in at91-sama5d27_som1_ek.dts:
+> > - removed memory tag and rely on bootloader to fill the right value
+> > - use pin macros (from arch/arm/boot/dts/sama5d2-pinfunc.h) wherever
+> > posible instead of pin numbers
+> > - remove pinctrl_sensor_power and pinctrl_sensor_reset pin muxing
+> > since they are not of intereset for this board
+> > - use "pb4" label for user button instead of "bp1"
+> > 
+> > Claudiu Beznea (2):
+> >   ARM: dts: at91: at91-sama5d27_som1: add sama5d27 SoM1 support
+> >   ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support
+> > 
+> > Cristian Birsan (1):
+> >   drivers: soc: atmel: Add basic support for new sama5d2 SiPs
+> > 
+> > Cyrille Pitchen (1):
+> >   ARM: dts: at91: sama5d2: add QSPI nodes
+> > 
+> > Songjun Wu (1):
+> >   ARM: dts: at91: sama5d2: add isc node
+> > 
+> >  arch/arm/boot/dts/Makefile                  |   1 +
+> >  arch/arm/boot/dts/at91-sama5d27_som1.dtsi   | 178 +++++++++
+> >  arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 551 ++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/sama5d2.dtsi              |  38 ++
+> >  drivers/soc/atmel/soc.c                     |   8 +
+> >  drivers/soc/atmel/soc.h                     |   4 +
+> >  6 files changed, 780 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
+> >  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+> > 
 > 
-> Claudiu Beznea (2):
->   ARM: dts: at91: at91-sama5d27_som1: add sama5d27 SoM1 support
->   ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support
 > 
-> Cristian Birsan (1):
->   drivers: soc: atmel: Add basic support for new sama5d2 SiPs
-> 
-> Cyrille Pitchen (1):
->   ARM: dts: at91: sama5d2: add QSPI nodes
-> 
-> Songjun Wu (1):
->   ARM: dts: at91: sama5d2: add isc node
-> 
->  arch/arm/boot/dts/Makefile                  |   1 +
->  arch/arm/boot/dts/at91-sama5d27_som1.dtsi   | 178 +++++++++
->  arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 551 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/sama5d2.dtsi              |  38 ++
->  drivers/soc/atmel/soc.c                     |   8 +
->  drivers/soc/atmel/soc.h                     |   4 +
->  6 files changed, 780 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
->  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-> 
-
-
--- 
-Nicolas Ferre
+> -- 
+> Nicolas Ferre
