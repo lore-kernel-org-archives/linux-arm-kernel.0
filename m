@@ -1,43 +1,195 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 6 Jul 2017 21:39:23 +0200
-Subject: v4.13-rc0 on nokia n900: spinlock bad magic
-In-Reply-To: <201707062015.54343@pali>
-References: <20170706180337.GA26875@amd>
- <201707062015.54343@pali>
-Message-ID: <20170706193922.GA31830@amd>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 6 Jul 2017 14:46:28 -0500
+Subject: [PATCH v9 0/3] Tango PCIe controller support
+In-Reply-To: <d04e1632-17b8-85f9-31c4-b789d55cc853@free.fr>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
+ <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
+ <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
+ <5a1207cb-31fd-6b85-86af-8c37bd57ad4f@free.fr>
+ <20170705213419.GD25063@bhelgaas-glaptop.roam.corp.google.com>
+ <8dcab663-245b-880a-be3a-2965fd12d663@free.fr>
+ <20170706033946.GO13824@bhelgaas-glaptop.roam.corp.google.com>
+ <d04e1632-17b8-85f9-31c4-b789d55cc853@free.fr>
+Message-ID: <20170706194628.GQ13824@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> On Thursday 06 July 2017 20:03:37 Pavel Machek wrote:
-> > Hi!
-> > 
-> > I don't think this is new in v4.13, but perhaps someone knows how to
-> > debug it?
-> > 
-> > [ 5611.801147] g_ether gadget: packet filter 0e
-> > [ 5611.801177] g_ether gadget: ecm req21.43 v000e i0000 l0
-> > [ 5668.771453] BUG: spinlock bad magic on CPU#0, kworker/u2:3/9745
-> > [ 5668.771850]  lock: 0xce63ef20, .magic: 00000000, .owner:
-> > <none>/-1, .owner_cpu: 0
-> > [ 5668.772277] CPU: 0 PID: 9745 Comm: kworker/u2:3 Tainted: G       
-> > W 4.12.0-03002-gec979a4-dirty #40
-> > [ 5668.772796] Hardware name: Nokia RX-51 board
-> > [ 5668.773071] Workqueue: phy1 wl1251_irq_work
+On Thu, Jul 06, 2017 at 02:26:44PM +0200, Mason wrote:
+> On 06/07/2017 05:39, Bjorn Helgaas wrote:
 > 
-> I do not remember that I saw this problem.
+> > On Wed, Jul 05, 2017 at 11:59:33PM +0200, Mason wrote:
+> >
+> >> There were a few nits I wanted to address:
+> >>
+> >> - Since we added suppress_bind_attrs = true, probe()
+> >> can only be called at init, so I wanted to mark __init
+> >> all the probe functions, to save space.
+> >>
+> >> - I left the definition of MSI_MAX in the wrong patch
 
-I guess I have some debug options enabled... do you want a .config to
-play with?
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/3f79ea61/attachment.sig>
+I moved this.
+
+> >> - You put a pointer to the pdev in the struct tango_pcie.
+> >> I think this is redundant, since the pdev already has a
+> >> pointer to the struct, as drvdata.
+> >> So I wanted to change tango_msi_probe() to take a pdev
+> >> as argument (to make it more like an actual probe function)
+> >> and derive pcie from pdev, instead of the other way around.
+> > 
+> > I don't think tango_msi_probe() is really a "probe" function.  It's
+> > all part of the tango driver, and it's not claiming a separate piece
+> > of hardware.
+> 
+> I agree that tango_msi_probe() is not a probe function;
+> it is merely a piece of the actual probe function (static
+> with single call site). I split the probe function in two,
+> because it seemed to make sense at the time.
+> 
+> Perhaps it's better to inline tango_msi_probe? That would
+> avoid the issues of that function's name and parameters.
+> 
+> If you think it's better to keep the two pieces separate,
+> I can rename the MSI part to tango_msi_init() or some such.
+> But I'd like to avoid adding unnecessary fields to the struct.
+
+I think it's better to follow the structure of existing drivers unless
+your hardware dictates a different model.  Same with adding fields to
+the struct.  If you have a better way of doing it that works for all
+the drivers, great -- but please change all the drivers to do it that
+way.  If it's a matter of saving one pointer per system, by making the
+code look different than other drivers, that's not so great.
+
+> >  So I would keep the name and structure similar to these:
+> > 
+> >   advk_pcie_init_msi_irq_domain()
+> >   nwl_pcie_init_msi_irq_domain()
+> > 
+> > BTW, those functions use irq_domain_add_linear(), while you are one of
+> > the very few callers of irq_domain_create_linear().  Why the difference?
+> > If your code does basically the same thing, it's very helpful to me if
+> > it *looks* basically the same.
+> 
+> It was a suggestion from Marc Z on 2017-03-23.
+> 
+> <QUOTE>
+> + irq_dom = irq_domain_add_linear(NULL, MSI_COUNT, &msi_domain_ops, pcie);
+> 
+> Use irq_domain_create_linear, pass the same fwnode.
+> </QUOTE>
+> 
+> It seems odd to pass NULL as the first argument.
+> (As I had first done, when copying the Altera driver.)
+
+I'm a little queasy about the MSI stuff.  It doesn't feel very settled
+yet, and I don't want to keep tweaking it at this stage.
+
+How about we merge the base patch for v4.13 and deal with MSIs for
+v4.14?  I need confirmation that the base patch works ASAP.  Or if
+it's not really useful by itself, we can defer it all until v4.14.
+
+For v4.14, I'd really like to see some unification of naming and
+structure across the drivers in how they handle IRQ domains, and
+then have tango follow whatever pattern that ends up being.
+
+Right now we don't have much consistency in the names of legacy and
+MSI IRQ domains, what device_node they're associated with, how we
+handle the 0-3 vs 1-4 legacy numbering, pci_msi_create_irq_domain()
+usage, etc.  Some of this may be dictated by different hardware
+requirements, but I doubt all of it is.
+
+Bjorn
+
+
+P.S. Notes about current IRQ domain usage below, just for reference
+about where I'm seeing inconsistencies.
+
+    advk_pcie_probe			# "marvell,armada-3700-pcie"
+      advk_pcie_init_irq_domain
+        pcie_intc_node =  of_get_next_child(node, NULL)
+        irq_domain_add_linear(pcie_intc_node, ...)
+      advk_pcie_init_msi_irq_domain
+        pcie->msi_inner_domain = irq_domain_add_linear(NULL, ...)
+        pcie->msi_domain = pci_msi_create_irq_domain(...)
+
+    altera_pcie_probe			# "altr,pcie-root-port-1.0"
+      altera_pcie_init_irq_domain
+        pcie->irq_domain = irq_domain_add_linear(node, ...)
+    altera_msi_probe			# "altr,msi-1.0"
+      altera_allocate_domains
+        msi->inner_domain = irq_domain_add_linear(NULL, ...)
+        msi->msi_domain = pci_msi_create_irq_domain(fwnode, ...)
+
+    iproc_pcie_pltfm_probe		# "brcm,iproc-pcie", etc
+      iproc_pcie_setup
+        iproc_pcie_msi_enable
+          iproc_msi_init
+            iproc_msi_alloc_domains
+              msi->inner_domain = irq_domain_add_linear(NULL, ...)
+              msi->msi_domain = pci_msi_create_irq_domain(...)
+
+    rcar_pcie_probe			# "renesas,pcie-r8a7779", etc
+      rcar_pcie_enable_msi
+        msi->domain = irq_domain_add_linear(dev->of_node, ...)
+
+    rockchip_pcie_probe			# "rockchip,rk3399-pcie"
+      rockchip_pcie_init_irq_domain
+        intc = of_get_next_child(dev->of_node, NULL)
+        rockchip->irq_domain = irq_domain_add_linear(intc, ...)
+  
+    xilinx_pcie_probe			# "xlnx,axi-pcie-host-1.00.a"
+      xilinx_pcie_init_irq_domain
+        pcie_intc_node = of_get_next_child(node, NULL)
+        port->leg_domain = irq_domain_add_linear(pcie_intc_node, ...)
+        port->msi_domain = irq_domain_add_linear(node, ...)
+
+    nwl_pcie_probe			# "xlnx,nwl-pcie-2.11"
+      nwl_pcie_init_irq_domain
+        legacy_intc_node = of_get_next_child(node, NULL)
+        pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node, ...)
+        nwl_pcie_init_msi_irq_domain
+          msi->dev_domain = irq_domain_add_linear(NULL, ...)
+          msi->msi_domain = pci_msi_create_irq_domain(fwnode, ...)
+
+    faraday_pci_probe			# "faraday,ftpci100", etc
+      faraday_pci_setup_cascaded_irq
+        intc = of_get_next_child(p->dev->of_node, NULL)
+        p->irqdomain = irq_domain_add_linear(intc, ...)
+
+    hv_pci_probe
+      hv_pcie_init_irq_domain
+        hbus->irq_domain = pci_msi_create_irq_domain(...)
+
+    tegra_pcie_probe			# "nvidia,tegra210-pcie", etc
+      tegra_pcie_enable_msi
+        msi->domain = irq_domain_add_linear(dev->of_node, ...)
+
+    xgene_pcie_probe_bridge		# "apm,xgene-pcie"
+    xgene_msi_probe			# "apm,xgene1-msi"
+      xgene_allocate_domains
+        msi->inner_domain = irq_domain_add_linear(NULL, ...)
+        msi->msi_domain = pci_msi_create_irq_domain(...)
+
+    vmd_probe				# [8086:201d]
+      vmd_enable_domain
+        vmd->irq_domain = pci_msi_create_irq_domain(NULL, ...)
+
+    dra7xx_pcie_probe			# "ti,dra7-pcie", etc
+      dra7xx_add_pcie_port
+        dra7xx_pcie_init_irq_domain
+          pcie_intc_node =  of_get_next_child(node, NULL)
+          dra7xx->irq_domain = irq_domain_add_linear(pcie_intc_node, ...)
+
+    dw_pcie_host_init
+      pp->ops->msi_host_init
+        ks_dw_pcie_msi_host_init	# .msi_host_init
+          pp->irq_domain = irq_domain_add_linear(ks_pcie->msi_intc_np, ...)
+
+    ks_pcie_probe			# "ti,keystone-pcie"
+      ks_add_pcie_port
+        ks_dw_pcie_host_init
+          ks_pcie->legacy_irq_domain = irq_domain_add_linear(ks_pcie->legacy_intc_np, ...)
+
+    *_add_pcie_port
+      dw_pcie_host_init
+        pp->irq_domain = irq_domain_add_linear(dev->of_node, ...) # generic
