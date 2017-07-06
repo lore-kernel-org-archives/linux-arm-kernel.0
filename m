@@ -1,45 +1,41 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 07 Jul 2017 07:13:30 +0800
-Subject: [PATCH 2/2] pinctrl: sunxi: add support of R40 to A10 pinctrl
- driver
-In-Reply-To: <20170706205030.e6wzn5n7ix3443cl@flea>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Fri, 07 Jul 2017 07:21:19 +0800
+Subject: [linux-sunxi] Re: [PATCH 1/2] pinctrl: sunxi: add a missing
+ function of A10/A20 pinctrl driver
+In-Reply-To: <20170706204646.3akr57fo6c2ok4wn@flea>
 References: <20170706142822.20296-1-icenowy@aosc.io>
- <20170706142822.20296-3-icenowy@aosc.io>
- <20170706205030.e6wzn5n7ix3443cl@flea>
-Message-ID: <72337BAD-680C-46BC-8DF5-645028E08F65@aosc.io>
+ <20170706142822.20296-2-icenowy@aosc.io>
+ <20170706204646.3akr57fo6c2ok4wn@flea>
+Message-ID: <a55741a065b818d8ff3843471da61c0e@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+? 2017-07-07 04:46?Maxime Ripard ???
+> Hi,
+> 
+> On Thu, Jul 06, 2017 at 10:28:21PM +0800, Icenowy Zheng wrote:
+>> The PH16 pin has a function with mux id 0x5, which is the DET pin of 
+>> the
+>> "sim" (smart card reader) IP block.
+>> 
+>> This function is missing both in the old A10 and A20 drivers, so it's
+>> not found during the merge of these two drivers.
+>> 
+>> Add it to the driver. As we now merged A20 pinctrl driver to the A10
+>> one, we need to only fix the A10 driver now.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> 
+> I'm not sure what you mean there. It's not mentionned in the A10
+> datasheet, and neither in the A20. Where did you get that info from?
 
+It's mentioned in all newest datasheets: "A10 Datasheet V1.70.pdf" and
+"A20 Datasheet V1.41 20131230.pdf".
 
-? 2017?7?7? GMT+08:00 ??4:50:30, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Thu, Jul 06, 2017 at 10:28:22PM +0800, Icenowy Zheng wrote:
->>  	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 0),
->>  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->>  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->> -		  SUNXI_FUNCTION(0x2, "i2c0")),		/* SCK */
->> +		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SCK */
->> +		  SUNXI_FUNCTION_VARIANT(0x3,
->> +					 "pll_lock_dbg",
->> +					 PINCTRL_SUN8I_R40)),
->
->You have a number of lines where the wrapping is not consistent with
->the rest, such as this one, but also...
-
-I think this one is because of extraordinary function name.
-
->
->>  	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 20),
->>  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->>  		  SUNXI_FUNCTION(0x1, "gpio_out"),
->> -		  SUNXI_FUNCTION(0x2, "i2c2")),		/* SCK */
->> +		  SUNXI_FUNCTION(0x2, "i2c2"),		/* SCK */
->> +		  SUNXI_FUNCTION_VARIANT(0x4,
->> +					 "pwm",		/* PWM4 */
->> +					 PINCTRL_SUN8I_R40)),
->
->... this one for example. Please fix this.
->
->Looks good otherwise.
->
->Maxime
+> 
+> Maxime
+> 
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
