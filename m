@@ -1,80 +1,72 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 06 Jul 2017 09:18:25 +0200
-Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
-In-Reply-To: <20170705171607.GG4902@n2100.armlinux.org.uk> (Russell King's
- message of "Wed, 5 Jul 2017 18:16:07 +0100")
-References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
- <20170705171607.GG4902@n2100.armlinux.org.uk>
-Message-ID: <874luqf2ym.fsf@free-electrons.com>
+From: Claudiu.Beznea@microchip.com (m18063)
+Date: Thu, 6 Jul 2017 10:31:04 +0300
+Subject: [PATCH v2 4/5] ARM: dts: at91: at91-sama5d27_som1: add sama5d27
+ SoM1 support
+In-Reply-To: <a74f9110-ced4-5412-8ed2-f57f65557f7e@microchip.com>
+References: <1499086572-6083-1-git-send-email-claudiu.beznea@microchip.com>
+ <1499086572-6083-5-git-send-email-claudiu.beznea@microchip.com>
+ <20170705152343.b735on6edg3vfsp3@rfolt0960.corp.atmel.com>
+ <a74f9110-ced4-5412-8ed2-f57f65557f7e@microchip.com>
+Message-ID: <947abe4f-af3a-78de-c800-728b56c53c6b@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On mer., juil. 05 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-> On Wed, Jul 05, 2017 at 06:13:33PM +0200, Gregory CLEMENT wrote:
->> Enable the PCIe interface on the MACCHIATOBin board. It is located on
->> CON12 and is 4 lanes capable.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> Why do you folk at free-electrons like doing half a job all the friggin
-> time?
->
-> You know I have complete patches for mcbin, but you pointedly won't look
-> at them at all - except when you have a problem and want to test my tree.
-> And even then, you ignore my work (despite testing that it works), and
-> you still recreate my patches.
->
-> This is really frustrating and insane behaviour on your part.
 
-Sorry for this, I wrongly assumed that if you had the PCIe part you
-would have already submitted it. Also I didn't expect there was a gpio
-dependency with PCIe because until now I never saw the reset-gpio for
-PCIe with the controller I use.
+On 05.07.2017 18:29, Nicolas Ferre wrote:
+> On 05/07/2017 at 17:23, Ludovic Desroches wrote:
+>> On Mon, Jul 03, 2017 at 03:56:11PM +0300, Claudiu Beznea wrote:
+>>> Add specific DTS file and bindings for sama5d27 SoM1 board.
+>>>
+>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>>> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+>>> ---
+>>>  arch/arm/boot/dts/at91-sama5d27_som1.dtsi | 178 ++++++++++++++++++++++++++++++
+>>>  1 file changed, 178 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91-sama5d27_som1.dtsi b/arch/arm/boot/dts/at91-sama5d27_som1.dtsi
+>>> new file mode 100644
+>>> index 0000000..c3a1dc8
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/at91-sama5d27_som1.dtsi
+>>
+>> [...]
+>>
+>>> +
+>>> +			i2c0: i2c at f8028000 {
+>>> +				dmas = <0>, <0>;
+>>> +				pinctrl-names = "default";
+>>> +				pinctrl-0 = <&pinctrl_i2c0_default>;
+>>> +				i2c-sda-hold-time-ns = <350>;
+>>> +				status = "disabled";
+>>> +
+>>> +				24aa at 50 {
+>>> +					compatible = "24mac602";
+>>> +					reg = <0x50>;
+>>> +					pagesize = <8>;
+>>> +					start-offset = /bits/ 8 <0xf8>;
+>>
+>> Are you sure about the offset? I thought it was 0xfa but maybe I am
+>> wrong.
+Indeed, it is 0xfa. I chose 0xf8 because at24 driver will truncate the
+eeprom size at something that is power of 2 (I don't know the reason behind
+this, maybe it is something historical, maybe it is something I don't get
+it for the moment). If I would use 24mac402 (which EEPROM size should be
+6 bytes but due to the truncation it will become of 4 bytes) and 0xfa as
+starting offset I could read only 4 octets. Due to this I chose to use
+24mac602 which length is 8 = 2^3 bytes, the reading will start from 0xf8
+but the first 2 bytes will not be of interest.
+Sorry that I forgot to mention this in the cover letter.
 
->
-> Here's what I have:
->
-> +&cpm_pcie0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&cpm_pcie_pins>;
-> +       num-lanes = <4>;
-> +       reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
-> +       status = "okay";
-> +};
-> +
->
-> +       cpm_pcie_pins: pcie-pins {
-> +               marvell,pins = "mpp52";
-> +               marvell,function = "gpio";
-> +       };
->
-> Since you have merged GPIO and pinmux support for the v4.13 window,
-> there's absolutely no reason not to include the GPIO bits.  In fact,
-> there's no reason not to consider using my bloody patches.
->
-> Except your stupid idiotic NiH problem that you seem to have.
->
-> I know that your behaviour in regard of this has been discussed within
-> Marvell, and people are getting unhappy with free electron's attitude
-> over this.  You need to change, and start working _with_ people instead
-> of constantly screwing people over.
->
-> So, NAK on your patch.
->
-> Once v4.13-rc1 is out, I'll update my patch series for the screw-over
-> free-electrons has already done, and post some patches.  I can't do it
-> sooner, your work is scattered all over the place which makes it
+> 
+> Moreover, as the binding for this is not yet accepted I would advice to
+> remove this part for now. It will be easier for synchronization with i2c
+> eeprom.
+Yes, I will remove this part form in the 3rd version.
 
-Actually everything is available in the linux-next branch since one or
-two weeks. So you can rebase and send your series right now.
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+Claudiu
+> 
+> Best regards,
+> 
