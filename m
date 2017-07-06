@@ -1,97 +1,51 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Thu, 6 Jul 2017 14:20:19 +0200
-Subject: [PATCH v3 1/5] dt-bindings: Document the STM32 DMAMUX bindings
+Date: Thu, 6 Jul 2017 14:20:21 +0200
+Subject: [PATCH v3 3/5] dt-bindings: stm32-dma: Add property to handle STM32
+ DMAMUX
 In-Reply-To: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1499343623-5964-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1499343623-5964-4-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation of device tree bindings for the STM32
-DMAMUX.
+This patch adds an optional property needed for STM32 DMA controller
+addressed via STM32 DMAMUX.
 
 Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
  Version history:
     v3:
-        * change compatible to st,stm32h7-dmamux to be mode Soc specific
-        * add verbosity in dma-cells
+        * None
     v2:
-        * Move clock bindings from optional to mandatory one
-        * Drop channelID bindings as managed dynamically from now on by
-          DMAMUX driver.
+        * Typo fix
 ---
 ---
- .../devicetree/bindings/dma/stm32-dmamux.txt       | 60 ++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+ Documentation/devicetree/bindings/dma/stm32-dma.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-new file mode 100644
-index 0000000..abdb5ed
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-@@ -0,0 +1,60 @@
-+STM32 DMA MUX (DMA request router)
-+
-+Required properties:
-+- compatible:	"st,stm32h7-dmamux"
-+- reg:		Memory map for accessing module
-+- #dma-cells:	Should be set to <3>.
-+		First parameter is request line number.
-+		Second is DMA channel configuration
-+		Third is Fifo threshold
-+		For more details about the three cells, please see
-+		stm32-dma.txt documentation binding file
-+- dma-masters:	Phandle pointing to the DMA controller
-+
-+Optional properties:
-+- dma-channels : Number of DMA channels supported.
-+- dma-requests : Number of DMA requests supported.
-+- resets: Reference to a reset controller asserting the DMA controller
-+- clocks: Input clock of the DMAMUX instance.
-+
-+Example:
-+
-+/* DMA controller */
-+dma2: dma-controller at 40026400 {
-+	compatible = "st,stm32-dma";
-+	reg = <0x40026400 0x400>;
-+	interrupts = <56>,
-+		     <57>,
-+		     <58>,
-+		     <59>,
-+		     <60>,
-+		     <68>,
-+		     <69>,
-+		     <70>;
-+	clocks = <&clk_hclk>;
-+	#dma-cells = <4>;
-+	st,mem2mem;
-+	resets = <&rcc 150>;
-+	st,dmamux;
-+	dma-channels = <8>;
-+};
-+
-+/* DMA mux */
-+dmamux2: dma-router at 40020820 {
-+	compatible = "st,stm32h7-dmamux";
-+	reg = <0x40020800 0x1c>;
-+	#dma-cells = <3>;
-+	dma-requests = <128>;
-+	dma-masters = <&dma2>;
-+};
-+
-+/* DMA client */
-+usart1: serial at 40011000 {
-+	compatible = "st,stm32-usart", "st,stm32-uart";
-+	reg = <0x40011000 0x400>;
-+	interrupts = <37>;
-+	clocks = <&clk_pclk2>;
-+	dmas = <&dmamux2 41 0x414 0>,
-+	       <&dmamux2 42 0x414 0>;
-+	dma-names = "rx", "tx";
-+};
+diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+index 4408af6..340c918 100644
+--- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
++++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+@@ -16,6 +16,9 @@ Optional properties:
+ - resets: Reference to a reset controller asserting the DMA controller
+ - st,mem2mem: boolean; if defined, it indicates that the controller supports
+   memory-to-memory transfer
++- st,dmamux: boolean; if defined, it indicates that the controller is behind a
++  DMA multiplexer. In that case, using dma instances doesn't work for DMA
++  clients. They have to use dma-router instances.
+ 
+ Example:
+ 
+@@ -39,7 +42,7 @@ Example:
+ * DMA client
+ 
+ DMA clients connected to the STM32 DMA controller must use the format
+-described in the dma.txt file, using a five-cell specifier for each
++described in the dma.txt file, using a four-cell specifier for each
+ channel: a phandle to the DMA controller plus the following four integer cells:
+ 
+ 1. The channel id
 -- 
 2.7.4
