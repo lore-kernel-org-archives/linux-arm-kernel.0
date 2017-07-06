@@ -1,16 +1,16 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 6 Jul 2017 19:38:41 +0200
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 6 Jul 2017 18:39:49 +0100
 Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
 In-Reply-To: <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
 References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
  <20170704233219.18790-1-afaerber@suse.de>
  <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
  <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
-Message-ID: <20170706173841.jwaskrrkooget6nk@piout.net>
+Message-ID: <20170706173949.GC2068@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2017 at 19:17:28 +0200, Andreas F?rber wrote:
+On Thu, Jul 06, 2017 at 07:17:28PM +0200, Andreas F?rber wrote:
 > Am 05.07.2017 um 04:36 schrieb Florian Fainelli:
 > > On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
 > >> Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
@@ -48,12 +48,29 @@ On 06/07/2017 at 19:17:28 +0200, Andreas F?rber wrote:
 > arch/arm/mach-at91/pm.c:        pm_bu->canary = virt_to_phys(&canary);
 > arch/arm/mach-at91/pm.c:        pm_bu->resume = virt_to_phys(cpu_resume);
 > 
+> What exactly is the difference between the two macros that makes it
+> wrong despite apparently working? 
 
-They can probably use __pa_symbol() (I must admit I didn't know about
-it before this email)
+virt_to_phys() is intended to operate on the linear/direct mapping of
+RAM.
 
+__pa_symbol() is intended to operate on the kernel mapping, which may
+not be in the linear/direct mapping on all architectures. e.g. arm64 and
+x86_64 map the kernel image and RAM separately.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+On 32-bit ARM the kernel image mapping is tied to the linear/direct
+mapping, so that works, but as it's semantically wrong (and broken for
+generic code), the DEBUG_VIRTUAL checks complain.
+
+> In particular I am wondering whether
+> the SoC/board vendors in CC need to fix it in their 3.10 trees, too.
+> 
+> In any case if this is a bug, I would rather fix it in a separate patch
+> for 4.13 and leave the name swap (this patch) for 4.14.
+
+To the best of my knowledge there's no functional problem in this
+particular case, though it should be cleaned up so as to keep
+DEBUG_VRITUAL useful.
+
+Thanks,
+Mark.
