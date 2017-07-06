@@ -1,29 +1,62 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 6 Jul 2017 12:17:30 -0500
-Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <065edbdb-3a7f-2608-3cc0-3876f55d414b@huawei.com>
-References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
- <43e01fca-a746-90d2-fdfa-c63f1d56ef5f@huawei.com>
- <065edbdb-3a7f-2608-3cc0-3876f55d414b@huawei.com>
-Message-ID: <20170706171729.GP13824@bhelgaas-glaptop.roam.corp.google.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 6 Jul 2017 19:17:28 +0200
+Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
+In-Reply-To: <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
+References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
+ <20170704233219.18790-1-afaerber@suse.de>
+ <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
+Message-ID: <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 08:58:51PM +0800, Ding Tianhong wrote:
-> Hi Bjorn:
+Am 05.07.2017 um 04:36 schrieb Florian Fainelli:
+> On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
+>> Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
+>> bogus holding pen") simplified the S500 SMP code by removing a loop for
+>> pen_release in owl_secondary_boot(). Since then it is only calling
+>> owl_v7_invalidate_l1() before branching to secondary_startup().
+>>
+>> The owl_v7_invalidate_l1() assembler function is superfluous, too.
+>> Therefore drop owl_secondary_boot() and use secondary_boot() directly.
+>>
+>> Cc: David Liu <liuwei@actions-semi.com>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
 > 
-> Could you please give some feedback about this patchset, it looks like no more comments for more than a week,
-> thanks. :)
+>> -	writel(virt_to_phys(owl_secondary_startup),
+>> +	writel(virt_to_phys(secondary_startup),
+>> 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
+> 
+> This is a kernel symbol so please use __pa_symbol() here, also you might want to build with CONFIG_DEBUG_VIRTUAL and see if you get other warnings about using virt_to_phys() in the owl platform code (I did not check if there are other uses)
 
-I was on vacation when you posted it, but don't worry, it's still in
-the queue:
+Thanks for the report. There are no other such uses in mach-actions, but
+git-grep'ing for virt_to_phys in arch/arm/mach-* I spot at least one
+other such usage in mach-oxnas:
 
-  https://patchwork.ozlabs.org/project/linux-pci/list
+arch/arm/mach-oxnas/platsmp.c:
+writel(virt_to_phys(ox820_secondary_startup),
 
-v4.12 was just released, so it's obviously too late for that.  The
-v4.13 merge window is open, so it's too late for v4.13 as well (we
-need stuff in -next before the merge window).
+as well as this in mach-mvebu:
 
-There's still plenty of time to work on this for v4.14.
+arch/arm/mach-mvebu/platsmp.c:  writel(virt_to_phys(boot_addr), base +
+MV98DX3236_CPU_RESUME_ADDR_REG);
 
-Bjorn
+and these in mach-at91:
+
+arch/arm/mach-at91/pm.c:        pm_bu->canary = virt_to_phys(&canary);
+arch/arm/mach-at91/pm.c:        pm_bu->resume = virt_to_phys(cpu_resume);
+
+What exactly is the difference between the two macros that makes it
+wrong despite apparently working? In particular I am wondering whether
+the SoC/board vendors in CC need to fix it in their 3.10 trees, too.
+
+In any case if this is a bug, I would rather fix it in a separate patch
+for 4.13 and leave the name swap (this patch) for 4.14.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
