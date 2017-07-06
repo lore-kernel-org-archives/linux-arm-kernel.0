@@ -1,56 +1,77 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 6 Jul 2017 11:35:26 +0300
-Subject: [PATCH v3 2/5] ARM: dts: at91: sama5d2: add isc node
+Date: Thu, 6 Jul 2017 11:35:27 +0300
+Subject: [PATCH v3 3/5] drivers: soc: atmel: Add basic support for new sama5d2
+ SiPs
 In-Reply-To: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1499330129-29319-3-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1499330129-29319-4-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Songjun Wu <songjun.wu@microchip.com>
+From: Cristian Birsan <cristian.birsan@microchip.com>
 
-Add isc node, it conflicts with pdmic and uart3.
+Add basic support for new sama5d2 System in a Package chips.
 
-Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
-[claudiu.beznea at microchip.com: place isc node after hlcdc node]
+Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+[claudiu.beznea at microchip.com: use MiB instead of MB]
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/soc/atmel/soc.c | 8 ++++++++
+ drivers/soc/atmel/soc.h | 4 ++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 71e9d83..9d13b55 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -416,6 +416,17 @@
- 				};
- 			};
+diff --git a/drivers/soc/atmel/soc.c b/drivers/soc/atmel/soc.c
+index c1363c8..4dd03b0 100644
+--- a/drivers/soc/atmel/soc.c
++++ b/drivers/soc/atmel/soc.c
+@@ -72,6 +72,8 @@ static const struct at91_soc __initconst socs[] = {
+ 		 "sama5d21", "sama5d2"),
+ 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D22CU_EXID_MATCH,
+ 		 "sama5d22", "sama5d2"),
++	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D225C_D1M_EXID_MATCH,
++		 "sama5d225c 16MiB SiP", "sama5d2"),
+ 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D23CU_EXID_MATCH,
+ 		 "sama5d23", "sama5d2"),
+ 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D24CX_EXID_MATCH,
+@@ -84,10 +86,16 @@ static const struct at91_soc __initconst socs[] = {
+ 		 "sama5d27", "sama5d2"),
+ 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27CN_EXID_MATCH,
+ 		 "sama5d27", "sama5d2"),
++	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27C_D1G_EXID_MATCH,
++		 "sama5d27c 128MiB SiP", "sama5d2"),
++	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27C_D5M_EXID_MATCH,
++		 "sama5d27c 64MiB SiP", "sama5d2"),
+ 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D28CU_EXID_MATCH,
+ 		 "sama5d28", "sama5d2"),
+ 	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D28CN_EXID_MATCH,
+ 		 "sama5d28", "sama5d2"),
++	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D28C_D1G_EXID_MATCH,
++		 "sama5d28c 128MiB SiP", "sama5d2"),
+ 	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D31_EXID_MATCH,
+ 		 "sama5d31", "sama5d3"),
+ 	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D33_EXID_MATCH,
+diff --git a/drivers/soc/atmel/soc.h b/drivers/soc/atmel/soc.h
+index a90bd5b..94cd5d1 100644
+--- a/drivers/soc/atmel/soc.h
++++ b/drivers/soc/atmel/soc.h
+@@ -64,14 +64,18 @@ at91_soc_init(const struct at91_soc *socs);
  
-+			isc: isc at f0008000 {
-+				compatible = "atmel,sama5d2-isc";
-+				reg = <0xf0008000 0x4000>;
-+				interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-+				clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
-+				clock-names = "hclock", "iscck", "gck";
-+				#clock-cells = <0>;
-+				clock-output-names = "isc-mck";
-+				status = "disabled";
-+			};
-+
- 			ramc0: ramc at f000c000 {
- 				compatible = "atmel,sama5d3-ddramc";
- 				reg = <0xf000c000 0x200>;
-@@ -925,6 +936,11 @@
- 						atmel,clk-output-range = <0 83000000>;
- 					};
+ #define SAMA5D2_CIDR_MATCH		0x0a5c08c0
+ #define SAMA5D21CU_EXID_MATCH		0x0000005a
++#define SAMA5D225C_D1M_EXID_MATCH	0x00000053
+ #define SAMA5D22CU_EXID_MATCH		0x00000059
+ #define SAMA5D22CN_EXID_MATCH		0x00000069
+ #define SAMA5D23CU_EXID_MATCH		0x00000058
+ #define SAMA5D24CX_EXID_MATCH		0x00000004
+ #define SAMA5D24CU_EXID_MATCH		0x00000014
+ #define SAMA5D26CU_EXID_MATCH		0x00000012
++#define SAMA5D27C_D1G_EXID_MATCH	0x00000033
++#define SAMA5D27C_D5M_EXID_MATCH	0x00000032
+ #define SAMA5D27CU_EXID_MATCH		0x00000011
+ #define SAMA5D27CN_EXID_MATCH		0x00000021
++#define SAMA5D28C_D1G_EXID_MATCH	0x00000013
+ #define SAMA5D28CU_EXID_MATCH		0x00000010
+ #define SAMA5D28CN_EXID_MATCH		0x00000020
  
-+					isc_gclk: isc_gclk {
-+						#clock-cells = <0>;
-+						reg = <46>;
-+					};
-+
- 					pdmic_gclk: pdmic_gclk {
- 						#clock-cells = <0>;
- 						reg = <48>;
 -- 
 2.7.4
