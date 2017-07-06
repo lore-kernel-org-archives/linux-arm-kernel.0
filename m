@@ -1,93 +1,117 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 6 Jul 2017 20:58:51 +0800
-Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <43e01fca-a746-90d2-fdfa-c63f1d56ef5f@huawei.com>
-References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
- <43e01fca-a746-90d2-fdfa-c63f1d56ef5f@huawei.com>
-Message-ID: <065edbdb-3a7f-2608-3cc0-3876f55d414b@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 6 Jul 2017 14:10:02 +0100
+Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
+In-Reply-To: <87inj5enck.fsf@free-electrons.com>
+References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
+ <20170705171607.GG4902@n2100.armlinux.org.uk>
+ <CAKv+Gu9DXFDDdx3Vrmo20cRtMcbS-MUa4MF5r-Odje68FinGOw@mail.gmail.com>
+ <20170705174403.GH4902@n2100.armlinux.org.uk>
+ <20170706143151.26e485fa@xhacker>
+ <CAKv+Gu-uU7SqcDZdoBfcJHjNMYYVtoH_QfQa7sffcLLOY=iQHQ@mail.gmail.com>
+ <87r2xtepfq.fsf@free-electrons.com>
+ <CAKv+Gu-MRXXEvDHuWfbRJ=if6sGGOScTCe8a97CCRp97O15RkQ@mail.gmail.com>
+ <87inj5enck.fsf@free-electrons.com>
+Message-ID: <CAKv+Gu9eMFbjuUFaoBCO10Z-30bkBOwjnokv0HUD4XO01VzNqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn:
+On 6 July 2017 at 13:55, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Ard,
+>
+>  On jeu., juil. 06 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> On 6 July 2017 at 13:10, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
+>>> Hi Ard,
+>>>
+>>>  On jeu., juil. 06 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>
+>>>> On 6 July 2017 at 07:31, Jisheng Zhang <jszhang@marvell.com> wrote:
+>>>>> On Wed, 5 Jul 2017 18:44:03 +0100 Russell King - ARM Linux wrote:
+>>>>>
+>>>>>> On Wed, Jul 05, 2017 at 06:36:53PM +0100, Ard Biesheuvel wrote:
+>>>>>> > On 5 July 2017 at 18:16, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+>>>>>> > > On Wed, Jul 05, 2017 at 06:13:33PM +0200, Gregory CLEMENT wrote:
+>>>>>> > >> Enable the PCIe interface on the MACCHIATOBin board. It is located on
+>>>>>> > >> CON12 and is 4 lanes capable.
+>>>>>> > >>
+>>>>>> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>>>> > >
+>>>>>> > > Why do you folk at free-electrons like doing half a job all the friggin
+>>>>>> > > time?
+>>>>>> > >
+>>>>>> > > You know I have complete patches for mcbin, but you pointedly won't look
+>>>>>> > > at them at all - except when you have a problem and want to test my tree.
+>>>>>> > > And even then, you ignore my work (despite testing that it works), and
+>>>>>> > > you still recreate my patches.
+>>>>>> > >
+>>>>>> > > This is really frustrating and insane behaviour on your part.
+>>>>>> > >
+>>>>>> > > Here's what I have:
+>>>>>> > >
+>>>>>> > > +&cpm_pcie0 {
+>>>>>> > > +       pinctrl-names = "default";
+>>>>>> > > +       pinctrl-0 = <&cpm_pcie_pins>;
+>>>>>> > > +       num-lanes = <4>;
+>>>>>> > > +       reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
+>>>>>> > > +       status = "okay";
+>>>>>> >
+>>>>>> > This needs 'num-viewport = <8>' as well, or the crazy Synopsys DWC
+>>>>>
+>>>>> IMHO, maybe putting this property into dtsi is better.
+>>>>>
+>>>>
+>>>> Good point. Do all instances of this IP that live on the SoC have 8
+>>>> viewports?
+>>>
+>>> In the Armada 80x0 datasheet there is no mention of viewport. However 2
+>>> days ago you said that "What I do know is that boards like the Marvell
+>>> 8040 based MacchiatoBin uses this IP in RC mode, and exposes config,
+>>> MMIO and IO space windows using only 2 viewports. Note that this is
+>>> essentially a bug in the DT description, given that its version of the
+>>> IP supports 8 viewports."[1]
+>>>
+>>> So you seem to know that the version of the IP used support the 8
+>>> viewports!
+>>>
+>>> What I can also say is that the in the datasheet there is no mention of
+>>> difference between the instance. The only thing that can differ is the
+>>> number of lane for each PCIe Port.
+>>>
+>>
+>> I am sure I found it in the datasheet somewhere. It is the number of
+>> ATU windows.
+>
+> Under the "Outbound iATU Features" and "Inbound iATU Features" I have
+> the following point:
+> "Up to 8 address regions programmable for location and size."
+>
+> Is that what you think about ?
+>
 
-Could you please give some feedback about this patchset, it looks like no more comments for more than a week,
-thanks. :)
+Yes.
 
-Ding
+>>
+>> In any case, I implemented ACPI firmware for the MacchiatoBin, which
+>> also involves programming the PCIe RC in a mode that is compatible
+>> with ECAM. This turns out to be impossible (which means you cannot
+>> implement a SBSA compatible platform with this SoC), but in attempting
+>> to do so, I used five different windows, for type 0 config cycles,
+>> type 1 config cycles, IO space, MMIO32 space and MMIO64 space (which
+>> the Synopsys DW PCIe controller does not even implement,
+>> unfortunately)
+>>
+>> Note that this also involved reprogramming all the memory translation
+>> windows from the secure firmware, to free up the region 0xc000_0000 -
+>> 0xefff_ffff for use by PCIe (config and MMIO32 space), and assigning a
+>> window 0x8_0000_0000 - 0x8_ffff_ffff for 64-bit MMIO BARs.
+>
+> Currently for the driver the only important information is having a
+> num-viewport greater than 2. So given all this we are OK if we add the
+> 'num-viewport = <8>' in all the PCIe port node in the dtsi file.
+>
 
-On 2017/6/29 13:47, Ding Tianhong wrote:
-> ping
-> 
-> On 2017/6/22 20:15, Ding Tianhong wrote:
->> Some devices have problems with Transaction Layer Packets with the Relaxed
->> Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
->> PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
->> devices with Relaxed Ordering issues, and a use of this new flag by the
->> cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
->> Ports.
->>
->> It's been years since I've submitted kernel.org patches, I appolgise for the
->> almost certain submission errors.
->>
->> v2: Alexander point out that the v1 was only a part of the whole solution,
->>     some platform which has some issues could use the new flag to indicate
->>     that it is not safe to enable relaxed ordering attribute, then we need
->>     to clear the relaxed ordering enable bits in the PCI configuration when
->>     initializing the device. So add a new second patch to modify the PCI
->>     initialization code to clear the relaxed ordering enable bit in the
->>     event that the root complex doesn't want relaxed ordering enabled.
->>
->>     The third patch was base on the v1's second patch and only be changed
->>     to query the relaxed ordering enable bit in the PCI configuration space
->>     to allow the Chelsio NIC to send TLPs with the relaxed ordering attributes
->>     set.
->>
->>     This version didn't plan to drop the defines for Intel Drivers to use the
->>     new checking way to enable relaxed ordering because it is not the hardest
->>     part of the moment, we could fix it in next patchset when this patches
->>     reach the goal.  
->>
->> v3: Redesigned the logic for pci_configure_relaxed_ordering when configuration,
->>     If a PCIe device didn't enable the relaxed ordering attribute default,
->>     we should not do anything in the PCIe configuration, otherwise we
->>     should check if any of the devices above us do not support relaxed
->>     ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
->>     the result if we get a return that indicate that the relaxed ordering
->>     is not supported we should update our device to disable relaxed ordering
->>     in configuration space. If the device above us doesn't exist or isn't
->>     the PCIe device, we shouldn't do anything and skip updating relaxed ordering
->>     because we are probably running in a guest.
->>
->> v4: Rename the functions pcie_get_relaxed_ordering and pcie_disable_relaxed_ordering
->>     according John's suggestion, and modify the description, use the true/false
->>     as the return value.
->>
->>     We shouldn't enable relaxed ordering attribute by the setting in the root
->>     complex configuration space for PCIe device, so fix it for cxgb4.
->>
->>     Fix some format issues.
->>
->> v5: Removed the unnecessary code for some function which only return the bool
->>     value, and add the check for VF device.
->>
->>     Make this patch set base on 4.12-rc5.
->>
->> v6: Fix the logic error in the need to enable the relaxed ordering attribute for cxgb4.
->>  
->> Casey Leedom (2):
->>   PCI: Add new PCIe Fabric End Node flag,
->>     PCI_DEV_FLAGS_NO_RELAXED_ORDERING
->>   net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
->>
->> Ding Tianhong (1):
->>   PCI: Enable PCIe Relaxed Ordering if supported
->>
->>  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
->>  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 ++++++++++
->>  drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +--
->>  drivers/pci/pci.c                               | 32 +++++++++++++++++++
->>  drivers/pci/probe.c                             | 41 +++++++++++++++++++++++++
->>  drivers/pci/quirks.c                            | 38 +++++++++++++++++++++++
->>  include/linux/pci.h                             |  4 +++
->>  7 files changed, 136 insertions(+), 2 deletions(-)
->>
+OK. If the x4 and the x1 versions of the description in the manual
+both contain the sentence about 8 the address regions, then I think it
+is safe to include it for all 6 instances of this IP.
