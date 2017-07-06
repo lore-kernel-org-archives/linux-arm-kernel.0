@@ -1,38 +1,43 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Thu, 6 Jul 2017 21:14:49 +0200
-Subject: Stack overflow in merge_fdt_bootargs()?
-Message-ID: <20170706191448.vbb72qev7o4frzld@localhost>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 6 Jul 2017 21:39:23 +0200
+Subject: v4.13-rc0 on nokia n900: spinlock bad magic
+In-Reply-To: <201707062015.54343@pali>
+References: <20170706180337.GA26875@amd>
+ <201707062015.54343@pali>
+Message-ID: <20170706193922.GA31830@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In arch/arm/boot/compressed/atags_to_fdt.c, we have
+Hi!
 
-static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
-{
-        char cmdline[COMMAND_LINE_SIZE];
-        const char *fdt_bootargs;
-        char *ptr = cmdline;
-        int len = 0;
+> On Thursday 06 July 2017 20:03:37 Pavel Machek wrote:
+> > Hi!
+> > 
+> > I don't think this is new in v4.13, but perhaps someone knows how to
+> > debug it?
+> > 
+> > [ 5611.801147] g_ether gadget: packet filter 0e
+> > [ 5611.801177] g_ether gadget: ecm req21.43 v000e i0000 l0
+> > [ 5668.771453] BUG: spinlock bad magic on CPU#0, kworker/u2:3/9745
+> > [ 5668.771850]  lock: 0xce63ef20, .magic: 00000000, .owner:
+> > <none>/-1, .owner_cpu: 0
+> > [ 5668.772277] CPU: 0 PID: 9745 Comm: kworker/u2:3 Tainted: G       
+> > W 4.12.0-03002-gec979a4-dirty #40
+> > [ 5668.772796] Hardware name: Nokia RX-51 board
+> > [ 5668.773071] Workqueue: phy1 wl1251_irq_work
+> 
+> I do not remember that I saw this problem.
 
-which means a stack frame of at least 1030 bytes. This is called very early
-on from head.S via atags_to_fdt(). How much stack space is available?
-
-I ask because all kernels after (but not including) v4.0.0 have hung with
-no output on my Trimslice, which runs an old boot loader without device tree
-support. The kernels for it have CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND
-enabled to pick up the command line passed in by the boot loader using the
-old ATAG mechanism. Between v4.0.0 and v4.1-rc1, head.S was changed by commit
-c2607f74aad96d18316a6e709b40e0ffe9def148 so that potentially much less room
-is left between the FDT and the stack[1]. The size of the DTB is 21152 bytes,
-and prevously, the buffer set aside for manipulating the DTB was 64 kB while
-now, it comes out to 32 kB in my case.
-
-I've managed to boot a newer kernel by hacking merge_fdt_bootargs() so the
-stack frame stays below 1024 bytes, so a stack overflow seems to be a
-possible explanation.
-
-[1] The way head.S is written suggests to me that on entry to head.S, the stack
-follows immediately after the appended DTB.
-
+I guess I have some debug options enabled... do you want a .config to
+play with?
+									Pavel
 -- 
-Rask Ingemann Lambertsen
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/3f79ea61/attachment.sig>
