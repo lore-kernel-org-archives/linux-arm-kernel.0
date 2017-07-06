@@ -1,50 +1,60 @@
-From: xiyou.wangcong@gmail.com (Cong Wang)
-Date: Thu, 6 Jul 2017 13:45:32 -0700
-Subject: v4.13-rc0 on nokia n900: spinlock bad magic
-In-Reply-To: <20170706180337.GA26875@amd>
-References: <20170706180337.GA26875@amd>
-Message-ID: <CAM_iQpXm8y55p-PVB2wqWxCGeOsMmLZrGgg-ZbozDTxXeSQOCg@mail.gmail.com>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Thu, 6 Jul 2017 15:46:00 -0500
+Subject: [PATCH] mtk-mdp: constify vb2_ops structure
+Message-ID: <20170706204600.GA18061@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 6, 2017 at 11:03 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> Hi!
->
-> I don't think this is new in v4.13, but perhaps someone knows how to
-> debug it?
->
-> [ 5611.801147] g_ether gadget: packet filter 0e
-> [ 5611.801177] g_ether gadget: ecm req21.43 v000e i0000 l0
-> [ 5668.771453] BUG: spinlock bad magic on CPU#0, kworker/u2:3/9745
-> [ 5668.771850]  lock: 0xce63ef20, .magic: 00000000, .owner: <none>/-1,
-> .owner_cpu: 0
-> [ 5668.772277] CPU: 0 PID: 9745 Comm: kworker/u2:3 Tainted: G        W
-> 4.12.0-03002-gec979a4-dirty #40
-> [ 5668.772796] Hardware name: Nokia RX-51 board
-> [ 5668.773071] Workqueue: phy1 wl1251_irq_work
-> [ 5668.773345] [<c010c9e4>] (unwind_backtrace) from [<c010a274>]
-> (show_stack+0x10/0x14)
-> [ 5668.773803] [<c010a274>] (show_stack) from [<c01545a4>]
-> (do_raw_spin_lock+0x6c/0xa0)
-> [ 5668.774230] [<c01545a4>] (do_raw_spin_lock) from [<c06ca578>]
-> (_raw_spin_lock_irqsave+0x10/0x18)
-> [ 5668.774658] [<c06ca578>] (_raw_spin_lock_irqsave) from [<c048c010>]
-> (wl1251_op_tx+0x38/0x5c)
-> [ 5668.775115] [<c048c010>] (wl1251_op_tx) from [<c06a12e8>]
-> (ieee80211_tx_frags+0x188/0x1c0)
+Check for vb2_ops structures that are only stored in the ops field of a
+vb2_queue structure. That field is declared const, so vb2_ops structures
+that have this property can be declared as const also.
 
-The following one-line fix should work.
+This issue was detected using Coccinelle and the following semantic patch:
 
-diff --git a/drivers/net/wireless/ti/wl1251/main.c
-b/drivers/net/wireless/ti/wl1251/main.c
-index bbf7604..1c539c8 100644
---- a/drivers/net/wireless/ti/wl1251/main.c
-+++ b/drivers/net/wireless/ti/wl1251/main.c
-@@ -1571,6 +1571,7 @@ struct ieee80211_hw *wl1251_alloc_hw(void)
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct vb2_ops i at p = { ... };
 
-        wl->state = WL1251_STATE_OFF;
-        mutex_init(&wl->mutex);
-+       spin_lock_init(&wl->wl_lock);
+@ok@
+identifier r.i;
+struct vb2_queue e;
+position p;
+@@
+e.ops = &i at p;
 
-        wl->tx_mgmt_frm_rate = DEFAULT_HW_GEN_TX_RATE;
-        wl->tx_mgmt_frm_mod = DEFAULT_HW_GEN_MODULATION_TYPE;
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct vb2_ops e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+struct vb2_ops i = { ... };
+
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+---
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+index 13afe48..3038d62 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+@@ -621,7 +621,7 @@ static void mtk_mdp_m2m_buf_queue(struct vb2_buffer *vb)
+ 	v4l2_m2m_buf_queue(ctx->m2m_ctx, to_vb2_v4l2_buffer(vb));
+ }
+ 
+-static struct vb2_ops mtk_mdp_m2m_qops = {
++static const struct vb2_ops mtk_mdp_m2m_qops = {
+ 	.queue_setup	 = mtk_mdp_m2m_queue_setup,
+ 	.buf_prepare	 = mtk_mdp_m2m_buf_prepare,
+ 	.buf_queue	 = mtk_mdp_m2m_buf_queue,
+-- 
+2.5.0
