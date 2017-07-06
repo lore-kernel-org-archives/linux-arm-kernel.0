@@ -1,30 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 6 Jul 2017 12:17:57 -0500
-Subject: [PATCH 4/5] pwm: rockchip: Add atomic updated feature for rk3328
-In-Reply-To: <1498739271-27431-5-git-send-email-david.wu@rock-chips.com>
-References: <1498739271-27431-1-git-send-email-david.wu@rock-chips.com>
- <1498739271-27431-5-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20170706171757.qmnvmdyjuj77tt27@rob-hp-laptop>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 6 Jul 2017 19:38:41 +0200
+Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
+In-Reply-To: <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
+References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
+ <20170704233219.18790-1-afaerber@suse.de>
+ <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
+ <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
+Message-ID: <20170706173841.jwaskrrkooget6nk@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 29, 2017 at 08:27:50PM +0800, David Wu wrote:
-> The rk3328 soc supports atomic update, we could lock the configuration
-> of period and duty at first, after unlock is configured, the period and
-> duty are effective at the same time.
+On 06/07/2017 at 19:17:28 +0200, Andreas F?rber wrote:
+> Am 05.07.2017 um 04:36 schrieb Florian Fainelli:
+> > On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
+> >> Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
+> >> bogus holding pen") simplified the S500 SMP code by removing a loop for
+> >> pen_release in owl_secondary_boot(). Since then it is only calling
+> >> owl_v7_invalidate_l1() before branching to secondary_startup().
+> >>
+> >> The owl_v7_invalidate_l1() assembler function is superfluous, too.
+> >> Therefore drop owl_secondary_boot() and use secondary_boot() directly.
+> >>
+> >> Cc: David Liu <liuwei@actions-semi.com>
+> >> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> >> ---
+> > 
+> >> -	writel(virt_to_phys(owl_secondary_startup),
+> >> +	writel(virt_to_phys(secondary_startup),
+> >> 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
+> > 
+> > This is a kernel symbol so please use __pa_symbol() here, also you might want to build with CONFIG_DEBUG_VIRTUAL and see if you get other warnings about using virt_to_phys() in the owl platform code (I did not check if there are other uses)
 > 
-> If the polarity, period and duty need to be configured together,
-> the way for atomic update is "configure lock and old polarity" ->
-> "configure period and duty" -> "configure unlock and new polarity".
+> Thanks for the report. There are no other such uses in mach-actions, but
+> git-grep'ing for virt_to_phys in arch/arm/mach-* I spot at least one
+> other such usage in mach-oxnas:
 > 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-rockchip.txt       |  1 +
+> arch/arm/mach-oxnas/platsmp.c:
+> writel(virt_to_phys(ox820_secondary_startup),
+> 
+> as well as this in mach-mvebu:
+> 
+> arch/arm/mach-mvebu/platsmp.c:  writel(virt_to_phys(boot_addr), base +
+> MV98DX3236_CPU_RESUME_ADDR_REG);
+> 
+> and these in mach-at91:
+> 
+> arch/arm/mach-at91/pm.c:        pm_bu->canary = virt_to_phys(&canary);
+> arch/arm/mach-at91/pm.c:        pm_bu->resume = virt_to_phys(cpu_resume);
+> 
 
-The subject is a bit misleading as you are adding support for a new 
-version of the IP. Otherwise,
+They can probably use __pa_symbol() (I must admit I didn't know about
+it before this email)
 
-Acked-by: Rob Herring <robh@kernel.org>
 
->  drivers/pwm/pwm-rockchip.c                         | 50 +++++++++++++++++++---
->  2 files changed, 46 insertions(+), 5 deletions(-)
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
