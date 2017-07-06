@@ -1,54 +1,51 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 6 Jul 2017 14:31:51 +0800
-Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
-In-Reply-To: <20170705174403.GH4902@n2100.armlinux.org.uk>
-References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
- <20170705171607.GG4902@n2100.armlinux.org.uk>
- <CAKv+Gu9DXFDDdx3Vrmo20cRtMcbS-MUa4MF5r-Odje68FinGOw@mail.gmail.com>
- <20170705174403.GH4902@n2100.armlinux.org.uk>
-Message-ID: <20170706143151.26e485fa@xhacker>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 6 Jul 2017 08:40:55 +0200
+Subject: [PATCH 00/58] ARM: at91: rework Atmel TCB drivers
+In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170706064055.GE16144@ulmo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Jul 2017 18:44:03 +0100 Russell King - ARM Linux wrote:
-
-> On Wed, Jul 05, 2017 at 06:36:53PM +0100, Ard Biesheuvel wrote:
-> > On 5 July 2017 at 18:16, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:  
-> > > On Wed, Jul 05, 2017 at 06:13:33PM +0200, Gregory CLEMENT wrote:  
-> > >> Enable the PCIe interface on the MACCHIATOBin board. It is located on
-> > >> CON12 and is 4 lanes capable.
-> > >>
-> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>  
-> > >
-> > > Why do you folk at free-electrons like doing half a job all the friggin
-> > > time?
-> > >
-> > > You know I have complete patches for mcbin, but you pointedly won't look
-> > > at them at all - except when you have a problem and want to test my tree.
-> > > And even then, you ignore my work (despite testing that it works), and
-> > > you still recreate my patches.
-> > >
-> > > This is really frustrating and insane behaviour on your part.
-> > >
-> > > Here's what I have:
-> > >
-> > > +&cpm_pcie0 {
-> > > +       pinctrl-names = "default";
-> > > +       pinctrl-0 = <&cpm_pcie_pins>;
-> > > +       num-lanes = <4>;
-> > > +       reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
-> > > +       status = "okay";  
-> > 
-> > This needs 'num-viewport = <8>' as well, or the crazy Synopsys DWC
-
-IMHO, maybe putting this property into dtsi is better.
-
-Thanks,
-Jisheng
-
-> > PCIe driver will happily reconfigure the I/O window at runtime to
-> > perform config space accesses, without any locking whatsoever.  
+On Tue, May 30, 2017 at 11:50:41PM +0200, Alexandre Belloni wrote:
+> Hi,
 > 
-> Thanks for the feedback, I'll integrate that change into my patch, so
-> it's ready for when I rebase after -rc1.
+> This series reworks the Atmel Timer counter Block drivers. Those blocks
+> each have 3 counters with 2 channels each and can be used for
+> multiple functions:
+>  - timers
+>  - PWMs
+>  - Quadrature decoders
+>  - Stepper motor counters
 > 
+> Up until now, each TCB was fully used by each driver, possibly wasting
+> counters/channels.
+> 
+> There is a second issue motivating that rework. Until now, the PIT is
+> still used to boot then later in the boot sequence, the clocksource is
+> switched to the TCB. This ends up not working well with preempt-rt
+> because on some SoCs, the PIT interrupt is shared with the DBGU uart.
+> When using preempt-rt the interrupt flags for the PIT and the DBGU end
+> up being incompatible.
+> 
+> The rework breaks the DT ABI. Backward compatibility can be kept by
+> keeping tcb_clksrc and atmel_tclib but as AVR32 is now gone from the
+> kernel, I don't think it makes much sense to keep them.
+> 
+> Also, there is no other choice than breaking the mainly unused
+> pwm-atmel-tcb binding. Only the kizbox is actually using it.
+> 
+> I think the bindings are now ok and I hope we can take the DT changes
+> for 4.13.
+
+Has anyone volunteered to pick this up? What are the dependencies here
+and how did you plan to get this merged?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/813edc1e/attachment.sig>
