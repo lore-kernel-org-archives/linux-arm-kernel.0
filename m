@@ -1,26 +1,29 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 6 Jul 2017 10:51:47 +0200
-Subject: [PATCH 6/6] net: stmmac: revert "support future possible
- different internal phy mode"
-In-Reply-To: <20170702123159.6939-7-clabbe.montjoie@gmail.com>
-References: <20170702123159.6939-1-clabbe.montjoie@gmail.com>
- <20170702123159.6939-7-clabbe.montjoie@gmail.com>
-Message-ID: <20170706085147.GA15728@Red>
+Date: Thu,  6 Jul 2017 10:53:34 +0200
+Subject: [PATCH] ARM: sunxi: h3/h5: Correct emac register size
+Message-ID: <20170706085334.25380-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 02, 2017 at 02:31:59PM +0200, Corentin Labbe wrote:
-> Since internal phy-mode is reserved for non-xMII protocol we cannot use
-> it with dwmac-sun8i
-> This reverts commit 1c2fa5f84683 ("net: stmmac: support future possible different internal phy mode")
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
+The datasheet said that emac register size is 0x1000 not 0x104
 
-Hello
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch was left not applied but all other patch from this serie was.
-Could you apply it, or perhaps you prefer I resend it with some "Fixes:"
-
-Regards
-Corentin Labbe
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 716e7d668dec..5a57b67c9b77 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -406,7 +406,7 @@
+ 		emac: ethernet at 1c30000 {
+ 			compatible = "allwinner,sun8i-h3-emac";
+ 			syscon = <&syscon>;
+-			reg = <0x01c30000 0x104>;
++			reg = <0x01c30000 0x1000>;
+ 			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+ 			resets = <&ccu RST_BUS_EMAC>;
+-- 
+2.13.0
