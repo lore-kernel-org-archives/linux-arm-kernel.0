@@ -1,62 +1,60 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 6 Jul 2017 12:47:55 -0700
-Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
-In-Reply-To: <20170706173841.jwaskrrkooget6nk@piout.net>
-References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
- <20170704233219.18790-1-afaerber@suse.de>
- <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
- <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
- <20170706173841.jwaskrrkooget6nk@piout.net>
-Message-ID: <c6336df9-4f38-e636-383a-d0ad31658c65@gmail.com>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Thu, 6 Jul 2017 15:05:17 -0500
+Subject: [PATCH] stm32-dcmi: constify vb2_ops structure
+Message-ID: <20170706200517.GA5886@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2017 10:38 AM, Alexandre Belloni wrote:
-> On 06/07/2017 at 19:17:28 +0200, Andreas F?rber wrote:
->> Am 05.07.2017 um 04:36 schrieb Florian Fainelli:
->>> On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
->>>> Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
->>>> bogus holding pen") simplified the S500 SMP code by removing a loop for
->>>> pen_release in owl_secondary_boot(). Since then it is only calling
->>>> owl_v7_invalidate_l1() before branching to secondary_startup().
->>>>
->>>> The owl_v7_invalidate_l1() assembler function is superfluous, too.
->>>> Therefore drop owl_secondary_boot() and use secondary_boot() directly.
->>>>
->>>> Cc: David Liu <liuwei@actions-semi.com>
->>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>>> ---
->>>
->>>> -	writel(virt_to_phys(owl_secondary_startup),
->>>> +	writel(virt_to_phys(secondary_startup),
->>>> 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
->>>
->>> This is a kernel symbol so please use __pa_symbol() here, also you might want to build with CONFIG_DEBUG_VIRTUAL and see if you get other warnings about using virt_to_phys() in the owl platform code (I did not check if there are other uses)
->>
->> Thanks for the report. There are no other such uses in mach-actions, but
->> git-grep'ing for virt_to_phys in arch/arm/mach-* I spot at least one
->> other such usage in mach-oxnas:
->>
->> arch/arm/mach-oxnas/platsmp.c:
->> writel(virt_to_phys(ox820_secondary_startup),
->>
->> as well as this in mach-mvebu:
->>
->> arch/arm/mach-mvebu/platsmp.c:  writel(virt_to_phys(boot_addr), base +
->> MV98DX3236_CPU_RESUME_ADDR_REG);
->>
->> and these in mach-at91:
->>
->> arch/arm/mach-at91/pm.c:        pm_bu->canary = virt_to_phys(&canary);
->> arch/arm/mach-at91/pm.c:        pm_bu->resume = virt_to_phys(cpu_resume);
->>
-> 
-> They can probably use __pa_symbol() (I must admit I didn't know about
-> it before this email)
+Check for vb2_ops structures that are only stored in the ops field of a
+vb2_queue structure. That field is declared const, so vb2_ops structures
+that have this property can be declared as const also.
 
-This is fine, do you mind sending fixes for the at91 parts? Gregory, can
-you also fix the mv98dx3236 platform SMP code?
+This issue was detected using Coccinelle and the following semantic patch:
 
-Thanks!
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct vb2_ops i at p = { ... };
+
+@ok@
+identifier r.i;
+struct vb2_queue e;
+position p;
+@@
+e.ops = &i at p;
+
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct vb2_ops e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+struct vb2_ops i = { ... };
+
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+---
+ drivers/media/platform/stm32/stm32-dcmi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+index 83d32a5..24ef888 100644
+--- a/drivers/media/platform/stm32/stm32-dcmi.c
++++ b/drivers/media/platform/stm32/stm32-dcmi.c
+@@ -662,7 +662,7 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+ 		dcmi->errors_count, dcmi->buffers_count);
+ }
+ 
+-static struct vb2_ops dcmi_video_qops = {
++static const struct vb2_ops dcmi_video_qops = {
+ 	.queue_setup		= dcmi_queue_setup,
+ 	.buf_init		= dcmi_buf_init,
+ 	.buf_prepare		= dcmi_buf_prepare,
 -- 
-Florian
+2.5.0
