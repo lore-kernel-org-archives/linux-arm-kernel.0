@@ -1,57 +1,80 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 6 Jul 2017 08:03:52 +0100
-Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
-In-Reply-To: <20170706064453.GH16144@ulmo.fritz.box>
-References: <20170521220212.1404-1-wsa@the-dreams.de>
- <20170521220212.1404-4-wsa@the-dreams.de>
- <20170706064453.GH16144@ulmo.fritz.box>
-Message-ID: <20170706070352.xdecvsnremwqed72@dell>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 06 Jul 2017 09:18:25 +0200
+Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
+In-Reply-To: <20170705171607.GG4902@n2100.armlinux.org.uk> (Russell King's
+ message of "Wed, 5 Jul 2017 18:16:07 +0100")
+References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
+ <20170705171607.GG4902@n2100.armlinux.org.uk>
+Message-ID: <874luqf2ym.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 06 Jul 2017, Thierry Reding wrote:
+Hi Russell King,
+ 
+ On mer., juil. 05 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-> On Mon, May 22, 2017 at 12:02:10AM +0200, Wolfram Sang wrote:
-> > include/linux/i2c is not for client devices. Move the header file to a
-> > more appropriate location.
-> > 
-> > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> > ---
-> >  arch/arm/mach-omap2/common.h            | 2 +-
-> >  arch/arm/mach-omap2/omap_twl.c          | 2 +-
-> >  drivers/gpio/gpio-twl4030.c             | 2 +-
-> >  drivers/iio/adc/twl4030-madc.c          | 2 +-
-> >  drivers/iio/adc/twl6030-gpadc.c         | 2 +-
-> >  drivers/input/keyboard/twl4030_keypad.c | 2 +-
-> >  drivers/input/misc/twl4030-pwrbutton.c  | 2 +-
-> >  drivers/input/misc/twl4030-vibra.c      | 2 +-
-> >  drivers/mfd/twl-core.c                  | 6 +++---
-> >  drivers/mfd/twl4030-audio.c             | 2 +-
-> >  drivers/mfd/twl4030-irq.c               | 2 +-
-> >  drivers/mfd/twl4030-power.c             | 2 +-
-> >  drivers/mfd/twl6030-irq.c               | 2 +-
-> >  drivers/phy/phy-twl4030-usb.c           | 2 +-
-> >  drivers/power/supply/twl4030_charger.c  | 2 +-
-> >  drivers/pwm/pwm-twl-led.c               | 2 +-
-> >  drivers/pwm/pwm-twl.c                   | 2 +-
-> >  drivers/regulator/twl-regulator.c       | 2 +-
-> >  drivers/regulator/twl6030-regulator.c   | 2 +-
-> >  drivers/rtc/rtc-twl.c                   | 2 +-
-> >  drivers/usb/phy/phy-twl6030-usb.c       | 2 +-
-> >  drivers/video/backlight/pandora_bl.c    | 2 +-
-> >  drivers/watchdog/twl4030_wdt.c          | 2 +-
-> >  include/linux/{i2c => mfd}/twl.h        | 0
-> >  sound/soc/codecs/twl4030.c              | 2 +-
-> >  25 files changed, 26 insertions(+), 26 deletions(-)
-> >  rename include/linux/{i2c => mfd}/twl.h (100%)
-> 
-> I didn't see this get applied yet, so just in case anyone was waiting
-> for me (this is trivial, so I don't think there's a need):
+> On Wed, Jul 05, 2017 at 06:13:33PM +0200, Gregory CLEMENT wrote:
+>> Enable the PCIe interface on the MACCHIATOBin board. It is located on
+>> CON12 and is 4 lanes capable.
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> Why do you folk at free-electrons like doing half a job all the friggin
+> time?
+>
+> You know I have complete patches for mcbin, but you pointedly won't look
+> at them at all - except when you have a problem and want to test my tree.
+> And even then, you ignore my work (despite testing that it works), and
+> you still recreate my patches.
+>
+> This is really frustrating and insane behaviour on your part.
 
-You're not the last. :)
+Sorry for this, I wrongly assumed that if you had the PCIe part you
+would have already submitted it. Also I didn't expect there was a gpio
+dependency with PCIe because until now I never saw the reset-gpio for
+PCIe with the controller I use.
+
+>
+> Here's what I have:
+>
+> +&cpm_pcie0 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&cpm_pcie_pins>;
+> +       num-lanes = <4>;
+> +       reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
+> +       status = "okay";
+> +};
+> +
+>
+> +       cpm_pcie_pins: pcie-pins {
+> +               marvell,pins = "mpp52";
+> +               marvell,function = "gpio";
+> +       };
+>
+> Since you have merged GPIO and pinmux support for the v4.13 window,
+> there's absolutely no reason not to include the GPIO bits.  In fact,
+> there's no reason not to consider using my bloody patches.
+>
+> Except your stupid idiotic NiH problem that you seem to have.
+>
+> I know that your behaviour in regard of this has been discussed within
+> Marvell, and people are getting unhappy with free electron's attitude
+> over this.  You need to change, and start working _with_ people instead
+> of constantly screwing people over.
+>
+> So, NAK on your patch.
+>
+> Once v4.13-rc1 is out, I'll update my patch series for the screw-over
+> free-electrons has already done, and post some patches.  I can't do it
+> sooner, your work is scattered all over the place which makes it
+
+Actually everything is available in the linux-next branch since one or
+two weeks. So you can rebase and send your series right now.
+
+Gregory
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
