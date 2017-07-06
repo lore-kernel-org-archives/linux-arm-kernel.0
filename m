@@ -1,54 +1,102 @@
 From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Thu,  6 Jul 2017 15:07:03 +0530
-Subject: [PATCH V4 4/6] iommu/arm-smmu: Add the device_link between masters
- and smmu
+Date: Thu,  6 Jul 2017 15:07:04 +0530
+Subject: [PATCH V4 5/6] iommu/arm-smmu: Add support for MMU40x/500 clocks
 In-Reply-To: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
 References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
-Message-ID: <1499333825-7658-5-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <1499333825-7658-6-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sricharan R <sricharan@codeaurora.org>
 
-Finally add the device link between the master device and
-smmu, so that the smmu gets runtime enabled/disabled only when the
-master needs it. This is done from add_device callback which gets
-called once when the master is added to the smmu.
+The MMU400x/500 is the implementation of the SMMUv2
+arch specification. It is split in to two blocks
+TBU, TCU. TBU caches the page table, instantiated
+for each master locally, clocked by the TBUn_clk.
+TCU manages the address translation with PTW and has
+the programming interface as well, clocked using the
+TCU_CLK. The TBU can also be sharing the same clock
+domain as TCU, in which case both are clocked using
+the TCU_CLK.
+
+This defines the clock bindings for the same and adds
+the clock names to compatible data.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+[vivek: clock rework and cleanup]
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 ---
- drivers/iommu/arm-smmu.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ .../devicetree/bindings/iommu/arm,smmu.txt         | 24 ++++++++++++++++++++++
+ drivers/iommu/arm-smmu.c                           | 12 ++++++++++-
+ 2 files changed, 35 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index 8a6ffce12af5..00331752d355 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -71,6 +71,26 @@ conditions.
+                   or using stream matching with #iommu-cells = <2>, and
+                   may be ignored if present in such cases.
+ 
++- clock-names:    Should be "tcu" and "iface" for "arm,mmu-400",
++                  "arm,mmu-401" and "arm,mmu-500"
++
++                  "tcu" clock is required for smmu's register access using the
++                  programming interface and ptw for downstream bus access. This
++                  clock is also used for access to the TBU connected to the
++                  master locally. Sometimes however, TBU is clocked along with
++                  the master.
++
++                  "iface" clock is required to access the TCU's programming
++                  interface, apart from the "tcu" clock.
++
++- clocks:         Phandles for respective clocks described by clock-names.
++
++- power-domains:  Phandles to SMMU's power domain specifier. This is
++                  required even if SMMU belongs to the master's power
++                  domain, as the SMMU will have to be enabled and
++                  accessed before master gets enabled and linked to its
++                  SMMU.
++
+ ** Deprecated properties:
+ 
+ - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+@@ -95,6 +115,10 @@ conditions.
+                              <0 36 4>,
+                              <0 37 4>;
+                 #iommu-cells = <1>;
++                clocks = <&gcc GCC_SMMU_CFG_CLK>,
++                         <&gcc GCC_APSS_TCU_CLK>;
++
++		clock-names = "iface", "tcu";
+         };
+ 
+         /* device with two stream IDs, 0 and 7 */
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ddbfa8ab69e6..75567d9698ab 100644
+index 75567d9698ab..7bb09280fa11 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -1348,6 +1348,7 @@ static int arm_smmu_add_device(struct device *dev)
- 	struct arm_smmu_device *smmu;
- 	struct arm_smmu_master_cfg *cfg;
- 	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-+	struct device_link *link = NULL;
- 	int i, ret;
+@@ -1947,9 +1947,19 @@ struct arm_smmu_match_data {
+ ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
+ ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
+ ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU);
+-ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500);
+ ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
  
- 	if (using_legacy_binding) {
-@@ -1403,6 +1404,16 @@ static int arm_smmu_add_device(struct device *dev)
- 
- 	pm_runtime_put_sync(smmu->dev);
- 
-+	/*
-+	 * Establish the link between smmu and master, so that the
-+	 * smmu gets runtime enabled/disabled as per the master's
-+	 * needs.
-+	 */
-+	link = device_link_add(dev, smmu->dev, DL_FLAG_PM_RUNTIME);
-+	if (!link)
-+		dev_warn(smmu->dev, "Unable to create device link between %s and %s\n",
-+			 dev_name(smmu->dev), dev_name(dev));
++static const char * const arm_mmu500_clks[] = {
++	"tcu", "iface",
++};
 +
- 	return 0;
- 
- out_cfg_free:
++static const struct arm_smmu_match_data arm_mmu500 = {
++	.version = ARM_SMMU_V2,
++	.model = ARM_MMU500,
++	.clks = arm_mmu500_clks,
++	.num_clks = ARRAY_SIZE(arm_mmu500_clks),
++};
++
+ static const struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
+ 	{ .compatible = "arm,smmu-v2", .data = &smmu_generic_v2 },
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
