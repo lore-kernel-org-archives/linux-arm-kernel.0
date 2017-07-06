@@ -1,51 +1,66 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Thu, 6 Jul 2017 10:31:38 +0200
-Subject: [PATCH v2 1/6] serial: imx: only set DMA rx-ing when DMA starts
-In-Reply-To: <20170705132910.nmixhnh4l6h2hlga@pengutronix.de>
-References: <20170705130706.10388-1-romain.perier@collabora.com>
- <20170705130706.10388-2-romain.perier@collabora.com>
- <20170705132910.nmixhnh4l6h2hlga@pengutronix.de>
-Message-ID: <49bfa666-b036-3ed9-8209-9ea59468371b@collabora.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 6 Jul 2017 11:35:24 +0300
+Subject: [PATCH v3 0/5] Add SoM1 support
+Message-ID: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi all,
 
+This series adds support for sama5d2 SoM1 devices.
 
-Le 05/07/2017 ? 15:29, Uwe Kleine-K?nig a ?crit :
-> Hello,
->
-> On Wed, Jul 05, 2017 at 03:07:01PM +0200, Romain Perier wrote:
->> From: Nandor Han <nandor.han@ge.com>
->>
->> Avoid the situation when `dma_is_rxing` could incorrectly signal that
->> DMA RX channel is receiving data in case DMA preparation or sg mapping
->> fails.
->>
->> This commit fixes the issues by moving the assignment of dma_is_rxing
->> out of imx_disable_rx_int(), then the variable is set to 1 from
->> start_rx_dma() only when the preparation is correctly done.
-> I'd write:
->
-> 	There are a few issues with setting dma_is_rxing to 1 in
-> 	imx_disable_rx_int:
->
-> 	 - Currently always after imx_disable_rx_int() the function
-> 	   start_rx_dma() is called. This dependency isn't obvious though.
-> 	 - start_rx_dma() does error checking and might exit without enabling
-> 	   DMA but keeping dma_is_rxing 1.
->
-> 	So the more natural place for setting dma_is_rxing to 1 is in
-> 	start_rx_dma after all errors are checked.
->
-> If you use this, there is nothing left of Nandor Han's patch and you can
-> drop his authorship.
->
-> Best regards
-> Uwe
->
-Ok, will do. No other feedback for the rest of the series ? (just to
-know if I send a v3 or If I wait a bit...)
+The at91-sama5d27_som1.dtsi add specific bindings for SoM1 board.
+The at91-sama5d27_som1_ek.dts add specific bindings for SoM1 EK board.
 
-Thanks,
-Romain
+Thank you,
+Claudiu
+
+Changes in v3:
+- remove qspi flash mapping for the moment
+- remove at24 and i2c bindings; this will be introduced when
+"Add at24 functionality to read form different EEPROM offsets" patch will
+be accepted
+- change the title of patch 5 from this series from
+"ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
+"ARM: dts: at91: at91-sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
+match the desired prefix
+
+Changes in v2:
+o in at91-sama5d27_som1.dtsi:
+- increase bootloader and kernel size in flash map (with bootloader
+flash offset the dtb and kernel flash offsets were changed)
+- use right pin for ethernet-phy interrupt
+
+o in at91-sama5d27_som1_ek.dts:
+- removed memory tag and rely on bootloader to fill the right value
+- use pin macros (from arch/arm/boot/dts/sama5d2-pinfunc.h) wherever
+posible instead of pin numbers
+- remove pinctrl_sensor_power and pinctrl_sensor_reset pin muxing
+since they are not of intereset for this board
+- use "pb4" label for user button instead of "bp1"
+
+Claudiu Beznea (2):
+  ARM: dts: at91: at91-sama5d27_som1: add sama5d27 SoM1 support
+  ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support
+
+Cristian Birsan (1):
+  drivers: soc: atmel: Add basic support for new sama5d2 SiPs
+
+Cyrille Pitchen (1):
+  ARM: dts: at91: sama5d2: add QSPI nodes
+
+Songjun Wu (1):
+  ARM: dts: at91: sama5d2: add isc node
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/at91-sama5d27_som1.dtsi   | 178 +++++++++
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 551 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sama5d2.dtsi              |  38 ++
+ drivers/soc/atmel/soc.c                     |   8 +
+ drivers/soc/atmel/soc.h                     |   4 +
+ 6 files changed, 780 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+
+-- 
+2.7.4
