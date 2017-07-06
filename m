@@ -1,84 +1,61 @@
-From: hugues.fruchet@st.com (Hugues FRUCHET)
-Date: Thu, 6 Jul 2017 07:51:28 +0000
-Subject: [PATCH v2 0/7] [PATCH v2 0/7] Add support of OV9655 camera
-In-Reply-To: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
-References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <26a55285-509c-b7f4-7806-db537a582631@st.com>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Thu, 6 Jul 2017 08:05:43 +0000
+Subject: [PATCH v2 2/2] ARM: shmobile: defconfig: Enable Ethernet AVB
+In-Reply-To: <12c32eee-8e4d-457e-97d7-625a5c63ad59@cogentembedded.com>
+References: <afcd181c-c805-8f3c-955f-652d001a03d4@cogentembedded.com>
+ <1499270189-29945-1-git-send-email-biju.das@bp.renesas.com>
+ <1499270189-29945-3-git-send-email-biju.das@bp.renesas.com>
+ <12c32eee-8e4d-457e-97d7-625a5c63ad59@cogentembedded.com>
+Message-ID: <TY1PR06MB07020F58F15C964FC1AA1D22B7D50@TY1PR06MB0702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Hello Sergei, 
 
-Do you have the possibility to check for non-regression of this patchset 
-on 9650/52 camera ?
+Thank you for your comments.
 
-Best regards,
-Hugues.
+> From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
+> Sent: 05 July 2017 17:14
+> 
+> Hello!
+> 
+> On 07/05/2017 06:56 PM, Biju Das wrote:
+> 
+> > The iWave RZ/G1M Q7 SOM supports Gigabit Ethernet Phy (Micrel
+> KSZ9031MNX).
+> > Gigabit Ethernet support is available in Renesas AVB driver.
+> > To increase hardware support enable the driver in the
+> > shmobile_defconfig multiplatform configuration.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> >  arch/arm/configs/shmobile_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm/configs/shmobile_defconfig
+> > b/arch/arm/configs/shmobile_defconfig
+> > index 3c66a42..d992911 100644
+> > --- a/arch/arm/configs/shmobile_defconfig
+> > +++ b/arch/arm/configs/shmobile_defconfig
+> > @@ -83,6 +83,7 @@ CONFIG_NETDEVICES=y
+> >  # CONFIG_NET_VENDOR_MICREL is not set  #
+> CONFIG_NET_VENDOR_NATSEMI is
+> > not set  CONFIG_SH_ETH=y
+> > +CONFIG_RAVB=y
+> 
+>     Hm, I would enable it only as a module, given it's not easy to make use of
+> AVB on the 32-bit boards.
 
-On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
-> This patchset enables OV9655 camera support.
+On the iWave-M platforms the only available Ethernet interface is AVB. Without including the RAVB driver in the Kernel we won't be able to use NFS.
+
+I know adding CONFIG_RAVB for all shmobile devices may increase the Kernel size for everyone, especially when most cannot use AVB without an add-on board, but I don't think the increase will be big.
+
+
+Kind regards, Chris 
+
 > 
-> OV9655 support has been tested using STM32F4DIS-CAM extension board
-> plugged on connector P1 of STM32F746G-DISCO board.
-> Due to lack of OV9650/52 hardware support, the modified related code
-> could not have been checked for non-regression.
+> [...]
 > 
-> First patches upgrade current support of OV9650/52 to prepare then
-> introduction of OV9655 variant patch.
-> Because of OV9655 register set slightly different from OV9650/9652,
-> not all of the driver features are supported (controls). Supported
-> resolutions are limited to VGA, QVGA, QQVGA.
-> Supported format is limited to RGB565.
-> Controls are limited to color bar test pattern for test purpose.
-> 
-> OV9655 initial support is based on a driver written by H. Nikolaus Schaller [1].
-> OV9655 registers sequences come from STM32CubeF7 embedded software [2].
-> 
-> [1] http://git.goldelico.com/?p=gta04-kernel.git;a=shortlog;h=refs/heads/work/hns/video/ov9655
-> [2] https://developer.mbed.org/teams/ST/code/BSP_DISCO_F746NG/file/e1d9da7fe856/Drivers/BSP/Components/ov9655/ov9655.c
-> 
-> ===========
-> = history =
-> ===========
-> version 2:
->    - Remove some unneeded semicolons (kbuild test robot):
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114616.html
->    - Remove patch [media] ov9650: select the nearest higher resolution:
->      it is up to the application to find the best matching resolution
->      using ENUM_FRAMESIZES/S_FMT/S_SELECTION (S_CROP), see
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114667.html
->    - dt-bindings: Fix remarks from Rob Herring about polarity:
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114705.html
->    - dt-bindings: Add optional regulators avdd, dvdd, dovdd:
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114785.html
->    - fix missing semicolons in if condition:
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114611.html
->    - move ov965x_pixfmt relocation in right patch:
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114849.html
->    - revisit OV965x renaming to ov965x for device id names and DT compatible strings,
->      drop of_device_id .data device identification
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114635.html
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114738.html
->    - Add analog power supply and clock gating, needed for GTA04 platform:
->        http://www.mail-archive.com/linux-media at vger.kernel.org/msg114519.html
-> 
-> version 1:
->    - Initial submission.
-> 
-> H. Nikolaus Schaller (1):
->    DT bindings: add bindings for ov965x camera module
-> 
-> Hugues Fruchet (6):
->    [media] ov9650: switch i2c device id to lower case
->    [media] ov9650: add device tree support
->    [media] ov9650: use write_array() for resolution sequences
->    [media] ov9650: add multiple variant support
->    [media] ov9650: add support of OV9655 variant
->    [media] ov9650: add analog power supply and clock gating
-> 
->   .../devicetree/bindings/media/i2c/ov965x.txt       |  45 ++
->   drivers/media/i2c/Kconfig                          |   6 +-
->   drivers/media/i2c/ov9650.c                         | 816 +++++++++++++++++----
->   3 files changed, 736 insertions(+), 131 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/media/i2c/ov965x.txt
-> 
+> MBR Sergei
