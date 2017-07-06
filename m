@@ -1,50 +1,70 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 6 Jul 2017 22:50:30 +0200
-Subject: [PATCH 2/2] pinctrl: sunxi: add support of R40 to A10 pinctrl
- driver
-In-Reply-To: <20170706142822.20296-3-icenowy@aosc.io>
-References: <20170706142822.20296-1-icenowy@aosc.io>
- <20170706142822.20296-3-icenowy@aosc.io>
-Message-ID: <20170706205030.e6wzn5n7ix3443cl@flea>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Thu, 6 Jul 2017 13:52:24 -0700
+Subject: [PATCH v10 1/3] x86/syscalls: Check address limit on user-mode
+ return
+In-Reply-To: <alpine.DEB.2.20.1707062247520.3239@nanos>
+References: <20170615011203.144108-1-thgarnie@google.com>
+ <CAGXu5j+byHUn_rb9jOTZqMYrc4ngmDj=a3k8QRTYrZYNSjhCkw@mail.gmail.com>
+ <CAGXu5jKrJv0y70e5JiafKGcGzWoJPZM_HruZ=Y0rM1m0J4tZAA@mail.gmail.com>
+ <CAJcbSZE6Og4gwhFwhy_-Jaq6GovwN3y1B6O89JmkpXHtVfDLBA@mail.gmail.com>
+ <alpine.DEB.2.20.1707062247520.3239@nanos>
+Message-ID: <CAJcbSZGSqm8HYMv8biOQEWvan1nma3vjKNJ1mgMz52AyJ5adGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 10:28:22PM +0800, Icenowy Zheng wrote:
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 0),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> -		  SUNXI_FUNCTION(0x2, "i2c0")),		/* SCK */
-> +		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SCK */
-> +		  SUNXI_FUNCTION_VARIANT(0x3,
-> +					 "pll_lock_dbg",
-> +					 PINCTRL_SUN8I_R40)),
+On Thu, Jul 6, 2017 at 1:48 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Thu, 6 Jul 2017, Thomas Garnier wrote:
+>> On Wed, Jun 28, 2017 at 10:52 AM, Kees Cook <keescook@chromium.org> wrote:
+>> >
+>> > On Tue, Jun 20, 2017 at 1:24 PM, Kees Cook <keescook@chromium.org> wrote:
+>> > > On Wed, Jun 14, 2017 at 6:12 PM, Thomas Garnier <thgarnie@google.com> wrote:
+>> > >> Ensure the address limit is a user-mode segment before returning to
+>> > >> user-mode. Otherwise a process can corrupt kernel-mode memory and elevate
+>> > >> privileges [1].
+>> > >>
+>> > >> The set_fs function sets the TIF_SETFS flag to force a slow path on
+>> > >> return. In the slow path, the address limit is checked to be USER_DS if
+>> > >> needed.
+>> > >>
+>> > >> The addr_limit_user_check function is added as a cross-architecture
+>> > >> function to check the address limit.
+>> > >>
+>> > >> [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+>> > >>
+>> > >> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+>> > >
+>> > > Thanks for reworking this series!
+>> > >
+>> > > The bad state correctly BUGs under the LKDTM test:
+>> > >
+>> > > [   21.171586] lkdtm: Performing direct entry CORRUPT_USER_DS
+>> > > [   21.172791] lkdtm: setting bad task size limit
+>> > > [   21.173742] ------------[ cut here ]------------
+>> > > [   21.174641] kernel BUG at ./include/linux/syscalls.h:220!
+>> > > ...
+>> > > [   21.193166] Call Trace:
+>> > > [   21.193617]  ? trace_hardirqs_on_thunk+0x1a/0x1c
+>> > > [   21.194443]  entry_SYSCALL64_slow_path+0x25/0x25
+>> > >
+>> > >
+>> > > Tested-by: Kees Cook <keescook@chromium.org>
+>> >
+>> > Is everyone happy with this patch for x86? Does this need anything
+>> > more/different?
+>>
+>> Asking again. Additional feedback? Anyone wants to pick-it up?
+>
+> Can do. This needs to be a combo of all 3 I assume as the x86 one contains
+> the function used by all of them, right?
 
-You have a number of lines where the wrapping is not consistent with
-the rest, such as this one, but also...
+That is correct.
 
->  	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 20),
->  		  SUNXI_FUNCTION(0x0, "gpio_in"),
->  		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> -		  SUNXI_FUNCTION(0x2, "i2c2")),		/* SCK */
-> +		  SUNXI_FUNCTION(0x2, "i2c2"),		/* SCK */
-> +		  SUNXI_FUNCTION_VARIANT(0x4,
-> +					 "pwm",		/* PWM4 */
-> +					 PINCTRL_SUN8I_R40)),
+>
+> Thanks,
+>
+>         tglx
 
-... this one for example. Please fix this.
 
-Looks good otherwise.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170706/b2248cfe/attachment.sig>
+Thomas
