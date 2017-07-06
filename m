@@ -1,107 +1,58 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Thu,  6 Jul 2017 15:07:05 +0530
-Subject: [PATCH V4 6/6] iommu/arm-smmu: Add support for qcom,
- msm8996-smmu-v2 clocks
-In-Reply-To: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
-References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
-Message-ID: <1499333825-7658-7-git-send-email-vivek.gautam@codeaurora.org>
+From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
+Date: Thu, 6 Jul 2017 17:39:44 +0800
+Subject: [PATCH] PCI: layerscape: Add support for ls2088a and ls1088a
+Message-ID: <1499333984-17668-1-git-send-email-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-qcom,msm8996-smmu-v2 is an arm,smmu-v2 implementation with
-specific clock and power requirements. This smmu core is used
-with multiple masters on msm8996, viz. mdss, video, etc.
-Add bindings for the same.
+From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+The ls1088a and ls2088a has the same PCIe controller, so the ls1088a
+will reuse the ls2088a's pcie compatible.
+
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
- Documentation/devicetree/bindings/iommu/arm,smmu.txt | 18 ++++++++++++++++++
- drivers/iommu/arm-smmu.c                             | 13 +++++++++++++
- 2 files changed, 31 insertions(+)
+ Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
+ drivers/pci/dwc/pci-layerscape.c                         | 9 +++++++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index 00331752d355..5d8e79775fae 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -17,6 +17,7 @@ conditions.
-                         "arm,mmu-401"
-                         "arm,mmu-500"
-                         "cavium,smmu-v2"
-+                        "qcom,msm8996-smmu-v2"
- 
-                   depending on the particular implementation and/or the
-                   version of the architecture implemented.
-@@ -74,11 +75,16 @@ conditions.
- - clock-names:    Should be "tcu" and "iface" for "arm,mmu-400",
-                   "arm,mmu-401" and "arm,mmu-500"
- 
-+                  Should be "bus", and "iface" for "qcom,msm8996-smmu-v2"
-+                  implementation.
-+
-                   "tcu" clock is required for smmu's register access using the
-                   programming interface and ptw for downstream bus access. This
-                   clock is also used for access to the TBU connected to the
-                   master locally. Sometimes however, TBU is clocked along with
-                   the master.
-+                  "bus" clock for "qcom,msm8996-smmu-v2" is requierd for downstream
-+                  bus access and for the smmu ptw.
- 
-                   "iface" clock is required to access the TCU's programming
-                   interface, apart from the "tcu" clock.
-@@ -161,3 +167,15 @@ conditions.
-                 iommu-map = <0 &smmu3 0 0x400>;
-                 ...
-         };
-+
-+	/* Qcom's arm,smmu-v2 implementation for msm8996 */
-+	smmu4: iommu {
-+		compatible = "qcom,msm8996-smmu-v2";
-+		...
-+		#iommu-cells = <1>;
-+		power-domains = <&mmcc MDSS_GDSC>;
-+
-+		clocks = <&mmcc SMMU_MDP_AXI_CLK>,
-+			 <&mmcc SMMU_MDP_AHB_CLK>;
-+		clock-names = "bus", "iface";
-+	};
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 7bb09280fa11..fe8e7fd61282 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -110,6 +110,7 @@ enum arm_smmu_implementation {
- 	GENERIC_SMMU,
- 	ARM_MMU500,
- 	CAVIUM_SMMUV2,
-+	QCOM_MSM8996_SMMUV2,
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index ee1c72d5..cb735e1 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -15,6 +15,7 @@ Required properties:
+ - compatible: should contain the platform identifier such as:
+         "fsl,ls1021a-pcie", "snps,dw-pcie"
+         "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
++        "fsl,ls2088a-pcie", "fsl,ls1088a-pcie"
+         "fsl,ls1046a-pcie"
+ - reg: base addresses and lengths of the PCIe controller
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
+index 9bed3cd..0df8189 100644
+--- a/drivers/pci/dwc/pci-layerscape.c
++++ b/drivers/pci/dwc/pci-layerscape.c
+@@ -239,12 +239,21 @@ static struct ls_pcie_drvdata ls2080_drvdata = {
+ 	.dw_pcie_ops = &dw_ls_pcie_ops,
  };
  
- /* Until ACPICA headers cover IORT rev. C */
-@@ -1960,6 +1961,17 @@ struct arm_smmu_match_data {
- 	.num_clks = ARRAY_SIZE(arm_mmu500_clks),
- };
- 
-+static const char * const qcom_msm8996_smmuv2_clks[] = {
-+	"bus", "iface",
++static struct ls_pcie_drvdata ls2088_drvdata = {
++	.lut_offset = 0x80000,
++	.ltssm_shift = 0,
++	.lut_dbg = 0x407fc,
++	.ops = &ls_pcie_host_ops,
++	.dw_pcie_ops = &dw_ls_pcie_ops,
 +};
 +
-+static const struct arm_smmu_match_data qcom_msm8996_smmuv2 = {
-+	.version = ARM_SMMU_V2,
-+	.model = QCOM_MSM8996_SMMUV2,
-+	.clks = qcom_msm8996_smmuv2_clks,
-+	.num_clks = ARRAY_SIZE(qcom_msm8996_smmuv2_clks),
-+};
-+
- static const struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
- 	{ .compatible = "arm,smmu-v2", .data = &smmu_generic_v2 },
-@@ -1967,6 +1979,7 @@ struct arm_smmu_match_data {
- 	{ .compatible = "arm,mmu-401", .data = &arm_mmu401 },
- 	{ .compatible = "arm,mmu-500", .data = &arm_mmu500 },
- 	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
-+	{ .compatible = "qcom,msm8996-smmu-v2", .data = &qcom_msm8996_smmuv2 },
+ static const struct of_device_id ls_pcie_of_match[] = {
+ 	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
+ 	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
+ 	{ .compatible = "fsl,ls1046a-pcie", .data = &ls1046_drvdata },
+ 	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
+ 	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
++	{ .compatible = "fsl,ls2088a-pcie", .data = &ls2088_drvdata },
  	{ },
  };
- MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+ 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.0.27.g96db324
