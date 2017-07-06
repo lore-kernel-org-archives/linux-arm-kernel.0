@@ -1,59 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 6 Jul 2017 12:02:27 +0200
-Subject: [PATCH v2 1/6] serial: imx: only set DMA rx-ing when DMA starts
-In-Reply-To: <49bfa666-b036-3ed9-8209-9ea59468371b@collabora.com>
-References: <20170705130706.10388-1-romain.perier@collabora.com>
- <20170705130706.10388-2-romain.perier@collabora.com>
- <20170705132910.nmixhnh4l6h2hlga@pengutronix.de>
- <49bfa666-b036-3ed9-8209-9ea59468371b@collabora.com>
-Message-ID: <20170706100227.gn3acq2ppdlofuj7@pengutronix.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu,  6 Jul 2017 12:24:20 +0200
+Subject: [PATCH 0/3] clk: meson: gxbb-aoclk: Add CEC 32k clock
+Message-ID: <1499336663-23875-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 10:31:38AM +0200, Romain Perier wrote:
-> Hello,
-> 
-> 
-> Le 05/07/2017 ? 15:29, Uwe Kleine-K?nig a ?crit :
-> > Hello,
-> >
-> > On Wed, Jul 05, 2017 at 03:07:01PM +0200, Romain Perier wrote:
-> >> From: Nandor Han <nandor.han@ge.com>
-> >>
-> >> Avoid the situation when `dma_is_rxing` could incorrectly signal that
-> >> DMA RX channel is receiving data in case DMA preparation or sg mapping
-> >> fails.
-> >>
-> >> This commit fixes the issues by moving the assignment of dma_is_rxing
-> >> out of imx_disable_rx_int(), then the variable is set to 1 from
-> >> start_rx_dma() only when the preparation is correctly done.
-> > I'd write:
-> >
-> > 	There are a few issues with setting dma_is_rxing to 1 in
-> > 	imx_disable_rx_int:
-> >
-> > 	 - Currently always after imx_disable_rx_int() the function
-> > 	   start_rx_dma() is called. This dependency isn't obvious though.
-> > 	 - start_rx_dma() does error checking and might exit without enabling
-> > 	   DMA but keeping dma_is_rxing 1.
-> >
-> > 	So the more natural place for setting dma_is_rxing to 1 is in
-> > 	start_rx_dma after all errors are checked.
-> >
-> > If you use this, there is nothing left of Nandor Han's patch and you can
-> > drop his authorship.
-> >
-> > Best regards
-> > Uwe
-> >
-> Ok, will do. No other feedback for the rest of the series ? (just to
-> know if I send a v3 or If I wait a bit...)
+In order to support the standalone CEC Controller on the Amlogic SoCs,
+a specific CEC 32K clock must be handled in the AO domain.
 
-I didn't come around looking in the patches I didn't comment yet.
+The CEC 32K AO Clock is a dual divider with dual counter to provide a more
+precise 32768Hz clock for the CEC subsystem from the external xtal.
 
-Best regards
-Uwe
+The AO clocks management registers are spread among the AO register space,
+so this patch also adds management of these registers mappings then uses them
+for the CEC 32K AO clock management.
+
+This patchset :
+ - updates the bindings accordingly
+ - adds the CEC 32k clock
+ - adds the clock binding entry
+
+The DT Update will be sent in another patchset.
+
+Neil Armstrong (3):
+  dt-bindings: clock: gxbb-aoclk: Add CEC 32k clock
+  clk: meson: gxbb-aoclk: Add CEC 32k clock
+  dt-bindings: clock: amlogic,gxbb-aoclkc: Update bindings
+
+ .../bindings/clock/amlogic,gxbb-aoclkc.txt         |  11 +-
+ drivers/clk/meson/Makefile                         |   2 +-
+ drivers/clk/meson/gxbb-aoclk-32k.c                 | 188 +++++++++++++++++++++
+ drivers/clk/meson/gxbb-aoclk.c                     |  59 ++++++-
+ drivers/clk/meson/gxbb-aoclk.h                     |  23 +++
+ include/dt-bindings/clock/gxbb-aoclkc.h            |   1 +
+ 6 files changed, 275 insertions(+), 9 deletions(-)
+ create mode 100644 drivers/clk/meson/gxbb-aoclk-32k.c
+ create mode 100644 drivers/clk/meson/gxbb-aoclk.h
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.1
