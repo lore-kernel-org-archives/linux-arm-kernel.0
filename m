@@ -1,43 +1,132 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 6 Jul 2017 21:52:30 +0530
-Subject: [GIT PULL] Mailbox changes for v4.13
-Message-ID: <CABb+yY2v=RrVk5E9eWAX5j2sMO=4waawGdQCHMQU8S-4GgBm+A@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 06 Jul 2017 17:39:24 +0100
+Subject: [PATCH v4 3/3] arm64: kvm: inject SError with user space specified
+ syndrome
+In-Reply-To: <b2b80fd0-4a8f-d605-590e-17785eee2e8b@huawei.com>
+References: <1498481199-24118-1-git-send-email-gengdongjiu@huawei.com>
+ <20170703083903.GE4066@cbox>
+ <429e4a67-3795-1449-f0b1-12df3012629a@huawei.com> <595B6A8A.1050809@arm.com>
+ <b2b80fd0-4a8f-d605-590e-17785eee2e8b@huawei.com>
+Message-ID: <595E67BC.6050707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi gengdongjiu,
 
-The following changes since commit 63f700aab4c11d46626de3cd051dae56cf7e9056:
+On 05/07/17 09:14, gengdongjiu wrote:
+> On 2017/7/4 18:14, James Morse wrote:
+>> Can you give us a specific example of an error you are trying to handle?
 
-  Merge tag 'xtensa-20170612' of
-git://github.com/jcmvbkbc/linux-xtensa (2017-06-13 15:09:10 +0900)
+> For example:
+> guest OS user space accesses device type memory, but happen SError. because the
+> SError is asynchronous faults, it does not take immediately. when guest OS call "SVC" to enter guest os
+> kernel space, the ESB instruction(Error Synchronization Barrier) will defter this SError. so the SError happen immediately.
 
-are available in the git repository at:
+Ah, this isn't necessarily a 'RAS notification' SError/SEI, it may be a
+'vanilla', v8.0 SError.
 
-  https://git.linaro.org/landing-teams/working/fujitsu/integration.git
-mailbox-for-next
+You've given a guest access to a physical device (how?), the guest has done
+something, which caused the device to respond with SError.
 
-for you to fetch changes up to 25bfee16d5a3158086273cc51110c7470144c842:
+Do you have a specific use-case for this? What is the ESR? What kinds of CPER
+records does firmware generate? (if any)
 
-  mailbox: Introduce Qualcomm APCS IPC driver (2017-06-14 17:47:19 +0530)
 
-----------------------------------------------------------------
-- Minor improvement : avoid requiring unnecessary startup/shutdown
-callback that many drivers seem to not need
-- New controller driver for Qualcomm's APCS IPC
+We have to be careful here as devices can still generate asynchronous-interrupts
+using SError, these aren't contained by ESB barriers. For these we should fall
+back to KVM's v8.0 SError behaviour. KVM can tell them apart as the APEI code
+doesn't claim the SError as an SEI notification, and with the RAS extensions the
+ESR has the 'IDS' bit set.
 
-----------------------------------------------------------------
-Bjorn Andersson (3):
-      mailbox: Make startup and shutdown ops optional
-      dt-bindings: mailbox: Introduce Qualcomm APCS global binding
-      mailbox: Introduce Qualcomm APCS IPC driver
 
- .../bindings/mailbox/qcom,apcs-kpss-global.txt     |  46 ++++++++
- drivers/mailbox/Kconfig                            |   8 ++
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/mailbox.c                          |  16 ++-
- drivers/mailbox/qcom-apcs-ipc-mailbox.c            | 129 +++++++++++++++++++++
- 5 files changed, 195 insertions(+), 6 deletions(-)
- create mode 100644
-Documentation/devicetree/bindings/mailbox/qcom,apcs-kpss-global.txt
- create mode 100644 drivers/mailbox/qcom-apcs-ipc-mailbox.c
+>> How would a non-KVM user space process handle the error?
+
+> it is indeed, non-KVM user space can not get the notification from hypervisor or host kernel. thanks for the pointing out
+> do you mean still Signal SIGBUS from memory_failure?
+
+No, I was assuming this was a RAS notification SEI, (because your patch 1/3 of
+touched the RAS cpu-features) being given to user space to handle.
+
+Instead, can I ask how the host should handle this SError if it had accessed the
+device itself?
+
+
+I agree device pass-through is going to be a special case for KVM, but before
+the host can deliver a device RAS error into the guest that was using the
+device, it needs to fully understand what the error means:
+
+The error may mean that the careful configuration that makes device-passthrough
+safe no longer works, letting the guest continue to access the device may let it
+damage another guest or the hyper visor.
+
+
+We may need a way for the host RAS code to identify the driver responsible, to
+handle the device error, or delegate it if that's appropriate.
+
+
+[...]
+
+>> So (a): a physical-CPU hardware error occurs, and then (c) we tell Qemu/kvmtool
+>> via a KVM-specific API.
+>>
+>> Don't do this, it doesn't work for non-KVM users. You are exposing host-specific
+>> implementation details to user space. What if I discover the same error via a
+>> Polling GHES, or one of the IRQ flavours?
+
+> James, you mainly concern the way that "tell Qemu/kvmtool via a KVM-specific API", right?
+> so how about still delivered SIGBUS same as the SEA(Synchronous External Abort)?
+
+> by the way, what is your meaning of below words?
+>  >"What if I discover the same error via a Polling GHES, or one of the IRQ flavours?"
+
+This was my mistaken assumption that you were passing an APEI RAS SEI
+notification to user space via a KVM specific API. This wouldn't work for
+applications not using KVM, or notifications not using SEI.
+
+Here I was asking what happens if the notification used NOTIFY_POLL or
+NOTIFY_IRQ (instead of NOTIFY_SEI) in the GHES, but this isn't relevant as it
+doesn't look like this is a APEI RAS notification.
+
+[...]
+
+
+>> If there is another type of CPER record where we should notify userspace, please
+>> do it from mm/memory-failure.c, drivers/acpi/apei/ghes.c or
+>> drivers/firmware/efi/cper.c. These should consider all user-space applications,
+>> not just users of KVM, and not just on arm64.
+> 
+> here I have a question, in the "drivers/acpi/apei/ghes.c" code, it only handle the memory section of CPER.
+
+Yes, we are certainly missing processing for the other record types.
+
+
+> if the section type of CPER is processor, it will not notify user-space. so only let userspace handle the memory section is reasonable?
+
+I think the only errors that user-space can know more than the kernel are memory
+errors. These are the only RAS errors we should expect user space to handle. All
+the others fall into either 'corrected by the kernel' or 'fatal for userspace -
+SIGKILL'.
+
+
+>> For memory errors we already have BUS_MCEERR_AR - action-required, and
+>> BUS_MCEERR_AO - action-optional.
+>>
+>> For a TLB error, (Table 250 of UEFI 2.6), what is Qemu expected to do? Linux has
+>> to classify the error and handle it as far as possible. In most cases the error
+>> is either handled (no notification required), or fatal. Memory errors are the
+>> only example I've found so far where an application can do additional work to
+>> handle the error.
+
+>   James, only memory errors needs application to do additional work. UEFI spec mentioned that?
+
+No, its my observation based on the record types. Memory is the only thing an
+application can change. Everything else belongs to the kernel.
+For a corrupt page of anonymous memory, there is nothing the kernel can do, but
+report the data lost. The application (e.g. web browser) may know what the
+corrupt data was, and if/how it can retrieve it again. This isn't true of
+Processor/Cache/TLB/PCIe errors, which cover the other CPER records.
+
+
+Thanks,
+
+James
