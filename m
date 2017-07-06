@@ -1,53 +1,54 @@
-From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Thu, 6 Jul 2017 14:16:41 +0800
-Subject: [PATCH v3 2/6] pwm: mediatek: fix pwm source clock selection
-In-Reply-To: <d009712e-f0a2-2dc7-2f64-ad8cfa21f98d@gmail.com>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
- <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
- <d009712e-f0a2-2dc7-2f64-ad8cfa21f98d@gmail.com>
-Message-ID: <1499321801.22478.12.camel@mhfsdcap03>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 6 Jul 2017 14:31:51 +0800
+Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
+In-Reply-To: <20170705174403.GH4902@n2100.armlinux.org.uk>
+References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
+ <20170705171607.GG4902@n2100.armlinux.org.uk>
+ <CAKv+Gu9DXFDDdx3Vrmo20cRtMcbS-MUa4MF5r-Odje68FinGOw@mail.gmail.com>
+ <20170705174403.GH4902@n2100.armlinux.org.uk>
+Message-ID: <20170706143151.26e485fa@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-07-05 at 13:09 +0200, Matthias Brugger wrote:
-> 
-> On 06/30/2017 08:05 AM, Zhi Mao wrote:
-> > In original code, the pwm output frequency is not correct
-> > when set bit<3>=1 to PWMCON register.
-> > 
-> > Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-> > ---
-> >   drivers/pwm/pwm-mediatek.c |    2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> > index 5c11bc7..d08b5b3 100644
-> > --- a/drivers/pwm/pwm-mediatek.c
-> > +++ b/drivers/pwm/pwm-mediatek.c
-> > @@ -91,7 +91,7 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> >   	if (clkdiv > 7)
-> >   		return -EINVAL;
-> >   
-> > -	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | clkdiv);
-> > +	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
-> 
-> Just for clarification, BIT(15) enables old PWM mode, which ignores 
-> CLKSEL (BIT(3)). Therefore setting BIT(3) does not have any effect and 
-> can be discarded.
-> 
-> Am I correct? I took mt7623n datasheet for reference.
-> 
-> Regards,
-> Matthias
-> 
-Yes, remove setting bit<3> will not take any effect. 
-PWMCON bit<3> is pwm source clock selecting register.
-You can check the datasheet of MT7623 for details.
+On Wed, 5 Jul 2017 18:44:03 +0100 Russell King - ARM Linux wrote:
 
-Regards
-Zhi
-
-> >   	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
-> >   	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
-> >   
+> On Wed, Jul 05, 2017 at 06:36:53PM +0100, Ard Biesheuvel wrote:
+> > On 5 July 2017 at 18:16, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:  
+> > > On Wed, Jul 05, 2017 at 06:13:33PM +0200, Gregory CLEMENT wrote:  
+> > >> Enable the PCIe interface on the MACCHIATOBin board. It is located on
+> > >> CON12 and is 4 lanes capable.
+> > >>
+> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>  
+> > >
+> > > Why do you folk at free-electrons like doing half a job all the friggin
+> > > time?
+> > >
+> > > You know I have complete patches for mcbin, but you pointedly won't look
+> > > at them at all - except when you have a problem and want to test my tree.
+> > > And even then, you ignore my work (despite testing that it works), and
+> > > you still recreate my patches.
+> > >
+> > > This is really frustrating and insane behaviour on your part.
+> > >
+> > > Here's what I have:
+> > >
+> > > +&cpm_pcie0 {
+> > > +       pinctrl-names = "default";
+> > > +       pinctrl-0 = <&cpm_pcie_pins>;
+> > > +       num-lanes = <4>;
+> > > +       reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
+> > > +       status = "okay";  
 > > 
+> > This needs 'num-viewport = <8>' as well, or the crazy Synopsys DWC
+
+IMHO, maybe putting this property into dtsi is better.
+
+Thanks,
+Jisheng
+
+> > PCIe driver will happily reconfigure the I/O window at runtime to
+> > perform config space accesses, without any locking whatsoever.  
+> 
+> Thanks for the feedback, I'll integrate that change into my patch, so
+> it's ready for when I rebase after -rc1.
+> 
