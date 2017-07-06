@@ -1,60 +1,78 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 06 Jul 2017 13:38:30 +0200
+Date: Thu, 06 Jul 2017 14:10:33 +0200
 Subject: [PATCH] arm64: dts: marvell: mcbin: Enable PCIe interface
-In-Reply-To: <20170706090143.GI4902@n2100.armlinux.org.uk> (Russell King's
- message of "Thu, 6 Jul 2017 10:01:43 +0100")
+In-Reply-To: <CAKv+Gu-uU7SqcDZdoBfcJHjNMYYVtoH_QfQa7sffcLLOY=iQHQ@mail.gmail.com>
+ (Ard Biesheuvel's message of "Thu, 6 Jul 2017 09:39:21 +0100")
 References: <20170705161333.9315-1-gregory.clement@free-electrons.com>
  <20170705171607.GG4902@n2100.armlinux.org.uk>
- <874luqf2ym.fsf@free-electrons.com>
- <20170706090143.GI4902@n2100.armlinux.org.uk>
-Message-ID: <87van5eqx5.fsf@free-electrons.com>
+ <CAKv+Gu9DXFDDdx3Vrmo20cRtMcbS-MUa4MF5r-Odje68FinGOw@mail.gmail.com>
+ <20170705174403.GH4902@n2100.armlinux.org.uk>
+ <20170706143151.26e485fa@xhacker>
+ <CAKv+Gu-uU7SqcDZdoBfcJHjNMYYVtoH_QfQa7sffcLLOY=iQHQ@mail.gmail.com>
+Message-ID: <87r2xtepfq.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
+Hi Ard,
  
- On jeu., juil. 06 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+ On jeu., juil. 06 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-> On Thu, Jul 06, 2017 at 09:18:25AM +0200, Gregory CLEMENT wrote:
->> Hi Russell King,
+> On 6 July 2017 at 07:31, Jisheng Zhang <jszhang@marvell.com> wrote:
+>> On Wed, 5 Jul 2017 18:44:03 +0100 Russell King - ARM Linux wrote:
 >>
->> Actually everything is available in the linux-next branch since one or
->> two weeks. So you can rebase and send your series right now.
+>>> On Wed, Jul 05, 2017 at 06:36:53PM +0100, Ard Biesheuvel wrote:
+>>> > On 5 July 2017 at 18:16, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+>>> > > On Wed, Jul 05, 2017 at 06:13:33PM +0200, Gregory CLEMENT wrote:
+>>> > >> Enable the PCIe interface on the MACCHIATOBin board. It is located on
+>>> > >> CON12 and is 4 lanes capable.
+>>> > >>
+>>> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> > >
+>>> > > Why do you folk at free-electrons like doing half a job all the friggin
+>>> > > time?
+>>> > >
+>>> > > You know I have complete patches for mcbin, but you pointedly won't look
+>>> > > at them at all - except when you have a problem and want to test my tree.
+>>> > > And even then, you ignore my work (despite testing that it works), and
+>>> > > you still recreate my patches.
+>>> > >
+>>> > > This is really frustrating and insane behaviour on your part.
+>>> > >
+>>> > > Here's what I have:
+>>> > >
+>>> > > +&cpm_pcie0 {
+>>> > > +       pinctrl-names = "default";
+>>> > > +       pinctrl-0 = <&cpm_pcie_pins>;
+>>> > > +       num-lanes = <4>;
+>>> > > +       reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
+>>> > > +       status = "okay";
+>>> >
+>>> > This needs 'num-viewport = <8>' as well, or the crazy Synopsys DWC
+>>
+>> IMHO, maybe putting this property into dtsi is better.
+>>
 >
-> As there are multiple trees, just specifying a branch is not helpful.
-> The Xenon SDHCI and ethernet changes were being published through the
-> MISL tree, but that tree has no for-next branch.
->
-> There is no git tree specified in MAINTAINERS either.
->
-> So, sorry, I've no idea which tree you're referring to.
->
-> And no, I do _not_ want to grab a copy of linux-next to rebase my
+> Good point. Do all instances of this IP that live on the SoC have 8
+> viewports?
 
-Well for upstreaming I don't see the problem to base on a linux-net tags
-such as next-20170704. We do it often when we submit patches to various
-subsystem (and if it is not a next tag we merge various branch by
-ourselves).
+In the Armada 80x0 datasheet there is no mention of viewport. However 2
+days ago you said that "What I do know is that boards like the Marvell
+8040 based MacchiatoBin uses this IP in RC mode, and exposes config,
+MMIO and IO space windows using only 2 viewports. Note that this is
+essentially a bug in the DT description, given that its version of the
+IP supports 8 viewports."[1]
 
-> changes on and publish back to SolidRun for their use, that would be
-> insane.
+So you seem to know that the version of the IP used support the 8
+viewports!
 
-We also deliver stable branch for various customers and in this case we
-just have a different branch or tree.
-
-However, I think we have exactly what meets your requirements:
-https://github.com/MISL-EBU-System-SW/mainline-public/tree/4.12-rc6/backports
-
-It is a stable branch which gathers most of the patch submitted for
-Armada 37xx, 7K and 8K.
+What I can also say is that the in the datasheet there is no mention of
+difference between the instance. The only thing that can differ is the
+number of lane for each PCIe Port.
 
 Gregory
 
->
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+
+[1]: https://www.spinics.net/lists/arm-kernel/msg592091.html
 
 -- 
 Gregory Clement, Free Electrons
