@@ -1,38 +1,63 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  6 Jul 2017 22:28:21 +0800
-Subject: [PATCH 1/2] pinctrl: sunxi: add a missing function of A10/A20 pinctrl
- driver
-In-Reply-To: <20170706142822.20296-1-icenowy@aosc.io>
-References: <20170706142822.20296-1-icenowy@aosc.io>
-Message-ID: <20170706142822.20296-2-icenowy@aosc.io>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Thu, 6 Jul 2017 14:21:26 +0000
+Subject: [PATCH v1 2/3] dt-bindings: display: panel: Add support for Orise
+ Tech otm8009a dsi panel
+In-Reply-To: <1499185805-23354-3-git-send-email-philippe.cornu@st.com>
+References: <1499185805-23354-1-git-send-email-philippe.cornu@st.com>
+ <1499185805-23354-3-git-send-email-philippe.cornu@st.com>
+Message-ID: <c7caa8fc-076b-c2ad-5210-19458f89dab7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PH16 pin has a function with mux id 0x5, which is the DET pin of the
-"sim" (smart card reader) IP block.
 
-This function is missing both in the old A10 and A20 drivers, so it's
-not found during the merge of these two drivers.
 
-Add it to the driver. As we now merged A20 pinctrl driver to the A10
-one, we need to only fix the A10 driver now.
+On 07/04/2017 06:30 PM, Philippe CORNU wrote:
+> The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
+> a MIPI-DSI video interface. Its backlight is managed through the DSI link.
+> 
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+> ---
+>   .../bindings/display/panel/orisetech,otm8009a.txt    | 20 ++++++++++++++++++++
+>   1 file changed, 20 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+> new file mode 100644
+> index 0000000..0bb8237
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+> @@ -0,0 +1,20 @@
+> +Orise Tech OTM8009A 3.97" 480x800 TFT LCD panel (MIPI-DSI video mode)
+> +
+> +The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
+> +a MIPI-DSI video interface. Its backlight is managed through the DSI link.
+> +
+> +Required properties:
+> +  - compatible: "orisetech,otm8009a"
+> +  - reg: the virtual channel number of a DSI peripheral
+> +  - reset-gpios: a GPIO spec for the reset pin (active low). (Optional)
+> +
+> +Example:
+> +&dsi {
+> +	...
+> +
+> +	panel at 0 {
+> +		compatible = "orisetech,otm8009a";
+> +		reg = <0>;
+> +		reset-gpios = <&gpioh 7 0>;
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 1 +
- 1 file changed, 1 insertion(+)
+Hi All,
+I should have written instead:
+  +		reset-gpios = <&gpioh 7 GPIO_ACTIVE_LOW>;
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-index 159580c04b14..47a392bc73c8 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-@@ -918,6 +918,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 		  SUNXI_FUNCTION_VARIANT(0x3, "emac",	/* ETXD1 */
- 					 PINCTRL_SUN7I_A20),
- 		  SUNXI_FUNCTION(0x4, "keypad"),	/* IN6 */
-+		  SUNXI_FUNCTION(0x5, "sim"),		/* DET */
- 		  SUNXI_FUNCTION_IRQ(0x6, 16),		/* EINT16 */
- 		  SUNXI_FUNCTION(0x7, "csi1")),		/* D16 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 17),
--- 
-2.13.0
+reset-gpios is active low and the define GPIO_ACTIVE_LOW = 1 so the 
+example was not good.
+
+I will send soon the v2 with the correction.
+Many thanks
+Philippe
+
+
+> +	};
+> +};
+> 
