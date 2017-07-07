@@ -1,34 +1,23 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  7 Jul 2017 12:06:45 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select the coda driver as module
-Message-ID: <1499440005-8067-1-git-send-email-festevam@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 7 Jul 2017 11:07:10 -0400
+Subject: [PATCH V2] PCI: Do not enable extended tags on pre-dated (v1.x)
+ systems
+In-Reply-To: <1499439193-16628-1-git-send-email-okaya@codeaurora.org>
+References: <1499439193-16628-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <f95ae702-1b7b-b2d4-72bd-0518badfefbc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On 7/7/2017 10:53 AM, Sinan Kaya wrote:
+> +	ret = pcie_capability_read_word(dev, PCI_EXP_FLAGS, &flags);
+> +	if (ret || ((flags & PCI_EXP_FLAGS_VERS) < 2))
+> +		return 0;
+>  
 
-The coda driver may be probed prior to the rootfs being available, leading
-to firmware loading failure.
+Never mind, there is a problem here. I shouldn't have added it here.
+I'll remove these and post again.
 
-To avoid such problem, select the coda driver as module.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index e74de69..621910a 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -234,7 +234,7 @@ CONFIG_USB_VIDEO_CLASS=m
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
- CONFIG_V4L_MEM2MEM_DRIVERS=y
--CONFIG_VIDEO_CODA=y
-+CONFIG_VIDEO_CODA=m
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
