@@ -1,57 +1,32 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Fri,  7 Jul 2017 17:33:58 +0530
-Subject: [PATCH V2 2/4] arm64: use hw_breakpoint_needs_single_step() to decide
- if step is needed
+Date: Fri,  7 Jul 2017 17:33:59 +0530
+Subject: [PATCH V2 3/4] hw-breakpoint: sample test: set step_needed bit field
 In-Reply-To: <cover.1499416107.git.panand@redhat.com>
 References: <cover.1499416107.git.panand@redhat.com>
-Message-ID: <53c57967c400d44bb0b3b3622d8dbe0108642247.1499416107.git.panand@redhat.com>
+Message-ID: <a38616dbf74dd13b5e41396cb11014be45bd15ba.1499416107.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we use is_default_overflow_handler() to decide whether a
-"step" will be needed or not. However, is_default_overflow_handler() is
-true only for perf implementation. There can be some custom kernel
-module tests like samples/hw_breakpoint/data_breakpoint.c which can
-rely on default step handler.
-
-hw_breakpoint_needs_single_step() will be true if any hw_breakpoint user
-wants to use default step handler and sets step_needed in attribute.
+arch like ARM64 expects 'step_needed == true'  in order to use default
+single step handler. Therefore, set the bit field in the test case.
+Other arch will not have any affect as they do not use it so far.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/kernel/hw_breakpoint.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ samples/hw_breakpoint/data_breakpoint.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index 749f81779420..9a73f85ab9ad 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -661,7 +661,7 @@ static int breakpoint_handler(unsigned long unused, unsigned int esr,
- 		perf_bp_event(bp, regs);
+diff --git a/samples/hw_breakpoint/data_breakpoint.c b/samples/hw_breakpoint/data_breakpoint.c
+index ef7f32291852..5a1919d01800 100644
+--- a/samples/hw_breakpoint/data_breakpoint.c
++++ b/samples/hw_breakpoint/data_breakpoint.c
+@@ -59,6 +59,7 @@ static int __init hw_break_module_init(void)
+ 	attr.bp_addr = kallsyms_lookup_name(ksym_name);
+ 	attr.bp_len = HW_BREAKPOINT_LEN_4;
+ 	attr.bp_type = HW_BREAKPOINT_W | HW_BREAKPOINT_R;
++	attr.step_needed = true;
  
- 		/* Do we need to handle the stepping? */
--		if (is_default_overflow_handler(bp))
-+		if (hw_breakpoint_needs_single_step(bp))
- 			step = 1;
- unlock:
- 		rcu_read_unlock();
-@@ -789,7 +789,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
- 		perf_bp_event(wp, regs);
- 
- 		/* Do we need to handle the stepping? */
--		if (is_default_overflow_handler(wp))
-+		if (hw_breakpoint_needs_single_step(wp))
- 			step = 1;
- 	}
- 	if (min_dist > 0 && min_dist != -1) {
-@@ -800,7 +800,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
- 		perf_bp_event(wp, regs);
- 
- 		/* Do we need to handle the stepping? */
--		if (is_default_overflow_handler(wp))
-+		if (hw_breakpoint_needs_single_step(wp))
- 			step = 1;
- 	}
- 	rcu_read_unlock();
+ 	sample_hbp = register_wide_hw_breakpoint(&attr, sample_hbp_handler, NULL);
+ 	if (IS_ERR((void __force *)sample_hbp)) {
 -- 
 2.9.3
