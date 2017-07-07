@@ -1,83 +1,51 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 7 Jul 2017 11:39:52 +0100
-Subject: [PATCH 0/7] ARM: NOMMU: MPU updates
-In-Reply-To: <003cd30f-b39f-c930-ab75-298333c2fa29@arm.com>
-References: <1497344707-14446-1-git-send-email-vladimir.murzin@arm.com>
- <e0b9c831-f864-934d-b694-aa92374231bf@arm.com>
- <003cd30f-b39f-c930-ab75-298333c2fa29@arm.com>
-Message-ID: <9fb560aa-59a7-9138-3b02-235c79d1fc33@arm.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri,  7 Jul 2017 17:33:56 +0530
+Subject: [PATCH V2 0/4] ARM64: Fix irq generation between breakpoint and step
+ exception
+Message-ID: <cover.1499416107.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+v1 was here http://marc.info/?l=linux-arm-kernel&m=149910958418708&w=2
 
-I know, we are in a middle of the merge window, but given that DMA fixes for
-NOMMU have landed in Linus tree it'd be handy to have this patch set included
-too:
+v1 -> v2:
+- patch 1 of v1 has been modified to patch 1-3 of v2.
+- Introduced a new event attribute step_needed and implemented
+  hw_breakpoint_needs_single_step() (patch 1)
+- Replaced usage of is_default_overflow_handler() with
+  hw_breakpoint_needs_single_step(). (patch 2)
+- Modified sample test to set set step_needed bit field (patch 3)
 
-"These MPU patches introduce a nice feature that it simplifies the bootloader:
-do not need to setup the MPU, for example for coherent DMA region, which is
-described in device-tree too." Andr?s Szemz?
+samples/hw_breakpoint/data_breakpoint.c passes with x86_64 but fails with
+ARM64. Even though it has been NAKed previously on upstream [1, 2], I have
+tried to come up with patches which can resolve it for ARM64 as well.
 
-Thanks!
-Vladimir
+I noticed that even perf step exception can go into an infinite loop if CPU
+receives an interrupt while executing breakpoint/watchpoint handler. So,
+event though we are not concerned about above test, we will have to find a
+solution for the perf issue.
 
-On 27/06/17 09:33, Vladimir Murzin wrote:
-> Ping!
-> 
-> On 20/06/17 09:30, Vladimir Murzin wrote:
->> Gentle ping...
->>
->> On 13/06/17 10:05, Vladimir Murzin wrote:
->>> Hi,
->>>
->>> This is an update of the existent MPU code which consist set of
->>> clean-ups and enhancements. The most significant changes are in the way
->>> how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
->>> layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
->>> support for M-class has been added (PATCH 6/7).
->>>
->>> Thanks!
->>>
->>> Changelog:
->>>
->>>         RFC v2 -> v1
->>>              - dropped RFC tag
->>> 	       - Tested-by from Andr?s
->>> 	       - rebased on 4.12-rc5
->>>
->>>            RFC -> RFC v2
->>> 	       - fixed MPU enable for v7m (PATCH 6/7)
->>>
->>> Vladimir Murzin (7):
->>>   ARM: NOMMU: Move out MPU setup in separate module
->>>   ARM: NOMMU: Update MPU accessors to use cp15 helpers
->>>   ARM: NOMMU: Rework MPU to be mostly done in C
->>>   ARM: NOMMU: Disallow MPU for XIP
->>>   ARM: Kconfig: Kill CONFIG_VECTORS_BASE
->>>   ARM: V7M: Add support for MPU to M-class
->>>   ARM: NOMMU: Use more MPU regions to cover memory
->>>
->>>  arch/arm/Kconfig               |   9 -
->>>  arch/arm/Kconfig-nommu         |   4 +-
->>>  arch/arm/include/asm/cputype.h |  10 +
->>>  arch/arm/include/asm/mpu.h     |  23 ++-
->>>  arch/arm/include/asm/smp.h     |   2 +-
->>>  arch/arm/include/asm/v7m.h     |  10 +
->>>  arch/arm/kernel/asm-offsets.c  |  11 +
->>>  arch/arm/kernel/head-nommu.S   | 128 +++++++++---
->>>  arch/arm/kernel/smp.c          |   2 +-
->>>  arch/arm/mm/Makefile           |   1 +
->>>  arch/arm/mm/nommu.c            | 254 +----------------------
->>>  arch/arm/mm/pmsa-v7.c          | 445 +++++++++++++++++++++++++++++++++++++++++
->>>  12 files changed, 598 insertions(+), 301 deletions(-)
->>>  create mode 100644 arch/arm/mm/pmsa-v7.c
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
+This patchset attempts to resolve both the issue. Please review.
+
+[1] http://marc.info/?l=linux-arm-kernel&m=149580777524910&w=2
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/425266.html
+
+Pratyush Anand (4):
+  hw_breakpoint: Add step_needed event attribute
+  arm64: use hw_breakpoint_needs_single_step() to decide if step is
+    needed
+  hw-breakpoint: sample test: set step_needed bit field
+  arm64: disable irq between breakpoint and step exception
+
+ arch/arm64/kernel/debug-monitors.c      |  3 +++
+ arch/arm64/kernel/hw_breakpoint.c       | 10 +++++-----
+ arch/arm64/mm/fault.c                   | 22 ++++++++++++++++++----
+ include/linux/hw_breakpoint.h           |  6 ++++++
+ include/uapi/linux/perf_event.h         |  3 ++-
+ kernel/events/core.c                    |  2 ++
+ samples/hw_breakpoint/data_breakpoint.c |  1 +
+ tools/include/uapi/linux/perf_event.h   |  3 ++-
+ 8 files changed, 39 insertions(+), 11 deletions(-)
+
+-- 
+2.9.3
