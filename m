@@ -1,62 +1,47 @@
 From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Fri, 07 Jul 2017 15:08:31 -0500
-Subject: [PATCH] net: ethernet: mediatek: add NULL check on
- of_match_device() return value
-In-Reply-To: <20170707145717.GG24237@lunn.ch>
-References: <20170707071135.GA29205@embeddedgus>
- <20170707145717.GG24237@lunn.ch>
-Message-ID: <20170707150831.Horde.MYtEbXeqxGS-hTg2bUv3DWt@gator4166.hostgator.com>
+Date: Fri, 7 Jul 2017 15:23:34 -0500
+Subject: [PATCH] net: ethernet: mediatek: remove useless code in mtk_probe()
+In-Reply-To: <20170707150831.Horde.MYtEbXeqxGS-hTg2bUv3DWt@gator4166.hostgator.com>
+Message-ID: <20170707202333.GA5114@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Remove useless local variables _match_, _soc_ and the code related.
 
-Quoting Andrew Lunn <andrew@lunn.ch>:
+Notice that
 
-> On Fri, Jul 07, 2017 at 02:11:35AM -0500, Gustavo A. R. Silva wrote:
->> Check return value from call to of_match_device()
->> in order to prevent a NULL pointer dereference.
->>
->> In case of NULL print error message and return -ENODEV
->>
->> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
->> ---
->>  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c  
->> b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> index adaaafc..6a77dea 100644
->> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> @@ -2408,6 +2408,11 @@ static int mtk_probe(struct platform_device *pdev)
->>  	int i;
->>
->>  	match = of_match_device(of_mtk_match, &pdev->dev);
->> +	if (!match) {
->> +		dev_err(&pdev->dev, "failed to match device\n");
->> +		return -ENODEV;
->> +	}
->> +
->>  	soc = (struct mtk_soc_data *)match->data;
->
-> Hi Gustavo
->
-> I think you are fixing the wrong thing. The soc variable is unused. Also,
->
-> const struct of_device_id of_mtk_match[] = {
->         { .compatible = "mediatek,mt2701-eth" },
->         {},
-> };
->
-> So match->data is NULL. This code is all pointless and should be
-> removed, rather than try to avoid a NULL pointer dereference which can
-> not actually happen.
->
+const struct of_device_id of_mtk_match[] = {
+        { .compatible = "mediatek,mt2701-eth" },
+        {},
+};
 
-You are right. Thank you for pointing it out. I'll remove that code  
-and send a new patch shortly.
+So match->data is NULL.
 
-Thanks!
---
-Gustavo A. R. Silva
+Suggested-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+index adaaafc..b9a5a65 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -2401,15 +2401,10 @@ static int mtk_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	struct device_node *mac_np;
+-	const struct of_device_id *match;
+-	struct mtk_soc_data *soc;
+ 	struct mtk_eth *eth;
+ 	int err;
+ 	int i;
+ 
+-	match = of_match_device(of_mtk_match, &pdev->dev);
+-	soc = (struct mtk_soc_data *)match->data;
+-
+ 	eth = devm_kzalloc(&pdev->dev, sizeof(*eth), GFP_KERNEL);
+ 	if (!eth)
+ 		return -ENOMEM;
+-- 
+2.5.0
