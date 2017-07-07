@@ -1,105 +1,83 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Fri, 07 Jul 2017 09:30:49 +0200
-Subject: [PATCH v3 1/3] cpufreq: mediatek: Add support of cpufreq to
- MT2701/MT7623 SoC
-In-Reply-To: <de42e68d86dd161bb18b4ca7f27774c63c1bd55d.1499399121.git.sean.wang@mediatek.com>
-References: <cover.1499399121.git.sean.wang@mediatek.com>
- <de42e68d86dd161bb18b4ca7f27774c63c1bd55d.1499399121.git.sean.wang@mediatek.com>
-Message-ID: <1499412649.4449.33.camel@suse.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 07 Jul 2017 09:34:18 +0200
+Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
+In-Reply-To: <c6336df9-4f38-e636-383a-d0ad31658c65@gmail.com> (Florian
+ Fainelli's message of "Thu, 6 Jul 2017 12:47:55 -0700")
+References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
+ <20170704233219.18790-1-afaerber@suse.de>
+ <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
+ <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
+ <20170706173841.jwaskrrkooget6nk@piout.net>
+ <c6336df9-4f38-e636-383a-d0ad31658c65@gmail.com>
+Message-ID: <87h8yod7k5.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi Florian,
+ 
+ On jeu., juil. 06 2017, Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-On ven., 2017-07-07 at 11:56 +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> MT2701/MT7623 is a 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
-> single cluster and this hardware is also compatible with the existing
-> driver through enabling CPU frequency feature with operating-points-v2
-> bindings. Also, this driver actually supports all MediaTek SoCs, the
-> Kconfig menu entry and file name itself should be updated with more
-> generic name to drop "MT8173"
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/cpufreq/Kconfig.arm                         | 8 ++++----
->  drivers/cpufreq/Makefile                            | 2 +-
->  drivers/cpufreq/{mt8173-cpufreq.c => mtk-cpufreq.c} | 2 ++
->  3 files changed, 7 insertions(+), 5 deletions(-)
->  rename drivers/cpufreq/{mt8173-cpufreq.c => mtk-cpufreq.c} (99%)
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 74ed7e9..79aece7 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -87,14 +87,14 @@ config ARM_KIRKWOOD_CPUFREQ
->  	  This adds the CPUFreq driver for Marvell Kirkwood
->  	  SoCs.
->  
-> -config ARM_MT8173_CPUFREQ
-> -	tristate "Mediatek MT8173 CPUFreq support"
-> +config ARM_MEDIATEK_CPUFREQ
-> +	tristate "CPU Frequency scaling support for MediaTek SoCs"
->  	depends on ARCH_MEDIATEK && REGULATOR
-> -	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
-> +	depends on ARM || ARM64 || COMPILE_TEST
+> On 07/06/2017 10:38 AM, Alexandre Belloni wrote:
+>> On 06/07/2017 at 19:17:28 +0200, Andreas F?rber wrote:
+>>> Am 05.07.2017 um 04:36 schrieb Florian Fainelli:
+>>>> On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
+>>>>> Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
+>>>>> bogus holding pen") simplified the S500 SMP code by removing a loop for
+>>>>> pen_release in owl_secondary_boot(). Since then it is only calling
+>>>>> owl_v7_invalidate_l1() before branching to secondary_startup().
+>>>>>
+>>>>> The owl_v7_invalidate_l1() assembler function is superfluous, too.
+>>>>> Therefore drop owl_secondary_boot() and use secondary_boot() directly.
+>>>>>
+>>>>> Cc: David Liu <liuwei@actions-semi.com>
+>>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>>> ---
+>>>>
+>>>>> -	writel(virt_to_phys(owl_secondary_startup),
+>>>>> +	writel(virt_to_phys(secondary_startup),
+>>>>> 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
+>>>>
+>>>> This is a kernel symbol so please use __pa_symbol() here, also you
+>>>> might want to build with CONFIG_DEBUG_VIRTUAL and see if you get
+>>>> other warnings about using virt_to_phys() in the owl platform code
+>>>> (I did not check if there are other uses)
+>>>
+>>> Thanks for the report. There are no other such uses in mach-actions, but
+>>> git-grep'ing for virt_to_phys in arch/arm/mach-* I spot at least one
+>>> other such usage in mach-oxnas:
+>>>
+>>> arch/arm/mach-oxnas/platsmp.c:
+>>> writel(virt_to_phys(ox820_secondary_startup),
+>>>
+>>> as well as this in mach-mvebu:
+>>>
+>>> arch/arm/mach-mvebu/platsmp.c:  writel(virt_to_phys(boot_addr), base +
+>>> MV98DX3236_CPU_RESUME_ADDR_REG);
+>>>
+>>> and these in mach-at91:
+>>>
+>>> arch/arm/mach-at91/pm.c:        pm_bu->canary = virt_to_phys(&canary);
+>>> arch/arm/mach-at91/pm.c:        pm_bu->resume = virt_to_phys(cpu_resume);
+>>>
+>> 
+>> They can probably use __pa_symbol() (I must admit I didn't know about
+>> it before this email)
+>
+> This is fine, do you mind sending fixes for the at91 parts? Gregory, can
+> you also fix the mv98dx3236 platform SMP code?
 
-This statement no longer serves any purpose. The whole Kconfig.arm file
-depends on ARM || ARM64, so you can drop it. As a matter of fact no
-other entry in this file has the dependency.
+Yes sure, actually, for Armada XP we already use  __pa_symbol() but from
+an other file that why I didn't pay attention on it.
 
->  	depends on !CPU_THERMAL || THERMAL
->  	select PM_OPP
->  	help
-> -	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
-> +	  This adds the CPUFreq driver support for MediaTek SoCs.
->  
->  config ARM_OMAP2PLUS_CPUFREQ
->  	bool "TI OMAP2+"
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index b7e78f0..4956f5d 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -58,7 +58,7 @@ obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
->  obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
->  obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
->  obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
-> -obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
-> +obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mtk-cpufreq.o
+Gregory
 
-I would have preferred mediatek-cpufreq. 3-letter abbreviations are
-likely to collide and cause confusion at some point in time. However it
-seems I am late to the party, I see that there are already many files
-named mtk-* or *-mtk.*... So, so be it.
-
-Also the file describing the bindings is named?cpufreq-mediatek.txt,
-which is inconsistent... But the situation is the same for a few other
-cpufreq drivers already, so I suppose this is acceptable.
-
->  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
->  obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
->  obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mtk-cpufreq.c
-> similarity index 99%
-> rename from drivers/cpufreq/mt8173-cpufreq.c
-> rename to drivers/cpufreq/mtk-cpufreq.c
-> index fd1886f..481ec77 100644
-> --- a/drivers/cpufreq/mt8173-cpufreq.c
-> +++ b/drivers/cpufreq/mtk-cpufreq.c
-> @@ -575,6 +575,8 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
->  
->  /* List of machines supported by this driver */
->  static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
-> +	{ .compatible = "mediatek,mt2701", },
-> +	{ .compatible = "mediatek,mt7623", },
->  	{ .compatible = "mediatek,mt817x", },
->  	{ .compatible = "mediatek,mt8173", },
->  	{ .compatible = "mediatek,mt8176", },
-
-Reviewed-by: Jean Delvare <jdelvare@suse.de>
+>
+> Thanks!
+> -- 
+> Florian
 
 -- 
-Jean Delvare
-SUSE L3 Support
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
