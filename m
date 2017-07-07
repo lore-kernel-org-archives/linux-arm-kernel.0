@@ -1,53 +1,22 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 7 Jul 2017 09:28:58 -0600
-Subject: [PATCH] hwtracing: coresight: constify attribute_group structures.
-In-Reply-To: <97ff1c3f7145b0e4326fbbb246579cd5382880b3.1499233557.git.arvind.yadav.cs@gmail.com>
-References: <97ff1c3f7145b0e4326fbbb246579cd5382880b3.1499233557.git.arvind.yadav.cs@gmail.com>
-Message-ID: <CANLsYkxrT+d-HLpPAOM_pZVWfDgTU92Q-njo_0e=K-auYL=BYA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 7 Jul 2017 10:53:52 -0500
+Subject: [PATCH v5 3/7] dt-bindings: display: Add Synopsys DW MIPI DSI
+ host controller
+In-Reply-To: <1499071287-10414-4-git-send-email-philippe.cornu@st.com>
+References: <1499071287-10414-1-git-send-email-philippe.cornu@st.com>
+ <1499071287-10414-4-git-send-email-philippe.cornu@st.com>
+Message-ID: <20170707155352.txmdesre77tqsybw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 July 2017 at 23:49, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
-> attribute_groups are not supposed to change at runtime. All functions
-> working with attribute_groups provided by <linux/sysfs.h> work with const
-> attribute_group. So mark the non-const structs as const.
->
-> File size before:
->   text     data     bss     dec     hex filename
->    2573     288     296    3157     c55 coresight-etm-perf.o
->
-> File size After adding 'const':
->    text    data     bss     dec     hex filename
->    2613     224     296    3133     c3d coresight-etm-perf.o
-
-Hi Arvind,
-
-Did you find this using an automated tool or simply stumbled on it
-while reviewing the code?  In case of the former it is usually a good
-idea to specify which tool was used in the change log.
-
-Thanks,
-Mathieu
-
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+On Mon, Jul 03, 2017 at 10:41:23AM +0200, Philippe CORNU wrote:
+> This patch adds documentation of device tree bindings for the
+> Synopsys DesignWare MIPI DSI host controller.
+> 
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
 > ---
->  drivers/hwtracing/coresight/coresight-etm-perf.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> index 288a423..e97775d 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> @@ -60,7 +60,7 @@ struct etm_event_data {
->         NULL,
->  };
->
-> -static struct attribute_group etm_pmu_format_group = {
-> +static const struct attribute_group etm_pmu_format_group = {
->         .name   = "format",
->         .attrs  = etm_config_formats_attr,
->  };
-> --
-> 1.9.1
->
+>  .../bindings/display/bridge/dw_mipi_dsi.txt        | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+
+Acked-by: Rob Herring <robh@kernel.org>
