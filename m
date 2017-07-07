@@ -1,63 +1,25 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Fri,  7 Jul 2017 14:12:45 +0100
-Subject: [PATCH v 2/2] ARM: dts: iwg20d-q7: Add Ethernet AVB support
-In-Reply-To: <1499433165-62475-1-git-send-email-biju.das@bp.renesas.com>
-References: <1499433165-62475-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1499433165-62475-3-git-send-email-biju.das@bp.renesas.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 7 Jul 2017 09:31:09 -0400
+Subject: [PATCH] PCI: Do not enable extended tags on pre-dated (v1.x)
+ systems
+In-Reply-To: <CANE52Ki_B0pitpyNMBjrtEJBX6Cspe8-m3hZuEFCWuBN2osh-g@mail.gmail.com>
+References: <1499260748-21860-1-git-send-email-okaya@codeaurora.org>
+ <CANE52Ki_B0pitpyNMBjrtEJBX6Cspe8-m3hZuEFCWuBN2osh-g@mail.gmail.com>
+Message-ID: <c5e37c83-a43d-257a-fa2f-50fdab29ce7a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the iWave RainboW-G20D-Qseven board dependent part of the Ethernet
-AVB device node.
+On 7/7/2017 1:04 AM, Jike Song wrote:
+> Maybe checking the version of this endpoint at first? Do you expect a
+> v1 endpoint
+> to be working under v2+ ports?
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
----
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+I see your point. I guess we need to validate both incoming and outgoing.
+I was only checking incoming direction. 
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index 497aec0..081af01 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -17,6 +17,7 @@
- 
- 	aliases {
- 		serial0 = &scif0;
-+		ethernet0 = &avb;
- 	};
- };
- 
-@@ -25,6 +26,11 @@
- 		groups = "scif0_data_d";
- 		function = "scif0";
- 	};
-+
-+	avb_pins: avb {
-+		groups = "avb_mdio", "avb_gmii";
-+		function = "avb";
-+	};
- };
- 
- &scif0 {
-@@ -33,3 +39,18 @@
- 
- 	status = "okay";
- };
-+
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy3>;
-+	phy-mode = "gmii";
-+	renesas,no-ether-link;
-+	status = "okay";
-+
-+	phy3: ethernet-phy at 3 {
-+		reg = <3>;
-+		micrel,led-mode = <1>;
-+	};
-+};
+Let me look at this one more time.
+
 -- 
-1.9.1
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
