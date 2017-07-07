@@ -1,52 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Jul 2017 13:46:49 +0100
-Subject: [PATCH 0/8] io-pgtable lock removal
-In-Reply-To: <94ba5d4a-0dae-9394-79ef-90da86e49c86@broadcom.com>
-References: <e43ba1fe-696e-fabb-a800-52fadaa2fa93@broadcom.com>
- <20170628114609.GD11053@arm.com>
- <87d53115-3d80-5a3d-6632-c31986cb7018@broadcom.com>
- <20170704173155.GN22175@arm.com>
- <6814b246-22f0-bfaa-5002-a269b2735116@broadcom.com>
- <2d5f5ef3-32b1-76c6-6869-ff980557f8e8@broadcom.com>
- <20170705084143.GA9378@arm.com>
- <5149280b-a214-249c-c5e2-3712b1f941d2@broadcom.com>
- <20170706150838.GB15574@arm.com>
- <94ba5d4a-0dae-9394-79ef-90da86e49c86@broadcom.com>
-Message-ID: <20170707124648.GH6735@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  7 Jul 2017 14:07:47 +0100
+Subject: [PATCH 4/5] dt-bindings: Document devicetree binding for ARM DSU PMU
+In-Reply-To: <1499432868-18462-1-git-send-email-suzuki.poulose@arm.com>
+References: <1499432868-18462-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1499432868-18462-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 11:14:00AM -0700, Ray Jui wrote:
-> On 7/6/17 8:08 AM, Will Deacon wrote:
-> > On Wed, Jul 05, 2017 at 04:24:22PM -0700, Ray Jui wrote:
-> >> However, with the fix patch, I can still see the deadlock message when I
-> >> have > 32 iperf TX threads active in the system:
-> > 
-> > Damn. We've been going over this today and the only plausible theory seems
-> > to be that concurrent TLB syncs are causing the completion to be pushed out,
-> > resulting in timeouts.
-> > 
-> > Can you try this patch below, instead of the one I sent before, please?
-> > 
-> > Thanks,
-> > 
-> > Will
-> > 
-> > --->8
-> 
-> Good news! I can confirm that with the new patch below, the error log of
-> "TLB sync timed out" is now gone. I ran 20 iterations of the iperf
-> client test with 64 threads spread across 8 CPUs. The error message used
-> to coming out very quickly with just one iteration. But now it's
-> completely gone.
+This patch documents the devicetree bindings for ARM DSU PMU.
 
-Good, I'll queue this is as a fix then. Thanks for testing!
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ .../devicetree/bindings/arm/arm-dsu-pmu.txt        | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
 
-> At the same time, I do seem to observe a slight impact on performance
-> when multiple threads are used, but I guess that is expected, given that
-> a spin lock is added to protect the TLB sync.
-
-Hopefully that performance will pick up again once we defer the sync
-to the end of iommu_unmap.
-
-Will
+diff --git a/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
+new file mode 100644
+index 0000000..ca0695d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
+@@ -0,0 +1,28 @@
++* ARM DynamIQ Shared Unit (DSU) Performance Monitor Unit (PMU)
++
++ARM DyanmIQ Shared Unit (DSU) integrates one or more CPU cores
++with a shared L3 memory system, control logic and external interfaces to
++form a multicore cluster. The PMU enables to gather various statistics on
++the operations of the DSU. The PMU provides independent 32bit counters that
++can count any of the supported events, along with a 64bit cycle counter.
++The PMU is accessed via CPU system registers and has no MMIO component.
++
++** DSU PMU required properties:
++
++- compatible	: should be one of :
++
++		"arm,dsu-pmu"
++
++- interrupts	: Exactly 1 SPI must be listed.
++
++- cpus		: List of phandles for the CPUs connected to this DSU instance.
++
++
++** Example:
++
++fcm-pmu at 0 {
++	compatible = "arm,dsu-pmu";
++	interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>;
++	cpus = <&cpu_0>, <&cpu_1>;
++};
++
+-- 
+2.7.5
