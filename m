@@ -1,56 +1,113 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  7 Jul 2017 09:59:28 +0200
-Subject: [PATCH] ARM: mvebu: use __pa_symbol in the mv98dx3236 platform SMP
- code
-Message-ID: <20170707075928.2938-1-gregory.clement@free-electrons.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 7 Jul 2017 16:01:07 +0800
+Subject: [PATCH v16 2/7] power: add power sequence library
+In-Reply-To: <2629938.X3D3UTyHBr@aspire.rjw.lan>
+References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
+ <1868803.ffQpiaMTN5@aspire.rjw.lan>
+ <20170705115400.GA17226@b29397-desktop>
+ <2629938.X3D3UTyHBr@aspire.rjw.lan>
+Message-ID: <20170707080107.GC21909@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we already did for Armada XP switch from virt_to_phys() to
-__pa_symbol().
+On Fri, Jul 07, 2017 at 03:13:48AM +0200, Rafael J. Wysocki wrote:
+> > 
+> > - Can I write new code for it or I need to depend on something?
+> 
+> There is nothing this code needs to depend on AFAICS, but there are existing
+> solutions in this problem space (ACPI power management, genpd), so it needs to
+> be careful enough about possible overlaps etc.
+> 
+> > I find there is already "power state" concept at documentation.
+> > Documentation/ABI/testing/sysfs-devices-power_state
+> 
+> This is ACPI-specific and only in sysfs directories representing ACPI device
+> objects (which aren't physical devices).
+> 
+> Anyway, since ACPI covers the problem space you are working in already,
+> your code has to be mutually exclusive with it.
+> 
+> > - If I can write the new code for it, except the problems I want
+> > to fix, are there any other use cases I need to consider?
+> 
+> I would start simple and focus on the particular problem at hand, that is
+> devices with two power states ("on" and "off") where the "on" state
+> depends on a number of clocks and/or GPIOs.  Still, I'd also avoid making
+> design choices that might prevent it from being extended in the future
+> if need be.
+> 
+> One major problem I can see is how to "attach" the power states framework
+> to a particular device (once we have discovered that it should be used with
+> that device).
+> 
+> For bus types that don't do power management of their own you could follow
+> ACPI (and genpd) and provide a PM domain for this purpose, but bus types
+> doing their own PM (like USB) will probably need to be treated differently.
+> In those cases the bus type code will have to know that it should call some
+> helpers to switch power states of devices.
+> 
 
-The reason for it was well explained by Mark Rutland so let's quote him:
+After thinking more, using a power state framework is seems too heavy
+for this use case. This use case is just do some clock and gpio
+operations before device is created, and do some put operations
+after device is deleted. We just need some helpers in one structure
+(called "power sequence" or "power state") for this purpose.
 
-"virt_to_phys() is intended to operate on the linear/direct mapping of
-RAM.
+For the use case, the clock and gpio operation can be done after device
+is created, the power domain is more suitable.
 
-__pa_symbol() is intended to operate on the kernel mapping, which may
-not be in the linear/direct mapping on all architectures. e.g. arm64 and
-x86_64 map the kernel image and RAM separately.
+> > > 
+> > > Moreover, it assumes that all of the platforms including the IP block driven
+> > > by the controller driver in question will use the "power sequences" model,
+> > > but what if there are more generally defined power domains on them?
+> > 
+> > No, the IP block doesn't need this "power sequence", the power stuffs
+> > (clock, gpio, regulator) are described at firmware (eg, DT), and power
+> > operations are carried out during the probe, the device and driver match
+> > happens before power operation.
+> > 
+> > But for devices on the bus (bus is controlled by controller), the match
+> > information (eg, product id/vendor id) is stored at device's firmware, the
+> > controller device needs to talk with its child first to get the match
+> > information before the child device's probe.
+> 
+> Actually, that may vary from bus to bus.  In some cases the enumeration is
+> entirely firmware-based and in some cases devices are discoverable.
+> 
+> I guess you mean the latter situation and you are saying that subordinate
+> devices may need to be turned "on" (by means of a "power sequence") in order
+> to be enumerated.
+> 
+> Fair enough, but this is not what I meant.
+> 
+> The concern was that if drivers started to use "power sequences", they would
+> become incompatible with alternative solutions in the same problem space,
+> like genpd, but that need not be the case, so never mind.
 
-On 32-bit ARM the kernel image mapping is tied to the linear/direct
-mapping, so that works, but as it's semantically wrong (and broken for
-generic code), the DEBUG_VIRTUAL checks complain."
+"power sequence" is just used before the device is created and after the
+device is deleted from the bus. I don't want to overlap with power
+domain.
 
-Fixes: db88977894ab ("arm: mvebu: support for SMP on 98DX3336 SoC")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
+> 
+> > > 
+> > > It looks like the power management should really be carried out by an
+> > > additional layer of code to avoid imposing platform dependencies on
+> > > controller drivers.
+> > > 
+> > > Further, what if there are "power sequences" for the host controllers
+> > > themselves?  Who's expected to operate those "power sequences" then?
+> > 
+> > See above.
+> 
+> Let me rephrase.  Assume that your host controller is a platform device and
+> it is not "on" when the SoC comes up.  It has to be turned "on" via a "power
+> sequence".  Who's expected to do that for it?
+> 
 
-Hi Chris,
+We can use power domain for it, doesn't need "power sequence" in this
+series introduces.
 
-with this patch I don't expect any regression, hover it would be nice
-if you can test it.
-
-Thanks,
-
-Gregory
-
- arch/arm/mach-mvebu/platsmp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index e62273aacb43..4ffbbd217e82 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -211,7 +211,7 @@ static int mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
- 		return PTR_ERR(base);
- 
- 	writel(0, base + MV98DX3236_CPU_RESUME_CTRL_REG);
--	writel(virt_to_phys(boot_addr), base + MV98DX3236_CPU_RESUME_ADDR_REG);
-+	writel(__pa_symbol(boot_addr), base + MV98DX3236_CPU_RESUME_ADDR_REG);
- 
- 	iounmap(base);
- 
 -- 
-2.13.2
+
+Best Regards,
+Peter Chen
