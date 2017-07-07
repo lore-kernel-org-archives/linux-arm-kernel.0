@@ -1,46 +1,65 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Fri, 7 Jul 2017 17:56:22 +0300
-Subject: [Patch v5 05/12] [media] videodev2.h: Add v4l2 definition for HEVC
-In-Reply-To: <1497849055-26583-6-git-send-email-smitha.t@samsung.com>
-References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <CGME20170619052505epcas5p33a78ee709263cc9ae33cd9383794ca06@epcas5p3.samsung.com>
- <1497849055-26583-6-git-send-email-smitha.t@samsung.com>
-Message-ID: <12b890e0-b955-4d64-6b6b-2847f693ee57@linaro.org>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Fri,  7 Jul 2017 16:57:10 +0200
+Subject: [PATCH] arm: dts: qcom: add pseudo random number generator on the
+ IPQ4019
+Message-ID: <20170707145710.13458-1-chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Smitha,
+This architecture has a pseudo random number generator
+supported by the existing "qcom,prng" binding.
 
-On 06/19/2017 08:10 AM, Smitha T Murthy wrote:
-> Add V4L2 definition for HEVC compressed format
-> 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> ---
->  include/uapi/linux/videodev2.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index 2b8feb8..488de3d 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -629,6 +629,7 @@ struct v4l2_pix_format {
->  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
->  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
->  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
-> +#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC */
->  
->  /*  Vendor-specific formats   */
->  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
-> 
+rngtest: bits received from input: 5795960032
+rngtest: FIPS 140-2 successes: 289591
+rngtest: FIPS 140-2 failures: 207
+rngtest: FIPS 140-2(2001-10-10) Monobit: 25
+rngtest: FIPS 140-2(2001-10-10) Poker: 28
+rngtest: FIPS 140-2(2001-10-10) Runs: 91
+rngtest: FIPS 140-2(2001-10-10) Long run: 67
+rngtest: FIPS 140-2(2001-10-10) Continuous run: 0
+rngtest: input channel speed: (min=244; avg=46122; max=3906250)Kibits/s
+rngtest: FIPS tests speed: (min=1.327; avg=20.966; max=26.345)Mibits/s
+rngtest: Program run time: 386965827 microseconds
 
-Hans wanted the name to be H265, not sure is that valid yet.
+Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+---
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 4 ++++
+ arch/arm/boot/dts/qcom-ipq4019.dtsi           | 8 ++++++++
+ 2 files changed, 12 insertions(+)
 
-I have tested 5/12, 6/12, and 7/12 on venus codec driver, and in case
-you need it, you have my
-
-Reviewed-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+index b9457dd21a69..c25d8f5c669d 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+@@ -40,6 +40,10 @@
+ 			clock-frequency = <48000000>;
+ 		};
+ 
++		rng at 22000 {
++			status = "ok";
++		};
++
+ 		pinctrl at 0x01000000 {
+ 			serial_pins: serial_pinmux {
+ 				mux {
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index d8c87faa0124..d1a56331ce96 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -120,6 +120,14 @@
+ 			reg = <0x1800000 0x60000>;
+ 		};
+ 
++		rng at 22000 {
++			compatible = "qcom,prng";
++			reg = <0x22000 0x140>;
++			clocks = <&gcc GCC_PRNG_AHB_CLK>;
++			clock-names = "core";
++			status = "disabled";
++		};
++
+ 		tlmm: pinctrl at 0x01000000 {
+ 			compatible = "qcom,ipq4019-pinctrl";
+ 			reg = <0x01000000 0x300000>;
 -- 
-regards,
-Stan
+2.13.2
