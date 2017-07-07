@@ -1,7 +1,8 @@
 From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Fri, 7 Jul 2017 01:39:39 -0500
-Subject: [PATCH] pwm: sun4i: add NULL check on of_match_device() return value
-Message-ID: <20170707063939.GA20510@embeddedgus>
+Date: Fri, 7 Jul 2017 01:46:30 -0500
+Subject: [PATCH] iio: adc: meson-saradc: add NULL check on of_match_device()
+ return value
+Message-ID: <20170707064630.GA21945@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,23 +13,24 @@ In case of NULL print error message and return -ENODEV
 
 Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 ---
- drivers/pwm/pwm-sun4i.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/iio/adc/meson_saradc.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index 1284ffa..295ca19 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -321,6 +321,10 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
+diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+index 83da50e..07dbcc3 100644
+--- a/drivers/iio/adc/meson_saradc.c
++++ b/drivers/iio/adc/meson_saradc.c
+@@ -915,6 +915,11 @@ static int meson_sar_adc_probe(struct platform_device *pdev)
+ 	init_completion(&priv->done);
  
- 	match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
+ 	match = of_match_device(meson_sar_adc_of_match, &pdev->dev);
 +	if (!match) {
 +		dev_err(&pdev->dev, "failed to match device\n");
 +		return -ENODEV;
 +	}
++
+ 	priv->data = match->data;
  
- 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
- 	if (!pwm)
+ 	indio_dev->name = priv->data->name;
 -- 
 2.5.0
