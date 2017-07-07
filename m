@@ -1,31 +1,100 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 7 Jul 2017 08:41:01 -0500
-Subject: [PATCH v3 1/5] dt-bindings: i2c-stm32: Document the STM32F7 I2C
- bindings
-In-Reply-To: <1499356386-28779-2-git-send-email-pierre-yves.mordret@st.com>
-References: <1499356386-28779-1-git-send-email-pierre-yves.mordret@st.com>
- <1499356386-28779-2-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20170707134101.pm6cni7mjefi56iv@rob-hp-laptop>
+Date: Fri, 7 Jul 2017 08:53:25 -0500
+Subject: [PATCH 2/8] dt-bindings: mailbox: add binding doc for the ARM
+ SMC mailbox
+In-Reply-To: <20170630095608.24943-3-andre.przywara@arm.com>
+References: <20170630095608.24943-1-andre.przywara@arm.com>
+ <20170630095608.24943-3-andre.przywara@arm.com>
+Message-ID: <20170707135325.7iqntzxhnh7fzv4m@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 05:53:02PM +0200, Pierre-Yves MORDRET wrote:
-> This patch adds the documentation of device tree bindings for STM32F7 I2C
+On Fri, Jun 30, 2017 at 10:56:02AM +0100, Andre Przywara wrote:
+> Add binding documentation for the generic ARM SMC mailbox.
+> This is not describing hardware, but a firmware interface.
 > 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  Version history:
->     v3:
->         * None
->     v2:
->         * Remove i2c-timing binding in order to use generic bindings SCL
->           Rising and Falling time instead
-> ---
-> ---
->  .../devicetree/bindings/i2c/i2c-stm32.txt          | 29 +++++++++++++++++++---
->  1 file changed, 26 insertions(+), 3 deletions(-)
+>  .../devicetree/bindings/mailbox/arm-smc.txt        | 61 ++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/arm-smc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/arm-smc.txt b/Documentation/devicetree/bindings/mailbox/arm-smc.txt
+> new file mode 100644
+> index 0000000..90c5926
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/arm-smc.txt
+> @@ -0,0 +1,61 @@
+> +ARM SMC Mailbox Driver
 
-I acked v2. Please add acks when posting new versions.
+s/Driver/Interface/
 
-Rob
+> +======================
+> +
+> +This mailbox uses the ARM smc (secure monitor call) instruction to
+> +trigger a mailbox-connected activity in firmware, executing on the very same
+> +core as the caller. By nature this operation is synchronous and this
+> +mailbox provides no way for asynchronous messages to be delivered the other
+> +way round, from firmware to the OS. However the value of r0/w0/x0 the firmware
+> +returns after the smc call is delivered as a received message to the
+> +mailbox framework, so a synchronous communication can be established.
+> +
+> +One use case of this mailbox is the SCP interface, which uses shared memory
+> +to transfer commands and parameters, and a mailbox to trigger a function
+> +call. This allows SoCs without a separate management processor (or
+> +when such a processor is not available or used) to use this standardized
+> +interface anyway.
+> +
+> +This binding describes no hardware, but establishes a firmware interface.
+> +The communication follows the ARM SMC calling convention[1].
+> +Any core which supports the SMC or HVC instruction can be used, as long as
+> +a firmware component running in EL3 or EL2 is handling these calls.
+> +
+> +Mailbox Device Node:
+> +====================
+
+Please state this should be a child of /firmware node.
+
+> +
+> +Required properties:
+> +--------------------
+> +- compatible:		Shall be "arm,smc-mbox"
+> +- #mbox-cells		Shall be 1 - the index of the channel needed.
+> +- arm,smc-func-ids	An array of 32-bit values specifying the function
+> +			IDs used by each mailbox channel. Those function IDs
+> +			follow the ARM SMC calling convention standard [1].
+> +			There is one identifier per channel and the number
+> +			of supported channels is determined by the length
+> +			of this array.
+> +
+> +Optional properties:
+> +--------------------
+> +- method:		A string, either:
+> +			"hvc": if the driver shall use an HVC call, or
+> +			"smc": if the driver shall use an SMC call
+> +			If omitted, defaults to an SMC call.
+> +
+> +Example:
+> +--------
+> +
+> +	mailbox: smc_mbox {
+
+swap these. mailbox for the node name.
+
+> +		#mbox-cells = <1>;
+> +		compatible = "arm,smc-mbox";
+> +		identifiers = <0x82000001>, <0x82000002>;
+> +	};
+> +
+> +	scpi {
+> +		compatible = "arm,scpi";
+> +		mboxes = <&mailbox 0>;
+> +		shmem = <&cpu_scp_shmem>;
+> +	};
+> +
+> +
+> +[1]
+> +http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0028a/index.html
+> -- 
+> 2.9.0
+> 
