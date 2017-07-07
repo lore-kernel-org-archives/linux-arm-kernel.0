@@ -1,109 +1,47 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 7 Jul 2017 16:32:09 +0800
-Subject: [Qemu-devel] [PATCH v3 1/4] ACPI: Add APEI GHES Table Generation
- support
-In-Reply-To: <e90c5fb8-e68b-a620-9023-f4fcfdd68e97@redhat.com>
-References: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
- <4dde45bb-a730-82b1-dc49-ad00a6b73d85@redhat.com>
- <accf8880-f4b0-85f1-9f33-4103c8c26d7a@redhat.com>
- <e90c5fb8-e68b-a620-9023-f4fcfdd68e97@redhat.com>
-Message-ID: <dbbab7f6-18c4-9b6c-799e-8267797a31bd@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 7 Jul 2017 11:18:38 +0200
+Subject: [PATCH 2/2] pinctrl: sunxi: add support of R40 to A10 pinctrl
+ driver
+In-Reply-To: <72337BAD-680C-46BC-8DF5-645028E08F65@aosc.io>
+References: <20170706142822.20296-1-icenowy@aosc.io>
+ <20170706142822.20296-3-icenowy@aosc.io>
+ <20170706205030.e6wzn5n7ix3443cl@flea>
+ <72337BAD-680C-46BC-8DF5-645028E08F65@aosc.io>
+Message-ID: <20170707091838.64phmj2p5qvn3dxc@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laszlo,
-   sorry for my late response.
+On Fri, Jul 07, 2017 at 07:13:30AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> ? 2017?7?7? GMT+08:00 ??4:50:30, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Thu, Jul 06, 2017 at 10:28:22PM +0800, Icenowy Zheng wrote:
+> >>  	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 0),
+> >>  		  SUNXI_FUNCTION(0x0, "gpio_in"),
+> >>  		  SUNXI_FUNCTION(0x1, "gpio_out"),
+> >> -		  SUNXI_FUNCTION(0x2, "i2c0")),		/* SCK */
+> >> +		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SCK */
+> >> +		  SUNXI_FUNCTION_VARIANT(0x3,
+> >> +					 "pll_lock_dbg",
+> >> +					 PINCTRL_SUN8I_R40)),
+> >
+> >You have a number of lines where the wrapping is not consistent with
+> >the rest, such as this one, but also...
+> 
+> I think this one is because of extraordinary function name.
 
-On 2017/6/3 20:01, Laszlo Ersek wrote:
-> On 05/22/17 16:23, Laszlo Ersek wrote:
->> Keeping some context:
->>
->> On 05/12/17 23:00, Laszlo Ersek wrote:
->>> On 04/30/17 07:35, Dongjiu Geng wrote:
-> 
->> (68) In the code below, you are not taking an "OVMF header probe
->> suppressor" into account.
->>
->> But, we have already planned to replace that quirk with a separate,
->> dedicated allocation hint or command, so I'm not going to describe what
->> an "OVMF header probe suppressor" is; instead, I'll describe the
->> replacement for it.
->>
->> [...]
-> 
-> So, the NOACPI allocation hint is a no-go at the moment, based on the
-> discussion in the following threads:
-> 
-> http://mid.mail-archive.com/20170601112241.2580-1-ard.biesheuvel at linaro.org
-> 
-> http://mid.mail-archive.com/c76b36de-ebf9-c662-d454-0a95b43901e8 at redhat.com
-> 
-> Therefore the header probe suppression remains necessary.
-> 
-> In this case, it is not hard to do, you just have to reorder the
-> following two ADD_POINTER additions a bit:
- Ok, it is no problem.
+Since you don't have a comment, I guess that's not really that bad.
 
-> 
->>>> +
->>>> +        bios_linker_loader_add_pointer(linker, GHES_ERRORS_FW_CFG_FILE,
->>>> +                                sizeof(uint64_t) * i, sizeof(uint64_t),
->>>> +                                GHES_ERRORS_FW_CFG_FILE,
->>>> +                                MAX_ERROR_SOURCE_COUNT_V6 * sizeof(uint64_t) +
->>>> +                                i * MAX_RAW_DATA_LENGTH);
-> 
-> This one should be moved out to a separate loop, after the current loop.
-> 
->>>> +        bios_linker_loader_add_pointer(linker, ACPI_BUILD_TABLE_FILE,
->>>> +                    address_registers_offset
->>>> +                    + i * sizeof(AcpiGenericHardwareErrorSource),
->>>> +                    sizeof(uint32_t), GHES_ERRORS_FW_CFG_FILE,
->>>> +                    i * sizeof(uint64_t));
-> 
-> This one should be kept in the first (i.e., current) loop.
-> 
-> The idea is, when you first point the HEST/GHES_n entries in
-> ACPI_BUILD_TABLE_FILE to the "address registers" in
-> GHES_ERRORS_FW_CFG_FILE, all those address registers will still be
-> zero-filled. This will fail the ACPI table header probe in
-> OvmfPkg/AcpiPlatformDxe, which is what we want.
-> 
-> After this is done, the address registers in GHES_ERRORS_FW_CFG_FILE
-> should be pointed to the error status data blocks in the same fw_cfg
-> blob, in a separate loop. (Those error status data blocks will again be
-> zero-filled, so no ACPI table headers will be mistakenly recognized in
-> them.)
-I understand your idear. but I have a question:
-how about we exchange the two function's place, such as shown below:
-then it still meets ours needs, the change is easy.
-For every loop:
-(1)when patch address in ACPI_BUILD_TABLE_FILE to the "address registers", the address register is zero-filed.
-(2)when patch address in GHES_ERRORS_FW_CFG_FILE to the error status data blocks, the error status data block is still zero-filed.
+Maxime
 
-    for (i = 0; i < GHES_ACPI_HEST_NOTIFY_RESERVED; i++) {
-        .....................................
-        bios_linker_loader_add_pointer(linker, ACPI_BUILD_TABLE_FILE,
-                    address_registers_offset
-                    + i * sizeof(AcpiGenericHardwareErrorSource),
-                    sizeof(uint32_t), GHES_ERRORS_FW_CFG_FILE,
-                    i * sizeof(uint64_t));
-
-
-        bios_linker_loader_add_pointer(linker, GHES_ERRORS_FW_CFG_FILE,
-                                sizeof(uint64_t) * i, sizeof(uint64_t),
-                                GHES_ERRORS_FW_CFG_FILE,
-                                MAX_ERROR_SOURCE_COUNT_V6 * sizeof(uint64_t) +
-                                i * MAX_RAW_DATA_LENGTH);
-	.........................................
-
-     }
-
-thanks
-
-> 
-> Thanks
-> Laszlo
-> 
-> 
-> .
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170707/9cff9cd6/attachment.sig>
