@@ -1,47 +1,34 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 7 Jul 2017 09:26:29 +0200
-Subject: [PATCH 6/8] irqchip: stm32: move the wakeup on interrupt mask
+Date: Fri, 7 Jul 2017 09:26:26 +0200
+Subject: [PATCH 3/8] dt-bindings: interrupt-controllers: add compatible string
+ for stm32h7
 In-Reply-To: <1499412391-25480-1-git-send-email-ludovic.Barre@st.com>
 References: <1499412391-25480-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1499412391-25480-7-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1499412391-25480-4-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-move irq_set_wake on interrupt mask, needed to out of
-low power mode (wakeup source)
-
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/irqchip/irq-stm32-exti.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt        | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-index 3c7077d..f92c103 100644
---- a/drivers/irqchip/irq-stm32-exti.c
-+++ b/drivers/irqchip/irq-stm32-exti.c
-@@ -142,16 +142,16 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
- 	struct stm32_exti_bank *stm32_bank = gc->private;
- 	int pin = data->hwirq % BITS_PER_LONG;
--	u32 emr;
-+	u32 imr;
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+index 6e7703d..edf03f0 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+@@ -2,7 +2,9 @@ STM32 External Interrupt Controller
  
- 	irq_gc_lock(gc);
+ Required properties:
  
--	emr = irq_reg_readl(gc, stm32_bank->emr_ofst);
-+	imr = irq_reg_readl(gc, stm32_bank->imr_ofst);
- 	if (on)
--		emr |= BIT(pin);
-+		imr |= BIT(pin);
- 	else
--		emr &= ~BIT(pin);
--	irq_reg_writel(gc, emr, stm32_bank->emr_ofst);
-+		imr &= ~BIT(pin);
-+	irq_reg_writel(gc, imr, stm32_bank->imr_ofst);
- 
- 	irq_gc_unlock(gc);
- 
+-- compatible: Should be "st,stm32-exti"
++- compatible: Should be:
++    "st,stm32-exti"
++    "st,stm32h7-exti"
+ - reg: Specifies base physical address and size of the registers
+ - interrupt-controller: Indentifies the node as an interrupt controller
+ - #interrupt-cells: Specifies the number of cells to encode an interrupt
 -- 
 2.7.4
