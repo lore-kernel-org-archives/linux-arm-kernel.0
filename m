@@ -1,22 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 7 Jul 2017 20:23:25 +0300
-Subject: [PATCH v 1/2] ARM: dts: r8a7743: Add Ethernet AVB support
-In-Reply-To: <1499433165-62475-2-git-send-email-biju.das@bp.renesas.com>
-References: <1499433165-62475-1-git-send-email-biju.das@bp.renesas.com>
- <1499433165-62475-2-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <49f40226-5956-15e2-ed89-662119339317@cogentembedded.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 7 Jul 2017 10:26:50 -0700
+Subject: [GIT PULL] Mailbox changes for v4.13
+In-Reply-To: <CABb+yY2v=RrVk5E9eWAX5j2sMO=4waawGdQCHMQU8S-4GgBm+A@mail.gmail.com>
+References: <CABb+yY2v=RrVk5E9eWAX5j2sMO=4waawGdQCHMQU8S-4GgBm+A@mail.gmail.com>
+Message-ID: <CA+55aFwhUhpX7ffFfp+BfoBQi8-Ma5oY6m_V4Y3i-djPT6QjMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
-
-On 07/07/2017 04:12 PM, Biju Das wrote:
-
-> Add Ethernet AVB support for r8a7743 SoC.
+On Thu, Jul 6, 2017 at 9:22 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
 >
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+>   https://git.linaro.org/landing-teams/working/fujitsu/integration.git mailbox-for-next
 
-Reviewed-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Can I ask you to change your habits just a tiny bit?
 
-MBR, Sergei
+ - use a signed tag (maybe git.linaro.org has the same kind of
+draconian security that git.kernel.org has, maybe not, I don't know,
+but I do prefer signed tags)
+
+ - use "git://" instead of https
+
+The second one is admittedly just to make my pull requests look more
+regular, so it's purely a visual thing.
+
+              Linus
