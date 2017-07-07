@@ -1,138 +1,109 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 7 Jul 2017 10:16:52 +0200
-Subject: [PATCH 8/8] ARM: dts: stm32: add support of exti on stm32h743
- pinctrl
-In-Reply-To: <1499412391-25480-9-git-send-email-ludovic.Barre@st.com>
-References: <1499412391-25480-1-git-send-email-ludovic.Barre@st.com>
- <1499412391-25480-9-git-send-email-ludovic.Barre@st.com>
-Message-ID: <743facf9-6c85-fa38-280f-86e477f0f6ce@st.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 7 Jul 2017 16:32:09 +0800
+Subject: [Qemu-devel] [PATCH v3 1/4] ACPI: Add APEI GHES Table Generation
+ support
+In-Reply-To: <e90c5fb8-e68b-a620-9023-f4fcfdd68e97@redhat.com>
+References: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
+ <4dde45bb-a730-82b1-dc49-ad00a6b73d85@redhat.com>
+ <accf8880-f4b0-85f1-9f33-4103c8c26d7a@redhat.com>
+ <e90c5fb8-e68b-a620-9023-f4fcfdd68e97@redhat.com>
+Message-ID: <dbbab7f6-18c4-9b6c-799e-8267797a31bd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic
+Hi Laszlo,
+   sorry for my late response.
 
-On 07/07/2017 09:26 AM, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
+On 2017/6/3 20:01, Laszlo Ersek wrote:
+> On 05/22/17 16:23, Laszlo Ersek wrote:
+>> Keeping some context:
+>>
+>> On 05/12/17 23:00, Laszlo Ersek wrote:
+>>> On 04/30/17 07:35, Dongjiu Geng wrote:
 > 
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> ---
-
-Can you fill commit message please
-
-
->   arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 24 ++++++++++++++++++++++++
->   1 file changed, 24 insertions(+)
+>> (68) In the code below, you are not taking an "OVMF header probe
+>> suppressor" into account.
+>>
+>> But, we have already planned to replace that quirk with a separate,
+>> dedicated allocation hint or command, so I'm not going to describe what
+>> an "OVMF header probe suppressor" is; instead, I'll describe the
+>> replacement for it.
+>>
+>> [...]
 > 
-> diff --git a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-> index fcc1e06..8854d26 100644
-> --- a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-> @@ -49,6 +49,8 @@
->   			#size-cells = <1>;
->   			compatible = "st,stm32h743-pinctrl";
->   			ranges = <0 0x58020000 0x3000>;
-> +			interrupt-parent = <&exti>;
-> +			st,syscfg = <&syscfg 0x8>;
->   			pins-are-numbered;
->   
->   			gpioa: gpio at 58020000 {
-> @@ -57,6 +59,8 @@
->   				reg = <0x0 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOA";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpiob: gpio at 58020400 {
-> @@ -65,6 +69,8 @@
->   				reg = <0x400 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOB";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpioc: gpio at 58020800 {
-> @@ -73,6 +79,8 @@
->   				reg = <0x800 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOC";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpiod: gpio at 58020c00 {
-> @@ -81,6 +89,8 @@
->   				reg = <0xc00 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOD";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpioe: gpio at 58021000 {
-> @@ -89,6 +99,8 @@
->   				reg = <0x1000 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOE";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpiof: gpio at 58021400 {
-> @@ -97,6 +109,8 @@
->   				reg = <0x1400 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOF";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpiog: gpio at 58021800 {
-> @@ -105,6 +119,8 @@
->   				reg = <0x1800 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOG";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpioh: gpio at 58021c00 {
-> @@ -113,6 +129,8 @@
->   				reg = <0x1c00 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOH";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpioi: gpio at 58022000 {
-> @@ -121,6 +139,8 @@
->   				reg = <0x2000 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOI";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpioj: gpio at 58022400 {
-> @@ -129,6 +149,8 @@
->   				reg = <0x2400 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOJ";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			gpiok: gpio at 58022800 {
-> @@ -137,6 +159,8 @@
->   				reg = <0x2800 0x400>;
->   				clocks = <&timer_clk>;
->   				st,bank-name = "GPIOK";
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
->   			};
->   
->   			usart1_pins: usart1 at 0 {
+> So, the NOACPI allocation hint is a no-go at the moment, based on the
+> discussion in the following threads:
+> 
+> http://mid.mail-archive.com/20170601112241.2580-1-ard.biesheuvel at linaro.org
+> 
+> http://mid.mail-archive.com/c76b36de-ebf9-c662-d454-0a95b43901e8 at redhat.com
+> 
+> Therefore the header probe suppression remains necessary.
+> 
+> In this case, it is not hard to do, you just have to reorder the
+> following two ADD_POINTER additions a bit:
+ Ok, it is no problem.
+
+> 
+>>>> +
+>>>> +        bios_linker_loader_add_pointer(linker, GHES_ERRORS_FW_CFG_FILE,
+>>>> +                                sizeof(uint64_t) * i, sizeof(uint64_t),
+>>>> +                                GHES_ERRORS_FW_CFG_FILE,
+>>>> +                                MAX_ERROR_SOURCE_COUNT_V6 * sizeof(uint64_t) +
+>>>> +                                i * MAX_RAW_DATA_LENGTH);
+> 
+> This one should be moved out to a separate loop, after the current loop.
+> 
+>>>> +        bios_linker_loader_add_pointer(linker, ACPI_BUILD_TABLE_FILE,
+>>>> +                    address_registers_offset
+>>>> +                    + i * sizeof(AcpiGenericHardwareErrorSource),
+>>>> +                    sizeof(uint32_t), GHES_ERRORS_FW_CFG_FILE,
+>>>> +                    i * sizeof(uint64_t));
+> 
+> This one should be kept in the first (i.e., current) loop.
+> 
+> The idea is, when you first point the HEST/GHES_n entries in
+> ACPI_BUILD_TABLE_FILE to the "address registers" in
+> GHES_ERRORS_FW_CFG_FILE, all those address registers will still be
+> zero-filled. This will fail the ACPI table header probe in
+> OvmfPkg/AcpiPlatformDxe, which is what we want.
+> 
+> After this is done, the address registers in GHES_ERRORS_FW_CFG_FILE
+> should be pointed to the error status data blocks in the same fw_cfg
+> blob, in a separate loop. (Those error status data blocks will again be
+> zero-filled, so no ACPI table headers will be mistakenly recognized in
+> them.)
+I understand your idear. but I have a question:
+how about we exchange the two function's place, such as shown below:
+then it still meets ours needs, the change is easy.
+For every loop:
+(1)when patch address in ACPI_BUILD_TABLE_FILE to the "address registers", the address register is zero-filed.
+(2)when patch address in GHES_ERRORS_FW_CFG_FILE to the error status data blocks, the error status data block is still zero-filed.
+
+    for (i = 0; i < GHES_ACPI_HEST_NOTIFY_RESERVED; i++) {
+        .....................................
+        bios_linker_loader_add_pointer(linker, ACPI_BUILD_TABLE_FILE,
+                    address_registers_offset
+                    + i * sizeof(AcpiGenericHardwareErrorSource),
+                    sizeof(uint32_t), GHES_ERRORS_FW_CFG_FILE,
+                    i * sizeof(uint64_t));
+
+
+        bios_linker_loader_add_pointer(linker, GHES_ERRORS_FW_CFG_FILE,
+                                sizeof(uint64_t) * i, sizeof(uint64_t),
+                                GHES_ERRORS_FW_CFG_FILE,
+                                MAX_ERROR_SOURCE_COUNT_V6 * sizeof(uint64_t) +
+                                i * MAX_RAW_DATA_LENGTH);
+	.........................................
+
+     }
+
+thanks
+
+> 
+> Thanks
+> Laszlo
+> 
+> 
+> .
 > 
