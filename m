@@ -1,178 +1,319 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 7 Jul 2017 11:55:52 +0200
-Subject: [PATCH v9 0/3] Tango PCIe controller support
-In-Reply-To: <20170706194628.GQ13824@bhelgaas-glaptop.roam.corp.google.com>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
- <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
- <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
- <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
- <5a1207cb-31fd-6b85-86af-8c37bd57ad4f@free.fr>
- <20170705213419.GD25063@bhelgaas-glaptop.roam.corp.google.com>
- <8dcab663-245b-880a-be3a-2965fd12d663@free.fr>
- <20170706033946.GO13824@bhelgaas-glaptop.roam.corp.google.com>
- <d04e1632-17b8-85f9-31c4-b789d55cc853@free.fr>
- <20170706194628.GQ13824@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <3a2e6791-006e-ce3f-f113-e7b0dc6dc2d9@sigmadesigns.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 7 Jul 2017 12:11:11 +0200
+Subject: [PATCH v2 4/8] pwm: Add STM32 LPTimer PWM driver
+In-Reply-To: <20170707092316.GA15652@ulmo.fritz.box>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+ <1498055415-31513-5-git-send-email-fabrice.gasnier@st.com>
+ <20170706074320.GK16144@ulmo.fritz.box>
+ <b82d9c76-d8c5-43bf-45cc-b5c26c1c7164@st.com>
+ <20170707092316.GA15652@ulmo.fritz.box>
+Message-ID: <af822b98-8258-ff91-92ba-13add262743f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2017 21:46, Bjorn Helgaas wrote:
-
-> I'm a little queasy about the MSI stuff.  It doesn't feel very settled
-> yet, and I don't want to keep tweaking it at this stage.
+On 07/07/2017 11:23 AM, Thierry Reding wrote:
+> On Fri, Jul 07, 2017 at 10:10:32AM +0200, Fabrice Gasnier wrote:
+>> On 07/06/2017 09:43 AM, Thierry Reding wrote:
+>>> On Wed, Jun 21, 2017 at 04:30:11PM +0200, Fabrice Gasnier wrote:
+>>>> Add support for single PWM channel on Low-Power Timer, that can be
+>>>> found on some STM32 platforms.
+>>>>
+>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>> ---
+>>>> Changes in v2:
+>>>> - s/Low Power/Low-Power
+>>>> - update few comment lines
+>>>> ---
+>>>>  drivers/pwm/Kconfig        |  10 +++
+>>>>  drivers/pwm/Makefile       |   1 +
+>>>>  drivers/pwm/pwm-stm32-lp.c | 216 +++++++++++++++++++++++++++++++++++++++++++++
+>>>>  3 files changed, 227 insertions(+)
+>>>>  create mode 100644 drivers/pwm/pwm-stm32-lp.c
+>>>>
+>>>> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+>>>> index 313c107..7cb982b 100644
+>>>> --- a/drivers/pwm/Kconfig
+>>>> +++ b/drivers/pwm/Kconfig
+>>>> @@ -417,6 +417,16 @@ config PWM_STM32
+>>>>  	  To compile this driver as a module, choose M here: the module
+>>>>  	  will be called pwm-stm32.
+>>>>  
+>>>> +config PWM_STM32_LP
+>>>> +	tristate "STMicroelectronics STM32 PWM LP"
+>>>> +	depends on MFD_STM32_LPTIMER || COMPILE_TEST
+>>>> +	help
+>>>> +	  Generic PWM framework driver for STMicroelectronics STM32 SoCs
+>>>> +	  with Low-Power Timer (LPTIM).
+>>>> +
+>>>> +	  To compile this driver as a module, choose M here: the module
+>>>> +	  will be called pwm-stm32-lp.
+>>>> +
+>>>>  config PWM_STMPE
+>>>>  	bool "STMPE expander PWM export"
+>>>>  	depends on MFD_STMPE
+>>>> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+>>>> index 93da1f7..a3a4bee 100644
+>>>> --- a/drivers/pwm/Makefile
+>>>> +++ b/drivers/pwm/Makefile
+>>>> @@ -40,6 +40,7 @@ obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+>>>>  obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+>>>>  obj-$(CONFIG_PWM_STI)		+= pwm-sti.o
+>>>>  obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
+>>>> +obj-$(CONFIG_PWM_STM32_LP)	+= pwm-stm32-lp.o
+>>>>  obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
+>>>>  obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
+>>>>  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+>>>> diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
+>>>> new file mode 100644
+>>>> index 0000000..eb997a8
+>>>> --- /dev/null
+>>>> +++ b/drivers/pwm/pwm-stm32-lp.c
+>>>> @@ -0,0 +1,216 @@
+>>>> +/*
+>>>> + * STM32 Low-Power Timer PWM driver
+>>>> + *
+>>>> + * Copyright (C) STMicroelectronics 2017
+>>>> + *
+>>>> + * Author: Gerald Baeza <gerald.baeza@st.com>
+>>>> + *
+>>>> + * License terms: GNU General Public License (GPL), version 2
+>>>> + *
+>>>> + * Inspired by Gerald Baeza's pwm-stm32 driver
+>>>> + */
+>>>> +
+>>>> +#include <linux/bitfield.h>
+>>>> +#include <linux/mfd/stm32-lptimer.h>
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/of.h>
+>>>> +#include <linux/platform_device.h>
+>>>> +#include <linux/pwm.h>
+>>>> +
+>>>> +struct stm32_pwm_lp {
+>>>> +	struct pwm_chip chip;
+>>>> +	struct clk *clk;
+>>>> +	struct regmap *regmap;
+>>>> +};
+>>>> +
+>>>> +static inline struct stm32_pwm_lp *to_stm32_pwm_lp(struct pwm_chip *chip)
+>>>> +{
+>>>> +	return container_of(chip, struct stm32_pwm_lp, chip);
+>>>> +}
+>>>> +
+>>>> +static const u8 prescalers[] = {1, 2, 4, 8, 16, 32, 64, 128};
+>>>> +
+>>>> +static int stm32_pwm_lp_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+>>>> +			      struct pwm_state *state)
+>>>> +{
+>>>> +	struct stm32_pwm_lp *priv = to_stm32_pwm_lp(chip);
+>>>> +	unsigned long long prd, div, dty;
+>>>> +	struct pwm_state cstate;
+>>>> +	u32 val, mask, cfgr, wavpol, presc = 0;
+>>>> +	bool reenable = false;
+>>>> +	int ret;
+>>>> +
+>>>> +	pwm_get_state(pwm, &cstate);
+>>>> +
+>>>> +	if (!state->enabled) {
+>>>> +		if (cstate.enabled) {
+>>>> +			/* Disable LP timer */
+>>>> +			ret = regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
+>>>> +			if (ret)
+>>>> +				return ret;
+>>>> +			clk_disable(priv->clk);
+>>>> +		}
+>>>> +		return 0;
+>>>> +	}
+>>>> +
+>>>> +	/* Calculate the period and prescaler value */
+>>>> +	div = (unsigned long long)clk_get_rate(priv->clk) * state->period;
+>>>> +	do_div(div, NSEC_PER_SEC);
+>>>> +	prd = div;
+>>>> +	while (div > STM32_LPTIM_MAX_ARR) {
+>>>> +		presc++;
+>>>> +		if (presc >= ARRAY_SIZE(prescalers)) {
+>>>> +			dev_err(priv->chip.dev, "max prescaler exceeded\n");
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +		div = prd;
+>>>> +		do_div(div, prescalers[presc]);
+>>>> +	}
+>>>> +	prd = div;
+>>>> +
+>>>> +	/* Calculate the duty cycle */
+>>>> +	dty = prd * state->duty_cycle;
+>>>> +	do_div(dty, state->period);
+>>>> +
+>>>> +	wavpol = FIELD_PREP(STM32_LPTIM_WAVPOL, state->polarity);
+>>>> +
+>>>> +	if (!cstate.enabled) {
+>>>> +		ret = clk_enable(priv->clk);
+>>>> +		if (ret)
+>>>> +			return ret;
+>>>> +	}
+>>>
+>>> Why do you need the checks here? Clock enabled are reference counted, so
+>>> you could do the clk_enable() unconditionally.
+>>
+>> Hi Thierry,
+>>
+>> This clock is used to generate PWM (source for LP timer counter). I
+>> enable it here as:
+>> - required state is 'enabled'
+>> - current state is 'disabled'.
+>> PWM is being turned on: first enable clock, then configure & enable PWM
+>> bellow.
+>>
+>> The opposite is done earlier, at the beginning of this routine:
+>> - required state is 'disabled'
+>> - current state is 'enabled'
+>> PWM is turned off, then clock is disabled.
+>>
+>> Enable count should be balanced, and clock is enabled when required
+>> (e.g. when PWM is 'on'). Doing it unconditionally here may cause
+>> unbalanced enable count (e.g. any duty_cycle update would increase
+>> enable count)
+>> Is it ok to keep this ?
 > 
-> How about we merge the base patch for v4.13 and deal with MSIs for
-> v4.14?  I need confirmation that the base patch works ASAP.  Or if
-> it's not really useful by itself, we can defer it all until v4.14.
+> The placement of the call suggested that you also need to enable the
+> clock in order to access any of the registers. In such cases it's often
+> simpler to take (and release) the reference to the clock irrespective
+> of the current state.
+> 
+> So the general sequence might look like this:
+> 
+> 	/* allow access to registers */
+> 	clk_enable();
+> 
+> 	/* modify registers */
+> 	...
+> 
+> 	/* enable clock to drive PWM counter */
+> 	if (state->enabled && !cstate.enabled)
+> 		clk_enable();
+> 
+> 	/* disable clock to PWM counter */
+> 	if (!state->enabled && cstate.enabled)
+> 		clk_disable();
+> 
+> 	/* access to registers no longer needed */
+> 	clk_disable();
+> 
+> This ensures that as long as you keep the "register" reference to the
+> clock, the clock will remain on.
 
-For what it's worth, the base patch allows enumeration:
+Hi Thierry,
 
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.12.0-rc1 (mgonzalez at misti.france.sdesigns.com) (gcc version 6.3.1 20170109 (Linaro GCC 6.3-2017.02) ) #6 SMP PREEMPT Fri Jul 7 11:43:24 CEST 2017
-...
-[    0.725488] pcie_tango 50000000.pcie: simultaneous PCI config and MMIO accesses may cause data corruption
-[    0.743158] OF: PCI: host bridge /soc/pcie at 2e000 ranges:
-[    0.748519] OF: PCI:   MEM 0x50400000..0x53ffffff -> 0x00400000
-[    0.754549] pcie_tango 50000000.pcie: ECAM at [mem 0x50000000-0x503fffff] for [bus 00-03]
-[    0.762907] pcie_tango 50000000.pcie: PCI host bridge to bus 0000:00
-[    0.769308] pci_bus 0000:00: root bus resource [bus 00-03]
-[    0.774829] pci_bus 0000:00: root bus resource [mem 0x50400000-0x53ffffff] (bus address [0x00400000-0x03ffffff])
-[    0.785303] PCI: bus0: Fast back to back transfers disabled
-[    0.790916] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-[    0.807282] PCI: bus1: Fast back to back transfers disabled
-[    0.812925] pci 0000:00:00.0: BAR 8: assigned [mem 0x50400000-0x504fffff]
-[    0.819759] pci 0000:01:00.0: BAR 0: assigned [mem 0x50400000-0x50401fff 64bit]
-[    0.827126] pci 0000:00:00.0: PCI bridge to [bus 01]
-[    0.832121] pci 0000:00:00.0:   bridge window [mem 0x50400000-0x504fffff]
-[    0.839004] pcieport 0000:00:00.0: enabling device (0140 -> 0142)
-[    0.845274] pci 0000:01:00.0: enabling device (0140 -> 0142)
+I better see your point now. Regmap is already handling clock for
+register access. I'll try to re-arrange things a little, so it's easier
+to read and comment about enable/disable clock to PWM counter.
 
+> 
+> There is a somewhat tricky situation that could happen if the initial
+> clock reference count is not in sync. Consider the case where your
+> ->get_state() determines that the PWM is enabled. cstate.enabled would
+> be true, but the clock enable count would not be incremented. So you'd
+> have to make sure to add code to the ->get_state() implementation that
+> calls clk_enable() for each PWM that is enabled.
+> 
+> In my opinion that would be the cleanest option and easiest to follow,
+> but its more work to properly implement than I initially assumed, so
+> I'm fine with the version that you have, too.
 
+Thanks for these hints, I'll try to follow your advise on this:
+- use get_state()
+- call clk_enable() if PWM is already enabled.
 
-# lspci -v  
-00:00.0 PCI bridge: Sigma Designs, Inc. Device 0024 (rev 01) (prog-if 00 [Normal decode])
-        Flags: bus master, fast devsel, latency 0
-        Memory at <ignored> (64-bit, non-prefetchable)
-        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-        I/O behind bridge: 00000000-00000fff
-        Memory behind bridge: 00400000-004fffff
-        Prefetchable memory behind bridge: 00000000-000fffff
-        Capabilities: [50] MSI: Enable- Count=1/4 Maskable- 64bit+
-        Capabilities: [78] Power Management version 3
-        Capabilities: [80] Express Root Port (Slot-), MSI 03
-        Capabilities: [100] Virtual Channel
-        Capabilities: [800] Advanced Error Reporting
-        Kernel driver in use: pcieport
+> 
+>>> Speaking of which, I don't see a clk_prepare() anywhere. Doesn't the clk
+>>> core warn about clk_enable() being called on a clock that's not been
+>>> prepared?
+>>
+>> clk_get() and clk_prepare() happens in regmap layer, when probing mfd part:
+>> -> stm32_lptimer_probe()
+>>   -> devm_regmap_init_mmio_clk()
+>>     -> __devm_regmap_init_mmio_clk()
+>>       -> regmap_mmio_gen_context()
+> 
+> Okay, looks like we don't need it here, then.
+> 
+>>>> +	    (presc != FIELD_GET(STM32_LPTIM_PRESC, cfgr))) {
+>>>> +		val = FIELD_PREP(STM32_LPTIM_PRESC, presc) | wavpol;
+>>>> +		mask = STM32_LPTIM_PRESC | STM32_LPTIM_WAVPOL;
+>>>> +
+>>>> +		/* Must disable LP timer to modify CFGR */
+>>>> +		ret = regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
+>>>> +		if (ret)
+>>>> +			goto err;
+>>>> +		reenable = true;
+>>>
+>>> The placement of this is somewhat odd. It suggests that it is somehow
+>>> related to the disabling of the LP timer, whereas it really isn't.
+>>
+>> In case of prescaler or polarity change, CFGR register needs to be
+>> updated. CFGR register must be modified only when LP timer HW is disabled.
+>> - Initial choice is to use this flag, to temporarily disable HW, update
+>> cfgr, then re-enable it. More thinking about this...
+> 
+> What I find odd about the placement is that it is between the
+> regmap_write() and the regmap_update_bits(). But it could just as well
+> be after the regmap_update_bits() (or before regmap_write() for that
+> matter). So the confusing thing is why it "breaks" the sequence of
+> register accesses.
 
-01:00.0 USB controller: Renesas Technology Corp. uPD720201 USB 3.0 Host Controller (rev 03) (prog-if 30 [XHCI])
-        Flags: fast devsel
-        Memory at 50400000 (64-bit, non-prefetchable) [size=8K]
-        Capabilities: [50] Power Management version 3
-        Capabilities: [70] MSI: Enable- Count=1/8 Maskable- 64bit+
-        Capabilities: [90] MSI-X: Enable- Count=8 Masked-
-        Capabilities: [a0] Express Endpoint, MSI 00
-        Capabilities: [100] Advanced Error Reporting
-        Capabilities: [150] Latency Tolerance Reporting
+Ok, I'll move it before or after register accesses sequence.
 
+> 
+>> - Another choice could be to refuse such a 'live' change and report
+>> (busy?) error ? Then user would have to explicitly disable it, configure
+>> new setting and re-enable it.
+>>
+>> Please let me know your opinion.
+> 
+> The PWM subsystem doesn't give a guarantee that a live change is
+> possible. Drivers always have to assume that the PWM may get disabled
+> and reenabled as part of the sequence.
+> 
+> That said, something like this could be added in the future if users
+> come along that required this guarantee.
+> 
+> For your driver, I think it's fine to keep this as-is.
+Got it.
 
+> 
+>>>> +static int stm32_pwm_lp_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +	struct stm32_lptimer *ddata = dev_get_drvdata(pdev->dev.parent);
+>>>> +	struct stm32_pwm_lp *priv;
+>>>> +	int ret;
+>>>> +
+>>>> +	if (IS_ERR_OR_NULL(ddata))
+>>>> +		return -EINVAL;
+>>>
+>>> It seems to me like this can never happen. How would you trigger this
+>>> condition?
+>>
+>> Bad dt configuration can trigger this error: thinking of a
+>> 'st,stm32-pwm-lp' dt node without proper mfd parent. Do you want me to
+>> drop this ?
+>> (or add comment about it ?)
+> 
+> In my opinion we should trust DTB in this type of situation. If the DT
+> binding says that the PWM node needs to be a child of an MFD, then the
+> author of the DTB needs to make sure it is.
+> 
+> For things that can be easily checked I think it makes sense to validate
+> the DTB, but this check here is not enough for all situations, right?
+> What if somebody added the device node as child to some unrelated node.
+> ddata could be a valid pointer, but pointing at something that's not a
+> struct stm32_lptimer at all. That's still pretty bad, and completely
+> undetectable.
 
-# lspci -vvv
-00:00.0 PCI bridge: Sigma Designs, Inc. Device 0024 (rev 01) (prog-if 00 [Normal decode])
-        Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
-        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
-        Latency: 0, Cache Line Size: 64 bytes
-        Region 0: Memory@<ignored> (64-bit, non-prefetchable)
-        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-        I/O behind bridge: 00000000-00000fff
-        Memory behind bridge: 00400000-004fffff
-        Prefetchable memory behind bridge: 00000000-000fffff
-        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- <SERR- <PERR-
-        BridgeCtl: Parity+ SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
-                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
-        Capabilities: [50] MSI: Enable- Count=1/4 Maskable- 64bit+
-                Address: 0000000000000000  Data: 0000
-        Capabilities: [78] Power Management version 3
-                Flags: PMEClk- DSI- D1+ D2+ AuxCurrent=0mA PME(D0+,D1+,D2+,D3hot+,D3cold-)
-                Status: D0 NoSoftRst+ PME-Enable- DSel=0 DScale=3 PME-
-        Capabilities: [80] Express (v2) Root Port (Slot-), MSI 03
-                DevCap: MaxPayload 256 bytes, PhantFunc 0
-                        ExtTag- RBE+
-                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
-                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
-                        MaxPayload 128 bytes, MaxReadReq 512 bytes
-                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq- AuxPwr- TransPend+
-                LnkCap: Port #1, Speed 5GT/s, Width x1, ASPM L0s L1, Exit Latency L0s <2us, L1 <4us
-                        ClockPM- Surprise- LLActRep- BwNot+ ASPMOptComp-
-                LnkCtl: ASPM Disabled; RCB 128 bytes Disabled- CommClk-
-                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
-                LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk- DLActive- BWMgmt- ABWMgmt-
-                RootCtl: ErrCorrectable- ErrNon-Fatal- ErrFatal- PMEIntEna- CRSVisible-
-                RootCap: CRSVisible-
-                RootSta: PME ReqID 0000, PMEStatus- PMEPending-
-                DevCap2: Completion Timeout: Range B, TimeoutDis-, LTR-, OBFF Not Supported ARIFwd-
-                DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis-, LTR-, OBFF Disabled ARIFwd-
-                LnkCtl2: Target Link Speed: 5GT/s, EnterCompliance- SpeedDis-
-                         Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
-                         Compliance De-emphasis: -6dB
-                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
-                         EqualizationPhase2-, EqualizationPhase3-, LinkEqualizationRequest-
-        Capabilities: [100 v1] Virtual Channel
-                Caps:   LPEVC=0 RefClk=100ns PATEntryBits=1
-                Arb:    Fixed- WRR32- WRR64- WRR128-
-                Ctrl:   ArbSelect=Fixed
-                Status: InProgress-
-                VC0:    Caps:   PATOffset=00 MaxTimeSlots=1 RejSnoopTrans-
-                        Arb:    Fixed- WRR32- WRR64- WRR128- TWRR128- WRR256-
-                        Ctrl:   Enable+ ID=0 ArbSelect=Fixed TC/VC=ff
-                        Status: NegoPending- InProgress-
-        Capabilities: [800 v1] Advanced Error Reporting
-                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
-                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
-                UESvrt: DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
-                CESta:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
-                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
-                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
-        Kernel driver in use: pcieport
+You're right. I'll remove this as well.
 
-01:00.0 USB controller: Renesas Technology Corp. uPD720201 USB 3.0 Host Controller (rev 03) (prog-if 30 [XHCI])
-        Control: I/O- Mem+ BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
-        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
-        Interrupt: pin A routed to IRQ 0
-        Region 0: Memory@50400000 (64-bit, non-prefetchable) [size=8K]
-        Capabilities: [50] Power Management version 3
-                Flags: PMEClk- DSI- D1- D2- AuxCurrent=375mA PME(D0+,D1-,D2-,D3hot+,D3cold+)
-                Status: D0 NoSoftRst+ PME-Enable- DSel=0 DScale=0 PME-
-        Capabilities: [70] MSI: Enable- Count=1/8 Maskable- 64bit+
-                Address: 0000000000000000  Data: 0000
-        Capabilities: [90] MSI-X: Enable- Count=8 Masked-
-                Vector table: BAR=0 offset=00001000
-                PBA: BAR=0 offset=00001080
-        Capabilities: [a0] Express (v2) Endpoint, MSI 00
-                DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s unlimited, L1 unlimited
-                        ExtTag- AttnBtn- AttnInd- PwrInd- RBE+ FLReset- SlotPowerLimit 0.000W
-                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
-                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
-                        MaxPayload 128 bytes, MaxReadReq 512 bytes
-                DevSta: CorrErr+ UncorrErr- FatalErr- UnsuppReq- AuxPwr+ TransPend-
-                LnkCap: Port #0, Speed 5GT/s, Width x1, ASPM L0s L1, Exit Latency L0s <4us, L1 unlimited
-                        ClockPM+ Surprise- LLActRep- BwNot- ASPMOptComp-
-                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- CommClk-
-                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
-                LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
-                DevCap2: Completion Timeout: Not Supported, TimeoutDis+, LTR+, OBFF Not Supported
-                DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis-, LTR-, OBFF Disabled
-                LnkCtl2: Target Link Speed: 5GT/s, EnterCompliance- SpeedDis-
-                         Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
-                         Compliance De-emphasis: -6dB
-                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
-                         EqualizationPhase2-, EqualizationPhase3-, LinkEqualizationRequest-
-        Capabilities: [100 v1] Advanced Error Reporting
-                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
-                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
-                UESvrt: DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
-                CESta:  RxErr- BadTLP- BadDLLP+ Rollover- Timeout- NonFatalErr-
-                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
-                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
-        Capabilities: [150 v1] Latency Tolerance Reporting
-                Max snoop latency: 0ns
-                Max no snoop latency: 0ns
+Thanks again,
+Best Regards,
+Fabrice
+
+> 
+> Thierry
+> 
