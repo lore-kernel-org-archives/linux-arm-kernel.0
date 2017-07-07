@@ -1,45 +1,34 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 7 Jul 2017 11:01:16 -0400
-Subject: [PATCH V2] PCI: Do not enable extended tags on pre-dated (v1.x)
- systems
-In-Reply-To: <1499439193-16628-1-git-send-email-okaya@codeaurora.org>
-References: <1499439193-16628-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <7d6e99b9-bdef-845a-a542-2c47f429eb12@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  7 Jul 2017 12:06:45 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select the coda driver as module
+Message-ID: <1499440005-8067-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On 7/7/2017 10:53 AM, Sinan Kaya wrote:
-> According to extended tags ECN document, all PCIe receivers are expected
-> to support extended tags support. It should be safe to enable extended
-> tags on endpoints without checking compatibility.
-> 
-> This assumption seems to be working fine except for the legacy systems.
-> The ECN has been written against PCIE spec version 2.0. Therefore, we need
-> to exclude all version 1.0 devices from this change as there is HW out
-> there that can't handle extended tags.
-> 
-> Note that the default value of Extended Tags Enable bit is implementation
-> specific. Therefore, we are clearing the bit by default when incompatible
-> HW is found without assuming that value is zero.
-> 
-> Reported-by: Wim ten Have <wim.ten.have@oracle.com>
-> Link: https://pcisig.com/sites/default/files/specification_documents/ECN_Extended_Tag_Enable_Default_05Sept2008_final.pdf
-> Link: https://bugzilla.redhat.com/show_bug.cgi?id=1467674
-> Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
+The coda driver may be probed prior to the rootfs being available, leading
+to firmware loading failure.
 
-Can you also give this a spin? I don't have a system with v1 PCIe bridges.
-I only tested v2 and later code path.
+To avoid such problem, select the coda driver as module.
 
-I tried to address Jike Song concerns on this version and removed your tested-by
-since the code changed.
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sinan
-
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index e74de69..621910a 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -234,7 +234,7 @@ CONFIG_USB_VIDEO_CLASS=m
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
+-CONFIG_VIDEO_CODA=y
++CONFIG_VIDEO_CODA=m
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_IMX_IPUV3_CORE=y
+ CONFIG_DRM=y
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
