@@ -1,99 +1,45 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Fri, 7 Jul 2017 17:59:21 +0300
-Subject: [Patch v5 12/12] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <1497849055-26583-13-git-send-email-smitha.t@samsung.com>
-References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <CGME20170619052521epcas5p36a0bc384d10809dcfe775e6da87ed37b@epcas5p3.samsung.com>
- <1497849055-26583-13-git-send-email-smitha.t@samsung.com>
-Message-ID: <617cb1c5-074c-3f47-0096-fe7568dab8be@linaro.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 7 Jul 2017 11:01:16 -0400
+Subject: [PATCH V2] PCI: Do not enable extended tags on pre-dated (v1.x)
+ systems
+In-Reply-To: <1499439193-16628-1-git-send-email-okaya@codeaurora.org>
+References: <1499439193-16628-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <7d6e99b9-bdef-845a-a542-2c47f429eb12@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Wim,
 
-On 06/19/2017 08:10 AM, Smitha T Murthy wrote:
-> Added V4l2 controls for HEVC encoder
+On 7/7/2017 10:53 AM, Sinan Kaya wrote:
+> According to extended tags ECN document, all PCIe receivers are expected
+> to support extended tags support. It should be safe to enable extended
+> tags on endpoints without checking compatibility.
 > 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> This assumption seems to be working fine except for the legacy systems.
+> The ECN has been written against PCIE spec version 2.0. Therefore, we need
+> to exclude all version 1.0 devices from this change as there is HW out
+> there that can't handle extended tags.
+> 
+> Note that the default value of Extended Tags Enable bit is implementation
+> specific. Therefore, we are clearing the bit by default when incompatible
+> HW is found without assuming that value is zero.
+> 
+> Reported-by: Wim ten Have <wim.ten.have@oracle.com>
+> Link: https://pcisig.com/sites/default/files/specification_documents/ECN_Extended_Tag_Enable_Default_05Sept2008_final.pdf
+> Link: https://bugzilla.redhat.com/show_bug.cgi?id=1467674
+> Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  Documentation/media/uapi/v4l/extended-controls.rst | 364 +++++++++++++++++++++
->  1 file changed, 364 insertions(+)
-> 
-> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-> index abb1057..7767c70 100644
-> --- a/Documentation/media/uapi/v4l/extended-controls.rst
-> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
-> @@ -1960,6 +1960,370 @@ enum v4l2_vp8_golden_frame_sel -
->      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
->  
->  
 
-<cut>
+Can you also give this a spin? I don't have a system with v1 PCIe bridges.
+I only tested v2 and later code path.
 
-> +``V4L2_CID_MPEG_VIDEO_HEVC_PROFILE``
-> +    (enum)
-> +
-> +enum v4l2_mpeg_video_hevc_profile -
-> +    Select the desired profile for HEVC encoder.
-> +
-> +.. raw:: latex
-> +
-> +    \begin{adjustbox}{width=\columnwidth}
-> +
-> +.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-> +
-> +.. flat-table::
-> +    :header-rows:  0
-> +    :stub-columns: 0
-> +
-> +    * - ``V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN``
-> +      - Main profile.
+I tried to address Jike Song concerns on this version and removed your tested-by
+since the code changed.
 
-MAIN10?
-
-> +    * - ``V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_STILL_PICTURE``
-> +      - Main still picture profile.
-> +
-> +.. raw:: latex
-> +
-> +    \end{adjustbox}
-> +
-> +
-
-<cut>
-
-> +MFC 10.10 MPEG Controls
-> +-----------------------
-> +
-> +The following MPEG class controls deal with MPEG decoding and encoding
-> +settings that are specific to the Multi Format Codec 10.10 device present
-> +in the S5P and Exynos family of SoCs by Samsung.
-> +
-> +
-> +.. _mfc1010-control-id:
-> +
-> +MFC 10.10 Control IDs
-> +^^^^^^^^^^^^^^^^^^^^^
-> +
-> +``V4L2_CID_MPEG_MFC10_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES (integer)``
-> +    Selects number of P reference pictures required for HEVC encoder.
-> +    P-Frame can use 1 or 2 frames for reference.
-> +
-> +``V4L2_CID_MPEG_MFC10_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR (integer)``
-> +    Indicates whether to generate SPS and PPS at every IDR. Setting it to 0
-> +    disables generating SPS and PPS at every IDR. Setting it to one enables
-> +    generating SPS and PPS at every IDR.
-> +
-
-I'm not sure those two should be driver specific, have to check does
-venus driver has similar controls.
-
-> +
->  .. _camera-controls:
->  
->  Camera Control Reference
-> 
+Sinan
 
 -- 
-regards,
-Stan
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
