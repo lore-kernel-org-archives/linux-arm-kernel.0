@@ -1,60 +1,51 @@
-From: qiaozhou@asrmicro.com (Qiao Zhou)
-Date: Fri, 7 Jul 2017 17:29:34 +0800
-Subject: [PATCH V2] arm64: traps: disable irq in die()
-Message-ID: <1499419774-14563-1-git-send-email-qiaozhou@asrmicro.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 7 Jul 2017 11:33:00 +0200
+Subject: [PATCH] pwm: sun4i: add NULL check on of_match_device() return
+ value
+In-Reply-To: <CAGb2v64vwrTX9=MR-pNZP3eSUQUDj9V=oxx8ef-DaxZVue-pHg@mail.gmail.com>
+References: <20170707063939.GA20510@embeddedgus>
+ <CAGb2v64vwrTX9=MR-pNZP3eSUQUDj9V=oxx8ef-DaxZVue-pHg@mail.gmail.com>
+Message-ID: <20170707093300.GD15652@ulmo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In current die(), the irq is disabled for __die() handle, not
-including the possible panic() handling. Since the log in __die()
-can take several hundreds ms, new irq might come and interrupt
-current die().
+On Fri, Jul 07, 2017 at 03:16:23PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Jul 7, 2017 at 2:39 PM, Gustavo A. R. Silva
+> <garsilva@embeddedor.com> wrote:
+> > Check return value from call to of_match_device()
+> > in order to prevent a NULL pointer dereference.
+> >
+> > In case of NULL print error message and return -ENODEV
+> >
+> > Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+> > ---
+> >  drivers/pwm/pwm-sun4i.c | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> >
+> > diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+> > index 1284ffa..295ca19 100644
+> > --- a/drivers/pwm/pwm-sun4i.c
+> > +++ b/drivers/pwm/pwm-sun4i.c
+> > @@ -321,6 +321,10 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
+> >         const struct of_device_id *match;
+> >
+> >         match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
+> 
+> AFAIK this simply can not and should not fail with a device tree
+> only driver with properly populated of_device_id tables.
 
-If the process calling die() holds some critical resource, and some
-other process scheduled later also needs it, then it would deadlock.
-The first panic will not be executed.
+Technically this could happen if someone manually created the platform
+device. In that case the core will try to match by name if there is no
+device node to use for a match against the list of of_device_ids.
 
-So here disable irq for the whole flow of die().
+In my opinion it's best to let things crash in this situation to make
+it really obvious that people have done something wrong.
 
-Signed-off-by: Qiao Zhou <qiaozhou@asrmicro.com>
----
- arch/arm64/kernel/traps.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 0805b44..2e2ff88 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -274,10 +274,12 @@ static DEFINE_RAW_SPINLOCK(die_lock);
- void die(const char *str, struct pt_regs *regs, int err)
- {
- 	int ret;
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&die_lock, flags);
- 
- 	oops_enter();
- 
--	raw_spin_lock_irq(&die_lock);
- 	console_verbose();
- 	bust_spinlocks(1);
- 	ret = __die(str, err, regs);
-@@ -287,13 +289,15 @@ void die(const char *str, struct pt_regs *regs, int err)
- 
- 	bust_spinlocks(0);
- 	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
--	raw_spin_unlock_irq(&die_lock);
- 	oops_exit();
- 
- 	if (in_interrupt())
- 		panic("Fatal exception in interrupt");
- 	if (panic_on_oops)
- 		panic("Fatal exception");
-+
-+	raw_spin_unlock_irqrestore(&die_lock, flags);
-+
- 	if (ret != NOTIFY_STOP)
- 		do_exit(SIGSEGV);
- }
--- 
-2.7.4
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170707/7dc65b25/attachment-0001.sig>
