@@ -1,24 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 7 Jul 2017 13:44:20 +0100
-Subject: [PATCH v2 7/9] ASoC: atmel-classd: remove aclk clock from DT
- binding
-In-Reply-To: <20170704115927.32662-8-quentin.schulz@free-electrons.com>
-References: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
- <20170704115927.32662-8-quentin.schulz@free-electrons.com>
-Message-ID: <20170707124419.jfkgyl66wi7jfhnu@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Jul 2017 13:46:49 +0100
+Subject: [PATCH 0/8] io-pgtable lock removal
+In-Reply-To: <94ba5d4a-0dae-9394-79ef-90da86e49c86@broadcom.com>
+References: <e43ba1fe-696e-fabb-a800-52fadaa2fa93@broadcom.com>
+ <20170628114609.GD11053@arm.com>
+ <87d53115-3d80-5a3d-6632-c31986cb7018@broadcom.com>
+ <20170704173155.GN22175@arm.com>
+ <6814b246-22f0-bfaa-5002-a269b2735116@broadcom.com>
+ <2d5f5ef3-32b1-76c6-6869-ff980557f8e8@broadcom.com>
+ <20170705084143.GA9378@arm.com>
+ <5149280b-a214-249c-c5e2-3712b1f941d2@broadcom.com>
+ <20170706150838.GB15574@arm.com>
+ <94ba5d4a-0dae-9394-79ef-90da86e49c86@broadcom.com>
+Message-ID: <20170707124648.GH6735@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 01:59:25PM +0200, Quentin Schulz wrote:
-> Since gclk (generated-clk) is now able to determine the rate of the
-> audio_pll, there is no need for classd to have a direct phandle to the
-> audio_pll while already having a phandle to gclk.
+On Thu, Jul 06, 2017 at 11:14:00AM -0700, Ray Jui wrote:
+> On 7/6/17 8:08 AM, Will Deacon wrote:
+> > On Wed, Jul 05, 2017 at 04:24:22PM -0700, Ray Jui wrote:
+> >> However, with the fix patch, I can still see the deadlock message when I
+> >> have > 32 iperf TX threads active in the system:
+> > 
+> > Damn. We've been going over this today and the only plausible theory seems
+> > to be that concurrent TLB syncs are causing the completion to be pushed out,
+> > resulting in timeouts.
+> > 
+> > Can you try this patch below, instead of the one I sent before, please?
+> > 
+> > Thanks,
+> > 
+> > Will
+> > 
+> > --->8
+> 
+> Good news! I can confirm that with the new patch below, the error log of
+> "TLB sync timed out" is now gone. I ran 20 iterations of the iperf
+> client test with 64 threads spread across 8 CPUs. The error message used
+> to coming out very quickly with just one iteration. But now it's
+> completely gone.
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170707/c3aac6b6/attachment.sig>
+Good, I'll queue this is as a fix then. Thanks for testing!
+
+> At the same time, I do seem to observe a slight impact on performance
+> when multiple threads are used, but I guess that is expected, given that
+> a spin lock is added to protect the TLB sync.
+
+Hopefully that performance will pick up again once we defer the sync
+to the end of iommu_unmap.
+
+Will
