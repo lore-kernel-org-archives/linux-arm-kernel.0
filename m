@@ -1,45 +1,53 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 7 Jul 2017 11:22:08 -0400
-Subject: [PATCH V2] PCI: Do not enable extended tags on pre-dated (v1.x)
- systems
-In-Reply-To: <f95ae702-1b7b-b2d4-72bd-0518badfefbc@codeaurora.org>
-References: <1499439193-16628-1-git-send-email-okaya@codeaurora.org>
- <f95ae702-1b7b-b2d4-72bd-0518badfefbc@codeaurora.org>
-Message-ID: <a257422d-206c-a5a9-f964-a1f476ca5850@codeaurora.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 7 Jul 2017 09:28:58 -0600
+Subject: [PATCH] hwtracing: coresight: constify attribute_group structures.
+In-Reply-To: <97ff1c3f7145b0e4326fbbb246579cd5382880b3.1499233557.git.arvind.yadav.cs@gmail.com>
+References: <97ff1c3f7145b0e4326fbbb246579cd5382880b3.1499233557.git.arvind.yadav.cs@gmail.com>
+Message-ID: <CANLsYkxrT+d-HLpPAOM_pZVWfDgTU92Q-njo_0e=K-auYL=BYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/7/2017 11:07 AM, Sinan Kaya wrote:
-> On 7/7/2017 10:53 AM, Sinan Kaya wrote:
->> +	ret = pcie_capability_read_word(dev, PCI_EXP_FLAGS, &flags);
->> +	if (ret || ((flags & PCI_EXP_FLAGS_VERS) < 2))
->> +		return 0;
->>  
-> 
-> Never mind, there is a problem here. I shouldn't have added it here.
-> I'll remove these and post again.
-> 
+On 4 July 2017 at 23:49, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+> attribute_groups are not supposed to change at runtime. All functions
+> working with attribute_groups provided by <linux/sysfs.h> work with const
+> attribute_group. So mark the non-const structs as const.
+>
+> File size before:
+>   text     data     bss     dec     hex filename
+>    2573     288     296    3157     c55 coresight-etm-perf.o
+>
+> File size After adding 'const':
+>    text    data     bss     dec     hex filename
+>    2613     224     296    3133     c3d coresight-etm-perf.o
 
-I guess I'll wait until Bjorn gets a chance to review it. There is a decision
-that needs to be made here. 
+Hi Arvind,
 
-Under normal circumstances, extended tags capability is a reserved field on
-v1 that's expected to be 0.
+Did you find this using an automated tool or simply stumbled on it
+while reviewing the code?  In case of the former it is usually a good
+idea to specify which tool was used in the change log.
 
-Code is checking for extended tags capability being non-zero next
-before setting/clearing the bit.
+Thanks,
+Mathieu
 
-It should be safe to rely on capability being 0 on v1. However, we can go
-paranoid and add the check above to not even look at the capability like I
-did it. 
-
-That's why, I thought this is redundant. 
-
-I'll wait until Bjorn chimes in. It is OK to keep the code as it is. It is
-just doing too much validation in my opinion. Somebody can always say
-play safe.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm-perf.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 288a423..e97775d 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -60,7 +60,7 @@ struct etm_event_data {
+>         NULL,
+>  };
+>
+> -static struct attribute_group etm_pmu_format_group = {
+> +static const struct attribute_group etm_pmu_format_group = {
+>         .name   = "format",
+>         .attrs  = etm_config_formats_attr,
+>  };
+> --
+> 1.9.1
+>
