@@ -1,82 +1,58 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 7 Jul 2017 11:56:45 +0800
-Subject: [PATCH v3 1/3] cpufreq: mediatek: Add support of cpufreq to
- MT2701/MT7623 SoC
-In-Reply-To: <cover.1499399121.git.sean.wang@mediatek.com>
-References: <cover.1499399121.git.sean.wang@mediatek.com>
-Message-ID: <de42e68d86dd161bb18b4ca7f27774c63c1bd55d.1499399121.git.sean.wang@mediatek.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 6 Jul 2017 21:42:12 -0700
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <CAHgaXd+ywWu6PjnqGGdyw=7=XTKm4_Ny227Eq7yH5N0s0e5YfA@mail.gmail.com>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <593E6B0F.8070901@iogearbox.net>
+ <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+ <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
+ <59419D1E.2060303@iogearbox.net>
+ <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
+ <594813AA.5010001@iogearbox.net>
+ <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
+ <59495367.3080402@iogearbox.net>
+ <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
+ <594A9FA5.1080003@iogearbox.net>
+ <CAHgaXdKCOM++jdoaq9PV6a_bbRU+VyuLC4KeUdYmA0gYdhmhkQ@mail.gmail.com>
+ <CAGXu5jJujrx3d+qM-50f1UCVxZopWzLCTJQpw3KWh+o4Nq9JOg@mail.gmail.com>
+ <CAGXu5jJnGfmDYcistcx-o3MmKaB1vn8Fav62JURk9epYEOiTRA@mail.gmail.com>
+ <CAHgaXd+ywWu6PjnqGGdyw=7=XTKm4_Ny227Eq7yH5N0s0e5YfA@mail.gmail.com>
+Message-ID: <CAGXu5j+yfOFU2xULwkQmp0Jz5pzLiurRSQ14kwGetBycdgF0Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Wed, Jul 5, 2017 at 8:49 PM, Shubham Bansal
+<illusionist.neo@gmail.com> wrote:
+> Hi Kees,
+>
+> Problem is my ARM machine don't have clang and iproute2 which is
+> keeping me from testing the bpf tail calls.
+>
+> You should do the following to test it,.
+>
+> 1. tools/testing/selftests/bpf/
+> 2. make
+> 3. sudo ./test_progs
+>
+> And, before testing, you have to do "make headers_install".
+> These tests are for tail calls with the attached patch. If its too
+> much work, Can you please upload your arm image so that I can test it?
+> I just need a good machine.
 
-MT2701/MT7623 is a 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
-single cluster and this hardware is also compatible with the existing
-driver through enabling CPU frequency feature with operating-points-v2
-bindings. Also, this driver actually supports all MediaTek SoCs, the
-Kconfig menu entry and file name itself should be updated with more
-generic name to drop "MT8173"
+I've got all this set up now, and it faults during the test:
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/Kconfig.arm                         | 8 ++++----
- drivers/cpufreq/Makefile                            | 2 +-
- drivers/cpufreq/{mt8173-cpufreq.c => mtk-cpufreq.c} | 2 ++
- 3 files changed, 7 insertions(+), 5 deletions(-)
- rename drivers/cpufreq/{mt8173-cpufreq.c => mtk-cpufreq.c} (99%)
+Unable to handle kernel NULL pointer dereference at virtual address 00000008
+...
+CPU: 0 PID: 1922 Comm: test_progs Not tainted 4.12.0+ #60
+...
+PC is at __htab_map_lookup_elem+0x54/0x1f4
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 74ed7e9..79aece7 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -87,14 +87,14 @@ config ARM_KIRKWOOD_CPUFREQ
- 	  This adds the CPUFreq driver for Marvell Kirkwood
- 	  SoCs.
- 
--config ARM_MT8173_CPUFREQ
--	tristate "Mediatek MT8173 CPUFreq support"
-+config ARM_MEDIATEK_CPUFREQ
-+	tristate "CPU Frequency scaling support for MediaTek SoCs"
- 	depends on ARCH_MEDIATEK && REGULATOR
--	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
-+	depends on ARM || ARM64 || COMPILE_TEST
- 	depends on !CPU_THERMAL || THERMAL
- 	select PM_OPP
- 	help
--	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
-+	  This adds the CPUFreq driver support for MediaTek SoCs.
- 
- config ARM_OMAP2PLUS_CPUFREQ
- 	bool "TI OMAP2+"
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index b7e78f0..4956f5d 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -58,7 +58,7 @@ obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
- obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
--obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
-+obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mtk-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
- obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
- obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mtk-cpufreq.c
-similarity index 99%
-rename from drivers/cpufreq/mt8173-cpufreq.c
-rename to drivers/cpufreq/mtk-cpufreq.c
-index fd1886f..481ec77 100644
---- a/drivers/cpufreq/mt8173-cpufreq.c
-+++ b/drivers/cpufreq/mtk-cpufreq.c
-@@ -575,6 +575,8 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
- 
- /* List of machines supported by this driver */
- static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
-+	{ .compatible = "mediatek,mt2701", },
-+	{ .compatible = "mediatek,mt7623", },
- 	{ .compatible = "mediatek,mt817x", },
- 	{ .compatible = "mediatek,mt8173", },
- 	{ .compatible = "mediatek,mt8176", },
+I'll see if I can send you this disk image...
+
+-Kees
+
+
 -- 
-2.7.4
+Kees Cook
+Pixel Security
