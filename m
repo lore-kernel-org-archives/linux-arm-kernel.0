@@ -1,507 +1,124 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 7 Jul 2017 18:31:07 +0200
-Subject: [PATCH v3 8/9] iio: counter: Add support for STM32 LPTimer
-In-Reply-To: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
-References: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1499445068-7037-9-git-send-email-fabrice.gasnier@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 7 Jul 2017 18:11:36 +0100
+Subject: [PATCH v8 00/20] ILP32 for ARM64
+In-Reply-To: <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
+References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
+ <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
+ <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
+Message-ID: <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for STM32 Low-Power Timer, that can be used as counter
-or quadrature encoder.
+Hi Yury,
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
-Changes in v2:
-- s/Low Power/Low-Power
-- update few comments
----
- .../ABI/testing/sysfs-bus-iio-lptimer-stm32        |  57 +++
- drivers/iio/counter/Kconfig                        |   9 +
- drivers/iio/counter/Makefile                       |   1 +
- drivers/iio/counter/stm32-lptimer-cnt.c            | 383 +++++++++++++++++++++
- 4 files changed, 450 insertions(+)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-lptimer-stm32
- create mode 100644 drivers/iio/counter/stm32-lptimer-cnt.c
+Just a quick reply as I'm about to go on holiday for the next two weeks.
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-iio-lptimer-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-lptimer-stm32
-new file mode 100644
-index 0000000..ad2cc63
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-bus-iio-lptimer-stm32
-@@ -0,0 +1,57 @@
-+What:		/sys/bus/iio/devices/iio:deviceX/in_count0_preset
-+KernelVersion:	4.13
-+Contact:	fabrice.gasnier at st.com
-+Description:
-+		Reading returns the current preset value. Writing sets the
-+		preset value. Encoder counts continuously from 0 to preset
-+		value, depending on direction (up/down).
-+
-+What:		/sys/bus/iio/devices/iio:deviceX/in_count_quadrature_mode_available
-+KernelVersion:	4.13
-+Contact:	fabrice.gasnier at st.com
-+Description:
-+		Reading returns the list possible quadrature modes.
-+
-+What:		/sys/bus/iio/devices/iio:deviceX/in_count0_quadrature_mode
-+KernelVersion:	4.13
-+Contact:	fabrice.gasnier at st.com
-+Description:
-+		Configure the device counter quadrature modes:
-+		- non-quadrature:
-+			Encoder IN1 input servers as the count input (up
-+			direction).
-+		- quadrature:
-+			Encoder IN1 and IN2 inputs are mixed to get direction
-+			and count.
-+
-+What:		/sys/bus/iio/devices/iio:deviceX/in_count_polarity_available
-+KernelVersion:	4.13
-+Contact:	fabrice.gasnier at st.com
-+Description:
-+		Reading returns the list possible active edges.
-+
-+What:		/sys/bus/iio/devices/iio:deviceX/in_count0_polarity
-+KernelVersion:	4.13
-+Contact:	fabrice.gasnier at st.com
-+Description:
-+		Configure the device encoder/counter active edge:
-+		- rising-edge
-+		- falling-edge
-+		- both-edges
-+
-+		In non-quadrature mode, device counts up on active edge.
-+		In quadrature mode, encoder counting scenarios are as follows:
-+		----------------------------------------------------------------
-+		| Active  | Level on |      IN1 signal    |     IN2 signal     |
-+		| edge    | opposite |------------------------------------------
-+		|         | signal   |  Rising  | Falling |  Rising  | Falling |
-+		----------------------------------------------------------------
-+		| Rising  | High ->  |   Down   |    -    |    Up    |    -    |
-+		| edge    | Low  ->  |    Up    |    -    |   Down   |    -    |
-+		----------------------------------------------------------------
-+		| Falling | High ->  |    -     |    Up   |    -     |   Down  |
-+		| edge    | Low  ->  |    -     |   Down  |    -     |    Up   |
-+		----------------------------------------------------------------
-+		| Both    | High ->  |   Down   |    Up   |    Up    |   Down  |
-+		| edges   | Low  ->  |    Up    |   Down  |   Down   |    Up   |
-+		----------------------------------------------------------------
-diff --git a/drivers/iio/counter/Kconfig b/drivers/iio/counter/Kconfig
-index b37e5fc..474e1ac 100644
---- a/drivers/iio/counter/Kconfig
-+++ b/drivers/iio/counter/Kconfig
-@@ -21,4 +21,13 @@ config 104_QUAD_8
- 	  The base port addresses for the devices may be configured via the base
- 	  array module parameter.
- 
-+config STM32_LPTIMER_CNT
-+	tristate "STM32 LP Timer encoder counter driver"
-+	depends on MFD_STM32_LPTIMER || COMPILE_TEST
-+	help
-+	  Select this option to enable STM32 Low-Power Timer quadrature encoder
-+	  and counter driver.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called stm32-lptimer-cnt.
- endmenu
-diff --git a/drivers/iio/counter/Makefile b/drivers/iio/counter/Makefile
-index 007e884..1b9a896 100644
---- a/drivers/iio/counter/Makefile
-+++ b/drivers/iio/counter/Makefile
-@@ -5,3 +5,4 @@
- # When adding new entries keep the list in alphabetical order
- 
- obj-$(CONFIG_104_QUAD_8)	+= 104-quad-8.o
-+obj-$(CONFIG_STM32_LPTIMER_CNT)	+= stm32-lptimer-cnt.o
-diff --git a/drivers/iio/counter/stm32-lptimer-cnt.c b/drivers/iio/counter/stm32-lptimer-cnt.c
-new file mode 100644
-index 0000000..1c5909b
---- /dev/null
-+++ b/drivers/iio/counter/stm32-lptimer-cnt.c
-@@ -0,0 +1,383 @@
-+/*
-+ * STM32 Low-Power Timer Encoder and Counter driver
-+ *
-+ * Copyright (C) STMicroelectronics 2017
-+ *
-+ * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
-+ *
-+ * Inspired by 104-quad-8 and stm32-timer-trigger drivers.
-+ *
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/bitfield.h>
-+#include <linux/iio/iio.h>
-+#include <linux/mfd/stm32-lptimer.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+
-+struct stm32_lptim_cnt {
-+	struct device *dev;
-+	struct regmap *regmap;
-+	struct clk *clk;
-+	u32 preset;
-+	u32 polarity;
-+	u32 quadrature_mode;
-+};
-+
-+static int stm32_lptim_is_enabled(struct stm32_lptim_cnt *priv)
-+{
-+	u32 val;
-+	int ret;
-+
-+	ret = regmap_read(priv->regmap, STM32_LPTIM_CR, &val);
-+	if (ret)
-+		return ret;
-+
-+	return FIELD_GET(STM32_LPTIM_ENABLE, val);
-+}
-+
-+static int stm32_lptim_set_enable_state(struct stm32_lptim_cnt *priv,
-+					int enable)
-+{
-+	int ret;
-+	u32 val;
-+
-+	val = FIELD_PREP(STM32_LPTIM_ENABLE, enable);
-+	ret = regmap_write(priv->regmap, STM32_LPTIM_CR, val);
-+	if (ret)
-+		return ret;
-+
-+	if (!enable) {
-+		clk_disable(priv->clk);
-+		return 0;
-+	}
-+
-+	/* LP timer must be enabled before writing CMP & ARR */
-+	ret = regmap_write(priv->regmap, STM32_LPTIM_ARR, priv->preset);
-+	if (ret)
-+		return ret;
-+
-+	ret = regmap_write(priv->regmap, STM32_LPTIM_CMP, 0);
-+	if (ret)
-+		return ret;
-+
-+	/* ensure CMP & ARR registers are properly written */
-+	ret = regmap_read_poll_timeout(priv->regmap, STM32_LPTIM_ISR, val,
-+				       (val & STM32_LPTIM_CMPOK_ARROK),
-+				       100, 1000);
-+	if (ret)
-+		return ret;
-+
-+	ret = regmap_write(priv->regmap, STM32_LPTIM_ICR,
-+			   STM32_LPTIM_CMPOKCF_ARROKCF);
-+	if (ret)
-+		return ret;
-+
-+	ret = clk_enable(priv->clk);
-+	if (ret) {
-+		regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
-+		return ret;
-+	}
-+
-+	/* Start LP timer in continuous mode */
-+	return regmap_update_bits(priv->regmap, STM32_LPTIM_CR,
-+				  STM32_LPTIM_CNTSTRT, STM32_LPTIM_CNTSTRT);
-+}
-+
-+static int stm32_lptim_setup(struct stm32_lptim_cnt *priv, int enable)
-+{
-+	u32 mask = STM32_LPTIM_ENC | STM32_LPTIM_COUNTMODE |
-+		   STM32_LPTIM_CKPOL | STM32_LPTIM_PRESC;
-+	u32 val;
-+
-+	/* Setup LP timer encoder/counter and polarity, without prescaler */
-+	if (priv->quadrature_mode)
-+		val = enable ? STM32_LPTIM_ENC : 0;
-+	else
-+		val = enable ? STM32_LPTIM_COUNTMODE : 0;
-+	val |= FIELD_PREP(STM32_LPTIM_CKPOL, enable ? priv->polarity : 0);
-+
-+	return regmap_update_bits(priv->regmap, STM32_LPTIM_CFGR, mask, val);
-+}
-+
-+static int stm32_lptim_write_raw(struct iio_dev *indio_dev,
-+				 struct iio_chan_spec const *chan,
-+				 int val, int val2, long mask)
-+{
-+	struct stm32_lptim_cnt *priv = iio_priv(indio_dev);
-+	int ret;
-+
-+	switch (mask) {
-+	case IIO_CHAN_INFO_ENABLE:
-+		if (val < 0 || val > 1)
-+			return -EINVAL;
-+
-+		/* Check nobody uses the timer, or already disabled/enabled */
-+		ret = stm32_lptim_is_enabled(priv);
-+		if ((ret < 0) || (!ret && !val))
-+			return ret;
-+		if (val && ret)
-+			return -EBUSY;
-+
-+		ret = stm32_lptim_setup(priv, val);
-+		if (ret)
-+			return ret;
-+		return stm32_lptim_set_enable_state(priv, val);
-+
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+static int stm32_lptim_read_raw(struct iio_dev *indio_dev,
-+				struct iio_chan_spec const *chan,
-+				int *val, int *val2, long mask)
-+{
-+	struct stm32_lptim_cnt *priv = iio_priv(indio_dev);
-+	u32 dat;
-+	int ret;
-+
-+	switch (mask) {
-+	case IIO_CHAN_INFO_RAW:
-+		ret = regmap_read(priv->regmap, STM32_LPTIM_CNT, &dat);
-+		if (ret)
-+			return ret;
-+		*val = dat;
-+		return IIO_VAL_INT;
-+
-+	case IIO_CHAN_INFO_ENABLE:
-+		ret = stm32_lptim_is_enabled(priv);
-+		if (ret < 0)
-+			return ret;
-+		*val = ret;
-+		return IIO_VAL_INT;
-+
-+	case IIO_CHAN_INFO_SCALE:
-+		/* Non-quadrature mode: scale = 1 */
-+		*val = 1;
-+		*val2 = 0;
-+		if (priv->quadrature_mode) {
-+			/*
-+			 * Quadrature encoder mode:
-+			 * - both edges, quarter cycle, scale is 0.25
-+			 * - either rising/falling edge scale is 0.5
-+			 */
-+			if (priv->polarity > 1)
-+				*val2 = 2;
-+			else
-+				*val2 = 1;
-+		}
-+		return IIO_VAL_FRACTIONAL_LOG2;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+static const struct iio_info stm32_lptim_cnt_iio_info = {
-+	.read_raw = stm32_lptim_read_raw,
-+	.write_raw = stm32_lptim_write_raw,
-+	.driver_module = THIS_MODULE,
-+};
-+
-+static const char *const stm32_lptim_quadrature_modes[] = {
-+	"non-quadrature",
-+	"quadrature",
-+};
-+
-+static int stm32_lptim_get_quadrature_mode(struct iio_dev *indio_dev,
-+					   const struct iio_chan_spec *chan)
-+{
-+	struct stm32_lptim_cnt *priv = iio_priv(indio_dev);
-+
-+	return priv->quadrature_mode;
-+}
-+
-+static int stm32_lptim_set_quadrature_mode(struct iio_dev *indio_dev,
-+					   const struct iio_chan_spec *chan,
-+					   unsigned int type)
-+{
-+	struct stm32_lptim_cnt *priv = iio_priv(indio_dev);
-+
-+	if (stm32_lptim_is_enabled(priv))
-+		return -EBUSY;
-+
-+	priv->quadrature_mode = type;
-+
-+	return 0;
-+}
-+
-+static const struct iio_enum stm32_lptim_quadrature_mode_en = {
-+	.items = stm32_lptim_quadrature_modes,
-+	.num_items = ARRAY_SIZE(stm32_lptim_quadrature_modes),
-+	.get = stm32_lptim_get_quadrature_mode,
-+	.set = stm32_lptim_set_quadrature_mode,
-+};
-+
-+static const char * const stm32_lptim_cnt_polarity[] = {
-+	"rising-edge", "falling-edge", "both-edges",
-+};
-+
-+static int stm32_lptim_cnt_get_polarity(struct iio_dev *indio_dev,
-+					const struct iio_chan_spec *chan)
-+{
-+	struct stm32_lptim_cnt *priv = iio_priv(indio_dev);
-+
-+	return priv->polarity;
-+}
-+
-+static int stm32_lptim_cnt_set_polarity(struct iio_dev *indio_dev,
-+					const struct iio_chan_spec *chan,
-+					unsigned int type)
-+{
-+	struct stm32_lptim_cnt *priv = iio_priv(indio_dev);
-+
-+	if (stm32_lptim_is_enabled(priv))
-+		return -EBUSY;
-+
-+	priv->polarity = type;
-+
-+	return 0;
-+}
-+
-+static const struct iio_enum stm32_lptim_cnt_polarity_en = {
-+	.items = stm32_lptim_cnt_polarity,
-+	.num_items = ARRAY_SIZE(stm32_lptim_cnt_polarity),
-+	.get = stm32_lptim_cnt_get_polarity,
-+	.set = stm32_lptim_cnt_set_polarity,
-+};
-+
-+static ssize_t stm32_lptim_cnt_get_preset(struct iio_dev *indio_dev,
-+					  uintptr_t private,
-+					  const struct iio_chan_spec *chan,
-+					  char *buf)
-+{
-+	struct stm32_lptim_cnt *priv = iio_priv(indio_dev);
-+
-+	return snprintf(buf, PAGE_SIZE, "%u\n", priv->preset);
-+}
-+
-+static ssize_t stm32_lptim_cnt_set_preset(struct iio_dev *indio_dev,
-+					  uintptr_t private,
-+					  const struct iio_chan_spec *chan,
-+					  const char *buf, size_t len)
-+{
-+	struct stm32_lptim_cnt *priv = iio_priv(indio_dev);
-+	int ret;
-+
-+	if (stm32_lptim_is_enabled(priv))
-+		return -EBUSY;
-+
-+	ret = kstrtouint(buf, 0, &priv->preset);
-+	if (ret)
-+		return ret;
-+
-+	if (priv->preset > STM32_LPTIM_MAX_ARR)
-+		return -EINVAL;
-+
-+	return len;
-+}
-+
-+/* LP timer with encoder */
-+static const struct iio_chan_spec_ext_info stm32_lptim_enc_ext_info[] = {
-+	{
-+		.name = "preset",
-+		.shared = IIO_SEPARATE,
-+		.read = stm32_lptim_cnt_get_preset,
-+		.write = stm32_lptim_cnt_set_preset,
-+	},
-+	IIO_ENUM("polarity", IIO_SEPARATE, &stm32_lptim_cnt_polarity_en),
-+	IIO_ENUM_AVAILABLE("polarity", &stm32_lptim_cnt_polarity_en),
-+	IIO_ENUM("quadrature_mode", IIO_SEPARATE,
-+		 &stm32_lptim_quadrature_mode_en),
-+	IIO_ENUM_AVAILABLE("quadrature_mode", &stm32_lptim_quadrature_mode_en),
-+	{}
-+};
-+
-+static const struct iio_chan_spec stm32_lptim_enc_channels = {
-+	.type = IIO_COUNT,
-+	.channel = 0,
-+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-+			      BIT(IIO_CHAN_INFO_ENABLE) |
-+			      BIT(IIO_CHAN_INFO_SCALE),
-+	.ext_info = stm32_lptim_enc_ext_info,
-+	.indexed = 1,
-+};
-+
-+/* LP timer without encoder (counter only) */
-+static const struct iio_chan_spec_ext_info stm32_lptim_cnt_ext_info[] = {
-+	{
-+		.name = "preset",
-+		.shared = IIO_SEPARATE,
-+		.read = stm32_lptim_cnt_get_preset,
-+		.write = stm32_lptim_cnt_set_preset,
-+	},
-+	IIO_ENUM("polarity", IIO_SEPARATE, &stm32_lptim_cnt_polarity_en),
-+	IIO_ENUM_AVAILABLE("polarity", &stm32_lptim_cnt_polarity_en),
-+	{}
-+};
-+
-+static const struct iio_chan_spec stm32_lptim_cnt_channels = {
-+	.type = IIO_COUNT,
-+	.channel = 0,
-+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-+			      BIT(IIO_CHAN_INFO_ENABLE) |
-+			      BIT(IIO_CHAN_INFO_SCALE),
-+	.ext_info = stm32_lptim_cnt_ext_info,
-+	.indexed = 1,
-+};
-+
-+static int stm32_lptim_cnt_probe(struct platform_device *pdev)
-+{
-+	struct stm32_lptimer *ddata = dev_get_drvdata(pdev->dev.parent);
-+	struct stm32_lptim_cnt *priv;
-+	struct iio_dev *indio_dev;
-+
-+	if (IS_ERR_OR_NULL(ddata))
-+		return -EINVAL;
-+
-+	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*priv));
-+	if (!indio_dev)
-+		return -ENOMEM;
-+
-+	priv = iio_priv(indio_dev);
-+	priv->dev = &pdev->dev;
-+	priv->regmap = ddata->regmap;
-+	priv->clk = ddata->clk;
-+	priv->preset = STM32_LPTIM_MAX_ARR;
-+
-+	indio_dev->name = dev_name(&pdev->dev);
-+	indio_dev->dev.parent = &pdev->dev;
-+	indio_dev->dev.of_node = pdev->dev.of_node;
-+	indio_dev->info = &stm32_lptim_cnt_iio_info;
-+	if (ddata->has_encoder)
-+		indio_dev->channels = &stm32_lptim_enc_channels;
-+	else
-+		indio_dev->channels = &stm32_lptim_cnt_channels;
-+	indio_dev->num_channels = 1;
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	return devm_iio_device_register(&pdev->dev, indio_dev);
-+}
-+
-+static const struct of_device_id stm32_lptim_cnt_of_match[] = {
-+	{ .compatible = "st,stm32-lptimer-counter", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stm32_lptim_cnt_of_match);
-+
-+static struct platform_driver stm32_lptim_cnt_driver = {
-+	.probe = stm32_lptim_cnt_probe,
-+	.driver = {
-+		.name = "stm32-lptimer-counter",
-+		.of_match_table = stm32_lptim_cnt_of_match,
-+	},
-+};
-+module_platform_driver(stm32_lptim_cnt_driver);
-+
-+MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
-+MODULE_ALIAS("platform:stm32-lptimer-counter");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 LPTIM counter driver");
-+MODULE_LICENSE("GPL v2");
+On Fri, Jul 07, 2017 at 12:59:02AM +0300, Yury Norov wrote:
+> On Thu, Jun 29, 2017 at 05:10:36PM +0100, Catalin Marinas wrote:
+> > On Mon, Jun 19, 2017 at 06:49:43PM +0300, Yury Norov wrote:
+> > > This series enables aarch64 with ilp32 mode.
+> > 
+> > What I'd like to propose is that Will and I (as arm64 maintainers, maybe
+> > with with the help of others including this series' authors) take over
+> > the series and push it to a staging branch under the arm64 kernel on
+> > git.kernel.org. This is aimed as a commitment to keep the ABI *stable*
+> > and will be rebased with every kernel release (starting with 4.13). The
+> > decision to merge upstream will be revisited every 6 months, assessing
+> > the progress on the points I mentioned above, with a time limit of 2
+> > years when, if still not upstream, we will stop maintaining such branch.
+> 
+> Thanks for the email. I appreciate your concern about long-term
+> support load for a new ABI. I also think that stabilizing the ABI
+> is a good idea.
+> 
+> At this point, most people expect the ABI to not change unless
+> critical issues are uncovered. IMO, if there is a good technical reason
+> to change the ABI -- the change will happen even on the "staging" branch.
+
+What I would like is that we change the ABI *only* if there is a serious
+bug, otherwise we should try hard to keep it stable. The "good technical
+reason" can be subjective (i.e. let's pass 64-bit arguments in a single
+register because some benchmark is slightly faster; with a wider user
+base, we may get more suggestions for ABI changes that we should
+reject).
+
+> And vise-versa, if there is no need for a change, the ABI will be stable
+> on my local branch, just like on staging branch you propose. I think it
+> will be that way until there will appear strong community of users who
+> will resist the changing of ABI. From this point of view, I don't see
+> major difference for ILP32 where to host the patchset.
+
+If we don't treat the ABI as stable now, regardless of the number of
+users, then it is not ready for upstream (we already have a user in the
+openSUSE build).
+
+The arm64 git.kernel.org suggestion was more of an endorsement from the
+maintainers that the ABI is stable. If you want to maintain it in your
+own tree, that's fine by me. If you want wider visibility, we could
+mirror it to git.kernel.org (though given how many trees are there, it
+may not mean much).
+
+> Is my understanding correct that you, Will and me will be responsible
+> for rebasing and maintainance of patches? To be clear, this it not an
+> automatic task - sometimes simple rebase take the whole day of my time,
+> and I rebase almost every week. The rebase in 2-month timeframe may become
+> unpredictable task, by time and amount of work. I think you understand what
+> I mean, as once before you already told that the series is too intrusive.
+
+I am fully aware there is significant effort to rebase the series and if
+you can help maintain such branch it would be great. I don't see the
+point of rebasing weekly though and it's not just the git handling
+process but doing the validation of such branch, regression testing etc.
+
+If it's too time consuming, we could do it only for LTS releases.
+
+> To make it more easy for maintainance, I would suggest to split the series
+> to 3 parts:
+>  - arch and generic patches that not related to ilp32 or arm64 (already
+>    done);
+
+That's fine.
+
+>  - arm64 patches that do cleanup and refactoring in aim to apply
+>    ilp32 patches smoothly, but not ilp32-specific;
+
+If there are such changes, that's fine. However, I wouldn't merge the
+AARCH32_EL0 #ifdef'ery since it's unnecessary if we never merge the
+ILP32 patches.
+
+> If we'll follow your suggestion, does it mean that you expect the 4.12-based
+> branch from me soon to put on staging?
+
+We can create one for 4.12 if you want (in about 2-3 weeks time when I'm
+back). If there is no rush we could aim for 4.13 (there are some
+non-trivial conflicts in the sigframe handling code as we are preparing
+it for SVE support).
+
+> > The decision to merge upstream will be revisited every 6 months,
+> > assessing the progress on the points I mentioned above, with a time
+> > limit of 2 years
+> 
+> IIUC, this is your personal decision based on responses and comments
+> from community?
+
+Yes, as arm64 kernel maintainer.
+
+> If so, I would like to ask you to do the first ILP32 community poll
+> now, not in 6 months. So we'll collect opinions and requests from
+> people interested in ILP32, and in 6 month will be able to check the
+> progress. I would like to see this thread public because if we are not
+> taking ILP32 to official sources right now, this is the only way to
+> inform people that the project exists and is ready to use.
+
+That's an ongoing process, I'm not going to ask for people's opinion
+every 6 months. It's just that I will revisit periodically the progress
+on automated testing, public availability of a cross-toolchain,
+Tested/Acked/Reviewed-by tags on these patches from interested parties.
+Since I haven't seen any of these now, I don't see any point in asking.
+
+To be clear, I'm not really interested in "we need this too" opinions, I
+get lots of these via the marketing channels. I'm looking for actual
+users with a long-term view of making/keeping ILP32 a first class ABI.
+
 -- 
-1.9.1
+Catalin
