@@ -1,8 +1,8 @@
 From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Fri, 7 Jul 2017 01:51:31 -0500
-Subject: [PATCH] iio: adc: rockchip_saradc: add NULL check on
- of_match_device() return value
-Message-ID: <20170707065131.GA23382@embeddedgus>
+Date: Fri, 7 Jul 2017 02:11:35 -0500
+Subject: [PATCH] net: ethernet: mediatek: add NULL check on of_match_device()
+ return value
+Message-ID: <20170707071135.GA29205@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +13,24 @@ In case of NULL print error message and return -ENODEV
 
 Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 ---
- drivers/iio/adc/rockchip_saradc.c | 5 +++++
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
-index ae6d332..2bf2ed1 100644
---- a/drivers/iio/adc/rockchip_saradc.c
-+++ b/drivers/iio/adc/rockchip_saradc.c
-@@ -224,6 +224,11 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
- 	info = iio_priv(indio_dev);
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+index adaaafc..6a77dea 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -2408,6 +2408,11 @@ static int mtk_probe(struct platform_device *pdev)
+ 	int i;
  
- 	match = of_match_device(rockchip_saradc_match, &pdev->dev);
+ 	match = of_match_device(of_mtk_match, &pdev->dev);
 +	if (!match) {
 +		dev_err(&pdev->dev, "failed to match device\n");
 +		return -ENODEV;
 +	}
 +
- 	info->data = match->data;
+ 	soc = (struct mtk_soc_data *)match->data;
  
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	eth = devm_kzalloc(&pdev->dev, sizeof(*eth), GFP_KERNEL);
 -- 
 2.5.0
