@@ -1,589 +1,187 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Fri, 7 Jul 2017 10:58:08 -0500
-Subject: [PATCHv4 3/3] i2c: altera: Add Altera I2C Controller driver
-In-Reply-To: <1497904618-27010-4-git-send-email-thor.thayer@linux.intel.com>
-References: <1497904618-27010-1-git-send-email-thor.thayer@linux.intel.com>
- <1497904618-27010-4-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <c47b5637-d7ae-7b53-b606-43ea9e5c5d6f@linux.intel.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 7 Jul 2017 17:06:39 +0100
+Subject: [PATCH 2/8] dt-bindings: mailbox: add binding doc for the ARM SMC
+ mailbox
+In-Reply-To: <20170707143546.GD3425@leverpostej>
+References: <20170630095608.24943-1-andre.przywara@arm.com>
+ <20170630095608.24943-3-andre.przywara@arm.com>
+ <20170707143546.GD3425@leverpostej>
+Message-ID: <8897a028-64b4-da2a-603f-b0b56228e8bb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 06/19/2017 03:36 PM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On 07/07/17 15:35, Mark Rutland wrote:
+> Hi Andre,
 > 
-> Add driver support for the Altera I2C Controller. The I2C
-> controller is soft IP for use in FPGAs.
+> As a nit, please post bindings before drivers, as per
+> Documentation/devicetree/bindings/submitting-patches.txt.
+
+Sure.
+
+> On Fri, Jun 30, 2017 at 10:56:02AM +0100, Andre Przywara wrote:
+>> Add binding documentation for the generic ARM SMC mailbox.
+>> This is not describing hardware, but a firmware interface.
 > 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
-> v2  Remove altr, from fifo-size to agree with bindings.
->      Change compatible string to "altr,softip-i2c"
-> v3  Add version to compatible string "altr,softip-i2c-v1.0"
-> v4  Add default 100kHz message. Cleanup IRQ error message.
-> ---
+> Is this following some standard, or is this something that you have
+> invented?
 
-Any thoughts or comments on this driver?
+The idea was that we don't need a "full featured standard", but rather
+just a contract between currently running firmware and the OS. Since I
+consider the DT as being provided as part of the firmware, I don't see
+how this would need to be "standardized" beyond that. This is just a
+"single bit signalling channel" to implement a "poor man's mailbox", if
+you like.
+If firmware implements this, it adds the respective node, if not, there
+is nothing in the DT.
+Do you see any way this would clash with existing standards or would
+need to standardized beyond this document? I would believe the SMCCC
+covers the bits that would need to standardized already (as in to make
+sure to not call any other service tied to a particular smc call).
 
-Thanks,
+> If the latter, why are we inventing a new standard? |How does
+> this relate to SCPI and/or SCMI?
 
-Thor
+Both SCPI and SCMI build upon a shared memory region for transferring
+arguments and a mailbox channel to signal that there is "work to do".
+So this is not competing with those standards, but rather complementing
+them and making them more widely usable (in cases where you don't have
+an actual mailbox).
+SCMI introduced a notion of multiple transport protocols for signalling,
+but so far only specifies a mailbox (and does the respective proposed
+binding).
 
->   drivers/i2c/busses/Kconfig      |  10 +
->   drivers/i2c/busses/Makefile     |   1 +
->   drivers/i2c/busses/i2c-altera.c | 511 ++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 522 insertions(+)
->   create mode 100644 drivers/i2c/busses/i2c-altera.c
+Actually this driver is more of a drop-in replacement for an ARM MHU
+mailbox (for instance to implement SCPI), so this driver and binding
+actually promotes existing standards.
+
+> What exactly is "the generic ARM SMC mailbox"?
+
+That's a bridge between the requirements of having a mailbox (which the
+SCPI *binding* requires, for instance) and some firmware parts being
+implemented in an EL3 runtime on the APs (instead of running on some
+separate management processors).
+I am happy to change the name if that sounds presumptuous, the naming
+comes from "generic" as in: does not require specific hardware. The
+"ARM" in there is just to give context to "SMC", which, as every TLA, is
+probably overloaded and confusing to the casual reader.
+
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  .../devicetree/bindings/mailbox/arm-smc.txt        | 61 ++++++++++++++++++++++
+>>  1 file changed, 61 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/arm-smc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/arm-smc.txt b/Documentation/devicetree/bindings/mailbox/arm-smc.txt
+>> new file mode 100644
+>> index 0000000..90c5926
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mailbox/arm-smc.txt
+>> @@ -0,0 +1,61 @@
+>> +ARM SMC Mailbox Driver
 > 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 144cbad..981ea48 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -326,6 +326,16 @@ config I2C_POWERMAC
->   
->   comment "I2C system bus drivers (mostly embedded / system-on-chip)"
->   
-> +config I2C_ALTERA
-> +	tristate "Altera Soft IP I2C"
-> +	depends on (ARCH_SOCFPGA || NIOS2) && OF
-> +	help
-> +	  If you say yes to this option, support will be included for the
-> +	  Altera Soft IP I2C interfaces on SoCFPGA and Nios2 architectures.
-> +
-> +	  This driver can also be built as a module.  If so, the module
-> +	  will be called i2c-altera.
-> +
->   config I2C_AT91
->   	tristate "Atmel AT91 I2C Two-Wire interface (TWI)"
->   	depends on ARCH_AT91
-> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> index 30b6085..4eb5c82 100644
-> --- a/drivers/i2c/busses/Makefile
-> +++ b/drivers/i2c/busses/Makefile
-> @@ -29,6 +29,7 @@ obj-$(CONFIG_I2C_HYDRA)		+= i2c-hydra.o
->   obj-$(CONFIG_I2C_POWERMAC)	+= i2c-powermac.o
->   
->   # Embedded system I2C/SMBus host controller drivers
-> +obj-$(CONFIG_I2C_ALTERA)	+= i2c-altera.o
->   obj-$(CONFIG_I2C_AT91)		+= i2c-at91.o
->   obj-$(CONFIG_I2C_AU1550)	+= i2c-au1550.o
->   obj-$(CONFIG_I2C_AXXIA)		+= i2c-axxia.o
-> diff --git a/drivers/i2c/busses/i2c-altera.c b/drivers/i2c/busses/i2c-altera.c
-> new file mode 100644
-> index 0000000..b47850e
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-altera.c
-> @@ -0,0 +1,511 @@
-> +/*
-> + *  Copyright Intel Corporation (C) 2017.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + * Based on the i2c-axxia.c driver.
-> + */
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/err.h>
-> +#include <linux/i2c.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define ALTR_I2C_TFR_CMD	0x00	/* Transfer Command register */
-> +#define     ALTR_I2C_TFR_CMD_STA	BIT(9)	/* send START before byte */
-> +#define     ALTR_I2C_TFR_CMD_STO	BIT(8)	/* send STOP after byte */
-> +#define     ALTR_I2C_TFR_CMD_RW_D	BIT(0)	/* Direction of transfer */
-> +#define ALTR_I2C_RX_DATA	0x04	/* RX data FIFO register */
-> +#define ALTR_I2C_CTRL		0x08	/* Control register */
-> +#define	    ALTR_I2C_CTRL_RXT_SHFT	4	/* RX FIFO Threshold */
-> +#define     ALTR_I2C_CTRL_TCT_SHFT	2	/* TFER CMD FIFO Threshold */
-> +#define     ALTR_I2C_CTRL_BSPEED	BIT(1)	/* Bus Speed (1=Fast) */
-> +#define     ALTR_I2C_CTRL_EN	BIT(0)	/* Enable Core (1=Enable) */
-> +#define ALTR_I2C_ISER		0x0C	/* Interrupt Status Enable register */
-> +#define     ALTR_I2C_ISER_RXOF_EN	BIT(4)	/* Enable RX OVERFLOW IRQ */
-> +#define     ALTR_I2C_ISER_ARB_EN	BIT(3)	/* Enable ARB LOST IRQ */
-> +#define     ALTR_I2C_ISER_NACK_EN	BIT(2)	/* Enable NACK DET IRQ */
-> +#define     ALTR_I2C_ISER_RXRDY_EN	BIT(1)	/* Enable RX Ready IRQ */
-> +#define     ALTR_I2C_ISER_TXRDY_EN	BIT(0)	/* Enable TX Ready IRQ */
-> +#define ALTR_I2C_ISR		0x10	/* Interrupt Status register */
-> +#define     ALTR_I2C_ISR_RXOF		BIT(4)	/* RX OVERFLOW IRQ */
-> +#define     ALTR_I2C_ISR_ARB		BIT(3)	/* ARB LOST IRQ */
-> +#define     ALTR_I2C_ISR_NACK		BIT(2)	/* NACK DET IRQ */
-> +#define     ALTR_I2C_ISR_RXRDY		BIT(1)	/* RX Ready IRQ */
-> +#define     ALTR_I2C_ISR_TXRDY		BIT(0)	/* TX Ready IRQ */
-> +#define ALTR_I2C_STATUS		0x14	/* Status register */
-> +#define	    ALTR_I2C_STAT_CORE		BIT(0)	/* Core Status (0=idle) */
-> +#define ALTR_I2C_TC_FIFO_LVL	0x18	/* Transfer FIFO LVL register */
-> +#define ALTR_I2C_RX_FIFO_LVL	0x1C	/* Receive FIFO LVL register */
-> +#define ALTR_I2C_SCL_LOW	0x20	/* SCL low count register */
-> +#define ALTR_I2C_SCL_HIGH	0x24	/* SCL high count register */
-> +#define ALTR_I2C_SDA_HOLD	0x28	/* SDA hold count register */
-> +
-> +#define ALTR_I2C_ALL_IRQ	(ALTR_I2C_ISR_RXOF | ALTR_I2C_ISR_ARB | \
-> +				 ALTR_I2C_ISR_NACK | ALTR_I2C_ISR_RXRDY | \
-> +				 ALTR_I2C_ISR_TXRDY)
-> +
-> +#define ALTR_I2C_THRESHOLD	0	/*IRQ Threshold at 1 element */
-> +#define ALTR_I2C_DFLT_FIFO_SZ	4
-> +#define ALTR_I2C_TIMEOUT	100
-> +#define ALTR_I2C_XFER_TIMEOUT	(msecs_to_jiffies(250))
-> +
-> +/**
-> + * altr_i2c_dev - I2C device context
-> + * @base: pointer to register struct
-> + * @msg: pointer to current message
-> + * @msg_len: number of bytes transferred in msg
-> + * @msg_err: error code for completed message
-> + * @msg_complete: xfer completion object
-> + * @dev: device reference
-> + * @adapter: core i2c abstraction
-> + * @i2c_clk: clock reference for i2c input clock
-> + * @bus_clk_rate: current i2c bus clock rate
-> + * @buf: ptr to msg buffer for easier use.
-> + * @fifo_size: size of the FIFO passed in.
-> + */
-> +struct altr_i2c_dev {
-> +	void __iomem *base;
-> +	struct i2c_msg *msg;
-> +	size_t msg_len;
-> +	int msg_err;
-> +	struct completion msg_complete;
-> +	struct device *dev;
-> +	struct i2c_adapter adapter;
-> +	struct clk *i2c_clk;
-> +	u32 bus_clk_rate;
-> +	u8 *buf;
-> +	unsigned int fifo_size;
-> +};
-> +
-> +static void i2c_int_disable(struct altr_i2c_dev *idev, u32 mask)
-> +{
-> +	u32 int_en = readl(idev->base + ALTR_I2C_ISER);
-> +
-> +	writel(int_en & ~mask, idev->base + ALTR_I2C_ISER);
-> +}
-> +
-> +static void i2c_int_enable(struct altr_i2c_dev *idev, u32 mask)
-> +{
-> +	u32 int_en = readl(idev->base + ALTR_I2C_ISER);
-> +
-> +	writel(int_en | mask, idev->base + ALTR_I2C_ISER);
-> +}
-> +
-> +static void i2c_int_clear(struct altr_i2c_dev *idev, u32 mask)
-> +{
-> +	u32 int_en = readl(idev->base + ALTR_I2C_ISR);
-> +
-> +	writel(int_en | mask, idev->base + ALTR_I2C_ISR);
-> +}
-> +
-> +static void altr_i2c_core_disable(struct altr_i2c_dev *idev)
-> +{
-> +	u32 tmp = readl(idev->base + ALTR_I2C_CTRL);
-> +
-> +	writel(tmp & ~ALTR_I2C_CTRL_EN, idev->base + ALTR_I2C_CTRL);
-> +}
-> +
-> +static void altr_i2c_core_enable(struct altr_i2c_dev *idev)
-> +{
-> +	u32 tmp = readl(idev->base + ALTR_I2C_CTRL);
-> +
-> +	writel(tmp | ALTR_I2C_CTRL_EN, idev->base + ALTR_I2C_CTRL);
-> +}
-> +
-> +static void altr_i2c_reset(struct altr_i2c_dev *idev)
-> +{
-> +	altr_i2c_core_disable(idev);
-> +	altr_i2c_core_enable(idev);
-> +}
-> +
-> +static void altr_i2c_recover(struct altr_i2c_dev *idev)
-> +{
-> +	altr_i2c_reset(idev);
-> +	/* Clock start bit + 8 bits + stop bit out */
-> +	writel(ALTR_I2C_TFR_CMD_STA | ALTR_I2C_TFR_CMD_STO,
-> +	       idev->base + ALTR_I2C_TFR_CMD);
-> +	altr_i2c_reset(idev);
-> +
-> +	i2c_recover_bus(&idev->adapter);
-> +}
-> +
-> +static inline void altr_i2c_stop(struct altr_i2c_dev *idev)
-> +{
-> +	writel(ALTR_I2C_TFR_CMD_STO, idev->base + ALTR_I2C_TFR_CMD);
-> +}
-> +
-> +static void altr_i2c_init(struct altr_i2c_dev *idev)
-> +{
-> +	u32 divisor = clk_get_rate(idev->i2c_clk) / idev->bus_clk_rate;
-> +	u32 clk_mhz = clk_get_rate(idev->i2c_clk) / 1000000;
-> +	u32 tmp = (ALTR_I2C_THRESHOLD << ALTR_I2C_CTRL_RXT_SHFT) |
-> +		  (ALTR_I2C_THRESHOLD << ALTR_I2C_CTRL_TCT_SHFT);
-> +	u32 t_high, t_low;
-> +
-> +	if (idev->bus_clk_rate <= 100000) {
-> +		tmp &= ~ALTR_I2C_CTRL_BSPEED;
-> +		/* Standard mode SCL 50/50 */
-> +		t_high = divisor * 1 / 2;
-> +		t_low = divisor * 1 / 2;
-> +	} else {
-> +		tmp |= ALTR_I2C_CTRL_BSPEED;
-> +		/* Fast mode SCL 33/66 */
-> +		t_high = divisor * 1 / 3;
-> +		t_low = divisor * 2 / 3;
-> +	}
-> +	writel(tmp, idev->base + ALTR_I2C_CTRL);
-> +
-> +	dev_dbg(idev->dev, "rate=%uHz per_clk=%uMHz -> ratio=1:%u\n",
-> +		idev->bus_clk_rate, clk_mhz, divisor);
-> +
-> +	/* Reset controller */
-> +	altr_i2c_reset(idev);
-> +
-> +	/* SCL High Time */
-> +	writel(t_high, idev->base + ALTR_I2C_SCL_HIGH);
-> +	/* SCL Low Time */
-> +	writel(t_low, idev->base + ALTR_I2C_SCL_LOW);
-> +	/* SDA Hold Time, 300ns */
-> +	writel(div_u64(300 * clk_mhz, 1000), idev->base + ALTR_I2C_SDA_HOLD);
-> +
-> +	/* Mask all master interrupt bits */
-> +	i2c_int_disable(idev, ~0);
-> +}
-> +
-> +static int i2c_m_rd(const struct i2c_msg *msg)
-> +{
-> +	return (msg->flags & I2C_M_RD) != 0;
-> +}
-> +
-> +/**
-> + * altr_i2c_empty_rx_fifo - Fetch data from RX FIFO until end of
-> + * transfer. Send a Stop bit on the last byte.
-> + */
-> +static void altr_i2c_empty_rx_fifo(struct altr_i2c_dev *idev)
-> +{
-> +	size_t rx_fifo_avail = readl(idev->base + ALTR_I2C_RX_FIFO_LVL);
-> +	int bytes_to_transfer = min(rx_fifo_avail, idev->msg_len);
-> +
-> +	while (bytes_to_transfer-- > 0) {
-> +		*idev->buf++ = readl(idev->base + ALTR_I2C_RX_DATA);
-> +		if (idev->msg_len == 1)
-> +			altr_i2c_stop(idev);
-> +		else
-> +			writel(0, idev->base + ALTR_I2C_TFR_CMD);
-> +
-> +		idev->msg_len--;
-> +	}
-> +}
-> +
-> +/**
-> + * altr_i2c_fill_tx_fifo - Fill TX FIFO from current message buffer.
-> + * @return: Number of bytes left to transfer.
-> + */
-> +static int altr_i2c_fill_tx_fifo(struct altr_i2c_dev *idev)
-> +{
-> +	size_t tx_fifo_avail = idev->fifo_size - readl(idev->base +
-> +						       ALTR_I2C_TC_FIFO_LVL);
-> +	int bytes_to_transfer = min(tx_fifo_avail, idev->msg_len);
-> +	int ret = idev->msg_len - bytes_to_transfer;
-> +
-> +	while (bytes_to_transfer-- > 0) {
-> +		if (idev->msg_len == 1)
-> +			writel(ALTR_I2C_TFR_CMD_STO | *idev->buf++,
-> +			       idev->base + ALTR_I2C_TFR_CMD);
-> +		else
-> +			writel(*idev->buf++, idev->base + ALTR_I2C_TFR_CMD);
-> +		idev->msg_len--;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/**
-> + * altr_i2c_wait_for_core_idle - After TX, check core idle for all bytes TX.
-> + * @return: 0 on success or -ETIMEDOUT on timeout.
-> + */
-> +static int altr_i2c_wait_for_core_idle(struct altr_i2c_dev *idev)
-> +{
-> +	unsigned long timeout = jiffies + msecs_to_jiffies(ALTR_I2C_TIMEOUT);
-> +
-> +	do {
-> +		if (time_after(jiffies, timeout)) {
-> +			dev_err(idev->dev, "Core Idle timeout\n");
-> +			return -ETIMEDOUT;
-> +		}
-> +	} while (readl(idev->base + ALTR_I2C_STATUS) & ALTR_I2C_STAT_CORE);
-> +
-> +	return 0;
-> +}
-> +
-> +static irqreturn_t altr_i2c_isr(int irq, void *_dev)
-> +{
-> +	struct altr_i2c_dev *idev = _dev;
-> +	/* Read IRQ status but only interested in Enabled IRQs. */
-> +	u32 status = readl(idev->base + ALTR_I2C_ISR) &
-> +		     readl(idev->base + ALTR_I2C_ISER);
-> +
-> +	if (!idev->msg) {
-> +		dev_warn(idev->dev, "unexpected interrupt\n");
-> +		goto out;
-> +	}
-> +
-> +	/* handle Lost Arbitration */
-> +	if (unlikely(status & ALTR_I2C_ISR_ARB)) {
-> +		dev_err(idev->dev, "%s: arbitration lost\n", __func__);
-> +		i2c_int_clear(idev, ALTR_I2C_ISR_ARB);
-> +		idev->msg_err = -EAGAIN;
-> +		goto complete;
-> +	}
-> +
-> +	if (unlikely(status & ALTR_I2C_ISR_NACK)) {
-> +		dev_dbg(idev->dev, "%s: could not get ACK\n", __func__);
-> +		idev->msg_err = -ENXIO;
-> +		i2c_int_clear(idev, ALTR_I2C_ISR_NACK);
-> +		altr_i2c_stop(idev);
-> +		goto complete;
-> +	}
-> +
-> +	/* handle RX FIFO Overflow */
-> +	if (i2c_m_rd(idev->msg) && unlikely(status & ALTR_I2C_ISR_RXOF)) {
-> +		altr_i2c_empty_rx_fifo(idev);
-> +		i2c_int_clear(idev, ALTR_I2C_ISR_RXRDY);
-> +		altr_i2c_stop(idev);
-> +		dev_err(idev->dev, "%s: RX FIFO Overflow\n", __func__);
-> +		goto complete;
-> +	}
-> +
-> +	/* RX FIFO needs service? */
-> +	if (i2c_m_rd(idev->msg) && (status & ALTR_I2C_ISR_RXRDY)) {
-> +		altr_i2c_empty_rx_fifo(idev);
-> +		i2c_int_clear(idev, ALTR_I2C_ISR_RXRDY);
-> +		if (!idev->msg_len)
-> +			goto complete;
-> +
-> +		goto out;
-> +	}
-> +
-> +	/* TX FIFO needs service? */
-> +	if (!i2c_m_rd(idev->msg) && (status & ALTR_I2C_ISR_TXRDY)) {
-> +		i2c_int_clear(idev, ALTR_I2C_ISR_TXRDY);
-> +		if (!altr_i2c_fill_tx_fifo(idev))
-> +			goto complete;
-> +
-> +		goto out;
-> +	}
-> +
-> +complete:
-> +	dev_dbg(idev->dev, "%s: Message Complete\n", __func__);
-> +	if (altr_i2c_wait_for_core_idle(idev))
-> +		dev_err(idev->dev, "%s: message timeout\n", __func__);
-> +	i2c_int_disable(idev, ALTR_I2C_ALL_IRQ);
-> +	i2c_int_clear(idev, ALTR_I2C_ALL_IRQ);
-> +	complete(&idev->msg_complete);
-> +
-> +out:
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int altr_i2c_xfer_msg(struct altr_i2c_dev *idev, struct i2c_msg *msg)
-> +{
-> +	u32 int_mask = ALTR_I2C_ISR_RXOF | ALTR_I2C_ISR_ARB | ALTR_I2C_ISR_NACK;
-> +	u32 addr = (msg->addr << 1) & 0xFF;
-> +	unsigned long time_left;
-> +
-> +	idev->msg = msg;
-> +	idev->msg_len = msg->len;
-> +	idev->buf = msg->buf;
-> +	idev->msg_err = 0;
-> +	reinit_completion(&idev->msg_complete);
-> +	altr_i2c_core_enable(idev);
-> +
-> +	if (i2c_m_rd(msg)) {
-> +		/* Dummy read to ensure RX FIFO is empty */
-> +		readl(idev->base + ALTR_I2C_RX_DATA);
-> +		addr |= ALTR_I2C_TFR_CMD_RW_D;
-> +	}
-> +
-> +	writel(ALTR_I2C_TFR_CMD_STA | addr, idev->base + ALTR_I2C_TFR_CMD);
-> +
-> +	if (i2c_m_rd(msg)) {
-> +		/* write the first byte to start the RX */
-> +		writel(0, idev->base + ALTR_I2C_TFR_CMD);
-> +		int_mask |= ALTR_I2C_ISER_RXOF_EN | ALTR_I2C_ISER_RXRDY_EN;
-> +	} else {
-> +		altr_i2c_fill_tx_fifo(idev);
-> +		int_mask |= ALTR_I2C_ISR_TXRDY;
-> +	}
-> +	i2c_int_enable(idev, int_mask);
-> +
-> +	time_left = wait_for_completion_timeout(&idev->msg_complete,
-> +						ALTR_I2C_XFER_TIMEOUT);
-> +
-> +	i2c_int_disable(idev, int_mask);
-> +
-> +	if (readl(idev->base + ALTR_I2C_STATUS) & ALTR_I2C_STAT_CORE)
-> +		dev_err(idev->dev, "%s: Core Status not IDLE...\n", __func__);
-> +
-> +	if (time_left == 0) {
-> +		idev->msg_err = -ETIMEDOUT;
-> +		dev_err(idev->dev, "%s: Transaction timed out.\n", __func__);
-> +		altr_i2c_recover(idev);
-> +	}
-> +
-> +	if (unlikely(idev->msg_err) && idev->msg_err != -ENXIO)
-> +		altr_i2c_init(idev);
-> +
-> +	altr_i2c_core_disable(idev);
-> +
-> +	return idev->msg_err;
-> +}
-> +
-> +static int
-> +altr_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
-> +{
-> +	struct altr_i2c_dev *idev = i2c_get_adapdata(adap);
-> +	int i;
-> +	int ret = 0;
-> +
-> +	for (i = 0; ret == 0 && i < num; ++i)
-> +		ret = altr_i2c_xfer_msg(idev, &msgs[i]);
-> +
-> +	return ret ? : i;
-> +}
-> +
-> +static u32 altr_i2c_func(struct i2c_adapter *adap)
-> +{
-> +	return I2C_FUNC_I2C;
-> +}
-> +
-> +static const struct i2c_algorithm altr_i2c_algo = {
-> +	.master_xfer = altr_i2c_xfer,
-> +	.functionality = altr_i2c_func,
-> +};
-> +
-> +static int altr_i2c_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct altr_i2c_dev *idev = NULL;
-> +	struct resource *res;
-> +	int irq;
-> +	int ret = 0;
-> +
-> +	idev = devm_kzalloc(&pdev->dev, sizeof(*idev), GFP_KERNEL);
-> +	if (!idev)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	idev->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(idev->base))
-> +		return PTR_ERR(idev->base);
-> +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq < 0) {
-> +		dev_err(&pdev->dev, "missing interrupt resource\n");
-> +		return irq;
-> +	}
-> +
-> +	idev->i2c_clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(idev->i2c_clk)) {
-> +		dev_err(&pdev->dev, "missing clock\n");
-> +		return PTR_ERR(idev->i2c_clk);
-> +	}
-> +
-> +	idev->dev = &pdev->dev;
-> +	init_completion(&idev->msg_complete);
-> +
-> +	if (of_property_read_u32(np, "fifo-size", &idev->fifo_size))
-> +		idev->fifo_size = ALTR_I2C_DFLT_FIFO_SZ;
-> +
-> +	if (of_property_read_u32(np, "clock-frequency", &idev->bus_clk_rate)) {
-> +		dev_err(&pdev->dev, "Default to 100kHz\n");
-> +		idev->bus_clk_rate = 100000;	/* default clock rate */
-> +	}
-> +
-> +	if (idev->bus_clk_rate > 400000) {
-> +		dev_err(&pdev->dev, "invalid clock-frequency %d\n",
-> +			idev->bus_clk_rate);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = devm_request_irq(&pdev->dev, irq, altr_i2c_isr, 0,
-> +			       pdev->name, idev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to claim IRQ %d\n", irq);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(idev->i2c_clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable clock\n");
-> +		return ret;
-> +	}
-> +
-> +	altr_i2c_init(idev);
-> +
-> +	i2c_set_adapdata(&idev->adapter, idev);
-> +	strlcpy(idev->adapter.name, pdev->name, sizeof(idev->adapter.name));
-> +	idev->adapter.owner = THIS_MODULE;
-> +	idev->adapter.algo = &altr_i2c_algo;
-> +	idev->adapter.dev.parent = &pdev->dev;
-> +	idev->adapter.dev.of_node = pdev->dev.of_node;
-> +
-> +	platform_set_drvdata(pdev, idev);
-> +
-> +	ret = i2c_add_adapter(&idev->adapter);
-> +	if (ret) {
-> +		clk_disable_unprepare(idev->i2c_clk);
-> +		return ret;
-> +	}
-> +	dev_info(&pdev->dev, "Altera SoftIP I2C Probe Complete\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static int altr_i2c_remove(struct platform_device *pdev)
-> +{
-> +	struct altr_i2c_dev *idev = platform_get_drvdata(pdev);
-> +
-> +	clk_disable_unprepare(idev->i2c_clk);
-> +	i2c_del_adapter(&idev->adapter);
-> +
-> +	return 0;
-> +}
-> +
-> +/* Match table for of_platform binding */
-> +static const struct of_device_id altr_i2c_of_match[] = {
-> +	{ .compatible = "altr,softip-i2c-v1.0" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, altr_i2c_of_match);
-> +
-> +static struct platform_driver altr_i2c_driver = {
-> +	.probe = altr_i2c_probe,
-> +	.remove = altr_i2c_remove,
-> +	.driver = {
-> +		.name = "altera-i2c",
-> +		.of_match_table = altr_i2c_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(altr_i2c_driver);
-> +
-> +MODULE_DESCRIPTION("Altera Soft IP I2C bus driver");
-> +MODULE_AUTHOR("Thor Thayer <thor.thayer@linux.intel.com>");
-> +MODULE_LICENSE("GPL v2");
+> Bindings do not document drivers. As Rob said, s/Driver/Interface/.
+
+Right, badly copied from arm-mhu.txt ;-)
+
+>> +======================
+>> +
+>> +This mailbox uses the ARM smc (secure monitor call) instruction to
+>> +trigger a mailbox-connected activity in firmware, executing on the very same
+>> +core as the caller. By nature this operation is synchronous and this
+>> +mailbox provides no way for asynchronous messages to be delivered the other
+>> +way round, from firmware to the OS. However the value of r0/w0/x0 the firmware
+>> +returns after the smc call is delivered as a received message to the
+>> +mailbox framework, so a synchronous communication can be established.
 > 
+> ... where those values are what specifically, under what circumstances?
+
+OK, I will look into how far this needs to be specified in this document
+here or how much we can delegate to the actual mailbox users.
+
+>> +One use case of this mailbox is the SCP interface, which uses shared memory
+>> +to transfer commands and parameters, and a mailbox to trigger a function
+>> +call. This allows SoCs without a separate management processor (or
+>> +when such a processor is not available or used) to use this standardized
+>> +interface anyway.
+>> +
+>> +This binding describes no hardware, but establishes a firmware interface.
+>> +The communication follows the ARM SMC calling convention[1].
+>> +Any core which supports the SMC or HVC instruction can be used, as long as
+>> +a firmware component running in EL3 or EL2 is handling these calls.
+>> +
+>> +Mailbox Device Node:
+>> +====================
+>> +
+>> +Required properties:
+>> +--------------------
+>> +- compatible:		Shall be "arm,smc-mbox"
+>> +- #mbox-cells		Shall be 1 - the index of the channel needed.
+>> +- arm,smc-func-ids	An array of 32-bit values specifying the function
+>> +			IDs used by each mailbox channel. Those function IDs
+>> +			follow the ARM SMC calling convention standard [1].
+>> +			There is one identifier per channel and the number
+>> +			of supported channels is determined by the length
+>> +			of this array.
+> 
+> What does each function do? I guess it signal that FW should look at a
+> particular mailbox, but the binding doesn't actually say.
+
+Calling the smc instruction with that function ID triggers the
+associated mailbox (in the somewhat Linux/DT meaning of "mailbox").
+Basically very much like the ARM MHU mailbox, for instance.
+
+I believe the term mailbox is a bit fuzzy here. I think the least common
+denominator just signals a single bit condition (like a doorbell), which
+is the only thing that SCPI (for instance) requires. And the actual
+mailbox content is then somewhere else, for instance in shared memory.
+Which is beyond the scope of the mailbox itself.
+
+> If this is following the SMCCC, what is the function prototype?
+
+> What arguments are taken, and what return values are required under
+> which conditions?
+
+Good point, I can describe this one.
+
+> Are they fast calls, or are they pre-emptible? When does the FW return?
+
+Naturally I would expect fast calls, but I am not sure we need to
+restrict it here. The SMCCC function ID encodes the type already. And I
+couldn't find anything more detailed in the SMCCC to require me to ban
+standard calls, so it would be up to the actual firmware implementation
+to decide.
+
+> If we're inventing a standard, why have multiple function IDs rather
+> than passing a channel ID in as a paarameter?
+
+What would be the advantage of doing so? I found it necessary to have
+the SMCCC IDs in the DT anyway and also useful to support multiple
+channels, so just having a list of SMCCC IDs sounded like a natural choice.
+Do you reckon we need a combination of SMCCC ID and mailbox ID (as a
+second parameter to the SMCCC call), to support cases where we only have
+one SMCCC ID available, but need multiple mailboxes?
+
+> This needs a more rigorous definition.
+> 
+>> +
+>> +Optional properties:
+>> +--------------------
+>> +- method:		A string, either:
+>> +			"hvc": if the driver shall use an HVC call, or
+>> +			"smc": if the driver shall use an SMC call
+>> +			If omitted, defaults to an SMC call.
+> 
+> Make this property mandatory, don't guess. Please follow the wording
+> used by ther PSCI binding.
+
+Sure.
+
+> Given one can use HVC, the "arm,smc-func-ids" property is misleading,
+> and would be better as something like "func-ids".
+
+Right, will fix this.
+
+Cheers,
+Andre.
