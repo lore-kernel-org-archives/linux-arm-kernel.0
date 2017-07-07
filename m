@@ -1,158 +1,178 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Fri, 7 Jul 2017 11:43:20 +0200
-Subject: [Qemu-devel] [PATCH v3 1/4] ACPI: Add APEI GHES Table Generation
- support
-In-Reply-To: <dbbab7f6-18c4-9b6c-799e-8267797a31bd@huawei.com>
-References: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
- <4dde45bb-a730-82b1-dc49-ad00a6b73d85@redhat.com>
- <accf8880-f4b0-85f1-9f33-4103c8c26d7a@redhat.com>
- <e90c5fb8-e68b-a620-9023-f4fcfdd68e97@redhat.com>
- <dbbab7f6-18c4-9b6c-799e-8267797a31bd@huawei.com>
-Message-ID: <d3443cbe-8752-0943-95b8-185d436de2fd@redhat.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 7 Jul 2017 11:55:52 +0200
+Subject: [PATCH v9 0/3] Tango PCIe controller support
+In-Reply-To: <20170706194628.GQ13824@bhelgaas-glaptop.roam.corp.google.com>
+References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
+ <20170704202412.GK13824@bhelgaas-glaptop.roam.corp.google.com>
+ <6256cab3-dd77-c0f6-66b8-be261695bbb1@free.fr>
+ <20170705180359.GL13824@bhelgaas-glaptop.roam.corp.google.com>
+ <5a1207cb-31fd-6b85-86af-8c37bd57ad4f@free.fr>
+ <20170705213419.GD25063@bhelgaas-glaptop.roam.corp.google.com>
+ <8dcab663-245b-880a-be3a-2965fd12d663@free.fr>
+ <20170706033946.GO13824@bhelgaas-glaptop.roam.corp.google.com>
+ <d04e1632-17b8-85f9-31c4-b789d55cc853@free.fr>
+ <20170706194628.GQ13824@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <3a2e6791-006e-ce3f-f113-e7b0dc6dc2d9@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/17 10:32, gengdongjiu wrote:
-> Hi Laszlo,
->    sorry for my late response.
+On 06/07/2017 21:46, Bjorn Helgaas wrote:
+
+> I'm a little queasy about the MSI stuff.  It doesn't feel very settled
+> yet, and I don't want to keep tweaking it at this stage.
 > 
-> On 2017/6/3 20:01, Laszlo Ersek wrote:
->> On 05/22/17 16:23, Laszlo Ersek wrote:
->>> Keeping some context:
->>>
->>> On 05/12/17 23:00, Laszlo Ersek wrote:
->>>> On 04/30/17 07:35, Dongjiu Geng wrote:
->>
->>> (68) In the code below, you are not taking an "OVMF header probe
->>> suppressor" into account.
->>>
->>> But, we have already planned to replace that quirk with a separate,
->>> dedicated allocation hint or command, so I'm not going to describe what
->>> an "OVMF header probe suppressor" is; instead, I'll describe the
->>> replacement for it.
->>>
->>> [...]
->>
->> So, the NOACPI allocation hint is a no-go at the moment, based on the
->> discussion in the following threads:
->>
->> http://mid.mail-archive.com/20170601112241.2580-1-ard.biesheuvel at linaro.org
->>
->> http://mid.mail-archive.com/c76b36de-ebf9-c662-d454-0a95b43901e8 at redhat.com
->>
->> Therefore the header probe suppression remains necessary.
->>
->> In this case, it is not hard to do, you just have to reorder the
->> following two ADD_POINTER additions a bit:
->  Ok, it is no problem.
-> 
->>
->>>>> +
->>>>> +        bios_linker_loader_add_pointer(linker, GHES_ERRORS_FW_CFG_FILE,
->>>>> +                                sizeof(uint64_t) * i, sizeof(uint64_t),
->>>>> +                                GHES_ERRORS_FW_CFG_FILE,
->>>>> +                                MAX_ERROR_SOURCE_COUNT_V6 * sizeof(uint64_t) +
->>>>> +                                i * MAX_RAW_DATA_LENGTH);
->>
->> This one should be moved out to a separate loop, after the current loop.
->>
->>>>> +        bios_linker_loader_add_pointer(linker, ACPI_BUILD_TABLE_FILE,
->>>>> +                    address_registers_offset
->>>>> +                    + i * sizeof(AcpiGenericHardwareErrorSource),
->>>>> +                    sizeof(uint32_t), GHES_ERRORS_FW_CFG_FILE,
->>>>> +                    i * sizeof(uint64_t));
->>
->> This one should be kept in the first (i.e., current) loop.
->>
->> The idea is, when you first point the HEST/GHES_n entries in
->> ACPI_BUILD_TABLE_FILE to the "address registers" in
->> GHES_ERRORS_FW_CFG_FILE, all those address registers will still be
->> zero-filled. This will fail the ACPI table header probe in
->> OvmfPkg/AcpiPlatformDxe, which is what we want.
->>
->> After this is done, the address registers in GHES_ERRORS_FW_CFG_FILE
->> should be pointed to the error status data blocks in the same fw_cfg
->> blob, in a separate loop. (Those error status data blocks will again be
->> zero-filled, so no ACPI table headers will be mistakenly recognized in
->> them.)
-> I understand your idear. but I have a question:
-> how about we exchange the two function's place, such as shown below:
-> then it still meets ours needs, the change is easy.
-> For every loop:
-> (1)when patch address in ACPI_BUILD_TABLE_FILE to the "address registers", the address register is zero-filed.
-> (2)when patch address in GHES_ERRORS_FW_CFG_FILE to the error status data blocks, the error status data block is still zero-filed.
-> 
->     for (i = 0; i < GHES_ACPI_HEST_NOTIFY_RESERVED; i++) {
->         .....................................
->         bios_linker_loader_add_pointer(linker, ACPI_BUILD_TABLE_FILE,
->                     address_registers_offset
->                     + i * sizeof(AcpiGenericHardwareErrorSource),
->                     sizeof(uint32_t), GHES_ERRORS_FW_CFG_FILE,
->                     i * sizeof(uint64_t));
-> 
-> 
->         bios_linker_loader_add_pointer(linker, GHES_ERRORS_FW_CFG_FILE,
->                                 sizeof(uint64_t) * i, sizeof(uint64_t),
->                                 GHES_ERRORS_FW_CFG_FILE,
->                                 MAX_ERROR_SOURCE_COUNT_V6 * sizeof(uint64_t) +
->                                 i * MAX_RAW_DATA_LENGTH);
-> 	.........................................
-> 
->      }
+> How about we merge the base patch for v4.13 and deal with MSIs for
+> v4.14?  I need confirmation that the base patch works ASAP.  Or if
+> it's not really useful by itself, we can defer it all until v4.14.
 
-Your suggestion seems to do the same, but there is a subtle difference.
+For what it's worth, the base patch allows enumeration:
 
-When the firmware scans the targets of the ADD_POINTER commands for byte
-sequences that "look like" an ACPI table header, in order to suppress
-that probe, we should keep 36 bytes (i.e., the size of the ACPI table
-header structure) zeroed at the target location.
-
-* In the patch, as posted, this was not the case, because it first
-filled in the address register inside the GHES_ERRORS_FW_CFG_FILE blob,
-and then pointed a GHES pointer field in the HEST table to the *now*
-nonzero address register.
-
-* My suggestion was to first fill in all the GHES pointers (when still
-all the pointed-to address registers are zero), and then the address
-registers themselves should be patched.
-
-Under this scheme, it is irrelevant whether both loops are incrementing
-or decrementing loops.
-
-* Your suggestion would preserve the safe patching order between any
-given GHES field and its corresponding (pointed-to) address register. So
-that's great.
-
-However, consider the following case:
-
-- Assume that the loop is decrementing, and not incrementing.
-
-- First, the last GHES pointer field, GHES[9].<whatever> is patched. It
-is pointed to the last address register in "etc/hardware_errors", which
-is still zero-filled. Also, the last address register in
-"etc/hardware_errors" is immediately followed by the first Error Status
-Data Block, which is also filled with zero. This means that when the
-header probe will look at the *target* of GHES[9].<whatever>, it will
-definitely fail (which is what we want), because all consecutive 36
-bytes that start at the last address register in "etc/hardware_errors"
-are zero.
-
-- Second, the last address register, address[9], is patched. It is
-pointed to the last Error Status Data Block, which is zero filled, so
-the header probe in the firmware fails -- great.
-
-- Third, GHES[8].<whatever> is patched. It is set to &address[8].
-However, at this point, the 36 consecutive bytes starting at &address[8]
-are *not* all zero, because at relative offset 8, we have the already
-patched address[9] register, which is nonzero. I'm not saying that this
-would necessarily cause a problem, but we'd better be safe than sorry.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.12.0-rc1 (mgonzalez at misti.france.sdesigns.com) (gcc version 6.3.1 20170109 (Linaro GCC 6.3-2017.02) ) #6 SMP PREEMPT Fri Jul 7 11:43:24 CEST 2017
+...
+[    0.725488] pcie_tango 50000000.pcie: simultaneous PCI config and MMIO accesses may cause data corruption
+[    0.743158] OF: PCI: host bridge /soc/pcie at 2e000 ranges:
+[    0.748519] OF: PCI:   MEM 0x50400000..0x53ffffff -> 0x00400000
+[    0.754549] pcie_tango 50000000.pcie: ECAM at [mem 0x50000000-0x503fffff] for [bus 00-03]
+[    0.762907] pcie_tango 50000000.pcie: PCI host bridge to bus 0000:00
+[    0.769308] pci_bus 0000:00: root bus resource [bus 00-03]
+[    0.774829] pci_bus 0000:00: root bus resource [mem 0x50400000-0x53ffffff] (bus address [0x00400000-0x03ffffff])
+[    0.785303] PCI: bus0: Fast back to back transfers disabled
+[    0.790916] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+[    0.807282] PCI: bus1: Fast back to back transfers disabled
+[    0.812925] pci 0000:00:00.0: BAR 8: assigned [mem 0x50400000-0x504fffff]
+[    0.819759] pci 0000:01:00.0: BAR 0: assigned [mem 0x50400000-0x50401fff 64bit]
+[    0.827126] pci 0000:00:00.0: PCI bridge to [bus 01]
+[    0.832121] pci 0000:00:00.0:   bridge window [mem 0x50400000-0x504fffff]
+[    0.839004] pcieport 0000:00:00.0: enabling device (0140 -> 0142)
+[    0.845274] pci 0000:01:00.0: enabling device (0140 -> 0142)
 
 
-In other words, your suggestion is OK, because the loop we have is
-incrementing, not decrementing. But, if you decide to go with your idea,
-please add a comment before the "for" instruction, "this loop must
-remain an incrementing loop, to safely suppress the ACPI SDT header
-probe in the firmware".
 
-Thanks
-Laszlo
+# lspci -v  
+00:00.0 PCI bridge: Sigma Designs, Inc. Device 0024 (rev 01) (prog-if 00 [Normal decode])
+        Flags: bus master, fast devsel, latency 0
+        Memory at <ignored> (64-bit, non-prefetchable)
+        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+        I/O behind bridge: 00000000-00000fff
+        Memory behind bridge: 00400000-004fffff
+        Prefetchable memory behind bridge: 00000000-000fffff
+        Capabilities: [50] MSI: Enable- Count=1/4 Maskable- 64bit+
+        Capabilities: [78] Power Management version 3
+        Capabilities: [80] Express Root Port (Slot-), MSI 03
+        Capabilities: [100] Virtual Channel
+        Capabilities: [800] Advanced Error Reporting
+        Kernel driver in use: pcieport
+
+01:00.0 USB controller: Renesas Technology Corp. uPD720201 USB 3.0 Host Controller (rev 03) (prog-if 30 [XHCI])
+        Flags: fast devsel
+        Memory at 50400000 (64-bit, non-prefetchable) [size=8K]
+        Capabilities: [50] Power Management version 3
+        Capabilities: [70] MSI: Enable- Count=1/8 Maskable- 64bit+
+        Capabilities: [90] MSI-X: Enable- Count=8 Masked-
+        Capabilities: [a0] Express Endpoint, MSI 00
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [150] Latency Tolerance Reporting
+
+
+
+# lspci -vvv
+00:00.0 PCI bridge: Sigma Designs, Inc. Device 0024 (rev 01) (prog-if 00 [Normal decode])
+        Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Region 0: Memory@<ignored> (64-bit, non-prefetchable)
+        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+        I/O behind bridge: 00000000-00000fff
+        Memory behind bridge: 00400000-004fffff
+        Prefetchable memory behind bridge: 00000000-000fffff
+        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- <SERR- <PERR-
+        BridgeCtl: Parity+ SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
+                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
+        Capabilities: [50] MSI: Enable- Count=1/4 Maskable- 64bit+
+                Address: 0000000000000000  Data: 0000
+        Capabilities: [78] Power Management version 3
+                Flags: PMEClk- DSI- D1+ D2+ AuxCurrent=0mA PME(D0+,D1+,D2+,D3hot+,D3cold-)
+                Status: D0 NoSoftRst+ PME-Enable- DSel=0 DScale=3 PME-
+        Capabilities: [80] Express (v2) Root Port (Slot-), MSI 03
+                DevCap: MaxPayload 256 bytes, PhantFunc 0
+                        ExtTag- RBE+
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq- AuxPwr- TransPend+
+                LnkCap: Port #1, Speed 5GT/s, Width x1, ASPM L0s L1, Exit Latency L0s <2us, L1 <4us
+                        ClockPM- Surprise- LLActRep- BwNot+ ASPMOptComp-
+                LnkCtl: ASPM Disabled; RCB 128 bytes Disabled- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk- DLActive- BWMgmt- ABWMgmt-
+                RootCtl: ErrCorrectable- ErrNon-Fatal- ErrFatal- PMEIntEna- CRSVisible-
+                RootCap: CRSVisible-
+                RootSta: PME ReqID 0000, PMEStatus- PMEPending-
+                DevCap2: Completion Timeout: Range B, TimeoutDis-, LTR-, OBFF Not Supported ARIFwd-
+                DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis-, LTR-, OBFF Disabled ARIFwd-
+                LnkCtl2: Target Link Speed: 5GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+                         EqualizationPhase2-, EqualizationPhase3-, LinkEqualizationRequest-
+        Capabilities: [100 v1] Virtual Channel
+                Caps:   LPEVC=0 RefClk=100ns PATEntryBits=1
+                Arb:    Fixed- WRR32- WRR64- WRR128-
+                Ctrl:   ArbSelect=Fixed
+                Status: InProgress-
+                VC0:    Caps:   PATOffset=00 MaxTimeSlots=1 RejSnoopTrans-
+                        Arb:    Fixed- WRR32- WRR64- WRR128- TWRR128- WRR256-
+                        Ctrl:   Enable+ ID=0 ArbSelect=Fixed TC/VC=ff
+                        Status: NegoPending- InProgress-
+        Capabilities: [800 v1] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
+                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
+        Kernel driver in use: pcieport
+
+01:00.0 USB controller: Renesas Technology Corp. uPD720201 USB 3.0 Host Controller (rev 03) (prog-if 30 [XHCI])
+        Control: I/O- Mem+ BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Interrupt: pin A routed to IRQ 0
+        Region 0: Memory@50400000 (64-bit, non-prefetchable) [size=8K]
+        Capabilities: [50] Power Management version 3
+                Flags: PMEClk- DSI- D1- D2- AuxCurrent=375mA PME(D0+,D1-,D2-,D3hot+,D3cold+)
+                Status: D0 NoSoftRst+ PME-Enable- DSel=0 DScale=0 PME-
+        Capabilities: [70] MSI: Enable- Count=1/8 Maskable- 64bit+
+                Address: 0000000000000000  Data: 0000
+        Capabilities: [90] MSI-X: Enable- Count=8 Masked-
+                Vector table: BAR=0 offset=00001000
+                PBA: BAR=0 offset=00001080
+        Capabilities: [a0] Express (v2) Endpoint, MSI 00
+                DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s unlimited, L1 unlimited
+                        ExtTag- AttnBtn- AttnInd- PwrInd- RBE+ FLReset- SlotPowerLimit 0.000W
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr+ UncorrErr- FatalErr- UnsuppReq- AuxPwr+ TransPend-
+                LnkCap: Port #0, Speed 5GT/s, Width x1, ASPM L0s L1, Exit Latency L0s <4us, L1 unlimited
+                        ClockPM+ Surprise- LLActRep- BwNot- ASPMOptComp-
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+                DevCap2: Completion Timeout: Not Supported, TimeoutDis+, LTR+, OBFF Not Supported
+                DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis-, LTR-, OBFF Disabled
+                LnkCtl2: Target Link Speed: 5GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+                         EqualizationPhase2-, EqualizationPhase3-, LinkEqualizationRequest-
+        Capabilities: [100 v1] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr- BadTLP- BadDLLP+ Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
+                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
+        Capabilities: [150 v1] Latency Tolerance Reporting
+                Max snoop latency: 0ns
+                Max no snoop latency: 0ns
