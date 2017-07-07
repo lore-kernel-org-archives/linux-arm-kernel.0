@@ -1,179 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat,  8 Jul 2017 00:32:27 +0200
-Subject: [PATCH] ARM: dts: gemini: Switch to using macros
-Message-ID: <20170707223227.20477-1-linus.walleij@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 7 Jul 2017 15:39:02 -0700
+Subject: [RFC 0/5] drivers: Add boot constraints core
+In-Reply-To: <CAF6AEGvH3Vivi8d=MyXsv3x9J9AenAdLN9pr9RtucQ+AwZTO=A@mail.gmail.com>
+References: <cover.1498642745.git.viresh.kumar@linaro.org>
+ <20170629124908.GV4902@n2100.armlinux.org.uk>
+ <20170629145808.GQ29665@vireshk-i7>
+ <20170629154353.GX4902@n2100.armlinux.org.uk>
+ <20170629210002.GB22780@codeaurora.org>
+ <CAF6AEGvH3Vivi8d=MyXsv3x9J9AenAdLN9pr9RtucQ+AwZTO=A@mail.gmail.com>
+Message-ID: <20170707223902.GI22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macros for reset and clock lines were merged during the merge
-window, this switches the Gemini to use these macros rather than
-numerical defines.
+On 07/05, Rob Clark wrote:
+> On Thu, Jun 29, 2017 at 5:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 06/29, Russell King - ARM Linux wrote:
+> >>
+> >> As far as the memory being used goes, they probably locate the frame
+> >> buffer well away from the kernel or any area that the kernel is likely
+> >> to use during decompression.
+> >>
+> >> It's probably also marked as a reserved memory region in DT to avoid
+> >> the kernel touching it during boot, or _maybe_ they just locate it
+> >> somewhere in memory that they've tested that the kernel doesn't touch
+> >> until after their kernel has initialised the LCD controller (thereby
+> >> avoiding the memory being permanently consumed.)
+> >>
+> >
+> > Yes. The display controller is typically pointed to a memory
+> > carveout that we treat as reserved in the kernel. I'm fairly
+> > certain that we avoid the "permanently consumed" problem by
+> > making it a carveout for the display controller, so that when the
+> > display controller probes it can take ownership of the memory
+> > from the bootloader.
+> >
+> 
+> For aarch64/arm64 booting with EFI, the bootloader passes info about
+> memory layout to the kernel (including the fact that the framebuffer
+> is carved out) so kernel doesn't clobber the scanout buffer.  The
+> non-EFI case, the bootloader should (not that lk does) patch up the
+> fdt reserved memory node w/ correct address/size.  I think
+> lk+downstream just relies on luck.
+> 
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: The required header files are now upstream. Please
-apply and merge this at -rc1 or whenever fits you best (it can be
-applied to Torvald's tree right now.)
----
- arch/arm/boot/dts/gemini.dtsi | 56 ++++++++++++++++++++++---------------------
- 1 file changed, 29 insertions(+), 27 deletions(-)
+Downstream+lk seems to be doing a carveout with reserved-memory
+in DT[1]. The bootloader isn't updating the DT to indicate this,
+instead we rely on an agreement between bootloader and kernel's
+DT file to have the carveout. Once the display driver configures
+things enough to allocate another display buffer it actually
+frees the memory back to the system[2]. Most of the code for this
+splash screen stuff is in that mdss_mdp_splash_logo.c file.
 
-diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
-index 141d8d3a1d07..49cce9e9d51f 100644
---- a/arch/arm/boot/dts/gemini.dtsi
-+++ b/arch/arm/boot/dts/gemini.dtsi
-@@ -5,6 +5,8 @@
- /include/ "skeleton.dtsi"
- 
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/clock/cortina,gemini-clock.h>
-+#include <dt-bindings/reset/cortina,gemini-reset.h>
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
-@@ -45,15 +47,15 @@
- 			compatible = "cortina,gemini-watchdog";
- 			reg = <0x41000000 0x1000>;
- 			interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
--			resets = <&syscon 23>;
--			clocks = <&syscon 2>;
-+			resets = <&syscon GEMINI_RESET_WDOG>;
-+			clocks = <&syscon GEMINI_CLK_APB>;
- 		};
- 
- 		uart0: serial at 42000000 {
- 			compatible = "ns16550a";
- 			reg = <0x42000000 0x100>;
--			resets = <&syscon 18>;
--			clocks = <&syscon 6>;
-+			resets = <&syscon GEMINI_RESET_UART>;
-+			clocks = <&syscon GEMINI_CLK_UART>;
- 			interrupts = <18 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 		};
-@@ -65,9 +67,9 @@
- 			interrupts = <14 IRQ_TYPE_EDGE_FALLING>, /* Timer 1 */
- 				     <15 IRQ_TYPE_EDGE_FALLING>, /* Timer 2 */
- 				     <16 IRQ_TYPE_EDGE_FALLING>; /* Timer 3 */
--			resets = <&syscon 17>;
-+			resets = <&syscon GEMINI_RESET_TIMER>;
- 			/* APB clock or RTC clock */
--			clocks = <&syscon 2>, <&syscon 0>;
-+			clocks = <&syscon GEMINI_CLK_APB>, <&syscon GEMINI_CLK_RTC>;
- 			clock-names = "PCLK", "EXTCLK";
- 			syscon = <&syscon>;
- 		};
-@@ -76,19 +78,19 @@
- 			compatible = "cortina,gemini-rtc";
- 			reg = <0x45000000 0x100>;
- 			interrupts = <17 IRQ_TYPE_LEVEL_HIGH>;
--			resets = <&syscon 16>;
--			clocks = <&syscon 2>, <&syscon 0>;
-+			resets = <&syscon GEMINI_RESET_RTC>;
-+			clocks = <&syscon GEMINI_CLK_APB>, <&syscon GEMINI_CLK_RTC>;
- 			clock-names = "PCLK", "EXTCLK";
- 		};
- 
- 		sata: sata at 46000000 {
- 			compatible = "cortina,gemini-sata-bridge";
- 			reg = <0x46000000 0x100>;
--			resets = <&syscon 26>,
--				 <&syscon 27>;
-+			resets = <&syscon GEMINI_RESET_SATA0>,
-+				 <&syscon GEMINI_RESET_SATA1>;
- 			reset-names = "sata0", "sata1";
--			clocks = <&syscon 10>,
--				 <&syscon 11>;
-+			clocks = <&syscon GEMINI_CLK_GATE_SATA0>,
-+				 <&syscon GEMINI_CLK_GATE_SATA1>;
- 			clock-names = "SATA0_PCLK", "SATA1_PCLK";
- 			syscon = <&syscon>;
- 			status = "disabled";
-@@ -97,7 +99,7 @@
- 		intcon: interrupt-controller at 48000000 {
- 			compatible = "faraday,ftintc010";
- 			reg = <0x48000000 0x1000>;
--			resets = <&syscon 14>;
-+			resets = <&syscon GEMINI_RESET_INTCON0>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 		};
-@@ -112,8 +114,8 @@
- 			compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
- 			reg = <0x4d000000 0x100>;
- 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;
--			resets = <&syscon 20>;
--			clocks = <&syscon 2>;
-+			resets = <&syscon GEMINI_RESET_GPIO0>;
-+			clocks = <&syscon GEMINI_CLK_APB>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
-@@ -124,8 +126,8 @@
- 			compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
- 			reg = <0x4e000000 0x100>;
- 			interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
--			resets = <&syscon 21>;
--			clocks = <&syscon 2>;
-+			resets = <&syscon GEMINI_RESET_GPIO1>;
-+			clocks = <&syscon GEMINI_CLK_APB>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
-@@ -136,8 +138,8 @@
- 			compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
- 			reg = <0x4f000000 0x100>;
- 			interrupts = <24 IRQ_TYPE_LEVEL_HIGH>;
--			resets = <&syscon 22>;
--			clocks = <&syscon 2>;
-+			resets = <&syscon GEMINI_RESET_GPIO2>;
-+			clocks = <&syscon GEMINI_CLK_APB>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
-@@ -151,8 +153,8 @@
- 			 * to configure the host bridge.
- 			 */
- 			reg = <0x50000000 0x100>;
--			resets = <&syscon 7>;
--			clocks = <&syscon 15>, <&syscon 4>;
-+			resets = <&syscon GEMINI_RESET_PCI>;
-+			clocks = <&syscon GEMINI_CLK_GATE_PCI>, <&syscon GEMINI_CLK_PCI>;
- 			clock-names = "PCLK", "PCICLK";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
-@@ -193,8 +195,8 @@
- 			compatible = "cortina,gemini-pata", "faraday,ftide010";
- 			reg = <0x63000000 0x1000>;
- 			interrupts = <4 IRQ_TYPE_EDGE_RISING>;
--			resets = <&syscon 2>;
--			clocks = <&syscon 14>;
-+			resets = <&syscon GEMINI_RESET_IDE>;
-+			clocks = <&syscon GEMINI_CLK_GATE_IDE>;
- 			clock-names = "PCLK";
- 			sata = <&sata>;
- 			status = "disabled";
-@@ -204,8 +206,8 @@
- 			compatible = "cortina,gemini-pata", "faraday,ftide010";
- 			reg = <0x63400000 0x1000>;
- 			interrupts = <5 IRQ_TYPE_EDGE_RISING>;
--			resets = <&syscon 2>;
--			clocks = <&syscon 14>;
-+			resets = <&syscon GEMINI_RESET_IDE>;
-+			clocks = <&syscon GEMINI_CLK_GATE_IDE>;
- 			clock-names = "PCLK";
- 			sata = <&sata>;
- 			status = "disabled";
-@@ -217,8 +219,8 @@
- 			arm,primecell-periphid = <0x0003b080>;
- 			reg = <0x67000000 0x1000>;
- 			interrupts = <9 IRQ_TYPE_EDGE_RISING>;
--			resets = <&syscon 10>;
--			clocks = <&syscon 1>;
-+			resets = <&syscon GEMINI_RESET_DMAC>;
-+			clocks = <&syscon GEMINI_CLK_AHB>;
- 			clock-names = "apb_pclk";
- 			/* Bus interface AHB1 (AHB0) is totally tilted */
- 			lli-bus-interface-ahb2;
+[1] https://source.codeaurora.org/quic/la/kernel/msm-4.4/tree/arch/arm/boot/dts/qcom/msm8996.dtsi?h=rel/msm-4.4#n231
+[2] https://source.codeaurora.org/quic/la/kernel/msm-4.4/tree/drivers/video/fbdev/msm/mdss_mdp_splash_logo.c?h=rel/msm-4.4#n252
+
 -- 
-2.9.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
