@@ -1,76 +1,129 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 7 Jul 2017 10:32:58 -0700
-Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
-In-Reply-To: <87h8yod7k5.fsf@free-electrons.com>
-References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
- <20170704233219.18790-1-afaerber@suse.de>
- <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
- <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
- <20170706173841.jwaskrrkooget6nk@piout.net>
- <c6336df9-4f38-e636-383a-d0ad31658c65@gmail.com>
- <87h8yod7k5.fsf@free-electrons.com>
-Message-ID: <b79e30da-66af-b059-4526-bd7c88d882b4@gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 7 Jul 2017 18:39:24 +0100
+Subject: [PATCH 3/9] firmware: arm_scmi: add basic driver infrastructure
+ for SCMI
+In-Reply-To: <1499446341-5956-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1498492513-29771-4-git-send-email-sudeep.holla@arm.com>
+ <1499446341-5956-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <5f2e4f3c-297b-c5f8-9244-399c1c4e2c21@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2017 12:34 AM, Gregory CLEMENT wrote:
-> Hi Florian,
->  
->  On jeu., juil. 06 2017, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 
->> On 07/06/2017 10:38 AM, Alexandre Belloni wrote:
->>> On 06/07/2017 at 19:17:28 +0200, Andreas F?rber wrote:
->>>> Am 05.07.2017 um 04:36 schrieb Florian Fainelli:
->>>>> On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
->>>>>> Commit 18cfd9429d8a82c49add8f3ca9d366599bfcac45 ("ARM: owl: smp: Drop
->>>>>> bogus holding pen") simplified the S500 SMP code by removing a loop for
->>>>>> pen_release in owl_secondary_boot(). Since then it is only calling
->>>>>> owl_v7_invalidate_l1() before branching to secondary_startup().
->>>>>>
->>>>>> The owl_v7_invalidate_l1() assembler function is superfluous, too.
->>>>>> Therefore drop owl_secondary_boot() and use secondary_boot() directly.
->>>>>>
->>>>>> Cc: David Liu <liuwei@actions-semi.com>
->>>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>>>>> ---
->>>>>
->>>>>> -	writel(virt_to_phys(owl_secondary_startup),
->>>>>> +	writel(virt_to_phys(secondary_startup),
->>>>>> 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
->>>>>
->>>>> This is a kernel symbol so please use __pa_symbol() here, also you
->>>>> might want to build with CONFIG_DEBUG_VIRTUAL and see if you get
->>>>> other warnings about using virt_to_phys() in the owl platform code
->>>>> (I did not check if there are other uses)
->>>>
->>>> Thanks for the report. There are no other such uses in mach-actions, but
->>>> git-grep'ing for virt_to_phys in arch/arm/mach-* I spot at least one
->>>> other such usage in mach-oxnas:
->>>>
->>>> arch/arm/mach-oxnas/platsmp.c:
->>>> writel(virt_to_phys(ox820_secondary_startup),
->>>>
->>>> as well as this in mach-mvebu:
->>>>
->>>> arch/arm/mach-mvebu/platsmp.c:  writel(virt_to_phys(boot_addr), base +
->>>> MV98DX3236_CPU_RESUME_ADDR_REG);
->>>>
->>>> and these in mach-at91:
->>>>
->>>> arch/arm/mach-at91/pm.c:        pm_bu->canary = virt_to_phys(&canary);
->>>> arch/arm/mach-at91/pm.c:        pm_bu->resume = virt_to_phys(cpu_resume);
->>>>
->>>
->>> They can probably use __pa_symbol() (I must admit I didn't know about
->>> it before this email)
->>
->> This is fine, do you mind sending fixes for the at91 parts? Gregory, can
->> you also fix the mv98dx3236 platform SMP code?
-> 
-> Yes sure, actually, for Armada XP we already use  __pa_symbol() but from
-> an other file that why I didn't pay attention on it.
 
-No worries, the conversion sort of happened in one go, so it's always a
-game of catching up patches merged after that one went in.
+
+On 07/07/17 17:52, Jassi Brar wrote:
+> Hi Arnd, Hi Rob, Hi Mark,
+> 
+> [CC'ing only those who I have the email id of]
+> 
+>> +/**
+>> + * scmi_do_xfer() - Do one transfer
+>> + *
+>> + * @info: Pointer to SCMI entity information
+>> + * @xfer: Transfer to initiate and wait for response
+>> + *
+>> + * Return: -ETIMEDOUT in case of no response, if transmit error,
+>> + *   return corresponding error, else if all goes well,
+>> + *   return 0.
+>> + */
+>> +int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+>> +{
+>> +	int ret;
+>> +	int timeout;
+>> +	struct scmi_info *info = handle_to_scmi_info(handle);
+>> +	struct device *dev = info->dev;
+>> +
+>> +	ret = mbox_send_message(info->tx_chan, xfer);
+>> +
+>>
+> The api is
+> 
+>     int mbox_send_message(struct mbox_chan *chan, void *mssg)
+> 
+> where each controller driver defines its own format in which it accepts
+> the 'mssg' to be transmitted.
+> 
+
+Yes they can continue that, but SCMI just doesn't depend on that.
+
+> For example :-
+> ti_msgmgr_send_data(struct mbox_chan *, struct ti_msgmgr_message *)
+> rockchip_mbox_send_data(struct mbox_chan *, struct rockchip_mbox_msg *)
+> ....and so on...  you get the idea.
+> 
+
+Yes I am aware of that.
+
+> Some controller driver may ignore the 'mssg' because only an interrupt line
+> is shared with the remote and not some register/fifo.
+> For example,
+>   sti_mbox_send_data(struct mbox_chan *, void *ignored)
+> 
+
+Exactly, now with SCMI, every controller *can do* that, as we just care
+about the signaling which in other terms I have so far referred as
+"doorbell". The data passed should not be used for any other purpose
+as there's no need to even by the remote firmware implementing SCMI.
+
+If you read the SCMI specification, it's designed to avoid all such
+issues with wide variety of mailbox controller we have in the wild.
+And hence all the command and other information are passed in the shared
+memory.
+
+> Out of 14 controller drivers today, this SCMI implementation will work with
+> only 5 (and that too by abusing the api).
+
+What do you mean by abusing the API ?
+
+> The other 9 controllers (and many
+> in future) are perfectly able to support SCMI (its just another protocol).
+
+Exactly, if and only if they adhere to the specification.
+
+> All we need is what the SCMI specification calls "Transport Layer".
+> Of course that will be a thin platform/controller specific code that will
+> encapsulate the 'struct scmi_xfer *xfer' from SCMI, into controller specified
+> format and actually call the mbox_send_message().
+
+OK, if platform had to send some platform specific data, I agree. But
+can you point me from the SCPI specification the need for the platforms
+to do that. That's the whole point. Transport is just a doorbell nothing
+more.
+
+You are trying to fit the existing platform implementation into SCMI
+which won't work.
+
+E.g. if TI/Rockchip implements SCMI, they can continue using these
+drivers as along as it does the job of "ringing the doorbell".
+
+They may be passing some data today because their existing remote
+firmware expects it. With SCMI, they don't have to. These existing
+drivers are doing additional job in the current form: passing some data
+along with triggering the remote doorbell. We just need latter in SCMI
+case as we don't need any data in the transport as it's all part of shmem.
+
+Why do you think that won't work ? Remember all the platform specific
+stuff(if platform implement own protocols) in SCMI is moved to the
+shared memory and transport just needs to do "doorbell". So I disagree
+with your concern unless I am missing something.
+
+> 
+>  To achieve that, we can either do similar to what platforms with DWC3
+> do - generic dwc3 child node of platform specific parent node. Or we can have
+> the SCMI protocol implemented as a library that platforms can init and use.
+> Or any other better way.
+> 
+>  I just think it is a bad idea to rule out all but one classes of mailbox controllers.
+> 
+
+Definitely neither SCMI specification nor SCMI driver is ruling out any
+class of mailbox controllers as long as there are capable of signaling
+the other end that "hey look you have something to check in shared
+memory" which I think is the case with most of the controllers.
+
+To be honest this whole mailbox framework is somewhat complex for simple
+doorbell kind of this, but hey I am not complaining ;).
+
 -- 
-Florian
+Regards,
+Sudeep
