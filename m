@@ -1,24 +1,51 @@
-From: webmaster@cloudplan.dk (webmaster at cloudplan.dk)
-Date: Fri, 7 Jul 2017 02:07:01 +0200
-Subject: Parcel ID9266156 delivery problems, please review
-Message-ID: <20170707000701.AF2E6C658F8@server8711868119.internet-server.dk>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 7 Jul 2017 08:56:28 +0800
+Subject: [PATCH] drm/rockchip: fix NULL check on devm_kzalloc() return
+ value
+In-Reply-To: <20170706215833.GA25411@embeddedgus>
+References: <20170706215833.GA25411@embeddedgus>
+Message-ID: <595EDC3C.1010801@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Customer,
+On 2017?07?07? 05:58, Gustavo A. R. Silva wrote:
+> The right variable to check here is port, not dp.
+>
+> This issue was detected using Coccinelle and the following semantic patch:
+>
+> @@
+> expression x;
+> identifier fld;
+> @@
+>
+> * x = devm_kzalloc(...);
+>    ... when != x == NULL
+>    x->fld
+>
+> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 
-Your parcel was successfully delivered July 04 to UPS Station, but our courier cound not contact you.
+Thanks for the fix,
 
-Please review delivery label in attachment!
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-Best regards,
- ,
-UPS Support Clerk.
+> ---
+>   drivers/gpu/drm/rockchip/cdn-dp-core.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> index 14fa1f8..9b0b058 100644
+> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> @@ -1195,7 +1195,7 @@ static int cdn_dp_probe(struct platform_device *pdev)
+>   			continue;
+>   
+>   		port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+> -		if (!dp)
+> +		if (!port)
+>   			return -ENOMEM;
+>   
+>   		port->extcon = extcon;
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: UPS-Receipt-9266156.zip
-Type: application/zip
-Size: 1481 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170707/ba82a6f5/attachment.zip>
+
+-- 
+?ark Yao
