@@ -1,100 +1,94 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 7 Jul 2017 08:53:25 -0500
-Subject: [PATCH 2/8] dt-bindings: mailbox: add binding doc for the ARM
- SMC mailbox
-In-Reply-To: <20170630095608.24943-3-andre.przywara@arm.com>
-References: <20170630095608.24943-1-andre.przywara@arm.com>
- <20170630095608.24943-3-andre.przywara@arm.com>
-Message-ID: <20170707135325.7iqntzxhnh7fzv4m@rob-hp-laptop>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Fri, 7 Jul 2017 15:56:11 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2_xplained: use pin macros instead of
+ numbers
+Message-ID: <20170707135611.10303-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 10:56:02AM +0100, Andre Przywara wrote:
-> Add binding documentation for the generic ARM SMC mailbox.
-> This is not describing hardware, but a firmware interface.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  .../devicetree/bindings/mailbox/arm-smc.txt        | 61 ++++++++++++++++++++++
->  1 file changed, 61 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/arm-smc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/arm-smc.txt b/Documentation/devicetree/bindings/mailbox/arm-smc.txt
-> new file mode 100644
-> index 0000000..90c5926
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/arm-smc.txt
-> @@ -0,0 +1,61 @@
-> +ARM SMC Mailbox Driver
+Use pin macros instead of magic numbers to ease interpretation.
 
-s/Driver/Interface/
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-> +======================
-> +
-> +This mailbox uses the ARM smc (secure monitor call) instruction to
-> +trigger a mailbox-connected activity in firmware, executing on the very same
-> +core as the caller. By nature this operation is synchronous and this
-> +mailbox provides no way for asynchronous messages to be delivered the other
-> +way round, from firmware to the OS. However the value of r0/w0/x0 the firmware
-> +returns after the smc call is delivered as a received message to the
-> +mailbox framework, so a synchronous communication can be established.
-> +
-> +One use case of this mailbox is the SCP interface, which uses shared memory
-> +to transfer commands and parameters, and a mailbox to trigger a function
-> +call. This allows SoCs without a separate management processor (or
-> +when such a processor is not available or used) to use this standardized
-> +interface anyway.
-> +
-> +This binding describes no hardware, but establishes a firmware interface.
-> +The communication follows the ARM SMC calling convention[1].
-> +Any core which supports the SMC or HVC instruction can be used, as long as
-> +a firmware component running in EL3 or EL2 is handling these calls.
-> +
-> +Mailbox Device Node:
-> +====================
-
-Please state this should be a child of /firmware node.
-
-> +
-> +Required properties:
-> +--------------------
-> +- compatible:		Shall be "arm,smc-mbox"
-> +- #mbox-cells		Shall be 1 - the index of the channel needed.
-> +- arm,smc-func-ids	An array of 32-bit values specifying the function
-> +			IDs used by each mailbox channel. Those function IDs
-> +			follow the ARM SMC calling convention standard [1].
-> +			There is one identifier per channel and the number
-> +			of supported channels is determined by the length
-> +			of this array.
-> +
-> +Optional properties:
-> +--------------------
-> +- method:		A string, either:
-> +			"hvc": if the driver shall use an HVC call, or
-> +			"smc": if the driver shall use an SMC call
-> +			If omitted, defaults to an SMC call.
-> +
-> +Example:
-> +--------
-> +
-> +	mailbox: smc_mbox {
-
-swap these. mailbox for the node name.
-
-> +		#mbox-cells = <1>;
-> +		compatible = "arm,smc-mbox";
-> +		identifiers = <0x82000001>, <0x82000002>;
-> +	};
-> +
-> +	scpi {
-> +		compatible = "arm,scpi";
-> +		mboxes = <&mailbox 0>;
-> +		shmem = <&cpu_scp_shmem>;
-> +	};
-> +
-> +
-> +[1]
-> +http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0028a/index.html
-> -- 
-> 2.9.0
-> 
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 2e2c3d1a1fa2..8dc436631b8d 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -68,7 +68,7 @@
+ 
+ 	ahb {
+ 		usb0: gadget at 00300000 {
+-			atmel,vbus-gpio = <&pioA 31 GPIO_ACTIVE_HIGH>;
++			atmel,vbus-gpio = <&pioA PIN_PA31 GPIO_ACTIVE_HIGH>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_usba_vbus>;
+ 			status = "okay";
+@@ -76,8 +76,8 @@
+ 
+ 		usb1: ohci at 00400000 {
+ 			num-ports = <3>;
+-			atmel,vbus-gpio = <0 /* &pioA 41 GPIO_ACTIVE_HIGH */
+-					   &pioA 42 GPIO_ACTIVE_HIGH
++			atmel,vbus-gpio = <0 /* &pioA PIN_PB9 GPIO_ACTIVE_HIGH */
++					   &pioA PIN_PB10 GPIO_ACTIVE_HIGH
+ 					   0
+ 					  >;
+ 			pinctrl-names = "default";
+@@ -127,7 +127,7 @@
+ 				ethernet-phy at 1 {
+ 					reg = <0x1>;
+ 					interrupt-parent = <&pioA>;
+-					interrupts = <73 IRQ_TYPE_LEVEL_LOW>;
++					interrupts = <PIN_PC9 IRQ_TYPE_LEVEL_LOW>;
+ 				};
+ 			};
+ 
+@@ -160,9 +160,9 @@
+ 					compatible = "active-semi,act8945a";
+ 					reg = <0x5b>;
+ 					active-semi,vsel-high;
+-					active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
+-					active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
+-					active-semi,irq_gpios = <&pioA 45 GPIO_ACTIVE_LOW>;
++					active-semi,chglev-gpios = <&pioA PIN_PA12 GPIO_ACTIVE_HIGH>;
++					active-semi,lbo-gpios = <&pioA PIN_PC8 GPIO_ACTIVE_LOW>;
++					active-semi,irq_gpios = <&pioA PIN_PB13 GPIO_ACTIVE_LOW>;
+ 					active-semi,input-voltage-threshold-microvolt = <6600>;
+ 					active-semi,precondition-timeout = <40>;
+ 					active-semi,total-timeout = <3>;
+@@ -504,7 +504,7 @@
+ 
+ 		bp1 {
+ 			label = "PB_USER";
+-			gpios = <&pioA 41 GPIO_ACTIVE_LOW>;
++			gpios = <&pioA PIN_PB9 GPIO_ACTIVE_LOW>;
+ 			linux,code = <0x104>;
+ 		};
+ 	};
+@@ -517,17 +517,17 @@
+ 
+ 		red {
+ 			label = "red";
+-			gpios = <&pioA 38 GPIO_ACTIVE_LOW>;
+-		};
++			gpios = <&pioA PIN_PB6 GPIO_ACTIVE_LOW>;
++
+ 
+ 		green {
+ 			label = "green";
+-			gpios = <&pioA 37 GPIO_ACTIVE_LOW>;
++			gpios = <&pioA PIN_PB5 GPIO_ACTIVE_LOW>;
+ 		};
+ 
+ 		blue {
+ 			label = "blue";
+-			gpios = <&pioA 32 GPIO_ACTIVE_LOW>;
++			gpios = <&pioA PIN_PB0 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
+-- 
+2.12.2
