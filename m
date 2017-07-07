@@ -1,42 +1,40 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 7 Jul 2017 09:26:28 +0200
-Subject: [PATCH 5/8] irqchip: stm32: fix initial values
+Date: Fri, 7 Jul 2017 09:26:30 +0200
+Subject: [PATCH 7/8] ARM: dts: stm32: add exti support for stm32h743
 In-Reply-To: <1499412391-25480-1-git-send-email-ludovic.Barre@st.com>
 References: <1499412391-25480-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1499412391-25480-6-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1499412391-25480-8-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
--after cold boot, imr default value depend of hw configuration
--after hot reboot the registers must be cleared to avoid residue
+this patch add support of external interrupt (exti)
+for stm32h743
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/irqchip/irq-stm32-exti.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/stm32h743.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-index 69ae09d..3c7077d 100644
---- a/drivers/irqchip/irq-stm32-exti.c
-+++ b/drivers/irqchip/irq-stm32-exti.c
-@@ -246,7 +246,16 @@ static int __init stm32_exti_init(struct stm32_exti_bank **stm32_exti_banks,
- 		irqs_mask = readl_relaxed(base + stm32_bank->rtsr_ofst);
- 		stm32_bank->irqs_mask = irqs_mask;
- 		nr_exti = fls(readl_relaxed(base + stm32_bank->rtsr_ofst));
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index 4685629..730cbd8 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -74,6 +74,14 @@
+ 			interrupts = <50>;
+ 			clocks = <&timer_clk>;
+ 		};
 +
-+		/*
-+		 * This IP has no reset, so after hot reboot we should
-+		 * clear registers to avoid residue
-+		 */
-+		writel_relaxed(0, base + stm32_bank->imr_ofst);
-+		writel_relaxed(0, base + stm32_bank->emr_ofst);
- 		writel_relaxed(0, base + stm32_bank->rtsr_ofst);
-+		writel_relaxed(0, base + stm32_bank->ftsr_ofst);
-+		writel_relaxed(~0UL, base + stm32_bank->pr_ofst);
++		exti: interrupt-controller at 58000000 {
++			compatible = "st,stm32h7-exti";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x58000000 0x400>;
++			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <62>, <76>;
++		};
+ 	};
+ };
  
- 		pr_info("%s: bank%d, External IRQs available:%#x\n",
- 			node->full_name, i, irqs_mask);
 -- 
 2.7.4
