@@ -1,190 +1,73 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 07 Jul 2017 15:03:06 +0200
-Subject: [PATCH v16 2/7] power: add power sequence library
-In-Reply-To: <20170707080107.GC21909@b29397-desktop>
-References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
- <2629938.X3D3UTyHBr@aspire.rjw.lan> <20170707080107.GC21909@b29397-desktop>
-Message-ID: <2042394.b4eZkzrJ5f@aspire.rjw.lan>
+From: labath@google.com (Pavel Labath)
+Date: Fri, 7 Jul 2017 14:11:49 +0100
+Subject: [arm/hw_breakpoint] Detecting that hardware watchpoint support is
+ unavailable
+In-Reply-To: <20170707124332.GF6735@arm.com>
+References: <CAJt8pk8f3Z4O=JLB8vSimAbwaAd8AqELKWJzZJF+io13Ziia6g@mail.gmail.com>
+ <20170707124332.GF6735@arm.com>
+Message-ID: <CAJt8pk9xh3ZzEO6Uv2V32MEw-ibgTX5Y9P8PGPYf2pYEWhePrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 07, 2017 04:01:07 PM Peter Chen wrote:
-> On Fri, Jul 07, 2017 at 03:13:48AM +0200, Rafael J. Wysocki wrote:
-> > > 
-> > > - Can I write new code for it or I need to depend on something?
-> > 
-> > There is nothing this code needs to depend on AFAICS, but there are existing
-> > solutions in this problem space (ACPI power management, genpd), so it needs to
-> > be careful enough about possible overlaps etc.
-> > 
-> > > I find there is already "power state" concept at documentation.
-> > > Documentation/ABI/testing/sysfs-devices-power_state
-> > 
-> > This is ACPI-specific and only in sysfs directories representing ACPI device
-> > objects (which aren't physical devices).
-> > 
-> > Anyway, since ACPI covers the problem space you are working in already,
-> > your code has to be mutually exclusive with it.
-> > 
-> > > - If I can write the new code for it, except the problems I want
-> > > to fix, are there any other use cases I need to consider?
-> > 
-> > I would start simple and focus on the particular problem at hand, that is
-> > devices with two power states ("on" and "off") where the "on" state
-> > depends on a number of clocks and/or GPIOs.  Still, I'd also avoid making
-> > design choices that might prevent it from being extended in the future
-> > if need be.
-> > 
-> > One major problem I can see is how to "attach" the power states framework
-> > to a particular device (once we have discovered that it should be used with
-> > that device).
-> > 
-> > For bus types that don't do power management of their own you could follow
-> > ACPI (and genpd) and provide a PM domain for this purpose, but bus types
-> > doing their own PM (like USB) will probably need to be treated differently.
-> > In those cases the bus type code will have to know that it should call some
-> > helpers to switch power states of devices.
-> > 
-> 
-> After thinking more, using a power state framework is seems too heavy
-> for this use case. This use case is just do some clock and gpio
-> operations before device is created, and do some put operations
-> after device is deleted. We just need some helpers in one structure
-> (called "power sequence" or "power state") for this purpose.
-> 
-> For the use case, the clock and gpio operation can be done after device
-> is created, the power domain is more suitable.
+On 7 July 2017 at 13:43, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jul 07, 2017 at 01:37:53PM +0100, Pavel Labath wrote:
+>> Hello Pratyush, Will,
+>>
+>> I have an arm(32) chip, which has hardware debug support disabled, as
+>> far as I can tell (DBGDSCR.MDBGen reads as zero even after explicitly
+>> setting in).
+>>
+>> The current behavior of the kernel on these chips is to return a
+>> non-zero number for the "number of supported watchpoint resources"
+>> when queried with ptrace and then fail at runtime (ENODEV) when the
+>> tracer attempts to set this breakpoint.
+>>
+>> This does not seem like a particularly nice api, and I believe it
+>> would be better to just return zero for the watchpoint count
+>> initially, as we already know that setting the watchpoints will fail.
+>>
+>> arch_hw_breakpoint_init() zeroes out the core_num_wrps when it detects
+>> that debug support is not present, however when we return resource
+>> info (ptrace_get_hbp_resource_info), we go through
+>> hw_breakpoint_slots(), which does not read these.
+>>
+>> I think having ptrace_get_hbp_resource_info() read core_num_wrps would
+>> be more consistent because that's how we read maximum watchpoint
+>> length (arch_get_max_wp_len), which means we (correctly ?) return 0
+>> when hardware debug is not supported. In fact, that is how I presently
+>> detect that hardware debug is not supported (reading max_wp_len), but
+>> at this moment that seems more like an accident than a deliberate
+>> interface. Having num_wrps, num_brps zeroed out as well would make it
+>> clear that this is how it's intended to be used.
+>>
+>> So, what do you think about a patch like that?
+>
 
-There is a problem with PM domains that they only provide hooks for runtime PM
-and system suspend/resume (including hibernation) and not for generic
-"power up" and "power down" operations that may need to be carried out at
-probe time before the runtime PM framework can be used (and analogously
-at remove time).
+Fair enough. I am going to read this as "good idea in general, but I
+object to the implementation".
 
-I would consider starting with the patch below or similar.
+> I don't want to expose hw_breakpoint internals to ptrace as long as we
+> go through the internal perf interface. The two options really are:
 
-Then you can define something like POWER_STATE_SEQUENCE type for your
-case and basically use almost what you have already with it, except that
-struct pwrsec_generic will now become struct power_state_sequence and
-struct power_state_info will be embedded in it instead of struct pwrsec.
+I have to point out that the two of them are already connected via the
+arch_get_debug_arch() and arch_get_max_wp_len() functions, both of
+which are solely called from ptrace_get_hbp_resource_info(). However,
+I understand that we don't want to add more stuff there if this is not
+the direction we want to be going in.
 
-The major comceptual difference is that ->power_up and ->power_down are
-now available at the level of the device that needs the power sequence and
-pm_device_power_up/down() can be used wherever necessary (in the code,
-in a bus type, in a controller driver or even in the driver for this particular
-device).
+>
+>   1. Rip out the perf crap and integrate ptrace more tightly with
+>      hw_breakpoint.
 
-Most likely you will need a PM domain in addition to that, but mostly to avoid
-code duplication.
+I am afraid this may be a bit above my skill level here. I am fairly
+new to the kernel end of the ptrace interface. Could you elaborate on
+what exactly would this entail? E.g. can this be done solely within
+arm code, or would it require changing general kernel interfaces (I
+fear yes).
 
-And in the future other types of power state definitions may be hooked up
-to that, including ACPI etc.
+>
+>   2. Fix hw_breakpoint_slots(...) to do what you want, although I seem
+>      to recall a chicken-and-egg problem there where perf insists on calling
+>      that function (hw_breakpoint_slots) early.
 
-
-Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
----
- drivers/base/power/common.c |   35 +++++++++++++++++++++++++++++++++++
- include/linux/pm.h          |   33 +++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+)
-
-Index: linux-pm/include/linux/pm.h
-===================================================================
---- linux-pm.orig/include/linux/pm.h
-+++ linux-pm/include/linux/pm.h
-@@ -550,6 +550,30 @@ struct pm_subsys_data {
- #endif
- };
- 
-+enum power_state_type {
-+	POWER_STATE_GENERIC = 0,
-+};
-+
-+/**
-+ * struct power_state_info - information related to device power states.
-+ *
-+ * @type: Power states definition type.
-+ * @power_up: Device power up method.
-+ * @power_down: Device power down method.
-+ *
-+ * @power_up is expected to put the device into a power state in which it can
-+ * be operated by software (it doesn't have to be the full power state in
-+ * principle as long as the device will respond to all software accesses in
-+ * this state) and @power_down is expected to put the device into the lowest
-+ * power state the device can be put into given all of the applicable
-+ * constraints and limitations (it may not mean completely off).
-+ */
-+struct power_state_info {
-+	enum power_state_type type;
-+	int (*power_up)(struct device *dev);
-+	int (*power_down)(struct device *dev);
-+};
-+
- struct dev_pm_info {
- 	pm_message_t		power_state;
- 	unsigned int		can_wakeup:1;
-@@ -600,6 +624,7 @@ struct dev_pm_info {
- 	unsigned long		active_jiffies;
- 	unsigned long		suspended_jiffies;
- 	unsigned long		accounting_timestamp;
-+	struct power_state_info	*state;
- #endif
- 	struct pm_subsys_data	*subsys_data;  /* Owned by the subsystem. */
- 	void (*set_latency_tolerance)(struct device *, s32);
-@@ -610,6 +635,14 @@ extern void update_pm_runtime_accounting
- extern int dev_pm_get_subsys_data(struct device *dev);
- extern void dev_pm_put_subsys_data(struct device *dev);
- 
-+#ifdef CONFIG_PM
-+extern int pm_device_power_up(struct device *dev);
-+extern int pm_device_power_down(struct device *dev);
-+#else
-+static inline int pm_device_power_up(struct device *dev) { return 0; }
-+static inline int pm_device_power_down(struct device *dev) { return 0; }
-+#endif /* CONFIG_PM */
-+
- /**
-  * struct dev_pm_domain - power management domain representation.
-  *
-Index: linux-pm/drivers/base/power/common.c
-===================================================================
---- linux-pm.orig/drivers/base/power/common.c
-+++ linux-pm/drivers/base/power/common.c
-@@ -152,3 +152,38 @@ void dev_pm_domain_set(struct device *de
- 	device_pm_check_callbacks(dev);
- }
- EXPORT_SYMBOL_GPL(dev_pm_domain_set);
-+
-+/**
-+ * pm_device_power_up - Power up a device using the power states framework.
-+ * @dev: Device to power up.
-+ *
-+ * Put the device into a power state in which it will respond to all software
-+ * accesses (that may not mean maximum power) using the callback provided
-+ * through the device power state framework, if present.
-+ */
-+int pm_device_power_up(struct device *dev)
-+{
-+	if (dev->power.state && dev->power.state->power_up)
-+		return dev->power.state->power_up(dev);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pm_device_power_up);
-+
-+/**
-+ * pm_device_power_down - Power down a device using the power states framework.
-+ * @dev: Device to power down.
-+ *
-+ * Put the device into the lowest power state it can be put into given the
-+ * applicable constraints and limitations (that may not mean maximum power)
-+ * using the callback provided through the device power state framework, if
-+ * present.
-+ */
-+int pm_device_power_down(struct device *dev)
-+{
-+	if (dev->power.state && dev->power.state->power_down)
-+		return dev->power.state->power_down(dev);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pm_device_power_down);
+Yeah, there is a call in init_hw_breakpoint(), which looks fairly hard to avoid.
