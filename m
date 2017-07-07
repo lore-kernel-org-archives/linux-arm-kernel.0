@@ -1,166 +1,283 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 7 Jul 2017 18:31:05 +0200
-Subject: [PATCH v3 6/9] iio: trigger: Add STM32 LPTimer trigger driver
+Date: Fri, 7 Jul 2017 18:31:03 +0200
+Subject: [PATCH v3 4/9] pwm: Add STM32 LPTimer PWM driver
 In-Reply-To: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
 References: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1499445068-7037-7-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1499445068-7037-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for LPTIMx_OUT triggers that can be found on some STM32
-devices. These triggers can be used then by ADC or DAC.
-Typical usage is to configure LPTimer as PWM output (via pwm-stm32-lp)
-and have synchronised analog conversions with these triggers.
+Add support for single PWM channel on Low-Power Timer, that can be
+found on some STM32 platforms.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
 Changes in v3:
-- Add validate_device callback
+- remove prescalers[] array, use power-of-2 presc directly
+- Update following Thierry's comments:
+- fix issue using FIELD_GET() macro
+- Add get_state() callback
+- remove some checks in probe
+- slight rework 'reenable' flag
+- use more common method to disable pwm in remove()
 
 Changes in v2:
 - s/Low Power/Low-Power
-- update few comments
+- update few comment lines
 ---
- drivers/iio/trigger/Kconfig                   |  11 +++
- drivers/iio/trigger/Makefile                  |   1 +
- drivers/iio/trigger/stm32-lptimer-trigger.c   | 118 ++++++++++++++++++++++++++
- include/linux/iio/timer/stm32-lptim-trigger.h |  27 ++++++
- 4 files changed, 157 insertions(+)
- create mode 100644 drivers/iio/trigger/stm32-lptimer-trigger.c
- create mode 100644 include/linux/iio/timer/stm32-lptim-trigger.h
+ drivers/pwm/Kconfig        |  10 ++
+ drivers/pwm/Makefile       |   1 +
+ drivers/pwm/pwm-stm32-lp.c | 246 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 257 insertions(+)
+ create mode 100644 drivers/pwm/pwm-stm32-lp.c
 
-diff --git a/drivers/iio/trigger/Kconfig b/drivers/iio/trigger/Kconfig
-index e4d4e63..a633d2c 100644
---- a/drivers/iio/trigger/Kconfig
-+++ b/drivers/iio/trigger/Kconfig
-@@ -24,6 +24,17 @@ config IIO_INTERRUPT_TRIGGER
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called iio-trig-interrupt.
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 313c107..7cb982b 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -417,6 +417,16 @@ config PWM_STM32
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called pwm-stm32.
  
-+config IIO_STM32_LPTIMER_TRIGGER
-+	tristate "STM32 Low-Power Timer Trigger"
++config PWM_STM32_LP
++	tristate "STMicroelectronics STM32 PWM LP"
 +	depends on MFD_STM32_LPTIMER || COMPILE_TEST
 +	help
-+	  Select this option to enable STM32 Low-Power Timer Trigger.
-+	  This can be used as trigger source for STM32 internal ADC
-+	  and/or DAC.
++	  Generic PWM framework driver for STMicroelectronics STM32 SoCs
++	  with Low-Power Timer (LPTIM).
 +
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called stm32-lptimer-trigger.
++	  To compile this driver as a module, choose M here: the module
++	  will be called pwm-stm32-lp.
 +
- config IIO_STM32_TIMER_TRIGGER
- 	tristate "STM32 Timer Trigger"
- 	depends on (ARCH_STM32 && OF && MFD_STM32_TIMERS) || COMPILE_TEST
-diff --git a/drivers/iio/trigger/Makefile b/drivers/iio/trigger/Makefile
-index 5c4ecd3..0a72a2a 100644
---- a/drivers/iio/trigger/Makefile
-+++ b/drivers/iio/trigger/Makefile
-@@ -6,6 +6,7 @@
- 
- obj-$(CONFIG_IIO_HRTIMER_TRIGGER) += iio-trig-hrtimer.o
- obj-$(CONFIG_IIO_INTERRUPT_TRIGGER) += iio-trig-interrupt.o
-+obj-$(CONFIG_IIO_STM32_LPTIMER_TRIGGER) += stm32-lptimer-trigger.o
- obj-$(CONFIG_IIO_STM32_TIMER_TRIGGER) += stm32-timer-trigger.o
- obj-$(CONFIG_IIO_SYSFS_TRIGGER) += iio-trig-sysfs.o
- obj-$(CONFIG_IIO_TIGHTLOOP_TRIGGER) += iio-trig-loop.o
-diff --git a/drivers/iio/trigger/stm32-lptimer-trigger.c b/drivers/iio/trigger/stm32-lptimer-trigger.c
+ config PWM_STMPE
+ 	bool "STMPE expander PWM export"
+ 	depends on MFD_STMPE
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index 93da1f7..a3a4bee 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -40,6 +40,7 @@ obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+ obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+ obj-$(CONFIG_PWM_STI)		+= pwm-sti.o
+ obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
++obj-$(CONFIG_PWM_STM32_LP)	+= pwm-stm32-lp.o
+ obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
+ obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
+ obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
 new file mode 100644
-index 0000000..241eae6
+index 0000000..9793b29
 --- /dev/null
-+++ b/drivers/iio/trigger/stm32-lptimer-trigger.c
-@@ -0,0 +1,118 @@
++++ b/drivers/pwm/pwm-stm32-lp.c
+@@ -0,0 +1,246 @@
 +/*
-+ * STM32 Low-Power Timer Trigger driver
++ * STM32 Low-Power Timer PWM driver
 + *
 + * Copyright (C) STMicroelectronics 2017
 + *
-+ * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
++ * Author: Gerald Baeza <gerald.baeza@st.com>
 + *
-+ * License terms:  GNU General Public License (GPL), version 2
++ * License terms: GNU General Public License (GPL), version 2
 + *
-+ * Inspired by Benjamin Gaignard's stm32-timer-trigger driver
++ * Inspired by Gerald Baeza's pwm-stm32 driver
 + */
 +
-+#include <linux/iio/timer/stm32-lptim-trigger.h>
++#include <linux/bitfield.h>
 +#include <linux/mfd/stm32-lptimer.h>
 +#include <linux/module.h>
++#include <linux/of.h>
 +#include <linux/platform_device.h>
++#include <linux/pwm.h>
 +
-+/* List Low-Power Timer triggers */
-+static const char * const stm32_lptim_triggers[] = {
-+	LPTIM1_OUT,
-+	LPTIM2_OUT,
-+	LPTIM3_OUT,
++struct stm32_pwm_lp {
++	struct pwm_chip chip;
++	struct clk *clk;
++	struct regmap *regmap;
 +};
 +
-+struct stm32_lptim_trigger {
-+	struct device *dev;
-+	const char *trg;
-+};
-+
-+static int stm32_lptim_validate_device(struct iio_trigger *trig,
-+				       struct iio_dev *indio_dev)
++static inline struct stm32_pwm_lp *to_stm32_pwm_lp(struct pwm_chip *chip)
 +{
-+	if (indio_dev->modes & INDIO_HARDWARE_TRIGGERED)
++	return container_of(chip, struct stm32_pwm_lp, chip);
++}
++
++/* STM32 Low-Power Timer is preceded by a configurable power-of-2 prescaler */
++#define STM32_LPTIM_MAX_PRESCALER	128
++
++static int stm32_pwm_lp_apply(struct pwm_chip *chip, struct pwm_device *pwm,
++			      struct pwm_state *state)
++{
++	struct stm32_pwm_lp *priv = to_stm32_pwm_lp(chip);
++	unsigned long long prd, div, dty;
++	struct pwm_state cstate;
++	u32 val, mask, cfgr, presc = 0;
++	bool reenable;
++	int ret;
++
++	pwm_get_state(pwm, &cstate);
++	reenable = !cstate.enabled;
++
++	if (!state->enabled) {
++		if (cstate.enabled) {
++			/* Disable LP timer */
++			ret = regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
++			if (ret)
++				return ret;
++			/* disable clock to PWM counter */
++			clk_disable(priv->clk);
++		}
 +		return 0;
++	}
 +
-+	return -EINVAL;
++	/* Calculate the period and prescaler value */
++	div = (unsigned long long)clk_get_rate(priv->clk) * state->period;
++	do_div(div, NSEC_PER_SEC);
++	prd = div;
++	while (div > STM32_LPTIM_MAX_ARR) {
++		presc++;
++		if ((1 << presc) > STM32_LPTIM_MAX_PRESCALER) {
++			dev_err(priv->chip.dev, "max prescaler exceeded\n");
++			return -EINVAL;
++		}
++		div = prd >> presc;
++	}
++	prd = div;
++
++	/* Calculate the duty cycle */
++	dty = prd * state->duty_cycle;
++	do_div(dty, state->period);
++
++	if (!cstate.enabled) {
++		/* enable clock to drive PWM counter */
++		ret = clk_enable(priv->clk);
++		if (ret)
++			return ret;
++	}
++
++	ret = regmap_read(priv->regmap, STM32_LPTIM_CFGR, &cfgr);
++	if (ret)
++		goto err;
++
++	if ((FIELD_GET(STM32_LPTIM_PRESC, cfgr) != presc) ||
++	    (FIELD_GET(STM32_LPTIM_WAVPOL, cfgr) != state->polarity)) {
++		val = FIELD_PREP(STM32_LPTIM_PRESC, presc);
++		val |= FIELD_PREP(STM32_LPTIM_WAVPOL, state->polarity);
++		mask = STM32_LPTIM_PRESC | STM32_LPTIM_WAVPOL;
++
++		/* Must disable LP timer to modify CFGR */
++		reenable = true;
++		ret = regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
++		if (ret)
++			goto err;
++
++		ret = regmap_update_bits(priv->regmap, STM32_LPTIM_CFGR, mask,
++					 val);
++		if (ret)
++			goto err;
++	}
++
++	if (reenable) {
++		/* Must (re)enable LP timer to modify CMP & ARR */
++		ret = regmap_write(priv->regmap, STM32_LPTIM_CR,
++				   STM32_LPTIM_ENABLE);
++		if (ret)
++			goto err;
++	}
++
++	ret = regmap_write(priv->regmap, STM32_LPTIM_ARR, prd - 1);
++	if (ret)
++		goto err;
++
++	ret = regmap_write(priv->regmap, STM32_LPTIM_CMP, prd - (1 + dty));
++	if (ret)
++		goto err;
++
++	/* ensure CMP & ARR registers are properly written */
++	ret = regmap_read_poll_timeout(priv->regmap, STM32_LPTIM_ISR, val,
++				       (val & STM32_LPTIM_CMPOK_ARROK),
++				       100, 1000);
++	if (ret) {
++		dev_err(priv->chip.dev, "ARR/CMP registers write issue\n");
++		goto err;
++	}
++	ret = regmap_write(priv->regmap, STM32_LPTIM_ICR,
++			   STM32_LPTIM_CMPOKCF_ARROKCF);
++	if (ret)
++		goto err;
++
++	if (reenable) {
++		/* Start LP timer in continuous mode */
++		ret = regmap_update_bits(priv->regmap, STM32_LPTIM_CR,
++					 STM32_LPTIM_CNTSTRT,
++					 STM32_LPTIM_CNTSTRT);
++		if (ret) {
++			regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
++			goto err;
++		}
++	}
++
++	return 0;
++err:
++	if (!cstate.enabled)
++		clk_disable(priv->clk);
++
++	return ret;
 +}
 +
-+static const struct iio_trigger_ops stm32_lptim_trigger_ops = {
++static void stm32_pwm_lp_get_state(struct pwm_chip *chip,
++				   struct pwm_device *pwm,
++				   struct pwm_state *state)
++{
++	struct stm32_pwm_lp *priv = to_stm32_pwm_lp(chip);
++	unsigned long rate = clk_get_rate(priv->clk);
++	u32 val, presc, prd;
++	u64 tmp;
++
++	regmap_read(priv->regmap, STM32_LPTIM_CR, &val);
++	state->enabled = !!FIELD_GET(STM32_LPTIM_ENABLE, val);
++	/* Keep PWM counter clock refcount in sync with PWM initial state */
++	if (state->enabled)
++		clk_enable(priv->clk);
++
++	regmap_read(priv->regmap, STM32_LPTIM_CFGR, &val);
++	presc = FIELD_GET(STM32_LPTIM_PRESC, val);
++	state->polarity = FIELD_GET(STM32_LPTIM_WAVPOL, val);
++
++	regmap_read(priv->regmap, STM32_LPTIM_ARR, &prd);
++	tmp = prd + 1;
++	tmp = (tmp << presc) * NSEC_PER_SEC;
++	state->period = DIV_ROUND_CLOSEST_ULL(tmp, rate);
++
++	regmap_read(priv->regmap, STM32_LPTIM_CMP, &val);
++	tmp = prd - val;
++	tmp = (tmp << presc) * NSEC_PER_SEC;
++	state->duty_cycle = DIV_ROUND_CLOSEST_ULL(tmp, rate);
++}
++
++static const struct pwm_ops stm32_pwm_lp_ops = {
 +	.owner = THIS_MODULE,
-+	.validate_device = stm32_lptim_validate_device,
++	.apply = stm32_pwm_lp_apply,
++	.get_state = stm32_pwm_lp_get_state,
 +};
 +
-+/**
-+ * is_stm32_lptim_trigger
-+ * @trig: trigger to be checked
-+ *
-+ * return true if the trigger is a valid STM32 IIO Low-Power Timer Trigger
-+ * either return false
-+ */
-+bool is_stm32_lptim_trigger(struct iio_trigger *trig)
++static int stm32_pwm_lp_probe(struct platform_device *pdev)
 +{
-+	return (trig->ops == &stm32_lptim_trigger_ops);
-+}
-+EXPORT_SYMBOL(is_stm32_lptim_trigger);
-+
-+static int stm32_lptim_setup_trig(struct stm32_lptim_trigger *priv)
-+{
-+	struct iio_trigger *trig;
-+
-+	trig = devm_iio_trigger_alloc(priv->dev, "%s", priv->trg);
-+	if  (!trig)
-+		return -ENOMEM;
-+
-+	trig->dev.parent = priv->dev->parent;
-+	trig->ops = &stm32_lptim_trigger_ops;
-+	iio_trigger_set_drvdata(trig, priv);
-+
-+	return devm_iio_trigger_register(priv->dev, trig);
-+}
-+
-+static int stm32_lptim_trigger_probe(struct platform_device *pdev)
-+{
-+	struct stm32_lptim_trigger *priv;
-+	u32 index;
++	struct stm32_lptimer *ddata = dev_get_drvdata(pdev->dev.parent);
++	struct stm32_pwm_lp *priv;
 +	int ret;
 +
 +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 +	if (!priv)
 +		return -ENOMEM;
 +
-+	if (of_property_read_u32(pdev->dev.of_node, "reg", &index))
-+		return -EINVAL;
++	priv->regmap = ddata->regmap;
++	priv->clk = ddata->clk;
++	priv->chip.base = -1;
++	priv->chip.dev = &pdev->dev;
++	priv->chip.ops = &stm32_pwm_lp_ops;
++	priv->chip.npwm = 1;
 +
-+	if (index >= ARRAY_SIZE(stm32_lptim_triggers))
-+		return -EINVAL;
-+
-+	priv->dev = &pdev->dev;
-+	priv->trg = stm32_lptim_triggers[index];
-+
-+	ret = stm32_lptim_setup_trig(priv);
-+	if (ret)
++	ret = pwmchip_add(&priv->chip);
++	if (ret < 0)
 +		return ret;
 +
 +	platform_set_drvdata(pdev, priv);
@@ -168,57 +285,36 @@ index 0000000..241eae6
 +	return 0;
 +}
 +
-+static const struct of_device_id stm32_lptim_trig_of_match[] = {
-+	{ .compatible = "st,stm32-lptimer-trigger", },
++static int stm32_pwm_lp_remove(struct platform_device *pdev)
++{
++	struct stm32_pwm_lp *priv = platform_get_drvdata(pdev);
++	unsigned int i;
++
++	for (i = 0; i < priv->chip.npwm; i++)
++		if (pwm_is_enabled(&priv->chip.pwms[i]))
++			pwm_disable(&priv->chip.pwms[i]);
++
++	return pwmchip_remove(&priv->chip);
++}
++
++static const struct of_device_id stm32_pwm_lp_of_match[] = {
++	{ .compatible = "st,stm32-pwm-lp", },
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, stm32_lptim_trig_of_match);
++MODULE_DEVICE_TABLE(of, stm32_pwm_lp_of_match);
 +
-+static struct platform_driver stm32_lptim_trigger_driver = {
-+	.probe = stm32_lptim_trigger_probe,
-+	.driver = {
-+		.name = "stm32-lptimer-trigger",
-+		.of_match_table = stm32_lptim_trig_of_match,
++static struct platform_driver stm32_pwm_lp_driver = {
++	.probe	= stm32_pwm_lp_probe,
++	.remove	= stm32_pwm_lp_remove,
++	.driver	= {
++		.name = "stm32-pwm-lp",
++		.of_match_table = of_match_ptr(stm32_pwm_lp_of_match),
 +	},
 +};
-+module_platform_driver(stm32_lptim_trigger_driver);
++module_platform_driver(stm32_pwm_lp_driver);
 +
-+MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
-+MODULE_ALIAS("platform:stm32-lptimer-trigger");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 LPTIM trigger driver");
++MODULE_ALIAS("platform:stm32-pwm-lp");
++MODULE_DESCRIPTION("STMicroelectronics STM32 PWM LP driver");
 +MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
-new file mode 100644
-index 0000000..34d59bf
---- /dev/null
-+++ b/include/linux/iio/timer/stm32-lptim-trigger.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (C) STMicroelectronics 2017
-+ *
-+ * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
-+ *
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef _STM32_LPTIM_TRIGGER_H_
-+#define _STM32_LPTIM_TRIGGER_H_
-+
-+#include <linux/iio/iio.h>
-+#include <linux/iio/trigger.h>
-+
-+#define LPTIM1_OUT	"lptim1_out"
-+#define LPTIM2_OUT	"lptim2_out"
-+#define LPTIM3_OUT	"lptim3_out"
-+
-+#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-+bool is_stm32_lptim_trigger(struct iio_trigger *trig);
-+#else
-+static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
-+{
-+	return false;
-+}
-+#endif
-+#endif
 -- 
 1.9.1
