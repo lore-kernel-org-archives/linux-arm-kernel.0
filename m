@@ -1,65 +1,97 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Fri, 7 Jul 2017 10:19:19 +0530
-Subject: [PATCH v2] arm: eBPF JIT compiler
-In-Reply-To: <CAGXu5j+yfOFU2xULwkQmp0Jz5pzLiurRSQ14kwGetBycdgF0Hg@mail.gmail.com>
-References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
- <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
- <593E6B0F.8070901@iogearbox.net>
- <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
- <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
- <59419D1E.2060303@iogearbox.net>
- <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
- <594813AA.5010001@iogearbox.net>
- <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
- <59495367.3080402@iogearbox.net>
- <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
- <594A9FA5.1080003@iogearbox.net>
- <CAHgaXdKCOM++jdoaq9PV6a_bbRU+VyuLC4KeUdYmA0gYdhmhkQ@mail.gmail.com>
- <CAGXu5jJujrx3d+qM-50f1UCVxZopWzLCTJQpw3KWh+o4Nq9JOg@mail.gmail.com>
- <CAGXu5jJnGfmDYcistcx-o3MmKaB1vn8Fav62JURk9epYEOiTRA@mail.gmail.com>
- <CAHgaXd+ywWu6PjnqGGdyw=7=XTKm4_Ny227Eq7yH5N0s0e5YfA@mail.gmail.com>
- <CAGXu5j+yfOFU2xULwkQmp0Jz5pzLiurRSQ14kwGetBycdgF0Hg@mail.gmail.com>
-Message-ID: <CAHgaXdLGT=7DfwJag5ZEmfp9n-UkPk9T6xbLEHVz6fHm3G8+=A@mail.gmail.com>
+From: albcamus@gmail.com (Jike Song)
+Date: Fri, 7 Jul 2017 13:04:16 +0800
+Subject: [PATCH] PCI: Do not enable extended tags on pre-dated (v1.x)
+ systems
+In-Reply-To: <1499260748-21860-1-git-send-email-okaya@codeaurora.org>
+References: <1499260748-21860-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <CANE52Ki_B0pitpyNMBjrtEJBX6Cspe8-m3hZuEFCWuBN2osh-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay Kees. I will take a look at it.
-Best,
-Shubham Bansal
+On Wed, Jul 5, 2017 at 9:19 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> According to extended tags ECN document, all PCIe receivers are expected
+> to support extended tags support. It should be safe to enable extended
+> tags on endpoints without checking compatibility.
+>
+> This assumption seems to be working fine except for the legacy systems.
+> The ECN has been written against PCIE spec version 2.0. Therefore, we need
+> to exclude all version 1.0 devices from this change as there is HW out
+> there that can't handle extended tags.
+>
+> Note that the default value of Extended Tags Enable bit is implementation
+> specific. Therefore, we are clearing the bit by default when incompatible
+> HW is found without assuming that value is zero.
+>
+> Reported-by: Wim ten Have <wim.ten.have@oracle.com>
+> Link: https://pcisig.com/sites/default/files/specification_documents/ECN_Extended_Tag_Enable_Default_05Sept2008_final.pdf
+> Link: https://bugzilla.redhat.com/show_bug.cgi?id=1467674
+> Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
+> Tested-by: Wim ten Have <wim.ten.have@oracle.com>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/probe.c | 52 +++++++++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 45 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 19c8950..5e39013 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1684,21 +1684,58 @@ static void program_hpp_type2(struct pci_dev *dev, struct hpp_type2 *hpp)
+>          */
+>  }
+>
+> -static void pci_configure_extended_tags(struct pci_dev *dev)
+> +static bool pcie_bus_exttags_supported(struct pci_bus *bus)
+> +{
+> +       bool exttags_supported = true;
+> +       struct pci_dev *bridge;
+> +       int rc;
+> +       u16 flags;
+> +
+> +       bridge = bus->self;
+> +       while (bridge) {
+> +               if (pci_is_pcie(bridge)) {
+> +                       rc = pcie_capability_read_word(bridge, PCI_EXP_FLAGS,
+> +                                                      &flags);
+> +                       if (!rc && ((flags & PCI_EXP_FLAGS_VERS) < 2)) {
+> +                               exttags_supported = false;
+> +                               break;
+> +                       }
+> +               }
+> +               if (!bridge->bus->parent)
+> +                       break;
+> +               bridge = bridge->bus->parent->self;
+> +       }
+> +
+> +       return exttags_supported;
+> +}
+> +
+> +static int pcie_bus_configure_exttags(struct pci_dev *dev, void *data)
+>  {
+>         u32 dev_cap;
+>         int ret;
+> +       bool supported;
+>
+>         if (!pci_is_pcie(dev))
+> -               return;
+> +               return 0;
+>
+>         ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &dev_cap);
+>         if (ret)
+> -               return;
+> +               return 0;
+>
+> -       if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
+> -               pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
+> -                                        PCI_EXP_DEVCTL_EXT_TAG);
+> +       if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG) {
+> +               supported = pcie_bus_exttags_supported(dev->bus);
+> +
 
+Maybe checking the version of this endpoint at first? Do you expect a
+v1 endpoint
+to be working under v2+ ports?
 
-On Fri, Jul 7, 2017 at 10:12 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Jul 5, 2017 at 8:49 PM, Shubham Bansal
-> <illusionist.neo@gmail.com> wrote:
->> Hi Kees,
->>
->> Problem is my ARM machine don't have clang and iproute2 which is
->> keeping me from testing the bpf tail calls.
->>
->> You should do the following to test it,.
->>
->> 1. tools/testing/selftests/bpf/
->> 2. make
->> 3. sudo ./test_progs
->>
->> And, before testing, you have to do "make headers_install".
->> These tests are for tail calls with the attached patch. If its too
->> much work, Can you please upload your arm image so that I can test it?
->> I just need a good machine.
->
-> I've got all this set up now, and it faults during the test:
->
-> Unable to handle kernel NULL pointer dereference at virtual address 00000008
-> ...
-> CPU: 0 PID: 1922 Comm: test_progs Not tainted 4.12.0+ #60
-> ...
-> PC is at __htab_map_lookup_elem+0x54/0x1f4
->
-> I'll see if I can send you this disk image...
->
-> -Kees
->
->
-> --
-> Kees Cook
-> Pixel Security
+-- 
+Thanks,
+Jike
