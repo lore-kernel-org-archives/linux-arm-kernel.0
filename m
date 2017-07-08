@@ -1,58 +1,66 @@
 From: david.wu@rock-chips.com (David Wu)
-Date: Sat,  8 Jul 2017 12:03:44 +0800
-Subject: [PATCH v2 2/7] pwm: rockchip: Remove the judge from return value of
- pwm_config
+Date: Sat,  8 Jul 2017 12:03:45 +0800
+Subject: [PATCH v2 3/7] pwm: rockchip: Remove the dumplicate rockchip_pwm_ops
+ ops
 In-Reply-To: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
 References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1499486629-9659-3-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1499486629-9659-4-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems the rockchip_pwm_config always returns the result 0,
-so remove the judge.
+The rockchip_pwm_ops_v1 and rockchip_pwm_ops_v2 ops are the same
+struct members, remove one of them.
 
 Signed-off-by: David Wu <david.wu@rock-chips.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/pwm-rockchip.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ drivers/pwm/pwm-rockchip.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index 617824c..cd45f17 100644
+index cd45f17..85f9515 100644
 --- a/drivers/pwm/pwm-rockchip.c
 +++ b/drivers/pwm/pwm-rockchip.c
-@@ -165,7 +165,7 @@ static void rockchip_pwm_get_state(struct pwm_chip *chip,
- 	clk_disable(pc->pclk);
+@@ -255,13 +255,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	return ret;
  }
  
--static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+static void rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 			       int duty_ns, int period_ns)
- {
- 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-@@ -188,8 +188,6 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 
- 	writel(period, pc->base + pc->data->regs.period);
- 	writel(duty, pc->base + pc->data->regs.duty);
+-static const struct pwm_ops rockchip_pwm_ops_v1 = {
+-	.get_state = rockchip_pwm_get_state,
+-	.apply = rockchip_pwm_apply,
+-	.owner = THIS_MODULE,
+-};
 -
--	return 0;
- }
- 
- static int rockchip_pwm_enable(struct pwm_chip *chip,
-@@ -236,13 +234,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 		enabled = false;
- 	}
- 
--	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
--	if (ret) {
--		if (enabled != curstate.enabled)
--			rockchip_pwm_enable(chip, pwm, !enabled,
--				      state->polarity);
--		goto out;
--	}
-+	rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
- 
- 	if (state->enabled != enabled) {
- 		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
+-static const struct pwm_ops rockchip_pwm_ops_v2 = {
++static const struct pwm_ops rockchip_pwm_ops = {
+ 	.get_state = rockchip_pwm_get_state,
+ 	.apply = rockchip_pwm_apply,
+ 	.owner = THIS_MODULE,
+@@ -275,7 +269,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		.ctrl = 0x0c,
+ 	},
+ 	.prescaler = 2,
+-	.ops = &rockchip_pwm_ops_v1,
++	.ops = &rockchip_pwm_ops,
+ 	.set_enable = rockchip_pwm_set_enable_v1,
+ 	.get_state = rockchip_pwm_get_state_v1,
+ };
+@@ -289,7 +283,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	},
+ 	.prescaler = 1,
+ 	.supports_polarity = true,
+-	.ops = &rockchip_pwm_ops_v2,
++	.ops = &rockchip_pwm_ops,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
+ 	.get_state = rockchip_pwm_get_state_v2,
+ };
+@@ -303,7 +297,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	},
+ 	.prescaler = 1,
+ 	.supports_polarity = true,
+-	.ops = &rockchip_pwm_ops_v2,
++	.ops = &rockchip_pwm_ops,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
+ 	.get_state = rockchip_pwm_get_state_v2,
+ };
 -- 
 1.9.1
