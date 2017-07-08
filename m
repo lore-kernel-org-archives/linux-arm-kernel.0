@@ -1,162 +1,40 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sun, 9 Jul 2017 02:08:23 +0300
-Subject: [PATCH v2 4/7] [media] ov9650: use write_array() for resolution
- sequences
-In-Reply-To: <1499073368-31905-5-git-send-email-hugues.fruchet@st.com>
-References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
- <1499073368-31905-5-git-send-email-hugues.fruchet@st.com>
-Message-ID: <20170708230822.zopjpuciemkajewf@valkosipuli.retiisi.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 9 Jul 2017 07:27:08 +0800
+Subject: [PATCH] ARM: dts: at91: sama5d2_xplained: use pin macros instead
+ of numbers
+In-Reply-To: <20170707135611.10303-1-ludovic.desroches@microchip.com>
+Message-ID: <201707090720.uyYcbj17%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 03, 2017 at 11:16:05AM +0200, Hugues Fruchet wrote:
-> Align resolution sequences on initialization sequence using
-> i2c_rv structure NULL terminated .This add flexibility
-> on resolution sequence size.
-> Document resolution related registers by using corresponding
-> define instead of hexa address/value.
-> 
-> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
-> ---
->  drivers/media/i2c/ov9650.c | 88 +++++++++++++++++++++++++++++++---------------
->  1 file changed, 59 insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/media/i2c/ov9650.c b/drivers/media/i2c/ov9650.c
-> index 7e9a902..db96698 100644
-> --- a/drivers/media/i2c/ov9650.c
-> +++ b/drivers/media/i2c/ov9650.c
-> @@ -227,11 +227,16 @@ struct ov965x_ctrls {
->  	u8 update;
->  };
->  
-> +struct i2c_rv {
-> +	u8 addr;
-> +	u8 value;
-> +};
-> +
->  struct ov965x_framesize {
->  	u16 width;
->  	u16 height;
->  	u16 max_exp_lines;
-> -	const u8 *regs;
-> +	const struct i2c_rv *regs;
->  };
->  
->  struct ov965x_interval {
-> @@ -280,11 +285,6 @@ struct ov965x {
->  	u8 apply_frame_fmt;
->  };
->  
-> -struct i2c_rv {
-> -	u8 addr;
-> -	u8 value;
-> -};
-> -
->  static const struct i2c_rv ov965x_init_regs[] = {
->  	{ REG_COM2, 0x10 },	/* Set soft sleep mode */
->  	{ REG_COM5, 0x00 },	/* System clock options */
-> @@ -342,30 +342,59 @@ struct i2c_rv {
->  	{ REG_NULL, 0 }
->  };
->  
-> -#define NUM_FMT_REGS 14
-> -/*
-> - * COM7,  COM3,  COM4, HSTART, HSTOP, HREF, VSTART, VSTOP, VREF,
-> - * EXHCH, EXHCL, ADC,  OCOM,   OFON
-> - */
-> -static const u8 frame_size_reg_addr[NUM_FMT_REGS] = {
-> -	0x12, 0x0c, 0x0d, 0x17, 0x18, 0x32, 0x19, 0x1a, 0x03,
-> -	0x2a, 0x2b, 0x37, 0x38, 0x39,
-> -};
-> -
-> -static const u8 ov965x_sxga_regs[NUM_FMT_REGS] = {
-> -	0x00, 0x00, 0x00, 0x1e, 0xbe, 0xbf, 0x01, 0x81, 0x12,
-> -	0x10, 0x34, 0x81, 0x93, 0x51,
-> +static const struct i2c_rv ov965x_sxga_regs[] = {
-> +	{ REG_COM7, 0x00 },
-> +	{ REG_COM3, 0x00 },
-> +	{ REG_COM4, 0x00 },
-> +	{ REG_HSTART, 0x1e },
-> +	{ REG_HSTOP, 0xbe },
-> +	{ 0x32, 0xbf },
-> +	{ REG_VSTART, 0x01 },
-> +	{ REG_VSTOP, 0x81 },
-> +	{ REG_VREF, 0x12 },
-> +	{ REG_EXHCH, 0x10 },
-> +	{ REG_EXHCL, 0x34 },
-> +	{ REG_ADC, 0x81 },
-> +	{ REG_ACOM, 0x93 },
-> +	{ REG_OFON, 0x51 },
-> +	{ REG_NULL, 0 },
->  };
->  
-> -static const u8 ov965x_vga_regs[NUM_FMT_REGS] = {
-> -	0x40, 0x04, 0x80, 0x26, 0xc6, 0xed, 0x01, 0x3d, 0x00,
-> -	0x10, 0x40, 0x91, 0x12, 0x43,
-> +static const struct i2c_rv ov965x_vga_regs[] = {
-> +	{ REG_COM7, 0x40 },
-> +	{ REG_COM3, 0x04 },
-> +	{ REG_COM4, 0x80 },
-> +	{ REG_HSTART, 0x26 },
-> +	{ REG_HSTOP, 0xc6 },
-> +	{ 0x32, 0xed },
-> +	{ REG_VSTART, 0x01 },
-> +	{ REG_VSTOP, 0x3d },
-> +	{ REG_VREF, 0x00 },
-> +	{ REG_EXHCH, 0x10 },
-> +	{ REG_EXHCL, 0x40 },
-> +	{ REG_ADC, 0x91 },
-> +	{ REG_ACOM, 0x12 },
-> +	{ REG_OFON, 0x43 },
-> +	{ REG_NULL, 0 },
->  };
->  
->  /* Determined empirically. */
-> -static const u8 ov965x_qvga_regs[NUM_FMT_REGS] = {
-> -	0x10, 0x04, 0x80, 0x25, 0xc5, 0xbf, 0x00, 0x80, 0x12,
-> -	0x10, 0x40, 0x91, 0x12, 0x43,
-> +static const struct i2c_rv ov965x_qvga_regs[] = {
-> +	{ REG_COM7, 0x10 },
-> +	{ REG_COM3, 0x04 },
-> +	{ REG_COM4, 0x80 },
-> +	{ REG_HSTART, 0x25 },
-> +	{ REG_HSTOP, 0xc5 },
-> +	{ 0x32, 0xbf },
-> +	{ REG_VSTART, 0x00 },
-> +	{ REG_VSTOP, 0x80 },
-> +	{ REG_VREF, 0x12 },
-> +	{ REG_EXHCH, 0x10 },
-> +	{ REG_EXHCL, 0x40 },
-> +	{ REG_ADC, 0x91 },
-> +	{ REG_ACOM, 0x12 },
-> +	{ REG_OFON, 0x43 },
-> +	{ REG_NULL, 0 },
->  };
->  
->  static const struct ov965x_framesize ov965x_framesizes[] = {
-> @@ -1266,11 +1295,12 @@ static int ov965x_set_fmt(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config
->  
->  static int ov965x_set_frame_size(struct ov965x *ov965x)
->  {
-> -	int i, ret = 0;
-> +	int ret = 0;
-> +
-> +	v4l2_dbg(1, debug, ov965x->client, "%s\n", __func__);
->  
-> -	for (i = 0; ret == 0 && i < NUM_FMT_REGS; i++)
-> -		ret = ov965x_write(ov965x->client, frame_size_reg_addr[i],
-> -				   ov965x->frame_size->regs[i]);
-> +	ret = ov965x_write_array(ov965x->client,
-> +				 ov965x->frame_size->regs);
->  	return ret;
+Hi Ludovic,
 
-return ov96...();
+[auto build test ERROR on at91/at91-next]
+[also build test ERROR on v4.12 next-20170707]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-And you can remove ret, too.
+url:    https://github.com/0day-ci/linux/commits/Ludovic-Desroches/ARM-dts-at91-sama5d2_xplained-use-pin-macros-instead-of-numbers/20170709-040631
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git at91-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
->  }
->  
+All errors (new ones prefixed by >>):
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+>> Error: arch/arm/boot/dts/at91-sama5d2_xplained.dts:538.3-539.1 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 22770 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170709/3da6f083/attachment-0001.gz>
