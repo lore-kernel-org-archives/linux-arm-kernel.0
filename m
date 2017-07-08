@@ -1,102 +1,206 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sat, 8 Jul 2017 11:02:42 +0530
-Subject: [PATCH 3/9] firmware: arm_scmi: add basic driver infrastructure
- for SCMI
-In-Reply-To: <5f2e4f3c-297b-c5f8-9244-399c1c4e2c21@arm.com>
-References: <1498492513-29771-4-git-send-email-sudeep.holla@arm.com>
- <1499446341-5956-1-git-send-email-jaswinder.singh@linaro.org>
- <5f2e4f3c-297b-c5f8-9244-399c1c4e2c21@arm.com>
-Message-ID: <CABb+yY3Xo-meg5bTZ5Cj1DAvf_0yOw0QB5Kq6U7VG+L_L+Mo3w@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Sat, 8 Jul 2017 13:51:15 +0800
+Subject: [PATCH v16 2/7] power: add power sequence library
+In-Reply-To: <2042394.b4eZkzrJ5f@aspire.rjw.lan>
+References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
+ <2629938.X3D3UTyHBr@aspire.rjw.lan>
+ <20170707080107.GC21909@b29397-desktop>
+ <2042394.b4eZkzrJ5f@aspire.rjw.lan>
+Message-ID: <20170708055115.GA25873@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roy, Matt, Nishant, Harb Abdulhamid, Loc,
+On Fri, Jul 07, 2017 at 03:03:06PM +0200, Rafael J. Wysocki wrote:
+> On Friday, July 07, 2017 04:01:07 PM Peter Chen wrote:
+> > On Fri, Jul 07, 2017 at 03:13:48AM +0200, Rafael J. Wysocki wrote:
+> > > > 
+> > > > - Can I write new code for it or I need to depend on something?
+> > > 
+> > > There is nothing this code needs to depend on AFAICS, but there are existing
+> > > solutions in this problem space (ACPI power management, genpd), so it needs to
+> > > be careful enough about possible overlaps etc.
+> > > 
+> > > > I find there is already "power state" concept at documentation.
+> > > > Documentation/ABI/testing/sysfs-devices-power_state
+> > > 
+> > > This is ACPI-specific and only in sysfs directories representing ACPI device
+> > > objects (which aren't physical devices).
+> > > 
+> > > Anyway, since ACPI covers the problem space you are working in already,
+> > > your code has to be mutually exclusive with it.
+> > > 
+> > > > - If I can write the new code for it, except the problems I want
+> > > > to fix, are there any other use cases I need to consider?
+> > > 
+> > > I would start simple and focus on the particular problem at hand, that is
+> > > devices with two power states ("on" and "off") where the "on" state
+> > > depends on a number of clocks and/or GPIOs.  Still, I'd also avoid making
+> > > design choices that might prevent it from being extended in the future
+> > > if need be.
+> > > 
+> > > One major problem I can see is how to "attach" the power states framework
+> > > to a particular device (once we have discovered that it should be used with
+> > > that device).
+> > > 
+> > > For bus types that don't do power management of their own you could follow
+> > > ACPI (and genpd) and provide a PM domain for this purpose, but bus types
+> > > doing their own PM (like USB) will probably need to be treated differently.
+> > > In those cases the bus type code will have to know that it should call some
+> > > helpers to switch power states of devices.
+> > > 
+> > 
+> > After thinking more, using a power state framework is seems too heavy
+> > for this use case. This use case is just do some clock and gpio
+> > operations before device is created, and do some put operations
+> > after device is deleted. We just need some helpers in one structure
+> > (called "power sequence" or "power state") for this purpose.
+> > 
+> > For the use case, the clock and gpio operation can be done after device
+> > is created, the power domain is more suitable.
+> 
+> There is a problem with PM domains that they only provide hooks for runtime PM
+> and system suspend/resume (including hibernation) and not for generic
+> "power up" and "power down" operations that may need to be carried out at
+> probe time before the runtime PM framework can be used (and analogously
+> at remove time).
+> 
+> I would consider starting with the patch below or similar.
+> 
+> Then you can define something like POWER_STATE_SEQUENCE type for your
+> case and basically use almost what you have already with it, except that
+> struct pwrsec_generic will now become struct power_state_sequence and
+> struct power_state_info will be embedded in it instead of struct pwrsec.
+> 
+> The major comceptual difference is that ->power_up and ->power_down are
+> now available at the level of the device that needs the power sequence and
+> pm_device_power_up/down() can be used wherever necessary (in the code,
+> in a bus type, in a controller driver or even in the driver for this particular
+> device).
 
-I have a gut feeling you guys were part of the SCMI spec committee. If
-so, could you please chime in?
+Rafeal, thanks for your patch.
 
+The biggest problem for my use case is the device is still not created.
+How can I call pm_device_power_up(dev)?
 
-On Fri, Jul 7, 2017 at 11:09 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 07/07/17 17:52, Jassi Brar wrote:
->> Hi Arnd, Hi Rob, Hi Mark,
->>
->> [CC'ing only those who I have the email id of]
->>
->>> +/**
->>> + * scmi_do_xfer() - Do one transfer
->>> + *
->>> + * @info: Pointer to SCMI entity information
->>> + * @xfer: Transfer to initiate and wait for response
->>> + *
->>> + * Return: -ETIMEDOUT in case of no response, if transmit error,
->>> + *   return corresponding error, else if all goes well,
->>> + *   return 0.
->>> + */
->>> +int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
->>> +{
->>> +    int ret;
->>> +    int timeout;
->>> +    struct scmi_info *info = handle_to_scmi_info(handle);
->>> +    struct device *dev = info->dev;
->>> +
->>> +    ret = mbox_send_message(info->tx_chan, xfer);
->>> +
->>>
->> The api is
->>
->>     int mbox_send_message(struct mbox_chan *chan, void *mssg)
->>
->> where each controller driver defines its own format in which it accepts
->> the 'mssg' to be transmitted.
->>
->
-> Yes they can continue that, but SCMI just doesn't depend on that.
->
->> For example :-
->> ti_msgmgr_send_data(struct mbox_chan *, struct ti_msgmgr_message *)
->> rockchip_mbox_send_data(struct mbox_chan *, struct rockchip_mbox_msg *)
->> ....and so on...  you get the idea.
->>
->
-> Yes I am aware of that.
->
->> Some controller driver may ignore the 'mssg' because only an interrupt line
->> is shared with the remote and not some register/fifo.
->> For example,
->>   sti_mbox_send_data(struct mbox_chan *, void *ignored)
->>
->
-> Exactly, now with SCMI, every controller *can do* that, as we just care
-> about the signaling which in other terms I have so far referred as
-> "doorbell".
->
-No, the controllers can not ... unless you clone and adapt the 9
-drivers+bindings to conform to the expectations of SCMI (like you
-attempted with MHU recently). Also, then mandate every future
-controller driver must emulate "doorbell" channels.
+Peter
+> 
+> Most likely you will need a PM domain in addition to that, but mostly to avoid
+> code duplication.
+> 
+> And in the future other types of power state definitions may be hooked up
+> to that, including ACPI etc.
+> 
+> 
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> ---
+>  drivers/base/power/common.c |   35 +++++++++++++++++++++++++++++++++++
+>  include/linux/pm.h          |   33 +++++++++++++++++++++++++++++++++
+>  2 files changed, 68 insertions(+)
+> 
+> Index: linux-pm/include/linux/pm.h
+> ===================================================================
+> --- linux-pm.orig/include/linux/pm.h
+> +++ linux-pm/include/linux/pm.h
+> @@ -550,6 +550,30 @@ struct pm_subsys_data {
+>  #endif
+>  };
+>  
+> +enum power_state_type {
+> +	POWER_STATE_GENERIC = 0,
+> +};
+> +
+> +/**
+> + * struct power_state_info - information related to device power states.
+> + *
+> + * @type: Power states definition type.
+> + * @power_up: Device power up method.
+> + * @power_down: Device power down method.
+> + *
+> + * @power_up is expected to put the device into a power state in which it can
+> + * be operated by software (it doesn't have to be the full power state in
+> + * principle as long as the device will respond to all software accesses in
+> + * this state) and @power_down is expected to put the device into the lowest
+> + * power state the device can be put into given all of the applicable
+> + * constraints and limitations (it may not mean completely off).
+> + */
+> +struct power_state_info {
+> +	enum power_state_type type;
+> +	int (*power_up)(struct device *dev);
+> +	int (*power_down)(struct device *dev);
+> +};
+> +
+>  struct dev_pm_info {
+>  	pm_message_t		power_state;
+>  	unsigned int		can_wakeup:1;
+> @@ -600,6 +624,7 @@ struct dev_pm_info {
+>  	unsigned long		active_jiffies;
+>  	unsigned long		suspended_jiffies;
+>  	unsigned long		accounting_timestamp;
+> +	struct power_state_info	*state;
+>  #endif
+>  	struct pm_subsys_data	*subsys_data;  /* Owned by the subsystem. */
+>  	void (*set_latency_tolerance)(struct device *, s32);
+> @@ -610,6 +635,14 @@ extern void update_pm_runtime_accounting
+>  extern int dev_pm_get_subsys_data(struct device *dev);
+>  extern void dev_pm_put_subsys_data(struct device *dev);
+>  
+> +#ifdef CONFIG_PM
+> +extern int pm_device_power_up(struct device *dev);
+> +extern int pm_device_power_down(struct device *dev);
+> +#else
+> +static inline int pm_device_power_up(struct device *dev) { return 0; }
+> +static inline int pm_device_power_down(struct device *dev) { return 0; }
+> +#endif /* CONFIG_PM */
+> +
+>  /**
+>   * struct dev_pm_domain - power management domain representation.
+>   *
+> Index: linux-pm/drivers/base/power/common.c
+> ===================================================================
+> --- linux-pm.orig/drivers/base/power/common.c
+> +++ linux-pm/drivers/base/power/common.c
+> @@ -152,3 +152,38 @@ void dev_pm_domain_set(struct device *de
+>  	device_pm_check_callbacks(dev);
+>  }
+>  EXPORT_SYMBOL_GPL(dev_pm_domain_set);
+> +
+> +/**
+> + * pm_device_power_up - Power up a device using the power states framework.
+> + * @dev: Device to power up.
+> + *
+> + * Put the device into a power state in which it will respond to all software
+> + * accesses (that may not mean maximum power) using the callback provided
+> + * through the device power state framework, if present.
+> + */
+> +int pm_device_power_up(struct device *dev)
+> +{
+> +	if (dev->power.state && dev->power.state->power_up)
+> +		return dev->power.state->power_up(dev);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pm_device_power_up);
+> +
+> +/**
+> + * pm_device_power_down - Power down a device using the power states framework.
+> + * @dev: Device to power down.
+> + *
+> + * Put the device into the lowest power state it can be put into given the
+> + * applicable constraints and limitations (that may not mean maximum power)
+> + * using the callback provided through the device power state framework, if
+> + * present.
+> + */
+> +int pm_device_power_down(struct device *dev)
+> +{
+> +	if (dev->power.state && dev->power.state->power_down)
+> +		return dev->power.state->power_down(dev);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pm_device_power_down);
+> 
 
-As the mailbox maintainer, I am open to suggestions that would allow
-every controller to support SCMI.
-But compared to the options of scmi-as-a-library and
-scmi-as-child-node-of-platform-parent, this does not even qualify as
-an option.
+-- 
 
-Why? Because SCMI is but one protocol that provides 4 features ATM,
-and certainly can not provide for every whim and quirk of future
-platforms.  Among the sane requirements are watchdog,
-suspend/resume/hibernation and thermal _control_ (not just sensor
-readings) and among the weird are video, network and storage over
-mailbox api. And even a filesystem backed by read/write over mailbox!!
- And these are only that I have worked on first hand.
-
-  The point is : you can not assume SCMI to be the only protocol
-running over a controller _and_ you can not dictate other protocols to
-not touch certain bits of the signal register/fifo.
-
-In simplest terms, controller driver can not cater to only a
-particular client. That's the reason we have the controller driver
-define the message format and clients conform to it.
-
-Thanks.
+Best Regards,
+Peter Chen
