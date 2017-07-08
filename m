@@ -1,46 +1,46 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sat, 08 Jul 2017 20:16:44 +0100
-Subject: [PATCH 4/6] arm64: dts: marvell: mcbin: properly add GPIO
+Date: Sat, 08 Jul 2017 20:16:55 +0100
+Subject: [PATCH CFT 6/6] arm64: dts: marvell: mcbin: add support for PCIe
 In-Reply-To: <20170708191317.GM4902@n2100.armlinux.org.uk>
 References: <20170708191317.GM4902@n2100.armlinux.org.uk>
-Message-ID: <E1dTvDg-0007Ew-Tv@rmk-PC.armlinux.org.uk>
+Message-ID: <E1dTvDr-0007FB-7Z@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Proprely add GPIO specifications for the USB 5V regulator.
+Add support for PCIe with the the PCIe reset signal wired up to the
+appropriate GPIO pin.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index 773a157e4af5..b20c17160cbb 100644
+index 1372558d037b..53346ccad6cf 100644
 --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
 +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -79,12 +79,13 @@
- 
- 	v_5v0_usb3_hst_vbus: regulator-usb3-vbus0 {
- 		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&cpm_gpio2 15 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cpm_xhci_vbus_pins>;
- 		regulator-name = "v_5v0_usb3_hst_vbus";
- 		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
--		gpio = <&cpm_gpio2 15 GPIO_ACTIVE_HIGH>;
--		regulator-always-on;
--		enable-active-high;
- 		status = "okay";
+@@ -161,6 +161,15 @@
  	};
+ };
  
-@@ -139,6 +140,10 @@
- 		marvell,pins = "mpp37", "mpp38";
- 		marvell,function = "i2c0";
++&cpm_pcie0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cpm_pcie_pins>;
++	num-lanes = <4>;
++	num-viewport = <8>;
++	reset-gpio = <&cpm_gpio1 20 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
+ &cpm_pinctrl {
+ 	cpm_ge_mdio_pins: ge-mdio-pins {
+ 		marvell,pins = "mpp32", "mpp34";
+@@ -178,6 +187,10 @@
+ 		marvell,pins = "mpp47";
+ 		marvell,function = "gpio";
  	};
-+	cpm_xhci_vbus_pins: xhci0-vbus-pins {
-+		marvell,pins = "mpp47";
++	cpm_pcie_pins: pcie-pins {
++		marvell,pins = "mpp52";
 +		marvell,function = "gpio";
 +	};
  	cpm_sdhci_pins: sdhci-pins {
