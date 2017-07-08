@@ -1,32 +1,31 @@
 From: davem@davemloft.net (David Miller)
-Date: Sat, 08 Jul 2017 10:40:20 +0100 (WEST)
-Subject: [PATCH] net: macb: Adding Support for Jumbo Frames up to 10240
- Bytes in SAMA5D3
-In-Reply-To: <20170705153616.15965-1-nicolas.ferre@microchip.com>
-References: <20170705153616.15965-1-nicolas.ferre@microchip.com>
-Message-ID: <20170708.104020.1241751447608549551.davem@davemloft.net>
+Date: Sat, 08 Jul 2017 11:28:19 +0100 (WEST)
+Subject: [PATCH] net: ethernet: mediatek: remove useless code in
+ mtk_probe()
+In-Reply-To: <20170707202333.GA5114@embeddedgus>
+References: <20170707150831.Horde.MYtEbXeqxGS-hTg2bUv3DWt@gator4166.hostgator.com>
+ <20170707202333.GA5114@embeddedgus>
+Message-ID: <20170708.112819.2140475148838704261.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@microchip.com>
-Date: Wed, 5 Jul 2017 17:36:16 +0200
+From: "Gustavo A. R. Silva" <garsilva@embeddedor.com>
+Date: Fri, 7 Jul 2017 15:23:34 -0500
 
-> From: vishnuvardhan <vardhanraj4143@gmail.com>
+> Remove useless local variables _match_, _soc_ and the code related.
 > 
-> As per the SAMA5D3 device specification it supports Jumbo frames.
-> But the suggested flag and length of bytes it supports was not updated
-> in this driver config_structure.
-> The maximum jumbo frames the device supports :
-> 10240 bytes as per the device spec.
+> Notice that
 > 
-> While changing the MTU value greater than 1500, it threw error:
-> sudo ifconfig eth1 mtu 9000
-> SIOCSIFMTU: Invalid argument
+> const struct of_device_id of_mtk_match[] = {
+>         { .compatible = "mediatek,mt2701-eth" },
+>         {},
+> };
 > 
-> Add this support to driver so that it works as expected and designed.
+> So match->data is NULL.
 > 
-> Signed-off-by: vishnuvardhan <vardhanraj4143@gmail.com>
-> [nicolas.ferre at microchip.com: modify slightly commit msg]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Suggested-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 
-Applied, thank you.
+Applied, thanks.
+
+If someone needs this they can it back, in a less buggy form.
