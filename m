@@ -1,9 +1,9 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 7 Jul 2017 18:45:06 -0700
+Date: Fri, 7 Jul 2017 18:45:21 -0700
 Subject: [PATCH] watchdog: stm32_iwdg: constify watchdog_ops structure
 In-Reply-To: <20170708002857.GA12556@embeddedgus>
 References: <20170708002857.GA12556@embeddedgus>
-Message-ID: <0082d827-3e07-ed28-a122-3dee8e438748@roeck-us.net>
+Message-ID: <1a211e3b-6edb-ed0c-1d8a-20ac9c62f763@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
