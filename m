@@ -1,206 +1,120 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sat, 8 Jul 2017 13:51:15 +0800
-Subject: [PATCH v16 2/7] power: add power sequence library
-In-Reply-To: <2042394.b4eZkzrJ5f@aspire.rjw.lan>
-References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
- <2629938.X3D3UTyHBr@aspire.rjw.lan>
- <20170707080107.GC21909@b29397-desktop>
- <2042394.b4eZkzrJ5f@aspire.rjw.lan>
-Message-ID: <20170708055115.GA25873@b29397-desktop>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Sat, 8 Jul 2017 14:30:26 +0800
+Subject: [PATCH v3 1/3] cpufreq: mediatek: Add support of cpufreq to
+ MT2701/MT7623 SoC
+In-Reply-To: <1499412649.4449.33.camel@suse.de>
+References: <cover.1499399121.git.sean.wang@mediatek.com>
+ <de42e68d86dd161bb18b4ca7f27774c63c1bd55d.1499399121.git.sean.wang@mediatek.com>
+ <1499412649.4449.33.camel@suse.de>
+Message-ID: <1499495426.16278.9.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 07, 2017 at 03:03:06PM +0200, Rafael J. Wysocki wrote:
-> On Friday, July 07, 2017 04:01:07 PM Peter Chen wrote:
-> > On Fri, Jul 07, 2017 at 03:13:48AM +0200, Rafael J. Wysocki wrote:
-> > > > 
-> > > > - Can I write new code for it or I need to depend on something?
-> > > 
-> > > There is nothing this code needs to depend on AFAICS, but there are existing
-> > > solutions in this problem space (ACPI power management, genpd), so it needs to
-> > > be careful enough about possible overlaps etc.
-> > > 
-> > > > I find there is already "power state" concept at documentation.
-> > > > Documentation/ABI/testing/sysfs-devices-power_state
-> > > 
-> > > This is ACPI-specific and only in sysfs directories representing ACPI device
-> > > objects (which aren't physical devices).
-> > > 
-> > > Anyway, since ACPI covers the problem space you are working in already,
-> > > your code has to be mutually exclusive with it.
-> > > 
-> > > > - If I can write the new code for it, except the problems I want
-> > > > to fix, are there any other use cases I need to consider?
-> > > 
-> > > I would start simple and focus on the particular problem at hand, that is
-> > > devices with two power states ("on" and "off") where the "on" state
-> > > depends on a number of clocks and/or GPIOs.  Still, I'd also avoid making
-> > > design choices that might prevent it from being extended in the future
-> > > if need be.
-> > > 
-> > > One major problem I can see is how to "attach" the power states framework
-> > > to a particular device (once we have discovered that it should be used with
-> > > that device).
-> > > 
-> > > For bus types that don't do power management of their own you could follow
-> > > ACPI (and genpd) and provide a PM domain for this purpose, but bus types
-> > > doing their own PM (like USB) will probably need to be treated differently.
-> > > In those cases the bus type code will have to know that it should call some
-> > > helpers to switch power states of devices.
-> > > 
+On Fri, 2017-07-07 at 09:30 +0200, Jean Delvare wrote:
+> Hi Sean,
+> 
+> On ven., 2017-07-07 at 11:56 +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
 > > 
-> > After thinking more, using a power state framework is seems too heavy
-> > for this use case. This use case is just do some clock and gpio
-> > operations before device is created, and do some put operations
-> > after device is deleted. We just need some helpers in one structure
-> > (called "power sequence" or "power state") for this purpose.
+> > MT2701/MT7623 is a 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
+> > single cluster and this hardware is also compatible with the existing
+> > driver through enabling CPU frequency feature with operating-points-v2
+> > bindings. Also, this driver actually supports all MediaTek SoCs, the
+> > Kconfig menu entry and file name itself should be updated with more
+> > generic name to drop "MT8173"
 > > 
-> > For the use case, the clock and gpio operation can be done after device
-> > is created, the power domain is more suitable.
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm                         | 8 ++++----
+> >  drivers/cpufreq/Makefile                            | 2 +-
+> >  drivers/cpufreq/{mt8173-cpufreq.c => mtk-cpufreq.c} | 2 ++
+> >  3 files changed, 7 insertions(+), 5 deletions(-)
+> >  rename drivers/cpufreq/{mt8173-cpufreq.c => mtk-cpufreq.c} (99%)
+> > 
+> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > index 74ed7e9..79aece7 100644
+> > --- a/drivers/cpufreq/Kconfig.arm
+> > +++ b/drivers/cpufreq/Kconfig.arm
+> > @@ -87,14 +87,14 @@ config ARM_KIRKWOOD_CPUFREQ
+> >  	  This adds the CPUFreq driver for Marvell Kirkwood
+> >  	  SoCs.
+> >  
+> > -config ARM_MT8173_CPUFREQ
+> > -	tristate "Mediatek MT8173 CPUFreq support"
+> > +config ARM_MEDIATEK_CPUFREQ
+> > +	tristate "CPU Frequency scaling support for MediaTek SoCs"
+> >  	depends on ARCH_MEDIATEK && REGULATOR
+> > -	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
+> > +	depends on ARM || ARM64 || COMPILE_TEST
 > 
-> There is a problem with PM domains that they only provide hooks for runtime PM
-> and system suspend/resume (including hibernation) and not for generic
-> "power up" and "power down" operations that may need to be carried out at
-> probe time before the runtime PM framework can be used (and analogously
-> at remove time).
-> 
-> I would consider starting with the patch below or similar.
-> 
-> Then you can define something like POWER_STATE_SEQUENCE type for your
-> case and basically use almost what you have already with it, except that
-> struct pwrsec_generic will now become struct power_state_sequence and
-> struct power_state_info will be embedded in it instead of struct pwrsec.
-> 
-> The major comceptual difference is that ->power_up and ->power_down are
-> now available at the level of the device that needs the power sequence and
-> pm_device_power_up/down() can be used wherever necessary (in the code,
-> in a bus type, in a controller driver or even in the driver for this particular
-> device).
-
-Rafeal, thanks for your patch.
-
-The biggest problem for my use case is the device is still not created.
-How can I call pm_device_power_up(dev)?
-
-Peter
-> 
-> Most likely you will need a PM domain in addition to that, but mostly to avoid
-> code duplication.
-> 
-> And in the future other types of power state definitions may be hooked up
-> to that, including ACPI etc.
-> 
-> 
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> ---
->  drivers/base/power/common.c |   35 +++++++++++++++++++++++++++++++++++
->  include/linux/pm.h          |   33 +++++++++++++++++++++++++++++++++
->  2 files changed, 68 insertions(+)
-> 
-> Index: linux-pm/include/linux/pm.h
-> ===================================================================
-> --- linux-pm.orig/include/linux/pm.h
-> +++ linux-pm/include/linux/pm.h
-> @@ -550,6 +550,30 @@ struct pm_subsys_data {
->  #endif
->  };
->  
-> +enum power_state_type {
-> +	POWER_STATE_GENERIC = 0,
-> +};
-> +
-> +/**
-> + * struct power_state_info - information related to device power states.
-> + *
-> + * @type: Power states definition type.
-> + * @power_up: Device power up method.
-> + * @power_down: Device power down method.
-> + *
-> + * @power_up is expected to put the device into a power state in which it can
-> + * be operated by software (it doesn't have to be the full power state in
-> + * principle as long as the device will respond to all software accesses in
-> + * this state) and @power_down is expected to put the device into the lowest
-> + * power state the device can be put into given all of the applicable
-> + * constraints and limitations (it may not mean completely off).
-> + */
-> +struct power_state_info {
-> +	enum power_state_type type;
-> +	int (*power_up)(struct device *dev);
-> +	int (*power_down)(struct device *dev);
-> +};
-> +
->  struct dev_pm_info {
->  	pm_message_t		power_state;
->  	unsigned int		can_wakeup:1;
-> @@ -600,6 +624,7 @@ struct dev_pm_info {
->  	unsigned long		active_jiffies;
->  	unsigned long		suspended_jiffies;
->  	unsigned long		accounting_timestamp;
-> +	struct power_state_info	*state;
->  #endif
->  	struct pm_subsys_data	*subsys_data;  /* Owned by the subsystem. */
->  	void (*set_latency_tolerance)(struct device *, s32);
-> @@ -610,6 +635,14 @@ extern void update_pm_runtime_accounting
->  extern int dev_pm_get_subsys_data(struct device *dev);
->  extern void dev_pm_put_subsys_data(struct device *dev);
->  
-> +#ifdef CONFIG_PM
-> +extern int pm_device_power_up(struct device *dev);
-> +extern int pm_device_power_down(struct device *dev);
-> +#else
-> +static inline int pm_device_power_up(struct device *dev) { return 0; }
-> +static inline int pm_device_power_down(struct device *dev) { return 0; }
-> +#endif /* CONFIG_PM */
-> +
->  /**
->   * struct dev_pm_domain - power management domain representation.
->   *
-> Index: linux-pm/drivers/base/power/common.c
-> ===================================================================
-> --- linux-pm.orig/drivers/base/power/common.c
-> +++ linux-pm/drivers/base/power/common.c
-> @@ -152,3 +152,38 @@ void dev_pm_domain_set(struct device *de
->  	device_pm_check_callbacks(dev);
->  }
->  EXPORT_SYMBOL_GPL(dev_pm_domain_set);
-> +
-> +/**
-> + * pm_device_power_up - Power up a device using the power states framework.
-> + * @dev: Device to power up.
-> + *
-> + * Put the device into a power state in which it will respond to all software
-> + * accesses (that may not mean maximum power) using the callback provided
-> + * through the device power state framework, if present.
-> + */
-> +int pm_device_power_up(struct device *dev)
-> +{
-> +	if (dev->power.state && dev->power.state->power_up)
-> +		return dev->power.state->power_up(dev);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(pm_device_power_up);
-> +
-> +/**
-> + * pm_device_power_down - Power down a device using the power states framework.
-> + * @dev: Device to power down.
-> + *
-> + * Put the device into the lowest power state it can be put into given the
-> + * applicable constraints and limitations (that may not mean maximum power)
-> + * using the callback provided through the device power state framework, if
-> + * present.
-> + */
-> +int pm_device_power_down(struct device *dev)
-> +{
-> +	if (dev->power.state && dev->power.state->power_down)
-> +		return dev->power.state->power_down(dev);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(pm_device_power_down);
+> This statement no longer serves any purpose. The whole Kconfig.arm file
+> depends on ARM || ARM64, so you can drop it. As a matter of fact no
+> other entry in this file has the dependency.
 > 
 
--- 
+Okay, the whole line seemed redundant for that's always true. 
+I will drop it in the next version.
 
-Best Regards,
-Peter Chen
+> >  	depends on !CPU_THERMAL || THERMAL
+> >  	select PM_OPP
+> >  	help
+> > -	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
+> > +	  This adds the CPUFreq driver support for MediaTek SoCs.
+> >  
+> >  config ARM_OMAP2PLUS_CPUFREQ
+> >  	bool "TI OMAP2+"
+> > diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> > index b7e78f0..4956f5d 100644
+> > --- a/drivers/cpufreq/Makefile
+> > +++ b/drivers/cpufreq/Makefile
+> > @@ -58,7 +58,7 @@ obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
+> >  obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
+> >  obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+> >  obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
+> > -obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
+> > +obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mtk-cpufreq.o
+> 
+> I would have preferred mediatek-cpufreq. 3-letter abbreviations are
+> likely to collide and cause confusion at some point in time. However it
+> seems I am late to the party, I see that there are already many files
+> named mtk-* or *-mtk.*... So, so be it.
+> 
+> Also the file describing the bindings is named cpufreq-mediatek.txt,
+> which is inconsistent... But the situation is the same for a few other
+> cpufreq drivers already, so I suppose this is acceptable.
+> 
+
+Agreed. I also prefer using whole name with mediatek as the 
+prefix than just abbreviation used. I will update it also in the
+next version.
+
+As for the file naming for other drivers, i feel it's okay for me
+changing into mediatek as file prefix, but it still depends on
+maintainers or original authors if they likes this.
+
+
+	Sean
+
+> >  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+> >  obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+> >  obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
+> > diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mtk-cpufreq.c
+> > similarity index 99%
+> > rename from drivers/cpufreq/mt8173-cpufreq.c
+> > rename to drivers/cpufreq/mtk-cpufreq.c
+> > index fd1886f..481ec77 100644
+> > --- a/drivers/cpufreq/mt8173-cpufreq.c
+> > +++ b/drivers/cpufreq/mtk-cpufreq.c
+> > @@ -575,6 +575,8 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
+> >  
+> >  /* List of machines supported by this driver */
+> >  static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
+> > +	{ .compatible = "mediatek,mt2701", },
+> > +	{ .compatible = "mediatek,mt7623", },
+> >  	{ .compatible = "mediatek,mt817x", },
+> >  	{ .compatible = "mediatek,mt8173", },
+> >  	{ .compatible = "mediatek,mt8176", },
+> 
+> Reviewed-by: Jean Delvare <jdelvare@suse.de>
+> 
