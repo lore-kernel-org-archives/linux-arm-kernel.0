@@ -1,53 +1,53 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 8 Jul 2017 15:42:46 +0200
-Subject: [PATCH] iio: adc: meson-saradc: add NULL check on
- of_match_device() return value
-In-Reply-To: <20170707064630.GA21945@embeddedgus>
-References: <20170707064630.GA21945@embeddedgus>
-Message-ID: <CAFBinCBgXAFvLqXP5e-j=UeQVd+foUDqKUNzO8hwQ71tKga1Vg@mail.gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sat,  8 Jul 2017 08:48:30 -0500
+Subject: [PATCH] KVM: arm/arm64: Fix bug in advertising KVM_CAP_MSI_DEVID
+ capability
+Message-ID: <1499521710-27494-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 7, 2017 at 8:46 AM, Gustavo A. R. Silva
-<garsilva@embeddedor.com> wrote:
-> Check return value from call to of_match_device()
-> in order to prevent a NULL pointer dereference.
->
-> In case of NULL print error message and return -ENODEV
->
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
-thanks for finding this. a crash here is a rather theoretical problem
-(since all compatible strings have their corresponding match data) -
-but it doesn't hurt either, so:
+Commit 0e4e82f154e3 ("KVM: arm64: vgic-its: Enable ITS emulation as
+a virtual MSI controller") tried to advertise KVM_CAP_MSI_DEVID, but
+the code logic was not updating the dist->msis_require_devid field
+correctly. If hypervisor tool creates the ITS device after VGIC
+initialization then we don't advertise KVM_CAP_MSI_DEVID capability.
 
-Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Update the field msis_require_devid to true inside vgic_its_create()
+to fix the issue.
 
+Fixes: 0e4e82f154e3 ("vgic-its: Enable ITS emulation as a virtual MSI controller")
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ virt/kvm/arm/vgic/vgic-init.c | 3 ---
+ virt/kvm/arm/vgic/vgic-its.c  | 1 +
+ 2 files changed, 1 insertion(+), 3 deletions(-)
 
-> ---
->  drivers/iio/adc/meson_saradc.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
-> index 83da50e..07dbcc3 100644
-> --- a/drivers/iio/adc/meson_saradc.c
-> +++ b/drivers/iio/adc/meson_saradc.c
-> @@ -915,6 +915,11 @@ static int meson_sar_adc_probe(struct platform_device *pdev)
->         init_completion(&priv->done);
->
->         match = of_match_device(meson_sar_adc_of_match, &pdev->dev);
-> +       if (!match) {
-> +               dev_err(&pdev->dev, "failed to match device\n");
-> +               return -ENODEV;
-> +       }
-> +
->         priv->data = match->data;
->
->         indio_dev->name = priv->data->name;
-> --
-> 2.5.0
->
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 3a0b899..5801261 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -285,9 +285,6 @@ int vgic_init(struct kvm *kvm)
+ 	if (ret)
+ 		goto out;
+ 
+-	if (vgic_has_its(kvm))
+-		dist->msis_require_devid = true;
+-
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		kvm_vgic_vcpu_enable(vcpu);
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 2dff288..aa6b68d 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1598,6 +1598,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+ 	INIT_LIST_HEAD(&its->device_list);
+ 	INIT_LIST_HEAD(&its->collection_list);
+ 
++	dev->kvm->arch.vgic.msis_require_devid = true;
+ 	dev->kvm->arch.vgic.has_its = true;
+ 	its->enabled = false;
+ 	its->dev = dev;
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
