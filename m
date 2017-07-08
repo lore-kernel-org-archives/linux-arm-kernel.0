@@ -1,165 +1,102 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Sat,  8 Jul 2017 12:25:42 +0800
-Subject: [RESEND PATCH v2 6/7] pwm: rockchip: Add rk3328 pwm support
-In-Reply-To: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
-References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1499487942-5302-1-git-send-email-david.wu@rock-chips.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 8 Jul 2017 11:02:42 +0530
+Subject: [PATCH 3/9] firmware: arm_scmi: add basic driver infrastructure
+ for SCMI
+In-Reply-To: <5f2e4f3c-297b-c5f8-9244-399c1c4e2c21@arm.com>
+References: <1498492513-29771-4-git-send-email-sudeep.holla@arm.com>
+ <1499446341-5956-1-git-send-email-jaswinder.singh@linaro.org>
+ <5f2e4f3c-297b-c5f8-9244-399c1c4e2c21@arm.com>
+Message-ID: <CABb+yY3Xo-meg5bTZ5Cj1DAvf_0yOw0QB5Kq6U7VG+L_L+Mo3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3328 soc supports atomic update, we could lock the configuration
-of period and duty at first, after unlock is configured, the period and
-duty are effective at the same time.
+Hi Roy, Matt, Nishant, Harb Abdulhamid, Loc,
 
-If the polarity, period and duty need to be configured together,
-the way for atomic update is "configure lock and old polarity" ->
-"configure period and duty" -> "configure unlock and new polarity".
+I have a gut feeling you guys were part of the SCMI spec committee. If
+so, could you please chime in?
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-change in v2:
- - 3 different pwm_ops apply(),one for each IP revision.
- .../devicetree/bindings/pwm/pwm-rockchip.txt       |  1 +
- drivers/pwm/pwm-rockchip.c                         | 63 ++++++++++++++++++++--
- 2 files changed, 60 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-index 2350ef9..152c736 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-@@ -4,6 +4,7 @@ Required properties:
-  - compatible: should be "rockchip,<name>-pwm"
-    "rockchip,rk2928-pwm": found on RK29XX,RK3066 and RK3188 SoCs
-    "rockchip,rk3288-pwm": found on RK3288 SoC
-+   "rockchip,rk3328-pwm": found on RK3328 SoC
-    "rockchip,vop-pwm": found integrated in VOP on RK3288 SoC
-  - reg: physical base address and length of the controller's registers
-  - clocks: See ../clock/clock-bindings.txt
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index 83703e1..838e8fc 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -29,6 +29,7 @@
- #define PWM_INACTIVE_POSITIVE	(1 << 4)
- #define PWM_POLARITY_MASK	(PWM_DUTY_POSITIVE | PWM_INACTIVE_POSITIVE)
- #define PWM_OUTPUT_LEFT		(0 << 5)
-+#define PWM_LOCK_EN		(1 << 6)
- #define PWM_LP_DISABLE		(0 << 8)
- 
- struct rockchip_pwm_chip {
-@@ -124,13 +125,24 @@ static void rockchip_pwm_get_state(struct pwm_chip *chip,
- }
- 
- static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
--			       struct pwm_state *state, bool polarity)
-+			       struct pwm_state *state, bool polarity,
-+			       bool lock)
- {
- 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
- 	unsigned long period, duty;
- 	u64 clk_rate, div;
- 	u32 ctrl;
- 
-+	/*
-+	 * Lock the period and duty of previous configuration, then
-+	 * change the duty and period, that would not be effective.
-+	 */
-+	ctrl = readl_relaxed(pc->base + pc->data->regs.ctrl);
-+	if (lock) {
-+		ctrl |= PWM_LOCK_EN;
-+		writel_relaxed(ctrl, pc->base + pc->data->regs.ctrl);
-+	}
-+
- 	clk_rate = clk_get_rate(pc->clk);
- 
- 	/*
-@@ -148,7 +160,6 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	writel(period, pc->base + pc->data->regs.period);
- 	writel(duty, pc->base + pc->data->regs.duty);
- 
--	ctrl = readl_relaxed(pc->base + pc->data->regs.ctrl);
- 	if (polarity) {
- 		ctrl &= ~PWM_POLARITY_MASK;
- 		if (state->polarity == PWM_POLARITY_INVERSED)
-@@ -156,6 +167,15 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 		else
- 			ctrl |= PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
- 	}
-+
-+	/*
-+	 * Unlock and set polarity at the same time,
-+	 * the configuration of duty, period and polarity
-+	 * would be effective together at next period.
-+	 */
-+	if (lock)
-+		ctrl &= ~PWM_LOCK_EN;
-+
- 	writel(ctrl, pc->base + pc->data->regs.ctrl);
- 
- 	return 0;
-@@ -209,7 +229,7 @@ static int rockchip_pwm_apply_v1(struct pwm_chip *chip, struct pwm_device *pwm,
- 		enabled = false;
- 	}
- 
--	rockchip_pwm_config(chip, pwm, state, false);
-+	rockchip_pwm_config(chip, pwm, state, false, false);
- 	if (state->enabled != enabled)
- 		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
- 				    enable_conf);
-@@ -236,7 +256,27 @@ static int rockchip_pwm_apply_v2(struct pwm_chip *chip, struct pwm_device *pwm,
- 		enabled = false;
- 	}
- 
--	rockchip_pwm_config(chip, pwm, state, true);
-+	rockchip_pwm_config(chip, pwm, state, true, false);
-+	if (state->enabled != enabled)
-+		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
-+					  enable_conf);
-+
-+	return ret;
-+}
-+
-+static int rockchip_pwm_apply_v3(struct pwm_chip *chip, struct pwm_device *pwm,
-+				 struct pwm_state *state)
-+{
-+	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
-+		  PWM_CONTINUOUS;
-+	struct pwm_state curstate;
-+	bool enabled;
-+	int ret = 0;
-+
-+	pwm_get_state(pwm, &curstate);
-+	enabled = curstate.enabled;
-+
-+	rockchip_pwm_config(chip, pwm, state, true, true);
- 	if (state->enabled != enabled)
- 		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
- 					  enable_conf);
-@@ -317,9 +357,24 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 	.pwm_apply = rockchip_pwm_apply_v2,
- };
- 
-+static const struct rockchip_pwm_data pwm_data_v3 = {
-+	.regs = {
-+		.duty = 0x08,
-+		.period = 0x04,
-+		.cntr = 0x00,
-+		.ctrl = 0x0c,
-+	},
-+	.prescaler = 1,
-+	.supports_polarity = true,
-+	.ops = &rockchip_pwm_ops,
-+	.get_state = rockchip_pwm_get_state_v2,
-+	.pwm_apply = rockchip_pwm_apply_v3,
-+};
-+
- static const struct of_device_id rockchip_pwm_dt_ids[] = {
- 	{ .compatible = "rockchip,rk2928-pwm", .data = &pwm_data_v1},
- 	{ .compatible = "rockchip,rk3288-pwm", .data = &pwm_data_v2},
-+	{ .compatible = "rockchip,rk3328-pwm", .data = &pwm_data_v3},
- 	{ .compatible = "rockchip,vop-pwm", .data = &pwm_data_vop},
- 	{ /* sentinel */ }
- };
--- 
-1.9.1
+On Fri, Jul 7, 2017 at 11:09 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 07/07/17 17:52, Jassi Brar wrote:
+>> Hi Arnd, Hi Rob, Hi Mark,
+>>
+>> [CC'ing only those who I have the email id of]
+>>
+>>> +/**
+>>> + * scmi_do_xfer() - Do one transfer
+>>> + *
+>>> + * @info: Pointer to SCMI entity information
+>>> + * @xfer: Transfer to initiate and wait for response
+>>> + *
+>>> + * Return: -ETIMEDOUT in case of no response, if transmit error,
+>>> + *   return corresponding error, else if all goes well,
+>>> + *   return 0.
+>>> + */
+>>> +int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+>>> +{
+>>> +    int ret;
+>>> +    int timeout;
+>>> +    struct scmi_info *info = handle_to_scmi_info(handle);
+>>> +    struct device *dev = info->dev;
+>>> +
+>>> +    ret = mbox_send_message(info->tx_chan, xfer);
+>>> +
+>>>
+>> The api is
+>>
+>>     int mbox_send_message(struct mbox_chan *chan, void *mssg)
+>>
+>> where each controller driver defines its own format in which it accepts
+>> the 'mssg' to be transmitted.
+>>
+>
+> Yes they can continue that, but SCMI just doesn't depend on that.
+>
+>> For example :-
+>> ti_msgmgr_send_data(struct mbox_chan *, struct ti_msgmgr_message *)
+>> rockchip_mbox_send_data(struct mbox_chan *, struct rockchip_mbox_msg *)
+>> ....and so on...  you get the idea.
+>>
+>
+> Yes I am aware of that.
+>
+>> Some controller driver may ignore the 'mssg' because only an interrupt line
+>> is shared with the remote and not some register/fifo.
+>> For example,
+>>   sti_mbox_send_data(struct mbox_chan *, void *ignored)
+>>
+>
+> Exactly, now with SCMI, every controller *can do* that, as we just care
+> about the signaling which in other terms I have so far referred as
+> "doorbell".
+>
+No, the controllers can not ... unless you clone and adapt the 9
+drivers+bindings to conform to the expectations of SCMI (like you
+attempted with MHU recently). Also, then mandate every future
+controller driver must emulate "doorbell" channels.
+
+As the mailbox maintainer, I am open to suggestions that would allow
+every controller to support SCMI.
+But compared to the options of scmi-as-a-library and
+scmi-as-child-node-of-platform-parent, this does not even qualify as
+an option.
+
+Why? Because SCMI is but one protocol that provides 4 features ATM,
+and certainly can not provide for every whim and quirk of future
+platforms.  Among the sane requirements are watchdog,
+suspend/resume/hibernation and thermal _control_ (not just sensor
+readings) and among the weird are video, network and storage over
+mailbox api. And even a filesystem backed by read/write over mailbox!!
+ And these are only that I have worked on first hand.
+
+  The point is : you can not assume SCMI to be the only protocol
+running over a controller _and_ you can not dictate other protocols to
+not touch certain bits of the signal register/fifo.
+
+In simplest terms, controller driver can not cater to only a
+particular client. That's the reason we have the controller driver
+define the message format and clients conform to it.
+
+Thanks.
