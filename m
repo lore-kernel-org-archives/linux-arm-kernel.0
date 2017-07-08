@@ -1,53 +1,33 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sat,  8 Jul 2017 08:48:30 -0500
-Subject: [PATCH] KVM: arm/arm64: Fix bug in advertising KVM_CAP_MSI_DEVID
- capability
-Message-ID: <1499521710-27494-1-git-send-email-shankerd@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Jul 2017 14:59:07 +0100
+Subject: [RFC PATCH 0/7] Hummingboard2 improvements
+In-Reply-To: <20170624073031.GW4902@n2100.armlinux.org.uk>
+References: <20170408143607.15928-1-dev@lynxeye.de>
+ <1498234514.24585.3.camel@pengutronix.de>
+ <20170624073031.GW4902@n2100.armlinux.org.uk>
+Message-ID: <20170708135907.GA23333@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0e4e82f154e3 ("KVM: arm64: vgic-its: Enable ITS emulation as
-a virtual MSI controller") tried to advertise KVM_CAP_MSI_DEVID, but
-the code logic was not updating the dist->msis_require_devid field
-correctly. If hypervisor tool creates the ITS device after VGIC
-initialization then we don't advertise KVM_CAP_MSI_DEVID capability.
+On Sat, Jun 24, 2017 at 08:30:31AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 23, 2017 at 06:15:14PM +0200, Lucas Stach wrote:
+> > Hi Russell,
+> > 
+> > it seems this is making no progress. If you don't mind I'm going to pick
+> > up the patches from you hb2 branch and submit the whole series to Shawn,
+> > so we can finally get things merged. Are you okay with this?
+> 
+> If you remember from the reviews back in January of my patch set, Jon
+> Nettleton promised to send me a replacement set of DT files that were
+> properly licensed and updated along the lines of your patches in April.
+> I'm still waiting...
 
-Update the field msis_require_devid to true inside vgic_its_create()
-to fix the issue.
+I've chased Jon a couple more times since (once today), and I'm feeling
+that we're not getting anywhere.  I've now told him that we (SolidRun/
+myself) are in danger of having this work replaced by others.  So, I'm
+now adding Rabeeh to this thread.
 
-Fixes: 0e4e82f154e3 ("vgic-its: Enable ITS emulation as a virtual MSI controller")
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
- virt/kvm/arm/vgic/vgic-init.c | 3 ---
- virt/kvm/arm/vgic/vgic-its.c  | 1 +
- 2 files changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 3a0b899..5801261 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -285,9 +285,6 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
- 		goto out;
- 
--	if (vgic_has_its(kvm))
--		dist->msis_require_devid = true;
--
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_vgic_vcpu_enable(vcpu);
- 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2dff288..aa6b68d 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1598,6 +1598,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
- 	INIT_LIST_HEAD(&its->device_list);
- 	INIT_LIST_HEAD(&its->collection_list);
- 
-+	dev->kvm->arch.vgic.msis_require_devid = true;
- 	dev->kvm->arch.vgic.has_its = true;
- 	its->enabled = false;
- 	its->dev = dev;
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
