@@ -1,13 +1,13 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 7 Jul 2017 18:45:21 -0700
-Subject: [PATCH] watchdog: stm32_iwdg: constify watchdog_ops structure
-In-Reply-To: <20170708002857.GA12556@embeddedgus>
-References: <20170708002857.GA12556@embeddedgus>
-Message-ID: <1a211e3b-6edb-ed0c-1d8a-20ac9c62f763@roeck-us.net>
+Date: Fri, 7 Jul 2017 18:45:32 -0700
+Subject: [PATCH] watchdog: coh901327_wdt: constify watchdog_ops structure
+In-Reply-To: <20170708003330.GA15374@embeddedgus>
+References: <20170708003330.GA15374@embeddedgus>
+Message-ID: <031cf1ab-7f1b-4e4d-adaf-efa6c3af8040@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2017 05:28 PM, Gustavo A. R. Silva wrote:
+On 07/07/2017 05:33 PM, Gustavo A. R. Silva wrote:
 > Check for watchdog_ops structures that are only stored in the ops field of
 > a watchdog_device structure. This field is declared const, so watchdog_ops
 > structures that have this property can be declared as const also.
@@ -47,20 +47,20 @@ On 07/07/2017 05:28 PM, Gustavo A. R. Silva wrote:
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
 > ---
->   drivers/watchdog/stm32_iwdg.c | 2 +-
+>   drivers/watchdog/coh901327_wdt.c | 2 +-
 >   1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
-> index 6c501b7..be64a86 100644
-> --- a/drivers/watchdog/stm32_iwdg.c
-> +++ b/drivers/watchdog/stm32_iwdg.c
-> @@ -140,7 +140,7 @@ static const struct watchdog_info stm32_iwdg_info = {
->   	.identity	= "STM32 Independent Watchdog",
+> diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
+> index 38dd60f0..4410337 100644
+> --- a/drivers/watchdog/coh901327_wdt.c
+> +++ b/drivers/watchdog/coh901327_wdt.c
+> @@ -218,7 +218,7 @@ static const struct watchdog_info coh901327_ident = {
+>   	.identity = DRV_NAME,
 >   };
 >   
-> -static struct watchdog_ops stm32_iwdg_ops = {
-> +static const struct watchdog_ops stm32_iwdg_ops = {
->   	.owner		= THIS_MODULE,
->   	.start		= stm32_iwdg_start,
->   	.ping		= stm32_iwdg_ping,
+> -static struct watchdog_ops coh901327_ops = {
+> +static const struct watchdog_ops coh901327_ops = {
+>   	.owner = THIS_MODULE,
+>   	.start = coh901327_start,
+>   	.stop = coh901327_stop,
 > 
