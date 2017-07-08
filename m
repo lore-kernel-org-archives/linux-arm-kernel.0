@@ -1,50 +1,70 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Fri, 7 Jul 2017 17:47:21 -0700
-Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <MWHPR12MB160006024D920ED58126048AC8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
-References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
- <MWHPR12MB160087E9E0B17F7A17609714C8AA0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <MWHPR12MB160006024D920ED58126048AC8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
-Message-ID: <CAKgT0Uc5KSJTj4A=9pSudiJ28AW0krc7FZpdW4upwY+FgpeArA@mail.gmail.com>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Fri, 7 Jul 2017 20:24:16 -0500
+Subject: [PATCH] video: xilinxfb: constify fb_fix_screeninfo and
+ fb_var_screeninfo structures
+Message-ID: <20170708012416.GA1843@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 7, 2017 at 5:30 PM, Casey Leedom <leedom@chelsio.com> wrote:
->   By the way, it ~seems~ like the patch set confuses the idea of the PCIe Capability Device Control[Relaxed Ordering Enable] with the device's ability to handle incoming TLPs with the Relaxed Ordering Attribute set.  These are completely different things.  The PCIe Capability Device Control[Relaxed Ordering Enable] solely governs the ability of the device to _send_ TLPs with the Relaxed Ordering Attribute set.  It has nothing whatsoever to do with the handling of incoming TLPs with the Relaxed Ordering Attribute set.  In fact, there is any standard way to disable receipt processing of such TLPs.  That's kind of the whole point of the majority of the patch.  If there was a separate "Ignore Incoming Relaxed Ordering Attributes" then we'd mostly just have a quirk which would set that for problematic devices.
->
->   Worse yet, if I'm reading the patch right, it _is_ turning off the PCIe Capability Device Control[Relaxed Ordering Enable] for the devices that we've identified with problematic receive handling.  Not only does this not solve the problem that we've been talking about, it actually almost certainly introduces a huge Graphics Performance Bug.  The Relaxed Ordering Attribute was originally developed for Graphics Device support in order to download textures, etc. to a graphics devices as fast as possible and only ensure ordering at points where needed.  For instance, as far as I know, the Intel Root Complexes that we've been talking about have no issues whatsoever in generating downstream TLPs with the Relaxed Ordering Attribute set.  By turning off the PCIe Capability Device Control[Relaxed Ordering Enable] on these Root Complexes, this patch prevents the generation of downstream TLPs with the Relaxed Ordering Attribute set targeted at devices like graphics adapters.
->
-> Casey
+These structures are only used to copy into other structures,
+so declare them as const.
 
-The patches should be disabling the relaxed ordering on upstream
-facing ports that would be sending requests to the root complex. So if
-the root complex cannot handle receiving a message with relaxed
-ordering enabled we should be clearing the relaxed ordering bit in the
-PCIe configuration on those device that could send TLPs to that root
-complex. By doing that the devices hosted on that root complex cannot
-generate requests that contain relaxed ordering TLPs.
+This issue was detected using Coccinelle and the following semantic patch:
 
-I'll have to do some double checking of the patches, but I thought we
-were only clearing the relaxed ordering bits on the devices that would
-be sending requests to the root complex, not the downstream ports of
-the root complex itself. As such we should be able to generate relaxed
-ordering TLPs from the root complex, but the devices hosted on the bus
-shouldn't be able to generate relaxed ordering TLPs. The bit in the
-configuration space controls the ability to generate content, not the
-ability to receive it so clearing the bit on the device should be the
-correct behavior for this.
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct fb_fix_screeninfo i at p = { ... };
 
-As far as your suggestions for the cxgb4 patch it has the same problem
-it originally had. We want to disable the relaxed ordering bit on the
-device since the device should not be generating relaxed ordering
-requests. This is why I was trying to get your input on this as I know
-you have a peer-to-peer configuration that you wanted to support. What
-we need to do is identify what platforms cannot support relaxed
-ordering to the root complex and prevent that from happening which is
-why we clear the relaxed ordering bit on the device. In that setup we
-need to have a good way to identify when this has occurred and instead
-setup a side channel type configuration where we then re-enable
-relaxed ordering, but only allow for sending directly to the peer and
-not the root complex.
+@ok@
+identifier r.i;
+expression e;
+position p;
+@@
+e = i at p
 
-- Alex
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct fb_fix_screeninfo e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct fb_fix_screeninfo i = { ... };
+
+The semantic patch for fb_var_screeninfo is analogous.
+
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+---
+ drivers/video/fbdev/xilinxfb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
+index 17dc119..0bda18e 100644
+--- a/drivers/video/fbdev/xilinxfb.c
++++ b/drivers/video/fbdev/xilinxfb.c
+@@ -110,14 +110,14 @@ static struct xilinxfb_platform_data xilinx_fb_default_pdata = {
+ /*
+  * Here are the default fb_fix_screeninfo and fb_var_screeninfo structures
+  */
+-static struct fb_fix_screeninfo xilinx_fb_fix = {
++static const struct fb_fix_screeninfo xilinx_fb_fix = {
+ 	.id =		"Xilinx",
+ 	.type =		FB_TYPE_PACKED_PIXELS,
+ 	.visual =	FB_VISUAL_TRUECOLOR,
+ 	.accel =	FB_ACCEL_NONE
+ };
+ 
+-static struct fb_var_screeninfo xilinx_fb_var = {
++static const struct fb_var_screeninfo xilinx_fb_var = {
+ 	.bits_per_pixel =	BITS_PER_PIXEL,
+ 
+ 	.red =		{ RED_SHIFT, 8, 0 },
+-- 
+2.5.0
