@@ -1,66 +1,49 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 7 Jul 2017 18:45:32 -0700
-Subject: [PATCH] watchdog: coh901327_wdt: constify watchdog_ops structure
-In-Reply-To: <20170708003330.GA15374@embeddedgus>
-References: <20170708003330.GA15374@embeddedgus>
-Message-ID: <031cf1ab-7f1b-4e4d-adaf-efa6c3af8040@roeck-us.net>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Sat, 8 Jul 2017 02:04:56 +0000
+Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <CAKgT0Uc5KSJTj4A=9pSudiJ28AW0krc7FZpdW4upwY+FgpeArA@mail.gmail.com>
+References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
+ <MWHPR12MB160087E9E0B17F7A17609714C8AA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <MWHPR12MB160006024D920ED58126048AC8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>,
+ <CAKgT0Uc5KSJTj4A=9pSudiJ28AW0krc7FZpdW4upwY+FgpeArA@mail.gmail.com>
+Message-ID: <MWHPR12MB1600AECAE619EAA97E6B15D5C8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2017 05:33 PM, Gustavo A. R. Silva wrote:
-> Check for watchdog_ops structures that are only stored in the ops field of
-> a watchdog_device structure. This field is declared const, so watchdog_ops
-> structures that have this property can be declared as const also.
-> 
-> This issue was detected using Coccinelle and the following semantic patch:
-> 
-> @r
-> disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct watchdog_ops i at p = { ... };
-> 
-> @ok@
-> identifier r.i;
-> struct watchdog_device e;
-> position p;
-> @@
-> e.ops = &i at p;
-> 
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct watchdog_ops e;
-> @@
-> e at i@p
-> 
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->   struct watchdog_ops i = { ... };
-> 
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+  Okay, thanks for the note Alexander.	I'll have to look more closely at
+the patch on Monday and try it out on one of the targeted systems to verify
+the semantics you describe.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+  However, that said, there is no way to tell a priori where a device will
+send TLPs.  To simply assume that all TLPs will be directed towards the Root
+Complex is a big assumption.  Only the device and the code controlling it
+know where the TLPs will be directed.  That's why there are changes required
+in the cxgb4 driver.  For instance, the code in
+drivers/net/ethernet/chelsio./cxgb4/sge.c: t4_sge_alloc_rxq() knows that
+it's allocating Free List Buffers in Host Memory and that the RX Queues that
+it's allocating in the Hardware will eventually send Ingress Data to those
+Free List Buffers.  (And similarly for the Free List Buffer Pointer Queue
+with respect to DMA Reads from the host.)  In that routine we explicitly
+configure the Hardware to use/not-use the Relaxed Ordering Attribute via the
+FW_IQ_CMD_FL0FETCHRO and FW_IQ_CMD_FL0DATARO flags.  Basically we're
+conditionally setting them based on the desirability of sending Relaxed
+Ordering TLPs to the Root Complex.  (And we would perform the same kind of
+check for an nVME application ... which brings us to ...)
 
-> ---
->   drivers/watchdog/coh901327_wdt.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
-> index 38dd60f0..4410337 100644
-> --- a/drivers/watchdog/coh901327_wdt.c
-> +++ b/drivers/watchdog/coh901327_wdt.c
-> @@ -218,7 +218,7 @@ static const struct watchdog_info coh901327_ident = {
->   	.identity = DRV_NAME,
->   };
->   
-> -static struct watchdog_ops coh901327_ops = {
-> +static const struct watchdog_ops coh901327_ops = {
->   	.owner = THIS_MODULE,
->   	.start = coh901327_start,
->   	.stop = coh901327_stop,
-> 
+  And what would be the code using these patch APIs to set up a Peer-to-Peer
+nVME-style application?	 In that case we'd need the Chelsio adapter's PCIe
+Capability Device Control[Relaxed Ordering Enable] set for the nVME
+application ... and we would avoid programming the Chelsio Hardware to use
+Relaxed Ordering for TLPs directed at the Root Complex.	 Thus we would be in
+a position where some TLPs being emitted by the device to Peer devices would
+have Relaxed Ordering set and some directed at the Root Complex would not.
+And the only way for that to work is if the source device's Device
+Control[Relaxed Ordering Enable] is set ...
+
+  Finally, setting aside my disagreements with the patch, we still have the
+code in the cxgb4 driver which explicitly turns on its own Device
+Control[Relaxed Ordering Enable] in cxgb4_main.c:
+enable_pcie_relaxed_ordering().  So the patch is something of a loop if all
+we're doing is testing our own Relaxed Ordering Enable state ...
+ 
+Casey
