@@ -1,107 +1,94 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sat, 8 Jul 2017 06:26:13 -0500
-Subject: [PATCH v2 38/52] KVM: arm/arm64: GICv4: Wire init/teardown of
- per-VM support
-In-Reply-To: <20170628150411.15846-39-marc.zyngier@arm.com>
-References: <20170628150411.15846-1-marc.zyngier@arm.com>
- <20170628150411.15846-39-marc.zyngier@arm.com>
-Message-ID: <738d2df9-c2b0-1444-8940-1027cf6fdd46@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 08 Jul 2017 14:14:56 +0200
+Subject: [PATCH v16 2/7] power: add power sequence library
+In-Reply-To: <20170708055115.GA25873@b29397-desktop>
+References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
+ <2042394.b4eZkzrJ5f@aspire.rjw.lan> <20170708055115.GA25873@b29397-desktop>
+Message-ID: <10723509.cz5GGA4OTz@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 06/28/2017 10:03 AM, Marc Zyngier wrote:
-> Should the HW support GICv4 and an ITS being associated with this
-> VM, let's init the its_vm and its_vpe structures.
+On Saturday, July 08, 2017 01:51:15 PM Peter Chen wrote:
+> On Fri, Jul 07, 2017 at 03:03:06PM +0200, Rafael J. Wysocki wrote:
+> > On Friday, July 07, 2017 04:01:07 PM Peter Chen wrote:
+> > > On Fri, Jul 07, 2017 at 03:13:48AM +0200, Rafael J. Wysocki wrote:
+> > > > > 
+> > > > > - Can I write new code for it or I need to depend on something?
+> > > > 
+> > > > There is nothing this code needs to depend on AFAICS, but there are existing
+> > > > solutions in this problem space (ACPI power management, genpd), so it needs to
+> > > > be careful enough about possible overlaps etc.
+> > > > 
+> > > > > I find there is already "power state" concept at documentation.
+> > > > > Documentation/ABI/testing/sysfs-devices-power_state
+> > > > 
+> > > > This is ACPI-specific and only in sysfs directories representing ACPI device
+> > > > objects (which aren't physical devices).
+> > > > 
+> > > > Anyway, since ACPI covers the problem space you are working in already,
+> > > > your code has to be mutually exclusive with it.
+> > > > 
+> > > > > - If I can write the new code for it, except the problems I want
+> > > > > to fix, are there any other use cases I need to consider?
+> > > > 
+> > > > I would start simple and focus on the particular problem at hand, that is
+> > > > devices with two power states ("on" and "off") where the "on" state
+> > > > depends on a number of clocks and/or GPIOs.  Still, I'd also avoid making
+> > > > design choices that might prevent it from being extended in the future
+> > > > if need be.
+> > > > 
+> > > > One major problem I can see is how to "attach" the power states framework
+> > > > to a particular device (once we have discovered that it should be used with
+> > > > that device).
+> > > > 
+> > > > For bus types that don't do power management of their own you could follow
+> > > > ACPI (and genpd) and provide a PM domain for this purpose, but bus types
+> > > > doing their own PM (like USB) will probably need to be treated differently.
+> > > > In those cases the bus type code will have to know that it should call some
+> > > > helpers to switch power states of devices.
+> > > > 
+> > > 
+> > > After thinking more, using a power state framework is seems too heavy
+> > > for this use case. This use case is just do some clock and gpio
+> > > operations before device is created, and do some put operations
+> > > after device is deleted. We just need some helpers in one structure
+> > > (called "power sequence" or "power state") for this purpose.
+> > > 
+> > > For the use case, the clock and gpio operation can be done after device
+> > > is created, the power domain is more suitable.
+> > 
+> > There is a problem with PM domains that they only provide hooks for runtime PM
+> > and system suspend/resume (including hibernation) and not for generic
+> > "power up" and "power down" operations that may need to be carried out at
+> > probe time before the runtime PM framework can be used (and analogously
+> > at remove time).
+> > 
+> > I would consider starting with the patch below or similar.
+> > 
+> > Then you can define something like POWER_STATE_SEQUENCE type for your
+> > case and basically use almost what you have already with it, except that
+> > struct pwrsec_generic will now become struct power_state_sequence and
+> > struct power_state_info will be embedded in it instead of struct pwrsec.
+> > 
+> > The major comceptual difference is that ->power_up and ->power_down are
+> > now available at the level of the device that needs the power sequence and
+> > pm_device_power_up/down() can be used wherever necessary (in the code,
+> > in a bus type, in a controller driver or even in the driver for this particular
+> > device).
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-init.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
+> Rafeal, thanks for your patch.
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index 3a0b8999f011..0de1f0d986d4 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -285,8 +285,14 @@ int vgic_init(struct kvm *kvm)
->  	if (ret)
->  		goto out;
->  
-> -	if (vgic_has_its(kvm))
-> +	if (vgic_has_its(kvm)) {
->  		dist->msis_require_devid = true;
-> +		if (kvm_vgic_global_state.has_gicv4) {
-> +			ret = vgic_v4_init(kvm);
-> +			if (ret)
-> +				goto out;
-> +		}
+> The biggest problem for my use case is the device is still not created.
+> How can I call pm_device_power_up(dev)?
 
-This is not quite right, ITS virtual device may not be initialized at the time of 
-calling vgic-init(). This change breaks the existing KVM functionality with QEMU
-hypervisor tool. In later patches, code assumes vgic_v4_init(kvm) was called when
-vgic_has_its(kvm) returns a true value. 
+Can you please elaborate on that a bit?
 
-The right change would be move this logic to inside vgic_its_create() something like this.
+You surely need a device object before probing the device and why would the
+device be accessed before that point?
 
- --- a/virt/kvm/arm/vgic/vgic-init.c
- +++ b/virt/kvm/arm/vgic/vgic-init.c
- @@ -285,14 +285,8 @@ int vgic_init(struct kvm *kvm)
-         if (ret)
-                 goto out;
- 
- -       if (vgic_has_its(kvm)) { 
- +       if (vgic_has_its(kvm))
-                 dist->msis_require_devid = true;
- -               if (kvm_vgic_global_state.has_gicv4) {
- -                       ret = vgic_v4_init(kvm);
- -                       if (ret)
- -                               goto out;
- -               }
- -       }
- 
-         kvm_for_each_vcpu(i, vcpu, kvm)
-                 kvm_vgic_vcpu_enable(vcpu);
+I guess you have a bus with devices that are discoverable in principle, but
+they cannot be discovered before being powered up, so you need the information
+on which devices to power up in a DT, right?
 
- --- a/virt/kvm/arm/vgic/vgic-its.c
- +++ b/virt/kvm/arm/vgic/vgic-its.c
- @@ -1637,6 +1637,7 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct
-  static int vgic_its_create(struct kvm_device *dev, u32 type)
-  {
-         struct vgic_its *its;
- +       int ret;
- 
-         if (type != KVM_DEV_TYPE_ARM_VGIC_ITS) 
-                 return -ENODEV;
- @@ -1657,6 +1658,12 @@ static int vgic_its_create(struct kvm_device *dev, u32 ty
-         its->enabled = false;
-         its->dev = dev;
-  
- +       if (kvm_vgic_global_state.has_gicv4) {
- +               ret = vgic_v4_init(dev->kvm);
- +               if (ret)
- +                       return -ENOMEM;
- +       }
- +
-
-
-> +	}
->  
->  	kvm_for_each_vcpu(i, vcpu, kvm)
->  		kvm_vgic_vcpu_enable(vcpu);
-> @@ -323,6 +329,9 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
->  
->  	kfree(dist->spis);
->  	dist->nr_spis = 0;
-> +
-> +	if (kvm_vgic_global_state.has_gicv4 && vgic_has_its(kvm))
-> +		vgic_v4_teardown(kvm);
->  }
->  
->  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
-> 
-
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks,
+Rafael
