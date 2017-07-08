@@ -1,31 +1,30 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Jul 2017 14:59:07 +0100
-Subject: [RFC PATCH 0/7] Hummingboard2 improvements
-In-Reply-To: <20170624073031.GW4902@n2100.armlinux.org.uk>
-References: <20170408143607.15928-1-dev@lynxeye.de>
- <1498234514.24585.3.camel@pengutronix.de>
- <20170624073031.GW4902@n2100.armlinux.org.uk>
-Message-ID: <20170708135907.GA23333@n2100.armlinux.org.uk>
+Date: Sat, 8 Jul 2017 20:13:17 +0100
+Subject: [PATCH 0/6] Macchiatobin updates
+Message-ID: <20170708191317.GM4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 24, 2017 at 08:30:31AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 23, 2017 at 06:15:14PM +0200, Lucas Stach wrote:
-> > Hi Russell,
-> > 
-> > it seems this is making no progress. If you don't mind I'm going to pick
-> > up the patches from you hb2 branch and submit the whole series to Shawn,
-> > so we can finally get things merged. Are you okay with this?
-> 
-> If you remember from the reviews back in January of my patch set, Jon
-> Nettleton promised to send me a replacement set of DT files that were
-> properly licensed and updated along the lines of your patches in April.
-> I'm still waiting...
+This series, based upon the 4.12-rc6 backports branch in the MISL tree:
+- adds a maintainer entry for the Macchiatobin board.
+- adds GPIO interrupt support to the CP110s
+- adds the pinmux entries
+- corrects the 5V regulator GPIO entry
+- adds support for the I2C mux (used for the SFP slots)
+- adds PCIe support
 
-I've chased Jon a couple more times since (once today), and I'm feeling
-that we're not getting anywhere.  I've now told him that we (SolidRun/
-myself) are in danger of having this work replaced by others.  So, I'm
-now adding Rabeeh to this thread.
+All entries include the appropriate pinmux and GPIO configuration.
+
+PCIe support has not been tested locally as I have no PCIe cards to
+test with; this patch includes support for the PCIe reset GPIO signal.
+If others can test that patch and let me know whether it works, I would
+be most grateful.
+
+ MAINTAINERS                                        |  6 ++
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 89 +++++++++++++++++++++-
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 11 ++-
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 11 ++-
+ 4 files changed, 112 insertions(+), 5 deletions(-)
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
