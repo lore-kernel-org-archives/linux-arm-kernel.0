@@ -1,32 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Jul 2017 20:13:17 +0100
-Subject: [PATCH 0/6] Macchiatobin updates
-Message-ID: <20170708191317.GM4902@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Sat, 08 Jul 2017 20:16:29 +0100
+Subject: [PATCH 1/6] MAINTAINERS: add Macchiatobin maintainers entry
+In-Reply-To: <20170708191317.GM4902@n2100.armlinux.org.uk>
+References: <20170708191317.GM4902@n2100.armlinux.org.uk>
+Message-ID: <E1dTvDR-0007Ea-Fx@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series, based upon the 4.12-rc6 backports branch in the MISL tree:
-- adds a maintainer entry for the Macchiatobin board.
-- adds GPIO interrupt support to the CP110s
-- adds the pinmux entries
-- corrects the 5V regulator GPIO entry
-- adds support for the I2C mux (used for the SFP slots)
-- adds PCIe support
+Add a maintainers entry for the Macchiatobin board.
 
-All entries include the appropriate pinmux and GPIO configuration.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-PCIe support has not been tested locally as I have no PCIe cards to
-test with; this patch includes support for the PCIe reset GPIO signal.
-If others can test that patch and let me know whether it works, I would
-be most grateful.
-
- MAINTAINERS                                        |  6 ++
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 89 +++++++++++++++++++++-
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 11 ++-
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 11 ++-
- 4 files changed, 112 insertions(+), 5 deletions(-)
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 91b149bc3206..0d236fe12597 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7976,6 +7976,12 @@ L:	libertas-dev at lists.infradead.org
+ S:	Orphan
+ F:	drivers/net/wireless/marvell/libertas/
+ 
++MARVELL MACCHIATOBIN SUPPORT
++M:	Russell King <rmk@armlinux.org.uk>
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++
+ MARVELL MV643XX ETHERNET DRIVER
+ M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+ L:	netdev at vger.kernel.org
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
