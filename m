@@ -1,61 +1,65 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Sun, 9 Jul 2017 15:57:44 -0500
-Subject: [PATCH] i2c: stm32f4: constify i2c_algorithm structure
-Message-ID: <20170709205744.GA18652@embeddedgus>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Sun, 9 Jul 2017 23:26:24 +0200
+Subject: [PATCH] KVM: arm/arm64: Fix bug in advertising KVM_CAP_MSI_DEVID
+ capability
+In-Reply-To: <1499521710-27494-1-git-send-email-shankerd@codeaurora.org>
+References: <1499521710-27494-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <37e9a495-e6e0-9d74-a205-3f8291edd3bb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for i2c_algorithm structures that are only stored in
-the algo field of an i2c_adapter structure. This field is
-declared const, so i2c_algorithm structures that have this
-property can be declared as const also.
+Hi,
 
-This issue was identified using Coccinelle and the following
-semantic patch:
+On 08/07/2017 15:48, Shanker Donthineni wrote:
+> Commit 0e4e82f154e3 ("KVM: arm64: vgic-its: Enable ITS emulation as
+> a virtual MSI controller") tried to advertise KVM_CAP_MSI_DEVID, but
+> the code logic was not updating the dist->msis_require_devid field
+> correctly. If hypervisor tool creates the ITS device after VGIC
+> initialization then we don't advertise KVM_CAP_MSI_DEVID capability.
+> 
+> Update the field msis_require_devid to true inside vgic_its_create()
+> to fix the issue.
+> 
+> Fixes: 0e4e82f154e3 ("vgic-its: Enable ITS emulation as a virtual MSI controller")
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct i2c_algorithm i at p = { ... };
+In QEMU the capability is not checked as "kvm_msi_use_devid" is directly
+set in the ITS device :-(
 
-@ok@
-identifier r.i;
-struct i2c_adapter e;
-position p;
-@@
-e.algo = &i at p;
+Thanks
 
-@bad@
-position p != {r.p,ok.p};
-identifier r.i;
-@@
-i at p
+Eric
 
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-static
-+const
- struct i2c_algorithm i = { ... };
-
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
----
- drivers/i2c/busses/i2c-stm32f4.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
-index f9dd7e8..9d6f110 100644
---- a/drivers/i2c/busses/i2c-stm32f4.c
-+++ b/drivers/i2c/busses/i2c-stm32f4.c
-@@ -751,7 +751,7 @@ static u32 stm32f4_i2c_func(struct i2c_adapter *adap)
- 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
- }
- 
--static struct i2c_algorithm stm32f4_i2c_algo = {
-+static const struct i2c_algorithm stm32f4_i2c_algo = {
- 	.master_xfer = stm32f4_i2c_xfer,
- 	.functionality = stm32f4_i2c_func,
- };
--- 
-2.5.0
+> ---
+>  virt/kvm/arm/vgic/vgic-init.c | 3 ---
+>  virt/kvm/arm/vgic/vgic-its.c  | 1 +
+>  2 files changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 3a0b899..5801261 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -285,9 +285,6 @@ int vgic_init(struct kvm *kvm)
+>  	if (ret)
+>  		goto out;
+>  
+> -	if (vgic_has_its(kvm))
+> -		dist->msis_require_devid = true;
+> -
+>  	kvm_for_each_vcpu(i, vcpu, kvm)
+>  		kvm_vgic_vcpu_enable(vcpu);
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 2dff288..aa6b68d 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1598,6 +1598,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+>  	INIT_LIST_HEAD(&its->device_list);
+>  	INIT_LIST_HEAD(&its->collection_list);
+>  
+> +	dev->kvm->arch.vgic.msis_require_devid = true;
+>  	dev->kvm->arch.vgic.has_its = true;
+>  	its->enabled = false;
+>  	its->dev = dev;
+> 
