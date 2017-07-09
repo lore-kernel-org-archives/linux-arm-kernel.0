@@ -1,69 +1,50 @@
-From: luca@z3ntu.xyz (Luca Weiss)
-Date: Sun, 09 Jul 2017 13:31:07 +0200
-Subject: spmi: pmic-arb: Always allocate ppid_to_apid table
-In-Reply-To: <20170627021746.22445-1-sboyd@codeaurora.org>
-References: <20170627021746.22445-1-sboyd@codeaurora.org>
-Message-ID: <1570691.3NiRTdm5OM@g550jk>
+From: net147@gmail.com (Jonathan Liu)
+Date: Sun, 9 Jul 2017 22:25:23 +1000
+Subject: [PATCH v5 2/6] clk: sunxi-ng: Add sun4i/sun7i CCU driver
+In-Reply-To: <65066c74b8dedfeb8de27d90b5fecfea3a700178.1499197129.git-series.plaes@plaes.org>
+References: <cover.23e9103a2becf2261d7e145bb1516221a5cfb8a4.1499197129.git-series.plaes@plaes.org>
+ <65066c74b8dedfeb8de27d90b5fecfea3a700178.1499197129.git-series.plaes@plaes.org>
+Message-ID: <CANwerB0d+2rU9gnCSKP4wwXZpzEsHXP6LtBYvxD+GnQAj6QHVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dienstag, 27. Juni 2017 04:17:46 CEST Stephen Boyd wrote:
-> After commit 7f1d4e58dabb ("spmi: pmic-arb: optimize table
-> lookups") we always need the ppid_to_apid table regardless of the
-> version of pmic arbiter we have. Otherwise, we will try to deref
-> the array when we don't allocate it on v2 hardware like the
-> msm8974 SoCs.
-> 
-> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> Cc: Kiran Gunda <kgunda@codeaurora.org>
-> Fixes: 7f1d4e58dabb ("spmi: pmic-arb: optimize table lookups")
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Reviewed-by: Kiran Gunda <kgunda@codeaurora.org>
-> ---
->  drivers/spmi/spmi-pmic-arb.c | 17 +++++++----------
->  1 file changed, 7 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
-> index 2afe3597982e..f4b7a98a7913 100644
-> --- a/drivers/spmi/spmi-pmic-arb.c
-> +++ b/drivers/spmi/spmi-pmic-arb.c
-> @@ -134,7 +134,6 @@ struct apid_data {
->   * @spmic:		SPMI controller object
->   * @ver_ops:		version dependent operations.
->   * @ppid_to_apid	in-memory copy of PPID -> channel (APID) mapping table.
-> - *			v2 only.
->   */
->  struct spmi_pmic_arb {
->  	void __iomem		*rd_base;
-> @@ -1016,6 +1015,13 @@ static int spmi_pmic_arb_probe(struct platform_device
-> *pdev) goto err_put_ctrl;
->  	}
-> 
-> +	pa->ppid_to_apid = devm_kcalloc(&ctrl->dev, PMIC_ARB_MAX_PPID,
-> +					sizeof(*pa->ppid_to_apid), GFP_KERNEL);
-> +	if (!pa->ppid_to_apid) {
-> +		err = -ENOMEM;
-> +		goto err_put_ctrl;
-> +	}
-> +
->  	hw_ver = readl_relaxed(core + PMIC_ARB_VERSION);
-> 
->  	if (hw_ver < PMIC_ARB_VERSION_V2_MIN) {
-> @@ -1048,15 +1054,6 @@ static int spmi_pmic_arb_probe(struct platform_device
-> *pdev) err = PTR_ERR(pa->wr_base);
->  			goto err_put_ctrl;
->  		}
-> -
-> -		pa->ppid_to_apid = devm_kcalloc(&ctrl->dev,
-> -						PMIC_ARB_MAX_PPID,
-> -						sizeof(*pa->ppid_to_apid),
-> -						GFP_KERNEL);
-> -		if (!pa->ppid_to_apid) {
-> -			err = -ENOMEM;
-> -			goto err_put_ctrl;
-> -		}
->  	}
-> 
->  	dev_info(&ctrl->dev, "PMIC arbiter version %s (0x%x)\n",
+Hi Priit,
 
-Tested-by: Luca Weiss <luca@z3ntu.xyz>
+On 5 July 2017 at 06:04, Priit Laes <plaes@plaes.org> wrote:
+> Introduce a clock controller driver for sun4i A10 and sun7i A20
+> series SoCs.
+>
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  drivers/clk/sunxi-ng/Kconfig              |   14 +-
+>  drivers/clk/sunxi-ng/Makefile             |    1 +-
+>  drivers/clk/sunxi-ng/ccu-sun4i-a10.c      | 1448 ++++++++++++++++++++++-
+>  drivers/clk/sunxi-ng/ccu-sun4i-a10.h      |   61 +-
+>  include/dt-bindings/clock/sun4i-a10-ccu.h |  200 +++-
+>  include/dt-bindings/clock/sun7i-a20-ccu.h |   53 +-
+>  include/dt-bindings/reset/sun4i-a10-ccu.h |   67 +-
+>  7 files changed, 1844 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun4i-a10.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun4i-a10.h
+>  create mode 100644 include/dt-bindings/clock/sun4i-a10-ccu.h
+>  create mode 100644 include/dt-bindings/clock/sun7i-a20-ccu.h
+>  create mode 100644 include/dt-bindings/reset/sun4i-a10-ccu.h
+>
+[snip]
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun4i-a10.c b/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
+> new file mode 100644
+> index 0000000..49052b7
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
+[snip]
+
+> +static const char *const hdmi_parents[] = { "pll-video0", "pll-video0-2x",
+> +                                           "pll-video1", "pll-video1-2x" };
+> +static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
+> +                                0x150, 0, 4, 24, 2, BIT(31), 0);
+
+hdmi_parents is in the wrong order. The correct order is "pll-video0",
+"pll-video1", "pll-video0-2x", "pll-video1-2x".
+
+Regards,
+Jonathan
