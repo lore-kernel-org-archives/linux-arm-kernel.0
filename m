@@ -1,170 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun,  9 Jul 2017 06:03:00 +0200
-Subject: [PATCH] Revert "reset: Add a Gemini reset controller"
-Message-ID: <20170709040300.11044-1-linus.walleij@linaro.org>
+From: jon@solid-run.com (Jon Nettleton)
+Date: Sun, 9 Jul 2017 06:42:28 +0200
+Subject: [RFC PATCH 0/7] Hummingboard2 improvements
+In-Reply-To: <CABdtJHutd5v4onVMMZdufnutzDWt5R3RE3XxicfHsTZkNUYXCg@mail.gmail.com>
+References: <20170408143607.15928-1-dev@lynxeye.de>
+ <1498234514.24585.3.camel@pengutronix.de>
+ <20170624073031.GW4902@n2100.armlinux.org.uk>
+ <20170708135907.GA23333@n2100.armlinux.org.uk>
+ <CABdtJHutd5v4onVMMZdufnutzDWt5R3RE3XxicfHsTZkNUYXCg@mail.gmail.com>
+Message-ID: <CABdtJHsGKrZ4R-kcikc9dsrO-CrZpRXzNEmQT4WgKJ=UZfDRCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 2acb037fc42b8ce5ae59a7d5db3c9b35672e3dd7.
+On Sun, Jul 9, 2017 at 6:39 AM, Jon Nettleton <jon@solid-run.com> wrote:
+>
+>
+>
+> On Sat, Jul 8, 2017 at 3:59 PM, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+>>
+>> On Sat, Jun 24, 2017 at 08:30:31AM +0100, Russell King - ARM Linux wrote:
+>> > On Fri, Jun 23, 2017 at 06:15:14PM +0200, Lucas Stach wrote:
+>> > > Hi Russell,
+>> > >
+>> > > it seems this is making no progress. If you don't mind I'm going to pick
+>> > > up the patches from you hb2 branch and submit the whole series to Shawn,
+>> > > so we can finally get things merged. Are you okay with this?
+>> >
+>> > If you remember from the reviews back in January of my patch set, Jon
+>> > Nettleton promised to send me a replacement set of DT files that were
+>> > properly licensed and updated along the lines of your patches in April.
+>> > I'm still waiting...
+>>
+>> I've chased Jon a couple more times since (once today), and I'm feeling
+>> that we're not getting anywhere.  I've now told him that we (SolidRun/
+>> myself) are in danger of having this work replaced by others.  So, I'm
+>> now adding Rabeeh to this thread.
+>>
+>>
 
-We ended up not needing the stand-alone reset controller driver
-as it was agreed that a better approach was to merge the reset
-control into the clock driver, which is now present and takes
-precedence. Revert the driver, keep the DT bindings intact.
+Besides the licensing there are still a number of bugs that exist for
+the device-tree files as they stand.  Most notably using the standard
+regulator code for the SDHC device causes a hang on reboot with some
+UHS cards.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/reset/Kconfig        |   7 ---
- drivers/reset/Makefile       |   1 -
- drivers/reset/reset-gemini.c | 110 -------------------------------------------
- 3 files changed, 118 deletions(-)
- delete mode 100644 drivers/reset/reset-gemini.c
-
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 608c071e4bbf..671ef2a01529 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -34,13 +34,6 @@ config RESET_BERLIN
- 	help
- 	  This enables the reset controller driver for Marvell Berlin SoCs.
- 
--config RESET_GEMINI
--	bool "Gemini Reset Driver" if COMPILE_TEST
--	default ARCH_GEMINI
--	select MFD_SYSCON
--	help
--	  This enables the reset controller driver for Cortina Systems Gemini.
--
- config RESET_IMX7
- 	bool "i.MX7 Reset Driver" if COMPILE_TEST
- 	default SOC_IMX7D
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 7081f9da2599..063dfdc7c400 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_TEGRA) += tegra/
- obj-$(CONFIG_RESET_A10SR) += reset-a10sr.o
- obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
- obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
--obj-$(CONFIG_RESET_GEMINI) += reset-gemini.o
- obj-$(CONFIG_RESET_IMX7) += reset-imx7.o
- obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
- obj-$(CONFIG_RESET_MESON) += reset-meson.o
-diff --git a/drivers/reset/reset-gemini.c b/drivers/reset/reset-gemini.c
-deleted file mode 100644
-index a2478997c75b..000000000000
---- a/drivers/reset/reset-gemini.c
-+++ /dev/null
-@@ -1,110 +0,0 @@
--/*
-- * Cortina Gemini Reset controller driver
-- * Copyright (C) 2017 Linus Walleij <linus.walleij@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/err.h>
--#include <linux/init.h>
--#include <linux/mfd/syscon.h>
--#include <linux/regmap.h>
--#include <linux/of.h>
--#include <linux/platform_device.h>
--#include <linux/reset-controller.h>
--#include <dt-bindings/reset/cortina,gemini-reset.h>
--
--/**
-- * struct gemini_reset - gemini reset controller
-- * @map: regmap to access the containing system controller
-- * @rcdev: reset controller device
-- */
--struct gemini_reset {
--	struct regmap *map;
--	struct reset_controller_dev rcdev;
--};
--
--#define GEMINI_GLOBAL_SOFT_RESET 0x0c
--
--#define to_gemini_reset(p) \
--	container_of((p), struct gemini_reset, rcdev)
--
--/*
-- * This is a self-deasserting reset controller.
-- */
--static int gemini_reset(struct reset_controller_dev *rcdev,
--			unsigned long id)
--{
--	struct gemini_reset *gr = to_gemini_reset(rcdev);
--
--	/* Manual says to always set BIT 30 (CPU1) to 1 */
--	return regmap_write(gr->map,
--			    GEMINI_GLOBAL_SOFT_RESET,
--			    BIT(GEMINI_RESET_CPU1) | BIT(id));
--}
--
--static int gemini_reset_status(struct reset_controller_dev *rcdev,
--			     unsigned long id)
--{
--	struct gemini_reset *gr = to_gemini_reset(rcdev);
--	u32 val;
--	int ret;
--
--	ret = regmap_read(gr->map, GEMINI_GLOBAL_SOFT_RESET, &val);
--	if (ret)
--		return ret;
--
--	return !!(val & BIT(id));
--}
--
--static const struct reset_control_ops gemini_reset_ops = {
--	.reset = gemini_reset,
--	.status = gemini_reset_status,
--};
--
--static int gemini_reset_probe(struct platform_device *pdev)
--{
--	struct gemini_reset *gr;
--	struct device *dev = &pdev->dev;
--	struct device_node *np = dev->of_node;
--	int ret;
--
--	gr = devm_kzalloc(dev, sizeof(*gr), GFP_KERNEL);
--	if (!gr)
--		return -ENOMEM;
--
--	gr->map = syscon_node_to_regmap(np);
--	if (IS_ERR(gr->map)) {
--		ret = PTR_ERR(gr->map);
--		dev_err(dev, "unable to get regmap (%d)", ret);
--		return ret;
--	}
--	gr->rcdev.owner = THIS_MODULE;
--	gr->rcdev.nr_resets = 32;
--	gr->rcdev.ops = &gemini_reset_ops;
--	gr->rcdev.of_node = pdev->dev.of_node;
--
--	ret = devm_reset_controller_register(&pdev->dev, &gr->rcdev);
--	if (ret)
--		return ret;
--
--	dev_info(dev, "registered Gemini reset controller\n");
--	return 0;
--}
--
--static const struct of_device_id gemini_reset_dt_ids[] = {
--	{ .compatible = "cortina,gemini-syscon", },
--	{ /* sentinel */ },
--};
--
--static struct platform_driver gemini_reset_driver = {
--	.probe	= gemini_reset_probe,
--	.driver = {
--		.name		= "gemini-reset",
--		.of_match_table	= gemini_reset_dt_ids,
--		.suppress_bind_attrs = true,
--	},
--};
--builtin_platform_driver(gemini_reset_driver);
--- 
-2.9.4
+Additionally we need to bring in the support for the SOM rev1.5 which
+has been waiting on the TTY slave devices infrastructure to land.  We
+have been trying to come up with a better solution than duplicating
+all our device-tree files with a som revision however there doesn't
+seem to be.  I would prefer to bring all the support in at once since
+we are only shipping rev 1.5 soms at this point
