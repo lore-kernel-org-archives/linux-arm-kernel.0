@@ -1,84 +1,69 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 9 Jul 2017 19:28:32 +0800
-Subject: [xlnx:master 688/744] drivers/gpu/drm/xylon/xylon_drv.c:247:19:
- error: initialization from incompatible pointer type
-Message-ID: <201707091930.CwD2A0RJ%fengguang.wu@intel.com>
+From: luca@z3ntu.xyz (Luca Weiss)
+Date: Sun, 09 Jul 2017 13:31:07 +0200
+Subject: spmi: pmic-arb: Always allocate ppid_to_apid table
+In-Reply-To: <20170627021746.22445-1-sboyd@codeaurora.org>
+References: <20170627021746.22445-1-sboyd@codeaurora.org>
+Message-ID: <1570691.3NiRTdm5OM@g550jk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Dienstag, 27. Juni 2017 04:17:46 CEST Stephen Boyd wrote:
+> After commit 7f1d4e58dabb ("spmi: pmic-arb: optimize table
+> lookups") we always need the ppid_to_apid table regardless of the
+> version of pmic arbiter we have. Otherwise, we will try to deref
+> the array when we don't allocate it on v2 hardware like the
+> msm8974 SoCs.
+> 
+> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Cc: Kiran Gunda <kgunda@codeaurora.org>
+> Fixes: 7f1d4e58dabb ("spmi: pmic-arb: optimize table lookups")
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Reviewed-by: Kiran Gunda <kgunda@codeaurora.org>
+> ---
+>  drivers/spmi/spmi-pmic-arb.c | 17 +++++++----------
+>  1 file changed, 7 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
+> index 2afe3597982e..f4b7a98a7913 100644
+> --- a/drivers/spmi/spmi-pmic-arb.c
+> +++ b/drivers/spmi/spmi-pmic-arb.c
+> @@ -134,7 +134,6 @@ struct apid_data {
+>   * @spmic:		SPMI controller object
+>   * @ver_ops:		version dependent operations.
+>   * @ppid_to_apid	in-memory copy of PPID -> channel (APID) mapping table.
+> - *			v2 only.
+>   */
+>  struct spmi_pmic_arb {
+>  	void __iomem		*rd_base;
+> @@ -1016,6 +1015,13 @@ static int spmi_pmic_arb_probe(struct platform_device
+> *pdev) goto err_put_ctrl;
+>  	}
+> 
+> +	pa->ppid_to_apid = devm_kcalloc(&ctrl->dev, PMIC_ARB_MAX_PPID,
+> +					sizeof(*pa->ppid_to_apid), GFP_KERNEL);
+> +	if (!pa->ppid_to_apid) {
+> +		err = -ENOMEM;
+> +		goto err_put_ctrl;
+> +	}
+> +
+>  	hw_ver = readl_relaxed(core + PMIC_ARB_VERSION);
+> 
+>  	if (hw_ver < PMIC_ARB_VERSION_V2_MIN) {
+> @@ -1048,15 +1054,6 @@ static int spmi_pmic_arb_probe(struct platform_device
+> *pdev) err = PTR_ERR(pa->wr_base);
+>  			goto err_put_ctrl;
+>  		}
+> -
+> -		pa->ppid_to_apid = devm_kcalloc(&ctrl->dev,
+> -						PMIC_ARB_MAX_PPID,
+> -						sizeof(*pa->ppid_to_apid),
+> -						GFP_KERNEL);
+> -		if (!pa->ppid_to_apid) {
+> -			err = -ENOMEM;
+> -			goto err_put_ctrl;
+> -		}
+>  	}
+> 
+>  	dev_info(&ctrl->dev, "PMIC arbiter version %s (0x%x)\n",
 
-FYI, the error/warning still remains.
-
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   50dbfdba9101210db33a5a311b85a7409ab62278
-commit: 472236088ad190937efa1be2d96965f9bb7c9bcb [688/744] kbuild: Add option to turn incompatible pointer check into error
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 472236088ad190937efa1be2d96965f9bb7c9bcb
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
->> drivers/gpu/drm/xylon/xylon_drv.c:247:19: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .enable_vblank = xylon_drm_vblank_enable,
-                      ^~~~~~~~~~~~~~~~~~~~~~~
-   drivers/gpu/drm/xylon/xylon_drv.c:247:19: note: (near initialization for 'xylon_drm_driver.enable_vblank')
-   drivers/gpu/drm/xylon/xylon_drv.c:248:20: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .disable_vblank = xylon_drm_vblank_disable,
-                       ^~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/gpu/drm/xylon/xylon_drv.c:248:20: note: (near initialization for 'xylon_drm_driver.disable_vblank')
-   cc1: some warnings being treated as errors
---
->> drivers/gpu/drm/xylon/xylon_fb.c:132:15: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .fb_create = xylon_drm_fb_create,
-                  ^~~~~~~~~~~~~~~~~~~
-   drivers/gpu/drm/xylon/xylon_fb.c:132:15: note: (near initialization for 'xylon_drm_mode_config_funcs.fb_create')
-   cc1: some warnings being treated as errors
-
-vim +247 drivers/gpu/drm/xylon/xylon_drv.c
-
-7100d698 Davor Joja 2014-03-24  231  #ifdef CONFIG_COMPAT
-7100d698 Davor Joja 2014-03-24  232  	.compat_ioctl = drm_compat_ioctl,
-7100d698 Davor Joja 2014-03-24  233  #endif
-7100d698 Davor Joja 2014-03-24  234  	.llseek = noop_llseek,
-7100d698 Davor Joja 2014-03-24  235  };
-7100d698 Davor Joja 2014-03-24  236  
-7100d698 Davor Joja 2014-03-24  237  static struct drm_driver xylon_drm_driver = {
-7100d698 Davor Joja 2014-03-24  238  	.driver_features = DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED |
-7100d698 Davor Joja 2014-03-24  239  			   DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME,
-7100d698 Davor Joja 2014-03-24  240  	.load = xylon_drm_load,
-7100d698 Davor Joja 2014-03-24  241  	.unload = xylon_drm_unload,
-7100d698 Davor Joja 2014-03-24  242  	.preclose = xylon_drm_preclose,
-7100d698 Davor Joja 2014-03-24  243  	.postclose = xylon_drm_postclose,
-7100d698 Davor Joja 2014-03-24  244  	.lastclose = xylon_drm_lastclose,
-7100d698 Davor Joja 2014-03-24  245  
-7100d698 Davor Joja 2014-03-24  246  	.get_vblank_counter = drm_vblank_count,
-7100d698 Davor Joja 2014-03-24 @247  	.enable_vblank = xylon_drm_vblank_enable,
-7100d698 Davor Joja 2014-03-24  248  	.disable_vblank = xylon_drm_vblank_disable,
-7100d698 Davor Joja 2014-03-24  249  
-7100d698 Davor Joja 2014-03-24  250  	.irq_preinstall = xylon_drm_irq_preinst,
-7100d698 Davor Joja 2014-03-24  251  	.irq_postinstall = xylon_drm_irq_postinst,
-7100d698 Davor Joja 2014-03-24  252  	.irq_uninstall = xylon_drm_irq_uninst,
-7100d698 Davor Joja 2014-03-24  253  	.irq_handler = xylon_drm_irq_handler,
-7100d698 Davor Joja 2014-03-24  254  
-7100d698 Davor Joja 2014-03-24  255  	.gem_free_object = drm_gem_cma_free_object,
-
-:::::: The code at line 247 was first introduced by commit
-:::::: 7100d6985a5c7e1c2758ddab9bebd972823ed85c gpu: drm: xylon: Add a Xylon DRM driver
-
-:::::: TO: Davor Joja <davorjoja@logicbricks.com>
-:::::: CC: Michal Simek <michal.simek@xilinx.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 57031 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170709/52574557/attachment-0001.gz>
+Tested-by: Luca Weiss <luca@z3ntu.xyz>
