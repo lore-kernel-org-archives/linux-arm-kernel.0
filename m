@@ -1,32 +1,64 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun,  9 Jul 2017 19:36:14 +0300
-Subject: [PATCH] ARM: tegra: Register host1x node with iommu binding on
- tegra124
-Message-ID: <20170709163614.6746-1-contact@paulk.fr>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 9 Jul 2017 19:08:43 +0100
+Subject: [PATCH] iio: adc: meson-saradc: add NULL check on
+ of_match_device() return value
+In-Reply-To: <CAFBinCBgXAFvLqXP5e-j=UeQVd+foUDqKUNzO8hwQ71tKga1Vg@mail.gmail.com>
+References: <20170707064630.GA21945@embeddedgus>
+ <CAFBinCBgXAFvLqXP5e-j=UeQVd+foUDqKUNzO8hwQ71tKga1Vg@mail.gmail.com>
+Message-ID: <20170709190843.0bfa292f@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This registers the host1x node with the SMMU (as HC swgroup) to allow
-the host1x code to attach to it. It avoid failing the probe sequence,
-which resulted in the tegra drm driver not probing and thus nothing
-being displayed on-screen.
+On Sat, 8 Jul 2017 15:42:46 +0200
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> wrote:
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
----
- arch/arm/boot/dts/tegra124.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+> On Fri, Jul 7, 2017 at 8:46 AM, Gustavo A. R. Silva
+> <garsilva@embeddedor.com> wrote:
+> > Check return value from call to of_match_device()
+> > in order to prevent a NULL pointer dereference.
+> >
+> > In case of NULL print error message and return -ENODEV
+> >
+> > Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>  
+> thanks for finding this. a crash here is a rather theoretical problem
+> (since all compatible strings have their corresponding match data) -
+> but it doesn't hurt either, so:
+> 
+> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Applied.
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 187a36c6d0fc..b3b89befffeb 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -85,6 +85,7 @@
- 		clocks = <&tegra_car TEGRA124_CLK_HOST1X>;
- 		resets = <&tegra_car 28>;
- 		reset-names = "host1x";
-+		iommus = <&mc TEGRA_SWGROUP_HC>;
- 
- 		#address-cells = <2>;
- 		#size-cells = <2>;
--- 
-2.13.1
+Jonathan
+> 
+> 
+> > ---
+> >  drivers/iio/adc/meson_saradc.c | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> >
+> > diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+> > index 83da50e..07dbcc3 100644
+> > --- a/drivers/iio/adc/meson_saradc.c
+> > +++ b/drivers/iio/adc/meson_saradc.c
+> > @@ -915,6 +915,11 @@ static int meson_sar_adc_probe(struct platform_device *pdev)
+> >         init_completion(&priv->done);
+> >
+> >         match = of_match_device(meson_sar_adc_of_match, &pdev->dev);
+> > +       if (!match) {
+> > +               dev_err(&pdev->dev, "failed to match device\n");
+> > +               return -ENODEV;
+> > +       }
+> > +
+> >         priv->data = match->data;
+> >
+> >         indio_dev->name = priv->data->name;
+> > --
+> > 2.5.0
+> >
+> >
+> > _______________________________________________
+> > linux-amlogic mailing list
+> > linux-amlogic at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-amlogic  
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
