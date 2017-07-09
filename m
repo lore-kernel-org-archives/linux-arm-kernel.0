@@ -1,26 +1,32 @@
-From: snawrocki@kernel.org (Sylwester Nawrocki)
-Date: Sun, 9 Jul 2017 18:18:05 +0200
-Subject: [PATCH v2 0/7] [PATCH v2 0/7] Add support of OV9655 camera
-In-Reply-To: <26a55285-509c-b7f4-7806-db537a582631@st.com>
-References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
- <26a55285-509c-b7f4-7806-db537a582631@st.com>
-Message-ID: <24ce3de1-5994-1687-ad97-c0d15c85aff5@kernel.org>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun,  9 Jul 2017 19:36:14 +0300
+Subject: [PATCH] ARM: tegra: Register host1x node with iommu binding on
+ tegra124
+Message-ID: <20170709163614.6746-1-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hugues,
+This registers the host1x node with the SMMU (as HC swgroup) to allow
+the host1x code to attach to it. It avoid failing the probe sequence,
+which resulted in the tegra drm driver not probing and thus nothing
+being displayed on-screen.
 
-On 07/06/2017 09:51 AM, Hugues FRUCHET wrote:
-> Hi Sylwester,
-> 
-> Do you have the possibility to check for non-regression of this patchset
-> on 9650/52 camera ?
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ arch/arm/boot/dts/tegra124.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-I will try to test your patch set once I find the camera module for
-my Micro2440SDK board. I've spent already a day on setting up everything 
-and fixing multiple regressions in the kernel. I will likely try your 
-patch series in coming week.
-
---
-Thanks,
-Sylwester
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 187a36c6d0fc..b3b89befffeb 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -85,6 +85,7 @@
+ 		clocks = <&tegra_car TEGRA124_CLK_HOST1X>;
+ 		resets = <&tegra_car 28>;
+ 		reset-names = "host1x";
++		iommus = <&mc TEGRA_SWGROUP_HC>;
+ 
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+-- 
+2.13.1
