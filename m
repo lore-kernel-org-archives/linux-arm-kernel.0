@@ -1,185 +1,170 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Sun, 9 Jul 2017 11:41:11 +0800
-Subject: [Qemu-devel] [PATCH v3 1/4] ACPI: Add APEI GHES Table Generation
- support
-In-Reply-To: <d3443cbe-8752-0943-95b8-185d436de2fd@redhat.com>
-References: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
- <4dde45bb-a730-82b1-dc49-ad00a6b73d85@redhat.com>
- <accf8880-f4b0-85f1-9f33-4103c8c26d7a@redhat.com>
- <e90c5fb8-e68b-a620-9023-f4fcfdd68e97@redhat.com>
- <dbbab7f6-18c4-9b6c-799e-8267797a31bd@huawei.com>
- <d3443cbe-8752-0943-95b8-185d436de2fd@redhat.com>
-Message-ID: <CAMj-D2DQDFcuMO7aaqWQhMC4u7fgd9GHR6=i9J86tqEDZ+=Nag@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun,  9 Jul 2017 06:03:00 +0200
+Subject: [PATCH] Revert "reset: Add a Gemini reset controller"
+Message-ID: <20170709040300.11044-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laszlo,
-  thanks for your clear and detailed answer. I completely understand
-what you mean.
+This reverts commit 2acb037fc42b8ce5ae59a7d5db3c9b35672e3dd7.
 
-2017-07-07 17:43 GMT+08:00, Laszlo Ersek <lersek@redhat.com>:
-> On 07/07/17 10:32, gengdongjiu wrote:
->> Hi Laszlo,
->>    sorry for my late response.
->>
->> On 2017/6/3 20:01, Laszlo Ersek wrote:
->>> On 05/22/17 16:23, Laszlo Ersek wrote:
->>>> Keeping some context:
->>>>
->>>> On 05/12/17 23:00, Laszlo Ersek wrote:
->>>>> On 04/30/17 07:35, Dongjiu Geng wrote:
->>>
->>>> (68) In the code below, you are not taking an "OVMF header probe
->>>> suppressor" into account.
->>>>
->>>> But, we have already planned to replace that quirk with a separate,
->>>> dedicated allocation hint or command, so I'm not going to describe what
->>>> an "OVMF header probe suppressor" is; instead, I'll describe the
->>>> replacement for it.
->>>>
->>>> [...]
->>>
->>> So, the NOACPI allocation hint is a no-go at the moment, based on the
->>> discussion in the following threads:
->>>
->>> http://mid.mail-archive.com/20170601112241.2580-1-ard.biesheuvel at linaro.org
->>>
->>> http://mid.mail-archive.com/c76b36de-ebf9-c662-d454-0a95b43901e8 at redhat.com
->>>
->>> Therefore the header probe suppression remains necessary.
->>>
->>> In this case, it is not hard to do, you just have to reorder the
->>> following two ADD_POINTER additions a bit:
->>  Ok, it is no problem.
->>
->>>
->>>>>> +
->>>>>> +        bios_linker_loader_add_pointer(linker,
->>>>>> GHES_ERRORS_FW_CFG_FILE,
->>>>>> +                                sizeof(uint64_t) * i,
->>>>>> sizeof(uint64_t),
->>>>>> +                                GHES_ERRORS_FW_CFG_FILE,
->>>>>> +                                MAX_ERROR_SOURCE_COUNT_V6 *
->>>>>> sizeof(uint64_t) +
->>>>>> +                                i * MAX_RAW_DATA_LENGTH);
->>>
->>> This one should be moved out to a separate loop, after the current loop.
->>>
->>>>>> +        bios_linker_loader_add_pointer(linker,
->>>>>> ACPI_BUILD_TABLE_FILE,
->>>>>> +                    address_registers_offset
->>>>>> +                    + i * sizeof(AcpiGenericHardwareErrorSource),
->>>>>> +                    sizeof(uint32_t), GHES_ERRORS_FW_CFG_FILE,
->>>>>> +                    i * sizeof(uint64_t));
->>>
->>> This one should be kept in the first (i.e., current) loop.
->>>
->>> The idea is, when you first point the HEST/GHES_n entries in
->>> ACPI_BUILD_TABLE_FILE to the "address registers" in
->>> GHES_ERRORS_FW_CFG_FILE, all those address registers will still be
->>> zero-filled. This will fail the ACPI table header probe in
->>> OvmfPkg/AcpiPlatformDxe, which is what we want.
->>>
->>> After this is done, the address registers in GHES_ERRORS_FW_CFG_FILE
->>> should be pointed to the error status data blocks in the same fw_cfg
->>> blob, in a separate loop. (Those error status data blocks will again be
->>> zero-filled, so no ACPI table headers will be mistakenly recognized in
->>> them.)
->> I understand your idear. but I have a question:
->> how about we exchange the two function's place, such as shown below:
->> then it still meets ours needs, the change is easy.
->> For every loop:
->> (1)when patch address in ACPI_BUILD_TABLE_FILE to the "address registers",
->> the address register is zero-filed.
->> (2)when patch address in GHES_ERRORS_FW_CFG_FILE to the error status data
->> blocks, the error status data block is still zero-filed.
->>
->>     for (i = 0; i < GHES_ACPI_HEST_NOTIFY_RESERVED; i++) {
->>         .....................................
->>         bios_linker_loader_add_pointer(linker, ACPI_BUILD_TABLE_FILE,
->>                     address_registers_offset
->>                     + i * sizeof(AcpiGenericHardwareErrorSource),
->>                     sizeof(uint32_t), GHES_ERRORS_FW_CFG_FILE,
->>                     i * sizeof(uint64_t));
->>
->>
->>         bios_linker_loader_add_pointer(linker, GHES_ERRORS_FW_CFG_FILE,
->>                                 sizeof(uint64_t) * i, sizeof(uint64_t),
->>                                 GHES_ERRORS_FW_CFG_FILE,
->>                                 MAX_ERROR_SOURCE_COUNT_V6 *
->> sizeof(uint64_t) +
->>                                 i * MAX_RAW_DATA_LENGTH);
->> 	.........................................
->>
->>      }
->
-> Your suggestion seems to do the same, but there is a subtle difference.
->
-> When the firmware scans the targets of the ADD_POINTER commands for byte
-> sequences that "look like" an ACPI table header, in order to suppress
-> that probe, we should keep 36 bytes (i.e., the size of the ACPI table
-> header structure) zeroed at the target location.
->
-> * In the patch, as posted, this was not the case, because it first
-> filled in the address register inside the GHES_ERRORS_FW_CFG_FILE blob,
-> and then pointed a GHES pointer field in the HEST table to the *now*
-> nonzero address register.
->
-> * My suggestion was to first fill in all the GHES pointers (when still
-> all the pointed-to address registers are zero), and then the address
-> registers themselves should be patched.
->
-> Under this scheme, it is irrelevant whether both loops are incrementing
-> or decrementing loops.
->
-> * Your suggestion would preserve the safe patching order between any
-> given GHES field and its corresponding (pointed-to) address register. So
-> that's great.
->
-> However, consider the following case:
->
-> - Assume that the loop is decrementing, and not incrementing.
->
-> - First, the last GHES pointer field, GHES[9].<whatever> is patched. It
-> is pointed to the last address register in "etc/hardware_errors", which
-> is still zero-filled. Also, the last address register in
-> "etc/hardware_errors" is immediately followed by the first Error Status
-> Data Block, which is also filled with zero. This means that when the
-> header probe will look at the *target* of GHES[9].<whatever>, it will
-> definitely fail (which is what we want), because all consecutive 36
-> bytes that start at the last address register in "etc/hardware_errors"
-> are zero.
->
-> - Second, the last address register, address[9], is patched. It is
-> pointed to the last Error Status Data Block, which is zero filled, so
-> the header probe in the firmware fails -- great.
->
-> - Third, GHES[8].<whatever> is patched. It is set to &address[8].
-> However, at this point, the 36 consecutive bytes starting at &address[8]
-> are *not* all zero, because at relative offset 8, we have the already
-> patched address[9] register, which is nonzero. I'm not saying that this
-> would necessarily cause a problem, but we'd better be safe than sorry.
+We ended up not needing the stand-alone reset controller driver
+as it was agreed that a better approach was to merge the reset
+control into the clock driver, which is now present and takes
+precedence. Revert the driver, keep the DT bindings intact.
 
-yes, it it. when the loop is  decrementing, my suggested method will
-have problem.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/reset/Kconfig        |   7 ---
+ drivers/reset/Makefile       |   1 -
+ drivers/reset/reset-gemini.c | 110 -------------------------------------------
+ 3 files changed, 118 deletions(-)
+ delete mode 100644 drivers/reset/reset-gemini.c
 
-
->
->
-> In other words, your suggestion is OK, because the loop we have is
-> incrementing, not decrementing. But, if you decide to go with your idea,
-> please add a comment before the "for" instruction, "this loop must
-> remain an incrementing loop, to safely suppress the ACPI SDT header
-> probe in the firmware".
-Laszlo, I will use your method that separated them into different loop
-to avoid the potential problem, thanks.
-
-
->
-> Thanks
-> Laszlo
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
->
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index 608c071e4bbf..671ef2a01529 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -34,13 +34,6 @@ config RESET_BERLIN
+ 	help
+ 	  This enables the reset controller driver for Marvell Berlin SoCs.
+ 
+-config RESET_GEMINI
+-	bool "Gemini Reset Driver" if COMPILE_TEST
+-	default ARCH_GEMINI
+-	select MFD_SYSCON
+-	help
+-	  This enables the reset controller driver for Cortina Systems Gemini.
+-
+ config RESET_IMX7
+ 	bool "i.MX7 Reset Driver" if COMPILE_TEST
+ 	default SOC_IMX7D
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 7081f9da2599..063dfdc7c400 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_TEGRA) += tegra/
+ obj-$(CONFIG_RESET_A10SR) += reset-a10sr.o
+ obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
+ obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
+-obj-$(CONFIG_RESET_GEMINI) += reset-gemini.o
+ obj-$(CONFIG_RESET_IMX7) += reset-imx7.o
+ obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+diff --git a/drivers/reset/reset-gemini.c b/drivers/reset/reset-gemini.c
+deleted file mode 100644
+index a2478997c75b..000000000000
+--- a/drivers/reset/reset-gemini.c
++++ /dev/null
+@@ -1,110 +0,0 @@
+-/*
+- * Cortina Gemini Reset controller driver
+- * Copyright (C) 2017 Linus Walleij <linus.walleij@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/err.h>
+-#include <linux/init.h>
+-#include <linux/mfd/syscon.h>
+-#include <linux/regmap.h>
+-#include <linux/of.h>
+-#include <linux/platform_device.h>
+-#include <linux/reset-controller.h>
+-#include <dt-bindings/reset/cortina,gemini-reset.h>
+-
+-/**
+- * struct gemini_reset - gemini reset controller
+- * @map: regmap to access the containing system controller
+- * @rcdev: reset controller device
+- */
+-struct gemini_reset {
+-	struct regmap *map;
+-	struct reset_controller_dev rcdev;
+-};
+-
+-#define GEMINI_GLOBAL_SOFT_RESET 0x0c
+-
+-#define to_gemini_reset(p) \
+-	container_of((p), struct gemini_reset, rcdev)
+-
+-/*
+- * This is a self-deasserting reset controller.
+- */
+-static int gemini_reset(struct reset_controller_dev *rcdev,
+-			unsigned long id)
+-{
+-	struct gemini_reset *gr = to_gemini_reset(rcdev);
+-
+-	/* Manual says to always set BIT 30 (CPU1) to 1 */
+-	return regmap_write(gr->map,
+-			    GEMINI_GLOBAL_SOFT_RESET,
+-			    BIT(GEMINI_RESET_CPU1) | BIT(id));
+-}
+-
+-static int gemini_reset_status(struct reset_controller_dev *rcdev,
+-			     unsigned long id)
+-{
+-	struct gemini_reset *gr = to_gemini_reset(rcdev);
+-	u32 val;
+-	int ret;
+-
+-	ret = regmap_read(gr->map, GEMINI_GLOBAL_SOFT_RESET, &val);
+-	if (ret)
+-		return ret;
+-
+-	return !!(val & BIT(id));
+-}
+-
+-static const struct reset_control_ops gemini_reset_ops = {
+-	.reset = gemini_reset,
+-	.status = gemini_reset_status,
+-};
+-
+-static int gemini_reset_probe(struct platform_device *pdev)
+-{
+-	struct gemini_reset *gr;
+-	struct device *dev = &pdev->dev;
+-	struct device_node *np = dev->of_node;
+-	int ret;
+-
+-	gr = devm_kzalloc(dev, sizeof(*gr), GFP_KERNEL);
+-	if (!gr)
+-		return -ENOMEM;
+-
+-	gr->map = syscon_node_to_regmap(np);
+-	if (IS_ERR(gr->map)) {
+-		ret = PTR_ERR(gr->map);
+-		dev_err(dev, "unable to get regmap (%d)", ret);
+-		return ret;
+-	}
+-	gr->rcdev.owner = THIS_MODULE;
+-	gr->rcdev.nr_resets = 32;
+-	gr->rcdev.ops = &gemini_reset_ops;
+-	gr->rcdev.of_node = pdev->dev.of_node;
+-
+-	ret = devm_reset_controller_register(&pdev->dev, &gr->rcdev);
+-	if (ret)
+-		return ret;
+-
+-	dev_info(dev, "registered Gemini reset controller\n");
+-	return 0;
+-}
+-
+-static const struct of_device_id gemini_reset_dt_ids[] = {
+-	{ .compatible = "cortina,gemini-syscon", },
+-	{ /* sentinel */ },
+-};
+-
+-static struct platform_driver gemini_reset_driver = {
+-	.probe	= gemini_reset_probe,
+-	.driver = {
+-		.name		= "gemini-reset",
+-		.of_match_table	= gemini_reset_dt_ids,
+-		.suppress_bind_attrs = true,
+-	},
+-};
+-builtin_platform_driver(gemini_reset_driver);
+-- 
+2.9.4
