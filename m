@@ -1,43 +1,61 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 9 Jul 2017 22:33:20 +0200
-Subject: [PATCH v2 0/3] rtc: make st-lpc robust against y2038/2106 bug
-In-Reply-To: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <20170709203320.aub7iiub2bcwmuvm@piout.net>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Sun, 9 Jul 2017 15:57:44 -0500
+Subject: [PATCH] i2c: stm32f4: constify i2c_algorithm structure
+Message-ID: <20170709205744.GA18652@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/2017 at 11:36:19 +0200, Benjamin Gaignard wrote:
-> On 32bits platforms "struct timeval" or "time_t" are using u32 to code the
-> date, this cause tools like "date" or "hwclock" failed even before setting
-> the RTC device if the date is superior to year 2038 (or 2106).
-> 
-> To avoid this problem I add one RTC test file which directly use RTC ioctl
-> to set and read RTC time and alarm values.
-> rtctest_setdate allow to set any date/time given in the command line.
-> 
-> On this version 2 I add check of problematics years in rtctest like suggest
-> by Alexandre.
-> 
-> Finally that had allowed me to test and fix rtc-st-lpc driver.
-> 
-> Benjamin Gaignard (3):
->   tools: timer: add rtctest_setdate
->   tool: timer: rtctest add check for problematic dates
->   rtc: st-lpc: make it robust against y2038/2106 bug
-> 
->  drivers/rtc/rtc-st-lpc.c                         |  19 ++--
->  tools/testing/selftests/timers/Makefile          |   2 +-
->  tools/testing/selftests/timers/rtctest.c         | 121 ++++++++++++++++++++++-
->  tools/testing/selftests/timers/rtctest_setdate.c |  86 ++++++++++++++++
->  4 files changed, 212 insertions(+), 16 deletions(-)
->  create mode 100644 tools/testing/selftests/timers/rtctest_setdate.c
-> 
-Applied, thanks.
+Check for i2c_algorithm structures that are only stored in
+the algo field of an i2c_adapter structure. This field is
+declared const, so i2c_algorithm structures that have this
+property can be declared as const also.
 
-I've fixed up the date to meaningful ones in patch 2.
+This issue was identified using Coccinelle and the following
+semantic patch:
 
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct i2c_algorithm i at p = { ... };
+
+@ok@
+identifier r.i;
+struct i2c_adapter e;
+position p;
+@@
+e.algo = &i at p;
+
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+@@
+i at p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct i2c_algorithm i = { ... };
+
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+---
+ drivers/i2c/busses/i2c-stm32f4.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
+index f9dd7e8..9d6f110 100644
+--- a/drivers/i2c/busses/i2c-stm32f4.c
++++ b/drivers/i2c/busses/i2c-stm32f4.c
+@@ -751,7 +751,7 @@ static u32 stm32f4_i2c_func(struct i2c_adapter *adap)
+ 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+ }
+ 
+-static struct i2c_algorithm stm32f4_i2c_algo = {
++static const struct i2c_algorithm stm32f4_i2c_algo = {
+ 	.master_xfer = stm32f4_i2c_xfer,
+ 	.functionality = stm32f4_i2c_func,
+ };
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.5.0
