@@ -1,246 +1,58 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 10 Jul 2017 22:23:10 +0800
-Subject: [PATCH v4 3/3] dt-bindings: cpufreq: enhance MediaTek cpufreq
- dt-binding document
-In-Reply-To: <cover.1499692967.git.sean.wang@mediatek.com>
-References: <cover.1499692967.git.sean.wang@mediatek.com>
-Message-ID: <8489dfbfc7ad8f849605709b1632f1835f075a33.1499692967.git.sean.wang@mediatek.com>
+Date: Mon, 10 Jul 2017 22:23:07 +0800
+Subject: [PATCH v4 0/3] some fixups for MediaTek cpufreq driver
+Message-ID: <cover.1499692967.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Update binding document with adding operating-points-v2 as the required
-property and the cooling level as the optional properties and adding more
-examples guiding people how to use MediaTek cpufreq driver for MediaTek
-SoCs.
+Changes since v3:
+- remove the redundant line depends on ARM || ARM64 || COMPILE_TEST
+since the whole Kconfig.arm file depends on ARM || ARM64.
+- renaming from mtk-cpufreq.c to mediatek-cpufreq.c avoiding
+collide and cause confusion at some point in time.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- .../bindings/cpufreq/cpufreq-mediatek.txt          | 170 ++++++++++++++++++++-
- 1 file changed, 167 insertions(+), 3 deletions(-)
+Changes since v2:
+- correct the typo in the binding document
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-index 52b457c..f640308 100644
---- a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-@@ -1,4 +1,5 @@
--Device Tree Clock bindins for CPU DVFS of Mediatek MT8173 SoC
-+Binding for MediaTek's CPUFreq driver
-+=====================================
- 
- Required properties:
- - clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
-@@ -9,6 +10,8 @@ Required properties:
- 			  transition and not stable yet.
- 	Please refer to Documentation/devicetree/bindings/clk/clock-bindings.txt for
- 	generic clock consumer properties.
-+- operating-points-v2: Please refer to Documentation/devicetree/bindings/opp/opp.txt
-+	for detail.
- - proc-supply: Regulator for Vproc of CPU cluster.
- 
- Optional properties:
-@@ -17,9 +20,166 @@ Optional properties:
- 	       Vsram to fit SoC specific needs. When absent, the voltage scaling
- 	       flow is handled by hardware, hence no software "voltage tracking" is
- 	       needed.
-+- #cooling-cells:
-+- cooling-min-level:
-+- cooling-max-level:
-+	Please refer to Documentation/devicetree/bindings/thermal/thermal.txt
-+	for detail.
-+
-+Example 1 (MT7623 SoC):
-+
-+	cpu_opp_table: opp_table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-598000000 {
-+			opp-hz = /bits/ 64 <598000000>;
-+			opp-microvolt = <1050000>;
-+		};
-+
-+		opp-747500000 {
-+			opp-hz = /bits/ 64 <747500000>;
-+			opp-microvolt = <1050000>;
-+		};
-+
-+		opp-1040000000 {
-+			opp-hz = /bits/ 64 <1040000000>;
-+			opp-microvolt = <1150000>;
-+		};
-+
-+		opp-1196000000 {
-+			opp-hz = /bits/ 64 <1196000000>;
-+			opp-microvolt = <1200000>;
-+		};
-+
-+		opp-1300000000 {
-+			opp-hz = /bits/ 64 <1300000000>;
-+			opp-microvolt = <1300000>;
-+		};
-+	};
-+
-+	cpu0: cpu at 0 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x0>;
-+		clocks = <&infracfg CLK_INFRA_CPUSEL>,
-+			 <&apmixedsys CLK_APMIXED_MAINPLL>;
-+		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table>;
-+		#cooling-cells = <2>;
-+		cooling-min-level = <0>;
-+		cooling-max-level = <7>;
-+	};
-+	cpu at 1 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x1>;
-+		operating-points-v2 = <&cpu_opp_table>;
-+	};
-+	cpu at 2 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x2>;
-+		operating-points-v2 = <&cpu_opp_table>;
-+	};
-+	cpu at 3 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x3>;
-+		operating-points-v2 = <&cpu_opp_table>;
-+	};
-+
-+Example 2 (MT8173 SoC):
-+	cpu_opp_table_a: opp_table_a {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-507000000 {
-+			opp-hz = /bits/ 64 <507000000>;
-+			opp-microvolt = <859000>;
-+		};
-+
-+		opp-702000000 {
-+			opp-hz = /bits/ 64 <702000000>;
-+			opp-microvolt = <908000>;
-+		};
-+
-+		opp-1001000000 {
-+			opp-hz = /bits/ 64 <1001000000>;
-+			opp-microvolt = <983000>;
-+		};
-+
-+		opp-1105000000 {
-+			opp-hz = /bits/ 64 <1105000000>;
-+			opp-microvolt = <1009000>;
-+		};
-+
-+		opp-1183000000 {
-+			opp-hz = /bits/ 64 <1183000000>;
-+			opp-microvolt = <1028000>;
-+		};
-+
-+		opp-1404000000 {
-+			opp-hz = /bits/ 64 <1404000000>;
-+			opp-microvolt = <1083000>;
-+		};
-+
-+		opp-1508000000 {
-+			opp-hz = /bits/ 64 <1508000000>;
-+			opp-microvolt = <1109000>;
-+		};
-+
-+		opp-1573000000 {
-+			opp-hz = /bits/ 64 <1573000000>;
-+			opp-microvolt = <1125000>;
-+		};
-+	};
-+
-+	cpu_opp_table_b: opp_table_b {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-507000000 {
-+			opp-hz = /bits/ 64 <507000000>;
-+			opp-microvolt = <828000>;
-+		};
-+
-+		opp-702000000 {
-+			opp-hz = /bits/ 64 <702000000>;
-+			opp-microvolt = <867000>;
-+		};
-+
-+		opp-1001000000 {
-+			opp-hz = /bits/ 64 <1001000000>;
-+			opp-microvolt = <927000>;
-+		};
-+
-+		opp-1209000000 {
-+			opp-hz = /bits/ 64 <1209000000>;
-+			opp-microvolt = <968000>;
-+		};
-+
-+		opp-1404000000 {
-+			opp-hz = /bits/ 64 <1007000000>;
-+			opp-microvolt = <1028000>;
-+		};
-+
-+		opp-1612000000 {
-+			opp-hz = /bits/ 64 <1612000000>;
-+			opp-microvolt = <1049000>;
-+		};
-+
-+		opp-1807000000 {
-+			opp-hz = /bits/ 64 <1807000000>;
-+			opp-microvolt = <1089000>;
-+		};
-+
-+		opp-1989000000 {
-+			opp-hz = /bits/ 64 <1989000000>;
-+			opp-microvolt = <1125000>;
-+		};
-+	};
- 
--Example:
----------
- 	cpu0: cpu at 0 {
- 		device_type = "cpu";
- 		compatible = "arm,cortex-a53";
-@@ -29,6 +189,7 @@ Example:
- 		clocks = <&infracfg CLK_INFRA_CA53SEL>,
- 			 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table_a>;
- 	};
- 
- 	cpu1: cpu at 1 {
-@@ -40,6 +201,7 @@ Example:
- 		clocks = <&infracfg CLK_INFRA_CA53SEL>,
- 			 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table_a>;
- 	};
- 
- 	cpu2: cpu at 100 {
-@@ -51,6 +213,7 @@ Example:
- 		clocks = <&infracfg CLK_INFRA_CA57SEL>,
- 			 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table_b>;
- 	};
- 
- 	cpu3: cpu at 101 {
-@@ -62,6 +225,7 @@ Example:
- 		clocks = <&infracfg CLK_INFRA_CA57SEL>,
- 			 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table_b>;
- 	};
- 
- 	&cpu0 {
+Changes since v1:
+- drop those patches already accepted
+- refine the commit messages and Kconfig dependency
+- Kconfig menu entry and file name itself are updated with more
+generic name to drop "MT8173" since this driver actually supports
+all MediaTek SoCs.
+- generate patchset again with git format-patch -C -M --thread=shallow
+- fix binding examples by replacing '@' with '-' as the OPP nodes will
+never have a "reg" property.
+
+Hi,
+
+The purpose of the series is
+- (patch 1 to 3) to fix up current Mediatek cpufreq driver
+can't work with the latest tree since one required CPU clock muxer missing
+would cause the driver getting the resource fails when driver probe gets
+called.
+- (patch 4) to enable cpufreq feature on MT2701/MT7623 platform.
+- (patch 5 to 6) to update the binding document to reflect
+latest driver logic and add more examples guiding people how to apply for
+Mediatek cpufreq driver.
+
+Sean Wang (3):
+  cpufreq: mediatek: Add support of cpufreq to MT2701/MT7623 SoC
+  dt-bindings: cpufreq: move MediaTek cpufreq dt-bindings document to
+    proper place
+  dt-bindings: cpufreq: enhance MediaTek cpufreq dt-binding document
+
+ .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  |  83 -------
+ .../bindings/cpufreq/cpufreq-mediatek.txt          | 247 +++++++++++++++++++++
+ drivers/cpufreq/Kconfig.arm                        |   7 +-
+ drivers/cpufreq/Makefile                           |   2 +-
+ .../{mt8173-cpufreq.c => mediatek-cpufreq.c}       |   2 +
+ 5 files changed, 253 insertions(+), 88 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+ rename drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} (99%)
+
 -- 
 2.7.4
