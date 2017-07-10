@@ -1,63 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 10 Jul 2017 11:31:32 +0200
-Subject: [PATCH 0/9] ARM: renesas: Use SMP jump stub SRAM region from DT
-In-Reply-To: <CAMuHMdVi4YhvpEZqbdhVe3AT=8_2Yp8zvaB7sxAPMdMGrvKa9Q@mail.gmail.com>
-References: <1499182903-31339-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdUFkaxoJCX5F3FH3vy=Sh50y02a3hF9HR3tkw-XwtiG2g@mail.gmail.com>
- <20170710083926.GI13680@verge.net.au>
- <CAMuHMdVi4YhvpEZqbdhVe3AT=8_2Yp8zvaB7sxAPMdMGrvKa9Q@mail.gmail.com>
-Message-ID: <20170710093132.GQ13680@verge.net.au>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Mon, 10 Jul 2017 09:34:24 +0000
+Subject: [PATCH v1 2/3] dt-bindings: display: panel: Add support for Orise
+ Tech otm8009a dsi panel
+In-Reply-To: <20170710011211.b6inrhlqmkph3otl@rob-hp-laptop>
+References: <1499185805-23354-1-git-send-email-philippe.cornu@st.com>
+ <1499185805-23354-3-git-send-email-philippe.cornu@st.com>
+ <20170710011211.b6inrhlqmkph3otl@rob-hp-laptop>
+Message-ID: <4f628366-d365-c55f-c26a-282f0678d147@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 10, 2017 at 10:44:47AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Mon, Jul 10, 2017 at 10:39 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Jul 04, 2017 at 06:44:48PM +0200, Geert Uytterhoeven wrote:
-> >> On Tue, Jul 4, 2017 at 5:41 PM, Geert Uytterhoeven
-> >> <geert+renesas@glider.be> wrote:
-> >> > The R-Car Gen2 platform code for CPU core bringup needs to copy a jump
-> >> > stub to on-SoC SRAM.  Currently it uses a hardcoded address pointing to
-> >> > ICRAM1.
-> >> >
-> >> > This patch series adds support to specify this region from DT.  It
-> >> > consists of 3 parts:
-> >> >   - DT binding documentation for reserving SRAM for the jump stub,
-> >> >   - A platform code update to retrieve the information from DT, if
-> >> >     present (of course backwards-compatibility with old DTBs is
-> >> >     preserved),
-> >> >   - DT updates to reserve an SRAM region in DT on all R-Car Gen2 and
-> >> >     RZ/G1 SoCs.
-> >> >
-> >> > The DT patches in this series depend on "[PATCH 0/7] ARM: dts: renesas:
-> >> > Add Inter Connect RAM".
-> >> >
-> >> > Note that the current jump stub in Linux is 12 bytes long.  The patches
-> >> > reserve 16 bytes of SRAM.  Should this be increased?  The mapping
-> >> > granularity is PAGE_SIZE anyway.
-> >> >
-> >> > Thanks for your comments!
-> >> >
-> >> > Geert Uytterhoeven (9):
-> >> >   dt-bindings: sram: Document renesas,smp-sram
-> >> >   ARM: shmobile: rcar-gen2: Obtain jump stub region from DT
-> >> >   ARM: dts: r8a7743: Reserve SRAM for the SMP jump stub
-> >> >   ARM: dts: r8a7745: Reserve SRAM for the SMP jump stub
-> >> >   ARM: dts: r8a7790: Reserve SRAM for the SMP jump stub
-> >> >   ARM: dts: r8a7791: Reserve SRAM for the SMP jump stub
-> >> >   ARM: dts: r8a7792: Reserve SRAM for the SMP jump stub
-> >> >   ARM: dts: r8a7793: Reserve SRAM for the SMP jump stub
-> >> >   ARM: dts: r8a7794: Reserve SRAM for the SMP jump stub
-> >>
-> >> Forgot to mention: this has been tested on r8a7790/lager, r8a7791/koelsch,
-> >> r8a7792/blanche, r8a7793/gose, and r8a7794/alt (r8a7794 needs an
-> >> unrelated fix to enable SMP).
-> >
-> > Geert, these seem nice and clean to me.
-> > Are they ready to be applied?
-> 
-> Now the binding has been Acked by Rob, I think they are.
-> Thanks!
 
-Thanks, all patches accepted for v4.14.
+
+On 07/10/2017 03:12 AM, Rob Herring wrote:
+> On Tue, Jul 04, 2017 at 06:30:04PM +0200, Philippe CORNU wrote:
+>> The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
+>> a MIPI-DSI video interface. Its backlight is managed through the DSI link.
+>>
+>> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+>> ---
+>>   .../bindings/display/panel/orisetech,otm8009a.txt    | 20 ++++++++++++++++++++
+>>   1 file changed, 20 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+>> new file mode 100644
+>> index 0000000..0bb8237
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+>> @@ -0,0 +1,20 @@
+>> +Orise Tech OTM8009A 3.97" 480x800 TFT LCD panel (MIPI-DSI video mode)
+>> +
+>> +The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
+>> +a MIPI-DSI video interface. Its backlight is managed through the DSI link.
+>> +
+>> +Required properties:
+>> +  - compatible: "orisetech,otm8009a"
+>> +  - reg: the virtual channel number of a DSI peripheral
+>> +  - reset-gpios: a GPIO spec for the reset pin (active low). (Optional)
+> 
+> If this is optional, move it to its own section.
+> 
+
+Dear Rob,
+Many thanks for your comment. Fixed in v2, sent few minutes ago.
+Best regards,
+Philippe
+
+>> +
+>> +Example:
+>> +&dsi {
+>> +	...
+>> +
+>> +	panel at 0 {
+>> +		compatible = "orisetech,otm8009a";
+>> +		reg = <0>;
+>> +		reset-gpios = <&gpioh 7 0>;
+>> +	};
+>> +};
+>> -- 
+>> 1.9.1
+>>
