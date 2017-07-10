@@ -1,21 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 9 Jul 2017 20:08:27 -0500
-Subject: [PATCH 1/9] dt-bindings: sram: Document renesas,smp-sram
-In-Reply-To: <1499182903-31339-2-git-send-email-geert+renesas@glider.be>
-References: <1499182903-31339-1-git-send-email-geert+renesas@glider.be>
- <1499182903-31339-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170710010827.qj2vw3fqalbzspfj@rob-hp-laptop>
+Date: Sun, 9 Jul 2017 20:10:00 -0500
+Subject: [PATCH v1 1/3] dt-bindings: Add vendor prefix for Orise Technology
+In-Reply-To: <1499185805-23354-2-git-send-email-philippe.cornu@st.com>
+References: <1499185805-23354-1-git-send-email-philippe.cornu@st.com>
+ <1499185805-23354-2-git-send-email-philippe.cornu@st.com>
+Message-ID: <20170710011000.i7toayx6z4bkpe3v@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 05:41:35PM +0200, Geert Uytterhoeven wrote:
-> Document reserved SRAM for the SMP jump stub on Renesas R-Car Gen2 and
-> RZ/G1 SoCs.
+On Tue, Jul 04, 2017 at 06:30:03PM +0200, Philippe CORNU wrote:
+> Orise Technology is headquartered in Taiwan and specializes
+> in manufacture of Flat Panel Display Driver IC and Flat Panel
+> Display Controller IC.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
 > ---
->  .../devicetree/bindings/sram/renesas,smp-sram.txt  | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sram/renesas,smp-sram.txt
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
