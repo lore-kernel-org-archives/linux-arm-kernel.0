@@ -1,44 +1,50 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 10 Jul 2017 09:40:46 +0200
-Subject: [RESEND PATCH v6 0/8] mfd: Add OF device table to I2C drivers
- that are missing it
-In-Reply-To: <20170615184928.12007-1-javier@dowhile0.org>
-References: <20170615184928.12007-1-javier@dowhile0.org>
-Message-ID: <CABxcv=k8g8c3KmLK+ZqQiG+-+j2Y=FuRpadQ=xguXG5qGGWwhg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 10 Jul 2017 09:46:11 +0200
+Subject: 4.13-rc0: stopped booting on Nokia N900
+Message-ID: <20170710074610.GA22846@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+Hi!
 
-On Thu, Jun 15, 2017 at 8:49 PM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
->
-> This series add OF device ID tables to mfd I2C drivers whose devices are
-> either used in Device Tree source files or are listed in binding docs as
-> a compatible string.
->
-> That's done because the plan is to change the I2C core to report proper OF
-> modaliases instead of always reporting a MODALIAS=i2c:<foo> regardless if
-> a device was registered via DT or using the legacy platform data mechanism.
->
-> So these patches will make sure that mfd I2C drivers modules will continue
-> to be autoloaded once the I2C core is changed to report proper OF modalias.
->
-> Users didn't have a vendor prefix in the used compatible strings, but since
-> there wasn't a DT binding document for these drivers, it can be said that
-> were working for mere luck and so this series fixes the users and add a DT
-> binding doc for the drivers.
->
-> Most patches can be applied independently, with the exception of patches
-> 2 to 4 that should be applied in the same tree to keep bisect-ability. I
-> suggest these to go through the MFD subsystem tree.
->
-> Best regards,
-> Javier
->
+First, I got segfault from make:
 
-Are you planning to pick this series? It has been in the list for
-months and were resent many times...
+: 0: Can't open
+scripts/Makefile.build:561: recipe for target
+'drivers/iio/imu/st_lsm6dsx' failed
+make[3]: *** [drivers/iio/imu/st_lsm6dsx] Segmentation fault (core
+dumped)
+scripts/Makefile.build:561: recipe for target 'drivers/iio/imu' failed
+make[2]: *** [drivers/iio/imu] Error 2
+scripts/Makefile.build:561: recipe for target 'drivers/iio' failed
+make[1]: *** [drivers/iio] Error 2
+make[1]: *** Waiting for unfinished jobs....
+Makefile:1008: recipe for target 'drivers' failed
+make: *** [drivers] Error 2
+make: *** Waiting for unfinished jobs....
+pavel at duo:/data/l/linux-n900$ ./mkit
+
+Then compile worked, but it failed to boot. I've now cleaned caches
+and am rebuilding to make sure it is not build machine that has
+glitches.
+
+No such luck :-(.
+
+I tested linux-next relatively recently, and it worked ok.
+
+af3c8d98508d37541d4bf57f13a984a7f73a328c is broken.
+650fc87 worked ok.
 
 Best regards,
-Javier
+
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/a626bfb6/attachment.sig>
