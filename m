@@ -1,50 +1,55 @@
 From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 10 Jul 2017 16:53:56 +1000
-Subject: [PATCH v2] drm/sun4i: Implement drm_driver lastclose to restore
- fbdev console
-In-Reply-To: <20170710064412.xpadh4p64krvohvi@flea>
-References: <20170709075951.16690-1-net147@gmail.com>
- <CAGb2v67s=_Z_zcvpMmNZOmZ+y+J5EoxiAVfWpQ+UUxQipUe=sw@mail.gmail.com>
- <20170710064412.xpadh4p64krvohvi@flea>
-Message-ID: <CANwerB062Ph52oFsKw6Uz_jrvnNAY24xWm_8tL3sK566hKYhbA@mail.gmail.com>
+Date: Mon, 10 Jul 2017 16:55:04 +1000
+Subject: [PATCH v3] drm/sun4i: Implement drm_driver lastclose to restore fbdev
+ console
+Message-ID: <20170710065504.31497-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+The drm_driver lastclose callback is called when the last userspace
+DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
+the fbdev console otherwise the fbdev console will stop working.
 
-On 10 July 2017 at 16:44, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sun, Jul 09, 2017 at 11:11:07PM +0800, Chen-Yu Tsai wrote:
->> On Sun, Jul 9, 2017 at 3:59 PM, Jonathan Liu <net147@gmail.com> wrote:
->> > The drm_driver lastclose callback is called when the last userspace
->> > DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
->> > the fbdev console otherwise the fbdev console will stop working.
->> >
->> > Signed-off-by: Jonathan Liu <net147@gmail.com>
->>
->> This should have
->>
->> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
->>
->> Otherwise,
->>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->
-> And it should be sent to stable too.
->
-> Can you resend it?
+Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
+Cc: stable at vger.kernel.org
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+---
+Changes for v3:
+ - Add 'Fixes:' tag
+ - Add CC to stable
+ - Add 'Reviewed-by: Chen-Yu Tsai <wens@csie.org>'
 
-Will do.
+Changes for v2:
+ - Rename sun4i_drm_lastclose to sun4i_drv_lastclose
 
->
-> Thanks!
-> Maxime
->
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Regards,
-Jonathan
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index abc7d8fe06b4..a45a627283a1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -25,12 +25,20 @@
+ #include "sun4i_framebuffer.h"
+ #include "sun4i_tcon.h"
+ 
++static void sun4i_drv_lastclose(struct drm_device *dev)
++{
++	struct sun4i_drv *drv = dev->dev_private;
++
++	drm_fbdev_cma_restore_mode(drv->fbdev);
++}
++
+ DEFINE_DRM_GEM_CMA_FOPS(sun4i_drv_fops);
+ 
+ static struct drm_driver sun4i_drv_driver = {
+ 	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_PRIME | DRIVER_ATOMIC,
+ 
+ 	/* Generic Operations */
++	.lastclose		= sun4i_drv_lastclose,
+ 	.fops			= &sun4i_drv_fops,
+ 	.name			= "sun4i-drm",
+ 	.desc			= "Allwinner sun4i Display Engine",
+-- 
+2.13.2
