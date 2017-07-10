@@ -1,30 +1,58 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 10 Jul 2017 22:23:09 +0800
-Subject: [PATCH v4 2/3] dt-bindings: cpufreq: move MediaTek cpufreq
- dt-bindings document to proper place
-In-Reply-To: <cover.1499692967.git.sean.wang@mediatek.com>
-References: <cover.1499692967.git.sean.wang@mediatek.com>
-Message-ID: <ff9b099839f5a83ef45771dd4fc5d72b7b807f1c.1499692967.git.sean.wang@mediatek.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Mon, 10 Jul 2017 16:42:18 +0200
+Subject: [PATCH v1 0/2] provide imx rproc driver
+Message-ID: <20170710144220.31594-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+this patch set to provide remoteproc functionality on
+i.MX7D SoC.
 
-The old place is Documentation/devicetree/bindings/clock/ that would
-let people hard to find how to use MediaTek cpufreq driver, so moving
-it to the appropriate place as other cpufreq drivers done would be
-better.
+For testing I used this simple counter written in ASM:
+======================================
+        .syntax unified
+        .text
+        .thumb
+        .int 0x10020000                 @ Initial SP value
+        .int reset + 1
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- .../bindings/{clock/mt8173-cpu-dvfs.txt => cpufreq/cpufreq-mediatek.txt}  | 0
- 1 file changed, 0 insertions(+), 0 deletions(-)
- rename Documentation/devicetree/bindings/{clock/mt8173-cpu-dvfs.txt => cpufreq/cpufreq-mediatek.txt} (100%)
+reset:
 
-diff --git a/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
-rename to Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+        mov     r0, #0x55
+        ldr     r1, =(0x40)
+1:
+        str     r0, [r1]
+        add     r0, 1
+        b       1b
+
+        /* Dummy data, required by remoteproc loader */
+        /* Please FIXME, this part seem to be incorrect */
+        .data
+        .section .resource_table, "aw"
+        .word   1, 0, 0, 0      /* struct resource_table base */
+        .word   0               /* uint32_t offset[1] */
+============================================================
+compiled with:
+${CROSS}as -o imx7m4.o imx7m4.S
+${CROSS}ld -Ttext=0x0 -o imx7m4.elf imx7m4.o
+cp imx7m4.elf /srv/nfs/sid-armhf/lib/firmware/rproc-imx_rproc-fw
+
+Functionality was confirmed with current OpenOCD master.
+OpenOCD cfg file can be found here:
+https://github.com/olerem/openocd/blob/imx7-2017.06.14/tcl/target/imx7.cfg
+
+Oleksij Rempel (2):
+  remoteproc: dt: Provide bindings for iMX6SX/7D Remote Processor
+    Controller driver
+  remoteproc: imx_rproc: add a NXP/Freescale imx_rproc driver
+
+ .../devicetree/bindings/remoteproc/imx-rproc.txt   |  44 +++
+ drivers/remoteproc/Kconfig                         |  10 +
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/imx_rproc.c                     | 417 +++++++++++++++++++++
+ 4 files changed, 472 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+ create mode 100644 drivers/remoteproc/imx_rproc.c
+
 -- 
-2.7.4
+2.11.0
