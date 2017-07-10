@@ -1,57 +1,97 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 10 Jul 2017 10:13:35 +0200
-Subject: 4.13-rc0: stopped booting on Nokia N900
-In-Reply-To: <20170710074610.GA22846@amd>
-References: <20170710074610.GA22846@amd>
-Message-ID: <20170710081334.GA29726@amd>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 10 Jul 2017 08:20:59 +0000
+Subject: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
+In-Reply-To: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
+References: <1499259711-56175-1-git-send-email-biju.das@bp.renesas.com>
+ <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
+ <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
+Message-ID: <KL1PR06MB1702B70F6F217FF33A103E7AB8A90@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2017-07-10 09:46:10, Pavel Machek wrote:
-> Hi!
-> 
-> First, I got segfault from make:
-> 
-> : 0: Can't open
-> scripts/Makefile.build:561: recipe for target
-> 'drivers/iio/imu/st_lsm6dsx' failed
-> make[3]: *** [drivers/iio/imu/st_lsm6dsx] Segmentation fault (core
-> dumped)
-> scripts/Makefile.build:561: recipe for target 'drivers/iio/imu' failed
-> make[2]: *** [drivers/iio/imu] Error 2
-> scripts/Makefile.build:561: recipe for target 'drivers/iio' failed
-> make[1]: *** [drivers/iio] Error 2
-> make[1]: *** Waiting for unfinished jobs....
-> Makefile:1008: recipe for target 'drivers' failed
-> make: *** [drivers] Error 2
-> make: *** Waiting for unfinished jobs....
-> pavel at duo:/data/l/linux-n900$ ./mkit
-> 
-> Then compile worked, but it failed to boot. I've now cleaned caches
-> and am rebuilding to make sure it is not build machine that has
-> glitches.
-> 
-> No such luck :-(.
-> 
-> I tested linux-next relatively recently, and it worked ok.
+Hello,
 
-> af3c8d98508d37541d4bf57f13a984a7f73a328c is broken.
-> 650fc87 worked ok.
+Thanks for the review.
 
-2b97620 is broken.
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: 10 July 2017 02:20
+> To: Biju Das <biju.das@bp.renesas.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>; Russell King
+> <linux@armlinux.org.uk>; Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com>; Simon Horman
+> <horms@verge.net.au>; Magnus Damm <magnus.damm@gmail.com>; Chris
+> Paterson <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; linux-
+> renesas-soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> netdev at vger.kernel.org
+> Subject: Re: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
+>
+> On Wed, Jul 05, 2017 at 02:01:50PM +0100, Biju Das wrote:
+> > Add support for Gigabit Ethernet E-MAC on r8a7743 (RZ/G1M) SoC.
+> > Renesas RZ/G1M (R8A7743) SoC Ethernet AVB IP is identical to the R-Car
+> > Gen2 family.
+>
+> For the subject: "dt-bindings: net: ..."
 
-commit a51166ce71844ffbb8f78d63647b44dd69e46cf1
-    Add linux-next specific files for 20170628
+I will change the subject to "dt-bindings: net: ravb: ..
 
-was ok.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/c962878f/attachment.sig>
+>
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> > ---
+> >  Documentation/devicetree/bindings/net/renesas,ravb.txt | 3 ++-
+> >  drivers/net/ethernet/renesas/ravb_main.c               | 1 +
+> >  2 files changed, 3 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> > b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> > index b519503..bc692ab 100644
+> > --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> > +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> > @@ -4,7 +4,8 @@ This file provides information on what the device node
+> > for the Ethernet AVB  interface contains.
+> >
+> >  Required properties:
+> > -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790
+> SoC.
+> > +- compatible: "renesas,etheravb-r8a7743" if the device is a part of R8A7743
+> SoC.
+> > +      "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+>
+> Please re-format like this:
+>
+> - compatible: Must be one of:
+> ...
+>
+Ok. I will change this as well.
+
+> So it's a one line change to add new compatibles.
+>
+> >        "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
+> >        "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
+> >        "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
+> > diff --git a/drivers/net/ethernet/renesas/ravb_main.c
+> > b/drivers/net/ethernet/renesas/ravb_main.c
+> > index 5931e85..e35b30f 100644
+> > --- a/drivers/net/ethernet/renesas/ravb_main.c
+> > +++ b/drivers/net/ethernet/renesas/ravb_main.c
+> > @@ -1869,6 +1869,7 @@ static int ravb_mdio_release(struct ravb_private
+> > *priv)  }
+> >
+> >  static const struct of_device_id ravb_match_table[] = {
+> > +{ .compatible = "renesas,etheravb-r8a7743", .data = (void
+> > +*)RCAR_GEN2 },
+> >  { .compatible = "renesas,etheravb-r8a7790", .data = (void
+> *)RCAR_GEN2 },
+> >  { .compatible = "renesas,etheravb-r8a7794", .data = (void
+> *)RCAR_GEN2 },
+> >  { .compatible = "renesas,etheravb-rcar-gen2", .data = (void
+> > *)RCAR_GEN2 },
+> > --
+> > 1.9.1
+> >
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
