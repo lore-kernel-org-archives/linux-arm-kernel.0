@@ -1,93 +1,52 @@
-From: jon@solid-run.com (Jon Nettleton)
-Date: Mon, 10 Jul 2017 11:29:24 +0200
-Subject: [RFC PATCH 0/7] Hummingboard2 improvements
-In-Reply-To: <1499676766.2924.6.camel@pengutronix.de>
-References: <20170408143607.15928-1-dev@lynxeye.de>
- <1498234514.24585.3.camel@pengutronix.de>
- <20170624073031.GW4902@n2100.armlinux.org.uk>
- <20170708135907.GA23333@n2100.armlinux.org.uk>
- <CABdtJHutd5v4onVMMZdufnutzDWt5R3RE3XxicfHsTZkNUYXCg@mail.gmail.com>
- <CABdtJHsGKrZ4R-kcikc9dsrO-CrZpRXzNEmQT4WgKJ=UZfDRCg@mail.gmail.com>
- <1499676766.2924.6.camel@pengutronix.de>
-Message-ID: <CABdtJHtnH8N70ed1z9GpjMZoHXNGVzXuM3UX+XED3pbvgOM0+g@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 10 Jul 2017 12:31:19 +0300
+Subject: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
+In-Reply-To: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
+References: <1499259711-56175-1-git-send-email-biju.das@bp.renesas.com>
+ <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
+ <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
+Message-ID: <7a631876-900e-66fb-c389-a33b9a146a8e@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 10, 2017 at 10:52 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Hi Jon,
->
-> Am Sonntag, den 09.07.2017, 06:42 +0200 schrieb Jon Nettleton:
->> On Sun, Jul 9, 2017 at 6:39 AM, Jon Nettleton <jon@solid-run.com> wrote:
->> >
->> >
->> >
->> > On Sat, Jul 8, 2017 at 3:59 PM, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
->> >>
->> >> On Sat, Jun 24, 2017 at 08:30:31AM +0100, Russell King - ARM Linux wrote:
->> >> > On Fri, Jun 23, 2017 at 06:15:14PM +0200, Lucas Stach wrote:
->> >> > > Hi Russell,
->> >> > >
->> >> > > it seems this is making no progress. If you don't mind I'm going to pick
->> >> > > up the patches from you hb2 branch and submit the whole series to Shawn,
->> >> > > so we can finally get things merged. Are you okay with this?
->> >> >
->> >> > If you remember from the reviews back in January of my patch set, Jon
->> >> > Nettleton promised to send me a replacement set of DT files that were
->> >> > properly licensed and updated along the lines of your patches in April.
->> >> > I'm still waiting...
->> >>
->> >> I've chased Jon a couple more times since (once today), and I'm feeling
->> >> that we're not getting anywhere.  I've now told him that we (SolidRun/
->> >> myself) are in danger of having this work replaced by others.  So, I'm
->> >> now adding Rabeeh to this thread.
->> >>
->> >>
+Hello!
+
+On 7/10/2017 4:20 AM, Rob Herring wrote:
+
+>> Add support for Gigabit Ethernet E-MAC on r8a7743 (RZ/G1M) SoC.
+>> Renesas RZ/G1M (R8A7743) SoC Ethernet AVB IP is identical to the R-Car Gen2
+>> family.
+> 
+> For the subject: "dt-bindings: net: ..."
+> 
 >>
->> Besides the licensing there are still a number of bugs that exist for
->> the device-tree files as they stand.  Most notably using the standard
->> regulator code for the SDHC device causes a hang on reboot with some
->> UHS cards.
->
-> What's the issue here? Is the bootloader not coming up, or does the
-> kernel hang at boot?
+>> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+>> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+>> ---
+>>   Documentation/devicetree/bindings/net/renesas,ravb.txt | 3 ++-
+>>   drivers/net/ethernet/renesas/ravb_main.c               | 1 +
+>>   2 files changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>> index b519503..bc692ab 100644
+>> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>> @@ -4,7 +4,8 @@ This file provides information on what the device node for the Ethernet AVB
+>>   interface contains.
+>>   
+>>   Required properties:
+>> -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+>> +- compatible: "renesas,etheravb-r8a7743" if the device is a part of R8A7743 SoC.
+>> +	      "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+> 
+> Please re-format like this:
+> 
+> - compatible: Must be one of:
+> ...
+> 
+> So it's a one line change to add new compatibles.
 
-it crashes the SDHC firmware because there isn't a long enough time
-between power down at 1.8V and power-up at 3.3V.  The old framework
-used to use card-external-vcc-supply which allowed enough time for the
-card to fully reset.
+    Note that the common gen2/3 values are at end of this list, so they'll 
+need different treating if you add these words.
 
->
->> Additionally we need to bring in the support for the SOM rev1.5 which
->> has been waiting on the TTY slave devices infrastructure to land.  We
->> have been trying to come up with a better solution than duplicating
->> all our device-tree files with a som revision however there doesn't
->> seem to be.  I would prefer to bring all the support in at once since
->> we are only shipping rev 1.5 soms at this point
->
-> What's the difference between the old and new SoMs? Can we patch the DTs
-> from the bootloader instead of introducing more variants?
-
-Yes that is the new plan now that u-boot supports this.
-
->
-> Frankly this whole situation is very bad. I have this Hummingboard2
-> lying around for 1.5 years now, with no mainline support available. With
-> the reasoning above it doesn't seem like this is going to change in the
-> near future, as perfect is the enemy of good.
->
-
-I will have new patches ready for -rc1.  Spoke with Russell on irc
-last night and the plan is to only support the fully populated board
-for each family.  Then we can use overlays in u-boot to disable /
-enable devices for the variants.
-
-We will also look into user-space probing for additional devices in
-order to load add-on device fragments later on in boot, although that
-is a topic for another discussion.
-
-Without changing the structure of our device-tree files in mainline we
-are looking at maintaining 20 just for iMX6, and that will only grow.
-Not to mention customer boards etc.  The main question now is, where
-do we store all the overlay fragments?
-
--Jon
+MBR, Sergei
