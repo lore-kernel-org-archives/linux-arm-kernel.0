@@ -1,47 +1,41 @@
-From: jan.kiszka@web.de (Jan Kiszka)
-Date: Mon, 10 Jul 2017 19:31:24 +0200
-Subject: [PATCH] spi: pxa2xx: Only claim CS GPIOs when the slave device is
- created
-In-Reply-To: <20170710120913.g35ftcbs7pngrtsm@sirena.org.uk>
-References: <90b3e14d-0077-9a25-9d90-ab340577af57@web.de>
- <CAHp75Vd8GRCwGp8eDFOL=dsgxCR+VqqUy+O50PEW=p99a8xAwQ@mail.gmail.com>
- <20170710120913.g35ftcbs7pngrtsm@sirena.org.uk>
-Message-ID: <cb21c69b-6f22-4c06-b308-16bd6895f1a9@web.de>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 10 Jul 2017 20:01:41 +0200
+Subject: [PATCH v2] drm/sun4i: Implement drm_driver lastclose to restore
+ fbdev console
+In-Reply-To: <20170710064412.xpadh4p64krvohvi@flea>
+References: <20170709075951.16690-1-net147@gmail.com>
+ <CAGb2v67s=_Z_zcvpMmNZOmZ+y+J5EoxiAVfWpQ+UUxQipUe=sw@mail.gmail.com>
+ <20170710064412.xpadh4p64krvohvi@flea>
+Message-ID: <CAKMK7uFTnr-qSWW0zqPZC2reO_19HDMwnpEYnMwunMtAvKO=1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-07-10 14:09, Mark Brown wrote:
-> On Sun, Jul 09, 2017 at 12:48:10AM +0300, Andy Shevchenko wrote:
->> On Sat, Jul 8, 2017 at 11:41 AM, Jan Kiszka <jan.kiszka@web.de> wrote:
-> 
->>> Tested on the IOT2000 where the second SPI bus is connected to an
->>> Arduino-compatible connector and multiplexed between SPI, GPIO and PWM
->>> usage.
-> 
->> Can we first switch the driver to use GPIO descriptors instead of
->> plain integers?
-> 
-> Only if you also convert the SPI core to use descriptors, Chris Packham
-> was looking at that but he needed update the ep93xx drivers among others
-> and getting reviewers was hard.
-> 
+On Mon, Jul 10, 2017 at 8:44 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sun, Jul 09, 2017 at 11:11:07PM +0800, Chen-Yu Tsai wrote:
+>> On Sun, Jul 9, 2017 at 3:59 PM, Jonathan Liu <net147@gmail.com> wrote:
+>> > The drm_driver lastclose callback is called when the last userspace
+>> > DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
+>> > the fbdev console otherwise the fbdev console will stop working.
+>> >
+>> > Signed-off-by: Jonathan Liu <net147@gmail.com>
+>>
+>> This should have
+>>
+>> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
+>>
+>> Otherwise,
+>>
+>> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>
+> And it should be sent to stable too.
+>
+> Can you resend it?
 
-IIUC, we can't convert completely due to some legacy boards providing
-their CS lines as integers. But even then, a few more API usages can be
-converted.
-
-While looking into this, I noticed that this patch violated the formal
-rule to never release a GPIO with the old API when it was requested with
-the new one. That's at least stated in the docs, even though gpio_free
-is equivalent to gpiod_put. Fixed that already, but I need to find some
-time to retest.
-
-Jan
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/ba806053/attachment.sig>
+Fyi but patchwork auto-adds these tags. Feels a bit like overkill
+asking for a resend for something you can trivially add yourself ...
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
