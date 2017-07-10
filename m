@@ -1,56 +1,46 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 10 Jul 2017 14:43:34 +0800
-Subject: [xlnx:master 553/744] drivers/mtd/spi-nor/spi-nor.c:2000:13: error:
- implicit declaration of function 'of_get_next_parent'
-Message-ID: <201707101431.q1Xo5W0H%fengguang.wu@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Jul 2017 08:44:12 +0200
+Subject: [PATCH v2] drm/sun4i: Implement drm_driver lastclose to restore
+ fbdev console
+In-Reply-To: <CAGb2v67s=_Z_zcvpMmNZOmZ+y+J5EoxiAVfWpQ+UUxQipUe=sw@mail.gmail.com>
+References: <20170709075951.16690-1-net147@gmail.com>
+ <CAGb2v67s=_Z_zcvpMmNZOmZ+y+J5EoxiAVfWpQ+UUxQipUe=sw@mail.gmail.com>
+Message-ID: <20170710064412.xpadh4p64krvohvi@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Naga,
+On Sun, Jul 09, 2017 at 11:11:07PM +0800, Chen-Yu Tsai wrote:
+> On Sun, Jul 9, 2017 at 3:59 PM, Jonathan Liu <net147@gmail.com> wrote:
+> > The drm_driver lastclose callback is called when the last userspace
+> > DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
+> > the fbdev console otherwise the fbdev console will stop working.
+> >
+> > Signed-off-by: Jonathan Liu <net147@gmail.com>
+> 
+> This should have
+> 
+> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
+> 
+> Otherwise,
+> 
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-FYI, the error/warning still remains.
+And it should be sent to stable too.
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   50dbfdba9101210db33a5a311b85a7409ab62278
-commit: d80f6153e7c446e0c7dc8400b06d199c50bfd509 [553/744] mtd: spi-nor: Disable 4-Byte addressing for axi_quad_spi
-config: blackfin-BF526-EZBRD_defconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d80f6153e7c446e0c7dc8400b06d199c50bfd509
-        # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
+Can you resend it?
 
-All errors (new ones prefixed by >>):
+Thanks!
+Maxime
 
-   drivers/mtd/spi-nor/spi-nor.c: In function 'spi_nor_scan':
->> drivers/mtd/spi-nor/spi-nor.c:2000:13: error: implicit declaration of function 'of_get_next_parent' [-Werror=implicit-function-declaration]
-       np_spi = of_get_next_parent(np);
-                ^~~~~~~~~~~~~~~~~~
-   drivers/mtd/spi-nor/spi-nor.c:2000:11: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-       np_spi = of_get_next_parent(np);
-              ^
-   drivers/mtd/spi-nor/spi-nor.c:1728:6: warning: unused variable 'is_dual' [-Wunused-variable]
-     u32 is_dual;
-         ^~~~~~~
-   At top level:
-   drivers/mtd/spi-nor/spi-nor.c:266:12: warning: 'read_ear' defined but not used [-Wunused-function]
-    static int read_ear(struct spi_nor *nor, struct flash_info *info)
-               ^~~~~~~~
-   cc1: some warnings being treated as errors
 
-vim +/of_get_next_parent +2000 drivers/mtd/spi-nor/spi-nor.c
-
-  1862	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 14537 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/4277abb6/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/f64b0505/attachment.sig>
