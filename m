@@ -1,22 +1,66 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 10 Jul 2017 10:24:27 +0200
-Subject: [PATCH v 2/2] ARM: dts: iwg20d-q7: Add Ethernet AVB support
-In-Reply-To: <CAMuHMdUwf+pvQ9Gat4wWuahhgmHV-Q2RHCxJDEGXJ_r4Jay8Nw@mail.gmail.com>
-References: <1499433165-62475-1-git-send-email-biju.das@bp.renesas.com>
- <1499433165-62475-3-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdUwf+pvQ9Gat4wWuahhgmHV-Q2RHCxJDEGXJ_r4Jay8Nw@mail.gmail.com>
-Message-ID: <20170710082427.GC13680@verge.net.au>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 10 Jul 2017 10:34:54 +0200
+Subject: [RESEND PATCH v6 0/8] mfd: Add OF device table to I2C drivers
+ that are missing it
+In-Reply-To: <20170710080712.3oyktu3pjdbgxx7k@dell>
+References: <20170615184928.12007-1-javier@dowhile0.org>
+ <CABxcv=k8g8c3KmLK+ZqQiG+-+j2Y=FuRpadQ=xguXG5qGGWwhg@mail.gmail.com>
+ <20170710080712.3oyktu3pjdbgxx7k@dell>
+Message-ID: <CABxcv=nOnKwOGQT1AyC2XizrLiz067dH2jVWyWDooLFNb8JFfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 10, 2017 at 10:03:52AM +0200, Geert Uytterhoeven wrote:
-> On Fri, Jul 7, 2017 at 3:12 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> > Define the iWave RainboW-G20D-Qseven board dependent part of the Ethernet
-> > AVB device node.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Mon, Jul 10, 2017 at 10:07 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 10 Jul 2017, Javier Martinez Canillas wrote:
+>
+>> Hello Lee,
+>>
+>> On Thu, Jun 15, 2017 at 8:49 PM, Javier Martinez Canillas
+>> <javier@dowhile0.org> wrote:
+>> >
+>> > This series add OF device ID tables to mfd I2C drivers whose devices are
+>> > either used in Device Tree source files or are listed in binding docs as
+>> > a compatible string.
+>> >
+>> > That's done because the plan is to change the I2C core to report proper OF
+>> > modaliases instead of always reporting a MODALIAS=i2c:<foo> regardless if
+>> > a device was registered via DT or using the legacy platform data mechanism.
+>> >
+>> > So these patches will make sure that mfd I2C drivers modules will continue
+>> > to be autoloaded once the I2C core is changed to report proper OF modalias.
+>> >
+>> > Users didn't have a vendor prefix in the used compatible strings, but since
+>> > there wasn't a DT binding document for these drivers, it can be said that
+>> > were working for mere luck and so this series fixes the users and add a DT
+>> > binding doc for the drivers.
+>> >
+>> > Most patches can be applied independently, with the exception of patches
+>> > 2 to 4 that should be applied in the same tree to keep bisect-ability. I
+>> > suggest these to go through the MFD subsystem tree.
+>> >
+>> > Best regards,
+>> > Javier
+>> >
+>>
+>> Are you planning to pick this series? It has been in the list for
+>> months and were resent many times...
+>
+> I think you exaggerate a little.  Your last Ack (from Linus) was only
+> collected in v6, which has only been resent once with that Ack
+> applied. =:)
+>
 
-Thanks, applied.
+You are right, sorry for the impatience.
+
+> We are currently only half way through the merge-window.  This patch
+> will be hoovered up during the early -rcs.  Please be patient around
+> the time of the merge-window, since Maintainers are either usually
+> very busy with pull-requests, or taking a 2 minute breather before
+> the chaos starts over.
+>
+
+Great, I just was worried that it could fell through the cracks.
+Thanks for your answer.
+
+Best regards,
+Javier
