@@ -1,43 +1,39 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 10 Jul 2017 21:51:05 +0100
-Subject: [PATCH 1/4] dt-bindings: iio: stm32-dac: add support for STM32F4
-In-Reply-To: <1499693040-12994-2-git-send-email-fabrice.gasnier@st.com>
+Date: Mon, 10 Jul 2017 21:51:58 +0100
+Subject: [PATCH 2/4] iio: dac: stm32: fix error message
+In-Reply-To: <1499693040-12994-3-git-send-email-fabrice.gasnier@st.com>
 References: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
- <1499693040-12994-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170710215105.126409dc@kernel.org>
+ <1499693040-12994-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170710215158.5f1689ef@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jul 2017 15:23:57 +0200
+On Mon, 10 Jul 2017 15:23:58 +0200
 Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> Introduce new compatible to support STM32F4 DAC (Digital-To-Analog
-> converter) variant.
+> Fix error message, there's no 'st,dac-channel' property, but 'reg'
+> (see https://lkml.org/lkml/2017/4/3/567).
 > 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to ignore it.
+Applied.
 
-Simple addition of a supported part so, whilst welcome review
-from Rob / Mark isn't really necessary I think.
+Thanks,
 
-Jonathan
+Joanthan
 > ---
->  Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  drivers/iio/dac/stm32-dac.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt b/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
-> index bcee71f..bf2925c 100644
-> --- a/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
-> +++ b/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
-> @@ -10,7 +10,9 @@ current.
->  Contents of a stm32 dac root node:
->  -----------------------------------
->  Required properties:
-> -- compatible: Must be "st,stm32h7-dac-core".
-> +- compatible: Should be one of:
-> +  "st,stm32f4-dac-core"
-> +  "st,stm32h7-dac-core"
->  - reg: Offset and length of the device's register set.
->  - clocks: Must contain an entry for pclk (which feeds the peripheral bus
->    interface)
+> diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
+> index 50f8ec0..c1864e8 100644
+> --- a/drivers/iio/dac/stm32-dac.c
+> +++ b/drivers/iio/dac/stm32-dac.c
+> @@ -268,7 +268,7 @@ static int stm32_dac_chan_of_init(struct iio_dev *indio_dev)
+>  			break;
+>  	}
+>  	if (i >= ARRAY_SIZE(stm32_dac_channels)) {
+> -		dev_err(&indio_dev->dev, "Invalid st,dac-channel\n");
+> +		dev_err(&indio_dev->dev, "Invalid reg property\n");
+>  		return -EINVAL;
+>  	}
+>  
