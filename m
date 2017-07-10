@@ -1,35 +1,82 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Jul 2017 19:32:44 +0100
-Subject: [PATCH] spi/bcm63xx-hspi: Fix checkpatch warnings
-In-Reply-To: <CAAUiYHf6n+C9Q7TdApG_7mOdc7fJyTKq9To=4PvgXARQ5eOAOg@mail.gmail.com>
-References: <1498579630-10109-1-git-send-email-aravind.thk@gmail.com>
- <20170628184507.tnl7jc4wvtt5op5q@sirena.org.uk>
- <CAAUiYHf6n+C9Q7TdApG_7mOdc7fJyTKq9To=4PvgXARQ5eOAOg@mail.gmail.com>
-Message-ID: <20170710183244.hds7lyoxoymiza7r@sirena.org.uk>
+Date: Mon, 10 Jul 2017 19:42:44 +0100
+Subject: Applied "spi/bcm63xx-hspi: Fix checkpatch warnings" to the spi tree
+In-Reply-To: <1498579630-10109-1-git-send-email-aravind.thk@gmail.com>
+Message-ID: <E1dUdds-0000NA-Dt@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 11:08:15PM +0530, Aravind Thokala wrote:
-> Hello Mark,
+The patch
 
-Please don't top post, reply in line with needed context.  This allows
-readers to readily follow the flow of conversation and understand what
-you are talking about and also helps ensure that everything in the
-discussion is being addressed.
+   spi/bcm63xx-hspi: Fix checkpatch warnings
 
-> These warnings looked straightforward for me so I've fixed those and
-> sent the patch.
+has been applied to the spi tree at
 
-> Kindly let me know if you want to record the warnings in the patch so
-> that I could send v2 patch as soon as possible.
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-It's not just a case of quoting the warnings, it's a case of explaining
-what your patch changes which usually requires more than just quoting
-the warning.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/1998d35f/attachment.sig>
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 92bd7c3b8612f6e753b8d8805d89a2e425a88fec Mon Sep 17 00:00:00 2001
+From: Aravind Thokala <aravind.thk@gmail.com>
+Date: Tue, 27 Jun 2017 21:37:10 +0530
+Subject: [PATCH] spi/bcm63xx-hspi: Fix checkpatch warnings
+
+This patch fixes the checkpatch.pl warnings on the driver
+file.
+
+Signed-off-by: Aravind Thokala <aravind.thk@gmail.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-bcm63xx-hsspi.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/spi/spi-bcm63xx-hsspi.c b/drivers/spi/spi-bcm63xx-hsspi.c
+index 4da2d4a524ca..475a79015aa6 100644
+--- a/drivers/spi/spi-bcm63xx-hsspi.c
++++ b/drivers/spi/spi-bcm63xx-hsspi.c
+@@ -108,7 +108,7 @@ struct bcm63xx_hsspi {
+ 	u8 cs_polarity;
+ };
+ 
+-static void bcm63xx_hsspi_set_cs(struct bcm63xx_hsspi *bs, unsigned cs,
++static void bcm63xx_hsspi_set_cs(struct bcm63xx_hsspi *bs, unsigned int cs,
+ 				 bool active)
+ {
+ 	u32 reg;
+@@ -127,7 +127,7 @@ static void bcm63xx_hsspi_set_cs(struct bcm63xx_hsspi *bs, unsigned cs,
+ static void bcm63xx_hsspi_set_clk(struct bcm63xx_hsspi *bs,
+ 				  struct spi_device *spi, int hz)
+ {
+-	unsigned profile = spi->chip_select;
++	unsigned int profile = spi->chip_select;
+ 	u32 reg;
+ 
+ 	reg = DIV_ROUND_UP(2048, DIV_ROUND_UP(bs->speed_hz, hz));
+@@ -154,7 +154,7 @@ static void bcm63xx_hsspi_set_clk(struct bcm63xx_hsspi *bs,
+ static int bcm63xx_hsspi_do_txrx(struct spi_device *spi, struct spi_transfer *t)
+ {
+ 	struct bcm63xx_hsspi *bs = spi_master_get_devdata(spi->master);
+-	unsigned chip_select = spi->chip_select;
++	unsigned int chip_select = spi->chip_select;
+ 	u16 opcode = 0;
+ 	int pending = t->len;
+ 	int step_size = HSSPI_BUFFER_LEN;
+-- 
+2.13.2
