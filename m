@@ -1,50 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 10 Jul 2017 09:46:11 +0200
-Subject: 4.13-rc0: stopped booting on Nokia N900
-Message-ID: <20170710074610.GA22846@amd>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 10 Jul 2017 09:47:05 +0200
+Subject: [RESEND PATCH v5 00/16] eeprom: at24: Add OF device ID table
+In-Reply-To: <20170615185418.13980-1-javier@dowhile0.org>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+Message-ID: <CABxcv==J_QwoivZ0PRWMoG-weAp7F-LpEXkBxw_9jwH3ENKjsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello Wolfram,
 
-First, I got segfault from make:
+On Thu, Jun 15, 2017 at 8:54 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+>
+> This series is a follow-up to patch [0] that added an OF device ID table
+> to the at24 EEPROM driver. As you suggested [1], this version instead of
+> adding entries for every used <vendor,device> tuple, only adds a single
+> entry for each chip type using the "atmel" vendor as a generic fallback.
+>
+> The first patch documents in the DT binding what's the correct vendor to
+> use and what are the ones that are being deprecated. The second one adds
+> the OF device ID table for the at24 driver and the next patches use this
+> vendor in the compatible string to each DTS that defines a compatible I2C
+> EEPROM device node.
+>
+> Patches can be applied independently since the DTS changes without driver
+> changes are no-op and the OF table won't be used without the DTS changes.
+>
+> [0]: https://lkml.org/lkml/2017/3/14/589
+> [1]: https://lkml.org/lkml/2017/3/15/99
+>
 
-: 0: Can't open
-scripts/Makefile.build:561: recipe for target
-'drivers/iio/imu/st_lsm6dsx' failed
-make[3]: *** [drivers/iio/imu/st_lsm6dsx] Segmentation fault (core
-dumped)
-scripts/Makefile.build:561: recipe for target 'drivers/iio/imu' failed
-make[2]: *** [drivers/iio/imu] Error 2
-scripts/Makefile.build:561: recipe for target 'drivers/iio' failed
-make[1]: *** [drivers/iio] Error 2
-make[1]: *** Waiting for unfinished jobs....
-Makefile:1008: recipe for target 'drivers' failed
-make: *** [drivers] Error 2
-make: *** Waiting for unfinished jobs....
-pavel at duo:/data/l/linux-n900$ ./mkit
-
-Then compile worked, but it failed to boot. I've now cleaned caches
-and am rebuilding to make sure it is not build machine that has
-glitches.
-
-No such luck :-(.
-
-I tested linux-next relatively recently, and it worked ok.
-
-af3c8d98508d37541d4bf57f13a984a7f73a328c is broken.
-650fc87 worked ok.
+Are you planning to pick this series? It has been in the list for
+months and were resent many times...
 
 Best regards,
-
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/a626bfb6/attachment.sig>
+Javier
