@@ -1,55 +1,63 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 9 Jul 2017 21:27:37 -0700
-Subject: [PATCH] ARM: owl: smp: Drop owl_secondary_boot()
-In-Reply-To: <1fd52467-48fc-5283-6b48-5d653105ba19@suse.de>
-References: <DC4E6E803E914F4B8AFE57F1456019F10364478E@srv-mail-02.actions.com.cn>
- <20170704233219.18790-1-afaerber@suse.de>
- <3F3740FC-3873-4C01-A625-C8DC7F50A018@gmail.com>
- <c037a437-0e9e-e451-d3a6-3a866db8bb16@suse.de>
- <1fd52467-48fc-5283-6b48-5d653105ba19@suse.de>
-Message-ID: <1c790718-657e-e860-e03e-473b5ddba6a3@gmail.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Mon, 10 Jul 2017 10:39:47 +0530
+Subject: [PATCH] hwtracing: coresight: constify attribute_group structures.
+In-Reply-To: <CANLsYkxrT+d-HLpPAOM_pZVWfDgTU92Q-njo_0e=K-auYL=BYA@mail.gmail.com>
+References: <97ff1c3f7145b0e4326fbbb246579cd5382880b3.1499233557.git.arvind.yadav.cs@gmail.com>
+ <CANLsYkxrT+d-HLpPAOM_pZVWfDgTU92Q-njo_0e=K-auYL=BYA@mail.gmail.com>
+Message-ID: <a735fa1f-a93a-2885-6f7f-ff7568640011@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mathieu,
 
 
-On 07/09/2017 02:55 PM, Andreas F?rber wrote:
-> Am 06.07.2017 um 19:17 schrieb Andreas F?rber:
->> Am 05.07.2017 um 04:36 schrieb Florian Fainelli:
->>> On July 4, 2017 4:32:18 PM PDT, "Andreas F?rber" <afaerber@suse.de> wrote:
->>>> -	writel(virt_to_phys(owl_secondary_startup),
->>>> +	writel(virt_to_phys(secondary_startup),
->>>> 	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
->>>
->>> This is a kernel symbol so please use __pa_symbol() here, also you might want to build with CONFIG_DEBUG_VIRTUAL and see if you get other warnings about using virt_to_phys() in the owl platform code (I did not check if there are other uses)
-> 
-> Florian, I don't spot any build or runtime warning for this
-> virt_to_phys() with CONFIG_DEBUG_VIRTUAL=y on Guitar/S500:
-
-You would only see run time warnings, not build time warnings for this,
-but in fact, no, see below.
-
-> 
-> [    0.062765] CPU: Testing write buffer coherency: ok
-> [    0.063468] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> [    0.100856] Setting up static identity map for 0x100000 - 0x100060
-> [    0.120864] Hierarchical SRCU implementation.
-> [    0.161092] smp: Bringing up secondary CPUs ...
-> [    0.291654] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-> [    0.422226] CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
-> [    0.552798] CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
-> [    0.553074] smp: Brought up 1 node, 4 CPUs
-> [    0.553388] SMP: Total of 4 processors activated (1629.38 BogoMIPS).
-> [    0.553477] CPU: All CPU(s) started in SVC mode.
-> 
-> I've tested that __pa_symbol() works as well, but I'd like to understand
-> this for commit message and future testing. Am I missing other options?
-
-After re-checking the implementation you would get a warning only if you
-were using virt_to_phys() against a part of the kernel that is not in
-the linear map, similarly you would get a warning if __pa_symbol() was
-used against symbols outside of the kernel image, this is obviously not
-the case here. You should use __pa_symbol() just for correctness, no
-warning would be produced, sorry for misleading you with that.
--- 
-Florian
+On Friday 07 July 2017 08:58 PM, Mathieu Poirier wrote:
+> On 4 July 2017 at 23:49, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+>> attribute_groups are not supposed to change at runtime. All functions
+>> working with attribute_groups provided by <linux/sysfs.h> work with const
+>> attribute_group. So mark the non-const structs as const.
+>>
+>> File size before:
+>>    text     data     bss     dec     hex filename
+>>     2573     288     296    3157     c55 coresight-etm-perf.o
+>>
+>> File size After adding 'const':
+>>     text    data     bss     dec     hex filename
+>>     2613     224     296    3133     c3d coresight-etm-perf.o
+> Hi Arvind,
+>
+> Did you find this using an automated tool or simply stumbled on it
+> while reviewing the code?  In case of the former it is usually a good
+> idea to specify which tool was used in the change log.
+       Automated tools are not able to caught this kind of error.
+       I have fixed same changes in zram ( commit - dfc8ed8d6a).
+       Minchan Kim suggested me to change all the places where have not
+       used const. It's good idea have a tool which can able to detect these
+       kind of error. I will try to create a tool.
+>
+> Thanks,
+> Mathieu
+>
+>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>> ---
+>>   drivers/hwtracing/coresight/coresight-etm-perf.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+>> index 288a423..e97775d 100644
+>> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+>> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+>> @@ -60,7 +60,7 @@ struct etm_event_data {
+>>          NULL,
+>>   };
+>>
+>> -static struct attribute_group etm_pmu_format_group = {
+>> +static const struct attribute_group etm_pmu_format_group = {
+>>          .name   = "format",
+>>          .attrs  = etm_config_formats_attr,
+>>   };
+>> --
+>> 1.9.1
+>>
+Thanks,
+~arvind
