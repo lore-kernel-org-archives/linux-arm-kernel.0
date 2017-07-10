@@ -1,53 +1,62 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 10 Jul 2017 18:23:32 +0800
-Subject: [linux-sunxi] Re: [PATCH 1/2] pinctrl: sunxi: add a missing
- function of A10/A20 pinctrl driver
-In-Reply-To: <20170710084400.wwrfjekv2fkoqvoa@flea>
-References: <20170706142822.20296-1-icenowy@aosc.io>
- <20170706142822.20296-2-icenowy@aosc.io>
- <20170706204646.3akr57fo6c2ok4wn@flea>
- <a55741a065b818d8ff3843471da61c0e@aosc.io>
- <20170710084400.wwrfjekv2fkoqvoa@flea>
-Message-ID: <E5197E25-926B-42C5-BBFC-061BB289E707@aosc.io>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 10 Jul 2017 18:49:02 +0800
+Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <MWHPR12MB1600AECAE619EAA97E6B15D5C8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
+References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
+ <MWHPR12MB160087E9E0B17F7A17609714C8AA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <MWHPR12MB160006024D920ED58126048AC8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0Uc5KSJTj4A=9pSudiJ28AW0krc7FZpdW4upwY+FgpeArA@mail.gmail.com>
+ <MWHPR12MB1600AECAE619EAA97E6B15D5C8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
+Message-ID: <0df11d6f-c9cb-3c6b-ba08-d5e5c45754ae@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Casey:
 
+On 2017/7/8 10:04, Casey Leedom wrote:
+>   Okay, thanks for the note Alexander.	I'll have to look more closely at
+> the patch on Monday and try it out on one of the targeted systems to verify
+> the semantics you describe.
+> 
 
-? 2017?7?10? GMT+08:00 ??4:44:00, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Fri, Jul 07, 2017 at 07:21:19AM +0800, icenowy at aosc.io wrote:
->> ? 2017-07-07 04:46?Maxime Ripard ???
->> > Hi,
->> > 
->> > On Thu, Jul 06, 2017 at 10:28:21PM +0800, Icenowy Zheng wrote:
->> > > The PH16 pin has a function with mux id 0x5, which is the DET pin
->of
->> > > the
->> > > "sim" (smart card reader) IP block.
->> > > 
->> > > This function is missing both in the old A10 and A20 drivers, so
->it's
->> > > not found during the merge of these two drivers.
->> > > 
->> > > Add it to the driver. As we now merged A20 pinctrl driver to the
->A10
->> > > one, we need to only fix the A10 driver now.
->> > > 
->> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> > 
->> > I'm not sure what you mean there. It's not mentionned in the A10
->> > datasheet, and neither in the A20. Where did you get that info
->from?
->> 
->> It's mentioned in all newest datasheets: "A10 Datasheet V1.70.pdf"
->and
->> "A20 Datasheet V1.41 20131230.pdf".
->
->Mentionning that in the commit log would be great.
->
->Where did you find those?
+All the modification is only clearing the device's Device Control{Relaxed Ordering
+Enable]bit when distinguish that the platform should not support RO and did nothing
+to the RC configuration, so I don't think it will break anything compare to the
+first version from yours.
 
-dl.linux-sunxi.org
-
->
->Maxime
+>   However, that said, there is no way to tell a priori where a device will
+> send TLPs.  To simply assume that all TLPs will be directed towards the Root
+> Complex is a big assumption.  Only the device and the code controlling it
+> know where the TLPs will be directed.  That's why there are changes required
+> in the cxgb4 driver.  For instance, the code in
+> drivers/net/ethernet/chelsio./cxgb4/sge.c: t4_sge_alloc_rxq() knows that
+> it's allocating Free List Buffers in Host Memory and that the RX Queues that
+> it's allocating in the Hardware will eventually send Ingress Data to those
+> Free List Buffers.  (And similarly for the Free List Buffer Pointer Queue
+> with respect to DMA Reads from the host.)  In that routine we explicitly
+> configure the Hardware to use/not-use the Relaxed Ordering Attribute via the
+> FW_IQ_CMD_FL0FETCHRO and FW_IQ_CMD_FL0DATARO flags.  Basically we're
+> conditionally setting them based on the desirability of sending Relaxed
+> Ordering TLPs to the Root Complex.  (And we would perform the same kind of
+> check for an nVME application ... which brings us to ...)
+> 
+>   And what would be the code using these patch APIs to set up a Peer-to-Peer
+> nVME-style application?	 In that case we'd need the Chelsio adapter's PCIe
+> Capability Device Control[Relaxed Ordering Enable] set for the nVME
+> application ... and we would avoid programming the Chelsio Hardware to use
+> Relaxed Ordering for TLPs directed at the Root Complex.	 Thus we would be in
+> a position where some TLPs being emitted by the device to Peer devices would
+> have Relaxed Ordering set and some directed at the Root Complex would not.
+> And the only way for that to work is if the source device's Device
+> Control[Relaxed Ordering Enable] is set ...
+> 
+>   Finally, setting aside my disagreements with the patch, we still have the
+> code in the cxgb4 driver which explicitly turns on its own Device
+> Control[Relaxed Ordering Enable] in cxgb4_main.c:
+> enable_pcie_relaxed_ordering().  So the patch is something of a loop if all
+> we're doing is testing our own Relaxed Ordering Enable state ...
+>  
+> Casey
+> 
+> .
+> 
