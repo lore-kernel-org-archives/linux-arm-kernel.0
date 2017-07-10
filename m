@@ -1,62 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Jul 2017 09:13:42 -0500
-Subject: [PATCH v3 3/4] dt-bindings: Document MIPS Broadcom STB power
- management nodes
-In-Reply-To: <20170706222225.9758-4-f.fainelli@gmail.com>
-References: <20170706222225.9758-1-f.fainelli@gmail.com>
- <20170706222225.9758-4-f.fainelli@gmail.com>
-Message-ID: <20170710141342.fghqil4px5ylj336@rob-hp-laptop>
+From: oliver+list@schinagl.nl (Olliver Schinagl)
+Date: Mon, 10 Jul 2017 16:22:21 +0200
+Subject: [linux-sunxi] [PATCH v3] drm/sun4i: Implement drm_driver
+ lastclose to restore fbdev console
+In-Reply-To: <20170710065504.31497-1-net147@gmail.com>
+References: <20170710065504.31497-1-net147@gmail.com>
+Message-ID: <9dd1080b-1a0c-888a-b336-bc321c823e80@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 03:22:24PM -0700, Florian Fainelli wrote:
-> Document the different nodes required for supporting S2/S3/S5 suspend
-> states on MIPS-based Broadcom STB SoCs.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Hey Jonathan,
+
+since I reported this to you on IRC, it's only fair that you can have my:
+
+Tested-by: Olliver Schinagl <oliver@schinagl.nl>
+
+For those interessted, I've tested it on an Olimex OLinuXino Lime2 with 
+their 4.3 LCD.
+
+Olliver
+
+On 10-07-17 08:55, Jonathan Liu wrote:
+> The drm_driver lastclose callback is called when the last userspace
+> DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
+> the fbdev console otherwise the fbdev console will stop working.
+>
+> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../devicetree/bindings/mips/brcm/soc.txt          | 153 +++++++++++++++++++++
->  1 file changed, 153 insertions(+)
-
-A couple of nits on the node names, otherwise:
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-> +Example:
+> Changes for v3:
+>  - Add 'Fixes:' tag
+>  - Add CC to stable
+>  - Add 'Reviewed-by: Chen-Yu Tsai <wens@csie.org>'
+>
+> Changes for v2:
+>  - Rename sun4i_drm_lastclose to sun4i_drv_lastclose
+>
+>  drivers/gpu/drm/sun4i/sun4i_drv.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> index abc7d8fe06b4..a45a627283a1 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> @@ -25,12 +25,20 @@
+>  #include "sun4i_framebuffer.h"
+>  #include "sun4i_tcon.h"
+>
+> +static void sun4i_drv_lastclose(struct drm_device *dev)
+> +{
+> +	struct sun4i_drv *drv = dev->dev_private;
 > +
-> +	memory-controller: memc at 0 {
-
-memory-controller at 0
-
-> +		compatible = "brcm,brcmstb-memc", "simple-bus";
-> +		ranges = <0x0 0x0 0xa000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
+> +	drm_fbdev_cma_restore_mode(drv->fbdev);
+> +}
 > +
-> +		memc-arb at 1000 {
-> +			...
-> +		};
-> +
-> +		memc-ddr at 2000 {
-> +			...
-> +		};
-> +
-> +		ddr-phy at 6000 {
-> +			...
-> +		};
-> +	};
-
-
-> +Example:
-> +
-> +	timers: timers at 4067c0 {
-
-timer at ...
-
-> +		compatible = "brcm,bcm7425-timers", "brcm,brcmstb-timers";
-> +		reg = <0x4067c0 0x40>;
-> +		interrupts = <&periph_intc 19>;
-> +	};
-> -- 
-> 2.9.3
-> 
+>  DEFINE_DRM_GEM_CMA_FOPS(sun4i_drv_fops);
+>
+>  static struct drm_driver sun4i_drv_driver = {
+>  	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_PRIME | DRIVER_ATOMIC,
+>
+>  	/* Generic Operations */
+> +	.lastclose		= sun4i_drv_lastclose,
+>  	.fops			= &sun4i_drv_fops,
+>  	.name			= "sun4i-drm",
+>  	.desc			= "Allwinner sun4i Display Engine",
+>
