@@ -1,201 +1,107 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Mon, 10 Jul 2017 12:16:08 +0200
-Subject: 4.13-rc0: stopped booting on Nokia N900
-In-Reply-To: <20170710081334.GA29726@amd>
-References: <20170710074610.GA22846@amd>
- <20170710081334.GA29726@amd>
-Message-ID: <20170710101608.qdamqomegbjwuweh@earth>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 10 Jul 2017 15:51:53 +0530
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <ed7416f2-e60b-bf8c-cdbe-8a83e83ca529@arm.com>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+ <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+ <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+ <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
+ <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
+ <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
+ <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
+ <bee8ac5a-b19f-8112-5529-485c269f3501@arm.com>
+ <CAFpQJXXPfBEP+_3rzkRo7Ydb31GKFokQB1bmOVHXSd1Pu0zsyA@mail.gmail.com>
+ <ed7416f2-e60b-bf8c-cdbe-8a83e83ca529@arm.com>
+Message-ID: <CAFpQJXUm5tEyaBURzx9OtssBt8+ThO0dmPqtdjjGRJzY5cMv-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marc,
 
-On Mon, Jul 10, 2017 at 10:13:35AM +0200, Pavel Machek wrote:
-> On Mon 2017-07-10 09:46:10, Pavel Machek wrote:
-> > Hi!
-> > 
-> > First, I got segfault from make:
-> > 
-> > : 0: Can't open
-> > scripts/Makefile.build:561: recipe for target
-> > 'drivers/iio/imu/st_lsm6dsx' failed
-> > make[3]: *** [drivers/iio/imu/st_lsm6dsx] Segmentation fault (core
-> > dumped)
-> > scripts/Makefile.build:561: recipe for target 'drivers/iio/imu' failed
-> > make[2]: *** [drivers/iio/imu] Error 2
-> > scripts/Makefile.build:561: recipe for target 'drivers/iio' failed
-> > make[1]: *** [drivers/iio] Error 2
-> > make[1]: *** Waiting for unfinished jobs....
-> > Makefile:1008: recipe for target 'drivers' failed
-> > make: *** [drivers] Error 2
-> > make: *** Waiting for unfinished jobs....
-> > pavel at duo:/data/l/linux-n900$ ./mkit
-> > 
-> > Then compile worked, but it failed to boot. I've now cleaned caches
-> > and am rebuilding to make sure it is not build machine that has
-> > glitches.
-> > 
-> > No such luck :-(.
-> > 
-> > I tested linux-next relatively recently, and it worked ok.
-> 
-> > af3c8d98508d37541d4bf57f13a984a7f73a328c is broken.
-> > 650fc87 worked ok.
-> 
-> 2b97620 is broken.
-> 
-> commit a51166ce71844ffbb8f78d63647b44dd69e46cf1
->     Add linux-next specific files for 20170628
+On Mon, Jul 10, 2017 at 2:53 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 10/07/17 10:08, Ganapatrao Kulkarni wrote:
+>> On Mon, Jul 10, 2017 at 2:36 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 10/07/17 09:48, Ganapatrao Kulkarni wrote:
+>>>> Hi Marc,
+>>>>
+>>>> On Mon, Jul 3, 2017 at 8:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>> Hi Shanker,
+>>>>>
+>>>>> On 03/07/17 15:24, Shanker Donthineni wrote:
+>>>>>> Hi Marc,
+>>>>>>
+>>>>>> On 06/30/2017 03:51 AM, Marc Zyngier wrote:
+>>>>>>> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
+>>>>>>>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
+>>>>>>>> <gpkulkarni@gmail.com> wrote:
+>>>>>>>>> Hi Shanker,
+>>>>>>>>>
+>>>>>>>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+>>>>>>>>> <shankerd@codeaurora.org> wrote:
+>>>>>>>>>> The NUMA node information is visible to ITS driver but not being used
+>>>>>>>>>> other than handling errata. This patch allocates the memory for ITS
+>>>>>>>>>> tables from the corresponding NUMA node using the appropriate NUMA
+>>>>>>>>>> aware functions.
+>>>>>>>>
+>>>>>>>> IMHO, the description would have been more constructive?
+>>>>>>>>
+>>>>>>>> "All ITS tables are mapped by default to NODE 0 memory.
+>>>>>>>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
+>>>>>>>> This will optimize tables access and avoids unnecessary inter-node traffic."
+>>>>>>>
+>>>>>>> But more importantly, I'd like to see figures showing the actual benefit
+>>>>>>> of this per-node allocation. Given that both of you guys have access to
+>>>>>>> such platforms, please show me the numbers!
+>>>>>>>
+>>>>>>
+>>>>>> I'll share the actual results which shows the improvement whenever
+>>>>>> available on our next chips. Current version of Qualcomm qdf2400 doesn't
+>>>>>> support multi socket configuration to capture results and share with you.
+>>>>>>
+>>>>>> Do you see any other issues with this patch apart from the performance
+>>>>>> improvements. I strongly believe this brings the noticeable improvement
+>>>>>> in numbers on systems where it has multi node memory/CPU configuration.
+>>>>>
+>>>>> I agree that it *could* show an improvement, but it very much depends on
+>>>>> how often the ITS misses in its caches. For this kind of patches, I want
+>>>>> to see two things:
+>>>>>
+>>>>> 1) It brings a measurable benefit on NUMA platforms
+>>>>
+>>>> Did some measurement of interrupt response time for LPIs and we don't
+>>>> see any major
+>>>> improvement due to caching of Tables. However, we have seen
+>>>> improvements of around 5%.
+>>>
+>>> An improvement of what exactly?
+>>
+>> interrupt response time.
+>
+> Measured how? On which HW? Using which benchmark?
 
-I just rebased my droid4 development branch. I do not have any
-problems with segfaulting toolchain, but boot also fails on OMAP4
-based Droid 4. The problem seems to be SPI being accessed without
-runtime PM (clocks) being enabled:
+This has been tested on ThunderX2.
+We have instrumented gic-v3-its driver code to create dummy LPI device
+with few vectors.
+The LPI is induced from dummy device(through sysfs by writing to
+TRANSLATOR reg).
+The ISR routine(gic_handle_irq) being called to handle the induced LPI.
+NODE 1 cpu is used to induce LPI and NODE 1 cpu/collection is mapped
+in ITT to route this LPI.
 
-[    1.346984] cpcap-core spi1.0: CPCAP vendor: ST rev: 2.10 (1a)
-[    1.354766] Unhandled fault: imprecise external abort (0x1406) at 0xfeffffff
-[    1.354797] ------------[ cut here ]------------
-[    1.354827] WARNING: CPU: 0 PID: 0 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x21c/0x348
-[    1.354827] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Read): Data Access in User mode during Functional access
-[    1.354827] Modules linked in:
-[    1.354858] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.12.0-10335-gb8c0c26d6667 #516
-[    1.354858] Hardware name: Generic OMAP4 (Flattened Device Tree)
-[    1.354888] [<c0110460>] (unwind_backtrace) from [<c010c4ac>] (show_stack+0x10/0x14)
-[    1.354888] [<c010c4ac>] (show_stack) from [<c0adca28>] (dump_stack+0xac/0xe0)
-[    1.354919] [<c0adca28>] (dump_stack) from [<c013a940>] (__warn+0xd8/0x104)
-[    1.354919] [<c013a940>] (__warn) from [<c013a9a0>] (warn_slowpath_fmt+0x34/0x44)
-[    1.354919] [<c013a9a0>] (warn_slowpath_fmt) from [<c0508324>] (l3_interrupt_handler+0x21c/0x348)
-[    1.354949] [<c0508324>] (l3_interrupt_handler) from [<c01aa1b4>] (__handle_irq_event_percpu+0x48/0x3b4)
-[    1.354949] [<c01aa1b4>] (__handle_irq_event_percpu) from [<c01aa53c>] (handle_irq_event_percpu+0x1c/0x58)
-[    1.354949] [<c01aa53c>] (handle_irq_event_percpu) from [<c01aa5b0>] (handle_irq_event+0x38/0x5c)
-[    1.354980] [<c01aa5b0>] (handle_irq_event) from [<c01adb30>] (handle_fasteoi_irq+0xb4/0x178)
-[    1.354980] [<c01adb30>] (handle_fasteoi_irq) from [<c01a94a8>] (generic_handle_irq+0x20/0x34)
-[    1.354980] [<c01a94a8>] (generic_handle_irq) from [<c01a9a18>] (__handle_domain_irq+0x64/0xe0)
-[    1.354980] [<c01a9a18>] (__handle_domain_irq) from [<c010155c>] (gic_handle_irq+0x54/0xb8)
-[    1.355010] [<c010155c>] (gic_handle_irq) from [<c0af7e30>] (__irq_svc+0x70/0x98)
-[    1.355010] Exception stack(0xc1001f38 to 0xc1001f80)
-[    1.355010] 1f20:                                                       00000001 00000001
-[    1.355041] 1f40: 00000000 c100abc0 c1000000 c1007bcc c1007b68 c0f8a938 c1007f68 c1046133
-[    1.355041] 1f60: 00000000 00000000 00000000 c1001f88 c019a828 c010822c 20000013 ffffffff
-[    1.355041] [<c0af7e30>] (__irq_svc) from [<c010822c>] (arch_cpu_idle+0x20/0x3c)
-[    1.355072] [<c010822c>] (arch_cpu_idle) from [<c018b6b4>] (do_idle+0x168/0x21c)
-[    1.355072] [<c018b6b4>] (do_idle) from [<c018bad4>] (cpu_startup_entry+0x18/0x1c)
-[    1.355072] [<c018bad4>] (cpu_startup_entry) from [<c0f00c2c>] (start_kernel+0x348/0x3c0)
-[    1.355102] [<c0f00c2c>] (start_kernel) from [<8000807c>] (0x8000807c)
-[    1.355133] ---[ end trace 03269d8f047e066b ]---
-[    1.584167] pgd = c0004000
-[    1.586914] [feffffff] *pgd=00000000
-[    1.590515] Internal error: : 1406 [#1] SMP ARM
-[    1.595062] Modules linked in:
-[    1.598144] CPU: 1 PID: 1 Comm: swapper/0 Tainted: G        W       4.12.0-10335-gb8c0c26d6667 #516
-[    1.607238] Hardware name: Generic OMAP4 (Flattened Device Tree)
-[    1.613281] task: ee8aae00 task.stack: ee8ac000
-[    1.617858] PC is at debug_lockdep_rcu_enabled+0x38/0x48
-[    1.623199] LR is at lock_release+0x25c/0x360
-[    1.627593] pc : [<c01b3788>]    lr : [<c019cc58>]    psr: 20000093
-[    1.633880] sp : ee8adb80  ip : c10fe40c  fp : eea0fc10
-[    1.639160] r10: 00000001  r9 : c10f4230  r8 : 60000093
-[    1.644409] r7 : c1007b68  r6 : c051b3f8  r5 : eea0ce74  r4 : a0000013
-[    1.650970] r3 : ee8aae00  r2 : 00000001  r1 : 00000003  r0 : 0000001f
-[    1.657531] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
-[    1.664825] Control: 10c5387d  Table: 8000404a  DAC: 00000051
-[    1.670593] Process swapper/0 (pid: 1, stack limit = 0xee8ac218)
-[    1.676635] Stack: (0xee8adb80 to 0xee8ae000)
-[    1.681030] db80: a0000013 c051b3e8 00000007 a0000013 eea0ce64 eea0ce64 00000007 eea0fd04
-[    1.689270] dba0: c06208d8 eea0fc00 eea0fc10 c0af76ec 00000000 fc310134 eea0ce64 c051b3f8
-[    1.697479] dbc0: 00000020 eea0cea4 eea0cc70 00000000 eea0fd04 c0514430 eea0cea4 eea0fc10
-[    1.705718] dbe0: eef44cc0 c0514960 eea0fc00 00000021 eef44cc0 c01ac370 ee8000c0 60000013
-[    1.713958] dc00: eed2d57c eef44cc0 00000000 c01aa628 eef42000 00000021 c06208d8 eea0fc00
-[    1.722198] dc20: eea0fc10 c01ac73c 00002084 eef42000 00000204 c10a88cc 00000001 eee8a200
-[    1.730407] dc40: 00000000 00000000 00000010 c0621460 c0da9f6c eef42000 00000000 00000111
-[    1.738647] dc60: 00000021 00000084 00000084 eee8a200 eef22610 00000021 00000084 eef23800
-[    1.746887] dc80: 00000010 eef2513c c0b69968 c0621618 c10a88cc ee8adc9c 00000004 eef23800
-[    1.755126] dca0: eef23800 eee8a200 00000021 eef22710 eef25010 c062d618 ffffffff c10a88cc
-[    1.763366] dcc0: eef22718 ee8aae00 00000001 00000000 c10a88cc 00000010 00000000 00000000
-[    1.771575] dce0: eef23800 0000001a eef22710 00000000 00000010 00000013 00000000 00000000
-[    1.779815] dd00: c0dba8a8 c062d7a0 0000000a 0000001a 00000000 00000013 eef23800 c10a887c
-[    1.788055] dd20: 00000000 c10a888c 00000000 c06a2784 eef23800 c18c195c 00000000 c05fdd00
-[    1.796295] dd40: 00000000 ee8add78 c05fde4c 00000001 00000000 c18c1918 00000000 c05fc374
-[    1.804534] dd60: ee9f2ad4 eee7e154 eef23800 eef23834 c10b0dbc c05fd9bc eef23800 00000001
-[    1.812744] dd80: c18c1918 eef23808 eef23800 c10b0dbc 00000000 c05fd044 eef23808 eef25800
-[    1.820983] dda0: eef23800 c05fb4d0 00000000 eef23800 eef23a64 00000000 eef23800 eef25800
-[    1.829223] ddc0: 00000000 eea6cc10 00000000 c0dba89c 00000000 c06a3958 eef25800 ef6e7b80
-[    1.837463] dde0: eef23800 ef6e7bd0 00000000 c06a41a4 00000000 00000000 c06a3dc4 002dc6c0
-[    1.845672] de00: eea6cc10 eef22990 eef25800 eef25800 eea6cc10 eea6cc10 c0dbaf80 c0dbaf78
-[    1.853912] de20: 000001f0 c06a4670 00000000 eef25ce8 eef25800 eef25800 eea6cc10 c06a8090
-[    1.862152] de40: 00000000 60000013 c1899108 00000004 21547a13 eea6cc10 ffffffed c10b1acc
-[    1.870391] de60: fffffdfb 00000000 00000000 c0f67858 c0f005a8 c05ffb34 eea6cc10 c18c195c
-[    1.878631] de80: 00000000 c10b1acc 00000000 c05fdd00 eea6cc10 c10b1acc eea6cc44 00000000
-[    1.886840] dea0: c10fa000 00000007 c0f67858 c05fde48 00000000 c10b1acc c05fdd88 c05fc2c8
-[    1.895080] dec0: ee8a46a4 eea67dd0 c10b1acc eee8ea00 c10a6210 c05fd248 c0dbaf88 c0f40af8
-[    1.903320] dee0: 00000000 c10b1acc c0f40af8 00000000 c0e68a14 c05fec8c ffffe000 c0f40af8
-[    1.911560] df00: 00000000 c0101874 00000138 00000000 efffec00 efffecdd c0e6a274 00000138
-[    1.919769] df20: 00000138 c015f0b8 c0e68a14 00000000 00000006 00000006 efffecdd 00000000
-[    1.928009] df40: c0f806b0 00000006 c10fa000 c0f6784c c0f80d58 c10fa000 c0f67850 c10fa000
-[    1.936248] df60: 00000007 c0f00ea0 00000006 00000006 00000000 c0f005a8 c0af025c 00000138
-[    1.944488] df80: 00000000 00000000 c0af025c 00000000 00000000 00000000 00000000 00000000
-[    1.952728] dfa0: 00000000 c0af0264 00000000 c01077b0 00000000 00000000 00000000 00000000
-[    1.960937] dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[    1.969177] dfe0: 00000000 00000000 00000000 00000000 00000013 00000000 c0c0c0c0 c0c0c0c0
-[    1.977416] [<c01b3788>] (debug_lockdep_rcu_enabled) from [<c019cc58>] (lock_release+0x25c/0x360)
-[    1.986358] [<c019cc58>] (lock_release) from [<c0af76ec>] (_raw_spin_unlock_irqrestore+0x1c/0x44)
-[    1.995300] [<c0af76ec>] (_raw_spin_unlock_irqrestore) from [<c051b3f8>] (omap_gpio_get_direction+0x38/0x44)
-[    2.005187] [<c051b3f8>] (omap_gpio_get_direction) from [<c0514430>] (gpiochip_lock_as_irq+0x98/0xe4)
-[    2.014495] [<c0514430>] (gpiochip_lock_as_irq) from [<c0514960>] (gpiochip_irq_reqres+0x2c/0x6c)
-[    2.023406] [<c0514960>] (gpiochip_irq_reqres) from [<c01ac370>] (__setup_irq+0x478/0x6ec)
-[    2.031738] [<c01ac370>] (__setup_irq) from [<c01ac73c>] (request_threaded_irq+0xcc/0x14c)
-[    2.040069] [<c01ac73c>] (request_threaded_irq) from [<c0621460>] (regmap_add_irq_chip+0x740/0x8a0)
-[    2.049194] [<c0621460>] (regmap_add_irq_chip) from [<c0621618>] (devm_regmap_add_irq_chip+0x58/0xb4)
-[    2.058471] [<c0621618>] (devm_regmap_add_irq_chip) from [<c062d618>] (cpcap_init_irq_chip+0x138/0x16c)
-[    2.067932] [<c062d618>] (cpcap_init_irq_chip) from [<c062d7a0>] (cpcap_probe+0x154/0x258)
-[    2.076263] [<c062d7a0>] (cpcap_probe) from [<c06a2784>] (spi_drv_probe+0x7c/0xac)
-[    2.083892] [<c06a2784>] (spi_drv_probe) from [<c05fdd00>] (driver_probe_device+0x260/0x2e8)
-[    2.092407] [<c05fdd00>] (driver_probe_device) from [<c05fc374>] (bus_for_each_drv+0x64/0x98)
-[    2.100982] [<c05fc374>] (bus_for_each_drv) from [<c05fd9bc>] (__device_attach+0xb0/0x118)
-[    2.109313] [<c05fd9bc>] (__device_attach) from [<c05fd044>] (bus_probe_device+0x88/0x90)
-[    2.117523] [<c05fd044>] (bus_probe_device) from [<c05fb4d0>] (device_add+0x3c8/0x57c)
-[    2.125518] [<c05fb4d0>] (device_add) from [<c06a3958>] (spi_add_device+0x90/0x134)
-[    2.133209] [<c06a3958>] (spi_add_device) from [<c06a41a4>] (spi_register_controller+0x350/0x7ec)
-[    2.142150] [<c06a41a4>] (spi_register_controller) from [<c06a4670>] (devm_spi_register_controller+0x30/0x70)
-[    2.152130] [<c06a4670>] (devm_spi_register_controller) from [<c06a8090>] (omap2_mcspi_probe+0x27c/0x358)
-[    2.161773] [<c06a8090>] (omap2_mcspi_probe) from [<c05ffb34>] (platform_drv_probe+0x50/0xb0)
-[    2.170349] [<c05ffb34>] (platform_drv_probe) from [<c05fdd00>] (driver_probe_device+0x260/0x2e8)
-[    2.179290] [<c05fdd00>] (driver_probe_device) from [<c05fde48>] (__driver_attach+0xc0/0xc4)
-[    2.187805] [<c05fde48>] (__driver_attach) from [<c05fc2c8>] (bus_for_each_dev+0x6c/0xa0)
-[    2.196014] [<c05fc2c8>] (bus_for_each_dev) from [<c05fd248>] (bus_add_driver+0x100/0x210)
-[    2.204345] [<c05fd248>] (bus_add_driver) from [<c05fec8c>] (driver_register+0x78/0xf4)
-[    2.212402] [<c05fec8c>] (driver_register) from [<c0101874>] (do_one_initcall+0x3c/0x16c)
-[    2.220642] [<c0101874>] (do_one_initcall) from [<c0f00ea0>] (kernel_init_freeable+0x1fc/0x2c4)
-[    2.229400] [<c0f00ea0>] (kernel_init_freeable) from [<c0af0264>] (kernel_init+0x8/0x114)
-[    2.237640] [<c0af0264>] (kernel_init) from [<c01077b0>] (ret_from_fork+0x14/0x24)
-[    2.245269] Code: e3c3303f e593300c e59305ec e16f0f10 (e1a002a0) 
-[    2.251403] ---[ end trace 03269d8f047e066c ]---
-[    2.256134] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-[    2.256134] 
-[    2.265350] CPU0: stopping
-[    2.268096] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G      D W       4.12.0-10335-gb8c0c26d6667 #516
-[    2.277221] Hardware name: Generic OMAP4 (Flattened Device Tree)
-[    2.283294] [<c0110460>] (unwind_backtrace) from [<c010c4ac>] (show_stack+0x10/0x14)
-[    2.291107] [<c010c4ac>] (show_stack) from [<c0adca28>] (dump_stack+0xac/0xe0)
-[    2.298400] [<c0adca28>] (dump_stack) from [<c010e920>] (handle_IPI+0x300/0x408)
-[    2.305847] [<c010e920>] (handle_IPI) from [<c01015a4>] (gic_handle_irq+0x9c/0xb8)
-[    2.313476] [<c01015a4>] (gic_handle_irq) from [<c0af7e30>] (__irq_svc+0x70/0x98)
-[    2.321044] Exception stack(0xc1001f38 to 0xc1001f80)
-[    2.326141] 1f20:                                                       c0108228 00000000
-[    2.334381] 1f40: 00000000 00000000 c1000000 c1007bcc c1007b68 c0f8a938 c1007f68 c1046133
-[    2.342620] 1f60: 00000000 00000000 000006c8 c1001f88 c0108228 c010822c 60000013 ffffffff
-[    2.350860] [<c0af7e30>] (__irq_svc) from [<c010822c>] (arch_cpu_idle+0x20/0x3c)
-[    2.358337] [<c010822c>] (arch_cpu_idle) from [<c018b6b4>] (do_idle+0x168/0x21c)
-[    2.365814] [<c018b6b4>] (do_idle) from [<c018bad4>] (cpu_startup_entry+0x18/0x1c)
-[    2.373443] [<c018bad4>] (cpu_startup_entry) from [<c0f00c2c>] (start_kernel+0x348/0x3c0)
-[    2.381683] [<c0f00c2c>] (start_kernel) from [<8000807c>] (0x8000807c)
-[    2.388275] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+CPU timer counter are sampled at the time LPI is Induced and in ISR
+routine to calculate interrupt response time.
+the result shown improvement of 5% with this patch.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/b94ae3aa/attachment-0001.sig>
+Do you have any recommended benchmarks to test the same?
+
+>
+> Give me the actual benchmark results. Don't expect me to accept this
+> kind of hand-wavy statement.
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+
+thanks
+Ganapat
