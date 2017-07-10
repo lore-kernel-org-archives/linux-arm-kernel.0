@@ -1,77 +1,53 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 10 Jul 2017 09:29:09 +0200
-Subject: [PATCH] video: xilinxfb: constify fb_fix_screeninfo and
- fb_var_screeninfo structures
-In-Reply-To: <20170708012416.GA1843@embeddedgus>
-References: <20170708012416.GA1843@embeddedgus>
-Message-ID: <c55390b8-c64b-e7ee-8099-5147970d5311@xilinx.com>
+From: sebastian.huber@embedded-brains.de (Sebastian Huber)
+Date: Mon, 10 Jul 2017 09:28:59 +0200
+Subject: [PATCH] soc/qbman: Simplify bman_release()
+Message-ID: <20170710072859.2616-1-sebastian.huber@embedded-brains.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8.7.2017 03:24, Gustavo A. R. Silva wrote:
-> These structures are only used to copy into other structures,
-> so declare them as const.
-> 
-> This issue was detected using Coccinelle and the following semantic patch:
-> 
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct fb_fix_screeninfo i at p = { ... };
-> 
-> @ok@
-> identifier r.i;
-> expression e;
-> position p;
-> @@
-> e = i at p
-> 
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct fb_fix_screeninfo e;
-> @@
-> e at i@p
-> 
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct fb_fix_screeninfo i = { ... };
-> 
-> The semantic patch for fb_var_screeninfo is analogous.
-> 
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
-> ---
->  drivers/video/fbdev/xilinxfb.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
-> index 17dc119..0bda18e 100644
-> --- a/drivers/video/fbdev/xilinxfb.c
-> +++ b/drivers/video/fbdev/xilinxfb.c
-> @@ -110,14 +110,14 @@ static struct xilinxfb_platform_data xilinx_fb_default_pdata = {
->  /*
->   * Here are the default fb_fix_screeninfo and fb_var_screeninfo structures
->   */
-> -static struct fb_fix_screeninfo xilinx_fb_fix = {
-> +static const struct fb_fix_screeninfo xilinx_fb_fix = {
->  	.id =		"Xilinx",
->  	.type =		FB_TYPE_PACKED_PIXELS,
->  	.visual =	FB_VISUAL_TRUECOLOR,
->  	.accel =	FB_ACCEL_NONE
->  };
->  
-> -static struct fb_var_screeninfo xilinx_fb_var = {
-> +static const struct fb_var_screeninfo xilinx_fb_var = {
->  	.bits_per_pixel =	BITS_PER_PIXEL,
->  
->  	.red =		{ RED_SHIFT, 8, 0 },
-> 
+Get the affine portal only once for the complete transaction.
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Sebastian Huber <sebastian.huber@embedded-brains.de>
+---
+ drivers/soc/fsl/qbman/bman.c | 15 ++++++---------
+ 1 file changed, 6 insertions(+), 9 deletions(-)
 
-Thanks,
-Michal
+diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
+index a3d6d7cfa929..0af2069a6b7e 100644
+--- a/drivers/soc/fsl/qbman/bman.c
++++ b/drivers/soc/fsl/qbman/bman.c
+@@ -723,26 +723,23 @@ int bman_release(struct bman_pool *pool, const struct bm_buffer *bufs, u8 num)
+ 
+ 	DPAA_ASSERT(num > 0 && num <= 8);
+ 
+-	do {
++	while (1) {
+ 		p = get_affine_portal();
+ 		local_irq_save(irqflags);
+ 		avail = bm_rcr_get_avail(&p->p);
+ 		if (avail < 2)
+ 			update_rcr_ci(p, avail);
+ 		r = bm_rcr_start(&p->p);
+-		local_irq_restore(irqflags);
+-		put_affine_portal();
+ 		if (likely(r))
+ 			break;
+ 
++		local_irq_restore(irqflags);
++		put_affine_portal();
++		if (unlikely(--timeout == 0))
++			return -ETIMEDOUT;
+ 		udelay(1);
+-	} while (--timeout);
+-
+-	if (unlikely(!timeout))
+-		return -ETIMEDOUT;
++	}
+ 
+-	p = get_affine_portal();
+-	local_irq_save(irqflags);
+ 	/*
+ 	 * we can copy all but the first entry, as this can trigger badness
+ 	 * with the valid-bit
+-- 
+2.12.3
