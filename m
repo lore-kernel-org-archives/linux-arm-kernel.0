@@ -1,66 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Jul 2017 14:54:27 +0100
-Subject: [PATCH RESEND] arm64: arch_timer: fix the infinite recursion when
- enable ftrace and erratum workaround
-In-Reply-To: <20170710112229.GA18040@leverpostej>
-References: <321e4c16-aa14-beee-b6dc-36e19e5ec35a@huawei.com>
- <20170710112229.GA18040@leverpostej>
-Message-ID: <b95c1c4e-2464-379b-e067-4e7c107760f8@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 10 Jul 2017 16:05:56 +0200
+Subject: [PATCH 8/9] ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by
+ generic bridge options
+In-Reply-To: <2320662.jifSpTNEif@avalon>
+References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+ <1499693302-25120-9-git-send-email-geert+renesas@glider.be>
+ <2320662.jifSpTNEif@avalon>
+Message-ID: <CAMuHMdWVQtE61BAdYaGRXenWYiW28xKd5oFXTOebXOJZ7sh_GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/17 12:22, Mark Rutland wrote:
-> On Sun, Jul 09, 2017 at 04:30:54PM +0800, Ding Tianhong wrote:
->> When enable preempt and debug ftrace, and perform the following steps, the
->> system will hang:
->> mount -t debugfs nodev /sys/kernel/debug/
->> cd /sys/kernel/debug/tracing/
->> echo function_graph > current_tracer
+Hi Laurent,
+
+On Mon, Jul 10, 2017 at 3:41 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Monday 10 Jul 2017 15:28:21 Geert Uytterhoeven wrote:
+>> The manual bridge implementation was removed in favor of the generic
+>> one, so now we need to enable standard bridge drivers like
+>> DRM_DUMB_VGA_DAC and DRM_I2C_ADV7511.
+>> Both were already enabled, but the (newer) ADV7511 audio part wasn't.
 >>
->> This is because tracing the preempt_disable/enable calls would cause
->> trace_clock() which would get local timer to go into infinite recursion
->> when enable the arch timer erratum workaround for some chips, so Prevent
->> tracing of preempt_disable/enable() in arch_timer_reg_read_stable().
->>
->> This problem is similar to the fixed by upstream commit 96b3d28bf4
->> ("sched/clock: Prevent tracing recursion in sched_clock_cpu()").
-> 
-> As I mentioned before, the patch itself looks fine to me, but the commit
-> message is somewhat difficult to read.
-> 
-> Can we please change this to:
-> 
->   arm64: arch_timer: avoid infinite recursion when ftrace is enabled
-> 
->   On platforms with an arch timer erratum workaround, it's possible for
->   arch_timer_reg_read_stable() to recurse into itself when certain
->   tracing options are enabled, leading to stack overflows and related
->   problems.
->  
->   For example, when PREEMPT_TRACER and FUNCTION_GRAPH_TRACER are
->   selected, it's possible to trigger this with:
->   
->   $ mount -t debugfs nodev /sys/kernel/debug/
->   $ echo function_graph > /sys/kernel/debug/tracing/current_tracer
-> 
->   The problem is that in such cases, preempt_disable() instrumentation
->   attempts to acquire a timestamp via trace_clock(), resulting in a call
->   back to arch_timer_reg_read_stable(), and hence recursion.
-> 
->   This patch changes arch_timer_reg_read_stable() to use
->   preempt_{disable,enable}_notrace(), which avoids this.
-> 
-> With that commit message:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> Daniel, Thomas, would you be happy to fold that in when picking this? Or
-> would you prefer that I fix this up and resend?
+>> Fixes: 5c602531feb3db39 ("drm: rcar-du: Replace manual bridge implementation
+>> with DRM bridge")
+>
+> I wonder if this patch really needs a Fixes tag. All it does is removing a now
+> deleted kernel option, and adding a new unrelated one. The former is related
+> to 5c602531feb3db39, but I'm not sure it should be considered as a bug.
 
-With the proposed changes:
+I added a Fixes tag because it aids backporting: if 5c602531feb3db39
+is backported, the defconfig update should be backported, too.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> The content of this patch looks good to me though.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
