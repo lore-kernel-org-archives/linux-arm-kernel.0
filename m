@@ -1,62 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 9 Jul 2017 20:20:24 -0500
-Subject: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
-In-Reply-To: <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
-References: <1499259711-56175-1-git-send-email-biju.das@bp.renesas.com>
- <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
+Date: Sun, 9 Jul 2017 20:26:03 -0500
+Subject: [PATCH 1/2] nvmem: rockchip-efuse: parse 'rockchip,efuse-size'
+In-Reply-To: <1499326597-10821-2-git-send-email-finley.xiao@rock-chips.com>
+References: <1499326597-10821-1-git-send-email-finley.xiao@rock-chips.com>
+ <1499326597-10821-2-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <20170710012603.yf3onf5kp6wgi3b3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 02:01:50PM +0100, Biju Das wrote:
-> Add support for Gigabit Ethernet E-MAC on r8a7743 (RZ/G1M) SoC.
-> Renesas RZ/G1M (R8A7743) SoC Ethernet AVB IP is identical to the R-Car Gen2
-> family.
-
-For the subject: "dt-bindings: net: ..."
-
+On Thu, Jul 06, 2017 at 03:36:36PM +0800, Finley Xiao wrote:
+> The eFuse size is defined in property <reg> before, but the length
+> of registers is not equal to the size on some platforms, so we
+> add a new property to redefine it.
 > 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 > ---
->  Documentation/devicetree/bindings/net/renesas,ravb.txt | 3 ++-
->  drivers/net/ethernet/renesas/ravb_main.c               | 1 +
->  2 files changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> index b519503..bc692ab 100644
-> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> @@ -4,7 +4,8 @@ This file provides information on what the device node for the Ethernet AVB
->  interface contains.
->  
->  Required properties:
-> -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
-> +- compatible: "renesas,etheravb-r8a7743" if the device is a part of R8A7743 SoC.
-> +	      "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+>  Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 4 ++++
+>  drivers/nvmem/rockchip-efuse.c                             | 4 +++-
+>  2 files changed, 7 insertions(+), 1 deletion(-)
 
-Please re-format like this:
-
-- compatible: Must be one of:
-...
-
-So it's a one line change to add new compatibles.
-
->  	      "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
->  	      "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
->  	      "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
-> diff --git a/drivers/net/ethernet/renesas/ravb_main.c b/drivers/net/ethernet/renesas/ravb_main.c
-> index 5931e85..e35b30f 100644
-> --- a/drivers/net/ethernet/renesas/ravb_main.c
-> +++ b/drivers/net/ethernet/renesas/ravb_main.c
-> @@ -1869,6 +1869,7 @@ static int ravb_mdio_release(struct ravb_private *priv)
->  }
->  
->  static const struct of_device_id ravb_match_table[] = {
-> +	{ .compatible = "renesas,etheravb-r8a7743", .data = (void *)RCAR_GEN2 },
->  	{ .compatible = "renesas,etheravb-r8a7790", .data = (void *)RCAR_GEN2 },
->  	{ .compatible = "renesas,etheravb-r8a7794", .data = (void *)RCAR_GEN2 },
->  	{ .compatible = "renesas,etheravb-rcar-gen2", .data = (void *)RCAR_GEN2 },
-> -- 
-> 1.9.1
-> 
+Acked-by: Rob Herring <robh@kernel.org>
