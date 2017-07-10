@@ -1,71 +1,61 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 10 Jul 2017 08:21:45 +0000
-Subject: [PATCH v 1/2] ARM: dts: r8a7743: Add Ethernet AVB support
-In-Reply-To: <CAMuHMdWsM_FBJ46=U69XptqpyC2cJYx_cqczaHBNq2nxZr68GQ@mail.gmail.com>
-References: <1499433165-62475-1-git-send-email-biju.das@bp.renesas.com>
- <1499433165-62475-2-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdWsM_FBJ46=U69XptqpyC2cJYx_cqczaHBNq2nxZr68GQ@mail.gmail.com>
-Message-ID: <KL1PR06MB1702CA5C697C50497F33E587B8A90@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 10 Jul 2017 10:38:47 +0200
+Subject: [PATCH v2 2/2] ARM: shmobile: defconfig: Enable Ethernet AVB
+In-Reply-To: <TY1PR06MB07020F58F15C964FC1AA1D22B7D50@TY1PR06MB0702.apcprd06.prod.outlook.com>
+References: <afcd181c-c805-8f3c-955f-652d001a03d4@cogentembedded.com>
+ <1499270189-29945-1-git-send-email-biju.das@bp.renesas.com>
+ <1499270189-29945-3-git-send-email-biju.das@bp.renesas.com>
+ <12c32eee-8e4d-457e-97d7-625a5c63ad59@cogentembedded.com>
+ <TY1PR06MB07020F58F15C964FC1AA1D22B7D50@TY1PR06MB0702.apcprd06.prod.outlook.com>
+Message-ID: <20170710083847.GH13680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-Thanks for the review.
+On Thu, Jul 06, 2017 at 08:05:43AM +0000, Chris Paterson wrote:
+> Hello Sergei, 
+> 
+> Thank you for your comments.
+> 
+> > From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
+> > Sent: 05 July 2017 17:14
+> > 
+> > Hello!
+> > 
+> > On 07/05/2017 06:56 PM, Biju Das wrote:
+> > 
+> > > The iWave RZ/G1M Q7 SOM supports Gigabit Ethernet Phy (Micrel
+> > KSZ9031MNX).
+> > > Gigabit Ethernet support is available in Renesas AVB driver.
+> > > To increase hardware support enable the driver in the
+> > > shmobile_defconfig multiplatform configuration.
+> > >
+> > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> > > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > ---
+> > >  arch/arm/configs/shmobile_defconfig | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > >
+> > > diff --git a/arch/arm/configs/shmobile_defconfig
+> > > b/arch/arm/configs/shmobile_defconfig
+> > > index 3c66a42..d992911 100644
+> > > --- a/arch/arm/configs/shmobile_defconfig
+> > > +++ b/arch/arm/configs/shmobile_defconfig
+> > > @@ -83,6 +83,7 @@ CONFIG_NETDEVICES=y
+> > >  # CONFIG_NET_VENDOR_MICREL is not set  #
+> > CONFIG_NET_VENDOR_NATSEMI is
+> > > not set  CONFIG_SH_ETH=y
+> > > +CONFIG_RAVB=y
+> > 
+> >     Hm, I would enable it only as a module, given it's not easy to make use of
+> > AVB on the 32-bit boards.
+> 
+> On the iWave-M platforms the only available Ethernet interface is AVB.
+> Without including the RAVB driver in the Kernel we won't be able to use
+> NFS.
+> 
+> I know adding CONFIG_RAVB for all shmobile devices may increase the
+> Kernel size for everyone, especially when most cannot use AVB without an
+> add-on board, but I don't think the increase will be big.
 
-> -----Original Message-----
-> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com]
-> On Behalf Of Geert Uytterhoeven
-> Sent: 10 July 2017 08:55
-> To: Biju Das <biju.das@bp.renesas.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; Russell King <linux@armlinux.org.uk>; Sergei
-> Shtylyov <sergei.shtylyov@cogentembedded.com>; Simon Horman
-> <horms@verge.net.au>; Magnus Damm <magnus.damm@gmail.com>; Chris
-> Paterson <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; Linux-
-> Renesas <linux-renesas-soc@vger.kernel.org>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v 1/2] ARM: dts: r8a7743: Add Ethernet AVB support
->
-> Hi Biju,
->
-> On Fri, Jul 7, 2017 at 3:12 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> > Add Ethernet AVB support for r8a7743 SoC.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
->
-> With the minor nit below fixed:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> > --- a/arch/arm/boot/dts/r8a7743.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7743.dtsi
-> > @@ -605,6 +605,19 @@
-> >                         #size-cells = <0>;
-> >                         status = "disabled";
-> >                 };
-> > +
-> > +               avb: ethernet at e6800000 {
-> > +                       compatible = "renesas,etheravb-r8a7743",
-> > +                                    "renesas,etheravb-rcar-gen2";
-> > +                       reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
-> > +                       interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
->
-
-OK. I will fix this.
-> s/0/GIC_SPI/
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Thanks for the explanation, applied for v4.14.
