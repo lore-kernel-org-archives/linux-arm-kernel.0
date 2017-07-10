@@ -1,50 +1,109 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Sun, 9 Jul 2017 22:04:58 -0500
-Subject: [PATCH] usb: gadget: udc-xilinx: compress return logic into one line
-Message-ID: <20170710030458.GA14639@embeddedgus>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 9 Jul 2017 22:37:55 -0500
+Subject: [PATCH V4 5/6] iommu/arm-smmu: Add support for MMU40x/500 clocks
+In-Reply-To: <1499333825-7658-6-git-send-email-vivek.gautam@codeaurora.org>
+References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1499333825-7658-6-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <20170710033755.fq36tl26hr42s5j2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify return logic to avoid unnecessary variable assignment.
+On Thu, Jul 06, 2017 at 03:07:04PM +0530, Vivek Gautam wrote:
+> From: Sricharan R <sricharan@codeaurora.org>
+> 
+> The MMU400x/500 is the implementation of the SMMUv2
+> arch specification. It is split in to two blocks
+> TBU, TCU. TBU caches the page table, instantiated
+> for each master locally, clocked by the TBUn_clk.
+> TCU manages the address translation with PTW and has
+> the programming interface as well, clocked using the
+> TCU_CLK. The TBU can also be sharing the same clock
+> domain as TCU, in which case both are clocked using
+> the TCU_CLK.
 
-This issue was detected using Coccinelle and the following
-semantic patch:
+No TBU clock below. When is it shared or not? If that's an integration 
+option then the binding should always have a TBU clock with the same 
+parent as the TCU_CLK.
 
-@@
-local idexpression ret;
-expression e;
-@@
-
--ret =
-+return
-     e;
--return ret;
-
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
----
- drivers/usb/gadget/udc/udc-xilinx.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
-index de207a9..552389d 100644
---- a/drivers/usb/gadget/udc/udc-xilinx.c
-+++ b/drivers/usb/gadget/udc/udc-xilinx.c
-@@ -1217,14 +1217,13 @@ static const struct usb_ep_ops xusb_ep_ops = {
- static int xudc_get_frame(struct usb_gadget *gadget)
- {
- 	struct xusb_udc *udc;
--	int frame;
- 
- 	if (!gadget)
- 		return -ENODEV;
- 
- 	udc = to_udc(gadget);
--	frame = udc->read_fn(udc->addr + XUSB_FRAMENUM_OFFSET);
--	return frame;
-+
-+	return udc->read_fn(udc->addr + XUSB_FRAMENUM_OFFSET);
- }
- 
- /**
--- 
-2.5.0
+> This defines the clock bindings for the same and adds
+> the clock names to compatible data.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> [vivek: clock rework and cleanup]
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> ---
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 24 ++++++++++++++++++++++
+>  drivers/iommu/arm-smmu.c                           | 12 ++++++++++-
+>  2 files changed, 35 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index 8a6ffce12af5..00331752d355 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -71,6 +71,26 @@ conditions.
+>                    or using stream matching with #iommu-cells = <2>, and
+>                    may be ignored if present in such cases.
+>  
+> +- clock-names:    Should be "tcu" and "iface" for "arm,mmu-400",
+> +                  "arm,mmu-401" and "arm,mmu-500"
+> +
+> +                  "tcu" clock is required for smmu's register access using the
+> +                  programming interface and ptw for downstream bus access. This
+> +                  clock is also used for access to the TBU connected to the
+> +                  master locally. Sometimes however, TBU is clocked along with
+> +                  the master.
+> +
+> +                  "iface" clock is required to access the TCU's programming
+> +                  interface, apart from the "tcu" clock.
+> +
+> +- clocks:         Phandles for respective clocks described by clock-names.
+> +
+> +- power-domains:  Phandles to SMMU's power domain specifier. This is
+> +                  required even if SMMU belongs to the master's power
+> +                  domain, as the SMMU will have to be enabled and
+> +                  accessed before master gets enabled and linked to its
+> +                  SMMU.
+> +
+>  ** Deprecated properties:
+>  
+>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+> @@ -95,6 +115,10 @@ conditions.
+>                               <0 36 4>,
+>                               <0 37 4>;
+>                  #iommu-cells = <1>;
+> +                clocks = <&gcc GCC_SMMU_CFG_CLK>,
+> +                         <&gcc GCC_APSS_TCU_CLK>;
+> +
+> +		clock-names = "iface", "tcu";
+>          };
+>  
+>          /* device with two stream IDs, 0 and 7 */
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 75567d9698ab..7bb09280fa11 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1947,9 +1947,19 @@ struct arm_smmu_match_data {
+>  ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
+>  ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
+>  ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU);
+> -ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500);
+>  ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
+>  
+> +static const char * const arm_mmu500_clks[] = {
+> +	"tcu", "iface",
+> +};
+> +
+> +static const struct arm_smmu_match_data arm_mmu500 = {
+> +	.version = ARM_SMMU_V2,
+> +	.model = ARM_MMU500,
+> +	.clks = arm_mmu500_clks,
+> +	.num_clks = ARRAY_SIZE(arm_mmu500_clks),
+> +};
+> +
+>  static const struct of_device_id arm_smmu_of_match[] = {
+>  	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
+>  	{ .compatible = "arm,smmu-v2", .data = &smmu_generic_v2 },
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
