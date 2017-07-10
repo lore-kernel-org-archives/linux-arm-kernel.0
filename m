@@ -1,53 +1,62 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 9 Jul 2017 20:12:11 -0500
-Subject: [PATCH v1 2/3] dt-bindings: display: panel: Add support for
- Orise Tech otm8009a dsi panel
-In-Reply-To: <1499185805-23354-3-git-send-email-philippe.cornu@st.com>
-References: <1499185805-23354-1-git-send-email-philippe.cornu@st.com>
- <1499185805-23354-3-git-send-email-philippe.cornu@st.com>
-Message-ID: <20170710011211.b6inrhlqmkph3otl@rob-hp-laptop>
+Date: Sun, 9 Jul 2017 20:20:24 -0500
+Subject: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
+In-Reply-To: <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
+References: <1499259711-56175-1-git-send-email-biju.das@bp.renesas.com>
+ <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 06:30:04PM +0200, Philippe CORNU wrote:
-> The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
-> a MIPI-DSI video interface. Its backlight is managed through the DSI link.
+On Wed, Jul 05, 2017 at 02:01:50PM +0100, Biju Das wrote:
+> Add support for Gigabit Ethernet E-MAC on r8a7743 (RZ/G1M) SoC.
+> Renesas RZ/G1M (R8A7743) SoC Ethernet AVB IP is identical to the R-Car Gen2
+> family.
+
+For the subject: "dt-bindings: net: ..."
+
 > 
-> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 > ---
->  .../bindings/display/panel/orisetech,otm8009a.txt    | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+>  Documentation/devicetree/bindings/net/renesas,ravb.txt | 3 ++-
+>  drivers/net/ethernet/renesas/ravb_main.c               | 1 +
+>  2 files changed, 3 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
-> new file mode 100644
-> index 0000000..0bb8237
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
-> @@ -0,0 +1,20 @@
-> +Orise Tech OTM8009A 3.97" 480x800 TFT LCD panel (MIPI-DSI video mode)
-> +
-> +The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
-> +a MIPI-DSI video interface. Its backlight is managed through the DSI link.
-> +
-> +Required properties:
-> +  - compatible: "orisetech,otm8009a"
-> +  - reg: the virtual channel number of a DSI peripheral
-> +  - reset-gpios: a GPIO spec for the reset pin (active low). (Optional)
+> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> index b519503..bc692ab 100644
+> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> @@ -4,7 +4,8 @@ This file provides information on what the device node for the Ethernet AVB
+>  interface contains.
+>  
+>  Required properties:
+> -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+> +- compatible: "renesas,etheravb-r8a7743" if the device is a part of R8A7743 SoC.
+> +	      "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
 
-If this is optional, move it to its own section.
+Please re-format like this:
 
-> +
-> +Example:
-> +&dsi {
-> +	...
-> +
-> +	panel at 0 {
-> +		compatible = "orisetech,otm8009a";
-> +		reg = <0>;
-> +		reset-gpios = <&gpioh 7 0>;
-> +	};
-> +};
+- compatible: Must be one of:
+...
+
+So it's a one line change to add new compatibles.
+
+>  	      "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
+>  	      "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
+>  	      "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
+> diff --git a/drivers/net/ethernet/renesas/ravb_main.c b/drivers/net/ethernet/renesas/ravb_main.c
+> index 5931e85..e35b30f 100644
+> --- a/drivers/net/ethernet/renesas/ravb_main.c
+> +++ b/drivers/net/ethernet/renesas/ravb_main.c
+> @@ -1869,6 +1869,7 @@ static int ravb_mdio_release(struct ravb_private *priv)
+>  }
+>  
+>  static const struct of_device_id ravb_match_table[] = {
+> +	{ .compatible = "renesas,etheravb-r8a7743", .data = (void *)RCAR_GEN2 },
+>  	{ .compatible = "renesas,etheravb-r8a7790", .data = (void *)RCAR_GEN2 },
+>  	{ .compatible = "renesas,etheravb-r8a7794", .data = (void *)RCAR_GEN2 },
+>  	{ .compatible = "renesas,etheravb-rcar-gen2", .data = (void *)RCAR_GEN2 },
 > -- 
 > 1.9.1
 > 
