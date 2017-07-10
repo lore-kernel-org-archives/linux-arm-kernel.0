@@ -1,106 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Jul 2017 17:34:30 +0100
-Subject: [PATCH v2 38/52] KVM: arm/arm64: GICv4: Wire init/teardown of
- per-VM support
-In-Reply-To: <738d2df9-c2b0-1444-8940-1027cf6fdd46@codeaurora.org>
-References: <20170628150411.15846-1-marc.zyngier@arm.com>
- <20170628150411.15846-39-marc.zyngier@arm.com>
- <738d2df9-c2b0-1444-8940-1027cf6fdd46@codeaurora.org>
-Message-ID: <4dcb1494-fe1f-2ace-2d1e-521b1dddc585@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 10 Jul 2017 11:01:10 -0600
+Subject: [PATCH] hwtracing: coresight: constify attribute_group structures.
+In-Reply-To: <97ff1c3f7145b0e4326fbbb246579cd5382880b3.1499233557.git.arvind.yadav.cs@gmail.com>
+References: <97ff1c3f7145b0e4326fbbb246579cd5382880b3.1499233557.git.arvind.yadav.cs@gmail.com>
+Message-ID: <CANLsYkwXbwRcj=Xd13-T_2rN1U=qzvWPzMnn07bUeWSU1FJatw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/17 12:26, Shanker Donthineni wrote:
-> Hi Marc,
-> 
-> On 06/28/2017 10:03 AM, Marc Zyngier wrote:
->> Should the HW support GICv4 and an ITS being associated with this
->> VM, let's init the its_vm and its_vpe structures.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-init.c | 11 ++++++++++-
->>  1 file changed, 10 insertions(+), 1 deletion(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
->> index 3a0b8999f011..0de1f0d986d4 100644
->> --- a/virt/kvm/arm/vgic/vgic-init.c
->> +++ b/virt/kvm/arm/vgic/vgic-init.c
->> @@ -285,8 +285,14 @@ int vgic_init(struct kvm *kvm)
->>  	if (ret)
->>  		goto out;
->>  
->> -	if (vgic_has_its(kvm))
->> +	if (vgic_has_its(kvm)) {
->>  		dist->msis_require_devid = true;
->> +		if (kvm_vgic_global_state.has_gicv4) {
->> +			ret = vgic_v4_init(kvm);
->> +			if (ret)
->> +				goto out;
->> +		}
-> 
-> This is not quite right, ITS virtual device may not be initialized at the time of 
-> calling vgic-init(). This change breaks the existing KVM functionality with QEMU
-> hypervisor tool. In later patches, code assumes vgic_v4_init(kvm) was called when
-> vgic_has_its(kvm) returns a true value. 
-> 
-> The right change would be move this logic to inside vgic_its_create() something like this.
-> 
->  --- a/virt/kvm/arm/vgic/vgic-init.c
->  +++ b/virt/kvm/arm/vgic/vgic-init.c
->  @@ -285,14 +285,8 @@ int vgic_init(struct kvm *kvm)
->          if (ret)
->                  goto out;
->  
->  -       if (vgic_has_its(kvm)) { 
->  +       if (vgic_has_its(kvm))
->                  dist->msis_require_devid = true;
->  -               if (kvm_vgic_global_state.has_gicv4) {
->  -                       ret = vgic_v4_init(kvm);
->  -                       if (ret)
->  -                               goto out;
->  -               }
->  -       }
->  
->          kvm_for_each_vcpu(i, vcpu, kvm)
->                  kvm_vgic_vcpu_enable(vcpu);
-> 
->  --- a/virt/kvm/arm/vgic/vgic-its.c
->  +++ b/virt/kvm/arm/vgic/vgic-its.c
->  @@ -1637,6 +1637,7 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct
->   static int vgic_its_create(struct kvm_device *dev, u32 type)
->   {
->          struct vgic_its *its;
->  +       int ret;
->  
->          if (type != KVM_DEV_TYPE_ARM_VGIC_ITS) 
->                  return -ENODEV;
->  @@ -1657,6 +1658,12 @@ static int vgic_its_create(struct kvm_device *dev, u32 ty
->          its->enabled = false;
->          its->dev = dev;
->   
->  +       if (kvm_vgic_global_state.has_gicv4) {
->  +               ret = vgic_v4_init(dev->kvm);
->  +               if (ret)
->  +                       return -ENOMEM;
->  +       }
->  +
+On 4 July 2017 at 23:49, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+> attribute_groups are not supposed to change at runtime. All functions
+> working with attribute_groups provided by <linux/sysfs.h> work with const
+> attribute_group. So mark the non-const structs as const.
+>
+> File size before:
+>   text     data     bss     dec     hex filename
+>    2573     288     296    3157     c55 coresight-etm-perf.o
+>
+> File size After adding 'const':
+>    text    data     bss     dec     hex filename
+>    2613     224     296    3133     c3d coresight-etm-perf.o
+>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm-perf.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 288a423..e97775d 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -60,7 +60,7 @@ struct etm_event_data {
+>         NULL,
+>  };
+>
+> -static struct attribute_group etm_pmu_format_group = {
+> +static const struct attribute_group etm_pmu_format_group = {
+>         .name   = "format",
+>         .attrs  = etm_config_formats_attr,
+>  };
+> --
+> 1.9.1
+>
 
-This approach is pretty busted if you have more than a single virtual
-ITS, as you now leak memory from the VPE array and IRQ domain allocations.
-
-Also, there is no guarantee that we've created all vcpus by the time we
-create an ITS, so this approach fails as well ("create vcpu 1, create
-ITS, create vcpu 2, init vgic" is a valid sequence).
-
-I guess we need to call vgic_v4_init() on both vgic_init() and
-its_create(), and only perform the GICv4 init if the vgic has already
-been initialized.
-
-Or we simply restrict the order to be vgic_init() last, and fix
-userspace to respect that order. Not enabling GICv4 won't break SW. It
-may even be faster.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Applied - thanks.
+Mathieu
