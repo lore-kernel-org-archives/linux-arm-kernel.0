@@ -1,87 +1,56 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Mon, 10 Jul 2017 12:12:29 +0530
-Subject: [PATCH V4 6/6] iommu/arm-smmu: Add support for
- qcom,msm8996-smmu-v2 clocks
-In-Reply-To: <20170710034057.o5tha22rlllbxu3y@rob-hp-laptop>
-References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
- <1499333825-7658-7-git-send-email-vivek.gautam@codeaurora.org>
- <20170710034057.o5tha22rlllbxu3y@rob-hp-laptop>
-Message-ID: <CAFp+6iFX=DDcK4DUC_U9h5cBa0Y1==3WKy3X6WXiQZSQ7_BNLg@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 10 Jul 2017 14:43:34 +0800
+Subject: [xlnx:master 553/744] drivers/mtd/spi-nor/spi-nor.c:2000:13: error:
+ implicit declaration of function 'of_get_next_parent'
+Message-ID: <201707101431.q1Xo5W0H%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Naga,
 
+FYI, the error/warning still remains.
 
-On Mon, Jul 10, 2017 at 9:10 AM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Jul 06, 2017 at 03:07:05PM +0530, Vivek Gautam wrote:
->> qcom,msm8996-smmu-v2 is an arm,smmu-v2 implementation with
->> specific clock and power requirements. This smmu core is used
->> with multiple masters on msm8996, viz. mdss, video, etc.
->> Add bindings for the same.
->>
->> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
->> ---
->>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 18 ++++++++++++++++++
->>  drivers/iommu/arm-smmu.c                             | 13 +++++++++++++
->>  2 files changed, 31 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> index 00331752d355..5d8e79775fae 100644
->> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> @@ -17,6 +17,7 @@ conditions.
->>                          "arm,mmu-401"
->>                          "arm,mmu-500"
->>                          "cavium,smmu-v2"
->> +                        "qcom,msm8996-smmu-v2"
->>
->>                    depending on the particular implementation and/or the
->>                    version of the architecture implemented.
->> @@ -74,11 +75,16 @@ conditions.
->>  - clock-names:    Should be "tcu" and "iface" for "arm,mmu-400",
->>                    "arm,mmu-401" and "arm,mmu-500"
->>
->> +                  Should be "bus", and "iface" for "qcom,msm8996-smmu-v2"
->> +                  implementation.
->> +
->>                    "tcu" clock is required for smmu's register access using the
->>                    programming interface and ptw for downstream bus access. This
->>                    clock is also used for access to the TBU connected to the
->>                    master locally. Sometimes however, TBU is clocked along with
->>                    the master.
->> +                  "bus" clock for "qcom,msm8996-smmu-v2" is requierd for downstream
->
-> s/requierd/required/
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   50dbfdba9101210db33a5a311b85a7409ab62278
+commit: d80f6153e7c446e0c7dc8400b06d199c50bfd509 [553/744] mtd: spi-nor: Disable 4-Byte addressing for axi_quad_spi
+config: blackfin-BF526-EZBRD_defconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout d80f6153e7c446e0c7dc8400b06d199c50bfd509
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-sure, will correct it.
+All errors (new ones prefixed by >>):
 
->
->> +                  bus access and for the smmu ptw.
->>
->>                    "iface" clock is required to access the TCU's programming
->>                    interface, apart from the "tcu" clock.
->> @@ -161,3 +167,15 @@ conditions.
->>                  iommu-map = <0 &smmu3 0 0x400>;
->>                  ...
->>          };
->> +
->> +     /* Qcom's arm,smmu-v2 implementation for msm8996 */
->> +     smmu4: iommu {
->> +             compatible = "qcom,msm8996-smmu-v2";
->
-> No registers?
+   drivers/mtd/spi-nor/spi-nor.c: In function 'spi_nor_scan':
+>> drivers/mtd/spi-nor/spi-nor.c:2000:13: error: implicit declaration of function 'of_get_next_parent' [-Werror=implicit-function-declaration]
+       np_spi = of_get_next_parent(np);
+                ^~~~~~~~~~~~~~~~~~
+   drivers/mtd/spi-nor/spi-nor.c:2000:11: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+       np_spi = of_get_next_parent(np);
+              ^
+   drivers/mtd/spi-nor/spi-nor.c:1728:6: warning: unused variable 'is_dual' [-Wunused-variable]
+     u32 is_dual;
+         ^~~~~~~
+   At top level:
+   drivers/mtd/spi-nor/spi-nor.c:266:12: warning: 'read_ear' defined but not used [-Wunused-function]
+    static int read_ear(struct spi_nor *nor, struct flash_info *info)
+               ^~~~~~~~
+   cc1: some warnings being treated as errors
 
-It does have registers. Will add the complete binding example.
+vim +/of_get_next_parent +2000 drivers/mtd/spi-nor/spi-nor.c
 
-Thank you for the review.
+  1862	
 
-Best Regards
-Vivek
-
-[snip]
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 14537 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/4277abb6/attachment-0001.gz>
