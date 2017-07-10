@@ -1,84 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Jul 2017 10:23:46 +0100
-Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-In-Reply-To: <CAFpQJXXPfBEP+_3rzkRo7Ydb31GKFokQB1bmOVHXSd1Pu0zsyA@mail.gmail.com>
-References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
- <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
- <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
- <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
- <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
- <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
- <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
- <bee8ac5a-b19f-8112-5529-485c269f3501@arm.com>
- <CAFpQJXXPfBEP+_3rzkRo7Ydb31GKFokQB1bmOVHXSd1Pu0zsyA@mail.gmail.com>
-Message-ID: <ed7416f2-e60b-bf8c-cdbe-8a83e83ca529@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 10 Jul 2017 11:26:55 +0200
+Subject: [PATCH 0/7] ARM: dts: renesas: Add Inter Connect RAM
+In-Reply-To: <CAMuHMdU7KC4X8+kOFUBiBw2ZHs=aukf+_1iR+Gjw2M+RgJ6mBQ@mail.gmail.com>
+References: <1499181798-28859-1-git-send-email-geert+renesas@glider.be>
+ <20170710084010.GJ13680@verge.net.au>
+ <CAMuHMdU7KC4X8+kOFUBiBw2ZHs=aukf+_1iR+Gjw2M+RgJ6mBQ@mail.gmail.com>
+Message-ID: <20170710092654.GP13680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/17 10:08, Ganapatrao Kulkarni wrote:
-> On Mon, Jul 10, 2017 at 2:36 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 10/07/17 09:48, Ganapatrao Kulkarni wrote:
->>> Hi Marc,
->>>
->>> On Mon, Jul 3, 2017 at 8:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> Hi Shanker,
->>>>
->>>> On 03/07/17 15:24, Shanker Donthineni wrote:
->>>>> Hi Marc,
->>>>>
->>>>> On 06/30/2017 03:51 AM, Marc Zyngier wrote:
->>>>>> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
->>>>>>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
->>>>>>> <gpkulkarni@gmail.com> wrote:
->>>>>>>> Hi Shanker,
->>>>>>>>
->>>>>>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
->>>>>>>> <shankerd@codeaurora.org> wrote:
->>>>>>>>> The NUMA node information is visible to ITS driver but not being used
->>>>>>>>> other than handling errata. This patch allocates the memory for ITS
->>>>>>>>> tables from the corresponding NUMA node using the appropriate NUMA
->>>>>>>>> aware functions.
->>>>>>>
->>>>>>> IMHO, the description would have been more constructive?
->>>>>>>
->>>>>>> "All ITS tables are mapped by default to NODE 0 memory.
->>>>>>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
->>>>>>> This will optimize tables access and avoids unnecessary inter-node traffic."
->>>>>>
->>>>>> But more importantly, I'd like to see figures showing the actual benefit
->>>>>> of this per-node allocation. Given that both of you guys have access to
->>>>>> such platforms, please show me the numbers!
->>>>>>
->>>>>
->>>>> I'll share the actual results which shows the improvement whenever
->>>>> available on our next chips. Current version of Qualcomm qdf2400 doesn't
->>>>> support multi socket configuration to capture results and share with you.
->>>>>
->>>>> Do you see any other issues with this patch apart from the performance
->>>>> improvements. I strongly believe this brings the noticeable improvement
->>>>> in numbers on systems where it has multi node memory/CPU configuration.
->>>>
->>>> I agree that it *could* show an improvement, but it very much depends on
->>>> how often the ITS misses in its caches. For this kind of patches, I want
->>>> to see two things:
->>>>
->>>> 1) It brings a measurable benefit on NUMA platforms
->>>
->>> Did some measurement of interrupt response time for LPIs and we don't
->>> see any major
->>> improvement due to caching of Tables. However, we have seen
->>> improvements of around 5%.
->>
->> An improvement of what exactly?
+On Mon, Jul 10, 2017 at 10:45:23AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> interrupt response time.
+> On Mon, Jul 10, 2017 at 10:40 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, Jul 04, 2017 at 05:23:11PM +0200, Geert Uytterhoeven wrote:
+> >> R-Car Gen2 and RZ/G1 SoCs contain two or three blocks of SRAM, which can be
+> >> used for several purposes.  One such purpose is holding a jump stub for CPU
+> >> core bringup.
+> >>
+> >> This patch series adds the SRAM blocks to the various DTS files, following
+> >> the generic DT bindings for "mmio-sram" in
+> >> Documentation/devicetree/bindings/sram/sram.txt.  Reserving SRAM for jump
+> >> stub for CPU core bringup will be handled in a follow-up series.
+> >>
+> >> Thanks!
+> >
+> > Geert, these seem nice and clean to me.
+> > Are they ready to be applied?
+> 
+> I think they are.
 
-Measured how? On which HW? Using which benchmark?
-
-Give me the actual benchmark results. Don't expect me to accept this
-kind of hand-wavy statement.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks, all patches applied for v4.14.
