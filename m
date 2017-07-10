@@ -1,60 +1,90 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Jul 2017 09:07:12 +0100
-Subject: [RESEND PATCH v6 0/8] mfd: Add OF device table to I2C drivers
- that are missing it
-In-Reply-To: <CABxcv=k8g8c3KmLK+ZqQiG+-+j2Y=FuRpadQ=xguXG5qGGWwhg@mail.gmail.com>
-References: <20170615184928.12007-1-javier@dowhile0.org>
- <CABxcv=k8g8c3KmLK+ZqQiG+-+j2Y=FuRpadQ=xguXG5qGGWwhg@mail.gmail.com>
-Message-ID: <20170710080712.3oyktu3pjdbgxx7k@dell>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Mon, 10 Jul 2017 10:13:24 +0200
+Subject: [linux-sunxi] [PATCH v5 1/6] clk: sunxi-ng: div: Add support for
+ fixed post-divider
+In-Reply-To: <805048a548031cafc890e6ea06ee773bdfb199d0.1499197129.git-series.plaes@plaes.org>
+References: <cover.23e9103a2becf2261d7e145bb1516221a5cfb8a4.1499197129.git-series.plaes@plaes.org>
+ <805048a548031cafc890e6ea06ee773bdfb199d0.1499197129.git-series.plaes@plaes.org>
+Message-ID: <3126e83a-c50c-fb12-134b-0b53f0f7eed6@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jul 2017, Javier Martinez Canillas wrote:
+Hey Plaes,
 
-> Hello Lee,
-> 
-> On Thu, Jun 15, 2017 at 8:49 PM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
-> >
-> > This series add OF device ID tables to mfd I2C drivers whose devices are
-> > either used in Device Tree source files or are listed in binding docs as
-> > a compatible string.
-> >
-> > That's done because the plan is to change the I2C core to report proper OF
-> > modaliases instead of always reporting a MODALIAS=i2c:<foo> regardless if
-> > a device was registered via DT or using the legacy platform data mechanism.
-> >
-> > So these patches will make sure that mfd I2C drivers modules will continue
-> > to be autoloaded once the I2C core is changed to report proper OF modalias.
-> >
-> > Users didn't have a vendor prefix in the used compatible strings, but since
-> > there wasn't a DT binding document for these drivers, it can be said that
-> > were working for mere luck and so this series fixes the users and add a DT
-> > binding doc for the drivers.
-> >
-> > Most patches can be applied independently, with the exception of patches
-> > 2 to 4 that should be applied in the same tree to keep bisect-ability. I
-> > suggest these to go through the MFD subsystem tree.
-> >
-> > Best regards,
-> > Javier
-> >
-> 
-> Are you planning to pick this series? It has been in the list for
-> months and were resent many times...
-
-I think you exaggerate a little.  Your last Ack (from Linus) was only
-collected in v6, which has only been resent once with that Ack
-applied. =:)
-
-We are currently only half way through the merge-window.  This patch
-will be hoovered up during the early -rcs.  Please be patient around
-the time of the merge-window, since Maintainers are either usually
-very busy with pull-requests, or taking a 2 minute breather before
-the chaos starts over.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+On 04-07-17 22:04, Priit Laes wrote:
+> SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
+> 6 is fixed post-divider.
+>
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  drivers/clk/sunxi-ng/ccu_div.c | 18 ++++++++++++++++--
+>  drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
+>  2 files changed, 18 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
+> index c0e5c10..054b12a 100644
+> --- a/drivers/clk/sunxi-ng/ccu_div.c
+> +++ b/drivers/clk/sunxi-ng/ccu_div.c
+> @@ -21,6 +21,9 @@ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
+>  {
+>  	struct ccu_div *cd = data;
+>
+> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +		rate /= cd->fixed_post_div;
+> +
+>  	return divider_round_rate_parent(&cd->common.hw, parent,
+>  					 rate, parent_rate,
+>  					 cd->div.table, cd->div.width,
+> @@ -62,8 +65,13 @@ static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
+>  	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
+>  						  parent_rate);
+>
+> -	return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+> -				   cd->div.flags);
+> +	val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+> +				  cd->div.flags);
+> +
+> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +		val /= cd->fixed_post_div;
+> +
+> +	return val;
+>  }
+>
+>  static int ccu_div_determine_rate(struct clk_hw *hw,
+> @@ -71,6 +79,9 @@ static int ccu_div_determine_rate(struct clk_hw *hw,
+>  {
+>  	struct ccu_div *cd = hw_to_ccu_div(hw);
+>
+> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +		req->rate *= cd->fixed_post_div;
+> +
+>  	return ccu_mux_helper_determine_rate(&cd->common, &cd->mux,
+>  					     req, ccu_div_round_rate, cd);
+>  }
+> @@ -89,6 +100,9 @@ static int ccu_div_set_rate(struct clk_hw *hw, unsigned long rate,
+>  	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
+>  			      cd->div.flags);
+>
+> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +		val /= cd->fixed_post_div;
+> +
+>  	spin_lock_irqsave(cd->common.lock, flags);
+>
+>  	reg = readl(cd->common.base + cd->common.reg);
+> diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+> index 08d0744..f3a5028 100644
+> --- a/drivers/clk/sunxi-ng/ccu_div.h
+> +++ b/drivers/clk/sunxi-ng/ccu_div.h
+> @@ -86,9 +86,10 @@ struct ccu_div_internal {
+>  struct ccu_div {
+>  	u32			enable;
+>
+> -	struct ccu_div_internal		div;
+> +	struct ccu_div_internal	div;
+>  	struct ccu_mux_internal	mux;
+>  	struct ccu_common	common;
+> +	unsigned int		fixed_post_div;
+>  };
+>
+>  #define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
+>
