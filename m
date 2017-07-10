@@ -1,98 +1,49 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 10 Jul 2017 15:23:59 +0200
-Subject: [PATCH 3/4] iio: dac: stm32: add support for stm32f4
-In-Reply-To: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
-References: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1499693040-12994-4-git-send-email-fabrice.gasnier@st.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 10 Jul 2017 15:28:21 +0200
+Subject: [PATCH 8/9] ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by generic
+ bridge options
+In-Reply-To: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1499693302-25120-9-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for STM32F4 Digital-To-Analog converter.
-Add compatible configuration data to handle hfsel (not present
-in stm32f4).
+The manual bridge implementation was removed in favor of the generic
+one, so now we need to enable standard bridge drivers like
+DRM_DUMB_VGA_DAC and DRM_I2C_ADV7511.
+Both were already enabled, but the (newer) ADV7511 audio part wasn't.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Fixes: 5c602531feb3db39 ("drm: rcar-du: Replace manual bridge implementation with DRM bridge")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/iio/dac/stm32-dac-core.c | 38 +++++++++++++++++++++++++++++++-------
- 1 file changed, 31 insertions(+), 7 deletions(-)
+multi_v7_defconfig is in desperate need of a refresh.
 
-diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
-index 75e4878..32701be 100644
---- a/drivers/iio/dac/stm32-dac-core.c
-+++ b/drivers/iio/dac/stm32-dac-core.c
-@@ -42,6 +42,14 @@ struct stm32_dac_priv {
- 	struct stm32_dac_common common;
- };
- 
-+/**
-+ * struct stm32_dac_cfg - DAC configuration
-+ * @has_hfsel: DAC has high frequency control
-+ */
-+struct stm32_dac_cfg {
-+	bool has_hfsel;
-+};
-+
- static struct stm32_dac_priv *to_stm32_dac_priv(struct stm32_dac_common *com)
- {
- 	return container_of(com, struct stm32_dac_priv, common);
-@@ -57,6 +65,7 @@ static struct stm32_dac_priv *to_stm32_dac_priv(struct stm32_dac_common *com)
- static int stm32_dac_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-+	const struct stm32_dac_cfg *cfg;
- 	struct stm32_dac_priv *priv;
- 	struct regmap *regmap;
- 	struct resource *res;
-@@ -69,6 +78,8 @@ static int stm32_dac_probe(struct platform_device *pdev)
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
- 		return -ENOMEM;
-+	cfg = (const struct stm32_dac_cfg *)
-+		of_match_device(dev->driver->of_match_table, dev)->data;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	mmio = devm_ioremap_resource(dev, res);
-@@ -121,12 +132,16 @@ static int stm32_dac_probe(struct platform_device *pdev)
- 		reset_control_deassert(priv->rst);
- 	}
- 
--	/* When clock speed is higher than 80MHz, set HFSEL */
--	priv->common.hfsel = (clk_get_rate(priv->pclk) > 80000000UL);
--	ret = regmap_update_bits(regmap, STM32_DAC_CR, STM32H7_DAC_CR_HFSEL,
--				 priv->common.hfsel ? STM32H7_DAC_CR_HFSEL : 0);
--	if (ret)
--		goto err_pclk;
-+	if (cfg && cfg->has_hfsel) {
-+		/* When clock speed is higher than 80MHz, set HFSEL */
-+		priv->common.hfsel = (clk_get_rate(priv->pclk) > 80000000UL);
-+		ret = regmap_update_bits(regmap, STM32_DAC_CR,
-+					 STM32H7_DAC_CR_HFSEL,
-+					 priv->common.hfsel ?
-+					 STM32H7_DAC_CR_HFSEL : 0);
-+		if (ret)
-+			goto err_pclk;
-+	}
- 
- 	platform_set_drvdata(pdev, &priv->common);
- 
-@@ -158,8 +173,17 @@ static int stm32_dac_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct stm32_dac_cfg stm32h7_dac_cfg = {
-+	.has_hfsel = true,
-+};
-+
- static const struct of_device_id stm32_dac_of_match[] = {
--	{ .compatible = "st,stm32h7-dac-core", },
-+	{
-+		.compatible = "st,stm32f4-dac-core",
-+	}, {
-+		.compatible = "st,stm32h7-dac-core",
-+		.data = (void *)&stm32h7_dac_cfg,
-+	},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, stm32_dac_of_match);
+To reduce conflicts, I went for the simple option of adding
+CONFIG_DRM_I2C_ADV7511_AUDIO below CONFIG_DRM_I2C_ADV7511, instead of
+moving CONFIG_DRM_I2C_ADV7511 and CONFIG_DRM_DUMB_VGA_DAC around.
+---
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 7fa1746970ecc531..ea2075d8e185f7aa 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -584,6 +584,7 @@ CONFIG_VIDEO_ADV7180=m
+ CONFIG_VIDEO_ML86V7667=m
+ CONFIG_DRM=y
+ CONFIG_DRM_I2C_ADV7511=m
++CONFIG_DRM_I2C_ADV7511_AUDIO=y
+ # CONFIG_DRM_I2C_CH7006 is not set
+ # CONFIG_DRM_I2C_SIL164 is not set
+ CONFIG_DRM_DUMB_VGA_DAC=m
+@@ -603,7 +604,6 @@ CONFIG_ROCKCHIP_DW_MIPI_DSI=y
+ CONFIG_ROCKCHIP_INNO_HDMI=y
+ CONFIG_DRM_ATMEL_HLCDC=m
+ CONFIG_DRM_RCAR_DU=m
+-CONFIG_DRM_RCAR_HDMI=y
+ CONFIG_DRM_RCAR_LVDS=y
+ CONFIG_DRM_SUN4I=m
+ CONFIG_DRM_TEGRA=y
 -- 
-1.9.1
+2.7.4
