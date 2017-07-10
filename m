@@ -1,46 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 10 Jul 2017 16:05:56 +0200
-Subject: [PATCH 8/9] ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by
- generic bridge options
-In-Reply-To: <2320662.jifSpTNEif@avalon>
-References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
- <1499693302-25120-9-git-send-email-geert+renesas@glider.be>
- <2320662.jifSpTNEif@avalon>
-Message-ID: <CAMuHMdWVQtE61BAdYaGRXenWYiW28xKd5oFXTOebXOJZ7sh_GQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Jul 2017 09:13:42 -0500
+Subject: [PATCH v3 3/4] dt-bindings: Document MIPS Broadcom STB power
+ management nodes
+In-Reply-To: <20170706222225.9758-4-f.fainelli@gmail.com>
+References: <20170706222225.9758-1-f.fainelli@gmail.com>
+ <20170706222225.9758-4-f.fainelli@gmail.com>
+Message-ID: <20170710141342.fghqil4px5ylj336@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Thu, Jul 06, 2017 at 03:22:24PM -0700, Florian Fainelli wrote:
+> Document the different nodes required for supporting S2/S3/S5 suspend
+> states on MIPS-based Broadcom STB SoCs.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  .../devicetree/bindings/mips/brcm/soc.txt          | 153 +++++++++++++++++++++
+>  1 file changed, 153 insertions(+)
 
-On Mon, Jul 10, 2017 at 3:41 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Monday 10 Jul 2017 15:28:21 Geert Uytterhoeven wrote:
->> The manual bridge implementation was removed in favor of the generic
->> one, so now we need to enable standard bridge drivers like
->> DRM_DUMB_VGA_DAC and DRM_I2C_ADV7511.
->> Both were already enabled, but the (newer) ADV7511 audio part wasn't.
->>
->> Fixes: 5c602531feb3db39 ("drm: rcar-du: Replace manual bridge implementation
->> with DRM bridge")
->
-> I wonder if this patch really needs a Fixes tag. All it does is removing a now
-> deleted kernel option, and adding a new unrelated one. The former is related
-> to 5c602531feb3db39, but I'm not sure it should be considered as a bug.
+A couple of nits on the node names, otherwise:
 
-I added a Fixes tag because it aids backporting: if 5c602531feb3db39
-is backported, the defconfig update should be backported, too.
+Acked-by: Rob Herring <robh@kernel.org>
 
-> The content of this patch looks good to me though.
+> +Example:
+> +
+> +	memory-controller: memc at 0 {
 
-Thanks!
+memory-controller at 0
 
-Gr{oetje,eeting}s,
+> +		compatible = "brcm,brcmstb-memc", "simple-bus";
+> +		ranges = <0x0 0x0 0xa000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		memc-arb at 1000 {
+> +			...
+> +		};
+> +
+> +		memc-ddr at 2000 {
+> +			...
+> +		};
+> +
+> +		ddr-phy at 6000 {
+> +			...
+> +		};
+> +	};
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> +Example:
+> +
+> +	timers: timers at 4067c0 {
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+timer at ...
+
+> +		compatible = "brcm,bcm7425-timers", "brcm,brcmstb-timers";
+> +		reg = <0x4067c0 0x40>;
+> +		interrupts = <&periph_intc 19>;
+> +	};
+> -- 
+> 2.9.3
+> 
