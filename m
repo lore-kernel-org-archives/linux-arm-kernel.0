@@ -1,32 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Jul 2017 06:46:21 -0700
-Subject: 4.13-rc0: stopped booting on Nokia N900
-In-Reply-To: <20170710133656.og2egbse5plp3afm@earth>
-References: <20170710074610.GA22846@amd> <20170710081334.GA29726@amd>
- <20170710101608.qdamqomegbjwuweh@earth>
- <20170710130602.GS3730@atomide.com>
- <20170710133656.og2egbse5plp3afm@earth>
-Message-ID: <20170710134620.GT3730@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Jul 2017 14:50:38 +0100
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <CAFpQJXUm5tEyaBURzx9OtssBt8+ThO0dmPqtdjjGRJzY5cMv-w@mail.gmail.com>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+ <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+ <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+ <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
+ <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
+ <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
+ <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
+ <bee8ac5a-b19f-8112-5529-485c269f3501@arm.com>
+ <CAFpQJXXPfBEP+_3rzkRo7Ydb31GKFokQB1bmOVHXSd1Pu0zsyA@mail.gmail.com>
+ <ed7416f2-e60b-bf8c-cdbe-8a83e83ca529@arm.com>
+ <CAFpQJXUm5tEyaBURzx9OtssBt8+ThO0dmPqtdjjGRJzY5cMv-w@mail.gmail.com>
+Message-ID: <09fa2b5a-9039-0902-4f57-6a6c2a5f7c37@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sebastian.reichel@collabora.co.uk> [170710 06:37]:
-> Hi,
+On 10/07/17 11:21, Ganapatrao Kulkarni wrote:
+> Hi Marc,
 > 
-> On Mon, Jul 10, 2017 at 06:06:03AM -0700, Tony Lindgren wrote:
-> > > I just rebased my droid4 development branch. I do not have any
-> > > problems with segfaulting toolchain, but boot also fails on OMAP4
-> > > based Droid 4. The problem seems to be SPI being accessed without
-> > > runtime PM (clocks) being enabled:
-> > 
-> > Care to check if commit c5b3955828ba ("ARM: OMAP4: Fix legacy code
-> > clean-up regression") make that one go away? I have already sent
-> > a pull request for that one.
+> On Mon, Jul 10, 2017 at 2:53 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 10/07/17 10:08, Ganapatrao Kulkarni wrote:
+>>> On Mon, Jul 10, 2017 at 2:36 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> On 10/07/17 09:48, Ganapatrao Kulkarni wrote:
+>>>>> Hi Marc,
+>>>>>
+>>>>> On Mon, Jul 3, 2017 at 8:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>>> Hi Shanker,
+>>>>>>
+>>>>>> On 03/07/17 15:24, Shanker Donthineni wrote:
+>>>>>>> Hi Marc,
+>>>>>>>
+>>>>>>> On 06/30/2017 03:51 AM, Marc Zyngier wrote:
+>>>>>>>> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
+>>>>>>>>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
+>>>>>>>>> <gpkulkarni@gmail.com> wrote:
+>>>>>>>>>> Hi Shanker,
+>>>>>>>>>>
+>>>>>>>>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+>>>>>>>>>> <shankerd@codeaurora.org> wrote:
+>>>>>>>>>>> The NUMA node information is visible to ITS driver but not being used
+>>>>>>>>>>> other than handling errata. This patch allocates the memory for ITS
+>>>>>>>>>>> tables from the corresponding NUMA node using the appropriate NUMA
+>>>>>>>>>>> aware functions.
+>>>>>>>>>
+>>>>>>>>> IMHO, the description would have been more constructive?
+>>>>>>>>>
+>>>>>>>>> "All ITS tables are mapped by default to NODE 0 memory.
+>>>>>>>>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
+>>>>>>>>> This will optimize tables access and avoids unnecessary inter-node traffic."
+>>>>>>>>
+>>>>>>>> But more importantly, I'd like to see figures showing the actual benefit
+>>>>>>>> of this per-node allocation. Given that both of you guys have access to
+>>>>>>>> such platforms, please show me the numbers!
+>>>>>>>>
+>>>>>>>
+>>>>>>> I'll share the actual results which shows the improvement whenever
+>>>>>>> available on our next chips. Current version of Qualcomm qdf2400 doesn't
+>>>>>>> support multi socket configuration to capture results and share with you.
+>>>>>>>
+>>>>>>> Do you see any other issues with this patch apart from the performance
+>>>>>>> improvements. I strongly believe this brings the noticeable improvement
+>>>>>>> in numbers on systems where it has multi node memory/CPU configuration.
+>>>>>>
+>>>>>> I agree that it *could* show an improvement, but it very much depends on
+>>>>>> how often the ITS misses in its caches. For this kind of patches, I want
+>>>>>> to see two things:
+>>>>>>
+>>>>>> 1) It brings a measurable benefit on NUMA platforms
+>>>>>
+>>>>> Did some measurement of interrupt response time for LPIs and we don't
+>>>>> see any major
+>>>>> improvement due to caching of Tables. However, we have seen
+>>>>> improvements of around 5%.
+>>>>
+>>>> An improvement of what exactly?
+>>>
+>>> interrupt response time.
+>>
+>> Measured how? On which HW? Using which benchmark?
 > 
-> I bisected to the same commit, that you also found. I just replied
-> to Thomas' pull-request from yesterday with bootlog + bisect result
-> + info that current master works again after reverting the patch.
+> This has been tested on ThunderX2.
+> We have instrumented gic-v3-its driver code to create dummy LPI device
+> with few vectors.
+> The LPI is induced from dummy device(through sysfs by writing to
+> TRANSLATOR reg).
+> The ISR routine(gic_handle_irq) being called to handle the induced LPI.
+> NODE 1 cpu is used to induce LPI and NODE 1 cpu/collection is mapped
+> in ITT to route this LPI.
+> 
+> CPU timer counter are sampled at the time LPI is Induced and in ISR
+> routine to calculate interrupt response time.
+> the result shown improvement of 5% with this patch.
 
-Oh OK thanks for clarifying it.
+And you call that a realistic measurement of the latency? Really? Sorry,
+but I cannot take you seriously here.
 
-Tony
+> Do you have any recommended benchmarks to test the same?
+
+Run a standard benchmark such as netperf, post the result with and
+without that patch. The above is just plain ridiculous.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
