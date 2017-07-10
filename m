@@ -1,33 +1,73 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Mon, 10 Jul 2017 11:02:11 +0200
-Subject: [PATCH v2 1/3] dt-bindings: Add vendor prefix for Orise Technology
-In-Reply-To: <1499677333-10571-1-git-send-email-philippe.cornu@st.com>
-References: <1499677333-10571-1-git-send-email-philippe.cornu@st.com>
-Message-ID: <1499677333-10571-2-git-send-email-philippe.cornu@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Jul 2017 10:06:12 +0100
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+ <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+ <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+ <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
+ <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
+ <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
+ <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
+Message-ID: <bee8ac5a-b19f-8112-5529-485c269f3501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orise Technology is headquartered in Taiwan and specializes
-in manufacture of Flat Panel Display Driver IC and Flat Panel
-Display Controller IC.
+On 10/07/17 09:48, Ganapatrao Kulkarni wrote:
+> Hi Marc,
+> 
+> On Mon, Jul 3, 2017 at 8:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Hi Shanker,
+>>
+>> On 03/07/17 15:24, Shanker Donthineni wrote:
+>>> Hi Marc,
+>>>
+>>> On 06/30/2017 03:51 AM, Marc Zyngier wrote:
+>>>> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
+>>>>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
+>>>>> <gpkulkarni@gmail.com> wrote:
+>>>>>> Hi Shanker,
+>>>>>>
+>>>>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+>>>>>> <shankerd@codeaurora.org> wrote:
+>>>>>>> The NUMA node information is visible to ITS driver but not being used
+>>>>>>> other than handling errata. This patch allocates the memory for ITS
+>>>>>>> tables from the corresponding NUMA node using the appropriate NUMA
+>>>>>>> aware functions.
+>>>>>
+>>>>> IMHO, the description would have been more constructive?
+>>>>>
+>>>>> "All ITS tables are mapped by default to NODE 0 memory.
+>>>>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
+>>>>> This will optimize tables access and avoids unnecessary inter-node traffic."
+>>>>
+>>>> But more importantly, I'd like to see figures showing the actual benefit
+>>>> of this per-node allocation. Given that both of you guys have access to
+>>>> such platforms, please show me the numbers!
+>>>>
+>>>
+>>> I'll share the actual results which shows the improvement whenever
+>>> available on our next chips. Current version of Qualcomm qdf2400 doesn't
+>>> support multi socket configuration to capture results and share with you.
+>>>
+>>> Do you see any other issues with this patch apart from the performance
+>>> improvements. I strongly believe this brings the noticeable improvement
+>>> in numbers on systems where it has multi node memory/CPU configuration.
+>>
+>> I agree that it *could* show an improvement, but it very much depends on
+>> how often the ITS misses in its caches. For this kind of patches, I want
+>> to see two things:
+>>
+>> 1) It brings a measurable benefit on NUMA platforms
+> 
+> Did some measurement of interrupt response time for LPIs and we don't
+> see any major
+> improvement due to caching of Tables. However, we have seen
+> improvements of around 5%.
 
-Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+An improvement of what exactly?
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index f08284e..e6d5f75 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -235,6 +235,7 @@ ontat	On Tat Industrial Company
- opencores	OpenCores.org
- option	Option NV
- ORCL	Oracle Corporation
-+orisetech	Orise Technology
- ortustech	Ortus Technology Co., Ltd.
- ovti	OmniVision Technologies
- oxsemi	Oxford Semiconductor, Ltd.
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
