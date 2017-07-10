@@ -1,31 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Jul 2017 13:09:14 +0100
-Subject: [PATCH] spi: pxa2xx: Only claim CS GPIOs when the slave device
- is created
-In-Reply-To: <CAHp75Vd8GRCwGp8eDFOL=dsgxCR+VqqUy+O50PEW=p99a8xAwQ@mail.gmail.com>
-References: <90b3e14d-0077-9a25-9d90-ab340577af57@web.de>
- <CAHp75Vd8GRCwGp8eDFOL=dsgxCR+VqqUy+O50PEW=p99a8xAwQ@mail.gmail.com>
-Message-ID: <20170710120913.g35ftcbs7pngrtsm@sirena.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 10 Jul 2017 14:12:27 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: remove arm,
+ mali-midgard compatible from rk3288
+In-Reply-To: <20170710121227.14264-1-heiko@sntech.de>
+References: <20170710121227.14264-1-heiko@sntech.de>
+Message-ID: <20170710121227.14264-2-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 09, 2017 at 12:48:10AM +0300, Andy Shevchenko wrote:
-> On Sat, Jul 8, 2017 at 11:41 AM, Jan Kiszka <jan.kiszka@web.de> wrote:
+The binding specifies the actual implementations only (mali-t760
+for example) but not the arm,mali-midgard used in some vendor kernels.
+So drop that compatible property from the rk3288 where it had slipped in.
 
-> > Tested on the IOT2000 where the second SPI bus is connected to an
-> > Arduino-compatible connector and multiplexed between SPI, GPIO and PWM
-> > usage.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Can we first switch the driver to use GPIO descriptors instead of
-> plain integers?
-
-Only if you also convert the SPI core to use descriptors, Chris Packham
-was looking at that but he needed update the ep93xx drivers among others
-and getting reviewers was hard.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/9c025d35/attachment.sig>
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index cb1d415d1201..e99d7ff4c939 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -1135,7 +1135,7 @@
+ 	};
+ 
+ 	gpu: mali at ffa30000 {
+-		compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
++		compatible = "rockchip,rk3288-mali", "arm,mali-t760";
+ 		reg = <0xffa30000 0x10000>;
+ 		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+-- 
+2.11.0
