@@ -1,68 +1,82 @@
-From: oliver+list@schinagl.nl (Olliver Schinagl)
-Date: Mon, 10 Jul 2017 16:22:21 +0200
-Subject: [linux-sunxi] [PATCH v3] drm/sun4i: Implement drm_driver
- lastclose to restore fbdev console
-In-Reply-To: <20170710065504.31497-1-net147@gmail.com>
-References: <20170710065504.31497-1-net147@gmail.com>
-Message-ID: <9dd1080b-1a0c-888a-b336-bc321c823e80@schinagl.nl>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 10 Jul 2017 22:23:08 +0800
+Subject: [PATCH v4 1/3] cpufreq: mediatek: Add support of cpufreq to
+ MT2701/MT7623 SoC
+In-Reply-To: <cover.1499692967.git.sean.wang@mediatek.com>
+References: <cover.1499692967.git.sean.wang@mediatek.com>
+Message-ID: <feabcfd53899954198c6620e9d9b68f4a3c55201.1499692967.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Jonathan,
+From: Sean Wang <sean.wang@mediatek.com>
 
-since I reported this to you on IRC, it's only fair that you can have my:
+MT2701/MT7623 is a 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
+single cluster and this hardware is also compatible with the existing
+driver through enabling CPU frequency feature with operating-points-v2
+bindings. Also, this driver actually supports all MediaTek SoCs, the
+Kconfig menu entry and file name itself should be updated with more
+generic name to drop "MT8173"
 
-Tested-by: Olliver Schinagl <oliver@schinagl.nl>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Jean Delvare <jdelvare@suse.de>
+---
+ drivers/cpufreq/Kconfig.arm                              | 7 +++----
+ drivers/cpufreq/Makefile                                 | 2 +-
+ drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} | 2 ++
+ 3 files changed, 6 insertions(+), 5 deletions(-)
+ rename drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} (99%)
 
-For those interessted, I've tested it on an Olimex OLinuXino Lime2 with 
-their 4.3 LCD.
-
-Olliver
-
-On 10-07-17 08:55, Jonathan Liu wrote:
-> The drm_driver lastclose callback is called when the last userspace
-> DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
-> the fbdev console otherwise the fbdev console will stop working.
->
-> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Jonathan Liu <net147@gmail.com>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes for v3:
->  - Add 'Fixes:' tag
->  - Add CC to stable
->  - Add 'Reviewed-by: Chen-Yu Tsai <wens@csie.org>'
->
-> Changes for v2:
->  - Rename sun4i_drm_lastclose to sun4i_drv_lastclose
->
->  drivers/gpu/drm/sun4i/sun4i_drv.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> index abc7d8fe06b4..a45a627283a1 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> @@ -25,12 +25,20 @@
->  #include "sun4i_framebuffer.h"
->  #include "sun4i_tcon.h"
->
-> +static void sun4i_drv_lastclose(struct drm_device *dev)
-> +{
-> +	struct sun4i_drv *drv = dev->dev_private;
-> +
-> +	drm_fbdev_cma_restore_mode(drv->fbdev);
-> +}
-> +
->  DEFINE_DRM_GEM_CMA_FOPS(sun4i_drv_fops);
->
->  static struct drm_driver sun4i_drv_driver = {
->  	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_PRIME | DRIVER_ATOMIC,
->
->  	/* Generic Operations */
-> +	.lastclose		= sun4i_drv_lastclose,
->  	.fops			= &sun4i_drv_fops,
->  	.name			= "sun4i-drm",
->  	.desc			= "Allwinner sun4i Display Engine",
->
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 74ed7e9..24ef446 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -87,14 +87,13 @@ config ARM_KIRKWOOD_CPUFREQ
+ 	  This adds the CPUFreq driver for Marvell Kirkwood
+ 	  SoCs.
+ 
+-config ARM_MT8173_CPUFREQ
+-	tristate "Mediatek MT8173 CPUFreq support"
++config ARM_MEDIATEK_CPUFREQ
++	tristate "CPU Frequency scaling support for MediaTek SoCs"
+ 	depends on ARCH_MEDIATEK && REGULATOR
+-	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
+ 	depends on !CPU_THERMAL || THERMAL
+ 	select PM_OPP
+ 	help
+-	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
++	  This adds the CPUFreq driver support for MediaTek SoCs.
+ 
+ config ARM_OMAP2PLUS_CPUFREQ
+ 	bool "TI OMAP2+"
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index b7e78f0..ea043aa 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -58,7 +58,7 @@ obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
+ obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
+ obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+ obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
+-obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
++obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mediatek-cpufreq.o
+ obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+ obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+ obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
+similarity index 99%
+rename from drivers/cpufreq/mt8173-cpufreq.c
+rename to drivers/cpufreq/mediatek-cpufreq.c
+index fd1886f..481ec77 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mediatek-cpufreq.c
+@@ -575,6 +575,8 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
+ 
+ /* List of machines supported by this driver */
+ static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
++	{ .compatible = "mediatek,mt2701", },
++	{ .compatible = "mediatek,mt7623", },
+ 	{ .compatible = "mediatek,mt817x", },
+ 	{ .compatible = "mediatek,mt8173", },
+ 	{ .compatible = "mediatek,mt8176", },
+-- 
+2.7.4
