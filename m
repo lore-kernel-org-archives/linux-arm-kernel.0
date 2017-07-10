@@ -1,61 +1,52 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 10 Jul 2017 10:38:47 +0200
-Subject: [PATCH v2 2/2] ARM: shmobile: defconfig: Enable Ethernet AVB
-In-Reply-To: <TY1PR06MB07020F58F15C964FC1AA1D22B7D50@TY1PR06MB0702.apcprd06.prod.outlook.com>
-References: <afcd181c-c805-8f3c-955f-652d001a03d4@cogentembedded.com>
- <1499270189-29945-1-git-send-email-biju.das@bp.renesas.com>
- <1499270189-29945-3-git-send-email-biju.das@bp.renesas.com>
- <12c32eee-8e4d-457e-97d7-625a5c63ad59@cogentembedded.com>
- <TY1PR06MB07020F58F15C964FC1AA1D22B7D50@TY1PR06MB0702.apcprd06.prod.outlook.com>
-Message-ID: <20170710083847.GH13680@verge.net.au>
+Date: Mon, 10 Jul 2017 10:39:27 +0200
+Subject: [PATCH 0/9] ARM: renesas: Use SMP jump stub SRAM region from DT
+In-Reply-To: <CAMuHMdUFkaxoJCX5F3FH3vy=Sh50y02a3hF9HR3tkw-XwtiG2g@mail.gmail.com>
+References: <1499182903-31339-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdUFkaxoJCX5F3FH3vy=Sh50y02a3hF9HR3tkw-XwtiG2g@mail.gmail.com>
+Message-ID: <20170710083926.GI13680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 08:05:43AM +0000, Chris Paterson wrote:
-> Hello Sergei, 
+On Tue, Jul 04, 2017 at 06:44:48PM +0200, Geert Uytterhoeven wrote:
+> On Tue, Jul 4, 2017 at 5:41 PM, Geert Uytterhoeven
+> <geert+renesas@glider.be> wrote:
+> > The R-Car Gen2 platform code for CPU core bringup needs to copy a jump
+> > stub to on-SoC SRAM.  Currently it uses a hardcoded address pointing to
+> > ICRAM1.
+> >
+> > This patch series adds support to specify this region from DT.  It
+> > consists of 3 parts:
+> >   - DT binding documentation for reserving SRAM for the jump stub,
+> >   - A platform code update to retrieve the information from DT, if
+> >     present (of course backwards-compatibility with old DTBs is
+> >     preserved),
+> >   - DT updates to reserve an SRAM region in DT on all R-Car Gen2 and
+> >     RZ/G1 SoCs.
+> >
+> > The DT patches in this series depend on "[PATCH 0/7] ARM: dts: renesas:
+> > Add Inter Connect RAM".
+> >
+> > Note that the current jump stub in Linux is 12 bytes long.  The patches
+> > reserve 16 bytes of SRAM.  Should this be increased?  The mapping
+> > granularity is PAGE_SIZE anyway.
+> >
+> > Thanks for your comments!
+> >
+> > Geert Uytterhoeven (9):
+> >   dt-bindings: sram: Document renesas,smp-sram
+> >   ARM: shmobile: rcar-gen2: Obtain jump stub region from DT
+> >   ARM: dts: r8a7743: Reserve SRAM for the SMP jump stub
+> >   ARM: dts: r8a7745: Reserve SRAM for the SMP jump stub
+> >   ARM: dts: r8a7790: Reserve SRAM for the SMP jump stub
+> >   ARM: dts: r8a7791: Reserve SRAM for the SMP jump stub
+> >   ARM: dts: r8a7792: Reserve SRAM for the SMP jump stub
+> >   ARM: dts: r8a7793: Reserve SRAM for the SMP jump stub
+> >   ARM: dts: r8a7794: Reserve SRAM for the SMP jump stub
 > 
-> Thank you for your comments.
-> 
-> > From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
-> > Sent: 05 July 2017 17:14
-> > 
-> > Hello!
-> > 
-> > On 07/05/2017 06:56 PM, Biju Das wrote:
-> > 
-> > > The iWave RZ/G1M Q7 SOM supports Gigabit Ethernet Phy (Micrel
-> > KSZ9031MNX).
-> > > Gigabit Ethernet support is available in Renesas AVB driver.
-> > > To increase hardware support enable the driver in the
-> > > shmobile_defconfig multiplatform configuration.
-> > >
-> > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-> > > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > ---
-> > >  arch/arm/configs/shmobile_defconfig | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > >
-> > > diff --git a/arch/arm/configs/shmobile_defconfig
-> > > b/arch/arm/configs/shmobile_defconfig
-> > > index 3c66a42..d992911 100644
-> > > --- a/arch/arm/configs/shmobile_defconfig
-> > > +++ b/arch/arm/configs/shmobile_defconfig
-> > > @@ -83,6 +83,7 @@ CONFIG_NETDEVICES=y
-> > >  # CONFIG_NET_VENDOR_MICREL is not set  #
-> > CONFIG_NET_VENDOR_NATSEMI is
-> > > not set  CONFIG_SH_ETH=y
-> > > +CONFIG_RAVB=y
-> > 
-> >     Hm, I would enable it only as a module, given it's not easy to make use of
-> > AVB on the 32-bit boards.
-> 
-> On the iWave-M platforms the only available Ethernet interface is AVB.
-> Without including the RAVB driver in the Kernel we won't be able to use
-> NFS.
-> 
-> I know adding CONFIG_RAVB for all shmobile devices may increase the
-> Kernel size for everyone, especially when most cannot use AVB without an
-> add-on board, but I don't think the increase will be big.
+> Forgot to mention: this has been tested on r8a7790/lager, r8a7791/koelsch,
+> r8a7792/blanche, r8a7793/gose, and r8a7794/alt (r8a7794 needs an
+> unrelated fix to enable SMP).
 
-Thanks for the explanation, applied for v4.14.
+Geert, these seem nice and clean to me.
+Are they ready to be applied?
