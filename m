@@ -1,132 +1,27 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 10 Jul 2017 09:57:54 -0500
-Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-In-Reply-To: <09fa2b5a-9039-0902-4f57-6a6c2a5f7c37@arm.com>
-References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
- <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
- <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
- <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
- <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
- <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
- <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
- <bee8ac5a-b19f-8112-5529-485c269f3501@arm.com>
- <CAFpQJXXPfBEP+_3rzkRo7Ydb31GKFokQB1bmOVHXSd1Pu0zsyA@mail.gmail.com>
- <ed7416f2-e60b-bf8c-cdbe-8a83e83ca529@arm.com>
- <CAFpQJXUm5tEyaBURzx9OtssBt8+ThO0dmPqtdjjGRJzY5cMv-w@mail.gmail.com>
- <09fa2b5a-9039-0902-4f57-6a6c2a5f7c37@arm.com>
-Message-ID: <6ea9d5df-d15f-a8a6-2442-e2f628b29816@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Jul 2017 09:58:52 -0500
+Subject: [PATCH v3 2/3] dt-bindings: cpufreq: move MediaTek cpufreq
+ dt-bindings document to proper place
+In-Reply-To: <77ada8e9c184b4a58463bfe0f2c8b0ef149d2845.1499399121.git.sean.wang@mediatek.com>
+References: <cover.1499399121.git.sean.wang@mediatek.com>
+ <77ada8e9c184b4a58463bfe0f2c8b0ef149d2845.1499399121.git.sean.wang@mediatek.com>
+Message-ID: <20170710145852.pwbpfrv2cyihy5kj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 07/10/2017 08:50 AM, Marc Zyngier wrote:
-> On 10/07/17 11:21, Ganapatrao Kulkarni wrote:
->> Hi Marc,
->>
->> On Mon, Jul 10, 2017 at 2:53 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On 10/07/17 10:08, Ganapatrao Kulkarni wrote:
->>>> On Mon, Jul 10, 2017 at 2:36 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> On 10/07/17 09:48, Ganapatrao Kulkarni wrote:
->>>>>> Hi Marc,
->>>>>>
->>>>>> On Mon, Jul 3, 2017 at 8:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>>>> Hi Shanker,
->>>>>>>
->>>>>>> On 03/07/17 15:24, Shanker Donthineni wrote:
->>>>>>>> Hi Marc,
->>>>>>>>
->>>>>>>> On 06/30/2017 03:51 AM, Marc Zyngier wrote:
->>>>>>>>> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
->>>>>>>>>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
->>>>>>>>>> <gpkulkarni@gmail.com> wrote:
->>>>>>>>>>> Hi Shanker,
->>>>>>>>>>>
->>>>>>>>>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
->>>>>>>>>>> <shankerd@codeaurora.org> wrote:
->>>>>>>>>>>> The NUMA node information is visible to ITS driver but not being used
->>>>>>>>>>>> other than handling errata. This patch allocates the memory for ITS
->>>>>>>>>>>> tables from the corresponding NUMA node using the appropriate NUMA
->>>>>>>>>>>> aware functions.
->>>>>>>>>>
->>>>>>>>>> IMHO, the description would have been more constructive?
->>>>>>>>>>
->>>>>>>>>> "All ITS tables are mapped by default to NODE 0 memory.
->>>>>>>>>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
->>>>>>>>>> This will optimize tables access and avoids unnecessary inter-node traffic."
->>>>>>>>>
->>>>>>>>> But more importantly, I'd like to see figures showing the actual benefit
->>>>>>>>> of this per-node allocation. Given that both of you guys have access to
->>>>>>>>> such platforms, please show me the numbers!
->>>>>>>>>
->>>>>>>>
->>>>>>>> I'll share the actual results which shows the improvement whenever
->>>>>>>> available on our next chips. Current version of Qualcomm qdf2400 doesn't
->>>>>>>> support multi socket configuration to capture results and share with you.
->>>>>>>>
->>>>>>>> Do you see any other issues with this patch apart from the performance
->>>>>>>> improvements. I strongly believe this brings the noticeable improvement
->>>>>>>> in numbers on systems where it has multi node memory/CPU configuration.
->>>>>>>
->>>>>>> I agree that it *could* show an improvement, but it very much depends on
->>>>>>> how often the ITS misses in its caches. For this kind of patches, I want
->>>>>>> to see two things:
->>>>>>>
->>>>>>> 1) It brings a measurable benefit on NUMA platforms
->>>>>>
->>>>>> Did some measurement of interrupt response time for LPIs and we don't
->>>>>> see any major
->>>>>> improvement due to caching of Tables. However, we have seen
->>>>>> improvements of around 5%.
->>>>>
->>>>> An improvement of what exactly?
->>>>
->>>> interrupt response time.
->>>
->>> Measured how? On which HW? Using which benchmark?
->>
->> This has been tested on ThunderX2.
->> We have instrumented gic-v3-its driver code to create dummy LPI device
->> with few vectors.
->> The LPI is induced from dummy device(through sysfs by writing to
->> TRANSLATOR reg).
->> The ISR routine(gic_handle_irq) being called to handle the induced LPI.
->> NODE 1 cpu is used to induce LPI and NODE 1 cpu/collection is mapped
->> in ITT to route this LPI.
->>
->> CPU timer counter are sampled at the time LPI is Induced and in ISR
->> routine to calculate interrupt response time.
->> the result shown improvement of 5% with this patch.
+On Fri, Jul 07, 2017 at 11:56:46AM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> And you call that a realistic measurement of the latency? Really? Sorry,
-> but I cannot take you seriously here.
+> The old place is Documentation/devicetree/bindings/clock/ that would
+> let people hard to find how to use MediaTek cpufreq driver, so moving
+> it to the appropriate place as other cpufreq drivers done would be
+> better.
 > 
->> Do you have any recommended benchmarks to test the same?
-> 
-> Run a standard benchmark such as netperf, post the result with and
-> without that patch. The above is just plain ridiculous.
->
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  .../bindings/{clock/mt8173-cpu-dvfs.txt => cpufreq/cpufreq-mediatek.txt}  | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/{clock/mt8173-cpu-dvfs.txt => cpufreq/cpufreq-mediatek.txt} (100%)
 
-The whole purpose of ACPI subtable "GIC Interrupt Translation Service (ITS) Affinity structure" 
-is to provide the proximity information to OS so that software will take advantage of NUMA
-aware allocations to improve the read latency of ITS/GICR tables, not just for implementing 
-software workarounds.
-
- 
-I believe ITS driver should provide NUMA aware allocations just like x86 Linux drivers. How much
-performance improvement we observer is based on the individual SOC implementation, inter NODE
-latency, inter node traffic, cache capacity, and type of the test used to measure results.
-
-Please consider this patch irrespective of the test results running on a specific hardware. We
-need this patch for upcoming Qualcomm server chips. 
-
-
- 
-> 	M.
-> 
-
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Acked-by: Rob Herring <robh@kernel.org>
