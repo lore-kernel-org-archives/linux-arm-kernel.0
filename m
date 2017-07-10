@@ -1,174 +1,106 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 10 Jul 2017 11:06:49 -0500
-Subject: [PATCH v2] irqchip: gicv3-its: Use NUMA aware memory allocation
- for ITS tables
-In-Reply-To: <1499702025-21383-1-git-send-email-shankerd@codeaurora.org>
-References: <1499702025-21383-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <19243e0f-20b7-b537-a343-06fb8d45daaf@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Jul 2017 17:34:30 +0100
+Subject: [PATCH v2 38/52] KVM: arm/arm64: GICv4: Wire init/teardown of
+ per-VM support
+In-Reply-To: <738d2df9-c2b0-1444-8940-1027cf6fdd46@codeaurora.org>
+References: <20170628150411.15846-1-marc.zyngier@arm.com>
+ <20170628150411.15846-39-marc.zyngier@arm.com>
+ <738d2df9-c2b0-1444-8940-1027cf6fdd46@codeaurora.org>
+Message-ID: <4dcb1494-fe1f-2ace-2d1e-521b1dddc585@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/07/17 12:26, Shanker Donthineni wrote:
+> Hi Marc,
+> 
+> On 06/28/2017 10:03 AM, Marc Zyngier wrote:
+>> Should the HW support GICv4 and an ITS being associated with this
+>> VM, let's init the its_vm and its_vpe structures.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-init.c | 11 ++++++++++-
+>>  1 file changed, 10 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+>> index 3a0b8999f011..0de1f0d986d4 100644
+>> --- a/virt/kvm/arm/vgic/vgic-init.c
+>> +++ b/virt/kvm/arm/vgic/vgic-init.c
+>> @@ -285,8 +285,14 @@ int vgic_init(struct kvm *kvm)
+>>  	if (ret)
+>>  		goto out;
+>>  
+>> -	if (vgic_has_its(kvm))
+>> +	if (vgic_has_its(kvm)) {
+>>  		dist->msis_require_devid = true;
+>> +		if (kvm_vgic_global_state.has_gicv4) {
+>> +			ret = vgic_v4_init(kvm);
+>> +			if (ret)
+>> +				goto out;
+>> +		}
+> 
+> This is not quite right, ITS virtual device may not be initialized at the time of 
+> calling vgic-init(). This change breaks the existing KVM functionality with QEMU
+> hypervisor tool. In later patches, code assumes vgic_v4_init(kvm) was called when
+> vgic_has_its(kvm) returns a true value. 
+> 
+> The right change would be move this logic to inside vgic_its_create() something like this.
+> 
+>  --- a/virt/kvm/arm/vgic/vgic-init.c
+>  +++ b/virt/kvm/arm/vgic/vgic-init.c
+>  @@ -285,14 +285,8 @@ int vgic_init(struct kvm *kvm)
+>          if (ret)
+>                  goto out;
+>  
+>  -       if (vgic_has_its(kvm)) { 
+>  +       if (vgic_has_its(kvm))
+>                  dist->msis_require_devid = true;
+>  -               if (kvm_vgic_global_state.has_gicv4) {
+>  -                       ret = vgic_v4_init(kvm);
+>  -                       if (ret)
+>  -                               goto out;
+>  -               }
+>  -       }
+>  
+>          kvm_for_each_vcpu(i, vcpu, kvm)
+>                  kvm_vgic_vcpu_enable(vcpu);
+> 
+>  --- a/virt/kvm/arm/vgic/vgic-its.c
+>  +++ b/virt/kvm/arm/vgic/vgic-its.c
+>  @@ -1637,6 +1637,7 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct
+>   static int vgic_its_create(struct kvm_device *dev, u32 type)
+>   {
+>          struct vgic_its *its;
+>  +       int ret;
+>  
+>          if (type != KVM_DEV_TYPE_ARM_VGIC_ITS) 
+>                  return -ENODEV;
+>  @@ -1657,6 +1658,12 @@ static int vgic_its_create(struct kvm_device *dev, u32 ty
+>          its->enabled = false;
+>          its->dev = dev;
+>   
+>  +       if (kvm_vgic_global_state.has_gicv4) {
+>  +               ret = vgic_v4_init(dev->kvm);
+>  +               if (ret)
+>  +                       return -ENOMEM;
+>  +       }
+>  +
 
+This approach is pretty busted if you have more than a single virtual
+ITS, as you now leak memory from the VPE array and IRQ domain allocations.
 
-On 07/10/2017 10:53 AM, Shanker Donthineni wrote:
-> The NUMA node information is visible to ITS driver but not being used
-> other than handling hardware errata. ITS/GICR hardware accesses to the
-> local NUMA node is usually quicker than the remote NUMA node. How slow
-> the remote NUMA accesses are depends on the implementation details.
-> 
-> This patch allocates memory for ITS management tables and command
-> queue from the corresponding NUMA node using the appropriate NUMA
-> aware functions. This change improves the performance of the ITS
-> tables read latency on systems where it has more than one ITS block,
-> and with the slower inter node accesses.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
-Sorry forgot to include v2 changes:
-  - Edited commit text.
-  - Added Ganapatrao's tested-by.
- 
->  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
->  1 file changed, 20 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 45ea1933..40442fb 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -858,8 +858,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->  	u64 val = its_read_baser(its, baser);
->  	u64 esz = GITS_BASER_ENTRY_SIZE(val);
->  	u64 type = GITS_BASER_TYPE(val);
-> +	struct page *page;
->  	u32 alloc_pages;
-> -	void *base;
->  	u64 tmp;
->  
->  retry_alloc_baser:
-> @@ -872,12 +872,12 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->  		order = get_order(GITS_BASER_PAGES_MAX * psz);
->  	}
->  
-> -	base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
-> -	if (!base)
-> +	page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO, order);
-> +	if (!page)
->  		return -ENOMEM;
->  
->  retry_baser:
-> -	val = (virt_to_phys(base)				 |
-> +	val = (page_to_phys(page)				 |
->  		(type << GITS_BASER_TYPE_SHIFT)			 |
->  		((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)	 |
->  		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
-> @@ -913,7 +913,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->  		shr = tmp & GITS_BASER_SHAREABILITY_MASK;
->  		if (!shr) {
->  			cache = GITS_BASER_nC;
-> -			gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
-> +			gic_flush_dcache_to_poc(page_to_virt(page),
-> +						PAGE_ORDER_TO_SIZE(order));
->  		}
->  		goto retry_baser;
->  	}
-> @@ -924,7 +925,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->  		 * size and retry. If we reach 4K, then
->  		 * something is horribly wrong...
->  		 */
-> -		free_pages((unsigned long)base, order);
-> +		__free_pages(page, order);
->  		baser->base = NULL;
->  
->  		switch (psz) {
-> @@ -941,19 +942,19 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->  		pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
->  		       &its->phys_base, its_base_type_string[type],
->  		       val, tmp);
-> -		free_pages((unsigned long)base, order);
-> +		__free_pages(page, order);
->  		return -ENXIO;
->  	}
->  
->  	baser->order = order;
-> -	baser->base = base;
-> +	baser->base = page_to_virt(page);
->  	baser->psz = psz;
->  	tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
->  
->  	pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
->  		&its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
->  		its_base_type_string[type],
-> -		(unsigned long)virt_to_phys(base),
-> +		(unsigned long)page_to_phys(page),
->  		indirect ? "indirect" : "flat", (int)esz,
->  		psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
->  
-> @@ -1017,7 +1018,7 @@ static void its_free_tables(struct its_node *its)
->  
->  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
->  		if (its->tables[i].base) {
-> -			free_pages((unsigned long)its->tables[i].base,
-> +			__free_pages(virt_to_page(its->tables[i].base),
->  				   its->tables[i].order);
->  			its->tables[i].base = NULL;
->  		}
-> @@ -1284,7 +1285,8 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
->  
->  	/* Allocate memory for 2nd level table */
->  	if (!table[idx]) {
-> -		page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(baser->psz));
-> +		page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
-> +					get_order(baser->psz));
->  		if (!page)
->  			return false;
->  
-> @@ -1330,7 +1332,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
->  	sz = nr_ites * its->ite_size;
->  	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
-> -	itt = kzalloc(sz, GFP_KERNEL);
-> +	itt = kzalloc_node(sz, GFP_KERNEL, its->numa_node);
->  	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
->  	if (lpi_map)
->  		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
-> @@ -1675,6 +1677,7 @@ static int __init its_probe_one(struct resource *res,
->  {
->  	struct its_node *its;
->  	void __iomem *its_base;
-> +	struct page *page;
->  	u32 val;
->  	u64 baser, tmp;
->  	int err;
-> @@ -1714,12 +1717,13 @@ static int __init its_probe_one(struct resource *res,
->  	its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
->  	its->numa_node = numa_node;
->  
-> -	its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
-> -						get_order(ITS_CMD_QUEUE_SZ));
-> -	if (!its->cmd_base) {
-> +	page = alloc_pages_node(its->numa_node, GFP_KERNEL | __GFP_ZERO,
-> +				get_order(ITS_CMD_QUEUE_SZ));
-> +	if (!page) {
->  		err = -ENOMEM;
->  		goto out_free_its;
->  	}
-> +	its->cmd_base = page_to_virt(page);
->  	its->cmd_write = its->cmd_base;
->  
->  	its_enable_quirks(its);
-> @@ -1773,7 +1777,7 @@ static int __init its_probe_one(struct resource *res,
->  out_free_tables:
->  	its_free_tables(its);
->  out_free_cmd:
-> -	free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
-> +	__free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
->  out_free_its:
->  	kfree(its);
->  out_unmap:
-> 
+Also, there is no guarantee that we've created all vcpus by the time we
+create an ITS, so this approach fails as well ("create vcpu 1, create
+ITS, create vcpu 2, init vgic" is a valid sequence).
 
+I guess we need to call vgic_v4_init() on both vgic_init() and
+its_create(), and only perform the GICv4 init if the vgic has already
+been initialized.
+
+Or we simply restrict the order to be vgic_init() last, and fix
+userspace to respect that order. Not enabling GICv4 won't break SW. It
+may even be faster.
+
+	M.
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Jazz is not dead. It just smells funny...
