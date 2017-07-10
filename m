@@ -1,49 +1,49 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 10 Jul 2017 11:07:22 +0530
-Subject: [PATCH] mfd: ab8500-core: constify attribute_group structures.
-Message-ID: <82391b6661b206976c244dcef76946c45c6aac2d.1499664942.git.arvind.yadav.cs@gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 10 Jul 2017 13:54:43 +0800
+Subject: [arm:drm-dwhdmi-devel 1/4]
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c:1760:26: error: 'HDMI_CEC_MASK'
+ undeclared
+Message-ID: <201707101331.izrmLHWI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-attribute_groups are not supposed to change at runtime. All functions
-working with attribute_groups provided by <linux/sysfs.h> work with const
-attribute_group. So mark the non-const structs as const.
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git drm-dwhdmi-devel
+head:   6916d37b572042c01ad9c87a18be3d096fb1d6ba
+commit: 302a868d45da97c06419bc7fe0f05e186c589337 [1/4] drm/bridge: dw-hdmi: remove CEC engine register definitions
+config: i386-randconfig-c0-07101214 (attached as .config)
+compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
+reproduce:
+        git checkout 302a868d45da97c06419bc7fe0f05e186c589337
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-  16298	   1009	    184	  17491	   4453	drivers/mfd/ab8500-core.o
+Note: the arm/drm-dwhdmi-devel HEAD 6916d37b572042c01ad9c87a18be3d096fb1d6ba builds fine.
+      It only hurts bisectibility.
 
-File size After adding 'const':
-   text	   data	    bss	    dec	    hex	filename
-  16490	    817	    184	  17491	   4453	drivers/mfd/ab8500-core.o
+All errors (new ones prefixed by >>):
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c: In function 'initialize_hdmi_ih_mutes':
+>> drivers/gpu/drm/bridge/synopsys/dw-hdmi.c:1760:26: error: 'HDMI_CEC_MASK' undeclared (first use in this function)
+     hdmi_writeb(hdmi, 0xff, HDMI_CEC_MASK);
+                             ^
+   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c:1760:26: note: each undeclared identifier is reported only once for each function it appears in
+
+vim +/HDMI_CEC_MASK +1760 drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+
+
+:::::: The code at line 1760 was first introduced by commit
+:::::: 9aaf880ed4ee3c3cb1aa628e76c177035ce000ae imx-drm: Add mx6 hdmi transmitter support
+
+:::::: TO: Fabio Estevam <fabio.estevam@freescale.com>
+:::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
 ---
- drivers/mfd/ab8500-core.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 8511c06..30d09d1 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1059,15 +1059,15 @@ static DEVICE_ATTR(dbbrstn, S_IRUGO | S_IWUSR,
- 	NULL,
- };
- 
--static struct attribute_group ab8500_attr_group = {
-+static const struct attribute_group ab8500_attr_group = {
- 	.attrs	= ab8500_sysfs_entries,
- };
- 
--static struct attribute_group ab8505_attr_group = {
-+static const struct attribute_group ab8505_attr_group = {
- 	.attrs	= ab8505_sysfs_entries,
- };
- 
--static struct attribute_group ab9540_attr_group = {
-+static const struct attribute_group ab9540_attr_group = {
- 	.attrs	= ab9540_sysfs_entries,
- };
- 
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31186 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/01f4c3e5/attachment-0001.gz>
