@@ -1,110 +1,61 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 10 Jul 2017 21:54:53 +0100
-Subject: [PATCH 3/4] iio: dac: stm32: add support for stm32f4
-In-Reply-To: <1499693040-12994-4-git-send-email-fabrice.gasnier@st.com>
+Date: Mon, 10 Jul 2017 21:56:07 +0100
+Subject: [PATCH 4/4] ARM: dts: stm32: Add DAC support on stm32f429
+In-Reply-To: <1499693040-12994-5-git-send-email-fabrice.gasnier@st.com>
 References: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
- <1499693040-12994-4-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170710215453.057afa22@kernel.org>
+ <1499693040-12994-5-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170710215607.1ef3caae@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jul 2017 15:23:59 +0200
+On Mon, 10 Jul 2017 15:24:00 +0200
 Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> This adds support for STM32F4 Digital-To-Analog converter.
-> Add compatible configuration data to handle hfsel (not present
-> in stm32f4).
+> Add support for DAC (Digital to Analog Converter) to STM32F429.
+> STM32F429 DAC has two output channels.
 > 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Hmm. I thought for a bit on whether I wanted to see data for the other
-part as well to act as documentation.
-Whilst that would have been fine, I came to the conclusion this is fine
-as well.
+Driver support is working it's way towards mainline, though will be
+next merge window now so no real rush on this one!
 
-Applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to time out on (not sure what is going on there
-at the moment but 0day has been struggling for a few days!)
-
-Jonathan
+Acked-by: Joanthan Cameron <Jonathan.Cameron@huawei.com>
 > ---
->  drivers/iio/dac/stm32-dac-core.c | 38 +++++++++++++++++++++++++++++++-------
->  1 file changed, 31 insertions(+), 7 deletions(-)
+>  arch/arm/boot/dts/stm32f429.dtsi | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 > 
-> diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
-> index 75e4878..32701be 100644
-> --- a/drivers/iio/dac/stm32-dac-core.c
-> +++ b/drivers/iio/dac/stm32-dac-core.c
-> @@ -42,6 +42,14 @@ struct stm32_dac_priv {
->  	struct stm32_dac_common common;
->  };
+> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+> index b2a2b5c..f15f633 100644
+> --- a/arch/arm/boot/dts/stm32f429.dtsi
+> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+> @@ -354,6 +354,31 @@
+>  			status = "disabled";
+>  		};
 >  
-> +/**
-> + * struct stm32_dac_cfg - DAC configuration
-> + * @has_hfsel: DAC has high frequency control
-> + */
-> +struct stm32_dac_cfg {
-> +	bool has_hfsel;
-> +};
+> +		dac: dac at 40007400 {
+> +			compatible = "st,stm32f4-dac-core";
+> +			reg = <0x40007400 0x400>;
+> +			resets = <&rcc STM32F4_APB1_RESET(DAC)>;
+> +			clocks = <&rcc 0 STM32F4_APB1_CLOCK(DAC)>;
+> +			clock-names = "pclk";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
 > +
->  static struct stm32_dac_priv *to_stm32_dac_priv(struct stm32_dac_common *com)
->  {
->  	return container_of(com, struct stm32_dac_priv, common);
-> @@ -57,6 +65,7 @@ static struct stm32_dac_priv *to_stm32_dac_priv(struct stm32_dac_common *com)
->  static int stm32_dac_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> +	const struct stm32_dac_cfg *cfg;
->  	struct stm32_dac_priv *priv;
->  	struct regmap *regmap;
->  	struct resource *res;
-> @@ -69,6 +78,8 @@ static int stm32_dac_probe(struct platform_device *pdev)
->  	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
->  	if (!priv)
->  		return -ENOMEM;
-> +	cfg = (const struct stm32_dac_cfg *)
-> +		of_match_device(dev->driver->of_match_table, dev)->data;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	mmio = devm_ioremap_resource(dev, res);
-> @@ -121,12 +132,16 @@ static int stm32_dac_probe(struct platform_device *pdev)
->  		reset_control_deassert(priv->rst);
->  	}
->  
-> -	/* When clock speed is higher than 80MHz, set HFSEL */
-> -	priv->common.hfsel = (clk_get_rate(priv->pclk) > 80000000UL);
-> -	ret = regmap_update_bits(regmap, STM32_DAC_CR, STM32H7_DAC_CR_HFSEL,
-> -				 priv->common.hfsel ? STM32H7_DAC_CR_HFSEL : 0);
-> -	if (ret)
-> -		goto err_pclk;
-> +	if (cfg && cfg->has_hfsel) {
-> +		/* When clock speed is higher than 80MHz, set HFSEL */
-> +		priv->common.hfsel = (clk_get_rate(priv->pclk) > 80000000UL);
-> +		ret = regmap_update_bits(regmap, STM32_DAC_CR,
-> +					 STM32H7_DAC_CR_HFSEL,
-> +					 priv->common.hfsel ?
-> +					 STM32H7_DAC_CR_HFSEL : 0);
-> +		if (ret)
-> +			goto err_pclk;
-> +	}
->  
->  	platform_set_drvdata(pdev, &priv->common);
->  
-> @@ -158,8 +173,17 @@ static int stm32_dac_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static const struct stm32_dac_cfg stm32h7_dac_cfg = {
-> +	.has_hfsel = true,
-> +};
+> +			dac1: dac at 1 {
+> +				compatible = "st,stm32-dac";
+> +				#io-channels-cells = <1>;
+> +				reg = <1>;
+> +				status = "disabled";
+> +			};
 > +
->  static const struct of_device_id stm32_dac_of_match[] = {
-> -	{ .compatible = "st,stm32h7-dac-core", },
-> +	{
-> +		.compatible = "st,stm32f4-dac-core",
-> +	}, {
-> +		.compatible = "st,stm32h7-dac-core",
-> +		.data = (void *)&stm32h7_dac_cfg,
-> +	},
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, stm32_dac_of_match);
+> +			dac2: dac at 2 {
+> +				compatible = "st,stm32-dac";
+> +				#io-channels-cells = <1>;
+> +				reg = <2>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+>  		usart7: serial at 40007800 {
+>  			compatible = "st,stm32-usart", "st,stm32-uart";
+>  			reg = <0x40007800 0x400>;
