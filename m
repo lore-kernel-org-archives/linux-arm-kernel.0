@@ -1,61 +1,35 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 10 Jul 2017 21:56:07 +0100
-Subject: [PATCH 4/4] ARM: dts: stm32: Add DAC support on stm32f429
-In-Reply-To: <1499693040-12994-5-git-send-email-fabrice.gasnier@st.com>
-References: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
- <1499693040-12994-5-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170710215607.1ef3caae@kernel.org>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon, 10 Jul 2017 16:14:48 -0500
+Subject: [PATCH] PM / Domains: Fix compilation error for devices that don't
+ enable PM_SLEEP
+Message-ID: <20170710211448.11046-1-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jul 2017 15:24:00 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+Set pm_genpd_poweroff_noirq to NULL if CONFIG_PM_SLEEP isn't enabled.
+This is the same approach done for other PM_SLEEP related functions.
 
-> Add support for DAC (Digital to Analog Converter) to STM32F429.
-> STM32F429 DAC has two output channels.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Driver support is working it's way towards mainline, though will be
-next merge window now so no real rush on this one!
+Without this patch building the kernel with the keystone_defconfig
+results in a compilation error.
 
-Acked-by: Joanthan Cameron <Jonathan.Cameron@huawei.com>
-> ---
->  arch/arm/boot/dts/stm32f429.dtsi | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index b2a2b5c..f15f633 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -354,6 +354,31 @@
->  			status = "disabled";
->  		};
->  
-> +		dac: dac at 40007400 {
-> +			compatible = "st,stm32f4-dac-core";
-> +			reg = <0x40007400 0x400>;
-> +			resets = <&rcc STM32F4_APB1_RESET(DAC)>;
-> +			clocks = <&rcc 0 STM32F4_APB1_CLOCK(DAC)>;
-> +			clock-names = "pclk";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +
-> +			dac1: dac at 1 {
-> +				compatible = "st,stm32-dac";
-> +				#io-channels-cells = <1>;
-> +				reg = <1>;
-> +				status = "disabled";
-> +			};
-> +
-> +			dac2: dac at 2 {
-> +				compatible = "st,stm32-dac";
-> +				#io-channels-cells = <1>;
-> +				reg = <2>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +
->  		usart7: serial at 40007800 {
->  			compatible = "st,stm32-usart", "st,stm32-uart";
->  			reg = <0x40007800 0x400>;
+Fixes: 10da65423fdb ("PM / Domains: Call driver's noirq callbacks")
+
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ drivers/base/power/domain.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 9649dce..c140a9d5 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1182,6 +1182,7 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
+ #define pm_genpd_thaw_noirq		NULL
+ #define pm_genpd_restore_noirq		NULL
+ #define pm_genpd_complete		NULL
++#define pm_genpd_poweroff_noirq		NULL
+ 
+ #endif /* CONFIG_PM_SLEEP */
+ 
+-- 
+2.10.0
