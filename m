@@ -1,97 +1,46 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 10 Jul 2017 08:20:59 +0000
-Subject: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
-In-Reply-To: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
-References: <1499259711-56175-1-git-send-email-biju.das@bp.renesas.com>
- <1499259711-56175-2-git-send-email-biju.das@bp.renesas.com>
- <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
-Message-ID: <KL1PR06MB1702B70F6F217FF33A103E7AB8A90@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 10 Jul 2017 10:23:51 +0200
+Subject: [PATCH v 1/2] ARM: dts: r8a7743: Add Ethernet AVB support
+In-Reply-To: <CAMuHMdWsM_FBJ46=U69XptqpyC2cJYx_cqczaHBNq2nxZr68GQ@mail.gmail.com>
+References: <1499433165-62475-1-git-send-email-biju.das@bp.renesas.com>
+ <1499433165-62475-2-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdWsM_FBJ46=U69XptqpyC2cJYx_cqczaHBNq2nxZr68GQ@mail.gmail.com>
+Message-ID: <20170710082350.GB13680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Thanks for the review.
-
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: 10 July 2017 02:20
-> To: Biju Das <biju.das@bp.renesas.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>; Russell King
-> <linux@armlinux.org.uk>; Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com>; Simon Horman
-> <horms@verge.net.au>; Magnus Damm <magnus.damm@gmail.com>; Chris
-> Paterson <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; linux-
-> renesas-soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> netdev at vger.kernel.org
-> Subject: Re: [PATCH v 1/2] ravb: Add support for r8a7743 SoC
->
-> On Wed, Jul 05, 2017 at 02:01:50PM +0100, Biju Das wrote:
-> > Add support for Gigabit Ethernet E-MAC on r8a7743 (RZ/G1M) SoC.
-> > Renesas RZ/G1M (R8A7743) SoC Ethernet AVB IP is identical to the R-Car
-> > Gen2 family.
->
-> For the subject: "dt-bindings: net: ..."
-
-I will change the subject to "dt-bindings: net: ravb: ..
-
->
+On Mon, Jul 10, 2017 at 09:54:40AM +0200, Geert Uytterhoeven wrote:
+> Hi Biju,
+> 
+> On Fri, Jul 7, 2017 at 3:12 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> > Add Ethernet AVB support for r8a7743 SoC.
 > >
 > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 > > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-> > ---
-> >  Documentation/devicetree/bindings/net/renesas,ravb.txt | 3 ++-
-> >  drivers/net/ethernet/renesas/ravb_main.c               | 1 +
-> >  2 files changed, 3 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > index b519503..bc692ab 100644
-> > --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > @@ -4,7 +4,8 @@ This file provides information on what the device node
-> > for the Ethernet AVB  interface contains.
-> >
-> >  Required properties:
-> > -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790
-> SoC.
-> > +- compatible: "renesas,etheravb-r8a7743" if the device is a part of R8A7743
-> SoC.
-> > +      "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
->
-> Please re-format like this:
->
-> - compatible: Must be one of:
-> ...
->
-Ok. I will change this as well.
+> 
+> With the minor nit below fixed:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> > --- a/arch/arm/boot/dts/r8a7743.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7743.dtsi
+> > @@ -605,6 +605,19 @@
+> >                         #size-cells = <0>;
+> >                         status = "disabled";
+> >                 };
+> > +
+> > +               avb: ethernet at e6800000 {
+> > +                       compatible = "renesas,etheravb-r8a7743",
 
-> So it's a one line change to add new compatibles.
->
-> >        "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
-> >        "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
-> >        "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
-> > diff --git a/drivers/net/ethernet/renesas/ravb_main.c
-> > b/drivers/net/ethernet/renesas/ravb_main.c
-> > index 5931e85..e35b30f 100644
-> > --- a/drivers/net/ethernet/renesas/ravb_main.c
-> > +++ b/drivers/net/ethernet/renesas/ravb_main.c
-> > @@ -1869,6 +1869,7 @@ static int ravb_mdio_release(struct ravb_private
-> > *priv)  }
-> >
-> >  static const struct of_device_id ravb_match_table[] = {
-> > +{ .compatible = "renesas,etheravb-r8a7743", .data = (void
-> > +*)RCAR_GEN2 },
-> >  { .compatible = "renesas,etheravb-r8a7790", .data = (void
-> *)RCAR_GEN2 },
-> >  { .compatible = "renesas,etheravb-r8a7794", .data = (void
-> *)RCAR_GEN2 },
-> >  { .compatible = "renesas,etheravb-rcar-gen2", .data = (void
-> > *)RCAR_GEN2 },
-> > --
-> > 1.9.1
-> >
+I do not see a patch to add "renesas,etheravb-r8a7743" to
+Documentation/devicetree/bindings/net/renesas,ravb.txt
 
+If you haven't already done so please post a patch to add this
+once net-next re-opens.
 
+> > +                                    "renesas,etheravb-rcar-gen2";
+> > +                       reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
+> > +                       interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
+> 
+> s/0/GIC_SPI/
 
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Thanks, I have applied this patch with the minor update above.
