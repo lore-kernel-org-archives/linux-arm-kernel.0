@@ -1,70 +1,48 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 10 Jul 2017 10:52:46 +0200
-Subject: [RFC PATCH 0/7] Hummingboard2 improvements
-In-Reply-To: <CABdtJHsGKrZ4R-kcikc9dsrO-CrZpRXzNEmQT4WgKJ=UZfDRCg@mail.gmail.com>
-References: <20170408143607.15928-1-dev@lynxeye.de>
- <1498234514.24585.3.camel@pengutronix.de>
- <20170624073031.GW4902@n2100.armlinux.org.uk>
- <20170708135907.GA23333@n2100.armlinux.org.uk>
- <CABdtJHutd5v4onVMMZdufnutzDWt5R3RE3XxicfHsTZkNUYXCg@mail.gmail.com>
- <CABdtJHsGKrZ4R-kcikc9dsrO-CrZpRXzNEmQT4WgKJ=UZfDRCg@mail.gmail.com>
-Message-ID: <1499676766.2924.6.camel@pengutronix.de>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Mon, 10 Jul 2017 11:02:12 +0200
+Subject: [PATCH v2 2/3] dt-bindings: display: panel: Add support for Orise
+ Tech otm8009a dsi panel
+In-Reply-To: <1499677333-10571-1-git-send-email-philippe.cornu@st.com>
+References: <1499677333-10571-1-git-send-email-philippe.cornu@st.com>
+Message-ID: <1499677333-10571-3-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
+a MIPI-DSI video interface. Its backlight is managed through the DSI link.
 
-Am Sonntag, den 09.07.2017, 06:42 +0200 schrieb Jon Nettleton:
-> On Sun, Jul 9, 2017 at 6:39 AM, Jon Nettleton <jon@solid-run.com> wrote:
-> >
-> >
-> >
-> > On Sat, Jul 8, 2017 at 3:59 PM, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> >>
-> >> On Sat, Jun 24, 2017 at 08:30:31AM +0100, Russell King - ARM Linux wrote:
-> >> > On Fri, Jun 23, 2017 at 06:15:14PM +0200, Lucas Stach wrote:
-> >> > > Hi Russell,
-> >> > >
-> >> > > it seems this is making no progress. If you don't mind I'm going to pick
-> >> > > up the patches from you hb2 branch and submit the whole series to Shawn,
-> >> > > so we can finally get things merged. Are you okay with this?
-> >> >
-> >> > If you remember from the reviews back in January of my patch set, Jon
-> >> > Nettleton promised to send me a replacement set of DT files that were
-> >> > properly licensed and updated along the lines of your patches in April.
-> >> > I'm still waiting...
-> >>
-> >> I've chased Jon a couple more times since (once today), and I'm feeling
-> >> that we're not getting anywhere.  I've now told him that we (SolidRun/
-> >> myself) are in danger of having this work replaced by others.  So, I'm
-> >> now adding Rabeeh to this thread.
-> >>
-> >>
-> 
-> Besides the licensing there are still a number of bugs that exist for
-> the device-tree files as they stand.  Most notably using the standard
-> regulator code for the SDHC device causes a hang on reboot with some
-> UHS cards.
+Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+---
+ .../bindings/display/panel/orisetech,otm8009a.txt   | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
 
-What's the issue here? Is the bootloader not coming up, or does the
-kernel hang at boot?
-
-> Additionally we need to bring in the support for the SOM rev1.5 which
-> has been waiting on the TTY slave devices infrastructure to land.  We
-> have been trying to come up with a better solution than duplicating
-> all our device-tree files with a som revision however there doesn't
-> seem to be.  I would prefer to bring all the support in at once since
-> we are only shipping rev 1.5 soms at this point
-
-What's the difference between the old and new SoMs? Can we patch the DTs
-from the bootloader instead of introducing more variants?
-
-Frankly this whole situation is very bad. I have this Hummingboard2
-lying around for 1.5 years now, with no mainline support available. With
-the reasoning above it doesn't seem like this is going to change in the
-near future, as perfect is the enemy of good.
-
-Is there anything we can do help out with this?
-
-Regards,
-Lucas
+diff --git a/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+new file mode 100644
+index 0000000..6862028
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+@@ -0,0 +1,21 @@
++Orise Tech OTM8009A 3.97" 480x800 TFT LCD panel (MIPI-DSI video mode)
++
++The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
++a MIPI-DSI video interface. Its backlight is managed through the DSI link.
++
++Required properties:
++  - compatible: "orisetech,otm8009a"
++  - reg: the virtual channel number of a DSI peripheral
++
++Optional properties:
++  - reset-gpios: a GPIO spec for the reset pin (active low).
++
++Example:
++&dsi {
++	...
++	panel at 0 {
++		compatible = "orisetech,otm8009a";
++		reg = <0>;
++		reset-gpios = <&gpioh 7 GPIO_ACTIVE_LOW>;
++	};
++};
+-- 
+1.9.1
