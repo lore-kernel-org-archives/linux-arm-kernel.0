@@ -1,55 +1,34 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 10 Jul 2017 15:28:13 +0200
-Subject: [PATCH 0/9] ARM: renesas: shmobile and multi_v7 defconfig updates
-Message-ID: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+Date: Mon, 10 Jul 2017 15:28:14 +0200
+Subject: [PATCH 1/9] ARM: shmobile: defconfig: Enable missing PCIE_RCAR
+ dependency
+In-Reply-To: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1499693302-25120-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Arnd, Kevin, Magnus, Olof, Simon,
+PCIE_RCAR is no longer enabled, as it now has a dependency on
+PCI_MSI_IRQ_DOMAIN instead of selecting PCI_MSI and PCI_MSI_IRQ_DOMAIN.
+Fix this by explicitly enabling PCIE_RCAR in shmobile_defconfig.
 
-This patch series updates shmobile_defconfig and multi_v7_defconfig to
-(re-)enable some features:
-  - Re-enable R-Car PCIe (shmobile_defconfig),
-  - Re-enable R-Car XHCI (shmobile_defconfig),
-  - Re-enable R-Car sound (both),
-  - Update DRM bridge (both),
-  - Enable serial port DMA (both).
+Fixes: 3ee803641e76bea7 ("PCI/MSI: irqchip: Fix PCI_MSI dependencies")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-There also a patch included to refresh shmobile_defconfig.
-To avoid conflicts, I didn't refresh multi_v7_defconfig (although it could
-definitely use a refresh), and only made "simple" changes to it.
-
-Thanks!
-
-Geert Uytterhoeven (9):
-  ARM: shmobile: defconfig: Enable missing PCIE_RCAR dependency
-  ARM: shmobile: defconfig: Replace USB_XHCI_RCAR by USB_XHCI_PLATFORM
-  ARM: shmobile: defconfig: Replace SND_SOC_RSRC_CARD by
-    SND_SIMPLE_SCU_CARD
-  ARM: shmobile: defconfig: Replace DRM_RCAR_HDMI by generic bridge
-    options
-  ARM: shmobile: defconfig: Enable DMA for serial ports
-  ARM: shmobile: defconfig: Refresh
-  ARM: multi_v7_defconfig: Replace SND_SOC_RSRC_CARD by
-    SND_SIMPLE_SCU_CARD
-  ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by generic bridge
-    options
-  ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports
-
- arch/arm/configs/multi_v7_defconfig |  5 +++--
- arch/arm/configs/shmobile_defconfig | 16 +++++++++-------
- 2 files changed, 12 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 3c66a422fb4df567..04cd18424016eba5 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -27,6 +27,7 @@ CONFIG_ARCH_SH73A0=y
+ CONFIG_PL310_ERRATA_588369=y
+ CONFIG_ARM_ERRATA_754322=y
+ CONFIG_PCI=y
++CONFIG_PCI_MSI=y
+ CONFIG_PCI_RCAR_GEN2=y
+ CONFIG_PCIE_RCAR=y
+ CONFIG_SMP=y
 -- 
 2.7.4
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
