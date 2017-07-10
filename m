@@ -1,482 +1,132 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 10 Jul 2017 16:42:20 +0200
-Subject: [PATCH v1 2/2] remoteproc: imx_rproc: add a NXP/Freescale imx_rproc
- driver
-In-Reply-To: <20170710144220.31594-1-o.rempel@pengutronix.de>
-References: <20170710144220.31594-1-o.rempel@pengutronix.de>
-Message-ID: <20170710144220.31594-3-o.rempel@pengutronix.de>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 10 Jul 2017 09:57:54 -0500
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <09fa2b5a-9039-0902-4f57-6a6c2a5f7c37@arm.com>
+References: <1498405569-463-1-git-send-email-shankerd@codeaurora.org>
+ <CAFpQJXU84OTEp-1BteQeSqNy3Ya2hDskZA=Th_0f47qtS9-ucw@mail.gmail.com>
+ <CAFpQJXVh0ojzwqZmT5OgBArx9rpK0_yDw_+gyP8LAkT1e4HWrQ@mail.gmail.com>
+ <ab7e26a8-5ab7-7c47-f19c-cb02fbd397b6@arm.com>
+ <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
+ <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
+ <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
+ <bee8ac5a-b19f-8112-5529-485c269f3501@arm.com>
+ <CAFpQJXXPfBEP+_3rzkRo7Ydb31GKFokQB1bmOVHXSd1Pu0zsyA@mail.gmail.com>
+ <ed7416f2-e60b-bf8c-cdbe-8a83e83ca529@arm.com>
+ <CAFpQJXUm5tEyaBURzx9OtssBt8+ThO0dmPqtdjjGRJzY5cMv-w@mail.gmail.com>
+ <09fa2b5a-9039-0902-4f57-6a6c2a5f7c37@arm.com>
+Message-ID: <6ea9d5df-d15f-a8a6-2442-e2f628b29816@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a basic driver to control Cortex M4 co-processor found
-on NXP i.MX7D and i.MX6SX.
-Currently it is able to resolve addresses between M4 and main CPU,
-start and stop the co-processor. Other functionality is not provided
-or test.
+Hi Marc,
 
-This driver was tested on NXP i.MX7D and expected to work on
-i.MX6SX as well.
+On 07/10/2017 08:50 AM, Marc Zyngier wrote:
+> On 10/07/17 11:21, Ganapatrao Kulkarni wrote:
+>> Hi Marc,
+>>
+>> On Mon, Jul 10, 2017 at 2:53 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 10/07/17 10:08, Ganapatrao Kulkarni wrote:
+>>>> On Mon, Jul 10, 2017 at 2:36 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>> On 10/07/17 09:48, Ganapatrao Kulkarni wrote:
+>>>>>> Hi Marc,
+>>>>>>
+>>>>>> On Mon, Jul 3, 2017 at 8:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>>>> Hi Shanker,
+>>>>>>>
+>>>>>>> On 03/07/17 15:24, Shanker Donthineni wrote:
+>>>>>>>> Hi Marc,
+>>>>>>>>
+>>>>>>>> On 06/30/2017 03:51 AM, Marc Zyngier wrote:
+>>>>>>>>> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
+>>>>>>>>>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
+>>>>>>>>>> <gpkulkarni@gmail.com> wrote:
+>>>>>>>>>>> Hi Shanker,
+>>>>>>>>>>>
+>>>>>>>>>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+>>>>>>>>>>> <shankerd@codeaurora.org> wrote:
+>>>>>>>>>>>> The NUMA node information is visible to ITS driver but not being used
+>>>>>>>>>>>> other than handling errata. This patch allocates the memory for ITS
+>>>>>>>>>>>> tables from the corresponding NUMA node using the appropriate NUMA
+>>>>>>>>>>>> aware functions.
+>>>>>>>>>>
+>>>>>>>>>> IMHO, the description would have been more constructive?
+>>>>>>>>>>
+>>>>>>>>>> "All ITS tables are mapped by default to NODE 0 memory.
+>>>>>>>>>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
+>>>>>>>>>> This will optimize tables access and avoids unnecessary inter-node traffic."
+>>>>>>>>>
+>>>>>>>>> But more importantly, I'd like to see figures showing the actual benefit
+>>>>>>>>> of this per-node allocation. Given that both of you guys have access to
+>>>>>>>>> such platforms, please show me the numbers!
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> I'll share the actual results which shows the improvement whenever
+>>>>>>>> available on our next chips. Current version of Qualcomm qdf2400 doesn't
+>>>>>>>> support multi socket configuration to capture results and share with you.
+>>>>>>>>
+>>>>>>>> Do you see any other issues with this patch apart from the performance
+>>>>>>>> improvements. I strongly believe this brings the noticeable improvement
+>>>>>>>> in numbers on systems where it has multi node memory/CPU configuration.
+>>>>>>>
+>>>>>>> I agree that it *could* show an improvement, but it very much depends on
+>>>>>>> how often the ITS misses in its caches. For this kind of patches, I want
+>>>>>>> to see two things:
+>>>>>>>
+>>>>>>> 1) It brings a measurable benefit on NUMA platforms
+>>>>>>
+>>>>>> Did some measurement of interrupt response time for LPIs and we don't
+>>>>>> see any major
+>>>>>> improvement due to caching of Tables. However, we have seen
+>>>>>> improvements of around 5%.
+>>>>>
+>>>>> An improvement of what exactly?
+>>>>
+>>>> interrupt response time.
+>>>
+>>> Measured how? On which HW? Using which benchmark?
+>>
+>> This has been tested on ThunderX2.
+>> We have instrumented gic-v3-its driver code to create dummy LPI device
+>> with few vectors.
+>> The LPI is induced from dummy device(through sysfs by writing to
+>> TRANSLATOR reg).
+>> The ISR routine(gic_handle_irq) being called to handle the induced LPI.
+>> NODE 1 cpu is used to induce LPI and NODE 1 cpu/collection is mapped
+>> in ITT to route this LPI.
+>>
+>> CPU timer counter are sampled at the time LPI is Induced and in ISR
+>> routine to calculate interrupt response time.
+>> the result shown improvement of 5% with this patch.
+> 
+> And you call that a realistic measurement of the latency? Really? Sorry,
+> but I cannot take you seriously here.
+> 
+>> Do you have any recommended benchmarks to test the same?
+> 
+> Run a standard benchmark such as netperf, post the result with and
+> without that patch. The above is just plain ridiculous.
+>
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- drivers/remoteproc/Kconfig     |  10 +
- drivers/remoteproc/Makefile    |   1 +
- drivers/remoteproc/imx_rproc.c | 417 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 428 insertions(+)
- create mode 100644 drivers/remoteproc/imx_rproc.c
+The whole purpose of ACPI subtable "GIC Interrupt Translation Service (ITS) Affinity structure" 
+is to provide the proximity information to OS so that software will take advantage of NUMA
+aware allocations to improve the read latency of ITS/GICR tables, not just for implementing 
+software workarounds.
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index faad69a1a597..1f6644908629 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -13,6 +13,16 @@ config REMOTEPROC
  
- if REMOTEPROC
+I believe ITS driver should provide NUMA aware allocations just like x86 Linux drivers. How much
+performance improvement we observer is based on the individual SOC implementation, inter NODE
+latency, inter node traffic, cache capacity, and type of the test used to measure results.
+
+Please consider this patch irrespective of the test results running on a specific hardware. We
+need this patch for upcoming Qualcomm server chips. 
+
+
  
-+config IMX_REMOTEPROC
-+	tristate "IMX6/7 remoteproc support"
-+	depends on SOC_IMX6SX || SOC_IMX7D
-+	depends on REMOTEPROC
-+	help
-+	  Say y here to support iMX's remote processors (Cortex M4
-+	  on iMX7D) via the remote processor framework.
-+
-+	  It's safe to say N here.
-+
- config OMAP_REMOTEPROC
- 	tristate "OMAP remoteproc support"
- 	depends on HAS_DMA
-diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-index ffc5e430df27..d351c25cdb4e 100644
---- a/drivers/remoteproc/Makefile
-+++ b/drivers/remoteproc/Makefile
-@@ -19,3 +19,4 @@ qcom_wcnss_pil-y			+= qcom_wcnss.o
- qcom_wcnss_pil-y			+= qcom_wcnss_iris.o
- obj-$(CONFIG_ST_REMOTEPROC)		+= st_remoteproc.o
- obj-$(CONFIG_ST_SLIM_REMOTEPROC)	+= st_slim_rproc.o
-+obj-$(CONFIG_IMX_REMOTEPROC)		+= imx_rproc.o
-diff --git a/drivers/remoteproc/imx_rproc.c b/drivers/remoteproc/imx_rproc.c
-new file mode 100644
-index 000000000000..2a5300c3323c
---- /dev/null
-+++ b/drivers/remoteproc/imx_rproc.c
-@@ -0,0 +1,417 @@
-+/*
-+ * Copyright (c) 2017 Pengutronix, Oleksij Rempel <kernel@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2
-+ * as published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/remoteproc.h>
-+
-+#define IMX7D_SRC_SCR			0x0C
-+#define IMX7D_ENABLE_M4			BIT(3)
-+#define IMX7D_SW_M4P_RST		BIT(2)
-+#define IMX7D_SW_M4C_RST		BIT(1)
-+#define IMX7D_SW_M4C_NON_SCLR_RST	BIT(0)
-+
-+#define IMX7D_M4_RST_MASK		(IMX7D_ENABLE_M4 | IMX7D_SW_M4P_RST \
-+					 | IMX7D_SW_M4C_RST \
-+					 | IMX7D_SW_M4C_NON_SCLR_RST)
-+
-+#define IMX7D_M4_START			(IMX7D_ENABLE_M4 | IMX7D_SW_M4P_RST \
-+					 | IMX7D_SW_M4C_RST)
-+#define IMX7D_M4_STOP			IMX7D_SW_M4C_NON_SCLR_RST
-+
-+/* Address: 0x020D8000 */
-+#define IMX6SX_SRC_SCR			0x00
-+#define IMX6SX_ENABLE_M4		BIT(22)
-+#define IMX6SX_SW_M4P_RST		BIT(12)
-+#define IMX6SX_SW_M4C_NON_SCLR_RST	BIT(4)
-+#define IMX6SX_SW_M4C_RST		BIT(3)
-+
-+#define IMX6SX_M4_START			(IMX6SX_ENABLE_M4 | IMX6SX_SW_M4P_RST \
-+					 | IMX6SX_SW_M4C_RST)
-+#define IMX6SX_M4_STOP			IMX6SX_SW_M4C_NON_SCLR_RST
-+#define IMX6SX_M4_RST_MASK		(IMX6SX_ENABLE_M4 | IMX6SX_SW_M4P_RST \
-+					 | IMX6SX_SW_M4C_NON_SCLR_RST \
-+					 | IMX6SX_SW_M4C_RST)
-+
-+#define IMX7D_RPROC_MEM_MAX		8
-+
-+/**
-+ * struct imx_rproc_mem - slim internal memory structure
-+ * @cpu_addr: MPU virtual address of the memory region
-+ * @sys_addr: Bus address used to access the memory region
-+ * @size: Size of the memory region
-+ */
-+struct imx_rproc_mem {
-+	void __iomem *cpu_addr;
-+	phys_addr_t sys_addr;
-+	size_t size;
-+};
-+
-+/* att flags */
-+/* M4 own area. Can be mapped at probe */
-+#define ATT_OWN		BIT(1)
-+
-+/* address translation table */
-+struct imx_rproc_att {
-+	u32 da;	/* device address (From Cortex M4 view)*/
-+	u32 sa;	/* system bus address */
-+	u32 size; /* size of reg range */
-+	int flags;
-+};
-+
-+struct imx_rproc_dcfg {
-+	u32				src_reg;
-+	u32				src_mask;
-+	u32				src_start;
-+	u32				src_stop;
-+	const struct imx_rproc_att	*att;
-+	size_t				att_size;
-+};
-+
-+struct imx_rproc {
-+	struct device			*dev;
-+	struct regmap			*regmap;
-+	struct rproc			*rproc;
-+	const struct imx_rproc_dcfg	*dcfg;
-+	struct imx_rproc_mem		mem[IMX7D_RPROC_MEM_MAX];
-+	struct clk			*clk;
-+};
-+
-+static const struct imx_rproc_att imx_rproc_att_imx7d[] = {
-+	/* dev addr , sys addr  , size	    , flags */
-+	/* OCRAM_S (M4 Boot code) - alias */
-+	{ 0x00000000, 0x00180000, 0x00008000, 0 },
-+	/* OCRAM_S (Code) */
-+	{ 0x00180000, 0x00180000, 0x00008000, ATT_OWN },
-+	/* OCRAM (Code) - alias */
-+	{ 0x00900000, 0x00900000, 0x00020000, 0 },
-+	/* OCRAM_EPDC (Code) - alias */
-+	{ 0x00920000, 0x00920000, 0x00020000, 0 },
-+	/* OCRAM_PXP (Code) - alias */
-+	{ 0x00940000, 0x00940000, 0x00008000, 0 },
-+	/* TCML (Code) */
-+	{ 0x1FFF8000, 0x007F8000, 0x00008000, ATT_OWN },
-+	/* DDR (Code) - alias, first part of DDR (Data) */
-+	{ 0x10000000, 0x80000000, 0x0FFF0000, 0 },
-+
-+	/* TCMU (Data) */
-+	{ 0x20000000, 0x00800000, 0x00008000, ATT_OWN },
-+	/* OCRAM (Data) */
-+	{ 0x20200000, 0x00900000, 0x00020000, 0 },
-+	/* OCRAM_EPDC (Data) */
-+	{ 0x20220000, 0x00920000, 0x00020000, 0 },
-+	/* OCRAM_PXP (Data) */
-+	{ 0x20240000, 0x00940000, 0x00008000, 0 },
-+	/* DDR (Data) */
-+	{ 0x80000000, 0x80000000, 0x60000000, 0 },
-+};
-+
-+static const struct imx_rproc_att imx_rproc_att_imx6sx[] = {
-+	/* dev addr , sys addr  , size	    , flags */
-+	/* TCML (M4 Boot Code) - alias */
-+	{ 0x00000000, 0x007F8000, 0x00008000, 0 },
-+	/* OCRAM_S (Code) */
-+	{ 0x00180000, 0x008F8000, 0x00004000, 0 },
-+	/* OCRAM_S (Code) - alias */
-+	{ 0x00180000, 0x008FC000, 0x00004000, 0 },
-+	/* TCML (Code) */
-+	{ 0x1FFF8000, 0x007F8000, 0x00008000, ATT_OWN },
-+	/* DDR (Code) - alias, first part of DDR (Data) */
-+	{ 0x10000000, 0x80000000, 0x0FFF8000, 0 },
-+
-+	/* TCMU (Data) */
-+	{ 0x20000000, 0x00800000, 0x00008000, ATT_OWN },
-+	/* OCRAM_S (Data) - alias? */
-+	{ 0x208F8000, 0x008F8000, 0x00004000, 0 },
-+	/* DDR (Data) */
-+	{ 0x80000000, 0x80000000, 0x60000000, 0 },
-+};
-+
-+static const struct imx_rproc_dcfg imx_rproc_cfg_imx7d = {
-+	.src_reg	= IMX7D_SRC_SCR,
-+	.src_mask	= IMX7D_M4_RST_MASK,
-+	.src_start	= IMX7D_M4_START,
-+	.src_stop	= IMX7D_M4_STOP,
-+	.att		= imx_rproc_att_imx7d,
-+	.att_size	= ARRAY_SIZE(imx_rproc_att_imx7d),
-+};
-+
-+static const struct imx_rproc_dcfg imx_rproc_cfg_imx6sx = {
-+	.src_reg	= IMX6SX_SRC_SCR,
-+	.src_mask	= IMX6SX_M4_RST_MASK,
-+	.src_start	= IMX6SX_M4_START,
-+	.src_stop	= IMX6SX_M4_STOP,
-+	.att		= imx_rproc_att_imx6sx,
-+	.att_size	= ARRAY_SIZE(imx_rproc_att_imx6sx),
-+};
-+
-+static int imx_rproc_start(struct rproc *rproc)
-+{
-+	struct imx_rproc *priv = rproc->priv;
-+	const struct imx_rproc_dcfg *dcfg = priv->dcfg;
-+	struct device *dev = priv->dev;
-+	int ret;
-+
-+	ret = regmap_update_bits(priv->regmap, dcfg->src_reg,
-+				 dcfg->src_mask, dcfg->src_start);
-+	if (ret)
-+		dev_err(dev, "Filed to enable M4!\n");
-+
-+	return ret;
-+}
-+
-+static int imx_rproc_stop(struct rproc *rproc)
-+{
-+	struct imx_rproc *priv = rproc->priv;
-+	const struct imx_rproc_dcfg *dcfg = priv->dcfg;
-+	struct device *dev = priv->dev;
-+	int ret;
-+
-+	ret = regmap_update_bits(priv->regmap, dcfg->src_reg,
-+				 dcfg->src_mask, dcfg->src_stop);
-+	if (ret)
-+		dev_err(dev, "Filed to stop M4!\n");
-+
-+	return ret;
-+}
-+
-+static int imx_rproc_da_to_sys(struct imx_rproc *priv, u64 da,
-+			       int len, u64 *sys)
-+{
-+	const struct imx_rproc_dcfg *dcfg = priv->dcfg;
-+	int i;
-+
-+	/* parse address translation table */
-+	for (i = 0; i < dcfg->att_size; i++) {
-+		const struct imx_rproc_att *att = &dcfg->att[i];
-+
-+		if (da >= att->da && da + len < att->da + att->size) {
-+			unsigned int offset = da - att->da;
-+
-+			*sys = att->sa + offset;
-+			return 0;
-+		}
-+	}
-+
-+	dev_warn(priv->dev, "Translation filed: da = 0x%llx len = 0x%x\n",
-+		 da, len);
-+	return -ENOENT;
-+}
-+
-+static void *imx_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
-+{
-+	struct imx_rproc *priv = rproc->priv;
-+	void *va = NULL;
-+	u64 sys;
-+	int i;
-+
-+	if (len <= 0)
-+		return NULL;
-+
-+	/*
-+	 * On device side we have many aliases, so we need to convert device
-+	 * address (M4) to system bus address first.
-+	 */
-+	if (imx_rproc_da_to_sys(priv, da, len, &sys))
-+		return NULL;
-+
-+	for (i = 0; i < IMX7D_RPROC_MEM_MAX; i++) {
-+		if (sys >= priv->mem[i].sys_addr && sys + len <
-+		    priv->mem[i].sys_addr +  priv->mem[i].size) {
-+			unsigned int offset = sys - priv->mem[i].sys_addr;
-+			/* __force to make sparse happy with type conversion */
-+			va = (__force void *)(priv->mem[i].cpu_addr + offset);
-+			break;
-+		}
-+	}
-+
-+	dev_dbg(&rproc->dev, "da = 0x%llx len = 0x%x va = 0x%p\n", da, len, va);
-+
-+	return va;
-+}
-+
-+static const struct rproc_ops imx_rproc_ops = {
-+	.start		= imx_rproc_start,
-+	.stop		= imx_rproc_stop,
-+	.da_to_va       = imx_rproc_da_to_va,
-+};
-+
-+static int imx_rproc_addr_init(struct imx_rproc *priv,
-+			       struct platform_device *pdev)
-+{
-+	const struct imx_rproc_dcfg *dcfg = priv->dcfg;
-+	static const char * const mem_names[] = { "ddr", "ocram", "ocram-s",
-+		"ocram-epdc", "ocram-pxp" };
-+	struct resource *res;
-+	int a, b = 0, err;
-+
-+	/* remap required addresses */
-+	for (a = 0; a < dcfg->att_size; a++) {
-+		const struct imx_rproc_att *att = &dcfg->att[a];
-+
-+		if (!(att->flags & ATT_OWN))
-+			continue;
-+
-+		if (b > IMX7D_RPROC_MEM_MAX)
-+			break;
-+
-+		priv->mem[b].cpu_addr = devm_ioremap(&pdev->dev,
-+						     att->sa, att->size);
-+		if (IS_ERR(priv->mem[b].cpu_addr)) {
-+			dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
-+			err = PTR_ERR(priv->mem[b].cpu_addr);
-+			return err;
-+		}
-+		priv->mem[b].sys_addr = att->sa;
-+		priv->mem[b].size = att->size;
-+		b++;
-+	}
-+
-+	/* remap optional addresses */
-+	for (a = 0; a < ARRAY_SIZE(mem_names); a++) {
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   mem_names[a]);
-+		if (!res)
-+			continue;
-+
-+		if (b > IMX7D_RPROC_MEM_MAX)
-+			break;
-+
-+		priv->mem[b].cpu_addr = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(priv->mem[b].cpu_addr)) {
-+			dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
-+			err = PTR_ERR(priv->mem[b].cpu_addr);
-+			return err;
-+		}
-+		priv->mem[b].sys_addr = res->start;
-+		priv->mem[b].size = resource_size(res);
-+		b++;
-+	}
-+
-+	return 0;
-+}
-+
-+static int imx_rproc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct imx_rproc *priv;
-+	struct rproc *rproc;
-+	struct regmap_config config = { .name = "imx-rproc" };
-+	const struct imx_rproc_dcfg *dcfg;
-+	struct regmap *regmap;
-+	int ret;
-+
-+	regmap = syscon_regmap_lookup_by_phandle(np, "syscon");
-+	if (IS_ERR(regmap)) {
-+		dev_err(dev, "failed to find syscon\n");
-+		return PTR_ERR(regmap);
-+	}
-+	regmap_attach_dev(dev, regmap, &config);
-+
-+	/* set some other name then imx */
-+	rproc = rproc_alloc(dev, "imx-rproc", &imx_rproc_ops,
-+			    NULL, sizeof(*priv));
-+	if (!rproc) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	dcfg = of_device_get_match_data(dev);
-+	if (!dcfg)
-+		return -EINVAL;
-+
-+	priv = rproc->priv;
-+	priv->rproc = rproc;
-+	priv->regmap = regmap;
-+	priv->dcfg = dcfg;
-+	priv->dev = dev;
-+
-+	dev_set_drvdata(dev, rproc);
-+
-+	ret = imx_rproc_addr_init(priv, pdev);
-+	if (ret) {
-+		dev_err(dev, "filed on imx_rproc_addr_init\n");
-+		goto err_put_rproc;
-+	}
-+
-+	priv->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(dev, "Failed to get clock\n");
-+		rproc_free(rproc);
-+		return PTR_ERR(priv->clk);
-+	}
-+
-+	/*
-+	 * clk for M4 block including memory. Should be
-+	 * enabled before .start for FW transfer.
-+	 */
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret) {
-+		dev_err(&rproc->dev, "Failed to enable clock\n");
-+		rproc_free(rproc);
-+		return ret;
-+	}
-+
-+	ret = rproc_add(rproc);
-+	if (ret) {
-+		dev_err(dev, "rproc_add failed\n");
-+		goto err_put_clk;
-+	}
-+
-+	return ret;
-+
-+err_put_clk:
-+	clk_disable_unprepare(priv->clk);
-+err_put_rproc:
-+	rproc_free(rproc);
-+err:
-+	return ret;
-+}
-+
-+static int imx_rproc_remove(struct platform_device *pdev)
-+{
-+	struct rproc *rproc = platform_get_drvdata(pdev);
-+	struct imx_rproc *priv = rproc->priv;
-+
-+	clk_disable_unprepare(priv->clk);
-+	rproc_del(rproc);
-+	rproc_free(rproc);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id imx_rproc_of_match[] = {
-+	{ .compatible = "fsl,imx7d-rproc", .data = &imx_rproc_cfg_imx7d },
-+	{ .compatible = "fsl,imx6sx-rproc", .data = &imx_rproc_cfg_imx6sx },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, imx_rproc_of_match);
-+
-+static struct platform_driver imx_rproc_driver = {
-+	.probe = imx_rproc_probe,
-+	.remove = imx_rproc_remove,
-+	.driver = {
-+		.name = "imx-rproc",
-+		.of_match_table = imx_rproc_of_match,
-+	},
-+};
-+
-+module_platform_driver(imx_rproc_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("IMX6SX/7D remote processor control driver");
-+MODULE_AUTHOR("Oleksij Rempel <o.rempel@pengutronix.de>");
+> 	M.
+> 
+
 -- 
-2.11.0
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
