@@ -1,47 +1,35 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 10 Jul 2017 15:28:19 +0200
-Subject: [PATCH 6/9] ARM: shmobile: defconfig: Refresh
-In-Reply-To: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
-References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1499693302-25120-7-git-send-email-geert+renesas@glider.be>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Mon, 10 Jul 2017 15:36:56 +0200
+Subject: 4.13-rc0: stopped booting on Nokia N900
+In-Reply-To: <20170710130602.GS3730@atomide.com>
+References: <20170710074610.GA22846@amd> <20170710081334.GA29726@amd>
+ <20170710101608.qdamqomegbjwuweh@earth>
+ <20170710130602.GS3730@atomide.com>
+Message-ID: <20170710133656.og2egbse5plp3afm@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  - Several options were moved,
-  - INPUT_MOUSEDEV_PSAUX is no longer enabled by default since commit
-    73d8ef76006b649f ("Input: mousedev - stop offering PS/2 to userspace
-    by default").
+Hi,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/configs/shmobile_defconfig | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+On Mon, Jul 10, 2017 at 06:06:03AM -0700, Tony Lindgren wrote:
+> > I just rebased my droid4 development branch. I do not have any
+> > problems with segfaulting toolchain, but boot also fails on OMAP4
+> > based Droid 4. The problem seems to be SPI being accessed without
+> > runtime PM (clocks) being enabled:
+> 
+> Care to check if commit c5b3955828ba ("ARM: OMAP4: Fix legacy code
+> clean-up regression") make that one go away? I have already sent
+> a pull request for that one.
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index dd9d1f9ede6e7f34..1cad253c030f4b25 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -89,9 +89,8 @@ CONFIG_SMSC911X=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- # CONFIG_NET_VENDOR_VIA is not set
- # CONFIG_NET_VENDOR_WIZNET is not set
--CONFIG_SMSC_PHY=y
- CONFIG_MICREL_PHY=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_SMSC_PHY=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
-@@ -123,9 +122,9 @@ CONFIG_SPI_SH_HSPI=y
- CONFIG_GPIO_EM=y
- CONFIG_GPIO_RCAR=y
- CONFIG_GPIO_PCF857X=y
--CONFIG_POWER_SUPPLY=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_RMOBILE=y
-+CONFIG_POWER_SUPPLY=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
--- 
-2.7.4
+I bisected to the same commit, that you also found. I just replied
+to Thomas' pull-request from yesterday with bootlog + bisect result
++ info that current master works again after reverting the patch.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170710/02c8bae9/attachment.sig>
