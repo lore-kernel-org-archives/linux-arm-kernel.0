@@ -1,28 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 9 Jul 2017 20:02:03 -0500
-Subject: [PATCH v2 7/9] ASoC: atmel-classd: remove aclk clock from DT
- binding
-In-Reply-To: <20170704115927.32662-8-quentin.schulz@free-electrons.com>
-References: <20170704115927.32662-1-quentin.schulz@free-electrons.com>
- <20170704115927.32662-8-quentin.schulz@free-electrons.com>
-Message-ID: <20170710010203.u54wtave2a3x2ke6@rob-hp-laptop>
+Date: Sun, 9 Jul 2017 20:08:27 -0500
+Subject: [PATCH 1/9] dt-bindings: sram: Document renesas,smp-sram
+In-Reply-To: <1499182903-31339-2-git-send-email-geert+renesas@glider.be>
+References: <1499182903-31339-1-git-send-email-geert+renesas@glider.be>
+ <1499182903-31339-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170710010827.qj2vw3fqalbzspfj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 01:59:25PM +0200, Quentin Schulz wrote:
-> Since gclk (generated-clk) is now able to determine the rate of the
-> audio_pll, there is no need for classd to have a direct phandle to the
-> audio_pll while already having a phandle to gclk.
+On Tue, Jul 04, 2017 at 05:41:35PM +0200, Geert Uytterhoeven wrote:
+> Document reserved SRAM for the SMP jump stub on Renesas R-Car Gen2 and
+> RZ/G1 SoCs.
 > 
-> This binding is used by no board in mainline so it is safe to be
-> modified.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
-> 
-> added in v2
-> 
->  Documentation/devicetree/bindings/sound/atmel-classd.txt | 9 +++------
->  1 file changed, 3 insertions(+), 6 deletions(-)
+>  .../devicetree/bindings/sram/renesas,smp-sram.txt  | 27 ++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sram/renesas,smp-sram.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
