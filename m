@@ -1,55 +1,77 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 10 Jul 2017 16:55:04 +1000
-Subject: [PATCH v3] drm/sun4i: Implement drm_driver lastclose to restore fbdev
- console
-Message-ID: <20170710065504.31497-1-net147@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 10 Jul 2017 09:29:09 +0200
+Subject: [PATCH] video: xilinxfb: constify fb_fix_screeninfo and
+ fb_var_screeninfo structures
+In-Reply-To: <20170708012416.GA1843@embeddedgus>
+References: <20170708012416.GA1843@embeddedgus>
+Message-ID: <c55390b8-c64b-e7ee-8099-5147970d5311@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drm_driver lastclose callback is called when the last userspace
-DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
-the fbdev console otherwise the fbdev console will stop working.
+On 8.7.2017 03:24, Gustavo A. R. Silva wrote:
+> These structures are only used to copy into other structures,
+> so declare them as const.
+> 
+> This issue was detected using Coccinelle and the following semantic patch:
+> 
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct fb_fix_screeninfo i at p = { ... };
+> 
+> @ok@
+> identifier r.i;
+> expression e;
+> position p;
+> @@
+> e = i at p
+> 
+> @bad@
+> position p != {r.p,ok.p};
+> identifier r.i;
+> struct fb_fix_screeninfo e;
+> @@
+> e at i@p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct fb_fix_screeninfo i = { ... };
+> 
+> The semantic patch for fb_var_screeninfo is analogous.
+> 
+> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+> ---
+>  drivers/video/fbdev/xilinxfb.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
+> index 17dc119..0bda18e 100644
+> --- a/drivers/video/fbdev/xilinxfb.c
+> +++ b/drivers/video/fbdev/xilinxfb.c
+> @@ -110,14 +110,14 @@ static struct xilinxfb_platform_data xilinx_fb_default_pdata = {
+>  /*
+>   * Here are the default fb_fix_screeninfo and fb_var_screeninfo structures
+>   */
+> -static struct fb_fix_screeninfo xilinx_fb_fix = {
+> +static const struct fb_fix_screeninfo xilinx_fb_fix = {
+>  	.id =		"Xilinx",
+>  	.type =		FB_TYPE_PACKED_PIXELS,
+>  	.visual =	FB_VISUAL_TRUECOLOR,
+>  	.accel =	FB_ACCEL_NONE
+>  };
+>  
+> -static struct fb_var_screeninfo xilinx_fb_var = {
+> +static const struct fb_var_screeninfo xilinx_fb_var = {
+>  	.bits_per_pixel =	BITS_PER_PIXEL,
+>  
+>  	.red =		{ RED_SHIFT, 8, 0 },
+> 
 
-Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
-Cc: stable at vger.kernel.org
-Signed-off-by: Jonathan Liu <net147@gmail.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes for v3:
- - Add 'Fixes:' tag
- - Add CC to stable
- - Add 'Reviewed-by: Chen-Yu Tsai <wens@csie.org>'
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-Changes for v2:
- - Rename sun4i_drm_lastclose to sun4i_drv_lastclose
-
- drivers/gpu/drm/sun4i/sun4i_drv.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index abc7d8fe06b4..a45a627283a1 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -25,12 +25,20 @@
- #include "sun4i_framebuffer.h"
- #include "sun4i_tcon.h"
- 
-+static void sun4i_drv_lastclose(struct drm_device *dev)
-+{
-+	struct sun4i_drv *drv = dev->dev_private;
-+
-+	drm_fbdev_cma_restore_mode(drv->fbdev);
-+}
-+
- DEFINE_DRM_GEM_CMA_FOPS(sun4i_drv_fops);
- 
- static struct drm_driver sun4i_drv_driver = {
- 	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_PRIME | DRIVER_ATOMIC,
- 
- 	/* Generic Operations */
-+	.lastclose		= sun4i_drv_lastclose,
- 	.fops			= &sun4i_drv_fops,
- 	.name			= "sun4i-drm",
- 	.desc			= "Allwinner sun4i Display Engine",
--- 
-2.13.2
+Thanks,
+Michal
