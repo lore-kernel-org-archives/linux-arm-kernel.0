@@ -1,26 +1,98 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 10 Jul 2017 15:23:56 +0200
-Subject: [PATCH 0/4] Add support for STM32F4 DAC
-Message-ID: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
+Date: Mon, 10 Jul 2017 15:23:59 +0200
+Subject: [PATCH 3/4] iio: dac: stm32: add support for stm32f4
+In-Reply-To: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
+References: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1499693040-12994-4-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for STM32F4 Digital to Analog Converter variant into
-existing STM32 DAC driver.
-Introduce compatible associated with configuration data.
-BTW, fix error message in driver probe (minor).
+This adds support for STM32F4 Digital-To-Analog converter.
+Add compatible configuration data to handle hfsel (not present
+in stm32f4).
 
-Fabrice Gasnier (4):
-  dt-bindings: iio: stm32-dac: add support for STM32F4
-  iio: dac: stm32: fix error message
-  iio: dac: stm32: add support for stm32f4
-  ARM: dts: stm32: Add DAC support on stm32f429
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/dac/stm32-dac-core.c | 38 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 31 insertions(+), 7 deletions(-)
 
- .../devicetree/bindings/iio/dac/st,stm32-dac.txt   |  4 ++-
- arch/arm/boot/dts/stm32f429.dtsi                   | 25 ++++++++++++++
- drivers/iio/dac/stm32-dac-core.c                   | 38 ++++++++++++++++++----
- drivers/iio/dac/stm32-dac.c                        |  2 +-
- 4 files changed, 60 insertions(+), 9 deletions(-)
-
+diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
+index 75e4878..32701be 100644
+--- a/drivers/iio/dac/stm32-dac-core.c
++++ b/drivers/iio/dac/stm32-dac-core.c
+@@ -42,6 +42,14 @@ struct stm32_dac_priv {
+ 	struct stm32_dac_common common;
+ };
+ 
++/**
++ * struct stm32_dac_cfg - DAC configuration
++ * @has_hfsel: DAC has high frequency control
++ */
++struct stm32_dac_cfg {
++	bool has_hfsel;
++};
++
+ static struct stm32_dac_priv *to_stm32_dac_priv(struct stm32_dac_common *com)
+ {
+ 	return container_of(com, struct stm32_dac_priv, common);
+@@ -57,6 +65,7 @@ static struct stm32_dac_priv *to_stm32_dac_priv(struct stm32_dac_common *com)
+ static int stm32_dac_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	const struct stm32_dac_cfg *cfg;
+ 	struct stm32_dac_priv *priv;
+ 	struct regmap *regmap;
+ 	struct resource *res;
+@@ -69,6 +78,8 @@ static int stm32_dac_probe(struct platform_device *pdev)
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+ 		return -ENOMEM;
++	cfg = (const struct stm32_dac_cfg *)
++		of_match_device(dev->driver->of_match_table, dev)->data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	mmio = devm_ioremap_resource(dev, res);
+@@ -121,12 +132,16 @@ static int stm32_dac_probe(struct platform_device *pdev)
+ 		reset_control_deassert(priv->rst);
+ 	}
+ 
+-	/* When clock speed is higher than 80MHz, set HFSEL */
+-	priv->common.hfsel = (clk_get_rate(priv->pclk) > 80000000UL);
+-	ret = regmap_update_bits(regmap, STM32_DAC_CR, STM32H7_DAC_CR_HFSEL,
+-				 priv->common.hfsel ? STM32H7_DAC_CR_HFSEL : 0);
+-	if (ret)
+-		goto err_pclk;
++	if (cfg && cfg->has_hfsel) {
++		/* When clock speed is higher than 80MHz, set HFSEL */
++		priv->common.hfsel = (clk_get_rate(priv->pclk) > 80000000UL);
++		ret = regmap_update_bits(regmap, STM32_DAC_CR,
++					 STM32H7_DAC_CR_HFSEL,
++					 priv->common.hfsel ?
++					 STM32H7_DAC_CR_HFSEL : 0);
++		if (ret)
++			goto err_pclk;
++	}
+ 
+ 	platform_set_drvdata(pdev, &priv->common);
+ 
+@@ -158,8 +173,17 @@ static int stm32_dac_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct stm32_dac_cfg stm32h7_dac_cfg = {
++	.has_hfsel = true,
++};
++
+ static const struct of_device_id stm32_dac_of_match[] = {
+-	{ .compatible = "st,stm32h7-dac-core", },
++	{
++		.compatible = "st,stm32f4-dac-core",
++	}, {
++		.compatible = "st,stm32h7-dac-core",
++		.data = (void *)&stm32h7_dac_cfg,
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, stm32_dac_of_match);
 -- 
 1.9.1
