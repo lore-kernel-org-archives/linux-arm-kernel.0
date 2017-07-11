@@ -1,13 +1,13 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Jul 2017 15:19:22 +0100
-Subject: [PATCH 1/2] arm64: mm: abort uaccess retries upon fatal signal
+Date: Tue, 11 Jul 2017 15:19:23 +0100
+Subject: [PATCH 2/2] arm: mm: abort uaccess retries upon fatal signal
 In-Reply-To: <1499782763-31418-1-git-send-email-mark.rutland@arm.com>
 References: <1499782763-31418-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1499782763-31418-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1499782763-31418-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When there's a fatal signal pending, arm64's do_page_fault()
+When there's a fatal signal pending, arm's do_page_fault()
 implementation returns 0. The intent is that we'll return to the
 faulting userspace instruction, delivering the signal on the way.
 
@@ -25,24 +25,20 @@ progress towards delivering the fatal signal.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Steve Capper <steve.capper@arm.com>
-Tested-by: Steve Capper <steve.capper@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: stable at vger.kernel.org
 ---
- arch/arm64/mm/fault.c | 5 ++++-
+ arch/arm/mm/fault.c | 5 ++++-
  1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 37b95df..3952d5e 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -397,8 +397,11 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	 * signal first. We do not need to release the mmap_sem because it
- 	 * would already be released in __lock_page_or_retry in mm/filemap.c.
- 	 */
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index ff8b0aa..42f5853 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -315,8 +315,11 @@ static inline bool access_error(unsigned int fsr, struct vm_area_struct *vma)
+ 	 * signal first. We do not need to release the mmap_sem because
+ 	 * it would already be released in __lock_page_or_retry in
+ 	 * mm/filemap.c. */
 -	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
 +	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
 +		if (!user_mode(regs))
@@ -51,6 +47,6 @@ index 37b95df..3952d5e 100644
 +	}
  
  	/*
- 	 * Major/minor page fault accounting is only done on the initial
+ 	 * Major/minor page fault accounting is only done on the
 -- 
 1.9.1
