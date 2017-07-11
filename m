@@ -1,65 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Jul 2017 15:58:49 +0100
-Subject: [PATCH 1/2] arm64: mm: abort uaccess retries upon fatal signal
-In-Reply-To: <1499782763-31418-2-git-send-email-mark.rutland@arm.com>
-References: <1499782763-31418-1-git-send-email-mark.rutland@arm.com>
- <1499782763-31418-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170711145849.GE13977@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 11 Jul 2017 17:56:56 +0200
+Subject: [RFC PATCH v1] irqchip: Add support for tango interrupt router
+In-Reply-To: <20170606175219.34ef62b9@free-electrons.com>
+References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
+ <20170606175219.34ef62b9@free-electrons.com>
+Message-ID: <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 03:19:22PM +0100, Mark Rutland wrote:
-> When there's a fatal signal pending, arm64's do_page_fault()
-> implementation returns 0. The intent is that we'll return to the
-> faulting userspace instruction, delivering the signal on the way.
-> 
-> However, if we take a fatal signal during fixing up a uaccess, this
-> results in a return to the faulting kernel instruction, which will be
-> instantly retried, resulting in the same fault being taken forever. As
-> the task never reaches userspace, the signal is not delivered, and the
-> task is left unkillable. While the task is stuck in this state, it can
-> inhibit the forward progress of the system.
-> 
-> To avoid this, we must ensure that when a fatal signal is pending, we
-> apply any necessary fixup for a faulting kernel instruction. Thus we
-> will return to an error path, and it is up to that code to make forward
-> progress towards delivering the fatal signal.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Steve Capper <steve.capper@arm.com>
-> Tested-by: Steve Capper <steve.capper@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm64/mm/fault.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 37b95df..3952d5e 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -397,8 +397,11 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
->  	 * signal first. We do not need to release the mmap_sem because it
->  	 * would already be released in __lock_page_or_retry in mm/filemap.c.
->  	 */
-> -	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
-> +	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
-> +		if (!user_mode(regs))
-> +			goto no_context;
->  		return 0;
-> +	}
+On 06/06/2017 17:52, Thomas Petazzoni wrote:
 
-This will need rebasing at -rc1 (take a look at current HEAD).
+> On Tue, 6 Jun 2017 15:42:36 +0200, Mason wrote:
+> 
+>> +	interrupt-controller at 6f800 {
+>> +		compatible = "sigma,smp8759-intc";
+>> +		reg = <0x6f800 0x430>;
+>> +		interrupt-controller;
+>> +		#interrupt-cells = <2>;
+>> +		interrupt-parent = <&gic>;
+>> +		/*
+>> +		 * There probably is a better way than explicitly listing
+>> +		 * the 24 interrupts?
+>> +		 */
+> 
+> What we do on Marvell platforms is:
+> 
+> 	marvell,spi-base = <128>, <136>, <144>, <152>;
+> 
+> see marvell,odmi-controller.txt.
+> 
+> In another driver I submitted, we're doing:
+> 
+> 	marvell,spi-ranges = <64 64>, <288 64>;
+> 
+> Retrospectively, I would have preferred to use marvell,spi-ranges for
+> the first DT binding as well, since it allows to express both the base
+> and number of interrupts available in the range.
 
-Also, I think it introduces a weird corner case where we take a page fault
-when writing the signal frame to the user stack to deliver a SIGSEGV. If
-we end up with VM_FAULT_RETRY and somebody has sent a SIGKILL to the task,
-then we'll fail setup_sigframe and force an un-handleable SIGSEGV instead
-of SIGKILL.
+Sorry for the delay, I got distracted by other drivers
+(PCIe, clkgen, i2c, infrared).
 
-The end result (task is killed) is the same, but the fatal signal is wrong.
+Thanks for the suggestion.
 
-Will
+So, if I remove the "interrupts" property from the controller's
+DT node, I can no longer use irq_of_parse_and_map() followed by
+irqd_set_trigger_type(), right?
+
+I would have to "emulate" irq_of_parse_and_map() with
+something along the lines of:
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+static int __init map_irq(struct device_node *gic, int irq, int type)
+{
+	struct of_phandle_args data = { gic, 3, { GIC_SPI, irq, type }};
+	return irq_create_of_mapping(&data);
+}
+
+Then map all 24 interrupts at init:
+
+	virq = map_irq(gic, 0, IRQ_TYPE_LEVEL_HIGH);
+	for (i = 1; i < 24; ++i)
+		virq = map_irq(gic, i, IRQ_TYPE_EDGE_RISING);
+
+Is that correct?
+
+Does it make sense to use a separate ISR for the two kinds
+of interrupts?
+
+Regards.
