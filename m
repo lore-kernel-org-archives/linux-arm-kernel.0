@@ -1,100 +1,68 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Tue, 11 Jul 2017 12:29:34 +0100
-Subject: [PATCH] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
-Message-ID: <1499772574-2267-1-git-send-email-mike.leach@linaro.org>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Tue, 11 Jul 2017 14:43:27 +0300
+Subject: [bug report] perf: xgene: Add APM X-Gene SoC Performance Monitoring
+ Unit driver
+Message-ID: <20170711114327.hezq3anev6bzxqz7@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The value passed into the perf.data file for the CONFIGR register in ETMv4
-was incorrectly being set to the command line options/ETMv3 value.
+Hello Tai Nguyen,
 
-Adds bit definitions and function to remap this value to the correct ETMv4
-CONFIGR bit values for all selected options.
+The patch 832c927d119b: "perf: xgene: Add APM X-Gene SoC Performance
+Monitoring Unit driver" from Jul 15, 2016, leads to the following
+static checker warning:
 
-Signed-off-by: Mike Leach <mike.leach@linaro.org>
----
- include/linux/coresight-pmu.h       |  5 +++++
- tools/include/linux/coresight-pmu.h |  5 +++++
- tools/perf/arch/arm/util/cs-etm.c   | 28 +++++++++++++++++++++++++++-
- 3 files changed, 37 insertions(+), 1 deletion(-)
+	drivers/perf/xgene_pmu.c:1922 xgene_pmu_probe()
+	warn: 'xgene_pmu->pcppmu_csr' is an error pointer or valid
 
-diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
-index 45852c2..edfeaba 100644
---- a/include/linux/coresight-pmu.h
-+++ b/include/linux/coresight-pmu.h
-@@ -26,6 +26,11 @@
- #define ETM_OPT_TS      28
- #define ETM_OPT_RETSTK	29
- 
-+/* ETMv4 CONFIGR programming bits for the ETM OPTs */
-+#define ETM4_CFG_BIT_CYCACC	4
-+#define ETM4_CFG_BIT_TS		11
-+#define ETM4_CFG_BIT_RETSTK	12
-+
- static inline int coresight_get_trace_id(int cpu)
- {
- 	/*
-diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
-index 45852c2..edfeaba 100644
---- a/tools/include/linux/coresight-pmu.h
-+++ b/tools/include/linux/coresight-pmu.h
-@@ -26,6 +26,11 @@
- #define ETM_OPT_TS      28
- #define ETM_OPT_RETSTK	29
- 
-+/* ETMv4 CONFIGR programming bits for the ETM OPTs */
-+#define ETM4_CFG_BIT_CYCACC	4
-+#define ETM4_CFG_BIT_TS		11
-+#define ETM4_CFG_BIT_RETSTK	12
-+
- static inline int coresight_get_trace_id(int cpu)
- {
- 	/*
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 29361d9..997734b 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -266,6 +266,32 @@ static u64 cs_etm_get_config(struct auxtrace_record *itr)
- 	return config;
- }
- 
-+#ifndef BIT
-+#define BIT(N) (1UL << (N))
-+#endif
-+
-+static u64 cs_etmv4_get_config(struct auxtrace_record *itr)
-+{
-+	u64 config = 0;
-+	u64 config_opts = 0;
-+
-+	/*
-+	 * The perf event variable config bits represent both
-+	 * the command line options and register programming
-+	 * bits in ETMv3/PTM. For ETMv4 we must remap options
-+	 * to real bits
-+	 */
-+	config_opts = cs_etm_get_config(itr);
-+	if (config_opts & BIT(ETM_OPT_CYCACC))
-+		config |= BIT(ETM4_CFG_BIT_CYCACC);
-+	if (config_opts & BIT(ETM_OPT_TS))
-+		config |= BIT(ETM4_CFG_BIT_TS);
-+	if (config_opts & BIT(ETM_OPT_RETSTK))
-+		config |= BIT(ETM4_CFG_BIT_RETSTK);
-+
-+	return config;
-+}
-+
- static size_t
- cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
- 		      struct perf_evlist *evlist __maybe_unused)
-@@ -363,7 +389,7 @@ static void cs_etm_get_metadata(int cpu, u32 *offset,
- 		magic = __perf_cs_etmv4_magic;
- 		/* Get trace configuration register */
- 		info->priv[*offset + CS_ETMV4_TRCCONFIGR] =
--						cs_etm_get_config(itr);
-+						cs_etmv4_get_config(itr);
- 		/* Get traceID from the framework */
- 		info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
- 						coresight_get_trace_id(cpu);
--- 
-2.7.4
+drivers/perf/xgene_pmu.c
+  1851          if (version < 0)
+  1852                  return -ENODEV;
+                        ^^^^^^^^^^^^^^
+Good.  Direct returns are the way to go if possible.
+
+  1853  
+  1854          if (version == PCP_PMU_V3)
+  1855                  xgene_pmu->ops = &xgene_pmu_v3_ops;
+  1856          else
+  1857                  xgene_pmu->ops = &xgene_pmu_ops;
+  1858  
+  1859          INIT_LIST_HEAD(&xgene_pmu->l3cpmus);
+  1860          INIT_LIST_HEAD(&xgene_pmu->iobpmus);
+  1861          INIT_LIST_HEAD(&xgene_pmu->mcbpmus);
+  1862          INIT_LIST_HEAD(&xgene_pmu->mcpmus);
+  1863  
+  1864          xgene_pmu->version = version;
+  1865          dev_info(&pdev->dev, "X-Gene PMU version %d\n", xgene_pmu->version);
+  1866  
+  1867          res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+  1868          xgene_pmu->pcppmu_csr = devm_ioremap_resource(&pdev->dev, res);
+  1869          if (IS_ERR(xgene_pmu->pcppmu_csr)) {
+  1870                  dev_err(&pdev->dev, "ioremap failed for PCP PMU resource\n");
+  1871                  rc = PTR_ERR(xgene_pmu->pcppmu_csr);
+  1872                  goto err;
+                        ^^^^^^^^
+If we hit this goto then the kernel will crash.
+
+  1873          }
+
+    [ snip ]
+
+  1916          /* Enable interrupt */
+  1917          xgene_pmu->ops->unmask_int(xgene_pmu);
+  1918  
+  1919          return 0;
+  1920  
+  1921  err:
+  1922          if (xgene_pmu->pcppmu_csr)
+  1923                  devm_iounmap(&pdev->dev, xgene_pmu->pcppmu_csr);
+  1924          devm_kfree(&pdev->dev, xgene_pmu);
+
+Can't we remove all this cleanup since it's devm_ managed resources?
+
+  1925  
+  1926          return rc;
+  1927  }
+
+regards,
+dan carpenter
