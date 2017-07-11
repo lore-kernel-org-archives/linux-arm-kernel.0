@@ -1,63 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 11 Jul 2017 13:47:03 +0200
-Subject: [PATCH 2/2] ARM: dts: rockchip: remove arm,
- mali-midgard compatible from rk3288
-In-Reply-To: <972bed58-76c2-04e3-f2ab-d5b8065a92dd@gmail.com>
-References: <20170710121227.14264-1-heiko@sntech.de>
- <20170710121227.14264-2-heiko@sntech.de>
- <972bed58-76c2-04e3-f2ab-d5b8065a92dd@gmail.com>
-Message-ID: <1865386.qPV9dVK26y@phil>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 11 Jul 2017 13:56:03 +0200
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+ <20170629143432.GM29665@vireshk-i7>
+ <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+ <20170711102514.GC17115@vireshk-i7>
+ <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
+Message-ID: <3095a4bb-39d0-5d91-e6e8-b39811e24ec1@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
-
-Am Dienstag, 11. Juli 2017, 16:04:38 CEST schrieb Caesar Wang:
-> Heiko,
+On 11/07/2017 13:09, Mason wrote:
+> On 11/07/2017 12:25, Viresh Kumar wrote:
+>> On 11-07-17, 11:27, Mason wrote:
+>>> On 29/06/2017 16:34, Viresh Kumar wrote:
+>>>
+>>>> On 29-06-17, 13:41, Mason wrote:
+>>>>
+>>>>> I'm on SoC B, where nominal/max freq is expected to be 1206 MHz.
+>>>>> So the OPPs in the DT are:
+>>>>> operating-points = <1206000 0 603000 0 402000 0 241200 0 134000 0>;
+>>>>> *But* FW changed the max freq behind my back, to 1215 MHz.
+>>
+>> What does this line mean really? Where is this frequency changed?
+>> In the OPP table in DT?
 > 
-> ? 2017?07?10? 20:12, Heiko Stuebner ??:
-> > The binding specifies the actual implementations only (mali-t760
-> > for example) but not the arm,mali-midgard used in some vendor kernels.
-> > So drop that compatible property from the rk3288 where it had slipped in.
-> >
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >   arch/arm/boot/dts/rk3288.dtsi | 2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> > index cb1d415d1201..e99d7ff4c939 100644
-> > --- a/arch/arm/boot/dts/rk3288.dtsi
-> > +++ b/arch/arm/boot/dts/rk3288.dtsi
-> > @@ -1135,7 +1135,7 @@
-> >   	};
-> >   
-> >   	gpu: mali at ffa30000 {
-> > -		compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
-> > +		compatible = "rockchip,rk3288-mali", "arm,mali-t760";
+> I apologize for being unclear.
 > 
-> If we remove the "arm,mali-midgard", the mali driver maybe need update 
-> first.
->
->  From the lastest MALI driver on ARM supply, the compatible only two 
-> property.
-> mali_kbase_core_linux.c
-> 4163:    { .compatible = "arm,malit6xx" },
-> 4164:    { .compatible = "arm,mali-midgard" },
+> What I meant is that the bootloader originally set the max frequency
+> to 1206 MHz. The OPP table in DTS was written based on that value.
 > 
-> That's odd with the two compatible, the driver should support the more.
+> Later, someone changed the bootloader code to set a slightly higher
+> max frequency. When I flashed the new bootloader on my board, the
+> OPP table no longer matches the actual frequency.
+> 
+> But I am not notified when bootloader authors change max frequencies,
+> which is why I wrote "changed the max freq behind my back".
+> 
+> Again, sorry for the confusing statements.
+> 
+> (The bootloader is not DT-aware, so it leaves the DT untouched.)
 
-Correct, the driver should be updated anyway. In general the official
-dt-binding (the one in the linux kernel) should be followed, not the random
-out-of-tree one distributed by vendor drivers :-) .
+I just realized that there's another unstated assumption.
 
-If you look for example at utgard (mali400 for example), the sane binding
-used in the kernel, differs a lot from the binding used by the vendor-driver
-as well (io-areas, irq-names etc).
+Since the bootloader is not DT-aware, the DTB is, in fact, appended
+to the kernel image. This is why it's possible to have "mismatching"
+kernel and bootloader.
 
-In any case, as you use the mali vendor-driver with you vendor-tree,
-it should be possible to do both in sync (dt-change from mainline; driver
-change to use better compatibles).
-
-
-Heiko
+Regards.
