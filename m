@@ -1,47 +1,120 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 11 Jul 2017 15:46:38 +0530
-Subject: [RESEND PATCH] bus: omap-ocp2scp: Fix error handling in
- omap_ocp2scp_probe
-Message-ID: <20170711101638.2233-1-kishon@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 11 Jul 2017 15:55:14 +0530
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+ <20170629143432.GM29665@vireshk-i7>
+ <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+Message-ID: <20170711102514.GC17115@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The error handling code in omap_ocp2scp_probe fails to invoke
-pm_runtime_disable and fails to initialize return value in
-certain cases. Fix it here.
+On 11-07-17, 11:27, Mason wrote:
+> On 29/06/2017 16:34, Viresh Kumar wrote:
+> 
+> > On 29-06-17, 13:41, Mason wrote:
+> > 
+> >> I was trying to "emulate" the behavior of the ondemand governor.
+> >> Based on your reaction, I got it wrong...
+> >> Here is the actual issue:
+> >>
+> >> I'm on SoC B, where nominal/max freq is expected to be 1206 MHz.
+> >> So the OPPs in the DT are:
+> >> operating-points = <1206000 0 603000 0 402000 0 241200 0 134000 0>;
+> >> *But* FW changed the max freq behind my back, to 1215 MHz.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- drivers/bus/omap-ocp2scp.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+What does this line mean really? Where is this frequency changed ? In the OPP
+table in DT?
 
-diff --git a/drivers/bus/omap-ocp2scp.c b/drivers/bus/omap-ocp2scp.c
-index bf500e0e7362..77791f3dcfc6 100644
---- a/drivers/bus/omap-ocp2scp.c
-+++ b/drivers/bus/omap-ocp2scp.c
-@@ -70,8 +70,10 @@ static int omap_ocp2scp_probe(struct platform_device *pdev)
- 	if (!of_device_is_compatible(np, "ti,am437x-ocp2scp")) {
- 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 		regs = devm_ioremap_resource(&pdev->dev, res);
--		if (IS_ERR(regs))
--			goto err0;
-+		if (IS_ERR(regs)) {
-+			ret = PTR_ERR(regs);
-+			goto err1;
-+		}
- 
- 		pm_runtime_get_sync(&pdev->dev);
- 		reg = readl_relaxed(regs + OCP2SCP_TIMING);
-@@ -83,6 +85,9 @@ static int omap_ocp2scp_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+err1:
-+	pm_runtime_disable(&pdev->dev);
-+
- err0:
- 	device_for_each_child(&pdev->dev, NULL, ocp2scp_remove_devices);
- 
+> >>
+> >> Here is what happens when I execute:
+> >> echo ondemand >scaling_governor
+> >> sleep 2
+> >> cpuburn-a9 & cpuburn-a9 & cpuburn-a9 & cpuburn-a9
+> >> ### cpuburn-a9 spins in a tight infinite loop,
+> >> ### hitting all FUs to raise the CPU temperature
+> >>
+> >> # cpufreq_test.sh
+> >> [   69.933874] set_target: index=4
+> >> [   69.944799] set_target: index=2
+> >> [   69.947988] clk_divider_set_rate: rate=303750000 parent_rate=1215000000 div=4
+> >> [   69.955542] set_target: index=4
+> >> [   69.958801] clk_divider_set_rate: rate=607500000 parent_rate=1215000000 div=2
+> >> [   69.984789] set_target: index=0
+> >> [   69.987980] clk_divider_set_rate: rate=121500000 parent_rate=1215000000 div=10
+> >> [   71.947597] set_target: index=4
+> >> [   71.950996] clk_divider_set_rate: rate=607500000 parent_rate=1215000000 div=2
+> >>
+> >> As you can see, the divider remains stuck at 2, so the SoC
+> >> is actually running only at 607.5 MHz (instead of 1215 MHz).
+> >>
+> >> If I fix the OPPs in DT to:
+> >> operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
+> >> Then I get the expected behavior:
+> >>
+> >> $ cpufreq_test.sh 
+> >> [   32.717930] set_target: index=1
+> >> [   32.721131] clk_divider_set_rate: rate=243000000 parent_rate=1215000000 div=5
+> >> [   32.731326] set_target: index=4
+> >> [   32.734521] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
+> >> [   32.754556] set_target: index=0
+> >> [   32.757738] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
+> >> [   32.765864] set_target: index=4
+> >> [   32.769217] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
+> >> [   33.438811] set_target: index=0
+> >> [   33.442001] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
+> >> [   33.450249] set_target: index=4
+> >> [   33.453470] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
+> >> [   33.477888] set_target: index=0
+> >> [   33.481067] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
+> >> [   34.714786] set_target: index=4
+> >> [   34.718237] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
+> >>
+> >> Divider settles at 1 (full speed) to provide maximum
+> >> performance for the user-space processes.
+> > 
+> > I am not sure how such behavior will happen just because we changed
+> > the max OPP (actually increased it). You need to dig in a bit to see
+> > why this happens, as I can't agree to your numbers for now.
+> 
+> I had a closer look.
+> 
+> static int _div_round(...)
+> {
+> 	if (flags & CLK_DIVIDER_ROUND_CLOSEST)
+> 		return _div_round_closest(table, parent_rate, rate, flags);
+> 
+> 	return _div_round_up(table, parent_rate, rate, flags);
+> }
+> 
+> This flag was /not/ set for the CPU divider clock.
+
+i.e. _div_round_up() was getting called ? And you failed to explain why do you
+think this results in that awkward behavior.
+
+> But setting it breaks in dev_pm_opp_set_rate()
+> 
+> [    9.201681] set_target: index=4
+> [    9.204870] dev_pm_opp_set_rate: target_freq=1206000000 freq=1215000000 old_freq=243000000
+
+I have some assumptions on how you are printing this line and will present my
+analysis based on that.
+
+cpufreq core asked for a freq of 1206 (why?, DT should have had 1215 as max),
+but clk framework rounded it up to 1215 (this should happen without the
+CLK_DIVIDER_ROUND_CLOSEST flag as well).
+
+> [    9.213647] cpu cpu0: dev_pm_opp_set_rate: failed to find OPP for freq 1215000000 (-34)
+
+Now we failed because DT didn't had the max set to 1215, why ?
+
+> I'll experiment with the other solution of creating the OPP table
+> at init.
+
+Sorry, I haven't got a convincing answer to why you see the problem you are
+seeing.
+
 -- 
-2.11.0
+viresh
