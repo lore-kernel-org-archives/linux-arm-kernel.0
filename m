@@ -1,74 +1,99 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Jul 2017 10:25:56 +0100
-Subject: [PATCH 3/3] ARM: dts: at91: sama5d2: use sama5d2 compatible
- string for SMC
-In-Reply-To: <20170711080853.uxdmxocq5nhrp7vq@rfolt0960.corp.atmel.com>
-References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
- <20170711074015.30440-4-ludovic.desroches@microchip.com>
- <029b80a8-2d3f-11b4-d4df-55f5fc48c8e7@microchip.com>
- <20170711075829.5rzdrjgao6efiuj2@rfolt0960.corp.atmel.com>
- <20170711080853.uxdmxocq5nhrp7vq@rfolt0960.corp.atmel.com>
-Message-ID: <20170711092556.mukp4umf4r4etqvt@dell>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 11 Jul 2017 11:27:46 +0200
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <20170629143432.GM29665@vireshk-i7>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+ <20170629143432.GM29665@vireshk-i7>
+Message-ID: <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jul 2017, Ludovic Desroches wrote:
+On 29/06/2017 16:34, Viresh Kumar wrote:
 
-> On Tue, Jul 11, 2017 at 09:58:29AM +0200, Ludovic Desroches wrote:
-> > On Tue, Jul 11, 2017 at 09:52:58AM +0200, Nicolas Ferre wrote:
-> > > On 11/07/2017 at 09:40, Ludovic Desroches wrote:
-> > > > A new compatible string has been introduced for sama5d2 SMC to allow to
-> > > > manage the registers mapping change.
-> > > > 
-> > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> > > > index 4fcd5bb219e3..60e69aeacbdb 100644
-> > > > --- a/arch/arm/boot/dts/sama5d2.dtsi
-> > > > +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> > > > @@ -1048,7 +1048,7 @@
-> > > >  			};
-> > > >  
-> > > >  			hsmc: hsmc at f8014000 {
-> > > > -				compatible = "atmel,sama5d3-smc", "syscon", "simple-mfd";
-> > > > +				compatible = "atmel,sama5d2-smc", "syscon", "simple-mfd";
-> > > 
-> > > You'd better use something like:
-> > >  compatible = "atmel,sama5d2-smc", "atmel,sama5d3-smc", "syscon", "simple-mfd";
-> > 
-> > But it's not true, during data interface setup, we will write values in
-> > the wrong place if we fallback on "atmel,sama5d3-smc".
-> > 
-> > Regards
-> > 
-> > Ludovic
-> > 
-> > > 
-> > > So that this patch is independent from the rest of the series and
-> > > we can avoid to having to synchronize with mfd or mtd/nand for this part.
+> On 29-06-17, 13:41, Mason wrote:
 > 
-> If Lee and Boris agree, maybe the series can go through AT91.
+>> I was trying to "emulate" the behavior of the ondemand governor.
+>> Based on your reaction, I got it wrong...
+>> Here is the actual issue:
+>>
+>> I'm on SoC B, where nominal/max freq is expected to be 1206 MHz.
+>> So the OPPs in the DT are:
+>> operating-points = <1206000 0 603000 0 402000 0 241200 0 134000 0>;
+>> *But* FW changed the max freq behind my back, to 1215 MHz.
+>>
+>> Here is what happens when I execute:
+>> echo ondemand >scaling_governor
+>> sleep 2
+>> cpuburn-a9 & cpuburn-a9 & cpuburn-a9 & cpuburn-a9
+>> ### cpuburn-a9 spins in a tight infinite loop,
+>> ### hitting all FUs to raise the CPU temperature
+>>
+>> # cpufreq_test.sh
+>> [   69.933874] set_target: index=4
+>> [   69.944799] set_target: index=2
+>> [   69.947988] clk_divider_set_rate: rate=303750000 parent_rate=1215000000 div=4
+>> [   69.955542] set_target: index=4
+>> [   69.958801] clk_divider_set_rate: rate=607500000 parent_rate=1215000000 div=2
+>> [   69.984789] set_target: index=0
+>> [   69.987980] clk_divider_set_rate: rate=121500000 parent_rate=1215000000 div=10
+>> [   71.947597] set_target: index=4
+>> [   71.950996] clk_divider_set_rate: rate=607500000 parent_rate=1215000000 div=2
+>>
+>> As you can see, the divider remains stuck at 2, so the SoC
+>> is actually running only at 607.5 MHz (instead of 1215 MHz).
+>>
+>> If I fix the OPPs in DT to:
+>> operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
+>> Then I get the expected behavior:
+>>
+>> $ cpufreq_test.sh 
+>> [   32.717930] set_target: index=1
+>> [   32.721131] clk_divider_set_rate: rate=243000000 parent_rate=1215000000 div=5
+>> [   32.731326] set_target: index=4
+>> [   32.734521] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
+>> [   32.754556] set_target: index=0
+>> [   32.757738] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
+>> [   32.765864] set_target: index=4
+>> [   32.769217] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
+>> [   33.438811] set_target: index=0
+>> [   33.442001] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
+>> [   33.450249] set_target: index=4
+>> [   33.453470] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
+>> [   33.477888] set_target: index=0
+>> [   33.481067] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
+>> [   34.714786] set_target: index=4
+>> [   34.718237] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
+>>
+>> Divider settles at 1 (full speed) to provide maximum
+>> performance for the user-space processes.
+> 
+> I am not sure how such behavior will happen just because we changed
+> the max OPP (actually increased it). You need to dig in a bit to see
+> why this happens, as I can't agree to your numbers for now.
 
-That's fine, but if the series goes though another tree, I will
-require a pull-request.
+I had a closer look.
 
-I am also happy to carry though the MFD tree (and will of course send
-out a PR to the other affected Maintainers).
+static int _div_round(...)
+{
+	if (flags & CLK_DIVIDER_ROUND_CLOSEST)
+		return _div_round_closest(table, parent_rate, rate, flags);
 
-> > > Regards,
-> > > 
-> > > >  				reg = <0xf8014000 0x1000>;
-> > > >  				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 6>;
-> > > >  				clocks = <&hsmc_clk>;
-> > > > 
-> > > 
-> > > 
+	return _div_round_up(table, parent_rate, rate, flags);
+}
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+This flag was /not/ set for the CPU divider clock.
+But setting it breaks in dev_pm_opp_set_rate()
+
+[    9.201681] set_target: index=4
+[    9.204870] dev_pm_opp_set_rate: target_freq=1206000000 freq=1215000000 old_freq=243000000
+[    9.213647] cpu cpu0: dev_pm_opp_set_rate: failed to find OPP for freq 1215000000 (-34)
+[    9.222029] cpufreq: __target_index: Failed to change cpu frequency: -34
+
+
+
+I'll experiment with the other solution of creating the OPP table
+at init.
+
+Regards.
