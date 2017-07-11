@@ -1,26 +1,65 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Jul 2017 11:07:27 +0200
-Subject: [PATCH v2] dt-bindings: net: ravb : Add support for r8a7743 SoC
-In-Reply-To: <CAMuHMdWA-qJW8wENRYEFUmoSM7G+DR3wcT9hQ0_1Z7ysUjZkBw@mail.gmail.com>
-References: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
- <1499700776-54504-1-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdWA-qJW8wENRYEFUmoSM7G+DR3wcT9hQ0_1Z7ysUjZkBw@mail.gmail.com>
-Message-ID: <20170711090727.GH4517@verge.net.au>
+Date: Tue, 11 Jul 2017 11:13:39 +0200
+Subject: [PATCH 0/9] ARM: renesas: shmobile and multi_v7 defconfig updates
+In-Reply-To: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170711091338.GI4517@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 10, 2017 at 05:51:09PM +0200, Geert Uytterhoeven wrote:
-> On Mon, Jul 10, 2017 at 5:32 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> > Add a new compatible string for the RZ/G1M (R8A7743) SoC.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+On Mon, Jul 10, 2017 at 03:28:13PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Arnd, Kevin, Magnus, Olof, Simon,
 > 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> This patch series updates shmobile_defconfig and multi_v7_defconfig to
+> (re-)enable some features:
+>   - Re-enable R-Car PCIe (shmobile_defconfig),
+>   - Re-enable R-Car XHCI (shmobile_defconfig),
+>   - Re-enable R-Car sound (both),
+>   - Update DRM bridge (both),
+>   - Enable serial port DMA (both).
+> 
+> There also a patch included to refresh shmobile_defconfig.
+> To avoid conflicts, I didn't refresh multi_v7_defconfig (although it could
+> definitely use a refresh), and only made "simple" changes to it.
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Thanks, all applied.
 
-I believe that as net-next is currently closed you should repost it once
-it re-opens (likely in about a week) with the following subject prefix
-and Geert's tag.
+Personally I would be in favour of co-ordinating a refresh of
+multi_v7_defconfig.
 
-[PATCH net-next repost v2]
+> 
+> Thanks!
+> 
+> Geert Uytterhoeven (9):
+>   ARM: shmobile: defconfig: Enable missing PCIE_RCAR dependency
+>   ARM: shmobile: defconfig: Replace USB_XHCI_RCAR by USB_XHCI_PLATFORM
+>   ARM: shmobile: defconfig: Replace SND_SOC_RSRC_CARD by
+>     SND_SIMPLE_SCU_CARD
+>   ARM: shmobile: defconfig: Replace DRM_RCAR_HDMI by generic bridge
+>     options
+>   ARM: shmobile: defconfig: Enable DMA for serial ports
+>   ARM: shmobile: defconfig: Refresh
+>   ARM: multi_v7_defconfig: Replace SND_SOC_RSRC_CARD by
+>     SND_SIMPLE_SCU_CARD
+>   ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by generic bridge
+>     options
+>   ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports
+> 
+>  arch/arm/configs/multi_v7_defconfig |  5 +++--
+>  arch/arm/configs/shmobile_defconfig | 16 +++++++++-------
+>  2 files changed, 12 insertions(+), 9 deletions(-)
+> 
+> -- 
+> 2.7.4
+> 
+> Gr{oetje,eeting}s,
+> 
+> 						Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
+> 
