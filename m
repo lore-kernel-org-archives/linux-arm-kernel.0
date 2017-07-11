@@ -1,58 +1,76 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 11 Jul 2017 11:25:33 -0400
-Subject: [PATCH V3 1/2] PCI: Add Extended Tags quirk for Broadcom HT2100 Root
- Port
-Message-ID: <1499786735-25782-1-git-send-email-okaya@codeaurora.org>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Tue, 11 Jul 2017 12:28:22 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6ul-evk: Add DRM panel support
+Message-ID: <1499786903-14600-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All PCIe devices are expected to be able to handle 8-bit tags.
-'commit 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")'
-enabled extended tags for all devices based on the spec direction.
+It is preferred to use the panel compatible string rather than passing the LCD
+timming in the device tree.
 
-The Broadcom HT2100 seems to be having issues with handling
-8-bit tags. Mark it as broken.
+So pass the "innolux,at043tn24" compatible string to describe the parallel LCD
+on this board.
 
-Reported-by: Wim ten Have <wim.ten.have@oracle.com>
-Link: https://bugzilla.redhat.com/show_bug.cgi?id=1467674
-Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 ---
- drivers/pci/quirks.c | 12 ++++++++++++
- include/linux/pci.h  |  1 +
- 2 files changed, 13 insertions(+)
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 36 ++++++++++++----------------------
+ 1 file changed, 13 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 085fb78..073d5dd 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -4664,3 +4664,15 @@ static void quirk_intel_no_flr(struct pci_dev *dev)
- }
- DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1502, quirk_intel_no_flr);
- DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1503, quirk_intel_no_flr);
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index d2be8aa..e08237f 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -78,6 +78,16 @@
+ 			clocks = <&clks IMX6UL_CLK_SAI2>;
+ 		};
+ 	};
 +
-+static void quirk_exttags_completer(struct pci_dev *pdev)
-+{
-+	/* This device cannot handle 256 tags as a completer */
-+	pdev->broken_exttags_completer = 1;
-+}
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0140,
-+			quirk_exttags_completer);
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0142,
-+			quirk_exttags_completer);
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0144,
-+			quirk_exttags_completer);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 8039f9f..0b9f42d 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -376,6 +376,7 @@ struct pci_dev {
- 	unsigned int	irq_managed:1;
- 	unsigned int	has_secondary_link:1;
- 	unsigned int	non_compliant_bars:1;	/* broken BARs; ignore them */
-+	unsigned int	broken_exttags_completer:1;
- 	pci_dev_flags_t dev_flags;
- 	atomic_t	enable_cnt;	/* pci_enable_device has been called */
++	panel {
++		compatible = "innolux,at043tn24";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
++	};
+ };
  
+ &clks {
+@@ -139,31 +149,11 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_lcdif_dat
+ 		     &pinctrl_lcdif_ctrl>;
+-	display = <&display0>;
+ 	status = "okay";
+ 
+-	display0: display {
+-		bits-per-pixel = <16>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-
+-			timing0: timing0 {
+-				clock-frequency = <9200000>;
+-				hactive = <480>;
+-				vactive = <272>;
+-				hfront-porch = <8>;
+-				hback-porch = <4>;
+-				hsync-len = <41>;
+-				vback-porch = <2>;
+-				vfront-porch = <4>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
++	port{
++		display_out: endpoint {
++			remote-endpoint = <&panel_in>;
+ 		};
+ 	};
+ };
 -- 
-1.9.1
+2.7.4
