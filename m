@@ -1,120 +1,62 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 11 Jul 2017 15:55:14 +0530
-Subject: cpufreq: frequency scaling spec in DT node
-In-Reply-To: <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
-References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
- <20170629100459.GL29665@vireshk-i7>
- <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
- <20170629143432.GM29665@vireshk-i7>
- <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
-Message-ID: <20170711102514.GC17115@vireshk-i7>
+From: rob@landley.net (Rob Landley)
+Date: Tue, 11 Jul 2017 05:37:15 -0500
+Subject: [PATCH 9/9] ARM: multi_v7_defconfig: Enable DMA for Renesas
+ serial ports
+In-Reply-To: <CAMuHMdUFnYSxF0grMQ6GB4h7svOeKa-SpPo_2TpTW9Hx+zvrEQ@mail.gmail.com>
+References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+ <1499693302-25120-10-git-send-email-geert+renesas@glider.be>
+ <CANqRtoSi8x7zqwV3Gp_n0dBe4Uw6LDRvC1Lheu+GrLZNYuxAHw@mail.gmail.com>
+ <CAMuHMdXb1yAgw4AVvheYhPV=V9HeDCW2NdvhJWzoSz8i-mM3TQ@mail.gmail.com>
+ <CAK8P3a3c68=L=h+nni39BmOb68wno7TuvXuBgOHrEMOrkhdx2g@mail.gmail.com>
+ <CAMuHMdUFnYSxF0grMQ6GB4h7svOeKa-SpPo_2TpTW9Hx+zvrEQ@mail.gmail.com>
+Message-ID: <95cf2c11-c7db-bdff-7165-282586e08b19@landley.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-07-17, 11:27, Mason wrote:
-> On 29/06/2017 16:34, Viresh Kumar wrote:
+
+
+On 07/11/2017 03:59 AM, Geert Uytterhoeven wrote:
+> Hi Arnd,
 > 
-> > On 29-06-17, 13:41, Mason wrote:
-> > 
-> >> I was trying to "emulate" the behavior of the ondemand governor.
-> >> Based on your reaction, I got it wrong...
-> >> Here is the actual issue:
-> >>
-> >> I'm on SoC B, where nominal/max freq is expected to be 1206 MHz.
-> >> So the OPPs in the DT are:
-> >> operating-points = <1206000 0 603000 0 402000 0 241200 0 134000 0>;
-> >> *But* FW changed the max freq behind my back, to 1215 MHz.
-
-What does this line mean really? Where is this frequency changed ? In the OPP
-table in DT?
-
-> >>
-> >> Here is what happens when I execute:
-> >> echo ondemand >scaling_governor
-> >> sleep 2
-> >> cpuburn-a9 & cpuburn-a9 & cpuburn-a9 & cpuburn-a9
-> >> ### cpuburn-a9 spins in a tight infinite loop,
-> >> ### hitting all FUs to raise the CPU temperature
-> >>
-> >> # cpufreq_test.sh
-> >> [   69.933874] set_target: index=4
-> >> [   69.944799] set_target: index=2
-> >> [   69.947988] clk_divider_set_rate: rate=303750000 parent_rate=1215000000 div=4
-> >> [   69.955542] set_target: index=4
-> >> [   69.958801] clk_divider_set_rate: rate=607500000 parent_rate=1215000000 div=2
-> >> [   69.984789] set_target: index=0
-> >> [   69.987980] clk_divider_set_rate: rate=121500000 parent_rate=1215000000 div=10
-> >> [   71.947597] set_target: index=4
-> >> [   71.950996] clk_divider_set_rate: rate=607500000 parent_rate=1215000000 div=2
-> >>
-> >> As you can see, the divider remains stuck at 2, so the SoC
-> >> is actually running only at 607.5 MHz (instead of 1215 MHz).
-> >>
-> >> If I fix the OPPs in DT to:
-> >> operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
-> >> Then I get the expected behavior:
-> >>
-> >> $ cpufreq_test.sh 
-> >> [   32.717930] set_target: index=1
-> >> [   32.721131] clk_divider_set_rate: rate=243000000 parent_rate=1215000000 div=5
-> >> [   32.731326] set_target: index=4
-> >> [   32.734521] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
-> >> [   32.754556] set_target: index=0
-> >> [   32.757738] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
-> >> [   32.765864] set_target: index=4
-> >> [   32.769217] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
-> >> [   33.438811] set_target: index=0
-> >> [   33.442001] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
-> >> [   33.450249] set_target: index=4
-> >> [   33.453470] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
-> >> [   33.477888] set_target: index=0
-> >> [   33.481067] clk_divider_set_rate: rate=135000000 parent_rate=1215000000 div=9
-> >> [   34.714786] set_target: index=4
-> >> [   34.718237] clk_divider_set_rate: rate=1215000000 parent_rate=1215000000 div=1
-> >>
-> >> Divider settles at 1 (full speed) to provide maximum
-> >> performance for the user-space processes.
-> > 
-> > I am not sure how such behavior will happen just because we changed
-> > the max OPP (actually increased it). You need to dig in a bit to see
-> > why this happens, as I can't agree to your numbers for now.
+> On Tue, Jul 11, 2017 at 10:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tue, Jul 11, 2017 at 8:59 AM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> On Tue, Jul 11, 2017 at 5:38 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>>> On Mon, Jul 10, 2017 at 10:28 PM, Geert Uytterhoeven
+>>>> Since enabling DMA Engine still keeps PIO support around I wonder why
+>>>> we need this Kconfig at all - other drivers seem to get by without
+>>>> this kind of thing?
+>>>> So in my opinion it would also be nice to get rid of SERIAL_SH_SCI_DMA
+>>>> completely and reducing the number of special per-driver Kconfig
+>>>> entries.
+>>>
+>>> In general, I would agree, and remove the option at the blimp of an eye.
+>>> However, this driver is shared with H8/300 and SuperH.  While both could use
+>>> DMA (but it's not supported by Linux yet), I don't know if they are willing to
+>>> live with the increased static and dynamic memory footprint of SH_SCI DMA
+>>> support.
+>>
+>> One more thing: enabling the DMA support in the console driver generally
+>> means you cannot use printk in the DMA driver anywhere that may be called
+>> during printk(). Not sure if that is a concern here.
 > 
-> I had a closer look.
-> 
-> static int _div_round(...)
-> {
-> 	if (flags & CLK_DIVIDER_ROUND_CLOSEST)
-> 		return _div_round_closest(table, parent_rate, rate, flags);
-> 
-> 	return _div_round_up(table, parent_rate, rate, flags);
-> }
-> 
-> This flag was /not/ set for the CPU divider clock.
+> Not anymore, as all of these prints should have been removed/disabled already.
 
-i.e. _div_round_up() was getting called ? And you failed to explain why do you
-think this results in that awkward behavior.
+Last I checked qemu-system-sh4 still doesn't work with current linux
+serial driver unless you do:
 
-> But setting it breaks in dev_pm_opp_set_rate()
-> 
-> [    9.201681] set_target: index=4
-> [    9.204870] dev_pm_opp_set_rate: target_freq=1206000000 freq=1215000000 old_freq=243000000
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -2193,7 +2193,7 @@ static void sci_reset(struct uart_port *port)
+ 			setup_timer(&s->rx_fifo_timer, rx_fifo_timer_fn,
+ 				    (unsigned long)s);
+ 		} else {
+-			if (port->type == PORT_SCIFA ||
++			if (1 || port->type == PORT_SCIFA ||
+ 			    port->type == PORT_SCIFB)
+ 				scif_set_rtrg(port, 1);
+ 			else
 
-I have some assumptions on how you are printing this line and will present my
-analysis based on that.
+Does this DMA stuff make that situation worse?
 
-cpufreq core asked for a freq of 1206 (why?, DT should have had 1215 as max),
-but clk framework rounded it up to 1215 (this should happen without the
-CLK_DIVIDER_ROUND_CLOSEST flag as well).
-
-> [    9.213647] cpu cpu0: dev_pm_opp_set_rate: failed to find OPP for freq 1215000000 (-34)
-
-Now we failed because DT didn't had the max set to 1215, why ?
-
-> I'll experiment with the other solution of creating the OPP table
-> at init.
-
-Sorry, I haven't got a convincing answer to why you see the problem you are
-seeing.
-
--- 
-viresh
+Rob
