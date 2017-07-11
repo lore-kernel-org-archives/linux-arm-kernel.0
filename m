@@ -1,43 +1,65 @@
-From: maarten.lankhorst@linux.intel.com (Maarten Lankhorst)
-Date: Tue, 11 Jul 2017 16:33:08 +0200
-Subject: [PATCH v2 06/12] drm/mediatek: Handle drm_atomic_helper_swap_state
- failure
-In-Reply-To: <20170711143314.2148-1-maarten.lankhorst@linux.intel.com>
-References: <20170711143314.2148-1-maarten.lankhorst@linux.intel.com>
-Message-ID: <20170711143314.2148-7-maarten.lankhorst@linux.intel.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 11 Jul 2017 23:21:25 +0900
+Subject: [PATCH 2/2] arm64: dts: uniphier: add Denali NAND controller nodes
+In-Reply-To: <1499782885-29023-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1499782885-29023-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1499782885-29023-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_atomic_helper_swap_state() will be changed to interruptible waiting
-in the next few commits, so all drivers have to be changed to handling
-failure.
+Add NAND controller node to LD11 and LD20.  Neither of them supports
+the CS1 line, so pinctrl is set up for a single CS line.
 
-Signed-off-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
-Cc: CK Hu <ck.hu@mediatek.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mediatek at lists.infradead.org
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_drv.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index 56f802d0a51c..9a130c84c861 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -109,7 +109,12 @@ static int mtk_atomic_commit(struct drm_device *drm,
- 	mutex_lock(&private->commit.lock);
- 	flush_work(&private->commit.work);
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 11 +++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 11 +++++++++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index bdce5b89baec..ca7eb49aa83d 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -368,6 +368,17 @@
+ 				#reset-cells = <1>;
+ 			};
+ 		};
++
++		nand: nand at 68000000 {
++			compatible = "socionext,uniphier-denali-nand-v5b";
++			status = "disabled";
++			reg-names = "nand_data", "denali_reg";
++			reg = <0x68000000 0x20>, <0x68100000 0x1000>;
++			interrupts = <0 65 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
++			clocks = <&sys_clk 2>;
++		};
+ 	};
+ };
  
--	drm_atomic_helper_swap_state(state, true);
-+	ret = drm_atomic_helper_swap_state(state, true);
-+	if (ret) {
-+		mutex_unlock(&private->commit.lock);
-+		drm_atomic_helper_cleanup_planes(drm, state);
-+		return ret;
-+	}
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index de1e75362817..1110be4c88ca 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -389,6 +389,17 @@
+ 				#reset-cells = <1>;
+ 			};
+ 		};
++
++		nand: nand at 68000000 {
++			compatible = "socionext,uniphier-denali-nand-v5b";
++			status = "disabled";
++			reg-names = "nand_data", "denali_reg";
++			reg = <0x68000000 0x20>, <0x68100000 0x1000>;
++			interrupts = <0 65 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
++			clocks = <&sys_clk 2>;
++		};
+ 	};
+ };
  
- 	drm_atomic_state_get(state);
- 	if (async)
 -- 
-2.11.0
+2.7.4
