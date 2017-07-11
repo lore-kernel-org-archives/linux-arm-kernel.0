@@ -1,37 +1,102 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 11 Jul 2017 15:39:57 -0500
-Subject: [PATCH V3 1/2] PCI: Add Extended Tags quirk for Broadcom HT2100
- Root Port
-In-Reply-To: <ae4dca5b-30cf-3a14-1707-380a3660badf@codeaurora.org>
-References: <1499786735-25782-1-git-send-email-okaya@codeaurora.org>
- <20170711195853.GA14614@bhelgaas-glaptop.roam.corp.google.com>
- <ae4dca5b-30cf-3a14-1707-380a3660badf@codeaurora.org>
-Message-ID: <20170711203957.GB14614@bhelgaas-glaptop.roam.corp.google.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 11 Jul 2017 23:23:44 +0200
+Subject: [RFC 2/2] mmc: meson-mx-sdio: Add a driver for the Amlogic Meson8
+ and Meson8b SoCs
+In-Reply-To: <CAPDyKFrbxMpgDrZXKmrN4fyJWJ_ZML3jPxBs+YDEz=L1kA-BaA@mail.gmail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+ <20170506171857.16492-3-martin.blumenstingl@googlemail.com>
+ <CAPDyKFrrSLCjbXO9R4VqPpabiFsbE6_RqR=U7otVF4Ncv0jHjQ@mail.gmail.com>
+ <CAFBinCD3modyyOpi3OY5XLhjX0UCuV+WPY2Z=mdvwdMCyeGoqg@mail.gmail.com>
+ <CAPDyKFptXRPk7mVUiRHf=hECDbeyhTxuf3K1M6NkZcVEF0Enww@mail.gmail.com>
+ <CAFBinCD=uH=oQmWAcsMpxtbJCnJZernZx3XoNaPixUUQ7pk76w@mail.gmail.com>
+ <CAPDyKFrbxMpgDrZXKmrN4fyJWJ_ZML3jPxBs+YDEz=L1kA-BaA@mail.gmail.com>
+Message-ID: <CAFBinCA-goSsyq7bo=ozPRnOqc8br4KDJJ_Lao5h==Xneh02nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 04:16:23PM -0400, Sinan Kaya wrote:
-> On 7/11/2017 3:58 PM, Bjorn Helgaas wrote:
-> > I'm trying to avoid pci_walk_bus() because it's such a minefield as
-> > far as hot-added devices.  I don't think we can avoid one in the
-> > quirk, to turn off extended tags for any devices we've already found,
-> > but I think we *can* avoid adding more i
-> 
-> Jike Song asked what if you attach a PCIe endpoint that has an extended
-> tags quirk to think about the reverse direction. That's why, I was walking
-> the entire bus. 
+Hi Ulf,
 
-My proposal handles endpoints, too.  The pci_walk_bus() in the quirk
-handles all devices we've already enumerated, and all devices we'll
-enumerate in the future are handled in pci_configure_device().
+sorry for the delay, I've been pretty busy.
+however, I'll have more time to work in this driver this and next week
 
-> We can maybe hold onto putting such a generic code until such a device
-> with quirk actually shows up.
-> 
-> I'll pull your suggestion into a patch, give it a try and then post the
-> next version.
-> 
-> -- 
-> Sinan Kaya
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+On Mon, Jun 19, 2017 at 1:50 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>
+>>> [...]
+>>>
+>>>>>> +       if (!(cmd->flags & MMC_RSP_CRC))
+>>>>>> +               send |= MESON_MX_SDIO_SEND_RESP_WITHOUT_CRC7;
+>>>>>> +
+>>>>>> +       if (cmd->flags & MMC_RSP_BUSY)
+>>>>>> +               send |= MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY;
+>>>>>
+>>>>> In case the controller has HW support of busy detection, please
+>>>>> consider to enable MMC_CAP_WAIT_WHILE_BUSY for this driver. Then also
+>>>>> assign host->max_busy_timeout a good value.
+>>>> the IRQS register has bit 4 (CMD_BUSY) - but apart from that there is
+>>>> no other documentation (about timeout values, etc.). the vendor driver
+>>>> also neither uses MMC_CAP_WAIT_WHILE_BUSY nor host->max_busy_timeout
+>>>> should I leave this as it is?
+>>>
+>>> Please don't just leave it as is. This is an important thing to get right.
+>>>
+>>> You should be able to explore this area and see how the controller
+>>> behaves without too much of documentation. Regarding timeouts, it may
+>>> very well be that the controller don't have a timeout, which is why
+>>> you need a software timeout. That's not so uncommon actually.
+>> during my experiments I've never seen an interrupt when a command
+>> timed out (nor could I find information about a timeout register in
+>> the documentation). do you have any pointers (like a previous mail
+>> where you've explained) how I can "explore the controller's timeout
+>> behavior"?
+>
+> Sorry, I don't have an pointers.
+>
+> Anyway. If you do a big erase operation on an SD card, the card should
+> signal busy on DAT0 for a rather long time.
+erase operation = mount sd card; rm big_file.bin; sync ?
+or is there some other way?
+
+> You could probably explore how long it takes for the card to respond
+> under those circumstances, and try both with and without
+> MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY.
+so I simply read the card status through sysfs? or would I need to get
+some of this information from the controller?
+I found that the IRQC register contains a few interesting bits:
+    u32 sdio_force_data:6; /*[13:8]
+        * Write operation: Data forced by software
+        * Read operation: {CLK,CMD,DAT[3:0]}*/
+I dumped these while transferring some data, the values seem to be
+changing constantly (0x3f, 0x1f, 0x20, ...)
+if I interpret those bits correctly then they are the status of the
+corresponding pin
+
+> Of course you also need to try with and without
+> MMC_CAP_WAIT_WHILE_BUSY, as the core may sometimes convert R1B to R1
+> responses depending on that cap.
+so MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY + MMC_CAP_WAIT_WHILE_BUSY should
+go together?
+and MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY should not be set when
+MMC_CAP_WAIT_WHILE_BUSY isn't?
+
+> [...]
+>
+>>>
+>>> It shouldn't be that hard to implement, although I strongly recommend
+>>> you to address this in a second step. In other words, I suggest you to
+>>> drop the entire multiple slot support in the first step, then we can
+>>> deal with that on top instead.
+>> many thanks for the detailed explanation again!
+>> I would be fine with dropping multiple slot support for the moment
+>> *if* we can agree on the fact that the devicetree binding can support
+>> multiple slots in theory (my idea here is: keep the child-nodes with
+>> compatible = "mmc-slot" mandatory - but only allow one such child node
+>> for now). I don't want to break DT compatibility after a few
+>> weeks/months for a new driver. is that OK for you as well?
+>
+> That's fine! We already have such a binding available for some other
+> mmc controllers. We could even consider to make that binding a generic
+> mmc binding.
+OK, perfect :)
+
+Regards,
+Martin
