@@ -1,413 +1,195 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 11 Jul 2017 18:56:25 +0800
-Subject: [PATCH V2 08/10] clk: sprd: add adjustable pll support
+Date: Tue, 11 Jul 2017 18:56:22 +0800
+Subject: [PATCH V2 05/10] clk: sprd: add mux clock support
 In-Reply-To: <20170711105627.20526-1-chunyan.zhang@spreadtrum.com>
 References: <20170711105627.20526-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170711105627.20526-9-chunyan.zhang@spreadtrum.com>
+Message-ID: <20170711105627.20526-6-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduced a common adjustable pll clock driver for Spreadtrum SoCs.
+This patch adds clock multiplexor support for Spreadtrum platforms,
+the mux clocks also can be found in sprd composite clocks, so
+provides two helpers that can be reused later on.
 
 Original-by: Xiaolong Zhang <xiaolong.zhang@spreadtrum.com>
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- drivers/clk/sprd/Makefile |   1 +
- drivers/clk/sprd/pll.c    | 236 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sprd/pll.h    | 133 ++++++++++++++++++++++++++
- 3 files changed, 370 insertions(+)
- create mode 100644 drivers/clk/sprd/pll.c
- create mode 100644 drivers/clk/sprd/pll.h
+ drivers/clk/sprd/Makefile |  1 +
+ drivers/clk/sprd/mux.c    | 86 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sprd/mux.h    | 63 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 150 insertions(+)
+ create mode 100644 drivers/clk/sprd/mux.c
+ create mode 100644 drivers/clk/sprd/mux.h
 
 diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
-index 2262e76..d693969 100644
+index 8cd5592..cee36b5 100644
 --- a/drivers/clk/sprd/Makefile
 +++ b/drivers/clk/sprd/Makefile
-@@ -5,3 +5,4 @@ clk-sprd-y	+= gate.o
- clk-sprd-y	+= mux.o
- clk-sprd-y	+= div.o
- clk-sprd-y	+= composite.o
-+clk-sprd-y	+= pll.o
-diff --git a/drivers/clk/sprd/pll.c b/drivers/clk/sprd/pll.c
+@@ -2,3 +2,4 @@ obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
+ 
+ clk-sprd-y	+= common.o
+ clk-sprd-y	+= gate.o
++clk-sprd-y	+= mux.o
+diff --git a/drivers/clk/sprd/mux.c b/drivers/clk/sprd/mux.c
 new file mode 100644
-index 0000000..97935a2
+index 0000000..b5d8988
 --- /dev/null
-+++ b/drivers/clk/sprd/pll.c
-@@ -0,0 +1,236 @@
++++ b/drivers/clk/sprd/mux.c
+@@ -0,0 +1,86 @@
 +/*
-+ * Spreadtrum pll clock driver
++ * Spreadtrum multiplexer clock driver
 + *
 + * Copyright (C) 2017 Spreadtrum, Inc.
 + *
 + * SPDX-License-Identifier: GPL-2.0
 + */
 +
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/slab.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
 +
-+#include "pll.h"
++#include "mux.h"
 +
-+#define CLK_PLL_1M	1000000
-+#define CLK_PLL_10M	(CLK_PLL_1M * 10)
++DEFINE_SPINLOCK(sprd_mux_lock);
++EXPORT_SYMBOL_GPL(sprd_mux_lock);
 +
-+#define pindex(pll, member)		\
-+	(pll->factors[member].shift / (8 * sizeof(pll->regs[0])))
-+
-+#define pshift(pll, member)		\
-+	(pll->factors[member].shift % (8 * sizeof(pll->regs[0])))
-+
-+#define pwidth(pll, member)		\
-+	pll->factors[member].width
-+
-+#define pmask(pll, member)					\
-+	((pwidth(pll, member)) ?				\
-+	GENMASK(pwidth(pll, member) + pshift(pll, member) - 1,	\
-+	pshift(pll, member)) : 0)
-+
-+#define pinternal(pll, cfg, member)	\
-+	(cfg[pindex(pll, member)] & pmask(pll, member))
-+
-+#define pinternal_val(pll, cfg, member)	\
-+	(pinternal(pll, cfg, member) >> pshift(pll, member))
-+
-+static unsigned long pll_get_refin(const struct sprd_pll *pll)
++u8 sprd_mux_helper_get_parent(const struct sprd_clk_common *common,
++			      const struct sprd_mux_internal *mux)
 +{
-+	u32 shift, mask, index, refin_id = 3;
-+	const unsigned long refin[4] = { 2, 4, 13, 26 };
++	u32 reg;
++	u8 parent;
++	int num_parents;
++	int i;
 +
-+	if (pwidth(pll, PLL_REFIN)) {
-+		index = pindex(pll, PLL_REFIN);
-+		shift = pshift(pll, PLL_REFIN);
-+		mask = pmask(pll, PLL_REFIN);
-+		refin_id = (sprd_pll_readl(pll, index) & mask) >> shift;
-+		if (refin_id > 3)
-+			refin_id = 3;
++	reg = sprd_clk_readl(common);
++	parent = reg >> mux->shift;
++	parent &= (1 << mux->width) - 1;
++
++	if (mux->table) {
++		num_parents = clk_hw_get_num_parents(&common->hw);
++
++		for (i = 0; i < num_parents; i++)
++			if (parent == mux->table[i] ||
++			    (i < (num_parents - 1) && parent > mux->table[i] &&
++			     parent < mux->table[i + 1]))
++				return i;
++		if (i == num_parents)
++			return i - 1;
 +	}
 +
-+	return refin[refin_id];
++	return parent;
++}
++EXPORT_SYMBOL_GPL(sprd_mux_helper_get_parent);
++
++static u8 sprd_mux_get_parent(struct clk_hw *hw)
++{
++	struct sprd_mux *cm = hw_to_sprd_mux(hw);
++
++	return sprd_mux_helper_get_parent(&cm->common, &cm->mux);
 +}
 +
-+static u32 pll_get_ibias(u64 rate, const u64 *table)
++int sprd_mux_helper_set_parent(const struct sprd_clk_common *common,
++			       const struct sprd_mux_internal *mux,
++			       u8 index)
 +{
-+	u32 i, num = table[0];
++	unsigned long flags = 0;
++	u32 reg;
 +
-+	for (i = 1; i < num + 1; i++)
-+		if (rate <= table[i])
-+			break;
++	if (mux->table)
++		index = mux->table[index];
 +
-+	return (i == num + 1) ? num : i;
-+}
++	spin_lock_irqsave(common->lock, flags);
 +
-+static unsigned long _sprd_pll_recalc_rate(const struct sprd_pll *pll,
-+					   unsigned long parent_rate)
-+{
-+	u32 *cfg;
-+	u32 i, mask, reg_num = pll->regs[0];
-+	unsigned long rate, nint, kint = 0;
-+	u64 refin;
-+	u16 k1, k2;
++	reg = sprd_clk_readl(common);
++	reg &= ~GENMASK(mux->width + mux->shift - 1, mux->shift);
++	sprd_clk_writel(reg | (index << mux->shift), common);
 +
-+	cfg = kcalloc(reg_num, sizeof(*cfg), GFP_KERNEL);
-+	if (!cfg)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < reg_num; i++)
-+		cfg[i] = sprd_pll_readl(pll, i);
-+
-+	refin = pll_get_refin(pll);
-+
-+	if (pinternal(pll, cfg, PLL_PREDIV))
-+		refin = refin * 2;
-+
-+	if (pwidth(pll, PLL_POSTDIV) &&
-+	    ((pll->fflag == 1 && pinternal(pll, cfg, PLL_POSTDIV)) ||
-+	     (!pll->fflag && !pinternal(pll, cfg, PLL_POSTDIV))))
-+		refin = refin / 2;
-+
-+	if (!pinternal(pll, cfg, PLL_DIV_S)) {
-+		rate = refin * pinternal_val(pll, cfg, PLL_N) * CLK_PLL_10M;
-+	} else {
-+		nint = pinternal_val(pll, cfg, PLL_NINT);
-+		if (pinternal(pll, cfg, PLL_SDM_EN))
-+			kint = pinternal_val(pll, cfg, PLL_KINT);
-+
-+		mask = pmask(pll, PLL_KINT);
-+
-+		k1 = pll->k1;
-+		k2 = pll->k2;
-+		rate = DIV_ROUND_CLOSEST_ULL(refin * kint * k1,
-+					 ((mask >> __ffs(mask)) + 1)) *
-+					 k2 + refin * nint * CLK_PLL_1M;
-+	}
-+
-+	return rate;
-+}
-+
-+#define SPRD_PLL_WRITE_CHECK(pll, i, mask, val)		\
-+	((sprd_pll_readl(pll, i) & mask) == val) ? 0 : -EFAULT
-+
-+static int _sprd_pll_set_rate(const struct sprd_pll *pll,
-+			      unsigned long rate,
-+			      unsigned long parent_rate)
-+{
-+	struct reg_cfg *cfg;
-+	int ret = 0;
-+	u32 mask, shift, width, ibias_val, index;
-+	u32 reg_num = pll->regs[0], i = 0;
-+	unsigned long kint, nint;
-+	u64 refin, fvco = rate;
-+
-+	cfg = kcalloc(reg_num, sizeof(*cfg), GFP_KERNEL);
-+	if (!cfg)
-+		return -ENOMEM;
-+
-+	refin = pll_get_refin(pll);
-+
-+	mask = pmask(pll, PLL_PREDIV);
-+	index = pindex(pll, PLL_PREDIV);
-+	width = pwidth(pll, PLL_PREDIV);
-+	if (width && (sprd_pll_readl(pll, index) & mask))
-+		refin = refin * 2;
-+
-+	mask = pmask(pll, PLL_POSTDIV);
-+	index = pindex(pll, PLL_POSTDIV);
-+	width = pwidth(pll, PLL_POSTDIV);
-+	cfg[index].msk = mask;
-+	if (width && ((pll->fflag == 1 && fvco <= pll->fvco) ||
-+		      (pll->fflag == 0 && fvco > pll->fvco)))
-+		cfg[index].val |= mask;
-+
-+	if (width && fvco <= pll->fvco)
-+		fvco = fvco * 2;
-+
-+	mask = pmask(pll, PLL_DIV_S);
-+	index = pindex(pll, PLL_DIV_S);
-+	cfg[index].val |= mask;
-+	cfg[index].msk |= mask;
-+
-+	mask = pmask(pll, PLL_SDM_EN);
-+	index = pindex(pll, PLL_SDM_EN);
-+	cfg[index].val |= mask;
-+	cfg[index].msk |= mask;
-+
-+	nint  = fvco/(refin * CLK_PLL_1M);
-+
-+	mask = pmask(pll, PLL_NINT);
-+	index = pindex(pll, PLL_NINT);
-+	shift = pshift(pll, PLL_NINT);
-+	cfg[index].val |= (nint << shift) & mask;
-+	cfg[index].msk |= mask;
-+
-+	mask = pmask(pll, PLL_KINT);
-+	index = pindex(pll, PLL_KINT);
-+	width = pwidth(pll, PLL_KINT);
-+	shift = pshift(pll, PLL_KINT);
-+	kint = DIV_ROUND_CLOSEST_ULL(((fvco - refin * nint * CLK_PLL_1M) /
-+				      10000) * ((mask >> shift) + 1),
-+				     refin * 100);
-+	cfg[index].val |= (kint << shift) & mask;
-+	cfg[index].msk |= mask;
-+
-+	ibias_val = pll_get_ibias(fvco, pll->itable);
-+
-+	mask = pmask(pll, PLL_IBIAS);
-+	index = pindex(pll, PLL_IBIAS);
-+	shift = pshift(pll, PLL_IBIAS);
-+	cfg[index].val |= ibias_val << shift & mask;
-+	cfg[index].msk |= mask;
-+
-+	for (i = 0; i < reg_num; i++) {
-+		if (cfg[i].msk) {
-+			sprd_pll_writel(pll, i, cfg[i].msk, cfg[i].val);
-+			ret |= SPRD_PLL_WRITE_CHECK(pll, i, cfg[i].msk,
-+						   cfg[i].val);
-+		}
-+	}
-+
-+	if (!ret)
-+		udelay(pll->udelay);
-+
-+	return ret;
-+}
-+
-+static unsigned long sprd_pll_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	struct sprd_pll *pll = hw_to_sprd_pll(hw);
-+
-+	return _sprd_pll_recalc_rate(pll, parent_rate);
-+}
-+
-+static int sprd_pll_set_rate(struct clk_hw *hw,
-+			     unsigned long rate,
-+			     unsigned long parent_rate)
-+{
-+	struct sprd_pll *pll = hw_to_sprd_pll(hw);
-+
-+	return _sprd_pll_set_rate(pll, rate, parent_rate);
-+}
-+
-+static int sprd_pll_clk_prepare(struct clk_hw *hw)
-+{
-+	struct sprd_pll *pll = hw_to_sprd_pll(hw);
-+
-+	udelay(pll->udelay);
++	spin_unlock_irqrestore(common->lock, flags);
 +
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(sprd_mux_helper_set_parent);
 +
-+static long sprd_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
++static int sprd_mux_set_parent(struct clk_hw *hw, u8 index)
 +{
-+	return rate;
++	struct sprd_mux *cm = hw_to_sprd_mux(hw);
++
++	return sprd_mux_helper_set_parent(&cm->common, &cm->mux, index);
 +}
 +
-+const struct clk_ops sprd_pll_ops = {
-+	.prepare = sprd_pll_clk_prepare,
-+	.recalc_rate = sprd_pll_recalc_rate,
-+	.round_rate = sprd_pll_round_rate,
-+	.set_rate = sprd_pll_set_rate,
++const struct clk_ops sprd_mux_ops = {
++	.get_parent = sprd_mux_get_parent,
++	.set_parent = sprd_mux_set_parent,
++	.determine_rate = __clk_mux_determine_rate,
 +};
-+EXPORT_SYMBOL_GPL(sprd_pll_ops);
-diff --git a/drivers/clk/sprd/pll.h b/drivers/clk/sprd/pll.h
++EXPORT_SYMBOL_GPL(sprd_mux_ops);
+diff --git a/drivers/clk/sprd/mux.h b/drivers/clk/sprd/mux.h
 new file mode 100644
-index 0000000..af5b2da
+index 0000000..aa35514
 --- /dev/null
-+++ b/drivers/clk/sprd/pll.h
-@@ -0,0 +1,133 @@
++++ b/drivers/clk/sprd/mux.h
+@@ -0,0 +1,63 @@
 +/*
-+ * Spreadtrum clock pll configurations
++ * Spreadtrum multiplexer clock driver
 + *
 + * Copyright (C) 2017 Spreadtrum, Inc.
 + *
 + * SPDX-License-Identifier: GPL-2.0
 + */
 +
-+#ifndef _SPRD_PLL_H_
-+#define _SPRD_PLL_H_
++#ifndef _SPRD_MUX_H_
++#define _SPRD_MUX_H_
 +
 +#include "common.h"
 +
-+struct reg_cfg {
-+	u32 val;
-+	u32 msk;
++struct sprd_mux_internal {
++	u8		shift;
++	u8		width;
++	const u8	*table;
 +};
 +
-+struct clk_bit_field {
-+	u8 shift;
-+	u8 width;
-+};
-+
-+enum {
-+	PLL_LOCK_DONE,
-+	PLL_DIV_S,
-+	PLL_MOD_EN,
-+	PLL_SDM_EN,
-+	PLL_REFIN,
-+	PLL_IBIAS,
-+	PLL_N,
-+	PLL_NINT,
-+	PLL_KINT,
-+	PLL_PREDIV,
-+	PLL_POSTDIV,
-+
-+	PLL_FACT_MAX
-+};
-+
-+/*
-+ * struct sprd_pll - definition of adjustable pll clock
-+ *
-+ * @reg:	registers used to set the configuration of pll clock,
-+ *		reg[0] shows how many registers this pll clock uses.
-+ * @itable:	pll ibias table, itable[0] means how many items this
-+ *		table includes
-+ * @udelay	delay time after setting rate
-+ * @factors	used to calculate the pll clock rate
-+ * @fvco:	fvco threshold rate
-+ * @fflag:	fvco flag
-+ */
-+struct sprd_pll {
-+	const u32 *regs;
-+	const u64 *itable;
-+	const struct clk_bit_field *factors;
-+	u16 udelay;
-+	u16 k1;
-+	u16 k2;
-+	u16 fflag;
-+	u64 fvco;
-+
++struct sprd_mux {
++	struct sprd_mux_internal mux;
 +	struct sprd_clk_common	common;
 +};
 +
-+#define SPRD_PLL_WITH_ITABLE_K_FVCO(_struct, _name, _parent, _reg,	\
-+				    _regs, _itable, _factors, _udelay,	\
-+				    _k1, _k2, _fflag, _fvco)		\
-+	struct sprd_pll _struct = {					\
-+		.regs		= _regs,				\
-+		.itable		= _itable,				\
-+		.factors	= _factors,				\
-+		.udelay		= _udelay,				\
-+		.k1		= _k1,					\
-+		.k2		= _k2,					\
-+		.fflag		= _fflag,				\
-+		.fvco		= _fvco,				\
-+		.common		= {					\
-+			.reg		= _reg,				\
-+			.hw.init	= CLK_HW_INIT(_name,		\
-+						      _parent,		\
-+						      &sprd_pll_ops,	\
-+						      0),		\
-+		},							\
++#define _SPRD_MUX_CLK(_shift, _width, _table)		\
++	{						\
++		.shift	= _shift,			\
++		.width	= _width,			\
++		.table	= _table,			\
 +	}
 +
-+#define SPRD_PLL_WITH_ITABLE_K(_struct, _name, _parent, _reg,		\
-+			       _regs, _itable, _factors,		\
-+			       _udelay, _k1, _k2)			\
-+	SPRD_PLL_WITH_ITABLE_K_FVCO(_struct, _name, _parent, _reg,	\
-+				    _regs, _itable, _factors,		\
-+				    _udelay, _k1, _k2, 0, 0)
++#define SPRD_MUX_CLK(_struct, _name, _parents, _table,			\
++				     _reg, _shift, _width,		\
++				     _flags)				\
++	struct sprd_mux _struct = {					\
++		.mux	= _SPRD_MUX_CLK(_shift, _width, _table),	\
++		.common	= {						\
++			.reg		= _reg,				\
++			.lock		= &sprd_mux_lock,		\
++			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++							      _parents, \
++							      &sprd_mux_ops,\
++							      _flags),	\
++		}							\
++	}
 +
-+#define SPRD_PLL_WITH_ITABLE_1K(_struct, _name, _parent, _reg,		\
-+				_regs, _itable, _factors, _udelay)	\
-+	SPRD_PLL_WITH_ITABLE_K_FVCO(_struct, _name, _parent, _reg,	\
-+				    _regs, _itable, _factors, _udelay,	\
-+				    1000, 1000, 0, 0)
-+
-+static inline struct sprd_pll *hw_to_sprd_pll(struct clk_hw *hw)
++static inline struct sprd_mux *hw_to_sprd_mux(const struct clk_hw *hw)
 +{
 +	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
 +
-+	return container_of(common, struct sprd_pll, common);
++	return container_of(common, struct sprd_mux, common);
 +}
 +
-+static inline u32 sprd_pll_readl(const struct sprd_pll *pll, u8 index)
-+{
-+	const struct sprd_clk_common *common = &pll->common;
++extern const struct clk_ops sprd_mux_ops;
++extern spinlock_t sprd_mux_lock;
 +
-+	if (WARN_ON(index >= pll->regs[0]))
-+		return 0;
++u8 sprd_mux_helper_get_parent(const struct sprd_clk_common *common,
++			      const struct sprd_mux_internal *mux);
++int sprd_mux_helper_set_parent(const struct sprd_clk_common *common,
++			       const struct sprd_mux_internal *mux,
++			       u8 index);
 +
-+	return readl(common->base + pll->regs[index + 1]);
-+}
-+
-+static inline void sprd_pll_writel(const struct sprd_pll *pll, u8 index,
-+				  u32 msk, u32 val)
-+{
-+	const struct sprd_clk_common *common = &pll->common;
-+	void __iomem *addr;
-+	u32 reg;
-+
-+	if (WARN_ON(index >= pll->regs[0]))
-+		return;
-+
-+	addr = common->base + pll->regs[index + 1];
-+	reg = readl(addr);
-+	writel((reg & ~msk) | val, addr);
-+}
-+
-+extern const struct clk_ops sprd_pll_ops;
-+
-+#endif /* _SPRD_PLL_H_ */
++#endif /* _SPRD_MUX_H_ */
 -- 
 2.7.4
