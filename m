@@ -1,93 +1,82 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 11 Jul 2017 17:44:14 +0300
-Subject: [PATCH] gpu: host1x: Free the IOMMU domain when there is no
- device to attach
-In-Reply-To: <1499783851.1520.16.camel@toradex.com>
-References: <20170710193305.5987-1-contact@paulk.fr>
- <1499762987.1340.10.camel@paulk.fr> <1499783851.1520.16.camel@toradex.com>
-Message-ID: <1499784254.1340.13.camel@paulk.fr>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 11 Jul 2017 15:50:19 +0100
+Subject: i.MX 6 and PCIe DMA issues
+In-Reply-To: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
+References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
+Message-ID: <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-07-11 at 14:37 +0000, Marcel Ziswiler wrote:
-> On Tue, 2017-07-11 at 11:49 +0300, Paul Kocialkowski wrote:
-> > On Mon, 2017-07-10 at 21:33 +0200, Paul Kocialkowski wrote:
-> > > When there is no device to attach to the IOMMU domain, as may be
-> > > the
-> > > case when the device-tree does not contain the proper iommu node,
-> > > it
-> > > is
-> > > best to keep going without IOMMU support rather than failing.
-> > > This allows the driver to probe and function instead of taking
-> > > down
-> > > all of the tegra drm driver, leading to missing display support.
-> > 
-> > Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
-> > 
-> > > Signed-off-by: Paul Kocialkowski <contact-W9ppeneeCTY@public.gmane
-> > > .
-> > > org>
-> > > ---
-> > >  drivers/gpu/host1x/dev.c | 8 +++++++-
-> > >  1 file changed, 7 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/gpu/host1x/dev.c b/drivers/gpu/host1x/dev.c
-> > > index ac65f52850a6..f296738d0de8 100644
-> > > --- a/drivers/gpu/host1x/dev.c
-> > > +++ b/drivers/gpu/host1x/dev.c
-> > > @@ -186,8 +186,13 @@ static int host1x_probe(struct
-> > > platform_device
-> > > *pdev)
-> > >  			return -ENOMEM;
-> > >  
-> > >  		err = iommu_attach_device(host->domain, &pdev-
-> > > > dev);
-> > > 
-> > > -		if (err)
-> > > +		if (err == -ENODEV) {
-> > > +			iommu_domain_free(host->domain);
-> > > +			host->domain = NULL;
-> > > +			goto iommu_skip;
-> > > +		} else if (err) {
-> > >  			goto fail_free_domain;
-> > > +		}
-> > >  
-> > >  		geometry = &host->domain->geometry;
-> > >  
-> > > @@ -198,6 +203,7 @@ static int host1x_probe(struct platform_device
-> > > *pdev)
-> > >  		host->iova_end = geometry->aperture_end;
-> > >  	}
-> > >  
-> > > +iommu_skip:
-> > >  	err = host1x_channel_list_init(host);
-> > >  	if (err) {
-> > >  		dev_err(&pdev->dev, "failed to initialize channel
-> > > list\n");
+On 11/07/17 14:40, Moese, Michael wrote:
+> Hello ARM folks, I turn to you in hope you have any hints or
+> directions on the problem I describe below.
 > 
-> Please note that this does no longer cleanly apply after Mikko's 'gpu:
-> host1x: Refactor channel allocation code' commit from June 15 already
-> applied to current -next. Other than that
+> I am currently investigating strange behavior of our i.MX 6 (Quad)
+> board with an FPGA connected to to PCI Express. This FPGA contains,
+> among others, an Ethernet (10/100 Mbps) IP core. The Ethernet relies
+> completely on DMA transfers. There is one buffer descriptor table
+> containing pointers to 64 RX and TX buffers. Buffers are allocated
+> using dma_alloc_coherent() and mapped using dma_map_single(). Prior
 
-Good to know! I intended this patch for fixing 4.12 stable, so I'm not
-even entirely sure it should land in next. The patch that fixes the
-device-tree to actually enable the iommu should be merged in priority.
+I don't much like the sound of that "and" there - coherent DMA
+allocations are, as the name implies, already coherent for CPU and DMA
+accesses, and require no maintenance; the streaming DMA API
+(dma_{map,unmap,sync}_*) on the other hand is *only* for use on
+kmalloced memory.
 
-If that is the case and anyone wants this patch rebased to next, feel
-free to let me know and I'll send a rebased version.
+I'm far more of a DMA guy than a networking guy, so I don't know much
+about the details of ethernet drivers, but typically, long-lived things
+like descriptor rings would usually use coherent allocations, whilst
+streaming DMA is used for the transient mapping/unmapping of individual
+skbs.
 
-> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Tested-on: Apalis TK1, Apalis T30, Beaver, Colibri T30, Jetson-TK1
+> to access, dma_sync_single_for_cpu() is called on the memory regions,
+> afterwards dma_sync_single_for_device().
 > 
-> Finally graphics working again, thanks guys!
+> If a new frame is received, the driver reads the RX buffer and passes
+> the frame using skb_put(). When the issue was reported for an old
+> (say 3.18.19) kernel, the buffer descriptor was read correctly
+> (including a correct length), but the buffer contained all zeroes.
+> When I map the physical address in userspace and dump the contents, I
+> can see the correct buffer descriptor contents and inside the buffers
+> valid Ethernet frames. So the DMA transfer itself is working
+> obviously. To avoid chasing after already-fixed bugs, I switched to a
+> 4.12.0 kernel and observed almost the same behavior, but this time
+> there was no length read as well. On 3.18.19 I was able to read the
+> buffers when I allocate them using kmalloc() instead of
+> dma_alloc_coherent(), on 4.12 this did not have any impact.
+> 
+> I was suspecting the caches to be the root of my issue, but I was not
+> able to resolve the issue with calls to flush_cache_all(), which I
+> suppose should have invalidated the entire cache.
 
-Yay! :)
+i.MX6Q has a PL310 L2 outer cache, which brings with it a whole load of
+extra fun, but the primary effect is that it'll be extremely hard to
+bodge things if the DMA API usage is incorrect in the first place.
+AFAICS flush_cache_all() on a v7 CPU performs set/way operations on the
+CPU caches, which means a) on that system it will only affect L1, and b)
+it shouldn't really be used from an SMP context with the MMU on anyway.
 
--- 
-Paul Kocialkowski,
+The PL310 does have more than its fair share of wackiness, but unless
+you also see DMA going wrong for the on-chip peripherals, the problem is
+almost certainly down to the driver itself rather than the cache
+configuration.
 
-developer of free digital technology and hardware support
+Robin.
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+> Unfortunately, our driver is legacy out-of-tree code and I started
+> working on this driver to get it ready for submission. If it is of
+> any help, I could send the code of the driver as well as our board's
+> device tree.
+> 
+> I would highly appreciate any hint or direction that may help my
+> troubleshooting.
+> 
+> Best Regards, Michael
+> 
+> 
+> 
+> _______________________________________________ linux-arm-kernel
+> mailing list linux-arm-kernel at lists.infradead.org 
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
