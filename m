@@ -1,42 +1,22 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 11 Jul 2017 10:49:46 +0800
-Subject: [PATCH v4 1/3] cpufreq: mediatek: Add support of cpufreq to
- MT2701/MT7623 SoC
-In-Reply-To: <feabcfd53899954198c6620e9d9b68f4a3c55201.1499692967.git.sean.wang@mediatek.com>
-References: <cover.1499692967.git.sean.wang@mediatek.com>
- <feabcfd53899954198c6620e9d9b68f4a3c55201.1499692967.git.sean.wang@mediatek.com>
-Message-ID: <1499741386.12408.11.camel@mtksdaap41>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Jul 2017 21:57:54 -0500
+Subject: [PATCH v2 2/3] dt-bindings: display: panel: Add support for
+ Orise Tech otm8009a dsi panel
+In-Reply-To: <1499677333-10571-3-git-send-email-philippe.cornu@st.com>
+References: <1499677333-10571-1-git-send-email-philippe.cornu@st.com>
+ <1499677333-10571-3-git-send-email-philippe.cornu@st.com>
+Message-ID: <20170711025754.qxb6jkdxhrj45eh3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
-
-On Mon, 2017-07-10 at 22:23 +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Mon, Jul 10, 2017 at 11:02:12AM +0200, Philippe CORNU wrote:
+> The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
+> a MIPI-DSI video interface. Its backlight is managed through the DSI link.
 > 
-> MT2701/MT7623 is a 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
-> single cluster and this hardware is also compatible with the existing
-> driver through enabling CPU frequency feature with operating-points-v2
-> bindings. Also, this driver actually supports all MediaTek SoCs, the
-> Kconfig menu entry and file name itself should be updated with more
-> generic name to drop "MT8173"
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Reviewed-by: Jean Delvare <jdelvare@suse.de>
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
 > ---
->  drivers/cpufreq/Kconfig.arm                              | 7 +++----
->  drivers/cpufreq/Makefile                                 | 2 +-
->  drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} | 2 ++
->  3 files changed, 6 insertions(+), 5 deletions(-)
->  rename drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} (99%)
-> 
+>  .../bindings/display/panel/orisetech,otm8009a.txt   | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
 
-As Viresh mentioned, there are already many drivers use "mtk" as
-filename prefix or postfix.To align with those files, I suggest use
-mtk-cpufreq.c.I think there are not too many values to change all "mtk-"
-to "mediatek-", but it is worth to have the same naming rule for
-mediatek upstream driver.
-
-Regards,
-Eddie. 
+Acked-by: Rob Herring <robh@kernel.org>
