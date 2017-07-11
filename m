@@ -1,65 +1,50 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 12 Jul 2017 00:14:38 +0200
-Subject: [PATCH v2] watchdog: meson-wdt: add support for the watchdog on
- Meson8 and Meson8m2
-Message-ID: <20170711221438.8958-1-martin.blumenstingl@googlemail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 11 Jul 2017 17:36:15 -0500
+Subject: [PATCH] dt-bindings: clock: ti-sci: Fix incorrect usage of headers
+Message-ID: <20170711223615.29398-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog IP block on Meson8 and Meson8m2 is already supported by the
-existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
-while the newer Meson8m2 SoC uses the same register bits as Meson8b.
+The clock consumer usage description was erroneously referring to
+couple of dt-binding headers that are no longer valid. The definition
+and/or usage of these headers is incorrect and the only file present
+at the moment, dt-bindings/soc/k2g.h is also being cleaned up. The
+examples in this binding were updated properly, but the update to
+description was missed out. So, fix this.
 
-Currently watchdog support on Meson8 SoC already works because
-meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
-separate compatible for Meson8 makes this more explicit though.
-
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Fixes: 8f306cfe4383 ("Documentation: dt: Add TI SCI clock driver")
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
-Changes since v1 at [0]:
-- updated the documentation to indicate that Meson8 should also specify
-  the Meson6 compatible and that Meson8m2 should also specify the
-  Meson8b compatible
+Hi Stephen,
 
-[0] https://patchwork.kernel.org/patch/9780093/
+Looks like this was missed during the update/repost of the ti-sci-clk
+driver/binding. FYI, Santosh is going to pickup the header file cleanup
+patch https://patchwork.kernel.org/patch/9741279/ for the next merge
+window.
 
+regards
+Suman
 
- Documentation/devicetree/bindings/watchdog/meson-wdt.txt | 6 +++++-
- drivers/watchdog/meson_wdt.c                             | 2 ++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/ti,sci-clk.txt | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-index ae70185d96e6..8a6d84cb36c9 100644
---- a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-@@ -2,7 +2,11 @@ Meson SoCs Watchdog timer
+diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+index 1e884c40ab50..4e59dc6b1778 100644
+--- a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
++++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+@@ -14,10 +14,9 @@ Required properties:
+ - compatible: Must be "ti,k2g-sci-clk"
+ - #clock-cells: Shall be 2.
+   In clock consumers, this cell represents the device ID and clock ID
+-  exposed by the PM firmware. The assignments can be found in the header
+-  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
+-  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where <soc>
+-  is the SoC involved, for example 'k2g'.
++  exposed by the PM firmware. The list of valid values for the device IDs
++  and clocks IDs for 66AK2G SoC are documented at
++  http://processors.wiki.ti.com/index.php/TISCI#66AK2G02_Data
  
- Required properties:
- 
--- compatible : should be "amlogic,meson6-wdt" or "amlogic,meson8b-wdt"
-+- compatible : depending on the SoC this should be one of:
-+	"amlogic,meson6-wdt" on Meson6 SoCs
-+	"amlogic,meson8-wdt" and "amlogic,meson6-wdt" on Meson8 SoCs
-+	"amlogic,meson8b-wdt" on Meson8b SoCs
-+	"amlogic,meson8m2-wdt" and "amlogic,meson8b-wdt" on Meson8m2 SoCs
- - reg : Specifies base physical address and size of the registers.
- 
- Example:
-diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
-index 491b9bf13d84..304274c67735 100644
---- a/drivers/watchdog/meson_wdt.c
-+++ b/drivers/watchdog/meson_wdt.c
-@@ -155,7 +155,9 @@ static const struct watchdog_ops meson_wdt_ops = {
- 
- static const struct of_device_id meson_wdt_dt_ids[] = {
- 	{ .compatible = "amlogic,meson6-wdt", .data = &meson6_wdt_data },
-+	{ .compatible = "amlogic,meson8-wdt", .data = &meson6_wdt_data },
- 	{ .compatible = "amlogic,meson8b-wdt", .data = &meson8b_wdt_data },
-+	{ .compatible = "amlogic,meson8m2-wdt", .data = &meson8b_wdt_data },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, meson_wdt_dt_ids);
+ Examples:
+ --------
 -- 
-2.13.2
+2.13.1
