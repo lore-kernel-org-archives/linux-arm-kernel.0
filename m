@@ -1,57 +1,34 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Tue, 11 Jul 2017 00:01:37 +0000
-Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <CAKgT0UdqoRR8XLG1o3ygUZTqEBQ4dgNaneZ-n1OSNC1AiswO_g@mail.gmail.com>
-References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
- <MWHPR12MB160087E9E0B17F7A17609714C8AA0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <MWHPR12MB160006024D920ED58126048AC8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0Uc5KSJTj4A=9pSudiJ28AW0krc7FZpdW4upwY+FgpeArA@mail.gmail.com>
- <MWHPR12MB1600AECAE619EAA97E6B15D5C8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>,
- <CAKgT0UdqoRR8XLG1o3ygUZTqEBQ4dgNaneZ-n1OSNC1AiswO_g@mail.gmail.com>
-Message-ID: <MWHPR12MB16008EFFC5F2792880F7E80BC8A90@MWHPR12MB1600.namprd12.prod.outlook.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 10 Jul 2017 20:20:49 -0400
+Subject: [PATCH V2] PCI: Do not enable extended tags on pre-dated (v1.x)
+ systems
+In-Reply-To: <20170710230911.GH5610@bhelgaas-glaptop.roam.corp.google.com>
+References: <1499439193-16628-1-git-send-email-okaya@codeaurora.org>
+ <20170710230911.GH5610@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <5f5119fd-64d5-5e7c-fa50-54ac6e6a36b6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bjorn,
 
-Hey Alexander,
+On 7/10/2017 7:09 PM, Bjorn Helgaas wrote:
+> The PCI_EXP_DEVCTL_EXT_TAG bit controls the behavior of the function as a
+> Requester.  As far as I can see, it has nothing to do with whether the
+> function supports 8-bit tags as a *Completer*, so the implicit assumption
+> of the spec is that all Completers always support 8-bit tags.  My guess is
+> that's why the ECN thought it would be safe to enable extended tags by
+> default.
+> 
+> If that's the case, this is just a defect in the device (the Completer),
+> and we should blacklist it.  Looking at the PCIe Capability version might
+> happen to correlate with Completer support for 8-bit tags, but that looks
+> like just a coincidence to me.
 
-  Okay, I understand your point regarding the "most likely scenario" being
-TLPs directed upstream to the Root Complex.  But I'd still like to make sure
-that we have an agreed upon API/methodology for doing Peer-to-Peer with
-Relaxed Ordering and no Relaxed Ordering to the Root Complex.  I don't see
-how the proposed APIs can be used in that fashion.
- 
-  Right now the proposed change for cxgb4 is for it to test its own PCIe
-Capability Device Control[Relaxed Ordering Enable] in order to use that
-information to program the Chelsio Hardware to emit/not emit upstream TLPs
-with the Relaxed Ordering Attribute set.  But if we're going to have the
-mixed mode situation I describe, the PCIe Capability Device Control[Relaxed
-Ordering Enable] will have to be set which means that we'll be programming
-the Chelsio Hardware to send upstream TLPs with Relaxed Ordering Enable to
-the Root Complex which is what we were trying to avoid in the first place ...
+Sure, I can change to blacklist. I'll not enable it unless the device is blacklisted
+via quirks.
 
-  [[ And, as I noted on Friday evening, the currect cxgb4 Driver hardwires
-     the Relaxed Ordering Enable on early dureing device probe, so that
-     would minimally need to be addressed even if we decide that we don't
-     ever want to support mixed mode Relaxed Ordering. ]]
-
-  We need some method of telling the Chelsio Driver that it should/shouldn't
-use Relaxed Ordering with TLPs directed at the Root Complex.  And the same
-is true for a Peer PCIe Device.
-
-  It may be that we should approach this from the completely opposite
-direction and instead of having quirks which identify problematic devices,
-have quirks which identify devices which would benefit from the use of
-Relaxed Ordering (if the sending device supports that).  That is, assume the
-using Relaxed Ordering shouldn't be done unless the target device says "I
-love Relaxed Ordering TLPs" ...  In such a world, an NVMe or a Graphics
-device might declare love of Relaxed Ordering and the same for a SPARC Root
-Complex (I think that was your example).
-
-  By the way, the sole example of Data Corruption with Relaxed Ordering is
-the AMD A1100 ARM SoC and AMD appears to have given up on that almost as
-soon as it was released.  So what we're left with currently is a performance
-problem on modern Intel CPUs ...  (And hopefully we'll get a Technical
-Publication on that issue fairly soon.)
-
-Casey
+Sinan
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
