@@ -1,16 +1,16 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 11 Jul 2017 15:51:40 +0300
+Date: Tue, 11 Jul 2017 15:55:57 +0300
 Subject: [PATCH v2] dt-bindings: net: ravb : Add support for r8a7743 SoC
-In-Reply-To: <20170711122100.GM4517@verge.net.au>
+In-Reply-To: <TY1PR06MB07023342440946F384B7C80EB7AE0@TY1PR06MB0702.apcprd06.prod.outlook.com>
 References: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
  <1499700776-54504-1-git-send-email-biju.das@bp.renesas.com>
  <52eb0b92-5d25-e1f4-df54-e4fcf648c90e@cogentembedded.com>
- <20170711122100.GM4517@verge.net.au>
-Message-ID: <87b6b38a-ca6b-a0d7-b777-0a4809eaf6fc@cogentembedded.com>
+ <TY1PR06MB07023342440946F384B7C80EB7AE0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+Message-ID: <afe04380-840a-c282-2f53-40d891e6400a@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2017 03:21 PM, Simon Horman wrote:
+On 07/11/2017 03:20 PM, Chris Paterson wrote:
 
 >>> Add a new compatible string for the RZ/G1M (R8A7743) SoC.
 >>>
@@ -20,53 +20,45 @@ On 07/11/2017 03:21 PM, Simon Horman wrote:
 >>> * Changed the subject
 >>> * re-formatted the required properties
 >>>
->>> .../devicetree/bindings/net/renesas,ravb.txt       | 29 +++++++++++++---------
->>> 1 file changed, 17 insertions(+), 12 deletions(-)
+>>>  .../devicetree/bindings/net/renesas,ravb.txt       | 29 +++++++++++++------
+>> ---
+>>>  1 file changed, 17 insertions(+), 12 deletions(-)
 >>>
->>> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>>> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>>> b/Documentation/devicetree/bindings/net/renesas,ravb.txt
 >>> index b519503..4717bc2 100644
 >>> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
 >>> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
->>> @@ -4,19 +4,24 @@ This file provides information on what the device node for the Ethernet AVB
->>> interface contains.
+>>> @@ -4,19 +4,24 @@ This file provides information on what the device
+>>> node for the Ethernet AVB  interface contains.
 >>>
->>> Required properties:
->>> -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+>>>  Required properties:
+>>> -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790
+>> SoC.
 >>> -	      "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
 >>> -	      "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
 >>> -	      "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
 >>> -	      "renesas,etheravb-r8a7794" if the device is a part of R8A7794 SoC.
 >>> -	      "renesas,etheravb-r8a7795" if the device is a part of R8A7795 SoC.
 >>> -	      "renesas,etheravb-r8a7796" if the device is a part of R8A7796 SoC.
->>> -	      "renesas,etheravb-rcar-gen2" for generic R-Car Gen 2 compatible interface.
->>> -	      "renesas,etheravb-rcar-gen3" for generic R-Car Gen 3 compatible interface.
+>>> -	      "renesas,etheravb-rcar-gen2" for generic R-Car Gen 2 compatible
+>> interface.
+>>> -	      "renesas,etheravb-rcar-gen3" for generic R-Car Gen 3 compatible
+>> interface.
 >>> +- compatible: Must contain one or more of the following:
 >>
->>    No, it can't contain more than one SoC specific value.
+>>     No, it can't contain more than one SoC specific value.
 >
-> The text above does not say it can unless one is under the delusion
-> that, f.e. an r8a7790 SoC is also an r8a7791 SoC.
+> Surely it can contain both "renesas,etheravb-r8a7743" and "renesas,etheravb-rcar-gen2" for example?
+>
+> As indeed dictated by the instruction further down:
 
-    Hm, you're right. Sorry about my misunderstanding...
+    Yes. Sorry, I should have been more attentive.
 
-    The only problem I'm still seeing with the current wording is that gen2/3 
-fallback
-values are declared optional, while you can't get the driver to bind without 
-them on
-the newer SoCs. But this is probably not a new problem...
+>>> +	When compatible with the generic version, nodes must list the
+>>> +	SoC-specific version corresponding to the platform first followed by
+>>> +	the generic version.
 
-> If you would prefer an alternate wording please provide a suggestion.
+> Kind regards, Chris
 
-    Perhaps we should emphasize that the gen2/3 fallback values are mandatory?
-
->>> +      - "renesas,etheravb-r8a7743" for the R8A7743 SoC.
->>> +      - "renesas,etheravb-r8a7790" for the R8A7790 SoC.
->>> +      - "renesas,etheravb-r8a7791" for the R8A7791 SoC.
->>> +      - "renesas,etheravb-r8a7792" for the R8A7792 SoC.
->>> +      - "renesas,etheravb-r8a7793" for the R8A7793 SoC.
->>> +      - "renesas,etheravb-r8a7794" for the R8A7794 SoC.
->>> +      - "renesas,etheravb-rcar-gen2" as a fallback for the above
->>> +		R-Car Gen2 and RZ/G1 devices.
-[...]
-
-WBR, Sergei
+MBR, Sergei
