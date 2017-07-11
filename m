@@ -1,54 +1,120 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 11 Jul 2017 14:56:48 +0200
-Subject: [PATCH 2/3] ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for
- vin nodes
-In-Reply-To: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
-References: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1499777809-27492-3-git-send-email-horms+renesas@verge.net.au>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 11 Jul 2017 15:10:37 +0200
+Subject: [PATCH 00/16] omap_hsmmc: Add ADMA support and UHS/HS200/DDR
+ support
+In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
+References: <20170616124544.15046-1-kishon@ti.com>
+Message-ID: <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a7791 SoC.
+On 16 June 2017 at 14:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> This is the final part of the series originally sent as
+> part of [2].
+>
+> This series adds UHS, HS200, DDR mode and ADMA support to
+> omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
+> SoCs.
+>
+> Changes from [2]:
+> *) No more updating omap2plus_defconfig or multi_v7_defconfig is
+>    required, so those patches are removed.
+> *) Addressed Rob Herring's comment on implementing a function
+>    instead of having a macro while getting pinctrl state.
+>
+> This series is created on top of [3], [4], [5] AND [6]
+> (i.e after
+>   ARM: dts: omap3-overo: Remove "vqmmc-supply" property from MMC dt node
+>   omap_hsmmc: use mmc_regulator_get_supply() to get regulators
+>   omap*: Fixes/Cleanups for MMC devicetree node
+>   ARM: dts: Add iodelay data for MMC)
+>
+> The functionality implemented in this series was sent before ([1]) but
+> was never followed up since supporting high speed modes in dra7 required
+> IODelay values to be configured. With IODelay driver being merged into
+> kernel, sending it as a fresh series with support for configuring IODelay
+> values.
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7791 and the
-fallback binding for R-Car Gen 2
+Is it safe to queue this via mmc tree for 4.14 or is there a
+dependency I must consider? The above didn't quite tell me that, could
+you please elaborate.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> Suggestions of migrating to sdhci driver (from omap_hsmmc driver) is not
+> addressed since
+> *) tuning ratio of MMC in dra7 is different from sdhci
+> *) IOdelay is required for dra7
+> *) GPIO based card detect is not supported in sdhci
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index e135da440eed..ea4a8147d995 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -987,7 +987,7 @@
- 	};
- 
- 	vin0: video at e6ef0000 {
--		compatible = "renesas,vin-r8a7791";
-+		compatible = "renesas,vin-r8a7791", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef0000 0 0x1000>;
- 		interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_VIN0>;
-@@ -996,7 +996,7 @@
- 	};
- 
- 	vin1: video at e6ef1000 {
--		compatible = "renesas,vin-r8a7791";
-+		compatible = "renesas,vin-r8a7791", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef1000 0 0x1000>;
- 		interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_VIN1>;
-@@ -1005,7 +1005,7 @@
- 	};
- 
- 	vin2: video at e6ef2000 {
--		compatible = "renesas,vin-r8a7791";
-+		compatible = "renesas,vin-r8a7791", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef2000 0 0x1000>;
- 		interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_VIN2>;
--- 
-2.1.4
+Lots of sdhci drivers calls mmc_of_parse(), and uses the mmc slot gpio
+APIs, so I don't this this is correct statement.
+
+> *) Some of the registers don't always have correct values as in sdhci
+>    (like PSTATE).
+> Supporting all of these in sdhci will result in adding lot of quirks in
+> sdhci driver.
+
+Is it really that much different? It would be nice if some really took
+on the challenge of converting omap_hsmmc into an sdhci variant.
+
+Especially by looking at the number new lines added in this series, I
+am starting to think that we have reached this point. That in
+conjunction with that sdhci is maintained and well supported,
+comparing to what the omap_hsmmc driver seems to be.
+
+>
+> This series has been tested on beagleboard, pandaboard, beaglebone-black,
+> beaglebone, am335x-evm, am437x-evm, dra7xx-evm, dra72x-evm, am571x-idk
+> and am572x-idk.
+>
+> I can split the series to go into Ulf Hansson's tree and Tony's tree
+> separately if that is required.
+>
+> [1] -> https://lkml.org/lkml/2015/8/25/213
+> [2] -> https://lkml.org/lkml/2017/5/19/19
+>
+> [3] -> https://lkml.org/lkml/2017/6/9/206
+> [4] -> https://lkml.org/lkml/2017/6/7/169
+> [5] -> https://www.spinics.net/lists/arm-kernel/msg586215.html /
+>        http://www.spinics.net/lists/devicetree/msg180747.html
+> [6] -> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1423381.html
+>
+> Kishon Vijay Abraham I (15):
+>   mmc: host: omap_hsmmc: Support pbias and vmmc_aux to switch to 1.8v
+>   mmc: host: omap_hsmmc: Separate setting voltage capabilities from bus
+>     power
+>   mmc: host: omap_hsmmc: Remove incorrect voltage switch sequence
+>   mmc: host: omap_hsmmc: Add voltage switch support for UHS SD card
+>   mmc: host: omap_hsmmc: Set clk rate to the max frequency
+>   mmc: host: omap_hsmmc: Add tuning support
+>   mmc: host: omap_hsmmc: Allow io voltage switch even for fixed vdd
+>   mmc: host: omap_hsmmc: Prepare *set_timing() to be used for iodelay
+>     setting
+>   mmc: host: omap_hsmmc: Add new compatible string to support dra7
+>   mmc: host: omap_hsmmc: Fix error path sequence
+>   mmc: host: omap_hsmmc: Add support to set IODELAY values
+>   mmc: host: omap_hsmmc: Remove *use_dma* member
+>   mmc: host: omap_hsmmc: Enable ADMA2
+>   ARM: dts: dra7: Use new dra7-specific compatible string
+>   ARM: dts: dra7: Add supported MMC/SD modes in MMC dt nodes
+>
+> Mugunthan V N (1):
+>   mmc: host: omap_hsmmc: Add software timer when timeout greater than
+>     hardware capablility
+>
+>  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    6 +
+>  arch/arm/boot/dts/am571x-idk.dts                   |    1 +
+>  arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts      |    1 +
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts            |    6 +
+>  arch/arm/boot/dts/am57xx-idk-common.dtsi           |    1 +
+>  arch/arm/boot/dts/dra7.dtsi                        |   22 +-
+>  drivers/mmc/host/omap_hsmmc.c                      | 1179 ++++++++++++++++----
+>  include/linux/platform_data/hsmmc-omap.h           |    2 +
+>  8 files changed, 1021 insertions(+), 197 deletions(-)
+>
+> --
+> 2.11.0
+>
+
+Kind regards
+Ulf Hansson
