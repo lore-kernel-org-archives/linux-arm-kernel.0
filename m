@@ -1,50 +1,72 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 11 Jul 2017 14:45:43 +0200
-Subject: [PATCH 5/5] dt-bindings: display: fill Documents for series of vop
-In-Reply-To: <1499776958-17062-1-git-send-email-mark.yao@rock-chips.com>
-References: <1499776908-16811-1-git-send-email-mark.yao@rock-chips.com>
- <1499776958-17062-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <7391489.lxuf2bMt0N@diego>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 11 Jul 2017 15:51:40 +0300
+Subject: [PATCH v2] dt-bindings: net: ravb : Add support for r8a7743 SoC
+In-Reply-To: <20170711122100.GM4517@verge.net.au>
+References: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
+ <1499700776-54504-1-git-send-email-biju.das@bp.renesas.com>
+ <52eb0b92-5d25-e1f4-df54-e4fcf648c90e@cogentembedded.com>
+ <20170711122100.GM4517@verge.net.au>
+Message-ID: <87b6b38a-ca6b-a0d7-b777-0a4809eaf6fc@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 07/11/2017 03:21 PM, Simon Horman wrote:
 
-Am Dienstag, 11. Juli 2017, 20:42:38 CEST schrieb Mark Yao:
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
->  Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 4
-> ++++ 1 file changed, 4 insertions(+)
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-> b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt index
-> 9eb3f0a..11fa3b0 100644
-> --- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-> @@ -8,8 +8,12 @@ Required properties:
->  - compatible: value should be one of the following
->  		"rockchip,rk3036-vop";
->  		"rockchip,rk3288-vop";
-> +		"rockchip,rk3368-vop";
-> +		"rockchip,rk3366-vop";
->  		"rockchip,rk3399-vop-big";
->  		"rockchip,rk3399-vop-lit";
-> +		"rockchip,rk322x-vop";
+>>> Add a new compatible string for the RZ/G1M (R8A7743) SoC.
+>>>
+>>> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+>>> ---
+>>> v1->v2
+>>> * Changed the subject
+>>> * re-formatted the required properties
+>>>
+>>> .../devicetree/bindings/net/renesas,ravb.txt       | 29 +++++++++++++---------
+>>> 1 file changed, 17 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>>> index b519503..4717bc2 100644
+>>> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>>> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>>> @@ -4,19 +4,24 @@ This file provides information on what the device node for the Ethernet AVB
+>>> interface contains.
+>>>
+>>> Required properties:
+>>> -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+>>> -	      "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
+>>> -	      "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
+>>> -	      "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
+>>> -	      "renesas,etheravb-r8a7794" if the device is a part of R8A7794 SoC.
+>>> -	      "renesas,etheravb-r8a7795" if the device is a part of R8A7795 SoC.
+>>> -	      "renesas,etheravb-r8a7796" if the device is a part of R8A7796 SoC.
+>>> -	      "renesas,etheravb-rcar-gen2" for generic R-Car Gen 2 compatible interface.
+>>> -	      "renesas,etheravb-rcar-gen3" for generic R-Car Gen 3 compatible interface.
+>>> +- compatible: Must contain one or more of the following:
+>>
+>>    No, it can't contain more than one SoC specific value.
+>
+> The text above does not say it can unless one is under the delusion
+> that, f.e. an r8a7790 SoC is also an r8a7791 SoC.
 
-please don't use wildcards in devicetree compatibles. We've somehow
-standardized on using rk3228 for both the rk3228 and rk3229 (which are
-nearly the same soc with some speed adjustments)
+    Hm, you're right. Sorry about my misunderstanding...
 
-So,
-+		"rockchip,rk3228-vop";
-please
+    The only problem I'm still seeing with the current wording is that gen2/3 
+fallback
+values are declared optional, while you can't get the driver to bind without 
+them on
+the newer SoCs. But this is probably not a new problem...
 
+> If you would prefer an alternate wording please provide a suggestion.
 
-Thanks
-Heiko
+    Perhaps we should emphasize that the gen2/3 fallback values are mandatory?
 
-> +		"rockchip,rk3328-vop";
-> 
->  - interrupts: should contain a list of all VOP IP block interrupts in the
->  		 order: VSYNC, LCD_SYSTEM. The interrupt specifier
+>>> +      - "renesas,etheravb-r8a7743" for the R8A7743 SoC.
+>>> +      - "renesas,etheravb-r8a7790" for the R8A7790 SoC.
+>>> +      - "renesas,etheravb-r8a7791" for the R8A7791 SoC.
+>>> +      - "renesas,etheravb-r8a7792" for the R8A7792 SoC.
+>>> +      - "renesas,etheravb-r8a7793" for the R8A7793 SoC.
+>>> +      - "renesas,etheravb-r8a7794" for the R8A7794 SoC.
+>>> +      - "renesas,etheravb-rcar-gen2" as a fallback for the above
+>>> +		R-Car Gen2 and RZ/G1 devices.
+[...]
+
+WBR, Sergei
