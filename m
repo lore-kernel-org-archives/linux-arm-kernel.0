@@ -1,43 +1,93 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 11 Jul 2017 16:43:54 +0200
-Subject: [PATCH] mmc: mediatek: add ops->get_cd() support
-In-Reply-To: <1499063096-10604-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1499063096-10604-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFo+UeW4AMFZDN=ob8U9Oj7mZ24ANyT5LQ=ZQ6YxOtRqKQ@mail.gmail.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Tue, 11 Jul 2017 17:44:14 +0300
+Subject: [PATCH] gpu: host1x: Free the IOMMU domain when there is no
+ device to attach
+In-Reply-To: <1499783851.1520.16.camel@toradex.com>
+References: <20170710193305.5987-1-contact@paulk.fr>
+ <1499762987.1340.10.camel@paulk.fr> <1499783851.1520.16.camel@toradex.com>
+Message-ID: <1499784254.1340.13.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 July 2017 at 08:24, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> if user plug out sd card slowly, finally card is plugged out but
-> cat /proc/partitions can find that card is still exist in kernel.
-> that's because alougth get card detect interrupt but CMD13 still
-> can get correct response(all other pins are connected expect card
-> detect pin).
-> add ops->get_cd() can avoid this issue.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+On Tue, 2017-07-11 at 14:37 +0000, Marcel Ziswiler wrote:
+> On Tue, 2017-07-11 at 11:49 +0300, Paul Kocialkowski wrote:
+> > On Mon, 2017-07-10 at 21:33 +0200, Paul Kocialkowski wrote:
+> > > When there is no device to attach to the IOMMU domain, as may be
+> > > the
+> > > case when the device-tree does not contain the proper iommu node,
+> > > it
+> > > is
+> > > best to keep going without IOMMU support rather than failing.
+> > > This allows the driver to probe and function instead of taking
+> > > down
+> > > all of the tegra drm driver, leading to missing display support.
+> > 
+> > Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
+> > 
+> > > Signed-off-by: Paul Kocialkowski <contact-W9ppeneeCTY@public.gmane
+> > > .
+> > > org>
+> > > ---
+> > >  drivers/gpu/host1x/dev.c | 8 +++++++-
+> > >  1 file changed, 7 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/gpu/host1x/dev.c b/drivers/gpu/host1x/dev.c
+> > > index ac65f52850a6..f296738d0de8 100644
+> > > --- a/drivers/gpu/host1x/dev.c
+> > > +++ b/drivers/gpu/host1x/dev.c
+> > > @@ -186,8 +186,13 @@ static int host1x_probe(struct
+> > > platform_device
+> > > *pdev)
+> > >  			return -ENOMEM;
+> > >  
+> > >  		err = iommu_attach_device(host->domain, &pdev-
+> > > > dev);
+> > > 
+> > > -		if (err)
+> > > +		if (err == -ENODEV) {
+> > > +			iommu_domain_free(host->domain);
+> > > +			host->domain = NULL;
+> > > +			goto iommu_skip;
+> > > +		} else if (err) {
+> > >  			goto fail_free_domain;
+> > > +		}
+> > >  
+> > >  		geometry = &host->domain->geometry;
+> > >  
+> > > @@ -198,6 +203,7 @@ static int host1x_probe(struct platform_device
+> > > *pdev)
+> > >  		host->iova_end = geometry->aperture_end;
+> > >  	}
+> > >  
+> > > +iommu_skip:
+> > >  	err = host1x_channel_list_init(host);
+> > >  	if (err) {
+> > >  		dev_err(&pdev->dev, "failed to initialize channel
+> > > list\n");
+> 
+> Please note that this does no longer cleanly apply after Mikko's 'gpu:
+> host1x: Refactor channel allocation code' commit from June 15 already
+> applied to current -next. Other than that
 
-Thanks, applied for next!
+Good to know! I intended this patch for fixing 4.12 stable, so I'm not
+even entirely sure it should land in next. The patch that fixes the
+device-tree to actually enable the iommu should be merged in priority.
 
-Kind regards
-Uffe
+If that is the case and anyone wants this patch rebased to next, feel
+free to let me know and I'll send a rebased version.
 
-> ---
->  drivers/mmc/host/mtk-sd.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 5c1e178..975c765 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -1585,6 +1585,7 @@ static void msdc_hw_reset(struct mmc_host *mmc)
->         .request = msdc_ops_request,
->         .set_ios = msdc_ops_set_ios,
->         .get_ro = mmc_gpio_get_ro,
-> +       .get_cd = mmc_gpio_get_cd,
->         .start_signal_voltage_switch = msdc_ops_switch_volt,
->         .card_busy = msdc_card_busy,
->         .execute_tuning = msdc_execute_tuning,
-> --
-> 1.8.1.1.dirty
->
+> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> Tested-on: Apalis TK1, Apalis T30, Beaver, Colibri T30, Jetson-TK1
+> 
+> Finally graphics working again, thanks guys!
+
+Yay! :)
+
+-- 
+Paul Kocialkowski,
+
+developer of free digital technology and hardware support
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
