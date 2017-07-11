@@ -1,50 +1,62 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 12 Jul 2017 00:27:27 +0800
-Subject: [nomadik:gemini-dir-685-pinctrl-flashswap 19/19] Error:
- arch/arm/boot/dts/gemini-wbd222.dts:10.1-2 syntax error
-Message-ID: <201707120025.pfl2XSIq%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 11 Jul 2017 17:35:25 +0100
+Subject: [PATCH] KVM: arm/arm64: Fix bug in advertising KVM_CAP_MSI_DEVID
+ capability
+In-Reply-To: <1499521710-27494-1-git-send-email-shankerd@codeaurora.org>
+References: <1499521710-27494-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <f5342680-2085-1e3a-d9c4-fe1c63dd07fd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-dir-685-pinctrl-flashswap
-head:   247336f3769b813b799feaead236d350f0da51ff
-commit: 247336f3769b813b799feaead236d350f0da51ff [19/19] flash hack
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 247336f3769b813b799feaead236d350f0da51ff
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 08/07/17 14:48, Shanker Donthineni wrote:
+> Commit 0e4e82f154e3 ("KVM: arm64: vgic-its: Enable ITS emulation as
+> a virtual MSI controller") tried to advertise KVM_CAP_MSI_DEVID, but
+> the code logic was not updating the dist->msis_require_devid field
+> correctly. If hypervisor tool creates the ITS device after VGIC
+> initialization then we don't advertise KVM_CAP_MSI_DEVID capability.
+> 
+> Update the field msis_require_devid to true inside vgic_its_create()
+> to fix the issue.
+> 
+> Fixes: 0e4e82f154e3 ("vgic-its: Enable ITS emulation as a virtual MSI controller")
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  virt/kvm/arm/vgic/vgic-init.c | 3 ---
+>  virt/kvm/arm/vgic/vgic-its.c  | 1 +
+>  2 files changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 3a0b899..5801261 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -285,9 +285,6 @@ int vgic_init(struct kvm *kvm)
+>  	if (ret)
+>  		goto out;
+>  
+> -	if (vgic_has_its(kvm))
+> -		dist->msis_require_devid = true;
+> -
+>  	kvm_for_each_vcpu(i, vcpu, kvm)
+>  		kvm_vgic_vcpu_enable(vcpu);
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 2dff288..aa6b68d 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1598,6 +1598,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+>  	INIT_LIST_HEAD(&its->device_list);
+>  	INIT_LIST_HEAD(&its->collection_list);
+>  
+> +	dev->kvm->arch.vgic.msis_require_devid = true;
+>  	dev->kvm->arch.vgic.has_its = true;
+>  	its->enabled = false;
+>  	its->dev = dev;
+> 
 
-All errors (new ones prefixed by >>):
+Seems sensible to me. Unless someone screams, I'll queue it for post -rc1.
 
->> Error: arch/arm/boot/dts/gemini-wbd222.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-nas4220b.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-sq201.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-rut1xx.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-wbd111.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/gemini-dlink-dir-685.dts:10.1-2 syntax error
-   FATAL ERROR: Unable to parse input tree
+Thanks,
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23021 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170712/12000934/attachment-0001.gz>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
