@@ -1,74 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Jul 2017 18:58:54 +0100
-Subject: prefetch inconsistency in copy_page()
-In-Reply-To: <CY4PR07MB34150D0718D0A101FD433E0893AE0@CY4PR07MB3415.namprd07.prod.outlook.com>
-References: <CAKv+Gu9hGwLJxBCMCTK2fsK31SgX7E=qc3PQcNXZA6OP2uUs8Q@mail.gmail.com>
- <20170711175257.GF13977@arm.com>
- <CY4PR07MB34150D0718D0A101FD433E0893AE0@CY4PR07MB3415.namprd07.prod.outlook.com>
-Message-ID: <CAKv+Gu9C7dn2cJ9nj0xyMRqn8yfqGj05hxONr1sOXuOUKaN_AA@mail.gmail.com>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Tue, 11 Jul 2017 13:03:39 -0500
+Subject: [PATCH] pinctrl: bcm2835: constify gpio_chip structure
+Message-ID: <20170711180339.GA17806@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2017 at 18:53, Pinski, Andrew <Andrew.Pinski@cavium.com> wrote:
->> -----Original Message-----
->> From: Will Deacon [mailto:will.deacon at arm.com]
->> Sent: Tuesday, July 11, 2017 10:53 AM
->> To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>; Pinski, Andrew
->> <Andrew.Pinski@cavium.com>; linux-arm-kernel at lists.infradead.org
->> Subject: Re: prefetch inconsistency in copy_page()
->>
->> On Tue, Jul 11, 2017 at 10:42:19AM +0100, Ard Biesheuvel wrote:
->> > Hi all,
->> >
->> > No big deal, but I spotted an inconsistency in how copy_page() does
->> > its prefetching. With the code as-is, it prefetches 2 lines at the
->> > start of the function, but it is off by one line in the loop, i.e., it
->> > prefetches 3 lines ahead (and skips a line at entry). So imo, we need
->> > either
->> >
->> > """
->> > @@ -30,9 +30,10 @@
->> >   */
->> >  ENTRY(copy_page)
->> >  alternative_if ARM64_HAS_NO_HW_PREFETCH
->> > -       # Prefetch two cache lines ahead.
->> > +       # Prefetch three cache lines ahead.
->> >         prfm    pldl1strm, [x1, #128]
->> >         prfm    pldl1strm, [x1, #256]
->> > +       prfm    pldl1strm, [x1, #384]
->> >  alternative_else_nop_endif
->> >
->> >         ldp     x2, x3, [x1]
->> > """
->> >
->> > or
->> >
->> > """
->> > @@ -50,7 +51,7 @@ alternative_else_nop_endif
->> >         subs    x18, x18, #128
->> >
->> >  alternative_if ARM64_HAS_NO_HW_PREFETCH
->> > -       prfm    pldl1strm, [x1, #384]
->> > +       prfm    pldl1strm, [x1, #256]
->> >  alternative_else_nop_endif
->> >
->> >         stnp    x2, x3, [x0]
->> >
->> > """
->> >
->> > to make things consistent again.
->> >
->> > Thoughts?
->>
->> Either of those look good to me. Andrew -- any preference? If not, I'll
->> take the second one.
->
-> The first one is my preference but both are ok to me.
->
+This structure is only used to copy into other structure, so declare
+it as const.
 
-I suppose the second one is the least likely to invalidate existing
-benchmark results.
+This issue was detected using Coccinelle and the following semantic patch:
 
-Will: should I spin it as a proper patch? Mind if I clean up the
-whitespace at the same time?
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct gpio_chip i at p = { ... };
+
+@ok@
+identifier r.i;
+expression e;
+position p;
+@@
+e = i at p;
+
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct gpio_chip e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct gpio_chip i = { ... };
+
+In the following log you can see a significant difference in the code size
+and data segment, hence in the dec segment. This log is the output
+of the size command, before and after the code change:
+
+before:
+   text    data     bss     dec     hex filename
+  18958    9000     128   28086    6db6 drivers/pinctrl/bcm/pinctrl-bcm2835.o
+
+after:
+   text    data     bss     dec     hex filename
+  18764    8912     128   27804    6c9c drivers/pinctrl/bcm/pinctrl-bcm2835.o
+
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+---
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+index 2308831..7203f35 100644
+--- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
++++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+@@ -353,7 +353,7 @@ static int bcm2835_gpio_direction_output(struct gpio_chip *chip,
+ 	return pinctrl_gpio_direction_output(chip->base + offset);
+ }
+ 
+-static struct gpio_chip bcm2835_gpio_chip = {
++static const struct gpio_chip bcm2835_gpio_chip = {
+ 	.label = MODULE_NAME,
+ 	.owner = THIS_MODULE,
+ 	.request = gpiochip_generic_request,
+-- 
+2.5.0
