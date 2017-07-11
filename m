@@ -1,55 +1,58 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Tue, 11 Jul 2017 09:43:43 +0300
-Subject: [PATCH] gpu: host1x: Free the IOMMU domain when there is no
- device to attach
-In-Reply-To: <20170710193305.5987-1-contact@paulk.fr>
-References: <20170710193305.5987-1-contact@paulk.fr>
-Message-ID: <09ecbf74-ac5d-a7f5-c6bd-53f4f84a0de5@kapsi.fi>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Tue, 11 Jul 2017 08:54:27 +0200
+Subject: [RESEND PATCH] ARM: dts: stm32: Add DMA support for STM32F746 SoC
+Message-ID: <1499756067-445-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the patch, didn't consider this case. I really need to get 
-together some system to automatically test on multiple platforms.. :)
+This patch adds DMA support for STM32F746 SoC.
 
-Reviewed-by: Mikko Perttunen <mperttunen@nvidia.com>
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+ arch/arm/boot/dts/stm32f746.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-On 10.07.2017 22:33, Paul Kocialkowski wrote:
-> When there is no device to attach to the IOMMU domain, as may be the
-> case when the device-tree does not contain the proper iommu node, it is
-> best to keep going without IOMMU support rather than failing.
-> This allows the driver to probe and function instead of taking down
-> all of the tegra drm driver, leading to missing display support.
->
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->  drivers/gpu/host1x/dev.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/host1x/dev.c b/drivers/gpu/host1x/dev.c
-> index ac65f52850a6..f296738d0de8 100644
-> --- a/drivers/gpu/host1x/dev.c
-> +++ b/drivers/gpu/host1x/dev.c
-> @@ -186,8 +186,13 @@ static int host1x_probe(struct platform_device *pdev)
->  			return -ENOMEM;
->
->  		err = iommu_attach_device(host->domain, &pdev->dev);
-> -		if (err)
-> +		if (err == -ENODEV) {
-> +			iommu_domain_free(host->domain);
-> +			host->domain = NULL;
-> +			goto iommu_skip;
-> +		} else if (err) {
->  			goto fail_free_domain;
-> +		}
->
->  		geometry = &host->domain->geometry;
->
-> @@ -198,6 +203,7 @@ static int host1x_probe(struct platform_device *pdev)
->  		host->iova_end = geometry->aperture_end;
->  	}
->
-> +iommu_skip:
->  	err = host1x_channel_list_init(host);
->  	if (err) {
->  		dev_err(&pdev->dev, "failed to initialize channel list\n");
->
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index c2765ce..bfffea4 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -344,6 +344,37 @@
+ 			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
+ 			assigned-clock-rates = <1000000>;
+ 		};
++
++		dma1: dma at 40026000 {
++			compatible = "st,stm32-dma";
++			reg = <0x40026000 0x400>;
++			interrupts = <11>,
++				     <12>,
++				     <13>,
++				     <14>,
++				     <15>,
++				     <16>,
++				     <17>,
++				     <47>;
++			clocks = <&rcc 0 21>;
++			#dma-cells = <4>;
++		};
++
++		dma2: dma at 40026400 {
++			compatible = "st,stm32-dma";
++			reg = <0x40026400 0x400>;
++			interrupts = <56>,
++				     <57>,
++				     <58>,
++				     <59>,
++				     <60>,
++				     <68>,
++				     <69>,
++				     <70>;
++			clocks = <&rcc 0 22>;
++			#dma-cells = <4>;
++			st,mem2mem;
++		};
+ 	};
+ };
+ 
+-- 
+2.7.4
