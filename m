@@ -1,24 +1,26 @@
-From: support@guitar-academy.ru (support at guitar-academy.ru)
-Date: Tue, 11 Jul 2017 09:41:11 +0300
-Subject: We have delivery problems with your parcel #004023668
-Message-ID: <E1dUor9-000DZ5-A2@centos-6-64bit.local>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Jul 2017 11:07:27 +0200
+Subject: [PATCH v2] dt-bindings: net: ravb : Add support for r8a7743 SoC
+In-Reply-To: <CAMuHMdWA-qJW8wENRYEFUmoSM7G+DR3wcT9hQ0_1Z7ysUjZkBw@mail.gmail.com>
+References: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
+ <1499700776-54504-1-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdWA-qJW8wENRYEFUmoSM7G+DR3wcT9hQ0_1Z7ysUjZkBw@mail.gmail.com>
+Message-ID: <20170711090727.GH4517@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Customer,
+On Mon, Jul 10, 2017 at 05:51:09PM +0200, Geert Uytterhoeven wrote:
+> On Mon, Jul 10, 2017 at 5:32 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> > Add a new compatible string for the RZ/G1M (R8A7743) SoC.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Your parcel was successfully delivered July 10 to UPS Station, but our courier cound not contact you.
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
-Please check delivery label attached!
+I believe that as net-next is currently closed you should repost it once
+it re-opens (likely in about a week) with the following subject prefix
+and Geert's tag.
 
-With anticipation,
- ,
-UPS Delivery Agent.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: UPS-Receipt-004023668.zip
-Type: application/zip
-Size: 1471 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170711/af639faa/attachment.zip>
+[PATCH net-next repost v2]
