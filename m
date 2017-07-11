@@ -1,73 +1,157 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 11 Jul 2017 12:46:15 +0200
-Subject: [PATCH 9/9] ARM: multi_v7_defconfig: Enable DMA for Renesas
- serial ports
-In-Reply-To: <95cf2c11-c7db-bdff-7165-282586e08b19@landley.net>
-References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
- <1499693302-25120-10-git-send-email-geert+renesas@glider.be>
- <CANqRtoSi8x7zqwV3Gp_n0dBe4Uw6LDRvC1Lheu+GrLZNYuxAHw@mail.gmail.com>
- <CAMuHMdXb1yAgw4AVvheYhPV=V9HeDCW2NdvhJWzoSz8i-mM3TQ@mail.gmail.com>
- <CAK8P3a3c68=L=h+nni39BmOb68wno7TuvXuBgOHrEMOrkhdx2g@mail.gmail.com>
- <CAMuHMdUFnYSxF0grMQ6GB4h7svOeKa-SpPo_2TpTW9Hx+zvrEQ@mail.gmail.com>
- <95cf2c11-c7db-bdff-7165-282586e08b19@landley.net>
-Message-ID: <CAMuHMdWW7gbdDY0y2jUVn=ERG1JEWCX=UotQVeyVwhW3fqSHMQ@mail.gmail.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Tue, 11 Jul 2017 18:56:24 +0800
+Subject: [PATCH V2 07/10] clk: sprd: add composite clock support
+In-Reply-To: <20170711105627.20526-1-chunyan.zhang@spreadtrum.com>
+References: <20170711105627.20526-1-chunyan.zhang@spreadtrum.com>
+Message-ID: <20170711105627.20526-8-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patch introduced composite driveri for Spreadtrum's SoCs. The
+functions of this composite clock simply consist of divider and
+mux clocks.
 
-On Tue, Jul 11, 2017 at 12:37 PM, Rob Landley <rob@landley.net> wrote:
-> On 07/11/2017 03:59 AM, Geert Uytterhoeven wrote:
->> On Tue, Jul 11, 2017 at 10:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Tue, Jul 11, 2017 at 8:59 AM, Geert Uytterhoeven
->>> <geert@linux-m68k.org> wrote:
->>>> On Tue, Jul 11, 2017 at 5:38 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>>>> On Mon, Jul 10, 2017 at 10:28 PM, Geert Uytterhoeven
->>>>> Since enabling DMA Engine still keeps PIO support around I wonder why
->>>>> we need this Kconfig at all - other drivers seem to get by without
->>>>> this kind of thing?
->>>>> So in my opinion it would also be nice to get rid of SERIAL_SH_SCI_DMA
->>>>> completely and reducing the number of special per-driver Kconfig
->>>>> entries.
->>>>
->>>> In general, I would agree, and remove the option at the blimp of an eye.
->>>> However, this driver is shared with H8/300 and SuperH.  While both could use
->>>> DMA (but it's not supported by Linux yet), I don't know if they are willing to
->>>> live with the increased static and dynamic memory footprint of SH_SCI DMA
->>>> support.
->>>
->>> One more thing: enabling the DMA support in the console driver generally
->>> means you cannot use printk in the DMA driver anywhere that may be called
->>> during printk(). Not sure if that is a concern here.
->>
->> Not anymore, as all of these prints should have been removed/disabled already.
->
-> Last I checked qemu-system-sh4 still doesn't work with current linux
-> serial driver unless you do:
->
-> --- a/drivers/tty/serial/sh-sci.c
-> +++ b/drivers/tty/serial/sh-sci.c
-> @@ -2193,7 +2193,7 @@ static void sci_reset(struct uart_port *port)
->                         setup_timer(&s->rx_fifo_timer, rx_fifo_timer_fn,
->                                     (unsigned long)s);
->                 } else {
-> -                       if (port->type == PORT_SCIFA ||
-> +                       if (1 || port->type == PORT_SCIFA ||
->                             port->type == PORT_SCIFB)
->                                 scif_set_rtrg(port, 1);
->                         else
->
-> Does this DMA stuff make that situation worse?
+Original-by: Xiaolong Zhang <xiaolong.zhang@spreadtrum.com>
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ drivers/clk/sprd/Makefile    |  1 +
+ drivers/clk/sprd/composite.c | 64 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sprd/composite.h | 47 ++++++++++++++++++++++++++++++++
+ 3 files changed, 112 insertions(+)
+ create mode 100644 drivers/clk/sprd/composite.c
+ create mode 100644 drivers/clk/sprd/composite.h
 
-No, SH-SCI DMA is not used on your platform.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
+index 80e6039..2262e76 100644
+--- a/drivers/clk/sprd/Makefile
++++ b/drivers/clk/sprd/Makefile
+@@ -4,3 +4,4 @@ clk-sprd-y	+= common.o
+ clk-sprd-y	+= gate.o
+ clk-sprd-y	+= mux.o
+ clk-sprd-y	+= div.o
++clk-sprd-y	+= composite.o
+diff --git a/drivers/clk/sprd/composite.c b/drivers/clk/sprd/composite.c
+new file mode 100644
+index 0000000..25b045d
+--- /dev/null
++++ b/drivers/clk/sprd/composite.c
+@@ -0,0 +1,64 @@
++/*
++ * Spreadtrum composite clock driver
++ *
++ * Copyright (C) 2017 Spreadtrum, Inc.
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#include <linux/clk-provider.h>
++
++#include "composite.h"
++
++DEFINE_SPINLOCK(sprd_comp_lock);
++EXPORT_SYMBOL_GPL(sprd_comp_lock);
++
++static long sprd_comp_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *parent_rate)
++{
++	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++
++	return sprd_div_helper_round_rate(&cc->common, &cc->div,
++					 rate, parent_rate);
++}
++
++static unsigned long sprd_comp_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
++{
++	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++
++	return sprd_div_helper_recalc_rate(&cc->common, &cc->div, parent_rate);
++}
++
++static int sprd_comp_set_rate(struct clk_hw *hw, unsigned long rate,
++			     unsigned long parent_rate)
++{
++	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++
++	return sprd_div_helper_set_rate(&cc->common, &cc->div,
++				       rate, parent_rate);
++}
++
++static u8 sprd_comp_get_parent(struct clk_hw *hw)
++{
++	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++
++	return sprd_mux_helper_get_parent(&cc->common, &cc->mux);
++}
++
++static int sprd_comp_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++
++	return sprd_mux_helper_set_parent(&cc->common, &cc->mux, index);
++}
++
++const struct clk_ops sprd_comp_ops = {
++	.get_parent	= sprd_comp_get_parent,
++	.set_parent	= sprd_comp_set_parent,
++
++	.round_rate	= sprd_comp_round_rate,
++	.recalc_rate	= sprd_comp_recalc_rate,
++	.set_rate	= sprd_comp_set_rate,
++};
++EXPORT_SYMBOL_GPL(sprd_comp_ops);
+diff --git a/drivers/clk/sprd/composite.h b/drivers/clk/sprd/composite.h
+new file mode 100644
+index 0000000..f5ca0c9
+--- /dev/null
++++ b/drivers/clk/sprd/composite.h
+@@ -0,0 +1,47 @@
++/*
++ * Spreadtrum composite clock driver
++ *
++ * Copyright (C) 2017 Spreadtrum, Inc.
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#ifndef _SPRD_COMPOSITE_H_
++#define _SPRD_COMPOSITE_H_
++
++#include "common.h"
++#include "mux.h"
++#include "div.h"
++
++struct sprd_comp {
++	struct sprd_mux_internal	mux;
++	struct sprd_div_internal	div;
++	struct sprd_clk_common	common;
++};
++
++#define SPRD_COMP_CLK(_struct, _name, _parent, _reg, _table,		\
++			_mshift, _mwidth, _dshift, _dwidth, _flags)	\
++	struct sprd_comp _struct = {					\
++		.mux	= _SPRD_MUX_CLK(_mshift, _mwidth, _table),	\
++		.div	= _SPRD_DIV_CLK(_dshift, _dwidth),		\
++		.common = {						\
++			 .reg		= _reg,				\
++			 .lock		= &sprd_comp_lock,		\
++			 .hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++							      _parent,	\
++							&sprd_comp_ops,	\
++							      _flags),	\
++			 }						\
++	}
++
++static inline struct sprd_comp *hw_to_sprd_comp(const struct clk_hw *hw)
++{
++	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
++
++	return container_of(common, struct sprd_comp, common);
++}
++
++extern const struct clk_ops sprd_comp_ops;
++extern spinlock_t sprd_comp_lock;
++
++#endif /* _SPRD_COMPOSITE_H_ */
+-- 
+2.7.4
