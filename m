@@ -1,120 +1,137 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 11 Jul 2017 15:10:37 +0200
-Subject: [PATCH 00/16] omap_hsmmc: Add ADMA support and UHS/HS200/DDR
- support
-In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
-References: <20170616124544.15046-1-kishon@ti.com>
-Message-ID: <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 11 Jul 2017 15:36:50 +0200
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+ <20170629143432.GM29665@vireshk-i7>
+ <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+Message-ID: <9a2638ee-e04f-13f1-b1e5-56f27b58da2e@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2017 at 14:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> This is the final part of the series originally sent as
-> part of [2].
->
-> This series adds UHS, HS200, DDR mode and ADMA support to
-> omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
-> SoCs.
->
-> Changes from [2]:
-> *) No more updating omap2plus_defconfig or multi_v7_defconfig is
->    required, so those patches are removed.
-> *) Addressed Rob Herring's comment on implementing a function
->    instead of having a macro while getting pinctrl state.
->
-> This series is created on top of [3], [4], [5] AND [6]
-> (i.e after
->   ARM: dts: omap3-overo: Remove "vqmmc-supply" property from MMC dt node
->   omap_hsmmc: use mmc_regulator_get_supply() to get regulators
->   omap*: Fixes/Cleanups for MMC devicetree node
->   ARM: dts: Add iodelay data for MMC)
->
-> The functionality implemented in this series was sent before ([1]) but
-> was never followed up since supporting high speed modes in dra7 required
-> IODelay values to be configured. With IODelay driver being merged into
-> kernel, sending it as a fresh series with support for configuring IODelay
-> values.
+On 11/07/2017 11:27, Mason wrote:
 
-Is it safe to queue this via mmc tree for 4.14 or is there a
-dependency I must consider? The above didn't quite tell me that, could
-you please elaborate.
+> I'll experiment with the other solution of creating the OPP table
+> at init.
 
->
-> Suggestions of migrating to sdhci driver (from omap_hsmmc driver) is not
-> addressed since
-> *) tuning ratio of MMC in dra7 is different from sdhci
-> *) IOdelay is required for dra7
-> *) GPIO based card detect is not supported in sdhci
+For the sake of discussion, based on your suggestion to use
+dev_pm_opp_add(), I have tested the patch below.
 
-Lots of sdhci drivers calls mmc_of_parse(), and uses the mmc slot gpio
-APIs, so I don't this this is correct statement.
+There is one remaining error:
+[    2.071139] of: dev_pm_opp_of_cpumask_add_table: couldn't find opp table for cpu:0, -19
 
-> *) Some of the registers don't always have correct values as in sdhci
->    (like PSTATE).
-> Supporting all of these in sdhci will result in adding lot of quirks in
-> sdhci driver.
+Reached through:
+[    1.878461] [<c0359a0c>] (dev_pm_opp_of_add_table) from [<c0359ff0>] (dev_pm_opp_of_cpumask_add_table+0x40/0xc8)
+[    1.888695] [<c0359ff0>] (dev_pm_opp_of_cpumask_add_table) from [<c03d66d8>] (cpufreq_init+0x23c/0x2dc)
+[    1.898139] [<c03d66d8>] (cpufreq_init) from [<c03d3d94>] (cpufreq_online+0xb8/0x660)
+[    1.906009] [<c03d3d94>] (cpufreq_online) from [<c03d43f8>] (cpufreq_add_dev+0xbc/0xcc)
+[    1.914058] [<c03d43f8>] (cpufreq_add_dev) from [<c0350560>] (subsys_interface_register+0x90/0xcc)
+[    1.923065] [<c0350560>] (subsys_interface_register) from [<c03d32f4>] (cpufreq_register_driver+0x15c/0x1e0)
+[    1.932945] [<c03d32f4>] (cpufreq_register_driver) from [<c03d67f0>] (dt_cpufreq_probe+0x78/0xec)
+[    1.941866] [<c03d67f0>] (dt_cpufreq_probe) from [<c035327c>] (platform_drv_probe+0x34/0x6c)
 
-Is it really that much different? It would be nice if some really took
-on the challenge of converting omap_hsmmc into an sdhci variant.
+The cpufreq-dt driver seems to recover despite the error:
 
-Especially by looking at the number new lines added in this series, I
-am starting to think that we have reached this point. That in
-conjunction with that sdhci is maintained and well supported,
-comparing to what the omap_hsmmc driver seems to be.
+/sys/devices/system/cpu/cpu0/cpufreq$ cat scaling_available_frequencies
+135000 243000 405000 607500 1215000 
 
->
-> This series has been tested on beagleboard, pandaboard, beaglebone-black,
-> beaglebone, am335x-evm, am437x-evm, dra7xx-evm, dra72x-evm, am571x-idk
-> and am572x-idk.
->
-> I can split the series to go into Ulf Hansson's tree and Tony's tree
-> separately if that is required.
->
-> [1] -> https://lkml.org/lkml/2015/8/25/213
-> [2] -> https://lkml.org/lkml/2017/5/19/19
->
-> [3] -> https://lkml.org/lkml/2017/6/9/206
-> [4] -> https://lkml.org/lkml/2017/6/7/169
-> [5] -> https://www.spinics.net/lists/arm-kernel/msg586215.html /
->        http://www.spinics.net/lists/devicetree/msg180747.html
-> [6] -> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1423381.html
->
-> Kishon Vijay Abraham I (15):
->   mmc: host: omap_hsmmc: Support pbias and vmmc_aux to switch to 1.8v
->   mmc: host: omap_hsmmc: Separate setting voltage capabilities from bus
->     power
->   mmc: host: omap_hsmmc: Remove incorrect voltage switch sequence
->   mmc: host: omap_hsmmc: Add voltage switch support for UHS SD card
->   mmc: host: omap_hsmmc: Set clk rate to the max frequency
->   mmc: host: omap_hsmmc: Add tuning support
->   mmc: host: omap_hsmmc: Allow io voltage switch even for fixed vdd
->   mmc: host: omap_hsmmc: Prepare *set_timing() to be used for iodelay
->     setting
->   mmc: host: omap_hsmmc: Add new compatible string to support dra7
->   mmc: host: omap_hsmmc: Fix error path sequence
->   mmc: host: omap_hsmmc: Add support to set IODELAY values
->   mmc: host: omap_hsmmc: Remove *use_dma* member
->   mmc: host: omap_hsmmc: Enable ADMA2
->   ARM: dts: dra7: Use new dra7-specific compatible string
->   ARM: dts: dra7: Add supported MMC/SD modes in MMC dt nodes
->
-> Mugunthan V N (1):
->   mmc: host: omap_hsmmc: Add software timer when timeout greater than
->     hardware capablility
->
->  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    6 +
->  arch/arm/boot/dts/am571x-idk.dts                   |    1 +
->  arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts      |    1 +
->  arch/arm/boot/dts/am57xx-beagle-x15.dts            |    6 +
->  arch/arm/boot/dts/am57xx-idk-common.dtsi           |    1 +
->  arch/arm/boot/dts/dra7.dtsi                        |   22 +-
->  drivers/mmc/host/omap_hsmmc.c                      | 1179 ++++++++++++++++----
->  include/linux/platform_data/hsmmc-omap.h           |    2 +
->  8 files changed, 1021 insertions(+), 197 deletions(-)
->
-> --
-> 2.11.0
->
+Regards.
 
-Kind regards
-Ulf Hansson
+
+
+ arch/arm/boot/dts/tango4-smp8758.dtsi |  1 -
+ drivers/cpufreq/Makefile              |  1 +
+ drivers/cpufreq/cpufreq-dt-platdev.c  |  2 --
+ drivers/cpufreq/tango-cpufreq.c       | 45 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 46 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
+index d2e65c46bcc7..eca33d568690 100644
+--- a/arch/arm/boot/dts/tango4-smp8758.dtsi
++++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
+@@ -13,7 +13,6 @@
+ 			reg = <0>;
+ 			clocks = <&clkgen CPU_CLK>;
+ 			clock-latency = <1>;
+-			operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 0a9b6a093646..5ae156dc0d35 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -75,6 +75,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
+ obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
+ obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+ obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
++obj-$(CONFIG_ARCH_TANGO)		+= tango-cpufreq.o
+ obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
+ obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
+ obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 71267626456b..1490e4ce3fbc 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -70,8 +70,6 @@
+ 	{ .compatible = "rockchip,rk3368", },
+ 	{ .compatible = "rockchip,rk3399", },
+ 
+-	{ .compatible = "sigma,tango4" },
+-
+ 	{ .compatible = "ti,am33xx", },
+ 	{ .compatible = "ti,dra7", },
+ 	{ .compatible = "ti,omap2", },
+diff --git a/drivers/cpufreq/tango-cpufreq.c b/drivers/cpufreq/tango-cpufreq.c
+new file mode 100644
+index 000000000000..270c8261ebfa
+--- /dev/null
++++ b/drivers/cpufreq/tango-cpufreq.c
+@@ -0,0 +1,45 @@
++#include <linux/of.h>
++#include <linux/cpu.h>
++#include <linux/clk.h>
++#include <linux/pm_opp.h>
++#include <linux/platform_device.h>
++
++static const struct of_device_id machines[] __initconst = {
++	{ .compatible = "sigma,tango4" },
++	{ .compatible = "sigma,tango5" },
++	{ /* sentinel */ }
++};
++
++static void __init build_opp_table(struct device *cpu_dev, struct clk *cpu_clk)
++{
++	unsigned long max_freq = clk_get_rate(cpu_clk);
++
++	dev_pm_opp_add(cpu_dev, max_freq / 1, 0);
++	dev_pm_opp_add(cpu_dev, max_freq / 2, 0);
++	dev_pm_opp_add(cpu_dev, max_freq / 3, 0);
++	dev_pm_opp_add(cpu_dev, max_freq / 5, 0);
++	dev_pm_opp_add(cpu_dev, max_freq / 9, 0);
++}
++
++static int __init cpufreq_dt_platdev_init(void)
++{
++	struct device *cpu_dev = get_cpu_device(0);
++	const struct of_device_id *match;
++	struct clk *cpu_clk;
++	void *res;
++
++	match = of_match_node(machines, of_root);
++	if (!match)
++		return -ENODEV;
++
++	cpu_clk = clk_get(cpu_dev, NULL);
++	if (IS_ERR(cpu_clk))
++		return -ENODEV;
++
++	build_opp_table(cpu_dev, cpu_clk);
++
++	res = platform_device_register_data(NULL, "cpufreq-dt", -1, NULL, 0);
++
++	return PTR_ERR_OR_ZERO(res);
++}
++device_initcall(cpufreq_dt_platdev_init);
