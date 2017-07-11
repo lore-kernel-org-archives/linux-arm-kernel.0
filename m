@@ -1,37 +1,75 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 11 Jul 2017 14:20:23 +0200
-Subject: [PATCH] staging: bcm2835-audio: replace BUG_ON with WARN_ON
-In-Reply-To: <CAHRz_yZ6OCke+umsprLmfgExe446jXi-Jnexn=t6bi9Jj7vBzQ@mail.gmail.com>
-References: <CAHRz_yZ6OCke+umsprLmfgExe446jXi-Jnexn=t6bi9Jj7vBzQ@mail.gmail.com>
-Message-ID: <20170711122023.GB21677@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Jul 2017 14:26:01 +0200
+Subject: [PATCH] clk: gemini: Fix reset regression
+Message-ID: <20170711122601.17745-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 04:54:24PM +0530, karuna grewal wrote:
-> replace BUG_ON with WARN_ON as pointed out by checkpatch
-> 
-> Signed-off-by: Karuna Grewal <karunagrewal98@gmail.com>
+commit e2860e1f62f2 ("serial: 8250_of: Add reset support")
+introduced reset support for the 8250_of driver.
 
-I can not accept patches sent in html format...
+However it unconditionally uses the assert/deassert pair to
+deassert reset on the device at probe and assert it at
+remove. This does not work with systems that have a
+self-deasserting reset controller, such as Gemini, that
+recently added a reset controller.
 
-> ---
-> ?drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> index 5ff4b1c..30d310b 100644
-> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> @@ -93,7 +93,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
-> ? ? ? ? if (mutex_lock_interruptible(&chip->audio_mutex))
-> ? ? ? ? ? ? ? ? return -EINTR;
-> 
-> -? ? ? ?BUG_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
-> +? ? ? ?WARN_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
+As a result, the console will not probe on the Gemini with
+this message:
 
-Why will this make things better?
+Serial: 8250/16550 driver, 1 ports, IRQ sharing disabled
+of_serial: probe of 42000000.serial failed with error -524
 
-thanks,
+This (-ENOTSUPP) is the error code returned by the
+deassert() operation on self-deasserting reset controllers.
 
-greg k-h
+To work around this, implement dummy .assert() and
+.deassert() operations in the Gemini combined clock and
+reset controller. This fixes the issue on this system.
+
+Cc: Joel Stanley <joel@jms.id.au>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-serial at vger.kernel.org
+Fixes: e2860e1f62f2 ("serial: 8250_of: Add reset support")
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+This is the solution suggested by Philipp, I think.
+---
+ drivers/clk/clk-gemini.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/drivers/clk/clk-gemini.c b/drivers/clk/clk-gemini.c
+index c391a49aaaff..b4cf2f699a21 100644
+--- a/drivers/clk/clk-gemini.c
++++ b/drivers/clk/clk-gemini.c
+@@ -237,6 +237,18 @@ static int gemini_reset(struct reset_controller_dev *rcdev,
+ 			    BIT(GEMINI_RESET_CPU1) | BIT(id));
+ }
+ 
++static int gemini_reset_assert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	return 0;
++}
++
++static int gemini_reset_deassert(struct reset_controller_dev *rcdev,
++				 unsigned long id)
++{
++	return 0;
++}
++
+ static int gemini_reset_status(struct reset_controller_dev *rcdev,
+ 			     unsigned long id)
+ {
+@@ -253,6 +265,8 @@ static int gemini_reset_status(struct reset_controller_dev *rcdev,
+ 
+ static const struct reset_control_ops gemini_reset_ops = {
+ 	.reset = gemini_reset,
++	.assert = gemini_reset_assert,
++	.deassert = gemini_reset_deassert,
+ 	.status = gemini_reset_status,
+ };
+ 
+-- 
+2.9.4
