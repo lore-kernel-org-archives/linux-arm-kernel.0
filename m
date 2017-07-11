@@ -1,71 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Jul 2017 15:43:20 +0100
-Subject: Applied "ASoC: pxa: SND_PXA2XX_SOC should depend on HAS_DMA" to the
- asoc tree
-In-Reply-To: <1499628632-15421-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <E1dUwNk-0005MS-82@debutante>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Tue, 11 Jul 2017 15:17:46 +0000
+Subject: [PATCH] ARM: tegra: Register host1x node with iommu binding on
+ tegra124
+In-Reply-To: <1499785555.1340.15.camel@paulk.fr>
+References: <20170709163614.6746-1-contact@paulk.fr>
+ <1499763009.1340.11.camel@paulk.fr> <1499784841.1520.20.camel@toradex.com>
+ <1499785555.1340.15.camel@paulk.fr>
+Message-ID: <1499786264.1520.22.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Tue, 2017-07-11 at 18:05 +0300, Paul Kocialkowski wrote:
+> On Tue, 2017-07-11 at 14:54 +0000, Marcel Ziswiler wrote:
+> > On Tue, 2017-07-11 at 11:50 +0300, Paul Kocialkowski wrote:
+> > > On Sun, 2017-07-09 at 19:36 +0300, Paul Kocialkowski wrote:
+> > > > This registers the host1x node with the SMMU (as HC swgroup) to
+> > > > allow
+> > > > the host1x code to attach to it. It avoid failing the probe
+> > > > sequence,
+> > > > which resulted in the tegra drm driver not probing and thus
+> > > > nothing
+> > > > being displayed on-screen.
+> > > 
+> > > Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
+> > > 
+> > > > Signed-off-by: Paul Kocialkowski <contact-
+> > > > W9ppeneeCTY at public.gmane.org>
+> > 
+> > Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > Tested-on: Apalis TK1, Jetson-TK1
+> > 
+> > > > ---
+> > > > ?arch/arm/boot/dts/tegra124.dtsi | 1 +
+> > > > ?1 file changed, 1 insertion(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/tegra124.dtsi
+> > > > b/arch/arm/boot/dts/tegra124.dtsi
+> > > > index 187a36c6d0fc..b3b89befffeb 100644
+> > > > --- a/arch/arm/boot/dts/tegra124.dtsi
+> > > > +++ b/arch/arm/boot/dts/tegra124.dtsi
+> > > > @@ -85,6 +85,7 @@
+> > > > ?		clocks = <&tegra_car TEGRA124_CLK_HOST1X>;
+> > > > ?		resets = <&tegra_car 28>;
+> > > > ?		reset-names = "host1x";
+> > > > +		iommus = <&mc TEGRA_SWGROUP_HC>;
+> > > > ?
+> > > > ?		#address-cells = <2>;
+> > > > ?		#size-cells = <2>;
+> > 
+> > So I take it we still will need this one moving forward, correct?
+> 
+> Yes, this one actually enables the IOMMU while the other one handles
+> the
+> failure to attach the IOMMU without brinding the whole drm driver
+> down.
+> 
+> So it's best to actually make use of the feature!
+> 
+> > How about tegra30, I guess the same applies there, isn't it? Should
+> > I
+> > send a patch or are you guys doing that?
+> 
+> I don't have any tegra hardware aside of tegra124, so that's all I
+> can
+> contribute to. I don't know if others have looked into the same type
+> of
+> issue happening on either newer or older platforms.
 
-   ASoC: pxa: SND_PXA2XX_SOC should depend on HAS_DMA
+OK, as we happen to still selling Apalis/Colibri T30 and me having
+Beaver as well as Cardhu available for testing I can cook something up,
+test and send it along. First tries indicate it working on 4.12 but
+somehow crashing during memory allocation on -next. We'll see.
 
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From ac1ca3ba9faae7e32f189edda14f6f147053d719 Mon Sep 17 00:00:00 2001
-From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Sun, 9 Jul 2017 21:30:32 +0200
-Subject: [PATCH] ASoC: pxa: SND_PXA2XX_SOC should depend on HAS_DMA
-
-If NO_DMA=y:
-
-    ERROR: "bad_dma_ops" [sound/soc/pxa/snd-soc-pxa2xx.ko] undefined!
-    ERROR: "bad_dma_ops" [sound/arm/snd-pxa2xx-lib.ko] undefined!
-    ERROR: "dma_common_mmap" [sound/arm/snd-pxa2xx-lib.ko] undefined!
-
-Add a dependency on HAS_DMA to fix this.
-
-Fixes: 73d7ee2e831f106c ("ASoC: pxa: add COMPILE_TEST on SND_PXA2XX_SOC")
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/pxa/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 960744e46edc..484ab3c2ad67 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -1,6 +1,7 @@
- config SND_PXA2XX_SOC
- 	tristate "SoC Audio for the Intel PXA2xx chip"
- 	depends on ARCH_PXA || COMPILE_TEST
-+	depends on HAS_DMA
- 	select SND_PXA2XX_LIB
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
--- 
-2.13.2
+> Cheers,
