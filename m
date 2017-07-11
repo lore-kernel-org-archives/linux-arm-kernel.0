@@ -1,75 +1,108 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Tue, 11 Jul 2017 15:17:46 +0000
-Subject: [PATCH] ARM: tegra: Register host1x node with iommu binding on
- tegra124
-In-Reply-To: <1499785555.1340.15.camel@paulk.fr>
-References: <20170709163614.6746-1-contact@paulk.fr>
- <1499763009.1340.11.camel@paulk.fr> <1499784841.1520.20.camel@toradex.com>
- <1499785555.1340.15.camel@paulk.fr>
-Message-ID: <1499786264.1520.22.camel@toradex.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 11 Jul 2017 11:25:34 -0400
+Subject: [PATCH V3 2/2] PCI: Do not enable extended tags if a quirky device is
+ found
+In-Reply-To: <1499786735-25782-1-git-send-email-okaya@codeaurora.org>
+References: <1499786735-25782-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1499786735-25782-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-07-11 at 18:05 +0300, Paul Kocialkowski wrote:
-> On Tue, 2017-07-11 at 14:54 +0000, Marcel Ziswiler wrote:
-> > On Tue, 2017-07-11 at 11:50 +0300, Paul Kocialkowski wrote:
-> > > On Sun, 2017-07-09 at 19:36 +0300, Paul Kocialkowski wrote:
-> > > > This registers the host1x node with the SMMU (as HC swgroup) to
-> > > > allow
-> > > > the host1x code to attach to it. It avoid failing the probe
-> > > > sequence,
-> > > > which resulted in the tegra drm driver not probing and thus
-> > > > nothing
-> > > > being displayed on-screen.
-> > > 
-> > > Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
-> > > 
-> > > > Signed-off-by: Paul Kocialkowski <contact-
-> > > > W9ppeneeCTY at public.gmane.org>
-> > 
-> > Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> > Tested-on: Apalis TK1, Jetson-TK1
-> > 
-> > > > ---
-> > > > ?arch/arm/boot/dts/tegra124.dtsi | 1 +
-> > > > ?1 file changed, 1 insertion(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/tegra124.dtsi
-> > > > b/arch/arm/boot/dts/tegra124.dtsi
-> > > > index 187a36c6d0fc..b3b89befffeb 100644
-> > > > --- a/arch/arm/boot/dts/tegra124.dtsi
-> > > > +++ b/arch/arm/boot/dts/tegra124.dtsi
-> > > > @@ -85,6 +85,7 @@
-> > > > ?		clocks = <&tegra_car TEGRA124_CLK_HOST1X>;
-> > > > ?		resets = <&tegra_car 28>;
-> > > > ?		reset-names = "host1x";
-> > > > +		iommus = <&mc TEGRA_SWGROUP_HC>;
-> > > > ?
-> > > > ?		#address-cells = <2>;
-> > > > ?		#size-cells = <2>;
-> > 
-> > So I take it we still will need this one moving forward, correct?
-> 
-> Yes, this one actually enables the IOMMU while the other one handles
-> the
-> failure to attach the IOMMU without brinding the whole drm driver
-> down.
-> 
-> So it's best to actually make use of the feature!
-> 
-> > How about tegra30, I guess the same applies there, isn't it? Should
-> > I
-> > send a patch or are you guys doing that?
-> 
-> I don't have any tegra hardware aside of tegra124, so that's all I
-> can
-> contribute to. I don't know if others have looked into the same type
-> of
-> issue happening on either newer or older platforms.
+According to extended tags ECN document, all PCIe receivers are expected
+to support extended tags. However, devices with exceptions/quirks were
+found. If a device with extended tags quirk is found, disable extended tags
+for all devices in the tree assuming peer-to-peer is possible.
 
-OK, as we happen to still selling Apalis/Colibri T30 and me having
-Beaver as well as Cardhu available for testing I can cook something up,
-test and send it along. First tries indicate it working on 4.12 but
-somehow crashing during memory allocation on -next. We'll see.
+Also note that the default value of Extended Tags Enable bit is
+implementation specific. Therefore, we are clearing the bit by default when
+incompatible HW is found.
 
-> Cheers,
+Reported-by: Wim ten Have <wim.ten.have@oracle.com>
+Link: https://bugzilla.redhat.com/show_bug.cgi?id=1467674
+Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/probe.c | 37 +++++++++++++++++++++++++++++++------
+ 1 file changed, 31 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 19c8950..396dd80 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1684,21 +1684,43 @@ static void program_hpp_type2(struct pci_dev *dev, struct hpp_type2 *hpp)
+ 	 */
+ }
+ 
+-static void pci_configure_extended_tags(struct pci_dev *dev)
++static int pcie_find_broken_exttags(struct pci_dev *dev, void *data)
+ {
++	bool *found = data;
++
++	if (!pci_is_pcie(dev))
++		return 0;
++
++	if (dev->broken_exttags_completer)
++		*found = dev->broken_exttags_completer;
++
++	return 0;
++}
++
++static int pcie_bus_configure_exttags(struct pci_dev *dev, void *broken)
++{
++	bool supported = !*(bool *)broken;
+ 	u32 dev_cap;
+ 	int ret;
+ 
+ 	if (!pci_is_pcie(dev))
+-		return;
++		return 0;
+ 
+ 	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &dev_cap);
+-	if (ret)
+-		return;
++	if (ret || (!(dev_cap & PCI_EXP_DEVCAP_EXT_TAG)))
++		return 0;
+ 
+-	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
++	if (supported) {
++		dev_dbg(&dev->dev, "setting extended tags capability\n");
+ 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
+ 					 PCI_EXP_DEVCTL_EXT_TAG);
++	} else {
++		dev_dbg(&dev->dev, "clearing extended tags capability\n");
++		pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
++					   PCI_EXP_DEVCTL_EXT_TAG);
++	}
++
++	return 0;
+ }
+ 
+ static void pci_configure_device(struct pci_dev *dev)
+@@ -1707,7 +1729,6 @@ static void pci_configure_device(struct pci_dev *dev)
+ 	int ret;
+ 
+ 	pci_configure_mps(dev);
+-	pci_configure_extended_tags(dev);
+ 
+ 	memset(&hpp, 0, sizeof(hpp));
+ 	ret = pci_get_hp_params(dev, &hpp);
+@@ -2201,6 +2222,7 @@ static int pcie_bus_configure_set(struct pci_dev *dev, void *data)
+ void pcie_bus_configure_settings(struct pci_bus *bus)
+ {
+ 	u8 smpss = 0;
++	bool broken_exttags = false;
+ 
+ 	if (!bus->self)
+ 		return;
+@@ -2224,6 +2246,9 @@ void pcie_bus_configure_settings(struct pci_bus *bus)
+ 
+ 	pcie_bus_configure_set(bus->self, &smpss);
+ 	pci_walk_bus(bus, pcie_bus_configure_set, &smpss);
++
++	pci_walk_bus(bus, pcie_find_broken_exttags, &broken_exttags);
++	pci_walk_bus(bus, pcie_bus_configure_exttags, &broken_exttags);
+ }
+ EXPORT_SYMBOL_GPL(pcie_bus_configure_settings);
+ 
+-- 
+1.9.1
