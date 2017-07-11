@@ -1,7 +1,7 @@
 From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Tue, 11 Jul 2017 13:03:39 -0500
-Subject: [PATCH] pinctrl: bcm2835: constify gpio_chip structure
-Message-ID: <20170711180339.GA17806@embeddedgus>
+Date: Tue, 11 Jul 2017 13:15:19 -0500
+Subject: [PATCH] pinctrl: st: constify gpio_chip structure
+Message-ID: <20170711181519.GA20001@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -43,29 +43,29 @@ of the size command, before and after the code change:
 
 before:
    text    data     bss     dec     hex filename
-  18958    9000     128   28086    6db6 drivers/pinctrl/bcm/pinctrl-bcm2835.o
+  21671    3632     128   25431    6357 drivers/pinctrl/pinctrl-st.o
 
 after:
    text    data     bss     dec     hex filename
-  18764    8912     128   27804    6c9c drivers/pinctrl/bcm/pinctrl-bcm2835.o
+  21366    3576     128   25070    61ee drivers/pinctrl/pinctrl-st.o
 
 Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 ---
- drivers/pinctrl/bcm/pinctrl-bcm2835.c | 2 +-
+ drivers/pinctrl/pinctrl-st.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-index 2308831..7203f35 100644
---- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-+++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-@@ -353,7 +353,7 @@ static int bcm2835_gpio_direction_output(struct gpio_chip *chip,
- 	return pinctrl_gpio_direction_output(chip->base + offset);
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 3ae8066..5d4789d 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -1442,7 +1442,7 @@ static void st_gpio_irqmux_handler(struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
  }
  
--static struct gpio_chip bcm2835_gpio_chip = {
-+static const struct gpio_chip bcm2835_gpio_chip = {
- 	.label = MODULE_NAME,
- 	.owner = THIS_MODULE,
- 	.request = gpiochip_generic_request,
+-static struct gpio_chip st_gpio_template = {
++static const struct gpio_chip st_gpio_template = {
+ 	.request		= gpiochip_generic_request,
+ 	.free			= gpiochip_generic_free,
+ 	.get			= st_gpio_get,
 -- 
 2.5.0
