@@ -1,71 +1,25 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 11 Jul 2017 19:27:00 +0530
-Subject: [PATCH 00/16] omap_hsmmc: Add ADMA support and UHS/HS200/DDR
- support
-In-Reply-To: <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
-References: <20170616124544.15046-1-kishon@ti.com>
- <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
-Message-ID: <fc9c1576-7419-b174-ea42-97ccf4666cee@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 11 Jul 2017 16:07:22 +0200
+Subject: i.MX 6 and PCIe DMA issues
+In-Reply-To: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
+References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
+Message-ID: <20170711140722.GI21118@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+> I was suspecting the caches to be the root of my issue, but I was
+> not able to resolve the issue with calls to flush_cache_all(), which
+> I suppose should have invalidated the entire cache.
 
-On Tuesday 11 July 2017 06:40 PM, Ulf Hansson wrote:
-> On 16 June 2017 at 14:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> This is the final part of the series originally sent as
->> part of [2].
->>
->> This series adds UHS, HS200, DDR mode and ADMA support to
->> omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
->> SoCs.
->>
->> Changes from [2]:
->> *) No more updating omap2plus_defconfig or multi_v7_defconfig is
->>    required, so those patches are removed.
->> *) Addressed Rob Herring's comment on implementing a function
->>    instead of having a macro while getting pinctrl state.
->>
->> This series is created on top of [3], [4], [5] AND [6]
->> (i.e after
->>   ARM: dts: omap3-overo: Remove "vqmmc-supply" property from MMC dt node
->>   omap_hsmmc: use mmc_regulator_get_supply() to get regulators
->>   omap*: Fixes/Cleanups for MMC devicetree node
->>   ARM: dts: Add iodelay data for MMC)
->>
->> The functionality implemented in this series was sent before ([1]) but
->> was never followed up since supporting high speed modes in dra7 required
->> IODelay values to be configured. With IODelay driver being merged into
->> kernel, sending it as a fresh series with support for configuring IODelay
->> values.
-> 
-> Is it safe to queue this via mmc tree for 4.14 or is there a
-> dependency I must consider? The above didn't quite tell me that, could
-> you please elaborate.
+Flush and invalidate are different operations. flush_cache_all() will
+not invalidate.
 
-There is a dependency with https://www.spinics.net/lists/arm-kernel/msg586215.html.
+How are your RX buffers aligned. It is good to ensure that your
+buffers don't share cache lines. What could be happening is that you
+are reading the tail end of one buffer which is bringing into cache
+the head of the next buffer, if they share cache lines.
 
-I'll resend the series after all the platform data specific stuff is merged.
-> 
->>
->> Suggestions of migrating to sdhci driver (from omap_hsmmc driver) is not
->> addressed since
->> *) tuning ratio of MMC in dra7 is different from sdhci
->> *) IOdelay is required for dra7
->> *) GPIO based card detect is not supported in sdhci
-> 
-> Lots of sdhci drivers calls mmc_of_parse(), and uses the mmc slot gpio
-> APIs, so I don't this this is correct statement.
-> 
->> *) Some of the registers don't always have correct values as in sdhci
->>    (like PSTATE).
->> Supporting all of these in sdhci will result in adding lot of quirks in
->> sdhci driver.
-> 
-> Is it really that much different? It would be nice if some really took
-> on the challenge of converting omap_hsmmc into an sdhci variant.
+Also, ARMv7 processors can do speculative reads, so you must get your
+dma_sync_single_for_cpu() and dma_sync_single_for_device() correct.
 
-Okay. I'll give that a shot and see how far I can get.
-
-Thanks
-Kishon
+    Andrew
