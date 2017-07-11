@@ -1,102 +1,71 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue, 11 Jul 2017 23:23:44 +0200
-Subject: [RFC 2/2] mmc: meson-mx-sdio: Add a driver for the Amlogic Meson8
- and Meson8b SoCs
-In-Reply-To: <CAPDyKFrbxMpgDrZXKmrN4fyJWJ_ZML3jPxBs+YDEz=L1kA-BaA@mail.gmail.com>
-References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
- <20170506171857.16492-3-martin.blumenstingl@googlemail.com>
- <CAPDyKFrrSLCjbXO9R4VqPpabiFsbE6_RqR=U7otVF4Ncv0jHjQ@mail.gmail.com>
- <CAFBinCD3modyyOpi3OY5XLhjX0UCuV+WPY2Z=mdvwdMCyeGoqg@mail.gmail.com>
- <CAPDyKFptXRPk7mVUiRHf=hECDbeyhTxuf3K1M6NkZcVEF0Enww@mail.gmail.com>
- <CAFBinCD=uH=oQmWAcsMpxtbJCnJZernZx3XoNaPixUUQ7pk76w@mail.gmail.com>
- <CAPDyKFrbxMpgDrZXKmrN4fyJWJ_ZML3jPxBs+YDEz=L1kA-BaA@mail.gmail.com>
-Message-ID: <CAFBinCA-goSsyq7bo=ozPRnOqc8br4KDJJ_Lao5h==Xneh02nw@mail.gmail.com>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Tue, 11 Jul 2017 16:29:29 -0500
+Subject: [PATCH] pinctrl: nomadik: abx500: constify gpio_chip structure
+Message-ID: <20170711212929.GA1037@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+This structure is only used to copy into another structure, so declare
+it as const.
 
-sorry for the delay, I've been pretty busy.
-however, I'll have more time to work in this driver this and next week
+This issue was detected using Coccinelle and the following semantic patch:
 
-On Mon, Jun 19, 2017 at 1:50 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>
->>> [...]
->>>
->>>>>> +       if (!(cmd->flags & MMC_RSP_CRC))
->>>>>> +               send |= MESON_MX_SDIO_SEND_RESP_WITHOUT_CRC7;
->>>>>> +
->>>>>> +       if (cmd->flags & MMC_RSP_BUSY)
->>>>>> +               send |= MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY;
->>>>>
->>>>> In case the controller has HW support of busy detection, please
->>>>> consider to enable MMC_CAP_WAIT_WHILE_BUSY for this driver. Then also
->>>>> assign host->max_busy_timeout a good value.
->>>> the IRQS register has bit 4 (CMD_BUSY) - but apart from that there is
->>>> no other documentation (about timeout values, etc.). the vendor driver
->>>> also neither uses MMC_CAP_WAIT_WHILE_BUSY nor host->max_busy_timeout
->>>> should I leave this as it is?
->>>
->>> Please don't just leave it as is. This is an important thing to get right.
->>>
->>> You should be able to explore this area and see how the controller
->>> behaves without too much of documentation. Regarding timeouts, it may
->>> very well be that the controller don't have a timeout, which is why
->>> you need a software timeout. That's not so uncommon actually.
->> during my experiments I've never seen an interrupt when a command
->> timed out (nor could I find information about a timeout register in
->> the documentation). do you have any pointers (like a previous mail
->> where you've explained) how I can "explore the controller's timeout
->> behavior"?
->
-> Sorry, I don't have an pointers.
->
-> Anyway. If you do a big erase operation on an SD card, the card should
-> signal busy on DAT0 for a rather long time.
-erase operation = mount sd card; rm big_file.bin; sync ?
-or is there some other way?
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct gpio_chip i at p = { ... };
 
-> You could probably explore how long it takes for the card to respond
-> under those circumstances, and try both with and without
-> MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY.
-so I simply read the card status through sysfs? or would I need to get
-some of this information from the controller?
-I found that the IRQC register contains a few interesting bits:
-    u32 sdio_force_data:6; /*[13:8]
-        * Write operation: Data forced by software
-        * Read operation: {CLK,CMD,DAT[3:0]}*/
-I dumped these while transferring some data, the values seem to be
-changing constantly (0x3f, 0x1f, 0x20, ...)
-if I interpret those bits correctly then they are the status of the
-corresponding pin
+@ok@
+identifier r.i;
+expression e;
+position p;
+@@
+e = i at p;
 
-> Of course you also need to try with and without
-> MMC_CAP_WAIT_WHILE_BUSY, as the core may sometimes convert R1B to R1
-> responses depending on that cap.
-so MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY + MMC_CAP_WAIT_WHILE_BUSY should
-go together?
-and MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY should not be set when
-MMC_CAP_WAIT_WHILE_BUSY isn't?
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct gpio_chip e;
+@@
+e at i@p
 
-> [...]
->
->>>
->>> It shouldn't be that hard to implement, although I strongly recommend
->>> you to address this in a second step. In other words, I suggest you to
->>> drop the entire multiple slot support in the first step, then we can
->>> deal with that on top instead.
->> many thanks for the detailed explanation again!
->> I would be fine with dropping multiple slot support for the moment
->> *if* we can agree on the fact that the devicetree binding can support
->> multiple slots in theory (my idea here is: keep the child-nodes with
->> compatible = "mmc-slot" mandatory - but only allow one such child node
->> for now). I don't want to break DT compatibility after a few
->> weeks/months for a new driver. is that OK for you as well?
->
-> That's fine! We already have such a binding available for some other
-> mmc controllers. We could even consider to make that binding a generic
-> mmc binding.
-OK, perfect :)
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct gpio_chip i = { ... };
 
-Regards,
-Martin
+In the following log you can see a significant difference in the code size
+and data segment, hence in the dec segment. This log is the output
+of the size command, before and after the code change:
+
+before:
+   text    data     bss     dec     hex filename
+  17545    5376       0   22921    5989 drivers/pinctrl/nomadik/pinctrl-abx500.o
+
+after:
+            bss     dec     hex filename
+  17273    5320       0   22593    5841 drivers/pinctrl/nomadik/pinctrl-abx500.o
+
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+---
+ drivers/pinctrl/nomadik/pinctrl-abx500.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+index f95001b..b32c0d6 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
++++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+@@ -647,7 +647,7 @@ static inline void abx500_gpio_dbg_show_one(struct seq_file *s,
+ #define abx500_gpio_dbg_show	NULL
+ #endif
+ 
+-static struct gpio_chip abx500gpio_chip = {
++static const struct gpio_chip abx500gpio_chip = {
+ 	.label			= "abx500-gpio",
+ 	.owner			= THIS_MODULE,
+ 	.request		= gpiochip_generic_request,
+-- 
+2.5.0
