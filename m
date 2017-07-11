@@ -1,39 +1,100 @@
 From: mike.leach@linaro.org (Mike Leach)
-Date: Tue, 11 Jul 2017 12:25:51 +0100
-Subject: [PATCH 3/3] coresight: etm4x: Adds trace return stack option
- programming for ETMv4.
-In-Reply-To: <1499772351-2210-1-git-send-email-mike.leach@linaro.org>
-References: <1499772351-2210-1-git-send-email-mike.leach@linaro.org>
-Message-ID: <1499772351-2210-4-git-send-email-mike.leach@linaro.org>
+Date: Tue, 11 Jul 2017 12:29:34 +0100
+Subject: [PATCH] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
+Message-ID: <1499772574-2267-1-git-send-email-mike.leach@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds handling to program the return stack option into ETMv4 hardware if
-specified in the perf command line.
+The value passed into the perf.data file for the CONFIGR register in ETMv4
+was incorrectly being set to the command line options/ETMv3 value.
 
-If option is not supported by the hardware then it will be ignored.
-This allows capture to move between core/ETM combinations that have the
-hardware support to those that do not.
+Adds bit definitions and function to remap this value to the correct ETMv4
+CONFIGR bit values for all selected options.
 
 Signed-off-by: Mike Leach <mike.leach@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ include/linux/coresight-pmu.h       |  5 +++++
+ tools/include/linux/coresight-pmu.h |  5 +++++
+ tools/perf/arch/arm/util/cs-etm.c   | 28 +++++++++++++++++++++++++++-
+ 3 files changed, 37 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index d1340fb..fb3ce34 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -224,6 +224,10 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
- 	if (attr->config & BIT(ETM_OPT_TS))
- 		/* bit[11], Global timestamp tracing bit */
- 		config->cfg |= BIT(11);
-+	/* return stack - enable if selected and supported */
-+	if ((attr->config & BIT(ETM_OPT_RETSTK)) && drvdata->retstack)
-+		/* bit[12], Return stack enable bit */
-+		config->cfg |= BIT(12);
+diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
+index 45852c2..edfeaba 100644
+--- a/include/linux/coresight-pmu.h
++++ b/include/linux/coresight-pmu.h
+@@ -26,6 +26,11 @@
+ #define ETM_OPT_TS      28
+ #define ETM_OPT_RETSTK	29
  
- out:
- 	return ret;
++/* ETMv4 CONFIGR programming bits for the ETM OPTs */
++#define ETM4_CFG_BIT_CYCACC	4
++#define ETM4_CFG_BIT_TS		11
++#define ETM4_CFG_BIT_RETSTK	12
++
+ static inline int coresight_get_trace_id(int cpu)
+ {
+ 	/*
+diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
+index 45852c2..edfeaba 100644
+--- a/tools/include/linux/coresight-pmu.h
++++ b/tools/include/linux/coresight-pmu.h
+@@ -26,6 +26,11 @@
+ #define ETM_OPT_TS      28
+ #define ETM_OPT_RETSTK	29
+ 
++/* ETMv4 CONFIGR programming bits for the ETM OPTs */
++#define ETM4_CFG_BIT_CYCACC	4
++#define ETM4_CFG_BIT_TS		11
++#define ETM4_CFG_BIT_RETSTK	12
++
+ static inline int coresight_get_trace_id(int cpu)
+ {
+ 	/*
+diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
+index 29361d9..997734b 100644
+--- a/tools/perf/arch/arm/util/cs-etm.c
++++ b/tools/perf/arch/arm/util/cs-etm.c
+@@ -266,6 +266,32 @@ static u64 cs_etm_get_config(struct auxtrace_record *itr)
+ 	return config;
+ }
+ 
++#ifndef BIT
++#define BIT(N) (1UL << (N))
++#endif
++
++static u64 cs_etmv4_get_config(struct auxtrace_record *itr)
++{
++	u64 config = 0;
++	u64 config_opts = 0;
++
++	/*
++	 * The perf event variable config bits represent both
++	 * the command line options and register programming
++	 * bits in ETMv3/PTM. For ETMv4 we must remap options
++	 * to real bits
++	 */
++	config_opts = cs_etm_get_config(itr);
++	if (config_opts & BIT(ETM_OPT_CYCACC))
++		config |= BIT(ETM4_CFG_BIT_CYCACC);
++	if (config_opts & BIT(ETM_OPT_TS))
++		config |= BIT(ETM4_CFG_BIT_TS);
++	if (config_opts & BIT(ETM_OPT_RETSTK))
++		config |= BIT(ETM4_CFG_BIT_RETSTK);
++
++	return config;
++}
++
+ static size_t
+ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+ 		      struct perf_evlist *evlist __maybe_unused)
+@@ -363,7 +389,7 @@ static void cs_etm_get_metadata(int cpu, u32 *offset,
+ 		magic = __perf_cs_etmv4_magic;
+ 		/* Get trace configuration register */
+ 		info->priv[*offset + CS_ETMV4_TRCCONFIGR] =
+-						cs_etm_get_config(itr);
++						cs_etmv4_get_config(itr);
+ 		/* Get traceID from the framework */
+ 		info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
+ 						coresight_get_trace_id(cpu);
 -- 
 2.7.4
