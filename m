@@ -1,117 +1,122 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 11 Jul 2017 23:08:56 +0900
-Subject: [PATCH] ARM: dts: uniphier: use SPDX-License-Identifier (2nd)
-Message-ID: <1499782136-7744-1-git-send-email-yamada.masahiro@socionext.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 11 Jul 2017 15:19:21 +0100
+Subject: [PATCH 0/2] Fatal signal handing within uaccess faults
+Message-ID: <1499782763-31418-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fa53757bca33 ("ARM: dts: uniphier: use SPDX-License-Identifier")
-missed to touch these two.  Now updating.
+[resending with LAKML's address corrected]
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Hi,
 
- arch/arm/boot/dts/uniphier-pinctrl.dtsi | 38 +--------------------------------
- arch/arm/boot/dts/uniphier-pro5.dtsi    | 38 +--------------------------------
- 2 files changed, 2 insertions(+), 74 deletions(-)
+Arch maintainer tl;dr: most arch fault code doesn't handle fatal signals
+correctly, allowing unprivileged users to create an unkillable task which can
+lock up the system. Please check whether your arch is affected.
 
-diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-index 246f35ffb638..f6c5cf2281d5 100644
---- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-@@ -4,43 +4,7 @@
-  * Copyright (C) 2015-2017 Socionext Inc.
-  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-  *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License, or (at your option) any later version.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
- &pinctrl {
-diff --git a/arch/arm/boot/dts/uniphier-pro5.dtsi b/arch/arm/boot/dts/uniphier-pro5.dtsi
-index 9577769a0add..140327ddde1c 100644
---- a/arch/arm/boot/dts/uniphier-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro5.dtsi
-@@ -4,43 +4,7 @@
-  * Copyright (C) 2015-2016 Socionext Inc.
-  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-  *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License, or (at your option) any later version.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
- / {
+AFAICT, most arches don't correctly handle a fatal signal interrupting a
+uaccess fault. They attempt to bail out, returning to the faulting context
+without bothering to handle the fault, but forget to apply the uaccess fixup.
+Consequently, the uaccess gets replayed, and the same thing happens forver.
+
+When this occurs, the relevant task never returns to userspace, never handles
+the fatal signal, and is stuck in an unkillable (though interruptible and
+preemptible) state. The task can inhibit forward progress of the rest of the
+system, leading to RCU stalls and lockups.
+
+It's possible for an unprivileged user to trigger this deliberately using the
+userfaultfd syscall, as demonstrated by the test case at the end of this email
+(note: requires CONFIG_USERFAULTFD to be selected). I am not sure if this is
+the only way of triggering the issue.
+
+I stumbled upon this while fuzzing arm64 with Syzkaller. I've verified that
+both arm and arm64 have the issue, and by inspection is seems that the majority
+of other architectures are affected.
+
+It looks like this was fixed up for x86 in 2014 with commit:
+
+  26178ec11ef3c6c8 ("x86: mm: consolidate VM_FAULT_RETRY handling")
+
+... but most other architectures never received a similar fixup.
+
+The duplication (and divergence) of this logic is unfortunate. It's largely
+copy-paste code that could be consolidated under mm/.
+
+Until we end up refactoring this, and so as to be sutiable for backporting,
+this series fixes arm and arm64 in-place. I've not touched other architectures
+as I don't have the relevant hardwre or arch knowledge.
+
+Thanks,
+Mark.
+
+----
+#include <errno.h>
+#include <linux/userfaultfd.h>
+#include <stdio.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/syscall.h>
+#include <sys/vfs.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[])
+{
+	void *mem;
+	long pagesz;
+	int uffd, ret;
+	struct uffdio_api api = {
+		.api = UFFD_API
+	};
+	struct uffdio_register reg;
+       
+	pagesz = sysconf(_SC_PAGESIZE);
+	if (pagesz < 0) {
+		return errno;
+	}
+
+	mem = mmap(NULL, pagesz, PROT_READ | PROT_WRITE,
+		   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (mem == MAP_FAILED)
+		return errno;
+
+	uffd = syscall(__NR_userfaultfd, 0);
+	if (uffd < 0)
+		return errno;
+
+	ret = ioctl(uffd, UFFDIO_API, &api);
+	if (ret < 0)
+		return errno;
+
+	reg = (struct uffdio_register) {
+		.range = {
+			.start = (unsigned long)mem,
+			.len = pagesz
+		},
+		.mode = UFFDIO_REGISTER_MODE_MISSING
+	};
+
+	ret = ioctl(uffd, UFFDIO_REGISTER, &reg);
+	if (ret < 0)
+		return errno;
+
+	/*
+	 * Force an arbitrary uaccess to memory monitored by the userfaultfd.
+	 * This will block, but when a SIGKILL is sent, will consume all
+	 * available CPU time without being killed, and may inhibit forward
+	 * progress of the system.
+	 */
+	ret = fstatfs(0, (struct statfs *)mem);
+
+	return 0;
+}
+----
+
+Mark Rutland (2):
+  arm64: mm: abort uaccess retries upon fatal signal
+  arm: mm: abort uaccess retries upon fatal signal
+
+ arch/arm/mm/fault.c   | 5 ++++-
+ arch/arm64/mm/fault.c | 5 ++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
 -- 
-2.7.4
+1.9.1
