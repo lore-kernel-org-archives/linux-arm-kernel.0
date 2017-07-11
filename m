@@ -1,70 +1,79 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Tue, 11 Jul 2017 14:37:35 +0000
-Subject: [PATCH] gpu: host1x: Free the IOMMU domain when there is no
- device to attach
-In-Reply-To: <1499762987.1340.10.camel@paulk.fr>
-References: <20170710193305.5987-1-contact@paulk.fr>
- <1499762987.1340.10.camel@paulk.fr>
-Message-ID: <1499783851.1520.16.camel@toradex.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 11 Jul 2017 16:42:50 +0200
+Subject: [PATCH] mmc: host: sdhci-st: Handle return value of
+ clk_prepare_enable
+In-Reply-To: <afbe2d9d649bc78992a72eda7124c093b3055047.1497957783.git.arvind.yadav.cs@gmail.com>
+References: <afbe2d9d649bc78992a72eda7124c093b3055047.1497957783.git.arvind.yadav.cs@gmail.com>
+Message-ID: <CAPDyKFrxSeZZPWWT7Oo-0XC8iTmyqu_Z4VPhvieVEPBDrhr98Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-07-11 at 11:49 +0300, Paul Kocialkowski wrote:
-> On Mon, 2017-07-10 at 21:33 +0200, Paul Kocialkowski wrote:
-> > When there is no device to attach to the IOMMU domain, as may be
-> > the
-> > case when the device-tree does not contain the proper iommu node,
-> > it
-> > is
-> > best to keep going without IOMMU support rather than failing.
-> > This allows the driver to probe and function instead of taking down
-> > all of the tegra drm driver, leading to missing display support.
-> 
-> Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
-> 
-> > Signed-off-by: Paul Kocialkowski <contact-W9ppeneeCTY@public.gmane.
-> > org>
-> > ---
-> > ?drivers/gpu/host1x/dev.c | 8 +++++++-
-> > ?1 file changed, 7 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/gpu/host1x/dev.c b/drivers/gpu/host1x/dev.c
-> > index ac65f52850a6..f296738d0de8 100644
-> > --- a/drivers/gpu/host1x/dev.c
-> > +++ b/drivers/gpu/host1x/dev.c
-> > @@ -186,8 +186,13 @@ static int host1x_probe(struct platform_device
-> > *pdev)
-> > ?			return -ENOMEM;
-> > ?
-> > ?		err = iommu_attach_device(host->domain, &pdev-
-> > >dev);
-> > -		if (err)
-> > +		if (err == -ENODEV) {
-> > +			iommu_domain_free(host->domain);
-> > +			host->domain = NULL;
-> > +			goto iommu_skip;
-> > +		} else if (err) {
-> > ?			goto fail_free_domain;
-> > +		}
-> > ?
-> > ?		geometry = &host->domain->geometry;
-> > ?
-> > @@ -198,6 +203,7 @@ static int host1x_probe(struct platform_device
-> > *pdev)
-> > ?		host->iova_end = geometry->aperture_end;
-> > ?	}
-> > ?
-> > +iommu_skip:
-> > ?	err = host1x_channel_list_init(host);
-> > ?	if (err) {
-> > ?		dev_err(&pdev->dev, "failed to initialize channel
-> > list\n");
+On 20 June 2017 at 13:57, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+> clk_prepare_enable() can fail here and we must check its return value.
+>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-Please note that this does no longer cleanly apply after Mikko's 'gpu:
-host1x: Refactor channel allocation code' commit from June 15 already
-applied to current -next. Other than that
+Thanks, applied for next!
 
-Tested-by:?Marcel Ziswiler <marcel.ziswiler@toradex.com>
-Tested-on: Apalis TK1, Apalis T30, Beaver, Colibri T30, Jetson-TK1
+Kind regards
+Uffe
 
-Finally graphics working again, thanks guys!
+> ---
+>  drivers/mmc/host/sdhci-st.c | 26 ++++++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+> index 68c36c9f..198b4ca 100644
+> --- a/drivers/mmc/host/sdhci-st.c
+> +++ b/drivers/mmc/host/sdhci-st.c
+> @@ -394,8 +394,17 @@ static int sdhci_st_probe(struct platform_device *pdev)
+>                 goto err_of;
+>         }
+>
+> -       clk_prepare_enable(clk);
+> -       clk_prepare_enable(icnclk);
+> +       ret = clk_prepare_enable(clk);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Failed to prepare clock\n");
+> +               goto err_of;
+> +       }
+> +
+> +       ret = clk_prepare_enable(icnclk);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Failed to prepare icn clock\n");
+> +               goto err_icnclk;
+> +       }
+>
+>         /* Configure the FlashSS Top registers for setting eMMC TX/RX delay */
+>         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> @@ -429,6 +438,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
+>
+>  err_out:
+>         clk_disable_unprepare(icnclk);
+> +err_icnclk:
+>         clk_disable_unprepare(clk);
+>  err_of:
+>         sdhci_pltfm_free(pdev);
+> @@ -487,9 +497,17 @@ static int sdhci_st_resume(struct device *dev)
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>         struct st_mmc_platform_data *pdata = sdhci_pltfm_priv(pltfm_host);
+>         struct device_node *np = dev->of_node;
+> +       int ret;
+> +
+> +       ret = clk_prepare_enable(pltfm_host->clk);
+> +       if (ret)
+> +               return ret;
+>
+> -       clk_prepare_enable(pltfm_host->clk);
+> -       clk_prepare_enable(pdata->icnclk);
+> +       ret = clk_prepare_enable(pdata->icnclk);
+> +       if (ret) {
+> +               clk_disable_unprepare(pltfm_host->clk);
+> +               return ret;
+> +       }
+>
+>         if (pdata->rstc)
+>                 reset_control_deassert(pdata->rstc);
+> --
+> 1.9.1
+>
