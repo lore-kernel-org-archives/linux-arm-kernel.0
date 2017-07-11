@@ -1,44 +1,50 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 11 Jul 2017 11:50:09 +0300
-Subject: [PATCH] ARM: tegra: Register host1x node with iommu binding on
- tegra124
-In-Reply-To: <20170709163614.6746-1-contact@paulk.fr>
-References: <20170709163614.6746-1-contact@paulk.fr>
-Message-ID: <1499763009.1340.11.camel@paulk.fr>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 11 Jul 2017 10:59:40 +0200
+Subject: [PATCH 9/9] ARM: multi_v7_defconfig: Enable DMA for Renesas
+ serial ports
+In-Reply-To: <CAK8P3a3c68=L=h+nni39BmOb68wno7TuvXuBgOHrEMOrkhdx2g@mail.gmail.com>
+References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+ <1499693302-25120-10-git-send-email-geert+renesas@glider.be>
+ <CANqRtoSi8x7zqwV3Gp_n0dBe4Uw6LDRvC1Lheu+GrLZNYuxAHw@mail.gmail.com>
+ <CAMuHMdXb1yAgw4AVvheYhPV=V9HeDCW2NdvhJWzoSz8i-mM3TQ@mail.gmail.com>
+ <CAK8P3a3c68=L=h+nni39BmOb68wno7TuvXuBgOHrEMOrkhdx2g@mail.gmail.com>
+Message-ID: <CAMuHMdUFnYSxF0grMQ6GB4h7svOeKa-SpPo_2TpTW9Hx+zvrEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-07-09 at 19:36 +0300, Paul Kocialkowski wrote:
-> This registers the host1x node with the SMMU (as HC swgroup) to allow
-> the host1x code to attach to it. It avoid failing the probe sequence,
-> which resulted in the tegra drm driver not probing and thus nothing
-> being displayed on-screen.
+Hi Arnd,
 
-Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
+On Tue, Jul 11, 2017 at 10:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tue, Jul 11, 2017 at 8:59 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> On Tue, Jul 11, 2017 at 5:38 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>> On Mon, Jul 10, 2017 at 10:28 PM, Geert Uytterhoeven
+>>> Since enabling DMA Engine still keeps PIO support around I wonder why
+>>> we need this Kconfig at all - other drivers seem to get by without
+>>> this kind of thing?
+>>> So in my opinion it would also be nice to get rid of SERIAL_SH_SCI_DMA
+>>> completely and reducing the number of special per-driver Kconfig
+>>> entries.
+>>
+>> In general, I would agree, and remove the option at the blimp of an eye.
+>> However, this driver is shared with H8/300 and SuperH.  While both could use
+>> DMA (but it's not supported by Linux yet), I don't know if they are willing to
+>> live with the increased static and dynamic memory footprint of SH_SCI DMA
+>> support.
+>
+> One more thing: enabling the DMA support in the console driver generally
+> means you cannot use printk in the DMA driver anywhere that may be called
+> during printk(). Not sure if that is a concern here.
 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->  arch/arm/boot/dts/tegra124.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124.dtsi
-> b/arch/arm/boot/dts/tegra124.dtsi
-> index 187a36c6d0fc..b3b89befffeb 100644
-> --- a/arch/arm/boot/dts/tegra124.dtsi
-> +++ b/arch/arm/boot/dts/tegra124.dtsi
-> @@ -85,6 +85,7 @@
->  		clocks = <&tegra_car TEGRA124_CLK_HOST1X>;
->  		resets = <&tegra_car 28>;
->  		reset-names = "host1x";
-> +		iommus = <&mc TEGRA_SWGROUP_HC>;
->  
->  		#address-cells = <2>;
->  		#size-cells = <2>;
--- 
-Paul Kocialkowski,
+Not anymore, as all of these prints should have been removed/disabled already.
 
-developer of free digital technology and hardware support
+Gr{oetje,eeting}s,
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
