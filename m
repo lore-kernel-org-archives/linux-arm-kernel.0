@@ -1,207 +1,413 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 11 Jul 2017 18:56:21 +0800
-Subject: [PATCH V2 04/10] clk: sprd: add gate clock support
+Date: Tue, 11 Jul 2017 18:56:25 +0800
+Subject: [PATCH V2 08/10] clk: sprd: add adjustable pll support
 In-Reply-To: <20170711105627.20526-1-chunyan.zhang@spreadtrum.com>
 References: <20170711105627.20526-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170711105627.20526-5-chunyan.zhang@spreadtrum.com>
+Message-ID: <20170711105627.20526-9-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks on the Spreadtrum's SoCs are just simple gates. Add
-support for those clocks.
+Introduced a common adjustable pll clock driver for Spreadtrum SoCs.
 
 Original-by: Xiaolong Zhang <xiaolong.zhang@spreadtrum.com>
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
  drivers/clk/sprd/Makefile |   1 +
- drivers/clk/sprd/gate.c   | 104 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sprd/gate.h   |  58 ++++++++++++++++++++++++++
- 3 files changed, 163 insertions(+)
- create mode 100644 drivers/clk/sprd/gate.c
- create mode 100644 drivers/clk/sprd/gate.h
+ drivers/clk/sprd/pll.c    | 236 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sprd/pll.h    | 133 ++++++++++++++++++++++++++
+ 3 files changed, 370 insertions(+)
+ create mode 100644 drivers/clk/sprd/pll.c
+ create mode 100644 drivers/clk/sprd/pll.h
 
 diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
-index 74f4b80..8cd5592 100644
+index 2262e76..d693969 100644
 --- a/drivers/clk/sprd/Makefile
 +++ b/drivers/clk/sprd/Makefile
-@@ -1,3 +1,4 @@
- obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
- 
- clk-sprd-y	+= common.o
-+clk-sprd-y	+= gate.o
-diff --git a/drivers/clk/sprd/gate.c b/drivers/clk/sprd/gate.c
+@@ -5,3 +5,4 @@ clk-sprd-y	+= gate.o
+ clk-sprd-y	+= mux.o
+ clk-sprd-y	+= div.o
+ clk-sprd-y	+= composite.o
++clk-sprd-y	+= pll.o
+diff --git a/drivers/clk/sprd/pll.c b/drivers/clk/sprd/pll.c
 new file mode 100644
-index 0000000..aa56b2b
+index 0000000..97935a2
 --- /dev/null
-+++ b/drivers/clk/sprd/gate.c
-@@ -0,0 +1,104 @@
++++ b/drivers/clk/sprd/pll.c
+@@ -0,0 +1,236 @@
 +/*
-+ * Spreadtrum gate clock driver
++ * Spreadtrum pll clock driver
 + *
 + * Copyright (C) 2017 Spreadtrum, Inc.
 + *
 + * SPDX-License-Identifier: GPL-2.0
 + */
 +
-+#include <linux/clk-provider.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/slab.h>
 +
-+#include "gate.h"
++#include "pll.h"
 +
-+DEFINE_SPINLOCK(sprd_gate_lock);
-+EXPORT_SYMBOL_GPL(sprd_gate_lock);
++#define CLK_PLL_1M	1000000
++#define CLK_PLL_10M	(CLK_PLL_1M * 10)
 +
-+static void sprd_gate_endisable(const struct sprd_gate *sg, u32 en)
++#define pindex(pll, member)		\
++	(pll->factors[member].shift / (8 * sizeof(pll->regs[0])))
++
++#define pshift(pll, member)		\
++	(pll->factors[member].shift % (8 * sizeof(pll->regs[0])))
++
++#define pwidth(pll, member)		\
++	pll->factors[member].width
++
++#define pmask(pll, member)					\
++	((pwidth(pll, member)) ?				\
++	GENMASK(pwidth(pll, member) + pshift(pll, member) - 1,	\
++	pshift(pll, member)) : 0)
++
++#define pinternal(pll, cfg, member)	\
++	(cfg[pindex(pll, member)] & pmask(pll, member))
++
++#define pinternal_val(pll, cfg, member)	\
++	(pinternal(pll, cfg, member) >> pshift(pll, member))
++
++static unsigned long pll_get_refin(const struct sprd_pll *pll)
 +{
-+	const struct sprd_clk_common *common = &sg->common;
-+	unsigned long flags = 0;
-+	u32 reg;
-+	int set = sg->flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
++	u32 shift, mask, index, refin_id = 3;
++	const unsigned long refin[4] = { 2, 4, 13, 26 };
 +
-+	set ^= en;
++	if (pwidth(pll, PLL_REFIN)) {
++		index = pindex(pll, PLL_REFIN);
++		shift = pshift(pll, PLL_REFIN);
++		mask = pmask(pll, PLL_REFIN);
++		refin_id = (sprd_pll_readl(pll, index) & mask) >> shift;
++		if (refin_id > 3)
++			refin_id = 3;
++	}
 +
-+	spin_lock_irqsave(common->lock, flags);
-+
-+	reg = sprd_clk_readl(common);
-+
-+	if (set)
-+		reg |= sg->op_bit;
-+	else
-+		reg &= ~sg->op_bit;
-+
-+	sprd_clk_writel(reg, common);
-+
-+	spin_unlock_irqrestore(common->lock, flags);
++	return refin[refin_id];
 +}
 +
-+static void clk_sc_gate_endisable(const struct sprd_gate *sg, u32 en)
++static u32 pll_get_ibias(u64 rate, const u64 *table)
 +{
-+	const struct sprd_clk_common *common = &sg->common;
-+	unsigned long flags = 0;
-+	int set = sg->flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
-+	u32 offset;
++	u32 i, num = table[0];
 +
-+	set ^= en;
++	for (i = 1; i < num + 1; i++)
++		if (rate <= table[i])
++			break;
 +
-+	/*
-+	 * Each set/clear gate clock has three registers:
-+	 * common->reg			- base register
-+	 * common->reg + offset		- set register
-+	 * common->reg + 2 * offset	- clear register
-+	 */
-+	offset = set ? sg->sc_offset : sg->sc_offset * 2;
-+
-+	spin_lock_irqsave(common->lock, flags);
-+	sprd_clk_writel_offset(sg->op_bit, common, offset);
-+	spin_unlock_irqrestore(common->lock, flags);
++	return (i == num + 1) ? num : i;
 +}
 +
-+static void sprd_gate_disable(struct clk_hw *hw)
++static unsigned long _sprd_pll_recalc_rate(const struct sprd_pll *pll,
++					   unsigned long parent_rate)
 +{
-+	struct sprd_gate *sg = hw_to_sprd_gate(hw);
++	u32 *cfg;
++	u32 i, mask, reg_num = pll->regs[0];
++	unsigned long rate, nint, kint = 0;
++	u64 refin;
++	u16 k1, k2;
 +
-+	if (sg->sc_offset)
-+		clk_sc_gate_endisable(sg, 0);
-+	else
-+		sprd_gate_endisable(sg, 0);
++	cfg = kcalloc(reg_num, sizeof(*cfg), GFP_KERNEL);
++	if (!cfg)
++		return -ENOMEM;
++
++	for (i = 0; i < reg_num; i++)
++		cfg[i] = sprd_pll_readl(pll, i);
++
++	refin = pll_get_refin(pll);
++
++	if (pinternal(pll, cfg, PLL_PREDIV))
++		refin = refin * 2;
++
++	if (pwidth(pll, PLL_POSTDIV) &&
++	    ((pll->fflag == 1 && pinternal(pll, cfg, PLL_POSTDIV)) ||
++	     (!pll->fflag && !pinternal(pll, cfg, PLL_POSTDIV))))
++		refin = refin / 2;
++
++	if (!pinternal(pll, cfg, PLL_DIV_S)) {
++		rate = refin * pinternal_val(pll, cfg, PLL_N) * CLK_PLL_10M;
++	} else {
++		nint = pinternal_val(pll, cfg, PLL_NINT);
++		if (pinternal(pll, cfg, PLL_SDM_EN))
++			kint = pinternal_val(pll, cfg, PLL_KINT);
++
++		mask = pmask(pll, PLL_KINT);
++
++		k1 = pll->k1;
++		k2 = pll->k2;
++		rate = DIV_ROUND_CLOSEST_ULL(refin * kint * k1,
++					 ((mask >> __ffs(mask)) + 1)) *
++					 k2 + refin * nint * CLK_PLL_1M;
++	}
++
++	return rate;
 +}
 +
-+static int sprd_gate_enable(struct clk_hw *hw)
-+{
-+	struct sprd_gate *sg = hw_to_sprd_gate(hw);
++#define SPRD_PLL_WRITE_CHECK(pll, i, mask, val)		\
++	((sprd_pll_readl(pll, i) & mask) == val) ? 0 : -EFAULT
 +
-+	if (sg->sc_offset)
-+		clk_sc_gate_endisable(sg, 1);
-+	else
-+		sprd_gate_endisable(sg, 1);
++static int _sprd_pll_set_rate(const struct sprd_pll *pll,
++			      unsigned long rate,
++			      unsigned long parent_rate)
++{
++	struct reg_cfg *cfg;
++	int ret = 0;
++	u32 mask, shift, width, ibias_val, index;
++	u32 reg_num = pll->regs[0], i = 0;
++	unsigned long kint, nint;
++	u64 refin, fvco = rate;
++
++	cfg = kcalloc(reg_num, sizeof(*cfg), GFP_KERNEL);
++	if (!cfg)
++		return -ENOMEM;
++
++	refin = pll_get_refin(pll);
++
++	mask = pmask(pll, PLL_PREDIV);
++	index = pindex(pll, PLL_PREDIV);
++	width = pwidth(pll, PLL_PREDIV);
++	if (width && (sprd_pll_readl(pll, index) & mask))
++		refin = refin * 2;
++
++	mask = pmask(pll, PLL_POSTDIV);
++	index = pindex(pll, PLL_POSTDIV);
++	width = pwidth(pll, PLL_POSTDIV);
++	cfg[index].msk = mask;
++	if (width && ((pll->fflag == 1 && fvco <= pll->fvco) ||
++		      (pll->fflag == 0 && fvco > pll->fvco)))
++		cfg[index].val |= mask;
++
++	if (width && fvco <= pll->fvco)
++		fvco = fvco * 2;
++
++	mask = pmask(pll, PLL_DIV_S);
++	index = pindex(pll, PLL_DIV_S);
++	cfg[index].val |= mask;
++	cfg[index].msk |= mask;
++
++	mask = pmask(pll, PLL_SDM_EN);
++	index = pindex(pll, PLL_SDM_EN);
++	cfg[index].val |= mask;
++	cfg[index].msk |= mask;
++
++	nint  = fvco/(refin * CLK_PLL_1M);
++
++	mask = pmask(pll, PLL_NINT);
++	index = pindex(pll, PLL_NINT);
++	shift = pshift(pll, PLL_NINT);
++	cfg[index].val |= (nint << shift) & mask;
++	cfg[index].msk |= mask;
++
++	mask = pmask(pll, PLL_KINT);
++	index = pindex(pll, PLL_KINT);
++	width = pwidth(pll, PLL_KINT);
++	shift = pshift(pll, PLL_KINT);
++	kint = DIV_ROUND_CLOSEST_ULL(((fvco - refin * nint * CLK_PLL_1M) /
++				      10000) * ((mask >> shift) + 1),
++				     refin * 100);
++	cfg[index].val |= (kint << shift) & mask;
++	cfg[index].msk |= mask;
++
++	ibias_val = pll_get_ibias(fvco, pll->itable);
++
++	mask = pmask(pll, PLL_IBIAS);
++	index = pindex(pll, PLL_IBIAS);
++	shift = pshift(pll, PLL_IBIAS);
++	cfg[index].val |= ibias_val << shift & mask;
++	cfg[index].msk |= mask;
++
++	for (i = 0; i < reg_num; i++) {
++		if (cfg[i].msk) {
++			sprd_pll_writel(pll, i, cfg[i].msk, cfg[i].val);
++			ret |= SPRD_PLL_WRITE_CHECK(pll, i, cfg[i].msk,
++						   cfg[i].val);
++		}
++	}
++
++	if (!ret)
++		udelay(pll->udelay);
++
++	return ret;
++}
++
++static unsigned long sprd_pll_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
++{
++	struct sprd_pll *pll = hw_to_sprd_pll(hw);
++
++	return _sprd_pll_recalc_rate(pll, parent_rate);
++}
++
++static int sprd_pll_set_rate(struct clk_hw *hw,
++			     unsigned long rate,
++			     unsigned long parent_rate)
++{
++	struct sprd_pll *pll = hw_to_sprd_pll(hw);
++
++	return _sprd_pll_set_rate(pll, rate, parent_rate);
++}
++
++static int sprd_pll_clk_prepare(struct clk_hw *hw)
++{
++	struct sprd_pll *pll = hw_to_sprd_pll(hw);
++
++	udelay(pll->udelay);
 +
 +	return 0;
 +}
 +
-+static int sprd_gate_is_enabled(struct clk_hw *hw)
++static long sprd_pll_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
 +{
-+	struct sprd_gate *sg = hw_to_sprd_gate(hw);
-+	struct sprd_clk_common *common = &sg->common;
-+	u32 reg;
-+
-+	reg = sprd_clk_readl(common);
-+
-+	if (sg->flags & CLK_GATE_SET_TO_DISABLE)
-+		reg ^= sg->op_bit;
-+
-+	reg &= sg->op_bit;
-+
-+	return reg ? 1 : 0;
++	return rate;
 +}
 +
-+const struct clk_ops sprd_gate_ops = {
-+	.disable	= sprd_gate_disable,
-+	.enable		= sprd_gate_enable,
-+	.is_enabled	= sprd_gate_is_enabled,
++const struct clk_ops sprd_pll_ops = {
++	.prepare = sprd_pll_clk_prepare,
++	.recalc_rate = sprd_pll_recalc_rate,
++	.round_rate = sprd_pll_round_rate,
++	.set_rate = sprd_pll_set_rate,
 +};
-+EXPORT_SYMBOL_GPL(sprd_gate_ops);
-diff --git a/drivers/clk/sprd/gate.h b/drivers/clk/sprd/gate.h
++EXPORT_SYMBOL_GPL(sprd_pll_ops);
+diff --git a/drivers/clk/sprd/pll.h b/drivers/clk/sprd/pll.h
 new file mode 100644
-index 0000000..7fb4e49
+index 0000000..af5b2da
 --- /dev/null
-+++ b/drivers/clk/sprd/gate.h
-@@ -0,0 +1,58 @@
++++ b/drivers/clk/sprd/pll.h
+@@ -0,0 +1,133 @@
 +/*
-+ * Spreadtrum gate clock driver
++ * Spreadtrum clock pll configurations
 + *
 + * Copyright (C) 2017 Spreadtrum, Inc.
 + *
 + * SPDX-License-Identifier: GPL-2.0
 + */
 +
-+#ifndef _SPRD_GATE_H_
-+#define _SPRD_GATE_H_
++#ifndef _SPRD_PLL_H_
++#define _SPRD_PLL_H_
 +
 +#include "common.h"
 +
-+struct sprd_gate {
-+	u32			op_bit;
-+	u16			flags;
-+	u16			sc_offset;
++struct reg_cfg {
++	u32 val;
++	u32 msk;
++};
++
++struct clk_bit_field {
++	u8 shift;
++	u8 width;
++};
++
++enum {
++	PLL_LOCK_DONE,
++	PLL_DIV_S,
++	PLL_MOD_EN,
++	PLL_SDM_EN,
++	PLL_REFIN,
++	PLL_IBIAS,
++	PLL_N,
++	PLL_NINT,
++	PLL_KINT,
++	PLL_PREDIV,
++	PLL_POSTDIV,
++
++	PLL_FACT_MAX
++};
++
++/*
++ * struct sprd_pll - definition of adjustable pll clock
++ *
++ * @reg:	registers used to set the configuration of pll clock,
++ *		reg[0] shows how many registers this pll clock uses.
++ * @itable:	pll ibias table, itable[0] means how many items this
++ *		table includes
++ * @udelay	delay time after setting rate
++ * @factors	used to calculate the pll clock rate
++ * @fvco:	fvco threshold rate
++ * @fflag:	fvco flag
++ */
++struct sprd_pll {
++	const u32 *regs;
++	const u64 *itable;
++	const struct clk_bit_field *factors;
++	u16 udelay;
++	u16 k1;
++	u16 k2;
++	u16 fflag;
++	u64 fvco;
 +
 +	struct sprd_clk_common	common;
 +};
 +
-+#define SPRD_GATE_CLK(_struct, _name, _parent, _reg, _sc_offset,	\
-+		      _op_bit, _flags, _gate_flags)			\
-+	struct sprd_gate _struct = {					\
-+		.op_bit		= _op_bit,				\
-+		.sc_offset	= _sc_offset,				\
-+		.flags		= _gate_flags,				\
-+		.common	= {						\
++#define SPRD_PLL_WITH_ITABLE_K_FVCO(_struct, _name, _parent, _reg,	\
++				    _regs, _itable, _factors, _udelay,	\
++				    _k1, _k2, _fflag, _fvco)		\
++	struct sprd_pll _struct = {					\
++		.regs		= _regs,				\
++		.itable		= _itable,				\
++		.factors	= _factors,				\
++		.udelay		= _udelay,				\
++		.k1		= _k1,					\
++		.k2		= _k2,					\
++		.fflag		= _fflag,				\
++		.fvco		= _fvco,				\
++		.common		= {					\
 +			.reg		= _reg,				\
-+			.lock		= &sprd_gate_lock,		\
 +			.hw.init	= CLK_HW_INIT(_name,		\
 +						      _parent,		\
-+						      &sprd_gate_ops,	\
-+						      _flags),		\
-+		}							\
++						      &sprd_pll_ops,	\
++						      0),		\
++		},							\
 +	}
 +
-+static inline struct sprd_gate *hw_to_sprd_gate(const struct clk_hw *hw)
++#define SPRD_PLL_WITH_ITABLE_K(_struct, _name, _parent, _reg,		\
++			       _regs, _itable, _factors,		\
++			       _udelay, _k1, _k2)			\
++	SPRD_PLL_WITH_ITABLE_K_FVCO(_struct, _name, _parent, _reg,	\
++				    _regs, _itable, _factors,		\
++				    _udelay, _k1, _k2, 0, 0)
++
++#define SPRD_PLL_WITH_ITABLE_1K(_struct, _name, _parent, _reg,		\
++				_regs, _itable, _factors, _udelay)	\
++	SPRD_PLL_WITH_ITABLE_K_FVCO(_struct, _name, _parent, _reg,	\
++				    _regs, _itable, _factors, _udelay,	\
++				    1000, 1000, 0, 0)
++
++static inline struct sprd_pll *hw_to_sprd_pll(struct clk_hw *hw)
 +{
 +	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
 +
-+	return container_of(common, struct sprd_gate, common);
++	return container_of(common, struct sprd_pll, common);
 +}
 +
-+static inline void sprd_clk_writel_offset(u32 val,
-+	const struct sprd_clk_common *common, u32 offset)
++static inline u32 sprd_pll_readl(const struct sprd_pll *pll, u8 index)
 +{
-+	writel(val, common->base + common->reg + offset);
++	const struct sprd_clk_common *common = &pll->common;
++
++	if (WARN_ON(index >= pll->regs[0]))
++		return 0;
++
++	return readl(common->base + pll->regs[index + 1]);
 +}
 +
-+void sprd_gate_helper_disable(struct sprd_clk_common *common, u32 gate);
-+int sprd_gate_helper_enable(struct sprd_clk_common *common, u32 gate);
-+int sprd_gate_helper_is_enabled(struct sprd_clk_common *common, u32 gate);
++static inline void sprd_pll_writel(const struct sprd_pll *pll, u8 index,
++				  u32 msk, u32 val)
++{
++	const struct sprd_clk_common *common = &pll->common;
++	void __iomem *addr;
++	u32 reg;
 +
-+extern const struct clk_ops sprd_gate_ops;
-+extern spinlock_t sprd_gate_lock;
++	if (WARN_ON(index >= pll->regs[0]))
++		return;
 +
-+#endif /* _SPRD_GATE_H_ */
++	addr = common->base + pll->regs[index + 1];
++	reg = readl(addr);
++	writel((reg & ~msk) | val, addr);
++}
++
++extern const struct clk_ops sprd_pll_ops;
++
++#endif /* _SPRD_PLL_H_ */
 -- 
 2.7.4
