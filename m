@@ -1,76 +1,93 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 11 Jul 2017 10:03:34 -0700
-Subject: [PATCH v2 1/7] pwm: rockchip: Add APB and function both clocks
- support
-In-Reply-To: <1499486629-9659-2-git-send-email-david.wu@rock-chips.com>
-References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
- <1499486629-9659-2-git-send-email-david.wu@rock-chips.com>
-Message-ID: <CAD=FV=Vqkueo_cqU8bJXXT3pV5d1dZR5LF+c=O-Ka1qR-Ff-WQ@mail.gmail.com>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Tue, 11 Jul 2017 20:09:56 +0300
+Subject: [PATCH] gpu: host1x: Free the IOMMU domain when there is no
+ device to attach
+In-Reply-To: <1499784254.1340.13.camel@paulk.fr>
+References: <20170710193305.5987-1-contact@paulk.fr>
+ <1499762987.1340.10.camel@paulk.fr> <1499783851.1520.16.camel@toradex.com>
+ <1499784254.1340.13.camel@paulk.fr>
+Message-ID: <1db2411c-c1af-62f5-18b4-55523dc5b56c@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/11/2017 05:44 PM, Paul Kocialkowski wrote:
+> On Tue, 2017-07-11 at 14:37 +0000, Marcel Ziswiler wrote:
+>> On Tue, 2017-07-11 at 11:49 +0300, Paul Kocialkowski wrote:
+>>> On Mon, 2017-07-10 at 21:33 +0200, Paul Kocialkowski wrote:
+>>>> When there is no device to attach to the IOMMU domain, as may be
+>>>> the
+>>>> case when the device-tree does not contain the proper iommu node,
+>>>> it
+>>>> is
+>>>> best to keep going without IOMMU support rather than failing.
+>>>> This allows the driver to probe and function instead of taking
+>>>> down
+>>>> all of the tegra drm driver, leading to missing display support.
+>>>
+>>> Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
+>>>
+>>>> Signed-off-by: Paul Kocialkowski <contact-W9ppeneeCTY@public.gmane
+>>>> .
+>>>> org>
+>>>> ---
+>>>>   drivers/gpu/host1x/dev.c | 8 +++++++-
+>>>>   1 file changed, 7 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/gpu/host1x/dev.c b/drivers/gpu/host1x/dev.c
+>>>> index ac65f52850a6..f296738d0de8 100644
+>>>> --- a/drivers/gpu/host1x/dev.c
+>>>> +++ b/drivers/gpu/host1x/dev.c
+>>>> @@ -186,8 +186,13 @@ static int host1x_probe(struct
+>>>> platform_device
+>>>> *pdev)
+>>>>   			return -ENOMEM;
+>>>>   
+>>>>   		err = iommu_attach_device(host->domain, &pdev-
+>>>>> dev);
+>>>>
+>>>> -		if (err)
+>>>> +		if (err == -ENODEV) {
+>>>> +			iommu_domain_free(host->domain);
+>>>> +			host->domain = NULL;
+>>>> +			goto iommu_skip;
+>>>> +		} else if (err) {
+>>>>   			goto fail_free_domain;
+>>>> +		}
+>>>>   
+>>>>   		geometry = &host->domain->geometry;
+>>>>   
+>>>> @@ -198,6 +203,7 @@ static int host1x_probe(struct platform_device
+>>>> *pdev)
+>>>>   		host->iova_end = geometry->aperture_end;
+>>>>   	}
+>>>>   
+>>>> +iommu_skip:
+>>>>   	err = host1x_channel_list_init(host);
+>>>>   	if (err) {
+>>>>   		dev_err(&pdev->dev, "failed to initialize channel
+>>>> list\n");
+>>
+>> Please note that this does no longer cleanly apply after Mikko's 'gpu:
+>> host1x: Refactor channel allocation code' commit from June 15 already
+>> applied to current -next. Other than that
+> 
+> Good to know! I intended this patch for fixing 4.12 stable, so I'm not
+> even entirely sure it should land in next. The patch that fixes the
+> device-tree to actually enable the iommu should be merged in priority.
+> 
+> If that is the case and anyone wants this patch rebased to next, feel
+> free to let me know and I'll send a rebased version.
 
-On Fri, Jul 7, 2017 at 9:03 PM, David Wu <david.wu@rock-chips.com> wrote:
+We should definitely have this for non-stable kernels too - it would be 
+a bit strange if the driver worked if IOMMU support wasn't built into 
+the kernel but failed if it was :) It can also be helpful for debugging 
+to be able to disable IOMMU just for host1x.
 
-> @@ -6,7 +6,13 @@ Required properties:
->     "rockchip,rk3288-pwm": found on RK3288 SoC
->     "rockchip,vop-pwm": found integrated in VOP on RK3288 SoC
->   - reg: physical base address and length of the controller's registers
-> - - clocks: phandle and clock specifier of the PWM reference clock
-> + - clocks: See ../clock/clock-bindings.txt
-> +   - For older hardware (rk2928, rk3066, rk3188, rk3228, rk3288, rk3399):
-> +     - There is one clock that's used both to derive the functional clock
-> +       for the device and as the bus clock.
-> +   - For newer hardware (rk3328 and future socs): specified by name
-> +     - "pwm": This is used to derive the functional clock.
-> +     - "pclk": This is the APB bus clock.
-
-I'm pretty sure that that the above description doesn't quite match the code.
-
-* The above description says that for old hardware there is one clock
-and 'clock-names' was not necessary (though as I understand it it's OK
-if it's there).
-
-* The old code matched the old description.  AKA: if there was no
-"clock-names" then everything was OK.
-
-* The new code will not work if there was no "clock-names".
-
-Many of the old devices had a clock-names present (and it was "pwm"),
-but not all.  Specifically it looks like
-"arch/arm/boot/dts/rk3xxx.dtsi" doesn't specify a clock-names.
-
-> @@ -343,13 +344,38 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
->         if (IS_ERR(pc->base))
->                 return PTR_ERR(pc->base);
->
-> -       pc->clk = devm_clk_get(&pdev->dev, NULL);
-> -       if (IS_ERR(pc->clk))
-> -               return PTR_ERR(pc->clk);
-> +       pc->clk = devm_clk_get(&pdev->dev, "pwm");
-> +       count = of_property_count_strings(pdev->dev.of_node, "clock-names");
-> +       if (count == 2)
-> +               pc->pclk = devm_clk_get(&pdev->dev, "pclk");
-> +       else
-> +               pc->pclk = pc->clk;
-> +
-> +       if (IS_ERR(pc->clk)) {
-> +               ret = PTR_ERR(pc->clk);
-> +               if (ret != -EPROBE_DEFER)
-> +                       dev_err(&pdev->dev, "Can't get bus clk: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       if (IS_ERR(pc->pclk)) {
-> +               ret = PTR_ERR(pc->pclk);
-> +               if (ret != -EPROBE_DEFER)
-> +                       dev_err(&pdev->dev, "Can't get APB clk: %d\n", ret);
-> +               return ret;
-> +       }
-
-In the above code you need to check the count _before_ trying to get
-the clock by name.
-
-
--Doug
+> 
+>> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+>> Tested-on: Apalis TK1, Apalis T30, Beaver, Colibri T30, Jetson-TK1
+>>
+>> Finally graphics working again, thanks guys!
+> 
+> Yay! :)
+> 
