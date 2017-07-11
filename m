@@ -1,65 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Jul 2017 11:13:39 +0200
-Subject: [PATCH 0/9] ARM: renesas: shmobile and multi_v7 defconfig updates
-In-Reply-To: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 11 Jul 2017 10:57:07 +0200
+Subject: [PATCH 9/9] ARM: multi_v7_defconfig: Enable DMA for Renesas
+ serial ports
+In-Reply-To: <CAK8P3a1-yuxQ-m5h+u38TKoybfxrAF8XpwcB9xFYKePhukXaQw@mail.gmail.com>
 References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170711091338.GI4517@verge.net.au>
+ <1499693302-25120-10-git-send-email-geert+renesas@glider.be>
+ <CANqRtoSi8x7zqwV3Gp_n0dBe4Uw6LDRvC1Lheu+GrLZNYuxAHw@mail.gmail.com>
+ <CAMuHMdXb1yAgw4AVvheYhPV=V9HeDCW2NdvhJWzoSz8i-mM3TQ@mail.gmail.com>
+ <CAK8P3a1-yuxQ-m5h+u38TKoybfxrAF8XpwcB9xFYKePhukXaQw@mail.gmail.com>
+Message-ID: <CAMuHMdUiXQEYroYsDAvrM_evGv0Fy-+knEoiQHdha3UExhQTEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 10, 2017 at 03:28:13PM +0200, Geert Uytterhoeven wrote:
-> 	Hi Arnd, Kevin, Magnus, Olof, Simon,
-> 
-> This patch series updates shmobile_defconfig and multi_v7_defconfig to
-> (re-)enable some features:
->   - Re-enable R-Car PCIe (shmobile_defconfig),
->   - Re-enable R-Car XHCI (shmobile_defconfig),
->   - Re-enable R-Car sound (both),
->   - Update DRM bridge (both),
->   - Enable serial port DMA (both).
-> 
-> There also a patch included to refresh shmobile_defconfig.
-> To avoid conflicts, I didn't refresh multi_v7_defconfig (although it could
-> definitely use a refresh), and only made "simple" changes to it.
+Hi Arnd,
 
-Thanks, all applied.
+On Tue, Jul 11, 2017 at 10:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tue, Jul 11, 2017 at 8:59 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>
+>> Whether we want to hide the option (and default to y if ARCH_RENESAS, i.e.
+>> ARM) is another question.  Note that that wouldn't reduce code maintainability,
+>> as the #ifdefs would be kept, and it would prevent building and testing
+>> with/without DMA on ARM.
+>
+> arch/sh/configs/sdk7786_defconfig enables it, too, so it should at least be
+> a user-selectable option on SuperH if you do that.
 
-Personally I would be in favour of co-ordinating a refresh of
-multi_v7_defconfig.
+But that can't enable DMA, as (1) the non-DT DMA configuration was removed
+due to (2) being unused.
 
-> 
-> Thanks!
-> 
-> Geert Uytterhoeven (9):
->   ARM: shmobile: defconfig: Enable missing PCIE_RCAR dependency
->   ARM: shmobile: defconfig: Replace USB_XHCI_RCAR by USB_XHCI_PLATFORM
->   ARM: shmobile: defconfig: Replace SND_SOC_RSRC_CARD by
->     SND_SIMPLE_SCU_CARD
->   ARM: shmobile: defconfig: Replace DRM_RCAR_HDMI by generic bridge
->     options
->   ARM: shmobile: defconfig: Enable DMA for serial ports
->   ARM: shmobile: defconfig: Refresh
->   ARM: multi_v7_defconfig: Replace SND_SOC_RSRC_CARD by
->     SND_SIMPLE_SCU_CARD
->   ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by generic bridge
->     options
->   ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports
-> 
->  arch/arm/configs/multi_v7_defconfig |  5 +++--
->  arch/arm/configs/shmobile_defconfig | 16 +++++++++-------
->  2 files changed, 12 insertions(+), 9 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
-> 
+Cfr. commit 219fb0c1436e4893 ("serial: sh-sci: Remove the platform data dma
+slave rx/tx channel IDs").
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
