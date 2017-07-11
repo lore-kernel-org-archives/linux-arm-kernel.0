@@ -1,63 +1,79 @@
 From: mike.leach@linaro.org (Mike Leach)
-Date: Tue, 11 Jul 2017 12:25:49 +0100
-Subject: [PATCH 1/3] coresight: pmu: Adds return stack option to perf
- coresight pmu
+Date: Tue, 11 Jul 2017 12:25:50 +0100
+Subject: [PATCH 2/3] coresight: ptm: Adds trace return stack option
+ programming for PTM.
 In-Reply-To: <1499772351-2210-1-git-send-email-mike.leach@linaro.org>
 References: <1499772351-2210-1-git-send-email-mike.leach@linaro.org>
-Message-ID: <1499772351-2210-2-git-send-email-mike.leach@linaro.org>
+Message-ID: <1499772351-2210-3-git-send-email-mike.leach@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return stack is a programmable option on some ETM and PTM hardware.
-Adds the option flags to enable this from the perf event command line.
+Adds handling to program the return stack option into PTM hardware if
+specified in the perf command line.
+
+If option is not supported by the hardware then it will be ignored.
+This allows capture to move between core/ETM combinations that have the
+hardware support to those that do not.
 
 Signed-off-by: Mike Leach <mike.leach@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 2 ++
- include/linux/coresight-pmu.h                    | 1 +
- tools/include/linux/coresight-pmu.h              | 1 +
- 3 files changed, 4 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm.h   |  1 +
+ drivers/hwtracing/coresight/coresight-etm3x.c | 18 +++++++++++++++---
+ 2 files changed, 16 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 8f546f5..5804551 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -53,10 +53,12 @@ static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
- /* ETMv3.5/PTM's ETMCR is 'config' */
- PMU_FORMAT_ATTR(cycacc,		"config:" __stringify(ETM_OPT_CYCACC));
- PMU_FORMAT_ATTR(timestamp,	"config:" __stringify(ETM_OPT_TS));
-+PMU_FORMAT_ATTR(retstack,	"config:" __stringify(ETM_OPT_RETSTK));
+diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
+index ad063d7..70b0a24 100644
+--- a/drivers/hwtracing/coresight/coresight-etm.h
++++ b/drivers/hwtracing/coresight/coresight-etm.h
+@@ -106,6 +106,7 @@
+ #define ETMTECR1_START_STOP	BIT(25)
+ /* ETMCCER - 0x1E8 */
+ #define ETMCCER_TIMESTAMP	BIT(22)
++#define ETMCCER_RETSTACK	BIT(23)
  
- static struct attribute *etm_config_formats_attr[] = {
- 	&format_attr_cycacc.attr,
- 	&format_attr_timestamp.attr,
-+	&format_attr_retstack.attr,
- 	NULL,
- };
+ #define ETM_MODE_EXCLUDE	BIT(0)
+ #define ETM_MODE_CYCACC		BIT(1)
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index a51b6b6..a0973f6 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -308,7 +308,9 @@ void etm_config_trace_mode(struct etm_config *config)
+ 	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
+ }
  
-diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
-index 7d41026..45852c2 100644
---- a/include/linux/coresight-pmu.h
-+++ b/include/linux/coresight-pmu.h
-@@ -24,6 +24,7 @@
- /* ETMv3.5/PTM's ETMCR config bit */
- #define ETM_OPT_CYCACC  12
- #define ETM_OPT_TS      28
-+#define ETM_OPT_RETSTK	29
+-#define ETM3X_SUPPORTED_OPTIONS (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN)
++#define ETM3X_SUPPORTED_OPTIONS (ETMCR_CYC_ACC | \
++				 ETMCR_TIMESTAMP_EN | \
++				 ETMCR_RETURN_STACK)
  
- static inline int coresight_get_trace_id(int cpu)
- {
-diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
-index 7d41026..45852c2 100644
---- a/tools/include/linux/coresight-pmu.h
-+++ b/tools/include/linux/coresight-pmu.h
-@@ -24,6 +24,7 @@
- /* ETMv3.5/PTM's ETMCR config bit */
- #define ETM_OPT_CYCACC  12
- #define ETM_OPT_TS      28
-+#define ETM_OPT_RETSTK	29
+ static int etm_parse_event_config(struct etm_drvdata *drvdata,
+ 				  struct perf_event *event)
+@@ -339,14 +341,24 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
+ 		etm_config_trace_mode(config);
  
- static inline int coresight_get_trace_id(int cpu)
- {
+ 	/*
+-	 * At this time only cycle accurate and timestamp options are
+-	 * available.
++	 * At this time only cycle accurate, return stack  and timestamp
++	 * options are available.
+ 	 */
+ 	if (attr->config & ~ETM3X_SUPPORTED_OPTIONS)
+ 		return -EINVAL;
+ 
+ 	config->ctrl = attr->config;
+ 
++	/*
++	 * Possible to have cores with PTM (supports ret stack) and ETM
++	 * (never has ret stack) on the same SoC. So if we have a request
++	 * for return stack that can't be honoured on this core then
++	 * clear the bit - trace will still continue normally
++	 */
++	if ((config->ctrl & ETMCR_RETURN_STACK) &&
++	    !(drvdata->etmccer & ETMCCER_RETSTACK))
++		config->ctrl &= ~ETMCR_RETURN_STACK;
++
+ 	return 0;
+ }
+ 
 -- 
 2.7.4
