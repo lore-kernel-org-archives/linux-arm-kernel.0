@@ -1,66 +1,25 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 11 Jul 2017 10:08:53 +0200
-Subject: [PATCH 3/3] ARM: dts: at91: sama5d2: use sama5d2 compatible
- string for SMC
-In-Reply-To: <20170711075829.5rzdrjgao6efiuj2@rfolt0960.corp.atmel.com>
-References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
- <20170711074015.30440-4-ludovic.desroches@microchip.com>
- <029b80a8-2d3f-11b4-d4df-55f5fc48c8e7@microchip.com>
- <20170711075829.5rzdrjgao6efiuj2@rfolt0960.corp.atmel.com>
-Message-ID: <20170711080853.uxdmxocq5nhrp7vq@rfolt0960.corp.atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Jul 2017 10:39:42 +0200
+Subject: [PATCH 9/9] ARM: multi_v7_defconfig: Enable DMA for Renesas
+ serial ports
+In-Reply-To: <CAMuHMdXb1yAgw4AVvheYhPV=V9HeDCW2NdvhJWzoSz8i-mM3TQ@mail.gmail.com>
+References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
+ <1499693302-25120-10-git-send-email-geert+renesas@glider.be>
+ <CANqRtoSi8x7zqwV3Gp_n0dBe4Uw6LDRvC1Lheu+GrLZNYuxAHw@mail.gmail.com>
+ <CAMuHMdXb1yAgw4AVvheYhPV=V9HeDCW2NdvhJWzoSz8i-mM3TQ@mail.gmail.com>
+Message-ID: <CAK8P3a1-yuxQ-m5h+u38TKoybfxrAF8XpwcB9xFYKePhukXaQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 09:58:29AM +0200, Ludovic Desroches wrote:
-> On Tue, Jul 11, 2017 at 09:52:58AM +0200, Nicolas Ferre wrote:
-> > On 11/07/2017 at 09:40, Ludovic Desroches wrote:
-> > > A new compatible string has been introduced for sama5d2 SMC to allow to
-> > > manage the registers mapping change.
-> > > 
-> > > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> > > ---
-> > >  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> > > index 4fcd5bb219e3..60e69aeacbdb 100644
-> > > --- a/arch/arm/boot/dts/sama5d2.dtsi
-> > > +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> > > @@ -1048,7 +1048,7 @@
-> > >  			};
-> > >  
-> > >  			hsmc: hsmc at f8014000 {
-> > > -				compatible = "atmel,sama5d3-smc", "syscon", "simple-mfd";
-> > > +				compatible = "atmel,sama5d2-smc", "syscon", "simple-mfd";
-> > 
-> > You'd better use something like:
-> >  compatible = "atmel,sama5d2-smc", "atmel,sama5d3-smc", "syscon", "simple-mfd";
-> 
-> But it's not true, during data interface setup, we will write values in
-> the wrong place if we fallback on "atmel,sama5d3-smc".
-> 
-> Regards
-> 
-> Ludovic
-> 
-> > 
-> > So that this patch is independent from the rest of the series and
-> > we can avoid to having to synchronize with mfd or mtd/nand for this part.
+On Tue, Jul 11, 2017 at 8:59 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
 
-If Lee and Boris agree, maybe the series can go through AT91.
+> Whether we want to hide the option (and default to y if ARCH_RENESAS, i.e.
+> ARM) is another question.  Note that that wouldn't reduce code maintainability,
+> as the #ifdefs would be kept, and it would prevent building and testing
+> with/without DMA on ARM.
 
-Regards
+arch/sh/configs/sdk7786_defconfig enables it, too, so it should at least be
+a user-selectable option on SuperH if you do that.
 
-Ludovic
-
-> > 
-> > Regards,
-> > 
-> > >  				reg = <0xf8014000 0x1000>;
-> > >  				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 6>;
-> > >  				clocks = <&hsmc_clk>;
-> > > 
-> > 
-> > 
-> > -- 
-> > Nicolas Ferre
+     Arnd
