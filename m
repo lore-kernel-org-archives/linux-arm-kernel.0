@@ -1,68 +1,63 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 11 Jul 2017 14:43:27 +0300
-Subject: [bug report] perf: xgene: Add APM X-Gene SoC Performance Monitoring
- Unit driver
-Message-ID: <20170711114327.hezq3anev6bzxqz7@mwanda>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 11 Jul 2017 13:47:03 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: remove arm,
+ mali-midgard compatible from rk3288
+In-Reply-To: <972bed58-76c2-04e3-f2ab-d5b8065a92dd@gmail.com>
+References: <20170710121227.14264-1-heiko@sntech.de>
+ <20170710121227.14264-2-heiko@sntech.de>
+ <972bed58-76c2-04e3-f2ab-d5b8065a92dd@gmail.com>
+Message-ID: <1865386.qPV9dVK26y@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tai Nguyen,
+Hi Caesar,
 
-The patch 832c927d119b: "perf: xgene: Add APM X-Gene SoC Performance
-Monitoring Unit driver" from Jul 15, 2016, leads to the following
-static checker warning:
+Am Dienstag, 11. Juli 2017, 16:04:38 CEST schrieb Caesar Wang:
+> Heiko,
+> 
+> ? 2017?07?10? 20:12, Heiko Stuebner ??:
+> > The binding specifies the actual implementations only (mali-t760
+> > for example) but not the arm,mali-midgard used in some vendor kernels.
+> > So drop that compatible property from the rk3288 where it had slipped in.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >   arch/arm/boot/dts/rk3288.dtsi | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> > index cb1d415d1201..e99d7ff4c939 100644
+> > --- a/arch/arm/boot/dts/rk3288.dtsi
+> > +++ b/arch/arm/boot/dts/rk3288.dtsi
+> > @@ -1135,7 +1135,7 @@
+> >   	};
+> >   
+> >   	gpu: mali at ffa30000 {
+> > -		compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
+> > +		compatible = "rockchip,rk3288-mali", "arm,mali-t760";
+> 
+> If we remove the "arm,mali-midgard", the mali driver maybe need update 
+> first.
+>
+>  From the lastest MALI driver on ARM supply, the compatible only two 
+> property.
+> mali_kbase_core_linux.c
+> 4163:    { .compatible = "arm,malit6xx" },
+> 4164:    { .compatible = "arm,mali-midgard" },
+> 
+> That's odd with the two compatible, the driver should support the more.
 
-	drivers/perf/xgene_pmu.c:1922 xgene_pmu_probe()
-	warn: 'xgene_pmu->pcppmu_csr' is an error pointer or valid
+Correct, the driver should be updated anyway. In general the official
+dt-binding (the one in the linux kernel) should be followed, not the random
+out-of-tree one distributed by vendor drivers :-) .
 
-drivers/perf/xgene_pmu.c
-  1851          if (version < 0)
-  1852                  return -ENODEV;
-                        ^^^^^^^^^^^^^^
-Good.  Direct returns are the way to go if possible.
+If you look for example at utgard (mali400 for example), the sane binding
+used in the kernel, differs a lot from the binding used by the vendor-driver
+as well (io-areas, irq-names etc).
 
-  1853  
-  1854          if (version == PCP_PMU_V3)
-  1855                  xgene_pmu->ops = &xgene_pmu_v3_ops;
-  1856          else
-  1857                  xgene_pmu->ops = &xgene_pmu_ops;
-  1858  
-  1859          INIT_LIST_HEAD(&xgene_pmu->l3cpmus);
-  1860          INIT_LIST_HEAD(&xgene_pmu->iobpmus);
-  1861          INIT_LIST_HEAD(&xgene_pmu->mcbpmus);
-  1862          INIT_LIST_HEAD(&xgene_pmu->mcpmus);
-  1863  
-  1864          xgene_pmu->version = version;
-  1865          dev_info(&pdev->dev, "X-Gene PMU version %d\n", xgene_pmu->version);
-  1866  
-  1867          res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-  1868          xgene_pmu->pcppmu_csr = devm_ioremap_resource(&pdev->dev, res);
-  1869          if (IS_ERR(xgene_pmu->pcppmu_csr)) {
-  1870                  dev_err(&pdev->dev, "ioremap failed for PCP PMU resource\n");
-  1871                  rc = PTR_ERR(xgene_pmu->pcppmu_csr);
-  1872                  goto err;
-                        ^^^^^^^^
-If we hit this goto then the kernel will crash.
+In any case, as you use the mali vendor-driver with you vendor-tree,
+it should be possible to do both in sync (dt-change from mainline; driver
+change to use better compatibles).
 
-  1873          }
 
-    [ snip ]
-
-  1916          /* Enable interrupt */
-  1917          xgene_pmu->ops->unmask_int(xgene_pmu);
-  1918  
-  1919          return 0;
-  1920  
-  1921  err:
-  1922          if (xgene_pmu->pcppmu_csr)
-  1923                  devm_iounmap(&pdev->dev, xgene_pmu->pcppmu_csr);
-  1924          devm_kfree(&pdev->dev, xgene_pmu);
-
-Can't we remove all this cleanup since it's devm_ managed resources?
-
-  1925  
-  1926          return rc;
-  1927  }
-
-regards,
-dan carpenter
+Heiko
