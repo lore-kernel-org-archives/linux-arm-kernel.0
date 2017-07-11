@@ -1,137 +1,28 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 11 Jul 2017 15:36:50 +0200
-Subject: cpufreq: frequency scaling spec in DT node
-In-Reply-To: <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
-References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
- <20170629100459.GL29665@vireshk-i7>
- <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
- <20170629143432.GM29665@vireshk-i7>
- <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
-Message-ID: <9a2638ee-e04f-13f1-b1e5-56f27b58da2e@free.fr>
+From: michael.moese@men.de (Moese, Michael)
+Date: Tue, 11 Jul 2017 13:40:57 +0000
+Subject: i.MX 6 and PCIe DMA issues
+Message-ID: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2017 11:27, Mason wrote:
+Hello ARM folks,
+I turn to you in hope you have any hints or directions on the problem I describe below.
 
-> I'll experiment with the other solution of creating the OPP table
-> at init.
+I am currently investigating strange behavior of our i.MX 6 (Quad) board with an FPGA connected to to PCI Express. This FPGA contains, among others, an Ethernet (10/100 Mbps) IP core. 
+The Ethernet relies completely on DMA transfers. There is one buffer descriptor table containing pointers to 64 RX and TX buffers.
+Buffers are allocated using dma_alloc_coherent() and mapped using dma_map_single().
+Prior to access, dma_sync_single_for_cpu() is called on the memory regions, afterwards dma_sync_single_for_device().
 
-For the sake of discussion, based on your suggestion to use
-dev_pm_opp_add(), I have tested the patch below.
+If a new frame is received, the driver reads the RX buffer and passes the frame using skb_put().
+When the issue was reported for an old (say 3.18.19) kernel, the buffer descriptor was read correctly (including a correct length), but the buffer contained all zeroes. When I map the physical address in userspace and dump the contents, I can see the correct buffer descriptor contents and inside the buffers valid Ethernet frames. So the DMA transfer itself is working obviously.
+To avoid chasing after already-fixed bugs, I switched to a 4.12.0 kernel and observed almost the same behavior, but this time there was no length read as well.
+On 3.18.19 I was able to read the buffers when I allocate them using kmalloc() instead of dma_alloc_coherent(), on 4.12 this did not have any impact.
 
-There is one remaining error:
-[    2.071139] of: dev_pm_opp_of_cpumask_add_table: couldn't find opp table for cpu:0, -19
+I was suspecting the caches to be the root of my issue, but I was not able to resolve the issue with calls to flush_cache_all(), which I suppose should have invalidated the entire cache.
 
-Reached through:
-[    1.878461] [<c0359a0c>] (dev_pm_opp_of_add_table) from [<c0359ff0>] (dev_pm_opp_of_cpumask_add_table+0x40/0xc8)
-[    1.888695] [<c0359ff0>] (dev_pm_opp_of_cpumask_add_table) from [<c03d66d8>] (cpufreq_init+0x23c/0x2dc)
-[    1.898139] [<c03d66d8>] (cpufreq_init) from [<c03d3d94>] (cpufreq_online+0xb8/0x660)
-[    1.906009] [<c03d3d94>] (cpufreq_online) from [<c03d43f8>] (cpufreq_add_dev+0xbc/0xcc)
-[    1.914058] [<c03d43f8>] (cpufreq_add_dev) from [<c0350560>] (subsys_interface_register+0x90/0xcc)
-[    1.923065] [<c0350560>] (subsys_interface_register) from [<c03d32f4>] (cpufreq_register_driver+0x15c/0x1e0)
-[    1.932945] [<c03d32f4>] (cpufreq_register_driver) from [<c03d67f0>] (dt_cpufreq_probe+0x78/0xec)
-[    1.941866] [<c03d67f0>] (dt_cpufreq_probe) from [<c035327c>] (platform_drv_probe+0x34/0x6c)
+Unfortunately, our driver is legacy out-of-tree code and I started working on this driver to get it ready for submission. If it is of any help, I could send the code of the driver as well as our board's device tree.
 
-The cpufreq-dt driver seems to recover despite the error:
+I would highly appreciate any hint or direction that may help my troubleshooting.
 
-/sys/devices/system/cpu/cpu0/cpufreq$ cat scaling_available_frequencies
-135000 243000 405000 607500 1215000 
-
-Regards.
-
-
-
- arch/arm/boot/dts/tango4-smp8758.dtsi |  1 -
- drivers/cpufreq/Makefile              |  1 +
- drivers/cpufreq/cpufreq-dt-platdev.c  |  2 --
- drivers/cpufreq/tango-cpufreq.c       | 45 +++++++++++++++++++++++++++++++++++
- 4 files changed, 46 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
-index d2e65c46bcc7..eca33d568690 100644
---- a/arch/arm/boot/dts/tango4-smp8758.dtsi
-+++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
-@@ -13,7 +13,6 @@
- 			reg = <0>;
- 			clocks = <&clkgen CPU_CLK>;
- 			clock-latency = <1>;
--			operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
- 		};
- 
- 		cpu1: cpu at 1 {
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 0a9b6a093646..5ae156dc0d35 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -75,6 +75,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
- obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
- obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
- obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
-+obj-$(CONFIG_ARCH_TANGO)		+= tango-cpufreq.o
- obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
- obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
- obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 71267626456b..1490e4ce3fbc 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -70,8 +70,6 @@
- 	{ .compatible = "rockchip,rk3368", },
- 	{ .compatible = "rockchip,rk3399", },
- 
--	{ .compatible = "sigma,tango4" },
--
- 	{ .compatible = "ti,am33xx", },
- 	{ .compatible = "ti,dra7", },
- 	{ .compatible = "ti,omap2", },
-diff --git a/drivers/cpufreq/tango-cpufreq.c b/drivers/cpufreq/tango-cpufreq.c
-new file mode 100644
-index 000000000000..270c8261ebfa
---- /dev/null
-+++ b/drivers/cpufreq/tango-cpufreq.c
-@@ -0,0 +1,45 @@
-+#include <linux/of.h>
-+#include <linux/cpu.h>
-+#include <linux/clk.h>
-+#include <linux/pm_opp.h>
-+#include <linux/platform_device.h>
-+
-+static const struct of_device_id machines[] __initconst = {
-+	{ .compatible = "sigma,tango4" },
-+	{ .compatible = "sigma,tango5" },
-+	{ /* sentinel */ }
-+};
-+
-+static void __init build_opp_table(struct device *cpu_dev, struct clk *cpu_clk)
-+{
-+	unsigned long max_freq = clk_get_rate(cpu_clk);
-+
-+	dev_pm_opp_add(cpu_dev, max_freq / 1, 0);
-+	dev_pm_opp_add(cpu_dev, max_freq / 2, 0);
-+	dev_pm_opp_add(cpu_dev, max_freq / 3, 0);
-+	dev_pm_opp_add(cpu_dev, max_freq / 5, 0);
-+	dev_pm_opp_add(cpu_dev, max_freq / 9, 0);
-+}
-+
-+static int __init cpufreq_dt_platdev_init(void)
-+{
-+	struct device *cpu_dev = get_cpu_device(0);
-+	const struct of_device_id *match;
-+	struct clk *cpu_clk;
-+	void *res;
-+
-+	match = of_match_node(machines, of_root);
-+	if (!match)
-+		return -ENODEV;
-+
-+	cpu_clk = clk_get(cpu_dev, NULL);
-+	if (IS_ERR(cpu_clk))
-+		return -ENODEV;
-+
-+	build_opp_table(cpu_dev, cpu_clk);
-+
-+	res = platform_device_register_data(NULL, "cpufreq-dt", -1, NULL, 0);
-+
-+	return PTR_ERR_OR_ZERO(res);
-+}
-+device_initcall(cpufreq_dt_platdev_init);
+Best Regards,
+Michael
