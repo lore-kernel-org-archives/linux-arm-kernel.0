@@ -1,93 +1,56 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Tue, 11 Jul 2017 20:09:56 +0300
-Subject: [PATCH] gpu: host1x: Free the IOMMU domain when there is no
- device to attach
-In-Reply-To: <1499784254.1340.13.camel@paulk.fr>
-References: <20170710193305.5987-1-contact@paulk.fr>
- <1499762987.1340.10.camel@paulk.fr> <1499783851.1520.16.camel@toradex.com>
- <1499784254.1340.13.camel@paulk.fr>
-Message-ID: <1db2411c-c1af-62f5-18b4-55523dc5b56c@kapsi.fi>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Jul 2017 18:52:57 +0100
+Subject: prefetch inconsistency in copy_page()
+In-Reply-To: <CAKv+Gu9hGwLJxBCMCTK2fsK31SgX7E=qc3PQcNXZA6OP2uUs8Q@mail.gmail.com>
+References: <CAKv+Gu9hGwLJxBCMCTK2fsK31SgX7E=qc3PQcNXZA6OP2uUs8Q@mail.gmail.com>
+Message-ID: <20170711175257.GF13977@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2017 05:44 PM, Paul Kocialkowski wrote:
-> On Tue, 2017-07-11 at 14:37 +0000, Marcel Ziswiler wrote:
->> On Tue, 2017-07-11 at 11:49 +0300, Paul Kocialkowski wrote:
->>> On Mon, 2017-07-10 at 21:33 +0200, Paul Kocialkowski wrote:
->>>> When there is no device to attach to the IOMMU domain, as may be
->>>> the
->>>> case when the device-tree does not contain the proper iommu node,
->>>> it
->>>> is
->>>> best to keep going without IOMMU support rather than failing.
->>>> This allows the driver to probe and function instead of taking
->>>> down
->>>> all of the tegra drm driver, leading to missing display support.
->>>
->>> Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
->>>
->>>> Signed-off-by: Paul Kocialkowski <contact-W9ppeneeCTY@public.gmane
->>>> .
->>>> org>
->>>> ---
->>>>   drivers/gpu/host1x/dev.c | 8 +++++++-
->>>>   1 file changed, 7 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/gpu/host1x/dev.c b/drivers/gpu/host1x/dev.c
->>>> index ac65f52850a6..f296738d0de8 100644
->>>> --- a/drivers/gpu/host1x/dev.c
->>>> +++ b/drivers/gpu/host1x/dev.c
->>>> @@ -186,8 +186,13 @@ static int host1x_probe(struct
->>>> platform_device
->>>> *pdev)
->>>>   			return -ENOMEM;
->>>>   
->>>>   		err = iommu_attach_device(host->domain, &pdev-
->>>>> dev);
->>>>
->>>> -		if (err)
->>>> +		if (err == -ENODEV) {
->>>> +			iommu_domain_free(host->domain);
->>>> +			host->domain = NULL;
->>>> +			goto iommu_skip;
->>>> +		} else if (err) {
->>>>   			goto fail_free_domain;
->>>> +		}
->>>>   
->>>>   		geometry = &host->domain->geometry;
->>>>   
->>>> @@ -198,6 +203,7 @@ static int host1x_probe(struct platform_device
->>>> *pdev)
->>>>   		host->iova_end = geometry->aperture_end;
->>>>   	}
->>>>   
->>>> +iommu_skip:
->>>>   	err = host1x_channel_list_init(host);
->>>>   	if (err) {
->>>>   		dev_err(&pdev->dev, "failed to initialize channel
->>>> list\n");
->>
->> Please note that this does no longer cleanly apply after Mikko's 'gpu:
->> host1x: Refactor channel allocation code' commit from June 15 already
->> applied to current -next. Other than that
+On Tue, Jul 11, 2017 at 10:42:19AM +0100, Ard Biesheuvel wrote:
+> Hi all,
 > 
-> Good to know! I intended this patch for fixing 4.12 stable, so I'm not
-> even entirely sure it should land in next. The patch that fixes the
-> device-tree to actually enable the iommu should be merged in priority.
+> No big deal, but I spotted an inconsistency in how copy_page() does
+> its prefetching. With the code as-is, it prefetches 2 lines at the
+> start of the function, but it is off by one line in the loop, i.e., it
+> prefetches 3 lines ahead (and skips a line at entry). So imo, we need
+> either
 > 
-> If that is the case and anyone wants this patch rebased to next, feel
-> free to let me know and I'll send a rebased version.
+> """
+> @@ -30,9 +30,10 @@
+>   */
+>  ENTRY(copy_page)
+>  alternative_if ARM64_HAS_NO_HW_PREFETCH
+> -       # Prefetch two cache lines ahead.
+> +       # Prefetch three cache lines ahead.
+>         prfm    pldl1strm, [x1, #128]
+>         prfm    pldl1strm, [x1, #256]
+> +       prfm    pldl1strm, [x1, #384]
+>  alternative_else_nop_endif
+> 
+>         ldp     x2, x3, [x1]
+> """
+> 
+> or
+> 
+> """
+> @@ -50,7 +51,7 @@ alternative_else_nop_endif
+>         subs    x18, x18, #128
+> 
+>  alternative_if ARM64_HAS_NO_HW_PREFETCH
+> -       prfm    pldl1strm, [x1, #384]
+> +       prfm    pldl1strm, [x1, #256]
+>  alternative_else_nop_endif
+> 
+>         stnp    x2, x3, [x0]
+> 
+> """
+> 
+> to make things consistent again.
+> 
+> Thoughts?
 
-We should definitely have this for non-stable kernels too - it would be 
-a bit strange if the driver worked if IOMMU support wasn't built into 
-the kernel but failed if it was :) It can also be helpful for debugging 
-to be able to disable IOMMU just for host1x.
+Either of those look good to me. Andrew -- any preference? If not, I'll take
+the second one.
 
-> 
->> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
->> Tested-on: Apalis TK1, Apalis T30, Beaver, Colibri T30, Jetson-TK1
->>
->> Finally graphics working again, thanks guys!
-> 
-> Yay! :)
-> 
+Will
