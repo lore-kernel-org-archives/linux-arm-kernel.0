@@ -1,64 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 11 Jul 2017 15:55:57 +0300
-Subject: [PATCH v2] dt-bindings: net: ravb : Add support for r8a7743 SoC
-In-Reply-To: <TY1PR06MB07023342440946F384B7C80EB7AE0@TY1PR06MB0702.apcprd06.prod.outlook.com>
-References: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
- <1499700776-54504-1-git-send-email-biju.das@bp.renesas.com>
- <52eb0b92-5d25-e1f4-df54-e4fcf648c90e@cogentembedded.com>
- <TY1PR06MB07023342440946F384B7C80EB7AE0@TY1PR06MB0702.apcprd06.prod.outlook.com>
-Message-ID: <afe04380-840a-c282-2f53-40d891e6400a@cogentembedded.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 11 Jul 2017 14:56:46 +0200
+Subject: [PATCH 0/3] ARM: dts: r8a779[014]: Use R-Car Gen 2 fallback binding
+ for vin nodes
+Message-ID: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2017 03:20 PM, Chris Paterson wrote:
+Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a779[014] SoCs.
 
->>> Add a new compatible string for the RZ/G1M (R8A7743) SoC.
->>>
->>> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
->>> ---
->>> v1->v2
->>> * Changed the subject
->>> * re-formatted the required properties
->>>
->>>  .../devicetree/bindings/net/renesas,ravb.txt       | 29 +++++++++++++------
->> ---
->>>  1 file changed, 17 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt
->>> b/Documentation/devicetree/bindings/net/renesas,ravb.txt
->>> index b519503..4717bc2 100644
->>> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
->>> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
->>> @@ -4,19 +4,24 @@ This file provides information on what the device
->>> node for the Ethernet AVB  interface contains.
->>>
->>>  Required properties:
->>> -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790
->> SoC.
->>> -	      "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
->>> -	      "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
->>> -	      "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
->>> -	      "renesas,etheravb-r8a7794" if the device is a part of R8A7794 SoC.
->>> -	      "renesas,etheravb-r8a7795" if the device is a part of R8A7795 SoC.
->>> -	      "renesas,etheravb-r8a7796" if the device is a part of R8A7796 SoC.
->>> -	      "renesas,etheravb-rcar-gen2" for generic R-Car Gen 2 compatible
->> interface.
->>> -	      "renesas,etheravb-rcar-gen3" for generic R-Car Gen 3 compatible
->> interface.
->>> +- compatible: Must contain one or more of the following:
->>
->>     No, it can't contain more than one SoC specific value.
->
-> Surely it can contain both "renesas,etheravb-r8a7743" and "renesas,etheravb-rcar-gen2" for example?
->
-> As indeed dictated by the instruction further down:
+This has no run-time effect for the current driver as the initialisation
+sequence is the same for the SoC-specific binding for r8a779[014] and the
+fallback binding for R-Car Gen 2
 
-    Yes. Sorry, I should have been more attentive.
+This is consistent with existing compat string usage in vin nodes for the
+r8a779[23] SoCs.
 
->>> +	When compatible with the generic version, nodes must list the
->>> +	SoC-specific version corresponding to the platform first followed by
->>> +	the generic version.
+Based on renesas-devel-20170711-v4.12
 
-> Kind regards, Chris
+Simon Horman (3):
+  ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for vin nodes
+  ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for vin nodes
+  ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for vin nodes
 
-MBR, Sergei
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+ arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
+ arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
+ 3 files changed, 9 insertions(+), 9 deletions(-)
+
+-- 
+2.1.4
