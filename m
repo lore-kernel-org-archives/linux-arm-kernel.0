@@ -1,33 +1,31 @@
 From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 11 Jul 2017 09:40:15 +0200
-Subject: [PATCH 3/3] ARM: dts: at91: sama5d2: use sama5d2 compatible string
- for SMC
+Date: Tue, 11 Jul 2017 09:40:13 +0200
+Subject: [PATCH 1/3] mfd: syscon: update Atmel SMC binding doc
 In-Reply-To: <20170711074015.30440-1-ludovic.desroches@microchip.com>
 References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
-Message-ID: <20170711074015.30440-4-ludovic.desroches@microchip.com>
+Message-ID: <20170711074015.30440-2-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new compatible string has been introduced for sama5d2 SMC to allow to
-manage the registers mapping change.
+A new compatible string is introduced for SMC on sama5d2 to manage a
+different layout of the registers.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mfd/atmel-smc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 4fcd5bb219e3..60e69aeacbdb 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1048,7 +1048,7 @@
- 			};
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-smc.txt b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+index 26eeed373934..1103ce2030fb 100644
+--- a/Documentation/devicetree/bindings/mfd/atmel-smc.txt
++++ b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+@@ -8,6 +8,7 @@ Required properties:
+ - compatible:		Should be one of the following
+ 			"atmel,at91sam9260-smc", "syscon"
+ 			"atmel,sama5d3-smc", "syscon"
++			"atmel,sama5d2-smc", "syscon"
+ - reg:			Contains offset/length value of the SMC memory
+ 			region.
  
- 			hsmc: hsmc at f8014000 {
--				compatible = "atmel,sama5d3-smc", "syscon", "simple-mfd";
-+				compatible = "atmel,sama5d2-smc", "syscon", "simple-mfd";
- 				reg = <0xf8014000 0x1000>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 6>;
- 				clocks = <&hsmc_clk>;
 -- 
 2.12.2
