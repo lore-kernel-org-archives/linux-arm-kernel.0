@@ -1,40 +1,65 @@
-From: marco.franchi@nxp.com (Marco Franchi)
-Date: Tue, 11 Jul 2017 12:28:23 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6ul-evk: Pass the 'backlight' property
-In-Reply-To: <1499786903-14600-1-git-send-email-marco.franchi@nxp.com>
-References: <1499786903-14600-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <1499786903-14600-2-git-send-email-marco.franchi@nxp.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Jul 2017 15:58:49 +0100
+Subject: [PATCH 1/2] arm64: mm: abort uaccess retries upon fatal signal
+In-Reply-To: <1499782763-31418-2-git-send-email-mark.rutland@arm.com>
+References: <1499782763-31418-1-git-send-email-mark.rutland@arm.com>
+ <1499782763-31418-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170711145849.GE13977@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass the 'backlight' property as described in
-Documentation/devicetree/bindings/display/panel/simple-panel.txt
+On Tue, Jul 11, 2017 at 03:19:22PM +0100, Mark Rutland wrote:
+> When there's a fatal signal pending, arm64's do_page_fault()
+> implementation returns 0. The intent is that we'll return to the
+> faulting userspace instruction, delivering the signal on the way.
+> 
+> However, if we take a fatal signal during fixing up a uaccess, this
+> results in a return to the faulting kernel instruction, which will be
+> instantly retried, resulting in the same fault being taken forever. As
+> the task never reaches userspace, the signal is not delivered, and the
+> task is left unkillable. While the task is stuck in this state, it can
+> inhibit the forward progress of the system.
+> 
+> To avoid this, we must ensure that when a fatal signal is pending, we
+> apply any necessary fixup for a faulting kernel instruction. Thus we
+> will return to an error path, and it is up to that code to make forward
+> progress towards delivering the fatal signal.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Steve Capper <steve.capper@arm.com>
+> Tested-by: Steve Capper <steve.capper@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: stable at vger.kernel.org
+> ---
+>  arch/arm64/mm/fault.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 37b95df..3952d5e 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -397,8 +397,11 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+>  	 * signal first. We do not need to release the mmap_sem because it
+>  	 * would already be released in __lock_page_or_retry in mm/filemap.c.
+>  	 */
+> -	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
+> +	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
+> +		if (!user_mode(regs))
+> +			goto no_context;
+>  		return 0;
+> +	}
 
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
----
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This will need rebasing at -rc1 (take a look at current HEAD).
 
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index e08237f..5341798 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -22,7 +22,7 @@
- 		reg = <0x80000000 0x20000000>;
- 	};
- 
--	backlight {
-+	backlight_display: backlight-display {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm1 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -81,6 +81,7 @@
- 
- 	panel {
- 		compatible = "innolux,at043tn24";
-+		backlight = <&backlight_display>;
- 
- 		port {
- 			panel_in: endpoint {
--- 
-2.7.4
+Also, I think it introduces a weird corner case where we take a page fault
+when writing the signal frame to the user stack to deliver a SIGSEGV. If
+we end up with VM_FAULT_RETRY and somebody has sent a SIGKILL to the task,
+then we'll fail setup_sigframe and force an un-handleable SIGSEGV instead
+of SIGKILL.
+
+The end result (task is killed) is the same, but the fatal signal is wrong.
+
+Will
