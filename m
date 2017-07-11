@@ -1,19 +1,42 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 11 Jul 2017 10:11:18 +0800
-Subject: [PATCH v4 1/4] ARM: dts: imx6ul-geam-kit: Remove re-enabled usdhc1
-In-Reply-To: <1497596680-3186-1-git-send-email-jteki@openedev.com>
-References: <1497596680-3186-1-git-send-email-jteki@openedev.com>
-Message-ID: <20170711021117.GC3172@dragon>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 11 Jul 2017 10:49:46 +0800
+Subject: [PATCH v4 1/3] cpufreq: mediatek: Add support of cpufreq to
+ MT2701/MT7623 SoC
+In-Reply-To: <feabcfd53899954198c6620e9d9b68f4a3c55201.1499692967.git.sean.wang@mediatek.com>
+References: <cover.1499692967.git.sean.wang@mediatek.com>
+ <feabcfd53899954198c6620e9d9b68f4a3c55201.1499692967.git.sean.wang@mediatek.com>
+Message-ID: <1499741386.12408.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 12:34:37PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> usdhc1 is enabled and assigned pinctrl-0 on imx6ul-geam.dtsi
-> but same thing done on imx6ul-geam-kit.dts, so remove this
-> re-enabled node from the same.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Hi Sean,
 
-Applied all, thanks.
+On Mon, 2017-07-10 at 22:23 +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> MT2701/MT7623 is a 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
+> single cluster and this hardware is also compatible with the existing
+> driver through enabling CPU frequency feature with operating-points-v2
+> bindings. Also, this driver actually supports all MediaTek SoCs, the
+> Kconfig menu entry and file name itself should be updated with more
+> generic name to drop "MT8173"
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Reviewed-by: Jean Delvare <jdelvare@suse.de>
+> ---
+>  drivers/cpufreq/Kconfig.arm                              | 7 +++----
+>  drivers/cpufreq/Makefile                                 | 2 +-
+>  drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} | 2 ++
+>  3 files changed, 6 insertions(+), 5 deletions(-)
+>  rename drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} (99%)
+> 
+
+As Viresh mentioned, there are already many drivers use "mtk" as
+filename prefix or postfix.To align with those files, I suggest use
+mtk-cpufreq.c.I think there are not too many values to change all "mtk-"
+to "mediatek-", but it is worth to have the same naming rule for
+mediatek upstream driver.
+
+Regards,
+Eddie. 
