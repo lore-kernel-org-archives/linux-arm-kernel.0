@@ -1,66 +1,37 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Tue, 11 Jul 2017 12:20:06 +0000
-Subject: [PATCH v2] dt-bindings: net: ravb : Add support for r8a7743 SoC
-In-Reply-To: <52eb0b92-5d25-e1f4-df54-e4fcf648c90e@cogentembedded.com>
-References: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
- <1499700776-54504-1-git-send-email-biju.das@bp.renesas.com>
- <52eb0b92-5d25-e1f4-df54-e4fcf648c90e@cogentembedded.com>
-Message-ID: <TY1PR06MB07023342440946F384B7C80EB7AE0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 11 Jul 2017 14:20:23 +0200
+Subject: [PATCH] staging: bcm2835-audio: replace BUG_ON with WARN_ON
+In-Reply-To: <CAHRz_yZ6OCke+umsprLmfgExe446jXi-Jnexn=t6bi9Jj7vBzQ@mail.gmail.com>
+References: <CAHRz_yZ6OCke+umsprLmfgExe446jXi-Jnexn=t6bi9Jj7vBzQ@mail.gmail.com>
+Message-ID: <20170711122023.GB21677@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
+On Tue, Jul 11, 2017 at 04:54:24PM +0530, karuna grewal wrote:
+> replace BUG_ON with WARN_ON as pointed out by checkpatch
+> 
+> Signed-off-by: Karuna Grewal <karunagrewal98@gmail.com>
 
-> From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
-> Sent: 11 July 2017 13:12
-> 
-> Hello!
-> 
-> On 07/10/2017 06:32 PM, Biju Das wrote:
-> 
-> > Add a new compatible string for the RZ/G1M (R8A7743) SoC.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > ---
-> > v1->v2
-> > * Changed the subject
-> > * re-formatted the required properties
-> >
-> >  .../devicetree/bindings/net/renesas,ravb.txt       | 29 +++++++++++++------
+I can not accept patches sent in html format...
+
 > ---
-> >  1 file changed, 17 insertions(+), 12 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > index b519503..4717bc2 100644
-> > --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > @@ -4,19 +4,24 @@ This file provides information on what the device
-> > node for the Ethernet AVB  interface contains.
-> >
-> >  Required properties:
-> > -- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790
-> SoC.
-> > -	      "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
-> > -	      "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
-> > -	      "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
-> > -	      "renesas,etheravb-r8a7794" if the device is a part of R8A7794 SoC.
-> > -	      "renesas,etheravb-r8a7795" if the device is a part of R8A7795 SoC.
-> > -	      "renesas,etheravb-r8a7796" if the device is a part of R8A7796 SoC.
-> > -	      "renesas,etheravb-rcar-gen2" for generic R-Car Gen 2 compatible
-> interface.
-> > -	      "renesas,etheravb-rcar-gen3" for generic R-Car Gen 3 compatible
-> interface.
-> > +- compatible: Must contain one or more of the following:
+> ?drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->     No, it can't contain more than one SoC specific value.
+> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+> index 5ff4b1c..30d310b 100644
+> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+> @@ -93,7 +93,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
+> ? ? ? ? if (mutex_lock_interruptible(&chip->audio_mutex))
+> ? ? ? ? ? ? ? ? return -EINTR;
+> 
+> -? ? ? ?BUG_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
+> +? ? ? ?WARN_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
 
-Surely it can contain both "renesas,etheravb-r8a7743" and "renesas,etheravb-rcar-gen2" for example?
+Why will this make things better?
 
-As indeed dictated by the instruction further down:
+thanks,
 
-> > +	When compatible with the generic version, nodes must list the
-> > +	SoC-specific version corresponding to the platform first followed by
-> > +	the generic version.
-
-Kind regards, Chris
+greg k-h
