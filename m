@@ -1,28 +1,71 @@
-From: michael.moese@men.de (Moese, Michael)
-Date: Tue, 11 Jul 2017 13:40:57 +0000
-Subject: i.MX 6 and PCIe DMA issues
-Message-ID: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 11 Jul 2017 19:27:00 +0530
+Subject: [PATCH 00/16] omap_hsmmc: Add ADMA support and UHS/HS200/DDR
+ support
+In-Reply-To: <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
+References: <20170616124544.15046-1-kishon@ti.com>
+ <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
+Message-ID: <fc9c1576-7419-b174-ea42-97ccf4666cee@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello ARM folks,
-I turn to you in hope you have any hints or directions on the problem I describe below.
+Hi Ulf,
 
-I am currently investigating strange behavior of our i.MX 6 (Quad) board with an FPGA connected to to PCI Express. This FPGA contains, among others, an Ethernet (10/100 Mbps) IP core. 
-The Ethernet relies completely on DMA transfers. There is one buffer descriptor table containing pointers to 64 RX and TX buffers.
-Buffers are allocated using dma_alloc_coherent() and mapped using dma_map_single().
-Prior to access, dma_sync_single_for_cpu() is called on the memory regions, afterwards dma_sync_single_for_device().
+On Tuesday 11 July 2017 06:40 PM, Ulf Hansson wrote:
+> On 16 June 2017 at 14:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> This is the final part of the series originally sent as
+>> part of [2].
+>>
+>> This series adds UHS, HS200, DDR mode and ADMA support to
+>> omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
+>> SoCs.
+>>
+>> Changes from [2]:
+>> *) No more updating omap2plus_defconfig or multi_v7_defconfig is
+>>    required, so those patches are removed.
+>> *) Addressed Rob Herring's comment on implementing a function
+>>    instead of having a macro while getting pinctrl state.
+>>
+>> This series is created on top of [3], [4], [5] AND [6]
+>> (i.e after
+>>   ARM: dts: omap3-overo: Remove "vqmmc-supply" property from MMC dt node
+>>   omap_hsmmc: use mmc_regulator_get_supply() to get regulators
+>>   omap*: Fixes/Cleanups for MMC devicetree node
+>>   ARM: dts: Add iodelay data for MMC)
+>>
+>> The functionality implemented in this series was sent before ([1]) but
+>> was never followed up since supporting high speed modes in dra7 required
+>> IODelay values to be configured. With IODelay driver being merged into
+>> kernel, sending it as a fresh series with support for configuring IODelay
+>> values.
+> 
+> Is it safe to queue this via mmc tree for 4.14 or is there a
+> dependency I must consider? The above didn't quite tell me that, could
+> you please elaborate.
 
-If a new frame is received, the driver reads the RX buffer and passes the frame using skb_put().
-When the issue was reported for an old (say 3.18.19) kernel, the buffer descriptor was read correctly (including a correct length), but the buffer contained all zeroes. When I map the physical address in userspace and dump the contents, I can see the correct buffer descriptor contents and inside the buffers valid Ethernet frames. So the DMA transfer itself is working obviously.
-To avoid chasing after already-fixed bugs, I switched to a 4.12.0 kernel and observed almost the same behavior, but this time there was no length read as well.
-On 3.18.19 I was able to read the buffers when I allocate them using kmalloc() instead of dma_alloc_coherent(), on 4.12 this did not have any impact.
+There is a dependency with https://www.spinics.net/lists/arm-kernel/msg586215.html.
 
-I was suspecting the caches to be the root of my issue, but I was not able to resolve the issue with calls to flush_cache_all(), which I suppose should have invalidated the entire cache.
+I'll resend the series after all the platform data specific stuff is merged.
+> 
+>>
+>> Suggestions of migrating to sdhci driver (from omap_hsmmc driver) is not
+>> addressed since
+>> *) tuning ratio of MMC in dra7 is different from sdhci
+>> *) IOdelay is required for dra7
+>> *) GPIO based card detect is not supported in sdhci
+> 
+> Lots of sdhci drivers calls mmc_of_parse(), and uses the mmc slot gpio
+> APIs, so I don't this this is correct statement.
+> 
+>> *) Some of the registers don't always have correct values as in sdhci
+>>    (like PSTATE).
+>> Supporting all of these in sdhci will result in adding lot of quirks in
+>> sdhci driver.
+> 
+> Is it really that much different? It would be nice if some really took
+> on the challenge of converting omap_hsmmc into an sdhci variant.
 
-Unfortunately, our driver is legacy out-of-tree code and I started working on this driver to get it ready for submission. If it is of any help, I could send the code of the driver as well as our board's device tree.
+Okay. I'll give that a shot and see how far I can get.
 
-I would highly appreciate any hint or direction that may help my troubleshooting.
-
-Best Regards,
-Michael
+Thanks
+Kishon
