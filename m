@@ -1,65 +1,70 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 11 Jul 2017 23:21:25 +0900
-Subject: [PATCH 2/2] arm64: dts: uniphier: add Denali NAND controller nodes
-In-Reply-To: <1499782885-29023-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1499782885-29023-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1499782885-29023-2-git-send-email-yamada.masahiro@socionext.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Tue, 11 Jul 2017 14:37:35 +0000
+Subject: [PATCH] gpu: host1x: Free the IOMMU domain when there is no
+ device to attach
+In-Reply-To: <1499762987.1340.10.camel@paulk.fr>
+References: <20170710193305.5987-1-contact@paulk.fr>
+ <1499762987.1340.10.camel@paulk.fr>
+Message-ID: <1499783851.1520.16.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NAND controller node to LD11 and LD20.  Neither of them supports
-the CS1 line, so pinctrl is set up for a single CS line.
+On Tue, 2017-07-11 at 11:49 +0300, Paul Kocialkowski wrote:
+> On Mon, 2017-07-10 at 21:33 +0200, Paul Kocialkowski wrote:
+> > When there is no device to attach to the IOMMU domain, as may be
+> > the
+> > case when the device-tree does not contain the proper iommu node,
+> > it
+> > is
+> > best to keep going without IOMMU support rather than failing.
+> > This allows the driver to probe and function instead of taking down
+> > all of the tegra drm driver, leading to missing display support.
+> 
+> Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
+> 
+> > Signed-off-by: Paul Kocialkowski <contact-W9ppeneeCTY@public.gmane.
+> > org>
+> > ---
+> > ?drivers/gpu/host1x/dev.c | 8 +++++++-
+> > ?1 file changed, 7 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/gpu/host1x/dev.c b/drivers/gpu/host1x/dev.c
+> > index ac65f52850a6..f296738d0de8 100644
+> > --- a/drivers/gpu/host1x/dev.c
+> > +++ b/drivers/gpu/host1x/dev.c
+> > @@ -186,8 +186,13 @@ static int host1x_probe(struct platform_device
+> > *pdev)
+> > ?			return -ENOMEM;
+> > ?
+> > ?		err = iommu_attach_device(host->domain, &pdev-
+> > >dev);
+> > -		if (err)
+> > +		if (err == -ENODEV) {
+> > +			iommu_domain_free(host->domain);
+> > +			host->domain = NULL;
+> > +			goto iommu_skip;
+> > +		} else if (err) {
+> > ?			goto fail_free_domain;
+> > +		}
+> > ?
+> > ?		geometry = &host->domain->geometry;
+> > ?
+> > @@ -198,6 +203,7 @@ static int host1x_probe(struct platform_device
+> > *pdev)
+> > ?		host->iova_end = geometry->aperture_end;
+> > ?	}
+> > ?
+> > +iommu_skip:
+> > ?	err = host1x_channel_list_init(host);
+> > ?	if (err) {
+> > ?		dev_err(&pdev->dev, "failed to initialize channel
+> > list\n");
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Please note that this does no longer cleanly apply after Mikko's 'gpu:
+host1x: Refactor channel allocation code' commit from June 15 already
+applied to current -next. Other than that
 
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 11 +++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 11 +++++++++++
- 2 files changed, 22 insertions(+)
+Tested-by:?Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Tested-on: Apalis TK1, Apalis T30, Beaver, Colibri T30, Jetson-TK1
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index bdce5b89baec..ca7eb49aa83d 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -368,6 +368,17 @@
- 				#reset-cells = <1>;
- 			};
- 		};
-+
-+		nand: nand at 68000000 {
-+			compatible = "socionext,uniphier-denali-nand-v5b";
-+			status = "disabled";
-+			reg-names = "nand_data", "denali_reg";
-+			reg = <0x68000000 0x20>, <0x68100000 0x1000>;
-+			interrupts = <0 65 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
-+			clocks = <&sys_clk 2>;
-+		};
- 	};
- };
- 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index de1e75362817..1110be4c88ca 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -389,6 +389,17 @@
- 				#reset-cells = <1>;
- 			};
- 		};
-+
-+		nand: nand at 68000000 {
-+			compatible = "socionext,uniphier-denali-nand-v5b";
-+			status = "disabled";
-+			reg-names = "nand_data", "denali_reg";
-+			reg = <0x68000000 0x20>, <0x68100000 0x1000>;
-+			interrupts = <0 65 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
-+			clocks = <&sys_clk 2>;
-+		};
- 	};
- };
- 
--- 
-2.7.4
+Finally graphics working again, thanks guys!
