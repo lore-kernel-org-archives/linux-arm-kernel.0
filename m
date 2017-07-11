@@ -1,72 +1,141 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 11 Jul 2017 18:05:55 +0300
-Subject: [PATCH] ARM: tegra: Register host1x node with iommu binding on
- tegra124
-In-Reply-To: <1499784841.1520.20.camel@toradex.com>
-References: <20170709163614.6746-1-contact@paulk.fr>
- <1499763009.1340.11.camel@paulk.fr> <1499784841.1520.20.camel@toradex.com>
-Message-ID: <1499785555.1340.15.camel@paulk.fr>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Jul 2017 15:43:30 +0100
+Subject: Applied "spi: imx: add selection for iMX53 and iMX6 controller" to
+ the spi tree
+In-Reply-To: <20170605033809.13726-3-jiada_wang@mentor.com>
+Message-ID: <E1dUwNu-0005Q8-HY@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-07-11 at 14:54 +0000, Marcel Ziswiler wrote:
-> On Tue, 2017-07-11 at 11:50 +0300, Paul Kocialkowski wrote:
-> > On Sun, 2017-07-09 at 19:36 +0300, Paul Kocialkowski wrote:
-> > > This registers the host1x node with the SMMU (as HC swgroup) to
-> > > allow
-> > > the host1x code to attach to it. It avoid failing the probe
-> > > sequence,
-> > > which resulted in the tegra drm driver not probing and thus
-> > > nothing
-> > > being displayed on-screen.
-> > 
-> > Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
-> > 
-> > > Signed-off-by: Paul Kocialkowski <contact-
-> > > W9ppeneeCTY at public.gmane.org>
-> 
-> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Tested-on: Apalis TK1, Jetson-TK1
-> 
-> > > ---
-> > >  arch/arm/boot/dts/tegra124.dtsi | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/tegra124.dtsi
-> > > b/arch/arm/boot/dts/tegra124.dtsi
-> > > index 187a36c6d0fc..b3b89befffeb 100644
-> > > --- a/arch/arm/boot/dts/tegra124.dtsi
-> > > +++ b/arch/arm/boot/dts/tegra124.dtsi
-> > > @@ -85,6 +85,7 @@
-> > >  		clocks = <&tegra_car TEGRA124_CLK_HOST1X>;
-> > >  		resets = <&tegra_car 28>;
-> > >  		reset-names = "host1x";
-> > > +		iommus = <&mc TEGRA_SWGROUP_HC>;
-> > >  
-> > >  		#address-cells = <2>;
-> > >  		#size-cells = <2>;
-> 
-> So I take it we still will need this one moving forward, correct?
+The patch
 
-Yes, this one actually enables the IOMMU while the other one handles the
-failure to attach the IOMMU without brinding the whole drm driver down.
+   spi: imx: add selection for iMX53 and iMX6 controller
 
-So it's best to actually make use of the feature!
+has been applied to the spi tree at
 
-> How about tegra30, I guess the same applies there, isn't it? Should I
-> send a patch or are you guys doing that?
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-I don't have any tegra hardware aside of tegra124, so that's all I can
-contribute to. I don't know if others have looked into the same type of
-issue happening on either newer or older platforms.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-Cheers,
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 65c60d7184df14be97d82fee77810901579493aa Mon Sep 17 00:00:00 2001
+From: jiada wang <jiada_wang@mentor.com>
+Date: Thu, 8 Jun 2017 14:16:01 +0900
+Subject: [PATCH] spi: imx: add selection for iMX53 and iMX6 controller
+
+ECSPI contorller for iMX53 and iMX6 has few hardware issues
+comparing to iMX51.
+The change add possibility to detect which controller is used
+to apply possible workaround and limitations.
+
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ .../devicetree/bindings/spi/fsl-imx-cspi.txt       |  1 +
+ drivers/spi/spi-imx.c                              | 26 ++++++++++++++++++++--
+ 2 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+index 31b5b21598ff..5bf13960f7f4 100644
+--- a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
++++ b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+@@ -9,6 +9,7 @@ Required properties:
+   - "fsl,imx31-cspi" for SPI compatible with the one integrated on i.MX31
+   - "fsl,imx35-cspi" for SPI compatible with the one integrated on i.MX35
+   - "fsl,imx51-ecspi" for SPI compatible with the one integrated on i.MX51
++  - "fsl,imx53-ecspi" for SPI compatible with the one integrated on i.MX53 and later Soc
+ - reg : Offset and length of the register set for the device
+ - interrupts : Should contain CSPI/eCSPI interrupt
+ - cs-gpios : Specifies the gpio pins to be used for chipselects.
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index d3093f355dfb..424dd013451e 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -63,7 +63,8 @@ enum spi_imx_devtype {
+ 	IMX27_CSPI,
+ 	IMX31_CSPI,
+ 	IMX35_CSPI,	/* CSPI on all i.mx except above */
+-	IMX51_ECSPI,	/* ECSPI on i.mx51 and later */
++	IMX51_ECSPI,	/* ECSPI on i.mx51 */
++	IMX53_ECSPI,	/* ECSPI on i.mx53 and later */
+ };
+ 
+ struct spi_imx_data;
+@@ -127,6 +128,11 @@ static inline int is_imx51_ecspi(struct spi_imx_data *d)
+ 	return d->devtype_data->devtype == IMX51_ECSPI;
+ }
+ 
++static inline int is_imx53_ecspi(struct spi_imx_data *d)
++{
++	return d->devtype_data->devtype == IMX53_ECSPI;
++}
++
+ #define MXC_SPI_BUF_RX(type)						\
+ static void spi_imx_buf_rx_##type(struct spi_imx_data *spi_imx)		\
+ {									\
+@@ -752,6 +758,17 @@ static struct spi_imx_devtype_data imx51_ecspi_devtype_data = {
+ 	.devtype = IMX51_ECSPI,
+ };
+ 
++static struct spi_imx_devtype_data imx53_ecspi_devtype_data = {
++	.intctrl = mx51_ecspi_intctrl,
++	.config = mx51_ecspi_config,
++	.trigger = mx51_ecspi_trigger,
++	.rx_available = mx51_ecspi_rx_available,
++	.reset = mx51_ecspi_reset,
++	.fifo_size = 64,
++	.has_dmamode = true,
++	.devtype = IMX53_ECSPI,
++};
++
+ static const struct platform_device_id spi_imx_devtype[] = {
+ 	{
+ 		.name = "imx1-cspi",
+@@ -772,6 +789,9 @@ static const struct platform_device_id spi_imx_devtype[] = {
+ 		.name = "imx51-ecspi",
+ 		.driver_data = (kernel_ulong_t) &imx51_ecspi_devtype_data,
+ 	}, {
++		.name = "imx53-ecspi",
++		.driver_data = (kernel_ulong_t) &imx53_ecspi_devtype_data,
++	}, {
+ 		/* sentinel */
+ 	}
+ };
+@@ -783,6 +803,7 @@ static const struct of_device_id spi_imx_dt_ids[] = {
+ 	{ .compatible = "fsl,imx31-cspi", .data = &imx31_cspi_devtype_data, },
+ 	{ .compatible = "fsl,imx35-cspi", .data = &imx35_cspi_devtype_data, },
+ 	{ .compatible = "fsl,imx51-ecspi", .data = &imx51_ecspi_devtype_data, },
++	{ .compatible = "fsl,imx53-ecspi", .data = &imx53_ecspi_devtype_data, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, spi_imx_dt_ids);
+@@ -1218,7 +1239,8 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
+ 	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
+ 	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+-	if (is_imx35_cspi(spi_imx) || is_imx51_ecspi(spi_imx))
++	if (is_imx35_cspi(spi_imx) || is_imx51_ecspi(spi_imx) ||
++	    is_imx53_ecspi(spi_imx))
+ 		spi_imx->bitbang.master->mode_bits |= SPI_LOOP | SPI_READY;
+ 
+ 	spi_imx->spi_drctl = spi_drctl;
 -- 
-Paul Kocialkowski,
-
-developer of free digital technology and hardware support
-
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+2.13.2
