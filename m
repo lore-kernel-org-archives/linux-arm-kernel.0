@@ -1,38 +1,154 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Jul 2017 10:42:32 +0200
-Subject: [PATCH 9/9] ARM: multi_v7_defconfig: Enable DMA for Renesas
- serial ports
-In-Reply-To: <CAMuHMdXb1yAgw4AVvheYhPV=V9HeDCW2NdvhJWzoSz8i-mM3TQ@mail.gmail.com>
-References: <1499693302-25120-1-git-send-email-geert+renesas@glider.be>
- <1499693302-25120-10-git-send-email-geert+renesas@glider.be>
- <CANqRtoSi8x7zqwV3Gp_n0dBe4Uw6LDRvC1Lheu+GrLZNYuxAHw@mail.gmail.com>
- <CAMuHMdXb1yAgw4AVvheYhPV=V9HeDCW2NdvhJWzoSz8i-mM3TQ@mail.gmail.com>
-Message-ID: <CAK8P3a3c68=L=h+nni39BmOb68wno7TuvXuBgOHrEMOrkhdx2g@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Tue, 11 Jul 2017 08:48:56 +0000
+Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
+ ITS tables
+In-Reply-To: <03162741-2ddc-fe3d-7f5d-4eafb8209ef5@arm.com>
+References: <ba64069e-f3a3-de85-df47-01008d7b3513@codeaurora.org>
+ <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
+ <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
+ <bee8ac5a-b19f-8112-5529-485c269f3501@arm.com>
+ <CAFpQJXXPfBEP+_3rzkRo7Ydb31GKFokQB1bmOVHXSd1Pu0zsyA@mail.gmail.com>
+ <ed7416f2-e60b-bf8c-cdbe-8a83e83ca529@arm.com>
+ <CAFpQJXUm5tEyaBURzx9OtssBt8+ThO0dmPqtdjjGRJzY5cMv-w@mail.gmail.com>
+ <09fa2b5a-9039-0902-4f57-6a6c2a5f7c37@arm.com>
+ <6ea9d5df-d15f-a8a6-2442-e2f628b29816@codeaurora.org>
+ <03162741-2ddc-fe3d-7f5d-4eafb8209ef5@arm.com>
+Message-ID: <20170711084855.GA4193@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 8:59 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Magnus,
->
-> On Tue, Jul 11, 2017 at 5:38 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> On Mon, Jul 10, 2017 at 10:28 PM, Geert Uytterhoeven
+Hi Marc,
 
->> Since enabling DMA Engine still keeps PIO support around I wonder why
->> we need this Kconfig at all - other drivers seem to get by without
->> this kind of thing?
->> So in my opinion it would also be nice to get rid of SERIAL_SH_SCI_DMA
->> completely and reducing the number of special per-driver Kconfig
->> entries.
->
-> In general, I would agree, and remove the option at the blimp of an eye.
-> However, this driver is shared with H8/300 and SuperH.  While both could use
-> DMA (but it's not supported by Linux yet), I don't know if they are willing to
-> live with the increased static and dynamic memory footprint of SH_SCI DMA
-> support.
+On Mon, Jul 10, 2017 at 04:15:28PM +0100, Marc Zyngier wrote:
+> On 10/07/17 15:57, Shanker Donthineni wrote:
+> > Hi Marc,
+> > 
+> > On 07/10/2017 08:50 AM, Marc Zyngier wrote:
+> >> On 10/07/17 11:21, Ganapatrao Kulkarni wrote:
+> >>> Hi Marc,
+> >>>
+> >>> On Mon, Jul 10, 2017 at 2:53 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >>>> On 10/07/17 10:08, Ganapatrao Kulkarni wrote:
+> >>>>> On Mon, Jul 10, 2017 at 2:36 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >>>>>> On 10/07/17 09:48, Ganapatrao Kulkarni wrote:
+> >>>>>>> Hi Marc,
+> >>>>>>>
+> >>>>>>> On Mon, Jul 3, 2017 at 8:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >>>>>>>> Hi Shanker,
+> >>>>>>>>
+> >>>>>>>> On 03/07/17 15:24, Shanker Donthineni wrote:
+> >>>>>>>>> Hi Marc,
+> >>>>>>>>>
+> >>>>>>>>> On 06/30/2017 03:51 AM, Marc Zyngier wrote:
+> >>>>>>>>>> On 30/06/17 04:01, Ganapatrao Kulkarni wrote:
+> >>>>>>>>>>> On Fri, Jun 30, 2017 at 8:04 AM, Ganapatrao Kulkarni
+> >>>>>>>>>>> <gpkulkarni@gmail.com> wrote:
+> >>>>>>>>>>>> Hi Shanker,
+> >>>>>>>>>>>>
+> >>>>>>>>>>>> On Sun, Jun 25, 2017 at 9:16 PM, Shanker Donthineni
+> >>>>>>>>>>>> <shankerd@codeaurora.org> wrote:
+> >>>>>>>>>>>>> The NUMA node information is visible to ITS driver but not being used
+> >>>>>>>>>>>>> other than handling errata. This patch allocates the memory for ITS
+> >>>>>>>>>>>>> tables from the corresponding NUMA node using the appropriate NUMA
+> >>>>>>>>>>>>> aware functions.
+> >>>>>>>>>>>
+> >>>>>>>>>>> IMHO, the description would have been more constructive?
+> >>>>>>>>>>>
+> >>>>>>>>>>> "All ITS tables are mapped by default to NODE 0 memory.
+> >>>>>>>>>>> Adding changes to allocate memory from respective NUMA NODES of ITS devices.
+> >>>>>>>>>>> This will optimize tables access and avoids unnecessary inter-node traffic."
+> >>>>>>>>>>
+> >>>>>>>>>> But more importantly, I'd like to see figures showing the actual benefit
+> >>>>>>>>>> of this per-node allocation. Given that both of you guys have access to
+> >>>>>>>>>> such platforms, please show me the numbers!
+> >>>>>>>>>>
+> >>>>>>>>>
+> >>>>>>>>> I'll share the actual results which shows the improvement whenever
+> >>>>>>>>> available on our next chips. Current version of Qualcomm qdf2400 doesn't
+> >>>>>>>>> support multi socket configuration to capture results and share with you.
+> >>>>>>>>>
+> >>>>>>>>> Do you see any other issues with this patch apart from the performance
+> >>>>>>>>> improvements. I strongly believe this brings the noticeable improvement
+> >>>>>>>>> in numbers on systems where it has multi node memory/CPU configuration.
+> >>>>>>>>
+> >>>>>>>> I agree that it *could* show an improvement, but it very much depends on
+> >>>>>>>> how often the ITS misses in its caches. For this kind of patches, I want
+> >>>>>>>> to see two things:
+> >>>>>>>>
+> >>>>>>>> 1) It brings a measurable benefit on NUMA platforms
+> >>>>>>>
+> >>>>>>> Did some measurement of interrupt response time for LPIs and we don't
+> >>>>>>> see any major
+> >>>>>>> improvement due to caching of Tables. However, we have seen
+> >>>>>>> improvements of around 5%.
+> >>>>>>
+> >>>>>> An improvement of what exactly?
+> >>>>>
+> >>>>> interrupt response time.
+> >>>>
+> >>>> Measured how? On which HW? Using which benchmark?
+> >>>
+> >>> This has been tested on ThunderX2.
+> >>> We have instrumented gic-v3-its driver code to create dummy LPI device
+> >>> with few vectors.
+> >>> The LPI is induced from dummy device(through sysfs by writing to
+> >>> TRANSLATOR reg).
+> >>> The ISR routine(gic_handle_irq) being called to handle the induced LPI.
+> >>> NODE 1 cpu is used to induce LPI and NODE 1 cpu/collection is mapped
+> >>> in ITT to route this LPI.
+> >>>
+> >>> CPU timer counter are sampled at the time LPI is Induced and in ISR
+> >>> routine to calculate interrupt response time.
+> >>> the result shown improvement of 5% with this patch.
+> >>
+> >> And you call that a realistic measurement of the latency? Really? Sorry,
+> >> but I cannot take you seriously here.
+> >>
+> >>> Do you have any recommended benchmarks to test the same?
+> >>
+> >> Run a standard benchmark such as netperf, post the result with and
+> >> without that patch. The above is just plain ridiculous.
+> >>
+> > 
+> > The whole purpose of ACPI subtable "GIC Interrupt Translation Service (ITS) Affinity structure" 
+> > is to provide the proximity information to OS so that software will take advantage of NUMA
+> > aware allocations to improve the read latency of ITS/GICR tables, not just for implementing 
+> > software workarounds.
+> > 
+> >  
+> > I believe ITS driver should provide NUMA aware allocations just like x86 Linux drivers. How much
+> > performance improvement we observer is based on the individual SOC implementation, inter NODE
+> > latency, inter node traffic, cache capacity, and type of the test used to measure results.
+> > 
+> > Please consider this patch irrespective of the test results running on a specific hardware. We
+> > need this patch for upcoming Qualcomm server chips. 
+> 
+> "I believe" and "We need" are not a proof of the usefulness of this. We
+> can argue all day, or you can provide a set of convincing results. Your
+> choice. But I can guarantee you the the latter is a much better method
+> than the former.
+> 
+> If you (or Cavium) cannot be bothered to provide tangible results that
+> this is useful, why should I take this at face value? This is just like
+> any other improvement we make to the kernel. We back it *with data*.
 
-One more thing: enabling the DMA support in the console driver generally
-means you cannot use printk in the DMA driver anywhere that may be called
-during printk(). Not sure if that is a concern here.
+At Cavium, most of the ThunderX2 boards we have are multi-node, and we
+are interested in enabling NUMA optimizations.
 
-      Arnd
+But, in this case, we do not see (or expect to see - given the nature of
+access) any significant improvement in any standard benchmark. Ganapat's
+LPI injection test to find interrupt latency was probably the best option
+we had so far. We could come up with another contrived test case to see
+if there is any change in behavior when we overload the interconnect,
+but I don't think we will get any data to really justify the patch.
+
+Allocating the tables on the node is a good thing since it avoids
+unnecessary traffic over the interconnect, so I do not see the
+problem in merging a simple patch for that. Is there any specific
+issue here?
+
+Anyway, for ThunderX2, the patch is good to have, but not critical.
+And as Ganapat noted, the patch can be improved a bit. Also going thru
+the patch, I think the chip data is better allocated using node as well.
+
+JC.
