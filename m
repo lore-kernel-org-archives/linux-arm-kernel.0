@@ -1,279 +1,46 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 11 Jul 2017 14:30:32 +0200
-Subject: [PATCH 2/3] regulator: Add support for stm32-vrefbuf
+Date: Tue, 11 Jul 2017 14:30:31 +0200
+Subject: [PATCH 1/3] dt-bindings: regulator: Add STM32 Voltage Reference Buffer
 In-Reply-To: <1499776233-29116-1-git-send-email-fabrice.gasnier@st.com>
 References: <1499776233-29116-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1499776233-29116-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1499776233-29116-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add regulator driver for STM32 voltage reference buffer which can be
-used as voltage reference for ADCs, DACs and external components through
-dedicated VREF+ pin.
+Document STM32 VREFBUF (voltage reference buffer) which can be used as
+voltage reference for ADCs, DACs and external components.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/regulator/Kconfig         |  12 +++
- drivers/regulator/Makefile        |   1 +
- drivers/regulator/stm32-vrefbuf.c | 215 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 228 insertions(+)
- create mode 100644 drivers/regulator/stm32-vrefbuf.c
+ .../bindings/regulator/st,stm32-vrefbuf.txt          | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 48db87d..7950283 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -728,6 +728,18 @@ config REGULATOR_SKY81452
- 	  This driver can also be built as a module. If so, the module
- 	  will be called sky81452-regulator.
- 
-+config REGULATOR_STM32_VREFBUF
-+	tristate "STMicroelectronics STM32 VREFBUF"
-+	depends on ARCH_STM32 || COMPILE_TEST
-+	help
-+	  This driver supports STMicroelectronics STM32 VREFBUF (voltage
-+	  reference buffer) which can be used as voltage reference for
-+	  internal ADCs, DACs and also for external components through
-+	  dedicated Vref+ pin.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called stm32-vrefbuf.
-+
- config REGULATOR_TI_ABB
- 	tristate "TI Adaptive Body Bias on-chip LDO"
- 	depends on ARCH_OMAP
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index dc3503f..d8caceb 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -92,6 +92,7 @@ obj-$(CONFIG_REGULATOR_S2MPA01) += s2mpa01.o
- obj-$(CONFIG_REGULATOR_S2MPS11) += s2mps11.o
- obj-$(CONFIG_REGULATOR_S5M8767) += s5m8767.o
- obj-$(CONFIG_REGULATOR_SKY81452) += sky81452-regulator.o
-+obj-$(CONFIG_REGULATOR_STM32_VREFBUF) += stm32-vrefbuf.o
- obj-$(CONFIG_REGULATOR_STW481X_VMMC) += stw481x-vmmc.o
- obj-$(CONFIG_REGULATOR_TI_ABB) += ti-abb-regulator.o
- obj-$(CONFIG_REGULATOR_TPS6105X) += tps6105x-regulator.o
-diff --git a/drivers/regulator/stm32-vrefbuf.c b/drivers/regulator/stm32-vrefbuf.c
+diff --git a/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt b/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
 new file mode 100644
-index 0000000..a4efa3b
+index 0000000..3944ee3
 --- /dev/null
-+++ b/drivers/regulator/stm32-vrefbuf.c
-@@ -0,0 +1,215 @@
-+/*
-+ * Copyright (C) STMicroelectronics 2017
-+ *
-+ * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
-+ *
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
++++ b/Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
+@@ -0,0 +1,20 @@
++STM32 VREFBUF - Voltage reference buffer
 +
-+#include <linux/bitfield.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/of_regulator.h>
++Some STM32 devices embed a voltage reference buffer which can be used as
++voltage reference for ADCs, DACs and also as voltage reference for external
++components through the dedicated VREF+ pin.
 +
-+/* STM32 VREFBUF registers */
-+#define STM32_VREFBUF_CSR		0x00
++Required properties:
++- compatible:		Must be "st,stm32-vrefbuf".
++- reg:			Offset and length of VREFBUF register set.
++- clocks:		Must contain an entry for peripheral clock.
 +
-+/* STM32 VREFBUF CSR bitfields */
-+#define STM32_VRS			GENMASK(6, 4)
-+#define STM32_VRR			BIT(3)
-+#define STM32_HIZ			BIT(1)
-+#define STM32_ENVR			BIT(0)
-+
-+struct stm32_vrefbuf {
-+	void __iomem *base;
-+	struct clk *clk;
-+};
-+
-+static const unsigned int stm32_vrefbuf_voltages[] = {
-+	/* Matches resp. VRS = 000b, 001b, 010b, 011b */
-+	2500000, 2048000, 1800000, 1500000,
-+};
-+
-+static int stm32_vrefbuf_enable(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+	int ret;
-+
-+	val = (val & ~STM32_HIZ) | STM32_ENVR;
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	/*
-+	 * Vrefbuf startup time depends on external capacitor: wait here for
-+	 * VRR to be set. That means output has reached expected value.
-+	 * ~650us sleep should be enough for caps up to 1.5uF. Use 10ms as
-+	 * arbitrary timeout.
-+	 */
-+	ret = readl_poll_timeout(priv->base + STM32_VREFBUF_CSR, val,
-+				 !(val & STM32_VRR), 650, 10000);
-+	if (ret) {
-+		dev_err(&rdev->dev, "stm32 vrefbuf timed out!\n");
-+		val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+		val = (val & ~STM32_ENVR) | STM32_HIZ;
-+		writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+	}
-+
-+	return ret;
-+}
-+
-+static int stm32_vrefbuf_disable(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	val = (val & ~STM32_ENVR) | STM32_HIZ;
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	return 0;
-+}
-+
-+static int stm32_vrefbuf_is_enabled(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+
-+	return readl_relaxed(priv->base + STM32_VREFBUF_CSR) & STM32_ENVR;
-+}
-+
-+static int stm32_vrefbuf_set_voltage_sel(struct regulator_dev *rdev,
-+					 unsigned sel)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	val = (val & ~STM32_VRS) | FIELD_PREP(STM32_VRS, sel);
-+	writel_relaxed(val, priv->base + STM32_VREFBUF_CSR);
-+
-+	return 0;
-+}
-+
-+static int stm32_vrefbuf_get_voltage_sel(struct regulator_dev *rdev)
-+{
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+	u32 val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
-+
-+	return FIELD_GET(STM32_VRS, val);
-+}
-+
-+static const struct regulator_ops stm32_vrefbuf_volt_ops = {
-+	.enable		= stm32_vrefbuf_enable,
-+	.disable	= stm32_vrefbuf_disable,
-+	.is_enabled	= stm32_vrefbuf_is_enabled,
-+	.get_voltage_sel = stm32_vrefbuf_get_voltage_sel,
-+	.set_voltage_sel = stm32_vrefbuf_set_voltage_sel,
-+	.list_voltage	= regulator_list_voltage_table,
-+};
-+
-+static const struct regulator_desc stm32_vrefbuf_regu = {
-+	.name = "vref",
-+	.supply_name = "vdda",
-+	.volt_table = stm32_vrefbuf_voltages,
-+	.n_voltages = ARRAY_SIZE(stm32_vrefbuf_voltages),
-+	.ops = &stm32_vrefbuf_volt_ops,
-+	.type = REGULATOR_VOLTAGE,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int stm32_vrefbuf_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct stm32_vrefbuf *priv;
-+	struct regulator_config config = { };
-+	struct regulator_dev *rdev;
-+	int ret;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->base))
-+		return PTR_ERR(priv->base);
-+
-+	priv->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(priv->clk))
-+		return PTR_ERR(priv->clk);
-+
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "clk prepare failed\n");
-+		return ret;
-+	}
-+
-+	config.dev = &pdev->dev;
-+	config.driver_data = priv;
-+	config.of_node = pdev->dev.of_node;
-+	config.init_data = of_get_regulator_init_data(&pdev->dev,
-+						      pdev->dev.of_node,
-+						      &stm32_vrefbuf_regu);
-+
-+	rdev = regulator_register(&stm32_vrefbuf_regu, &config);
-+	if (IS_ERR(rdev)) {
-+		dev_err(&pdev->dev, "vrefbuf register failed\n");
-+		ret = PTR_ERR(rdev);
-+		goto err_clk_dis;
-+	}
-+	platform_set_drvdata(pdev, rdev);
-+
-+	dev_info(&pdev->dev, "STM32 VREFBUF initialized\n");
-+
-+	return 0;
-+
-+err_clk_dis:
-+	clk_disable_unprepare(priv->clk);
-+
-+	return ret;
-+}
-+
-+static int stm32_vrefbuf_remove(struct platform_device *pdev)
-+{
-+	struct regulator_dev *rdev = platform_get_drvdata(pdev);
-+	struct stm32_vrefbuf *priv = rdev_get_drvdata(rdev);
-+
-+	regulator_unregister(rdev);
-+	clk_disable_unprepare(priv->clk);
-+
-+	return 0;
-+};
-+
-+static const struct of_device_id stm32_vrefbuf_of_match[] = {
-+	{ .compatible = "st,stm32-vrefbuf", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stm32_vrefbuf_of_match);
-+
-+static struct platform_driver stm32_vrefbuf_driver = {
-+	.probe = stm32_vrefbuf_probe,
-+	.remove = stm32_vrefbuf_remove,
-+	.driver = {
-+		.name  = "stm32-vrefbuf",
-+		.of_match_table = of_match_ptr(stm32_vrefbuf_of_match),
-+	},
-+};
-+
-+static int __init stm32_vrefbuf_init(void)
-+{
-+	return platform_driver_register(&stm32_vrefbuf_driver);
-+}
-+subsys_initcall(stm32_vrefbuf_init);
-+
-+static void __exit stm32_vrefbuf_exit(void)
-+{
-+	platform_driver_unregister(&stm32_vrefbuf_driver);
-+}
-+module_exit(stm32_vrefbuf_exit)
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 VREFBUF driver");
-+MODULE_ALIAS("platform:stm32-vrefbuf");
++Example:
++	vrefbuf: regulator at 58003C00 {
++		compatible = "st,stm32-vrefbuf";
++		reg = <0x58003C00 0x8>;
++		clocks = <&rcc VREF_CK>;
++		regulator-min-microvolt = <1500000>;
++		regulator-max-microvolt = <2500000>;
++		vdda-supply = <&vdda>;
++	};
 -- 
 1.9.1
