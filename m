@@ -1,91 +1,75 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Wed, 12 Jul 2017 11:51:44 -0500
-Subject: [PATCH] pinctrl: st: constify gpio_chip structure
-In-Reply-To: <c0a35f14-7c22-63f9-8bfa-2d88b5800fbd@st.com>
-References: <20170711181519.GA20001@embeddedgus>
- <c0a35f14-7c22-63f9-8bfa-2d88b5800fbd@st.com>
-Message-ID: <20170712115144.Horde.FbWJCF3tLLNmzrIfChEYUVc@gator4166.hostgator.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Jul 2017 18:54:42 +0200
+Subject: [PATCH 0/6] Macchiatobin updates
+In-Reply-To: <20170708191317.GM4902@n2100.armlinux.org.uk> (Russell King's
+ message of "Sat, 8 Jul 2017 20:13:17 +0100")
+References: <20170708191317.GM4902@n2100.armlinux.org.uk>
+Message-ID: <87fue1bnot.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice,
+Hi Russell King,
+ 
+ On sam., juil. 08 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-Quoting Patrice CHOTARD <patrice.chotard@st.com>:
-
-> Hi Gustavo
+> This series, based upon the 4.12-rc6 backports branch in the MISL tree:
+> - adds a maintainer entry for the Macchiatobin board.
+> - adds GPIO interrupt support to the CP110s
+> - adds the pinmux entries
+> - corrects the 5V regulator GPIO entry
+> - adds support for the I2C mux (used for the SFP slots)
+> - adds PCIe support
 >
-> On 07/11/2017 08:15 PM, Gustavo A. R. Silva wrote:
->> This structure is only used to copy into other structure, so declare
->> it as const.
->>
->> This issue was detected using Coccinelle and the following semantic patch:
->>
->> @r disable optional_qualifier@
->> identifier i;
->> position p;
->> @@
->> static struct gpio_chip i at p = { ... };
->>
->> @ok@
->> identifier r.i;
->> expression e;
->> position p;
->> @@
->> e = i at p;
->>
->> @bad@
->> position p != {r.p,ok.p};
->> identifier r.i;
->> struct gpio_chip e;
->> @@
->> e at i@p
->>
->> @depends on !bad disable optional_qualifier@
->> identifier r.i;
->> @@
->> static
->> +const
->>   struct gpio_chip i = { ... };
->>
->> In the following log you can see a significant difference in the code size
->> and data segment, hence in the dec segment. This log is the output
->> of the size command, before and after the code change:
->>
->> before:
->>     text    data     bss     dec     hex filename
->>    21671    3632     128   25431    6357 drivers/pinctrl/pinctrl-st.o
->>
->> after:
->>     text    data     bss     dec     hex filename
->>    21366    3576     128   25070    61ee drivers/pinctrl/pinctrl-st.o
->>
->> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
->> ---
->>   drivers/pinctrl/pinctrl-st.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
->> index 3ae8066..5d4789d 100644
->> --- a/drivers/pinctrl/pinctrl-st.c
->> +++ b/drivers/pinctrl/pinctrl-st.c
->> @@ -1442,7 +1442,7 @@ static void st_gpio_irqmux_handler(struct  
->> irq_desc *desc)
->>   	chained_irq_exit(chip, desc);
->>   }
->>
->> -static struct gpio_chip st_gpio_template = {
->> +static const struct gpio_chip st_gpio_template = {
->>   	.request		= gpiochip_generic_request,
->>   	.free			= gpiochip_generic_free,
->>   	.get			= st_gpio_get,
->>
+> All entries include the appropriate pinmux and GPIO configuration.
 >
-> Acked-by: Patrice Chotard <patrice.chotard@st.com>
+> PCIe support has not been tested locally as I have no PCIe cards to
+> test with; this patch includes support for the PCIe reset GPIO signal.
+> If others can test that patch and let me know whether it works, I would
+> be most grateful.
 >
-> Thanks
 
-Glad to help. :)
+The first patch had been applied on mvebu/arm64-for-4.14.
 
-Thanks
---
-Gustavo A. R. Silva
+Patch 2 to 6 had been applied on mvebu/dt64-for-4.14.
+
+For the patch 4, I merged it with the patch that Thomas previously sent
+because it was not in mainline yet even if it was on the backport
+branch. The resulting patch is attached.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-arm64-dts-marvell-fix-USB3-regulator-definition-on-M.patch
+Type: text/x-diff
+Size: 2133 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170712/7c7ddc27/attachment.bin>
+-------------- next part --------------
+
+
+Finally I tested the last patch with an Ethernet PCIe card it worked
+well, but the reset part was not tested as I don't know how it should be
+tested.
+
+As soon as the v4.13-rc1 will be released then the branches will be rebased
+on it and renamed mvebu/arm64 and mvebu/dt64.
+
+Thanks,
+
+Gregory
+
+
+>  MAINTAINERS                                        |  6 ++
+>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 89 +++++++++++++++++++++-
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      | 11 ++-
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 11 ++-
+>  4 files changed, 112 insertions(+), 5 deletions(-)
+>
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
