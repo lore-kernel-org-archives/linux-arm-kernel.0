@@ -1,24 +1,27 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 12 Jul 2017 16:27:34 +0530
-Subject: [RESEND PATCH] bus: omap-ocp2scp: Fix error handling in
- omap_ocp2scp_probe
-In-Reply-To: <20170712092616.GC16509@atomide.com>
-References: <20170711101638.2233-1-kishon@ti.com>
- <20170712092616.GC16509@atomide.com>
-Message-ID: <7291e53a-cc06-0056-9f50-50d3c35fba31@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 12 Jul 2017 13:20:07 +0200
+Subject: [PATCH 1/3] dt-bindings: mmc: sh_mmcif: Document r8a7743 DT
+ bindings
+In-Reply-To: <1499853805-5915-2-git-send-email-chris.paterson2@renesas.com>
+References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
+ <1499853805-5915-2-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <CAMuHMdX0TZ7KKzGDq8t2jMwMciEf30KKW2tE5fieqJ2D7+feqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 12, 2017 at 12:03 PM, Chris Paterson
+<chris.paterson2@renesas.com> wrote:
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-On Wednesday 12 July 2017 02:56 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [170711 03:17]:
->> The error handling code in omap_ocp2scp_probe fails to invoke
->> pm_runtime_disable and fails to initialize return value in
->> certain cases. Fix it here.
-> 
-> Applying into omap-for-v4.13/fixes thanks.
+Gr{oetje,eeting}s,
 
-Thanks!
+                        Geert
 
--Kishon
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
