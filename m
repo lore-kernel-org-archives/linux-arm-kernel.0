@@ -1,150 +1,92 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 12 Jul 2017 00:04:14 -0400
-Subject: [PATCH V4] PCI: Add Extended Tags quirk for Broadcom HT2100 Root Port
-Message-ID: <1499832255-9845-1-git-send-email-okaya@codeaurora.org>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 12 Jul 2017 07:04:46 +0200
+Subject: [PATCH 0/3] USB Mux support for Chipidea
+In-Reply-To: <20170712010255.26855-1-stephen.boyd@linaro.org>
+References: <20170712010255.26855-1-stephen.boyd@linaro.org>
+Message-ID: <fc1f2836-cd9b-0905-21fc-d2d3029d1f52@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All PCIe devices are expected to be able to handle 8-bit tags.
-'commit 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")'
-enabled extended tags for all devices based on the spec direction.
+On 2017-07-12 03:02, Stephen Boyd wrote:
+> This patchset adds support for the TC7USB40MU usb mux found on 
+> db410c 96boards platforms via the new multiplexer framework and
+> hooks that into the chipidea driver. This allows us to properly
+> control host or device mode on this board via the sysfs knob.
+> 
+> So far I've only tested this on db410c, and there are some rough
+> edges to finish off before it can merge. Also I'm experiencing
+> odd behavior with switching the role while gadget is enabled and
+> the micro-usb cable is kept connected. Not sure what's wrong but
+> it seems like the gadget never gets disconnected? I'll investigate
+> more.
+> 
+> TODO:
+> 
+>  1. The mux framework has to be selected for consumers to use it. We'll
+>     need some stubs in the consumer header file to allow compilation to
+>     continue without mux always enabled by consumers.
 
-The Broadcom HT2100 seems to be having issues with handling
-8-bit tags. Mark it as broken.
+Instead of "depends on MULTIPLEXER", just add "select MULTIPLEXER"
+to the Kconfig. Otherwise, you'll have to convince Linus that we
+really do need a Kconfig question for the subsystem :-)
 
-If a device with extended tags quirk is found, disable extended tags for
-all devices in the tree assuming peer-to-peer is possible.
+https://lkml.org/lkml/2017/7/4/118
 
-The pci_walk_bus() in the quirk handles all devices we've already
-enumerated, and all devices we'll enumerate in the future are handled in
-pci_configure_device().
+>  2. We probably need some sort of mux_control_get_optional() API so that
+>     we know if there was an error getting the mux control, instead of just
+>     ignoring errors. For now I can pass up EPROBE_DEFER errors and ignore
+>     other errors and consider it "missing from DT".
 
-Reported-by: Wim ten Have <wim.ten.have@oracle.com>
-Link: https://bugzilla.redhat.com/show_bug.cgi?id=1467674
-Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pci.h    |  1 +
- drivers/pci/probe.c  | 35 ++++++++++++++++++++++++++++++-----
- drivers/pci/quirks.c | 19 +++++++++++++++++++
- include/linux/pci.h  |  1 +
- 4 files changed, 51 insertions(+), 5 deletions(-)
+Yes, mux_control_get_optional should be easy to add.
 
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index f8113e5..7153c92 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -239,6 +239,7 @@ enum pci_bar_type {
- 	pci_bar_mem64,		/* A 64-bit memory BAR */
- };
- 
-+int pci_configure_extended_tags(struct pci_dev *dev, void *ign);
- bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *pl,
- 				int crs_timeout);
- int pci_setup_device(struct pci_dev *dev);
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 19c8950..bc067fb 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1684,22 +1684,47 @@ static void program_hpp_type2(struct pci_dev *dev, struct hpp_type2 *hpp)
- 	 */
- }
- 
--static void pci_configure_extended_tags(struct pci_dev *dev)
-+int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
- {
-+	struct pci_host_bridge *host;
- 	u32 dev_cap;
- 	int ret;
-+	u16 ctl;
- 
- 	if (!pci_is_pcie(dev))
--		return;
-+		return 0;
- 
- 	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &dev_cap);
- 	if (ret)
--		return;
-+		return 0;
-+
-+	if (!(dev_cap & PCI_EXP_DEVCAP_EXT_TAG))
-+		return 0;
-+
-+	ret = pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
-+	if (ret)
-+		return 0;
-+
-+	host = pci_find_host_bridge(dev->bus);
-+	if (!host)
-+		return 0;
- 
--	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
-+	if (host->broken_ext_tags) {
-+		if (ctl & PCI_EXP_DEVCTL_EXT_TAG) {
-+			dev_info(&dev->dev, "disabling Extended Tags\n");
-+			pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
-+						   PCI_EXP_DEVCTL_EXT_TAG);
-+		}
-+		return 0;
-+	}
-+	if (!(ctl & PCI_EXP_DEVCTL_EXT_TAG)) {
-+		dev_info(&dev->dev, "enabling Extended Tags\n");
- 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
- 					 PCI_EXP_DEVCTL_EXT_TAG);
-+	}
-+	return 0;
- }
-+EXPORT_SYMBOL(pci_configure_extended_tags);
- 
- static void pci_configure_device(struct pci_dev *dev)
- {
-@@ -1707,7 +1732,7 @@ static void pci_configure_device(struct pci_dev *dev)
- 	int ret;
- 
- 	pci_configure_mps(dev);
--	pci_configure_extended_tags(dev);
-+	pci_configure_extended_tags(dev, NULL);
- 
- 	memset(&hpp, 0, sizeof(hpp));
- 	ret = pci_get_hp_params(dev, &hpp);
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 085fb78..b5dc99c 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -4664,3 +4664,22 @@ static void quirk_intel_no_flr(struct pci_dev *dev)
- }
- DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1502, quirk_intel_no_flr);
- DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1503, quirk_intel_no_flr);
-+
-+static void quirk_exttags_completer(struct pci_dev *pdev)
-+{
-+	struct pci_host_bridge *bridge = pci_find_host_bridge(pdev->bus);
-+
-+	if (!bridge)
-+		return;
-+
-+	bridge->broken_ext_tags = 1;
-+	dev_info(&pdev->dev, "Extended Tag handling is broken\n");
-+
-+	pci_walk_bus(bridge->bus, pci_configure_extended_tags, NULL);
-+}
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0140,
-+			quirk_exttags_completer);
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0142,
-+			quirk_exttags_completer);
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0144,
-+			quirk_exttags_completer);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 8039f9f..2b22c3e 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -441,6 +441,7 @@ struct pci_host_bridge {
- 	void *release_data;
- 	struct msi_controller *msi;
- 	unsigned int ignore_reset_delay:1;	/* for entire hierarchy */
-+	unsigned int broken_ext_tags:1;
- 	/* Resource alignment requirements */
- 	resource_size_t (*align_resource)(struct pci_dev *dev,
- 			const struct resource *res,
--- 
-1.9.1
+>  3. Maybe we can get rid of the mux driver and just use mux-gpio.c with
+>     a compatible string update? I split it off because we may want to
+>     support the "S" pin on the TC7USB40MU one day that shuts off both
+>     mux outputs.
+
+Maybe no need for a compatible update either, if it works to do something
+like this in the DT?
+
+	usb_switch: usb-switch {
+		compatible = "gpio-mux";
+		mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>,
+			    <&pm8916_gpios XXX GPIO_ACTIVE_XXX>;
+		idle-state = <2>;
+		#mux-control-cells = <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&usb_sw_sel_pm>;
+	};
+
+But I obviously know little about how things are wired and really works,
+so that might be totally off...
+
+Otherwise, maybe a generic mux-pinctrl driver would do the trick?
+(compare with drivers/i2c/muxes/i2c-mux-pinctrl.c)
+
+Cheers,
+peda
+
+>  4. The userspace side of things is murky. What is expected to go and toggle
+>     the host/gadget side of things in userspace at this very specific location
+>     for chipidea devices?
+> 
+> Stephen Boyd (3):
+>   usb: misc: Add a driver for TC7USB40MU
+>   usb: chipidea: Hook into mux framework to toggle usb switch
+>   arm64: dts: qcom: Collapse usb support into one node
+> 
+>  .../devicetree/bindings/usb/ci-hdrc-usb2.txt       |  8 +++
+>  .../devicetree/bindings/usb/toshiba,tc7usb40mu.txt | 31 +++++++++
+>  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          | 39 +++++++-----
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi              | 62 +++++++++---------
+>  drivers/usb/chipidea/core.c                        | 17 +++++
+>  drivers/usb/chipidea/host.c                        | 10 +++
+>  drivers/usb/chipidea/udc.c                         | 11 ++++
+>  drivers/usb/misc/Kconfig                           | 11 ++++
+>  drivers/usb/misc/Makefile                          |  1 +
+>  drivers/usb/misc/tc7usb40mu.c                      | 74 ++++++++++++++++++++++
+>  include/linux/usb/chipidea.h                       | 14 ++++
+>  11 files changed, 228 insertions(+), 50 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/toshiba,tc7usb40mu.txt
+>  create mode 100644 drivers/usb/misc/tc7usb40mu.c
+> 
