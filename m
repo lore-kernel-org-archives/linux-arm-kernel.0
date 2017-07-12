@@ -1,85 +1,71 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Wed, 12 Jul 2017 17:16:29 +0800
-Subject: [PATCH 2/4] arm64: dts: rockchip: add ARM Mali GPU node for
- RK3399 SoCs
-In-Reply-To: <4066931.s766IOqHgB@phil>
-References: <1499840971-20392-1-git-send-email-wxt@rock-chips.com>
- <1499840971-20392-3-git-send-email-wxt@rock-chips.com>
- <4066931.s766IOqHgB@phil>
-Message-ID: <3c3a2e24-7cb1-dc31-6532-1d6182bdf3ee@gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 12 Jul 2017 11:21:58 +0200
+Subject: [PATCH 09/16] drm/rockchip: Use for_each_oldnew_plane_in_state
+ in vop_crtc_atomic_flush
+In-Reply-To: <20170712081344.25495-10-maarten.lankhorst@linux.intel.com>
+References: <20170712081344.25495-1-maarten.lankhorst@linux.intel.com>
+ <20170712081344.25495-10-maarten.lankhorst@linux.intel.com>
+Message-ID: <20170712092158.44xm7fkrskcdtfs4@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017?07?12? 15:19, Heiko Stuebner ??:
-> Hi Caesar,
->
-> Am Mittwoch, 12. Juli 2017, 14:29:28 CEST schrieb Caesar Wang:
->> Add Mali GPU device tree node for the RK3399 SoCs, with devfreq
->> opp table.
->>
->> RK3399 and RK3399-OP1 SoCs have a different recommendation table with
->> gpu opp. As the ARM's mali driver found on
->> https://developer.arm.com/products/software/mali-drivers/midgard-kernel.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> ---
->>
->>   arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi | 33 ++++++++++++++++++++++++
->>   arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi     | 33 ++++++++++++++++++++++++
->>   arch/arm64/boot/dts/rockchip/rk3399.dtsi         | 16 ++++++++++++
->>   3 files changed, 82 insertions(+)
-> [...]
->
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> index 1cbd7a2..8c6438b 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -1443,6 +1443,22 @@
->>   		status = "disabled";
->>   	};
->>   
->> +	gpu: gpu at ff9a0000 {
->> +		compatible = "arm,rk3399-mali",
->> +			     "arm,malit860",
->> +			     "arm,malit86x",
->> +			     "arm,malit8xx";
-> no wildcards and correct compatibles please.
-> The binding specifies arm,mali-t860 for your chip and the soc
-> specific compatible needs a rockchip vendor, so you need
->
-> 	compatible = "rockchip,rk3399-mali", "arm,mali-t860";
->
+On Wed, Jul 12, 2017 at 10:13:37AM +0200, Maarten Lankhorst wrote:
+> for_each_obj_in_state is about to be removed, so use the new atomic
+> iterator macros.
+> 
+> Signed-off-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+> Cc: Mark Yao <mark.yao@rock-chips.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index ee876a9631f0..f90088b1a247 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -1029,7 +1029,7 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
+>  				  struct drm_crtc_state *old_crtc_state)
+>  {
+>  	struct drm_atomic_state *old_state = old_crtc_state->state;
+> -	struct drm_plane_state *old_plane_state;
+> +	struct drm_plane_state *old_plane_state, *new_plane_state;
+>  	struct vop *vop = to_vop(crtc);
+>  	struct drm_plane *plane;
+>  	int i;
+> @@ -1060,11 +1060,12 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
+>  	}
+>  	spin_unlock_irq(&crtc->dev->event_lock);
+>  
+> -	for_each_plane_in_state(old_state, plane, old_plane_state, i) {
+> +	for_each_oldnew_plane_in_state(old_state, plane, old_plane_state,
+> +				       new_plane_state, i) {
+>  		if (!old_plane_state->fb)
+>  			continue;
+>  
+> -		if (old_plane_state->fb == plane->state->fb)
+> +		if (old_plane_state->fb == new_plane_state->fb)
+>  			continue;
 
-Okay,  sound resonable.
+This entire machinery here seems to be the perfect candidate for Boris'
+wait_for_flip_done work.
 
->> +		reg = <0x0 0xff9a0000 0x0 0x10000>;
->> +		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH 0>,
->> +			     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH 0>,
->> +			     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH 0>;
->> +		interrupt-names = "GPU", "JOB", "MMU";
-> interrupt names are job, mmu, gpu in lower case. The out-of-tree driver
-> will need to conform to that.
+Patch itself looks good.
 
-Okay, we need update the ARM's mali driver to follow up.
-
->> +		clocks = <&cru ACLK_GPU>;
->> +		clock-names = "clk_mali";
-> no clock-names property, as midgard malis only have one clock input
-
-Sorry, I seem to be reference for the MAILI's document, not the Linux 
-document.
-
-Update these for patches v2.
-
-Thanks your comments.
-
--Caesar
-
->
-> Heiko
->
->
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+>  
+>  		drm_framebuffer_reference(old_plane_state->fb);
+> -- 
+> 2.11.0
+> 
 > _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
