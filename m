@@ -1,49 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Jul 2017 13:23:11 +0200
-Subject: [PATCH] ARM: dts: armada-38x: Fix irq type for pca955
-Message-ID: <20170712112311.922-1-gregory.clement@free-electrons.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 12 Jul 2017 13:25:11 +0200
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <20170712100942.GF1679@vireshk-i7>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+ <20170629143432.GM29665@vireshk-i7>
+ <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+ <20170711102514.GC17115@vireshk-i7>
+ <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
+ <20170712034150.GD17115@vireshk-i7>
+ <9476e8ee-24ae-1676-067b-18a867892894@free.fr>
+ <20170712100942.GF1679@vireshk-i7>
+Message-ID: <19d1613b-aea0-1ddf-e5b4-11e027402de1@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As written in the datasheet the PCA955 can only handle low level irq and
-not edge irq.
+On 12/07/2017 12:09, Viresh Kumar wrote:
+> On 12-07-17, 11:58, Mason wrote:
+>> I would object to the characterization of "just a PLL" :-)
+>>
+>> The PLL outputs "garbage" before actually "locking" a target
+>> frequency. It is not possible for the CPU to blindly change
+>> the PLL settings, because that crashes the system.
+>>
+>> The bootloader implements the steps required to change said
+>> settings, so the strategy has been: have Linux use whatever
+>> PLL frequency the bootloader programs.
+>>
+>> Behind the PLL, there is a glitch-free divider, which is able
+>> to divide the PLL output without crashing the system. I've
+>> been using that divider for DFS.
+>>
+>> drivers/clk/clk-tango4.c
+> 
+> Okay, got it now.
+> 
+> Yes, you *really* need to create these OPPs dynamically.
+> I am convinced now :)
 
-Without this fix the interrupt is not usable for pca955: the gpio-pca953x
-driver already set the irq type as low level which is incompatible with
-edge type, then the kernel prevents using the interrupt:
+I will test your patch on my 4.9 branch.
 
-"irq: type mismatch, failed to map hwirq-18 for
-/soc/internal-regs/gpio at 18100!"
+Does tango-cpufreq.c look acceptable to you?
+(I am aware the patch needs work in the the Kconfig/Makefile part.
+That was quick and dirty.)
 
-Fixes: 928413bd859c ("ARM: mvebu: Add Armada 388 General Purpose
-Development Board support")
-Cc: stable at vger.kernel.org
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 895fa6cfa15a..563901e0ec07 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -75,7 +75,7 @@
- 					pinctrl-names = "default";
- 					pinctrl-0 = <&pca0_pins>;
- 					interrupt-parent = <&gpio0>;
--					interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
-+					interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
- 					gpio-controller;
- 					#gpio-cells = <2>;
- 					interrupt-controller;
-@@ -87,7 +87,7 @@
- 					compatible = "nxp,pca9555";
- 					pinctrl-names = "default";
- 					interrupt-parent = <&gpio0>;
--					interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
-+					interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
- 					gpio-controller;
- 					#gpio-cells = <2>;
- 					interrupt-controller;
--- 
-2.13.2
+Regards.
