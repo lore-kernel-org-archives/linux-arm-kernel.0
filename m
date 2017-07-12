@@ -1,44 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 12 Jul 2017 13:52:49 +0200
-Subject: [PATCH 3/3] ARM: dts: iwg20m: Add MMCIF0 support
-In-Reply-To: <1499853805-5915-4-git-send-email-chris.paterson2@renesas.com>
-References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
- <1499853805-5915-4-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAMuHMdXMFkXopGiLOVf0jDDQTKig-wFrgMOKrf14341h85kPNw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Jul 2017 13:59:52 +0200
+Subject: [PATCH V4 0/7] pinctrl: imx: add imx7ulp pinctrl support
+In-Reply-To: <AM3PR04MB306A0A86603EF133C37852480D60@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
+ <AM3PR04MB306A0A86603EF133C37852480D60@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <CACRpkdbeqiGJAD5idGPJXpN2VEnOVnExzHripnfFwaneRHAuGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Mon, Jul 3, 2017 at 12:36 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
 
-On Wed, Jul 12, 2017 at 12:03 PM, Chris Paterson
-<chris.paterson2@renesas.com> wrote:
-> Define the iwg20m board dependent part of the MMCIF0 device node.
+> Is the series got missed?
 >
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> I saw you only picked the revised patch 1.
 >
-> diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-> index 001ca91..ffce1b6 100644
-> --- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-> +++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+> Or do I need resend it?
 
-> +&pfc {
-> +       mmcif0_pins: mmc {
-> +               groups = "mmc_data8", "mmc_ctrl";
+Can you please:
 
-"mmc_data8" is not correct, as D6/D7 of the eMMC are not connected to GP6_28
-resp. GP6_29, but to GP6_6 resp. GP6_7.
-So it should be "mmc_data8_b".
+- Rebase on v4.13-rc1 once it is out
 
-Unfortunately the latter pin group isn't supported by the PFC driver yet.
-Cooking a patch...
+- Include the explicit ACKs from Shawn and Stephan Agner on
+  the patches, also make sure all patches have ACKs.
 
-Gr{oetje,eeting}s,
+I am sorry if I missed it, it may be due to that I had a hard time
+to see which patches were ACKed and not.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
