@@ -1,156 +1,189 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 12 Jul 2017 11:43:39 -0700
-Subject: [PATCH v5 1/5] dt-bindings: gpu: add bindings for the ARM Mali
- Midgard GPU
-In-Reply-To: <1692483.PxpH1MfcPQ@diego>
-References: <cover.1493804968.git.guillaume.tucker@collabora.com>
- <bebe578ba130de5fa320ca7c6427b2fae83d61d7.1493804968.git.guillaume.tucker@collabora.com>
- <20170712172636.GA90759@google.com> <1692483.PxpH1MfcPQ@diego>
-Message-ID: <20170712184338.GA140539@google.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 12 Jul 2017 20:44:51 +0200
+Subject: [PATCH 4/4] arm64: dts: rockchip: update the thermal zones for
+ RK3399 SoCs
+In-Reply-To: <1499840971-20392-5-git-send-email-wxt@rock-chips.com>
+References: <1499840971-20392-1-git-send-email-wxt@rock-chips.com>
+ <1499840971-20392-5-git-send-email-wxt@rock-chips.com>
+Message-ID: <1962948.PJPnbPYrr4@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Caesar,
 
-On Wed, Jul 12, 2017 at 08:30:55PM +0200, Heiko Stuebner wrote:
-> Am Mittwoch, 12. Juli 2017, 10:26:39 CEST schrieb Brian Norris:
-> > On Wed, May 03, 2017 at 10:56:25AM +0100, Guillaume Tucker wrote:
-> > > The ARM Mali Midgard GPU family is present in a number of SoCs
-> > > from many different vendors such as Samsung Exynos and Rockchip.
-> > > 
-> > > Import the device tree bindings documentation from the r16p0
-> > > 
-> > > release of the Mali Midgard GPU kernel driver:
-> > >   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/ma
-> > >   li-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz> 
-> > > Remove the copyright and GPL licence header as deemed not necessary.
-> > > 
-> > > Redesign the "compatible" property strings to list all the Mali
-> > > Midgard GPU types and add vendor specific ones.
-> > > 
-> > > Drop the "clock-names" property as the Mali Midgard GPU uses only one
-> > > clock (the driver now needs to call clk_get with NULL).
-> > > 
-> > > Convert the "interrupt-names" property values to lower-case: "job",
-> > > "mmu" and "gpu".
-> > > 
-> > > Replace the deprecated "operating-points" optional property with
-> > > "operating-points-v2".
-> > > 
-> > > Omit the following optional properties in this initial version as they
-> > > 
-> > > are only used in very specific cases:
-> > >   * snoop_enable_smc
-> > >   * snoop_disable_smc
-> > >   * jm_config
-> > >   * power_model
-> > >   * system-coherency
-> > >   * ipa-model
-> > > 
-> > > Update the example accordingly to reflect all these changes, based on
-> > > rk3288 mali-t760.
-> > > 
-> > > CC: John Reitan <john.reitan@arm.com>
-> > > Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> > > Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
-> > > ---
-> > > 
-> > >  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 86
-> > >  ++++++++++++++++++++++ 1 file changed, 86 insertions(+)
-> > >  create mode 100644
-> > >  Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt> 
-> > > diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
-> > > b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt new file
-> > > mode 100644
-> > > index 000000000000..d3b6e1a4713a
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
-> > 
-> > ^^ This file name implies we're talking about a base "arm,mali-midgard"
-> > compatible property.
+Am Mittwoch, 12. Juli 2017, 14:29:30 CEST schrieb Caesar Wang:
+> As RK3399 had used the Power allocator thermal governor by default,
+> enabled this to manage thermals by dynamically allocating and limiting
+> power to devices.
+
+Does this still run with other thermal governors? The devicetree describes
+the hardware, but should not mandate or exclude specific implementations.
+
+
+> Also, this patch supported the dynamic-power-coefficient/sustainable_power
+> and GPU's power model for needed parameters with thermal IPA.
+
+As written below, this doesn't look like a reviewed binding (otherwise
+please point me to the binding patch), but even if it is a real binding
+it should get its separate patch.
+
+
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 > 
-> it follows the precedent of arm,mali-utgard.txt and while the file-name
-> is not part of the compatible list, it feels way better collecting all the 
-> variants in one file, compared to spawning multiple ones for each soc
-> vendor using a mali gpu.
+> ---
 > 
-> Also in other places the naming of binding descriptions does not follow
-> any compatible at all, so the filename = main-compatible does not seem
-> to be the rule.
-
-Well, when they do get a name in the form of "<vendor>,<foo>.txt", the
-"<vendor>,<foo>" is usually at least *a* valid compatible string. For
-example, "nvidia,gk20a.txt" has several other strings, but its filename
-is one of the supported ones.
-
-Anyway, that wasn't my main worry. I was mostly curious about the body
-of the text.
-
-> > > @@ -0,0 +1,86 @@
-> > > +ARM Mali Midgard GPU
-> > > +====================
-> > > +
-> > > +Required properties:
-> > > +
-> > > +- compatible :
-> > > +  * Must contain one of the following:
-> > > +    + "arm,mali-t604"
-> > > +    + "arm,mali-t624"
-> > > +    + "arm,mali-t628"
-> > > +    + "arm,mali-t720"
-> > > +    + "arm,mali-t760"
-> > > +    + "arm,mali-t820"
-> > > +    + "arm,mali-t830"
-> > > +    + "arm,mali-t860"
-> > > +    + "arm,mali-t880"
-> > > +  * which must be preceded by one of the following vendor specifics:
-> > > +    + "amlogic,meson-gxm-mali"
-> > > +    + "rockchip,rk3288-mali"
-> > 
-> > But it's not listed here.
-> > 
-> > > +
-> > > +- reg : Physical base address of the device and length of the register
-> > > area. +
-> > > +- interrupts : Contains the three IRQ lines required by Mali Midgard
-> > > devices. +
-> > > +- interrupt-names : Contains the names of IRQ resources in the order they
-> > > were +  provided in the interrupts property. Must contain: "job", "mmu",
-> > > "gpu". +
-> > > +
-> > > +Optional properties:
-> > > +
-> > > +- clocks : Phandle to clock for the Mali Midgard device.
-> > > +
-> > > +- mali-supply : Phandle to regulator for the Mali device. Refer to
-> > > +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
-> > > +
-> > > +- operating-points-v2 : Refer to
-> > > Documentation/devicetree/bindings/power/opp.txt +  for details.
-> > > +
-> > > +
-> > > +Example for a Mali-T760:
-> > > +
-> > > +gpu at ffa30000 {
-> > > +	compatible = "rockchip,rk3288-mali", "arm,mali-t760",
-> > > "arm,mali-midgard";
-> > 
-> > And it *is* used here in this example.
-> > 
-> > So, should it be used/documented or not?
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 62 +++++++++++++++-----------------
+>  1 file changed, 29 insertions(+), 33 deletions(-)
 > 
-> No I don't think it should and have patches that drop the mali-midgard from
-> the example + rk3288 dtsi to not confuse people:
-> - https://patchwork.kernel.org/patch/9832811/
-> - https://patchwork.kernel.org/patch/9832807/
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 8c6438b..139f58c 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -147,7 +147,7 @@
+>  			enable-method = "psci";
+>  			#cooling-cells = <2>; /* min followed by max */
+>  			clocks = <&cru ARMCLKB>;
+> -			dynamic-power-coefficient = <100>;
+> +			dynamic-power-coefficient = <436>;
+>  		};
+>  
+>  		cpu_b1: cpu at 101 {
+> @@ -156,7 +156,7 @@
+>  			reg = <0x0 0x101>;
+>  			enable-method = "psci";
+>  			clocks = <&cru ARMCLKB>;
+> -			dynamic-power-coefficient = <100>;
+> +			dynamic-power-coefficient = <436>;
+>  		};
+>  	};
+>  
+> @@ -690,24 +690,25 @@
+>  	};
+>  
+>  	thermal_zones: thermal-zones {
+> -		cpu_thermal: cpu {
+> +		soc_thermal: soc-thermal {
+>  			polling-delay-passive = <100>;
+>  			polling-delay = <1000>;
+> +			sustainable-power = <1000>;
+>  
+>  			thermal-sensors = <&tsadc 0>;
+>  
+>  			trips {
+> -				cpu_alert0: cpu_alert0 {
+> +				threshold: trip-point at 0 {
 
-I didn't notice those. Thanks.
+foo at 0 will produce warnings when used without reg property. Also,
+why all that renaming, the previous names sounded fine to me.
 
-> Devicetree supposedly should not contain wildcards and without knowing
-> for real that all of then in fact are compatible we should not assume so
-> [and that's hard to check with all the secrecy :-) ] . Using the real name 
-> (tXXX) sounds nice enough.
 
-Fine with me.
+>  					temperature = <70000>;
+>  					hysteresis = <2000>;
+>  					type = "passive";
+>  				};
+> -				cpu_alert1: cpu_alert1 {
+> -					temperature = <75000>;
+> +				target: trip-point at 1 {
+> +					temperature = <85000>;
 
-Brian
+When raising the target-temperature to 85 degrees I really
+do expect some sort of reassurement in the commit message
+why that is really safe - especially when the old limit was 10 degrees
+lower.
+
+>  					hysteresis = <2000>;
+>  					type = "passive";
+>  				};
+> -				cpu_crit: cpu_crit {
+> +				soc_crit: soc-crit {
+>  					temperature = <95000>;
+>  					hysteresis = <2000>;
+>  					type = "critical";
+> @@ -716,45 +717,31 @@
+>  
+>  			cooling-maps {
+>  				map0 {
+> -					trip = <&cpu_alert0>;
+> +					trip = <&target>;
+>  					cooling-device =
+> -						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +						<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +					contribution = <4096>;
+>  				};
+>  				map1 {
+> -					trip = <&cpu_alert1>;
+> +					trip = <&target>;
+
+Is it correct to use the _same_ trip point all the time? ... what about
+the threshold and soc_crit ones?
+
+>  					cooling-device =
+> -						<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+>  						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +					contribution = <1024>;
+> +				};
+> +				map2 {
+> +					trip = <&target>;
+> +					cooling-device =
+> +						<&gpu THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +					contribution = <4096>;
+>  				};
+>  			};
+>  		};
+>  
+> -		gpu_thermal: gpu {
+> +		gpu_thermal: gpu-thermal {
+>  			polling-delay-passive = <100>;
+>  			polling-delay = <1000>;
+>  
+>  			thermal-sensors = <&tsadc 1>;
+> -
+> -			trips {
+> -				gpu_alert0: gpu_alert0 {
+> -					temperature = <75000>;
+> -					hysteresis = <2000>;
+> -					type = "passive";
+> -				};
+> -				gpu_crit: gpu_crit {
+> -					temperature = <95000>;
+> -					hysteresis = <2000>;
+> -					type = "critical";
+> -				};
+> -			};
+> -
+> -			cooling-maps {
+> -				map0 {
+> -					trip = <&gpu_alert0>;
+> -					cooling-device =
+> -						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> -				};
+> -			};
+>  		};
+>  	};
+>  
+> @@ -1455,8 +1442,17 @@
+>  		interrupt-names = "GPU", "JOB", "MMU";
+>  		clocks = <&cru ACLK_GPU>;
+>  		clock-names = "clk_mali";
+> +		#cooling-cells = <2>;
+>  		power-domains = <&power RK3399_PD_GPU>;
+>  		status = "disabled";
+> +
+> +		gpu_power_model: power_model {
+> +			compatible = "arm,mali-simple-power-model";
+
+Is this binding documented / reviewed somewhere? Because it looks
+quite suspcicious :-) .
+
+
+Heiko
+
+> +			static-coefficient = <1079403>;
+> +			dynamic-coefficient = <977>;
+> +			ts = <32000 4700 (-80) 2>;
+> +			thermal-zone = "gpu-thermal";
+> +		};
+>  	};
+>  
+>  	pinctrl: pinctrl {
+> 
