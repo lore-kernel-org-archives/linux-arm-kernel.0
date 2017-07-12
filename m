@@ -1,101 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 12 Jul 2017 15:06:11 +0800
-Subject: [PATCH v1 1/1] ARM: dts: imx6: RIoTboard provide gpio-line-names
-In-Reply-To: <20170620142830.5119-1-o.rempel@pengutronix.de>
-References: <20170620142830.5119-1-o.rempel@pengutronix.de>
-Message-ID: <20170712070609.GG3172@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 12 Jul 2017 12:48:02 +0530
+Subject: [RFC v2 4/6] drivers: boot_constraint: Add debugfs support
+In-Reply-To: <c52f57d42ec875da97acde84e5dbe86be5390f6c.1499770771.git.viresh.kumar@linaro.org>
+References: <cover.1499770771.git.viresh.kumar@linaro.org>
+ <c52f57d42ec875da97acde84e5dbe86be5390f6c.1499770771.git.viresh.kumar@linaro.org>
+Message-ID: <20170712071802.GA1679@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 04:28:30PM +0200, Oleksij Rempel wrote:
-> for each gpio controller
-
-Please write up a complete sentence.  If you can explain a bit why these
-names are useful would be better.
-
+On 12-07-17, 12:04, Viresh Kumar wrote:
+> This patch adds debugfs support for boot constraints. This is how it
+> looks for a "vmmc-supply" constraint for the MMC device.
 > 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> $ ls -R /sys/kernel/debug/boot_constraints/
+> /sys/kernel/debug/boot_constraints/:
+> f723d000.dwmmc0
+> 
+> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0:
+> supply-vmmc
+> 
+> /sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmc:
+> u_volt_max  u_volt_min
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm/boot/dts/imx6dl-riotboard.dts | 61 ++++++++++++++++++++++++++++++++++
->  1 file changed, 61 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> index 2cb72824e800..b9ecb3b3792a 100644
-> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> @@ -84,6 +84,67 @@
->  	};
->  };
->  
-> +&gpio1 {
-> +	gpio-line-names =
-> +		"", "", "[SD2_WP]", "", "[SD2_CD]", "I2C3_SCL",
-> +			"I2C3_SDA", "I2C4_SCL",
-> +		"I2C4_SDA", "", "", "", "", "", "", "",
-> +		"", "PWM3", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "";
-> +};
-> +
-> +&gpio2 {
-> +	gpio-line-names =
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "";
-> +};
-> +
-> +&gpio3 {
-> +	gpio-line-names =
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "[USB_OTG_VBUS]", "",
-> +		"UART3_TXD", "UART3_RXD", "", "", "[EIM_D28]", "", "", "";
-> +};
-> +
-> +&gpio4 {
-> +	gpio-line-names =
-> +		"", "", "", "", "", "", "UART4_TXD", "UART4_RXD",
-> +		"UART5_TXD", "UART5_RXD", "", "", "", "", "", "",
-> +		"GPIO4_16", "GPIO4_17", "GPIO4_18", "GPIO4_19", "",
-> +			"CSPI3_CLK", "CSPI3_MOSI", "CSPI3_MISO",
-> +		"CSPI3_CS0", "CSPI3_CS1", "GPIO4_26", "GPIO4_27",
-> +			"CSPI3_RDY", "PWM1", "PWM2", "GPIO4_31";
-> +};
-> +
-> +&gpio5 {
-> +	gpio-line-names =
-> +		"", "", "[EIM_A25]", "", "", "GPIO5_05", "GPIO5_06",
-> +			"GPIO5_07",
-> +		"GPIO5_08", "CSPI2_CS1", "CSPI2_MOSI", "CSPI2_MISO",
-> +			"CSPI2_CS0", "CSPI2_CLK", "", "",
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "";
-> +};
-> +
-> +&gpio6 {
-> +	gpio-line-names =
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "";
-> +};
-> +
-> +&gpio7 {
-> +	gpio-line-names =
-> +		"[SD3_CD]", "[SD3_WP]", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "",
-> +		"", "", "", "", "", "", "", "";
-> +};
-> +
->  &audmux {
+>  drivers/base/boot_constraint.c | 80 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 80 insertions(+)
 
-Please keep the new added nodes sorted alphabetically in label name.
+Forgot to mention that this one depends on
+https://marc.info/?l=linux-kernel&m=149870936319587 for compilation
+without CONFIG_DEBUG_FS.
 
-Shawn
-
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_audmux>;
-> -- 
-> 2.11.0
-> 
+--
+viresh
