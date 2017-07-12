@@ -1,116 +1,271 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Wed, 12 Jul 2017 18:28:11 +0200
-Subject: [RFC 2/3] net: macb: Add buffer descriptor names
-In-Reply-To: <1499876892-14423-1-git-send-email-ada@thorsis.com>
-References: <1499876892-14423-1-git-send-email-ada@thorsis.com>
-Message-ID: <1499876892-14423-3-git-send-email-ada@thorsis.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 12 Jul 2017 18:39:27 +0200
+Subject: [RFC PATCH v2] irqchip: Add support for tango interrupt router
+In-Reply-To: <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
+References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
+ <20170606175219.34ef62b9@free-electrons.com>
+ <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
+Message-ID: <dfb86360-2247-65bb-602b-5c21029709fd@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation of the EMAC buffer descriptor bitfields. Taken from the
-AT91SAM9G20 complete datasheet.
-
-Signed-off-by: Alexander Dahl <ada@thorsis.com>
+128 inputs, 24 outputs (to GIC SPI 0-23)
 ---
- drivers/net/ethernet/cadence/macb.h | 50 ++++++++++++++++++-------------------
- 1 file changed, 25 insertions(+), 25 deletions(-)
+There might be a few things wrong with this driver.
+When I cat /proc/interrupts the interrupt count appears
+to be bogus (as if level IRQ counts are added to edge
+IRQ counts). Did I mess something up with the IRQ domains?
+---
+ .../interrupt-controller/sigma,smp8759-intc.txt    |  18 ++
+ drivers/irqchip/Makefile                           |   2 +-
+ drivers/irqchip/irq-smp8759.c                      | 203 +++++++++++++++++++++
+ 3 files changed, 222 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
+ create mode 100644 drivers/irqchip/irq-smp8759.c
 
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 8547d92..567c72d 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -566,39 +566,39 @@ struct macb_dma_desc_64 {
- #define MACB_RX_WADDR_OFFSET			2
- #define MACB_RX_WADDR_SIZE			30
- 
--#define MACB_RX_FRMLEN_OFFSET			0
-+#define MACB_RX_FRMLEN_OFFSET			0  /* Length of frame */
- #define MACB_RX_FRMLEN_SIZE			12
--#define MACB_RX_OFFSET_OFFSET			12
-+#define MACB_RX_OFFSET_OFFSET			12 /* Receive buffer offset */
- #define MACB_RX_OFFSET_SIZE			2
--#define MACB_RX_SOF_OFFSET			14
-+#define MACB_RX_SOF_OFFSET			14 /* Start of frame */
- #define MACB_RX_SOF_SIZE			1
--#define MACB_RX_EOF_OFFSET			15
-+#define MACB_RX_EOF_OFFSET			15 /* End of frame */
- #define MACB_RX_EOF_SIZE			1
--#define MACB_RX_CFI_OFFSET			16
-+#define MACB_RX_CFI_OFFSET			16 /* Concatenation format indicator */
- #define MACB_RX_CFI_SIZE			1
--#define MACB_RX_VLAN_PRI_OFFSET			17
-+#define MACB_RX_VLAN_PRI_OFFSET			17 /* VLAN priority */
- #define MACB_RX_VLAN_PRI_SIZE			3
--#define MACB_RX_PRI_TAG_OFFSET			20
-+#define MACB_RX_PRI_TAG_OFFSET			20 /* Priority tag detected */
- #define MACB_RX_PRI_TAG_SIZE			1
--#define MACB_RX_VLAN_TAG_OFFSET			21
-+#define MACB_RX_VLAN_TAG_OFFSET			21 /* VLAN tag detected */
- #define MACB_RX_VLAN_TAG_SIZE			1
--#define MACB_RX_TYPEID_MATCH_OFFSET		22
-+#define MACB_RX_TYPEID_MATCH_OFFSET		22 /* Type ID match */
- #define MACB_RX_TYPEID_MATCH_SIZE		1
--#define MACB_RX_SA4_MATCH_OFFSET		23
-+#define MACB_RX_SA4_MATCH_OFFSET		23 /* Specific address register 4 match */
- #define MACB_RX_SA4_MATCH_SIZE			1
--#define MACB_RX_SA3_MATCH_OFFSET		24
-+#define MACB_RX_SA3_MATCH_OFFSET		24 /* Specific address register 3 match */
- #define MACB_RX_SA3_MATCH_SIZE			1
--#define MACB_RX_SA2_MATCH_OFFSET		25
-+#define MACB_RX_SA2_MATCH_OFFSET		25 /* Specific address register 2 match */
- #define MACB_RX_SA2_MATCH_SIZE			1
--#define MACB_RX_SA1_MATCH_OFFSET		26
-+#define MACB_RX_SA1_MATCH_OFFSET		26 /* Specific address register 1 match */
- #define MACB_RX_SA1_MATCH_SIZE			1
--#define MACB_RX_EXT_MATCH_OFFSET		28
-+#define MACB_RX_EXT_MATCH_OFFSET		28 /* External address match */
- #define MACB_RX_EXT_MATCH_SIZE			1
--#define MACB_RX_UHASH_MATCH_OFFSET		29
-+#define MACB_RX_UHASH_MATCH_OFFSET		29 /* Unicast hash match */
- #define MACB_RX_UHASH_MATCH_SIZE		1
--#define MACB_RX_MHASH_MATCH_OFFSET		30
-+#define MACB_RX_MHASH_MATCH_OFFSET		30 /* Multicast hash match */
- #define MACB_RX_MHASH_MATCH_SIZE		1
--#define MACB_RX_BROADCAST_OFFSET		31
-+#define MACB_RX_BROADCAST_OFFSET		31 /* Global all ones broadcast addr detected */
- #define MACB_RX_BROADCAST_SIZE			1
- 
- #define MACB_RX_FRMLEN_MASK			0xFFF
-@@ -612,11 +612,11 @@ struct macb_dma_desc_64 {
- #define GEM_RX_CSUM_OFFSET			22
- #define GEM_RX_CSUM_SIZE			2
- 
--#define MACB_TX_FRMLEN_OFFSET			0
-+#define MACB_TX_FRMLEN_OFFSET			0  /* Length of buffer */
- #define MACB_TX_FRMLEN_SIZE			11
--#define MACB_TX_LAST_OFFSET			15
-+#define MACB_TX_LAST_OFFSET			15 /* Last buffer */
- #define MACB_TX_LAST_SIZE			1
--#define MACB_TX_NOCRC_OFFSET			16
-+#define MACB_TX_NOCRC_OFFSET			16 /* No CRC */
- #define MACB_TX_NOCRC_SIZE			1
- #define MACB_MSS_MFS_OFFSET			16
- #define MACB_MSS_MFS_SIZE			14
-@@ -624,15 +624,15 @@ struct macb_dma_desc_64 {
- #define MACB_TX_LSO_SIZE			2
- #define MACB_TX_TCP_SEQ_SRC_OFFSET		19
- #define MACB_TX_TCP_SEQ_SRC_SIZE		1
--#define MACB_TX_BUF_EXHAUSTED_OFFSET		27
-+#define MACB_TX_BUF_EXHAUSTED_OFFSET		27 /* Buffers exhausted in mid frame */
- #define MACB_TX_BUF_EXHAUSTED_SIZE		1
--#define MACB_TX_UNDERRUN_OFFSET			28
-+#define MACB_TX_UNDERRUN_OFFSET			28 /* Transmit underrun */
- #define MACB_TX_UNDERRUN_SIZE			1
--#define MACB_TX_ERROR_OFFSET			29
-+#define MACB_TX_ERROR_OFFSET			29 /* Retry limit exceeded */
- #define MACB_TX_ERROR_SIZE			1
--#define MACB_TX_WRAP_OFFSET			30
-+#define MACB_TX_WRAP_OFFSET			30 /* Wrap */
- #define MACB_TX_WRAP_SIZE			1
--#define MACB_TX_USED_OFFSET			31
-+#define MACB_TX_USED_OFFSET			31 /* Used */
- #define MACB_TX_USED_SIZE			1
- 
- #define GEM_TX_FRMLEN_OFFSET			0
--- 
-2.1.4
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
+new file mode 100644
+index 000000000000..9ec922f3c0a4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
+@@ -0,0 +1,18 @@
++Sigma Designs SMP8759 interrupt router
++
++Required properties:
++- compatible: "sigma,smp8759-intc"
++- reg: address/size of register area
++- interrupt-controller
++- #interrupt-cells: <2>  (hwirq and trigger_type)
++- interrupt-parent: parent phandle
++
++Example:
++
++	interrupt-controller at 6f800 {
++		compatible = "sigma,smp8759-intc";
++		reg = <0x6f800 0x430>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-parent = <&gic>;
++	};
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index e4dbfc85abdb..013104923b71 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -47,7 +47,7 @@ obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+ obj-$(CONFIG_ARCH_NSPIRE)		+= irq-zevio.o
+ obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
+ obj-$(CONFIG_ST_IRQCHIP)		+= irq-st.o
+-obj-$(CONFIG_TANGO_IRQ)			+= irq-tango.o
++obj-$(CONFIG_TANGO_IRQ)			+= irq-tango.o irq-smp8759.o
+ obj-$(CONFIG_TB10X_IRQC)		+= irq-tb10x.o
+ obj-$(CONFIG_TS4800_IRQ)		+= irq-ts4800.o
+ obj-$(CONFIG_XTENSA)			+= irq-xtensa-pic.o
+diff --git a/drivers/irqchip/irq-smp8759.c b/drivers/irqchip/irq-smp8759.c
+new file mode 100644
+index 000000000000..ec7fee4574ef
+--- /dev/null
++++ b/drivers/irqchip/irq-smp8759.c
+@@ -0,0 +1,203 @@
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++#include <linux/irqchip.h>
++#include <linux/irqchip/chained_irq.h>
++
++#define IRQ_MAX		128
++#define SPI_MAX		24 /* 24 output lines routed to SPI 0-23 */
++#define LEVEL_SPI	17
++#define IRQ_ENABLE	BIT(31)
++
++/*
++ * 128 inputs mapped to 24 outputs
++ * LEVEL_HIGH IRQs are muxed on output line 'LEVEL_SPI'
++ * EDGE_RISING IRQs get a dedicated output line
++ * gic_spi_to_tango_hwirq array maps GIC SPI hwirq to tango hwirq
++ */
++struct tango_intc {
++	DECLARE_BITMAP(enabled, IRQ_MAX);
++	spinlock_t lock;
++	void __iomem *config;
++	void __iomem *status;
++	struct irq_domain *dom;
++	u8 gic_spi_to_tango_hwirq[SPI_MAX];
++};
++
++static void tango_level_isr(struct irq_desc *desc)
++{
++	unsigned int pos, virq;
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct tango_intc *intc = irq_desc_get_handler_data(desc);
++	DECLARE_BITMAP(status, IRQ_MAX);
++
++	chained_irq_enter(chip, desc);
++
++	memcpy_fromio(status, intc->status, IRQ_MAX / BITS_PER_BYTE);
++	spin_lock(&intc->lock);
++	bitmap_and(status, status, intc->enabled, IRQ_MAX);
++	spin_unlock(&intc->lock);
++	for_each_set_bit(pos, status, IRQ_MAX) {
++		virq = irq_find_mapping(intc->dom, pos);
++		generic_handle_irq(virq);
++	}
++
++	chained_irq_exit(chip, desc);
++}
++
++static void tango_edge_isr(struct irq_desc *desc)
++{
++	unsigned int virq;
++	struct irq_data *d = &desc->irq_data;
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct tango_intc *intc = irq_desc_get_handler_data(desc);
++
++	/* I don't know how to get the SPI number, d->hwirq - 32 is a hack */
++	int hwirq = intc->gic_spi_to_tango_hwirq[d->hwirq - 32];
++	//printk("%s: SPI=%lu hwirq=%d\n", __func__, d->hwirq, hwirq);
++
++	chained_irq_enter(chip, desc);
++	virq = irq_find_mapping(intc->dom, hwirq);
++	generic_handle_irq(virq);
++	chained_irq_exit(chip, desc);
++}
++
++static void tango_mask(struct irq_data *data)
++{
++	unsigned long flags;
++	struct tango_intc *intc = data->chip_data;
++
++	spin_lock_irqsave(&intc->lock, flags);
++	__clear_bit(data->hwirq, intc->enabled);
++	writel_relaxed(0, intc->config + data->hwirq * 4);
++	spin_unlock_irqrestore(&intc->lock, flags);
++}
++
++static void tango_unmask(struct irq_data *data)
++{
++	unsigned long flags;
++	struct tango_intc *intc = data->chip_data;
++
++#if 0
++	if (!in_irq() && !in_interrupt()) {
++		printk("HWIRQ=%lu mask=%u\n", data->hwirq, data->mask);
++		dump_stack();
++	}
++#endif
++
++	spin_lock_irqsave(&intc->lock, flags);
++	__set_bit(data->hwirq, intc->enabled);
++	writel_relaxed(IRQ_ENABLE | data->mask, intc->config + data->hwirq * 4);
++	spin_unlock_irqrestore(&intc->lock, flags);
++}
++
++static int find_free_output_line(struct tango_intc *intc)
++{
++	int spi;
++
++	for (spi = 0; spi < SPI_MAX; ++spi)
++		if (intc->gic_spi_to_tango_hwirq[spi] == 0)
++			return spi;
++
++	return -ENOSPC;
++}
++
++int tango_set_type(struct irq_data *data, unsigned int flow_type)
++{
++	struct tango_intc *intc = data->chip_data;
++	printk("%s: IRQ=%lu type=%x\n", __func__, data->hwirq, flow_type);
++	dump_stack();
++	if (flow_type & IRQ_TYPE_LEVEL_HIGH) {
++		data->mask = LEVEL_SPI;
++		return 0;
++	}
++
++	if (flow_type & IRQ_TYPE_EDGE_RISING) {
++		int res = find_free_output_line(intc);
++		if (res < 0)
++			return res;
++		data->mask = res;
++		intc->gic_spi_to_tango_hwirq[res] = data->hwirq;
++		printk("Map tango hwirq %lu to GIC SPI %d\n", data->hwirq, res);
++		return 0;
++	}
++
++	/* LEVEL_LOW and EDGE_FALLING are not supported */
++	return -ENOSYS;
++}
++
++static struct irq_chip tango_chip = {
++	.name		= "tango",
++	.irq_mask	= tango_mask,
++	.irq_unmask	= tango_unmask,
++	.irq_set_type	= tango_set_type,
++};
++
++static int tango_map(struct irq_domain *dom, unsigned int virq, irq_hw_number_t hw)
++{
++	struct tango_intc *intc = dom->host_data;
++	struct irq_desc *desc = irq_to_desc(virq);
++	printk("%s: dom=%p virq=%u hwirq=%lu desc=%p\n", __func__, dom, virq, hw, desc);
++	irq_domain_set_info(dom, virq, hw, &tango_chip, intc, handle_simple_irq, NULL, NULL);
++	return 0;
++}
++
++static void tango_unmap(struct irq_domain *d, unsigned int virq)
++{
++	printk("%s: dom=%p virq=%u\n", __func__, d, virq);
++	dump_stack();
++}
++
++struct irq_domain_ops dom_ops =
++{
++	.map	= tango_map,
++	.unmap	= tango_unmap,
++	.xlate	= irq_domain_xlate_twocell,
++};
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++static int __init map_irq(struct device_node *gic, int irq, int type)
++{
++	struct of_phandle_args irq_data = { gic, 3, { GIC_SPI, irq, type }};
++	return irq_create_of_mapping(&irq_data);
++}
++
++static int __init tango_irq_init(struct device_node *node, struct device_node *parent)
++{
++	int spi, virq;
++	struct irq_domain *irq_dom;
++	void __iomem *base;
++	struct tango_intc *intc = kzalloc(sizeof(*intc), GFP_KERNEL);
++
++	base = of_iomap(node, 0);
++	if (!base)
++		panic("%s: of_iomap failed", node->name);
++
++	virq = map_irq(parent, LEVEL_SPI, IRQ_TYPE_LEVEL_HIGH);
++	if (!virq)
++		panic("%s: Failed to map IRQ %d\n", node->name, LEVEL_SPI);
++
++	irq_set_chained_handler_and_data(virq, tango_level_isr, intc);
++
++	for (spi = 0; spi < SPI_MAX; ++spi) {
++		if (spi == LEVEL_SPI)
++			continue;
++
++		virq = map_irq(parent, spi, IRQ_TYPE_EDGE_RISING);
++		if (!virq)
++			panic("%s: Failed to map IRQ %d\n", node->name, spi);
++
++		irq_set_chained_handler_and_data(virq, tango_edge_isr, intc);
++	}
++
++	irq_dom = irq_domain_add_linear(node, IRQ_MAX, &dom_ops, intc);
++
++	spin_lock_init(&intc->lock);
++	intc->config = base;
++	intc->status = base + 0x420;
++	intc->dom = irq_dom;
++	intc->gic_spi_to_tango_hwirq[LEVEL_SPI] = ~0;
++
++	return 0;
++}
++IRQCHIP_DECLARE(tango_intc, "sigma,smp8759-intc", tango_irq_init);
