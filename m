@@ -1,285 +1,229 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Jul 2017 12:04:36 +0530
-Subject: [RFC v2 6/6] drivers: boot_constraint: Add constraints for OF devices
-In-Reply-To: <cover.1499770771.git.viresh.kumar@linaro.org>
-References: <cover.1499770771.git.viresh.kumar@linaro.org>
-Message-ID: <2d53af367f7d912338d5d00e8fb7065b8ce45548.1499770771.git.viresh.kumar@linaro.org>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 12 Jul 2017 08:45:24 +0200
+Subject: [PATCH 2/3] usb: chipidea: Hook into mux framework to toggle usb
+ switch
+In-Reply-To: <20170712010255.26855-3-stephen.boyd@linaro.org>
+References: <20170712010255.26855-1-stephen.boyd@linaro.org>
+ <20170712010255.26855-3-stephen.boyd@linaro.org>
+Message-ID: <2db7bc39-9274-6007-d971-59e2a577d437@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements the device tree dependent part of the boot constraints.
+On 2017-07-12 03:02, Stephen Boyd wrote:
+> On the db410c 96boards platform we have a TC7USB40MU on the board
+> to mux the D+/D- lines coming from the controller between a micro
+> usb "device" port and a USB hub for "host" roles[1]. During a
+> role switch, we need to toggle this mux to forward the D+/D-
+> lines to either the port or the hub. Add the necessary code to do
+> the role switch in chipidea core via the generic mux framework.
+> Board configurations like on db410c are expected to change roles
+> via the sysfs API described in
+> Documentation/ABI/testing/sysfs-platform-chipidea-usb2.
+> 
+> [1] https://github.com/96boards/documentation/raw/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
+> 
+> Cc: Peter Rosin <peda@axentia.se>
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt |  8 ++++++++
+>  drivers/usb/chipidea/core.c                            | 17 +++++++++++++++++
+>  drivers/usb/chipidea/host.c                            | 10 ++++++++++
+>  drivers/usb/chipidea/udc.c                             | 11 +++++++++++
+>  include/linux/usb/chipidea.h                           | 14 ++++++++++++++
+>  5 files changed, 60 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+> index 0e03344e2e8b..96ce81d975d5 100644
+> --- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+> +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+> @@ -76,6 +76,11 @@ Optional properties:
+>    needs to make sure it does not send more than 90%
+>    maximum_periodic_data_per_frame. The use case is multiple transactions, but
+>    less frame rate.
+> +- mux-controls: The mux control for toggling host/device output of this
+> +  controller.
+> +- mux-control-names: Shall be "usb_switch" if mux-controls is specified.
+> +- usb-switch-states: Two u32's defining the state to set on the mux for the
+> +  host mode and device modes respectively.
+>  
+>  i.mx specific properties
+>  - fsl,usbmisc: phandler of non-core register device, with one
+> @@ -102,4 +107,7 @@ Example:
+>  		rx-burst-size-dword = <0x10>;
+>  		extcon = <0>, <&usb_id>;
+>  		phy-clkgate-delay-us = <400>;
+> +		mux-controls = <&usb_switch>;
+> +		mux-control-names = "usb_switch";
+> +		usb-switch-states = <0>, <1>;
 
-The supply constraints are added automatically for the platform and AMBA
-devices created from DT and will be removed after the driver is
-registered for the devices.
+I don't see the need for usb-switch-states? Just assume states 0/1 and
+if someone later needs some other states, make them add a property that
+overrides the defaults. Just document that 0 is host and 1 is device.
 
-It is possible that some of the resources aren't available at the time
-when the devices are added and so the boot constraints core will return
--EPROBE_DEFER for them. In order to retry adding the constraints at a
-later point of time (after the resource is added and before any of its
-users come up), this patch proposes two things:
+>  	};
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index b17ed3a9a304..6531d771f296 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -64,6 +64,7 @@
+>  #include <linux/of.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/usb/ehci_def.h>
+> +#include <linux/mux/consumer.h>
+>  
+>  #include "ci.h"
+>  #include "udc.h"
+> @@ -606,6 +607,7 @@ static int ci_get_platdata(struct device *dev,
+>  {
+>  	struct extcon_dev *ext_vbus, *ext_id;
+>  	struct ci_hdrc_cable *cable;
+> +	struct ci_hdrc_switch *usb_switch;
+>  	int ret;
+>  
+>  	if (!platdata->phy_mode)
+> @@ -690,6 +692,21 @@ static int ci_get_platdata(struct device *dev,
+>  	if (of_find_property(dev->of_node, "non-zero-ttctrl-ttha", NULL))
+>  		platdata->flags |= CI_HDRC_SET_NON_ZERO_TTHA;
+>  
+> +	if (IS_ENABLED(CONFIG_MULTIPLEXER)) {
+> +		usb_switch = &platdata->usb_switch;
+> +		usb_switch->mux = devm_mux_control_get(dev, "usb_switch");
+> +		if (!IS_ERR(usb_switch->mux)) {
+> +			if (of_property_read_u32_index(dev->of_node,
+> +						       "usb-switch-states",
+> +						       0, &usb_switch->device))
+> +				return -EINVAL;
+> +			if (of_property_read_u32_index(dev->of_node,
+> +						       "usb-switch-states",
+> +						       1, &usb_switch->host))
+> +				return -EINVAL;
+> +		}
+> +	}
+> +
+>  	ext_id = ERR_PTR(-ENODEV);
+>  	ext_vbus = ERR_PTR(-ENODEV);
+>  	if (of_property_read_bool(dev->of_node, "extcon")) {
+> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+> index 18cb8e46262d..9fd23ecc2da3 100644
+> --- a/drivers/usb/chipidea/host.c
+> +++ b/drivers/usb/chipidea/host.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/usb/hcd.h>
+>  #include <linux/usb/chipidea.h>
+>  #include <linux/regulator/consumer.h>
+> +#include <linux/mux/consumer.h>
+>  
+>  #include "../host/ehci.h"
+>  
+> @@ -123,6 +124,13 @@ static int host_start(struct ci_hdrc *ci)
+>  	if (usb_disabled())
+>  		return -ENODEV;
+>  
+> +	if (!IS_ERR(ci->platdata->usb_switch.mux)) {
+> +		ret = mux_control_select(ci->platdata->usb_switch.mux,
+> +					 ci->platdata->usb_switch.host);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
 
-- Each constraint is represented by a virtual platform device, so that
-  it is re-probed again until the time all the dependencies aren't met.
-  The platform device is removed along with the constraint, with help of
-  the free_resources() callback.
+You *must* call mux_control_deselect to clean up if there is a failure
+later in host_start. Is that handled in some non-obvious way?
 
-- Enable early defer probing support by calling
-  driver_enable_deferred_probe(), so that the core retries probing
-  deferred devices every time any device is bound to a driver. This
-  makes sure that the constraint is set before any of the users of the
-  resources come up.
+>  	hcd = __usb_create_hcd(&ci_ehci_hc_driver, ci->dev->parent,
+>  			       ci->dev, dev_name(ci->dev), NULL);
+>  	if (!hcd)
+> @@ -205,6 +213,8 @@ static void host_stop(struct ci_hdrc *ci)
+>  		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
+>  			(ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON))
+>  				regulator_disable(ci->platdata->reg_vbus);
+> +		if (!IS_ERR(ci->platdata->usb_switch.mux))
+> +			mux_control_deselect(ci->platdata->usb_switch.mux);
+>  	}
+>  	ci->hcd = NULL;
+>  	ci->otg.host = NULL;
+> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> index d68b125796f9..ab3355905740 100644
+> --- a/drivers/usb/chipidea/udc.c
+> +++ b/drivers/usb/chipidea/udc.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/usb/gadget.h>
+>  #include <linux/usb/otg-fsm.h>
+>  #include <linux/usb/chipidea.h>
+> +#include <linux/mux/consumer.h>
+>  
+>  #include "ci.h"
+>  #include "udc.h"
+> @@ -1899,6 +1900,13 @@ static int udc_start(struct ci_hdrc *ci)
+>  	ci->gadget.name         = ci->platdata->name;
+>  	ci->gadget.otg_caps	= otg_caps;
+>  
+> +	if (!IS_ERR(ci->platdata->usb_switch.mux)) {
+> +		retval = mux_control_select(ci->platdata->usb_switch.mux,
+> +					    ci->platdata->usb_switch.device);
+> +		if (retval)
+> +			return retval;
+> +	}
+> +
 
-This is tested on ARM64 Hikey board where probe was deferred for a
-device.
+Dito.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/base/Makefile             |   3 +
- drivers/base/base.h               |   1 +
- drivers/base/boot_constraint.c    |   2 +-
- drivers/base/boot_constraint_of.c | 122 ++++++++++++++++++++++++++++++++++++++
- drivers/base/dd.c                 |  12 ++++
- drivers/of/platform.c             |   4 ++
- include/linux/boot_constraint.h   |   2 +
- 7 files changed, 145 insertions(+), 1 deletion(-)
- create mode 100644 drivers/base/boot_constraint_of.c
+Cheers,
+peda
 
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 6094b3b75184..0f47a5de585a 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -6,6 +6,9 @@ obj-y			:= component.o core.o bus.o dd.o syscore.o \
- 			   attribute_container.o transport_class.o \
- 			   topology.o container.o property.o cacheinfo.o
- obj-$(CONFIG_BOOT_CONSTRAINTS) += boot_constraint.o
-+ifeq ($(CONFIG_OF),y)
-+obj-$(CONFIG_BOOT_CONSTRAINTS) += boot_constraint_of.o
-+endif
- obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
- obj-$(CONFIG_DMA_CMA) += dma-contiguous.o
- obj-y			+= power/
-diff --git a/drivers/base/base.h b/drivers/base/base.h
-index e19b1008e5fb..9d6910cdbc8e 100644
---- a/drivers/base/base.h
-+++ b/drivers/base/base.h
-@@ -136,6 +136,7 @@ extern char *make_class_name(const char *name, struct kobject *kobj);
- extern int devres_release_all(struct device *dev);
- extern void device_block_probing(void);
- extern void device_unblock_probing(void);
-+extern void driver_enable_deferred_probe(void);
- 
- /* /sys/devices directory */
- extern struct kset *devices_kset;
-diff --git a/drivers/base/boot_constraint.c b/drivers/base/boot_constraint.c
-index 4e3b5e1aec7c..80ac3f9aaa72 100644
---- a/drivers/base/boot_constraint.c
-+++ b/drivers/base/boot_constraint.c
-@@ -50,7 +50,7 @@ static DEFINE_MUTEX(constraint_devices_mutex);
- static int constraint_supply_add(struct constraint *constraint, void *data);
- static void constraint_supply_remove(struct constraint *constraint);
- 
--static bool boot_constraints_disabled;
-+bool boot_constraints_disabled;
- 
- static int __init constraints_disable(char *str)
- {
-diff --git a/drivers/base/boot_constraint_of.c b/drivers/base/boot_constraint_of.c
-new file mode 100644
-index 000000000000..671241b3d3a3
---- /dev/null
-+++ b/drivers/base/boot_constraint_of.c
-@@ -0,0 +1,122 @@
-+/*
-+ * Copyright (C) 2017 Linaro.
-+ * Viresh Kumar <viresh.kumar@linaro.org>
-+ *
-+ * This file is released under the GPLv2.
-+ */
-+
-+#define pr_fmt(fmt) "Boot Constraints: " fmt
-+
-+#include <linux/boot_constraint.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#include "base.h"
-+
-+extern bool boot_constraints_disabled;
-+
-+struct boot_constraint_of_pdata {
-+	struct device *dev;
-+	enum boot_constraint_type type;
-+	struct boot_constraint_supply_info info;
-+};
-+
-+static void boot_constraint_add_supply(struct device *dev, int index)
-+{
-+	struct boot_constraint_of_pdata pdata = {
-+		.dev = dev,
-+		.type = BOOT_CONSTRAINT_SUPPLY,
-+	};
-+	struct boot_constraint_supply_info *info;
-+	struct device_node *np = dev->of_node;
-+	struct platform_device *pdev;
-+	int ret;
-+
-+	info = &pdata.info;
-+
-+	ret = of_property_read_string_index(np, "boot-constraint-supplies",
-+					    index, &info->name);
-+	if (ret < 0) {
-+		dev_err(dev, "%s: Failed to read supply@index %d (%d)\n",
-+			__func__, index, ret);
-+		return;
-+	}
-+
-+	of_property_read_u32_index(np, "boot-constraint-uV", 2 * index,
-+				   &info->u_volt_min);
-+
-+	of_property_read_u32_index(np, "boot-constraint-uV", 2 * index + 1,
-+				   &info->u_volt_max);
-+
-+	pdev = platform_device_register_data(NULL, "boot-constraints-of", index,
-+					     &pdata, sizeof(pdata));
-+	if (IS_ERR(pdev)) {
-+		dev_err(dev, "%s: Failed to create pdev for index %d (%d)\n",
-+			__func__, index, ret);
-+	}
-+}
-+
-+static void boot_constraint_add_supplies(struct device *dev)
-+{
-+	struct device_node *np = dev->of_node;
-+	int i, count;
-+
-+	count = of_property_count_strings(np, "boot-constraint-supplies");
-+	if (count <= 0)
-+		return;
-+
-+	for (i = 0; i < count; i++)
-+		boot_constraint_add_supply(dev, i);
-+}
-+
-+void of_boot_constraint_init(struct device *dev)
-+{
-+	if (boot_constraints_disabled)
-+		return;
-+
-+	BUG_ON(!dev->of_node);
-+
-+	boot_constraint_add_supplies(dev);
-+}
-+
-+static void boot_constraint_remove_of(void *data)
-+{
-+	platform_device_unregister(data);
-+}
-+
-+/*
-+ * A platform device is added for each and every constraint, to handle
-+ * -EPROBE_DEFER properly.
-+ */
-+static int boot_constraint_of_probe(struct platform_device *pdev)
-+{
-+	struct boot_constraint_of_pdata *pdata = dev_get_platdata(&pdev->dev);
-+	struct boot_constraint_info info;
-+	int ret;
-+
-+	BUG_ON(!pdata);
-+
-+	info.free_resources = boot_constraint_remove_of;
-+	info.free_resources_data = pdev;
-+	info.constraint_info = &pdata->info;
-+
-+	ret = boot_constraint_add(pdata->dev, pdata->type, &info);
-+	if (ret == -EPROBE_DEFER)
-+		driver_enable_deferred_probe();
-+
-+	return ret;
-+}
-+
-+static struct platform_driver boot_constraint_of_driver = {
-+	.driver = {
-+		.name = "boot-constraints-of",
-+	},
-+	.probe = boot_constraint_of_probe,
-+};
-+
-+static int __init boot_constraint_of_init(void)
-+{
-+	return platform_driver_register(&boot_constraint_of_driver);
-+}
-+core_initcall(boot_constraint_of_init);
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 4eb9d183d647..aa761e13d8a7 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -204,6 +204,18 @@ void device_unblock_probing(void)
- }
- 
- /**
-+ * driver_enable_deferred_probe() - Enable probing of deferred devices
-+ *
-+ * We don't want to get in the way when the bulk of drivers are getting probed
-+ * and so deferred probe is disabled in the beginning. Enable it now because we
-+ * need it.
-+ */
-+void driver_enable_deferred_probe(void)
-+{
-+	driver_deferred_probe_enable = true;
-+}
-+
-+/**
-  * deferred_probe_initcall() - Enable probing of deferred devices
-  *
-  * We don't want to get in the way when the bulk of drivers are getting probed.
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 703a42118ffc..b88a1bf3e7fb 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -17,6 +17,7 @@
- #include <linux/errno.h>
- #include <linux/module.h>
- #include <linux/amba/bus.h>
-+#include <linux/boot_constraint.h>
- #include <linux/device.h>
- #include <linux/dma-mapping.h>
- #include <linux/slab.h>
-@@ -194,6 +195,8 @@ static struct platform_device *of_platform_device_create_pdata(
- 		goto err_clear_flag;
- 	}
- 
-+	of_boot_constraint_init(&dev->dev);
-+
- 	return dev;
- 
- err_clear_flag:
-@@ -271,6 +274,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 		goto err_free;
- 	}
- 
-+	of_boot_constraint_init(&dev->dev);
- 	return dev;
- 
- err_free:
-diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
-index 110e5eca36c6..17bec71df228 100644
---- a/include/linux/boot_constraint.h
-+++ b/include/linux/boot_constraint.h
-@@ -33,10 +33,12 @@ struct boot_constraint_info {
- int boot_constraint_add(struct device *dev, enum boot_constraint_type type,
- 			struct boot_constraint_info *info);
- void boot_constraints_remove(struct device *dev);
-+void of_boot_constraint_init(struct device *dev);
- #else
- static inline int boot_constraint_add(struct device *dev,
- 				      enum boot_constraint_type type,
- 				      struct boot_constraint_info *info)
- { return -EINVAL; }
- static inline void boot_constraints_remove(struct device *dev) {}
-+static inline void of_boot_constraint_init(struct device *dev) {}
- #endif
--- 
-2.13.0.71.gd7076ec9c9cb
+>  	if (ci->is_otg && (otg_caps->hnp_support || otg_caps->srp_support ||
+>  						otg_caps->adp_support))
+>  		ci->gadget.is_otg = 1;
+> @@ -1982,6 +1990,9 @@ static void udc_id_switch_for_host(struct ci_hdrc *ci)
+>  		hw_write_otgsc(ci, OTGSC_BSVIE | OTGSC_BSVIS, OTGSC_BSVIS);
+>  
+>  	ci->vbus_active = 0;
+> +
+> +	if (!IS_ERR(ci->platdata->usb_switch.mux))
+> +		mux_control_deselect(ci->platdata->usb_switch.mux);
+>  }
+>  
+>  /**
+> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+> index c5fdfcf99828..559bd470b8c0 100644
+> --- a/include/linux/usb/chipidea.h
+> +++ b/include/linux/usb/chipidea.h
+> @@ -9,6 +9,7 @@
+>  #include <linux/usb/otg.h>
+>  
+>  struct ci_hdrc;
+> +struct mux_control;
+>  
+>  /**
+>   * struct ci_hdrc_cable - structure for external connector cable state tracking
+> @@ -29,6 +30,18 @@ struct ci_hdrc_cable {
+>  	struct notifier_block		nb;
+>  };
+>  
+> +/**
+> + * struct ci_hdrc_switch - structure for usb mux control
+> + * @mux: mux to set @host state or @device state on during role switch
+> + * @host: Value to set for mux to connect D+/D- to host D+/D- lines
+> + * @device: Value to set for mux to connect D+/D- to device D+/D- lines
+> + */
+> +struct ci_hdrc_switch {
+> +	struct mux_control		*mux;
+> +	int				host;
+> +	int				device;
+> +};
+> +
+>  struct ci_hdrc_platform_data {
+>  	const char	*name;
+>  	/* offset of the capability registers */
+> @@ -74,6 +87,7 @@ struct ci_hdrc_platform_data {
+>  	/* VBUS and ID signal state tracking, using extcon framework */
+>  	struct ci_hdrc_cable		vbus_extcon;
+>  	struct ci_hdrc_cable		id_extcon;
+> +	struct ci_hdrc_switch		usb_switch;
+>  	u32			phy_clkgate_delay_us;
+>  };
+>  
+> 
