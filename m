@@ -1,28 +1,49 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 12 Jul 2017 10:40:16 +0800
-Subject: [PATCH v3] drm/sun4i: Implement drm_driver lastclose to restore
- fbdev console
-In-Reply-To: <20170711192131.mdmkvgxgzo7bwywe@flea>
-References: <20170710065504.31497-1-net147@gmail.com>
- <20170711192131.mdmkvgxgzo7bwywe@flea>
-Message-ID: <CAGb2v64svM2KB7dtf+USM=LppHrnvYiV-AobZubB8D3T6u=9Ew@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 12 Jul 2017 09:11:50 +0530
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+ <20170629143432.GM29665@vireshk-i7>
+ <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+ <20170711102514.GC17115@vireshk-i7>
+ <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
+Message-ID: <20170712034150.GD17115@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 3:21 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Jul 10, 2017 at 04:55:04PM +1000, Jonathan Liu wrote:
->> The drm_driver lastclose callback is called when the last userspace
->> DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
->> the fbdev console otherwise the fbdev console will stop working.
->>
->> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Jonathan Liu <net147@gmail.com>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->
-> Queued for 4.14, thanks!
+On 11-07-17, 13:09, Mason wrote:
+> I apologize for being unclear.
+> 
+> What I meant is that the bootloader originally set the max frequency
+> to 1206 MHz. The OPP table in DTS was written based on that value.
+> 
+> Later, someone changed the bootloader code to set a slightly higher
+> max frequency. When I flashed the new bootloader on my board, the
+> OPP table no longer matches the actual frequency.
+> 
+> But I am not notified when bootloader authors change max frequencies,
+> which is why I wrote "changed the max freq behind my back".
+> 
+> Again, sorry for the confusing statements.
+> 
+> (The bootloader is not DT-aware, so it leaves the DT untouched.)
 
-May we have this sooner? Like 4.13? :)
+Here we go. Finally I have understood what the problem you are facing is :)
+And yes, it was really not clear to me until now. I though that someone just
+changed the max in DT and that's making things go bad :)
 
-ChenYu
+Anyway, how does the bootloader control the max frequency? For the boards I
+worked on, its just a PLL that the kernel needs to set and kernel can choose to
+program it the way it wants to irrespective of the way bootloader has worked on
+it.
+
+> Maybe this is the real issue that needs to be addressed,
+> rather than the symptoms that turn up later because of
+> the root issue.
+
+Sure, I just need a bit more of input from you :)
+
+-- 
+viresh
