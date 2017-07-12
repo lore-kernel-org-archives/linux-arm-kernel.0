@@ -1,103 +1,76 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Wed, 12 Jul 2017 18:01:23 +0100
-Subject: [PATCH v1] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
-Message-ID: <1499878883-3066-1-git-send-email-mike.leach@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Jul 2017 19:06:40 +0200
+Subject: [PATCH] ARM: mvebu: use __pa_symbol in the mv98dx3236 platform
+ SMP code
+In-Reply-To: <20170707075928.2938-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Fri, 7 Jul 2017 09:59:28 +0200")
+References: <20170707075928.2938-1-gregory.clement@free-electrons.com>
+Message-ID: <874luhbn4v.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The value passed into the perf.data file for the CONFIGR register in ETMv4
-was incorrectly being set to the command line options/ETMv3 value.
-
-Adds bit definitions and function to remap this value to the correct ETMv4
-CONFIGR bit values for all selected options.
-
-Signed-off-by: Mike Leach <mike.leach@linaro.org>
----
-Changes for v1:
- - Added more people to the recipient list.
-
- include/linux/coresight-pmu.h       |  5 +++++
- tools/include/linux/coresight-pmu.h |  5 +++++
- tools/perf/arch/arm/util/cs-etm.c   | 28 +++++++++++++++++++++++++++-
- 3 files changed, 37 insertions(+), 1 deletion(-)
-
-diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
-index 45852c2..edfeaba 100644
---- a/include/linux/coresight-pmu.h
-+++ b/include/linux/coresight-pmu.h
-@@ -26,6 +26,11 @@
- #define ETM_OPT_TS      28
- #define ETM_OPT_RETSTK	29
+Hi,
  
-+/* ETMv4 CONFIGR programming bits for the ETM OPTs */
-+#define ETM4_CFG_BIT_CYCACC	4
-+#define ETM4_CFG_BIT_TS		11
-+#define ETM4_CFG_BIT_RETSTK	12
-+
- static inline int coresight_get_trace_id(int cpu)
- {
- 	/*
-diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
-index 45852c2..edfeaba 100644
---- a/tools/include/linux/coresight-pmu.h
-+++ b/tools/include/linux/coresight-pmu.h
-@@ -26,6 +26,11 @@
- #define ETM_OPT_TS      28
- #define ETM_OPT_RETSTK	29
- 
-+/* ETMv4 CONFIGR programming bits for the ETM OPTs */
-+#define ETM4_CFG_BIT_CYCACC	4
-+#define ETM4_CFG_BIT_TS		11
-+#define ETM4_CFG_BIT_RETSTK	12
-+
- static inline int coresight_get_trace_id(int cpu)
- {
- 	/*
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 29361d9..997734b 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -266,6 +266,32 @@ static u64 cs_etm_get_config(struct auxtrace_record *itr)
- 	return config;
- }
- 
-+#ifndef BIT
-+#define BIT(N) (1UL << (N))
-+#endif
-+
-+static u64 cs_etmv4_get_config(struct auxtrace_record *itr)
-+{
-+	u64 config = 0;
-+	u64 config_opts = 0;
-+
-+	/*
-+	 * The perf event variable config bits represent both
-+	 * the command line options and register programming
-+	 * bits in ETMv3/PTM. For ETMv4 we must remap options
-+	 * to real bits
-+	 */
-+	config_opts = cs_etm_get_config(itr);
-+	if (config_opts & BIT(ETM_OPT_CYCACC))
-+		config |= BIT(ETM4_CFG_BIT_CYCACC);
-+	if (config_opts & BIT(ETM_OPT_TS))
-+		config |= BIT(ETM4_CFG_BIT_TS);
-+	if (config_opts & BIT(ETM_OPT_RETSTK))
-+		config |= BIT(ETM4_CFG_BIT_RETSTK);
-+
-+	return config;
-+}
-+
- static size_t
- cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
- 		      struct perf_evlist *evlist __maybe_unused)
-@@ -363,7 +389,7 @@ static void cs_etm_get_metadata(int cpu, u32 *offset,
- 		magic = __perf_cs_etmv4_magic;
- 		/* Get trace configuration register */
- 		info->priv[*offset + CS_ETMV4_TRCCONFIGR] =
--						cs_etm_get_config(itr);
-+						cs_etmv4_get_config(itr);
- 		/* Get traceID from the framework */
- 		info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
- 						coresight_get_trace_id(cpu);
+ On ven., juil. 07 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> As we already did for Armada XP switch from virt_to_phys() to
+> __pa_symbol().
+>
+> The reason for it was well explained by Mark Rutland so let's quote him:
+>
+> "virt_to_phys() is intended to operate on the linear/direct mapping of
+> RAM.
+>
+> __pa_symbol() is intended to operate on the kernel mapping, which may
+> not be in the linear/direct mapping on all architectures. e.g. arm64 and
+> x86_64 map the kernel image and RAM separately.
+>
+> On 32-bit ARM the kernel image mapping is tied to the linear/direct
+> mapping, so that works, but as it's semantically wrong (and broken for
+> generic code), the DEBUG_VIRTUAL checks complain."
+>
+> Fixes: db88977894ab ("arm: mvebu: support for SMP on 98DX3336 SoC")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Applied on mvebu/fixes with the tags from Chris and Floriant.
+
+Gregory
+
+> ---
+>
+> Hi Chris,
+>
+> with this patch I don't expect any regression, hover it would be nice
+> if you can test it.
+>
+> Thanks,
+>
+> Gregory
+>
+>  arch/arm/mach-mvebu/platsmp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+> index e62273aacb43..4ffbbd217e82 100644
+> --- a/arch/arm/mach-mvebu/platsmp.c
+> +++ b/arch/arm/mach-mvebu/platsmp.c
+> @@ -211,7 +211,7 @@ static int mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+>  		return PTR_ERR(base);
+>  
+>  	writel(0, base + MV98DX3236_CPU_RESUME_CTRL_REG);
+> -	writel(virt_to_phys(boot_addr), base + MV98DX3236_CPU_RESUME_ADDR_REG);
+> +	writel(__pa_symbol(boot_addr), base + MV98DX3236_CPU_RESUME_ADDR_REG);
+>  
+>  	iounmap(base);
+>  
+> -- 
+> 2.13.2
+>
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
