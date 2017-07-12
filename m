@@ -1,42 +1,54 @@
 From: chris.paterson2@renesas.com (Chris Paterson)
-Date: Wed, 12 Jul 2017 11:03:24 +0100
-Subject: [PATCH 2/3] ARM: dts: r8a7743: Add MMCIF0 support
+Date: Wed, 12 Jul 2017 11:03:25 +0100
+Subject: [PATCH 3/3] ARM: dts: iwg20m: Add MMCIF0 support
 In-Reply-To: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
 References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <1499853805-5915-3-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <1499853805-5915-4-git-send-email-chris.paterson2@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the MMCIF0 device to the r8a7743 device tree.
+Define the iwg20m board dependent part of the MMCIF0 device node.
 
 Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 0d02191..f62e858 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -641,6 +641,22 @@
- 			#size-cells = <0>;
- 			status = "disabled";
- 		};
-+
-+		mmcif0: mmc at ee200000 {
-+			compatible = "renesas,mmcif-r8a7743",
-+				     "renesas,sh-mmcif";
-+			reg = <0 0xee200000 0 0x80>;
-+			interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 315>;
-+			dmas = <&dmac0 0xd1>, <&dmac0 0xd2>,
-+			       <&dmac1 0xd1>, <&dmac1 0xd2>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 315>;
-+			reg-io-width = <4>;
-+			max-frequency = <97500000>;
-+			status = "disabled";
-+		};
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+index 001ca91..ffce1b6 100644
+--- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
++++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+@@ -22,8 +22,34 @@
+ 		device_type = "memory";
+ 		reg = <2 0x00000000 0 0x20000000>;
  	};
++
++	reg_3p3v: 3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
+ };
  
- 	/* External root clock */
+ &extal_clk {
+ 	clock-frequency = <20000000>;
+ };
++
++&pfc {
++	mmcif0_pins: mmc {
++		groups = "mmc_data8", "mmc_ctrl";
++		function = "mmc";
++	};
++};
++
++&mmcif0 {
++		pinctrl-0 = <&mmcif0_pins>;
++		pinctrl-names = "default";
++
++		vmmc-supply = <&reg_3p3v>;
++		bus-width = <8>;
++		non-removable;
++		status = "okay";
++};
 -- 
 1.9.1
