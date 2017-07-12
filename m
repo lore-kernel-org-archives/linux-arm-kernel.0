@@ -1,68 +1,57 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 12 Jul 2017 09:19:42 +0200
-Subject: [PATCH 2/4] arm64: dts: rockchip: add ARM Mali GPU node for
- RK3399 SoCs
-In-Reply-To: <1499840971-20392-3-git-send-email-wxt@rock-chips.com>
-References: <1499840971-20392-1-git-send-email-wxt@rock-chips.com>
- <1499840971-20392-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <4066931.s766IOqHgB@phil>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 12 Jul 2017 09:32:34 +0200
+Subject: [PATCH] net: stmmac: revert "support future possible different
+ internal phy mode"
+Message-ID: <20170712073234.9809-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+Since internal phy-mode is reserved for non-xMII protocol we cannot use
+it with dwmac-sun8i.
+Furthermore, all DT patchs which comes with this patch were cleaned, so
+the current state is broken.
+This reverts commit 1c2fa5f84683 ("net: stmmac: support future possible different internal phy mode")
 
-Am Mittwoch, 12. Juli 2017, 14:29:28 CEST schrieb Caesar Wang:
-> Add Mali GPU device tree node for the RK3399 SoCs, with devfreq
-> opp table.
-> 
-> RK3399 and RK3399-OP1 SoCs have a different recommendation table with
-> gpu opp. As the ARM's mali driver found on
-> https://developer.arm.com/products/software/mali-drivers/midgard-kernel.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
-> 
->  arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi | 33 ++++++++++++++++++++++++
->  arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi     | 33 ++++++++++++++++++++++++
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi         | 16 ++++++++++++
->  3 files changed, 82 insertions(+)
+Fixes: 1c2fa5f84683 ("net: stmmac: support future possible different internal phy mode")
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-[...]
-
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index 1cbd7a2..8c6438b 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -1443,6 +1443,22 @@
->  		status = "disabled";
->  	};
->  
-> +	gpu: gpu at ff9a0000 {
-> +		compatible = "arm,rk3399-mali",
-> +			     "arm,malit860",
-> +			     "arm,malit86x",
-> +			     "arm,malit8xx";
-
-no wildcards and correct compatibles please.
-The binding specifies arm,mali-t860 for your chip and the soc
-specific compatible needs a rockchip vendor, so you need
-
-	compatible = "rockchip,rk3399-mali", "arm,mali-t860";
-
-
-> +		reg = <0x0 0xff9a0000 0x0 0x10000>;
-> +		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH 0>,
-> +			     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH 0>,
-> +			     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH 0>;
-> +		interrupt-names = "GPU", "JOB", "MMU";
-
-interrupt names are job, mmu, gpu in lower case. The out-of-tree driver
-will need to conform to that.
-
-> +		clocks = <&cru ACLK_GPU>;
-> +		clock-names = "clk_mali";
-
-no clock-names property, as midgard malis only have one clock input
-
-
-Heiko
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+index 6c2d1da05588..fffd6d5fc907 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+@@ -638,7 +638,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
+ {
+ 	struct sunxi_priv_data *gmac = priv->plat->bsp_priv;
+ 	struct device_node *node = priv->device->of_node;
+-	int ret, phy_interface;
++	int ret;
+ 	u32 reg, val;
+ 
+ 	regmap_read(gmac->regmap, SYSCON_EMAC_REG, &val);
+@@ -718,11 +718,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
+ 	if (gmac->variant->support_rmii)
+ 		reg &= ~SYSCON_RMII_EN;
+ 
+-	phy_interface = priv->plat->interface;
+-	/* if PHY is internal, select the mode (xMII) used by the SoC */
+-	if (gmac->use_internal_phy)
+-		phy_interface = gmac->variant->internal_phy;
+-	switch (phy_interface) {
++	switch (priv->plat->interface) {
+ 	case PHY_INTERFACE_MODE_MII:
+ 		/* default */
+ 		break;
+@@ -936,7 +932,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	plat_dat->interface = of_get_phy_mode(dev->of_node);
+-	if (plat_dat->interface == PHY_INTERFACE_MODE_INTERNAL) {
++	if (plat_dat->interface == gmac->variant->internal_phy) {
+ 		dev_info(&pdev->dev, "Will use internal PHY\n");
+ 		gmac->use_internal_phy = true;
+ 		gmac->ephy_clk = of_clk_get(plat_dat->phy_node, 0);
+-- 
+2.13.0
