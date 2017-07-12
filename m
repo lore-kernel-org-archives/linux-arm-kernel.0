@@ -1,65 +1,152 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 12 Jul 2017 11:45:03 +0200
-Subject: [PATCH 13/16] drm/mediatek: Convert to new iterator macros
-In-Reply-To: <20170712081344.25495-14-maarten.lankhorst@linux.intel.com>
-References: <20170712081344.25495-1-maarten.lankhorst@linux.intel.com>
- <20170712081344.25495-14-maarten.lankhorst@linux.intel.com>
-Message-ID: <20170712094503.hilg3he7amcrwvyi@phenom.ffwll.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Jul 2017 10:46:55 +0100
+Subject: [PATCH] ARM: dts: imx: add CX9020 Embedded PC device tree
+In-Reply-To: <20170712090408.12212-1-linux-kernel-dev@beckhoff.com>
+References: <20170712090408.12212-1-linux-kernel-dev@beckhoff.com>
+Message-ID: <20170712094655.GC7472@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 10:13:41AM +0200, Maarten Lankhorst wrote:
-> for_each_obj_in_state is about to be removed, so use the new atomic
-> iterator macros.
-> 
-> Signed-off-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
-> Cc: CK Hu <ck.hu@mediatek.com>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-mediatek at lists.infradead.org
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index 56f802d0a51c..be0741638f94 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -48,11 +48,11 @@ static void mtk_atomic_schedule(struct mtk_drm_private *private,
->  static void mtk_atomic_wait_for_fences(struct drm_atomic_state *state)
->  {
->  	struct drm_plane *plane;
-> -	struct drm_plane_state *plane_state;
-> +	struct drm_plane_state *new_plane_state;
->  	int i;
->  
-> -	for_each_plane_in_state(state, plane, plane_state, i)
-> -		mtk_fb_wait(plane->state->fb);
-> +	for_each_new_plane_in_state(state, plane, new_plane_state, i)
-> +		mtk_fb_wait(new_plane_state->fb);
->  }
+Hi,
 
-I think a variant of drm_atomic_set_fence_for_plane, which takes a
-reservation obj (or a dma-buf and then derefs dma_buf->resv itself) would
-be nice, so that drivers don't have to hand-roll sub-par fence waiting
-code like this (it's e.g. not interruptible for blocking commits).
+On Wed, Jul 12, 2017 at 11:04:08AM +0200, linux-kernel-dev at beckhoff.com wrote:
+> +/dts-v1/;
+> +#include "imx53.dtsi"
+> +
+> +#define MX53_PAD_EIM_D26__UART2_RXD_MUX    0x144 0x48c 0x880 0x2 0x0
+> +#define MX53_PAD_EIM_D27__UART2_TXD_MUX    0x148 0x490 0x000 0x2 0x0
+> +#define MX53_PAD_EIM_D28__UART2_RTS        0x14c 0x494 0x87c 0x2 0x0
+> +#define MX53_PAD_EIM_D29__UART2_CTS        0x150 0x498 0x000 0x2 0x0
+> +
+> +/ {
+> +	model = "Freescale i.MX53 based Beckhoff CX9020";
+> +	compatible = "fsl,imx53-qsb", "fsl,imx53";
+> +
+> +	chosen {
+> +		stdout-path = &uart2;
 
-Anyway, patch itself looks good.
+No baud-rate or bits configuration?
 
-Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> +	};
+> +
+> +	memory {
+> +		reg = <0x70000000 0x20000000>,
+> +		      <0xb0000000 0x20000000>;
+> +	};
+> +
+> +	ccat {
+> +		compatible = "bhf,emi-ccat";
+> +	};
+> +
+> +	display0: display at di0 {
 
->  
->  static void mtk_atomic_complete(struct mtk_drm_private *private,
-> -- 
-> 2.11.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+This unit-address (the bit after the @) isn't valid, as that should
+match a reg or ranges, but this node has neither.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Just call this display-0.
+
+> +		#address-cells =<1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,imx-parallel-display";
+> +		interface-pix-fmt = "rgb24";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_ipu_disp0>;
+> +		status = "okay";
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +			display0_in: endpoint {
+> +				remote-endpoint = <&ipu_di0_disp0>;
+> +			};
+> +		};
+> +
+> +		port at 1 {
+> +			reg = <1>;
+> +			display0_out: endpoint {
+> +				remote-endpoint = <&panel_in>;
+> +			};
+> +		};
+> +	};
+> +
+> +	dvi_panel: display at 0 {
+
+Likewise you have no reg here, so the unit address isn't valid.
+
+Surely panel-0?
+
+> +		#address-cells =<1>;
+> +		#size-cells = <0>;
+> +		compatible = "simple,ddc-only";
+
+I don't see that compatible string in my Linux tree, and it doesn't make
+sense to me -- "simple" isn't a vendor-prefix.
+
+Where has this come from?
+
+> +		ddc-i2c-bus = <&i2c2>;
+> +
+> +		port {
+> +			panel_in: endpoint {
+> +				remote-endpoint = <&display0_out>;
+> +			};
+> +		};
+> +	};
+
+[...]
+
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg_3p2v: regulator at 0 {
+> +			compatible = "regulator-fixed";
+> +			reg = <0>;
+
+Meaningless reg entry.
+
+> +			regulator-name = "3P2V";
+> +			regulator-min-microvolt = <3200000>;
+> +			regulator-max-microvolt = <3200000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_usb_vbus: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+
+Likewise.
+
+> +			regulator-name = "usb_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio7 8 0>;
+> +			enable-active-high;
+> +		};
+> +	};
+
+There's no need for a simple-bus here. It doesn't represent HW, and you
+can nothing. You can put these directly under the root node, without a
+synthetic reg or unnecessary container:
+
+	reg_3p2v: regulator-3p2v {
+		compatible = "regulator-fixed";
+		regulator-name = "3P2V";
+		regulator-min-microvolt = <3200000>;
+		regulator-max-microvolt = <3200000>;
+		regulator-always-on;
+	};
+
+	reg_usb_vbus: regulator-usb-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb_vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		gpio = <&gpio7 8 0>;
+		enable-active-high;
+	}
+
+Otherwise, looks fine to me.
+
+Thanks,
+Mark.
