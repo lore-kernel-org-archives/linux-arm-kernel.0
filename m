@@ -1,87 +1,166 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 12 Jul 2017 11:08:19 -0700
-Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <6613228.WfFrGvAy1X@aspire.rjw.lan>
-References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
- <20170623010837.11199-1-f.fainelli@gmail.com>
- <20170623010837.11199-2-f.fainelli@gmail.com>
- <6613228.WfFrGvAy1X@aspire.rjw.lan>
-Message-ID: <85441336-8d89-f7aa-4fbe-a4edaf478649@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 12 Jul 2017 20:30:55 +0200
+Subject: [PATCH v5 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <20170712172636.GA90759@google.com>
+References: <cover.1493804968.git.guillaume.tucker@collabora.com>
+ <bebe578ba130de5fa320ca7c6427b2fae83d61d7.1493804968.git.guillaume.tucker@collabora.com>
+ <20170712172636.GA90759@google.com>
+Message-ID: <1692483.PxpH1MfcPQ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2017 04:00 PM, Rafael J. Wysocki wrote:
-> On Thursday, June 22, 2017 06:08:36 PM Florian Fainelli wrote:
->> Add an optional platform_suspend_ops callback: target_state, and a
->> helper function globally visible to get this called:
->> platform_suspend_target_state().
->>
->> This is useful for platform specific drivers that may need to take a
->> slightly different suspend/resume path based on the system's
->> suspend/resume state being entered.
->>
->> Although this callback is optional and documented as such, it requires
->> a platform_suspend_ops::begin callback to be implemented in order to
->> provide an accurate suspend/resume state within the driver that
->> implements this platform_suspend_ops.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>  include/linux/suspend.h | 12 ++++++++++++
->>  kernel/power/suspend.c  | 15 +++++++++++++++
->>  2 files changed, 27 insertions(+)
->>
->> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
->> index d9718378a8be..d998a04a90a2 100644
->> --- a/include/linux/suspend.h
->> +++ b/include/linux/suspend.h
->> @@ -172,6 +172,15 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
->>   *	Called by the PM core if the suspending of devices fails.
->>   *	This callback is optional and should only be implemented by platforms
->>   *	which require special recovery actions in that situation.
->> + *
->> + * @target_state: Returns the suspend state the suspend_ops will be entering.
->> + * 	Called by device drivers that need to know the platform specific suspend
->> + * 	state the system is about to enter.
->> + * 	This callback is optional and should only be implemented by platforms
->> + * 	which require special handling of power management states within
->> + * 	drivers. It does require @begin to be implemented to provide the suspend
->> + * 	state. Return value is platform_suspend_ops specific, and may be a 1:1
->> + * 	mapping to suspend_state_t when relevant.
->>   */
->>  struct platform_suspend_ops {
->>  	int (*valid)(suspend_state_t state);
->> @@ -184,6 +193,7 @@ struct platform_suspend_ops {
->>  	bool (*suspend_again)(void);
->>  	void (*end)(void);
->>  	void (*recover)(void);
->> +	int (*target_state)(void);
-> 
-> I would use unsigned int (the sign should not matter).
-> 
->>  };
-> 
-> That's almost what I was thinking about except that the values returned by
-> ->target_state should be unique, so it would be good to do something to
-> ensure that.
-> 
-> The concern is as follows.
-> 
-> Say you have a driver develped for platform X where ->target_state returns
-> A for "mem" and B for "standby".  Then, the same IP is re-used on platform Y
-> returning B for "mem" and C for "standby" and now the driver cannot
-> distinguish between them.
-> 
-> Moreover, even if they both returned A for "mem" there might be differences
-> in how "mem" was defined by each of them and therefore in what the driver was
-> expected to do to handle "mem" on X and Y.
+Hi Brian,
 
-That makes sense, would you need the core implementation in
-platform_suspend_target_state() to range check what
-suspend_ops->target_state() returns against a set of reserved value say,
-checking from 0 up to ACPI_S_STATE_COUNT or is there another range you
-would like to see being used?
+Am Mittwoch, 12. Juli 2017, 10:26:39 CEST schrieb Brian Norris:
+> Hi Guillaume,
+> 
+> I know this has already been merged, but I figured here was an OK place
+> to note (inline):
+> 
+> On Wed, May 03, 2017 at 10:56:25AM +0100, Guillaume Tucker wrote:
+> > The ARM Mali Midgard GPU family is present in a number of SoCs
+> > from many different vendors such as Samsung Exynos and Rockchip.
+> > 
+> > Import the device tree bindings documentation from the r16p0
+> > 
+> > release of the Mali Midgard GPU kernel driver:
+> >   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/ma
+> >   li-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz> 
+> > Remove the copyright and GPL licence header as deemed not necessary.
+> > 
+> > Redesign the "compatible" property strings to list all the Mali
+> > Midgard GPU types and add vendor specific ones.
+> > 
+> > Drop the "clock-names" property as the Mali Midgard GPU uses only one
+> > clock (the driver now needs to call clk_get with NULL).
+> > 
+> > Convert the "interrupt-names" property values to lower-case: "job",
+> > "mmu" and "gpu".
+> > 
+> > Replace the deprecated "operating-points" optional property with
+> > "operating-points-v2".
+> > 
+> > Omit the following optional properties in this initial version as they
+> > 
+> > are only used in very specific cases:
+> >   * snoop_enable_smc
+> >   * snoop_disable_smc
+> >   * jm_config
+> >   * power_model
+> >   * system-coherency
+> >   * ipa-model
+> > 
+> > Update the example accordingly to reflect all these changes, based on
+> > rk3288 mali-t760.
+> > 
+> > CC: John Reitan <john.reitan@arm.com>
+> > Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+> > ---
+> > 
+> >  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 86
+> >  ++++++++++++++++++++++ 1 file changed, 86 insertions(+)
+> >  create mode 100644
+> >  Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt> 
+> > diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> > b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt new file
+> > mode 100644
+> > index 000000000000..d3b6e1a4713a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> 
+> ^^ This file name implies we're talking about a base "arm,mali-midgard"
+> compatible property.
 
-Thanks!
--- 
-Florian
+it follows the precedent of arm,mali-utgard.txt and while the file-name
+is not part of the compatible list, it feels way better collecting all the 
+variants in one file, compared to spawning multiple ones for each soc
+vendor using a mali gpu.
+
+Also in other places the naming of binding descriptions does not follow
+any compatible at all, so the filename = main-compatible does not seem
+to be the rule.
+
+
+> > @@ -0,0 +1,86 @@
+> > +ARM Mali Midgard GPU
+> > +====================
+> > +
+> > +Required properties:
+> > +
+> > +- compatible :
+> > +  * Must contain one of the following:
+> > +    + "arm,mali-t604"
+> > +    + "arm,mali-t624"
+> > +    + "arm,mali-t628"
+> > +    + "arm,mali-t720"
+> > +    + "arm,mali-t760"
+> > +    + "arm,mali-t820"
+> > +    + "arm,mali-t830"
+> > +    + "arm,mali-t860"
+> > +    + "arm,mali-t880"
+> > +  * which must be preceded by one of the following vendor specifics:
+> > +    + "amlogic,meson-gxm-mali"
+> > +    + "rockchip,rk3288-mali"
+> 
+> But it's not listed here.
+> 
+> > +
+> > +- reg : Physical base address of the device and length of the register
+> > area. +
+> > +- interrupts : Contains the three IRQ lines required by Mali Midgard
+> > devices. +
+> > +- interrupt-names : Contains the names of IRQ resources in the order they
+> > were +  provided in the interrupts property. Must contain: "job", "mmu",
+> > "gpu". +
+> > +
+> > +Optional properties:
+> > +
+> > +- clocks : Phandle to clock for the Mali Midgard device.
+> > +
+> > +- mali-supply : Phandle to regulator for the Mali device. Refer to
+> > +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+> > +
+> > +- operating-points-v2 : Refer to
+> > Documentation/devicetree/bindings/power/opp.txt +  for details.
+> > +
+> > +
+> > +Example for a Mali-T760:
+> > +
+> > +gpu at ffa30000 {
+> > +	compatible = "rockchip,rk3288-mali", "arm,mali-t760",
+> > "arm,mali-midgard";
+> 
+> And it *is* used here in this example.
+> 
+> So, should it be used/documented or not?
+
+No I don't think it should and have patches that drop the mali-midgard from
+the example + rk3288 dtsi to not confuse people:
+- https://patchwork.kernel.org/patch/9832811/
+- https://patchwork.kernel.org/patch/9832807/
+
+
+Devicetree supposedly should not contain wildcards and without knowing
+for real that all of then in fact are compatible we should not assume so
+[and that's hard to check with all the secrecy :-) ] . Using the real name 
+(tXXX) sounds nice enough.
+
+
+Heiko
+
+> > +	reg = <0xffa30000 0x10000>;
+> > +	interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+> > +		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+> > +		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+> > +	interrupt-names = "job", "mmu", "gpu";
+> > +	clocks = <&cru ACLK_GPU>;
+> > +	mali-supply = <&vdd_gpu>;
+> > +	operating-points-v2 = <&gpu_opp_table>;
+> > +	power-domains = <&power RK3288_PD_GPU>;
+> > +};
+> 
+> [...]
+> 
+> Brian
