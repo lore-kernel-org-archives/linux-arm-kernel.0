@@ -1,39 +1,105 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 12 Jul 2017 15:41:51 +0200
-Subject: [PATCH v3 00/12] AC97 device/driver model revamp
-In-Reply-To: <20170712105530.p3yb2gj3vt3thlab@sirena.org.uk> (Mark Brown's
- message of "Wed, 12 Jul 2017 11:55:30 +0100")
-References: <20170630194408.24978-1-robert.jarzmik@free.fr>
- <20170712105530.p3yb2gj3vt3thlab@sirena.org.uk>
-Message-ID: <87r2xlsrfk.fsf@belgarion.home>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 12 Jul 2017 15:42:45 +0200
+Subject: [RFC 2/2] mmc: meson-mx-sdio: Add a driver for the Amlogic Meson8
+ and Meson8b SoCs
+In-Reply-To: <CAFBinCA-goSsyq7bo=ozPRnOqc8br4KDJJ_Lao5h==Xneh02nw@mail.gmail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+ <20170506171857.16492-3-martin.blumenstingl@googlemail.com>
+ <CAPDyKFrrSLCjbXO9R4VqPpabiFsbE6_RqR=U7otVF4Ncv0jHjQ@mail.gmail.com>
+ <CAFBinCD3modyyOpi3OY5XLhjX0UCuV+WPY2Z=mdvwdMCyeGoqg@mail.gmail.com>
+ <CAPDyKFptXRPk7mVUiRHf=hECDbeyhTxuf3K1M6NkZcVEF0Enww@mail.gmail.com>
+ <CAFBinCD=uH=oQmWAcsMpxtbJCnJZernZx3XoNaPixUUQ7pk76w@mail.gmail.com>
+ <CAPDyKFrbxMpgDrZXKmrN4fyJWJ_ZML3jPxBs+YDEz=L1kA-BaA@mail.gmail.com>
+ <CAFBinCA-goSsyq7bo=ozPRnOqc8br4KDJJ_Lao5h==Xneh02nw@mail.gmail.com>
+Message-ID: <CAPDyKFoKaT_3MVF7SrS8bVm7iG=y6K+-R1+YNj=9bTS6qNrcug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
-
-> On Fri, Jun 30, 2017 at 09:43:56PM +0200, Robert Jarzmik wrote:
->> Hi Lars, Mark, Charles, Lee,
->> 
->> This is a resend of the v2, with patch 1 added (forgotten in v2). Patch 12 was
->> slightly modified after module unloading tests, and Dmitry acks were added.
+On 11 July 2017 at 23:23, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> Hi Ulf,
 >
-> This all looks good to me modulo the naming thing Takashi raised.
-Ok Mark, let us do this :
- - I'll do some extensive testing this week just to ensure the v4 is on par with
- v3 (should be the case but I prefer to be carefull).
- - Once I'm sure it's not worse than before, I'll post a v4.
+> sorry for the delay, I've been pretty busy.
+> however, I'll have more time to work in this driver this and next week
+>
+> On Mon, Jun 19, 2017 at 1:50 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>
+>>>> [...]
+>>>>
+>>>>>>> +       if (!(cmd->flags & MMC_RSP_CRC))
+>>>>>>> +               send |= MESON_MX_SDIO_SEND_RESP_WITHOUT_CRC7;
+>>>>>>> +
+>>>>>>> +       if (cmd->flags & MMC_RSP_BUSY)
+>>>>>>> +               send |= MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY;
+>>>>>>
+>>>>>> In case the controller has HW support of busy detection, please
+>>>>>> consider to enable MMC_CAP_WAIT_WHILE_BUSY for this driver. Then also
+>>>>>> assign host->max_busy_timeout a good value.
+>>>>> the IRQS register has bit 4 (CMD_BUSY) - but apart from that there is
+>>>>> no other documentation (about timeout values, etc.). the vendor driver
+>>>>> also neither uses MMC_CAP_WAIT_WHILE_BUSY nor host->max_busy_timeout
+>>>>> should I leave this as it is?
+>>>>
+>>>> Please don't just leave it as is. This is an important thing to get right.
+>>>>
+>>>> You should be able to explore this area and see how the controller
+>>>> behaves without too much of documentation. Regarding timeouts, it may
+>>>> very well be that the controller don't have a timeout, which is why
+>>>> you need a software timeout. That's not so uncommon actually.
+>>> during my experiments I've never seen an interrupt when a command
+>>> timed out (nor could I find information about a timeout register in
+>>> the documentation). do you have any pointers (like a previous mail
+>>> where you've explained) how I can "explore the controller's timeout
+>>> behavior"?
+>>
+>> Sorry, I don't have an pointers.
+>>
+>> Anyway. If you do a big erase operation on an SD card, the card should
+>> signal busy on DAT0 for a rather long time.
+> erase operation = mount sd card; rm big_file.bin; sync ?
+> or is there some other way?
 
-That might give a couple of days to :
- - have Lee's ack on patch 6/12
+There is tool called fstrim, maybe you can you that as well.
 
-   Lee, could you have a look please, that touches your tree, and if you have
-   concerns I'd rather wait before releasing v4 in order to take them into
-   account ?
+Don't forget that the mount options of the fs also matters of what
+will happen for the so called discard operations (translates to erase
+in SD).
 
- - give Lars another opportunity to complain about what I had forgotten :)
- - give me time to retest
+>
+>> You could probably explore how long it takes for the card to respond
+>> under those circumstances, and try both with and without
+>> MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY.
+> so I simply read the card status through sysfs? or would I need to get
+> some of this information from the controller?
+> I found that the IRQC register contains a few interesting bits:
+>     u32 sdio_force_data:6; /*[13:8]
+>         * Write operation: Data forced by software
+>         * Read operation: {CLK,CMD,DAT[3:0]}*/
+> I dumped these while transferring some data, the values seem to be
+> changing constantly (0x3f, 0x1f, 0x20, ...)
+> if I interpret those bits correctly then they are the status of the
+> corresponding pin
 
-Cheers.
+Okay! So if the controller doesn't fully support HW busy detection,
+you should at least be able to implement the ->card_busy() host ops,
+which is used to poll the DAT0 line for busy detection.
 
--- 
-Robert
+>
+>> Of course you also need to try with and without
+>> MMC_CAP_WAIT_WHILE_BUSY, as the core may sometimes convert R1B to R1
+>> responses depending on that cap.
+> so MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY + MMC_CAP_WAIT_WHILE_BUSY should
+> go together?
+> and MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY should not be set when
+> MMC_CAP_WAIT_WHILE_BUSY isn't?
+
+Yeah, something like that.
+
+So if you controller fully supports HW busy detection, the driver
+should set MMC_CAP_WAIT_WHILE_BUSY and then act accordingly when R1B
+responses are expected.
+
+[...]
+
+Kind regards
+Uffe
