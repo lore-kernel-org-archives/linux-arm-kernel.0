@@ -1,57 +1,49 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 12 Jul 2017 16:45:20 +0200
-Subject: [PATCH] ARM: shmobile: rcar-gen2: Fix deadlock in regulator quirk
-Message-ID: <1499870720-30390-1-git-send-email-geert+renesas@glider.be>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 12 Jul 2017 15:44:22 +0100
+Subject: [RFC PATCH 09/10] arm64: mm: add C level handling for stack overflows
+In-Reply-To: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
+References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170712144424.19528-10-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon Horman reported that Koelsch and Lager hang during boot, and
-bisected this to commit 1c3c5eab171590f8 ("sched/core: Enable
-might_sleep() and smp_processor_id() checks early").
+Add the code to __do_kernel_fault() to force a panic when the faulting
+address of a data abort points into the guard page below the current
+task's stack.
 
-The da9063/da9210 regulator quirk for R-Car Gen2 boards uses a bus
-notifier, and unregisters the notifier when it is no longer needed.
-However, a notifier must not be unregistered from within the call chain.
+Currently, we won't be able to make it all the way here under such a
+condition, but that will be addressed in a subsequent patch.
 
-This bug went unnoticed, as blocking_notifier_chain_unregister() didn't
-take the semaphore during early boot.  The aforementioned commit changed
-that behavior, leading to a deadlock.
-
-Fix this by removing the call to bus_unregister_notifier(), and keeping
-local completion state instead.
-
-Reported-by: Simon Horman <horms+renesas@verge.net.au>
-Fixes: 663fbb52159cca6f ("ARM: shmobile: R-Car Gen2: Add da9063/da9210 regulator quirk")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm64/mm/fault.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-index 73e3adbc133096ec..44438f344dc80f9c 100644
---- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-@@ -67,8 +67,12 @@ static int regulator_quirk_notify(struct notifier_block *nb,
- {
- 	struct device *dev = data;
- 	struct i2c_client *client;
-+	static bool done;
- 	u32 mon;
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c7861c9864e6..b3317e5ff5dd 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -229,6 +229,21 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+ 		return;
  
-+	if (done)
-+		return 0;
+ 	/*
++	 * If we faulted on the guard page below this task's stack,
++	 * we evidently overflowed
++	 */
++	if (addr >= (u64)current->stack - PAGE_SIZE &&
++	    addr < (u64)current->stack) {
++		printk(KERN_EMERG "BUG: stack guard page was hit at %p (stack is %p..%p)\n",
++			 (void *)addr, current->stack,
++			 (char *)current->stack + THREAD_SIZE - 1);
++		die("Oops", regs, esr);
 +
- 	mon = ioread32(irqc + IRQC_MONITOR);
- 	dev_dbg(dev, "%s: %ld, IRQC_MONITOR = 0x%x\n", __func__, action, mon);
- 	if (mon & REGULATOR_IRQ_MASK)
-@@ -99,7 +103,7 @@ static int regulator_quirk_notify(struct notifier_block *nb,
- remove:
- 	dev_info(dev, "IRQ2 is not asserted, removing quirk\n");
- 
--	bus_unregister_notifier(&i2c_bus_type, nb);
-+	done = true;
- 	iounmap(irqc);
- 	return 0;
- }
++		/* Be absolutely certain we don't return. */
++		panic("Kernel stack overflow");
++	}
++
++	/*
+ 	 * No handler, we'll have to terminate things with extreme prejudice.
+ 	 */
+ 	bust_spinlocks(1);
 -- 
-2.7.4
+2.9.3
