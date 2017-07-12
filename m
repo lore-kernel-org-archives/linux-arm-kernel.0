@@ -1,98 +1,177 @@
 From: ada@thorsis.com (Alexander Dahl)
-Date: Wed, 12 Jul 2017 18:28:10 +0200
-Subject: [RFC 1/3] net: macb: Add register descriptions
+Date: Wed, 12 Jul 2017 18:28:12 +0200
+Subject: [RFC 3/3] net: macb: Use sram for rx buffers
 In-Reply-To: <1499876892-14423-1-git-send-email-ada@thorsis.com>
 References: <1499876892-14423-1-git-send-email-ada@thorsis.com>
-Message-ID: <1499876892-14423-2-git-send-email-ada@thorsis.com>
+Message-ID: <1499876892-14423-4-git-send-email-ada@thorsis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Analog to the already present long register names for GEM, add those for
-MACB. Taken from the AT91SAM9G20 complete datasheet.
+The default way for the driver is to use system memory for RX/TX DMA
+buffers and rings. For the AT91SAM9G20 this is SDRAM which is connected
+through the EBI bus, together with other memories like NAND-Flash or
+external SRAM. If a memory access to external SRAM using the NWAIT
+signal takes too long, the EMAC on the SoC throws receive overrun (ROVR)
+errors which means it can not put incoming packets into SDRAM (through
+DMA). Those errors add up in /proc/net/dev
+
+To circumvent those "dropped" ethernet frames, we put the RX buffers and
+rings into the small internal SRAM of the SoC, which are also usable for
+DMA but directly connected through the AHB without the path through the
+EBI. This way there are no lost ethernet frames anymore. (If there's too
+much load however packets can still be dropped by the kernel.)
 
 Signed-off-by: Alexander Dahl <ada@thorsis.com>
 ---
- drivers/net/ethernet/cadence/macb.h | 66 ++++++++++++++++++-------------------
- 1 file changed, 33 insertions(+), 33 deletions(-)
+ drivers/net/ethernet/cadence/macb.c | 66 ++++++++++++++++++++++++++++++-------
+ drivers/net/ethernet/cadence/macb.h |  2 ++
+ 2 files changed, 57 insertions(+), 11 deletions(-)
 
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 91f7492..8dacd9c 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -23,6 +23,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/netdevice.h>
+ #include <linux/etherdevice.h>
++#include <linux/genalloc.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/platform_data/macb.h>
+ #include <linux/platform_device.h>
+@@ -40,9 +41,9 @@
+ #define MACB_RX_BUFFER_SIZE	128
+ #define RX_BUFFER_MULTIPLE	64  /* bytes */
+ 
+-#define DEFAULT_RX_RING_SIZE	512 /* must be power of 2 */
++#define DEFAULT_RX_RING_SIZE	128 /* must be power of 2 */
+ #define MIN_RX_RING_SIZE	64
+-#define MAX_RX_RING_SIZE	8192
++#define MAX_RX_RING_SIZE	128
+ #define RX_RING_BYTES(bp)	(macb_dma_desc_get_size(bp)	\
+ 				 * (bp)->rx_ring_size)
+ 
+@@ -1660,9 +1661,14 @@ static void gem_free_rx_buffers(struct macb *bp)
+ static void macb_free_rx_buffers(struct macb *bp)
+ {
+ 	if (bp->rx_buffers) {
+-		dma_free_coherent(&bp->pdev->dev,
+-				  bp->rx_ring_size * bp->rx_buffer_size,
+-				  bp->rx_buffers, bp->rx_buffers_dma);
++		if (bp->sram_pool)
++			gen_pool_free(bp->sram_pool,
++				      (unsigned long)bp->rx_buffers,
++				      bp->rx_ring_size * bp->rx_buffer_size);
++		else
++			dma_free_coherent(&bp->pdev->dev,
++					  bp->rx_ring_size * bp->rx_buffer_size,
++					  bp->rx_buffers, bp->rx_buffers_dma);
+ 		bp->rx_buffers = NULL;
+ 	}
+ }
+@@ -1674,8 +1680,12 @@ static void macb_free_consistent(struct macb *bp)
+ 
+ 	bp->macbgem_ops.mog_free_rx_buffers(bp);
+ 	if (bp->rx_ring) {
+-		dma_free_coherent(&bp->pdev->dev, RX_RING_BYTES(bp),
+-				  bp->rx_ring, bp->rx_ring_dma);
++		if (bp->sram_pool)
++			gen_pool_free(bp->sram_pool, (unsigned long)bp->rx_ring,
++				      RX_RING_BYTES(bp));
++		else
++			dma_free_coherent(&bp->pdev->dev, RX_RING_BYTES(bp),
++					  bp->rx_ring, bp->rx_ring_dma);
+ 		bp->rx_ring = NULL;
+ 	}
+ 
+@@ -1690,6 +1700,28 @@ static void macb_free_consistent(struct macb *bp)
+ 	}
+ }
+ 
++static void macb_init_sram(struct macb *bp)
++{
++	struct device_node *node;
++	struct platform_device *pdev = NULL;
++
++	for_each_compatible_node(node, NULL, "mmio-sram") {
++		pdev = of_find_device_by_node(node);
++		if (pdev) {
++			of_node_put(node);
++			break;
++		}
++	}
++
++	if (!pdev) {
++		netdev_warn(bp->dev, "Failed to find sram device!\n");
++		bp->sram_pool = NULL;
++		return;
++	}
++
++	bp->sram_pool = gen_pool_get(&pdev->dev, NULL);
++}
++
+ static int gem_alloc_rx_buffers(struct macb *bp)
+ {
+ 	int size;
+@@ -1710,14 +1742,20 @@ static int macb_alloc_rx_buffers(struct macb *bp)
+ 	int size;
+ 
+ 	size = bp->rx_ring_size * bp->rx_buffer_size;
+-	bp->rx_buffers = dma_alloc_coherent(&bp->pdev->dev, size,
+-					    &bp->rx_buffers_dma, GFP_KERNEL);
++	if (bp->sram_pool)
++		bp->rx_buffers = gen_pool_dma_alloc(bp->sram_pool, size,
++						    &bp->rx_buffers_dma);
++	else
++		bp->rx_buffers = dma_alloc_coherent(&bp->pdev->dev, size,
++						    &bp->rx_buffers_dma,
++						    GFP_KERNEL);
+ 	if (!bp->rx_buffers)
+ 		return -ENOMEM;
+ 
+ 	netdev_dbg(bp->dev,
+ 		   "Allocated RX buffers of %d bytes at %08lx (mapped %p)\n",
+ 		   size, (unsigned long)bp->rx_buffers_dma, bp->rx_buffers);
++
+ 	return 0;
+ }
+ 
+@@ -1746,8 +1784,12 @@ static int macb_alloc_consistent(struct macb *bp)
+ 	}
+ 
+ 	size = RX_RING_BYTES(bp);
+-	bp->rx_ring = dma_alloc_coherent(&bp->pdev->dev, size,
+-					 &bp->rx_ring_dma, GFP_KERNEL);
++	if (bp->sram_pool)
++		bp->rx_ring = gen_pool_dma_alloc(bp->sram_pool, size,
++						 &bp->rx_ring_dma);
++	else
++		bp->rx_ring = dma_alloc_coherent(&bp->pdev->dev, size,
++						 &bp->rx_ring_dma, GFP_KERNEL);
+ 	if (!bp->rx_ring)
+ 		goto out_err;
+ 	netdev_dbg(bp->dev,
+@@ -2698,6 +2740,8 @@ static int macb_init(struct platform_device *pdev)
+ 	int err;
+ 	u32 val;
+ 
++	macb_init_sram(bp);
++
+ 	bp->tx_ring_size = DEFAULT_TX_RING_SIZE;
+ 	bp->rx_ring_size = DEFAULT_RX_RING_SIZE;
+ 
 diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index ec037b0..8547d92 100644
+index 567c72d..d352181 100644
 --- a/drivers/net/ethernet/cadence/macb.h
 +++ b/drivers/net/ethernet/cadence/macb.h
-@@ -31,41 +31,41 @@
- #define MACB_IDR		0x002c /* Interrupt Disable */
- #define MACB_IMR		0x0030 /* Interrupt Mask */
- #define MACB_MAN		0x0034 /* PHY Maintenance */
--#define MACB_PTR		0x0038
--#define MACB_PFR		0x003c
--#define MACB_FTO		0x0040
--#define MACB_SCF		0x0044
--#define MACB_MCF		0x0048
--#define MACB_FRO		0x004c
--#define MACB_FCSE		0x0050
--#define MACB_ALE		0x0054
--#define MACB_DTF		0x0058
--#define MACB_LCOL		0x005c
--#define MACB_EXCOL		0x0060
--#define MACB_TUND		0x0064
--#define MACB_CSE		0x0068
--#define MACB_RRE		0x006c
--#define MACB_ROVR		0x0070
--#define MACB_RSE		0x0074
--#define MACB_ELE		0x0078
--#define MACB_RJA		0x007c
--#define MACB_USF		0x0080
--#define MACB_STE		0x0084
--#define MACB_RLE		0x0088
-+#define MACB_PTR		0x0038 /* Pause Time */
-+#define MACB_PFR		0x003c /* Pause Frames Received */
-+#define MACB_FTO		0x0040 /* Frames Transmitted Ok */
-+#define MACB_SCF		0x0044 /* Single Collision Frames */
-+#define MACB_MCF		0x0048 /* Multiple Collision Frames */
-+#define MACB_FRO		0x004c /* Frames Received Ok */
-+#define MACB_FCSE		0x0050 /* Frame Check Sequence Errors */
-+#define MACB_ALE		0x0054 /* Alignment Errors */
-+#define MACB_DTF		0x0058 /* Deferred Transmission Frames */
-+#define MACB_LCOL		0x005c /* Late Collisions */
-+#define MACB_EXCOL		0x0060 /* Excessive Collisions */
-+#define MACB_TUND		0x0064 /* Transmit Underrun Errors */
-+#define MACB_CSE		0x0068 /* Carrier Sense Errors */
-+#define MACB_RRE		0x006c /* Receive Resource Errors */
-+#define MACB_ROVR		0x0070 /* Receive Overrun Errors */
-+#define MACB_RSE		0x0074 /* Receive Symbol Errors */
-+#define MACB_ELE		0x0078 /* Excessive Length Errors */
-+#define MACB_RJA		0x007c /* Receive Jabbers */
-+#define MACB_USF		0x0080 /* Undersize Frames */
-+#define MACB_STE		0x0084 /* SQE Test Errors */
-+#define MACB_RLE		0x0088 /* Received Length Field Mismatch */
- #define MACB_TPF		0x008c
--#define MACB_HRB		0x0090
--#define MACB_HRT		0x0094
--#define MACB_SA1B		0x0098
--#define MACB_SA1T		0x009c
--#define MACB_SA2B		0x00a0
--#define MACB_SA2T		0x00a4
--#define MACB_SA3B		0x00a8
--#define MACB_SA3T		0x00ac
--#define MACB_SA4B		0x00b0
--#define MACB_SA4T		0x00b4
--#define MACB_TID		0x00b8
-+#define MACB_HRB		0x0090 /* Hash Register Bottom [31:0] */
-+#define MACB_HRT		0x0094 /* Hash Register Top [63:32] */
-+#define MACB_SA1B		0x0098 /* Specific Address 1 Bottom */
-+#define MACB_SA1T		0x009c /* Specific Address 1 Top */
-+#define MACB_SA2B		0x00a0 /* Specific Address 2 Bottom */
-+#define MACB_SA2T		0x00a4 /* Specific Address 2 Top */
-+#define MACB_SA3B		0x00a8 /* Specific Address 3 Bottom */
-+#define MACB_SA3T		0x00ac /* Specific Address 3 Top */
-+#define MACB_SA4B		0x00b0 /* Specific Address 4 Bottom */
-+#define MACB_SA4T		0x00b4 /* Specific Address 4 Top */
-+#define MACB_TID		0x00b8 /* Type ID Checking */
- #define MACB_TPQ		0x00bc
--#define MACB_USRIO		0x00c0
-+#define MACB_USRIO		0x00c0 /* User Input/Output */
- #define MACB_WOL		0x00c4
- #define MACB_MID		0x00fc
- #define MACB_TBQPH		0x04C8
+@@ -957,6 +957,8 @@ struct macb {
+ #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+ 	enum macb_hw_dma_cap hw_dma_cap;
+ #endif
++
++	struct gen_pool		*sram_pool;
+ };
+ 
+ static inline bool macb_is_gem(struct macb *bp)
 -- 
 2.1.4
