@@ -1,72 +1,74 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 12 Jul 2017 13:57:25 +0000
-Subject: [PATCH V4 3/7] pinctrl: imx: switch to use the generic pinmux
- property
-In-Reply-To: <1498046395-30001-4-git-send-email-aisheng.dong@nxp.com>
-References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
- <1498046395-30001-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <AM3PR04MB3068BC904003E560AF4F62280AF0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 12 Jul 2017 15:59:27 +0200
+Subject: [PATCH 3/3] ARM: dts: at91: sama5d2: use sama5d2 compatible
+ string for SMC
+In-Reply-To: <20170711092556.mukp4umf4r4etqvt@dell>
+References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
+ <20170711074015.30440-4-ludovic.desroches@microchip.com>
+ <029b80a8-2d3f-11b4-d4df-55f5fc48c8e7@microchip.com>
+ <20170711075829.5rzdrjgao6efiuj2@rfolt0960.corp.atmel.com>
+ <20170711080853.uxdmxocq5nhrp7vq@rfolt0960.corp.atmel.com>
+ <20170711092556.mukp4umf4r4etqvt@dell>
+Message-ID: <20170712135927.v2mlzknsn4w4o2r2@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-> -----Original Message-----
-> From: Dong Aisheng [mailto:aisheng.dong at nxp.com]
-> Sent: Wednesday, June 21, 2017 8:00 PM
-> To: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linus.walleij at linaro.org;
-> shawnguo at kernel.org; stefan at agner.ch; Jacky Bai; Andy Duan;
-> kernel at pengutronix.de; A.s. Dong
-> Subject: [PATCH V4 3/7] pinctrl: imx: switch to use the generic pinmux
-> property
+On 11/07/2017 at 10:25:56 +0100, Lee Jones wrote:
+> On Tue, 11 Jul 2017, Ludovic Desroches wrote:
 > 
-> The generic pinmux property seems to be more suitable for IMX.
-> So we change to use 'pinmux' instead of 'pins'.
+> > On Tue, Jul 11, 2017 at 09:58:29AM +0200, Ludovic Desroches wrote:
+> > > On Tue, Jul 11, 2017 at 09:52:58AM +0200, Nicolas Ferre wrote:
+> > > > On 11/07/2017 at 09:40, Ludovic Desroches wrote:
+> > > > > A new compatible string has been introduced for sama5d2 SMC to allow to
+> > > > > manage the registers mapping change.
+> > > > > 
+> > > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> > > > > ---
+> > > > >  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+> > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> > > > > index 4fcd5bb219e3..60e69aeacbdb 100644
+> > > > > --- a/arch/arm/boot/dts/sama5d2.dtsi
+> > > > > +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> > > > > @@ -1048,7 +1048,7 @@
+> > > > >  			};
+> > > > >  
+> > > > >  			hsmc: hsmc at f8014000 {
+> > > > > -				compatible = "atmel,sama5d3-smc", "syscon", "simple-mfd";
+> > > > > +				compatible = "atmel,sama5d2-smc", "syscon", "simple-mfd";
+> > > > 
+> > > > You'd better use something like:
+> > > >  compatible = "atmel,sama5d2-smc", "atmel,sama5d3-smc", "syscon", "simple-mfd";
+> > > 
+> > > But it's not true, during data interface setup, we will write values in
+> > > the wrong place if we fallback on "atmel,sama5d3-smc".
+> > > 
+> > > Regards
+> > > 
+> > > Ludovic
+> > > 
+> > > > 
+> > > > So that this patch is independent from the rest of the series and
+> > > > we can avoid to having to synchronize with mfd or mtd/nand for this part.
+> > 
+> > If Lee and Boris agree, maybe the series can go through AT91.
 > 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Bai Ping <ping.bai@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> That's fine, but if the series goes though another tree, I will
+> require a pull-request.
+> 
+> I am also happy to carry though the MFD tree (and will of course send
+> out a PR to the other affected Maintainers).
 > 
 
-Would you help review this minor change?
+I think the easiest is that you take the first two patches through mfd
+and I'll take the third one through at91.
 
-I will collect your ACKs and resent based on 4.13 RC1.
+Our plan is to get everything fixed for the final 4.13 (I'll send the DT
+as a fix, on top of 4.13-rc1). Is that OK for you ?
 
-Regards
-Dong Aisheng
 
-> ---
-> ChangeLog:
->  * new patch
-> ---
->  drivers/pinctrl/freescale/pinctrl-imx.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
-> b/drivers/pinctrl/freescale/pinctrl-imx.c
-> index 72aca75..fc1ba3c 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> @@ -563,14 +563,14 @@ static int imx_pinctrl_parse_groups(struct
-> device_node *np,
->  	 * do sanity check and calculate pins number
->  	 *
->  	 * First try legacy 'fsl,pins' property, then fall back to the
-> -	 * generic 'pins'.
-> +	 * generic 'pinmux'.
->  	 *
-> -	 * Note: for generic 'pins' case, there's no CONFIG part in
-> +	 * Note: for generic 'pinmux' case, there's no CONFIG part in
->  	 * the binding format.
->  	 */
->  	list = of_get_property(np, "fsl,pins", &size);
->  	if (!list) {
-> -		list = of_get_property(np, "pins", &size);
-> +		list = of_get_property(np, "pinmux", &size);
->  		if (!list) {
->  			dev_err(info->dev,
->  				"no fsl,pins and pins property in node %s\n",
-> --
-> 2.7.4
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
