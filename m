@@ -1,92 +1,85 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 12 Jul 2017 07:04:46 +0200
-Subject: [PATCH 0/3] USB Mux support for Chipidea
-In-Reply-To: <20170712010255.26855-1-stephen.boyd@linaro.org>
-References: <20170712010255.26855-1-stephen.boyd@linaro.org>
-Message-ID: <fc1f2836-cd9b-0905-21fc-d2d3029d1f52@axentia.se>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Jul 2017 07:52:58 +0200
+Subject: [PATCH v2] dt-bindings: net: ravb : Add support for r8a7743 SoC
+In-Reply-To: <87b6b38a-ca6b-a0d7-b777-0a4809eaf6fc@cogentembedded.com>
+References: <20170710012024.j4cso2jyi6canws2@rob-hp-laptop>
+ <1499700776-54504-1-git-send-email-biju.das@bp.renesas.com>
+ <52eb0b92-5d25-e1f4-df54-e4fcf648c90e@cogentembedded.com>
+ <20170711122100.GM4517@verge.net.au>
+ <87b6b38a-ca6b-a0d7-b777-0a4809eaf6fc@cogentembedded.com>
+Message-ID: <20170712055258.GB18990@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-07-12 03:02, Stephen Boyd wrote:
-> This patchset adds support for the TC7USB40MU usb mux found on 
-> db410c 96boards platforms via the new multiplexer framework and
-> hooks that into the chipidea driver. This allows us to properly
-> control host or device mode on this board via the sysfs knob.
+On Tue, Jul 11, 2017 at 03:51:40PM +0300, Sergei Shtylyov wrote:
+> On 07/11/2017 03:21 PM, Simon Horman wrote:
 > 
-> So far I've only tested this on db410c, and there are some rough
-> edges to finish off before it can merge. Also I'm experiencing
-> odd behavior with switching the role while gadget is enabled and
-> the micro-usb cable is kept connected. Not sure what's wrong but
-> it seems like the gadget never gets disconnected? I'll investigate
-> more.
+> >>>Add a new compatible string for the RZ/G1M (R8A7743) SoC.
+> >>>
+> >>>Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> >>>---
+> >>>v1->v2
+> >>>* Changed the subject
+> >>>* re-formatted the required properties
+> >>>
+> >>>.../devicetree/bindings/net/renesas,ravb.txt       | 29 +++++++++++++---------
+> >>>1 file changed, 17 insertions(+), 12 deletions(-)
+> >>>
+> >>>diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> >>>index b519503..4717bc2 100644
+> >>>--- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> >>>+++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> >>>@@ -4,19 +4,24 @@ This file provides information on what the device node for the Ethernet AVB
+> >>>interface contains.
+> >>>
+> >>>Required properties:
+> >>>-- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+> >>>-	      "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
+> >>>-	      "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
+> >>>-	      "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
+> >>>-	      "renesas,etheravb-r8a7794" if the device is a part of R8A7794 SoC.
+> >>>-	      "renesas,etheravb-r8a7795" if the device is a part of R8A7795 SoC.
+> >>>-	      "renesas,etheravb-r8a7796" if the device is a part of R8A7796 SoC.
+> >>>-	      "renesas,etheravb-rcar-gen2" for generic R-Car Gen 2 compatible interface.
+> >>>-	      "renesas,etheravb-rcar-gen3" for generic R-Car Gen 3 compatible interface.
+> >>>+- compatible: Must contain one or more of the following:
+> >>
+> >>   No, it can't contain more than one SoC specific value.
+> >
+> >The text above does not say it can unless one is under the delusion
+> >that, f.e. an r8a7790 SoC is also an r8a7791 SoC.
 > 
-> TODO:
+>    Hm, you're right. Sorry about my misunderstanding...
 > 
->  1. The mux framework has to be selected for consumers to use it. We'll
->     need some stubs in the consumer header file to allow compilation to
->     continue without mux always enabled by consumers.
-
-Instead of "depends on MULTIPLEXER", just add "select MULTIPLEXER"
-to the Kconfig. Otherwise, you'll have to convince Linus that we
-really do need a Kconfig question for the subsystem :-)
-
-https://lkml.org/lkml/2017/7/4/118
-
->  2. We probably need some sort of mux_control_get_optional() API so that
->     we know if there was an error getting the mux control, instead of just
->     ignoring errors. For now I can pass up EPROBE_DEFER errors and ignore
->     other errors and consider it "missing from DT".
-
-Yes, mux_control_get_optional should be easy to add.
-
->  3. Maybe we can get rid of the mux driver and just use mux-gpio.c with
->     a compatible string update? I split it off because we may want to
->     support the "S" pin on the TC7USB40MU one day that shuts off both
->     mux outputs.
-
-Maybe no need for a compatible update either, if it works to do something
-like this in the DT?
-
-	usb_switch: usb-switch {
-		compatible = "gpio-mux";
-		mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>,
-			    <&pm8916_gpios XXX GPIO_ACTIVE_XXX>;
-		idle-state = <2>;
-		#mux-control-cells = <0>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&usb_sw_sel_pm>;
-	};
-
-But I obviously know little about how things are wired and really works,
-so that might be totally off...
-
-Otherwise, maybe a generic mux-pinctrl driver would do the trick?
-(compare with drivers/i2c/muxes/i2c-mux-pinctrl.c)
-
-Cheers,
-peda
-
->  4. The userspace side of things is murky. What is expected to go and toggle
->     the host/gadget side of things in userspace at this very specific location
->     for chipidea devices?
+>    The only problem I'm still seeing with the current wording is that gen2/3
+> fallback
+> values are declared optional, while you can't get the driver to bind without
+> them on
+> the newer SoCs. But this is probably not a new problem...
 > 
-> Stephen Boyd (3):
->   usb: misc: Add a driver for TC7USB40MU
->   usb: chipidea: Hook into mux framework to toggle usb switch
->   arm64: dts: qcom: Collapse usb support into one node
+> >If you would prefer an alternate wording please provide a suggestion.
 > 
->  .../devicetree/bindings/usb/ci-hdrc-usb2.txt       |  8 +++
->  .../devicetree/bindings/usb/toshiba,tc7usb40mu.txt | 31 +++++++++
->  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          | 39 +++++++-----
->  arch/arm64/boot/dts/qcom/msm8916.dtsi              | 62 +++++++++---------
->  drivers/usb/chipidea/core.c                        | 17 +++++
->  drivers/usb/chipidea/host.c                        | 10 +++
->  drivers/usb/chipidea/udc.c                         | 11 ++++
->  drivers/usb/misc/Kconfig                           | 11 ++++
->  drivers/usb/misc/Makefile                          |  1 +
->  drivers/usb/misc/tc7usb40mu.c                      | 74 ++++++++++++++++++++++
->  include/linux/usb/chipidea.h                       | 14 ++++
->  11 files changed, 228 insertions(+), 50 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/toshiba,tc7usb40mu.txt
->  create mode 100644 drivers/usb/misc/tc7usb40mu.c
+>    Perhaps we should emphasize that the gen2/3 fallback values are mandatory?
+
+It's only mandatory for SoCs covered by those values - admittedly all SoCs
+supported by the driver at this time. But that is an artifact of the
+implementation rather than a property of the binding.
+
+In any case I think is already described sufficiently in:
+
+	When compatible with the generic version, nodes must list the
+	SoC-specific version corresponding to the platform first followed by
+	the generic version.
+
+> >>>+      - "renesas,etheravb-r8a7743" for the R8A7743 SoC.
+> >>>+      - "renesas,etheravb-r8a7790" for the R8A7790 SoC.
+> >>>+      - "renesas,etheravb-r8a7791" for the R8A7791 SoC.
+> >>>+      - "renesas,etheravb-r8a7792" for the R8A7792 SoC.
+> >>>+      - "renesas,etheravb-r8a7793" for the R8A7793 SoC.
+> >>>+      - "renesas,etheravb-r8a7794" for the R8A7794 SoC.
+> >>>+      - "renesas,etheravb-rcar-gen2" as a fallback for the above
+> >>>+		R-Car Gen2 and RZ/G1 devices.
+> [...]
+> 
+> WBR, Sergei
 > 
