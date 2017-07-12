@@ -1,129 +1,150 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Jul 2017 09:26:30 +0530
-Subject: cpufreq: frequency scaling spec in DT node
-In-Reply-To: <9a2638ee-e04f-13f1-b1e5-56f27b58da2e@free.fr>
-References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
- <20170629100459.GL29665@vireshk-i7>
- <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
- <20170629143432.GM29665@vireshk-i7>
- <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
- <9a2638ee-e04f-13f1-b1e5-56f27b58da2e@free.fr>
-Message-ID: <20170712035630.GE17115@vireshk-i7>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 12 Jul 2017 00:04:14 -0400
+Subject: [PATCH V4] PCI: Add Extended Tags quirk for Broadcom HT2100 Root Port
+Message-ID: <1499832255-9845-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-07-17, 15:36, Mason wrote:
-> On 11/07/2017 11:27, Mason wrote:
-> 
-> > I'll experiment with the other solution of creating the OPP table
-> > at init.
-> 
-> For the sake of discussion, based on your suggestion to use
-> dev_pm_opp_add(), I have tested the patch below.
-> 
-> There is one remaining error:
-> [    2.071139] of: dev_pm_opp_of_cpumask_add_table: couldn't find opp table for cpu:0, -19
-> 
-> Reached through:
-> [    1.878461] [<c0359a0c>] (dev_pm_opp_of_add_table) from [<c0359ff0>] (dev_pm_opp_of_cpumask_add_table+0x40/0xc8)
-> [    1.888695] [<c0359ff0>] (dev_pm_opp_of_cpumask_add_table) from [<c03d66d8>] (cpufreq_init+0x23c/0x2dc)
-> [    1.898139] [<c03d66d8>] (cpufreq_init) from [<c03d3d94>] (cpufreq_online+0xb8/0x660)
-> [    1.906009] [<c03d3d94>] (cpufreq_online) from [<c03d43f8>] (cpufreq_add_dev+0xbc/0xcc)
-> [    1.914058] [<c03d43f8>] (cpufreq_add_dev) from [<c0350560>] (subsys_interface_register+0x90/0xcc)
-> [    1.923065] [<c0350560>] (subsys_interface_register) from [<c03d32f4>] (cpufreq_register_driver+0x15c/0x1e0)
-> [    1.932945] [<c03d32f4>] (cpufreq_register_driver) from [<c03d67f0>] (dt_cpufreq_probe+0x78/0xec)
-> [    1.941866] [<c03d67f0>] (dt_cpufreq_probe) from [<c035327c>] (platform_drv_probe+0x34/0x6c)
+All PCIe devices are expected to be able to handle 8-bit tags.
+'commit 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")'
+enabled extended tags for all devices based on the spec direction.
 
-I have sent a patch to fix that.
+The Broadcom HT2100 seems to be having issues with handling
+8-bit tags. Mark it as broken.
 
-> The cpufreq-dt driver seems to recover despite the error:
-> 
-> /sys/devices/system/cpu/cpu0/cpufreq$ cat scaling_available_frequencies
-> 135000 243000 405000 607500 1215000 
+If a device with extended tags quirk is found, disable extended tags for
+all devices in the tree assuming peer-to-peer is possible.
 
-Yeah, it worked as expected.
+The pci_walk_bus() in the quirk handles all devices we've already
+enumerated, and all devices we'll enumerate in the future are handled in
+pci_configure_device().
 
->  arch/arm/boot/dts/tango4-smp8758.dtsi |  1 -
->  drivers/cpufreq/Makefile              |  1 +
->  drivers/cpufreq/cpufreq-dt-platdev.c  |  2 --
->  drivers/cpufreq/tango-cpufreq.c       | 45 +++++++++++++++++++++++++++++++++++
->  4 files changed, 46 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
-> index d2e65c46bcc7..eca33d568690 100644
-> --- a/arch/arm/boot/dts/tango4-smp8758.dtsi
-> +++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
-> @@ -13,7 +13,6 @@
->  			reg = <0>;
->  			clocks = <&clkgen CPU_CLK>;
->  			clock-latency = <1>;
-> -			operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index 0a9b6a093646..5ae156dc0d35 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -75,6 +75,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
->  obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
->  obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
->  obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
-> +obj-$(CONFIG_ARCH_TANGO)		+= tango-cpufreq.o
->  obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
->  obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
->  obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
-> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> index 71267626456b..1490e4ce3fbc 100644
-> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> @@ -70,8 +70,6 @@
->  	{ .compatible = "rockchip,rk3368", },
->  	{ .compatible = "rockchip,rk3399", },
->  
-> -	{ .compatible = "sigma,tango4" },
-> -
->  	{ .compatible = "ti,am33xx", },
->  	{ .compatible = "ti,dra7", },
->  	{ .compatible = "ti,omap2", },
-> diff --git a/drivers/cpufreq/tango-cpufreq.c b/drivers/cpufreq/tango-cpufreq.c
-> new file mode 100644
-> index 000000000000..270c8261ebfa
-> --- /dev/null
-> +++ b/drivers/cpufreq/tango-cpufreq.c
-> @@ -0,0 +1,45 @@
-> +#include <linux/of.h>
-> +#include <linux/cpu.h>
-> +#include <linux/clk.h>
-> +#include <linux/pm_opp.h>
-> +#include <linux/platform_device.h>
-> +
-> +static const struct of_device_id machines[] __initconst = {
-> +	{ .compatible = "sigma,tango4" },
-> +	{ .compatible = "sigma,tango5" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static void __init build_opp_table(struct device *cpu_dev, struct clk *cpu_clk)
-> +{
-> +	unsigned long max_freq = clk_get_rate(cpu_clk);
+Reported-by: Wim ten Have <wim.ten.have@oracle.com>
+Link: https://bugzilla.redhat.com/show_bug.cgi?id=1467674
+Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pci.h    |  1 +
+ drivers/pci/probe.c  | 35 ++++++++++++++++++++++++++++++-----
+ drivers/pci/quirks.c | 19 +++++++++++++++++++
+ include/linux/pci.h  |  1 +
+ 4 files changed, 51 insertions(+), 5 deletions(-)
 
-I kind of get the idea on how is the bootloader fixing your max. So you take the
-frequency at which the CPU booted to be Max, right ?
-
-I think that is part of the problem here. IMHO, the kernel really isn't required
-to do that. It can have a MAX value of its own. Not sure if we can get it via DT
-somehow today, otherwise statically should be fine as well.
-
-And if kernel can take care of max and not depend on the value set by
-bootloader, you wouldn't be required to have this patch and use DT based OPP.
-
-> +	dev_pm_opp_add(cpu_dev, max_freq / 1, 0);
-> +	dev_pm_opp_add(cpu_dev, max_freq / 2, 0);
-> +	dev_pm_opp_add(cpu_dev, max_freq / 3, 0);
-> +	dev_pm_opp_add(cpu_dev, max_freq / 5, 0);
-> +	dev_pm_opp_add(cpu_dev, max_freq / 9, 0);
-> +}
-
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index f8113e5..7153c92 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -239,6 +239,7 @@ enum pci_bar_type {
+ 	pci_bar_mem64,		/* A 64-bit memory BAR */
+ };
+ 
++int pci_configure_extended_tags(struct pci_dev *dev, void *ign);
+ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *pl,
+ 				int crs_timeout);
+ int pci_setup_device(struct pci_dev *dev);
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 19c8950..bc067fb 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1684,22 +1684,47 @@ static void program_hpp_type2(struct pci_dev *dev, struct hpp_type2 *hpp)
+ 	 */
+ }
+ 
+-static void pci_configure_extended_tags(struct pci_dev *dev)
++int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
+ {
++	struct pci_host_bridge *host;
+ 	u32 dev_cap;
+ 	int ret;
++	u16 ctl;
+ 
+ 	if (!pci_is_pcie(dev))
+-		return;
++		return 0;
+ 
+ 	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &dev_cap);
+ 	if (ret)
+-		return;
++		return 0;
++
++	if (!(dev_cap & PCI_EXP_DEVCAP_EXT_TAG))
++		return 0;
++
++	ret = pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
++	if (ret)
++		return 0;
++
++	host = pci_find_host_bridge(dev->bus);
++	if (!host)
++		return 0;
+ 
+-	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
++	if (host->broken_ext_tags) {
++		if (ctl & PCI_EXP_DEVCTL_EXT_TAG) {
++			dev_info(&dev->dev, "disabling Extended Tags\n");
++			pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
++						   PCI_EXP_DEVCTL_EXT_TAG);
++		}
++		return 0;
++	}
++	if (!(ctl & PCI_EXP_DEVCTL_EXT_TAG)) {
++		dev_info(&dev->dev, "enabling Extended Tags\n");
+ 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
+ 					 PCI_EXP_DEVCTL_EXT_TAG);
++	}
++	return 0;
+ }
++EXPORT_SYMBOL(pci_configure_extended_tags);
+ 
+ static void pci_configure_device(struct pci_dev *dev)
+ {
+@@ -1707,7 +1732,7 @@ static void pci_configure_device(struct pci_dev *dev)
+ 	int ret;
+ 
+ 	pci_configure_mps(dev);
+-	pci_configure_extended_tags(dev);
++	pci_configure_extended_tags(dev, NULL);
+ 
+ 	memset(&hpp, 0, sizeof(hpp));
+ 	ret = pci_get_hp_params(dev, &hpp);
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index 085fb78..b5dc99c 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -4664,3 +4664,22 @@ static void quirk_intel_no_flr(struct pci_dev *dev)
+ }
+ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1502, quirk_intel_no_flr);
+ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1503, quirk_intel_no_flr);
++
++static void quirk_exttags_completer(struct pci_dev *pdev)
++{
++	struct pci_host_bridge *bridge = pci_find_host_bridge(pdev->bus);
++
++	if (!bridge)
++		return;
++
++	bridge->broken_ext_tags = 1;
++	dev_info(&pdev->dev, "Extended Tag handling is broken\n");
++
++	pci_walk_bus(bridge->bus, pci_configure_extended_tags, NULL);
++}
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0140,
++			quirk_exttags_completer);
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0142,
++			quirk_exttags_completer);
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0144,
++			quirk_exttags_completer);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 8039f9f..2b22c3e 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -441,6 +441,7 @@ struct pci_host_bridge {
+ 	void *release_data;
+ 	struct msi_controller *msi;
+ 	unsigned int ignore_reset_delay:1;	/* for entire hierarchy */
++	unsigned int broken_ext_tags:1;
+ 	/* Resource alignment requirements */
+ 	resource_size_t (*align_resource)(struct pci_dev *dev,
+ 			const struct resource *res,
 -- 
-viresh
+1.9.1
