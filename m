@@ -1,271 +1,221 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 12 Jul 2017 18:39:27 +0200
-Subject: [RFC PATCH v2] irqchip: Add support for tango interrupt router
-In-Reply-To: <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
-References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
- <20170606175219.34ef62b9@free-electrons.com>
- <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
-Message-ID: <dfb86360-2247-65bb-602b-5c21029709fd@free.fr>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 12 Jul 2017 12:47:58 -0400
+Subject: [PATCH v2 1/5] drm/rockchip: vop: get rid of register init table
+In-Reply-To: <1499825008-7451-1-git-send-email-mark.yao@rock-chips.com>
+References: <1499824991-7391-1-git-send-email-mark.yao@rock-chips.com>
+ <1499825008-7451-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <20170712164758.ojzsfjq4vrf2cj27@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-128 inputs, 24 outputs (to GIC SPI 0-23)
----
-There might be a few things wrong with this driver.
-When I cat /proc/interrupts the interrupt count appears
-to be bogus (as if level IRQ counts are added to edge
-IRQ counts). Did I mess something up with the IRQ domains?
----
- .../interrupt-controller/sigma,smp8759-intc.txt    |  18 ++
- drivers/irqchip/Makefile                           |   2 +-
- drivers/irqchip/irq-smp8759.c                      | 203 +++++++++++++++++++++
- 3 files changed, 222 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
- create mode 100644 drivers/irqchip/irq-smp8759.c
+On Wed, Jul 12, 2017 at 10:03:27AM +0800, Mark Yao wrote:
+> Register init table use un-document define, it is unreadable,
+> And sometimes we only want to update tiny bits, init table
+> method is not friendly, it's diffcult to reuse for difference
+> chips.
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
-new file mode 100644
-index 000000000000..9ec922f3c0a4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
-@@ -0,0 +1,18 @@
-+Sigma Designs SMP8759 interrupt router
-+
-+Required properties:
-+- compatible: "sigma,smp8759-intc"
-+- reg: address/size of register area
-+- interrupt-controller
-+- #interrupt-cells: <2>  (hwirq and trigger_type)
-+- interrupt-parent: parent phandle
-+
-+Example:
-+
-+	interrupt-controller at 6f800 {
-+		compatible = "sigma,smp8759-intc";
-+		reg = <0x6f800 0x430>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		interrupt-parent = <&gic>;
-+	};
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index e4dbfc85abdb..013104923b71 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -47,7 +47,7 @@ obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
- obj-$(CONFIG_ARCH_NSPIRE)		+= irq-zevio.o
- obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
- obj-$(CONFIG_ST_IRQCHIP)		+= irq-st.o
--obj-$(CONFIG_TANGO_IRQ)			+= irq-tango.o
-+obj-$(CONFIG_TANGO_IRQ)			+= irq-tango.o irq-smp8759.o
- obj-$(CONFIG_TB10X_IRQC)		+= irq-tb10x.o
- obj-$(CONFIG_TS4800_IRQ)		+= irq-ts4800.o
- obj-$(CONFIG_XTENSA)			+= irq-xtensa-pic.o
-diff --git a/drivers/irqchip/irq-smp8759.c b/drivers/irqchip/irq-smp8759.c
-new file mode 100644
-index 000000000000..ec7fee4574ef
---- /dev/null
-+++ b/drivers/irqchip/irq-smp8759.c
-@@ -0,0 +1,203 @@
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/irqchip.h>
-+#include <linux/irqchip/chained_irq.h>
-+
-+#define IRQ_MAX		128
-+#define SPI_MAX		24 /* 24 output lines routed to SPI 0-23 */
-+#define LEVEL_SPI	17
-+#define IRQ_ENABLE	BIT(31)
-+
-+/*
-+ * 128 inputs mapped to 24 outputs
-+ * LEVEL_HIGH IRQs are muxed on output line 'LEVEL_SPI'
-+ * EDGE_RISING IRQs get a dedicated output line
-+ * gic_spi_to_tango_hwirq array maps GIC SPI hwirq to tango hwirq
-+ */
-+struct tango_intc {
-+	DECLARE_BITMAP(enabled, IRQ_MAX);
-+	spinlock_t lock;
-+	void __iomem *config;
-+	void __iomem *status;
-+	struct irq_domain *dom;
-+	u8 gic_spi_to_tango_hwirq[SPI_MAX];
-+};
-+
-+static void tango_level_isr(struct irq_desc *desc)
-+{
-+	unsigned int pos, virq;
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct tango_intc *intc = irq_desc_get_handler_data(desc);
-+	DECLARE_BITMAP(status, IRQ_MAX);
-+
-+	chained_irq_enter(chip, desc);
-+
-+	memcpy_fromio(status, intc->status, IRQ_MAX / BITS_PER_BYTE);
-+	spin_lock(&intc->lock);
-+	bitmap_and(status, status, intc->enabled, IRQ_MAX);
-+	spin_unlock(&intc->lock);
-+	for_each_set_bit(pos, status, IRQ_MAX) {
-+		virq = irq_find_mapping(intc->dom, pos);
-+		generic_handle_irq(virq);
-+	}
-+
-+	chained_irq_exit(chip, desc);
-+}
-+
-+static void tango_edge_isr(struct irq_desc *desc)
-+{
-+	unsigned int virq;
-+	struct irq_data *d = &desc->irq_data;
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct tango_intc *intc = irq_desc_get_handler_data(desc);
-+
-+	/* I don't know how to get the SPI number, d->hwirq - 32 is a hack */
-+	int hwirq = intc->gic_spi_to_tango_hwirq[d->hwirq - 32];
-+	//printk("%s: SPI=%lu hwirq=%d\n", __func__, d->hwirq, hwirq);
-+
-+	chained_irq_enter(chip, desc);
-+	virq = irq_find_mapping(intc->dom, hwirq);
-+	generic_handle_irq(virq);
-+	chained_irq_exit(chip, desc);
-+}
-+
-+static void tango_mask(struct irq_data *data)
-+{
-+	unsigned long flags;
-+	struct tango_intc *intc = data->chip_data;
-+
-+	spin_lock_irqsave(&intc->lock, flags);
-+	__clear_bit(data->hwirq, intc->enabled);
-+	writel_relaxed(0, intc->config + data->hwirq * 4);
-+	spin_unlock_irqrestore(&intc->lock, flags);
-+}
-+
-+static void tango_unmask(struct irq_data *data)
-+{
-+	unsigned long flags;
-+	struct tango_intc *intc = data->chip_data;
-+
-+#if 0
-+	if (!in_irq() && !in_interrupt()) {
-+		printk("HWIRQ=%lu mask=%u\n", data->hwirq, data->mask);
-+		dump_stack();
-+	}
-+#endif
-+
-+	spin_lock_irqsave(&intc->lock, flags);
-+	__set_bit(data->hwirq, intc->enabled);
-+	writel_relaxed(IRQ_ENABLE | data->mask, intc->config + data->hwirq * 4);
-+	spin_unlock_irqrestore(&intc->lock, flags);
-+}
-+
-+static int find_free_output_line(struct tango_intc *intc)
-+{
-+	int spi;
-+
-+	for (spi = 0; spi < SPI_MAX; ++spi)
-+		if (intc->gic_spi_to_tango_hwirq[spi] == 0)
-+			return spi;
-+
-+	return -ENOSPC;
-+}
-+
-+int tango_set_type(struct irq_data *data, unsigned int flow_type)
-+{
-+	struct tango_intc *intc = data->chip_data;
-+	printk("%s: IRQ=%lu type=%x\n", __func__, data->hwirq, flow_type);
-+	dump_stack();
-+	if (flow_type & IRQ_TYPE_LEVEL_HIGH) {
-+		data->mask = LEVEL_SPI;
-+		return 0;
-+	}
-+
-+	if (flow_type & IRQ_TYPE_EDGE_RISING) {
-+		int res = find_free_output_line(intc);
-+		if (res < 0)
-+			return res;
-+		data->mask = res;
-+		intc->gic_spi_to_tango_hwirq[res] = data->hwirq;
-+		printk("Map tango hwirq %lu to GIC SPI %d\n", data->hwirq, res);
-+		return 0;
-+	}
-+
-+	/* LEVEL_LOW and EDGE_FALLING are not supported */
-+	return -ENOSYS;
-+}
-+
-+static struct irq_chip tango_chip = {
-+	.name		= "tango",
-+	.irq_mask	= tango_mask,
-+	.irq_unmask	= tango_unmask,
-+	.irq_set_type	= tango_set_type,
-+};
-+
-+static int tango_map(struct irq_domain *dom, unsigned int virq, irq_hw_number_t hw)
-+{
-+	struct tango_intc *intc = dom->host_data;
-+	struct irq_desc *desc = irq_to_desc(virq);
-+	printk("%s: dom=%p virq=%u hwirq=%lu desc=%p\n", __func__, dom, virq, hw, desc);
-+	irq_domain_set_info(dom, virq, hw, &tango_chip, intc, handle_simple_irq, NULL, NULL);
-+	return 0;
-+}
-+
-+static void tango_unmap(struct irq_domain *d, unsigned int virq)
-+{
-+	printk("%s: dom=%p virq=%u\n", __func__, d, virq);
-+	dump_stack();
-+}
-+
-+struct irq_domain_ops dom_ops =
-+{
-+	.map	= tango_map,
-+	.unmap	= tango_unmap,
-+	.xlate	= irq_domain_xlate_twocell,
-+};
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+static int __init map_irq(struct device_node *gic, int irq, int type)
-+{
-+	struct of_phandle_args irq_data = { gic, 3, { GIC_SPI, irq, type }};
-+	return irq_create_of_mapping(&irq_data);
-+}
-+
-+static int __init tango_irq_init(struct device_node *node, struct device_node *parent)
-+{
-+	int spi, virq;
-+	struct irq_domain *irq_dom;
-+	void __iomem *base;
-+	struct tango_intc *intc = kzalloc(sizeof(*intc), GFP_KERNEL);
-+
-+	base = of_iomap(node, 0);
-+	if (!base)
-+		panic("%s: of_iomap failed", node->name);
-+
-+	virq = map_irq(parent, LEVEL_SPI, IRQ_TYPE_LEVEL_HIGH);
-+	if (!virq)
-+		panic("%s: Failed to map IRQ %d\n", node->name, LEVEL_SPI);
-+
-+	irq_set_chained_handler_and_data(virq, tango_level_isr, intc);
-+
-+	for (spi = 0; spi < SPI_MAX; ++spi) {
-+		if (spi == LEVEL_SPI)
-+			continue;
-+
-+		virq = map_irq(parent, spi, IRQ_TYPE_EDGE_RISING);
-+		if (!virq)
-+			panic("%s: Failed to map IRQ %d\n", node->name, spi);
-+
-+		irq_set_chained_handler_and_data(virq, tango_edge_isr, intc);
-+	}
-+
-+	irq_dom = irq_domain_add_linear(node, IRQ_MAX, &dom_ops, intc);
-+
-+	spin_lock_init(&intc->lock);
-+	intc->config = base;
-+	intc->status = base + 0x420;
-+	intc->dom = irq_dom;
-+	intc->gic_spi_to_tango_hwirq[LEVEL_SPI] = ~0;
-+
-+	return 0;
-+}
-+IRQCHIP_DECLARE(tango_intc, "sigma,smp8759-intc", tango_irq_init);
+While I'm happy to see the init_table removed, it seems like the new code is not
+equivalent to the old (ie: some register writes have been dropped). How did you
+ensure that you're not breaking existing boards that depend on the deleted register
+initialization?
+
+Sean
+
+> 
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  6 ++--
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 10 ++-----
+>  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 43 +++--------------------------
+>  3 files changed, 10 insertions(+), 49 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 45589d6..7a5f809 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -1393,7 +1393,6 @@ static void vop_destroy_crtc(struct vop *vop)
+>  static int vop_initial(struct vop *vop)
+>  {
+>  	const struct vop_data *vop_data = vop->data;
+> -	const struct vop_reg_data *init_table = vop_data->init_table;
+>  	struct reset_control *ahb_rst;
+>  	int i, ret;
+>  
+> @@ -1453,13 +1452,14 @@ static int vop_initial(struct vop *vop)
+>  
+>  	memcpy(vop->regsbak, vop->regs, vop->len);
+>  
+> -	for (i = 0; i < vop_data->table_size; i++)
+> -		vop_writel(vop, init_table[i].offset, init_table[i].value);
+> +	VOP_CTRL_SET(vop, global_regdone_en, 1);
+> +	VOP_CTRL_SET(vop, dsp_blank, 0);
+>  
+>  	for (i = 0; i < vop_data->win_size; i++) {
+>  		const struct vop_win_data *win = &vop_data->win[i];
+>  
+>  		VOP_WIN_SET(vop, win, enable, 0);
+> +		VOP_WIN_SET(vop, win, gate, 1);
+>  	}
+>  
+>  	vop_cfg_done(vop);
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+> index 9979fd0..084d3b2 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+> @@ -24,11 +24,6 @@ enum vop_data_format {
+>  	VOP_FMT_YUV444SP,
+>  };
+>  
+> -struct vop_reg_data {
+> -	uint32_t offset;
+> -	uint32_t value;
+> -};
+> -
+>  struct vop_reg {
+>  	uint32_t offset;
+>  	uint32_t shift;
+> @@ -46,6 +41,7 @@ struct vop_ctrl {
+>  	struct vop_reg hdmi_en;
+>  	struct vop_reg mipi_en;
+>  	struct vop_reg dp_en;
+> +	struct vop_reg dsp_blank;
+>  	struct vop_reg out_mode;
+>  	struct vop_reg dither_down;
+>  	struct vop_reg dither_up;
+> @@ -65,6 +61,7 @@ struct vop_ctrl {
+>  
+>  	struct vop_reg line_flag_num[2];
+>  
+> +	struct vop_reg global_regdone_en;
+>  	struct vop_reg cfg_done;
+>  };
+>  
+> @@ -115,6 +112,7 @@ struct vop_win_phy {
+>  	uint32_t nformats;
+>  
+>  	struct vop_reg enable;
+> +	struct vop_reg gate;
+>  	struct vop_reg format;
+>  	struct vop_reg rb_swap;
+>  	struct vop_reg act_info;
+> @@ -136,8 +134,6 @@ struct vop_win_data {
+>  };
+>  
+>  struct vop_data {
+> -	const struct vop_reg_data *init_table;
+> -	unsigned int table_size;
+>  	const struct vop_ctrl *ctrl;
+>  	const struct vop_intr *intr;
+>  	const struct vop_win_data *win;
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> index bafd698..00e9d79 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> @@ -127,13 +127,7 @@
+>  	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
+>  };
+>  
+> -static const struct vop_reg_data rk3036_vop_init_reg_table[] = {
+> -	{RK3036_DSP_CTRL1, 0x00000000},
+> -};
+> -
+>  static const struct vop_data rk3036_vop = {
+> -	.init_table = rk3036_vop_init_reg_table,
+> -	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
+>  	.ctrl = &rk3036_ctrl_data,
+>  	.intr = &rk3036_intr,
+>  	.win = rk3036_vop_win_data,
+> @@ -193,7 +187,8 @@
+>  static const struct vop_win_phy rk3288_win23_data = {
+>  	.data_formats = formats_win_lite,
+>  	.nformats = ARRAY_SIZE(formats_win_lite),
+> -	.enable = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 0),
+> +	.enable = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 4),
+> +	.gate = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 0),
+>  	.format = VOP_REG(RK3288_WIN2_CTRL0, 0x7, 1),
+>  	.rb_swap = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 12),
+>  	.dsp_info = VOP_REG(RK3288_WIN2_DSP_INFO0, 0x0fff0fff, 0),
+> @@ -215,6 +210,7 @@
+>  	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0xf, 1),
+>  	.dither_up = VOP_REG(RK3288_DSP_CTRL1, 0x1, 6),
+>  	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
+> +	.dsp_blank = VOP_REG(RK3288_DSP_CTRL0, 0x3, 18),
+>  	.out_mode = VOP_REG(RK3288_DSP_CTRL0, 0xf, 0),
+>  	.pin_pol = VOP_REG(RK3288_DSP_CTRL0, 0xf, 4),
+>  	.htotal_pw = VOP_REG(RK3288_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
+> @@ -224,22 +220,10 @@
+>  	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
+>  	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
+>  	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
+> +	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
+>  	.cfg_done = VOP_REG(RK3288_REG_CFG_DONE, 0x1, 0),
+>  };
+>  
+> -static const struct vop_reg_data rk3288_init_reg_table[] = {
+> -	{RK3288_SYS_CTRL, 0x00c00000},
+> -	{RK3288_DSP_CTRL0, 0x00000000},
+> -	{RK3288_WIN0_CTRL0, 0x00000080},
+> -	{RK3288_WIN1_CTRL0, 0x00000080},
+> -	/* TODO: Win2/3 support multiple area function, but we haven't found
+> -	 * a suitable way to use it yet, so let's just use them as other windows
+> -	 * with only area 0 enabled.
+> -	 */
+> -	{RK3288_WIN2_CTRL0, 0x00000010},
+> -	{RK3288_WIN3_CTRL0, 0x00000010},
+> -};
+> -
+>  /*
+>   * Note: rk3288 has a dedicated 'cursor' window, however, that window requires
+>   * special support to get alpha blending working.  For now, just use overlay
+> @@ -273,8 +257,6 @@
+>  };
+>  
+>  static const struct vop_data rk3288_vop = {
+> -	.init_table = rk3288_init_reg_table,
+> -	.table_size = ARRAY_SIZE(rk3288_init_reg_table),
+>  	.feature = VOP_FEATURE_OUTPUT_RGB10,
+>  	.intr = &rk3288_vop_intr,
+>  	.ctrl = &rk3288_ctrl_data,
+> @@ -328,22 +310,7 @@
+>  	.clear = VOP_REG_MASK(RK3399_INTR_CLEAR0, 0xffff, 0),
+>  };
+>  
+> -static const struct vop_reg_data rk3399_init_reg_table[] = {
+> -	{RK3399_SYS_CTRL, 0x2000f800},
+> -	{RK3399_DSP_CTRL0, 0x00000000},
+> -	{RK3399_WIN0_CTRL0, 0x00000080},
+> -	{RK3399_WIN1_CTRL0, 0x00000080},
+> -	/* TODO: Win2/3 support multiple area function, but we haven't found
+> -	 * a suitable way to use it yet, so let's just use them as other windows
+> -	 * with only area 0 enabled.
+> -	 */
+> -	{RK3399_WIN2_CTRL0, 0x00000010},
+> -	{RK3399_WIN3_CTRL0, 0x00000010},
+> -};
+> -
+>  static const struct vop_data rk3399_vop_big = {
+> -	.init_table = rk3399_init_reg_table,
+> -	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
+>  	.feature = VOP_FEATURE_OUTPUT_RGB10,
+>  	.intr = &rk3399_vop_intr,
+>  	.ctrl = &rk3399_ctrl_data,
+> @@ -362,8 +329,6 @@
+>  };
+>  
+>  static const struct vop_data rk3399_vop_lit = {
+> -	.init_table = rk3399_init_reg_table,
+> -	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
+>  	.intr = &rk3399_vop_intr,
+>  	.ctrl = &rk3399_ctrl_data,
+>  	/*
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
