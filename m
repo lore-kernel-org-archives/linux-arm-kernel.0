@@ -1,41 +1,106 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Jul 2017 15:39:42 +0530
-Subject: cpufreq: frequency scaling spec in DT node
-In-Reply-To: <9476e8ee-24ae-1676-067b-18a867892894@free.fr>
-References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
- <20170629100459.GL29665@vireshk-i7>
- <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
- <20170629143432.GM29665@vireshk-i7>
- <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
- <20170711102514.GC17115@vireshk-i7>
- <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
- <20170712034150.GD17115@vireshk-i7>
- <9476e8ee-24ae-1676-067b-18a867892894@free.fr>
-Message-ID: <20170712100942.GF1679@vireshk-i7>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 12 Jul 2017 12:34:21 +0200
+Subject: [PATCH v3] arm64: dts: r8a7795: Add all MSIOF nodes
+Message-ID: <1499855661-21386-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-07-17, 11:58, Mason wrote:
-> I would object to the characterization of "just a PLL" :-)
-> 
-> The PLL outputs "garbage" before actually "locking" a target
-> frequency. It is not possible for the CPU to blindly change
-> the PLL settings, because that crashes the system.
-> 
-> The bootloader implements the steps required to change said
-> settings, so the strategy has been: have Linux use whatever
-> PLL frequency the bootloader programs.
-> 
-> Behind the PLL, there is a glitch-free divider, which is able
-> to divide the PLL output without crashing the system. I've
-> been using that divider for DFS.
-> 
-> drivers/clk/clk-tango4.c
+Add the device nodes for all MSIOF SPI controllers, incl. clocks, power
+domain, dma, and reset properties.
 
-Okay, got it now.
+Due to a hardware erratum on R-Car H3 ES1.x, using MSIOF for SPI is only
+supported on ES2.0 and later.
 
-Yes, you *really* need to create these OPPs dynamically. I am
-convinced now :)
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Tested on r8a7795/salvator-xs with MSIOF3(A) connected to a HD44780
+character LCD through a pair of 74HCT595 shift registers.
 
+v3:
+  - Add resets properties,
+  - Add family-specific compatible values,
+  - Add link to second DMA controller for MSIOF[01],
+
+v2:
+  - Rebased,
+  - Switch to final CPG/MSSR bindings,
+  - Change one-line summary prefix to match current arm-soc practices.
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 62 ++++++++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 6f5130766a212d6d..507d8ad07aaf9007 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -899,6 +899,68 @@
+ 			status = "disabled";
+ 		};
+ 
++		msiof0: spi at e6e90000 {
++			compatible = "renesas,msiof-r8a7795",
++				     "renesas,rcar-gen3-msiof";
++			reg = <0 0xe6e90000 0 0x0064>;
++			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 211>;
++			dmas = <&dmac1 0x41>, <&dmac1 0x40>,
++			       <&dmac2 0x41>, <&dmac2 0x40>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 211>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof1: spi at e6ea0000 {
++			compatible = "renesas,msiof-r8a7795",
++				     "renesas,rcar-gen3-msiof";
++			reg = <0 0xe6ea0000 0 0x0064>;
++			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 210>;
++			dmas = <&dmac1 0x43>, <&dmac1 0x42>,
++			       <&dmac2 0x43>, <&dmac2 0x42>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 210>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof2: spi at e6c00000 {
++			compatible = "renesas,msiof-r8a7795",
++				     "renesas,rcar-gen3-msiof";
++			reg = <0 0xe6c00000 0 0x0064>;
++			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 209>;
++			dmas = <&dmac0 0x45>, <&dmac0 0x44>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 209>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof3: spi at e6c10000 {
++			compatible = "renesas,msiof-r8a7795",
++				     "renesas,rcar-gen3-msiof";
++			reg = <0 0xe6c10000 0 0x0064>;
++			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 208>;
++			dmas = <&dmac0 0x47>, <&dmac0 0x46>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 208>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		scif0: serial at e6e60000 {
+ 			compatible = "renesas,scif-r8a7795",
+ 				     "renesas,rcar-gen3-scif", "renesas,scif";
 -- 
-viresh
+2.7.4
