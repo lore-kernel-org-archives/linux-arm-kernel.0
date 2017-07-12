@@ -1,51 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Jul 2017 14:43:58 +0100
-Subject: [boot-wrapper] [PATCH 2/2] gic: Make sure all the supported SPIs
- are marked non-secure
-In-Reply-To: <1499866108-15140-2-git-send-email-suzuki.poulose@arm.com>
-References: <1499866108-15140-1-git-send-email-suzuki.poulose@arm.com>
- <1499866108-15140-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <3acba6ab-cc3a-54ba-2bda-4b198f73d87d@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 12 Jul 2017 13:54:47 +0000
+Subject: [PATCH V4 0/7] pinctrl: imx: add imx7ulp pinctrl support
+In-Reply-To: <CACRpkdbeqiGJAD5idGPJXpN2VEnOVnExzHripnfFwaneRHAuGA@mail.gmail.com>
+References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
+ <AM3PR04MB306A0A86603EF133C37852480D60@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <CACRpkdbeqiGJAD5idGPJXpN2VEnOVnExzHripnfFwaneRHAuGA@mail.gmail.com>
+Message-ID: <AM3PR04MB30694430A0C0AA437DA1CE680AF0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/17 14:28, Suzuki K Poulose wrote:
-> The maximum SPI INTID is 32(N+1) - 1, where N = GICD_TYPER:ITLinesNumber.
-> But currently we only mark the range, {32, 32*(N)-1} as Group1 non-secure.
-> If there happens to be an SPI allocated in the last 32 INTIDs, the EL1
-> will fail to use them as it would be marked Group0.
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: Wednesday, July 12, 2017 8:00 PM
+> To: A.s. Dong
+> Cc: linux-arm-kernel at lists.infradead.org; shawnguo at kernel.org;
+> stefan at agner.ch; Jacky Bai; Andy Duan; kernel at pengutronix.de; linux-
+> gpio at vger.kernel.org
+> Subject: Re: [PATCH V4 0/7] pinctrl: imx: add imx7ulp pinctrl support
 > 
-> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  gic.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> On Mon, Jul 3, 2017 at 12:36 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
 > 
-> diff --git a/gic.c b/gic.c
-> index a84779e..83e340d 100644
-> --- a/gic.c
-> +++ b/gic.c
-> @@ -40,9 +40,10 @@ void gic_secure_init(void)
->  
->  	if (cpu == 0) {
->  		uint32_t typer = raw_readl(gicd_base + GICD_TYPER);
-> +		uint32_t n_itlines = typer & GICD_TYPER_ITLineNumber;
->  
-> -		/* Set SPIs to Group 1 */
-> -		for (i = 1; i < (typer & GICD_TYPER_ITLineNumber); i++)
-> +		/* Set SPIs {32, 32(n_itlines + 1) - 1} to Group 1 */
-> +		for (i = 1; i < n_itlines + 1; i++)
->  			raw_writel(~0, gicd_base + GICD_IGROUPRn + i * 4);
->  
->  		raw_writel(GICD_CTLR_EnableGrp0 | GICD_CTLR_EnableGrp1,
+> > Is the series got missed?
+> >
+> > I saw you only picked the revised patch 1.
+> >
+> > Or do I need resend it?
+> 
+> Can you please:
+> 
+> - Rebase on v4.13-rc1 once it is out
+> 
+> - Include the explicit ACKs from Shawn and Stephan Agner on
+>   the patches, also make sure all patches have ACKs.
 > 
 
-For both patches:
+Of course.
+Except two new introduced patches(Patch 3 and 7) in this series.
+All have ACKs already.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Regards
+Dong Aisheng
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> I am sorry if I missed it, it may be due to that I had a hard time to see
+> which patches were ACKed and not.
+> 
+> Yours,
+> Linus Walleij
