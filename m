@@ -1,20 +1,20 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 12 Jul 2017 16:44:29 +0800
-Subject: [PATCH 1/4] ARM: dts: imx7d-sdb: Put pinctrl_spi4 in the correct
- location
-In-Reply-To: <1498855385-9690-1-git-send-email-festevam@gmail.com>
-References: <1498855385-9690-1-git-send-email-festevam@gmail.com>
-Message-ID: <20170712084428.GL3172@dragon>
+Date: Wed, 12 Jul 2017 16:51:27 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select the coda driver as module
+In-Reply-To: <1499440005-8067-1-git-send-email-festevam@gmail.com>
+References: <1499440005-8067-1-git-send-email-festevam@gmail.com>
+Message-ID: <20170712085126.GM3172@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 05:43:02PM -0300, Fabio Estevam wrote:
+On Fri, Jul 07, 2017 at 12:06:45PM -0300, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> pinctrl_spi4 pin group is not part of the low power iomux controller,
-> so move it under the normal iomuxc node.
+> The coda driver may be probed prior to the rootfs being available, leading
+> to firmware loading failure.
 > 
-> Fixes: 184f39b57cab6 ("ARM: dts: imx7d-sdb: Add GPIO expander node")
+> To avoid such problem, select the coda driver as module.
+> 
 > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied all, thanks.
+Applied, thanks.
