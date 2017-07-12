@@ -1,36 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 12 Jul 2017 09:34:19 -0300
-Subject: [PATCH v4 1/1] ARM: dts: imx53: Add GE Healthcare PPD
-In-Reply-To: <CAOMZO5D6xw4hVCOWfM0+++PQ87xBwihGSCJZsW8qBdn==vrLvA@mail.gmail.com>
-References: <cffaa6f22474ff2ba4ca46d4252d35fc75cb0dd7.1499779628.git.martyn.welch@collabora.co.uk>
- <CAOMZO5D6xw4hVCOWfM0+++PQ87xBwihGSCJZsW8qBdn==vrLvA@mail.gmail.com>
-Message-ID: <CAOMZO5APZNVFNz2ZHnWo15mzkZ7XpP-HyPgJKs1jootN3WM=HQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 12 Jul 2017 09:07:14 -0400
+Subject: [PATCH V3 1/2] PCI: Add Extended Tags quirk for Broadcom HT2100
+ Root Port
+In-Reply-To: <20170711203957.GB14614@bhelgaas-glaptop.roam.corp.google.com>
+References: <1499786735-25782-1-git-send-email-okaya@codeaurora.org>
+ <20170711195853.GA14614@bhelgaas-glaptop.roam.corp.google.com>
+ <ae4dca5b-30cf-3a14-1707-380a3660badf@codeaurora.org>
+ <20170711203957.GB14614@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <25b6bbf6-20b5-dfc8-c92a-268c07fa1f98@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 9:32 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, Jul 11, 2017 at 10:42 AM, Martyn Welch
-> <martyn.welch@collabora.co.uk> wrote:
->
->> Changes since PATCHv3: https://patchwork.kernel.org/patch/9819017/
->>  - licensing modified
->>  - manufacturer changed to GE
->>  - regulator nodes corrected
->>  - backlight node corrected
->>  - flags rather than magic numbers used
->>  - registers for usbphys added
->>  - set up IOMUX configuration correctly
->>  - various whitespace corrections
->>  - removed unused fsl,mode node
->
-> Actually I still see 'fsl,mode' under the ssi2 node. Please remove it.
->
->> +#define I2C_PAD_CTL 0xc0000000
->
-> This still sets bits 31, which means the kernel will rely on the IOMUX
-> configuration from the bootloader.
->
-> It is better if you could just pass the real IOMUX values here instead.
+Hi Bjorn,
 
-And please also fix the typo on the
-linux-arm-kernel at lists.infradead.org address next time :-)
+On 7/11/2017 4:39 PM, Bjorn Helgaas wrote:
+> My proposal handles endpoints, too.  The pci_walk_bus() in the quirk
+> handles all devices we've already enumerated, and all devices we'll
+> enumerate in the future are handled in pci_configure_device().
+
+Code clears the endpoint's extended tag capability only if a quirky host
+bridge is found. 
+
+The question here was 
+
+"what if you have an endpoint, it may declare extended tags capability
+and has a bug even though the host bridge is just fine"
+
+Code will enable extended tags on both the host bridge and endpoint
+if it is supported.
+
+The host bridge will start generating 256 tags towards the endpoint
+but endpoint is unable to catch up with it. 
+
+Same thing is possible with two endpoints that try to do peer-to-peer
+communication. The first endpoint may generate 256 requests, second
+endpoint may not handle it.
+
+Again, this is a hypothetical condition with no known endpoints. I
+suggest we deal with this when time comes.
+
+Sinan 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
