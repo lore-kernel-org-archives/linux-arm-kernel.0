@@ -1,73 +1,94 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 12 Jul 2017 10:04:39 +0200
-Subject: [PATCH v2 19/22] rtc: sun6i: stop using rtc deprecated functions
-In-Reply-To: <1499846682-14093-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1499846682-14093-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1499846682-14093-20-git-send-email-benjamin.gaignard@linaro.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 12 Jul 2017 10:09:01 +0200
+Subject: [PATCH 1/2] pinctrl: stm32: select IRQ_DOMAIN_HIERARCHY instead
+ of depends on
+In-Reply-To: <1499814710-16686-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1499814710-16686-1-git-send-email-yamada.masahiro@socionext.com>
+ <1499814710-16686-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <8a12356e-14bf-9044-ddc7-ba3087843ee0@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
-rely on 32bits variables and that will make rtc break in y2038/2016.
-Stop using those two functions to safer 64bits ones.
+Hi,
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-CC: Maxime Ripard <maxime.ripard@free-electrons.com>
-CC: Chen-Yu Tsai <wens@csie.org>
-CC: Alessandro Zummo <a.zummo@towertech.it>
-CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-CC: rtc-linux at googlegroups.com
-CC: linux-kernel at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
----
- drivers/rtc/rtc-sun6i.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+On 07/12/2017 01:11 AM, Masahiro Yamada wrote:
+> Drivers that need IRQ_DOMAIN_HIERARCHY should "select" it, but
+> drivers/pinctrl/stm32/Kconfig is the only exception that uses
+> "depends on" syntax.  This prevents GPIO drivers from select'ing
+> IRQ_DOMAIN_HIERARCHY.
+> 
+> For example, if I add "select IRQ_DOMAIN_HIERARCHY" to GPIO_XGENE_SB,
+> I get the following recursive dependency error.
+> 
+> drivers/gpio/Kconfig:13:error: recursive dependency detected!
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/gpio/Kconfig:13:	symbol GPIOLIB is selected by PINCTRL_STM32
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/pinctrl/stm32/Kconfig:3:	symbol PINCTRL_STM32 is selected by PINCTRL_STM32F429
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/pinctrl/stm32/Kconfig:11:	symbol PINCTRL_STM32F429 depends on IRQ_DOMAIN_HIERARCHY
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> kernel/irq/Kconfig:67:	symbol IRQ_DOMAIN_HIERARCHY is selected by GPIO_XGENE_SB
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/gpio/Kconfig:502:	symbol GPIO_XGENE_SB depends on GPIOLIB
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com
+> ---
 
-diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
-index 39cbc12..9928f74 100644
---- a/drivers/rtc/rtc-sun6i.c
-+++ b/drivers/rtc/rtc-sun6i.c
-@@ -120,7 +120,7 @@ struct sun6i_rtc_dev {
- 	struct device *dev;
- 	void __iomem *base;
- 	int irq;
--	unsigned long alarm;
-+	unsigned long long alarm;
- 
- 	struct clk_hw hw;
- 	struct clk_hw *int_osc;
-@@ -342,7 +342,7 @@ static int sun6i_rtc_getalarm(struct device *dev, struct rtc_wkalrm *wkalrm)
- 
- 	wkalrm->enabled = !!(alrm_en & SUN6I_ALRM_EN_CNT_EN);
- 	wkalrm->pending = !!(alrm_st & SUN6I_ALRM_EN_CNT_EN);
--	rtc_time_to_tm(chip->alarm, &wkalrm->time);
-+	rtc_time64_to_tm(chip->alarm, &wkalrm->time);
- 
- 	return 0;
- }
-@@ -352,9 +352,9 @@ static int sun6i_rtc_setalarm(struct device *dev, struct rtc_wkalrm *wkalrm)
- 	struct sun6i_rtc_dev *chip = dev_get_drvdata(dev);
- 	struct rtc_time *alrm_tm = &wkalrm->time;
- 	struct rtc_time tm_now;
--	unsigned long time_now = 0;
--	unsigned long time_set = 0;
--	unsigned long time_gap = 0;
-+	unsigned long long time_now = 0;
-+	unsigned long long time_set = 0;
-+	unsigned long long time_gap = 0;
- 	int ret = 0;
- 
- 	ret = sun6i_rtc_gettime(dev, &tm_now);
-@@ -363,8 +363,8 @@ static int sun6i_rtc_setalarm(struct device *dev, struct rtc_wkalrm *wkalrm)
- 		return -EINVAL;
- 	}
- 
--	rtc_tm_to_time(alrm_tm, &time_set);
--	rtc_tm_to_time(&tm_now, &time_now);
-+	time_set = rtc_tm_to_time64(alrm_tm);
-+	time_now = rtc_tm_to_time64(&tm_now);
- 	if (time_set <= time_now) {
- 		dev_err(dev, "Date to set in the past\n");
- 		return -EINVAL;
--- 
-1.9.1
+Thanks for the patch.
+
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+
+regards
+Alex
+
+
+> 
+>   drivers/pinctrl/stm32/Kconfig | 9 +++++----
+>   1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/stm32/Kconfig b/drivers/pinctrl/stm32/Kconfig
+> index 3b8026fca057..7e1fe39a56a5 100644
+> --- a/drivers/pinctrl/stm32/Kconfig
+> +++ b/drivers/pinctrl/stm32/Kconfig
+> @@ -6,29 +6,30 @@ config PINCTRL_STM32
+>   	select PINMUX
+>   	select GENERIC_PINCONF
+>   	select GPIOLIB
+> +	select IRQ_DOMAIN_HIERARCHY
+>   	select MFD_SYSCON
+>   
+>   config PINCTRL_STM32F429
+>   	bool "STMicroelectronics STM32F429 pin control" if COMPILE_TEST && !MACH_STM32F429
+> -	depends on OF && IRQ_DOMAIN_HIERARCHY
+> +	depends on OF
+>   	default MACH_STM32F429
+>   	select PINCTRL_STM32
+>   
+>   config PINCTRL_STM32F469
+>   	bool "STMicroelectronics STM32F469 pin control" if COMPILE_TEST && !MACH_STM32F469
+> -	depends on OF && IRQ_DOMAIN_HIERARCHY
+> +	depends on OF
+>   	default MACH_STM32F469
+>   	select PINCTRL_STM32
+>   
+>   config PINCTRL_STM32F746
+>   	bool "STMicroelectronics STM32F746 pin control" if COMPILE_TEST && !MACH_STM32F746
+> -	depends on OF && IRQ_DOMAIN_HIERARCHY
+> +	depends on OF
+>   	default MACH_STM32F746
+>   	select PINCTRL_STM32
+>   
+>   config PINCTRL_STM32H743
+>   	bool "STMicroelectronics STM32H743 pin control" if COMPILE_TEST && !MACH_STM32H743
+> -	depends on OF && IRQ_DOMAIN_HIERARCHY
+> +	depends on OF
+>   	default MACH_STM32H743
+>   	select PINCTRL_STM32
+>   endif
+> 
