@@ -1,152 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Jul 2017 10:46:55 +0100
-Subject: [PATCH] ARM: dts: imx: add CX9020 Embedded PC device tree
-In-Reply-To: <20170712090408.12212-1-linux-kernel-dev@beckhoff.com>
-References: <20170712090408.12212-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20170712094655.GC7472@leverpostej>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 12 Jul 2017 17:46:40 +0800
+Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <MWHPR12MB16008EFFC5F2792880F7E80BC8A90@MWHPR12MB1600.namprd12.prod.outlook.com>
+References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
+ <MWHPR12MB160087E9E0B17F7A17609714C8AA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <MWHPR12MB160006024D920ED58126048AC8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0Uc5KSJTj4A=9pSudiJ28AW0krc7FZpdW4upwY+FgpeArA@mail.gmail.com>
+ <MWHPR12MB1600AECAE619EAA97E6B15D5C8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0UdqoRR8XLG1o3ygUZTqEBQ4dgNaneZ-n1OSNC1AiswO_g@mail.gmail.com>
+ <MWHPR12MB16008EFFC5F2792880F7E80BC8A90@MWHPR12MB1600.namprd12.prod.outlook.com>
+Message-ID: <16d18af6-f578-ef8a-a52e-46ec975e59e0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, Jul 12, 2017 at 11:04:08AM +0200, linux-kernel-dev at beckhoff.com wrote:
-> +/dts-v1/;
-> +#include "imx53.dtsi"
-> +
-> +#define MX53_PAD_EIM_D26__UART2_RXD_MUX    0x144 0x48c 0x880 0x2 0x0
-> +#define MX53_PAD_EIM_D27__UART2_TXD_MUX    0x148 0x490 0x000 0x2 0x0
-> +#define MX53_PAD_EIM_D28__UART2_RTS        0x14c 0x494 0x87c 0x2 0x0
-> +#define MX53_PAD_EIM_D29__UART2_CTS        0x150 0x498 0x000 0x2 0x0
-> +
-> +/ {
-> +	model = "Freescale i.MX53 based Beckhoff CX9020";
-> +	compatible = "fsl,imx53-qsb", "fsl,imx53";
-> +
-> +	chosen {
-> +		stdout-path = &uart2;
 
-No baud-rate or bits configuration?
+On 2017/7/11 8:01, Casey Leedom wrote:
+> 
+> Hey Alexander,
+> 
+>   Okay, I understand your point regarding the "most likely scenario" being
+> TLPs directed upstream to the Root Complex.  But I'd still like to make sure
+> that we have an agreed upon API/methodology for doing Peer-to-Peer with
+> Relaxed Ordering and no Relaxed Ordering to the Root Complex.  I don't see
+> how the proposed APIs can be used in that fashion.
+>  
+>   Right now the proposed change for cxgb4 is for it to test its own PCIe
+> Capability Device Control[Relaxed Ordering Enable] in order to use that
+> information to program the Chelsio Hardware to emit/not emit upstream TLPs
+> with the Relaxed Ordering Attribute set.  But if we're going to have the
+> mixed mode situation I describe, the PCIe Capability Device Control[Relaxed
+> Ordering Enable] will have to be set which means that we'll be programming
+> the Chelsio Hardware to send upstream TLPs with Relaxed Ordering Enable to
+> the Root Complex which is what we were trying to avoid in the first place ...
+> 
+>   [[ And, as I noted on Friday evening, the currect cxgb4 Driver hardwires
+>      the Relaxed Ordering Enable on early dureing device probe, so that
+>      would minimally need to be addressed even if we decide that we don't
+>      ever want to support mixed mode Relaxed Ordering. ]]
+> 
+>   We need some method of telling the Chelsio Driver that it should/shouldn't
+> use Relaxed Ordering with TLPs directed at the Root Complex.  And the same
+> is true for a Peer PCIe Device.
+> 
+>   It may be that we should approach this from the completely opposite
+> direction and instead of having quirks which identify problematic devices,
+> have quirks which identify devices which would benefit from the use of
+> Relaxed Ordering (if the sending device supports that).  That is, assume the
+> using Relaxed Ordering shouldn't be done unless the target device says "I
+> love Relaxed Ordering TLPs" ...  In such a world, an NVMe or a Graphics
+> device might declare love of Relaxed Ordering and the same for a SPARC Root
+> Complex (I think that was your example).
+> 
+>   By the way, the sole example of Data Corruption with Relaxed Ordering is
+> the AMD A1100 ARM SoC and AMD appears to have given up on that almost as
+> soon as it was released.  So what we're left with currently is a performance
+> problem on modern Intel CPUs ...  (And hopefully we'll get a Technical
+> Publication on that issue fairly soon.)
+> 
+> Casey
+> 
 
-> +	};
-> +
-> +	memory {
-> +		reg = <0x70000000 0x20000000>,
-> +		      <0xb0000000 0x20000000>;
-> +	};
-> +
-> +	ccat {
-> +		compatible = "bhf,emi-ccat";
-> +	};
-> +
-> +	display0: display at di0 {
+Hi Casey:
 
-This unit-address (the bit after the @) isn't valid, as that should
-match a reg or ranges, but this node has neither.
+After the long discuss, I think If the PCIe Capability Device Control[Relaxed Ordering
+Enable] to be cleared when the platform's RC has some problematic for RO didn't break
+anything in your driver, I think you could choose to check the
+(!pci_dev_should_disable_relaxed_ordering(root)) in the code to to enable
+ROOT_NO_RELAXED_ORDERING for your adapter, and enable the PCIe Capability Device Control
+[Relaxed Ordering Enable] bit when you need it, I think we don't have much gap here.
+And we could leave the pear-to-pear situation to be fixed later.
 
-Just call this display-0.
+Thanks
+Ding
 
-> +		#address-cells =<1>;
-> +		#size-cells = <0>;
-> +		compatible = "fsl,imx-parallel-display";
-> +		interface-pix-fmt = "rgb24";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ipu_disp0>;
-> +		status = "okay";
-> +
-> +		port at 0 {
-> +			reg = <0>;
-> +			display0_in: endpoint {
-> +				remote-endpoint = <&ipu_di0_disp0>;
-> +			};
-> +		};
-> +
-> +		port at 1 {
-> +			reg = <1>;
-> +			display0_out: endpoint {
-> +				remote-endpoint = <&panel_in>;
-> +			};
-> +		};
-> +	};
-> +
-> +	dvi_panel: display at 0 {
-
-Likewise you have no reg here, so the unit address isn't valid.
-
-Surely panel-0?
-
-> +		#address-cells =<1>;
-> +		#size-cells = <0>;
-> +		compatible = "simple,ddc-only";
-
-I don't see that compatible string in my Linux tree, and it doesn't make
-sense to me -- "simple" isn't a vendor-prefix.
-
-Where has this come from?
-
-> +		ddc-i2c-bus = <&i2c2>;
-> +
-> +		port {
-> +			panel_in: endpoint {
-> +				remote-endpoint = <&display0_out>;
-> +			};
-> +		};
-> +	};
-
-[...]
-
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_3p2v: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-
-Meaningless reg entry.
-
-> +			regulator-name = "3P2V";
-> +			regulator-min-microvolt = <3200000>;
-> +			regulator-max-microvolt = <3200000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		reg_usb_vbus: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-
-Likewise.
-
-> +			regulator-name = "usb_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio7 8 0>;
-> +			enable-active-high;
-> +		};
-> +	};
-
-There's no need for a simple-bus here. It doesn't represent HW, and you
-can nothing. You can put these directly under the root node, without a
-synthetic reg or unnecessary container:
-
-	reg_3p2v: regulator-3p2v {
-		compatible = "regulator-fixed";
-		regulator-name = "3P2V";
-		regulator-min-microvolt = <3200000>;
-		regulator-max-microvolt = <3200000>;
-		regulator-always-on;
-	};
-
-	reg_usb_vbus: regulator-usb-vbus {
-		compatible = "regulator-fixed";
-		regulator-name = "usb_vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		gpio = <&gpio7 8 0>;
-		enable-active-high;
-	}
-
-Otherwise, looks fine to me.
-
-Thanks,
-Mark.
+> .
+> 
