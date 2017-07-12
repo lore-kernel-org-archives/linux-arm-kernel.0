@@ -1,28 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 12 Jul 2017 13:21:20 +0200
-Subject: [PATCH 2/3] ARM: dts: r8a7743: Add MMCIF0 support
-In-Reply-To: <1499853805-5915-3-git-send-email-chris.paterson2@renesas.com>
-References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
- <1499853805-5915-3-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAMuHMdV9V56kU8PtZb3jHwQeocj2_uUDYN3D=g2ZxHGN0cSbhQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Jul 2017 13:22:29 +0200
+Subject: [PATCH] gpio: mvebu: Fix cause computation in irq handler
+Message-ID: <20170712112229.858-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 12:03 PM, Chris Paterson
-<chris.paterson2@renesas.com> wrote:
-> Add the MMCIF0 device to the r8a7743 device tree.
->
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+When switching to regmap, the way to compute the irq cause was
+reorganized. However while doing it, a typo was introduced: a 'xor'
+replaced a 'and'.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This lead to wrong behavior in the interrupt handler ans one of the
+symptom was wrong irq handler called on the Armada 388 GP:
+"->handle_irq():  c016303c,
+handle_bad_irq+0x0/0x278
+->irq_data.chip(): c0b0ec0c,
+0xc0b0ec0c
+->action():   (null)
+   IRQ_NOPROBE set
+ IRQ_NOREQUEST set
+unexpected IRQ trap at vector 00
+irq 0, desc: ee804800, depth: 1, count: 0, unhandled: 0"
 
-Gr{oetje,eeting}s,
+Fixes: 2233bf7a92e7 ("gpio: mvebu: switch to regmap for register access")
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/gpio/gpio-mvebu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index e338c3743562..45c65f805fd6 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -557,7 +557,7 @@ static void mvebu_gpio_irq_handler(struct irq_desc *desc)
+ 	edge_cause = mvebu_gpio_read_edge_cause(mvchip);
+ 	edge_mask  = mvebu_gpio_read_edge_mask(mvchip);
+ 
+-	cause = (data_in ^ level_mask) | (edge_cause & edge_mask);
++	cause = (data_in & level_mask) | (edge_cause & edge_mask);
+ 
+ 	for (i = 0; i < mvchip->chip.ngpio; i++) {
+ 		int irq;
+-- 
+2.13.2
