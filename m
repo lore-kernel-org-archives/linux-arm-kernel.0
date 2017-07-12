@@ -1,123 +1,78 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 12 Jul 2017 15:44:16 +0100
-Subject: [RFC PATCH 03/10] arm64: crypto: avoid register x18 in scalar AES code
+Date: Wed, 12 Jul 2017 15:44:17 +0100
+Subject: [RFC PATCH 04/10] arm64: kvm: stop treating register x18 as caller
+ save
 In-Reply-To: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
 References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170712144424.19528-4-ard.biesheuvel@linaro.org>
+Message-ID: <20170712144424.19528-5-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register x18 is the platform register, and is not unconditionally
-classified as a caller save register by the AAPCS64 ABI. So avoid
-using it in our AES assembler code, to allow the kernel to use it
-as a task_struct pointer.
+In preparation of using x18 as a task struct pointer register when
+running in the kernel, stop treating it as caller save in the KVM
+guest entry/exit code. Currently, the code assumes there is no need
+to preserve it for the host, given that it would have been assumed
+clobbered anyway by the function call to __guest_enter(). Instead,
+preserve its value and restore it upon return.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/aes-cipher-core.S | 55 ++++++++++----------
- 1 file changed, 28 insertions(+), 27 deletions(-)
+ arch/arm64/kvm/hyp/entry.S | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/crypto/aes-cipher-core.S b/arch/arm64/crypto/aes-cipher-core.S
-index f2f9cc519309..62c91b9fcd56 100644
---- a/arch/arm64/crypto/aes-cipher-core.S
-+++ b/arch/arm64/crypto/aes-cipher-core.S
-@@ -17,8 +17,7 @@
- 	out		.req	x1
- 	in		.req	x2
- 	rounds		.req	x3
--	tt		.req	x4
--	lt		.req	x2
-+	tt		.req	x2
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index 12ee62d6d410..75d31a161d3e 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -32,6 +32,7 @@
+ 	.pushsection	.hyp.text, "ax"
  
- 	.macro		__pair, enc, reg0, reg1, in0, in1e, in1d, shift
- 	ubfx		\reg0, \in0, #\shift, #8
-@@ -34,17 +33,17 @@
- 	.macro		__hround, out0, out1, in0, in1, in2, in3, t0, t1, enc
- 	ldp		\out0, \out1, [rk], #8
+ .macro save_callee_saved_regs ctxt
++	str	x18,      [\ctxt, #CPU_XREG_OFFSET(18)]
+ 	stp	x19, x20, [\ctxt, #CPU_XREG_OFFSET(19)]
+ 	stp	x21, x22, [\ctxt, #CPU_XREG_OFFSET(21)]
+ 	stp	x23, x24, [\ctxt, #CPU_XREG_OFFSET(23)]
+@@ -47,6 +48,7 @@
+ 	ldp	x25, x26, [\ctxt, #CPU_XREG_OFFSET(25)]
+ 	ldp	x27, x28, [\ctxt, #CPU_XREG_OFFSET(27)]
+ 	ldp	x29, lr,  [\ctxt, #CPU_XREG_OFFSET(29)]
++	ldr	x18,      [\ctxt, #CPU_XREG_OFFSET(18)]
+ .endm
  
--	__pair		\enc, w13, w14, \in0, \in1, \in3, 0
--	__pair		\enc, w15, w16, \in1, \in2, \in0, 8
--	__pair		\enc, w17, w18, \in2, \in3, \in1, 16
-+	__pair		\enc, w12, w13, \in0, \in1, \in3, 0
-+	__pair		\enc, w14, w15, \in1, \in2, \in0, 8
-+	__pair		\enc, w16, w17, \in2, \in3, \in1, 16
- 	__pair		\enc, \t0, \t1, \in3, \in0, \in2, 24
+ /*
+@@ -78,12 +80,9 @@ ENTRY(__guest_enter)
+ 	ldp	x14, x15, [x18, #CPU_XREG_OFFSET(14)]
+ 	ldp	x16, x17, [x18, #CPU_XREG_OFFSET(16)]
  
--	eor		\out0, \out0, w13
--	eor		\out1, \out1, w14
--	eor		\out0, \out0, w15, ror #24
--	eor		\out1, \out1, w16, ror #24
--	eor		\out0, \out0, w17, ror #16
--	eor		\out1, \out1, w18, ror #16
-+	eor		\out0, \out0, w12
-+	eor		\out1, \out1, w13
-+	eor		\out0, \out0, w14, ror #24
-+	eor		\out1, \out1, w15, ror #24
-+	eor		\out0, \out0, w16, ror #16
-+	eor		\out1, \out1, w17, ror #16
- 	eor		\out0, \out0, \t0, ror #8
- 	eor		\out1, \out1, \t1, ror #8
- 	.endm
-@@ -60,42 +59,44 @@
- 	.endm
+-	// Restore guest regs x19-x29, lr
++	// Restore guest regs x18-x29, lr
+ 	restore_callee_saved_regs x18
  
- 	.macro		do_crypt, round, ttab, ltab
--	ldp		w5, w6, [in]
--	ldp		w7, w8, [in, #8]
--	ldp		w9, w10, [rk], #16
--	ldp		w11, w12, [rk, #-8]
-+	ldp		w4, w5, [in]
-+	ldp		w6, w7, [in, #8]
-+	ldp		w8, w9, [rk], #16
-+	ldp		w10, w11, [rk, #-8]
+-	// Restore guest reg x18
+-	ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
+-
+ 	// Do not touch any register after this!
+ 	eret
+ ENDPROC(__guest_enter)
+@@ -104,7 +103,7 @@ ENTRY(__guest_exit)
+ 	// Retrieve the guest regs x0-x1 from the stack
+ 	ldp	x2, x3, [sp], #16	// x0, x1
  
-+CPU_BE(	rev		w4, w4		)
- CPU_BE(	rev		w5, w5		)
- CPU_BE(	rev		w6, w6		)
- CPU_BE(	rev		w7, w7		)
--CPU_BE(	rev		w8, w8		)
+-	// Store the guest regs x0-x1 and x4-x18
++	// Store the guest regs x0-x1 and x4-x17
+ 	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(0)]
+ 	stp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
+ 	stp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
+@@ -113,9 +112,8 @@ ENTRY(__guest_exit)
+ 	stp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
+ 	stp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
+ 	stp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
+-	str	x18,      [x1, #CPU_XREG_OFFSET(18)]
  
-+	eor		w4, w4, w8
- 	eor		w5, w5, w9
- 	eor		w6, w6, w10
- 	eor		w7, w7, w11
--	eor		w8, w8, w12
+-	// Store the guest regs x19-x29, lr
++	// Store the guest regs x18-x29, lr
+ 	save_callee_saved_regs x1
  
- 	adr_l		tt, \ttab
--	adr_l		lt, \ltab
- 
- 	tbnz		rounds, #1, 1f
- 
--0:	\round		w9, w10, w11, w12, w5, w6, w7, w8
--	\round		w5, w6, w7, w8, w9, w10, w11, w12
-+0:	\round		w8, w9, w10, w11, w4, w5, w6, w7
-+	\round		w4, w5, w6, w7, w8, w9, w10, w11
- 
- 1:	subs		rounds, rounds, #4
--	\round		w9, w10, w11, w12, w5, w6, w7, w8
--	csel		tt, tt, lt, hi
--	\round		w5, w6, w7, w8, w9, w10, w11, w12
--	b.hi		0b
-+	\round		w8, w9, w10, w11, w4, w5, w6, w7
-+	b.ls		2f
-+	\round		w4, w5, w6, w7, w8, w9, w10, w11
-+	b		0b
- 
-+2:	adr_l		tt, \ltab
-+	\round		w4, w5, w6, w7, w8, w9, w10, w11
-+
-+CPU_BE(	rev		w4, w4		)
- CPU_BE(	rev		w5, w5		)
- CPU_BE(	rev		w6, w6		)
- CPU_BE(	rev		w7, w7		)
--CPU_BE(	rev		w8, w8		)
- 
--	stp		w5, w6, [out]
--	stp		w7, w8, [out, #8]
-+	stp		w4, w5, [out]
-+	stp		w6, w7, [out, #8]
- 	ret
- 	.endm
- 
+ 	// Restore the host_ctxt from the stack
 -- 
 2.9.3
