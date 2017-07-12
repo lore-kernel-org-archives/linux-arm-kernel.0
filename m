@@ -1,79 +1,101 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Wed, 12 Jul 2017 07:03:29 +0000
-Subject: [PATCH] pinctrl: st: constify gpio_chip structure
-In-Reply-To: <20170711181519.GA20001@embeddedgus>
-References: <20170711181519.GA20001@embeddedgus>
-Message-ID: <c0a35f14-7c22-63f9-8bfa-2d88b5800fbd@st.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 12 Jul 2017 15:06:11 +0800
+Subject: [PATCH v1 1/1] ARM: dts: imx6: RIoTboard provide gpio-line-names
+In-Reply-To: <20170620142830.5119-1-o.rempel@pengutronix.de>
+References: <20170620142830.5119-1-o.rempel@pengutronix.de>
+Message-ID: <20170712070609.GG3172@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gustavo
+On Tue, Jun 20, 2017 at 04:28:30PM +0200, Oleksij Rempel wrote:
+> for each gpio controller
 
-On 07/11/2017 08:15 PM, Gustavo A. R. Silva wrote:
-> This structure is only used to copy into other structure, so declare
-> it as const.
+Please write up a complete sentence.  If you can explain a bit why these
+names are useful would be better.
+
 > 
-> This issue was detected using Coccinelle and the following semantic patch:
-> 
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct gpio_chip i at p = { ... };
-> 
-> @ok@
-> identifier r.i;
-> expression e;
-> position p;
-> @@
-> e = i at p;
-> 
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct gpio_chip e;
-> @@
-> e at i@p
-> 
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->   struct gpio_chip i = { ... };
-> 
-> In the following log you can see a significant difference in the code size
-> and data segment, hence in the dec segment. This log is the output
-> of the size command, before and after the code change:
-> 
-> before:
->     text    data     bss     dec     hex filename
->    21671    3632     128   25431    6357 drivers/pinctrl/pinctrl-st.o
-> 
-> after:
->     text    data     bss     dec     hex filename
->    21366    3576     128   25070    61ee drivers/pinctrl/pinctrl-st.o
-> 
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 > ---
->   drivers/pinctrl/pinctrl-st.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/imx6dl-riotboard.dts | 61 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
 > 
-> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> index 3ae8066..5d4789d 100644
-> --- a/drivers/pinctrl/pinctrl-st.c
-> +++ b/drivers/pinctrl/pinctrl-st.c
-> @@ -1442,7 +1442,7 @@ static void st_gpio_irqmux_handler(struct irq_desc *desc)
->   	chained_irq_exit(chip, desc);
->   }
->   
-> -static struct gpio_chip st_gpio_template = {
-> +static const struct gpio_chip st_gpio_template = {
->   	.request		= gpiochip_generic_request,
->   	.free			= gpiochip_generic_free,
->   	.get			= st_gpio_get,
+> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> index 2cb72824e800..b9ecb3b3792a 100644
+> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
+> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> @@ -84,6 +84,67 @@
+>  	};
+>  };
+>  
+> +&gpio1 {
+> +	gpio-line-names =
+> +		"", "", "[SD2_WP]", "", "[SD2_CD]", "I2C3_SCL",
+> +			"I2C3_SDA", "I2C4_SCL",
+> +		"I2C4_SDA", "", "", "", "", "", "", "",
+> +		"", "PWM3", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "";
+> +};
+> +
+> +&gpio2 {
+> +	gpio-line-names =
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "";
+> +};
+> +
+> +&gpio3 {
+> +	gpio-line-names =
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "[USB_OTG_VBUS]", "",
+> +		"UART3_TXD", "UART3_RXD", "", "", "[EIM_D28]", "", "", "";
+> +};
+> +
+> +&gpio4 {
+> +	gpio-line-names =
+> +		"", "", "", "", "", "", "UART4_TXD", "UART4_RXD",
+> +		"UART5_TXD", "UART5_RXD", "", "", "", "", "", "",
+> +		"GPIO4_16", "GPIO4_17", "GPIO4_18", "GPIO4_19", "",
+> +			"CSPI3_CLK", "CSPI3_MOSI", "CSPI3_MISO",
+> +		"CSPI3_CS0", "CSPI3_CS1", "GPIO4_26", "GPIO4_27",
+> +			"CSPI3_RDY", "PWM1", "PWM2", "GPIO4_31";
+> +};
+> +
+> +&gpio5 {
+> +	gpio-line-names =
+> +		"", "", "[EIM_A25]", "", "", "GPIO5_05", "GPIO5_06",
+> +			"GPIO5_07",
+> +		"GPIO5_08", "CSPI2_CS1", "CSPI2_MOSI", "CSPI2_MISO",
+> +			"CSPI2_CS0", "CSPI2_CLK", "", "",
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "";
+> +};
+> +
+> +&gpio6 {
+> +	gpio-line-names =
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "";
+> +};
+> +
+> +&gpio7 {
+> +	gpio-line-names =
+> +		"[SD3_CD]", "[SD3_WP]", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "",
+> +		"", "", "", "", "", "", "", "";
+> +};
+> +
+>  &audmux {
+
+Please keep the new added nodes sorted alphabetically in label name.
+
+Shawn
+
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_audmux>;
+> -- 
+> 2.11.0
 > 
-
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
-
-Thanks
