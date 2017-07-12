@@ -1,44 +1,49 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Jul 2017 13:22:29 +0200
-Subject: [PATCH] gpio: mvebu: Fix cause computation in irq handler
-Message-ID: <20170712112229.858-1-gregory.clement@free-electrons.com>
+Date: Wed, 12 Jul 2017 13:23:11 +0200
+Subject: [PATCH] ARM: dts: armada-38x: Fix irq type for pca955
+Message-ID: <20170712112311.922-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When switching to regmap, the way to compute the irq cause was
-reorganized. However while doing it, a typo was introduced: a 'xor'
-replaced a 'and'.
+As written in the datasheet the PCA955 can only handle low level irq and
+not edge irq.
 
-This lead to wrong behavior in the interrupt handler ans one of the
-symptom was wrong irq handler called on the Armada 388 GP:
-"->handle_irq():  c016303c,
-handle_bad_irq+0x0/0x278
-->irq_data.chip(): c0b0ec0c,
-0xc0b0ec0c
-->action():   (null)
-   IRQ_NOPROBE set
- IRQ_NOREQUEST set
-unexpected IRQ trap at vector 00
-irq 0, desc: ee804800, depth: 1, count: 0, unhandled: 0"
+Without this fix the interrupt is not usable for pca955: the gpio-pca953x
+driver already set the irq type as low level which is incompatible with
+edge type, then the kernel prevents using the interrupt:
 
-Fixes: 2233bf7a92e7 ("gpio: mvebu: switch to regmap for register access")
+"irq: type mismatch, failed to map hwirq-18 for
+/soc/internal-regs/gpio at 18100!"
+
+Fixes: 928413bd859c ("ARM: mvebu: Add Armada 388 General Purpose
+Development Board support")
+Cc: stable at vger.kernel.org
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/gpio/gpio-mvebu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index e338c3743562..45c65f805fd6 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -557,7 +557,7 @@ static void mvebu_gpio_irq_handler(struct irq_desc *desc)
- 	edge_cause = mvebu_gpio_read_edge_cause(mvchip);
- 	edge_mask  = mvebu_gpio_read_edge_mask(mvchip);
- 
--	cause = (data_in ^ level_mask) | (edge_cause & edge_mask);
-+	cause = (data_in & level_mask) | (edge_cause & edge_mask);
- 
- 	for (i = 0; i < mvchip->chip.ngpio; i++) {
- 		int irq;
+diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+index 895fa6cfa15a..563901e0ec07 100644
+--- a/arch/arm/boot/dts/armada-388-gp.dts
++++ b/arch/arm/boot/dts/armada-388-gp.dts
+@@ -75,7 +75,7 @@
+ 					pinctrl-names = "default";
+ 					pinctrl-0 = <&pca0_pins>;
+ 					interrupt-parent = <&gpio0>;
+-					interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
++					interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+ 					interrupt-controller;
+@@ -87,7 +87,7 @@
+ 					compatible = "nxp,pca9555";
+ 					pinctrl-names = "default";
+ 					interrupt-parent = <&gpio0>;
+-					interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
++					interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+ 					interrupt-controller;
 -- 
 2.13.2
