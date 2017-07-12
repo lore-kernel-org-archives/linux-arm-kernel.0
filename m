@@ -1,48 +1,76 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 12 Jul 2017 09:07:14 -0400
-Subject: [PATCH V3 1/2] PCI: Add Extended Tags quirk for Broadcom HT2100
- Root Port
-In-Reply-To: <20170711203957.GB14614@bhelgaas-glaptop.roam.corp.google.com>
-References: <1499786735-25782-1-git-send-email-okaya@codeaurora.org>
- <20170711195853.GA14614@bhelgaas-glaptop.roam.corp.google.com>
- <ae4dca5b-30cf-3a14-1707-380a3660badf@codeaurora.org>
- <20170711203957.GB14614@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <25b6bbf6-20b5-dfc8-c92a-268c07fa1f98@codeaurora.org>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Wed, 12 Jul 2017 10:18:19 -0300
+Subject: [PATCH 1/2] ARM: dts: imx7d-sdb: Add DRM panel support
+Message-ID: <1499865500-8857-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+It is preferred to use the panel compatible string rather than passing the LCD 
+timming in the device tree.
 
-On 7/11/2017 4:39 PM, Bjorn Helgaas wrote:
-> My proposal handles endpoints, too.  The pci_walk_bus() in the quirk
-> handles all devices we've already enumerated, and all devices we'll
-> enumerate in the future are handled in pci_configure_device().
+So pass the "innolux,at043tn24" compatible string to describe the parallel LCD 
+on this board.
 
-Code clears the endpoint's extended tag capability only if a quirky host
-bridge is found. 
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+---
+ arch/arm/boot/dts/imx7d-sdb.dts | 36 +++++++++++++-----------------------
+ 1 file changed, 13 insertions(+), 23 deletions(-)
 
-The question here was 
-
-"what if you have an endpoint, it may declare extended tags capability
-and has a bug even though the host bridge is just fine"
-
-Code will enable extended tags on both the host bridge and endpoint
-if it is supported.
-
-The host bridge will start generating 256 tags towards the endpoint
-but endpoint is unable to catch up with it. 
-
-Same thing is possible with two endpoints that try to do peer-to-peer
-communication. The first endpoint may generate 256 requests, second
-endpoint may not handle it.
-
-Again, this is a hypothetical condition with no known endpoints. I
-suggest we deal with this when time comes.
-
-Sinan 
-
-
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 664582d..22e106e 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -117,6 +117,16 @@
+ 		regulator-max-microvolt = <3300000>;
+ 		startup-delay-us = <200000>;
+ 	};
++
++	panel {
++		compatible = "innolux,at043tn24";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
++	};
+ };
+ 
+ &adc1 {
+@@ -323,31 +333,11 @@
+ &lcdif {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_lcdif>;
+-	display = <&display0>;
+ 	status = "okay";
+ 
+-	display0: display {
+-		bits-per-pixel = <16>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-
+-			timing0: timing0 {
+-				clock-frequency = <9200000>;
+-				hactive = <480>;
+-				vactive = <272>;
+-				hfront-porch = <8>;
+-				hback-porch = <4>;
+-				hsync-len = <41>;
+-				vback-porch = <2>;
+-				vfront-porch = <4>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
++	port{
++		display_out: endpoint {
++			remote-endpoint = <&panel_in>;
+ 		};
+ 	};
+ };
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
