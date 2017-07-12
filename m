@@ -1,56 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Jul 2017 23:59:38 +0100
-Subject: [RFC PATCH 10/10] arm64: kernel: add support for virtually
- mapped stacks
-In-Reply-To: <20170712144424.19528-11-ard.biesheuvel@linaro.org>
-References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
- <20170712144424.19528-11-ard.biesheuvel@linaro.org>
-Message-ID: <20170712225937.GA25816@leverpostej>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Jul 2017 16:01:52 -0700
+Subject: [PATCH V4 2/6] iommu/arm-smmu: Add pm_runtime/sleep ops
+In-Reply-To: <20170712225821.GB22780@codeaurora.org>
+References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1499333825-7658-3-git-send-email-vivek.gautam@codeaurora.org>
+ <20170712225821.GB22780@codeaurora.org>
+Message-ID: <20170712230152.GC22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 03:44:23PM +0100, Ard Biesheuvel wrote:
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 2ba3185b1c78..4c3e82d6e2f2 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -392,6 +392,20 @@ ENDPROC(el1_error_invalid)
->   */
->  	.align	6
->  el1_sync:
-> +#ifdef CONFIG_VMAP_STACK
-> +	/*
-> +	 * When taking an exception from EL1, we need to check whether it is
-> +	 * caused by a faulting out-of-bounds access to the virtually mapped
-> +	 * stack before we can attempt to preserve the interrupted context.
-> +	 */
-> +	msr	tpidrro_el0, x0			// stash x0
-> +	mrs	x0, far_el1			// get faulting address
-> +	tbnz	x0, #63, .Lcheck_stack_ovf	// check if not user address
+On 07/12, Stephen Boyd wrote:
+> On 07/06, Vivek Gautam wrote:
+> > From: Sricharan R <sricharan@codeaurora.org>
+> > 
+> > The smmu needs to be functional only when the respective
+> > master's using it are active. The device_link feature
+> > helps to track such functional dependencies, so that the
+> > iommu gets powered when the master device enables itself
+> > using pm_runtime. So by adapting the smmu driver for
+> > runtime pm, above said dependency can be addressed.
+> > 
+> > This patch adds the pm runtime/sleep callbacks to the
+> > driver and also the functions to parse the smmu clocks
+> > from DT and enable them in resume/suspend.
+> > 
+> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> > Signed-off-by: Archit Taneja <architt@codeaurora.org>
+> > [vivek: Clock rework to loop over clock names data]
+> > Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> > ---
+> 
+> General comment, we have a bulk clk API now, but I guess we
+> failed to add the clk_bulk_prepare_enable() API that could be
+> used here. Perhaps you can add that API and then use it here to
+> reduce lines of code.
+> 
 
-One thing I don't like about this is that we're reading FAR_EL1 even
-though we don't know whether it's valid. It could contain junk, and we
-could spuriously jump into the slow path. That's liable to make
-performance erratic.
+Bjorn just sent a patch for that API an hour ago.
 
-Given we have to stash a GPR anyway, we can check whether the SP is
-valid in the fast-path, and that should be the only check we require. I
-think we can also get rid of the overflow heuristic by checking that the
-SP is strictly in the THREAD_SIZE stack area.
-
-[...]
-
-> @@ -234,6 +239,10 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
->  	 */
->  	if (addr >= (u64)current->stack - PAGE_SIZE &&
->  	    addr < (u64)current->stack) {
-> +
-> +		/* fix up regs->sp, we stashed the faulting value in sp_el0 */
-> +		regs->sp = read_sysreg(sp_el0);
-> +
-
-This also seems a bit "magic", as we're relying on what the entry asm
-will have done in a very specific case.
-
-Thanks,
-Mark.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
