@@ -1,49 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 12 Jul 2017 15:44:22 +0100
-Subject: [RFC PATCH 09/10] arm64: mm: add C level handling for stack overflows
-In-Reply-To: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
-References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170712144424.19528-10-ard.biesheuvel@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 12 Jul 2017 16:50:53 +0200
+Subject: [PATCH v4 1/3] cpufreq: mediatek: Add support of cpufreq to
+ MT2701/MT7623 SoC
+In-Reply-To: <1499741386.12408.11.camel@mtksdaap41>
+References: <cover.1499692967.git.sean.wang@mediatek.com>
+ <feabcfd53899954198c6620e9d9b68f4a3c55201.1499692967.git.sean.wang@mediatek.com>
+ <1499741386.12408.11.camel@mtksdaap41>
+Message-ID: <12f23fb1-a145-bdf0-54c8-c2818ba75d9d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the code to __do_kernel_fault() to force a panic when the faulting
-address of a data abort points into the guard page below the current
-task's stack.
+Hi Eddie,
 
-Currently, we won't be able to make it all the way here under such a
-condition, but that will be addressed in a subsequent patch.
+On 07/11/2017 04:49 AM, Eddie Huang wrote:
+> Hi Sean,
+> 
+> On Mon, 2017-07-10 at 22:23 +0800, sean.wang at mediatek.com wrote:
+>> From: Sean Wang <sean.wang@mediatek.com>
+>>
+>> MT2701/MT7623 is a 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
+>> single cluster and this hardware is also compatible with the existing
+>> driver through enabling CPU frequency feature with operating-points-v2
+>> bindings. Also, this driver actually supports all MediaTek SoCs, the
+>> Kconfig menu entry and file name itself should be updated with more
+>> generic name to drop "MT8173"
+>>
+>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Reviewed-by: Jean Delvare <jdelvare@suse.de>
+>> ---
+>>   drivers/cpufreq/Kconfig.arm                              | 7 +++----
+>>   drivers/cpufreq/Makefile                                 | 2 +-
+>>   drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} | 2 ++
+>>   3 files changed, 6 insertions(+), 5 deletions(-)
+>>   rename drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} (99%)
+>>
+> 
+> As Viresh mentioned, there are already many drivers use "mtk" as
+> filename prefix or postfix.To align with those files, I suggest use
+> mtk-cpufreq.c.I think there are not too many values to change all "mtk-"
+> to "mediatek-", but it is worth to have the same naming rule for
+> mediatek upstream driver.
+> 
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/fault.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+In the last submission Jean proposed to change all file names from 
+mtk-*.[ch] to mediatek-*.[ch] as this will cause less confusion.
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index c7861c9864e6..b3317e5ff5dd 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -229,6 +229,21 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
- 		return;
- 
- 	/*
-+	 * If we faulted on the guard page below this task's stack,
-+	 * we evidently overflowed
-+	 */
-+	if (addr >= (u64)current->stack - PAGE_SIZE &&
-+	    addr < (u64)current->stack) {
-+		printk(KERN_EMERG "BUG: stack guard page was hit at %p (stack is %p..%p)\n",
-+			 (void *)addr, current->stack,
-+			 (char *)current->stack + THREAD_SIZE - 1);
-+		die("Oops", regs, esr);
-+
-+		/* Be absolutely certain we don't return. */
-+		panic("Kernel stack overflow");
-+	}
-+
-+	/*
- 	 * No handler, we'll have to terminate things with extreme prejudice.
- 	 */
- 	bust_spinlocks(1);
--- 
-2.9.3
+Viresh are you OK with that approach or do you prefer that we stay with 
+mtk prefix? I think it makes sense to have a unique prefix and resolve 
+the situation we now have with source files and Kconfig options.
+But TBH I have no strong feeling for any of the two prefixes.
+
+Regards,
+Matthias
