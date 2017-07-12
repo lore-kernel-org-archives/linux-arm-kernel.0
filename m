@@ -1,51 +1,89 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 12 Jul 2017 15:44:14 +0100
-Subject: [RFC PATCH 01/10] arm64/lib: copy_page: use consistent prefetch stride
+Date: Wed, 12 Jul 2017 15:44:15 +0100
+Subject: [RFC PATCH 02/10] arm64/lib: copy_page: avoid x18 register in
+ assembler code
 In-Reply-To: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
 References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170712144424.19528-2-ard.biesheuvel@linaro.org>
+Message-ID: <20170712144424.19528-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The optional prefetch instructions in the copy_page() routine are
-inconsistent: at the start of the function, two cachelines are
-prefetched beyond the one being loaded in the first iteration, but
-in the loop, the prefetch is one more line ahead. This appears to
-be unintentional, so let's fix it.
-
-While at it, fix the comment style and white space.
+Register x18 will no longer be used as a caller save register in the
+future, so stop using it in the copy_page() code.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/lib/copy_page.S | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/arm64/lib/copy_page.S | 38 ++++++++++----------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
 
 diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
-index c3cd65e31814..076c43715e64 100644
+index 076c43715e64..ba84a992b362 100644
 --- a/arch/arm64/lib/copy_page.S
 +++ b/arch/arm64/lib/copy_page.S
-@@ -30,9 +30,10 @@
-  */
- ENTRY(copy_page)
+@@ -45,45 +45,45 @@ alternative_else_nop_endif
+ 	ldp	x14, x15, [x1, #96]
+ 	ldp	x16, x17, [x1, #112]
+ 
+-	mov	x18, #(PAGE_SIZE - 128)
++	add	x0, x0, #256
+ 	add	x1, x1, #128
+ 1:
+-	subs	x18, x18, #128
++	tst	x0, #(PAGE_SIZE - 1)
+ 
  alternative_if ARM64_HAS_NO_HW_PREFETCH
--	# Prefetch two cache lines ahead.
--	prfm    pldl1strm, [x1, #128]
--	prfm    pldl1strm, [x1, #256]
-+	// Prefetch three cache lines ahead.
-+	prfm	pldl1strm, [x1, #128]
-+	prfm	pldl1strm, [x1, #256]
-+	prfm	pldl1strm, [x1, #384]
+ 	prfm	pldl1strm, [x1, #384]
  alternative_else_nop_endif
  
+-	stnp	x2, x3, [x0]
++	stnp	x2, x3, [x0, #-256]
  	ldp	x2, x3, [x1]
-@@ -50,7 +51,7 @@ alternative_else_nop_endif
- 	subs	x18, x18, #128
+-	stnp	x4, x5, [x0, #16]
++	stnp	x4, x5, [x0, #-240]
+ 	ldp	x4, x5, [x1, #16]
+-	stnp	x6, x7, [x0, #32]
++	stnp	x6, x7, [x0, #-224]
+ 	ldp	x6, x7, [x1, #32]
+-	stnp	x8, x9, [x0, #48]
++	stnp	x8, x9, [x0, #-208]
+ 	ldp	x8, x9, [x1, #48]
+-	stnp	x10, x11, [x0, #64]
++	stnp	x10, x11, [x0, #-192]
+ 	ldp	x10, x11, [x1, #64]
+-	stnp	x12, x13, [x0, #80]
++	stnp	x12, x13, [x0, #-176]
+ 	ldp	x12, x13, [x1, #80]
+-	stnp	x14, x15, [x0, #96]
++	stnp	x14, x15, [x0, #-160]
+ 	ldp	x14, x15, [x1, #96]
+-	stnp	x16, x17, [x0, #112]
++	stnp	x16, x17, [x0, #-144]
+ 	ldp	x16, x17, [x1, #112]
  
- alternative_if ARM64_HAS_NO_HW_PREFETCH
--	prfm    pldl1strm, [x1, #384]
-+	prfm	pldl1strm, [x1, #384]
- alternative_else_nop_endif
+ 	add	x0, x0, #128
+ 	add	x1, x1, #128
  
- 	stnp	x2, x3, [x0]
+-	b.gt	1b
++	b.ne	1b
+ 
+-	stnp	x2, x3, [x0]
+-	stnp	x4, x5, [x0, #16]
+-	stnp	x6, x7, [x0, #32]
+-	stnp	x8, x9, [x0, #48]
+-	stnp	x10, x11, [x0, #64]
+-	stnp	x12, x13, [x0, #80]
+-	stnp	x14, x15, [x0, #96]
+-	stnp	x16, x17, [x0, #112]
++	stnp	x2, x3, [x0, #-256]
++	stnp	x4, x5, [x0, #-240]
++	stnp	x6, x7, [x0, #-224]
++	stnp	x8, x9, [x0, #-208]
++	stnp	x10, x11, [x0, #-192]
++	stnp	x12, x13, [x0, #-176]
++	stnp	x14, x15, [x0, #-160]
++	stnp	x16, x17, [x0, #-144]
+ 
+ 	ret
+ ENDPROC(copy_page)
 -- 
 2.9.3
