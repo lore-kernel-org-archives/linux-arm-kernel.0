@@ -1,162 +1,59 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 11 Jul 2017 18:02:55 -0700
-Subject: [PATCH 3/3] arm64: dts: qcom: Collapse usb support into one node
-In-Reply-To: <20170712010255.26855-1-stephen.boyd@linaro.org>
-References: <20170712010255.26855-1-stephen.boyd@linaro.org>
-Message-ID: <20170712010255.26855-4-stephen.boyd@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 11 Jul 2017 18:09:23 -0700
+Subject: [PATCH] dt-bindings: clock: ti-sci: Fix incorrect usage of headers
+In-Reply-To: <20170711223615.29398-1-s-anna@ti.com>
+References: <20170711223615.29398-1-s-anna@ti.com>
+Message-ID: <20170712010923.GP22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have three device nodes for the same USB hardware
-block, as evident by the reuse of the same reg address multiple
-times. Now that the chipidea driver fully supports OTG with the
-MSM wrapper we can collapse all these nodes into one USB device
-node, reflecting the true nature of the hardware.
+On 07/11, Suman Anna wrote:
+> The clock consumer usage description was erroneously referring to
+> couple of dt-binding headers that are no longer valid. The definition
+> and/or usage of these headers is incorrect and the only file present
+> at the moment, dt-bindings/soc/k2g.h is also being cleaned up. The
+> examples in this binding were updated properly, but the update to
+> description was missed out. So, fix this.
+> 
+> Fixes: 8f306cfe4383 ("Documentation: dt: Add TI SCI clock driver")
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+> Hi Stephen,
+> 
+> Looks like this was missed during the update/repost of the ti-sci-clk
+> driver/binding. FYI, Santosh is going to pickup the header file cleanup
+> patch https://patchwork.kernel.org/patch/9741279/ for the next merge
+> window.
 
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
----
+I'll let Rob apply this as it is purely a binding document update.
 
-Should go through arm-soc via Andy.
+> 
+> regards
+> Suman
+> 
+>  Documentation/devicetree/bindings/clock/ti,sci-clk.txt | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+> index 1e884c40ab50..4e59dc6b1778 100644
+> --- a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+> +++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+> @@ -14,10 +14,9 @@ Required properties:
+>  - compatible: Must be "ti,k2g-sci-clk"
+>  - #clock-cells: Shall be 2.
+>    In clock consumers, this cell represents the device ID and clock ID
+> -  exposed by the PM firmware. The assignments can be found in the header
+> -  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
+> -  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where <soc>
+> -  is the SoC involved, for example 'k2g'.
+> +  exposed by the PM firmware. The list of valid values for the device IDs
+> +  and clocks IDs for 66AK2G SoC are documented at
+> +  http://processors.wiki.ti.com/index.php/TISCI#66AK2G02_Data
+>  
 
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 39 ++++++++++---------
- arch/arm64/boot/dts/qcom/msm8916.dtsi     | 62 +++++++++++++++----------------
- 2 files changed, 51 insertions(+), 50 deletions(-)
+I hope the weblink doesn't die in the future. Why can't we copy
+it into the binding document here for safe keeping?
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index f326f4fb4d72..dc950a054d0a 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -213,24 +213,21 @@
- 		};
- 
- 		usb at 78d9000 {
--			extcon = <&usb_id>, <&usb_id>;
-+			extcon = <&usb_id>;
- 			status = "okay";
--		};
--
--		ehci at 78d9000 {
--			status = "okay";
--		};
--
--		phy at 78d9000 {
--			v1p8-supply = <&pm8916_l7>;
--			v3p3-supply = <&pm8916_l13>;
--			vddcx-supply = <&pm8916_s1>;
--			extcon = <&usb_id>, <&usb_id>;
--			dr_mode = "otg";
--			status = "okay";
--			switch-gpio = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&usb_sw_sel_pm>;
-+			adp-disable;
-+			hnp-disable;
-+			srp-disable;
-+			mux-controls = <&usb_switch>;
-+			mux-control-names = "usb_switch";
-+			usb-switch-states = <0>, <1>;
-+
-+			ulpi {
-+				phy {
-+					v1p8-supply = <&pm8916_l7>;
-+					v3p3-supply = <&pm8916_l13>;
-+				};
-+			};
- 		};
- 
- 		lpass at 07708000 {
-@@ -348,6 +345,14 @@
- 		pinctrl-0 = <&usb_id_default>;
- 	};
- 
-+	usb_switch: usb-switch {
-+		compatible = "toshiba,tc7usb40mu";
-+		mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
-+		#mux-control-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb_sw_sel_pm>;
-+	};
-+
- 	hdmi-out {
- 		compatible = "hdmi-connector";
- 		type = "a";
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 17691abea608..039991f80831 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -546,44 +546,40 @@
- 			status = "disabled";
- 		};
- 
--		usb_dev: usb at 78d9000 {
-+		otg: usb at 78d9000 {
- 			compatible = "qcom,ci-hdrc";
--			reg = <0x78d9000 0x400>;
--			dr_mode = "peripheral";
--			interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
--			usb-phy = <&usb_otg>;
--			status = "disabled";
--		};
--
--		usb_host: ehci at 78d9000 {
--			compatible = "qcom,ehci-host";
--			reg = <0x78d9000 0x400>;
--			interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
--			usb-phy = <&usb_otg>;
--			status = "disabled";
--		};
--
--		usb_otg: phy at 78d9000 {
--			compatible = "qcom,usb-otg-snps";
--			reg = <0x78d9000 0x400>;
-+			reg = <0x78d9000 0x200>,
-+			      <0x78d9200 0x200>;
- 			interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>;
--
--			qcom,vdd-levels = <500000 1000000 1320000>;
--			qcom,phy-init-sequence = <0x44 0x6B 0x24 0x13>;
--			dr_mode = "peripheral";
--			qcom,otg-control = <2>; // PMIC
--			qcom,manual-pullup;
--
- 			clocks = <&gcc GCC_USB_HS_AHB_CLK>,
--				 <&gcc GCC_USB_HS_SYSTEM_CLK>,
--				 <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
--			clock-names = "iface", "core", "sleep";
--
--			resets = <&gcc GCC_USB2A_PHY_BCR>,
--				 <&gcc GCC_USB_HS_BCR>;
--			reset-names = "phy", "link";
-+				 <&gcc GCC_USB_HS_SYSTEM_CLK>;
-+			clock-names = "iface", "core";
-+			assigned-clocks = <&gcc GCC_USB_HS_SYSTEM_CLK>;
-+			assigned-clock-rates = <80000000>;
-+			resets = <&gcc GCC_USB_HS_BCR>;
-+			reset-names = "core";
-+			phy_type = "ulpi";
-+			dr_mode = "otg";
-+			ahb-burst-config = <0>;
-+			phy-names = "usb-phy";
-+			phys = <&usb_hs_phy>;
- 			status = "disabled";
-+			#reset-cells = <1>;
-+
-+			ulpi {
-+				usb_hs_phy: phy {
-+					compatible = "qcom,usb-hs-phy-msm8916",
-+						     "qcom,usb-hs-phy";
-+					#phy-cells = <0>;
-+					clocks = <&xo_board>, <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
-+					clock-names = "ref", "sleep";
-+					resets = <&gcc GCC_USB2A_PHY_BCR>, <&otg 0>;
-+					reset-names = "phy", "por";
-+					qcom,init-seq = /bits/ 8 <0x0 0x44
-+						0x1 0x6b 0x2 0x24 0x3 0x13>;
-+				};
-+			};
- 		};
- 
- 		intc: interrupt-controller at b000000 {
 -- 
-2.10.0.297.gf6727b0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
