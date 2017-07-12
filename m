@@ -1,35 +1,48 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 12 Jul 2017 08:15:43 -0400
-Subject: [PATCH V4] PCI: Add Extended Tags quirk for Broadcom HT2100 Root
- Port
-In-Reply-To: <CABawtvMCJy1Y0Cv-NhVRv4qKLiZ-PUWfeZhTA6uGiiiswe+g6A@mail.gmail.com>
-References: <1499832255-9845-1-git-send-email-okaya@codeaurora.org>
- <20170712105550.6007fa06.wim.ten.have@oracle.com>
- <CABawtvMCJy1Y0Cv-NhVRv4qKLiZ-PUWfeZhTA6uGiiiswe+g6A@mail.gmail.com>
-Message-ID: <b8ccaffe-d907-db04-a793-86a3b67f61af@codeaurora.org>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 12 Jul 2017 14:34:06 +0200
+Subject: [PATCH 2/6] irqchip/tango: Use irq_gc_mask_disable_and_ack_set
+In-Reply-To: <20170707192016.13001-3-opendmb@gmail.com>
+References: <20170707192016.13001-1-opendmb@gmail.com>
+ <20170707192016.13001-3-opendmb@gmail.com>
+Message-ID: <13014560-e6a5-85b4-1f76-b83e9c44879d@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/12/2017 5:44 AM, Ethan Zhao wrote:
-> The dmesg yelled "...Tag handling is broken" , but didn't say how it
-> was handled, that is weird and confusing, just because there is no
-> device under that bridge ?
+Hello,
+
+I've added Mans (the code's author) to the recipient list.
+
+Regards.
+
+On 07/07/2017 21:20, Doug Berger wrote:
+
+> From: Florian Fainelli <f.fainelli@gmail.com>
 > 
-> How about move the messages together "...is broken, disable Extended tag..."
-
-This was something requested by Bjorn to inform that user has a broken HW
-when a quirk is matched.
-
-The new code will disable extended tags only if it was enabled on endpoint
-via power on reset value or via some broken BIOS.
-
-It looks like we are not seeing any disabling message. This implies that
-both the card and BIOS is good.
-
-That's why, you are no longer seeing a disabling message on this system
-and code is just not enabling extended tags.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Any usage of the irq_gc_mask_disable_reg_and_ack() function should be
+> replaced with either the irq_gc_mask_disable_and_ack_set() or the
+> irq_gc_mask_set_and_ack_set() function depending on which corrects
+> the bugs in irq_gc_mask_disable_reg_and_ack() for a given usage.
+> 
+> For the Tango irqchip driver, irq_gc_mask_disable_and_ack_set() seems to
+> be what is intended, so use it.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
+> ---
+>  drivers/irqchip/irq-tango.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-tango.c b/drivers/irqchip/irq-tango.c
+> index bdbb5c0ff7fe..0c085303a583 100644
+> --- a/drivers/irqchip/irq-tango.c
+> +++ b/drivers/irqchip/irq-tango.c
+> @@ -141,7 +141,7 @@ static void __init tangox_irq_init_chip(struct irq_chip_generic *gc,
+>  	for (i = 0; i < 2; i++) {
+>  		ct[i].chip.irq_ack = irq_gc_ack_set_bit;
+>  		ct[i].chip.irq_mask = irq_gc_mask_disable_reg;
+> -		ct[i].chip.irq_mask_ack = irq_gc_mask_disable_reg_and_ack;
+> +		ct[i].chip.irq_mask_ack = irq_gc_mask_disable_and_ack_set;
+>  		ct[i].chip.irq_unmask = irq_gc_unmask_enable_reg;
+>  		ct[i].chip.irq_set_type = tangox_irq_set_type;
+>  		ct[i].chip.name = gc->domain->name;
+> 
