@@ -1,81 +1,42 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Thu, 13 Jul 2017 00:03:55 +0800
-Subject: [PATCH 5/5] arm64: dts: rockchip: add rk3399 hdmi nodes
-In-Reply-To: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1499875435-23944-6-git-send-email-jacob-chen@iotwrt.com>
+From: ada@thorsis.com (Alexander Dahl)
+Date: Wed, 12 Jul 2017 18:28:09 +0200
+Subject: [RFC 0/3] net: macb: Use SRAM on SoC for RX rings and buffers
+Message-ID: <1499876892-14423-1-git-send-email-ada@thorsis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an hdmi node, and also add hdmi endpoints to vopb and vopl
-output port nodes.
+Hei hei,
 
-Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 37 ++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+this is a small patch series for a problem we encoutered with a board
+based on an AT91SAM9G20 SoC. I talked about it a few days ago on the
+#armlinux IRC channel with Alexandre Belloni and Florian Fainelli. The
+current state of those patches is 'prove of concept', but if this is
+useful for someone I would like to get it upstream.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 4965163..c398eb0 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1485,6 +1485,11 @@
- 				remote-endpoint = <&edp_in_vopl>;
- 			};
- 
-+			vopl_out_hdmi: endpoint at 2 {
-+				reg = <2>;
-+				remote-endpoint = <&hdmi_in_vopl>;
-+			};
-+
- 		};
- 	};
- 
-@@ -1526,6 +1531,11 @@
- 				remote-endpoint = <&mipi_in_vopb>;
- 			};
- 
-+			vopb_out_hdmi: endpoint at 2 {
-+				reg = <2>;
-+				remote-endpoint = <&hdmi_in_vopb>;
-+			};
-+
- 		};
- 	};
- 
-@@ -1541,6 +1551,33 @@
- 		status = "disabled";
- 	};
- 
-+	hdmi: hdmi at ff940000 {
-+		compatible = "rockchip,rk3399-dw-hdmi";
-+		reg = <0x0 0xff940000 0x0 0x20000>;
-+		reg-io-width = <4>;
-+		rockchip,grf = <&grf>;
-+		power-domains = <&power RK3399_PD_HDCP>;
-+		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH 0>;
-+		clocks = <&cru PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_SFR>, <&cru PLL_VPLL>, <&cru PCLK_VIO_GRF>;
-+		clock-names = "iahb", "isfr", "vpll", "grf";
-+		status = "disabled";
-+
-+		ports {
-+			hdmi_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				hdmi_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_hdmi>;
-+				};
-+				hdmi_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_hdmi>;
-+				};
-+			};
-+		};
-+	};
-+
- 	mipi_dsi: mipi at ff960000 {
- 		compatible = "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi";
- 		reg = <0x0 0xff960000 0x0 0x8000>;
--- 
-2.7.4
+The first two patches are just adding some descriptive comments for
+register and bit definitions, taken from the at91sam9g20 hardware
+manual. Those may be of general interest, even without the third
+patch.
+
+The third patch is the main one. I tried to describe in the commit
+message as clear as possible what problem is to be solved. If you
+don't understand the reason please ask, I will happily change or
+extend the message.
+
+Regarding the third patch: It's just a proof of concept so far, I
+changed some hardcoded values which probably should not be that low
+for the normal usecase with RX buffers/rings in SD-RAM/DDR-RAM. It
+would be good if this would be somehow configurable at boot time, so
+maybe in device tree. However I would need an idea how to do this and
+some help, that's why this series is just RFC.
+
+I tested this with heavy load on the EBI bus (external SRAM), network
+seems to work as usual and I get no receive overrun errors anymore.
+
+An interesting question for me would be where this mac is used and
+whether internal sram is available on those SoCs and in what sizes
+(sam9g20 has 32k). A quick view in arch/arm/boot/dts just showed my
+at91sam9 and sama5 platforms using the macb driver.
+
+Greets
+Alex
