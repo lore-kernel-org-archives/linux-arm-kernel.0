@@ -1,78 +1,57 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 12 Jul 2017 17:46:40 +0800
-Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <MWHPR12MB16008EFFC5F2792880F7E80BC8A90@MWHPR12MB1600.namprd12.prod.outlook.com>
-References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
- <MWHPR12MB160087E9E0B17F7A17609714C8AA0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <MWHPR12MB160006024D920ED58126048AC8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0Uc5KSJTj4A=9pSudiJ28AW0krc7FZpdW4upwY+FgpeArA@mail.gmail.com>
- <MWHPR12MB1600AECAE619EAA97E6B15D5C8AB0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0UdqoRR8XLG1o3ygUZTqEBQ4dgNaneZ-n1OSNC1AiswO_g@mail.gmail.com>
- <MWHPR12MB16008EFFC5F2792880F7E80BC8A90@MWHPR12MB1600.namprd12.prod.outlook.com>
-Message-ID: <16d18af6-f578-ef8a-a52e-46ec975e59e0@huawei.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 12 Jul 2017 11:58:53 +0200
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <20170712034150.GD17115@vireshk-i7>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+ <20170629143432.GM29665@vireshk-i7>
+ <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+ <20170711102514.GC17115@vireshk-i7>
+ <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
+ <20170712034150.GD17115@vireshk-i7>
+Message-ID: <9476e8ee-24ae-1676-067b-18a867892894@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/07/2017 05:41, Viresh Kumar wrote:
 
+> On 11-07-17, 13:09, Mason wrote:
+>
+>> What I meant is that the bootloader originally set the max frequency
+>> to 1206 MHz. The OPP table in DTS was written based on that value.
+>>
+>> Later, someone changed the bootloader code to set a slightly higher
+>> max frequency. When I flashed the new bootloader on my board, the
+>> OPP table no longer matches the actual frequency.
+>>
+>> But I am not notified when bootloader authors change max frequencies,
+>> which is why I wrote "changed the max freq behind my back".
+>>
+>> (The bootloader is not DT-aware, so it leaves the DT untouched.)
+> 
+> Here we go. Finally I have understood what the problem you are facing is :)
+> And yes, it was really not clear to me until now. I though that someone just
+> changed the max in DT and that's making things go bad :)
+> 
+> Anyway, how does the bootloader control the max frequency? For the boards I
+> worked on, it's just a PLL that the kernel needs to set and kernel can choose to
+> program it the way it wants to irrespective of the way bootloader has worked on it.
 
-On 2017/7/11 8:01, Casey Leedom wrote:
-> 
-> Hey Alexander,
-> 
->   Okay, I understand your point regarding the "most likely scenario" being
-> TLPs directed upstream to the Root Complex.  But I'd still like to make sure
-> that we have an agreed upon API/methodology for doing Peer-to-Peer with
-> Relaxed Ordering and no Relaxed Ordering to the Root Complex.  I don't see
-> how the proposed APIs can be used in that fashion.
->  
->   Right now the proposed change for cxgb4 is for it to test its own PCIe
-> Capability Device Control[Relaxed Ordering Enable] in order to use that
-> information to program the Chelsio Hardware to emit/not emit upstream TLPs
-> with the Relaxed Ordering Attribute set.  But if we're going to have the
-> mixed mode situation I describe, the PCIe Capability Device Control[Relaxed
-> Ordering Enable] will have to be set which means that we'll be programming
-> the Chelsio Hardware to send upstream TLPs with Relaxed Ordering Enable to
-> the Root Complex which is what we were trying to avoid in the first place ...
-> 
->   [[ And, as I noted on Friday evening, the currect cxgb4 Driver hardwires
->      the Relaxed Ordering Enable on early dureing device probe, so that
->      would minimally need to be addressed even if we decide that we don't
->      ever want to support mixed mode Relaxed Ordering. ]]
-> 
->   We need some method of telling the Chelsio Driver that it should/shouldn't
-> use Relaxed Ordering with TLPs directed at the Root Complex.  And the same
-> is true for a Peer PCIe Device.
-> 
->   It may be that we should approach this from the completely opposite
-> direction and instead of having quirks which identify problematic devices,
-> have quirks which identify devices which would benefit from the use of
-> Relaxed Ordering (if the sending device supports that).  That is, assume the
-> using Relaxed Ordering shouldn't be done unless the target device says "I
-> love Relaxed Ordering TLPs" ...  In such a world, an NVMe or a Graphics
-> device might declare love of Relaxed Ordering and the same for a SPARC Root
-> Complex (I think that was your example).
-> 
->   By the way, the sole example of Data Corruption with Relaxed Ordering is
-> the AMD A1100 ARM SoC and AMD appears to have given up on that almost as
-> soon as it was released.  So what we're left with currently is a performance
-> problem on modern Intel CPUs ...  (And hopefully we'll get a Technical
-> Publication on that issue fairly soon.)
-> 
-> Casey
-> 
+I would object to the characterization of "just a PLL" :-)
 
-Hi Casey:
+The PLL outputs "garbage" before actually "locking" a target
+frequency. It is not possible for the CPU to blindly change
+the PLL settings, because that crashes the system.
 
-After the long discuss, I think If the PCIe Capability Device Control[Relaxed Ordering
-Enable] to be cleared when the platform's RC has some problematic for RO didn't break
-anything in your driver, I think you could choose to check the
-(!pci_dev_should_disable_relaxed_ordering(root)) in the code to to enable
-ROOT_NO_RELAXED_ORDERING for your adapter, and enable the PCIe Capability Device Control
-[Relaxed Ordering Enable] bit when you need it, I think we don't have much gap here.
-And we could leave the pear-to-pear situation to be fixed later.
+The bootloader implements the steps required to change said
+settings, so the strategy has been: have Linux use whatever
+PLL frequency the bootloader programs.
 
-Thanks
-Ding
+Behind the PLL, there is a glitch-free divider, which is able
+to divide the PLL output without crashing the system. I've
+been using that divider for DFS.
 
-> .
-> 
+drivers/clk/clk-tango4.c
+
+Regards.
