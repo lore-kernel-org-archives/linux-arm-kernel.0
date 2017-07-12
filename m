@@ -1,59 +1,87 @@
-From: dustinb@codeaurora.org (Dustin Brown)
-Date: Wed, 12 Jul 2017 11:06:26 -0700
-Subject: [PATCH 1/2] arm: Export save_stack_trace_tsk()
-In-Reply-To: <20170613184056.23433-1-dustinb@codeaurora.org>
-References: <20170613181603.GE4902@n2100.armlinux.org.uk>
- <20170613184056.23433-1-dustinb@codeaurora.org>
-Message-ID: <000001d2fb39$948f1b80$bdad5280$@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 12 Jul 2017 11:08:19 -0700
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <6613228.WfFrGvAy1X@aspire.rjw.lan>
+References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+ <20170623010837.11199-1-f.fainelli@gmail.com>
+ <20170623010837.11199-2-f.fainelli@gmail.com>
+ <6613228.WfFrGvAy1X@aspire.rjw.lan>
+Message-ID: <85441336-8d89-f7aa-4fbe-a4edaf478649@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Everyone,
+On 06/29/2017 04:00 PM, Rafael J. Wysocki wrote:
+> On Thursday, June 22, 2017 06:08:36 PM Florian Fainelli wrote:
+>> Add an optional platform_suspend_ops callback: target_state, and a
+>> helper function globally visible to get this called:
+>> platform_suspend_target_state().
+>>
+>> This is useful for platform specific drivers that may need to take a
+>> slightly different suspend/resume path based on the system's
+>> suspend/resume state being entered.
+>>
+>> Although this callback is optional and documented as such, it requires
+>> a platform_suspend_ops::begin callback to be implemented in order to
+>> provide an accurate suspend/resume state within the driver that
+>> implements this platform_suspend_ops.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  include/linux/suspend.h | 12 ++++++++++++
+>>  kernel/power/suspend.c  | 15 +++++++++++++++
+>>  2 files changed, 27 insertions(+)
+>>
+>> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+>> index d9718378a8be..d998a04a90a2 100644
+>> --- a/include/linux/suspend.h
+>> +++ b/include/linux/suspend.h
+>> @@ -172,6 +172,15 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
+>>   *	Called by the PM core if the suspending of devices fails.
+>>   *	This callback is optional and should only be implemented by platforms
+>>   *	which require special recovery actions in that situation.
+>> + *
+>> + * @target_state: Returns the suspend state the suspend_ops will be entering.
+>> + * 	Called by device drivers that need to know the platform specific suspend
+>> + * 	state the system is about to enter.
+>> + * 	This callback is optional and should only be implemented by platforms
+>> + * 	which require special handling of power management states within
+>> + * 	drivers. It does require @begin to be implemented to provide the suspend
+>> + * 	state. Return value is platform_suspend_ops specific, and may be a 1:1
+>> + * 	mapping to suspend_state_t when relevant.
+>>   */
+>>  struct platform_suspend_ops {
+>>  	int (*valid)(suspend_state_t state);
+>> @@ -184,6 +193,7 @@ struct platform_suspend_ops {
+>>  	bool (*suspend_again)(void);
+>>  	void (*end)(void);
+>>  	void (*recover)(void);
+>> +	int (*target_state)(void);
+> 
+> I would use unsigned int (the sign should not matter).
+> 
+>>  };
+> 
+> That's almost what I was thinking about except that the values returned by
+> ->target_state should be unique, so it would be good to do something to
+> ensure that.
+> 
+> The concern is as follows.
+> 
+> Say you have a driver develped for platform X where ->target_state returns
+> A for "mem" and B for "standby".  Then, the same IP is re-used on platform Y
+> returning B for "mem" and C for "standby" and now the driver cannot
+> distinguish between them.
+> 
+> Moreover, even if they both returned A for "mem" there might be differences
+> in how "mem" was defined by each of them and therefore in what the driver was
+> expected to do to handle "mem" on X and Y.
 
-I just wanted to touch base and see where we are with respect to this one. I
-see that the arm64 version of this patch has already landed for 4.13. Is
-there anything needed from me for this? I apologize in advance if I am just
-being impatient.
+That makes sense, would you need the core implementation in
+platform_suspend_target_state() to range check what
+suspend_ops->target_state() returns against a set of reserved value say,
+checking from 0 up to ACPI_S_STATE_COUNT or is there another range you
+would like to see being used?
 
-Thanks,
-
--Dustin
-
------Original Message-----
-From: Dustin Brown [mailto:dustinb at codeaurora.org] 
-Sent: Tuesday, June 13, 2017 11:41 AM
-To: linux at armlinux.org.uk; catalin.marinas at arm.com; will.deacon at arm.com;
-linux-arm-kernel at lists.infradead.org
-Cc: Dustin Brown <dustinb@codeaurora.org>
-Subject: [PATCH 1/2] arm: Export save_stack_trace_tsk()
-
-The kernel watchdog is a great debugging tool for finding tasks that
-consume a disproportionate amount of CPU time in contiguous chunks. One
-can imagine building a similar watchdog for arbitrary driver threads
-using save_stack_trace_tsk() and print_stack_trace(). However, this is
-not viable for dynamically loaded driver modules on ARM platforms
-because save_stack_trace_tsk() is not exported for those architectures.
-Export save_stack_trace_tsk() for the ARM architecture to align with x86
-and support various debugging use cases such as arbitrary driver thread
-watchdog timers.
-
-Signed-off-by: Dustin Brown <dustinb@codeaurora.org>
----
- arch/arm/kernel/stacktrace.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index 3a2fa203637a..564bb468b7ba 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -171,6 +171,7 @@ void save_stack_trace_tsk(struct task_struct *tsk,
-struct stack_trace *trace)
- {
- 	__save_stack_trace(tsk, trace, 1);
- }
-+EXPORT_SYMBOL_GPL(save_stack_trace_tsk);
- 
- void save_stack_trace(struct stack_trace *trace)
- {
+Thanks!
 -- 
-2.12.2
+Florian
