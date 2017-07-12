@@ -1,57 +1,48 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 12 Jul 2017 11:58:53 +0200
-Subject: cpufreq: frequency scaling spec in DT node
-In-Reply-To: <20170712034150.GD17115@vireshk-i7>
-References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
- <20170629100459.GL29665@vireshk-i7>
- <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
- <20170629143432.GM29665@vireshk-i7>
- <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
- <20170711102514.GC17115@vireshk-i7>
- <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
- <20170712034150.GD17115@vireshk-i7>
-Message-ID: <9476e8ee-24ae-1676-067b-18a867892894@free.fr>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 12 Jul 2017 12:00:49 +0200
+Subject: [PATCH v2 06/12] drm/mediatek: Handle
+ drm_atomic_helper_swap_state failure
+In-Reply-To: <20170711143314.2148-7-maarten.lankhorst@linux.intel.com>
+References: <20170711143314.2148-1-maarten.lankhorst@linux.intel.com>
+ <20170711143314.2148-7-maarten.lankhorst@linux.intel.com>
+Message-ID: <1499853649.6374.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/2017 05:41, Viresh Kumar wrote:
-
-> On 11-07-17, 13:09, Mason wrote:
->
->> What I meant is that the bootloader originally set the max frequency
->> to 1206 MHz. The OPP table in DTS was written based on that value.
->>
->> Later, someone changed the bootloader code to set a slightly higher
->> max frequency. When I flashed the new bootloader on my board, the
->> OPP table no longer matches the actual frequency.
->>
->> But I am not notified when bootloader authors change max frequencies,
->> which is why I wrote "changed the max freq behind my back".
->>
->> (The bootloader is not DT-aware, so it leaves the DT untouched.)
+On Tue, 2017-07-11 at 16:33 +0200, Maarten Lankhorst wrote:
+> drm_atomic_helper_swap_state() will be changed to interruptible waiting
+> in the next few commits, so all drivers have to be changed to handling
+> failure.
 > 
-> Here we go. Finally I have understood what the problem you are facing is :)
-> And yes, it was really not clear to me until now. I though that someone just
-> changed the max in DT and that's making things go bad :)
+> Signed-off-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+> Cc: CK Hu <ck.hu@mediatek.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> Anyway, how does the bootloader control the max frequency? For the boards I
-> worked on, it's just a PLL that the kernel needs to set and kernel can choose to
-> program it the way it wants to irrespective of the way bootloader has worked on it.
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> index 56f802d0a51c..9a130c84c861 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> @@ -109,7 +109,12 @@ static int mtk_atomic_commit(struct drm_device *drm,
+>  	mutex_lock(&private->commit.lock);
+>  	flush_work(&private->commit.work);
+>  
+> -	drm_atomic_helper_swap_state(state, true);
+> +	ret = drm_atomic_helper_swap_state(state, true);
+> +	if (ret) {
+> +		mutex_unlock(&private->commit.lock);
+> +		drm_atomic_helper_cleanup_planes(drm, state);
+> +		return ret;
+> +	}
+>  
+>  	drm_atomic_state_get(state);
+>  	if (async)
 
-I would object to the characterization of "just a PLL" :-)
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-The PLL outputs "garbage" before actually "locking" a target
-frequency. It is not possible for the CPU to blindly change
-the PLL settings, because that crashes the system.
-
-The bootloader implements the steps required to change said
-settings, so the strategy has been: have Linux use whatever
-PLL frequency the bootloader programs.
-
-Behind the PLL, there is a glitch-free divider, which is able
-to divide the PLL output without crashing the system. I've
-been using that divider for DFS.
-
-drivers/clk/clk-tango4.c
-
-Regards.
+regards
+Philipp
