@@ -1,159 +1,86 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 12 Jul 2017 21:49:30 +0100
-Subject: [RFC PATCH 00/10] arm64: allow virtually mapped stacks to be
- enabled
-In-Reply-To: <5b94a765-ca82-9cc4-fc91-ef959f658b04@redhat.com>
-References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
- <5b94a765-ca82-9cc4-fc91-ef959f658b04@redhat.com>
-Message-ID: <CAKv+Gu8EY0C96d8VVy28JCsxZ8KX95gG8RwF5uyRUJHFaeqF4Q@mail.gmail.com>
+From: fkan@apm.com (Feng Kan)
+Date: Wed, 12 Jul 2017 14:07:14 -0700
+Subject: APM smmu implementation
+In-Reply-To: <9d083b5e-0fe4-b649-c4f4-e1005feb9ec1@arm.com>
+References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+ <d9e40de8-82e2-0f19-5b99-d756ded21e80@arm.com>
+ <20170109120300.GC21398@arm.com>
+ <9d083b5e-0fe4-b649-c4f4-e1005feb9ec1@arm.com>
+Message-ID: <CAL85gmCM-=iTbK3mcsFOtJrxbYFE99FWn7Aj9w-JLhMu03wWqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 July 2017 at 21:12, Laura Abbott <labbott@redhat.com> wrote:
-> On 07/12/2017 07:44 AM, Ard Biesheuvel wrote:
->> This is a fairly quick'n'dirty attempt at enabling virtually mapped
->> stacks for arm64, after learning from Mark yesterday that progress
->> had more or less stalled on that front.
+On Mon, Jan 9, 2017 at 9:55 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 09/01/17 12:03, Will Deacon wrote:
+>> On Mon, Jan 09, 2017 at 11:34:42AM +0000, Robin Murphy wrote:
+>>> On 06/01/17 23:21, Feng Kan wrote:
+>>>> The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
+>>>
+>>> "Mostly"? Have APM actually modified it (which I strongly doubt) or do
+>>> you mean it's simply been integrated with the upper address lines tied
+>>> off? MMU-500 reports a 48-bit IAS because MMU-500 has 48-bit-wide slave
+>>> interfaces; that's all there is to it. Whether or not you use all of
+>>> those bits is up to you as a system integrator.
 >>
->> Since having actual patches to poke at is infinitely better than having
->> abstract discussions about how to approach it, I threw some code together
->> that:
->> 1. frees up sp_el0 by promoting register x18 to 'current' pointer while in
->>    the kernel; flames welcome :-) (#7)
->> 2. preparatory work to allow 1., i.e., to free up x18 and preserve/restore it
->>    correctly as a platform register (#2, #3, #4, #5, #6)
->> 3. dump the entire task stack if regs->sp points elsewhere (#8)
->> 4. add the code that checks for a stack overflow and dumps the task context
->>    before panic()king (#9, #10)
+>> That's a good point; MMU-500 doesn't appear to let you change the IAS
+>> anyway. That should also mean that UBS and OAS are unchanged.
 >>
->> (#1 is an unrelated cleanup patch for copy_page())
+>>>> However, our internal bus is only 42 bits wide. Our IAS field is coded
+>>>> as 48 bits, which cause IPA to truncated to 42 bits on the physical
+>>>> bus. In order for our system to work with the arm-smmu.c, there needs
+>>>> to be a way to force the ipa_size to 42. The current internal solution
+>>>> is to use the cpuid, but that is quite ugly. I was thinking of using
+>>>> the model
+>>>> as indication to right the ipa_size, but I am not too sure of the ACPI
+>>>> side. Would it be okay to add an APM MMU500 variant? I would also
+>>>> appreciated it if you guys have any alternate solutions.
+>>>
+>>> This is something we've been axpecting to run into for a while now - the
+>>> appropriate solution is to use a "dma-ranges" property on the master
+>>> device(s) to describe that they have 42 bits of address wired up, from
+>>> which they will then inherit the appropriate DMA mask. The outstanding
+>>> issue which remains is that we're still missing some way of preventing
+>>> drivers simply clobbering that with a 64-bit mask later, but that's a
+>>> more general problem[1].
 >>
->> So instead of unconditionally switching between stacks, this code simply uses
->> tpidrro_el0 and sp_el0 as scratch registers in the entry-from-el1 code so that
->> we have a couple of general purpose registers to play with.
+>> I wonder if the driver is actually using IAS, OAS and UBS incorrectly.
+>> We're using them to parameterise the DMA aperture, which is then used
+>> to size the IOVA domain, but that's wrong because the IAS, OAS and UBS
+>> are upper bounds and we can still end up allocating unusable/unreachable
+>> addresses.
+>
+> It's not incorrect, it's simply all we know at that point. From inside
+> the SMMU, we can't tell how many of the bits we have are actually wired
+> up externally, which is why we always take the intersection of the DMA
+> aperture and the given device's DMA mask at the point of IOVA allocation.
+>
+> You can reproduce much the same thing on your Juno if you fancy - just
+> make the HDLCD or PL330 driver set a DMA mask larger than the default 32
+> bits and the top 8 bits of the MMU-401's 40-bit input being tied off to
+> 0 will become apparent (the only difference being there's not actually
+> anything at the master end they could be wired to either).
+>
+>> So I do think that this should be fixed on the SMMU firmware node, rather
+>> than restricting the range of each master device.
+>
+> In general, it's a per-master thing which "dma-ranges" is exactly the
+> correct tool to describe - a property on the SMMU would just be a weird
+> nonstandard shorthand for a very particular case (it breaks as soon as
+> you have some *more* limited, e.g. 32-bit, device in the same system).
+> The fact that every master in this case apparently has the same
+> capability is just happenstance.
+I know this thread is pretty old, so sorry about that. Given that
+using dma-range is
+not an option in our system since it uses ACPI tables. There doesn't seem to be
+any more activity on this. I see that the IORT table has added support
+for CAVIUM_SMMUV2,
+would it be possible to add APM_SMMUV2 and key the ipa_size to less or equal
+to 42 bits. This way, we can fix the problem in the SMMUv2 driver and not worry
+about the greater DMA layer changes that could affect everyone.
+>
+> Robin.
+>
 >>
->> Tested with the following hunk applied
->>
->> --- a/arch/arm64/crypto/aes-cipher-core.S
->> +++ b/arch/arm64/crypto/aes-cipher-core.S
->> @@ -102,6 +102,11 @@ CPU_BE(    rev             w7, w7          )
->>
->>         .align          5
->>  ENTRY(__aes_arm64_encrypt)
->> +       stp             x29, x30, [sp, #-400]!
->> +       mov             x29, sp
->> +
->> +       bl              __aes_arm64_encrypt
->> +
->>         do_crypt        fround, crypto_ft_tab, crypto_fl_tab
->>  ENDPROC(__aes_arm64_encrypt)
->>
->> which produces the output below at boot (provided that CONFIG_CRYPTO_AES_ARM64=y
->> and CONFIG_CRYPTO_MANAGER_DISABLE_TESTS is not set). Note that the call stack is
->> missing: I suppose it should be possible to display something meaningful if x29
->> still points to a valid location, but I haven't looked into it yet.
->>
->>   BUG: stack guard page was hit at ffff000009bdbf90 (stack is ffff000009bdc000..ffff000009bdffff)
->>   Internal error: Oops: 96000047 [#1] PREEMPT SMP
->>   Modules linked in:
->>   CPU: 0 PID: 613 Comm: cryptomgr_test Not tainted 4.12.0-rc4-00119-g1fb2159e248e-dirty #520
->>   Hardware name: linux,dummy-virt (DT)
->>   task: ffff80007c031a00 task.stack: ffff000009bdc000
->>   PC is at __aes_arm64_encrypt+0x0/0x440
->>   LR is at __aes_arm64_encrypt+0xc/0x440
->>   pc : [<ffff0000080c5760>] lr : [<ffff0000080c576c>] pstate: 80000145
->>   sp : ffff000009bdc120
->>   x29: ffff000009bdc120 x28: ffff80007c181c00
->>   x27: 0000000000000000 x26: 0000000000000100
->>   x25: ffff0000089a52e8 x24: ffff000009bdfd10
->>   x23: 0000000000000001 x22: ffff0000089a5408
->>   x21: 0000000000000001 x20: ffff80007c181c08
->>   x19: ffff80007c220000 x18: ffff80007c031a00
->>   x17: 00000000002f0000 x16: ffff80007c181d24
->>   x15: ffff0000089b2a68 x14: 00000000000003be
->>   x13: 0000000000000071 x12: 00000000bf5fe8a9
->>   x11: 0000000000000028 x10: 000000000000002c
->>   x9 : ffff80007c181d20 x8 : 000000000000001b
->>   x7 : 0000000046d4609c x6 : ffff0000080c5fd8
->>   x5 : 0000000000000043 x4 : 0000000046d47b87
->>   x3 : 000000000000000a x2 : ffff80007c220000
->>   x1 : ffff80007c220000 x0 : ffff80007c181c80
->>   Process cryptomgr_test (pid: 613, stack limit = 0xffff000009bdc000)
->>   Stack: (0xffff000009bdc120 to 0xffff000009be0000)
->>   c120: ffff000009bdc2b0 ffff0000080c576c 0000000000000000 0000000000000000
->>   c140: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
->>   <snipped ...>
->>   ffc0: 0000000000000000 0000000000000005 0000000000000000 0000000000000000
->>   ffe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
->>   Call trace:
->>   Exception stack(0xffff80007efd0ad0 to 0xffff80007efd0c00)
->>   0ac0:                                   ffff80007c220000 0001000000000000
->>   0ae0: ffff80007efd0ca0 ffff0000080c5760 0000000000000000 0000000000000000
->>   0b00: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
->>   0b20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
->>   0b40: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
->>   0b60: 0000000000000000 0000000000000000 ffff80007c181c80 ffff80007c220000
->>   0b80: ffff80007c220000 000000000000000a 0000000046d47b87 0000000000000043
->>   0ba0: ffff0000080c5fd8 0000000046d4609c 000000000000001b ffff80007c181d20
->>   0bc0: 000000000000002c 0000000000000028 00000000bf5fe8a9 0000000000000071
->>   0be0: 00000000000003be ffff0000089b2a68 ffff80007c181d24 00000000002f0000
->>   [<ffff0000080c5760>] __aes_arm64_encrypt+0x0/0x440
->>   Code: 00000000 00000000 00000000 00000000 (a9a77bfd)
->>   ---[ end trace 2c6304a96ec827cb ]---
->>
->> Ard Biesheuvel (10):
->>   arm64/lib: copy_page: use consistent prefetch stride
->>   arm64/lib: copy_page: avoid x18 register in assembler code
->>   arm64: crypto: avoid register x18 in scalar AES code
->>   arm64: kvm: stop treating register x18 as caller save
->>   arm64: kernel: avoid x18 as an arbitrary temp register
->>   arm64: kbuild: reserve reg x18 from general allocation by the compiler
->>   arm64: kernel: switch to register x18 as a task struct pointer
->>   arm64/kernel: dump entire stack if sp points elsewhere
->>   arm64: mm: add C level handling for stack overflows
->>   arm64: kernel: add support for virtually mapped stacks
->>
->>  arch/arm64/Kconfig                   |  1 +
->>  arch/arm64/Makefile                  |  2 +-
->>  arch/arm64/crypto/aes-cipher-core.S  | 55 ++++++++---------
->>  arch/arm64/include/asm/asm-uaccess.h |  3 +-
->>  arch/arm64/include/asm/assembler.h   |  8 +--
->>  arch/arm64/include/asm/current.h     |  6 +-
->>  arch/arm64/include/asm/thread_info.h |  2 +
->>  arch/arm64/kernel/cpu-reset.S        |  4 +-
->>  arch/arm64/kernel/entry.S            | 63 ++++++++++++++++----
->>  arch/arm64/kernel/head.S             |  6 +-
->>  arch/arm64/kernel/process.c          |  2 +-
->>  arch/arm64/kernel/traps.c            |  9 ++-
->>  arch/arm64/kvm/hyp/entry.S           | 12 ++--
->>  arch/arm64/lib/Makefile              |  3 +-
->>  arch/arm64/lib/copy_page.S           | 47 ++++++++-------
->>  arch/arm64/mm/fault.c                | 24 ++++++++
->>  16 files changed, 154 insertions(+), 93 deletions(-)
+>> Will
 >>
 >
-> This fails to compile with 64K pages
->
-> kernel/fork.c: In function ?free_thread_stack?:
-> kernel/fork.c:267:41: error: ?THREAD_SIZE_ORDER? undeclared (first use in this function); did you mean ?THREAD_SIZE??
->   __free_pages(virt_to_page(tsk->stack), THREAD_SIZE_ORDER);
->                                          ^~~~~~~~~~~~~~~~~
->                                          THREAD_SIZE
->
-> Because THREAD_SIZE_ORDER isn't defined at all for 64K pages
->
-> #ifdef CONFIG_ARM64_4K_PAGES
-> #define THREAD_SIZE_ORDER       2
-> #elif defined(CONFIG_ARM64_16K_PAGES)
-> #define THREAD_SIZE_ORDER       0
-> #endif
->
-> I think this should just be dead code on arm64 but the asymmetric
-> #ifdef looks fishy to me.
->
-
-I guess this is because 16 KB cannot be expressed as PAGE_SIZE <<
-THREAD_SIZE_ORDER for sane values of the latter.
-
-For vmap stack, we should just switch to THREAD_SIZE_ORDER == 0 and
-hence THREAD_SIZE == PAGE_SIZE
