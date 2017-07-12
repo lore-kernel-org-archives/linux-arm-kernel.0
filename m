@@ -1,50 +1,103 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Jul 2017 18:56:48 +0200
-Subject: [PATCH 2/2] arm64: defconfig: enable nop-xceiv PHY driver
-In-Reply-To: <20170623154014.20573-2-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Fri, 23 Jun 2017 17:40:14 +0200")
-References: <20170623154014.20573-1-thomas.petazzoni@free-electrons.com>
- <20170623154014.20573-2-thomas.petazzoni@free-electrons.com>
-Message-ID: <87bmopbnlb.fsf@free-electrons.com>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Wed, 12 Jul 2017 18:01:23 +0100
+Subject: [PATCH v1] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
+Message-ID: <1499878883-3066-1-git-send-email-mike.leach@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+The value passed into the perf.data file for the CONFIGR register in ETMv4
+was incorrectly being set to the command line options/ETMv3 value.
+
+Adds bit definitions and function to remap this value to the correct ETMv4
+CONFIGR bit values for all selected options.
+
+Signed-off-by: Mike Leach <mike.leach@linaro.org>
+---
+Changes for v1:
+ - Added more people to the recipient list.
+
+ include/linux/coresight-pmu.h       |  5 +++++
+ tools/include/linux/coresight-pmu.h |  5 +++++
+ tools/perf/arch/arm/util/cs-etm.c   | 28 +++++++++++++++++++++++++++-
+ 3 files changed, 37 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
+index 45852c2..edfeaba 100644
+--- a/include/linux/coresight-pmu.h
++++ b/include/linux/coresight-pmu.h
+@@ -26,6 +26,11 @@
+ #define ETM_OPT_TS      28
+ #define ETM_OPT_RETSTK	29
  
- On ven., juin 23 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> This commit enables the nop-xceiv PHY driver, which is needed for USB
-> support to work on the MacchiatoBin platform (Marvell Armada 8K).
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Applied on mvebu/arm64-for-4.14
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 97c123e..e037f1b 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -388,6 +388,7 @@ CONFIG_USB_CHIPIDEA_UDC=y
->  CONFIG_USB_CHIPIDEA_HOST=y
->  CONFIG_USB_ISP1760=y
->  CONFIG_USB_HSIC_USB3503=y
-> +CONFIG_NOP_USB_XCEIV=y
->  CONFIG_USB_MSM_OTG=y
->  CONFIG_USB_QCOM_8X16_PHY=y
->  CONFIG_USB_ULPI=y
-> -- 
-> 2.9.4
->
-
++/* ETMv4 CONFIGR programming bits for the ETM OPTs */
++#define ETM4_CFG_BIT_CYCACC	4
++#define ETM4_CFG_BIT_TS		11
++#define ETM4_CFG_BIT_RETSTK	12
++
+ static inline int coresight_get_trace_id(int cpu)
+ {
+ 	/*
+diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
+index 45852c2..edfeaba 100644
+--- a/tools/include/linux/coresight-pmu.h
++++ b/tools/include/linux/coresight-pmu.h
+@@ -26,6 +26,11 @@
+ #define ETM_OPT_TS      28
+ #define ETM_OPT_RETSTK	29
+ 
++/* ETMv4 CONFIGR programming bits for the ETM OPTs */
++#define ETM4_CFG_BIT_CYCACC	4
++#define ETM4_CFG_BIT_TS		11
++#define ETM4_CFG_BIT_RETSTK	12
++
+ static inline int coresight_get_trace_id(int cpu)
+ {
+ 	/*
+diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
+index 29361d9..997734b 100644
+--- a/tools/perf/arch/arm/util/cs-etm.c
++++ b/tools/perf/arch/arm/util/cs-etm.c
+@@ -266,6 +266,32 @@ static u64 cs_etm_get_config(struct auxtrace_record *itr)
+ 	return config;
+ }
+ 
++#ifndef BIT
++#define BIT(N) (1UL << (N))
++#endif
++
++static u64 cs_etmv4_get_config(struct auxtrace_record *itr)
++{
++	u64 config = 0;
++	u64 config_opts = 0;
++
++	/*
++	 * The perf event variable config bits represent both
++	 * the command line options and register programming
++	 * bits in ETMv3/PTM. For ETMv4 we must remap options
++	 * to real bits
++	 */
++	config_opts = cs_etm_get_config(itr);
++	if (config_opts & BIT(ETM_OPT_CYCACC))
++		config |= BIT(ETM4_CFG_BIT_CYCACC);
++	if (config_opts & BIT(ETM_OPT_TS))
++		config |= BIT(ETM4_CFG_BIT_TS);
++	if (config_opts & BIT(ETM_OPT_RETSTK))
++		config |= BIT(ETM4_CFG_BIT_RETSTK);
++
++	return config;
++}
++
+ static size_t
+ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+ 		      struct perf_evlist *evlist __maybe_unused)
+@@ -363,7 +389,7 @@ static void cs_etm_get_metadata(int cpu, u32 *offset,
+ 		magic = __perf_cs_etmv4_magic;
+ 		/* Get trace configuration register */
+ 		info->priv[*offset + CS_ETMV4_TRCCONFIGR] =
+-						cs_etm_get_config(itr);
++						cs_etmv4_get_config(itr);
+ 		/* Get traceID from the framework */
+ 		info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
+ 						coresight_get_trace_id(cpu);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.4
