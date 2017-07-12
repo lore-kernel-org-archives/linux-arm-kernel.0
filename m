@@ -1,42 +1,39 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 12 Jul 2017 14:28:28 +0100
-Subject: [boot-wrapper] [PATCH 2/2] gic: Make sure all the supported SPIs are
- marked non-secure
-In-Reply-To: <1499866108-15140-1-git-send-email-suzuki.poulose@arm.com>
-References: <1499866108-15140-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1499866108-15140-2-git-send-email-suzuki.poulose@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 12 Jul 2017 15:41:51 +0200
+Subject: [PATCH v3 00/12] AC97 device/driver model revamp
+In-Reply-To: <20170712105530.p3yb2gj3vt3thlab@sirena.org.uk> (Mark Brown's
+ message of "Wed, 12 Jul 2017 11:55:30 +0100")
+References: <20170630194408.24978-1-robert.jarzmik@free.fr>
+ <20170712105530.p3yb2gj3vt3thlab@sirena.org.uk>
+Message-ID: <87r2xlsrfk.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The maximum SPI INTID is 32(N+1) - 1, where N = GICD_TYPER:ITLinesNumber.
-But currently we only mark the range, {32, 32*(N)-1} as Group1 non-secure.
-If there happens to be an SPI allocated in the last 32 INTIDs, the EL1
-will fail to use them as it would be marked Group0.
+Mark Brown <broonie@kernel.org> writes:
 
-Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- gic.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> On Fri, Jun 30, 2017 at 09:43:56PM +0200, Robert Jarzmik wrote:
+>> Hi Lars, Mark, Charles, Lee,
+>> 
+>> This is a resend of the v2, with patch 1 added (forgotten in v2). Patch 12 was
+>> slightly modified after module unloading tests, and Dmitry acks were added.
+>
+> This all looks good to me modulo the naming thing Takashi raised.
+Ok Mark, let us do this :
+ - I'll do some extensive testing this week just to ensure the v4 is on par with
+ v3 (should be the case but I prefer to be carefull).
+ - Once I'm sure it's not worse than before, I'll post a v4.
 
-diff --git a/gic.c b/gic.c
-index a84779e..83e340d 100644
---- a/gic.c
-+++ b/gic.c
-@@ -40,9 +40,10 @@ void gic_secure_init(void)
- 
- 	if (cpu == 0) {
- 		uint32_t typer = raw_readl(gicd_base + GICD_TYPER);
-+		uint32_t n_itlines = typer & GICD_TYPER_ITLineNumber;
- 
--		/* Set SPIs to Group 1 */
--		for (i = 1; i < (typer & GICD_TYPER_ITLineNumber); i++)
-+		/* Set SPIs {32, 32(n_itlines + 1) - 1} to Group 1 */
-+		for (i = 1; i < n_itlines + 1; i++)
- 			raw_writel(~0, gicd_base + GICD_IGROUPRn + i * 4);
- 
- 		raw_writel(GICD_CTLR_EnableGrp0 | GICD_CTLR_EnableGrp1,
+That might give a couple of days to :
+ - have Lee's ack on patch 6/12
+
+   Lee, could you have a look please, that touches your tree, and if you have
+   concerns I'd rather wait before releasing v4 in order to take them into
+   account ?
+
+ - give Lars another opportunity to complain about what I had forgotten :)
+ - give me time to retest
+
+Cheers.
+
 -- 
-2.7.5
+Robert
