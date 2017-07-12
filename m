@@ -1,72 +1,47 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Jul 2017 18:54:42 +0200
-Subject: [PATCH 0/6] Macchiatobin updates
-In-Reply-To: <20170708191317.GM4902@n2100.armlinux.org.uk> (Russell King's
- message of "Sat, 8 Jul 2017 20:13:17 +0100")
-References: <20170708191317.GM4902@n2100.armlinux.org.uk>
-Message-ID: <87fue1bnot.fsf@free-electrons.com>
+Date: Wed, 12 Jul 2017 18:56:48 +0200
+Subject: [PATCH 2/2] arm64: defconfig: enable nop-xceiv PHY driver
+In-Reply-To: <20170623154014.20573-2-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Fri, 23 Jun 2017 17:40:14 +0200")
+References: <20170623154014.20573-1-thomas.petazzoni@free-electrons.com>
+ <20170623154014.20573-2-thomas.petazzoni@free-electrons.com>
+Message-ID: <87bmopbnlb.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
+Hi Thomas,
  
- On sam., juil. 08 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+ On ven., juin 23 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-> This series, based upon the 4.12-rc6 backports branch in the MISL tree:
-> - adds a maintainer entry for the Macchiatobin board.
-> - adds GPIO interrupt support to the CP110s
-> - adds the pinmux entries
-> - corrects the 5V regulator GPIO entry
-> - adds support for the I2C mux (used for the SFP slots)
-> - adds PCIe support
+> This commit enables the nop-xceiv PHY driver, which is needed for USB
+> support to work on the MacchiatoBin platform (Marvell Armada 8K).
 >
-> All entries include the appropriate pinmux and GPIO configuration.
->
-> PCIe support has not been tested locally as I have no PCIe cards to
-> test with; this patch includes support for the PCIe reset GPIO signal.
-> If others can test that patch and let me know whether it works, I would
-> be most grateful.
->
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-The first patch had been applied on mvebu/arm64-for-4.14.
-
-Patch 2 to 6 had been applied on mvebu/dt64-for-4.14.
-
-For the patch 4, I merged it with the patch that Thomas previously sent
-because it was not in mainline yet even if it was on the backport
-branch. The resulting patch is attached.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-arm64-dts-marvell-fix-USB3-regulator-definition-on-M.patch
-Type: text/x-diff
-Size: 2133 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170712/7c7ddc27/attachment.bin>
--------------- next part --------------
-
-
-Finally I tested the last patch with an Ethernet PCIe card it worked
-well, but the reset part was not tested as I don't know how it should be
-tested.
-
-As soon as the v4.13-rc1 will be released then the branches will be rebased
-on it and renamed mvebu/arm64 and mvebu/dt64.
+Applied on mvebu/arm64-for-4.14
 
 Thanks,
 
 Gregory
-
-
->  MAINTAINERS                                        |  6 ++
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 89 +++++++++++++++++++++-
->  .../boot/dts/marvell/armada-cp110-master.dtsi      | 11 ++-
->  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 11 ++-
->  4 files changed, 112 insertions(+), 5 deletions(-)
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 >
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 97c123e..e037f1b 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -388,6 +388,7 @@ CONFIG_USB_CHIPIDEA_UDC=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+>  CONFIG_USB_ISP1760=y
+>  CONFIG_USB_HSIC_USB3503=y
+> +CONFIG_NOP_USB_XCEIV=y
+>  CONFIG_USB_MSM_OTG=y
+>  CONFIG_USB_QCOM_8X16_PHY=y
+>  CONFIG_USB_ULPI=y
 > -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> 2.9.4
+>
 
 -- 
 Gregory Clement, Free Electrons
