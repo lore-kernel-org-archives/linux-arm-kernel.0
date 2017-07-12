@@ -1,54 +1,41 @@
-From: chris.paterson2@renesas.com (Chris Paterson)
-Date: Wed, 12 Jul 2017 11:03:25 +0100
-Subject: [PATCH 3/3] ARM: dts: iwg20m: Add MMCIF0 support
-In-Reply-To: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
-References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <1499853805-5915-4-git-send-email-chris.paterson2@renesas.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 12 Jul 2017 15:39:42 +0530
+Subject: cpufreq: frequency scaling spec in DT node
+In-Reply-To: <9476e8ee-24ae-1676-067b-18a867892894@free.fr>
+References: <1f665895-a2a0-6bdf-a9d9-66219fe3a8ef@free.fr>
+ <20170629100459.GL29665@vireshk-i7>
+ <538b1aa2-9298-6f21-392e-73d6559b581c@free.fr>
+ <20170629143432.GM29665@vireshk-i7>
+ <405bfa30-b083-2690-5747-aa1cd423e576@free.fr>
+ <20170711102514.GC17115@vireshk-i7>
+ <c0838592-5613-660d-56fc-e7022a38a86d@free.fr>
+ <20170712034150.GD17115@vireshk-i7>
+ <9476e8ee-24ae-1676-067b-18a867892894@free.fr>
+Message-ID: <20170712100942.GF1679@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the iwg20m board dependent part of the MMCIF0 device node.
+On 12-07-17, 11:58, Mason wrote:
+> I would object to the characterization of "just a PLL" :-)
+> 
+> The PLL outputs "garbage" before actually "locking" a target
+> frequency. It is not possible for the CPU to blindly change
+> the PLL settings, because that crashes the system.
+> 
+> The bootloader implements the steps required to change said
+> settings, so the strategy has been: have Linux use whatever
+> PLL frequency the bootloader programs.
+> 
+> Behind the PLL, there is a glitch-free divider, which is able
+> to divide the PLL output without crashing the system. I've
+> been using that divider for DFS.
+> 
+> drivers/clk/clk-tango4.c
 
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+Okay, got it now.
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-index 001ca91..ffce1b6 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-+++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-@@ -22,8 +22,34 @@
- 		device_type = "memory";
- 		reg = <2 0x00000000 0 0x20000000>;
- 	};
-+
-+	reg_3p3v: 3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
- };
- 
- &extal_clk {
- 	clock-frequency = <20000000>;
- };
-+
-+&pfc {
-+	mmcif0_pins: mmc {
-+		groups = "mmc_data8", "mmc_ctrl";
-+		function = "mmc";
-+	};
-+};
-+
-+&mmcif0 {
-+		pinctrl-0 = <&mmcif0_pins>;
-+		pinctrl-names = "default";
-+
-+		vmmc-supply = <&reg_3p3v>;
-+		bus-width = <8>;
-+		non-removable;
-+		status = "okay";
-+};
+Yes, you *really* need to create these OPPs dynamically. I am
+convinced now :)
+
 -- 
-1.9.1
+viresh
