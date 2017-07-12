@@ -1,79 +1,49 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 12 Jul 2017 21:09:30 +0200
-Subject: [PATCH v2 1/7] pwm: rockchip: Add APB and function both clocks
- support
-In-Reply-To: <caba81f3-d066-d64e-7e8e-6457b759e757@rock-chips.com>
-References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
- <CAD=FV=Vqkueo_cqU8bJXXT3pV5d1dZR5LF+c=O-Ka1qR-Ff-WQ@mail.gmail.com>
- <caba81f3-d066-d64e-7e8e-6457b759e757@rock-chips.com>
-Message-ID: <2474407.Xar3q3nCx6@diego>
+From: snawrocki@kernel.org (Sylwester Nawrocki)
+Date: Wed, 12 Jul 2017 21:18:52 +0200
+Subject: [PATCH v2 2/7] [media] ov9650: switch i2c device id to lower case
+In-Reply-To: <1499073368-31905-3-git-send-email-hugues.fruchet@st.com>
+References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
+ <1499073368-31905-3-git-send-email-hugues.fruchet@st.com>
+Message-ID: <8b84296e-b3c7-f5d1-5e90-5890b1b0ed48@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
+> Switch i2c device id to lower case as it is
 
-Am Mittwoch, 12. Juli 2017, 16:38:09 CEST schrieb David.Wu:
-> Hi Doug,
+s/i2c/I2C ?
+
+> done for other omnivision cameras.
+
+s/omnivision/Omnivision
+
+This is required for properly matching driver with device on DT platforms,
+right? It might be worth to mention that so it is clear why we break any
+non-dt platform that could be already using this driver. There seem to be 
+none in the mainline kernel tree though.
+
+> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+
+Reviewed-by: Sylwester Nawrocki <snawrocki@kernel.org>
+
+> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+> ---
+>   drivers/media/i2c/ov9650.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> ? 2017/7/12 1:03, Doug Anderson ??:
-> > Hi,
-> > 
-> > On Fri, Jul 7, 2017 at 9:03 PM, David Wu <david.wu@rock-chips.com> wrote:
-> >> @@ -6,7 +6,13 @@ Required properties:
-> >>      "rockchip,rk3288-pwm": found on RK3288 SoC
-> >>      "rockchip,vop-pwm": found integrated in VOP on RK3288 SoC
-> >>    
-> >>    - reg: physical base address and length of the controller's registers
-> >> 
-> >> - - clocks: phandle and clock specifier of the PWM reference clock
-> >> + - clocks: See ../clock/clock-bindings.txt
-> >> +   - For older hardware (rk2928, rk3066, rk3188, rk3228, rk3288,
-> >> rk3399):
-> >> +     - There is one clock that's used both to derive the functional
-> >> clock
-> >> +       for the device and as the bus clock.
-> >> +   - For newer hardware (rk3328 and future socs): specified by name
-> >> +     - "pwm": This is used to derive the functional clock.
-> >> +     - "pclk": This is the APB bus clock.
-> > 
-> > I'm pretty sure that that the above description doesn't quite match the
-> > code.
-> > 
-> > * The above description says that for old hardware there is one clock
-> > and 'clock-names' was not necessary (though as I understand it it's OK
-> > if it's there).
-> > 
-> > * The old code matched the old description.  AKA: if there was no
-> > "clock-names" then everything was OK.
-> > 
-> > * The new code will not work if there was no "clock-names".
-> > 
-> > Many of the old devices had a clock-names present (and it was "pwm"),
-> > but not all.  Specifically it looks like
-> > "arch/arm/boot/dts/rk3xxx.dtsi" doesn't specify a clock-names.
-> 
-> So we can keep code: the pc->clk = devm_clk_get(&pdev->dev, NULL);
-> If the name is NULL, we can get the first clk defined at DTB.
-
-I don't think it will work that way.
-
-clk_get with NULL argument will likely grab the first clock of the list
-independent of clock-names being present.
-
-It might be better to do something like [pseudo-code]:
-
-pwm->pclk = clk_get( ..., "pclk");
-if (IS_ERR(pwm->pclk))
-	pwm->pclk = NULL;
-
-pwm->pwm_clk = clk_get(..., "pwm");
-if (IS_ERR(pwm->pwm_clk))
-	pwm->pwm_clk = clk_get(..., NULL);
-if (IS_ERR(pwm->pwm_clk))
-	return PTR_ERR(pwm->pwm_clk);
-
-That way, you make your way backwards through the pwm-binding-history.
-Ending at the single-clock without clock-names property as the last fallback.
-
-
-Heiko
+> diff --git a/drivers/media/i2c/ov9650.c b/drivers/media/i2c/ov9650.c
+> index 2de2fbb..1e4e99e 100644
+> --- a/drivers/media/i2c/ov9650.c
+> +++ b/drivers/media/i2c/ov9650.c
+> @@ -1545,8 +1545,8 @@ static int ov965x_remove(struct i2c_client *client)
+>   }
+>   
+>   static const struct i2c_device_id ov965x_id[] = {
+> -	{ "OV9650", 0 },
+> -	{ "OV9652", 0 },
+> +	{ "ov9650", 0 },
+> +	{ "ov9652", 0 },
+>   	{ /* sentinel */ }
+>   };
+>   MODULE_DEVICE_TABLE(i2c, ov965x_id);
+ 
