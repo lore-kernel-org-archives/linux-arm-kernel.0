@@ -1,60 +1,79 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 12 Jul 2017 21:03:42 +0200
-Subject: [PATCH v3.1 0/3] soc: amlogic: Add Amlogic SoC Information driver
-In-Reply-To: <1498206498-19139-1-git-send-email-narmstrong@baylibre.com>
-References: <1498206498-19139-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAFBinCAK0iXJ5zLg64oABXs7rno48Dni6Zc2dQ3_aadJS7wiSQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 12 Jul 2017 21:09:30 +0200
+Subject: [PATCH v2 1/7] pwm: rockchip: Add APB and function both clocks
+ support
+In-Reply-To: <caba81f3-d066-d64e-7e8e-6457b759e757@rock-chips.com>
+References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
+ <CAD=FV=Vqkueo_cqU8bJXXT3pV5d1dZR5LF+c=O-Ka1qR-Ff-WQ@mail.gmail.com>
+ <caba81f3-d066-d64e-7e8e-6457b759e757@rock-chips.com>
+Message-ID: <2474407.Xar3q3nCx6@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi David,
 
-On Fri, Jun 23, 2017 at 10:28 AM, Neil Armstrong
-<narmstrong@baylibre.com> wrote:
-> Amlogic SoCs have a SoC information register for SoC type, package type and
-> revision information.
-> This patchset adds support for this register decoding and exposing with the
-> SoC bus infrastructure, with dt-bindings and DT node.
-I'm curious: are you going to take this through your tree or are we
-waiting for someone's ACK here?
+Am Mittwoch, 12. Juli 2017, 16:38:09 CEST schrieb David.Wu:
+> Hi Doug,
+> 
+> ? 2017/7/12 1:03, Doug Anderson ??:
+> > Hi,
+> > 
+> > On Fri, Jul 7, 2017 at 9:03 PM, David Wu <david.wu@rock-chips.com> wrote:
+> >> @@ -6,7 +6,13 @@ Required properties:
+> >>      "rockchip,rk3288-pwm": found on RK3288 SoC
+> >>      "rockchip,vop-pwm": found integrated in VOP on RK3288 SoC
+> >>    
+> >>    - reg: physical base address and length of the controller's registers
+> >> 
+> >> - - clocks: phandle and clock specifier of the PWM reference clock
+> >> + - clocks: See ../clock/clock-bindings.txt
+> >> +   - For older hardware (rk2928, rk3066, rk3188, rk3228, rk3288,
+> >> rk3399):
+> >> +     - There is one clock that's used both to derive the functional
+> >> clock
+> >> +       for the device and as the bus clock.
+> >> +   - For newer hardware (rk3328 and future socs): specified by name
+> >> +     - "pwm": This is used to derive the functional clock.
+> >> +     - "pclk": This is the APB bus clock.
+> > 
+> > I'm pretty sure that that the above description doesn't quite match the
+> > code.
+> > 
+> > * The above description says that for old hardware there is one clock
+> > and 'clock-names' was not necessary (though as I understand it it's OK
+> > if it's there).
+> > 
+> > * The old code matched the old description.  AKA: if there was no
+> > "clock-names" then everything was OK.
+> > 
+> > * The new code will not work if there was no "clock-names".
+> > 
+> > Many of the old devices had a clock-names present (and it was "pwm"),
+> > but not all.  Specifically it looks like
+> > "arch/arm/boot/dts/rk3xxx.dtsi" doesn't specify a clock-names.
+> 
+> So we can keep code: the pc->clk = devm_clk_get(&pdev->dev, NULL);
+> If the name is NULL, we can get the first clk defined at DTB.
 
-> Changes since v3.1 at [3] :
->  - Prepend amlogic to has-chip-id property
->
-> Changes since v2 at [2] :
->  - Removed subnodes of socinfo node
->  - Checks has-chip-id property and if node is enabled
->
-> Changes since v1 at [1] :
->  - Switch DT representation to use regmap ans sub-node of a simple-mfd node
->  - Updated DT, bindings and driver accordingly
->
-> [1] http://lkml.kernel.org/r/1490950079-10145-1-git-send-email-narmstrong at baylibre.com
-> [2] http://lkml.kernel.org/r/1496742340-10307-1-git-send-email-narmstrong at baylibre.com
-> [3] http://lkml.kernel.org/r/1497441946-24379-1-git-send-email-narmstrong at baylibre.com
->
-> Neil Armstrong (3):
->   dt-bindings: arm: amlogic: Add SoC information bindings
->   ARM64: dts: meson-gx: Add SoC info register
->   soc: Add Amlogic SoC Information driver
->
->  Documentation/devicetree/bindings/arm/amlogic.txt |  29 ++++
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi         |   6 +
->  drivers/soc/Kconfig                               |   1 +
->  drivers/soc/Makefile                              |   1 +
->  drivers/soc/amlogic/Kconfig                       |  12 ++
->  drivers/soc/amlogic/Makefile                      |   1 +
->  drivers/soc/amlogic/meson-gx-socinfo.c            | 177 ++++++++++++++++++++++
->  7 files changed, 227 insertions(+)
->  create mode 100644 drivers/soc/amlogic/Kconfig
->  create mode 100644 drivers/soc/amlogic/Makefile
->  create mode 100644 drivers/soc/amlogic/meson-gx-socinfo.c
->
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+I don't think it will work that way.
+
+clk_get with NULL argument will likely grab the first clock of the list
+independent of clock-names being present.
+
+It might be better to do something like [pseudo-code]:
+
+pwm->pclk = clk_get( ..., "pclk");
+if (IS_ERR(pwm->pclk))
+	pwm->pclk = NULL;
+
+pwm->pwm_clk = clk_get(..., "pwm");
+if (IS_ERR(pwm->pwm_clk))
+	pwm->pwm_clk = clk_get(..., NULL);
+if (IS_ERR(pwm->pwm_clk))
+	return PTR_ERR(pwm->pwm_clk);
+
+That way, you make your way backwards through the pwm-binding-history.
+Ending at the single-clock without clock-names property as the last fallback.
+
+
+Heiko
