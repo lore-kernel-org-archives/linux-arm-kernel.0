@@ -1,79 +1,150 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 12 Jul 2017 14:29:26 +0800
-Subject: [PATCH 0/4] arm64: dts: rockchip: support mail and IPA thermal for
- rk3399
-Message-ID: <1499840971-20392-1-git-send-email-wxt@rock-chips.com>
+Date: Wed, 12 Jul 2017 14:29:28 +0800
+Subject: [PATCH 2/4] arm64: dts: rockchip: add ARM Mali GPU node for RK3399
+ SoCs
+In-Reply-To: <1499840971-20392-1-git-send-email-wxt@rock-chips.com>
+References: <1499840971-20392-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1499840971-20392-3-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patches supported the mail in devicetree and used the
-thermal IPA by default.
+Add Mali GPU device tree node for the RK3399 SoCs, with devfreq
+opp table.
 
-Verified with rk3399 kevin board on my github
-https://github.com/Caesar-github/rockchip/commits/gru/next-stable-chromeos
-The kernel is based on Linus's master branch and Heiko's
-v4.14-armsoc-tmp/dts64 branch. ( The Linux version 4.12.0 for now).
+RK3399 and RK3399-OP1 SoCs have a different recommendation table with
+gpu opp. As the ARM's mali driver found on
+https://developer.arm.com/products/software/mali-drivers/midgard-kernel.
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
 
-Tested on Kevin board with bringing up ChromeOS.
-OS VERSION:
-    CHROMEOS_RELEASE_DESCRIPTION=9693.1.0 (Official Build) dev-channel kevin test
+ arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi | 33 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi     | 33 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi         | 16 ++++++++++++
+ 3 files changed, 82 insertions(+)
 
-BIOS VERSION:
-    Google_Kevin.8785.211.2017_06_20_1043
-
-EC VERSION:
-    Build info:    kevin_v1.10.217-24514961d 2017-07-03 07:46:36 wxt at nb
-
-With the ARM's lastest mali driver TX011-SW-99002-r18p0-01rel0 on
-https://developer.arm.com/products/software/mali-drivers/midgard-kernel
-
->From the bootup log:
-    localhost devfreq0 # dmesg |grep mali
-    [    0.933334] mali ff9a0000.gpu: GPU identified as 0x0860 r2p0 status 0
-    [    0.940830] mali ff9a0000.gpu: Protected mode not available
-    [    0.947334] mali ff9a0000.gpu: Using configured power model mali-simple-power-model, and fallback mali-simple-power-model
-    [    0.960083] mali ff9a0000.gpu: Probed as mali0
-
-    localhost devfreq0 # pwd
-    /sys/devices/platform/ff9a0000.gpu/devfreq/devfreq0
-    localhost devfreq0 # ls
-    available_frequencies  device    min_freq          subsystem    uevent
-    available_governors    governor  polling_interval  target_freq  userspace
-    cur_freq               max_freq  power             trans_stat
-
-    localhost ff9a0000.gpu # ls
-    core_availability_policy  gpuinfo               modalias       soft_job_timeout
-    core_mask                 js_scheduling_period  of_node        subsystem
-    devfreq                   js_timeouts           pm_poweroff    uevent
-    driver                    mem_pool_max_size     power
-    driver_override           mem_pool_size         power_policy
-    dvfs_period               misc                  reset_timeout
----
-
-And for thermal with IPA.
-Try to run 'md5sum /dev/zero &' and octane/benchmark scripts to go up the temperature.
->From the scripts to have a look at the actual control.
-"
-while true; do grep "" /sys/class/thermal/thermal_zone[0-1]/temp /sys/devices/system/cpu/cpu[0-5]/cpufreq/scaling_cur_freq /sys/devices/platform/ff9a0000.gpu/devfreq/ff9a0000.gpu/cur_freq;date;sleep .5; done &
-"
-
--Caesar
-
-
-
-Caesar Wang (4):
-  dt-bindings: gpu: add the RK3399 mali for rockchip specifics
-  arm64: dts: rockchip: add ARM Mali GPU node for RK3399 SoCs
-  arm64: dts: rockchip: enable the GPU for RK3399-GRU
-  arm64: dts: rockchip: update the thermal zones for RK3399 SoCs
-
- .../devicetree/bindings/gpu/arm,mali-midgard.txt   |  1 +
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |  5 ++
- arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi   | 33 +++++++++
- arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       | 33 +++++++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 78 +++++++++++++---------
- 5 files changed, 117 insertions(+), 33 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
+index be7fe63..d8a120f 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
+@@ -118,6 +118,35 @@
+ 			opp-microvolt = <1250000>;
+ 		};
+ 	};
++
++	gpu_opp_table: opp-table2 {
++		compatible = "operating-points-v2";
++
++		opp00 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <800000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <297000000>;
++			opp-microvolt = <800000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <825000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <850000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <925000>;
++		};
++		opp05 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <1075000>;
++		};
++	};
+ };
+ 
+ &cpu_l0 {
+@@ -143,3 +172,7 @@
+ &cpu_b1 {
+ 	operating-points-v2 = <&cluster1_opp>;
+ };
++
++&gpu {
++	operating-points-v2 = <&gpu_opp_table>;
++};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+index c83460d..81617bc 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+@@ -110,6 +110,35 @@
+ 			opp-microvolt = <1200000>;
+ 		};
+ 	};
++
++	gpu_opp_table: opp-table2 {
++		compatible = "operating-points-v2";
++
++		opp00 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <800000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <297000000>;
++			opp-microvolt = <800000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <825000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <875000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <925000>;
++		};
++		opp05 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <1100000>;
++		};
++	};
+ };
+ 
+ &cpu_l0 {
+@@ -135,3 +164,7 @@
+ &cpu_b1 {
+ 	operating-points-v2 = <&cluster1_opp>;
+ };
++
++&gpu {
++	operating-points-v2 = <&gpu_opp_table>;
++};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 1cbd7a2..8c6438b 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1443,6 +1443,22 @@
+ 		status = "disabled";
+ 	};
+ 
++	gpu: gpu at ff9a0000 {
++		compatible = "arm,rk3399-mali",
++			     "arm,malit860",
++			     "arm,malit86x",
++			     "arm,malit8xx";
++		reg = <0x0 0xff9a0000 0x0 0x10000>;
++		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH 0>,
++			     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH 0>,
++			     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH 0>;
++		interrupt-names = "GPU", "JOB", "MMU";
++		clocks = <&cru ACLK_GPU>;
++		clock-names = "clk_mali";
++		power-domains = <&power RK3399_PD_GPU>;
++		status = "disabled";
++	};
++
+ 	pinctrl: pinctrl {
+ 		compatible = "rockchip,rk3399-pinctrl";
+ 		rockchip,grf = <&grf>;
 -- 
 2.7.4
