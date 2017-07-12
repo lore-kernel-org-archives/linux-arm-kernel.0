@@ -1,150 +1,578 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 12 Jul 2017 14:12:20 +0000
-Subject: [PATCH 2/2] gpio: gpio-vf610: add imx7ulp support
-In-Reply-To: <e15b08d4857d5498b70a57f8022b5ba5@agner.ch>
-References: <1494829706-5661-1-git-send-email-aisheng.dong@nxp.com>
- <1494829706-5661-3-git-send-email-aisheng.dong@nxp.com>
- <690d43f0314da9d340065b551700d6b7@agner.ch>
- <AM3PR04MB3067C3AFBD7285A5CC24B6780DA0@AM3PR04MB306.eurprd04.prod.outlook.com>
- <e15b08d4857d5498b70a57f8022b5ba5@agner.ch>
-Message-ID: <AM3PR04MB3066E8D18C14661F2107CBE80AF0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 12 Jul 2017 16:12:55 +0200
+Subject: [PATCH v2 3/3] drm/panel: Add support for otm8009a panel driver
+In-Reply-To: <1499677333-10571-4-git-send-email-philippe.cornu@st.com>
+References: <1499677333-10571-1-git-send-email-philippe.cornu@st.com>
+ <CGME20170710090349epcas1p1a4471dcb209a7830abf830be11a3b245@epcas1p1.samsung.com>
+ <1499677333-10571-4-git-send-email-philippe.cornu@st.com>
+Message-ID: <831126ea-c1a2-8fc5-7e31-47ddd4740f8c@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On 10.07.2017 11:02, Philippe CORNU wrote:
+> This patch adds Orise Tech otm8009a 3.97" 480x800 TFT LCD
+> panel driver (MIPI-DSI video mode). The panel backlight is
+> managed through the DSI link. This panel driver is used in
+> several STM32 boards.
+>
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+> ---
+>  drivers/gpu/drm/panel/Kconfig                    |   9 +
+>  drivers/gpu/drm/panel/Makefile                   |   1 +
+>  drivers/gpu/drm/panel/panel-orisetech-otm8009a.c | 489 +++++++++++++++++++++++
+>  3 files changed, 499 insertions(+)
+>  create mode 100755 drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
+>
+> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+> index d84a031..c1c9291 100644
+> --- a/drivers/gpu/drm/panel/Kconfig
+> +++ b/drivers/gpu/drm/panel/Kconfig
+> @@ -117,4 +117,13 @@ config DRM_PANEL_SITRONIX_ST7789V
+>  	  Say Y here if you want to enable support for the Sitronix
+>  	  ST7789V controller for 240x320 LCD panels
+>  
+> +config DRM_PANEL_ORISETECH_OTM8009A
+> +	tristate "Orise Tech otm8009a 480p dsi 2dl video mode panel"
+> +	depends on OF
+> +	depends on DRM_MIPI_DSI
+> +	depends on BACKLIGHT_CLASS_DEVICE
+> +	help
+> +	  Say Y here if you want to enable support for Orise Tech OTM8009A
+> +	  480x800 DSI panel
+> +
+>  endmenu
+> diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+> index 9f6610d..ac798f3 100644
+> --- a/drivers/gpu/drm/panel/Makefile
+> +++ b/drivers/gpu/drm/panel/Makefile
+> @@ -10,3 +10,4 @@ obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0) += panel-samsung-s6e8aa0.o
+>  obj-$(CONFIG_DRM_PANEL_SHARP_LQ101R1SX01) += panel-sharp-lq101r1sx01.o
+>  obj-$(CONFIG_DRM_PANEL_SHARP_LS043T1LE01) += panel-sharp-ls043t1le01.o
+>  obj-$(CONFIG_DRM_PANEL_SITRONIX_ST7789V) += panel-sitronix-st7789v.o
+> +obj-$(CONFIG_DRM_PANEL_ORISETECH_OTM8009A) += panel-orisetech-otm8009a.o
+> \ No newline at end of file
 
-> -----Original Message-----
-> From: Stefan Agner [mailto:stefan at agner.ch]
-> Sent: Saturday, July 01, 2017 5:54 AM
-> To: A.s. Dong
-> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
-> kernel at pengutronix.de; Alexandre Courbot; Peter Chen; LW at KARO-
-> electronics.de
-> Subject: Re: [PATCH 2/2] gpio: gpio-vf610: add imx7ulp support
-> 
-> On 2017-06-21 06:30, A.s. Dong wrote:
-> > Hi Stefan,
-> >
-> >> -----Original Message-----
-> >> From: Stefan Agner [mailto:stefan at agner.ch]
-> >> Sent: Tuesday, May 16, 2017 1:59 AM
-> >> To: A.S. Dong
-> >> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >> linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
-> >> kernel at pengutronix.de; Alexandre Courbot; Peter Chen
-> >> Subject: Re: [PATCH 2/2] gpio: gpio-vf610: add imx7ulp support
-> >>
-> >> On 2017-05-14 23:28, Dong Aisheng wrote:
-> >> > The Rapid General-Purpose Input and Output with 2 Ports (RGPIO2P)
-> >> > on MX7ULP is similar to GPIO on Vibrid. But unlike Vibrid, the
-> >> > RGPIO2P has an extra Port Data Direction Register (PDDR) used to
-> >> > configure the individual port pins for input or output.
-> >> >
-> >> > We introduce a FSL_GPIO_HAVE_PDDR with fsl_gpio_soc_data data to
-> >> > distinguish this differences. And we support getting the output
-> >> > status by checking the GPIO direction in PDDR.
-> >> >
-> >> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> > Cc: Alexandre Courbot <gnurou@gmail.com>
-> >> > Cc: Shawn Guo <shawnguo@kernel.org>
-> >> > Cc: Stefan Agner <stefan@agner.ch>
-> >> > Cc: Fugang Duan <fugang.duan@nxp.com>
-> >> > Cc: Peter Chen <peter.chen@nxp.com>
-> >> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> >> > ---
-> >> >  drivers/gpio/gpio-vf610.c | 49
-> >> > ++++++++++++++++++++++++++++++++++++++++++++---
-> >> >  1 file changed, 46 insertions(+), 3 deletions(-)
-> >> >
-> >> > diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-> >> > index 521fbe3..a439d27 100644
-> >> > --- a/drivers/gpio/gpio-vf610.c
-> >> > +++ b/drivers/gpio/gpio-vf610.c
-> >> > @@ -30,10 +30,15 @@
-> >> >
-> >> >  #define VF610_GPIO_PER_PORT		32
-> >> >
-> >> > +struct fsl_gpio_soc_data {
-> >> > +	u32 flags;
-> >> > +};
-> >> > +
-> >> >  struct vf610_gpio_port {
-> >> >  	struct gpio_chip gc;
-> >> >  	void __iomem *base;
-> >> >  	void __iomem *gpio_base;
-> >> > +	const struct fsl_gpio_soc_data *sdata;
-> >> >  	u8 irqc[VF610_GPIO_PER_PORT];
-> >> >  	int irq;
-> >> >  };
-> >> > @@ -43,6 +48,7 @@ struct vf610_gpio_port {
-> >> >  #define GPIO_PCOR		0x08
-> >> >  #define GPIO_PTOR		0x0c
-> >> >  #define GPIO_PDIR		0x10
-> >> > +#define GPIO_PDDR		0x14
-> >> >
-> >> >  #define PORT_PCR(n)		((n) * 0x4)
-> >> >  #define PORT_PCR_IRQC_OFFSET	16
-> >> > @@ -59,10 +65,18 @@ struct vf610_gpio_port {
-> >> >  #define PORT_INT_EITHER_EDGE	0xb
-> >> >  #define PORT_INT_LOGIC_ONE	0xc
-> >> >
-> >> > +/* SoC has a Port Data Direction Register (PDDR) */
-> >> > +#define FSL_GPIO_HAVE_PDDR	BIT(0)
-> >> > +
-> >> >  static struct irq_chip vf610_gpio_irq_chip;
-> >> >
-> >> > +static const struct fsl_gpio_soc_data imx_data = {
-> >> > +	.flags = FSL_GPIO_HAVE_PDDR,
-> >> > +};
-> >> > +
-> >> >  static const struct of_device_id vf610_gpio_dt_ids[] = {
-> >> > -	{ .compatible = "fsl,vf610-gpio" },
-> >> > +	{ .compatible = "fsl,vf610-gpio",	.data = NULL, },
-> >> > +	{ .compatible = "fsl,imx7ulp-gpio",	.data = &imx_data, },
-> >> >  	{ /* sentinel */ }
-> >> >  };
-> >> >
-> >> > @@ -79,8 +93,18 @@ static inline u32 vf610_gpio_readl(void __iomem
-> >> > *reg)  static int vf610_gpio_get(struct gpio_chip *gc, unsigned int
-> >> > gpio)  {
-> >> >  	struct vf610_gpio_port *port = gpiochip_get_data(gc);
-> >> > -
-> >> > -	return !!(vf610_gpio_readl(port->gpio_base + GPIO_PDIR) &
-> BIT(gpio));
-> >> > +	unsigned long mask = BIT(gpio);
-> >> > +	void __iomem *addr;
-> >> > +
-> >> > +	if (port->sdata && port->sdata->flags & FSL_GPIO_HAVE_PDDR) {
-> >> > +		mask &= vf610_gpio_readl(port->gpio_base + GPIO_PDDR);
-> >> > +		addr = mask ? port->gpio_base + GPIO_PDOR :
-> >> > +			      port->gpio_base + GPIO_PDIR;
-> >> > +		return !!(vf610_gpio_readl(addr) & BIT(gpio));
-> 
-> I still feel it would be better to read back the actual value on the
-> wire...
-> 
-> But this would require to enable the input buffer in
-> imx7ulp_pmx_gpio_set_direction.
-> 
-> Lothar was with me in this discussion:
-> https://patchwork.kernel.org/patch/9726163/
-> 
-> Or is there really a technical limitation on i.MX7ULP?
-> 
+Alphabetical order and new line at EOF.
 
-No actually technical limitation, just different from Vybrid,
-MX7ULP has a GPIO_PDDR register to distinguish the input and output,
-We want to disable the input logic for output case to save power.
+> diff --git a/drivers/gpu/drm/panel/panel-orisetech-otm8009a.c b/drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
+> new file mode 100755
+> index 0000000..2a3ce47
+> --- /dev/null
+> +++ b/drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
+> @@ -0,0 +1,489 @@
+> +/*
+> + * Copyright (C) STMicroelectronics SA 2017
+> + *
+> + * Authors: Philippe Cornu <philippe.cornu@st.com>
+> + *          Yannick Fertre <yannick.fertre@st.com>
+> + *
+> + * License terms:  GNU General Public License (GPL), version 2
+> + */
+> +#include <drm/drmP.h>
+> +#include <drm/drm_mipi_dsi.h>
+> +#include <drm/drm_panel.h>
+> +#include <linux/backlight.h>
+> +#include <linux/gpio/consumer.h>
+> +#include <video/mipi_display.h>
+> +
+> +#define DRV_NAME "orisetech_otm8009a"
+> +
+> +#define OTM8009A_BACKLIGHT_DEFAULT	240
+> +#define OTM8009A_BACKLIGHT_MAX		255
+> +
+> +/* Manufacturer Command Set */
+> +#define MCS_ADRSFT	0x0000	/* Address Shift Function */
+> +#define MCS_PANSET	0xB3A6	/* Panel Type Setting */
+> +#define MCS_SD_CTRL	0xC0A2	/* Source Driver Timing Setting */
+> +#define MCS_P_DRV_M	0xC0B4	/* Panel Driving Mode */
+> +#define MCS_OSC_ADJ	0xC181	/* Oscillator Adjustment for Idle/Normal mode */
+> +#define MCS_RGB_VID_SET	0xC1A1	/* RGB Video Mode Setting */
+> +#define MCS_SD_PCH_CTRL	0xC480	/* Source Driver Precharge Control */
+> +#define MCS_NO_DOC1	0xC48A	/* Command not documented */
+> +#define MCS_PWR_CTRL1	0xC580	/* Power Control Setting 1 */
+> +#define MCS_PWR_CTRL2	0xC590	/* Power Control Setting 2 for Normal Mode */
+> +#define MCS_PWR_CTRL4	0xC5B0	/* Power Control Setting 4 for DC Voltage */
+> +#define MCS_PANCTRLSET1	0xCB80	/* Panel Control Setting 1 */
+> +#define MCS_PANCTRLSET2	0xCB90	/* Panel Control Setting 2 */
+> +#define MCS_PANCTRLSET3	0xCBA0	/* Panel Control Setting 3 */
+> +#define MCS_PANCTRLSET4	0xCBB0	/* Panel Control Setting 4 */
+> +#define MCS_PANCTRLSET5	0xCBC0	/* Panel Control Setting 5 */
+> +#define MCS_PANCTRLSET6	0xCBD0	/* Panel Control Setting 6 */
+> +#define MCS_PANCTRLSET7	0xCBE0	/* Panel Control Setting 7 */
+> +#define MCS_PANCTRLSET8	0xCBF0	/* Panel Control Setting 8 */
+> +#define MCS_PANU2D1	0xCC80	/* Panel U2D Setting 1 */
+> +#define MCS_PANU2D2	0xCC90	/* Panel U2D Setting 2 */
+> +#define MCS_PANU2D3	0xCCA0	/* Panel U2D Setting 3 */
+> +#define MCS_PAND2U1	0xCCB0	/* Panel D2U Setting 1 */
+> +#define MCS_PAND2U2	0xCCC0	/* Panel D2U Setting 2 */
+> +#define MCS_PAND2U3	0xCCD0	/* Panel D2U Setting 3 */
+> +#define MCS_GOAVST	0xCE80	/* GOA VST Setting */
+> +#define MCS_GOACLKA1	0xCEA0	/* GOA CLKA1 Setting */
+> +#define MCS_GOACLKA3	0xCEB0	/* GOA CLKA3 Setting */
+> +#define MCS_GOAECLK	0xCFC0	/* GOA ECLK Setting */
+> +#define MCS_NO_DOC2	0xCFD0	/* Command not documented */
+> +#define MCS_GVDDSET	0xD800	/* GVDD/NGVDD */
+> +#define MCS_VCOMDC	0xD900	/* VCOM Voltage Setting */
+> +#define MCS_GMCT2_2P	0xE100	/* Gamma Correction 2.2+ Setting */
+> +#define MCS_GMCT2_2N	0xE200	/* Gamma Correction 2.2- Setting */
+> +#define MCS_NO_DOC3	0xF5B6	/* Command not documented */
+> +#define MCS_CMD2_ENA1	0xFF00	/* Enable Access Command2 "CMD2" */
+> +#define MCS_CMD2_ENA2	0xFF80	/* Enable Access Orise Command2 */
+> +
+> +struct otm8009a {
+> +	struct device *dev;
+> +	struct drm_panel panel;
+> +	struct backlight_device *bl_dev;
+> +	struct gpio_desc *reset_gpio;
+> +	bool prepared;
+> +	bool enabled;
+> +};
+> +
+> +static const struct drm_display_mode default_mode = {
+> +	.clock = 32729,
+> +	.hdisplay = 480,
+> +	.hsync_start = 480 + 120,
+> +	.hsync_end = 480 + 120 + 63,
+> +	.htotal = 480 + 120 + 63 + 120,
+> +	.vdisplay = 800,
+> +	.vsync_start = 800 + 12,
+> +	.vsync_end = 800 + 12 + 12,
+> +	.vtotal = 800 + 12 + 12 + 12,
+> +	.vrefresh = 50,
+> +	.flags = 0,
+> +	.width_mm = 52,
+> +	.height_mm = 86,
+> +};
+> +
+> +static inline struct otm8009a *panel_to_otm8009a(struct drm_panel *panel)
+> +{
+> +	return container_of(panel, struct otm8009a, panel);
+> +}
+> +
+> +static void otm8009a_dcs_write_buf(struct otm8009a *ctx, const void *data,
+> +				   size_t len)
+> +{
+> +	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+> +
+> +	if (mipi_dsi_dcs_write_buffer(dsi, data, len) < 0)
+> +		DRM_WARN("mipi dsi dcs write buffer failed\n");
+> +}
+> +
+> +#define dcs_write_seq(ctx, seq...)			\
+> +({							\
+> +	static const u8 d[] = { seq };			\
+> +	otm8009a_dcs_write_buf(ctx, d, ARRAY_SIZE(d));	\
+> +})
+> +
+> +#define dcs_write_cmd_at(ctx, cmd, seq...)		\
+> +({							\
+> +	dcs_write_seq(ctx, MCS_ADRSFT, (cmd) & 0xFF);	\
+> +	dcs_write_seq(ctx, (cmd) >> 8, seq);		\
+> +})
 
-> We could also change it later, especially if the pinctrl changes already
-> got merged anyway.
-> 
-> From a Vybrid perspective:
-> Acked-by: Stefan Agner <stefan@agner.ch>
-> 
+This approach looks better than my proposition, for sure it is more
+consistent with documentation.
 
-Thanks.
+> +
+> +static int otm8009a_init_sequence(struct otm8009a *ctx)
+> +{
+> +	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+> +	int ret;
+> +
+> +	/* Enter CMD2 */
+> +	dcs_write_cmd_at(ctx, MCS_CMD2_ENA1, 0x80, 0x09, 0x01);
+> +
+> +	/* Enter Orise Command2 */
+> +	dcs_write_cmd_at(ctx, MCS_CMD2_ENA2, 0x80, 0x09);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_SD_PCH_CTRL, 0x30);
+> +	mdelay(10);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_NO_DOC1, 0x40);
+> +	mdelay(10);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_PWR_CTRL4 + 1, 0xA9);
+> +	dcs_write_cmd_at(ctx, MCS_PWR_CTRL2 + 1, 0x34);
+> +	dcs_write_cmd_at(ctx, MCS_P_DRV_M, 0x50);
+> +	dcs_write_cmd_at(ctx, MCS_VCOMDC, 0x4E);
+> +	dcs_write_cmd_at(ctx, MCS_OSC_ADJ, 0x66); /* 65Hz */
+> +	dcs_write_cmd_at(ctx, MCS_RGB_VID_SET, 0x08);
+> +	dcs_write_cmd_at(ctx, MCS_PWR_CTRL2 + 2, 0x01);
+> +	dcs_write_cmd_at(ctx, MCS_PWR_CTRL2 + 5, 0x34);
+> +	dcs_write_cmd_at(ctx, MCS_PWR_CTRL2 + 4, 0x33);
+> +	dcs_write_cmd_at(ctx, MCS_GVDDSET, 0x79, 0x79);
+> +	dcs_write_cmd_at(ctx, MCS_SD_CTRL + 1, 0x1B);
+> +	dcs_write_cmd_at(ctx, MCS_PWR_CTRL1 + 2, 0x83);
+> +	dcs_write_cmd_at(ctx, MCS_SD_PCH_CTRL + 1, 0x83);
+> +	dcs_write_cmd_at(ctx, MCS_RGB_VID_SET, 0x0E); /* FIXME before 0x08! */
 
+Quite cryptic comment, either remove, either make it readable.
+
+> +	dcs_write_cmd_at(ctx, MCS_PANSET, 0x00, 0x01);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_GOAVST, 0x85, 0x01, 0x00, 0x84, 0x01, 0x00);
+> +	dcs_write_cmd_at(ctx, MCS_GOACLKA1, 0x18, 0x04, 0x03, 0x39, 0x00, 0x00,
+> +			 0x00, 0x18, 0x03, 0x03, 0x3A, 0x00, 0x00, 0x00);
+> +	dcs_write_cmd_at(ctx, MCS_GOACLKA3, 0x18, 0x02, 0x03, 0x3B, 0x00, 0x00,
+> +			 0x00, 0x18, 0x01, 0x03, 0x3C, 0x00, 0x00, 0x00);
+> +	dcs_write_cmd_at(ctx, MCS_GOAECLK, 0x01, 0x01, 0x20, 0x20, 0x00, 0x00,
+> +			 0x01, 0x02, 0x00, 0x00);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_NO_DOC2, 0x00);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_PANCTRLSET1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+> +	dcs_write_cmd_at(ctx, MCS_PANCTRLSET2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+> +			 0, 0, 0, 0, 0);
+> +	dcs_write_cmd_at(ctx, MCS_PANCTRLSET3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+> +			 0, 0, 0, 0, 0);
+> +	dcs_write_cmd_at(ctx, MCS_PANCTRLSET4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+> +	dcs_write_cmd_at(ctx, MCS_PANCTRLSET5, 0, 4, 4, 4, 4, 4, 0, 0, 0, 0,
+> +			 0, 0, 0, 0, 0);
+> +	dcs_write_cmd_at(ctx, MCS_PANCTRLSET6, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4,
+> +			 4, 0, 0, 0, 0);
+> +	dcs_write_cmd_at(ctx, MCS_PANCTRLSET7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+> +	dcs_write_cmd_at(ctx, MCS_PANCTRLSET8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+> +			 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_PANU2D1, 0x00, 0x26, 0x09, 0x0B, 0x01, 0x25,
+> +			 0x00, 0x00, 0x00, 0x00);
+> +	dcs_write_cmd_at(ctx, MCS_PANU2D2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+> +			 0x00, 0x00, 0x00, 0x00, 0x00, 0x26, 0x0A, 0x0C, 0x02);
+> +	dcs_write_cmd_at(ctx, MCS_PANU2D3, 0x25, 0x00, 0x00, 0x00, 0x00, 0x00,
+> +			 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+> +	dcs_write_cmd_at(ctx, MCS_PAND2U1, 0x00, 0x25, 0x0C, 0x0A, 0x02, 0x26,
+> +			 0x00, 0x00, 0x00, 0x00);
+> +	dcs_write_cmd_at(ctx, MCS_PAND2U2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+> +			 0x00, 0x00, 0x00, 0x00, 0x00, 0x25, 0x0B, 0x09, 0x01);
+> +	dcs_write_cmd_at(ctx, MCS_PAND2U3, 0x26, 0x00, 0x00, 0x00, 0x00, 0x00,
+> +			 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_PWR_CTRL1 + 1, 0x66);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_NO_DOC3, 0x06);
+> +
+> +	dcs_write_cmd_at(ctx, MCS_GMCT2_2P, 0x00, 0x09, 0x0F, 0x0E, 0x07, 0x10,
+> +			 0x0B, 0x0A, 0x04, 0x07, 0x0B, 0x08, 0x0F, 0x10, 0x0A,
+> +			 0x01);
+> +	dcs_write_cmd_at(ctx, MCS_GMCT2_2N, 0x00, 0x09, 0x0F, 0x0E, 0x07, 0x10,
+> +			 0x0B, 0x0A, 0x04, 0x07, 0x0B, 0x08, 0x0F, 0x10, 0x0A,
+> +			 0x01);
+> +
+> +	/* Exit CMD2 */
+> +	dcs_write_cmd_at(ctx, MCS_CMD2_ENA1, 0xFF, 0xFF, 0xFF);
+> +
+> +	ret = mipi_dsi_dcs_nop(dsi);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Wait for sleep out exit */
+> +	mdelay(120);
+> +
+> +	/* Default portrait 480x800 rgb24 */
+> +	dcs_write_seq(ctx, MIPI_DCS_SET_ADDRESS_MODE, 0x00);
+> +
+> +	ret = mipi_dsi_dcs_set_column_address(dsi, 0,
+> +					      default_mode.hdisplay - 1);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = mipi_dsi_dcs_set_page_address(dsi, 0, default_mode.vdisplay - 1);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* See otm8009a driver documentation for pixel format descriptions */
+> +	ret = mipi_dsi_dcs_set_pixel_format(dsi, MIPI_DCS_PIXEL_FMT_24BIT |
+> +					    MIPI_DCS_PIXEL_FMT_24BIT << 4);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Disable CABC feature */
+> +	dcs_write_seq(ctx, MIPI_DCS_WRITE_POWER_SAVE, 0x00);
+> +
+> +	ret = mipi_dsi_dcs_set_display_on(dsi);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = mipi_dsi_dcs_nop(dsi);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Send Command GRAM memory write (no parameters) */
+> +	dcs_write_seq(ctx, MIPI_DCS_WRITE_MEMORY_START);
+> +
+> +	return 0;
+> +}
+> +
+> +static int otm8009a_disable(struct drm_panel *panel)
+> +{
+> +	struct otm8009a *ctx = panel_to_otm8009a(panel);
+> +	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+> +	int ret;
+> +
+> +	if (!ctx->enabled)
+> +		return 0; /* This is not an issue so we return 0 here */
+> +
+> +	/* Power off the backlight. Note: end-user still controls brightness */
+> +	ctx->bl_dev->props.power = FB_BLANK_POWERDOWN;
+> +	ret = backlight_update_status(ctx->bl_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = mipi_dsi_dcs_set_display_off(dsi);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	msleep(120);
+> +
+> +	ctx->enabled = false;
+> +
+> +	return 0;
+> +}
+> +
+> +static int otm8009a_unprepare(struct drm_panel *panel)
+> +{
+> +	struct otm8009a *ctx = panel_to_otm8009a(panel);
+> +
+> +	if (!ctx->prepared)
+> +		return 0;
+> +
+> +	if (ctx->reset_gpio) {
+> +		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+> +		msleep(20);
+> +	}
+> +
+> +	ctx->prepared = false;
+> +
+> +	return 0;
+> +}
+> +
+> +static int otm8009a_prepare(struct drm_panel *panel)
+> +{
+> +	struct otm8009a *ctx = panel_to_otm8009a(panel);
+> +	int ret;
+> +
+> +	if (ctx->prepared)
+> +		return 0;
+> +
+> +	if (ctx->reset_gpio) {
+> +		gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+> +		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+> +		msleep(20);
+> +		gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+> +		msleep(100);
+> +	}
+> +
+> +	ret = otm8009a_init_sequence(ctx);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ctx->prepared = true;
+> +
+> +	/* Power on the backlight. Note: end-user still controls brightness */
+> +	ctx->bl_dev->props.power = FB_BLANK_UNBLANK;
+> +	backlight_update_status(ctx->bl_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int otm8009a_enable(struct drm_panel *panel)
+> +{
+> +	struct otm8009a *ctx = panel_to_otm8009a(panel);
+> +
+> +	ctx->enabled = true;
+> +
+> +	return 0;
+> +}
+
+I am not sure about it, but I guess unblanking should be performed in
+_enable callback. Otherwise you risk seeing garbage at panel start - it
+starts displaying uninitialized data.
+Usually sequence looks like:
+A. Power on DSI host
+B. Initialize panel (prepare callback)
+C. Start video transmission from the host to the panel
+D. wait about 120ms, then unblank panel (enable callback)
+
+Of course this is only my experience, maybe your panel is different.
+
+Beside above comments:
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+
+ --
 Regards
-Dong Aisheng
+Andrzej
+
+
+> +
+> +static int otm8009a_get_modes(struct drm_panel *panel)
+> +{
+> +	struct drm_display_mode *mode;
+> +
+> +	mode = drm_mode_duplicate(panel->drm, &default_mode);
+> +	if (!mode) {
+> +		DRM_ERROR("failed to add mode %ux%ux@%u\n",
+> +			  default_mode.hdisplay, default_mode.vdisplay,
+> +			  default_mode.vrefresh);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	drm_mode_set_name(mode);
+> +
+> +	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
+> +	drm_mode_probed_add(panel->connector, mode);
+> +
+> +	panel->connector->display_info.width_mm = mode->width_mm;
+> +	panel->connector->display_info.height_mm = mode->height_mm;
+> +
+> +	return 1;
+> +}
+> +
+> +static const struct drm_panel_funcs otm8009a_drm_funcs = {
+> +	.disable   = otm8009a_disable,
+> +	.unprepare = otm8009a_unprepare,
+> +	.prepare   = otm8009a_prepare,
+> +	.enable    = otm8009a_enable,
+> +	.get_modes = otm8009a_get_modes,
+> +};
+> +
+> +/*
+> + * DSI-BASED BACKLIGHT
+> + */
+> +
+> +static int otm8009a_backlight_update_status(struct backlight_device *bd)
+> +{
+> +	struct otm8009a *ctx = bl_get_data(bd);
+> +	u8 data[2];
+> +
+> +	if (!ctx->prepared) {
+> +		DRM_DEBUG("lcd not ready yet for setting its backlight!\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (bd->props.power <= FB_BLANK_NORMAL) {
+> +		/* Power on the backlight with the requested brightness
+> +		 * Note We can not use mipi_dsi_dcs_set_display_brightness()
+> +		 * as otm8009a driver support only 8-bit brightness (1 param).
+> +		 */
+> +		data[0] = MIPI_DCS_SET_DISPLAY_BRIGHTNESS;
+> +		data[1] = bd->props.brightness;
+> +		otm8009a_dcs_write_buf(ctx, data, ARRAY_SIZE(data));
+> +
+> +		/* set Brightness Control & Backlight on */
+> +		data[1] = 0x24;
+> +
+> +	} else {
+> +		/* Power off the backlight: set Brightness Control & Bl off */
+> +		data[1] = 0;
+> +	}
+> +
+> +	/* Update Brightness Control & Backlight */
+> +	data[0] = MIPI_DCS_WRITE_CONTROL_DISPLAY;
+> +	otm8009a_dcs_write_buf(ctx, data, ARRAY_SIZE(data));
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct backlight_ops otm8009a_backlight_ops = {
+> +	.update_status = otm8009a_backlight_update_status,
+> +};
+> +
+> +static int otm8009a_probe(struct mipi_dsi_device *dsi)
+> +{
+> +	struct device *dev = &dsi->dev;
+> +	struct otm8009a *ctx;
+> +	int ret;
+> +
+> +	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
+> +	if (!ctx)
+> +		return -ENOMEM;
+> +
+> +	ctx->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
+> +	if (IS_ERR(ctx->reset_gpio)) {
+> +		dev_err(dev, "cannot get reset-gpio\n");
+> +		return PTR_ERR(ctx->reset_gpio);
+> +	}
+> +
+> +	mipi_dsi_set_drvdata(dsi, ctx);
+> +
+> +	ctx->dev = dev;
+> +
+> +	dsi->lanes = 2;
+> +	dsi->format = MIPI_DSI_FMT_RGB888;
+> +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
+> +			  MIPI_DSI_MODE_LPM;
+> +
+> +	drm_panel_init(&ctx->panel);
+> +	ctx->panel.dev = dev;
+> +	ctx->panel.funcs = &otm8009a_drm_funcs;
+> +
+> +	ctx->bl_dev = backlight_device_register(DRV_NAME "_backlight", dev, ctx,
+> +						&otm8009a_backlight_ops, NULL);
+> +	if (IS_ERR(ctx->bl_dev)) {
+> +		dev_err(dev, "failed to register backlight device\n");
+> +		return PTR_ERR(ctx->bl_dev);
+> +	}
+> +
+> +	ctx->bl_dev->props.max_brightness = OTM8009A_BACKLIGHT_MAX;
+> +	ctx->bl_dev->props.brightness = OTM8009A_BACKLIGHT_DEFAULT;
+> +	ctx->bl_dev->props.power = FB_BLANK_POWERDOWN;
+> +	ctx->bl_dev->props.type = BACKLIGHT_RAW;
+> +
+> +	drm_panel_add(&ctx->panel);
+> +
+> +	ret = mipi_dsi_attach(dsi);
+> +	if (ret < 0) {
+> +		dev_err(dev, "mipi_dsi_attach failed. Is host ready?\n");
+> +		drm_panel_remove(&ctx->panel);
+> +		backlight_device_unregister(ctx->bl_dev);
+> +		return ret;
+> +	}
+> +
+> +	DRM_INFO(DRV_NAME "_panel %ux%u@%u %ubpp dsi %udl - ready\n",
+> +		 default_mode.hdisplay, default_mode.vdisplay,
+> +		 default_mode.vrefresh,
+> +		 mipi_dsi_pixel_format_to_bpp(dsi->format), dsi->lanes);
+> +
+> +	return 0;
+> +}
+> +
+> +static int otm8009a_remove(struct mipi_dsi_device *dsi)
+> +{
+> +	struct otm8009a *ctx = mipi_dsi_get_drvdata(dsi);
+> +
+> +	mipi_dsi_detach(dsi);
+> +	drm_panel_remove(&ctx->panel);
+> +
+> +	backlight_device_unregister(ctx->bl_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id orisetech_otm8009a_of_match[] = {
+> +	{ .compatible = "orisetech,otm8009a" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, orisetech_otm8009a_of_match);
+> +
+> +static struct mipi_dsi_driver orisetech_otm8009a_driver = {
+> +	.probe  = otm8009a_probe,
+> +	.remove = otm8009a_remove,
+> +	.driver = {
+> +		.name = DRV_NAME "_panel",
+> +		.of_match_table = orisetech_otm8009a_of_match,
+> +	},
+> +};
+> +module_mipi_dsi_driver(orisetech_otm8009a_driver);
+> +
+> +MODULE_AUTHOR("Philippe Cornu <philippe.cornu@st.com>");
+> +MODULE_AUTHOR("Yannick Fertre <yannick.fertre@st.com>");
+> +MODULE_DESCRIPTION("DRM driver for Orise Tech OTM8009A MIPI DSI panel");
+> +MODULE_LICENSE("GPL v2");
