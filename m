@@ -1,42 +1,69 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 12 Jul 2017 12:35:53 +0200
-Subject: [PATCH] arm64: dts: r8a7796: Add missing second pair of DMA names to
- MSIOF nodes
-Message-ID: <1499855753-21630-1-git-send-email-geert+renesas@glider.be>
+Date: Wed, 12 Jul 2017 12:39:32 +0200
+Subject: [PATCH v2] ARM: shmobile: rcar-gen2: Add support for CPG/MSSR bindings
+Message-ID: <1499855972-22126-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSIOF0 and MSIOF1 are tied to two DMA controllers through two pairs of
-DMA specifiers.  However, the second pair of corresponding DMA names was
-missing.
+When using the new CPG/MSSR bindings, there is no longer a
+"renesas,rcar-gen2-cpg-clocks" node, and the code to obtain the external
+clock crystal frequency falls back to a default of 20 MHz.
+While this is correct for all upstream R-Car Gen2 and RZ/G1 boards, this
+is not necessarily the case for out-of-tree third party boards.
 
-Fixes: 80fab06e258da762 ("arm64: dts: r8a7796: Add all MSIOF nodes")
+Add support for finding the external clock crystal oscillator on RZ/G1M,
+and on R-Car H2, M2-W, and M2-N using the new CPG/MSSR bindings, through
+the corresponding "renesas,r8a77xx-cpg-mssr" nodes.
+
+Note that this is not needed on R-Car V2H and E2, and on RZ/G1E, as on
+those SoCs the arch_timer and generic counter clock is derived from the
+ZS clock instead.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+v2:
+  - Drop RZ/G1E,
+  - Add support for R-Car H2, M2-W, and M2-N.
+---
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index c7bbb501ebe06826..f63f9107f453b5b7 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1000,7 +1000,7 @@
- 			clocks = <&cpg CPG_MOD 211>;
- 			dmas = <&dmac1 0x41>, <&dmac1 0x40>,
- 			       <&dmac2 0x41>, <&dmac2 0x40>;
--			dma-names = "tx", "rx";
-+			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
- 			resets = <&cpg 211>;
- 			#address-cells = <1>;
-@@ -1016,7 +1016,7 @@
- 			clocks = <&cpg CPG_MOD 210>;
- 			dmas = <&dmac1 0x43>, <&dmac1 0x42>,
- 			       <&dmac2 0x43>, <&dmac2 0x42>;
--			dma-names = "tx", "rx";
-+			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
- 			resets = <&cpg 210>;
- 			#address-cells = <1>;
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index a54125cb509ca775..18b556835e474feb 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -30,17 +30,29 @@
+ #include "common.h"
+ #include "rcar-gen2.h"
+ 
++static const struct of_device_id cpg_matches[] __initconst = {
++	{ .compatible = "renesas,rcar-gen2-cpg-clocks", },
++	{ .compatible = "renesas,r8a7743-cpg-mssr", .data = "extal" },
++	{ .compatible = "renesas,r8a7790-cpg-mssr", .data = "extal" },
++	{ .compatible = "renesas,r8a7791-cpg-mssr", .data = "extal" },
++	{ .compatible = "renesas,r8a7793-cpg-mssr", .data = "extal" },
++	{ /* sentinel */ }
++};
++
+ static unsigned int __init get_extal_freq(void)
+ {
++	const struct of_device_id *match;
+ 	struct device_node *cpg, *extal;
+ 	u32 freq = 20000000;
++	int idx = 0;
+ 
+-	cpg = of_find_compatible_node(NULL, NULL,
+-				      "renesas,rcar-gen2-cpg-clocks");
++	cpg = of_find_matching_node_and_match(NULL, cpg_matches, &match);
+ 	if (!cpg)
+ 		return freq;
+ 
+-	extal = of_parse_phandle(cpg, "clocks", 0);
++	if (match->data)
++		idx = of_property_match_string(cpg, "clock-names", match->data);
++	extal = of_parse_phandle(cpg, "clocks", idx);
+ 	of_node_put(cpg);
+ 	if (!extal)
+ 		return freq;
 -- 
 2.7.4
