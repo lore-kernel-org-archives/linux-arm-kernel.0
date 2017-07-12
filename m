@@ -1,24 +1,48 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 12 Jul 2017 15:47:56 -0400
-Subject: [PATCH V3 1/2] PCI: Add Extended Tags quirk for Broadcom HT2100
- Root Port
-In-Reply-To: <20170712194543.GF14614@bhelgaas-glaptop.roam.corp.google.com>
-References: <1499786735-25782-1-git-send-email-okaya@codeaurora.org>
- <20170711195853.GA14614@bhelgaas-glaptop.roam.corp.google.com>
- <ae4dca5b-30cf-3a14-1707-380a3660badf@codeaurora.org>
- <20170711203957.GB14614@bhelgaas-glaptop.roam.corp.google.com>
- <25b6bbf6-20b5-dfc8-c92a-268c07fa1f98@codeaurora.org>
- <20170712194543.GF14614@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <286325ca-f0b4-a91d-979e-5ee724550e6a@codeaurora.org>
+From: snawrocki@kernel.org (Sylwester Nawrocki)
+Date: Wed, 12 Jul 2017 22:01:59 +0200
+Subject: [PATCH v2 0/7] [PATCH v2 0/7] Add support of OV9655 camera
+In-Reply-To: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
+References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
+Message-ID: <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/12/2017 3:45 PM, Bjorn Helgaas wrote:
-> There's nothing we can do until we find them.
+Hi Hugues,
 
-sounds good.
+On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
+> This patchset enables OV9655 camera support.
+> 
+> OV9655 support has been tested using STM32F4DIS-CAM extension board
+> plugged on connector P1 of STM32F746G-DISCO board.
+> Due to lack of OV9650/52 hardware support, the modified related code
+> could not have been checked for non-regression.
+> 
+> First patches upgrade current support of OV9650/52 to prepare then
+> introduction of OV9655 variant patch.
+> Because of OV9655 register set slightly different from OV9650/9652,
+> not all of the driver features are supported (controls). Supported
+> resolutions are limited to VGA, QVGA, QQVGA.
+> Supported format is limited to RGB565.
+> Controls are limited to color bar test pattern for test purpose.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+I appreciate your efforts towards making a common driver but IMO it would be 
+better to create a separate driver for the OV9655 sensor.  The original driver 
+is 1576 lines of code, your patch set adds half of that (816).  There are
+significant differences in the feature set of both sensors, there are 
+differences in the register layout.  I would go for a separate driver, we  
+would then have code easier to follow and wouldn't need to worry about possible
+regressions.  I'm afraid I have lost the camera module and won't be able 
+to test the patch set against regressions.
+
+IMHO from maintenance POV it's better to make a separate driver. In the end 
+of the day we wouldn't be adding much more code than it is being done now.
+
+>   .../devicetree/bindings/media/i2c/ov965x.txt       |  45 ++
+>   drivers/media/i2c/Kconfig                          |   6 +-
+>   drivers/media/i2c/ov9650.c                         | 816 +++++++++++++++++----
+>   3 files changed, 736 insertions(+), 131 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/media/i2c/ov965x.txt
+
+--
+Thanks,
+Sylwester
