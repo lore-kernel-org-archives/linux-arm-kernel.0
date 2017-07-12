@@ -1,74 +1,104 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 12 Jul 2017 15:59:27 +0200
-Subject: [PATCH 3/3] ARM: dts: at91: sama5d2: use sama5d2 compatible
- string for SMC
-In-Reply-To: <20170711092556.mukp4umf4r4etqvt@dell>
-References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
- <20170711074015.30440-4-ludovic.desroches@microchip.com>
- <029b80a8-2d3f-11b4-d4df-55f5fc48c8e7@microchip.com>
- <20170711075829.5rzdrjgao6efiuj2@rfolt0960.corp.atmel.com>
- <20170711080853.uxdmxocq5nhrp7vq@rfolt0960.corp.atmel.com>
- <20170711092556.mukp4umf4r4etqvt@dell>
-Message-ID: <20170712135927.v2mlzknsn4w4o2r2@piout.net>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 12 Jul 2017 13:59:57 +0000
+Subject: [PATCH V4 7/7] pinctrl: pinctrl-imx7ulp: add gpio_set_direction
+ support
+In-Reply-To: <1498046395-30001-8-git-send-email-aisheng.dong@nxp.com>
+References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
+ <1498046395-30001-8-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <AM3PR04MB3067C5E7E96CBFFF84B68B180AF0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2017 at 10:25:56 +0100, Lee Jones wrote:
-> On Tue, 11 Jul 2017, Ludovic Desroches wrote:
-> 
-> > On Tue, Jul 11, 2017 at 09:58:29AM +0200, Ludovic Desroches wrote:
-> > > On Tue, Jul 11, 2017 at 09:52:58AM +0200, Nicolas Ferre wrote:
-> > > > On 11/07/2017 at 09:40, Ludovic Desroches wrote:
-> > > > > A new compatible string has been introduced for sama5d2 SMC to allow to
-> > > > > manage the registers mapping change.
-> > > > > 
-> > > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> > > > > ---
-> > > > >  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
-> > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > > 
-> > > > > diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> > > > > index 4fcd5bb219e3..60e69aeacbdb 100644
-> > > > > --- a/arch/arm/boot/dts/sama5d2.dtsi
-> > > > > +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> > > > > @@ -1048,7 +1048,7 @@
-> > > > >  			};
-> > > > >  
-> > > > >  			hsmc: hsmc at f8014000 {
-> > > > > -				compatible = "atmel,sama5d3-smc", "syscon", "simple-mfd";
-> > > > > +				compatible = "atmel,sama5d2-smc", "syscon", "simple-mfd";
-> > > > 
-> > > > You'd better use something like:
-> > > >  compatible = "atmel,sama5d2-smc", "atmel,sama5d3-smc", "syscon", "simple-mfd";
-> > > 
-> > > But it's not true, during data interface setup, we will write values in
-> > > the wrong place if we fallback on "atmel,sama5d3-smc".
-> > > 
-> > > Regards
-> > > 
-> > > Ludovic
-> > > 
-> > > > 
-> > > > So that this patch is independent from the rest of the series and
-> > > > we can avoid to having to synchronize with mfd or mtd/nand for this part.
-> > 
-> > If Lee and Boris agree, maybe the series can go through AT91.
-> 
-> That's fine, but if the series goes though another tree, I will
-> require a pull-request.
-> 
-> I am also happy to carry though the MFD tree (and will of course send
-> out a PR to the other affected Maintainers).
-> 
+Hi Shawn,
 
-I think the easiest is that you take the first two patches through mfd
-and I'll take the third one through at91.
+> -----Original Message-----
+> From: Dong Aisheng [mailto:aisheng.dong at nxp.com]
+> Sent: Wednesday, June 21, 2017 8:00 PM
+> To: linux-gpio at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; linus.walleij at linaro.org;
+> shawnguo at kernel.org; stefan at agner.ch; Jacky Bai; Andy Duan;
+> kernel at pengutronix.de; A.s. Dong; Alexandre Courbot
+> Subject: [PATCH V4 7/7] pinctrl: pinctrl-imx7ulp: add gpio_set_direction
+> support
+> 
+> Add gpio_set_direction support. This makes the driver support GPIO
+> input/output dynamically change from userspace.
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Fugang Duan <fugang.duan@nxp.com>
+> Cc: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> ---
+> ChangeLog:
+>  * New patch. Derived from the original:
+>    [PATCH 1/2] pinctrl: pinctrl-imx: add IBE and OBE SoC property
 
-Our plan is to get everything fixed for the final 4.13 (I'll send the DT
-as a fix, on top of 4.13-rc1). Is that OK for you ?
+And this one.
 
+Please help review.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards
+Dong Aisheng
+
+> ---
+>  drivers/pinctrl/freescale/pinctrl-imx7ulp.c | 26
+> ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+> b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+> index 96127dc..b7bebb2 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+> @@ -259,6 +259,8 @@ static const struct pinctrl_pin_desc
+> imx7ulp_pinctrl_pads[] = {
+>  	IMX_PINCTRL_PIN(IMX7ULP_PAD_PTF19),
+>  };
+> 
+> +#define BM_OBE_ENABLED		BIT(17)
+> +#define BM_IBE_ENABLED		BIT(16)
+>  #define BM_LK_ENABLED		BIT(15)
+>  #define BM_MUX_MODE		0xf00
+>  #define BP_MUX_MODE		8
+> @@ -300,10 +302,34 @@ static void imx7ulp_cfg_params_fixup(unsigned long
+> *configs,
+>  	}
+>  }
+> 
+> +static int imx7ulp_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+> +					  struct pinctrl_gpio_range *range,
+> +					  unsigned offset, bool input)
+> +{
+> +	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
+> +	struct imx_pinctrl_soc_info *info = ipctl->info;
+> +	const struct imx_pin_reg *pin_reg;
+> +	u32 reg;
+> +
+> +	pin_reg = &info->pin_regs[offset];
+> +	if (pin_reg->mux_reg == -1)
+> +		return -EINVAL;
+> +
+> +	reg = readl(ipctl->base + pin_reg->mux_reg);
+> +	if (input)
+> +		reg = (reg & ~BM_OBE_ENABLED) | BM_IBE_ENABLED;
+> +	else
+> +		reg = (reg & ~BM_IBE_ENABLED) | BM_OBE_ENABLED;
+> +	writel(reg, ipctl->base + pin_reg->mux_reg);
+> +
+> +	return 0;
+> +}
+> +
+>  static struct imx_pinctrl_soc_info imx7ulp_pinctrl_info = {
+>  	.pins = imx7ulp_pinctrl_pads,
+>  	.npins = ARRAY_SIZE(imx7ulp_pinctrl_pads),
+>  	.flags = ZERO_OFFSET_VALID | SHARE_MUX_CONF_REG,
+> +	.gpio_set_direction = imx7ulp_pmx_gpio_set_direction,
+>  	.mux_mask = BM_MUX_MODE,
+>  	.mux_shift = BP_MUX_MODE,
+>  	.generic_pinconf = true,
+> --
+> 2.7.4
