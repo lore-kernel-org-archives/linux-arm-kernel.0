@@ -1,82 +1,61 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 12 Jul 2017 08:11:49 +0900
-Subject: [PATCH 1/2] pinctrl: stm32: select IRQ_DOMAIN_HIERARCHY instead of
- depends on
-In-Reply-To: <1499814710-16686-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1499814710-16686-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1499814710-16686-2-git-send-email-yamada.masahiro@socionext.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Wed, 12 Jul 2017 08:21:00 +0800
+Subject: [PATCH 5/5] dt-bindings: display: fill Documents for series of vop
+In-Reply-To: <7391489.lxuf2bMt0N@diego>
+References: <1499776908-16811-1-git-send-email-mark.yao@rock-chips.com>
+ <1499776958-17062-1-git-send-email-mark.yao@rock-chips.com>
+ <7391489.lxuf2bMt0N@diego>
+Message-ID: <59656B6C.5020308@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers that need IRQ_DOMAIN_HIERARCHY should "select" it, but
-drivers/pinctrl/stm32/Kconfig is the only exception that uses
-"depends on" syntax.  This prevents GPIO drivers from select'ing
-IRQ_DOMAIN_HIERARCHY.
+On 2017?07?11? 20:45, Heiko St?bner wrote:
+> Hi Mark,
+>
+> Am Dienstag, 11. Juli 2017, 20:42:38 CEST schrieb Mark Yao:
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>> ---
+>>   Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 4
+>> ++++ 1 file changed, 4 insertions(+)
+>>
+>> diff --git
+>> a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
+>> b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt index
+>> 9eb3f0a..11fa3b0 100644
+>> --- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
+>> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
+>> @@ -8,8 +8,12 @@ Required properties:
+>>   - compatible: value should be one of the following
+>>   		"rockchip,rk3036-vop";
+>>   		"rockchip,rk3288-vop";
+>> +		"rockchip,rk3368-vop";
+>> +		"rockchip,rk3366-vop";
+>>   		"rockchip,rk3399-vop-big";
+>>   		"rockchip,rk3399-vop-lit";
+>> +		"rockchip,rk322x-vop";
+> please don't use wildcards in devicetree compatibles. We've somehow
+> standardized on using rk3228 for both the rk3228 and rk3229 (which are
+> nearly the same soc with some speed adjustments)
+>
+> So,
+> +		"rockchip,rk3228-vop";
+> please
+>
+>
+> Thanks
+> Heiko
 
-For example, if I add "select IRQ_DOMAIN_HIERARCHY" to GPIO_XGENE_SB,
-I get the following recursive dependency error.
+Got it, I will fix it at next version
 
-drivers/gpio/Kconfig:13:error: recursive dependency detected!
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpio/Kconfig:13:	symbol GPIOLIB is selected by PINCTRL_STM32
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/pinctrl/stm32/Kconfig:3:	symbol PINCTRL_STM32 is selected by PINCTRL_STM32F429
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/pinctrl/stm32/Kconfig:11:	symbol PINCTRL_STM32F429 depends on IRQ_DOMAIN_HIERARCHY
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-kernel/irq/Kconfig:67:	symbol IRQ_DOMAIN_HIERARCHY is selected by GPIO_XGENE_SB
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpio/Kconfig:502:	symbol GPIO_XGENE_SB depends on GPIOLIB
+Thanks
+Mark
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/pinctrl/stm32/Kconfig | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/pinctrl/stm32/Kconfig b/drivers/pinctrl/stm32/Kconfig
-index 3b8026fca057..7e1fe39a56a5 100644
---- a/drivers/pinctrl/stm32/Kconfig
-+++ b/drivers/pinctrl/stm32/Kconfig
-@@ -6,29 +6,30 @@ config PINCTRL_STM32
- 	select PINMUX
- 	select GENERIC_PINCONF
- 	select GPIOLIB
-+	select IRQ_DOMAIN_HIERARCHY
- 	select MFD_SYSCON
- 
- config PINCTRL_STM32F429
- 	bool "STMicroelectronics STM32F429 pin control" if COMPILE_TEST && !MACH_STM32F429
--	depends on OF && IRQ_DOMAIN_HIERARCHY
-+	depends on OF
- 	default MACH_STM32F429
- 	select PINCTRL_STM32
- 
- config PINCTRL_STM32F469
- 	bool "STMicroelectronics STM32F469 pin control" if COMPILE_TEST && !MACH_STM32F469
--	depends on OF && IRQ_DOMAIN_HIERARCHY
-+	depends on OF
- 	default MACH_STM32F469
- 	select PINCTRL_STM32
- 
- config PINCTRL_STM32F746
- 	bool "STMicroelectronics STM32F746 pin control" if COMPILE_TEST && !MACH_STM32F746
--	depends on OF && IRQ_DOMAIN_HIERARCHY
-+	depends on OF
- 	default MACH_STM32F746
- 	select PINCTRL_STM32
- 
- config PINCTRL_STM32H743
- 	bool "STMicroelectronics STM32H743 pin control" if COMPILE_TEST && !MACH_STM32H743
--	depends on OF && IRQ_DOMAIN_HIERARCHY
-+	depends on OF
- 	default MACH_STM32H743
- 	select PINCTRL_STM32
- endif
--- 
-2.7.4
+>
+>> +		"rockchip,rk3328-vop";
+>>
+>>   - interrupts: should contain a list of all VOP IP block interrupts in the
+>>   		 order: VSYNC, LCD_SYSTEM. The interrupt specifier
+>
+>
+>
+>
