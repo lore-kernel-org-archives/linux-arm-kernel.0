@@ -1,118 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Jul 2017 23:33:02 +0100
-Subject: [RFC PATCH 5/6] arm64: keep track of current stack
-In-Reply-To: <1499898783-25732-1-git-send-email-mark.rutland@arm.com>
-References: <1499898783-25732-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1499898783-25732-6-git-send-email-mark.rutland@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 13 Jul 2017 06:37:31 +0800
+Subject: [xlnx:master 737/744]
+ drivers/gpu//drm/xilinx/xilinx_drm_dp_sub.c:516:148: warning: comparison of
+ distinct pointer types lacks a cast
+Message-ID: <201707130629.i1adGEgm%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To reliably check stack bounds, we'll need to know whether we're on a
-task stack, or an IRQ stack.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   50dbfdba9101210db33a5a311b85a7409ab62278
+commit: 40bacdf28c31f6f9d6e628940cfaa98db02c5e16 [737/744] drm: xilinx: Kconfig: Add config option for DPSUB debugfs
+config: i386-allyesconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 40bacdf28c31f6f9d6e628940cfaa98db02c5e16
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Stash the base of the current stack in thread_info so that we have this
-information.
+All warnings (new ones prefixed by >>):
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+   drivers/gpu//drm/xilinx/xilinx_drm_dp_sub.c: In function 'xilinx_dp_sub_debugfs_output_display_format_read':
+>> drivers/gpu//drm/xilinx/xilinx_drm_dp_sub.c:516:148: warning: comparison of distinct pointer types lacks a cast
+     out_str_len = min(XILINX_DP_SUB_DEBUGFS_READ_MAX_SIZE, out_str_len);
+                                                                                                                                                       ^ 
+   drivers/gpu//drm/xilinx/xilinx_drm_dp_sub.c: In function 'xilinx_dp_sub_debugfs_background_color_read':
+   drivers/gpu//drm/xilinx/xilinx_drm_dp_sub.c:533:148: warning: comparison of distinct pointer types lacks a cast
+     out_str_len = min(XILINX_DP_SUB_DEBUGFS_READ_MAX_SIZE, out_str_len);
+                                                                                                                                                       ^ 
+   drivers/gpu//drm/xilinx/xilinx_drm_dp_sub.c: In function 'xilinx_dp_sub_debugfs_read':
+   drivers/gpu//drm/xilinx/xilinx_drm_dp_sub.c:608:149: warning: comparison of distinct pointer types lacks a cast
+      out_str_len = min(XILINX_DP_SUB_DEBUGFS_READ_MAX_SIZE,
+                                                                                                                                                        ^ 
+
+vim +516 drivers/gpu//drm/xilinx/xilinx_drm_dp_sub.c
+
+94d31bdd Tejas Upadhyay 2017-06-06  506  
+94d31bdd Tejas Upadhyay 2017-06-06  507  static ssize_t
+94d31bdd Tejas Upadhyay 2017-06-06  508  xilinx_dp_sub_debugfs_output_display_format_read(char **kern_buff)
+94d31bdd Tejas Upadhyay 2017-06-06  509  {
+94d31bdd Tejas Upadhyay 2017-06-06  510  	size_t out_str_len;
+94d31bdd Tejas Upadhyay 2017-06-06  511  
+94d31bdd Tejas Upadhyay 2017-06-06  512  	dp_sub_debugfs.testcase = DP_SUB_TC_NONE;
+94d31bdd Tejas Upadhyay 2017-06-06  513  	xilinx_dp_sub_debugfs_output_format(dp_sub_debugfs.output_fmt);
+94d31bdd Tejas Upadhyay 2017-06-06  514  
+94d31bdd Tejas Upadhyay 2017-06-06  515  	out_str_len = strlen("Success");
+94d31bdd Tejas Upadhyay 2017-06-06 @516  	out_str_len = min(XILINX_DP_SUB_DEBUGFS_READ_MAX_SIZE, out_str_len);
+94d31bdd Tejas Upadhyay 2017-06-06  517  	snprintf(*kern_buff, out_str_len, "%s", "Success");
+94d31bdd Tejas Upadhyay 2017-06-06  518  
+94d31bdd Tejas Upadhyay 2017-06-06  519  	return 0;
+94d31bdd Tejas Upadhyay 2017-06-06  520  }
+94d31bdd Tejas Upadhyay 2017-06-06  521  
+
+:::::: The code at line 516 was first introduced by commit
+:::::: 94d31bdd30d4bfba972eb169e3bf5f1a607cc273 drm: xilinx: dp_sub: Add debugfs testcases
+
+:::::: TO: Tejas Upadhyay <tejas.upadhyay@xilinx.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
 ---
- arch/arm64/include/asm/thread_info.h | 3 +++
- arch/arm64/kernel/asm-offsets.c      | 3 +++
- arch/arm64/kernel/entry.S            | 7 +++++++
- arch/arm64/kernel/head.S             | 6 ++++++
- arch/arm64/kernel/process.c          | 4 ++++
- 5 files changed, 23 insertions(+)
-
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 3684f86..ae4f44b 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -62,6 +62,9 @@ struct thread_info {
- #endif
- 	unsigned long		pcp_offset;
- 	int			preempt_count;	/* 0 => preemptable, <0 => bug */
-+#ifdef CONFIG_VMAP_STACK
-+	unsigned long		current_stack;
-+#endif
- };
- 
- #define INIT_THREAD_INFO(tsk)						\
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 17001be..10c8ffa 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -40,6 +40,9 @@ int main(void)
-   DEFINE(TSK_TI_PREEMPT,	offsetof(struct task_struct, thread_info.preempt_count));
-   DEFINE(TSK_TI_PCP,		offsetof(struct task_struct, thread_info.pcp_offset));
-   DEFINE(TSK_TI_ADDR_LIMIT,	offsetof(struct task_struct, thread_info.addr_limit));
-+#ifdef CONFIG_VMAP_STACK
-+  DEFINE(TSK_TI_CUR_STK,	offsetof(struct task_struct, thread_info.current_stack));
-+#endif
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
-   DEFINE(TSK_TI_TTBR0,		offsetof(struct task_struct, thread_info.ttbr0));
- #endif
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 773b3fea..7c8b164 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -258,6 +258,9 @@ alternative_else_nop_endif
- 
- 	/* switch to the irq stack */
- 	mov	sp, x26
-+#ifdef CONFIG_VMAP_STACK
-+	str	x25, [tsk, #TSK_TI_CUR_STK]
-+#endif
- 
- 	/*
- 	 * Add a dummy stack frame, this non-standard format is fixed up
-@@ -275,6 +278,10 @@ alternative_else_nop_endif
- 	 */
- 	.macro	irq_stack_exit
- 	mov	sp, x19
-+#ifdef CONFIG_VMAP_STACK
-+	and	x19, x19, #~(THREAD_SIZE - 1)
-+	str	x19, [tsk, #TSK_TI_CUR_STK]
-+#endif
- 	.endm
- 
- /*
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index db77cac..3363846 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -325,6 +325,9 @@ __primary_switched:
- 	add	sp, x4, #THREAD_SIZE
- 	adr_l	x5, init_task
- 	msr	tpidr_el1, x5			// Save thread_info
-+#ifdef CONFIG_VMAP_STACK
-+	str	x4, [x5, #TSK_TI_CUR_STK]
-+#endif
- 
- 	adr_l	x8, vectors			// load VBAR_EL1 with virtual
- 	msr	vbar_el1, x8			// vector table address
-@@ -616,6 +619,9 @@ __secondary_switched:
- 	mov	x3, #THREAD_START_SP
- 	add	sp, x1, x3
- 	ldr	x2, [x0, #CPU_BOOT_TASK]
-+#ifdef CONFIG_VMAP_STACK
-+	str	x1, [x2, #TSK_TI_CUR_STK]
-+#endif
- 	msr	tpidr_el1, x2
- 	mov	x29, #0
- 	b	secondary_start_kernel
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 4212da3..5dc5797 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -294,6 +294,10 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 
- 	ptrace_hw_copy_thread(p);
- 
-+#ifdef CONFIG_VMAP_STACK
-+	p->thread_info.current_stack = (unsigned long)p->stack;
-+#endif
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56405 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170713/84c6a010/attachment-0001.gz>
