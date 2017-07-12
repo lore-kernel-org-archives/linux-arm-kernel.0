@@ -1,213 +1,162 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 11 Jul 2017 18:02:54 -0700
-Subject: [PATCH 2/3] usb: chipidea: Hook into mux framework to toggle usb
- switch
+Date: Tue, 11 Jul 2017 18:02:55 -0700
+Subject: [PATCH 3/3] arm64: dts: qcom: Collapse usb support into one node
 In-Reply-To: <20170712010255.26855-1-stephen.boyd@linaro.org>
 References: <20170712010255.26855-1-stephen.boyd@linaro.org>
-Message-ID: <20170712010255.26855-3-stephen.boyd@linaro.org>
+Message-ID: <20170712010255.26855-4-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the db410c 96boards platform we have a TC7USB40MU on the board
-to mux the D+/D- lines coming from the controller between a micro
-usb "device" port and a USB hub for "host" roles[1]. During a
-role switch, we need to toggle this mux to forward the D+/D-
-lines to either the port or the hub. Add the necessary code to do
-the role switch in chipidea core via the generic mux framework.
-Board configurations like on db410c are expected to change roles
-via the sysfs API described in
-Documentation/ABI/testing/sysfs-platform-chipidea-usb2.
+We currently have three device nodes for the same USB hardware
+block, as evident by the reuse of the same reg address multiple
+times. Now that the chipidea driver fully supports OTG with the
+MSM wrapper we can collapse all these nodes into one USB device
+node, reflecting the true nature of the hardware.
 
-[1] https://github.com/96boards/documentation/raw/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
-
-Cc: Peter Rosin <peda@axentia.se>
-Cc: Peter Chen <peter.chen@nxp.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt |  8 ++++++++
- drivers/usb/chipidea/core.c                            | 17 +++++++++++++++++
- drivers/usb/chipidea/host.c                            | 10 ++++++++++
- drivers/usb/chipidea/udc.c                             | 11 +++++++++++
- include/linux/usb/chipidea.h                           | 14 ++++++++++++++
- 5 files changed, 60 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-index 0e03344e2e8b..96ce81d975d5 100644
---- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-+++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-@@ -76,6 +76,11 @@ Optional properties:
-   needs to make sure it does not send more than 90%
-   maximum_periodic_data_per_frame. The use case is multiple transactions, but
-   less frame rate.
-+- mux-controls: The mux control for toggling host/device output of this
-+  controller.
-+- mux-control-names: Shall be "usb_switch" if mux-controls is specified.
-+- usb-switch-states: Two u32's defining the state to set on the mux for the
-+  host mode and device modes respectively.
+Should go through arm-soc via Andy.
+
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 39 ++++++++++---------
+ arch/arm64/boot/dts/qcom/msm8916.dtsi     | 62 +++++++++++++++----------------
+ 2 files changed, 51 insertions(+), 50 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index f326f4fb4d72..dc950a054d0a 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -213,24 +213,21 @@
+ 		};
  
- i.mx specific properties
- - fsl,usbmisc: phandler of non-core register device, with one
-@@ -102,4 +107,7 @@ Example:
- 		rx-burst-size-dword = <0x10>;
- 		extcon = <0>, <&usb_id>;
- 		phy-clkgate-delay-us = <400>;
-+		mux-controls = <&usb_switch>;
-+		mux-control-names = "usb_switch";
-+		usb-switch-states = <0>, <1>;
+ 		usb at 78d9000 {
+-			extcon = <&usb_id>, <&usb_id>;
++			extcon = <&usb_id>;
+ 			status = "okay";
+-		};
+-
+-		ehci at 78d9000 {
+-			status = "okay";
+-		};
+-
+-		phy at 78d9000 {
+-			v1p8-supply = <&pm8916_l7>;
+-			v3p3-supply = <&pm8916_l13>;
+-			vddcx-supply = <&pm8916_s1>;
+-			extcon = <&usb_id>, <&usb_id>;
+-			dr_mode = "otg";
+-			status = "okay";
+-			switch-gpio = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&usb_sw_sel_pm>;
++			adp-disable;
++			hnp-disable;
++			srp-disable;
++			mux-controls = <&usb_switch>;
++			mux-control-names = "usb_switch";
++			usb-switch-states = <0>, <1>;
++
++			ulpi {
++				phy {
++					v1p8-supply = <&pm8916_l7>;
++					v3p3-supply = <&pm8916_l13>;
++				};
++			};
+ 		};
+ 
+ 		lpass at 07708000 {
+@@ -348,6 +345,14 @@
+ 		pinctrl-0 = <&usb_id_default>;
  	};
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index b17ed3a9a304..6531d771f296 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -64,6 +64,7 @@
- #include <linux/of.h>
- #include <linux/regulator/consumer.h>
- #include <linux/usb/ehci_def.h>
-+#include <linux/mux/consumer.h>
  
- #include "ci.h"
- #include "udc.h"
-@@ -606,6 +607,7 @@ static int ci_get_platdata(struct device *dev,
- {
- 	struct extcon_dev *ext_vbus, *ext_id;
- 	struct ci_hdrc_cable *cable;
-+	struct ci_hdrc_switch *usb_switch;
- 	int ret;
- 
- 	if (!platdata->phy_mode)
-@@ -690,6 +692,21 @@ static int ci_get_platdata(struct device *dev,
- 	if (of_find_property(dev->of_node, "non-zero-ttctrl-ttha", NULL))
- 		platdata->flags |= CI_HDRC_SET_NON_ZERO_TTHA;
- 
-+	if (IS_ENABLED(CONFIG_MULTIPLEXER)) {
-+		usb_switch = &platdata->usb_switch;
-+		usb_switch->mux = devm_mux_control_get(dev, "usb_switch");
-+		if (!IS_ERR(usb_switch->mux)) {
-+			if (of_property_read_u32_index(dev->of_node,
-+						       "usb-switch-states",
-+						       0, &usb_switch->device))
-+				return -EINVAL;
-+			if (of_property_read_u32_index(dev->of_node,
-+						       "usb-switch-states",
-+						       1, &usb_switch->host))
-+				return -EINVAL;
-+		}
-+	}
++	usb_switch: usb-switch {
++		compatible = "toshiba,tc7usb40mu";
++		mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
++		#mux-control-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb_sw_sel_pm>;
++	};
 +
- 	ext_id = ERR_PTR(-ENODEV);
- 	ext_vbus = ERR_PTR(-ENODEV);
- 	if (of_property_read_bool(dev->of_node, "extcon")) {
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 18cb8e46262d..9fd23ecc2da3 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -25,6 +25,7 @@
- #include <linux/usb/hcd.h>
- #include <linux/usb/chipidea.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/mux/consumer.h>
+ 	hdmi-out {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 17691abea608..039991f80831 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -546,44 +546,40 @@
+ 			status = "disabled";
+ 		};
  
- #include "../host/ehci.h"
- 
-@@ -123,6 +124,13 @@ static int host_start(struct ci_hdrc *ci)
- 	if (usb_disabled())
- 		return -ENODEV;
- 
-+	if (!IS_ERR(ci->platdata->usb_switch.mux)) {
-+		ret = mux_control_select(ci->platdata->usb_switch.mux,
-+					 ci->platdata->usb_switch.host);
-+		if (ret)
-+			return ret;
-+	}
+-		usb_dev: usb at 78d9000 {
++		otg: usb at 78d9000 {
+ 			compatible = "qcom,ci-hdrc";
+-			reg = <0x78d9000 0x400>;
+-			dr_mode = "peripheral";
+-			interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
+-			usb-phy = <&usb_otg>;
+-			status = "disabled";
+-		};
+-
+-		usb_host: ehci at 78d9000 {
+-			compatible = "qcom,ehci-host";
+-			reg = <0x78d9000 0x400>;
+-			interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
+-			usb-phy = <&usb_otg>;
+-			status = "disabled";
+-		};
+-
+-		usb_otg: phy at 78d9000 {
+-			compatible = "qcom,usb-otg-snps";
+-			reg = <0x78d9000 0x400>;
++			reg = <0x78d9000 0x200>,
++			      <0x78d9200 0x200>;
+ 			interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>;
+-
+-			qcom,vdd-levels = <500000 1000000 1320000>;
+-			qcom,phy-init-sequence = <0x44 0x6B 0x24 0x13>;
+-			dr_mode = "peripheral";
+-			qcom,otg-control = <2>; // PMIC
+-			qcom,manual-pullup;
+-
+ 			clocks = <&gcc GCC_USB_HS_AHB_CLK>,
+-				 <&gcc GCC_USB_HS_SYSTEM_CLK>,
+-				 <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
+-			clock-names = "iface", "core", "sleep";
+-
+-			resets = <&gcc GCC_USB2A_PHY_BCR>,
+-				 <&gcc GCC_USB_HS_BCR>;
+-			reset-names = "phy", "link";
++				 <&gcc GCC_USB_HS_SYSTEM_CLK>;
++			clock-names = "iface", "core";
++			assigned-clocks = <&gcc GCC_USB_HS_SYSTEM_CLK>;
++			assigned-clock-rates = <80000000>;
++			resets = <&gcc GCC_USB_HS_BCR>;
++			reset-names = "core";
++			phy_type = "ulpi";
++			dr_mode = "otg";
++			ahb-burst-config = <0>;
++			phy-names = "usb-phy";
++			phys = <&usb_hs_phy>;
+ 			status = "disabled";
++			#reset-cells = <1>;
 +
- 	hcd = __usb_create_hcd(&ci_ehci_hc_driver, ci->dev->parent,
- 			       ci->dev, dev_name(ci->dev), NULL);
- 	if (!hcd)
-@@ -205,6 +213,8 @@ static void host_stop(struct ci_hdrc *ci)
- 		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
- 			(ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON))
- 				regulator_disable(ci->platdata->reg_vbus);
-+		if (!IS_ERR(ci->platdata->usb_switch.mux))
-+			mux_control_deselect(ci->platdata->usb_switch.mux);
- 	}
- 	ci->hcd = NULL;
- 	ci->otg.host = NULL;
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index d68b125796f9..ab3355905740 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -22,6 +22,7 @@
- #include <linux/usb/gadget.h>
- #include <linux/usb/otg-fsm.h>
- #include <linux/usb/chipidea.h>
-+#include <linux/mux/consumer.h>
++			ulpi {
++				usb_hs_phy: phy {
++					compatible = "qcom,usb-hs-phy-msm8916",
++						     "qcom,usb-hs-phy";
++					#phy-cells = <0>;
++					clocks = <&xo_board>, <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
++					clock-names = "ref", "sleep";
++					resets = <&gcc GCC_USB2A_PHY_BCR>, <&otg 0>;
++					reset-names = "phy", "por";
++					qcom,init-seq = /bits/ 8 <0x0 0x44
++						0x1 0x6b 0x2 0x24 0x3 0x13>;
++				};
++			};
+ 		};
  
- #include "ci.h"
- #include "udc.h"
-@@ -1899,6 +1900,13 @@ static int udc_start(struct ci_hdrc *ci)
- 	ci->gadget.name         = ci->platdata->name;
- 	ci->gadget.otg_caps	= otg_caps;
- 
-+	if (!IS_ERR(ci->platdata->usb_switch.mux)) {
-+		retval = mux_control_select(ci->platdata->usb_switch.mux,
-+					    ci->platdata->usb_switch.device);
-+		if (retval)
-+			return retval;
-+	}
-+
- 	if (ci->is_otg && (otg_caps->hnp_support || otg_caps->srp_support ||
- 						otg_caps->adp_support))
- 		ci->gadget.is_otg = 1;
-@@ -1982,6 +1990,9 @@ static void udc_id_switch_for_host(struct ci_hdrc *ci)
- 		hw_write_otgsc(ci, OTGSC_BSVIE | OTGSC_BSVIS, OTGSC_BSVIS);
- 
- 	ci->vbus_active = 0;
-+
-+	if (!IS_ERR(ci->platdata->usb_switch.mux))
-+		mux_control_deselect(ci->platdata->usb_switch.mux);
- }
- 
- /**
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index c5fdfcf99828..559bd470b8c0 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -9,6 +9,7 @@
- #include <linux/usb/otg.h>
- 
- struct ci_hdrc;
-+struct mux_control;
- 
- /**
-  * struct ci_hdrc_cable - structure for external connector cable state tracking
-@@ -29,6 +30,18 @@ struct ci_hdrc_cable {
- 	struct notifier_block		nb;
- };
- 
-+/**
-+ * struct ci_hdrc_switch - structure for usb mux control
-+ * @mux: mux to set @host state or @device state on during role switch
-+ * @host: Value to set for mux to connect D+/D- to host D+/D- lines
-+ * @device: Value to set for mux to connect D+/D- to device D+/D- lines
-+ */
-+struct ci_hdrc_switch {
-+	struct mux_control		*mux;
-+	int				host;
-+	int				device;
-+};
-+
- struct ci_hdrc_platform_data {
- 	const char	*name;
- 	/* offset of the capability registers */
-@@ -74,6 +87,7 @@ struct ci_hdrc_platform_data {
- 	/* VBUS and ID signal state tracking, using extcon framework */
- 	struct ci_hdrc_cable		vbus_extcon;
- 	struct ci_hdrc_cable		id_extcon;
-+	struct ci_hdrc_switch		usb_switch;
- 	u32			phy_clkgate_delay_us;
- };
- 
+ 		intc: interrupt-controller at b000000 {
 -- 
 2.10.0.297.gf6727b0
