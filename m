@@ -1,106 +1,156 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 12 Jul 2017 14:33:58 -0400
-Subject: [PATCH v2 4/5] drm/rockchip: vop: add a series of vop support
-In-Reply-To: <1499825034-7604-1-git-send-email-mark.yao@rock-chips.com>
-References: <1499824991-7391-1-git-send-email-mark.yao@rock-chips.com>
- <1499825034-7604-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20170712183358.7n4vspuygiuu6era@art_vandelay>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 12 Jul 2017 11:43:39 -0700
+Subject: [PATCH v5 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <1692483.PxpH1MfcPQ@diego>
+References: <cover.1493804968.git.guillaume.tucker@collabora.com>
+ <bebe578ba130de5fa320ca7c6427b2fae83d61d7.1493804968.git.guillaume.tucker@collabora.com>
+ <20170712172636.GA90759@google.com> <1692483.PxpH1MfcPQ@diego>
+Message-ID: <20170712184338.GA140539@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 10:03:54AM +0800, Mark Yao wrote:
-> Vop Full framework now has following vops:
-> IP version    chipname
->   3.1           rk3288
->   3.2           rk3368
->   3.4           rk3366
->   3.5           rk3399 big
->   3.6           rk3399 lit
+Hi Heiko,
 
-Below you say little vop is major == 2, but you have major == 3 here.
-
->   3.7           rk3228
->   3.8           rk3328
+On Wed, Jul 12, 2017 at 08:30:55PM +0200, Heiko Stuebner wrote:
+> Am Mittwoch, 12. Juli 2017, 10:26:39 CEST schrieb Brian Norris:
+> > On Wed, May 03, 2017 at 10:56:25AM +0100, Guillaume Tucker wrote:
+> > > The ARM Mali Midgard GPU family is present in a number of SoCs
+> > > from many different vendors such as Samsung Exynos and Rockchip.
+> > > 
+> > > Import the device tree bindings documentation from the r16p0
+> > > 
+> > > release of the Mali Midgard GPU kernel driver:
+> > >   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/ma
+> > >   li-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz> 
+> > > Remove the copyright and GPL licence header as deemed not necessary.
+> > > 
+> > > Redesign the "compatible" property strings to list all the Mali
+> > > Midgard GPU types and add vendor specific ones.
+> > > 
+> > > Drop the "clock-names" property as the Mali Midgard GPU uses only one
+> > > clock (the driver now needs to call clk_get with NULL).
+> > > 
+> > > Convert the "interrupt-names" property values to lower-case: "job",
+> > > "mmu" and "gpu".
+> > > 
+> > > Replace the deprecated "operating-points" optional property with
+> > > "operating-points-v2".
+> > > 
+> > > Omit the following optional properties in this initial version as they
+> > > 
+> > > are only used in very specific cases:
+> > >   * snoop_enable_smc
+> > >   * snoop_disable_smc
+> > >   * jm_config
+> > >   * power_model
+> > >   * system-coherency
+> > >   * ipa-model
+> > > 
+> > > Update the example accordingly to reflect all these changes, based on
+> > > rk3288 mali-t760.
+> > > 
+> > > CC: John Reitan <john.reitan@arm.com>
+> > > Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > > Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+> > > ---
+> > > 
+> > >  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 86
+> > >  ++++++++++++++++++++++ 1 file changed, 86 insertions(+)
+> > >  create mode 100644
+> > >  Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt> 
+> > > diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> > > b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt new file
+> > > mode 100644
+> > > index 000000000000..d3b6e1a4713a
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> > 
+> > ^^ This file name implies we're talking about a base "arm,mali-midgard"
+> > compatible property.
 > 
-> The above IP version is from H/W define, some of vop support get
-> the IP version from VERSION_INFO register, some are not.
-> hardcode the IP version for each vop to identify them.
+> it follows the precedent of arm,mali-utgard.txt and while the file-name
+> is not part of the compatible list, it feels way better collecting all the 
+> variants in one file, compared to spawning multiple ones for each soc
+> vendor using a mali gpu.
 > 
-> major version: used for IP structure, Vop full framework is 3,
->                vop little framework is 2.
-> minor version: on same structure, newer design vop will bigger
->                then old one.
+> Also in other places the naming of binding descriptions does not follow
+> any compatible at all, so the filename = main-compatible does not seem
+> to be the rule.
+
+Well, when they do get a name in the form of "<vendor>,<foo>.txt", the
+"<vendor>,<foo>" is usually at least *a* valid compatible string. For
+example, "nvidia,gk20a.txt" has several other strings, but its filename
+is one of the supported ones.
+
+Anyway, that wasn't my main worry. I was mostly curious about the body
+of the text.
+
+> > > @@ -0,0 +1,86 @@
+> > > +ARM Mali Midgard GPU
+> > > +====================
+> > > +
+> > > +Required properties:
+> > > +
+> > > +- compatible :
+> > > +  * Must contain one of the following:
+> > > +    + "arm,mali-t604"
+> > > +    + "arm,mali-t624"
+> > > +    + "arm,mali-t628"
+> > > +    + "arm,mali-t720"
+> > > +    + "arm,mali-t760"
+> > > +    + "arm,mali-t820"
+> > > +    + "arm,mali-t830"
+> > > +    + "arm,mali-t860"
+> > > +    + "arm,mali-t880"
+> > > +  * which must be preceded by one of the following vendor specifics:
+> > > +    + "amlogic,meson-gxm-mali"
+> > > +    + "rockchip,rk3288-mali"
+> > 
+> > But it's not listed here.
+> > 
+> > > +
+> > > +- reg : Physical base address of the device and length of the register
+> > > area. +
+> > > +- interrupts : Contains the three IRQ lines required by Mali Midgard
+> > > devices. +
+> > > +- interrupt-names : Contains the names of IRQ resources in the order they
+> > > were +  provided in the interrupts property. Must contain: "job", "mmu",
+> > > "gpu". +
+> > > +
+> > > +Optional properties:
+> > > +
+> > > +- clocks : Phandle to clock for the Mali Midgard device.
+> > > +
+> > > +- mali-supply : Phandle to regulator for the Mali device. Refer to
+> > > +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+> > > +
+> > > +- operating-points-v2 : Refer to
+> > > Documentation/devicetree/bindings/power/opp.txt +  for details.
+> > > +
+> > > +
+> > > +Example for a Mali-T760:
+> > > +
+> > > +gpu at ffa30000 {
+> > > +	compatible = "rockchip,rk3288-mali", "arm,mali-t760",
+> > > "arm,mali-midgard";
+> > 
+> > And it *is* used here in this example.
+> > 
+> > So, should it be used/documented or not?
 > 
-> Changes in v2:
-> - rename rk322x to rk3228(Heiko St?bner)
-> - correct some vop registers define
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
->  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 202 +++++--
->  drivers/gpu/drm/rockchip/rockchip_vop_reg.h | 905 ++++++++++++++++++++++------
->  2 files changed, 863 insertions(+), 244 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> index 159cedf..b33483c 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> @@ -211,6 +211,7 @@
->  	.standby = VOP_REG(RK3288_SYS_CTRL, 0x1, 22),
->  	.gate_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 23),
->  	.mmu_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 20),
-> +	.dp_en = VOP_REG_VER(RK3399_SYS_CTRL, 0x1, 11, 3, 5, -1),
->  	.rgb_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 12),
->  	.hdmi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 13),
->  	.edp_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 14),
-> @@ -220,14 +221,19 @@
->  	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
->  	.dsp_blank = VOP_REG(RK3288_DSP_CTRL0, 0x3, 18),
->  	.out_mode = VOP_REG(RK3288_DSP_CTRL0, 0xf, 0),
-> -	.pin_pol = VOP_REG(RK3288_DSP_CTRL0, 0xf, 4),
-> +	.pin_pol = VOP_REG_VER(RK3288_DSP_CTRL0, 0xf, 4, 3, 0, 1),
-> +	.dp_pin_pol = VOP_REG_VER(RK3399_DSP_CTRL1, 0xf, 16, 3, 5, -1),
-> +	.rgb_pin_pol = VOP_REG_VER(RK3368_DSP_CTRL1, 0xf, 16, 3, 2, -1),
-> +	.hdmi_pin_pol = VOP_REG_VER(RK3368_DSP_CTRL1, 0xf, 20, 3, 2, -1),
-> +	.edp_pin_pol = VOP_REG_VER(RK3368_DSP_CTRL1, 0xf, 24, 3, 2, -1),
-> +	.mipi_pin_pol = VOP_REG_VER(RK3368_DSP_CTRL1, 0xf, 28, 3, 2, -1),
->  	.htotal_pw = VOP_REG(RK3288_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
->  	.hact_st_end = VOP_REG(RK3288_DSP_HACT_ST_END, 0x1fff1fff, 0),
->  	.vtotal_pw = VOP_REG(RK3288_DSP_VTOTAL_VS_END, 0x1fff1fff, 0),
->  	.vact_st_end = VOP_REG(RK3288_DSP_VACT_ST_END, 0x1fff1fff, 0),
->  	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
->  	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
-> -	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
-> +	.global_regdone_en = VOP_REG_VER(RK3288_SYS_CTRL, 0x1, 11, 3, 2, -1),
->  	.cfg_done = VOP_REG(RK3288_REG_CFG_DONE, 0x1, 0),
+> No I don't think it should and have patches that drop the mali-midgard from
+> the example + rk3288 dtsi to not confuse people:
+> - https://patchwork.kernel.org/patch/9832811/
+> - https://patchwork.kernel.org/patch/9832807/
 
-I'm not really convinced VOP_REG_VER is a good idea. In the case of dp_en and
-pin_pol, the register is already used for different offsets, so presumably
-you're writing into don't care offsets?
+I didn't notice those. Thanks.
 
-In the other cases, it just looks like a few new registers added for 3368 and
-3399. In this scenario, I don't think it's that bad to just have separate
-structs for each version that has distinct features. There's going to be more
-duplication, but then it's super easy to understand which platform has which
-registers.
+> Devicetree supposedly should not contain wildcards and without knowing
+> for real that all of then in fact are compatible we should not assume so
+> [and that's hard to check with all the secrecy :-) ] . Using the real name 
+> (tXXX) sounds nice enough.
 
-The whole versioning system is a little strange. For example, is each version
-guaranteed to have the registered defined for the previous version (ie: 3.6
-contains all registers defined for 3.5)?
+Fine with me.
 
-Sean
-
-
-<snip>
-
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Brian
