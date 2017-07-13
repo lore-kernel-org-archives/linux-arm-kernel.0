@@ -1,34 +1,62 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 13 Jul 2017 17:09:55 -0400
-Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
-References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
- <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
-Message-ID: <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 13 Jul 2017 15:11:46 -0600
+Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
+ HiSilicon bridge
+In-Reply-To: <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170712050811.3620-1-dja@axtens.net>
+ <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
+ <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170713151146.53e9644c@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/13/2017 10:21 AM, Ding Tianhong wrote:
-> static void pci_configure_relaxed_ordering(struct pci_dev *dev)
-> +{
-> +	/* We should not alter the relaxed ordering bit for the VF */
-> +	if (dev->is_virtfn)
-> +		return;
-> +
-> +	/* If the releaxed ordering enable bit is not set, do nothing. */
-> +	if (!pcie_relaxed_ordering_supported(dev))
-> +		return;
-> +
-> +	if (pci_dev_should_disable_relaxed_ordering(dev)) {
-> +		pcie_clear_relaxed_ordering(dev);
-> +		dev_info(&dev->dev, "Disable Relaxed Ordering\n");
-> +	}
-> +}
+On Thu, 13 Jul 2017 06:29:38 -0500
+Bjorn Helgaas <helgaas@kernel.org> wrote:
 
-I couldn't find anywhere where you actually enable the relaxed ordering
-like the subject suggests.
+> [+cc Ben, David, Daniel, Alex]
+> 
+> On Thu, Jul 13, 2017 at 10:29:25AM +0000, Gabriele Paoloni wrote:
+> > Hi Bjorn, Daniel
+> > 
+> > [...]
+> >   
+> > > 
+> > > Is this quirk useful on any arch other than arm64?  Per
+> > > drivers/pci/dwc/Kconfig, CONFIG_PCI_HISI depends on CONFIG_ARM64.
+> > > 
+> > > Would it make sense to put this quirk in arch/arm64/kernel/pci.c?  
+> > 
+> > Indeed our host controller depends on ARM64 so maybe it would make
+> > sense to move the quirk arch/arm64/kernel/pci.c; however regardless
+> > why is it strictly required for a VGA device to be legacy one in order
+> > to make it the default boot device?
+> > i.e. couldn't we have:
+> > 
+> > diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+> > index 0f5b2dd..a6b606c 100644
+> > --- a/drivers/gpu/vga/vgaarb.c
+> > +++ b/drivers/gpu/vga/vgaarb.c
+> > @@ -667,8 +667,7 @@ static bool vga_arbiter_add_pci_device(struct pci_dev *pdev)
+> >  	/* Deal with VGA default device. Use first enabled one
+> >  	 * by default if arch doesn't have it's own hook
+> >  	 */
+> > -	if (vga_default == NULL &&
+> > -	    ((vgadev->owns & VGA_RSRC_LEGACY_MASK) == VGA_RSRC_LEGACY_MASK)) {
+> > +	if (vga_default == NULL) {
+> >  		vgaarb_info(&pdev->dev, "setting as boot VGA device\n");
+> >  		vga_set_default_device(pdev);
+> >  	}  
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+"Legacy" is the breadcrumb we use to try to pick the same device for
+default VGA as the system firmware used as the boot VGA.  There can be
+multiple VGA devices in the system, the change above would simply make
+the first discovered device be the default VGA.  That would break many,
+many systems.  If legacy VGA ranges mean nothing on ARM64, then follow
+the powerpc lead and make an arch quirk that simply selects the first
+enabled VGA device as the default.  VGA routing is part of the PCI spec
+though, so the default of selecting the device with routing enabled
+makes sense.  Thanks,
+
+Alex
