@@ -1,42 +1,55 @@
-From: michael.moese@men.de (michael.moese at men.de)
-Date: Thu, 13 Jul 2017 09:07:19 +0200
-Subject: i.MX 6 and PCIe DMA issues
-In-Reply-To: <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
-References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
- <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
-Message-ID: <20170713070718.GA3871@mmlinux>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Thu, 13 Jul 2017 09:49:20 +0200
+Subject: [PATCH v3 2/9] clk: at91: add audio plls to the compatible list in DT
+ binding
+In-Reply-To: <20170713074927.10882-1-quentin.schulz@free-electrons.com>
+References: <20170713074927.10882-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170713074927.10882-3-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This new clock driver set allows to have a fractional divided clock that
+would generate a precise clock particularly suitable for audio
+applications.
 
+The main audio pll clock has two children clocks: one that is connected
+to the PMC, the other that can directly drive a pad. As these two routes
+have different enable bits and different dividers and divider formulas,
+they are handled by two different drivers.
 
-On Tue, Jul 11, 2017 at 03:50:19PM +0100, Robin Murphy wrote:
-> I don't much like the sound of that "and" there - coherent DMA
-> allocations are, as the name implies, already coherent for CPU and DMA
-> accesses, and require no maintenance; the streaming DMA API
-> (dma_{map,unmap,sync}_*) on the other hand is *only* for use on
-> kmalloced memory.
-Ok, I hope I am correct. I alloc my memory using dma_alloc_coherent()
-once, the dma_handle is passed to the device, with no other dma_map*()
-or dma_sync_*() calls needed?
+This adds the audio plls (frac, pad and pmc) to the compatible list of
+at91 clocks in DT binding.
 
-Yesterday I observed some strange behavior  when I did some debug prints in 
-the driver, printing me the result from phys_to_virt() of my
-virtual address and the dma_handle. I know these may be different, but,
-when I dump the memory (from userspace using mmap), I can see the data
-at the adress of my dma_handle, but the memory the driver has the
-pointer for has different contents. I don't understand this.
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
+added in v2:
+  - split from big patch with pll drivers and dt-binding
+
+ Documentation/devicetree/bindings/clock/at91-clock.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+index 5f3ad65daf69..51c259a92d02 100644
+--- a/Documentation/devicetree/bindings/clock/at91-clock.txt
++++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+@@ -81,6 +81,16 @@ Required properties:
+ 	"atmel,sama5d2-clk-generated":
+ 		at91 generated clock
  
-> The PL310 does have more than its fair share of wackiness, but unless
-> you also see DMA going wrong for the on-chip peripherals, the problem is
-> almost certainly down to the driver itself rather than the cache
-> configuration.
-Well, I think I need do dive into this as well, my former co-worker
-disabled DMA for SPI, for example, in the device tree. That may be
-another hint. I think I will need to find out what is setup here.
-
-
-Thank you for your advise, I will try to find out more.
-
-Michael
++	"atmel,sama5d2-clk-audio-pll-frac":
++		at91 audio fractional pll
++
++	"atmel,sama5d2-clk-audio-pll-pad":
++		at91 audio pll CLK_AUDIO output pin
++
++	"atmel,sama5d2-clk-audio-pll-pmc"
++		at91 audio pll output on AUDIOPLLCLK that feeds the PMC
++		and can be used by peripheral clock or generic clock
++
+ Required properties for SCKC node:
+ - reg : defines the IO memory reserved for the SCKC.
+ - #size-cells : shall be 0 (reg is used to encode clk id).
+-- 
+2.11.0
