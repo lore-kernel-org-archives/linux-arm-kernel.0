@@ -1,51 +1,78 @@
-From: bich.hemon@st.com (Bich HEMON)
-Date: Thu, 13 Jul 2017 15:08:29 +0000
-Subject: [PATCH 7/9] dt-bindings: serial: add compatible for stm32h7
-In-Reply-To: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
-References: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
-Message-ID: <1499958494-19354-8-git-send-email-bich.hemon@st.com>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Thu, 13 Jul 2017 12:35:59 -0300
+Subject: [PATCH 1/2 v2] ARM: dts: imx6ul-evk: Add DRM panel support
+Message-ID: <1499960160-20852-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
+It is preferred to use the panel compatible string rather than passing the LCD
+timming in the device tree.
 
-Introduce new compatibles for "st,stm32h7-usart" and "st,stm32h7-uart".
-This new compatible allow to use optional wake-up interrupt.
+So pass the "innolux,at043tn24" compatible string to describe the parallel LCD
+on this board.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Signed-off-by: Bich Hemon <bich.hemon@st.com>
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 ---
- .../devicetree/bindings/serial/st,stm32-usart.txt       | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+Changes since v1:
+-Add missed space
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 36 ++++++++++++----------------------
+ 1 file changed, 13 insertions(+), 23 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-index 85ec5f2..3657f9f 100644
---- a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-@@ -1,12 +1,19 @@
- * STMicroelectronics STM32 USART
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index d2be8aa..ed11cd1 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -78,6 +78,16 @@
+ 			clocks = <&clks IMX6UL_CLK_SAI2>;
+ 		};
+ 	};
++
++	panel {
++		compatible = "innolux,at043tn24";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
++	};
+ };
  
- Required properties:
--- compatible: Can be either "st,stm32-usart", "st,stm32-uart",
--"st,stm32f7-usart" or "st,stm32f7-uart" depending on whether
--the device supports synchronous mode and is compatible with
--stm32(f4) or stm32f7.
-+- compatible: can be either:
-+  - "st,stm32-usart",
-+  - "st,stm32-uart",
-+  - "st,stm32f7-usart",
-+  - "st,stm32f7-uart",
-+  - "st,stm32h7-usart"
-+  - "st,stm32h7-uart".
-+  depending on whether the device supports synchronous mode
-+  and is compatible with stm32(f4), stm32f7 or stm32h7.
- - reg: The address and length of the peripheral registers space
--- interrupts: The interrupt line of the USART instance
-+- interrupts:
-+  - The interrupt line for the USART instance,
-+  - An optional wake-up interrupt.
- - clocks: The input clock of the USART instance
+ &clks {
+@@ -139,31 +149,11 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_lcdif_dat
+ 		     &pinctrl_lcdif_ctrl>;
+-	display = <&display0>;
+ 	status = "okay";
  
- Optional properties:
+-	display0: display {
+-		bits-per-pixel = <16>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-
+-			timing0: timing0 {
+-				clock-frequency = <9200000>;
+-				hactive = <480>;
+-				vactive = <272>;
+-				hfront-porch = <8>;
+-				hback-porch = <4>;
+-				hsync-len = <41>;
+-				vback-porch = <2>;
+-				vfront-porch = <4>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
++	port {
++		display_out: endpoint {
++			remote-endpoint = <&panel_in>;
+ 		};
+ 	};
+ };
 -- 
-1.9.1
+2.7.4
