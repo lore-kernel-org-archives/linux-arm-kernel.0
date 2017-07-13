@@ -1,56 +1,33 @@
 From: lionel.debieve@st.com (Lionel Debieve)
-Date: Thu, 13 Jul 2017 15:32:26 +0200
-Subject: [PATCH 1/2] dt-bindings: Document STM32 HASH bindings
-In-Reply-To: <1499952747-16423-1-git-send-email-lionel.debieve@st.com>
-References: <1499952747-16423-1-git-send-email-lionel.debieve@st.com>
-Message-ID: <1499952747-16423-2-git-send-email-lionel.debieve@st.com>
+Date: Thu, 13 Jul 2017 15:32:25 +0200
+Subject: [PATCH 0/2] STM32 HASH crypto driver
+Message-ID: <1499952747-16423-1-git-send-email-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the STM32
-HASH controller.
+This set of patches adds a new crypto driver for STMicroelectronics stm32 HW.
+This drivers uses the crypto API and provides with HW-enabled md5, sha1,
+sha224, sha256 hash based algorithms.
+It makes use of the crypto engine to support ahash requests.
 
-Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
----
- .../devicetree/bindings/crypto/st,stm32-hash.txt   | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+This driver was successfully tested with tcrypt / testmgr.
+
+Note:
+Since two other set of patches (update of STM32 CRC32 and addition of STM32
+CRYP) are being proposed, it may happen that there are some minor conflicts in
+'Kconfig' and 'Makefile'. In that case, I will fix the issue in due course.
+
+Lionel Debieve (2):
+  dt-bindings: Document STM32 HASH bindings
+  crypto: stm32 - Support for STM32 HASH module
+
+ .../devicetree/bindings/crypto/st,stm32-hash.txt   |   30 +
+ drivers/crypto/stm32/Kconfig                       |   13 +
+ drivers/crypto/stm32/Makefile                      |    1 +
+ drivers/crypto/stm32/stm32-hash.c                  | 1576 ++++++++++++++++++++
+ 4 files changed, 1620 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/crypto/st,stm32-hash.txt
+ create mode 100644 drivers/crypto/stm32/stm32-hash.c
 
-diff --git a/Documentation/devicetree/bindings/crypto/st,stm32-hash.txt b/Documentation/devicetree/bindings/crypto/st,stm32-hash.txt
-new file mode 100644
-index 0000000..04fc246
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/st,stm32-hash.txt
-@@ -0,0 +1,30 @@
-+* STMicroelectronics STM32 HASH
-+
-+Required properties:
-+- compatible: Should contain entries for this and backward compatible
-+  HASH versions:
-+  - "st,stm32f456-hash" for stm32 F456.
-+  - "st,stm32f756-hash" for stm32 F756.
-+- reg: The address and length of the peripheral registers space
-+- interrupts: the interrupt specifier for the HASH
-+- clocks: The input clock of the HASH instance
-+
-+Optional properties:
-+- resets: The input reset of the HASH instance
-+- dmas: DMA specifiers for the HASH. See the DMA client binding,
-+	 Documentation/devicetree/bindings/dma/dma.txt
-+- dma-names: DMA request name. Should be "in" if a dma is present.
-+- dma-maxburst: Set number of maximum dma burst supported
-+
-+Example:
-+
-+hash1: hash at 50060400 {
-+	compatible = "st,stm32f756-hash";
-+	reg = <0x50060400 0x400>;
-+	interrupts = <80>;
-+	clocks = <&rcc 0 STM32F7_AHB2_CLOCK(HASH)>;
-+	resets = <&rcc STM32F7_AHB2_RESET(HASH)>;
-+	dmas = <&dma2 7 2 0x400 0x0>;
-+	dma-names = "in";
-+	dma-maxburst = <0>;
-+};
 -- 
 2.7.4
