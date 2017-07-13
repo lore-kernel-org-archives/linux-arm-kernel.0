@@ -1,31 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jul 2017 08:35:30 +0200
-Subject: [PATCH] ASoC: sun8i-codec: constify snd_soc_dai_ops structure
-In-Reply-To: <20170713055223.GA18940@embeddedgus>
-References: <20170713055223.GA18940@embeddedgus>
-Message-ID: <20170713063530.mheqk6kymzrxfbud@flea>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Jul 2017 23:48:43 -0700
+Subject: [PATCH V4 3/6] iommu/arm-smmu: Invoke pm_runtime during probe,
+ add/remove device
+In-Reply-To: <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
+References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1499333825-7658-4-git-send-email-vivek.gautam@codeaurora.org>
+ <20170712225459.GZ22780@codeaurora.org>
+ <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
+Message-ID: <20170713064843.GX22780@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 12:52:23AM -0500, Gustavo A. R. Silva wrote:
-> This structure is only stored in the ops field of a snd_soc_dai_driver
-> structure. That field is declared const, so snd_soc_dai_ops structures
-> that have this property can be declared as const also.
+On 07/13, Vivek Gautam wrote:
+> Hi Stephen,
 > 
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+> 
+> On 07/13/2017 04:24 AM, Stephen Boyd wrote:
+> >On 07/06, Vivek Gautam wrote:
+> >>@@ -1231,12 +1237,18 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+> >>  static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+> >>  			     size_t size)
+> >>  {
+> >>-	struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
+> >>+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+> >>+	struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+> >>+	size_t ret;
+> >>  	if (!ops)
+> >>  		return 0;
+> >>-	return ops->unmap(ops, iova, size);
+> >>+	pm_runtime_get_sync(smmu_domain->smmu->dev);
+> >Can these map/unmap ops be called from an atomic context? I seem
+> >to recall that being a problem before.
+> 
+> That's something which was dropped in the following patch merged in master:
+> 523d7423e21b iommu/arm-smmu: Remove io-pgtable spinlock
+> 
+> Looks like we don't  need locks here anymore?
+> 
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Maxime
+While removing the spinlock around the map/unmap path may be one
+thing, I'm not sure that's all of them. Is there a path from an
+atomic DMA allocation (GFP_ATOMIC sort of thing) mapped into an
+IOMMU for a device that can eventually get down to here and
+attempt to turn a clk on?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170713/6e90b6d9/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
