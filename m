@@ -1,22 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 13 Jul 2017 16:03:22 +0800
-Subject: [RESEND PATCH] ARM: dts: imx: update snvs-poweroff mask
-In-Reply-To: <20170704161912.29618-1-m.niestroj@grinn-global.com>
-References: <20170704161912.29618-1-m.niestroj@grinn-global.com>
-Message-ID: <20170713080321.GO3172@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Jul 2017 09:54:14 +0200
+Subject: [PATCH 3/3] ARM: dts: iwg20m: Add MMCIF0 support
+In-Reply-To: <201707130850.0py1QazG%fengguang.wu@intel.com>
+References: <1499853805-5915-4-git-send-email-chris.paterson2@renesas.com>
+ <201707130850.0py1QazG%fengguang.wu@intel.com>
+Message-ID: <20170713075414.GF5580@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 06:19:12PM +0200, Marcin Niestroj wrote:
-> From: Guy Shapiro <guy.shapiro@mobi-wize.com>
+On Thu, Jul 13, 2017 at 08:25:56AM +0800, kbuild test robot wrote:
+> Hi Chris,
 > 
-> Make the syscon-poweroff driver change only the shutdown bits on the
-> SNVS_LP control register.
+> [auto build test ERROR on renesas/next]
+> [also build test ERROR on next-20170712]
+> [cannot apply to v4.12]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
-> This change fixes an issue with the RTC wakeup alarm, that was
-> previously disabled during power off.
+> url:    https://github.com/0day-ci/linux/commits/Chris-Paterson/Add-MMCIF0-support-for-r8a7743-iwg20m/20170713-042814
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
+> config: arm-at91_dt_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
 > 
-> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
-> Reviewed-by: Marcin Niestroj <m.niestroj@grinn-global.com>
+> All errors (new ones prefixed by >>):
+> 
+> >> Error: arch/arm/boot/dts/r8a7743-iwg20m.dtsi:40.1-5 Label or path pfc not found
+>    FATAL ERROR: Syntax error parsing input tree
 
-Applied, thanks.
+This seems to be a false positive. The node in question is present in
+the devel branch which is the base of these changes.
