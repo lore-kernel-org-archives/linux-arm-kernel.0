@@ -1,64 +1,33 @@
 From: lionel.debieve@st.com (Lionel Debieve)
-Date: Thu, 13 Jul 2017 15:06:31 +0200
-Subject: [PATCH 1/3] crypto: stm32 - CRC use relaxed function
+Date: Thu, 13 Jul 2017 15:06:32 +0200
+Subject: [PATCH 2/3] crypto: stm32 - solve crc issue during unbind
 In-Reply-To: <cover.1499950409.git.lionel.debieve@st.com>
 References: <cover.1499950409.git.lionel.debieve@st.com>
-Message-ID: <05aae64aaee08aa97b53179d64be1a76e0d9c182.1499950409.git.lionel.debieve@st.com>
+Message-ID: <cb1e49d9cbdfe43ea2243ed8aa95d11f18813042.1499950409.git.lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of arm soc support, readl and writel will
-be optimized using relaxed functions
+Use the correct unregister_shashes function to
+to remove the registered algo
 
 Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
 Reviewed-by: Fabien Dessenne <fabien.dessenne@st.com>
 ---
- drivers/crypto/stm32/stm32_crc32.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/crypto/stm32/stm32_crc32.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/crypto/stm32/stm32_crc32.c b/drivers/crypto/stm32/stm32_crc32.c
-index ec83b1e..04d2f4b 100644
+index 04d2f4b..090582b 100644
 --- a/drivers/crypto/stm32/stm32_crc32.c
 +++ b/drivers/crypto/stm32/stm32_crc32.c
-@@ -107,12 +107,12 @@ static int stm32_crc_init(struct shash_desc *desc)
- 	spin_unlock_bh(&crc_list.lock);
+@@ -296,7 +296,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
+ 	list_del(&crc->list);
+ 	spin_unlock(&crc_list.lock);
  
- 	/* Reset, set key, poly and configure in bit reverse mode */
--	writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
--	writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
--	writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-+	writel_relaxed(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
-+	writel_relaxed(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
-+	writel_relaxed(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
+-	crypto_unregister_shash(algs);
++	crypto_unregister_shashes(algs, ARRAY_SIZE(algs));
  
- 	/* Store partial result */
--	ctx->partial = readl(ctx->crc->regs + CRC_DR);
-+	ctx->partial = readl_relaxed(ctx->crc->regs + CRC_DR);
- 	ctx->crc->nb_pending_bytes = 0;
+ 	clk_disable_unprepare(crc->clk);
  
- 	return 0;
-@@ -135,7 +135,8 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
- 
- 		if (crc->nb_pending_bytes == sizeof(u32)) {
- 			/* Process completed pending data */
--			writel(*(u32 *)crc->pending_data, crc->regs + CRC_DR);
-+			writel_relaxed(*(u32 *)crc->pending_data,
-+				       crc->regs + CRC_DR);
- 			crc->nb_pending_bytes = 0;
- 		}
- 	}
-@@ -143,10 +144,10 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
- 	d32 = (u32 *)d8;
- 	for (i = 0; i < length >> 2; i++)
- 		/* Process 32 bits data */
--		writel(*(d32++), crc->regs + CRC_DR);
-+		writel_relaxed(*(d32++), crc->regs + CRC_DR);
- 
- 	/* Store partial result */
--	ctx->partial = readl(crc->regs + CRC_DR);
-+	ctx->partial = readl_relaxed(crc->regs + CRC_DR);
- 
- 	/* Check for pending data (non 32 bits) */
- 	length &= 3;
 -- 
 2.7.4
