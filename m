@@ -1,71 +1,52 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 13 Jul 2017 11:44:12 -0400
+From: keith.busch@intel.com (Keith Busch)
+Date: Thu, 13 Jul 2017 12:03:45 -0400
 Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
 In-Reply-To: <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
 References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
  <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <0bcc0b00-1ad3-6866-32ab-15da8ea1821e@codeaurora.org>
+Message-ID: <20170713160345.GG8388@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/13/2017 8:17 AM, Bjorn Helgaas wrote:
->> he spec is calling to wait up to 1 seconds if the device is sending CRS.
->> The NVMe device seems to be requiring more. Relax this up to 60 seconds.
+On Thu, Jul 13, 2017 at 07:17:58AM -0500, Bjorn Helgaas wrote:
+> On Thu, Jul 06, 2017 at 05:07:14PM -0400, Sinan Kaya wrote:
+> > An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+> > following a Function Level Reset (FLR) request to indicate that it is not
+> > ready to accept new requests.
+> > 
+> > Seen a timeout message with Intel 750 NVMe drive and FLR reset.
+> > 
+> > Kernel enables CRS visibility in pci_enable_crs() function for each bridge
+> > it discovers. The OS observes a special vendor ID read value of 0xFFFF0001
+> > in this case. We need to keep polling until this special read value
+> > disappears. pci_bus_read_dev_vendor_id() takes care of CRS handling for a
+> > given vendor id read request under the covers.
+> > 
+> > Adding a vendor ID read if this is a physical function before attempting
+> > to read any other registers on the endpoint. A CRS indication will only
+> > be given if the address to be read is vendor ID register.
+> > 
+> > Note that virtual functions report their vendor ID through another
+> > mechanism.
+> > 
+> > The spec is calling to wait up to 1 seconds if the device is sending CRS.
+> > The NVMe device seems to be requiring more. Relax this up to 60 seconds.
+> 
 > Can you add a pointer to the "1 second" requirement in the spec here?
 > We use 60 seconds in pci_scan_device() and acpiphp_add_context().  Is
 > there a basis in the spec for the 60 second timeout?
 
-This does not specify a hard limit above on how long SW need to wait. 
+I also don't see anywhere that says CRS is limited to only 1 second. It
+looks to me that the spec allows a device to return CRS for as long as it
+takes to complete initialization.
 
-"6.6.2 Function Level Reset
-After an FLR has been initiated by writing a 1b to the Initiate Function Level Reset bit, 
-the Function must complete the FLR within 100 ms.
+>From PCIe Base Spec, Section 2.3.1 CRS Implementation note:
 
-While a Function is required to complete the FLR operation within the time limit described above,
-the subsequent Function-specific initialization sequence may require additional time. 
-If additional time is required, the Function must return a Configuration Request Retry Status (CRS) 
-Completion Status when a Configuration Request is received 15 after the time limit above. 
-After the Function responds to a Configuration Request with a Completion status other than CRS, 
-it is not permitted to return CRS until it is reset again."
+  A device in receipt of a Configuration Request following a valid reset
+  condition may respond with a CRS Completion Status to terminate the
+  Request, and thus effectively stall the Configuration Request until
+  such time that the subsystem has completed local initialization and
+  is ready to communicate with the host.
 
-However, another indirect reference here tells us it is capped by 1 second below.
-
-"6.23. Readiness Notifications (RN)
-Readiness Notifications (RN) is intended to reduce the time software needs to
-wait before issuing Configuration Requests to a Device or Function following DRS
-Events or FRS Events. RN includes both the Device Readiness Status (DRS) and
-Function Readiness Status (FRS) mechanisms. These mechanisms provide a direct
-indication of Configuration-Readiness (see 5 Terms and Acronyms entry for ?Configuration-Ready?). 
-
-When used, DRS and FRS allow an improved behavior over the CRS mechanism, and eliminate
-its associated periodic polling time of up to 1 second following a reset."
-
-If I remember it right from CRS commit messages, 60 seconds was coming from
-some PCIe switch taking too long to boot.
-
-> 
-> What's the NVMe excuse for requiring more time than the spec allows?
-> Is this a hardware erratum?  Is there some PCIe ECN pending to address
-> this?
-
-We have seen the issue with Intel 750 and Intel P3600 NVMe drives. I don't
-have access to the errata document for either of the drives.
-
-> 
-> I try to avoid adding generic changes based on one specific piece of
-> hardware because it can penalize everybody else who actually bothered
-> to follow the spec.  For example, if FLR fails because a non-NVMe
-> device is broken, it will now take 60 seconds to notice that instead
-> of 1 second.
-> 
-
-We can look for a better number like 3-4 seconds and put some nice warning
-that HW might be broken (violating the spec) and could be in need of
-a FW/BIOS update.
-
-What do you think?
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+No time limit specified here, or anywhere else for that matter AFAICT.
+Where is 1 second requirement coming from?
