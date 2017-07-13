@@ -1,146 +1,167 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Thu, 13 Jul 2017 09:49:26 +0200
-Subject: [PATCH v3 8/9] ASoC: atmel-classd: remove aclk clock
+Date: Thu, 13 Jul 2017 09:49:24 +0200
+Subject: [PATCH v3 6/9] clk: at91: clk-generated: make gclk determine
+ audio_pll rate
 In-Reply-To: <20170713074927.10882-1-quentin.schulz@free-electrons.com>
 References: <20170713074927.10882-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170713074927.10882-9-quentin.schulz@free-electrons.com>
+Message-ID: <20170713074927.10882-7-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since gclk (generated-clk) is now able to determine the rate of the
-audio_pll, there is no need for classd to have a direct phandle to the
-audio_pll while already having a phandle to gclk.
+This allows gclk to determine audio_pll rate and set the parent rate
+accordingly.
 
-Thus, remove all mentions to aclk in classd driver and update macros and
-variable names.
+However, there are multiple children clocks that could technically
+change the rate of audio_pll (via gck). With the rate locking, the first
+consumer to enable the clock will be the one definitely setting the rate
+of the clock.
+
+Since audio IPs are most likely to request the same rate, we enforce
+that the only clks able to modify gck rate are those of audio IPs.
+
+To remain consistent, we deny other clocks to be children of audio_pll.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Mark Brown <broonie@kernel.org>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
 
-added in v2:
-  - split from bigger patch with audio PLLs and DT binding,
-  - updated all variables and macros named ACLK to GCLK,
+v3:
+  - added a flag per generated clock to know which one is allowed to
+modify audio_pll rate,
+  - set the flag in setup function depending on the compatible and the
+clock ID,
 
- sound/soc/atmel/atmel-classd.c | 47 +++++++++++++-----------------------------
- 1 file changed, 14 insertions(+), 33 deletions(-)
+v2:
+  - added conditions for audio pll rate setting restriction for SSC and
+I2S,
 
-diff --git a/sound/soc/atmel/atmel-classd.c b/sound/soc/atmel/atmel-classd.c
-index b7ef8c59b49a..be6b775b6f46 100644
---- a/sound/soc/atmel/atmel-classd.c
-+++ b/sound/soc/atmel/atmel-classd.c
-@@ -32,7 +32,6 @@ struct atmel_classd {
+ drivers/clk/at91/clk-generated.c | 63 ++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 57 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+index 7260e498e059..33481368740e 100644
+--- a/drivers/clk/at91/clk-generated.c
++++ b/drivers/clk/at91/clk-generated.c
+@@ -26,6 +26,13 @@
+ #define GENERATED_SOURCE_MAX	6
+ #define GENERATED_MAX_DIV	255
+ 
++#define GCK_ID_SSC0		43
++#define GCK_ID_SSC1		44
++#define GCK_ID_I2S0		54
++#define GCK_ID_I2S1		55
++#define GCK_ID_CLASSD		59
++#define GCK_INDEX_DT_AUDIO_PLL	5
++
+ struct clk_generated {
+ 	struct clk_hw hw;
  	struct regmap *regmap;
- 	struct clk *pclk;
- 	struct clk *gclk;
--	struct clk *aclk;
- 	int irq;
- 	const struct atmel_classd_pdata *pdata;
+@@ -34,6 +41,7 @@ struct clk_generated {
+ 	u32 id;
+ 	u32 gckdiv;
+ 	u8 parent_id;
++	bool audio_pll_allowed;
  };
-@@ -330,11 +329,6 @@ static int atmel_classd_codec_dai_startup(struct snd_pcm_substream *substream,
+ 
+ #define to_clk_generated(hw) \
+@@ -126,15 +134,14 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
  {
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct atmel_classd *dd = snd_soc_card_get_drvdata(rtd->card);
--	int ret;
+ 	struct clk_generated *gck = to_clk_generated(hw);
+ 	struct clk_hw *parent = NULL;
++	struct clk_rate_request req_parent = *req;
+ 	long best_rate = -EINVAL;
+-	unsigned long min_rate;
++	unsigned long min_rate, parent_rate;
+ 	int best_diff = -1;
+ 	int i;
++	u32 div;
+ 
+-	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+-		u32 div;
+-		unsigned long parent_rate;
 -
--	ret = clk_prepare_enable(dd->aclk);
--	if (ret)
--		return ret;
++	for (i = 0; i < clk_hw_get_num_parents(hw) - 1; i++) {
+ 		parent = clk_hw_get_parent_by_index(hw, i);
+ 		if (!parent)
+ 			continue;
+@@ -150,11 +157,38 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
+ 		clk_generated_best_diff(req, parent, parent_rate, div,
+ 					&best_diff, &best_rate);
  
- 	return clk_prepare_enable(dd->gclk);
- }
-@@ -357,31 +351,31 @@ static int atmel_classd_codec_dai_digital_mute(struct snd_soc_dai *codec_dai,
- 	return 0;
- }
++		if (!best_diff)
++			break;
++	}
++
++	/*
++	 * The audio_pll rate can be modified, unlike the five others clocks
++	 * that should never be altered.
++	 * The audio_pll can technically be used by multiple consumers. However,
++	 * with the rate locking, the first consumer to enable to clock will be
++	 * the one definitely setting the rate of the clock.
++	 * Since audio IPs are most likely to request the same rate, we enforce
++	 * that the only clks able to modify gck rate are those of audio IPs.
++	 */
++
++	if (!gck->audio_pll_allowed)
++		goto end;
++
++	parent = clk_hw_get_parent_by_index(hw, GCK_INDEX_DT_AUDIO_PLL);
++	if (!parent)
++		goto end;
++
++	for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
++		req_parent.rate = req->rate * div;
++		__clk_determine_rate(parent, &req_parent);
++		clk_generated_best_diff(req, parent, req_parent.rate, div,
++					&best_diff, &best_rate);
  
--#define CLASSD_ACLK_RATE_11M2896_MPY_8 (112896 * 100 * 8)
--#define CLASSD_ACLK_RATE_12M288_MPY_8  (12288 * 1000 * 8)
-+#define CLASSD_GCLK_RATE_11M2896_MPY_8 (112896 * 100 * 8)
-+#define CLASSD_GCLK_RATE_12M288_MPY_8  (12288 * 1000 * 8)
- 
- static struct {
- 	int rate;
- 	int sample_rate;
- 	int dsp_clk;
--	unsigned long aclk_rate;
-+	unsigned long gclk_rate;
- } const sample_rates[] = {
- 	{ 8000,  CLASSD_INTPMR_FRAME_8K,
--	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-+	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
- 	{ 16000, CLASSD_INTPMR_FRAME_16K,
--	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-+	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
- 	{ 32000, CLASSD_INTPMR_FRAME_32K,
--	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-+	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
- 	{ 48000, CLASSD_INTPMR_FRAME_48K,
--	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-+	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
- 	{ 96000, CLASSD_INTPMR_FRAME_96K,
--	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-+	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
- 	{ 22050, CLASSD_INTPMR_FRAME_22K,
--	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
-+	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
- 	{ 44100, CLASSD_INTPMR_FRAME_44K,
--	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
-+	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
- 	{ 88200, CLASSD_INTPMR_FRAME_88K,
--	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
-+	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
- };
- 
- static int
-@@ -410,13 +404,12 @@ atmel_classd_codec_dai_hw_params(struct snd_pcm_substream *substream,
+ 		if (!best_diff)
+ 			break;
  	}
  
- 	dev_dbg(codec->dev,
--		"Selected SAMPLE_RATE of %dHz, ACLK_RATE of %ldHz\n",
--		sample_rates[best].rate, sample_rates[best].aclk_rate);
-+		"Selected SAMPLE_RATE of %dHz, GCLK_RATE of %ldHz\n",
-+		sample_rates[best].rate, sample_rates[best].gclk_rate);
++end:
+ 	pr_debug("GCLK: %s, best_rate = %ld, parent clk: %s @ %ld\n",
+ 		 __func__, best_rate,
+ 		 __clk_get_name((req->best_parent_hw)->clk),
+@@ -264,7 +298,8 @@ at91_clk_register_generated(struct regmap *regmap, spinlock_t *lock,
+ 	init.ops = &generated_ops;
+ 	init.parent_names = parent_names;
+ 	init.num_parents = num_parents;
+-	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
++	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE |
++		CLK_SET_RATE_PARENT;
  
- 	clk_disable_unprepare(dd->gclk);
--	clk_disable_unprepare(dd->aclk);
+ 	gck->id = id;
+ 	gck->hw.init = &init;
+@@ -296,6 +331,7 @@ static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
+ 	struct device_node *gcknp;
+ 	struct clk_range range = CLK_RANGE(0, 0);
+ 	struct regmap *regmap;
++	struct clk_generated *gck;
  
--	ret = clk_set_rate(dd->aclk, sample_rates[best].aclk_rate);
-+	ret = clk_set_rate(dd->gclk, sample_rates[best].gclk_rate);
- 	if (ret)
- 		return ret;
+ 	num_parents = of_clk_get_parent_count(np);
+ 	if (num_parents == 0 || num_parents > GENERATED_SOURCE_MAX)
+@@ -327,6 +363,21 @@ static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
+ 		hw = at91_clk_register_generated(regmap, &pmc_pcr_lock, name,
+ 						  parent_names, num_parents,
+ 						  id, &range);
++
++		gck = to_clk_generated(hw);
++
++		if (of_device_is_compatible(np,
++					    "atmel,sama5d2-clk-generated")) {
++			if (gck->id == GCK_ID_SSC0 || gck->id == GCK_ID_SSC1 ||
++			    gck->id == GCK_ID_I2S0 || gck->id == GCK_ID_I2S1 ||
++			    gck->id == GCK_ID_CLASSD)
++				gck->audio_pll_allowed = true;
++			else
++				gck->audio_pll_allowed = false;
++		} else {
++			gck->audio_pll_allowed = false;
++		}
++
+ 		if (IS_ERR(hw))
+ 			continue;
  
-@@ -426,10 +419,6 @@ atmel_classd_codec_dai_hw_params(struct snd_pcm_substream *substream,
- 
- 	snd_soc_update_bits(codec, CLASSD_INTPMR, mask, val);
- 
--	ret = clk_prepare_enable(dd->aclk);
--	if (ret)
--		return ret;
--
- 	return clk_prepare_enable(dd->gclk);
- }
- 
-@@ -441,7 +430,6 @@ atmel_classd_codec_dai_shutdown(struct snd_pcm_substream *substream,
- 	struct atmel_classd *dd = snd_soc_card_get_drvdata(rtd->card);
- 
- 	clk_disable_unprepare(dd->gclk);
--	clk_disable_unprepare(dd->aclk);
- }
- 
- static int atmel_classd_codec_dai_prepare(struct snd_pcm_substream *substream,
-@@ -596,13 +584,6 @@ static int atmel_classd_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	dd->aclk = devm_clk_get(dev, "aclk");
--	if (IS_ERR(dd->aclk)) {
--		ret = PTR_ERR(dd->aclk);
--		dev_err(dev, "failed to get audio clock: %d\n", ret);
--		return ret;
--	}
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	io_base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(io_base)) {
 -- 
 2.11.0
