@@ -1,37 +1,73 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 13 Jul 2017 19:47:06 +0800
-Subject: [PATCH V2 01/10] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk
- support
+Date: Thu, 13 Jul 2017 19:47:07 +0800
+Subject: [PATCH V2 02/10] clk: reparent orphans after critical clocks enabled
 In-Reply-To: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
 References: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1499946435-7177-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1499946435-7177-3-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For dividers with zero indicating clock is disabled, instead of giving a
-warning each time like "clkx: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not
-set" in exist code, we'd like to introduce enable/disable function for it.
-e.g.
-000b - Clock disabled
-001b - Divide by 1
-010b - Divide by 2
-...
+The orphan clocks reparent operation should be moved after the critical
+clocks enabled, otherwise it may get a chance to disable a newly
+registered critical clock which triggers the following warning.
 
-Set rate when the clk is disabled will cache the rate request and only
-when the clk is enabled will the driver actually program the hardware to
-have the requested divider value. Similarly, when the clk is disabled we'll
-write a 0 there, but when the clk is enabled we'll restore whatever rate
-(divider) was chosen last.
+Assuming we have two clocks: A and B, B is the parent of A.
+Clock A has flag: CLK_OPS_PARENT_ENABLE
+Clock B has flag: CLK_IS_CRITICAL
 
-It does mean that recalc rate will be sort of odd, because when the clk is
-off it will return 0, and when the clk is on it will return the right rate.
-So to make things work, we'll need to return the cached rate in recalc rate
-when the clk is off and read the hardware when the clk is on.
+Step 1:
+Clock A is registered, then it becomes orphan.
 
-NOTE for the default off divider, the recalc rate will still return 0 as
-there's still no proper preset rate. Enable such divider will give user
-a reminder error message.
+Step 2:
+Clock B is registered. Before clock B reach the critical clock enable
+operation, orphan A will find the newly registered parent B and do
+reparent operation, then parent B will be finally disabled in
+__clk_set_parent_after() due to CLK_OPS_PARENT_ENABLE flag as there's
+still no users of B which will then trigger the following warning.
 
+[    0.000000] WARNING: CPU: 0 PID: 0 at drivers/clk/clk.c:597 clk_core_disable+0xb4/0xe0
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.11.0-rc1-00056-gdff1f66-dirty #1373
+[    0.000000] Hardware name: Generic DT based system
+[    0.000000] Backtrace:
+[    0.000000] [<c010c4bc>] (dump_backtrace) from [<c010c764>] (show_stack+0x18/0x1c)
+[    0.000000]  r6:600000d3 r5:00000000 r4:c0e26358 r3:00000000
+[    0.000000] [<c010c74c>] (show_stack) from [<c040599c>] (dump_stack+0xb4/0xe8)
+[    0.000000] [<c04058e8>] (dump_stack) from [<c0125c94>] (__warn+0xd8/0x104)
+[    0.000000]  r10:c0c21cd0 r9:c048aa78 r8:00000255 r7:00000009 r6:c0c1cd90 r5:00000000
+[    0.000000]  r4:00000000 r3:c0e01d34
+[    0.000000] [<c0125bbc>] (__warn) from [<c0125d74>] (warn_slowpath_null+0x28/0x30)
+[    0.000000]  r9:00000000 r8:ef00bf80 r7:c165ac4c r6:ef00bf80 r5:ef00bf80 r4:ef00bf80
+[    0.000000] [<c0125d4c>] (warn_slowpath_null) from [<c048aa78>] (clk_core_disable+0xb4/0xe0)
+[    0.000000] [<c048a9c4>] (clk_core_disable) from [<c048be88>] (clk_core_disable_lock+0x20/0x2c)
+[    0.000000]  r4:000000d3 r3:c0e0af00
+[    0.000000] [<c048be68>] (clk_core_disable_lock) from [<c048c224>] (clk_core_disable_unprepare+0x14/0x28)
+[    0.000000]  r5:00000000 r4:ef00bf80
+[    0.000000] [<c048c210>] (clk_core_disable_unprepare) from [<c048c270>] (__clk_set_parent_after+0x38/0x54)
+[    0.000000]  r4:ef00bd80 r3:000010a0
+[    0.000000] [<c048c238>] (__clk_set_parent_after) from [<c048daa8>] (clk_register+0x4d0/0x648)
+[    0.000000]  r6:ef00d500 r5:ef00bf80 r4:ef00bd80 r3:ef00bfd4
+[    0.000000] [<c048d5d8>] (clk_register) from [<c048dc30>] (clk_hw_register+0x10/0x1c)
+[    0.000000]  r9:00000000 r8:00000003 r7:00000000 r6:00000824 r5:00000001 r4:ef00d500
+[    0.000000] [<c048dc20>] (clk_hw_register) from [<c048e698>] (_register_divider+0xcc/0x120)
+[    0.000000] [<c048e5cc>] (_register_divider) from [<c048e730>] (clk_register_divider+0x44/0x54)
+[    0.000000]  r10:00000004 r9:00000003 r8:00000001 r7:00000000 r6:00000003 r5:00000001
+[    0.000000]  r4:f0810030
+[    0.000000] [<c048e6ec>] (clk_register_divider) from [<c0d3ff58>] (imx7ulp_clocks_init+0x558/0xe98)
+[    0.000000]  r7:c0e296f8 r6:c165c808 r5:00000000 r4:c165c808
+[    0.000000] [<c0d3fa00>] (imx7ulp_clocks_init) from [<c0d24db0>] (of_clk_init+0x118/0x1e0)
+[    0.000000]  r10:00000001 r9:c0e01f68 r8:00000000 r7:c0e01f60 r6:ef7f8974 r5:ef0035c0
+[    0.000000]  r4:00000006
+[    0.000000] [<c0d24c98>] (of_clk_init) from [<c0d04a50>] (time_init+0x2c/0x38)
+[    0.000000]  r10:efffed40 r9:c0d61a48 r8:c0e78000 r7:c0e07900 r6:ffffffff r5:c0e78000
+[    0.000000]  r4:00000000
+[    0.000000] [<c0d04a24>] (time_init) from [<c0d00b8c>] (start_kernel+0x218/0x394)
+[    0.000000] [<c0d00974>] (start_kernel) from [<6000807c>] (0x6000807c)
+[    0.000000]  r10:00000000 r9:410fc075 r8:6000406a r7:c0e0c930 r6:c0d61a44 r5:c0e07918
+[    0.000000]  r4:c0e78294
+[    0.000000] ---[ end trace 0000000000000000 ]---
+
+Fixes: fc8726a2c021 ("clk: core: support clocks which requires parents enable (part 2)")
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Shawn Guo <shawnguo@kernel.org>
@@ -40,202 +76,67 @@ Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 ChangeLog:
 v1->v2:
- * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+ * add more detailed commit messages
 ---
- drivers/clk/clk-divider.c    | 100 ++++++++++++++++++++++++++++++++++++++++++-
- include/linux/clk-provider.h |   9 ++++
- 2 files changed, 107 insertions(+), 2 deletions(-)
+ drivers/clk/clk.c | 39 ++++++++++++++++++++-------------------
+ 1 file changed, 20 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 9bb472c..55f8c41 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -123,6 +123,9 @@ unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
- 	struct clk_divider *divider = to_clk_divider(hw);
- 	unsigned int div;
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index fc58c52..e2955b1 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2471,25 +2471,6 @@ static int __clk_core_init(struct clk_core *core)
+ 	core->rate = core->req_rate = rate;
  
-+	if (flags & CLK_DIVIDER_ZERO_GATE && !val)
-+		return 0;
+ 	/*
+-	 * walk the list of orphan clocks and reparent any that newly finds a
+-	 * parent.
+-	 */
+-	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
+-		struct clk_core *parent = __clk_init_parent(orphan);
+-
+-		/*
+-		 * we could call __clk_set_parent, but that would result in a
+-		 * redundant call to the .set_rate op, if it exists
+-		 */
+-		if (parent) {
+-			__clk_set_parent_before(orphan, parent);
+-			__clk_set_parent_after(orphan, parent, NULL);
+-			__clk_recalc_accuracies(orphan);
+-			__clk_recalc_rates(orphan, 0);
+-		}
+-	}
+-
+-	/*
+ 	 * optional platform-specific magic
+ 	 *
+ 	 * The .init callback is not used by any of the basic clock types, but
+@@ -2511,6 +2492,26 @@ static int __clk_core_init(struct clk_core *core)
+ 	}
+ 
+ 	kref_init(&core->ref);
 +
- 	div = _get_div(table, val, flags, divider->width);
- 	if (!div) {
- 		WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
-@@ -141,8 +144,13 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
- 	struct clk_divider *divider = to_clk_divider(hw);
- 	unsigned int val;
- 
--	val = clk_readl(divider->reg) >> divider->shift;
--	val &= div_mask(divider->width);
-+	if ((divider->flags & CLK_DIVIDER_ZERO_GATE) &&
-+	    !clk_hw_is_enabled(hw)) {
-+		val = divider->cached_val;
-+	} else {
-+		val = clk_readl(divider->reg) >> divider->shift;
-+		val &= div_mask(divider->width);
-+	}
- 
- 	return divider_recalc_rate(hw, parent_rate, val, divider->table,
- 				   divider->flags);
-@@ -392,6 +400,12 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	value = divider_get_val(rate, parent_rate, divider->table,
- 				divider->width, divider->flags);
- 
-+	if ((divider->flags & CLK_DIVIDER_ZERO_GATE) &&
-+	    !clk_hw_is_enabled(hw)) {
-+		divider->cached_val = value;
-+		return 0;
-+	}
++	/*
++	 * walk the list of orphan clocks and reparent any that newly finds a
++	 * parent.
++	 */
++	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
++		struct clk_core *parent = __clk_init_parent(orphan);
 +
- 	if (divider->lock)
- 		spin_lock_irqsave(divider->lock, flags);
- 	else
-@@ -414,10 +428,85 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return 0;
- }
- 
-+static int clk_divider_enable(struct clk_hw *hw)
-+{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned long flags = 0;
-+	u32 val;
-+
-+	if (!(divider->flags & CLK_DIVIDER_ZERO_GATE))
-+		return 0;
-+
-+	if (!divider->cached_val) {
-+		pr_err("%s: no valid preset rate\n", clk_hw_get_name(hw));
-+		return -EINVAL;
++		/*
++		 * we could call __clk_set_parent, but that would result in a
++		 * redundant call to the .set_rate op, if it exists
++		 */
++		if (parent) {
++			__clk_set_parent_before(orphan, parent);
++			__clk_set_parent_after(orphan, parent, NULL);
++			__clk_recalc_accuracies(orphan);
++			__clk_recalc_rates(orphan, 0);
++		}
 +	}
 +
-+	if (divider->lock)
-+		spin_lock_irqsave(divider->lock, flags);
-+	else
-+		__acquire(divider->lock);
-+
-+	/* restore div val */
-+	val = clk_readl(divider->reg);
-+	val |= divider->cached_val << divider->shift;
-+	clk_writel(val, divider->reg);
-+
-+	if (divider->lock)
-+		spin_unlock_irqrestore(divider->lock, flags);
-+	else
-+		__release(divider->lock);
-+
-+	return 0;
-+}
-+
-+static void clk_divider_disable(struct clk_hw *hw)
-+{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned long flags = 0;
-+	u32 val;
-+
-+	if (!(divider->flags & CLK_DIVIDER_ZERO_GATE))
-+		return;
-+
-+	if (divider->lock)
-+		spin_lock_irqsave(divider->lock, flags);
-+	else
-+		__acquire(divider->lock);
-+
-+	/* store the current div val */
-+	val = clk_readl(divider->reg) >> divider->shift;
-+	val &= div_mask(divider->width);
-+	divider->cached_val = val;
-+	clk_writel(0, divider->reg);
-+
-+	if (divider->lock)
-+		spin_unlock_irqrestore(divider->lock, flags);
-+	else
-+		__release(divider->lock);
-+}
-+
-+static int clk_divider_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	u32 val;
-+
-+	if (!(divider->flags & CLK_DIVIDER_ZERO_GATE))
-+		return __clk_get_enable_count(hw->clk);
-+
-+	val = clk_readl(divider->reg) >> divider->shift;
-+	val &= div_mask(divider->width);
-+
-+	return val ? 1 : 0;
-+}
-+
- const struct clk_ops clk_divider_ops = {
- 	.recalc_rate = clk_divider_recalc_rate,
- 	.round_rate = clk_divider_round_rate,
- 	.set_rate = clk_divider_set_rate,
-+	.enable = clk_divider_enable,
-+	.disable = clk_divider_disable,
-+	.is_enabled = clk_divider_is_enabled,
- };
- EXPORT_SYMBOL_GPL(clk_divider_ops);
+ out:
+ 	clk_prepare_unlock();
  
-@@ -436,6 +525,7 @@ static struct clk_hw *_register_divider(struct device *dev, const char *name,
- 	struct clk_divider *div;
- 	struct clk_hw *hw;
- 	struct clk_init_data init;
-+	u32 val;
- 	int ret;
- 
- 	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
-@@ -468,6 +558,12 @@ static struct clk_hw *_register_divider(struct device *dev, const char *name,
- 	div->hw.init = &init;
- 	div->table = table;
- 
-+	if (div->flags & CLK_DIVIDER_ZERO_GATE) {
-+		val = clk_readl(reg) >> shift;
-+		val &= div_mask(width);
-+		div->cached_val = val;
-+	}
-+
- 	/* register the clock */
- 	hw = &div->hw;
- 	ret = clk_hw_register(dev, hw);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index c59c625..efaf5cf 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -357,6 +357,7 @@ struct clk_div_table {
-  * @shift:	shift to the divider bit field
-  * @width:	width of the divider bit field
-  * @table:	array of value/divider pairs, last entry should have div = 0
-+ * @cached_val: cached div hw value used for CLK_DIVIDER_ZERO_GATE
-  * @lock:	register lock
-  *
-  * Clock with an adjustable divider affecting its output frequency.  Implements
-@@ -385,6 +386,12 @@ struct clk_div_table {
-  * CLK_DIVIDER_MAX_AT_ZERO - For dividers which are like CLK_DIVIDER_ONE_BASED
-  *	except when the value read from the register is zero, the divisor is
-  *	2^width of the field.
-+ * CLK_DIVIDER_ZERO_GATE - For dividers when the value read from the register
-+ *	is zero, it means the divisor is gated. For this case, the cached_val
-+ *	will be used to store the intermediate div for the normal rate
-+ *	operation, like set_rate/get_rate/recalc_rate. When the divider is
-+ *	ungated, the driver will actually program the hardware to have the
-+ *	requested divider value.
-  */
- struct clk_divider {
- 	struct clk_hw	hw;
-@@ -393,6 +400,7 @@ struct clk_divider {
- 	u8		width;
- 	u8		flags;
- 	const struct clk_div_table	*table;
-+	u32		cached_val;
- 	spinlock_t	*lock;
- };
- 
-@@ -405,6 +413,7 @@ struct clk_divider {
- #define CLK_DIVIDER_ROUND_CLOSEST	BIT(4)
- #define CLK_DIVIDER_READ_ONLY		BIT(5)
- #define CLK_DIVIDER_MAX_AT_ZERO		BIT(6)
-+#define CLK_DIVIDER_ZERO_GATE		BIT(7)
- 
- extern const struct clk_ops clk_divider_ops;
- extern const struct clk_ops clk_divider_ro_ops;
 -- 
 2.7.4
