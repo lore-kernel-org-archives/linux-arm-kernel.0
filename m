@@ -1,59 +1,36 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 13 Jul 2017 10:22:15 -0700
-Subject: [PATCH v5 1/2] clk: gate: expose clk_gate_ops::is_enabled
-In-Reply-To: <1499954552-20075-2-git-send-email-gabriel.fernandez@st.com>
-References: <1499954552-20075-1-git-send-email-gabriel.fernandez@st.com>
- <1499954552-20075-2-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <efa06f77-7b0e-9902-dbf1-c76d3203b813@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jul 2017 18:35:45 +0100
+Subject: Porting a custom interrupt handler from kernel 2.6.25 to 3.16.45
+In-Reply-To: <CAHumR2LazFFmmNNKJ=KrEjt7iCgrKewkdzO6ww7RtLU+wWTFoA@mail.gmail.com>
+References: <CAHumR2+WR3Fdtft8xrPfcT3-dpKqCL__aaEc6qri3N5-x0yCXw@mail.gmail.com>
+ <20170713160625.GB27801@lunn.ch>
+ <CAHumR2LazFFmmNNKJ=KrEjt7iCgrKewkdzO6ww7RtLU+wWTFoA@mail.gmail.com>
+Message-ID: <20170713173545.GE31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2017 07:02 AM, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> This patch exposes clk_gate_ops::is_enabled as functions
-> that can be directly called and assigned in places like this so
-> we don't need wrapper functions that do nothing besides forward
-> the call.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> Sugested by Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/clk-gate.c       | 2 +-
->  include/linux/clk-provider.h | 1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-> index 4e0c054a..e27e28f 100644
-> --- a/drivers/clk/clk-gate.c
-> +++ b/drivers/clk/clk-gate.c
-> @@ -86,7 +86,7 @@ static void clk_gate_disable(struct clk_hw *hw)
->  	clk_gate_endisable(hw, 0);
->  }
->  
-> -static int clk_gate_is_enabled(struct clk_hw *hw)
-> +int clk_gate_is_enabled(struct clk_hw *hw)
->  {
->  	u32 reg;
->  	struct clk_gate *gate = to_clk_gate(hw);
+On Thu, Jul 13, 2017 at 06:32:29PM +0200, Mircea Ciocan wrote:
+> I'm still struggle to understand the full purpose of
+> the *get_irqnr_preamble* and *get_irqnr_and_base* macros.
 
-Don't you need to add an EXPORT_SYMBOL_GPL(clk_gate_is_enabled) as well
-in case this gets used by modules?
+get_irqnr_preamble does whatever you need that's common to handling a
+set of interrupts read from the hardware.  It can set the two registers
+to anything it likes.  Commonly, this is used to get the address of the
+top level interrupt controller.  These two registers are passed to the
+get_irqnr_and_base and test_for_ipi macros unmodified.
 
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index c59c625..e9587ab 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
->  		u8 clk_gate_flags, spinlock_t *lock);
->  void clk_unregister_gate(struct clk *clk);
->  void clk_hw_unregister_gate(struct clk_hw *hw);
-> +int clk_gate_is_enabled(struct clk_hw *hw);
->  
->  struct clk_div_table {
->  	unsigned int	val;
-> 
+get_irqnr_and_base gets the interrupt number.  This must clear the Z
+flag if an interrupt is pending, or set it if there's no interrupt.
 
+test_for_ipi takes all the registers that were given to get_irqnr_and_base
+and determines whether an IPI happened and which IPI, otherwise it
+has the same behaviour as get_irqnr_and_base.
+
+So it's not complicated - get_irqnr_preamble is basically the common
+setup bits and get_irqnr_and_base is called repeatedly in a loop until
+it indicates that there are no further pending interrupts.
 
 -- 
-Florian
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
