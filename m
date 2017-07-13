@@ -1,40 +1,103 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 14 Jul 2017 07:21:22 +1000
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <20170713151146.53e9644c@w520.home>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
- <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
- <20170713151146.53e9644c@w520.home>
-Message-ID: <1499980882.2865.65.camel@kernel.crashing.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 13 Jul 2017 16:52:42 -0500
+Subject: [PATCH 1/2] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
+References: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1499982763-29619-2-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-07-13 at 15:11 -0600, Alex Williamson wrote:
-> > > ????? */
-> > > -???if (vga_default == NULL &&
-> > > -?????? ((vgadev->owns & VGA_RSRC_LEGACY_MASK) == VGA_RSRC_LEGACY_MASK)) {
-> > > +???if (vga_default == NULL) {
-> > > ?????????????vgaarb_info(&pdev->dev, "setting as boot VGA device\n");
-> > > ?????????????vga_set_default_device(pdev);
-> > > ?????}? 
-> 
-> 
-> "Legacy" is the breadcrumb we use to try to pick the same device for
-> default VGA as the system firmware used as the boot VGA.? There can be
-> multiple VGA devices in the system, the change above would simply make
-> the first discovered device be the default VGA.? That would break many,
-> many systems.? If legacy VGA ranges mean nothing on ARM64, then follow
-> the powerpc lead and make an arch quirk that simply selects the first
-> enabled VGA device as the default.? VGA routing is part of the PCI spec
-> though, so the default of selecting the device with routing enabled
-> makes sense.? Thanks,
+To support sparse GPIO maps, pinctrl-msm client drivers can specify
+that a given GPIO has a pin count of zero.  These GPIOs will be
+considered "hidden".  Any attempt to claim the GPIO will fail, and they
+will not be listed in debugfs.
 
-"Legacy" there iirc also means that it has decoding enabled at boot. If
-you pick the first one you may pick a device that doesn't and hasn't
-been initialized by any driver (good old BIOS-initialized text mode).
+However, when the driver probes, it calls gpiochip_add_data() which
+wants to initialize the direction of all the GPIOs, even the ones that
+are unavailable.  Therefore, msm_gpio_get_direction() checks to make
+sure the pin is available.
 
-Cheers,
-Ben.
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/pinctrl/qcom/pinctrl-msm.c | 34 ++++++++++++++++++++++++++++++----
+ 1 file changed, 30 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+index 273badd..e915db4 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -165,7 +165,22 @@ static int msm_pinmux_set_mux(struct pinctrl_dev *pctldev,
+ 	return 0;
+ }
+ 
++/*
++ * Request a GPIO. If the number of pins for this GPIO group is zero,
++ * then assume that the GPIO is unavailable.
++ */
++static int msm_request(struct pinctrl_dev *pctldev, unsigned int offset)
++{
++	struct msm_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
++	const struct msm_pingroup *g;
++
++	g = &pctrl->soc->groups[offset];
++
++	return g->npins ? 0 : -ENODEV;
++}
++
+ static const struct pinmux_ops msm_pinmux_ops = {
++	.request		= msm_request,
+ 	.get_functions_count	= msm_get_functions_count,
+ 	.get_function_name	= msm_get_function_name,
+ 	.get_function_groups	= msm_get_function_groups,
+@@ -430,6 +445,14 @@ static int msm_gpio_get_direction(struct gpio_chip *chip, unsigned int offset)
+ 
+ 	g = &pctrl->soc->groups[offset];
+ 
++	/*
++	 * If the GPIO is unavailable, just return error.  This is necessary
++	 * because the GPIO layer tries to initialize the direction of all
++	 * the GPIOs, even the ones that are unavailable.
++	 */
++	if (!g->npins)
++		return -ENODEV;
++
+ 	val = readl(pctrl->regs + g->ctl_reg);
+ 
+ 	/* 0 = output, 1 = input */
+@@ -494,6 +517,11 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 	};
+ 
+ 	g = &pctrl->soc->groups[offset];
++
++	/* If the GPIO group has no pins, then don't show it. */
++	if (!g->npins)
++		return;
++
+ 	ctl_reg = readl(pctrl->regs + g->ctl_reg);
+ 
+ 	is_out = !!(ctl_reg & BIT(g->oe_bit));
+@@ -503,7 +531,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 
+ 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
+ 	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
+-	seq_printf(s, " %s", pulls[pull]);
++	seq_printf(s, " %s\n", pulls[pull]);
+ }
+ 
+ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+@@ -511,10 +539,8 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 	unsigned gpio = chip->base;
+ 	unsigned i;
+ 
+-	for (i = 0; i < chip->ngpio; i++, gpio++) {
++	for (i = 0; i < chip->ngpio; i++, gpio++)
+ 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
+-		seq_puts(s, "\n");
+-	}
+ }
+ 
+ #else
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
