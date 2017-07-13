@@ -1,51 +1,71 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 13 Jul 2017 06:29:38 -0500
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Thu, 13 Jul 2017 19:47:05 +0800
+Subject: [PATCH V2 00/10] clk: add imx7ulp clk support
+Message-ID: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Ben, David, Daniel, Alex]
+This patch series intends to add imx7ulp clk support.
 
-On Thu, Jul 13, 2017 at 10:29:25AM +0000, Gabriele Paoloni wrote:
-> Hi Bjorn, Daniel
-> 
-> [...]
-> 
-> > 
-> > Is this quirk useful on any arch other than arm64?  Per
-> > drivers/pci/dwc/Kconfig, CONFIG_PCI_HISI depends on CONFIG_ARM64.
-> > 
-> > Would it make sense to put this quirk in arch/arm64/kernel/pci.c?
-> 
-> Indeed our host controller depends on ARM64 so maybe it would make
-> sense to move the quirk arch/arm64/kernel/pci.c; however regardless
-> why is it strictly required for a VGA device to be legacy one in order
-> to make it the default boot device?
-> i.e. couldn't we have:
-> 
-> diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-> index 0f5b2dd..a6b606c 100644
-> --- a/drivers/gpu/vga/vgaarb.c
-> +++ b/drivers/gpu/vga/vgaarb.c
-> @@ -667,8 +667,7 @@ static bool vga_arbiter_add_pci_device(struct pci_dev *pdev)
->  	/* Deal with VGA default device. Use first enabled one
->  	 * by default if arch doesn't have it's own hook
->  	 */
-> -	if (vga_default == NULL &&
-> -	    ((vgadev->owns & VGA_RSRC_LEGACY_MASK) == VGA_RSRC_LEGACY_MASK)) {
-> +	if (vga_default == NULL) {
->  		vgaarb_info(&pdev->dev, "setting as boot VGA device\n");
->  		vga_set_default_device(pdev);
->  	}
+i.MX7ULP Clock functions are under joint control of the System
+Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
+modules, and Core Mode Controller (CMC)1 blocks
 
-I don't know enough about the VGA arbiter to answer this.  This test was
-part of the initial implementation: deb2d2ecd43d ("PCI/GPU: implement VGA
-arbitration on Linux") by Ben.
+The clocking scheme provides clear separation between M4 domain
+and A7 domain. Except for a few clock sources shared between two
+domains, such as the System Oscillator clock, the Slow IRC (SIRC),
+and and the Fast IRC clock (FIRCLK), clock sources and clock
+management are separated and contained within each domain.
 
-Bjorn
+M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
+A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+
+Note: this series only adds A7 clock domain support as M4 clock
+domain will be handled by M4 seperately.
+
+Change Log:
+v1->v2:
+ * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+ * use clk_hw apis to register clocks
+ * use of_clk_add_hw_provider
+ * split the clocks register process into two parts: early part for possible
+   timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
+   the left normal peripheral clocks registered by a platform driver.
+
+Dong Aisheng (10):
+  clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
+  clk: reparent orphans after critical clocks enabled
+  clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
+  clk: imx: add pllv4 support
+  clk: imx: add pfdv2 support
+  clk: imx: add composite clk support
+  dt-bindings: clock: add imx7ulp clock binding doc
+  clk: imx: make mux parent strings const
+  clk: imx: implement new clk_hw based APIs
+  clk: imx: add imx7ulp clk driver
+
+ .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 ++++++
+ drivers/clk/clk-divider.c                          | 100 ++++++++-
+ drivers/clk/clk-fractional-divider.c               |  10 +
+ drivers/clk/clk.c                                  |  39 ++--
+ drivers/clk/imx/Makefile                           |   6 +-
+ drivers/clk/imx/clk-busy.c                         |   2 +-
+ drivers/clk/imx/clk-composite.c                    |  90 ++++++++
+ drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
+ drivers/clk/imx/clk-imx7ulp.c                      | 245 +++++++++++++++++++++
+ drivers/clk/imx/clk-pfdv2.c                        | 207 +++++++++++++++++
+ drivers/clk/imx/clk-pllv4.c                        | 188 ++++++++++++++++
+ drivers/clk/imx/clk.c                              |  22 ++
+ drivers/clk/imx/clk.h                              |  92 +++++++-
+ include/dt-bindings/clock/imx7ulp-clock.h          | 108 +++++++++
+ include/linux/clk-provider.h                       |  17 ++
+ 15 files changed, 1159 insertions(+), 31 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+ create mode 100644 drivers/clk/imx/clk-composite.c
+ create mode 100644 drivers/clk/imx/clk-imx7ulp.c
+ create mode 100644 drivers/clk/imx/clk-pfdv2.c
+ create mode 100644 drivers/clk/imx/clk-pllv4.c
+ create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
+
+-- 
+2.7.4
