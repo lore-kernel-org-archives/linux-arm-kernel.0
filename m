@@ -1,20 +1,52 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Jul 2017 09:54:59 +0200
-Subject: [PATCH 1/3] dt-bindings: mmc: sh_mmcif: Document r8a7743 DT
- bindings
-In-Reply-To: <CAMuHMdX0TZ7KKzGDq8t2jMwMciEf30KKW2tE5fieqJ2D7+feqw@mail.gmail.com>
-References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
- <1499853805-5915-2-git-send-email-chris.paterson2@renesas.com>
- <CAMuHMdX0TZ7KKzGDq8t2jMwMciEf30KKW2tE5fieqJ2D7+feqw@mail.gmail.com>
-Message-ID: <20170713075459.GG5580@verge.net.au>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 13 Jul 2017 09:57:06 +0200
+Subject: [patch] autogain support for bayer10 format (was Re: [patch]
+ propagating controls in libv4l2)
+In-Reply-To: <8a129dca-69c2-366f-1a81-c64dbabc1983@gmail.com>
+References: <20170424093059.GA20427@amd> <20170424103802.00d3b554@vento.lan>
+ <20170424212914.GA20780@amd> <20170424224724.5bb52382@vento.lan>
+ <20170426105300.GA857@amd> <20170426081330.6ca10e42@vento.lan>
+ <20170426132337.GA6482@amd>
+ <cedfd68d-d0fe-6fa8-2676-b61f3ddda652@gmail.com>
+ <20170426225150.GA4188@amd>
+ <8a129dca-69c2-366f-1a81-c64dbabc1983@gmail.com>
+Message-ID: <20170713075706.GB1363@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 01:20:07PM +0200, Geert Uytterhoeven wrote:
-> On Wed, Jul 12, 2017 at 12:03 PM, Chris Paterson
-> <chris.paterson2@renesas.com> wrote:
-> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi!
 
-Thanks, applied for v4.14.
+> Oh, somehow I got confused that this is kernel code :)
+> 
+> >But I'd say NEON conversion is not neccessary anytime soon. First,
+> >this is just trying to get average luminosity. We can easily skip
+> >quite a lot of pixels, and still get reasonable answer.
+> >
+> >Second, omap3isp actually has a hardware block computing statistics
+> >for us. We just don't use it for simplicity.
+> >
+> 
+> Right, I forgot about that.
+> 
+> >(But if you want to play with camera, I'll get you patches; there's
+> >ton of work to be done, both kernel and userspace :-).
+> 
+> Well, I saw a low hanging fruit I thought I can convert to NEON in a day or
+> two, while having some rest from the huge "project" I am devoting all my
+> spare time recently (rebasing hildon/maemo 5 on top of devuan Jessie).
+> Still, if there is something relatively small to be done, just email me and
+> I'll have a look.
+
+Well, there's a ton of work on camera, and some work on
+libcmtspeechdata. The later is rather self-contained.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170713/01ea4d01/attachment.sig>
