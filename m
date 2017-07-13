@@ -1,126 +1,36 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Thu, 13 Jul 2017 21:46:57 +0200
-Subject: [linux-sunxi] [PATCH v5 2/6] clk: sunxi-ng: Add sun4i/sun7i CCU
- driver
-In-Reply-To: <20170713192358.GB22375@plaes.org>
-References: <cover.23e9103a2becf2261d7e145bb1516221a5cfb8a4.1499197129.git-series.plaes@plaes.org>
- <65066c74b8dedfeb8de27d90b5fecfea3a700178.1499197129.git-series.plaes@plaes.org>
- <5099cd90-e019-8a65-38e5-02b3c939a7a8@schinagl.nl>
- <20170713192358.GB22375@plaes.org>
-Message-ID: <d178101c-bcc7-3914-481e-1edc4f5d7b60@schinagl.nl>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 13 Jul 2017 22:04:34 +0200
+Subject: Porting a custom interrupt handler from kernel 2.6.25 to 3.16.45
+In-Reply-To: <CAHumR2LazFFmmNNKJ=KrEjt7iCgrKewkdzO6ww7RtLU+wWTFoA@mail.gmail.com>
+References: <CAHumR2+WR3Fdtft8xrPfcT3-dpKqCL__aaEc6qri3N5-x0yCXw@mail.gmail.com>
+ <20170713160625.GB27801@lunn.ch>
+ <CAHumR2LazFFmmNNKJ=KrEjt7iCgrKewkdzO6ww7RtLU+wWTFoA@mail.gmail.com>
+Message-ID: <20170713200434.GE3120@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Priit,
+On Thu, Jul 13, 2017 at 06:32:29PM +0200, Mircea Ciocan wrote:
+> On Thu, Jul 13, 2017 at 6:06 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> > On Thu, Jul 13, 2017 at 10:23:41AM +0200, Mircea Ciocan wrote:
+> >> Hello everybody, I'm new to the intricacies of the ARM platform
+> >> interrupt handling and I have to port a custom interrupt handler from
+> >> 2.6.25 to 3.16.45.
+> >
+> > Hi Mircea
+> >
+> > Could you please take a step back and explain why you need a custom
+> > interrupt handler.
+> >
+> >           Andrew
+> 
+> Hi Andrew, sure I can explain, or at least offer the original
+> explanation of the long lost developer:
+> The ARM core has a custom interrupt controller and a DSP co-processor
+> that does some funny (read strange & abnormal) stuff.
 
-On 07/13/17 21:23, Priit Laes wrote:
-> On Mon, Jul 10, 2017 at 11:45:32AM +0200, Olliver Schinagl wrote:
->> Hi Pleas,
->>
->> again, but this time with content :)
->>
->> On 04-07-17 22:04, Priit Laes wrote:
->>> Introduce a clock controller driver for sun4i A10 and sun7i A20
->>> series SoCs.
-> [ ... ]
->
->>> +++ b/drivers/clk/sunxi-ng/Kconfig
->>> @@ -11,6 +11,19 @@ config SUN50I_A64_CCU
->>> 	default ARM64 && ARCH_SUNXI
->>> 	depends on (ARM64 && ARCH_SUNXI) || COMPILE_TEST
->>>
->>> +config SUNXI_A10_CCU
->> I understand why you say sunXi here (it's support for both sun4i and sun7i)
->> but then why A10, as it also supports the A20.
->>
->> I guess the CCU is identical on the A20 and the A10, right? Thus would it
->> not be sensible to just call it sun4i_ccu (like we do for sun5i_ccu below?
-> No, it's not identical.
-But then saying SUNXI_A10_CCU is not correct? Since it is not identical
-on the A20? So what does the A10 stand for?
->
->>> +	bool "Support for the Allwinner A10/A20 CCU"
->>> +	select SUNXI_CCU_DIV
->>> +	select SUNXI_CCU_MULT
->>> +	select SUNXI_CCU_NK
->>> +	select SUNXI_CCU_NKM
->>> +	select SUNXI_CCU_NM
->>> +	select SUNXI_CCU_MP
->>> +	select SUNXI_CCU_PHASE
->>> +	default MACH_SUN4I
->>> +	default MACH_SUN7I
->>> +	depends on MACH_SUN4I || MACH_SUN7I || COMPILE_TEST
->>> +
->>> config SUN5I_CCU
->>> 	bool "Support for the Allwinner sun5i family CCM"
->>> 	default MACH_SUN5I
->>> @@ -57,4 +70,5 @@ config SUN8I_R_CCU
->>> 	bool "Support for Allwinner SoCs' PRCM CCUs"
->>> 	default MACH_SUN8I || (ARCH_SUNXI && ARM64)
->>>
->>> +
->> oops?
-> OK
->
->>> new file mode 100644
->>> index 0000000..49052b7
->>> --- /dev/null
->>> +++ b/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
->> <snip>
->>
->>> +static const char *const apb1_parents[] = { "hosc", "pll-periph", "osc32k" };
->>> +static SUNXI_CCU_MP_WITH_MUX(apb1_clk, "apb1", apb1_parents, 0x058,
->>> +			     0, 5,	/* M */
->>> +			     16, 2,	/* P */
->>> +			     24, 2,	/* mux */
->>> +			     0);
->>> +
->>> +/* Not present on A20 */
->>> +static SUNXI_CCU_GATE(axi_dram_clk,	"axi-dram",	"ahb",
->>> +		      0x05c, BIT(31), 0);
->> Same here I guess, two defines make this a bit more readable.
-> You mean SUN4I_CCU_GATE? and SUN7I_CCU_GATE defines?
-> I don't think it makes things more readable...
-you think 0x05c and BIT(31) are easier to read? I'll do a pop quiz in 6
-months from now and see if you remember :p
->
->>> +
->>> +static SUNXI_CCU_GATE(ahb_otg_clk,	"ahb-otg",	"ahb",
-> ...
->>> +		      0x060, BIT(14), CLK_IS_CRITICAL);
->> <snip>
->>
->>> +static struct ccu_reset_map sun7i_a20_ccu_resets[] = {
->>> +	[RST_USB_PHY0]		= { 0x0cc, BIT(0) },
->>> +	[RST_USB_PHY1]		= { 0x0cc, BIT(1) },
->>> +	[RST_USB_PHY2]		= { 0x0cc, BIT(2) },
->>> +	[RST_GPS]		= { 0x0d0, BIT(0) },
->>> +	[RST_DE_BE0]		= { 0x104, BIT(30) },
->>> +	[RST_DE_BE1]		= { 0x108, BIT(30) },
->>> +	[RST_DE_FE0]		= { 0x10c, BIT(30) },
->>> +	[RST_DE_FE1]		= { 0x110, BIT(30) },
->>> +	[RST_DE_MP]		= { 0x114, BIT(30) },
->>> +	[RST_TCON0]		= { 0x118, BIT(30) },
->>> +	[RST_TCON1]		= { 0x11c, BIT(30) },
->> You are missing the TV encoder reset:
->> +      [RST_TVE0]              = { 0x118, BIT(29) },
->> +      [RST_TVE1]              = { 0x11c, BIT(29) },
->>
->> (to match your table i did not use defines :p)
-> Where did you get this information?
-> This is not present in any datasheets I have:
->   * A10 - 1.50
->   * A20 - 1.4
-It is actually from the A13. In the A13 all the other bits match up. We
-know from both that TCON0 is at 0x118 with its reset at BIT(30) and
-TCON1 has its reset 0x11c. From the A13 datasheet we gather that TCON(0)
-and TV(0) are at 0x118 with RST_TV on BIT(31) and thus it is only
-logical that that for the TVE1 we have the rest at 0x11c.
+Hi Mircea
 
-But this is writing from the top of my head, I think we can also find it
-in the 3.4 sources if I recall correctly.
->
-> [...]
->
-> P?ikest,
-> Priit Laes
+How is this interrupt controller connected? Is it chained off another
+interrupt controller? Or is it a root interrupt controller?
+
+	  Andrew
