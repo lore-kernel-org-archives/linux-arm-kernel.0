@@ -1,52 +1,36 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 13 Jul 2017 14:03:01 +0200
-Subject: Drivers taking different actions depending on sleep state
-In-Reply-To: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
-References: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
- <CAJZ5v0iL7voAz9T+36fXXncOj4UrFSAH8WzwEbec96GuFUteaQ@mail.gmail.com>
- <ccac39d6-4611-8b46-12f7-24227ef3b35e@gmail.com>
- <CAJZ5v0g_egRwxOLqft=JhvzAqBWuyvC8yiO7De5TYUZLUT2Fpw@mail.gmail.com>
- <7001768d-9134-4975-127e-e8444e00f677@gmail.com>
- <CAJZ5v0ihqn5Xcj1yoZcrb7caYiH+x8YivLJit6BqvDGradZJ=Q@mail.gmail.com>
- <b7a49925-d823-b03d-2990-2894ba2c2714@gmail.com>
- <20170622085102.mpk7vxodpgxtrlfd@piout.net>
-Message-ID: <20170713120300.GH1363@amd>
+Date: Thu, 13 Jul 2017 14:03:34 +0200
+Subject: [[PATCH]] Revert "leds: handle suspend/resume in heartbeat
+ trigger"
+In-Reply-To: <CACRpkdY6-REXoXjWNUrfCuPn3GYHhV0di7Lhbb=wRhBtPC0+mA@mail.gmail.com>
+References: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
+ <CACRpkdY6-REXoXjWNUrfCuPn3GYHhV0di7Lhbb=wRhBtPC0+mA@mail.gmail.com>
+Message-ID: <20170713120333.GI1363@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2017-06-22 10:51:02, Alexandre Belloni wrote:
-> On 21/06/2017 at 16:55:04 -0700, Florian Fainelli wrote:
-> > > That is conceivable, but again, the meaning of STANDBY and MEM is
-> > > platform-specific.  Actions to be taken for, say, STANDBY, may differ
-> > > from one platform to another.
-> > 
-> > True, though I would only expect drivers for that particular platform to
-> > care about that information and these drivers would only make sense on
-> > that particular platform so the meaning of STANDBY and MEM would be
-> > clear for those drivers. The intent is really to keep the "distributed"
-> > model where individual drivers manage their particular piece of HW,
-> > while utilizing a global piece of information that is platform specific.
-> > 
-> > If this seems acceptable to you along with proper documentation to
-> > illustrate the platform specific meaning of these states, I will got
-> > ahead and cook a patch.
+On Tue 2017-06-13 11:35:22, Linus Walleij wrote:
+> On Tue, Jun 13, 2017 at 4:39 AM, Zhang Bo <bo.zhang@nxp.com> wrote:
 > 
-> Well, that won't work for us. We need need two kind of information:
->  - whether main clock is switched from the master clock to the slow
->    clock
->  - whether VDDcore will be cut
+> > This reverts commit 5ab92a7cb82c66bf30685583a38a18538e3807db.
+> >
+> > System cannot enter suspend mode because of heartbeat led trigger.
+> > In autosleep_wq, try_to_suspend function will try to enter suspend
+> > mode in specific period. it will get wakeup_count then call pm_notifier
+> > chain callback function and freeze processes.
+> > Heartbeat_pm_notifier is called and it call led_trigger_unregister to
+> > change the trigger of led device to none. It will send uevent message
+> > and the wakeup source count changed. As wakeup_count changed, suspend
+> > will abort.
+> >
+> > Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
 > 
-> for the first one, we already have an hackish callback:
-> at91_suspend_entering_slow_clock() that will call from the platform
-> specific drivers.
+> OK I was stupid, lesson learned.
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Sounds like you need another "will_vddcore_be_cut?()" callback, not
-"int platform_suspend_target_state(void)".
+You may still want to submit patch to turn the LED off over suspend
+for your platform...
 
-And actually I'd hope you have some kind of regulator, so that "will
-this regulator be available over suspend" question can be asked?
-
-									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
@@ -56,4 +40,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170713/a0aff987/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170713/26983c1c/attachment-0001.sig>
