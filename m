@@ -1,260 +1,50 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 13 Jul 2017 16:33:40 -0400
-Subject: [PATCH v2 2/5] drm/rockchip: vop: support verify registers with
- vop version
-In-Reply-To: <5966D0A8.6060003@rock-chips.com>
-References: <1499824991-7391-1-git-send-email-mark.yao@rock-chips.com>
- <1499825019-7503-1-git-send-email-mark.yao@rock-chips.com>
- <20170712175305.n7kk7dzvfs2vywz3@art_vandelay>
- <5966D0A8.6060003@rock-chips.com>
-Message-ID: <20170713203340.asxoah7xgfj2fubs@art_vandelay>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 14 Jul 2017 06:45:26 +1000
+Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
+ HiSilicon bridge
+In-Reply-To: <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170712050811.3620-1-dja@axtens.net>
+ <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
+ <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1499978726.2865.59.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 09:45:12AM +0800, Mark yao wrote:
-> On 2017?07?13? 01:53, Sean Paul wrote:
-> > On Wed, Jul 12, 2017 at 10:03:38AM +0800, Mark Yao wrote:
+On Thu, 2017-07-13 at 06:29 -0500, Bjorn Helgaas wrote:
+> > Indeed our host controller depends on ARM64 so maybe it would make
+> > sense to move the quirk arch/arm64/kernel/pci.c; however regardless
+> > why is it strictly required for a VGA device to be legacy one in order
+> > to make it the default boot device?
+> > i.e. couldn't we have:
 > > 
-> > Please add a commit message describing *what* and *why* you are making the
-> > change.
+> > diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+> > index 0f5b2dd..a6b606c 100644
+> > --- a/drivers/gpu/vga/vgaarb.c
+> > +++ b/drivers/gpu/vga/vgaarb.c
+> > @@ -667,8 +667,7 @@ static bool vga_arbiter_add_pci_device(struct pci_dev *pdev)
+> > ???????/* Deal with VGA default device. Use first enabled one
+> > ??????? * by default if arch doesn't have it's own hook
+> > ??????? */
+> > -?????if (vga_default == NULL &&
+> > -???????? ((vgadev->owns & VGA_RSRC_LEGACY_MASK) == VGA_RSRC_LEGACY_MASK)) {
+> > +?????if (vga_default == NULL) {
+> > ???????????????vgaarb_info(&pdev->dev, "setting as boot VGA device\n");
+> > ???????????????vga_set_default_device(pdev);
+> > ???????}
 > 
-> Got it, I will fix it at next version.
-> 
-> Thanks.
-> > 
-> > > Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> > > ---
-> > >   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 66 +++++++++++++++++++++--------
-> > >   drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 18 ++++++--
-> > >   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 20 ++++++---
-> > >   3 files changed, 77 insertions(+), 27 deletions(-)
-> > > 
-> > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > > index 7a5f809..a9180fd 100644
-> > > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > > @@ -42,33 +42,60 @@
-> > >   #include "rockchip_drm_psr.h"
-> > >   #include "rockchip_drm_vop.h"
-> > > -#define __REG_SET_RELAXED(x, off, mask, shift, v, write_mask) \
-> > > -		vop_mask_write(x, off, mask, shift, v, write_mask, true)
-> > > +#define VOP_REG_SUPPORT(vop, reg) \
-> > > +		(!reg.major || (reg.major == VOP_MAJOR(vop->data->version) && \
-> > > +		reg.begin_minor <= VOP_MINOR(vop->data->version) && \
-> > > +		reg.end_minor >= VOP_MINOR(vop->data->version) && \
-> > > +		reg.mask))
-> > This would be better suited as a static inline function. As would many of the
-> > macros below.
-> 
-> Got it, will fix it at next version.
-> > 
-> > > -#define __REG_SET_NORMAL(x, off, mask, shift, v, write_mask) \
-> > > -		vop_mask_write(x, off, mask, shift, v, write_mask, false)
-> > > +#define VOP_WIN_SUPPORT(vop, win, name) \
-> > > +		VOP_REG_SUPPORT(vop, win->phy->name)
-> > > -#define REG_SET(x, base, reg, v, mode) \
-> > > -		__REG_SET_##mode(x, base + reg.offset, \
-> > > -				 reg.mask, reg.shift, v, reg.write_mask)
-> > > -#define REG_SET_MASK(x, base, reg, mask, v, mode) \
-> > > -		__REG_SET_##mode(x, base + reg.offset, \
-> > > -				 mask, reg.shift, v, reg.write_mask)
-> > > +#define VOP_CTRL_SUPPORT(vop, name) \
-> > > +		VOP_REG_SUPPORT(vop, vop->data->ctrl->name)
-> > > +
-> > > +#define VOP_INTR_SUPPORT(vop, name) \
-> > > +		VOP_REG_SUPPORT(vop, vop->data->intr->name)
-> > > +
-> > > +#define __REG_SET(x, off, mask, shift, v, write_mask, relaxed) \
-> > > +		vop_mask_write(x, off, mask, shift, v, write_mask, relaxed)
-> > There's really no point to this, just call vop_mask_write directly.
-> 
-> Got it, will fix it at next version.
-> > 
-> > > +
-> > > +#define _REG_SET(vop, name, off, reg, mask, v, relaxed) \
-> > > +	do { \
-> > > +		if (VOP_REG_SUPPORT(vop, reg)) \
-> > > +			__REG_SET(vop, off + reg.offset, mask, reg.shift, \
-> > s/mask/reg.mask & mask/
-> 
-> Got it, will fix it at next version.
-> > 
-> > > +				  v, reg.write_mask, relaxed); \
-> > > +		else \
-> > > +			dev_dbg(vop->dev, "Warning: not support "#name"\n"); \
-> > > +	} while (0)
-> > 
-> > Also better as static inline, IMO.
-> 
-> Good idea, I will try it.
-> 
-> > 
-> > > +
-> > > +#define REG_SET(x, name, off, reg, v, relaxed) \
-> > > +		_REG_SET(x, name, off, reg, reg.mask, v, relaxed)
-> > s/reg.mask/~0/
-> 
-> Got it, will fix it at next version.
-> > 
-> > > +#define REG_SET_MASK(x, name, off, reg, mask, v, relaxed) \
-> > > +		_REG_SET(x, name, off, reg, reg.mask & mask, v, relaxed)
-> > s/reg.mask &//
-> > 
-> > Also, these can become static inline functions as well.
-> 
-> Got it, will fix it at next version.
-> > 
-> > >   #define VOP_WIN_SET(x, win, name, v) \
-> > > -		REG_SET(x, win->base, win->phy->name, v, RELAXED)
-> > > +		REG_SET(x, name, win->base, win->phy->name, v, true)
-> > > +#define VOP_WIN_SET_EXT(x, win, ext, name, v) \
-> > > +		REG_SET(x, name, 0, win->ext->name, v, true)
-> > >   #define VOP_SCL_SET(x, win, name, v) \
-> > > -		REG_SET(x, win->base, win->phy->scl->name, v, RELAXED)
-> > > +		REG_SET(x, name, win->base, win->phy->scl->name, v, true)
-> > >   #define VOP_SCL_SET_EXT(x, win, name, v) \
-> > > -		REG_SET(x, win->base, win->phy->scl->ext->name, v, RELAXED)
-> > > +		REG_SET(x, name, win->base, win->phy->scl->ext->name, v, true)
-> > > +
-> > >   #define VOP_CTRL_SET(x, name, v) \
-> > > -		REG_SET(x, 0, (x)->data->ctrl->name, v, NORMAL)
-> > > +		REG_SET(x, name, 0, (x)->data->ctrl->name, v, false)
-> > >   #define VOP_INTR_GET(vop, name) \
-> > >   		vop_read_reg(vop, 0, &vop->data->ctrl->name)
-> > > -#define VOP_INTR_SET(vop, name, mask, v) \
-> > > -		REG_SET_MASK(vop, 0, vop->data->intr->name, mask, v, NORMAL)
-> > > +#define VOP_INTR_SET(vop, name, v) \
-> > > +		REG_SET(vop, name, 0, vop->data->intr->name, \
-> > > +			v, false)
-> > > +#define VOP_INTR_SET_MASK(vop, name, mask, v) \
-> > > +		REG_SET_MASK(vop, name, 0, vop->data->intr->name, \
-> > > +			     mask, v, false)
-> > > +
-> > >   #define VOP_INTR_SET_TYPE(vop, name, type, v) \
-> > >   	do { \
-> > >   		int i, reg = 0, mask = 0; \
-> > > @@ -78,13 +105,16 @@
-> > >   				mask |= 1 << i; \
-> > >   			} \
-> > >   		} \
-> > > -		VOP_INTR_SET(vop, name, mask, reg); \
-> > > +		VOP_INTR_SET_MASK(vop, name, mask, reg); \
-> > >   	} while (0)
-> > >   #define VOP_INTR_GET_TYPE(vop, name, type) \
-> > >   		vop_get_intr_type(vop, &vop->data->intr->name, type)
-> > > +#define VOP_CTRL_GET(x, name) \
-> > > +		vop_read_reg(x, 0, &vop->data->ctrl->name)
-> > > +
-> > >   #define VOP_WIN_GET(x, win, name) \
-> > > -		vop_read_reg(x, win->base, &win->phy->name)
-> > > +		vop_read_reg(x, win->offset, win->phy->name)
-> > >   #define VOP_WIN_GET_YRGBADDR(vop, win) \
-> > >   		vop_readl(vop, win->base + win->phy->yrgb_mst.offset)
-> > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> > > index 084d3b2..e4de890 100644
-> > > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> > > @@ -15,6 +15,14 @@
-> > >   #ifndef _ROCKCHIP_DRM_VOP_H
-> > >   #define _ROCKCHIP_DRM_VOP_H
-> > > +/*
-> > > + * major: IP major vertion, used for IP structure
-> > s/vertion/version
-> 
-> Got it, will fix it at next version.
-> Thanks.
-> 
-> > 
-> > > + * minor: big feature change under same structure
-> > > + */
-> > > +#define VOP_VERSION(major, minor)	((major) << 8 | (minor))
-> > > +#define VOP_MAJOR(version)		((version) >> 8)
-> > > +#define VOP_MINOR(version)		((version) & 0xff)
-> > > +
-> > >   enum vop_data_format {
-> > >   	VOP_FMT_ARGB8888 = 0,
-> > >   	VOP_FMT_RGB888,
-> > > @@ -25,10 +33,13 @@ enum vop_data_format {
-> > >   };
-> > >   struct vop_reg {
-> > > -	uint32_t offset;
-> > > -	uint32_t shift;
-> > >   	uint32_t mask;
-> > > -	bool write_mask;
-> > > +	uint32_t offset:12;
-> > > +	uint32_t shift:5;
-> > > +	uint32_t begin_minor:4;
-> > > +	uint32_t end_minor:4;
-> > > +	uint32_t major:3;
-> > > +	uint32_t write_mask:1;
-> > Why are you packing this?
-> 
-> make struct vop_reg not too big, jus u64 size, struct vop_reg use a lot on register define, packing it would reduce register table size.
-> 
+> I don't know enough about the VGA arbiter to answer this.? This test was
+> part of the initial implementation: deb2d2ecd43d ("PCI/GPU: implement VGA
+> arbitration on Linux") by Ben.
 
-Ehhh, let's not get too fancy. If you want to save space, you can use uint8_t
-and uint16_t. Packing like this makes it look like you're sending the struct
-elsewhere, which is just confusing.
+The above simply uses the first device that has memory and IO enabled
+as the default device (you don't need to have a default device).
 
-Sean
+This is essentially picking up whatever device had been initialized
+by the BIOS/firmware as default. This is needed for example on x86
+where the BIOS tends to only initialize one device. 
 
-> > 
-> > >   };
-> > >   struct vop_ctrl {
-> > > @@ -134,6 +145,7 @@ struct vop_win_data {
-> > >   };
-> > >   struct vop_data {
-> > > +	uint32_t version;
-> > >   	const struct vop_ctrl *ctrl;
-> > >   	const struct vop_intr *intr;
-> > >   	const struct vop_win_data *win;
-> > > diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> > > index 00e9d79..7744603 100644
-> > > --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> > > +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> > > @@ -20,17 +20,25 @@
-> > >   #include "rockchip_drm_vop.h"
-> > >   #include "rockchip_vop_reg.h"
-> > > -#define VOP_REG(off, _mask, s) \
-> > > +#define VOP_REG_VER_MASK(off, _mask, s, _write_mask, _major, \
-> > > +			 _begin_minor, _end_minor) \
-> > >   		{.offset = off, \
-> > >   		 .mask = _mask, \
-> > >   		 .shift = s, \
-> > > -		 .write_mask = false,}
-> > > +		 .write_mask = _write_mask, \
-> > > +		 .major = _major, \
-> > > +		 .begin_minor = _begin_minor, \
-> > > +		 .end_minor = _end_minor,}
-> > > +
-> > > +#define VOP_REG_VER(off, _mask, s, _major, _begin_minor, _end_minor) \
-> > > +		VOP_REG_VER_MASK(off, _mask, s, false, \
-> > > +				 _major, _begin_minor, _end_minor)
-> > > +
-> > > +#define VOP_REG(off, _mask, s) \
-> > > +		VOP_REG_VER(off, _mask, s, 0, 0, -1)
-> > >   #define VOP_REG_MASK(off, _mask, s) \
-> > > -		{.offset = off, \
-> > > -		 .mask = _mask, \
-> > > -		 .shift = s, \
-> > > -		 .write_mask = true,}
-> > > +		VOP_REG_VER_MASK(off, _mask, s, true, 0, 0, -1)
-> > >   static const uint32_t formats_win_full[] = {
-> > >   	DRM_FORMAT_XRGB8888,
-> > > -- 
-> > > 1.9.1
-> > > 
-> > > 
-> > > _______________________________________________
-> > > dri-devel mailing list
-> > > dri-devel at lists.freedesktop.org
-> > > https://lists.freedesktop.org/mailman/listinfo/dri-devel
-> 
-> 
-> -- 
-> ?ark Yao
-> 
-> 
+I'm not sure what problem you are trying to solve here ?
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Cheers,
+Ben.
