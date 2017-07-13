@@ -1,57 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jul 2017 16:12:57 +0200
-Subject: [PATCH 02/18] drm/sun4i: Add if statement instead of depends on
+Date: Thu, 13 Jul 2017 16:13:04 +0200
+Subject: [PATCH 09/18] drm/sun4i: tcon: Adjust dotclock dividers range
 In-Reply-To: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <d51d45d57d2bacaa5bafcd861aa0142fcaf0ad77.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <74db696da66cffafe1e729fe2df73b437c8fd483.1499955058.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The depends on relationship is obvious, and using an if statement will
-propagate it to every option without the need for each and every one of
-them to define it.
+It seems like the dotclock dividers are a bit less strict range, and can
+operate even with a smaller than 6 divider. Loose the boundaries a bit.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/Kconfig | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
-index 5bcad8f5fb4f..5cc116692913 100644
---- a/drivers/gpu/drm/sun4i/Kconfig
-+++ b/drivers/gpu/drm/sun4i/Kconfig
-@@ -13,9 +13,10 @@ config DRM_SUN4I
- 	  Display Engine. If M is selected the module will be called
- 	  sun4i-drm.
+diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+index d401156490f3..0b844c0dd102 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
++++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+@@ -77,7 +77,25 @@ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	u8 best_div = 1;
+ 	int i;
  
-+if DRM_SUN4I
-+
- config DRM_SUN4I_HDMI
-        tristate "Allwinner A10 HDMI Controller Support"
--       depends on DRM_SUN4I
-        default DRM_SUN4I
-        help
- 	  Choose this option if you have an Allwinner SoC with an HDMI
-@@ -23,7 +24,6 @@ config DRM_SUN4I_HDMI
+-	for (i = 6; i <= 127; i++) {
++	/*
++	 * There's something odd here.
++	 *
++	 * In the A13 user manual, this is stated to be >= 6 when
++	 * dclk1 and dclk2 are used (without any hint on how to use
++	 * them), and >= 4 when only dclk is used.
++	 *
++	 * In the A33 user manual, when only dclk is used, it is set
++	 * to be >= 6 in the former case, and >= 1 in the
++	 * latter. There's also some (obscure) explanations about the
++	 * dclk1 and dclk2 vs dclk that seems to be in the upper 4
++	 * bits. What those clocks are and what bit does what is not
++	 * really clear.
++	 *
++	 * On the A33 however, while something lower than 4 works, it
++	 * does have a few artifacts. Let's not use those values, and
++	 * see how it goes.
++	 */
++	for (i = 4; i <= 127; i++) {
+ 		unsigned long ideal = rate * i;
+ 		unsigned long rounded;
  
- config DRM_SUN4I_BACKEND
- 	tristate "Support for Allwinner A10 Display Engine Backend"
--	depends on DRM_SUN4I
- 	default DRM_SUN4I
- 	help
- 	  Choose this option if you have an Allwinner SoC with the
-@@ -33,10 +33,11 @@ config DRM_SUN4I_BACKEND
- 
- config DRM_SUN8I_MIXER
- 	tristate "Support for Allwinner Display Engine 2.0 Mixer"
--	depends on DRM_SUN4I
- 	default MACH_SUN8I
- 	help
- 	  Choose this option if you have an Allwinner SoC with the
- 	  Allwinner Display Engine 2.0, which has a mixer to do some
- 	  graphics mixture and feed graphics to TCON, If M is
- 	  selected the module will be called sun8i-mixer.
-+
-+endif
 -- 
 git-series 0.9.1
