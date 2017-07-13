@@ -1,54 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 13 Jul 2017 10:12:59 +0100
-Subject: [kernel-hardening] Re: [RFC PATCH 10/10] arm64: kernel: add
- support for virtually mapped stacks
-In-Reply-To: <20170712225937.GA25816@leverpostej>
-References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
- <20170712144424.19528-11-ard.biesheuvel@linaro.org>
- <20170712225937.GA25816@leverpostej>
-Message-ID: <20170713091259.GA26194@leverpostej>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Thu, 13 Jul 2017 09:28:24 +0000
+Subject: [PATCH 3/3] ARM: dts: iwg20m: Add MMCIF0 support
+In-Reply-To: <20170713081213.GL5580@verge.net.au>
+References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
+ <1499853805-5915-4-git-send-email-chris.paterson2@renesas.com>
+ <CAMuHMdXMFkXopGiLOVf0jDDQTKig-wFrgMOKrf14341h85kPNw@mail.gmail.com>
+ <20170713080228.GI5580@verge.net.au> <20170713081213.GL5580@verge.net.au>
+Message-ID: <TY1PR06MB07024FD88BB0ED16E860F650B7AC0@TY1PR06MB0702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 11:59:38PM +0100, Mark Rutland wrote:
-> On Wed, Jul 12, 2017 at 03:44:23PM +0100, Ard Biesheuvel wrote:
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index 2ba3185b1c78..4c3e82d6e2f2 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -392,6 +392,20 @@ ENDPROC(el1_error_invalid)
-> >   */
-> >  	.align	6
-> >  el1_sync:
-> > +#ifdef CONFIG_VMAP_STACK
-> > +	/*
-> > +	 * When taking an exception from EL1, we need to check whether it is
-> > +	 * caused by a faulting out-of-bounds access to the virtually mapped
-> > +	 * stack before we can attempt to preserve the interrupted context.
-> > +	 */
-> > +	msr	tpidrro_el0, x0			// stash x0
-> > +	mrs	x0, far_el1			// get faulting address
-> > +	tbnz	x0, #63, .Lcheck_stack_ovf	// check if not user address
+
+
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 13 July 2017 09:12
 > 
-> One thing I don't like about this is that we're reading FAR_EL1 even
-> though we don't know whether it's valid. It could contain junk, and we
-> could spuriously jump into the slow path. That's liable to make
-> performance erratic.
+> On Thu, Jul 13, 2017 at 10:02:29AM +0200, Simon Horman wrote:
+> > On Wed, Jul 12, 2017 at 01:52:49PM +0200, Geert Uytterhoeven wrote:
+> > > Hi Chris,
+> > >
+> > > On Wed, Jul 12, 2017 at 12:03 PM, Chris Paterson
+> > > <chris.paterson2@renesas.com> wrote:
+> > > > Define the iwg20m board dependent part of the MMCIF0 device node.
+> > > >
+> > > > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> > > >
+> > > > diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+> > > > b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+> > > > index 001ca91..ffce1b6 100644
+> > > > --- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+> > > > +++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+> > >
+> > > > +&pfc {
+> > > > +       mmcif0_pins: mmc {
+> > > > +               groups = "mmc_data8", "mmc_ctrl";
+> > >
+> > > "mmc_data8" is not correct, as D6/D7 of the eMMC are not connected
+> > > to GP6_28 resp. GP6_29, but to GP6_6 resp. GP6_7.
+> > > So it should be "mmc_data8_b".
+> > >
+> > > Unfortunately the latter pin group isn't supported by the PFC driver yet.
+> > > Cooking a patch...
 
-Once I sent this, I realised what I said wasn't quite right.
+Thanks for your review Geert. Sorry I missed this.
 
-It's true that FAR_EL1 is UNKNOWN in some cases, but today those are all
-fatal (e.g. if we take an UNDEFINED exception due to a bad instruction
-at EL1).
+> >
+> > The above notwithstanding I have applied this patch for v4.14.
+> 
+> ...
+> 
+> Sorry, I think I need more coffee.
 
-So my performance concern was spurious; sorry for the noise.
+No worries!
 
-However, so as to not mis-report those fatal cases, we either need to
-inspect the SP or ESR_EL1 to determine that FAR_EL1 is valid and/or this
-was a stack-overflow
+> 
+> I misread Geert's comment above. I have dropped this patch.
+> Please post a corrected v2 of this patch.
 
-If we follow the approach of this series, we can move those checks into
-the check_stack_ovf slow path.
-
-Thanks,
-Mark.
+Will do.
