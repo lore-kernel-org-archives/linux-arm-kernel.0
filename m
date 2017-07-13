@@ -1,54 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 13 Jul 2017 16:07:18 +0800
-Subject: [PATCH] arm64: dts: ls1012a: add USB host controller nodes
-In-Reply-To: <1499223243-13253-1-git-send-email-ran.wang_1@nxp.com>
-References: <1499223243-13253-1-git-send-email-ran.wang_1@nxp.com>
-Message-ID: <20170713080717.GP3172@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Jul 2017 10:08:55 +0200
+Subject: [PATCH 0/3] ARM: dts: r8a779[014]: Use R-Car Gen 2 fallback
+ binding for vin nodes
+In-Reply-To: <20170713050744.GA23854@bigcity.dyn.berto.se>
+References: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
+ <20170713050744.GA23854@bigcity.dyn.berto.se>
+Message-ID: <20170713080855.GK5580@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 10:54:03AM +0800, Ran Wang wrote:
-> LS1012A has one USB 3.0(DWC3) controller and
-> one USB 2.0 controller.
+On Thu, Jul 13, 2017 at 07:07:44AM +0200, Niklas S?derlund wrote:
+> Hi Simon,
 > 
-> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+> Thanks for your work.
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> index b497ac1..8aa2dcf 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> @@ -411,6 +411,23 @@
->  				 <&clockgen 4 3>;
->  		};
->  
-> +		usb0: usb3 at 2f00000 {
-> +			compatible = "snps,dwc3";
-> +			reg = <0x0 0x2f00000 0x0 0x10000>;
-> +			interrupts = <0 60 0x4>;
-> +			dr_mode = "host";
-> +			snps,quirk-frame-length-adjustment = <0x20>;
-> +			snps,dis_rxdet_inp3_quirk;
-> +		};
-> +
-> +		usb1: usb2 at 8600000 {
-> +			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
-> +			reg = <0x0 0x8600000 0x0 0x1000>;
-> +			interrupts = <0 139 0x4>;
-> +			dr_mode = "host";
-> +			phy_type = "ulpi";
-> +		};
-
-Please keep the nodes sorted in unit-address.
-
-Shawn
-
-> +
->  		sata: sata at 3200000 {
->  			compatible = "fsl,ls1012a-ahci", "fsl,ls1043a-ahci";
->  			reg = <0x0 0x3200000 0x0 0x10000>,
-> -- 
-> 2.1.0.27.g96db324
+> On 2017-07-11 14:56:46 +0200, Simon Horman wrote:
+> > Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a779[014] SoCs.
+> > 
+> > This has no run-time effect for the current driver as the initialisation
+> > sequence is the same for the SoC-specific binding for r8a779[014] and the
+> > fallback binding for R-Car Gen 2
+> > 
+> > This is consistent with existing compat string usage in vin nodes for the
+> > r8a779[23] SoCs.
 > 
+> For whole serries:
+> 
+> Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+Thanks, applied for v4.14.
