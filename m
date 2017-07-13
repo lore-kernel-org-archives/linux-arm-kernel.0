@@ -1,57 +1,39 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 13 Jul 2017 16:31:22 +0800
-Subject: [PATCH 1/3] dts: ls2088a: add pcie support
-In-Reply-To: <VI1PR0402MB2782E2EB4B0E36EFF55CD5E684AC0@VI1PR0402MB2782.eurprd04.prod.outlook.com>
-References: <1499331330-38362-1-git-send-email-Zhiqiang.Hou@nxp.com>
- <20170713081728.GQ3172@dragon>
- <VI1PR0402MB2782E2EB4B0E36EFF55CD5E684AC0@VI1PR0402MB2782.eurprd04.prod.outlook.com>
-Message-ID: <20170713083121.GR3172@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Jul 2017 10:33:19 +0200
+Subject: [PATCH] arm64: dts: r8a7796: Add missing second pair of DMA
+ names to MSIOF nodes
+In-Reply-To: <CAMuHMdU58TtEpHAdmf-wKCrOvziZTTs3xBc7hv4E15n1UdCOOQ@mail.gmail.com>
+References: <1499855753-21630-1-git-send-email-geert+renesas@glider.be>
+ <20170713081811.GN5580@verge.net.au>
+ <CAMuHMdU58TtEpHAdmf-wKCrOvziZTTs3xBc7hv4E15n1UdCOOQ@mail.gmail.com>
+Message-ID: <20170713083319.GP5580@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 08:27:47AM +0000, Z.q. Hou wrote:
-> Hi Shawn,
+On Thu, Jul 13, 2017 at 10:23:43AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> Thanks for your comments!
+> On Thu, Jul 13, 2017 at 10:18 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Wed, Jul 12, 2017 at 12:35:53PM +0200, Geert Uytterhoeven wrote:
+> >> MSIOF0 and MSIOF1 are tied to two DMA controllers through two pairs of
+> >> DMA specifiers.  However, the second pair of corresponding DMA names was
+> >> missing.
+> >>
+> >> Fixes: 80fab06e258da762 ("arm64: dts: r8a7796: Add all MSIOF nodes")
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >>  arch/arm64/boot/dts/renesas/r8a7796.dtsi | 4 ++--
+> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > Thanks, applied for v4.14.
+> >
+> > Let me know if you would prefer it handled as a fix for v4.13.
+> > I see the commit it fixes was part of v4.11.
 > 
-> > -----Original Message-----
-> > From: Shawn Guo [mailto:shawnguo at kernel.org]
-> > Sent: 2017?7?13? 16:18
-> > To: Z.q. Hou <zhiqiang.hou@nxp.com>
-> > Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> > robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> > will.deacon at arm.com; Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> > Subject: Re: [PATCH 1/3] dts: ls2088a: add pcie support
-> > 
-> > On Thu, Jul 06, 2017 at 04:55:28PM +0800, Zhiqiang Hou wrote:
-> > > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > >
-> > > The physical memory map address and CCSR registers map address are
-> > > different between LS2088A and other LS2080A series SoCs.
-> > >
-> > > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > > ---
-> > >  arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi | 4 ++++
-> > >  1 file changed, 4 insertions(+)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-> > > b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-> > > index 5c695c6..7d26531 100644
-> > > --- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-> > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-> > > @@ -134,6 +134,7 @@
-> > >  };
-> > >
-> > >  &pcie1 {
-> > > +	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-> > 
-> > I do not see "fsl,ls2088a-pcie" in either bindings doc or kernel driver.
-> > 
+> Thanks!
 > 
-> I submitted the DT node patch and driver code patch separately, see the driver patch:
-> https://patchwork.kernel.org/patch/9827915/
+> V4.14 is fine.  It's not enabled in any board DTS, and DMA will stll work as
+> long as there are free channels on DMAC1.
 
-Send me the dts changes after bindings and driver patch land on
-mainline.
-
-Shawn
+Thanks, for clarifying. The second point above was the main part of my
+reasoning that it is v4.14 material.
