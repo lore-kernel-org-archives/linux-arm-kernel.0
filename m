@@ -1,62 +1,85 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 13 Jul 2017 15:11:46 -0600
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
- <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170713151146.53e9644c@w520.home>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 13 Jul 2017 23:25:37 +0200
+Subject: [PATCH v3 4/6] ARM: meson: Add SMP bringup code for Meson8 and
+ Meson8b
+In-Reply-To: <CAFBinCBnQgnZQ3ogPBCxCxhTWzjSi1A4uSpdKO97NpBhQPryPw@mail.gmail.com>
+References: <20170713103113.21560-1-martin.blumenstingl@googlemail.com>
+ <20170713103113.21560-5-martin.blumenstingl@googlemail.com>
+ <20170713131625.GC31807@n2100.armlinux.org.uk>
+ <CAFBinCBnQgnZQ3ogPBCxCxhTWzjSi1A4uSpdKO97NpBhQPryPw@mail.gmail.com>
+Message-ID: <CAFBinCDQpZM6+5tAsMHNhkESnKZx9Ox+mSs110KYiE-oUr1thg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jul 2017 06:29:38 -0500
-Bjorn Helgaas <helgaas@kernel.org> wrote:
+On Thu, Jul 13, 2017 at 9:39 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> Hi Russel,
+>
+> On Thu, Jul 13, 2017 at 3:16 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Thu, Jul 13, 2017 at 12:31:11PM +0200, Martin Blumenstingl wrote:
+>>> +static DEFINE_SPINLOCK(boot_lock);
+>>> +
+>>> +/*
+>>> + * Write pen_release in a way that is guaranteed to be visible to all
+>>> + * observers, irrespective of whether they're taking part in coherency
+>>> + * or not.  This is necessary for the hotplug code to work reliably.
+>>> + */
+>>> +static void write_pen_release(int val)
+>>> +{
+>>> +     pen_release = val;
+>>> +     smp_wmb();
+>>> +     sync_cache_w(&pen_release);
+>>> +}
+>>
+>> Hi Martin,
+>>
+>> This looks like a classic case of cargo-cult copying of the early ARM
+>> Ltd Realview SMP code, and people really need to understand that is
+>> not a good implementation to copy.  The Realview platforms are very
+>> limited in what they can do: there's no power control of the CPU cores,
+>> and there's no individual reset.  These platforms are evaluation
+>> platforms for the CPUs, where the CPUs themselves are often "test chips".
+>> They are not production systems.
+>>
+>> The only way to control the cores on these platforms is via software
+>> loops such as the holding pen and loops in the hotplug code, since the
+>> CPUs always have to be executing some code somewhere.  There are other
+>> issues too which required the boot_lock (to ensure local timer
+>> calibration worked.)
+>>
+>> None of these issues apply to production SMP platforms, so you likely do
+>> not need any of this - and I see from your code that you do have power
+>> and reset controls for the CPUs.  What I'm basically saying here is:
+>> please rip out the holding pen and boot_lock code from your SMP
+>> implementation.
+>>
+>> If you do need it, please include a detailed explanation why it's
+>> required - requiring it suggests that the hardware is broken, and
+>> probably doesn't support hotplug and therefore does not support suspend/
+>> resume.
+> uh, I see - thank you for the explanation!
+> you are probably right when you say that it's not needed - I added it
+> when implementing Meson8 support (Carlo's series only handled
+> Meson8b). I couldn't get it working on Meson8 at first, but that was
+> before I found out that we have to enable power through SCU first.
+>
+> I will remove and re-test this later - many thanks for looking into
+> this (and for the detailed explanation).
+> this will probably make the code much easier to read :)
+and indeed, you were right: it works fine without all this pen_release
+/ smp_lock code!
+this also allows us to get rid of meson8_smp_secondary_init()
 
-> [+cc Ben, David, Daniel, Alex]
-> 
-> On Thu, Jul 13, 2017 at 10:29:25AM +0000, Gabriele Paoloni wrote:
-> > Hi Bjorn, Daniel
-> > 
-> > [...]
-> >   
-> > > 
-> > > Is this quirk useful on any arch other than arm64?  Per
-> > > drivers/pci/dwc/Kconfig, CONFIG_PCI_HISI depends on CONFIG_ARM64.
-> > > 
-> > > Would it make sense to put this quirk in arch/arm64/kernel/pci.c?  
-> > 
-> > Indeed our host controller depends on ARM64 so maybe it would make
-> > sense to move the quirk arch/arm64/kernel/pci.c; however regardless
-> > why is it strictly required for a VGA device to be legacy one in order
-> > to make it the default boot device?
-> > i.e. couldn't we have:
-> > 
-> > diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-> > index 0f5b2dd..a6b606c 100644
-> > --- a/drivers/gpu/vga/vgaarb.c
-> > +++ b/drivers/gpu/vga/vgaarb.c
-> > @@ -667,8 +667,7 @@ static bool vga_arbiter_add_pci_device(struct pci_dev *pdev)
-> >  	/* Deal with VGA default device. Use first enabled one
-> >  	 * by default if arch doesn't have it's own hook
-> >  	 */
-> > -	if (vga_default == NULL &&
-> > -	    ((vgadev->owns & VGA_RSRC_LEGACY_MASK) == VGA_RSRC_LEGACY_MASK)) {
-> > +	if (vga_default == NULL) {
-> >  		vgaarb_info(&pdev->dev, "setting as boot VGA device\n");
-> >  		vga_set_default_device(pdev);
-> >  	}  
-
-
-"Legacy" is the breadcrumb we use to try to pick the same device for
-default VGA as the system firmware used as the boot VGA.  There can be
-multiple VGA devices in the system, the change above would simply make
-the first discovered device be the default VGA.  That would break many,
-many systems.  If legacy VGA ranges mean nothing on ARM64, then follow
-the powerpc lead and make an arch quirk that simply selects the first
-enabled VGA device as the default.  VGA routing is part of the PCI spec
-though, so the default of selecting the device with routing enabled
-makes sense.  Thanks,
-
-Alex
+> one more question:
+> the code uses some memory barrier macros (smp_wmb(), smp_rmb(), mb()
+> and dsb_sev()).
+> unfortunately I'm not very familiar with these - could you please have
+> a look at this and let me know which ones you would keep or remove?
+> secondary_start_kernel() is already flushing some caches, so maybe
+> those barriers can also be removed
+deleting the pen_release / smp_lock code also gets rid of the
+smp_wmb(), mb() and dsb_sev() invocation.
+there's only a dsb(); dmb(); left in
+meson_smp_finalize_secondary_boot() and an smp_rmb() in
+{meson8,meson8b}_smp_cpu_kill()
