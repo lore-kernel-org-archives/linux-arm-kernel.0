@@ -1,104 +1,59 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 13 Jul 2017 11:18:35 +0100
-Subject: [RFC PATCH 2/6] arm64: avoid open-coding THREAD_SIZE{,_ORDER}
-In-Reply-To: <1499898783-25732-3-git-send-email-mark.rutland@arm.com>
-References: <1499898783-25732-1-git-send-email-mark.rutland@arm.com>
- <1499898783-25732-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <596748FB.20902@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jul 2017 11:18:45 +0100
+Subject: i.MX 6 and PCIe DMA issues
+In-Reply-To: <20170713100031.GA31131@mmlinux>
+References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
+ <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
+ <20170713070718.GA3871@mmlinux>
+ <20170713090423.GA31807@n2100.armlinux.org.uk>
+ <20170713100031.GA31131@mmlinux>
+Message-ID: <20170713101845.GB31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 12/07/17 23:32, Mark Rutland wrote:
-> Currently we define THREAD_SIZE_ORDER dependent on which arm64-specific
-> page size kconfig symbol was selected. This is unfortunate, as it hides
-> the relationship between THREAD_SIZE_ORDER and THREAD_SIZE, and makes it
-> painful more painful than necessary to modify the thread size as we will
-> need to do for some debug configurations.
+On Thu, Jul 13, 2017 at 12:00:31PM +0200, michael.moese at men.de wrote:
+> On Thu, Jul 13, 2017 at 10:04:23AM +0100, Russell King - ARM Linux wrote:
+> > You must always use the two addresses returned from dma_alloc_coherent()
+> > and never try to translate them - the DMA address is for programming
+> > into the hardware, and the virtual address for CPU accesses.  If you do
+> > try to pass these to the various translators (like virt_to_phys()) the
+> > result is undefined.
 > 
-> This patch follows arch/metag's approach of consistently defining
-> THREAD_SIZE in terms of THREAD_SIZE_ORDER. This avoids having ifdefs for
-> particular page size configurations, and allows us to change a single
-> definition to change the thread size.
+> I was trying to just print some addresses for debugging. I removed this
+> again. I'm just confused, because the DMA device address seems to be the
+> physical one. At least the memory contains my data. The virtual memory
+> contains different data. 
 
-I think this has unintended side effects for 64K page systems.  (or at least not
-yet intended)
+The DMA address might be a physical address if that's what the device
+requires, but equally, it might not be.
 
-Today:
-> #ifdef CONFIG_ARM64_4K_PAGES
-> #define THREAD_SIZE_ORDER	2
-> #elif defined(CONFIG_ARM64_16K_PAGES)
-> #define THREAD_SIZE_ORDER	0
-> #endif
+If it is a physical address, phys_to_virt() will return the virtual
+address in the lowmem mapping provided that the physical address
+corresponds with a lowmem mapped page.  If it's a highmem page, then
+phys_to_virt() will still return something that looks like a virtual
+address, but it could be anything.  It's undefined.
 
-Means THREAD_SIZE_ORDER is unset on 64K, and THREAD_SIZE is always:
-> #define THREAD_SIZE		16384
+Accessing memory through that pointer could end up hitting a cacheable
+mapping, which would destroy the semantics of the DMA coherent mapping,
+thereby leading to unpredictable behaviour.
 
-/kernel/fork.c matches this with its:
-> # if THREAD_SIZE >= PAGE_SIZE || defined(CONFIG_VMAP_STACK)
-[...]
-> #else
-[...]
-> void thread_stack_cache_init(void)
-> {
->	thread_stack_cache = kmem_cache_create("thread_stack", THREAD_SIZE,
-> 					      THREAD_SIZE, 0, NULL);
-> 	BUG_ON(thread_stack_cache == NULL);
-> }
-> #endif
+As I've already said, use _both_ pointers for a DMA coherent allocation.
+If you want to dump the data in the DMA coherent memory, use the virtual
+address returned from dma_alloc_coherent() - this will have the least
+side effects.
 
-To create a kmemcache to share 64K pages as 16K stacks.
+If you access it through phys_to_virt(dma_addr) then you could be
+dragging the data into the caches, and the first time you print it, it
+would look correct, but when the DMA device updates it, it becomes stale,
+and even if you subsequently access it through the correct pointer, you
+could continue receiving the stale data.  Just don't do this - using
+phys_to_virt() may seem like a short-cut, but it really isn't.
 
+> Could it be possible this mapping on my board is going wrong?
 
-After this patch:
-> #define THREAD_SHIFT		14
->
-> #if THREAD_SHIFT >= PAGE_SHIFT
-> #define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
-> #else
-> #define THREAD_SIZE_ORDER	0
-> #endif
+Unlikely.
 
-Means THREAD_SIZE_ORDER is 0, and:
-> #define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
-
-gives us a 64K THREAD_SIZE.
-
-
-
-Thanks,
-
-James
-
-
-
-
-
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index 141f13e9..6d0c59a 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -23,13 +23,17 @@
->  
->  #include <linux/compiler.h>
->  
-> -#ifdef CONFIG_ARM64_4K_PAGES
-> -#define THREAD_SIZE_ORDER	2
-> -#elif defined(CONFIG_ARM64_16K_PAGES)
-> +#include <asm/page.h>
-> +
-> +#define THREAD_SHIFT		14
-> +
-> +#if THREAD_SHIFT >= PAGE_SHIFT
-> +#define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
-> +#else
->  #define THREAD_SIZE_ORDER	0
->  #endif
->  
-> -#define THREAD_SIZE		16384
-> +#define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
->  #define THREAD_START_SP		(THREAD_SIZE - 16)
->  
->  #ifndef __ASSEMBLY__
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
