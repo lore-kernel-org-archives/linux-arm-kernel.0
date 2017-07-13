@@ -1,233 +1,89 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 13 Jul 2017 16:52:43 -0500
-Subject: [PATCH 2/2] pinctrl: qcom: qdf2xxx: add support for new ACPI HID
- QCOM8002
-In-Reply-To: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
-References: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1499982763-29619-3-git-send-email-timur@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 13 Jul 2017 15:11:25 -0700
+Subject: [PATCH] arm64: dts: qcom: Force host mode for USB on apq8016-sbc
+Message-ID: <20170713221125.16195-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Newer versions of the firmware for the Qualcomm Datacenter Technologies
-QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-prevent older kernels from accidentally accessing the restricted GPIOs,
-we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-and introduce a new property "gpios".  This property is an array of
-specific GPIOs that are accessible.  When an older kernel boots on
-newer (restricted) firmware, it will fail to probe.
+Commit ed75d6a96905 ("arm64: dts: qcom: Collapse usb support into
+one node") breaks host mode support on apq8016-sbc boards. This
+is because the mux driver (tc7usb40mu) hasn't been merged.
+Without that driver, we can't toggle the GPIO going to the mux to
+route out the D+/D- lines to the USB hub that's on the board.
 
-To implement the sparse GPIO map, we register all of the GPIOs, but set
-the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
-driver will block those unavailable GPIOs from being accessed.
+One solution would be to totally revert this change, but that
+opens us up to other problems when two USB drivers are operating
+the same hardware block at the same time. Let's modify the DT so
+that the USB controller is always in host mode and connected to
+the hub so that things like USB keyboards and mouses work. This
+is the mode that most people prefer anyway with these devices. We
+also delete the usb-switch node because the binding was never
+accepted upstream.
 
-To allow newer kernels to support older firmware, the driver retains
-support for QCOM8001.
+In the future, we can add muxing support and then update the DT
+to support both modes at runtime. Patches to support this are
+already on the mailing list.
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
+Fixes: ed75d6a96905 ("arm64: dts: qcom: Collapse usb support into one node")
+Reported-by: Rob Clark <robdclark@gmail.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 157 +++++++++++++++++++++++----------
- 1 file changed, 111 insertions(+), 46 deletions(-)
+ arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |  1 +
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi           | 14 ++++----------
+ 2 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-index bb3ce5c..266f2e6 100644
---- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-+++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-@@ -38,83 +38,148 @@
- /* maximum size of each gpio name (enough room for "gpioXXX" + null) */
- #define NAME_SIZE	8
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+index d94640812194..790b7775b901 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+@@ -17,6 +17,7 @@
+ 			function = PMIC_GPIO_FUNC_NORMAL;
+ 			power-source = <PM8916_GPIO_VPH>;
+ 			input-disable;
++			output-high;
+ 		};
+ 	};
  
-+enum {
-+	QDF2XXX_V1,
-+	QDF2XXX_V2,
-+};
-+
-+static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
-+	{"QCOM8001", QDF2XXX_V1},
-+	{"QCOM8002", QDF2XXX_V2},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-+
- static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- {
-+	const struct acpi_device_id *id =
-+		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
-+	struct device *dev = &pdev->dev;
- 	struct pinctrl_pin_desc *pins;
- 	struct msm_pingroup *groups;
- 	char (*names)[NAME_SIZE];
- 	unsigned int i;
--	u32 num_gpios;
-+	unsigned int num_gpios; /* The number of GPIOs we support */
-+	u32 max_gpios; /* The highest number GPIO that exists */
-+	u16 *gpios; /* An array of supported GPIOs */
- 	int ret;
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index bd310ac1967a..8f2decf84bbf 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -213,16 +213,18 @@
+ 		};
  
--	/* Query the number of GPIOs from ACPI */
--	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
-+	/* The total number of GPIOs that exist */
-+	ret = device_property_read_u32(dev, "num-gpios", &max_gpios);
- 	if (ret < 0) {
--		dev_warn(&pdev->dev, "missing num-gpios property\n");
-+		dev_err(dev, "missing or invalid 'num-gpios' property\n");
- 		return ret;
- 	}
-+	if (!max_gpios || max_gpios > MAX_GPIOS) {
-+		dev_err(dev, "invalid 'num-gpios' property\n");
-+		return -EINVAL;
-+	}
+ 		usb at 78d9000 {
+-			extcon = <&usb_id>, <&usb_id>;
++			extcon = <&usb_id>;
+ 			status = "okay";
+ 			adp-disable;
+ 			hnp-disable;
+ 			srp-disable;
++			dr_mode = "host";
++			pinctrl-names = "default";
++			pinctrl-0 = <&usb_sw_sel_pm>;
+ 			ulpi {
+ 				phy {
+ 					v1p8-supply = <&pm8916_l7>;
+ 					v3p3-supply = <&pm8916_l13>;
+-					extcon = <&usb_id>;
+ 				};
+ 			};
+ 		};
+@@ -342,14 +344,6 @@
+ 		pinctrl-0 = <&usb_id_default>;
+ 	};
  
--	if (!num_gpios || num_gpios > MAX_GPIOS) {
--		dev_warn(&pdev->dev, "invalid num-gpios property\n");
--		return -ENODEV;
-+	/*
-+	 * The QCOM8001 HID contains only the number of GPIOs, and assumes
-+	 * that all of them are available.  num_gpios is the same as max_gpios.
-+	 *
-+	 * The QCOM8002 HID introduces the 'gpios' DSD, which lists
-+	 * specific GPIOs that the driver is allowed to access.
-+	 *
-+	 * The make the common code simpler, in both cases we create an
-+	 * array of GPIOs that are accessible.  So for QCOM8001, that would
-+	 * be all of the GPIOs.
-+	 */
-+	if (id->driver_data == QDF2XXX_V1) {
-+		num_gpios = max_gpios;
-+
-+		gpios = devm_kcalloc(dev, num_gpios, sizeof(u16), GFP_KERNEL);
-+		if (!gpios)
-+			return -ENOMEM;
-+
-+		for (i = 0; i < num_gpios; i++)
-+			gpios[i] = i;
-+	} else {
-+		/* The number of GPIOs in the approved list */
-+		ret = device_property_read_u16_array(dev, "gpios", NULL, 0);
-+		if (ret < 0) {
-+			dev_err(dev, "missing/invalid 'gpios' property\n");
-+			return ret;
-+		}
-+		if (ret == 0) {
-+			dev_warn(dev, "no GPIOs defined\n");
-+			return -ENODEV;
-+		}
-+		num_gpios = ret;
-+
-+		gpios = devm_kcalloc(dev, num_gpios, sizeof(u16), GFP_KERNEL);
-+		if (!gpios)
-+			return -ENOMEM;
-+
-+		ret = device_property_read_u16_array(dev, "gpios", gpios,
-+						     num_gpios);
-+		if (ret < 0) {
-+			dev_err(dev, "could not read list of GPIOs\n");
-+			return ret;
-+		}
- 	}
- 
--	pins = devm_kcalloc(&pdev->dev, num_gpios,
-+	pins = devm_kcalloc(dev, max_gpios,
- 		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
--	groups = devm_kcalloc(&pdev->dev, num_gpios,
-+	groups = devm_kcalloc(dev, max_gpios,
- 		sizeof(struct msm_pingroup), GFP_KERNEL);
--	names = devm_kcalloc(&pdev->dev, num_gpios, NAME_SIZE, GFP_KERNEL);
-+	names = devm_kcalloc(dev, num_gpios, NAME_SIZE, GFP_KERNEL);
- 
- 	if (!pins || !groups || !names)
- 		return -ENOMEM;
- 
--	for (i = 0; i < num_gpios; i++) {
--		snprintf(names[i], NAME_SIZE, "gpio%u", i);
+-	usb-switch {
+-		compatible = "toshiba,tc7usb40mu";
+-		switch-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
+-		extcon = <&usb_id>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&usb_sw_sel_pm>;
+-	};
 -
-+	/*
-+	 * Initialize the array.  GPIOs not listed in the 'gpios' array
-+	 * still need a number and a name, but nothing else.
-+	 */
-+	for (i = 0; i < max_gpios; i++) {
- 		pins[i].number = i;
--		pins[i].name = names[i];
--
--		groups[i].npins = 1;
--		groups[i].name = names[i];
- 		groups[i].pins = &pins[i].number;
-+	}
- 
--		groups[i].ctl_reg = 0x10000 * i;
--		groups[i].io_reg = 0x04 + 0x10000 * i;
--		groups[i].intr_cfg_reg = 0x08 + 0x10000 * i;
--		groups[i].intr_status_reg = 0x0c + 0x10000 * i;
--		groups[i].intr_target_reg = 0x08 + 0x10000 * i;
--
--		groups[i].mux_bit = 2;
--		groups[i].pull_bit = 0;
--		groups[i].drv_bit = 6;
--		groups[i].oe_bit = 9;
--		groups[i].in_bit = 0;
--		groups[i].out_bit = 1;
--		groups[i].intr_enable_bit = 0;
--		groups[i].intr_status_bit = 0;
--		groups[i].intr_target_bit = 5;
--		groups[i].intr_target_kpss_val = 1;
--		groups[i].intr_raw_status_bit = 4;
--		groups[i].intr_polarity_bit = 1;
--		groups[i].intr_detection_bit = 2;
--		groups[i].intr_detection_width = 2;
-+	/* Populate the entries that are meant to be exposes as GPIOs. */
-+	for (i = 0; i < num_gpios; i++) {
-+		unsigned int gpio = gpios[i];
-+
-+		groups[gpio].npins = 1;
-+		snprintf(names[i], NAME_SIZE, "gpio%u", gpio);
-+		pins[gpio].name = names[i];
-+		groups[gpio].name = names[i];
-+
-+		groups[gpio].ctl_reg = 0x10000 * gpio;
-+		groups[gpio].io_reg = 0x04 + 0x10000 * gpio;
-+		groups[gpio].intr_cfg_reg = 0x08 + 0x10000 * gpio;
-+		groups[gpio].intr_status_reg = 0x0c + 0x10000 * gpio;
-+		groups[gpio].intr_target_reg = 0x08 + 0x10000 * gpio;
-+
-+		groups[gpio].mux_bit = 2;
-+		groups[gpio].pull_bit = 0;
-+		groups[gpio].drv_bit = 6;
-+		groups[gpio].oe_bit = 9;
-+		groups[gpio].in_bit = 0;
-+		groups[gpio].out_bit = 1;
-+		groups[gpio].intr_enable_bit = 0;
-+		groups[gpio].intr_status_bit = 0;
-+		groups[gpio].intr_target_bit = 5;
-+		groups[gpio].intr_target_kpss_val = 1;
-+		groups[gpio].intr_raw_status_bit = 4;
-+		groups[gpio].intr_polarity_bit = 1;
-+		groups[gpio].intr_detection_bit = 2;
-+		groups[gpio].intr_detection_width = 2;
- 	}
- 
-+	devm_kfree(dev, gpios);
-+
- 	qdf2xxx_pinctrl.pins = pins;
- 	qdf2xxx_pinctrl.groups = groups;
--	qdf2xxx_pinctrl.npins = num_gpios;
--	qdf2xxx_pinctrl.ngroups = num_gpios;
--	qdf2xxx_pinctrl.ngpios = num_gpios;
-+	qdf2xxx_pinctrl.npins = max_gpios;
-+	qdf2xxx_pinctrl.ngroups = max_gpios;
-+	qdf2xxx_pinctrl.ngpios = max_gpios;
- 
- 	return msm_pinctrl_probe(pdev, &qdf2xxx_pinctrl);
- }
- 
--static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
--	{"QCOM8001"},
--	{},
--};
--MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
--
- static struct platform_driver qdf2xxx_pinctrl_driver = {
- 	.driver = {
- 		.name = "qdf2xxx-pinctrl",
+ 	hdmi-out {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
