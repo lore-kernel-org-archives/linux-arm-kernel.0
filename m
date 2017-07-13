@@ -1,34 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 13 Jul 2017 15:21:21 +0530
-Subject: [RFC v2 5/6] drivers: boot_constraint: Add initial DT bindings
-In-Reply-To: <CAGb2v67pjFRTq56DE+2xCnnKhxa_1u6RdoxbwXznkg6EJ3=X9Q@mail.gmail.com>
-References: <cover.1499770771.git.viresh.kumar@linaro.org>
- <0610277aef9830cff53b7b53cf41cc54886fdc7f.1499770771.git.viresh.kumar@linaro.org>
- <CAL_Jsq+oAB3gejRMXuY0q9+Et4GrtvF3RwGzPNJ08TPooVyXJg@mail.gmail.com>
- <CAGb2v67XtUcqdjMt-Ln6zn3ShH4JFmjkK4bPSpUNZpJqnmwivw@mail.gmail.com>
- <20170713050934.GB352@vireshk-i7>
- <CAGb2v67pjFRTq56DE+2xCnnKhxa_1u6RdoxbwXznkg6EJ3=X9Q@mail.gmail.com>
-Message-ID: <20170713095121.GH352@vireshk-i7>
+From: fabien.dessenne@st.com (Fabien Dessenne)
+Date: Thu, 13 Jul 2017 11:59:38 +0200
+Subject: [PATCH 2/3] dt-bindings: Document STM32 CRYP bindings
+In-Reply-To: <1499939979-8623-1-git-send-email-fabien.dessenne@st.com>
+References: <1499939979-8623-1-git-send-email-fabien.dessenne@st.com>
+Message-ID: <1499939979-8623-3-git-send-email-fabien.dessenne@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-07-17, 17:46, Chen-Yu Tsai wrote:
-> This makes more sense. The LCD being able to do DVFS was missing from the last
-> discussion. I assume this is for power saving purposes?
+Document device tree bindings for the STM32 CRYP.
 
-Yeah.
+Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
+---
+ .../devicetree/bindings/crypto/st,stm32-cryp.txt     | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
 
-> Otherwise one could just
-> say you should not use the lower part of the voltage range. And DVFS is for the
-> controller's core logic and not I/O?
-
-Yeah.
-
-But for many such cases in different platforms, the LCD controller may
-not do DVFS. But we still need to make sure its clk, regulator and
-power domain are enabled until the time the driver comes up. This
-series would also help in doing proxy-voting for all such resources,
-so that they don't get disabled while being used.
-
+diff --git a/Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt b/Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
+new file mode 100644
+index 0000000..f631c37
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
+@@ -0,0 +1,20 @@
++* STMicroelectronics STM32 CRYP
++
++Required properties:
++- compatible: Should be "st,stm32f756-cryp".
++- reg: The address and length of the peripheral registers space
++- clocks: The input clock of the CRYP instance
++- interrupts: The CRYP interrupts
++
++Optional properties:
++- resets: The input reset of the CRYP instance
++
++Example:
++cryp1: cryp at 50060000 {
++	compatible = "st,stm32f756-cryp";
++	reg = <0x50060000 0x400>;
++	interrupts = <79>;
++	clocks = <&rcc 0 STM32F7_AHB2_CLOCK(CRYP)>;
++	resets = <&rcc STM32F7_AHB2_RESET(CRYP)>;
++	status = "disabled";
++};
 -- 
-viresh
+2.7.4
