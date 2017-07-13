@@ -1,72 +1,127 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 13 Jul 2017 19:00:12 +0100
-Subject: [PATCH 1/2] md/raid6: use faster multiplication for ARM NEON
- delta syndrome
-In-Reply-To: <12EF8D94C6F8734FB2FF37B9FBEDD173010E029C61@EXCHANGE.collogia.de>
-References: <20170713171601.25440-1-ard.biesheuvel@linaro.org>
- <20170713171601.25440-2-ard.biesheuvel@linaro.org>
- <12EF8D94C6F8734FB2FF37B9FBEDD173010E029C61@EXCHANGE.collogia.de>
-Message-ID: <CAKv+Gu865hPJZ=7L8dQgN1coALhb3+6rY7HGbd=bRisK7W6yWw@mail.gmail.com>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Thu, 13 Jul 2017 11:14:08 -0700
+Subject: [PATCH v7 3/3] net/cxgb4: Use new
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <1499955692-26556-4-git-send-email-dingtianhong@huawei.com>
+References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
+ <1499955692-26556-4-git-send-email-dingtianhong@huawei.com>
+Message-ID: <CAKgT0UcBFBk9T7g0Dh-rHY6Z+6-4=5jsUWHbLcSMc+ohdTz=CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2017 at 18:51, Markus Stockhausen <stockhausen@collogia.de> wrote:
->> Von: Ard Biesheuvel [ard.biesheuvel at linaro.org]
->> Gesendet: Donnerstag, 13. Juli 2017 19:16
->> An: linux-arm-kernel at lists.infradead.org; linux-raid at vger.kernel.org
->> Cc: shli at kernel.org; Markus Stockhausen; linux at armlinux.org.uk; will.deacon at arm.com; catalin.marinas at arm.com; Ard Biesheuvel
->> Betreff: [PATCH 1/2] md/raid6: use faster multiplication for ARM NEON delta syndrome
->>
->> The P/Q left side optimization in the delta syndrome simply involves
->> repeatedly multiplying a value by polynomial 'x' in GF(2^8). Given
->> that 'x * x * x * x' equals 'x^4' even in the polynomial world, we
->> can accelerate this substantially by performing up to 4 such operations
->> at once, using the NEON instructions for polynomial multiplication.
->>
->> Results on a Cortex-A57 running in 64-bit mode:
->>
->>   Before:
->>   -------
->>   raid6: neonx1   xor()  1680 MB/s
->>   raid6: neonx2   xor()  2286 MB/s
->>   raid6: neonx4   xor()  3162 MB/s
->>   raid6: neonx8   xor()  3389 MB/s
->>
->>   After:
->>   ------
->>   raid6: neonx1   xor()  2281 MB/s
->>   raid6: neonx2   xor()  3362 MB/s
->>   raid6: neonx4   xor()  3787 MB/s
->>   raid6: neonx8   xor()  4239 MB/s
+On Thu, Jul 13, 2017 at 7:21 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+> From: Casey Leedom <leedom@chelsio.com>
 >
-> Nice optimiziation. Nevertheless the test algorithm favours this implementation. See:
+> cxgb4 Ethernet driver now queries PCIe configuration space to determine
+> if it can send TLPs to it with the Relaxed Ordering Attribute set.
 >
-> int start = (disks>>1)-1, stop = disks-3; /* work on the second half of the disks */
+> Remove the enable_pcie_relaxed_ordering() to avoid enable PCIe Capability
+> Device Control[Relaxed Ordering Enable] at probe routine, to make sure
+> the driver will not send the Relaxed Ordering TLPs to the Root Complex which
+> could not deal the Relaxed Ordering TLPs.
 >
-> What gives the before/after test if you work on the middle data disks and not on
-> the right ones? In the 4K page size this should be  start = 3, stop = 11 instead of
-> start = 7, stop = 13. Given the large gain you see the impact should be lower but
-> at least in the >10% range.
+> Signed-off-by: Casey Leedom <leedom@chelsio.com>
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+
+Ding,
+
+You can probably just drop this patch. If I am understanding Casey
+correctly just the fact that the relaxed ordering enable bit is
+cleared in the configuration should be enough to do this for the
+device automatically.
+
+- Alex
+
+> ---
+>  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
+>  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 23 +++++++++++++++++------
+>  drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +++--
+>  3 files changed, 21 insertions(+), 8 deletions(-)
 >
-
-Relative before and after (using raid6test rather than the kernel
-module this time, so they should not be compared with the numbers
-above)
-
-before
-raid6: neonx1   xor()  1773 MB/s
-raid6: neonx2   xor()  2362 MB/s
-raid6: neonx4   xor()  3223 MB/s
-raid6: neonx8   xor()  3375 MB/s
-
-after
-raid6: neonx1   xor()  2259 MB/s
-raid6: neonx2   xor()  2975 MB/s
-raid6: neonx4   xor()  3404 MB/s
-raid6: neonx8   xor()  3788 MB/s
-
-So your estimate is correct: 12% speedup for neonx8 in the 'start = 7,
-stop = 13' case
-
--- 
-Ard.
+> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+> index ef4be78..09ea62e 100644
+> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+> @@ -529,6 +529,7 @@ enum {                                 /* adapter flags */
+>         USING_SOFT_PARAMS  = (1 << 6),
+>         MASTER_PF          = (1 << 7),
+>         FW_OFLD_CONN       = (1 << 9),
+> +       ROOT_NO_RELAXED_ORDERING = (1 << 10),
+>  };
+>
+>  enum {
+> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+> index e403fa1..391e484 100644
+> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+> @@ -4654,11 +4654,6 @@ static void print_port_info(const struct net_device *dev)
+>                     dev->name, adap->params.vpd.id, adap->name, buf);
+>  }
+>
+> -static void enable_pcie_relaxed_ordering(struct pci_dev *dev)
+> -{
+> -       pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_RELAX_EN);
+> -}
+> -
+>  /*
+>   * Free the following resources:
+>   * - memory used for tables
+> @@ -4908,7 +4903,6 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+>         }
+>
+>         pci_enable_pcie_error_reporting(pdev);
+> -       enable_pcie_relaxed_ordering(pdev);
+>         pci_set_master(pdev);
+>         pci_save_state(pdev);
+>
+> @@ -4947,6 +4941,23 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+>         adapter->msg_enable = DFLT_MSG_ENABLE;
+>         memset(adapter->chan_map, 0xff, sizeof(adapter->chan_map));
+>
+> +       /* If possible, we use PCIe Relaxed Ordering Attribute to deliver
+> +        * Ingress Packet Data to Free List Buffers in order to allow for
+> +        * chipset performance optimizations between the Root Complex and
+> +        * Memory Controllers.  (Messages to the associated Ingress Queue
+> +        * notifying new Packet Placement in the Free Lists Buffers will be
+> +        * send without the Relaxed Ordering Attribute thus guaranteeing that
+> +        * all preceding PCIe Transaction Layer Packets will be processed
+> +        * first.)  But some Root Complexes have various issues with Upstream
+> +        * Transaction Layer Packets with the Relaxed Ordering Attribute set.
+> +        * The PCIe devices which under the Root Complexes will be cleared the
+> +        * Relaxed Ordering bit in the configuration space, So we check our
+> +        * PCIe configuration space to see if it's flagged with advice against
+> +        * using Relaxed Ordering.
+> +        */
+> +       if (!pcie_relaxed_ordering_supported(pdev))
+> +               adapter->flags |= ROOT_NO_RELAXED_ORDERING;
+> +
+>         spin_lock_init(&adapter->stats_lock);
+>         spin_lock_init(&adapter->tid_release_lock);
+>         spin_lock_init(&adapter->win0_lock);
+> diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+> index ede1220..4ef68f6 100644
+> --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
+> +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+> @@ -2719,6 +2719,7 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
+>         struct fw_iq_cmd c;
+>         struct sge *s = &adap->sge;
+>         struct port_info *pi = netdev_priv(dev);
+> +       int relaxed = !(adap->flags & ROOT_NO_RELAXED_ORDERING);
+>
+>         /* Size needs to be multiple of 16, including status entry. */
+>         iq->size = roundup(iq->size, 16);
+> @@ -2772,8 +2773,8 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
+>
+>                 flsz = fl->size / 8 + s->stat_len / sizeof(struct tx_desc);
+>                 c.iqns_to_fl0congen |= htonl(FW_IQ_CMD_FL0PACKEN_F |
+> -                                            FW_IQ_CMD_FL0FETCHRO_F |
+> -                                            FW_IQ_CMD_FL0DATARO_F |
+> +                                            FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
+> +                                            FW_IQ_CMD_FL0DATARO_V(relaxed) |
+>                                              FW_IQ_CMD_FL0PADEN_F);
+>                 if (cong >= 0)
+>                         c.iqns_to_fl0congen |=
+> --
+> 1.8.3.1
+>
+>
