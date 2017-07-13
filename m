@@ -1,98 +1,57 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jul 2017 16:12:59 +0200
-Subject: [PATCH 04/18] drm/sun4i: Remove useless atomic_check
+Date: Thu, 13 Jul 2017 16:12:57 +0200
+Subject: [PATCH 02/18] drm/sun4i: Add if statement instead of depends on
 In-Reply-To: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <effdc5f1e0fe485b141c057bb66f9dadf7433a88.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <d51d45d57d2bacaa5bafcd861aa0142fcaf0ad77.1499955058.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atomic_check callback is optional, and we don't implement anything in
-some parts of our drivers. Let's remove it.
+The depends on relationship is obvious, and using an if statement will
+propagate it to every option without the need for each and every one of
+them to define it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 7 -------
- drivers/gpu/drm/sun4i/sun4i_rgb.c   | 8 --------
- drivers/gpu/drm/sun4i/sun4i_tv.c    | 8 --------
- 3 files changed, 23 deletions(-)
+ drivers/gpu/drm/sun4i/Kconfig | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index ead4f9d4c1ee..62b08cb47ccd 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -25,12 +25,6 @@ struct sun4i_plane_desc {
- 	       uint32_t                nformats;
- };
+diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
+index 5bcad8f5fb4f..5cc116692913 100644
+--- a/drivers/gpu/drm/sun4i/Kconfig
++++ b/drivers/gpu/drm/sun4i/Kconfig
+@@ -13,9 +13,10 @@ config DRM_SUN4I
+ 	  Display Engine. If M is selected the module will be called
+ 	  sun4i-drm.
  
--static int sun4i_backend_layer_atomic_check(struct drm_plane *plane,
--					    struct drm_plane_state *state)
--{
--	return 0;
--}
--
- static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
- 					       struct drm_plane_state *old_state)
- {
-@@ -53,7 +47,6 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- }
++if DRM_SUN4I
++
+ config DRM_SUN4I_HDMI
+        tristate "Allwinner A10 HDMI Controller Support"
+-       depends on DRM_SUN4I
+        default DRM_SUN4I
+        help
+ 	  Choose this option if you have an Allwinner SoC with an HDMI
+@@ -23,7 +24,6 @@ config DRM_SUN4I_HDMI
  
- static struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
--	.atomic_check	= sun4i_backend_layer_atomic_check,
- 	.atomic_disable	= sun4i_backend_layer_atomic_disable,
- 	.atomic_update	= sun4i_backend_layer_atomic_update,
- };
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index 422b191faa77..76362c09c608 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -128,13 +128,6 @@ static struct drm_connector_funcs sun4i_rgb_con_funcs = {
- 	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
- };
+ config DRM_SUN4I_BACKEND
+ 	tristate "Support for Allwinner A10 Display Engine Backend"
+-	depends on DRM_SUN4I
+ 	default DRM_SUN4I
+ 	help
+ 	  Choose this option if you have an Allwinner SoC with the
+@@ -33,10 +33,11 @@ config DRM_SUN4I_BACKEND
  
--static int sun4i_rgb_atomic_check(struct drm_encoder *encoder,
--				  struct drm_crtc_state *crtc_state,
--				  struct drm_connector_state *conn_state)
--{
--	return 0;
--}
--
- static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
-@@ -182,7 +175,6 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
- }
- 
- static struct drm_encoder_helper_funcs sun4i_rgb_enc_helper_funcs = {
--	.atomic_check	= sun4i_rgb_atomic_check,
- 	.mode_set	= sun4i_rgb_encoder_mode_set,
- 	.disable	= sun4i_rgb_encoder_disable,
- 	.enable		= sun4i_rgb_encoder_enable,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index 338b9e5bb2a3..73bfe7b1cd78 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -341,13 +341,6 @@ static void sun4i_tv_mode_to_drm_mode(const struct tv_mode *tv_mode,
- 	mode->vtotal = mode->vsync_end  + tv_mode->vback_porch;
- }
- 
--static int sun4i_tv_atomic_check(struct drm_encoder *encoder,
--				 struct drm_crtc_state *crtc_state,
--				 struct drm_connector_state *conn_state)
--{
--	return 0;
--}
--
- static void sun4i_tv_disable(struct drm_encoder *encoder)
- {
- 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
-@@ -489,7 +482,6 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
- }
- 
- static struct drm_encoder_helper_funcs sun4i_tv_helper_funcs = {
--	.atomic_check	= sun4i_tv_atomic_check,
- 	.disable	= sun4i_tv_disable,
- 	.enable		= sun4i_tv_enable,
- 	.mode_set	= sun4i_tv_mode_set,
+ config DRM_SUN8I_MIXER
+ 	tristate "Support for Allwinner Display Engine 2.0 Mixer"
+-	depends on DRM_SUN4I
+ 	default MACH_SUN8I
+ 	help
+ 	  Choose this option if you have an Allwinner SoC with the
+ 	  Allwinner Display Engine 2.0, which has a mixer to do some
+ 	  graphics mixture and feed graphics to TCON, If M is
+ 	  selected the module will be called sun8i-mixer.
++
++endif
 -- 
 git-series 0.9.1
