@@ -1,49 +1,77 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 13 Jul 2017 15:57:19 +0100
-Subject: i.MX 6 and PCIe DMA issues
-In-Reply-To: <20170713070718.GA3871@mmlinux>
-References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
- <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
- <20170713070718.GA3871@mmlinux>
-Message-ID: <37eec44d-2157-1f11-681f-7fbc50983d62@arm.com>
+From: bich.hemon@st.com (Bich HEMON)
+Date: Thu, 13 Jul 2017 15:08:27 +0000
+Subject: [PATCH 2/9] serial: stm32: fix multi-ports management
+In-Reply-To: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
+References: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
+Message-ID: <1499958494-19354-3-git-send-email-bich.hemon@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/07/17 08:07, michael.moese at men.de wrote:
-> 
-> 
-> On Tue, Jul 11, 2017 at 03:50:19PM +0100, Robin Murphy wrote:
->> I don't much like the sound of that "and" there - coherent DMA
->> allocations are, as the name implies, already coherent for CPU and DMA
->> accesses, and require no maintenance; the streaming DMA API
->> (dma_{map,unmap,sync}_*) on the other hand is *only* for use on
->> kmalloced memory.
-> Ok, I hope I am correct. I alloc my memory using dma_alloc_coherent()
-> once, the dma_handle is passed to the device, with no other dma_map*()
-> or dma_sync_*() calls needed?
-> 
-> Yesterday I observed some strange behavior  when I did some debug prints in 
-> the driver, printing me the result from phys_to_virt() of my
-> virtual address and the dma_handle. I know these may be different, but,
-> when I dump the memory (from userspace using mmap), I can see the data
-> at the adress of my dma_handle, but the memory the driver has the
-> pointer for has different contents. I don't understand this.
-> 
->  
->> The PL310 does have more than its fair share of wackiness, but unless
->> you also see DMA going wrong for the on-chip peripherals, the problem is
->> almost certainly down to the driver itself rather than the cache
->> configuration.
-> Well, I think I need do dive into this as well, my former co-worker
-> disabled DMA for SPI, for example, in the device tree. That may be
-> another hint. I think I will need to find out what is setup here.
+From: Gerald Baeza <gerald.baeza@st.com>
 
-OK, the first thing I'd check is that you have the "arm,shared-override"
-property on the DT node for the PL310 and that it's being applied
-correctly (e.g. you're not entering the kernel with L2 already enabled).
-Otherwise I think it might be possible to end up in a situation where
-you get stale data into L2 that even reads from the non-cacheable remap
-of the buffer can hit, which would probably look rather like what you're
-describing.
+Correct management of multi-ports. Each port has
+its own last residue value and its own alias.
 
-Robin.
+Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+Signed-off-by: Bich Hemon <bich.hemon@st.com>
+---
+ drivers/tty/serial/stm32-usart.c | 12 +++++++-----
+ drivers/tty/serial/stm32-usart.h |  1 +
+ 2 files changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
+index ebc49e4..a12d79c 100644
+--- a/drivers/tty/serial/stm32-usart.c
++++ b/drivers/tty/serial/stm32-usart.c
+@@ -111,14 +111,13 @@ static void stm32_receive_chars(struct uart_port *port, bool threaded)
+ 	unsigned long c;
+ 	u32 sr;
+ 	char flag;
+-	static int last_res = RX_BUF_L;
+ 
+ 	if (port->irq_wake)
+ 		pm_wakeup_event(tport->tty->dev, 0);
+ 
+-	while (stm32_pending_rx(port, &sr, &last_res, threaded)) {
++	while (stm32_pending_rx(port, &sr, &stm32_port->last_res, threaded)) {
+ 		sr |= USART_SR_DUMMY_RX;
+-		c = stm32_get_char(port, &sr, &last_res);
++		c = stm32_get_char(port, &sr, &stm32_port->last_res);
+ 		flag = TTY_NORMAL;
+ 		port->icount.rx++;
+ 
+@@ -694,8 +693,10 @@ static struct stm32_port *stm32_of_get_stm32_port(struct platform_device *pdev)
+ 		return NULL;
+ 
+ 	id = of_alias_get_id(np, "serial");
+-	if (id < 0)
+-		id = 0;
++	if (id < 0) {
++		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", id);
++		return NULL;
++	}
+ 
+ 	if (WARN_ON(id >= STM32_MAX_PORTS))
+ 		return NULL;
+@@ -703,6 +704,7 @@ static struct stm32_port *stm32_of_get_stm32_port(struct platform_device *pdev)
+ 	stm32_ports[id].hw_flow_control = of_property_read_bool(np,
+ 							"st,hw-flow-ctrl");
+ 	stm32_ports[id].port.line = id;
++	stm32_ports[id].last_res = RX_BUF_L;
+ 	return &stm32_ports[id];
+ }
+ 
+diff --git a/drivers/tty/serial/stm32-usart.h b/drivers/tty/serial/stm32-usart.h
+index 0532b2f..65b4ffa 100644
+--- a/drivers/tty/serial/stm32-usart.h
++++ b/drivers/tty/serial/stm32-usart.h
+@@ -222,6 +222,7 @@ struct stm32_port {
+ 	struct dma_chan *tx_ch;  /* dma tx channel            */
+ 	dma_addr_t tx_dma_buf;   /* dma tx buffer bus address */
+ 	unsigned char *tx_buf;   /* dma tx buffer cpu address */
++	int last_res;
+ 	bool tx_dma_busy;	 /* dma tx busy               */
+ 	bool hw_flow_control;
+ };
+-- 
+1.9.1
