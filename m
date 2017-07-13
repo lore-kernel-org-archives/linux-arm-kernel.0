@@ -1,54 +1,48 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Thu, 13 Jul 2017 09:29:30 +0530
-Subject: [PATCH V4 4/6] iommu/arm-smmu: Add the device_link between
- masters and smmu
-In-Reply-To: <20170712225547.GA22780@codeaurora.org>
-References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
- <1499333825-7658-5-git-send-email-vivek.gautam@codeaurora.org>
- <20170712225547.GA22780@codeaurora.org>
-Message-ID: <52b24d55-b7d5-2d50-4bb4-3e94d81c1be6@codeaurora.org>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Thu, 13 Jul 2017 07:07:44 +0200
+Subject: [PATCH 0/3] ARM: dts: r8a779[014]: Use R-Car Gen 2 fallback
+ binding for vin nodes
+In-Reply-To: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
+References: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20170713050744.GA23854@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
+Thanks for your work.
 
-On 07/13/2017 04:25 AM, Stephen Boyd wrote:
-> On 07/06, Vivek Gautam wrote:
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index ddbfa8ab69e6..75567d9698ab 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1348,6 +1348,7 @@ static int arm_smmu_add_device(struct device *dev)
->>   	struct arm_smmu_device *smmu;
->>   	struct arm_smmu_master_cfg *cfg;
->>   	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->> +	struct device_link *link = NULL;
-> Unnecessary initialization?
+On 2017-07-11 14:56:46 +0200, Simon Horman wrote:
+> Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a779[014] SoCs.
+> 
+> This has no run-time effect for the current driver as the initialisation
+> sequence is the same for the SoC-specific binding for r8a779[014] and the
+> fallback binding for R-Car Gen 2
+> 
+> This is consistent with existing compat string usage in vin nodes for the
+> r8a779[23] SoCs.
 
-Right, will drop this.
-Thanks.
+For whole serries:
 
->
->>   	int i, ret;
->>   
->>   	if (using_legacy_binding) {
->> @@ -1403,6 +1404,16 @@ static int arm_smmu_add_device(struct device *dev)
->>   
->>   	pm_runtime_put_sync(smmu->dev);
->>   
->> +	/*
->> +	 * Establish the link between smmu and master, so that the
->> +	 * smmu gets runtime enabled/disabled as per the master's
->> +	 * needs.
->> +	 */
->> +	link = device_link_add(dev, smmu->dev, DL_FLAG_PM_RUNTIME);
->> +	if (!link)
->> +		dev_warn(smmu->dev, "Unable to create device link between %s and %s\n",
->> +			 dev_name(smmu->dev), dev_name(dev));
->> +
->>   	return 0;
->>   
+Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+> 
+> Based on renesas-devel-20170711-v4.12
+> 
+> Simon Horman (3):
+>   ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for vin nodes
+>   ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for vin nodes
+>   ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for vin nodes
+> 
+>  arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+>  arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
+>  arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
+>  3 files changed, 9 insertions(+), 9 deletions(-)
+> 
+> -- 
+> 2.1.4
+> 
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Niklas S?derlund
