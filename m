@@ -1,128 +1,52 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 13 Jul 2017 09:46:10 +0800
-Subject: [PATCH v2 3/5] drm/rockchip: vop: move line_flag_num to interrupt
- registers
-In-Reply-To: <20170712175437.6do5shj2evqft7nc@art_vandelay>
-References: <1499824991-7391-1-git-send-email-mark.yao@rock-chips.com>
- <1499825027-7552-1-git-send-email-mark.yao@rock-chips.com>
- <20170712175437.6do5shj2evqft7nc@art_vandelay>
-Message-ID: <5966D0E2.8040102@rock-chips.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Thu, 13 Jul 2017 11:20:40 +0900
+Subject: [PATCH v4 0/3] Add support for the s6e63j0x03 panel on Rinato board
+References: <CGME20170713022056epcas5p21ece2860cb2cce0b4381cf98988496f9@epcas5p2.samsung.com>
+Message-ID: <1499912443-3671-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?07?13? 01:54, Sean Paul wrote:
-> On Wed, Jul 12, 2017 at 10:03:46AM +0800, Mark Yao wrote:
->
-> Again, please add commit message describing the what and why of this change.
->
-> You can also add:
->
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
->
+Hi Andrzej,
 
-Thanks for the review, will fix it at next version.
+Thank you for your review.
 
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 4 ++--
->>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 8 ++++----
->>   3 files changed, 7 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index a9180fd..be208ee 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -507,7 +507,7 @@ static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
->>   
->>   	spin_lock_irqsave(&vop->irq_lock, flags);
->>   
->> -	VOP_CTRL_SET(vop, line_flag_num[0], line_num);
->> +	VOP_INTR_SET(vop, line_flag_num[0], line_num);
->>   	VOP_INTR_SET_TYPE(vop, clear, LINE_FLAG_INTR, 1);
->>   	VOP_INTR_SET_TYPE(vop, enable, LINE_FLAG_INTR, 1);
->>   
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->> index e4de890..f64685e 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->> @@ -70,8 +70,6 @@ struct vop_ctrl {
->>   	struct vop_reg hpost_st_end;
->>   	struct vop_reg vpost_st_end;
->>   
->> -	struct vop_reg line_flag_num[2];
->> -
->>   	struct vop_reg global_regdone_en;
->>   	struct vop_reg cfg_done;
->>   };
->> @@ -79,6 +77,8 @@ struct vop_ctrl {
->>   struct vop_intr {
->>   	const int *intrs;
->>   	uint32_t nintrs;
->> +
->> +	struct vop_reg line_flag_num[2];
->>   	struct vop_reg enable;
->>   	struct vop_reg clear;
->>   	struct vop_reg status;
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> index 7744603..159cedf 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> @@ -118,6 +118,7 @@
->>   static const struct vop_intr rk3036_intr = {
->>   	.intrs = rk3036_vop_intrs,
->>   	.nintrs = ARRAY_SIZE(rk3036_vop_intrs),
->> +	.line_flag_num[0] = VOP_REG(RK3036_INT_STATUS, 0xfff, 12),
->>   	.status = VOP_REG(RK3036_INT_STATUS, 0xf, 0),
->>   	.enable = VOP_REG(RK3036_INT_STATUS, 0xf, 4),
->>   	.clear = VOP_REG(RK3036_INT_STATUS, 0xf, 8),
->> @@ -131,7 +132,6 @@
->>   	.hact_st_end = VOP_REG(RK3036_DSP_HACT_ST_END, 0x1fff1fff, 0),
->>   	.vtotal_pw = VOP_REG(RK3036_DSP_VTOTAL_VS_END, 0x1fff1fff, 0),
->>   	.vact_st_end = VOP_REG(RK3036_DSP_VACT_ST_END, 0x1fff1fff, 0),
->> -	.line_flag_num[0] = VOP_REG(RK3036_INT_STATUS, 0xfff, 12),
->>   	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
->>   };
->>   
->> @@ -227,7 +227,6 @@
->>   	.vact_st_end = VOP_REG(RK3288_DSP_VACT_ST_END, 0x1fff1fff, 0),
->>   	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
->>   	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
->> -	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
->>   	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
->>   	.cfg_done = VOP_REG(RK3288_REG_CFG_DONE, 0x1, 0),
->>   };
->> @@ -259,6 +258,7 @@
->>   static const struct vop_intr rk3288_vop_intr = {
->>   	.intrs = rk3288_vop_intrs,
->>   	.nintrs = ARRAY_SIZE(rk3288_vop_intrs),
->> +	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
->>   	.status = VOP_REG(RK3288_INTR_CTRL0, 0xf, 0),
->>   	.enable = VOP_REG(RK3288_INTR_CTRL0, 0xf, 4),
->>   	.clear = VOP_REG(RK3288_INTR_CTRL0, 0xf, 8),
->> @@ -295,8 +295,6 @@
->>   	.vact_st_end = VOP_REG(RK3399_DSP_VACT_ST_END, 0x1fff1fff, 0),
->>   	.hpost_st_end = VOP_REG(RK3399_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
->>   	.vpost_st_end = VOP_REG(RK3399_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
->> -	.line_flag_num[0] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 0),
->> -	.line_flag_num[1] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 16),
->>   	.cfg_done = VOP_REG_MASK(RK3399_REG_CFG_DONE, 0x1, 0),
->>   };
->>   
->> @@ -313,6 +311,8 @@
->>   static const struct vop_intr rk3399_vop_intr = {
->>   	.intrs = rk3399_vop_intrs,
->>   	.nintrs = ARRAY_SIZE(rk3399_vop_intrs),
->> +	.line_flag_num[0] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 0),
->> +	.line_flag_num[1] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 16),
->>   	.status = VOP_REG_MASK(RK3399_INTR_STATUS0, 0xffff, 0),
->>   	.enable = VOP_REG_MASK(RK3399_INTR_EN0, 0xffff, 0),
->>   	.clear = VOP_REG_MASK(RK3399_INTR_CLEAR0, 0xffff, 0),
->> -- 
->> 1.9.1
->>
->>
+The purpose of this patch is add support for s6e63j0x03 AMOLED panel
+on the rinato board(Samsung Galaxy Gear 2).
 
+Changes for V4:
+- Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> (2/3 patch).
+- Fixed the style of macro function.
+
+Changes for V3:
+- Applied patch 'ARM: dts: exynos: Fix the active of reset gpios from rinato dts' (v2 3/4)
+- Remove the unnecessary define ('MIN_BRIGHTNESS')
+- Removed explicit casting.
+- Removed violation of kernel coding style.
+
+Changes for V2:
+- Added the interface info in binding document.
+- Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> (1/3 patch).
+- Added Acked-by: Rob Herring <robh@kernel.org> (1/3 patch).
+- Fixed the tristate of config from video mode to command mode.
+- Fixed the reset gpios from active high to low from rinato dts.
+- Fixed a lot of things in panel driver, reflect Andrzej's review.
+
+Best regards,
+Hoegeun
+
+Hoegeun Kwon (3):
+  dt-bindings: Add support for samsung s6e63j0x03 panel binding
+  drm/panel: Add support for s6e63j0x03 panel driver
+  ARM: dts: exynos: Remove the display-timing and delay from rinato dts
+
+ .../bindings/display/panel/samsung,s6e63j0x03.txt  |  24 +
+ arch/arm/boot/dts/exynos3250-rinato.dts            |  22 -
+ drivers/gpu/drm/panel/Kconfig                      |   7 +
+ drivers/gpu/drm/panel/Makefile                     |   1 +
+ drivers/gpu/drm/panel/panel-samsung-s6e63j0x03.c   | 532 +++++++++++++++++++++
+ 5 files changed, 564 insertions(+), 22 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
+ create mode 100644 drivers/gpu/drm/panel/panel-samsung-s6e63j0x03.c
 
 -- 
-?ark Yao
+1.9.1
