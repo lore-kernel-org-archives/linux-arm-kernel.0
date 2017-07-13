@@ -1,32 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Jul 2017 10:07:18 +0200
-Subject: [PATCH 1/3] dt-bindings: mmc: sh_mmcif: Document r8a7743 DT
- bindings
-In-Reply-To: <CAMuHMdXdkA-F74pYOMi=K2DMZJdkSCpJtzfHfSMTAQgAfzPUkw@mail.gmail.com>
-References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
- <1499853805-5915-2-git-send-email-chris.paterson2@renesas.com>
- <CAMuHMdX0TZ7KKzGDq8t2jMwMciEf30KKW2tE5fieqJ2D7+feqw@mail.gmail.com>
- <20170713075459.GG5580@verge.net.au>
- <CAMuHMdXdkA-F74pYOMi=K2DMZJdkSCpJtzfHfSMTAQgAfzPUkw@mail.gmail.com>
-Message-ID: <20170713080717.GJ5580@verge.net.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 13 Jul 2017 16:07:18 +0800
+Subject: [PATCH] arm64: dts: ls1012a: add USB host controller nodes
+In-Reply-To: <1499223243-13253-1-git-send-email-ran.wang_1@nxp.com>
+References: <1499223243-13253-1-git-send-email-ran.wang_1@nxp.com>
+Message-ID: <20170713080717.GP3172@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 10:00:11AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Wed, Jul 05, 2017 at 10:54:03AM +0800, Ran Wang wrote:
+> LS1012A has one USB 3.0(DWC3) controller and
+> one USB 2.0 controller.
 > 
-> On Thu, Jul 13, 2017 at 9:54 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Jul 12, 2017 at 01:20:07PM +0200, Geert Uytterhoeven wrote:
-> >> On Wed, Jul 12, 2017 at 12:03 PM, Chris Paterson
-> >> <chris.paterson2@renesas.com> wrote:
-> >> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> >>
-> >> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >
-> > Thanks, applied for v4.14.
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
 > 
-> Shouldn't this be applied by Ulf to the MMC tree?
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+> index b497ac1..8aa2dcf 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+> @@ -411,6 +411,23 @@
+>  				 <&clockgen 4 3>;
+>  		};
+>  
+> +		usb0: usb3 at 2f00000 {
+> +			compatible = "snps,dwc3";
+> +			reg = <0x0 0x2f00000 0x0 0x10000>;
+> +			interrupts = <0 60 0x4>;
+> +			dr_mode = "host";
+> +			snps,quirk-frame-length-adjustment = <0x20>;
+> +			snps,dis_rxdet_inp3_quirk;
+> +		};
+> +
+> +		usb1: usb2 at 8600000 {
+> +			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
+> +			reg = <0x0 0x8600000 0x0 0x1000>;
+> +			interrupts = <0 139 0x4>;
+> +			dr_mode = "host";
+> +			phy_type = "ulpi";
+> +		};
 
-Sorry, my bad. I have dropped this from the renesas tree.
+Please keep the nodes sorted in unit-address.
 
-Ulf, please consider this patch for the mmc tree.
+Shawn
+
+> +
+>  		sata: sata at 3200000 {
+>  			compatible = "fsl,ls1012a-ahci", "fsl,ls1043a-ahci";
+>  			reg = <0x0 0x3200000 0x0 0x10000>,
+> -- 
+> 2.1.0.27.g96db324
+> 
