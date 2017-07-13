@@ -1,93 +1,57 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Thu, 13 Jul 2017 09:49:22 +0200
-Subject: [PATCH v3 4/9] ARM: dts: at91: sama5d2: add classd nodes
+Date: Thu, 13 Jul 2017 09:49:27 +0200
+Subject: [PATCH v3 9/9] ARM: dts: at91: sama5d2_xplained: add pin muxing and
+ enable classd
 In-Reply-To: <20170713074927.10882-1-quentin.schulz@free-electrons.com>
 References: <20170713074927.10882-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170713074927.10882-5-quentin.schulz@free-electrons.com>
+Message-ID: <20170713074927.10882-10-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-This patch adds nodes for the classd device and its generated clock.
+This patch adds the pin muxing for classd and enables it.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 39 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 38 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index cc06da394366..a564cd1ba327 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -494,6 +494,24 @@
- 					clocks = <&plla>;
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 2e2c3d1a1fa2..e92b030ca45a 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -355,6 +355,14 @@
+ 					bias-pull-up;
  				};
  
-+				audio_pll_frac: audiopll_fracck {
-+					compatible = "atmel,sama5d2-clk-audio-pll-frac";
-+					#clock-cells = <0>;
-+					clocks = <&main>;
++				pinctrl_classd_default: classd_default {
++					pinmux = <PIN_PB1__CLASSD_R0>,
++						 <PIN_PB2__CLASSD_R1>,
++						 <PIN_PB3__CLASSD_R2>,
++						 <PIN_PB4__CLASSD_R3>;
++					bias-pull-up;
 +				};
 +
-+				audio_pll_pad: audiopll_padck {
-+					compatible = "atmel,sama5d2-clk-audio-pll-pad";
-+					#clock-cells = <0>;
-+					clocks = <&audio_pll_frac>;
-+				};
-+
-+				audio_pll_pmc: audiopll_pmcck {
-+					compatible = "atmel,sama5d2-clk-audio-pll-pmc";
-+					#clock-cells = <0>;
-+					clocks = <&audio_pll_frac>;
-+				};
-+
- 				utmi: utmick {
- 					compatible = "atmel,at91sam9x5-clk-utmi";
- 					#clock-cells = <0>;
-@@ -895,7 +913,7 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					interrupt-parent = <&pmc>;
--					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
-+					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>, <&audio_pll_pmc>;
+ 				pinctrl_flx0_default: flx0_default {
+ 					pinmux = <PIN_PB28__FLEXCOM0_IO0>,
+ 						 <PIN_PB29__FLEXCOM0_IO1>;
+@@ -488,6 +496,14 @@
  
- 					sdmmc0_gclk: sdmmc0_gclk {
- 						#clock-cells = <0>;
-@@ -951,6 +969,12 @@
- 						reg = <57>;
- 						atmel,clk-output-range = <0 80000000>;
- 					};
-+
-+					classd_gclk: classd_gclk {
-+						#clock-cells = <0>;
-+						reg = <59>;
-+						atmel,clk-output-range = <0 100000000>;
-+					};
- 				};
- 			};
- 
-@@ -1406,6 +1430,19 @@
- 				status = "okay";
  			};
  
 +			classd: classd at fc048000 {
-+				compatible = "atmel,sama5d2-classd";
-+				reg = <0xfc048000 0x100>;
-+				interrupts = <59 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(47))>;
-+				dma-names = "tx";
-+				clocks = <&classd_clk>, <&classd_gclk>;
-+				clock-names = "pclk", "gclk";
-+				status = "disabled";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_classd_default>;
++				atmel,pwm-type = "diff";
++				atmel,non-overlap-time = <10>;
++				status = "okay";
 +			};
 +
  			can1: can at fc050000 {
- 				compatible = "bosch,m_can";
- 				reg = <0xfc050000 0x4000>, <0x210000 0x4000>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_can1_default>;
 -- 
 2.11.0
