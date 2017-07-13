@@ -1,74 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 13 Jul 2017 13:27:50 +0100
-Subject: [RFC PATCH 07/10] arm64: kernel: switch to register x18 as a task
- struct pointer
-In-Reply-To: <20170713104116.GD3966@e103592.cambridge.arm.com>
-References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
- <20170712144424.19528-8-ard.biesheuvel@linaro.org>
- <20170713104116.GD3966@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu8gFSSYV5-11bZOMnQGMcvx0gSDnTpibciEPMv_3HpAUA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Jul 2017 14:46:14 +0200
+Subject: [[PATCH]] Revert "leds: handle suspend/resume in heartbeat
+ trigger"
+In-Reply-To: <20170713120333.GI1363@amd>
+References: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
+ <CACRpkdY6-REXoXjWNUrfCuPn3GYHhV0di7Lhbb=wRhBtPC0+mA@mail.gmail.com>
+ <20170713120333.GI1363@amd>
+Message-ID: <CACRpkdZuXHRhX4athuf6-=fwMkqpWetVWn85uKB0-k3K9PRdfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2017 at 11:41, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Wed, Jul 12, 2017 at 03:44:20PM +0100, Ard Biesheuvel wrote:
->> In order to free up sp_el0, which we will need to deal with faulting
->> stack accesses when using virtually mapped stacks, switch to register
->> x18 as the task struct register. This is permitted by the AAPCS64 ABI,
->> and simplifies many references to 'current', given that they no longer
->> involve a MSR instruction to access SP_EL0.
+On Thu, Jul 13, 2017 at 2:03 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Tue 2017-06-13 11:35:22, Linus Walleij wrote:
+>> On Tue, Jun 13, 2017 at 4:39 AM, Zhang Bo <bo.zhang@nxp.com> wrote:
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> [...]
->
->> diff --git a/arch/arm64/include/asm/current.h b/arch/arm64/include/asm/current.h
->> index f6580d4afb0e..b4e3acff699c 100644
->> --- a/arch/arm64/include/asm/current.h
->> +++ b/arch/arm64/include/asm/current.h
->> @@ -13,11 +13,9 @@ struct task_struct;
->>   */
->>  static __always_inline struct task_struct *get_current(void)
->>  {
->> -     unsigned long sp_el0;
->> +     register unsigned long tsk asm ("x18");
+>> > This reverts commit 5ab92a7cb82c66bf30685583a38a18538e3807db.
+>> >
+>> > System cannot enter suspend mode because of heartbeat led trigger.
+>> > In autosleep_wq, try_to_suspend function will try to enter suspend
+>> > mode in specific period. it will get wakeup_count then call pm_notifier
+>> > chain callback function and freeze processes.
+>> > Heartbeat_pm_notifier is called and it call led_trigger_unregister to
+>> > change the trigger of led device to none. It will send uevent message
+>> > and the wakeup source count changed. As wakeup_count changed, suspend
+>> > will abort.
+>> >
+>> > Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
 >>
->> -     asm ("mrs %0, sp_el0" : "=r" (sp_el0));
->> -
->> -     return (struct task_struct *)sp_el0;
->> +     return (struct task_struct *)tsk;
+>> OK I was stupid, lesson learned.
+>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> Nit:
->
-> You're explicitly returning an uninitialised variable here: the asm
-> annotation doesn't change the fact that tsk lifetime is that of the
-> function.   Sufficiently aggressive GCC can probably optimise the whole
-> thing (and any caller) away as undefined behaviour.
->
-> The GCC docs say
->
-> "The only supported use for [specifying registers for local variables]
-> is to specify registers for input and output operands when calling
-> Extended 'asm'".
->
+> You may still want to submit patch to turn the LED off over suspend
+> for your platform...
 
-Ah ok, so it needs to live outside of the function, just like
-current_stack_pointer.
+I think it would make more sense to have the LED subsystem handle
+that. Given that it already keeps track of LED_SUSPENDED in a
+special flag.
 
->
-> As an alternative, you could make tsk a global register variable.  I
-> don't know whether it should be volatile or not in that case --
-> probably not, since it's constant for a given thread.
->
-> Alternatively, the following should work:
->
->         unsigned long ret;
->
->         asm ("mrs %0, x18" : "=r" (ret));
->
->         return ret;
->
-> (with -ffixed-x18, naturally).
->
+Probably optionally, like LEDs can opt in to be turned off during
+suspend.
 
-Indeed (assuming you meant mov not mrs)
+Yours,
+Linus Walleij
