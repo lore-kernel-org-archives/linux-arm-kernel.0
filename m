@@ -1,133 +1,54 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 13 Jul 2017 11:12:43 +0200
-Subject: [PATCH 2/2] pinctrl: zynq: Fix warnings in the driver
-In-Reply-To: <4c6e1f9b0635682518d2ffa50cf611efef4aff68.1499937148.git.michal.simek@xilinx.com>
-References: <4c6e1f9b0635682518d2ffa50cf611efef4aff68.1499937148.git.michal.simek@xilinx.com>
-Message-ID: <4ec0134906b80ac107dfc80fbf7beb10e38e47cb.1499937148.git.michal.simek@xilinx.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Jul 2017 10:12:59 +0100
+Subject: [kernel-hardening] Re: [RFC PATCH 10/10] arm64: kernel: add
+ support for virtually mapped stacks
+In-Reply-To: <20170712225937.GA25816@leverpostej>
+References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
+ <20170712144424.19528-11-ard.biesheuvel@linaro.org>
+ <20170712225937.GA25816@leverpostej>
+Message-ID: <20170713091259.GA26194@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nava kishore Manne <nava.manne@xilinx.com>
+On Wed, Jul 12, 2017 at 11:59:38PM +0100, Mark Rutland wrote:
+> On Wed, Jul 12, 2017 at 03:44:23PM +0100, Ard Biesheuvel wrote:
+> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > index 2ba3185b1c78..4c3e82d6e2f2 100644
+> > --- a/arch/arm64/kernel/entry.S
+> > +++ b/arch/arm64/kernel/entry.S
+> > @@ -392,6 +392,20 @@ ENDPROC(el1_error_invalid)
+> >   */
+> >  	.align	6
+> >  el1_sync:
+> > +#ifdef CONFIG_VMAP_STACK
+> > +	/*
+> > +	 * When taking an exception from EL1, we need to check whether it is
+> > +	 * caused by a faulting out-of-bounds access to the virtually mapped
+> > +	 * stack before we can attempt to preserve the interrupted context.
+> > +	 */
+> > +	msr	tpidrro_el0, x0			// stash x0
+> > +	mrs	x0, far_el1			// get faulting address
+> > +	tbnz	x0, #63, .Lcheck_stack_ovf	// check if not user address
+> 
+> One thing I don't like about this is that we're reading FAR_EL1 even
+> though we don't know whether it's valid. It could contain junk, and we
+> could spuriously jump into the slow path. That's liable to make
+> performance erratic.
 
-This patch fixes the below warning
-        --> Prefer 'unsigned int' to bare use of 'unsigned'.
-        --> line over 80 characters.
-        --> Prefer 'unsigned int **' to bare use of 'unsigned **'.
+Once I sent this, I realised what I said wasn't quite right.
 
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+It's true that FAR_EL1 is UNKNOWN in some cases, but today those are all
+fatal (e.g. if we take an UNDEFINED exception due to a bad instruction
+at EL1).
 
- drivers/pinctrl/pinctrl-zynq.c | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+So my performance concern was spurious; sorry for the noise.
 
-diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-index 7565651acdc6..a0daf27042bd 100644
---- a/drivers/pinctrl/pinctrl-zynq.c
-+++ b/drivers/pinctrl/pinctrl-zynq.c
-@@ -62,7 +62,7 @@ struct zynq_pinctrl {
- struct zynq_pctrl_group {
- 	const char *name;
- 	const unsigned int *pins;
--	const unsigned npins;
-+	const unsigned int npins;
- };
- 
- /**
-@@ -841,7 +841,7 @@ static int zynq_pctrl_get_groups_count(struct pinctrl_dev *pctldev)
- }
- 
- static const char *zynq_pctrl_get_group_name(struct pinctrl_dev *pctldev,
--					     unsigned selector)
-+					     unsigned int selector)
- {
- 	struct zynq_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
- 
-@@ -849,9 +849,9 @@ static const char *zynq_pctrl_get_group_name(struct pinctrl_dev *pctldev,
- }
- 
- static int zynq_pctrl_get_group_pins(struct pinctrl_dev *pctldev,
--				     unsigned selector,
--				     const unsigned **pins,
--				     unsigned *num_pins)
-+				     unsigned int selector,
-+				     const unsigned int **pins,
-+				     unsigned int *num_pins)
- {
- 	struct zynq_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
- 
-@@ -878,7 +878,7 @@ static int zynq_pmux_get_functions_count(struct pinctrl_dev *pctldev)
- }
- 
- static const char *zynq_pmux_get_function_name(struct pinctrl_dev *pctldev,
--					       unsigned selector)
-+					       unsigned int selector)
- {
- 	struct zynq_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
- 
-@@ -886,7 +886,7 @@ static const char *zynq_pmux_get_function_name(struct pinctrl_dev *pctldev,
- }
- 
- static int zynq_pmux_get_function_groups(struct pinctrl_dev *pctldev,
--					 unsigned selector,
-+					 unsigned int selector,
- 					 const char * const **groups,
- 					 unsigned * const num_groups)
- {
-@@ -898,8 +898,8 @@ static int zynq_pmux_get_function_groups(struct pinctrl_dev *pctldev,
- }
- 
- static int zynq_pinmux_set_mux(struct pinctrl_dev *pctldev,
--			       unsigned function,
--			       unsigned group)
-+			       unsigned int function,
-+			       unsigned int  group)
- {
- 	int i, ret;
- 	struct zynq_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-@@ -986,8 +986,8 @@ enum zynq_pin_config_param {
- };
- 
- #ifdef CONFIG_DEBUG_FS
--static const struct pin_config_item zynq_conf_items[ARRAY_SIZE(zynq_dt_params)] = {
--	PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
-+static const struct pin_config_item zynq_conf_items[ARRAY_SIZE(zynq_dt_params)]
-+	= { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
- };
- #endif
- 
-@@ -997,7 +997,7 @@ static unsigned int zynq_pinconf_iostd_get(u32 reg)
- }
- 
- static int zynq_pinconf_cfg_get(struct pinctrl_dev *pctldev,
--				unsigned pin,
-+				unsigned int pin,
- 				unsigned long *config)
- {
- 	u32 reg;
-@@ -1054,9 +1054,9 @@ static int zynq_pinconf_cfg_get(struct pinctrl_dev *pctldev,
- }
- 
- static int zynq_pinconf_cfg_set(struct pinctrl_dev *pctldev,
--				unsigned pin,
-+				unsigned int pin,
- 				unsigned long *configs,
--				unsigned num_configs)
-+				unsigned int num_configs)
- {
- 	int i, ret;
- 	u32 reg;
-@@ -1130,9 +1130,9 @@ static int zynq_pinconf_cfg_set(struct pinctrl_dev *pctldev,
- }
- 
- static int zynq_pinconf_group_set(struct pinctrl_dev *pctldev,
--				  unsigned selector,
-+				  unsigned int selector,
- 				  unsigned long *configs,
--				  unsigned num_configs)
-+				  unsigned int  num_configs)
- {
- 	int i, ret;
- 	struct zynq_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
--- 
-1.9.1
+However, so as to not mis-report those fatal cases, we either need to
+inspect the SP or ESR_EL1 to determine that FAR_EL1 is valid and/or this
+was a stack-overflow
+
+If we follow the approach of this series, we can move those checks into
+the check_stack_ovf slow path.
+
+Thanks,
+Mark.
