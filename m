@@ -1,35 +1,41 @@
 From: bich.hemon@st.com (Bich HEMON)
-Date: Thu, 13 Jul 2017 15:08:28 +0000
-Subject: [PATCH 4/9] serial: stm32: fix pio transmit timeout
+Date: Thu, 13 Jul 2017 15:08:26 +0000
+Subject: [PATCH 1/9] serial: stm32: fix copyright
 In-Reply-To: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
 References: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
-Message-ID: <1499958494-19354-5-git-send-email-bich.hemon@st.com>
+Message-ID: <1499958494-19354-2-git-send-email-bich.hemon@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gerald Baeza <gerald.baeza@st.com>
+Fix missing copyright for STMicroelectronics
 
-100?s was too short for low speed transmission
-(9600bps)
-
-Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
 Signed-off-by: Bich Hemon <bich.hemon@st.com>
 ---
- drivers/tty/serial/stm32-usart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/tty/serial/stm32-usart.c | 1 +
+ drivers/tty/serial/stm32-usart.h | 1 +
+ 2 files changed, 2 insertions(+)
 
 diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-index a12d79c..ca61bfe 100644
+index 0338562..ebc49e4 100644
 --- a/drivers/tty/serial/stm32-usart.c
 +++ b/drivers/tty/serial/stm32-usart.c
-@@ -202,7 +202,7 @@ static void stm32_transmit_chars_pio(struct uart_port *port)
- 	ret = readl_relaxed_poll_timeout_atomic(port->membase + ofs->isr,
- 						isr,
- 						(isr & USART_SR_TXE),
--						10, 100);
-+						10, 100000);
- 
- 	if (ret)
- 		dev_err(port->dev, "tx empty not set\n");
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) Maxime Coquelin 2015
++ * Copyright (C) STMicroelectronics SA 2017
+  * Authors:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+  *	     Gerald Baeza <gerald.baeza@st.com>
+  * License terms:  GNU General Public License (GPL), version 2
+diff --git a/drivers/tty/serial/stm32-usart.h b/drivers/tty/serial/stm32-usart.h
+index cd97ceb..0532b2f 100644
+--- a/drivers/tty/serial/stm32-usart.h
++++ b/drivers/tty/serial/stm32-usart.h
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) Maxime Coquelin 2015
++ * Copyright (C) STMicroelectronics SA 2017
+  * Authors:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+  *	     Gerald Baeza <gerald_baeza@yahoo.fr>
+  * License terms:  GNU General Public License (GPL), version 2
 -- 
 1.9.1
