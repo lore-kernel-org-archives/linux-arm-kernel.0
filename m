@@ -1,37 +1,36 @@
 From: abhishek.shah@broadcom.com (Abhishek Shah)
-Date: Fri, 14 Jul 2017 00:34:07 +0530
-Subject: [PATCH 1/3] net: ethernet: bgmac: Remove unnecessary 'return' from
- platform_bgmac_idm_write
+Date: Fri, 14 Jul 2017 00:34:09 +0530
+Subject: [PATCH 3/3] Documentation: devicetree: net: optional idm regs for
+ bgmac
 In-Reply-To: <1499972649-6200-1-git-send-email-abhishek.shah@broadcom.com>
 References: <1499972649-6200-1-git-send-email-abhishek.shah@broadcom.com>
-Message-ID: <1499972649-6200-2-git-send-email-abhishek.shah@broadcom.com>
+Message-ID: <1499972649-6200-4-git-send-email-abhishek.shah@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return type for idm register write callback should be void as 'writel'
-API is used for write operation. However, there no need to have 'return'
-in this function.
+Specifying IDM register space in DT is not mendatory for SoCs
+where firmware takes care of IDM operations. This patch updates
+BGMAC driver's DT binding documentation indicating the same.
 
 Signed-off-by: Abhishek Shah <abhishek.shah@broadcom.com>
-Reviewed-by: Oza Oza <oza.oza@broadcom.com>
 Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Oza Oza <oza.oza@broadcom.com>
 Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- drivers/net/ethernet/broadcom/bgmac-platform.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/net/brcm,amac.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/net/ethernet/broadcom/bgmac-platform.c b/drivers/net/ethernet/broadcom/bgmac-platform.c
-index 73aca97..1ca75de 100644
---- a/drivers/net/ethernet/broadcom/bgmac-platform.c
-+++ b/drivers/net/ethernet/broadcom/bgmac-platform.c
-@@ -50,7 +50,7 @@ static u32 platform_bgmac_idm_read(struct bgmac *bgmac, u16 offset)
- 
- static void platform_bgmac_idm_write(struct bgmac *bgmac, u16 offset, u32 value)
- {
--	return writel(value, bgmac->plat.idm_base + offset);
-+	writel(value, bgmac->plat.idm_base + offset);
- }
- 
- static bool platform_bgmac_clk_enabled(struct bgmac *bgmac)
+diff --git a/Documentation/devicetree/bindings/net/brcm,amac.txt b/Documentation/devicetree/bindings/net/brcm,amac.txt
+index 2fefa1a..ad16c1f 100644
+--- a/Documentation/devicetree/bindings/net/brcm,amac.txt
++++ b/Documentation/devicetree/bindings/net/brcm,amac.txt
+@@ -11,6 +11,7 @@ Required properties:
+  - reg-names:	Names of the registers.
+ 		"amac_base":	Address and length of the GMAC registers
+ 		"idm_base":	Address and length of the GMAC IDM registers
++				(required for NSP and Northstar2)
+ 		"nicpm_base":	Address and length of the NIC Port Manager
+ 				registers (required for Northstar2)
+  - interrupts:	Interrupt number
 -- 
 2.7.4
