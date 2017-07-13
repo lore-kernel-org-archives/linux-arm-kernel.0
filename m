@@ -1,49 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Jul 2017 23:48:43 -0700
-Subject: [PATCH V4 3/6] iommu/arm-smmu: Invoke pm_runtime during probe,
- add/remove device
-In-Reply-To: <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
-References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
- <1499333825-7658-4-git-send-email-vivek.gautam@codeaurora.org>
- <20170712225459.GZ22780@codeaurora.org>
- <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
-Message-ID: <20170713064843.GX22780@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 13 Jul 2017 07:51:22 +0100
+Subject: [RFC PATCH 00/10] arm64: allow virtually mapped stacks to be
+ enabled
+In-Reply-To: <20170712224726.GA10559@leverpostej>
+References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
+ <20170712224726.GA10559@leverpostej>
+Message-ID: <CAKv+Gu_=LVVCe29aaubPrN7Y9sP8N+DLi5dEdpJ38T7Ns61N5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13, Vivek Gautam wrote:
-> Hi Stephen,
-> 
-> 
-> On 07/13/2017 04:24 AM, Stephen Boyd wrote:
-> >On 07/06, Vivek Gautam wrote:
-> >>@@ -1231,12 +1237,18 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
-> >>  static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
-> >>  			     size_t size)
-> >>  {
-> >>-	struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
-> >>+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-> >>+	struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
-> >>+	size_t ret;
-> >>  	if (!ops)
-> >>  		return 0;
-> >>-	return ops->unmap(ops, iova, size);
-> >>+	pm_runtime_get_sync(smmu_domain->smmu->dev);
-> >Can these map/unmap ops be called from an atomic context? I seem
-> >to recall that being a problem before.
-> 
-> That's something which was dropped in the following patch merged in master:
-> 523d7423e21b iommu/arm-smmu: Remove io-pgtable spinlock
-> 
-> Looks like we don't  need locks here anymore?
-> 
+On 12 July 2017 at 23:47, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ard,
+>
+> On Wed, Jul 12, 2017 at 03:44:13PM +0100, Ard Biesheuvel wrote:
+>> This is a fairly quick'n'dirty attempt at enabling virtually mapped
+>> stacks for arm64, after learning from Mark yesterday that progress
+>> had more or less stalled on that front.
+>
+> Thanks for putting this together. If nothing else, this work needed a
+> good kick.
+>
+> I had some rought comments on this, but in the process of wiring those
+> up, I ended up writing an alternative [1] by cobblnig together prior
+> attempts. Apologies for the NIH.
+>
 
-While removing the spinlock around the map/unmap path may be one
-thing, I'm not sure that's all of them. Is there a path from an
-atomic DMA allocation (GFP_ATOMIC sort of thing) mapped into an
-IOMMU for a device that can eventually get down to here and
-attempt to turn a clk on?
+No worries. I deliberately refrained from any polishing of the code
+because I was expecting debate not acks.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>> Since having actual patches to poke at is infinitely better than having
+>> abstract discussions about how to approach it, I threw some code together
+>> that:
+>> 1. frees up sp_el0 by promoting register x18 to 'current' pointer while in
+>>    the kernel; flames welcome :-) (#7)
+>> 2. preparatory work to allow 1., i.e., to free up x18 and preserve/restore it
+>>    correctly as a platform register (#2, #3, #4, #5, #6)
+>
+> From past experience [2], I know that Will is not a fan of reserving a
+> GPR like this. There are a couple of other ways we can free up SP_EL0,
+> though, so that isn't the end of the world.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/518434.html
+> [2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/this-cpu-reg
+>
+>> 3. dump the entire task stack if regs->sp points elsewhere (#8)
+>
+> This sounds useful, but it's liable to fill a scrollbuffer and/or take a
+> while to dump (especially with 64K stacks), so we might want a boot-time
+> option to turn that on/off.
+>
+> Thanks,
+> Mark.
