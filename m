@@ -1,48 +1,36 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 13 Jul 2017 07:07:44 +0200
-Subject: [PATCH 0/3] ARM: dts: r8a779[014]: Use R-Car Gen 2 fallback
- binding for vin nodes
-In-Reply-To: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
-References: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20170713050744.GA23854@bigcity.dyn.berto.se>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 13 Jul 2017 10:39:34 +0530
+Subject: [RFC v2 5/6] drivers: boot_constraint: Add initial DT bindings
+In-Reply-To: <CAGb2v67XtUcqdjMt-Ln6zn3ShH4JFmjkK4bPSpUNZpJqnmwivw@mail.gmail.com>
+References: <cover.1499770771.git.viresh.kumar@linaro.org>
+ <0610277aef9830cff53b7b53cf41cc54886fdc7f.1499770771.git.viresh.kumar@linaro.org>
+ <CAL_Jsq+oAB3gejRMXuY0q9+Et4GrtvF3RwGzPNJ08TPooVyXJg@mail.gmail.com>
+ <CAGb2v67XtUcqdjMt-Ln6zn3ShH4JFmjkK4bPSpUNZpJqnmwivw@mail.gmail.com>
+Message-ID: <20170713050934.GB352@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 13-07-17, 10:52, Chen-Yu Tsai wrote:
+> I'm afraid the regulator case still doesn't make sense. The voltage
+> constraints should be set within each supplies device node. This was
+> explained in the discussion in v1 [1].
 
-Thanks for your work.
+I thought we were discussing about something I mentioned in one of my example
+but never to a point that the regulator problem doesn't exist at all. Perhaps I
+misunderstood your concerns. Anyway, lemme try once more with a better example.
 
-On 2017-07-11 14:56:46 +0200, Simon Horman wrote:
-> Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a779[014] SoCs.
-> 
-> This has no run-time effect for the current driver as the initialisation
-> sequence is the same for the SoC-specific binding for r8a779[014] and the
-> fallback binding for R-Car Gen 2
-> 
-> This is consistent with existing compat string usage in vin nodes for the
-> r8a779[23] SoCs.
+Regulator shared by: LCD and MMC (both can do DVFS) and the min/max constraint
+that can be set by the consumers of the regulator (both LCD/MMC) are: 1.5 V to
+3 V.
 
-For whole serries:
+The bootloader has programmed the LCD to work at the highest pixel frequency,
+which needs the voltage to be in range from 2.5 - 3 V.
 
-Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Now MMC can get probed first and it can try to bring the voltages below 2.5 V.
+Though, 1.5 - 2.5 is a valid range for the LCD, but not at the current pixel
+frequency.
 
-> 
-> Based on renesas-devel-20170711-v4.12
-> 
-> Simon Horman (3):
->   ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for vin nodes
->   ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for vin nodes
->   ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding for vin nodes
-> 
->  arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
->  arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
->  arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
->  3 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> -- 
-> 2.1.4
-> 
+Does that sound like a valid problem?
 
 -- 
-Regards,
-Niklas S?derlund
+viresh
