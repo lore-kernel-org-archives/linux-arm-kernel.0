@@ -1,77 +1,58 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu, 13 Jul 2017 15:35:02 -0700
-Subject: [PATCH 0/3] USB Mux support for Chipidea
-In-Reply-To: <fc1f2836-cd9b-0905-21fc-d2d3029d1f52@axentia.se>
-References: <20170712010255.26855-1-stephen.boyd@linaro.org>
- <fc1f2836-cd9b-0905-21fc-d2d3029d1f52@axentia.se>
-Message-ID: <149998530228.4532.1798948469358915658@sboyd-linaro>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 14 Jul 2017 01:34:53 +0200
+Subject: [PATCH 1/5] arm64: dts: rockchip: Add rk3399 vop and
+ display-subsystem
+In-Reply-To: <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
+References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
+ <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <4655605.dLm3uFpe8F@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Rosin (2017-07-11 22:04:46)
-> On 2017-07-12 03:02, Stephen Boyd wrote:
-> > This patchset adds support for the TC7USB40MU usb mux found on 
-> > db410c 96boards platforms via the new multiplexer framework and
-> > hooks that into the chipidea driver. This allows us to properly
-> > control host or device mode on this board via the sysfs knob.
-> > 
-> > So far I've only tested this on db410c, and there are some rough
-> > edges to finish off before it can merge. Also I'm experiencing
-> > odd behavior with switching the role while gadget is enabled and
-> > the micro-usb cable is kept connected. Not sure what's wrong but
-> > it seems like the gadget never gets disconnected? I'll investigate
-> > more.
-> > 
-> > TODO:
-> > 
-> >  1. The mux framework has to be selected for consumers to use it. We'll
-> >     need some stubs in the consumer header file to allow compilation to
-> >     continue without mux always enabled by consumers.
-> 
-> Instead of "depends on MULTIPLEXER", just add "select MULTIPLEXER"
-> to the Kconfig. Otherwise, you'll have to convince Linus that we
-> really do need a Kconfig question for the subsystem :-)
-> 
-> https://lkml.org/lkml/2017/7/4/118
+Hi Jacob,
 
-Ok. I'll add a select to the chipidea driver.
+Am Donnerstag, 13. Juli 2017, 00:03:51 CEST schrieb Jacob Chen:
+> Add devicetree nodes for rk3399 VOP (Video Output Processors), and the
+> top level display-subsystem root node.
+> 
+> Later patches add endpoints (eDP, HDMI, MIPI, etc) that attach to the
+> VOPs' output ports.
+> 
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 65 ++++++++++++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index e795135..300e500 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -1455,6 +1455,71 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	vopl: vop at ff8f0000 {
+> +		compatible = "rockchip,rk3399-vop-lit";
+> +		reg = <0x0 0xff8f0000 0x0 0x1ffc>, <0x0 0xff8f2000 0x0 0x400>;
 
-> 
-> >  2. We probably need some sort of mux_control_get_optional() API so that
-> >     we know if there was an error getting the mux control, instead of just
-> >     ignoring errors. For now I can pass up EPROBE_DEFER errors and ignore
-> >     other errors and consider it "missing from DT".
-> 
-> Yes, mux_control_get_optional should be easy to add.
-> 
-> >  3. Maybe we can get rid of the mux driver and just use mux-gpio.c with
-> >     a compatible string update? I split it off because we may want to
-> >     support the "S" pin on the TC7USB40MU one day that shuts off both
+What is this second memory region doing? It looks like this is the meant
+to cover VOP_GAMMA_LUT_ADDR, but can't you just map the whole area?
+ChromeOS seems to be doing fine using the whole area as
+	<0x0 0xff8f0000 0x0 0x3efc>
+and I've also not seen any code changes actually mapping/using this
+second area.
 
-Oh this is a typo. I mean "OE" pin.
 
-> >     mux outputs.
-> 
-> Maybe no need for a compatible update either, if it works to do something
-> like this in the DT?
-> 
->         usb_switch: usb-switch {
->                 compatible = "gpio-mux";
->                 mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>,
->                             <&pm8916_gpios XXX GPIO_ACTIVE_XXX>;
->                 idle-state = <2>;
->                 #mux-control-cells = <0>;
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&usb_sw_sel_pm>;
->         };
-> 
-> But I obviously know little about how things are wired and really works,
-> so that might be totally off...
-> 
-> Otherwise, maybe a generic mux-pinctrl driver would do the trick?
-> (compare with drivers/i2c/muxes/i2c-mux-pinctrl.c)
-> 
+> +		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
+> +		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>, <&cru DCLK_VOP1_DIV>;
+> +		clock-names = "aclk_vop", "dclk_vop", "hclk_vop", "dclk_source";
 
-Agreed. On the board I have the "OE" pin is shorted so that it always
-outputs a signal. For someone else they could do what you say and add
-another pin to gpio-mux binding and things will still work.
+While I know that this is based on my idea on handling the hdmi pll-rate
+requirements, I haven't found the matching code- and dt-binding-changes
+posted to a list yet. 
+
+
+Heiko
