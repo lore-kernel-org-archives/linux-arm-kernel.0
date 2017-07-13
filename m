@@ -1,88 +1,84 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 13 Jul 2017 08:10:22 -0400
-Subject: [PATCH V4 3/6] iommu/arm-smmu: Invoke pm_runtime during probe,
- add/remove device
-In-Reply-To: <939f8745-6f72-522c-1216-70e424740b62@samsung.com>
-References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
- <1499333825-7658-4-git-send-email-vivek.gautam@codeaurora.org>
- <20170712225459.GZ22780@codeaurora.org>
- <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
- <4dbc938c-ac88-9bd4-cf00-458008ae24c1@codeaurora.org>
- <CGME20170713115036epcas1p250113e9009dbf92487d258a90fffc66a@epcas1p2.samsung.com>
- <CAF6AEGsFOtsOjt1sLNPSFLEcu-7d1zxCOhTeC+P8e0TDbb1dSA@mail.gmail.com>
- <939f8745-6f72-522c-1216-70e424740b62@samsung.com>
-Message-ID: <CAF6AEGsfDewRUHLUbFKT1Q+8U2BkmFMHo4ZBSwSGspU3ktUY8g@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 13 Jul 2017 07:17:58 -0500
+Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
+In-Reply-To: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
+References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 8:02 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hi All,
->
-> On 2017-07-13 13:50, Rob Clark wrote:
->>
->> On Thu, Jul 13, 2017 at 1:35 AM, Sricharan R <sricharan@codeaurora.org>
->> wrote:
->>>
->>> On 7/13/2017 10:43 AM, Vivek Gautam wrote:
->>>>
->>>> On 07/13/2017 04:24 AM, Stephen Boyd wrote:
->>>>>
->>>>> On 07/06, Vivek Gautam wrote:
->>>>>>
->>>>>> @@ -1231,12 +1237,18 @@ static int arm_smmu_map(struct iommu_domain
->>>>>> *domain, unsigned long iova,
->>>>>>    static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned
->>>>>> long iova,
->>>>>>                     size_t size)
->>>>>>    {
->>>>>> -    struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
->>>>>> +    struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->>>>>> +    struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
->>>>>> +    size_t ret;
->>>>>>          if (!ops)
->>>>>>            return 0;
->>>>>>    -    return ops->unmap(ops, iova, size);
->>>>>> +    pm_runtime_get_sync(smmu_domain->smmu->dev);
->>>>>
->>>>> Can these map/unmap ops be called from an atomic context? I seem
->>>>> to recall that being a problem before.
->>>>
->>>> That's something which was dropped in the following patch merged in
->>>> master:
->>>> 523d7423e21b iommu/arm-smmu: Remove io-pgtable spinlock
->>>>
->>>> Looks like we don't  need locks here anymore?
->>>
->>>   Apart from the locking, wonder why a explicit pm_runtime is needed
->>>   from unmap. Somehow looks like some path in the master using that
->>>   should have enabled the pm ?
->>>
->> Yes, there are a bunch of scenarios where unmap can happen with
->> disabled master (but not in atomic context).  On the gpu side we
->> opportunistically keep a buffer mapping until the buffer is freed
->> (which can happen after gpu is disabled).  Likewise, v4l2 won't unmap
->> an exported dmabuf while some other driver holds a reference to it
->> (which can be dropped when the v4l2 device is suspended).
->>
->> Since unmap triggers tbl flush which touches iommu regs, the iommu
->> driver *definitely* needs a pm_runtime_get_sync().
->
->
-> Afair unmap might be called from atomic context as well, for example as
-> a result of dma_unmap_page(). In exynos IOMMU I simply check the runtime
-> PM state of IOMMU device. TLB flush is performed only when IOMMU is in
-> active
-> state. If it is suspended, I assume that the IOMMU controller's context
-> is already lost and its respective power domain might be already turned off,
-> so there is no point in touching IOMMU registers.
->
+On Thu, Jul 06, 2017 at 05:07:14PM -0400, Sinan Kaya wrote:
+> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+> following a Function Level Reset (FLR) request to indicate that it is not
+> ready to accept new requests.
+> 
+> Seen a timeout message with Intel 750 NVMe drive and FLR reset.
+> 
+> Kernel enables CRS visibility in pci_enable_crs() function for each bridge
+> it discovers. The OS observes a special vendor ID read value of 0xFFFF0001
+> in this case. We need to keep polling until this special read value
+> disappears. pci_bus_read_dev_vendor_id() takes care of CRS handling for a
+> given vendor id read request under the covers.
+> 
+> Adding a vendor ID read if this is a physical function before attempting
+> to read any other registers on the endpoint. A CRS indication will only
+> be given if the address to be read is vendor ID register.
+> 
+> Note that virtual functions report their vendor ID through another
+> mechanism.
+> 
+> The spec is calling to wait up to 1 seconds if the device is sending CRS.
+> The NVMe device seems to be requiring more. Relax this up to 60 seconds.
 
-that seems like an interesting approach.. although I wonder if there
-can be some race w/ new device memory access once clks are enabled
-before tlb flush completes?  That would be rather bad, since this
-approach is letting the backing pages of memory be freed before tlb
-flush.
+Can you add a pointer to the "1 second" requirement in the spec here?
+We use 60 seconds in pci_scan_device() and acpiphp_add_context().  Is
+there a basis in the spec for the 60 second timeout?
 
-BR,
--R
+What's the NVMe excuse for requiring more time than the spec allows?
+Is this a hardware erratum?  Is there some PCIe ECN pending to address
+this?
+
+I try to avoid adding generic changes based on one specific piece of
+hardware because it can penalize everybody else who actually bothered
+to follow the spec.  For example, if FLR fails because a non-NVMe
+device is broken, it will now take 60 seconds to notice that instead
+of 1 second.
+
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index aab9d51..83a9784 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3723,10 +3723,16 @@ static void pci_flr_wait(struct pci_dev *dev)
+>  	int i = 0;
+>  	u32 id;
+>  
+> -	do {
+> -		msleep(100);
+> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
+> -	} while (i++ < 10 && id == ~0);
+> +	if (dev->is_virtfn) {
+> +		do {
+> +			msleep(100);
+> +			pci_read_config_dword(dev, PCI_COMMAND, &id);
+> +		} while (i++ < 10 && id == ~0);
+> +	} else {
+> +		if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+> +						60*1000))
+> +			id = ~0;
+> +	}
+>  
+>  	if (id == ~0)
+>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
