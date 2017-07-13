@@ -1,72 +1,53 @@
-From: mirceac@gmail.com (Mircea Ciocan)
-Date: Thu, 13 Jul 2017 10:23:41 +0200
-Subject: Porting a custom interrupt handler from kernel 2.6.25 to 3.16.45
-Message-ID: <CAHumR2+WR3Fdtft8xrPfcT3-dpKqCL__aaEc6qri3N5-x0yCXw@mail.gmail.com>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Thu, 13 Jul 2017 08:27:47 +0000
+Subject: [PATCH 1/3] dts: ls2088a: add pcie support
+In-Reply-To: <20170713081728.GQ3172@dragon>
+References: <1499331330-38362-1-git-send-email-Zhiqiang.Hou@nxp.com>
+ <20170713081728.GQ3172@dragon>
+Message-ID: <VI1PR0402MB2782E2EB4B0E36EFF55CD5E684AC0@VI1PR0402MB2782.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everybody, I'm new to the intricacies of the ARM platform
-interrupt handling and I have to port a custom interrupt handler from
-2.6.25 to 3.16.45.
-The current situation is like this:
-The timer IRQ (only one active for the moment) triggers, and the
-interrupt routine is executed only once correctly.
-The next time it triggers, or maybe at the end of the generic arm
-interrupt handler, I got an Oops because the stack or PC seems to be
-smashed and the CPU goes haywire.
-The strange thing is that if in the "normal" irq handler of the timer
-I don't clear the interrupt bit, the kernel loops endlessly in the
-interrupt routine but it doesn't crash at all.
+Hi Shawn,
 
-In the original 2.6 arch/arm/kernel/entry-armv.S the code is inserted like this:
-/*  Interrupt handling.  Preserves r7, r8, r9 */
-        .macro  irq_handler
-#ifdef CONFIG_ARCH_CUSTOM
-        irq_handler_custom r0, r6, r5, r1, lr, r2
-#else
-        get_irqnr_preamble r5, lr
-1:      get_irqnr_and_base r0, r6, r5, lr
-        movne   r1, sp
-        @
-        @ routine called with r0 = irq number, r1 = struct pt_regs *
-        @
-        adrne   lr, 1b
-        bne     asm_do_IRQ
-#endif
-[...snip...]
-        .endm
+Thanks for your comments!
 
-In the 3.16 new kernel the code, that doesn't work, looks like this:
-/* Interrupt handling.  */
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: 2017?7?13? 16:18
+> To: Z.q. Hou <zhiqiang.hou@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+> will.deacon at arm.com; Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> Subject: Re: [PATCH 1/3] dts: ls2088a: add pcie support
+> 
+> On Thu, Jul 06, 2017 at 04:55:28PM +0800, Zhiqiang Hou wrote:
+> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> >
+> > The physical memory map address and CCSR registers map address are
+> > different between LS2088A and other LS2080A series SoCs.
+> >
+> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> > b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> > index 5c695c6..7d26531 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> > @@ -134,6 +134,7 @@
+> >  };
+> >
+> >  &pcie1 {
+> > +	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
+> 
+> I do not see "fsl,ls2088a-pcie" in either bindings doc or kernel driver.
+> 
 
-        .macro  irq_handler
-#ifdef CONFIG_ARCH_CUSTOM
-        irq_handler_spc300 r0, r6, r5, r1, lr, r2
-#else
-#ifdef CONFIG_MULTI_IRQ_HANDLER
-        ldr     r1, =handle_arch_irq
-        mov     r0, sp
-        adr     lr, BSYM(9997f)
-        ldr     pc, [r1]
-#else
-        arch_irq_handler_default
-#endif
-#endif
-9997:
-        .endm
+I submitted the DT node patch and driver code patch separately, see the driver patch:
+https://patchwork.kernel.org/patch/9827915/
 
-I have seen that around kernel 3.0 there were some register shuffling
-in the irq handler ( commit b059bdc ("ARM: entry: rejig register
-allocation in exception entry handlers", 2011-06-25) )
-
-So I will kindly ask for your assistance to point me on the right
-track to have this issue solved, do I just need to shuffle the
-registers or other more important changes are need ?
-At least I would like to know what registers have a special meaning
-and must be preserved in the latest kernel.
-Also if it's a Fine Manual that I can read about the architecture of
-the interrupt handling on the ARM platform, explaining the roles and
-constrains on the registers used I will appreciate any pointers.
-
- Best regards,
- Mircea
+Thanks,
+Zhiqiang
