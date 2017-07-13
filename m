@@ -1,70 +1,88 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Jul 2017 02:43:12 +0300
-Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail
- for runtime_pm users
-In-Reply-To: <aeeb8f778dae8f170294b6da92819973b742feb2.1499956639.git-series.maxime.ripard@free-electrons.com>
-References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
- <aeeb8f778dae8f170294b6da92819973b742feb2.1499956639.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <1823154.LT2zYSFJ4j@avalon>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 13 Jul 2017 18:49:11 -0500
+Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
+In-Reply-To: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
+References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170713234910.GB5944@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-Thank you for the patch.
-
-On Thursday 13 Jul 2017 16:41:13 Maxime Ripard wrote:
-> The current drm_atomic_helper_commit_tail helper works only if the CRTC is
-> accessible, and documents an alternative implementation that is supposed to
-> be used if that happens.
+On Thu, Jul 06, 2017 at 05:07:14PM -0400, Sinan Kaya wrote:
+> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+> following a Function Level Reset (FLR) request to indicate that it is not
+> ready to accept new requests.
 > 
-> That implementation is then duplicated by some drivers. Instead of
-> documenting it, let's implement an helper that all the relevant users can
-> use directly.
+> Seen a timeout message with Intel 750 NVMe drive and FLR reset.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Kernel enables CRS visibility in pci_enable_crs() function for each bridge
+> it discovers. The OS observes a special vendor ID read value of 0xFFFF0001
+> in this case. We need to keep polling until this special read value
+> disappears. pci_bus_read_dev_vendor_id() takes care of CRS handling for a
+> given vendor id read request under the covers.
+
+This patch isn't about how CRS works; we already have support for
+that.  So this paragraph is mostly extraneous and can be replaced by a
+simple reference to CRS in the spec.  
+
+> Adding a vendor ID read if this is a physical function before attempting
+> to read any other registers on the endpoint. A CRS indication will only
+> be given if the address to be read is vendor ID register.
+> 
+> Note that virtual functions report their vendor ID through another
+> mechanism.
+
+How VFs report vendor ID is irrelevant.
+
+What *is* relevant is how FLR affects VFs.  The SR-IOV spec, r1.1,
+sec 2.2.2, says FLR doesn't affect a VF's existence in config space.
+
+That suggests to me that reading a VF's PCI_COMMAND register after an
+FLR should always return valid data (never ~0).  I suppose an FLR VF
+reset isn't instantaneous, though, so I suppose we do need the 100ms
+delay.  But maybe we should just return immediately after that,
+without reading any VF config space?
+
+pci_flr_wait() was added by 5adecf817dd6 ("PCI: Wait for up to 1000ms
+after FLR reset"); maybe Alex has more insight into this.
+
+> The spec is calling to wait up to 1 seconds if the device is sending CRS.
+> The NVMe device seems to be requiring more. Relax this up to 60 seconds.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  drivers/gpu/drm/drm_atomic_helper.c        | 47 +++++++++++++++--------
->  drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
->  drivers/gpu/drm/rcar-du/rcar_du_kms.c      | 18 +---------
-
-I've submitted "[PATCH] drm: rcar-du: Setup planes before enabling CRTC to 
-avoid flicker" that changes the rcar-du implementation to the standard 
-disable/update planes/enable order, so I'd appreciate if you could drop the 
-rcar-du part of this patch to avoid conflicts.
-
-This being said, the reason why I switched back from the "runtime PM" to the 
-"standard" order is probably of interest to you. Quoting the commit message,
-
-> Commit 52055bafa1ff ("drm: rcar-du: Move plane commit code from CRTC
-> start to CRTC resume") changed the order of the plane commit and CRTC
-> enable operations to accommodate the runtime PM requirements. However,
-> this introduced corruption in the first displayed frame, as the CRTC is
-> now enabled without any plane configured. On Gen2 hardware the first
-> frame will be black and likely unnoticed, but on Gen3 hardware we end up
-> starting the display before the VSP compositor, which is more
-> noticeable.
+>  drivers/pci/pci.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
 > 
-> To fix this, revert the order of the commit operations back, and handle
-> runtime PM requirements in the CRTC .atomic_begin() and .atomic_enable()
-> helper operation handlers.
-
-I believe that the "runtime PM" order is problematic in most drivers. The 
-problem usually goes unnoticed as most monitors will not even display the 
-first frame, and I assume many devices will just output it black, but it's an 
-issue nonetheless.
-
-Note that my driver hasn't lost the "runtime PM" requirements, so I had to 
-support them with the "standard" order. The best way I've found was to runtime 
-resume in the one of .atomic_begin() and .enable() that is run first. Not very 
-neat, as similar code would be needed in most drivers. I wonder whether it 
-wouldn't be useful to add resume/suspend helper callbacks for the CRTC.
-
->  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 21 +----------
->  include/drm/drm_atomic_helper.h            |  1 +-
->  5 files changed, 36 insertions(+), 78 deletions(-)
-
--- 
-Regards,
-
-Laurent Pinchart
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index aab9d51..83a9784 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3723,10 +3723,16 @@ static void pci_flr_wait(struct pci_dev *dev)
+>  	int i = 0;
+>  	u32 id;
+>  
+> -	do {
+> -		msleep(100);
+> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
+> -	} while (i++ < 10 && id == ~0);
+> +	if (dev->is_virtfn) {
+> +		do {
+> +			msleep(100);
+> +			pci_read_config_dword(dev, PCI_COMMAND, &id);
+> +		} while (i++ < 10 && id == ~0);
+> +	} else {
+> +		if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+> +						60*1000))
+> +			id = ~0;
+> +	}
+>  
+>  	if (id == ~0)
+>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
