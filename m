@@ -1,107 +1,67 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Thu, 13 Jul 2017 13:56:53 +0200
-Subject: [PATCH v2] ARM: dts: at91: sama5d2_xplained: use pin macros
- instead of numbers
-In-Reply-To: <20170710061205.12921-1-ludovic.desroches@microchip.com>
-References: <201707090720.uyYcbj17%fengguang.wu@intel.com>
- <20170710061205.12921-1-ludovic.desroches@microchip.com>
-Message-ID: <ad99579b-d655-c748-6434-dc2330a82fe4@microchip.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 13 Jul 2017 14:02:40 +0200
+Subject: [PATCH V4 3/6] iommu/arm-smmu: Invoke pm_runtime during probe,
+ add/remove device
+In-Reply-To: <CAF6AEGsFOtsOjt1sLNPSFLEcu-7d1zxCOhTeC+P8e0TDbb1dSA@mail.gmail.com>
+References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1499333825-7658-4-git-send-email-vivek.gautam@codeaurora.org>
+ <20170712225459.GZ22780@codeaurora.org>
+ <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
+ <4dbc938c-ac88-9bd4-cf00-458008ae24c1@codeaurora.org>
+ <CGME20170713115036epcas1p250113e9009dbf92487d258a90fffc66a@epcas1p2.samsung.com>
+ <CAF6AEGsFOtsOjt1sLNPSFLEcu-7d1zxCOhTeC+P8e0TDbb1dSA@mail.gmail.com>
+Message-ID: <939f8745-6f72-522c-1216-70e424740b62@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2017 at 08:12, Ludovic Desroches wrote:
-> Use pin macros instead of magic numbers to ease interpretation.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Hi All,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+On 2017-07-13 13:50, Rob Clark wrote:
+> On Thu, Jul 13, 2017 at 1:35 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+>> On 7/13/2017 10:43 AM, Vivek Gautam wrote:
+>>> On 07/13/2017 04:24 AM, Stephen Boyd wrote:
+>>>> On 07/06, Vivek Gautam wrote:
+>>>>> @@ -1231,12 +1237,18 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+>>>>>    static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+>>>>>                     size_t size)
+>>>>>    {
+>>>>> -    struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
+>>>>> +    struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>>>>> +    struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+>>>>> +    size_t ret;
+>>>>>          if (!ops)
+>>>>>            return 0;
+>>>>>    -    return ops->unmap(ops, iova, size);
+>>>>> +    pm_runtime_get_sync(smmu_domain->smmu->dev);
+>>>> Can these map/unmap ops be called from an atomic context? I seem
+>>>> to recall that being a problem before.
+>>> That's something which was dropped in the following patch merged in master:
+>>> 523d7423e21b iommu/arm-smmu: Remove io-pgtable spinlock
+>>>
+>>> Looks like we don't  need locks here anymore?
+>>   Apart from the locking, wonder why a explicit pm_runtime is needed
+>>   from unmap. Somehow looks like some path in the master using that
+>>   should have enabled the pm ?
+>>
+> Yes, there are a bunch of scenarios where unmap can happen with
+> disabled master (but not in atomic context).  On the gpu side we
+> opportunistically keep a buffer mapping until the buffer is freed
+> (which can happen after gpu is disabled).  Likewise, v4l2 won't unmap
+> an exported dmabuf while some other driver holds a reference to it
+> (which can be dropped when the v4l2 device is suspended).
+>
+> Since unmap triggers tbl flush which touches iommu regs, the iommu
+> driver *definitely* needs a pm_runtime_get_sync().
 
-> ---
-> 
-> I have remove the unexpected brace removal from the first version of this patch.
-> 
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 23 ++++++++++++-----------
->  1 file changed, 12 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> index 2e2c3d1a1fa2..6eec8dc5143e 100644
-> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> @@ -68,7 +68,7 @@
->  
->  	ahb {
->  		usb0: gadget at 00300000 {
-> -			atmel,vbus-gpio = <&pioA 31 GPIO_ACTIVE_HIGH>;
-> +			atmel,vbus-gpio = <&pioA PIN_PA31 GPIO_ACTIVE_HIGH>;
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&pinctrl_usba_vbus>;
->  			status = "okay";
-> @@ -76,8 +76,8 @@
->  
->  		usb1: ohci at 00400000 {
->  			num-ports = <3>;
-> -			atmel,vbus-gpio = <0 /* &pioA 41 GPIO_ACTIVE_HIGH */
-> -					   &pioA 42 GPIO_ACTIVE_HIGH
-> +			atmel,vbus-gpio = <0 /* &pioA PIN_PB9 GPIO_ACTIVE_HIGH */
-> +					   &pioA PIN_PB10 GPIO_ACTIVE_HIGH
->  					   0
->  					  >;
->  			pinctrl-names = "default";
-> @@ -127,7 +127,7 @@
->  				ethernet-phy at 1 {
->  					reg = <0x1>;
->  					interrupt-parent = <&pioA>;
-> -					interrupts = <73 IRQ_TYPE_LEVEL_LOW>;
-> +					interrupts = <PIN_PC9 IRQ_TYPE_LEVEL_LOW>;
->  				};
->  			};
->  
-> @@ -160,9 +160,9 @@
->  					compatible = "active-semi,act8945a";
->  					reg = <0x5b>;
->  					active-semi,vsel-high;
-> -					active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-> -					active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
-> -					active-semi,irq_gpios = <&pioA 45 GPIO_ACTIVE_LOW>;
-> +					active-semi,chglev-gpios = <&pioA PIN_PA12 GPIO_ACTIVE_HIGH>;
-> +					active-semi,lbo-gpios = <&pioA PIN_PC8 GPIO_ACTIVE_LOW>;
-> +					active-semi,irq_gpios = <&pioA PIN_PB13 GPIO_ACTIVE_LOW>;
->  					active-semi,input-voltage-threshold-microvolt = <6600>;
->  					active-semi,precondition-timeout = <40>;
->  					active-semi,total-timeout = <3>;
-> @@ -504,7 +504,7 @@
->  
->  		bp1 {
->  			label = "PB_USER";
-> -			gpios = <&pioA 41 GPIO_ACTIVE_LOW>;
-> +			gpios = <&pioA PIN_PB9 GPIO_ACTIVE_LOW>;
->  			linux,code = <0x104>;
->  		};
->  	};
-> @@ -517,17 +517,18 @@
->  
->  		red {
->  			label = "red";
-> -			gpios = <&pioA 38 GPIO_ACTIVE_LOW>;
-> +			gpios = <&pioA PIN_PB6 GPIO_ACTIVE_LOW>;
->  		};
->  
-> +
->  		green {
->  			label = "green";
-> -			gpios = <&pioA 37 GPIO_ACTIVE_LOW>;
-> +			gpios = <&pioA PIN_PB5 GPIO_ACTIVE_LOW>;
->  		};
->  
->  		blue {
->  			label = "blue";
-> -			gpios = <&pioA 32 GPIO_ACTIVE_LOW>;
-> +			gpios = <&pioA PIN_PB0 GPIO_ACTIVE_LOW>;
->  			linux,default-trigger = "heartbeat";
->  		};
->  	};
-> 
+Afair unmap might be called from atomic context as well, for example as
+a result of dma_unmap_page(). In exynos IOMMU I simply check the runtime
+PM state of IOMMU device. TLB flush is performed only when IOMMU is in 
+active
+state. If it is suspended, I assume that the IOMMU controller's context
+is already lost and its respective power domain might be already turned off,
+so there is no point in touching IOMMU registers.
 
-
+Best regards
 -- 
-Nicolas Ferre
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
