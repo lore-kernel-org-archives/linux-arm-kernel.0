@@ -1,69 +1,214 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jul 2017 16:41:15 +0200
-Subject: [PATCH 3/4] drm/sun4i: engine: Add commit_poll function
+Date: Thu, 13 Jul 2017 16:41:13 +0200
+Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail for
+ runtime_pm users
 In-Reply-To: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
 References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <b483c2c05704615957dc6d96bbd06f2e3b117bf5.1499956639.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <aeeb8f778dae8f170294b6da92819973b742feb2.1499956639.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the earlier Allwinner chips, with the first iteration of the display
-engine, the backend commit bit needs to be polled before making any
-register access to the backend.
+The current drm_atomic_helper_commit_tail helper works only if the CRTC is
+accessible, and documents an alternative implementation that is supposed to
+be used if that happens.
 
-Add an operation for that, that will be called in atomic_begin in order to
-be sure to have that bit cleared before we do any modifications.
+That implementation is then duplicated by some drivers. Instead of
+documenting it, let's implement an helper that all the relevant users can
+use directly.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c   |  2 ++
- drivers/gpu/drm/sun4i/sunxi_engine.h | 14 ++++++++++++++
- 2 files changed, 16 insertions(+)
+ drivers/gpu/drm/drm_atomic_helper.c        | 47 +++++++++++++++--------
+ drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
+ drivers/gpu/drm/rcar-du/rcar_du_kms.c      | 18 +---------
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 21 +----------
+ include/drm/drm_atomic_helper.h            |  1 +-
+ 5 files changed, 36 insertions(+), 78 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index f8c70439d1e2..2eba1d8639d8 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -45,6 +45,8 @@ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
- 		spin_unlock_irqrestore(&dev->event_lock, flags);
- 		crtc->state->event = NULL;
- 	 }
-+
-+	WARN_ON(sunxi_engine_commit_poll(engine));
+diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+index 86d3093c6c9b..a288805078f9 100644
+--- a/drivers/gpu/drm/drm_atomic_helper.c
++++ b/drivers/gpu/drm/drm_atomic_helper.c
+@@ -1245,23 +1245,11 @@ EXPORT_SYMBOL(drm_atomic_helper_wait_for_vblanks);
+  * @old_state: atomic state object with old state structures
+  *
+  * This is the default implementation for the
+- * &drm_mode_config_helper_funcs.atomic_commit_tail hook.
++ * &drm_mode_config_helper_funcs.atomic_commit_tail hook, for drivers
++ * that do not support runtime_pm.
+  *
+  * Note that the default ordering of how the various stages are called is to
+- * match the legacy modeset helper library closest. One peculiarity of that is
+- * that it doesn't mesh well with runtime PM at all.
+- *
+- * For drivers supporting runtime PM the recommended sequence is instead ::
+- *
+- *     drm_atomic_helper_commit_modeset_disables(dev, old_state);
+- *
+- *     drm_atomic_helper_commit_modeset_enables(dev, old_state);
+- *
+- *     drm_atomic_helper_commit_planes(dev, old_state,
+- *                                     DRM_PLANE_COMMIT_ACTIVE_ONLY);
+- *
+- * for committing the atomic update to hardware.  See the kerneldoc entries for
+- * these three functions for more details.
++ * match the legacy modeset helper library closest.
+  */
+ void drm_atomic_helper_commit_tail(struct drm_atomic_state *old_state)
+ {
+@@ -1281,6 +1269,35 @@ void drm_atomic_helper_commit_tail(struct drm_atomic_state *old_state)
  }
+ EXPORT_SYMBOL(drm_atomic_helper_commit_tail);
  
- static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
-diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
-index 4cb70ae65c79..6618e182613c 100644
---- a/drivers/gpu/drm/sun4i/sunxi_engine.h
-+++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
-@@ -17,6 +17,7 @@ struct sunxi_engine;
- 
- struct sunxi_engine_ops {
- 	void (*commit)(struct sunxi_engine *engine);
-+	int (*commit_poll)(struct sunxi_engine *engine);
- 	struct drm_plane **(*layers_init)(struct drm_device *drm,
- 					  struct sunxi_engine *engine);
- 
-@@ -55,6 +56,19 @@ sunxi_engine_commit(struct sunxi_engine *engine)
- }
- 
- /**
-+ * sunxi_engine_commit_poll() - wait for all changes to be committed
-+ * @engine:	pointer to the engine
-+ */
-+static inline int
-+sunxi_engine_commit_poll(struct sunxi_engine *engine)
-+{
-+	if (engine->ops && engine->ops->commit_poll)
-+		return engine->ops->commit_poll(engine);
-+
-+	return 0;
-+}
-+
 +/**
-  * sunxi_engine_layers_init() - Create planes (layers) for the engine
-  * @drm:	pointer to the drm_device for which planes will be created
-  * @engine:	pointer to the engine
++ * drm_atomic_helper_commit_tail_runtime_pm - commit atomic update to hardware
++ * @old_state: new modeset state to be committed
++ *
++ * This is a variant of drm_atomic_helper_commit_tail suited for
++ * drivers that implement runtime_pm.
++ *
++ * Note that the default ordering of how the various stages are called is to
++ * match the legacy modeset helper library closest.
++ */
++void drm_atomic_helper_commit_tail_runtime_pm(struct drm_atomic_state *old_state)
++{
++	struct drm_device *dev = old_state->dev;
++
++	drm_atomic_helper_commit_modeset_disables(dev, old_state);
++
++	drm_atomic_helper_commit_modeset_enables(dev, old_state);
++
++	drm_atomic_helper_commit_planes(dev, old_state,
++					DRM_PLANE_COMMIT_ACTIVE_ONLY);
++
++	drm_atomic_helper_commit_hw_done(old_state);
++
++	drm_atomic_helper_wait_for_vblanks(dev, old_state);
++
++	drm_atomic_helper_cleanup_planes(dev, old_state);
++}
++EXPORT_SYMBOL(drm_atomic_helper_commit_tail_runtime_pm);
++
+ static void commit_tail(struct drm_atomic_state *old_state)
+ {
+ 	struct drm_device *dev = old_state->dev;
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fb.c b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+index d48fd7c918f8..71f6873255f1 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fb.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+@@ -187,33 +187,8 @@ dma_addr_t exynos_drm_fb_dma_addr(struct drm_framebuffer *fb, int index)
+ 	return exynos_fb->dma_addr[index];
+ }
+ 
+-static void exynos_drm_atomic_commit_tail(struct drm_atomic_state *state)
+-{
+-	struct drm_device *dev = state->dev;
+-
+-	drm_atomic_helper_commit_modeset_disables(dev, state);
+-
+-	drm_atomic_helper_commit_modeset_enables(dev, state);
+-
+-	/*
+-	 * Exynos can't update planes with CRTCs and encoders disabled,
+-	 * its updates routines, specially for FIMD, requires the clocks
+-	 * to be enabled. So it is necessary to handle the modeset operations
+-	 * *before* the commit_planes() step, this way it will always
+-	 * have the relevant clocks enabled to perform the update.
+-	 */
+-	drm_atomic_helper_commit_planes(dev, state,
+-					DRM_PLANE_COMMIT_ACTIVE_ONLY);
+-
+-	drm_atomic_helper_commit_hw_done(state);
+-
+-	drm_atomic_helper_wait_for_vblanks(dev, state);
+-
+-	drm_atomic_helper_cleanup_planes(dev, state);
+-}
+-
+ static struct drm_mode_config_helper_funcs exynos_drm_mode_config_helpers = {
+-	.atomic_commit_tail = exynos_drm_atomic_commit_tail,
++	.atomic_commit_tail = drm_atomic_helper_commit_tail_runtime_pm,
+ };
+ 
+ static const struct drm_mode_config_funcs exynos_drm_mode_config_funcs = {
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_kms.c b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+index f4125c8ca902..cb0f6266fbae 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+@@ -249,28 +249,12 @@ static int rcar_du_atomic_check(struct drm_device *dev,
+ 	return rcar_du_atomic_check_planes(dev, state);
+ }
+ 
+-static void rcar_du_atomic_commit_tail(struct drm_atomic_state *old_state)
+-{
+-	struct drm_device *dev = old_state->dev;
+-
+-	/* Apply the atomic update. */
+-	drm_atomic_helper_commit_modeset_disables(dev, old_state);
+-	drm_atomic_helper_commit_modeset_enables(dev, old_state);
+-	drm_atomic_helper_commit_planes(dev, old_state,
+-					DRM_PLANE_COMMIT_ACTIVE_ONLY);
+-
+-	drm_atomic_helper_commit_hw_done(old_state);
+-	drm_atomic_helper_wait_for_vblanks(dev, old_state);
+-
+-	drm_atomic_helper_cleanup_planes(dev, old_state);
+-}
+-
+ /* -----------------------------------------------------------------------------
+  * Initialization
+  */
+ 
+ static const struct drm_mode_config_helper_funcs rcar_du_mode_config_helper = {
+-	.atomic_commit_tail = rcar_du_atomic_commit_tail,
++	.atomic_commit_tail = drm_atomic_helper_commit_tail_runtime_pm,
+ };
+ 
+ static const struct drm_mode_config_funcs rcar_du_mode_config_funcs = {
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+index 81f9548672b0..647745479c39 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+@@ -174,27 +174,8 @@ static void rockchip_drm_output_poll_changed(struct drm_device *dev)
+ 		drm_fb_helper_hotplug_event(fb_helper);
+ }
+ 
+-static void
+-rockchip_atomic_commit_tail(struct drm_atomic_state *state)
+-{
+-	struct drm_device *dev = state->dev;
+-
+-	drm_atomic_helper_commit_modeset_disables(dev, state);
+-
+-	drm_atomic_helper_commit_modeset_enables(dev, state);
+-
+-	drm_atomic_helper_commit_planes(dev, state,
+-					DRM_PLANE_COMMIT_ACTIVE_ONLY);
+-
+-	drm_atomic_helper_commit_hw_done(state);
+-
+-	drm_atomic_helper_wait_for_vblanks(dev, state);
+-
+-	drm_atomic_helper_cleanup_planes(dev, state);
+-}
+-
+ static const struct drm_mode_config_helper_funcs rockchip_mode_config_helpers = {
+-	.atomic_commit_tail = rockchip_atomic_commit_tail,
++	.atomic_commit_tail = drm_atomic_helper_commit_tail_runtime_pm,
+ };
+ 
+ static const struct drm_mode_config_funcs rockchip_drm_mode_config_funcs = {
+diff --git a/include/drm/drm_atomic_helper.h b/include/drm/drm_atomic_helper.h
+index f0a8678ae98e..9ff64c6d3043 100644
+--- a/include/drm/drm_atomic_helper.h
++++ b/include/drm/drm_atomic_helper.h
+@@ -41,6 +41,7 @@ int drm_atomic_helper_check_planes(struct drm_device *dev,
+ int drm_atomic_helper_check(struct drm_device *dev,
+ 			    struct drm_atomic_state *state);
+ void drm_atomic_helper_commit_tail(struct drm_atomic_state *state);
++void drm_atomic_helper_commit_tail_runtime_pm(struct drm_atomic_state *state);
+ int drm_atomic_helper_commit(struct drm_device *dev,
+ 			     struct drm_atomic_state *state,
+ 			     bool nonblock);
 -- 
 git-series 0.9.1
