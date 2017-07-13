@@ -1,41 +1,28 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 13 Jul 2017 15:01:58 +0200
-Subject: [PATCH] input: serio: Fix multiline comments style in xilinx_ps2
-Message-ID: <bd4e538a597b0762b636176d83834490116d3f5e.1499950913.git.michal.simek@xilinx.com>
+From: lionel.debieve@st.com (Lionel Debieve)
+Date: Thu, 13 Jul 2017 15:06:30 +0200
+Subject: [PATCH 0/3] STM32 CRC update
+Message-ID: <1499951193-14842-1-git-send-email-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix multiline comments style not to be reported by checkpatch.
+This set of patches update the STM32 CRC driver.
+It contains two corrections and one global Kconfig rework.
+First correction is about the relaxed usage in scope of arm
+platform usage, second about a unbind driver issue.
+Last patch is about a Kconfig rework that make configuration
+generic for STM32 crypto algos, HASH and CRYP are pushed
+accordingly.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Lionel Debieve (3):
+  crypto: stm32 - CRC use relaxed function
+  crypto: stm32 - solve crc issue during unbind
+  crypto: stm32 - Rename module to use generic crypto
 
- drivers/input/serio/xilinx_ps2.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/crypto/Makefile            |  2 +-
+ drivers/crypto/stm32/Kconfig       |  6 +++---
+ drivers/crypto/stm32/Makefile      |  3 +--
+ drivers/crypto/stm32/stm32_crc32.c | 17 +++++++++--------
+ 4 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/input/serio/xilinx_ps2.c b/drivers/input/serio/xilinx_ps2.c
-index 14c40892ed82..474724296363 100644
---- a/drivers/input/serio/xilinx_ps2.c
-+++ b/drivers/input/serio/xilinx_ps2.c
-@@ -46,7 +46,8 @@
- #define XPS2_STATUS_TX_FULL	0x00000002 /* Transmit Full  */
- 
- /* Bit definitions for ISR/IER registers. Both the registers have the same bit
-- * definitions and are only defined once. */
-+ * definitions and are only defined once.
-+ */
- #define XPS2_IPIXR_WDT_TOUT	0x00000001 /* Watchdog Timeout Interrupt */
- #define XPS2_IPIXR_TX_NOACK	0x00000002 /* Transmit No ACK Interrupt */
- #define XPS2_IPIXR_TX_ACK	0x00000004 /* Transmit ACK (Data) Interrupt */
-@@ -293,7 +294,8 @@ static int xps2_of_probe(struct platform_device *ofdev)
- 	out_be32(drvdata->base_address + XPS2_IPIER_OFFSET, 0);
- 
- 	/* Reset the PS2 device and abort any current transaction, to make sure
--	 * we have the PS2 in a good state */
-+	 * we have the PS2 in a good state
-+	 */
- 	out_be32(drvdata->base_address + XPS2_SRST_OFFSET, XPS2_SRST_RESET);
- 
- 	dev_info(dev, "Xilinx PS2 at 0x%08llX mapped to 0x%p, irq=%d\n",
 -- 
-1.9.1
+2.7.4
