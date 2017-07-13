@@ -1,20 +1,32 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 13 Jul 2017 19:13:20 +0200
-Subject: [PATCH 2/2] ARM: dts: rockchip: remove arm,
- mali-midgard compatible from rk3288
-In-Reply-To: <20170710121227.14264-2-heiko@sntech.de>
-References: <20170710121227.14264-1-heiko@sntech.de>
- <20170710121227.14264-2-heiko@sntech.de>
-Message-ID: <2174958.YDB435SJ6H@phil>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 13 Jul 2017 18:15:59 +0100
+Subject: [PATCH 0/2] md/raid6: improvements for ARM/arm64
+Message-ID: <20170713171601.25440-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 10. Juli 2017, 14:12:27 CEST schrieb Heiko Stuebner:
-> The binding specifies the actual implementations only (mali-t760
-> for example) but not the arm,mali-midgard used in some vendor kernels.
-> So drop that compatible property from the rk3288 where it had slipped in.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+1. Use a faster algorithm for the delta syndrome
+2. Implement recovery routines in NEON
 
-applied as fix for 4.13 after also fixing the node name to gpu at ...
-as spotted by Rob.
+As before, NEON intrinsics are used, which means the same code can be
+compiled for ARM as well as arm64.
+
+Given that there does not seem to be a maintainer for lib/raid6, could
+we take this through one of the ARM trees instead?
+
+Ard Biesheuvel (2):
+  md/raid6: use faster multiplication for ARM NEON delta syndrome
+  md/raid6: implement recovery using ARM NEON intrinsics
+
+ include/linux/raid/pq.h      |   1 +
+ lib/raid6/Makefile           |   4 +-
+ lib/raid6/algos.c            |   3 +
+ lib/raid6/neon.uc            |  33 +++++-
+ lib/raid6/recov_neon.c       | 110 ++++++++++++++++++
+ lib/raid6/recov_neon_inner.c | 117 ++++++++++++++++++++
+ 6 files changed, 264 insertions(+), 4 deletions(-)
+ create mode 100644 lib/raid6/recov_neon.c
+ create mode 100644 lib/raid6/recov_neon_inner.c
+
+-- 
+2.9.3
