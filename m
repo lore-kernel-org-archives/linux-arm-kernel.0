@@ -1,89 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 13 Jul 2017 15:11:25 -0700
-Subject: [PATCH] arm64: dts: qcom: Force host mode for USB on apq8016-sbc
-Message-ID: <20170713221125.16195-1-sboyd@codeaurora.org>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Thu, 13 Jul 2017 15:29:43 -0700
+Subject: [PATCH 2/3] usb: chipidea: Hook into mux framework to toggle usb
+ switch
+In-Reply-To: <2db7bc39-9274-6007-d971-59e2a577d437@axentia.se>
+References: <20170712010255.26855-1-stephen.boyd@linaro.org>
+ <20170712010255.26855-3-stephen.boyd@linaro.org>
+ <2db7bc39-9274-6007-d971-59e2a577d437@axentia.se>
+Message-ID: <149998498328.4532.10720468535933872401@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ed75d6a96905 ("arm64: dts: qcom: Collapse usb support into
-one node") breaks host mode support on apq8016-sbc boards. This
-is because the mux driver (tc7usb40mu) hasn't been merged.
-Without that driver, we can't toggle the GPIO going to the mux to
-route out the D+/D- lines to the USB hub that's on the board.
+Quoting Peter Rosin (2017-07-11 23:45:24)
+> On 2017-07-12 03:02, Stephen Boyd wrote:
+> > @@ -102,4 +107,7 @@ Example:
+> >               rx-burst-size-dword = <0x10>;
+> >               extcon = <0>, <&usb_id>;
+> >               phy-clkgate-delay-us = <400>;
+> > +             mux-controls = <&usb_switch>;
+> > +             mux-control-names = "usb_switch";
+> > +             usb-switch-states = <0>, <1>;
+> 
+> I don't see the need for usb-switch-states? Just assume states 0/1 and
+> if someone later needs some other states, make them add a property that
+> overrides the defaults. Just document that 0 is host and 1 is device.
+> 
 
-One solution would be to totally revert this change, but that
-opens us up to other problems when two USB drivers are operating
-the same hardware block at the same time. Let's modify the DT so
-that the USB controller is always in host mode and connected to
-the hub so that things like USB keyboards and mouses work. This
-is the mode that most people prefer anyway with these devices. We
-also delete the usb-switch node because the binding was never
-accepted upstream.
+Fine by me. Rob H do you agree?
 
-In the future, we can add muxing support and then update the DT
-to support both modes at runtime. Patches to support this are
-already on the mailing list.
+> > diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+> > index 18cb8e46262d..9fd23ecc2da3 100644
+> > --- a/drivers/usb/chipidea/host.c
+> > +++ b/drivers/usb/chipidea/host.c
+> > @@ -25,6 +25,7 @@
+> >  #include <linux/usb/hcd.h>
+> >  #include <linux/usb/chipidea.h>
+> >  #include <linux/regulator/consumer.h>
+> > +#include <linux/mux/consumer.h>
+> >  
+> >  #include "../host/ehci.h"
+> >  
+> > @@ -123,6 +124,13 @@ static int host_start(struct ci_hdrc *ci)
+> >       if (usb_disabled())
+> >               return -ENODEV;
+> >  
+> > +     if (!IS_ERR(ci->platdata->usb_switch.mux)) {
+> > +             ret = mux_control_select(ci->platdata->usb_switch.mux,
+> > +                                      ci->platdata->usb_switch.host);
+> > +             if (ret)
+> > +                     return ret;
+> > +     }
+> > +
+> 
+> You *must* call mux_control_deselect to clean up if there is a failure
+> later in host_start. Is that handled in some non-obvious way?
 
-Fixes: ed75d6a96905 ("arm64: dts: qcom: Collapse usb support into one node")
-Reported-by: Rob Clark <robdclark@gmail.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |  1 +
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi           | 14 ++++----------
- 2 files changed, 5 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-index d94640812194..790b7775b901 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-@@ -17,6 +17,7 @@
- 			function = PMIC_GPIO_FUNC_NORMAL;
- 			power-source = <PM8916_GPIO_VPH>;
- 			input-disable;
-+			output-high;
- 		};
- 	};
- 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index bd310ac1967a..8f2decf84bbf 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -213,16 +213,18 @@
- 		};
- 
- 		usb at 78d9000 {
--			extcon = <&usb_id>, <&usb_id>;
-+			extcon = <&usb_id>;
- 			status = "okay";
- 			adp-disable;
- 			hnp-disable;
- 			srp-disable;
-+			dr_mode = "host";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&usb_sw_sel_pm>;
- 			ulpi {
- 				phy {
- 					v1p8-supply = <&pm8916_l7>;
- 					v3p3-supply = <&pm8916_l13>;
--					extcon = <&usb_id>;
- 				};
- 			};
- 		};
-@@ -342,14 +344,6 @@
- 		pinctrl-0 = <&usb_id_default>;
- 	};
- 
--	usb-switch {
--		compatible = "toshiba,tc7usb40mu";
--		switch-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
--		extcon = <&usb_id>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&usb_sw_sel_pm>;
--	};
--
- 	hdmi-out {
- 		compatible = "hdmi-connector";
- 		type = "a";
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Good catch. Thanks. I'll add in the unwinding on the error path.
