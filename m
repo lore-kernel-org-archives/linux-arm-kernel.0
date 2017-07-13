@@ -1,65 +1,71 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 13 Jul 2017 17:40:00 +0200
-Subject: [PATCH] irqchip: gicv3-its: Use NUMA aware memory allocation for
- ITS tables
-In-Reply-To: <20170711084855.GA4193@localhost>
-References: <27b46938-ae23-9750-e0c7-09fa472d3297@arm.com>
- <CAFpQJXVVeAB7RgGKGX-hwo-0ZU8KHzy9ipgbXN0NHorUpk-5Kw@mail.gmail.com>
- <bee8ac5a-b19f-8112-5529-485c269f3501@arm.com>
- <CAFpQJXXPfBEP+_3rzkRo7Ydb31GKFokQB1bmOVHXSd1Pu0zsyA@mail.gmail.com>
- <ed7416f2-e60b-bf8c-cdbe-8a83e83ca529@arm.com>
- <CAFpQJXUm5tEyaBURzx9OtssBt8+ThO0dmPqtdjjGRJzY5cMv-w@mail.gmail.com>
- <09fa2b5a-9039-0902-4f57-6a6c2a5f7c37@arm.com>
- <6ea9d5df-d15f-a8a6-2442-e2f628b29816@codeaurora.org>
- <03162741-2ddc-fe3d-7f5d-4eafb8209ef5@arm.com>
- <20170711084855.GA4193@localhost>
-Message-ID: <20170713154000.GA18024@rric.localdomain>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 13 Jul 2017 11:44:12 -0400
+Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
+In-Reply-To: <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
+References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
+ <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <0bcc0b00-1ad3-6866-32ab-15da8ea1821e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.07.17 08:48:56, Jayachandran C wrote:
-> On Mon, Jul 10, 2017 at 04:15:28PM +0100, Marc Zyngier wrote:
-> > On 10/07/17 15:57, Shanker Donthineni wrote:
+On 7/13/2017 8:17 AM, Bjorn Helgaas wrote:
+>> he spec is calling to wait up to 1 seconds if the device is sending CRS.
+>> The NVMe device seems to be requiring more. Relax this up to 60 seconds.
+> Can you add a pointer to the "1 second" requirement in the spec here?
+> We use 60 seconds in pci_scan_device() and acpiphp_add_context().  Is
+> there a basis in the spec for the 60 second timeout?
 
-> > > I believe ITS driver should provide NUMA aware allocations just like x86 Linux drivers. How much
-> > > performance improvement we observer is based on the individual SOC implementation, inter NODE
-> > > latency, inter node traffic, cache capacity, and type of the test used to measure results.
-> > > 
-> > > Please consider this patch irrespective of the test results running on a specific hardware. We
-> > > need this patch for upcoming Qualcomm server chips. 
-> > 
-> > "I believe" and "We need" are not a proof of the usefulness of this. We
-> > can argue all day, or you can provide a set of convincing results. Your
-> > choice. But I can guarantee you the the latter is a much better method
-> > than the former.
-> > 
-> > If you (or Cavium) cannot be bothered to provide tangible results that
-> > this is useful, why should I take this at face value? This is just like
-> > any other improvement we make to the kernel. We back it *with data*.
-> 
-> At Cavium, most of the ThunderX2 boards we have are multi-node, and we
-> are interested in enabling NUMA optimizations.
-> 
-> But, in this case, we do not see (or expect to see - given the nature of
-> access) any significant improvement in any standard benchmark. Ganapat's
-> LPI injection test to find interrupt latency was probably the best option
-> we had so far. We could come up with another contrived test case to see
-> if there is any change in behavior when we overload the interconnect,
-> but I don't think we will get any data to really justify the patch.
-> 
-> Allocating the tables on the node is a good thing since it avoids
-> unnecessary traffic over the interconnect, so I do not see the
-> problem in merging a simple patch for that. Is there any specific
-> issue here?
-> 
-> Anyway, for ThunderX2, the patch is good to have, but not critical.
-> And as Ganapat noted, the patch can be improved a bit. Also going thru
-> the patch, I think the chip data is better allocated using node as well.
+This does not specify a hard limit above on how long SW need to wait. 
 
-There is another thing to consider here. We will need cma and devm for
-ITS. There are only a few per node allocation functions that can be
-used then, so per-node allocation should only be used in rare cases
-where really needed. I am going to repost my cma device table
-allocation series after the merge window closes.
+"6.6.2 Function Level Reset
+After an FLR has been initiated by writing a 1b to the Initiate Function Level Reset bit, 
+the Function must complete the FLR within 100 ms.
 
--Robert
+While a Function is required to complete the FLR operation within the time limit described above,
+the subsequent Function-specific initialization sequence may require additional time. 
+If additional time is required, the Function must return a Configuration Request Retry Status (CRS) 
+Completion Status when a Configuration Request is received 15 after the time limit above. 
+After the Function responds to a Configuration Request with a Completion status other than CRS, 
+it is not permitted to return CRS until it is reset again."
+
+However, another indirect reference here tells us it is capped by 1 second below.
+
+"6.23. Readiness Notifications (RN)
+Readiness Notifications (RN) is intended to reduce the time software needs to
+wait before issuing Configuration Requests to a Device or Function following DRS
+Events or FRS Events. RN includes both the Device Readiness Status (DRS) and
+Function Readiness Status (FRS) mechanisms. These mechanisms provide a direct
+indication of Configuration-Readiness (see 5 Terms and Acronyms entry for ?Configuration-Ready?). 
+
+When used, DRS and FRS allow an improved behavior over the CRS mechanism, and eliminate
+its associated periodic polling time of up to 1 second following a reset."
+
+If I remember it right from CRS commit messages, 60 seconds was coming from
+some PCIe switch taking too long to boot.
+
+> 
+> What's the NVMe excuse for requiring more time than the spec allows?
+> Is this a hardware erratum?  Is there some PCIe ECN pending to address
+> this?
+
+We have seen the issue with Intel 750 and Intel P3600 NVMe drives. I don't
+have access to the errata document for either of the drives.
+
+> 
+> I try to avoid adding generic changes based on one specific piece of
+> hardware because it can penalize everybody else who actually bothered
+> to follow the spec.  For example, if FLR fails because a non-NVMe
+> device is broken, it will now take 60 seconds to notice that instead
+> of 1 second.
+> 
+
+We can look for a better number like 3-4 seconds and put some nice warning
+that HW might be broken (violating the spec) and could be in need of
+a FW/BIOS update.
+
+What do you think?
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
