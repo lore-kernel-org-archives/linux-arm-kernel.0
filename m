@@ -1,26 +1,21 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 13 Jul 2017 16:42:18 +0800
-Subject: [PATCH 2/2] ARM: dts: imx7d-sdb: Pass 'enable-gpios' and
- 'power-supply'
-In-Reply-To: <1499865500-8857-2-git-send-email-marco.franchi@nxp.com>
-References: <1499865500-8857-1-git-send-email-marco.franchi@nxp.com>
- <1499865500-8857-2-git-send-email-marco.franchi@nxp.com>
-Message-ID: <20170713084216.GU3172@dragon>
+Date: Thu, 13 Jul 2017 16:43:42 +0800
+Subject: [PATCH V4 3/7] pinctrl: imx: switch to use the generic pinmux
+ property
+In-Reply-To: <1498046395-30001-4-git-send-email-aisheng.dong@nxp.com>
+References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
+ <1498046395-30001-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170713084341.GV3172@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 10:18:20AM -0300, Marco Franchi wrote:
-> Currently the LCD is turned on thanks to the bootloader initialization.
+On Wed, Jun 21, 2017 at 07:59:51PM +0800, Dong Aisheng wrote:
+> The generic pinmux property seems to be more suitable for IMX.
+> So we change to use 'pinmux' instead of 'pins'.
 > 
-> In order to make the kernel to turn on the LCD on is own, pass the 
-> 'enable-gpios' and 'power-supply' properties.
-> 
-> Also, the GPIO1_IO01 is not used as PWM functionality on this board. It is 
-> connected to the PWREN pin of connector J14 and has a GPIO function, so remove 
-> the PWM1 node and change the GPIO1_IO01 IOMUX to GPIO function.
-> 
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-It doesn't apply to imx/dt.  Please rebase.
-
-Shawn
+Acked-by: Shawn Guo <shawnguo@kernel.org>
