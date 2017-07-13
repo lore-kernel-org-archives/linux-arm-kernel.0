@@ -1,48 +1,36 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 13 Jul 2017 12:42:44 -0400
-Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
-In-Reply-To: <20170713162915.GA14716@localhost.localdomain>
-References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
- <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
- <0bcc0b00-1ad3-6866-32ab-15da8ea1821e@codeaurora.org>
- <20170713162915.GA14716@localhost.localdomain>
-Message-ID: <78020acc-c2b6-423c-38a0-251f86ffa8a9@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Jul 2017 17:52:12 +0100
+Subject: APM smmu implementation
+In-Reply-To: <CAL85gmBwZ1RGa8my3L1psD0xn2CiJvgDy1SniY27BkJHVD8B1Q@mail.gmail.com>
+References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+ <d9e40de8-82e2-0f19-5b99-d756ded21e80@arm.com>
+ <20170109120300.GC21398@arm.com>
+ <9d083b5e-0fe4-b649-c4f4-e1005feb9ec1@arm.com>
+ <CAL85gmCM-=iTbK3mcsFOtJrxbYFE99FWn7Aj9w-JLhMu03wWqQ@mail.gmail.com>
+ <f8cefa15-9d1b-ae92-b673-3010875ac16b@redhat.com>
+ <CAL85gmBoE+AXoaVaSuimvX=aPRSEhMXoHvaEZPAvLxzaYSUvSQ@mail.gmail.com>
+ <d571ed74-3a89-a6ba-6350-1be181405366@arm.com>
+ <CAL85gmBwZ1RGa8my3L1psD0xn2CiJvgDy1SniY27BkJHVD8B1Q@mail.gmail.com>
+Message-ID: <20170713165212.GA4228@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/13/2017 12:29 PM, Keith Busch wrote:
->> When used, DRS and FRS allow an improved behavior over the CRS mechanism, and eliminate
->> its associated periodic polling time of up to 1 second following a reset."
-> That wording is just confusing. It looks to me the 1 second polling is
-> to be used following a reset if CRS is not implemented.
+On Thu, Jul 13, 2017 at 09:08:38AM -0700, Feng Kan wrote:
+
+[...]
+
+> > Cavium are not using MMU-500 - the ThunderX SMMU is their own in-house
+> > microarchitecture (with its own bugs and foibles), hence it rightly gets
+> > its own implementation identifier. I think Lorenzo has plans to wire up
+> > support for the IORT "Device memory address size limit" field, which is
+> > the correct way for ACPI to describe the upstream bus width of your
+> > MMU-500 integration (and all the other IOMMU integrations facing the
+> > same issue).
+> This is great, thanks.
 > 
->   https://pcisig.com/sites/default/files/specification_documents/ECN_RN_29_Aug_2013.pdf
-> 
-> "
->   Through the mechanisms defined by this ECR, we can avoid the long,
->   architected, fixed delays following various forms of reset before
->   software is permitted to perform its first Configuration Request. These
->   delays are very large:
-> 
->   1 second if Configuration Retry Status (CRS) is not used
-> "
-> 
-> It goes on to say CRS is usually much lower, but doesn't specify an
-> upper bound either.
-> 
+> Lorenzo, May I ask when will this be ready. We would very much like
+> this change to push out into the latest CentOS release.
 
-I see, we got caught on spec language where we don't know what 'its' is. 
+I should be able to post a patch at v4.13-rc1 aiming for v4.14.
 
-Bjorn,
-
-Since there is no upper cap on how long, what is your preference (stick to 60),
-give incremental warning updates every 5 seconds?
-
-I can certainly rewrite the commit message.
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Lorenzo
