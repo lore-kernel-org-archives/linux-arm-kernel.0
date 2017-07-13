@@ -1,42 +1,59 @@
-From: keith.busch@intel.com (Keith Busch)
-Date: Thu, 13 Jul 2017 13:24:33 -0400
-Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
-In-Reply-To: <78020acc-c2b6-423c-38a0-251f86ffa8a9@codeaurora.org>
-References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
- <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
- <0bcc0b00-1ad3-6866-32ab-15da8ea1821e@codeaurora.org>
- <20170713162915.GA14716@localhost.localdomain>
- <78020acc-c2b6-423c-38a0-251f86ffa8a9@codeaurora.org>
-Message-ID: <20170713172432.GB14716@localhost.localdomain>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 13 Jul 2017 10:22:15 -0700
+Subject: [PATCH v5 1/2] clk: gate: expose clk_gate_ops::is_enabled
+In-Reply-To: <1499954552-20075-2-git-send-email-gabriel.fernandez@st.com>
+References: <1499954552-20075-1-git-send-email-gabriel.fernandez@st.com>
+ <1499954552-20075-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <efa06f77-7b0e-9902-dbf1-c76d3203b813@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 12:42:44PM -0400, Sinan Kaya wrote:
-> On 7/13/2017 12:29 PM, Keith Busch wrote:
-> > That wording is just confusing. It looks to me the 1 second polling is
-> > to be used following a reset if CRS is not implemented.
-> > 
-> >   https://pcisig.com/sites/default/files/specification_documents/ECN_RN_29_Aug_2013.pdf
-> > 
-> > "
-> >   Through the mechanisms defined by this ECR, we can avoid the long,
-> >   architected, fixed delays following various forms of reset before
-> >   software is permitted to perform its first Configuration Request. These
-> >   delays are very large:
-> > 
-> >   1 second if Configuration Retry Status (CRS) is not used
-> > "
-> > 
-> > It goes on to say CRS is usually much lower, but doesn't specify an
-> > upper bound either.
-> > 
+On 07/13/2017 07:02 AM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> I see, we got caught on spec language where we don't know what 'its' is. 
+> This patch exposes clk_gate_ops::is_enabled as functions
+> that can be directly called and assigned in places like this so
+> we don't need wrapper functions that do nothing besides forward
+> the call.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Sugested by Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clk/clk-gate.c       | 2 +-
+>  include/linux/clk-provider.h | 1 +
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> index 4e0c054a..e27e28f 100644
+> --- a/drivers/clk/clk-gate.c
+> +++ b/drivers/clk/clk-gate.c
+> @@ -86,7 +86,7 @@ static void clk_gate_disable(struct clk_hw *hw)
+>  	clk_gate_endisable(hw, 0);
+>  }
+>  
+> -static int clk_gate_is_enabled(struct clk_hw *hw)
+> +int clk_gate_is_enabled(struct clk_hw *hw)
+>  {
+>  	u32 reg;
+>  	struct clk_gate *gate = to_clk_gate(hw);
 
-Well, I don't know for certain if your original interpretation is
-incorrect. Just saying the CRS intention doesn't explicitly stand out to me.
+Don't you need to add an EXPORT_SYMBOL_GPL(clk_gate_is_enabled) as well
+in case this gets used by modules?
 
-On a side note, I'll also see if I can get clarification on what
-expectations the hardware people have for this particular product. Your
-observation seems a little high to me, but I don't know if that's
-outside the product's limits.
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index c59c625..e9587ab 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
+>  		u8 clk_gate_flags, spinlock_t *lock);
+>  void clk_unregister_gate(struct clk *clk);
+>  void clk_hw_unregister_gate(struct clk_hw *hw);
+> +int clk_gate_is_enabled(struct clk_hw *hw);
+>  
+>  struct clk_div_table {
+>  	unsigned int	val;
+> 
+
+
+-- 
+Florian
