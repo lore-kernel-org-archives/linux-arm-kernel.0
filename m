@@ -1,58 +1,51 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 13 Jul 2017 16:57:21 +0800
-Subject: [PATCH] arm64: dts: ls1012a: add USB host controller nodes
-In-Reply-To: <AM3PR04MB14896986FF8C5A18C2643C29F1AC0@AM3PR04MB1489.eurprd04.prod.outlook.com>
-References: <1499223243-13253-1-git-send-email-ran.wang_1@nxp.com>
- <20170713080717.GP3172@dragon>
- <AM3PR04MB14896986FF8C5A18C2643C29F1AC0@AM3PR04MB1489.eurprd04.prod.outlook.com>
-Message-ID: <20170713085720.GX3172@dragon>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jul 2017 10:04:23 +0100
+Subject: i.MX 6 and PCIe DMA issues
+In-Reply-To: <20170713070718.GA3871@mmlinux>
+References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
+ <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
+ <20170713070718.GA3871@mmlinux>
+Message-ID: <20170713090423.GA31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 08:46:50AM +0000, Ran Wang wrote:
-> > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > > b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > > index b497ac1..8aa2dcf 100644
-> > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > > @@ -411,6 +411,23 @@
-> > >  				 <&clockgen 4 3>;
-> > >  		};
-> > >
-> > > +		usb0: usb3 at 2f00000 {
-> > > +			compatible = "snps,dwc3";
-> > > +			reg = <0x0 0x2f00000 0x0 0x10000>;
-> > > +			interrupts = <0 60 0x4>;
-> > > +			dr_mode = "host";
-> > > +			snps,quirk-frame-length-adjustment = <0x20>;
-> > > +			snps,dis_rxdet_inp3_quirk;
-> > > +		};
-> > > +
-> > > +		usb1: usb2 at 8600000 {
-> > > +			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
-> > > +			reg = <0x0 0x8600000 0x0 0x1000>;
-> > > +			interrupts = <0 139 0x4>;
-> > > +			dr_mode = "host";
-> > > +			phy_type = "ulpi";
-> > > +		};
-> > 
-> > Please keep the nodes sorted in unit-address.
-> > 
-> > Shawn
-> Do you mean to move the node 'usb1: usb2 at 8600000' forward to where it's address is just before  '@8600000 '?
-> I think it's reasonable to put USB controller nodes together in DTS for developer to do issue analysis.
+On Thu, Jul 13, 2017 at 09:07:19AM +0200, michael.moese at men.de wrote:
+> Ok, I hope I am correct. I alloc my memory using dma_alloc_coherent()
+> once, the dma_handle is passed to the device, with no other dma_map*()
+> or dma_sync_*() calls needed?
 
-The nodes under simple-bus are maintained in order of unit-address.
-Please respect that.
+Correct.
 
-usb2 at 8600000 should go after sata at 3200000 with the current nodes.
+> Yesterday I observed some strange behavior  when I did some debug prints in 
+> the driver, printing me the result from phys_to_virt() of my
+> virtual address and the dma_handle. I know these may be different, but,
+> when I dump the memory (from userspace using mmap), I can see the data
+> at the adress of my dma_handle, but the memory the driver has the
+> pointer for has different contents. I don't understand this.
 
-Shawn
+phys_to_virt() and virt_to_phys() are only defined for the linear map
+region.
 
-> > > +
-> > >  		sata: sata at 3200000 {
-> > >  			compatible = "fsl,ls1012a-ahci", "fsl,ls1043a-ahci";
-> > >  			reg = <0x0 0x3200000 0x0 0x10000>,
-> > > --
-> > > 2.1.0.27.g96db324
-> > >
+DMA coherent allocations may or may not return addresses in the linear
+region, which means virt_to_phys() on a virtual address returned from
+dma_alloc_coherent() is not defined.
+
+DMA addresses are not physical addresses, they are device addresses -
+this is an important distinction when IOMMUs or address translators are
+in the path between the device and memory.  phys_to_virt() must not be
+used with dma_addr_t data types.
+
+You must always use the two addresses returned from dma_alloc_coherent()
+and never try to translate them - the DMA address is for programming
+into the hardware, and the virtual address for CPU accesses.  If you do
+try to pass these to the various translators (like virt_to_phys()) the
+result is undefined.
+
+Moreover, passing the dma_addr_t returned from dma_alloc_coherent() to
+the dma_sync_*() functions also results in undefined behaviour, and
+potential data corruption.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
