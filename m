@@ -1,41 +1,250 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Thu, 13 Jul 2017 11:17:28 -0700
-Subject: [PATCH v7 3/3] net/cxgb4: Use new
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <CAKgT0UcBFBk9T7g0Dh-rHY6Z+6-4=5jsUWHbLcSMc+ohdTz=CA@mail.gmail.com>
-References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
- <1499955692-26556-4-git-send-email-dingtianhong@huawei.com>
- <CAKgT0UcBFBk9T7g0Dh-rHY6Z+6-4=5jsUWHbLcSMc+ohdTz=CA@mail.gmail.com>
-Message-ID: <CAKgT0Uf8Tg6AFthXt-bJrdNHCqJ3MfzduR1yCMMsjLYoEFXb-w@mail.gmail.com>
+From: ttnguyen@apm.com (Tai Nguyen)
+Date: Thu, 13 Jul 2017 11:19:08 -0700
+Subject: [PATCH] perf: xgene: Remove unnecessary managed resources cleanup
+Message-ID: <1499969948-24755-1-git-send-email-ttnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 11:14 AM, Alexander Duyck
-<alexander.duyck@gmail.com> wrote:
-> On Thu, Jul 13, 2017 at 7:21 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
->> From: Casey Leedom <leedom@chelsio.com>
->>
->> cxgb4 Ethernet driver now queries PCIe configuration space to determine
->> if it can send TLPs to it with the Relaxed Ordering Attribute set.
->>
->> Remove the enable_pcie_relaxed_ordering() to avoid enable PCIe Capability
->> Device Control[Relaxed Ordering Enable] at probe routine, to make sure
->> the driver will not send the Relaxed Ordering TLPs to the Root Complex which
->> could not deal the Relaxed Ordering TLPs.
->>
->> Signed-off-by: Casey Leedom <leedom@chelsio.com>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->
-> Ding,
->
-> You can probably just drop this patch. If I am understanding Casey
-> correctly just the fact that the relaxed ordering enable bit is
-> cleared in the configuration should be enough to do this for the
-> device automatically.
->
-> - Alex
+Managed resources in the driver should be automatically cleaned up on
+driver detach. It's unnecessary to manually free/unmmap these resources.
+One of the manual cleanup causes static checkers to complain.
+The bug is reported by Dan Carpenter <dan.carpenter@oracle.com> in [1]
 
-Actually I take that back. I hadn't caught the most recent parts of
-the thread. If this is good for Casey then this works for me.
+[1] https://www.spinics.net/lists/arm-kernel/msg593012.html
 
-- Alex
+This patch gets rid of all the unnecessary manual cleanup and properly
+unregister all the registered PMU devices by the driver on driver detach.
+
+Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+---
+ drivers/perf/xgene_pmu.c | 74 ++++++++++++++----------------------------------
+ 1 file changed, 22 insertions(+), 52 deletions(-)
+
+diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
+index e841282..eb23311 100644
+--- a/drivers/perf/xgene_pmu.c
++++ b/drivers/perf/xgene_pmu.c
+@@ -1147,7 +1147,6 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
+ {
+ 	struct device *dev = xgene_pmu->dev;
+ 	struct xgene_pmu_dev *pmu;
+-	int rc;
+ 
+ 	pmu = devm_kzalloc(dev, sizeof(*pmu), GFP_KERNEL);
+ 	if (!pmu)
+@@ -1159,7 +1158,7 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
+ 	switch (pmu->inf->type) {
+ 	case PMU_TYPE_L3C:
+ 		if (!(xgene_pmu->l3c_active_mask & pmu->inf->enable_mask))
+-			goto dev_err;
++			return -ENODEV;
+ 		if (xgene_pmu->version == PCP_PMU_V3)
+ 			pmu->attr_groups = l3c_pmu_v3_attr_groups;
+ 		else
+@@ -1177,7 +1176,7 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
+ 		break;
+ 	case PMU_TYPE_MCB:
+ 		if (!(xgene_pmu->mcb_active_mask & pmu->inf->enable_mask))
+-			goto dev_err;
++			return -ENODEV;
+ 		if (xgene_pmu->version == PCP_PMU_V3)
+ 			pmu->attr_groups = mcb_pmu_v3_attr_groups;
+ 		else
+@@ -1185,7 +1184,7 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
+ 		break;
+ 	case PMU_TYPE_MC:
+ 		if (!(xgene_pmu->mc_active_mask & pmu->inf->enable_mask))
+-			goto dev_err;
++			return -ENODEV;
+ 		if (xgene_pmu->version == PCP_PMU_V3)
+ 			pmu->attr_groups = mc_pmu_v3_attr_groups;
+ 		else
+@@ -1195,19 +1194,14 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
+ 		return -EINVAL;
+ 	}
+ 
+-	rc = xgene_init_perf(pmu, ctx->name);
+-	if (rc) {
++	if (xgene_init_perf(pmu, ctx->name)) {
+ 		dev_err(dev, "%s PMU: Failed to init perf driver\n", ctx->name);
+-		goto dev_err;
++		return -ENODEV;
+ 	}
+ 
+ 	dev_info(dev, "%s PMU registered\n", ctx->name);
+ 
+-	return rc;
+-
+-dev_err:
+-	devm_kfree(dev, pmu);
+-	return -ENODEV;
++	return 0;
+ }
+ 
+ static void _xgene_pmu_isr(int irq, struct xgene_pmu_dev *pmu_dev)
+@@ -1515,13 +1509,13 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
+ 	acpi_dev_free_resource_list(&resource_list);
+ 	if (rc < 0) {
+ 		dev_err(dev, "PMU type %d: No resource address found\n", type);
+-		goto err;
++		return NULL;
+ 	}
+ 
+ 	dev_csr = devm_ioremap_resource(dev, &res);
+ 	if (IS_ERR(dev_csr)) {
+ 		dev_err(dev, "PMU type %d: Fail to map resource\n", type);
+-		goto err;
++		return NULL;
+ 	}
+ 
+ 	/* A PMU device node without enable-bit-index is always enabled */
+@@ -1535,7 +1529,7 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
+ 	ctx->name = xgene_pmu_dev_name(dev, type, enable_bit);
+ 	if (!ctx->name) {
+ 		dev_err(dev, "PMU type %d: Fail to get device name\n", type);
+-		goto err;
++		return NULL;
+ 	}
+ 	inf = &ctx->inf;
+ 	inf->type = type;
+@@ -1543,9 +1537,6 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
+ 	inf->enable_mask = 1 << enable_bit;
+ 
+ 	return ctx;
+-err:
+-	devm_kfree(dev, ctx);
+-	return NULL;
+ }
+ 
+ static const struct acpi_device_id xgene_pmu_acpi_type_match[] = {
+@@ -1663,20 +1654,20 @@ xgene_pmu_dev_ctx *fdt_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
+ 	void __iomem *dev_csr;
+ 	struct resource res;
+ 	int enable_bit;
+-	int rc;
+ 
+ 	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
+ 	if (!ctx)
+ 		return NULL;
+-	rc = of_address_to_resource(np, 0, &res);
+-	if (rc < 0) {
++
++	if (of_address_to_resource(np, 0, &res) < 0) {
+ 		dev_err(dev, "PMU type %d: No resource address found\n", type);
+-		goto err;
++		return NULL;
+ 	}
++
+ 	dev_csr = devm_ioremap_resource(dev, &res);
+ 	if (IS_ERR(dev_csr)) {
+ 		dev_err(dev, "PMU type %d: Fail to map resource\n", type);
+-		goto err;
++		return NULL;
+ 	}
+ 
+ 	/* A PMU device node without enable-bit-index is always enabled */
+@@ -1686,17 +1677,15 @@ xgene_pmu_dev_ctx *fdt_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
+ 	ctx->name = xgene_pmu_dev_name(dev, type, enable_bit);
+ 	if (!ctx->name) {
+ 		dev_err(dev, "PMU type %d: Fail to get device name\n", type);
+-		goto err;
++		return NULL;
+ 	}
++
+ 	inf = &ctx->inf;
+ 	inf->type = type;
+ 	inf->csr = dev_csr;
+ 	inf->enable_mask = 1 << enable_bit;
+ 
+ 	return ctx;
+-err:
+-	devm_kfree(dev, ctx);
+-	return NULL;
+ }
+ 
+ static int fdt_pmu_probe_pmu_dev(struct xgene_pmu *xgene_pmu,
+@@ -1868,22 +1857,20 @@ static int xgene_pmu_probe(struct platform_device *pdev)
+ 	xgene_pmu->pcppmu_csr = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(xgene_pmu->pcppmu_csr)) {
+ 		dev_err(&pdev->dev, "ioremap failed for PCP PMU resource\n");
+-		rc = PTR_ERR(xgene_pmu->pcppmu_csr);
+-		goto err;
++		return PTR_ERR(xgene_pmu->pcppmu_csr);
+ 	}
+ 
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(&pdev->dev, "No IRQ resource\n");
+-		rc = -EINVAL;
+-		goto err;
++		return -EINVAL;
+ 	}
+ 	rc = devm_request_irq(&pdev->dev, irq, xgene_pmu_isr,
+ 				IRQF_NOBALANCING | IRQF_NO_THREAD,
+ 				dev_name(&pdev->dev), xgene_pmu);
+ 	if (rc) {
+ 		dev_err(&pdev->dev, "Could not request IRQ %d\n", irq);
+-		goto err;
++		return rc;
+ 	}
+ 
+ 	raw_spin_lock_init(&xgene_pmu->lock);
+@@ -1903,42 +1890,29 @@ static int xgene_pmu_probe(struct platform_device *pdev)
+ 	rc = irq_set_affinity(irq, &xgene_pmu->cpu);
+ 	if (rc) {
+ 		dev_err(&pdev->dev, "Failed to set interrupt affinity!\n");
+-		goto err;
++		return rc;
+ 	}
+ 
+ 	/* Walk through the tree for all PMU perf devices */
+ 	rc = xgene_pmu_probe_pmu_dev(xgene_pmu, pdev);
+ 	if (rc) {
+ 		dev_err(&pdev->dev, "No PMU perf devices found!\n");
+-		goto err;
++		return rc;
+ 	}
+ 
+ 	/* Enable interrupt */
+ 	xgene_pmu->ops->unmask_int(xgene_pmu);
+ 
+ 	return 0;
+-
+-err:
+-	if (xgene_pmu->pcppmu_csr)
+-		devm_iounmap(&pdev->dev, xgene_pmu->pcppmu_csr);
+-	devm_kfree(&pdev->dev, xgene_pmu);
+-
+-	return rc;
+ }
+ 
+ static void
+ xgene_pmu_dev_cleanup(struct xgene_pmu *xgene_pmu, struct list_head *pmus)
+ {
+ 	struct xgene_pmu_dev_ctx *ctx;
+-	struct device *dev = xgene_pmu->dev;
+-	struct xgene_pmu_dev *pmu_dev;
+ 
+ 	list_for_each_entry(ctx, pmus, next) {
+-		pmu_dev = ctx->pmu_dev;
+-		if (pmu_dev->inf->csr)
+-			devm_iounmap(dev, pmu_dev->inf->csr);
+-		devm_kfree(dev, ctx);
+-		devm_kfree(dev, pmu_dev);
++		perf_pmu_unregister(&ctx->pmu_dev->pmu);
+ 	}
+ }
+ 
+@@ -1951,10 +1925,6 @@ static int xgene_pmu_remove(struct platform_device *pdev)
+ 	xgene_pmu_dev_cleanup(xgene_pmu, &xgene_pmu->mcbpmus);
+ 	xgene_pmu_dev_cleanup(xgene_pmu, &xgene_pmu->mcpmus);
+ 
+-	if (xgene_pmu->pcppmu_csr)
+-		devm_iounmap(&pdev->dev, xgene_pmu->pcppmu_csr);
+-	devm_kfree(&pdev->dev, xgene_pmu);
+-
+ 	return 0;
+ }
+ 
+-- 
+1.9.1
