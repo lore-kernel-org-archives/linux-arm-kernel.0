@@ -1,45 +1,73 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 13 Jul 2017 10:29:25 +0000
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 13 Jul 2017 12:31:07 +0200
+Subject: [PATCH v3 0/6] SMP and CPU hotplug support for Meson8/Meson8b
+Message-ID: <20170713103113.21560-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn, Daniel
+This patchset adds support for booting the secondary CPU cores (and
+taking them offline again) on Amlogic Meson8 and Meson8b SoCs.
+It is based on an earlier version from Carlo Caione - this helped me
+a lot to get a better understanding of how SMP/CPU hotplug works
+(compared to the code found in Amlogic's GPL kernel sources from
+year 2015).
 
-[...]
 
-> 
-> Is this quirk useful on any arch other than arm64?  Per
-> drivers/pci/dwc/Kconfig, CONFIG_PCI_HISI depends on CONFIG_ARM64.
-> 
-> Would it make sense to put this quirk in arch/arm64/kernel/pci.c?
+The .dts changes from series depend on:
+- "add the reset controller to the Meson8b clkc", see [1]
+- "ARM: dts: meson: add a node which describes the SRAM", see [2]
 
-Indeed our host controller depends on ARM64 so maybe it would make
-sense to move the quirk arch/arm64/kernel/pci.c; however regardless
-why is it strictly required for a VGA device to be legacy one in order
-to make it the default boot device?
-i.e. couldn't we have:
 
-diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-index 0f5b2dd..a6b606c 100644
---- a/drivers/gpu/vga/vgaarb.c
-+++ b/drivers/gpu/vga/vgaarb.c
-@@ -667,8 +667,7 @@ static bool vga_arbiter_add_pci_device(struct pci_dev *pdev)
- 	/* Deal with VGA default device. Use first enabled one
- 	 * by default if arch doesn't have it's own hook
- 	 */
--	if (vga_default == NULL &&
--	    ((vgadev->owns & VGA_RSRC_LEGACY_MASK) == VGA_RSRC_LEGACY_MASK)) {
-+	if (vga_default == NULL) {
- 		vgaarb_info(&pdev->dev, "setting as boot VGA device\n");
- 		vga_set_default_device(pdev);
- 	}
+Changes since v2 from [0]
+- added support for Meson8 (which requires a slightly different
+  enable-method)
+- implemented CPU hotplug support which allows taking a CPU core
+  offline for both, Meson8 and Meson8b
+- add a function to smp_scu.c which allows enabling a CPU core from
+  a different CPU (previously only the power mode for the current CPU
+  could be changed). Without this the CPU cores on Meson8 won't come
+  up (Amlogic's vendor GPL kernel sources also enable power through
+  SCU as very first step for Meson8b as well)
+- add a function to smp_scu.c to get the power status of a CPU core
+  (which is needed because the code in .cpu_kill needs to wait until
+  the core is actually powered off)
+- dropped patch "ARM: DTS: meson8b: Extend L2 cache controller node"
+  as it is already applied (for both, Meson8 and Meson8b)
+- dropped the patches which implement the reset controller which is
+  built into the clock-controller, these are a separate series: [1]
+- moved the enable-method property to each CPU node
 
-?
-Thanks
-Gab
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390355.html
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004283.html
+[2] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004282.html
+
+
+Carlo Caione (2):
+  dt-bindings: Amlogic: Add Meson8 and Meson8b SMP related documentation
+  ARM: dts: meson8b: add support for booting the secondary CPU cores
+
+Martin Blumenstingl (4):
+  ARM: smp_scu: add a helper for powering on a specific CPU
+  ARM: smp_scu: allow the platform code to read the SCU CPU status
+  ARM: meson: Add SMP bringup code for Meson8 and Meson8b
+  ARM: dts: meson8: add support for booting the secondary CPU cores
+
+ .../devicetree/bindings/arm/amlogic/pmu.txt        |  18 +
+ .../devicetree/bindings/arm/amlogic/smp-sram.txt   |  32 ++
+ Documentation/devicetree/bindings/arm/cpus.txt     |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/meson8.dtsi                      |  20 +
+ arch/arm/boot/dts/meson8b.dtsi                     |  20 +
+ arch/arm/include/asm/smp_scu.h                     |  12 +
+ arch/arm/kernel/smp_scu.c                          |  47 +-
+ arch/arm/mach-meson/Kconfig                        |   1 +
+ arch/arm/mach-meson/Makefile                       |   1 +
+ arch/arm/mach-meson/platsmp.c                      | 502 +++++++++++++++++++++
+ 11 files changed, 650 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
+ create mode 100644 arch/arm/mach-meson/platsmp.c
+
+-- 
+2.13.2
