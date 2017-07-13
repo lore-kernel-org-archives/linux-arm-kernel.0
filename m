@@ -1,86 +1,74 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 13 Jul 2017 14:23:54 +0200
-Subject: [PATCH V4 3/6] iommu/arm-smmu: Invoke pm_runtime during probe,
- add/remove device
-In-Reply-To: <CAF6AEGsfDewRUHLUbFKT1Q+8U2BkmFMHo4ZBSwSGspU3ktUY8g@mail.gmail.com>
-References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
- <1499333825-7658-4-git-send-email-vivek.gautam@codeaurora.org>
- <20170712225459.GZ22780@codeaurora.org>
- <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
- <4dbc938c-ac88-9bd4-cf00-458008ae24c1@codeaurora.org>
- <CGME20170713115036epcas1p250113e9009dbf92487d258a90fffc66a@epcas1p2.samsung.com>
- <CAF6AEGsFOtsOjt1sLNPSFLEcu-7d1zxCOhTeC+P8e0TDbb1dSA@mail.gmail.com>
- <939f8745-6f72-522c-1216-70e424740b62@samsung.com>
- <CAF6AEGsfDewRUHLUbFKT1Q+8U2BkmFMHo4ZBSwSGspU3ktUY8g@mail.gmail.com>
-Message-ID: <4f2b6272-d938-767f-6ea3-0b515374d1a1@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 13 Jul 2017 13:27:50 +0100
+Subject: [RFC PATCH 07/10] arm64: kernel: switch to register x18 as a task
+ struct pointer
+In-Reply-To: <20170713104116.GD3966@e103592.cambridge.arm.com>
+References: <20170712144424.19528-1-ard.biesheuvel@linaro.org>
+ <20170712144424.19528-8-ard.biesheuvel@linaro.org>
+ <20170713104116.GD3966@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu8gFSSYV5-11bZOMnQGMcvx0gSDnTpibciEPMv_3HpAUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 2017-07-13 14:10, Rob Clark wrote:
-> On Thu, Jul 13, 2017 at 8:02 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> On 2017-07-13 13:50, Rob Clark wrote:
->>> On Thu, Jul 13, 2017 at 1:35 AM, Sricharan R <sricharan@codeaurora.org>
->>> wrote:
->>>> On 7/13/2017 10:43 AM, Vivek Gautam wrote:
->>>>> On 07/13/2017 04:24 AM, Stephen Boyd wrote:
->>>>>> On 07/06, Vivek Gautam wrote:
->>>>>>> @@ -1231,12 +1237,18 @@ static int arm_smmu_map(struct iommu_domain
->>>>>>> *domain, unsigned long iova,
->>>>>>>     static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned
->>>>>>> long iova,
->>>>>>>                      size_t size)
->>>>>>>     {
->>>>>>> -    struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
->>>>>>> +    struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->>>>>>> +    struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
->>>>>>> +    size_t ret;
->>>>>>>           if (!ops)
->>>>>>>             return 0;
->>>>>>>     -    return ops->unmap(ops, iova, size);
->>>>>>> +    pm_runtime_get_sync(smmu_domain->smmu->dev);
->>>>>> Can these map/unmap ops be called from an atomic context? I seem
->>>>>> to recall that being a problem before.
->>>>> That's something which was dropped in the following patch merged in
->>>>> master:
->>>>> 523d7423e21b iommu/arm-smmu: Remove io-pgtable spinlock
->>>>>
->>>>> Looks like we don't  need locks here anymore?
->>>>    Apart from the locking, wonder why a explicit pm_runtime is needed
->>>>    from unmap. Somehow looks like some path in the master using that
->>>>    should have enabled the pm ?
->>>>
->>> Yes, there are a bunch of scenarios where unmap can happen with
->>> disabled master (but not in atomic context).  On the gpu side we
->>> opportunistically keep a buffer mapping until the buffer is freed
->>> (which can happen after gpu is disabled).  Likewise, v4l2 won't unmap
->>> an exported dmabuf while some other driver holds a reference to it
->>> (which can be dropped when the v4l2 device is suspended).
->>>
->>> Since unmap triggers tbl flush which touches iommu regs, the iommu
->>> driver *definitely* needs a pm_runtime_get_sync().
+On 13 July 2017 at 11:41, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Wed, Jul 12, 2017 at 03:44:20PM +0100, Ard Biesheuvel wrote:
+>> In order to free up sp_el0, which we will need to deal with faulting
+>> stack accesses when using virtually mapped stacks, switch to register
+>> x18 as the task struct register. This is permitted by the AAPCS64 ABI,
+>> and simplifies many references to 'current', given that they no longer
+>> involve a MSR instruction to access SP_EL0.
 >>
->> Afair unmap might be called from atomic context as well, for example as
->> a result of dma_unmap_page(). In exynos IOMMU I simply check the runtime
->> PM state of IOMMU device. TLB flush is performed only when IOMMU is in
->> active
->> state. If it is suspended, I assume that the IOMMU controller's context
->> is already lost and its respective power domain might be already turned off,
->> so there is no point in touching IOMMU registers.
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> [...]
+>
+>> diff --git a/arch/arm64/include/asm/current.h b/arch/arm64/include/asm/current.h
+>> index f6580d4afb0e..b4e3acff699c 100644
+>> --- a/arch/arm64/include/asm/current.h
+>> +++ b/arch/arm64/include/asm/current.h
+>> @@ -13,11 +13,9 @@ struct task_struct;
+>>   */
+>>  static __always_inline struct task_struct *get_current(void)
+>>  {
+>> -     unsigned long sp_el0;
+>> +     register unsigned long tsk asm ("x18");
 >>
-> that seems like an interesting approach.. although I wonder if there
-> can be some race w/ new device memory access once clks are enabled
-> before tlb flush completes?  That would be rather bad, since this
-> approach is letting the backing pages of memory be freed before tlb
-> flush.
+>> -     asm ("mrs %0, sp_el0" : "=r" (sp_el0));
+>> -
+>> -     return (struct task_struct *)sp_el0;
+>> +     return (struct task_struct *)tsk;
+>
+> Nit:
+>
+> You're explicitly returning an uninitialised variable here: the asm
+> annotation doesn't change the fact that tsk lifetime is that of the
+> function.   Sufficiently aggressive GCC can probably optimise the whole
+> thing (and any caller) away as undefined behaviour.
+>
+> The GCC docs say
+>
+> "The only supported use for [specifying registers for local variables]
+> is to specify registers for input and output operands when calling
+> Extended 'asm'".
+>
 
-Exynos IOMMU has spinlock for ensuring that there is no race between PM 
-runtime
-suspend and unmap/tlb flush.
+Ah ok, so it needs to live outside of the function, just like
+current_stack_pointer.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+>
+> As an alternative, you could make tsk a global register variable.  I
+> don't know whether it should be volatile or not in that case --
+> probably not, since it's constant for a given thread.
+>
+> Alternatively, the following should work:
+>
+>         unsigned long ret;
+>
+>         asm ("mrs %0, x18" : "=r" (ret));
+>
+>         return ret;
+>
+> (with -ffixed-x18, naturally).
+>
+
+Indeed (assuming you meant mov not mrs)
