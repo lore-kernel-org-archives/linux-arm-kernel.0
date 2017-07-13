@@ -1,59 +1,67 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Jul 2017 11:18:45 +0100
-Subject: i.MX 6 and PCIe DMA issues
-In-Reply-To: <20170713100031.GA31131@mmlinux>
-References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
- <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
- <20170713070718.GA3871@mmlinux>
- <20170713090423.GA31807@n2100.armlinux.org.uk>
- <20170713100031.GA31131@mmlinux>
-Message-ID: <20170713101845.GB31807@n2100.armlinux.org.uk>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 13 Jul 2017 12:25:20 +0200
+Subject: [PATCH v3.1 0/3] soc: amlogic: Add Amlogic SoC Information driver
+In-Reply-To: <CAFBinCAK0iXJ5zLg64oABXs7rno48Dni6Zc2dQ3_aadJS7wiSQ@mail.gmail.com>
+References: <1498206498-19139-1-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCAK0iXJ5zLg64oABXs7rno48Dni6Zc2dQ3_aadJS7wiSQ@mail.gmail.com>
+Message-ID: <e9558b4f-b155-9f25-fe39-b876973299b5@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 12:00:31PM +0200, michael.moese at men.de wrote:
-> On Thu, Jul 13, 2017 at 10:04:23AM +0100, Russell King - ARM Linux wrote:
-> > You must always use the two addresses returned from dma_alloc_coherent()
-> > and never try to translate them - the DMA address is for programming
-> > into the hardware, and the virtual address for CPU accesses.  If you do
-> > try to pass these to the various translators (like virt_to_phys()) the
-> > result is undefined.
+On 07/12/2017 09:03 PM, Martin Blumenstingl wrote:
+> Hi Kevin,
 > 
-> I was trying to just print some addresses for debugging. I removed this
-> again. I'm just confused, because the DMA device address seems to be the
-> physical one. At least the memory contains my data. The virtual memory
-> contains different data. 
+> On Fri, Jun 23, 2017 at 10:28 AM, Neil Armstrong
+> <narmstrong@baylibre.com> wrote:
+>> Amlogic SoCs have a SoC information register for SoC type, package type and
+>> revision information.
+>> This patchset adds support for this register decoding and exposing with the
+>> SoC bus infrastructure, with dt-bindings and DT node.
+> I'm curious: are you going to take this through your tree or are we
+> waiting for someone's ACK here?
 
-The DMA address might be a physical address if that's what the device
-requires, but equally, it might not be.
+I'm curious also, it should go through armsoc-drivers, no ?
 
-If it is a physical address, phys_to_virt() will return the virtual
-address in the lowmem mapping provided that the physical address
-corresponds with a lowmem mapped page.  If it's a highmem page, then
-phys_to_virt() will still return something that looks like a virtual
-address, but it could be anything.  It's undefined.
+Neil
 
-Accessing memory through that pointer could end up hitting a cacheable
-mapping, which would destroy the semantics of the DMA coherent mapping,
-thereby leading to unpredictable behaviour.
-
-As I've already said, use _both_ pointers for a DMA coherent allocation.
-If you want to dump the data in the DMA coherent memory, use the virtual
-address returned from dma_alloc_coherent() - this will have the least
-side effects.
-
-If you access it through phys_to_virt(dma_addr) then you could be
-dragging the data into the caches, and the first time you print it, it
-would look correct, but when the DMA device updates it, it becomes stale,
-and even if you subsequently access it through the correct pointer, you
-could continue receiving the stale data.  Just don't do this - using
-phys_to_virt() may seem like a short-cut, but it really isn't.
-
-> Could it be possible this mapping on my board is going wrong?
-
-Unlikely.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> 
+>> Changes since v3.1 at [3] :
+>>  - Prepend amlogic to has-chip-id property
+>>
+>> Changes since v2 at [2] :
+>>  - Removed subnodes of socinfo node
+>>  - Checks has-chip-id property and if node is enabled
+>>
+>> Changes since v1 at [1] :
+>>  - Switch DT representation to use regmap ans sub-node of a simple-mfd node
+>>  - Updated DT, bindings and driver accordingly
+>>
+>> [1] http://lkml.kernel.org/r/1490950079-10145-1-git-send-email-narmstrong at baylibre.com
+>> [2] http://lkml.kernel.org/r/1496742340-10307-1-git-send-email-narmstrong at baylibre.com
+>> [3] http://lkml.kernel.org/r/1497441946-24379-1-git-send-email-narmstrong at baylibre.com
+>>
+>> Neil Armstrong (3):
+>>   dt-bindings: arm: amlogic: Add SoC information bindings
+>>   ARM64: dts: meson-gx: Add SoC info register
+>>   soc: Add Amlogic SoC Information driver
+>>
+>>  Documentation/devicetree/bindings/arm/amlogic.txt |  29 ++++
+>>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi         |   6 +
+>>  drivers/soc/Kconfig                               |   1 +
+>>  drivers/soc/Makefile                              |   1 +
+>>  drivers/soc/amlogic/Kconfig                       |  12 ++
+>>  drivers/soc/amlogic/Makefile                      |   1 +
+>>  drivers/soc/amlogic/meson-gx-socinfo.c            | 177 ++++++++++++++++++++++
+>>  7 files changed, 227 insertions(+)
+>>  create mode 100644 drivers/soc/amlogic/Kconfig
+>>  create mode 100644 drivers/soc/amlogic/Makefile
+>>  create mode 100644 drivers/soc/amlogic/meson-gx-socinfo.c
+>>
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-amlogic mailing list
+>> linux-amlogic at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-amlogic
