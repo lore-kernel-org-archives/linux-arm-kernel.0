@@ -1,18 +1,21 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 13 Jul 2017 15:58:36 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-icore-rqs: Remove unneeded 'fsl, mode'
- property
-In-Reply-To: <1499183961-10237-1-git-send-email-fabio.estevam@nxp.com>
-References: <1499183961-10237-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20170713075834.GN3172@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Jul 2017 09:59:01 +0200
+Subject: [PATCH 2/3] ARM: dts: r8a7743: Add MMCIF0 support
+In-Reply-To: <CAMuHMdV9V56kU8PtZb3jHwQeocj2_uUDYN3D=g2ZxHGN0cSbhQ@mail.gmail.com>
+References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
+ <1499853805-5915-3-git-send-email-chris.paterson2@renesas.com>
+ <CAMuHMdV9V56kU8PtZb3jHwQeocj2_uUDYN3D=g2ZxHGN0cSbhQ@mail.gmail.com>
+Message-ID: <20170713075900.GH5580@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 12:59:21PM -0300, Fabio Estevam wrote:
-> imx6qdl-icore-rqs boards use sgtl5000 codec and the machine
-> file (imx-sgtl5000) already sets SSI in slave mode and codec in
-> master mode, so there is no need for having this property.
+On Wed, Jul 12, 2017 at 01:21:20PM +0200, Geert Uytterhoeven wrote:
+> On Wed, Jul 12, 2017 at 12:03 PM, Chris Paterson
+> <chris.paterson2@renesas.com> wrote:
+> > Add the MMCIF0 device to the r8a7743 device tree.
+> >
+> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Applied, thanks.
+Thanks, applied for v4.14.
