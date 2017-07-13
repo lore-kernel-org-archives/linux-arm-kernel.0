@@ -1,43 +1,61 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 13 Jul 2017 12:06:03 +0200
-Subject: [PATCH 1/3] dt-bindings: mmc: sh_mmcif: Document r8a7743 DT
- bindings
-In-Reply-To: <1499853805-5915-2-git-send-email-chris.paterson2@renesas.com>
-References: <1499853805-5915-1-git-send-email-chris.paterson2@renesas.com>
- <1499853805-5915-2-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAPDyKFq1m6WEk-Hr9cm8L5EM3k1bXx-+bUXyosfh9SMDW39vhg@mail.gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 13 Jul 2017 11:16:12 +0100
+Subject: [PATCH 2/6] irqchip/tango: Use irq_gc_mask_disable_and_ack_set
+In-Reply-To: <13014560-e6a5-85b4-1f76-b83e9c44879d@sigmadesigns.com> (Marc
+ Gonzalez's message of "Wed, 12 Jul 2017 14:34:06 +0200")
+References: <20170707192016.13001-1-opendmb@gmail.com>
+ <20170707192016.13001-3-opendmb@gmail.com>
+ <13014560-e6a5-85b4-1f76-b83e9c44879d@sigmadesigns.com>
+Message-ID: <yw1x7ezctzf7.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 July 2017 at 12:03, Chris Paterson <chris.paterson2@renesas.com> wrote:
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+
+> Hello,
 >
-> diff --git a/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt b/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-> index c32dc5a..703e18c 100644
-> --- a/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-> +++ b/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-> @@ -11,6 +11,7 @@ Required properties:
->         - "renesas,mmcif-r7s72100" for the MMCIF found in r7s72100 SoCs
->         - "renesas,mmcif-r8a73a4" for the MMCIF found in r8a73a4 SoCs
->         - "renesas,mmcif-r8a7740" for the MMCIF found in r8a7740 SoCs
-> +       - "renesas,mmcif-r8a7743" for the MMCIF found in r8a7743 SoCs
->         - "renesas,mmcif-r8a7778" for the MMCIF found in r8a7778 SoCs
->         - "renesas,mmcif-r8a7790" for the MMCIF found in r8a7790 SoCs
->         - "renesas,mmcif-r8a7791" for the MMCIF found in r8a7791 SoCs
-> @@ -21,7 +22,7 @@ Required properties:
->  - interrupts: Some SoCs have only 1 shared interrupt, while others have either
->    2 or 3 individual interrupts (error, int, card detect). Below is the number
->    of interrupts for each SoC:
-> -    1: r8a73a4, r8a7778, r8a7790, r8a7791, r8a7793, r8a7794
-> +    1: r8a73a4, r8a7743, r8a7778, r8a7790, r8a7791, r8a7793, r8a7794
->      2: r8a7740, sh73a0
->      3: r7s72100
+> I've added Mans (the code's author) to the recipient list.
 >
-> --
-> 1.9.1
+> Regards.
+>
+> On 07/07/2017 21:20, Doug Berger wrote:
+>
+>> From: Florian Fainelli <f.fainelli@gmail.com>
+>> 
+>> Any usage of the irq_gc_mask_disable_reg_and_ack() function should be
+>> replaced with either the irq_gc_mask_disable_and_ack_set() or the
+>> irq_gc_mask_set_and_ack_set() function depending on which corrects
+>> the bugs in irq_gc_mask_disable_reg_and_ack() for a given usage.
+>> 
+>> For the Tango irqchip driver, irq_gc_mask_disable_and_ack_set() seems to
+>> be what is intended, so use it.
+>> 
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> Signed-off-by: Doug Berger <opendmb@gmail.com>
+
+As I said elsewhere, this looks more correct although I haven't tested it.
+
+Acked-by: Mans Rullgard <mans@mansr.com>
+
+>> ---
+>>  drivers/irqchip/irq-tango.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/irqchip/irq-tango.c b/drivers/irqchip/irq-tango.c
+>> index bdbb5c0ff7fe..0c085303a583 100644
+>> --- a/drivers/irqchip/irq-tango.c
+>> +++ b/drivers/irqchip/irq-tango.c
+>> @@ -141,7 +141,7 @@ static void __init tangox_irq_init_chip(struct irq_chip_generic *gc,
+>>  	for (i = 0; i < 2; i++) {
+>>  		ct[i].chip.irq_ack = irq_gc_ack_set_bit;
+>>  		ct[i].chip.irq_mask = irq_gc_mask_disable_reg;
+>> -		ct[i].chip.irq_mask_ack = irq_gc_mask_disable_reg_and_ack;
+>> +		ct[i].chip.irq_mask_ack = irq_gc_mask_disable_and_ack_set;
+>>  		ct[i].chip.irq_unmask = irq_gc_unmask_enable_reg;
+>>  		ct[i].chip.irq_set_type = tangox_irq_set_type;
+>>  		ct[i].chip.name = gc->domain->name;
+>> 
 >
 
-Thanks, applied for next!
-
-Kind regards
-Uffe
+-- 
+M?ns Rullg?rd
