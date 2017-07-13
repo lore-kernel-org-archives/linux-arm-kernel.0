@@ -1,32 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Jul 2017 10:20:44 +0200
-Subject: [PATCH v2] ARM: shmobile: rcar-gen2: Add support for CPG/MSSR
- bindings
-In-Reply-To: <1499855972-22126-1-git-send-email-geert+renesas@glider.be>
-References: <1499855972-22126-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170713082043.GO5580@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 13 Jul 2017 10:23:43 +0200
+Subject: [PATCH] arm64: dts: r8a7796: Add missing second pair of DMA names
+ to MSIOF nodes
+In-Reply-To: <20170713081811.GN5580@verge.net.au>
+References: <1499855753-21630-1-git-send-email-geert+renesas@glider.be>
+ <20170713081811.GN5580@verge.net.au>
+Message-ID: <CAMuHMdU58TtEpHAdmf-wKCrOvziZTTs3xBc7hv4E15n1UdCOOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 12:39:32PM +0200, Geert Uytterhoeven wrote:
-> When using the new CPG/MSSR bindings, there is no longer a
-> "renesas,rcar-gen2-cpg-clocks" node, and the code to obtain the external
-> clock crystal frequency falls back to a default of 20 MHz.
-> While this is correct for all upstream R-Car Gen2 and RZ/G1 boards, this
-> is not necessarily the case for out-of-tree third party boards.
-> 
-> Add support for finding the external clock crystal oscillator on RZ/G1M,
-> and on R-Car H2, M2-W, and M2-N using the new CPG/MSSR bindings, through
-> the corresponding "renesas,r8a77xx-cpg-mssr" nodes.
-> 
-> Note that this is not needed on R-Car V2H and E2, and on RZ/G1E, as on
-> those SoCs the arch_timer and generic counter clock is derived from the
-> ZS clock instead.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - Drop RZ/G1E,
->   - Add support for R-Car H2, M2-W, and M2-N.
+Hi Simon,
 
-Thanks, applied for v4.14.
+On Thu, Jul 13, 2017 at 10:18 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jul 12, 2017 at 12:35:53PM +0200, Geert Uytterhoeven wrote:
+>> MSIOF0 and MSIOF1 are tied to two DMA controllers through two pairs of
+>> DMA specifiers.  However, the second pair of corresponding DMA names was
+>> missing.
+>>
+>> Fixes: 80fab06e258da762 ("arm64: dts: r8a7796: Add all MSIOF nodes")
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>>  arch/arm64/boot/dts/renesas/r8a7796.dtsi | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> Thanks, applied for v4.14.
+>
+> Let me know if you would prefer it handled as a fix for v4.13.
+> I see the commit it fixes was part of v4.11.
+
+Thanks!
+
+V4.14 is fine.  It's not enabled in any board DTS, and DMA will stll work as
+long as there are free channels on DMAC1.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
