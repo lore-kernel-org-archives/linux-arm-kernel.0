@@ -1,37 +1,36 @@
-From: fabien.dessenne@st.com (Fabien Dessenne)
-Date: Thu, 13 Jul 2017 11:59:36 +0200
-Subject: [PATCH 0/3] STM32 CRYP crypto driver
-Message-ID: <1499939979-8623-1-git-send-email-fabien.dessenne@st.com>
+From: michael.moese@men.de (michael.moese at men.de)
+Date: Thu, 13 Jul 2017 12:00:31 +0200
+Subject: i.MX 6 and PCIe DMA issues
+In-Reply-To: <20170713090423.GA31807@n2100.armlinux.org.uk>
+References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
+ <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
+ <20170713070718.GA3871@mmlinux>
+ <20170713090423.GA31807@n2100.armlinux.org.uk>
+Message-ID: <20170713100031.GA31131@mmlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches adds a new crypto driver for STMicroelectronics stm32 HW.
-This drivers uses the crypto API and provides with HW-enabled AEAD and block
-cipher algorithms.
-It makes use of the crypto engine which is upgraded in order to support AEAD
-requests.
+On Thu, Jul 13, 2017 at 10:04:23AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 13, 2017 at 09:07:19AM +0200, michael.moese at men.de wrote:
+> > Ok, I hope I am correct. I alloc my memory using dma_alloc_coherent()
+> > once, the dma_handle is passed to the device, with no other dma_map*()
+> > or dma_sync_*() calls needed?
+> 
+> Correct.
+Great. Thanks for the clarification. I will make sure the usage is done
+the right way.
 
-This driver was successfully tested with tcrypt / testmgr.
+> You must always use the two addresses returned from dma_alloc_coherent()
+> and never try to translate them - the DMA address is for programming
+> into the hardware, and the virtual address for CPU accesses.  If you do
+> try to pass these to the various translators (like virt_to_phys()) the
+> result is undefined.
 
-Note:
-Since two other set of patches (update of STM32 CRC32 and addition of STM32
-HASH) are being proposed, it may happen that there are some minor conflicts in
-'Kconfig' and 'Makefile'. In that case, I will fix the issue in due course.
+I was trying to just print some addresses for debugging. I removed this
+again. I'm just confused, because the DMA device address seems to be the
+physical one. At least the memory contains my data. The virtual memory
+contains different data. 
 
-Fabien Dessenne (3):
-  crypto: engine - permit to enqueue aead_request
-  dt-bindings: Document STM32 CRYP bindings
-  crypto: stm32 - Support for STM32 CRYP crypto module
+Could it be possible this mapping on my board is going wrong?
 
- .../devicetree/bindings/crypto/st,stm32-cryp.txt   |   20 +
- crypto/crypto_engine.c                             |  101 +
- drivers/crypto/stm32/Kconfig                       |    9 +
- drivers/crypto/stm32/Makefile                      |    1 +
- drivers/crypto/stm32/stm32-cryp.c                  | 1962 ++++++++++++++++++++
- include/crypto/engine.h                            |   16 +
- 6 files changed, 2109 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
- create mode 100644 drivers/crypto/stm32/stm32-cryp.c
-
--- 
-2.7.4
+Michael
