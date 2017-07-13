@@ -1,45 +1,90 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jul 2017 16:13:09 +0200
-Subject: [PATCH 14/18] dt-bindings: panel: Add Huarui LHR050H41 panel
- documentation
+Date: Thu, 13 Jul 2017 16:12:56 +0200
+Subject: [PATCH 01/18] regmap: mmio: Add function to attach a clock
 In-Reply-To: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <5c1df0e5171fd2fb0e4536e88363eeb8c8382b80.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <02f409ad80afed68e02660f161fc26d588a86fa7.1499955058.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LHR050H41 is a 1280x700 4-lanes DSI panel.
+regmap_init_mmio_clk allows to specify a clock that needs to be enabled
+while accessing the registers.
+
+However, that clock is retrieved through its clock ID, which means it will
+lookup that clock based on the current device that registers the regmap,
+and, in the DT case, will only look in that device OF node.
+
+This might be problematic if the clock to enable is stored in another node.
+Let's add a function that allows to attach a clock that has already been
+retrieved to a regmap in order to fix this.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/panel/huarui,lhr050h41.txt | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/huarui,lhr050h41.txt
+ drivers/base/regmap/regmap-mmio.c | 24 ++++++++++++++++++++++++
+ include/linux/regmap.h            |  4 ++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/huarui,lhr050h41.txt b/Documentation/devicetree/bindings/display/panel/huarui,lhr050h41.txt
-new file mode 100644
-index 000000000000..b254db4d29c5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/huarui,lhr050h41.txt
-@@ -0,0 +1,19 @@
-+Huarui LHR050H41 MIPI-DSI panel
+diff --git a/drivers/base/regmap/regmap-mmio.c b/drivers/base/regmap/regmap-mmio.c
+index 5189fd6182f6..5cadfd3394d8 100644
+--- a/drivers/base/regmap/regmap-mmio.c
++++ b/drivers/base/regmap/regmap-mmio.c
+@@ -28,6 +28,8 @@
+ struct regmap_mmio_context {
+ 	void __iomem *regs;
+ 	unsigned val_bytes;
 +
-+Required properties:
-+  - compatible: "huarui,lhr050h41"
-+  - reg: DSI virtual channel used by that screen
-+  - power-gpios: a GPIO phandle for the power pin
-+  - reset-gpios: a GPIO phandle for the reset pin
++	bool attached_clk;
+ 	struct clk *clk;
+ 
+ 	void (*reg_write)(struct regmap_mmio_context *ctx,
+@@ -363,4 +365,26 @@ struct regmap *__devm_regmap_init_mmio_clk(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(__devm_regmap_init_mmio_clk);
+ 
++int regmap_mmio_attach_clk(struct regmap *map, struct clk *clk)
++{
++	struct regmap_mmio_context *ctx = map->bus_context;
 +
-+Optional properties:
-+  - backlight: phandle to the backlight used
++	ctx->clk = clk;
++	ctx->attached_clk = true;
 +
-+Example:
-+panel at 0 {
-+	compatible = "huarui,lhr050h41";
-+	reg = <0>;
-+	power-gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* PB07 */
-+	reset-gpios = <&r_pio 0 5 GPIO_ACTIVE_LOW>; /* PL05 */
-+	backlight = <&pwm_bl>;
-+};
++	return clk_prepare(ctx->clk);
++}
++EXPORT_SYMBOL_GPL(regmap_mmio_attach_clk);
++
++void regmap_mmio_detach_clk(struct regmap *map)
++{
++	struct regmap_mmio_context *ctx = map->bus_context;
++
++	clk_unprepare(ctx->clk);
++
++	ctx->attached_clk = false;
++	ctx->clk = NULL;
++}
++EXPORT_SYMBOL_GPL(regmap_mmio_detach_clk);
++
+ MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 978abfbac617..11a292a76586 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -21,6 +21,7 @@
+ #include <linux/lockdep.h>
+ 
+ struct module;
++struct clk;
+ struct device;
+ struct i2c_client;
+ struct irq_domain;
+@@ -789,6 +790,9 @@ bool regmap_ac97_default_volatile(struct device *dev, unsigned int reg);
+ 	__regmap_lockdep_wrapper(__devm_regmap_init_ac97, #config,	\
+ 				ac97, config)
+ 
++int regmap_mmio_attach_clk(struct regmap *map, struct clk *clk);
++void regmap_mmio_detach_clk(struct regmap *map);
++
+ void regmap_exit(struct regmap *map);
+ int regmap_reinit_cache(struct regmap *map,
+ 			const struct regmap_config *config);
 -- 
 git-series 0.9.1
