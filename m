@@ -1,60 +1,42 @@
-From: keith.busch@intel.com (Keith Busch)
-Date: Thu, 13 Jul 2017 12:29:16 -0400
-Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
-In-Reply-To: <0bcc0b00-1ad3-6866-32ab-15da8ea1821e@codeaurora.org>
-References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
- <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
- <0bcc0b00-1ad3-6866-32ab-15da8ea1821e@codeaurora.org>
-Message-ID: <20170713162915.GA14716@localhost.localdomain>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 13 Jul 2017 18:25:29 +0200
+Subject: [PATCH v2] irqchip: gicv3-its: Use NUMA aware memory allocation
+ for ITS tables
+In-Reply-To: <1499702025-21383-1-git-send-email-shankerd@codeaurora.org>
+References: <1499702025-21383-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20170713162529.GB18024@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 11:44:12AM -0400, Sinan Kaya wrote:
-> On 7/13/2017 8:17 AM, Bjorn Helgaas wrote:
-> >> he spec is calling to wait up to 1 seconds if the device is sending CRS.
-> >> The NVMe device seems to be requiring more. Relax this up to 60 seconds.
-> > Can you add a pointer to the "1 second" requirement in the spec here?
-> > We use 60 seconds in pci_scan_device() and acpiphp_add_context().  Is
-> > there a basis in the spec for the 60 second timeout?
+On 10.07.17 10:53:45, Shanker Donthineni wrote:
+> The NUMA node information is visible to ITS driver but not being used
+> other than handling hardware errata. ITS/GICR hardware accesses to the
+> local NUMA node is usually quicker than the remote NUMA node. How slow
+> the remote NUMA accesses are depends on the implementation details.
 > 
-> This does not specify a hard limit above on how long SW need to wait. 
+> This patch allocates memory for ITS management tables and command
+> queue from the corresponding NUMA node using the appropriate NUMA
+> aware functions. This change improves the performance of the ITS
+> tables read latency on systems where it has more than one ITS block,
+> and with the slower inter node accesses.
 > 
-> "6.6.2 Function Level Reset
-> After an FLR has been initiated by writing a 1b to the Initiate Function Level Reset bit, 
-> the Function must complete the FLR within 100 ms.
-> 
-> While a Function is required to complete the FLR operation within the time limit described above,
-> the subsequent Function-specific initialization sequence may require additional time. 
-> If additional time is required, the Function must return a Configuration Request Retry Status (CRS) 
-> Completion Status when a Configuration Request is received 15 after the time limit above. 
-> After the Function responds to a Configuration Request with a Completion status other than CRS, 
-> it is not permitted to return CRS until it is reset again."
-> 
-> However, another indirect reference here tells us it is capped by 1 second below.
-> 
-> "6.23. Readiness Notifications (RN)
-> Readiness Notifications (RN) is intended to reduce the time software needs to
-> wait before issuing Configuration Requests to a Device or Function following DRS
-> Events or FRS Events. RN includes both the Device Readiness Status (DRS) and
-> Function Readiness Status (FRS) mechanisms. These mechanisms provide a direct
-> indication of Configuration-Readiness (see 5 Terms and Acronyms entry for ?Configuration-Ready?). 
-> 
-> When used, DRS and FRS allow an improved behavior over the CRS mechanism, and eliminate
-> its associated periodic polling time of up to 1 second following a reset."
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++----------------
+>  1 file changed, 20 insertions(+), 16 deletions(-)
 
-That wording is just confusing. It looks to me the 1 second polling is
-to be used following a reset if CRS is not implemented.
+> @@ -1773,7 +1777,7 @@ static int __init its_probe_one(struct resource *res,
+>  out_free_tables:
+>  	its_free_tables(its);
+>  out_free_cmd:
+> -	free_pages((unsigned long)its->cmd_base, get_order(ITS_CMD_QUEUE_SZ));
+> +	__free_pages(virt_to_page(its->cmd_base), get_order(ITS_CMD_QUEUE_SZ));
 
-  https://pcisig.com/sites/default/files/specification_documents/ECN_RN_29_Aug_2013.pdf
+This change is not required as free_pages() can be used here directly.
 
-"
-  Through the mechanisms defined by this ECR, we can avoid the long,
-  architected, fixed delays following various forms of reset before
-  software is permitted to perform its first Configuration Request. These
-  delays are very large:
+-Robert
 
-  1 second if Configuration Retry Status (CRS) is not used
-"
-
-It goes on to say CRS is usually much lower, but doesn't specify an
-upper bound either.
+>  out_free_its:
+>  	kfree(its);
+>  out_unmap:
