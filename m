@@ -1,77 +1,31 @@
 From: bich.hemon@st.com (Bich HEMON)
-Date: Thu, 13 Jul 2017 15:08:27 +0000
-Subject: [PATCH 2/9] serial: stm32: fix multi-ports management
+Date: Thu, 13 Jul 2017 15:08:28 +0000
+Subject: [PATCH 5/9] serial: stm32: add RTS support
 In-Reply-To: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
 References: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
-Message-ID: <1499958494-19354-3-git-send-email-bich.hemon@st.com>
+Message-ID: <1499958494-19354-6-git-send-email-bich.hemon@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gerald Baeza <gerald.baeza@st.com>
+Implement support of RTS in USART control register
 
-Correct management of multi-ports. Each port has
-its own last residue value and its own alias.
-
-Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
 Signed-off-by: Bich Hemon <bich.hemon@st.com>
 ---
- drivers/tty/serial/stm32-usart.c | 12 +++++++-----
- drivers/tty/serial/stm32-usart.h |  1 +
- 2 files changed, 8 insertions(+), 5 deletions(-)
+ drivers/tty/serial/stm32-usart.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-index ebc49e4..a12d79c 100644
+index ca61bfe..9158d31 100644
 --- a/drivers/tty/serial/stm32-usart.c
 +++ b/drivers/tty/serial/stm32-usart.c
-@@ -111,14 +111,13 @@ static void stm32_receive_chars(struct uart_port *port, bool threaded)
- 	unsigned long c;
- 	u32 sr;
- 	char flag;
--	static int last_res = RX_BUF_L;
+@@ -518,7 +518,7 @@ static void stm32_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	port->status &= ~(UPSTAT_AUTOCTS | UPSTAT_AUTORTS);
+ 	if (cflag & CRTSCTS) {
+ 		port->status |= UPSTAT_AUTOCTS | UPSTAT_AUTORTS;
+-		cr3 |= USART_CR3_CTSE;
++		cr3 |= USART_CR3_CTSE | USART_CR3_RTSE;
+ 	}
  
- 	if (port->irq_wake)
- 		pm_wakeup_event(tport->tty->dev, 0);
- 
--	while (stm32_pending_rx(port, &sr, &last_res, threaded)) {
-+	while (stm32_pending_rx(port, &sr, &stm32_port->last_res, threaded)) {
- 		sr |= USART_SR_DUMMY_RX;
--		c = stm32_get_char(port, &sr, &last_res);
-+		c = stm32_get_char(port, &sr, &stm32_port->last_res);
- 		flag = TTY_NORMAL;
- 		port->icount.rx++;
- 
-@@ -694,8 +693,10 @@ static struct stm32_port *stm32_of_get_stm32_port(struct platform_device *pdev)
- 		return NULL;
- 
- 	id = of_alias_get_id(np, "serial");
--	if (id < 0)
--		id = 0;
-+	if (id < 0) {
-+		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", id);
-+		return NULL;
-+	}
- 
- 	if (WARN_ON(id >= STM32_MAX_PORTS))
- 		return NULL;
-@@ -703,6 +704,7 @@ static struct stm32_port *stm32_of_get_stm32_port(struct platform_device *pdev)
- 	stm32_ports[id].hw_flow_control = of_property_read_bool(np,
- 							"st,hw-flow-ctrl");
- 	stm32_ports[id].port.line = id;
-+	stm32_ports[id].last_res = RX_BUF_L;
- 	return &stm32_ports[id];
- }
- 
-diff --git a/drivers/tty/serial/stm32-usart.h b/drivers/tty/serial/stm32-usart.h
-index 0532b2f..65b4ffa 100644
---- a/drivers/tty/serial/stm32-usart.h
-+++ b/drivers/tty/serial/stm32-usart.h
-@@ -222,6 +222,7 @@ struct stm32_port {
- 	struct dma_chan *tx_ch;  /* dma tx channel            */
- 	dma_addr_t tx_dma_buf;   /* dma tx buffer bus address */
- 	unsigned char *tx_buf;   /* dma tx buffer cpu address */
-+	int last_res;
- 	bool tx_dma_busy;	 /* dma tx busy               */
- 	bool hw_flow_control;
- };
+ 	usartdiv = DIV_ROUND_CLOSEST(port->uartclk, baud);
 -- 
 1.9.1
