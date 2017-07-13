@@ -1,58 +1,36 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 14 Jul 2017 01:34:53 +0200
-Subject: [PATCH 1/5] arm64: dts: rockchip: Add rk3399 vop and
- display-subsystem
-In-Reply-To: <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
-References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
- <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <4655605.dLm3uFpe8F@phil>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 13 Jul 2017 18:38:59 -0500
+Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
+In-Reply-To: <0bcc0b00-1ad3-6866-32ab-15da8ea1821e@codeaurora.org>
+References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
+ <20170713121758.GL4486@bhelgaas-glaptop.roam.corp.google.com>
+ <0bcc0b00-1ad3-6866-32ab-15da8ea1821e@codeaurora.org>
+Message-ID: <20170713233859.GA5944@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
-
-Am Donnerstag, 13. Juli 2017, 00:03:51 CEST schrieb Jacob Chen:
-> Add devicetree nodes for rk3399 VOP (Video Output Processors), and the
-> top level display-subsystem root node.
+On Thu, Jul 13, 2017 at 11:44:12AM -0400, Sinan Kaya wrote:
+> On 7/13/2017 8:17 AM, Bjorn Helgaas wrote:
+> >> he spec is calling to wait up to 1 seconds if the device is sending CRS.
+> >> The NVMe device seems to be requiring more. Relax this up to 60 seconds.
+> > Can you add a pointer to the "1 second" requirement in the spec here?
+> > We use 60 seconds in pci_scan_device() and acpiphp_add_context().  Is
+> > there a basis in the spec for the 60 second timeout?
 > 
-> Later patches add endpoints (eDP, HDMI, MIPI, etc) that attach to the
-> VOPs' output ports.
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 65 ++++++++++++++++++++++++++++++++
->  1 file changed, 65 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index e795135..300e500 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -1455,6 +1455,71 @@
->  		status = "disabled";
->  	};
->  
-> +	vopl: vop at ff8f0000 {
-> +		compatible = "rockchip,rk3399-vop-lit";
-> +		reg = <0x0 0xff8f0000 0x0 0x1ffc>, <0x0 0xff8f2000 0x0 0x400>;
+> This does not specify a hard limit above on how long SW need to wait. 
 
-What is this second memory region doing? It looks like this is the meant
-to cover VOP_GAMMA_LUT_ADDR, but can't you just map the whole area?
-ChromeOS seems to be doing fine using the whole area as
-	<0x0 0xff8f0000 0x0 0x3efc>
-and I've also not seen any code changes actually mapping/using this
-second area.
+I wouldn't expect a *maximum* time we can wait.  I'm looking for the
+minimum times the spec requires.
 
+If you're claiming "the spec is calling to wait up to 1 second", I
+just want to know where in the spec it says that.  That helps in the
+future when we need to maintain code like this.
 
-> +		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
-> +		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>, <&cru DCLK_VOP1_DIV>;
-> +		clock-names = "aclk_vop", "dclk_vop", "hclk_vop", "dclk_source";
+> If I remember it right from CRS commit messages, 60 seconds was coming from
+> some PCIe switch taking too long to boot.
 
-While I know that this is based on my idea on handling the hdmi pll-rate
-requirements, I haven't found the matching code- and dt-binding-changes
-posted to a list yet. 
+If you have a pointer to this, please include it.  The earliest thing
+I can find is when Linux was imported into git (1da177e4c3f4
+("Linux-2.6.12-rc2")), which includes a 60 second timeout:
 
-
-Heiko
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/pci/probe.c?id=1da177e4c3f4#n686
