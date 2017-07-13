@@ -1,36 +1,104 @@
-From: michael.moese@men.de (michael.moese at men.de)
-Date: Thu, 13 Jul 2017 12:00:31 +0200
-Subject: i.MX 6 and PCIe DMA issues
-In-Reply-To: <20170713090423.GA31807@n2100.armlinux.org.uk>
-References: <04e1d18a504a477b84f5a9ec661dc9ae@MEN-EX01.intra.men.de>
- <5235ccf4-9dc2-a4aa-280b-18a0ab5a42bf@arm.com>
- <20170713070718.GA3871@mmlinux>
- <20170713090423.GA31807@n2100.armlinux.org.uk>
-Message-ID: <20170713100031.GA31131@mmlinux>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 13 Jul 2017 11:03:48 +0100
+Subject: APM smmu implementation
+In-Reply-To: <CAL85gmBoE+AXoaVaSuimvX=aPRSEhMXoHvaEZPAvLxzaYSUvSQ@mail.gmail.com>
+References: <CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g@mail.gmail.com>
+ <d9e40de8-82e2-0f19-5b99-d756ded21e80@arm.com>
+ <20170109120300.GC21398@arm.com>
+ <9d083b5e-0fe4-b649-c4f4-e1005feb9ec1@arm.com>
+ <CAL85gmCM-=iTbK3mcsFOtJrxbYFE99FWn7Aj9w-JLhMu03wWqQ@mail.gmail.com>
+ <f8cefa15-9d1b-ae92-b673-3010875ac16b@redhat.com>
+ <CAL85gmBoE+AXoaVaSuimvX=aPRSEhMXoHvaEZPAvLxzaYSUvSQ@mail.gmail.com>
+Message-ID: <d571ed74-3a89-a6ba-6350-1be181405366@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 10:04:23AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 13, 2017 at 09:07:19AM +0200, michael.moese at men.de wrote:
-> > Ok, I hope I am correct. I alloc my memory using dma_alloc_coherent()
-> > once, the dma_handle is passed to the device, with no other dma_map*()
-> > or dma_sync_*() calls needed?
-> 
-> Correct.
-Great. Thanks for the clarification. I will make sure the usage is done
-the right way.
+On 13/07/17 00:31, Feng Kan wrote:
+> On Wed, Jul 12, 2017 at 4:28 PM, Al Stone <ahs3@redhat.com> wrote:
+>> On 07/12/2017 03:07 PM, Feng Kan wrote:
+>>> On Mon, Jan 9, 2017 at 9:55 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>> On 09/01/17 12:03, Will Deacon wrote:
+>>>>> On Mon, Jan 09, 2017 at 11:34:42AM +0000, Robin Murphy wrote:
+>>>>>> On 06/01/17 23:21, Feng Kan wrote:
+>>>>>>> The APM IOMMU implementation is mostly just the ARM SMMU 500 variant.
+>>>>>>
+>>>>>> "Mostly"? Have APM actually modified it (which I strongly doubt) or do
+>>>>>> you mean it's simply been integrated with the upper address lines tied
+>>>>>> off? MMU-500 reports a 48-bit IAS because MMU-500 has 48-bit-wide slave
+>>>>>> interfaces; that's all there is to it. Whether or not you use all of
+>>>>>> those bits is up to you as a system integrator.
+>>>>>
+>>>>> That's a good point; MMU-500 doesn't appear to let you change the IAS
+>>>>> anyway. That should also mean that UBS and OAS are unchanged.
+>>>>>
+>>>>>>> However, our internal bus is only 42 bits wide. Our IAS field is coded
+>>>>>>> as 48 bits, which cause IPA to truncated to 42 bits on the physical
+>>>>>>> bus. In order for our system to work with the arm-smmu.c, there needs
+>>>>>>> to be a way to force the ipa_size to 42. The current internal solution
+>>>>>>> is to use the cpuid, but that is quite ugly. I was thinking of using
+>>>>>>> the model
+>>>>>>> as indication to right the ipa_size, but I am not too sure of the ACPI
+>>>>>>> side. Would it be okay to add an APM MMU500 variant? I would also
+>>>>>>> appreciated it if you guys have any alternate solutions.
+>>>>>>
+>>>>>> This is something we've been axpecting to run into for a while now - the
+>>>>>> appropriate solution is to use a "dma-ranges" property on the master
+>>>>>> device(s) to describe that they have 42 bits of address wired up, from
+>>>>>> which they will then inherit the appropriate DMA mask. The outstanding
+>>>>>> issue which remains is that we're still missing some way of preventing
+>>>>>> drivers simply clobbering that with a 64-bit mask later, but that's a
+>>>>>> more general problem[1].
+>>>>>
+>>>>> I wonder if the driver is actually using IAS, OAS and UBS incorrectly.
+>>>>> We're using them to parameterise the DMA aperture, which is then used
+>>>>> to size the IOVA domain, but that's wrong because the IAS, OAS and UBS
+>>>>> are upper bounds and we can still end up allocating unusable/unreachable
+>>>>> addresses.
+>>>>
+>>>> It's not incorrect, it's simply all we know at that point. From inside
+>>>> the SMMU, we can't tell how many of the bits we have are actually wired
+>>>> up externally, which is why we always take the intersection of the DMA
+>>>> aperture and the given device's DMA mask at the point of IOVA allocation.
+>>>>
+>>>> You can reproduce much the same thing on your Juno if you fancy - just
+>>>> make the HDLCD or PL330 driver set a DMA mask larger than the default 32
+>>>> bits and the top 8 bits of the MMU-401's 40-bit input being tied off to
+>>>> 0 will become apparent (the only difference being there's not actually
+>>>> anything at the master end they could be wired to either).
+>>>>
+>>>>> So I do think that this should be fixed on the SMMU firmware node, rather
+>>>>> than restricting the range of each master device.
+>>>>
+>>>> In general, it's a per-master thing which "dma-ranges" is exactly the
+>>>> correct tool to describe - a property on the SMMU would just be a weird
+>>>> nonstandard shorthand for a very particular case (it breaks as soon as
+>>>> you have some *more* limited, e.g. 32-bit, device in the same system).
+>>>> The fact that every master in this case apparently has the same
+>>>> capability is just happenstance.
+>>> I know this thread is pretty old, so sorry about that. Given that
+>>> using dma-range is
+>>> not an option in our system since it uses ACPI tables. There doesn't seem to be
+>>> any more activity on this. I see that the IORT table has added support
+>>> for CAVIUM_SMMUV2,
+>>> would it be possible to add APM_SMMUV2 and key the ipa_size to less or equal
+>>> to 42 bits. This way, we can fix the problem in the SMMUv2 driver and not worry
+>>> about the greater DMA layer changes that could affect everyone.
+>>
+>> Adding Charles to the To: list -- he's the one you'll need to contact
+>> about modifying IORT content since he controls the document.  I would
+>> guess it's possible to add an entry for APM but I don't get to decide
+>> that, Charles does.  Contacting him directly would be your best bet,
+>> though.
+> Thanks Al, I already send Charles an email. However, I think the SMMU driver
+> maintainers at ARM should have the first say in if this change would
+> be okay to do.
 
-> You must always use the two addresses returned from dma_alloc_coherent()
-> and never try to translate them - the DMA address is for programming
-> into the hardware, and the virtual address for CPU accesses.  If you do
-> try to pass these to the various translators (like virt_to_phys()) the
-> result is undefined.
+Cavium are not using MMU-500 - the ThunderX SMMU is their own in-house
+microarchitecture (with its own bugs and foibles), hence it rightly gets
+its own implementation identifier. I think Lorenzo has plans to wire up
+support for the IORT "Device memory address size limit" field, which is
+the correct way for ACPI to describe the upstream bus width of your
+MMU-500 integration (and all the other IOMMU integrations facing the
+same issue).
 
-I was trying to just print some addresses for debugging. I removed this
-again. I'm just confused, because the DMA device address seems to be the
-physical one. At least the memory contains my data. The virtual memory
-contains different data. 
-
-Could it be possible this mapping on my board is going wrong?
-
-Michael
+Robin.
