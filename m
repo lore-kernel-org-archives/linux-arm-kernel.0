@@ -1,361 +1,342 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jul 2017 16:13:12 +0200
-Subject: [PATCH 17/18] arm: dts: sun8i: Add BananaPI M2-Magic DTS
+Date: Thu, 13 Jul 2017 16:13:01 +0200
+Subject: [PATCH 06/18] drm/sun4i: tcon: Don't rely on encoders to enable the
+ TCON
 In-Reply-To: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <fd6f80ac08ce9cbe4ccba884750dae128c538a2f.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <e8e204b4b366f609db5b7d848f8cfb88345cd2d7.1499955058.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Bananapi M2-Magic is a board with an A33, a USB host and USB OTG
-connectors, and 8GB eMMC, an AP6212 WiFi/Bluetooth chip and connectors for
-DSI, CSI and GPIOs.
+So far, we've required all the TCON-connected encoders to call the TCON
+enable and disable functions.
+
+This was made this way because in the RGB/LVDS case, the TCON is the CRTC
+and the encoder. However, in all the other cases (HDMI, TV, DSI, etc.), we
+have another encoder down the road that needs to be programmed.
+
+We also needed to know which channel the encoder is connected to, which is
+encoder-specific.
+
+The CRTC's enable and disable callbacks can work just fine for our use
+case, and we can get the channel to use just by looking at the type of
+encoder, since that is fixed. Implement those callbacks, which will
+remove some of the encoder boilerplate.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile                   |   1 +-
- arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts | 321 ++++++++++++++++++++-
- 2 files changed, 322 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
+ drivers/gpu/drm/sun4i/sun4i_crtc.c     | 22 ++++++-
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c |  8 +--
+ drivers/gpu/drm/sun4i/sun4i_rgb.c      | 14 +---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c     | 91 +++++++++++++--------------
+ drivers/gpu/drm/sun4i/sun4i_tcon.h     | 10 +---
+ drivers/gpu/drm/sun4i/sun4i_tv.c       |  6 +--
+ 6 files changed, 70 insertions(+), 81 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4b17f35dc9a7..e0d77ab79f5f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -918,6 +918,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-pc-plus.dtb \
- 	sun8i-h3-orangepi-plus.dtb \
- 	sun8i-h3-orangepi-plus2e.dtb \
-+	sun8i-r16-bananapi-m2m.dtb \
- 	sun8i-r16-parrot.dtb \
- 	sun8i-v3s-licheepi-zero.dtb \
- 	sun8i-v3s-licheepi-zero-dock.dtb
-diff --git a/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts b/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
-new file mode 100644
-index 000000000000..eaf09666720d
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
-@@ -0,0 +1,321 @@
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index f8c70439d1e2..30c7568dde5c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -30,6 +30,22 @@
+ #include "sunxi_engine.h"
+ #include "sun4i_tcon.h"
+ 
 +/*
-+ * Copyright (c) 2017 Free Electrons <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
++ * While this isn't really working in the DRM theory, in practice we
++ * can only ever have one encoder per TCON since we have a mux in our
++ * TCON.
 + */
++static struct drm_encoder *sun4i_crtc_get_encoder(struct drm_crtc *crtc)
++{
++	struct drm_encoder *encoder;
 +
-+/dts-v1/;
-+#include "sun8i-a33.dtsi"
++	drm_for_each_encoder(encoder, crtc->dev)
++		if (encoder->crtc == crtc)
++			return encoder;
 +
-+#include <dt-bindings/gpio/gpio.h>
++	return NULL;
++}
 +
-+/ {
-+	model = "BananaPi M2 Magic";
-+	compatible = "sinovoip,bananapi-m2m", "allwinner,sun8i-a33";
+ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+ 				    struct drm_crtc_state *old_state)
+ {
+@@ -71,11 +87,12 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
+ 
+ static void sun4i_crtc_disable(struct drm_crtc *crtc)
+ {
++	struct drm_encoder *encoder = sun4i_crtc_get_encoder(crtc);
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+ 
+ 	DRM_DEBUG_DRIVER("Disabling the CRTC\n");
+ 
+-	sun4i_tcon_disable(scrtc->tcon);
++	sun4i_tcon_set_status(scrtc->tcon, encoder, false);
+ 
+ 	if (crtc->state->event && !crtc->state->active) {
+ 		spin_lock_irq(&crtc->dev->event_lock);
+@@ -88,11 +105,12 @@ static void sun4i_crtc_disable(struct drm_crtc *crtc)
+ 
+ static void sun4i_crtc_enable(struct drm_crtc *crtc)
+ {
++	struct drm_encoder *encoder = sun4i_crtc_get_encoder(crtc);
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+ 
+ 	DRM_DEBUG_DRIVER("Enabling the CRTC\n");
+ 
+-	sun4i_tcon_enable(scrtc->tcon);
++	sun4i_tcon_set_status(scrtc->tcon, encoder, true);
+ }
+ 
+ static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+index d3398f6250ef..06af2f6d0b31 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+@@ -85,8 +85,6 @@ static int sun4i_hdmi_atomic_check(struct drm_encoder *encoder,
+ static void sun4i_hdmi_disable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
+-	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+-	struct sun4i_tcon *tcon = crtc->tcon;
+ 	u32 val;
+ 
+ 	DRM_DEBUG_DRIVER("Disabling the HDMI Output\n");
+@@ -94,22 +92,16 @@ static void sun4i_hdmi_disable(struct drm_encoder *encoder)
+ 	val = readl(hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
+ 	val &= ~SUN4I_HDMI_VID_CTRL_ENABLE;
+ 	writel(val, hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
+-
+-	sun4i_tcon_channel_disable(tcon, 1);
+ }
+ 
+ static void sun4i_hdmi_enable(struct drm_encoder *encoder)
+ {
+ 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
+ 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
+-	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+-	struct sun4i_tcon *tcon = crtc->tcon;
+ 	u32 val = 0;
+ 
+ 	DRM_DEBUG_DRIVER("Enabling the HDMI Output\n");
+ 
+-	sun4i_tcon_channel_enable(tcon, 1);
+-
+ 	sun4i_hdmi_setup_avi_infoframes(hdmi, mode);
+ 	val |= SUN4I_HDMI_PKT_CTRL_TYPE(0, SUN4I_HDMI_PKT_AVI);
+ 	val |= SUN4I_HDMI_PKT_CTRL_TYPE(1, SUN4I_HDMI_PKT_END);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index 76362c09c608..ecce1f5b50ab 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -135,13 +135,10 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+ 
+ 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
+ 
+-	if (!IS_ERR(tcon->panel))
++	if (!IS_ERR(tcon->panel)) {
+ 		drm_panel_prepare(tcon->panel);
+-
+-	sun4i_tcon_channel_enable(tcon, 0);
+-
+-	if (!IS_ERR(tcon->panel))
+ 		drm_panel_enable(tcon->panel);
++	}
+ }
+ 
+ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+@@ -151,13 +148,10 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+ 
+ 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
+ 
+-	if (!IS_ERR(tcon->panel))
++	if (!IS_ERR(tcon->panel)) {
+ 		drm_panel_disable(tcon->panel);
+-
+-	sun4i_tcon_channel_disable(tcon, 0);
+-
+-	if (!IS_ERR(tcon->panel))
+ 		drm_panel_unprepare(tcon->panel);
++	}
+ }
+ 
+ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index d9791292553e..dc70bc2a42a5 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -14,6 +14,7 @@
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
++#include <drm/drm_encoder.h>
+ #include <drm/drm_modes.h>
+ #include <drm/drm_of.h>
+ 
+@@ -32,66 +33,62 @@
+ #include "sun4i_tcon.h"
+ #include "sunxi_engine.h"
+ 
+-void sun4i_tcon_disable(struct sun4i_tcon *tcon)
++static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
++					  bool enabled)
+ {
+-	DRM_DEBUG_DRIVER("Disabling TCON\n");
++	struct clk *clk;
+ 
+-	/* Disable the TCON */
+-	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
+-			   SUN4I_TCON_GCTL_TCON_ENABLE, 0);
+-}
+-EXPORT_SYMBOL(sun4i_tcon_disable);
+-
+-void sun4i_tcon_enable(struct sun4i_tcon *tcon)
+-{
+-	DRM_DEBUG_DRIVER("Enabling TCON\n");
+-
+-	/* Enable the TCON */
+-	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
+-			   SUN4I_TCON_GCTL_TCON_ENABLE,
+-			   SUN4I_TCON_GCTL_TCON_ENABLE);
+-}
+-EXPORT_SYMBOL(sun4i_tcon_enable);
+-
+-void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel)
+-{
+-	DRM_DEBUG_DRIVER("Disabling TCON channel %d\n", channel);
+-
+-	/* Disable the TCON's channel */
+-	if (channel == 0) {
++	switch (channel) {
++	case 0:
+ 		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+-				   SUN4I_TCON0_CTL_TCON_ENABLE, 0);
+-		clk_disable_unprepare(tcon->dclk);
++				   SUN4I_TCON0_CTL_TCON_ENABLE,
++				   enabled ? SUN4I_TCON0_CTL_TCON_ENABLE : 0);
++		clk = tcon->dclk;
++		break;
++	case 1:
++		WARN_ON(!tcon->quirks->has_channel_1);
++		regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
++				   SUN4I_TCON1_CTL_TCON_ENABLE,
++				   enabled ? SUN4I_TCON1_CTL_TCON_ENABLE : 0);
++		clk = tcon->sclk1;
++		break;
++	default:
++		DRM_DEBUG_DRIVER("Unknown channel... doing nothing\n");
+ 		return;
+ 	}
+ 
+-	WARN_ON(!tcon->quirks->has_channel_1);
+-	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
+-			   SUN4I_TCON1_CTL_TCON_ENABLE, 0);
+-	clk_disable_unprepare(tcon->sclk1);
++	if (enabled)
++		clk_prepare_enable(clk);
++	else
++		clk_disable_unprepare(clk);
+ }
+-EXPORT_SYMBOL(sun4i_tcon_channel_disable);
+ 
+-void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel)
++void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
++			   struct drm_encoder *encoder,
++			   bool enabled)
+ {
+-	DRM_DEBUG_DRIVER("Enabling TCON channel %d\n", channel);
+-
+-	/* Enable the TCON's channel */
+-	if (channel == 0) {
+-		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+-				   SUN4I_TCON0_CTL_TCON_ENABLE,
+-				   SUN4I_TCON0_CTL_TCON_ENABLE);
+-		clk_prepare_enable(tcon->dclk);
++	int channel;
 +
-+	aliases {
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		i2c2 = &i2c2;
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+	};
++	switch (encoder->encoder_type) {
++	case DRM_MODE_ENCODER_NONE:
++		channel = 0;
++		break;
++	case DRM_MODE_ENCODER_TMDS:
++	case DRM_MODE_ENCODER_TVDAC:
++		channel = 1;
++		break;
++	default:
++		DRM_DEBUG_DRIVER("Unknown encoder type, doing nothing...\n");
+ 		return;
+ 	}
+ 
+-	WARN_ON(!tcon->quirks->has_channel_1);
+-	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
+-			   SUN4I_TCON1_CTL_TCON_ENABLE,
+-			   SUN4I_TCON1_CTL_TCON_ENABLE);
+-	clk_prepare_enable(tcon->sclk1);
++	sun4i_tcon_channel_set_status(tcon, channel, enabled);
 +
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		blue {
-+			label = "bpi-m2m:blue:usr";
-+			gpios = <&pio 2 7 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		green {
-+			label = "bpi-m2m:green:usr";
-+			gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		red {
-+			label = "bpi-m2m:red:power";
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	reg_vcc5v0: vcc5v0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc5v0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* PL06 */
-+	};
-+};
-+
-+&codec {
-+	status = "okay";
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc3>;
-+};
-+
-+&cpu0_opp_table {
-+	opp at 1104000000 {
-+		opp-hz = /bits/ 64 <1104000000>;
-+		opp-microvolt = <1320000>;
-+		clock-latency-ns = <244144>; /* 8 32k periods */
-+	};
-+
-+	opp at 1200000000 {
-+		opp-hz = /bits/ 64 <1200000000>;
-+		opp-microvolt = <1320000>;
-+		clock-latency-ns = <244144>; /* 8 32k periods */
-+	};
-+};
-+
-+&dai {
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+/* This is the i2c bus exposed on the DSI connector for the touch panel */
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "disabled";
-+};
-+
-+/* This is the i2c bus exposed on the GPIO header */
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "disabled";
-+};
-+
-+/* This is the i2c bus exposed on the CSI connector to control the sensor */
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "disabled";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_aldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_pins>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&r_rsb {
-+	status = "okay";
-+
-+	axp22x: pmic at 3a3 {
-+		compatible = "x-powers,axp223";
-+		reg = <0x3a3>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		eldoin-supply = <&reg_dcdc1>;
-+		x-powers,drive-vbus-en;
-+	};
-+};
-+
-+#include "axp223.dtsi"
-+
-+&ac_power_supply {
-+	status = "okay";
-+};
-+
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-io";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2500000>;
-+	regulator-max-microvolt = <2500000>;
-+	regulator-name = "vdd-dll";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_dc1sw {
-+	regulator-name = "vcc-lcd";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+/*
-+ * Our WiFi chip needs both DLDO1 and DLDO2 to be powered at the same
-+ * time, with the two being in sync. Since this is not really
-+ * supported right now, just use the two as always on, and we will fix
-+ * it later.
-+ */
-+&reg_dldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi0";
-+};
-+
-+&reg_dldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi1";
-+};
-+
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
-+&reg_rtc_ldo {
-+	regulator-name = "vcc-rtc";
-+};
-+
-+&sound {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_b>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_a>, <&uart1_pins_cts_rts_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb0_id_det-gpios = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_drivevbus>;
-+	usb1_vbus-supply = <&reg_vcc5v0>;
-+	status = "okay";
-+};
++	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
++			   SUN4I_TCON_GCTL_TCON_ENABLE,
++			   enabled ? SUN4I_TCON_GCTL_TCON_ENABLE : 0);
+ }
+-EXPORT_SYMBOL(sun4i_tcon_channel_enable);
++EXPORT_SYMBOL(sun4i_tcon_set_status);
+ 
+ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+ {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index 552c88ec16be..824732c90a2a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -183,15 +183,9 @@ struct sun4i_tcon {
+ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
+ struct drm_panel *sun4i_tcon_find_panel(struct device_node *node);
+ 
+-/* Global Control */
+-void sun4i_tcon_disable(struct sun4i_tcon *tcon);
+-void sun4i_tcon_enable(struct sun4i_tcon *tcon);
+-
+-/* Channel Control */
+-void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel);
+-void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel);
+-
+ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
++void sun4i_tcon_set_status(struct sun4i_tcon *crtc, struct drm_encoder *encoder,
++			   bool enable);
+ 
+ /* Mode Related Controls */
+ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index 73bfe7b1cd78..78d6cf77fdd3 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -345,12 +345,9 @@ static void sun4i_tv_disable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
+ 	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+-	struct sun4i_tcon *tcon = crtc->tcon;
+ 
+ 	DRM_DEBUG_DRIVER("Disabling the TV Output\n");
+ 
+-	sun4i_tcon_channel_disable(tcon, 1);
+-
+ 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
+ 			   SUN4I_TVE_EN_ENABLE,
+ 			   0);
+@@ -362,7 +359,6 @@ static void sun4i_tv_enable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
+ 	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
+-	struct sun4i_tcon *tcon = crtc->tcon;
+ 
+ 	DRM_DEBUG_DRIVER("Enabling the TV Output\n");
+ 
+@@ -371,8 +367,6 @@ static void sun4i_tv_enable(struct drm_encoder *encoder)
+ 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
+ 			   SUN4I_TVE_EN_ENABLE,
+ 			   SUN4I_TVE_EN_ENABLE);
+-
+-	sun4i_tcon_channel_enable(tcon, 1);
+ }
+ 
+ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
 -- 
 git-series 0.9.1
