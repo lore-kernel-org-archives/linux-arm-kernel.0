@@ -1,60 +1,32 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jul 2017 16:12:58 +0200
-Subject: [PATCH 03/18] drm/sun4i: Realign Makefile padding and reorder it
+Date: Thu, 13 Jul 2017 16:13:00 +0200
+Subject: [PATCH 05/18] drm/sun4i: tcon: remove unused function
 In-Reply-To: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <fd70853df9e7ee66a20df9d42921f1f6608a2bc9.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <7d8e9b8d77c9bef3258e97a06aab42314355acf4.1499955058.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some options were not padded as they should, and the order in the Makefile
-was chaotic. Fix that.
+Even though that function is defined in the TCON header, it's not defined
+nor used anywhere. Remove the prototype.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/Makefile | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index e29fd3a2ba9c..42871ee7acf6 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -1,23 +1,23 @@
--sun4i-drm-y += sun4i_drv.o
--sun4i-drm-y += sun4i_framebuffer.o
-+sun4i-backend-y			+= sun4i_backend.o sun4i_layer.o
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index e3c50ecdcd04..552c88ec16be 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -194,8 +194,6 @@ void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel);
+ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
  
--sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
--sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
--sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
-+sun4i-drm-y			+= sun4i_drv.o
-+sun4i-drm-y			+= sun4i_framebuffer.o
- 
--sun4i-tcon-y += sun4i_tcon.o
--sun4i-tcon-y += sun4i_rgb.o
--sun4i-tcon-y += sun4i_dotclock.o
--sun4i-tcon-y += sun4i_crtc.o
-+sun4i-drm-hdmi-y		+= sun4i_hdmi_enc.o
-+sun4i-drm-hdmi-y		+= sun4i_hdmi_ddc_clk.o
-+sun4i-drm-hdmi-y		+= sun4i_hdmi_tmds_clk.o
- 
--sun4i-backend-y += sun4i_backend.o sun4i_layer.o
-+sun4i-tcon-y			+= sun4i_tcon.o
-+sun4i-tcon-y			+= sun4i_rgb.o
-+sun4i-tcon-y			+= sun4i_dotclock.o
-+sun4i-tcon-y			+= sun4i_crtc.o
- 
--sun8i-mixer-y += sun8i_mixer.o sun8i_layer.o
-+sun8i-mixer-y			+= sun8i_mixer.o sun8i_layer.o
- 
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
- 
--obj-$(CONFIG_DRM_SUN4I_BACKEND)		+= sun4i-backend.o
-+obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o
- obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
--obj-$(CONFIG_DRM_SUN8I_MIXER)		+= sun8i-mixer.o
-+obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o
+ /* Mode Related Controls */
+-void sun4i_tcon_switch_interlace(struct sun4i_tcon *tcon,
+-				 bool enable);
+ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+ 			struct drm_encoder *encoder);
+ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
 -- 
 git-series 0.9.1
