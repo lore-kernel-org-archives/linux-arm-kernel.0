@@ -1,250 +1,147 @@
-From: ttnguyen@apm.com (Tai Nguyen)
-Date: Thu, 13 Jul 2017 11:19:08 -0700
-Subject: [PATCH] perf: xgene: Remove unnecessary managed resources cleanup
-Message-ID: <1499969948-24755-1-git-send-email-ttnguyen@apm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 13 Jul 2017 19:28:48 +0100
+Subject: [kernel-hardening] Re: [RFC PATCH 6/6] arm64: add VMAP_STACK and
+ detect out-of-bounds SP
+In-Reply-To: <20170713175543.GA32528@leverpostej>
+References: <1499898783-25732-1-git-send-email-mark.rutland@arm.com>
+ <1499898783-25732-7-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu8jey+uPSFoCsjQn9BeGiChZpS=iZ0v9nEWvkwcO1gFYg@mail.gmail.com>
+ <20170713104950.GB26194@leverpostej>
+ <CAKv+Gu9eSX-f4uv3gaNw9_eKV0soe2-CqSnMaTjjEhMifxe_8g@mail.gmail.com>
+ <20170713161050.GG26194@leverpostej> <20170713175543.GA32528@leverpostej>
+Message-ID: <CAKv+Gu_v3PO7=JSgCTb3aZu3sg4cwYYjy68VJnr58vzaMYvhTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Managed resources in the driver should be automatically cleaned up on
-driver detach. It's unnecessary to manually free/unmmap these resources.
-One of the manual cleanup causes static checkers to complain.
-The bug is reported by Dan Carpenter <dan.carpenter@oracle.com> in [1]
+On 13 July 2017 at 18:55, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jul 13, 2017 at 05:10:50PM +0100, Mark Rutland wrote:
+>> On Thu, Jul 13, 2017 at 12:49:48PM +0100, Ard Biesheuvel wrote:
+>> > On 13 July 2017 at 11:49, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > > On Thu, Jul 13, 2017 at 07:58:50AM +0100, Ard Biesheuvel wrote:
+>> > >> On 12 July 2017 at 23:33, Mark Rutland <mark.rutland@arm.com> wrote:
+>
+>> > Given that the very first stp in kernel_entry will fault if we have
+>> > less than S_FRAME_SIZE bytes of stack left, I think we should check
+>> > that we have at least that much space available.
+>>
+>> I was going to reply saying that I didn't agree, but in writing up
+>> examples, I mostly convinced myself that this is the right thing to do.
+>> So I mostly agree!
+>>
+>> This would mean we treat the first impossible-to-handle exception as
+>> that fatal case, which is similar to x86's double-fault, triggered when
+>> the HW can't stack the regs. All other cases are just arbitrary faults.
+>>
+>> However, to provide that consistently, we'll need to perform this check
+>> at every exception boundary, or some of those cases will result in a
+>> recursive fault first.
+>>
+>> So I think there are three choices:
+>>
+>> 1) In el1_sync, only check SP bounds, and live with the recursive
+>>    faults.
+>>
+>> 2) in el1_sync, check there's room for the regs, and live with the
+>>    recursive faults for overflow on other exceptions.
+>>
+>> 3) In all EL1 entry paths, check there's room for the regs.
+>
+> FWIW, for the moment I've applied (2), as you suggested, to my
+> arm64/vmap-stack branch, adding an additional:
+>
+>         sub     x0, x0, #S_FRAME_SIZE
+>
+> ... to the entry path.
+>
+> I think it's worth trying (3) so that we consistently report these
+> cases, benchmarks permitting.
+>
 
-[1] https://www.spinics.net/lists/arm-kernel/msg593012.html
+OK, so here's a crazy idea: what if we
+a) carve out a dedicated range in the VMALLOC area for stacks
+b) for each stack, allocate a naturally aligned window of 2x the stack
+size, and map the stack inside it, leaving the remaining space
+unmapped
 
-This patch gets rid of all the unnecessary manual cleanup and properly
-unregister all the registered PMU devices by the driver on driver detach.
+That way, we can compare SP (minus S_FRAME_SIZE) against a mask that
+is a build time constant, to decide whether its value points into a
+stack or not. Of course, it may be pointing into the wrong stack, but
+that should not prevent us from taking the exception, and we can deal
+with that later. It would give us a very cheap way to perform this
+test on the hot paths.
 
-Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
----
- drivers/perf/xgene_pmu.c | 74 ++++++++++++++----------------------------------
- 1 file changed, 22 insertions(+), 52 deletions(-)
+>> I believe that determining whether the exception was caused by a stack
+>> overflow is not something we can do robustly or efficiently.
+>>
 
-diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-index e841282..eb23311 100644
---- a/drivers/perf/xgene_pmu.c
-+++ b/drivers/perf/xgene_pmu.c
-@@ -1147,7 +1147,6 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
- {
- 	struct device *dev = xgene_pmu->dev;
- 	struct xgene_pmu_dev *pmu;
--	int rc;
- 
- 	pmu = devm_kzalloc(dev, sizeof(*pmu), GFP_KERNEL);
- 	if (!pmu)
-@@ -1159,7 +1158,7 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
- 	switch (pmu->inf->type) {
- 	case PMU_TYPE_L3C:
- 		if (!(xgene_pmu->l3c_active_mask & pmu->inf->enable_mask))
--			goto dev_err;
-+			return -ENODEV;
- 		if (xgene_pmu->version == PCP_PMU_V3)
- 			pmu->attr_groups = l3c_pmu_v3_attr_groups;
- 		else
-@@ -1177,7 +1176,7 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
- 		break;
- 	case PMU_TYPE_MCB:
- 		if (!(xgene_pmu->mcb_active_mask & pmu->inf->enable_mask))
--			goto dev_err;
-+			return -ENODEV;
- 		if (xgene_pmu->version == PCP_PMU_V3)
- 			pmu->attr_groups = mcb_pmu_v3_attr_groups;
- 		else
-@@ -1185,7 +1184,7 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
- 		break;
- 	case PMU_TYPE_MC:
- 		if (!(xgene_pmu->mc_active_mask & pmu->inf->enable_mask))
--			goto dev_err;
-+			return -ENODEV;
- 		if (xgene_pmu->version == PCP_PMU_V3)
- 			pmu->attr_groups = mc_pmu_v3_attr_groups;
- 		else
-@@ -1195,19 +1194,14 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
- 		return -EINVAL;
- 	}
- 
--	rc = xgene_init_perf(pmu, ctx->name);
--	if (rc) {
-+	if (xgene_init_perf(pmu, ctx->name)) {
- 		dev_err(dev, "%s PMU: Failed to init perf driver\n", ctx->name);
--		goto dev_err;
-+		return -ENODEV;
- 	}
- 
- 	dev_info(dev, "%s PMU registered\n", ctx->name);
- 
--	return rc;
--
--dev_err:
--	devm_kfree(dev, pmu);
--	return -ENODEV;
-+	return 0;
- }
- 
- static void _xgene_pmu_isr(int irq, struct xgene_pmu_dev *pmu_dev)
-@@ -1515,13 +1509,13 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
- 	acpi_dev_free_resource_list(&resource_list);
- 	if (rc < 0) {
- 		dev_err(dev, "PMU type %d: No resource address found\n", type);
--		goto err;
-+		return NULL;
- 	}
- 
- 	dev_csr = devm_ioremap_resource(dev, &res);
- 	if (IS_ERR(dev_csr)) {
- 		dev_err(dev, "PMU type %d: Fail to map resource\n", type);
--		goto err;
-+		return NULL;
- 	}
- 
- 	/* A PMU device node without enable-bit-index is always enabled */
-@@ -1535,7 +1529,7 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
- 	ctx->name = xgene_pmu_dev_name(dev, type, enable_bit);
- 	if (!ctx->name) {
- 		dev_err(dev, "PMU type %d: Fail to get device name\n", type);
--		goto err;
-+		return NULL;
- 	}
- 	inf = &ctx->inf;
- 	inf->type = type;
-@@ -1543,9 +1537,6 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
- 	inf->enable_mask = 1 << enable_bit;
- 
- 	return ctx;
--err:
--	devm_kfree(dev, ctx);
--	return NULL;
- }
- 
- static const struct acpi_device_id xgene_pmu_acpi_type_match[] = {
-@@ -1663,20 +1654,20 @@ xgene_pmu_dev_ctx *fdt_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
- 	void __iomem *dev_csr;
- 	struct resource res;
- 	int enable_bit;
--	int rc;
- 
- 	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
- 	if (!ctx)
- 		return NULL;
--	rc = of_address_to_resource(np, 0, &res);
--	if (rc < 0) {
-+
-+	if (of_address_to_resource(np, 0, &res) < 0) {
- 		dev_err(dev, "PMU type %d: No resource address found\n", type);
--		goto err;
-+		return NULL;
- 	}
-+
- 	dev_csr = devm_ioremap_resource(dev, &res);
- 	if (IS_ERR(dev_csr)) {
- 		dev_err(dev, "PMU type %d: Fail to map resource\n", type);
--		goto err;
-+		return NULL;
- 	}
- 
- 	/* A PMU device node without enable-bit-index is always enabled */
-@@ -1686,17 +1677,15 @@ xgene_pmu_dev_ctx *fdt_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
- 	ctx->name = xgene_pmu_dev_name(dev, type, enable_bit);
- 	if (!ctx->name) {
- 		dev_err(dev, "PMU type %d: Fail to get device name\n", type);
--		goto err;
-+		return NULL;
- 	}
-+
- 	inf = &ctx->inf;
- 	inf->type = type;
- 	inf->csr = dev_csr;
- 	inf->enable_mask = 1 << enable_bit;
- 
- 	return ctx;
--err:
--	devm_kfree(dev, ctx);
--	return NULL;
- }
- 
- static int fdt_pmu_probe_pmu_dev(struct xgene_pmu *xgene_pmu,
-@@ -1868,22 +1857,20 @@ static int xgene_pmu_probe(struct platform_device *pdev)
- 	xgene_pmu->pcppmu_csr = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(xgene_pmu->pcppmu_csr)) {
- 		dev_err(&pdev->dev, "ioremap failed for PCP PMU resource\n");
--		rc = PTR_ERR(xgene_pmu->pcppmu_csr);
--		goto err;
-+		return PTR_ERR(xgene_pmu->pcppmu_csr);
- 	}
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		dev_err(&pdev->dev, "No IRQ resource\n");
--		rc = -EINVAL;
--		goto err;
-+		return -EINVAL;
- 	}
- 	rc = devm_request_irq(&pdev->dev, irq, xgene_pmu_isr,
- 				IRQF_NOBALANCING | IRQF_NO_THREAD,
- 				dev_name(&pdev->dev), xgene_pmu);
- 	if (rc) {
- 		dev_err(&pdev->dev, "Could not request IRQ %d\n", irq);
--		goto err;
-+		return rc;
- 	}
- 
- 	raw_spin_lock_init(&xgene_pmu->lock);
-@@ -1903,42 +1890,29 @@ static int xgene_pmu_probe(struct platform_device *pdev)
- 	rc = irq_set_affinity(irq, &xgene_pmu->cpu);
- 	if (rc) {
- 		dev_err(&pdev->dev, "Failed to set interrupt affinity!\n");
--		goto err;
-+		return rc;
- 	}
- 
- 	/* Walk through the tree for all PMU perf devices */
- 	rc = xgene_pmu_probe_pmu_dev(xgene_pmu, pdev);
- 	if (rc) {
- 		dev_err(&pdev->dev, "No PMU perf devices found!\n");
--		goto err;
-+		return rc;
- 	}
- 
- 	/* Enable interrupt */
- 	xgene_pmu->ops->unmask_int(xgene_pmu);
- 
- 	return 0;
--
--err:
--	if (xgene_pmu->pcppmu_csr)
--		devm_iounmap(&pdev->dev, xgene_pmu->pcppmu_csr);
--	devm_kfree(&pdev->dev, xgene_pmu);
--
--	return rc;
- }
- 
- static void
- xgene_pmu_dev_cleanup(struct xgene_pmu *xgene_pmu, struct list_head *pmus)
- {
- 	struct xgene_pmu_dev_ctx *ctx;
--	struct device *dev = xgene_pmu->dev;
--	struct xgene_pmu_dev *pmu_dev;
- 
- 	list_for_each_entry(ctx, pmus, next) {
--		pmu_dev = ctx->pmu_dev;
--		if (pmu_dev->inf->csr)
--			devm_iounmap(dev, pmu_dev->inf->csr);
--		devm_kfree(dev, ctx);
--		devm_kfree(dev, pmu_dev);
-+		perf_pmu_unregister(&ctx->pmu_dev->pmu);
- 	}
- }
- 
-@@ -1951,10 +1925,6 @@ static int xgene_pmu_remove(struct platform_device *pdev)
- 	xgene_pmu_dev_cleanup(xgene_pmu, &xgene_pmu->mcbpmus);
- 	xgene_pmu_dev_cleanup(xgene_pmu, &xgene_pmu->mcpmus);
- 
--	if (xgene_pmu->pcppmu_csr)
--		devm_iounmap(&pdev->dev, xgene_pmu->pcppmu_csr);
--	devm_kfree(&pdev->dev, xgene_pmu);
--
- 	return 0;
- }
- 
--- 
-1.9.1
+Actually, if the stack pointer is within S_FRAME_SIZE of the base, and
+the faulting address points into the guard page, that is a pretty
+strong indicator that the stack overflowed. That shouldn't be too
+costly?
+
+> It's probably worth putting the fast-path check directly into the
+> vectors, where we currently only use 1/32 of the instruction slots
+> available to us.
+>
+>> As above, I think it's helpful to think of this as something closer to a
+>> double-fault handler (i.e. aiming to catch when we can't take the
+>> exception safely), rather than something that's trying to catch logical
+>> stack overflows.
+>
+> Does this make sense to you?
+>
+> I've tried to reword the log output, as below, to give this impression.
+>
+> [   49.288232] Insufficient stack space to handle exception!
+
+This could be a separate warning, if we find out that the actual
+exception was caused by something else.
+
+> [   49.288245] CPU: 5 PID: 2208 Comm: bash Not tainted 4.12.0-00005-ga781af2 #81
+> [   49.300680] Hardware name: ARM Juno development board (r1) (DT)
+> [   49.306549] task: ffff800974955100 task.stack: ffff00000d6f0000
+> [   49.312426] PC is at recursive_loop+0x10/0x50
+> [   49.316747] LR is at recursive_loop+0x34/0x50
+> [   49.321066] pc : [<ffff000008588aa0>] lr : [<ffff000008588ac4>] pstate: 40000145
+> [   49.328398] sp : ffff00000d6eff30
+> [   49.331682] x29: ffff00000d6f0350 x28: ffff800974955100
+> [   49.336953] x27: ffff000008942000 x26: ffff000008f0d758
+> [   49.342223] x25: ffff00000d6f3eb8 x24: ffff00000d6f3eb8
+> [   49.347493] x23: ffff000008f0d490 x22: 0000000000000009
+> [   49.352764] x21: ffff800974a57000 x20: ffff000008f0d4e0
+> [   49.358034] x19: 0000000000000013 x18: 0000ffffe7e2e4f0
+> [   49.363304] x17: 0000ffff9c1256a4 x16: ffff0000081f8b88
+> [   49.368574] x15: 00002a81b8000000 x14: 00000000fffffff0
+> [   49.373845] x13: ffff000008f6278a x12: ffff000008e62818
+> [   49.379115] x11: 0000000000000000 x10: 000000000000019e
+> [   49.384385] x9 : 0000000000000004 x8 : ffff00000d6f0770
+> [   49.389656] x7 : 1313131313131313 x6 : 000000000000019e
+> [   49.394925] x5 : 0000000000000000 x4 : 0000000000000000
+> [   49.400205] x3 : 0000000000000000 x2 : 0000000000000400
+> [   49.405484] x1 : 0000000000000013 x0 : 0000000000000012
+> [   49.410764] Task stack: [0xffff00000d6f0000..0xffff00000d6f4000]
+> [   49.416728] IRQ stack:  [0xffff80097ffb90a0..0xffff80097ffbd0a0]
+> [   49.422692] ESR: 0x96000047 -- DABT (current EL)
+> [   49.427277] FAR: 0xffff00000d6eff30
+> [   49.430742] Kernel panic - not syncing: kernel stack overflow
+> [   49.436451] CPU: 5 PID: 2208 Comm: bash Not tainted 4.12.0-00005-ga781af2 #81
+> [   49.443534] Hardware name: ARM Juno development board (r1) (DT)
+> [   49.449412] Call trace:
+> [   49.451852] [<ffff0000080885f0>] dump_backtrace+0x0/0x230
+> [   49.457218] [<ffff0000080888e4>] show_stack+0x14/0x20
+> [   49.462240] [<ffff00000839be0c>] dump_stack+0x9c/0xc0
+> [   49.467261] [<ffff000008175218>] panic+0x11c/0x294
+> [   49.472024] [<ffff000008089184>] handle_bad_stack+0xe4/0xe8
+> [   49.477561] [<ffff000008588ac4>] recursive_loop+0x34/0x50
+> [   49.482926] SMP: stopping secondary CPUs
+> [   49.487145] Kernel Offset: disabled
+> [   49.490609] Memory Limit: none
+> [   49.493649] ---[ end Kernel panic - not syncing: kernel stack overflow
+>
+
+Yes, this looks nice.
+
+> ... I still need to attack the backtracing to walk across stacks.
+>
+
+Yup
