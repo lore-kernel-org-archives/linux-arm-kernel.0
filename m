@@ -1,17 +1,21 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 13 Jul 2017 19:47:10 +0800
-Subject: [PATCH V2 05/10] clk: imx: add pfdv2 support
+Date: Thu, 13 Jul 2017 19:47:12 +0800
+Subject: [PATCH V2 07/10] dt-bindings: clock: add imx7ulp clock binding doc
 In-Reply-To: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
 References: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1499946435-7177-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1499946435-7177-8-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pfdv2 is designed for PLL Fractional Divide (PFD) observed in System
-Clock Generation (SCG) module in IMX ULP SoC series. e.g. i.MX7ULP.
+i.MX7ULP Clock functions are under joint control of the System
+Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
+modules, and Core Mode Controller (CMC)1 blocks
 
-NOTE pfdv2 can only be operated when clk is gated.
+Note IMX7ULP has two clock domains: M4 and A7. This binding doc
+is only for A7 clock domain.
 
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Shawn Guo <shawnguo@kernel.org>
@@ -21,258 +25,195 @@ Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
 ---
 ChangeLog:
-v1->v2:
- * change to readl_poll_timeout
- * add pfd lock to protect share reg access between rate and enable/disable
-   operations and multiple pfd instances.
- * use clk_hw_register
+v1->v2: no changes
 ---
- drivers/clk/imx/Makefile    |   3 +-
- drivers/clk/imx/clk-pfdv2.c | 207 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk.h       |   3 +
- 3 files changed, 212 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/clk-pfdv2.c
+ .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 ++++++++++++
+ include/dt-bindings/clock/imx7ulp-clock.h          | 108 +++++++++++++++++++++
+ 2 files changed, 170 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+ create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
 
-diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index 1e308e2..ea4ef27 100644
---- a/drivers/clk/imx/Makefile
-+++ b/drivers/clk/imx/Makefile
-@@ -11,7 +11,8 @@ obj-y += \
- 	clk-pllv2.o \
- 	clk-pllv3.o \
- 	clk-pllv4.o \
--	clk-pfd.o
-+	clk-pfd.o \
-+	clk-pfdv2.o
- 
- obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
- obj-$(CONFIG_SOC_IMX21)  += clk-imx21.o
-diff --git a/drivers/clk/imx/clk-pfdv2.c b/drivers/clk/imx/clk-pfdv2.c
+diff --git a/Documentation/devicetree/bindings/clock/imx7ulp-clock.txt b/Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
 new file mode 100644
-index 0000000..5421bdf
+index 0000000..76ea3c7
 --- /dev/null
-+++ b/drivers/clk/imx/clk-pfdv2.c
-@@ -0,0 +1,207 @@
++++ b/Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+@@ -0,0 +1,62 @@
++* Clock bindings for Freescale i.MX7ULP
++
++i.MX7ULP Clock functions are under joint control of the System
++Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
++modules, and Core Mode Controller (CMC)1 blocks
++
++The clocking scheme provides clear separation between M4 domain
++and A7 domain. Except for a few clock sources shared between two
++domains, such as the System Oscillator clock, the Slow IRC (SIRC),
++and and the Fast IRC clock (FIRCLK), clock sources and clock
++management are separated and contained within each domain.
++
++M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
++A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
++
++Note: this binding doc is only for A7 clock domain.
++
++Required properties:
++
++- compatible:	Should be "fsl,imx7ulp-clock".
++- reg : 	Should contain registers location and length for scg1,
++		pcc2 and pcc3.
++- reg-names:	Should contain the according reg names "scg1", "pcc2"
++		and "pcc3".
++- #clock-cells:	Should be <1>.
++- clocks:	Should contain the fixed input clocks.
++- clock-name:   Should contain the following clock names:"rsoc", "sosc",
++		"sirc", "firc", "upll", "mpll".
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell.
++See include/dt-bindings/clock/imx7ulp-clock.h
++for the full list of i.MX7ULP clock IDs.
++
++Examples:
++
++#include <dt-bindings/clock/imx7ulp-clock.h>
++
++clks: scg1 at 403e0000 {
++	compatible = "fsl,imx7ulp-clock";
++	reg = <0x403e0000 0x10000>
++	      <0x403f0000 0x10000>
++	      <0x40b30000 0x10000>;
++	reg-names = "scg1", "pcc2", "pcc3";
++	clocks = <&rsoc>, <&sosc>, <&sirc>,
++		 <&firc>, <&upll>, <&mpll>;
++	clock-names = "rsoc", "sosc", "sirc",
++		      "firc", "upll", "mpll";
++	#clock-cells = <1>;
++};
++
++usdhc1: usdhc at 40380000 {
++	compatible = "fsl,imx7ulp-usdhc";
++	reg = <0x40380000 0x10000>;
++	interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&clks IMX7ULP_CLK_NIC1_BUS_DIV>,
++		 <&clks IMX7ULP_CLK_NIC1_DIV>,
++		 <&clks IMX7ULP_CLK_USDHC1>;
++	clock-names ="ipg", "ahb", "per";
++	bus-width = <4>;
++	status = "disabled";
++};
+diff --git a/include/dt-bindings/clock/imx7ulp-clock.h b/include/dt-bindings/clock/imx7ulp-clock.h
+new file mode 100644
+index 0000000..2556106
+--- /dev/null
++++ b/include/dt-bindings/clock/imx7ulp-clock.h
+@@ -0,0 +1,108 @@
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017 NXP
 + *
-+ * Author: Dong Aisheng <aisheng.dong@nxp.com>
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/iopoll.h>
-+#include <linux/slab.h>
++#ifndef __DT_BINDINGS_CLOCK_IMX7ULP_H
++#define __DT_BINDINGS_CLOCK_IMX7ULP_H
 +
-+/**
-+ * struct clk_pfdv2 - IMX PFD clock
-+ * @clk_hw:	clock source
-+ * @reg:	PFD register address
-+ * @gate_bit:	Gate bit offset
-+ * @vld_bit:	Valid bit offset
-+ * @frac_off:	PLL Fractional Divider offset
-+ */
++#define IMX7ULP_CLK_DUMMY		0
++#define IMX7ULP_CLK_ROSC		1
++#define IMX7ULP_CLK_SOSC		2
++#define IMX7ULP_CLK_FIRC		3
 +
-+struct clk_pfdv2 {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;
-+	u8		gate_bit;
-+	u8		vld_bit;
-+	u8		frac_off;
-+};
++/* SCG1 */
++#define IMX7ULP_CLK_SPLL_PRE_SEL	4
++#define IMX7ULP_CLK_SPLL_PRE_DIV	5
++#define IMX7ULP_CLK_SPLL		6
++#define IMX7ULP_CLK_SPLL_POST_DIV1	7
++#define IMX7ULP_CLK_SPLL_POST_DIV2	8
++#define IMX7ULP_CLK_SPLL_PFD0		9
++#define IMX7ULP_CLK_SPLL_PFD1		10
++#define IMX7ULP_CLK_SPLL_PFD2		11
++#define IMX7ULP_CLK_SPLL_PFD3		12
++#define IMX7ULP_CLK_SPLL_PFD_SEL	13
++#define IMX7ULP_CLK_SPLL_SEL		14
++#define IMX7ULP_CLK_APLL_PRE_SEL	15
++#define IMX7ULP_CLK_APLL_PRE_DIV	16
++#define IMX7ULP_CLK_APLL		17
++#define IMX7ULP_CLK_APLL_POST_DIV1	18
++#define IMX7ULP_CLK_APLL_POST_DIV2	19
++#define IMX7ULP_CLK_APLL_PFD0		20
++#define IMX7ULP_CLK_APLL_PFD1		21
++#define IMX7ULP_CLK_APLL_PFD2		22
++#define IMX7ULP_CLK_APLL_PFD3		23
++#define IMX7ULP_CLK_APLL_PFD_SEL	24
++#define IMX7ULP_CLK_APLL_SEL		25
++#define IMX7ULP_CLK_UPLL		26
++#define IMX7ULP_CLK_SYS_SEL		27
++#define IMX7ULP_CLK_CORE_DIV		28
++#define IMX7ULP_CLK_BUS_DIV		29
++#define IMX7ULP_CLK_PLAT_DIV		30
++#define IMX7ULP_CLK_DDR_SEL		31
++#define IMX7ULP_CLK_DDR_DIV		32
++#define IMX7ULP_CLK_NIC_SEL		33
++#define IMX7ULP_CLK_NIC0_DIV		34
++#define IMX7ULP_CLK_GPU_DIV		35
++#define IMX7ULP_CLK_NIC1_DIV		36
++#define IMX7ULP_CLK_NIC1_BUS_DIV	37
++#define IMX7ULP_CLK_NIC1_EXT_DIV	38
 +
-+#define to_clk_pfdv2(_hw) container_of(_hw, struct clk_pfdv2, hw)
++/* PCG2 */
++#define IMX7ULP_CLK_DMA1		39
++#define IMX7ULP_CLK_RGPIO2P1		40
++#define IMX7ULP_CLK_FLEXBUS		41
++#define IMX7ULP_CLK_SEMA42_1		42
++#define IMX7ULP_CLK_DMA_MUX1		43
++#define IMX7ULP_CLK_SNVS		44
++#define IMX7ULP_CLK_CAAM		45
++#define IMX7ULP_CLK_LPTPM4		46
++#define IMX7ULP_CLK_LPTPM5		47
++#define IMX7ULP_CLK_LPIT1		48
++#define IMX7ULP_CLK_LPSPI2		49
++#define IMX7ULP_CLK_LPSPI3		50
++#define IMX7ULP_CLK_LPI2C4		51
++#define IMX7ULP_CLK_LPI2C5		52
++#define IMX7ULP_CLK_LPUART4		53
++#define IMX7ULP_CLK_LPUART5		54
++#define IMX7ULP_CLK_FLEXIO1		55
++#define IMX7ULP_CLK_USB0		56
++#define IMX7ULP_CLK_USB1		57
++#define IMX7ULP_CLK_USB_PHY		58
++#define IMX7ULP_CLK_USB_PL301		59
++#define IMX7ULP_CLK_USDHC0		60
++#define IMX7ULP_CLK_USDHC1		61
++#define IMX7ULP_CLK_WDG1		62
++#define IMX7ULP_CLK_WDG2		63
 +
-+#define CLK_PFDV2_FRAC_MASK 0x3f
++/* PCG3 */
++#define IMX7ULP_CLK_LPTPM6		64
++#define IMX7ULP_CLK_LPTPM7		65
++#define IMX7ULP_CLK_LPI2C6		66
++#define IMX7ULP_CLK_LPI2C7		67
++#define IMX7ULP_CLK_LPUART6		68
++#define IMX7ULP_CLK_LPUART7		69
++#define IMX7ULP_CLK_VIU			70
++#define IMX7ULP_CLK_DSI			71
++#define IMX7ULP_CLK_LCDIF		72
++#define IMX7ULP_CLK_MMDC		73
++#define IMX7ULP_CLK_PCTLC		74
++#define IMX7ULP_CLK_PCTLD		75
++#define IMX7ULP_CLK_PCTLE		76
++#define IMX7ULP_CLK_PCTLF		77
++#define IMX7ULP_CLK_GPU3D		78
++#define IMX7ULP_CLK_GPU2D		79
++#define IMX7ULP_CLK_MIPI_PLL		80
++#define IMX7ULP_CLK_SIRC		81
++#define IMX7ULP_CLK_SOSC_BUS_CLK	82
++#define IMX7ULP_CLK_FIRC_BUS_CLK	83
++#define IMX7ULP_CLK_SPLL_BUS_CLK	84
 +
-+#define LOCK_TIMEOUT_US		USEC_PER_MSEC
++#define IMX7ULP_CLK_END			85
 +
-+static DEFINE_SPINLOCK(pfd_lock);
-+
-+static int clk_pfdv2_wait(struct clk_pfdv2 *pfd)
-+{
-+	u32 val;
-+
-+	return readl_poll_timeout(pfd->reg, val, val & pfd->vld_bit,
-+				  0, LOCK_TIMEOUT_US);
-+}
-+
-+static int clk_pfdv2_enable(struct clk_hw *hw)
-+{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+	unsigned long flags;
-+	u32 val;
-+
-+	spin_lock_irqsave(&pfd_lock, flags);
-+	val = readl_relaxed(pfd->reg);
-+	val &= ~pfd->gate_bit;
-+	writel_relaxed(val, pfd->reg);
-+	spin_unlock_irqrestore(&pfd_lock, flags);
-+
-+	return clk_pfdv2_wait(pfd);
-+}
-+
-+static void clk_pfdv2_disable(struct clk_hw *hw)
-+{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+	unsigned long flags;
-+	u32 val;
-+
-+	spin_lock_irqsave(&pfd_lock, flags);
-+	val = readl_relaxed(pfd->reg);
-+	val |= pfd->gate_bit;
-+	writel_relaxed(val, pfd->reg);
-+	spin_unlock_irqrestore(&pfd_lock, flags);
-+}
-+
-+static unsigned long clk_pfdv2_recalc_rate(struct clk_hw *hw,
-+					   unsigned long parent_rate)
-+{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+	u64 tmp = parent_rate;
-+	u8 frac;
-+
-+	frac = (readl_relaxed(pfd->reg) >> pfd->frac_off)
-+		& CLK_PFDV2_FRAC_MASK;
-+
-+	if (!frac) {
-+		pr_debug("clk_pfdv2: %s invalid pfd frac value 0\n",
-+			 clk_hw_get_name(hw));
-+		return 0;
-+	}
-+
-+	tmp *= 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
-+}
-+
-+static long clk_pfdv2_round_rate(struct clk_hw *hw, unsigned long rate,
-+				 unsigned long *prate)
-+{
-+	u64 tmp = *prate;
-+	u8 frac;
-+
-+	tmp = tmp * 18 + rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+
-+	if (frac < 12)
-+		frac = 12;
-+	else if (frac > 35)
-+		frac = 35;
-+
-+	tmp = *prate;
-+	tmp *= 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
-+}
-+
-+static int clk_pfdv2_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+
-+	if (readl_relaxed(pfd->reg) & pfd->gate_bit)
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static int clk_pfdv2_set_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long parent_rate)
-+{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+	unsigned long flags;
-+	u64 tmp = parent_rate;
-+	u32 val;
-+	u8 frac;
-+
-+	tmp = tmp * 18 + rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+	if (frac < 12)
-+		frac = 12;
-+	else if (frac > 35)
-+		frac = 35;
-+
-+	spin_lock_irqsave(&pfd_lock, flags);
-+	val = readl_relaxed(pfd->reg);
-+	val &= ~(CLK_PFDV2_FRAC_MASK << pfd->frac_off);
-+	val |= frac << pfd->frac_off;
-+	writel_relaxed(val, pfd->reg);
-+	spin_unlock_irqrestore(&pfd_lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops clk_pfdv2_ops = {
-+	.enable		= clk_pfdv2_enable,
-+	.disable	= clk_pfdv2_disable,
-+	.recalc_rate	= clk_pfdv2_recalc_rate,
-+	.round_rate	= clk_pfdv2_round_rate,
-+	.set_rate	= clk_pfdv2_set_rate,
-+	.is_enabled     = clk_pfdv2_is_enabled,
-+};
-+
-+struct clk_hw *imx_clk_pfdv2(const char *name, const char *parent_name,
-+			     void __iomem *reg, u8 idx)
-+{
-+	struct clk_init_data init;
-+	struct clk_pfdv2 *pfd;
-+	struct clk_hw *hw;
-+	int ret;
-+
-+	WARN_ON(idx > 3);
-+
-+	pfd = kzalloc(sizeof(*pfd), GFP_KERNEL);
-+	if (!pfd)
-+		return ERR_PTR(-ENOMEM);
-+
-+	pfd->reg = reg;
-+	pfd->gate_bit = 1 << ((idx + 1) * 8 - 1);
-+	pfd->vld_bit = pfd->gate_bit - 1;
-+	pfd->frac_off = idx * 8;
-+
-+	init.name = name;
-+	init.ops = &clk_pfdv2_ops;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+	init.flags = CLK_SET_RATE_GATE;
-+
-+	pfd->hw.init = &init;
-+
-+	hw = &pfd->hw;
-+	ret = clk_hw_register(NULL, hw);
-+	if (ret) {
-+		kfree(pfd);
-+		hw = ERR_PTR(ret);
-+	}
-+
-+	return hw;
-+}
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 132c89f..cf3ea92 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -59,6 +59,9 @@ struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
- struct clk *imx_clk_pfd(const char *name, const char *parent_name,
- 		void __iomem *reg, u8 idx);
- 
-+struct clk_hw *imx_clk_pfdv2(const char *name, const char *parent_name,
-+			     void __iomem *reg, u8 idx);
-+
- struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
- 				 void __iomem *reg, u8 shift, u8 width,
- 				 void __iomem *busy_reg, u8 busy_shift);
++#endif /* __DT_BINDINGS_CLOCK_IMX7ULP_H */
 -- 
 2.7.4
