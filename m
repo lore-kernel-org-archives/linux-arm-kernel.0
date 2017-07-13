@@ -1,31 +1,31 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 13 Jul 2017 16:35:14 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6ul-evk: Add DRM panel support
-In-Reply-To: <1499786903-14600-1-git-send-email-marco.franchi@nxp.com>
-References: <1499786903-14600-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <20170713083512.GS3172@dragon>
+Date: Thu, 13 Jul 2017 16:36:28 +0800
+Subject: [PATCH 1/2] ARM: dts: imx7d-sdb: Add DRM panel support
+In-Reply-To: <1499865500-8857-1-git-send-email-marco.franchi@nxp.com>
+References: <1499865500-8857-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <20170713083624.GT3172@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 12:28:22PM -0300, Marco Franchi wrote:
-> It is preferred to use the panel compatible string rather than passing the LCD
+On Wed, Jul 12, 2017 at 10:18:19AM -0300, Marco Franchi wrote:
+> It is preferred to use the panel compatible string rather than passing the LCD 
 > timming in the device tree.
 > 
-> So pass the "innolux,at043tn24" compatible string to describe the parallel LCD
+> So pass the "innolux,at043tn24" compatible string to describe the parallel LCD 
 > on this board.
 > 
 > Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 > ---
->  arch/arm/boot/dts/imx6ul-14x14-evk.dts | 36 ++++++++++++----------------------
+>  arch/arm/boot/dts/imx7d-sdb.dts | 36 +++++++++++++-----------------------
 >  1 file changed, 13 insertions(+), 23 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> index d2be8aa..e08237f 100644
-> --- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> +++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> @@ -78,6 +78,16 @@
->  			clocks = <&clks IMX6UL_CLK_SAI2>;
->  		};
+> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+> index 664582d..22e106e 100644
+> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+> @@ -117,6 +117,16 @@
+>  		regulator-max-microvolt = <3300000>;
+>  		startup-delay-us = <200000>;
 >  	};
 > +
 > +	panel {
@@ -39,11 +39,11 @@ On Tue, Jul 11, 2017 at 12:28:22PM -0300, Marco Franchi wrote:
 > +	};
 >  };
 >  
->  &clks {
-> @@ -139,31 +149,11 @@
+>  &adc1 {
+> @@ -323,31 +333,11 @@
+>  &lcdif {
 >  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_lcdif_dat
->  		     &pinctrl_lcdif_ctrl>;
+>  	pinctrl-0 = <&pinctrl_lcdif>;
 > -	display = <&display0>;
 >  	status = "okay";
 >  
