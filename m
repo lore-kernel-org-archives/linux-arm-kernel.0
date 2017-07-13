@@ -1,342 +1,73 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jul 2017 16:13:01 +0200
-Subject: [PATCH 06/18] drm/sun4i: tcon: Don't rely on encoders to enable the
- TCON
+Date: Thu, 13 Jul 2017 16:13:03 +0200
+Subject: [PATCH 08/18] drm/sun4i: tcon: Add TRI finish interrupt for vblank
 In-Reply-To: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <e8e204b4b366f609db5b7d848f8cfb88345cd2d7.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <8114707d8063d0c9e67694528925baf4f4ee2f7c.1499955058.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we've required all the TCON-connected encoders to call the TCON
-enable and disable functions.
+The "CPU" (or Intel 8080) interface uses a different interrupt called
+TRI_FINISH (most likely TRI being for trigger) to notify the end of frames,
+and hence the VBLANK period.
 
-This was made this way because in the RGB/LVDS case, the TCON is the CRTC
-and the encoder. However, in all the other cases (HDMI, TV, DSI, etc.), we
-have another encoder down the road that needs to be programmed.
-
-We also needed to know which channel the encoder is connected to, which is
-encoder-specific.
-
-The CRTC's enable and disable callbacks can work just fine for our use
-case, and we can get the channel to use just by looking at the type of
-encoder, since that is fixed. Implement those callbacks, which will
-remove some of the encoder boilerplate.
+And that interrupt to the possible VBLANK interrupts source.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c     | 22 ++++++-
- drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c |  8 +--
- drivers/gpu/drm/sun4i/sun4i_rgb.c      | 14 +---
- drivers/gpu/drm/sun4i/sun4i_tcon.c     | 91 +++++++++++++--------------
- drivers/gpu/drm/sun4i/sun4i_tcon.h     | 10 +---
- drivers/gpu/drm/sun4i/sun4i_tv.c       |  6 +--
- 6 files changed, 70 insertions(+), 81 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c |  9 ++++++---
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index f8c70439d1e2..30c7568dde5c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -30,6 +30,22 @@
- #include "sunxi_engine.h"
- #include "sun4i_tcon.h"
- 
-+/*
-+ * While this isn't really working in the DRM theory, in practice we
-+ * can only ever have one encoder per TCON since we have a mux in our
-+ * TCON.
-+ */
-+static struct drm_encoder *sun4i_crtc_get_encoder(struct drm_crtc *crtc)
-+{
-+	struct drm_encoder *encoder;
-+
-+	drm_for_each_encoder(encoder, crtc->dev)
-+		if (encoder->crtc == crtc)
-+			return encoder;
-+
-+	return NULL;
-+}
-+
- static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
- 				    struct drm_crtc_state *old_state)
- {
-@@ -71,11 +87,12 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
- 
- static void sun4i_crtc_disable(struct drm_crtc *crtc)
- {
-+	struct drm_encoder *encoder = sun4i_crtc_get_encoder(crtc);
- 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
- 
- 	DRM_DEBUG_DRIVER("Disabling the CRTC\n");
- 
--	sun4i_tcon_disable(scrtc->tcon);
-+	sun4i_tcon_set_status(scrtc->tcon, encoder, false);
- 
- 	if (crtc->state->event && !crtc->state->active) {
- 		spin_lock_irq(&crtc->dev->event_lock);
-@@ -88,11 +105,12 @@ static void sun4i_crtc_disable(struct drm_crtc *crtc)
- 
- static void sun4i_crtc_enable(struct drm_crtc *crtc)
- {
-+	struct drm_encoder *encoder = sun4i_crtc_get_encoder(crtc);
- 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
- 
- 	DRM_DEBUG_DRIVER("Enabling the CRTC\n");
- 
--	sun4i_tcon_enable(scrtc->tcon);
-+	sun4i_tcon_set_status(scrtc->tcon, encoder, true);
- }
- 
- static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-index d3398f6250ef..06af2f6d0b31 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-@@ -85,8 +85,6 @@ static int sun4i_hdmi_atomic_check(struct drm_encoder *encoder,
- static void sun4i_hdmi_disable(struct drm_encoder *encoder)
- {
- 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
--	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
--	struct sun4i_tcon *tcon = crtc->tcon;
- 	u32 val;
- 
- 	DRM_DEBUG_DRIVER("Disabling the HDMI Output\n");
-@@ -94,22 +92,16 @@ static void sun4i_hdmi_disable(struct drm_encoder *encoder)
- 	val = readl(hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
- 	val &= ~SUN4I_HDMI_VID_CTRL_ENABLE;
- 	writel(val, hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
--
--	sun4i_tcon_channel_disable(tcon, 1);
- }
- 
- static void sun4i_hdmi_enable(struct drm_encoder *encoder)
- {
- 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
- 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
--	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
--	struct sun4i_tcon *tcon = crtc->tcon;
- 	u32 val = 0;
- 
- 	DRM_DEBUG_DRIVER("Enabling the HDMI Output\n");
- 
--	sun4i_tcon_channel_enable(tcon, 1);
--
- 	sun4i_hdmi_setup_avi_infoframes(hdmi, mode);
- 	val |= SUN4I_HDMI_PKT_CTRL_TYPE(0, SUN4I_HDMI_PKT_AVI);
- 	val |= SUN4I_HDMI_PKT_CTRL_TYPE(1, SUN4I_HDMI_PKT_END);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index 76362c09c608..ecce1f5b50ab 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -135,13 +135,10 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
- 
--	if (!IS_ERR(tcon->panel))
-+	if (!IS_ERR(tcon->panel)) {
- 		drm_panel_prepare(tcon->panel);
--
--	sun4i_tcon_channel_enable(tcon, 0);
--
--	if (!IS_ERR(tcon->panel))
- 		drm_panel_enable(tcon->panel);
-+	}
- }
- 
- static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
-@@ -151,13 +148,10 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
- 
--	if (!IS_ERR(tcon->panel))
-+	if (!IS_ERR(tcon->panel)) {
- 		drm_panel_disable(tcon->panel);
--
--	sun4i_tcon_channel_disable(tcon, 0);
--
--	if (!IS_ERR(tcon->panel))
- 		drm_panel_unprepare(tcon->panel);
-+	}
- }
- 
- static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index d9791292553e..dc70bc2a42a5 100644
+index c4407910dfaf..a3bbf9994cfa 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -14,6 +14,7 @@
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
-+#include <drm/drm_encoder.h>
- #include <drm/drm_modes.h>
- #include <drm/drm_of.h>
+@@ -97,7 +97,8 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+ 	DRM_DEBUG_DRIVER("%sabling VBLANK interrupt\n", enable ? "En" : "Dis");
  
-@@ -32,66 +33,62 @@
- #include "sun4i_tcon.h"
- #include "sunxi_engine.h"
+ 	mask = SUN4I_TCON_GINT0_VBLANK_ENABLE(0) |
+-	       SUN4I_TCON_GINT0_VBLANK_ENABLE(1);
++		SUN4I_TCON_GINT0_VBLANK_ENABLE(1) |
++		SUN4I_TCON_GINT0_TCON0_TRI_FINISH_ENABLE;
  
--void sun4i_tcon_disable(struct sun4i_tcon *tcon)
-+static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
-+					  bool enabled)
- {
--	DRM_DEBUG_DRIVER("Disabling TCON\n");
-+	struct clk *clk;
+ 	if (enable)
+ 		val = mask;
+@@ -336,7 +337,8 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
+ 	regmap_read(tcon->regs, SUN4I_TCON_GINT0_REG, &status);
  
--	/* Disable the TCON */
--	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
--			   SUN4I_TCON_GCTL_TCON_ENABLE, 0);
--}
--EXPORT_SYMBOL(sun4i_tcon_disable);
--
--void sun4i_tcon_enable(struct sun4i_tcon *tcon)
--{
--	DRM_DEBUG_DRIVER("Enabling TCON\n");
--
--	/* Enable the TCON */
--	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
--			   SUN4I_TCON_GCTL_TCON_ENABLE,
--			   SUN4I_TCON_GCTL_TCON_ENABLE);
--}
--EXPORT_SYMBOL(sun4i_tcon_enable);
--
--void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel)
--{
--	DRM_DEBUG_DRIVER("Disabling TCON channel %d\n", channel);
--
--	/* Disable the TCON's channel */
--	if (channel == 0) {
-+	switch (channel) {
-+	case 0:
- 		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
--				   SUN4I_TCON0_CTL_TCON_ENABLE, 0);
--		clk_disable_unprepare(tcon->dclk);
-+				   SUN4I_TCON0_CTL_TCON_ENABLE,
-+				   enabled ? SUN4I_TCON0_CTL_TCON_ENABLE : 0);
-+		clk = tcon->dclk;
-+		break;
-+	case 1:
-+		WARN_ON(!tcon->quirks->has_channel_1);
-+		regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
-+				   SUN4I_TCON1_CTL_TCON_ENABLE,
-+				   enabled ? SUN4I_TCON1_CTL_TCON_ENABLE : 0);
-+		clk = tcon->sclk1;
-+		break;
-+	default:
-+		DRM_DEBUG_DRIVER("Unknown channel... doing nothing\n");
- 		return;
- 	}
+ 	if (!(status & (SUN4I_TCON_GINT0_VBLANK_INT(0) |
+-			SUN4I_TCON_GINT0_VBLANK_INT(1))))
++			SUN4I_TCON_GINT0_VBLANK_INT(1) |
++			SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT)))
+ 		return IRQ_NONE;
  
--	WARN_ON(!tcon->quirks->has_channel_1);
--	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
--			   SUN4I_TCON1_CTL_TCON_ENABLE, 0);
--	clk_disable_unprepare(tcon->sclk1);
-+	if (enabled)
-+		clk_prepare_enable(clk);
-+	else
-+		clk_disable_unprepare(clk);
- }
--EXPORT_SYMBOL(sun4i_tcon_channel_disable);
+ 	drm_crtc_handle_vblank(&scrtc->crtc);
+@@ -345,7 +347,8 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
+ 	/* Acknowledge the interrupt */
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON_GINT0_REG,
+ 			   SUN4I_TCON_GINT0_VBLANK_INT(0) |
+-			   SUN4I_TCON_GINT0_VBLANK_INT(1),
++			   SUN4I_TCON_GINT0_VBLANK_INT(1) |
++			   SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT,
+ 			   0);
  
--void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel)
-+void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
-+			   struct drm_encoder *encoder,
-+			   bool enabled)
- {
--	DRM_DEBUG_DRIVER("Enabling TCON channel %d\n", channel);
--
--	/* Enable the TCON's channel */
--	if (channel == 0) {
--		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
--				   SUN4I_TCON0_CTL_TCON_ENABLE,
--				   SUN4I_TCON0_CTL_TCON_ENABLE);
--		clk_prepare_enable(tcon->dclk);
-+	int channel;
-+
-+	switch (encoder->encoder_type) {
-+	case DRM_MODE_ENCODER_NONE:
-+		channel = 0;
-+		break;
-+	case DRM_MODE_ENCODER_TMDS:
-+	case DRM_MODE_ENCODER_TVDAC:
-+		channel = 1;
-+		break;
-+	default:
-+		DRM_DEBUG_DRIVER("Unknown encoder type, doing nothing...\n");
- 		return;
- 	}
- 
--	WARN_ON(!tcon->quirks->has_channel_1);
--	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
--			   SUN4I_TCON1_CTL_TCON_ENABLE,
--			   SUN4I_TCON1_CTL_TCON_ENABLE);
--	clk_prepare_enable(tcon->sclk1);
-+	sun4i_tcon_channel_set_status(tcon, channel, enabled);
-+
-+	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
-+			   SUN4I_TCON_GCTL_TCON_ENABLE,
-+			   enabled ? SUN4I_TCON_GCTL_TCON_ENABLE : 0);
- }
--EXPORT_SYMBOL(sun4i_tcon_channel_enable);
-+EXPORT_SYMBOL(sun4i_tcon_set_status);
- 
- void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
- {
+ 	return IRQ_HANDLED;
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 552c88ec16be..824732c90a2a 100644
+index a318e5ccb612..b3582ee82855 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -183,15 +183,9 @@ struct sun4i_tcon {
- struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
- struct drm_panel *sun4i_tcon_find_panel(struct device_node *node);
+@@ -28,7 +28,11 @@
  
--/* Global Control */
--void sun4i_tcon_disable(struct sun4i_tcon *tcon);
--void sun4i_tcon_enable(struct sun4i_tcon *tcon);
--
--/* Channel Control */
--void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel);
--void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel);
--
- void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
-+void sun4i_tcon_set_status(struct sun4i_tcon *crtc, struct drm_encoder *encoder,
-+			   bool enable);
+ #define SUN4I_TCON_GINT0_REG			0x4
+ #define SUN4I_TCON_GINT0_VBLANK_ENABLE(pipe)		BIT(31 - (pipe))
++#define SUN4I_TCON_GINT0_TCON0_TRI_FINISH_ENABLE	BIT(27)
++#define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_ENABLE	BIT(26)
+ #define SUN4I_TCON_GINT0_VBLANK_INT(pipe)		BIT(15 - (pipe))
++#define SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT		BIT(11)
++#define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_INT		BIT(10)
  
- /* Mode Related Controls */
- void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index 73bfe7b1cd78..78d6cf77fdd3 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -345,12 +345,9 @@ static void sun4i_tv_disable(struct drm_encoder *encoder)
- {
- 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
- 	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
--	struct sun4i_tcon *tcon = crtc->tcon;
- 
- 	DRM_DEBUG_DRIVER("Disabling the TV Output\n");
- 
--	sun4i_tcon_channel_disable(tcon, 1);
--
- 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
- 			   SUN4I_TVE_EN_ENABLE,
- 			   0);
-@@ -362,7 +359,6 @@ static void sun4i_tv_enable(struct drm_encoder *encoder)
- {
- 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
- 	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
--	struct sun4i_tcon *tcon = crtc->tcon;
- 
- 	DRM_DEBUG_DRIVER("Enabling the TV Output\n");
- 
-@@ -371,8 +367,6 @@ static void sun4i_tv_enable(struct drm_encoder *encoder)
- 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
- 			   SUN4I_TVE_EN_ENABLE,
- 			   SUN4I_TVE_EN_ENABLE);
--
--	sun4i_tcon_channel_enable(tcon, 1);
- }
- 
- static void sun4i_tv_mode_set(struct drm_encoder *encoder,
+ #define SUN4I_TCON_GINT1_REG			0x8
+ #define SUN4I_TCON_FRM_CTL_REG			0x10
 -- 
 git-series 0.9.1
