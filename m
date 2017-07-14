@@ -1,41 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Jul 2017 14:07:03 +0200
-Subject: [PATCH 11/22] net: thunder_bgx: avoid format string overflow warning
-In-Reply-To: <20170714120720.906842-1-arnd@arndb.de>
-References: <20170714120720.906842-1-arnd@arndb.de>
-Message-ID: <20170714120720.906842-12-arnd@arndb.de>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 14 Jul 2017 12:14:01 +0000
+Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
+ HiSilicon bridge
+In-Reply-To: <1499978726.2865.59.camel@kernel.crashing.org>
+References: <20170712050811.3620-1-dja@axtens.net>
+ <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
+ <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+ <1499978726.2865.59.camel@kernel.crashing.org>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B39943@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc warns that the temporary buffer might be too small here:
+Hi Ben
 
-drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function 'bgx_probe':
-drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: error: '%d' directive writing between 1 and 10 bytes into a region of size between 9 and 11 [-Werror=format-overflow=]
-sprintf(str, "BGX%d LMAC%d mode", bgx->bgx_id, lmacid);
-             ^~~~~~~~~~~~~~~~~~~
-drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: note: directive argument in the range [0, 2147483647]
-drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:3: note: 'sprintf' output between 16 and 27 bytes into a destination of size 20
+> -----Original Message-----
+> From: Benjamin Herrenschmidt [mailto:benh at kernel.crashing.org]
+> Sent: 13 July 2017 21:45
+> To: Bjorn Helgaas; Gabriele Paoloni
+> Cc: Daniel Axtens; linux-pci at vger.kernel.org; Liuxinliang (Matthew
+> Liu); Rongrong Zou; Catalin Marinas; Will Deacon; linux-arm-
+> kernel at lists.infradead.org; David Airlie; Daniel Vetter; Alex
+> Williamson
+> Subject: Re: [PATCH v4] PCI: Support hibmc VGA cards behind a
+> misbehaving HiSilicon bridge
+> 
+> On Thu, 2017-07-13 at 06:29 -0500, Bjorn Helgaas wrote:
+> > > Indeed our host controller depends on ARM64 so maybe it would make
+> > > sense to move the quirk arch/arm64/kernel/pci.c; however regardless
+> > > why is it strictly required for a VGA device to be legacy one in
+> order
+> > > to make it the default boot device?
+> > > i.e. couldn't we have:
+> > >
+> > > diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+> > > index 0f5b2dd..a6b606c 100644
+> > > --- a/drivers/gpu/vga/vgaarb.c
+> > > +++ b/drivers/gpu/vga/vgaarb.c
+> > > @@ -667,8 +667,7 @@ static bool vga_arbiter_add_pci_device(struct
+> pci_dev *pdev)
+> > > ???????/* Deal with VGA default device. Use first enabled one
+> > > ??????? * by default if arch doesn't have it's own hook
+> > > ??????? */
+> > > -?????if (vga_default == NULL &&
+> > > -???????? ((vgadev->owns & VGA_RSRC_LEGACY_MASK) ==
+> VGA_RSRC_LEGACY_MASK)) {
+> > > +?????if (vga_default == NULL) {
+> > > ???????????????vgaarb_info(&pdev->dev, "setting as boot VGA
+> device\n");
+> > > ???????????????vga_set_default_device(pdev);
+> > > ???????}
+> >
+> > I don't know enough about the VGA arbiter to answer this.? This test
+> was
+> > part of the initial implementation: deb2d2ecd43d ("PCI/GPU: implement
+> VGA
+> > arbitration on Linux") by Ben.
+> 
+> The above simply uses the first device that has memory and IO enabled
+> as the default device (you don't need to have a default device).
+> 
+> This is essentially picking up whatever device had been initialized
+> by the BIOS/firmware as default. This is needed for example on x86
+> where the BIOS tends to only initialize one device.
+> 
+> I'm not sure what problem you are trying to solve here ?
 
-This probably can't happen, but it can't hurt to make it long
-enough for the theoretical limit.
+Well our host platform does not support legacy devices and therefore we find
+ourselves without a default VGA device...
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I was trying to understand why a default device has to be legacy...but I think
+this was answered by both you and Alex in other follows-up...
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index a0ca68ce3fbb..79112563a25a 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -1008,7 +1008,7 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
- {
- 	struct device *dev = &bgx->pdev->dev;
- 	struct lmac *lmac;
--	char str[20];
-+	char str[27];
- 
- 	if (!bgx->is_dlm && lmacid)
- 		return;
--- 
-2.9.0
+Thanks
+Gab 
+
+> 
+> Cheers,
+> Ben.
