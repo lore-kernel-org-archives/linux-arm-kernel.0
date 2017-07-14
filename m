@@ -1,118 +1,94 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 14 Jul 2017 17:03:59 +0000
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <1500040204.2865.90.camel@kernel.crashing.org>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
- <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
- <20170713151146.53e9644c@w520.home>
- <1499980882.2865.65.camel@kernel.crashing.org>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B399B4@FRAEML521-MBX.china.huawei.com>
- <1500040204.2865.90.camel@kernel.crashing.org>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B39FC4@FRAEML521-MBX.china.huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 14 Jul 2017 18:07:43 +0100
+Subject: [PATCH V4 3/6] iommu/arm-smmu: Invoke pm_runtime during probe,
+ add/remove device
+In-Reply-To: <CAF6AEGvDpRChNQAzqgRFwaQcH=4JCwfKcvj2GQGgQOnO2_A1sg@mail.gmail.com>
+References: <1499333825-7658-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1499333825-7658-4-git-send-email-vivek.gautam@codeaurora.org>
+ <20170712225459.GZ22780@codeaurora.org>
+ <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
+ <4dbc938c-ac88-9bd4-cf00-458008ae24c1@codeaurora.org>
+ <CAF6AEGsFOtsOjt1sLNPSFLEcu-7d1zxCOhTeC+P8e0TDbb1dSA@mail.gmail.com>
+ <60a56ae6-ed9d-57cd-130f-5bd9d32d4d58@codeaurora.org>
+ <CAF6AEGvDpRChNQAzqgRFwaQcH=4JCwfKcvj2GQGgQOnO2_A1sg@mail.gmail.com>
+Message-ID: <20170714170743.GA26488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex, Ben
-
-> -----Original Message-----
-> From: Benjamin Herrenschmidt [mailto:benh at kernel.crashing.org]
-> Sent: 14 July 2017 14:50
-> To: Gabriele Paoloni; Alex Williamson; Bjorn Helgaas
-> Cc: Daniel Axtens; linux-pci at vger.kernel.org; Liuxinliang (Matthew
-> Liu); Rongrong Zou; Catalin Marinas; Will Deacon; linux-arm-
-> kernel at lists.infradead.org; David Airlie; Daniel Vetter
-> Subject: Re: [PATCH v4] PCI: Support hibmc VGA cards behind a
-> misbehaving HiSilicon bridge
-> 
-> On Fri, 2017-07-14 at 12:26 +0000, Gabriele Paoloni wrote:
-> > diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-> > index 92f1452..ab3ad9a 100644
-> > --- a/drivers/gpu/vga/vgaarb.c
-> > +++ b/drivers/gpu/vga/vgaarb.c
-> > @@ -1424,6 +1424,14 @@ static int __init vga_arb_device_init(void)
+On Thu, Jul 13, 2017 at 10:55:10AM -0400, Rob Clark wrote:
+> On Thu, Jul 13, 2017 at 9:53 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+> > Hi,
 > >
-> > ????????list_for_each_entry(vgadev, &vga_list, list) {
-> > ????????????????struct device *dev = &vgadev->pdev->dev;
-> > +
-> > +???????????????/* if no legacy device has been set as default VGA
-> > +??????????????? * device, just pick up the first one in the list */
-> > +???????????????if (vga_default == NULL) {
-> > +???????????????????????vgaarb_info(dev, "setting as boot VGA
-> device\n");
-> > +???????????????????????vga_set_default_device(vgadev->pdev);
-> > +???????????????}
-> > +
-> > ?#if defined(CONFIG_X86) || defined(CONFIG_IA64)
-> > ????????????????/*
-> > ???????????????? * Override vga_arbiter_add_pci_device()'s I/O based
-> detection
+> > On 7/13/2017 5:20 PM, Rob Clark wrote:
+> >> On Thu, Jul 13, 2017 at 1:35 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+> >>> Hi Vivek,
+> >>>
+> >>> On 7/13/2017 10:43 AM, Vivek Gautam wrote:
+> >>>> Hi Stephen,
+> >>>>
+> >>>>
+> >>>> On 07/13/2017 04:24 AM, Stephen Boyd wrote:
+> >>>>> On 07/06, Vivek Gautam wrote:
+> >>>>>> @@ -1231,12 +1237,18 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+> >>>>>>   static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+> >>>>>>                    size_t size)
+> >>>>>>   {
+> >>>>>> -    struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
+> >>>>>> +    struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+> >>>>>> +    struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+> >>>>>> +    size_t ret;
+> >>>>>>         if (!ops)
+> >>>>>>           return 0;
+> >>>>>>   -    return ops->unmap(ops, iova, size);
+> >>>>>> +    pm_runtime_get_sync(smmu_domain->smmu->dev);
+> >>>>> Can these map/unmap ops be called from an atomic context? I seem
+> >>>>> to recall that being a problem before.
+> >>>>
+> >>>> That's something which was dropped in the following patch merged in master:
+> >>>> 523d7423e21b iommu/arm-smmu: Remove io-pgtable spinlock
+> >>>>
+> >>>> Looks like we don't  need locks here anymore?
+> >>>
+> >>>  Apart from the locking, wonder why a explicit pm_runtime is needed
+> >>>  from unmap. Somehow looks like some path in the master using that
+> >>>  should have enabled the pm ?
+> >>>
+> >>
+> >> Yes, there are a bunch of scenarios where unmap can happen with
+> >> disabled master (but not in atomic context).  On the gpu side we
+> >> opportunistically keep a buffer mapping until the buffer is freed
+> >> (which can happen after gpu is disabled).  Likewise, v4l2 won't unmap
+> >> an exported dmabuf while some other driver holds a reference to it
+> >> (which can be dropped when the v4l2 device is suspended).
+> >>
+> >> Since unmap triggers tbl flush which touches iommu regs, the iommu
+> >> driver *definitely* needs a pm_runtime_get_sync().
 > >
-> > Above after we have filled the list of VGA devices by iterating over
-> all
-> > PCI devices we check if no legacy one has been set as default VGA
-> device
-> > yet: therefore we set the first VGA device in the list as default
-> one...
+> >  Ok, with that being the case, there are two things here,
 > >
-> > Do you think it would work?
+> >  1) If the device links are still intact at these places where unmap is called,
+> >     then pm_runtime from the master would setup the all the clocks. That would
+> >     avoid reintroducing the locking indirectly here.
+> >
+> >  2) If not, then doing it here is the only way. But for both cases, since
+> >     the unmap can be called from atomic context, resume handler here should
+> >     avoid doing clk_prepare_enable , instead move the clk_prepare to the init.
+> >
 > 
-> I honestly don't remember all of the details of the arbiter but just
-> make sure that it won't think that device is enabled for things like
-> VGA etc... if it's memory/IO decode weren't enabled.
-> 
+> I do kinda like the approach Marek suggested.. of deferring the tlb
+> flush until resume.  I'm wondering if we could combine that with
+> putting the mmu in a stalled state when we suspend (and not resume the
+> mmu until after the pending tlb flush)?
 
-I think the following one should make sure that MEM/IO response are
-enabled (also as suggested by Alex)
+I'm not sure that a stalled state is what we're after here, because we need
+to take care to prevent any table walks if we've freed the underlying pages.
+What we could try to do is disable the SMMU (put into global bypass) and
+invalidate the TLB when performing a suspend operation, then we just ignore
+invalidation whilst the clocks are stopped and, on resume, enable the SMMU
+again.
 
-diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-index 92f1452..a90c48c 100644
---- a/drivers/gpu/vga/vgaarb.c
-+++ b/drivers/gpu/vga/vgaarb.c
-@@ -1424,6 +1424,21 @@ static int __init vga_arb_device_init(void)
- 
- 	list_for_each_entry(vgadev, &vga_list, list) {
- 		struct device *dev = &vgadev->pdev->dev;
-+
-+		/* if no legacy device has been set as default VGA device,
-+		 * justpick up the first one in the list capable of responding to
-+		 * mem and io requests*/
-+		if (vga_default == NULL) {
-+			u16 cmd;
-+
-+			pci_read_config_word(vgadev->pdev, PCI_COMMAND, &cmd);
-+			if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) ||
-+					!vga_default_device()) {
-+				vga_set_default_device(vgadev->pdev);
-+				vgaarb_info(dev, "setting as boot VGA device\n");
-+			}
-+		}
-+
- #if defined(CONFIG_X86) || defined(CONFIG_IA64)
- 		/*
- 		 * Override vga_arbiter_add_pci_device()'s I/O based detection
+That said, I don't think we can tolerate suspend/resume racing with
+map/unmap, and it's not clear to me how we avoid that without penalising
+the fastpath.
 
-
-Also the above one could allow us to get rid of fixup_vga in powerpc....
-
-
-> I'd rather we have no default device until a driver actually picks up
-> though, and then, if we still have no default, use the first driver to
-> pick up.
-
-Well from my understanding the PCI host controller driver will enumerate
-all the devices in the PCI hierarchy and call pci_device_add() for each of
-them, that in turn will call device_add(), at this stage if there is a
-driver available for the device such driver will probe otherwise it will not.
-
-Are you suggesting to add the code above in pci_device_add() after device_add()
-and after checking that a driver has been bound for such dev?
-
-Thanks
-Gab
-
-
-> 
-> Ben.
+Will
