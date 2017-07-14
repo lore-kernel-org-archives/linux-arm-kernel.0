@@ -1,90 +1,50 @@
-From: mirceac@gmail.com (Mircea Ciocan)
-Date: Fri, 14 Jul 2017 09:58:39 +0200
-Subject: Porting a custom interrupt handler from kernel 2.6.25 to 3.16.45
-In-Reply-To: <20170713173545.GE31807@n2100.armlinux.org.uk>
-References: <CAHumR2+WR3Fdtft8xrPfcT3-dpKqCL__aaEc6qri3N5-x0yCXw@mail.gmail.com>
- <20170713160625.GB27801@lunn.ch>
- <CAHumR2LazFFmmNNKJ=KrEjt7iCgrKewkdzO6ww7RtLU+wWTFoA@mail.gmail.com>
- <20170713173545.GE31807@n2100.armlinux.org.uk>
-Message-ID: <CAHumR2+5qWG5TTqS47PdtrQfu2N+B7x+gtmq85VL5NZj5X2-tA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 14 Jul 2017 10:04:39 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Fixes for v4.13
+Message-ID: <cover.1500019167.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 7:35 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Thu, Jul 13, 2017 at 06:32:29PM +0200, Mircea Ciocan wrote:
->> I'm still struggle to understand the full purpose of
->> the *get_irqnr_preamble* and *get_irqnr_and_base* macros.
->
-> get_irqnr_preamble does whatever you need that's common to handling a
-> set of interrupts read from the hardware.  It can set the two registers
-> to anything it likes.  Commonly, this is used to get the address of the
-> top level interrupt controller.  These two registers are passed to the
-> get_irqnr_and_base and test_for_ipi macros unmodified.
->
-> get_irqnr_and_base gets the interrupt number.  This must clear the Z
-> flag if an interrupt is pending, or set it if there's no interrupt.
->
-> test_for_ipi takes all the registers that were given to get_irqnr_and_base
-> and determines whether an IPI happened and which IPI, otherwise it
-> has the same behaviour as get_irqnr_and_base.
->
-> So it's not complicated - get_irqnr_preamble is basically the common
-> setup bits and get_irqnr_and_base is called repeatedly in a loop until
-> it indicates that there are no further pending interrupts.
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Hi Russel and thanks for the answer, first thing first, write a book,
-seriously, write a book (or minimally a verbose FAQ ;) describing the
-whole Linux kernel ARM architecture, including the deep details,
-something focused on the low level details for avoiding creating a
-class of "specialists" that were following the topic for years and of
-course considers this stuff "elementary", it may be, but the barriers
-for understanding it are pretty high IMHO. and sadly this is why we
-have a lot of ARM SoCs with extraordinary obsolete kernels, because
-everybody is kind of afraid to try to update. If it's a book I will
-definitely buy it.
+Please consider these second round of Renesas ARM based SoC fixes for v4.13.
 
-Now that the rant part is over, let me summarize what I understand
-form my searches and your explanations, and kindly please confirm if
-it's correct:
+This pull request is based on the previous round of
+such requests, tagged as renesas-fixes-for-v4.13,
+which I have already sent a pull-request for.
+That pull request provides the same fix as this pull one
+but for the Salvator rather than ULCB boards.
 
-- *get_irqnr_preamble* - it's mostly used to get the top level
-interrupt controller address of if it's a funky controller, to make it
-ready for *get_irqnr_and_base* and  *test_for_ipi* that gets those
-registers as parameters.
-It is used only once.
+On a personal note, I will be on holidays from the 17th - 26th July.
+I apologise in advance for any inconvenience that may cause.
 
-- *get_irqnr_and_base* gets it's \base register already set by
-*get_irqnr_preamble* and does it have to return the \irqnr or it
-receives the \irqnr already set by *get_irqnr_preamble* ?
-At the end of the macro, is any of the registers value \irqnr,
-\irqstat, \base, \tmp of any significance or strictly only the zero
-flag matters ?
-In the original custom function I have this gem of a comment, where
-the original developer said:
 
-"... snip...
-1001:
-        /* WARNING: These lines override the default behavior, */
-        /* which is to loop back at the start of the macro after the handler */
+The following changes since commit 5e2feac330953fe75197aecb20c781400e2bf606:
 
-        /* set r1 to registers address */
-        movne   r1, sp
+  arm64: renesas: salvator-common: sound clock-frequency needs descending order (2017-06-19 11:18:33 +0200)
 
-        /* set label 2 as return address */
-        adrne   lr, 2f
-    .endm
-"
-I believe in the current framework this is an incorrect behavior, is
-there any possible situation where this can offer some advantage ?
+are available in the git repository at:
 
-In the end many thanks for the support and hopefully in the future I
-will be able to contribute myself something back to the community.
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v4.13
 
- Best regards,
-Mircea
+for you to fetch changes up to 2752660a37aed65b1e00fd4563d9f152eefb8200:
+
+  arm64: dts: renesas: ulcb: sound clock-frequency needs descending order (2017-07-10 10:28:07 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Fixes for v4.13
+
+Correct order of sound clock frequencies for ULCB boards
+used by r8a7795 and r8a7796 SoCs.
+
+These sounds clock frequencies are used as the ADG clock (output clocks
+for audio module) initial setting and sound codec's initial system clock
+which needs the maximum clock frequency. Thus, descending order is
+required.
+
+----------------------------------------------------------------
+Vladimir Barinov (1):
+      arm64: dts: renesas: ulcb: sound clock-frequency needs descending order
+
+ arch/arm64/boot/dts/renesas/ulcb.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
