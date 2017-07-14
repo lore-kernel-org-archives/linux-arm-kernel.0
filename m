@@ -1,113 +1,95 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:16 +0100
-Subject: [PATCH v3 11/18] coresight tmc etr: Add capabilitiy information
+Date: Fri, 14 Jul 2017 14:04:18 +0100
+Subject: [PATCH v3 13/18] coresight tmc etr: Detect address width at runtime
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-14-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With new version of TMC ETR, there are differing set of
-features supported by the TMC. Add the capability of a
-given TMC ETR for making safer decisions at runtime.
+TMC in Coresight SoC-600 advertises the AXI address width
+in the device configuration register.
 
-The device configuration register of the TMC (DEVID) lists
-some of the capabilities. So, we can detect some of them at
-probe. However, some of the features (or changes in behavior)
-are not advertised and we have to depend on the PID to infer
-the features. So we use a static description of the "unadvertised"
-capabilities attached to the PID. Combining both, the static
-and the dynamic capabilities, we maintain a bitmask of the
-available features which can be later checked to take
-appropriate actions.
+Bit 16 - AXIAW_VALID
+ 0 - AXI Address Width not valid
+ 1 - Valid AXI Address width in Bits[23-17]
 
-Cc: Mathieu Poirier <mathieu.porier@linaro.org>
+Bits [23-17] - AXIAW. If AXIAW_VALID = b01 then
+ 0x20 - 32bit AXI address bus
+ 0x28 - 40bit AXI address bus
+ 0x2c - 44bit AXI address bus
+ 0x30 - 48bit AXI address bus
+ 0x34 - 52bit AXI address bus
+
+Use the address bits from the device configuration register, if
+available. Otherwise, default to 40bit.
+
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 20 +++++++++++++++-----
- drivers/hwtracing/coresight/coresight-tmc.h | 20 ++++++++++++++++++++
- 2 files changed, 35 insertions(+), 5 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 26 +++++++++++++++++++++++---
+ drivers/hwtracing/coresight/coresight-tmc.h |  4 ++++
+ 2 files changed, 27 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 73184a1..ebf81bc 100644
+index a1de265..32e88ec 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -297,6 +297,20 @@ const struct attribute_group *coresight_tmc_groups[] = {
- 	NULL,
- };
- 
-+/* Detect and initialise the capabilities of a TMC ETR */
-+static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
-+			     u32 devid, void *dev_caps)
-+{
-+	/* Set the unadvertised capabilities */
-+	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
-+
-+	/*
-+	 * ETR configuration uses a 40-bit AXI master in place of
-+	 * the embedded SRAM of ETB/ETF.
-+	 */
-+	return dma_set_mask_and_coherent(drvdata->dev, DMA_BIT_MASK(40));
-+}
-+
- static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+@@ -301,16 +301,36 @@ const struct attribute_group *coresight_tmc_groups[] = {
+ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
+ 			     u32 devid, void *dev_caps)
  {
- 	int ret = 0;
-@@ -368,11 +382,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 		desc.type = CORESIGHT_DEV_TYPE_SINK;
- 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
- 		desc.ops = &tmc_etr_cs_ops;
--		/*
--		 * ETR configuration uses a 40-bit AXI master in place of
--		 * the embedded SRAM of ETB/ETF.
--		 */
--		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
-+		ret = tmc_etr_setup_caps(drvdata, devid, id->data);
- 		if (ret)
- 			goto out;
- 		break;
++	u32 dma_mask = 0;
++
+ 	/* Set the unadvertised capabilities */
+ 	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
+ 
+ 	if (!(devid & TMC_DEVID_NOSCAT))
+ 		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
++
++	/* Check if the AXI address width is available */
++	if (devid & TMC_DEVID_AXIAW_VALID)
++		dma_mask = ((devid >> TMC_DEVID_AXIAW_SHIFT) &
++				TMC_DEVID_AXIAW_MASK);
++
+ 	/*
+-	 * ETR configuration uses a 40-bit AXI master in place of
+-	 * the embedded SRAM of ETB/ETF.
++	 * Unless specified in the device configuration, ETR uses a 40-bit
++	 * AXI master in place of the embedded SRAM of ETB/ETF.
+ 	 */
+-	return dma_set_mask_and_coherent(drvdata->dev, DMA_BIT_MASK(40));
++	switch (dma_mask) {
++	case 32:
++	case 40:
++	case 44:
++	case 48:
++	case 52:
++		dev_info(drvdata->dev, "Detected dma mask %dbits\n", dma_mask);
++		break;
++	default:
++		dma_mask = 40;
++	}
++
++	return dma_set_mask_and_coherent(drvdata->dev, DMA_BIT_MASK(dma_mask));
+ }
+ 
+ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index c78de00..b2ebcef 100644
+index bc94550..a0668f6 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -105,6 +105,8 @@ enum tmc_mem_intf_width {
-  * @config_type: TMC variant, must be of type @tmc_config_type.
-  * @memwidth:	width of the memory interface databus, in bytes.
-  * @trigger_cntr: amount of words to store after a trigger.
-+ * @etr_caps:	Bitmask of capabilities of the TMC ETR, inferred from the
-+ * 		device configuration register (DEVID)
-  */
- struct tmc_drvdata {
- 	void __iomem		*base;
-@@ -122,6 +124,7 @@ struct tmc_drvdata {
- 	enum tmc_config_type	config_type;
- 	enum tmc_mem_intf_width	memwidth;
- 	u32			trigger_cntr;
-+	u32			etr_caps;
- };
+@@ -72,6 +72,10 @@
  
- /* Generic functions */
-@@ -158,4 +161,21 @@ TMC_REG_PAIR(rrp, TMC_RRP, TMC_RRPHI)
- TMC_REG_PAIR(rwp, TMC_RWP, TMC_RWPHI)
- TMC_REG_PAIR(dba, TMC_DBALO, TMC_DBAHI)
+ #define TMC_DEVID_NOSCAT	BIT(24)
  
-+/* Initialise the caps from unadvertised static capabilities of the device */
-+static inline void tmc_etr_init_caps(struct tmc_drvdata *drvdata, u32 dev_caps)
-+{
-+	WARN_ON(drvdata->etr_caps);
-+	drvdata->etr_caps = dev_caps;
-+}
++#define TMC_DEVID_AXIAW_VALID	BIT(16)
++#define TMC_DEVID_AXIAW_SHIFT	17
++#define TMC_DEVID_AXIAW_MASK	0x7f
 +
-+static inline void tmc_etr_set_cap(struct tmc_drvdata *drvdata, u32 cap)
-+{
-+	drvdata->etr_caps |= cap;
-+}
-+
-+static inline bool tmc_etr_has_cap(struct tmc_drvdata *drvdata, u32 cap)
-+{
-+	return !!(drvdata->etr_caps & cap);
-+}
-+
- #endif
+ enum tmc_config_type {
+ 	TMC_CONFIG_TYPE_ETB,
+ 	TMC_CONFIG_TYPE_ETR,
 -- 
 2.7.5
