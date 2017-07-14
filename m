@@ -1,66 +1,28 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 14 Jul 2017 10:28:58 -0400
-Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
-In-Reply-To: <20170713234910.GB5944@bhelgaas-glaptop.roam.corp.google.com>
-References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
- <20170713234910.GB5944@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <ae1846b2-1752-577b-e651-ef864953af8e@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 14 Jul 2017 16:30:40 +0200
+Subject: Porting a custom interrupt handler from kernel 2.6.25 to 3.16.45
+In-Reply-To: <CAHumR2L95HSyXEsFtxMwAe1454og5EcsJk70ZaMOgdwQ5QGJHQ@mail.gmail.com>
+References: <CAHumR2+WR3Fdtft8xrPfcT3-dpKqCL__aaEc6qri3N5-x0yCXw@mail.gmail.com>
+ <20170713160625.GB27801@lunn.ch>
+ <CAHumR2LazFFmmNNKJ=KrEjt7iCgrKewkdzO6ww7RtLU+wWTFoA@mail.gmail.com>
+ <20170713173545.GE31807@n2100.armlinux.org.uk>
+ <CAHumR2+5qWG5TTqS47PdtrQfu2N+B7x+gtmq85VL5NZj5X2-tA@mail.gmail.com>
+ <20170714084831.GG31807@n2100.armlinux.org.uk>
+ <CAHumR2L95HSyXEsFtxMwAe1454og5EcsJk70ZaMOgdwQ5QGJHQ@mail.gmail.com>
+Message-ID: <20170714143040.GF21743@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+> In the end Russell, I thank you once more for your kind help and I
+> will try to re-factor the existing code to fit into the framework, the
+> existing stuff was looking strange to me as well, but lacking an
+> overview of the architecture lead me to ask this noob questions.
 
-On 7/13/2017 7:49 PM, Bjorn Helgaas wrote:
-> How VFs report vendor ID is irrelevant.
+Hi Mircea
 
-I was trying to highlight this. 
+Things are probably a lot easier if your custom interrupt controller
+is daisy-chained off a standard interrupt controller. If it is, you
+don't need to touch this low level code. No hacks are needed, and you
+probably get portable code.
 
-"SR-IOV spec rev 1.1, 3.4.1.1 & 3.4.1.2, Vendor ID and Device ID fields
-for the VF return 0xFFFF when read.  The "Virtualization Intermediary"
-is supposed to use the vendor ID from the PF and the device ID defined
-in the PF SR-IOV capability."
-
-https://www.spinics.net/lists/linux-pci/msg58530.html
-
-The point is we can't use pci_bus_read_dev_vendor_id() for both
-virtual and physical functions as in my V3 patch.
-
-> 
-> What *is* relevant is how FLR affects VFs.  The SR-IOV spec, r1.1,
-> sec 2.2.2, says FLR doesn't affect a VF's existence in config space.
-> 
-
-I see.
-
-> That suggests to me that reading a VF's PCI_COMMAND register after an
-> FLR should always return valid data (never ~0).  I suppose an FLR VF
-> reset isn't instantaneous, though, so I suppose we do need the 100ms
-> delay.  But maybe we should just return immediately after that,
-> without reading any VF config space?
-
-make sense.
-
-> 
-> pci_flr_wait() was added by 5adecf817dd6 ("PCI: Wait for up to 1000ms
-> after FLR reset"); maybe Alex has more insight into this.
-
-I think code is handling both virtual and physical functions. 1 second
-is nice to have for physical functions. See this comment at the top.
-
-/*
- * We should only need to wait 100ms after FLR, but some devices take longer.
- * Wait for up to 1000ms for config space to return something other than -1.
- * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
- * dword because VFs don't implement the 1st dword.
- */
-
-Since we are separating the handling of physical and virtual functions,
-we could go back to 100ms for virtual functions and handle CRS/wait for
-physical functions.
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+      Andrew
