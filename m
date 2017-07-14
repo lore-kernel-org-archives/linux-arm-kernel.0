@@ -1,87 +1,63 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 14 Jul 2017 14:42:59 +0800
-Subject: [PATCH 08/11] ARM: dts: sun8i: a83t: Add MMC controller device nodes
+Date: Fri, 14 Jul 2017 14:42:58 +0800
+Subject: [PATCH 07/11] mmc: sunxi: Add support for A83T eMMC (MMC2)
 In-Reply-To: <20170714064302.20383-1-wens@csie.org>
 References: <20170714064302.20383-1-wens@csie.org>
-Message-ID: <20170714064302.20383-9-wens@csie.org>
+Message-ID: <20170714064302.20383-8-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T has 3 MMC controllers. The third one is a bit special, as it
-supports a wider 8-bit bus, and a "new timing mode".
+The third MMC controller (MMC2) on the Allwinner A83T SoC is slightly
+different. It supports a wider 8-bit bus, has a dedicated controllable
+reset pin for eMMC, and a "new timing mode" which is supposed to deliver
+better signals and thus better performance.
+
+Add a compatible for this one to use the new timing mode not found in the
+other controllers.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 57 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+ Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
+ drivers/mmc/host/sunxi-mmc.c                        | 8 ++++++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index beed05e10a3b..085312d0c521 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -182,6 +182,63 @@
- 			#dma-cells = <1>;
- 		};
+diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+index 7d53a799f140..63b57e2a10fb 100644
+--- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+@@ -12,6 +12,7 @@ Required properties:
+    * "allwinner,sun4i-a10-mmc"
+    * "allwinner,sun5i-a13-mmc"
+    * "allwinner,sun7i-a20-mmc"
++   * "allwinner,sun8i-a83t-emmc"
+    * "allwinner,sun9i-a80-mmc"
+    * "allwinner,sun50i-a64-emmc"
+    * "allwinner,sun50i-a64-mmc"
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 7b6f5f49620e..e70065dbd50e 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1113,6 +1113,13 @@ static const struct sunxi_mmc_cfg sun7i_a20_cfg = {
+ 	.can_calibrate = false,
+ };
  
-+		mmc0: mmc at 1c0f000 {
-+			compatible = "allwinner,sun7i-a20-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC0>,
-+				 <&ccu CLK_MMC0>,
-+				 <&ccu CLK_MMC0_OUTPUT>,
-+				 <&ccu CLK_MMC0_SAMPLE>;
-+			clock-names = "ahb",
-+				      "mmc",
-+				      "output",
-+				      "sample";
-+			resets = <&ccu RST_BUS_MMC0>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
++static const struct sunxi_mmc_cfg sun8i_a83t_emmc_cfg = {
++	.idma_des_size_bits = 16,
++	.clk_delays = sunxi_mmc_clk_delays,
++	.can_calibrate = false,
++	.has_new_timings = true,
++};
 +
-+		mmc1: mmc at 1c10000 {
-+			compatible = "allwinner,sun7i-a20-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC1>,
-+				 <&ccu CLK_MMC1>,
-+				 <&ccu CLK_MMC1_OUTPUT>,
-+				 <&ccu CLK_MMC1_SAMPLE>;
-+			clock-names = "ahb",
-+				      "mmc",
-+				      "output",
-+				      "sample";
-+			resets = <&ccu RST_BUS_MMC1>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc2: mmc at 1c11000 {
-+			compatible = "allwinner,sun8i-a83t-emmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC2>,
-+				 <&ccu CLK_MMC2>,
-+				 <&ccu CLK_MMC2_OUTPUT>,
-+				 <&ccu CLK_MMC2_SAMPLE>;
-+			clock-names = "ahb",
-+				      "mmc",
-+				      "output",
-+				      "sample";
-+			resets = <&ccu RST_BUS_MMC2>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		ccu: clock at 1c20000 {
- 			compatible = "allwinner,sun8i-a83t-ccu";
- 			reg = <0x01c20000 0x400>;
+ static const struct sunxi_mmc_cfg sun9i_a80_cfg = {
+ 	.idma_des_size_bits = 16,
+ 	.clk_delays = sun9i_mmc_clk_delays,
+@@ -1137,6 +1144,7 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
+ 	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
+ 	{ .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
++	{ .compatible = "allwinner,sun8i-a83t-emmc", .data = &sun8i_a83t_emmc_cfg },
+ 	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
+ 	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
+ 	{ .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
 -- 
 2.13.2
