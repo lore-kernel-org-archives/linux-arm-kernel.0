@@ -1,62 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 14 Jul 2017 17:44:40 +0800
-Subject: [PATCH 04/11] mmc: sunxi: Keep default timing phase settings for
- new timing mode
-In-Reply-To: <CAPDyKFoOsp7ATFY-0N4ExVWQb=z1kCJqowLv7g7CSBK4jWVj_A@mail.gmail.com>
-References: <20170714064302.20383-1-wens@csie.org>
- <20170714064302.20383-5-wens@csie.org>
- <CAPDyKFoOsp7ATFY-0N4ExVWQb=z1kCJqowLv7g7CSBK4jWVj_A@mail.gmail.com>
-Message-ID: <CAGb2v674ZT-4O-FD4T3uK9pZEOZT5UtUFa8L90bUa2YKdbftig@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 14 Jul 2017 17:50:05 +0800
+Subject: [PATCH 10/18] drm/sun4i: tcon: Move out the tcon0 common setup
+In-Reply-To: <45529eeddc5d5eab9bcfa74982343eeb36fe11f6.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <201707141731.HN0XJ5q3%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 5:16 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 14 July 2017 at 08:42, Chen-Yu Tsai <wens@csie.org> wrote:
->> The register for the "new timing mode" also has bit fields for setting
->> output and sample timing phases. According to comments in Allwinner's
->> BSP kernel, the default values are good enough.
->>
->> Keep the default values already in the hardware when setting new timing
->> mode, instead of overwriting the whole register.
->>
->> Fixes: 9a37e53e451e ("mmc: sunxi: Enable the new timings for the A64 MMC
->>                       controllers")
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> It looks like this change doesn't depend on anything else? Do you want
-> me to pick it up for fixes and adding stable tag?
+Hi Maxime,
 
-Yes, please.
+[auto build test ERROR on next-20170710]
+[cannot apply to mripard/sunxi/for-next robh/for-next regmap/for-next v4.12 v4.12-rc7 v4.12-rc6 v4.12]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-ChenYu
+url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/drm-sun4i-Allwinner-MIPI-DSI-support/20170714-123103
+config: arm-sunxi_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
->
-> Kind regards
-> Uffe
->
->> ---
->>  drivers/mmc/host/sunxi-mmc.c | 8 ++++++--
->>  1 file changed, 6 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->> index d6fa2214aaae..0fb4e4c119e1 100644
->> --- a/drivers/mmc/host/sunxi-mmc.c
->> +++ b/drivers/mmc/host/sunxi-mmc.c
->> @@ -793,8 +793,12 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->>         }
->>         mmc_writel(host, REG_CLKCR, rval);
->>
->> -       if (host->cfg->needs_new_timings)
->> -               mmc_writel(host, REG_SD_NTSR, SDXC_2X_TIMING_MODE);
->> +       if (host->cfg->needs_new_timings) {
->> +               /* Don't touch the delay bits */
->> +               rval = mmc_readl(host, REG_SD_NTSR);
->> +               rval |= SDXC_2X_TIMING_MODE;
->> +               mmc_writel(host, REG_SD_NTSR, rval);
->> +       }
->>
->>         ret = sunxi_mmc_clk_set_phase(host, ios, rate);
->>         if (ret)
->> --
->> 2.13.2
->>
+All errors (new ones prefixed by >>):
+
+   drivers/gpu/drm/sun4i/sun4i_tcon.c: In function 'sun4i_tcon0_mode_set_common':
+>> drivers/gpu/drm/sun4i/sun4i_tcon.c:132:2: error: implicit declaration of function 'clk_set_rate_protect' [-Werror=implicit-function-declaration]
+     clk_set_rate_protect(tcon->dclk, mode->crtc_clock * 1000);
+     ^~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+
+vim +/clk_set_rate_protect +132 drivers/gpu/drm/sun4i/sun4i_tcon.c
+
+   127	
+   128	static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
+   129						struct drm_display_mode *mode)
+   130	{
+   131		/* Configure the dot clock */
+ > 132		clk_set_rate_protect(tcon->dclk, mode->crtc_clock * 1000);
+   133	
+   134		/* Set the resolution */
+   135		regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
+   136			     SUN4I_TCON0_BASIC0_X(mode->crtc_hdisplay) |
+   137			     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+   138	}
+   139	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 21256 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170714/0829acf9/attachment-0001.gz>
