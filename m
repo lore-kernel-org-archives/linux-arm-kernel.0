@@ -1,61 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 14 Jul 2017 16:25:03 +0100
-Subject: [kernel-hardening] Re: [RFC PATCH 6/6] arm64: add VMAP_STACK and
- detect out-of-bounds SP
-In-Reply-To: <8f805a19-19d1-3c97-c85b-510664d22dad@arm.com>
-References: <CAKv+Gu9eSX-f4uv3gaNw9_eKV0soe2-CqSnMaTjjEhMifxe_8g@mail.gmail.com>
- <20170713161050.GG26194@leverpostej>
- <20170713175543.GA32528@leverpostej>
- <CAKv+Gu_v3PO7=JSgCTb3aZu3sg4cwYYjy68VJnr58vzaMYvhTw@mail.gmail.com>
- <20170714103258.GA16128@leverpostej>
- <CAKv+Gu-FvfPFQooCie6HwP=mBng3C0jp9p8WMkFwTxctDu4JBA@mail.gmail.com>
- <CAKv+Gu96YHXDta7=YdYO4=wtR3mGVdkzAkG6tSzS-vo7toiPXA@mail.gmail.com>
- <20170714140605.GB16687@leverpostej>
- <188731af-269c-4197-1c55-78e485e7af46@arm.com>
- <8f805a19-19d1-3c97-c85b-510664d22dad@arm.com>
-Message-ID: <20170714152503.GC16687@leverpostej>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 14 Jul 2017 09:03:55 -0700 (PDT)
+Subject: [PATCH 11/22] net: thunder_bgx: avoid format string overflow
+ warning
+In-Reply-To: <20170714120720.906842-12-arnd@arndb.de>
+References: <20170714120720.906842-1-arnd@arndb.de>
+ <20170714120720.906842-12-arnd@arndb.de>
+Message-ID: <20170714.090355.1299368178510322895.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 04:03:51PM +0100, Robin Murphy wrote:
-> On 14/07/17 15:39, Robin Murphy wrote:
-> > On 14/07/17 15:06, Mark Rutland wrote:
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 14 Jul 2017 14:07:03 +0200
 
-> >> 	add	sp, sp, x0	// sp = orig_sp + orig_x0
-> >> 	sub	x0, sp, x0	// x0 = orig_sp
-> >> 	< check > 
-> >> 	sub	x0, sp, x0	// x0 = orig_x0
-> > 
-> > Haven't you now forcibly cleared the top bit of x0 thanks to overflow?
+> gcc warns that the temporary buffer might be too small here:
 > 
-> ...or maybe not. I still can't quite see it, but I suppose it must
-> cancel out somewhere, since Mr. Helpful C Program[1] has apparently
-> proven me mistaken :(
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function 'bgx_probe':
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: error: '%d' directive writing between 1 and 10 bytes into a region of size between 9 and 11 [-Werror=format-overflow=]
+> sprintf(str, "BGX%d LMAC%d mode", bgx->bgx_id, lmacid);
+>              ^~~~~~~~~~~~~~~~~~~
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: note: directive argument in the range [0, 2147483647]
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:3: note: 'sprintf' output between 16 and 27 bytes into a destination of size 20
 > 
-> I guess that means I approve!
+> This probably can't happen, but it can't hurt to make it long
+> enough for the theoretical limit.
 > 
-> Robin.
-> 
-> [1]:
-> #include <assert.h>
-> #include <stdint.h>
-> 
-> int main(void) {
->         for (int i = 0; i < 256; i++) {
->                 for (int j = 0; j < 256; j++) {
->                         uint8_t x = i;
->                         uint8_t y = j;
->                         y = y + x;
->                         x = y - x;
->                         x = y - x;
->                         y = y - x;
->                         assert(x == i && y == j);
->                 }
->         }
-> }
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I guess we have our first Tested-by for this series. :)
-
-Thanks for taking a look!
-
-Mark.
+Applied.
