@@ -1,75 +1,98 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 14 Jul 2017 08:33:07 +0200
-Subject: [PATCH 1/5] arm64: dts: rockchip: Add rk3399 vop and
- display-subsystem
-In-Reply-To: <CAFLEztSbZExA2_t5D+TWGsrCU5Gqrg7azdi97brhjO2wPdup3A@mail.gmail.com>
-References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
- <4655605.dLm3uFpe8F@phil>
- <CAFLEztSbZExA2_t5D+TWGsrCU5Gqrg7azdi97brhjO2wPdup3A@mail.gmail.com>
-Message-ID: <3813924.64TLu7Ua5F@phil>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Fri, 14 Jul 2017 07:41:24 +0100
+Subject: [PATCH v5 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <20170712172636.GA90759@google.com>
+References: <cover.1493804968.git.guillaume.tucker@collabora.com>
+ <bebe578ba130de5fa320ca7c6427b2fae83d61d7.1493804968.git.guillaume.tucker@collabora.com>
+ <20170712172636.GA90759@google.com>
+Message-ID: <3339c7d9-c420-777c-e8eb-e9b82a38aa97@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
+Hi Brian,
 
-Am Freitag, 14. Juli 2017, 09:52:30 CEST schrieb Jacob Chen:
-> 2017-07-14 7:34 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
-> > Am Donnerstag, 13. Juli 2017, 00:03:51 CEST schrieb Jacob Chen:
-> >> Add devicetree nodes for rk3399 VOP (Video Output Processors), and the
-> >> top level display-subsystem root node.
-> >>
-> >> Later patches add endpoints (eDP, HDMI, MIPI, etc) that attach to the
-> >> VOPs' output ports.
-> >>
-> >> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> >> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> >> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> >> ---
-> >>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 65 ++++++++++++++++++++++++++++++++
-> >>  1 file changed, 65 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> >> index e795135..300e500 100644
-> >> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> >> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> >> @@ -1455,6 +1455,71 @@
-> >>               status = "disabled";
-> >>       };
-> >>
-> >> +     vopl: vop at ff8f0000 {
-> >> +             compatible = "rockchip,rk3399-vop-lit";
-> >> +             reg = <0x0 0xff8f0000 0x0 0x1ffc>, <0x0 0xff8f2000 0x0 0x400>;
-> >
-> > What is this second memory region doing? It looks like this is the meant
-> > to cover VOP_GAMMA_LUT_ADDR, but can't you just map the whole area?
-> > ChromeOS seems to be doing fine using the whole area as
-> >         <0x0 0xff8f0000 0x0 0x3efc>
-> > and I've also not seen any code changes actually mapping/using this
-> > second area.
-> >
-> 
-> 0x1c00 - 0x200 for cabc_lut
-> 0x2000 - 0x300 for gama_lut
-> 
-> My mistakes, It seems mark havn't send gamma and cabc support to upstream.
-> We shoud just using the whole area map.
-> 
-> 
-> >
-> >> +             interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
-> >> +             clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>, <&cru DCLK_VOP1_DIV>;
-> >> +             clock-names = "aclk_vop", "dclk_vop", "hclk_vop", "dclk_source";
-> >
-> > While I know that this is based on my idea on handling the hdmi pll-rate
-> > requirements, I haven't found the matching code- and dt-binding-changes
-> > posted to a list yet.
-> >
-> 
-> Yeah, should i collect mark's patches or remove it at first?
+On 12/07/17 18:26, Brian Norris wrote:
+> Hi Guillaume,
+>
+> I know this has already been merged, but I figured here was an OK place
+> to note (inline):
+>
+> On Wed, May 03, 2017 at 10:56:25AM +0100, Guillaume Tucker wrote:
 
-As we don't know how much discussion is necessary for that, removing
-dclk_source in the first iteration and re-add it once the feature.
+[...]
 
+>> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>> new file mode 100644
+>> index 000000000000..d3b6e1a4713a
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>
+> ^^ This file name implies we're talking about a base "arm,mali-midgard"
+> compatible property.
+>
+>> @@ -0,0 +1,86 @@
+>> +ARM Mali Midgard GPU
+>> +====================
+>> +
+>> +Required properties:
+>> +
+>> +- compatible :
+>> +  * Must contain one of the following:
+>> +    + "arm,mali-t604"
+>> +    + "arm,mali-t624"
+>> +    + "arm,mali-t628"
+>> +    + "arm,mali-t720"
+>> +    + "arm,mali-t760"
+>> +    + "arm,mali-t820"
+>> +    + "arm,mali-t830"
+>> +    + "arm,mali-t860"
+>> +    + "arm,mali-t880"
+>> +  * which must be preceded by one of the following vendor specifics:
+>> +    + "amlogic,meson-gxm-mali"
+>> +    + "rockchip,rk3288-mali"
+>
+> But it's not listed here.
+>
+>> +
+>> +- reg : Physical base address of the device and length of the register area.
+>> +
+>> +- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
+>> +
+>> +- interrupt-names : Contains the names of IRQ resources in the order they were
+>> +  provided in the interrupts property. Must contain: "job", "mmu", "gpu".
+>> +
+>> +
+>> +Optional properties:
+>> +
+>> +- clocks : Phandle to clock for the Mali Midgard device.
+>> +
+>> +- mali-supply : Phandle to regulator for the Mali device. Refer to
+>> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+>> +
+>> +- operating-points-v2 : Refer to Documentation/devicetree/bindings/power/opp.txt
+>> +  for details.
+>> +
+>> +
+>> +Example for a Mali-T760:
+>> +
+>> +gpu at ffa30000 {
+>> +	compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
+>
+> And it *is* used here in this example.
+>
+> So, should it be used/documented or not?
 
-Heiko
+The important part is that having only arm,mali-midgard in the
+gpu node is not enough to accurately describe the hardware, which
+is why it is not listed in the required compatible strings.  On
+the other hand, it does help with describing the hardware, so
+it's fine to use it.  If people find this confusing then I guess
+we could add something to say that arm,mali-midgard can be used
+optionally in addition to the specific ones.
+
+Also, if you look at the 64-bit ARM CPUs for example, they
+typically have armv8 in their node although armv8 is not
+mentioned anywhere in the bindings documentation...
+
+Guillaume
