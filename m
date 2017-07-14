@@ -1,65 +1,110 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 14 Jul 2017 15:11:11 -0700
-Subject: [PATCH v2 0/7] ARM: Broadcom Brahma-B15 readahead cache support
-In-Reply-To: <20170623175227.19743-1-f.fainelli@gmail.com>
-References: <20170623175227.19743-1-f.fainelli@gmail.com>
-Message-ID: <23e2f72f-bc22-2084-660f-bc793e68c174@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 15 Jul 2017 00:16:16 +0200
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <85441336-8d89-f7aa-4fbe-a4edaf478649@gmail.com>
+References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+ <6613228.WfFrGvAy1X@aspire.rjw.lan>
+ <85441336-8d89-f7aa-4fbe-a4edaf478649@gmail.com>
+Message-ID: <2497538.J9F6XFeBfd@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2017 10:52 AM, Florian Fainelli wrote:
-> Hi all,
+On Wednesday, July 12, 2017 11:08:19 AM Florian Fainelli wrote:
+> On 06/29/2017 04:00 PM, Rafael J. Wysocki wrote:
+> > On Thursday, June 22, 2017 06:08:36 PM Florian Fainelli wrote:
+> >> Add an optional platform_suspend_ops callback: target_state, and a
+> >> helper function globally visible to get this called:
+> >> platform_suspend_target_state().
+> >>
+> >> This is useful for platform specific drivers that may need to take a
+> >> slightly different suspend/resume path based on the system's
+> >> suspend/resume state being entered.
+> >>
+> >> Although this callback is optional and documented as such, it requires
+> >> a platform_suspend_ops::begin callback to be implemented in order to
+> >> provide an accurate suspend/resume state within the driver that
+> >> implements this platform_suspend_ops.
+> >>
+> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> >> ---
+> >>  include/linux/suspend.h | 12 ++++++++++++
+> >>  kernel/power/suspend.c  | 15 +++++++++++++++
+> >>  2 files changed, 27 insertions(+)
+> >>
+> >> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+> >> index d9718378a8be..d998a04a90a2 100644
+> >> --- a/include/linux/suspend.h
+> >> +++ b/include/linux/suspend.h
+> >> @@ -172,6 +172,15 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
+> >>   *	Called by the PM core if the suspending of devices fails.
+> >>   *	This callback is optional and should only be implemented by platforms
+> >>   *	which require special recovery actions in that situation.
+> >> + *
+> >> + * @target_state: Returns the suspend state the suspend_ops will be entering.
+> >> + * 	Called by device drivers that need to know the platform specific suspend
+> >> + * 	state the system is about to enter.
+> >> + * 	This callback is optional and should only be implemented by platforms
+> >> + * 	which require special handling of power management states within
+> >> + * 	drivers. It does require @begin to be implemented to provide the suspend
+> >> + * 	state. Return value is platform_suspend_ops specific, and may be a 1:1
+> >> + * 	mapping to suspend_state_t when relevant.
+> >>   */
+> >>  struct platform_suspend_ops {
+> >>  	int (*valid)(suspend_state_t state);
+> >> @@ -184,6 +193,7 @@ struct platform_suspend_ops {
+> >>  	bool (*suspend_again)(void);
+> >>  	void (*end)(void);
+> >>  	void (*recover)(void);
+> >> +	int (*target_state)(void);
+> > 
+> > I would use unsigned int (the sign should not matter).
+> > 
+> >>  };
+> > 
+> > That's almost what I was thinking about except that the values returned by
+> > ->target_state should be unique, so it would be good to do something to
+> > ensure that.
+> > 
+> > The concern is as follows.
+> > 
+> > Say you have a driver develped for platform X where ->target_state returns
+> > A for "mem" and B for "standby".  Then, the same IP is re-used on platform Y
+> > returning B for "mem" and C for "standby" and now the driver cannot
+> > distinguish between them.
+> > 
+> > Moreover, even if they both returned A for "mem" there might be differences
+> > in how "mem" was defined by each of them and therefore in what the driver was
+> > expected to do to handle "mem" on X and Y.
 > 
-> This patch series adds support for the Broadcom Brahma-B15 readahead cache.
-> I submitted that patch series a couple of years ago, and then slept on it so
-> here is another stab at it.
-> 
-> Note that we did not implement this cache as a version of an outer cache
-> for several reasons:
-> 
-> - we initially thought we needed to intercept flush_icache_all and
->   flush_kern_cache_louis but upon further inspection we convinced ourselves
->   this is no longer needed, still, flush_cache_all() needs special handling
->   here and needs to be wrapped around
-> 
-> - the outer cache does not allow differentiating a DMA transfer direction
->   this is a readahead cache, so it does not participate in writes, flushing
->   it during reads *and* writes kills the performance completely
-> 
-> - finally, most operations that outer_cache cares about are on MVA, which
->   is transparent to the readahead cache here
-> 
-> Changes in v2:
-> 
-> - clarify that the read-ahead caches does invalidates on writes (IOW) based
->   on Russell's feedback
+> That makes sense, would you need the core implementation in
+> platform_suspend_target_state() to range check what
+> suspend_ops->target_state() returns against a set of reserved value say,
+> checking from 0 up to ACPI_S_STATE_COUNT or is there another range you
+> would like to see being used?
 
-Any comments on this? Thank you.
+I had an idea of using an enum type encompassing all of the power states
+defined for various platforms and serving both as a registry (to ensure the
+uniqueness of the values assigned to the states) and a common ground
+between platforms and drivers.
 
-> 
-> Florian Fainelli (7):
->   ARM: v7: allow setting different cache functions
->   ARM: Add Broadcom Brahma-B15 readahead cache support
->   ARM: Hook B15 readahead cache functions based on processor
->   ARM: B15: Add CPU hotplug awareness
->   ARM: B15: Add suspend/resume hooks
->   ARM: B15: Register reboot notifier for KEXEC
->   MAINTAINERS: Update brcmstb entries to cover B15 code
-> 
->  MAINTAINERS                                   |   2 +
->  arch/arm/include/asm/glue-cache.h             |   4 +
->  arch/arm/include/asm/hardware/cache-b15-rac.h |  10 +
->  arch/arm/mm/Kconfig                           |   8 +
->  arch/arm/mm/Makefile                          |   1 +
->  arch/arm/mm/cache-b15-rac.c                   | 360 ++++++++++++++++++++++++++
->  arch/arm/mm/cache-v7.S                        |  21 ++
->  arch/arm/mm/proc-v7.S                         |   6 +-
->  include/linux/cpuhotplug.h                    |   2 +
->  9 files changed, 411 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/include/asm/hardware/cache-b15-rac.h
->  create mode 100644 arch/arm/mm/cache-b15-rac.c
-> 
+Something like:
 
+enum platform_target_state {
+	PLATFORM_STATE_UNKNOWN = -1,
+	PLATFORM_STATE_WORKING = 0,
+	PLATFORM_STATE_ACPI_S1,
+	PLATFORM_STATE_ACPI_S2,
+	PLATFORM_STATE_ACPI_S3,
+	PLATFORM_STATE_MY_BOARD_1_GATE_CLOCKS,
+	PLATFORM_STATE_MY_BOARD_1_GATE_POWER,
+	PLATFORM_STATE_ANOTHER_BOARD_DO_CRAZY_STUFF,
+	...
+};
 
--- 
-Florian
+and define ->target_state to return a value of this type.
+
+Then, if a driver sees one of these and recognizes that value, it should
+know exactly what to do.
+
+Thanks,
+Rafael
