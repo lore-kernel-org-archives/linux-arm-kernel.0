@@ -1,185 +1,139 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:10 +0100
-Subject: [PATCH v3 05/18] coresight: Extend the PIDR mask to cover relevant
- bits in PIDR2
+Date: Fri, 14 Jul 2017 14:04:12 +0100
+Subject: [PATCH v3 07/18] coresight tmc: Add helpers for accessing 64bit
+ registers
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per coresight standards, PIDR2 register has the following format :
-
- [2-0]	- JEP106_bits6to4
- [3]	- JEDEC, designer ID is specified by JEDEC.
-
-However some of the drivers only use mask of 0x3 for the PIDR2 leaving
-bits [3-2] unchecked, which could potentially match the component for
-a different device altogether. This patch fixes the mask and the
-corresponding id bits for the existing devices.
+Coresight TMC splits 64bit registers into a pair of 32bit registers
+(e.g DBA, RRP, RWP). Provide helpers to read/write to these registers.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-I have not touched the TPIU ids for Ux500 (see commit: 4339b699),
-as I don't have a platform to fix/correct the ids.
----
- .../coresight/coresight-dynamic-replicator.c       |  4 ++--
- drivers/hwtracing/coresight/coresight-etb10.c      |  4 ++--
- drivers/hwtracing/coresight/coresight-etm3x.c      | 24 +++++++++++-----------
- drivers/hwtracing/coresight/coresight-funnel.c     |  4 ++--
- drivers/hwtracing/coresight/coresight-stm.c        |  8 ++++----
- drivers/hwtracing/coresight/coresight-tmc.c        |  4 ++--
- drivers/hwtracing/coresight/coresight-tpiu.c       |  4 ++--
- 7 files changed, 26 insertions(+), 26 deletions(-)
+ drivers/hwtracing/coresight/coresight-priv.h    |  8 ++++++++
+ drivers/hwtracing/coresight/coresight-tmc-etf.c |  8 ++++----
+ drivers/hwtracing/coresight/coresight-tmc-etr.c |  8 ++++----
+ drivers/hwtracing/coresight/coresight-tmc.h     | 19 +++++++++++++++++++
+ 4 files changed, 35 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index 1675031..ccbafaf 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -177,8 +177,8 @@ static const struct dev_pm_ops replicator_dev_pm_ops = {
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 1080a67..93333f9 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -123,6 +123,14 @@ coresight_read_reg_pair(void __iomem *addr, s32 lo_offset, s32 hi_offset)
+ 	return val;
+ }
  
- static struct amba_id replicator_ids[] = {
- 	{
--		.id     = 0x0003b909,
--		.mask   = 0x0003ffff,
-+		.id     = 0x000bb909,
-+		.mask   = 0x000fffff,
- 	},
- 	{ 0, 0 },
- };
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index d5b9642..be6f59c 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -730,8 +730,8 @@ static const struct dev_pm_ops etb_dev_pm_ops = {
++static inline void coresight_write_reg_pair(void __iomem *addr, u64 val,
++						 s32 lo_offset, s32 hi_offset)
++{
++	writel_relaxed((u32)val, addr + lo_offset);
++	if (hi_offset >= 0)
++		writel_relaxed((u32)(val >> 32), addr + hi_offset);
++}
++
+ void coresight_disable_path(struct list_head *path);
+ int coresight_enable_path(struct list_head *path, u32 mode);
+ struct coresight_device *coresight_get_sink(struct list_head *path);
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index e3b9fb8..aecd712 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -371,7 +371,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+ {
+ 	int i, cur;
+ 	u32 *buf_ptr;
+-	u32 read_ptr, write_ptr;
++	u64 read_ptr, write_ptr;
+ 	u32 status, to_read;
+ 	unsigned long offset;
+ 	struct cs_buffers *buf = sink_config;
+@@ -388,8 +388,8 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
  
- static struct amba_id etb_ids[] = {
- 	{
--		.id	= 0x0003b907,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb907,
-+		.mask	= 0x000fffff,
- 	},
- 	{ 0, 0},
- };
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index a51b6b6..1af7f9e 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -887,33 +887,33 @@ static const struct dev_pm_ops etm_dev_pm_ops = {
+ 	tmc_flush_and_stop(drvdata);
  
- static struct amba_id etm_ids[] = {
- 	{	/* ETM 3.3 */
--		.id	= 0x0003b921,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb921,
-+		.mask	= 0x000fffff,
- 		.data	= "ETM 3.3",
- 	},
- 	{	/* ETM 3.5 - Cortex-A5 */
--		.id	= 0x0003b955,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb955,
-+		.mask	= 0x000fffff,
- 		.data	= "ETM 3.5",
- 	},
- 	{	/* ETM 3.5 */
--		.id	= 0x0003b956,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb956,
-+		.mask	= 0x000fffff,
- 		.data	= "ETM 3.5",
- 	},
- 	{	/* PTM 1.0 */
--		.id	= 0x0003b950,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb950,
-+		.mask	= 0x000fffff,
- 		.data	= "PTM 1.0",
- 	},
- 	{	/* PTM 1.1 */
--		.id	= 0x0003b95f,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb95f,
-+		.mask	= 0x000fffff,
- 		.data	= "PTM 1.1",
- 	},
- 	{	/* PTM 1.1 Qualcomm */
--		.id	= 0x0003006f,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000b006f,
-+		.mask	= 0x000fffff,
- 		.data	= "PTM 1.1",
- 	},
- 	{ 0, 0},
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 860fe6e..6f7f3d3 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -248,8 +248,8 @@ static const struct dev_pm_ops funnel_dev_pm_ops = {
+-	read_ptr = readl_relaxed(drvdata->base + TMC_RRP);
+-	write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
++	read_ptr = tmc_read_rrp(drvdata);
++	write_ptr = tmc_read_rwp(drvdata);
  
- static struct amba_id funnel_ids[] = {
- 	{
--		.id     = 0x0003b908,
--		.mask   = 0x0003ffff,
-+		.id     = 0x000bb908,
-+		.mask   = 0x000fffff,
- 	},
- 	{ 0, 0},
- };
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 93fc26f..1bcda80 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -916,13 +916,13 @@ static const struct dev_pm_ops stm_dev_pm_ops = {
+ 	/*
+ 	 * Get a hold of the status register and see if a wrap around
+@@ -441,7 +441,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+ 		if (read_ptr > (drvdata->size - 1))
+ 			read_ptr -= drvdata->size;
+ 		/* Tell the HW */
+-		writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
++		tmc_write_rrp(drvdata, read_ptr);
+ 		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
+ 	}
  
- static struct amba_id stm_ids[] = {
- 	{
--		.id     = 0x0003b962,
--		.mask   = 0x0003ffff,
-+		.id     = 0x000bb962,
-+		.mask   = 0x000fffff,
- 		.data	= "STM32",
- 	},
- 	{
--		.id	= 0x0003b963,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb963,
-+		.mask	= 0x000fffff,
- 		.data	= "STM500",
- 	},
- 	{ 0, 0},
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 8644887..eb0c7b3 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -393,8 +393,8 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 5d31269..ff11b92 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -44,9 +44,8 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ 		  ~(TMC_AXICTL_PROT_CTL_B0 | TMC_AXICTL_PROT_CTL_B1)) |
+ 		  TMC_AXICTL_PROT_CTL_B1;
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
++	tmc_write_dba(drvdata, drvdata->paddr);
  
- static struct amba_id tmc_ids[] = {
- 	{
--		.id     = 0x0003b961,
--		.mask   = 0x0003ffff,
-+		.id     = 0x000bb961,
-+		.mask   = 0x000fffff,
- 	},
- 	{ 0, 0},
- };
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 0673baf..59c1510 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -194,8 +194,8 @@ static const struct dev_pm_ops tpiu_dev_pm_ops = {
+-	writel_relaxed(drvdata->paddr, drvdata->base + TMC_DBALO);
+-	writel_relaxed(0x0, drvdata->base + TMC_DBAHI);
+ 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
+ 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
+ 		       TMC_FFCR_TRIGON_TRIGIN,
+@@ -59,9 +58,10 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
  
- static struct amba_id tpiu_ids[] = {
- 	{
--		.id	= 0x0003b912,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb912,
-+		.mask	= 0x000fffff,
- 	},
- 	{
- 		.id	= 0x0004b912,
+ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ {
+-	u32 rwp, val;
++	u64 rwp;
++	u32 val;
+ 
+-	rwp = readl_relaxed(drvdata->base + TMC_RWP);
++	rwp = tmc_read_rwp(drvdata);
+ 	val = readl_relaxed(drvdata->base + TMC_STS);
+ 
+ 	/*
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index 51c0185..c78de00 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -18,6 +18,7 @@
+ #ifndef _CORESIGHT_TMC_H
+ #define _CORESIGHT_TMC_H
+ 
++#include <linux/io.h>
+ #include <linux/miscdevice.h>
+ 
+ #define TMC_RSZ			0x004
+@@ -139,4 +140,22 @@ extern const struct coresight_ops tmc_etf_cs_ops;
+ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata);
+ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata);
+ extern const struct coresight_ops tmc_etr_cs_ops;
++
++
++#define TMC_REG_PAIR(name, lo_off, hi_off)				\
++static inline u64							\
++tmc_read_##name(struct tmc_drvdata *drvdata)				\
++{									\
++	return coresight_read_reg_pair(drvdata->base, lo_off, hi_off);	\
++}									\
++static inline void							\
++tmc_write_##name(struct tmc_drvdata *drvdata, u64 val)			\
++{									\
++	coresight_write_reg_pair(drvdata->base, val, lo_off, hi_off);	\
++}
++
++TMC_REG_PAIR(rrp, TMC_RRP, TMC_RRPHI)
++TMC_REG_PAIR(rwp, TMC_RWP, TMC_RWPHI)
++TMC_REG_PAIR(dba, TMC_DBALO, TMC_DBAHI)
++
+ #endif
 -- 
 2.7.5
