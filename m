@@ -1,249 +1,187 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 14 Jul 2017 14:40:03 -0700
-Subject: [PATCH v2 1/3] mux: Add mux_control_get_optional() API
+Date: Fri, 14 Jul 2017 14:40:04 -0700
+Subject: [PATCH v2 2/3] usb: chipidea: Hook into mux framework to toggle usb
+ switch
 In-Reply-To: <20170714214005.14967-1-stephen.boyd@linaro.org>
 References: <20170714214005.14967-1-stephen.boyd@linaro.org>
-Message-ID: <20170714214005.14967-2-stephen.boyd@linaro.org>
+Message-ID: <20170714214005.14967-3-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes drivers only use muxes under certain scenarios. For
-example, the chipidea usb controller may be connected to a usb
-switch on some platforms, and connected directly to a usb port on
-others. The driver won't know one way or the other though, so add
-a mux_control_get_optional() API that allows the driver to
-differentiate errors getting the mux from there not being a mux
-for the driver to use at all.
+On the db410c 96boards platform we have a TC7USB40MU on the board
+to mux the D+/D- lines coming from the controller between a micro
+usb "device" port and a USB hub for "host" roles[1]. During a
+role switch, we need to toggle this mux to forward the D+/D-
+lines to either the port or the hub. Add the necessary code to do
+the role switch in chipidea core via the generic mux framework.
+Board configurations like on db410c are expected to change roles
+via the sysfs API described in
+Documentation/ABI/testing/sysfs-platform-chipidea-usb2.
 
-Cc: Jonathan Cameron <jic23@kernel.org>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
+[1] https://github.com/96boards/documentation/raw/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
+
+Cc: Peter Rosin <peda@axentia.se>
+Cc: Peter Chen <peter.chen@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- Documentation/driver-model/devres.txt |  1 +
- drivers/mux/mux-core.c                | 98 ++++++++++++++++++++++++++++-------
- include/linux/mux/consumer.h          |  4 ++
- 3 files changed, 83 insertions(+), 20 deletions(-)
+ Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt |  6 ++++++
+ drivers/usb/chipidea/Kconfig                           |  1 +
+ drivers/usb/chipidea/core.c                            |  5 +++++
+ drivers/usb/chipidea/host.c                            |  7 +++++++
+ drivers/usb/chipidea/udc.c                             | 13 ++++++++++++-
+ include/linux/usb/chipidea.h                           |  2 ++
+ 6 files changed, 33 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
-index 30e04f7a690d..4fdd3e63ff8b 100644
---- a/Documentation/driver-model/devres.txt
-+++ b/Documentation/driver-model/devres.txt
-@@ -342,6 +342,7 @@ MUX
-   devm_mux_chip_alloc()
-   devm_mux_chip_register()
-   devm_mux_control_get()
-+  devm_mux_control_get_optional()
+diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+index 0e03344e2e8b..2e9318151df7 100644
+--- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
++++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+@@ -76,6 +76,10 @@ Optional properties:
+   needs to make sure it does not send more than 90%
+   maximum_periodic_data_per_frame. The use case is multiple transactions, but
+   less frame rate.
++- mux-controls: The mux control for toggling host/device output of this
++  controller. It's expected that a mux state of 0 indicates device mode and a
++  mux state of 1 indicates host mode.
++- mux-control-names: Shall be "usb_switch" if mux-controls is specified.
  
- PER-CPU MEM
-   devm_alloc_percpu()
-diff --git a/drivers/mux/mux-core.c b/drivers/mux/mux-core.c
-index 90b8995f07cb..a0e5bf16f02f 100644
---- a/drivers/mux/mux-core.c
-+++ b/drivers/mux/mux-core.c
-@@ -289,6 +289,9 @@ EXPORT_SYMBOL_GPL(devm_mux_chip_register);
-  */
- unsigned int mux_control_states(struct mux_control *mux)
- {
-+	if (!mux)
-+		return 0;
+ i.mx specific properties
+ - fsl,usbmisc: phandler of non-core register device, with one
+@@ -102,4 +106,6 @@ Example:
+ 		rx-burst-size-dword = <0x10>;
+ 		extcon = <0>, <&usb_id>;
+ 		phy-clkgate-delay-us = <400>;
++		mux-controls = <&usb_switch>;
++		mux-control-names = "usb_switch";
+ 	};
+diff --git a/drivers/usb/chipidea/Kconfig b/drivers/usb/chipidea/Kconfig
+index 51f4157bbecf..3798e0e69d57 100644
+--- a/drivers/usb/chipidea/Kconfig
++++ b/drivers/usb/chipidea/Kconfig
+@@ -3,6 +3,7 @@ config USB_CHIPIDEA
+ 	depends on ((USB_EHCI_HCD && USB_GADGET) || (USB_EHCI_HCD && !USB_GADGET) || (!USB_EHCI_HCD && USB_GADGET)) && HAS_DMA
+ 	select EXTCON
+ 	select RESET_CONTROLLER
++	select MULTIPLEXER
+ 	help
+ 	  Say Y here if your system has a dual role high speed USB
+ 	  controller based on ChipIdea silicon IP. It supports:
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index b17ed3a9a304..d088c262ebb8 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -64,6 +64,7 @@
+ #include <linux/of.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/usb/ehci_def.h>
++#include <linux/mux/consumer.h>
+ 
+ #include "ci.h"
+ #include "udc.h"
+@@ -690,6 +691,10 @@ static int ci_get_platdata(struct device *dev,
+ 	if (of_find_property(dev->of_node, "non-zero-ttctrl-ttha", NULL))
+ 		platdata->flags |= CI_HDRC_SET_NON_ZERO_TTHA;
+ 
++	platdata->usb_switch = devm_mux_control_get_optional(dev, "usb_switch");
++	if (IS_ERR(platdata->usb_switch))
++		return PTR_ERR(platdata->usb_switch);
 +
- 	return mux->states;
+ 	ext_id = ERR_PTR(-ENODEV);
+ 	ext_vbus = ERR_PTR(-ENODEV);
+ 	if (of_property_read_bool(dev->of_node, "extcon")) {
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 18cb8e46262d..9ef3ecf27ad3 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -25,6 +25,7 @@
+ #include <linux/usb/hcd.h>
+ #include <linux/usb/chipidea.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/mux/consumer.h>
+ 
+ #include "../host/ehci.h"
+ 
+@@ -175,6 +176,10 @@ static int host_start(struct ci_hdrc *ci)
+ 		if (ci_otg_is_fsm_mode(ci)) {
+ 			otg->host = &hcd->self;
+ 			hcd->self.otg_port = 1;
++		} else {
++			ret = mux_control_select(ci->platdata->usb_switch, 1);
++			if (ret)
++				goto disable_reg;
+ 		}
+ 	}
+ 
+@@ -195,6 +200,8 @@ static void host_stop(struct ci_hdrc *ci)
+ 	struct usb_hcd *hcd = ci->hcd;
+ 
+ 	if (hcd) {
++		if (!ci_otg_is_fsm_mode(ci))
++			mux_control_deselect(ci->platdata->usb_switch);
+ 		if (ci->platdata->notify_event)
+ 			ci->platdata->notify_event(ci,
+ 				CI_HDRC_CONTROLLER_STOPPED_EVENT);
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index d68b125796f9..deb18099e168 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -22,6 +22,7 @@
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/otg-fsm.h>
+ #include <linux/usb/chipidea.h>
++#include <linux/mux/consumer.h>
+ 
+ #include "ci.h"
+ #include "udc.h"
+@@ -1964,16 +1965,26 @@ void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
+ 
+ static int udc_id_switch_for_device(struct ci_hdrc *ci)
+ {
++	int ret = 0;
++
+ 	if (ci->is_otg)
+ 		/* Clear and enable BSV irq */
+ 		hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
+ 					OTGSC_BSVIS | OTGSC_BSVIE);
+ 
+-	return 0;
++	if (!ci_otg_is_fsm_mode(ci))
++		ret = mux_control_select(ci->platdata->usb_switch, 0);
++
++	if (ci->is_otg && ret)
++		hw_write_otgsc(ci, OTGSC_BSVIE | OTGSC_BSVIS, OTGSC_BSVIS);
++
++	return ret;
  }
- EXPORT_SYMBOL_GPL(mux_control_states);
-@@ -338,6 +341,9 @@ int mux_control_select(struct mux_control *mux, unsigned int state)
+ 
+ static void udc_id_switch_for_host(struct ci_hdrc *ci)
  {
- 	int ret;
- 
-+	if (!mux)
-+		return 0;
++	mux_control_deselect(ci->platdata->usb_switch);
 +
- 	ret = down_killable(&mux->lock);
- 	if (ret < 0)
- 		return ret;
-@@ -370,6 +376,9 @@ int mux_control_try_select(struct mux_control *mux, unsigned int state)
- {
- 	int ret;
+ 	/*
+ 	 * host doesn't care B_SESSION_VALID event
+ 	 * so clear and disbale BSV irq
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index c5fdfcf99828..3b27e333de1d 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -9,6 +9,7 @@
+ #include <linux/usb/otg.h>
  
-+	if (!mux)
-+		return 0;
-+
- 	if (down_trylock(&mux->lock))
- 		return -EBUSY;
- 
-@@ -398,6 +407,9 @@ int mux_control_deselect(struct mux_control *mux)
- {
- 	int ret = 0;
- 
-+	if (!mux)
-+		return 0;
-+
- 	if (mux->idle_state != MUX_IDLE_AS_IS &&
- 	    mux->idle_state != mux->cached_state)
- 		ret = mux_control_set(mux, mux->idle_state);
-@@ -422,14 +434,8 @@ static struct mux_chip *of_find_mux_chip_by_node(struct device_node *np)
- 	return dev ? to_mux_chip(dev) : NULL;
- }
- 
--/**
-- * mux_control_get() - Get the mux-control for a device.
-- * @dev: The device that needs a mux-control.
-- * @mux_name: The name identifying the mux-control.
-- *
-- * Return: A pointer to the mux-control, or an ERR_PTR with a negative errno.
-- */
--struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
-+struct mux_control *
-+__mux_control_get(struct device *dev, const char *mux_name, bool optional)
- {
- 	struct device_node *np = dev->of_node;
- 	struct of_phandle_args args;
-@@ -441,6 +447,8 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
- 	if (mux_name) {
- 		index = of_property_match_string(np, "mux-control-names",
- 						 mux_name);
-+		if (index == -EINVAL && optional)
-+			return NULL;
- 		if (index < 0) {
- 			dev_err(dev, "mux controller '%s' not found\n",
- 				mux_name);
-@@ -451,6 +459,8 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
- 	ret = of_parse_phandle_with_args(np,
- 					 "mux-controls", "#mux-control-cells",
- 					 index, &args);
-+	if (ret == -ENOENT && optional)
-+		return NULL;
- 	if (ret) {
- 		dev_err(dev, "%s: failed to get mux-control %s(%i)\n",
- 			np->full_name, mux_name ?: "", index);
-@@ -482,9 +492,35 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
- 	get_device(&mux_chip->dev);
- 	return &mux_chip->mux[controller];
- }
-+
-+/**
-+ * mux_control_get() - Get the mux-control for a device.
-+ * @dev: The device that needs a mux-control.
-+ * @mux_name: The name identifying the mux-control.
-+ *
-+ * Return: A pointer to the mux-control, or an ERR_PTR with a negative errno.
-+ */
-+struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
-+{
-+	return __mux_control_get(dev, mux_name, false);
-+}
- EXPORT_SYMBOL_GPL(mux_control_get);
+ struct ci_hdrc;
++struct mux_control;
  
  /**
-+ * mux_control_get_optional() - Get the optional mux-control for a device.
-+ * @dev: The device that needs a mux-control.
-+ * @mux_name: The name identifying the mux-control.
-+ *
-+ * Return: A pointer to the mux-control, or an ERR_PTR with a negative errno.
-+ */
-+struct mux_control *
-+mux_control_get_optional(struct device *dev, const char *mux_name)
-+{
-+	return __mux_control_get(dev, mux_name, true);
-+}
-+EXPORT_SYMBOL_GPL(mux_control_get_optional);
-+
-+/**
-  * mux_control_put() - Put away the mux-control for good.
-  * @mux: The mux-control to put away.
-  *
-@@ -492,7 +528,8 @@ EXPORT_SYMBOL_GPL(mux_control_get);
-  */
- void mux_control_put(struct mux_control *mux)
- {
--	put_device(&mux->chip->dev);
-+	if (mux)
-+		put_device(&mux->chip->dev);
- }
- EXPORT_SYMBOL_GPL(mux_control_put);
+  * struct ci_hdrc_cable - structure for external connector cable state tracking
+@@ -74,6 +75,7 @@ struct ci_hdrc_platform_data {
+ 	/* VBUS and ID signal state tracking, using extcon framework */
+ 	struct ci_hdrc_cable		vbus_extcon;
+ 	struct ci_hdrc_cable		id_extcon;
++	struct mux_control		*usb_switch;
+ 	u32			phy_clkgate_delay_us;
+ };
  
-@@ -503,16 +540,8 @@ static void devm_mux_control_release(struct device *dev, void *res)
- 	mux_control_put(mux);
- }
- 
--/**
-- * devm_mux_control_get() - Get the mux-control for a device, with resource
-- *			    management.
-- * @dev: The device that needs a mux-control.
-- * @mux_name: The name identifying the mux-control.
-- *
-- * Return: Pointer to the mux-control, or an ERR_PTR with a negative errno.
-- */
--struct mux_control *devm_mux_control_get(struct device *dev,
--					 const char *mux_name)
-+static struct mux_control *
-+__devm_mux_control_get(struct device *dev, const char *mux_name, bool optional)
- {
- 	struct mux_control **ptr, *mux;
- 
-@@ -520,7 +549,7 @@ struct mux_control *devm_mux_control_get(struct device *dev,
- 	if (!ptr)
- 		return ERR_PTR(-ENOMEM);
- 
--	mux = mux_control_get(dev, mux_name);
-+	mux = __mux_control_get(dev, mux_name, optional);
- 	if (IS_ERR(mux)) {
- 		devres_free(ptr);
- 		return mux;
-@@ -531,8 +560,37 @@ struct mux_control *devm_mux_control_get(struct device *dev,
- 
- 	return mux;
- }
-+
-+/**
-+ * devm_mux_control_get() - Get the mux-control for a device, with resource
-+ *			    management.
-+ * @dev: The device that needs a mux-control.
-+ * @mux_name: The name identifying the mux-control.
-+ *
-+ * Return: Pointer to the mux-control, or an ERR_PTR with a negative errno.
-+ */
-+struct mux_control *
-+devm_mux_control_get(struct device *dev, const char *mux_name)
-+{
-+	return __devm_mux_control_get(dev, mux_name, false);
-+}
- EXPORT_SYMBOL_GPL(devm_mux_control_get);
- 
-+/**
-+ * devm_mux_control_get_optional() - Get the optional mux-control for a device,
-+ * 				     with resource management.
-+ * @dev: The device that needs a mux-control.
-+ * @mux_name: The name identifying the mux-control.
-+ *
-+ * Return: Pointer to the mux-control, or an ERR_PTR with a negative errno.
-+ */
-+struct mux_control *
-+devm_mux_control_get_optional(struct device *dev, const char *mux_name)
-+{
-+	return __devm_mux_control_get(dev, mux_name, true);
-+}
-+EXPORT_SYMBOL_GPL(devm_mux_control_get_optional);
-+
- /*
-  * Using subsys_initcall instead of module_init here to try to ensure - for
-  * the non-modular case - that the subsystem is initialized when mux consumers
-diff --git a/include/linux/mux/consumer.h b/include/linux/mux/consumer.h
-index 5577e1b773c4..5e2aa046f032 100644
---- a/include/linux/mux/consumer.h
-+++ b/include/linux/mux/consumer.h
-@@ -24,9 +24,13 @@ int __must_check mux_control_try_select(struct mux_control *mux,
- int mux_control_deselect(struct mux_control *mux);
- 
- struct mux_control *mux_control_get(struct device *dev, const char *mux_name);
-+struct mux_control *mux_control_get_optional(struct device *dev,
-+					     const char *mux_name);
- void mux_control_put(struct mux_control *mux);
- 
- struct mux_control *devm_mux_control_get(struct device *dev,
- 					 const char *mux_name);
-+struct mux_control *devm_mux_control_get_optional(struct device *dev,
-+						  const char *mux_name);
- 
- #endif /* _LINUX_MUX_CONSUMER_H */
 -- 
 2.10.0.297.gf6727b0
