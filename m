@@ -1,66 +1,126 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 15 Jul 2017 02:52:30 +0800
-Subject: [PATCH v5 1/2] clk: gate: expose clk_gate_ops::is_enabled
-In-Reply-To: <1499954552-20075-2-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <201707150222.ogIMUhKu%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 14 Jul 2017 20:01:14 +0100
+Subject: [PATCH V4 3/6] iommu/arm-smmu: Invoke pm_runtime during probe,
+ add/remove device
+In-Reply-To: <CAF6AEGubgNiq5fJ9LaBULvW3450iY4-u0ecpp_a6xyMvRx9kug@mail.gmail.com>
+References: <20170712225459.GZ22780@codeaurora.org>
+ <5ee0bacd-e557-a6c4-a897-844fb12ea6ae@codeaurora.org>
+ <4dbc938c-ac88-9bd4-cf00-458008ae24c1@codeaurora.org>
+ <CAF6AEGsFOtsOjt1sLNPSFLEcu-7d1zxCOhTeC+P8e0TDbb1dSA@mail.gmail.com>
+ <60a56ae6-ed9d-57cd-130f-5bd9d32d4d58@codeaurora.org>
+ <CAF6AEGvDpRChNQAzqgRFwaQcH=4JCwfKcvj2GQGgQOnO2_A1sg@mail.gmail.com>
+ <20170714170743.GA26488@arm.com>
+ <CAF6AEGtMiVJvSrPXmQppM2NwS3fsXM8Vep3g0PwQK7SH4N=3xQ@mail.gmail.com>
+ <20170714180615.GC26488@arm.com>
+ <CAF6AEGubgNiq5fJ9LaBULvW3450iY4-u0ecpp_a6xyMvRx9kug@mail.gmail.com>
+Message-ID: <20170714190113.GE26488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+On Fri, Jul 14, 2017 at 02:25:45PM -0400, Rob Clark wrote:
+> On Fri, Jul 14, 2017 at 2:06 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Jul 14, 2017 at 01:42:13PM -0400, Rob Clark wrote:
+> >> On Fri, Jul 14, 2017 at 1:07 PM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Thu, Jul 13, 2017 at 10:55:10AM -0400, Rob Clark wrote:
+> >> >> On Thu, Jul 13, 2017 at 9:53 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+> >> >> > Hi,
+> >> >> >
+> >> >> > On 7/13/2017 5:20 PM, Rob Clark wrote:
+> >> >> >> On Thu, Jul 13, 2017 at 1:35 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+> >> >> >>> Hi Vivek,
+> >> >> >>>
+> >> >> >>> On 7/13/2017 10:43 AM, Vivek Gautam wrote:
+> >> >> >>>> Hi Stephen,
+> >> >> >>>>
+> >> >> >>>>
+> >> >> >>>> On 07/13/2017 04:24 AM, Stephen Boyd wrote:
+> >> >> >>>>> On 07/06, Vivek Gautam wrote:
+> >> >> >>>>>> @@ -1231,12 +1237,18 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+> >> >> >>>>>>   static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+> >> >> >>>>>>                    size_t size)
+> >> >> >>>>>>   {
+> >> >> >>>>>> -    struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
+> >> >> >>>>>> +    struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+> >> >> >>>>>> +    struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+> >> >> >>>>>> +    size_t ret;
+> >> >> >>>>>>         if (!ops)
+> >> >> >>>>>>           return 0;
+> >> >> >>>>>>   -    return ops->unmap(ops, iova, size);
+> >> >> >>>>>> +    pm_runtime_get_sync(smmu_domain->smmu->dev);
+> >> >> >>>>> Can these map/unmap ops be called from an atomic context? I seem
+> >> >> >>>>> to recall that being a problem before.
+> >> >> >>>>
+> >> >> >>>> That's something which was dropped in the following patch merged in master:
+> >> >> >>>> 523d7423e21b iommu/arm-smmu: Remove io-pgtable spinlock
+> >> >> >>>>
+> >> >> >>>> Looks like we don't  need locks here anymore?
+> >> >> >>>
+> >> >> >>>  Apart from the locking, wonder why a explicit pm_runtime is needed
+> >> >> >>>  from unmap. Somehow looks like some path in the master using that
+> >> >> >>>  should have enabled the pm ?
+> >> >> >>>
+> >> >> >>
+> >> >> >> Yes, there are a bunch of scenarios where unmap can happen with
+> >> >> >> disabled master (but not in atomic context).  On the gpu side we
+> >> >> >> opportunistically keep a buffer mapping until the buffer is freed
+> >> >> >> (which can happen after gpu is disabled).  Likewise, v4l2 won't unmap
+> >> >> >> an exported dmabuf while some other driver holds a reference to it
+> >> >> >> (which can be dropped when the v4l2 device is suspended).
+> >> >> >>
+> >> >> >> Since unmap triggers tbl flush which touches iommu regs, the iommu
+> >> >> >> driver *definitely* needs a pm_runtime_get_sync().
+> >> >> >
+> >> >> >  Ok, with that being the case, there are two things here,
+> >> >> >
+> >> >> >  1) If the device links are still intact at these places where unmap is called,
+> >> >> >     then pm_runtime from the master would setup the all the clocks. That would
+> >> >> >     avoid reintroducing the locking indirectly here.
+> >> >> >
+> >> >> >  2) If not, then doing it here is the only way. But for both cases, since
+> >> >> >     the unmap can be called from atomic context, resume handler here should
+> >> >> >     avoid doing clk_prepare_enable , instead move the clk_prepare to the init.
+> >> >> >
+> >> >>
+> >> >> I do kinda like the approach Marek suggested.. of deferring the tlb
+> >> >> flush until resume.  I'm wondering if we could combine that with
+> >> >> putting the mmu in a stalled state when we suspend (and not resume the
+> >> >> mmu until after the pending tlb flush)?
+> >> >
+> >> > I'm not sure that a stalled state is what we're after here, because we need
+> >> > to take care to prevent any table walks if we've freed the underlying pages.
+> >> > What we could try to do is disable the SMMU (put into global bypass) and
+> >> > invalidate the TLB when performing a suspend operation, then we just ignore
+> >> > invalidation whilst the clocks are stopped and, on resume, enable the SMMU
+> >> > again.
+> >>
+> >> wouldn't stalled just block any memory transactions by device(s) using
+> >> the context bank?  Putting it in bypass isn't really a good thing if
+> >> there is any chance the device can sneak in a memory access before
+> >> we've taking it back out of bypass (ie. makes gpu a giant userspace
+> >> controlled root hole).
+> >
+> > If it doesn't deadlock, then yes, it will stall transactions. However, that
+> > doesn't mean it necessarily prevents page table walks.
+> 
+> btw, I guess the concern about pagetable walk is that the unmap could
+> have removed some sub-level of the pt that the tlb walk would hit?
+> Would deferring freeing those pages help?
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.12 next-20170714]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Could do, but it sounds like a lot of complication that I think we can fix
+by making the suspend operation put the SMMU into a "clean" state.
 
-url:    https://github.com/0day-ci/linux/commits/gabriel-fernandez-st-com/clk-stm32h7-Add-stm32h743-clock-driver/20170714-170518
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-lpc32xx_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> > Instead of bypass, we
+> > could configure all the streams to terminate, but this race still worries me
+> > somewhat. I thought that the SMMU would only be suspended if all of its
+> > masters were suspended, so if the GPU wants to come out of suspend then the
+> > SMMU should be resumed first.
+> 
+> I believe this should be true.. on the gpu side, I'm mostly trying to
+> avoid having to power the gpu back on to free buffers.  (On the v4l2
+> side, somewhere in the core videobuf code would also need to be made
+> to wrap it's dma_unmap_sg() with pm_runtime_get/put()..)
 
-All errors (new ones prefixed by >>):
+Right, and we shouldn't have to resume it if we suspend it in a clean state,
+with the TLBs invalidated.
 
->> drivers/clk/nxp/clk-lpc32xx.c:906:12: error: static declaration of 'clk_gate_is_enabled' follows non-static declaration
-    static int clk_gate_is_enabled(struct clk_hw *hw)
-               ^~~~~~~~~~~~~~~~~~~
-   In file included from drivers/clk/nxp/clk-lpc32xx.c:13:0:
-   include/linux/clk-provider.h:346:5: note: previous declaration of 'clk_gate_is_enabled' was here
-    int clk_gate_is_enabled(struct clk_hw *hw);
-        ^~~~~~~~~~~~~~~~~~~
-
-vim +/clk_gate_is_enabled +906 drivers/clk/nxp/clk-lpc32xx.c
-
-f7c82a60 Vladimir Zapolskiy 2015-12-06  905  
-f7c82a60 Vladimir Zapolskiy 2015-12-06 @906  static int clk_gate_is_enabled(struct clk_hw *hw)
-f7c82a60 Vladimir Zapolskiy 2015-12-06  907  {
-f7c82a60 Vladimir Zapolskiy 2015-12-06  908  	struct lpc32xx_clk_gate *clk = to_lpc32xx_gate(hw);
-f7c82a60 Vladimir Zapolskiy 2015-12-06  909  	u32 val;
-f7c82a60 Vladimir Zapolskiy 2015-12-06  910  	bool is_set;
-f7c82a60 Vladimir Zapolskiy 2015-12-06  911  
-f7c82a60 Vladimir Zapolskiy 2015-12-06  912  	regmap_read(clk_regmap, clk->reg, &val);
-f7c82a60 Vladimir Zapolskiy 2015-12-06  913  	is_set = val & BIT(clk->bit_idx);
-f7c82a60 Vladimir Zapolskiy 2015-12-06  914  
-f7c82a60 Vladimir Zapolskiy 2015-12-06  915  	return (clk->flags & CLK_GATE_SET_TO_DISABLE ? !is_set : is_set);
-f7c82a60 Vladimir Zapolskiy 2015-12-06  916  }
-f7c82a60 Vladimir Zapolskiy 2015-12-06  917  
-
-:::::: The code at line 906 was first introduced by commit
-:::::: f7c82a60ba26c2f003662bcb2cff131021c1e828 clk: lpc32xx: add common clock framework driver
-
-:::::: TO: Vladimir Zapolskiy <vz@mleia.com>
-:::::: CC: Michael Turquette <mturquette@baylibre.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 21155 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170715/e8e16a82/attachment-0001.gz>
+Will
