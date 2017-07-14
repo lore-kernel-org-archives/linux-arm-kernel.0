@@ -1,43 +1,77 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:13 +0100
-Subject: [PATCH v3 08/18] coresight tmc: Expose DBA and AXICTL
+Date: Fri, 14 Jul 2017 14:04:21 +0100
+Subject: [PATCH v3 16/18] coresight tmc: Support for save-restore in ETR
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-17-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose DBALO,DBAHI and AXICTL registers
+The Coresight SoC 600 TMC ETR supports save-restore feature,
+where the values of the RRP/RWP and STS.Full are retained
+when it leaves the Disabled state. Hence, we must program the
+RRP/RWP and STS.Full to a proper value. For now, set the RRP/RWP
+to the base address of the buffer and clear the STS.Full register.
+This can be later exploited for proper save-restore of ETR
+trace contexts (e.g, perf).
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 ++++++++++++-
+ drivers/hwtracing/coresight/coresight-tmc.h     |  9 +++++++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index ccdc2d3..6bf4170 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -229,8 +229,10 @@ coresight_tmc_simple_func(ffcr, TMC_FFCR);
- coresight_tmc_simple_func(mode, TMC_MODE);
- coresight_tmc_simple_func(pscr, TMC_PSCR);
- coresight_tmc_simple_func(devid, CORESIGHT_DEVID);
-+coresight_tmc_simple_func(axictl, TMC_AXICTL);
- coresight_simple_reg64(struct tmc_drvdata, rrp, TMC_RRP, TMC_RRPHI);
- coresight_simple_reg64(struct tmc_drvdata, rwp, TMC_RWP, TMC_RWPHI);
-+coresight_simple_reg64(struct tmc_drvdata, dba, TMC_DBALO, TMC_DBAHI);
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index d5f51cb..a69d1c4 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -22,7 +22,7 @@
  
- static struct attribute *coresight_tmc_mgmt_attrs[] = {
- 	&dev_attr_rsz.attr,
-@@ -244,6 +246,8 @@ static struct attribute *coresight_tmc_mgmt_attrs[] = {
- 	&dev_attr_mode.attr,
- 	&dev_attr_pscr.attr,
- 	&dev_attr_devid.attr,
-+	&dev_attr_dba.attr,
-+	&dev_attr_axictl.attr,
- 	NULL,
- };
+ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ {
+-	u32 axictl;
++	u32 axictl, sts;
  
+ 	/* Zero out the memory to help with debug */
+ 	memset(drvdata->vaddr, 0, drvdata->size);
+@@ -47,6 +47,17 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ 
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+ 	tmc_write_dba(drvdata, drvdata->paddr);
++	/*
++	 * If the TMC pointers must be programmed before the session,
++	 * we have to set it properly (i.e, RRP/RWP to base address and
++	 * STS to "not full").
++	 */
++	if (tmc_etr_has_cap(drvdata, TMC_ETR_SAVE_RESTORE)) {
++		tmc_write_rrp(drvdata, drvdata->paddr);
++		tmc_write_rwp(drvdata, drvdata->paddr);
++		sts = readl_relaxed(drvdata->base + TMC_STS) & ~TMC_STS_FULL;
++		writel_relaxed(sts, drvdata->base + TMC_STS);
++	}
+ 
+ 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
+ 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index de92011..5032d8e 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -121,6 +121,15 @@ enum tmc_mem_intf_width {
+ #define TMC_ETR_SG			(0x1U << 0)
+ /* ETR has separate read/write cache encodings */
+ #define TMC_ETR_AXI_ARCACHE		(0x1U << 1)
++/*
++ * TMC_ETR_SAVE_RESTORE - Values of RRP/RWP/STS.Full are
++ * retained when TMC leaves Disabled state, allowing us to continue
++ * the tracing from a point where we stopped. This also implies that
++ * the RRP/RWP/STS.Full should always be programmed to the correct
++ * value. Unfortunately this is not advertised by the hardware,
++ * so we have to rely on PID of the IP to detect the functionality.
++ */
++#define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
+ 
+ /**
+  * struct tmc_drvdata - specifics associated to an TMC component
 -- 
 2.7.5
