@@ -1,29 +1,20 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 14 Jul 2017 09:03:55 -0700 (PDT)
-Subject: [PATCH 11/22] net: thunder_bgx: avoid format string overflow
- warning
-In-Reply-To: <20170714120720.906842-12-arnd@arndb.de>
-References: <20170714120720.906842-1-arnd@arndb.de>
- <20170714120720.906842-12-arnd@arndb.de>
-Message-ID: <20170714.090355.1299368178510322895.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 14 Jul 2017 11:06:03 -0500
+Subject: [PATCH 1/3] mfd: syscon: update Atmel SMC binding doc
+In-Reply-To: <20170711074015.30440-2-ludovic.desroches@microchip.com>
+References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
+ <20170711074015.30440-2-ludovic.desroches@microchip.com>
+Message-ID: <20170714160603.b6hwut3t7spoygdx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 14 Jul 2017 14:07:03 +0200
+On Tue, Jul 11, 2017 at 09:40:13AM +0200, Ludovic Desroches wrote:
+> A new compatible string is introduced for SMC on sama5d2 to manage a
+> different layout of the registers.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/atmel-smc.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-> gcc warns that the temporary buffer might be too small here:
-> 
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function 'bgx_probe':
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: error: '%d' directive writing between 1 and 10 bytes into a region of size between 9 and 11 [-Werror=format-overflow=]
-> sprintf(str, "BGX%d LMAC%d mode", bgx->bgx_id, lmacid);
->              ^~~~~~~~~~~~~~~~~~~
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: note: directive argument in the range [0, 2147483647]
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:3: note: 'sprintf' output between 16 and 27 bytes into a destination of size 20
-> 
-> This probably can't happen, but it can't hurt to make it long
-> enough for the theoretical limit.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Applied.
+Acked-by: Rob Herring <robh@kernel.org>
