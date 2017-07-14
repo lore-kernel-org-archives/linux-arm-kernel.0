@@ -1,87 +1,78 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 14 Jul 2017 10:11:48 -0700
-Subject: [PATCH 1/2] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <1499982763-29619-2-git-send-email-timur@codeaurora.org>
-References: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
- <1499982763-29619-2-git-send-email-timur@codeaurora.org>
-Message-ID: <20170714171148.GH22780@codeaurora.org>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Fri, 14 Jul 2017 14:12:39 -0300
+Subject: [PATCH 1/2 v2] ARM: dts: imx7d-sdb: Add DRM panel support
+Message-ID: <1500052360-19272-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13, Timur Tabi wrote:
-> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-> index 273badd..e915db4 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-> @@ -165,7 +165,22 @@ static int msm_pinmux_set_mux(struct pinctrl_dev *pctldev,
->  	return 0;
->  }
->  
-> +/*
-> + * Request a GPIO. If the number of pins for this GPIO group is zero,
-> + * then assume that the GPIO is unavailable.
-> + */
-> +static int msm_request(struct pinctrl_dev *pctldev, unsigned int offset)
+It is preferred to use the panel compatible string rather than passing the
+LCD timming in the device tree.
 
-These names are awful. Reminds me of the serial driver that has
-functions like msm_reset(). But when in Rome this is how it goes
-I suppose.
+So pass the "innolux,at043tn24" compatible string to describe the parallel
+LCD on this board.
 
-> +{
-> +	struct msm_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-> +	const struct msm_pingroup *g;
-> +
-> +	g = &pctrl->soc->groups[offset];
-> +
-> +	return g->npins ? 0 : -ENODEV;
-> +}
-> +
->  static const struct pinmux_ops msm_pinmux_ops = {
-> +	.request		= msm_request,
->  	.get_functions_count	= msm_get_functions_count,
->  	.get_function_name	= msm_get_function_name,
->  	.get_function_groups	= msm_get_function_groups,
-> @@ -430,6 +445,14 @@ static int msm_gpio_get_direction(struct gpio_chip *chip, unsigned int offset)
->  
->  	g = &pctrl->soc->groups[offset];
->  
-> +	/*
-> +	 * If the GPIO is unavailable, just return error.  This is necessary
-> +	 * because the GPIO layer tries to initialize the direction of all
-> +	 * the GPIOs, even the ones that are unavailable.
-> +	 */
-> +	if (!g->npins)
-> +		return -ENODEV;
-> +
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+---
+Changes since v1:
+- add missed space
+ arch/arm/boot/dts/imx7d-sdb.dts | 36 +++++++++++++-----------------------
+ 1 file changed, 13 insertions(+), 23 deletions(-)
 
-gpiochips also have a request() hook. Can we use that before
-initializing direction to make sure the GPIO is accessible?
-
->  	val = readl(pctrl->regs + g->ctl_reg);
->  
->  	/* 0 = output, 1 = input */
-> @@ -503,7 +531,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
->  
->  	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
->  	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
-> -	seq_printf(s, " %s", pulls[pull]);
-> +	seq_printf(s, " %s\n", pulls[pull]);
->  }
->  
->  static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
-> @@ -511,10 +539,8 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
->  	unsigned gpio = chip->base;
->  	unsigned i;
->  
-> -	for (i = 0; i < chip->ngpio; i++, gpio++) {
-> +	for (i = 0; i < chip->ngpio; i++, gpio++)
->  		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
-> -		seq_puts(s, "\n");
-> -	}
->  }
-
-Were these two hunks necessary? Looks like noise.
-
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 2dce141..1600c7d 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -117,6 +117,16 @@
+ 		regulator-max-microvolt = <3300000>;
+ 		startup-delay-us = <200000>;
+ 	};
++
++	panel {
++		compatible = "innolux,at043tn24";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
++	};
+ };
+ 
+ &adc1 {
+@@ -323,31 +333,11 @@
+ &lcdif {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_lcdif>;
+-	display = <&display0>;
+ 	status = "okay";
+ 
+-	display0: display {
+-		bits-per-pixel = <16>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-
+-			timing0: timing0 {
+-				clock-frequency = <9200000>;
+-				hactive = <480>;
+-				vactive = <272>;
+-				hfront-porch = <8>;
+-				hback-porch = <4>;
+-				hsync-len = <41>;
+-				vback-porch = <2>;
+-				vfront-porch = <4>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
++	port{
++		display_out: endpoint {
++			remote-endpoint = <&panel_in>;
+ 		};
+ 	};
+ };
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
