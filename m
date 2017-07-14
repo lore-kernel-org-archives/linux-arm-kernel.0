@@ -1,93 +1,54 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 14 Jul 2017 12:26:05 +0000
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <1499980882.2865.65.camel@kernel.crashing.org>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
- <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
- <20170713151146.53e9644c@w520.home>
- <1499980882.2865.65.camel@kernel.crashing.org>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B399B4@FRAEML521-MBX.china.huawei.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 14 Jul 2017 13:33:28 +0100
+Subject: [PATCH 11/22] net: thunder_bgx: avoid format string overflow
+ warning
+In-Reply-To: <20170714120720.906842-12-arnd@arndb.de>
+References: <20170714120720.906842-1-arnd@arndb.de>
+ <20170714120720.906842-12-arnd@arndb.de>
+Message-ID: <b741f219-c025-db9a-81ce-3c8e5ab33310@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben, Alex
-
-> -----Original Message-----
-> From: Benjamin Herrenschmidt [mailto:benh at kernel.crashing.org]
-> Sent: 13 July 2017 22:21
-> To: Alex Williamson; Bjorn Helgaas
-> Cc: Gabriele Paoloni; Daniel Axtens; linux-pci at vger.kernel.org;
-> Liuxinliang (Matthew Liu); Rongrong Zou; Catalin Marinas; Will Deacon;
-> linux-arm-kernel at lists.infradead.org; David Airlie; Daniel Vetter
-> Subject: Re: [PATCH v4] PCI: Support hibmc VGA cards behind a
-> misbehaving HiSilicon bridge
+On 14/07/17 13:07, Arnd Bergmann wrote:
+> gcc warns that the temporary buffer might be too small here:
 > 
-> On Thu, 2017-07-13 at 15:11 -0600, Alex Williamson wrote:
-> > > > ????? */
-> > > > -???if (vga_default == NULL &&
-> > > > -?????? ((vgadev->owns & VGA_RSRC_LEGACY_MASK) ==
-> VGA_RSRC_LEGACY_MASK)) {
-> > > > +???if (vga_default == NULL) {
-> > > > ?????????????vgaarb_info(&pdev->dev, "setting as boot VGA
-> device\n");
-> > > > ?????????????vga_set_default_device(pdev);
-> > > > ?????}
-> >
-> >
-> > "Legacy" is the breadcrumb we use to try to pick the same device for
-> > default VGA as the system firmware used as the boot VGA.? There can
-> be
-> > multiple VGA devices in the system, the change above would simply
-> make
-> > the first discovered device be the default VGA.? That would break
-> many,
-> > many systems.? If legacy VGA ranges mean nothing on ARM64, then
-> follow
-> > the powerpc lead and make an arch quirk that simply selects the first
-> > enabled VGA device as the default.? VGA routing is part of the PCI
-> spec
-> > though, so the default of selecting the device with routing enabled
-> > makes sense.? Thanks,
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function 'bgx_probe':
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: error: '%d' directive writing between 1 and 10 bytes into a region of size between 9 and 11 [-Werror=format-overflow=]
+> sprintf(str, "BGX%d LMAC%d mode", bgx->bgx_id, lmacid);
+>              ^~~~~~~~~~~~~~~~~~~
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: note: directive argument in the range [0, 2147483647]
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:3: note: 'sprintf' output between 16 and 27 bytes into a destination of size 20
 > 
-> "Legacy" there iirc also means that it has decoding enabled at boot. If
-> you pick the first one you may pick a device that doesn't and hasn't
-> been initialized by any driver (good old BIOS-initialized text mode).
+> This probably can't happen, but it can't hurt to make it long
+> enough for the theoretical limit.
 
-Right so effectively if there is a legacy dev we should pick that up;
-however what about the following code:
+Probably indeed - both bgx_id and lmacid are u8 here, which would make
+the maximum length of that string, including null terminator, exactly 20
+characters.
 
-diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-index 92f1452..ab3ad9a 100644
---- a/drivers/gpu/vga/vgaarb.c
-+++ b/drivers/gpu/vga/vgaarb.c
-@@ -1424,6 +1424,14 @@ static int __init vga_arb_device_init(void)
- 
- 	list_for_each_entry(vgadev, &vga_list, list) {
- 		struct device *dev = &vgadev->pdev->dev;
-+
-+		/* if no legacy device has been set as default VGA
-+		 * device, just pick up the first one in the list */
-+		if (vga_default == NULL) {
-+			vgaarb_info(dev, "setting as boot VGA device\n");
-+			vga_set_default_device(vgadev->pdev);
-+		}
-+
- #if defined(CONFIG_X86) || defined(CONFIG_IA64)
- 		/*
- 		 * Override vga_arbiter_add_pci_device()'s I/O based detection 
+So in this case the warning is not only silly, it's actively wrong;
+sure, the arguments themselves are being promoted to ints at that point,
+but GCC *knows* the original type, or it couldn't have generated the
+correct code for the call :/
 
-Above after we have filled the list of VGA devices by iterating over all
-PCI devices we check if no legacy one has been set as default VGA device
-yet: therefore we set the first VGA device in the list as default one...
+Robin.
 
-Do you think it would work?
-
-Thanks
-Gab
-
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Cheers,
-> Ben.
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> index a0ca68ce3fbb..79112563a25a 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> @@ -1008,7 +1008,7 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
+>  {
+>  	struct device *dev = &bgx->pdev->dev;
+>  	struct lmac *lmac;
+> -	char str[20];
+> +	char str[27];
+>  
+>  	if (!bgx->is_dlm && lmacid)
+>  		return;
+> 
