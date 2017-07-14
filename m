@@ -1,53 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 14 Jul 2017 15:04:22 -0700
-Subject: [PATCH 1/2] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <e8720afb-fbf9-2330-d4f6-89acb6e839cc@codeaurora.org>
-References: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
- <1499982763-29619-2-git-send-email-timur@codeaurora.org>
- <20170714171148.GH22780@codeaurora.org>
- <8eaeefc0-2f2c-a488-283f-80e26f4d13f5@codeaurora.org>
- <20170714214648.GL22780@codeaurora.org>
- <e8720afb-fbf9-2330-d4f6-89acb6e839cc@codeaurora.org>
-Message-ID: <20170714220422.GM22780@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 14 Jul 2017 15:11:11 -0700
+Subject: [PATCH v2 0/7] ARM: Broadcom Brahma-B15 readahead cache support
+In-Reply-To: <20170623175227.19743-1-f.fainelli@gmail.com>
+References: <20170623175227.19743-1-f.fainelli@gmail.com>
+Message-ID: <23e2f72f-bc22-2084-660f-bc793e68c174@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14, Timur Tabi wrote:
-> On 07/14/2017 04:46 PM, Stephen Boyd wrote:
-> >Right, the gpiolib core would need to be updated to request the
-> >gpio in gpiochip_add_data() around the loop where it goes and
-> >configures things. And it could ignore ones that it can't request
-> >there.
+On 06/23/2017 10:52 AM, Florian Fainelli wrote:
+> Hi all,
 > 
-> __gpiod_request already calls chip->request(), so this would need to
-> be a temporary request.  It seems a bit hackish, but I'll try it.
+> This patch series adds support for the Broadcom Brahma-B15 readahead cache.
+> I submitted that patch series a couple of years ago, and then slept on it so
+> here is another stab at it.
+> 
+> Note that we did not implement this cache as a version of an outer cache
+> for several reasons:
+> 
+> - we initially thought we needed to intercept flush_icache_all and
+>   flush_kern_cache_louis but upon further inspection we convinced ourselves
+>   this is no longer needed, still, flush_cache_all() needs special handling
+>   here and needs to be wrapped around
+> 
+> - the outer cache does not allow differentiating a DMA transfer direction
+>   this is a readahead cache, so it does not participate in writes, flushing
+>   it during reads *and* writes kills the performance completely
+> 
+> - finally, most operations that outer_cache cares about are on MVA, which
+>   is transparent to the readahead cache here
+> 
+> Changes in v2:
+> 
+> - clarify that the read-ahead caches does invalidates on writes (IOW) based
+>   on Russell's feedback
 
-Yeah, request, configure, free, in a loop. Unless someone is
-aware why we don't do that here.
+Any comments on this? Thank you.
 
 > 
-> BTW, I noticed that __gpiod_free() does this:
+> Florian Fainelli (7):
+>   ARM: v7: allow setting different cache functions
+>   ARM: Add Broadcom Brahma-B15 readahead cache support
+>   ARM: Hook B15 readahead cache functions based on processor
+>   ARM: B15: Add CPU hotplug awareness
+>   ARM: B15: Add suspend/resume hooks
+>   ARM: B15: Register reboot notifier for KEXEC
+>   MAINTAINERS: Update brcmstb entries to cover B15 code
 > 
-> 	if (chip->free) {
-> 		spin_unlock_irqrestore(&gpio_lock, flags);
-> --->		might_sleep_if(chip->can_sleep);
-> 		chip->free(chip, gpio_chip_hwgpio(desc));
-> 		spin_lock_irqsave(&gpio_lock, flags);
-> 
-> 
-> Should __gpiod_request() also call might_sleep_if()?
-> 
-> 	if (chip->request) {
-> 		/* chip->request may sleep */
-> 		spin_unlock_irqrestore(&gpio_lock, flags);
-> ---> missing call to might_sleep_if() here?
-> 		status = chip->request(chip, gpio_chip_hwgpio(desc));
-> 		spin_lock_irqsave(&gpio_lock, flags);
+>  MAINTAINERS                                   |   2 +
+>  arch/arm/include/asm/glue-cache.h             |   4 +
+>  arch/arm/include/asm/hardware/cache-b15-rac.h |  10 +
+>  arch/arm/mm/Kconfig                           |   8 +
+>  arch/arm/mm/Makefile                          |   1 +
+>  arch/arm/mm/cache-b15-rac.c                   | 360 ++++++++++++++++++++++++++
+>  arch/arm/mm/cache-v7.S                        |  21 ++
+>  arch/arm/mm/proc-v7.S                         |   6 +-
+>  include/linux/cpuhotplug.h                    |   2 +
+>  9 files changed, 411 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/include/asm/hardware/cache-b15-rac.h
+>  create mode 100644 arch/arm/mm/cache-b15-rac.c
 > 
 
-Probably. Except we would have caught it earlier when it was
-requested?
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Florian
