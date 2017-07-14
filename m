@@ -1,59 +1,60 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:14 +0100
-Subject: [PATCH v3 09/18] coresight replicator: Expose replicator management
- registers
+Date: Fri, 14 Jul 2017 14:04:17 +0100
+Subject: [PATCH v3 12/18] coresight tmc: Detect support for scatter gather
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-13-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose the idfilter* registers of the programmable replicator.
+The SG unit in the TMC has been removed in Coresight SoC-600.
+This is however advertised by DEVID:Bit 24 = 0b1. On the
+previous generation, the bit is RES0, hence we can rely on the
+DEVID to detect the support.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Mike Leach <mike.leach@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../coresight/coresight-dynamic-replicator.c        | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc.c | 2 ++
+ drivers/hwtracing/coresight/coresight-tmc.h | 5 +++++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index ccbafaf..4df4726 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -95,6 +95,26 @@ static const struct coresight_ops replicator_cs_ops = {
- 	.link_ops	= &replicator_link_ops,
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index ebf81bc..a1de265 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -304,6 +304,8 @@ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
+ 	/* Set the unadvertised capabilities */
+ 	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
+ 
++	if (!(devid & TMC_DEVID_NOSCAT))
++		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
+ 	/*
+ 	 * ETR configuration uses a 40-bit AXI master in place of
+ 	 * the embedded SRAM of ETB/ETF.
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index b2ebcef..bc94550 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -70,6 +70,8 @@
+ #define TMC_FFCR_STOP_ON_FLUSH	BIT(12)
+ 
+ 
++#define TMC_DEVID_NOSCAT	BIT(24)
++
+ enum tmc_config_type {
+ 	TMC_CONFIG_TYPE_ETB,
+ 	TMC_CONFIG_TYPE_ETR,
+@@ -89,6 +91,9 @@ enum tmc_mem_intf_width {
+ 	TMC_MEM_INTF_WIDTH_256BITS	= 8,
  };
  
-+coresight_simple_func(struct replicator_state, NULL, idfilter0,
-+				 REPLICATOR_IDFILTER0);
-+coresight_simple_func(struct replicator_state, NULL, idfilter1,
-+				REPLICATOR_IDFILTER1);
-+static struct attribute *replicator_mgmt_attrs[] = {
-+	&dev_attr_idfilter0.attr,
-+	&dev_attr_idfilter1.attr,
-+	NULL,
-+};
++/* TMC ETR Capability bit definitions */
++#define TMC_ETR_SG			(0x1U << 0)
 +
-+static const struct attribute_group replicator_mgmt_group = {
-+	.attrs = replicator_mgmt_attrs,
-+	.name = "mgmt",
-+};
-+
-+static const struct attribute_group *replicator_groups[] = {
-+	&replicator_mgmt_group,
-+	NULL,
-+};
-+
- static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	int ret;
-@@ -139,6 +159,7 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
- 	desc.ops = &replicator_cs_ops;
- 	desc.pdata = adev->dev.platform_data;
- 	desc.dev = &adev->dev;
-+	desc.groups = replicator_groups;
- 	drvdata->csdev = coresight_register(&desc);
- 	if (IS_ERR(drvdata->csdev))
- 		return PTR_ERR(drvdata->csdev);
+ /**
+  * struct tmc_drvdata - specifics associated to an TMC component
+  * @base:	memory mapped base address for this component.
 -- 
 2.7.5
