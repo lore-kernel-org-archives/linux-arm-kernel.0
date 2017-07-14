@@ -1,74 +1,491 @@
-From: jacobchen110@gmail.com (Jacob Chen)
-Date: Fri, 14 Jul 2017 09:52:30 +0800
-Subject: [PATCH 1/5] arm64: dts: rockchip: Add rk3399 vop and
- display-subsystem
-In-Reply-To: <4655605.dLm3uFpe8F@phil>
-References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
- <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
- <4655605.dLm3uFpe8F@phil>
-Message-ID: <CAFLEztSbZExA2_t5D+TWGsrCU5Gqrg7azdi97brhjO2wPdup3A@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 14 Jul 2017 10:16:26 +0800
+Subject: [PATCH v3 1/2] ARM: dts: imx: add CX9020 Embedded PC device tree
+In-Reply-To: <20170713111340.13862-2-linux-kernel-dev@beckhoff.com>
+References: <20170712090408.12212-1-linux-kernel-dev@beckhoff.com>
+ <20170713111340.13862-1-linux-kernel-dev@beckhoff.com>
+ <20170713111340.13862-2-linux-kernel-dev@beckhoff.com>
+Message-ID: <20170714021624.GZ3172@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi heko,
+On Thu, Jul 13, 2017 at 01:13:38PM +0200, linux-kernel-dev at beckhoff.com wrote:
+> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+> 
+> The CX9020 differs from i.MX53 Quick Start Board by:
+> - use uart2 instead of uart1
+> - DVI-D connector instead of VGA
+> - no audio
+> - CCAT FPGA connected to emi
+> - enable rtc
+> 
+> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+> 
+> ---
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> 
+> v3: add missig changelog
+> v2:
+> - keep alphabetic order of dts/Makefile
+> - configure uart2 with 'fsl,dte-mode'
+> - use display-0 and panel-0 as node names
+> - remove unnecessary "simple-bus" for fixed regulators
+> ---
+>  arch/arm/boot/dts/Makefile         |   1 +
+>  arch/arm/boot/dts/imx53-cx9020.dts | 370 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 371 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx53-cx9020.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9c5e1d944d1c..590cdb77d972 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -338,6 +338,7 @@ dtb-$(CONFIG_SOC_IMX51) += \
+>  	imx51-ts4800.dtb
+>  dtb-$(CONFIG_SOC_IMX53) += \
+>  	imx53-ard.dtb \
+> +	imx53-cx9020.dtb \
+>  	imx53-m53evk.dtb \
+>  	imx53-mba53.dtb \
+>  	imx53-qsb.dtb \
+> diff --git a/arch/arm/boot/dts/imx53-cx9020.dts b/arch/arm/boot/dts/imx53-cx9020.dts
+> new file mode 100644
+> index 000000000000..0c3de61a5f4f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-cx9020.dts
+> @@ -0,0 +1,370 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx53.dtsi"
+> +
+> +#define MX53_PAD_EIM_D26__UART2_RXD_MUX    0x144 0x48c 0x880 0x2 0x0
+> +#define MX53_PAD_EIM_D27__UART2_TXD_MUX    0x148 0x490 0x000 0x2 0x0
+> +#define MX53_PAD_EIM_D28__UART2_RTS        0x14c 0x494 0x87c 0x2 0x0
+> +#define MX53_PAD_EIM_D29__UART2_CTS        0x150 0x498 0x000 0x2 0x0
 
-2017-07-14 7:34 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
-> Hi Jacob,
->
-> Am Donnerstag, 13. Juli 2017, 00:03:51 CEST schrieb Jacob Chen:
->> Add devicetree nodes for rk3399 VOP (Video Output Processors), and the
->> top level display-subsystem root node.
->>
->> Later patches add endpoints (eDP, HDMI, MIPI, etc) that attach to the
->> VOPs' output ports.
->>
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
->> ---
->>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 65 ++++++++++++++++++++++++++++++++
->>  1 file changed, 65 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> index e795135..300e500 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -1455,6 +1455,71 @@
->>               status = "disabled";
->>       };
->>
->> +     vopl: vop at ff8f0000 {
->> +             compatible = "rockchip,rk3399-vop-lit";
->> +             reg = <0x0 0xff8f0000 0x0 0x1ffc>, <0x0 0xff8f2000 0x0 0x400>;
->
-> What is this second memory region doing? It looks like this is the meant
-> to cover VOP_GAMMA_LUT_ADDR, but can't you just map the whole area?
-> ChromeOS seems to be doing fine using the whole area as
->         <0x0 0xff8f0000 0x0 0x3efc>
-> and I've also not seen any code changes actually mapping/using this
-> second area.
->
+Why cannot these be defined in imx53-pinfunc.h?
 
-0x1c00 - 0x200 for cabc_lut
-0x2000 - 0x300 for gama_lut
+> +
+> +/ {
+> +	model = "Freescale i.MX53 based Beckhoff CX9020";
 
-My mistakes, It seems mark havn't send gamma and cabc support to upstream.
-We shoud just using the whole area map.
+This isn't a board manufactured by Freescale, right?
 
+> +	compatible = "fsl,imx53-qsb", "fsl,imx53";
 
->
->> +             interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
->> +             clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>, <&cru DCLK_VOP1_DIV>;
->> +             clock-names = "aclk_vop", "dclk_vop", "hclk_vop", "dclk_source";
->
-> While I know that this is based on my idea on handling the hdmi pll-rate
-> requirements, I haven't found the matching code- and dt-binding-changes
-> posted to a list yet.
->
+Don't you need a compatible for Beckhoff CX9020 rather than using
+fsl,imx53-qsb?
 
-Yeah, should i collect mark's patches or remove it at first?
+> +
+> +	chosen {
+> +		stdout-path = &uart2;
+> +	};
+> +
+> +	memory {
+> +		reg = <0x70000000 0x20000000>,
+> +		      <0xb0000000 0x20000000>;
+> +	};
+> +
+> +	ccat {
+> +		compatible = "bhf,emi-ccat";
 
->
-> Heiko
->
+Undocumented bindings?
+
+> +	};
+> +
+> +	display-0 {
+> +		#address-cells =<1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,imx-parallel-display";
+> +		interface-pix-fmt = "rgb24";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_ipu_disp0>;
+> +		status = "okay";
+> +
+> +		port at 0 {
+> +			reg = <0>;
+
+Please a newline between property list and child node.
+
+> +			display0_in: endpoint {
+> +				remote-endpoint = <&ipu_di0_disp0>;
+> +			};
+> +		};
+> +
+> +		port at 1 {
+> +			reg = <1>;
+> +			display0_out: endpoint {
+> +				remote-endpoint = <&panel_in>;
+> +			};
+> +		};
+> +	};
+> +
+> +	panel-0 {
+> +		#address-cells =<1>;
+> +		#size-cells = <0>;
+> +		compatible = "simple,ddc-only";
+
+Send me the dts change only after the bindings and driver parts land on
+mainline.
+
+> +		ddc-i2c-bus = <&i2c2>;
+> +
+> +		port {
+> +			panel_in: endpoint {
+> +				remote-endpoint = <&display0_out>;
+> +			};
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+
+newline
+
+> +		pwr_r {
+
+We prefer to use hyphen than underscore in node name.
+
+> +			gpios = <&gpio3 22 0>;
+
+Use the polarity defines in include/dt-bindings/gpio/gpio.h.
+
+> +			default-state = "off";
+> +		};
+
+Please have a newline between child nodes.
+
+> +		pwr_g {
+> +			gpios = <&gpio3 24 0>;
+> +			default-state = "on";
+> +		};
+> +		pwr_b {
+> +			gpios = <&gpio3 23 0>;
+> +			default-state = "off";
+> +		};
+> +	};
+> +
+> +	rtc: rtc at 53fa4000 {
+> +		compatible = "fsl,imx53-rtc", "fsl,imx25-rtc";
+> +		reg = <0x53fa4000 0x4000>;
+> +		interrupts = <24>;
+> +		interrupt-parent = <&tzic>;
+> +		clocks = <&clks IMX5_CLK_SRTC_GATE>;
+> +		clock-names = "ipg";
+> +	};
+
+It should be added to imx53.dtsi.
+
+> +
+> +	reg_3p2v: regulator at 0 {
+
+name at unit-address only applies to device nodes under bus with 'reg'
+property.  You should go regulator-3p2v in your case.
+
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "3P2V";
+> +		regulator-min-microvolt = <3200000>;
+> +		regulator-max-microvolt = <3200000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	reg_usb_vbus: regulator at 1 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio7 8 0>;
+> +		enable-active-high;
+> +	};
+> +};
+> +
+> +&esdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_esdhc1>;
+> +	cd-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
+> +	bus-width = <4>;
+> +	status = "okay";
+> +};
+> +
+> +&esdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_esdhc2>;
+> +	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+> +	bus-width = <4>;
+> +	status = "okay";
+> +};
+> +
+> +&ipu_di0_disp0 {
+> +	remote-endpoint = <&display0_in>;
+> +};
+> +
+> +&ssi2 {
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+
+We generally sort these labelled nodes alphabetically.  Considering
+iomuxc usually contains a lot of pinctrl data which might impact the
+readability of the file, it can be put at the bottom of the file.
+
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	imx53-qsb {
+
+This container node can be dropped to save one level of indent.
+
+> +		pinctrl_hog: hoggrp {
+> +			fsl,pins = <
+> +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
+
+Please use a proper configuration value rather than relying on the value
+coming out of reset or firmware setup.
+
+> +				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
+> +				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
+> +				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
+> +				MX53_PAD_GPIO_1__GPIO1_1          0x80000000
+> +				MX53_PAD_GPIO_4__GPIO1_4          0x80000000
+> +				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
+> +				MX53_PAD_PATA_DA_2__GPIO7_8	  0x80000000
+> +				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
+> +
+
+Drop this newline.
+
+> +				MX53_PAD_EIM_OE__EMI_WEIM_OE            0x80000000
+> +				MX53_PAD_EIM_WAIT__EMI_WEIM_WAIT        0x80000000
+> +				MX53_PAD_EIM_LBA__EMI_WEIM_LBA          0x80000000
+> +				MX53_PAD_EIM_RW__EMI_WEIM_RW            0x80000000
+> +				MX53_PAD_EIM_EB0__EMI_WEIM_EB_0         0x80000000
+> +				MX53_PAD_EIM_EB1__EMI_WEIM_EB_1         0x80000000
+> +				MX53_PAD_EIM_EB2__EMI_WEIM_EB_2         0x80000000
+> +				MX53_PAD_EIM_EB3__EMI_WEIM_EB_3         0x80000000
+> +				MX53_PAD_EIM_CS0__EMI_WEIM_CS_0         0x80000000
+> +				MX53_PAD_EIM_CS1__EMI_WEIM_CS_1         0x80000000
+> +				MX53_PAD_EIM_A16__EMI_WEIM_A_16         0x80000000
+> +				MX53_PAD_EIM_A17__EMI_WEIM_A_17         0x80000000
+> +				MX53_PAD_EIM_A18__EMI_WEIM_A_18         0x80000000
+> +				MX53_PAD_EIM_A19__EMI_WEIM_A_19         0x80000000
+> +				MX53_PAD_EIM_A20__EMI_WEIM_A_20         0x80000000
+> +				MX53_PAD_EIM_A21__EMI_WEIM_A_21         0x80000000
+> +				MX53_PAD_EIM_A22__EMI_WEIM_A_22         0x80000000
+> +				MX53_PAD_EIM_DA0__EMI_NAND_WEIM_DA_0    0xa4
+> +				MX53_PAD_EIM_DA1__EMI_NAND_WEIM_DA_1    0xa4
+> +				MX53_PAD_EIM_DA2__EMI_NAND_WEIM_DA_2    0xa4
+> +				MX53_PAD_EIM_DA3__EMI_NAND_WEIM_DA_3    0xa4
+> +				MX53_PAD_EIM_DA4__EMI_NAND_WEIM_DA_4    0xa4
+> +				MX53_PAD_EIM_DA5__EMI_NAND_WEIM_DA_5    0xa4
+> +				MX53_PAD_EIM_DA6__EMI_NAND_WEIM_DA_6    0xa4
+> +				MX53_PAD_EIM_DA7__EMI_NAND_WEIM_DA_7    0xa4
+> +				MX53_PAD_EIM_DA8__EMI_NAND_WEIM_DA_8    0xa4
+> +				MX53_PAD_EIM_DA9__EMI_NAND_WEIM_DA_9    0xa4
+> +				MX53_PAD_EIM_DA10__EMI_NAND_WEIM_DA_10	0xa4
+> +				MX53_PAD_EIM_DA11__EMI_NAND_WEIM_DA_11  0xa4
+> +				MX53_PAD_EIM_DA12__EMI_NAND_WEIM_DA_12  0xa4
+> +				MX53_PAD_EIM_DA13__EMI_NAND_WEIM_DA_13  0xa4
+> +				MX53_PAD_EIM_DA14__EMI_NAND_WEIM_DA_14  0xa4
+> +				MX53_PAD_EIM_DA15__EMI_NAND_WEIM_DA_15  0xa4
+> +				MX53_PAD_PATA_DATA0__EMI_NANDF_D_0      0xa4
+> +				MX53_PAD_PATA_DATA1__EMI_NANDF_D_1      0xa4
+> +				MX53_PAD_PATA_DATA2__EMI_NANDF_D_2      0xa4
+> +				MX53_PAD_PATA_DATA3__EMI_NANDF_D_3      0xa4
+> +				MX53_PAD_PATA_DATA4__EMI_NANDF_D_4      0xa4
+> +				MX53_PAD_PATA_DATA5__EMI_NANDF_D_5      0xa4
+> +				MX53_PAD_PATA_DATA6__EMI_NANDF_D_6      0xa4
+> +				MX53_PAD_PATA_DATA7__EMI_NANDF_D_7      0xa4
+> +				MX53_PAD_PATA_DATA8__EMI_NANDF_D_8      0xa4
+> +				MX53_PAD_PATA_DATA9__EMI_NANDF_D_9      0xa4
+> +				MX53_PAD_PATA_DATA10__EMI_NANDF_D_10    0xa4
+> +				MX53_PAD_PATA_DATA11__EMI_NANDF_D_11    0xa4
+> +				MX53_PAD_PATA_DATA12__EMI_NANDF_D_12    0xa4
+> +				MX53_PAD_PATA_DATA13__EMI_NANDF_D_13    0xa4
+> +				MX53_PAD_PATA_DATA14__EMI_NANDF_D_14    0xa4
+> +				MX53_PAD_PATA_DATA15__EMI_NANDF_D_15    0xa4
+> +				MX53_PAD_NANDF_CLE__GPIO6_7             0x00000001
+> +				MX53_PAD_NANDF_WP_B__GPIO6_9            0x00000001
+> +				MX53_PAD_NANDF_ALE__GPIO6_8             0x00000001
+
+Do you really need so many pin setups in hog group?  The hog group is
+only for those pins that do not have a clear client device.
+
+> +			>;
+> +		};
+> +
+> +		led_pin_gpio3_23: led_gpio3_23 at 0 {
+
+How is this being used?
+
+> +			fsl,pins = <
+> +				MX53_PAD_EIM_D23__GPIO3_23 0x80000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_audmux: audmuxgrp {
+> +			fsl,pins = <
+> +				MX53_PAD_KEY_COL0__AUDMUX_AUD5_TXC	0x80000000
+> +				MX53_PAD_KEY_ROW0__AUDMUX_AUD5_TXD	0x80000000
+> +				MX53_PAD_KEY_COL1__AUDMUX_AUD5_TXFS	0x80000000
+> +				MX53_PAD_KEY_ROW1__AUDMUX_AUD5_RXD	0x80000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_esdhc1: esdhc1grp {
+> +			fsl,pins = <
+> +				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
+> +				MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
+> +				MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
+> +				MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
+> +				MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
+> +				MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
+> +			>;
+> +		};
+> +
+> +		pinctrl_esdhc2: esdhc2grp {
+> +			fsl,pins = <
+> +				MX53_PAD_SD2_DATA0__ESDHC2_DAT0		0x1d5
+> +				MX53_PAD_SD2_DATA1__ESDHC2_DAT1		0x1d5
+> +				MX53_PAD_SD2_DATA2__ESDHC2_DAT2		0x1d5
+> +				MX53_PAD_SD2_DATA3__ESDHC2_DAT3		0x1d5
+> +				MX53_PAD_SD2_CMD__ESDHC2_CMD		0x1d5
+> +				MX53_PAD_SD2_CLK__ESDHC2_CLK		0x1d5
+> +			>;
+> +		};
+> +
+> +		pinctrl_fec: fecgrp {
+> +			fsl,pins = <
+> +				MX53_PAD_FEC_MDC__FEC_MDC		0x80000000
+> +				MX53_PAD_FEC_MDIO__FEC_MDIO		0x80000000
+> +				MX53_PAD_FEC_REF_CLK__FEC_TX_CLK	0x80000000
+> +				MX53_PAD_FEC_RX_ER__FEC_RX_ER		0x80000000
+> +				MX53_PAD_FEC_CRS_DV__FEC_RX_DV		0x80000000
+> +				MX53_PAD_FEC_RXD1__FEC_RDATA_1		0x80000000
+> +				MX53_PAD_FEC_RXD0__FEC_RDATA_0		0x80000000
+> +				MX53_PAD_FEC_TX_EN__FEC_TX_EN		0x80000000
+> +				MX53_PAD_FEC_TXD1__FEC_TDATA_1		0x80000000
+> +				MX53_PAD_FEC_TXD0__FEC_TDATA_0		0x80000000
+> +			>;
+> +		};
+> +
+> +		/* open drain */
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX53_PAD_CSI0_DAT8__I2C1_SDA		0x400001ec
+> +				MX53_PAD_CSI0_DAT9__I2C1_SCL		0x400001ec
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c2: i2c2grp {
+> +			fsl,pins = <
+> +				MX53_PAD_KEY_ROW3__I2C2_SDA             0xc0000000
+> +				MX53_PAD_KEY_COL3__I2C2_SCL             0xc0000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_ipu_disp0: ipudisp0grp {
+> +			fsl,pins = <
+> +				MX53_PAD_DI0_DISP_CLK__IPU_DI0_DISP_CLK	0x5
+> +				MX53_PAD_DI0_PIN15__IPU_DI0_PIN15	0x5
+> +				MX53_PAD_DI0_PIN2__IPU_DI0_PIN2		0x5
+> +				MX53_PAD_DI0_PIN3__IPU_DI0_PIN3		0x5
+> +				MX53_PAD_DI0_PIN4__IPU_DI0_PIN4		0x5
+> +				MX53_PAD_DISP0_DAT0__IPU_DISP0_DAT_0	0x5
+> +				MX53_PAD_DISP0_DAT1__IPU_DISP0_DAT_1	0x5
+> +				MX53_PAD_DISP0_DAT2__IPU_DISP0_DAT_2	0x5
+> +				MX53_PAD_DISP0_DAT3__IPU_DISP0_DAT_3	0x5
+> +				MX53_PAD_DISP0_DAT4__IPU_DISP0_DAT_4	0x5
+> +				MX53_PAD_DISP0_DAT5__IPU_DISP0_DAT_5	0x5
+> +				MX53_PAD_DISP0_DAT6__IPU_DISP0_DAT_6	0x5
+> +				MX53_PAD_DISP0_DAT7__IPU_DISP0_DAT_7	0x5
+> +				MX53_PAD_DISP0_DAT8__IPU_DISP0_DAT_8	0x5
+> +				MX53_PAD_DISP0_DAT9__IPU_DISP0_DAT_9	0x5
+> +				MX53_PAD_DISP0_DAT10__IPU_DISP0_DAT_10	0x5
+> +				MX53_PAD_DISP0_DAT11__IPU_DISP0_DAT_11	0x5
+> +				MX53_PAD_DISP0_DAT12__IPU_DISP0_DAT_12	0x5
+> +				MX53_PAD_DISP0_DAT13__IPU_DISP0_DAT_13	0x5
+> +				MX53_PAD_DISP0_DAT14__IPU_DISP0_DAT_14	0x5
+> +				MX53_PAD_DISP0_DAT15__IPU_DISP0_DAT_15	0x5
+> +				MX53_PAD_DISP0_DAT16__IPU_DISP0_DAT_16	0x5
+> +				MX53_PAD_DISP0_DAT17__IPU_DISP0_DAT_17	0x5
+> +				MX53_PAD_DISP0_DAT18__IPU_DISP0_DAT_18	0x5
+> +				MX53_PAD_DISP0_DAT19__IPU_DISP0_DAT_19	0x5
+> +				MX53_PAD_DISP0_DAT20__IPU_DISP0_DAT_20	0x5
+> +				MX53_PAD_DISP0_DAT21__IPU_DISP0_DAT_21	0x5
+> +				MX53_PAD_DISP0_DAT22__IPU_DISP0_DAT_22	0x5
+> +				MX53_PAD_DISP0_DAT23__IPU_DISP0_DAT_23	0x5
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart2: uart2grp {
+> +			fsl,pins = <
+> +				MX53_PAD_EIM_D26__UART2_RXD_MUX	0x1e4
+> +				MX53_PAD_EIM_D27__UART2_TXD_MUX 0x1e4
+> +				MX53_PAD_EIM_D28__UART2_RTS 0x1e4
+> +				MX53_PAD_EIM_D29__UART2_CTS 0x1e4
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	fsl,dte-mode;
+> +	status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux>;
+> +	status = "okay";
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_fec>;
+> +	phy-mode = "rmii";
+> +	phy-reset-gpios = <&gpio7 6 0>;
+> +	status = "okay";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +};
+> +
+> +&vpu {
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	vbus-supply = <&reg_usb_vbus>;
+> +	phy_type = "utmi";
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	dr_mode = "peripheral";
+> +	status = "okay";
+> +};
+
+Sort these labelled nodes alphabetically.
+
+Shawn
