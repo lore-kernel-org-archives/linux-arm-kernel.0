@@ -1,88 +1,20 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 13 Jul 2017 18:49:11 -0500
-Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
-In-Reply-To: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
-References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170713234910.GB5944@bhelgaas-glaptop.roam.corp.google.com>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Fri, 14 Jul 2017 00:00:07 +0000
+Subject: [PATCH v7 3/3] net/cxgb4: Use new
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <CAKgT0Uf8Tg6AFthXt-bJrdNHCqJ3MfzduR1yCMMsjLYoEFXb-w@mail.gmail.com>
+References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
+ <1499955692-26556-4-git-send-email-dingtianhong@huawei.com>
+ <CAKgT0UcBFBk9T7g0Dh-rHY6Z+6-4=5jsUWHbLcSMc+ohdTz=CA@mail.gmail.com>,
+ <CAKgT0Uf8Tg6AFthXt-bJrdNHCqJ3MfzduR1yCMMsjLYoEFXb-w@mail.gmail.com>
+Message-ID: <MWHPR12MB16004FB4E5A3DFB5B8D87876C8AC0@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 05:07:14PM -0400, Sinan Kaya wrote:
-> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
-> following a Function Level Reset (FLR) request to indicate that it is not
-> ready to accept new requests.
-> 
-> Seen a timeout message with Intel 750 NVMe drive and FLR reset.
-> 
-> Kernel enables CRS visibility in pci_enable_crs() function for each bridge
-> it discovers. The OS observes a special vendor ID read value of 0xFFFF0001
-> in this case. We need to keep polling until this special read value
-> disappears. pci_bus_read_dev_vendor_id() takes care of CRS handling for a
-> given vendor id read request under the covers.
+[[ Sorry for the Double Send: I forgot to switch to Plain Text.  Have I mentioned how much I hate modern Web-based email agents? :-) -- Casey ]]
 
-This patch isn't about how CRS works; we already have support for
-that.  So this paragraph is mostly extraneous and can be replaced by a
-simple reference to CRS in the spec.  
+? Yeah, I think this works  for now.? We'll stumble over what to do when we want to mix upstream  TLPs without Relaxed Ordering Attributes directed at problematic Root  Complexes, and Peer-to-Peer TLPs with Relaxed Ordering Attributes ... or vice versa depending on which target PCIe Device has  issues with Relaxed Ordering.
 
-> Adding a vendor ID read if this is a physical function before attempting
-> to read any other registers on the endpoint. A CRS indication will only
-> be given if the address to be read is vendor ID register.
-> 
-> Note that virtual functions report their vendor ID through another
-> mechanism.
+? Thanks for all the work!
 
-How VFs report vendor ID is irrelevant.
-
-What *is* relevant is how FLR affects VFs.  The SR-IOV spec, r1.1,
-sec 2.2.2, says FLR doesn't affect a VF's existence in config space.
-
-That suggests to me that reading a VF's PCI_COMMAND register after an
-FLR should always return valid data (never ~0).  I suppose an FLR VF
-reset isn't instantaneous, though, so I suppose we do need the 100ms
-delay.  But maybe we should just return immediately after that,
-without reading any VF config space?
-
-pci_flr_wait() was added by 5adecf817dd6 ("PCI: Wait for up to 1000ms
-after FLR reset"); maybe Alex has more insight into this.
-
-> The spec is calling to wait up to 1 seconds if the device is sending CRS.
-> The NVMe device seems to be requiring more. Relax this up to 60 seconds.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index aab9d51..83a9784 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3723,10 +3723,16 @@ static void pci_flr_wait(struct pci_dev *dev)
->  	int i = 0;
->  	u32 id;
->  
-> -	do {
-> -		msleep(100);
-> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
-> -	} while (i++ < 10 && id == ~0);
-> +	if (dev->is_virtfn) {
-> +		do {
-> +			msleep(100);
-> +			pci_read_config_dword(dev, PCI_COMMAND, &id);
-> +		} while (i++ < 10 && id == ~0);
-> +	} else {
-> +		if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
-> +						60*1000))
-> +			id = ~0;
-> +	}
->  
->  	if (id == ~0)
->  		dev_warn(&dev->dev, "Failed to return from FLR\n");
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Casey    
