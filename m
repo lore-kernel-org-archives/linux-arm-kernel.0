@@ -1,60 +1,61 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:17 +0100
-Subject: [PATCH v3 12/18] coresight tmc: Detect support for scatter gather
+Date: Fri, 14 Jul 2017 14:04:15 +0100
+Subject: [PATCH v3 10/18] coresight tmc: Handle configuration types properly
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-11-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SG unit in the TMC has been removed in Coresight SoC-600.
-This is however advertised by DEVID:Bit 24 = 0b1. On the
-previous generation, the bit is RES0, hence we can rely on the
-DEVID to detect the support.
+Coresight SoC 600 defines a new configuration for TMC, Embedded Trace
+Streamer (ETS), indicated by 0x3 in MODE:CONFIG_TYPE. This would break
+the existing driver which will treat anything other than ETR/ETB as an
+ETF. Fix the driver to check the configuration type properly and also
+add a warning if we encounter an unsupported configuration (ETS).
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mike Leach <mike.leach@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 2 ++
- drivers/hwtracing/coresight/coresight-tmc.h | 5 +++++
- 2 files changed, 7 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index ebf81bc..a1de265 100644
+index 6bf4170..73184a1 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -304,6 +304,8 @@ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
- 	/* Set the unadvertised capabilities */
- 	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
+@@ -358,11 +358,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 	desc.dev = dev;
+ 	desc.groups = coresight_tmc_groups;
  
-+	if (!(devid & TMC_DEVID_NOSCAT))
-+		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
- 	/*
- 	 * ETR configuration uses a 40-bit AXI master in place of
- 	 * the embedded SRAM of ETB/ETF.
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index b2ebcef..bc94550 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -70,6 +70,8 @@
- #define TMC_FFCR_STOP_ON_FLUSH	BIT(12)
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++	switch (drvdata->config_type) {
++	case TMC_CONFIG_TYPE_ETB:
+ 		desc.type = CORESIGHT_DEV_TYPE_SINK;
+ 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+ 		desc.ops = &tmc_etb_cs_ops;
+-	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		break;
++	case TMC_CONFIG_TYPE_ETR:
+ 		desc.type = CORESIGHT_DEV_TYPE_SINK;
+ 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+ 		desc.ops = &tmc_etr_cs_ops;
+@@ -373,10 +375,16 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
+ 		if (ret)
+ 			goto out;
+-	} else {
++		break;
++	case TMC_CONFIG_TYPE_ETF:
+ 		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
+ 		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
+ 		desc.ops = &tmc_etf_cs_ops;
++		break;
++	default:
++		pr_err("%s: Unsupported TMC config\n", pdata->name);
++		ret = -EINVAL;
++		goto out;
+ 	}
  
- 
-+#define TMC_DEVID_NOSCAT	BIT(24)
-+
- enum tmc_config_type {
- 	TMC_CONFIG_TYPE_ETB,
- 	TMC_CONFIG_TYPE_ETR,
-@@ -89,6 +91,9 @@ enum tmc_mem_intf_width {
- 	TMC_MEM_INTF_WIDTH_256BITS	= 8,
- };
- 
-+/* TMC ETR Capability bit definitions */
-+#define TMC_ETR_SG			(0x1U << 0)
-+
- /**
-  * struct tmc_drvdata - specifics associated to an TMC component
-  * @base:	memory mapped base address for this component.
+ 	drvdata->csdev = coresight_register(&desc);
 -- 
 2.7.5
