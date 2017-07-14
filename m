@@ -1,47 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Jul 2017 14:27:19 +0200
-Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
- interpreted as bool
-In-Reply-To: <20170714120512.ioe67nnloqivtbr7@mwanda>
-References: <20170714092540.1217397-1-arnd@arndb.de>
- <20170714093938.1469319-1-arnd@arndb.de>
- <20170714120512.ioe67nnloqivtbr7@mwanda>
-Message-ID: <CAK8P3a0f84OPcCK1r3P9inGYDJC2KaAO4mjE2vn+vCws-oo_bw@mail.gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 14 Jul 2017 12:26:05 +0000
+Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
+ HiSilicon bridge
+In-Reply-To: <1499980882.2865.65.camel@kernel.crashing.org>
+References: <20170712050811.3620-1-dja@axtens.net>
+ <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
+ <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+ <20170713151146.53e9644c@w520.home>
+ <1499980882.2865.65.camel@kernel.crashing.org>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B399B4@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 2:05 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
-> Changing:
->
-> - if (!frob()) {
-> + if (frob() == 0) {
->
-> is a totally pointless change.  They're both bad, because they're doing
-> success testing instead of failure testing, but probably the second one
-> is slightly worse.
->
-> This warning seems dumb.  I can't imagine it has even a 10% success rate
-> at finding real bugs.  Just disable it.
->
-> Changing the code to propagate error codes, is the right thing of course
-> so long as it doesn't introduce bugs.
+Hi Ben, Alex
 
-It found a two of bugs that I fixed earlier:
+> -----Original Message-----
+> From: Benjamin Herrenschmidt [mailto:benh at kernel.crashing.org]
+> Sent: 13 July 2017 22:21
+> To: Alex Williamson; Bjorn Helgaas
+> Cc: Gabriele Paoloni; Daniel Axtens; linux-pci at vger.kernel.org;
+> Liuxinliang (Matthew Liu); Rongrong Zou; Catalin Marinas; Will Deacon;
+> linux-arm-kernel at lists.infradead.org; David Airlie; Daniel Vetter
+> Subject: Re: [PATCH v4] PCI: Support hibmc VGA cards behind a
+> misbehaving HiSilicon bridge
+> 
+> On Thu, 2017-07-13 at 15:11 -0600, Alex Williamson wrote:
+> > > > ????? */
+> > > > -???if (vga_default == NULL &&
+> > > > -?????? ((vgadev->owns & VGA_RSRC_LEGACY_MASK) ==
+> VGA_RSRC_LEGACY_MASK)) {
+> > > > +???if (vga_default == NULL) {
+> > > > ?????????????vgaarb_info(&pdev->dev, "setting as boot VGA
+> device\n");
+> > > > ?????????????vga_set_default_device(pdev);
+> > > > ?????}
+> >
+> >
+> > "Legacy" is the breadcrumb we use to try to pick the same device for
+> > default VGA as the system firmware used as the boot VGA.? There can
+> be
+> > multiple VGA devices in the system, the change above would simply
+> make
+> > the first discovered device be the default VGA.? That would break
+> many,
+> > many systems.? If legacy VGA ranges mean nothing on ARM64, then
+> follow
+> > the powerpc lead and make an arch quirk that simply selects the first
+> > enabled VGA device as the default.? VGA routing is part of the PCI
+> spec
+> > though, so the default of selecting the device with routing enabled
+> > makes sense.? Thanks,
+> 
+> "Legacy" there iirc also means that it has decoding enabled at boot. If
+> you pick the first one you may pick a device that doesn't and hasn't
+> been initialized by any driver (good old BIOS-initialized text mode).
 
-f0e8faa7a5e8 ("ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation")
-af15769ffab1 ("scsi: mvsas: fix command_active typo")
+Right so effectively if there is a legacy dev we should pick that up;
+however what about the following code:
 
-plus three patches from this series:
+diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+index 92f1452..ab3ad9a 100644
+--- a/drivers/gpu/vga/vgaarb.c
++++ b/drivers/gpu/vga/vgaarb.c
+@@ -1424,6 +1424,14 @@ static int __init vga_arb_device_init(void)
+ 
+ 	list_for_each_entry(vgadev, &vga_list, list) {
+ 		struct device *dev = &vgadev->pdev->dev;
++
++		/* if no legacy device has been set as default VGA
++		 * device, just pick up the first one in the list */
++		if (vga_default == NULL) {
++			vgaarb_info(dev, "setting as boot VGA device\n");
++			vga_set_default_device(vgadev->pdev);
++		}
++
+ #if defined(CONFIG_X86) || defined(CONFIG_IA64)
+ 		/*
+ 		 * Override vga_arbiter_add_pci_device()'s I/O based detection 
 
-1. staging:iio:resolver:ad2s1210 fix negative IIO_ANGL_VEL read
-2. isdn: isdnloop: suppress a gcc-7 warning (my patch is wrong,
-   as Joe pointed out there is a real bug)
-3. drm/vmwgfx: avoid gcc-7 parentheses (here, Linus had a better
-   analysis of the problem, so we should consider that a bug as well)
+Above after we have filled the list of VGA devices by iterating over all
+PCI devices we check if no legacy one has been set as default VGA device
+yet: therefore we set the first VGA device in the list as default one...
 
-I would estimate around 25% success rate here, which isn't that
-bad for a new warning.
+Do you think it would work?
 
-I agree that most of the false positives are really dumb though.
+Thanks
+Gab
 
-       Arnd
+> 
+> Cheers,
+> Ben.
