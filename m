@@ -1,55 +1,47 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Fri, 14 Jul 2017 16:08:45 -0400
-Subject: [PATCH v4 0/8] Add board support for TS-4600
-Message-ID: <20170714200853.10362-1-sebastien.bourdelin@savoirfairelinux.com>
+Date: Fri, 14 Jul 2017 16:08:51 -0400
+Subject: [PATCH v4 6/8] dt-bindings: watchdog: add documentation for TS4600
+ watchdog controller
+In-Reply-To: <20170714200853.10362-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170714200853.10362-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20170714200853.10362-7-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch serie adds support for the TS-4600 boards rev A and B. These
-boards, manufactured by Technologic Systems, are based on an i.MX28.
+This patch adds dt-binding documentation for TS4600 watchdog controller.
 
-This serie include the support for the watchdog which could be enable
-at Linux boot time depending on the bootloader.
-
-The watchdog and few peripherals are implemented in a FPGA, and can
-only be access using a custom GPIOs bit-banged bus which is called the
-NBUS by Technologic Systems.
-A driver for this bus is also included and used by the watchdog.
-
-Sebastien Bourdelin (8):
-  of: documentation: add bindings documentation for TS-4600
-  ARM: dts: TS-4600: add basic device tree
-  dt-bindings: bus: Add documentation for the Technologic Systems NBUS
-  bus: add driver for the Technologic Systems NBUS
-  ARM: dts: TS-4600: add NBUS support
-  dt-bindings: watchdog: add documentation for TS4600 watchdog
-    controller
-  watchdog: TS-4600: add driver for TS-4600 watchdog controller
-  ARM: dts: TS-4600: add watchdog support
-
- .../devicetree/bindings/arm/technologic.txt        |   5 +
- Documentation/devicetree/bindings/bus/ts-nbus.txt  |  50 +++
- .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/imx28-ts4600-common.dtsi         | 126 +++++++
- arch/arm/boot/dts/imx28-ts4600-rev-a.dts           |  22 ++
- arch/arm/boot/dts/imx28-ts4600-rev-b.dts           |  22 ++
- drivers/bus/Kconfig                                |   8 +
- drivers/bus/Makefile                               |   1 +
- drivers/bus/ts-nbus.c                              | 375 +++++++++++++++++++++
- drivers/watchdog/Kconfig                           |  11 +
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/ts4600_wdt.c                      | 185 ++++++++++
- include/linux/ts-nbus.h                            |  18 +
- 14 files changed, 842 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
+Acked-by: Rob Herring <robh@kernel.org>
+---
+v4:
+  - this documentation was previously merged with the watchdog driver
+  and had been acked by Rob Herring, no changes have been done since.
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+---
+ .../devicetree/bindings/watchdog/ts4600-wdt.txt          | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
- create mode 100644 arch/arm/boot/dts/imx28-ts4600-common.dtsi
- create mode 100644 arch/arm/boot/dts/imx28-ts4600-rev-a.dts
- create mode 100644 arch/arm/boot/dts/imx28-ts4600-rev-b.dts
- create mode 100644 drivers/bus/ts-nbus.c
- create mode 100644 drivers/watchdog/ts4600_wdt.c
- create mode 100644 include/linux/ts-nbus.h
 
+diff --git a/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt b/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
+new file mode 100644
+index 000000000000..7de00ceae341
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
+@@ -0,0 +1,16 @@
++TS-4600 Technologic Systems Watchdog
++
++Required properties:
++- compatible: must be "technologic,ts4600-wdt"
++- reg: offset to the FPGA's watchdog register
++
++Optional property:
++- timeout-sec: contains the watchdog timeout in seconds.
++
++Example:
++
++watchdog {
++	compatible = "technologic,ts4600-wdt";
++	reg = <0x2a>;
++	timeout-sec = <10>;
++};
 -- 
 2.13.0
