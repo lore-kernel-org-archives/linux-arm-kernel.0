@@ -1,19 +1,90 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 14 Jul 2017 10:19:49 +0800
-Subject: [PATCH 1/2 v2] ARM: dts: imx6ul-evk: Add DRM panel support
-In-Reply-To: <1499960160-20852-1-git-send-email-marco.franchi@nxp.com>
-References: <1499960160-20852-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <20170714021948.GA3172@dragon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 13 Jul 2017 19:20:42 -0700
+Subject: [PATCH v2] arm64: dts: qcom: Force host mode for USB on apq8016-sbc
+Message-ID: <20170714022042.13886-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 12:35:59PM -0300, Marco Franchi wrote:
-> It is preferred to use the panel compatible string rather than passing the LCD
-> timming in the device tree.
-> 
-> So pass the "innolux,at043tn24" compatible string to describe the parallel LCD
-> on this board.
-> 
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+Commit ed75d6a96905 ("arm64: dts: qcom: Collapse usb support into
+one node") breaks host mode support on apq8016-sbc boards. This
+is because the mux driver (tc7usb40mu) hasn't been merged.
+Without that driver, we can't toggle the GPIO going to the mux to
+route out the D+/D- lines to the USB hub that's on the board.
 
-Applied both, thanks.
+One solution would be to totally revert this change, but that
+opens us up to other problems when two USB drivers are operating
+the same hardware block at the same time. Let's modify the DT so
+that the USB controller is always in host mode and connected to
+the hub so that things like USB keyboards and mouses work. This
+is the mode that most people prefer anyway with these devices. We
+also delete the usb-switch node because the binding was never
+accepted upstream.
+
+In the future, we can add muxing support and then update the DT
+to support both modes at runtime. Patches to support this are
+already on the mailing list.
+
+Fixes: ed75d6a96905 ("arm64: dts: qcom: Collapse usb support into one node")
+Reported-by: Rob Clark <robdclark@gmail.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+I noticed that I accidently removed the vbus notifier part of the phy.
+Without it, we'll change settings that shouldn't changed. The thing
+that we don't have is the ID pin on this board, not the vbus. That's
+the only difference from v1.
+
+ arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |  1 +
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi           | 13 ++++---------
+ 2 files changed, 5 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+index d94640812194..790b7775b901 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+@@ -17,6 +17,7 @@
+ 			function = PMIC_GPIO_FUNC_NORMAL;
+ 			power-source = <PM8916_GPIO_VPH>;
+ 			input-disable;
++			output-high;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index bd310ac1967a..bb9e29e6b164 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -213,11 +213,14 @@
+ 		};
+ 
+ 		usb at 78d9000 {
+-			extcon = <&usb_id>, <&usb_id>;
++			extcon = <&usb_id>;
+ 			status = "okay";
+ 			adp-disable;
+ 			hnp-disable;
+ 			srp-disable;
++			dr_mode = "host";
++			pinctrl-names = "default";
++			pinctrl-0 = <&usb_sw_sel_pm>;
+ 			ulpi {
+ 				phy {
+ 					v1p8-supply = <&pm8916_l7>;
+@@ -342,14 +345,6 @@
+ 		pinctrl-0 = <&usb_id_default>;
+ 	};
+ 
+-	usb-switch {
+-		compatible = "toshiba,tc7usb40mu";
+-		switch-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
+-		extcon = <&usb_id>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&usb_sw_sel_pm>;
+-	};
+-
+ 	hdmi-out {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
