@@ -1,76 +1,29 @@
-From: marco.franchi@nxp.com (Marco Franchi)
-Date: Fri, 14 Jul 2017 16:05:14 -0300
-Subject: [PATCH 2/2 v3] ARM: dts: imx7d-sdb: Pass 'enable-gpios' and 
-In-Reply-To: <1500059114-23677-1-git-send-email-marco.franchi@nxp.com>
-References: <1500059114-23677-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <1500059114-23677-2-git-send-email-marco.franchi@nxp.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Jul 2017 21:32:25 +0200
+Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
+ interpreted as bool
+In-Reply-To: <20170714130955.zqe26g6zpixr3xj2@mwanda>
+References: <20170714092540.1217397-1-arnd@arndb.de>
+ <20170714093938.1469319-1-arnd@arndb.de>
+ <20170714120512.ioe67nnloqivtbr7@mwanda>
+ <CAK8P3a0f84OPcCK1r3P9inGYDJC2KaAO4mjE2vn+vCws-oo_bw@mail.gmail.com>
+ <20170714125525.kjemhcn4poon6r3i@mwanda>
+ <20170714130955.zqe26g6zpixr3xj2@mwanda>
+Message-ID: <CAK8P3a1ckDk2VEhK9EWXU7ZWqh1UoZVMac9j3-1KGioj8EE+kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the LCD is turned on thanks to the bootloader initialization.
+On Fri, Jul 14, 2017 at 3:09 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+> On Fri, Jul 14, 2017 at 03:55:26PM +0300, Dan Carpenter wrote:
+>> I don't agree with it as a static analysis dev...
+>
+> What I mean is if it's a macro that returns -ENODEV or a function that
+> returns -ENODEV, they should both be treated the same.  The other
+> warnings this check prints are quite clever.
 
-In order to make the kernel to turn on the LCD on is own, pass the
-'enable-gpios' and 'power-supply' properties.
+I think this is what gcc tries to do, and it should work normally, but it
+fails when using ccache. I know I had cases like that, not entirely sure
+if this is one of them. Maybe it just means I should give up on using
+ccache in preprocessor mode.
 
-Also, the GPIO1_IO01 is not used as PWM functionality on this board. It is
-connected to the PWREN pin of connector J14 and has a GPIO function, so 
-remove the PWM1 node and change the GPIO1_IO01 IOMUX to GPIO function.
-
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
----
-Changes since v2:
-- none
- arch/arm/boot/dts/imx7d-sdb.dts | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 1600c7d..a01e6b3 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -118,8 +118,19 @@
- 		startup-delay-us = <200000>;
- 	};
- 
-+	reg_lcd_3v3: regulator-lcd-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lcd-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&extended_io 7 GPIO_ACTIVE_LOW>;
-+	};
-+
- 	panel {
- 		compatible = "innolux,at043tn24";
-+		pinctrl-0 = <&pinctrl_backlight>;
-+		enable-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
-+		power-supply = <&reg_lcd_3v3>;
- 
- 		port {
- 			panel_in: endpoint {
-@@ -347,12 +358,6 @@
- 	status = "okay";
- };
- 
--&pwm1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_pwm1>;
--	status = "okay";
--};
--
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -684,9 +689,9 @@
- 		>;
- 	};
- 
--	pinctrl_pwm1: pwm1grp {
-+	pinctrl_backlight: backlightgrp {
- 		fsl,pins = <
--			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x110b0
-+			MX7D_PAD_LPSR_GPIO1_IO01__GPIO1_IO1		0x110b0
- 		>;
- 
- 		pinctrl_spi4: spi4grp {
--- 
-2.7.4
+       Arnd
