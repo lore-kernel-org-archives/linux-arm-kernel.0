@@ -1,57 +1,75 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 14 Jul 2017 07:37:54 +0200
-Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail
- for runtime_pm users
-In-Reply-To: <1823154.LT2zYSFJ4j@avalon>
-References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
- <aeeb8f778dae8f170294b6da92819973b742feb2.1499956639.git-series.maxime.ripard@free-electrons.com>
- <1823154.LT2zYSFJ4j@avalon>
-Message-ID: <CAKMK7uE4j3Dy4qOd+WbTxg1BrYfPXGZVsxMWgPSx_1a1OhKu7A@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 14 Jul 2017 08:33:07 +0200
+Subject: [PATCH 1/5] arm64: dts: rockchip: Add rk3399 vop and
+ display-subsystem
+In-Reply-To: <CAFLEztSbZExA2_t5D+TWGsrCU5Gqrg7azdi97brhjO2wPdup3A@mail.gmail.com>
+References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
+ <4655605.dLm3uFpe8F@phil>
+ <CAFLEztSbZExA2_t5D+TWGsrCU5Gqrg7azdi97brhjO2wPdup3A@mail.gmail.com>
+Message-ID: <3813924.64TLu7Ua5F@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 1:43 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> Commit 52055bafa1ff ("drm: rcar-du: Move plane commit code from CRTC
->> start to CRTC resume") changed the order of the plane commit and CRTC
->> enable operations to accommodate the runtime PM requirements. However,
->> this introduced corruption in the first displayed frame, as the CRTC is
->> now enabled without any plane configured. On Gen2 hardware the first
->> frame will be black and likely unnoticed, but on Gen3 hardware we end up
->> starting the display before the VSP compositor, which is more
->> noticeable.
->>
->> To fix this, revert the order of the commit operations back, and handle
->> runtime PM requirements in the CRTC .atomic_begin() and .atomic_enable()
->> helper operation handlers.
->
-> I believe that the "runtime PM" order is problematic in most drivers. The
-> problem usually goes unnoticed as most monitors will not even display the
-> first frame, and I assume many devices will just output it black, but it's an
-> issue nonetheless.
->
-> Note that my driver hasn't lost the "runtime PM" requirements, so I had to
-> support them with the "standard" order. The best way I've found was to runtime
-> resume in the one of .atomic_begin() and .enable() that is run first. Not very
-> neat, as similar code would be needed in most drivers. I wonder whether it
-> wouldn't be useful to add resume/suspend helper callbacks for the CRTC.
+Hi Jacob,
 
-I discussed this with Laurent and explained that "first black frame"
-is exactly what i915 does. I'd say given special customer requests we
-don't yet have to bother with this in general ...
+Am Freitag, 14. Juli 2017, 09:52:30 CEST schrieb Jacob Chen:
+> 2017-07-14 7:34 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
+> > Am Donnerstag, 13. Juli 2017, 00:03:51 CEST schrieb Jacob Chen:
+> >> Add devicetree nodes for rk3399 VOP (Video Output Processors), and the
+> >> top level display-subsystem root node.
+> >>
+> >> Later patches add endpoints (eDP, HDMI, MIPI, etc) that attach to the
+> >> VOPs' output ports.
+> >>
+> >> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> >> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> >> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> >> ---
+> >>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 65 ++++++++++++++++++++++++++++++++
+> >>  1 file changed, 65 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> >> index e795135..300e500 100644
+> >> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> >> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> >> @@ -1455,6 +1455,71 @@
+> >>               status = "disabled";
+> >>       };
+> >>
+> >> +     vopl: vop at ff8f0000 {
+> >> +             compatible = "rockchip,rk3399-vop-lit";
+> >> +             reg = <0x0 0xff8f0000 0x0 0x1ffc>, <0x0 0xff8f2000 0x0 0x400>;
+> >
+> > What is this second memory region doing? It looks like this is the meant
+> > to cover VOP_GAMMA_LUT_ADDR, but can't you just map the whole area?
+> > ChromeOS seems to be doing fine using the whole area as
+> >         <0x0 0xff8f0000 0x0 0x3efc>
+> > and I've also not seen any code changes actually mapping/using this
+> > second area.
+> >
+> 
+> 0x1c00 - 0x200 for cabc_lut
+> 0x2000 - 0x300 for gama_lut
+> 
+> My mistakes, It seems mark havn't send gamma and cabc support to upstream.
+> We shoud just using the whole area map.
+> 
+> 
+> >
+> >> +             interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
+> >> +             clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>, <&cru DCLK_VOP1_DIV>;
+> >> +             clock-names = "aclk_vop", "dclk_vop", "hclk_vop", "dclk_source";
+> >
+> > While I know that this is based on my idea on handling the hdmi pll-rate
+> > requirements, I haven't found the matching code- and dt-binding-changes
+> > posted to a list yet.
+> >
+> 
+> Yeah, should i collect mark's patches or remove it at first?
 
-Wrt adding more hooks for rpm: I honestly don't like that, because
-then someone else wants to add a hook for clocks, or for the sideband
-and then we have a horror show of hooks where every driver uses just a
-very small subset. The point of atomic helpers is to make them
-modular, if one part doesn't fit, just redo in your driver. Goal
-should be that shared parts are good for about 90% of
-drivers/use-cases (maybe even less, there's sooooo many special
-cases).
+As we don't know how much discussion is necessary for that, removing
+dclk_source in the first iteration and re-add it once the feature.
 
-tldr; I still think the _runtime_pm variant is the recommended way to do this.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+
+Heiko
