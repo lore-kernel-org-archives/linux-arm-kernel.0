@@ -1,52 +1,66 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 14 Jul 2017 23:50:04 +1000
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40B399B4@FRAEML521-MBX.china.huawei.com>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
- <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
- <20170713151146.53e9644c@w520.home>
- <1499980882.2865.65.camel@kernel.crashing.org>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B399B4@FRAEML521-MBX.china.huawei.com>
-Message-ID: <1500040204.2865.90.camel@kernel.crashing.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 14 Jul 2017 10:28:58 -0400
+Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
+In-Reply-To: <20170713234910.GB5944@bhelgaas-glaptop.roam.corp.google.com>
+References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
+ <20170713234910.GB5944@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <ae1846b2-1752-577b-e651-ef864953af8e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-07-14 at 12:26 +0000, Gabriele Paoloni wrote:
-> diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
-> index 92f1452..ab3ad9a 100644
-> --- a/drivers/gpu/vga/vgaarb.c
-> +++ b/drivers/gpu/vga/vgaarb.c
-> @@ -1424,6 +1424,14 @@ static int __init vga_arb_device_init(void)
-> ?
-> ????????list_for_each_entry(vgadev, &vga_list, list) {
-> ????????????????struct device *dev = &vgadev->pdev->dev;
-> +
-> +???????????????/* if no legacy device has been set as default VGA
-> +??????????????? * device, just pick up the first one in the list */
-> +???????????????if (vga_default == NULL) {
-> +???????????????????????vgaarb_info(dev, "setting as boot VGA device\n");
-> +???????????????????????vga_set_default_device(vgadev->pdev);
-> +???????????????}
-> +
-> ?#if defined(CONFIG_X86) || defined(CONFIG_IA64)
-> ????????????????/*
-> ???????????????? * Override vga_arbiter_add_pci_device()'s I/O based detection 
+Hi Bjorn,
+
+On 7/13/2017 7:49 PM, Bjorn Helgaas wrote:
+> How VFs report vendor ID is irrelevant.
+
+I was trying to highlight this. 
+
+"SR-IOV spec rev 1.1, 3.4.1.1 & 3.4.1.2, Vendor ID and Device ID fields
+for the VF return 0xFFFF when read.  The "Virtualization Intermediary"
+is supposed to use the vendor ID from the PF and the device ID defined
+in the PF SR-IOV capability."
+
+https://www.spinics.net/lists/linux-pci/msg58530.html
+
+The point is we can't use pci_bus_read_dev_vendor_id() for both
+virtual and physical functions as in my V3 patch.
+
 > 
-> Above after we have filled the list of VGA devices by iterating over all
-> PCI devices we check if no legacy one has been set as default VGA device
-> yet: therefore we set the first VGA device in the list as default one...
+> What *is* relevant is how FLR affects VFs.  The SR-IOV spec, r1.1,
+> sec 2.2.2, says FLR doesn't affect a VF's existence in config space.
 > 
-> Do you think it would work?
 
-I honestly don't remember all of the details of the arbiter but just
-make sure that it won't think that device is enabled for things like
-VGA etc... if it's memory/IO decode weren't enabled.
+I see.
 
-I'd rather we have no default device until a driver actually picks up
-though, and then, if we still have no default, use the first driver to
-pick up.
+> That suggests to me that reading a VF's PCI_COMMAND register after an
+> FLR should always return valid data (never ~0).  I suppose an FLR VF
+> reset isn't instantaneous, though, so I suppose we do need the 100ms
+> delay.  But maybe we should just return immediately after that,
+> without reading any VF config space?
 
-Ben.
+make sense.
+
+> 
+> pci_flr_wait() was added by 5adecf817dd6 ("PCI: Wait for up to 1000ms
+> after FLR reset"); maybe Alex has more insight into this.
+
+I think code is handling both virtual and physical functions. 1 second
+is nice to have for physical functions. See this comment at the top.
+
+/*
+ * We should only need to wait 100ms after FLR, but some devices take longer.
+ * Wait for up to 1000ms for config space to return something other than -1.
+ * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
+ * dword because VFs don't implement the 1st dword.
+ */
+
+Since we are separating the handling of physical and virtual functions,
+we could go back to 100ms for virtual functions and handle CRS/wait for
+physical functions.
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
