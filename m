@@ -1,100 +1,71 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:11 +0100
-Subject: [PATCH v3 06/18] coresight: Add support for reading 64bit registers
+Date: Fri, 14 Jul 2017 14:04:23 +0100
+Subject: [PATCH v3 18/18] coresight: Add support for Coresight SoC 600
+ components
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-19-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for reading a lower and upper 32bits of a register
-as a single 64bit register.
+Add the peripheral ids for the Coresight SoC 600 TPIU, replicator
+and funnel.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-priv.h | 27 ++++++++++++++++++++++-----
- drivers/hwtracing/coresight/coresight-tmc.c  |  4 ++--
- 2 files changed, 24 insertions(+), 7 deletions(-)
+ drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 5 +++++
+ drivers/hwtracing/coresight/coresight-funnel.c             | 5 +++++
+ drivers/hwtracing/coresight/coresight-tpiu.c               | 5 +++++
+ 3 files changed, 15 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 5f662d8..1080a67 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -39,23 +39,29 @@
- #define ETM_MODE_EXCL_USER	BIT(31)
+diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+index 4df4726..8f93a00 100644
+--- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+@@ -201,6 +201,11 @@ static struct amba_id replicator_ids[] = {
+ 		.id     = 0x000bb909,
+ 		.mask   = 0x000fffff,
+ 	},
++	{
++		/* Coresight SoC-600 */
++		.id     = 0x000bb9ec,
++		.mask   = 0x000fffff,
++	},
+ 	{ 0, 0 },
+ };
  
- typedef u32 (*coresight_read_fn)(const struct device *, u32 offset);
--#define coresight_simple_func(type, func, name, offset)			\
-+#define __coresight_simple_func(type, func, name, lo_off, hi_off)	\
- static ssize_t name##_show(struct device *_dev,				\
- 			   struct device_attribute *attr, char *buf)	\
- {									\
- 	type *drvdata = dev_get_drvdata(_dev->parent);			\
- 	coresight_read_fn fn = func;					\
--	u32 val;							\
-+	u64 val;							\
- 	pm_runtime_get_sync(_dev->parent);				\
- 	if (fn)								\
--		val = fn(_dev->parent, offset);				\
-+		val = (u64)fn(_dev->parent, lo_off);			\
- 	else								\
--		val = readl_relaxed(drvdata->base + offset);		\
-+		val = coresight_read_reg_pair(drvdata->base,		\
-+						 lo_off, hi_off);	\
- 	pm_runtime_put_sync(_dev->parent);				\
--	return scnprintf(buf, PAGE_SIZE, "0x%x\n", val);		\
-+	return scnprintf(buf, PAGE_SIZE, "0x%llx\n", val);		\
- }									\
- static DEVICE_ATTR_RO(name)
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index 6f7f3d3..df1cf73 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -251,6 +251,11 @@ static struct amba_id funnel_ids[] = {
+ 		.id     = 0x000bb908,
+ 		.mask   = 0x000fffff,
+ 	},
++	{
++		/* Coresight SoC-600 */
++		.id     = 0x000bb9eb,
++		.mask   = 0x000fffff,
++	},
+ 	{ 0, 0},
+ };
  
-+#define coresight_simple_func(type, func, name, offset)			\
-+	__coresight_simple_func(type, func, name, offset, -1)
-+#define coresight_simple_reg64(type, name, lo_off, hi_off)		\
-+	__coresight_simple_func(type, NULL, name, lo_off, hi_off)
-+
- enum etm_addr_type {
- 	ETM_ADDR_TYPE_NONE,
- 	ETM_ADDR_TYPE_SINGLE,
-@@ -106,6 +112,17 @@ static inline void CS_UNLOCK(void __iomem *addr)
- 	} while (0);
- }
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 59c1510..eda5d5a 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -201,6 +201,11 @@ static struct amba_id tpiu_ids[] = {
+ 		.id	= 0x0004b912,
+ 		.mask	= 0x0007ffff,
+ 	},
++	{
++		/* Coresight SoC-600 */
++		.id	= 0x000bb9e7,
++		.mask	= 0x000fffff,
++	},
+ 	{ 0, 0},
+ };
  
-+static inline u64
-+coresight_read_reg_pair(void __iomem *addr, s32 lo_offset, s32 hi_offset)
-+{
-+	u64 val;
-+
-+	val = readl_relaxed(addr + lo_offset);
-+	val |= (hi_offset < 0) ? 0 :
-+	       (u64)readl_relaxed(addr + hi_offset) << 32;
-+	return val;
-+}
-+
- void coresight_disable_path(struct list_head *path);
- int coresight_enable_path(struct list_head *path, u32 mode);
- struct coresight_device *coresight_get_sink(struct list_head *path);
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index eb0c7b3..ccdc2d3 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -222,8 +222,6 @@ static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
- 
- coresight_tmc_simple_func(rsz, TMC_RSZ);
- coresight_tmc_simple_func(sts, TMC_STS);
--coresight_tmc_simple_func(rrp, TMC_RRP);
--coresight_tmc_simple_func(rwp, TMC_RWP);
- coresight_tmc_simple_func(trg, TMC_TRG);
- coresight_tmc_simple_func(ctl, TMC_CTL);
- coresight_tmc_simple_func(ffsr, TMC_FFSR);
-@@ -231,6 +229,8 @@ coresight_tmc_simple_func(ffcr, TMC_FFCR);
- coresight_tmc_simple_func(mode, TMC_MODE);
- coresight_tmc_simple_func(pscr, TMC_PSCR);
- coresight_tmc_simple_func(devid, CORESIGHT_DEVID);
-+coresight_simple_reg64(struct tmc_drvdata, rrp, TMC_RRP, TMC_RRPHI);
-+coresight_simple_reg64(struct tmc_drvdata, rwp, TMC_RWP, TMC_RWPHI);
- 
- static struct attribute *coresight_tmc_mgmt_attrs[] = {
- 	&dev_attr_rsz.attr,
 -- 
 2.7.5
