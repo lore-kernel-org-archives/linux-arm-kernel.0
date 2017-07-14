@@ -1,82 +1,91 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 14 Jul 2017 16:56:01 +0800
-Subject: [PATCH 4/4] drm/sun4i: make sure we don't have a commit pending
-In-Reply-To: <a6dfec7ea3598c64f6653e9b8b5febac79172341.1499956639.git-series.maxime.ripard@free-electrons.com>
-References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
- <a6dfec7ea3598c64f6653e9b8b5febac79172341.1499956639.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64KnB_zU0yk7MsGr9WRK1wpWq1xOj_cNuQ4mSQJeAGarw@mail.gmail.com>
+From: giuseppe.cantavenera@azcom.it (Giuseppe Cantavenera)
+Date: Fri, 14 Jul 2017 11:00:44 +0200
+Subject: [PATCH] i2c-cadence: fix repeated start in message sequence
+Message-ID: <1500022844-3027-1-git-send-email-giuseppe.cantavenera@azcom.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Wrong i2c transactions have been observed in reads made up of
+a write followed by a read supposed to be interleaved by a
+repeated start.
+cdns_i2c_mrecv() and cdns_i2c_msend() were clearing the
+HOLD bit in the control register before issuing the last
+transaction of a series, which somehow reflects the
+Zynq-7000 Reference Manual but is incorrect for most slaves.
+Seems like most of the times the clearing of the HOLD bit
+takes some istants to be effective:
+the controller sends a restart on the bus.
+Sometimes the clearing does take effect and the last call
+to cdns_i2c_mrecv() or cdns_i2c_msend() results in:
+STOP + START instead of simply a RESTART (often mandatory).
 
-On Thu, Jul 13, 2017 at 10:41 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> In the earlier display engine designs, any register access while a commit
-> is pending is forbidden.
->
-> One of the symptoms is that reading a register will return another, random,
-> register value which can lead to register corruptions if we ever do a
-> read/modify/write cycle.
+Modify the command sequence:
+1- enable interrupts
+2- issue the write/read operation
+3- clear the HOLD bit if needed
 
-Alternatively, if changes to the backend (layers) are guaranteed to happen
-while the CRTC is disabled (which seems to be the case after looking at
-drm_atomic_helper_commit_planes and drm_atomic_helper_commit_tail), we
-could just turn on register auto-commit all the time and not deal with
-this.
+Signed-off-by: Giuseppe Cantavenera <giuseppe.cantavenera@azcom.it>
+Tested-by: Giuseppe Cantavenera <giuseppe.cantavenera@azcom.it>
+Cc: stable at vger.kernel.org
+Cc: michal.simek at xilinx.com
+Cc: soren.brinkmann at xilinx.com
+---
+ drivers/i2c/busses/i2c-cadence.c | 25 ++++++++++++++++---------
+ 1 file changed, 16 insertions(+), 9 deletions(-)
 
-ChenYu
-
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 14 ++++++++++++++
->  drivers/gpu/drm/sun4i/sun4i_crtc.c    |  1 +
->  2 files changed, 15 insertions(+)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index cf480218daa5..ce1f40f7511e 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -67,6 +67,19 @@ static void sun4i_backend_commit(struct sunxi_engine *engine)
->                      SUN4I_BACKEND_REGBUFFCTL_LOADCTL);
->  }
->
-> +static int sun4i_backend_commit_poll(struct sunxi_engine *engine)
-> +{
-> +       u32 val;
-> +
-> +       DRM_DEBUG_DRIVER("Polling for the commit to end\n");
-> +
-> +       return regmap_read_poll_timeout(engine->regs,
-> +                                       SUN4I_BACKEND_REGBUFFCTL_REG,
-> +                                       val,
-> +                                       !(val & SUN4I_BACKEND_REGBUFFCTL_LOADCTL),
-> +                                       100, 50000);
-> +}
-> +
->  void sun4i_backend_layer_enable(struct sun4i_backend *backend,
->                                 int layer, bool enable)
->  {
-> @@ -330,6 +343,7 @@ static int sun4i_backend_of_get_id(struct device_node *node)
->
->  static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
->         .commit                         = sun4i_backend_commit,
-> +       .commit_poll                    = sun4i_backend_commit_poll,
->         .layers_init                    = sun4i_layers_init,
->         .apply_color_correction         = sun4i_backend_apply_color_correction,
->         .disable_color_correction       = sun4i_backend_disable_color_correction,
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-> index 2eba1d8639d8..31550493fa1d 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-> @@ -34,6 +34,7 @@ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
->                                     struct drm_crtc_state *old_state)
->  {
->         struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
-> +       struct sunxi_engine *engine = scrtc->engine;
->         struct drm_device *dev = crtc->dev;
->         unsigned long flags;
->
-> --
-> git-series 0.9.1
+diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+index 7234e32..8a36df2 100644
+--- a/drivers/i2c/busses/i2c-cadence.c
++++ b/drivers/i2c/busses/i2c-cadence.c
+@@ -428,15 +428,21 @@ static void cdns_i2c_mrecv(struct cdns_i2c *id)
+ 		cdns_i2c_writereg(id->recv_count, CDNS_I2C_XFER_SIZE_OFFSET);
+ 	}
+ 
+-	/* Clear the bus hold flag if bytes to receive is less than FIFO size */
++	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
++	/* Set the slave address in address register - triggers operation */
++	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
++						CDNS_I2C_ADDR_OFFSET);
++
++	/*
++	 * Clear the bus hold flag if bytes to receive is less than FIFO size.
++	 * This needs to be after the read is triggered, otherwise any read
++	 * made up of a write plus a read interleaved by a repeated start
++	 * may fail.
++	 */
+ 	if (!id->bus_hold_flag &&
+ 		((id->p_msg->flags & I2C_M_RECV_LEN) != I2C_M_RECV_LEN) &&
+ 		(id->recv_count <= CDNS_I2C_FIFO_DEPTH))
+ 			cdns_i2c_clear_bus_hold(id);
+-	/* Set the slave address in address register - triggers operation */
+-	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
+-						CDNS_I2C_ADDR_OFFSET);
+-	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
+ }
+ 
+ /**
+@@ -489,17 +495,18 @@ static void cdns_i2c_msend(struct cdns_i2c *id)
+ 		id->send_count--;
+ 	}
+ 
++
++	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
++	/* Set the slave address in address register - triggers operation. */
++	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
++						CDNS_I2C_ADDR_OFFSET);
+ 	/*
+ 	 * Clear the bus hold flag if there is no more data
+ 	 * and if it is the last message.
+ 	 */
+ 	if (!id->bus_hold_flag && !id->send_count)
+ 		cdns_i2c_clear_bus_hold(id);
+-	/* Set the slave address in address register - triggers operation. */
+-	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
+-						CDNS_I2C_ADDR_OFFSET);
+ 
+-	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
+ }
+ 
+ /**
+-- 
+1.9.1
