@@ -1,126 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Jul 2017 02:35:30 +0100
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170714013529.GF22336@arm.com>
+From: jacobchen110@gmail.com (Jacob Chen)
+Date: Fri, 14 Jul 2017 09:52:30 +0800
+Subject: [PATCH 1/5] arm64: dts: rockchip: Add rk3399 vop and
+ display-subsystem
+In-Reply-To: <4655605.dLm3uFpe8F@phil>
+References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
+ <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
+ <4655605.dLm3uFpe8F@phil>
+Message-ID: <CAFLEztSbZExA2_t5D+TWGsrCU5Gqrg7azdi97brhjO2wPdup3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi heko,
 
-On Wed, Jul 12, 2017 at 03:04:30PM -0500, Bjorn Helgaas wrote:
-> [+cc Catalin, Will, linux-arm-kernel]
-> 
-> On Wed, Jul 12, 2017 at 03:08:11PM +1000, Daniel Axtens wrote:
-> > The HiSilicon D05 board has some PCI bridges (PCI ID 19e5:1610) that
-> > are not spec-compliant: the VGA Enable bit is hardwired to 0 and
-> > writes do not change it.
-> > 
-> > The HiSilicon engineers report that the bridge does not forward the
-> > 0xa0000-0xbffff mem range and the 0x3b0-0x3bb and 0x3c0-0x3df I/O
-> > ranges.
-> > 
-> > Because the VGA Enable bit is hardwired to 0, the VGA arbiter refuses
-> > to mark any card behind it as the boot device. This breaks Xorg
-> > auto-detection.
-> > 
-> > However, the hibmc VGA card (PCI ID 19e5:1711) has been tested and is
-> > known to work when behind these bridges. (It does not require the
-> > legacy resources to operate.)
-> > 
-> > Provide a quirk so that this combination of bridge and card is eligible
-> > to be the default VGA card. This fixes Xorg auto-detection on the D05.
-> > 
-> > Cc: Xinliang Liu <z.liuxinliang@hisilicon.com>
-> > Cc: Rongrong Zou <zourongrong@gmail.com>
-> > Signed-off-by: Daniel Axtens <dja@axtens.net>
-> > ---
-> > 
-> > v3: fix commit message
-> > v4: fix comment (forgot to git add/git commit, sorry for the noise)
-> > 
-> > ---
-> >  drivers/pci/quirks.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 50 insertions(+)
-> > 
-> > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> > index 16e6cd86ad71..b42324cba29e 100644
-> > --- a/drivers/pci/quirks.c
-> > +++ b/drivers/pci/quirks.c
-> > @@ -25,6 +25,7 @@
-> >  #include <linux/sched.h>
-> >  #include <linux/ktime.h>
-> >  #include <linux/mm.h>
-> > +#include <linux/vgaarb.h>
-> >  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
-> >  #include "pci.h"
-> >  
-> > @@ -4664,3 +4665,52 @@ static void quirk_intel_no_flr(struct pci_dev *dev)
-> >  }
-> >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1502, quirk_intel_no_flr);
-> >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x1503, quirk_intel_no_flr);
-> > +
-> > +/*
-> > + * The HiSilicon D05 board has some PCI bridges (PCI ID 19e5:1610)
-> > + * that are not spec-compliant: the VGA Enable bit is hardwired to 0
-> > + * and writes do not change it. The bridge does not forward legacy
-> > + * memory or I/O resources.
-> > + *
-> > + * Because the VGA Enable bit is hardwired to 0, the VGA arbiter
-> > + * refuses to mark any card behind it as the boot device. However, the
-> > + * hibmc VGA card (PCI ID 19e5:1711) has been tested and is known to
-> > + * work when behind these bridges.
-> > + *
-> > + * If we have this bridge, this card, and no default card already,
-> > + * mark the card as default.
-> > + */
-> > +static void hibmc_fixup_vgaarb(struct pci_dev *pdev)
-> > +{
-> > +	struct pci_dev *bridge;
-> > +	struct pci_bus *bus;
-> > +	u16 config;
-> > +
-> > +	bus = pdev->bus;
-> > +	bridge = bus->self;
-> > +	if (!bridge)
-> > +		return;
-> > +
-> > +	if (!pci_is_bridge(bridge))
-> > +		return;
-> > +
-> > +	if (bridge->vendor != PCI_VENDOR_ID_HUAWEI ||
-> > +	    bridge->device != 0x1610)
-> > +		return;
-> > +
-> > +	pci_read_config_word(bridge, PCI_BRIDGE_CONTROL,
-> > +			     &config);
-> > +	if (config & PCI_BRIDGE_CTL_VGA) {
-> > +		/*
-> > +		 * Weirdly, this bridge *is* spec compliant, so bail
-> > +		 * and let vgaarb do its job
-> > +		 */
-> > +		return;
-> > +	}
-> > +
-> > +	if (vga_default_device())
-> > +		return;
-> > +
-> > +	vga_set_default_device(pdev);
-> > +}
-> > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_HUAWEI, 0x1711, hibmc_fixup_vgaarb);
-> 
-> Is this quirk useful on any arch other than arm64?  Per
-> drivers/pci/dwc/Kconfig, CONFIG_PCI_HISI depends on CONFIG_ARM64.
-> 
-> Would it make sense to put this quirk in arch/arm64/kernel/pci.c?
+2017-07-14 7:34 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
+> Hi Jacob,
+>
+> Am Donnerstag, 13. Juli 2017, 00:03:51 CEST schrieb Jacob Chen:
+>> Add devicetree nodes for rk3399 VOP (Video Output Processors), and the
+>> top level display-subsystem root node.
+>>
+>> Later patches add endpoints (eDP, HDMI, MIPI, etc) that attach to the
+>> VOPs' output ports.
+>>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+>> ---
+>>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 65 ++++++++++++++++++++++++++++++++
+>>  1 file changed, 65 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> index e795135..300e500 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> @@ -1455,6 +1455,71 @@
+>>               status = "disabled";
+>>       };
+>>
+>> +     vopl: vop at ff8f0000 {
+>> +             compatible = "rockchip,rk3399-vop-lit";
+>> +             reg = <0x0 0xff8f0000 0x0 0x1ffc>, <0x0 0xff8f2000 0x0 0x400>;
+>
+> What is this second memory region doing? It looks like this is the meant
+> to cover VOP_GAMMA_LUT_ADDR, but can't you just map the whole area?
+> ChromeOS seems to be doing fine using the whole area as
+>         <0x0 0xff8f0000 0x0 0x3efc>
+> and I've also not seen any code changes actually mapping/using this
+> second area.
+>
 
-We've resisted adding PCI quirks in the arch directory so far, so I'd rather
-it lived in the PCI code if you don't have a strong objection to that.
-Hardware vendors have a tendency to reuse broken IP, so it's not beyond the
-realms of imagination that this quirk might be needed for another part some
-day (e.g. based on 32-bit ARM).
+0x1c00 - 0x200 for cabc_lut
+0x2000 - 0x300 for gama_lut
 
-Will
+My mistakes, It seems mark havn't send gamma and cabc support to upstream.
+We shoud just using the whole area map.
+
+
+>
+>> +             interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
+>> +             clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>, <&cru DCLK_VOP1_DIV>;
+>> +             clock-names = "aclk_vop", "dclk_vop", "hclk_vop", "dclk_source";
+>
+> While I know that this is based on my idea on handling the hdmi pll-rate
+> requirements, I haven't found the matching code- and dt-binding-changes
+> posted to a list yet.
+>
+
+Yeah, should i collect mark's patches or remove it at first?
+
+>
+> Heiko
+>
