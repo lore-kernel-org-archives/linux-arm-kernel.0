@@ -1,54 +1,61 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 14 Jul 2017 13:33:28 +0100
-Subject: [PATCH 11/22] net: thunder_bgx: avoid format string overflow
- warning
-In-Reply-To: <20170714120720.906842-12-arnd@arndb.de>
-References: <20170714120720.906842-1-arnd@arndb.de>
- <20170714120720.906842-12-arnd@arndb.de>
-Message-ID: <b741f219-c025-db9a-81ce-3c8e5ab33310@arm.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 14 Jul 2017 15:41:32 +0300
+Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
+ interpreted as bool
+In-Reply-To: <20170714093938.1469319-1-arnd@arndb.de>
+References: <20170714092540.1217397-1-arnd@arndb.de>
+ <20170714093938.1469319-1-arnd@arndb.de>
+Message-ID: <20170714124132.u3fzpetbh3b7gj7f@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/17 13:07, Arnd Bergmann wrote:
-> gcc warns that the temporary buffer might be too small here:
-> 
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function 'bgx_probe':
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: error: '%d' directive writing between 1 and 10 bytes into a region of size between 9 and 11 [-Werror=format-overflow=]
-> sprintf(str, "BGX%d LMAC%d mode", bgx->bgx_id, lmacid);
->              ^~~~~~~~~~~~~~~~~~~
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: note: directive argument in the range [0, 2147483647]
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:3: note: 'sprintf' output between 16 and 27 bytes into a destination of size 20
-> 
-> This probably can't happen, but it can't hurt to make it long
-> enough for the theoretical limit.
+On Fri, Jul 14, 2017 at 11:36:56AM +0200, Arnd Bergmann wrote:
+> @@ -1158,7 +1158,8 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
+>  	 */
+>  	fmt_src.pad = pad->index;
+>  	fmt_src.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+> -	if (!v4l2_subdev_call(sensor, pad, get_fmt, NULL, &fmt_src)) {
+> +	ret = v4l2_subdev_call(sensor, pad, get_fmt, NULL, &fmt_src);
+> +	if (!ret) {
+>  		fmt_info = omap3isp_video_format_info(fmt_src.format.code);
+>  		depth_in = fmt_info->width;
+>  	}
 
-Probably indeed - both bgx_id and lmacid are u8 here, which would make
-the maximum length of that string, including null terminator, exactly 20
-characters.
+Is the original code buggy?
 
-So in this case the warning is not only silly, it's actively wrong;
-sure, the arguments themselves are being promoted to ints at that point,
-but GCC *knows* the original type, or it couldn't have generated the
-correct code for the call :/
+media/platform/omap3isp/ispccdc.c
+  1156          /* Compute the lane shifter shift value and enable the bridge when the
+  1157           * input format is a non-BT.656 YUV variant.
+  1158           */
+  1159          fmt_src.pad = pad->index;
+  1160          fmt_src.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+  1161          if (!v4l2_subdev_call(sensor, pad, get_fmt, NULL, &fmt_src)) {
+  1162                  fmt_info = omap3isp_video_format_info(fmt_src.format.code);
+  1163                  depth_in = fmt_info->width;
+  1164          }
 
-Robin.
+If v4l2_subdev_call() then depth_in is zero.
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> index a0ca68ce3fbb..79112563a25a 100644
-> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> @@ -1008,7 +1008,7 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
->  {
->  	struct device *dev = &bgx->pdev->dev;
->  	struct lmac *lmac;
-> -	char str[20];
-> +	char str[27];
->  
->  	if (!bgx->is_dlm && lmacid)
->  		return;
-> 
+  1165  
+  1166          fmt_info = omap3isp_video_format_info(format->code);
+  1167          depth_out = fmt_info->width;
+  1168          shift = depth_in - depth_out;
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+How do we know that this subtraction doesn't set "shift" to a very high
+positive?
+
+  1169  
+  1170          if (ccdc->bt656)
+  1171                  bridge = ISPCTRL_PAR_BRIDGE_DISABLE;
+  1172          else if (fmt_info->code == MEDIA_BUS_FMT_YUYV8_2X8)
+  1173                  bridge = ISPCTRL_PAR_BRIDGE_LENDIAN;
+  1174          else if (fmt_info->code == MEDIA_BUS_FMT_UYVY8_2X8)
+  1175                  bridge = ISPCTRL_PAR_BRIDGE_BENDIAN;
+  1176          else
+  1177                  bridge = ISPCTRL_PAR_BRIDGE_DISABLE;
+  1178  
+  1179          omap3isp_configure_bridge(isp, ccdc->input, parcfg, shift, bridge);
+
+regards,
+dan carpenter
