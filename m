@@ -1,98 +1,71 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Fri, 14 Jul 2017 07:41:24 +0100
-Subject: [PATCH v5 1/5] dt-bindings: gpu: add bindings for the ARM Mali
- Midgard GPU
-In-Reply-To: <20170712172636.GA90759@google.com>
-References: <cover.1493804968.git.guillaume.tucker@collabora.com>
- <bebe578ba130de5fa320ca7c6427b2fae83d61d7.1493804968.git.guillaume.tucker@collabora.com>
- <20170712172636.GA90759@google.com>
-Message-ID: <3339c7d9-c420-777c-e8eb-e9b82a38aa97@collabora.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 14 Jul 2017 14:42:51 +0800
+Subject: [PATCH 00/11] ARM: sun8i: a83t: Add support for MMC controllers
+Message-ID: <20170714064302.20383-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Hi everyone,
 
-On 12/07/17 18:26, Brian Norris wrote:
-> Hi Guillaume,
->
-> I know this has already been merged, but I figured here was an OK place
-> to note (inline):
->
-> On Wed, May 03, 2017 at 10:56:25AM +0100, Guillaume Tucker wrote:
+This series adds support for the MMC controllers on the A83T. The A83T's
+MMC controller adds what they call the "new timing mode". It moves the
+MMC clock delay lines into the controller itself. There are some minor
+changes to how the clock rate is calculated. The new mode give better
+performance and stability for eMMC applications. This mode is only
+found on the eMMC facing controller (or MMC2 on this chip).
 
-[...]
+This mode is also found on the A64, but on that chip, the controller
+is fixed to that mode. On the A83t, the user is free to use the old
+or new mode, but the new mode is recommended. There are two switches,
+one in the clock controller, the other in the MMC controller, that
+must be set in tandem.
 
->> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->> new file mode 100644
->> index 000000000000..d3b6e1a4713a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->
-> ^^ This file name implies we're talking about a base "arm,mali-midgard"
-> compatible property.
->
->> @@ -0,0 +1,86 @@
->> +ARM Mali Midgard GPU
->> +====================
->> +
->> +Required properties:
->> +
->> +- compatible :
->> +  * Must contain one of the following:
->> +    + "arm,mali-t604"
->> +    + "arm,mali-t624"
->> +    + "arm,mali-t628"
->> +    + "arm,mali-t720"
->> +    + "arm,mali-t760"
->> +    + "arm,mali-t820"
->> +    + "arm,mali-t830"
->> +    + "arm,mali-t860"
->> +    + "arm,mali-t880"
->> +  * which must be preceded by one of the following vendor specifics:
->> +    + "amlogic,meson-gxm-mali"
->> +    + "rockchip,rk3288-mali"
->
-> But it's not listed here.
->
->> +
->> +- reg : Physical base address of the device and length of the register area.
->> +
->> +- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
->> +
->> +- interrupt-names : Contains the names of IRQ resources in the order they were
->> +  provided in the interrupts property. Must contain: "job", "mmu", "gpu".
->> +
->> +
->> +Optional properties:
->> +
->> +- clocks : Phandle to clock for the Mali Midgard device.
->> +
->> +- mali-supply : Phandle to regulator for the Mali device. Refer to
->> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
->> +
->> +- operating-points-v2 : Refer to Documentation/devicetree/bindings/power/opp.txt
->> +  for details.
->> +
->> +
->> +Example for a Mali-T760:
->> +
->> +gpu at ffa30000 {
->> +	compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
->
-> And it *is* used here in this example.
->
-> So, should it be used/documented or not?
+The main part of this series adds custom functions to the sunxi-ng
+clk driver, allowing the MMC driver to query and configure the mode.
+The MMC driver can then support timing mode switching, and thus, the
+MMC2 controller on the A83t.
 
-The important part is that having only arm,mali-midgard in the
-gpu node is not enough to accurately describe the hardware, which
-is why it is not listed in the required compatible strings.  On
-the other hand, it does help with describing the hardware, so
-it's fine to use it.  If people find this confusing then I guess
-we could add something to say that arm,mali-midgard can be used
-optionally in addition to the specific ones.
+The other bits are some related cleanups, and the usual device tree
+changes.
 
-Also, if you look at the 64-bit ARM CPUs for example, they
-typically have armv8 in their node although armv8 is not
-mentioned anywhere in the bindings documentation...
+The first patch, while largely unrelated, converts the raw clock
+indices used in the A83t device tree to properly named macros. This
+should be applied for 4.13, before any other device tree additions
+that reference the CCU clocks. So it is included in this series.
 
-Guillaume
+Please have a look.
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (11):
+  ARM: dts: sun8i: a83t: Switch to CCU device tree binding macros
+  clk: sunxi-ng: Add interface to query or configure MMC timing modes.
+  clk: sunxi-ng: a83t: Support new timing mode for mmc2 clock
+  mmc: sunxi: Keep default timing phase settings for new timing mode
+  mmc: sunxi: Support controllers that can use both old and new timings
+  mmc: sunxi: Support MMC DDR52 transfer mode with new timing mode
+  mmc: sunxi: Add support for A83T eMMC (MMC2)
+  ARM: dts: sun8i: a83t: Add MMC controller device nodes
+  ARM: dts: sun8i: a83t: Add pingroup for 8-bit eMMC on mmc2
+  ARM: dts: sun8i: a83t: cubietruck-plus: Enable micro-SD card and eMMC
+  ARM: dts: sun8i: a83t: h8homlet: Enable micro-SD card and onboard eMMC
+
+ .../devicetree/bindings/mmc/sunxi-mmc.txt          |  1 +
+ .../boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts  | 21 ++++++
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts   | 27 +++++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi                  | 82 ++++++++++++++++++++--
+ drivers/clk/sunxi-ng/Makefile                      |  1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c              | 38 +++++++---
+ drivers/clk/sunxi-ng/ccu_common.h                  |  2 +
+ drivers/clk/sunxi-ng/ccu_mmc_timing.c              | 73 +++++++++++++++++++
+ drivers/mmc/host/sunxi-mmc.c                       | 78 +++++++++++++++-----
+ include/linux/clk/sunxi-ng.h                       | 20 ++++++
+ 10 files changed, 311 insertions(+), 32 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_mmc_timing.c
+ create mode 100644 include/linux/clk/sunxi-ng.h
+
+-- 
+2.13.2
