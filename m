@@ -1,176 +1,87 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 14 Jul 2017 14:42:53 +0800
-Subject: [PATCH 02/11] clk: sunxi-ng: Add interface to query or configure MMC
- timing modes.
+Date: Fri, 14 Jul 2017 14:42:59 +0800
+Subject: [PATCH 08/11] ARM: dts: sun8i: a83t: Add MMC controller device nodes
 In-Reply-To: <20170714064302.20383-1-wens@csie.org>
 References: <20170714064302.20383-1-wens@csie.org>
-Message-ID: <20170714064302.20383-3-wens@csie.org>
+Message-ID: <20170714064302.20383-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with the A83T SoC, Allwinner introduced a new timing mode for
-its MMC clocks. The new mode changes how the MMC controller sample and
-output clocks are delayed to match chip and board specifics. There are
-two controls for this, one on the CCU side controlling how the clocks
-behave, and one in the MMC controller controlling what inputs to take
-and how to route them.
-
-In the old mode, the MMC clock had 2 child clocks providing the output
-and sample clocks, which could be delayed by a number of clock cycles
-measured from the MMC clock's parent.
-
-With the new mode, the 2 delay clocks are no longer active. Instead,
-the delays and associated controls are moved into the MMC controller.
-The output of the MMC clock is also halved.
-
-The difference in how things are wired between the modes means that the
-clock controls and the MMC controls must match. To achieve this in a
-clear, explicit way, we introduce two functions for the MMC driver to
-use: one queries the hardware for the current mode set, and the other
-allows the MMC driver to request a mode.
-
-With newer SoCs such as the A64, the old mode is all but removed. Hence
-we support two variations, one where the mode can be toggled, and the
-other where the clock is fixed in the new mode.
+The A83T has 3 MMC controllers. The third one is a bit special, as it
+supports a wider 8-bit bus, and a "new timing mode".
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/Makefile         |  1 +
- drivers/clk/sunxi-ng/ccu_common.h     |  2 +
- drivers/clk/sunxi-ng/ccu_mmc_timing.c | 73 +++++++++++++++++++++++++++++++++++
- include/linux/clk/sunxi-ng.h          | 20 ++++++++++
- 4 files changed, 96 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_mmc_timing.c
- create mode 100644 include/linux/clk/sunxi-ng.h
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 57 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 0c45fa50283d..45a5910379a5 100644
---- a/drivers/clk/sunxi-ng/Makefile
-+++ b/drivers/clk/sunxi-ng/Makefile
-@@ -1,5 +1,6 @@
- # Common objects
- lib-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_mmc_timing.o
- lib-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index beed05e10a3b..085312d0c521 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -182,6 +182,63 @@
+ 			#dma-cells = <1>;
+ 		};
  
- # Base clock types
-diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
-index d6fdd7a789aa..88981e7fd978 100644
---- a/drivers/clk/sunxi-ng/ccu_common.h
-+++ b/drivers/clk/sunxi-ng/ccu_common.h
-@@ -23,6 +23,8 @@
- #define CCU_FEATURE_FIXED_POSTDIV	BIT(3)
- #define CCU_FEATURE_ALL_PREDIV		BIT(4)
- #define CCU_FEATURE_LOCK_REG		BIT(5)
-+#define CCU_FEATURE_MMC_TIMING_SWITCH	BIT(6)
-+#define CCU_FEATURE_MMC_ALWAYS_NEW	BIT(7)
- 
- struct device_node;
- 
-diff --git a/drivers/clk/sunxi-ng/ccu_mmc_timing.c b/drivers/clk/sunxi-ng/ccu_mmc_timing.c
-new file mode 100644
-index 000000000000..f236a56abf48
---- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_mmc_timing.c
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright (c) 2017 Chen-Yu Tsai. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++		mmc0: mmc at 1c0f000 {
++			compatible = "allwinner,sun7i-a20-mmc";
++			reg = <0x01c0f000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC0>,
++				 <&ccu CLK_MMC0>,
++				 <&ccu CLK_MMC0_OUTPUT>,
++				 <&ccu CLK_MMC0_SAMPLE>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ccu RST_BUS_MMC0>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
-+#include <linux/clk-provider.h>
-+#include <linux/clk/sunxi-ng.h>
++		mmc1: mmc at 1c10000 {
++			compatible = "allwinner,sun7i-a20-mmc";
++			reg = <0x01c10000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC1>,
++				 <&ccu CLK_MMC1>,
++				 <&ccu CLK_MMC1_OUTPUT>,
++				 <&ccu CLK_MMC1_SAMPLE>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ccu RST_BUS_MMC1>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
-+#include "ccu_common.h"
++		mmc2: mmc at 1c11000 {
++			compatible = "allwinner,sun8i-a83t-emmc";
++			reg = <0x01c11000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC2>,
++				 <&ccu CLK_MMC2>,
++				 <&ccu CLK_MMC2_OUTPUT>,
++				 <&ccu CLK_MMC2_SAMPLE>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ccu RST_BUS_MMC2>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
-+#define CCU_MMC_NEW_TIMING_MODE		BIT(30)
-+
-+/**
-+ * sunxi_ccu_set_mmc_timing_mode: Configure the MMC clock timing mode
-+ * @clk: clock to be configured
-+ * @new_mode: true for new timing mode introduced in A83T and later
-+ *
-+ * Returns 0 on success, -ENOTSUPP if the clock does not support
-+ * switching modes.
-+ */
-+int sunxi_ccu_set_mmc_timing_mode(struct clk *clk, bool new_mode)
-+{
-+	struct clk_hw *hw = __clk_get_hw(clk);
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+	unsigned long flags;
-+	u32 val;
-+
-+	if (!(cm->features & CCU_FEATURE_MMC_TIMING_SWITCH))
-+		return -ENOTSUPP;
-+
-+	spin_lock_irqsave(cm->lock, flags);
-+
-+	val = readl(cm->base + cm->reg);
-+	if (new_mode)
-+		val |= CCU_MMC_NEW_TIMING_MODE;
-+	else
-+		val &= ~CCU_MMC_NEW_TIMING_MODE;
-+	writel(val, cm->base + cm->reg);
-+
-+	spin_unlock_irqrestore(cm->lock, flags);
-+
-+	return 0;
-+}
-+
-+/**
-+ * sunxi_ccu_set_mmc_timing_mode: Get the current MMC clock timing mode
-+ * @clk: clock to query
-+ *
-+ * Returns 0 if the clock is in old timing mode, > 0 if it is in
-+ * new timing mode, and -ENOTSUPP if the clock does not support
-+ * this function.
-+ */
-+int sunxi_ccu_get_mmc_timing_mode(struct clk *clk)
-+{
-+	struct clk_hw *hw = __clk_get_hw(clk);
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+
-+	if (cm->features & CCU_FEATURE_MMC_ALWAYS_NEW)
-+		return 1;
-+
-+	if (!(cm->features & CCU_FEATURE_MMC_TIMING_SWITCH))
-+		return -ENOTSUPP;
-+
-+	return !!(readl(cm->base + cm->reg) & CCU_MMC_NEW_TIMING_MODE);
-+}
-diff --git a/include/linux/clk/sunxi-ng.h b/include/linux/clk/sunxi-ng.h
-new file mode 100644
-index 000000000000..f1bd321fc264
---- /dev/null
-+++ b/include/linux/clk/sunxi-ng.h
-@@ -0,0 +1,20 @@
-+/*
-+ * Copyright (c) 2017 Chen-Yu Tsai. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _LINUX_CLK_SUNXI_NG_H_
-+#define _LINUX_CLK_SUNXI_NG_H_
-+
-+int sunxi_ccu_set_mmc_timing_mode(struct clk *clk, bool new_mode);
-+int sunxi_ccu_get_mmc_timing_mode(struct clk *clk);
-+
-+#endif
+ 		ccu: clock at 1c20000 {
+ 			compatible = "allwinner,sun8i-a83t-ccu";
+ 			reg = <0x01c20000 0x400>;
 -- 
 2.13.2
