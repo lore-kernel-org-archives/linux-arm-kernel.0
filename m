@@ -1,43 +1,76 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 14 Jul 2017 14:27:09 -0700
-Subject: [PATCH 0/3] USB Mux support for Chipidea
-In-Reply-To: <149998530228.4532.1798948469358915658@sboyd-linaro>
-References: <20170712010255.26855-1-stephen.boyd@linaro.org>
- <fc1f2836-cd9b-0905-21fc-d2d3029d1f52@axentia.se>
- <149998530228.4532.1798948469358915658@sboyd-linaro>
-Message-ID: <150006762899.13439.5431012472808314482@sboyd-linaro>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 14 Jul 2017 22:27:18 +0100
+Subject: [kernel-hardening] Re: [RFC PATCH 6/6] arm64: add VMAP_STACK and
+ detect out-of-bounds SP
+In-Reply-To: <20170714140605.GB16687@leverpostej>
+References: <CAKv+Gu8jey+uPSFoCsjQn9BeGiChZpS=iZ0v9nEWvkwcO1gFYg@mail.gmail.com>
+ <20170713104950.GB26194@leverpostej>
+ <CAKv+Gu9eSX-f4uv3gaNw9_eKV0soe2-CqSnMaTjjEhMifxe_8g@mail.gmail.com>
+ <20170713161050.GG26194@leverpostej>
+ <20170713175543.GA32528@leverpostej>
+ <CAKv+Gu_v3PO7=JSgCTb3aZu3sg4cwYYjy68VJnr58vzaMYvhTw@mail.gmail.com>
+ <20170714103258.GA16128@leverpostej>
+ <CAKv+Gu-FvfPFQooCie6HwP=mBng3C0jp9p8WMkFwTxctDu4JBA@mail.gmail.com>
+ <CAKv+Gu96YHXDta7=YdYO4=wtR3mGVdkzAkG6tSzS-vo7toiPXA@mail.gmail.com>
+ <20170714140605.GB16687@leverpostej>
+Message-ID: <20170714212717.GB1086@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2017-07-13 15:35:02)
-> Quoting Peter Rosin (2017-07-11 22:04:46)
-> > 
-> > Maybe no need for a compatible update either, if it works to do something
-> > like this in the DT?
-> > 
-> >         usb_switch: usb-switch {
-> >                 compatible = "gpio-mux";
-> >                 mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>,
-> >                             <&pm8916_gpios XXX GPIO_ACTIVE_XXX>;
-> >                 idle-state = <2>;
-> >                 #mux-control-cells = <0>;
-> >                 pinctrl-names = "default";
-> >                 pinctrl-0 = <&usb_sw_sel_pm>;
-> >         };
-> > 
-> > But I obviously know little about how things are wired and really works,
-> > so that might be totally off...
-> > 
-> > Otherwise, maybe a generic mux-pinctrl driver would do the trick?
-> > (compare with drivers/i2c/muxes/i2c-mux-pinctrl.c)
-> > 
+On Fri, Jul 14, 2017 at 03:06:06PM +0100, Mark Rutland wrote:
+> On Fri, Jul 14, 2017 at 01:27:14PM +0100, Ard Biesheuvel wrote:
+> > On 14 July 2017 at 11:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > > On 14 July 2017 at 11:32, Mark Rutland <mark.rutland@arm.com> wrote:
+> > >> On Thu, Jul 13, 2017 at 07:28:48PM +0100, Ard Biesheuvel wrote:
 > 
-> Agreed.
+> > >>> OK, so here's a crazy idea: what if we
+> > >>> a) carve out a dedicated range in the VMALLOC area for stacks
+> > >>> b) for each stack, allocate a naturally aligned window of 2x the stack
+> > >>> size, and map the stack inside it, leaving the remaining space
+> > >>> unmapped
+> 
+> > >> The logical ops (TST) and conditional branches (TB(N)Z, CB(N)Z) operate
+> > >> on XZR rather than SP, so to do this we need to get the SP value into a
+> > >> GPR.
+> > >>
+> > >> Previously, I assumed this meant we needed to corrupt a GPR (and hence
+> > >> stash that GPR in a sysreg), so I started writing code to free sysregs.
+> > >>
+> > >> However, I now realise I was being thick, since we can stash the GPR
+> > >> in the SP:
+> > >>
+> > >>         sub     sp, sp, x0      // sp = orig_sp - x0
+> > >>         add     x0, sp, x0      // x0 = x0 - (orig_sp - x0) == orig_sp
+> 
+> That comment is off, and should say     x0 = x0 + (orig_sp - x0) == orig_sp
+> 
+> > >>         sub     x0, x0, #S_FRAME_SIZE
+> > >>         tb(nz)  x0, #THREAD_SHIFT, overflow
+> > >>         add     x0, x0, #S_FRAME_SIZE
+> > >>         sub     x0, sp, x0
+> > 
+> > You need a neg x0, x0 here I think
+> 
+> Oh, whoops. I'd mis-simplified things.
+> 
+> We can avoid that by storing orig_sp + orig_x0 in sp:
+> 
+> 	add	sp, sp, x0	// sp = orig_sp + orig_x0
+> 	sub	x0, sp, x0	// x0 = orig_sp
+> 	< check > 
+> 	sub	x0, sp, x0	// x0 = orig_x0
+> 	sub	sp, sp, x0	// sp = orig_sp
+> 
+> ... which works in a locally-built kernel where I've aligned all the
+> stacks.
 
-Testing looks good when I use the gpio-mux binding. The only thing I
-noticed is that gpio-mux driver is requesting the gpio with
-GPIOD_OUT_LOW. Is that intentional? I worry that may randomly mux the
-D+/D- lines during probe if the gpio is asserted at probe time. It isn't
-a problem for me right now, because the mux is power on defaulted to
-have the gpio deasserted, but it may be a problem if the default
-changes.
+FWIW, I've pushed out a somewhat cleaned-up (and slightly broken!)
+version of said kernel source to my arm64/vmap-stack-align branch [1].
+That's still missing the backtrace handling, IRQ stack alignment is
+broken at least on 64K pages, and there's still more cleanup and rework
+to do.
+
+Thanks,
+Mark.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/vmap-stack-align
