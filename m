@@ -1,82 +1,66 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 14 Jul 2017 13:30:50 -0500
-Subject: [PATCH 2/2] pinctrl: qcom: qdf2xxx: add support for new ACPI HID
- QCOM8002
-In-Reply-To: <20170714172121.GN20973@minitux>
-References: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
- <1499982763-29619-3-git-send-email-timur@codeaurora.org>
- <20170714172121.GN20973@minitux>
-Message-ID: <99cc9d6e-da81-82b5-8402-0a471a6c9fb2@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 15 Jul 2017 02:52:30 +0800
+Subject: [PATCH v5 1/2] clk: gate: expose clk_gate_ops::is_enabled
+In-Reply-To: <1499954552-20075-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <201707150222.ogIMUhKu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2017 12:21 PM, Bjorn Andersson wrote:
+Hi Gabriel,
 
->> +enum {
->> +	QDF2XXX_V1,
->> +	QDF2XXX_V2,
->> +};
->> +
->> +static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
->> +	{"QCOM8001", QDF2XXX_V1},
->> +	{"QCOM8002", QDF2XXX_V2},
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-> 
-> NB. too bad there doesn't seem to be an equivalent of
-> of_device_get_match_data().
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.12 next-20170714]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-There's acpi_match_device(), which I use.
+url:    https://github.com/0day-ci/linux/commits/gabriel-fernandez-st-com/clk-stm32h7-Add-stm32h743-clock-driver/20170714-170518
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm-lpc32xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> 
->> +
->>   static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
->>   {
->> +	const struct acpi_device_id *id =
->> +		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
->> +	struct device *dev = &pdev->dev;
->>   	struct pinctrl_pin_desc *pins;
->>   	struct msm_pingroup *groups;
->>   	char (*names)[NAME_SIZE];
->>   	unsigned int i;
-> 
-> The result of the patch looks fine, but unfortunately there's some noise
-> in the patch due to the transition from &pdev->dev to dev and num_gpios
-> to max_gpios.
+All errors (new ones prefixed by >>):
 
-I did that to shrink the line lengths.  I can put it back if you want.
+>> drivers/clk/nxp/clk-lpc32xx.c:906:12: error: static declaration of 'clk_gate_is_enabled' follows non-static declaration
+    static int clk_gate_is_enabled(struct clk_hw *hw)
+               ^~~~~~~~~~~~~~~~~~~
+   In file included from drivers/clk/nxp/clk-lpc32xx.c:13:0:
+   include/linux/clk-provider.h:346:5: note: previous declaration of 'clk_gate_is_enabled' was here
+    int clk_gate_is_enabled(struct clk_hw *hw);
+        ^~~~~~~~~~~~~~~~~~~
 
-> 
->> -	u32 num_gpios;
->> +	unsigned int num_gpios; /* The number of GPIOs we support */
->> +	u32 max_gpios; /* The highest number GPIO that exists */
-> 
-> Could you please keep the "num_gpios" naming and name the new variable
-> "avail_gpios" or something similar.
+vim +/clk_gate_is_enabled +906 drivers/clk/nxp/clk-lpc32xx.c
 
-Sure.
+f7c82a60 Vladimir Zapolskiy 2015-12-06  905  
+f7c82a60 Vladimir Zapolskiy 2015-12-06 @906  static int clk_gate_is_enabled(struct clk_hw *hw)
+f7c82a60 Vladimir Zapolskiy 2015-12-06  907  {
+f7c82a60 Vladimir Zapolskiy 2015-12-06  908  	struct lpc32xx_clk_gate *clk = to_lpc32xx_gate(hw);
+f7c82a60 Vladimir Zapolskiy 2015-12-06  909  	u32 val;
+f7c82a60 Vladimir Zapolskiy 2015-12-06  910  	bool is_set;
+f7c82a60 Vladimir Zapolskiy 2015-12-06  911  
+f7c82a60 Vladimir Zapolskiy 2015-12-06  912  	regmap_read(clk_regmap, clk->reg, &val);
+f7c82a60 Vladimir Zapolskiy 2015-12-06  913  	is_set = val & BIT(clk->bit_idx);
+f7c82a60 Vladimir Zapolskiy 2015-12-06  914  
+f7c82a60 Vladimir Zapolskiy 2015-12-06  915  	return (clk->flags & CLK_GATE_SET_TO_DISABLE ? !is_set : is_set);
+f7c82a60 Vladimir Zapolskiy 2015-12-06  916  }
+f7c82a60 Vladimir Zapolskiy 2015-12-06  917  
 
-> 
->> +	u16 *gpios; /* An array of supported GPIOs */
->>   	int ret;
-> 
->>   
->> -	/* Query the number of GPIOs from ACPI */
->> -	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
->> +	/* The total number of GPIOs that exist */
->> +	ret = device_property_read_u32(dev, "num-gpios", &max_gpios);
->>   	if (ret < 0) {
->> -		dev_warn(&pdev->dev, "missing num-gpios property\n");
->> +		dev_err(dev, "missing or invalid 'num-gpios' property\n");
-> 
-> While this makes sense it's not entirely related to this patch. My
-> suggestion is that you prepend a patch transitioning &pdev->dev to dev
-> and change these to dev_err in the same.
+:::::: The code at line 906 was first introduced by commit
+:::::: f7c82a60ba26c2f003662bcb2cff131021c1e828 clk: lpc32xx: add common clock framework driver
 
-I'd rather put pdev->dev back.
+:::::: TO: Vladimir Zapolskiy <vz@mleia.com>
+:::::: CC: Michael Turquette <mturquette@baylibre.com>
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 21155 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170715/e8e16a82/attachment-0001.gz>
