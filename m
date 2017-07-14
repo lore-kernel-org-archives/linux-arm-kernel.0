@@ -1,77 +1,185 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:21 +0100
-Subject: [PATCH v3 16/18] coresight tmc: Support for save-restore in ETR
+Date: Fri, 14 Jul 2017 14:04:10 +0100
+Subject: [PATCH v3 05/18] coresight: Extend the PIDR mask to cover relevant
+ bits in PIDR2
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-17-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Coresight SoC 600 TMC ETR supports save-restore feature,
-where the values of the RRP/RWP and STS.Full are retained
-when it leaves the Disabled state. Hence, we must program the
-RRP/RWP and STS.Full to a proper value. For now, set the RRP/RWP
-to the base address of the buffer and clear the STS.Full register.
-This can be later exploited for proper save-restore of ETR
-trace contexts (e.g, perf).
+As per coresight standards, PIDR2 register has the following format :
+
+ [2-0]	- JEP106_bits6to4
+ [3]	- JEDEC, designer ID is specified by JEDEC.
+
+However some of the drivers only use mask of 0x3 for the PIDR2 leaving
+bits [3-2] unchecked, which could potentially match the component for
+a different device altogether. This patch fixes the mask and the
+corresponding id bits for the existing devices.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 ++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc.h     |  9 +++++++++
- 2 files changed, 21 insertions(+), 1 deletion(-)
+I have not touched the TPIU ids for Ux500 (see commit: 4339b699),
+as I don't have a platform to fix/correct the ids.
+---
+ .../coresight/coresight-dynamic-replicator.c       |  4 ++--
+ drivers/hwtracing/coresight/coresight-etb10.c      |  4 ++--
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 24 +++++++++++-----------
+ drivers/hwtracing/coresight/coresight-funnel.c     |  4 ++--
+ drivers/hwtracing/coresight/coresight-stm.c        |  8 ++++----
+ drivers/hwtracing/coresight/coresight-tmc.c        |  4 ++--
+ drivers/hwtracing/coresight/coresight-tpiu.c       |  4 ++--
+ 7 files changed, 26 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index d5f51cb..a69d1c4 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -22,7 +22,7 @@
+diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+index 1675031..ccbafaf 100644
+--- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+@@ -177,8 +177,8 @@ static const struct dev_pm_ops replicator_dev_pm_ops = {
  
- static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- {
--	u32 axictl;
-+	u32 axictl, sts;
+ static struct amba_id replicator_ids[] = {
+ 	{
+-		.id     = 0x0003b909,
+-		.mask   = 0x0003ffff,
++		.id     = 0x000bb909,
++		.mask   = 0x000fffff,
+ 	},
+ 	{ 0, 0 },
+ };
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index d5b9642..be6f59c 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -730,8 +730,8 @@ static const struct dev_pm_ops etb_dev_pm_ops = {
  
- 	/* Zero out the memory to help with debug */
- 	memset(drvdata->vaddr, 0, drvdata->size);
-@@ -47,6 +47,17 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ static struct amba_id etb_ids[] = {
+ 	{
+-		.id	= 0x0003b907,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000bb907,
++		.mask	= 0x000fffff,
+ 	},
+ 	{ 0, 0},
+ };
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index a51b6b6..1af7f9e 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -887,33 +887,33 @@ static const struct dev_pm_ops etm_dev_pm_ops = {
  
- 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
- 	tmc_write_dba(drvdata, drvdata->paddr);
-+	/*
-+	 * If the TMC pointers must be programmed before the session,
-+	 * we have to set it properly (i.e, RRP/RWP to base address and
-+	 * STS to "not full").
-+	 */
-+	if (tmc_etr_has_cap(drvdata, TMC_ETR_SAVE_RESTORE)) {
-+		tmc_write_rrp(drvdata, drvdata->paddr);
-+		tmc_write_rwp(drvdata, drvdata->paddr);
-+		sts = readl_relaxed(drvdata->base + TMC_STS) & ~TMC_STS_FULL;
-+		writel_relaxed(sts, drvdata->base + TMC_STS);
-+	}
+ static struct amba_id etm_ids[] = {
+ 	{	/* ETM 3.3 */
+-		.id	= 0x0003b921,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000bb921,
++		.mask	= 0x000fffff,
+ 		.data	= "ETM 3.3",
+ 	},
+ 	{	/* ETM 3.5 - Cortex-A5 */
+-		.id	= 0x0003b955,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000bb955,
++		.mask	= 0x000fffff,
+ 		.data	= "ETM 3.5",
+ 	},
+ 	{	/* ETM 3.5 */
+-		.id	= 0x0003b956,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000bb956,
++		.mask	= 0x000fffff,
+ 		.data	= "ETM 3.5",
+ 	},
+ 	{	/* PTM 1.0 */
+-		.id	= 0x0003b950,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000bb950,
++		.mask	= 0x000fffff,
+ 		.data	= "PTM 1.0",
+ 	},
+ 	{	/* PTM 1.1 */
+-		.id	= 0x0003b95f,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000bb95f,
++		.mask	= 0x000fffff,
+ 		.data	= "PTM 1.1",
+ 	},
+ 	{	/* PTM 1.1 Qualcomm */
+-		.id	= 0x0003006f,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000b006f,
++		.mask	= 0x000fffff,
+ 		.data	= "PTM 1.1",
+ 	},
+ 	{ 0, 0},
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index 860fe6e..6f7f3d3 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -248,8 +248,8 @@ static const struct dev_pm_ops funnel_dev_pm_ops = {
  
- 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
- 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index de92011..5032d8e 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -121,6 +121,15 @@ enum tmc_mem_intf_width {
- #define TMC_ETR_SG			(0x1U << 0)
- /* ETR has separate read/write cache encodings */
- #define TMC_ETR_AXI_ARCACHE		(0x1U << 1)
-+/*
-+ * TMC_ETR_SAVE_RESTORE - Values of RRP/RWP/STS.Full are
-+ * retained when TMC leaves Disabled state, allowing us to continue
-+ * the tracing from a point where we stopped. This also implies that
-+ * the RRP/RWP/STS.Full should always be programmed to the correct
-+ * value. Unfortunately this is not advertised by the hardware,
-+ * so we have to rely on PID of the IP to detect the functionality.
-+ */
-+#define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
+ static struct amba_id funnel_ids[] = {
+ 	{
+-		.id     = 0x0003b908,
+-		.mask   = 0x0003ffff,
++		.id     = 0x000bb908,
++		.mask   = 0x000fffff,
+ 	},
+ 	{ 0, 0},
+ };
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index 93fc26f..1bcda80 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -916,13 +916,13 @@ static const struct dev_pm_ops stm_dev_pm_ops = {
  
- /**
-  * struct tmc_drvdata - specifics associated to an TMC component
+ static struct amba_id stm_ids[] = {
+ 	{
+-		.id     = 0x0003b962,
+-		.mask   = 0x0003ffff,
++		.id     = 0x000bb962,
++		.mask   = 0x000fffff,
+ 		.data	= "STM32",
+ 	},
+ 	{
+-		.id	= 0x0003b963,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000bb963,
++		.mask	= 0x000fffff,
+ 		.data	= "STM500",
+ 	},
+ 	{ 0, 0},
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 8644887..eb0c7b3 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -393,8 +393,8 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ static struct amba_id tmc_ids[] = {
+ 	{
+-		.id     = 0x0003b961,
+-		.mask   = 0x0003ffff,
++		.id     = 0x000bb961,
++		.mask   = 0x000fffff,
+ 	},
+ 	{ 0, 0},
+ };
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 0673baf..59c1510 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -194,8 +194,8 @@ static const struct dev_pm_ops tpiu_dev_pm_ops = {
+ 
+ static struct amba_id tpiu_ids[] = {
+ 	{
+-		.id	= 0x0003b912,
+-		.mask	= 0x0003ffff,
++		.id	= 0x000bb912,
++		.mask	= 0x000fffff,
+ 	},
+ 	{
+ 		.id	= 0x0004b912,
 -- 
 2.7.5
