@@ -1,32 +1,21 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Thu, 13 Jul 2017 23:30:52 -0500
-Subject: [PATCH] ARM: mm: iomap: use is_vmalloc_addr
-Message-ID: <20170714043052.GA27345@embeddedgus>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 14 Jul 2017 12:40:19 +0800
+Subject: [PATCH 17/18] arm: dts: sun8i: Add BananaPI M2-Magic DTS
+In-Reply-To: <fd6f80ac08ce9cbe4ccba884750dae128c538a2f.1499955058.git-series.maxime.ripard@free-electrons.com>
+References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <fd6f80ac08ce9cbe4ccba884750dae128c538a2f.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v678uy7YBHyO01q84ypQu+zfp2Mp+pnORz7s5m91svx0vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of manually checking the bounds of VMALLOC_START and VMALLOC_END,
-use is_vmalloc_addr. Such function was specifically designed for that
-purpose.
+On Thu, Jul 13, 2017 at 10:13 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The Bananapi M2-Magic is a board with an A33, a USB host and USB OTG
+> connectors, and 8GB eMMC, an AP6212 WiFi/Bluetooth chip and connectors for
+> DSI, CSI and GPIOs.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
----
- arch/arm/mm/iomap.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
-index 4614208..4bf5457 100644
---- a/arch/arm/mm/iomap.c
-+++ b/arch/arm/mm/iomap.c
-@@ -34,8 +34,7 @@ EXPORT_SYMBOL(pcibios_min_mem);
- 
- void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
- {
--	if ((unsigned long)addr >= VMALLOC_START &&
--	    (unsigned long)addr < VMALLOC_END)
-+	if (is_vmalloc_addr(addr))
- 		iounmap(addr);
- }
- EXPORT_SYMBOL(pci_iounmap);
--- 
-2.5.0
+Has BPI publicly released the schematics and/or FEX file yet?
