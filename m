@@ -1,36 +1,36 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:07 +0100
-Subject: [PATCH v3 02/18] arm64: juno: dts: Use the new coresight replicator
- string
+Date: Fri, 14 Jul 2017 14:04:08 +0100
+Subject: [PATCH v3 03/18] arm: qcom-msm8974: dts: Update coresight replicator
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new compatible for ATB programmable replicator in Juno.
+Replace the obsolete compatible string for Coresight programmable
+replicator with the new one.
 
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Mike Leach <mike.leach@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: David Brown <david.brown@linaro.org>
+Cc: linux-arm-msm at vger.kernel.org
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/boot/dts/arm/juno-base.dtsi | 2 +-
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index bfe7d68..c82c706 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -373,7 +373,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 307bf6a..3c7c6b9 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -729,7 +729,7 @@
+ 		};
  
- 	replicator at 20120000 {
--		compatible = "qcom,coresight-replicator1x", "arm,primecell";
-+		compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
- 		reg = <0 0x20120000 0 0x1000>;
+ 		replicator at fc31c000 {
+-			compatible = "qcom,coresight-replicator1x", "arm,primecell";
++			compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
+ 			reg = <0xfc31c000 0x1000>;
  
- 		clocks = <&soc_smc50mhz>;
+ 			clocks = <&rpmcc RPM_SMD_QDSS_CLK>, <&rpmcc RPM_SMD_QDSS_A_CLK>;
 -- 
 2.7.5
