@@ -1,28 +1,118 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 14 Jul 2017 12:01:31 -0500
-Subject: [PATCH 1/2] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <20170714164455.GM20973@minitux>
-References: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
- <1499982763-29619-2-git-send-email-timur@codeaurora.org>
- <20170714164455.GM20973@minitux>
-Message-ID: <be10e365-95fa-dfa4-9900-4af05d8f41a9@codeaurora.org>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 14 Jul 2017 17:03:59 +0000
+Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
+ HiSilicon bridge
+In-Reply-To: <1500040204.2865.90.camel@kernel.crashing.org>
+References: <20170712050811.3620-1-dja@axtens.net>
+ <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
+ <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+ <20170713151146.53e9644c@w520.home>
+ <1499980882.2865.65.camel@kernel.crashing.org>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B399B4@FRAEML521-MBX.china.huawei.com>
+ <1500040204.2865.90.camel@kernel.crashing.org>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B39FC4@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2017 11:44 AM, Bjorn Andersson wrote:
-> We would have to drop the "const" on the groups arrays of the other
-> platform in order to use this, but I don't have a better suggestion at
-> this time.
+Hi Alex, Ben
 
-Why?  I don't modify any data in this patch, and I build just fine with 
-these options enabled:
+> -----Original Message-----
+> From: Benjamin Herrenschmidt [mailto:benh at kernel.crashing.org]
+> Sent: 14 July 2017 14:50
+> To: Gabriele Paoloni; Alex Williamson; Bjorn Helgaas
+> Cc: Daniel Axtens; linux-pci at vger.kernel.org; Liuxinliang (Matthew
+> Liu); Rongrong Zou; Catalin Marinas; Will Deacon; linux-arm-
+> kernel at lists.infradead.org; David Airlie; Daniel Vetter
+> Subject: Re: [PATCH v4] PCI: Support hibmc VGA cards behind a
+> misbehaving HiSilicon bridge
+> 
+> On Fri, 2017-07-14 at 12:26 +0000, Gabriele Paoloni wrote:
+> > diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+> > index 92f1452..ab3ad9a 100644
+> > --- a/drivers/gpu/vga/vgaarb.c
+> > +++ b/drivers/gpu/vga/vgaarb.c
+> > @@ -1424,6 +1424,14 @@ static int __init vga_arb_device_init(void)
+> >
+> > ????????list_for_each_entry(vgadev, &vga_list, list) {
+> > ????????????????struct device *dev = &vgadev->pdev->dev;
+> > +
+> > +???????????????/* if no legacy device has been set as default VGA
+> > +??????????????? * device, just pick up the first one in the list */
+> > +???????????????if (vga_default == NULL) {
+> > +???????????????????????vgaarb_info(dev, "setting as boot VGA
+> device\n");
+> > +???????????????????????vga_set_default_device(vgadev->pdev);
+> > +???????????????}
+> > +
+> > ?#if defined(CONFIG_X86) || defined(CONFIG_IA64)
+> > ????????????????/*
+> > ???????????????? * Override vga_arbiter_add_pci_device()'s I/O based
+> detection
+> >
+> > Above after we have filled the list of VGA devices by iterating over
+> all
+> > PCI devices we check if no legacy one has been set as default VGA
+> device
+> > yet: therefore we set the first VGA device in the list as default
+> one...
+> >
+> > Do you think it would work?
+> 
+> I honestly don't remember all of the details of the arbiter but just
+> make sure that it won't think that device is enabled for things like
+> VGA etc... if it's memory/IO decode weren't enabled.
+> 
 
-CONFIG_PINCTRL_MSM8916=y
-CONFIG_PINCTRL_MSM8994=y
-CONFIG_PINCTRL_MSM8996=y
-CONFIG_PINCTRL_QDF2XXX=m
+I think the following one should make sure that MEM/IO response are
+enabled (also as suggested by Alex)
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+index 92f1452..a90c48c 100644
+--- a/drivers/gpu/vga/vgaarb.c
++++ b/drivers/gpu/vga/vgaarb.c
+@@ -1424,6 +1424,21 @@ static int __init vga_arb_device_init(void)
+ 
+ 	list_for_each_entry(vgadev, &vga_list, list) {
+ 		struct device *dev = &vgadev->pdev->dev;
++
++		/* if no legacy device has been set as default VGA device,
++		 * justpick up the first one in the list capable of responding to
++		 * mem and io requests*/
++		if (vga_default == NULL) {
++			u16 cmd;
++
++			pci_read_config_word(vgadev->pdev, PCI_COMMAND, &cmd);
++			if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) ||
++					!vga_default_device()) {
++				vga_set_default_device(vgadev->pdev);
++				vgaarb_info(dev, "setting as boot VGA device\n");
++			}
++		}
++
+ #if defined(CONFIG_X86) || defined(CONFIG_IA64)
+ 		/*
+ 		 * Override vga_arbiter_add_pci_device()'s I/O based detection
+
+
+Also the above one could allow us to get rid of fixup_vga in powerpc....
+
+
+> I'd rather we have no default device until a driver actually picks up
+> though, and then, if we still have no default, use the first driver to
+> pick up.
+
+Well from my understanding the PCI host controller driver will enumerate
+all the devices in the PCI hierarchy and call pci_device_add() for each of
+them, that in turn will call device_add(), at this stage if there is a
+driver available for the device such driver will probe otherwise it will not.
+
+Are you suggesting to add the code above in pci_device_add() after device_add()
+and after checking that a driver has been bound for such dev?
+
+Thanks
+Gab
+
+
+> 
+> Ben.
