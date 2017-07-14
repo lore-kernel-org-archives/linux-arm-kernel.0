@@ -1,35 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 14 Jul 2017 14:10:27 +0200
-Subject: Back camera working at 1MPix, not working at 5Mpix
-Message-ID: <20170714121027.GA31248@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Jul 2017 14:07:03 +0200
+Subject: [PATCH 11/22] net: thunder_bgx: avoid format string overflow warning
+In-Reply-To: <20170714120720.906842-1-arnd@arndb.de>
+References: <20170714120720.906842-1-arnd@arndb.de>
+Message-ID: <20170714120720.906842-12-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+gcc warns that the temporary buffer might be too small here:
 
->From cca v4.6 kernel, I have working back camera in 1Mpix resolution.
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function 'bgx_probe':
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: error: '%d' directive writing between 1 and 10 bytes into a region of size between 9 and 11 [-Werror=format-overflow=]
+sprintf(str, "BGX%d LMAC%d mode", bgx->bgx_id, lmacid);
+             ^~~~~~~~~~~~~~~~~~~
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:16: note: directive argument in the range [0, 2147483647]
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c:1020:3: note: 'sprintf' output between 16 and 27 bytes into a destination of size 20
 
-I can't get 5Mpix to work at all. In preview mode, display is
-distorted in various ways, in raw mode, I get
-[  522.576354] omap3isp 480bc000.isp: Unable to stop OMAP3 ISP CCDC
-and no data.
+This probably can't happen, but it can't hurt to make it long
+enough for the theoretical limit.
 
-If you have recent kernel tree where 5MPix mode works, let me
-know. 2.6.x probably does not help me, but 4.x would be interesting. 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-BTW my tree with camera is at
-kernel.org:pub/scm/linux/kernel/git/pavel/linux-n900.git branch
-camera-fw6-2 ... if someone wants to play.
-
-Best regards,
-									Pavel
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index a0ca68ce3fbb..79112563a25a 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -1008,7 +1008,7 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
+ {
+ 	struct device *dev = &bgx->pdev->dev;
+ 	struct lmac *lmac;
+-	char str[20];
++	char str[27];
+ 
+ 	if (!bgx->is_dlm && lmacid)
+ 		return;
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170714/a60d8761/attachment.sig>
+2.9.0
