@@ -1,28 +1,28 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 14 Jul 2017 11:54:53 -0500
-Subject: [PATCH] spmi: pmic-arb: Always allocate ppid_to_apid table
-In-Reply-To: <20170627021746.22445-1-sboyd@codeaurora.org>
-References: <20170627021746.22445-1-sboyd@codeaurora.org>
-Message-ID: <20170714165453.GA25773@hector.attlocal.net>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 14 Jul 2017 12:01:31 -0500
+Subject: [PATCH 1/2] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <20170714164455.GM20973@minitux>
+References: <1499982763-29619-1-git-send-email-timur@codeaurora.org>
+ <1499982763-29619-2-git-send-email-timur@codeaurora.org>
+ <20170714164455.GM20973@minitux>
+Message-ID: <be10e365-95fa-dfa4-9900-4af05d8f41a9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 07:17:46PM -0700, Stephen Boyd wrote:
-> After commit 7f1d4e58dabb ("spmi: pmic-arb: optimize table
-> lookups") we always need the ppid_to_apid table regardless of the
-> version of pmic arbiter we have. Otherwise, we will try to deref
-> the array when we don't allocate it on v2 hardware like the
-> msm8974 SoCs.
-> 
-> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> Cc: Kiran Gunda <kgunda@codeaurora.org>
-> Fixes: 7f1d4e58dabb ("spmi: pmic-arb: optimize table lookups")
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On 07/14/2017 11:44 AM, Bjorn Andersson wrote:
+> We would have to drop the "const" on the groups arrays of the other
+> platform in order to use this, but I don't have a better suggestion at
+> this time.
 
-Greg,
+Why?  I don't modify any data in this patch, and I build just fine with 
+these options enabled:
 
-Can you pick this up?  This is an urgent fix for Qualcomm 8x74 platforms.
+CONFIG_PINCTRL_MSM8916=y
+CONFIG_PINCTRL_MSM8994=y
+CONFIG_PINCTRL_MSM8996=y
+CONFIG_PINCTRL_QDF2XXX=m
 
-Thanks!
-
-Andy
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
