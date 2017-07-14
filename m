@@ -1,110 +1,35 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 15 Jul 2017 00:16:16 +0200
-Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <85441336-8d89-f7aa-4fbe-a4edaf478649@gmail.com>
-References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
- <6613228.WfFrGvAy1X@aspire.rjw.lan>
- <85441336-8d89-f7aa-4fbe-a4edaf478649@gmail.com>
-Message-ID: <2497538.J9F6XFeBfd@aspire.rjw.lan>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 15 Jul 2017 09:54:33 +1000
+Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
+ HiSilicon bridge
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40B39FC4@FRAEML521-MBX.china.huawei.com>
+References: <20170712050811.3620-1-dja@axtens.net>
+ <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
+ <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
+ <20170713151146.53e9644c@w520.home>
+ <1499980882.2865.65.camel@kernel.crashing.org>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B399B4@FRAEML521-MBX.china.huawei.com>
+ <1500040204.2865.90.camel@kernel.crashing.org>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40B39FC4@FRAEML521-MBX.china.huawei.com>
+Message-ID: <1500076473.2865.99.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 12, 2017 11:08:19 AM Florian Fainelli wrote:
-> On 06/29/2017 04:00 PM, Rafael J. Wysocki wrote:
-> > On Thursday, June 22, 2017 06:08:36 PM Florian Fainelli wrote:
-> >> Add an optional platform_suspend_ops callback: target_state, and a
-> >> helper function globally visible to get this called:
-> >> platform_suspend_target_state().
-> >>
-> >> This is useful for platform specific drivers that may need to take a
-> >> slightly different suspend/resume path based on the system's
-> >> suspend/resume state being entered.
-> >>
-> >> Although this callback is optional and documented as such, it requires
-> >> a platform_suspend_ops::begin callback to be implemented in order to
-> >> provide an accurate suspend/resume state within the driver that
-> >> implements this platform_suspend_ops.
-> >>
-> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> >> ---
-> >>  include/linux/suspend.h | 12 ++++++++++++
-> >>  kernel/power/suspend.c  | 15 +++++++++++++++
-> >>  2 files changed, 27 insertions(+)
-> >>
-> >> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
-> >> index d9718378a8be..d998a04a90a2 100644
-> >> --- a/include/linux/suspend.h
-> >> +++ b/include/linux/suspend.h
-> >> @@ -172,6 +172,15 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
-> >>   *	Called by the PM core if the suspending of devices fails.
-> >>   *	This callback is optional and should only be implemented by platforms
-> >>   *	which require special recovery actions in that situation.
-> >> + *
-> >> + * @target_state: Returns the suspend state the suspend_ops will be entering.
-> >> + * 	Called by device drivers that need to know the platform specific suspend
-> >> + * 	state the system is about to enter.
-> >> + * 	This callback is optional and should only be implemented by platforms
-> >> + * 	which require special handling of power management states within
-> >> + * 	drivers. It does require @begin to be implemented to provide the suspend
-> >> + * 	state. Return value is platform_suspend_ops specific, and may be a 1:1
-> >> + * 	mapping to suspend_state_t when relevant.
-> >>   */
-> >>  struct platform_suspend_ops {
-> >>  	int (*valid)(suspend_state_t state);
-> >> @@ -184,6 +193,7 @@ struct platform_suspend_ops {
-> >>  	bool (*suspend_again)(void);
-> >>  	void (*end)(void);
-> >>  	void (*recover)(void);
-> >> +	int (*target_state)(void);
-> > 
-> > I would use unsigned int (the sign should not matter).
-> > 
-> >>  };
-> > 
-> > That's almost what I was thinking about except that the values returned by
-> > ->target_state should be unique, so it would be good to do something to
-> > ensure that.
-> > 
-> > The concern is as follows.
-> > 
-> > Say you have a driver develped for platform X where ->target_state returns
-> > A for "mem" and B for "standby".  Then, the same IP is re-used on platform Y
-> > returning B for "mem" and C for "standby" and now the driver cannot
-> > distinguish between them.
-> > 
-> > Moreover, even if they both returned A for "mem" there might be differences
-> > in how "mem" was defined by each of them and therefore in what the driver was
-> > expected to do to handle "mem" on X and Y.
+On Fri, 2017-07-14 at 17:03 +0000, Gabriele Paoloni wrote:
+> > I'd rather we have no default device until a driver actually picks up
+> > though, and then, if we still have no default, use the first driver to
+> > pick up.
 > 
-> That makes sense, would you need the core implementation in
-> platform_suspend_target_state() to range check what
-> suspend_ops->target_state() returns against a set of reserved value say,
-> checking from 0 up to ACPI_S_STATE_COUNT or is there another range you
-> would like to see being used?
+> Well from my understanding the PCI host controller driver will enumerate
+> all the devices in the PCI hierarchy and call pci_device_add() for each of
+> them, that in turn will call device_add(), at this stage if there is a
+> driver available for the device such driver will probe otherwise it will not.
+> 
+> Are you suggesting to add the code above in pci_device_add() after device_add()
+> and after checking that a driver has been bound for such dev?
 
-I had an idea of using an enum type encompassing all of the power states
-defined for various platforms and serving both as a registry (to ensure the
-uniqueness of the values assigned to the states) and a common ground
-between platforms and drivers.
+I don't like us turning on MEM/IO decoding on a device that has
+potentially not been initialized by its driver.
 
-Something like:
-
-enum platform_target_state {
-	PLATFORM_STATE_UNKNOWN = -1,
-	PLATFORM_STATE_WORKING = 0,
-	PLATFORM_STATE_ACPI_S1,
-	PLATFORM_STATE_ACPI_S2,
-	PLATFORM_STATE_ACPI_S3,
-	PLATFORM_STATE_MY_BOARD_1_GATE_CLOCKS,
-	PLATFORM_STATE_MY_BOARD_1_GATE_POWER,
-	PLATFORM_STATE_ANOTHER_BOARD_DO_CRAZY_STUFF,
-	...
-};
-
-and define ->target_state to return a value of this type.
-
-Then, if a driver sees one of these and recognizes that value, it should
-know exactly what to do.
-
-Thanks,
-Rafael
+Ben.
