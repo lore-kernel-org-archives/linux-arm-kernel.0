@@ -1,76 +1,113 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 14 Jul 2017 14:04:19 +0100
-Subject: [PATCH v3 14/18] coresight tmc etr: Cleanup AXICTL register handling
+Date: Fri, 14 Jul 2017 14:04:16 +0100
+Subject: [PATCH v3 11/18] coresight tmc etr: Add capabilitiy information
 In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500037463-19951-15-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500037463-19951-12-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up how we setup the AXICTL register on
-TMC ETR. At the moment we don't set the CacheCtrl bits, which
-drives the arcache and awcache bits on AXI bus specifying the
-cacheablitiy. Set this to Write-back Read and Write-allocate.
+With new version of TMC ETR, there are differing set of
+features supported by the TMC. Add the capability of a
+given TMC ETR for making safer decisions at runtime.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+The device configuration register of the TMC (DEVID) lists
+some of the capabilities. So, we can detect some of them at
+probe. However, some of the features (or changes in behavior)
+are not advertised and we have to depend on the PID to infer
+the features. So we use a static description of the "unadvertised"
+capabilities attached to the PID. Combining both, the static
+and the dynamic capabilities, we maintain a bitmask of the
+available features which can be later checked to take
+appropriate actions.
+
+Cc: Mathieu Poirier <mathieu.porier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 10 +++-------
- drivers/hwtracing/coresight/coresight-tmc.h     | 17 ++++++++++++++++-
- 2 files changed, 19 insertions(+), 8 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 20 +++++++++++++++-----
+ drivers/hwtracing/coresight/coresight-tmc.h | 20 ++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index ff11b92..4aa5d36 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -36,13 +36,9 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- 	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 73184a1..ebf81bc 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -297,6 +297,20 @@ const struct attribute_group *coresight_tmc_groups[] = {
+ 	NULL,
+ };
  
- 	axictl = readl_relaxed(drvdata->base + TMC_AXICTL);
--	axictl |= TMC_AXICTL_WR_BURST_16;
--	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
--	axictl &= ~TMC_AXICTL_SCT_GAT_MODE;
--	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
--	axictl = (axictl &
--		  ~(TMC_AXICTL_PROT_CTL_B0 | TMC_AXICTL_PROT_CTL_B1)) |
--		  TMC_AXICTL_PROT_CTL_B1;
-+	axictl &= ~TMC_AXICTL_CLEAR_MASK;
-+	axictl |= (TMC_AXICTL_PROT_CTL_B1 | TMC_AXICTL_WR_BURST_16);
-+	axictl |= TMC_AXICTL_AxCACHE_OS;
- 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
- 	tmc_write_dba(drvdata, drvdata->paddr);
- 
++/* Detect and initialise the capabilities of a TMC ETR */
++static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
++			     u32 devid, void *dev_caps)
++{
++	/* Set the unadvertised capabilities */
++	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
++
++	/*
++	 * ETR configuration uses a 40-bit AXI master in place of
++	 * the embedded SRAM of ETB/ETF.
++	 */
++	return dma_set_mask_and_coherent(drvdata->dev, DMA_BIT_MASK(40));
++}
++
+ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	int ret = 0;
+@@ -368,11 +382,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 		desc.type = CORESIGHT_DEV_TYPE_SINK;
+ 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+ 		desc.ops = &tmc_etr_cs_ops;
+-		/*
+-		 * ETR configuration uses a 40-bit AXI master in place of
+-		 * the embedded SRAM of ETB/ETF.
+-		 */
+-		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
++		ret = tmc_etr_setup_caps(drvdata, devid, id->data);
+ 		if (ret)
+ 			goto out;
+ 		break;
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index a0668f6..5d6d7e5 100644
+index c78de00..b2ebcef 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -55,11 +55,26 @@
- #define TMC_STS_TMCREADY_BIT	2
- #define TMC_STS_FULL		BIT(0)
- #define TMC_STS_TRIGGERED	BIT(1)
--/* TMC_AXICTL - 0x110 */
-+/*
-+ * TMC_AXICTL - 0x110
-+ *
-+ * TMC AXICTL format for SoC-400
-+ * 	Bits [0-1]	: ProtCtrlBit0-1
-+ * 	Bits [2-5]	: CacheCtrlBits 0-3 (AxCACHE)
-+ * 	Bit  6		: Reserved
-+ * 	Bit  7		: ScatterGatherMode
-+ * 	Bits [8-11]	: WrBurstLen
-+ * 	Bits [12-31]	: Reserved.
-+ */
-+#define TMC_AXICTL_CLEAR_MASK 0xfbf
+@@ -105,6 +105,8 @@ enum tmc_mem_intf_width {
+  * @config_type: TMC variant, must be of type @tmc_config_type.
+  * @memwidth:	width of the memory interface databus, in bytes.
+  * @trigger_cntr: amount of words to store after a trigger.
++ * @etr_caps:	Bitmask of capabilities of the TMC ETR, inferred from the
++ * 		device configuration register (DEVID)
+  */
+ struct tmc_drvdata {
+ 	void __iomem		*base;
+@@ -122,6 +124,7 @@ struct tmc_drvdata {
+ 	enum tmc_config_type	config_type;
+ 	enum tmc_mem_intf_width	memwidth;
+ 	u32			trigger_cntr;
++	u32			etr_caps;
+ };
+ 
+ /* Generic functions */
+@@ -158,4 +161,21 @@ TMC_REG_PAIR(rrp, TMC_RRP, TMC_RRPHI)
+ TMC_REG_PAIR(rwp, TMC_RWP, TMC_RWPHI)
+ TMC_REG_PAIR(dba, TMC_DBALO, TMC_DBAHI)
+ 
++/* Initialise the caps from unadvertised static capabilities of the device */
++static inline void tmc_etr_init_caps(struct tmc_drvdata *drvdata, u32 dev_caps)
++{
++	WARN_ON(drvdata->etr_caps);
++	drvdata->etr_caps = dev_caps;
++}
 +
- #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
- #define TMC_AXICTL_PROT_CTL_B1	BIT(1)
- #define TMC_AXICTL_SCT_GAT_MODE	BIT(7)
- #define TMC_AXICTL_WR_BURST_16	0xF00
-+/* Write-back Read and Write-allocate */
-+#define TMC_AXICTL_AxCACHE_OS	(0xf << 2)
++static inline void tmc_etr_set_cap(struct tmc_drvdata *drvdata, u32 cap)
++{
++	drvdata->etr_caps |= cap;
++}
 +
- /* TMC_FFCR - 0x304 */
- #define TMC_FFCR_FLUSHMAN_BIT	6
- #define TMC_FFCR_EN_FMT		BIT(0)
++static inline bool tmc_etr_has_cap(struct tmc_drvdata *drvdata, u32 cap)
++{
++	return !!(drvdata->etr_caps & cap);
++}
++
+ #endif
 -- 
 2.7.5
