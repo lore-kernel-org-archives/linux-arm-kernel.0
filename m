@@ -1,46 +1,34 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Fri, 14 Jul 2017 16:08:46 -0400
-Subject: [PATCH v4 1/8] of: documentation: add bindings documentation for
- TS-4600
+Date: Fri, 14 Jul 2017 16:08:53 -0400
+Subject: [PATCH v4 8/8] ARM: dts: TS-4600: add watchdog support
 In-Reply-To: <20170714200853.10362-1-sebastien.bourdelin@savoirfairelinux.com>
 References: <20170714200853.10362-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20170714200853.10362-2-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20170714200853.10362-9-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the documentation for the TS-4600 by Technologic Systems.
+This enables support for the watchdog located in the FPGA.
 
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changes v3 -> v4:
-  - rebase on master
-
-Changes v2 -> v3:
-  - rebase on master
-
-Changes v1 -> v2:
-  - rebase on master
-  - add ack by Rob Herring <robh@kernel.org>
 Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
 ---
- Documentation/devicetree/bindings/arm/technologic.txt | 5 +++++
+ arch/arm/boot/dts/imx28-ts4600-common.dtsi | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
-index 33797acad846..e9d6d6575566 100644
---- a/Documentation/devicetree/bindings/arm/technologic.txt
-+++ b/Documentation/devicetree/bindings/arm/technologic.txt
-@@ -1,6 +1,11 @@
- Technologic Systems Platforms Device Tree Bindings
- --------------------------------------------------
- 
-+TS-4600 is a System-on-Module based on the Freescale i.MX28 System-on-Chip.
-+It can be mounted on a carrier board providing additional peripheral connectors.
-+Required root node properties:
-+	- compatible = "technologic,imx28-ts4600", "fsl,imx28"
+diff --git a/arch/arm/boot/dts/imx28-ts4600-common.dtsi b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+index a90bd934e4a3..9e177d33ba9c 100644
+--- a/arch/arm/boot/dts/imx28-ts4600-common.dtsi
++++ b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+@@ -116,6 +116,11 @@
+ 		ts,strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
+ 		ts,ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+ 		ts,rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
 +
- TS-4800 board
- Required root node properties:
- 	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
++		watchdog at 2a {
++			compatible = "technologic,ts4600-wdt";
++			reg = <0x2a>;
++		};
+ 	};
+ 
+ };
 -- 
 2.13.0
