@@ -1,90 +1,19 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 13 Jul 2017 19:20:42 -0700
-Subject: [PATCH v2] arm64: dts: qcom: Force host mode for USB on apq8016-sbc
-Message-ID: <20170714022042.13886-1-sboyd@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 14 Jul 2017 11:09:07 +0800
+Subject: [PATCH 02/18] drm/sun4i: Add if statement instead of depends on
+In-Reply-To: <d51d45d57d2bacaa5bafcd861aa0142fcaf0ad77.1499955058.git-series.maxime.ripard@free-electrons.com>
+References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <d51d45d57d2bacaa5bafcd861aa0142fcaf0ad77.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64KXCm1SzCz1hSkk1WOA03rju5_v_Q9XdF=cSs26Wz+Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ed75d6a96905 ("arm64: dts: qcom: Collapse usb support into
-one node") breaks host mode support on apq8016-sbc boards. This
-is because the mux driver (tc7usb40mu) hasn't been merged.
-Without that driver, we can't toggle the GPIO going to the mux to
-route out the D+/D- lines to the USB hub that's on the board.
+On Thu, Jul 13, 2017 at 10:12 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The depends on relationship is obvious, and using an if statement will
+> propagate it to every option without the need for each and every one of
+> them to define it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-One solution would be to totally revert this change, but that
-opens us up to other problems when two USB drivers are operating
-the same hardware block at the same time. Let's modify the DT so
-that the USB controller is always in host mode and connected to
-the hub so that things like USB keyboards and mouses work. This
-is the mode that most people prefer anyway with these devices. We
-also delete the usb-switch node because the binding was never
-accepted upstream.
-
-In the future, we can add muxing support and then update the DT
-to support both modes at runtime. Patches to support this are
-already on the mailing list.
-
-Fixes: ed75d6a96905 ("arm64: dts: qcom: Collapse usb support into one node")
-Reported-by: Rob Clark <robdclark@gmail.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
-
-I noticed that I accidently removed the vbus notifier part of the phy.
-Without it, we'll change settings that shouldn't changed. The thing
-that we don't have is the ID pin on this board, not the vbus. That's
-the only difference from v1.
-
- arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |  1 +
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi           | 13 ++++---------
- 2 files changed, 5 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-index d94640812194..790b7775b901 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-@@ -17,6 +17,7 @@
- 			function = PMIC_GPIO_FUNC_NORMAL;
- 			power-source = <PM8916_GPIO_VPH>;
- 			input-disable;
-+			output-high;
- 		};
- 	};
- 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index bd310ac1967a..bb9e29e6b164 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -213,11 +213,14 @@
- 		};
- 
- 		usb at 78d9000 {
--			extcon = <&usb_id>, <&usb_id>;
-+			extcon = <&usb_id>;
- 			status = "okay";
- 			adp-disable;
- 			hnp-disable;
- 			srp-disable;
-+			dr_mode = "host";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&usb_sw_sel_pm>;
- 			ulpi {
- 				phy {
- 					v1p8-supply = <&pm8916_l7>;
-@@ -342,14 +345,6 @@
- 		pinctrl-0 = <&usb_id_default>;
- 	};
- 
--	usb-switch {
--		compatible = "toshiba,tc7usb40mu";
--		switch-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
--		extcon = <&usb_id>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&usb_sw_sel_pm>;
--	};
--
- 	hdmi-out {
- 		compatible = "hdmi-connector";
- 		type = "a";
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
