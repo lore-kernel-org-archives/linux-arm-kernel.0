@@ -1,95 +1,84 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 15 Jul 2017 18:46:26 +0200
-Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <5864280.u6UQBsuXnA@aspire.rjw.lan>
-References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
- <2497538.J9F6XFeBfd@aspire.rjw.lan> <20170715062838.GA20741@amd>
- <5864280.u6UQBsuXnA@aspire.rjw.lan>
-Message-ID: <20170715164626.GA1373@amd>
+From: nicolas@ndufresne.ca (Personnel)
+Date: Sat, 15 Jul 2017 12:49:13 -0400
+Subject: [PATCH v2 2/6] [media] rockchip/rga: v4l2 m2m support
+In-Reply-To: <2363665.x6z9MR1vqI@avalon>
+References: <1500101920-24039-1-git-send-email-jacob-chen@iotwrt.com>
+ <1500101920-24039-3-git-send-email-jacob-chen@iotwrt.com>
+ <2363665.x6z9MR1vqI@avalon>
+Message-ID: <1500137353.2353.1.camel@ndufresne.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > I had an idea of using an enum type encompassing all of the power states
-> > > defined for various platforms and serving both as a registry (to ensure the
-> > > uniqueness of the values assigned to the states) and a common ground
-> > > between platforms and drivers.
-> > > 
-> > > Something like:
-> > > 
-> > > enum platform_target_state {
-> > > 	PLATFORM_STATE_UNKNOWN = -1,
-> > > 	PLATFORM_STATE_WORKING = 0,
-> > > 	PLATFORM_STATE_ACPI_S1,
-> > > 	PLATFORM_STATE_ACPI_S2,
-> > > 	PLATFORM_STATE_ACPI_S3,
-> > > 	PLATFORM_STATE_MY_BOARD_1_GATE_CLOCKS,
-> > > 	PLATFORM_STATE_MY_BOARD_1_GATE_POWER,
-> > > 	PLATFORM_STATE_ANOTHER_BOARD_DO_CRAZY_STUFF,
-> > > 	...
-> > > };
-> > > 
-> > > and define ->target_state to return a value of this type.
-> > > 
-> > > Then, if a driver sees one of these and recognizes that value, it should
-> > > know exactly what to do.
+Le samedi 15 juillet 2017 ? 12:42 +0300, Laurent Pinchart a ?crit :
+> Hi Jacob,
+> 
+> Thank you for the patch.
+> 
+> On Saturday 15 Jul 2017 14:58:36 Jacob Chen wrote:
+> > Rockchip RGA is a separate 2D raster graphic acceleration unit. It
+> > accelerates 2D graphics operations, such as point/line drawing, image
+> > scaling, rotation, BitBLT, alpha blending and image blur/sharpness.
 > > 
-> > Remind me why this is good idea?
+> > The drvier is mostly based on s5p-g2d v4l2 m2m driver.
+> > And supports various operations from the rendering pipeline.
+> >  - copy
+> >  - fast solid color fill
+> >  - rotation
+> >  - flip
+> >  - alpha blending
 > 
-> Because there are drivers that need to do specific things during
-> suspend on a specific board when it goes into a specific state as a
-> whole.
+> I notice that you don't support the drawing operations. How do you plan to 
+> support them later through the V4L2 M2M API ? I hate stating the obvious, but 
+> wouldn't the DRM API be better fit for a graphic accelerator ?
 
-We have seen driver that cares about voltage to his device being
-lost. That's reasonable.
+It could fit, maybe, but it really lacks some framework. Also, DRM is
+not really meant for M2M operation, and it's also not great for multi-
+process. Until recently, there was competing drivers for Exynos, both
+implemented in V4L2 and DRM, for similar rational, all DRM ones are
+being deprecated/removed.
 
-Inquiring what the platform target state is... is not.
+I think 2D blitters in V4L2 are fine, but they terribly lack something
+to differentiate them from converters/scalers when looking up the HW
+list. Could be as simple as a capability flag, if I can suggest. For
+the reference, the 2D blitter on IMX6 has been used to implement a live
+video mixer in GStreamer.
 
-> > If board wants to know if certain regulator stays online during
-> > suspend, it should invent an API for _that_.
+https://bugzilla.gnome.org/show_bug.cgi?id=772766
+
 > 
-> Ideally, yes.  However, that may be problematic for multiplatform kernels,
-> because they would need to have all of those APIs built in and the driver
-> code to figure out which API to use would be rather nasty.
+> Additionally, V4L2 M2M has one source and one destination. How do you 
+> implement alpha blending in that case, which by definition requires at least 
+> two sources ?
 
-Lets do it the right way. Big enum is wrong.
+This type of HW only do in-place blits. When using such a node, the
+buffer queued on the V4L2_CAPTURE contains the destination image, and
+the buffer queued on the V4L2_OUTPUT is the source image.
 
-We already have
-
-struct regulator_state {
-       int uV; /* suspend voltage */
-       unsigned int mode; /* suspend regulator operating mode */
-       int enabled; /* is regulator enabled in this suspend state */
-       int disabled; /* is the regulator disabled in this suspend state */
-};
-
- * struct regulation_constraints - regulator operating constraints.
-  * @state_disk: State for regulator when system is suspended in disk
-  * mode.
-  * @state_mem: State for regulator when system is suspended in mem
-  * mode.
-  * @state_standby: State for regulator when system is suspended in
-  * standby
-  *                 mode.
-   
-. So it seems that maybe we should tell the drivers if we are entering
-"state_mem" or "state_standby" (something I may have opposed, sorry),
-then the driver can get neccessary information from regulator
-framework.
-
-I don't think it should cause problems with multiplatform kernels.
-
-Best regards,
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170715/aad6fa22/attachment.sig>
+> 
+> > The code in rga-hw.c is used to configure regs accroding to operations.
+> > 
+> > The code in rga-buf.c is used to create private mmu table for RGA.
+> > The tables is stored in a list, and be removed when buffer is cleanup.
+> 
+> Looking at the implementation it seems to be a scatter-gather list, not an 
+> MMU. Is that right ? Does the hardware documentation refer to it as an MMU ?
+> 
+> > Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> > ---
+> >  drivers/media/platform/Kconfig                |  11 +
+> >  drivers/media/platform/Makefile               |   2 +
+> >  drivers/media/platform/rockchip-rga/Makefile  |   3 +
+> >  drivers/media/platform/rockchip-rga/rga-buf.c | 122 ++++
+> >  drivers/media/platform/rockchip-rga/rga-hw.c  | 652 ++++++++++++++++++
+> >  drivers/media/platform/rockchip-rga/rga-hw.h  | 437 ++++++++++++
+> >  drivers/media/platform/rockchip-rga/rga.c     | 958 +++++++++++++++++++++++
+> >  drivers/media/platform/rockchip-rga/rga.h     | 111 +++
+> >  8 files changed, 2296 insertions(+)
+> >  create mode 100644 drivers/media/platform/rockchip-rga/Makefile
+> >  create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
+> >  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
+> >  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
+> >  create mode 100644 drivers/media/platform/rockchip-rga/rga.c
+> >  create mode 100644 drivers/media/platform/rockchip-rga/rga.h
+> 
+> 
