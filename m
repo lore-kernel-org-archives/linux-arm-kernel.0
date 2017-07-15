@@ -1,63 +1,126 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Sat, 15 Jul 2017 10:33:47 +0200
-Subject: [PATCH 0/3] USB Mux support for Chipidea
-In-Reply-To: <150006762899.13439.5431012472808314482@sboyd-linaro>
-References: <20170712010255.26855-1-stephen.boyd@linaro.org>
- <fc1f2836-cd9b-0905-21fc-d2d3029d1f52@axentia.se>
- <149998530228.4532.1798948469358915658@sboyd-linaro>
- <150006762899.13439.5431012472808314482@sboyd-linaro>
-Message-ID: <2d2b411a-8a2c-85b9-5dc9-870c11801756@axentia.se>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 15 Jul 2017 12:16:55 +0300
+Subject: [PATCH v2 5/6] ARM: dts: rockchip: enable RGA for rk3288 devices
+In-Reply-To: <1500101920-24039-6-git-send-email-jacob-chen@iotwrt.com>
+References: <1500101920-24039-1-git-send-email-jacob-chen@iotwrt.com>
+ <1500101920-24039-6-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <2238838.k7NpPUxaC0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-07-14 23:27, Stephen Boyd wrote:
-> Quoting Stephen Boyd (2017-07-13 15:35:02)
->> Quoting Peter Rosin (2017-07-11 22:04:46)
->>>
->>> Maybe no need for a compatible update either, if it works to do something
->>> like this in the DT?
->>>
->>>         usb_switch: usb-switch {
->>>                 compatible = "gpio-mux";
->>>                 mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>,
->>>                             <&pm8916_gpios XXX GPIO_ACTIVE_XXX>;
->>>                 idle-state = <2>;
->>>                 #mux-control-cells = <0>;
->>>                 pinctrl-names = "default";
->>>                 pinctrl-0 = <&usb_sw_sel_pm>;
->>>         };
->>>
->>> But I obviously know little about how things are wired and really works,
->>> so that might be totally off...
->>>
->>> Otherwise, maybe a generic mux-pinctrl driver would do the trick?
->>> (compare with drivers/i2c/muxes/i2c-mux-pinctrl.c)
->>>
->>
->> Agreed.
+Hi Jacob,
+
+Thank you for the patch.
+
+On Saturday 15 Jul 2017 14:58:39 Jacob Chen wrote:
+> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> ---
+>  arch/arm/boot/dts/rk3288-evb.dtsi                 | 4 ++++
+>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 4 ++++
+>  arch/arm/boot/dts/rk3288-firefly.dtsi             | 4 ++++
+>  arch/arm/boot/dts/rk3288-miqi.dts                 | 4 ++++
+>  arch/arm/boot/dts/rk3288-popmetal.dts             | 4 ++++
+>  arch/arm/boot/dts/rk3288-tinker.dts               | 4 ++++
+
+Some boards are missing from this list (Fennec, Phycore, ...) What criteria 
+have you used to decide on which ones to enable the RGA ? That should be 
+explained in the commit message.
+
+>  6 files changed, 24 insertions(+)
 > 
-> Testing looks good when I use the gpio-mux binding. The only thing I
+> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
+> b/arch/arm/boot/dts/rk3288-evb.dtsi index 4905760..ec12162 100644
+> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> @@ -379,6 +379,10 @@
+>  	};
+>  };
+> 
+> +&rga {
+> +	status = "okay";
+> +};
+> +
+>  &usbphy {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi index 8134966..fffa92e2
+> 100644
+> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> @@ -283,6 +283,10 @@
+>  	};
+>  };
+> 
+> +&rga {
+> +	status = "okay";
+> +};
+> +
+>  &tsadc {
+>  	rockchip,hw-tshut-mode = <0>;
+>  	rockchip,hw-tshut-polarity = <0>;
+> diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi
+> b/arch/arm/boot/dts/rk3288-firefly.dtsi index f520589..74a6ce5 100644
+> --- a/arch/arm/boot/dts/rk3288-firefly.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+> @@ -500,6 +500,10 @@
+>  	};
+>  };
+> 
+> +&rga {
+> +	status = "okay";
+> +};
+> +
+>  &saradc {
+>  	vref-supply = <&vcc_18>;
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/rk3288-miqi.dts
+> b/arch/arm/boot/dts/rk3288-miqi.dts index 21326f3..dc5e6bd 100644
+> --- a/arch/arm/boot/dts/rk3288-miqi.dts
+> +++ b/arch/arm/boot/dts/rk3288-miqi.dts
+> @@ -401,6 +401,10 @@
+>  	};
+>  };
+> 
+> +&rga {
+> +	status = "okay";
+> +};
+> +
+>  &saradc {
+>  	vref-supply = <&vcc_18>;
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts
+> b/arch/arm/boot/dts/rk3288-popmetal.dts index aa1f9ec..362e5aa 100644
+> --- a/arch/arm/boot/dts/rk3288-popmetal.dts
+> +++ b/arch/arm/boot/dts/rk3288-popmetal.dts
+> @@ -490,6 +490,10 @@
+>  	};
+>  };
+> 
+> +&rga {
+> +	status = "okay";
+> +};
+> +
+>  &tsadc {
+>  	rockchip,hw-tshut-mode = <0>;
+>  	rockchip,hw-tshut-polarity = <0>;
+> diff --git a/arch/arm/boot/dts/rk3288-tinker.dts
+> b/arch/arm/boot/dts/rk3288-tinker.dts index 525b0e5..1a8c149 100644
+> --- a/arch/arm/boot/dts/rk3288-tinker.dts
+> +++ b/arch/arm/boot/dts/rk3288-tinker.dts
+> @@ -460,6 +460,10 @@
+>  	status = "okay";
+>  };
+> 
+> +&rga {
+> +	status = "okay";
+> +};
+> +
+>  &saradc {
+>  	vref-supply = <&vcc18_ldo1>;
+>  	status ="okay";
 
-Glad to hear it, I didn't really want a new driver so similar to the
-mux-gpio driver...
+-- 
+Regards,
 
-> noticed is that gpio-mux driver is requesting the gpio with
-> GPIOD_OUT_LOW. Is that intentional?
-
-Not really intentional, it was just easy.
-
->                                     I worry that may randomly mux the
-> D+/D- lines during probe if the gpio is asserted at probe time. It isn't
-> a problem for me right now, because the mux is power on defaulted to
-> have the gpio deasserted, but it may be a problem if the default
-> changes.
-
-It will not change, the only change I will accept is if the code in
-mux-gpio can be arranged to request the gpios with the idle-state from
-the start. But even then, the default idle-state (0) will not change.
-So, you should be safe.
-
-I will look at the new patches later.
-
-Cheers,
-Peter
+Laurent Pinchart
