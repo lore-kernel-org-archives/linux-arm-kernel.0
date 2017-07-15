@@ -1,228 +1,114 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 15 Jul 2017 19:05:11 +0200
-Subject: [PATCH] ARM: dts: Add DTS file for D-Link DIR-685
-Message-ID: <20170715170511.16312-1-linus.walleij@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 15 Jul 2017 10:20:27 -0700
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <20170715164626.GA1373@amd>
+References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+ <2497538.J9F6XFeBfd@aspire.rjw.lan> <20170715062838.GA20741@amd>
+ <5864280.u6UQBsuXnA@aspire.rjw.lan> <20170715164626.GA1373@amd>
+Message-ID: <1a5ef0ae-16f3-5a61-ae4e-083664cb30c0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a device tree file for the Gemini-based D-Link DIR-685
-router, supporting all devices that are currently supported in
-the main DTSI SoC file.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/gemini-dlink-dir-685.dts | 190 +++++++++++++++++++++++++++++
- 2 files changed, 191 insertions(+)
- create mode 100644 arch/arm/boot/dts/gemini-dlink-dir-685.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4b17f35dc9a7..dc00f3ec1b23 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -180,6 +180,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
- 	exynos5440-ssdk5440.dtb \
- 	exynos5800-peach-pi.dtb
- dtb-$(CONFIG_ARCH_GEMINI) += \
-+	gemini-dlink-dir-685.dtb \
- 	gemini-nas4220b.dtb \
- 	gemini-rut1xx.dtb \
- 	gemini-sq201.dtb \
-diff --git a/arch/arm/boot/dts/gemini-dlink-dir-685.dts b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-new file mode 100644
-index 000000000000..f59dada28f6a
---- /dev/null
-+++ b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-@@ -0,0 +1,190 @@
-+/*
-+ * Device Tree file for D-Link DIR-685 Xtreme N Storage Router
-+ */
-+
-+/dts-v1/;
-+
-+#include "gemini.dtsi"
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "D-Link DIR-685 Xtreme N Storage Router";
-+	compatible = "dlink,dir-685", "cortina,gemini";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	memory {
-+		/* 128 MB SDRAM in 2 x Hynix HY5DU121622DTP-D43 */
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,19200n8";
-+		stdout-path = &uart0;
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		button at 8 {
-+			debounce_interval = <50>;
-+			wakeup-source;
-+			linux,code = <KEY_ESC>;
-+			label = "reset";
-+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
-+		};
-+		button at 13 {
-+			debounce_interval = <50>;
-+			wakeup-source;
-+			linux,code = <KEY_EJECTCD>;
-+			label = "unmount";
-+			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		led at 7 {
-+			label = "dir685:blue:WPS";
-+			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+			linux,default-trigger = "heartbeat";
-+		};
-+		/*
-+		 * These two LEDs are on the side of the device.
-+		 * For electrical reasons, both LEDs cannot be active
-+		 * at the same time so only blue or orange can on at
-+		 * one time. Enabling both makes the LED go dark.
-+		 */
-+		led at 11 {
-+			label = "dir685:blue:HD";
-+			gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+		led at 12 {
-+			label = "dir685:orange:HD";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	/*
-+	 * This is a Sunon Maglev GM0502PFV2-8 cooling fan @10000 RPM.
-+	 * Since the platform has no temperature sensor, this is controlled
-+	 * from userspace by using the hard disks S.M.A.R.T. temperature
-+	 * sensor. It is turned on when the temperature exceeds 46 degrees
-+	 * and turned off when the temperatures goes below 41 degrees
-+	 * (celsius).
-+	 */
-+	gpio-fan {
-+		compatible = "gpio-fan";
-+		gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
-+		gpio-fan,speed-map = <0 0>, <10000 1>;
-+		#cooling-cells = <2>;
-+	};
-+
-+	/*
-+	 * The touchpad input is connected to a GPIO bit-banged
-+	 * I2C bus.
-+	 */
-+	gpio-i2c {
-+		compatible = "i2c-gpio";
-+		gpios = <&gpio0 5 0>, /* SDA */
-+			<&gpio0 6 0>; /* SCL */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		touchkeys at 26 {
-+			compatible = "dlink,dir685-touchkeys";
-+			reg = <0x26>;
-+			interrupt-parent = <&gpio0>;
-+			interrupts = <17 IRQ_TYPE_EDGE_FALLING>;
-+		};
-+	};
-+
-+	soc {
-+		flash at 30000000 {
-+			status = "okay";
-+			/* 32MB of flash */
-+			reg = <0x30000000 0x02000000>;
-+
-+			/*
-+			 * This "RedBoot" is the Storlink derivative.
-+			 */
-+			partition at 0 {
-+				label = "RedBoot";
-+				reg = <0x00000000 0x00040000>;
-+				read-only;
-+			};
-+			/*
-+			 * Between the boot loader and the rootfs is the kernel
-+			 * in a custom Storlink format flashed from the boot
-+			 * menu. The rootfs is in squashfs format.
-+			 */
-+			partition at 1800c0 {
-+				label = "rootfs";
-+				reg = <0x001800c0 0x01dbff40>;
-+				read-only;
-+			};
-+			partition at 1f40000 {
-+				label = "upgrade";
-+				reg = <0x01f40000 0x00040000>;
-+				read-only;
-+			};
-+			partition at 1f80000 {
-+				label = "rgdb";
-+				reg = <0x01f80000 0x00040000>;
-+				read-only;
-+			};
-+			/*
-+			 * This partition contains MAC addresses for WAN,
-+			 * WLAN and LAN, and the country code (for wireless
-+			 * I guess).
-+			 */
-+			partition at 1fc0000 {
-+				label = "nvram";
-+				reg = <0x01fc0000 0x00020000>;
-+				read-only;
-+			};
-+			partition at 1fe0000 {
-+				label = "LangPack";
-+				reg = <0x01fe0000 0x00020000>;
-+				read-only;
-+			};
-+		};
-+
-+		sata: sata at 46000000 {
-+			cortina,gemini-ata-muxmode = <0>;
-+			cortina,gemini-enable-sata-bridge;
-+			status = "okay";
-+		};
-+
-+		pci at 50000000 {
-+			status = "okay";
-+			interrupt-map-mask = <0xf800 0 0 7>;
-+			interrupt-map =
-+				<0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
-+				<0x4800 0 0 2 &pci_intc 1>,
-+				<0x4800 0 0 3 &pci_intc 2>,
-+				<0x4800 0 0 4 &pci_intc 3>,
-+				<0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
-+				<0x5000 0 0 2 &pci_intc 2>,
-+				<0x5000 0 0 3 &pci_intc 3>,
-+				<0x5000 0 0 4 &pci_intc 0>,
-+				<0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
-+				<0x5800 0 0 2 &pci_intc 3>,
-+				<0x5800 0 0 3 &pci_intc 0>,
-+				<0x5800 0 0 4 &pci_intc 1>,
-+				<0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
-+				<0x6000 0 0 2 &pci_intc 0>,
-+				<0x6000 0 0 3 &pci_intc 1>,
-+				<0x6000 0 0 4 &pci_intc 2>;
-+		};
-+
-+		ata at 63000000 {
-+			status = "okay";
-+		};
-+	};
-+};
+On 07/15/2017 09:46 AM, Pavel Machek wrote:
+> Hi!
+> 
+>>>> I had an idea of using an enum type encompassing all of the power states
+>>>> defined for various platforms and serving both as a registry (to ensure the
+>>>> uniqueness of the values assigned to the states) and a common ground
+>>>> between platforms and drivers.
+>>>>
+>>>> Something like:
+>>>>
+>>>> enum platform_target_state {
+>>>> 	PLATFORM_STATE_UNKNOWN = -1,
+>>>> 	PLATFORM_STATE_WORKING = 0,
+>>>> 	PLATFORM_STATE_ACPI_S1,
+>>>> 	PLATFORM_STATE_ACPI_S2,
+>>>> 	PLATFORM_STATE_ACPI_S3,
+>>>> 	PLATFORM_STATE_MY_BOARD_1_GATE_CLOCKS,
+>>>> 	PLATFORM_STATE_MY_BOARD_1_GATE_POWER,
+>>>> 	PLATFORM_STATE_ANOTHER_BOARD_DO_CRAZY_STUFF,
+>>>> 	...
+>>>> };
+>>>>
+>>>> and define ->target_state to return a value of this type.
+>>>>
+>>>> Then, if a driver sees one of these and recognizes that value, it should
+>>>> know exactly what to do.
+>>>
+>>> Remind me why this is good idea?
+>>
+>> Because there are drivers that need to do specific things during
+>> suspend on a specific board when it goes into a specific state as a
+>> whole.
+> 
+> We have seen driver that cares about voltage to his device being
+> lost. That's reasonable.
+> 
+> Inquiring what the platform target state is... is not.
+> 
+>>> If board wants to know if certain regulator stays online during
+>>> suspend, it should invent an API for _that_.
+>>
+>> Ideally, yes.  However, that may be problematic for multiplatform kernels,
+>> because they would need to have all of those APIs built in and the driver
+>> code to figure out which API to use would be rather nasty.
+> 
+> Lets do it the right way. Big enum is wrong.
+
+The enum offers the advantage of centralizing how many different states
+exist for all the platforms we know about in the kernel, it's easy to
+define common values for platforms that have the same semantics, just
+like it's simple to add new values for platform specific details.
+
+Is the concern that we could overflow the enum size, or that there is
+not a common set of values to describe states?
+
+> 
+> We already have
+> 
+> struct regulator_state {
+>        int uV; /* suspend voltage */
+>        unsigned int mode; /* suspend regulator operating mode */
+>        int enabled; /* is regulator enabled in this suspend state */
+>        int disabled; /* is the regulator disabled in this suspend state */
+> };
+> 
+>  * struct regulation_constraints - regulator operating constraints.
+>   * @state_disk: State for regulator when system is suspended in disk
+>   * mode.
+>   * @state_mem: State for regulator when system is suspended in mem
+>   * mode.
+>   * @state_standby: State for regulator when system is suspended in
+>   * standby
+>   *                 mode.
+>    
+> . So it seems that maybe we should tell the drivers if we are entering
+> "state_mem" or "state_standby" (something I may have opposed, sorry),
+> then the driver can get neccessary information from regulator
+> framework.
+
+OK, so what would be the mechanism to tell these drivers about the
+system wide suspend state they are entering if it is not via
+platform_suspend_target_state()?
+
+Keep in mind that regulators might be one aspect of what could be
+causing the platform to behave specifically in one suspend state vs.
+another, but there could be pieces of HW within the SoC that can't be
+described with power domains, voltage islands etc. that would still have
+inherent suspend states properties (like memory retention, pin/pad
+controls etc. etc). We still need some mechanism, possibly centralized
+
+> 
+> I don't think it should cause problems with multiplatform kernels.
+
+Just like platform_suspend_target_state() with an enum is not creating
+problems either. suspend_ops is already a singleton for a given kernel
+image so a given kernel running on a given platform will get to see a
+subset of the enum values defined.
+
+In any case, just agree and I will be happy to follow-up with patches.
 -- 
-2.9.4
+Florian
