@@ -1,80 +1,49 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 15 Jul 2017 19:50:52 +0200
-Subject: [PATCH 1/5] pinctrl: Add DT bindings for Cortina Gemini
-Message-ID: <20170715175056.13040-1-linus.walleij@linaro.org>
+Date: Sat, 15 Jul 2017 19:50:54 +0200
+Subject: [PATCH 3/5] MAINTAINERS: Update the Gemini maintainer list
+In-Reply-To: <20170715175056.13040-1-linus.walleij@linaro.org>
+References: <20170715175056.13040-1-linus.walleij@linaro.org>
+Message-ID: <20170715175056.13040-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortina Gemini pin controller uses the standard pin control
-bindings for muxing functions with groups so these bindings
-should be entirely uncontroversial.
+This patch:
+- Adds myself as comaintainer for the Gemini.
+- Adds the Gemini main bindings to the file list.
+- Adds the pin controller plus bindings to the Gemini
+  file list.
+- Fixes up the path of the RTC binding and driver.
 
-Cc: devicetree at vger.kernel.org
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../bindings/pinctrl/cortina,gemini-pinctrl.txt    | 54 ++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+Hans: please ACK this if you're OK with it and I'll merge this
+fixup along with the new pin control driver into my pin control
+tree.
+---
+ MAINTAINERS | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
-new file mode 100644
-index 000000000000..2ef3e8a65559
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
-@@ -0,0 +1,54 @@
-+Cortina Systems Gemini pin controller
-+
-+This pin controller is found in the Cortina Systems Gemini SoC family,
-+see further arm/gemini.txt. It is a purely group-based multiplexing pin
-+controller.
-+
-+Required properties:
-+- compatible: "cortina,gemini-pinctrl"
-+- regmap: phandle to the system controller node
-+
-+Subnodes of the pin controller contain pin control multiplexing set-up.
-+Please refer to pinctrl-bindings.txt for generic pin multiplexing nodes.
-+
-+Example:
-+
-+pinctrl {
-+	compatible = "cortina,gemini-pinctrl";
-+	regmap = <&syscon>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dram_default_pins>, <&system_default_pins>,
-+		    <&vcontrol_default_pins>;
-+
-+	dram_default_pins: pinctrl-dram {
-+		mux {
-+			function = "dram";
-+			groups = "dramgrp";
-+		};
-+	};
-+	rtc_default_pins: pinctrl-rtc {
-+		mux {
-+			function = "rtc";
-+			groups = "rtcgrp";
-+		};
-+	};
-+	power_default_pins: pinctrl-power {
-+		mux {
-+			function = "power";
-+			groups = "powergrp";
-+		};
-+	};
-+	system_default_pins: pinctrl-system {
-+		mux {
-+			function = "system";
-+			groups = "systemgrp";
-+		};
-+	};
-+	(...)
-+	uart_default_pins: pinctrl-uart {
-+		mux {
-+			function = "uart";
-+			groups = "uartrxtxgrp";
-+		};
-+	};
-+};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7ad8107b47db..27c56bbba3a7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1239,11 +1239,16 @@ S:	Maintained
+ 
+ ARM/CORTINA SYSTEMS GEMINI ARM ARCHITECTURE
+ M:	Hans Ulli Kroll <ulli.kroll@googlemail.com>
++M:	Linus Walleij <linus.walleij@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://github.com/ulli-kroll/linux.git
+ S:	Maintained
++F:	Documentation/devicetree/bindings/arm/gemini.txt
++F:	Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
++F:	Documentation/devicetree/bindings/rtc/faraday,ftrtc010.txt
+ F:	arch/arm/mach-gemini/
+-F:	drivers/rtc/rtc-gemini.c
++F:	drivers/pinctrl/pinctrl-gemini.c
++F:	drivers/rtc/rtc-ftrtc010.c
+ 
+ ARM/CSR SIRFPRIMA2 MACHINE SUPPORT
+ M:	Barry Song <baohua@kernel.org>
 -- 
 2.9.4
