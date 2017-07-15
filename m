@@ -1,65 +1,25 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 15 Jul 2017 21:40:53 +0200
-Subject: [PATCH] cpufreq: s5pv210: add missing of_node_put
-Message-ID: <1500147653-31229-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Sat, 15 Jul 2017 22:07:35 +0200
+Subject: [PATCH 00/11] Drop unnecessary static
+Message-ID: <1500149266-32357-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_compatible_node performs an of_node_get on each iteration, so a
-return from the loop requires an of_node_put.
-
-The semantic patch that fixes this problem is as follows
-(http://coccinelle.lip6.fr):
-
-// <smpl>
-@@
-local idexpression n;
-expression e,e1,e2;
-statement S;
-iterator i1;
-iterator name for_each_compatible_node;
-@@
-
- for_each_compatible_node(n,e1,e2) {
-   ...
-(
-   of_node_put(n);
-|
-   e = n
-|
-   return n;
-|
-   i1(...,n,...) S
-|
-+  of_node_put(n);
-?  return ...;
-)
-   ...
- }
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+These patches fix cases where there is a static on a local variable, but
+the variable is initialized before any possible use.  Thus, the static has
+no benefit.
 
 ---
- drivers/cpufreq/s5pv210-cpufreq.c |    2 ++
- 1 file changed, 2 insertions(+)
 
-diff -u -p a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
---- a/drivers/cpufreq/s5pv210-cpufreq.c
-+++ b/drivers/cpufreq/s5pv210-cpufreq.c
-@@ -612,6 +612,7 @@ static int s5pv210_cpufreq_probe(struct
- 		if (id < 0 || id >= ARRAY_SIZE(dmc_base)) {
- 			pr_err("%s: failed to get alias of dmc node '%s'\n",
- 				__func__, np->name);
-+			of_node_put(np);
- 			return id;
- 		}
- 
-@@ -619,6 +620,7 @@ static int s5pv210_cpufreq_probe(struct
- 		if (!dmc_base[id]) {
- 			pr_err("%s: failed to map dmc%d registers\n",
- 				__func__, id);
-+			of_node_put(np);
- 			return -EFAULT;
- 		}
- 	}
+ drivers/ata/sata_gemini.c                     |    2 +-
+ drivers/clk/clk-moxart.c                      |    4 ++--
+ drivers/clk/mmp/clk.c                         |    2 +-
+ drivers/iio/orientation/hid-sensor-rotation.c |    2 +-
+ drivers/irqchip/irq-digicolor.c               |    2 +-
+ drivers/irqchip/irq-gic-realview.c            |    2 +-
+ drivers/irqchip/irq-mips-cpu.c                |    2 +-
+ drivers/mfd/max8925-i2c.c                     |    2 +-
+ drivers/mfd/twl4030-irq.c                     |    2 +-
+ drivers/mtd/maps/physmap_of_versatile.c       |    2 +-
+ drivers/video/fbdev/da8xx-fb.c                |    2 +-
+ 11 files changed, 12 insertions(+), 12 deletions(-)
