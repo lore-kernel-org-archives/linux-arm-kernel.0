@@ -1,35 +1,22 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 15 Jul 2017 09:54:33 +1000
-Subject: [PATCH v4] PCI: Support hibmc VGA cards behind a misbehaving
- HiSilicon bridge
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40B39FC4@FRAEML521-MBX.china.huawei.com>
-References: <20170712050811.3620-1-dja@axtens.net>
- <20170712200430.GI14614@bhelgaas-glaptop.roam.corp.google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B35F02@FRAEML521-MBX.china.huawei.com>
- <20170713112938.GI4486@bhelgaas-glaptop.roam.corp.google.com>
- <20170713151146.53e9644c@w520.home>
- <1499980882.2865.65.camel@kernel.crashing.org>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B399B4@FRAEML521-MBX.china.huawei.com>
- <1500040204.2865.90.camel@kernel.crashing.org>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B39FC4@FRAEML521-MBX.china.huawei.com>
-Message-ID: <1500076473.2865.99.camel@kernel.crashing.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 14 Jul 2017 20:29:29 -0500
+Subject: [PATCH 1/3] dt-bindings: regulator: Add STM32 Voltage Reference
+ Buffer
+In-Reply-To: <1499776233-29116-2-git-send-email-fabrice.gasnier@st.com>
+References: <1499776233-29116-1-git-send-email-fabrice.gasnier@st.com>
+ <1499776233-29116-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170715012929.ofmd3yxi6iv2bkbs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-07-14 at 17:03 +0000, Gabriele Paoloni wrote:
-> > I'd rather we have no default device until a driver actually picks up
-> > though, and then, if we still have no default, use the first driver to
-> > pick up.
+On Tue, Jul 11, 2017 at 02:30:31PM +0200, Fabrice Gasnier wrote:
+> Document STM32 VREFBUF (voltage reference buffer) which can be used as
+> voltage reference for ADCs, DACs and external components.
 > 
-> Well from my understanding the PCI host controller driver will enumerate
-> all the devices in the PCI hierarchy and call pci_device_add() for each of
-> them, that in turn will call device_add(), at this stage if there is a
-> driver available for the device such driver will probe otherwise it will not.
-> 
-> Are you suggesting to add the code above in pci_device_add() after device_add()
-> and after checking that a driver has been bound for such dev?
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  .../bindings/regulator/st,stm32-vrefbuf.txt          | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/st,stm32-vrefbuf.txt
 
-I don't like us turning on MEM/IO decoding on a device that has
-potentially not been initialized by its driver.
-
-Ben.
+Acked-by: Rob Herring <robh@kernel.org>
