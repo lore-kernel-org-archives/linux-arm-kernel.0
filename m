@@ -1,25 +1,58 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 15 Jul 2017 22:07:35 +0200
-Subject: [PATCH 00/11] Drop unnecessary static
-Message-ID: <1500149266-32357-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Sat, 15 Jul 2017 22:07:45 +0200
+Subject: [PATCH 10/11] irqchip: digicolor: Drop unnecessary static
+In-Reply-To: <1500149266-32357-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1500149266-32357-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1500149266-32357-11-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches fix cases where there is a static on a local variable, but
-the variable is initialized before any possible use.  Thus, the static has
-no benefit.
+Drop static on a local variable, when the variable is initialized before
+any possible use.  Thus, the static has no benefit.
+
+The semantic patch that fixes this problem is as follows:
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@bad exists@
+position p;
+identifier x;
+type T;
+@@
+static T x at p;
+...
+x = <+...x...+>
+
+@@
+identifier x;
+expression e;
+type T;
+position p != bad.p;
+@@
+-static
+ T x at p;
+ ... when != x
+     when strict
+?x = e;
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
+These patches are all independent of each other.
 
- drivers/ata/sata_gemini.c                     |    2 +-
- drivers/clk/clk-moxart.c                      |    4 ++--
- drivers/clk/mmp/clk.c                         |    2 +-
- drivers/iio/orientation/hid-sensor-rotation.c |    2 +-
- drivers/irqchip/irq-digicolor.c               |    2 +-
- drivers/irqchip/irq-gic-realview.c            |    2 +-
- drivers/irqchip/irq-mips-cpu.c                |    2 +-
- drivers/mfd/max8925-i2c.c                     |    2 +-
- drivers/mfd/twl4030-irq.c                     |    2 +-
- drivers/mtd/maps/physmap_of_versatile.c       |    2 +-
- drivers/video/fbdev/da8xx-fb.c                |    2 +-
- 11 files changed, 12 insertions(+), 12 deletions(-)
+ drivers/irqchip/irq-digicolor.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff -u -p a/drivers/irqchip/irq-digicolor.c b/drivers/irqchip/irq-digicolor.c
+--- a/drivers/irqchip/irq-digicolor.c
++++ b/drivers/irqchip/irq-digicolor.c
+@@ -71,7 +71,7 @@ static void __init digicolor_set_gc(void
+ static int __init digicolor_of_init(struct device_node *node,
+ 				struct device_node *parent)
+ {
+-	static void __iomem *reg_base;
++	void __iomem *reg_base;
+ 	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
+ 	struct regmap *ucregs;
+ 	int ret;
