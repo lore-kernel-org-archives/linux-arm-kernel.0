@@ -1,57 +1,77 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sun, 16 Jul 2017 01:46:58 +0200
-Subject: [RFC PATCH v2] irqchip: Add support for tango interrupt router
-In-Reply-To: <c0bd235a-9035-2002-31eb-e68710b076fd@free.fr>
-References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
- <20170606175219.34ef62b9@free-electrons.com>
- <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
- <dfb86360-2247-65bb-602b-5c21029709fd@free.fr>
- <c0bd235a-9035-2002-31eb-e68710b076fd@free.fr>
-Message-ID: <24f34220-a017-f4e0-b72e-d1fdb014c0e1@free.fr>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 16 Jul 2017 01:03:05 +0100
+Subject: [kernel-hardening] Re: [RFC PATCH 6/6] arm64: add VMAP_STACK and
+ detect out-of-bounds SP
+In-Reply-To: <20170714212717.GB1086@leverpostej>
+References: <CAKv+Gu8jey+uPSFoCsjQn9BeGiChZpS=iZ0v9nEWvkwcO1gFYg@mail.gmail.com>
+ <20170713104950.GB26194@leverpostej>
+ <CAKv+Gu9eSX-f4uv3gaNw9_eKV0soe2-CqSnMaTjjEhMifxe_8g@mail.gmail.com>
+ <20170713161050.GG26194@leverpostej> <20170713175543.GA32528@leverpostej>
+ <CAKv+Gu_v3PO7=JSgCTb3aZu3sg4cwYYjy68VJnr58vzaMYvhTw@mail.gmail.com>
+ <20170714103258.GA16128@leverpostej>
+ <CAKv+Gu-FvfPFQooCie6HwP=mBng3C0jp9p8WMkFwTxctDu4JBA@mail.gmail.com>
+ <CAKv+Gu96YHXDta7=YdYO4=wtR3mGVdkzAkG6tSzS-vo7toiPXA@mail.gmail.com>
+ <20170714140605.GB16687@leverpostej> <20170714212717.GB1086@leverpostej>
+Message-ID: <CAKv+Gu9EB1nJPwvZh1Nti8tPVivqbwrE60t2v5zZp02DyaScxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/2017 15:06, Mason wrote:
+On 14 July 2017 at 22:27, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jul 14, 2017 at 03:06:06PM +0100, Mark Rutland wrote:
+>> On Fri, Jul 14, 2017 at 01:27:14PM +0100, Ard Biesheuvel wrote:
+>> > On 14 July 2017 at 11:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > > On 14 July 2017 at 11:32, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > >> On Thu, Jul 13, 2017 at 07:28:48PM +0100, Ard Biesheuvel wrote:
+>>
+>> > >>> OK, so here's a crazy idea: what if we
+>> > >>> a) carve out a dedicated range in the VMALLOC area for stacks
+>> > >>> b) for each stack, allocate a naturally aligned window of 2x the stack
+>> > >>> size, and map the stack inside it, leaving the remaining space
+>> > >>> unmapped
+>>
+>> > >> The logical ops (TST) and conditional branches (TB(N)Z, CB(N)Z) operate
+>> > >> on XZR rather than SP, so to do this we need to get the SP value into a
+>> > >> GPR.
+>> > >>
+>> > >> Previously, I assumed this meant we needed to corrupt a GPR (and hence
+>> > >> stash that GPR in a sysreg), so I started writing code to free sysregs.
+>> > >>
+>> > >> However, I now realise I was being thick, since we can stash the GPR
+>> > >> in the SP:
+>> > >>
+>> > >>         sub     sp, sp, x0      // sp = orig_sp - x0
+>> > >>         add     x0, sp, x0      // x0 = x0 - (orig_sp - x0) == orig_sp
+>>
+>> That comment is off, and should say     x0 = x0 + (orig_sp - x0) == orig_sp
+>>
+>> > >>         sub     x0, x0, #S_FRAME_SIZE
+>> > >>         tb(nz)  x0, #THREAD_SHIFT, overflow
+>> > >>         add     x0, x0, #S_FRAME_SIZE
+>> > >>         sub     x0, sp, x0
+>> >
+>> > You need a neg x0, x0 here I think
+>>
+>> Oh, whoops. I'd mis-simplified things.
+>>
+>> We can avoid that by storing orig_sp + orig_x0 in sp:
+>>
+>>       add     sp, sp, x0      // sp = orig_sp + orig_x0
+>>       sub     x0, sp, x0      // x0 = orig_sp
+>>       < check >
+>>       sub     x0, sp, x0      // x0 = orig_x0
+>>       sub     sp, sp, x0      // sp = orig_sp
+>>
+>> ... which works in a locally-built kernel where I've aligned all the
+>> stacks.
+>
+> FWIW, I've pushed out a somewhat cleaned-up (and slightly broken!)
+> version of said kernel source to my arm64/vmap-stack-align branch [1].
+> That's still missing the backtrace handling, IRQ stack alignment is
+> broken at least on 64K pages, and there's still more cleanup and rework
+> to do.
+>
 
-> I have two remaining issues:
-> 
-> 1) In the ISR, I get the hwirq from the GIC. What is the
-> API to translate that to the SPI? I'm currently just
-> subtracting 32.
+I have spent some time addressing the issues mentioned in the commit
+log. Please take a look.
 
-gic_set_type() in drivers/irqchip/irq-gic.c
-
-	/* SPIs have restrictions on the supported types */
-	if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
-			    type != IRQ_TYPE_EDGE_RISING)
-		return -EINVAL;
-
-
-gic_irq_domain_translate() in the same file:
-
-		/* Get the interrupt number and add 16 to skip over SGIs */
-		*hwirq = fwspec->param[1] + 16;
-
-		/*
-		 * For SPIs, we need to add 16 more to get the GIC irq
-		 * ID number
-		 */
-		if (!fwspec->param[0])
-			*hwirq += 16;
-
-
-So it seems "acceptable" to compute spi = d->hwirq - 32;
-
-
-> 2) I'm currently using a single domain, with a
-> handle_simple_irq domain handler. That's probably
-> wrong. Should I define two domains, one for edge
-> IRQs and one for level IRQs, and use the appropriate
-> handler?  Should both domain have 128 entries?
-> (I.e. are they indexed by the hwirq?)
-> And should I use linear or tree?
-
-I will read this again carefully:
-https://www.kernel.org/doc/Documentation/IRQ-domain.txt
-
-Regards.
+git://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git vmap-arm64-mark
