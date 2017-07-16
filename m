@@ -1,122 +1,58 @@
-From: u@pkh.me (=?utf-8?B?Q2zDqW1lbnQgQsWTc2No?=)
-Date: Sun, 16 Jul 2017 12:05:37 +0200
-Subject: Questions about PMU counters
-Message-ID: <20170716100537.GA15094@golem.pkh.me>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 16 Jul 2017 12:22:08 +0200
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <e680f86a-88db-8a53-dca6-a79d120d480b@gmail.com>
+References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+ <1703157.S2GHVxrQk4@aspire.rjw.lan>
+ <e680f86a-88db-8a53-dca6-a79d120d480b@gmail.com>
+Message-ID: <3675920.H2f5xgTCgu@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Saturday, July 15, 2017 07:36:21 PM Florian Fainelli wrote:
+> 
+> On 07/15/2017 04:38 PM, Rafael J. Wysocki wrote:
+> > On Sunday, July 16, 2017 01:34:53 AM Mason wrote:
+> >> On 16/07/2017 01:24, Rafael J. Wysocki wrote:
+> >>
+> >>> On Saturday, July 15, 2017 10:20:27 AM Florian Fainelli wrote:
+> >>>
+> >>>> The enum offers the advantage of centralizing how many different states
+> >>>> exist for all the platforms we know about in the kernel, it's easy to
+> >>>> define common values for platforms that have the same semantics, just
+> >>>> like it's simple to add new values for platform specific details.
+> >>>
+> >>> Well, you seem to be liking this, so why don't you just implement it?
+> >>
+> >> At the end of his message, Florian wrote:
+> >>
+> >>> In any case, just agree and I will be happy to follow-up with patches.
+> > 
+> > But it may be hard to convince everybody without posting code changes
+> > and often enough showing a patch makes a good argument.
+> 
+> I had the patches ready last night, saw the emails this morning and
+> decided to go mountain bike for a bit to think about it some more. You
+> will find my follow-up patches that hopefully implement your recommendation.
 
-I have a few questions about the PMU counters I couldn't get anywhere
-else. Hopefully this is the right place.
+OK, thanks!
 
+There is one problem with this I missed before, though, sorry about that.
 
-1. Device-Tree: pmu vs arm-pmu
-==============================
+Drivers need to be able to distinguish between suspend-to-idle and the platform
+states too, so we need to store the argument passed to suspend_devices_and_enter()
+somewhere too, either in the core or in the platform code.
 
-Documentation/devicetree/bindings/arm/pmu.txt is documenting "pmu" as
-identifier, but both "arm-pmu" and "pmu" seems to be used interchangeably
-in the codebase in both arch/{arm,arm64}.
+And if we need to store it anyway, let's just store it in the core in a global var
+(say pm_suspend_target_state), export that and be done.
 
-While most of the codebase seems to use "pmu", drivers/perf/arm_pmu.c is
-also checking for the exact "arm-pmu" string.
+There still will be a concern regarding drivers that care about differences between
+PM_SUSPEND_MEM and PM_SUSPEND_STANDBY, because those differences are
+platform-dependent, but let's defer addressing this until we have a driver
+that needs to run on different platforms with different definitions for those
+things.
 
-Q: what is the difference between the two?
-
-
-2. Userspace access
-===================
-
-An RFC patch was sent a few years ago to allows userspace access to the
-PMU counters: https://patchwork.kernel.org/patch/5217341/
-
-AFAICT, this was not mainlined as a module or the suggested sysfs control.
-I tried to contact the author of this patch but got no answer.
-
-The perf API may be considered good enough for end users, but some
-projects have their own benchmarking framework which they want
-cross-platform, with as little overhead as possible (FFmpeg is one of
-them).
-
-Currently, the only workaround seems to use this lost module, which
-"recently" got arm64 support: https://github.com/zhiyisun/enable_arm_pmu/
-I confirm it's working on various boards I tested, but it's still not
-ideal (typically, it's breaking badly if perf is used at the same time).
-
-Q: did anything come out of this, is there any plan, or is there a
-decision to not doing this?
-
-
-3. ACPU controller for the Hikey
-================================
-
-This question is specific to the Hikey (hisilicon/hi6220-hikey.dts).
-
-While I was able to get PMU counters access through enable_arm_pmu with
-most of my boards, it made no difference for the Hikey. So I was under the
-impression that the board needs a special treatment to enable these PMU
-counters.
-
-Anyway, according the specifications, there is an ACPU interrupt
-ACPU_PMUIRQ_intr=131 (so SPI 99) "combined interrupt of the eight core
-CoreSight interrupts of the two clusters of the ACPU)."
-
-Just in case, I naively attempted:
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 470461ddd427..98fb2c775540 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -171,6 +171,11 @@
-                CLUSTER1_L2: l2-cache1 {
-                        compatible = "cache";
-                };
-+
-+               pmu {
-+                       compatible = "arm,armv8-pmuv3";
-+                       interrupts = <GCI_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
-+               };
-        };
- 
-        cpu_opp_table: cpu_opp_table {
-
-But it didn't make any difference.
-
-Q: any idea where I can find more information on this? I couldn't get any help
-   from 96boards.
-
-
-4. Quick questions
-==================
-
-Q: Where can I find the "interrupt" parser of the device-tree? (I'm trying
-   to verify I understand correctly how exactly is handled 1, 2 and 3
-   parameters forms).
-
-Q: rpi3 seems to have perf counters in 32-bit but not in 64-bit. I don't
-   understand why: they seem to both share the same device-tree. Oh, and
-   that bcm2837 doesn't seem to even have pmu declared, so I'm confused.
-
-Q: Why "v3" in "armv8-pmuv3"?
-
-Q: I watched an old talk about device trees, and one of the main issue seemed
-   to be the impossibility to keep API/ABI compatibility forever. What came out
-   of this wrt the process of defining how to write device trees?
-
-
-Note: as you probably guessed, I'm completely new to all this stuff, so if you
-can answer at least one of these questions, this will probably help me a lot
-finding my way in the forest.
-
+That should address the Pavel's objections too I guess.
 
 Thanks,
-
--- 
-Cl?ment B.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170716/c021857b/attachment-0001.sig>
+Rafael
