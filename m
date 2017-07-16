@@ -1,76 +1,36 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 16 Jul 2017 12:28:40 +0200
-Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <20170706031750.GA12954@xo-6d-61-c0.localdomain>
-References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
- <1529148.KHlxNOSRLV@aspire.rjw.lan>
- <20170706031750.GA12954@xo-6d-61-c0.localdomain>
-Message-ID: <5290346.YItt1Jp12B@aspire.rjw.lan>
+Date: Sun, 16 Jul 2017 12:30:55 +0200
+Subject: [PATCH 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <20170716023610.4658-2-f.fainelli@gmail.com>
+References: <20170623010837.11199-1-f.fainelli@gmail.com>
+ <20170716023610.4658-1-f.fainelli@gmail.com>
+ <20170716023610.4658-2-f.fainelli@gmail.com>
+Message-ID: <1787546.EYh03heFAd@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 06, 2017 05:17:50 AM Pavel Machek wrote:
-> On Sun 2017-07-16 01:29:57, Rafael J. Wysocki wrote:
-> > On Saturday, July 15, 2017 06:46:26 PM Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > > > > I had an idea of using an enum type encompassing all of the power states
-> > > > > > defined for various platforms and serving both as a registry (to ensure the
-> > > > > > uniqueness of the values assigned to the states) and a common ground
-> > > > > > between platforms and drivers.
-> > > > > > 
-> > > > > > Something like:
-> > > > > > 
-> > > > > > enum platform_target_state {
-> > > > > > 	PLATFORM_STATE_UNKNOWN = -1,
-> > > > > > 	PLATFORM_STATE_WORKING = 0,
-> > > > > > 	PLATFORM_STATE_ACPI_S1,
-> > > > > > 	PLATFORM_STATE_ACPI_S2,
-> > > > > > 	PLATFORM_STATE_ACPI_S3,
-> > > > > > 	PLATFORM_STATE_MY_BOARD_1_GATE_CLOCKS,
-> > > > > > 	PLATFORM_STATE_MY_BOARD_1_GATE_POWER,
-> > > > > > 	PLATFORM_STATE_ANOTHER_BOARD_DO_CRAZY_STUFF,
-> > > > > > 	...
-> > > > > > };
-> > > > > > 
-> > > > > > and define ->target_state to return a value of this type.
-> > > > > > 
-> > > > > > Then, if a driver sees one of these and recognizes that value, it should
-> > > > > > know exactly what to do.
-> > > > > 
-> > > > > Remind me why this is good idea?
-> > > > 
-> > > > Because there are drivers that need to do specific things during
-> > > > suspend on a specific board when it goes into a specific state as a
-> > > > whole.
-> > > 
-> > > We have seen driver that cares about voltage to his device being
-> > > lost. That's reasonable.
-> > > 
-> > > Inquiring what the platform target state is... is not.
-> > 
-> > So why exactly isn't it reasonable?
-> > 
-> > Please use technical arguments.  Saying that something is wrong without
-> > explaining the problem you see with it isn't particulatly useful in technical
-> > discussions.
+On Saturday, July 15, 2017 07:36:09 PM Florian Fainelli wrote:
+> Add an optional platform_suspend_ops callback: target_state, and a
+> helper function globally visible to get this called:
+> platform_suspend_target_state().
 > 
-> Deep in your heart, you should know that having enum listing all the platforms linux
-> runs on is a very bad idea.
+> This is useful for platform specific drivers that may need to take a
+> slightly different suspend/resume path based on the system's
+> suspend/resume state being entered.
+> 
+> Although this callback is optional and documented as such, it requires
+> a platform_suspend_ops::begin callback to be implemented in order to
+> provide an accurate suspend/resume state within the driver that
+> implements this platform_suspend_ops.
+> 
+> An enumeration: platform_target_state is defined which currently defines
+> the standard ACPI_S[1-4] states and can be extended with platform
+> specific suspend states.
 
-Even so, if I'm unable to explain to people why this is a bad idea in technical
-terms, that doesn't mean too much.
+This has a couple of problems, but I'm not sure if it is worth to go too much
+into details here.
 
-I actually noticed an issue with the approach that I missed before, see my last
-reply to Florian.
-
-> Anyway, there are better solutions, regulator framework already knows if given rail
-> will be powered off or not, and their driver already knows if they are going
-> suspend/standby. They just need to use existing interfaces.
-
-So they need to know what has been passed to suspend_devices_and_enter()
-anyway and currently there's no interface for that.  That actually is the source
-of the whole issue.
+Let's just take a different approach as I said in the other thread.
 
 Thanks,
 Rafael
