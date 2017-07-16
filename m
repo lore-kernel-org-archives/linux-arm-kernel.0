@@ -1,32 +1,87 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 16 Jul 2017 10:30:38 -0400
-Subject: [PATCH 2/2] dmaengine: qcom_hidma: correct channel QOS register offset
-In-Reply-To: <1500215438-30672-1-git-send-email-okaya@codeaurora.org>
-References: <1500215438-30672-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1500215438-30672-2-git-send-email-okaya@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 16 Jul 2017 08:35:59 -0700
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <20170716134116.wxwb3gevbhlereij@piout.net>
+References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+ <2497538.J9F6XFeBfd@aspire.rjw.lan> <20170715062838.GA20741@amd>
+ <5864280.u6UQBsuXnA@aspire.rjw.lan> <20170715164626.GA1373@amd>
+ <1a5ef0ae-16f3-5a61-ae4e-083664cb30c0@gmail.com>
+ <20170715183358.4bnhshokalyulswz@piout.net>
+ <20170706031819.GD12954@xo-6d-61-c0.localdomain>
+ <20170716134116.wxwb3gevbhlereij@piout.net>
+Message-ID: <d8c15114-636d-79bb-883e-d2d4439f755d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A regression was found while testing QOS with different channels.
-The QOS register offset is 0x700 rather than 0x300.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma_mgmt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
-index d51cd34..c45e244 100644
---- a/drivers/dma/qcom/hidma_mgmt.c
-+++ b/drivers/dma/qcom/hidma_mgmt.c
-@@ -28,7 +28,7 @@
- 
- #include "hidma_mgmt.h"
- 
--#define HIDMA_QOS_N_OFFSET		0x300
-+#define HIDMA_QOS_N_OFFSET		0x700
- #define HIDMA_CFG_OFFSET		0x400
- #define HIDMA_MAX_BUS_REQ_LEN_OFFSET	0x41C
- #define HIDMA_MAX_XACTIONS_OFFSET	0x420
+On 07/16/2017 06:41 AM, Alexandre Belloni wrote:
+> On 06/07/2017 at 05:18:19 +0200, Pavel Machek wrote:
+>> On Sat 2017-07-15 20:33:58, Alexandre Belloni wrote:
+>>> On 15/07/2017 at 10:20:27 -0700, Florian Fainelli wrote:
+>>>>> We already have
+>>>>>
+>>>>> struct regulator_state {
+>>>>>        int uV; /* suspend voltage */
+>>>>>        unsigned int mode; /* suspend regulator operating mode */
+>>>>>        int enabled; /* is regulator enabled in this suspend state */
+>>>>>        int disabled; /* is the regulator disabled in this suspend state */
+>>>>> };
+>>>>>
+>>>>>  * struct regulation_constraints - regulator operating constraints.
+>>>>>   * @state_disk: State for regulator when system is suspended in disk
+>>>>>   * mode.
+>>>>>   * @state_mem: State for regulator when system is suspended in mem
+>>>>>   * mode.
+>>>>>   * @state_standby: State for regulator when system is suspended in
+>>>>>   * standby
+>>>>>   *                 mode.
+>>>>>    
+>>>>> . So it seems that maybe we should tell the drivers if we are entering
+>>>>> "state_mem" or "state_standby" (something I may have opposed, sorry),
+>>>>> then the driver can get neccessary information from regulator
+>>>>> framework.
+>>>>
+>>>> OK, so what would be the mechanism to tell these drivers about the
+>>>> system wide suspend state they are entering if it is not via
+>>>> platform_suspend_target_state()?
+>>>>
+>>>> Keep in mind that regulators might be one aspect of what could be
+>>>> causing the platform to behave specifically in one suspend state vs.
+>>>> another, but there could be pieces of HW within the SoC that can't be
+>>>> described with power domains, voltage islands etc. that would still have
+>>>> inherent suspend states properties (like memory retention, pin/pad
+>>>> controls etc. etc). We still need some mechanism, possibly centralized
+>>>>
+>>>
+>>> I concur, the regulator stuff is one aspect of one of our suspend state
+>>> (cutting VDDcore). But we have another state where the main clock (going
+>>> to the IPs) is going from a few hundred MHz to 32kHz. This is currently
+>>> handled by calling at91_suspend_entering_slow_clock(). I think it is
+>>> important to take that into account so we can remove this hack from the
+>>> kernel.
+>>
+>> Cure should not be worse then the disease... and it is in this case.
+>>
+>> For clocks, take a look at clock framework, perhaps it already has "clock_will_be_suspended"
+>> as regulator framework had. If not, implement it.
+>>
+> 
+> See Rafael's comment, currently, the clock framework can't say whether
+> the clock will change because it doesn't know anything about the suspend
+> target.
+> 
+>> Same with memory retention, pin/pad controls.
+>>
+> 
+> Same here.
+
+Exactly, here is another side effect of not knowing the platform
+suspend/state that I came across on our platforms:
+
+https://patchwork.kernel.org/patch/9561575/
+
+(we later discussed this in details with Linus and this is why this very
+patch set is being introduced now)
 -- 
-1.9.1
+Florian
