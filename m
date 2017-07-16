@@ -1,111 +1,117 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 16 Jul 2017 18:07:58 +0200
-Subject: [PATCH v2 6/6] dt-bindings: Document the Rockchip RGA bindings
-In-Reply-To: <1918615.rEp9U5BAbC@avalon>
-References: <1500101920-24039-1-git-send-email-jacob-chen@iotwrt.com>
- <1500101920-24039-7-git-send-email-jacob-chen@iotwrt.com>
- <1918615.rEp9U5BAbC@avalon>
-Message-ID: <1882912.vhlUDqklbZ@phil>
+From: giuseppe.cantavenera@azcom.it (Giuseppe Cantavenera)
+Date: Sun, 16 Jul 2017 18:47:08 +0200 (CEST)
+Subject: [PATCH] i2c-cadence: fix repeated start in message sequence
+In-Reply-To: <1500022844-3027-1-git-send-email-giuseppe.cantavenera@azcom.it>
+References: <1500022844-3027-1-git-send-email-giuseppe.cantavenera@azcom.it>
+Message-ID: <580184342.11300.1500223628588.JavaMail.zimbra@azcom.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+> Wrong i2c transactions have been observed in reads made up of
+> a write followed by a read supposed to be interleaved by a
+> repeated start.
+> cdns_i2c_mrecv() and cdns_i2c_msend() were clearing the
+> HOLD bit in the control register before issuing the last
+> transaction of a series, which somehow reflects the
+> Zynq-7000 Reference Manual but is incorrect for most slaves.
+> Seems like most of the times the clearing of the HOLD bit
+> takes some istants to be effective:
+> the controller sends a restart on the bus.
+> Sometimes the clearing does take effect and the last call
+> to cdns_i2c_mrecv() or cdns_i2c_msend() results in:
+> STOP + START instead of simply a RESTART (often mandatory).
+> 
+> Modify the command sequence:
+> 1- enable interrupts
+> 2- issue the write/read operation
+> 3- clear the HOLD bit if needed
+> 
+> Signed-off-by: Giuseppe Cantavenera <giuseppe.cantavenera@azcom.it>
+> Tested-by: Giuseppe Cantavenera <giuseppe.cantavenera@azcom.it>
+> Cc: stable at vger.kernel.org
+> Cc: michal.simek at xilinx.com
+> Cc: soren.brinkmann at xilinx.com
+> ---
 
-Am Samstag, 15. Juli 2017, 12:23:12 CEST schrieb Laurent Pinchart:
-> On Saturday 15 Jul 2017 14:58:40 Jacob Chen wrote:
-> > Add DT bindings documentation for Rockchip RGA
-> > 
-> > Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> > Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> > ---
-> >  .../devicetree/bindings/media/rockchip-rga.txt     | 35 +++++++++++++++++++
-> >  1 file changed, 35 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt
-> > b/Documentation/devicetree/bindings/media/rockchip-rga.txt new file mode
-> > 100644
-> > index 0000000..966eba0
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
-> > @@ -0,0 +1,35 @@
-> > +device-tree bindings for rockchip 2D raster graphic acceleration controller
-> > (RGA)
-> > +
-> > +RGA is a separate 2D raster graphic acceleration unit. It accelerates 2D
-> 
-> "Separate" from what ? Do you mean "standalone" ?
-> 
-> > +graphics operations, such as point/line drawing, image scaling, rotation,
-> > +BitBLT, alpha blending and image blur/sharpness.
-> > +
-> > +Required properties:
-> > +- compatible: value should be one of the following
-> > +		"rockchip,rk3228-rga";
-> > +		"rockchip,rk3288-rga";
-> > +		"rockchip,rk3399-rga";
-> 
-> The driver in patch 2/6 has match entry for rk3328, which is missing from this 
-> list.
-> 
-> As the implementation of the driver doesn't seem to discriminate between the 
-> four SoCs, wouldn't it make sense to create a generic compatible string on 
-> which the driver would match ? You can have both the generic and SoC-specific 
-> compatible strings in DT if there are differences between the IP core in those 
-> SoCs that might need to be handled later by the driver.
+Hello,
 
-I think the block is named something like RGA2 in some kernel trees, but
-am not sure if that is an actual name, or someone just added a number.
->From short glances at vendor rga-code in the past, it looks like there are
-currently 2 basic versions of the in existence I.e. older Rockchip socs
-(like the rk3188 or so) use something older.
+just noticed a similar fix [8064c616984eaa] 
+is in the just released  4.13-rc1, submitted about 1 month ago.
+Sadly, it would have saved our team weeks of investigation 
+on a major issue if we had noticed before, but that's our problem :(
 
-I think everywhere else we do have only (or at least mostly) soc-specifc
-compatibles, but I guess that is more a question what Rob prefers.
+Still I don't understand why that one applies the change only to the receive
+and not to the write as well.
+Moreover, the interrupts being enabled after issuing the command does not
+seem logic to me.
+Does anyone has different advice? I think we need that as well..
+
+I would like to submit it, maybe split in two
+subpatches, but about the interrupts I still wonder whether
+there was a reason it was coded like that in the first place.
+
+Let us know,
+thanks,
+Giuseppe C.
+  
 
 
-Heiko
-
-> > +- interrupts: RGA interrupt number.
+> drivers/i2c/busses/i2c-cadence.c | 25 ++++++++++++++++---------
+> 1 file changed, 16 insertions(+), 9 deletions(-)
 > 
-> This is an "interrupt specifier", not just an "interrupt number" (as you can 
-> see in the example below there are three numbers)
+> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+> index 7234e32..8a36df2 100644
+> --- a/drivers/i2c/busses/i2c-cadence.c
+> +++ b/drivers/i2c/busses/i2c-cadence.c
+> @@ -428,15 +428,21 @@ static void cdns_i2c_mrecv(struct cdns_i2c *id)
+> 		cdns_i2c_writereg(id->recv_count, CDNS_I2C_XFER_SIZE_OFFSET);
+> 	}
 > 
-> > +
-> > +- clocks: phandle to RGA sclk/hclk/aclk clocks
-> > +
-> > +- clock-names: should be "aclk" "hclk" and "sclk"
+> -	/* Clear the bus hold flag if bytes to receive is less than FIFO size */
+> +	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
+> +	/* Set the slave address in address register - triggers operation */
+> +	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
+> +						CDNS_I2C_ADDR_OFFSET);
+> +
+> +	/*
+> +	 * Clear the bus hold flag if bytes to receive is less than FIFO size.
+> +	 * This needs to be after the read is triggered, otherwise any read
+> +	 * made up of a write plus a read interleaved by a repeated start
+> +	 * may fail.
+> +	 */
+> 	if (!id->bus_hold_flag &&
+> 		((id->p_msg->flags & I2C_M_RECV_LEN) != I2C_M_RECV_LEN) &&
+> 		(id->recv_count <= CDNS_I2C_FIFO_DEPTH))
+> 			cdns_i2c_clear_bus_hold(id);
+> -	/* Set the slave address in address register - triggers operation */
+> -	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
+> -						CDNS_I2C_ADDR_OFFSET);
+> -	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
+> }
 > 
-> Nitpicking, there should be a comma after "aclk".
+> /**
+> @@ -489,17 +495,18 @@ static void cdns_i2c_msend(struct cdns_i2c *id)
+> 		id->send_count--;
+> 	}
 > 
-> > +
-> > +- resets: Must contain an entry for each entry in reset-names.
-> > +  See ../reset/reset.txt for details.
-> > +- reset-names: should be "core" "axi" and "ahb"
+> +
+> +	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
+> +	/* Set the slave address in address register - triggers operation. */
+> +	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
+> +						CDNS_I2C_ADDR_OFFSET);
+> 	/*
+> 	 * Clear the bus hold flag if there is no more data
+> 	 * and if it is the last message.
+> 	 */
+> 	if (!id->bus_hold_flag && !id->send_count)
+> 		cdns_i2c_clear_bus_hold(id);
+> -	/* Set the slave address in address register - triggers operation. */
+> -	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
+> -						CDNS_I2C_ADDR_OFFSET);
 > 
-> And a comma after "core".
+> -	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
+> }
 > 
-> > +
-> > +Example:
-> > +SoC specific DT entry:
-> 
-> s/SoC specific/SoC-specific/
-> 
-> > +	rga: rga at ff680000 {
-> > +		compatible = "rockchip,rk3399-rga";
-> > +		reg = <0xff680000 0x10000>;
-> > +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-> > +		interrupt-names = "rga";
-> 
-> The interrupt-names property is not described above. Do you really need it ?
-> 
-> > +		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru 
-> SCLK_RGA_CORE>;
-> > +		clock-names = "aclk", "hclk", "sclk";
-> > +
-> > +		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru 
-> SRST_H_RGA>;
-> > +		reset-names = "core, "axi", "ahb";
-> > +	};
-> 
-> 
+> /**
+> --
+> 1.9.1
