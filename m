@@ -1,34 +1,67 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 16 Jul 2017 19:31:09 +0200
-Subject: [PATCH 1/5] arm64: dts: rockchip: Add rk3399 vop and
- display-subsystem
-In-Reply-To: <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
-References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
- <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <71446982.CYE3jZejiS@phil>
+From: slash.tmp@free.fr (Mason)
+Date: Sun, 16 Jul 2017 19:40:06 +0200
+Subject: [PATCH] irqchip/gic: Use GIC_SPI symbolic constant
+Message-ID: <e25e0ac5-abe2-6024-f669-c5352183114e@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
+Use GIC_SPI explicitly instead of an implicit 0.
 
-Am Donnerstag, 13. Juli 2017, 00:03:51 CEST schrieb Jacob Chen:
-> Add devicetree nodes for rk3399 VOP (Video Output Processors), and the
-> top level display-subsystem root node.
-> 
-> Later patches add endpoints (eDP, HDMI, MIPI, etc) that attach to the
-> VOPs' output ports.
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+Signed-off-by: Mason <slash.tmp@free.fr>
+---
+FWIW, 'make C=2' flagged a few lines:
 
-you might want to reduce the number of Signed-offs a bit :-)
+$ make C=2 drivers/irqchip/irq-gic.o
+  CHECK   drivers/irqchip/irq-gic.c
+drivers/irqchip/irq-gic.c:1079:44: warning: incorrect type in assignment (different address spaces)
+drivers/irqchip/irq-gic.c:1079:44:    expected void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
+drivers/irqchip/irq-gic.c:1079:44:    got void [noderef] <asn:2>*[noderef] <asn:3>*<noident>
+drivers/irqchip/irq-gic.c:1080:43: warning: incorrect type in assignment (different address spaces)
+drivers/irqchip/irq-gic.c:1080:43:    expected void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
+drivers/irqchip/irq-gic.c:1080:43:    got void [noderef] <asn:2>*[noderef] <asn:3>*<noident>
+drivers/irqchip/irq-gic.c:1091:26: warning: incorrect type in initializer (different address spaces)
+drivers/irqchip/irq-gic.c:1091:26:    expected void const [noderef] <asn:3>*__vpp_verify
+drivers/irqchip/irq-gic.c:1091:26:    got void [noderef] <asn:3>*[noderef] <asn:2>*<noident>
+drivers/irqchip/irq-gic.c:1091:71: warning: incorrect type in assignment (different address spaces)
+drivers/irqchip/irq-gic.c:1091:71:    expected void [noderef] <asn:3>*<noident>
+drivers/irqchip/irq-gic.c:1091:71:    got void [noderef] <asn:2>*
+drivers/irqchip/irq-gic.c:1093:26: warning: incorrect type in initializer (different address spaces)
+drivers/irqchip/irq-gic.c:1093:26:    expected void const [noderef] <asn:3>*__vpp_verify
+drivers/irqchip/irq-gic.c:1093:26:    got void [noderef] <asn:3>*[noderef] <asn:2>*<noident>
+drivers/irqchip/irq-gic.c:1093:70: warning: incorrect type in assignment (different address spaces)
+drivers/irqchip/irq-gic.c:1093:70:    expected void [noderef] <asn:3>*<noident>
+drivers/irqchip/irq-gic.c:1093:70:    got void [noderef] <asn:2>*
+drivers/irqchip/irq-gic.c:1167:43: warning: incorrect type in argument 1 (different address spaces)
+drivers/irqchip/irq-gic.c:1167:43:    expected void [noderef] <asn:3>*__pdata
+drivers/irqchip/irq-gic.c:1167:43:    got void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
+drivers/irqchip/irq-gic.c:1168:42: warning: incorrect type in argument 1 (different address spaces)
+drivers/irqchip/irq-gic.c:1168:42:    expected void [noderef] <asn:3>*__pdata
+drivers/irqchip/irq-gic.c:1168:42:    got void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
+---
+ drivers/irqchip/irq-gic.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Also authorship needs to be fixed. I.e. first Signed-off for this patch
-is from Mark, so in that case Mark probably also was the original author
-and the patch should reflect that. General rule, topmost Signed-off is
-of course from the original author.
-
-
-Heiko
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 1b1df4f770bd..ae414f5223b6 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -42,6 +42,8 @@
+ #include <linux/irqchip/chained_irq.h>
+ #include <linux/irqchip/arm-gic.h>
+ 
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
+ #include <asm/cputype.h>
+ #include <asm/irq.h>
+ #include <asm/exception.h>
+@@ -990,7 +992,7 @@ static int gic_irq_domain_translate(struct irq_domain *d,
+ 		 * For SPIs, we need to add 16 more to get the GIC irq
+ 		 * ID number
+ 		 */
+-		if (!fwspec->param[0])
++		if (fwspec->param[0] == GIC_SPI)
+ 			*hwirq += 16;
+ 
+ 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+-- 
+2.8.2
