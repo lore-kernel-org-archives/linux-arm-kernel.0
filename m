@@ -1,74 +1,111 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 16 Jul 2017 08:41:43 -0700
-Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <3675920.H2f5xgTCgu@aspire.rjw.lan>
-References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
- <1703157.S2GHVxrQk4@aspire.rjw.lan>
- <e680f86a-88db-8a53-dca6-a79d120d480b@gmail.com>
- <3675920.H2f5xgTCgu@aspire.rjw.lan>
-Message-ID: <6d93ebd4-79aa-ad4c-6670-234de28c59ba@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 16 Jul 2017 18:07:58 +0200
+Subject: [PATCH v2 6/6] dt-bindings: Document the Rockchip RGA bindings
+In-Reply-To: <1918615.rEp9U5BAbC@avalon>
+References: <1500101920-24039-1-git-send-email-jacob-chen@iotwrt.com>
+ <1500101920-24039-7-git-send-email-jacob-chen@iotwrt.com>
+ <1918615.rEp9U5BAbC@avalon>
+Message-ID: <1882912.vhlUDqklbZ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laurent,
+
+Am Samstag, 15. Juli 2017, 12:23:12 CEST schrieb Laurent Pinchart:
+> On Saturday 15 Jul 2017 14:58:40 Jacob Chen wrote:
+> > Add DT bindings documentation for Rockchip RGA
+> > 
+> > Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> > Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> > ---
+> >  .../devicetree/bindings/media/rockchip-rga.txt     | 35 +++++++++++++++++++
+> >  1 file changed, 35 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt
+> > b/Documentation/devicetree/bindings/media/rockchip-rga.txt new file mode
+> > 100644
+> > index 0000000..966eba0
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
+> > @@ -0,0 +1,35 @@
+> > +device-tree bindings for rockchip 2D raster graphic acceleration controller
+> > (RGA)
+> > +
+> > +RGA is a separate 2D raster graphic acceleration unit. It accelerates 2D
+> 
+> "Separate" from what ? Do you mean "standalone" ?
+> 
+> > +graphics operations, such as point/line drawing, image scaling, rotation,
+> > +BitBLT, alpha blending and image blur/sharpness.
+> > +
+> > +Required properties:
+> > +- compatible: value should be one of the following
+> > +		"rockchip,rk3228-rga";
+> > +		"rockchip,rk3288-rga";
+> > +		"rockchip,rk3399-rga";
+> 
+> The driver in patch 2/6 has match entry for rk3328, which is missing from this 
+> list.
+> 
+> As the implementation of the driver doesn't seem to discriminate between the 
+> four SoCs, wouldn't it make sense to create a generic compatible string on 
+> which the driver would match ? You can have both the generic and SoC-specific 
+> compatible strings in DT if there are differences between the IP core in those 
+> SoCs that might need to be handled later by the driver.
+
+I think the block is named something like RGA2 in some kernel trees, but
+am not sure if that is an actual name, or someone just added a number.
+>From short glances at vendor rga-code in the past, it looks like there are
+currently 2 basic versions of the in existence I.e. older Rockchip socs
+(like the rk3188 or so) use something older.
+
+I think everywhere else we do have only (or at least mostly) soc-specifc
+compatibles, but I guess that is more a question what Rob prefers.
 
 
-On 07/16/2017 03:22 AM, Rafael J. Wysocki wrote:
-> On Saturday, July 15, 2017 07:36:21 PM Florian Fainelli wrote:
->>
->> On 07/15/2017 04:38 PM, Rafael J. Wysocki wrote:
->>> On Sunday, July 16, 2017 01:34:53 AM Mason wrote:
->>>> On 16/07/2017 01:24, Rafael J. Wysocki wrote:
->>>>
->>>>> On Saturday, July 15, 2017 10:20:27 AM Florian Fainelli wrote:
->>>>>
->>>>>> The enum offers the advantage of centralizing how many different states
->>>>>> exist for all the platforms we know about in the kernel, it's easy to
->>>>>> define common values for platforms that have the same semantics, just
->>>>>> like it's simple to add new values for platform specific details.
->>>>>
->>>>> Well, you seem to be liking this, so why don't you just implement it?
->>>>
->>>> At the end of his message, Florian wrote:
->>>>
->>>>> In any case, just agree and I will be happy to follow-up with patches.
->>>
->>> But it may be hard to convince everybody without posting code changes
->>> and often enough showing a patch makes a good argument.
->>
->> I had the patches ready last night, saw the emails this morning and
->> decided to go mountain bike for a bit to think about it some more. You
->> will find my follow-up patches that hopefully implement your recommendation.
-> 
-> OK, thanks!
-> 
-> There is one problem with this I missed before, though, sorry about that.
-> 
-> Drivers need to be able to distinguish between suspend-to-idle and the platform
-> states too, so we need to store the argument passed to suspend_devices_and_enter()
-> somewhere too, either in the core or in the platform code.
-> 
-> And if we need to store it anyway, let's just store it in the core in a global var
-> (say pm_suspend_target_state), export that and be done.
+Heiko
 
-I was not sure this would be acceptable which was why I opted for making
-suspend_ops::begin store the state passed from suspend_ops::enter, I
-will change that.
-
+> > +- interrupts: RGA interrupt number.
 > 
-> There still will be a concern regarding drivers that care about differences between
-> PM_SUSPEND_MEM and PM_SUSPEND_STANDBY, because those differences are
-> platform-dependent, but let's defer addressing this until we have a driver
-> that needs to run on different platforms with different definitions for those
-> things.
-
-Makes sense, thanks!
-
+> This is an "interrupt specifier", not just an "interrupt number" (as you can 
+> see in the example below there are three numbers)
 > 
-> That should address the Pavel's objections too I guess.
+> > +
+> > +- clocks: phandle to RGA sclk/hclk/aclk clocks
+> > +
+> > +- clock-names: should be "aclk" "hclk" and "sclk"
 > 
-> Thanks,
-> Rafael
+> Nitpicking, there should be a comma after "aclk".
 > 
-
--- 
-Florian
+> > +
+> > +- resets: Must contain an entry for each entry in reset-names.
+> > +  See ../reset/reset.txt for details.
+> > +- reset-names: should be "core" "axi" and "ahb"
+> 
+> And a comma after "core".
+> 
+> > +
+> > +Example:
+> > +SoC specific DT entry:
+> 
+> s/SoC specific/SoC-specific/
+> 
+> > +	rga: rga at ff680000 {
+> > +		compatible = "rockchip,rk3399-rga";
+> > +		reg = <0xff680000 0x10000>;
+> > +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+> > +		interrupt-names = "rga";
+> 
+> The interrupt-names property is not described above. Do you really need it ?
+> 
+> > +		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru 
+> SCLK_RGA_CORE>;
+> > +		clock-names = "aclk", "hclk", "sclk";
+> > +
+> > +		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru 
+> SRST_H_RGA>;
+> > +		reset-names = "core, "axi", "ahb";
+> > +	};
+> 
+> 
