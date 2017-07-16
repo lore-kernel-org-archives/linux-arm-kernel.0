@@ -1,79 +1,74 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 16 Jul 2017 15:41:16 +0200
-Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <20170706031819.GD12954@xo-6d-61-c0.localdomain>
-References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
- <2497538.J9F6XFeBfd@aspire.rjw.lan> <20170715062838.GA20741@amd>
- <5864280.u6UQBsuXnA@aspire.rjw.lan> <20170715164626.GA1373@amd>
- <1a5ef0ae-16f3-5a61-ae4e-083664cb30c0@gmail.com>
- <20170715183358.4bnhshokalyulswz@piout.net>
- <20170706031819.GD12954@xo-6d-61-c0.localdomain>
-Message-ID: <20170716134116.wxwb3gevbhlereij@piout.net>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 16 Jul 2017 10:30:37 -0400
+Subject: [PATCH 1/2] dmaengine: qcom_hidma: correct overriding message
+Message-ID: <1500215438-30672-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2017 at 05:18:19 +0200, Pavel Machek wrote:
-> On Sat 2017-07-15 20:33:58, Alexandre Belloni wrote:
-> > On 15/07/2017 at 10:20:27 -0700, Florian Fainelli wrote:
-> > > > We already have
-> > > > 
-> > > > struct regulator_state {
-> > > >        int uV; /* suspend voltage */
-> > > >        unsigned int mode; /* suspend regulator operating mode */
-> > > >        int enabled; /* is regulator enabled in this suspend state */
-> > > >        int disabled; /* is the regulator disabled in this suspend state */
-> > > > };
-> > > > 
-> > > >  * struct regulation_constraints - regulator operating constraints.
-> > > >   * @state_disk: State for regulator when system is suspended in disk
-> > > >   * mode.
-> > > >   * @state_mem: State for regulator when system is suspended in mem
-> > > >   * mode.
-> > > >   * @state_standby: State for regulator when system is suspended in
-> > > >   * standby
-> > > >   *                 mode.
-> > > >    
-> > > > . So it seems that maybe we should tell the drivers if we are entering
-> > > > "state_mem" or "state_standby" (something I may have opposed, sorry),
-> > > > then the driver can get neccessary information from regulator
-> > > > framework.
-> > > 
-> > > OK, so what would be the mechanism to tell these drivers about the
-> > > system wide suspend state they are entering if it is not via
-> > > platform_suspend_target_state()?
-> > > 
-> > > Keep in mind that regulators might be one aspect of what could be
-> > > causing the platform to behave specifically in one suspend state vs.
-> > > another, but there could be pieces of HW within the SoC that can't be
-> > > described with power domains, voltage islands etc. that would still have
-> > > inherent suspend states properties (like memory retention, pin/pad
-> > > controls etc. etc). We still need some mechanism, possibly centralized
-> > > 
-> > 
-> > I concur, the regulator stuff is one aspect of one of our suspend state
-> > (cutting VDDcore). But we have another state where the main clock (going
-> > to the IPs) is going from a few hundred MHz to 32kHz. This is currently
-> > handled by calling at91_suspend_entering_slow_clock(). I think it is
-> > important to take that into account so we can remove this hack from the
-> > kernel.
-> 
-> Cure should not be worse then the disease... and it is in this case.
-> 
-> For clocks, take a look at clock framework, perhaps it already has "clock_will_be_suspended"
-> as regulator framework had. If not, implement it.
-> 
+A false overriding information is being presented during boot
+under this scenario.
 
-See Rafael's comment, currently, the clock framework can't say whether
-the clock will change because it doesn't know anything about the suspend
-target.
+1. First object checks for kernel command line value against zero.
+2. It doesn't find it, it sets the command line variable to the
+value coming from ACPI/DT.
+3. Second object is being probed.
+4. Second object sees that the value of kernel command line
+override is non-zero, it prints an overriding message even though
+value matches ACPI/DT value.
 
-> Same with memory retention, pin/pad controls.
-> 
+hidma-mgmt QCOM8060:03: overriding max-write-burst-bytes: 1024
 
-Same here.
+Add an additional check to verify that kernel command line value
+is different from the ACPI/DT value.
 
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/qcom/hidma_mgmt.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
+index 5a0991b..d51cd34 100644
+--- a/drivers/dma/qcom/hidma_mgmt.c
++++ b/drivers/dma/qcom/hidma_mgmt.c
+@@ -227,7 +227,8 @@ static int hidma_mgmt_probe(struct platform_device *pdev)
+ 		goto out;
+ 	}
+ 
+-	if (max_write_request) {
++	if (max_write_request &&
++			(max_write_request != mgmtdev->max_write_request)) {
+ 		dev_info(&pdev->dev, "overriding max-write-burst-bytes: %d\n",
+ 			max_write_request);
+ 		mgmtdev->max_write_request = max_write_request;
+@@ -240,7 +241,8 @@ static int hidma_mgmt_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "max-read-burst-bytes missing\n");
+ 		goto out;
+ 	}
+-	if (max_read_request) {
++	if (max_read_request &&
++			(max_read_request != mgmtdev->max_read_request)) {
+ 		dev_info(&pdev->dev, "overriding max-read-burst-bytes: %d\n",
+ 			max_read_request);
+ 		mgmtdev->max_read_request = max_read_request;
+@@ -253,7 +255,8 @@ static int hidma_mgmt_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "max-write-transactions missing\n");
+ 		goto out;
+ 	}
+-	if (max_wr_xactions) {
++	if (max_wr_xactions &&
++			(max_wr_xactions != mgmtdev->max_wr_xactions)) {
+ 		dev_info(&pdev->dev, "overriding max-write-transactions: %d\n",
+ 			max_wr_xactions);
+ 		mgmtdev->max_wr_xactions = max_wr_xactions;
+@@ -266,7 +269,8 @@ static int hidma_mgmt_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "max-read-transactions missing\n");
+ 		goto out;
+ 	}
+-	if (max_rd_xactions) {
++	if (max_rd_xactions &&
++			(max_rd_xactions != mgmtdev->max_rd_xactions)) {
+ 		dev_info(&pdev->dev, "overriding max-read-transactions: %d\n",
+ 			max_rd_xactions);
+ 		mgmtdev->max_rd_xactions = max_rd_xactions;
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
