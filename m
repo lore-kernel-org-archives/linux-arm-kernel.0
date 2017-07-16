@@ -1,36 +1,55 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 16 Jul 2017 12:30:55 +0200
-Subject: [PATCH 1/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <20170716023610.4658-2-f.fainelli@gmail.com>
-References: <20170623010837.11199-1-f.fainelli@gmail.com>
- <20170716023610.4658-1-f.fainelli@gmail.com>
- <20170716023610.4658-2-f.fainelli@gmail.com>
-Message-ID: <1787546.EYh03heFAd@aspire.rjw.lan>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 16 Jul 2017 21:33:28 +0800
+Subject: [PATCH] pinctrl: zte: fix 'functions' allocation in
+ zx_pinctrl_build_state()
+Message-ID: <1500212008-29321-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 15, 2017 07:36:09 PM Florian Fainelli wrote:
-> Add an optional platform_suspend_ops callback: target_state, and a
-> helper function globally visible to get this called:
-> platform_suspend_target_state().
-> 
-> This is useful for platform specific drivers that may need to take a
-> slightly different suspend/resume path based on the system's
-> suspend/resume state being entered.
-> 
-> Although this callback is optional and documented as such, it requires
-> a platform_suspend_ops::begin callback to be implemented in order to
-> provide an accurate suspend/resume state within the driver that
-> implements this platform_suspend_ops.
-> 
-> An enumeration: platform_target_state is defined which currently defines
-> the standard ACPI_S[1-4] states and can be extended with platform
-> specific suspend states.
+From: Shawn Guo <shawn.guo@linaro.org>
 
-This has a couple of problems, but I'm not sure if it is worth to go too much
-into details here.
+It fixes the following Smatch static check warning:
 
-Let's just take a different approach as I said in the other thread.
+ drivers/pinctrl/zte/pinctrl-zx.c:338 zx_pinctrl_build_state()
+ warn: passing devm_ allocated variable to kfree.
 
-Thanks,
-Rafael
+As we will be calling krealloc() on pointer 'functions', which means
+kfree() will be called in there, devm_kzalloc() shouldn't be used with
+the allocation in the first place.  Fix the warning by calling kcalloc()
+and managing the free procedure in error path on our own.
+
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Fixes: cbff0c4d27f4 ("pinctrl: add ZTE ZX pinctrl driver support")
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/pinctrl/zte/pinctrl-zx.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pinctrl/zte/pinctrl-zx.c b/drivers/pinctrl/zte/pinctrl-zx.c
+index f828ee340a98..ded366bb6564 100644
+--- a/drivers/pinctrl/zte/pinctrl-zx.c
++++ b/drivers/pinctrl/zte/pinctrl-zx.c
+@@ -295,8 +295,7 @@ static int zx_pinctrl_build_state(struct platform_device *pdev)
+ 	pctldev->num_groups = ngroups;
+ 
+ 	/* Build function list from pin mux functions */
+-	functions = devm_kzalloc(&pdev->dev, info->npins * sizeof(*functions),
+-				 GFP_KERNEL);
++	functions = kcalloc(info->npins, sizeof(*functions), GFP_KERNEL);
+ 	if (!functions)
+ 		return -ENOMEM;
+ 
+@@ -367,8 +366,10 @@ static int zx_pinctrl_build_state(struct platform_device *pdev)
+ 						func->num_group_names *
+ 						sizeof(*func->group_names),
+ 						GFP_KERNEL);
+-				if (!func->group_names)
++				if (!func->group_names) {
++					kfree(functions);
+ 					return -ENOMEM;
++				}
+ 			}
+ 
+ 			group = func->group_names;
+-- 
+1.9.1
