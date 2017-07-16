@@ -1,112 +1,138 @@
 From: jacobchen110@gmail.com (Jacob Chen)
-Date: Sun, 16 Jul 2017 12:19:41 +0800
-Subject: [PATCH v2 2/6] [media] rockchip/rga: v4l2 m2m support
-In-Reply-To: <1500137353.2353.1.camel@ndufresne.ca>
+Date: Sun, 16 Jul 2017 12:23:02 +0800
+Subject: [PATCH v2 5/6] ARM: dts: rockchip: enable RGA for rk3288 devices
+In-Reply-To: <2238838.k7NpPUxaC0@avalon>
 References: <1500101920-24039-1-git-send-email-jacob-chen@iotwrt.com>
- <1500101920-24039-3-git-send-email-jacob-chen@iotwrt.com>
- <2363665.x6z9MR1vqI@avalon> <1500137353.2353.1.camel@ndufresne.ca>
-Message-ID: <CAFLEztQZKqDwOyRCYLapa=730mWs80SOi6RuXwq5VR6m+RjO5w@mail.gmail.com>
+ <1500101920-24039-6-git-send-email-jacob-chen@iotwrt.com>
+ <2238838.k7NpPUxaC0@avalon>
+Message-ID: <CAFLEztRwuzkAn_QrgRNv_yrNixuicfr99PEpR2SDyRROqe=b7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Laurent,
 
-2017-07-16 0:49 GMT+08:00 Personnel <nicolas@ndufresne.ca>:
-> Le samedi 15 juillet 2017 ? 12:42 +0300, Laurent Pinchart a ?crit :
->> Hi Jacob,
->>
->> Thank you for the patch.
->>
->> On Saturday 15 Jul 2017 14:58:36 Jacob Chen wrote:
->> > Rockchip RGA is a separate 2D raster graphic acceleration unit. It
->> > accelerates 2D graphics operations, such as point/line drawing, image
->> > scaling, rotation, BitBLT, alpha blending and image blur/sharpness.
->> >
->> > The drvier is mostly based on s5p-g2d v4l2 m2m driver.
->> > And supports various operations from the rendering pipeline.
->> >  - copy
->> >  - fast solid color fill
->> >  - rotation
->> >  - flip
->> >  - alpha blending
->>
->> I notice that you don't support the drawing operations. How do you plan to
->> support them later through the V4L2 M2M API ? I hate stating the obvious, but
->> wouldn't the DRM API be better fit for a graphic accelerator ?
+2017-07-15 17:16 GMT+08:00 Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
+> Hi Jacob,
 >
-> It could fit, maybe, but it really lacks some framework. Also, DRM is
-> not really meant for M2M operation, and it's also not great for multi-
-> process. Until recently, there was competing drivers for Exynos, both
-> implemented in V4L2 and DRM, for similar rational, all DRM ones are
-> being deprecated/removed.
+> Thank you for the patch.
 >
-> I think 2D blitters in V4L2 are fine, but they terribly lack something
-> to differentiate them from converters/scalers when looking up the HW
-> list. Could be as simple as a capability flag, if I can suggest. For
-> the reference, the 2D blitter on IMX6 has been used to implement a live
-> video mixer in GStreamer.
+> On Saturday 15 Jul 2017 14:58:39 Jacob Chen wrote:
+>> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+>> ---
+>>  arch/arm/boot/dts/rk3288-evb.dtsi                 | 4 ++++
+>>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 4 ++++
+>>  arch/arm/boot/dts/rk3288-firefly.dtsi             | 4 ++++
+>>  arch/arm/boot/dts/rk3288-miqi.dts                 | 4 ++++
+>>  arch/arm/boot/dts/rk3288-popmetal.dts             | 4 ++++
+>>  arch/arm/boot/dts/rk3288-tinker.dts               | 4 ++++
 >
-> https://bugzilla.gnome.org/show_bug.cgi?id=772766
+> Some boards are missing from this list (Fennec, Phycore, ...) What criteria
+> have you used to decide on which ones to enable the RGA ? That should be
+> explained in the commit message.
 >
 
-We have write a drm RGA driver.
-https://patchwork.kernel.org/patch/8630841/
+Ok.
 
-Here are the reasons that why i rewrite it to V4l2 M2M.
-1. V4l2 have a better buffer framework. If it use DRM-GEM to handle buffers,
-there will be much redundant cache flush, and we have to add much hack code
-to workaround.
-2. This driver will be used in rockchip linux project. We mostly use it to
-scale/colorconvert/rotate/mix video/camera stream.
-A V4L2 M2M drvier can be directly used in gstreamer.
+I just enable the boards i have tested, because i can't make sure it
+won't break the other board
+because of clocks or power-domains.
 
-The disadvantages of V4l2 M2M API is that it's not stateless.
-It's inconvenient if user change size frequently, but it's OK,
-we have not yet need this and I think it's possible to extend. ; )
-
-
+>>  6 files changed, 24 insertions(+)
 >>
->> Additionally, V4L2 M2M has one source and one destination. How do you
->> implement alpha blending in that case, which by definition requires at least
->> two sources ?
+>> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
+>> b/arch/arm/boot/dts/rk3288-evb.dtsi index 4905760..ec12162 100644
+>> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+>> @@ -379,6 +379,10 @@
+>>       };
+>>  };
+>>
+>> +&rga {
+>> +     status = "okay";
+>> +};
+>> +
+>>  &usbphy {
+>>       status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi index 8134966..fffa92e2
+>> 100644
+>> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> @@ -283,6 +283,10 @@
+>>       };
+>>  };
+>>
+>> +&rga {
+>> +     status = "okay";
+>> +};
+>> +
+>>  &tsadc {
+>>       rockchip,hw-tshut-mode = <0>;
+>>       rockchip,hw-tshut-polarity = <0>;
+>> diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi
+>> b/arch/arm/boot/dts/rk3288-firefly.dtsi index f520589..74a6ce5 100644
+>> --- a/arch/arm/boot/dts/rk3288-firefly.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+>> @@ -500,6 +500,10 @@
+>>       };
+>>  };
+>>
+>> +&rga {
+>> +     status = "okay";
+>> +};
+>> +
+>>  &saradc {
+>>       vref-supply = <&vcc_18>;
+>>       status = "okay";
+>> diff --git a/arch/arm/boot/dts/rk3288-miqi.dts
+>> b/arch/arm/boot/dts/rk3288-miqi.dts index 21326f3..dc5e6bd 100644
+>> --- a/arch/arm/boot/dts/rk3288-miqi.dts
+>> +++ b/arch/arm/boot/dts/rk3288-miqi.dts
+>> @@ -401,6 +401,10 @@
+>>       };
+>>  };
+>>
+>> +&rga {
+>> +     status = "okay";
+>> +};
+>> +
+>>  &saradc {
+>>       vref-supply = <&vcc_18>;
+>>       status = "okay";
+>> diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts
+>> b/arch/arm/boot/dts/rk3288-popmetal.dts index aa1f9ec..362e5aa 100644
+>> --- a/arch/arm/boot/dts/rk3288-popmetal.dts
+>> +++ b/arch/arm/boot/dts/rk3288-popmetal.dts
+>> @@ -490,6 +490,10 @@
+>>       };
+>>  };
+>>
+>> +&rga {
+>> +     status = "okay";
+>> +};
+>> +
+>>  &tsadc {
+>>       rockchip,hw-tshut-mode = <0>;
+>>       rockchip,hw-tshut-polarity = <0>;
+>> diff --git a/arch/arm/boot/dts/rk3288-tinker.dts
+>> b/arch/arm/boot/dts/rk3288-tinker.dts index 525b0e5..1a8c149 100644
+>> --- a/arch/arm/boot/dts/rk3288-tinker.dts
+>> +++ b/arch/arm/boot/dts/rk3288-tinker.dts
+>> @@ -460,6 +460,10 @@
+>>       status = "okay";
+>>  };
+>>
+>> +&rga {
+>> +     status = "okay";
+>> +};
+>> +
+>>  &saradc {
+>>       vref-supply = <&vcc18_ldo1>;
+>>       status ="okay";
 >
-> This type of HW only do in-place blits. When using such a node, the
-> buffer queued on the V4L2_CAPTURE contains the destination image, and
-> the buffer queued on the V4L2_OUTPUT is the source image.
+> --
+> Regards,
 >
-
-Yep.
-
->>
->> > The code in rga-hw.c is used to configure regs accroding to operations.
->> >
->> > The code in rga-buf.c is used to create private mmu table for RGA.
->> > The tables is stored in a list, and be removed when buffer is cleanup.
->>
->> Looking at the implementation it seems to be a scatter-gather list, not an
->> MMU. Is that right ? Does the hardware documentation refer to it as an MMU ?
->>
-
-It's a 1-level MMU... We use it like a scatter-gather list,
-It's also the reason why we don't use RGA with DRM API.
-
-
->> > Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
->> > ---
->> >  drivers/media/platform/Kconfig                |  11 +
->> >  drivers/media/platform/Makefile               |   2 +
->> >  drivers/media/platform/rockchip-rga/Makefile  |   3 +
->> >  drivers/media/platform/rockchip-rga/rga-buf.c | 122 ++++
->> >  drivers/media/platform/rockchip-rga/rga-hw.c  | 652 ++++++++++++++++++
->> >  drivers/media/platform/rockchip-rga/rga-hw.h  | 437 ++++++++++++
->> >  drivers/media/platform/rockchip-rga/rga.c     | 958 +++++++++++++++++++++++
->> >  drivers/media/platform/rockchip-rga/rga.h     | 111 +++
->> >  8 files changed, 2296 insertions(+)
->> >  create mode 100644 drivers/media/platform/rockchip-rga/Makefile
->> >  create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
->> >  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
->> >  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
->> >  create mode 100644 drivers/media/platform/rockchip-rga/rga.c
->> >  create mode 100644 drivers/media/platform/rockchip-rga/rga.h
->>
->>
+> Laurent Pinchart
+>
