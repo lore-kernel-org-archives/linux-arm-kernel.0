@@ -1,84 +1,31 @@
-From: vesa.jaaskelainen@vaisala.com (=?UTF-8?q?Vesa=20J=C3=A4=C3=A4skel=C3=A4inen?=)
-Date: Sun, 16 Jul 2017 23:00:54 +0300
-Subject: [RFC PATCH 0/2] device tree support for board revision
-Message-ID: <1500235256-48937-1-git-send-email-vesa.jaaskelainen@vaisala.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 16 Jul 2017 21:13:47 +0100
+Subject: [PATCH] irqchip/gic: Use GIC_SPI symbolic constant
+In-Reply-To: <e25e0ac5-abe2-6024-f669-c5352183114e@free.fr> (Mason's message
+ of "Sun, 16 Jul 2017 19:40:06 +0200")
+References: <e25e0ac5-abe2-6024-f669-c5352183114e@free.fr>
+Message-ID: <86shhwywas.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Privously without using device trees system revision was carried over ATAGs.
-Now with device tree system revision information is not carried at all. This
-RFC proposes a method for this.
+On Sun, Jul 16 2017 at  7:40:06 pm BST, Mason <slash.tmp@free.fr> wrote:
+> Use GIC_SPI explicitly instead of an implicit 0.
 
-With ARM arch system revision information (as 4 digit hex string) has been
-available in /proc/cpuinfo.
+What bug is this fixing? What benefit does this bring?
 
-Respective change is needed to boot loader to provide board revision. U-boot
-provides board_rev environment variable that holds string version of board
-revision information.
+>
+> Signed-off-by: Mason <slash.tmp@free.fr>
+> ---
+> FWIW, 'make C=2' flagged a few lines:
+>
+> $ make C=2 drivers/irqchip/irq-gic.o
+>   CHECK   drivers/irqchip/irq-gic.c
+> drivers/irqchip/irq-gic.c:1079:44: warning: incorrect type in assignment (different address spaces)
+> drivers/irqchip/irq-gic.c:1079:44:    expected void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
+> drivers/irqchip/irq-gic.c:1079:44:    got void [noderef] <asn:2>*[noderef] <asn:3>*<noident>
 
-With BeagleBone Black I was able to get following /proc/cpuinfo output:
+How is that related to this patch?
 
-processor       : 0
-model name      : ARMv7 Processor rev 2 (v7l)
-BogoMIPS        : 996.14
-Features        : half thumb fastmult vfp edsp thumbee neon vfpv3 tls vfpd32 
-CPU implementer : 0x41
-CPU architecture: 7
-CPU variant     : 0x3
-CPU part        : 0xc08
-CPU revision    : 2
-
-Hardware        : Generic AM33XX (Flattened Device Tree)
-Revision        : 000B
-Serial          : 1614BBBK1211
-
-Note: I set board_serial to serial# in u-boot to get serial number.
-
-Reason why I deviced to go RFC approach was that there is kinda definition
-problem here and possibilty that it might be a good idea to define more
-than one field to device tree. Also there seems to be multiple ways that
-people try to workaround the issues so it would be a good idea to
-standardize the interfaces a bit.
-
-One problem here is that what does actually those fields mean in
-/proc/cpuinfo?
-
-What does "Revision" mean? Does it mean board revision, device revision or
-system revision?
-
-Same goes for "Serial". Does it mean board serial, device serial or system
-serial?
-
-I see that "board" here would mean PCB or SoM module whose manufacturer
-defines model name, serial number and revision.
-
-Then we have "device" scope which I would see that it means PCB and chasis
-of the device, and in chasis you might have label with information like
-device model, serial number and revision. One device can consist of one or
-more boards.
-
-Then we have "system" scope which I would see that it means collection of
-devices. System might have model and serial number (haven't seen one with
-revision thou). It might be that "system" level is out-of-scope for device
-tree interface level.
-
-It may be that /proc/cpuinfo is wrong place to display this information but
-as a result of this discussion I would like to see the standard way to pass
-this information as it might be that bootloader can only access the
-information (in case of multipurpose pin in chip). And the standard way for
-user space to access this information.
-
-Thanks,
-Vesa J??skel?inen
-
-Vesa J??skel?inen (2):
-  Documentation: devicetree: root node board-revision property
-    documentation
-  arm: setup: Show the board revision from devicetree in cpuinfo
-
- Documentation/devicetree/booting-without-of.txt |  1 +
- arch/arm/kernel/setup.c                         | 12 +++++++++++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
-
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny.
