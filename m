@@ -1,55 +1,66 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 16 Jul 2017 21:33:28 +0800
-Subject: [PATCH] pinctrl: zte: fix 'functions' allocation in
- zx_pinctrl_build_state()
-Message-ID: <1500212008-29321-1-git-send-email-shawnguo@kernel.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 16 Jul 2017 15:38:32 +0200
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <3675920.H2f5xgTCgu@aspire.rjw.lan>
+References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+ <1703157.S2GHVxrQk4@aspire.rjw.lan>
+ <e680f86a-88db-8a53-dca6-a79d120d480b@gmail.com>
+ <3675920.H2f5xgTCgu@aspire.rjw.lan>
+Message-ID: <20170716133832.mnuaie4jnlwu6dwj@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+On 16/07/2017 at 12:22:08 +0200, Rafael J. Wysocki wrote:
+> On Saturday, July 15, 2017 07:36:21 PM Florian Fainelli wrote:
+> > 
+> > On 07/15/2017 04:38 PM, Rafael J. Wysocki wrote:
+> > > On Sunday, July 16, 2017 01:34:53 AM Mason wrote:
+> > >> On 16/07/2017 01:24, Rafael J. Wysocki wrote:
+> > >>
+> > >>> On Saturday, July 15, 2017 10:20:27 AM Florian Fainelli wrote:
+> > >>>
+> > >>>> The enum offers the advantage of centralizing how many different states
+> > >>>> exist for all the platforms we know about in the kernel, it's easy to
+> > >>>> define common values for platforms that have the same semantics, just
+> > >>>> like it's simple to add new values for platform specific details.
+> > >>>
+> > >>> Well, you seem to be liking this, so why don't you just implement it?
+> > >>
+> > >> At the end of his message, Florian wrote:
+> > >>
+> > >>> In any case, just agree and I will be happy to follow-up with patches.
+> > > 
+> > > But it may be hard to convince everybody without posting code changes
+> > > and often enough showing a patch makes a good argument.
+> > 
+> > I had the patches ready last night, saw the emails this morning and
+> > decided to go mountain bike for a bit to think about it some more. You
+> > will find my follow-up patches that hopefully implement your recommendation.
+> 
+> OK, thanks!
+> 
+> There is one problem with this I missed before, though, sorry about that.
+> 
+> Drivers need to be able to distinguish between suspend-to-idle and the platform
+> states too, so we need to store the argument passed to suspend_devices_and_enter()
+> somewhere too, either in the core or in the platform code.
+> 
+> And if we need to store it anyway, let's just store it in the core in a global var
+> (say pm_suspend_target_state), export that and be done.
+> 
+> There still will be a concern regarding drivers that care about differences between
+> PM_SUSPEND_MEM and PM_SUSPEND_STANDBY, because those differences are
+> platform-dependent, but let's defer addressing this until we have a driver
+> that needs to run on different platforms with different definitions for those
+> things.
+> 
 
-It fixes the following Smatch static check warning:
+We already have the case for drivers/net/ethernet/cadence/ and
+drivers/net/can/m_can/ and many of the at91 drivers. Depending on the
+specific SoC they run on, PM_SUSPEND_MEM may or may not cut VDDcore or
+may or may not change the peripheral clock.
 
- drivers/pinctrl/zte/pinctrl-zx.c:338 zx_pinctrl_build_state()
- warn: passing devm_ allocated variable to kfree.
-
-As we will be calling krealloc() on pointer 'functions', which means
-kfree() will be called in there, devm_kzalloc() shouldn't be used with
-the allocation in the first place.  Fix the warning by calling kcalloc()
-and managing the free procedure in error path on our own.
-
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Fixes: cbff0c4d27f4 ("pinctrl: add ZTE ZX pinctrl driver support")
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/pinctrl/zte/pinctrl-zx.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pinctrl/zte/pinctrl-zx.c b/drivers/pinctrl/zte/pinctrl-zx.c
-index f828ee340a98..ded366bb6564 100644
---- a/drivers/pinctrl/zte/pinctrl-zx.c
-+++ b/drivers/pinctrl/zte/pinctrl-zx.c
-@@ -295,8 +295,7 @@ static int zx_pinctrl_build_state(struct platform_device *pdev)
- 	pctldev->num_groups = ngroups;
- 
- 	/* Build function list from pin mux functions */
--	functions = devm_kzalloc(&pdev->dev, info->npins * sizeof(*functions),
--				 GFP_KERNEL);
-+	functions = kcalloc(info->npins, sizeof(*functions), GFP_KERNEL);
- 	if (!functions)
- 		return -ENOMEM;
- 
-@@ -367,8 +366,10 @@ static int zx_pinctrl_build_state(struct platform_device *pdev)
- 						func->num_group_names *
- 						sizeof(*func->group_names),
- 						GFP_KERNEL);
--				if (!func->group_names)
-+				if (!func->group_names) {
-+					kfree(functions);
- 					return -ENOMEM;
-+				}
- 			}
- 
- 			group = func->group_names;
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
