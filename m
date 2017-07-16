@@ -1,67 +1,52 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sun, 16 Jul 2017 19:40:06 +0200
-Subject: [PATCH] irqchip/gic: Use GIC_SPI symbolic constant
-Message-ID: <e25e0ac5-abe2-6024-f669-c5352183114e@free.fr>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 16 Jul 2017 20:22:35 +0200
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <5290346.YItt1Jp12B@aspire.rjw.lan>
+References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+ <1529148.KHlxNOSRLV@aspire.rjw.lan>
+ <20170706031750.GA12954@xo-6d-61-c0.localdomain>
+ <5290346.YItt1Jp12B@aspire.rjw.lan>
+Message-ID: <20170716182235.GB14461@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use GIC_SPI explicitly instead of an implicit 0.
+Hi!
 
-Signed-off-by: Mason <slash.tmp@free.fr>
----
-FWIW, 'make C=2' flagged a few lines:
+> > > So why exactly isn't it reasonable?
+> > > 
+> > > Please use technical arguments.  Saying that something is wrong without
+> > > explaining the problem you see with it isn't particulatly useful in technical
+> > > discussions.
+> > 
+> > Deep in your heart, you should know that having enum listing all the platforms linux
+> > runs on is a very bad idea.
+> 
+> Even so, if I'm unable to explain to people why this is a bad idea in technical
+> terms, that doesn't mean too much.
 
-$ make C=2 drivers/irqchip/irq-gic.o
-  CHECK   drivers/irqchip/irq-gic.c
-drivers/irqchip/irq-gic.c:1079:44: warning: incorrect type in assignment (different address spaces)
-drivers/irqchip/irq-gic.c:1079:44:    expected void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
-drivers/irqchip/irq-gic.c:1079:44:    got void [noderef] <asn:2>*[noderef] <asn:3>*<noident>
-drivers/irqchip/irq-gic.c:1080:43: warning: incorrect type in assignment (different address spaces)
-drivers/irqchip/irq-gic.c:1080:43:    expected void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
-drivers/irqchip/irq-gic.c:1080:43:    got void [noderef] <asn:2>*[noderef] <asn:3>*<noident>
-drivers/irqchip/irq-gic.c:1091:26: warning: incorrect type in initializer (different address spaces)
-drivers/irqchip/irq-gic.c:1091:26:    expected void const [noderef] <asn:3>*__vpp_verify
-drivers/irqchip/irq-gic.c:1091:26:    got void [noderef] <asn:3>*[noderef] <asn:2>*<noident>
-drivers/irqchip/irq-gic.c:1091:71: warning: incorrect type in assignment (different address spaces)
-drivers/irqchip/irq-gic.c:1091:71:    expected void [noderef] <asn:3>*<noident>
-drivers/irqchip/irq-gic.c:1091:71:    got void [noderef] <asn:2>*
-drivers/irqchip/irq-gic.c:1093:26: warning: incorrect type in initializer (different address spaces)
-drivers/irqchip/irq-gic.c:1093:26:    expected void const [noderef] <asn:3>*__vpp_verify
-drivers/irqchip/irq-gic.c:1093:26:    got void [noderef] <asn:3>*[noderef] <asn:2>*<noident>
-drivers/irqchip/irq-gic.c:1093:70: warning: incorrect type in assignment (different address spaces)
-drivers/irqchip/irq-gic.c:1093:70:    expected void [noderef] <asn:3>*<noident>
-drivers/irqchip/irq-gic.c:1093:70:    got void [noderef] <asn:2>*
-drivers/irqchip/irq-gic.c:1167:43: warning: incorrect type in argument 1 (different address spaces)
-drivers/irqchip/irq-gic.c:1167:43:    expected void [noderef] <asn:3>*__pdata
-drivers/irqchip/irq-gic.c:1167:43:    got void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
-drivers/irqchip/irq-gic.c:1168:42: warning: incorrect type in argument 1 (different address spaces)
-drivers/irqchip/irq-gic.c:1168:42:    expected void [noderef] <asn:3>*__pdata
-drivers/irqchip/irq-gic.c:1168:42:    got void [noderef] <asn:3>*[noderef] <asn:2>*percpu_base
----
- drivers/irqchip/irq-gic.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+I could say something O(#drivers * #platforms) vs. O(#drivers +
+#platforms) lines of code -- but I thought it was obvious...?
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 1b1df4f770bd..ae414f5223b6 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -42,6 +42,8 @@
- #include <linux/irqchip/chained_irq.h>
- #include <linux/irqchip/arm-gic.h>
- 
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
- #include <asm/cputype.h>
- #include <asm/irq.h>
- #include <asm/exception.h>
-@@ -990,7 +992,7 @@ static int gic_irq_domain_translate(struct irq_domain *d,
- 		 * For SPIs, we need to add 16 more to get the GIC irq
- 		 * ID number
- 		 */
--		if (!fwspec->param[0])
-+		if (fwspec->param[0] == GIC_SPI)
- 			*hwirq += 16;
- 
- 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+> > Anyway, there are better solutions, regulator framework already knows if given rail
+> > will be powered off or not, and their driver already knows if they are going
+> > suspend/standby. They just need to use existing interfaces.
+> 
+> So they need to know what has been passed to suspend_devices_and_enter()
+> anyway and currently there's no interface for that.  That actually is the source
+> of the whole issue.
+
+Yep, I don't like that, but I guess we should give drivers enough
+information to ask regulator framework.
+
+Best regards,
+								Pavel
 -- 
-2.8.2
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170716/5b0418fd/attachment.sig>
