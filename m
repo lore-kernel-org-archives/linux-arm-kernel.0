@@ -1,44 +1,34 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 16 Jul 2017 20:22:35 +0200
+Date: Sun, 16 Jul 2017 20:24:58 +0200
 Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <5290346.YItt1Jp12B@aspire.rjw.lan>
+In-Reply-To: <20170716133832.mnuaie4jnlwu6dwj@piout.net>
 References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
- <1529148.KHlxNOSRLV@aspire.rjw.lan>
- <20170706031750.GA12954@xo-6d-61-c0.localdomain>
- <5290346.YItt1Jp12B@aspire.rjw.lan>
-Message-ID: <20170716182235.GB14461@amd>
+ <1703157.S2GHVxrQk4@aspire.rjw.lan>
+ <e680f86a-88db-8a53-dca6-a79d120d480b@gmail.com>
+ <3675920.H2f5xgTCgu@aspire.rjw.lan>
+ <20170716133832.mnuaie4jnlwu6dwj@piout.net>
+Message-ID: <20170716182457.GC14461@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-> > > So why exactly isn't it reasonable?
-> > > 
-> > > Please use technical arguments.  Saying that something is wrong without
-> > > explaining the problem you see with it isn't particulatly useful in technical
-> > > discussions.
+> > There still will be a concern regarding drivers that care about differences between
+> > PM_SUSPEND_MEM and PM_SUSPEND_STANDBY, because those differences are
+> > platform-dependent, but let's defer addressing this until we have a driver
+> > that needs to run on different platforms with different definitions for those
+> > things.
 > > 
-> > Deep in your heart, you should know that having enum listing all the platforms linux
-> > runs on is a very bad idea.
 > 
-> Even so, if I'm unable to explain to people why this is a bad idea in technical
-> terms, that doesn't mean too much.
+> We already have the case for drivers/net/ethernet/cadence/ and
+> drivers/net/can/m_can/ and many of the at91 drivers. Depending on the
+> specific SoC they run on, PM_SUSPEND_MEM may or may not cut VDDcore or
+> may or may not change the peripheral clock.
 
-I could say something O(#drivers * #platforms) vs. O(#drivers +
-#platforms) lines of code -- but I thought it was obvious...?
+Please please introduce will_vddcore_be_cut_down() or similar helper,
+so that we have one place to fix..
 
-> > Anyway, there are better solutions, regulator framework already knows if given rail
-> > will be powered off or not, and their driver already knows if they are going
-> > suspend/standby. They just need to use existing interfaces.
-> 
-> So they need to know what has been passed to suspend_devices_and_enter()
-> anyway and currently there's no interface for that.  That actually is the source
-> of the whole issue.
-
-Yep, I don't like that, but I guess we should give drivers enough
-information to ask regulator framework.
-
-Best regards,
+Thanks,
 								Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
@@ -49,4 +39,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170716/5b0418fd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170716/382ea0f6/attachment.sig>
