@@ -1,44 +1,46 @@
 From: martin@kaiser.cx (Martin Kaiser)
-Date: Mon, 17 Jul 2017 23:04:25 +0200
-Subject: [PATCH v2 1/3] Documentation: devicetree: add Freescale RNGC
- binding
-In-Reply-To: <20160318194213.GA10766@rob-hp-laptop>
+Date: Mon, 17 Jul 2017 23:16:02 +0200
+Subject: [PATCH v3 2/3] ARM: i.MX25: add RNGC node to dtsi
+In-Reply-To: <1500326163-4556-1-git-send-email-martin@kaiser.cx>
 References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
- <20160318194213.GA10766@rob-hp-laptop>
-Message-ID: <20170717210425.GB15429@reykholt.kaiser.cx>
+ <1500326163-4556-1-git-send-email-martin@kaiser.cx>
+Message-ID: <1500326163-4556-2-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-I'd like to pick this up and get the rngc driver merged finally.
+Add a devicetree entry for the Random Number Generator Version C (RNGC).
 
-Thus wrote Rob Herring (robh at kernel.org):
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+Changes in v3:
+  - remove clock-names from dtsi
 
-> The MXC name is still not dead?
+Changes in v2:
+  - remove interrupt-names from dtsi
 
-looks like no. There's still CONFIG_ARCH_MXC etc. The other similar rng
-driver is called mxc-rnga.c so it makes sense to use mxc-rngc.
+ arch/arm/boot/dts/imx25.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> >  1 file changed, 16 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/rng/mxc_rngc.txt
-
-> > diff --git a/Documentation/devicetree/bindings/rng/mxc_rngc.txt b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
-> > new file mode 100644
-> > index 000000000000..e147a6dde40a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
-> > @@ -0,0 +1,16 @@
-> > +Freescale RNGC (Random Number Generator Version C)
-> > +
-> > +Required properties:
-> > +- compatible : Should be "fsl,imx25-rng"
-
-> What about i.MX3/5 compatible strings?
-
-I couldn't find an imx5 chip that has this rng. I added a compatible
-string for imx35.
-
-Best regards,
-
-   Martin
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index dfcc8e0..0d2f3a1 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -451,6 +451,13 @@
+ 				interrupt-names = "scm", "smn";
+ 			};
+ 
++			rng: rng at 53fb0000 {
++				compatible = "fsl,imx25-rng";
++				reg = <0x53fb0000 0x4000>;
++				clocks = <&clks 109>;
++				interrupts = <22>;
++			};
++
+ 			esdhc1: esdhc at 53fb4000 {
+ 				compatible = "fsl,imx25-esdhc";
+ 				reg = <0x53fb4000 0x4000>;
+-- 
+2.1.4
