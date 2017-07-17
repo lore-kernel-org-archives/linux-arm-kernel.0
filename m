@@ -1,80 +1,60 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 17 Jul 2017 08:56:10 +0530
-Subject: [PATCH] arm64: perf: Allow more than one cycle counter to be used
-In-Reply-To: <5817e4915963d7fae5928a77d85f7e0c4dca290c.1498890614.git.panand@redhat.com>
-References: <5817e4915963d7fae5928a77d85f7e0c4dca290c.1498890614.git.panand@redhat.com>
-Message-ID: <32b8658a-e48d-308d-4c89-9d22161ec1a8@redhat.com>
+Date: Mon, 17 Jul 2017 08:51:04 +0530
+Subject: [PATCH V2 0/4] ARM64: Fix irq generation between breakpoint and
+ step exception
+In-Reply-To: <cover.1499416107.git.panand@redhat.com>
+References: <cover.1499416107.git.panand@redhat.com>
+Message-ID: <45e8f432-8786-2cb1-421e-e4093167c57a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Mark
 
-On Saturday 01 July 2017 12:03 PM, Pratyush Anand wrote:
-> Currently:
-> $ perf stat -e cycles:u -e cycles:k  true
->
->  Performance counter stats for 'true':
->
->           2,24,699      cycles:u
->      <not counted>      cycles:k	(0.00%)
->
->        0.000788087 seconds time elapsed
->
-> We can not count more than one cycle counter in one instance,because we
-> allow to map cycle counter into PMCCNTR_EL0 only. However, if I did not
-> miss anything then specification do not prohibit to use PMEVCNTR<n>_EL0
-> for cycle count as well.
->
-> Modify the code so that it still prefers to use PMCCNTR_EL0 for cycle
-> counter, however allow to use PMEVCNTR<n>_EL0 if PMCCNTR_EL0 is already
-> in use.
->
-> After this patch:
->
-> $ perf stat -e cycles:u -e cycles:k   true
->
->  Performance counter stats for 'true':
->
->           2,17,310      cycles:u
->           7,40,009      cycles:k
->
->        0.000764149 seconds time elapsed
->
 
-Any comment/feedback?
+On Friday 07 July 2017 05:33 PM, Pratyush Anand wrote:
+> v1 was here http://marc.info/?l=linux-arm-kernel&m=149910958418708&w=2
+>
+> v1 -> v2:
+> - patch 1 of v1 has been modified to patch 1-3 of v2.
+> - Introduced a new event attribute step_needed and implemented
+>   hw_breakpoint_needs_single_step() (patch 1)
+> - Replaced usage of is_default_overflow_handler() with
+>   hw_breakpoint_needs_single_step(). (patch 2)
+> - Modified sample test to set set step_needed bit field (patch 3)
+>
+> samples/hw_breakpoint/data_breakpoint.c passes with x86_64 but fails with
+> ARM64. Even though it has been NAKed previously on upstream [1, 2], I have
+> tried to come up with patches which can resolve it for ARM64 as well.
+>
+> I noticed that even perf step exception can go into an infinite loop if CPU
+> receives an interrupt while executing breakpoint/watchpoint handler. So,
+> event though we are not concerned about above test, we will have to find a
+> solution for the perf issue.
+>
+> This patchset attempts to resolve both the issue. Please review.
 
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
+Any comments/feedback?
+
 >
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 83a1b1ad189f..43c77314f345 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -846,17 +846,14 @@ static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
->  	struct hw_perf_event *hwc = &event->hw;
->  	unsigned long evtype = hwc->config_base & ARMV8_PMU_EVTYPE_EVENT;
+> [1] http://marc.info/?l=linux-arm-kernel&m=149580777524910&w=2
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/425266.html
 >
-> -	/* Always place a cycle counter into the cycle counter. */
-> +	/* Always prefer to place a cycle counter into the cycle counter. */
->  	if (evtype == ARMV8_PMUV3_PERFCTR_CPU_CYCLES) {
-> -		if (test_and_set_bit(ARMV8_IDX_CYCLE_COUNTER, cpuc->used_mask))
-> -			return -EAGAIN;
-> -
-> -		return ARMV8_IDX_CYCLE_COUNTER;
-> +		if (!test_and_set_bit(ARMV8_IDX_CYCLE_COUNTER, cpuc->used_mask))
-> +			return ARMV8_IDX_CYCLE_COUNTER;
->  	}
+> Pratyush Anand (4):
+>   hw_breakpoint: Add step_needed event attribute
+>   arm64: use hw_breakpoint_needs_single_step() to decide if step is
+>     needed
+>   hw-breakpoint: sample test: set step_needed bit field
+>   arm64: disable irq between breakpoint and step exception
 >
->  	/*
-> -	 * For anything other than a cycle counter, try and use
-> -	 * the events counters
-> +	 * Otherwise use events counters
->  	 */
->  	for (idx = ARMV8_IDX_COUNTER0; idx < cpu_pmu->num_events; ++idx) {
->  		if (!test_and_set_bit(idx, cpuc->used_mask))
+>  arch/arm64/kernel/debug-monitors.c      |  3 +++
+>  arch/arm64/kernel/hw_breakpoint.c       | 10 +++++-----
+>  arch/arm64/mm/fault.c                   | 22 ++++++++++++++++++----
+>  include/linux/hw_breakpoint.h           |  6 ++++++
+>  include/uapi/linux/perf_event.h         |  3 ++-
+>  kernel/events/core.c                    |  2 ++
+>  samples/hw_breakpoint/data_breakpoint.c |  1 +
+>  tools/include/uapi/linux/perf_event.h   |  3 ++-
+>  8 files changed, 39 insertions(+), 11 deletions(-)
 >
 
--- 
+--
 Pratyush
