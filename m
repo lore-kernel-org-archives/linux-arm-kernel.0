@@ -1,42 +1,71 @@
-From: jacobchen110@gmail.com (Jacob Chen)
-Date: Mon, 17 Jul 2017 11:44:51 +0800
-Subject: [PATCH 1/5] arm64: dts: rockchip: Add rk3399 vop and
- display-subsystem
-In-Reply-To: <71446982.CYE3jZejiS@phil>
-References: <1499875435-23944-1-git-send-email-jacob-chen@iotwrt.com>
- <1499875435-23944-2-git-send-email-jacob-chen@iotwrt.com>
- <71446982.CYE3jZejiS@phil>
-Message-ID: <CAFLEztTAa8jPMNYO8iAgybGFTerCDBqwLUrjbKOfFqEE++oXhw@mail.gmail.com>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Sun, 16 Jul 2017 23:01:16 -0500
+Subject: [PATCH] stm32-dcmi: constify vb2_ops structure
+In-Reply-To: <d6b36309-2152-a55e-f160-ed43fdc3791c@st.com>
+References: <20170706200517.GA5886@embeddedgus>
+ <d6b36309-2152-a55e-f160-ed43fdc3791c@st.com>
+Message-ID: <52e9bcd7-6a85-4200-4418-83e3de547643@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi heko,
 
-2017-07-17 1:31 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
-> Hi Jacob,
->
-> Am Donnerstag, 13. Juli 2017, 00:03:51 CEST schrieb Jacob Chen:
->> Add devicetree nodes for rk3399 VOP (Video Output Processors), and the
->> top level display-subsystem root node.
+On 07/07/2017 09:33 AM, Hugues FRUCHET wrote:
+> Acked-by: Hugues Fruchet <hugues.fruchet@st.com>
+
+Thank you, Hugues.
+
+> On 07/06/2017 10:05 PM, Gustavo A. R. Silva wrote:
+>> Check for vb2_ops structures that are only stored in the ops field of a
+>> vb2_queue structure. That field is declared const, so vb2_ops structures
+>> that have this property can be declared as const also.
 >>
->> Later patches add endpoints (eDP, HDMI, MIPI, etc) that attach to the
->> VOPs' output ports.
+>> This issue was detected using Coccinelle and the following semantic patch:
 >>
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
->
-> you might want to reduce the number of Signed-offs a bit :-)
->
-> Also authorship needs to be fixed. I.e. first Signed-off for this patch
-> is from Mark, so in that case Mark probably also was the original author
-> and the patch should reflect that. General rule, topmost Signed-off is
-> of course from the original author.
->
+>> @r disable optional_qualifier@
+>> identifier i;
+>> position p;
+>> @@
+>> static struct vb2_ops i at p = { ... };
+>>
+>> @ok@
+>> identifier r.i;
+>> struct vb2_queue e;
+>> position p;
+>> @@
+>> e.ops = &i at p;
+>>
+>> @bad@
+>> position p != {r.p,ok.p};
+>> identifier r.i;
+>> struct vb2_ops e;
+>> @@
+>> e at i@p
+>>
+>> @depends on !bad disable optional_qualifier@
+>> identifier r.i;
+>> @@
+>> static
+>> +const
+>> struct vb2_ops i = { ... };
+>>
+>> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+>> ---
+>>    drivers/media/platform/stm32/stm32-dcmi.c | 2 +-
+>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+>> index 83d32a5..24ef888 100644
+>> --- a/drivers/media/platform/stm32/stm32-dcmi.c
+>> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
+>> @@ -662,7 +662,7 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+>>    		dcmi->errors_count, dcmi->buffers_count);
+>>    }
+>>    
+>> -static struct vb2_ops dcmi_video_qops = {
+>> +static const struct vb2_ops dcmi_video_qops = {
+>>    	.queue_setup		= dcmi_queue_setup,
+>>    	.buf_init		= dcmi_buf_init,
+>>    	.buf_prepare		= dcmi_buf_prepare,
 
-OK, get it.
-
->
-> Heiko
->
+-- 
+Gustavo A. R. Silva
