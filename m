@@ -1,40 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Jul 2017 14:00:00 -0500
-Subject: [PATCH v5 3/8] dt-bindings: bus: Add documentation for the
- Technologic Systems NBUS
-In-Reply-To: <20170714203218.14409-4-sebastien.bourdelin@savoirfairelinux.com>
-References: <20170714203218.14409-1-sebastien.bourdelin@savoirfairelinux.com>
- <20170714203218.14409-4-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20170717190000.n2lifnduqzgp4b6g@rob-hp-laptop>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Mon, 17 Jul 2017 15:05:44 -0400
+Subject: [PATCH 2/3] net: ethernet: bgmac: Make IDM register space optional
+In-Reply-To: <CAKUFe6ad027MAg-A3XO7i1=c-Q623JqMPCKV_+Hi+ZpUojBn-Q@mail.gmail.com>
+References: <1499972649-6200-1-git-send-email-abhishek.shah@broadcom.com>
+ <1499972649-6200-3-git-send-email-abhishek.shah@broadcom.com>
+ <CAC3K-4o=WRqBv_vTf7QGDYjWzMmVog=63ZbiHbHAuW7zJcsHFQ@mail.gmail.com>
+ <CAKUFe6ad027MAg-A3XO7i1=c-Q623JqMPCKV_+Hi+ZpUojBn-Q@mail.gmail.com>
+Message-ID: <CAC3K-4rgVYkjGq_WTHoO6=fvSH0TuHOpdDpukbvK+5LxhLm4BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 04:32:13PM -0400, Sebastien Bourdelin wrote:
-> Add binding documentation for the Technologic Systems NBUS that is used
-> to interface with peripherals in the FPGA of the TS-4600 SoM.
-> 
-> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
-> ---
-> Changes v4 -> v5:
->   - fix missing signed off
-> 
-> Changes v3 -> v4:
->   - rebase on master
->   - fix vendor prefixes for dts properties (suggested by Rob Herring)
->   - v3 was acked by Linus Walleij
-> 
-> Changes v2 -> v3:
->   - rebase on master
->   - fix typo (suggested by Rob Herring)
-> 
-> Changes v1 -> v2:
->   - rebase on master
->   - remove the simple-bus compatibility as the root node will now
->   populate child nodes (suggested by Rob Herring)
->   - use the ts vendor prefix for gpios (suggested by Rob Herring)
-> ---
->  Documentation/devicetree/bindings/bus/ts-nbus.txt | 50 +++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
+On Mon, Jul 17, 2017 at 2:37 PM, Abhishek Shah
+<abhishek.shah@broadcom.com> wrote:
+> Hi Jon,
+>
+>> This also will need to be added to
+>> drivers/net/ethernet/broadcom/bgmac-bcma.c.  Otherwise, the driver
+>> will no longer work for those platforms.  Since this was already
+>> accepted, please push out a fix ASAP.
+>>
+> I do not see how the bcma driver [bgmac-bcma.c] will no longer work.
+> The whole idea behind introducing this  BGMAC_FEAT_IDM_MASK bit
+> was to keep bcma driver's functionality intact.
+>
+> The BGMAC_FEAT_IDM_MASK bit is explicitly set by the bgmac-platform driver
+> and is unset inside the same if the idm register base is provided.
+>
+> For BCMA driver case, I do not touch BGMAC_FEAT_IDM_MASK bit, i.e. it
+> is *not* set.
+> And if it is not set, each idm operation done in bgmac.c will take place.
+> Please explain if I am missing something here.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Sorry, I had it flipped in my mind.  Please disregard.
+
+>
+>
+> Regards,
+> Abhishek
