@@ -1,49 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Jul 2017 11:22:09 +0200
-Subject: [PATCH 08/11] ARM: dts: sun8i: a83t: Add MMC controller device
- nodes
-In-Reply-To: <20170714064302.20383-9-wens@csie.org>
-References: <20170714064302.20383-1-wens@csie.org>
- <20170714064302.20383-9-wens@csie.org>
-Message-ID: <20170717092209.r55enf4ub7ttwpdy@flea>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Mon, 17 Jul 2017 10:27:44 +0100
+Subject: [PATCH] PCI: dwc: designware: test PCIE_ATU_ENABLE bit to check
+ enabled or not
+In-Reply-To: <20170713103527.1642-1-jszhang@marvell.com>
+References: <20170713103527.1642-1-jszhang@marvell.com>
+Message-ID: <1df044ef-1daf-0b60-da30-a6a45215f275@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Jul 14, 2017 at 02:42:59PM +0800, Chen-Yu Tsai wrote:
-> The A83T has 3 MMC controllers. The third one is a bit special, as it
-> supports a wider 8-bit bus, and a "new timing mode".
+?s 11:35 AM de 7/13/2017, Jisheng Zhang escreveu:
+> The ATU CTRL2 register is 32 bit, besides the enable bit, other bits
+> may also be set. To check whether the ATU is enabled or not, we should
+> test the enable it.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 57 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
+>  drivers/pci/dwc/pcie-designware.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index beed05e10a3b..085312d0c521 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -182,6 +182,63 @@
->  			#dma-cells = <1>;
->  		};
+> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+> index 0e03af279259..6bf0b409050a 100644
+> --- a/drivers/pci/dwc/pcie-designware.c
+> +++ b/drivers/pci/dwc/pcie-designware.c
+> @@ -177,7 +177,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>  	 */
+>  	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
+>  		val = dw_pcie_readl_dbi(pci, PCIE_ATU_CR2);
+> -		if (val == PCIE_ATU_ENABLE)
+> +		if (val & PCIE_ATU_ENABLE)
+>  			return;
 >  
-> +		mmc0: mmc at 1c0f000 {
-> +			compatible = "allwinner,sun7i-a20-mmc";
+>  		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> 
+Make sense, turn it more accurate. Thanks!
 
-Ideally, we should have an A83T compatible here too, just in case.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/43dbbfa9/attachment.sig>
+Acked-by: Joao Pinto <jpinto@synopsys.com>
