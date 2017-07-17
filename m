@@ -1,53 +1,46 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Mon, 17 Jul 2017 16:26:41 +0300
-Subject: [PATCH 2/7] staging: fsl-mc: use generic memory barriers
+Date: Mon, 17 Jul 2017 16:26:42 +0300
+Subject: [PATCH 3/7] staging: fsl-mc: drop useless gic v3 related #include
 In-Reply-To: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
 References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170717132646.3020-3-laurentiu.tudor@nxp.com>
+Message-ID: <20170717132646.3020-4-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-No need to use arch-specific memory barriers; switch to using generic
-ones. The rmb()s were useless so drop them.
+Nothing from linux/irqchip/arm-gic-v3.h is used, so the #include can be
+safely dropped.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/mc-sys.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/staging/fsl-mc/bus/fsl-mc-msi.c                | 1 -
+ drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
-index a1704c3..012abd5 100644
---- a/drivers/staging/fsl-mc/bus/mc-sys.c
-+++ b/drivers/staging/fsl-mc/bus/mc-sys.c
-@@ -127,7 +127,8 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
- 	/* copy command parameters into the portal */
- 	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
- 		__raw_writeq(cmd->params[i], &portal->params[i]);
--	__iowmb();
-+	/* ensure command params are committed before submitting it */
-+	wmb();
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
+index c04a2f2..ee6e3b7 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
+@@ -11,7 +11,6 @@
  
- 	/* submit the command by writing the header */
- 	__raw_writeq(cmd->header, &portal->header);
-@@ -150,9 +151,7 @@ static inline enum mc_cmd_status mc_read_response(struct mc_command __iomem *
- 	enum mc_cmd_status status;
+ #include <linux/of_device.h>
+ #include <linux/of_address.h>
+-#include <linux/irqchip/arm-gic-v3.h>
+ #include <linux/of_irq.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+index 865d385..e798ea4 100644
+--- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
++++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+@@ -11,7 +11,6 @@
  
- 	/* Copy command response header from MC portal: */
--	__iormb();
- 	resp->header = __raw_readq(&portal->header);
--	__iormb();
- 	status = mc_cmd_hdr_read_status(resp);
- 	if (status != MC_CMD_STATUS_OK)
- 		return status;
-@@ -160,7 +159,6 @@ static inline enum mc_cmd_status mc_read_response(struct mc_command __iomem *
- 	/* Copy command response data from MC portal: */
- 	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
- 		resp->params[i] = __raw_readq(&portal->params[i]);
--	__iormb();
- 
- 	return status;
- }
+ #include <linux/of_device.h>
+ #include <linux/of_address.h>
+-#include <linux/irqchip/arm-gic-v3.h>
+ #include <linux/irq.h>
+ #include <linux/msi.h>
+ #include <linux/of.h>
 -- 
 2.9.4
