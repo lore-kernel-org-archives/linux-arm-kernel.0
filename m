@@ -1,35 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Jul 2017 10:47:40 +0200
-Subject: [PATCH 04/18] drm/sun4i: Remove useless atomic_check
-In-Reply-To: <CAGb2v67=x+6tdKsKEkY2VS75H561zUfh55h2sNUcrCERr+z72A@mail.gmail.com>
-References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
- <effdc5f1e0fe485b141c057bb66f9dadf7433a88.1499955058.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67=x+6tdKsKEkY2VS75H561zUfh55h2sNUcrCERr+z72A@mail.gmail.com>
-Message-ID: <20170717084740.5bwzjevaxkedz7zp@flea>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 17 Jul 2017 09:33:52 +0100
+Subject: [PATCH net-next repost v2] dt-bindings: net: ravb : Add support for
+ r8a7743 SoC
+Message-ID: <1500280432-43162-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 11:15:18AM +0800, Chen-Yu Tsai wrote:
-> On Thu, Jul 13, 2017 at 10:12 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The atomic_check callback is optional, and we don't implement anything in
-> > some parts of our drivers. Let's remove it.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Add a new compatible string for the RZ/G1M (R8A7743) SoC.
 
-Applied, thanks!
-Maxime
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+---
+v1->v2
+* Changed the subject
+* re-formatted the required properties
 
+ .../devicetree/bindings/net/renesas,ravb.txt       | 29 +++++++++++++---------
+ 1 file changed, 17 insertions(+), 12 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+index b519503..4717bc2 100644
+--- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
++++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+@@ -4,19 +4,24 @@ This file provides information on what the device node for the Ethernet AVB
+ interface contains.
+ 
+ Required properties:
+-- compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
+-	      "renesas,etheravb-r8a7791" if the device is a part of R8A7791 SoC.
+-	      "renesas,etheravb-r8a7792" if the device is a part of R8A7792 SoC.
+-	      "renesas,etheravb-r8a7793" if the device is a part of R8A7793 SoC.
+-	      "renesas,etheravb-r8a7794" if the device is a part of R8A7794 SoC.
+-	      "renesas,etheravb-r8a7795" if the device is a part of R8A7795 SoC.
+-	      "renesas,etheravb-r8a7796" if the device is a part of R8A7796 SoC.
+-	      "renesas,etheravb-rcar-gen2" for generic R-Car Gen 2 compatible interface.
+-	      "renesas,etheravb-rcar-gen3" for generic R-Car Gen 3 compatible interface.
++- compatible: Must contain one or more of the following:
++      - "renesas,etheravb-r8a7743" for the R8A7743 SoC.
++      - "renesas,etheravb-r8a7790" for the R8A7790 SoC.
++      - "renesas,etheravb-r8a7791" for the R8A7791 SoC.
++      - "renesas,etheravb-r8a7792" for the R8A7792 SoC.
++      - "renesas,etheravb-r8a7793" for the R8A7793 SoC.
++      - "renesas,etheravb-r8a7794" for the R8A7794 SoC.
++      - "renesas,etheravb-rcar-gen2" as a fallback for the above
++		R-Car Gen2 and RZ/G1 devices.
+ 
+-	      When compatible with the generic version, nodes must list the
+-	      SoC-specific version corresponding to the platform first
+-	      followed by the generic version.
++      - "renesas,etheravb-r8a7795" for the R8A7795 SoC.
++      - "renesas,etheravb-r8a7796" for the R8A7796 SoC.
++      - "renesas,etheravb-rcar-gen3" as a fallback for the above
++		R-Car Gen3 devices.
++
++	When compatible with the generic version, nodes must list the
++	SoC-specific version corresponding to the platform first followed by
++	the generic version.
+ 
+ - reg: offset and length of (1) the register block and (2) the stream buffer.
+ - interrupts: A list of interrupt-specifiers, one for each entry in
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/9259ac6d/attachment.sig>
+1.9.1
