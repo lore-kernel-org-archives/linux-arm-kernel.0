@@ -1,43 +1,64 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 17 Jul 2017 13:19:11 +0200
-Subject: [RFC PATCH] ARM: dts: stm32: change pinctrl bindings definition
-In-Reply-To: <CAK8P3a2tfCjWyOGoatXGydVU21pfAxVf96JsRVgMHFpG5sCWeg@mail.gmail.com>
-References: <1500289258-3700-1-git-send-email-alexandre.torgue@st.com>
- <1500289258-3700-2-git-send-email-alexandre.torgue@st.com>
- <CAK8P3a2tfCjWyOGoatXGydVU21pfAxVf96JsRVgMHFpG5sCWeg@mail.gmail.com>
-Message-ID: <25cebb45-b770-c0b4-a478-13b01b5cfd0e@st.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 17 Jul 2017 13:19:59 +0200
+Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
+In-Reply-To: <20170717090516.GJ31807@n2100.armlinux.org.uk>
+References: <20170530142218.GS22219@n2100.armlinux.org.uk>
+ <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
+ <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
+ <20170609133822.GR4902@n2100.armlinux.org.uk>
+ <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
+ <20170609141056.GS4902@n2100.armlinux.org.uk>
+ <b46f25c1-45fd-2917-6559-218f6887a882@xs4all.nl>
+ <20170717090516.GJ31807@n2100.armlinux.org.uk>
+Message-ID: <99f8e543-1e6d-7638-0fb4-c648503d9a13@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On 07/17/2017 01:15 PM, Arnd Bergmann wrote:
-> On Mon, Jul 17, 2017 at 1:00 PM, Alexandre TORGUE
-> <alexandre.torgue@st.com> wrote:
->> blabla
+On 17/07/17 11:05, Russell King - ARM Linux wrote:
+> On Mon, Jul 17, 2017 at 10:56:47AM +0200, Hans Verkuil wrote:
+>> Hi Russell,
 >>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>> On 09/06/17 16:10, Russell King - ARM Linux wrote:
+>>> On Fri, Jun 09, 2017 at 03:56:39PM +0200, Neil Armstrong wrote:
+>>>> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is
+>>>> not used, but a custom one, so this notifier is actually useful for
+>>>> this platform and maybe others.
+>>>
+>>> Is the CEC controller configured into dw-hdmi (is the config bit set?)
+>>> I'm just wondering if we're going to end up with two CEC drivers trying
+>>> to bind to the same notifier.
+>>>
+>>>> Should we really wait until I push the Amlogic AO CEC driver ? Having a
+>>>> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
+>>>
+>>> It sounds like this adds additional information that has been missing
+>>> from the review of my patches - and I suspect changes Hans' comments.
+>>> So, I'll wait, it seems pointless to try and update the patches when
+>>> it's not clear how to proceed due to other dependencies, especially
+>>> when it means that their existing state is what's required (I'm pleased
+>>> that I've held off modifying the patches so far.)
+>>>
+>>> If that means having to wait another kernel revision, then I guess that's
+>>> what will have to happen.
+>>
+>> Can you respin your patch series, keeping the notifier support? The CEC
+>> kernel config handling has been cleaned up (just select CEC_CORE and
+>> CEC_NOTIFIER) so you should be good to go.
 > 
-> You may want to provide a little more detail here ;-)
+> Not yet - the change to the way you're dealing with Kconfig in CEC is
+> fundamentally broken, and needs fixing before we can merge dw-hdmi-cec
+> support.
 > 
-Oh!! Sorry, I changed it but no sent the good commit :).
-
-Please translate blablable by:
-
-Initially each pin was declared in 
-"include/dt-bindings/stm32f429-pinfunc.h"and each definition contained 
-SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
-Since this approach was approved, the number of supported MCU has
-increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a 
-new file in "include/dt-bindings" each time a new STM32 SOC arrives I 
-propose a new approach which consist to use a macro to define pin muxing 
-in device tree. All STM32 will use the common macro to define pinmux. 
-Furthermore, it will make easy maintenance and integration of new SOC.
-
-Regards
-Alex
-
-
-
->           Arnd
+> As a result of these Kconfig changes, dw-hdmi-cec now fails if:
+> 
+> 1. You build the CEC part as a module
+> 2. You build the HDMI part into the kernel
+> 
+> This results in CEC_NOTIFIER=y and CEC_CORE=m, which, when the HDMI part
+> gets built, results in the stubs in the notifier code being used, rather
+> than the real functions.  This in turn causes the CEC part to never
+> receive a physical address, which is therefore non-functional.
+> 
+> I did have a patch to fix this, but it was never committed, and I got
+> busy with other stuff (so it ended up being git reset --hard away.)
 > 
