@@ -1,46 +1,43 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Mon, 17 Jul 2017 09:59:14 +0100
-Subject: [RFC] PCI: dwc: designware: allow customize unroll registers'
- readl/writel
-In-Reply-To: <20170713185213.0b04a4fc@xhacker>
-References: <20170713184837.541ccf26@xhacker> <20170713185213.0b04a4fc@xhacker>
-Message-ID: <825636e2-f685-738e-46d9-bbc483e95606@synopsys.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Jul 2017 11:01:07 +0200
+Subject: [PATCH 01/18] regmap: mmio: Add function to attach a clock
+In-Reply-To: <20170713160142.2buaie6ebqbxunin@sirena.org.uk>
+References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <02f409ad80afed68e02660f161fc26d588a86fa7.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <20170713160142.2buaie6ebqbxunin@sirena.org.uk>
+Message-ID: <20170717090107.cpjxoxfqcc3qwabh@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+Hi Mark,
 
-?s 11:52 AM de 7/13/2017, Jisheng Zhang escreveu:
-> On Thu, 13 Jul 2017 18:48:37 +0800 Jisheng Zhang wrote:
+On Thu, Jul 13, 2017 at 05:01:42PM +0100, Mark Brown wrote:
+> On Thu, Jul 13, 2017 at 04:12:56PM +0200, Maxime Ripard wrote:
 > 
->> Hi Joao, Jingoo,
->>
->> Now, the PCIE_GET_ATU_OUTB_UNR_REG_OFFSET macro is defined as:
->>
->> /* Register address builder */
->> #define PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(region)        \
->>                         ((0x3 << 20) | ((region) << 9))
->>
->> I have one question: where does the (0x3 << 20) come from? 2MB space, a bit
-
-From, the PCIe Core 4.80 you have the new feature Unroll, which was developed
-for both iATU and DMA.
-To inform the Core that you want to access an Unroll register address, bits 20
-and 21 must be set, and thats where 0x3 comes from.
-
-If it is not clear please let me know.
-
+> > This might be problematic if the clock to enable is stored in another node.
+> > Let's add a function that allows to attach a clock that has already been
+> > retrieved to a regmap in order to fix this.
 > 
-> sorry, typo. (0x3 << 20) should be 3MB.
-> 
->> large. And I didn't find it in the databook. Is it platform specific?
->> If yes, I want to cook one patch to customize unroll registers' readl/writel.
->>
->> And how does (0x3 << 20) enable DBI2 access?
->>
->> Thanks in advance,
->> Jisheng
-> 
+> What is the use case for this?
 
-Thanks,
-Joao
+This is useful when the clock you want to be handled by the regmap is
+not described in the device node that probed the driver, but one of
+its subnode, or an another node entirely.
+
+We're in the latter case, where we have two controllers in the DT, but
+are driven by the same driver. We'll create two regmaps, but one will
+not have the proper of_node used to retrieve the clock.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/409cd274/attachment.sig>
