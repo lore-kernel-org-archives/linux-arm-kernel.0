@@ -1,56 +1,77 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Mon, 17 Jul 2017 19:07:00 -0400
-Subject: [PATCH] nvme: Acknowledge completion queue on each iteration
-In-Reply-To: <20170717225615.GB1496@localhost.localdomain>
-References: <1500330983-27501-1-git-send-email-okaya@codeaurora.org>
- <20170717224551.GA1496@localhost.localdomain>
- <6d10032c-35ec-978c-6b8f-1ab9c07adf7f@codeaurora.org>
- <20170717225615.GB1496@localhost.localdomain>
-Message-ID: <79413407294645f0e1252112c3435a29@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 18 Jul 2017 01:24:54 +0200
+Subject: [PATCH v3] PM / suspend: Export pm_suspend_target_state
+In-Reply-To: <20170717221059.6523-1-f.fainelli@gmail.com>
+References: <20170716023610.4658-1-f.fainelli@gmail.com>
+ <20170717221059.6523-1-f.fainelli@gmail.com>
+Message-ID: <3384121.PEd7U8K5ps@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-07-17 18:56, Keith Busch wrote:
-> On Mon, Jul 17, 2017 at 06:46:11PM -0400, Sinan Kaya wrote:
->> Hi Keith,
->> 
->> On 7/17/2017 6:45 PM, Keith Busch wrote:
->> > On Mon, Jul 17, 2017 at 06:36:23PM -0400, Sinan Kaya wrote:
->> >> Code is moving the completion queue doorbell after processing all completed
->> >> events and sending callbacks to the block layer on each iteration.
->> >>
->> >> This is causing a performance drop when a lot of jobs are queued towards
->> >> the HW. Move the completion queue doorbell on each loop instead and allow new
->> >> jobs to be queued by the HW.
->> >
->> > That doesn't make sense. Aggregating doorbell writes should be much more
->> > efficient for high depth workloads.
->> >
->> 
->> Problem is that code is throttling the HW as HW cannot queue more 
->> completions until
->> SW get a chance to clear it.
->> 
->> As an example:
->> 
->> for each in N
->> (
->> 	blk_layer()
->> )
->> ring door bell
->> 
->> HW cannot queue new job until N x blk_layer operations are processed 
->> and queue
->> element ownership is passed to the HW after the loop. HW is just 
->> sitting idle
->> there if no queue entries are available.
+On Monday, July 17, 2017 03:10:59 PM Florian Fainelli wrote:
+> Have the core suspend/resume framework store the system-wide suspend
+> state (suspend_state_t) we are about to enter, and expose it to drivers
+> via pm_suspend_target_state in order to retrieve that. The state is
+> assigned in suspend_devices_and_enter().
 > 
-> If no completion queue entries are available, then there can't possibly
-> be any submission queue entries for the HW to work on either.
+> This is useful for platform specific drivers that may need to take a
+> slightly different suspend/resume path based on the system's
+> suspend/resume state being entered.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+> Changes in v3:
+> 
+> - just export pm_suspend_target_state without a helper function
+> 
+> Changes in v2:
+> 
+> - rename platform_suspend_target_state() -> suspend_target_state()
+> - directly export the suspend_state_t value and assign it in
+>   suspend_devices_and_enter()
+> 
+>  include/linux/suspend.h | 1 +
+>  kernel/power/suspend.c  | 4 ++++
+>  2 files changed, 5 insertions(+)
+> 
+> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+> index 0b1cf32edfd7..2159f6841768 100644
+> --- a/include/linux/suspend.h
+> +++ b/include/linux/suspend.h
+> @@ -427,6 +427,7 @@ extern int unregister_pm_notifier(struct notifier_block *nb);
+>  /* drivers/base/power/wakeup.c */
+>  extern bool events_check_enabled;
+>  extern unsigned int pm_wakeup_irq;
+> +extern suspend_state_t pm_suspend_target_state;
+>  
+>  extern bool pm_wakeup_pending(void);
+>  extern void pm_system_wakeup(void);
+> diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
+> index 3ecf275d7e44..1aecdaf22ab5 100644
+> --- a/kernel/power/suspend.c
+> +++ b/kernel/power/suspend.c
+> @@ -47,6 +47,8 @@ const char *mem_sleep_states[PM_SUSPEND_MAX];
+>  
+>  suspend_state_t mem_sleep_current = PM_SUSPEND_FREEZE;
+>  static suspend_state_t mem_sleep_default = PM_SUSPEND_MEM;
+> +suspend_state_t pm_suspend_target_state;
+> +EXPORT_SYMBOL_GPL(pm_suspend_target_state);
+>  
+>  unsigned int pm_suspend_global_flags;
+>  EXPORT_SYMBOL_GPL(pm_suspend_global_flags);
+> @@ -456,6 +458,8 @@ int suspend_devices_and_enter(suspend_state_t state)
+>  	if (!sleep_state_supported(state))
+>  		return -ENOSYS;
+>  
+> +	pm_suspend_target_state = state;
+> +
+>  	error = platform_suspend_begin(state);
+>  	if (error)
+>  		goto Close;
+> 
 
-Maybe, I need to understand the design better. I was curious why 
-completion and submission queues were protected by a single lock causing 
-lock contention.
+And please clear pm_suspend_target_state before returning from
+suspend_devices_and_enter().
 
-I was treating each queue independently. I have seen slightly better 
-performance by an early doorbell. That was my explanation.
+Thanks,
+Rafael
