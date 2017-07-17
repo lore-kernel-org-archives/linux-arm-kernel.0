@@ -1,39 +1,28 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Mon, 17 Jul 2017 10:27:44 +0100
-Subject: [PATCH] PCI: dwc: designware: test PCIE_ATU_ENABLE bit to check
- enabled or not
-In-Reply-To: <20170713103527.1642-1-jszhang@marvell.com>
-References: <20170713103527.1642-1-jszhang@marvell.com>
-Message-ID: <1df044ef-1daf-0b60-da30-a6a45215f275@synopsys.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 17 Jul 2017 11:15:38 +0200
+Subject: [PATCH v2] ARM: dts: at91: sama5d2_xplained: use pin macros
+ instead of numbers
+In-Reply-To: <20170710061205.12921-1-ludovic.desroches@microchip.com>
+References: <201707090720.uyYcbj17%fengguang.wu@intel.com>
+ <20170710061205.12921-1-ludovic.desroches@microchip.com>
+Message-ID: <20170717091538.dacforjesplevsa4@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-?s 11:35 AM de 7/13/2017, Jisheng Zhang escreveu:
-> The ATU CTRL2 register is 32 bit, besides the enable bit, other bits
-> may also be set. To check whether the ATU is enabled or not, we should
-> test the enable it.
+On 10/07/2017 at 08:12:05 +0200, Ludovic Desroches wrote:
+> Use pin macros instead of magic numbers to ease interpretation.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 > ---
->  drivers/pci/dwc/pcie-designware.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-> index 0e03af279259..6bf0b409050a 100644
-> --- a/drivers/pci/dwc/pcie-designware.c
-> +++ b/drivers/pci/dwc/pcie-designware.c
-> @@ -177,7 +177,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
->  	 */
->  	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
->  		val = dw_pcie_readl_dbi(pci, PCIE_ATU_CR2);
-> -		if (val == PCIE_ATU_ENABLE)
-> +		if (val & PCIE_ATU_ENABLE)
->  			return;
->  
->  		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> I have remove the unexpected brace removal from the first version of this patch.
 > 
-Make sense, turn it more accurate. Thanks!
+>  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 23 ++++++++++++-----------
+>  1 file changed, 12 insertions(+), 11 deletions(-)
+> 
+Applied, thanks.
 
-Acked-by: Joao Pinto <jpinto@synopsys.com>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
