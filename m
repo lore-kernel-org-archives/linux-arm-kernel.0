@@ -1,66 +1,54 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 17 Jul 2017 07:48:07 +0200
-Subject: [PATCH 1/3] ARM: s3c24xx: Remove non-existing CONFIG_CPU_S3C2413
-Message-ID: <1500270489-14749-1-git-send-email-krzk@kernel.org>
+Date: Mon, 17 Jul 2017 07:48:09 +0200
+Subject: [PATCH 3/3] ARM: s3c24xx: Do not confuse local define with Kconfig
+In-Reply-To: <1500270489-14749-1-git-send-email-krzk@kernel.org>
+References: <1500270489-14749-1-git-send-email-krzk@kernel.org>
+Message-ID: <1500270489-14749-3-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no CONFIG_CPU_S3C2413 so get rid of it.
+Drop CONFIG_ prefix from a local DEBUG_RESUME define guarding some
+debugging code to avoid any confusion with Kconfig options.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/mach-s3c24xx/common.c                  | 2 +-
- arch/arm/mach-s3c24xx/include/mach/regs-clock.h | 4 ++--
- arch/arm/plat-samsung/include/plat/map-s3c.h    | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-s3c24xx/sleep.S | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-index b59f4f4f256f..5b6b94ef41e2 100644
---- a/arch/arm/mach-s3c24xx/common.c
-+++ b/arch/arm/mach-s3c24xx/common.c
-@@ -173,7 +173,7 @@ static unsigned long s3c24xx_read_idcode_v5(void)
- 		return gs;
+diff --git a/arch/arm/mach-s3c24xx/sleep.S b/arch/arm/mach-s3c24xx/sleep.S
+index d833d616bd2e..b859268fa8da 100644
+--- a/arch/arm/mach-s3c24xx/sleep.S
++++ b/arch/arm/mach-s3c24xx/sleep.S
+@@ -33,10 +33,11 @@
+ #include <mach/regs-gpio.h>
+ #include <mach/regs-clock.h>
+ 
+-/* CONFIG_DEBUG_RESUME is dangerous if your bootloader does not
++/*
++ * S3C24XX_DEBUG_RESUME is dangerous if your bootloader does not
+  * reset the UART configuration, only enable if you really need this!
+-*/
+-//#define CONFIG_DEBUG_RESUME
++ */
++//#define S3C24XX_DEBUG_RESUME
+ 
+ 	.text
+ 
+@@ -71,13 +72,13 @@ ENTRY(s3c_cpu_resume)
+ 	str	r12, [ r14, #0x54 ]
  #endif
  
--#if defined(CONFIG_CPU_S3C2412) || defined(CONFIG_CPU_S3C2413)
-+#if defined(CONFIG_CPU_S3C2412)
- 	return __raw_readl(S3C2412_GSTATUS1);
- #else
- 	return 1UL;	/* don't look like an 2400 */
-diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-clock.h b/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
-index 3db6c10de023..ae4a3e0f3ba2 100644
---- a/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
-+++ b/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
-@@ -77,7 +77,7 @@
+-#ifdef CONFIG_DEBUG_RESUME
++#ifdef S3C24XX_DEBUG_RESUME
+ 	mov	r3, #'L'
+ 	strb	r3, [ r2, #S3C2410_UTXH ]
+ 1001:
+ 	ldrb	r14, [ r3, #S3C2410_UTRSTAT ]
+ 	tst	r14, #S3C2410_UTRSTAT_TXE
+ 	beq	1001b
+-#endif /* CONFIG_DEBUG_RESUME */
++#endif /* S3C24XX_DEBUG_RESUME */
  
- #endif /* CONFIG_CPU_S3C2440 or CONFIG_CPU_S3C2442 */
- 
--#if defined(CONFIG_CPU_S3C2412) || defined(CONFIG_CPU_S3C2413)
-+#if defined(CONFIG_CPU_S3C2412)
- 
- #define S3C2412_OSCSET		S3C2410_CLKREG(0x18)
- #define S3C2412_CLKSRC		S3C2410_CLKREG(0x1C)
-@@ -141,7 +141,7 @@
- #define S3C2412_CLKSRC_UREFCLK_EXTCLK	(1<<12)
- #define S3C2412_CLKSRC_EREFCLK_EXTCLK	(1<<14)
- 
--#endif /* CONFIG_CPU_S3C2412 | CONFIG_CPU_S3C2413 */
-+#endif /* CONFIG_CPU_S3C2412 */
- 
- #define S3C2416_CLKDIV2		S3C2410_CLKREG(0x28)
- 
-diff --git a/arch/arm/plat-samsung/include/plat/map-s3c.h b/arch/arm/plat-samsung/include/plat/map-s3c.h
-index 6feedd47d875..33104911862e 100644
---- a/arch/arm/plat-samsung/include/plat/map-s3c.h
-+++ b/arch/arm/plat-samsung/include/plat/map-s3c.h
-@@ -61,7 +61,7 @@
- 
- /* deal with the registers that move under the 2412/2413 */
- 
--#if defined(CONFIG_CPU_S3C2412) || defined(CONFIG_CPU_S3C2413)
-+#if defined(CONFIG_CPU_S3C2412)
- #ifndef __ASSEMBLY__
- extern void __iomem *s3c24xx_va_gpio2;
- #endif
+ 	b	cpu_resume
 -- 
 2.7.4
