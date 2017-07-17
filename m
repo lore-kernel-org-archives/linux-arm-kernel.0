@@ -1,59 +1,271 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 17 Jul 2017 15:35:25 +0100
-Subject: [PATCH] mfd: ab8500-core: constify attribute_group structures.
-In-Reply-To: <82391b6661b206976c244dcef76946c45c6aac2d.1499664942.git.arvind.yadav.cs@gmail.com>
-References: <82391b6661b206976c244dcef76946c45c6aac2d.1499664942.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170717143525.iyv2nmjflzattir3@dell>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Mon, 17 Jul 2017 16:44:15 +0200
+Subject: [PATCH] tee: add kernel internal client interface
+Message-ID: <1500302655-4909-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jul 2017, Arvind Yadav wrote:
+Adds a kernel internal TEE client interface to be used by other drivers.
 
-> attribute_groups are not supposed to change at runtime. All functions
-> working with attribute_groups provided by <linux/sysfs.h> work with const
-> attribute_group. So mark the non-const structs as const.
-> 
-> File size before:
->    text	   data	    bss	    dec	    hex	filename
->   16298	   1009	    184	  17491	   4453	drivers/mfd/ab8500-core.o
-> 
-> File size After adding 'const':
->    text	   data	    bss	    dec	    hex	filename
->   16490	    817	    184	  17491	   4453	drivers/mfd/ab8500-core.o
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/mfd/ab8500-core.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ drivers/tee/tee_core.c  | 124 +++++++++++++++++++++++++++++++++++++++++++-----
+ include/linux/tee_drv.h |  73 ++++++++++++++++++++++++++++
+ 2 files changed, 186 insertions(+), 11 deletions(-)
 
-Applied, thanks.
-
-> diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-> index 8511c06..30d09d1 100644
-> --- a/drivers/mfd/ab8500-core.c
-> +++ b/drivers/mfd/ab8500-core.c
-> @@ -1059,15 +1059,15 @@ static DEVICE_ATTR(dbbrstn, S_IRUGO | S_IWUSR,
->  	NULL,
->  };
->  
-> -static struct attribute_group ab8500_attr_group = {
-> +static const struct attribute_group ab8500_attr_group = {
->  	.attrs	= ab8500_sysfs_entries,
->  };
->  
-> -static struct attribute_group ab8505_attr_group = {
-> +static const struct attribute_group ab8505_attr_group = {
->  	.attrs	= ab8505_sysfs_entries,
->  };
->  
-> -static struct attribute_group ab9540_attr_group = {
-> +static const struct attribute_group ab9540_attr_group = {
->  	.attrs	= ab9540_sysfs_entries,
->  };
->  
-
+diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+index 58a5009eacc3..bcc39e263bdd 100644
+--- a/drivers/tee/tee_core.c
++++ b/drivers/tee/tee_core.c
+@@ -38,15 +38,13 @@ static DEFINE_SPINLOCK(driver_lock);
+ static struct class *tee_class;
+ static dev_t tee_devt;
+ 
+-static int tee_open(struct inode *inode, struct file *filp)
++static struct tee_context *teedev_open(struct tee_device *teedev)
+ {
+ 	int rc;
+-	struct tee_device *teedev;
+ 	struct tee_context *ctx;
+ 
+-	teedev = container_of(inode->i_cdev, struct tee_device, cdev);
+ 	if (!tee_device_get(teedev))
+-		return -EINVAL;
++		return ERR_PTR(-EINVAL);
+ 
+ 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+ 	if (!ctx) {
+@@ -56,22 +54,20 @@ static int tee_open(struct inode *inode, struct file *filp)
+ 
+ 	ctx->teedev = teedev;
+ 	INIT_LIST_HEAD(&ctx->list_shm);
+-	filp->private_data = ctx;
+ 	rc = teedev->desc->ops->open(ctx);
+ 	if (rc)
+ 		goto err;
+ 
+-	return 0;
++	return ctx;
+ err:
+ 	kfree(ctx);
+ 	tee_device_put(teedev);
+-	return rc;
++	return ERR_PTR(rc);
++
+ }
+ 
+-static int tee_release(struct inode *inode, struct file *filp)
++static void teedev_close_context(struct tee_context *ctx)
+ {
+-	struct tee_context *ctx = filp->private_data;
+-	struct tee_device *teedev = ctx->teedev;
+ 	struct tee_shm *shm;
+ 
+ 	ctx->teedev->desc->ops->release(ctx);
+@@ -79,8 +75,25 @@ static int tee_release(struct inode *inode, struct file *filp)
+ 	list_for_each_entry(shm, &ctx->list_shm, link)
+ 		shm->ctx = NULL;
+ 	mutex_unlock(&ctx->teedev->mutex);
++	tee_device_put(ctx->teedev);
+ 	kfree(ctx);
+-	tee_device_put(teedev);
++}
++
++static int tee_open(struct inode *inode, struct file *filp)
++{
++	struct tee_context *ctx;
++
++	ctx = teedev_open(container_of(inode->i_cdev, struct tee_device, cdev));
++	if (IS_ERR(ctx))
++		return PTR_ERR(ctx);
++
++	filp->private_data = ctx;
++	return 0;
++}
++
++static int tee_release(struct inode *inode, struct file *filp)
++{
++	teedev_close_context(filp->private_data);
+ 	return 0;
+ }
+ 
+@@ -862,6 +875,95 @@ void *tee_get_drvdata(struct tee_device *teedev)
+ }
+ EXPORT_SYMBOL_GPL(tee_get_drvdata);
+ 
++struct match_dev_data {
++	struct tee_ioctl_version_data *vers;
++	const void *data;
++	int (*match)(struct tee_ioctl_version_data *, const void *);
++};
++
++static int match_dev(struct device *dev, const void *data)
++{
++	const struct match_dev_data *match_data = data;
++	struct tee_device *teedev = container_of(dev, struct tee_device, dev);
++
++	teedev->desc->ops->get_version(teedev, match_data->vers);
++	return match_data->match(match_data->vers, match_data->data);
++}
++
++struct tee_context *
++tee_client_open_context(struct tee_context *start,
++			int (*match)(struct tee_ioctl_version_data *,
++				     const void *),
++			const void *data, struct tee_ioctl_version_data *vers)
++{
++	struct device *dev = NULL;
++	struct device *put_dev = NULL;
++	struct tee_context *ctx = NULL;
++	struct tee_ioctl_version_data v;
++	struct match_dev_data match_data = { vers ? vers : &v, data, match };
++
++	if (start)
++		dev = &start->teedev->dev;
++
++	do {
++		dev = class_find_device(tee_class, dev, &match_data, match_dev);
++		if (!dev) {
++			ctx = ERR_PTR(-ENOENT);
++			break;
++		}
++
++		put_device(put_dev);
++		put_dev = dev;
++
++		ctx = teedev_open(container_of(dev, struct tee_device, dev));
++	} while (IS_ERR(ctx) && PTR_ERR(ctx) != -ENOMEM);
++
++	put_device(put_dev);
++	return ctx;
++}
++EXPORT_SYMBOL_GPL(tee_client_open_context);
++
++void tee_client_close_context(struct tee_context *ctx)
++{
++	teedev_close_context(ctx);
++}
++EXPORT_SYMBOL_GPL(tee_client_close_context);
++
++void tee_client_get_version(struct tee_context *ctx,
++			    struct tee_ioctl_version_data *vers)
++{
++	ctx->teedev->desc->ops->get_version(ctx->teedev, vers);
++}
++EXPORT_SYMBOL_GPL(tee_client_get_version);
++
++int tee_client_open_session(struct tee_context *ctx,
++			    struct tee_ioctl_open_session_arg *arg,
++			    struct tee_param *param)
++{
++	if (!ctx->teedev->desc->ops->open_session)
++		return -EINVAL;
++	return ctx->teedev->desc->ops->open_session(ctx, arg, param);
++}
++EXPORT_SYMBOL_GPL(tee_client_open_session);
++
++int tee_client_close_session(struct tee_context *ctx, u32 session)
++{
++	if (!ctx->teedev->desc->ops->close_session)
++		return -EINVAL;
++	return ctx->teedev->desc->ops->close_session(ctx, session);
++}
++EXPORT_SYMBOL_GPL(tee_client_close_session);
++
++int tee_client_invoke_func(struct tee_context *ctx,
++			   struct tee_ioctl_invoke_arg *arg,
++			   struct tee_param *param)
++{
++	if (!ctx->teedev->desc->ops->invoke_func)
++		return -EINVAL;
++	return ctx->teedev->desc->ops->invoke_func(ctx, arg, param);
++}
++EXPORT_SYMBOL_GPL(tee_client_invoke_func);
++
+ static int __init tee_init(void)
+ {
+ 	int rc;
+diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+index 0f175b8f6456..39440c7c7558 100644
+--- a/include/linux/tee_drv.h
++++ b/include/linux/tee_drv.h
+@@ -274,4 +274,77 @@ int tee_shm_get_id(struct tee_shm *shm);
+  */
+ struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
+ 
++/**
++ * tee_client_open_context() - Open a TEE context
++ * @start:	if not NULL, continue search after this context
++ * @match:	function to check TEE device
++ * @data:	data for match function
++ * @vers:	if not NULL, version data of TEE device of the context returned
++ *
++ * This function does an operation similar to open("/dev/teeX") in user space.
++ * A returned context must be released with tee_client_close_context().
++ *
++ * Returns a TEE context of the first TEE device matched by the match()
++ * callback or an ERR_PTR.
++ */
++struct tee_context *
++tee_client_open_context(struct tee_context *start,
++			int (*match)(struct tee_ioctl_version_data *,
++				     const void *),
++			const void *data, struct tee_ioctl_version_data *vers);
++
++/**
++ * tee_client_close_context() - Close a TEE context
++ * @ctx:	TEE context to close
++ *
++ * Note that all sessions previously opened with this context will be
++ * closed when this function is called.
++ */
++void tee_client_close_context(struct tee_context *ctx);
++
++/**
++ * tee_client_get_version() - Query version of TEE
++ * @ctx:	TEE context to TEE to query
++ * @vers:	Pointer to version data
++ */
++void tee_client_get_version(struct tee_context *ctx,
++			    struct tee_ioctl_version_data *vers);
++
++/**
++ * tee_client_open_session() - Open a session to a Trusted Application
++ * @ctx:	TEE context
++ * @arg:	Open session arguments, see description of
++ *		struct tee_ioctl_open_session_arg
++ * @param:	Parameters passed to the Trusted Application
++ *
++ * Returns < 0 on error else see @arg->ret for result. If @arg->ret
++ * is TEEC_SUCCESS the session identifier is available in @arg->session.
++ */
++int tee_client_open_session(struct tee_context *ctx,
++			    struct tee_ioctl_open_session_arg *arg,
++			    struct tee_param *param);
++
++/**
++ * tee_client_close_session() - Close a session to a Trusted Application
++ * @ctx:	TEE Context
++ * @session:	Session id
++ *
++ * Return < 0 on error else 0, regardless the session will not be
++ * valid after this function has returned.
++ */
++int tee_client_close_session(struct tee_context *ctx, u32 session);
++
++/**
++ * tee_client_invoke_func() - Invoke a function in a Trusted Application
++ * @ctx:	TEE Context
++ * @arg:	Invoke arguments, see description of
++ *		struct tee_ioctl_invoke_arg
++ * @param:	Parameters passed to the Trusted Application
++ *
++ * Returns < 0 on error else see @arg->ret for result.
++ */
++int tee_client_invoke_func(struct tee_context *ctx,
++			   struct tee_ioctl_invoke_arg *arg,
++			   struct tee_param *param);
++
+ #endif /*__TEE_DRV_H*/
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
