@@ -1,36 +1,36 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 17 Jul 2017 18:37:16 +0200
-Subject: [PATCH 1/6] ARM: multi_v7_defconfig: Cleanup from non-existing
- options
-In-Reply-To: <CAMuHMdUnFCUKQdEcyFiKzVgkL5__ZLRMudCvkRxp6cBXgV6g=g@mail.gmail.com>
-References: <1500270596-22384-1-git-send-email-krzk@kernel.org>
- <CAMuHMdUnFCUKQdEcyFiKzVgkL5__ZLRMudCvkRxp6cBXgV6g=g@mail.gmail.com>
-Message-ID: <20170717163716.GB2346@kozik-book>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 17 Jul 2017 11:51:52 -0500
+Subject: [PATCH v2] watchdog: meson-wdt: add support for the watchdog on
+ Meson8 and Meson8m2
+In-Reply-To: <20170711221438.8958-1-martin.blumenstingl@googlemail.com>
+References: <20170711221438.8958-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170717165152.xv2kq2lqgi3jtobm@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 09:28:09AM +0200, Geert Uytterhoeven wrote:
-> Hi Krzysztof,
+On Wed, Jul 12, 2017 at 12:14:38AM +0200, Martin Blumenstingl wrote:
+> The watchdog IP block on Meson8 and Meson8m2 is already supported by the
+> existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
+> while the newer Meson8m2 SoC uses the same register bits as Meson8b.
 > 
-> On Mon, Jul 17, 2017 at 7:49 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > Remove options which do not exist anymore:
+> Currently watchdog support on Meson8 SoC already works because
+> meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
+> separate compatible for Meson8 makes this more explicit though.
 > 
-> <snip>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+> Changes since v1 at [0]:
+> - updated the documentation to indicate that Meson8 should also specify
+>   the Meson6 compatible and that Meson8m2 should also specify the
+>   Meson8b compatible
 > 
-> >  - DRM_RCAR_HDMI was merged to generic DRM bridge and is obsolete since
-> >    commit 5c602531feb3 ("drm: rcar-du: Replace manual bridge
-> >    implementation with DRM bridge");
-> >
-> >  - SND_SOC_RSRC_CARD was replaced by SND_SIMPLE_SCU_CARD in commit
-> >    d12c6216c4a5 ("ASoC: rsrc-card: rename rsrc-card to simple-scu-card
-> >    phase3");
+> [0] https://patchwork.kernel.org/patch/9780093/
 > 
-> These have already be fixed in the defconfig-for-v4.14 branch Simon Horman's
-> tree (git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git).
-> They're not yet in -next as v4.13-rc1 wasn't released at that time, and
-> Simon is noew on holidays.
+> 
+>  Documentation/devicetree/bindings/watchdog/meson-wdt.txt | 6 +++++-
+>  drivers/watchdog/meson_wdt.c                             | 2 ++
+>  2 files changed, 7 insertions(+), 1 deletion(-)
 
-I'll rebase then on top of his branch.
-
-Best regards,
-Krzysztof
+Acked-by: Rob Herring <robh@kernel.org>
