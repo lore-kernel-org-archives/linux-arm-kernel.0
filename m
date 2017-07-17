@@ -1,35 +1,36 @@
 From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Sun, 16 Jul 2017 23:01:16 -0500
-Subject: [PATCH] stm32-dcmi: constify vb2_ops structure
-In-Reply-To: <d6b36309-2152-a55e-f160-ed43fdc3791c@st.com>
-References: <20170706200517.GA5886@embeddedgus>
- <d6b36309-2152-a55e-f160-ed43fdc3791c@st.com>
-Message-ID: <52e9bcd7-6a85-4200-4418-83e3de547643@embeddedor.com>
+Date: Sun, 16 Jul 2017 23:03:50 -0500
+Subject: [PATCH] watchdog: coh901327_wdt: constify watchdog_ops structure
+In-Reply-To: <031cf1ab-7f1b-4e4d-adaf-efa6c3af8040@roeck-us.net>
+References: <20170708003330.GA15374@embeddedgus>
+ <031cf1ab-7f1b-4e4d-adaf-efa6c3af8040@roeck-us.net>
+Message-ID: <72fb7a2e-f075-57b0-72e2-6c16205eaf4e@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 07/07/2017 09:33 AM, Hugues FRUCHET wrote:
-> Acked-by: Hugues Fruchet <hugues.fruchet@st.com>
 
-Thank you, Hugues.
-
-> On 07/06/2017 10:05 PM, Gustavo A. R. Silva wrote:
->> Check for vb2_ops structures that are only stored in the ops field of a
->> vb2_queue structure. That field is declared const, so vb2_ops structures
->> that have this property can be declared as const also.
+On 07/07/2017 08:45 PM, Guenter Roeck wrote:
+> On 07/07/2017 05:33 PM, Gustavo A. R. Silva wrote:
+>> Check for watchdog_ops structures that are only stored in the ops 
+>> field of
+>> a watchdog_device structure. This field is declared const, so 
+>> watchdog_ops
+>> structures that have this property can be declared as const also.
 >>
->> This issue was detected using Coccinelle and the following semantic patch:
+>> This issue was detected using Coccinelle and the following semantic 
+>> patch:
 >>
->> @r disable optional_qualifier@
+>> @r
+>> disable optional_qualifier@
 >> identifier i;
 >> position p;
 >> @@
->> static struct vb2_ops i at p = { ... };
+>> static struct watchdog_ops i at p = { ... };
 >>
 >> @ok@
 >> identifier r.i;
->> struct vb2_queue e;
+>> struct watchdog_device e;
 >> position p;
 >> @@
 >> e.ops = &i at p;
@@ -37,7 +38,7 @@ Thank you, Hugues.
 >> @bad@
 >> position p != {r.p,ok.p};
 >> identifier r.i;
->> struct vb2_ops e;
+>> struct watchdog_ops e;
 >> @@
 >> e at i@p
 >>
@@ -46,26 +47,35 @@ Thank you, Hugues.
 >> @@
 >> static
 >> +const
->> struct vb2_ops i = { ... };
+>>   struct watchdog_ops i = { ... };
 >>
 >> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>
+
+Thank you, Guenter.
+
 >> ---
->>    drivers/media/platform/stm32/stm32-dcmi.c | 2 +-
->>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>   drivers/watchdog/coh901327_wdt.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
->> index 83d32a5..24ef888 100644
->> --- a/drivers/media/platform/stm32/stm32-dcmi.c
->> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
->> @@ -662,7 +662,7 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
->>    		dcmi->errors_count, dcmi->buffers_count);
->>    }
->>    
->> -static struct vb2_ops dcmi_video_qops = {
->> +static const struct vb2_ops dcmi_video_qops = {
->>    	.queue_setup		= dcmi_queue_setup,
->>    	.buf_init		= dcmi_buf_init,
->>    	.buf_prepare		= dcmi_buf_prepare,
+>> diff --git a/drivers/watchdog/coh901327_wdt.c 
+>> b/drivers/watchdog/coh901327_wdt.c
+>> index 38dd60f0..4410337 100644
+>> --- a/drivers/watchdog/coh901327_wdt.c
+>> +++ b/drivers/watchdog/coh901327_wdt.c
+>> @@ -218,7 +218,7 @@ static const struct watchdog_info coh901327_ident 
+>> = {
+>>       .identity = DRV_NAME,
+>>   };
+>>   -static struct watchdog_ops coh901327_ops = {
+>> +static const struct watchdog_ops coh901327_ops = {
+>>       .owner = THIS_MODULE,
+>>       .start = coh901327_start,
+>>       .stop = coh901327_stop,
+>>
+>
 
 -- 
 Gustavo A. R. Silva
