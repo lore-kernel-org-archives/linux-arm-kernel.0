@@ -1,64 +1,49 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 17 Jul 2017 13:19:59 +0200
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <20170717090516.GJ31807@n2100.armlinux.org.uk>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
- <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
- <20170609133822.GR4902@n2100.armlinux.org.uk>
- <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
- <20170609141056.GS4902@n2100.armlinux.org.uk>
- <b46f25c1-45fd-2917-6559-218f6887a882@xs4all.nl>
- <20170717090516.GJ31807@n2100.armlinux.org.uk>
-Message-ID: <99f8e543-1e6d-7638-0fb4-c648503d9a13@xs4all.nl>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Mon, 17 Jul 2017 16:42:39 +0530
+Subject: [Patch v5 05/12] [media] videodev2.h: Add v4l2 definition for HEVC
+In-Reply-To: <12b890e0-b955-4d64-6b6b-2847f693ee57@linaro.org>
+References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170619052505epcas5p33a78ee709263cc9ae33cd9383794ca06@epcas5p3.samsung.com>
+ <1497849055-26583-6-git-send-email-smitha.t@samsung.com>
+ <12b890e0-b955-4d64-6b6b-2847f693ee57@linaro.org>
+Message-ID: <1500289959.16819.0.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/17 11:05, Russell King - ARM Linux wrote:
-> On Mon, Jul 17, 2017 at 10:56:47AM +0200, Hans Verkuil wrote:
->> Hi Russell,
->>
->> On 09/06/17 16:10, Russell King - ARM Linux wrote:
->>> On Fri, Jun 09, 2017 at 03:56:39PM +0200, Neil Armstrong wrote:
->>>> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is
->>>> not used, but a custom one, so this notifier is actually useful for
->>>> this platform and maybe others.
->>>
->>> Is the CEC controller configured into dw-hdmi (is the config bit set?)
->>> I'm just wondering if we're going to end up with two CEC drivers trying
->>> to bind to the same notifier.
->>>
->>>> Should we really wait until I push the Amlogic AO CEC driver ? Having a
->>>> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
->>>
->>> It sounds like this adds additional information that has been missing
->>> from the review of my patches - and I suspect changes Hans' comments.
->>> So, I'll wait, it seems pointless to try and update the patches when
->>> it's not clear how to proceed due to other dependencies, especially
->>> when it means that their existing state is what's required (I'm pleased
->>> that I've held off modifying the patches so far.)
->>>
->>> If that means having to wait another kernel revision, then I guess that's
->>> what will have to happen.
->>
->> Can you respin your patch series, keeping the notifier support? The CEC
->> kernel config handling has been cleaned up (just select CEC_CORE and
->> CEC_NOTIFIER) so you should be good to go.
+On Fri, 2017-07-07 at 17:56 +0300, Stanimir Varbanov wrote:
+> Hi Smitha,
 > 
-> Not yet - the change to the way you're dealing with Kconfig in CEC is
-> fundamentally broken, and needs fixing before we can merge dw-hdmi-cec
-> support.
+> On 06/19/2017 08:10 AM, Smitha T Murthy wrote:
+> > Add V4L2 definition for HEVC compressed format
+> > 
+> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> > ---
+> >  include/uapi/linux/videodev2.h | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> > index 2b8feb8..488de3d 100644
+> > --- a/include/uapi/linux/videodev2.h
+> > +++ b/include/uapi/linux/videodev2.h
+> > @@ -629,6 +629,7 @@ struct v4l2_pix_format {
+> >  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
+> >  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
+> >  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
+> > +#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC */
+> >  
+> >  /*  Vendor-specific formats   */
+> >  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
+> > 
 > 
-> As a result of these Kconfig changes, dw-hdmi-cec now fails if:
+> Hans wanted the name to be H265, not sure is that valid yet.
 > 
-> 1. You build the CEC part as a module
-> 2. You build the HDMI part into the kernel
+> I have tested 5/12, 6/12, and 7/12 on venus codec driver, and in case
+> you need it, you have my
 > 
-> This results in CEC_NOTIFIER=y and CEC_CORE=m, which, when the HDMI part
-> gets built, results in the stubs in the notifier code being used, rather
-> than the real functions.  This in turn causes the CEC part to never
-> receive a physical address, which is therefore non-functional.
+> Reviewed-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 > 
-> I did have a patch to fix this, but it was never committed, and I got
-> busy with other stuff (so it ended up being git reset --hard away.)
-> 
+Thank you for the review.
+
+Regards,
+Smitha
