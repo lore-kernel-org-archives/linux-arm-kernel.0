@@ -1,81 +1,31 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 17 Jul 2017 22:16:59 +0800
-Subject: [PATCH v2 5/5] arm64: dts: rockchip: add rk3399 hdmi nodes
-In-Reply-To: <1500301019-9960-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1500301019-9960-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1500301019-9960-6-git-send-email-jacob-chen@iotwrt.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Mon, 17 Jul 2017 16:18:40 +0200
+Subject: [PATCH v3] drivers/char: kmem: disable on arm64
+In-Reply-To: <CAKv+Gu_nOo3VfjHistipR7vhaTnO89M8X1rrePgk3jhK0xnYVA@mail.gmail.com>
+References: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_nOo3VfjHistipR7vhaTnO89M8X1rrePgk3jhK0xnYVA@mail.gmail.com>
+Message-ID: <20170717141840.GA16198@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an hdmi node, and also add hdmi endpoints to vopb and vopl
-output port nodes.
+On Tue, Jun 20, 2017 at 01:20:49PM +0200, Ard Biesheuvel wrote:
+> On 20 June 2017 at 08:59, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > As it turns out, arm64 deviates from other architectures in the way it
+> > maps the VMALLOC region: on most (all?) other architectures, it resides
+> > strictly above the kernel's direct mapping of DRAM, but on arm64, this
+> > is the other way around. For instance, for a 48-bit VA configuration,
+> > we have
+> >
+> >   modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
+> >   vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
+> >   ...
+> >   vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
+> >             0xffff7e0000000000 - 0xffff7e0003ff0000   (    63 MB actual)
+> >   memory  : 0xffff800000000000 - 0xffff8000ffc00000   (  4092 MB)
+> >
+> > This has mostly gone unnoticed until now, but it does appear that it
+> > breaks an assumption in the kcore
+> 
+> s/kcore/kmem/
 
-Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 37 ++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 5c5c9d9..e204929 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1485,6 +1485,11 @@
- 				remote-endpoint = <&edp_in_vopl>;
- 			};
- 
-+			vopl_out_hdmi: endpoint at 2 {
-+				reg = <2>;
-+				remote-endpoint = <&hdmi_in_vopl>;
-+			};
-+
- 		};
- 	};
- 
-@@ -1526,6 +1531,11 @@
- 				remote-endpoint = <&mipi_in_vopb>;
- 			};
- 
-+			vopb_out_hdmi: endpoint at 2 {
-+				reg = <2>;
-+				remote-endpoint = <&hdmi_in_vopb>;
-+			};
-+
- 		};
- 	};
- 
-@@ -1541,6 +1551,33 @@
- 		status = "disabled";
- 	};
- 
-+	hdmi: hdmi at ff940000 {
-+		compatible = "rockchip,rk3399-dw-hdmi";
-+		reg = <0x0 0xff940000 0x0 0x20000>;
-+		reg-io-width = <4>;
-+		rockchip,grf = <&grf>;
-+		power-domains = <&power RK3399_PD_HDCP>;
-+		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH 0>;
-+		clocks = <&cru PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_SFR>, <&cru PLL_VPLL>, <&cru PCLK_VIO_GRF>;
-+		clock-names = "iahb", "isfr", "vpll", "grf";
-+		status = "disabled";
-+
-+		ports {
-+			hdmi_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				hdmi_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_hdmi>;
-+				};
-+				hdmi_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_hdmi>;
-+				};
-+			};
-+		};
-+	};
-+
- 	mipi_dsi: mipi at ff960000 {
- 		compatible = "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi";
- 		reg = <0x0 0xff960000 0x0 0x8000>;
--- 
-2.7.4
+v4?  :)
