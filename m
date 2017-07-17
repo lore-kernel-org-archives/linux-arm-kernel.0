@@ -1,103 +1,70 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 17 Jul 2017 11:48:18 -0600
-Subject: [PATCH v3 00/16] coresight: Support for ARM Coresight SoC-600
-In-Reply-To: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170717174818.GC21523@xps15>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 17 Jul 2017 19:48:09 +0200
+Subject: Uncorrectable bitflips with Linux 4.12 on SAMA5D2
+In-Reply-To: <CAMiSF3CtVY7G=ugt-bpsOOMqLcFrmx7hDstUag2_6H-KrN4yBg@mail.gmail.com>
+References: <CAMiSF3CtVY7G=ugt-bpsOOMqLcFrmx7hDstUag2_6H-KrN4yBg@mail.gmail.com>
+Message-ID: <20170717194809.4a080e0c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 02:04:05PM +0100, Suzuki K Poulose wrote:
-> This series adds support for ARM Coresight SoC-600 IP, which implements
-> Coresight V3 architecture. It also does some clean up of the replicator
-> driver namings used in the driver to prevent confusions to the user.
-> 
-> The SoC-600 comes with an improved TMC which supports new features,
-> including Save-Restore and Software FIFO2 mode (for streaming the trace
-> data over functional I/O like USB/PCI).
-> 
-> This series only supports Save-Restore feature of the new ETR by reusing
-> the driver to perform additional setups required in case we are dealing
-> with an IP which supports it. Towards this we keep track of the capabilities
-> of the given TMC ETR. Some of the features are advertised via DEVID
-> register (address width, scatter gather support), while some are not
-> (save-restore). So we attach a static capability mask with the device
-> PID for the unadvertised features and detect the rest at device probe.
-> 
-> Tested on Juno (with Coresight SoC 400) and an FPGA based system
-> for SoC 600. Applies on Mathieu's coresight/next.
-> 
-> Changes since V2:
->  - Fix typos in masks for ETM3.
->  - Fix all dts for obsoleted compatible string for replicator.
->  - Detect advertised capabilities at runtime.
->  - Add support for detecting the address width at runtime, new
->    feature in SoC-600.
->  - Add support for split ARCACHE/WCACHE encoding for AXI transactions
-> 
-> Changes since V1
->  - Rename coresight-replicator-qcom.c => coresight-dynamic-replicator.c
->  - Fix PIDR2 codings for ETB-10, ETM3x
->  - Fix cosmetic issues pointed out by  Mathieu
->  - Fix commit description for
-> 	 "coresight tmc: Handle configuration types properly"
->  - Drop SWFIFO2 from the capability of SoC-600 TMC
-> 
-> 
-> Suzuki K Poulose (18):
->   coresight replicator: Cleanup programmable replicator naming
->   arm64: juno: dts:  Use the new coresight replicator string
->   arm: qcom-msm8974: dts: Update coresight replicator
->   arm64: qcom-msm8916: dts: Update coresight replicator
->   coresight: Extend the PIDR mask to cover relevant bits in PIDR2
->   coresight: Add support for reading 64bit registers
->   coresight tmc: Add helpers for accessing 64bit registers
->   coresight tmc: Expose DBA and AXICTL
->   coresight replicator: Expose replicator management registers
->   coresight tmc: Handle configuration types properly
->   coresight tmc etr: Add capabilitiy information
->   coresight tmc: Detect support for scatter gather
->   coresight tmc etr: Detect address width at runtime
->   coresight tmc etr: Cleanup AXICTL register handling
->   coresigh tmc etr: Setup AXI cache encoding for read transfers
->   coresight tmc: Support for save-restore in ETR
->   coresight tmc: Add support for Coresight SoC 600 TMC
->   coresight: Add support for Coresight SoC 600 components
-> 
->  .../devicetree/bindings/arm/coresight.txt          |   4 +-
->  arch/arm/boot/dts/qcom-msm8974.dtsi                |   2 +-
->  arch/arm64/boot/dts/arm/juno-base.dtsi             |   2 +-
->  arch/arm64/boot/dts/qcom/msm8916.dtsi              |   2 +-
->  drivers/hwtracing/coresight/Kconfig                |  10 +-
->  drivers/hwtracing/coresight/Makefile               |   2 +-
->  .../coresight/coresight-dynamic-replicator.c       | 221 +++++++++++++++++++++
->  drivers/hwtracing/coresight/coresight-etb10.c      |   4 +-
->  drivers/hwtracing/coresight/coresight-etm3x.c      |  24 +--
->  drivers/hwtracing/coresight/coresight-funnel.c     |   9 +-
->  drivers/hwtracing/coresight/coresight-priv.h       |  35 +++-
->  .../coresight/coresight-replicator-qcom.c          | 196 ------------------
->  drivers/hwtracing/coresight/coresight-stm.c        |   8 +-
->  drivers/hwtracing/coresight/coresight-tmc-etf.c    |   8 +-
->  drivers/hwtracing/coresight/coresight-tmc-etr.c    |  37 ++--
->  drivers/hwtracing/coresight/coresight-tmc.c        |  84 ++++++--
->  drivers/hwtracing/coresight/coresight-tmc.h        |  87 +++++++-
->  drivers/hwtracing/coresight/coresight-tpiu.c       |   9 +-
->  18 files changed, 481 insertions(+), 263 deletions(-)
->  create mode 100644 drivers/hwtracing/coresight/coresight-dynamic-replicator.c
->  delete mode 100644 drivers/hwtracing/coresight/coresight-replicator-qcom.c
++Ludovic, Nicolas and Alexandre
 
-Good day,
+Hi Romain,
 
-I'm good with the code in this set - but I need it to be rebased on
-4.13-rc1 and the checkpatch errors addressed.
+Le Mon, 17 Jul 2017 18:11:26 +0200,
+Romain Izard <romain.izard.pro@gmail.com> a ?crit :
 
-There's also an extra line in 07 that isn't detected by checkpatch.
+> Hello,
+> 
+> On a custom board based on Microchip's SAMA5D2 SoC, I am encountering
+> ECC problems with the NAND Flash controller. The board is currently
+> working with Linux v4.9.x, but it does not with Linux 4.12.
+> 
+> Some pages on the NAND Flash memory chip of the device have bitflips.
+> With Linux 4.9.x, the bitflips are fixed by the PMECC code, but with
+> Linux 4.12, the errors are reported as uncorrectable.
+> 
+> From my end, I updated the board's device tree to include the
+> sama5d2.dtsi as it exists in Linux 4.12, but the rest of the file is
+> the same as for Linux 4.9. From my understanding, it should be
+> sufficient as the legacy DTB binding for the NAND controller is
+> supported.
+
+I know Ludovic add some problems with the NAND controller on sama5d2,
+but it was with the new bindings (see the fixes here [1]).
+
+Your problem seems a bit different since you're using the backward
+compat code.
+
+Could you dump PMECC/NFC regs when booting 4.9 and 4.12, and see if
+there's a difference?
+
+> 
+> The relevant extract is:
+> 
+>         nand0: nand at 80000000 {
+>             pinctrl-names = "default";
+>             pinctrl-0 = <&pinctrl_nand_default>;
+>             status = "okay";
+>             nand-ecc-mode = "hw";
+>             atmel,pmecc-cap = <8>;
+>             atmel,pmecc-sector-size = <512>;
+>             /delete-property/ atmel,nand-has-dma;
+>         };
+> 
+> The attached files show the same block read through nanddump, with
+> Linux 4.9 and Linux 4.12
+
+Yep, the dumps show 2 identical pages except for the bitflip in ECC
+block 2, but I can't tell from this dump why PMECC fails to correct
+bitflips.
+
+Really sorry that you have to debug this problem, but I don't have a
+sama5d2 platform with a NAND on it and couldn't test my
+modification on this platform :-/.
 
 Thanks,
-Mathieu
 
+Boris
 
-> 
-> -- 
-> 2.7.5
-> 
+[1]https://lkml.org/lkml/2017/7/11/95
