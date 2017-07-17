@@ -1,53 +1,92 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 17 Jul 2017 21:45:27 +0200
-Subject: [v4.13-rc1 fixes] ARM: dts: exynos: Add clocks to audss block to fix
- silent hang on Exynos4412
-Message-ID: <20170717194527.16559-1-krzk@kernel.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 17 Jul 2017 13:06:28 -0700
+Subject: [PATCH v2] PM / suspend: Add suspend_target_state()
+In-Reply-To: <20170716023610.4658-1-f.fainelli@gmail.com>
+References: <20170716023610.4658-1-f.fainelli@gmail.com>
+Message-ID: <20170717200628.7018-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add necessary parent clocks for audss (Audio SubSystem, MAUDIO) clock
-controller block.
+Have the core suspend/resume framework store the system-wide suspend
+state (suspend_state_t) we are about to enter, and expose it to drivers
+via suspend_target_state() in order to retrieve that. The state is
+assigned in suspend_devices_and_enter().
 
-This allows driver to keep EPLL enabled before accessing any MAUDIO
-registers thus fixing silent hang.  This silent hang appeared with
-commit 6edfa11cb396 ("clk: samsung: Add enable/disable operation for
-PLL36XX clocks"), e.g. on Odroid U3 usually with last (but unrelated)
-messages:
+This is useful for platform specific drivers that may need to take a
+slightly different suspend/resume path based on the system's
+suspend/resume state being entered.
 
-	[    2.382741] input: gpio_keys as /devices/platform/gpio_keys/input/input0
-	[    2.405686] usb 1-3: new high-speed USB device number 3 using exynos-ehci
-	[    2.419843] max77686-rtc max77686-rtc: setting system clock to 2017-06-21 17:04:13 UTC (1498064653)
-
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
+Changes in v2:
 
-Hi Arnd, Olof,
+- rename platform_suspend_target_state() -> suspend_target_state()
+- directly export the suspend_state_t value and assign it in
+  suspend_devices_and_enter()
 
-I have only one patch in fixes queue for v4.13, so how about applying this
-directly without a pull request?
+ include/linux/suspend.h |  2 ++
+ kernel/power/suspend.c  | 15 +++++++++++++++
+ 2 files changed, 17 insertions(+)
 
-
-Best regards,
-Krzysztof
-
----
- arch/arm/boot/dts/exynos4.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 497a9470c888..5739389f5bb8 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -59,6 +59,9 @@
- 		compatible = "samsung,exynos4210-audss-clock";
- 		reg = <0x03810000 0x0C>;
- 		#clock-cells = <1>;
-+		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_FOUT_EPLL>,
-+			 <&clock CLK_SCLK_AUDIO0>, <&clock CLK_SCLK_AUDIO0>;
-+		clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
- 	};
+diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+index 0b1cf32edfd7..7b70e7d6a006 100644
+--- a/include/linux/suspend.h
++++ b/include/linux/suspend.h
+@@ -202,6 +202,7 @@ struct platform_freeze_ops {
+  */
+ extern void suspend_set_ops(const struct platform_suspend_ops *ops);
+ extern int suspend_valid_only_mem(suspend_state_t state);
++extern suspend_state_t suspend_target_state(void);
  
- 	i2s0: i2s at 03830000 {
+ extern unsigned int pm_suspend_global_flags;
+ 
+@@ -281,6 +282,7 @@ static inline bool pm_resume_via_firmware(void) { return false; }
+ 
+ static inline void suspend_set_ops(const struct platform_suspend_ops *ops) {}
+ static inline int pm_suspend(suspend_state_t state) { return -ENOSYS; }
++static inline suspend_state_t suspend_target_state(void) { return -ENOSYS; }
+ static inline bool idle_should_freeze(void) { return false; }
+ static inline void __init pm_states_init(void) {}
+ static inline void freeze_set_ops(const struct platform_freeze_ops *ops) {}
+diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
+index 3ecf275d7e44..a296d6e25d52 100644
+--- a/kernel/power/suspend.c
++++ b/kernel/power/suspend.c
+@@ -47,6 +47,7 @@ const char *mem_sleep_states[PM_SUSPEND_MAX];
+ 
+ suspend_state_t mem_sleep_current = PM_SUSPEND_FREEZE;
+ static suspend_state_t mem_sleep_default = PM_SUSPEND_MEM;
++static suspend_state_t pm_suspend_target_state;
+ 
+ unsigned int pm_suspend_global_flags;
+ EXPORT_SYMBOL_GPL(pm_suspend_global_flags);
+@@ -202,6 +203,18 @@ void suspend_set_ops(const struct platform_suspend_ops *ops)
+ EXPORT_SYMBOL_GPL(suspend_set_ops);
+ 
+ /**
++ * suspend_target_state - Return the system wide suspend state.
++ *
++ * The pm_suspend_target_state becomes valid during
++ * suspend_devices_and_enter().
++ */
++suspend_state_t suspend_target_state(void)
++{
++	return pm_suspend_target_state;
++}
++EXPORT_SYMBOL_GPL(suspend_target_state);
++
++/**
+  * suspend_valid_only_mem - Generic memory-only valid callback.
+  *
+  * Platform drivers that implement mem suspend only and only need to check for
+@@ -456,6 +469,8 @@ int suspend_devices_and_enter(suspend_state_t state)
+ 	if (!sleep_state_supported(state))
+ 		return -ENOSYS;
+ 
++	pm_suspend_target_state = state;
++
+ 	error = platform_suspend_begin(state);
+ 	if (error)
+ 		goto Close;
 -- 
-2.11.0
+2.9.3
