@@ -1,91 +1,59 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 17 Jul 2017 16:35:27 +0200
-Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
- interpreted as bool
-In-Reply-To: <CAK8P3a1zBW_QuPtRFNwuVyE_ziySoV9_ebz4sD7Bya3eRoo8SA@mail.gmail.com>
-References: <20170714092540.1217397-1-arnd@arndb.de>
- <20170714093938.1469319-1-arnd@arndb.de>
- <f57e08d9-0984-b67c-c64b-c7e0542d0361@xs4all.nl>
- <CAK8P3a1zBW_QuPtRFNwuVyE_ziySoV9_ebz4sD7Bya3eRoo8SA@mail.gmail.com>
-Message-ID: <3a927e60-332a-f01d-f1af-98649e9f51b5@xs4all.nl>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 17 Jul 2017 15:35:25 +0100
+Subject: [PATCH] mfd: ab8500-core: constify attribute_group structures.
+In-Reply-To: <82391b6661b206976c244dcef76946c45c6aac2d.1499664942.git.arvind.yadav.cs@gmail.com>
+References: <82391b6661b206976c244dcef76946c45c6aac2d.1499664942.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170717143525.iyv2nmjflzattir3@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/17 16:26, Arnd Bergmann wrote:
-> On Mon, Jul 17, 2017 at 3:45 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
->> On 14/07/17 11:36, Arnd Bergmann wrote:
->>> @@ -201,8 +202,9 @@ static int cx18_g_fmt_sliced_vbi_cap(struct file *file, void *fh,
->>>        * digitizer/slicer.  Note, cx18_av_vbi() wipes the passed in
->>>        * fmt->fmt.sliced under valid calling conditions
->>>        */
->>> -     if (v4l2_subdev_call(cx->sd_av, vbi, g_sliced_fmt, &fmt->fmt.sliced))
->>> -             return -EINVAL;
->>> +     ret = v4l2_subdev_call(cx->sd_av, vbi, g_sliced_fmt, &fmt->fmt.sliced);
->>> +     if (ret)
->>> +             return ret;
->>
->> Please keep the -EINVAL here. I can't be 100% certain that returning 'ret' wouldn't
->> break something.
-> 
-> I think Dan was recommending the opposite here, if I understood you
-> both correctly:
-> he said we should propagate the error code unless we know it's wrong, while you
-> want to keep the current behavior to avoid introducing changes ;-)
-> 
-> I guess in either case, looking at the callers more carefully would be
-> a good idea.
+On Mon, 10 Jul 2017, Arvind Yadav wrote:
 
-The subtle problem here is that v4l2_subdev_call will return -ENOIOCTLCMD if
-ops->vbi->g_sliced_fmt == NULL, which typically is not returned to userspace
-but either ignored or replaced by another error. It indicates that the
-sub device doesn't implement this operation, and it depends on the context
-and the operation whether or not that is to be considered an error.
+> attribute_groups are not supposed to change at runtime. All functions
+> working with attribute_groups provided by <linux/sysfs.h> work with const
+> attribute_group. So mark the non-const structs as const.
+> 
+> File size before:
+>    text	   data	    bss	    dec	    hex	filename
+>   16298	   1009	    184	  17491	   4453	drivers/mfd/ab8500-core.o
+> 
+> File size After adding 'const':
+>    text	   data	    bss	    dec	    hex	filename
+>   16490	    817	    184	  17491	   4453	drivers/mfd/ab8500-core.o
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/mfd/ab8500-core.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
-I have no clue what is expected here, without digging deep in the code.
+Applied, thanks.
 
-Better to keep it as-is. It really isn't important to waste time on this.
+> diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+> index 8511c06..30d09d1 100644
+> --- a/drivers/mfd/ab8500-core.c
+> +++ b/drivers/mfd/ab8500-core.c
+> @@ -1059,15 +1059,15 @@ static DEVICE_ATTR(dbbrstn, S_IRUGO | S_IWUSR,
+>  	NULL,
+>  };
+>  
+> -static struct attribute_group ab8500_attr_group = {
+> +static const struct attribute_group ab8500_attr_group = {
+>  	.attrs	= ab8500_sysfs_entries,
+>  };
+>  
+> -static struct attribute_group ab8505_attr_group = {
+> +static const struct attribute_group ab8505_attr_group = {
+>  	.attrs	= ab8505_sysfs_entries,
+>  };
+>  
+> -static struct attribute_group ab9540_attr_group = {
+> +static const struct attribute_group ab9540_attr_group = {
+>  	.attrs	= ab9540_sysfs_entries,
+>  };
+>  
 
-> 
->>> -     return 0;
->>> +     return ret;
->>>  }
->>>
->>>  int atomisp_flash_enable(struct atomisp_sub_device *asd, int num_frames)
->>>
->>
->> This is all very hackish, though. I'm not terribly keen on this patch. It's not
->> clear to me *why* these warnings appear in your setup.
-> 
-> it's possible that this only happened with 'ccache', which first preprocesses
-> the source and the passes it with v4l2_subdev_call expanded into the
-> compiler. This means the line looks like
-> 
->         if ((!(cx->sd_av) ? -ENODEV :
->             (((cx->sd_av)->ops->vbi && (cx->sd_av)->ops->vbi->g_sliced_fmt) ?
->                (cx->sd_av)->ops->vbi->g_sliced_fmt(cx->sd_av)),
-> &fmt->fmt.sliced) :
->                -ENOIOCTLCMD))
-> 
-> The compiler now complains about the sub-expression that it sees for
-> cx->sd_av==NULL:
-> 
->    if (-ENODEV)
-> 
-> which it considers nonsense because it is always true and the value gets
-> ignored.
-> 
-> Let me try again without ccache for now and see what warnings remain.
-> We can find a solution for those first, and then decide how to deal with
-> ccache.
-
-Sounds good.
-
-I'm OK with applying this if there is no other way to prevent these warnings.
-
-Regards,
-
-	Hans
-
-> 
->         Arnd
-> 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
