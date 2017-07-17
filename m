@@ -1,39 +1,50 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 17 Jul 2017 21:10:47 +0800
-Subject: [PATCH 05/11] mmc: sunxi: Support controllers that can use both
- old and new timings
-In-Reply-To: <20170714064302.20383-6-wens@csie.org>
-Message-ID: <201707172131.gWlKt3Lf%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Jul 2017 14:16:35 +0100
+Subject: [PATCH] arm64: perf: Allow more than one cycle counter to be used
+In-Reply-To: <32b8658a-e48d-308d-4c89-9d22161ec1a8@redhat.com>
+References: <5817e4915963d7fae5928a77d85f7e0c4dca290c.1498890614.git.panand@redhat.com>
+ <32b8658a-e48d-308d-4c89-9d22161ec1a8@redhat.com>
+Message-ID: <20170717131635.GK26488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+On Mon, Jul 17, 2017 at 08:56:10AM +0530, Pratyush Anand wrote:
+> On Saturday 01 July 2017 12:03 PM, Pratyush Anand wrote:
+> >Currently:
+> >$ perf stat -e cycles:u -e cycles:k  true
+> >
+> > Performance counter stats for 'true':
+> >
+> >          2,24,699      cycles:u
+> >     <not counted>      cycles:k	(0.00%)
+> >
+> >       0.000788087 seconds time elapsed
+> >
+> >We can not count more than one cycle counter in one instance,because we
+> >allow to map cycle counter into PMCCNTR_EL0 only. However, if I did not
+> >miss anything then specification do not prohibit to use PMEVCNTR<n>_EL0
+> >for cycle count as well.
+> >
+> >Modify the code so that it still prefers to use PMCCNTR_EL0 for cycle
+> >counter, however allow to use PMEVCNTR<n>_EL0 if PMCCNTR_EL0 is already
+> >in use.
+> >
+> >After this patch:
+> >
+> >$ perf stat -e cycles:u -e cycles:k   true
+> >
+> > Performance counter stats for 'true':
+> >
+> >          2,17,310      cycles:u
+> >          7,40,009      cycles:k
+> >
+> >       0.000764149 seconds time elapsed
+> >
+> 
+> Any comment/feedback?
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.13-rc1]
-[cannot apply to robh/for-next clk/clk-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I'll pick this one up.
 
-url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-sun8i-a83t-Add-support-for-MMC-controllers/20170715-071008
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Thanks,
 
-All errors (new ones prefixed by >>):
-
->> ERROR: "sunxi_ccu_set_mmc_timing_mode" [drivers/mmc/host/sunxi-mmc.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56606 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/ed3302ce/attachment-0001.gz>
+Will
