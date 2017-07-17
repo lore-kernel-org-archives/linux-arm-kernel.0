@@ -1,44 +1,40 @@
 From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Sun, 16 Jul 2017 23:03:50 -0500
-Subject: [PATCH] watchdog: coh901327_wdt: constify watchdog_ops structure
-In-Reply-To: <031cf1ab-7f1b-4e4d-adaf-efa6c3af8040@roeck-us.net>
-References: <20170708003330.GA15374@embeddedgus>
- <031cf1ab-7f1b-4e4d-adaf-efa6c3af8040@roeck-us.net>
-Message-ID: <72fb7a2e-f075-57b0-72e2-6c16205eaf4e@embeddedor.com>
+Date: Sun, 16 Jul 2017 23:06:42 -0500
+Subject: [PATCH] video: xilinxfb: constify fb_fix_screeninfo and
+ fb_var_screeninfo structures
+In-Reply-To: <c55390b8-c64b-e7ee-8099-5147970d5311@xilinx.com>
+References: <20170708012416.GA1843@embeddedgus>
+ <c55390b8-c64b-e7ee-8099-5147970d5311@xilinx.com>
+Message-ID: <f9952748-5663-19ae-5417-aaf3c3f01d7e@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 07/07/2017 08:45 PM, Guenter Roeck wrote:
-> On 07/07/2017 05:33 PM, Gustavo A. R. Silva wrote:
->> Check for watchdog_ops structures that are only stored in the ops 
->> field of
->> a watchdog_device structure. This field is declared const, so 
->> watchdog_ops
->> structures that have this property can be declared as const also.
+On 07/10/2017 02:29 AM, Michal Simek wrote:
+> On 8.7.2017 03:24, Gustavo A. R. Silva wrote:
+>> These structures are only used to copy into other structures,
+>> so declare them as const.
 >>
->> This issue was detected using Coccinelle and the following semantic 
->> patch:
+>> This issue was detected using Coccinelle and the following semantic patch:
 >>
->> @r
->> disable optional_qualifier@
+>> @r disable optional_qualifier@
 >> identifier i;
 >> position p;
 >> @@
->> static struct watchdog_ops i at p = { ... };
+>> static struct fb_fix_screeninfo i at p = { ... };
 >>
 >> @ok@
 >> identifier r.i;
->> struct watchdog_device e;
+>> expression e;
 >> position p;
 >> @@
->> e.ops = &i at p;
+>> e = i at p
 >>
 >> @bad@
 >> position p != {r.p,ok.p};
 >> identifier r.i;
->> struct watchdog_ops e;
+>> struct fb_fix_screeninfo e;
 >> @@
 >> e at i@p
 >>
@@ -47,35 +43,40 @@ On 07/07/2017 08:45 PM, Guenter Roeck wrote:
 >> @@
 >> static
 >> +const
->>   struct watchdog_ops i = { ... };
+>>   struct fb_fix_screeninfo i = { ... };
+>>
+>> The semantic patch for fb_var_screeninfo is analogous.
 >>
 >> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
->
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->
-
-Thank you, Guenter.
-
 >> ---
->>   drivers/watchdog/coh901327_wdt.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>   drivers/video/fbdev/xilinxfb.c | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
 >>
->> diff --git a/drivers/watchdog/coh901327_wdt.c 
->> b/drivers/watchdog/coh901327_wdt.c
->> index 38dd60f0..4410337 100644
->> --- a/drivers/watchdog/coh901327_wdt.c
->> +++ b/drivers/watchdog/coh901327_wdt.c
->> @@ -218,7 +218,7 @@ static const struct watchdog_info coh901327_ident 
->> = {
->>       .identity = DRV_NAME,
+>> diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
+>> index 17dc119..0bda18e 100644
+>> --- a/drivers/video/fbdev/xilinxfb.c
+>> +++ b/drivers/video/fbdev/xilinxfb.c
+>> @@ -110,14 +110,14 @@ static struct xilinxfb_platform_data xilinx_fb_default_pdata = {
+>>   /*
+>>    * Here are the default fb_fix_screeninfo and fb_var_screeninfo structures
+>>    */
+>> -static struct fb_fix_screeninfo xilinx_fb_fix = {
+>> +static const struct fb_fix_screeninfo xilinx_fb_fix = {
+>>   	.id =		"Xilinx",
+>>   	.type =		FB_TYPE_PACKED_PIXELS,
+>>   	.visual =	FB_VISUAL_TRUECOLOR,
+>>   	.accel =	FB_ACCEL_NONE
 >>   };
->>   -static struct watchdog_ops coh901327_ops = {
->> +static const struct watchdog_ops coh901327_ops = {
->>       .owner = THIS_MODULE,
->>       .start = coh901327_start,
->>       .stop = coh901327_stop,
+>>   
+>> -static struct fb_var_screeninfo xilinx_fb_var = {
+>> +static const struct fb_var_screeninfo xilinx_fb_var = {
+>>   	.bits_per_pixel =	BITS_PER_PIXEL,
+>>   
+>>   	.red =		{ RED_SHIFT, 8, 0 },
 >>
->
+> Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+Thank you, Michal.
 
 -- 
 Gustavo A. R. Silva
