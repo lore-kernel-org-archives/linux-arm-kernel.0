@@ -1,49 +1,40 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 17 Jul 2017 17:40:33 +0200
-Subject: [BUG] v4.12 breaks pxa25x
-In-Reply-To: <20170717081518.GI31807@n2100.armlinux.org.uk> (Russell King's
- message of "Mon, 17 Jul 2017 09:15:18 +0100")
-References: <87inirsgzk.fsf@belgarion.home>
- <20170717081518.GI31807@n2100.armlinux.org.uk>
-Message-ID: <87eftfrs0e.fsf@belgarion.home>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 17 Jul 2017 17:42:26 +0200
+Subject: [PATCH] iommu/exynos: Replace non-existing big-endian Kconfig
+ option
+In-Reply-To: <201707172340.xpsuGzYj%fengguang.wu@intel.com>
+References: <1500270422-4805-1-git-send-email-krzk@kernel.org>
+ <201707172340.xpsuGzYj%fengguang.wu@intel.com>
+Message-ID: <CAJKOXPcQuCE4N=MuJPu_4AEcx7pgd-8VyRxese7D_nBQE9o7Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-
-> On Mon, Jul 17, 2017 at 08:41:03AM +0200, Robert Jarzmik wrote:
+On Mon, Jul 17, 2017 at 5:25 PM, kbuild test robot <lkp@intel.com> wrote:
+> Hi Krzysztof,
 >
->> [    0.000000] Unhandled fault: alignment exception (0x003) at 0xc06f82cd
->> [    0.000000] pgd = c0004000
->> [    0.000000] [c06f82cd] *pgd=a060040e(bad)
->> [    0.000000] Internal error: : 3 [#1] ARM
->> [    0.000000] Modules linked in:
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.12.0-11927-g6bf3d68 #4582
->> [    0.000000] Hardware name: Intel DBPXA250 Development Platform (aka Lubbock)
->> [    0.000000] task: c06f6fd8 task.stack: c06f2000
->> [    0.000000] PC is at __flush_whole_cache+0x4/0x60
->> [    0.000000] LR is at paging_init+0x4b4/0x590
->> [    0.000000] pc : [<c0019e24>]    lr : [<c049d274>]    psr: 600000d3
->> [    0.000000] sp : c06f3f38  ip : 00000000  fp : c0700000
->> [    0.000000] r10: a4000000  r9 : c06f82c0  r8 : c0723540
->> [    0.000000] r7 : fe100000  r6 : fe200000  r5 : c06f82a0  r4 : c0705ef4
->> [    0.000000] r3 : 00000000  r2 : 00000004  r1 : c06f82cd  r0 : c06f82c0
+> [auto build test WARNING on iommu/next]
+> [also build test WARNING on v4.13-rc1 next-20170717]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 >
-> Looks like the .data section has become misaligned somehow.  r1 is the
-> address of "clean_addr" which is clearly not 32-bit aligned.
+> url:    https://github.com/0day-ci/linux/commits/Krzysztof-Kozlowski/iommu-exynos-Replace-non-existing-big-endian-Kconfig-option/20170717-141202
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
+> config: arm-allmodconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm
 >
-> Please can you check in System.map to see what's immediately before it?
-Sure, it like this :
-c06f22c8 D user_pmd_table
-c06f22cc d __warned.19178
-c06f22cd d clean_addr
+> All warnings (new ones prefixed by >>):
+>
+>>> drivers//iommu/exynos-iommu.c:58:2: warning: #warning "revisit driver if we can enable big-endian ptes" [-Wcpp]
+>     #warning "revisit driver if we can enable big-endian ptes"
+>      ^~~~~~~
 
-And I have no idea how to link that __warned.19178 with the WARN_xxx() statement ...
+FYI,
+Everything is fine, this is an expected warning which I am bringing
+back to life.
 
-This bisection I made points me to :
-# first bad commit: [799c43415442414b1032580c47684cb709dfed6d] kbuild: thin archives make default for all archs
-
-Reverting this commit makes my kernel boot again.
-
---
-Robert
+Best regards,
+Krzysztof
