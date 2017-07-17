@@ -1,34 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Jul 2017 12:04:57 -0500
-Subject: [PATCH] dt-bindings: clock: ti-sci: Fix incorrect usage of headers
-In-Reply-To: <20170712010923.GP22780@codeaurora.org>
-References: <20170711223615.29398-1-s-anna@ti.com>
- <20170712010923.GP22780@codeaurora.org>
-Message-ID: <20170717170457.4pkb6qaa3qbept5n@rob-hp-laptop>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 17 Jul 2017 18:04:57 +0100
+Subject: [PATCH v3] drivers/char: kmem: disable on arm64
+In-Reply-To: <20170717141840.GA16198@kroah.com>
+References: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_nOo3VfjHistipR7vhaTnO89M8X1rrePgk3jhK0xnYVA@mail.gmail.com>
+ <20170717141840.GA16198@kroah.com>
+Message-ID: <CAKv+Gu-qXZXVV7MX-oB76dK21RGXEpc=P4vE6MF2nMA+_Q=LtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 06:09:23PM -0700, Stephen Boyd wrote:
-> On 07/11, Suman Anna wrote:
-> > The clock consumer usage description was erroneously referring to
-> > couple of dt-binding headers that are no longer valid. The definition
-> > and/or usage of these headers is incorrect and the only file present
-> > at the moment, dt-bindings/soc/k2g.h is also being cleaned up. The
-> > examples in this binding were updated properly, but the update to
-> > description was missed out. So, fix this.
-> > 
-> > Fixes: 8f306cfe4383 ("Documentation: dt: Add TI SCI clock driver")
-> > Signed-off-by: Suman Anna <s-anna@ti.com>
-> > ---
-> > Hi Stephen,
-> > 
-> > Looks like this was missed during the update/repost of the ti-sci-clk
-> > driver/binding. FYI, Santosh is going to pickup the header file cleanup
-> > patch https://patchwork.kernel.org/patch/9741279/ for the next merge
-> > window.
-> 
-> I'll let Rob apply this as it is purely a binding document update.
+On 17 July 2017 at 15:18, gregkh at linuxfoundation.org
+<gregkh@linuxfoundation.org> wrote:
+> On Tue, Jun 20, 2017 at 01:20:49PM +0200, Ard Biesheuvel wrote:
+>> On 20 June 2017 at 08:59, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > As it turns out, arm64 deviates from other architectures in the way it
+>> > maps the VMALLOC region: on most (all?) other architectures, it resides
+>> > strictly above the kernel's direct mapping of DRAM, but on arm64, this
+>> > is the other way around. For instance, for a 48-bit VA configuration,
+>> > we have
+>> >
+>> >   modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
+>> >   vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
+>> >   ...
+>> >   vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
+>> >             0xffff7e0000000000 - 0xffff7e0003ff0000   (    63 MB actual)
+>> >   memory  : 0xffff800000000000 - 0xffff8000ffc00000   (  4092 MB)
+>> >
+>> > This has mostly gone unnoticed until now, but it does appear that it
+>> > breaks an assumption in the kcore
+>>
+>> s/kcore/kmem/
+>
+> v4?  :)
+>
 
-Applied.
-
-Rob
+This is already in mainline as 06c35ef1fdf8d955684448683f7e48ac5f15ccfd
