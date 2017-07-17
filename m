@@ -1,33 +1,22 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 17 Jul 2017 10:10:13 +0200
-Subject: [PATCH 3/3] ARM: dts: r8a7794: Use R-Car Gen 2 fallback binding
- for vin nodes
-In-Reply-To: <1499777809-27492-4-git-send-email-horms+renesas@verge.net.au>
-References: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
- <1499777809-27492-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUcNzAf4bvnpXvaNDJoOieZV+gehhdNSviPQ6h3iOQ7eg@mail.gmail.com>
+From: cosardindar@gmail.com (Cosar Dindar)
+Date: Mon, 17 Jul 2017 11:26:39 +0300
+Subject: [RESEND,PATCH v4 0/2] Add support for the STM32F4 CRC32
+Message-ID: <1500279999-46120-1-git-send-email-cosardindar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 2:56 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a7794 SoC.
->
-> This has no run-time effect for the current driver as the initialisation
-> sequence is the same for the SoC-specific binding for r8a7794 and the
-> fallback binding for R-Car Gen 2
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+This patch series add hardware CRC32 ("Ethernet") calculation support
+for STMicroelectronics STM32F429.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Polynomial and key setting are not supported, key is fixed as 0x4C11DB7
+and poly is 0xFFFFFFFF.
 
-Gr{oetje,eeting}s,
+Module is tested on STM32F429-disco board with crypto testmgr using
+cases within the key 0xFFFFFFFF.
 
-                        Geert
+Changes in v4:
+  - Edited patchset brief.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cosar Dindar (2):
+  dt-bindings : Document the STM32F4 CRC32 binding
+  crypto : stm32 - Add STM32F4 CRC32 support
