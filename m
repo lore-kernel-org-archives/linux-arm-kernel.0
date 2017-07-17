@@ -1,42 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Jul 2017 10:07:32 +0200
-Subject: [PATCH] irqchip/gic: Use GIC_SPI symbolic constant
-In-Reply-To: <86h8ycytse.fsf@arm.com>
-References: <e25e0ac5-abe2-6024-f669-c5352183114e@free.fr>
- <86shhwywas.fsf@arm.com>
- <d0701807-74fb-f54e-ccff-378c15da076e@free.fr>
- <86h8ycytse.fsf@arm.com>
-Message-ID: <20170717100732.435116c8@windsurf>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 17 Jul 2017 10:09:28 +0200
+Subject: [PATCH 2/3] ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding
+ for vin nodes
+In-Reply-To: <1499777809-27492-3-git-send-email-horms+renesas@verge.net.au>
+References: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
+ <1499777809-27492-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVrjsU8=1UmK-SNG316sDDpMehwFu+zJFBDjMFUptjjYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jul 11, 2017 at 2:56 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a7791 SoC.
+>
+> This has no run-time effect for the current driver as the initialisation
+> sequence is the same for the SoC-specific binding for r8a7791 and the
+> fallback binding for R-Car Gen 2
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-On Sun, 16 Jul 2017 22:08:01 +0100, Marc Zyngier wrote:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> > Are you saying that changing the code at this point is
-> > not worth the trouble?  
-> 
-> You're assuming that this GIC_SPI macro has anything to do with the GIC
-> driver. It doesn't. That's just a convenience macro for people writing
-> DT, and definitely not something I'd ever want to rely on in the Linux
-> driver. The binding defines the raw value, and not this macro.
-> 
-> So to sum it up, thank you, but no thank out.
+Gr{oetje,eeting}s,
 
-FWIW, a few drivers are already using GIC_SPI:
+                        Geert
 
-irq-mvebu-gicp.c:       fwspec.param[0] = GIC_SPI;
-irq-mvebu-odmi.c:       fwspec.param[0] = GIC_SPI;
-irq-tegra.c:    if (fwspec->param[0] != GIC_SPI)
-irq-vf610-mscm-ir.c:            parent_fwspec.param[0] = GIC_SPI;
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-For pretty much exactly the situation being patched by Mason.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
