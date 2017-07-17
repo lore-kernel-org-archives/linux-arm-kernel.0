@@ -1,27 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Jul 2017 13:51:26 -0500
-Subject: [PATCH 07/11] mmc: sunxi: Add support for A83T eMMC (MMC2)
-In-Reply-To: <20170714064302.20383-8-wens@csie.org>
-References: <20170714064302.20383-1-wens@csie.org>
- <20170714064302.20383-8-wens@csie.org>
-Message-ID: <20170717185126.rrhriqckjextpaxj@rob-hp-laptop>
+Date: Mon, 17 Jul 2017 13:51:55 -0500
+Subject: [PATCH v1 2/3] dt-bindings: add binding for rk3366 power domains
+In-Reply-To: <1500015763-4940-3-git-send-email-zhangqing@rock-chips.com>
+References: <1500015763-4940-1-git-send-email-zhangqing@rock-chips.com>
+ <1500015763-4940-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20170717185155.silbgsacswtpaujw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 02:42:58PM +0800, Chen-Yu Tsai wrote:
-> The third MMC controller (MMC2) on the Allwinner A83T SoC is slightly
-> different. It supports a wider 8-bit bus, has a dedicated controllable
-> reset pin for eMMC, and a "new timing mode" which is supposed to deliver
-> better signals and thus better performance.
+On Fri, Jul 14, 2017 at 03:02:42PM +0800, Elaine Zhang wrote:
+> Add binding documentation for the power domains
+> found on Rockchip RK3366 SoCs.
 > 
-> Add a compatible for this one to use the new timing mode not found in the
-> other controllers.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 > ---
->  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
+>  Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
-
->  drivers/mmc/host/sunxi-mmc.c                        | 8 ++++++++
->  2 files changed, 9 insertions(+)
