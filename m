@@ -1,43 +1,39 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Jul 2017 15:08:54 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: hsmmc.c: Remove dead code
-In-Reply-To: <1500036404-5556-2-git-send-email-faiz_abbas@ti.com>
-References: <1500036404-5556-1-git-send-email-faiz_abbas@ti.com>
- <1500036404-5556-2-git-send-email-faiz_abbas@ti.com>
-Message-ID: <CAPDyKFpwb3T4PhQSyUwWDwpEnOwVDxLeK7hAMS0Q4P3tzPXXrQ@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 17 Jul 2017 21:10:47 +0800
+Subject: [PATCH 05/11] mmc: sunxi: Support controllers that can use both
+ old and new timings
+In-Reply-To: <20170714064302.20383-6-wens@csie.org>
+Message-ID: <201707172131.gWlKt3Lf%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 July 2017 at 14:46, Faiz Abbas <faiz_abbas@ti.com> wrote:
-> Most platforms using OMAP hsmmc driver have switched to device tree
-> for passing platform data to omap_hsmmc.c driver.
->
-> The hsmmc.c file in mach-omap2 exists only to support pandora board
-> which uses wl1251 driver in legacy platform data mode.
->
-> Hence, remove the dead code not used by the pandora board.
->
-> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+Hi Chen-Yu,
 
-I just got an ack from Tony to pick this up. So I did that (including
-the mmc change in patch 2) and intend to send this for 4.13 rcs, via
-my fixes branch in my mmc tree.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.13-rc1]
+[cannot apply to robh/for-next clk/clk-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-However the below comment for testing puzzles me. Either it's dead
-code or not, so then what is there to test? :-)
+url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-sun8i-a83t-Add-support-for-MMC-controllers/20170715-071008
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Anyway, it's available on my fixes and next branch, so let's see if
-zero build reports some issues.
+All errors (new ones prefixed by >>):
 
-> ---
-> This is only compile tested. Someone with a pandora board should help
-> test this for functionality.
->
->  arch/arm/mach-omap2/hsmmc.c | 239 +-------------------------------------------
->  arch/arm/mach-omap2/hsmmc.h |   9 --
->  2 files changed, 2 insertions(+), 246 deletions(-)
+>> ERROR: "sunxi_ccu_set_mmc_timing_mode" [drivers/mmc/host/sunxi-mmc.ko] undefined!
 
-[...]
-
-Kind regards
-Uffe
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56606 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/ed3302ce/attachment-0001.gz>
