@@ -1,55 +1,78 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 17 Jul 2017 18:11:26 +0200
-Subject: Uncorrectable bitflips with Linux 4.12 on SAMA5D2
-Message-ID: <CAMiSF3CtVY7G=ugt-bpsOOMqLcFrmx7hDstUag2_6H-KrN4yBg@mail.gmail.com>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Mon, 17 Jul 2017 13:12:13 -0300
+Subject: [PATCH v4 1/2] ARM: dts: imx7d-sdb: Add DRM panel support
+Message-ID: <1500307934-22160-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+It is preferred to use the panel compatible string rather than passing the
+LCD timming in the device tree.
 
-On a custom board based on Microchip's SAMA5D2 SoC, I am encountering
-ECC problems with the NAND Flash controller. The board is currently
-working with Linux v4.9.x, but it does not with Linux 4.12.
+So pass the "innolux,at043tn24" compatible string to describe the parallel
+LCD on this board.
 
-Some pages on the NAND Flash memory chip of the device have bitflips.
-With Linux 4.9.x, the bitflips are fixed by the PMECC code, but with
-Linux 4.12, the errors are reported as uncorrectable.
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+---
+Changes since v3:
+- none
+ arch/arm/boot/dts/imx7d-sdb.dts | 36 +++++++++++++-----------------------
+ 1 file changed, 13 insertions(+), 23 deletions(-)
 
->From my end, I updated the board's device tree to include the
-sama5d2.dtsi as it exists in Linux 4.12, but the rest of the file is
-the same as for Linux 4.9. From my understanding, it should be
-sufficient as the legacy DTB binding for the NAND controller is
-supported.
-
-The relevant extract is:
-
-        nand0: nand at 80000000 {
-            pinctrl-names = "default";
-            pinctrl-0 = <&pinctrl_nand_default>;
-            status = "okay";
-            nand-ecc-mode = "hw";
-            atmel,pmecc-cap = <8>;
-            atmel,pmecc-sector-size = <512>;
-            /delete-property/ atmel,nand-has-dma;
-        };
-
-The attached files show the same block read through nanddump, with
-Linux 4.9 and Linux 4.12
-
-Best regards,
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 2dce141..5827ae3 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -117,6 +117,16 @@
+ 		regulator-max-microvolt = <3300000>;
+ 		startup-delay-us = <200000>;
+ 	};
++
++	panel {
++		compatible = "innolux,at043tn24";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
++	};
+ };
+ 
+ &adc1 {
+@@ -323,31 +333,11 @@
+ &lcdif {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_lcdif>;
+-	display = <&display0>;
+ 	status = "okay";
+ 
+-	display0: display {
+-		bits-per-pixel = <16>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-
+-			timing0: timing0 {
+-				clock-frequency = <9200000>;
+-				hactive = <480>;
+-				vactive = <272>;
+-				hfront-porch = <8>;
+-				hback-porch = <4>;
+-				hsync-len = <41>;
+-				vback-porch = <2>;
+-				vfront-porch = <4>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
++	port {
++		display_out: endpoint {
++			remote-endpoint = <&panel_in>;
+ 		};
+ 	};
+ };
 -- 
-Romain Izard
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ad97000_nofix.dump
-Type: application/octet-stream
-Size: 10880 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/da725c62/attachment-0002.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ad97000_fix.dump
-Type: application/octet-stream
-Size: 10880 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/da725c62/attachment-0003.obj>
+2.7.4
