@@ -1,37 +1,85 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 17 Jul 2017 18:04:57 +0100
-Subject: [PATCH v3] drivers/char: kmem: disable on arm64
-In-Reply-To: <20170717141840.GA16198@kroah.com>
-References: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_nOo3VfjHistipR7vhaTnO89M8X1rrePgk3jhK0xnYVA@mail.gmail.com>
- <20170717141840.GA16198@kroah.com>
-Message-ID: <CAKv+Gu-qXZXVV7MX-oB76dK21RGXEpc=P4vE6MF2nMA+_Q=LtQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 17 Jul 2017 11:06:59 -0600
+Subject: [PATCH v3 14/18] coresight tmc etr: Cleanup AXICTL register
+ handling
+In-Reply-To: <1500037463-19951-15-git-send-email-suzuki.poulose@arm.com>
+References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
+ <1500037463-19951-15-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20170717170659.GA21523@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2017 at 15:18, gregkh at linuxfoundation.org
-<gregkh@linuxfoundation.org> wrote:
-> On Tue, Jun 20, 2017 at 01:20:49PM +0200, Ard Biesheuvel wrote:
->> On 20 June 2017 at 08:59, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > As it turns out, arm64 deviates from other architectures in the way it
->> > maps the VMALLOC region: on most (all?) other architectures, it resides
->> > strictly above the kernel's direct mapping of DRAM, but on arm64, this
->> > is the other way around. For instance, for a 48-bit VA configuration,
->> > we have
->> >
->> >   modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
->> >   vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
->> >   ...
->> >   vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
->> >             0xffff7e0000000000 - 0xffff7e0003ff0000   (    63 MB actual)
->> >   memory  : 0xffff800000000000 - 0xffff8000ffc00000   (  4092 MB)
->> >
->> > This has mostly gone unnoticed until now, but it does appear that it
->> > breaks an assumption in the kcore
->>
->> s/kcore/kmem/
->
-> v4?  :)
->
+On Fri, Jul 14, 2017 at 02:04:19PM +0100, Suzuki K Poulose wrote:
+> This patch cleans up how we setup the AXICTL register on
+> TMC ETR. At the moment we don't set the CacheCtrl bits, which
+> drives the arcache and awcache bits on AXI bus specifying the
+> cacheablitiy. Set this to Write-back Read and Write-allocate.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 10 +++-------
+>  drivers/hwtracing/coresight/coresight-tmc.h     | 17 ++++++++++++++++-
+>  2 files changed, 19 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index ff11b92..4aa5d36 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -36,13 +36,9 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+>  	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
+>  
+>  	axictl = readl_relaxed(drvdata->base + TMC_AXICTL);
+> -	axictl |= TMC_AXICTL_WR_BURST_16;
+> -	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+> -	axictl &= ~TMC_AXICTL_SCT_GAT_MODE;
+> -	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+> -	axictl = (axictl &
+> -		  ~(TMC_AXICTL_PROT_CTL_B0 | TMC_AXICTL_PROT_CTL_B1)) |
+> -		  TMC_AXICTL_PROT_CTL_B1;
+> +	axictl &= ~TMC_AXICTL_CLEAR_MASK;
+> +	axictl |= (TMC_AXICTL_PROT_CTL_B1 | TMC_AXICTL_WR_BURST_16);
+> +	axictl |= TMC_AXICTL_AxCACHE_OS;
+>  	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+>  	tmc_write_dba(drvdata, drvdata->paddr);
+>  
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+> index a0668f6..5d6d7e5 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+> @@ -55,11 +55,26 @@
+>  #define TMC_STS_TMCREADY_BIT	2
+>  #define TMC_STS_FULL		BIT(0)
+>  #define TMC_STS_TRIGGERED	BIT(1)
+> -/* TMC_AXICTL - 0x110 */
+> +/*
+> + * TMC_AXICTL - 0x110
+> + *
+> + * TMC AXICTL format for SoC-400
+> + * 	Bits [0-1]	: ProtCtrlBit0-1
+> + * 	Bits [2-5]	: CacheCtrlBits 0-3 (AxCACHE)
+> + * 	Bit  6		: Reserved
+> + * 	Bit  7		: ScatterGatherMode
+> + * 	Bits [8-11]	: WrBurstLen
+> + * 	Bits [12-31]	: Reserved.
+> + */
+> +#define TMC_AXICTL_CLEAR_MASK 0xfbf
+> +
+>  #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
+>  #define TMC_AXICTL_PROT_CTL_B1	BIT(1)
+>  #define TMC_AXICTL_SCT_GAT_MODE	BIT(7)
+>  #define TMC_AXICTL_WR_BURST_16	0xF00
+> +/* Write-back Read and Write-allocate */
+> +#define TMC_AXICTL_AxCACHE_OS	(0xf << 2)
 
-This is already in mainline as 06c35ef1fdf8d955684448683f7e48ac5f15ccfd
+Please use a capital 'x' here.
+
+Also this patch is giving me a few checkpatch.pl warnings.
+
+> +
+>  /* TMC_FFCR - 0x304 */
+>  #define TMC_FFCR_FLUSHMAN_BIT	6
+>  #define TMC_FFCR_EN_FMT		BIT(0)
+> -- 
+> 2.7.5
+> 
