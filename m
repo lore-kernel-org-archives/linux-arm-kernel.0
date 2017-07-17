@@ -1,80 +1,148 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Mon, 17 Jul 2017 12:38:57 +0200
-Subject: [PATCH] tee: optee: sync with new naming of interrupts
-Message-ID: <1500287937-30504-1-git-send-email-jens.wiklander@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 17 Jul 2017 11:41:11 +0100
+Subject: [PATCH 3/6] mfd: axp20x: Add support for AXP813 PMIC
+In-Reply-To: <20170622040833.15329-4-wens@csie.org>
+References: <20170622040833.15329-1-wens@csie.org>
+ <20170622040833.15329-4-wens@csie.org>
+Message-ID: <20170717104111.jsg4edvptps76jnb@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Wang <david.wang@arm.com>
+On Thu, 22 Jun 2017, Chen-Yu Tsai wrote:
 
-In the latest changes of optee_os, the interrupts' names are
-changed to "native" and "foreign" interrupts.
+> The X-Powers AXP813 PMIC is normally used with Allwinner's A83T SoC.
+> It has the same range of functions as other X-Powers PMICs, such as
+> DC-DC buck converter and linear regulator outputs, AC-IN and VBUS
+> power supplies, power button trigger, GPIOs, ADCs, and a battery
+> charger.
+> 
+> Note that the IRQ table given in the datasheet is incorrect: in IRQ
+> enable/status registers 1, there are separate IRQs for ACIN and VBUS,
+> instead of bits [7:5] being the same as bits [4:2]. So it shares the
+> same IRQs as the AXP803, rather than the AXP288.
+> 
+> This patch adds basic mfd support for it, with only the power button
+> enabled.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mfd/axp20x-rsb.c   |  1 +
+>  drivers/mfd/axp20x.c       | 22 ++++++++++++++++++++++
+>  include/linux/mfd/axp20x.h | 29 +++++++++++++++++++++++++++++
+>  3 files changed, 52 insertions(+)
 
-Signed-off-by: David Wang <david.wang@arm.com>
-Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
----
- drivers/tee/optee/optee_smc.h | 12 ++++++------
- drivers/tee/optee/rpc.c       |  8 ++++----
- 2 files changed, 10 insertions(+), 10 deletions(-)
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+  
+> diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+> index fd5c7267b136..7ddbd9e8dd03 100644
+> --- a/drivers/mfd/axp20x-rsb.c
+> +++ b/drivers/mfd/axp20x-rsb.c
+> @@ -64,6 +64,7 @@ static const struct of_device_id axp20x_rsb_of_match[] = {
+>  	{ .compatible = "x-powers,axp803", .data = (void *)AXP803_ID },
+>  	{ .compatible = "x-powers,axp806", .data = (void *)AXP806_ID },
+>  	{ .compatible = "x-powers,axp809", .data = (void *)AXP809_ID },
+> +	{ .compatible = "x-powers,axp813", .data = (void *)AXP813_ID },
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 917b6ddc4f15..ec4271ca065c 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -44,6 +44,7 @@ static const char * const axp20x_model_names[] = {
+>  	"AXP803",
+>  	"AXP806",
+>  	"AXP809",
+> +	"AXP813",
+>  };
+>  
+>  static const struct regmap_range axp152_writeable_ranges[] = {
+> @@ -870,6 +871,14 @@ static struct mfd_cell axp809_cells[] = {
+>  	},
+>  };
+>  
+> +static struct mfd_cell axp813_cells[] = {
+> +	{
+> +		.name			= "axp20x-pek",
+> +		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+> +		.resources		= axp803_pek_resources,
+> +	}
+> +};
+> +
+>  static struct axp20x_dev *axp20x_pm_power_off;
+>  static void axp20x_power_off(void)
+>  {
+> @@ -956,6 +965,19 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+>  		axp20x->regmap_cfg = &axp22x_regmap_config;
+>  		axp20x->regmap_irq_chip = &axp809_regmap_irq_chip;
+>  		break;
+> +	case AXP813_ID:
+> +		axp20x->nr_cells = ARRAY_SIZE(axp813_cells);
+> +		axp20x->cells = axp813_cells;
+> +		axp20x->regmap_cfg = &axp288_regmap_config;
+> +		/*
+> +		 * The IRQ table given in the datasheet is incorrect.
+> +		 * In IRQ enable/status registers 1, there are separate
+> +		 * IRQs for ACIN and VBUS, instead of bits [7:5] being
+> +		 * the same as bits [4:2]. So it shares the same IRQs
+> +		 * as the AXP803, rather than the AXP288.
+> +		 */
+> +		axp20x->regmap_irq_chip = &axp803_regmap_irq_chip;
+> +		break;
+>  	default:
+>  		dev_err(dev, "unsupported AXP20X ID %lu\n", axp20x->variant);
+>  		return -EINVAL;
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 965b027e31b3..e9c908c4fba8 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -23,6 +23,7 @@ enum axp20x_variants {
+>  	AXP803_ID,
+>  	AXP806_ID,
+>  	AXP809_ID,
+> +	AXP813_ID,
+>  	NR_AXP20X_VARIANTS,
+>  };
+>  
+> @@ -387,6 +388,34 @@ enum {
+>  	AXP803_REG_ID_MAX,
+>  };
+>  
+> +enum {
+> +	AXP813_DCDC1 = 0,
+> +	AXP813_DCDC2,
+> +	AXP813_DCDC3,
+> +	AXP813_DCDC4,
+> +	AXP813_DCDC5,
+> +	AXP813_DCDC6,
+> +	AXP813_DCDC7,
+> +	AXP813_ALDO1,
+> +	AXP813_ALDO2,
+> +	AXP813_ALDO3,
+> +	AXP813_DLDO1,
+> +	AXP813_DLDO2,
+> +	AXP813_DLDO3,
+> +	AXP813_DLDO4,
+> +	AXP813_ELDO1,
+> +	AXP813_ELDO2,
+> +	AXP813_ELDO3,
+> +	AXP813_FLDO1,
+> +	AXP813_FLDO2,
+> +	AXP813_FLDO3,
+> +	AXP813_RTC_LDO,
+> +	AXP813_LDO_IO0,
+> +	AXP813_LDO_IO1,
+> +	AXP813_SW,
+> +	AXP813_REG_ID_MAX,
+> +};
+> +
+>  /* IRQs */
+>  enum {
+>  	AXP152_IRQ_LDO0IN_CONNECT = 1,
 
-diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
-index 13b7c98cdf25..069c8e1429de 100644
---- a/drivers/tee/optee/optee_smc.h
-+++ b/drivers/tee/optee/optee_smc.h
-@@ -298,7 +298,7 @@ struct optee_smc_disable_shm_cache_result {
- 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_ENABLE_SHM_CACHE)
- 
- /*
-- * Resume from RPC (for example after processing an IRQ)
-+ * Resume from RPC (for example after processing a foreign interrupt)
-  *
-  * Call register usage:
-  * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC
-@@ -383,19 +383,19 @@ struct optee_smc_disable_shm_cache_result {
- 	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_FREE)
- 
- /*
-- * Deliver an IRQ in normal world.
-+ * Deliver foreign interrupt to normal world.
-  *
-  * "Call" register usage:
-- * a0	OPTEE_SMC_RETURN_RPC_IRQ
-+ * a0	OPTEE_SMC_RETURN_RPC_FOREIGN_INTR
-  * a1-7	Resume information, must be preserved
-  *
-  * "Return" register usage:
-  * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC.
-  * a1-7	Preserved
-  */
--#define OPTEE_SMC_RPC_FUNC_IRQ		4
--#define OPTEE_SMC_RETURN_RPC_IRQ \
--	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_IRQ)
-+#define OPTEE_SMC_RPC_FUNC_FOREIGN_INTR		4
-+#define OPTEE_SMC_RETURN_RPC_FOREIGN_INTR \
-+	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_FOREIGN_INTR)
- 
- /*
-  * Do an RPC request. The supplied struct optee_msg_arg tells which
-diff --git a/drivers/tee/optee/rpc.c b/drivers/tee/optee/rpc.c
-index 9488ed1541bc..cef417f4f4d2 100644
---- a/drivers/tee/optee/rpc.c
-+++ b/drivers/tee/optee/rpc.c
-@@ -371,11 +371,11 @@ void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param)
- 		shm = reg_pair_to_ptr(param->a1, param->a2);
- 		tee_shm_free(shm);
- 		break;
--	case OPTEE_SMC_RPC_FUNC_IRQ:
-+	case OPTEE_SMC_RPC_FUNC_FOREIGN_INTR:
- 		/*
--		 * An IRQ was raised while secure world was executing,
--		 * since all IRQs are handled in Linux a dummy RPC is
--		 * performed to let Linux take the IRQ through the normal
-+		 * A foreign interrupt was raised while secure world was
-+		 * executing, since they are handled in Linux a dummy RPC is
-+		 * performed to let Linux take the interrupt through the normal
- 		 * vector.
- 		 */
- 		break;
 -- 
-2.7.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
