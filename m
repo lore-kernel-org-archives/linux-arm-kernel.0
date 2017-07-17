@@ -1,33 +1,21 @@
-From: abhishek.shah@broadcom.com (Abhishek Shah)
-Date: Tue, 18 Jul 2017 00:07:35 +0530
-Subject: [PATCH 2/3] net: ethernet: bgmac: Make IDM register space optional
-In-Reply-To: <CAC3K-4o=WRqBv_vTf7QGDYjWzMmVog=63ZbiHbHAuW7zJcsHFQ@mail.gmail.com>
-References: <1499972649-6200-1-git-send-email-abhishek.shah@broadcom.com>
- <1499972649-6200-3-git-send-email-abhishek.shah@broadcom.com>
- <CAC3K-4o=WRqBv_vTf7QGDYjWzMmVog=63ZbiHbHAuW7zJcsHFQ@mail.gmail.com>
-Message-ID: <CAKUFe6ad027MAg-A3XO7i1=c-Q623JqMPCKV_+Hi+ZpUojBn-Q@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 17 Jul 2017 13:37:55 -0500
+Subject: [PATCH 1/2] dt-bindings: Document STM32 HASH bindings
+In-Reply-To: <1499952747-16423-2-git-send-email-lionel.debieve@st.com>
+References: <1499952747-16423-1-git-send-email-lionel.debieve@st.com>
+ <1499952747-16423-2-git-send-email-lionel.debieve@st.com>
+Message-ID: <20170717183755.uvkd2fkdcduqf3dq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Thu, Jul 13, 2017 at 03:32:26PM +0200, Lionel Debieve wrote:
+> This adds documentation of device tree bindings for the STM32
+> HASH controller.
+> 
+> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+> ---
+>  .../devicetree/bindings/crypto/st,stm32-hash.txt   | 30 ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/st,stm32-hash.txt
 
-> This also will need to be added to
-> drivers/net/ethernet/broadcom/bgmac-bcma.c.  Otherwise, the driver
-> will no longer work for those platforms.  Since this was already
-> accepted, please push out a fix ASAP.
->
-I do not see how the bcma driver [bgmac-bcma.c] will no longer work.
-The whole idea behind introducing this  BGMAC_FEAT_IDM_MASK bit
-was to keep bcma driver's functionality intact.
-
-The BGMAC_FEAT_IDM_MASK bit is explicitly set by the bgmac-platform driver
-and is unset inside the same if the idm register base is provided.
-
-For BCMA driver case, I do not touch BGMAC_FEAT_IDM_MASK bit, i.e. it
-is *not* set.
-And if it is not set, each idm operation done in bgmac.c will take place.
-Please explain if I am missing something here.
-
-
-Regards,
-Abhishek
+Acked-by: Rob Herring <robh@kernel.org>
