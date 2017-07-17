@@ -1,20 +1,20 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 17 Jul 2017 10:09:28 +0200
-Subject: [PATCH 2/3] ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding
+Date: Mon, 17 Jul 2017 10:08:53 +0200
+Subject: [PATCH 1/3] ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding
  for vin nodes
-In-Reply-To: <1499777809-27492-3-git-send-email-horms+renesas@verge.net.au>
+In-Reply-To: <1499777809-27492-2-git-send-email-horms+renesas@verge.net.au>
 References: <1499777809-27492-1-git-send-email-horms+renesas@verge.net.au>
- <1499777809-27492-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVrjsU8=1UmK-SNG316sDDpMehwFu+zJFBDjMFUptjjYA@mail.gmail.com>
+ <1499777809-27492-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVw4oKqj1c+OX8JosP5wmFFz0UoQDkazd7JkgnJs0yiEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Jul 11, 2017 at 2:56 PM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a7791 SoC.
+> Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a7790 SoC.
 >
 > This has no run-time effect for the current driver as the initialisation
-> sequence is the same for the SoC-specific binding for r8a7791 and the
+> sequence is the same for the SoC-specific binding for r8a7790 and the
 > fallback binding for R-Car Gen 2
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
