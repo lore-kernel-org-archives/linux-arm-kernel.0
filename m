@@ -1,192 +1,43 @@
-From: cosardindar@gmail.com (Cosar Dindar)
-Date: Mon, 17 Jul 2017 19:14:43 +0300
-Subject: [RESEND,PATCH v4 3/3] crypto : stm32 - Add STM32F4 CRC32 support
-In-Reply-To: <bc6634fb-22df-5f36-70ee-9b29f6ded05c@st.com>
-References: <1500280056-46251-1-git-send-email-cosardindar@gmail.com>
- <bc6634fb-22df-5f36-70ee-9b29f6ded05c@st.com>
-Message-ID: <20170717161443.GD62822@osboxes>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 17 Jul 2017 18:23:49 +0200
+Subject: [RESEND RFC PATCH] ARM: dts: stm32: change pinctrl bindings definition
+Message-ID: <1500308630-14364-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 02:23:44PM +0000, Lionel DEBIEVE wrote:
-> Hi Cosar,
-> 
-> -	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
-> +	/* For F4 series only CRC32 algorithm will be used */
-> +	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc"))
-> +		algs_size = 1;
-> +	else
-> +		algs_size = ARRAY_SIZE(algs);
-> +
-> +	ret = crypto_register_shashes(algs, algs_size);
-> 
-> Should it be better to have a dedicated array per platform data instead? Could be new platform update?
-> 
-> BR,
-> 
-> Lionel
->
+Initially each pin was declared in "include/dt-bindings/stm32f429-pinfunc.h"
+and each definition contained SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
+Since this approach was approved, the number of supported MCU has
+increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a new
+file in "include/dt-bindings" each time a new STM32 SOC arrives I propose
+a new approach which consist to use a macro to define pin muxing in device
+tree. All STM32 DT will use the common macro to define pinmux. Furthermore, it
+will make easy maintenance and integration of new SOC.
 
-Hi Lionel,
+To check that patch generate same dtb than befrore I used dtc binary to (re)generate dts files
+(before and after apply the series).
+Example on stm32f469-disco:
 
-Thanks for the comment.
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
+stm32f469-disco-after.dtb
 
-It might be better to seperate shash_alg array according to the platform, one alg array for F7 and one for M4.
-Adding a new array definition for M4 platform with only CRC-32 algorithm might be enough.
-This action would be necessary since it might cause problem while unregistering with your last patch.
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
+stm32f469-disco-before.dtb
 
-BR,
+Then diff -u stm32f469-disco-before.dts stm32f469-disco-after.dts
 
-Cosar
- 
-> 
-> On 07/17/2017 10:27 AM, Cosar Dindar wrote:
-> > This patch adds CRC (CRC32 Crypto) support for STM32F4 series.
-> >
-> > As an hardware limitation polynomial and key setting are not supported.
-> > They are fixed as 0x4C11DB7 (poly) and 0xFFFFFFFF (key).
-> > CRC32C Castagnoli algorithm is not used.
-> >
-> > Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
-> > Reviewed-by: Fabien Dessenne <fabien.dessenne@st.com>
-> > ---
-> >   drivers/crypto/stm32/stm32_crc32.c | 68 ++++++++++++++++++++++++++++++++------
-> >   1 file changed, 58 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/drivers/crypto/stm32/stm32_crc32.c b/drivers/crypto/stm32/stm32_crc32.c
-> > index ec83b1e..12fbd98 100644
-> > --- a/drivers/crypto/stm32/stm32_crc32.c
-> > +++ b/drivers/crypto/stm32/stm32_crc32.c
-> > @@ -7,6 +7,7 @@
-> >   #include <linux/bitrev.h>
-> >   #include <linux/clk.h>
-> >   #include <linux/module.h>
-> > +#include <linux/of.h>
-> >   #include <linux/platform_device.h>
-> >   
-> >   #include <crypto/internal/hash.h>
-> > @@ -39,6 +40,9 @@ struct stm32_crc {
-> >   	struct clk       *clk;
-> >   	u8               pending_data[sizeof(u32)];
-> >   	size_t           nb_pending_bytes;
-> > +	bool             key_support;
-> > +	bool             poly_support;
-> > +	bool             reverse_support;
-> >   };
-> >   
-> >   struct stm32_crc_list {
-> > @@ -106,13 +110,31 @@ static int stm32_crc_init(struct shash_desc *desc)
-> >   	}
-> >   	spin_unlock_bh(&crc_list.lock);
-> >   
-> > -	/* Reset, set key, poly and configure in bit reverse mode */
-> > -	writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
-> > -	writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
-> > -	writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-> > +	/* set key */
-> > +	if (ctx->crc->key_support) {
-> > +		writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
-> > +	} else if (mctx->key != CRC_INIT_DEFAULT) {
-> > +		dev_err(ctx->crc->dev, "Unsupported key value! Should be: 0x%x\n",
-> > +			CRC_INIT_DEFAULT);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	/* set poly */
-> > +	if (ctx->crc->poly_support)
-> > +		writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
-> > +
-> > +	/* reset and configure in bit reverse mode if supported */
-> > +	if (ctx->crc->reverse_support)
-> > +		writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-> > +	else
-> > +		writel(CRC_CR_RESET, ctx->crc->regs + CRC_CR);
-> > +
-> > +	/* store partial result */
-> > +	if (!ctx->crc->reverse_support)
-> > +		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
-> > +	else
-> > +		ctx->partial = readl(ctx->crc->regs + CRC_DR);
-> >   
-> > -	/* Store partial result */
-> > -	ctx->partial = readl(ctx->crc->regs + CRC_DR);
-> >   	ctx->crc->nb_pending_bytes = 0;
-> >   
-> >   	return 0;
-> > @@ -135,7 +157,12 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
-> >   
-> >   		if (crc->nb_pending_bytes == sizeof(u32)) {
-> >   			/* Process completed pending data */
-> > -			writel(*(u32 *)crc->pending_data, crc->regs + CRC_DR);
-> > +			if (!ctx->crc->reverse_support)
-> > +				writel(bitrev32(*(u32 *)crc->pending_data),
-> > +				       crc->regs + CRC_DR);
-> > +			else
-> > +				writel(*(u32 *)crc->pending_data,
-> > +				       crc->regs + CRC_DR);
-> >   			crc->nb_pending_bytes = 0;
-> >   		}
-> >   	}
-> > @@ -143,10 +170,16 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
-> >   	d32 = (u32 *)d8;
-> >   	for (i = 0; i < length >> 2; i++)
-> >   		/* Process 32 bits data */
-> > -		writel(*(d32++), crc->regs + CRC_DR);
-> > +		if (!ctx->crc->reverse_support)
-> > +			writel(bitrev32(*(d32++)), crc->regs + CRC_DR);
-> > +		else
-> > +			writel(*(d32++), crc->regs + CRC_DR);
-> >   
-> >   	/* Store partial result */
-> > -	ctx->partial = readl(crc->regs + CRC_DR);
-> > +	if (!ctx->crc->reverse_support)
-> > +		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
-> > +	else
-> > +		ctx->partial = readl(crc->regs + CRC_DR);
-> >   
-> >   	/* Check for pending data (non 32 bits) */
-> >   	length &= 3;
-> > @@ -243,6 +276,7 @@ static int stm32_crc_probe(struct platform_device *pdev)
-> >   	struct stm32_crc *crc;
-> >   	struct resource *res;
-> >   	int ret;
-> > +	int algs_size;
-> >   
-> >   	crc = devm_kzalloc(dev, sizeof(*crc), GFP_KERNEL);
-> >   	if (!crc)
-> > @@ -269,13 +303,26 @@ static int stm32_crc_probe(struct platform_device *pdev)
-> >   		return ret;
-> >   	}
-> >   
-> > +	/* set key, poly and reverse support if device is of F7 series */
-> > +	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f7-crc")) {
-> > +		crc->key_support = true;
-> > +		crc->poly_support = true;
-> > +		crc->reverse_support = true;
-> > +	}
-> > +
-> >   	platform_set_drvdata(pdev, crc);
-> >   
-> >   	spin_lock(&crc_list.lock);
-> >   	list_add(&crc->list, &crc_list.dev_list);
-> >   	spin_unlock(&crc_list.lock);
-> >   
-> > -	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
-> > +	/* For F4 series only CRC32 algorithm will be used */
-> > +	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc"))
-> > +		algs_size = 1;
-> > +	else
-> > +		algs_size = ARRAY_SIZE(algs);
-> > +
-> > +	ret = crypto_register_shashes(algs, algs_size);
-> >   	if (ret) {
-> >   		dev_err(dev, "Failed to register\n");
-> >   		clk_disable_unprepare(crc->clk);
-> > @@ -304,6 +351,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
-> >   
-> >   static const struct of_device_id stm32_dt_ids[] = {
-> >   	{ .compatible = "st,stm32f7-crc", },
-> > +	{ .compatible = "st,stm32f4-crc", },
-> >   	{},
-> >   };
-> >   MODULE_DEVICE_TABLE(of, stm32_dt_ids);
+Regards
+Alex
+
+Alexandre TORGUE (1):
+  ARM: dts: stm32: change pinctrl bindings definition
+
+ arch/arm/boot/dts/stm32f429.dtsi                |  176 ++--
+ include/dt-bindings/pinctrl/stm32-pinfunc.h     |   61 ++
+ include/dt-bindings/pinctrl/stm32f429-pinfunc.h | 1239 -----------------------
+ 3 files changed, 149 insertions(+), 1327 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/stm32-pinfunc.h
+ delete mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+
+-- 
+1.9.1
