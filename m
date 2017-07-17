@@ -1,62 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Jul 2017 11:17:47 +0200
+Date: Mon, 17 Jul 2017 11:20:45 +0200
 Subject: [PATCH 05/11] mmc: sunxi: Support controllers that can use both
  old and new timings
-In-Reply-To: <20170714064302.20383-6-wens@csie.org>
+In-Reply-To: <CAPDyKFqe1hFmfWziu04fW=cQa0EGvT11YzuJ0f-eHy6+u7vutQ@mail.gmail.com>
 References: <20170714064302.20383-1-wens@csie.org>
  <20170714064302.20383-6-wens@csie.org>
-Message-ID: <20170717091747.kcrlifbp7meihszm@flea>
+ <CAPDyKFoLTXJ10EJRfPPggJBg8bh9BpdwTnew-WL0G7LpnO43Pg@mail.gmail.com>
+ <CAGb2v64gjLSdb83fR9OCZthtgMQz-UkmMhT9OmJkq3Xp6mJ-aA@mail.gmail.com>
+ <CAPDyKFqe1hFmfWziu04fW=cQa0EGvT11YzuJ0f-eHy6+u7vutQ@mail.gmail.com>
+Message-ID: <20170717092045.3hidokuo6w7cgorw@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jul 14, 2017 at 02:42:56PM +0800, Chen-Yu Tsai wrote:
-> On the SoCs that introduced the new timing mode for MMC controllers,
-> both the old (where the clock delays are set in the CCU) and new
-> (where the clock delays are set in the MMC controller) timing modes
-> are available, and we have to support them both. However there are
-> two bits that control which mode is active. One is in the CCU, the
-> other is in the MMC controller. The settings on both sides must be
-> the same, or nothing will work.
+On Fri, Jul 14, 2017 at 11:57:35AM +0200, Ulf Hansson wrote:
+> >>> +       if (host->use_new_timings) {
+> >>> +               ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
+> >>
+> >> Can't this be solved through some other generic API/interface?
+> >
+> > The old discussion is here: https://lkml.org/lkml/2017/5/5/77
+> >
+> > It is possible to piggy back on existing API, but as Maxime mentioned
+> > back in the discussion, it is confusing.
+> >
+> > IIRC Mike said (via Maxime) an SoC specific call was the easy way
+> > to handle this. I don't think there's anything generic about this.
+> > Even if you could have a _set_mode callback for the clks, the modes
+> > would be SoC specific anyway.
 > 
-> The CCU's get/set_phase callbacks return -ENOTSUPP when the new
-> timing mode is active. This provides a way to know which mode is
-> active on that side, and we can set the bit on the MMC controller
-> side accordingly.
+> Right. But it would benefit that we can keep drivers generic, as they
+> are using generic APIs/interfaces. I prefer that.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 34 ++++++++++++++++++++++++++++++----
->  1 file changed, 30 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 0fb4e4c119e1..56e45c65b52d 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -22,6 +22,7 @@
->  #include <linux/err.h>
->  
->  #include <linux/clk.h>
-> +#include <linux/clk/sunxi-ng.h>
->  #include <linux/gpio.h>
->  #include <linux/platform_device.h>
->  #include <linux/spinlock.h>
-> @@ -259,7 +260,7 @@ struct sunxi_mmc_cfg {
->  	/* Does DATA0 needs to be masked while the clock is updated */
->  	bool mask_data0;
->  
-> -	bool needs_new_timings;
-> +	bool has_new_timings;
+> Anyway, let me try to dig up the earlier discussion.
 
-I think we should have both, it's a bit different. Newer SoCs like the
-A64 can only operate using new timings, while the older ones can
-operate in both modes.
+There's really not any generic way to support that. Even if we reuse
+some other function (clk_set_phase/clk_get_phase was suggested), and
+use error codes and / or values to differentiate between two modes,
+this will be very much implementation-specific as well, and any other
+SoC that in theory would be using that will very likely to not
+implement the same behaviour for its clocks.
 
-In one case, we're forced to use it, in the other one it's a
-policy. We should differentiate both cases.
+And this driver is only used on one SoC family, so it's not really a
+big deal anyway.
 
-Looks good otherwise, thanks!
 Maxime
 
 -- 
@@ -69,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/3fff9c9f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/4308a42b/attachment-0001.sig>
