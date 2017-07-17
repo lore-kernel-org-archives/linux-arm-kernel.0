@@ -1,46 +1,59 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Mon, 17 Jul 2017 16:26:42 +0300
-Subject: [PATCH 3/7] staging: fsl-mc: drop useless gic v3 related #include
+Date: Mon, 17 Jul 2017 16:26:43 +0300
+Subject: [PATCH 4/7] staging: fsl-mc: fix compilation with non-generic msi
+ domain ops
 In-Reply-To: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
 References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170717132646.3020-4-laurentiu.tudor@nxp.com>
+Message-ID: <20170717132646.3020-5-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Nothing from linux/irqchip/arm-gic-v3.h is used, so the #include can be
-safely dropped.
+The bus driver relies on generic msi domain ops.
+Fix compilation for architectures that don't provide it (e.g. x86_64).
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/fsl-mc-msi.c                | 1 -
- drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c | 1 -
- 2 files changed, 2 deletions(-)
+ drivers/staging/fsl-mc/bus/fsl-mc-msi.c                | 4 ++++
+ drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c | 2 ++
+ 2 files changed, 6 insertions(+)
 
 diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-index c04a2f2..ee6e3b7 100644
+index ee6e3b7..18774ee 100644
 --- a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
 +++ b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-@@ -11,7 +11,6 @@
+@@ -17,6 +17,7 @@
+ #include <linux/msi.h>
+ #include "fsl-mc-private.h"
  
- #include <linux/of_device.h>
- #include <linux/of_address.h>
--#include <linux/irqchip/arm-gic-v3.h>
- #include <linux/of_irq.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
++#ifdef GENERIC_MSI_DOMAIN_OPS
+ /*
+  * Generate a unique ID identifying the interrupt (only used within the MSI
+  * irqdomain.  Combine the icid with the interrupt index.
+@@ -38,6 +39,9 @@ static void fsl_mc_msi_set_desc(msi_alloc_info_t *arg,
+ 	arg->hwirq = fsl_mc_domain_calc_hwirq(to_fsl_mc_device(desc->dev),
+ 					      desc);
+ }
++#else
++#define fsl_mc_msi_set_desc NULL
++#endif
+ 
+ static void fsl_mc_msi_update_dom_ops(struct msi_domain_info *info)
+ {
 diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-index 865d385..e798ea4 100644
+index e798ea4..cd73c58 100644
 --- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
 +++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-@@ -11,7 +11,6 @@
- 
- #include <linux/of_device.h>
- #include <linux/of_address.h>
--#include <linux/irqchip/arm-gic-v3.h>
- #include <linux/irq.h>
- #include <linux/msi.h>
- #include <linux/of.h>
+@@ -45,7 +45,9 @@ static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
+ 	 * NOTE: This device id corresponds to the IOMMU stream ID
+ 	 * associated with the DPRC object (ICID).
+ 	 */
++#ifdef GENERIC_MSI_DOMAIN_OPS
+ 	info->scratchpad[0].ul = mc_bus_dev->icid;
++#endif
+ 	msi_info = msi_get_domain_info(msi_domain->parent);
+ 	return msi_info->ops->msi_prepare(msi_domain->parent, dev, nvec, info);
+ }
 -- 
 2.9.4
