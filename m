@@ -1,5 +1,5 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 17 Jul 2017 16:32:18 +0200
+Date: Mon, 17 Jul 2017 16:35:27 +0200
 Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
  interpreted as bool
 In-Reply-To: <CAK8P3a1zBW_QuPtRFNwuVyE_ziySoV9_ebz4sD7Bya3eRoo8SA@mail.gmail.com>
@@ -7,7 +7,7 @@ References: <20170714092540.1217397-1-arnd@arndb.de>
  <20170714093938.1469319-1-arnd@arndb.de>
  <f57e08d9-0984-b67c-c64b-c7e0542d0361@xs4all.nl>
  <CAK8P3a1zBW_QuPtRFNwuVyE_ziySoV9_ebz4sD7Bya3eRoo8SA@mail.gmail.com>
-Message-ID: <9624c37a-1118-7d4f-888e-f0de196e4c15@xs4all.nl>
+Message-ID: <3a927e60-332a-f01d-f1af-98649e9f51b5@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
