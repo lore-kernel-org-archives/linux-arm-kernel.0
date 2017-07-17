@@ -1,31 +1,31 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 17 Jul 2017 07:49:55 +0200
-Subject: [PATCH 5/6] ARM: ezx_defconfig: Cleanup from non-existing options
+Date: Mon, 17 Jul 2017 07:49:56 +0200
+Subject: [PATCH 6/6] ARM: qcom_defconfig: Cleanup from non-existing options
 In-Reply-To: <1500270596-22384-1-git-send-email-krzk@kernel.org>
 References: <1500270596-22384-1-git-send-email-krzk@kernel.org>
-Message-ID: <1500270596-22384-5-git-send-email-krzk@kernel.org>
+Message-ID: <1500270596-22384-6-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU_FREQ_DEBUG is gone since commit 2d06d8c49afd  ("[CPUFREQ] use
-dynamic debug instead of custom infrastructure").
+QCOM_SMD is gone since commit 395a48053af6 ("soc: qcom: smd: Remove
+standalone driver").
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/configs/ezx_defconfig | 1 -
+ arch/arm/configs/qcom_defconfig | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/configs/ezx_defconfig b/arch/arm/configs/ezx_defconfig
-index 23660f3d0f7f..484e51fbd4a6 100644
---- a/arch/arm/configs/ezx_defconfig
-+++ b/arch/arm/configs/ezx_defconfig
-@@ -27,7 +27,6 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="console=tty1 root=/dev/mmcblk0p2 rootfstype=ext2 rootdelay=3 ip=192.168.0.202:192.168.0.200:192.168.0.200:255.255.255.0 debug"
- CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
--CONFIG_CPU_FREQ_DEBUG=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=m
- CONFIG_CPU_FREQ_GOV_USERSPACE=m
- CONFIG_CPU_FREQ_GOV_ONDEMAND=m
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index b02039c712c3..879159e4ab58 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -199,7 +199,6 @@ CONFIG_QCOM_WCNSS_PIL=y
+ CONFIG_QCOM_GSBI=y
+ CONFIG_QCOM_PM=y
+ CONFIG_QCOM_SMEM=y
+-CONFIG_QCOM_SMD=y
+ CONFIG_QCOM_SMD_RPM=y
+ CONFIG_QCOM_SMP2P=y
+ CONFIG_QCOM_SMSM=y
 -- 
 2.7.4
