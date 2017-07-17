@@ -1,91 +1,95 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 17 Jul 2017 16:27:17 +0200
-Subject: [RFC PATCH v2 18/19] KVM: arm/arm64: Get rid of
- kvm_timer_flush_hwstate
-In-Reply-To: <20170717142718.13853-1-cdall@linaro.org>
-References: <20170717142718.13853-1-cdall@linaro.org>
-Message-ID: <20170717142718.13853-19-cdall@linaro.org>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Mon, 17 Jul 2017 14:53:54 +0000
+Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to
+ work on 32-bits
+In-Reply-To: <59364128-679b-2ea8-9838-62e9bd5f5a7e@arm.com>
+References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
+ <20170717132646.3020-7-laurentiu.tudor@nxp.com>
+ <59364128-679b-2ea8-9838-62e9bd5f5a7e@arm.com>
+Message-ID: <596CCF7E.9030005@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now when both the vtimer and the ptimer when using both the in-kernel
-vgic emulation and a userspace IRQ chip are driven by the timer signals
-and at the vcpu load/put boundaries, instead of recomputing the timer
-state at every entry/exit to/from the guest, we can get entirely rid of
-the flush hwstate function.
+Hi Robin,
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+On 07/17/2017 04:43 PM, Robin Murphy wrote:
+> On 17/07/17 14:26, laurentiu.tudor at nxp.com wrote:
+>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>
+>> Split the 64-bit accesses in 32-bit accesses because there's no real
+>> constrain in MC to do only atomic 64-bit. There's only one place
+>> where ordering is important: when writing the MC command header the
+>> first 32-bit part of the header must be written last.
+>> We do this switch in order to allow compiling the driver on 32-bit.
+>
+> #include <linux/io-64-nonatomic-hi-lo.h>
+>
+> Then you can just use writeq()/writeq_relaxed()/readq_relaxed() on
+> 32-bit platforms as well.
+>
+
+Thanks, didn't knew of the header. This should take care of the 
+compilation errors i was seeing. There's one problem though: these 
+handle byte-ordering and i need raw accessors. :-(
+
 ---
- include/kvm/arm_arch_timer.h |  1 -
- virt/kvm/arm/arch_timer.c    | 24 ------------------------
- virt/kvm/arm/arm.c           |  1 -
- 3 files changed, 26 deletions(-)
+Best Regards, Laurentiu
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 8e5ed54..af29563 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -61,7 +61,6 @@ int kvm_timer_hyp_init(void);
- int kvm_timer_enable(struct kvm_vcpu *vcpu);
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
--void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
- bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu);
- void kvm_timer_update_run(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index aa18a5d..f92459a 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -302,12 +302,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 
--	/*
--	 * If userspace modified the timer registers via SET_ONE_REG before
--	 * the vgic was initialized, we mustn't set the vtimer->irq.level value
--	 * because the guest would never see the interrupt.  Instead wait
--	 * until we call this function from kvm_timer_flush_hwstate.
--	 */
- 	if (unlikely(!timer->enabled))
- 		return;
- 
-@@ -493,24 +487,6 @@ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
- 	       ptimer->irq.level != plevel;
- }
- 
--/**
-- * kvm_timer_flush_hwstate - prepare timers before running the vcpu
-- * @vcpu: The vcpu pointer
-- *
-- * Check if the virtual timer has expired while we were running in the host,
-- * and inject an interrupt if that was the case, making sure the timer is
-- * masked or disabled on the host so that we keep executing.  Also schedule a
-- * software timer for the physical timer if it is enabled.
-- */
--void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
--{
--	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
--
--	if (unlikely(!timer->enabled))
--		return;
--}
--
- void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index aed3e5c..6322605 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -651,7 +651,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		local_irq_disable();
- 
--		kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
- 
- 		/*
--- 
-2.9.0
+>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>> ---
+>>   drivers/staging/fsl-mc/bus/mc-sys.c | 31 ++++++++++++-------------------
+>>   1 file changed, 12 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
+>> index 195d9f3..dd2828e 100644
+>> --- a/drivers/staging/fsl-mc/bus/mc-sys.c
+>> +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
+>> @@ -124,14 +124,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
+>>   {
+>>   	int i;
+>>
+>> -	/* copy command parameters into the portal */
+>> -	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
+>> -		__raw_writeq(cmd->params[i], &portal->params[i]);
+>> -	/* ensure command params are committed before submitting it */
+>> -	wmb();
+>> -
+>> -	/* submit the command by writing the header */
+>> -	__raw_writeq(cmd->header, &portal->header);
+>> +	/*
+>> +	 * copy command parameters into the portal. Final write
+>> +	 * triggers the submission of the command.
+>> +	 */
+>> +	for (i = sizeof(struct mc_command) / sizeof(u32) - 1; i >= 0; i--) {
+>> +		__raw_writel(((u32 *)cmd)[i], &((u32 *)portal)[i]);
+>> +		/* ensure command params are committed before submitting it */
+>> +		wmb();
+>> +	}
+>>   }
+>>
+>>   /**
+>> @@ -148,19 +149,11 @@ static inline enum mc_cmd_status mc_read_response(struct mc_command __iomem *
+>>   						  struct mc_command *resp)
+>>   {
+>>   	int i;
+>> -	enum mc_cmd_status status;
+>> -
+>> -	/* Copy command response header from MC portal: */
+>> -	resp->header = __raw_readq(&portal->header);
+>> -	status = mc_cmd_hdr_read_status(resp);
+>> -	if (status != MC_CMD_STATUS_OK)
+>> -		return status;
+>>
+>> -	/* Copy command response data from MC portal: */
+>> -	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
+>> -		resp->params[i] = __raw_readq(&portal->params[i]);
+>> +	for (i = 0; i < sizeof(struct mc_command) / sizeof(u32); i++)
+>> +		((u32 *)resp)[i] = __raw_readl(&((u32 *)portal)[i]);
+>>
+>> -	return status;
+>> +	return mc_cmd_hdr_read_status(resp);
+>>   }
+>>
+>>   /**
+>>
+>
