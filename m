@@ -1,95 +1,68 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 17 Jul 2017 14:53:54 +0000
-Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to
- work on 32-bits
-In-Reply-To: <59364128-679b-2ea8-9838-62e9bd5f5a7e@arm.com>
-References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
- <20170717132646.3020-7-laurentiu.tudor@nxp.com>
- <59364128-679b-2ea8-9838-62e9bd5f5a7e@arm.com>
-Message-ID: <596CCF7E.9030005@nxp.com>
+From: lukas@mntmn.com (Lukas F. Hartmann)
+Date: Mon, 17 Jul 2017 16:58:38 +0200
+Subject: Debugging i.MX6QP HDMI Output on Mainline Kernel 
+Message-ID: <87d18z3yap.fsf@irata-debian.mntnas>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hello,
 
-On 07/17/2017 04:43 PM, Robin Murphy wrote:
-> On 17/07/17 14:26, laurentiu.tudor at nxp.com wrote:
->> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>
->> Split the 64-bit accesses in 32-bit accesses because there's no real
->> constrain in MC to do only atomic 64-bit. There's only one place
->> where ordering is important: when writing the MC command header the
->> first 32-bit part of the header must be written last.
->> We do this switch in order to allow compiling the driver on 32-bit.
->
-> #include <linux/io-64-nonatomic-hi-lo.h>
->
-> Then you can just use writeq()/writeq_relaxed()/readq_relaxed() on
-> 32-bit platforms as well.
->
+I'm trying, for several days full-time, to get HDMI Output working with
+the mainline kernel (first 4.12, now 4.13-rc1) on a board called TinyRex
+Ultra (incl. development baseboard), which has an i.MX6QP SoC and 4GB
+RAM. The HDMI output works with freescale-linux 4.1 but not with
+mainline. I'm willing to invest significant effort to make this work,
+and I appreciate some direction from experts on the subject.
 
-Thanks, didn't knew of the header. This should take care of the 
-compilation errors i was seeing. There's one problem though: these 
-handle byte-ordering and i need raw accessors. :-(
+I ported the DTS/DTSI files (mostly differing pinctrls) from the
+third-party tinyrexultra DTS/DTSI. I modified the imx6qp-sabresd files
+for this (attached). With this, most features of the board work fine,
+e.g. SATA, USB, ethernet. I boot a debian-unstable userland from it.
 
----
-Best Regards, Laurentiu
+When starting a program that uses DRM, e.g. Xorg, the program will pause
+for 10 second intervals and DRM will log:
 
->> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->> ---
->>   drivers/staging/fsl-mc/bus/mc-sys.c | 31 ++++++++++++-------------------
->>   1 file changed, 12 insertions(+), 19 deletions(-)
->>
->> diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
->> index 195d9f3..dd2828e 100644
->> --- a/drivers/staging/fsl-mc/bus/mc-sys.c
->> +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
->> @@ -124,14 +124,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
->>   {
->>   	int i;
->>
->> -	/* copy command parameters into the portal */
->> -	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
->> -		__raw_writeq(cmd->params[i], &portal->params[i]);
->> -	/* ensure command params are committed before submitting it */
->> -	wmb();
->> -
->> -	/* submit the command by writing the header */
->> -	__raw_writeq(cmd->header, &portal->header);
->> +	/*
->> +	 * copy command parameters into the portal. Final write
->> +	 * triggers the submission of the command.
->> +	 */
->> +	for (i = sizeof(struct mc_command) / sizeof(u32) - 1; i >= 0; i--) {
->> +		__raw_writel(((u32 *)cmd)[i], &((u32 *)portal)[i]);
->> +		/* ensure command params are committed before submitting it */
->> +		wmb();
->> +	}
->>   }
->>
->>   /**
->> @@ -148,19 +149,11 @@ static inline enum mc_cmd_status mc_read_response(struct mc_command __iomem *
->>   						  struct mc_command *resp)
->>   {
->>   	int i;
->> -	enum mc_cmd_status status;
->> -
->> -	/* Copy command response header from MC portal: */
->> -	resp->header = __raw_readq(&portal->header);
->> -	status = mc_cmd_hdr_read_status(resp);
->> -	if (status != MC_CMD_STATUS_OK)
->> -		return status;
->>
->> -	/* Copy command response data from MC portal: */
->> -	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
->> -		resp->params[i] = __raw_readq(&portal->params[i]);
->> +	for (i = 0; i < sizeof(struct mc_command) / sizeof(u32); i++)
->> +		((u32 *)resp)[i] = __raw_readl(&((u32 *)portal)[i]);
->>
->> -	return status;
->> +	return mc_cmd_hdr_read_status(resp);
->>   }
->>
->>   /**
->>
->
+[ 127.831760] [drm:drm_atomic_helper_commit_cleanup_done] *ERROR* [CRTC:27:crtc-0] flip_done timed out
+[ 138.711740] [drm:drm_atomic_helper_commit_cleanup_done] *ERROR* [CRTC:27:crtc-0] flip_done timed out
+[ 148.951738] [drm:drm_atomic_helper_commit_cleanup_done] *ERROR*
+[CRTC:27:crtc-0] flip_done timed out
+
+As far as I understand this is:
+wait_for_completion_interruptible_timeout(&stall_commit->flip_done,
+10*HZ); in gpu/drm/drm_atomic_helper.c. In gpu/drm/imx/ipuv3-crtc.c
+there is a function ipu_irq_handler(int irq, void *dev_id). Putting a
+printk statement there reveals that this is never called. The interrupt
+is requested as ipu_idmac_channel_irq(ipu_plane->ipu, ipu_plane->ipu_ch,
+IPU_IRQ_EOF).
+
+Thus, IRQ_EOF interrupts are never triggered. If I understand correctly,
+this points to a problem with IPU setup or maybe clocks/CCM? I traced
+register writes of the HDMI TX driver and they seem mostly sane / very
+similar to what the freescale kernel does, but I don't know how to best
+trace what is happening with IPU.
+
+If anyone has an idea of how I could track down the cause for this
+problem or a checklist of places to double-check, I would be very
+thankful.
+
+I've tried to communicate with NXP on this issue and they pointed me to
+this list. https://community.nxp.com/message/924230
+
+Cheers
+Lukas F. Hartmann / mntmn
+http://mntmn.com
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: imx6qdl-tinyrex2.dtsi
+Type: application/octet-stream
+Size: 11944 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/c19778f1/attachment.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: imx6-tinyrexultra.dts
+Type: application/octet-stream
+Size: 602 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/c19778f1/attachment-0001.obj>
