@@ -1,23 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Jul 2017 13:46:19 -0500
-Subject: [PATCH 7/9] dt-bindings: serial: add compatible for stm32h7
-In-Reply-To: <1499958494-19354-8-git-send-email-bich.hemon@st.com>
-References: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
- <1499958494-19354-8-git-send-email-bich.hemon@st.com>
-Message-ID: <20170717184619.ffvt4ebzyurke3h2@rob-hp-laptop>
+Date: Mon, 17 Jul 2017 13:51:26 -0500
+Subject: [PATCH 07/11] mmc: sunxi: Add support for A83T eMMC (MMC2)
+In-Reply-To: <20170714064302.20383-8-wens@csie.org>
+References: <20170714064302.20383-1-wens@csie.org>
+ <20170714064302.20383-8-wens@csie.org>
+Message-ID: <20170717185126.rrhriqckjextpaxj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 03:08:29PM +0000, Bich HEMON wrote:
-> From: Fabrice Gasnier <fabrice.gasnier@st.com>
+On Fri, Jul 14, 2017 at 02:42:58PM +0800, Chen-Yu Tsai wrote:
+> The third MMC controller (MMC2) on the Allwinner A83T SoC is slightly
+> different. It supports a wider 8-bit bus, has a dedicated controllable
+> reset pin for eMMC, and a "new timing mode" which is supposed to deliver
+> better signals and thus better performance.
 > 
-> Introduce new compatibles for "st,stm32h7-usart" and "st,stm32h7-uart".
-> This new compatible allow to use optional wake-up interrupt.
+> Add a compatible for this one to use the new timing mode not found in the
+> other controllers.
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Signed-off-by: Bich Hemon <bich.hemon@st.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../devicetree/bindings/serial/st,stm32-usart.txt       | 17 ++++++++++++-----
->  1 file changed, 12 insertions(+), 5 deletions(-)
+>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
 
 Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/mmc/host/sunxi-mmc.c                        | 8 ++++++++
+>  2 files changed, 9 insertions(+)
