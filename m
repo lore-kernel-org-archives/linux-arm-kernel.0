@@ -1,43 +1,173 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 17 Jul 2017 10:02:28 -0600
-Subject: [PATCH v3 03/18] arm: qcom-msm8974: dts: Update coresight
- replicator
-In-Reply-To: <1500037463-19951-4-git-send-email-suzuki.poulose@arm.com>
-References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
- <1500037463-19951-4-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170717160228.GB21003@xps15>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 17 Jul 2017 18:03:01 +0200
+Subject: [PATCH RESEND] ARM64: dts: meson-gxl-s905x-libretech-cc: fixup board
+ definition
+Message-ID: <20170717160301.32729-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 02:04:08PM +0100, Suzuki K Poulose wrote:
-> Replace the obsolete compatible string for Coresight programmable
-> replicator with the new one.
-> 
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm/boot/dts/qcom-msm8974.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index 307bf6a..3c7c6b9 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -729,7 +729,7 @@
->  		};
->  
->  		replicator at fc31c000 {
-> -			compatible = "qcom,coresight-replicator1x", "arm,primecell";
-> +			compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
->  			reg = <0xfc31c000 0x1000>;
->  
->  			clocks = <&rpmcc RPM_SMD_QDSS_CLK>, <&rpmcc RPM_SMD_QDSS_A_CLK>;
+The libretech CC derives less from the p212 than initially thought.
+Several voltage regulators are different and the capabilities of the
+sdcard and emmc also differ.
 
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Deriving from the p212 is not convient anymore so the libretech is now
+derived from s905x definition directly.
 
-> -- 
-> 2.7.5
-> 
+Fixes: cd84aff1d981 ("ARM64: dts: meson-gxl: Add Libre Technology CC support")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ .../dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 103 ++++++++++++++++++---
+ 1 file changed, 91 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+index 890821d6e52b..266fbcf3e47f 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+@@ -10,12 +10,20 @@
+ 
+ #include <dt-bindings/input/input.h>
+ 
+-#include "meson-gxl-s905x-p212.dtsi"
++#include "meson-gxl-s905x.dtsi"
+ 
+ / {
+ 	compatible = "libretech,cc", "amlogic,s905x", "amlogic,meson-gxl";
+ 	model = "Libre Technology CC";
+ 
++	aliases {
++		serial0 = &uart_AO;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	cvbs-connector {
+ 		compatible = "composite-video-connector";
+ 
+@@ -26,6 +34,11 @@
+ 		};
+ 	};
+ 
++	emmc_pwrseq: emmc-pwrseq {
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
++	};
++
+ 	hdmi-connector {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -53,6 +66,39 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x80000000>;
++	};
++
++	vcc_3v3: regulator-vcc_3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	vcc_card: regulator-vcc-card {
++		compatible = "regulator-gpio";
++
++		regulator-name = "VCC_CARD";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
++		gpios-states = <0>;
++
++		states = <3300000 0>,
++			 <1800000 1>;
++	};
++
++	vddio_boot: regulator-vddio_boot {
++		compatible = "regulator-fixed";
++		regulator-name = "VDDIO_BOOT";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
+ };
+ 
+ &cvbs_vdac_port {
+@@ -61,6 +107,16 @@
+ 	};
+ };
+ 
++&ethmac {
++	status = "okay";
++};
++
++&ir {
++	status = "okay";
++	pinctrl-0 = <&remote_input_ao_pins>;
++	pinctrl-names = "default";
++};
++
+ &hdmi_tx {
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+@@ -73,20 +129,43 @@
+ 	};
+ };
+ 
+-/*
+- * The following devices exists but are exposed on the general
+- * purpose GPIO header. End user may well decide to use those pins
+- * for another purpose
+- */
++/* SD card */
++&sd_emmc_b {
++	status = "okay";
++	pinctrl-0 = <&sdcard_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <4>;
++	cap-sd-highspeed;
++	max-frequency = <100000000>;
++	disable-wp;
++
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
+ 
+-&sd_emmc_a {
+-	status = "disabled";
++	vmmc-supply = <&vcc_3v3>;
++	vqmmc-supply = <&vcc_card>;
+ };
+ 
+-&uart_A {
+-	status = "disabled";
++/* eMMC */
++&sd_emmc_c {
++	status = "okay";
++	pinctrl-0 = <&emmc_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <8>;
++	cap-mmc-highspeed;
++	max-frequency = <50000000>;
++	non-removable;
++	disable-wp;
++
++	mmc-pwrseq = <&emmc_pwrseq>;
++	vmmc-supply = <&vcc_3v3>;
++	vqmmc-supply = <&vddio_boot>;
+ };
+ 
+-&wifi32k {
+-	status = "disabled";
++&uart_AO {
++	status = "okay";
++	pinctrl-0 = <&uart_ao_a_pins>;
++	pinctrl-names = "default";
+ };
+-- 
+2.9.4
