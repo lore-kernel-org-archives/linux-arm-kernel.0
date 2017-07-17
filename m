@@ -1,50 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Jul 2017 14:16:35 +0100
-Subject: [PATCH] arm64: perf: Allow more than one cycle counter to be used
-In-Reply-To: <32b8658a-e48d-308d-4c89-9d22161ec1a8@redhat.com>
-References: <5817e4915963d7fae5928a77d85f7e0c4dca290c.1498890614.git.panand@redhat.com>
- <32b8658a-e48d-308d-4c89-9d22161ec1a8@redhat.com>
-Message-ID: <20170717131635.GK26488@arm.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Mon, 17 Jul 2017 15:19:52 +0200
+Subject: [PATCH v3 2/3] dt-bindings: display: panel: Add support for Orise
+ Tech otm8009a dsi panel
+In-Reply-To: <1500297593-30633-1-git-send-email-philippe.cornu@st.com>
+References: <1500297593-30633-1-git-send-email-philippe.cornu@st.com>
+Message-ID: <1500297593-30633-3-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 08:56:10AM +0530, Pratyush Anand wrote:
-> On Saturday 01 July 2017 12:03 PM, Pratyush Anand wrote:
-> >Currently:
-> >$ perf stat -e cycles:u -e cycles:k  true
-> >
-> > Performance counter stats for 'true':
-> >
-> >          2,24,699      cycles:u
-> >     <not counted>      cycles:k	(0.00%)
-> >
-> >       0.000788087 seconds time elapsed
-> >
-> >We can not count more than one cycle counter in one instance,because we
-> >allow to map cycle counter into PMCCNTR_EL0 only. However, if I did not
-> >miss anything then specification do not prohibit to use PMEVCNTR<n>_EL0
-> >for cycle count as well.
-> >
-> >Modify the code so that it still prefers to use PMCCNTR_EL0 for cycle
-> >counter, however allow to use PMEVCNTR<n>_EL0 if PMCCNTR_EL0 is already
-> >in use.
-> >
-> >After this patch:
-> >
-> >$ perf stat -e cycles:u -e cycles:k   true
-> >
-> > Performance counter stats for 'true':
-> >
-> >          2,17,310      cycles:u
-> >          7,40,009      cycles:k
-> >
-> >       0.000764149 seconds time elapsed
-> >
-> 
-> Any comment/feedback?
+The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
+a MIPI-DSI video interface. Its backlight is managed through the DSI link.
 
-I'll pick this one up.
+Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/display/panel/orisetech,otm8009a.txt   | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
 
-Thanks,
-
-Will
+diff --git a/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+new file mode 100644
+index 0000000..6862028
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+@@ -0,0 +1,21 @@
++Orise Tech OTM8009A 3.97" 480x800 TFT LCD panel (MIPI-DSI video mode)
++
++The Orise Tech OTM8009A is a 3.97" 480x800 TFT LCD panel connected using
++a MIPI-DSI video interface. Its backlight is managed through the DSI link.
++
++Required properties:
++  - compatible: "orisetech,otm8009a"
++  - reg: the virtual channel number of a DSI peripheral
++
++Optional properties:
++  - reset-gpios: a GPIO spec for the reset pin (active low).
++
++Example:
++&dsi {
++	...
++	panel at 0 {
++		compatible = "orisetech,otm8009a";
++		reg = <0>;
++		reset-gpios = <&gpioh 7 GPIO_ACTIVE_LOW>;
++	};
++};
+-- 
+1.9.1
