@@ -1,43 +1,32 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 17 Jul 2017 09:35:16 +0200
-Subject: [PATCH] arm64: dts: marvell: mark the cp110 crypto engine as dma
- coherent
-Message-ID: <20170717073516.26746-1-antoine.tenart@free-electrons.com>
+Date: Mon, 17 Jul 2017 09:30:22 +0200
+Subject: [PATCH] arm64: dts: marvell: mcbin: add an stdout-path
+Message-ID: <20170717073022.25452-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The crypto engines found on the cp110 master and slave are dma coherent.
-This patch adds the relevant property to their dt nodes.
+This patch adds an stdout-path to the mcbin device tree. This allows to
+use earlycon.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 726528ce54e9..4c68605675a8 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -270,6 +270,7 @@
- 				interrupt-names = "mem", "ring0", "ring1",
- 				"ring2", "ring3", "eip";
- 				clocks = <&cpm_clk 1 26>;
-+				dma-coherent;
- 			};
- 		};
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index a4f87faae67b..178fe1fca015 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -51,6 +51,10 @@
+ 	compatible = "marvell,armada8040-mcbin", "marvell,armada8040",
+ 			"marvell,armada-ap806-quad", "marvell,armada-ap806";
  
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 95f8e5f607f6..0dbb59811d00 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -261,6 +261,7 @@
- 				interrupt-names = "mem", "ring0", "ring1",
- 						  "ring2", "ring3", "eip";
- 				clocks = <&cps_clk 1 26>;
-+				dma-coherent;
- 				/*
- 				 * The cryptographic engine found on the cp110
- 				 * master is enabled by default at the SoC
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	memory at 00000000 {
+ 		device_type = "memory";
+ 		reg = <0x0 0x0 0x0 0x80000000>;
 -- 
 2.13.3
