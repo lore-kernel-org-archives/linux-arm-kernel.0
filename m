@@ -1,59 +1,87 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Mon, 17 Jul 2017 16:26:43 +0300
-Subject: [PATCH 4/7] staging: fsl-mc: fix compilation with non-generic msi
- domain ops
+Date: Mon, 17 Jul 2017 16:26:44 +0300
+Subject: [PATCH 5/7] staging: fsl-mc: fix formating of phys_addr_t on 32 bits
 In-Reply-To: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
 References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170717132646.3020-5-laurentiu.tudor@nxp.com>
+Message-ID: <20170717132646.3020-6-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-The bus driver relies on generic msi domain ops.
-Fix compilation for architectures that don't provide it (e.g. x86_64).
+Use correct format specifier for phys_addr_t variables (%pa) instead
+of %llx. This fixes these warnings on 32 bit targets:
+ "format '%llx' expects argument of type 'long long unsigned int',
+  but argument 4 has type 'phys_addr_t' [-Wformat=]"
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/fsl-mc-msi.c                | 4 ++++
- drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c | 2 ++
- 2 files changed, 6 insertions(+)
+ drivers/staging/fsl-mc/bus/mc-io.c  |  8 ++++----
+ drivers/staging/fsl-mc/bus/mc-sys.c | 12 ++++++------
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-index ee6e3b7..18774ee 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-@@ -17,6 +17,7 @@
- #include <linux/msi.h>
- #include "fsl-mc-private.h"
+diff --git a/drivers/staging/fsl-mc/bus/mc-io.c b/drivers/staging/fsl-mc/bus/mc-io.c
+index 35221a17..4e6f99a 100644
+--- a/drivers/staging/fsl-mc/bus/mc-io.c
++++ b/drivers/staging/fsl-mc/bus/mc-io.c
+@@ -129,8 +129,8 @@ int __must_check fsl_create_mc_io(struct device *dev,
+ 				      "mc_portal");
+ 	if (!res) {
+ 		dev_err(dev,
+-			"devm_request_mem_region failed for MC portal %#llx\n",
+-			mc_portal_phys_addr);
++			"devm_request_mem_region failed for MC portal %pa\n",
++			&mc_portal_phys_addr);
+ 		return -EBUSY;
+ 	}
  
-+#ifdef GENERIC_MSI_DOMAIN_OPS
- /*
-  * Generate a unique ID identifying the interrupt (only used within the MSI
-  * irqdomain.  Combine the icid with the interrupt index.
-@@ -38,6 +39,9 @@ static void fsl_mc_msi_set_desc(msi_alloc_info_t *arg,
- 	arg->hwirq = fsl_mc_domain_calc_hwirq(to_fsl_mc_device(desc->dev),
- 					      desc);
- }
-+#else
-+#define fsl_mc_msi_set_desc NULL
-+#endif
+@@ -139,8 +139,8 @@ int __must_check fsl_create_mc_io(struct device *dev,
+ 						   mc_portal_size);
+ 	if (!mc_portal_virt_addr) {
+ 		dev_err(dev,
+-			"devm_ioremap_nocache failed for MC portal %#llx\n",
+-			mc_portal_phys_addr);
++			"devm_ioremap_nocache failed for MC portal %pa\n",
++			&mc_portal_phys_addr);
+ 		return -ENXIO;
+ 	}
  
- static void fsl_mc_msi_update_dom_ops(struct msi_domain_info *info)
- {
-diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-index e798ea4..cd73c58 100644
---- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-+++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-@@ -45,7 +45,9 @@ static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
- 	 * NOTE: This device id corresponds to the IOMMU stream ID
- 	 * associated with the DPRC object (ICID).
- 	 */
-+#ifdef GENERIC_MSI_DOMAIN_OPS
- 	info->scratchpad[0].ul = mc_bus_dev->icid;
-+#endif
- 	msi_info = msi_get_domain_info(msi_domain->parent);
- 	return msi_info->ops->msi_prepare(msi_domain->parent, dev, nvec, info);
- }
+diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
+index 012abd5..195d9f3 100644
+--- a/drivers/staging/fsl-mc/bus/mc-sys.c
++++ b/drivers/staging/fsl-mc/bus/mc-sys.c
+@@ -196,8 +196,8 @@ static int mc_polling_wait_preemptible(struct fsl_mc_io *mc_io,
+ 
+ 		if (time_after_eq(jiffies, jiffies_until_timeout)) {
+ 			dev_dbg(mc_io->dev,
+-				"MC command timed out (portal: %#llx, dprc handle: %#x, command: %#x)\n",
+-				 mc_io->portal_phys_addr,
++				"MC command timed out (portal: %pa, dprc handle: %#x, command: %#x)\n",
++				 &mc_io->portal_phys_addr,
+ 				 (unsigned int)mc_cmd_hdr_read_token(cmd),
+ 				 (unsigned int)mc_cmd_hdr_read_cmdid(cmd));
+ 
+@@ -236,8 +236,8 @@ static int mc_polling_wait_atomic(struct fsl_mc_io *mc_io,
+ 		timeout_usecs -= MC_CMD_COMPLETION_POLLING_MAX_SLEEP_USECS;
+ 		if (timeout_usecs == 0) {
+ 			dev_dbg(mc_io->dev,
+-				"MC command timed out (portal: %#llx, dprc handle: %#x, command: %#x)\n",
+-				 mc_io->portal_phys_addr,
++				"MC command timed out (portal: %pa, dprc handle: %#x, command: %#x)\n",
++				 &mc_io->portal_phys_addr,
+ 				 (unsigned int)mc_cmd_hdr_read_token(cmd),
+ 				 (unsigned int)mc_cmd_hdr_read_cmdid(cmd));
+ 
+@@ -290,8 +290,8 @@ int mc_send_command(struct fsl_mc_io *mc_io, struct mc_command *cmd)
+ 
+ 	if (status != MC_CMD_STATUS_OK) {
+ 		dev_dbg(mc_io->dev,
+-			"MC command failed: portal: %#llx, dprc handle: %#x, command: %#x, status: %s (%#x)\n",
+-			 mc_io->portal_phys_addr,
++			"MC command failed: portal: %pa, dprc handle: %#x, command: %#x, status: %s (%#x)\n",
++			 &mc_io->portal_phys_addr,
+ 			 (unsigned int)mc_cmd_hdr_read_token(cmd),
+ 			 (unsigned int)mc_cmd_hdr_read_cmdid(cmd),
+ 			 mc_status_to_string(status),
 -- 
 2.9.4
