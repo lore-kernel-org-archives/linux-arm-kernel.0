@@ -1,59 +1,31 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 17 Jul 2017 10:20:52 +0900
-Subject: [PATCH 1/5] phy: qcom-usb-hs: Replace the extcon API
-In-Reply-To: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
-References: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170717012058epcas1p181ca458cd4c80643ee7077e9ee78f7bb@epcas1p1.samsung.com>
-Message-ID: <1500254456-6525-2-git-send-email-cw00.choi@samsung.com>
+Date: Mon, 17 Jul 2017 10:20:51 +0900
+Subject: [PATCH 0/5] phy: Replace the deprecated extcon API
+References: <CGME20170717012057epcas1p11fe3d445ed16c7f94b57922b0a8f243a@epcas1p1.samsung.com>
+Message-ID: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses the resource-managed extcon API for extcon_register_notifier()
-and replaces the deprecated extcon API as following:
-- (deprecated) extcon_get_cable_state_() -> extcon_get_state()
+These patches replace the deprecated extcon API
+and remove them from extcon framework.
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- drivers/phy/qualcomm/phy-qcom-usb-hs.c | 14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+The patch1 and patch2 were already acked by Kishon Vijay Abraham I.
+If patch3/patch4 are reviewed, I'll create the immutable branch
+and send the pull request to both usb and phy maintainer.
 
-diff --git a/drivers/phy/qualcomm/phy-qcom-usb-hs.c b/drivers/phy/qualcomm/phy-qcom-usb-hs.c
-index 4b20abc3ae2f..2d0c70b5589f 100644
---- a/drivers/phy/qualcomm/phy-qcom-usb-hs.c
-+++ b/drivers/phy/qualcomm/phy-qcom-usb-hs.c
-@@ -155,12 +155,12 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
- 	}
- 
- 	if (uphy->vbus_edev) {
--		state = extcon_get_cable_state_(uphy->vbus_edev, EXTCON_USB);
-+		state = extcon_get_state(uphy->vbus_edev, EXTCON_USB);
- 		/* setup initial state */
- 		qcom_usb_hs_phy_vbus_notifier(&uphy->vbus_notify, state,
- 					      uphy->vbus_edev);
--		ret = extcon_register_notifier(uphy->vbus_edev, EXTCON_USB,
--				&uphy->vbus_notify);
-+		ret = devm_extcon_register_notifier(&ulpi->dev, uphy->vbus_edev,
-+				EXTCON_USB, &uphy->vbus_notify);
- 		if (ret)
- 			goto err_ulpi;
- 	}
-@@ -179,16 +179,8 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
- 
- static int qcom_usb_hs_phy_power_off(struct phy *phy)
- {
--	int ret;
- 	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
- 
--	if (uphy->vbus_edev) {
--		ret = extcon_unregister_notifier(uphy->vbus_edev, EXTCON_USB,
--						 &uphy->vbus_notify);
--		if (ret)
--			return ret;
--	}
--
- 	regulator_disable(uphy->v3p3);
- 	regulator_disable(uphy->v1p8);
- 	clk_disable_unprepare(uphy->sleep_clk);
+Chanwoo Choi (5):
+  phy: qcom-usb-hs: Replace the extcon API
+  phy: rockchip-inno-usb2: Replace the extcon API
+  phy: phy-bcm-ns2-usbdrd: Replace the deprecated extcon API
+  usb: gadget: udc: Replace the deprecated extcon API
+  extcon: Remove deprecated extcon_set/get_cable_state_()
+
+ drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c     |  8 ++++----
+ drivers/phy/qualcomm/phy-qcom-usb-hs.c        | 14 +++-----------
+ drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 10 +++++-----
+ drivers/usb/gadget/udc/snps_udc_plat.c        |  6 +++---
+ include/linux/extcon.h                        | 11 -----------
+ 5 files changed, 15 insertions(+), 34 deletions(-)
+
 -- 
 1.9.1
