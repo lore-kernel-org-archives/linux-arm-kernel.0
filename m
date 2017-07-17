@@ -1,235 +1,129 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 17 Jul 2017 10:10:21 +0800
-Subject: [PATCH v2 1/5] drm/rockchip: vop: get rid of register init table
-In-Reply-To: <20170713202927.7mb2w2tudin3fizx@art_vandelay>
-References: <1499824991-7391-1-git-send-email-mark.yao@rock-chips.com>
- <1499825008-7451-1-git-send-email-mark.yao@rock-chips.com>
- <20170712164758.ojzsfjq4vrf2cj27@art_vandelay>
- <5966CDF9.3060509@rock-chips.com>
- <20170713202927.7mb2w2tudin3fizx@art_vandelay>
-Message-ID: <596C1C8D.6030100@rock-chips.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Jul 2017 05:21:53 +0300
+Subject: [PATCH v2 6/6] dt-bindings: Document the Rockchip RGA bindings
+In-Reply-To: <1882912.vhlUDqklbZ@phil>
+References: <1500101920-24039-1-git-send-email-jacob-chen@iotwrt.com>
+ <1918615.rEp9U5BAbC@avalon> <1882912.vhlUDqklbZ@phil>
+Message-ID: <68196359.W3MbNaIOVC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?07?14? 04:29, Sean Paul wrote:
-> On Thu, Jul 13, 2017 at 09:33:45AM +0800, Mark yao wrote:
->> On 2017?07?13? 00:47, Sean Paul wrote:
->>> On Wed, Jul 12, 2017 at 10:03:27AM +0800, Mark Yao wrote:
->>>> Register init table use un-document define, it is unreadable,
->>>> And sometimes we only want to update tiny bits, init table
->>>> method is not friendly, it's diffcult to reuse for difference
->>>> chips.
->>> While I'm happy to see the init_table removed, it seems like the new code is not
->>> equivalent to the old (ie: some register writes have been dropped). How did you
->>> ensure that you're not breaking existing boards that depend on the deleted register
->>> initialization?
->>>
->>> Sean
->> All the existing boards works fine on my internal kernel board with the init_table removed,
->> We had tested all the existing boards, so it's no problem to removed init_table
->>
-> That begs the question... why was it introduced if it's not necessary?
-Hi Sean
+Hi Heiko,
 
-Some registers need to be initialized when vop power on, global_config_done, blank, win gate, etc.
-Previously init_table was introduced to handle the initialization of these registers.
+On Sunday 16 Jul 2017 18:07:58 Heiko Stuebner wrote:
+> Am Samstag, 15. Juli 2017, 12:23:12 CEST schrieb Laurent Pinchart:
+> > On Saturday 15 Jul 2017 14:58:40 Jacob Chen wrote:
+> >> Add DT bindings documentation for Rockchip RGA
+> >> 
+> >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> >> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> >> ---
+> >> 
+> >>  .../devicetree/bindings/media/rockchip-rga.txt     | 35 +++++++++++++++
+> >>  1 file changed, 35 insertions(+)
+> >>  create mode 100644
+> >>  Documentation/devicetree/bindings/media/rockchip-rga.txt
+> >> 
+> >> diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt
+> >> b/Documentation/devicetree/bindings/media/rockchip-rga.txt new file mode
+> >> 100644
+> >> index 0000000..966eba0
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
+> >> @@ -0,0 +1,35 @@
+> >> +device-tree bindings for rockchip 2D raster graphic acceleration
+> >> controller (RGA)
+> >> +
+> >> +RGA is a separate 2D raster graphic acceleration unit. It accelerates
+> >> 2D
+> > 
+> > "Separate" from what ? Do you mean "standalone" ?
+> > 
+> >> +graphics operations, such as point/line drawing, image scaling,
+> >> rotation,
+> >> +BitBLT, alpha blending and image blur/sharpness.
+> >> +
+> >> +Required properties:
+> >> +- compatible: value should be one of the following
+> >> +		"rockchip,rk3228-rga";
+> >> +		"rockchip,rk3288-rga";
+> >> +		"rockchip,rk3399-rga";
+> > 
+> > The driver in patch 2/6 has match entry for rk3328, which is missing from
+> > this list.
+> > 
+> > As the implementation of the driver doesn't seem to discriminate between
+> > the four SoCs, wouldn't it make sense to create a generic compatible
+> > string on which the driver would match ? You can have both the generic
+> > and SoC-specific compatible strings in DT if there are differences
+> > between the IP core in those SoCs that might need to be handled later by
+> > the driver.
+> 
+> I think the block is named something like RGA2 in some kernel trees, but
+> am not sure if that is an actual name, or someone just added a number.
+> From short glances at vendor rga-code in the past, it looks like there are
+> currently 2 basic versions of the in existence I.e. older Rockchip socs
+> (like the rk3188 or so) use something older.
+> 
+> I think everywhere else we do have only (or at least mostly) soc-specifc
+> compatibles, but I guess that is more a question what Rob prefers.
 
-So, when we remove the init_table mechanism, we need to re-join the initialization of these registers,
-this job is already done in this patch.
+Many SoC vendors use SoC-specific compatible string, often in addition to more 
+generic ones. When a more generic compatible string is available, drivers can 
+match against it, which avoid having to update drivers every time a new SoC 
+integrates the same version of the IP core. The SoC-specific compatible string 
+is still specified in DT, "just in case" we later realize that the IP core 
+integrated in the SoC is slightly different than the other ones and requires 
+specific handling in the driver.
 
-I think the title "get rid of" caused some doubts, it's not just remove init_table mechanism,
-to be exact, direct setting needed register instead of handling with init_table.
+I'm not completely happy with that scheme, as it's really a workaround for 
+defective communication with the hardware team (or possibly defective hardware 
+development...), but that's the best compromise we have so far.
 
-I will make it cleaner next version.
-
-Thanks.
-
->
-> Sean
->
->>>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->>>> ---
->>>>    drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  6 ++--
->>>>    drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 10 ++-----
->>>>    drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 43 +++--------------------------
->>>>    3 files changed, 10 insertions(+), 49 deletions(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>> index 45589d6..7a5f809 100644
->>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>> @@ -1393,7 +1393,6 @@ static void vop_destroy_crtc(struct vop *vop)
->>>>    static int vop_initial(struct vop *vop)
->>>>    {
->>>>    	const struct vop_data *vop_data = vop->data;
->>>> -	const struct vop_reg_data *init_table = vop_data->init_table;
->>>>    	struct reset_control *ahb_rst;
->>>>    	int i, ret;
->>>> @@ -1453,13 +1452,14 @@ static int vop_initial(struct vop *vop)
->>>>    	memcpy(vop->regsbak, vop->regs, vop->len);
->>>> -	for (i = 0; i < vop_data->table_size; i++)
->>>> -		vop_writel(vop, init_table[i].offset, init_table[i].value);
->>>> +	VOP_CTRL_SET(vop, global_regdone_en, 1);
->>>> +	VOP_CTRL_SET(vop, dsp_blank, 0);
->>>>    	for (i = 0; i < vop_data->win_size; i++) {
->>>>    		const struct vop_win_data *win = &vop_data->win[i];
->>>>    		VOP_WIN_SET(vop, win, enable, 0);
->>>> +		VOP_WIN_SET(vop, win, gate, 1);
->>>>    	}
->>>>    	vop_cfg_done(vop);
->>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->>>> index 9979fd0..084d3b2 100644
->>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->>>> @@ -24,11 +24,6 @@ enum vop_data_format {
->>>>    	VOP_FMT_YUV444SP,
->>>>    };
->>>> -struct vop_reg_data {
->>>> -	uint32_t offset;
->>>> -	uint32_t value;
->>>> -};
->>>> -
->>>>    struct vop_reg {
->>>>    	uint32_t offset;
->>>>    	uint32_t shift;
->>>> @@ -46,6 +41,7 @@ struct vop_ctrl {
->>>>    	struct vop_reg hdmi_en;
->>>>    	struct vop_reg mipi_en;
->>>>    	struct vop_reg dp_en;
->>>> +	struct vop_reg dsp_blank;
->>>>    	struct vop_reg out_mode;
->>>>    	struct vop_reg dither_down;
->>>>    	struct vop_reg dither_up;
->>>> @@ -65,6 +61,7 @@ struct vop_ctrl {
->>>>    	struct vop_reg line_flag_num[2];
->>>> +	struct vop_reg global_regdone_en;
->>>>    	struct vop_reg cfg_done;
->>>>    };
->>>> @@ -115,6 +112,7 @@ struct vop_win_phy {
->>>>    	uint32_t nformats;
->>>>    	struct vop_reg enable;
->>>> +	struct vop_reg gate;
->>>>    	struct vop_reg format;
->>>>    	struct vop_reg rb_swap;
->>>>    	struct vop_reg act_info;
->>>> @@ -136,8 +134,6 @@ struct vop_win_data {
->>>>    };
->>>>    struct vop_data {
->>>> -	const struct vop_reg_data *init_table;
->>>> -	unsigned int table_size;
->>>>    	const struct vop_ctrl *ctrl;
->>>>    	const struct vop_intr *intr;
->>>>    	const struct vop_win_data *win;
->>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->>>> index bafd698..00e9d79 100644
->>>> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->>>> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->>>> @@ -127,13 +127,7 @@
->>>>    	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
->>>>    };
->>>> -static const struct vop_reg_data rk3036_vop_init_reg_table[] = {
->>>> -	{RK3036_DSP_CTRL1, 0x00000000},
->>>> -};
->>>> -
->>>>    static const struct vop_data rk3036_vop = {
->>>> -	.init_table = rk3036_vop_init_reg_table,
->>>> -	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
->>>>    	.ctrl = &rk3036_ctrl_data,
->>>>    	.intr = &rk3036_intr,
->>>>    	.win = rk3036_vop_win_data,
->>>> @@ -193,7 +187,8 @@
->>>>    static const struct vop_win_phy rk3288_win23_data = {
->>>>    	.data_formats = formats_win_lite,
->>>>    	.nformats = ARRAY_SIZE(formats_win_lite),
->>>> -	.enable = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 0),
->>>> +	.enable = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 4),
->>>> +	.gate = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 0),
->>>>    	.format = VOP_REG(RK3288_WIN2_CTRL0, 0x7, 1),
->>>>    	.rb_swap = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 12),
->>>>    	.dsp_info = VOP_REG(RK3288_WIN2_DSP_INFO0, 0x0fff0fff, 0),
->>>> @@ -215,6 +210,7 @@
->>>>    	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0xf, 1),
->>>>    	.dither_up = VOP_REG(RK3288_DSP_CTRL1, 0x1, 6),
->>>>    	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
->>>> +	.dsp_blank = VOP_REG(RK3288_DSP_CTRL0, 0x3, 18),
->>>>    	.out_mode = VOP_REG(RK3288_DSP_CTRL0, 0xf, 0),
->>>>    	.pin_pol = VOP_REG(RK3288_DSP_CTRL0, 0xf, 4),
->>>>    	.htotal_pw = VOP_REG(RK3288_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
->>>> @@ -224,22 +220,10 @@
->>>>    	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
->>>>    	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
->>>>    	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
->>>> +	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
->>>>    	.cfg_done = VOP_REG(RK3288_REG_CFG_DONE, 0x1, 0),
->>>>    };
->>>> -static const struct vop_reg_data rk3288_init_reg_table[] = {
->>>> -	{RK3288_SYS_CTRL, 0x00c00000},
->>>> -	{RK3288_DSP_CTRL0, 0x00000000},
->>>> -	{RK3288_WIN0_CTRL0, 0x00000080},
->>>> -	{RK3288_WIN1_CTRL0, 0x00000080},
->>>> -	/* TODO: Win2/3 support multiple area function, but we haven't found
->>>> -	 * a suitable way to use it yet, so let's just use them as other windows
->>>> -	 * with only area 0 enabled.
->>>> -	 */
->>>> -	{RK3288_WIN2_CTRL0, 0x00000010},
->>>> -	{RK3288_WIN3_CTRL0, 0x00000010},
->>>> -};
->>>> -
->>>>    /*
->>>>     * Note: rk3288 has a dedicated 'cursor' window, however, that window requires
->>>>     * special support to get alpha blending working.  For now, just use overlay
->>>> @@ -273,8 +257,6 @@
->>>>    };
->>>>    static const struct vop_data rk3288_vop = {
->>>> -	.init_table = rk3288_init_reg_table,
->>>> -	.table_size = ARRAY_SIZE(rk3288_init_reg_table),
->>>>    	.feature = VOP_FEATURE_OUTPUT_RGB10,
->>>>    	.intr = &rk3288_vop_intr,
->>>>    	.ctrl = &rk3288_ctrl_data,
->>>> @@ -328,22 +310,7 @@
->>>>    	.clear = VOP_REG_MASK(RK3399_INTR_CLEAR0, 0xffff, 0),
->>>>    };
->>>> -static const struct vop_reg_data rk3399_init_reg_table[] = {
->>>> -	{RK3399_SYS_CTRL, 0x2000f800},
->>>> -	{RK3399_DSP_CTRL0, 0x00000000},
->>>> -	{RK3399_WIN0_CTRL0, 0x00000080},
->>>> -	{RK3399_WIN1_CTRL0, 0x00000080},
->>>> -	/* TODO: Win2/3 support multiple area function, but we haven't found
->>>> -	 * a suitable way to use it yet, so let's just use them as other windows
->>>> -	 * with only area 0 enabled.
->>>> -	 */
->>>> -	{RK3399_WIN2_CTRL0, 0x00000010},
->>>> -	{RK3399_WIN3_CTRL0, 0x00000010},
->>>> -};
->>>> -
->>>>    static const struct vop_data rk3399_vop_big = {
->>>> -	.init_table = rk3399_init_reg_table,
->>>> -	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
->>>>    	.feature = VOP_FEATURE_OUTPUT_RGB10,
->>>>    	.intr = &rk3399_vop_intr,
->>>>    	.ctrl = &rk3399_ctrl_data,
->>>> @@ -362,8 +329,6 @@
->>>>    };
->>>>    static const struct vop_data rk3399_vop_lit = {
->>>> -	.init_table = rk3399_init_reg_table,
->>>> -	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
->>>>    	.intr = &rk3399_vop_intr,
->>>>    	.ctrl = &rk3399_ctrl_data,
->>>>    	/*
->>>> -- 
->>>> 1.9.1
->>>>
->>>>
->>>> _______________________________________________
->>>> dri-devel mailing list
->>>> dri-devel at lists.freedesktop.org
->>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->>
->> -- 
->> ?ark Yao
->>
->>
-
+> >> +- interrupts: RGA interrupt number.
+> > 
+> > This is an "interrupt specifier", not just an "interrupt number" (as you
+> > can see in the example below there are three numbers)
+> > 
+> >> +
+> >> +- clocks: phandle to RGA sclk/hclk/aclk clocks
+> >> +
+> >> +- clock-names: should be "aclk" "hclk" and "sclk"
+> > 
+> > Nitpicking, there should be a comma after "aclk".
+> > 
+> >> +
+> >> +- resets: Must contain an entry for each entry in reset-names.
+> >> +  See ../reset/reset.txt for details.
+> >> +- reset-names: should be "core" "axi" and "ahb"
+> > 
+> > And a comma after "core".
+> > 
+> >> +
+> >> +Example:
+> >> +SoC specific DT entry:
+> >
+> > s/SoC specific/SoC-specific/
+> > 
+> >> +	rga: rga at ff680000 {
+> >> +		compatible = "rockchip,rk3399-rga";
+> >> +		reg = <0xff680000 0x10000>;
+> >> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+> >> +		interrupt-names = "rga";
+> > 
+> > The interrupt-names property is not described above. Do you really need it
+> > ?
+> >
+> >> +		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru
+> >> SCLK_RGA_CORE>;
+> >> +		clock-names = "aclk", "hclk", "sclk";
+> >> +
+> >> +		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru
+> >> SRST_H_RGA>;
+> >> +		reset-names = "core, "axi", "ahb";
+> >> +	};
 
 -- 
-?ark Yao
+Regards,
+
+Laurent Pinchart
