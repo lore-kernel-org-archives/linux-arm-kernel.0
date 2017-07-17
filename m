@@ -1,36 +1,285 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jul 2017 09:15:18 +0100
-Subject: [BUG] v4.12 breaks pxa25x
-In-Reply-To: <87inirsgzk.fsf@belgarion.home>
-References: <87inirsgzk.fsf@belgarion.home>
-Message-ID: <20170717081518.GI31807@n2100.armlinux.org.uk>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 17 Jul 2017 10:20:14 +0200
+Subject: [PATCH v2 1/3] mux: Add mux_control_get_optional() API
+In-Reply-To: <20170714214005.14967-2-stephen.boyd@linaro.org>
+References: <20170714214005.14967-1-stephen.boyd@linaro.org>
+ <20170714214005.14967-2-stephen.boyd@linaro.org>
+Message-ID: <aac61f46-f963-2631-00e0-2d62baac6bf4@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 08:41:03AM +0200, Robert Jarzmik wrote:
+Generally looks like I imagined, but there are a few nits and some
+things that I'd like to do differently. Comments inline. Thanks!
 
-> [    0.000000] Unhandled fault: alignment exception (0x003) at 0xc06f82cd
-> [    0.000000] pgd = c0004000
-> [    0.000000] [c06f82cd] *pgd=a060040e(bad)
-> [    0.000000] Internal error: : 3 [#1] ARM
-> [    0.000000] Modules linked in:
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.12.0-11927-g6bf3d68 #4582
-> [    0.000000] Hardware name: Intel DBPXA250 Development Platform (aka Lubbock)
-> [    0.000000] task: c06f6fd8 task.stack: c06f2000
-> [    0.000000] PC is at __flush_whole_cache+0x4/0x60
-> [    0.000000] LR is at paging_init+0x4b4/0x590
-> [    0.000000] pc : [<c0019e24>]    lr : [<c049d274>]    psr: 600000d3
-> [    0.000000] sp : c06f3f38  ip : 00000000  fp : c0700000
-> [    0.000000] r10: a4000000  r9 : c06f82c0  r8 : c0723540
-> [    0.000000] r7 : fe100000  r6 : fe200000  r5 : c06f82a0  r4 : c0705ef4
-> [    0.000000] r3 : 00000000  r2 : 00000004  r1 : c06f82cd  r0 : c06f82c0
+On 2017-07-14 23:40, Stephen Boyd wrote:
+> Sometimes drivers only use muxes under certain scenarios. For
+> example, the chipidea usb controller may be connected to a usb
+> switch on some platforms, and connected directly to a usb port on
+> others. The driver won't know one way or the other though, so add
+> a mux_control_get_optional() API that allows the driver to
+> differentiate errors getting the mux from there not being a mux
+> for the driver to use at all.
+> 
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  Documentation/driver-model/devres.txt |  1 +
+>  drivers/mux/mux-core.c                | 98 ++++++++++++++++++++++++++++-------
+>  include/linux/mux/consumer.h          |  4 ++
+>  3 files changed, 83 insertions(+), 20 deletions(-)
+> 
+> diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
+> index 30e04f7a690d..4fdd3e63ff8b 100644
+> --- a/Documentation/driver-model/devres.txt
+> +++ b/Documentation/driver-model/devres.txt
+> @@ -342,6 +342,7 @@ MUX
+>    devm_mux_chip_alloc()
+>    devm_mux_chip_register()
+>    devm_mux_control_get()
+> +  devm_mux_control_get_optional()
+>  
+>  PER-CPU MEM
+>    devm_alloc_percpu()
+> diff --git a/drivers/mux/mux-core.c b/drivers/mux/mux-core.c
+> index 90b8995f07cb..a0e5bf16f02f 100644
+> --- a/drivers/mux/mux-core.c
+> +++ b/drivers/mux/mux-core.c
+> @@ -289,6 +289,9 @@ EXPORT_SYMBOL_GPL(devm_mux_chip_register);
+>   */
+>  unsigned int mux_control_states(struct mux_control *mux)
+>  {
+> +	if (!mux)
+> +		return 0;
+> +
 
-Looks like the .data section has become misaligned somehow.  r1 is the
-address of "clean_addr" which is clearly not 32-bit aligned.
+I don't think this is appropriate. For this function, it might be ok,
+but...
 
-Please can you check in System.map to see what's immediately before it?
+>  	return mux->states;
+>  }
+>  EXPORT_SYMBOL_GPL(mux_control_states);
+> @@ -338,6 +341,9 @@ int mux_control_select(struct mux_control *mux, unsigned int state)
+>  {
+>  	int ret;
+>  
+> +	if (!mux)
+> +		return 0;
+> +
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+...here and for other cases below it's very odd to return "ok", when
+-EINVAL or something seems much more appropriate. And if -EINVAL is
+returned here, the benefit of returning fake values for anything
+pretty much falls apart.
+
+I simply don't like it, and prefer if the consumer code is arranged
+to not call the mux functions when the optional get() does not find
+the mux.
+
+>  	ret = down_killable(&mux->lock);
+>  	if (ret < 0)
+>  		return ret;
+> @@ -370,6 +376,9 @@ int mux_control_try_select(struct mux_control *mux, unsigned int state)
+>  {
+>  	int ret;
+>  
+> +	if (!mux)
+> +		return 0;
+> +
+>  	if (down_trylock(&mux->lock))
+>  		return -EBUSY;
+>  
+> @@ -398,6 +407,9 @@ int mux_control_deselect(struct mux_control *mux)
+>  {
+>  	int ret = 0;
+>  
+> +	if (!mux)
+> +		return 0;
+> +
+>  	if (mux->idle_state != MUX_IDLE_AS_IS &&
+>  	    mux->idle_state != mux->cached_state)
+>  		ret = mux_control_set(mux, mux->idle_state);
+> @@ -422,14 +434,8 @@ static struct mux_chip *of_find_mux_chip_by_node(struct device_node *np)
+>  	return dev ? to_mux_chip(dev) : NULL;
+>  }
+>  
+> -/**
+> - * mux_control_get() - Get the mux-control for a device.
+> - * @dev: The device that needs a mux-control.
+> - * @mux_name: The name identifying the mux-control.
+> - *
+> - * Return: A pointer to the mux-control, or an ERR_PTR with a negative errno.
+> - */
+> -struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
+> +struct mux_control *
+> +__mux_control_get(struct device *dev, const char *mux_name, bool optional)
+>  {
+>  	struct device_node *np = dev->of_node;
+>  	struct of_phandle_args args;
+> @@ -441,6 +447,8 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
+>  	if (mux_name) {
+>  		index = of_property_match_string(np, "mux-control-names",
+>  						 mux_name);
+> +		if (index == -EINVAL && optional)
+> +			return NULL;
+
+What about -ENODATA? And if an optional mux is found here, but lookup
+fails later in e.g. the of_parse_phandle_with_args call, then I think
+an error should be returned. Because that seems like an indication that
+DT specifies that there *should* be a mux, but then there isn't one.
+
+>  		if (index < 0) {
+>  			dev_err(dev, "mux controller '%s' not found\n",
+>  				mux_name);
+> @@ -451,6 +459,8 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
+>  	ret = of_parse_phandle_with_args(np,
+>  					 "mux-controls", "#mux-control-cells",
+>  					 index, &args);
+> +	if (ret == -ENOENT && optional)
+> +		return NULL;
+>  	if (ret) {
+>  		dev_err(dev, "%s: failed to get mux-control %s(%i)\n",
+>  			np->full_name, mux_name ?: "", index);
+> @@ -482,9 +492,35 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
+>  	get_device(&mux_chip->dev);
+>  	return &mux_chip->mux[controller];
+>  }
+> +
+> +/**
+> + * mux_control_get() - Get the mux-control for a device.
+> + * @dev: The device that needs a mux-control.
+> + * @mux_name: The name identifying the mux-control.
+> + *
+> + * Return: A pointer to the mux-control, or an ERR_PTR with a negative errno.
+> + */
+> +struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
+> +{
+> +	return __mux_control_get(dev, mux_name, false);
+> +}
+>  EXPORT_SYMBOL_GPL(mux_control_get);
+>  
+>  /**
+> + * mux_control_get_optional() - Get the optional mux-control for a device.
+> + * @dev: The device that needs a mux-control.
+> + * @mux_name: The name identifying the mux-control.
+> + *
+> + * Return: A pointer to the mux-control, or an ERR_PTR with a negative errno.
+
+You don't mention that NULL may be returned, or when.
+
+> + */
+> +struct mux_control *
+> +mux_control_get_optional(struct device *dev, const char *mux_name)
+> +{
+> +	return __mux_control_get(dev, mux_name, true);
+> +}
+> +EXPORT_SYMBOL_GPL(mux_control_get_optional);
+> +
+> +/**
+>   * mux_control_put() - Put away the mux-control for good.
+>   * @mux: The mux-control to put away.
+>   *
+> @@ -492,7 +528,8 @@ EXPORT_SYMBOL_GPL(mux_control_get);
+>   */
+>  void mux_control_put(struct mux_control *mux)
+>  {
+> -	put_device(&mux->chip->dev);
+> +	if (mux)
+> +		put_device(&mux->chip->dev);
+
+Don't put it if you don't have it.
+
+>  }
+>  EXPORT_SYMBOL_GPL(mux_control_put);
+>  
+> @@ -503,16 +540,8 @@ static void devm_mux_control_release(struct device *dev, void *res)
+>  	mux_control_put(mux);
+>  }
+>  
+> -/**
+> - * devm_mux_control_get() - Get the mux-control for a device, with resource
+> - *			    management.
+> - * @dev: The device that needs a mux-control.
+> - * @mux_name: The name identifying the mux-control.
+> - *
+> - * Return: Pointer to the mux-control, or an ERR_PTR with a negative errno.
+> - */
+> -struct mux_control *devm_mux_control_get(struct device *dev,
+> -					 const char *mux_name)
+> +static struct mux_control *
+> +__devm_mux_control_get(struct device *dev, const char *mux_name, bool optional)
+>  {
+>  	struct mux_control **ptr, *mux;
+>  
+> @@ -520,7 +549,7 @@ struct mux_control *devm_mux_control_get(struct device *dev,
+>  	if (!ptr)
+>  		return ERR_PTR(-ENOMEM);
+>  
+> -	mux = mux_control_get(dev, mux_name);
+> +	mux = __mux_control_get(dev, mux_name, optional);
+>  	if (IS_ERR(mux)) {
+>  		devres_free(ptr);
+>  		return mux;
+> @@ -531,8 +560,37 @@ struct mux_control *devm_mux_control_get(struct device *dev,
+>  
+>  	return mux;
+>  }
+> +
+> +/**
+> + * devm_mux_control_get() - Get the mux-control for a device, with resource
+> + *			    management.
+> + * @dev: The device that needs a mux-control.
+> + * @mux_name: The name identifying the mux-control.
+> + *
+> + * Return: Pointer to the mux-control, or an ERR_PTR with a negative errno.
+> + */
+> +struct mux_control *
+> +devm_mux_control_get(struct device *dev, const char *mux_name)
+> +{
+> +	return __devm_mux_control_get(dev, mux_name, false);
+> +}
+>  EXPORT_SYMBOL_GPL(devm_mux_control_get);
+>  
+> +/**
+> + * devm_mux_control_get_optional() - Get the optional mux-control for a device,
+> + * 				     with resource management.
+> + * @dev: The device that needs a mux-control.
+> + * @mux_name: The name identifying the mux-control.
+> + *
+> + * Return: Pointer to the mux-control, or an ERR_PTR with a negative errno.
+
+You don't mention that NULL may be returned, or when.
+
+Cheers,
+Peter
+
+> + */
+> +struct mux_control *
+> +devm_mux_control_get_optional(struct device *dev, const char *mux_name)
+> +{
+> +	return __devm_mux_control_get(dev, mux_name, true);
+> +}
+> +EXPORT_SYMBOL_GPL(devm_mux_control_get_optional);
+> +
+>  /*
+>   * Using subsys_initcall instead of module_init here to try to ensure - for
+>   * the non-modular case - that the subsystem is initialized when mux consumers
+> diff --git a/include/linux/mux/consumer.h b/include/linux/mux/consumer.h
+> index 5577e1b773c4..5e2aa046f032 100644
+> --- a/include/linux/mux/consumer.h
+> +++ b/include/linux/mux/consumer.h
+> @@ -24,9 +24,13 @@ int __must_check mux_control_try_select(struct mux_control *mux,
+>  int mux_control_deselect(struct mux_control *mux);
+>  
+>  struct mux_control *mux_control_get(struct device *dev, const char *mux_name);
+> +struct mux_control *mux_control_get_optional(struct device *dev,
+> +					     const char *mux_name);
+>  void mux_control_put(struct mux_control *mux);
+>  
+>  struct mux_control *devm_mux_control_get(struct device *dev,
+>  					 const char *mux_name);
+> +struct mux_control *devm_mux_control_get_optional(struct device *dev,
+> +						  const char *mux_name);
+>  
+>  #endif /* _LINUX_MUX_CONSUMER_H */
+> 
