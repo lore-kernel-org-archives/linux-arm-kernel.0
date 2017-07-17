@@ -1,55 +1,172 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 17 Jul 2017 23:25:55 +0800
-Subject: [PATCH] iommu/exynos: Replace non-existing big-endian Kconfig
- option
-In-Reply-To: <1500270422-4805-1-git-send-email-krzk@kernel.org>
-Message-ID: <201707172340.xpsuGzYj%fengguang.wu@intel.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 17 Jul 2017 17:35:37 +0200
+Subject: [PATCH] ARM64: dts: fixup libretech cc definition
+Message-ID: <20170717153537.18330-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+The libretech CC derives less from the p212 than initially thought.
+Several voltage regulators are different and the capabilities of the
+sdcard and emmc also differ.
 
-[auto build test WARNING on iommu/next]
-[also build test WARNING on v4.13-rc1 next-20170717]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Deriving from the p212 is not convient anymore so the libretech is now
+derived from s905x definition directly.
 
-url:    https://github.com/0day-ci/linux/commits/Krzysztof-Kozlowski/iommu-exynos-Replace-non-existing-big-endian-Kconfig-option/20170717-141202
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All warnings (new ones prefixed by >>):
-
->> drivers//iommu/exynos-iommu.c:58:2: warning: #warning "revisit driver if we can enable big-endian ptes" [-Wcpp]
-    #warning "revisit driver if we can enable big-endian ptes"
-     ^~~~~~~
-
-vim +58 drivers//iommu/exynos-iommu.c
-
-2a96536e KyongHo Cho         2012-05-12  56  
-61dfd0bc Krzysztof Kozlowski 2017-07-17  57  #ifdef CONFIG_CPU_BIG_ENDIAN
-6ae5343c Ben Dooks           2016-06-08 @58  #warning "revisit driver if we can enable big-endian ptes"
-6ae5343c Ben Dooks           2016-06-08  59  #endif
-6ae5343c Ben Dooks           2016-06-08  60  
-
-:::::: The code at line 58 was first introduced by commit
-:::::: 6ae5343c26f9cba5e9ef8ba6f23b5bb255ebc798 iommu/exynos: update to use iommu big-endian
-
-:::::: TO: Ben Dooks <ben.dooks@codethink.co.uk>
-:::::: CC: Joerg Roedel <jroedel@suse.de>
-
+Fixes: cd84aff1d981 ("ARM64: dts: meson-gxl: Add Libre Technology CC support")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62409 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/9af14339/attachment-0001.gz>
+ .../dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 103 ++++++++++++++++++---
+ 1 file changed, 91 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+index 890821d6e52b..266fbcf3e47f 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+@@ -10,12 +10,20 @@
+ 
+ #include <dt-bindings/input/input.h>
+ 
+-#include "meson-gxl-s905x-p212.dtsi"
++#include "meson-gxl-s905x.dtsi"
+ 
+ / {
+ 	compatible = "libretech,cc", "amlogic,s905x", "amlogic,meson-gxl";
+ 	model = "Libre Technology CC";
+ 
++	aliases {
++		serial0 = &uart_AO;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	cvbs-connector {
+ 		compatible = "composite-video-connector";
+ 
+@@ -26,6 +34,11 @@
+ 		};
+ 	};
+ 
++	emmc_pwrseq: emmc-pwrseq {
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
++	};
++
+ 	hdmi-connector {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -53,6 +66,39 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x80000000>;
++	};
++
++	vcc_3v3: regulator-vcc_3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	vcc_card: regulator-vcc-card {
++		compatible = "regulator-gpio";
++
++		regulator-name = "VCC_CARD";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
++		gpios-states = <0>;
++
++		states = <3300000 0>,
++			 <1800000 1>;
++	};
++
++	vddio_boot: regulator-vddio_boot {
++		compatible = "regulator-fixed";
++		regulator-name = "VDDIO_BOOT";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
+ };
+ 
+ &cvbs_vdac_port {
+@@ -61,6 +107,16 @@
+ 	};
+ };
+ 
++&ethmac {
++	status = "okay";
++};
++
++&ir {
++	status = "okay";
++	pinctrl-0 = <&remote_input_ao_pins>;
++	pinctrl-names = "default";
++};
++
+ &hdmi_tx {
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+@@ -73,20 +129,43 @@
+ 	};
+ };
+ 
+-/*
+- * The following devices exists but are exposed on the general
+- * purpose GPIO header. End user may well decide to use those pins
+- * for another purpose
+- */
++/* SD card */
++&sd_emmc_b {
++	status = "okay";
++	pinctrl-0 = <&sdcard_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <4>;
++	cap-sd-highspeed;
++	max-frequency = <100000000>;
++	disable-wp;
++
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
+ 
+-&sd_emmc_a {
+-	status = "disabled";
++	vmmc-supply = <&vcc_3v3>;
++	vqmmc-supply = <&vcc_card>;
+ };
+ 
+-&uart_A {
+-	status = "disabled";
++/* eMMC */
++&sd_emmc_c {
++	status = "okay";
++	pinctrl-0 = <&emmc_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <8>;
++	cap-mmc-highspeed;
++	max-frequency = <50000000>;
++	non-removable;
++	disable-wp;
++
++	mmc-pwrseq = <&emmc_pwrseq>;
++	vmmc-supply = <&vcc_3v3>;
++	vqmmc-supply = <&vddio_boot>;
+ };
+ 
+-&wifi32k {
+-	status = "disabled";
++&uart_AO {
++	status = "okay";
++	pinctrl-0 = <&uart_ao_a_pins>;
++	pinctrl-names = "default";
+ };
+-- 
+2.9.4
