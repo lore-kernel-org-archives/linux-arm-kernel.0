@@ -1,177 +1,278 @@
-From: lionel.debieve@st.com (Lionel DEBIEVE)
-Date: Mon, 17 Jul 2017 14:23:44 +0000
-Subject: [RESEND,PATCH v4 3/3] crypto : stm32 - Add STM32F4 CRC32 support
-In-Reply-To: <1500280056-46251-1-git-send-email-cosardindar@gmail.com>
-References: <1500280056-46251-1-git-send-email-cosardindar@gmail.com>
-Message-ID: <bc6634fb-22df-5f36-70ee-9b29f6ded05c@st.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Mon, 17 Jul 2017 22:23:37 +0800
+Subject: [PATCH 1/5] iommu/arm-smmu-v3: put off the execution of TLBI*
+ to reduce lock confliction
+In-Reply-To: <cd5b8ec5-f884-450c-df61-45d70bf40b10@huawei.com>
+References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
+ <1498484330-10840-2-git-send-email-thunder.leizhen@huawei.com>
+ <20170628093207.GB11053@arm.com> <5954610F.9020807@huawei.com>
+ <cd5b8ec5-f884-450c-df61-45d70bf40b10@huawei.com>
+Message-ID: <20170717222337.0000508f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cosar,
+On Mon, 17 Jul 2017 14:06:42 +0100
+John Garry <john.garry@huawei.com> wrote:
 
--	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
-+	/* For F4 series only CRC32 algorithm will be used */
-+	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc"))
-+		algs_size = 1;
-+	else
-+		algs_size = ARRAY_SIZE(algs);
-+
-+	ret = crypto_register_shashes(algs, algs_size);
-
-Should it be better to have a dedicated array per platform data instead? Could be new platform update?
-
-BR,
-
-Lionel
-
-
-On 07/17/2017 10:27 AM, Cosar Dindar wrote:
-> This patch adds CRC (CRC32 Crypto) support for STM32F4 series.
->
-> As an hardware limitation polynomial and key setting are not supported.
-> They are fixed as 0x4C11DB7 (poly) and 0xFFFFFFFF (key).
-> CRC32C Castagnoli algorithm is not used.
->
-> Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
-> Reviewed-by: Fabien Dessenne <fabien.dessenne@st.com>
-> ---
->   drivers/crypto/stm32/stm32_crc32.c | 68 ++++++++++++++++++++++++++++++++------
->   1 file changed, 58 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/crypto/stm32/stm32_crc32.c b/drivers/crypto/stm32/stm32_crc32.c
-> index ec83b1e..12fbd98 100644
-> --- a/drivers/crypto/stm32/stm32_crc32.c
-> +++ b/drivers/crypto/stm32/stm32_crc32.c
-> @@ -7,6 +7,7 @@
->   #include <linux/bitrev.h>
->   #include <linux/clk.h>
->   #include <linux/module.h>
-> +#include <linux/of.h>
->   #include <linux/platform_device.h>
->   
->   #include <crypto/internal/hash.h>
-> @@ -39,6 +40,9 @@ struct stm32_crc {
->   	struct clk       *clk;
->   	u8               pending_data[sizeof(u32)];
->   	size_t           nb_pending_bytes;
-> +	bool             key_support;
-> +	bool             poly_support;
-> +	bool             reverse_support;
->   };
->   
->   struct stm32_crc_list {
-> @@ -106,13 +110,31 @@ static int stm32_crc_init(struct shash_desc *desc)
->   	}
->   	spin_unlock_bh(&crc_list.lock);
->   
-> -	/* Reset, set key, poly and configure in bit reverse mode */
-> -	writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
-> -	writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
-> -	writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-> +	/* set key */
-> +	if (ctx->crc->key_support) {
-> +		writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
-> +	} else if (mctx->key != CRC_INIT_DEFAULT) {
-> +		dev_err(ctx->crc->dev, "Unsupported key value! Should be: 0x%x\n",
-> +			CRC_INIT_DEFAULT);
-> +		return -EINVAL;
-> +	}
 > +
-> +	/* set poly */
-> +	if (ctx->crc->poly_support)
-> +		writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
-> +
-> +	/* reset and configure in bit reverse mode if supported */
-> +	if (ctx->crc->reverse_support)
-> +		writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-> +	else
-> +		writel(CRC_CR_RESET, ctx->crc->regs + CRC_CR);
-> +
-> +	/* store partial result */
-> +	if (!ctx->crc->reverse_support)
-> +		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
-> +	else
-> +		ctx->partial = readl(ctx->crc->regs + CRC_DR);
->   
-> -	/* Store partial result */
-> -	ctx->partial = readl(ctx->crc->regs + CRC_DR);
->   	ctx->crc->nb_pending_bytes = 0;
->   
->   	return 0;
-> @@ -135,7 +157,12 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
->   
->   		if (crc->nb_pending_bytes == sizeof(u32)) {
->   			/* Process completed pending data */
-> -			writel(*(u32 *)crc->pending_data, crc->regs + CRC_DR);
-> +			if (!ctx->crc->reverse_support)
-> +				writel(bitrev32(*(u32 *)crc->pending_data),
-> +				       crc->regs + CRC_DR);
-> +			else
-> +				writel(*(u32 *)crc->pending_data,
-> +				       crc->regs + CRC_DR);
->   			crc->nb_pending_bytes = 0;
->   		}
->   	}
-> @@ -143,10 +170,16 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
->   	d32 = (u32 *)d8;
->   	for (i = 0; i < length >> 2; i++)
->   		/* Process 32 bits data */
-> -		writel(*(d32++), crc->regs + CRC_DR);
-> +		if (!ctx->crc->reverse_support)
-> +			writel(bitrev32(*(d32++)), crc->regs + CRC_DR);
-> +		else
-> +			writel(*(d32++), crc->regs + CRC_DR);
->   
->   	/* Store partial result */
-> -	ctx->partial = readl(crc->regs + CRC_DR);
-> +	if (!ctx->crc->reverse_support)
-> +		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
-> +	else
-> +		ctx->partial = readl(crc->regs + CRC_DR);
->   
->   	/* Check for pending data (non 32 bits) */
->   	length &= 3;
-> @@ -243,6 +276,7 @@ static int stm32_crc_probe(struct platform_device *pdev)
->   	struct stm32_crc *crc;
->   	struct resource *res;
->   	int ret;
-> +	int algs_size;
->   
->   	crc = devm_kzalloc(dev, sizeof(*crc), GFP_KERNEL);
->   	if (!crc)
-> @@ -269,13 +303,26 @@ static int stm32_crc_probe(struct platform_device *pdev)
->   		return ret;
->   	}
->   
-> +	/* set key, poly and reverse support if device is of F7 series */
-> +	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f7-crc")) {
-> +		crc->key_support = true;
-> +		crc->poly_support = true;
-> +		crc->reverse_support = true;
-> +	}
-> +
->   	platform_set_drvdata(pdev, crc);
->   
->   	spin_lock(&crc_list.lock);
->   	list_add(&crc->list, &crc_list.dev_list);
->   	spin_unlock(&crc_list.lock);
->   
-> -	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
-> +	/* For F4 series only CRC32 algorithm will be used */
-> +	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc"))
-> +		algs_size = 1;
-> +	else
-> +		algs_size = ARRAY_SIZE(algs);
-> +
-> +	ret = crypto_register_shashes(algs, algs_size);
->   	if (ret) {
->   		dev_err(dev, "Failed to register\n");
->   		clk_disable_unprepare(crc->clk);
-> @@ -304,6 +351,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
->   
->   static const struct of_device_id stm32_dt_ids[] = {
->   	{ .compatible = "st,stm32f7-crc", },
-> +	{ .compatible = "st,stm32f4-crc", },
->   	{},
->   };
->   MODULE_DEVICE_TABLE(of, stm32_dt_ids);
+> 
+> On 29/06/2017 03:08, Leizhen (ThunderTown) wrote:
+> >
+> >
+> > On 2017/6/28 17:32, Will Deacon wrote:  
+> >> Hi Zhen Lei,
+> >>
+> >> Nate (CC'd), Robin and I have been working on something very similar to
+> >> this series, but this patch is different to what we had planned. More below.
+> >>
+> >> On Mon, Jun 26, 2017 at 09:38:46PM +0800, Zhen Lei wrote:  
+> >>> Because all TLBI commands should be followed by a SYNC command, to make
+> >>> sure that it has been completely finished. So we can just add the TLBI
+> >>> commands into the queue, and put off the execution until meet SYNC or
+> >>> other commands. To prevent the followed SYNC command waiting for a long
+> >>> time because of too many commands have been delayed, restrict the max
+> >>> delayed number.
+> >>>
+> >>> According to my test, I got the same performance data as I replaced writel
+> >>> with writel_relaxed in queue_inc_prod.
+> >>>
+> >>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> >>> ---
+> >>>  drivers/iommu/arm-smmu-v3.c | 42 +++++++++++++++++++++++++++++++++++++-----
+> >>>  1 file changed, 37 insertions(+), 5 deletions(-)
+> >>>
+> >>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> >>> index 291da5f..4481123 100644
+> >>> --- a/drivers/iommu/arm-smmu-v3.c
+> >>> +++ b/drivers/iommu/arm-smmu-v3.c
+> >>> @@ -337,6 +337,7 @@
+> >>>  /* Command queue */
+> >>>  #define CMDQ_ENT_DWORDS			2
+> >>>  #define CMDQ_MAX_SZ_SHIFT		8
+> >>> +#define CMDQ_MAX_DELAYED		32
+> >>>
+> >>>  #define CMDQ_ERR_SHIFT			24
+> >>>  #define CMDQ_ERR_MASK			0x7f
+> >>> @@ -472,6 +473,7 @@ struct arm_smmu_cmdq_ent {
+> >>>  			};
+> >>>  		} cfgi;
+> >>>
+> >>> +		#define CMDQ_OP_TLBI_NH_ALL	0x10
+> >>>  		#define CMDQ_OP_TLBI_NH_ASID	0x11
+> >>>  		#define CMDQ_OP_TLBI_NH_VA	0x12
+> >>>  		#define CMDQ_OP_TLBI_EL2_ALL	0x20
+> >>> @@ -499,6 +501,7 @@ struct arm_smmu_cmdq_ent {
+> >>>
+> >>>  struct arm_smmu_queue {
+> >>>  	int				irq; /* Wired interrupt */
+> >>> +	u32				nr_delay;
+> >>>
+> >>>  	__le64				*base;
+> >>>  	dma_addr_t			base_dma;
+> >>> @@ -722,11 +725,16 @@ static int queue_sync_prod(struct arm_smmu_queue *q)
+> >>>  	return ret;
+> >>>  }
+> >>>
+> >>> -static void queue_inc_prod(struct arm_smmu_queue *q)
+> >>> +static void queue_inc_swprod(struct arm_smmu_queue *q)
+> >>>  {
+> >>> -	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
+> >>> +	u32 prod = q->prod + 1;
+> >>>
+> >>>  	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
+> >>> +}
+> >>> +
+> >>> +static void queue_inc_prod(struct arm_smmu_queue *q)
+> >>> +{
+> >>> +	queue_inc_swprod(q);
+> >>>  	writel(q->prod, q->prod_reg);
+> >>>  }
+> >>>
+> >>> @@ -761,13 +769,24 @@ static void queue_write(__le64 *dst, u64 *src, size_t n_dwords)
+> >>>  		*dst++ = cpu_to_le64(*src++);
+> >>>  }
+> >>>
+> >>> -static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent)
+> >>> +static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent, int optimize)
+> >>>  {
+> >>>  	if (queue_full(q))
+> >>>  		return -ENOSPC;
+> >>>
+> >>>  	queue_write(Q_ENT(q, q->prod), ent, q->ent_dwords);
+> >>> -	queue_inc_prod(q);
+> >>> +
+> >>> +	/*
+> >>> +	 * We don't want too many commands to be delayed, this may lead the
+> >>> +	 * followed sync command to wait for a long time.
+> >>> +	 */
+> >>> +	if (optimize && (++q->nr_delay < CMDQ_MAX_DELAYED)) {
+> >>> +		queue_inc_swprod(q);
+> >>> +	} else {
+> >>> +		queue_inc_prod(q);
+> >>> +		q->nr_delay = 0;
+> >>> +	}
+> >>> +  
+> >>
+> >> So here, you're effectively putting invalidation commands into the command
+> >> queue without updating PROD. Do you actually see a performance advantage
+> >> from doing so? Another side of the argument would be that we should be  
+> > Yes, my sas ssd performance test showed that it can improve about 100-150K/s(the same to I directly replace
+> > writel with writel_relaxed). And the average execution time of iommu_unmap(which called by iommu_dma_unmap_sg)
+> > dropped from 10us to 5us.
+> >  
+> >> moving PROD as soon as we can, so that the SMMU can process invalidation
+> >> commands in the background and reduce the cost of the final SYNC operation
+> >> when the high-level unmap operation is complete.  
+> > There maybe that __iowmb() is more expensive than wait for tlbi complete. Except the time of __iowmb()
+> > itself, it also protected by spinlock, lock confliction will rise rapidly in the stress scene. __iowmb()
+> > average cost 300-500ns(Sorry, I forget the exact value).
+> >
+> > In addition, after applied this patcheset and Robin's v2, and my earlier dma64 iova optimization patchset.
+> > Our net performance test got the same data to global bypass. But sas ssd still have more than 20% dropped.
+> > Maybe we should still focus at map/unamp, because the average execution time of iova alloc/free is only
+> > about 400ns.
+> >
+> > By the way, patch2-5 is more effective than this one, it can improve more than 350K/s. And with it, we can
+> > got about 100-150K/s improvement of Robin's v2. Otherwise, I saw non effective of Robin's v2. Sorry, I have
+> > not tested how about this patch without patch2-5. Further more, I got the same performance data to global
+> > bypass for the traditional mechanical hard disk with only patch2-5(without this patch and Robin's).
+> >  
+Hi All,
+
+I'm a bit of late entry to this discussion.  Just been running some more
+detailed tests on our d05 boards and wanted to bring some more numbers to
+the discussion.
+
+All tests against 4.12 with the following additions:
+* Robin's series removing the io-pgtable spinlock (and a few recent fixes)
+* Cherry picked updates to the sas driver, merged prior to 4.13-rc1
+* An additional HNS (network card) bug fix that will be upstreamed shortly.
+
+I've broken the results down into this patch and this patch + the remainder
+of the set. As leizhen mentioned we got a nice little performance
+bump from Robin's series so that was applied first (as it's in mainline now)
+
+SAS tests were fio with noop scheduler, 4k block size and various io depths
+1 process per disk.  Note this is probably a different setup to leizhen's
+original numbers.
+
+Precentages are off the performance seen with the smmu disabled.
+SAS
+4.12 - none of this series.
+SMMU disabled
+read io-depth 32 -   384K IOPS (100%)
+read io-depth 2048 - 950K IOPS (100%)
+rw io-depth 32 -     166K IOPS (100%)
+rw io-depth 2048 -   340K IOPS (100%)
+
+SMMU enabled
+read io-depth 32 -   201K IOPS (52%)
+read io-depth 2048 - 306K IOPS (32%)
+rw io-depth 32 -     99K  IOPS (60%)
+rw io-depth 2048 -   150K IOPS (44%)
+
+Robin's recent series with fixes as seen on list (now merged)
+SMMU enabled.
+read io-depth 32 -   208K IOPS (54%)
+read io-depth 2048 - 335K IOPS (35%)
+rw io-depth 32 -     105K IOPS (63%)
+rw io-depth 2048 -   165K IOPS (49%)
+
+4.12 + Robin's series + just this patch SMMU enabled
+
+(iommu/arm-smmu-v3: put of the execution of TLBI* to reduce lock conflict)
+
+read io-depth 32 -   225K IOPS (59%)
+read io-depth 2048 - 365K IOPS (38%) 
+rw io-depth 32 -     110K IOPS (66%)
+rw io-depth 2048 -   179K IOPS (53%)
+
+4.12 + Robin's series + Second part of this series
+
+(iommu/arm-smmu-v3: put of the execution of TLBI* to reduce lock conflict)
+(iommu: add a new member unmap_tlb_sync into struct iommu_ops)
+(iommu/arm-smmu-v3: add supprot for unmap an iova range with only on tlb sync)
+(iommu/arm-smmu: add support for unmap of a memory range with only one tlb sync)
+
+read io-depth 32 -    225K IOPS (59%)
+read io-depth 2048 -  833K IOPS (88%)
+rw io-depth 32 -      112K IOPS (67%)
+rw io-depth 2048 -    220K IOPS (65%)
+
+Robin's series gave us small gains across the board (3-5% recovered)
+relative to the no smmu performance (which we are taking as the ideal case)
+
+This first patch gets us back another 2-5% of the no smmu performance
+
+The next few patches get us very little advantage on the small io-depths
+but make a large difference to the larger io-depths - in particular the
+read IOPS which is over twice as fast as without the series.
+
+For HNS it seems that we are less dependent on the SMMU performance and
+can reach the non SMMU speed.
+
+Tests with
+iperf -t 30 -i 10 -c IPADDRESS -P 3 last 10 seconds taken to avoid any
+initial variability.
+
+The server end of the link was always running with smmu v3 disabled
+so as to act as a fast sink of the data. Some variation seen across
+repeat runs.
+
+Mainline v4.12 + network card fix
+NO SMMU
+9.42 GBits/sec
+
+SMMU
+4.36 GBits/sec (46%)
+
+Robin's io-pgtable spinlock series
+
+6.68 to 7.34 (71% - 78% variation across runs)
+
+Just this patch SMMU enabled
+
+(iommu/arm-smmu-v3: put of the execution of TLBI* to reduce lock conflict)
+
+7.96-8.8 GBits/sec (85% - 94%  some variation across runs)
+
+Full series
+
+(iommu/arm-smmu-v3: put of the execution of TLBI* to reduce lock conflict)
+(iommu: add a new member unmap_tlb_sync into struct iommu_ops)
+(iommu/arm-smmu-v3: add supprot for unmap an iova range with only on tlb sync)
+(iommu/arm-smmu: add support for unmap of a memory range with only one tlb sync)
+
+9.42 GBits/Sec (100%)
+
+So HNS test shows a greater boost from Robin's series and this first patch.
+This is most likely because the HNS test is not putting as high a load on
+the SMMU and associated code as the SAS test.
+
+In both cases however, this shows that both parts of this patch
+series are beneficial.
+
+So on to the questions ;)
+
+Will, you mentioned that along with Robin and Nate you were working on
+a somewhat related strategy to improve the performance.  Any ETA on that?
+
+As you might imagine, with the above numbers we are very keen to try and
+move forward with this as quickly as possible.
+
+If you want additional testing we would be happy to help.
+
+Thanks,
+
+Jonathan
+
+
+
+> >>
+> >> Will
+> >>
+> >> .
+> >>  
+> >  
+> 
+> 
