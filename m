@@ -1,52 +1,29 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 17 Jul 2017 10:56:47 +0200
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <20170609141056.GS4902@n2100.armlinux.org.uk>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
- <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
- <20170609133822.GR4902@n2100.armlinux.org.uk>
- <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
- <20170609141056.GS4902@n2100.armlinux.org.uk>
-Message-ID: <b46f25c1-45fd-2917-6559-218f6887a882@xs4all.nl>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 17 Jul 2017 09:58:03 +0100
+Subject: [RFC PATCH 0/2] Introduce interface for default DMA pool
+Message-ID: <1500281885-3034-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-On 09/06/17 16:10, Russell King - ARM Linux wrote:
-> On Fri, Jun 09, 2017 at 03:56:39PM +0200, Neil Armstrong wrote:
->> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is
->> not used, but a custom one, so this notifier is actually useful for
->> this platform and maybe others.
-> 
-> Is the CEC controller configured into dw-hdmi (is the config bit set?)
-> I'm just wondering if we're going to end up with two CEC drivers trying
-> to bind to the same notifier.
-> 
->> Should we really wait until I push the Amlogic AO CEC driver ? Having a
->> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
-> 
-> It sounds like this adds additional information that has been missing
-> from the review of my patches - and I suspect changes Hans' comments.
-> So, I'll wait, it seems pointless to try and update the patches when
-> it's not clear how to proceed due to other dependencies, especially
-> when it means that their existing state is what's required (I'm pleased
-> that I've held off modifying the patches so far.)
-> 
-> If that means having to wait another kernel revision, then I guess that's
-> what will have to happen.
+This is follow-up for Christoph complain of overloading the current
+dma coherent infrastructure with the global pool. To address that I
+implemented Robin's idea of the new interface to the global pool and
+wire up it with (only existent user) ARM NOMMU.  Since I have not
+heard from Vitaly and/or George of their use of global pool, I'm
+leaving ARM MMU part to them.
 
-Can you respin your patch series, keeping the notifier support? The CEC
-kernel config handling has been cleaned up (just select CEC_CORE and
-CEC_NOTIFIER) so you should be good to go.
+[1] https://lkml.org/lkml/2017/7/7/370
 
-I've already Acked patches 1-3. I had some comments for patch 4, so that
-needs a bit more work.
+Vladimir Murzin (2):
+  drivers: dma-coherent: Introduce interface for default DMA pool
+  ARM: NOMMU: Wire-up default DMA interface
 
-Note that there is now a cec_transmit_attempt_done() helper function that
-will simplify your code.
+ arch/arm/mm/dma-mapping-nommu.c |  45 +++++++++---
+ drivers/base/dma-coherent.c     | 159 ++++++++++++++++++++++++++--------------
+ include/linux/dma-mapping.h     |  24 ++++++
+ 3 files changed, 166 insertions(+), 62 deletions(-)
 
-Regards,
-
-	Hans
+-- 
+2.0.0
