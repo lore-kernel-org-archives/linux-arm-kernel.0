@@ -1,61 +1,40 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Mon, 17 Jul 2017 15:32:43 -0400
-Subject: [PATCH] PCI: dwc: designware: test PCIE_ATU_ENABLE bit to check
- enabled or not
-In-Reply-To: <1df044ef-1daf-0b60-da30-a6a45215f275@synopsys.com>
-References: <20170713103527.1642-1-jszhang@marvell.com>
- <1df044ef-1daf-0b60-da30-a6a45215f275@synopsys.com>
-Message-ID: <000b01d2ff33$76d4fad0$647ef070$@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 17 Jul 2017 14:39:39 -0500
+Subject: [PATCH 1/5] pinctrl: Add DT bindings for Cortina Gemini
+In-Reply-To: <20170715175056.13040-1-linus.walleij@linaro.org>
+References: <20170715175056.13040-1-linus.walleij@linaro.org>
+Message-ID: <20170717193939.dwl2w6m47gqysvdc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 17, 2017 5:28 AM, Joao Pinto wrote:
+On Sat, Jul 15, 2017 at 07:50:52PM +0200, Linus Walleij wrote:
+> The Cortina Gemini pin controller uses the standard pin control
+> bindings for muxing functions with groups so these bindings
+> should be entirely uncontroversial.
 > 
-> Hi,
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  .../bindings/pinctrl/cortina,gemini-pinctrl.txt    | 54 ++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
 > 
-> ?s 11:35 AM de 7/13/2017, Jisheng Zhang escreveu:
-> > The ATU CTRL2 register is 32 bit, besides the enable bit, other bits
-> > may also be set. To check whether the ATU is enabled or not, we should
-> > test the enable it.
+> diff --git a/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+> new file mode 100644
+> index 000000000000..2ef3e8a65559
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+> @@ -0,0 +1,54 @@
+> +Cortina Systems Gemini pin controller
+> +
+> +This pin controller is found in the Cortina Systems Gemini SoC family,
+> +see further arm/gemini.txt. It is a purely group-based multiplexing pin
+> +controller.
+> +
+> +Required properties:
+> +- compatible: "cortina,gemini-pinctrl"
+> +- regmap: phandle to the system controller node
 
-To Jisheng Zhang,
+Why not a child of the system controller?
 
-typo s/it/bit
-
-"test the enable it."  ---> "test the enable bit."
-
-
-Please fix this typo, and send it again.
-Type is confusing.
-
-
-Best regards,
-Jingoo Han
-
-
-> >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  drivers/pci/dwc/pcie-designware.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-
-> designware.c
-> > index 0e03af279259..6bf0b409050a 100644
-> > --- a/drivers/pci/dwc/pcie-designware.c
-> > +++ b/drivers/pci/dwc/pcie-designware.c
-> > @@ -177,7 +177,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci,
-> int index, int type,
-> >  	 */
-> >  	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++)
-> {
-> >  		val = dw_pcie_readl_dbi(pci, PCIE_ATU_CR2);
-> > -		if (val == PCIE_ATU_ENABLE)
-> > +		if (val & PCIE_ATU_ENABLE)
-> >  			return;
-> >
-> >  		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-> >
-> Make sense, turn it more accurate. Thanks!
-> 
-> Acked-by: Joao Pinto <jpinto@synopsys.com>
+Rob
