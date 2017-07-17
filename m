@@ -1,48 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Jul 2017 11:20:45 +0200
-Subject: [PATCH 05/11] mmc: sunxi: Support controllers that can use both
- old and new timings
-In-Reply-To: <CAPDyKFqe1hFmfWziu04fW=cQa0EGvT11YzuJ0f-eHy6+u7vutQ@mail.gmail.com>
+Date: Mon, 17 Jul 2017 11:22:09 +0200
+Subject: [PATCH 08/11] ARM: dts: sun8i: a83t: Add MMC controller device
+ nodes
+In-Reply-To: <20170714064302.20383-9-wens@csie.org>
 References: <20170714064302.20383-1-wens@csie.org>
- <20170714064302.20383-6-wens@csie.org>
- <CAPDyKFoLTXJ10EJRfPPggJBg8bh9BpdwTnew-WL0G7LpnO43Pg@mail.gmail.com>
- <CAGb2v64gjLSdb83fR9OCZthtgMQz-UkmMhT9OmJkq3Xp6mJ-aA@mail.gmail.com>
- <CAPDyKFqe1hFmfWziu04fW=cQa0EGvT11YzuJ0f-eHy6+u7vutQ@mail.gmail.com>
-Message-ID: <20170717092045.3hidokuo6w7cgorw@flea>
+ <20170714064302.20383-9-wens@csie.org>
+Message-ID: <20170717092209.r55enf4ub7ttwpdy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 11:57:35AM +0200, Ulf Hansson wrote:
-> >>> +       if (host->use_new_timings) {
-> >>> +               ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
-> >>
-> >> Can't this be solved through some other generic API/interface?
-> >
-> > The old discussion is here: https://lkml.org/lkml/2017/5/5/77
-> >
-> > It is possible to piggy back on existing API, but as Maxime mentioned
-> > back in the discussion, it is confusing.
-> >
-> > IIRC Mike said (via Maxime) an SoC specific call was the easy way
-> > to handle this. I don't think there's anything generic about this.
-> > Even if you could have a _set_mode callback for the clks, the modes
-> > would be SoC specific anyway.
+Hi,
+
+On Fri, Jul 14, 2017 at 02:42:59PM +0800, Chen-Yu Tsai wrote:
+> The A83T has 3 MMC controllers. The third one is a bit special, as it
+> supports a wider 8-bit bus, and a "new timing mode".
 > 
-> Right. But it would benefit that we can keep drivers generic, as they
-> are using generic APIs/interfaces. I prefer that.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t.dtsi | 57 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
 > 
-> Anyway, let me try to dig up the earlier discussion.
+> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> index beed05e10a3b..085312d0c521 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> @@ -182,6 +182,63 @@
+>  			#dma-cells = <1>;
+>  		};
+>  
+> +		mmc0: mmc at 1c0f000 {
+> +			compatible = "allwinner,sun7i-a20-mmc";
 
-There's really not any generic way to support that. Even if we reuse
-some other function (clk_set_phase/clk_get_phase was suggested), and
-use error codes and / or values to differentiate between two modes,
-this will be very much implementation-specific as well, and any other
-SoC that in theory would be using that will very likely to not
-implement the same behaviour for its clocks.
+Ideally, we should have an A83T compatible here too, just in case.
 
-And this driver is only used on one SoC family, so it's not really a
-big deal anyway.
-
+Thanks!
 Maxime
 
 -- 
@@ -55,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/4308a42b/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/43dbbfa9/attachment.sig>
