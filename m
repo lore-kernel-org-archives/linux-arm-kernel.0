@@ -1,35 +1,29 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Mon, 17 Jul 2017 12:51:31 +0200
-Subject: [PATCH 0/8] EDAC drivers for Armada XP L2 and DDR
-In-Reply-To: <20170717102214.GC23129@nazgul.tnic>
-References: <20170630145106.29820-1-jlu@pengutronix.de>
- <1500286727.6946.7.camel@pengutronix.de>
- <20170717102214.GC23129@nazgul.tnic>
-Message-ID: <1500288691.6946.10.camel@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 17 Jul 2017 16:30:33 +0530
+Subject: [PATCH v3] ARM: dts: da850-evm: drop VPIF endpoints
+In-Reply-To: <20170615215730.28585-1-khilman@baylibre.com>
+References: <20170615215730.28585-1-khilman@baylibre.com>
+Message-ID: <55429c4a-987d-a157-9565-eef04daeefea@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-07-17 at 12:22 +0200, Borislav Petkov wrote:
-> On Mon, Jul 17, 2017 at 12:18:47PM +0200, Jan L?bbe wrote:
-> > Patches 5-7 only touch drivers/edac. If you are fine the them as
-> > is, maybe you could pick them from the current version and I'll
-> > drop them from v2.
+Hi Kevin,
+
+On Friday 16 June 2017 03:27 AM, Kevin Hilman wrote:
+> Drop the unused endpoints.  They should only be used when there is
+> an actual remote-endpoint connected.
 > 
-> No, send them all together. I'd like to have patches adding new
-> interfaces and their users go together.
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-OK.
+A similar patch is needed for da850-lcdk too. In fact with v4.13-rc1, 
+without it, we get a warning splat that starts with:
 
-> I'll take a look at v2 as a whole then.
+WARNING: CPU: 0 PID: 129 at fs/sysfs/dir.c:31 sysfs_warn_dup+0x5c/0x7c
+sysfs: cannot create duplicate filename '/bus/platform/devices/vpif_capture'
 
-As the drivers/edac patches won't change in v2 based on the current
-feedback, I hoped to reduce reduce the list traffic by addressing your
-review comments in v2 as well. 
+I am adding this patch to fixes and would like to send this along with 
+a similar LCDK patch (hopefully both for -rc2). While committing this I 
+will add "unused" to subject line too.
 
-Regards,
-Jan
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Sekhar
