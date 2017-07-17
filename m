@@ -1,178 +1,65 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 17 Jul 2017 17:48:55 +0200
-Subject: [PATCH] ARM64: dts: fixup libretech cc definition
-In-Reply-To: <20170717153537.18330-1-jbrunet@baylibre.com>
-References: <20170717153537.18330-1-jbrunet@baylibre.com>
-Message-ID: <1500306535.8054.5.camel@baylibre.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 17 Jul 2017 18:51:47 +0300
+Subject: [PATCH 08/20] thread: move thread bits accessors to separated file
+In-Reply-To: <mvma8432jsx.fsf@suse.de>
+References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
+ <20170619155003.13218-9-ynorov@caviumnetworks.com>
+ <mvma8432jsx.fsf@suse.de>
+Message-ID: <20170717155147.7s3qi2uduiz5ozon@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-07-17 at 17:35 +0200, Jerome Brunet wrote:
-> The libretech CC derives less from the p212 than initially thought.
-> Several voltage regulators are different and the capabilities of the
-> sdcard and emmc also differ.
+On Mon, Jul 17, 2017 at 04:57:02PM +0200, Andreas Schwab wrote:
+> On Jun 19 2017, Yury Norov <ynorov@caviumnetworks.com> wrote:
 > 
-> Deriving from the p212 is not convient anymore so the libretech is now
-> derived from s905x definition directly.
+> > diff --git a/include/linux/thread_bits.h b/include/linux/thread_bits.h
+> > new file mode 100644
+> > index 000000000000..87354331bc7b
+> > --- /dev/null
+> > +++ b/include/linux/thread_bits.h
+> > @@ -0,0 +1,63 @@
+> > +/* thread_bits.h: common low-level thread bits accessors */
+> > +
+> > +#ifndef _LINUX_THREAD_BITS_H
+> > +#define _LINUX_THREAD_BITS_H
+> > +
+> > +#ifndef __ASSEMBLY__
+> > +
+> > +#include <linux/bitops.h>
+> > +#include <asm/thread_info.h>
+> > +
+> > +#ifdef CONFIG_THREAD_INFO_IN_TASK
+> > +/*
+> > + * For CONFIG_THREAD_INFO_IN_TASK kernels we need <asm/current.h> for the
+> > + * definition of current, but for !CONFIG_THREAD_INFO_IN_TASK kernels,
+> > + * including <asm/current.h> can cause a circular dependency on some platforms.
+> > + */
+> > +#include <asm/current.h>
+> > +#define current_thread_info() ((struct thread_info *)current)
+> > +#endif
 > 
+> This is duplicate.
+> 
+> > diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+> > index d7d3ea637dd0..c40a89357329 100644
+> > --- a/include/linux/thread_info.h
+> > +++ b/include/linux/thread_info.h
+> > @@ -7,9 +7,21 @@
+> >  #ifndef _LINUX_THREAD_INFO_H
+> >  #define _LINUX_THREAD_INFO_H
+> >  
+> > +/*
+> > + * For per-arch arch_within_stack_frames() implementations, defined in
+> > + * asm/thread_info.h.
+> > + */
+> > +enum {
+> > +	BAD_STACK = -1,
+> > +	NOT_STACK = 0,
+> > +	GOOD_FRAME,
+> > +	GOOD_STACK,
+> > +};
+> > +
+> 
+> That should be kept after the includes.
 
-Please ignore this patch. Title is missing the target SoC :( will resend
-
-> Fixes: cd84aff1d981 ("ARM64: dts: meson-gxl: Add Libre Technology CC support")
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
-> ?.../dts/amlogic/meson-gxl-s905x-libretech-cc.dts???| 103 ++++++++++++++++++
-> ---
-> ?1 file changed, 91 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> index 890821d6e52b..266fbcf3e47f 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> @@ -10,12 +10,20 @@
-> ?
-> ?#include <dt-bindings/input/input.h>
-> ?
-> -#include "meson-gxl-s905x-p212.dtsi"
-> +#include "meson-gxl-s905x.dtsi"
-> ?
-> ?/ {
-> ?	compatible = "libretech,cc", "amlogic,s905x", "amlogic,meson-gxl";
-> ?	model = "Libre Technology CC";
-> ?
-> +	aliases {
-> +		serial0 = &uart_AO;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> ?	cvbs-connector {
-> ?		compatible = "composite-video-connector";
-> ?
-> @@ -26,6 +34,11 @@
-> ?		};
-> ?	};
-> ?
-> +	emmc_pwrseq: emmc-pwrseq {
-> +		compatible = "mmc-pwrseq-emmc";
-> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
-> +	};
-> +
-> ?	hdmi-connector {
-> ?		compatible = "hdmi-connector";
-> ?		type = "a";
-> @@ -53,6 +66,39 @@
-> ?			linux,default-trigger = "heartbeat";
-> ?		};
-> ?	};
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x0 0x0 0x80000000>;
-> +	};
-> +
-> +	vcc_3v3: regulator-vcc_3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VCC_3V3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	vcc_card: regulator-vcc-card {
-> +		compatible = "regulator-gpio";
-> +
-> +		regulator-name = "VCC_CARD";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <3300000>;
-> +
-> +		gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
-> +		gpios-states = <0>;
-> +
-> +		states = <3300000 0>,
-> +			?<1800000 1>;
-> +	};
-> +
-> +	vddio_boot: regulator-vddio_boot {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VDDIO_BOOT";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> ?};
-> ?
-> ?&cvbs_vdac_port {
-> @@ -61,6 +107,16 @@
-> ?	};
-> ?};
-> ?
-> +&ethmac {
-> +	status = "okay";
-> +};
-> +
-> +&ir {
-> +	status = "okay";
-> +	pinctrl-0 = <&remote_input_ao_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> ?&hdmi_tx {
-> ?	status = "okay";
-> ?	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-> @@ -73,20 +129,43 @@
-> ?	};
-> ?};
-> ?
-> -/*
-> - * The following devices exists but are exposed on the general
-> - * purpose GPIO header. End user may well decide to use those pins
-> - * for another purpose
-> - */
-> +/* SD card */
-> +&sd_emmc_b {
-> +	status = "okay";
-> +	pinctrl-0 = <&sdcard_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	bus-width = <4>;
-> +	cap-sd-highspeed;
-> +	max-frequency = <100000000>;
-> +	disable-wp;
-> +
-> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
-> +	cd-inverted;
-> ?
-> -&sd_emmc_a {
-> -	status = "disabled";
-> +	vmmc-supply = <&vcc_3v3>;
-> +	vqmmc-supply = <&vcc_card>;
-> ?};
-> ?
-> -&uart_A {
-> -	status = "disabled";
-> +/* eMMC */
-> +&sd_emmc_c {
-> +	status = "okay";
-> +	pinctrl-0 = <&emmc_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	bus-width = <8>;
-> +	cap-mmc-highspeed;
-> +	max-frequency = <50000000>;
-> +	non-removable;
-> +	disable-wp;
-> +
-> +	mmc-pwrseq = <&emmc_pwrseq>;
-> +	vmmc-supply = <&vcc_3v3>;
-> +	vqmmc-supply = <&vddio_boot>;
-> ?};
-> ?
-> -&wifi32k {
-> -	status = "disabled";
-> +&uart_AO {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_ao_a_pins>;
-> +	pinctrl-names = "default";
-> ?};
+Thanks, will fix.
