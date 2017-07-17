@@ -1,29 +1,39 @@
-From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Mon, 17 Jul 2017 11:35:11 -0500
-Subject: [PATCHv5 0/3] Add Altera I2C Controller Driver
-Message-ID: <1500309314-18464-1-git-send-email-thor.thayer@linux.intel.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 17 Jul 2017 18:34:28 +0200
+Subject: [PATCH 2/6] ARM: shmobile_defconfig: Cleanup from non-existing
+ options
+In-Reply-To: <CAMuHMdXWjw_k+-Fsv6gv8jH4hKvyZ_ygfVJqJ8QB4B8=LEfiGQ@mail.gmail.com>
+References: <1500270596-22384-1-git-send-email-krzk@kernel.org>
+ <1500270596-22384-2-git-send-email-krzk@kernel.org>
+ <CAMuHMdXWjw_k+-Fsv6gv8jH4hKvyZ_ygfVJqJ8QB4B8=LEfiGQ@mail.gmail.com>
+Message-ID: <20170717163428.GA2346@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <thor.thayer@linux.intel.com>
+On Mon, Jul 17, 2017 at 09:29:24AM +0200, Geert Uytterhoeven wrote:
+> Hi Krzysztof,
+> 
+> On Mon, Jul 17, 2017 at 7:49 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > Remove options which do not exist anymore:
+> >  - DRM_RCAR_HDMI was merged to generic DRM bridge and is obsolete since
+> >    commit 5c602531feb3 ("drm: rcar-du: Replace manual bridge
+> >    implementation with DRM bridge");
+> >
+> >  - SND_SOC_RSRC_CARD was replaced by SND_SIMPLE_SCU_CARD in commit
+> >    d12c6216c4a5 ("ASoC: rsrc-card: rename rsrc-card to simple-scu-card
+> >    phase3");
+> >
+> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> 
+> These have already be fixed in the defconfig-for-v4.14 branch Simon Horman's
+> tree (git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git).
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git/log/?h=defconfig-for-v4.14
+> 
+> They're not yet in -next as v4.13-rc1 wasn't released at that time, and
+> Simon is now on holidays.
 
-This patch series adds the Altera I2C Controller driver for use in FPGAs.
-This version includes cleanup and a bug fix noticed by the Linux
-community.
+Ahhh, thanks for noticing this!
 
-Thor Thayer (3):
-  MAINTAINERS: Add Altera I2C Controller Driver
-  dt-bindings: i2c: Add Altera I2C Controller
-  i2c: altera: Add Altera I2C Controller driver
-
- .../devicetree/bindings/i2c/i2c-altera.txt         |  39 ++
- MAINTAINERS                                        |   5 +
- drivers/i2c/busses/Kconfig                         |  10 +
- drivers/i2c/busses/Makefile                        |   1 +
- drivers/i2c/busses/i2c-altera.c                    | 510 +++++++++++++++++++++
- 5 files changed, 565 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-altera.txt
- create mode 100644 drivers/i2c/busses/i2c-altera.c
-
--- 
-2.7.4
+Best regards,
+Krzysztof
