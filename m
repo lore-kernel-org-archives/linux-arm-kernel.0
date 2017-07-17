@@ -1,58 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 17 Jul 2017 11:43:58 +0100
-Subject: [PATCH 2/6] dt-bindings: mfd: axp20x: Introduce bindings for
- AXP813
-In-Reply-To: <20170622040833.15329-3-wens@csie.org>
-References: <20170622040833.15329-1-wens@csie.org>
- <20170622040833.15329-3-wens@csie.org>
-Message-ID: <20170717104358.ndplsnhzmcdx4sxo@dell>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Mon, 17 Jul 2017 12:51:31 +0200
+Subject: [PATCH 0/8] EDAC drivers for Armada XP L2 and DDR
+In-Reply-To: <20170717102214.GC23129@nazgul.tnic>
+References: <20170630145106.29820-1-jlu@pengutronix.de>
+ <1500286727.6946.7.camel@pengutronix.de>
+ <20170717102214.GC23129@nazgul.tnic>
+Message-ID: <1500288691.6946.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Jun 2017, Chen-Yu Tsai wrote:
-
-> The X-Powers AXP813 is a PMIC designed to be paired with Allwinner's
-> A83T SoC. There is also an AXP818, which is paired with the H8 SoC.
+On Mon, 2017-07-17 at 12:22 +0200, Borislav Petkov wrote:
+> On Mon, Jul 17, 2017 at 12:18:47PM +0200, Jan L?bbe wrote:
+> > Patches 5-7 only touch drivers/edac. If you are fine the them as
+> > is, maybe you could pick them from the current version and I'll
+> > drop them from v2.
 > 
-> The two models seem to be identical, apart from the external markings.
-> 
-> This patch introduces the basic mfd and regulator bindings for the
-> AXP813.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 49 +++++++++++++++++++++---
->  1 file changed, 44 insertions(+), 5 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index 211a100c6b20..1dff7e2ec375 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -9,6 +9,12 @@ axp223 (X-Powers)
->  axp803 (X-Powers)
->  axp806 (X-Powers)
->  axp809 (X-Powers)
-> +axp813 (X-Powers)
-> +
-> +The AXP813 is 2 chips packaged into 1. The 2 chips do not share anything
-> +other than the packaging. Pins are routed separately. As such they should
-> +be treated as separate entities. The other half is an AC100 RTC/codec
-> +combo chip. Please see ac100.txt for its bindings.
+> No, send them all together. I'd like to have patches adding new
+> interfaces and their users go together.
 
-Please indicate where this lives using standard Linux syntax.
+OK.
 
-./ac100.txt
-../<subsystem>/ac100.txt
+> I'll take a look at v2 as a whole then.
 
-etc.
+As the drivers/edac patches won't change in v2 based on the current
+feedback, I hoped to reduce reduce the list traffic by addressing your
+review comments in v2 as well. 
 
-Once that's been fixed, you may apply my:
-
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-  
+Regards,
+Jan
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
