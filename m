@@ -1,29 +1,44 @@
 From: martin@kaiser.cx (Martin Kaiser)
-Date: Mon, 17 Jul 2017 23:05:23 +0200
-Subject: [PATCH v2 2/3] ARM: i.MX25: add RNGC node to dtsi
-In-Reply-To: <20160401085259.GH18833@tiger>
+Date: Mon, 17 Jul 2017 23:04:25 +0200
+Subject: [PATCH v2 1/3] Documentation: devicetree: add Freescale RNGC
+ binding
+In-Reply-To: <20160318194213.GA10766@rob-hp-laptop>
 References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
- <1457705200-16951-2-git-send-email-s.trumtrar@pengutronix.de>
- <20160401085259.GH18833@tiger>
-Message-ID: <20170717210523.GC15429@reykholt.kaiser.cx>
+ <20160318194213.GA10766@rob-hp-laptop>
+Message-ID: <20170717210425.GB15429@reykholt.kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+Hi,
 
-I'd like to pick this up and get the rgnc driver merged.
+I'd like to pick this up and get the rngc driver merged finally.
 
-Thus wrote Shawn Guo (shawnguo at kernel.org):
+Thus wrote Rob Herring (robh at kernel.org):
 
-> > +			rng: rng at 53fb0000 {
-> > +				compatible = "fsl,imx25-rng";
-> > +				reg = <0x53fb0000 0x4000>;
-> > +				clocks = <&clks 109>;
-> > +				clock-names = "ipg";
+> The MXC name is still not dead?
 
-> I think clock-names can be dropped too.
+looks like no. There's still CONFIG_ARCH_MXC etc. The other similar rng
+driver is called mxc-rnga.c so it makes sense to use mxc-rngc.
 
-done. I'll upload a new version shortly.
+> >  1 file changed, 16 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/rng/mxc_rngc.txt
+
+> > diff --git a/Documentation/devicetree/bindings/rng/mxc_rngc.txt b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
+> > new file mode 100644
+> > index 000000000000..e147a6dde40a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
+> > @@ -0,0 +1,16 @@
+> > +Freescale RNGC (Random Number Generator Version C)
+> > +
+> > +Required properties:
+> > +- compatible : Should be "fsl,imx25-rng"
+
+> What about i.MX3/5 compatible strings?
+
+I couldn't find an imx5 chip that has this rng. I added a compatible
+string for imx35.
 
 Best regards,
-Martin
+
+   Martin
