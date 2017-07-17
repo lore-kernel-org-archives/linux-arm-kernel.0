@@ -1,123 +1,173 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 17 Jul 2017 14:23:54 +0200
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <20170717120513.GK31807@n2100.armlinux.org.uk>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
- <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
- <20170609133822.GR4902@n2100.armlinux.org.uk>
- <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
- <20170609141056.GS4902@n2100.armlinux.org.uk>
- <b46f25c1-45fd-2917-6559-218f6887a882@xs4all.nl>
- <20170717090516.GJ31807@n2100.armlinux.org.uk>
- <e80b0213-7632-faf4-5d57-06509912990d@xs4all.nl>
- <20170717120513.GK31807@n2100.armlinux.org.uk>
-Message-ID: <35c2af77-b717-b86a-1f19-b3571d2fe156@xs4all.nl>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 17 Jul 2017 17:58:31 +0530
+Subject: [PATCH V4 3/6] iommu/arm-smmu: Invoke pm_runtime during probe,
+ add/remove device
+In-Reply-To: <6cd287bb-25c0-a7bd-8d3c-a63b9da0fd25@codeaurora.org>
+References: <4dbc938c-ac88-9bd4-cf00-458008ae24c1@codeaurora.org>
+ <CAF6AEGsFOtsOjt1sLNPSFLEcu-7d1zxCOhTeC+P8e0TDbb1dSA@mail.gmail.com>
+ <60a56ae6-ed9d-57cd-130f-5bd9d32d4d58@codeaurora.org>
+ <CAF6AEGvDpRChNQAzqgRFwaQcH=4JCwfKcvj2GQGgQOnO2_A1sg@mail.gmail.com>
+ <20170714170743.GA26488@arm.com>
+ <CAF6AEGtMiVJvSrPXmQppM2NwS3fsXM8Vep3g0PwQK7SH4N=3xQ@mail.gmail.com>
+ <20170714180615.GC26488@arm.com>
+ <CAF6AEGubgNiq5fJ9LaBULvW3450iY4-u0ecpp_a6xyMvRx9kug@mail.gmail.com>
+ <20170714190113.GE26488@arm.com>
+ <CAF6AEGsjPQa_CviY4w-uEvH95rC6VkR+u7s7knVxTDW_8V-t_Q@mail.gmail.com>
+ <20170714193637.GI26488@arm.com>
+ <CAF6AEGtw-bgK6hfFOHRtO0z6o2zxpvjERTX4i=HzioE69G8kAw@mail.gmail.com>
+ <6cd287bb-25c0-a7bd-8d3c-a63b9da0fd25@codeaurora.org>
+Message-ID: <7984ef64-fb6d-52f6-26bf-00a685a3efc5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/17 14:05, Russell King - ARM Linux wrote:
-> On Mon, Jul 17, 2017 at 01:39:48PM +0200, Hans Verkuil wrote:
->> On 17/07/17 11:05, Russell King - ARM Linux wrote:
->>> On Mon, Jul 17, 2017 at 10:56:47AM +0200, Hans Verkuil wrote:
->>>> Hi Russell,
->>>>
->>>> On 09/06/17 16:10, Russell King - ARM Linux wrote:
->>>>> On Fri, Jun 09, 2017 at 03:56:39PM +0200, Neil Armstrong wrote:
->>>>>> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is
->>>>>> not used, but a custom one, so this notifier is actually useful for
->>>>>> this platform and maybe others.
->>>>>
->>>>> Is the CEC controller configured into dw-hdmi (is the config bit set?)
->>>>> I'm just wondering if we're going to end up with two CEC drivers trying
->>>>> to bind to the same notifier.
->>>>>
->>>>>> Should we really wait until I push the Amlogic AO CEC driver ? Having a
->>>>>> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
->>>>>
->>>>> It sounds like this adds additional information that has been missing
->>>>> from the review of my patches - and I suspect changes Hans' comments.
->>>>> So, I'll wait, it seems pointless to try and update the patches when
->>>>> it's not clear how to proceed due to other dependencies, especially
->>>>> when it means that their existing state is what's required (I'm pleased
->>>>> that I've held off modifying the patches so far.)
->>>>>
->>>>> If that means having to wait another kernel revision, then I guess that's
->>>>> what will have to happen.
->>>>
->>>> Can you respin your patch series, keeping the notifier support? The CEC
->>>> kernel config handling has been cleaned up (just select CEC_CORE and
->>>> CEC_NOTIFIER) so you should be good to go.
->>>
->>> Not yet - the change to the way you're dealing with Kconfig in CEC is
->>> fundamentally broken, and needs fixing before we can merge dw-hdmi-cec
->>> support.
->>>
->>> As a result of these Kconfig changes, dw-hdmi-cec now fails if:
->>>
->>> 1. You build the CEC part as a module
->>> 2. You build the HDMI part into the kernel
->>>
->>> This results in CEC_NOTIFIER=y and CEC_CORE=m, which, when the HDMI part
->>> gets built, results in the stubs in the notifier code being used, rather
->>> than the real functions.  This in turn causes the CEC part to never
->>> receive a physical address, which is therefore non-functional.
->>>
->>> I did have a patch to fix this, but it was never committed, and I got
->>> busy with other stuff (so it ended up being git reset --hard away.)
->>>
->>
->> This is more a DRM_DW_HDMI issue than a CEC issue IMHO.
->>
->> This will fix this:
->>
->> config DRM_DW_HDMI
->>         tristate
->>         select DRM_KMS_HELPER
->>         select REGMAP_MMIO
->>         select CEC_CORE if CEC_NOTIFIER			<<<<<<
->>
->> config DRM_DW_HDMI_CEC
->>         tristate "Synopsis Designware CEC interface"
->>         depends on DRM_DW_HDMI
->>         select CEC_CORE
->>         select CEC_NOTIFIER
->>         help
->>           Support the CE interface which is part of the Synopsis
->>           Designware HDMI block.
->>
->> This makes sense: if DRM_DW_HDMI_CEC is disabled but another CEC module is
->> used instead (as is apparently the case for amlogic), then the
->>
->> 	select CEC_CORE if CEC_NOTIFIER
->>
->> line ensures that CONFIG_CEC_CORE has the right m/y value.
+Hi,
+
+On 7/17/2017 5:16 PM, Sricharan R wrote:
+> Hi,
 > 
-> I disagree with this approach.
+> On 7/15/2017 1:09 AM, Rob Clark wrote:
+>> On Fri, Jul 14, 2017 at 3:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Fri, Jul 14, 2017 at 03:34:42PM -0400, Rob Clark wrote:
+>>>> On Fri, Jul 14, 2017 at 3:01 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>>>> On Fri, Jul 14, 2017 at 02:25:45PM -0400, Rob Clark wrote:
+>>>>>> On Fri, Jul 14, 2017 at 2:06 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>>>>>> On Fri, Jul 14, 2017 at 01:42:13PM -0400, Rob Clark wrote:
+>>>>>>>> On Fri, Jul 14, 2017 at 1:07 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>>>>>>>> On Thu, Jul 13, 2017 at 10:55:10AM -0400, Rob Clark wrote:
+>>>>>>>>>> On Thu, Jul 13, 2017 at 9:53 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+>>>>>>>>>>> Hi,
+>>>>>>>>>>>
+>>>>>>>>>>> On 7/13/2017 5:20 PM, Rob Clark wrote:
+>>>>>>>>>>>> On Thu, Jul 13, 2017 at 1:35 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+>>>>>>>>>>>>> Hi Vivek,
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> On 7/13/2017 10:43 AM, Vivek Gautam wrote:
+>>>>>>>>>>>>>> Hi Stephen,
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> On 07/13/2017 04:24 AM, Stephen Boyd wrote:
+>>>>>>>>>>>>>>> On 07/06, Vivek Gautam wrote:
+>>>>>>>>>>>>>>>> @@ -1231,12 +1237,18 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+>>>>>>>>>>>>>>>>   static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+>>>>>>>>>>>>>>>>                    size_t size)
+>>>>>>>>>>>>>>>>   {
+>>>>>>>>>>>>>>>> -    struct io_pgtable_ops *ops = to_smmu_domain(domain)->pgtbl_ops;
+>>>>>>>>>>>>>>>> +    struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>>>>>>>>>>>>>>>> +    struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+>>>>>>>>>>>>>>>> +    size_t ret;
+>>>>>>>>>>>>>>>>         if (!ops)
+>>>>>>>>>>>>>>>>           return 0;
+>>>>>>>>>>>>>>>>   -    return ops->unmap(ops, iova, size);
+>>>>>>>>>>>>>>>> +    pm_runtime_get_sync(smmu_domain->smmu->dev);
+>>>>>>>>>>>>>>> Can these map/unmap ops be called from an atomic context? I seem
+>>>>>>>>>>>>>>> to recall that being a problem before.
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> That's something which was dropped in the following patch merged in master:
+>>>>>>>>>>>>>> 523d7423e21b iommu/arm-smmu: Remove io-pgtable spinlock
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> Looks like we don't  need locks here anymore?
+>>>>>>>>>>>>>
+>>>>>>>>>>>>>  Apart from the locking, wonder why a explicit pm_runtime is needed
+>>>>>>>>>>>>>  from unmap. Somehow looks like some path in the master using that
+>>>>>>>>>>>>>  should have enabled the pm ?
+>>>>>>>>>>>>>
+>>>>>>>>>>>>
+>>>>>>>>>>>> Yes, there are a bunch of scenarios where unmap can happen with
+>>>>>>>>>>>> disabled master (but not in atomic context).  On the gpu side we
+>>>>>>>>>>>> opportunistically keep a buffer mapping until the buffer is freed
+>>>>>>>>>>>> (which can happen after gpu is disabled).  Likewise, v4l2 won't unmap
+>>>>>>>>>>>> an exported dmabuf while some other driver holds a reference to it
+>>>>>>>>>>>> (which can be dropped when the v4l2 device is suspended).
+>>>>>>>>>>>>
+>>>>>>>>>>>> Since unmap triggers tbl flush which touches iommu regs, the iommu
+>>>>>>>>>>>> driver *definitely* needs a pm_runtime_get_sync().
+>>>>>>>>>>>
+>>>>>>>>>>>  Ok, with that being the case, there are two things here,
+>>>>>>>>>>>
+>>>>>>>>>>>  1) If the device links are still intact at these places where unmap is called,
+>>>>>>>>>>>     then pm_runtime from the master would setup the all the clocks. That would
+>>>>>>>>>>>     avoid reintroducing the locking indirectly here.
+>>>>>>>>>>>
+>>>>>>>>>>>  2) If not, then doing it here is the only way. But for both cases, since
+>>>>>>>>>>>     the unmap can be called from atomic context, resume handler here should
+>>>>>>>>>>>     avoid doing clk_prepare_enable , instead move the clk_prepare to the init.
+>>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> I do kinda like the approach Marek suggested.. of deferring the tlb
+>>>>>>>>>> flush until resume.  I'm wondering if we could combine that with
+>>>>>>>>>> putting the mmu in a stalled state when we suspend (and not resume the
+>>>>>>>>>> mmu until after the pending tlb flush)?
+>>>>>>>>>
+>>>>>>>>> I'm not sure that a stalled state is what we're after here, because we need
+>>>>>>>>> to take care to prevent any table walks if we've freed the underlying pages.
+>>>>>>>>> What we could try to do is disable the SMMU (put into global bypass) and
+>>>>>>>>> invalidate the TLB when performing a suspend operation, then we just ignore
+>>>>>>>>> invalidation whilst the clocks are stopped and, on resume, enable the SMMU
+>>>>>>>>> again.
+>>>>>>>>
+>>>>>>>> wouldn't stalled just block any memory transactions by device(s) using
+>>>>>>>> the context bank?  Putting it in bypass isn't really a good thing if
+>>>>>>>> there is any chance the device can sneak in a memory access before
+>>>>>>>> we've taking it back out of bypass (ie. makes gpu a giant userspace
+>>>>>>>> controlled root hole).
+>>>>>>>
+>>>>>>> If it doesn't deadlock, then yes, it will stall transactions. However, that
+>>>>>>> doesn't mean it necessarily prevents page table walks.
+>>>>>>
+>>>>>> btw, I guess the concern about pagetable walk is that the unmap could
+>>>>>> have removed some sub-level of the pt that the tlb walk would hit?
+>>>>>> Would deferring freeing those pages help?
+>>>>>
+>>>>> Could do, but it sounds like a lot of complication that I think we can fix
+>>>>> by making the suspend operation put the SMMU into a "clean" state.
+>>>>>
+>>>>>>> Instead of bypass, we
+>>>>>>> could configure all the streams to terminate, but this race still worries me
+>>>>>>> somewhat. I thought that the SMMU would only be suspended if all of its
+>>>>>>> masters were suspended, so if the GPU wants to come out of suspend then the
+>>>>>>> SMMU should be resumed first.
+>>>>>>
+>>>>>> I believe this should be true.. on the gpu side, I'm mostly trying to
+>>>>>> avoid having to power the gpu back on to free buffers.  (On the v4l2
+>>>>>> side, somewhere in the core videobuf code would also need to be made
+>>>>>> to wrap it's dma_unmap_sg() with pm_runtime_get/put()..)
+>>>>>
+>>>>> Right, and we shouldn't have to resume it if we suspend it in a clean state,
+>>>>> with the TLBs invalidated.
+>>>>>
+>>>>
+>>>> I guess if the device_link() stuff ensured the attached device
+>>>> (gpu/etc) was suspended before suspending the iommu, then I guess I
+>>>> can't see how temporarily putting the iommu in bypass would be a
+>>>> problem.  I haven't looked at the device_link() stuff too closely, but
+>>>> iommu being resumed first and suspended last seems like the only thing
+>>>> that would make sense.  I'm mostly just nervous about iommu in bypass
+>>>> vs gpu since userspace has so much control over what address gpu
+>>>> writes to / reads from, so getting it wrong w/ the iommu would be a
+>>>> rather bad thing ;-)
+>>>
+>>> Right, but we can also configure it to terminate if you don't want bypass.
+>>>
+>>
 > 
-> If DRM_DW_HDMI=y and DRM_DW_HDMI_CEC=n, but some other driver is enabled
-> that selects CEC_NOTIFIER, then we end up with CEC_CORE forced enabled
-> through dw-hdmi, even though we haven't asked for the CEC part to be
-> enabled.
+>  But one thing here is, with devicelinks in picture, iommu suspend/resume
+>  is called along with the master. That means, we can end up cleaning even
+>  active entries on the suspend path ?, if suspend is going to
+>  put the smmu in to a clean state every time. So if the master's are following
+>  the pm_runtime sequence before a dma_map/unmap operation, that seems better.
+> 
 
-If CEC_NOTIFIER is enabled by a CEC driver, then CEC_CORE will also be
-enabled (without CEC_CORE that driver wouldn't compile, obviously).
-
-So I don't see the problem. All the select...if does is make sure that
-the CEC_CORE can be reached from the HDMI driver if someone enabled the
-CEC notifier (and thus CEC_CORE).
-
-> You might as well have CEC_NOTIFIER itself select CEC_CORE, and be done
-> with it, because that's basically what this boils down to.
-
-That makes no sense.
-
-If CEC_NOTIFIER is set, then both the CEC driver and the HDMI driver have to
-select CEC_CORE to ensure the right dependency. If CEC_NOTIFIER is not set,
-then only the CEC driver has to select CEC_CORE. In that case the CEC code
-is typically either integrated into the HDMI driver or it is a standalone
-device like the USB pulse8-cec driver.
+ Also, for the usecase of unmap being done from master's like GPU while it is already
+ suspended, then following the Marek's approach of checking for the smmu state while
+ in unmap and defer the TLB flush till resume seems correct way. All of the above
+ true if we want to use device_link.
 
 Regards,
+ Sricharan
 
-	Hans
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+
+---
+This email has been checked for viruses by Avast antivirus software.
+https://www.avast.com/antivirus
