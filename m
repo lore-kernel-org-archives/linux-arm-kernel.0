@@ -1,116 +1,226 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jul 2017 17:00:19 +0200
-Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to
- work on 32-bits
-In-Reply-To: <596CC912.3020709@nxp.com>
-References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
- <20170717132646.3020-7-laurentiu.tudor@nxp.com>
- <CAK8P3a3KDh=MgfjG+sKNqcrQwq1yf-DgQN0=HigPaPYYJq0Uug@mail.gmail.com>
- <596CC912.3020709@nxp.com>
-Message-ID: <CAK8P3a3e+Gv2bdHKkRdNVp1e2-Z6j351cudLU4fuH2aZ8CSwmQ@mail.gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Mon, 17 Jul 2017 11:04:36 -0400
+Subject: [PATCH 2/3] net: ethernet: bgmac: Make IDM register space optional
+In-Reply-To: <1499972649-6200-3-git-send-email-abhishek.shah@broadcom.com>
+References: <1499972649-6200-1-git-send-email-abhishek.shah@broadcom.com>
+ <1499972649-6200-3-git-send-email-abhishek.shah@broadcom.com>
+Message-ID: <CAC3K-4o=WRqBv_vTf7QGDYjWzMmVog=63ZbiHbHAuW7zJcsHFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 4:27 PM, Laurentiu Tudor
-<laurentiu.tudor@nxp.com> wrote:
-> Hi Arnd,
+On Thu, Jul 13, 2017 at 3:04 PM, Abhishek Shah
+<abhishek.shah@broadcom.com> wrote:
+> IDM operations are usually one time ops and should be done in
+> firmware itself. Driver is not supposed to touch IDM registers.
 >
-> On 07/17/2017 04:45 PM, Arnd Bergmann wrote:
->> On Mon, Jul 17, 2017 at 3:26 PM,  <laurentiu.tudor@nxp.com> wrote:
->>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>
->>> Split the 64-bit accesses in 32-bit accesses because there's no real
->>> constrain in MC to do only atomic 64-bit. There's only one place
->>> where ordering is important: when writing the MC command header the
->>> first 32-bit part of the header must be written last.
->>> We do this switch in order to allow compiling the driver on 32-bit.
->>>
->>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>> ---
->>>   drivers/staging/fsl-mc/bus/mc-sys.c | 31 ++++++++++++-------------------
->>>   1 file changed, 12 insertions(+), 19 deletions(-)
->>>
->>> diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
->>> index 195d9f3..dd2828e 100644
->>> --- a/drivers/staging/fsl-mc/bus/mc-sys.c
->>> +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
->>> @@ -124,14 +124,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
->>>   {
->>>          int i;
->>>
->>> -       /* copy command parameters into the portal */
->>> -       for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
->>> -               __raw_writeq(cmd->params[i], &portal->params[i]);
->>> -       /* ensure command params are committed before submitting it */
->>> -       wmb();
->>> -
->>> -       /* submit the command by writing the header */
->>> -       __raw_writeq(cmd->header, &portal->header);
->>> +       /*
->>> +        * copy command parameters into the portal. Final write
->>> +        * triggers the submission of the command.
->>> +        */
->>> +       for (i = sizeof(struct mc_command) / sizeof(u32) - 1; i >= 0; i--) {
->>> +               __raw_writel(((u32 *)cmd)[i], &((u32 *)portal)[i]);
->>> +               /* ensure command params are committed before submitting it */
->>> +               wmb();
->>> +       }
->>>   }
->>
->> What is the byte order requirement on this buffer?
+> However, for some SoCs', driver is performing IDM read/writes.
+> So this patch masks IDM operations in case firmware is taking
+> care of IDM operations.
 >
-> Endianness is handled by the callers so this function must leave
-> the binary blob intact.
-
-Got it, the endianess looks correct indeed.
-
->> If this is a byte string
->> rather than individual registers, you should probably just use
->> memcpy_toio()
+> Signed-off-by: Abhishek Shah <abhishek.shah@broadcom.com>
+> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  drivers/net/ethernet/broadcom/bgmac-platform.c | 19 ++++---
+>  drivers/net/ethernet/broadcom/bgmac.c          | 70 +++++++++++++++-----------
+>  drivers/net/ethernet/broadcom/bgmac.h          |  1 +
+>  3 files changed, 55 insertions(+), 35 deletions(-)
 >
-> It's a header followed by an opaque command. The protocol for queueing a
-> command says that the first 32-bit half of the header must be written
-> last, this triggering the command handling in the MC.
-
-Strictly speaking the __raw_writel() won't guarantee that the
-data is written as a single word, the compiler might decide to
-split it up into byte-sized writes if it believes the destination pointer
-is unaligned and the CPU has no efficient writes.
-
-I think this cannot happen on arm or powerpc, as we go through
-inline assembly for the store, but it's not completely portable.
-
-Before your patch, both the compiler and the CPU could also
-reorder the stores in theory (but normally won't), but the wmb()
-will prevent that now.
-
->> but if these are separate registers, then using the
->> __raw_* accessors is still wrong, at least on kernels that have a
->> different byteorder from the hardware.
+> diff --git a/drivers/net/ethernet/broadcom/bgmac-platform.c b/drivers/net/ethernet/broadcom/bgmac-platform.c
+> index 1ca75de..d937083d 100644
+> --- a/drivers/net/ethernet/broadcom/bgmac-platform.c
+> +++ b/drivers/net/ethernet/broadcom/bgmac-platform.c
+> @@ -55,6 +55,9 @@ static void platform_bgmac_idm_write(struct bgmac *bgmac, u16 offset, u32 value)
 >
-> As mentioned above, endianness is handled by the caller. This function
-> takes raw data and must leave it unchanged.
+>  static bool platform_bgmac_clk_enabled(struct bgmac *bgmac)
+>  {
+> +       if (!bgmac->plat.idm_base)
+> +               return true;
+> +
+>         if ((bgmac_idm_read(bgmac, BCMA_IOCTL) & BGMAC_CLK_EN) != BGMAC_CLK_EN)
+>                 return false;
+>         if (bgmac_idm_read(bgmac, BCMA_RESET_CTL) & BCMA_RESET_CTL_RESET)
+> @@ -66,6 +69,9 @@ static void platform_bgmac_clk_enable(struct bgmac *bgmac, u32 flags)
+>  {
+>         u32 val;
 >
->> Also, are you sure that adding those six extra barriers has no
->> performance impact?
+> +       if (!bgmac->plat.idm_base)
+> +               return;
+> +
+>         /* The Reset Control register only contains a single bit to show if the
+>          * controller is currently in reset.  Do a sanity check here, just in
+>          * case the bootloader happened to leave the device in reset.
+> @@ -180,6 +186,7 @@ static int bgmac_probe(struct platform_device *pdev)
+>         bgmac->feature_flags |= BGMAC_FEAT_CMDCFG_SR_REV4;
+>         bgmac->feature_flags |= BGMAC_FEAT_TX_MASK_SETUP;
+>         bgmac->feature_flags |= BGMAC_FEAT_RX_MASK_SETUP;
+> +       bgmac->feature_flags |= BGMAC_FEAT_IDM_MASK;
 >
-> This is a slow interface used in slow paths, so i don't think those
-> extra barriers will have any performance impact.
+>         bgmac->dev = &pdev->dev;
+>         bgmac->dma_dev = &pdev->dev;
+> @@ -207,15 +214,13 @@ static int bgmac_probe(struct platform_device *pdev)
+>                 return PTR_ERR(bgmac->plat.base);
+>
+>         regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "idm_base");
+> -       if (!regs) {
+> -               dev_err(&pdev->dev, "Unable to obtain idm resource\n");
+> -               return -EINVAL;
+> +       if (regs) {
+> +               bgmac->plat.idm_base = devm_ioremap_resource(&pdev->dev, regs);
+> +               if (IS_ERR(bgmac->plat.idm_base))
+> +                       return PTR_ERR(bgmac->plat.idm_base);
+> +               bgmac->feature_flags &= ~BGMAC_FEAT_IDM_MASK;
+>         }
+>
+> -       bgmac->plat.idm_base = devm_ioremap_resource(&pdev->dev, regs);
+> -       if (IS_ERR(bgmac->plat.idm_base))
+> -               return PTR_ERR(bgmac->plat.idm_base);
+> -
+>         regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nicpm_base");
+>         if (regs) {
+>                 bgmac->plat.nicpm_base = devm_ioremap_resource(&pdev->dev,
+> diff --git a/drivers/net/ethernet/broadcom/bgmac.c b/drivers/net/ethernet/broadcom/bgmac.c
+> index ba4d2e1..48d672b 100644
+> --- a/drivers/net/ethernet/broadcom/bgmac.c
+> +++ b/drivers/net/ethernet/broadcom/bgmac.c
+> @@ -622,9 +622,11 @@ static int bgmac_dma_alloc(struct bgmac *bgmac)
+>         BUILD_BUG_ON(BGMAC_MAX_TX_RINGS > ARRAY_SIZE(ring_base));
+>         BUILD_BUG_ON(BGMAC_MAX_RX_RINGS > ARRAY_SIZE(ring_base));
+>
+> -       if (!(bgmac_idm_read(bgmac, BCMA_IOST) & BCMA_IOST_DMA64)) {
+> -               dev_err(bgmac->dev, "Core does not report 64-bit DMA\n");
+> -               return -ENOTSUPP;
+> +       if (!(bgmac->feature_flags & BGMAC_FEAT_IDM_MASK)) {
+> +               if (!(bgmac_idm_read(bgmac, BCMA_IOST) & BCMA_IOST_DMA64)) {
+> +                       dev_err(bgmac->dev, "Core does not report 64-bit DMA\n");
+> +                       return -ENOTSUPP;
+> +               }
+>         }
+>
+>         for (i = 0; i < BGMAC_MAX_TX_RINGS; i++) {
+> @@ -855,9 +857,11 @@ static void bgmac_mac_speed(struct bgmac *bgmac)
+>  static void bgmac_miiconfig(struct bgmac *bgmac)
+>  {
+>         if (bgmac->feature_flags & BGMAC_FEAT_FORCE_SPEED_2500) {
+> -               bgmac_idm_write(bgmac, BCMA_IOCTL,
+> -                               bgmac_idm_read(bgmac, BCMA_IOCTL) | 0x40 |
+> -                               BGMAC_BCMA_IOCTL_SW_CLKEN);
+> +               if (!(bgmac->feature_flags & BGMAC_FEAT_IDM_MASK)) {
+> +                       bgmac_idm_write(bgmac, BCMA_IOCTL,
+> +                                       bgmac_idm_read(bgmac, BCMA_IOCTL) |
+> +                                       0x40 | BGMAC_BCMA_IOCTL_SW_CLKEN);
+> +               }
+>                 bgmac->mac_speed = SPEED_2500;
+>                 bgmac->mac_duplex = DUPLEX_FULL;
+>                 bgmac_mac_speed(bgmac);
+> @@ -874,11 +878,36 @@ static void bgmac_miiconfig(struct bgmac *bgmac)
+>         }
+>  }
+>
+> +static void bgmac_chip_reset_idm_config(struct bgmac *bgmac)
+> +{
+> +       u32 iost;
+> +
+> +       iost = bgmac_idm_read(bgmac, BCMA_IOST);
+> +       if (bgmac->feature_flags & BGMAC_FEAT_IOST_ATTACHED)
+> +               iost &= ~BGMAC_BCMA_IOST_ATTACHED;
+> +
+> +       /* 3GMAC: for BCM4707 & BCM47094, only do core reset at bgmac_probe() */
+> +       if (!(bgmac->feature_flags & BGMAC_FEAT_NO_RESET)) {
+> +               u32 flags = 0;
+> +
+> +               if (iost & BGMAC_BCMA_IOST_ATTACHED) {
+> +                       flags = BGMAC_BCMA_IOCTL_SW_CLKEN;
+> +                       if (!bgmac->has_robosw)
+> +                               flags |= BGMAC_BCMA_IOCTL_SW_RESET;
+> +               }
+> +               bgmac_clk_enable(bgmac, flags);
+> +       }
+> +
+> +       if (iost & BGMAC_BCMA_IOST_ATTACHED && !bgmac->has_robosw)
+> +               bgmac_idm_write(bgmac, BCMA_IOCTL,
+> +                               bgmac_idm_read(bgmac, BCMA_IOCTL) &
+> +                               ~BGMAC_BCMA_IOCTL_SW_RESET);
+> +}
+> +
+>  /* http://bcm-v4.sipsolutions.net/mac-gbit/gmac/chipreset */
+>  static void bgmac_chip_reset(struct bgmac *bgmac)
+>  {
+>         u32 cmdcfg_sr;
+> -       u32 iost;
+>         int i;
+>
+>         if (bgmac_clk_enabled(bgmac)) {
+> @@ -899,20 +928,8 @@ static void bgmac_chip_reset(struct bgmac *bgmac)
+>                 /* TODO: Clear software multicast filter list */
+>         }
+>
+> -       iost = bgmac_idm_read(bgmac, BCMA_IOST);
+> -       if (bgmac->feature_flags & BGMAC_FEAT_IOST_ATTACHED)
+> -               iost &= ~BGMAC_BCMA_IOST_ATTACHED;
+> -
+> -       /* 3GMAC: for BCM4707 & BCM47094, only do core reset at bgmac_probe() */
+> -       if (!(bgmac->feature_flags & BGMAC_FEAT_NO_RESET)) {
+> -               u32 flags = 0;
+> -               if (iost & BGMAC_BCMA_IOST_ATTACHED) {
+> -                       flags = BGMAC_BCMA_IOCTL_SW_CLKEN;
+> -                       if (!bgmac->has_robosw)
+> -                               flags |= BGMAC_BCMA_IOCTL_SW_RESET;
+> -               }
+> -               bgmac_clk_enable(bgmac, flags);
+> -       }
+> +       if (!(bgmac->feature_flags & BGMAC_FEAT_IDM_MASK))
+> +               bgmac_chip_reset_idm_config(bgmac);
+>
+>         /* Request Misc PLL for corerev > 2 */
+>         if (bgmac->feature_flags & BGMAC_FEAT_MISC_PLL_REQ) {
+> @@ -970,11 +987,6 @@ static void bgmac_chip_reset(struct bgmac *bgmac)
+>                                       BGMAC_CHIPCTL_7_IF_TYPE_RGMII);
+>         }
+>
+> -       if (iost & BGMAC_BCMA_IOST_ATTACHED && !bgmac->has_robosw)
+> -               bgmac_idm_write(bgmac, BCMA_IOCTL,
+> -                               bgmac_idm_read(bgmac, BCMA_IOCTL) &
+> -                               ~BGMAC_BCMA_IOCTL_SW_RESET);
+> -
+>         /* http://bcm-v4.sipsolutions.net/mac-gbit/gmac/gmac_reset
+>          * Specs don't say about using BGMAC_CMDCFG_SR, but in this routine
+>          * BGMAC_CMDCFG is read _after_ putting chip in a reset. So it has to
+> @@ -1497,8 +1509,10 @@ int bgmac_enet_probe(struct bgmac *bgmac)
+>         bgmac_clk_enable(bgmac, 0);
+>
+>         /* This seems to be fixing IRQ by assigning OOB #6 to the core */
+> -       if (bgmac->feature_flags & BGMAC_FEAT_IRQ_ID_OOB_6)
+> -               bgmac_idm_write(bgmac, BCMA_OOB_SEL_OUT_A30, 0x86);
+> +       if (!(bgmac->feature_flags & BGMAC_FEAT_IDM_MASK)) {
+> +               if (bgmac->feature_flags & BGMAC_FEAT_IRQ_ID_OOB_6)
+> +                       bgmac_idm_write(bgmac, BCMA_OOB_SEL_OUT_A30, 0x86);
+> +       }
+>
+>         bgmac_chip_reset(bgmac);
+>
+> diff --git a/drivers/net/ethernet/broadcom/bgmac.h b/drivers/net/ethernet/broadcom/bgmac.h
+> index c181876..443d57b 100644
+> --- a/drivers/net/ethernet/broadcom/bgmac.h
+> +++ b/drivers/net/ethernet/broadcom/bgmac.h
+> @@ -425,6 +425,7 @@
+>  #define BGMAC_FEAT_CC4_IF_SW_TYPE      BIT(17)
+>  #define BGMAC_FEAT_CC4_IF_SW_TYPE_RGMII        BIT(18)
+>  #define BGMAC_FEAT_CC7_IF_TYPE_RGMII   BIT(19)
+> +#define BGMAC_FEAT_IDM_MASK            BIT(20)
 
-Ok.
+This also will need to be added to
+drivers/net/ethernet/broadcom/bgmac-bcma.c.  Otherwise, the driver
+will no longer work for those platforms.  Since this was already
+accepted, please push out a fix ASAP.
 
-One other problem remains: most developers looking at this
-code like Robin and me will immediately think there might be
-an endianess bug here. As this is a slow path, how about
-using an explicit conversion using
+Thanks,
+Jon
 
-     writeq(le64_to_cpup(buffer), pointer);
-
-with a comment? That would explain what's going on and
-escape people looking for incorrect __raw_writeq() uses.
-I would expect that the compiler can actually drop the
-double byteswap here by itself, and even if it doesn't,
-the extra swaps won't cause noticeable overhead compared
-to the barriers.
-
-       Arnd
+>
+>  struct bgmac_slot_info {
+>         union {
+> --
+> 2.7.4
+>
