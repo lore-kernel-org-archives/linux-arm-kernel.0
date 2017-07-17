@@ -1,24 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 17 Jul 2017 13:05:43 +0530
-Subject: [PATCH v4 0/3] some fixups for MediaTek cpufreq driver
-In-Reply-To: <1500272192.16278.44.camel@mtkswgap22>
-References: <cover.1499692967.git.sean.wang@mediatek.com>
- <1500272192.16278.44.camel@mtkswgap22>
-Message-ID: <20170717073543.GL352@vireshk-i7>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Mon, 17 Jul 2017 09:40:21 +0200
+Subject: [PATCH v6 5/7] dt-bindings: display: stm32: remove
+ st-display-subsystem parent node requirement
+In-Reply-To: <1500277223-29553-1-git-send-email-philippe.cornu@st.com>
+References: <1500277223-29553-1-git-send-email-philippe.cornu@st.com>
+Message-ID: <1500277223-29553-6-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-07-17, 14:16, Sean Wang wrote:
-> Hi, Viresh
-> 
-> I missed to add Acks from Rob for patch 2 and 3 since we sent out almost
-> at the same time. Do I need to resend again for this or the series is
-> okay for you?
+There is no need anymore to have a "st-display-subsystem" parent node
+in the device tree for the ltdc.
 
-Looks like you missed including Rafael for this series (He is the one
-who applies these patches).
+Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 1 -
+ 1 file changed, 1 deletion(-)
 
-I will let him answer for this.
-
+diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+index 8e14769..90a8459 100644
+--- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
++++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+@@ -1,7 +1,6 @@
+ * STMicroelectronics STM32 lcd-tft display controller
+ 
+ - ltdc: lcd-tft display controller host
+-  must be a sub-node of st-display-subsystem
+   Required properties:
+   - compatible: "st,stm32-ltdc"
+   - reg: Physical base address of the IP registers and length of memory mapped region.
 -- 
-viresh
+1.9.1
