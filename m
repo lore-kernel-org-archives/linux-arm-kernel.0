@@ -1,84 +1,91 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 17 Jul 2017 14:27:57 +0000
-Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to
- work on 32-bits
-In-Reply-To: <CAK8P3a3KDh=MgfjG+sKNqcrQwq1yf-DgQN0=HigPaPYYJq0Uug@mail.gmail.com>
-References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
- <20170717132646.3020-7-laurentiu.tudor@nxp.com>
- <CAK8P3a3KDh=MgfjG+sKNqcrQwq1yf-DgQN0=HigPaPYYJq0Uug@mail.gmail.com>
-Message-ID: <596CC912.3020709@nxp.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 17 Jul 2017 16:32:18 +0200
+Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
+ interpreted as bool
+In-Reply-To: <CAK8P3a1zBW_QuPtRFNwuVyE_ziySoV9_ebz4sD7Bya3eRoo8SA@mail.gmail.com>
+References: <20170714092540.1217397-1-arnd@arndb.de>
+ <20170714093938.1469319-1-arnd@arndb.de>
+ <f57e08d9-0984-b67c-c64b-c7e0542d0361@xs4all.nl>
+ <CAK8P3a1zBW_QuPtRFNwuVyE_ziySoV9_ebz4sD7Bya3eRoo8SA@mail.gmail.com>
+Message-ID: <9624c37a-1118-7d4f-888e-f0de196e4c15@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 07/17/2017 04:45 PM, Arnd Bergmann wrote:
-> On Mon, Jul 17, 2017 at 3:26 PM,  <laurentiu.tudor@nxp.com> wrote:
->> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+On 17/07/17 16:26, Arnd Bergmann wrote:
+> On Mon, Jul 17, 2017 at 3:45 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+>> On 14/07/17 11:36, Arnd Bergmann wrote:
+>>> @@ -201,8 +202,9 @@ static int cx18_g_fmt_sliced_vbi_cap(struct file *file, void *fh,
+>>>        * digitizer/slicer.  Note, cx18_av_vbi() wipes the passed in
+>>>        * fmt->fmt.sliced under valid calling conditions
+>>>        */
+>>> -     if (v4l2_subdev_call(cx->sd_av, vbi, g_sliced_fmt, &fmt->fmt.sliced))
+>>> -             return -EINVAL;
+>>> +     ret = v4l2_subdev_call(cx->sd_av, vbi, g_sliced_fmt, &fmt->fmt.sliced);
+>>> +     if (ret)
+>>> +             return ret;
 >>
->> Split the 64-bit accesses in 32-bit accesses because there's no real
->> constrain in MC to do only atomic 64-bit. There's only one place
->> where ordering is important: when writing the MC command header the
->> first 32-bit part of the header must be written last.
->> We do this switch in order to allow compiling the driver on 32-bit.
+>> Please keep the -EINVAL here. I can't be 100% certain that returning 'ret' wouldn't
+>> break something.
+> 
+> I think Dan was recommending the opposite here, if I understood you
+> both correctly:
+> he said we should propagate the error code unless we know it's wrong, while you
+> want to keep the current behavior to avoid introducing changes ;-)
+> 
+> I guess in either case, looking at the callers more carefully would be
+> a good idea.
+
+The subtle problem here is that v4l2_subdev_call will return -ENOIOCTLCMD if
+ops->vbi->g_sliced_fmt == NULL, which typically is not returned to userspace
+but either ignored or replaced by another error. It indicates that the
+sub device doesn't implement this operation, and it depends on the context
+and the operation whether or not that is to be considered an error.
+
+I have no clue what is expected here, without digging deep in the code.
+
+Better to keep it as-is. It really isn't important to waste time on this.
+
+> 
+>>> -     return 0;
+>>> +     return ret;
+>>>  }
+>>>
+>>>  int atomisp_flash_enable(struct atomisp_sub_device *asd, int num_frames)
+>>>
 >>
->> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->> ---
->>   drivers/staging/fsl-mc/bus/mc-sys.c | 31 ++++++++++++-------------------
->>   1 file changed, 12 insertions(+), 19 deletions(-)
->>
->> diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
->> index 195d9f3..dd2828e 100644
->> --- a/drivers/staging/fsl-mc/bus/mc-sys.c
->> +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
->> @@ -124,14 +124,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
->>   {
->>          int i;
->>
->> -       /* copy command parameters into the portal */
->> -       for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
->> -               __raw_writeq(cmd->params[i], &portal->params[i]);
->> -       /* ensure command params are committed before submitting it */
->> -       wmb();
->> -
->> -       /* submit the command by writing the header */
->> -       __raw_writeq(cmd->header, &portal->header);
->> +       /*
->> +        * copy command parameters into the portal. Final write
->> +        * triggers the submission of the command.
->> +        */
->> +       for (i = sizeof(struct mc_command) / sizeof(u32) - 1; i >= 0; i--) {
->> +               __raw_writel(((u32 *)cmd)[i], &((u32 *)portal)[i]);
->> +               /* ensure command params are committed before submitting it */
->> +               wmb();
->> +       }
->>   }
->
-> What is the byte order requirement on this buffer?
+>> This is all very hackish, though. I'm not terribly keen on this patch. It's not
+>> clear to me *why* these warnings appear in your setup.
+> 
+> it's possible that this only happened with 'ccache', which first preprocesses
+> the source and the passes it with v4l2_subdev_call expanded into the
+> compiler. This means the line looks like
+> 
+>         if ((!(cx->sd_av) ? -ENODEV :
+>             (((cx->sd_av)->ops->vbi && (cx->sd_av)->ops->vbi->g_sliced_fmt) ?
+>                (cx->sd_av)->ops->vbi->g_sliced_fmt(cx->sd_av)),
+> &fmt->fmt.sliced) :
+>                -ENOIOCTLCMD))
+> 
+> The compiler now complains about the sub-expression that it sees for
+> cx->sd_av==NULL:
+> 
+>    if (-ENODEV)
+> 
+> which it considers nonsense because it is always true and the value gets
+> ignored.
+> 
+> Let me try again without ccache for now and see what warnings remain.
+> We can find a solution for those first, and then decide how to deal with
+> ccache.
 
-Endianness is handled by the callers so this function must leave
-the binary blob intact.
+Sounds good.
 
-> If this is a byte string
-> rather than individual registers, you should probably just use
-> memcpy_toio()
+I'm OK with applying this if there is no other way to prevent these warnings.
 
-It's a header followed by an opaque command. The protocol for queueing a 
-command says that the first 32-bit half of the header must be written 
-last, this triggering the command handling in the MC.
+Regards,
 
-> but if these are separate registers, then using the
-> __raw_* accessors is still wrong, at least on kernels that have a
-> different byteorder from the hardware.
+	Hans
 
-As mentioned above, endianness is handled by the caller. This function
-takes raw data and must leave it unchanged.
-
-> Also, are you sure that adding those six extra barriers has no
-> performance impact?
-
-This is a slow interface used in slow paths, so i don't think those 
-extra barriers will have any performance impact.
-
----
-Thanks & Best Regards, Laurentiu
+> 
+>         Arnd
+> 
