@@ -1,38 +1,39 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 17 Jul 2017 22:16:54 +0800
-Subject: [PATCH v2 0/5] arm64: dts: add rk3399 display-related nodes
-Message-ID: <1500301019-9960-1-git-send-email-jacob-chen@iotwrt.com>
+Date: Mon, 17 Jul 2017 22:16:56 +0800
+Subject: [PATCH v2 2/5] arm64: dts: rockchip: add pd_edp node for rk3399
+In-Reply-To: <1500301019-9960-1-git-send-email-jacob-chen@iotwrt.com>
+References: <1500301019-9960-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1500301019-9960-3-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patches add the display-related nodes for rk3399.
+From: Elaine Zhang <zhangqing@rock-chips.com>
 
-Tested with kernel base on drm-misc and below patches.
-https://cgit.freedesktop.org/drm/drm-misc/
-"drm: bridge: synopsys/dw-hdmi: Provide default configuration function for HDMI 2.0 PHY"
-"iommu/rockchip: Enable Rockchip IOMMU on ARM64"
+1. add pd node for RK3399 Soc
+2. create power domain tree
+3. add qos node for domain
 
-HDMI could work and have a display output.
-eDP could link with panel but i didn't get a display(Maybe something wrong in power things).
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-For convenience, i think we should have those nodes in kernel now.
-
-changes in V2:
-- remove unused clock and reg for VOP.
-- correct author.
-
-Mark Yao (1):
-  arm64: dts: rockchip: Add rk3399 vop and display-subsystem
-Elaine Zhang (1):
-  arm64: dts: rockchip: add pd_edp node for rk3399
-Yakir Yang (1):
-  arm64: dts: rockchip: add rk3399 edp nodes
-Jacob Chen (2):
-  arm64: dts: rockchip: add rk3399 mipi nodes
-  arm64: dts: rockchip: add rk3399 hdmi nodes
-
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 198 +++++++++++++++++++++++++++++++
- 1 file changed, 198 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 978057d..e0285f8 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -956,6 +956,10 @@
+ 			};
+ 
+ 			/* These power domains are grouped by VD_LOGIC */
++			pd_edp at RK3399_PD_EDP {
++				reg = <RK3399_PD_EDP>;
++				clocks = <&cru PCLK_EDP_CTRL>;
++			};
+ 			pd_emmc at RK3399_PD_EMMC {
+ 				reg = <RK3399_PD_EMMC>;
+ 				clocks = <&cru ACLK_EMMC>;
 -- 
 2.7.4
