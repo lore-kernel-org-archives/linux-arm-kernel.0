@@ -1,201 +1,116 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 17 Jul 2017 16:27:01 +0200
-Subject: [RFC PATCH v2 02/19] arm64: Use the physical counter when available
- for read_cycles
+Date: Mon, 17 Jul 2017 16:27:05 +0200
+Subject: [RFC PATCH v2 06/19] KVM: arm/arm64: Make timer_arm and timer_disarm
+ helpers more generic
 In-Reply-To: <20170717142718.13853-1-cdall@linaro.org>
 References: <20170717142718.13853-1-cdall@linaro.org>
-Message-ID: <20170717142718.13853-3-cdall@linaro.org>
+Message-ID: <20170717142718.13853-7-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently get_cycles() is hardwired to arch_counter_get_cntvct() on
-arm64, but as we move to using the physical timer for the in-kernel
-time-keeping, we need to make that more flexible.
+We are about to add an additional soft timer to the arch timer state for
+a VCPU and would like to be able to reuse the functions to program and
+cancel a timer, so we make them slightly more generic and rename to make
+it more clear that these functions work on soft timers and not the
+hardware resource that this code is managing.
 
-First, we need to make sure the physical counter can be read on equal
-terms to the virtual counter, which includes adding physical counter
-read functions for timers that require errata.
-
-Second, we need to make a choice between reading the physical vs virtual
-counter, depending on which timer is used for time keeping in the kernel
-otherwise.  We can do this using a static key to avoid a performance
-penalty during runtime when reading the counter.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/include/asm/arch_timer.h  | 18 ++++++++++++------
- arch/arm64/include/asm/timex.h       |  2 +-
- drivers/clocksource/arm_arch_timer.c | 32 ++++++++++++++++++++++++++++++--
- 3 files changed, 43 insertions(+), 9 deletions(-)
+ virt/kvm/arm/arch_timer.c | 33 ++++++++++++++++-----------------
+ 1 file changed, 16 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index ee5619b..48d522c 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -30,6 +30,8 @@
- 
- #include <clocksource/arm_arch_timer.h>
- 
-+extern struct static_key_false arch_timer_phys_counter_available;
-+
- #if IS_ENABLED(CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND)
- extern struct static_key_false arch_timer_read_ool_enabled;
- #define needs_unstable_timer_counter_workaround() \
-@@ -52,6 +54,7 @@ struct arch_timer_erratum_workaround {
- 	const char *desc;
- 	u32 (*read_cntp_tval_el0)(void);
- 	u32 (*read_cntv_tval_el0)(void);
-+	u64 (*read_cntpct_el0)(void);
- 	u64 (*read_cntvct_el0)(void);
- 	int (*set_next_event_phys)(unsigned long, struct clock_event_device *);
- 	int (*set_next_event_virt)(unsigned long, struct clock_event_device *);
-@@ -148,13 +151,8 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
- 
- static inline u64 arch_counter_get_cntpct(void)
- {
--	u64 cval;
--	/*
--	 * AArch64 kernel and user space mandate the use of CNTVCT.
--	 */
- 	isb();
--	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
--	return cval;
-+	return arch_timer_reg_read_stable(cntpct_el0);
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 8e89d63..871d8ae 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -56,26 +56,22 @@ u64 kvm_phys_timer_read(void)
+ 	return timecounter->cc->read(timecounter->cc);
  }
  
- static inline u64 arch_counter_get_cntvct(void)
-@@ -163,6 +161,14 @@ static inline u64 arch_counter_get_cntvct(void)
- 	return arch_timer_reg_read_stable(cntvct_el0);
+-static bool timer_is_armed(struct arch_timer_cpu *timer)
++static bool soft_timer_is_armed(struct arch_timer_cpu *timer)
+ {
+ 	return timer->armed;
  }
  
-+static inline u64 arch_counter_get_cycles(void)
-+{
-+	if (static_branch_unlikely(&arch_timer_phys_counter_available))
-+	    return arch_counter_get_cntpct();
-+	else
-+	    return arch_counter_get_cntvct();
-+}
-+
- static inline int arch_timer_arch_init(void)
+-/* timer_arm: as in "arm the timer", not as in ARM the company */
+-static void timer_arm(struct arch_timer_cpu *timer, u64 ns)
++static void soft_timer_start(struct hrtimer *hrt, u64 ns)
  {
- 	return 0;
-diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
-index 81a076e..c0d214c 100644
---- a/arch/arm64/include/asm/timex.h
-+++ b/arch/arm64/include/asm/timex.h
-@@ -22,7 +22,7 @@
-  * Use the current timer as a cycle counter since this is what we use for
-  * the delay loop.
-  */
--#define get_cycles()	arch_counter_get_cntvct()
-+#define get_cycles()	arch_counter_get_cycles()
- 
- #include <asm-generic/timex.h>
- 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index c24327c..f4e7261 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -77,6 +77,9 @@ static bool arch_timer_mem_use_virtual;
- static bool arch_counter_suspend_stop;
- static bool vdso_default = true;
- 
-+DEFINE_STATIC_KEY_FALSE(arch_timer_phys_counter_available);
-+EXPORT_SYMBOL_GPL(arch_timer_phys_counter_available);
-+
- static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
- 
- static int __init early_evtstrm_cfg(char *buf)
-@@ -217,6 +220,11 @@ static u32 notrace fsl_a008585_read_cntv_tval_el0(void)
- 	return __fsl_a008585_read_reg(cntv_tval_el0);
+-	timer->armed = true;
+-	hrtimer_start(&timer->timer, ktime_add_ns(ktime_get(), ns),
++	hrtimer_start(hrt, ktime_add_ns(ktime_get(), ns),
+ 		      HRTIMER_MODE_ABS);
  }
  
-+static u64 notrace fsl_a008585_read_cntpct_el0(void)
-+{
-+	return __fsl_a008585_read_reg(cntpct_el0);
-+}
-+
- static u64 notrace fsl_a008585_read_cntvct_el0(void)
+-static void timer_disarm(struct arch_timer_cpu *timer)
++static void soft_timer_cancel(struct hrtimer *hrt, struct work_struct *work)
  {
- 	return __fsl_a008585_read_reg(cntvct_el0);
-@@ -258,6 +266,11 @@ static u32 notrace hisi_161010101_read_cntv_tval_el0(void)
- 	return __hisi_161010101_read_reg(cntv_tval_el0);
+-	if (timer_is_armed(timer)) {
+-		hrtimer_cancel(&timer->timer);
+-		cancel_work_sync(&timer->expired);
+-		timer->armed = false;
+-	}
++	hrtimer_cancel(hrt);
++	if (work)
++		cancel_work_sync(work);
  }
  
-+static u64 notrace hisi_161010101_read_cntpct_el0(void)
-+{
-+	return __hisi_161010101_read_reg(cntpct_el0);
-+}
-+
- static u64 notrace hisi_161010101_read_cntvct_el0(void)
+ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+@@ -271,7 +267,7 @@ static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+ 		return;
+ 
+ 	/*  The timer has not yet expired, schedule a background timer */
+-	timer_arm(timer, kvm_timer_compute_delta(timer_ctx));
++	soft_timer_start(&timer->timer, kvm_timer_compute_delta(timer_ctx));
+ }
+ 
+ /*
+@@ -285,7 +281,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+-	BUG_ON(timer_is_armed(timer));
++	BUG_ON(soft_timer_is_armed(timer));
+ 
+ 	/*
+ 	 * No need to schedule a background timer if any guest timer has
+@@ -306,13 +302,16 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	 * The guest timers have not yet expired, schedule a background timer.
+ 	 * Set the earliest expiration time among the guest timers.
+ 	 */
+-	timer_arm(timer, kvm_timer_earliest_exp(vcpu));
++	timer->armed = true;
++	soft_timer_start(&timer->timer, kvm_timer_earliest_exp(vcpu));
+ }
+ 
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
  {
- 	return __hisi_161010101_read_reg(cntvct_el0);
-@@ -288,6 +301,15 @@ static struct ate_acpi_oem_info hisi_161010101_oem_info[] = {
- #endif
- 
- #ifdef CONFIG_ARM64_ERRATUM_858921
-+static u64 notrace arm64_858921_read_cntpct_el0(void)
-+{
-+	u64 old, new;
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+-	timer_disarm(timer);
 +
-+	old = read_sysreg(cntpct_el0);
-+	new = read_sysreg(cntpct_el0);
-+	return (((old ^ new) >> 32) & 1) ? old : new;
-+}
-+
- static u64 notrace arm64_858921_read_cntvct_el0(void)
- {
- 	u64 old, new;
-@@ -346,6 +368,7 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- 		.desc = "Freescale erratum a005858",
- 		.read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
- 		.read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
-+		.read_cntpct_el0 = fsl_a008585_read_cntpct_el0,
- 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
- 		.set_next_event_phys = erratum_set_next_event_tval_phys,
- 		.set_next_event_virt = erratum_set_next_event_tval_virt,
-@@ -358,6 +381,7 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- 		.desc = "HiSilicon erratum 161010101",
- 		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
- 		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
-+		.read_cntpct_el0 = hisi_161010101_read_cntpct_el0,
- 		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
- 		.set_next_event_phys = erratum_set_next_event_tval_phys,
- 		.set_next_event_virt = erratum_set_next_event_tval_virt,
-@@ -368,6 +392,7 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- 		.desc = "HiSilicon erratum 161010101",
- 		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
- 		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
-+		.read_cntpct_el0 = hisi_161010101_read_cntpct_el0,
- 		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
- 		.set_next_event_phys = erratum_set_next_event_tval_phys,
- 		.set_next_event_virt = erratum_set_next_event_tval_virt,
-@@ -378,6 +403,7 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- 		.match_type = ate_match_local_cap_id,
- 		.id = (void *)ARM64_WORKAROUND_858921,
- 		.desc = "ARM erratum 858921",
-+		.read_cntpct_el0 = arm64_858921_read_cntpct_el0,
- 		.read_cntvct_el0 = arm64_858921_read_cntvct_el0,
- 	},
- #endif
-@@ -886,10 +912,12 @@ static void __init arch_counter_register(unsigned type)
++	soft_timer_cancel(&timer->timer, &timer->expired);
++	timer->armed = false;
+ }
  
- 	/* Register the CP15 based counter if we have one */
- 	if (type & ARCH_TIMER_TYPE_CP15) {
--		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
-+		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI) {
- 			arch_timer_read_counter = arch_counter_get_cntvct;
--		else
-+		} else {
- 			arch_timer_read_counter = arch_counter_get_cntpct;
-+			static_branch_enable(&arch_timer_phys_counter_available);
-+		}
+ static void kvm_timer_flush_hwstate_vgic(struct kvm_vcpu *vcpu)
+@@ -448,7 +447,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	 * This is to cancel the background timer for the physical timer
+ 	 * emulation if it is set.
+ 	 */
+-	timer_disarm(timer);
++	soft_timer_cancel(&timer->timer, &timer->expired);
  
- 		clocksource_counter.archdata.vdso_direct = vdso_default;
- 	} else {
+ 	/*
+ 	 * The guest could have modified the timer registers or the timer
+@@ -615,7 +614,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+-	timer_disarm(timer);
++	soft_timer_cancel(&timer->timer, &timer->expired);
+ 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
+ }
+ 
 -- 
 2.9.0
