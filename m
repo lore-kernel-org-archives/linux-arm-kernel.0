@@ -1,80 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 16 Jul 2017 20:26:42 -0300
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable staging video4linux
- drivers
-Message-ID: <1500247602-3364-1-git-send-email-festevam@gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 17 Jul 2017 10:20:54 +0900
+Subject: [PATCH 3/5] phy: phy-bcm-ns2-usbdrd: Replace the deprecated extcon API
+In-Reply-To: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
+References: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170717012058epcas1p10b22154ffb2184cae7453a8b557dbcca@epcas1p1.samsung.com>
+Message-ID: <1500254456-6525-4-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Longerbeam <steve_longerbeam@mentor.com>
+This patch replaces the deprecated extcon API as following:
+- extcon_set_cable_state_() -> extcon_get_state()
 
-Enable i.MX v4l2 media staging driver. For video capture on i.MX, the
-video multiplexer subdev is required. On the SabreAuto, the ADV7180
-video decoder is required along with i2c-mux-gpio. The Sabrelite
-and SabreSD require the OV5640 and the SabreLite requires PWM clocks
-for the OV5640.
-
-Increase max zoneorder to allow larger video buffer allocations.
-
-Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Raviteja Garimella <raviteja.garimella@broadcom.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
-Changes since v1:
-- Rebased against Shawn Guo's for-next tree.
+ drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
- arch/arm/configs/imx_v6_v7_defconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 49e7969..3a48ad8 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -51,6 +51,7 @@ CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_CMA=y
-+CONFIG_FORCE_MAX_ZONEORDER=14
- CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
- CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
-@@ -186,6 +187,7 @@ CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- # CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_GPIO=y
- # CONFIG_I2C_HELPER_AUTO is not set
- CONFIG_I2C_ALGOPCF=m
-@@ -229,14 +231,20 @@ CONFIG_REGULATOR_PFUZE100=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_RC_SUPPORT=y
-+CONFIG_MEDIA_CONTROLLER=y
-+CONFIG_VIDEO_V4L2_SUBDEV_API=y
- CONFIG_RC_DEVICES=y
- CONFIG_IR_GPIO_CIR=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_VIDEO_MUX=y
- CONFIG_SOC_CAMERA=y
- CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_CODA=m
-+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_ADV7180=m
-+CONFIG_VIDEO_OV5640=m
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
-@@ -346,6 +354,9 @@ CONFIG_FSL_EDMA=y
- CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
- CONFIG_STAGING=y
-+CONFIG_STAGING_MEDIA=y
-+CONFIG_VIDEO_IMX_MEDIA=y
-+CONFIG_COMMON_CLK_PWM=y
- CONFIG_IIO=y
- CONFIG_IMX7D_ADC=y
- CONFIG_VF610_ADC=y
+diff --git a/drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c b/drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c
+index 9ae59e223131..d099a0c8cee5 100644
+--- a/drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c
++++ b/drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c
+@@ -253,16 +253,16 @@ static void extcon_work(struct work_struct *work)
+ 	vbus = gpiod_get_value_cansleep(driver->vbus_gpiod);
+ 
+ 	if (!id && vbus) { /* Host connected */
+-		extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, true);
++		extcon_set_state_sync(driver->edev, EXTCON_USB_HOST, true);
+ 		pr_debug("Host cable connected\n");
+ 		driver->data->new_state = EVT_HOST;
+ 		connect_change(driver);
+ 	} else if (id && !vbus) { /* Disconnected */
+-		extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, false);
+-		extcon_set_cable_state_(driver->edev, EXTCON_USB, false);
++		extcon_set_state_sync(driver->edev, EXTCON_USB_HOST, false);
++		extcon_set_state_sync(driver->edev, EXTCON_USB, false);
+ 		pr_debug("Cable disconnected\n");
+ 	} else if (id && vbus) { /* Device connected */
+-		extcon_set_cable_state_(driver->edev, EXTCON_USB, true);
++		extcon_set_state_sync(driver->edev, EXTCON_USB, true);
+ 		pr_debug("Device cable connected\n");
+ 		driver->data->new_state = EVT_DEVICE;
+ 		connect_change(driver);
 -- 
-2.7.4
+1.9.1
