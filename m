@@ -1,29 +1,76 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Mon, 17 Jul 2017 10:36:05 +0200
-Subject: [PATCH 3/3] ARM: dts: stm32: Remove rdinit from bootargs on
- stm32f429-disco
-In-Reply-To: <1500280565-26049-1-git-send-email-alexandre.torgue@st.com>
-References: <1500280565-26049-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1500280565-26049-4-git-send-email-alexandre.torgue@st.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 17 Jul 2017 14:13:45 +0530
+Subject: [PATCH] cpufreq: s5pv210: add missing of_node_put
+In-Reply-To: <1500147653-31229-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1500147653-31229-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20170717084345.GN352@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rootfs is independent from the board.
+On 15-07-17, 21:40, Julia Lawall wrote:
+> for_each_compatible_node performs an of_node_get on each iteration, so a
+> return from the loop requires an of_node_put.
+> 
+> The semantic patch that fixes this problem is as follows
+> (http://coccinelle.lip6.fr):
+> 
+> // <smpl>
+> @@
+> local idexpression n;
+> expression e,e1,e2;
+> statement S;
+> iterator i1;
+> iterator name for_each_compatible_node;
+> @@
+> 
+>  for_each_compatible_node(n,e1,e2) {
+>    ...
+> (
+>    of_node_put(n);
+> |
+>    e = n
+> |
+>    return n;
+> |
+>    i1(...,n,...) S
+> |
+> +  of_node_put(n);
+> ?  return ...;
+> )
+>    ...
+>  }
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> ---
+>  drivers/cpufreq/s5pv210-cpufreq.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff -u -p a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
+> --- a/drivers/cpufreq/s5pv210-cpufreq.c
+> +++ b/drivers/cpufreq/s5pv210-cpufreq.c
+> @@ -612,6 +612,7 @@ static int s5pv210_cpufreq_probe(struct
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Just before this location we also called of_find_compatible_node()
+directly and never did a of_node_put() for that. Can you please fix
+that as well ?
 
-diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
-index ae47cde..c66d617 100644
---- a/arch/arm/boot/dts/stm32f429-disco.dts
-+++ b/arch/arm/boot/dts/stm32f429-disco.dts
-@@ -54,7 +54,7 @@
- 	compatible = "st,stm32f429i-disco", "st,stm32f429";
- 
- 	chosen {
--		bootargs = "root=/dev/ram rdinit=/linuxrc";
-+		bootargs = "root=/dev/ram";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
+>  		if (id < 0 || id >= ARRAY_SIZE(dmc_base)) {
+>  			pr_err("%s: failed to get alias of dmc node '%s'\n",
+>  				__func__, np->name);
+> +			of_node_put(np);
+>  			return id;
+>  		}
+>  
+> @@ -619,6 +620,7 @@ static int s5pv210_cpufreq_probe(struct
+>  		if (!dmc_base[id]) {
+>  			pr_err("%s: failed to map dmc%d registers\n",
+>  				__func__, id);
+> +			of_node_put(np);
+>  			return -EFAULT;
+>  		}
+>  	}
+
 -- 
-1.9.1
+viresh
