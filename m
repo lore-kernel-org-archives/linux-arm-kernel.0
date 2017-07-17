@@ -1,43 +1,66 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 17 Jul 2017 10:03:28 -0600
-Subject: [PATCH v3 04/18] arm64: qcom-msm8916: dts: Update coresight
- replicator
-In-Reply-To: <1500037463-19951-5-git-send-email-suzuki.poulose@arm.com>
-References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
- <1500037463-19951-5-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170717160328.GC21003@xps15>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 17 Jul 2017 17:05:12 +0100
+Subject: Applied "ASoC: mmp-sspa: constify snd_soc_dai_ops structure" to the
+ asoc tree
+In-Reply-To: <20170713060508.GA22657@embeddedgus>
+Message-ID: <E1dX8WG-0004hS-0D@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 02:04:09PM +0100, Suzuki K Poulose wrote:
-> Replace the obsolete compatible string for Coresight programmable
-> replicator with the new one.
-> 
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index 17691ab..a0db8c6 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -994,7 +994,7 @@
->  		};
->  
->  		replicator at 824000 {
-> -			compatible = "qcom,coresight-replicator1x", "arm,primecell";
-> +			compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
->  			reg = <0x824000 0x1000>;
->  
->  			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+The patch
 
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+   ASoC: mmp-sspa: constify snd_soc_dai_ops structure
 
-> -- 
-> 2.7.5
-> 
+has been applied to the asoc tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From cb7534437956650ab0dcebf7a7b4795eb904d22a Mon Sep 17 00:00:00 2001
+From: "Gustavo A. R. Silva" <garsilva@embeddedor.com>
+Date: Thu, 13 Jul 2017 01:05:08 -0500
+Subject: [PATCH] ASoC: mmp-sspa: constify snd_soc_dai_ops structure
+
+This structure is only stored in the ops field of a snd_soc_dai_driver
+structure. That field is declared const, so snd_soc_dai_ops structures
+that have this property can be declared as const also.
+
+Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/pxa/mmp-sspa.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/pxa/mmp-sspa.c b/sound/soc/pxa/mmp-sspa.c
+index 9cc35012e6e5..64b85e30c1f8 100644
+--- a/sound/soc/pxa/mmp-sspa.c
++++ b/sound/soc/pxa/mmp-sspa.c
+@@ -380,7 +380,7 @@ static int mmp_sspa_probe(struct snd_soc_dai *dai)
+ 		SNDRV_PCM_FMTBIT_S24_LE | \
+ 		SNDRV_PCM_FMTBIT_S32_LE)
+ 
+-static struct snd_soc_dai_ops mmp_sspa_dai_ops = {
++static const struct snd_soc_dai_ops mmp_sspa_dai_ops = {
+ 	.startup	= mmp_sspa_startup,
+ 	.shutdown	= mmp_sspa_shutdown,
+ 	.trigger	= mmp_sspa_trigger,
+-- 
+2.13.2
