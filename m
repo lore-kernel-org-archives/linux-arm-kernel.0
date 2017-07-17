@@ -1,66 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jul 2017 10:05:16 +0100
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <b46f25c1-45fd-2917-6559-218f6887a882@xs4all.nl>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
- <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
- <20170609133822.GR4902@n2100.armlinux.org.uk>
- <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
- <20170609141056.GS4902@n2100.armlinux.org.uk>
- <b46f25c1-45fd-2917-6559-218f6887a882@xs4all.nl>
-Message-ID: <20170717090516.GJ31807@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Jul 2017 11:06:51 +0200
+Subject: [PATCH 01/11] ARM: dts: sun8i: a83t: Switch to CCU device tree
+ binding macros
+In-Reply-To: <20170714064302.20383-2-wens@csie.org>
+References: <20170714064302.20383-1-wens@csie.org>
+ <20170714064302.20383-2-wens@csie.org>
+Message-ID: <20170717090651.olohxjjzte4whvvz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 10:56:47AM +0200, Hans Verkuil wrote:
-> Hi Russell,
+On Fri, Jul 14, 2017 at 02:42:52PM +0800, Chen-Yu Tsai wrote:
+> Now that the CCU device tree binding headers have been merged, we can
+> use the properly named macros in the device tree, instead of raw
+> numbers.
 > 
-> On 09/06/17 16:10, Russell King - ARM Linux wrote:
-> > On Fri, Jun 09, 2017 at 03:56:39PM +0200, Neil Armstrong wrote:
-> >> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is
-> >> not used, but a custom one, so this notifier is actually useful for
-> >> this platform and maybe others.
-> > 
-> > Is the CEC controller configured into dw-hdmi (is the config bit set?)
-> > I'm just wondering if we're going to end up with two CEC drivers trying
-> > to bind to the same notifier.
-> > 
-> >> Should we really wait until I push the Amlogic AO CEC driver ? Having a
-> >> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
-> > 
-> > It sounds like this adds additional information that has been missing
-> > from the review of my patches - and I suspect changes Hans' comments.
-> > So, I'll wait, it seems pointless to try and update the patches when
-> > it's not clear how to proceed due to other dependencies, especially
-> > when it means that their existing state is what's required (I'm pleased
-> > that I've held off modifying the patches so far.)
-> > 
-> > If that means having to wait another kernel revision, then I guess that's
-> > what will have to happen.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 > 
-> Can you respin your patch series, keeping the notifier support? The CEC
-> kernel config handling has been cleaned up (just select CEC_CORE and
-> CEC_NOTIFIER) so you should be good to go.
+> This patch is included as it is a pre-requisite to the other device
+> tree changes in this series. It is however independent, and should
+> be applied as a fix for 4.13-rc, not for -next, and preferably sooner
+> than later.
 
-Not yet - the change to the way you're dealing with Kconfig in CEC is
-fundamentally broken, and needs fixing before we can merge dw-hdmi-cec
-support.
-
-As a result of these Kconfig changes, dw-hdmi-cec now fails if:
-
-1. You build the CEC part as a module
-2. You build the HDMI part into the kernel
-
-This results in CEC_NOTIFIER=y and CEC_CORE=m, which, when the HDMI part
-gets built, results in the stubs in the notifier code being used, rather
-than the real functions.  This in turn causes the CEC part to never
-receive a physical address, which is therefore non-functional.
-
-I did have a patch to fix this, but it was never committed, and I got
-busy with other stuff (so it ended up being git reset --hard away.)
+Applied as a fix for 4.13, thanks!
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/273422a1/attachment.sig>
