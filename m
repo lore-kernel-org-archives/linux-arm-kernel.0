@@ -1,56 +1,80 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Jul 2017 12:37:41 +0200
-Subject: [PATCH 04/11] mmc: sunxi: Keep default timing phase settings for
- new timing mode
-In-Reply-To: <20170714064302.20383-5-wens@csie.org>
-References: <20170714064302.20383-1-wens@csie.org>
- <20170714064302.20383-5-wens@csie.org>
-Message-ID: <CAPDyKFq0xgZCuow41-VsN+5bORt_pBAqZ_ZAajWG-TcCPxvRSA@mail.gmail.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Mon, 17 Jul 2017 12:38:57 +0200
+Subject: [PATCH] tee: optee: sync with new naming of interrupts
+Message-ID: <1500287937-30504-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+stable
+From: David Wang <david.wang@arm.com>
 
-On 14 July 2017 at 08:42, Chen-Yu Tsai <wens@csie.org> wrote:
-> The register for the "new timing mode" also has bit fields for setting
-> output and sample timing phases. According to comments in Allwinner's
-> BSP kernel, the default values are good enough.
->
-> Keep the default values already in the hardware when setting new timing
-> mode, instead of overwriting the whole register.
->
-> Fixes: 9a37e53e451e ("mmc: sunxi: Enable the new timings for the A64 MMC
->                       controllers")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+In the latest changes of optee_os, the interrupts' names are
+changed to "native" and "foreign" interrupts.
 
-Thanks, applied for fixes and added a stable tag.
+Signed-off-by: David Wang <david.wang@arm.com>
+Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ drivers/tee/optee/optee_smc.h | 12 ++++++------
+ drivers/tee/optee/rpc.c       |  8 ++++----
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
-Kind regards
-Uffe
-
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index d6fa2214aaae..0fb4e4c119e1 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -793,8 +793,12 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->         }
->         mmc_writel(host, REG_CLKCR, rval);
->
-> -       if (host->cfg->needs_new_timings)
-> -               mmc_writel(host, REG_SD_NTSR, SDXC_2X_TIMING_MODE);
-> +       if (host->cfg->needs_new_timings) {
-> +               /* Don't touch the delay bits */
-> +               rval = mmc_readl(host, REG_SD_NTSR);
-> +               rval |= SDXC_2X_TIMING_MODE;
-> +               mmc_writel(host, REG_SD_NTSR, rval);
-> +       }
->
->         ret = sunxi_mmc_clk_set_phase(host, ios, rate);
->         if (ret)
-> --
-> 2.13.2
->
+diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
+index 13b7c98cdf25..069c8e1429de 100644
+--- a/drivers/tee/optee/optee_smc.h
++++ b/drivers/tee/optee/optee_smc.h
+@@ -298,7 +298,7 @@ struct optee_smc_disable_shm_cache_result {
+ 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_ENABLE_SHM_CACHE)
+ 
+ /*
+- * Resume from RPC (for example after processing an IRQ)
++ * Resume from RPC (for example after processing a foreign interrupt)
+  *
+  * Call register usage:
+  * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC
+@@ -383,19 +383,19 @@ struct optee_smc_disable_shm_cache_result {
+ 	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_FREE)
+ 
+ /*
+- * Deliver an IRQ in normal world.
++ * Deliver foreign interrupt to normal world.
+  *
+  * "Call" register usage:
+- * a0	OPTEE_SMC_RETURN_RPC_IRQ
++ * a0	OPTEE_SMC_RETURN_RPC_FOREIGN_INTR
+  * a1-7	Resume information, must be preserved
+  *
+  * "Return" register usage:
+  * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC.
+  * a1-7	Preserved
+  */
+-#define OPTEE_SMC_RPC_FUNC_IRQ		4
+-#define OPTEE_SMC_RETURN_RPC_IRQ \
+-	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_IRQ)
++#define OPTEE_SMC_RPC_FUNC_FOREIGN_INTR		4
++#define OPTEE_SMC_RETURN_RPC_FOREIGN_INTR \
++	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_FOREIGN_INTR)
+ 
+ /*
+  * Do an RPC request. The supplied struct optee_msg_arg tells which
+diff --git a/drivers/tee/optee/rpc.c b/drivers/tee/optee/rpc.c
+index 9488ed1541bc..cef417f4f4d2 100644
+--- a/drivers/tee/optee/rpc.c
++++ b/drivers/tee/optee/rpc.c
+@@ -371,11 +371,11 @@ void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param)
+ 		shm = reg_pair_to_ptr(param->a1, param->a2);
+ 		tee_shm_free(shm);
+ 		break;
+-	case OPTEE_SMC_RPC_FUNC_IRQ:
++	case OPTEE_SMC_RPC_FUNC_FOREIGN_INTR:
+ 		/*
+-		 * An IRQ was raised while secure world was executing,
+-		 * since all IRQs are handled in Linux a dummy RPC is
+-		 * performed to let Linux take the IRQ through the normal
++		 * A foreign interrupt was raised while secure world was
++		 * executing, since they are handled in Linux a dummy RPC is
++		 * performed to let Linux take the interrupt through the normal
+ 		 * vector.
+ 		 */
+ 		break;
+-- 
+2.7.4
