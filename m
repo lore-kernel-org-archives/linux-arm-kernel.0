@@ -1,37 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jul 2017 22:20:25 +0100
-Subject: [PATCH resend] Documentation: arm: Replace use of virt_to_phys
- with __pa_symbol
-In-Reply-To: <20170717134445.22a1b00d@lwn.net>
-References: <1500298768-13262-1-git-send-email-geert+renesas@glider.be>
- <20170717134445.22a1b00d@lwn.net>
-Message-ID: <20170717212025.GM31807@n2100.armlinux.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 17 Jul 2017 23:22:37 +0200
+Subject: [RFC PATCH v3] irqchip: Add support for tango interrupt router
+In-Reply-To: <9f384711-eef0-5117-b89c-9d2dc16e5ae5@free.fr>
+References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
+ <20170606175219.34ef62b9@free-electrons.com>
+ <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
+ <dfb86360-2247-65bb-602b-5c21029709fd@free.fr>
+ <c0bd235a-9035-2002-31eb-e68710b076fd@free.fr>
+ <24f34220-a017-f4e0-b72e-d1fdb014c0e1@free.fr>
+ <9f384711-eef0-5117-b89c-9d2dc16e5ae5@free.fr>
+Message-ID: <afcc2b79-61ff-b54d-eac1-ea7f3ee6b6b2@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 01:44:45PM -0600, Jonathan Corbet wrote:
-> On Mon, 17 Jul 2017 15:39:28 +0200
-> Geert Uytterhoeven <geert+renesas@glider.be> wrote:
-> 
-> > All low-level PM/SMP code using virt_to_phys() should actually use
-> > __pa_symbol() against kernel symbols.  Update the documentation to move
-> > away from virt_to_phys().
-> > 
-> > Cfr. commit 6996cbb2372189f7 ("ARM: 8641/1: treewide: Replace uses of
-> > virt_to_phys with __pa_symbol")
-> 
-> I was kind of hoping for an ack from somebody on this, but, four months
-> later, I'll take the absence of complaints as being enough.  Applied,
-> thanks.
+On 17/07/2017 17:36, Mason wrote:
 
-Maybe those who contributed Documentation/arm/firmware.txt should
-have responded, seems that was Tomasz Figa <t.figa@samsung.com>
-who isn't even on the Cc list for this...
+> This controller maps 128 input lines to 24 output lines.
+> The output lines are routed to GIC SPI 0 to 23.
+> This driver muxes LEVEL_HIGH IRQs onto output line 0,
+> and gives every EDGE_RISING IRQ a dedicated output line.
+> ---
+> I think the driver is mostly finished. It works without
+> errors for my basic use-cases.
 
-Can't blame people who aren't copied with the patch for not
-responding.
+I spotted a problem. Output lines are allocated
+for edge interrupts in tango_set_type() but they
+are never released. So if we insmod/rmmod modules
+in a loop, we will run out of output lines.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+It seems set_type() is not the right place for an
+allocation. Perhaps that should be done in tango_map()?
+
+I'll try to trace the code to figure out when the
+unmap function is called, as well.
+
+> There is one required feature missing:
+> suspend/resume support.
+> Should it be a separate patch, or just squashed
+> into this patch?
+
+That question still stands.
+
+Regards.
