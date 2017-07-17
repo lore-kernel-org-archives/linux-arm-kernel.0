@@ -1,87 +1,76 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Mon, 17 Jul 2017 16:26:44 +0300
-Subject: [PATCH 5/7] staging: fsl-mc: fix formating of phys_addr_t on 32 bits
+Date: Mon, 17 Jul 2017 16:26:45 +0300
+Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to work
+ on 32-bits
 In-Reply-To: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
 References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170717132646.3020-6-laurentiu.tudor@nxp.com>
+Message-ID: <20170717132646.3020-7-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Use correct format specifier for phys_addr_t variables (%pa) instead
-of %llx. This fixes these warnings on 32 bit targets:
- "format '%llx' expects argument of type 'long long unsigned int',
-  but argument 4 has type 'phys_addr_t' [-Wformat=]"
+Split the 64-bit accesses in 32-bit accesses because there's no real
+constrain in MC to do only atomic 64-bit. There's only one place
+where ordering is important: when writing the MC command header the
+first 32-bit part of the header must be written last.
+We do this switch in order to allow compiling the driver on 32-bit.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/mc-io.c  |  8 ++++----
- drivers/staging/fsl-mc/bus/mc-sys.c | 12 ++++++------
- 2 files changed, 10 insertions(+), 10 deletions(-)
+ drivers/staging/fsl-mc/bus/mc-sys.c | 31 ++++++++++++-------------------
+ 1 file changed, 12 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/mc-io.c b/drivers/staging/fsl-mc/bus/mc-io.c
-index 35221a17..4e6f99a 100644
---- a/drivers/staging/fsl-mc/bus/mc-io.c
-+++ b/drivers/staging/fsl-mc/bus/mc-io.c
-@@ -129,8 +129,8 @@ int __must_check fsl_create_mc_io(struct device *dev,
- 				      "mc_portal");
- 	if (!res) {
- 		dev_err(dev,
--			"devm_request_mem_region failed for MC portal %#llx\n",
--			mc_portal_phys_addr);
-+			"devm_request_mem_region failed for MC portal %pa\n",
-+			&mc_portal_phys_addr);
- 		return -EBUSY;
- 	}
- 
-@@ -139,8 +139,8 @@ int __must_check fsl_create_mc_io(struct device *dev,
- 						   mc_portal_size);
- 	if (!mc_portal_virt_addr) {
- 		dev_err(dev,
--			"devm_ioremap_nocache failed for MC portal %#llx\n",
--			mc_portal_phys_addr);
-+			"devm_ioremap_nocache failed for MC portal %pa\n",
-+			&mc_portal_phys_addr);
- 		return -ENXIO;
- 	}
- 
 diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
-index 012abd5..195d9f3 100644
+index 195d9f3..dd2828e 100644
 --- a/drivers/staging/fsl-mc/bus/mc-sys.c
 +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
-@@ -196,8 +196,8 @@ static int mc_polling_wait_preemptible(struct fsl_mc_io *mc_io,
+@@ -124,14 +124,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
+ {
+ 	int i;
  
- 		if (time_after_eq(jiffies, jiffies_until_timeout)) {
- 			dev_dbg(mc_io->dev,
--				"MC command timed out (portal: %#llx, dprc handle: %#x, command: %#x)\n",
--				 mc_io->portal_phys_addr,
-+				"MC command timed out (portal: %pa, dprc handle: %#x, command: %#x)\n",
-+				 &mc_io->portal_phys_addr,
- 				 (unsigned int)mc_cmd_hdr_read_token(cmd),
- 				 (unsigned int)mc_cmd_hdr_read_cmdid(cmd));
+-	/* copy command parameters into the portal */
+-	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
+-		__raw_writeq(cmd->params[i], &portal->params[i]);
+-	/* ensure command params are committed before submitting it */
+-	wmb();
+-
+-	/* submit the command by writing the header */
+-	__raw_writeq(cmd->header, &portal->header);
++	/*
++	 * copy command parameters into the portal. Final write
++	 * triggers the submission of the command.
++	 */
++	for (i = sizeof(struct mc_command) / sizeof(u32) - 1; i >= 0; i--) {
++		__raw_writel(((u32 *)cmd)[i], &((u32 *)portal)[i]);
++		/* ensure command params are committed before submitting it */
++		wmb();
++	}
+ }
  
-@@ -236,8 +236,8 @@ static int mc_polling_wait_atomic(struct fsl_mc_io *mc_io,
- 		timeout_usecs -= MC_CMD_COMPLETION_POLLING_MAX_SLEEP_USECS;
- 		if (timeout_usecs == 0) {
- 			dev_dbg(mc_io->dev,
--				"MC command timed out (portal: %#llx, dprc handle: %#x, command: %#x)\n",
--				 mc_io->portal_phys_addr,
-+				"MC command timed out (portal: %pa, dprc handle: %#x, command: %#x)\n",
-+				 &mc_io->portal_phys_addr,
- 				 (unsigned int)mc_cmd_hdr_read_token(cmd),
- 				 (unsigned int)mc_cmd_hdr_read_cmdid(cmd));
+ /**
+@@ -148,19 +149,11 @@ static inline enum mc_cmd_status mc_read_response(struct mc_command __iomem *
+ 						  struct mc_command *resp)
+ {
+ 	int i;
+-	enum mc_cmd_status status;
+-
+-	/* Copy command response header from MC portal: */
+-	resp->header = __raw_readq(&portal->header);
+-	status = mc_cmd_hdr_read_status(resp);
+-	if (status != MC_CMD_STATUS_OK)
+-		return status;
  
-@@ -290,8 +290,8 @@ int mc_send_command(struct fsl_mc_io *mc_io, struct mc_command *cmd)
+-	/* Copy command response data from MC portal: */
+-	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
+-		resp->params[i] = __raw_readq(&portal->params[i]);
++	for (i = 0; i < sizeof(struct mc_command) / sizeof(u32); i++)
++		((u32 *)resp)[i] = __raw_readl(&((u32 *)portal)[i]);
  
- 	if (status != MC_CMD_STATUS_OK) {
- 		dev_dbg(mc_io->dev,
--			"MC command failed: portal: %#llx, dprc handle: %#x, command: %#x, status: %s (%#x)\n",
--			 mc_io->portal_phys_addr,
-+			"MC command failed: portal: %pa, dprc handle: %#x, command: %#x, status: %s (%#x)\n",
-+			 &mc_io->portal_phys_addr,
- 			 (unsigned int)mc_cmd_hdr_read_token(cmd),
- 			 (unsigned int)mc_cmd_hdr_read_cmdid(cmd),
- 			 mc_status_to_string(status),
+-	return status;
++	return mc_cmd_hdr_read_status(resp);
+ }
+ 
+ /**
 -- 
 2.9.4
