@@ -1,79 +1,128 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 17 Jul 2017 16:27:04 +0200
-Subject: [RFC PATCH v2 05/19] KVM: arm/arm64: Check that system supports split
- eoi/deactivate
+Date: Mon, 17 Jul 2017 16:27:06 +0200
+Subject: [RFC PATCH v2 07/19] KVM: arm/arm64: Rename soft timer to bg_timer
 In-Reply-To: <20170717142718.13853-1-cdall@linaro.org>
 References: <20170717142718.13853-1-cdall@linaro.org>
-Message-ID: <20170717142718.13853-6-cdall@linaro.org>
+Message-ID: <20170717142718.13853-8-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some systems without proper firmware and/or hardware description data
-don't support the split EOI and deactivate operation.
+As we are about to introduce a separate hrtimer for the physical timer,
+call this timer bg_timer, because we refer to this timer as the
+background timer in the code and comments elsewhere.
 
-On such systems, we cannot leave the physical interrupt active after the
-timer handler on the host has run, so we cannot support KVM with an
-in-kernel GIC with the timer changes we about to introduce.
-
-This patch makes sure that trying to initialize the KVM GIC code will
-fail on such systems.
-
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- drivers/irqchip/irq-gic.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ include/kvm/arm_arch_timer.h |  3 +--
+ virt/kvm/arm/arch_timer.c    | 22 +++++++++++-----------
+ 2 files changed, 12 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 090991f..b7e4fed 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1391,7 +1391,8 @@ int gic_of_init_child(struct device *dev, struct gic_chip_data **gic, int irq)
- 	return 0;
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index f0053f8..dcbb2e1 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -43,8 +43,7 @@ struct arch_timer_cpu {
+ 	struct arch_timer_context	ptimer;
+ 
+ 	/* Background timer used when the guest is not running */
+-	struct hrtimer			timer;
+-
++	struct hrtimer			bg_timer;
+ 	/* Work queued with the above timer expires */
+ 	struct work_struct		expired;
+ 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 871d8ae..c2e8326 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -56,7 +56,7 @@ u64 kvm_phys_timer_read(void)
+ 	return timecounter->cc->read(timecounter->cc);
  }
  
--static void __init gic_of_setup_kvm_info(struct device_node *node)
-+static void __init gic_of_setup_kvm_info(struct device_node *node,
-+					 bool supports_deactivate)
+-static bool soft_timer_is_armed(struct arch_timer_cpu *timer)
++static bool bg_timer_is_armed(struct arch_timer_cpu *timer)
  {
- 	int ret;
- 	struct resource *vctrl_res = &gic_v2_kvm_info.vctrl;
-@@ -1411,6 +1412,9 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
- 	if (ret)
+ 	return timer->armed;
+ }
+@@ -154,13 +154,13 @@ static u64 kvm_timer_earliest_exp(struct kvm_vcpu *vcpu)
+ 	return min(min_virt, min_phys);
+ }
+ 
+-static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
++static enum hrtimer_restart kvm_bg_timer_expire(struct hrtimer *hrt)
+ {
+ 	struct arch_timer_cpu *timer;
+ 	struct kvm_vcpu *vcpu;
+ 	u64 ns;
+ 
+-	timer = container_of(hrt, struct arch_timer_cpu, timer);
++	timer = container_of(hrt, struct arch_timer_cpu, bg_timer);
+ 	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
+ 
+ 	/*
+@@ -267,7 +267,7 @@ static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
  		return;
  
-+	if (!supports_deactivate)
-+		return;
-+
- 	gic_set_kvm_info(&gic_v2_kvm_info);
+ 	/*  The timer has not yet expired, schedule a background timer */
+-	soft_timer_start(&timer->timer, kvm_timer_compute_delta(timer_ctx));
++	soft_timer_start(&timer->bg_timer, kvm_timer_compute_delta(timer_ctx));
  }
  
-@@ -1419,6 +1423,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- {
- 	struct gic_chip_data *gic;
- 	int irq, ret;
-+	bool has_eoimode;
+ /*
+@@ -281,7 +281,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
  
- 	if (WARN_ON(!node))
- 		return -ENODEV;
-@@ -1436,7 +1441,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- 	 * Disable split EOI/Deactivate if either HYP is not available
- 	 * or the CPU interface is too small.
+-	BUG_ON(soft_timer_is_armed(timer));
++	BUG_ON(bg_timer_is_armed(timer));
+ 
+ 	/*
+ 	 * No need to schedule a background timer if any guest timer has
+@@ -303,14 +303,14 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	 * Set the earliest expiration time among the guest timers.
  	 */
--	if (gic_cnt == 0 && !gic_check_eoimode(node, &gic->raw_cpu_base))
-+	has_eoimode = gic_check_eoimode(node, &gic->raw_cpu_base);
-+	if (gic_cnt == 0 && !has_eoimode)
- 		static_key_slow_dec(&supports_deactivate);
+ 	timer->armed = true;
+-	soft_timer_start(&timer->timer, kvm_timer_earliest_exp(vcpu));
++	soft_timer_start(&timer->bg_timer, kvm_timer_earliest_exp(vcpu));
+ }
  
- 	ret = __gic_init_bases(gic, -1, &node->fwnode);
-@@ -1447,7 +1453,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
  
- 	if (!gic_cnt) {
- 		gic_init_physaddr(node);
--		gic_of_setup_kvm_info(node);
-+		gic_of_setup_kvm_info(node, has_eoimode);
- 	}
+-	soft_timer_cancel(&timer->timer, &timer->expired);
++	soft_timer_cancel(&timer->bg_timer, &timer->expired);
+ 	timer->armed = false;
+ }
  
- 	if (parent) {
+@@ -447,7 +447,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	 * This is to cancel the background timer for the physical timer
+ 	 * emulation if it is set.
+ 	 */
+-	soft_timer_cancel(&timer->timer, &timer->expired);
++	soft_timer_cancel(&timer->bg_timer, &timer->expired);
+ 
+ 	/*
+ 	 * The guest could have modified the timer registers or the timer
+@@ -504,8 +504,8 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+ 	vcpu_ptimer(vcpu)->cntvoff = 0;
+ 
+ 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
+-	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+-	timer->timer.function = kvm_timer_expire;
++	hrtimer_init(&timer->bg_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
++	timer->bg_timer.function = kvm_bg_timer_expire;
+ 
+ 	vtimer->irq.irq = default_vtimer_irq.irq;
+ 	ptimer->irq.irq = default_ptimer_irq.irq;
+@@ -614,7 +614,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+-	soft_timer_cancel(&timer->timer, &timer->expired);
++	soft_timer_cancel(&timer->bg_timer, &timer->expired);
+ 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
+ }
+ 
 -- 
 2.9.0
