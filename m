@@ -1,44 +1,32 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 17 Jul 2017 23:22:37 +0200
-Subject: [RFC PATCH v3] irqchip: Add support for tango interrupt router
-In-Reply-To: <9f384711-eef0-5117-b89c-9d2dc16e5ae5@free.fr>
-References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
- <20170606175219.34ef62b9@free-electrons.com>
- <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
- <dfb86360-2247-65bb-602b-5c21029709fd@free.fr>
- <c0bd235a-9035-2002-31eb-e68710b076fd@free.fr>
- <24f34220-a017-f4e0-b72e-d1fdb014c0e1@free.fr>
- <9f384711-eef0-5117-b89c-9d2dc16e5ae5@free.fr>
-Message-ID: <afcc2b79-61ff-b54d-eac1-ea7f3ee6b6b2@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Jul 2017 23:23:11 +0200
+Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
+ interpreted as bool
+In-Reply-To: <3a927e60-332a-f01d-f1af-98649e9f51b5@xs4all.nl>
+References: <20170714092540.1217397-1-arnd@arndb.de>
+ <20170714093938.1469319-1-arnd@arndb.de>
+ <f57e08d9-0984-b67c-c64b-c7e0542d0361@xs4all.nl>
+ <CAK8P3a1zBW_QuPtRFNwuVyE_ziySoV9_ebz4sD7Bya3eRoo8SA@mail.gmail.com>
+ <3a927e60-332a-f01d-f1af-98649e9f51b5@xs4all.nl>
+Message-ID: <CAK8P3a3rc-7mXsPosXG7jWBDf9D31816eRpTP266cC94B5jfWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/2017 17:36, Mason wrote:
+On Mon, Jul 17, 2017 at 4:35 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+> On 17/07/17 16:26, Arnd Bergmann wrote:
 
-> This controller maps 128 input lines to 24 output lines.
-> The output lines are routed to GIC SPI 0 to 23.
-> This driver muxes LEVEL_HIGH IRQs onto output line 0,
-> and gives every EDGE_RISING IRQ a dedicated output line.
-> ---
-> I think the driver is mostly finished. It works without
-> errors for my basic use-cases.
+>> Let me try again without ccache for now and see what warnings remain.
+>> We can find a solution for those first, and then decide how to deal with
+>> ccache.
+>
+> Sounds good.
+>
+> I'm OK with applying this if there is no other way to prevent these warnings.
 
-I spotted a problem. Output lines are allocated
-for edge interrupts in tango_set_type() but they
-are never released. So if we insmod/rmmod modules
-in a loop, we will run out of output lines.
+Small update: I noticed that having ccache being the default compiler
+even with CCACHE_DISABLE=1 causes a lot of these warnings. Completely
+taking ccache out of the picture however seems to have eliminated the
+warnings about v4l2_subdev_call() and other silly warnings, but not
+the interesting ones in the -Wint-in-bool-context category.
 
-It seems set_type() is not the right place for an
-allocation. Perhaps that should be done in tango_map()?
-
-I'll try to trace the code to figure out when the
-unmap function is called, as well.
-
-> There is one required feature missing:
-> suspend/resume support.
-> Should it be a separate patch, or just squashed
-> into this patch?
-
-That question still stands.
-
-Regards.
+       Arnd
