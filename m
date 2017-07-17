@@ -1,77 +1,30 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 18 Jul 2017 01:24:54 +0200
-Subject: [PATCH v3] PM / suspend: Export pm_suspend_target_state
-In-Reply-To: <20170717221059.6523-1-f.fainelli@gmail.com>
-References: <20170716023610.4658-1-f.fainelli@gmail.com>
- <20170717221059.6523-1-f.fainelli@gmail.com>
-Message-ID: <3384121.PEd7U8K5ps@aspire.rjw.lan>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 17 Jul 2017 18:43:58 -0500
+Subject: [PATCH 0/3][v2] pinctrl: qcom: add support for sparse GPIOs
+Message-ID: <1500335041-32711-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 17, 2017 03:10:59 PM Florian Fainelli wrote:
-> Have the core suspend/resume framework store the system-wide suspend
-> state (suspend_state_t) we are about to enter, and expose it to drivers
-> via pm_suspend_target_state in order to retrieve that. The state is
-> assigned in suspend_devices_and_enter().
-> 
-> This is useful for platform specific drivers that may need to take a
-> slightly different suspend/resume path based on the system's
-> suspend/resume state being entered.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
-> Changes in v3:
-> 
-> - just export pm_suspend_target_state without a helper function
-> 
-> Changes in v2:
-> 
-> - rename platform_suspend_target_state() -> suspend_target_state()
-> - directly export the suspend_state_t value and assign it in
->   suspend_devices_and_enter()
-> 
->  include/linux/suspend.h | 1 +
->  kernel/power/suspend.c  | 4 ++++
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
-> index 0b1cf32edfd7..2159f6841768 100644
-> --- a/include/linux/suspend.h
-> +++ b/include/linux/suspend.h
-> @@ -427,6 +427,7 @@ extern int unregister_pm_notifier(struct notifier_block *nb);
->  /* drivers/base/power/wakeup.c */
->  extern bool events_check_enabled;
->  extern unsigned int pm_wakeup_irq;
-> +extern suspend_state_t pm_suspend_target_state;
->  
->  extern bool pm_wakeup_pending(void);
->  extern void pm_system_wakeup(void);
-> diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
-> index 3ecf275d7e44..1aecdaf22ab5 100644
-> --- a/kernel/power/suspend.c
-> +++ b/kernel/power/suspend.c
-> @@ -47,6 +47,8 @@ const char *mem_sleep_states[PM_SUSPEND_MAX];
->  
->  suspend_state_t mem_sleep_current = PM_SUSPEND_FREEZE;
->  static suspend_state_t mem_sleep_default = PM_SUSPEND_MEM;
-> +suspend_state_t pm_suspend_target_state;
-> +EXPORT_SYMBOL_GPL(pm_suspend_target_state);
->  
->  unsigned int pm_suspend_global_flags;
->  EXPORT_SYMBOL_GPL(pm_suspend_global_flags);
-> @@ -456,6 +458,8 @@ int suspend_devices_and_enter(suspend_state_t state)
->  	if (!sleep_state_supported(state))
->  		return -ENOSYS;
->  
-> +	pm_suspend_target_state = state;
-> +
->  	error = platform_suspend_begin(state);
->  	if (error)
->  		goto Close;
-> 
+First patch update gpiolib so that it requests the GPIO before trying to
+initialize it.
 
-And please clear pm_suspend_target_state before returning from
-suspend_devices_and_enter().
+Second patch allows for for pinctrl-msm to understand GPIO groups with
+no pins.  Such pins are "hidden" and can't be exported or accessed.
 
-Thanks,
-Rafael
+Last patch updates the QDF2xxx driver to take advantage of all that.
+
+
+Timur Tabi (3):
+  gliolib: request the gpio before querying its direction
+  [v2] pinctrl: qcom: disable GPIO groups with no pins
+  [v2] pinctrl: qcom: qdf2xxx: add support for new ACPI HID QCOM8002
+
+ drivers/gpio/gpiolib.c                 |  11 +++
+ drivers/pinctrl/qcom/pinctrl-msm.c     |  22 ++++--
+ drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 139 ++++++++++++++++++++++++---------
+ 3 files changed, 131 insertions(+), 41 deletions(-)
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
