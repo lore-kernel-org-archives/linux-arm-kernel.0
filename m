@@ -1,36 +1,34 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Jul 2017 11:51:52 -0500
-Subject: [PATCH v2] watchdog: meson-wdt: add support for the watchdog on
- Meson8 and Meson8m2
-In-Reply-To: <20170711221438.8958-1-martin.blumenstingl@googlemail.com>
-References: <20170711221438.8958-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170717165152.xv2kq2lqgi3jtobm@rob-hp-laptop>
+Date: Mon, 17 Jul 2017 12:04:57 -0500
+Subject: [PATCH] dt-bindings: clock: ti-sci: Fix incorrect usage of headers
+In-Reply-To: <20170712010923.GP22780@codeaurora.org>
+References: <20170711223615.29398-1-s-anna@ti.com>
+ <20170712010923.GP22780@codeaurora.org>
+Message-ID: <20170717170457.4pkb6qaa3qbept5n@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 12:14:38AM +0200, Martin Blumenstingl wrote:
-> The watchdog IP block on Meson8 and Meson8m2 is already supported by the
-> existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
-> while the newer Meson8m2 SoC uses the same register bits as Meson8b.
+On Tue, Jul 11, 2017 at 06:09:23PM -0700, Stephen Boyd wrote:
+> On 07/11, Suman Anna wrote:
+> > The clock consumer usage description was erroneously referring to
+> > couple of dt-binding headers that are no longer valid. The definition
+> > and/or usage of these headers is incorrect and the only file present
+> > at the moment, dt-bindings/soc/k2g.h is also being cleaned up. The
+> > examples in this binding were updated properly, but the update to
+> > description was missed out. So, fix this.
+> > 
+> > Fixes: 8f306cfe4383 ("Documentation: dt: Add TI SCI clock driver")
+> > Signed-off-by: Suman Anna <s-anna@ti.com>
+> > ---
+> > Hi Stephen,
+> > 
+> > Looks like this was missed during the update/repost of the ti-sci-clk
+> > driver/binding. FYI, Santosh is going to pickup the header file cleanup
+> > patch https://patchwork.kernel.org/patch/9741279/ for the next merge
+> > window.
 > 
-> Currently watchdog support on Meson8 SoC already works because
-> meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
-> separate compatible for Meson8 makes this more explicit though.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> ---
-> Changes since v1 at [0]:
-> - updated the documentation to indicate that Meson8 should also specify
->   the Meson6 compatible and that Meson8m2 should also specify the
->   Meson8b compatible
-> 
-> [0] https://patchwork.kernel.org/patch/9780093/
-> 
-> 
->  Documentation/devicetree/bindings/watchdog/meson-wdt.txt | 6 +++++-
->  drivers/watchdog/meson_wdt.c                             | 2 ++
->  2 files changed, 7 insertions(+), 1 deletion(-)
+> I'll let Rob apply this as it is purely a binding document update.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Applied.
+
+Rob
