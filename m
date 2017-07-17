@@ -1,75 +1,95 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 17 Jul 2017 11:13:35 +0200
-Subject: [PATCH v3 0/5] Add SoM1 support
-In-Reply-To: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1499330129-29319-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20170717091335.adgoomh6yirzdzeh@piout.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Jul 2017 11:14:02 +0200
+Subject: [PATCH 03/11] clk: sunxi-ng: a83t: Support new timing mode for
+ mmc2 clock
+In-Reply-To: <20170714064302.20383-4-wens@csie.org>
+References: <20170714064302.20383-1-wens@csie.org>
+ <20170714064302.20383-4-wens@csie.org>
+Message-ID: <20170717091402.3qb3fhdyhfbv6t66@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2017 at 11:35:24 +0300, Claudiu Beznea wrote:
-> Hi all,
-> 
-> This series adds support for sama5d2 SoM1 devices.
-> 
-> The at91-sama5d27_som1.dtsi add specific bindings for SoM1 board.
-> The at91-sama5d27_som1_ek.dts add specific bindings for SoM1 EK board.
-> 
-> Thank you,
-> Claudiu
-> 
-> Changes in v3:
-> - remove qspi flash mapping for the moment
-> - remove at24 and i2c bindings; this will be introduced when
-> "Add at24 functionality to read form different EEPROM offsets" patch will
-> be accepted
-> - change the title of patch 5 from this series from
-> "ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
-> "ARM: dts: at91: at91-sama5d27_som1_ek: Add sama5d27 SoM1 EK support" to
-> match the desired prefix
-> 
-> Changes in v2:
-> o in at91-sama5d27_som1.dtsi:
-> - increase bootloader and kernel size in flash map (with bootloader
-> flash offset the dtb and kernel flash offsets were changed)
-> - use right pin for ethernet-phy interrupt
-> 
-> o in at91-sama5d27_som1_ek.dts:
-> - removed memory tag and rely on bootloader to fill the right value
-> - use pin macros (from arch/arm/boot/dts/sama5d2-pinfunc.h) wherever
-> posible instead of pin numbers
-> - remove pinctrl_sensor_power and pinctrl_sensor_reset pin muxing
-> since they are not of intereset for this board
-> - use "pb4" label for user button instead of "bp1"
-> 
-> Claudiu Beznea (2):
->   ARM: dts: at91: at91-sama5d27_som1: add sama5d27 SoM1 support
->   ARM: dts: sama5d27_som1_ek: Add sama5d27 SoM1 EK support
-> 
-> Cristian Birsan (1):
->   drivers: soc: atmel: Add basic support for new sama5d2 SiPs
-> 
-> Cyrille Pitchen (1):
->   ARM: dts: at91: sama5d2: add QSPI nodes
-> 
-> Songjun Wu (1):
->   ARM: dts: at91: sama5d2: add isc node
-> 
->  arch/arm/boot/dts/Makefile                  |   1 +
->  arch/arm/boot/dts/at91-sama5d27_som1.dtsi   | 178 +++++++++
->  arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 551 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/sama5d2.dtsi              |  38 ++
->  drivers/soc/atmel/soc.c                     |   8 +
->  drivers/soc/atmel/soc.h                     |   4 +
->  6 files changed, 780 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1.dtsi
->  create mode 100644 arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-> 
+Hi,
 
-All applied, thanks!
+On Fri, Jul 14, 2017 at 02:42:54PM +0800, Chen-Yu Tsai wrote:
+> The MMC2 clock supports a new timing mode. When the new mode is active,
+> the output clock rate is halved.
+> 
+> This patch sets the feature flag for the new timing mode, and adds
+> a pre-divider based on the mode bit.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 38 +++++++++++++++++++++++++++--------
+>  1 file changed, 30 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+> index 947f9f6e05d2..ee6688e9b361 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+> @@ -418,14 +418,36 @@ static SUNXI_CCU_PHASE(mmc1_sample_clk, "mmc1-sample", "mmc1",
+>  static SUNXI_CCU_PHASE(mmc1_output_clk, "mmc1-output", "mmc1",
+>  		       0x08c, 8, 3, 0);
+>  
+> -/* TODO Support MMC2 clock's new timing mode. */
+> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mod0_default_parents,
+> -				  0x090,
+> -				  0, 4,		/* M */
+> -				  16, 2,	/* P */
+> -				  24, 2,	/* mux */
+> -				  BIT(31),	/* gate */
+> -				  0);
+> +/*
+> + * MMC2 supports both old and new timing modes. When the new timing
+> + * mode is active, the output clock rate is halved by two. Here we
+> + * treat it as a variable pre-divider. Note that the pre-divider is
+> + * _not_ included in the possible factors during a set clock rate
+> + * operation. It is only read out.
+> + */
+> +static const struct ccu_mux_var_prediv mmc2_new_timing_predivs[] = {
+> +	{ .index = 0, .shift = 30, .width = 1 },
+> +	{ .index = 1, .shift = 30, .width = 1 },
+> +};
+> +static struct ccu_mp mmc2_clk = {
+> +	.enable = BIT(31),
+> +	.m      = _SUNXI_CCU_DIV(0, 4),
+> +	.p      = _SUNXI_CCU_DIV(16, 2),
+> +	.mux    = {
+> +		.shift  = 24,
+> +		.width  = 2,
+> +		.var_predivs    = mmc2_new_timing_predivs,
+> +		.n_var_predivs  = ARRAY_SIZE(mmc2_new_timing_predivs),
+> +	},
+> +	.common         = {
+> +		.reg            = 0x090,
+> +		.features	= CCU_FEATURE_MMC_TIMING_SWITCH,
+> +		.hw.init        = CLK_HW_INIT_PARENTS("mmc2",
+> +						      mod0_default_parents,
+> +						      &ccu_mp_ops,
+> +						      CLK_GET_RATE_NOCACHE),
+> +	},
+> +};
 
+Treating the new bit seems a bit of a hack to me. It only works
+because we're not evaluating the various pre-dividers during a
+determine_rate (and set_rate), but it might change in the future, and
+we will break all our eMMC controllers then.
+
+Since they're quite special, I was thinking about creating a new MMC
+clock type? We're going to use it on a number of SoCs, and we'll be
+able to model it properly, without crippling the regular and generic
+MP clocks.
+
+Maxime
 
 -- 
-Alexandre Belloni, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/5742f82f/attachment.sig>
