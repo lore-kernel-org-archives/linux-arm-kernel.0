@@ -1,82 +1,45 @@
 From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Sun, 16 Jul 2017 23:06:42 -0500
-Subject: [PATCH] video: xilinxfb: constify fb_fix_screeninfo and
- fb_var_screeninfo structures
-In-Reply-To: <c55390b8-c64b-e7ee-8099-5147970d5311@xilinx.com>
-References: <20170708012416.GA1843@embeddedgus>
- <c55390b8-c64b-e7ee-8099-5147970d5311@xilinx.com>
-Message-ID: <f9952748-5663-19ae-5417-aaf3c3f01d7e@embeddedor.com>
+Date: Sun, 16 Jul 2017 23:12:15 -0500
+Subject: [PATCH] pinctrl: bcm2835: constify gpio_chip structure
+In-Reply-To: <877ezdh3jn.fsf@eliezer.anholt.net>
+References: <20170711180339.GA17806@embeddedgus>
+ <877ezdh3jn.fsf@eliezer.anholt.net>
+Message-ID: <e2e1909e-9a8a-9fc5-a002-b8597cef6b64@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 07/10/2017 02:29 AM, Michal Simek wrote:
-> On 8.7.2017 03:24, Gustavo A. R. Silva wrote:
->> These structures are only used to copy into other structures,
->> so declare them as const.
+On 07/12/2017 02:13 PM, Eric Anholt wrote:
+> "Gustavo A. R. Silva" <garsilva@embeddedor.com> writes:
+>
+>> This structure is only used to copy into other structure, so declare
+>> it as const.
 >>
 >> This issue was detected using Coccinelle and the following semantic patch:
->>
->> @r disable optional_qualifier@
->> identifier i;
->> position p;
->> @@
->> static struct fb_fix_screeninfo i at p = { ... };
->>
->> @ok@
->> identifier r.i;
->> expression e;
->> position p;
->> @@
->> e = i at p
->>
->> @bad@
->> position p != {r.p,ok.p};
->> identifier r.i;
->> struct fb_fix_screeninfo e;
->> @@
->> e at i@p
->>
->> @depends on !bad disable optional_qualifier@
->> identifier r.i;
->> @@
->> static
->> +const
->>   struct fb_fix_screeninfo i = { ... };
->>
->> The semantic patch for fb_var_screeninfo is analogous.
->>
->> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
->> ---
->>   drivers/video/fbdev/xilinxfb.c | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
->> index 17dc119..0bda18e 100644
->> --- a/drivers/video/fbdev/xilinxfb.c
->> +++ b/drivers/video/fbdev/xilinxfb.c
->> @@ -110,14 +110,14 @@ static struct xilinxfb_platform_data xilinx_fb_default_pdata = {
->>   /*
->>    * Here are the default fb_fix_screeninfo and fb_var_screeninfo structures
->>    */
->> -static struct fb_fix_screeninfo xilinx_fb_fix = {
->> +static const struct fb_fix_screeninfo xilinx_fb_fix = {
->>   	.id =		"Xilinx",
->>   	.type =		FB_TYPE_PACKED_PIXELS,
->>   	.visual =	FB_VISUAL_TRUECOLOR,
->>   	.accel =	FB_ACCEL_NONE
->>   };
->>   
->> -static struct fb_var_screeninfo xilinx_fb_var = {
->> +static const struct fb_var_screeninfo xilinx_fb_var = {
->>   	.bits_per_pixel =	BITS_PER_PIXEL,
->>   
->>   	.red =		{ RED_SHIFT, 8, 0 },
->>
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
+> Acked-by: Eric Anholt <eric@anholt.net>
 
-Thank you, Michal.
+Thank you, Eric
+
+>> ---
+>>   drivers/pinctrl/bcm/pinctrl-bcm2835.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+>> index 2308831..7203f35 100644
+>> --- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+>> +++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+>> @@ -353,7 +353,7 @@ static int bcm2835_gpio_direction_output(struct gpio_chip *chip,
+>>   	return pinctrl_gpio_direction_output(chip->base + offset);
+>>   }
+>>   
+>> -static struct gpio_chip bcm2835_gpio_chip = {
+>> +static const struct gpio_chip bcm2835_gpio_chip = {
+>>   	.label = MODULE_NAME,
+>>   	.owner = THIS_MODULE,
+>>   	.request = gpiochip_generic_request,
+>> -- 
+>> 2.5.0
 
 -- 
 Gustavo A. R. Silva
