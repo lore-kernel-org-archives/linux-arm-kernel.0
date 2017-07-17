@@ -1,68 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jul 2017 16:26:23 +0200
-Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
- interpreted as bool
-In-Reply-To: <f57e08d9-0984-b67c-c64b-c7e0542d0361@xs4all.nl>
-References: <20170714092540.1217397-1-arnd@arndb.de>
- <20170714093938.1469319-1-arnd@arndb.de>
- <f57e08d9-0984-b67c-c64b-c7e0542d0361@xs4all.nl>
-Message-ID: <CAK8P3a1zBW_QuPtRFNwuVyE_ziySoV9_ebz4sD7Bya3eRoo8SA@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 17 Jul 2017 16:27:02 +0200
+Subject: [RFC PATCH v2 03/19] KVM: arm/arm64: Guard kvm_vgic_map_is_active
+ against !vgic_initialized
+In-Reply-To: <20170717142718.13853-1-cdall@linaro.org>
+References: <20170717142718.13853-1-cdall@linaro.org>
+Message-ID: <20170717142718.13853-4-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 3:45 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> On 14/07/17 11:36, Arnd Bergmann wrote:
->> @@ -201,8 +202,9 @@ static int cx18_g_fmt_sliced_vbi_cap(struct file *file, void *fh,
->>        * digitizer/slicer.  Note, cx18_av_vbi() wipes the passed in
->>        * fmt->fmt.sliced under valid calling conditions
->>        */
->> -     if (v4l2_subdev_call(cx->sd_av, vbi, g_sliced_fmt, &fmt->fmt.sliced))
->> -             return -EINVAL;
->> +     ret = v4l2_subdev_call(cx->sd_av, vbi, g_sliced_fmt, &fmt->fmt.sliced);
->> +     if (ret)
->> +             return ret;
->
-> Please keep the -EINVAL here. I can't be 100% certain that returning 'ret' wouldn't
-> break something.
+If the vgic is not initialized, don't try to grab its spinlocks or
+traverse its data structures.
 
-I think Dan was recommending the opposite here, if I understood you
-both correctly:
-he said we should propagate the error code unless we know it's wrong, while you
-want to keep the current behavior to avoid introducing changes ;-)
+This is important because we soon have to start considering the active
+state of a virtual interrupts when doing vcpu_load, which may happen
+early on before the vgic is initialized.
 
-I guess in either case, looking at the callers more carefully would be
-a good idea.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ virt/kvm/arm/vgic/vgic.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
->> -     return 0;
->> +     return ret;
->>  }
->>
->>  int atomisp_flash_enable(struct atomisp_sub_device *asd, int num_frames)
->>
->
-> This is all very hackish, though. I'm not terribly keen on this patch. It's not
-> clear to me *why* these warnings appear in your setup.
-
-it's possible that this only happened with 'ccache', which first preprocesses
-the source and the passes it with v4l2_subdev_call expanded into the
-compiler. This means the line looks like
-
-        if ((!(cx->sd_av) ? -ENODEV :
-            (((cx->sd_av)->ops->vbi && (cx->sd_av)->ops->vbi->g_sliced_fmt) ?
-               (cx->sd_av)->ops->vbi->g_sliced_fmt(cx->sd_av)),
-&fmt->fmt.sliced) :
-               -ENOIOCTLCMD))
-
-The compiler now complains about the sub-expression that it sees for
-cx->sd_av==NULL:
-
-   if (-ENODEV)
-
-which it considers nonsense because it is always true and the value gets
-ignored.
-
-Let me try again without ccache for now and see what warnings remain.
-We can find a solution for those first, and then decide how to deal with
-ccache.
-
-        Arnd
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index fed717e..e1f7dbc 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -777,6 +777,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+ 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
+ 	bool map_is_active;
+ 
++	if (!vgic_initialized(vcpu->kvm))
++		return false;
++
+ 	spin_lock(&irq->irq_lock);
+ 	map_is_active = irq->hw && irq->active;
+ 	spin_unlock(&irq->irq_lock);
+-- 
+2.9.0
