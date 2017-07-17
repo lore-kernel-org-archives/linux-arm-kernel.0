@@ -1,125 +1,62 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 17 Jul 2017 15:45:08 +0200
-Subject: [PATCH 14/14] [media] fix warning on v4l2_subdev_call() result
- interpreted as bool
-In-Reply-To: <20170714093938.1469319-1-arnd@arndb.de>
-References: <20170714092540.1217397-1-arnd@arndb.de>
- <20170714093938.1469319-1-arnd@arndb.de>
-Message-ID: <f57e08d9-0984-b67c-c64b-c7e0542d0361@xs4all.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Jul 2017 15:45:37 +0200
+Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to
+ work on 32-bits
+In-Reply-To: <20170717132646.3020-7-laurentiu.tudor@nxp.com>
+References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
+ <20170717132646.3020-7-laurentiu.tudor@nxp.com>
+Message-ID: <CAK8P3a3KDh=MgfjG+sKNqcrQwq1yf-DgQN0=HigPaPYYJq0Uug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/17 11:36, Arnd Bergmann wrote:
-> v4l2_subdev_call is a macro returning whatever the callback return
-> type is, usually 'int'. With gcc-7 and ccache, this can lead to
-> many wanings like:
-> 
-> media/platform/pxa_camera.c: In function 'pxa_mbus_build_fmts_xlate':
-> media/platform/pxa_camera.c:766:27: error: ?: using integer constants in boolean context [-Werror=int-in-bool-context]
->   while (!v4l2_subdev_call(subdev, pad, enum_mbus_code, NULL, &code)) {
-> media/atomisp/pci/atomisp2/atomisp_cmd.c: In function 'atomisp_s_ae_window':
-> media/atomisp/pci/atomisp2/atomisp_cmd.c:6414:52: error: ?: using integer constants in boolean context [-Werror=int-in-bool-context]
->   if (v4l2_subdev_call(isp->inputs[asd->input_curr].camera,
-> 
-> The best workaround I could come up with is to change all the
-> callers that use the return code from v4l2_subdev_call() in an
-> 'if' or 'while' condition.
-> 
-> In case of simple 'if' checks, adding a temporary variable is
-> usually ok, and sometimes this can be used to propagate or
-> print an error code, so I do that.
-> 
-> For the 'while' loops, I ended up adding an otherwise useless
-> comparison with zero, which unfortunately makes the code a little
-> uglied.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Mon, Jul 17, 2017 at 3:26 PM,  <laurentiu.tudor@nxp.com> wrote:
+> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>
+> Split the 64-bit accesses in 32-bit accesses because there's no real
+> constrain in MC to do only atomic 64-bit. There's only one place
+> where ordering is important: when writing the MC command header the
+> first 32-bit part of the header must be written last.
+> We do this switch in order to allow compiling the driver on 32-bit.
+>
+> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 > ---
->  drivers/media/pci/cx18/cx18-ioctl.c                      |  6 ++++--
->  drivers/media/pci/saa7146/mxb.c                          |  5 +++--
->  drivers/media/platform/atmel/atmel-isc.c                 |  4 ++--
->  drivers/media/platform/atmel/atmel-isi.c                 |  4 ++--
->  drivers/media/platform/blackfin/bfin_capture.c           |  4 ++--
->  drivers/media/platform/omap3isp/ispccdc.c                |  5 +++--
->  drivers/media/platform/pxa_camera.c                      |  3 ++-
->  drivers/media/platform/rcar-vin/rcar-core.c              |  2 +-
->  drivers/media/platform/rcar-vin/rcar-dma.c               |  4 +++-
->  drivers/media/platform/soc_camera/soc_camera.c           |  4 ++--
->  drivers/media/platform/stm32/stm32-dcmi.c                |  4 ++--
->  drivers/media/platform/ti-vpe/cal.c                      |  6 ++++--
->  drivers/staging/media/atomisp/pci/atomisp2/atomisp_cmd.c | 13 +++++++------
->  13 files changed, 37 insertions(+), 27 deletions(-)
-> 
-> diff --git a/drivers/media/pci/cx18/cx18-ioctl.c b/drivers/media/pci/cx18/cx18-ioctl.c
-> index 80b902b12a78..1803f28fc501 100644
-> --- a/drivers/media/pci/cx18/cx18-ioctl.c
-> +++ b/drivers/media/pci/cx18/cx18-ioctl.c
-> @@ -188,6 +188,7 @@ static int cx18_g_fmt_sliced_vbi_cap(struct file *file, void *fh,
+>  drivers/staging/fsl-mc/bus/mc-sys.c | 31 ++++++++++++-------------------
+>  1 file changed, 12 insertions(+), 19 deletions(-)
+>
+> diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
+> index 195d9f3..dd2828e 100644
+> --- a/drivers/staging/fsl-mc/bus/mc-sys.c
+> +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
+> @@ -124,14 +124,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
 >  {
->  	struct cx18 *cx = fh2id(fh)->cx;
->  	struct v4l2_sliced_vbi_format *vbifmt = &fmt->fmt.sliced;
-> +	int ret;
->  
->  	/* sane, V4L2 spec compliant, defaults */
->  	vbifmt->reserved[0] = 0;
-> @@ -201,8 +202,9 @@ static int cx18_g_fmt_sliced_vbi_cap(struct file *file, void *fh,
->  	 * digitizer/slicer.  Note, cx18_av_vbi() wipes the passed in
->  	 * fmt->fmt.sliced under valid calling conditions
->  	 */
-> -	if (v4l2_subdev_call(cx->sd_av, vbi, g_sliced_fmt, &fmt->fmt.sliced))
-> -		return -EINVAL;
-> +	ret = v4l2_subdev_call(cx->sd_av, vbi, g_sliced_fmt, &fmt->fmt.sliced);
-> +	if (ret)
-> +		return ret;
-
-Please keep the -EINVAL here. I can't be 100% certain that returning 'ret' wouldn't
-break something.
-
->  
->  	vbifmt->service_set = cx18_get_service_set(vbifmt);
->  	return 0;
-
-<snip>
-
-> diff --git a/drivers/staging/media/atomisp/pci/atomisp2/atomisp_cmd.c b/drivers/staging/media/atomisp/pci/atomisp2/atomisp_cmd.c
-> index 97093baf28ac..fe56a037f065 100644
-> --- a/drivers/staging/media/atomisp/pci/atomisp2/atomisp_cmd.c
-> +++ b/drivers/staging/media/atomisp/pci/atomisp2/atomisp_cmd.c
-> @@ -6405,19 +6405,20 @@ int atomisp_s_ae_window(struct atomisp_sub_device *asd,
->  	struct atomisp_device *isp = asd->isp;
->  	/* Coverity CID 298071 - initialzize struct */
->  	struct v4l2_subdev_selection sel = { 0 };
-> +	int ret;
->  
->  	sel.r.left = arg->x_left;
->  	sel.r.top = arg->y_top;
->  	sel.r.width = arg->x_right - arg->x_left + 1;
->  	sel.r.height = arg->y_bottom - arg->y_top + 1;
->  
-> -	if (v4l2_subdev_call(isp->inputs[asd->input_curr].camera,
-> -			     pad, set_selection, NULL, &sel)) {
-> -		dev_err(isp->dev, "failed to call sensor set_selection.\n");
-> -		return -EINVAL;
-> -	}
-> +	ret = v4l2_subdev_call(isp->inputs[asd->input_curr].camera,
-> +			       pad, set_selection, NULL, &sel);
-> +	if (ret)
-> +		dev_err(isp->dev, "failed to call sensor set_selection: %d\n",
-> +			ret);
-
-Same here: just keep the 'return -EINVAL'.
-
->  
-> -	return 0;
-> +	return ret;
+>         int i;
+>
+> -       /* copy command parameters into the portal */
+> -       for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
+> -               __raw_writeq(cmd->params[i], &portal->params[i]);
+> -       /* ensure command params are committed before submitting it */
+> -       wmb();
+> -
+> -       /* submit the command by writing the header */
+> -       __raw_writeq(cmd->header, &portal->header);
+> +       /*
+> +        * copy command parameters into the portal. Final write
+> +        * triggers the submission of the command.
+> +        */
+> +       for (i = sizeof(struct mc_command) / sizeof(u32) - 1; i >= 0; i--) {
+> +               __raw_writel(((u32 *)cmd)[i], &((u32 *)portal)[i]);
+> +               /* ensure command params are committed before submitting it */
+> +               wmb();
+> +       }
 >  }
->  
->  int atomisp_flash_enable(struct atomisp_sub_device *asd, int num_frames)
-> 
 
-This is all very hackish, though. I'm not terribly keen on this patch. It's not
-clear to me *why* these warnings appear in your setup.
+What is the byte order requirement on this buffer? If this is a byte string
+rather than individual registers, you should probably just use
+memcpy_toio(), but if these are separate registers, then using the
+__raw_* accessors is still wrong, at least on kernels that have a
+different byteorder from the hardware.
 
-Regards,
+Also, are you sure that adding those six extra barriers has no
+performance impact?
 
-	Hans
+      Arnd
