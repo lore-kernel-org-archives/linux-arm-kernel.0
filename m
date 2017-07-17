@@ -1,31 +1,45 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 17 Jul 2017 10:20:51 +0900
-Subject: [PATCH 0/5] phy: Replace the deprecated extcon API
-References: <CGME20170717012057epcas1p11fe3d445ed16c7f94b57922b0a8f243a@epcas1p1.samsung.com>
-Message-ID: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
+Date: Mon, 17 Jul 2017 10:20:56 +0900
+Subject: [PATCH 5/5] extcon: Remove deprecated extcon_set/get_cable_state_()
+In-Reply-To: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
+References: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170717012058epcas1p136b3a1e55ec313d68b941bc34a8f0779@epcas1p1.samsung.com>
+Message-ID: <1500254456-6525-6-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches replace the deprecated extcon API
-and remove them from extcon framework.
+The commit 575c2b867ee0 ("extcon: Rename the extcon_set/get_state()
+to maintain the function naming pattern") renames the extcon function as
+following: But, the extcon just keeps the old API to prevent the build error.
+This patch removes the deprecatd extcon API.
 
-The patch1 and patch2 were already acked by Kishon Vijay Abraham I.
-If patch3/patch4 are reviewed, I'll create the immutable branch
-and send the pull request to both usb and phy maintainer.
+- extcon_get_cable_state_() -> extcon_get_state()
+- extcon_set_cable_state_() -> extcon_set_state_sync()
 
-Chanwoo Choi (5):
-  phy: qcom-usb-hs: Replace the extcon API
-  phy: rockchip-inno-usb2: Replace the extcon API
-  phy: phy-bcm-ns2-usbdrd: Replace the deprecated extcon API
-  usb: gadget: udc: Replace the deprecated extcon API
-  extcon: Remove deprecated extcon_set/get_cable_state_()
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ include/linux/extcon.h | 11 -----------
+ 1 file changed, 11 deletions(-)
 
- drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c     |  8 ++++----
- drivers/phy/qualcomm/phy-qcom-usb-hs.c        | 14 +++-----------
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 10 +++++-----
- drivers/usb/gadget/udc/snps_udc_plat.c        |  6 +++---
- include/linux/extcon.h                        | 11 -----------
- 5 files changed, 15 insertions(+), 34 deletions(-)
-
+diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+index 7e206a9f88db..3ba02eecba2e 100644
+--- a/include/linux/extcon.h
++++ b/include/linux/extcon.h
+@@ -422,15 +422,4 @@ static inline int extcon_unregister_interest(struct extcon_specific_cable_nb
+ {
+ 	return -EINVAL;
+ }
+-
+-static inline int extcon_get_cable_state_(struct extcon_dev *edev, unsigned int id)
+-{
+-	return extcon_get_state(edev, id);
+-}
+-
+-static inline int extcon_set_cable_state_(struct extcon_dev *edev, unsigned int id,
+-				   bool cable_state)
+-{
+-	return extcon_set_state_sync(edev, id, cable_state);
+-}
+ #endif /* __LINUX_EXTCON_H__ */
 -- 
 1.9.1
