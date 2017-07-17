@@ -1,34 +1,50 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Mon, 17 Jul 2017 12:18:47 +0200
-Subject: [PATCH 0/8] EDAC drivers for Armada XP L2 and DDR
-In-Reply-To: <20170630145106.29820-1-jlu@pengutronix.de>
-References: <20170630145106.29820-1-jlu@pengutronix.de>
-Message-ID: <1500286727.6946.7.camel@pengutronix.de>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Mon, 17 Jul 2017 12:21:15 +0200
+Subject: [PATCH] tee: indicate privileged dev in gen_caps
+Message-ID: <1500286875-29888-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
+Mirrors the TEE_DESC_PRIVILEGED bit of struct tee_desc:flags into struct
+tee_ioctl_version_data:gen_caps as TEE_GEN_CAP_PRIVILEGED in
+tee_ioctl_version()
 
-On Fri, 2017-06-30 at 16:50 +0200, Jan Luebbe wrote:
-> This series adds drivers for the L2 cache and DDR RAM ECC functionality as
-> found on the MV78230/MV78x60 SoCs. I've tested these changes with the MV78460
-> (on a custom board with a DDR3 ECC DIMM).
-> 
-> Also contained in this series are an additional debugfs wrapper and devm_
-> helpers for edac_mc_/edac_device_ allocation and registration, which make error
-> handing and cleanup simpler.
+Reviewed-by: Jerome Forissier <jerome.forissier@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ drivers/tee/tee_core.c   | 5 +++++
+ include/uapi/linux/tee.h | 1 +
+ 2 files changed, 6 insertions(+)
 
-before I send a v2 series (fixing the patch order and vendor prefix as
-reported by Russell King), do you have comments on this series?
-
-Patches 5-7 only touch drivers/edac. If you are fine the them as is,
-maybe you could pick them from the current version and I'll drop them
-from v2.
-
-Thanks,
-Jan
+diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+index 5c60bf4423e6..58a5009eacc3 100644
+--- a/drivers/tee/tee_core.c
++++ b/drivers/tee/tee_core.c
+@@ -90,8 +90,13 @@ static int tee_ioctl_version(struct tee_context *ctx,
+ 	struct tee_ioctl_version_data vers;
+ 
+ 	ctx->teedev->desc->ops->get_version(ctx->teedev, &vers);
++
++	if (ctx->teedev->desc->flags & TEE_DESC_PRIVILEGED)
++		vers.gen_caps |= TEE_GEN_CAP_PRIVILEGED;
++
+ 	if (copy_to_user(uvers, &vers, sizeof(vers)))
+ 		return -EFAULT;
++
+ 	return 0;
+ }
+ 
+diff --git a/include/uapi/linux/tee.h b/include/uapi/linux/tee.h
+index 370d8845ab21..688782e90140 100644
+--- a/include/uapi/linux/tee.h
++++ b/include/uapi/linux/tee.h
+@@ -49,6 +49,7 @@
+ #define TEE_MAX_ARG_SIZE	1024
+ 
+ #define TEE_GEN_CAP_GP		(1 << 0)/* GlobalPlatform compliant TEE */
++#define TEE_GEN_CAP_PRIVILEGED	(1 << 1)/* Privileged device (for supplicant) */
+ 
+ /*
+  * TEE Implementation ID
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.4
