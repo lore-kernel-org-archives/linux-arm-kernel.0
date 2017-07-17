@@ -1,7 +1,7 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 17 Jul 2017 15:23:54 +0200
-Subject: [PATCH] ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
-Message-ID: <1500297834-7387-1-git-send-email-geert+renesas@glider.be>
+Date: Mon, 17 Jul 2017 15:24:28 +0200
+Subject: [PATCH v2] ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
+Message-ID: <1500297868-7479-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
