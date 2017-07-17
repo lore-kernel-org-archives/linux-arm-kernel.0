@@ -1,106 +1,46 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 17 Jul 2017 09:58:05 +0100
-Subject: [RFC PATCH 2/2] ARM: NOMMU: Wire-up default DMA interface
-In-Reply-To: <1500281885-3034-1-git-send-email-vladimir.murzin@arm.com>
-References: <1500281885-3034-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1500281885-3034-3-git-send-email-vladimir.murzin@arm.com>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Mon, 17 Jul 2017 09:59:14 +0100
+Subject: [RFC] PCI: dwc: designware: allow customize unroll registers'
+ readl/writel
+In-Reply-To: <20170713185213.0b04a4fc@xhacker>
+References: <20170713184837.541ccf26@xhacker> <20170713185213.0b04a4fc@xhacker>
+Message-ID: <825636e2-f685-738e-46d9-bbc483e95606@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way how default DMA pool is exposed has changed and now we need to
-use dedicated interface to work with it. This patch makes alloc/release
-operations to use such interface. Since default DMA pool is not
-handled by generic code anymore we have to implement our own mmap
-operation.
+Hi Jisheng,
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/mm/dma-mapping-nommu.c | 45 ++++++++++++++++++++++++++++++++---------
- 1 file changed, 36 insertions(+), 9 deletions(-)
+?s 11:52 AM de 7/13/2017, Jisheng Zhang escreveu:
+> On Thu, 13 Jul 2017 18:48:37 +0800 Jisheng Zhang wrote:
+> 
+>> Hi Joao, Jingoo,
+>>
+>> Now, the PCIE_GET_ATU_OUTB_UNR_REG_OFFSET macro is defined as:
+>>
+>> /* Register address builder */
+>> #define PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(region)        \
+>>                         ((0x3 << 20) | ((region) << 9))
+>>
+>> I have one question: where does the (0x3 << 20) come from? 2MB space, a bit
 
-diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-index 90ee354..6db5fc2 100644
---- a/arch/arm/mm/dma-mapping-nommu.c
-+++ b/arch/arm/mm/dma-mapping-nommu.c
-@@ -40,9 +40,21 @@ static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
- 
- {
- 	const struct dma_map_ops *ops = &dma_noop_ops;
-+	void *ret;
- 
- 	/*
--	 * We are here because:
-+	 * Try generic allocator first if we are advertised that
-+	 * consistency is not required.
-+	 */
-+
-+	if (attrs & DMA_ATTR_NON_CONSISTENT)
-+		return ops->alloc(dev, size, dma_handle, gfp, attrs);
-+
-+	ret = dma_alloc_from_global_coherent(size, dma_handle);
-+
-+	/*
-+	 * dma_alloc_from_global_coherent() may fail because:
-+	 *
- 	 * - no consistent DMA region has been defined, so we can't
- 	 *   continue.
- 	 * - there is no space left in consistent DMA region, so we
-@@ -50,11 +62,8 @@ static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
- 	 *   advertised that consistency is not required.
- 	 */
- 
--	if (attrs & DMA_ATTR_NON_CONSISTENT)
--		return ops->alloc(dev, size, dma_handle, gfp, attrs);
--
--	WARN_ON_ONCE(1);
--	return NULL;
-+	WARN_ON_ONCE(ret == NULL);
-+	return ret;
- }
- 
- static void arm_nommu_dma_free(struct device *dev, size_t size,
-@@ -63,14 +72,31 @@ static void arm_nommu_dma_free(struct device *dev, size_t size,
- {
- 	const struct dma_map_ops *ops = &dma_noop_ops;
- 
--	if (attrs & DMA_ATTR_NON_CONSISTENT)
-+	if (attrs & DMA_ATTR_NON_CONSISTENT) {
- 		ops->free(dev, size, cpu_addr, dma_addr, attrs);
--	else
--		WARN_ON_ONCE(1);
-+	} else {
-+		int ret = dma_release_from_global_coherent(get_order(size),
-+							   cpu_addr);
-+
-+		WARN_ON_ONCE(ret == 0);
-+	}
- 
- 	return;
- }
- 
-+static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-+			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+			      unsigned long attrs)
-+{
-+	int ret;
-+
-+	if (dma_mmap_from_global_coherent(vma, cpu_addr, size, &ret))
-+		return ret;
-+
-+	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
-+}
-+
-+
- static void __dma_page_cpu_to_dev(phys_addr_t paddr, size_t size,
- 				  enum dma_data_direction dir)
- {
-@@ -173,6 +199,7 @@ static void arm_nommu_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist
- const struct dma_map_ops arm_nommu_dma_ops = {
- 	.alloc			= arm_nommu_dma_alloc,
- 	.free			= arm_nommu_dma_free,
-+	.mmap			= arm_nommu_dma_mmap,
- 	.map_page		= arm_nommu_dma_map_page,
- 	.unmap_page		= arm_nommu_dma_unmap_page,
- 	.map_sg			= arm_nommu_dma_map_sg,
--- 
-2.0.0
+From, the PCIe Core 4.80 you have the new feature Unroll, which was developed
+for both iATU and DMA.
+To inform the Core that you want to access an Unroll register address, bits 20
+and 21 must be set, and thats where 0x3 comes from.
+
+If it is not clear please let me know.
+
+> 
+> sorry, typo. (0x3 << 20) should be 3MB.
+> 
+>> large. And I didn't find it in the databook. Is it platform specific?
+>> If yes, I want to cook one patch to customize unroll registers' readl/writel.
+>>
+>> And how does (0x3 << 20) enable DBI2 access?
+>>
+>> Thanks in advance,
+>> Jisheng
+> 
+
+Thanks,
+Joao
