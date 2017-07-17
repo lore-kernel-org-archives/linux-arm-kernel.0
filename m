@@ -1,68 +1,47 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 17 Jul 2017 14:16:32 +0800
-Subject: [PATCH v4 0/3] some fixups for MediaTek cpufreq driver
-In-Reply-To: <cover.1499692967.git.sean.wang@mediatek.com>
-References: <cover.1499692967.git.sean.wang@mediatek.com>
-Message-ID: <1500272192.16278.44.camel@mtkswgap22>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Jul 2017 08:22:35 +0200
+Subject: [PATCH v3] drm/sun4i: Implement drm_driver lastclose to restore
+ fbdev console
+In-Reply-To: <CAGb2v64svM2KB7dtf+USM=LppHrnvYiV-AobZubB8D3T6u=9Ew@mail.gmail.com>
+References: <20170710065504.31497-1-net147@gmail.com>
+ <20170711192131.mdmkvgxgzo7bwywe@flea>
+ <CAGb2v64svM2KB7dtf+USM=LppHrnvYiV-AobZubB8D3T6u=9Ew@mail.gmail.com>
+Message-ID: <20170717062235.okshxkouswlujmie@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Viresh
+On Wed, Jul 12, 2017 at 10:40:16AM +0800, Chen-Yu Tsai wrote:
+> On Wed, Jul 12, 2017 at 3:21 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Jul 10, 2017 at 04:55:04PM +1000, Jonathan Liu wrote:
+> >> The drm_driver lastclose callback is called when the last userspace
+> >> DRM client has closed. Call drm_fbdev_cma_restore_mode to restore
+> >> the fbdev console otherwise the fbdev console will stop working.
+> >>
+> >> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
+> >> Cc: stable at vger.kernel.org
+> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> >> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > Queued for 4.14, thanks!
+> 
+> May we have this sooner? Like 4.13? :)
 
-I missed to add Acks from Rob for patch 2 and 3 since we sent out almost
-at the same time. Do I need to resend again for this or the series is
-okay for you?
+Yes, of course :)
 
-	Sean
+I queued it for 4.13.
 
+Thanks!
+Maxime
 
-On Mon, 2017-07-10 at 22:23 +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Changes since v3:
-> - remove the redundant line depends on ARM || ARM64 || COMPILE_TEST
-> since the whole Kconfig.arm file depends on ARM || ARM64.
-> - renaming from mtk-cpufreq.c to mediatek-cpufreq.c avoiding
-> collide and cause confusion at some point in time.
-> 
-> Changes since v2:
-> - correct the typo in the binding document
-> 
-> Changes since v1:
-> - drop those patches already accepted
-> - refine the commit messages and Kconfig dependency
-> - Kconfig menu entry and file name itself are updated with more
-> generic name to drop "MT8173" since this driver actually supports
-> all MediaTek SoCs.
-> - generate patchset again with git format-patch -C -M --thread=shallow
-> - fix binding examples by replacing '@' with '-' as the OPP nodes will
-> never have a "reg" property.
-> 
-> Hi,
-> 
-> The purpose of the series is
-> - (patch 1 to 3) to fix up current Mediatek cpufreq driver
-> can't work with the latest tree since one required CPU clock muxer missing
-> would cause the driver getting the resource fails when driver probe gets
-> called.
-> - (patch 4) to enable cpufreq feature on MT2701/MT7623 platform.
-> - (patch 5 to 6) to update the binding document to reflect
-> latest driver logic and add more examples guiding people how to apply for
-> Mediatek cpufreq driver.
-> 
-> Sean Wang (3):
->   cpufreq: mediatek: Add support of cpufreq to MT2701/MT7623 SoC
->   dt-bindings: cpufreq: move MediaTek cpufreq dt-bindings document to
->     proper place
->   dt-bindings: cpufreq: enhance MediaTek cpufreq dt-binding document
-> 
->  .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  |  83 -------
->  .../bindings/cpufreq/cpufreq-mediatek.txt          | 247 +++++++++++++++++++++
->  drivers/cpufreq/Kconfig.arm                        |   7 +-
->  drivers/cpufreq/Makefile                           |   2 +-
->  .../{mt8173-cpufreq.c => mediatek-cpufreq.c}       |   2 +
->  5 files changed, 253 insertions(+), 88 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
->  rename drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} (99%)
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/22c3532c/attachment.sig>
