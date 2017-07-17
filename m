@@ -1,102 +1,31 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 17 Jul 2017 16:48:56 +0530
-Subject: [Patch v5 12/12] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <617cb1c5-074c-3f47-0096-fe7568dab8be@linaro.org>
-References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <CGME20170619052521epcas5p36a0bc384d10809dcfe775e6da87ed37b@epcas5p3.samsung.com>
- <1497849055-26583-13-git-send-email-smitha.t@samsung.com>
- <617cb1c5-074c-3f47-0096-fe7568dab8be@linaro.org>
-Message-ID: <1500290336.16819.6.camel@smitha-fedora>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 17 Jul 2017 13:33:11 +0200
+Subject: [PATCH v4 0/3] some fixups for MediaTek cpufreq driver
+In-Reply-To: <20170717073543.GL352@vireshk-i7>
+References: <cover.1499692967.git.sean.wang@mediatek.com>
+ <1500272192.16278.44.camel@mtkswgap22> <20170717073543.GL352@vireshk-i7>
+Message-ID: <2164503.JjlIkNveU4@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-07-07 at 17:59 +0300, Stanimir Varbanov wrote:
-> Hi,
-> 
-> On 06/19/2017 08:10 AM, Smitha T Murthy wrote:
-> > Added V4l2 controls for HEVC encoder
+On Monday, July 17, 2017 01:05:43 PM Viresh Kumar wrote:
+> On 17-07-17, 14:16, Sean Wang wrote:
+> > Hi, Viresh
 > > 
-> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> > ---
-> >  Documentation/media/uapi/v4l/extended-controls.rst | 364 +++++++++++++++++++++
-> >  1 file changed, 364 insertions(+)
-> > 
-> > diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-> > index abb1057..7767c70 100644
-> > --- a/Documentation/media/uapi/v4l/extended-controls.rst
-> > +++ b/Documentation/media/uapi/v4l/extended-controls.rst
-> > @@ -1960,6 +1960,370 @@ enum v4l2_vp8_golden_frame_sel -
-> >      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
-> >  
-> >  
+> > I missed to add Acks from Rob for patch 2 and 3 since we sent out almost
+> > at the same time. Do I need to resend again for this or the series is
+> > okay for you?
 > 
-> <cut>
+> Looks like you missed including Rafael for this series (He is the one
+> who applies these patches).
 > 
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_PROFILE``
-> > +    (enum)
-> > +
-> > +enum v4l2_mpeg_video_hevc_profile -
-> > +    Select the desired profile for HEVC encoder.
-> > +
-> > +.. raw:: latex
-> > +
-> > +    \begin{adjustbox}{width=\columnwidth}
-> > +
-> > +.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-> > +
-> > +.. flat-table::
-> > +    :header-rows:  0
-> > +    :stub-columns: 0
-> > +
-> > +    * - ``V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN``
-> > +      - Main profile.
+> I will let him answer for this.
 > 
-> MAIN10?
 > 
-No just MAIN.
 
-> > +    * - ``V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_STILL_PICTURE``
-> > +      - Main still picture profile.
-> > +
-> > +.. raw:: latex
-> > +
-> > +    \end{adjustbox}
-> > +
-> > +
-> 
-> <cut>
-> 
-> > +MFC 10.10 MPEG Controls
-> > +-----------------------
-> > +
-> > +The following MPEG class controls deal with MPEG decoding and encoding
-> > +settings that are specific to the Multi Format Codec 10.10 device present
-> > +in the S5P and Exynos family of SoCs by Samsung.
-> > +
-> > +
-> > +.. _mfc1010-control-id:
-> > +
-> > +MFC 10.10 Control IDs
-> > +^^^^^^^^^^^^^^^^^^^^^
-> > +
-> > +``V4L2_CID_MPEG_MFC10_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES (integer)``
-> > +    Selects number of P reference pictures required for HEVC encoder.
-> > +    P-Frame can use 1 or 2 frames for reference.
-> > +
-> > +``V4L2_CID_MPEG_MFC10_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR (integer)``
-> > +    Indicates whether to generate SPS and PPS at every IDR. Setting it to 0
-> > +    disables generating SPS and PPS at every IDR. Setting it to one enables
-> > +    generating SPS and PPS at every IDR.
-> > +
-> 
-> I'm not sure those two should be driver specific, have to check does
-> venus driver has similar controls.
-> 
-Yes please check and let me know if you have similar controls, I will
-move it out.
-> > +
-> >  .. _camera-controls:
-> >  
-> >  Camera Control Reference
-> > 
-> 
+Please respin with all of the applicable tags.
+
+I haven't been following all of the discussions on this that closely.
+
+Thanks,
+Rafael
