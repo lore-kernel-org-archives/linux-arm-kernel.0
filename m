@@ -1,39 +1,24 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Mon, 17 Jul 2017 15:05:44 -0400
-Subject: [PATCH 2/3] net: ethernet: bgmac: Make IDM register space optional
-In-Reply-To: <CAKUFe6ad027MAg-A3XO7i1=c-Q623JqMPCKV_+Hi+ZpUojBn-Q@mail.gmail.com>
-References: <1499972649-6200-1-git-send-email-abhishek.shah@broadcom.com>
- <1499972649-6200-3-git-send-email-abhishek.shah@broadcom.com>
- <CAC3K-4o=WRqBv_vTf7QGDYjWzMmVog=63ZbiHbHAuW7zJcsHFQ@mail.gmail.com>
- <CAKUFe6ad027MAg-A3XO7i1=c-Q623JqMPCKV_+Hi+ZpUojBn-Q@mail.gmail.com>
-Message-ID: <CAC3K-4rgVYkjGq_WTHoO6=fvSH0TuHOpdDpukbvK+5LxhLm4BA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 17 Jul 2017 21:16:20 +0200
+Subject: [RESEND PATCH v2 7/7] ARM: dts: rockchip: add efuse device node
+ for rk3228
+In-Reply-To: <1498127560-6960-1-git-send-email-frank.wang@rock-chips.com>
+References: <1498127402-6705-1-git-send-email-frank.wang@rock-chips.com>
+ <1498127560-6960-1-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <4816350.S9q04trJsa@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 2:37 PM, Abhishek Shah
-<abhishek.shah@broadcom.com> wrote:
-> Hi Jon,
->
->> This also will need to be added to
->> drivers/net/ethernet/broadcom/bgmac-bcma.c.  Otherwise, the driver
->> will no longer work for those platforms.  Since this was already
->> accepted, please push out a fix ASAP.
->>
-> I do not see how the bcma driver [bgmac-bcma.c] will no longer work.
-> The whole idea behind introducing this  BGMAC_FEAT_IDM_MASK bit
-> was to keep bcma driver's functionality intact.
->
-> The BGMAC_FEAT_IDM_MASK bit is explicitly set by the bgmac-platform driver
-> and is unset inside the same if the idm register base is provided.
->
-> For BCMA driver case, I do not touch BGMAC_FEAT_IDM_MASK bit, i.e. it
-> is *not* set.
-> And if it is not set, each idm operation done in bgmac.c will take place.
-> Please explain if I am missing something here.
+Am Donnerstag, 22. Juni 2017, 18:32:40 CEST schrieb Frank Wang:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
+> 
+> Add a efuse node in the device tree for the rk3228 SoC.
+> 
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
 
-Sorry, I had it flipped in my mind.  Please disregard.
+with the compatible change applied to Greg's tree,
+I've now applied this one for 4.14.
 
->
->
-> Regards,
-> Abhishek
+
+Heiko
