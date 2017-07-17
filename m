@@ -1,46 +1,147 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 17 Jul 2017 22:16:32 +0200
-Subject: [PATCH v2] PM / suspend: Add suspend_target_state()
-In-Reply-To: <20170717200628.7018-1-f.fainelli@gmail.com>
-References: <20170716023610.4658-1-f.fainelli@gmail.com>
- <20170717200628.7018-1-f.fainelli@gmail.com>
-Message-ID: <20170717201631.GA13024@amd>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 17 Jul 2017 16:23:00 -0400
+Subject: [PATCH] drm/rockchip: cdn-dp: send audio infoframe to sink
+In-Reply-To: <1500116418-4178-1-git-send-email-zyw@rock-chips.com>
+References: <1500116418-4178-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <20170717202300.c2r7ypclqbwvqbzq@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Sat, Jul 15, 2017 at 07:00:18PM +0800, Chris Zhong wrote:
+> Some DP/HDMI sink need to receive the audio infoframe to play sound,
+> especially some multi-channel AV receiver, they need the
+> channel_allocation from infoframe to config the speakers. Send the
+> audio infoframe via SDP will make them work properly.
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 
-> Have the core suspend/resume framework store the system-wide suspend
-> state (suspend_state_t) we are about to enter, and expose it to drivers
-> via suspend_target_state() in order to retrieve that. The state is
-> assigned in suspend_devices_and_enter().
+Hi Chris,
+Thanks for the patch, please see comments below.
 
-Do we really want to have variable + inline functions that just read
-that variable?
+> ---
+> 
+>  drivers/gpu/drm/rockchip/cdn-dp-core.c | 20 ++++++++++++++++++++
+>  drivers/gpu/drm/rockchip/cdn-dp-reg.c  | 19 +++++++++++++++++++
+>  drivers/gpu/drm/rockchip/cdn-dp-reg.h  |  6 ++++++
+>  3 files changed, 45 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> index 9b0b058..e59ca47 100644
+> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> @@ -802,6 +802,7 @@ static int cdn_dp_audio_hw_params(struct device *dev,  void *data,
+>  		.sample_rate = params->sample_rate,
+>  		.channels = params->channels,
+>  	};
+> +	u8 buffer[14];
 
-> +static inline suspend_state_t suspend_target_state(void) { return  -ENOSYS; }
+Why 14?
 
-I'm pretty sure -ENOSYS is not compatible with suspend_state_t ...
+I think you should probably have buffer[HDMI_AUDIO_INFOFRAME_SIZE +
+SDP_HEADER_SIZE] so the reader knows how you arrived at this value.
 
-> diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
-> index 3ecf275d7e44..a296d6e25d52 100644
-> --- a/kernel/power/suspend.c
-> +++ b/kernel/power/suspend.c
-> @@ -47,6 +47,7 @@ const char *mem_sleep_states[PM_SUSPEND_MAX];
+>  	int ret;
 >  
->  suspend_state_t mem_sleep_current = PM_SUSPEND_FREEZE;
->  static suspend_state_t mem_sleep_default = PM_SUSPEND_MEM;
-> +static suspend_state_t pm_suspend_target_state;
+>  	mutex_lock(&dp->lock);
+> @@ -823,6 +824,25 @@ static int cdn_dp_audio_hw_params(struct device *dev,  void *data,
+>  		goto out;
+>  	}
+>  
+> +	memset(buffer, 0, sizeof(buffer));
+> +
+> +	ret = hdmi_audio_infoframe_pack(&params->cea, buffer, sizeof(buffer));
+> +	if (ret < 0) {
+> +		DRM_DEV_ERROR(dev, "Failed to pack audio infoframe: %d\n", ret);
+> +		goto out;
+> +	}
+> +
+> +	/*
+> +	 * Change the infoframe header to SDP header per DP 1.3 spec, Table
+> +	 * 2-98.
+> +	 */
+> +	buffer[0] = 0;
+> +	buffer[1] = HDMI_INFOFRAME_TYPE_AUDIO;
+> +	buffer[2] = 0x1b;
+> +	buffer[3] = 0x48;
 
-Is there disadvantage of just having this variable non-static?
-									Pavel
+Instead of doing this, consider splitting up hdmi_audio_infoframe_pack into
+hdmi_audio_infoframe_pack and hdmi_audio_infoframe_pack_payload. The first
+function does everything, while the second just packs the payload, then you can
+set the SDP header independently.
+
+> +
+> +	cdn_dp_sdp_write(dp, 0, buffer, sizeof(buffer));
+> +
+>  	ret = cdn_dp_audio_config(dp, &audio);
+>  	if (!ret)
+>  		dp->audio_info = audio;
+> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+> index b14d211..8907db0 100644
+> --- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+> +++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+> @@ -951,6 +951,25 @@ static void cdn_dp_audio_config_spdif(struct cdn_dp_device *dp)
+>  	clk_set_rate(dp->spdif_clk, CDN_DP_SPDIF_CLK);
+>  }
+>  
+> +void cdn_dp_sdp_write(struct cdn_dp_device *dp, int entry_id, u8 *buf, u32 len)
+> +{
+> +	int idx;
+> +	u32 *packet = (u32 *)buf;
+> +	u32 length = len / 4;
+
+length and len are pretty terrible names, it would be quite easy to use the
+wrong one. Consider more descriptive names (ie: buf_len and num_packets).
+
+> +	u8 type = buf[1];
+
+Check for len < 0?
+
+> +
+> +	for (idx = 0; idx < length; idx++)
+> +		writel(cpu_to_le32(*packet++), dp->regs + SOURCE_PIF_DATA_WR);
+> +
+> +	writel(entry_id, dp->regs + SOURCE_PIF_WR_ADDR);
+> +
+> +	writel(F_HOST_WR, dp->regs + SOURCE_PIF_WR_REQ);
+> +
+> +	writel(PIF_PKT_TYPE_VALID | F_PACKET_TYPE(type) | entry_id,
+> +	       dp->regs + SOURCE_PIF_PKT_ALLOC_REG);
+> +	writel(PIF_PKT_ALLOC_WR_EN, dp->regs + SOURCE_PIF_PKT_ALLOC_WR_EN);
+> +}
+> +
+>  int cdn_dp_audio_config(struct cdn_dp_device *dp, struct audio_info *audio)
+>  {
+>  	int ret;
+> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.h b/drivers/gpu/drm/rockchip/cdn-dp-reg.h
+> index c4bbb4a83..6ec0e81 100644
+> --- a/drivers/gpu/drm/rockchip/cdn-dp-reg.h
+> +++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.h
+> @@ -424,6 +424,11 @@
+>  /* Reference cycles when using lane clock as reference */
+>  #define LANE_REF_CYC				0x8000
+>  
+> +#define F_HOST_WR		BIT(0)
+> +#define PIF_PKT_ALLOC_WR_EN	BIT(0)
+> +#define PIF_PKT_TYPE_VALID	(3 << 16)
+> +#define F_PACKET_TYPE(x)	(((x) & 0xff) << 8)
+
+Can you tuck these #defines under the definition of SOURCE_PIF_PKT_ALLOC_REG, so
+we know which register they apply to?
+
+> +
+>  enum voltage_swing_level {
+>  	VOLTAGE_LEVEL_0,
+>  	VOLTAGE_LEVEL_1,
+> @@ -478,5 +483,6 @@ int cdn_dp_set_video_status(struct cdn_dp_device *dp, int active);
+>  int cdn_dp_config_video(struct cdn_dp_device *dp);
+>  int cdn_dp_audio_stop(struct cdn_dp_device *dp, struct audio_info *audio);
+>  int cdn_dp_audio_mute(struct cdn_dp_device *dp, bool enable);
+> +void cdn_dp_sdp_write(struct cdn_dp_device *dp, int entry_id, u8 *buf, u32 len);
+>  int cdn_dp_audio_config(struct cdn_dp_device *dp, struct audio_info *audio);
+>  #endif /* _CDN_DP_REG_H */
+> -- 
+> 2.6.3
+> 
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170717/40b9fdf6/attachment.sig>
+Sean Paul, Software Engineer, Google / Chromium OS
