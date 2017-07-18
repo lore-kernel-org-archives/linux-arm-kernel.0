@@ -1,92 +1,37 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 18 Jul 2017 16:42:24 +0200
-Subject: [PATCH] arm64: dts: marvell: Fully re-order nodes in Marvell CP110
- dtsi files
-Message-ID: <20170718144224.7228-1-gregory.clement@free-electrons.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Tue, 18 Jul 2017 14:43:45 +0000
+Subject: [PATCH v2 0/7] staging: fsl-mc: make the driver compile on other
+ architectures
+In-Reply-To: <CAK8P3a39fpEHwCvR3TOL8u8W7TORSNpw27xwma70sxi-VfXhyA@mail.gmail.com>
+References: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
+ <CAK8P3a39fpEHwCvR3TOL8u8W7TORSNpw27xwma70sxi-VfXhyA@mail.gmail.com>
+Message-ID: <596E1EA0.3040002@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the introduction of the CP110 dt files, the sata node was
-misplaced. Move it at the right place. Thanks to this, the files are
-completely ordered.
+Hi Arnd,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On 07/18/2017 05:26 PM, Arnd Bergmann wrote:
+> On Tue, Jul 18, 2017 at 3:37 PM,  <laurentiu.tudor@nxp.com> wrote:
+>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>
+>> Apart from a small change (first patch) which adds a missing comment,
+>> this series make the bus driver compile on other architectures, as per
+>> GregKH comment [1].
+>> Compiled tested on:
+>>   - booke powerpc (corenet{32,64}_smp_defconfig) with this ppc patch [2]
+>>   - x86 (i386_defconfig, x86_64_defconfig, needs CONFIG_OF)
+>>   - arm64 (defconfig)
+>>
+>> [1] https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.spinics.net%2Flists%2Flinux-driver-devel%2Fmsg100585.html&data=01%7C01%7Claurentiu.tudor%40nxp.com%7C2564747d26964ed5b3f408d4cde8f442%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0&sdata=Dz8vvLzQESel2UTXrhQ3JZyNhx5VhUdj6%2BE6TDLnXmc%3D&reserved=0
+>> [2] https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpatchwork.ozlabs.org%2Fpatch%2F789474%2F&data=01%7C01%7Claurentiu.tudor%40nxp.com%7C2564747d26964ed5b3f408d4cde8f442%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0&sdata=%2FiGSaa4j60INeTWEbT926iEIAtya6tqIiIoQN1yFbmA%3D&reserved=0
+>
+> Looks good overall. With the two minor questions addressed
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+
+Thanks for the ack. I'll mention it the next version.
+
 ---
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 18 +++++++++---------
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 18 +++++++++---------
- 2 files changed, 18 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 394e54d37fff..1acd6a92d1a7 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -162,15 +162,6 @@
- 				};
- 			};
- 
--			cpm_sata0: sata at 540000 {
--				compatible = "marvell,armada-8k-ahci",
--					     "generic-ahci";
--				reg = <0x540000 0x30000>;
--				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cpm_clk 1 15>;
--				status = "disabled";
--			};
--
- 			cpm_usb3_0: usb3 at 500000 {
- 				compatible = "marvell,armada-8k-xhci",
- 					     "generic-xhci";
-@@ -191,6 +182,15 @@
- 				status = "disabled";
- 			};
- 
-+			cpm_sata0: sata at 540000 {
-+				compatible = "marvell,armada-8k-ahci",
-+					     "generic-ahci";
-+				reg = <0x540000 0x30000>;
-+				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&cpm_clk 1 15>;
-+				status = "disabled";
-+			};
-+
- 			cpm_xor0: xor at 6a0000 {
- 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
- 				reg = <0x6a0000 0x1000>,
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 2e6422a66d76..a21814855799 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -163,15 +163,6 @@
- 
- 			};
- 
--			cps_sata0: sata at 540000 {
--				compatible = "marvell,armada-8k-ahci",
--					     "generic-ahci";
--				reg = <0x540000 0x30000>;
--				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cps_clk 1 15>;
--				status = "disabled";
--			};
--
- 			cps_usb3_0: usb3 at 500000 {
- 				compatible = "marvell,armada-8k-xhci",
- 					     "generic-xhci";
-@@ -192,6 +183,15 @@
- 				status = "disabled";
- 			};
- 
-+			cps_sata0: sata at 540000 {
-+				compatible = "marvell,armada-8k-ahci",
-+					     "generic-ahci";
-+				reg = <0x540000 0x30000>;
-+				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&cps_clk 1 15>;
-+				status = "disabled";
-+			};
-+
- 			cps_xor0: xor at 6a0000 {
- 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
- 				reg = <0x6a0000 0x1000>,
--- 
-2.13.2
+Thanks & Best Regards, Laurentiu
