@@ -1,180 +1,71 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 18 Jul 2017 18:29:13 +0200
-Subject: [PATCH v4 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
- board dts and Makefile
-In-Reply-To: <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
-References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
- <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
-Message-ID: <ddfb5e58-520f-1ef5-2351-d7545e17a429@gmail.com>
+Date: Tue, 18 Jul 2017 18:34:17 +0200
+Subject: [PATCH v3 2/6] pwm: mediatek: fix pwm source clock selection
+In-Reply-To: <1499323435.22478.26.camel@mhfsdcap03>
+References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
+ <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
+ <d009712e-f0a2-2dc7-2f64-ad8cfa21f98d@gmail.com>
+ <1499321801.22478.12.camel@mhfsdcap03> <1499323435.22478.26.camel@mhfsdcap03>
+Message-ID: <6d74d623-e08d-3552-8d4e-b109d06589c5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 06/22/2017 11:32 AM, YT Shen wrote:
-> This adds basic chip support for Mediatek 2712
+On 07/06/2017 08:43 AM, Zhi Mao wrote:
+> On Thu, 2017-07-06 at 14:16 +0800, Zhi Mao wrote:
+>> On Wed, 2017-07-05 at 13:09 +0200, Matthias Brugger wrote:
+>>>
+>>> On 06/30/2017 08:05 AM, Zhi Mao wrote:
+>>>> In original code, the pwm output frequency is not correct
+>>>> when set bit<3>=1 to PWMCON register.
+>>>>
+>>>> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+>>>> ---
+>>>>    drivers/pwm/pwm-mediatek.c |    2 +-
+>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+>>>> index 5c11bc7..d08b5b3 100644
+>>>> --- a/drivers/pwm/pwm-mediatek.c
+>>>> +++ b/drivers/pwm/pwm-mediatek.c
+>>>> @@ -91,7 +91,7 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>>>>    	if (clkdiv > 7)
+>>>>    		return -EINVAL;
+>>>>    
+>>>> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | clkdiv);
+>>>> +	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+>>>
+>>> Just for clarification, BIT(15) enables old PWM mode, which ignores
+>>> CLKSEL (BIT(3)). Therefore setting BIT(3) does not have any effect and
+>>> can be discarded.
+>>>
+>>> Am I correct? I took mt7623n datasheet for reference.
+>>>
+>>> Regards,
+>>> Matthias
+>>>
+>> Yes, remove setting bit<3> will not take any effect.
+>> PWMCON bit<3> is pwm source clock selecting register.
+>> You can check the datasheet of MT7623 for details.
+>>
+>> Regards
+>> Zhi
+>>
+> Hi Mattias,
 > 
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> ---
->   arch/arm64/boot/dts/mediatek/Makefile       |   1 +
->   arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  32 ++++++
->   arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 172 ++++++++++++++++++++++++++++
->   3 files changed, 205 insertions(+)
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> index 9fbfd32..fcc0604 100644
-> --- a/arch/arm64/boot/dts/mediatek/Makefile
-> +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> @@ -1,3 +1,4 @@
-> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
->   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
->   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
->   dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> new file mode 100644
-> index 0000000..8c804df
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Copyright (c) 2017 MediaTek Inc.
-> + * Author: YT Shen <yt.shen@mediatek.com>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> + */
-> +
-> +/dts-v1/;
-> +#include "mt2712e.dtsi"
-> +
-> +/ {
-> +	model = "MediaTek MT2712 evaluation board";
-> +	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	memory at 40000000 {
-> +		device_type = "memory";
-> +		reg = <0 0x40000000 0 0x80000000>;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:921600n8";
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> new file mode 100644
-> index 0000000..461ee0f
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> @@ -0,0 +1,172 @@
-> +/*
-> + * Copyright (c) 2017 MediaTek Inc.
-> + * Author: YT Shen <yt.shen@mediatek.com>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "mediatek,mt2712";
-> +	interrupt-parent = <&sysirq>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu-map {
-> +			cluster0 {
-> +				core0 {
-> +					cpu = <&cpu0>;
-> +				};
-> +				core1 {
-> +					cpu = <&cpu1>;
-> +				};
-> +			};
-> +
-> +			cluster1 {
-> +				core0 {
-> +					cpu = <&cpu2>;
-> +				};
-> +			};
-> +		};
-> +
-> +		cpu0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a35";
-> +			reg = <0x000>;
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a35";
-> +			reg = <0x001>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu2: cpu at 200 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a72";
-> +			reg = <0x200>;
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
-> +	uart_clk: dummy26m {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <26000000>;
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_PPI 13
-> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14
-> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11
-> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10
-> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
-> +	};
-> +
-> +	soc {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		compatible = "simple-bus";
-> +		ranges;
-> +
-> +		uart5: serial at 1000f000 {
-> +			compatible = "mediatek,mt2712-uart",
-> +				     "mediatek,mt6577-uart";
-> +			reg = <0 0x1000f000 0 0x400>;
-> +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&uart_clk>, <&uart_clk>;
-> +			clock-names = "baud", "bus";
-> +			status = "disabled";
-> +		};
+> Ignore the above reply, I explain this bit<3> issue for you.
+> In the data sheet of MT7623:
+> PWMCON bit<3> is PWM source clock selecting register
+> 0: CLK=CLKSRC
+> 1: CLK=CLKSRC/1625
+> for example,
+> bit<3>=0, PWM clk source is 26M
+> bit<3>=1, PWM clk source is 16K
+> The frequency of PWM output will based on this clock source
+> if set bit<3>=1, it will cause the frequency of PWM output is not
+> correct. I also use the oscilloscope device to measure the output,
+> set bit<3>=0, the output meet expectation.
+>   
 
-So baud and bus clock are both 26 MHz?
-
-Regards,
-Matthias
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
