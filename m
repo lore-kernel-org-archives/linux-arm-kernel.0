@@ -1,98 +1,103 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 11:58:55 -0500
-Subject: [RFC PATCH v2 29/38] KVM: arm64: Support a VM with VHE considering
- EL0 of the VHE host
+Date: Tue, 18 Jul 2017 11:58:46 -0500
+Subject: [RFC PATCH v2 20/38] KVM: arm64: Handle eret instruction traps
 In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
 References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1500397144-16232-30-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1500397144-16232-21-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On VHE systems, EL0 of the host kernel is considered as a part of 'VHE
-host'; The execution of EL0 is affected by system registers set by the
-VHE kernel including the hypervisor. To emulate this for a VM, we use
-the same set of system registers (i.e. shadow registers) for the virtual
-EL2 and EL0 execution.
+When HCR.NV bit is set, eret instructions trap to EL2 with EC code 0x1A.
+Emulate eret instructions by setting pc and pstate.
 
-Note that the assumption so far is that a hypervisor in a VM always runs
-in the virtual EL2, and the exception level change from/to the virtual
-EL2 always goes through the host hypervisor. With VHE support for a VM,
-however, the exception level can be changed from EL0 to virtual EL2
-without trapping to the host hypervisor. So, when returning from the VHE
-host mode, set the vcpu mode depending on the physical exception level.
+Note that the current exception level is always the virtual EL2, since
+we set HCR_EL2.NV bit only when entering the virtual EL2. So, we take
+spsr and elr states from the virtual _EL2 registers.
 
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- arch/arm64/kvm/context.c | 36 ++++++++++++++++++++++--------------
- 1 file changed, 22 insertions(+), 14 deletions(-)
+ arch/arm64/include/asm/esr.h |  1 +
+ arch/arm64/kvm/handle_exit.c | 16 ++++++++++++++++
+ arch/arm64/kvm/trace.h       | 21 +++++++++++++++++++++
+ 3 files changed, 38 insertions(+)
 
-diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
-index f3d3398..39bd92d 100644
---- a/arch/arm64/kvm/context.c
-+++ b/arch/arm64/kvm/context.c
-@@ -150,16 +150,18 @@ static void flush_shadow_special_regs(struct kvm_vcpu *vcpu)
- 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index e7d8e28..210fde6 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -43,6 +43,7 @@
+ #define ESR_ELx_EC_HVC64	(0x16)
+ #define ESR_ELx_EC_SMC64	(0x17)
+ #define ESR_ELx_EC_SYS64	(0x18)
++#define ESR_ELx_EC_ERET		(0x1A)
+ /* Unallocated EC: 0x19 - 0x1E */
+ #define ESR_ELx_EC_IMP_DEF	(0x1f)
+ #define ESR_ELx_EC_IABT_LOW	(0x20)
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 17d8a16..9259881 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -147,6 +147,21 @@ static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
+ }
  
- 	ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
--	/*
--	 * We can emulate the guest's configuration of which
--	 * stack pointer to use when executing in virtual EL2 by
--	 * using the equivalent feature in EL1 to point to
--	 * either the EL1 or EL0 stack pointer.
--	 */
--	if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
--		ctxt->hw_pstate |= PSR_MODE_EL1h;
--	else
--		ctxt->hw_pstate |= PSR_MODE_EL1t;
-+	if (vcpu_mode_el2(vcpu)) {
-+		/*
-+		 * We can emulate the guest's configuration of which
-+		 * stack pointer to use when executing in virtual EL2 by
-+		 * using the equivalent feature in EL1 to point to
-+		 * either the EL1 or EL0 stack pointer.
-+		 */
-+		if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
-+			ctxt->hw_pstate |= PSR_MODE_EL1h;
-+		else
-+			ctxt->hw_pstate |= PSR_MODE_EL1t;
-+	}
- 
- 	ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
- 	ctxt->hw_sp_el1 = vcpu_el2_sreg(vcpu, SP_EL2);
-@@ -182,8 +184,14 @@ static void sync_shadow_special_regs(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
- 
--	*vcpu_cpsr(vcpu) &= PSR_MODE_MASK;
--	*vcpu_cpsr(vcpu) |= ctxt->hw_pstate & ~PSR_MODE_MASK;
-+	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
-+	*vcpu_cpsr(vcpu) &= ~PSR_MODE_MASK;
-+	/* Set vcpu exception level depending on the physical EL */
-+	if ((ctxt->hw_pstate & PSR_MODE_MASK) == PSR_MODE_EL0t)
-+		*vcpu_cpsr(vcpu) |= PSR_MODE_EL0t;
-+	else
-+		*vcpu_cpsr(vcpu) |= PSR_MODE_EL2h;
++static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	trace_kvm_nested_eret(vcpu, vcpu_el2_sreg(vcpu, ELR_EL2),
++			      vcpu_el2_sreg(vcpu, SPSR_EL2));
 +
- 	vcpu_el2_sreg(vcpu, SP_EL2) = ctxt->hw_sp_el1;
- 	vcpu_el2_sreg(vcpu, ELR_EL2) = ctxt->hw_elr_el1;
- 	vcpu_el2_sreg(vcpu, SPSR_EL2) = ctxt->hw_spsr_el1;
-@@ -218,7 +226,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
++	/*
++	 * Note that the current exception level is always the virtual EL2,
++	 * since we set HCR_EL2.NV bit only when entering the virtual EL2.
++	 */
++	*vcpu_pc(vcpu) = vcpu_el2_sreg(vcpu, ELR_EL2);
++	*vcpu_cpsr(vcpu) = vcpu_el2_sreg(vcpu, SPSR_EL2);
++
++	return 1;
++}
++
+ static exit_handle_fn arm_exit_handlers[] = {
+ 	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
+ 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+@@ -160,6 +175,7 @@ static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	[ESR_ELx_EC_HVC64]	= handle_hvc,
+ 	[ESR_ELx_EC_SMC64]	= handle_smc,
+ 	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
++	[ESR_ELx_EC_ERET]	= kvm_handle_eret,
+ 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
+diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
+index 7c86cfb..5f40987 100644
+--- a/arch/arm64/kvm/trace.h
++++ b/arch/arm64/kvm/trace.h
+@@ -187,6 +187,27 @@
+ 	TP_printk("vcpu: %p, inject exception to vEL2: ESR_EL2 0x%lx, vector: 0x%016lx",
+ 		  __entry->vcpu, __entry->esr_el2, __entry->pc)
+ );
++
++TRACE_EVENT(kvm_nested_eret,
++	TP_PROTO(struct kvm_vcpu *vcpu, unsigned long elr_el2,
++		 unsigned long spsr_el2),
++	TP_ARGS(vcpu, elr_el2, spsr_el2),
++
++	TP_STRUCT__entry(
++		__field(struct kvm_vcpu *,	vcpu)
++		__field(unsigned long,		elr_el2)
++		__field(unsigned long,		spsr_el2)
++	),
++
++	TP_fast_assign(
++		__entry->vcpu = vcpu;
++		__entry->elr_el2 = elr_el2;
++		__entry->spsr_el2 = spsr_el2;
++	),
++
++	TP_printk("vcpu: %p, eret to elr_el2: 0x%016lx, with spsr_el2: 0x%08lx",
++		  __entry->vcpu, __entry->elr_el2, __entry->spsr_el2)
++);
+ #endif /* _TRACE_ARM64_KVM_H */
  
--	if (unlikely(vcpu_mode_el2(vcpu))) {
-+	if (unlikely(is_hyp_ctxt(vcpu))) {
- 		flush_shadow_special_regs(vcpu);
- 		flush_shadow_el1_sysregs(vcpu);
- 		flush_shadow_non_trap_el1_state(vcpu);
-@@ -236,7 +244,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
-  */
- void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
- {
--	if (unlikely(vcpu_mode_el2(vcpu))) {
-+	if (unlikely(is_hyp_ctxt(vcpu))) {
- 		sync_shadow_special_regs(vcpu);
- 		sync_shadow_non_trap_el1_state(vcpu);
- 	} else
+ #undef TRACE_INCLUDE_PATH
 -- 
 1.9.1
