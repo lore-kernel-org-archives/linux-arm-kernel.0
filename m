@@ -1,61 +1,113 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 18 Jul 2017 10:48:07 +0100
-Subject: [PATCH v4 10/18] coresight tmc: Handle configuration types properly
+Date: Tue, 18 Jul 2017 10:48:08 +0100
+Subject: [PATCH v4 11/18] coresight tmc etr: Add capabilitiy information
 In-Reply-To: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500371295-30472-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500371295-30472-12-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coresight SoC 600 defines a new configuration for TMC, Embedded Trace
-Streamer (ETS), indicated by 0x3 in MODE:CONFIG_TYPE. This would break
-the existing driver which will treat anything other than ETR/ETB as an
-ETF. Fix the driver to check the configuration type properly and also
-add a warning if we encounter an unsupported configuration (ETS).
+With new version of TMC ETR, there are differing set of
+features supported by the TMC. Add the capability of a
+given TMC ETR for making safer decisions at runtime.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+The device configuration register of the TMC (DEVID) lists
+some of the capabilities. So, we can detect some of them at
+probe. However, some of the features (or changes in behavior)
+are not advertised and we have to depend on the PID to infer
+the features. So we use a static description of the "unadvertised"
+capabilities attached to the PID. Combining both, the static
+and the dynamic capabilities, we maintain a bitmask of the
+available features which can be later checked to take
+appropriate actions.
+
+Cc: Mathieu Poirier <mathieu.porier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 20 +++++++++++++++-----
+ drivers/hwtracing/coresight/coresight-tmc.h | 20 ++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 6bf4170..73184a1 100644
+index 73184a1..ebf81bc 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -358,11 +358,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 	desc.dev = dev;
- 	desc.groups = coresight_tmc_groups;
+@@ -297,6 +297,20 @@ const struct attribute_group *coresight_tmc_groups[] = {
+ 	NULL,
+ };
  
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-+	switch (drvdata->config_type) {
-+	case TMC_CONFIG_TYPE_ETB:
- 		desc.type = CORESIGHT_DEV_TYPE_SINK;
- 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
- 		desc.ops = &tmc_etb_cs_ops;
--	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
-+		break;
-+	case TMC_CONFIG_TYPE_ETR:
++/* Detect and initialise the capabilities of a TMC ETR */
++static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
++			     u32 devid, void *dev_caps)
++{
++	/* Set the unadvertised capabilities */
++	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
++
++	/*
++	 * ETR configuration uses a 40-bit AXI master in place of
++	 * the embedded SRAM of ETB/ETF.
++	 */
++	return dma_set_mask_and_coherent(drvdata->dev, DMA_BIT_MASK(40));
++}
++
+ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	int ret = 0;
+@@ -368,11 +382,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
  		desc.type = CORESIGHT_DEV_TYPE_SINK;
  		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
  		desc.ops = &tmc_etr_cs_ops;
-@@ -373,10 +375,16 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
+-		/*
+-		 * ETR configuration uses a 40-bit AXI master in place of
+-		 * the embedded SRAM of ETB/ETF.
+-		 */
+-		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
++		ret = tmc_etr_setup_caps(drvdata, devid, id->data);
  		if (ret)
  			goto out;
--	} else {
-+		break;
-+	case TMC_CONFIG_TYPE_ETF:
- 		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
- 		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
- 		desc.ops = &tmc_etf_cs_ops;
-+		break;
-+	default:
-+		pr_err("%s: Unsupported TMC config\n", pdata->name);
-+		ret = -EINVAL;
-+		goto out;
- 	}
+ 		break;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index c78de00..7b20863 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -105,6 +105,8 @@ enum tmc_mem_intf_width {
+  * @config_type: TMC variant, must be of type @tmc_config_type.
+  * @memwidth:	width of the memory interface databus, in bytes.
+  * @trigger_cntr: amount of words to store after a trigger.
++ * @etr_caps:	Bitmask of capabilities of the TMC ETR, inferred from the
++ *		device configuration register (DEVID)
+  */
+ struct tmc_drvdata {
+ 	void __iomem		*base;
+@@ -122,6 +124,7 @@ struct tmc_drvdata {
+ 	enum tmc_config_type	config_type;
+ 	enum tmc_mem_intf_width	memwidth;
+ 	u32			trigger_cntr;
++	u32			etr_caps;
+ };
  
- 	drvdata->csdev = coresight_register(&desc);
+ /* Generic functions */
+@@ -158,4 +161,21 @@ TMC_REG_PAIR(rrp, TMC_RRP, TMC_RRPHI)
+ TMC_REG_PAIR(rwp, TMC_RWP, TMC_RWPHI)
+ TMC_REG_PAIR(dba, TMC_DBALO, TMC_DBAHI)
+ 
++/* Initialise the caps from unadvertised static capabilities of the device */
++static inline void tmc_etr_init_caps(struct tmc_drvdata *drvdata, u32 dev_caps)
++{
++	WARN_ON(drvdata->etr_caps);
++	drvdata->etr_caps = dev_caps;
++}
++
++static inline void tmc_etr_set_cap(struct tmc_drvdata *drvdata, u32 cap)
++{
++	drvdata->etr_caps |= cap;
++}
++
++static inline bool tmc_etr_has_cap(struct tmc_drvdata *drvdata, u32 cap)
++{
++	return !!(drvdata->etr_caps & cap);
++}
++
+ #endif
 -- 
 2.7.5
