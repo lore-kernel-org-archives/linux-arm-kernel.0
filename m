@@ -1,81 +1,72 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue, 18 Jul 2017 07:40:22 +0200
-Subject: [PATCH v2] ARM: dts: imx6: RIoTboard provide gpio-line-names
-Message-ID: <20170718054022.2867-1-o.rempel@pengutronix.de>
+From: colin.king@canonical.com (Colin King)
+Date: Tue, 18 Jul 2017 06:45:51 +0100
+Subject: [PATCH] soc: TI knav_qmss: Fix spelling mistake "instace" ->
+ "instance"
+Message-ID: <20170718054551.8536-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio-line-names may help to make work with GPIOs from user space easier.
-Following examples are provided with libgpiod
-https://github.com/brgl/libgpiod :
-|# Toggle a GPIO by name, then wait for the user to press ENTER.
-|$ gpioset --mode=wait `gpiofind "USR-LED-2"`=1
-|# Pause execution until a single event of any type occurs. Don't print
-|# anything. Find the line by name.
-|$ gpiomon --num-events=1 --silent `gpiofind "USR-IN"`
+From: Colin Ian King <colin.king@canonical.com>
 
-Used names was taken from RIoTboard schematics, version 1 (2013.12.07).
+Trivial fix to spelling mistake in dev_err messages and comments
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- arch/arm/boot/dts/imx6dl-riotboard.dts | 45 ++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ drivers/soc/ti/knav_dma.c  | 4 ++--
+ drivers/soc/ti/knav_qmss.h | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-index 2cb72824e800..3ecd3913280f 100644
---- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-@@ -101,6 +101,51 @@
- 	status = "okay";
+diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
+index 026182d3b27c..f463e04be412 100644
+--- a/drivers/soc/ti/knav_dma.c
++++ b/drivers/soc/ti/knav_dma.c
+@@ -431,7 +431,7 @@ void *knav_dma_open_channel(struct device *dev, const char *name,
+ 
+ 	chan_num = of_channel_match_helper(dev->of_node, name, &instance);
+ 	if (chan_num < 0) {
+-		dev_err(kdev->dev, "No DMA instace with name %s\n", name);
++		dev_err(kdev->dev, "No DMA instance with name %s\n", name);
+ 		return (void *)-EINVAL;
+ 	}
+ 
+@@ -454,7 +454,7 @@ void *knav_dma_open_channel(struct device *dev, const char *name,
+ 		}
+ 	}
+ 	if (!found) {
+-		dev_err(kdev->dev, "No DMA instace with name %s\n", instance);
++		dev_err(kdev->dev, "No DMA instance with name %s\n", instance);
+ 		return (void *)-EINVAL;
+ 	}
+ 
+diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
+index 905b974d1bdc..0cc29bd6c219 100644
+--- a/drivers/soc/ti/knav_qmss.h
++++ b/drivers/soc/ti/knav_qmss.h
+@@ -238,14 +238,14 @@ struct knav_pool {
  };
  
-+&gpio1 {
-+	gpio-line-names =
-+		"", "", "SD2_WP", "", "SD2_CD", "I2C3_SCL",
-+			"I2C3_SDA", "I2C4_SCL",
-+		"I2C4_SDA", "", "", "", "", "", "", "",
-+		"", "PWM3", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "";
-+};
-+
-+&gpio3 {
-+	gpio-line-names =
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "USB_OTG_VBUS", "",
-+		"UART3_TXD", "UART3_RXD", "", "", "EIM_D28", "", "", "";
-+};
-+
-+&gpio4 {
-+	gpio-line-names =
-+		"", "", "", "", "", "", "UART4_TXD", "UART4_RXD",
-+		"UART5_TXD", "UART5_RXD", "", "", "", "", "", "",
-+		"GPIO4_16", "GPIO4_17", "GPIO4_18", "GPIO4_19", "",
-+			"CSPI3_CLK", "CSPI3_MOSI", "CSPI3_MISO",
-+		"CSPI3_CS0", "CSPI3_CS1", "GPIO4_26", "GPIO4_27",
-+			"CSPI3_RDY", "PWM1", "PWM2", "GPIO4_31";
-+};
-+
-+&gpio5 {
-+	gpio-line-names =
-+		"", "", "EIM_A25", "", "", "GPIO5_05", "GPIO5_06",
-+			"GPIO5_07",
-+		"GPIO5_08", "CSPI2_CS1", "CSPI2_MOSI", "CSPI2_MISO",
-+			"CSPI2_CS0", "CSPI2_CLK", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "";
-+};
-+
-+&gpio7 {
-+	gpio-line-names =
-+		"SD3_CD", "SD3_WP", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "";
-+};
-+
- &hdmi {
- 	ddc-i2c-bus = <&i2c2>;
- 	status = "okay";
+ /**
+- * struct knav_queue_inst:		qmss queue instace properties
++ * struct knav_queue_inst:		qmss queue instance properties
+  * @descs:				descriptor pointer
+  * @desc_head, desc_tail, desc_count:	descriptor counters
+  * @acc:				accumulator channel pointer
+  * @kdev:				qmss device pointer
+  * @range:				range info
+  * @qmgr:				queue manager info
+- * @id:					queue instace id
++ * @id:					queue instance id
+  * @irq_num:				irq line number
+  * @notify_needed:			notifier needed based on queue type
+  * @num_notifiers:			total notifiers
+@@ -272,7 +272,7 @@ struct knav_queue_inst {
+ /**
+  * struct knav_queue:			qmss queue properties
+  * @reg_push, reg_pop, reg_peek:	push, pop queue registers
+- * @inst:				qmss queue instace properties
++ * @inst:				qmss queue instance properties
+  * @notifier_fn:			notifier function
+  * @notifier_fn_arg:			notifier function argument
+  * @notifier_enabled:			notier enabled for a give queue
 -- 
 2.11.0
