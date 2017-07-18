@@ -1,75 +1,41 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 18 Jul 2017 10:51:51 -0700
-Subject: [PATCH 0/5] earlycon hang under some conditions
-In-Reply-To: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <20170718175149.GA131686@google.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 19 Jul 2017 03:38:57 +0900
+Subject: [PATCH] kbuild: modpost: Warn about references from rodata to
+ __init text
+In-Reply-To: <20170630225822.25349-1-sboyd@codeaurora.org>
+References: <20170630225822.25349-1-sboyd@codeaurora.org>
+Message-ID: <CAK7LNAQgv5s8-2fo+qV9a29Fyj0m1nKA1WZzoJpYzhP6NAZ8wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
+2017-07-01 7:58 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
+> If we have a structure that's marked const it will be placed
+> into the .rodata section but it could reference an init section
+> function. Include the read only data section in the check we have
+> for read/write data sections referencing init sections so we can
+> find this class of problems. This exposes quite a few places
+> where const marked structures are referencing __init functions and
+> __init data that we were previously ignoring.
+>
+> Cc: Rob Clark <robdclark@gmail.com>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>
+> Making this change leads to quite a few other errors even on the
+> multi_v7_defconfig for ARM[1]. I still need to do a build of the
+> allmodconfig to see how many other errors there, but it seems to
+> be quite a few. I suppose those will need to be fixed before we can
+> merge this?
+>
+> [1] https://www.irccloud.com/pastebin/zzqfWGQY/
 
-On Tue, Jul 18, 2017 at 02:02:53PM +0800, Jeffy Chen wrote:
-> I was testing earlycon with 8250 dw serial console. And it hangs in
-> these cases:
-> 1/ kernel hang when calling early write function after free_initmem:
-> a) the earlycon not disabled after the init code(due to keep_bootcon or
->    not specify a real console to switch to)
-> b) the early write func is marked as __init, for example 8250_early.
+Applied to linux-kbuild/misc.  Thanks!
 
-FWIW, I tested 8250_early with "keep_bootcon", and this fixes that:
+Now people will notice the warnings in linux-next,
+and will start fixing drivers.
+We still have plenty of time until the next merge windows.  :-)
 
-Tested-by: Brian Norris <briannorris@chromium.org>
-
-But then I get double console, if I have both a "real" and "early"
-console.
-
-If I were to *only* have the early console, then I might hit the
-problems you mention:
-
-> 2/ kernel hang when calling early write function after disable unused
-> clks/pm domain:
-> a) the earlycon not disabled after the init code
-> b) the disable unused clks/pm domain kill the requiered clks/pm
->    domain, since they are not referenced by the earlycon.
-> 
-> 3/ kernel hang when calling early write function after the serial
->    console driver runtime suspended:
-> a) the earlycon not disabled after the init code
-> b) the serial console driver's runtime suspend kills the requiered
->    clks/pm domain, since they are not referenced by the earlycon.
-> 
-> This serial fix 1/ case only.
-
-Problems 2 and 3 look like something that's not really in scope for
-early consoles. There's a reason they are mainly supported for early
-boot, and we try to switch off of them. There isn't really a good way to
-handle all the clock and PM infrastructure without...switching off the
-earlycon and using the real one :)
-
-So, I guess this patchset has value for systems where the clock/PM
-requirements are simple enough, and the earlycon can actually be useful
-beyond early init.
-
-Brian
-
-> 
-> 
-> Jeffy Chen (5):
->   serial: arc: Remove __init marking from early write
->   serial: omap: Remove __init marking from early write
->   serial: xuartps: Remove __init marking from early write
->   serial: 8250_ingenic: Remove __init marking from early write
->   serial: 8250_early: Remove __init marking from early write
-> 
->  drivers/tty/serial/8250/8250_early.c   |  8 ++++----
->  drivers/tty/serial/8250/8250_ingenic.c |  8 ++++----
->  drivers/tty/serial/arc_uart.c          |  4 ++--
->  drivers/tty/serial/omap-serial.c       | 13 ++++++-------
->  drivers/tty/serial/xilinx_uartps.c     |  2 +-
->  5 files changed, 17 insertions(+), 18 deletions(-)
-> 
-> -- 
-> 2.1.4
-> 
-> 
+-- 
+Best Regards
+Masahiro Yamada
