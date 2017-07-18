@@ -1,47 +1,47 @@
 From: zhangshaokun@hisilicon.com (Shaokun Zhang)
-Date: Tue, 18 Jul 2017 15:59:58 +0800
-Subject: [PATCH v3 5/6] perf: hisi: Add support for HiSilicon SoC DDRC PMU
+Date: Tue, 18 Jul 2017 15:59:56 +0800
+Subject: [PATCH v3 3/6] perf: hisi: Add support for HiSilicon SoC L3C PMU
  driver
 In-Reply-To: <1500364799-90518-1-git-send-email-zhangshaokun@hisilicon.com>
 References: <1500364799-90518-1-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <1500364799-90518-6-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <1500364799-90518-4-git-send-email-zhangshaokun@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for DDRC PMU driver in HiSilicon SoC chip, Each
-DDRC has own control, counter and interrupt registers and is an separate
-PMU. For each DDRC PMU, it has 8-fixed-purpose counters which have been
-mapped to 8-events by hardware, it assumes that counter index is equal
-to event code (0 - 7) in DDRC PMU driver. Interrupt is supported to
-handle counter (32-bits) overflow.
+This patch adds support for L3C PMU driver in HiSilicon SoC chip, Each
+L3C has own control, counter and interrupt registers and is an separate
+PMU. For each L3C PMU, it has 8-programable counters and supports 0x60
+events, event code is 8-bits and every counter is free-running.
+Interrupt is supported to handle counter (48-bits) overflow.
 
 Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
 Signed-off-by: Anurup M <anurup.m@huawei.com>
 ---
- drivers/perf/hisilicon/Makefile               |   2 +-
- drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 437 ++++++++++++++++++++++++++
- 2 files changed, 438 insertions(+), 1 deletion(-)
- create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+ drivers/perf/hisilicon/Makefile              |   2 +-
+ drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c | 556 +++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h                   |   1 +
+ 3 files changed, 558 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
 
 diff --git a/drivers/perf/hisilicon/Makefile b/drivers/perf/hisilicon/Makefile
-index a72afe8..2621d51 100644
+index 2783bb3..4a3d3e6 100644
 --- a/drivers/perf/hisilicon/Makefile
 +++ b/drivers/perf/hisilicon/Makefile
 @@ -1 +1 @@
--obj-$(CONFIG_HISI_PMU) += hisi_uncore_pmu.o hisi_uncore_l3c_pmu.o hisi_uncore_hha_pmu.o
-+obj-$(CONFIG_HISI_PMU) += hisi_uncore_pmu.o hisi_uncore_l3c_pmu.o hisi_uncore_hha_pmu.o hisi_uncore_ddrc_pmu.o
-diff --git a/drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c b/drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+-obj-$(CONFIG_HISI_PMU) += hisi_uncore_pmu.o
++obj-$(CONFIG_HISI_PMU) += hisi_uncore_pmu.o hisi_uncore_l3c_pmu.o
+diff --git a/drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c b/drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
 new file mode 100644
-index 0000000..f362835
+index 0000000..d430508
 --- /dev/null
-+++ b/drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
-@@ -0,0 +1,437 @@
++++ b/drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
+@@ -0,0 +1,556 @@
 +/*
-+ * HiSilicon SoC DDRC uncore Hardware event counters support
++ * HiSilicon SoC L3C uncore Hardware event counters support
 + *
 + * Copyright (C) 2017 Hisilicon Limited
-+ * Author: Shaokun Zhang <zhangshaokun@hisilicon.com>
-+ *         Anurup M <anurup.m@huawei.com>
++ * Author: Anurup M <anurup.m@huawei.com>
++ *         Shaokun Zhang <zhangshaokun@hisilicon.com>
 + *
 + * This code is based on the uncore PMUs like arm-cci and arm-ccn.
 + *
@@ -59,191 +59,187 @@ index 0000000..f362835
 + */
 +#include <linux/acpi.h>
 +#include <linux/bitmap.h>
-+#include <linux/io.h>
++#include <linux/cpuhotplug.h>
 +#include <linux/module.h>
 +#include <linux/perf_event.h>
++#include <linux/topology.h>
 +#include "hisi_uncore_pmu.h"
 +
-+/* DDRC register definition */
-+#define DDRC_PERF_CTRL		0x010
-+#define DDRC_FLUX_WR		0x380
-+#define DDRC_FLUX_RD		0x384
-+#define DDRC_FLUX_WCMD          0x388
-+#define DDRC_FLUX_RCMD          0x38c
-+#define DDRC_PRE_CMD            0x3c0
-+#define DDRC_ACT_CMD            0x3c4
-+#define DDRC_BNK_CHG            0x3c8
-+#define DDRC_RNK_CHG            0x3cc
-+#define DDRC_EVENT_CTRL         0x6C0
-+#define DDRC_INT_MASK		0x6c8
-+#define DDRC_INT_STATUS		0x6cc
-+#define DDRC_INT_CLEAR		0x6d0
++/* L3C register definition */
++#define L3C_PERF_CTRL		0x0408
++#define L3C_INT_MASK		0x0800
++#define L3C_INT_STATUS		0x0808
++#define L3C_INT_CLEAR		0x080c
++#define L3C_EVENT_CTRL	        0x1c00
++#define L3C_EVENT_TYPE0		0x1d00
++#define L3C_CNTR0_LOWER		0x1e00
 +
-+/* DDRC supports 8-events and counter is fixed-purpose */
-+#define DDRC_NR_COUNTERS	0x8
-+#define DDRC_NR_EVENTS		DDRC_NR_COUNTERS
++/* L3C has 8-counters and supports 0x60 events */
++#define L3C_NR_COUNTERS		0x8
++#define L3C_NR_EVENTS		0x60
 +
-+#define DDRC_PERF_CTRL_EN	0x2
++#define L3C_PERF_CTRL_EN	0x20000
++#define L3C_EVTYPE_NONE		0xff
 +
 +/*
-+ * For DDRC PMU, there are eight-events and every event has been mapped
-+ * to fixed-purpose counters which register offset is not consistent.
-+ * Therefore there is no write event type and we assume that event
-+ * code (0 to 7) is equal to counter index in PMU driver.
-+ */
-+#define GET_DDRC_EVENTID(hwc)	(hwc->config_base & 0x7)
-+
-+static const u32 ddrc_reg_off[] = {
-+	DDRC_FLUX_WR, DDRC_FLUX_RD, DDRC_FLUX_WCMD, DDRC_FLUX_RCMD,
-+	DDRC_PRE_CMD, DDRC_ACT_CMD, DDRC_BNK_CHG, DDRC_RNK_CHG
-+};
-+
-+/*
-+ * Select the counter register offset using the counter index.
-+ * In DDRC there are no programmable counter, the count
-+ * is readed form the statistics counter register itself.
++ * Select the counter register offset using the counter index
++ * every counter is 48-bits and [48:63] is reserved.
 + */
 +static u32 get_counter_reg_off(int cntr_idx)
 +{
-+	return ddrc_reg_off[cntr_idx];
++	return (L3C_CNTR0_LOWER + (cntr_idx * 8));
 +}
 +
-+static u64 hisi_ddrc_pmu_read_counter(struct hisi_pmu *ddrc_pmu,
-+				      struct hw_perf_event *hwc)
++static u64 hisi_l3c_pmu_read_counter(struct hisi_pmu *l3c_pmu,
++				     struct hw_perf_event *hwc)
 +{
-+	/* Use event code as counter index */
-+	u32 idx = GET_DDRC_EVENTID(hwc);
++	u32 idx = hwc->idx;
 +	u32 reg;
 +
-+	if (!hisi_uncore_pmu_counter_valid(ddrc_pmu, idx)) {
-+		dev_err(ddrc_pmu->dev, "Unsupported event index:%d!\n", idx);
++	if (!hisi_uncore_pmu_counter_valid(l3c_pmu, idx)) {
++		dev_err(l3c_pmu->dev, "Unsupported event index:%d!\n", idx);
 +		return 0;
 +	}
 +
 +	reg = get_counter_reg_off(idx);
 +
-+	return readl(ddrc_pmu->base + reg);
++	/* Read 64-bits and the upper 16 bits are Read-As-Zero */
++	return readq(l3c_pmu->base + reg);
 +}
 +
-+static void hisi_ddrc_pmu_write_counter(struct hisi_pmu *ddrc_pmu,
-+					struct hw_perf_event *hwc, u64 val)
++static void hisi_l3c_pmu_write_counter(struct hisi_pmu *l3c_pmu,
++				       struct hw_perf_event *hwc, u64 val)
 +{
-+	u32 idx = GET_DDRC_EVENTID(hwc);
++	u32 idx = hwc->idx;
 +	u32 reg;
 +
-+	if (!hisi_uncore_pmu_counter_valid(ddrc_pmu, idx)) {
-+		dev_err(ddrc_pmu->dev, "Unsupported event index:%d!\n", idx);
++	if (!hisi_uncore_pmu_counter_valid(l3c_pmu, idx)) {
++		dev_err(l3c_pmu->dev, "Unsupported event index:%d!\n", idx);
 +		return;
 +	}
 +
 +	reg = get_counter_reg_off(idx);
-+	writel((u32)val, ddrc_pmu->base + reg);
++	/* Write 64-bits and the upper 16 bits are Writes-Ignored */
++	writeq(val, l3c_pmu->base + reg);
 +}
 +
-+static void hisi_ddrc_pmu_start_counters(struct hisi_pmu *ddrc_pmu)
++static void hisi_l3c_pmu_write_evtype(struct hisi_pmu *l3c_pmu, int idx,
++				      u32 type)
++{
++	u32 reg, reg_idx, shift, val;
++
++	/*
++	 * Select the appropriate event select register(L3C_EVENT_TYPE0/1).
++	 * There are 2 event select registers for the 8 hardware counters.
++	 * Event code is 8-bits and for the former 4 hardware counters,
++	 * L3C_EVENT_TYPE0 is chosen. For the latter 4 hardware counters,
++	 * L3C_EVENT_TYPE1 is chosen.
++	 */
++	reg = L3C_EVENT_TYPE0 + (idx / 4) * 4;
++	reg_idx = idx % 4;
++	shift = 8 * reg_idx;
++
++	/* Write event code to L3C_EVENT_TYPEx Register */
++	val = readl(l3c_pmu->base + reg);
++	val &= ~(L3C_EVTYPE_NONE << shift);
++	val |= (type << shift);
++	writel(val, l3c_pmu->base + reg);
++}
++
++static void hisi_l3c_pmu_start_counters(struct hisi_pmu *l3c_pmu)
 +{
 +	u32 val;
 +
-+	/* Set perf_enable in DDRC_PERF_CTRL to start event counting */
-+	val = readl(ddrc_pmu->base + DDRC_PERF_CTRL);
-+	val |= DDRC_PERF_CTRL_EN;
-+	writel(val, ddrc_pmu->base + DDRC_PERF_CTRL);
++	/*
++	 * Set perf_enable bit in L3C_PERF_CTRL register to start counting
++	 * for all enabled counters.
++	 */
++	val = readl(l3c_pmu->base + L3C_PERF_CTRL);
++	val |= L3C_PERF_CTRL_EN;
++	writel(val, l3c_pmu->base + L3C_PERF_CTRL);
 +}
 +
-+static void hisi_ddrc_pmu_stop_counters(struct hisi_pmu *ddrc_pmu)
++static void hisi_l3c_pmu_stop_counters(struct hisi_pmu *l3c_pmu)
 +{
 +	u32 val;
 +
-+	/* Clear perf_enable in DDRC_PERF_CTRL to stop event counting */
-+	val = readl(ddrc_pmu->base + DDRC_PERF_CTRL);
-+	val &= ~DDRC_PERF_CTRL_EN;
-+	writel(val, ddrc_pmu->base + DDRC_PERF_CTRL);
++	/*
++	 * Clear perf_enable bit in L3C_PERF_CTRL register to stop counting
++	 * for all enabled counters.
++	 */
++	val = readl(l3c_pmu->base + L3C_PERF_CTRL);
++	val &= ~(L3C_PERF_CTRL_EN);
++	writel(val, l3c_pmu->base + L3C_PERF_CTRL);
 +}
 +
-+static void hisi_ddrc_pmu_enable_counter(struct hisi_pmu *ddrc_pmu,
++static void hisi_l3c_pmu_enable_counter(struct hisi_pmu *l3c_pmu,
++					struct hw_perf_event *hwc)
++{
++	u32 val;
++
++	/* Enable counter index in L3C_EVENT_CTRL register */
++	val = readl(l3c_pmu->base + L3C_EVENT_CTRL);
++	val |= (1 << hwc->idx);
++	writel(val, l3c_pmu->base + L3C_EVENT_CTRL);
++}
++
++static void hisi_l3c_pmu_disable_counter(struct hisi_pmu *l3c_pmu,
 +					 struct hw_perf_event *hwc)
 +{
 +	u32 val;
 +
-+	/* Set counter index(event code) in DDRC_EVENT_CTRL register */
-+	val = readl(ddrc_pmu->base + DDRC_EVENT_CTRL);
-+	val |= (1 << GET_DDRC_EVENTID(hwc));
-+	writel(val, ddrc_pmu->base + DDRC_EVENT_CTRL);
++	/* Clear counter index in L3C_EVENT_CTRL register */
++	val = readl(l3c_pmu->base + L3C_EVENT_CTRL);
++	val &= ~(1 << hwc->idx);
++	writel(val, l3c_pmu->base + L3C_EVENT_CTRL);
 +}
 +
-+static void hisi_ddrc_pmu_disable_counter(struct hisi_pmu *ddrc_pmu,
-+					  struct hw_perf_event *hwc)
++static void hisi_l3c_pmu_enable_counter_int(struct hisi_pmu *l3c_pmu,
++					    struct hw_perf_event *hwc)
 +{
 +	u32 val;
 +
-+	/* Clear counter index(event code) in DDRC_EVENT_CTRL register */
-+	val = readl(ddrc_pmu->base + DDRC_EVENT_CTRL);
-+	val &= ~(1 << GET_DDRC_EVENTID(hwc));
-+	writel(val, ddrc_pmu->base + DDRC_EVENT_CTRL);
++	val = readl(l3c_pmu->base + L3C_INT_MASK);
++	/* Write 0 to enable interrupt */
++	val &= ~(1 << hwc->idx);
++	writel(val, l3c_pmu->base + L3C_INT_MASK);
 +}
 +
-+static int hisi_ddrc_pmu_get_event_idx(struct perf_event *event)
-+{
-+	struct hisi_pmu *ddrc_pmu = to_hisi_pmu(event->pmu);
-+	unsigned long *used_mask = ddrc_pmu->pmu_events.used_mask;
-+	struct hw_perf_event *hwc = &event->hw;
-+	/* For DDRC PMU, we use event code as counter index */
-+	int idx = GET_DDRC_EVENTID(hwc);
-+
-+	if (test_bit(idx, used_mask))
-+		return -EAGAIN;
-+
-+	set_bit(idx, used_mask);
-+
-+	return idx;
-+}
-+
-+static void hisi_ddrc_pmu_enable_counter_int(struct hisi_pmu *ddrc_pmu,
++static void hisi_l3c_pmu_disable_counter_int(struct hisi_pmu *l3c_pmu,
 +					     struct hw_perf_event *hwc)
 +{
 +	u32 val;
 +
-+	/* Write 0 to enable interrupt */
-+	val = readl(ddrc_pmu->base + DDRC_INT_MASK);
-+	val &= ~(1 << GET_DDRC_EVENTID(hwc));
-+	writel(val, ddrc_pmu->base + DDRC_INT_MASK);
-+}
-+
-+static void hisi_ddrc_pmu_disable_counter_int(struct hisi_pmu *ddrc_pmu,
-+					      struct hw_perf_event *hwc)
-+{
-+	u32 val;
-+
++	val = readl(l3c_pmu->base + L3C_INT_MASK);
 +	/* Write 1 to mask interrupt */
-+	val = readl(ddrc_pmu->base + DDRC_INT_MASK);
-+	val |= (1 << GET_DDRC_EVENTID(hwc));
-+	writel(val, ddrc_pmu->base + DDRC_INT_MASK);
++	val |= (1 << hwc->idx);
++	writel(val, l3c_pmu->base + L3C_INT_MASK);
 +}
 +
-+static irqreturn_t hisi_ddrc_pmu_isr(int irq, void *dev_id)
++static irqreturn_t hisi_l3c_pmu_isr(int irq, void *dev_id)
 +{
-+	struct hisi_pmu *ddrc_pmu = dev_id;
++	struct hisi_pmu *l3c_pmu = dev_id;
 +	struct perf_event *event;
 +	unsigned long overflown;
 +	u32 status;
 +	int idx;
 +
-+	/* Read the DDRC_INT_STATUS register */
-+	status = readl(ddrc_pmu->base + DDRC_INT_STATUS);
++	/* Read L3C_INT_STATUS register */
++	status = readl(l3c_pmu->base + L3C_INT_STATUS);
 +	if (!status)
 +		return IRQ_NONE;
 +	overflown = status;
 +
 +	/*
 +	 * Find the counter index which overflowed if the bit was set
-+	 * and handle it
++	 * and handle it.
 +	 */
-+	for_each_set_bit(idx, &overflown, DDRC_NR_COUNTERS) {
++	for_each_set_bit(idx, &overflown, L3C_NR_COUNTERS) {
 +		/* Write 1 to clear the IRQ status flag */
-+		writel((1 << idx), ddrc_pmu->base + DDRC_INT_CLEAR);
++		writel((1 << idx), l3c_pmu->base + L3C_INT_CLEAR);
 +
 +		/* Get the corresponding event struct */
-+		event = ddrc_pmu->pmu_events.hw_events[idx];
++		event = l3c_pmu->pmu_events.hw_events[idx];
 +		if (!event)
 +			continue;
 +
@@ -254,8 +250,8 @@ index 0000000..f362835
 +	return IRQ_HANDLED;
 +}
 +
-+static int hisi_ddrc_pmu_init_irq(struct hisi_pmu *ddrc_pmu,
-+				  struct platform_device *pdev)
++static int hisi_l3c_pmu_init_irq(struct hisi_pmu *l3c_pmu,
++				 struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
 +	int irq, ret;
@@ -263,171 +259,263 @@ index 0000000..f362835
 +	/* Read and init IRQ */
 +	irq = platform_get_irq(pdev, 0);
 +	if (irq < 0) {
-+		dev_err(dev, "irq init: fail map DDRC overflow interrupt\n");
++		dev_err(dev, "irq init: fail L3C overflow interrupt\n");
 +		return irq;
 +	}
 +
-+	ret = devm_request_irq(dev, irq, hisi_ddrc_pmu_isr,
++	ret = devm_request_irq(dev, irq, hisi_l3c_pmu_isr,
 +			       IRQF_NOBALANCING | IRQF_NO_THREAD,
-+			       dev_name(dev), ddrc_pmu);
++			       dev_name(dev), l3c_pmu);
 +	if (ret < 0) {
 +		dev_err(dev, "Fail to request IRQ:%d ret:%d\n", irq, ret);
 +		return ret;
 +	}
 +
 +	/* Overflow interrupt also should use the same CPU */
-+	WARN_ON(irq_set_affinity(irq, &ddrc_pmu->cpus));
++	WARN_ON(irq_set_affinity(irq, &l3c_pmu->cpus));
 +
 +	return 0;
 +}
 +
-+static const struct acpi_device_id hisi_ddrc_pmu_acpi_match[] = {
-+	{ "HISI0233", },
++/* Check if the CPU belongs to the SCCL and CCL of PMU */
++static bool hisi_l3c_is_cpu_in_ccl(struct hisi_pmu *l3c_pmu)
++{
++	u32 ccl_id, scl_id;
++
++	/* Read Super CPU cluster ID from CPU MPIDR_EL1 */
++	hisi_read_scl_and_ccl_id(&scl_id, &ccl_id);
++
++	/* Check if the CPU match with the SCCL and CCL */
++	if (scl_id != l3c_pmu->scl_id)
++		return false;
++	if (ccl_id != l3c_pmu->ccl_id)
++		return false;
++
++	/* Return true if matched */
++	return true;
++}
++
++static int hisi_l3c_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
++{
++	struct hisi_pmu *l3c_pmu;
++
++	l3c_pmu = hlist_entry_safe(node, struct hisi_pmu, node);
++
++	/* Proceed only when CPU belongs to the same SCCL and CCL */
++	if (!hisi_l3c_is_cpu_in_ccl(l3c_pmu))
++		return 0;
++
++	/* If another CPU is already managing the CPU cluster, simply return */
++	if (!cpumask_empty(&l3c_pmu->cpus))
++		return 0;
++
++	/* Use this CPU for event counting in the CCL */
++	cpumask_set_cpu(cpu, &l3c_pmu->cpus);
++
++	return 0;
++}
++
++static int hisi_l3c_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
++{
++	struct hisi_pmu *l3c_pmu;
++	cpumask_t ccl_online_cpus;
++	unsigned int target;
++
++	l3c_pmu = hlist_entry_safe(node, struct hisi_pmu, node);
++
++	/* Proceed only when CPU belongs to the same SCCL and CCL */
++	if (!hisi_l3c_is_cpu_in_ccl(l3c_pmu))
++		return 0;
++
++	/* Proceed if this CPU is used for event counting */
++	if (!cpumask_test_cpu(cpu, &l3c_pmu->cpus))
++		return 0;
++
++	/* Give up ownership of CCL */
++	cpumask_test_and_clear_cpu(cpu, &l3c_pmu->cpus);
++
++	/* Any other CPU for this CCL which is still online */
++	cpumask_and(&ccl_online_cpus, cpu_coregroup_mask(cpu),
++		    cpu_online_mask);
++	target = cpumask_any_but(&ccl_online_cpus, cpu);
++	if (target >= nr_cpu_ids)
++		return 0;
++
++	perf_pmu_migrate_context(&l3c_pmu->pmu, cpu, target);
++	/* Use this CPU for event counting in the CCL */
++	cpumask_set_cpu(target, &l3c_pmu->cpus);
++
++	return 0;
++}
++
++static const struct acpi_device_id hisi_l3c_pmu_acpi_match[] = {
++	{ "HISI0213", },
 +	{},
 +};
-+MODULE_DEVICE_TABLE(acpi, hisi_ddrc_pmu_acpi_match);
++MODULE_DEVICE_TABLE(acpi, hisi_l3c_pmu_acpi_match);
 +
-+static int hisi_ddrc_pmu_init_data(struct platform_device *pdev,
-+				   struct hisi_pmu *ddrc_pmu)
++static int hisi_l3c_pmu_init_data(struct platform_device *pdev,
++				  struct hisi_pmu *l3c_pmu)
 +{
 +	struct device *dev = &pdev->dev;
 +	struct resource *res;
++	unsigned long long id;
++	acpi_status status;
 +
-+	/* Get the DDRC Channel ID */
-+	if (device_property_read_u32(dev, "hisilicon,ch-id",
-+				     &ddrc_pmu->ddrc_chn_id)) {
-+		dev_err(dev, "Can not read ddrc ch-id!\n");
++	status = acpi_evaluate_integer(ACPI_HANDLE(dev), "_UID", NULL, &id);
++	if (ACPI_FAILURE(status))
++		return false;
++	l3c_pmu->l3c_tag_id = id;
++
++	/* Get the L3C SCCL ID */
++	if (device_property_read_u32(dev, "hisilicon,scl-id",
++				     &l3c_pmu->scl_id)) {
++		dev_err(dev, "Can not read l3c scl-id!\n");
 +		return -EINVAL;
 +	}
 +
-+	/* Get the DDRC SCCL ID */
-+	if (device_property_read_u32(dev, "hisilicon,scl-id",
-+				     &ddrc_pmu->scl_id)) {
-+		dev_err(dev, "Can not read ddrc scl-id!\n");
++	/* Get the L3C CPU cluster(CCL) ID */
++	if (device_property_read_u32(dev, "hisilicon,ccl-id",
++				     &l3c_pmu->ccl_id)) {
++		dev_err(dev, "Can not read l3c ccl-id!\n");
 +		return -EINVAL;
 +	}
 +
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	ddrc_pmu->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(ddrc_pmu->base)) {
-+		dev_err(dev, "ioremap failed for ddrc_pmu resource\n");
-+		return PTR_ERR(ddrc_pmu->base);
++	l3c_pmu->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(l3c_pmu->base)) {
++		dev_err(dev, "ioremap failed for l3c_pmu resource\n");
++		return PTR_ERR(l3c_pmu->base);
 +	}
 +
 +	return 0;
 +}
 +
-+static struct attribute *hisi_ddrc_pmu_format_attr[] = {
-+	HISI_PMU_FORMAT_ATTR(event, "config:0-4"),
++static struct attribute *hisi_l3c_pmu_format_attr[] = {
++	HISI_PMU_FORMAT_ATTR(event, "config:0-7"),
 +	NULL,
 +};
 +
-+static const struct attribute_group hisi_ddrc_pmu_format_group = {
++static const struct attribute_group hisi_l3c_pmu_format_group = {
 +	.name = "format",
-+	.attrs = hisi_ddrc_pmu_format_attr,
++	.attrs = hisi_l3c_pmu_format_attr,
 +};
 +
-+static struct attribute *hisi_ddrc_pmu_events_attr[] = {
-+	HISI_PMU_EVENT_ATTR(flux_wr,		0x00),
-+	HISI_PMU_EVENT_ATTR(flux_rd,		0x01),
-+	HISI_PMU_EVENT_ATTR(flux_wcmd,		0x02),
-+	HISI_PMU_EVENT_ATTR(flux_rcmd,		0x03),
-+	HISI_PMU_EVENT_ATTR(pre_cmd,		0x04),
-+	HISI_PMU_EVENT_ATTR(act_cmd,		0x05),
-+	HISI_PMU_EVENT_ATTR(rnk_chg,		0x06),
-+	HISI_PMU_EVENT_ATTR(rw_chg,		0x07),
++static struct attribute *hisi_l3c_pmu_events_attr[] = {
++	HISI_PMU_EVENT_ATTR(rd_cpipe,		0x00),
++	HISI_PMU_EVENT_ATTR(wr_cpipe,		0x01),
++	HISI_PMU_EVENT_ATTR(rd_hit_cpipe,	0x02),
++	HISI_PMU_EVENT_ATTR(wr_hit_cpipe,	0x03),
++	HISI_PMU_EVENT_ATTR(victim_num,		0x04),
++	HISI_PMU_EVENT_ATTR(rd_spipe,		0x20),
++	HISI_PMU_EVENT_ATTR(wr_spipe,		0x21),
++	HISI_PMU_EVENT_ATTR(rd_hit_spipe,	0x22),
++	HISI_PMU_EVENT_ATTR(wr_hit_spipe,	0x23),
++	HISI_PMU_EVENT_ATTR(back_invalid,	0x29),
++	HISI_PMU_EVENT_ATTR(retry_cpu,		0x40),
++	HISI_PMU_EVENT_ATTR(retry_ring,		0x41),
++	HISI_PMU_EVENT_ATTR(prefetch_drop,	0x42),
 +	NULL,
 +};
 +
-+static const struct attribute_group hisi_ddrc_pmu_events_group = {
++static const struct attribute_group hisi_l3c_pmu_events_group = {
 +	.name = "events",
-+	.attrs = hisi_ddrc_pmu_events_attr,
++	.attrs = hisi_l3c_pmu_events_attr,
 +};
 +
-+static struct attribute *hisi_ddrc_pmu_attrs[] = {
++static struct attribute *hisi_l3c_pmu_attrs[] = {
 +	NULL,
 +};
 +
-+static const struct attribute_group hisi_ddrc_pmu_attr_group = {
-+	.attrs = hisi_ddrc_pmu_attrs,
++static const struct attribute_group hisi_l3c_pmu_attr_group = {
++	.attrs = hisi_l3c_pmu_attrs,
 +};
 +
 +static DEVICE_ATTR(cpumask, 0444, hisi_cpumask_sysfs_show, NULL);
 +
-+static struct attribute *hisi_ddrc_pmu_cpumask_attrs[] = {
++static struct attribute *hisi_l3c_pmu_cpumask_attrs[] = {
 +	&dev_attr_cpumask.attr,
 +	NULL,
 +};
 +
-+static const struct attribute_group hisi_ddrc_pmu_cpumask_attr_group = {
-+	.attrs = hisi_ddrc_pmu_cpumask_attrs,
++static const struct attribute_group hisi_l3c_pmu_cpumask_attr_group = {
++	.attrs = hisi_l3c_pmu_cpumask_attrs,
 +};
 +
-+static const struct attribute_group *hisi_ddrc_pmu_attr_groups[] = {
-+	&hisi_ddrc_pmu_attr_group,
-+	&hisi_ddrc_pmu_format_group,
-+	&hisi_ddrc_pmu_events_group,
-+	&hisi_ddrc_pmu_cpumask_attr_group,
++static const struct attribute_group *hisi_l3c_pmu_attr_groups[] = {
++	&hisi_l3c_pmu_attr_group,
++	&hisi_l3c_pmu_format_group,
++	&hisi_l3c_pmu_events_group,
++	&hisi_l3c_pmu_cpumask_attr_group,
 +	NULL,
 +};
 +
-+static const struct hisi_uncore_ops hisi_uncore_ddrc_ops = {
-+	.get_event_idx		= hisi_ddrc_pmu_get_event_idx,
-+	.start_counters		= hisi_ddrc_pmu_start_counters,
-+	.stop_counters		= hisi_ddrc_pmu_stop_counters,
-+	.enable_counter		= hisi_ddrc_pmu_enable_counter,
-+	.disable_counter	= hisi_ddrc_pmu_disable_counter,
-+	.enable_counter_int	= hisi_ddrc_pmu_enable_counter_int,
-+	.disable_counter_int	= hisi_ddrc_pmu_disable_counter_int,
-+	.write_counter		= hisi_ddrc_pmu_write_counter,
-+	.read_counter		= hisi_ddrc_pmu_read_counter,
++static const struct hisi_uncore_ops hisi_uncore_l3c_ops = {
++	.write_evtype		= hisi_l3c_pmu_write_evtype,
++	.get_event_idx		= hisi_uncore_pmu_get_event_idx,
++	.start_counters		= hisi_l3c_pmu_start_counters,
++	.stop_counters		= hisi_l3c_pmu_stop_counters,
++	.enable_counter		= hisi_l3c_pmu_enable_counter,
++	.disable_counter	= hisi_l3c_pmu_disable_counter,
++	.enable_counter_int	= hisi_l3c_pmu_enable_counter_int,
++	.disable_counter_int	= hisi_l3c_pmu_disable_counter_int,
++	.write_counter		= hisi_l3c_pmu_write_counter,
++	.read_counter		= hisi_l3c_pmu_read_counter,
 +};
 +
-+static int hisi_ddrc_pmu_dev_probe(struct platform_device *pdev,
-+				   struct hisi_pmu *ddrc_pmu)
++static int hisi_l3c_pmu_dev_probe(struct platform_device *pdev,
++				  struct hisi_pmu *l3c_pmu)
 +{
 +	struct device *dev = &pdev->dev;
 +	int ret;
 +
-+	ret = hisi_ddrc_pmu_init_data(pdev, ddrc_pmu);
++	ret = hisi_l3c_pmu_init_data(pdev, l3c_pmu);
 +	if (ret)
 +		return ret;
 +
-+	/* Pick one core to use for cpumask attributes */
-+	cpumask_set_cpu(smp_processor_id(), &ddrc_pmu->cpus);
-+
-+	ret = hisi_ddrc_pmu_init_irq(ddrc_pmu, pdev);
-+	if (ret)
++	ret = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_HISI_L3_ONLINE,
++				       &l3c_pmu->node);
++	if (ret) {
++		dev_err(dev, "Error %d registering hotplug", ret);
 +		return ret;
++	}
 +
-+	ddrc_pmu->name = devm_kasprintf(dev, GFP_KERNEL, "hisi_ddrc%u_%u",
-+					ddrc_pmu->ddrc_chn_id,
-+					ddrc_pmu->scl_id);
-+	ddrc_pmu->num_events = DDRC_NR_EVENTS;
-+	ddrc_pmu->num_counters = DDRC_NR_COUNTERS;
-+	ddrc_pmu->counter_bits = 32;
-+	ddrc_pmu->ops = &hisi_uncore_ddrc_ops;
-+	ddrc_pmu->dev = dev;
++	ret = hisi_l3c_pmu_init_irq(l3c_pmu, pdev);
++	if (ret)
++		goto fail;
++
++	l3c_pmu->name = devm_kasprintf(dev, GFP_KERNEL, "hisi_l3c%u_%u",
++				       l3c_pmu->l3c_tag_id, l3c_pmu->scl_id);
++	l3c_pmu->num_events = L3C_NR_EVENTS;
++	l3c_pmu->num_counters = L3C_NR_COUNTERS;
++	l3c_pmu->counter_bits = 48;
++	l3c_pmu->ops = &hisi_uncore_l3c_ops;
++	l3c_pmu->dev = dev;
 +
 +	return 0;
++
++fail:
++	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_HISI_L3_ONLINE,
++				    &l3c_pmu->node);
++	return ret;
 +}
 +
-+static int hisi_ddrc_pmu_probe(struct platform_device *pdev)
++static int hisi_l3c_pmu_probe(struct platform_device *pdev)
 +{
-+	struct hisi_pmu *ddrc_pmu;
++	struct hisi_pmu *l3c_pmu;
 +	struct device *dev = &pdev->dev;
 +	int ret;
 +
-+	ddrc_pmu = hisi_pmu_alloc(dev, DDRC_NR_COUNTERS);
-+	if (!ddrc_pmu)
++	l3c_pmu = hisi_pmu_alloc(dev, L3C_NR_COUNTERS);
++	if (!l3c_pmu)
 +		return -ENOMEM;
 +
-+	ret = hisi_ddrc_pmu_dev_probe(pdev, ddrc_pmu);
++	ret = hisi_l3c_pmu_dev_probe(pdev, l3c_pmu);
 +	if (ret)
 +		return ret;
 +
-+	ddrc_pmu->pmu = (struct pmu) {
-+		.name		= ddrc_pmu->name,
++	l3c_pmu->pmu = (struct pmu) {
++		.name		= l3c_pmu->name,
 +		.task_ctx_nr	= perf_invalid_context,
 +		.event_init	= hisi_uncore_pmu_event_init,
 +		.pmu_enable	= hisi_uncore_pmu_enable,
@@ -437,41 +525,84 @@ index 0000000..f362835
 +		.start		= hisi_uncore_pmu_start,
 +		.stop		= hisi_uncore_pmu_stop,
 +		.read		= hisi_uncore_pmu_read,
-+		.attr_groups	= hisi_ddrc_pmu_attr_groups,
++		.attr_groups	= hisi_l3c_pmu_attr_groups,
 +	};
 +
-+	ret = hisi_uncore_pmu_setup(ddrc_pmu, ddrc_pmu->name);
++	ret = hisi_uncore_pmu_setup(l3c_pmu, l3c_pmu->name);
 +	if (ret) {
-+		dev_err(ddrc_pmu->dev, "hisi_uncore_pmu_setup failed!\n");
++		dev_err(l3c_pmu->dev, "hisi_uncore_pmu_setup failed!\n");
++		cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_HISI_L3_ONLINE,
++					    &l3c_pmu->node);
 +		return ret;
 +	}
 +
-+	platform_set_drvdata(pdev, ddrc_pmu);
++	platform_set_drvdata(pdev, l3c_pmu);
 +
 +	return 0;
 +}
 +
-+static int hisi_ddrc_pmu_remove(struct platform_device *pdev)
++static int hisi_l3c_pmu_remove(struct platform_device *pdev)
 +{
-+	struct hisi_pmu *ddrc_pmu = platform_get_drvdata(pdev);
++	struct hisi_pmu *l3c_pmu = platform_get_drvdata(pdev);
 +
-+	perf_pmu_unregister(&ddrc_pmu->pmu);
++	perf_pmu_unregister(&l3c_pmu->pmu);
++	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_HISI_L3_ONLINE,
++				    &l3c_pmu->node);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver hisi_ddrc_pmu_driver = {
++static struct platform_driver hisi_l3c_pmu_driver = {
 +	.driver = {
-+		.name = "hisi_ddrc_pmu",
-+		.acpi_match_table = ACPI_PTR(hisi_ddrc_pmu_acpi_match),
++		.name = "hisi_l3c_pmu",
++		.acpi_match_table = ACPI_PTR(hisi_l3c_pmu_acpi_match),
 +	},
-+	.probe = hisi_ddrc_pmu_probe,
-+	.remove = hisi_ddrc_pmu_remove,
++	.probe = hisi_l3c_pmu_probe,
++	.remove = hisi_l3c_pmu_remove,
 +};
-+module_platform_driver(hisi_ddrc_pmu_driver);
 +
-+MODULE_DESCRIPTION("HiSilicon SoC DDRC uncore PMU driver");
++static int __init hisi_l3c_pmu_module_init(void)
++{
++	int ret;
++
++	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_HISI_L3_ONLINE,
++				      "AP_PERF_ARM_HISI_L3_ONLINE",
++				      hisi_l3c_pmu_online_cpu,
++				      hisi_l3c_pmu_offline_cpu);
++	if (ret) {
++		pr_err("l3c_pmu_module_init: Error setup hotplug, ret=%d", ret);
++		return ret;
++	}
++
++	ret = platform_driver_register(&hisi_l3c_pmu_driver);
++	if (ret)
++		cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_HISI_L3_ONLINE);
++
++	return ret;
++}
++module_init(hisi_l3c_pmu_module_init);
++
++static void __exit hisi_l3c_pmu_module_exit(void)
++{
++	cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_HISI_L3_ONLINE);
++	platform_driver_unregister(&hisi_l3c_pmu_driver);
++}
++module_exit(hisi_l3c_pmu_module_exit);
++
++MODULE_DESCRIPTION("HiSilicon SoC L3C uncore PMU driver");
 +MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Shaokun Zhang, Anurup M");
++MODULE_AUTHOR("Anurup M, Shaokun Zhang");
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index b56573b..2eab157 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -136,6 +136,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_S390_SF_ONLINE,
+ 	CPUHP_AP_PERF_ARM_CCI_ONLINE,
+ 	CPUHP_AP_PERF_ARM_CCN_ONLINE,
++	CPUHP_AP_PERF_ARM_HISI_L3_ONLINE,
+ 	CPUHP_AP_PERF_ARM_L2X0_ONLINE,
+ 	CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
+ 	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
 -- 
 1.9.1
