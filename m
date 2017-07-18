@@ -1,88 +1,93 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 11:59:01 -0500
-Subject: [RFC PATCH v2 35/38] KVM: arm64: Respect the virtual HCR_EL2.NV bit
- setting for EL12 register traps
+Date: Tue, 18 Jul 2017 11:58:59 -0500
+Subject: [RFC PATCH v2 33/38] KVM: arm64: Emulate appropriate VM control
+ system registers
 In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
 References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1500397144-16232-36-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1500397144-16232-34-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to EL2 register accesses, setting NV bit will also make EL12
-register accesses trap to EL2. To emulate this for the virtual EL2,
-forword traps due to EL12 register accessses to the virtual EL2 if the
-virtual HCR_EL2.NV bit is set.
-
-This is for recursive nested virtualization.
+Now that the virtual EL2 can access EL2 register states via EL1
+registers, we need to consider it when selecting the register to
+emulate.
 
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 46 ++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 44 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 4fd7090..3559cf7 100644
+index 79980be..910b50d 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -149,6 +149,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
- 	int i;
- 	const struct el1_el2_map *map;
+@@ -110,6 +110,31 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
  
-+	if (el12_reg(p) && forward_nv_traps(vcpu))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++struct el1_el2_map {
++	int	el1;
++	int	el2;
++};
 +
- 	/*
- 	 * Redirect EL1 register accesses to the corresponding EL2 registers if
- 	 * they are meant to access EL2 registers.
-@@ -959,6 +962,9 @@ static bool access_cntkctl_el12(struct kvm_vcpu *vcpu,
- 			 struct sys_reg_params *p,
- 			 const struct sys_reg_desc *r)
- {
-+	if (forward_nv_traps(vcpu))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++static const struct el1_el2_map vm_map[] = {
++	{SCTLR_EL1, SCTLR_EL2},
++	{TTBR0_EL1, TTBR0_EL2},
++	{TTBR1_EL1, TTBR1_EL2},
++	{TCR_EL1, TCR_EL2},
++	{ESR_EL1, ESR_EL2},
++	{FAR_EL1, FAR_EL2},
++	{AFSR0_EL1, AFSR0_EL2},
++	{AFSR1_EL1, AFSR1_EL2},
++	{MAIR_EL1, MAIR_EL2},
++	{AMAIR_EL1, AMAIR_EL2},
++	{CONTEXTIDR_EL1, CONTEXTIDR_EL2},
++};
 +
- 	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
- 	return true;
- }
-@@ -1005,6 +1011,9 @@ static bool access_elr(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
-+	if (el12_reg(p) && forward_nv_traps(vcpu))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++static inline bool el12_reg(struct sys_reg_params *p)
++{
++	/* All *_EL12 registers have Op1=5. */
++	return (p->Op1 == 5);
++}
 +
- 	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
- 	return true;
- }
-@@ -1013,6 +1022,9 @@ static bool access_spsr(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
+ /*
+  * Generic accessor for VM registers. Only called as long as HCR_TVM
+  * is set. If the guest enables the MMU, we stop trapping the VM
+@@ -120,16 +145,33 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+ 			  const struct sys_reg_desc *r)
  {
-+	if (el12_reg(p) && forward_nv_traps(vcpu))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+ 	bool was_enabled = vcpu_has_cache_enabled(vcpu);
++	u64 *sysreg = &vcpu_sys_reg(vcpu, r->reg);
++	int i;
++	const struct el1_el2_map *map;
 +
- 	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
- 	return true;
- }
-@@ -1021,6 +1033,9 @@ static bool access_vbar(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
-+	if (el12_reg(p) && forward_nv_traps(vcpu))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
- 	return true;
- }
-@@ -1031,6 +1046,9 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
- {
- 	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
++	/*
++	 * Redirect EL1 register accesses to the corresponding EL2 registers if
++	 * they are meant to access EL2 registers.
++	 */
++	if (vcpu_el2_e2h_is_set(vcpu) && !el12_reg(p)) {
++		for (i = 0; i < ARRAY_SIZE(vm_map); i++) {
++			map = &vm_map[i];
++			if (map->el1 == r->reg) {
++				sysreg = &vcpu_sys_reg(vcpu, map->el2);
++				break;
++			}
++		}
++	}
  
-+	if (el12_reg(p) && forward_nv_traps(vcpu))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	/*
- 	 * When the virtual HCR_EL2.E2H == 1, an access to CPACR_EL1
- 	 * in the virtual EL2 is to access CPTR_EL2.
+ 	BUG_ON(!vcpu_mode_el2(vcpu) && !p->is_write);
+ 
+ 	if (!p->is_write) {
+-		p->regval = vcpu_sys_reg(vcpu, r->reg);
++		p->regval = *sysreg;
+ 		return true;
+ 	}
+ 
+ 	if (!p->is_aarch32) {
+-		vcpu_sys_reg(vcpu, r->reg) = p->regval;
++		*sysreg = p->regval;
+ 	} else {
+ 		if (!p->is_32bit)
+ 			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
 -- 
 1.9.1
