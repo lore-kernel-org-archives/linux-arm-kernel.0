@@ -1,247 +1,51 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 18 Jul 2017 14:01:45 +0800
-Subject: [PATCH v5 3/3] dt-bindings: cpufreq: enhance MediaTek cpufreq
- dt-binding document
-In-Reply-To: <cover.1500355954.git.sean.wang@mediatek.com>
-References: <cover.1500355954.git.sean.wang@mediatek.com>
-Message-ID: <b89218d70ab6119991c1bc32194fa6563f15e0ec.1500355954.git.sean.wang@mediatek.com>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Tue, 18 Jul 2017 15:10:25 +0900
+Subject: [PATCH] arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
+In-Reply-To: <CAK7LNAQiUn_NbFAbf4jQuhXGk7CXw4hBDimWTi_hNh4x0MPiPQ@mail.gmail.com>
+References: <1500355472-27521-1-git-send-email-hayashibara.keiji@socionext.com>
+ <CAK7LNAQiUn_NbFAbf4jQuhXGk7CXw4hBDimWTi_hNh4x0MPiPQ@mail.gmail.com>
+Message-ID: <000001d2ff8c$8c170970$a4451c50$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hello Yamada-san,
 
-Update binding document with adding operating-points-v2 as the required
-property and the cooling level as the optional properties and adding more
-examples guiding people how to use MediaTek cpufreq driver for MediaTek
-SoCs.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/cpufreq/cpufreq-mediatek.txt          | 170 ++++++++++++++++++++-
- 1 file changed, 167 insertions(+), 3 deletions(-)
+> From: Masahiro Yamada [mailto:yamada.masahiro at socionext.com]
+> Sent: Tuesday, July 18, 2017 2:51 PM
+> Subject: Re: [PATCH] arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
+> 
+> 2017-07-18 14:24 GMT+09:00 Keiji Hayashibara <hayashibara.keiji@socionext.com>:
+> > Enable the watchdog driver for UniPhier SoC
+> >
+> > Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+> > ---
+> >  arch/arm64/configs/defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > index 6c7d147..5d204a4 100644
+> > --- a/arch/arm64/configs/defconfig
+> > +++ b/arch/arm64/configs/defconfig
+> > @@ -310,6 +310,7 @@ CONFIG_WATCHDOG=y
+> >  CONFIG_S3C2410_WATCHDOG=y
+> >  CONFIG_MESON_GXBB_WATCHDOG=m
+> >  CONFIG_MESON_WATCHDOG=m
+> > +CONFIG_UNIPHIER_WATCHDOG=y
+> >  CONFIG_RENESAS_WDT=y
+> >  CONFIG_BCM2835_WDT=y
+> >  CONFIG_MFD_CROS_EC=y
+> 
+> 
+> Please add CONFIG_UNIPHIER_WATCHDOG=y
+> below CONFIG_RENESAS_WDT=y
+> 
+> It is the order preferred by "make savedefconfig".
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-index 52b457c..f640308 100644
---- a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-@@ -1,4 +1,5 @@
--Device Tree Clock bindins for CPU DVFS of Mediatek MT8173 SoC
-+Binding for MediaTek's CPUFreq driver
-+=====================================
- 
- Required properties:
- - clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
-@@ -9,6 +10,8 @@ Required properties:
- 			  transition and not stable yet.
- 	Please refer to Documentation/devicetree/bindings/clk/clock-bindings.txt for
- 	generic clock consumer properties.
-+- operating-points-v2: Please refer to Documentation/devicetree/bindings/opp/opp.txt
-+	for detail.
- - proc-supply: Regulator for Vproc of CPU cluster.
- 
- Optional properties:
-@@ -17,9 +20,166 @@ Optional properties:
- 	       Vsram to fit SoC specific needs. When absent, the voltage scaling
- 	       flow is handled by hardware, hence no software "voltage tracking" is
- 	       needed.
-+- #cooling-cells:
-+- cooling-min-level:
-+- cooling-max-level:
-+	Please refer to Documentation/devicetree/bindings/thermal/thermal.txt
-+	for detail.
-+
-+Example 1 (MT7623 SoC):
-+
-+	cpu_opp_table: opp_table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-598000000 {
-+			opp-hz = /bits/ 64 <598000000>;
-+			opp-microvolt = <1050000>;
-+		};
-+
-+		opp-747500000 {
-+			opp-hz = /bits/ 64 <747500000>;
-+			opp-microvolt = <1050000>;
-+		};
-+
-+		opp-1040000000 {
-+			opp-hz = /bits/ 64 <1040000000>;
-+			opp-microvolt = <1150000>;
-+		};
-+
-+		opp-1196000000 {
-+			opp-hz = /bits/ 64 <1196000000>;
-+			opp-microvolt = <1200000>;
-+		};
-+
-+		opp-1300000000 {
-+			opp-hz = /bits/ 64 <1300000000>;
-+			opp-microvolt = <1300000>;
-+		};
-+	};
-+
-+	cpu0: cpu at 0 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x0>;
-+		clocks = <&infracfg CLK_INFRA_CPUSEL>,
-+			 <&apmixedsys CLK_APMIXED_MAINPLL>;
-+		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table>;
-+		#cooling-cells = <2>;
-+		cooling-min-level = <0>;
-+		cooling-max-level = <7>;
-+	};
-+	cpu at 1 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x1>;
-+		operating-points-v2 = <&cpu_opp_table>;
-+	};
-+	cpu at 2 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x2>;
-+		operating-points-v2 = <&cpu_opp_table>;
-+	};
-+	cpu at 3 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x3>;
-+		operating-points-v2 = <&cpu_opp_table>;
-+	};
-+
-+Example 2 (MT8173 SoC):
-+	cpu_opp_table_a: opp_table_a {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-507000000 {
-+			opp-hz = /bits/ 64 <507000000>;
-+			opp-microvolt = <859000>;
-+		};
-+
-+		opp-702000000 {
-+			opp-hz = /bits/ 64 <702000000>;
-+			opp-microvolt = <908000>;
-+		};
-+
-+		opp-1001000000 {
-+			opp-hz = /bits/ 64 <1001000000>;
-+			opp-microvolt = <983000>;
-+		};
-+
-+		opp-1105000000 {
-+			opp-hz = /bits/ 64 <1105000000>;
-+			opp-microvolt = <1009000>;
-+		};
-+
-+		opp-1183000000 {
-+			opp-hz = /bits/ 64 <1183000000>;
-+			opp-microvolt = <1028000>;
-+		};
-+
-+		opp-1404000000 {
-+			opp-hz = /bits/ 64 <1404000000>;
-+			opp-microvolt = <1083000>;
-+		};
-+
-+		opp-1508000000 {
-+			opp-hz = /bits/ 64 <1508000000>;
-+			opp-microvolt = <1109000>;
-+		};
-+
-+		opp-1573000000 {
-+			opp-hz = /bits/ 64 <1573000000>;
-+			opp-microvolt = <1125000>;
-+		};
-+	};
-+
-+	cpu_opp_table_b: opp_table_b {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-507000000 {
-+			opp-hz = /bits/ 64 <507000000>;
-+			opp-microvolt = <828000>;
-+		};
-+
-+		opp-702000000 {
-+			opp-hz = /bits/ 64 <702000000>;
-+			opp-microvolt = <867000>;
-+		};
-+
-+		opp-1001000000 {
-+			opp-hz = /bits/ 64 <1001000000>;
-+			opp-microvolt = <927000>;
-+		};
-+
-+		opp-1209000000 {
-+			opp-hz = /bits/ 64 <1209000000>;
-+			opp-microvolt = <968000>;
-+		};
-+
-+		opp-1404000000 {
-+			opp-hz = /bits/ 64 <1007000000>;
-+			opp-microvolt = <1028000>;
-+		};
-+
-+		opp-1612000000 {
-+			opp-hz = /bits/ 64 <1612000000>;
-+			opp-microvolt = <1049000>;
-+		};
-+
-+		opp-1807000000 {
-+			opp-hz = /bits/ 64 <1807000000>;
-+			opp-microvolt = <1089000>;
-+		};
-+
-+		opp-1989000000 {
-+			opp-hz = /bits/ 64 <1989000000>;
-+			opp-microvolt = <1125000>;
-+		};
-+	};
- 
--Example:
----------
- 	cpu0: cpu at 0 {
- 		device_type = "cpu";
- 		compatible = "arm,cortex-a53";
-@@ -29,6 +189,7 @@ Example:
- 		clocks = <&infracfg CLK_INFRA_CA53SEL>,
- 			 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table_a>;
- 	};
- 
- 	cpu1: cpu at 1 {
-@@ -40,6 +201,7 @@ Example:
- 		clocks = <&infracfg CLK_INFRA_CA53SEL>,
- 			 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table_a>;
- 	};
- 
- 	cpu2: cpu at 100 {
-@@ -51,6 +213,7 @@ Example:
- 		clocks = <&infracfg CLK_INFRA_CA57SEL>,
- 			 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table_b>;
- 	};
- 
- 	cpu3: cpu at 101 {
-@@ -62,6 +225,7 @@ Example:
- 		clocks = <&infracfg CLK_INFRA_CA57SEL>,
- 			 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 		clock-names = "cpu", "intermediate";
-+		operating-points-v2 = <&cpu_opp_table_b>;
- 	};
- 
- 	&cpu0 {
--- 
-2.7.4
+I will fix this in v2.
+
+Thank you.
+
+----------
+Best Regards,
+Keiji Hayashibara
