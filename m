@@ -1,78 +1,52 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 18 Jul 2017 11:56:31 +0200
-Subject: [PATCH 2/3] mfd: syscon: atmel-smc: add helper to retrieve
- register layout
-In-Reply-To: <20170718093713.stqshzuuv3l7pfve@dell>
-References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
- <20170711074015.30440-3-ludovic.desroches@microchip.com>
- <20170718081508.yo6uld5ip5hr6ipk@dell>
- <20170718091238.wweaobzccdlgv5dh@dell>
- <02a0c390-610c-d38b-e6a3-f04120c6fbb3@microchip.com>
- <20170718093713.stqshzuuv3l7pfve@dell>
-Message-ID: <20170718095631.xz6p2u74z4i2n2lj@rfolt0960.corp.atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 18 Jul 2017 12:03:19 +0200
+Subject: [PATCH] arm64: dts: marvell: mark the cp110 crypto engine as dma
+ coherent
+In-Reply-To: <20170718095130.GC2563@kwain> (Antoine Tenart's message of "Tue,
+ 18 Jul 2017 11:51:30 +0200")
+References: <20170717073516.26746-1-antoine.tenart@free-electrons.com>
+ <87o9si84ej.fsf@free-electrons.com> <20170718095130.GC2563@kwain>
+Message-ID: <87bmoi83ko.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 10:37:13AM +0100, Lee Jones wrote:
-> On Tue, 18 Jul 2017, Nicolas Ferre wrote:
-> 
-> > On 18/07/2017 at 11:12, Lee Jones wrote:
-> > > On Tue, 18 Jul 2017, Lee Jones wrote:
-> > > 
-> > >> On Tue, 11 Jul 2017, Ludovic Desroches wrote:
-> > >>
-> > >>> For HSMC controller, the register layout depends on the device i.e. the
-> > >>> offset of setup, pulse, cycle, mode and timings registers is not the
-> > >>> same. An helper is added to provide the correct register layout.
-> > >>>
-> > >>> Fixes: fe9d7cb22ef3 ("mfd: syscon: atmel-smc: Add new helpers to ease
-> > >>> SMC regs manipulation")
-> > >>> Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > >>> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> > >>> ---
-> > >>>  drivers/memory/atmel-ebi.c               | 13 +++++--
-> > >>>  drivers/mfd/atmel-smc.c                  | 67 +++++++++++++++++++++++++-------
-> > >>>  drivers/mtd/nand/atmel/nand-controller.c | 10 +++--
-> > >>>  include/linux/mfd/syscon/atmel-smc.h     | 32 ++++++++++-----
-> > >>>  4 files changed, 92 insertions(+), 30 deletions(-)
-> > >>
-> > >> Applied, thanks.
-> > > 
-> > > Apologies, it looks like this needs 2 more Acks before I can even
-> > > consider taking it.
-> > > 
-> > > Unapplied.
-> > 
-> > If mine is missing, here it is:
-> > 
-> > For the whole series:
-> > Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > 
-> > And I think that Alexandre seemed okay by discussing the path those
-> > patches should take...
-> 
-> Thanks Anlexadre and Nicolas.
-> 
-> Patch does not apply to v4.13-rc1 however.
-> 
-> Ludovic,
-> 
-> Could you please rebase this patch and apply the 2 new Acks please?
-> 
-> Please also apply my:
-> 
-> For my own reference:
->   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-> 
+Hi Antoine,
+ 
+ On mar., juil. 18 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-Ok, I'll rebase the patch on top of v4.13-rc1 and resend it.
+> Hi Gregory,
+>
+> On Tue, Jul 18, 2017 at 11:45:24AM +0200, Gregory CLEMENT wrote:
+>>  On lun., juil. 17 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+>> 
+>> > The crypto engines found on the cp110 master and slave are dma coherent.
+>> > This patch adds the relevant property to their dt nodes.
+>> 
+>> Is it a fix?
+>> 
+>> Should it go to the current ans stable kernel?
+>
+> Yes I think that should go into stable. I forgot the stable tag, do you
+> want me to send a v2 with it included?
+>
+Yes please and also add the Fixes tag.
 
-Ludovic
+Thanks,
 
-> ... and I'll get it applied ASAP.
-> 
+Gregory
+
+> Thanks!
+> Antoine
+
+>
 > -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> Antoine T?nart, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
