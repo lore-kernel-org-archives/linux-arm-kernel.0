@@ -1,67 +1,39 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 18 Jul 2017 16:37:23 +0300
-Subject: [PATCH v2 8/8] staging: fsl-mc: allow the driver compile multi-arch
+Date: Tue, 18 Jul 2017 16:37:22 +0300
+Subject: [PATCH v2 7/8] staging: fsl-mc: make the driver compile on 32-bit
 In-Reply-To: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
 References: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170718133723.12709-9-laurentiu.tudor@nxp.com>
+Message-ID: <20170718133723.12709-8-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Drop dependency on ARCH_LAYERSCAPE (which in turn depends on ARM64),
-thus leaving this driver compile on other architectures.
-Also, other drivers depending on the bus are updated to depend
-on ARCH_LAYERSCAPE until they'll also be made multi-arch.
-This was compiled tested on:
- - booke powerpc (corenet{32,64}_smp_defconfig)
- - x86 (i386_defconfig, x86_64_defconfig, needs CONFIG_OF)
- - arm64 (defconfig)
+Since there's no real constrain in MC to do only atomic 64-bit we can
+enable this driver on 32-bit platforms too.
+Include linux/io-64-nonatomic-hi-lo.h to make quad device io apis used
+in the driver available on 32-bit platforms.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
 Notes:
     -v2
-      -no changes
+      -new patch replacing https://lkml.org/lkml/2017/7/17/419
 
- drivers/staging/fsl-dpaa2/Kconfig  | 2 +-
- drivers/staging/fsl-mc/bus/Kconfig | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/fsl-mc/bus/mc-sys.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/staging/fsl-dpaa2/Kconfig b/drivers/staging/fsl-dpaa2/Kconfig
-index 730fd6d..dfff675 100644
---- a/drivers/staging/fsl-dpaa2/Kconfig
-+++ b/drivers/staging/fsl-dpaa2/Kconfig
-@@ -4,7 +4,7 @@
+diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
+index 8a6dc47..7ce105b 100644
+--- a/drivers/staging/fsl-mc/bus/mc-sys.c
++++ b/drivers/staging/fsl-mc/bus/mc-sys.c
+@@ -37,6 +37,7 @@
+ #include <linux/ioport.h>
+ #include <linux/device.h>
+ #include <linux/io.h>
++#include <linux/io-64-nonatomic-hi-lo.h>
+ #include "../include/mc.h"
  
- config FSL_DPAA2
- 	bool "Freescale DPAA2 devices"
--	depends on FSL_MC_BUS
-+	depends on FSL_MC_BUS && ARCH_LAYERSCAPE
- 	---help---
- 	  Build drivers for Freescale DataPath Acceleration
- 	  Architecture (DPAA2) family of SoCs.
-diff --git a/drivers/staging/fsl-mc/bus/Kconfig b/drivers/staging/fsl-mc/bus/Kconfig
-index a10aaf0..c0acc97 100644
---- a/drivers/staging/fsl-mc/bus/Kconfig
-+++ b/drivers/staging/fsl-mc/bus/Kconfig
-@@ -8,7 +8,7 @@
- 
- config FSL_MC_BUS
- 	bool "QorIQ DPAA2 fsl-mc bus driver"
--	depends on OF && ARCH_LAYERSCAPE
-+	depends on OF
- 	select GENERIC_MSI_IRQ_DOMAIN
- 	help
- 	  Driver to enable the bus infrastructure for the QorIQ DPAA2
-@@ -18,7 +18,7 @@ config FSL_MC_BUS
- 
- config FSL_MC_DPIO
-         tristate "QorIQ DPAA2 DPIO driver"
--        depends on FSL_MC_BUS
-+        depends on FSL_MC_BUS && ARCH_LAYERSCAPE
-         help
- 	  Driver for the DPAA2 DPIO object.  A DPIO provides queue and
- 	  buffer management facilities for software to interact with
+ #include "dpmcp.h"
 -- 
 2.9.4
