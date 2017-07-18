@@ -1,60 +1,60 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 18 Jul 2017 10:48:09 +0100
-Subject: [PATCH v4 12/18] coresight tmc: Detect support for scatter gather
-In-Reply-To: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
-References: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500371295-30472-13-git-send-email-suzuki.poulose@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 18 Jul 2017 11:49:44 +0200
+Subject: [PATCH] clk: gemini: Fix reset regression
+In-Reply-To: <1499874682.6374.57.camel@pengutronix.de>
+References: <20170711122601.17745-1-linus.walleij@linaro.org>
+ <1499874682.6374.57.camel@pengutronix.de>
+Message-ID: <CACRpkda3ZW4rQTwg8Y63uzzupCZAtTP6jv1ppsTXHuDDy0y8og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SG unit in the TMC has been removed in Coresight SoC-600.
-This is however advertised by DEVID:Bit 24 = 0b1. On the
-previous generation, the bit is RES0, hence we can rely on the
-DEVID to detect the support.
+On Wed, Jul 12, 2017 at 5:51 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mike Leach <mike.leach@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc.c | 2 ++
- drivers/hwtracing/coresight/coresight-tmc.h | 5 +++++
- 2 files changed, 7 insertions(+)
+> From fab3a9a697e9797ba1c24874d7c43c09dd812e77 Mon Sep 17 00:00:00 2001
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> Date: Wed, 12 Jul 2017 17:29:28 +0200
+> Subject: [PATCH] reset: make (de)assert report succeess for self-deasserting
+>  reset drivers
+>
+> By now there are drivers using shared reset controls and (de)assert
+> calls on platforms with self-deasserting reset lines and thus reset
+> drivers that do not implement .assert() and .deassert().
+> As long as the initial state of the reset line is deasserted, there
+> is no reason for a reset_control_assert call to return an error for
+> shared reset controls, or for a reset_control_deassert call to return
+> an error for either shared or exclusive reset controls: after a call
+> to reset_control_deassert the reset line is guaranteed to be deasserted,
+> and after a call to reset_control_assert it is valid for the reset
+> line to stay deasserted for shared reset controls.
+>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index ebf81bc..a1de265 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -304,6 +304,8 @@ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
- 	/* Set the unadvertised capabilities */
- 	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
- 
-+	if (!(devid & TMC_DEVID_NOSCAT))
-+		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
- 	/*
- 	 * ETR configuration uses a 40-bit AXI master in place of
- 	 * the embedded SRAM of ETB/ETF.
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 7b20863..23dfbf3 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -70,6 +70,8 @@
- #define TMC_FFCR_STOP_ON_FLUSH	BIT(12)
- 
- 
-+#define TMC_DEVID_NOSCAT	BIT(24)
-+
- enum tmc_config_type {
- 	TMC_CONFIG_TYPE_ETB,
- 	TMC_CONFIG_TYPE_ETR,
-@@ -89,6 +91,9 @@ enum tmc_mem_intf_width {
- 	TMC_MEM_INTF_WIDTH_256BITS	= 8,
- };
- 
-+/* TMC ETR Capability bit definitions */
-+#define TMC_ETR_SG			(0x1U << 0)
-+
- /**
-  * struct tmc_drvdata - specifics associated to an TMC component
-  * @base:	memory mapped base address for this component.
--- 
-2.7.5
+This patch makes all kind of sense, and I follow your
+reasoning.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+In the back of my head I was thinking that the deassert/assert
+pair matches a certain SoC driver design pattern I have seen
+around:
+
+When a driver use an IP block it enables the clock and takes
+the block out of reset.
+
+When it stops using it, it asserts reset and disables the clock.
+
+This is not entirely self-evident, for example why is reset asserted
+across say insmod/rmmod/insmod. Just disabling the clock would
+be OK, I guess, in most cases. It is just one of those "dances"
+that developers do, as if to clear the desk or something.
+
+But I guess there must be cases where doing things in another way
+creates problems or power leaks.
+
+I would surely like to understand, from a silicon perspective, why
+drivers are so often written like this. I could think of things like
+little automata and gates inside the silicon that need to be reset
+to minimize off-power consumption but I have no clue if it is
+really so.
+
+Yours,
+Linus Walleij
