@@ -1,17 +1,17 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 18 Jul 2017 18:36:26 +0800
-Subject: [PATCH] crypto: mediatek: fix error return code in
- mtk_crypto_probe()
-In-Reply-To: <20170630062454.GA9699@embeddedgus>
-References: <20170630062454.GA9699@embeddedgus>
-Message-ID: <20170718103626.GJ6479@gondor.apana.org.au>
+Date: Tue, 18 Jul 2017 18:37:46 +0800
+Subject: [PATCH v5] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <20170703184848.23699-1-clabbe.montjoie@gmail.com>
+References: <20170703184848.23699-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170718103746.GO6479@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 01:24:54AM -0500, Gustavo A. R. Silva wrote:
-> Propagate the return value of platform_get_irq on failure.
+On Mon, Jul 03, 2017 at 08:48:48PM +0200, Corentin Labbe wrote:
+> The Security System has a PRNG, this patch adds support for it via
+> crypto_rng.
 > 
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
 Patch applied.  Thanks.
 -- 
