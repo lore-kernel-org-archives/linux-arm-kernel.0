@@ -1,35 +1,55 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Jul 2017 16:43:30 -0500
-Subject: [PATCH] soc/samsung: use kbasename instead of open coding
-Message-ID: <20170718214339.7774-50-robh@kernel.org>
+Date: Tue, 18 Jul 2017 16:43:22 -0500
+Subject: [PATCH] perf: Convert to using %pOF instead of full_name
+Message-ID: <20170718214339.7774-42-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to not store the full path of nodes in full_name, use
-kbasename instead as it will work either with the full path or not.
+Now that we have a custom printf format specifier, convert users of
+full_name to use %pOF instead. This is preparation to remove storing
+of the full path string for each node.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
 ---
- drivers/soc/samsung/pm_domains.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/perf/arm_pmu_platform.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/soc/samsung/pm_domains.c b/drivers/soc/samsung/pm_domains.c
-index c630eba32066..7c4fec1f93b5 100644
---- a/drivers/soc/samsung/pm_domains.c
-+++ b/drivers/soc/samsung/pm_domains.c
-@@ -147,7 +147,7 @@ static __init const char *exynos_get_domain_name(struct device_node *node)
- 	const char *name;
+diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+index 69255f53057a..4eafa7a42e52 100644
+--- a/drivers/perf/arm_pmu_platform.c
++++ b/drivers/perf/arm_pmu_platform.c
+@@ -131,8 +131,8 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+ 	}
 
- 	if (of_property_read_string(node, "label", &name) < 0)
--		name = strrchr(node->full_name, '/') + 1;
-+		name = kbasename(node->full_name);
- 	return kstrdup_const(name, GFP_KERNEL);
+ 	if (!pmu_has_irq_affinity(pdev->dev.of_node)) {
+-		pr_warn("no interrupt-affinity property for %s, guessing.\n",
+-			of_node_full_name(pdev->dev.of_node));
++		pr_warn("no interrupt-affinity property for %pOF, guessing.\n",
++			pdev->dev.of_node);
+ 	}
+
+ 	/*
+@@ -211,7 +211,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 	}
+
+ 	if (ret) {
+-		pr_info("%s: failed to probe PMU!\n", of_node_full_name(node));
++		pr_info("%pOF: failed to probe PMU!\n", node);
+ 		goto out_free;
+ 	}
+
+@@ -228,8 +228,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ out_free_irqs:
+ 	armpmu_free_irqs(pmu);
+ out_free:
+-	pr_info("%s: failed to register PMU devices!\n",
+-		of_node_full_name(node));
++	pr_info("%pOF: failed to register PMU devices!\n", node);
+ 	armpmu_free(pmu);
+ 	return ret;
  }
-
 --
 2.11.0
