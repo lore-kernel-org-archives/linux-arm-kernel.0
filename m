@@ -1,61 +1,82 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 18 Jul 2017 14:01:42 +0800
-Subject: [PATCH v5 0/3] some fixups for MediaTek cpufreq driver
-Message-ID: <cover.1500355954.git.sean.wang@mediatek.com>
+Date: Tue, 18 Jul 2017 14:01:43 +0800
+Subject: [PATCH v5 1/3] cpufreq: mediatek: Add support of cpufreq to
+ MT2701/MT7623 SoC
+In-Reply-To: <cover.1500355954.git.sean.wang@mediatek.com>
+References: <cover.1500355954.git.sean.wang@mediatek.com>
+Message-ID: <feabcfd53899954198c6620e9d9b68f4a3c55201.1500355954.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Changes since v4:
-- add back the missing Acked-by from v3
+MT2701/MT7623 is a 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
+single cluster and this hardware is also compatible with the existing
+driver through enabling CPU frequency feature with operating-points-v2
+bindings. Also, this driver actually supports all MediaTek SoCs, the
+Kconfig menu entry and file name itself should be updated with more
+generic name to drop "MT8173"
 
-Changes since v3:
-- remove the redundant line depends on ARM || ARM64 || COMPILE_TEST
-since the whole Kconfig.arm file depends on ARM || ARM64.
-- renaming from mtk-cpufreq.c to mediatek-cpufreq.c avoiding
-collide and cause confusion at some point in time.
-
-Changes since v2:
-- correct the typo in the binding document
-
-Changes since v1:
-- drop those patches already accepted
-- refine the commit messages and Kconfig dependency
-- Kconfig menu entry and file name itself are updated with more
-generic name to drop "MT8173" since this driver actually supports
-all MediaTek SoCs.
-- generate patchset again with git format-patch -C -M --thread=shallow
-- fix binding examples by replacing '@' with '-' as the OPP nodes will
-never have a "reg" property.
-
-Hi,
-
-The purpose of the series is
-- (patch 1 to 3) to fix up current Mediatek cpufreq driver
-can't work with the latest tree since one required CPU clock muxer missing
-would cause the driver getting the resource fails when driver probe gets
-called.
-- (patch 4) to enable cpufreq feature on MT2701/MT7623 platform.
-- (patch 5 to 6) to update the binding document to reflect
-latest driver logic and add more examples guiding people how to apply for
-Mediatek cpufreq driver.
-
-Sean Wang (3):
-  cpufreq: mediatek: Add support of cpufreq to MT2701/MT7623 SoC
-  dt-bindings: cpufreq: move MediaTek cpufreq dt-bindings document to
-    proper place
-  dt-bindings: cpufreq: enhance MediaTek cpufreq dt-binding document
-
- .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  |  83 -------
- .../bindings/cpufreq/cpufreq-mediatek.txt          | 247 +++++++++++++++++++++
- drivers/cpufreq/Kconfig.arm                        |   7 +-
- drivers/cpufreq/Makefile                           |   2 +-
- .../{mt8173-cpufreq.c => mediatek-cpufreq.c}       |   2 +
- 5 files changed, 253 insertions(+), 88 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Jean Delvare <jdelvare@suse.de>
+---
+ drivers/cpufreq/Kconfig.arm                              | 7 +++----
+ drivers/cpufreq/Makefile                                 | 2 +-
+ drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} | 2 ++
+ 3 files changed, 6 insertions(+), 5 deletions(-)
  rename drivers/cpufreq/{mt8173-cpufreq.c => mediatek-cpufreq.c} (99%)
 
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 74ed7e9..24ef446 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -87,14 +87,13 @@ config ARM_KIRKWOOD_CPUFREQ
+ 	  This adds the CPUFreq driver for Marvell Kirkwood
+ 	  SoCs.
+ 
+-config ARM_MT8173_CPUFREQ
+-	tristate "Mediatek MT8173 CPUFreq support"
++config ARM_MEDIATEK_CPUFREQ
++	tristate "CPU Frequency scaling support for MediaTek SoCs"
+ 	depends on ARCH_MEDIATEK && REGULATOR
+-	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
+ 	depends on !CPU_THERMAL || THERMAL
+ 	select PM_OPP
+ 	help
+-	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
++	  This adds the CPUFreq driver support for MediaTek SoCs.
+ 
+ config ARM_OMAP2PLUS_CPUFREQ
+ 	bool "TI OMAP2+"
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index b7e78f0..ea043aa 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -58,7 +58,7 @@ obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
+ obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
+ obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+ obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
+-obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
++obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mediatek-cpufreq.o
+ obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+ obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+ obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
+similarity index 99%
+rename from drivers/cpufreq/mt8173-cpufreq.c
+rename to drivers/cpufreq/mediatek-cpufreq.c
+index fd1886f..481ec77 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mediatek-cpufreq.c
+@@ -575,6 +575,8 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
+ 
+ /* List of machines supported by this driver */
+ static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
++	{ .compatible = "mediatek,mt2701", },
++	{ .compatible = "mediatek,mt7623", },
+ 	{ .compatible = "mediatek,mt817x", },
+ 	{ .compatible = "mediatek,mt8173", },
+ 	{ .compatible = "mediatek,mt8176", },
 -- 
 2.7.4
