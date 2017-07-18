@@ -1,33 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jul 2017 16:39:03 +0200
-Subject: [PATCH v2 8/8] staging: fsl-mc: allow the driver compile
- multi-arch
-In-Reply-To: <596E1CD7.1050909@nxp.com>
-References: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
- <20170718133723.12709-9-laurentiu.tudor@nxp.com>
- <CAK8P3a0WvNgk5eXQoPpXiLwOS_wB1NdfCyPtiKMys3qqEwHjDw@mail.gmail.com>
- <596E1CD7.1050909@nxp.com>
-Message-ID: <CAK8P3a2E64O6tgAdGck9ce1a=1yeQfzc9tNex7H+i1K0uKaOHg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 18 Jul 2017 16:42:24 +0200
+Subject: [PATCH] arm64: dts: marvell: Fully re-order nodes in Marvell CP110
+ dtsi files
+Message-ID: <20170718144224.7228-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 4:36 PM, Laurentiu Tudor
-<laurentiu.tudor@nxp.com> wrote:
+Since the introduction of the CP110 dt files, the sata node was
+misplaced. Move it at the right place. Thanks to this, the files are
+completely ordered.
 
-> Good point, I'll take care of it. But don't you mean COMPILE_TEST be
-> added on the actual MC_BUS config, like so:
->
->   config FSL_MC_BUS
->         bool "QorIQ DPAA2 fsl-mc bus driver"
-> -       depends on OF && ARCH_LAYERSCAPE
-> +       depends on OF && (ARCH_LAYERSCAPE || COMPILE_TEST)
->         select GENERIC_MSI_IRQ_DOMAIN
-> ?
->
-> The other drivers that depend on the MC_BUS won't compile on other
-> architectures.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 18 +++++++++---------
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 18 +++++++++---------
+ 2 files changed, 18 insertions(+), 18 deletions(-)
 
-I was thinking of adding it to all three, but you are right we only needed
-it for the bus.
-
-        Arnd
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 394e54d37fff..1acd6a92d1a7 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -162,15 +162,6 @@
+ 				};
+ 			};
+ 
+-			cpm_sata0: sata at 540000 {
+-				compatible = "marvell,armada-8k-ahci",
+-					     "generic-ahci";
+-				reg = <0x540000 0x30000>;
+-				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&cpm_clk 1 15>;
+-				status = "disabled";
+-			};
+-
+ 			cpm_usb3_0: usb3 at 500000 {
+ 				compatible = "marvell,armada-8k-xhci",
+ 					     "generic-xhci";
+@@ -191,6 +182,15 @@
+ 				status = "disabled";
+ 			};
+ 
++			cpm_sata0: sata at 540000 {
++				compatible = "marvell,armada-8k-ahci",
++					     "generic-ahci";
++				reg = <0x540000 0x30000>;
++				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&cpm_clk 1 15>;
++				status = "disabled";
++			};
++
+ 			cpm_xor0: xor at 6a0000 {
+ 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+ 				reg = <0x6a0000 0x1000>,
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 2e6422a66d76..a21814855799 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -163,15 +163,6 @@
+ 
+ 			};
+ 
+-			cps_sata0: sata at 540000 {
+-				compatible = "marvell,armada-8k-ahci",
+-					     "generic-ahci";
+-				reg = <0x540000 0x30000>;
+-				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&cps_clk 1 15>;
+-				status = "disabled";
+-			};
+-
+ 			cps_usb3_0: usb3 at 500000 {
+ 				compatible = "marvell,armada-8k-xhci",
+ 					     "generic-xhci";
+@@ -192,6 +183,15 @@
+ 				status = "disabled";
+ 			};
+ 
++			cps_sata0: sata at 540000 {
++				compatible = "marvell,armada-8k-ahci",
++					     "generic-ahci";
++				reg = <0x540000 0x30000>;
++				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&cps_clk 1 15>;
++				status = "disabled";
++			};
++
+ 			cps_xor0: xor at 6a0000 {
+ 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+ 				reg = <0x6a0000 0x1000>,
+-- 
+2.13.2
