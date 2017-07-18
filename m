@@ -1,60 +1,79 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 18 Jul 2017 19:43:28 +0200
-Subject: [PATCH] pinctrl: samsung: Remove unneeded local variable
- initialization
-Message-ID: <1500399808-6580-1-git-send-email-krzk@kernel.org>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 18 Jul 2017 23:15:18 +0530
+Subject: [PATCH 1/4] gpio: davinci: Use devm_gpiochip_add_data in place of
+ gpiochip_add_data
+In-Reply-To: <0aa79585-c88e-e5b7-c260-6e9ceee6d776@ti.com>
+References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+ <1500375436-9435-2-git-send-email-j-keerthy@ti.com>
+ <0aa79585-c88e-e5b7-c260-6e9ceee6d776@ti.com>
+Message-ID: <bd21705e-cf64-572e-ef21-42b9c7f41f1b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two local variables (shift and reg_con) were initialized to unused
-values - they were overwritten just few lines after.  Getting rid of
-this unused initialization allows dropping other variables and
-compacting slightly the code.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/pinctrl/samsung/pinctrl-exynos.c | 18 ++++--------------
- 1 file changed, 4 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index 731530a9ce38..f6bdbc8cd5c0 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -149,15 +149,10 @@ static int exynos_irq_set_type(struct irq_data *irqd, unsigned int type)
- 
- static int exynos_irq_request_resources(struct irq_data *irqd)
- {
--	struct irq_chip *chip = irq_data_get_irq_chip(irqd);
--	struct exynos_irq_chip *our_chip = to_exynos_irq_chip(chip);
- 	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
- 	const struct samsung_pin_bank_type *bank_type = bank->type;
--	unsigned int shift = EXYNOS_EINT_CON_LEN * irqd->hwirq;
--	unsigned long reg_con = our_chip->eint_con + bank->eint_offset;
--	unsigned long flags;
--	unsigned int mask;
--	unsigned int con;
-+	unsigned long reg_con, flags;
-+	unsigned int shift, mask, con;
- 	int ret;
- 
- 	ret = gpiochip_lock_as_irq(&bank->gpio_chip, irqd->hwirq);
-@@ -186,15 +181,10 @@ static int exynos_irq_request_resources(struct irq_data *irqd)
- 
- static void exynos_irq_release_resources(struct irq_data *irqd)
- {
--	struct irq_chip *chip = irq_data_get_irq_chip(irqd);
--	struct exynos_irq_chip *our_chip = to_exynos_irq_chip(chip);
- 	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
- 	const struct samsung_pin_bank_type *bank_type = bank->type;
--	unsigned int shift = EXYNOS_EINT_CON_LEN * irqd->hwirq;
--	unsigned long reg_con = our_chip->eint_con + bank->eint_offset;
--	unsigned long flags;
--	unsigned int mask;
--	unsigned int con;
-+	unsigned long reg_con, flags;
-+	unsigned int shift, mask, con;
- 
- 	reg_con = bank->pctl_offset + bank_type->reg_offset[PINCFG_TYPE_FUNC];
- 	shift = irqd->hwirq * bank_type->fld_width[PINCFG_TYPE_FUNC];
--- 
-2.7.4
+On Tuesday 18 July 2017 10:20 PM, Suman Anna wrote:
+> Hi Keerthy,
+> 
+> On 07/18/2017 05:57 AM, Keerthy wrote:
+>> Use the devm version of gpiochip_add_data and pass on the
+>> return value. Reset the static variables to 0 before returning.
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>  drivers/gpio/gpio-davinci.c | 10 ++++++++--
+>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+>> index 65cb359..2c88054 100644
+>> --- a/drivers/gpio/gpio-davinci.c
+>> +++ b/drivers/gpio/gpio-davinci.c
+>> @@ -166,7 +166,7 @@ static int davinci_gpio_get(struct gpio_chip *chip, unsigned offset)
+>>  static int davinci_gpio_probe(struct platform_device *pdev)
+>>  {
+>>  	static int ctrl_num, bank_base;
+>> -	int gpio, bank;
+>> +	int gpio, bank, ret = 0;
+>>  	unsigned ngpio, nbank;
+>>  	struct davinci_gpio_controller *chips;
+>>  	struct davinci_gpio_platform_data *pdata;
+>> @@ -232,7 +232,13 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+>>  	for (gpio = 0, bank = 0; gpio < ngpio; gpio += 32, bank++)
+>>  		chips->regs[bank] = gpio_base + offset_array[bank];
+>>  
+>> -	gpiochip_add_data(&chips->chip, chips);
+>> +	ret = devm_gpiochip_add_data(dev, &chips->chip, chips);
+>> +	if (ret) {
+>> +		ctrl_num = 0;
+>> +		bank_base = 0;
+> 
+> Hmm, this doesn't look right to me. These variables are defined as
+> static, and you are resetting them unconditionally. This should be an
+> issue when you have multiple devices and one of them fails.
+
+Agreed. With multiple instances this can reset the successful count also.
+
+Upon failure in any iteration, the following should take care of those
+static variables:
+
+/* Revert the static variable increments */
+        ctrl_num--;
+        bank_base -= ngpio;
+
+Thanks for the quick review!
+
+Reagrds,
+Keerthy
+
+> 
+> regards
+> Suman
+> 
+>> +		return ret;
+>> +	}
+>> +
+>>  	platform_set_drvdata(pdev, chips);
+>>  	davinci_gpio_irq_setup(pdev);
+>>  	return 0;
+>>
+> 
