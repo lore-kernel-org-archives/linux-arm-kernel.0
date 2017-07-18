@@ -1,117 +1,507 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Tue, 18 Jul 2017 10:28:35 +0800
-Subject: [PATCH v3 3/7] drm/rockchip: vop: move line_flag_num to interrupt
- registers
+Date: Tue, 18 Jul 2017 10:28:39 +0800
+Subject: [PATCH v3 4/7] drm/rockchip: vop: group vop registers
 In-Reply-To: <1500344888-28165-1-git-send-email-mark.yao@rock-chips.com>
 References: <1500344888-28165-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1500344916-28309-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1500344920-28356-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the hardware design process, the design of line flags
-register is associated with the interrupt register,
-placing the line flags in the interrupt definition is
-more reasonable, and it would make multi-vop define easilier.
-
-Changes in v3:
-- Explain more in details, introduce why we need this patch
+Grouping the vop registers facilitates make register
+definition clearer, and also is useful for different vop
+reuse the same group register.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 4 ++--
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 8 ++++----
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  99 +++++++++++++-------------
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  61 +++++++++-------
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 106 +++++++++++++++-------------
+ 3 files changed, 142 insertions(+), 124 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 101f3db..add097c 100644
+index add097c..4e9d372 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -471,7 +471,7 @@ static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
+@@ -42,27 +42,20 @@
+ #include "rockchip_drm_psr.h"
+ #include "rockchip_drm_vop.h"
+ 
+-#define REG_SET(x, base, reg, v, mode) \
+-		vop_mask_write(x, base + reg.offset, reg.mask, reg.shift, \
+-			       v, reg.write_mask, reg.relaxed)
+-#define REG_SET_MASK(x, base, reg, mask, v, mode) \
+-		vop_mask_write(x, base + reg.offset, \
+-			       mask, reg.shift, v, reg.write_mask, reg.relaxed)
+-
+ #define VOP_WIN_SET(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->name, v, RELAXED)
++		vop_reg_set(vop, &win->phy->name, win->base, ~0, v, #name)
+ #define VOP_SCL_SET(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->scl->name, v, RELAXED)
++		vop_reg_set(vop, &win->phy->scl->name, win->base, ~0, v, #name)
+ #define VOP_SCL_SET_EXT(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->scl->ext->name, v, RELAXED)
+-#define VOP_CTRL_SET(x, name, v) \
+-		REG_SET(x, 0, (x)->data->ctrl->name, v, NORMAL)
++		vop_reg_set(vop, &win->phy->scl->ext->name, \
++			    win->base, ~0, v, #name)
++
++#define VOP_INTR_SET_MASK(vop, name, mask, v) \
++		vop_reg_set(vop, &vop->data->intr->name, 0, mask, v, #name)
+ 
+-#define VOP_INTR_GET(vop, name) \
+-		vop_read_reg(vop, 0, &vop->data->ctrl->name)
++#define VOP_REG_SET(vop, group, name, v) \
++		    vop_reg_set(vop, &vop->data->group->name, 0, ~0, v, #name)
+ 
+-#define VOP_INTR_SET(vop, name, mask, v) \
+-		REG_SET_MASK(vop, 0, vop->data->intr->name, mask, v, NORMAL)
+ #define VOP_INTR_SET_TYPE(vop, name, type, v) \
+ 	do { \
+ 		int i, reg = 0, mask = 0; \
+@@ -72,13 +65,13 @@
+ 				mask |= 1 << i; \
+ 			} \
+ 		} \
+-		VOP_INTR_SET(vop, name, mask, reg); \
++		VOP_INTR_SET_MASK(vop, name, mask, reg); \
+ 	} while (0)
+ #define VOP_INTR_GET_TYPE(vop, name, type) \
+ 		vop_get_intr_type(vop, &vop->data->intr->name, type)
+ 
+ #define VOP_WIN_GET(x, win, name) \
+-		vop_read_reg(x, win->base, &win->phy->name)
++		vop_read_reg(x, win->offset, win->phy->name)
+ 
+ #define VOP_WIN_GET_YRGBADDR(vop, win) \
+ 		vop_readl(vop, win->base + win->phy->yrgb_mst.offset)
+@@ -160,14 +153,20 @@ static inline uint32_t vop_read_reg(struct vop *vop, uint32_t base,
+ 	return (vop_readl(vop, base + reg->offset) >> reg->shift) & reg->mask;
+ }
+ 
+-static inline void vop_mask_write(struct vop *vop, uint32_t offset,
+-				  uint32_t mask, uint32_t shift, uint32_t v,
+-				  bool write_mask, bool relaxed)
++static void vop_reg_set(struct vop *vop, const struct vop_reg *reg,
++			uint32_t _offset, uint32_t _mask, uint32_t v,
++			const char *reg_name)
+ {
+-	if (!mask)
++	int offset = reg->offset + _offset;
++	int mask = reg->mask & _mask;
++	int shift = reg->shift;
++
++	if (!reg || !reg->mask) {
++		dev_dbg(vop->dev, "Warning: not support %s\n", reg_name);
+ 		return;
++	}
+ 
+-	if (write_mask) {
++	if (reg->write_mask) {
+ 		v = ((v << shift) & 0xffff) | (mask << (shift + 16));
+ 	} else {
+ 		uint32_t cached_val = vop->regsbak[offset >> 2];
+@@ -176,7 +175,7 @@ static inline void vop_mask_write(struct vop *vop, uint32_t offset,
+ 		vop->regsbak[offset >> 2] = v;
+ 	}
+ 
+-	if (relaxed)
++	if (reg->relaxed)
+ 		writel_relaxed(v, vop->regs + offset);
+ 	else
+ 		writel(v, vop->regs + offset);
+@@ -198,7 +197,7 @@ static inline uint32_t vop_get_intr_type(struct vop *vop,
+ 
+ static inline void vop_cfg_done(struct vop *vop)
+ {
+-	VOP_CTRL_SET(vop, cfg_done, 1);
++	VOP_REG_SET(vop, common, cfg_done, 1);
+ }
+ 
+ static bool has_rb_swapped(uint32_t format)
+@@ -471,7 +470,7 @@ static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
  
  	spin_lock_irqsave(&vop->irq_lock, flags);
  
--	VOP_CTRL_SET(vop, line_flag_num[0], line_num);
-+	VOP_INTR_SET(vop, line_flag_num[0], line_num);
+-	VOP_INTR_SET(vop, line_flag_num[0], line_num);
++	VOP_REG_SET(vop, intr, line_flag_num[0], line_num);
  	VOP_INTR_SET_TYPE(vop, clear, LINE_FLAG_INTR, 1);
  	VOP_INTR_SET_TYPE(vop, enable, LINE_FLAG_INTR, 1);
  
+@@ -537,7 +536,7 @@ static int vop_enable(struct drm_crtc *crtc)
+ 
+ 	spin_lock(&vop->reg_lock);
+ 
+-	VOP_CTRL_SET(vop, standby, 0);
++	VOP_REG_SET(vop, common, standby, 1);
+ 
+ 	spin_unlock(&vop->reg_lock);
+ 
+@@ -597,7 +596,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 
+ 	spin_lock(&vop->reg_lock);
+ 
+-	VOP_CTRL_SET(vop, standby, 1);
++	VOP_REG_SET(vop, common, standby, 1);
+ 
+ 	spin_unlock(&vop->reg_lock);
+ 
+@@ -920,7 +919,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+ 
+ 		spin_lock(&vop->reg_lock);
+ 
+-		VOP_CTRL_SET(vop, standby, 1);
++		VOP_REG_SET(vop, common, standby, 1);
+ 
+ 		spin_unlock(&vop->reg_lock);
+ 
+@@ -934,29 +933,29 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+ 		   BIT(HSYNC_POSITIVE) : 0;
+ 	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ?
+ 		   BIT(VSYNC_POSITIVE) : 0;
+-	VOP_CTRL_SET(vop, pin_pol, pin_pol);
++	VOP_REG_SET(vop, output, pin_pol, pin_pol);
+ 
+ 	switch (s->output_type) {
+ 	case DRM_MODE_CONNECTOR_LVDS:
+-		VOP_CTRL_SET(vop, rgb_en, 1);
+-		VOP_CTRL_SET(vop, rgb_pin_pol, pin_pol);
++		VOP_REG_SET(vop, output, rgb_en, 1);
++		VOP_REG_SET(vop, output, rgb_pin_pol, pin_pol);
+ 		break;
+ 	case DRM_MODE_CONNECTOR_eDP:
+-		VOP_CTRL_SET(vop, edp_pin_pol, pin_pol);
+-		VOP_CTRL_SET(vop, edp_en, 1);
++		VOP_REG_SET(vop, output, edp_pin_pol, pin_pol);
++		VOP_REG_SET(vop, output, edp_en, 1);
+ 		break;
+ 	case DRM_MODE_CONNECTOR_HDMIA:
+-		VOP_CTRL_SET(vop, hdmi_pin_pol, pin_pol);
+-		VOP_CTRL_SET(vop, hdmi_en, 1);
++		VOP_REG_SET(vop, output, hdmi_pin_pol, pin_pol);
++		VOP_REG_SET(vop, output, hdmi_en, 1);
+ 		break;
+ 	case DRM_MODE_CONNECTOR_DSI:
+-		VOP_CTRL_SET(vop, mipi_pin_pol, pin_pol);
+-		VOP_CTRL_SET(vop, mipi_en, 1);
++		VOP_REG_SET(vop, output, mipi_pin_pol, pin_pol);
++		VOP_REG_SET(vop, output, mipi_en, 1);
+ 		break;
+ 	case DRM_MODE_CONNECTOR_DisplayPort:
+ 		pin_pol &= ~BIT(DCLK_INVERT);
+-		VOP_CTRL_SET(vop, dp_pin_pol, pin_pol);
+-		VOP_CTRL_SET(vop, dp_en, 1);
++		VOP_REG_SET(vop, output, dp_pin_pol, pin_pol);
++		VOP_REG_SET(vop, output, dp_en, 1);
+ 		break;
+ 	default:
+ 		DRM_DEV_ERROR(vop->dev, "unsupported connector_type [%d]\n",
+@@ -969,23 +968,23 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+ 	if (s->output_mode == ROCKCHIP_OUT_MODE_AAAA &&
+ 	    !(vop_data->feature & VOP_FEATURE_OUTPUT_RGB10))
+ 		s->output_mode = ROCKCHIP_OUT_MODE_P888;
+-	VOP_CTRL_SET(vop, out_mode, s->output_mode);
++	VOP_REG_SET(vop, common, out_mode, s->output_mode);
+ 
+-	VOP_CTRL_SET(vop, htotal_pw, (htotal << 16) | hsync_len);
++	VOP_REG_SET(vop, modeset, htotal_pw, (htotal << 16) | hsync_len);
+ 	val = hact_st << 16;
+ 	val |= hact_end;
+-	VOP_CTRL_SET(vop, hact_st_end, val);
+-	VOP_CTRL_SET(vop, hpost_st_end, val);
++	VOP_REG_SET(vop, modeset, hact_st_end, val);
++	VOP_REG_SET(vop, modeset, hpost_st_end, val);
+ 
+-	VOP_CTRL_SET(vop, vtotal_pw, (vtotal << 16) | vsync_len);
++	VOP_REG_SET(vop, modeset, vtotal_pw, (vtotal << 16) | vsync_len);
+ 	val = vact_st << 16;
+ 	val |= vact_end;
+-	VOP_CTRL_SET(vop, vact_st_end, val);
+-	VOP_CTRL_SET(vop, vpost_st_end, val);
++	VOP_REG_SET(vop, modeset, vact_st_end, val);
++	VOP_REG_SET(vop, modeset, vpost_st_end, val);
+ 
+ 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
+ 
+-	VOP_CTRL_SET(vop, standby, 0);
++	VOP_REG_SET(vop, common, standby, 0);
+ 
+ 	rockchip_drm_psr_activate(&vop->crtc);
+ }
+@@ -1446,8 +1445,8 @@ static int vop_initial(struct vop *vop)
+ 
+ 	memcpy(vop->regsbak, vop->regs, vop->len);
+ 
+-	VOP_CTRL_SET(vop, global_regdone_en, 1);
+-	VOP_CTRL_SET(vop, dsp_blank, 0);
++	VOP_REG_SET(vop, misc, global_regdone_en, 1);
++	VOP_REG_SET(vop, common, dsp_blank, 0);
+ 
+ 	for (i = 0; i < vop_data->win_size; i++) {
+ 		const struct vop_win_data *win = &vop_data->win[i];
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index 084d3b2..9c5da32 100644
+index 9c5da32..3ba962c 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -59,8 +59,6 @@ struct vop_ctrl {
- 	struct vop_reg hpost_st_end;
- 	struct vop_reg vpost_st_end;
- 
--	struct vop_reg line_flag_num[2];
--
- 	struct vop_reg global_regdone_en;
- 	struct vop_reg cfg_done;
+@@ -25,42 +25,50 @@ enum vop_data_format {
  };
-@@ -68,6 +66,8 @@ struct vop_ctrl {
- struct vop_intr {
- 	const int *intrs;
- 	uint32_t nintrs;
+ 
+ struct vop_reg {
+-	uint32_t offset;
+-	uint32_t shift;
+ 	uint32_t mask;
++	uint16_t offset;
++	uint8_t shift;
+ 	bool write_mask;
++	bool relaxed;
+ };
+ 
+-struct vop_ctrl {
+-	struct vop_reg standby;
+-	struct vop_reg data_blank;
+-	struct vop_reg gate_en;
+-	struct vop_reg mmu_en;
+-	struct vop_reg rgb_en;
++struct vop_modeset {
++	struct vop_reg htotal_pw;
++	struct vop_reg hact_st_end;
++	struct vop_reg hpost_st_end;
++	struct vop_reg vtotal_pw;
++	struct vop_reg vact_st_end;
++	struct vop_reg vpost_st_end;
++};
 +
-+	struct vop_reg line_flag_num[2];
- 	struct vop_reg enable;
- 	struct vop_reg clear;
- 	struct vop_reg status;
++struct vop_output {
++	struct vop_reg pin_pol;
++	struct vop_reg dp_pin_pol;
++	struct vop_reg edp_pin_pol;
++	struct vop_reg hdmi_pin_pol;
++	struct vop_reg mipi_pin_pol;
++	struct vop_reg rgb_pin_pol;
++	struct vop_reg dp_en;
+ 	struct vop_reg edp_en;
+ 	struct vop_reg hdmi_en;
+ 	struct vop_reg mipi_en;
+-	struct vop_reg dp_en;
++	struct vop_reg rgb_en;
++};
++
++struct vop_common {
++	struct vop_reg cfg_done;
+ 	struct vop_reg dsp_blank;
+-	struct vop_reg out_mode;
++	struct vop_reg data_blank;
+ 	struct vop_reg dither_down;
+ 	struct vop_reg dither_up;
+-	struct vop_reg pin_pol;
+-	struct vop_reg rgb_pin_pol;
+-	struct vop_reg hdmi_pin_pol;
+-	struct vop_reg edp_pin_pol;
+-	struct vop_reg mipi_pin_pol;
+-	struct vop_reg dp_pin_pol;
+-
+-	struct vop_reg htotal_pw;
+-	struct vop_reg hact_st_end;
+-	struct vop_reg vtotal_pw;
+-	struct vop_reg vact_st_end;
+-	struct vop_reg hpost_st_end;
+-	struct vop_reg vpost_st_end;
++	struct vop_reg gate_en;
++	struct vop_reg mmu_en;
++	struct vop_reg out_mode;
++	struct vop_reg standby;
++};
+ 
++struct vop_misc {
+ 	struct vop_reg global_regdone_en;
+-	struct vop_reg cfg_done;
+ };
+ 
+ struct vop_intr {
+@@ -134,8 +142,11 @@ struct vop_win_data {
+ };
+ 
+ struct vop_data {
+-	const struct vop_ctrl *ctrl;
+ 	const struct vop_intr *intr;
++	const struct vop_common *common;
++	const struct vop_misc *misc;
++	const struct vop_modeset *modeset;
++	const struct vop_output *output;
+ 	const struct vop_win_data *win;
+ 	unsigned int win_size;
+ 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 691dd42..064a46d 100644
+index 064a46d..53bcdd5 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -116,6 +116,7 @@
- static const struct vop_intr rk3036_intr = {
+@@ -117,25 +117,33 @@
  	.intrs = rk3036_vop_intrs,
  	.nintrs = ARRAY_SIZE(rk3036_vop_intrs),
-+	.line_flag_num[0] = VOP_REG(RK3036_INT_STATUS, 0xfff, 12),
- 	.status = VOP_REG(RK3036_INT_STATUS, 0xf, 0),
- 	.enable = VOP_REG(RK3036_INT_STATUS, 0xf, 4),
- 	.clear = VOP_REG(RK3036_INT_STATUS, 0xf, 8),
-@@ -129,7 +130,6 @@
+ 	.line_flag_num[0] = VOP_REG(RK3036_INT_STATUS, 0xfff, 12),
+-	.status = VOP_REG(RK3036_INT_STATUS, 0xf, 0),
+-	.enable = VOP_REG(RK3036_INT_STATUS, 0xf, 4),
+-	.clear = VOP_REG(RK3036_INT_STATUS, 0xf, 8),
++	.status = VOP_REG_SYNC(RK3036_INT_STATUS, 0xf, 0),
++	.enable = VOP_REG_SYNC(RK3036_INT_STATUS, 0xf, 4),
++	.clear = VOP_REG_SYNC(RK3036_INT_STATUS, 0xf, 8),
+ };
+ 
+-static const struct vop_ctrl rk3036_ctrl_data = {
+-	.standby = VOP_REG_SYNC(RK3036_SYS_CTRL, 0x1, 30),
+-	.out_mode = VOP_REG(RK3036_DSP_CTRL0, 0xf, 0),
+-	.pin_pol = VOP_REG(RK3036_DSP_CTRL0, 0xf, 4),
++static const struct vop_modeset rk3036_modeset = {
+ 	.htotal_pw = VOP_REG(RK3036_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
  	.hact_st_end = VOP_REG(RK3036_DSP_HACT_ST_END, 0x1fff1fff, 0),
  	.vtotal_pw = VOP_REG(RK3036_DSP_VTOTAL_VS_END, 0x1fff1fff, 0),
  	.vact_st_end = VOP_REG(RK3036_DSP_VACT_ST_END, 0x1fff1fff, 0),
--	.line_flag_num[0] = VOP_REG(RK3036_INT_STATUS, 0xfff, 12),
++};
++
++static const struct vop_output rk3036_output = {
++	.pin_pol = VOP_REG(RK3036_DSP_CTRL0, 0xf, 4),
++};
++
++static const struct vop_common rk3036_common = {
++	.standby = VOP_REG_SYNC(RK3036_SYS_CTRL, 0x1, 30),
++	.out_mode = VOP_REG(RK3036_DSP_CTRL0, 0xf, 0),
  	.cfg_done = VOP_REG_SYNC(RK3036_REG_CFG_DONE, 0x1, 0),
  };
  
-@@ -225,7 +225,6 @@
- 	.vact_st_end = VOP_REG(RK3288_DSP_VACT_ST_END, 0x1fff1fff, 0),
- 	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
- 	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
--	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
- 	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
- 	.cfg_done = VOP_REG_SYNC(RK3288_REG_CFG_DONE, 0x1, 0),
+ static const struct vop_data rk3036_vop = {
+-	.ctrl = &rk3036_ctrl_data,
+ 	.intr = &rk3036_intr,
++	.common = &rk3036_common,
++	.modeset = &rk3036_modeset,
++	.output = &rk3036_output,
+ 	.win = rk3036_vop_win_data,
+ 	.win_size = ARRAY_SIZE(rk3036_vop_win_data),
  };
-@@ -257,6 +256,7 @@
- static const struct vop_intr rk3288_vop_intr = {
- 	.intrs = rk3288_vop_intrs,
- 	.nintrs = ARRAY_SIZE(rk3288_vop_intrs),
-+	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
- 	.status = VOP_REG(RK3288_INTR_CTRL0, 0xf, 0),
- 	.enable = VOP_REG(RK3288_INTR_CTRL0, 0xf, 4),
- 	.clear = VOP_REG(RK3288_INTR_CTRL0, 0xf, 8),
-@@ -293,8 +293,6 @@
- 	.vact_st_end = VOP_REG(RK3399_DSP_VACT_ST_END, 0x1fff1fff, 0),
- 	.hpost_st_end = VOP_REG(RK3399_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
- 	.vpost_st_end = VOP_REG(RK3399_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
--	.line_flag_num[0] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 0),
--	.line_flag_num[1] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 16),
- 	.cfg_done = VOP_REG_MASK_SYNC(RK3399_REG_CFG_DONE, 0x1, 0),
+@@ -205,27 +213,32 @@
+ 	.dst_alpha_ctl = VOP_REG(RK3288_WIN2_DST_ALPHA_CTRL, 0xff, 0),
  };
  
-@@ -311,6 +309,8 @@
- static const struct vop_intr rk3399_vop_intr = {
- 	.intrs = rk3399_vop_intrs,
- 	.nintrs = ARRAY_SIZE(rk3399_vop_intrs),
-+	.line_flag_num[0] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 0),
-+	.line_flag_num[1] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 16),
- 	.status = VOP_REG_MASK_SYNC(RK3399_INTR_STATUS0, 0xffff, 0),
- 	.enable = VOP_REG_MASK_SYNC(RK3399_INTR_EN0, 0xffff, 0),
+-static const struct vop_ctrl rk3288_ctrl_data = {
+-	.standby = VOP_REG_SYNC(RK3288_SYS_CTRL, 0x1, 22),
+-	.gate_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 23),
+-	.mmu_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 20),
++static const struct vop_modeset rk3288_modeset = {
++	.htotal_pw = VOP_REG(RK3288_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
++	.hact_st_end = VOP_REG(RK3288_DSP_HACT_ST_END, 0x1fff1fff, 0),
++	.vtotal_pw = VOP_REG(RK3288_DSP_VTOTAL_VS_END, 0x1fff1fff, 0),
++	.vact_st_end = VOP_REG(RK3288_DSP_VACT_ST_END, 0x1fff1fff, 0),
++	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
++	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
++};
++
++static const struct vop_output rk3288_output = {
++	.pin_pol = VOP_REG(RK3288_DSP_CTRL0, 0xf, 4),
+ 	.rgb_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 12),
+ 	.hdmi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 13),
+ 	.edp_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 14),
+ 	.mipi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 15),
++};
++
++static const struct vop_common rk3288_common = {
++	.standby = VOP_REG_SYNC(RK3288_SYS_CTRL, 0x1, 22),
++	.gate_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 23),
++	.mmu_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 20),
+ 	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0xf, 1),
+ 	.dither_up = VOP_REG(RK3288_DSP_CTRL1, 0x1, 6),
+ 	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
+ 	.dsp_blank = VOP_REG(RK3288_DSP_CTRL0, 0x3, 18),
+ 	.out_mode = VOP_REG(RK3288_DSP_CTRL0, 0xf, 0),
+-	.pin_pol = VOP_REG(RK3288_DSP_CTRL0, 0xf, 4),
+-	.htotal_pw = VOP_REG(RK3288_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
+-	.hact_st_end = VOP_REG(RK3288_DSP_HACT_ST_END, 0x1fff1fff, 0),
+-	.vtotal_pw = VOP_REG(RK3288_DSP_VTOTAL_VS_END, 0x1fff1fff, 0),
+-	.vact_st_end = VOP_REG(RK3288_DSP_VACT_ST_END, 0x1fff1fff, 0),
+-	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
+-	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
+-	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
+ 	.cfg_done = VOP_REG_SYNC(RK3288_REG_CFG_DONE, 0x1, 0),
+ };
+ 
+@@ -265,37 +278,13 @@
+ static const struct vop_data rk3288_vop = {
+ 	.feature = VOP_FEATURE_OUTPUT_RGB10,
+ 	.intr = &rk3288_vop_intr,
+-	.ctrl = &rk3288_ctrl_data,
++	.common = &rk3288_common,
++	.modeset = &rk3288_modeset,
++	.output = &rk3288_output,
+ 	.win = rk3288_vop_win_data,
+ 	.win_size = ARRAY_SIZE(rk3288_vop_win_data),
+ };
+ 
+-static const struct vop_ctrl rk3399_ctrl_data = {
+-	.standby = VOP_REG_SYNC(RK3399_SYS_CTRL, 0x1, 22),
+-	.gate_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 23),
+-	.dp_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 11),
+-	.rgb_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 12),
+-	.hdmi_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 13),
+-	.edp_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 14),
+-	.mipi_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 15),
+-	.dither_down = VOP_REG(RK3399_DSP_CTRL1, 0xf, 1),
+-	.dither_up = VOP_REG(RK3399_DSP_CTRL1, 0x1, 6),
+-	.data_blank = VOP_REG(RK3399_DSP_CTRL0, 0x1, 19),
+-	.out_mode = VOP_REG(RK3399_DSP_CTRL0, 0xf, 0),
+-	.rgb_pin_pol = VOP_REG(RK3399_DSP_CTRL1, 0xf, 16),
+-	.dp_pin_pol = VOP_REG(RK3399_DSP_CTRL1, 0xf, 16),
+-	.hdmi_pin_pol = VOP_REG(RK3399_DSP_CTRL1, 0xf, 20),
+-	.edp_pin_pol = VOP_REG(RK3399_DSP_CTRL1, 0xf, 24),
+-	.mipi_pin_pol = VOP_REG(RK3399_DSP_CTRL1, 0xf, 28),
+-	.htotal_pw = VOP_REG(RK3399_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
+-	.hact_st_end = VOP_REG(RK3399_DSP_HACT_ST_END, 0x1fff1fff, 0),
+-	.vtotal_pw = VOP_REG(RK3399_DSP_VTOTAL_VS_END, 0x1fff1fff, 0),
+-	.vact_st_end = VOP_REG(RK3399_DSP_VACT_ST_END, 0x1fff1fff, 0),
+-	.hpost_st_end = VOP_REG(RK3399_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
+-	.vpost_st_end = VOP_REG(RK3399_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
+-	.cfg_done = VOP_REG_MASK_SYNC(RK3399_REG_CFG_DONE, 0x1, 0),
+-};
+-
+ static const int rk3399_vop_intrs[] = {
+ 	FS_INTR,
+ 	0, 0,
+@@ -316,10 +305,26 @@
  	.clear = VOP_REG_MASK_SYNC(RK3399_INTR_CLEAR0, 0xffff, 0),
+ };
+ 
++static const struct vop_output rk3399_output = {
++	.dp_pin_pol = VOP_REG(RK3399_DSP_CTRL1, 0xf, 16),
++	.rgb_pin_pol = VOP_REG(RK3368_DSP_CTRL1, 0xf, 16),
++	.hdmi_pin_pol = VOP_REG(RK3368_DSP_CTRL1, 0xf, 20),
++	.edp_pin_pol = VOP_REG(RK3368_DSP_CTRL1, 0xf, 24),
++	.mipi_pin_pol = VOP_REG(RK3368_DSP_CTRL1, 0xf, 28),
++	.dp_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 11),
++	.rgb_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 12),
++	.hdmi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 13),
++	.edp_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 14),
++	.mipi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 15),
++};
++
+ static const struct vop_data rk3399_vop_big = {
+ 	.feature = VOP_FEATURE_OUTPUT_RGB10,
+ 	.intr = &rk3399_vop_intr,
+-	.ctrl = &rk3399_ctrl_data,
++	.common = &rk3288_common,
++	.modeset = &rk3288_modeset,
++	.output = &rk3399_output,
++	.misc = &rk3368_misc,
+ 	/*
+ 	 * rk3399 vop big windows register layout is same as rk3288.
+ 	 */
+@@ -336,7 +341,10 @@
+ 
+ static const struct vop_data rk3399_vop_lit = {
+ 	.intr = &rk3399_vop_intr,
+-	.ctrl = &rk3399_ctrl_data,
++	.common = &rk3288_common,
++	.modeset = &rk3288_modeset,
++	.output = &rk3399_output,
++	.misc = &rk3368_misc,
+ 	/*
+ 	 * rk3399 vop lit windows register layout is same as rk3288,
+ 	 * but cut off the win1 and win3 windows.
 -- 
 1.9.1
