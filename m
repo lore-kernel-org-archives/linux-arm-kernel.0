@@ -1,82 +1,32 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 17 Jul 2017 17:19:25 -0700
-Subject: [PATCH v4] PM / suspend: Export pm_suspend_target_state
-In-Reply-To: <20170717221059.6523-1-f.fainelli@gmail.com>
-References: <20170717221059.6523-1-f.fainelli@gmail.com>
-Message-ID: <20170718001925.25286-1-f.fainelli@gmail.com>
+From: cphealy@gmail.com (Chris Healy)
+Date: Mon, 17 Jul 2017 17:42:16 -0700
+Subject: [PATCH 0/5] ARM: dts: imx6: RDU2: Ethernet switch and PHYs
+In-Reply-To: <1500323104-11583-1-git-send-email-andrew@lunn.ch>
+References: <1500323104-11583-1-git-send-email-andrew@lunn.ch>
+Message-ID: <CAFXsbZrtDqprDkcazbkJ5reJ80UYzJAzx3sCnBp7UnoZEC6aNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Have the core suspend/resume framework store the system-wide suspend
-state (suspend_state_t) we are about to enter, and expose it to drivers
-via pm_suspend_target_state in order to retrieve that. The state is
-assigned in suspend_devices_and_enter().
+I tested the full series successfully on the RDU2 platform.
 
-This is useful for platform specific drivers that may need to take a
-slightly different suspend/resume path based on the system's
-suspend/resume state being entered.
-
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
-Changes in v4:
-- clear pm_suspend_target_state in Close label
-
-Changes in v3:
-
-- just export pm_suspend_target_state without a helper function
-
-Changes in v2:
-
-- rename platform_suspend_target_state() -> suspend_target_state()
-- directly export the suspend_state_t value and assign it in
-  suspend_devices_and_enter()
+Tested-by: Chris Healy <cphealy@gmail.com>
 
 
- include/linux/suspend.h | 1 +
- kernel/power/suspend.c  | 5 +++++
- 2 files changed, 6 insertions(+)
-
-diff --git a/include/linux/suspend.h b/include/linux/suspend.h
-index 0b1cf32edfd7..2159f6841768 100644
---- a/include/linux/suspend.h
-+++ b/include/linux/suspend.h
-@@ -427,6 +427,7 @@ extern int unregister_pm_notifier(struct notifier_block *nb);
- /* drivers/base/power/wakeup.c */
- extern bool events_check_enabled;
- extern unsigned int pm_wakeup_irq;
-+extern suspend_state_t pm_suspend_target_state;
- 
- extern bool pm_wakeup_pending(void);
- extern void pm_system_wakeup(void);
-diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
-index 3ecf275d7e44..d0c0b96c2383 100644
---- a/kernel/power/suspend.c
-+++ b/kernel/power/suspend.c
-@@ -47,6 +47,8 @@ const char *mem_sleep_states[PM_SUSPEND_MAX];
- 
- suspend_state_t mem_sleep_current = PM_SUSPEND_FREEZE;
- static suspend_state_t mem_sleep_default = PM_SUSPEND_MEM;
-+suspend_state_t pm_suspend_target_state;
-+EXPORT_SYMBOL_GPL(pm_suspend_target_state);
- 
- unsigned int pm_suspend_global_flags;
- EXPORT_SYMBOL_GPL(pm_suspend_global_flags);
-@@ -456,6 +458,8 @@ int suspend_devices_and_enter(suspend_state_t state)
- 	if (!sleep_state_supported(state))
- 		return -ENOSYS;
- 
-+	pm_suspend_target_state = state;
-+
- 	error = platform_suspend_begin(state);
- 	if (error)
- 		goto Close;
-@@ -485,6 +489,7 @@ int suspend_devices_and_enter(suspend_state_t state)
- 
-  Close:
- 	platform_resume_end(state);
-+	pm_suspend_target_state = PM_SUSPEND_ON;
- 	return error;
- 
-  Recover_platform:
--- 
-2.9.3
+On Mon, Jul 17, 2017 at 1:24 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> This patchset extends the RDU2 to support its Ethernet switch, the
+> PHYs within the switch, the switches EEPROM, and the Micrel
+> PHY connected to the FEC.
+>
+> Andrew Lunn (5):
+>   ARM: dts: imx6: RDU2: Add Micrel PHY to FEC
+>   ARM: dts: imx6: RDU2: Add DSA support for the Marvell 88E6352
+>   ARM: dts: imx6: RDU2: Add Switch EEPROM
+>   ARM: dts: imx6: RDU2: Add Switch interrupts
+>   ARM: dts: imx6: RDU2: Add Micrel PHY interrupt
+>
+>  arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 112 +++++++++++++++++++++++++++++++-
+>  1 file changed, 109 insertions(+), 3 deletions(-)
+>
+> --
+> 2.13.2
+>
