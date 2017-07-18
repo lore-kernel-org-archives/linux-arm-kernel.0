@@ -1,53 +1,23 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Tue, 18 Jul 2017 15:46:02 +0800
-Subject: [PATCH v4 0/2] Add basic support for Mediatek MT2712 SoC
-In-Reply-To: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
-References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1500363962.4499.4.camel@mtksdaap41>
+From: adriana.reus@nxp.com (Adriana Reus)
+Date: Tue, 18 Jul 2017 10:44:50 +0300
+Subject: [PATCH 0/2] clk: imx: imx7d: Fixes for imx7d-ccm clock driver
+Message-ID: <1500363892-1173-1-git-send-email-adriana.reus@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+The first patch sets the OCRAM_CLK parent to main_axi_root_clk instead of
+axi_post_div.
 
-Just a gentle ping.
-Should I rebase to 4.13-rc1 and send v5?
+The second patch removes the ARM_M0 clock.
+IMX7d does not have an M0 and this clock is not otherwise used.
 
-Thanks
-yt.shen
+Adriana Reus (2):
+  clk: imx: imx7d: Fix parent clock for OCRAM_CLK
+  clk: imx: imx7d: Remove ARM_M0 clock
 
-On Thu, 2017-06-22 at 17:32 +0800, YT Shen wrote:
-> MT2712 is a SoC based on 64bit ARMv8 architecture.
-> MT2712 share many HW IP with MT8173.  This patchset was tested on MT2712 evaluation board, and boot to shell ok.
-> 
-> This series contains document bindings, device tree including interrupt and uart.
-> 
-> Changes compared to v3:
-> - use two uart clocks refer to the bindings
-> 
-> Changes compared to v2:
-> - remove alias from serial1 to serial5
-> - remove initrd-start and initrd-end
-> - change GIC_CPU_MASK_SIMPLE(6) to GIC_CPU_MASK_RAW(0x13)
-> - change gic-400 reg range
-> 
-> Changes compared to v1:
-> - change subject prefix for bindings
-> - change device tree license to SPDX tag.
-> - change bootargs parameter to DT usage.
-> - change intpol-controller to interrupt-controller
-> 
-> YT Shen (2):
->   dt-bindings: arm: Add bindings for Mediatek MT2712 SoC Platform
->   arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and
->     Makefile
-> 
->  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
->  .../interrupt-controller/mediatek,sysirq.txt       |   1 +
->  .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
->  arch/arm64/boot/dts/mediatek/Makefile              |   1 +
->  arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  32 ++++
->  arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 172 +++++++++++++++++++++
->  6 files changed, 211 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> 
+ drivers/clk/imx/clk-imx7d.c             |  11 +-
+ include/dt-bindings/clock/imx7d-clock.h | 742 ++++++++++++++++----------------
+ 2 files changed, 370 insertions(+), 383 deletions(-)
+
+-- 
+2.7.4
