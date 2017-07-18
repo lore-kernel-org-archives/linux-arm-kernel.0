@@ -1,92 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Jul 2017 18:37:55 +0100
-Subject: [PATCH] irqchip/gic: Ensure we have an ISB between ack and
- ->handle_irq
-Message-ID: <1500399475-11489-1-git-send-email-will.deacon@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 18 Jul 2017 19:43:28 +0200
+Subject: [PATCH] pinctrl: samsung: Remove unneeded local variable
+ initialization
+Message-ID: <1500399808-6580-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Devices that expose their interrupt status registers via system
-registers (e.g. Statistical profiling, CPU PMU, DynamIQ PMU, arch timer,
-vgic (although unused by Linux), ...) rely on a context synchronising
-operation on the CPU to ensure that the updated status register is
-visible to the CPU when handling the interrupt. This usually happens as
-a result of taking the IRQ exception in the first place, but there are
-two race scenarios where this isn't the case.
+Two local variables (shift and reg_con) were initialized to unused
+values - they were overwritten just few lines after.  Getting rid of
+this unused initialization allows dropping other variables and
+compacting slightly the code.
 
-For example, let's say we have two peripherals (X and Y), where Y uses a
-system register for its interrupt status.
-
-Case 1:
-1. CPU takes an IRQ exception as a result of X raising an interrupt
-2. Y then raises its interrupt line, but the update to its system
-   register is not yet visible to the CPU
-3. The GIC decides to expose Y's interrupt number first in the Ack
-   register
-4. The CPU runs the IRQ handler for Y, but the status register is stale
-
-Case 2:
-1. CPU takes an IRQ exception as a result of X raising an interrupt
-2. CPU reads the interrupt number for X from the Ack register and runs
-   its IRQ handler
-3. Y raises its interrupt line and the Ack register is updated, but
-   again, the update to its system register is not yet visible to the
-   CPU.
-4. Since the GIC drivers poll the Ack register, we read Y's interrupt
-   number and run its handler without a context synchronisation
-   operation, therefore seeing the stale register value.
-
-In either case, we run the risk of missing an IRQ. This patch solves the
-problem by ensuring that we execute an ISB in the GIC drivers prior
-to invoking the interrupt handler. This is already the case for GICv3
-and EOIMode 1 (the usual case for the host).
-
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/irqchip/irq-gic-v3.c | 2 ++
- drivers/irqchip/irq-gic.c    | 7 +++++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 18 ++++--------------
+ 1 file changed, 4 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index dbffb7ab6203..b1297ff8b6d0 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -353,6 +353,8 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index 731530a9ce38..f6bdbc8cd5c0 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -149,15 +149,10 @@ static int exynos_irq_set_type(struct irq_data *irqd, unsigned int type)
  
- 			if (static_key_true(&supports_deactivate))
- 				gic_write_eoir(irqnr);
-+			else
-+				isb();
+ static int exynos_irq_request_resources(struct irq_data *irqd)
+ {
+-	struct irq_chip *chip = irq_data_get_irq_chip(irqd);
+-	struct exynos_irq_chip *our_chip = to_exynos_irq_chip(chip);
+ 	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
+ 	const struct samsung_pin_bank_type *bank_type = bank->type;
+-	unsigned int shift = EXYNOS_EINT_CON_LEN * irqd->hwirq;
+-	unsigned long reg_con = our_chip->eint_con + bank->eint_offset;
+-	unsigned long flags;
+-	unsigned int mask;
+-	unsigned int con;
++	unsigned long reg_con, flags;
++	unsigned int shift, mask, con;
+ 	int ret;
  
- 			err = handle_domain_irq(gic_data.domain, irqnr, regs);
- 			if (err) {
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 1b1df4f770bd..f45aef69e352 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -361,6 +361,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
- 		if (likely(irqnr > 15 && irqnr < 1020)) {
- 			if (static_key_true(&supports_deactivate))
- 				writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
-+			isb();
- 			handle_domain_irq(gic->domain, irqnr, regs);
- 			continue;
- 		}
-@@ -401,10 +402,12 @@ static void gic_handle_cascade_irq(struct irq_desc *desc)
- 		goto out;
+ 	ret = gpiochip_lock_as_irq(&bank->gpio_chip, irqd->hwirq);
+@@ -186,15 +181,10 @@ static int exynos_irq_request_resources(struct irq_data *irqd)
  
- 	cascade_irq = irq_find_mapping(chip_data->domain, gic_irq);
--	if (unlikely(gic_irq < 32 || gic_irq > 1020))
-+	if (unlikely(gic_irq < 32 || gic_irq > 1020)) {
- 		handle_bad_irq(desc);
--	else
-+	} else {
-+		isb();
- 		generic_handle_irq(cascade_irq);
-+	}
+ static void exynos_irq_release_resources(struct irq_data *irqd)
+ {
+-	struct irq_chip *chip = irq_data_get_irq_chip(irqd);
+-	struct exynos_irq_chip *our_chip = to_exynos_irq_chip(chip);
+ 	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
+ 	const struct samsung_pin_bank_type *bank_type = bank->type;
+-	unsigned int shift = EXYNOS_EINT_CON_LEN * irqd->hwirq;
+-	unsigned long reg_con = our_chip->eint_con + bank->eint_offset;
+-	unsigned long flags;
+-	unsigned int mask;
+-	unsigned int con;
++	unsigned long reg_con, flags;
++	unsigned int shift, mask, con;
  
-  out:
- 	chained_irq_exit(chip, desc);
+ 	reg_con = bank->pctl_offset + bank_type->reg_offset[PINCFG_TYPE_FUNC];
+ 	shift = irqd->hwirq * bank_type->fld_width[PINCFG_TYPE_FUNC];
 -- 
-2.1.4
+2.7.4
