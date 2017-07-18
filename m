@@ -1,109 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Jul 2017 16:47:58 +0200
-Subject: [PATCH 03/11] clk: sunxi-ng: a83t: Support new timing mode for
- mmc2 clock
-In-Reply-To: <CAGb2v67Ofdr9zL=o82F6-90meYZGaYtr_zy7y-OeBH30n1gERQ@mail.gmail.com>
-References: <20170714064302.20383-1-wens@csie.org>
- <20170714064302.20383-4-wens@csie.org>
- <20170717091402.3qb3fhdyhfbv6t66@flea>
- <CAGb2v67Ofdr9zL=o82F6-90meYZGaYtr_zy7y-OeBH30n1gERQ@mail.gmail.com>
-Message-ID: <20170718144758.os7yy6saulb65gam@flea>
+From: afd@ti.com (Andrew F. Davis)
+Date: Tue, 18 Jul 2017 10:00:35 -0500
+Subject: [PATCH 1/4] ARM: dts: keystone-k2g: Add PMMC node to support
+ TI-SCI protocol
+In-Reply-To: <20170718032844.29490-2-s-anna@ti.com>
+References: <20170718032844.29490-1-s-anna@ti.com>
+ <20170718032844.29490-2-s-anna@ti.com>
+Message-ID: <8b8c4eff-4f18-f0d2-e075-389921e5a990@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 06:12:35PM +0800, Chen-Yu Tsai wrote:
-> On Mon, Jul 17, 2017 at 5:14 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Fri, Jul 14, 2017 at 02:42:54PM +0800, Chen-Yu Tsai wrote:
-> >> The MMC2 clock supports a new timing mode. When the new mode is active,
-> >> the output clock rate is halved.
-> >>
-> >> This patch sets the feature flag for the new timing mode, and adds
-> >> a pre-divider based on the mode bit.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 38 +++++++++++++++++++++++++++--------
-> >>  1 file changed, 30 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
-> >> index 947f9f6e05d2..ee6688e9b361 100644
-> >> --- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
-> >> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
-> >> @@ -418,14 +418,36 @@ static SUNXI_CCU_PHASE(mmc1_sample_clk, "mmc1-sample", "mmc1",
-> >>  static SUNXI_CCU_PHASE(mmc1_output_clk, "mmc1-output", "mmc1",
-> >>                      0x08c, 8, 3, 0);
-> >>
-> >> -/* TODO Support MMC2 clock's new timing mode. */
-> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mod0_default_parents,
-> >> -                               0x090,
-> >> -                               0, 4,         /* M */
-> >> -                               16, 2,        /* P */
-> >> -                               24, 2,        /* mux */
-> >> -                               BIT(31),      /* gate */
-> >> -                               0);
-> >> +/*
-> >> + * MMC2 supports both old and new timing modes. When the new timing
-> >> + * mode is active, the output clock rate is halved by two. Here we
-> >> + * treat it as a variable pre-divider. Note that the pre-divider is
-> >> + * _not_ included in the possible factors during a set clock rate
-> >> + * operation. It is only read out.
-> >> + */
-> >> +static const struct ccu_mux_var_prediv mmc2_new_timing_predivs[] = {
-> >> +     { .index = 0, .shift = 30, .width = 1 },
-> >> +     { .index = 1, .shift = 30, .width = 1 },
-> >> +};
-> >> +static struct ccu_mp mmc2_clk = {
-> >> +     .enable = BIT(31),
-> >> +     .m      = _SUNXI_CCU_DIV(0, 4),
-> >> +     .p      = _SUNXI_CCU_DIV(16, 2),
-> >> +     .mux    = {
-> >> +             .shift  = 24,
-> >> +             .width  = 2,
-> >> +             .var_predivs    = mmc2_new_timing_predivs,
-> >> +             .n_var_predivs  = ARRAY_SIZE(mmc2_new_timing_predivs),
-> >> +     },
-> >> +     .common         = {
-> >> +             .reg            = 0x090,
-> >> +             .features       = CCU_FEATURE_MMC_TIMING_SWITCH,
-> >> +             .hw.init        = CLK_HW_INIT_PARENTS("mmc2",
-> >> +                                                   mod0_default_parents,
-> >> +                                                   &ccu_mp_ops,
-> >> +                                                   CLK_GET_RATE_NOCACHE),
-> >> +     },
-> >> +};
-> >
-> > Treating the new bit seems a bit of a hack to me. It only works
-> > because we're not evaluating the various pre-dividers during a
-> > determine_rate (and set_rate), but it might change in the future, and
-> > we will break all our eMMC controllers then.
-> >
-> > Since they're quite special, I was thinking about creating a new MMC
-> > clock type? We're going to use it on a number of SoCs, and we'll be
-> > able to model it properly, without crippling the regular and generic
-> > MP clocks.
+On 07/17/2017 10:28 PM, Suman Anna wrote:
+> From: Nishanth Menon <nm@ti.com>
 > 
-> Yes that should be doable. I could put them in the same file and
-> reuse all the existing MP clocks stuff by wrapping them in new
-> functions that check the timing mode bit.
+> Texas Instrument's System Control Interface (TI-SCI) Message Protocol
+> is implemented in Keystone 2 generation 66AK2G SoC with the PMMC entity.
 > 
-> Would that work for you?
+> Add the ti-sci node representing this 66AK2G PMMC module.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> [s-anna at ti.com: add unit address to DT node]
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>  arch/arm/boot/dts/keystone-k2g.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+> index a789f75a1ed5..7f0f4180b373 100644
+> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
+> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+> @@ -139,5 +139,19 @@
+>  			interrupts = <GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH>,
+>  				     <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+> +
+> +		pmmc: pmmc at 02921c00 {
+> +			compatible = "ti,k2g-sci";
+> +			/*
+> +			 * In case of rare platforms that does not use k2g as
+> +			 * system master, use /delete-property/
+> +			 */
 
-Yep, it does.
+This comment seems mis-worded, I believe this was meant to say "for
+platforms that do not use the *PMMC* as the system master".
 
-Thanks!
-Maxime
+Andrew
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170718/ec6ee430/attachment.sig>
+> +			ti,system-reboot-controller;
+> +			mbox-names = "rx", "tx";
+> +			mboxes= <&msgmgr 5 2>,
+> +				<&msgmgr 0 0>;
+> +			reg-names = "debug_messages";
+> +			reg = <0x02921c00 0x400>;
+> +		};
+>  	};
+>  };
+> 
