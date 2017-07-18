@@ -1,77 +1,93 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 18 Jul 2017 10:48:13 +0100
-Subject: [PATCH v4 16/18] coresight tmc: Support for save-restore in ETR
-In-Reply-To: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
-References: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500371295-30472-17-git-send-email-suzuki.poulose@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 18 Jul 2017 13:14:12 +0300
+Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail
+ for runtime_pm users
+In-Reply-To: <20170718070522.6uu7s6o3ivpemslf@flea>
+References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
+ <1823154.LT2zYSFJ4j@avalon> <20170718070522.6uu7s6o3ivpemslf@flea>
+Message-ID: <10955632.YI7NJnTkKU@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Coresight SoC 600 TMC ETR supports save-restore feature,
-where the values of the RRP/RWP and STS.Full are retained
-when it leaves the Disabled state. Hence, we must program the
-RRP/RWP and STS.Full to a proper value. For now, set the RRP/RWP
-to the base address of the buffer and clear the STS.Full register.
-This can be later exploited for proper save-restore of ETR
-trace contexts (e.g, perf).
+Hi Maxime,
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 ++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc.h     |  9 +++++++++
- 2 files changed, 21 insertions(+), 1 deletion(-)
+On Tuesday 18 Jul 2017 09:05:22 Maxime Ripard wrote:
+> On Fri, Jul 14, 2017 at 02:43:12AM +0300, Laurent Pinchart wrote:
+> > On Thursday 13 Jul 2017 16:41:13 Maxime Ripard wrote:
+> >> The current drm_atomic_helper_commit_tail helper works only if the CRTC
+> >> is accessible, and documents an alternative implementation that is
+> >> supposed to be used if that happens.
+> >> 
+> >> That implementation is then duplicated by some drivers. Instead of
+> >> documenting it, let's implement an helper that all the relevant users
+> >> can use directly.
+> >> 
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> ---
+> >> 
+> >>  drivers/gpu/drm/drm_atomic_helper.c        | 47 +++++++++++++++--------
+> >>  drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
+> >>  drivers/gpu/drm/rcar-du/rcar_du_kms.c      | 18 +---------
+> > 
+> > I've submitted "[PATCH] drm: rcar-du: Setup planes before enabling CRTC to
+> > avoid flicker" that changes the rcar-du implementation to the standard
+> > disable/update planes/enable order, so I'd appreciate if you could drop
+> > the rcar-du part of this patch to avoid conflicts.
+> 
+> I will.
+> 
+> > This being said, the reason why I switched back from the "runtime PM" to
+> > the "standard" order is probably of interest to you. Quoting the commit
+> > message,
+> >
+> >> Commit 52055bafa1ff ("drm: rcar-du: Move plane commit code from CRTC
+> >> start to CRTC resume") changed the order of the plane commit and CRTC
+> >> enable operations to accommodate the runtime PM requirements. However,
+> >> this introduced corruption in the first displayed frame, as the CRTC is
+> >> now enabled without any plane configured. On Gen2 hardware the first
+> >> frame will be black and likely unnoticed, but on Gen3 hardware we end up
+> >> starting the display before the VSP compositor, which is more
+> >> noticeable.
+> >> 
+> >> To fix this, revert the order of the commit operations back, and handle
+> >> runtime PM requirements in the CRTC .atomic_begin() and .atomic_enable()
+> >> helper operation handlers.
+> > 
+> > I believe that the "runtime PM" order is problematic in most drivers. The
+> > problem usually goes unnoticed as most monitors will not even display the
+> > first frame, and I assume many devices will just output it black, but it's
+> > an issue nonetheless.
+> > 
+> > Note that my driver hasn't lost the "runtime PM" requirements, so I had to
+> > support them with the "standard" order. The best way I've found was to
+> > runtime resume in the one of .atomic_begin() and .enable() that is run
+> > first. Not very neat, as similar code would be needed in most drivers. I
+> > wonder whether it wouldn't be useful to add resume/suspend helper
+> > callbacks for the CRTC.
+> 
+> I'm not sure it would apply. Our driver doesn't use runtime_pm at all,
+> but in order for the commits to happen, we need to have the CRTC
+> active, but it will remain powered up the whole time. I'm not sure if
+> we'll ever see such a frame.
+> 
+> But since this seems to be a pretty generic, maybe we should address
+> it in the helper itself?
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 38a0440..c2939af 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -22,7 +22,7 @@
- 
- static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- {
--	u32 axictl;
-+	u32 axictl, sts;
- 
- 	/* Zero out the memory to help with debug */
- 	memset(drvdata->vaddr, 0, drvdata->size);
-@@ -47,6 +47,17 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- 
- 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
- 	tmc_write_dba(drvdata, drvdata->paddr);
-+	/*
-+	 * If the TMC pointers must be programmed before the session,
-+	 * we have to set it properly (i.e, RRP/RWP to base address and
-+	 * STS to "not full").
-+	 */
-+	if (tmc_etr_has_cap(drvdata, TMC_ETR_SAVE_RESTORE)) {
-+		tmc_write_rrp(drvdata, drvdata->paddr);
-+		tmc_write_rwp(drvdata, drvdata->paddr);
-+		sts = readl_relaxed(drvdata->base + TMC_STS) & ~TMC_STS_FULL;
-+		writel_relaxed(sts, drvdata->base + TMC_STS);
-+	}
- 
- 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
- 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index c691014..08f1aea 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -120,6 +120,15 @@ enum tmc_mem_intf_width {
- #define TMC_ETR_SG			(0x1U << 0)
- /* ETR has separate read/write cache encodings */
- #define TMC_ETR_AXI_ARCACHE		(0x1U << 1)
-+/*
-+ * TMC_ETR_SAVE_RESTORE - Values of RRP/RWP/STS.Full are
-+ * retained when TMC leaves Disabled state, allowing us to continue
-+ * the tracing from a point where we stopped. This also implies that
-+ * the RRP/RWP/STS.Full should always be programmed to the correct
-+ * value. Unfortunately this is not advertised by the hardware,
-+ * so we have to rely on PID of the IP to detect the functionality.
-+ */
-+#define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
- 
- /**
-  * struct tmc_drvdata - specifics associated to an TMC component
+I think that would make sense.
+
+There are a few options that result in too many combinations for separate 
+commit tail helpers to be provided in my opinion:
+
+- disable/enable/planes vs. disable/planes/enable
+- DRM_PLANE_COMMIT_ACTIVE_ONLY vs. all CRTCs
+- drm_atomic_helper_wait_for_vblanks vs drm_atomic_helper_wait_for_flip_done
+
+Maybe we could add a few CRTC commit helper flags along the line of 
+DRM_PLANE_COMMIT_ACTIVE_ONLY, add a field to the drm_crtc structure to store 
+them, and have drm_atomic_helper_commit_tail() use those flags to control the 
+sequence of operations.
+
 -- 
-2.7.5
+Regards,
+
+Laurent Pinchart
