@@ -1,78 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Jul 2017 09:05:22 +0200
-Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail
- for runtime_pm users
-In-Reply-To: <1823154.LT2zYSFJ4j@avalon>
+Date: Tue, 18 Jul 2017 09:07:32 +0200
+Subject: [PATCH 4/4] drm/sun4i: make sure we don't have a commit pending
+In-Reply-To: <CAGb2v676F2ye7fDUSFwzWMxd8rF7_5YAxn+u+MNG-U2PuaDDoQ@mail.gmail.com>
 References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
- <aeeb8f778dae8f170294b6da92819973b742feb2.1499956639.git-series.maxime.ripard@free-electrons.com>
- <1823154.LT2zYSFJ4j@avalon>
-Message-ID: <20170718070522.6uu7s6o3ivpemslf@flea>
+ <a6dfec7ea3598c64f6653e9b8b5febac79172341.1499956639.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v64KnB_zU0yk7MsGr9WRK1wpWq1xOj_cNuQ4mSQJeAGarw@mail.gmail.com>
+ <20170717065504.xnahsboer3fh4k3i@flea>
+ <CAGb2v676F2ye7fDUSFwzWMxd8rF7_5YAxn+u+MNG-U2PuaDDoQ@mail.gmail.com>
+Message-ID: <20170718070732.ogoyc2fjcxoqbgj5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Mon, Jul 17, 2017 at 02:57:19PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Jul 17, 2017 at 2:55 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, Jul 14, 2017 at 04:56:01PM +0800, Chen-Yu Tsai wrote:
+> >> Hi,
+> >>
+> >> On Thu, Jul 13, 2017 at 10:41 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > In the earlier display engine designs, any register access while a commit
+> >> > is pending is forbidden.
+> >> >
+> >> > One of the symptoms is that reading a register will return another, random,
+> >> > register value which can lead to register corruptions if we ever do a
+> >> > read/modify/write cycle.
+> >>
+> >> Alternatively, if changes to the backend (layers) are guaranteed to happen
+> >> while the CRTC is disabled (which seems to be the case after looking at
+> >> drm_atomic_helper_commit_planes and drm_atomic_helper_commit_tail), we
+> >> could just turn on register auto-commit all the time and not deal with
+> >> this.
+> >
+> > As far as I understand, it will only be the case if we need a new
+> > modeset or we changed the active CRTC or connectors. But if you change
+> > only the format, buffers or properties it won't be the case, and we'll
+> > need to commit.
+> 
+> So in other words, if someone were to use it for actual compositing and
+> moved the upper composited layer around, we would need commit support to be
+> safe.
+>
+> Sounds more or less like something a video player would do.
 
-On Fri, Jul 14, 2017 at 02:43:12AM +0300, Laurent Pinchart wrote:
-> Hi Maxime,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 13 Jul 2017 16:41:13 Maxime Ripard wrote:
-> > The current drm_atomic_helper_commit_tail helper works only if the CRTC is
-> > accessible, and documents an alternative implementation that is supposed to
-> > be used if that happens.
-> > 
-> > That implementation is then duplicated by some drivers. Instead of
-> > documenting it, let's implement an helper that all the relevant users can
-> > use directly.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/drm_atomic_helper.c        | 47 +++++++++++++++--------
-> >  drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
-> >  drivers/gpu/drm/rcar-du/rcar_du_kms.c      | 18 +---------
-> 
-> I've submitted "[PATCH] drm: rcar-du: Setup planes before enabling CRTC to 
-> avoid flicker" that changes the rcar-du implementation to the standard 
-> disable/update planes/enable order, so I'd appreciate if you could drop the 
-> rcar-du part of this patch to avoid conflicts.
-
-I will.
-
-> This being said, the reason why I switched back from the "runtime PM" to the 
-> "standard" order is probably of interest to you. Quoting the commit message,
-> 
-> > Commit 52055bafa1ff ("drm: rcar-du: Move plane commit code from CRTC
-> > start to CRTC resume") changed the order of the plane commit and CRTC
-> > enable operations to accommodate the runtime PM requirements. However,
-> > this introduced corruption in the first displayed frame, as the CRTC is
-> > now enabled without any plane configured. On Gen2 hardware the first
-> > frame will be black and likely unnoticed, but on Gen3 hardware we end up
-> > starting the display before the VSP compositor, which is more
-> > noticeable.
-> > 
-> > To fix this, revert the order of the commit operations back, and handle
-> > runtime PM requirements in the CRTC .atomic_begin() and .atomic_enable()
-> > helper operation handlers.
-> 
-> I believe that the "runtime PM" order is problematic in most drivers. The 
-> problem usually goes unnoticed as most monitors will not even display the 
-> first frame, and I assume many devices will just output it black, but it's an 
-> issue nonetheless.
-> 
-> Note that my driver hasn't lost the "runtime PM" requirements, so I had to 
-> support them with the "standard" order. The best way I've found was to runtime 
-> resume in the one of .atomic_begin() and .enable() that is run first. Not very 
-> neat, as similar code would be needed in most drivers. I wonder whether it 
-> wouldn't be useful to add resume/suspend helper callbacks for the CRTC.
-
-I'm not sure it would apply. Our driver doesn't use runtime_pm at all,
-but in order for the commits to happen, we need to have the CRTC
-active, but it will remain powered up the whole time. I'm not sure if
-we'll ever see such a frame.
-
-But since this seems to be a pretty generic, maybe we should address
-it in the helper itself?
+Not only that. A change of buffer will happen every frame or so, and
+we can change the format whenever we want too (even if it's usually
+going to be in sync with a new buffer). Changing a property can happen
+any time too (like zpos for example).
 
 Maxime
 
@@ -86,4 +60,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170718/bb87f374/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170718/1ccb524a/attachment.sig>
