@@ -1,55 +1,116 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 18 Jul 2017 10:51:09 +0200
-Subject: [PATCH 1/2] arm: dts: stm32: add cec for stm32f7 familly
-Message-ID: <1500367869-566-1-git-send-email-benjamin.gaignard@linaro.org>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Tue, 18 Jul 2017 11:05:18 +0200
+Subject: Uncorrectable bitflips with Linux 4.12 on SAMA5D2
+In-Reply-To: <20170717202008.6c798789@bbrezillon>
+References: <CAMiSF3CtVY7G=ugt-bpsOOMqLcFrmx7hDstUag2_6H-KrN4yBg@mail.gmail.com>
+ <20170717194809.4a080e0c@bbrezillon> <20170717202008.6c798789@bbrezillon>
+Message-ID: <CAGkQfmMp2rTxhUv=JVa78BqFBGBEiUicb1vN7bqbXLKWL8pOsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add cec in devicetree for stm32f7 familly
+Hi Boris,
 
-version 1.1:
-- with correct slew rate
+2017-07-17 20:20 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
+> Le Mon, 17 Jul 2017 19:48:09 +0200,
+> Boris Brezillon <boris.brezillon@free-electrons.com> a ?crit :
+>
+>> +Ludovic, Nicolas and Alexandre
+>>
+>> Hi Romain,
+>>
+>> Le Mon, 17 Jul 2017 18:11:26 +0200,
+>> Romain Izard <romain.izard.pro@gmail.com> a ?crit :
+>>
+>> > Hello,
+>> >
+>> > On a custom board based on Microchip's SAMA5D2 SoC, I am encountering
+>> > ECC problems with the NAND Flash controller. The board is currently
+>> > working with Linux v4.9.x, but it does not with Linux 4.12.
+>> >
+>> > Some pages on the NAND Flash memory chip of the device have bitflips.
+>> > With Linux 4.9.x, the bitflips are fixed by the PMECC code, but with
+>> > Linux 4.12, the errors are reported as uncorrectable.
+>> >
+>> > From my end, I updated the board's device tree to include the
+>> > sama5d2.dtsi as it exists in Linux 4.12, but the rest of the file is
+>> > the same as for Linux 4.9. From my understanding, it should be
+>> > sufficient as the legacy DTB binding for the NAND controller is
+>> > supported.
+>>
+>> I know Ludovic add some problems with the NAND controller on sama5d2,
+>> but it was with the new bindings (see the fixes here [1]).
+>>
+>> Your problem seems a bit different since you're using the backward
+>> compat code.
+>
+> Can you try with the following patch applied?
+>
+> --->8---
+> From cb95a16cdd497137872c44d5dd4e251ec73c79c1 Mon Sep 17 00:00:00 2001
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Date: Mon, 17 Jul 2017 20:09:59 +0200
+> Subject: [PATCH] mtd: nand: atmel: Fix DT backward compatibility in pmecc.c
+>
+> PMECC caps extraction from old DT bindings is broken, thus leading to
+> erroneous EL registers offset, which in turn make HW ECC unusable on
+> sama5d2 when old bindings are in use.
+>
+> Passing the NAND dev node instead of the NFC node to of_match_node()
+> solves the problem.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Fixes: f88fc122cc34 ("mtd: nand: Cleanup/rework the atmel_nand driver")
+> Cc: <stable@vger.kernel.org>
+> ---
+>  drivers/mtd/nand/atmel/pmecc.c | 21 ++++++---------------
+>  1 file changed, 6 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
+> index 55a8ee5306ea..8c210a5776bc 100644
+> --- a/drivers/mtd/nand/atmel/pmecc.c
+> +++ b/drivers/mtd/nand/atmel/pmecc.c
+> @@ -945,6 +945,7 @@ struct atmel_pmecc *devm_atmel_pmecc_get(struct device *userdev)
+>                  */
+>                 struct platform_device *pdev = to_platform_device(userdev);
+>                 const struct atmel_pmecc_caps *caps;
+> +               const struct of_device_id *match;
+>
+>                 /* No PMECC engine available. */
+>                 if (!of_property_read_bool(userdev->of_node,
+> @@ -953,21 +954,11 @@ struct atmel_pmecc *devm_atmel_pmecc_get(struct device *userdev)
+>
+>                 caps = &at91sam9g45_caps;
+>
+> -               /*
+> -                * Try to find the NFC subnode and extract the associated caps
+> -                * from there.
+> -                */
+> -               np = of_find_compatible_node(userdev->of_node, NULL,
+> -                                            "atmel,sama5d3-nfc");
+> -               if (np) {
+> -                       const struct of_device_id *match;
+> -
+> -                       match = of_match_node(atmel_pmecc_legacy_match, np);
+> -                       if (match && match->data)
+> -                               caps = match->data;
+> -
+> -                       of_node_put(np);
+> -               }
+> +               /* Find the caps associated to the NAND dev node. */
+> +               match = of_match_node(atmel_pmecc_legacy_match,
+> +                                     userdev->of_node);
+> +               if (match && match->data)
+> +                       caps = match->data;
+>
+>                 pmecc = atmel_pmecc_create(pdev, caps, 1, 2);
+>         }
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- arch/arm/boot/dts/stm32f746.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-index 0c3dd1f..770e474 100644
---- a/arch/arm/boot/dts/stm32f746.dtsi
-+++ b/arch/arm/boot/dts/stm32f746.dtsi
-@@ -167,6 +167,15 @@
- 			status = "disabled";
- 		};
- 
-+		cec: cec at 40006c00 {
-+			compatible = "st,stm32-cec";
-+			reg = <0x40006C00 0x400>;
-+			interrupts = <94>;
-+			clocks = <&rcc 0 STM32F7_APB1_CLOCK(CEC)>, <&rcc 1 CLK_HDMI_CEC>;
-+			clock-names = "cec", "hdmi-cec";
-+			status = "disabled";
-+		};
-+
- 		usart7: serial at 40007800 {
- 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
- 			reg = <0x40007800 0x400>;
-@@ -339,6 +348,15 @@
- 				st,bank-name = "GPIOK";
- 			};
- 
-+			cec_pins_a: cec at 0 {
-+				pins {
-+					pinmux = <STM32F746_PA15_FUNC_HDMI_CEC>;
-+					slew-rate = <0>;
-+					drive-open-drain;
-+					bias-disable;
-+				};
-+			};
-+
- 			usart1_pins_a: usart1 at 0 {
- 				pins1 {
- 					pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
+The proposed patch fixes my issue. Thank you for your quick response!
+
+You can add my:
+Tested-by: Romain Izard <romain.izard.pro@gmail.com>
+
+Best regards,
 -- 
-1.9.1
+Romain Izard
