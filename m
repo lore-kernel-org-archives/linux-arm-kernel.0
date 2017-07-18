@@ -1,27 +1,56 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Mon, 17 Jul 2017 21:47:33 -0700
-Subject: [PATCH 0/4] Add various TI-SCI DT nodes on 66AK2G SoCs
-In-Reply-To: <20170718032844.29490-1-s-anna@ti.com>
-References: <20170718032844.29490-1-s-anna@ti.com>
-Message-ID: <33691a29-4a50-36e0-ad87-b5698d26bf77@oracle.com>
+From: ore@pengutronix.de (Oleksij Rempel)
+Date: Tue, 18 Jul 2017 06:52:50 +0200
+Subject: [PATCH v7 0/3] nvmem: upstream snvs_lpgpr driver
+In-Reply-To: <20170620070932.10353-1-o.rempel@pengutronix.de>
+References: <20170620070932.10353-1-o.rempel@pengutronix.de>
+Message-ID: <07198c02-ac87-ec1f-accd-75ad6fd0ac30@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/17/17 8:28 PM, Suman Anna wrote:
-> Hi Santosh,
-> 
-> The following patch series adds various TI-SCI related DTS nodes that
-> probe the corresponding TI-SCI genpd, clock and reset drivers for the
-> 66AK2G platforms.
-> 
-> This is the second of two series, and these nodes along with the defconfig
-> patches finally allows adding other peripherals to the 66AK2G platforms.
-> All the new peripherals should/will be added without using the device id
-> macros [1]. Patches are baselined on 4.13-rc1 and are intended for the 4.14
-> merge window.
-> 
-And this one looks good as well. Please ping me if you don't see this 
-show up in next, by next week.
+Hallo all,
 
-Regards,
-Santosh
+Here Gentle Ping to the Old King ;)
+
+DT is already ACKed.
+
+On 20.06.2017 09:09, Oleksij Rempel wrote:
+> changes v7:
+>  - split imx6ul patch and squash it with with main patches.
+>  - spell fixes in the binding documentation
+>  - return regmap_bulk_read directly.
+>
+> changes v6:
+>  - check if device is writable by reading GPR_SL and GPR_HL bits
+>  - use regmap_bulk_* functions instead of while() { regmap_read/write }
+>  - add patch for imx6ul
+>
+> changes v5:
+>  - use dcfg->offset instead of priv->offset.
+>
+> changes v4:
+>  - change dependencies in Kconfig
+>  - remove unused includes and order them alphabetically
+>  - set MODULE_LICENSE = GPL v2
+>  - remove unused int err variable
+>
+> changes v3:
+>  - remove regmap and offset properties.
+>
+> changes v2:
+>  - correct typos: Registe, parrent...
+>
+> Oleksij Rempel (3):
+>   nvmem: dt: document SNVS LPGPR binding
+>   nvmem: add snvs_lpgpr driver
+>   ARM: dts: imx6qdl.dtsi/imx6ul.dtsi: add "fsl,imx6q-snvs-lpgpr" node
+>
+>  .../devicetree/bindings/nvmem/snvs-lpgpr.txt       |  20 +++
+>  arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +
+>  arch/arm/boot/dts/imx6ul.dtsi                      |   4 +
+>  drivers/nvmem/Kconfig                              |  10 ++
+>  drivers/nvmem/Makefile                             |   2 +
+>  drivers/nvmem/snvs_lpgpr.c                         | 155 +++++++++++++++++++++
+>  6 files changed, 195 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+>  create mode 100644 drivers/nvmem/snvs_lpgpr.c
+>
