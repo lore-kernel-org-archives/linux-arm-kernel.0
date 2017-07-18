@@ -1,35 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Jul 2017 10:56:54 +0100
-Subject: [PATCH v2 2/2] crypto: arm64/ghash - add NEON accelerated
- fallback for 64-bit PMULL
-In-Reply-To: <20170718094946.GA6347@gondor.apana.org.au>
-References: <20170704234319.8398-1-ard.biesheuvel@linaro.org>
- <20170704234319.8398-2-ard.biesheuvel@linaro.org>
- <20170718094946.GA6347@gondor.apana.org.au>
-Message-ID: <CAKv+Gu8qeaL+YdWNtOhV7tGM3s3eykwAh6Vf2stB5nHpMYoHyQ@mail.gmail.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Tue, 18 Jul 2017 11:56:31 +0200
+Subject: [PATCH 2/3] mfd: syscon: atmel-smc: add helper to retrieve
+ register layout
+In-Reply-To: <20170718093713.stqshzuuv3l7pfve@dell>
+References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
+ <20170711074015.30440-3-ludovic.desroches@microchip.com>
+ <20170718081508.yo6uld5ip5hr6ipk@dell>
+ <20170718091238.wweaobzccdlgv5dh@dell>
+ <02a0c390-610c-d38b-e6a3-f04120c6fbb3@microchip.com>
+ <20170718093713.stqshzuuv3l7pfve@dell>
+Message-ID: <20170718095631.xz6p2u74z4i2n2lj@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 July 2017 at 10:49, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Wed, Jul 05, 2017 at 12:43:19AM +0100, Ard Biesheuvel wrote:
->> Implement a NEON fallback for systems that do support NEON but have
->> no support for the optional 64x64->128 polynomial multiplication
->> instruction that is part of the ARMv8 Crypto Extensions. It is based
->> on the paper "Fast Software Polynomial Multiplication on ARM Processors
->> Using the NEON Engine" by Danilo Camara, Conrado Gouvea, Julio Lopez and
->> Ricardo Dahab (https://hal.inria.fr/hal-01506572), but has been reworked
->> extensively for the AArch64 ISA.
->>
->> On a low-end core such as the Cortex-A53 found in the Raspberry Pi3, the
->> NEON based implementation is 4x faster than the table based one, and
->> is time invariant as well, making it less vulnerable to timing attacks.
->> When combined with the bit-sliced NEON implementation of AES-CTR, the
->> AES-GCM performance increases by ~2x (from 58 to 30 cycles per byte).
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> This patch does not apply against cryptodev.
->
+On Tue, Jul 18, 2017 at 10:37:13AM +0100, Lee Jones wrote:
+> On Tue, 18 Jul 2017, Nicolas Ferre wrote:
+> 
+> > On 18/07/2017 at 11:12, Lee Jones wrote:
+> > > On Tue, 18 Jul 2017, Lee Jones wrote:
+> > > 
+> > >> On Tue, 11 Jul 2017, Ludovic Desroches wrote:
+> > >>
+> > >>> For HSMC controller, the register layout depends on the device i.e. the
+> > >>> offset of setup, pulse, cycle, mode and timings registers is not the
+> > >>> same. An helper is added to provide the correct register layout.
+> > >>>
+> > >>> Fixes: fe9d7cb22ef3 ("mfd: syscon: atmel-smc: Add new helpers to ease
+> > >>> SMC regs manipulation")
+> > >>> Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > >>> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> > >>> ---
+> > >>>  drivers/memory/atmel-ebi.c               | 13 +++++--
+> > >>>  drivers/mfd/atmel-smc.c                  | 67 +++++++++++++++++++++++++-------
+> > >>>  drivers/mtd/nand/atmel/nand-controller.c | 10 +++--
+> > >>>  include/linux/mfd/syscon/atmel-smc.h     | 32 ++++++++++-----
+> > >>>  4 files changed, 92 insertions(+), 30 deletions(-)
+> > >>
+> > >> Applied, thanks.
+> > > 
+> > > Apologies, it looks like this needs 2 more Acks before I can even
+> > > consider taking it.
+> > > 
+> > > Unapplied.
+> > 
+> > If mine is missing, here it is:
+> > 
+> > For the whole series:
+> > Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > 
+> > And I think that Alexandre seemed okay by discussing the path those
+> > patches should take...
+> 
+> Thanks Anlexadre and Nicolas.
+> 
+> Patch does not apply to v4.13-rc1 however.
+> 
+> Ludovic,
+> 
+> Could you please rebase this patch and apply the 2 new Acks please?
+> 
+> Please also apply my:
+> 
+> For my own reference:
+>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> 
 
-Yeah, it implements a non-SIMD fallback which depends on the AES
-refactor series.
+Ok, I'll rebase the patch on top of v4.13-rc1 and resend it.
+
+Ludovic
+
+> ... and I'll get it applied ASAP.
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
