@@ -1,40 +1,65 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Tue, 18 Jul 2017 15:48:06 -0500
-Subject: [PATCH] net: ethernet: mediatek: remove useless code in mtk_poll_tx()
-Message-ID: <20170718204805.GA30888@embeddedgus>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 18 Jul 2017 14:17:52 -0700
+Subject: [PATCH 0/5] earlycon hang under some conditions
+In-Reply-To: <20170718175149.GA131686@google.com>
+References: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
+ <20170718175149.GA131686@google.com>
+Message-ID: <CAD=FV=UGWGbYycU8Avb9uLJ3j8mwbW0mGbifZpsMn+6isEwF=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove useless local variable _condition_ and the code related.
+Hi,
 
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
----
- drivers/net/ethernet/mediatek/mtk_eth_soc.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+On Tue, Jul 18, 2017 at 10:51 AM, Brian Norris <briannorris@chromium.org> wrote:
+> Hi Jeffy,
+>
+> On Tue, Jul 18, 2017 at 02:02:53PM +0800, Jeffy Chen wrote:
+>> I was testing earlycon with 8250 dw serial console. And it hangs in
+>> these cases:
+>> 1/ kernel hang when calling early write function after free_initmem:
+>> a) the earlycon not disabled after the init code(due to keep_bootcon or
+>>    not specify a real console to switch to)
+>> b) the early write func is marked as __init, for example 8250_early.
+>
+> FWIW, I tested 8250_early with "keep_bootcon", and this fixes that:
+>
+> Tested-by: Brian Norris <briannorris@chromium.org>
+>
+> But then I get double console, if I have both a "real" and "early"
+> console.
+>
+> If I were to *only* have the early console, then I might hit the
+> problems you mention:
+>
+>> 2/ kernel hang when calling early write function after disable unused
+>> clks/pm domain:
+>> a) the earlycon not disabled after the init code
+>> b) the disable unused clks/pm domain kill the requiered clks/pm
+>>    domain, since they are not referenced by the earlycon.
+>>
+>> 3/ kernel hang when calling early write function after the serial
+>>    console driver runtime suspended:
+>> a) the earlycon not disabled after the init code
+>> b) the serial console driver's runtime suspend kills the requiered
+>>    clks/pm domain, since they are not referenced by the earlycon.
+>>
+>> This serial fix 1/ case only.
+>
+> Problems 2 and 3 look like something that's not really in scope for
+> early consoles. There's a reason they are mainly supported for early
+> boot, and we try to switch off of them. There isn't really a good way to
+> handle all the clock and PM infrastructure without...switching off the
+> earlycon and using the real one :)
+>
+> So, I guess this patchset has value for systems where the clock/PM
+> requirements are simple enough, and the earlycon can actually be useful
+> beyond early init.
 
-diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-index b3d0c2e..7e95cf5 100644
---- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-+++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-@@ -1027,7 +1027,6 @@ static int mtk_poll_tx(struct mtk_eth *eth, int budget)
- 	unsigned int done[MTK_MAX_DEVS];
- 	unsigned int bytes[MTK_MAX_DEVS];
- 	u32 cpu, dma;
--	static int condition;
- 	int total = 0, i;
- 
- 	memset(done, 0, sizeof(done));
-@@ -1051,10 +1050,8 @@ static int mtk_poll_tx(struct mtk_eth *eth, int budget)
- 			mac = 1;
- 
- 		skb = tx_buf->skb;
--		if (!skb) {
--			condition = 1;
-+		if (!skb)
- 			break;
--		}
- 
- 		if (skb != (struct sk_buff *)MTK_DMA_DUMMY_DESC) {
- 			bytes[mac] += skb->len;
--- 
-2.5.0
+Presumably someone using this would just use the "clk_ignore_unused"
+and "pd_ignore_unused" kernel parameters to help them...  In this case
+that seems fine to me.  The "early" boot console is early because it
+can't rely on all of the generic OS mechanisms to do things super
+cleanly, so requiring the user to know that they should add the extra
+command line arguments seems sane.
+
+-Doug
