@@ -1,89 +1,65 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 18 Jul 2017 19:06:05 +0200
-Subject: [PATCH v16 2/7] power: add power sequence library
-In-Reply-To: <20170718042955.GA12080@b29397-desktop>
-References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
- <10723509.cz5GGA4OTz@aspire.rjw.lan> <20170710022815.GA8720@b29397-desktop>
- <2659617.dvNVihq86F@aspire.rjw.lan> <20170718042955.GA12080@b29397-desktop>
-Message-ID: <CAJZ5v0hGbJuqqY6Pq5cYPrawSGW-zdhYHj0ovhJ9zXRAkBPCRQ@mail.gmail.com>
+From: jintack.lim@linaro.org (Jintack Lim)
+Date: Tue, 18 Jul 2017 11:59:02 -0500
+Subject: [RFC PATCH v2 36/38] KVM: arm64: Respect virtual HCR_EL2.TVM and TRVM
+ settings
+In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1500397144-16232-37-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 6:29 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Mon, Jul 17, 2017 at 03:39:07PM +0200, Rafael J. Wysocki wrote:
->> > Sorry, I should describe more.
->> >
->> > Let's take USB bus as an example, when the new USB device is at the
->> > host port, the device structure at device model is not created until
->> > it is discoverable by the USB bus. If this new USB device needs to be
->> > powered on before can be discoverable by the bus, the device structure
->> > will be not created without powering on operation. The code usb_alloc_dev
->> > (drivers/usb/core/usb.c) is only called for discoverable device.
->> >
->> > Unlike the other bus, eg, platform bus, it creates device structure
->> > according to DT node. The USB bus was designed for hot plug model, the
->> > device structure is for discoverable device. In recent years, we begin
->> > to have some hard-wired USB device, Eg, onboard USB-hub, onboard USB 4G
->> > Modem, etc at the market. It needs some board level power operation before
->> > it can be found by the USB bus. This patch set is designed primarily for
->> > fix this kind of problem. You will see at at pwrseq_generic.c, we use DT
->> > version clock API of_clk_get and DT version gpio API of_get_named_gpio_flags
->> > instead of device structure version, like devm_clk_get and
->> > devm_gpiod_get_optional.
->> >
->> > MMC system has similar use case, it creates power sequence platform
->> > device for this issue, but all those power stuffs (clock, gpio, etc)
->> > may not be suitable as a dedicated virtual device at DT, they are belonged
->> > to one physical device, so this patch set is created to see if this issue
->> > can be fixed better.
->>
->> OK, thanks for the explanation.
->>
->> The above needs to be part of your problem statement.
->
-> Ok, I will add it to cover letter.
->
->> >
->> > The bus will power up all device nodes in this bus according to DT
->> > information, the device structure has not created at this time.
->>
->> OK
->>
->> I still think that the information on power resources depended on by devices
->> should be used for power management as well as for the initial power-up.
->>
->> The most straightforward way to arrange for that would be to make it possible
->> to find the DT node matching the device after the device has been discovered
->> and struct device created for it, say by USB.  That would require adding some
->> more information on the device to the DT node, probably.
->
-> After the device is created, the device node structure is under struct
-> device, say dev->of_node. The most difficulty for this issue is the
-> device creation is dynamic and is after the physical device is
-> discovered by the bus, the initial power-up is needed before the device
-> can be discovered by the bus.
+Forward the EL1 virtual memory register traps to the virtual EL2 if they
+are not coming from the virtual EL2 and the virtual HCR_EL2.TVM or TRVM
+bit is set.
 
-So you power up all devices on the bus using the information from
-of_nodes upfront.
+This is for recursive nested virtualization.
 
-Then you scan the bus and discover devices.  For each of them, once it
-has been discovered, you look up a matching of_node and initialize
-power_state from there.
+Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
+---
+ arch/arm64/kvm/sys_regs.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
->>
->> Then, the DT device nodes would be used for the initial power-up and next, after
->> discovering a device, you'd do a lookup in the DT, find the node matching it
->> and read the power resuources information from there to populate the device's
->> power state structure.  From that point on you can simply use the interface I
->> suggested.
->>
->
-> Just like I said above, without initial power-up, the device can't be
-> discovered by the bus.
-
-Right.
-
-So you do the power up upfront, as per the above.
-
-Thanks,
-Rafael
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 3559cf7..3e4ec5e 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -135,6 +135,27 @@ static inline bool el12_reg(struct sys_reg_params *p)
+ 	return (p->Op1 == 5);
+ }
+ 
++/* This function is to support the recursive nested virtualization */
++static bool forward_vm_traps(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
++{
++	u64 hcr_el2 = vcpu_sys_reg(vcpu, HCR_EL2);
++
++	/* If a trap comes from the virtual EL2, the host hypervisor handles. */
++	if (vcpu_mode_el2(vcpu))
++		return false;
++
++	/*
++	 * If the virtual HCR_EL2.TVM or TRVM bit is set, we need to foward
++	 * this trap to the virtual EL2.
++	 */
++	if ((hcr_el2 & HCR_TVM) && p->is_write)
++		return true;
++	else if ((hcr_el2 & HCR_TRVM) && !p->is_write)
++		return true;
++
++	return false;
++}
++
+ /*
+  * Generic accessor for VM registers. Only called as long as HCR_TVM
+  * is set. If the guest enables the MMU, we stop trapping the VM
+@@ -152,6 +173,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+ 	if (el12_reg(p) && forward_nv_traps(vcpu))
+ 		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+ 
++	if (!el12_reg(p) && forward_vm_traps(vcpu, p))
++		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++
+ 	/*
+ 	 * Redirect EL1 register accesses to the corresponding EL2 registers if
+ 	 * they are meant to access EL2 registers.
+-- 
+1.9.1
