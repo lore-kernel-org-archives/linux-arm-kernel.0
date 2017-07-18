@@ -1,31 +1,28 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 18 Jul 2017 06:59:07 +0200
-Subject: [PATCH v2 5/5] ARM: qcom_defconfig: Cleanup from non-existing options
-In-Reply-To: <1500353947-26122-1-git-send-email-krzk@kernel.org>
-References: <1500353947-26122-1-git-send-email-krzk@kernel.org>
-Message-ID: <1500353947-26122-6-git-send-email-krzk@kernel.org>
+Date: Tue, 18 Jul 2017 07:03:02 +0200
+Subject: [PATCH v5 4/5] arm64: dts: exynos: Remove the OF graph from DSI
+ node
+In-Reply-To: <1488948852-5380-5-git-send-email-hoegeun.kwon@samsung.com>
+References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170308045502epcas1p21a483d429e2169b322e40fd833c47f27@epcas1p2.samsung.com>
+ <1488948852-5380-5-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <20170718050302.GA13779@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-QCOM_SMD is gone since commit 395a48053af6 ("soc: qcom: smd: Remove
-standalone driver").
+On Wed, Mar 08, 2017 at 01:54:11PM +0900, Hoegeun Kwon wrote:
+> The OF graph is not needed because the panel is a child of dsi. Remove
+> the ports node in DSI node.
+> 
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 14 --------------
+>  1 file changed, 14 deletions(-)
+> 
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/configs/qcom_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+Thanks, applied this and 5/5.
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index b02039c712c3..879159e4ab58 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -199,7 +199,6 @@ CONFIG_QCOM_WCNSS_PIL=y
- CONFIG_QCOM_GSBI=y
- CONFIG_QCOM_PM=y
- CONFIG_QCOM_SMEM=y
--CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
- CONFIG_QCOM_SMP2P=y
- CONFIG_QCOM_SMSM=y
--- 
-2.7.4
+Best regards,
+Krzysztof
