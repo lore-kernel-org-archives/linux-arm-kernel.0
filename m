@@ -1,91 +1,50 @@
-From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 11:58:50 -0500
-Subject: [RFC PATCH v2 24/38] KVM: arm64: Respect virtual HCR_EL2.TWX setting
-In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1500397144-16232-25-git-send-email-jintack.lim@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 18 Jul 2017 17:57:19 +0100
+Subject: [PATCH 1/4] iommu/iova: Optimise rbtree searching
+In-Reply-To: <cover.1500396007.git.robin.murphy@arm.com>
+References: <cover.1500396007.git.robin.murphy@arm.com>
+Message-ID: <d633f522f2d4c6707b1dd7a331ff5de4b17110bb.1500396007.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward exceptions due to WFI or WFE instructions to the virtual EL2 if
-they are not coming from the virtual EL2 and virtual HCR_EL2.TWX is set.
+From: Zhen Lei <thunder.leizhen@huawei.com>
 
-Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
+Checking the IOVA bounds separately before deciding which direction to
+continue the search (if necessary) results in redundantly comparing both
+pfns twice each. GCC can already determine that the final comparison op
+is redundant and optimise it down to 3 in total, but we can go one
+further with a little tweak of the ordering (which makes the intent of
+the code that much cleaner as a bonus).
+
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+[rm: rewrote commit message to clarify]
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h |  1 +
- arch/arm64/kvm/handle_exit.c      | 13 ++++++++++++-
- arch/arm64/kvm/nested.c           | 20 ++++++++++++++++++++
- 3 files changed, 33 insertions(+), 1 deletion(-)
+ drivers/iommu/iova.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 46880c3..53b0b33 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -442,5 +442,6 @@ static inline void __cpu_init_stage2(void)
- int __init kvmarm_nested_cfg(char *buf);
- int init_nested_virt(void);
- bool nested_virt_in_use(struct kvm_vcpu *vcpu);
-+int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe);
+diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
+index 246f14c83944..8f7552dc4e04 100644
+--- a/drivers/iommu/iova.c
++++ b/drivers/iommu/iova.c
+@@ -289,15 +289,12 @@ private_find_iova(struct iova_domain *iovad, unsigned long pfn)
+ 	while (node) {
+ 		struct iova *iova = rb_entry(node, struct iova, node);
  
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 8b398b2..25ec824 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -107,7 +107,18 @@ static int handle_no_fpsimd(struct kvm_vcpu *vcpu, struct kvm_run *run)
-  */
- static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	if (kvm_vcpu_get_hsr(vcpu) & ESR_ELx_WFx_ISS_WFE) {
-+	bool is_wfe = !!(kvm_vcpu_get_hsr(vcpu) & ESR_ELx_WFx_ISS_WFE);
-+
-+	if (nested_virt_in_use(vcpu)) {
-+		int ret = handle_wfx_nested(vcpu, is_wfe);
-+
-+		if (ret < 0 && ret != -EINVAL)
-+			return ret;
-+		else if (ret >= 0)
-+			return ret;
-+	}
-+
-+	if (is_wfe) {
- 		trace_kvm_wfx_arm64(*vcpu_pc(vcpu), true);
- 		vcpu->stat.wfe_exit_stat++;
- 		kvm_vcpu_on_spin(vcpu);
-diff --git a/arch/arm64/kvm/nested.c b/arch/arm64/kvm/nested.c
-index 9a05c76..042d304 100644
---- a/arch/arm64/kvm/nested.c
-+++ b/arch/arm64/kvm/nested.c
-@@ -18,6 +18,8 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
+-		/* If pfn falls within iova's range, return iova */
+-		if ((pfn >= iova->pfn_lo) && (pfn <= iova->pfn_hi)) {
+-			return iova;
+-		}
+-
+ 		if (pfn < iova->pfn_lo)
+ 			node = node->rb_left;
+-		else if (pfn > iova->pfn_lo)
++		else if (pfn > iova->pfn_hi)
+ 			node = node->rb_right;
++		else
++			return iova;	/* pfn falls within iova's range */
+ 	}
  
-+#include <asm/kvm_emulate.h>
-+
- static bool nested_param;
- 
- int __init kvmarm_nested_cfg(char *buf)
-@@ -41,3 +43,21 @@ bool nested_virt_in_use(struct kvm_vcpu *vcpu)
- 
- 	return false;
- }
-+
-+/*
-+ * Inject wfx to the virtual EL2 if this is not from the virtual EL2 and
-+ * the virtual HCR_EL2.TWX is set. Otherwise, let the host hypervisor
-+ * handle this.
-+ */
-+int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe)
-+{
-+	u64 hcr_el2 = vcpu_sys_reg(vcpu, HCR_EL2);
-+
-+	if (vcpu_mode_el2(vcpu))
-+		return -EINVAL;
-+
-+	if ((is_wfe && (hcr_el2 & HCR_TWE)) || (!is_wfe && (hcr_el2 & HCR_TWI)))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
-+	return -EINVAL;
-+}
+ 	return NULL;
 -- 
-1.9.1
+2.12.2.dirty
