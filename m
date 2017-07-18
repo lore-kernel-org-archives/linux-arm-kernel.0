@@ -1,30 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 18 Jul 2017 15:18:31 +0200
-Subject: [PATCH] arm64: dts: marvell: armada-cp110-slave: Fix RTC interrupt
-Message-ID: <20170718131831.5088-1-gregory.clement@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 18 Jul 2017 14:21:47 +0100
+Subject: [PATCH 01/18] regmap: mmio: Add function to attach a clock
+In-Reply-To: <20170717090107.cpjxoxfqcc3qwabh@flea>
+References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <02f409ad80afed68e02660f161fc26d588a86fa7.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <20170713160142.2buaie6ebqbxunin@sirena.org.uk>
+ <20170717090107.cpjxoxfqcc3qwabh@flea>
+Message-ID: <20170718132147.uzexelksygjeasmw@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While switching from GIC to ICU, the RTC node in hte CP110 slave dtsi was
-missed. Fix the interrupt by using the ICU value instead of the GIC one.
+On Mon, Jul 17, 2017 at 11:01:07AM +0200, Maxime Ripard wrote:
+> On Thu, Jul 13, 2017 at 05:01:42PM +0100, Mark Brown wrote:
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> > > This might be problematic if the clock to enable is stored in another node.
+> > > Let's add a function that allows to attach a clock that has already been
+> > > retrieved to a regmap in order to fix this.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 95f8e5f607f6..471aaf8dc750 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -64,7 +64,7 @@
- 				compatible = "marvell,armada-8k-rtc";
- 				reg = <0x284000 0x20>, <0x284080 0x24>;
- 				reg-names = "rtc", "rtc-soc";
--				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 
- 			cps_ethernet: ethernet at 0 {
--- 
-2.13.2
+> > What is the use case for this?
+
+> This is useful when the clock you want to be handled by the regmap is
+> not described in the device node that probed the driver, but one of
+> its subnode, or an another node entirely.
+
+> We're in the latter case, where we have two controllers in the DT, but
+> are driven by the same driver. We'll create two regmaps, but one will
+> not have the proper of_node used to retrieve the clock.
+
+I'm sorry but I'm still not seeing why you're doing this.  Can you be
+more concrete please?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170718/a35aeee7/attachment.sig>
