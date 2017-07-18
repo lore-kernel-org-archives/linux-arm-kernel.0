@@ -1,158 +1,162 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 11:58:47 -0500
-Subject: [RFC PATCH v2 21/38] KVM: arm64: Set a handler for the system
- instruction traps
+Date: Tue, 18 Jul 2017 11:58:54 -0500
+Subject: [RFC PATCH v2 28/38] KVM: arm64: Emulate EL12 register accesses from
+ the virtual EL2
 In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
 References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1500397144-16232-22-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1500397144-16232-29-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When HCR.NV bit is set, execution of the EL2 translation regime address
-aranslation instructions and TLB maintenance instructions are trapped to
-EL2. In addition, execution of the EL1 translation regime address
-aranslation instructions and TLB maintenance instructions that are only
-accessible from EL2 and above are trapped to EL2. In these cases,
-ESR_EL2.EC will be set to 0x18.
+With HCR_EL2.NV bit set, accesses to EL12 registers in the virtual EL2
+trap to EL2. Handle those traps just like we do for EL1 registers.
 
-Change the existing handler to handle those system instructions as well
-as MRS/MSR instructions.  Emulation of each system instructions will be
-done in separate patches.
+One exception is CNTKCTL_EL12. We don't trap on CNTKCTL_EL1 for non-VHE
+virtual EL2 because we don't have to. However, accessing CNTKCTL_EL12
+will trap since it's one of the EL12 registers controlled by HCR_EL2.NV
+bit.  Therefore, add a handler for it and don't treat it as a
+non-trap-registers when preparing a shadow context.
+
+Move EL12 system register macros to a common place to reuse them.
 
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- arch/arm64/include/asm/kvm_coproc.h |  2 +-
- arch/arm64/kvm/handle_exit.c        |  2 +-
- arch/arm64/kvm/sys_regs.c           | 53 ++++++++++++++++++++++++++++++++-----
- arch/arm64/kvm/trace.h              |  2 +-
- 4 files changed, 50 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/kvm_hyp.h | 24 ------------------------
+ arch/arm64/include/asm/sysreg.h  | 24 ++++++++++++++++++++++++
+ arch/arm64/kvm/context.c         |  7 +++++++
+ arch/arm64/kvm/sys_regs.c        | 25 +++++++++++++++++++++++++
+ 4 files changed, 56 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
-index 0b52377..1b3d21b 100644
---- a/arch/arm64/include/asm/kvm_coproc.h
-+++ b/arch/arm64/include/asm/kvm_coproc.h
-@@ -43,7 +43,7 @@ void kvm_register_target_sys_reg_table(unsigned int target,
- int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
--int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_sys(struct kvm_vcpu *vcpu, struct kvm_run *run);
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 4572a9b..353b895 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -73,30 +73,6 @@
+ #define read_sysreg_el1(r)	read_sysreg_elx(r, _EL1, _EL12)
+ #define write_sysreg_el1(v,r)	write_sysreg_elx(v, r, _EL1, _EL12)
  
- #define kvm_coproc_table_init kvm_sys_reg_table_init
- void kvm_sys_reg_table_init(void);
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 9259881..d19e253 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -174,7 +174,7 @@ static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	[ESR_ELx_EC_SMC32]	= handle_smc,
- 	[ESR_ELx_EC_HVC64]	= handle_hvc,
- 	[ESR_ELx_EC_SMC64]	= handle_smc,
--	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
-+	[ESR_ELx_EC_SYS64]	= kvm_handle_sys,
- 	[ESR_ELx_EC_ERET]	= kvm_handle_eret,
- 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+-/* The VHE specific system registers and their encoding */
+-#define sctlr_EL12              sys_reg(3, 5, 1, 0, 0)
+-#define cpacr_EL12              sys_reg(3, 5, 1, 0, 2)
+-#define ttbr0_EL12              sys_reg(3, 5, 2, 0, 0)
+-#define ttbr1_EL12              sys_reg(3, 5, 2, 0, 1)
+-#define tcr_EL12                sys_reg(3, 5, 2, 0, 2)
+-#define afsr0_EL12              sys_reg(3, 5, 5, 1, 0)
+-#define afsr1_EL12              sys_reg(3, 5, 5, 1, 1)
+-#define esr_EL12                sys_reg(3, 5, 5, 2, 0)
+-#define far_EL12                sys_reg(3, 5, 6, 0, 0)
+-#define mair_EL12               sys_reg(3, 5, 10, 2, 0)
+-#define amair_EL12              sys_reg(3, 5, 10, 3, 0)
+-#define vbar_EL12               sys_reg(3, 5, 12, 0, 0)
+-#define contextidr_EL12         sys_reg(3, 5, 13, 0, 1)
+-#define cntkctl_EL12            sys_reg(3, 5, 14, 1, 0)
+-#define cntp_tval_EL02          sys_reg(3, 5, 14, 2, 0)
+-#define cntp_ctl_EL02           sys_reg(3, 5, 14, 2, 1)
+-#define cntp_cval_EL02          sys_reg(3, 5, 14, 2, 2)
+-#define cntv_tval_EL02          sys_reg(3, 5, 14, 3, 0)
+-#define cntv_ctl_EL02           sys_reg(3, 5, 14, 3, 1)
+-#define cntv_cval_EL02          sys_reg(3, 5, 14, 3, 2)
+-#define spsr_EL12               sys_reg(3, 5, 4, 0, 0)
+-#define elr_EL12                sys_reg(3, 5, 4, 0, 1)
+-
+ /**
+  * hyp_alternate_select - Generates patchable code sequences that are
+  * used to switch between two implementations of a function, depending
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index b01c608..b8d4d0c 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -338,6 +338,30 @@
+ #define SYS_CNTVOFF_EL2			sys_reg(3, 4, 14, 0, 3)
+ #define SYS_CNTHCTL_EL2			sys_reg(3, 4, 14, 1, 0)
+ 
++/* The VHE specific system registers and their encoding */
++#define sctlr_EL12              sys_reg(3, 5, 1, 0, 0)
++#define cpacr_EL12              sys_reg(3, 5, 1, 0, 2)
++#define ttbr0_EL12              sys_reg(3, 5, 2, 0, 0)
++#define ttbr1_EL12              sys_reg(3, 5, 2, 0, 1)
++#define tcr_EL12                sys_reg(3, 5, 2, 0, 2)
++#define afsr0_EL12              sys_reg(3, 5, 5, 1, 0)
++#define afsr1_EL12              sys_reg(3, 5, 5, 1, 1)
++#define esr_EL12                sys_reg(3, 5, 5, 2, 0)
++#define far_EL12                sys_reg(3, 5, 6, 0, 0)
++#define mair_EL12               sys_reg(3, 5, 10, 2, 0)
++#define amair_EL12              sys_reg(3, 5, 10, 3, 0)
++#define vbar_EL12               sys_reg(3, 5, 12, 0, 0)
++#define contextidr_EL12         sys_reg(3, 5, 13, 0, 1)
++#define cntkctl_EL12            sys_reg(3, 5, 14, 1, 0)
++#define cntp_tval_EL02          sys_reg(3, 5, 14, 2, 0)
++#define cntp_ctl_EL02           sys_reg(3, 5, 14, 2, 1)
++#define cntp_cval_EL02          sys_reg(3, 5, 14, 2, 2)
++#define cntv_tval_EL02          sys_reg(3, 5, 14, 3, 0)
++#define cntv_ctl_EL02           sys_reg(3, 5, 14, 3, 1)
++#define cntv_cval_EL02          sys_reg(3, 5, 14, 3, 2)
++#define spsr_EL12               sys_reg(3, 5, 4, 0, 0)
++#define elr_EL12                sys_reg(3, 5, 4, 0, 1)
++
+ #define SYS_SP_EL2			sys_reg(3, 6, 4, 1, 0)
+ 
+ /* Common SCTLR_ELx flags. */
+diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+index e1bc753..f3d3398 100644
+--- a/arch/arm64/kvm/context.c
++++ b/arch/arm64/kvm/context.c
+@@ -121,6 +121,13 @@ static void copy_shadow_non_trap_el1_state(struct kvm_vcpu *vcpu, bool setup)
+ 	for (i = 0; i < ARRAY_SIZE(el1_non_trap_regs); i++) {
+ 		const int sr = el1_non_trap_regs[i];
+ 
++		/*
++		 * We trap on cntkctl_el12 accesses from virtual EL2 as suppose
++		 * to not trapping on cntlctl_el1 accesses.
++		 */
++		if (vcpu_el2_e2h_is_set(vcpu) && sr == CNTKCTL_EL1)
++			continue;
++
+ 		if (setup)
+ 			s_sys_regs[sr] = vcpu_sys_reg(vcpu, sr);
+ 		else
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 7062645..dbf5022 100644
+index b3e0cb8..2aa922c 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -1808,6 +1808,40 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
- 	return 1;
+@@ -905,6 +905,14 @@ static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
+ 		*sysreg = p->regval;
  }
  
-+static int emulate_tlbi(struct kvm_vcpu *vcpu,
-+			     struct sys_reg_params *params)
++static bool access_cntkctl_el12(struct kvm_vcpu *vcpu,
++			 struct sys_reg_params *p,
++			 const struct sys_reg_desc *r)
 +{
-+	/* TODO: support tlbi instruction emulation*/
-+	kvm_inject_undefined(vcpu);
-+	return 1;
++	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
++	return true;
 +}
 +
-+static int emulate_at(struct kvm_vcpu *vcpu,
-+			     struct sys_reg_params *params)
-+{
-+	/* TODO: support address translation instruction emulation */
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
-+static int emulate_sys_instr(struct kvm_vcpu *vcpu,
-+			     struct sys_reg_params *params)
-+{
-+	int ret = 0;
-+
-+	/* TLB maintenance instructions*/
-+	if (params->CRn == 0b1000)
-+		ret = emulate_tlbi(vcpu, params);
-+	/* Address Translation instructions */
-+	else if (params->CRn == 0b0111 && params->CRm == 0b1000)
-+		ret = emulate_at(vcpu, params);
-+
-+	if (ret)
-+		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-+
-+	return ret;
-+}
-+
- static void reset_sys_reg_descs(struct kvm_vcpu *vcpu,
- 			      const struct sys_reg_desc *table, size_t num)
+ static u64 *get_special_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
  {
-@@ -1819,18 +1853,19 @@ static void reset_sys_reg_descs(struct kvm_vcpu *vcpu,
- }
+ 	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+@@ -1201,6 +1209,23 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
+ 	{ SYS_DESC(SYS_CNTVOFF_EL2), trap_el2_regs, reset_val, CNTVOFF_EL2, 0 },
+ 	{ SYS_DESC(SYS_CNTHCTL_EL2), trap_el2_regs, reset_val, CNTHCTL_EL2, 0 },
  
- /**
-- * kvm_handle_sys_reg -- handles a mrs/msr trap on a guest sys_reg access
-+ * kvm_handle_sys-- handles a system instruction or mrs/msr instruction trap
-+		    on a guest execution
-  * @vcpu: The VCPU pointer
-  * @run:  The kvm_run struct
-  */
--int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+int kvm_handle_sys(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
- 	struct sys_reg_params params;
- 	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
- 	int Rt = kvm_vcpu_sys_get_rt(vcpu);
- 	int ret;
- 
--	trace_kvm_handle_sys_reg(esr);
-+	trace_kvm_handle_sys(esr);
- 
- 	params.is_aarch32 = false;
- 	params.is_32bit = false;
-@@ -1842,10 +1877,16 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	params.regval = vcpu_get_reg(vcpu, Rt);
- 	params.is_write = !(esr & 1);
- 
--	ret = emulate_sys_reg(vcpu, &params);
-+	if (params.Op0 == 1) {
-+		/* System instructions */
-+		ret = emulate_sys_instr(vcpu, &params);
-+	} else {
-+		/* MRS/MSR instructions */
-+		ret = emulate_sys_reg(vcpu, &params);
-+		if (!params.is_write)
-+			vcpu_set_reg(vcpu, Rt, params.regval);
-+	}
- 
--	if (!params.is_write)
--		vcpu_set_reg(vcpu, Rt, params.regval);
- 	return ret;
- }
- 
-diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
-index 5f40987..192708e 100644
---- a/arch/arm64/kvm/trace.h
-+++ b/arch/arm64/kvm/trace.h
-@@ -134,7 +134,7 @@
- 	TP_printk("%s %s reg %d (0x%08llx)", __entry->fn,  __entry->is_write?"write to":"read from", __entry->reg, __entry->write_value)
- );
- 
--TRACE_EVENT(kvm_handle_sys_reg,
-+TRACE_EVENT(kvm_handle_sys,
- 	TP_PROTO(unsigned long hsr),
- 	TP_ARGS(hsr),
++	{ SYS_DESC(sctlr_EL12), access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
++	{ SYS_DESC(cpacr_EL12), access_cpacr, reset_val, CPACR_EL1, 0 },
++	{ SYS_DESC(ttbr0_EL12), access_vm_reg, reset_unknown, TTBR0_EL1 },
++	{ SYS_DESC(ttbr1_EL12), access_vm_reg, reset_unknown, TTBR1_EL1 },
++	{ SYS_DESC(tcr_EL12), access_vm_reg, reset_val, TCR_EL1, 0 },
++	{ SYS_DESC(spsr_EL12), access_spsr},
++	{ SYS_DESC(elr_EL12), access_elr},
++	{ SYS_DESC(afsr0_EL12), access_vm_reg, reset_unknown, AFSR0_EL1 },
++	{ SYS_DESC(afsr1_EL12), access_vm_reg, reset_unknown, AFSR1_EL1 },
++	{ SYS_DESC(esr_EL12), access_vm_reg, reset_unknown, ESR_EL1 },
++	{ SYS_DESC(far_EL12), access_vm_reg, reset_unknown, FAR_EL1 },
++	{ SYS_DESC(mair_EL12), access_vm_reg, reset_unknown, MAIR_EL1 },
++	{ SYS_DESC(amair_EL12), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
++	{ SYS_DESC(vbar_EL12), access_vbar, reset_val, VBAR_EL1, 0 },
++	{ SYS_DESC(contextidr_EL12), access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
++	{ SYS_DESC(cntkctl_EL12), access_cntkctl_el12, reset_val, CNTKCTL_EL1, 0 },
++
+ 	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
+ };
  
 -- 
 1.9.1
