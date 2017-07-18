@@ -1,52 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 18 Jul 2017 12:03:19 +0200
-Subject: [PATCH] arm64: dts: marvell: mark the cp110 crypto engine as dma
- coherent
-In-Reply-To: <20170718095130.GC2563@kwain> (Antoine Tenart's message of "Tue,
- 18 Jul 2017 11:51:30 +0200")
-References: <20170717073516.26746-1-antoine.tenart@free-electrons.com>
- <87o9si84ej.fsf@free-electrons.com> <20170718095130.GC2563@kwain>
-Message-ID: <87bmoi83ko.fsf@free-electrons.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 18 Jul 2017 17:49:46 +0800
+Subject: [PATCH v2 2/2] crypto: arm64/ghash - add NEON accelerated
+ fallback for 64-bit PMULL
+In-Reply-To: <20170704234319.8398-2-ard.biesheuvel@linaro.org>
+References: <20170704234319.8398-1-ard.biesheuvel@linaro.org>
+ <20170704234319.8398-2-ard.biesheuvel@linaro.org>
+Message-ID: <20170718094946.GA6347@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On mar., juil. 18 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+On Wed, Jul 05, 2017 at 12:43:19AM +0100, Ard Biesheuvel wrote:
+> Implement a NEON fallback for systems that do support NEON but have
+> no support for the optional 64x64->128 polynomial multiplication
+> instruction that is part of the ARMv8 Crypto Extensions. It is based
+> on the paper "Fast Software Polynomial Multiplication on ARM Processors
+> Using the NEON Engine" by Danilo Camara, Conrado Gouvea, Julio Lopez and
+> Ricardo Dahab (https://hal.inria.fr/hal-01506572), but has been reworked
+> extensively for the AArch64 ISA.
+> 
+> On a low-end core such as the Cortex-A53 found in the Raspberry Pi3, the
+> NEON based implementation is 4x faster than the table based one, and
+> is time invariant as well, making it less vulnerable to timing attacks.
+> When combined with the bit-sliced NEON implementation of AES-CTR, the
+> AES-GCM performance increases by ~2x (from 58 to 30 cycles per byte).
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-> Hi Gregory,
->
-> On Tue, Jul 18, 2017 at 11:45:24AM +0200, Gregory CLEMENT wrote:
->>  On lun., juil. 17 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
->> 
->> > The crypto engines found on the cp110 master and slave are dma coherent.
->> > This patch adds the relevant property to their dt nodes.
->> 
->> Is it a fix?
->> 
->> Should it go to the current ans stable kernel?
->
-> Yes I think that should go into stable. I forgot the stable tag, do you
-> want me to send a v2 with it included?
->
-Yes please and also add the Fixes tag.
+This patch does not apply against cryptodev.
 
-Thanks,
-
-Gregory
-
-> Thanks!
-> Antoine
-
->
-> -- 
-> Antoine T?nart, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
->
-
+Cheers,
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
