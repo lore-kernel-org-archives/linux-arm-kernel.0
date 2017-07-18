@@ -1,71 +1,113 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 18 Jul 2017 18:34:17 +0200
-Subject: [PATCH v3 2/6] pwm: mediatek: fix pwm source clock selection
-In-Reply-To: <1499323435.22478.26.camel@mhfsdcap03>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
- <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
- <d009712e-f0a2-2dc7-2f64-ad8cfa21f98d@gmail.com>
- <1499321801.22478.12.camel@mhfsdcap03> <1499323435.22478.26.camel@mhfsdcap03>
-Message-ID: <6d74d623-e08d-3552-8d4e-b109d06589c5@gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 18 Jul 2017 09:38:15 -0700
+Subject: [PATCH v1 1/2] remoteproc: dt: Provide bindings for iMX6SX/7D
+ Remote Processor Controller driver
+In-Reply-To: <91bfe236-0410-b26e-7ef6-73d14ebf120d@pengutronix.de>
+References: <20170710144220.31594-1-o.rempel@pengutronix.de>
+ <20170710144220.31594-2-o.rempel@pengutronix.de>
+ <20170710221408.GD1618@tuxbook>
+ <91bfe236-0410-b26e-7ef6-73d14ebf120d@pengutronix.de>
+Message-ID: <20170718163814.GD20973@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue 18 Jul 01:45 PDT 2017, Oleksij Rempel wrote:
 
-
-On 07/06/2017 08:43 AM, Zhi Mao wrote:
-> On Thu, 2017-07-06 at 14:16 +0800, Zhi Mao wrote:
->> On Wed, 2017-07-05 at 13:09 +0200, Matthias Brugger wrote:
->>>
->>> On 06/30/2017 08:05 AM, Zhi Mao wrote:
->>>> In original code, the pwm output frequency is not correct
->>>> when set bit<3>=1 to PWMCON register.
->>>>
->>>> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
->>>> ---
->>>>    drivers/pwm/pwm-mediatek.c |    2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
->>>> index 5c11bc7..d08b5b3 100644
->>>> --- a/drivers/pwm/pwm-mediatek.c
->>>> +++ b/drivers/pwm/pwm-mediatek.c
->>>> @@ -91,7 +91,7 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->>>>    	if (clkdiv > 7)
->>>>    		return -EINVAL;
->>>>    
->>>> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | clkdiv);
->>>> +	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
->>>
->>> Just for clarification, BIT(15) enables old PWM mode, which ignores
->>> CLKSEL (BIT(3)). Therefore setting BIT(3) does not have any effect and
->>> can be discarded.
->>>
->>> Am I correct? I took mt7623n datasheet for reference.
->>>
->>> Regards,
->>> Matthias
->>>
->> Yes, remove setting bit<3> will not take any effect.
->> PWMCON bit<3> is pwm source clock selecting register.
->> You can check the datasheet of MT7623 for details.
->>
->> Regards
->> Zhi
->>
-> Hi Mattias,
+> Hallo Bjorn,
 > 
-> Ignore the above reply, I explain this bit<3> issue for you.
-> In the data sheet of MT7623:
-> PWMCON bit<3> is PWM source clock selecting register
-> 0: CLK=CLKSRC
-> 1: CLK=CLKSRC/1625
-> for example,
-> bit<3>=0, PWM clk source is 26M
-> bit<3>=1, PWM clk source is 16K
-> The frequency of PWM output will based on this clock source
-> if set bit<3>=1, it will cause the frequency of PWM output is not
-> correct. I also use the oscilloscope device to measure the output,
-> set bit<3>=0, the output meet expectation.
->   
+> On 11.07.2017 00:14, Bjorn Andersson wrote:
+> > On Mon 10 Jul 07:42 PDT 2017, Oleksij Rempel wrote:
+> > 
+> > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> > > ---
+> > >  .../devicetree/bindings/remoteproc/imx-rproc.txt   | 44 ++++++++++++++++++++++
+> > >  1 file changed, 44 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt b/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+> > > new file mode 100644
+> > > index 000000000000..e7c61993e1b8
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+> > > @@ -0,0 +1,44 @@
+> > > +NXP iMX6SX/iMX7D Co-Processor Bindings
+> > > +----------------------------------------
+> > > +
+> > > +This binding provides support for ARM Cortex M4 Co-processor found on some
+> > > +NXP iMX SoCs.
+> > > +
+> > > +Required properties:
+> > > +- compatible		Should be one of:
+> > > +				"fsl,imx7d-rproc"
+> > > +				"fsl,imx6sx-rproc"
+> > > +- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
+> > > +- syscfg		Phandle to syscon block which provide access to
+> > 
+> > This is called "syscon" in the code and the example.
+> 
+> done.
+> 
+> > > +			System Reset Controller
+> > > +
+> > > +Optional properties:
+> > > +- reg:			Should contain the address ranges for some of internal
+> > > +			memory regions.
+> > 
+> > Something less hand-wavy, like: "Should list the memory regions for the
+> > remoteproc"
+> > 
+> > > +- reg-names:		Contains the corresponding names for the memory
+> > > +			regions. These should be named "ddr", "ocram", "ocram-s",
+> > > +			"ocram-epdc" or "ocram-pxp".
+> > 
+> > Make this comment define which memory regions are required for each of
+> > the systems.
+> 
+> done.
+> 
+> > > +Fallowing memory ranges are expected:
+> > > +- For "fsl,imx7d-rproc"
+> > > +	<0x00900000 0x00020000> - "ocram"
+> > > +	<0x00920000 0x00020000> - "ocram-epdc"
+> > > +	<0x00940000 0x00008000> - "ocram-pxp"
+> > > +	<0x80000000 0x0FFF0000> - "ddr" (code area)
+> > > +	<0x80000000 0x60000000> - "ddr" (data area)
+> > 
+> > There's no reason to list the actual regions in the binding
+> > document. Just list the requires regions for each system.
+> > 
+> > > +- For "fsl,imx6sx-rproc"
+> > > +	<0x008F8000 0x00004000> - "ocram-s"
+> > > +	<0x80000000 0x0FFF8000> - "ddr" (code area)
+> > > +	<0x80000000 0x60000000> - "ddr" (data area)
+> > > +
+> > > +Note: the "ddr" code and data ranges are overlapping. Code area is smaller
+> > > +than data area.  So this range should be carefully chosen according to your
+> > > +system and application requirements.
+> > > +
+> > 
+> > This is a source of future issues as this indicates that I should have
+> > reg-names list "ddr" twice.
+> 
+> Then I will name it:
+> "ddri" (incstruction/code area),
+> "ddrd" (data area)
+> 
+> unless there are other suggestions.
+> 
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+But are you saying that it's correct that these two memory regions
+should overlap?
+
+> > Also, as you warn about the user needing to pick the values for "ddr",
+> > does that mean that it's a carveout of System RAM?
+> 
+> Yes, it is a part of System RAM.
+> 
+
+Then there will be an associated reserved-memory region for the
+region(s), you should add a label to this and use "memory-region" to get
+hold of the addresses instead.
+
+Regards,
+Bjorn
