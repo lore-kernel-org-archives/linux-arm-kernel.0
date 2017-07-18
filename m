@@ -1,47 +1,121 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 18 Jul 2017 22:17:06 +0530
-Subject: [PATCH V3 1/2] dmaengine: qcom_hidma: introduce memset support
-In-Reply-To: <29d47cc4-f618-7253-6f59-41f10e7b4b87@codeaurora.org>
-References: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
- <20170718161956.GV3053@localhost>
- <29d47cc4-f618-7253-6f59-41f10e7b4b87@codeaurora.org>
-Message-ID: <20170718164705.GY3053@localhost>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 18 Jul 2017 18:48:39 +0200
+Subject: [PATCH] cpufreq: dt: Don't use generic platdev driver for tango
+Message-ID: <f6b9a4e6-bbff-fe92-6867-547c581db3c8@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 12:26:14PM -0400, Sinan Kaya wrote:
-> Hi Vinod,
-> 
-> On 7/18/2017 12:19 PM, Vinod Koul wrote:
-> > On Thu, Jun 29, 2017 at 10:30:57PM -0400, Sinan Kaya wrote:
-> > 
-> >> @@ -410,7 +410,40 @@ static int hidma_alloc_chan_resources(struct dma_chan *dmach)
-> >>  		return NULL;
-> >>  
-> >>  	hidma_ll_set_transfer_params(mdma->lldev, mdesc->tre_ch,
-> >> -				     src, dest, len, flags);
-> >> +				     src, dest, len, flags,
-> >> +				     HIDMA_TRE_MEMCPY);
-> >> +
-> >> +	/* Place descriptor in prepared list */
-> >> +	spin_lock_irqsave(&mchan->lock, irqflags);
-> >> +	list_add_tail(&mdesc->node, &mchan->prepared);
-> >> +	spin_unlock_irqrestore(&mchan->lock, irqflags);
-> > 
-> > This change looks suspicious, cna you clarify the need to do this?
-> > 
-> > 
-> 
-> Diff looks weird for some reason. I noticed that too.
-> 
-> I just added HIDMA_TRE_MEMCPY parameter to hidma_ll_set_transfer_params() function call
-> from hidma_prep_dma_memcpy() and created a new hidma_prep_dma_memset() function very
-> similar to memcpy with HIDMA_TRE_MEMSET call difference.
-> 
-> My suggestion is to use kdiff or another visual tool to look at the change.
+On tango platforms, firmware configures the CPU clock, and Linux is
+then only allowed to use the cpu_clk_divider to change the frequency.
+Build the OPP table dynamically at init, in order to support whatever
+firmware throws at us.
 
-ah fine then, let me take a look at it again with rested pair of eyes in the
-morn :)
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ arch/arm/boot/dts/tango4-smp8758.dtsi |  1 -
+ drivers/cpufreq/Kconfig.arm           |  5 +++++
+ drivers/cpufreq/Makefile              |  1 +
+ drivers/cpufreq/cpufreq-dt-platdev.c  |  2 --
+ drivers/cpufreq/tango-cpufreq.c       | 38 +++++++++++++++++++++++++++++++++++
+ 5 files changed, 44 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/cpufreq/tango-cpufreq.c
 
+diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
+index d2e65c46bcc7..eca33d568690 100644
+--- a/arch/arm/boot/dts/tango4-smp8758.dtsi
++++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
+@@ -13,7 +13,6 @@
+ 			reg = <0>;
+ 			clocks = <&clkgen CPU_CLK>;
+ 			clock-latency = <1>;
+-			operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 2011fec2d6ad..ea9ba00091bb 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -242,6 +242,11 @@ config ARM_STI_CPUFREQ
+ 	  this config option if you wish to add CPUFreq support for STi based
+ 	  SoCs.
+ 
++config ARM_TANGO_CPUFREQ
++	bool
++	depends on CPUFREQ_DT && ARCH_TANGO
++	default y
++
+ config ARM_TEGRA20_CPUFREQ
+ 	bool "Tegra20 CPUFreq support"
+ 	depends on ARCH_TEGRA
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index ab3a42cd29ef..bb9841f57787 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -75,6 +75,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
+ obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
+ obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+ obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
++obj-$(CONFIG_ARM_TANGO_CPUFREQ)		+= tango-cpufreq.o
+ obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
+ obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
+ obj-$(CONFIG_ARM_TEGRA186_CPUFREQ)	+= tegra186-cpufreq.o
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 1c262923fe58..6cbe77765f46 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -80,8 +80,6 @@ static const struct of_device_id machines[] __initconst = {
+ 	{ .compatible = "rockchip,rk3368", },
+ 	{ .compatible = "rockchip,rk3399", },
+ 
+-	{ .compatible = "sigma,tango4" },
+-
+ 	{ .compatible = "socionext,uniphier-pro5", },
+ 	{ .compatible = "socionext,uniphier-pxs2", },
+ 	{ .compatible = "socionext,uniphier-ld6b", },
+diff --git a/drivers/cpufreq/tango-cpufreq.c b/drivers/cpufreq/tango-cpufreq.c
+new file mode 100644
+index 000000000000..89a7f860bfe8
+--- /dev/null
++++ b/drivers/cpufreq/tango-cpufreq.c
+@@ -0,0 +1,38 @@
++#include <linux/of.h>
++#include <linux/cpu.h>
++#include <linux/clk.h>
++#include <linux/pm_opp.h>
++#include <linux/platform_device.h>
++
++static const struct of_device_id machines[] __initconst = {
++	{ .compatible = "sigma,tango4" },
++	{ /* sentinel */ }
++};
++
++static int __init tango_cpufreq_init(void)
++{
++	struct device *cpu_dev = get_cpu_device(0);
++	unsigned long max_freq;
++	struct clk *cpu_clk;
++	void *res;
++
++	if (!of_match_node(machines, of_root))
++		return -ENODEV;
++
++	cpu_clk = clk_get(cpu_dev, NULL);
++	if (IS_ERR(cpu_clk))
++		return -ENODEV;
++
++	max_freq = clk_get_rate(cpu_clk);
++
++	dev_pm_opp_add(cpu_dev, max_freq / 1, 0);
++	dev_pm_opp_add(cpu_dev, max_freq / 2, 0);
++	dev_pm_opp_add(cpu_dev, max_freq / 3, 0);
++	dev_pm_opp_add(cpu_dev, max_freq / 5, 0);
++	dev_pm_opp_add(cpu_dev, max_freq / 9, 0);
++
++	res = platform_device_register_data(NULL, "cpufreq-dt", -1, NULL, 0);
++
++	return PTR_ERR_OR_ZERO(res);
++}
++device_initcall(tango_cpufreq_init);
 -- 
-~Vinod
+2.11.0
