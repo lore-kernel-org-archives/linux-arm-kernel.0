@@ -1,80 +1,27 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Tue, 18 Jul 2017 14:26:00 +0000
-Subject: [PATCH v2 6/8] staging: fsl-mc: don't use raw device io functions
-In-Reply-To: <CAK8P3a0zH1nVoppNkT=uVgFp-NUkmenZ0AVc9vOwHEe_VEt_cQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jul 2017 16:26:15 +0200
+Subject: [PATCH v2 0/7] staging: fsl-mc: make the driver compile on other
+ architectures
+In-Reply-To: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
 References: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
- <20170718133723.12709-7-laurentiu.tudor@nxp.com>
- <CAK8P3a0zH1nVoppNkT=uVgFp-NUkmenZ0AVc9vOwHEe_VEt_cQ@mail.gmail.com>
-Message-ID: <596E1A77.4030204@nxp.com>
+Message-ID: <CAK8P3a39fpEHwCvR3TOL8u8W7TORSNpw27xwma70sxi-VfXhyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 07/18/2017 05:18 PM, Arnd Bergmann wrote:
-> On Tue, Jul 18, 2017 at 3:37 PM,  <laurentiu.tudor@nxp.com> wrote:
->> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>
->> As raw device io functions are not portable and don't handle byte-order
->> (triggering suspicion that endianness isn't handled well) switch to
->> using the standard api.
->> Since MC expects LE byte-order and the upper layers already take care
->> of that, we need to trick the device io api by doing a LE -> CPU
->> conversion just before calling it. This way, the CPU -> LE conversion
->> done in the api puts the data back in the right byte-order. Obviously,
->> for reads the extra step is mirrored: there's a CPU -> LE conversion
->> following the API call.
->>
->> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->> ---
->> Notes:
->>      -v2
->>        -new patch replacing https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flkml.org%2Flkml%2F2017%2F7%2F17%2F419&data=01%7C01%7Claurentiu.tudor%40nxp.com%7C77381272b4914c9ac64708d4cde7d94e%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0&sdata=FTVLKox6T4i9OFmb%2B5BkSEDQrDrafXznY6nsJ0dgFSk%3D&reserved=0
->>
->>   drivers/staging/fsl-mc/bus/mc-sys.c | 21 +++++++++++++++------
->>   1 file changed, 15 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
->> index 195d9f3..8a6dc47 100644
->> --- a/drivers/staging/fsl-mc/bus/mc-sys.c
->> +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
->> @@ -126,12 +126,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
->>
->>          /* copy command parameters into the portal */
->>          for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
->> -               __raw_writeq(cmd->params[i], &portal->params[i]);
->> -       /* ensure command params are committed before submitting it */
->> -       wmb();
->> +               /*
->> +                * Data is already in the expected LE byte-order. Do an
->> +                * extra LE -> CPU conversion so that the CPU -> LE done in
->> +                * the device io write api puts it back in the right order.
->> +                */
->> +               writeq_relaxed(le64_to_cpu(cmd->params[i]), &portal->params[i]);
->>
->>          /* submit the command by writing the header */
->> -       __raw_writeq(cmd->header, &portal->header);
->> +       writeq(le64_to_cpu(cmd->header), &portal->header);
->>   }
+On Tue, Jul 18, 2017 at 3:37 PM,  <laurentiu.tudor@nxp.com> wrote:
+> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 >
-> Looks good, but just to be sure this is what you intended:
+> Apart from a small change (first patch) which adds a missing comment,
+> this series make the bus driver compile on other architectures, as per
+> GregKH comment [1].
+> Compiled tested on:
+>  - booke powerpc (corenet{32,64}_smp_defconfig) with this ppc patch [2]
+>  - x86 (i386_defconfig, x86_64_defconfig, needs CONFIG_OF)
+>  - arm64 (defconfig)
 >
-> On 32-bit systems, this will now write val>>32 to cmd->header+4,
-> followed by writing val&0xffffffff to cmd->header.
+> [1] https://www.spinics.net/lists/linux-driver-devel/msg100585.html
+> [2] https://patchwork.ozlabs.org/patch/789474/
 
-Right. That's how it should happen.
+Looks good overall. With the two minor questions addressed
 
-> You said earlier that the command is triggered when the final
-> four bytes are written, but it looks like the order is wrong now.
->
-> Should you use io-64-nonatomic-lo-hi.h instead of
-> io-64-nonatomic-hi-lo.h then?
->
-
-Maybe i made an error in my previous emails, but the hi-lo variant is
-the correct one. The command execution is triggered when the _first_ 
-32-bit half of the header (header&0xffffffff) is written, so that's why 
-it must be written last.
-
----
-Thanks & Best Regards, Laurentiu
+Acked-by: Arnd Bergmann <arnd@arndb.de>
