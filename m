@@ -1,31 +1,57 @@
-From: keith.busch@intel.com (Keith Busch)
-Date: Tue, 18 Jul 2017 17:26:32 -0400
-Subject: [PATCH] nvme: Acknowledge completion queue on each iteration
-In-Reply-To: <dada875c-ed69-0126-8e83-78a564e6b4bd@codeaurora.org>
-References: <1500330983-27501-1-git-send-email-okaya@codeaurora.org>
- <20170717224551.GA1496@localhost.localdomain>
- <6d10032c-35ec-978c-6b8f-1ab9c07adf7f@codeaurora.org>
- <20170717225615.GB1496@localhost.localdomain>
- <79413407294645f0e1252112c3435a29@codeaurora.org>
- <20170718143617.GA7613@localhost.localdomain>
- <dada875c-ed69-0126-8e83-78a564e6b4bd@codeaurora.org>
-Message-ID: <20170718212631.GB1202@localhost.localdomain>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Tue, 18 Jul 2017 23:40:22 +0200
+Subject: [PATCH] ARM: zImage: Fix stack overflow in merge_fdt_bootargs()
+In-Reply-To: <74e55919-5378-1412-5c20-aae9db56495f@gmail.com>
+References: <257f11e3b0010a3a44c28b34a048278f7b960f3b.1500238579.git.rask@formelder.dk>
+ <74e55919-5378-1412-5c20-aae9db56495f@gmail.com>
+Message-ID: <20170718214022.znbme3ipirwtnuvn@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 02:52:26PM -0400, Sinan Kaya wrote:
-> On 7/18/2017 10:36 AM, Keith Busch wrote:
-> 
-> I do see that the NVMe driver is creating a completion interrupt on
-> each CPU core for the completions. No problems with that. 
-> 
-> However, I don't think you can guarantee that there will always be a single
-> CPU core targeting one submission queue especially with asynchronous IO.
->
-> Lock contention counters from CONFIG_LOCK_STAT are pointing to nvmeq->lock
-> in my FIO tests.
-> 
-> Did I miss something?
+On Tue, Jul 18, 2017 at 09:39:10AM +0200, Richard Genoud wrote:
+> On 16/07/2017 23:43, Rask Ingemann Lambertsen wrote:
+[snip]
+> > +/* This is called early on from head.S, so it can't use much stack. */
+> > +static void merge_fdt_bootargs(void *fdt, const char *atag_cmdline)
+> > +{
+> > +	char *fdt_bootargs;
+> > +	int len = 0;
+> > +
+> > +	/* With no ATAG command line or an empty one, there is nothing to do. */
+> > +	if (!atag_cmdline || strlen(atag_cmdline) == 0)
+> > +		return;
+> > +
+> > +	fdt_bootargs = getprop_w(fdt, "/chosen", "bootargs", &len);
+> > +
+> > +	/* With no FDT command line or an empty one, just use the ATAG one. */
+> > +	if (!fdt_bootargs || len <= 1) {
+> > +		setprop_string(fdt, "/chosen", "bootargs", atag_cmdline);
+> > +		return;
+> > +	}
+> > +	fdt_bootargs[len - 1] = ' ';
+> > +	appendprop_string(fdt, "/chosen", "bootargs", atag_cmdline);
+> Let's say appendprop_string() fails for whatever reason, the /chosen
+> string won't be null terminated anymore.
 
-I think that must mean your machine has many more CPUs than your nvme
-controller has IO queues.
+Good catch, I will fix that. Thank you for your review.
+
+> Won't it cause some problems ?
+
+It's OK at the moment because the last character of the "bootargs" property
+is not used. This is the code from early_init_dt_scan_chosen() in
+drivers/of/fdt.c:
+
+	/* Retrieve command line */
+	p = of_get_flat_dt_prop(node, "bootargs", &l);
+	if (p != NULL && l > 0)
+		strlcpy(data, p, min((int)l, COMMAND_LINE_SIZE));
+
+But not all accesses are that careful. I found get_cmdline() in
+arch/arm64/kernel/kaslr.c using
+
+		prop = fdt_getprop(fdt, node, "bootargs", NULL);
+
+so there is an expectation that the string is NUL terminated.
+
+-- 
+Rask Ingemann Lambertsen
