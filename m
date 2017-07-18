@@ -1,46 +1,59 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 18 Jul 2017 09:49:17 -0700
-Subject: [PATCH resend] Documentation: arm: Replace use of virt_to_phys
- with __pa_symbol
-In-Reply-To: <1500298768-13262-1-git-send-email-geert+renesas@glider.be>
-References: <1500298768-13262-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <d0d5568e-e70a-5576-fd0f-f01acfe8cfa2@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 18 Jul 2017 11:50:11 -0500
+Subject: [PATCH 1/4] gpio: davinci: Use devm_gpiochip_add_data in place of
+ gpiochip_add_data
+In-Reply-To: <1500375436-9435-2-git-send-email-j-keerthy@ti.com>
+References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+ <1500375436-9435-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <0aa79585-c88e-e5b7-c260-6e9ceee6d776@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2017 06:39 AM, Geert Uytterhoeven wrote:
-> All low-level PM/SMP code using virt_to_phys() should actually use
-> __pa_symbol() against kernel symbols.  Update the documentation to move
-> away from virt_to_phys().
+Hi Keerthy,
+
+On 07/18/2017 05:57 AM, Keerthy wrote:
+> Use the devm version of gpiochip_add_data and pass on the
+> return value. Reset the static variables to 0 before returning.
 > 
-> Cfr. commit 6996cbb2372189f7 ("ARM: 8641/1: treewide: Replace uses of
-> virt_to_phys with __pa_symbol")
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-
-Sorry for not noticing earlier.
-
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
 > ---
->  Documentation/arm/firmware.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/gpio/gpio-davinci.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/arm/firmware.txt b/Documentation/arm/firmware.txt
-> index da6713adac8acffc..7f175dbb427e631a 100644
-> --- a/Documentation/arm/firmware.txt
-> +++ b/Documentation/arm/firmware.txt
-> @@ -60,7 +60,7 @@ Example of using a firmware operation:
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index 65cb359..2c88054 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+> @@ -166,7 +166,7 @@ static int davinci_gpio_get(struct gpio_chip *chip, unsigned offset)
+>  static int davinci_gpio_probe(struct platform_device *pdev)
+>  {
+>  	static int ctrl_num, bank_base;
+> -	int gpio, bank;
+> +	int gpio, bank, ret = 0;
+>  	unsigned ngpio, nbank;
+>  	struct davinci_gpio_controller *chips;
+>  	struct davinci_gpio_platform_data *pdata;
+> @@ -232,7 +232,13 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+>  	for (gpio = 0, bank = 0; gpio < ngpio; gpio += 32, bank++)
+>  		chips->regs[bank] = gpio_base + offset_array[bank];
 >  
->  	/* some platform code, e.g. SMP initialization */
->  
-> -	__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> +	__raw_writel(__pa_symbol(exynos4_secondary_startup),
->  		CPU1_BOOT_REG);
->  
->  	/* Call Exynos specific smc call */
+> -	gpiochip_add_data(&chips->chip, chips);
+> +	ret = devm_gpiochip_add_data(dev, &chips->chip, chips);
+> +	if (ret) {
+> +		ctrl_num = 0;
+> +		bank_base = 0;
+
+Hmm, this doesn't look right to me. These variables are defined as
+static, and you are resetting them unconditionally. This should be an
+issue when you have multiple devices and one of them fails.
+
+regards
+Suman
+
+> +		return ret;
+> +	}
+> +
+>  	platform_set_drvdata(pdev, chips);
+>  	davinci_gpio_irq_setup(pdev);
+>  	return 0;
 > 
-
-
--- 
-Florian
