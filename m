@@ -1,82 +1,68 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Tue, 18 Jul 2017 16:46:21 -0700
-Subject: [PATCH] spmi: pmic-arb: Always allocate ppid_to_apid table
-In-Reply-To: <50b43f2e54cb0b2260a249ed07fe21ce@codeaurora.org>
-References: <20170627021746.22445-1-sboyd@codeaurora.org>
- <50b43f2e54cb0b2260a249ed07fe21ce@codeaurora.org>
-Message-ID: <596E9DCD.7030009@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 18 Jul 2017 18:50:44 -0500
+Subject: [PATCH 1/4] ARM: dts: keystone-k2g: Add PMMC node to support
+ TI-SCI protocol
+In-Reply-To: <8b8c4eff-4f18-f0d2-e075-389921e5a990@ti.com>
+References: <20170718032844.29490-1-s-anna@ti.com>
+ <20170718032844.29490-2-s-anna@ti.com>
+ <8b8c4eff-4f18-f0d2-e075-389921e5a990@ti.com>
+Message-ID: <4ff798de-9926-4bf8-74a5-572f0f0c1081@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/17 23:58, kgunda at codeaurora.org wrote:
-> On 2017-06-27 07:47, Stephen Boyd wrote:
->> After commit 7f1d4e58dabb ("spmi: pmic-arb: optimize table
->> lookups") we always need the ppid_to_apid table regardless of the
->> version of pmic arbiter we have. Otherwise, we will try to deref
->> the array when we don't allocate it on v2 hardware like the
->> msm8974 SoCs.
+On 07/18/2017 10:00 AM, Andrew F. Davis wrote:
+> On 07/17/2017 10:28 PM, Suman Anna wrote:
+>> From: Nishanth Menon <nm@ti.com>
 >>
->> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
->> Cc: Kiran Gunda <kgunda@codeaurora.org>
->> Fixes: 7f1d4e58dabb ("spmi: pmic-arb: optimize table lookups")
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Reviewed-by: Kiran Gunda <kgunda@codeaurora.org>
-
-Tested on a qcom-apq8074-dragonboard on 4.13-rc1
-
-Tested-by: Frank Rowand <frank.rowand@sony.com>
-
+>> Texas Instrument's System Control Interface (TI-SCI) Message Protocol
+>> is implemented in Keystone 2 generation 66AK2G SoC with the PMMC entity.
+>>
+>> Add the ti-sci node representing this 66AK2G PMMC module.
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> [s-anna at ti.com: add unit address to DT node]
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
 >> ---
->>  drivers/spmi/spmi-pmic-arb.c | 17 +++++++----------
->>  1 file changed, 7 insertions(+), 10 deletions(-)
+>>  arch/arm/boot/dts/keystone-k2g.dtsi | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
 >>
->> diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
->> index 2afe3597982e..f4b7a98a7913 100644
->> --- a/drivers/spmi/spmi-pmic-arb.c
->> +++ b/drivers/spmi/spmi-pmic-arb.c
->> @@ -134,7 +134,6 @@ struct apid_data {
->>   * @spmic:        SPMI controller object
->>   * @ver_ops:        version dependent operations.
->>   * @ppid_to_apid    in-memory copy of PPID -> channel (APID) mapping table.
->> - *            v2 only.
->>   */
->>  struct spmi_pmic_arb {
->>      void __iomem        *rd_base;
->> @@ -1016,6 +1015,13 @@ static int spmi_pmic_arb_probe(struct
->> platform_device *pdev)
->>          goto err_put_ctrl;
->>      }
->>
->> +    pa->ppid_to_apid = devm_kcalloc(&ctrl->dev, PMIC_ARB_MAX_PPID,
->> +                    sizeof(*pa->ppid_to_apid), GFP_KERNEL);
->> +    if (!pa->ppid_to_apid) {
->> +        err = -ENOMEM;
->> +        goto err_put_ctrl;
->> +    }
+>> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+>> index a789f75a1ed5..7f0f4180b373 100644
+>> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
+>> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+>> @@ -139,5 +139,19 @@
+>>  			interrupts = <GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH>,
+>>  				     <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
+>>  		};
 >> +
->>      hw_ver = readl_relaxed(core + PMIC_ARB_VERSION);
->>
->>      if (hw_ver < PMIC_ARB_VERSION_V2_MIN) {
->> @@ -1048,15 +1054,6 @@ static int spmi_pmic_arb_probe(struct
->> platform_device *pdev)
->>              err = PTR_ERR(pa->wr_base);
->>              goto err_put_ctrl;
->>          }
->> -
->> -        pa->ppid_to_apid = devm_kcalloc(&ctrl->dev,
->> -                        PMIC_ARB_MAX_PPID,
->> -                        sizeof(*pa->ppid_to_apid),
->> -                        GFP_KERNEL);
->> -        if (!pa->ppid_to_apid) {
->> -            err = -ENOMEM;
->> -            goto err_put_ctrl;
->> -        }
->>      }
->>
->>      dev_info(&ctrl->dev, "PMIC arbiter version %s (0x%x)\n",
-> Thanks for the fix !
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> +		pmmc: pmmc at 02921c00 {
+>> +			compatible = "ti,k2g-sci";
+>> +			/*
+>> +			 * In case of rare platforms that does not use k2g as
+>> +			 * system master, use /delete-property/
+>> +			 */
 > 
+> This comment seems mis-worded, I believe this was meant to say "for
+> platforms that do not use the *PMMC* as the system master".
+
+The comment is for the system-reboot-controller property, and is meant
+to say that this property is to be deleted from this node if there is an
+external entity on the board other than the K2G SoC that is responsible
+for triggering a reboot.
+
+regards
+Suman
+
+> 
+> Andrew
+> 
+>> +			ti,system-reboot-controller;
+>> +			mbox-names = "rx", "tx";
+>> +			mboxes= <&msgmgr 5 2>,
+>> +				<&msgmgr 0 0>;
+>> +			reg-names = "debug_messages";
+>> +			reg = <0x02921c00 0x400>;
+>> +		};
+>>  	};
+>>  };
+>>
