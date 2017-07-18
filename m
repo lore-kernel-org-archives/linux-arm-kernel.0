@@ -1,152 +1,40 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue, 18 Jul 2017 19:36:13 +0800
-Subject: [PATCH] drm/rockchip: cdn-dp: send audio infoframe to sink
-In-Reply-To: <20170717202300.c2r7ypclqbwvqbzq@art_vandelay>
-References: <1500116418-4178-1-git-send-email-zyw@rock-chips.com>
- <20170717202300.c2r7ypclqbwvqbzq@art_vandelay>
-Message-ID: <e926d902-ceb9-4189-7ad7-ce95f134c3a6@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jul 2017 13:39:48 +0200
+Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to
+ work on 32-bits
+In-Reply-To: <596DEC19.6060301@nxp.com>
+References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
+ <20170717132646.3020-7-laurentiu.tudor@nxp.com>
+ <CAK8P3a3KDh=MgfjG+sKNqcrQwq1yf-DgQN0=HigPaPYYJq0Uug@mail.gmail.com>
+ <596CC912.3020709@nxp.com>
+ <CAK8P3a3e+Gv2bdHKkRdNVp1e2-Z6j351cudLU4fuH2aZ8CSwmQ@mail.gmail.com>
+ <596DEC19.6060301@nxp.com>
+Message-ID: <CAK8P3a1HDSXXsSfSfOrHYSGLhNKOv__JAFVH-RVZAbojq+=AOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean
+On Tue, Jul 18, 2017 at 1:08 PM, Laurentiu Tudor
+<laurentiu.tudor@nxp.com> wrote:
+> On 07/17/2017 06:00 PM, Arnd Bergmann wrote:
 
-Thanks for your replying.
-
-
-On Tuesday, July 18, 2017 04:23 AM, Sean Paul wrote:
-> On Sat, Jul 15, 2017 at 07:00:18PM +0800, Chris Zhong wrote:
->> Some DP/HDMI sink need to receive the audio infoframe to play sound,
->> especially some multi-channel AV receiver, they need the
->> channel_allocation from infoframe to config the speakers. Send the
->> audio infoframe via SDP will make them work properly.
+>> Strictly speaking the __raw_writel() won't guarantee that the
+>> data is written as a single word, the compiler might decide to
+>> split it up into byte-sized writes if it believes the destination pointer
+>> is unaligned and the CPU has no efficient writes.
 >>
->> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Hi Chris,
-> Thanks for the patch, please see comments below.
+>> I think this cannot happen on arm or powerpc, as we go through
+>> inline assembly for the store, but it's not completely portable.
 >
->> ---
->>
->>   drivers/gpu/drm/rockchip/cdn-dp-core.c | 20 ++++++++++++++++++++
->>   drivers/gpu/drm/rockchip/cdn-dp-reg.c  | 19 +++++++++++++++++++
->>   drivers/gpu/drm/rockchip/cdn-dp-reg.h  |  6 ++++++
->>   3 files changed, 45 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
->> index 9b0b058..e59ca47 100644
->> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
->> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
->> @@ -802,6 +802,7 @@ static int cdn_dp_audio_hw_params(struct device *dev,  void *data,
->>   		.sample_rate = params->sample_rate,
->>   		.channels = params->channels,
->>   	};
->> +	u8 buffer[14];
-> Why 14?
->
-> I think you should probably have buffer[HDMI_AUDIO_INFOFRAME_SIZE +
-> SDP_HEADER_SIZE] so the reader knows how you arrived at this value.
->
->>   	int ret;
->>   
->>   	mutex_lock(&dp->lock);
->> @@ -823,6 +824,25 @@ static int cdn_dp_audio_hw_params(struct device *dev,  void *data,
->>   		goto out;
->>   	}
->>   
->> +	memset(buffer, 0, sizeof(buffer));
->> +
->> +	ret = hdmi_audio_infoframe_pack(&params->cea, buffer, sizeof(buffer));
->> +	if (ret < 0) {
->> +		DRM_DEV_ERROR(dev, "Failed to pack audio infoframe: %d\n", ret);
->> +		goto out;
->> +	}
->> +
->> +	/*
->> +	 * Change the infoframe header to SDP header per DP 1.3 spec, Table
->> +	 * 2-98.
->> +	 */
->> +	buffer[0] = 0;
->> +	buffer[1] = HDMI_INFOFRAME_TYPE_AUDIO;
->> +	buffer[2] = 0x1b;
->> +	buffer[3] = 0x48;
-> Instead of doing this, consider splitting up hdmi_audio_infoframe_pack into
-> hdmi_audio_infoframe_pack and hdmi_audio_infoframe_pack_payload. The first
-> function does everything, while the second just packs the payload, then you can
-> set the SDP header independently.
->
->> +
->> +	cdn_dp_sdp_write(dp, 0, buffer, sizeof(buffer));
->> +
->>   	ret = cdn_dp_audio_config(dp, &audio);
->>   	if (!ret)
->>   		dp->audio_info = audio;
->> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
->> index b14d211..8907db0 100644
->> --- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
->> +++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
->> @@ -951,6 +951,25 @@ static void cdn_dp_audio_config_spdif(struct cdn_dp_device *dp)
->>   	clk_set_rate(dp->spdif_clk, CDN_DP_SPDIF_CLK);
->>   }
->>   
->> +void cdn_dp_sdp_write(struct cdn_dp_device *dp, int entry_id, u8 *buf, u32 len)
->> +{
->> +	int idx;
->> +	u32 *packet = (u32 *)buf;
->> +	u32 length = len / 4;
-> length and len are pretty terrible names, it would be quite easy to use the
-> wrong one. Consider more descriptive names (ie: buf_len and num_packets).
->
->> +	u8 type = buf[1];
-> Check for len < 0?
->
->> +
->> +	for (idx = 0; idx < length; idx++)
->> +		writel(cpu_to_le32(*packet++), dp->regs + SOURCE_PIF_DATA_WR);
->> +
->> +	writel(entry_id, dp->regs + SOURCE_PIF_WR_ADDR);
->> +
->> +	writel(F_HOST_WR, dp->regs + SOURCE_PIF_WR_REQ);
->> +
->> +	writel(PIF_PKT_TYPE_VALID | F_PACKET_TYPE(type) | entry_id,
->> +	       dp->regs + SOURCE_PIF_PKT_ALLOC_REG);
->> +	writel(PIF_PKT_ALLOC_WR_EN, dp->regs + SOURCE_PIF_PKT_ALLOC_WR_EN);
->> +}
->> +
->>   int cdn_dp_audio_config(struct cdn_dp_device *dp, struct audio_info *audio)
->>   {
->>   	int ret;
->> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.h b/drivers/gpu/drm/rockchip/cdn-dp-reg.h
->> index c4bbb4a83..6ec0e81 100644
->> --- a/drivers/gpu/drm/rockchip/cdn-dp-reg.h
->> +++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.h
->> @@ -424,6 +424,11 @@
->>   /* Reference cycles when using lane clock as reference */
->>   #define LANE_REF_CYC				0x8000
->>   
->> +#define F_HOST_WR		BIT(0)
->> +#define PIF_PKT_ALLOC_WR_EN	BIT(0)
->> +#define PIF_PKT_TYPE_VALID	(3 << 16)
->> +#define F_PACKET_TYPE(x)	(((x) & 0xff) << 8)
-> Can you tuck these #defines under the definition of SOURCE_PIF_PKT_ALLOC_REG, so
-> we know which register they apply to?
->
->
-Considering the existing code style of this file, can we keep these 
-defines here?
+> Should i worry about portability? Slim changes that this driver
+> will ever run on anything else other than ARM & ARM64.
+> My current goal was just to make it compile on other arches.
 
->> +
->>   enum voltage_swing_level {
->>   	VOLTAGE_LEVEL_0,
->>   	VOLTAGE_LEVEL_1,
->> @@ -478,5 +483,6 @@ int cdn_dp_set_video_status(struct cdn_dp_device *dp, int active);
->>   int cdn_dp_config_video(struct cdn_dp_device *dp);
->>   int cdn_dp_audio_stop(struct cdn_dp_device *dp, struct audio_info *audio);
->>   int cdn_dp_audio_mute(struct cdn_dp_device *dp, bool enable);
->> +void cdn_dp_sdp_write(struct cdn_dp_device *dp, int entry_id, u8 *buf, u32 len);
->>   int cdn_dp_audio_config(struct cdn_dp_device *dp, struct audio_info *audio);
->>   #endif /* _CDN_DP_REG_H */
->> -- 
->> 2.6.3
->>
+I always recommend writing any driver in the most portable way
+out of principle, since you never know who looks at it for reference
+when writing another driver.
 
--- 
-Chris Zhong
+I wouldn't expect the driver itself to be used on other architectures,
+but of course you never know what CPU becomes fashionable
+10 years from now.
+
+        Arnd
