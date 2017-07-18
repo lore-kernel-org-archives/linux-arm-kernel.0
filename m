@@ -1,71 +1,48 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 18 Jul 2017 10:48:15 +0100
-Subject: [PATCH v4 18/18] coresight: Add support for Coresight SoC 600
- components
-In-Reply-To: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
-References: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500371295-30472-19-git-send-email-suzuki.poulose@arm.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 18 Jul 2017 16:27:13 +0530
+Subject: [PATCH 1/4] gpio: davinci: Use devm_gpiochip_add_data in place of
+ gpiochip_add_data
+In-Reply-To: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1500375436-9435-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the peripheral ids for the Coresight SoC 600 TPIU, replicator
-and funnel.
+Use the devm version of gpiochip_add_data and pass on the
+return value. Reset the static variables to 0 before returning.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 5 +++++
- drivers/hwtracing/coresight/coresight-funnel.c             | 5 +++++
- drivers/hwtracing/coresight/coresight-tpiu.c               | 5 +++++
- 3 files changed, 15 insertions(+)
+ drivers/gpio/gpio-davinci.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index 93c2206..1e4beb2 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -200,6 +200,11 @@ static struct amba_id replicator_ids[] = {
- 		.id     = 0x000bb909,
- 		.mask   = 0x000fffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id     = 0x000bb9ec,
-+		.mask   = 0x000fffff,
-+	},
- 	{ 0, 0 },
- };
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index 65cb359..2c88054 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -166,7 +166,7 @@ static int davinci_gpio_get(struct gpio_chip *chip, unsigned offset)
+ static int davinci_gpio_probe(struct platform_device *pdev)
+ {
+ 	static int ctrl_num, bank_base;
+-	int gpio, bank;
++	int gpio, bank, ret = 0;
+ 	unsigned ngpio, nbank;
+ 	struct davinci_gpio_controller *chips;
+ 	struct davinci_gpio_platform_data *pdata;
+@@ -232,7 +232,13 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+ 	for (gpio = 0, bank = 0; gpio < ngpio; gpio += 32, bank++)
+ 		chips->regs[bank] = gpio_base + offset_array[bank];
  
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 6f7f3d3..df1cf73 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -251,6 +251,11 @@ static struct amba_id funnel_ids[] = {
- 		.id     = 0x000bb908,
- 		.mask   = 0x000fffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id     = 0x000bb9eb,
-+		.mask   = 0x000fffff,
-+	},
- 	{ 0, 0},
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 59c1510..eda5d5a 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -201,6 +201,11 @@ static struct amba_id tpiu_ids[] = {
- 		.id	= 0x0004b912,
- 		.mask	= 0x0007ffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id	= 0x000bb9e7,
-+		.mask	= 0x000fffff,
-+	},
- 	{ 0, 0},
- };
- 
+-	gpiochip_add_data(&chips->chip, chips);
++	ret = devm_gpiochip_add_data(dev, &chips->chip, chips);
++	if (ret) {
++		ctrl_num = 0;
++		bank_base = 0;
++		return ret;
++	}
++
+ 	platform_set_drvdata(pdev, chips);
+ 	davinci_gpio_irq_setup(pdev);
+ 	return 0;
 -- 
-2.7.5
+1.9.1
