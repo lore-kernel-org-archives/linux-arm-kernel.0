@@ -1,7 +1,7 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Jul 2017 16:43:21 -0500
-Subject: [PATCH] PCI: Convert to using %pOF instead of full_name
-Message-ID: <20170718214339.7774-41-robh@kernel.org>
+Date: Tue, 18 Jul 2017 16:43:14 -0500
+Subject: [PATCH] memory: Convert to using %pOF instead of full_name
+Message-ID: <20170718214339.7774-34-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,180 +10,197 @@ full_name to use %pOF instead. This is preparation to remove storing
 of the full path string for each node.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Jonathan Hunter <jonathanh@nvidia.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: linux-pci at vger.kernel.org
+Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-tegra at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
+Cc: linux-omap at vger.kernel.org
 ---
- drivers/pci/host/pci-mvebu.c        | 8 ++++----
- drivers/pci/host/pci-tegra.c        | 3 +--
- drivers/pci/hotplug/pnv_php.c       | 4 ++--
- drivers/pci/hotplug/rpadlpar_core.c | 4 ++--
- drivers/pci/hotplug/rpaphp_core.c   | 2 +-
- drivers/pci/hotplug/rpaphp_pci.c    | 4 ++--
- drivers/pci/hotplug/rpaphp_slot.c   | 4 ++--
- drivers/pci/pci-sysfs.c             | 4 ++--
- drivers/pci/pci.c                   | 4 ++--
- 9 files changed, 18 insertions(+), 19 deletions(-)
+ drivers/memory/atmel-ebi.c    | 17 ++++++++---------
+ drivers/memory/jz4780-nemc.c  | 12 ++++++------
+ drivers/memory/mvebu-devbus.c | 12 ++++++------
+ drivers/memory/omap-gpmc.c    | 18 +++++++++---------
+ 4 files changed, 29 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index f353a6eb2f01..424982997eb9 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -1054,8 +1054,8 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 	port->pcie = pcie;
-
- 	if (of_property_read_u32(child, "marvell,pcie-port", &port->port)) {
--		dev_warn(dev, "ignoring %s, missing pcie-port property\n",
--			 of_node_full_name(child));
-+		dev_warn(dev, "ignoring %pOF, missing pcie-port property\n",
-+			 child);
- 		goto skip;
- 	}
-
-@@ -1106,8 +1106,8 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
- 		}
-
- 		if (flags & OF_GPIO_ACTIVE_LOW) {
--			dev_info(dev, "%s: reset gpio is active low\n",
--				 of_node_full_name(child));
-+			dev_info(dev, "%pOF: reset gpio is active low\n",
-+				 child);
- 			gpio_flags = GPIOF_ACTIVE_LOW |
- 				     GPIOF_OUT_INIT_LOW;
- 		} else {
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index b3722b7709df..7eb9be5ae357 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -1703,8 +1703,7 @@ static int tegra_pcie_get_legacy_regulators(struct tegra_pcie *pcie)
- 		pcie->num_supplies = 2;
-
- 	if (pcie->num_supplies == 0) {
--		dev_err(dev, "device %s not supported in legacy mode\n",
+diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
+index 99e644cda4d1..597282e35c69 100644
+--- a/drivers/memory/atmel-ebi.c
++++ b/drivers/memory/atmel-ebi.c
+@@ -156,8 +156,8 @@ static int atmel_ebi_xslate_smc_timings(struct atmel_ebi_dev *ebid,
+ out:
+ 	if (ret) {
+ 		dev_err(ebid->ebi->dev,
+-			"missing or invalid timings definition in %s",
 -			np->full_name);
-+		dev_err(dev, "device %pOF not supported in legacy mode\n", np);
- 		return -ENODEV;
++			"missing or invalid timings definition in %pOF",
++			np);
+ 		return ret;
  	}
 
-diff --git a/drivers/pci/hotplug/pnv_php.c b/drivers/pci/hotplug/pnv_php.c
-index 7c203198b582..74f6a17e4614 100644
---- a/drivers/pci/hotplug/pnv_php.c
-+++ b/drivers/pci/hotplug/pnv_php.c
-@@ -163,8 +163,8 @@ static void pnv_php_detach_device_nodes(struct device_node *parent)
- 		of_node_put(dn);
- 		refcount = kref_read(&dn->kobj.kref);
- 		if (refcount != 1)
--			pr_warn("Invalid refcount %d on <%s>\n",
--				refcount, of_node_full_name(dn));
-+			pr_warn("Invalid refcount %d on <%pOF>\n",
-+				refcount, dn);
+@@ -267,8 +267,8 @@ static int atmel_ebi_xslate_smc_config(struct atmel_ebi_dev *ebid,
+ 		return -EINVAL;
 
- 		of_detach_node(dn);
- 	}
-diff --git a/drivers/pci/hotplug/rpadlpar_core.c b/drivers/pci/hotplug/rpadlpar_core.c
-index 3f93a4e79595..a3449d717a99 100644
---- a/drivers/pci/hotplug/rpadlpar_core.c
-+++ b/drivers/pci/hotplug/rpadlpar_core.c
-@@ -150,8 +150,8 @@ static void dlpar_pci_add_bus(struct device_node *dn)
- 	/* Add EADS device to PHB bus, adding new entry to bus->devices */
- 	dev = of_create_pci_dev(dn, phb->bus, pdn->devfn);
- 	if (!dev) {
--		printk(KERN_ERR "%s: failed to create pci dev for %s\n",
--				__func__, dn->full_name);
-+		printk(KERN_ERR "%s: failed to create pci dev for %pOF\n",
-+				__func__, dn);
- 		return;
- 	}
-
-diff --git a/drivers/pci/hotplug/rpaphp_core.c b/drivers/pci/hotplug/rpaphp_core.c
-index 8d132024f06e..1e29abaaea08 100644
---- a/drivers/pci/hotplug/rpaphp_core.c
-+++ b/drivers/pci/hotplug/rpaphp_core.c
-@@ -318,7 +318,7 @@ int rpaphp_add_slot(struct device_node *dn)
- 	if (!is_php_dn(dn, &indexes, &names, &types, &power_domains))
- 		return 0;
-
--	dbg("Entry %s: dn->full_name=%s\n", __func__, dn->full_name);
-+	dbg("Entry %s: dn=%pOF\n", __func__, dn);
-
- 	/* register PCI devices */
- 	name = (char *) &names[1];
-diff --git a/drivers/pci/hotplug/rpaphp_pci.c b/drivers/pci/hotplug/rpaphp_pci.c
-index ea41ea1d3c00..32aabc533be8 100644
---- a/drivers/pci/hotplug/rpaphp_pci.c
-+++ b/drivers/pci/hotplug/rpaphp_pci.c
-@@ -95,7 +95,7 @@ int rpaphp_enable_slot(struct slot *slot)
-
- 	bus = pci_find_bus_by_node(slot->dn);
- 	if (!bus) {
--		err("%s: no pci_bus for dn %s\n", __func__, slot->dn->full_name);
-+		err("%s: no pci_bus for dn %pOF\n", __func__, slot->dn);
+ 	if ((ret > 0 && !required) || (!ret && required)) {
+-		dev_err(ebid->ebi->dev, "missing atmel,smc- properties in %s",
+-			np->full_name);
++		dev_err(ebid->ebi->dev, "missing atmel,smc- properties in %pOF",
++			np);
  		return -EINVAL;
  	}
 
-@@ -125,7 +125,7 @@ int rpaphp_enable_slot(struct slot *slot)
+@@ -311,8 +311,7 @@ static int atmel_ebi_dev_setup(struct atmel_ebi *ebi, struct device_node *np,
 
- 		if (rpaphp_debug) {
- 			struct pci_dev *dev;
--			dbg("%s: pci_devs of slot[%s]\n", __func__, slot->dn->full_name);
-+			dbg("%s: pci_devs of slot[%pOF]\n", __func__, slot->dn);
- 			list_for_each_entry(dev, &bus->devices, bus_list)
- 				dbg("\t%s\n", pci_name(dev));
+ 		if (cs >= AT91_MATRIX_EBI_NUM_CS ||
+ 		    !(ebi->caps->available_cs & BIT(cs))) {
+-			dev_err(dev, "invalid reg property in %s\n",
+-				np->full_name);
++			dev_err(dev, "invalid reg property in %pOF\n", np);
+ 			return -EINVAL;
  		}
-diff --git a/drivers/pci/hotplug/rpaphp_slot.c b/drivers/pci/hotplug/rpaphp_slot.c
-index 388c4d8fcdd1..489862360f2c 100644
---- a/drivers/pci/hotplug/rpaphp_slot.c
-+++ b/drivers/pci/hotplug/rpaphp_slot.c
-@@ -122,8 +122,8 @@ int rpaphp_register_slot(struct slot *slot)
- 	int retval;
- 	int slotno = -1;
 
--	dbg("%s registering slot:path[%s] index[%x], name[%s] pdomain[%x] type[%d]\n",
--		__func__, slot->dn->full_name, slot->index, slot->name,
-+	dbg("%s registering slot:path[%pOF] index[%x], name[%s] pdomain[%x] type[%d]\n",
-+		__func__, slot->dn, slot->index, slot->name,
- 		slot->power_domain, slot->type);
-
- 	/* should not try to register the same slot twice */
-diff --git a/drivers/pci/pci-sysfs.c b/drivers/pci/pci-sysfs.c
-index 2f3780b50723..33d4df7ed591 100644
---- a/drivers/pci/pci-sysfs.c
-+++ b/drivers/pci/pci-sysfs.c
-@@ -556,9 +556,9 @@ static ssize_t devspec_show(struct device *dev,
- 	struct pci_dev *pdev = to_pci_dev(dev);
- 	struct device_node *np = pci_device_to_OF_node(pdev);
-
--	if (np == NULL || np->full_name == NULL)
-+	if (np == NULL)
- 		return 0;
--	return sprintf(buf, "%s", np->full_name);
-+	return sprintf(buf, "%pOF", np);
- }
- static DEVICE_ATTR_RO(devspec);
- #endif
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index af0cc3456dc1..e8e40dea2842 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -5363,8 +5363,8 @@ static int of_pci_bus_find_domain_nr(struct device *parent)
- 		use_dt_domains = 0;
- 		domain = pci_get_new_domain_nr();
- 	} else {
--		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
--			parent->of_node->full_name);
-+		dev_err(parent, "Node %pOF has inconsistent \"linux,pci-domain\" property in DT\n",
-+			parent->of_node);
- 		domain = -1;
+@@ -321,7 +320,7 @@ static int atmel_ebi_dev_setup(struct atmel_ebi *ebi, struct device_node *np,
  	}
 
+ 	if (!numcs) {
+-		dev_err(dev, "invalid reg property in %s\n", np->full_name);
++		dev_err(dev, "invalid reg property in %pOF\n", np);
+ 		return -EINVAL;
+ 	}
+
+@@ -569,8 +568,8 @@ static int atmel_ebi_probe(struct platform_device *pdev)
+
+ 		ret = atmel_ebi_dev_setup(ebi, child, reg_cells);
+ 		if (ret) {
+-			dev_err(dev, "failed to configure EBI bus for %s, disabling the device",
+-				child->full_name);
++			dev_err(dev, "failed to configure EBI bus for %pOF, disabling the device",
++				child);
+
+ 			ret = atmel_ebi_dev_disable(ebi, child);
+ 			if (ret)
+diff --git a/drivers/memory/jz4780-nemc.c b/drivers/memory/jz4780-nemc.c
+index 919d1925acb9..bcf06adefc96 100644
+--- a/drivers/memory/jz4780-nemc.c
++++ b/drivers/memory/jz4780-nemc.c
+@@ -322,8 +322,8 @@ static int jz4780_nemc_probe(struct platform_device *pdev)
+ 			bank = of_read_number(prop, 1);
+ 			if (bank < 1 || bank >= JZ4780_NEMC_NUM_BANKS) {
+ 				dev_err(nemc->dev,
+-					"%s requests invalid bank %u\n",
+-					child->full_name, bank);
++					"%pOF requests invalid bank %u\n",
++					child, bank);
+
+ 				/* Will continue the outer loop below. */
+ 				referenced = 0;
+@@ -334,12 +334,12 @@ static int jz4780_nemc_probe(struct platform_device *pdev)
+ 		}
+
+ 		if (!referenced) {
+-			dev_err(nemc->dev, "%s has no addresses\n",
+-				child->full_name);
++			dev_err(nemc->dev, "%pOF has no addresses\n",
++				child);
+ 			continue;
+ 		} else if (nemc->banks_present & referenced) {
+-			dev_err(nemc->dev, "%s conflicts with another node\n",
+-				child->full_name);
++			dev_err(nemc->dev, "%pOF conflicts with another node\n",
++				child);
+ 			continue;
+ 		}
+
+diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
+index 24852812fd44..981860879d02 100644
+--- a/drivers/memory/mvebu-devbus.c
++++ b/drivers/memory/mvebu-devbus.c
+@@ -105,8 +105,8 @@ static int get_timing_param_ps(struct devbus *devbus,
+
+ 	err = of_property_read_u32(node, name, &time_ps);
+ 	if (err < 0) {
+-		dev_err(devbus->dev, "%s has no '%s' property\n",
+-			name, node->full_name);
++		dev_err(devbus->dev, "%pOF has no '%s' property\n",
++			node, name);
+ 		return err;
+ 	}
+
+@@ -127,8 +127,8 @@ static int devbus_get_timing_params(struct devbus *devbus,
+ 	err = of_property_read_u32(node, "devbus,bus-width", &r->bus_width);
+ 	if (err < 0) {
+ 		dev_err(devbus->dev,
+-			"%s has no 'devbus,bus-width' property\n",
+-			node->full_name);
++			"%pOF has no 'devbus,bus-width' property\n",
++			node);
+ 		return err;
+ 	}
+
+@@ -180,8 +180,8 @@ static int devbus_get_timing_params(struct devbus *devbus,
+ 					   &w->sync_enable);
+ 		if (err < 0) {
+ 			dev_err(devbus->dev,
+-				"%s has no 'devbus,sync-enable' property\n",
+-				node->full_name);
++				"%pOF has no 'devbus,sync-enable' property\n",
++				node);
+ 			return err;
+ 		}
+ 	}
+diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+index a80e17de906d..f7f393541934 100644
+--- a/drivers/memory/omap-gpmc.c
++++ b/drivers/memory/omap-gpmc.c
+@@ -960,7 +960,7 @@ static int gpmc_cs_remap(int cs, u32 base)
+ 	 * Make sure we ignore any device offsets from the GPMC partition
+ 	 * allocated for the chip select and that the new base confirms
+ 	 * to the GPMC 16MB minimum granularity.
+-	 */
++	 */
+ 	base &= ~(SZ_16M - 1);
+
+ 	gpmc_cs_get_memconf(cs, &old_base, &size);
+@@ -1930,8 +1930,8 @@ static int gpmc_probe_onenand_child(struct platform_device *pdev,
+ 	struct omap_onenand_platform_data *gpmc_onenand_data;
+
+ 	if (of_property_read_u32(child, "reg", &val) < 0) {
+-		dev_err(&pdev->dev, "%s has no 'reg' property\n",
+-			child->full_name);
++		dev_err(&pdev->dev, "%pOF has no 'reg' property\n",
++			child);
+ 		return -ENODEV;
+ 	}
+
+@@ -1979,14 +1979,14 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
+ 	struct gpmc_device *gpmc = platform_get_drvdata(pdev);
+
+ 	if (of_property_read_u32(child, "reg", &cs) < 0) {
+-		dev_err(&pdev->dev, "%s has no 'reg' property\n",
+-			child->full_name);
++		dev_err(&pdev->dev, "%pOF has no 'reg' property\n",
++			child);
+ 		return -ENODEV;
+ 	}
+
+ 	if (of_address_to_resource(child, 0, &res) < 0) {
+-		dev_err(&pdev->dev, "%s has malformed 'reg' property\n",
+-			child->full_name);
++		dev_err(&pdev->dev, "%pOF has malformed 'reg' property\n",
++			child);
+ 		return -ENODEV;
+ 	}
+
+@@ -2084,8 +2084,8 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
+ 		ret = of_property_read_u32(child, "bank-width",
+ 					   &gpmc_s.device_width);
+ 		if (ret < 0) {
+-			dev_err(&pdev->dev, "%s has no 'bank-width' property\n",
+-				child->full_name);
++			dev_err(&pdev->dev, "%pOF has no 'bank-width' property\n",
++				child);
+ 			goto err;
+ 		}
+ 	}
 --
 2.11.0
