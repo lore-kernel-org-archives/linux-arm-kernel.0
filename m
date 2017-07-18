@@ -1,122 +1,75 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 18 Jul 2017 15:47:29 +0300
-Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail
- for runtime_pm users
-In-Reply-To: <20170718120839.k7zsey67qgrtnfwe@phenom.ffwll.local>
-References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
- <10955632.YI7NJnTkKU@avalon>
- <20170718120839.k7zsey67qgrtnfwe@phenom.ffwll.local>
-Message-ID: <2697690.BvagR2OUgd@avalon>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Tue, 18 Jul 2017 12:53:12 +0000
+Subject: [PATCH v2 0/7] [PATCH v2 0/7] Add support of OV9655 camera
+In-Reply-To: <BCD1BD18-96E3-4638-8935-B5C832D8EE52@goldelico.com>
+References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
+ <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
+ <956f17e6-36dd-6733-0d35-9b801ed4244d@xs4all.nl>
+ <BCD1BD18-96E3-4638-8935-B5C832D8EE52@goldelico.com>
+Message-ID: <2dd3402e-55b0-231d-878f-5ba95ee8cb36@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
 
-On Tuesday 18 Jul 2017 14:08:39 Daniel Vetter wrote:
-> On Tue, Jul 18, 2017 at 01:14:12PM +0300, Laurent Pinchart wrote:
-> > On Tuesday 18 Jul 2017 09:05:22 Maxime Ripard wrote:
-> >> On Fri, Jul 14, 2017 at 02:43:12AM +0300, Laurent Pinchart wrote:
-> >>> On Thursday 13 Jul 2017 16:41:13 Maxime Ripard wrote:
-> >>>> The current drm_atomic_helper_commit_tail helper works only if the
-> >>>> CRTC is accessible, and documents an alternative implementation that
-> >>>> is supposed to be used if that happens.
-> >>>> 
-> >>>> That implementation is then duplicated by some drivers. Instead of
-> >>>> documenting it, let's implement an helper that all the relevant users
-> >>>> can use directly.
-> >>>> 
-> >>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>>> ---
-> >>>> 
-> >>>>  drivers/gpu/drm/drm_atomic_helper.c        | 47 +++++++++++++--------
-> >>>>  drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
-> >>>>  drivers/gpu/drm/rcar-du/rcar_du_kms.c      | 18 +---------
-> >>> 
-> >>> I've submitted "[PATCH] drm: rcar-du: Setup planes before enabling
-> >>> CRTC to avoid flicker" that changes the rcar-du implementation to the
-> >>> standard disable/update planes/enable order, so I'd appreciate if you
-> >>> could drop the rcar-du part of this patch to avoid conflicts.
-> >> 
-> >> I will.
-> >> 
-> >>> This being said, the reason why I switched back from the "runtime PM"
-> >>> to the "standard" order is probably of interest to you. Quoting the
-> >>> commit message,
-> >>> 
-> >>>> Commit 52055bafa1ff ("drm: rcar-du: Move plane commit code from CRTC
-> >>>> start to CRTC resume") changed the order of the plane commit and CRTC
-> >>>> enable operations to accommodate the runtime PM requirements.
-> >>>> However, this introduced corruption in the first displayed frame, as
-> >>>> the CRTC is now enabled without any plane configured. On Gen2
-> >>>> hardware the first frame will be black and likely unnoticed, but on
-> >>>> Gen3 hardware we end up starting the display before the VSP
-> >>>> compositor, which is more noticeable.
-> >>>> 
-> >>>> To fix this, revert the order of the commit operations back, and
-> >>>> handle runtime PM requirements in the CRTC .atomic_begin() and
-> >>>> .atomic_enable() helper operation handlers.
-> >>> 
-> >>> I believe that the "runtime PM" order is problematic in most drivers.
-> >>> The problem usually goes unnoticed as most monitors will not even
-> >>> display the first frame, and I assume many devices will just output it
-> >>> black, but it's an issue nonetheless.
-> >>> 
-> >>> Note that my driver hasn't lost the "runtime PM" requirements, so I
-> >>> had to support them with the "standard" order. The best way I've found
-> >>> was to runtime resume in the one of .atomic_begin() and .enable() that
-> >>> is run first. Not very neat, as similar code would be needed in most
-> >>> drivers. I wonder whether it wouldn't be useful to add resume/suspend
-> >>> helper callbacks for the CRTC.
-> >> 
-> >> I'm not sure it would apply. Our driver doesn't use runtime_pm at all,
-> >> but in order for the commits to happen, we need to have the CRTC
-> >> active, but it will remain powered up the whole time. I'm not sure if
-> >> we'll ever see such a frame.
-> >> 
-> >> But since this seems to be a pretty generic, maybe we should address
-> >> it in the helper itself?
-> > 
-> > I think that would make sense.
-> > 
-> > There are a few options that result in too many combinations for separate
-> > commit tail helpers to be provided in my opinion:
-> > 
-> > - disable/enable/planes vs. disable/planes/enable
-> > - DRM_PLANE_COMMIT_ACTIVE_ONLY vs. all CRTCs
-> > - drm_atomic_helper_wait_for_vblanks vs
-> > drm_atomic_helper_wait_for_flip_done
-> > 
-> > Maybe we could add a few CRTC commit helper flags along the line of
-> > DRM_PLANE_COMMIT_ACTIVE_ONLY, add a field to the drm_crtc structure to
-> > store them, and have drm_atomic_helper_commit_tail() use those flags to
-> > control the sequence of operations.
+
+On 07/18/2017 02:17 PM, H. Nikolaus Schaller wrote:
+> Hi,
 > 
-> Why not write your own? Yes it's a bit of copypaste, but imo that's really
-> not horrible.
-
-I don't find it horrible either, it's not too much code. The question was more 
-about which version(s) to consider standard enough to provide a core helper 
-for.
-
-What bothers me a bit more with the copy&paste implementations isn't so much 
-the commit tail handling itself, but the consequences it has on the rest of 
-the driver. Drivers pick the order they want based on their requirements, and 
-that order then leads to different race conditions between the drivers. We 
-don't document the potential issues there, so new drivers (and for that 
-matter, possibly existing ones) will likely have bugs if the author is not 
-aware of the subtle issues related to the particular operation order they 
-happen to use.
-
-> I'm already not happy with the flags for commit_planes because the docs for
-> them are not great and it's hard to know when to use them and when not to.
+>> Am 18.07.2017 um 13:59 schrieb Hans Verkuil <hverkuil@xs4all.nl>:
+>>
+>> On 12/07/17 22:01, Sylwester Nawrocki wrote:
+>>> Hi Hugues,
+>>>
+>>> On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
+>>>> This patchset enables OV9655 camera support.
+>>>>
+>>>> OV9655 support has been tested using STM32F4DIS-CAM extension board
+>>>> plugged on connector P1 of STM32F746G-DISCO board.
+>>>> Due to lack of OV9650/52 hardware support, the modified related code
+>>>> could not have been checked for non-regression.
+>>>>
+>>>> First patches upgrade current support of OV9650/52 to prepare then
+>>>> introduction of OV9655 variant patch.
+>>>> Because of OV9655 register set slightly different from OV9650/9652,
+>>>> not all of the driver features are supported (controls). Supported
+>>>> resolutions are limited to VGA, QVGA, QQVGA.
+>>>> Supported format is limited to RGB565.
+>>>> Controls are limited to color bar test pattern for test purpose.
+>>>
+>>> I appreciate your efforts towards making a common driver but IMO it would be
+>>> better to create a separate driver for the OV9655 sensor.  The original driver
+>>> is 1576 lines of code, your patch set adds half of that (816).  There are
+>>> significant differences in the feature set of both sensors, there are
+>>> differences in the register layout.  I would go for a separate driver, we
+>>> would then have code easier to follow and wouldn't need to worry about possible
+>>> regressions.  I'm afraid I have lost the camera module and won't be able
+>>> to test the patch set against regressions.
+>>>
+>>> IMHO from maintenance POV it's better to make a separate driver. In the end
+>>> of the day we wouldn't be adding much more code than it is being done now.
+>>
+>> I agree. We do not have great experiences in the past with trying to support
+>> multiple variants in a single driver (unless the diffs are truly small).
 > 
-> ->commit_tail was specifically done to allow drivers to overwrite the hw
-> commit stage without having to reinvent all the other commit tracking. I
-> expect most non-simple drivers to have their own commit_tail function.
+> Well,
+> IMHO the diffs in ov965x are smaller (but untestable because nobody seems
+> to have an ov9650/52 board) than within the bq27xxx chips, but I can dig out
+> an old pdata based separate ov9655 driver and extend that to become DT compatible.
+> 
+> I had abandoned that separate approach in favour of extending the ov965x driver.
+> 
+> Have to discuss with Hugues how to proceed.
+> 
+> BR and thanks,
+> Nikolaus
+> 
 
-Maybe that should be all of them instead of most of them ?
+As Sylwester and Hans, I'm also in flavour of a separate driver, the 
+fact that register set seems similar but in fact is not and that we 
+cannot test for non-regression of 9650/52 are killer for me to continue 
+on a single driver.
+We can now restart from a new fresh state of the art sensor driver 
+getting rid of legacy (pdata, old gpio, etc...).
 
--- 
-Regards,
-
-Laurent Pinchart
+BR,
+Hugues.
