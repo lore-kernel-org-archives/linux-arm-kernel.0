@@ -1,47 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Jul 2017 13:33:52 +0100
-Subject: [PATCH v2 2/2] crypto: arm64/ghash - add NEON accelerated
- fallback for 64-bit PMULL
-In-Reply-To: <CAKv+Gu8qeaL+YdWNtOhV7tGM3s3eykwAh6Vf2stB5nHpMYoHyQ@mail.gmail.com>
-References: <20170704234319.8398-1-ard.biesheuvel@linaro.org>
- <20170704234319.8398-2-ard.biesheuvel@linaro.org>
- <20170718094946.GA6347@gondor.apana.org.au>
- <CAKv+Gu8qeaL+YdWNtOhV7tGM3s3eykwAh6Vf2stB5nHpMYoHyQ@mail.gmail.com>
-Message-ID: <CAKv+Gu9EH3CoDoc5zwv2qffXVWG-fg9k+9VgrNY9VtVrZE2hFg@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 18 Jul 2017 14:35:30 +0200
+Subject: [PATCH 1/3] iio: adc: stm32: fix common clock rate
+In-Reply-To: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
+References: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1500381332-17086-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 July 2017 at 10:56, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 18 July 2017 at 10:49, Herbert Xu <herbert@gondor.apana.org.au> wrote:
->> On Wed, Jul 05, 2017 at 12:43:19AM +0100, Ard Biesheuvel wrote:
->>> Implement a NEON fallback for systems that do support NEON but have
->>> no support for the optional 64x64->128 polynomial multiplication
->>> instruction that is part of the ARMv8 Crypto Extensions. It is based
->>> on the paper "Fast Software Polynomial Multiplication on ARM Processors
->>> Using the NEON Engine" by Danilo Camara, Conrado Gouvea, Julio Lopez and
->>> Ricardo Dahab (https://hal.inria.fr/hal-01506572), but has been reworked
->>> extensively for the AArch64 ISA.
->>>
->>> On a low-end core such as the Cortex-A53 found in the Raspberry Pi3, the
->>> NEON based implementation is 4x faster than the table based one, and
->>> is time invariant as well, making it less vulnerable to timing attacks.
->>> When combined with the bit-sliced NEON implementation of AES-CTR, the
->>> AES-GCM performance increases by ~2x (from 58 to 30 cycles per byte).
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> This patch does not apply against cryptodev.
->>
->
-> Yeah, it implements a non-SIMD fallback which depends on the AES
-> refactor series.
+Fixes commit 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
 
-FYI I have pushed everything I have queued up locally here:
-https://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git/log/?h=crypto-arm-for-v4.14
+Fix common clock rate used then by stm32-adc sub-devices: take common
+prescaler into account.
+Fix ADC max clock rate on STM32H7 (fADC from datasheet)
 
-Once the crypto_xor() and AES refactor stuff looks satisfactory to
-you, I will repost the remaining bits, including these GCM and GHASH
-changes.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/adc/stm32-adc-core.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Thanks,
-Ard.
+diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
+index e09233b..6096763 100644
+--- a/drivers/iio/adc/stm32-adc-core.c
++++ b/drivers/iio/adc/stm32-adc-core.c
+@@ -64,7 +64,7 @@
+ #define STM32H7_CKMODE_MASK		GENMASK(17, 16)
+ 
+ /* STM32 H7 maximum analog clock rate (from datasheet) */
+-#define STM32H7_ADC_MAX_CLK_RATE	72000000
++#define STM32H7_ADC_MAX_CLK_RATE	36000000
+ 
+ /**
+  * stm32_adc_common_regs - stm32 common registers, compatible dependent data
+@@ -148,14 +148,14 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
+ 		return -EINVAL;
+ 	}
+ 
+-	priv->common.rate = rate;
++	priv->common.rate = rate / stm32f4_pclk_div[i];
+ 	val = readl_relaxed(priv->common.base + STM32F4_ADC_CCR);
+ 	val &= ~STM32F4_ADC_ADCPRE_MASK;
+ 	val |= i << STM32F4_ADC_ADCPRE_SHIFT;
+ 	writel_relaxed(val, priv->common.base + STM32F4_ADC_CCR);
+ 
+ 	dev_dbg(&pdev->dev, "Using analog clock source at %ld kHz\n",
+-		rate / (stm32f4_pclk_div[i] * 1000));
++		priv->common.rate / 1000);
+ 
+ 	return 0;
+ }
+@@ -250,7 +250,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
+ 
+ out:
+ 	/* rate used later by each ADC instance to control BOOST mode */
+-	priv->common.rate = rate;
++	priv->common.rate = rate / div;
+ 
+ 	/* Set common clock mode and prescaler */
+ 	val = readl_relaxed(priv->common.base + STM32H7_ADC_CCR);
+@@ -260,7 +260,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
+ 	writel_relaxed(val, priv->common.base + STM32H7_ADC_CCR);
+ 
+ 	dev_dbg(&pdev->dev, "Using %s clock/%d source at %ld kHz\n",
+-		ckmode ? "bus" : "adc", div, rate / (div * 1000));
++		ckmode ? "bus" : "adc", div, priv->common.rate / 1000);
+ 
+ 	return 0;
+ }
+-- 
+1.9.1
