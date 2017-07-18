@@ -1,65 +1,31 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 18 Jul 2017 14:17:52 -0700
-Subject: [PATCH 0/5] earlycon hang under some conditions
-In-Reply-To: <20170718175149.GA131686@google.com>
-References: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
- <20170718175149.GA131686@google.com>
-Message-ID: <CAD=FV=UGWGbYycU8Avb9uLJ3j8mwbW0mGbifZpsMn+6isEwF=Q@mail.gmail.com>
+From: keith.busch@intel.com (Keith Busch)
+Date: Tue, 18 Jul 2017 17:26:32 -0400
+Subject: [PATCH] nvme: Acknowledge completion queue on each iteration
+In-Reply-To: <dada875c-ed69-0126-8e83-78a564e6b4bd@codeaurora.org>
+References: <1500330983-27501-1-git-send-email-okaya@codeaurora.org>
+ <20170717224551.GA1496@localhost.localdomain>
+ <6d10032c-35ec-978c-6b8f-1ab9c07adf7f@codeaurora.org>
+ <20170717225615.GB1496@localhost.localdomain>
+ <79413407294645f0e1252112c3435a29@codeaurora.org>
+ <20170718143617.GA7613@localhost.localdomain>
+ <dada875c-ed69-0126-8e83-78a564e6b4bd@codeaurora.org>
+Message-ID: <20170718212631.GB1202@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 18, 2017 at 02:52:26PM -0400, Sinan Kaya wrote:
+> On 7/18/2017 10:36 AM, Keith Busch wrote:
+> 
+> I do see that the NVMe driver is creating a completion interrupt on
+> each CPU core for the completions. No problems with that. 
+> 
+> However, I don't think you can guarantee that there will always be a single
+> CPU core targeting one submission queue especially with asynchronous IO.
+>
+> Lock contention counters from CONFIG_LOCK_STAT are pointing to nvmeq->lock
+> in my FIO tests.
+> 
+> Did I miss something?
 
-On Tue, Jul 18, 2017 at 10:51 AM, Brian Norris <briannorris@chromium.org> wrote:
-> Hi Jeffy,
->
-> On Tue, Jul 18, 2017 at 02:02:53PM +0800, Jeffy Chen wrote:
->> I was testing earlycon with 8250 dw serial console. And it hangs in
->> these cases:
->> 1/ kernel hang when calling early write function after free_initmem:
->> a) the earlycon not disabled after the init code(due to keep_bootcon or
->>    not specify a real console to switch to)
->> b) the early write func is marked as __init, for example 8250_early.
->
-> FWIW, I tested 8250_early with "keep_bootcon", and this fixes that:
->
-> Tested-by: Brian Norris <briannorris@chromium.org>
->
-> But then I get double console, if I have both a "real" and "early"
-> console.
->
-> If I were to *only* have the early console, then I might hit the
-> problems you mention:
->
->> 2/ kernel hang when calling early write function after disable unused
->> clks/pm domain:
->> a) the earlycon not disabled after the init code
->> b) the disable unused clks/pm domain kill the requiered clks/pm
->>    domain, since they are not referenced by the earlycon.
->>
->> 3/ kernel hang when calling early write function after the serial
->>    console driver runtime suspended:
->> a) the earlycon not disabled after the init code
->> b) the serial console driver's runtime suspend kills the requiered
->>    clks/pm domain, since they are not referenced by the earlycon.
->>
->> This serial fix 1/ case only.
->
-> Problems 2 and 3 look like something that's not really in scope for
-> early consoles. There's a reason they are mainly supported for early
-> boot, and we try to switch off of them. There isn't really a good way to
-> handle all the clock and PM infrastructure without...switching off the
-> earlycon and using the real one :)
->
-> So, I guess this patchset has value for systems where the clock/PM
-> requirements are simple enough, and the earlycon can actually be useful
-> beyond early init.
-
-Presumably someone using this would just use the "clk_ignore_unused"
-and "pd_ignore_unused" kernel parameters to help them...  In this case
-that seems fine to me.  The "early" boot console is early because it
-can't rely on all of the generic OS mechanisms to do things super
-cleanly, so requiring the user to know that they should add the extra
-command line arguments seems sane.
-
--Doug
+I think that must mean your machine has many more CPUs than your nvme
+controller has IO queues.
