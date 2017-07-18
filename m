@@ -1,50 +1,85 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 17 Jul 2017 22:28:41 -0500
-Subject: [PATCH 1/4] ARM: dts: keystone-k2g: Add PMMC node to support TI-SCI
- protocol
-In-Reply-To: <20170718032844.29490-1-s-anna@ti.com>
-References: <20170718032844.29490-1-s-anna@ti.com>
-Message-ID: <20170718032844.29490-2-s-anna@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 18 Jul 2017 11:41:36 +0800
+Subject: [PATCH 10/18] drm/sun4i: tcon: Move out the tcon0 common setup
+In-Reply-To: <45529eeddc5d5eab9bcfa74982343eeb36fe11f6.1499955058.git-series.maxime.ripard@free-electrons.com>
+References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <45529eeddc5d5eab9bcfa74982343eeb36fe11f6.1499955058.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65TfUKyWg=vxWP-YhM3Be1i=N1OmNTO16aFk2VTCg4VXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+On Thu, Jul 13, 2017 at 10:13 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Some channel0 setup has to be done, no matter what the output interface is
+> (RGB, CPU, LVDS). Move that code into a common function in order to avoid
+> duplication.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 26 ++++++++++++++++----------
+>  1 file changed, 16 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index a3bbf9994cfa..f051862d635e 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -125,15 +125,26 @@ static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
+>         return delay;
+>  }
+>
+> -static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> -                                struct drm_display_mode *mode)
+> +static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
+> +                                       struct drm_display_mode *mode)
+> +{
+> +       /* Configure the dot clock */
+> +       clk_set_rate_protect(tcon->dclk, mode->crtc_clock * 1000);
 
-Texas Instrument's System Control Interface (TI-SCI) Message Protocol
-is implemented in Keystone 2 generation 66AK2G SoC with the PMMC entity.
+I'd prefer not changing APIs in a code move. It also means we could
+apply this sooner than later. Otherwise,
 
-Add the ti-sci node representing this 66AK2G PMMC module.
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-[s-anna at ti.com: add unit address to DT node]
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/keystone-k2g.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index a789f75a1ed5..7f0f4180b373 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -139,5 +139,19 @@
- 			interrupts = <GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		pmmc: pmmc at 02921c00 {
-+			compatible = "ti,k2g-sci";
-+			/*
-+			 * In case of rare platforms that does not use k2g as
-+			 * system master, use /delete-property/
-+			 */
-+			ti,system-reboot-controller;
-+			mbox-names = "rx", "tx";
-+			mboxes= <&msgmgr 5 2>,
-+				<&msgmgr 0 0>;
-+			reg-names = "debug_messages";
-+			reg = <0x02921c00 0x400>;
-+		};
- 	};
- };
--- 
-2.13.1
+> +
+> +       /* Set the resolution */
+> +       regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
+> +                    SUN4I_TCON0_BASIC0_X(mode->crtc_hdisplay) |
+> +                    SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+> +}
+> +
+> +static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+> +                                    struct drm_display_mode *mode)
+>  {
+>         unsigned int bp, hsync, vsync;
+>         u8 clk_delay;
+>         u32 val = 0;
+>
+> -       /* Configure the dot clock */
+> -       clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
+> +       sun4i_tcon0_mode_set_common(tcon, mode);
+>
+>         /* Adjust clock delay */
+>         clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+> @@ -141,11 +152,6 @@ static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+>                            SUN4I_TCON0_CTL_CLK_DELAY_MASK,
+>                            SUN4I_TCON0_CTL_CLK_DELAY(clk_delay));
+>
+> -       /* Set the resolution */
+> -       regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
+> -                    SUN4I_TCON0_BASIC0_X(mode->crtc_hdisplay) |
+> -                    SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+> -
+>         /*
+>          * This is called a backporch in the register documentation,
+>          * but it really is the back porch + hsync
+> @@ -295,7 +301,7 @@ void sun4i_tcon_mode_set(struct sun4i_tcon *tcon, struct drm_encoder *encoder,
+>  {
+>         switch (encoder->encoder_type) {
+>         case DRM_MODE_ENCODER_NONE:
+> -               sun4i_tcon0_mode_set(tcon, mode);
+> +               sun4i_tcon0_mode_set_rgb(tcon, mode);
+>                 break;
+>         case DRM_MODE_ENCODER_TVDAC:
+>                 /*
+> --
+> git-series 0.9.1
