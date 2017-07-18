@@ -1,40 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jul 2017 13:39:48 +0200
-Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to
- work on 32-bits
-In-Reply-To: <596DEC19.6060301@nxp.com>
-References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
- <20170717132646.3020-7-laurentiu.tudor@nxp.com>
- <CAK8P3a3KDh=MgfjG+sKNqcrQwq1yf-DgQN0=HigPaPYYJq0Uug@mail.gmail.com>
- <596CC912.3020709@nxp.com>
- <CAK8P3a3e+Gv2bdHKkRdNVp1e2-Z6j351cudLU4fuH2aZ8CSwmQ@mail.gmail.com>
- <596DEC19.6060301@nxp.com>
-Message-ID: <CAK8P3a1HDSXXsSfSfOrHYSGLhNKOv__JAFVH-RVZAbojq+=AOA@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 18 Jul 2017 14:55:30 +0300
+Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for
+ Allwinner CSI
+In-Reply-To: <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
+References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+ <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
+Message-ID: <20170718115530.ssy7g5vv4siqnfpo@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 1:08 PM, Laurentiu Tudor
-<laurentiu.tudor@nxp.com> wrote:
-> On 07/17/2017 06:00 PM, Arnd Bergmann wrote:
+Hi Yong,
 
->> Strictly speaking the __raw_writel() won't guarantee that the
->> data is written as a single word, the compiler might decide to
->> split it up into byte-sized writes if it believes the destination pointer
->> is unaligned and the CPU has no efficient writes.
->>
->> I think this cannot happen on arm or powerpc, as we go through
->> inline assembly for the store, but it's not completely portable.
->
-> Should i worry about portability? Slim changes that this driver
-> will ever run on anything else other than ARM & ARM64.
-> My current goal was just to make it compile on other arches.
+I am trying to get this driver working on the Olimex A33 OLinuXino. I didn't 
+get it working yet, but I had some progress. See the comment below on one 
+issue I encountered.
 
-I always recommend writing any driver in the most portable way
-out of principle, since you never know who looks at it for reference
-when writing another driver.
+On Tue, Jun 27, 2017 at 07:07:34PM +0800, Yong Deng wrote:
+> Add binding documentation for Allwinner CSI.
+> 
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> ---
+>  .../devicetree/bindings/media/sunxi-csi.txt        | 51 ++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sunxi-csi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/sunxi-csi.txt b/Documentation/devicetree/bindings/media/sunxi-csi.txt
+> new file mode 100644
+> index 0000000..770be0e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sunxi-csi.txt
+> @@ -0,0 +1,51 @@
+> +Allwinner V3s Camera Sensor Interface
+> +------------------------------
+> +
+> +Required properties:
+> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> +  - reg: base address and size of the memory-mapped region.
+> +  - interrupts: interrupt associated to this IP
+> +  - clocks: phandles to the clocks feeding the CSI
+> +    * ahb: the CSI interface clock
+> +    * mod: the CSI module clock
+> +    * ram: the CSI DRAM clock
+> +  - clock-names: the clock names mentioned above
+> +  - resets: phandles to the reset line driving the CSI
+> +
+> +- ports: A ports node with endpoint definitions as defined in
+> +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> +  first port should be the input endpoints, the second one the outputs
+> +
+> +Example:
+> +
+> +	csi1: csi at 01cb4000 {
+> +		compatible = "allwinner,sun8i-v3s-csi";
+> +		reg = <0x01cb4000 0x1000>;
 
-I wouldn't expect the driver itself to be used on other architectures,
-but of course you never know what CPU becomes fashionable
-10 years from now.
+You use platform_get_resource_byname() to get this IO resource. This requires 
+adding mandatory
 
-        Arnd
+  reg-names = "csi";
+
+But is it actually needed? Wouldn't a simple platform_get_resource() be 
+enough?
+
+Thanks,
+baruch
+
+> +		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&ccu CLK_BUS_CSI>,
+> +			 <&ccu CLK_CSI1_SCLK>,
+> +			 <&ccu CLK_DRAM_CSI>;
+> +		clock-names = "ahb", "mod", "ram";
+> +		resets = <&ccu RST_BUS_CSI>;
+> +
+> +		port {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			/* Parallel bus endpoint */
+> +			csi1_0: endpoint at 0 {
+> +				reg = <0>;
+> +				remote = <&adv7611_1>;
+> +				bus-width = <16>;
+> +				data-shift = <0>;
+> +
+> +				/* If hsync-active/vsync-active are missing,
+> +				   embedded BT.656 sync is used */
+> +				hsync-active = <0>; /* Active low */
+> +				vsync-active = <0>; /* Active low */
+> +				data-active = <1>;  /* Active high */
+> +				pclk-sample = <1>;  /* Rising */
+> +			};
+> +		};
+> +	};
+> +
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
