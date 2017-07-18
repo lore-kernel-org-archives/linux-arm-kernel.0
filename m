@@ -1,85 +1,75 @@
-From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 11:59:03 -0500
-Subject: [RFC PATCH v2 37/38] KVM: arm64: Respect the virtual HCR_EL2.NV1 bit
- setting
-In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1500397144-16232-38-git-send-email-jintack.lim@linaro.org>
+From: briannorris@chromium.org (Brian Norris)
+Date: Tue, 18 Jul 2017 10:51:51 -0700
+Subject: [PATCH 0/5] earlycon hang under some conditions
+In-Reply-To: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <20170718175149.GA131686@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward ELR_EL1, SPSR_EL1 and VBAR_EL1 traps to the virtual EL2 if the
-virtual HCR_EL2.NV bit is set.
+Hi Jeffy,
 
-This is for recursive nested virtualization.
+On Tue, Jul 18, 2017 at 02:02:53PM +0800, Jeffy Chen wrote:
+> I was testing earlycon with 8250 dw serial console. And it hangs in
+> these cases:
+> 1/ kernel hang when calling early write function after free_initmem:
+> a) the earlycon not disabled after the init code(due to keep_bootcon or
+>    not specify a real console to switch to)
+> b) the early write func is marked as __init, for example 8250_early.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
----
- arch/arm64/include/asm/kvm_arm.h |  1 +
- arch/arm64/kvm/sys_regs.c        | 18 ++++++++++++++++++
- 2 files changed, 19 insertions(+)
+FWIW, I tested 8250_early with "keep_bootcon", and this fixes that:
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index aeaac4e..a1274b7 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -23,6 +23,7 @@
- #include <asm/types.h>
- 
- /* Hyp Configuration Register (HCR) bits */
-+#define HCR_NV1		(UL(1) << 43)
- #define HCR_NV		(UL(1) << 42)
- #define HCR_E2H		(UL(1) << 34)
- #define HCR_ID		(UL(1) << 33)
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 3e4ec5e..6f67666 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1031,6 +1031,15 @@ static bool trap_el2_regs(struct kvm_vcpu *vcpu,
- 	return true;
- }
- 
-+/* This function is to support the recursive nested virtualization */
-+static bool forward_nv1_traps(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
-+{
-+	if (!vcpu_mode_el2(vcpu) && (vcpu_sys_reg(vcpu, HCR_EL2) & HCR_NV1))
-+		return true;
-+
-+	return false;
-+}
-+
- static bool access_elr(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
-@@ -1038,6 +1047,9 @@ static bool access_elr(struct kvm_vcpu *vcpu,
- 	if (el12_reg(p) && forward_nv_traps(vcpu))
- 		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
- 
-+	if (!el12_reg(p) && forward_nv1_traps(vcpu, p))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
- 	return true;
- }
-@@ -1049,6 +1061,9 @@ static bool access_spsr(struct kvm_vcpu *vcpu,
- 	if (el12_reg(p) && forward_nv_traps(vcpu))
- 		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
- 
-+	if (!el12_reg(p) && forward_nv1_traps(vcpu, p))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
- 	return true;
- }
-@@ -1060,6 +1075,9 @@ static bool access_vbar(struct kvm_vcpu *vcpu,
- 	if (el12_reg(p) && forward_nv_traps(vcpu))
- 		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
- 
-+	if (!el12_reg(p) && forward_nv1_traps(vcpu, p))
-+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-+
- 	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
- 	return true;
- }
--- 
-1.9.1
+Tested-by: Brian Norris <briannorris@chromium.org>
+
+But then I get double console, if I have both a "real" and "early"
+console.
+
+If I were to *only* have the early console, then I might hit the
+problems you mention:
+
+> 2/ kernel hang when calling early write function after disable unused
+> clks/pm domain:
+> a) the earlycon not disabled after the init code
+> b) the disable unused clks/pm domain kill the requiered clks/pm
+>    domain, since they are not referenced by the earlycon.
+> 
+> 3/ kernel hang when calling early write function after the serial
+>    console driver runtime suspended:
+> a) the earlycon not disabled after the init code
+> b) the serial console driver's runtime suspend kills the requiered
+>    clks/pm domain, since they are not referenced by the earlycon.
+> 
+> This serial fix 1/ case only.
+
+Problems 2 and 3 look like something that's not really in scope for
+early consoles. There's a reason they are mainly supported for early
+boot, and we try to switch off of them. There isn't really a good way to
+handle all the clock and PM infrastructure without...switching off the
+earlycon and using the real one :)
+
+So, I guess this patchset has value for systems where the clock/PM
+requirements are simple enough, and the earlycon can actually be useful
+beyond early init.
+
+Brian
+
+> 
+> 
+> Jeffy Chen (5):
+>   serial: arc: Remove __init marking from early write
+>   serial: omap: Remove __init marking from early write
+>   serial: xuartps: Remove __init marking from early write
+>   serial: 8250_ingenic: Remove __init marking from early write
+>   serial: 8250_early: Remove __init marking from early write
+> 
+>  drivers/tty/serial/8250/8250_early.c   |  8 ++++----
+>  drivers/tty/serial/8250/8250_ingenic.c |  8 ++++----
+>  drivers/tty/serial/arc_uart.c          |  4 ++--
+>  drivers/tty/serial/omap-serial.c       | 13 ++++++-------
+>  drivers/tty/serial/xilinx_uartps.c     |  2 +-
+>  5 files changed, 17 insertions(+), 18 deletions(-)
+> 
+> -- 
+> 2.1.4
+> 
+> 
