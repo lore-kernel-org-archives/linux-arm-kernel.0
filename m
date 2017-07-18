@@ -1,56 +1,59 @@
 From: ore@pengutronix.de (Oleksij Rempel)
-Date: Tue, 18 Jul 2017 06:52:50 +0200
-Subject: [PATCH v7 0/3] nvmem: upstream snvs_lpgpr driver
-In-Reply-To: <20170620070932.10353-1-o.rempel@pengutronix.de>
-References: <20170620070932.10353-1-o.rempel@pengutronix.de>
-Message-ID: <07198c02-ac87-ec1f-accd-75ad6fd0ac30@pengutronix.de>
+Date: Tue, 18 Jul 2017 06:53:54 +0200
+Subject: [PATCH v6 0/6] provide power off support for iMX6 with external
+ PMIC
+In-Reply-To: <20170620140910.7568-1-o.rempel@pengutronix.de>
+References: <20170620140910.7568-1-o.rempel@pengutronix.de>
+Message-ID: <c64ce8db-eea6-3709-9c97-fda16e93481a@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hallo all,
 
-Here Gentle Ping to the Old King ;)
+Here Gentle Ping to the Old King
 
 DT is already ACKed.
 
-On 20.06.2017 09:09, Oleksij Rempel wrote:
-> changes v7:
->  - split imx6ul patch and squash it with with main patches.
->  - spell fixes in the binding documentation
->  - return regmap_bulk_read directly.
+On 20.06.2017 16:09, Oleksij Rempel wrote:
+> This patch series is providing power off support for Freescale/NXP iMX6 based
+> boards with external power management integrated circuit (PMIC).
 >
-> changes v6:
->  - check if device is writable by reading GPR_SL and GPR_HL bits
->  - use regmap_bulk_* functions instead of while() { regmap_read/write }
->  - add patch for imx6ul
+> changes:
+> v6:
+>  - rename imx6_pm_poweroff to imx6_pm_stby_poweroff
+>  - fix "MPIC_STBY_REQ" typo in the comment.
 >
-> changes v5:
->  - use dcfg->offset instead of priv->offset.
+> v5:
+>  - remove useless includes from pm-imx6.c patch
+>  - add Acked-by to "regulator: pfuze100: add fsl,pmic-stby-poweroff property"
+>    patch
 >
-> changes v4:
->  - change dependencies in Kconfig
->  - remove unused includes and order them alphabetically
->  - set MODULE_LICENSE = GPL v2
->  - remove unused int err variable
+> v4:
+>  - update comment in "regulator: pfuze100: add fsl,pmic-stby-poweroff ..."
+>    patch
+>  - add Acked-by to "ARM: imx6q: provide documentation for new ..."
+>    patch
 >
-> changes v3:
->  - remove regmap and offset properties.
+> v3:
+>  - set pm_power_off_prepare = NULL on .remove.
+>  - documentation and spelling fixes.
+>  - use %pf instead of lookup_symbol_name.
 >
-> changes v2:
->  - correct typos: Registe, parrent...
+> Oleksij Rempel (6):
+>   ARM: imx6q: provide documentation for new fsl,pmic-stby-poweroff
+>     property
+>   ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff"
+>     is set
+>   kernel/reboot.c: export pm_power_off_prepare
+>   regulator: pfuze100: add fsl,pmic-stby-poweroff property
+>   regulator: pfuze100-regulator: provide pm_power_off_prepare handler
+>   ARM: dts: imx6: RIoTboard provide standby on power off option
 >
-> Oleksij Rempel (3):
->   nvmem: dt: document SNVS LPGPR binding
->   nvmem: add snvs_lpgpr driver
->   ARM: dts: imx6qdl.dtsi/imx6ul.dtsi: add "fsl,imx6q-snvs-lpgpr" node
->
->  .../devicetree/bindings/nvmem/snvs-lpgpr.txt       |  20 +++
->  arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +
->  arch/arm/boot/dts/imx6ul.dtsi                      |   4 +
->  drivers/nvmem/Kconfig                              |  10 ++
->  drivers/nvmem/Makefile                             |   2 +
->  drivers/nvmem/snvs_lpgpr.c                         | 155 +++++++++++++++++++++
->  6 files changed, 195 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
->  create mode 100644 drivers/nvmem/snvs_lpgpr.c
+>  .../devicetree/bindings/clock/imx6q-clock.txt      |  8 ++
+>  .../devicetree/bindings/regulator/pfuze100.txt     |  7 ++
+>  arch/arm/boot/dts/imx6dl-riotboard.dts             |  5 ++
+>  arch/arm/mach-imx/pm-imx6.c                        | 25 ++++++
+>  drivers/regulator/pfuze100-regulator.c             | 92 ++++++++++++++++++++++
+>  kernel/reboot.c                                    |  1 +
+>  6 files changed, 138 insertions(+)
 >
