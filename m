@@ -1,27 +1,180 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jul 2017 16:26:15 +0200
-Subject: [PATCH v2 0/7] staging: fsl-mc: make the driver compile on other
- architectures
-In-Reply-To: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
-References: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
-Message-ID: <CAK8P3a39fpEHwCvR3TOL8u8W7TORSNpw27xwma70sxi-VfXhyA@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 18 Jul 2017 16:26:26 +0200
+Subject: [PATCH v2 2/3] ARM: shmobile: rcar-gen2: Make sure CNTVOFF is
+ initialized on CA7/15
+In-Reply-To: <1500387987-9240-1-git-send-email-geert+renesas@glider.be>
+References: <1500387987-9240-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1500387987-9240-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 3:37 PM,  <laurentiu.tudor@nxp.com> wrote:
-> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->
-> Apart from a small change (first patch) which adds a missing comment,
-> this series make the bus driver compile on other architectures, as per
-> GregKH comment [1].
-> Compiled tested on:
->  - booke powerpc (corenet{32,64}_smp_defconfig) with this ppc patch [2]
->  - x86 (i386_defconfig, x86_64_defconfig, needs CONFIG_OF)
->  - arm64 (defconfig)
->
-> [1] https://www.spinics.net/lists/linux-driver-devel/msg100585.html
-> [2] https://patchwork.ozlabs.org/patch/789474/
+On Cortex-A7, the arch timer CNTVOFF register is uninitialized.
+Ideally it should be initialized by the boot loader, but it isn't.
 
-Looks good overall. With the two minor questions addressed
+For the boot CPU, CNTVOFF is initialized by Linux since commit
+9ce3fa6816c2fb59 ("ARM: shmobile: rcar-gen2: Add CA7 arch_timer
+initialization for r8a7794").
+For secondary CPU cores, no such initialization is done.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Hence when enabling SMP on r8a7794, the kernel log is spammed with:
+
+    WARNING: Underflow in clocksource 'arch_sys_counter' observed, time update ignored.
+	     Please report this, consider using a different clocksource, if possible.
+	     Your kernel is probably still fine.
+
+As Marc Zyngier pointed out that Cortex-A15 and Cortex-A7 are similar with
+respect to CNTVOFF, we have been very lucky this just worked on R-Car
+Gen2 SoCs with Cortex-A15 cores.
+
+To fix this:
+  - Move the existing inline asm code to initialize CNTVOFF to an
+    assembler source file (adding comments and replacing hardcoded
+    constants by definitions in the process), so it can be reused,
+  - Perform the initialization of CNTVOFF on the boot CPU (Cortex-A15 or
+    Cortex-A7) on all R-Car Gen2 and RZ/G1 parts,
+  - Wrap the standard secondary_startup() routine inside a routine which
+    initializes CNTVOFF.
+
+Based on patches by Hisashi Nakamura in the BSP.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - Initialize CNTVOFF on Cortex-A15, too,
+  - Use *_MODE definitions instead of hardcoded values,
+  - Reduce duplication by calling the asm version from C,
+  - Always build headsmp-apmu.o on R-Car Gen2.
+---
+ arch/arm/mach-shmobile/Makefile          |  1 +
+ arch/arm/mach-shmobile/common.h          |  2 ++
+ arch/arm/mach-shmobile/headsmp-apmu.S    | 37 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/platsmp-apmu.c    |  2 +-
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 20 ++---------------
+ 5 files changed, 43 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/headsmp-apmu.S
+
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 64611a1b4276517b..32176a00c664ba16 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -22,6 +22,7 @@ cpu-y				:= platsmp.o headsmp.o
+ # Shared SoC family objects
+ obj-$(CONFIG_ARCH_RCAR_GEN2)	+= setup-rcar-gen2.o platsmp-apmu.o $(cpu-y)
+ CFLAGS_setup-rcar-gen2.o	+= -march=armv7-a
++obj-$(CONFIG_ARCH_RCAR_GEN2)	+= headsmp-apmu.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= regulator-quirk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= regulator-quirk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7793)	+= regulator-quirk-rcar-gen2.o
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 1a8f7b3ab449db56..ea6e9e2be3f7f4da 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -1,6 +1,7 @@
+ #ifndef __ARCH_MACH_COMMON_H
+ #define __ARCH_MACH_COMMON_H
+ 
++extern void shmobile_init_cntvoff(void);
+ extern void shmobile_init_delay(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+@@ -11,6 +12,7 @@ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+ 			      unsigned long arg);
+ extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
+ extern bool shmobile_smp_init_fallback_ops(void);
++extern void shmobile_boot_apmu(void);
+ extern void shmobile_boot_scu(void);
+ extern void shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
+ 					  unsigned int max_cpus);
+diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
+new file mode 100644
+index 0000000000000000..933d3190ffc02066
+--- /dev/null
++++ b/arch/arm/mach-shmobile/headsmp-apmu.S
+@@ -0,0 +1,37 @@
++/*
++ * SMP support for APMU based systems with Cortex A7/A15
++ *
++ * Copyright (C) 2014  Renesas Electronics Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++ENTRY(shmobile_init_cntvoff)
++	/*
++	 * CNTVOFF has to be initialized either from non-secure Hypervisor
++	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
++	 * then it should be handled by the secure code
++	 */
++	cps	#MON_MODE
++	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
++	orr	r0, r1, #1
++	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
++	isb
++	mov	r0, #0
++	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
++	isb
++	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
++	isb
++	cps	#SVC_MODE
++	ret	lr
++ENDPROC(shmobile_init_cntvoff)
++
++ENTRY(shmobile_boot_apmu)
++	bl	shmobile_init_cntvoff
++	b	secondary_startup
++ENDPROC(shmobile_boot_apmu)
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index 3ca2c13346f0cbc3..4422b615a6ee6045 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -204,7 +204,7 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
+ int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	/* For this particular CPU register boot vector */
+-	shmobile_smp_hook(cpu, __pa_symbol(secondary_startup), 0);
++	shmobile_smp_hook(cpu, __pa_symbol(shmobile_boot_apmu), 0);
+ 
+ 	return apmu_wrap(cpu, apmu_power_on);
+ }
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 7ab1690fab8299eb..5561dbed7a332a58 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -70,28 +70,12 @@ void __init rcar_gen2_timer_init(void)
+ 	void __iomem *base;
+ 	u32 freq;
+ 
++	shmobile_init_cntvoff();
++
+ 	if (of_machine_is_compatible("renesas,r8a7745") ||
+ 	    of_machine_is_compatible("renesas,r8a7792") ||
+ 	    of_machine_is_compatible("renesas,r8a7794")) {
+ 		freq = 260000000 / 8;	/* ZS / 8 */
+-		/* CNTVOFF has to be initialized either from non-secure
+-		 * Hypervisor mode or secure Monitor mode with SCR.NS==1.
+-		 * If TrustZone is enabled then it should be handled by the
+-		 * secure code.
+-		 */
+-		asm volatile(
+-		"	cps	0x16\n"
+-		"	mrc	p15, 0, r1, c1, c1, 0\n"
+-		"	orr	r0, r1, #1\n"
+-		"	mcr	p15, 0, r0, c1, c1, 0\n"
+-		"	isb\n"
+-		"	mov	r0, #0\n"
+-		"	mcrr	p15, 4, r0, r0, c14\n"
+-		"	isb\n"
+-		"	mcr	p15, 0, r1, c1, c1, 0\n"
+-		"	isb\n"
+-		"	cps	0x13\n"
+-			: : : "r0", "r1");
+ 	} else {
+ 		/* At Linux boot time the r8a7790 arch timer comes up
+ 		 * with the counter disabled. Moreover, it may also report
+-- 
+2.7.4
