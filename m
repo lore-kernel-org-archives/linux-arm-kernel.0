@@ -1,37 +1,89 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 18 Jul 2017 14:48:21 +0800
-Subject: [PATCH v2] PCI: dwc: designware: test PCIE_ATU_ENABLE bit to check
- enabled or not
-Message-ID: <20170718064821.3668-1-jszhang@marvell.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Jul 2017 09:05:22 +0200
+Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail
+ for runtime_pm users
+In-Reply-To: <1823154.LT2zYSFJ4j@avalon>
+References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
+ <aeeb8f778dae8f170294b6da92819973b742feb2.1499956639.git-series.maxime.ripard@free-electrons.com>
+ <1823154.LT2zYSFJ4j@avalon>
+Message-ID: <20170718070522.6uu7s6o3ivpemslf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ATU CTRL2 register is 32 bit, besides the enable bit, other bits
-may also be set. To check whether the ATU is enabled or not, we should
-test the enable bit.
+Hi Laurent,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Acked-by: Joao Pinto <jpinto@synopsys.com>
----
-Since v1:
- - Add Joao's Ack
- - Fix typo in commit msg, thank Jingoo
+On Fri, Jul 14, 2017 at 02:43:12AM +0300, Laurent Pinchart wrote:
+> Hi Maxime,
+> 
+> Thank you for the patch.
+> 
+> On Thursday 13 Jul 2017 16:41:13 Maxime Ripard wrote:
+> > The current drm_atomic_helper_commit_tail helper works only if the CRTC is
+> > accessible, and documents an alternative implementation that is supposed to
+> > be used if that happens.
+> > 
+> > That implementation is then duplicated by some drivers. Instead of
+> > documenting it, let's implement an helper that all the relevant users can
+> > use directly.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/drm_atomic_helper.c        | 47 +++++++++++++++--------
+> >  drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
+> >  drivers/gpu/drm/rcar-du/rcar_du_kms.c      | 18 +---------
+> 
+> I've submitted "[PATCH] drm: rcar-du: Setup planes before enabling CRTC to 
+> avoid flicker" that changes the rcar-du implementation to the standard 
+> disable/update planes/enable order, so I'd appreciate if you could drop the 
+> rcar-du part of this patch to avoid conflicts.
 
- drivers/pci/dwc/pcie-designware.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I will.
 
-diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-index 0e03af279259..6bf0b409050a 100644
---- a/drivers/pci/dwc/pcie-designware.c
-+++ b/drivers/pci/dwc/pcie-designware.c
-@@ -177,7 +177,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
- 	 */
- 	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
- 		val = dw_pcie_readl_dbi(pci, PCIE_ATU_CR2);
--		if (val == PCIE_ATU_ENABLE)
-+		if (val & PCIE_ATU_ENABLE)
- 			return;
- 
- 		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> This being said, the reason why I switched back from the "runtime PM" to the 
+> "standard" order is probably of interest to you. Quoting the commit message,
+> 
+> > Commit 52055bafa1ff ("drm: rcar-du: Move plane commit code from CRTC
+> > start to CRTC resume") changed the order of the plane commit and CRTC
+> > enable operations to accommodate the runtime PM requirements. However,
+> > this introduced corruption in the first displayed frame, as the CRTC is
+> > now enabled without any plane configured. On Gen2 hardware the first
+> > frame will be black and likely unnoticed, but on Gen3 hardware we end up
+> > starting the display before the VSP compositor, which is more
+> > noticeable.
+> > 
+> > To fix this, revert the order of the commit operations back, and handle
+> > runtime PM requirements in the CRTC .atomic_begin() and .atomic_enable()
+> > helper operation handlers.
+> 
+> I believe that the "runtime PM" order is problematic in most drivers. The 
+> problem usually goes unnoticed as most monitors will not even display the 
+> first frame, and I assume many devices will just output it black, but it's an 
+> issue nonetheless.
+> 
+> Note that my driver hasn't lost the "runtime PM" requirements, so I had to 
+> support them with the "standard" order. The best way I've found was to runtime 
+> resume in the one of .atomic_begin() and .enable() that is run first. Not very 
+> neat, as similar code would be needed in most drivers. I wonder whether it 
+> wouldn't be useful to add resume/suspend helper callbacks for the CRTC.
+
+I'm not sure it would apply. Our driver doesn't use runtime_pm at all,
+but in order for the commits to happen, we need to have the CRTC
+active, but it will remain powered up the whole time. I'm not sure if
+we'll ever see such a frame.
+
+But since this seems to be a pretty generic, maybe we should address
+it in the helper itself?
+
+Maxime
+
 -- 
-2.13.2
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170718/bb87f374/attachment.sig>
