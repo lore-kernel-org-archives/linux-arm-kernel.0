@@ -1,46 +1,44 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 18 Jul 2017 16:27:15 +0530
-Subject: [PATCH 3/4] gpio: davinci: Add a separate compatible for keystone-k2g
- soc
-In-Reply-To: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1500375436-9435-4-git-send-email-j-keerthy@ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 18 Jul 2017 12:59:39 +0200
+Subject: [PATCH v4 0/9] Add and make use of a common rs485 device tree parsing
+ function
+Message-ID: <20170718105948.21986-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a separate compatible for keystone-k2g soc
+Hello,
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- Documentation/devicetree/bindings/gpio/gpio-davinci.txt | 3 ++-
- drivers/gpio/gpio-davinci.c                             | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+this is v4 of the series. Compared to v3 It fixes a compile error and is
+rebased to a newer kernel to apply fine on Greg's tree.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-index 5079ba7..1a5c1a2 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-@@ -1,7 +1,8 @@
- Davinci/Keystone GPIO controller bindings
- 
- Required Properties:
--- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
-+- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio",
-+	      "ti,keystone-k2g-gpio"
- 
- - reg: Physical base address of the controller and the size of memory mapped
-        registers.
-diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-index 932f270..a8d8dd9 100644
---- a/drivers/gpio/gpio-davinci.c
-+++ b/drivers/gpio/gpio-davinci.c
-@@ -610,6 +610,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
- static const struct of_device_id davinci_gpio_ids[] = {
- 	{ .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
- 	{ .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
-+	{ .compatible = "ti,keystone-k2g-gpio", keystone_gpio_get_irq_chip},
- 	{ /* sentinel */ },
- };
- MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
+Sascha Hauer (6):
+  serial: Add common rs485 device tree parsing function
+  serial: atmel: Use common rs485 device tree parsing function
+  serial: fsl_lpuart: Use common rs485 device tree parsing function
+  serial: omap-serial: Use common rs485 device tree parsing function
+  serial: imx: default to half duplex rs485
+  serial: imx: Use common rs485 device tree parsing function
+
+Uwe Kleine-K?nig (3):
+  serial: fsl_lpuart: clear unsupported options in .rs485_config()
+  dt-bindings: serial/rs485: make rs485-rts-delay optional
+  dt-bindings: serial: document rs485 bindings for various devices
+
+ .../devicetree/bindings/serial/atmel-usart.txt     |  1 +
+ .../devicetree/bindings/serial/fsl-imx-uart.txt    |  1 +
+ .../devicetree/bindings/serial/fsl-lpuart.txt      |  1 +
+ .../devicetree/bindings/serial/omap_serial.txt     |  1 +
+ Documentation/devicetree/bindings/serial/rs485.txt |  5 +--
+ drivers/tty/serial/Kconfig                         |  4 ++
+ drivers/tty/serial/Makefile                        |  2 +
+ drivers/tty/serial/atmel_serial.c                  | 25 +-----------
+ drivers/tty/serial/fsl_lpuart.c                    | 29 ++++++++++---
+ drivers/tty/serial/imx.c                           |  5 ++-
+ drivers/tty/serial/of.c                            | 47 ++++++++++++++++++++++
+ drivers/tty/serial/omap-serial.c                   | 13 +-----
+ include/linux/serial_core.h                        | 13 ++++++
+ 13 files changed, 100 insertions(+), 47 deletions(-)
+ create mode 100644 drivers/tty/serial/of.c
+
 -- 
-1.9.1
+2.11.0
