@@ -1,93 +1,98 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 11:58:59 -0500
-Subject: [RFC PATCH v2 33/38] KVM: arm64: Emulate appropriate VM control
- system registers
+Date: Tue, 18 Jul 2017 11:58:55 -0500
+Subject: [RFC PATCH v2 29/38] KVM: arm64: Support a VM with VHE considering
+ EL0 of the VHE host
 In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
 References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1500397144-16232-34-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1500397144-16232-30-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the virtual EL2 can access EL2 register states via EL1
-registers, we need to consider it when selecting the register to
-emulate.
+On VHE systems, EL0 of the host kernel is considered as a part of 'VHE
+host'; The execution of EL0 is affected by system registers set by the
+VHE kernel including the hypervisor. To emulate this for a VM, we use
+the same set of system registers (i.e. shadow registers) for the virtual
+EL2 and EL0 execution.
+
+Note that the assumption so far is that a hypervisor in a VM always runs
+in the virtual EL2, and the exception level change from/to the virtual
+EL2 always goes through the host hypervisor. With VHE support for a VM,
+however, the exception level can be changed from EL0 to virtual EL2
+without trapping to the host hypervisor. So, when returning from the VHE
+host mode, set the vcpu mode depending on the physical exception level.
 
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 46 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 44 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/context.c | 36 ++++++++++++++++++++++--------------
+ 1 file changed, 22 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 79980be..910b50d 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -110,6 +110,31 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
- 	return true;
- }
+diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+index f3d3398..39bd92d 100644
+--- a/arch/arm64/kvm/context.c
++++ b/arch/arm64/kvm/context.c
+@@ -150,16 +150,18 @@ static void flush_shadow_special_regs(struct kvm_vcpu *vcpu)
+ 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
  
-+struct el1_el2_map {
-+	int	el1;
-+	int	el2;
-+};
-+
-+static const struct el1_el2_map vm_map[] = {
-+	{SCTLR_EL1, SCTLR_EL2},
-+	{TTBR0_EL1, TTBR0_EL2},
-+	{TTBR1_EL1, TTBR1_EL2},
-+	{TCR_EL1, TCR_EL2},
-+	{ESR_EL1, ESR_EL2},
-+	{FAR_EL1, FAR_EL2},
-+	{AFSR0_EL1, AFSR0_EL2},
-+	{AFSR1_EL1, AFSR1_EL2},
-+	{MAIR_EL1, MAIR_EL2},
-+	{AMAIR_EL1, AMAIR_EL2},
-+	{CONTEXTIDR_EL1, CONTEXTIDR_EL2},
-+};
-+
-+static inline bool el12_reg(struct sys_reg_params *p)
-+{
-+	/* All *_EL12 registers have Op1=5. */
-+	return (p->Op1 == 5);
-+}
-+
- /*
-  * Generic accessor for VM registers. Only called as long as HCR_TVM
-  * is set. If the guest enables the MMU, we stop trapping the VM
-@@ -120,16 +145,33 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
- 			  const struct sys_reg_desc *r)
- {
- 	bool was_enabled = vcpu_has_cache_enabled(vcpu);
-+	u64 *sysreg = &vcpu_sys_reg(vcpu, r->reg);
-+	int i;
-+	const struct el1_el2_map *map;
-+
-+	/*
-+	 * Redirect EL1 register accesses to the corresponding EL2 registers if
-+	 * they are meant to access EL2 registers.
-+	 */
-+	if (vcpu_el2_e2h_is_set(vcpu) && !el12_reg(p)) {
-+		for (i = 0; i < ARRAY_SIZE(vm_map); i++) {
-+			map = &vm_map[i];
-+			if (map->el1 == r->reg) {
-+				sysreg = &vcpu_sys_reg(vcpu, map->el2);
-+				break;
-+			}
-+		}
+ 	ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
+-	/*
+-	 * We can emulate the guest's configuration of which
+-	 * stack pointer to use when executing in virtual EL2 by
+-	 * using the equivalent feature in EL1 to point to
+-	 * either the EL1 or EL0 stack pointer.
+-	 */
+-	if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
+-		ctxt->hw_pstate |= PSR_MODE_EL1h;
+-	else
+-		ctxt->hw_pstate |= PSR_MODE_EL1t;
++	if (vcpu_mode_el2(vcpu)) {
++		/*
++		 * We can emulate the guest's configuration of which
++		 * stack pointer to use when executing in virtual EL2 by
++		 * using the equivalent feature in EL1 to point to
++		 * either the EL1 or EL0 stack pointer.
++		 */
++		if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
++			ctxt->hw_pstate |= PSR_MODE_EL1h;
++		else
++			ctxt->hw_pstate |= PSR_MODE_EL1t;
 +	}
  
- 	BUG_ON(!vcpu_mode_el2(vcpu) && !p->is_write);
+ 	ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
+ 	ctxt->hw_sp_el1 = vcpu_el2_sreg(vcpu, SP_EL2);
+@@ -182,8 +184,14 @@ static void sync_shadow_special_regs(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
  
- 	if (!p->is_write) {
--		p->regval = vcpu_sys_reg(vcpu, r->reg);
-+		p->regval = *sysreg;
- 		return true;
- 	}
+-	*vcpu_cpsr(vcpu) &= PSR_MODE_MASK;
+-	*vcpu_cpsr(vcpu) |= ctxt->hw_pstate & ~PSR_MODE_MASK;
++	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
++	*vcpu_cpsr(vcpu) &= ~PSR_MODE_MASK;
++	/* Set vcpu exception level depending on the physical EL */
++	if ((ctxt->hw_pstate & PSR_MODE_MASK) == PSR_MODE_EL0t)
++		*vcpu_cpsr(vcpu) |= PSR_MODE_EL0t;
++	else
++		*vcpu_cpsr(vcpu) |= PSR_MODE_EL2h;
++
+ 	vcpu_el2_sreg(vcpu, SP_EL2) = ctxt->hw_sp_el1;
+ 	vcpu_el2_sreg(vcpu, ELR_EL2) = ctxt->hw_elr_el1;
+ 	vcpu_el2_sreg(vcpu, SPSR_EL2) = ctxt->hw_spsr_el1;
+@@ -218,7 +226,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
  
- 	if (!p->is_aarch32) {
--		vcpu_sys_reg(vcpu, r->reg) = p->regval;
-+		*sysreg = p->regval;
- 	} else {
- 		if (!p->is_32bit)
- 			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
+-	if (unlikely(vcpu_mode_el2(vcpu))) {
++	if (unlikely(is_hyp_ctxt(vcpu))) {
+ 		flush_shadow_special_regs(vcpu);
+ 		flush_shadow_el1_sysregs(vcpu);
+ 		flush_shadow_non_trap_el1_state(vcpu);
+@@ -236,7 +244,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+  */
+ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
+ {
+-	if (unlikely(vcpu_mode_el2(vcpu))) {
++	if (unlikely(is_hyp_ctxt(vcpu))) {
+ 		sync_shadow_special_regs(vcpu);
+ 		sync_shadow_non_trap_el1_state(vcpu);
+ 	} else
 -- 
 1.9.1
