@@ -1,84 +1,79 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 18 Jul 2017 22:52:23 +0300
-Subject: [PATCH v2 0/7] [PATCH v2 0/7] Add support of OV9655 camera
-In-Reply-To: <2dd3402e-55b0-231d-878f-5ba95ee8cb36@st.com>
-References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
- <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
- <956f17e6-36dd-6733-0d35-9b801ed4244d@xs4all.nl>
- <BCD1BD18-96E3-4638-8935-B5C832D8EE52@goldelico.com>
- <2dd3402e-55b0-231d-878f-5ba95ee8cb36@st.com>
-Message-ID: <20170718195223.zrqfrefxxzqfsojd@valkosipuli.retiisi.org.uk>
+From: florian.fainelli@broadcom.com (Florian Fainelli)
+Date: Tue, 18 Jul 2017 12:52:56 -0700
+Subject: [PATCH v3 0/4] Broadcom STB S2/S3/S5 support for ARM and MIPS
+In-Reply-To: <20170706222225.9758-1-f.fainelli@gmail.com>
+References: <20170706222225.9758-1-f.fainelli@gmail.com>
+Message-ID: <72d54e9c-6a50-2eac-52db-b1e8c234c552@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 12:53:12PM +0000, Hugues FRUCHET wrote:
+On 07/06/2017 03:22 PM, Florian Fainelli wrote:
+> Hi,
 > 
+> This patch series adds support for S2/S3/S5 suspend/resume states on
+> ARM and MIPS based Broadcom STB SoCs.
 > 
-> On 07/18/2017 02:17 PM, H. Nikolaus Schaller wrote:
-> > Hi,
-> > 
-> >> Am 18.07.2017 um 13:59 schrieb Hans Verkuil <hverkuil@xs4all.nl>:
-> >>
-> >> On 12/07/17 22:01, Sylwester Nawrocki wrote:
-> >>> Hi Hugues,
-> >>>
-> >>> On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
-> >>>> This patchset enables OV9655 camera support.
-> >>>>
-> >>>> OV9655 support has been tested using STM32F4DIS-CAM extension board
-> >>>> plugged on connector P1 of STM32F746G-DISCO board.
-> >>>> Due to lack of OV9650/52 hardware support, the modified related code
-> >>>> could not have been checked for non-regression.
-> >>>>
-> >>>> First patches upgrade current support of OV9650/52 to prepare then
-> >>>> introduction of OV9655 variant patch.
-> >>>> Because of OV9655 register set slightly different from OV9650/9652,
-> >>>> not all of the driver features are supported (controls). Supported
-> >>>> resolutions are limited to VGA, QVGA, QQVGA.
-> >>>> Supported format is limited to RGB565.
-> >>>> Controls are limited to color bar test pattern for test purpose.
-> >>>
-> >>> I appreciate your efforts towards making a common driver but IMO it would be
-> >>> better to create a separate driver for the OV9655 sensor.  The original driver
-> >>> is 1576 lines of code, your patch set adds half of that (816).  There are
-> >>> significant differences in the feature set of both sensors, there are
-> >>> differences in the register layout.  I would go for a separate driver, we
-> >>> would then have code easier to follow and wouldn't need to worry about possible
-> >>> regressions.  I'm afraid I have lost the camera module and won't be able
-> >>> to test the patch set against regressions.
-> >>>
-> >>> IMHO from maintenance POV it's better to make a separate driver. In the end
-> >>> of the day we wouldn't be adding much more code than it is being done now.
-> >>
-> >> I agree. We do not have great experiences in the past with trying to support
-> >> multiple variants in a single driver (unless the diffs are truly small).
-> > 
-> > Well,
-> > IMHO the diffs in ov965x are smaller (but untestable because nobody seems
-> > to have an ov9650/52 board) than within the bq27xxx chips, but I can dig out
-> > an old pdata based separate ov9655 driver and extend that to become DT compatible.
-> > 
-> > I had abandoned that separate approach in favour of extending the ov965x driver.
-> > 
-> > Have to discuss with Hugues how to proceed.
-> > 
-> > BR and thanks,
-> > Nikolaus
-> > 
+> This was submitted a long time ago by Brian, and I am now picking this
+> up and trying to get this included with support for our latest chips.
 > 
-> As Sylwester and Hans, I'm also in flavour of a separate driver, the 
-> fact that register set seems similar but in fact is not and that we 
-> cannot test for non-regression of 9650/52 are killer for me to continue 
-> on a single driver.
-> We can now restart from a new fresh state of the art sensor driver 
-> getting rid of legacy (pdata, old gpio, etc...).
+> Provided that I can collect the necessary Acks from Rob (DT) and other
+> people (Rafael?) I would probably take this via the Broadcom ARM SoC
+> pull requests.
 
-Agreed. I bet the result will look cleaner indeed although this wasn't one
-of the complex drivers.
+Rafael, any feedback on this?
 
-It'd be nice that someone was able to test the ov9650/2, too, drivers that
-are never used tend to break...
+> 
+> Thank you!
+> 
+> Changes in v3:
+> 
+> - make SRAM mapping uncached
+> - make SWAP_STACK + brcmstb_pm_s3_finish a single asm volatile statement
+> - added Rob's Acked-by to first patch
+> 
+> Changes in v2:
+> 
+> - clarify the first patch's subject (Rob)
+> - removed patch #2 which was creating a bisectability problem (kbuild)
+> - added proper AFLAGS to get s2-arm.S to build properly (kbuild)
+> - improved MIPS power management binding document (Rob)
+> 
+> Brian Norris (1):
+>   soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)
+> 
+> Florian Fainelli (2):
+>   dt-bindings: ARM: brcmstb: Update Broadcom STB Power Management
+>     binding
+>   dt-bindings: Document MIPS Broadcom STB power management nodes
+> 
+> Justin Chen (1):
+>   soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS)
+> 
+>  .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   6 +-
+>  .../devicetree/bindings/mips/brcm/soc.txt          | 153 ++++
+>  drivers/soc/bcm/Kconfig                            |   2 +
+>  drivers/soc/bcm/brcmstb/Kconfig                    |   9 +
+>  drivers/soc/bcm/brcmstb/Makefile                   |   1 +
+>  drivers/soc/bcm/brcmstb/pm/Makefile                |   3 +
+>  drivers/soc/bcm/brcmstb/pm/aon_defs.h              | 113 +++
+>  drivers/soc/bcm/brcmstb/pm/pm-arm.c                | 836 +++++++++++++++++++++
+>  drivers/soc/bcm/brcmstb/pm/pm-mips.c               | 461 ++++++++++++
+>  drivers/soc/bcm/brcmstb/pm/pm.h                    |  89 +++
+>  drivers/soc/bcm/brcmstb/pm/s2-arm.S                |  76 ++
+>  drivers/soc/bcm/brcmstb/pm/s2-mips.S               | 200 +++++
+>  drivers/soc/bcm/brcmstb/pm/s3-mips.S               | 146 ++++
+>  13 files changed, 2094 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
+>  create mode 100644 drivers/soc/bcm/brcmstb/pm/Makefile
+>  create mode 100644 drivers/soc/bcm/brcmstb/pm/aon_defs.h
+>  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-arm.c
+>  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-mips.c
+>  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm.h
+>  create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-arm.S
+>  create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-mips.S
+>  create mode 100644 drivers/soc/bcm/brcmstb/pm/s3-mips.S
+> 
+
 
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Florian
