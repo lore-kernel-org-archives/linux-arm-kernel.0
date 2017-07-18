@@ -1,78 +1,122 @@
 From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 11:58:27 -0500
-Subject: [RFC PATCH v2 01/38] arm64: Add ARM64_HAS_NESTED_VIRT feature
+Date: Tue, 18 Jul 2017 11:58:37 -0500
+Subject: [RFC PATCH v2 11/38] KVM: arm64: Set vcpu context depending on the
+ guest exception level
 In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
 References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1500397144-16232-2-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1500397144-16232-12-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new ARM64_HAS_NESTED_VIRT feature to indicate that the
-CPU has the ARMv8.3 nested virtualization capability.
+If the guest exception level is EL2, then set up the shadow context of
+the virtual EL2 to hardware. Otherwise, set the regular EL0/EL1 context.
 
-This will be used to support nested virtualization in KVM.
+Note that the shadow context content will be prepared in subsequent
+patches.
 
 Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- arch/arm64/include/asm/cpucaps.h |  3 ++-
- arch/arm64/include/asm/sysreg.h  |  1 +
- arch/arm64/kernel/cpufeature.c   | 11 +++++++++++
- 3 files changed, 14 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/context.c | 74 +++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 64 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 8d2272c..64df263 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -39,7 +39,8 @@
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
- #define ARM64_WORKAROUND_858921			19
- #define ARM64_WORKAROUND_CAVIUM_30115		20
-+#define ARM64_HAS_NESTED_VIRT			21
+diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+index bc43e66..2645787 100644
+--- a/arch/arm64/kvm/context.c
++++ b/arch/arm64/kvm/context.c
+@@ -18,11 +18,29 @@
+ #include <linux/kvm_host.h>
+ #include <asm/kvm_emulate.h>
  
--#define ARM64_NCAPS				21
-+#define ARM64_NCAPS				22
+-/**
+- * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
+- * @vcpu: The VCPU pointer
+- */
+-void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
++static void flush_shadow_special_regs(struct kvm_vcpu *vcpu)
++{
++	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
++
++	ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
++	/*
++	 * We can emulate the guest's configuration of which
++	 * stack pointer to use when executing in virtual EL2 by
++	 * using the equivalent feature in EL1 to point to
++	 * either the EL1 or EL0 stack pointer.
++	 */
++	if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
++		ctxt->hw_pstate |= PSR_MODE_EL1h;
++	else
++		ctxt->hw_pstate |= PSR_MODE_EL1t;
++
++	ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
++	ctxt->hw_sp_el1 = vcpu_el2_sreg(vcpu, SP_EL2);
++	ctxt->hw_elr_el1 = vcpu_el2_sreg(vcpu, ELR_EL2);
++	ctxt->hw_spsr_el1 = vcpu_el2_sreg(vcpu, SPSR_EL2);
++}
++
++static void flush_special_regs(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
  
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 16e44fa..737ca30 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -376,6 +376,7 @@
- #define ID_AA64MMFR1_VMIDBITS_16	2
+@@ -33,11 +51,18 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+ 	ctxt->hw_spsr_el1 = ctxt->gp_regs.spsr[KVM_SPSR_EL1];
+ }
  
- /* id_aa64mmfr2 */
-+#define ID_AA64MMFR2_NV_SHIFT		24
- #define ID_AA64MMFR2_LVA_SHIFT		16
- #define ID_AA64MMFR2_IESB_SHIFT		12
- #define ID_AA64MMFR2_LSM_SHIFT		8
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 94b8f7f..523f998 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -144,6 +144,7 @@
- };
+-/**
+- * kvm_arm_restore_shadow_state -- write back shadow state from guest
+- * @vcpu: The VCPU pointer
+- */
+-void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
++static void sync_shadow_special_regs(struct kvm_vcpu *vcpu)
++{
++	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
++
++	*vcpu_cpsr(vcpu) &= PSR_MODE_MASK;
++	*vcpu_cpsr(vcpu) |= ctxt->hw_pstate & ~PSR_MODE_MASK;
++	vcpu_el2_sreg(vcpu, SP_EL2) = ctxt->hw_sp_el1;
++	vcpu_el2_sreg(vcpu, ELR_EL2) = ctxt->hw_elr_el1;
++	vcpu_el2_sreg(vcpu, SPSR_EL2) = ctxt->hw_spsr_el1;
++}
++
++static void sync_special_regs(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
  
- static const struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_NV_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
-@@ -867,6 +868,16 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 		.min_field_value = 0,
- 		.matches = has_no_fpsimd,
- 	},
-+	{
-+		.desc = "Nested Virtualization Support",
-+		.capability = ARM64_HAS_NESTED_VIRT,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64MMFR2_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64MMFR2_NV_SHIFT,
-+		.min_field_value = 1,
-+	},
- 	{},
- };
+@@ -47,6 +72,35 @@ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
+ 	ctxt->gp_regs.spsr[KVM_SPSR_EL1] = ctxt->hw_spsr_el1;
+ }
  
++/**
++ * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
++ * @vcpu: The VCPU pointer
++ */
++void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
++{
++	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
++
++	if (unlikely(vcpu_mode_el2(vcpu))) {
++		flush_shadow_special_regs(vcpu);
++		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
++	} else {
++		flush_special_regs(vcpu);
++		ctxt->hw_sys_regs = ctxt->sys_regs;
++	}
++}
++
++/**
++ * kvm_arm_restore_shadow_state -- write back shadow state from guest
++ * @vcpu: The VCPU pointer
++ */
++void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
++{
++	if (unlikely(vcpu_mode_el2(vcpu)))
++		sync_shadow_special_regs(vcpu);
++	else
++		sync_special_regs(vcpu);
++}
++
+ void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
+ {
+ 	/* This is to set hw_sys_regs of host_cpu_context */
 -- 
 1.9.1
