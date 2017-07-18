@@ -1,113 +1,47 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 18 Jul 2017 09:38:15 -0700
-Subject: [PATCH v1 1/2] remoteproc: dt: Provide bindings for iMX6SX/7D
- Remote Processor Controller driver
-In-Reply-To: <91bfe236-0410-b26e-7ef6-73d14ebf120d@pengutronix.de>
-References: <20170710144220.31594-1-o.rempel@pengutronix.de>
- <20170710144220.31594-2-o.rempel@pengutronix.de>
- <20170710221408.GD1618@tuxbook>
- <91bfe236-0410-b26e-7ef6-73d14ebf120d@pengutronix.de>
-Message-ID: <20170718163814.GD20973@minitux>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 18 Jul 2017 22:17:06 +0530
+Subject: [PATCH V3 1/2] dmaengine: qcom_hidma: introduce memset support
+In-Reply-To: <29d47cc4-f618-7253-6f59-41f10e7b4b87@codeaurora.org>
+References: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
+ <20170718161956.GV3053@localhost>
+ <29d47cc4-f618-7253-6f59-41f10e7b4b87@codeaurora.org>
+Message-ID: <20170718164705.GY3053@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 18 Jul 01:45 PDT 2017, Oleksij Rempel wrote:
+On Tue, Jul 18, 2017 at 12:26:14PM -0400, Sinan Kaya wrote:
+> Hi Vinod,
+> 
+> On 7/18/2017 12:19 PM, Vinod Koul wrote:
+> > On Thu, Jun 29, 2017 at 10:30:57PM -0400, Sinan Kaya wrote:
+> > 
+> >> @@ -410,7 +410,40 @@ static int hidma_alloc_chan_resources(struct dma_chan *dmach)
+> >>  		return NULL;
+> >>  
+> >>  	hidma_ll_set_transfer_params(mdma->lldev, mdesc->tre_ch,
+> >> -				     src, dest, len, flags);
+> >> +				     src, dest, len, flags,
+> >> +				     HIDMA_TRE_MEMCPY);
+> >> +
+> >> +	/* Place descriptor in prepared list */
+> >> +	spin_lock_irqsave(&mchan->lock, irqflags);
+> >> +	list_add_tail(&mdesc->node, &mchan->prepared);
+> >> +	spin_unlock_irqrestore(&mchan->lock, irqflags);
+> > 
+> > This change looks suspicious, cna you clarify the need to do this?
+> > 
+> > 
+> 
+> Diff looks weird for some reason. I noticed that too.
+> 
+> I just added HIDMA_TRE_MEMCPY parameter to hidma_ll_set_transfer_params() function call
+> from hidma_prep_dma_memcpy() and created a new hidma_prep_dma_memset() function very
+> similar to memcpy with HIDMA_TRE_MEMSET call difference.
+> 
+> My suggestion is to use kdiff or another visual tool to look at the change.
 
-> Hallo Bjorn,
-> 
-> On 11.07.2017 00:14, Bjorn Andersson wrote:
-> > On Mon 10 Jul 07:42 PDT 2017, Oleksij Rempel wrote:
-> > 
-> > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > > ---
-> > >  .../devicetree/bindings/remoteproc/imx-rproc.txt   | 44 ++++++++++++++++++++++
-> > >  1 file changed, 44 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt b/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
-> > > new file mode 100644
-> > > index 000000000000..e7c61993e1b8
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
-> > > @@ -0,0 +1,44 @@
-> > > +NXP iMX6SX/iMX7D Co-Processor Bindings
-> > > +----------------------------------------
-> > > +
-> > > +This binding provides support for ARM Cortex M4 Co-processor found on some
-> > > +NXP iMX SoCs.
-> > > +
-> > > +Required properties:
-> > > +- compatible		Should be one of:
-> > > +				"fsl,imx7d-rproc"
-> > > +				"fsl,imx6sx-rproc"
-> > > +- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
-> > > +- syscfg		Phandle to syscon block which provide access to
-> > 
-> > This is called "syscon" in the code and the example.
-> 
-> done.
-> 
-> > > +			System Reset Controller
-> > > +
-> > > +Optional properties:
-> > > +- reg:			Should contain the address ranges for some of internal
-> > > +			memory regions.
-> > 
-> > Something less hand-wavy, like: "Should list the memory regions for the
-> > remoteproc"
-> > 
-> > > +- reg-names:		Contains the corresponding names for the memory
-> > > +			regions. These should be named "ddr", "ocram", "ocram-s",
-> > > +			"ocram-epdc" or "ocram-pxp".
-> > 
-> > Make this comment define which memory regions are required for each of
-> > the systems.
-> 
-> done.
-> 
-> > > +Fallowing memory ranges are expected:
-> > > +- For "fsl,imx7d-rproc"
-> > > +	<0x00900000 0x00020000> - "ocram"
-> > > +	<0x00920000 0x00020000> - "ocram-epdc"
-> > > +	<0x00940000 0x00008000> - "ocram-pxp"
-> > > +	<0x80000000 0x0FFF0000> - "ddr" (code area)
-> > > +	<0x80000000 0x60000000> - "ddr" (data area)
-> > 
-> > There's no reason to list the actual regions in the binding
-> > document. Just list the requires regions for each system.
-> > 
-> > > +- For "fsl,imx6sx-rproc"
-> > > +	<0x008F8000 0x00004000> - "ocram-s"
-> > > +	<0x80000000 0x0FFF8000> - "ddr" (code area)
-> > > +	<0x80000000 0x60000000> - "ddr" (data area)
-> > > +
-> > > +Note: the "ddr" code and data ranges are overlapping. Code area is smaller
-> > > +than data area.  So this range should be carefully chosen according to your
-> > > +system and application requirements.
-> > > +
-> > 
-> > This is a source of future issues as this indicates that I should have
-> > reg-names list "ddr" twice.
-> 
-> Then I will name it:
-> "ddri" (incstruction/code area),
-> "ddrd" (data area)
-> 
-> unless there are other suggestions.
-> 
+ah fine then, let me take a look at it again with rested pair of eyes in the
+morn :)
 
-But are you saying that it's correct that these two memory regions
-should overlap?
-
-> > Also, as you warn about the user needing to pick the values for "ddr",
-> > does that mean that it's a carveout of System RAM?
-> 
-> Yes, it is a part of System RAM.
-> 
-
-Then there will be an associated reserved-memory region for the
-region(s), you should add a label to this and use "memory-region" to get
-hold of the addresses instead.
-
-Regards,
-Bjorn
+-- 
+~Vinod
