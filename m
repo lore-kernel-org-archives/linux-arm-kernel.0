@@ -1,19 +1,22 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 18 Jul 2017 16:37:20 +0300
-Subject: [PATCH v2 5/8] staging: fsl-mc: fix formating of phys_addr_t on 32
- bits
+Date: Tue, 18 Jul 2017 16:37:23 +0300
+Subject: [PATCH v2 8/8] staging: fsl-mc: allow the driver compile multi-arch
 In-Reply-To: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
 References: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170718133723.12709-6-laurentiu.tudor@nxp.com>
+Message-ID: <20170718133723.12709-9-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Use correct format specifier for phys_addr_t variables (%pa) instead
-of %llx. This fixes these warnings on 32 bit targets:
- "format '%llx' expects argument of type 'long long unsigned int',
-  but argument 4 has type 'phys_addr_t' [-Wformat=]"
+Drop dependency on ARCH_LAYERSCAPE (which in turn depends on ARM64),
+thus leaving this driver compile on other architectures.
+Also, other drivers depending on the bus are updated to depend
+on ARCH_LAYERSCAPE until they'll also be made multi-arch.
+This was compiled tested on:
+ - booke powerpc (corenet{32,64}_smp_defconfig)
+ - x86 (i386_defconfig, x86_64_defconfig, needs CONFIG_OF)
+ - arm64 (defconfig)
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
@@ -21,72 +24,44 @@ Notes:
     -v2
       -no changes
 
- drivers/staging/fsl-mc/bus/mc-io.c  |  8 ++++----
- drivers/staging/fsl-mc/bus/mc-sys.c | 12 ++++++------
- 2 files changed, 10 insertions(+), 10 deletions(-)
+ drivers/staging/fsl-dpaa2/Kconfig  | 2 +-
+ drivers/staging/fsl-mc/bus/Kconfig | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/mc-io.c b/drivers/staging/fsl-mc/bus/mc-io.c
-index 35221a17..4e6f99a 100644
---- a/drivers/staging/fsl-mc/bus/mc-io.c
-+++ b/drivers/staging/fsl-mc/bus/mc-io.c
-@@ -129,8 +129,8 @@ int __must_check fsl_create_mc_io(struct device *dev,
- 				      "mc_portal");
- 	if (!res) {
- 		dev_err(dev,
--			"devm_request_mem_region failed for MC portal %#llx\n",
--			mc_portal_phys_addr);
-+			"devm_request_mem_region failed for MC portal %pa\n",
-+			&mc_portal_phys_addr);
- 		return -EBUSY;
- 	}
+diff --git a/drivers/staging/fsl-dpaa2/Kconfig b/drivers/staging/fsl-dpaa2/Kconfig
+index 730fd6d..dfff675 100644
+--- a/drivers/staging/fsl-dpaa2/Kconfig
++++ b/drivers/staging/fsl-dpaa2/Kconfig
+@@ -4,7 +4,7 @@
  
-@@ -139,8 +139,8 @@ int __must_check fsl_create_mc_io(struct device *dev,
- 						   mc_portal_size);
- 	if (!mc_portal_virt_addr) {
- 		dev_err(dev,
--			"devm_ioremap_nocache failed for MC portal %#llx\n",
--			mc_portal_phys_addr);
-+			"devm_ioremap_nocache failed for MC portal %pa\n",
-+			&mc_portal_phys_addr);
- 		return -ENXIO;
- 	}
+ config FSL_DPAA2
+ 	bool "Freescale DPAA2 devices"
+-	depends on FSL_MC_BUS
++	depends on FSL_MC_BUS && ARCH_LAYERSCAPE
+ 	---help---
+ 	  Build drivers for Freescale DataPath Acceleration
+ 	  Architecture (DPAA2) family of SoCs.
+diff --git a/drivers/staging/fsl-mc/bus/Kconfig b/drivers/staging/fsl-mc/bus/Kconfig
+index a10aaf0..c0acc97 100644
+--- a/drivers/staging/fsl-mc/bus/Kconfig
++++ b/drivers/staging/fsl-mc/bus/Kconfig
+@@ -8,7 +8,7 @@
  
-diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
-index 012abd5..195d9f3 100644
---- a/drivers/staging/fsl-mc/bus/mc-sys.c
-+++ b/drivers/staging/fsl-mc/bus/mc-sys.c
-@@ -196,8 +196,8 @@ static int mc_polling_wait_preemptible(struct fsl_mc_io *mc_io,
+ config FSL_MC_BUS
+ 	bool "QorIQ DPAA2 fsl-mc bus driver"
+-	depends on OF && ARCH_LAYERSCAPE
++	depends on OF
+ 	select GENERIC_MSI_IRQ_DOMAIN
+ 	help
+ 	  Driver to enable the bus infrastructure for the QorIQ DPAA2
+@@ -18,7 +18,7 @@ config FSL_MC_BUS
  
- 		if (time_after_eq(jiffies, jiffies_until_timeout)) {
- 			dev_dbg(mc_io->dev,
--				"MC command timed out (portal: %#llx, dprc handle: %#x, command: %#x)\n",
--				 mc_io->portal_phys_addr,
-+				"MC command timed out (portal: %pa, dprc handle: %#x, command: %#x)\n",
-+				 &mc_io->portal_phys_addr,
- 				 (unsigned int)mc_cmd_hdr_read_token(cmd),
- 				 (unsigned int)mc_cmd_hdr_read_cmdid(cmd));
- 
-@@ -236,8 +236,8 @@ static int mc_polling_wait_atomic(struct fsl_mc_io *mc_io,
- 		timeout_usecs -= MC_CMD_COMPLETION_POLLING_MAX_SLEEP_USECS;
- 		if (timeout_usecs == 0) {
- 			dev_dbg(mc_io->dev,
--				"MC command timed out (portal: %#llx, dprc handle: %#x, command: %#x)\n",
--				 mc_io->portal_phys_addr,
-+				"MC command timed out (portal: %pa, dprc handle: %#x, command: %#x)\n",
-+				 &mc_io->portal_phys_addr,
- 				 (unsigned int)mc_cmd_hdr_read_token(cmd),
- 				 (unsigned int)mc_cmd_hdr_read_cmdid(cmd));
- 
-@@ -290,8 +290,8 @@ int mc_send_command(struct fsl_mc_io *mc_io, struct mc_command *cmd)
- 
- 	if (status != MC_CMD_STATUS_OK) {
- 		dev_dbg(mc_io->dev,
--			"MC command failed: portal: %#llx, dprc handle: %#x, command: %#x, status: %s (%#x)\n",
--			 mc_io->portal_phys_addr,
-+			"MC command failed: portal: %pa, dprc handle: %#x, command: %#x, status: %s (%#x)\n",
-+			 &mc_io->portal_phys_addr,
- 			 (unsigned int)mc_cmd_hdr_read_token(cmd),
- 			 (unsigned int)mc_cmd_hdr_read_cmdid(cmd),
- 			 mc_status_to_string(status),
+ config FSL_MC_DPIO
+         tristate "QorIQ DPAA2 DPIO driver"
+-        depends on FSL_MC_BUS
++        depends on FSL_MC_BUS && ARCH_LAYERSCAPE
+         help
+ 	  Driver for the DPAA2 DPIO object.  A DPIO provides queue and
+ 	  buffer management facilities for software to interact with
 -- 
 2.9.4
