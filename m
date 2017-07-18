@@ -1,41 +1,62 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 18 Jul 2017 15:39:42 +0200
-Subject: [PATCH v2 3/3] ARM: dts: at91: sama5d2: use sama5d2 compatible
- string for SMC
-In-Reply-To: <20170718132220.25018-4-ludovic.desroches@microchip.com>
-References: <20170718132220.25018-1-ludovic.desroches@microchip.com>
- <20170718132220.25018-4-ludovic.desroches@microchip.com>
-Message-ID: <c51be7a7-01c1-87e1-5ec9-54650021df7d@microchip.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 18 Jul 2017 15:49:36 +0200
+Subject: [PATCH 3/3] arm64: dts: marvell: add description for SDHCI
+ controller in CP110 slave
+In-Reply-To: <20170718131034.25167-4-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Tue, 18 Jul 2017 15:10:34 +0200")
+References: <20170718131034.25167-1-thomas.petazzoni@free-electrons.com>
+ <20170718131034.25167-4-thomas.petazzoni@free-electrons.com>
+Message-ID: <87lgnl7t3j.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/2017 at 15:22, Ludovic Desroches wrote:
-> A new compatible string has been introduced for sama5d2 SMC to allow to
-> manage the registers mapping change.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Hi Thomas,
+ 
+ On mar., juil. 18 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> The two CP110 blocks present in the Armada 8K are identical, so since
+> there is an SDHCI controller described in the master CP110
+> description, it should also be described in the slave CP110.
 
+
+Actually they are not totally identically and there is no SD/eMMC
+controller on the CP slave.
+
+Gregory
+
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index cc06da394366..3e6e2dbc2595 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -1048,7 +1048,7 @@
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index 2e6422a..ef95718 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -258,6 +258,16 @@
+>  				status = "okay";
 >  			};
 >  
->  			hsmc: hsmc at f8014000 {
-> -				compatible = "atmel,sama5d3-smc", "syscon", "simple-mfd";
-> +				compatible = "atmel,sama5d2-smc", "syscon", "simple-mfd";
->  				reg = <0xf8014000 0x1000>;
->  				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
->  				clocks = <&hsmc_clk>;
-> 
-
+> +			cps_sdhci0: sdhci at 780000 {
+> +				compatible = "marvell,armada-cp110-sdhci";
+> +				reg = <0x780000 0x300>;
+> +				interrupts = <ICU_GRP_NSR 27 IRQ_TYPE_LEVEL_HIGH>;
+> +				clock-names = "core";
+> +				clocks = <&cps_clk 1 4>;
+> +				dma-coherent;
+> +				status = "disabled";
+> +			};
+> +
+>  			cps_crypto: crypto at 800000 {
+>  				compatible = "inside-secure,safexcel-eip197";
+>  				reg = <0x800000 0x200000>;
+> -- 
+> 2.9.4
+>
 
 -- 
-Nicolas Ferre
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
