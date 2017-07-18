@@ -1,39 +1,46 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 17 Jul 2017 22:26:44 -0500
-Subject: [PATCH 1/3] ARM: configs: keystone: Enable Message Manager
-In-Reply-To: <20170718032646.29389-1-s-anna@ti.com>
-References: <20170718032646.29389-1-s-anna@ti.com>
-Message-ID: <20170718032646.29389-2-s-anna@ti.com>
+Date: Mon, 17 Jul 2017 22:28:40 -0500
+Subject: [PATCH 0/4] Add various TI-SCI DT nodes on 66AK2G SoCs
+Message-ID: <20170718032844.29490-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+Hi Santosh,
 
-Message Manager is a communication hardware block on 66AK2G[1] SoCs.
-Enable the same to provide support for communication with 66AK2G Power
-Management Micro Controller (PMMC) via the TISCI protocol[2].
+The following patch series adds various TI-SCI related DTS nodes that
+probe the corresponding TI-SCI genpd, clock and reset drivers for the
+66AK2G platforms.
 
-[1] http://www.ti.com/product/66ak2g02
-[2] http://processors.wiki.ti.com/index.php/TISCI
+This is the second of two series, and these nodes along with the defconfig
+patches finally allows adding other peripherals to the 66AK2G platforms.
+All the new peripherals should/will be added without using the device id
+macros [1]. Patches are baselined on 4.13-rc1 and are intended for the 4.14
+merge window.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/configs/keystone_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+I have boot-tested both the series individually and combined on all
+the Keystone2 platforms. K2G platforms are boot-tested using ramdisk,
+the MMC boot and NFS boot can be enabled once the corresponding DTS nodes
+are added. The addition of the PMMC node also enables the system reboot.
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index 1331f6dc456a..1a56a4000a14 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -174,6 +174,8 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
- CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_DMADEVICES=y
- CONFIG_TI_EDMA=y
-+CONFIG_MAILBOX=y
-+CONFIG_TI_MESSAGE_MANAGER=y
- CONFIG_SOC_TI=y
- CONFIG_KEYSTONE_NAVIGATOR_QMSS=y
- CONFIG_KEYSTONE_NAVIGATOR_DMA=y
+regards
+Suman
+
+[1] https://patchwork.kernel.org/patch/9741279/
+
+Andrew F. Davis (1):
+  ARM: dts: keystone-k2g: Add TI SCI reset-controller node
+
+Dave Gerlach (1):
+  ARM: dts: keystone-k2g: Add ti-sci power domain node
+
+Nishanth Menon (1):
+  ARM: dts: keystone-k2g: Add PMMC node to support TI-SCI protocol
+
+Tero Kristo (1):
+  ARM: dts: keystone-k2g: Add ti-sci clock provider node
+
+ arch/arm/boot/dts/keystone-k2g.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
 -- 
 2.13.1
