@@ -1,95 +1,143 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 18 Jul 2017 14:13:42 -0500
-Subject: [PATCH 4/4] ARM: dts: keystone-k2g-evm: Add gpio nodes
-In-Reply-To: <1500375436-9435-5-git-send-email-j-keerthy@ti.com>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-5-git-send-email-j-keerthy@ti.com>
-Message-ID: <1cd6ef99-a98e-7cdb-5c2a-f5cd057eef41@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 18 Jul 2017 12:36:09 -0700
+Subject: [PATCH] ARM: dts: BCM53573: Add Broadcom BCM947189ACDBMR board support
+Message-ID: <20170718193611.8543-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Keerthy,
+Adds support for the Broadcom reference board BCM947189ACDMBR which
+features the following:
 
-On 07/18/2017 05:57 AM, Keerthy wrote:
-> keystone-k2g has 2 instances of gpio. The first one has all the 144 GPIOs
+* 128MB of DRAM
+* External MoCA support through a Broadcom BCM6802 chip
+* 1x external Gigabit PHY through the external BCM6802
+* 1x USB 2.0 port
+* 1x PCIE slot
+* Few configurable buttons and LEDs
 
-Please use 66AK2G for keystone-k2g.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/boot/dts/Makefile            |  3 +-
+ arch/arm/boot/dts/bcm947189acdbmr.dts | 97 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 99 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm947189acdbmr.dts
 
-> functional( 9 banks with 16 gpios = 144). The second instance has
-> only the GPIO0:GPIO67 functional and rest are marked reserved.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->  arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-> index bf4d1fa..58ac3db 100644
-> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
-> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-> @@ -15,6 +15,7 @@
->  
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/pinctrl/keystone.h>
-> +#include <dt-bindings/gpio/gpio.h>
->  
->  / {
->  	compatible = "ti,k2g","ti,keystone";
-> @@ -168,5 +169,46 @@
->  				#reset-cells = <2>;
->  			};
->  		};
-> +
-> +		gpio0: gpio at 2603000 {
-> +			compatible = "ti,keystone-k2g-gpio";
-> +			reg = <0x02603000 0x100>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +
-> +			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			ti,ngpio = <144>;
-> +			ti,davinci-gpio-unbanked = <0>;
-> +			clocks = <&k2g_clks 0x001b 0x0>;
-> +			clock-names = "gpio";
-
-I don't see the clocks and clock-names documented in the binding.
-Looking at davinci_gpio_irq_setup(), these are required, and a specific
-clock name is what the driver is looking for. And you have different
-semantics for this on K2G and non-K2G SoCs. Davinci platforms are using
-non-DT clocks, so their DT nodes didn't have them.
-
-regards
-Suman
-
-> +		};
-> +
-> +		gpio1: gpio at 260a000 {
-> +			compatible = "ti,keystone-k2g-gpio";
-> +			reg = <0x0260a000 0x100>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			ti,ngpio = <68>;
-> +			ti,davinci-gpio-unbanked = <0>;
-> +			clocks = <&k2g_clks 0x001c 0x0>;
-> +			clock-names = "gpio";
-> +		};
->  	};
->  };
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4b17f35dc9a7..236587e7f07d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -106,7 +106,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm953012hr.dtb \
+ 	bcm953012k.dtb
+ dtb-$(CONFIG_ARCH_BCM_53573) += \
+-	bcm47189-tenda-ac9.dtb
++	bcm47189-tenda-ac9.dtb \
++	bcm947189acdbmr.dtb
+ dtb-$(CONFIG_ARCH_BCM_63XX) += \
+ 	bcm963138dvt.dtb
+ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+diff --git a/arch/arm/boot/dts/bcm947189acdbmr.dts b/arch/arm/boot/dts/bcm947189acdbmr.dts
+new file mode 100644
+index 000000000000..ef263412fea5
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm947189acdbmr.dts
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (C) 2017 Broadcom
++ * Author: Florian Fainelli <f.fainelli@gmail.com>
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm53573.dtsi"
++
++/ {
++	compatible = "brcm,bcm947189acdbmr", "brcm,bcm47189", "brcm,bcm53573";
++	model = "Broadcom BCM947189ACDBMR";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		wps {
++			label = "bcm53xx:blue:wps";
++			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
++		};
++
++		5ghz {
++			label = "bcm53xx:blue:5ghz";
++			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
++		};
++
++		2ghz {
++			label = "bcm53xx:blue:2ghz";
++			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_HIGH>;
++		};
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 9 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	spi {
++		compatible = "spi-gpio";
++		num-chipselects = <1>;
++		gpio-sck = <&chipcommon 21 0>;
++		gpio-miso = <&chipcommon 22 0>;
++		gpio-mosi = <&chipcommon 23 0>;
++		cs-gpios = <&chipcommon 24 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/* External BCM6802 MoCA chip is connected */
++	};
++};
++
++&pcie0 {
++	ranges = <0x00000000 0 0 0 0 0x00100000>;
++	#address-cells = <3>;
++	#size-cells = <2>;
++
++	bridge at 0,0,0 {
++		reg = <0x0000 0 0 0 0>;
++		ranges = <0x00000000 0 0 0 0 0 0 0x00100000>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++
++		wifi at 0,1,0 {
++			reg = <0x0000 0 0 0 0>;
++			ranges = <0x00000000 0 0 0 0x00100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++		};
++	};
++};
++
++&usb2 {
++	vcc-gpio = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
++};
+-- 
+2.9.3
