@@ -1,28 +1,37 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Tue, 18 Jul 2017 15:38:10 +0900
-Subject: [PATCH v2] arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
-Message-ID: <1500359890-30358-1-git-send-email-hayashibara.keiji@socionext.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 18 Jul 2017 14:48:21 +0800
+Subject: [PATCH v2] PCI: dwc: designware: test PCIE_ATU_ENABLE bit to check
+ enabled or not
+Message-ID: <20170718064821.3668-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the watchdog driver for UniPhier SoC
+The ATU CTRL2 register is 32 bit, besides the enable bit, other bits
+may also be set. To check whether the ATU is enabled or not, we should
+test the enable bit.
 
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Acked-by: Joao Pinto <jpinto@synopsys.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Since v1:
+ - Add Joao's Ack
+ - Fix typo in commit msg, thank Jingoo
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 6c7d147..629c815 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -311,6 +311,7 @@ CONFIG_S3C2410_WATCHDOG=y
- CONFIG_MESON_GXBB_WATCHDOG=m
- CONFIG_MESON_WATCHDOG=m
- CONFIG_RENESAS_WDT=y
-+CONFIG_UNIPHIER_WATCHDOG=y
- CONFIG_BCM2835_WDT=y
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
+ drivers/pci/dwc/pcie-designware.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+index 0e03af279259..6bf0b409050a 100644
+--- a/drivers/pci/dwc/pcie-designware.c
++++ b/drivers/pci/dwc/pcie-designware.c
+@@ -177,7 +177,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+ 	 */
+ 	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
+ 		val = dw_pcie_readl_dbi(pci, PCIE_ATU_CR2);
+-		if (val == PCIE_ATU_ENABLE)
++		if (val & PCIE_ATU_ENABLE)
+ 			return;
+ 
+ 		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
 -- 
-2.7.4
+2.13.2
