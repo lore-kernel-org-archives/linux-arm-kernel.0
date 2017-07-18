@@ -1,35 +1,77 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 18 Jul 2017 17:49:46 +0800
-Subject: [PATCH v2 2/2] crypto: arm64/ghash - add NEON accelerated
- fallback for 64-bit PMULL
-In-Reply-To: <20170704234319.8398-2-ard.biesheuvel@linaro.org>
-References: <20170704234319.8398-1-ard.biesheuvel@linaro.org>
- <20170704234319.8398-2-ard.biesheuvel@linaro.org>
-Message-ID: <20170718094946.GA6347@gondor.apana.org.au>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 18 Jul 2017 10:48:13 +0100
+Subject: [PATCH v4 16/18] coresight tmc: Support for save-restore in ETR
+In-Reply-To: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
+References: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500371295-30472-17-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 05, 2017 at 12:43:19AM +0100, Ard Biesheuvel wrote:
-> Implement a NEON fallback for systems that do support NEON but have
-> no support for the optional 64x64->128 polynomial multiplication
-> instruction that is part of the ARMv8 Crypto Extensions. It is based
-> on the paper "Fast Software Polynomial Multiplication on ARM Processors
-> Using the NEON Engine" by Danilo Camara, Conrado Gouvea, Julio Lopez and
-> Ricardo Dahab (https://hal.inria.fr/hal-01506572), but has been reworked
-> extensively for the AArch64 ISA.
-> 
-> On a low-end core such as the Cortex-A53 found in the Raspberry Pi3, the
-> NEON based implementation is 4x faster than the table based one, and
-> is time invariant as well, making it less vulnerable to timing attacks.
-> When combined with the bit-sliced NEON implementation of AES-CTR, the
-> AES-GCM performance increases by ~2x (from 58 to 30 cycles per byte).
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+The Coresight SoC 600 TMC ETR supports save-restore feature,
+where the values of the RRP/RWP and STS.Full are retained
+when it leaves the Disabled state. Hence, we must program the
+RRP/RWP and STS.Full to a proper value. For now, set the RRP/RWP
+to the base address of the buffer and clear the STS.Full register.
+This can be later exploited for proper save-restore of ETR
+trace contexts (e.g, perf).
 
-This patch does not apply against cryptodev.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 ++++++++++++-
+ drivers/hwtracing/coresight/coresight-tmc.h     |  9 +++++++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
 
-Cheers,
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 38a0440..c2939af 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -22,7 +22,7 @@
+ 
+ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ {
+-	u32 axictl;
++	u32 axictl, sts;
+ 
+ 	/* Zero out the memory to help with debug */
+ 	memset(drvdata->vaddr, 0, drvdata->size);
+@@ -47,6 +47,17 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ 
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+ 	tmc_write_dba(drvdata, drvdata->paddr);
++	/*
++	 * If the TMC pointers must be programmed before the session,
++	 * we have to set it properly (i.e, RRP/RWP to base address and
++	 * STS to "not full").
++	 */
++	if (tmc_etr_has_cap(drvdata, TMC_ETR_SAVE_RESTORE)) {
++		tmc_write_rrp(drvdata, drvdata->paddr);
++		tmc_write_rwp(drvdata, drvdata->paddr);
++		sts = readl_relaxed(drvdata->base + TMC_STS) & ~TMC_STS_FULL;
++		writel_relaxed(sts, drvdata->base + TMC_STS);
++	}
+ 
+ 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
+ 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index c691014..08f1aea 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -120,6 +120,15 @@ enum tmc_mem_intf_width {
+ #define TMC_ETR_SG			(0x1U << 0)
+ /* ETR has separate read/write cache encodings */
+ #define TMC_ETR_AXI_ARCACHE		(0x1U << 1)
++/*
++ * TMC_ETR_SAVE_RESTORE - Values of RRP/RWP/STS.Full are
++ * retained when TMC leaves Disabled state, allowing us to continue
++ * the tracing from a point where we stopped. This also implies that
++ * the RRP/RWP/STS.Full should always be programmed to the correct
++ * value. Unfortunately this is not advertised by the hardware,
++ * so we have to rely on PID of the IP to detect the functionality.
++ */
++#define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
+ 
+ /**
+  * struct tmc_drvdata - specifics associated to an TMC component
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.7.5
