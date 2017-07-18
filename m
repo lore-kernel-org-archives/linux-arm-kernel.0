@@ -1,63 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Jul 2017 09:07:32 +0200
-Subject: [PATCH 4/4] drm/sun4i: make sure we don't have a commit pending
-In-Reply-To: <CAGb2v676F2ye7fDUSFwzWMxd8rF7_5YAxn+u+MNG-U2PuaDDoQ@mail.gmail.com>
-References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
- <a6dfec7ea3598c64f6653e9b8b5febac79172341.1499956639.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v64KnB_zU0yk7MsGr9WRK1wpWq1xOj_cNuQ4mSQJeAGarw@mail.gmail.com>
- <20170717065504.xnahsboer3fh4k3i@flea>
- <CAGb2v676F2ye7fDUSFwzWMxd8rF7_5YAxn+u+MNG-U2PuaDDoQ@mail.gmail.com>
-Message-ID: <20170718070732.ogoyc2fjcxoqbgj5@flea>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 18 Jul 2017 09:14:53 +0200
+Subject: [PATCH resend] Documentation: arm: Replace use of virt_to_phys
+ with __pa_symbol
+In-Reply-To: <20170717212025.GM31807@n2100.armlinux.org.uk>
+References: <1500298768-13262-1-git-send-email-geert+renesas@glider.be>
+ <20170717134445.22a1b00d@lwn.net>
+ <20170717212025.GM31807@n2100.armlinux.org.uk>
+Message-ID: <CAMuHMdUNKJzRfe-_fYUj3wQaL=nA_E-Q60ENJG5ZiVJ+fXg4UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 02:57:19PM +0800, Chen-Yu Tsai wrote:
-> On Mon, Jul 17, 2017 at 2:55 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, Jul 14, 2017 at 04:56:01PM +0800, Chen-Yu Tsai wrote:
-> >> Hi,
-> >>
-> >> On Thu, Jul 13, 2017 at 10:41 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > In the earlier display engine designs, any register access while a commit
-> >> > is pending is forbidden.
-> >> >
-> >> > One of the symptoms is that reading a register will return another, random,
-> >> > register value which can lead to register corruptions if we ever do a
-> >> > read/modify/write cycle.
-> >>
-> >> Alternatively, if changes to the backend (layers) are guaranteed to happen
-> >> while the CRTC is disabled (which seems to be the case after looking at
-> >> drm_atomic_helper_commit_planes and drm_atomic_helper_commit_tail), we
-> >> could just turn on register auto-commit all the time and not deal with
-> >> this.
-> >
-> > As far as I understand, it will only be the case if we need a new
-> > modeset or we changed the active CRTC or connectors. But if you change
-> > only the format, buffers or properties it won't be the case, and we'll
-> > need to commit.
-> 
-> So in other words, if someone were to use it for actual compositing and
-> moved the upper composited layer around, we would need commit support to be
-> safe.
+Hi Russell,
+
+On Mon, Jul 17, 2017 at 11:20 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Jul 17, 2017 at 01:44:45PM -0600, Jonathan Corbet wrote:
+>> On Mon, 17 Jul 2017 15:39:28 +0200
+>> Geert Uytterhoeven <geert+renesas@glider.be> wrote:
+>>
+>> > All low-level PM/SMP code using virt_to_phys() should actually use
+>> > __pa_symbol() against kernel symbols.  Update the documentation to move
+>> > away from virt_to_phys().
+>> >
+>> > Cfr. commit 6996cbb2372189f7 ("ARM: 8641/1: treewide: Replace uses of
+>> > virt_to_phys with __pa_symbol")
+>>
+>> I was kind of hoping for an ack from somebody on this, but, four months
+>> later, I'll take the absence of complaints as being enough.  Applied,
+>> thanks.
 >
-> Sounds more or less like something a video player would do.
+> Maybe those who contributed Documentation/arm/firmware.txt should
+> have responded, seems that was Tomasz Figa <t.figa@samsung.com>
+> who isn't even on the Cc list for this...
 
-Not only that. A change of buffer will happen every frame or so, and
-we can change the format whenever we want too (even if it's usually
-going to be in sync with a new buffer). Changing a property can happen
-any time too (like zpos for example).
+Ah, get_maintainer.pl didn't report Tomasz' Samsung email address, which
+bounces for sure ;-)
 
-Maxime
+> Can't blame people who aren't copied with the patch for not
+> responding.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170718/1ccb524a/attachment.sig>
+I did copy the people responsible for the __pa_symbol conversion.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
