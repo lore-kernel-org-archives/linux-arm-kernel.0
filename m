@@ -1,71 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Jul 2017 10:37:13 +0100
-Subject: [PATCH 2/3] mfd: syscon: atmel-smc: add helper to retrieve
- register layout
-In-Reply-To: <02a0c390-610c-d38b-e6a3-f04120c6fbb3@microchip.com>
-References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
- <20170711074015.30440-3-ludovic.desroches@microchip.com>
- <20170718081508.yo6uld5ip5hr6ipk@dell>
- <20170718091238.wweaobzccdlgv5dh@dell>
- <02a0c390-610c-d38b-e6a3-f04120c6fbb3@microchip.com>
-Message-ID: <20170718093713.stqshzuuv3l7pfve@dell>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 18 Jul 2017 11:38:05 +0200
+Subject: [PATCH 1/5] pinctrl: Add DT bindings for Cortina Gemini
+In-Reply-To: <20170717193939.dwl2w6m47gqysvdc@rob-hp-laptop>
+References: <20170715175056.13040-1-linus.walleij@linaro.org>
+ <20170717193939.dwl2w6m47gqysvdc@rob-hp-laptop>
+Message-ID: <CACRpkdY3e1N=StPHa8VOSXfeBT1KxdmXAnBX+j0cjm_+Ccw6Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Jul 2017, Nicolas Ferre wrote:
+On Mon, Jul 17, 2017 at 9:39 PM, Rob Herring <robh@kernel.org> wrote:
+> On Sat, Jul 15, 2017 at 07:50:52PM +0200, Linus Walleij wrote:
+>> The Cortina Gemini pin controller uses the standard pin control
+>> bindings for muxing functions with groups so these bindings
+>> should be entirely uncontroversial.
+>>
+>> Cc: devicetree at vger.kernel.org
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>>  .../bindings/pinctrl/cortina,gemini-pinctrl.txt    | 54 ++++++++++++++++++++++
+>>  1 file changed, 54 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+>> new file mode 100644
+>> index 000000000000..2ef3e8a65559
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+>> @@ -0,0 +1,54 @@
+>> +Cortina Systems Gemini pin controller
+>> +
+>> +This pin controller is found in the Cortina Systems Gemini SoC family,
+>> +see further arm/gemini.txt. It is a purely group-based multiplexing pin
+>> +controller.
+>> +
+>> +Required properties:
+>> +- compatible: "cortina,gemini-pinctrl"
+>> +- regmap: phandle to the system controller node
+>
+> Why not a child of the system controller?
 
-> On 18/07/2017 at 11:12, Lee Jones wrote:
-> > On Tue, 18 Jul 2017, Lee Jones wrote:
-> > 
-> >> On Tue, 11 Jul 2017, Ludovic Desroches wrote:
-> >>
-> >>> For HSMC controller, the register layout depends on the device i.e. the
-> >>> offset of setup, pulse, cycle, mode and timings registers is not the
-> >>> same. An helper is added to provide the correct register layout.
-> >>>
-> >>> Fixes: fe9d7cb22ef3 ("mfd: syscon: atmel-smc: Add new helpers to ease
-> >>> SMC regs manipulation")
-> >>> Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> >>> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> >>> ---
-> >>>  drivers/memory/atmel-ebi.c               | 13 +++++--
-> >>>  drivers/mfd/atmel-smc.c                  | 67 +++++++++++++++++++++++++-------
-> >>>  drivers/mtd/nand/atmel/nand-controller.c | 10 +++--
-> >>>  include/linux/mfd/syscon/atmel-smc.h     | 32 ++++++++++-----
-> >>>  4 files changed, 92 insertions(+), 30 deletions(-)
-> >>
-> >> Applied, thanks.
-> > 
-> > Apologies, it looks like this needs 2 more Acks before I can even
-> > consider taking it.
-> > 
-> > Unapplied.
-> 
-> If mine is missing, here it is:
-> 
-> For the whole series:
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> 
-> And I think that Alexandre seemed okay by discussing the path those
-> patches should take...
+It is a child of the system controller, I just didn't show that in the
+example.
 
-Thanks Anlexadre and Nicolas.
+And it's true, then I can just look it up from the parent.
 
-Patch does not apply to v4.13-rc1 however.
+I'll revise.
 
-Ludovic,
-
-Could you please rebase this patch and apply the 2 new Acks please?
-
-Please also apply my:
-
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-
-... and I'll get it applied ASAP.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
