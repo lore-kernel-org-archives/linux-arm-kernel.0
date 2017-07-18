@@ -1,116 +1,98 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Tue, 18 Jul 2017 11:05:18 +0200
-Subject: Uncorrectable bitflips with Linux 4.12 on SAMA5D2
-In-Reply-To: <20170717202008.6c798789@bbrezillon>
-References: <CAMiSF3CtVY7G=ugt-bpsOOMqLcFrmx7hDstUag2_6H-KrN4yBg@mail.gmail.com>
- <20170717194809.4a080e0c@bbrezillon> <20170717202008.6c798789@bbrezillon>
-Message-ID: <CAGkQfmMp2rTxhUv=JVa78BqFBGBEiUicb1vN7bqbXLKWL8pOsw@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 18 Jul 2017 10:07:36 +0100
+Subject: [PATCH v3 14/18] coresight tmc etr: Cleanup AXICTL register
+ handling
+In-Reply-To: <20170717170659.GA21523@xps15>
+References: <1500037463-19951-1-git-send-email-suzuki.poulose@arm.com>
+ <1500037463-19951-15-git-send-email-suzuki.poulose@arm.com>
+ <20170717170659.GA21523@xps15>
+Message-ID: <6b7c32c2-a372-4666-1d77-830155ab8f33@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-2017-07-17 20:20 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> Le Mon, 17 Jul 2017 19:48:09 +0200,
-> Boris Brezillon <boris.brezillon@free-electrons.com> a ?crit :
->
->> +Ludovic, Nicolas and Alexandre
+On 17/07/17 18:06, Mathieu Poirier wrote:
+> On Fri, Jul 14, 2017 at 02:04:19PM +0100, Suzuki K Poulose wrote:
+>> This patch cleans up how we setup the AXICTL register on
+>> TMC ETR. At the moment we don't set the CacheCtrl bits, which
+>> drives the arcache and awcache bits on AXI bus specifying the
+>> cacheablitiy. Set this to Write-back Read and Write-allocate.
 >>
->> Hi Romain,
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 10 +++-------
+>>  drivers/hwtracing/coresight/coresight-tmc.h     | 17 ++++++++++++++++-
+>>  2 files changed, 19 insertions(+), 8 deletions(-)
 >>
->> Le Mon, 17 Jul 2017 18:11:26 +0200,
->> Romain Izard <romain.izard.pro@gmail.com> a ?crit :
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> index ff11b92..4aa5d36 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> @@ -36,13 +36,9 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+>>  	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
 >>
->> > Hello,
->> >
->> > On a custom board based on Microchip's SAMA5D2 SoC, I am encountering
->> > ECC problems with the NAND Flash controller. The board is currently
->> > working with Linux v4.9.x, but it does not with Linux 4.12.
->> >
->> > Some pages on the NAND Flash memory chip of the device have bitflips.
->> > With Linux 4.9.x, the bitflips are fixed by the PMECC code, but with
->> > Linux 4.12, the errors are reported as uncorrectable.
->> >
->> > From my end, I updated the board's device tree to include the
->> > sama5d2.dtsi as it exists in Linux 4.12, but the rest of the file is
->> > the same as for Linux 4.9. From my understanding, it should be
->> > sufficient as the legacy DTB binding for the NAND controller is
->> > supported.
+>>  	axictl = readl_relaxed(drvdata->base + TMC_AXICTL);
+>> -	axictl |= TMC_AXICTL_WR_BURST_16;
+>> -	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+>> -	axictl &= ~TMC_AXICTL_SCT_GAT_MODE;
+>> -	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+>> -	axictl = (axictl &
+>> -		  ~(TMC_AXICTL_PROT_CTL_B0 | TMC_AXICTL_PROT_CTL_B1)) |
+>> -		  TMC_AXICTL_PROT_CTL_B1;
+>> +	axictl &= ~TMC_AXICTL_CLEAR_MASK;
+>> +	axictl |= (TMC_AXICTL_PROT_CTL_B1 | TMC_AXICTL_WR_BURST_16);
+>> +	axictl |= TMC_AXICTL_AxCACHE_OS;
+>>  	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+>>  	tmc_write_dba(drvdata, drvdata->paddr);
 >>
->> I know Ludovic add some problems with the NAND controller on sama5d2,
->> but it was with the new bindings (see the fixes here [1]).
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+>> index a0668f6..5d6d7e5 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+>> @@ -55,11 +55,26 @@
+>>  #define TMC_STS_TMCREADY_BIT	2
+>>  #define TMC_STS_FULL		BIT(0)
+>>  #define TMC_STS_TRIGGERED	BIT(1)
+>> -/* TMC_AXICTL - 0x110 */
+>> +/*
+>> + * TMC_AXICTL - 0x110
+>> + *
+>> + * TMC AXICTL format for SoC-400
+>> + * 	Bits [0-1]	: ProtCtrlBit0-1
+>> + * 	Bits [2-5]	: CacheCtrlBits 0-3 (AxCACHE)
+>> + * 	Bit  6		: Reserved
+>> + * 	Bit  7		: ScatterGatherMode
+>> + * 	Bits [8-11]	: WrBurstLen
+>> + * 	Bits [12-31]	: Reserved.
+>> + */
+>> +#define TMC_AXICTL_CLEAR_MASK 0xfbf
+>> +
+>>  #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
+>>  #define TMC_AXICTL_PROT_CTL_B1	BIT(1)
+>>  #define TMC_AXICTL_SCT_GAT_MODE	BIT(7)
+>>  #define TMC_AXICTL_WR_BURST_16	0xF00
+>> +/* Write-back Read and Write-allocate */
+>> +#define TMC_AXICTL_AxCACHE_OS	(0xf << 2)
+>
+> Please use a capital 'x' here.
+
+Sure, fixed in the next version.
+
+>
+> Also this patch is giving me a few checkpatch.pl warnings.
+>
+
+Thats because of the space before the TABs in the comment section
+above describing the bits. I have fixed it now, though I am not sure
+if it checkpatch should really complain about it.
+
+Cheers
+Suzuki
+
+>> +
+>>  /* TMC_FFCR - 0x304 */
+>>  #define TMC_FFCR_FLUSHMAN_BIT	6
+>>  #define TMC_FFCR_EN_FMT		BIT(0)
+>> --
+>> 2.7.5
 >>
->> Your problem seems a bit different since you're using the backward
->> compat code.
->
-> Can you try with the following patch applied?
->
-> --->8---
-> From cb95a16cdd497137872c44d5dd4e251ec73c79c1 Mon Sep 17 00:00:00 2001
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Date: Mon, 17 Jul 2017 20:09:59 +0200
-> Subject: [PATCH] mtd: nand: atmel: Fix DT backward compatibility in pmecc.c
->
-> PMECC caps extraction from old DT bindings is broken, thus leading to
-> erroneous EL registers offset, which in turn make HW ECC unusable on
-> sama5d2 when old bindings are in use.
->
-> Passing the NAND dev node instead of the NFC node to of_match_node()
-> solves the problem.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes: f88fc122cc34 ("mtd: nand: Cleanup/rework the atmel_nand driver")
-> Cc: <stable@vger.kernel.org>
-> ---
->  drivers/mtd/nand/atmel/pmecc.c | 21 ++++++---------------
->  1 file changed, 6 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
-> index 55a8ee5306ea..8c210a5776bc 100644
-> --- a/drivers/mtd/nand/atmel/pmecc.c
-> +++ b/drivers/mtd/nand/atmel/pmecc.c
-> @@ -945,6 +945,7 @@ struct atmel_pmecc *devm_atmel_pmecc_get(struct device *userdev)
->                  */
->                 struct platform_device *pdev = to_platform_device(userdev);
->                 const struct atmel_pmecc_caps *caps;
-> +               const struct of_device_id *match;
->
->                 /* No PMECC engine available. */
->                 if (!of_property_read_bool(userdev->of_node,
-> @@ -953,21 +954,11 @@ struct atmel_pmecc *devm_atmel_pmecc_get(struct device *userdev)
->
->                 caps = &at91sam9g45_caps;
->
-> -               /*
-> -                * Try to find the NFC subnode and extract the associated caps
-> -                * from there.
-> -                */
-> -               np = of_find_compatible_node(userdev->of_node, NULL,
-> -                                            "atmel,sama5d3-nfc");
-> -               if (np) {
-> -                       const struct of_device_id *match;
-> -
-> -                       match = of_match_node(atmel_pmecc_legacy_match, np);
-> -                       if (match && match->data)
-> -                               caps = match->data;
-> -
-> -                       of_node_put(np);
-> -               }
-> +               /* Find the caps associated to the NAND dev node. */
-> +               match = of_match_node(atmel_pmecc_legacy_match,
-> +                                     userdev->of_node);
-> +               if (match && match->data)
-> +                       caps = match->data;
->
->                 pmecc = atmel_pmecc_create(pdev, caps, 1, 2);
->         }
-
-
-The proposed patch fixes my issue. Thank you for your quick response!
-
-You can add my:
-Tested-by: Romain Izard <romain.izard.pro@gmail.com>
-
-Best regards,
--- 
-Romain Izard
