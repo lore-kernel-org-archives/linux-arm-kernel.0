@@ -1,109 +1,55 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 18 Jul 2017 09:20:14 +0800
-Subject: Unhandled level 2 translation fault on A72 board.
-In-Reply-To: <CAB4PhKeBc=-1ikZje24kPA5B3RFDqRsP97RqOE9FHtfsDBExTg@mail.gmail.com>
-References: <56A72246.4050105@huawei.com>
- <20160126110358.GA23579@localhost.localdomain> <56A7597D.6020609@huawei.com>
- <20160126114445.GD23579@localhost.localdomain> <56A7720B.3020505@huawei.com>
- <CAB4PhKeBc=-1ikZje24kPA5B3RFDqRsP97RqOE9FHtfsDBExTg@mail.gmail.com>
-Message-ID: <c0bcb777-62e1-65ef-99d3-720abbaab05e@huawei.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Tue, 18 Jul 2017 10:28:07 +0800
+Subject: [PATCH v3 0/7] drm/rockchip: add all full framework vop support
+Message-ID: <1500344888-28165-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+These patches try to make all current rockchip full framework vop works
+on drm, fill missing vop on full framework.
+Vop Full framework now has following vops:
+IP version    chipname
+      3.1           rk3288
+      3.2           rk3368
+      3.4           rk3366
+      3.5           rk3399 big
+      3.6           rk3399 lit
+      3.7           rk3228
+      3.8           rk3328
 
+Group the vop register, it would make register  definition clearer and
+more easily to reuse same group register define for difference vops.
 
-On 2017/6/1 18:52, Jason Liu wrote:
-> 2016-01-26 21:18 GMT+08:00 Ding Tianhong <dingtianhong@huawei.com>:
->> On 2016/1/26 19:44, Catalin Marinas wrote:
->>> On Tue, Jan 26, 2016 at 07:33:17PM +0800, Ding Tianhong wrote:
->>>> On 2016/1/26 19:03, Catalin Marinas wrote:
->>>>> On Tue, Jan 26, 2016 at 03:37:42PM +0800, Ding Tianhong wrote:
->>>>>> I met this problem when running the hackbench test on A72 chip board:
->>>>>>
->>>>>> sh[4779]: unhandled level 2 translation fault (11) at 0x7f96be0c80, esr 0x83000006
->>>>>> pgd = ffffffc01a1f0000
->>>>>> [7f96be0c80] *pgd=0000000084a20003, *pud=0000000084a20003, *pmd=0000000000000000
->>> [...]
->>>>> I can't tell for sure it's a TLB issue. The kernel page table dump shows
->>>>> *pmd being 0, so the fault is correctly called "level 2 translation
->>>>> fault". It also seems that there is no vma at this address, hence the
->>>>> kernel reports it as unhandled. It looks like data corruption which
->>>>> could be caused by cache or TLB incoherence. Just make sure the
->>>>> interconnect linking the two clusters is configured correctly by
->>>>> _firmware_ before Linux starts.
->>>>
->>>> Thanks for the apply, I have try to apply this patch to test:
->>>>
->>>> --- arch/arm64/kernel/process.c | 9 +++++++++
->>>> 1 file changed, 9 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->>>> index 6391485..d7d8439 100644
->>>> --- a/arch/arm64/kernel/process.c
->>>> +++ b/arch/arm64/kernel/process.c
->>>> @@ -283,6 +283,13 @@ static void tls_thread_switch(struct task_struct *next)
->>>> : : "r" (tpidr), "r" (tpidrro));
->>>> }
->>>> +static void tlb_flush_thread(struct task_struct *prev)
->>>> +{
->>>> +/* Flush the prev task&apos;s TLB entries */
->>>> +if (prev->mm)
->>>> +flush_tlb_mm(prev->mm);
->>>> +}
->>>> +
->>>> /*
->>>>   * Thread switching.
->>>>   */
->>>> @@ -296,6 +303,8 @@ struct task_struct *__switch_to(struct task_struct *prev,
->>>> hw_breakpoint_thread_switch(next);
->>>> contextidr_thread_switch(next);
->>>> +tlb_flush_thread(prev);
->>>> +
->>>> /*
->>>> * Complete any pending TLB or cache maintenance on this CPU in case
->>>> * the thread migrates to a different CPU.
->>>>
->>>> The hackbench would work fine after this patch, so I guess that the old thread tlb may not be
->>>> invalidate as soon as possible, but I don't know why, everything is fine on A57,
->>>> Does I miss something?
->>>
->>> It looks like the TLB invalidation messages may not get across the CCI
->>> between clusters. I don't have the TRMs at hand but make sure all the
->>> relevant bits in the CPUs and CCI are enabled.
->>>
->> Indeed check them several times, and need more information, check it again.
-> 
-> How this issue is resolved finally? I search the mail-list and find this old
-> email thread. Any response will be appreciated.
-> 
+Tested on rk3399 excavator board with kernel 4.12-rc1.
 
-Fix it already, the main reason is that the chip didn't config correctly to
-send broadcast for tlb snoop, so do it in the bios.
+And other chips works find on rockchip kernel 4.4:
+   https://github.com/rockchip-linux/kernel/tree/release-4.4/drivers/gpu/drm/rockchip
 
-Thanks
-Ding
+Changes in v3:
+- group vop register instead using VOP_REG_VER mechanism
+- move write_relaxed flags to vop registers
+- Explain more on patch commit message
+- fix rk3328 overlay abnormal
 
-> 
-> Jason Liu
->>
->>
->>> BTW, which kernel version are you running? Is the firmware your own or
->>> built around ARM Trusted Firmware?
->> I use 4.1 kernel version, and the firmware is our own.
->>
->> Ding
->>
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+Changes in v2:
+- rename rk322x to rk3228(Heiko St?bner)
+- correct some vop registers define
+
+Mark Yao (7):
+  drm/rockchip: vop: initialize registers directly
+  drm/rockchip: vop: move write_relaxed flags to vop register
+  drm/rockchip: vop: move line_flag_num to interrupt registers
+  drm/rockchip: vop: group vop registers
+  drm/rockchip: vop: add a series of vop support
+  dt-bindings: display: fill Documents for series of vop
+  drm/rockchip: vop: rk3328: fix overlay abnormal
+
+ .../bindings/display/rockchip/rockchip-vop.txt     |   4 +
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 109 ++-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |  81 +-
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        | 374 ++++++---
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.h        | 905 ++++++++++++++++-----
+ 5 files changed, 1074 insertions(+), 399 deletions(-)
+
+-- 
+1.9.1
