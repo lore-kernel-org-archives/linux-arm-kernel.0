@@ -1,223 +1,82 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 17 Jul 2017 18:44:01 -0500
-Subject: [PATCH 3/3] [v2] pinctrl: qcom: qdf2xxx: add support for new ACPI HID
- QCOM8002
-In-Reply-To: <1500335041-32711-1-git-send-email-timur@codeaurora.org>
-References: <1500335041-32711-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1500335041-32711-4-git-send-email-timur@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 17 Jul 2017 17:19:25 -0700
+Subject: [PATCH v4] PM / suspend: Export pm_suspend_target_state
+In-Reply-To: <20170717221059.6523-1-f.fainelli@gmail.com>
+References: <20170717221059.6523-1-f.fainelli@gmail.com>
+Message-ID: <20170718001925.25286-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Newer versions of the firmware for the Qualcomm Datacenter Technologies
-QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-prevent older kernels from accidentally accessing the restricted GPIOs,
-we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-and introduce a new property "gpios".  This property is an array of
-specific GPIOs that are accessible.  When an older kernel boots on
-newer (restricted) firmware, it will fail to probe.
+Have the core suspend/resume framework store the system-wide suspend
+state (suspend_state_t) we are about to enter, and expose it to drivers
+via pm_suspend_target_state in order to retrieve that. The state is
+assigned in suspend_devices_and_enter().
 
-To implement the sparse GPIO map, we register all of the GPIOs, but set
-the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
-driver will block those unavailable GPIOs from being accessed.
+This is useful for platform specific drivers that may need to take a
+slightly different suspend/resume path based on the system's
+suspend/resume state being entered.
 
-To allow newer kernels to support older firmware, the driver retains
-support for QCOM8001.
-
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 139 ++++++++++++++++++++++++---------
- 1 file changed, 103 insertions(+), 36 deletions(-)
+Changes in v4:
+- clear pm_suspend_target_state in Close label
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-index bb3ce5c..e3b58c4 100644
---- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-+++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-@@ -38,68 +38,141 @@
- /* maximum size of each gpio name (enough room for "gpioXXX" + null) */
- #define NAME_SIZE	8
+Changes in v3:
+
+- just export pm_suspend_target_state without a helper function
+
+Changes in v2:
+
+- rename platform_suspend_target_state() -> suspend_target_state()
+- directly export the suspend_state_t value and assign it in
+  suspend_devices_and_enter()
+
+
+ include/linux/suspend.h | 1 +
+ kernel/power/suspend.c  | 5 +++++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+index 0b1cf32edfd7..2159f6841768 100644
+--- a/include/linux/suspend.h
++++ b/include/linux/suspend.h
+@@ -427,6 +427,7 @@ extern int unregister_pm_notifier(struct notifier_block *nb);
+ /* drivers/base/power/wakeup.c */
+ extern bool events_check_enabled;
+ extern unsigned int pm_wakeup_irq;
++extern suspend_state_t pm_suspend_target_state;
  
-+enum {
-+	QDF2XXX_V1,
-+	QDF2XXX_V2,
-+};
-+
-+static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
-+	{"QCOM8001", QDF2XXX_V1},
-+	{"QCOM8002", QDF2XXX_V2},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-+
- static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- {
-+	const struct acpi_device_id *id =
-+		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
- 	struct pinctrl_pin_desc *pins;
- 	struct msm_pingroup *groups;
- 	char (*names)[NAME_SIZE];
- 	unsigned int i;
- 	u32 num_gpios;
-+	unsigned int avail_gpios; /* The number of GPIOs we support */
-+	u16 *gpios; /* An array of supported GPIOs */
- 	int ret;
+ extern bool pm_wakeup_pending(void);
+ extern void pm_system_wakeup(void);
+diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
+index 3ecf275d7e44..d0c0b96c2383 100644
+--- a/kernel/power/suspend.c
++++ b/kernel/power/suspend.c
+@@ -47,6 +47,8 @@ const char *mem_sleep_states[PM_SUSPEND_MAX];
  
- 	/* Query the number of GPIOs from ACPI */
- 	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
- 	if (ret < 0) {
--		dev_warn(&pdev->dev, "missing num-gpios property\n");
-+		dev_err(&pdev->dev, "missing 'num-gpios' property\n");
- 		return ret;
- 	}
--
- 	if (!num_gpios || num_gpios > MAX_GPIOS) {
--		dev_warn(&pdev->dev, "invalid num-gpios property\n");
-+		dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
- 		return -ENODEV;
- 	}
+ suspend_state_t mem_sleep_current = PM_SUSPEND_FREEZE;
+ static suspend_state_t mem_sleep_default = PM_SUSPEND_MEM;
++suspend_state_t pm_suspend_target_state;
++EXPORT_SYMBOL_GPL(pm_suspend_target_state);
  
-+	/*
-+	 * The QCOM8001 HID contains only the number of GPIOs, and assumes
-+	 * that all of them are available. avail_gpios is the same as num_gpios.
-+	 *
-+	 * The QCOM8002 HID introduces the 'gpios' DSD, which lists
-+	 * specific GPIOs that the driver is allowed to access.
-+	 *
-+	 * The make the common code simpler, in both cases we create an
-+	 * array of GPIOs that are accessible.  So for QCOM8001, that would
-+	 * be all of the GPIOs.
-+	 */
-+	if (id->driver_data == QDF2XXX_V1) {
-+		avail_gpios = num_gpios;
-+
-+		gpios = devm_kcalloc(&pdev->dev, avail_gpios, sizeof(gpios[0]),
-+				     GFP_KERNEL);
-+		if (!gpios)
-+			return -ENOMEM;
-+
-+		for (i = 0; i < avail_gpios; i++)
-+			gpios[i] = i;
-+	} else {
-+		/* The number of GPIOs in the approved list */
-+		ret = device_property_read_u16_array(&pdev->dev, "gpios",
-+						     NULL, 0);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "missing 'num-gpios' property\n");
-+			return ret;
-+		}
-+		if (!ret || ret > MAX_GPIOS) {
-+			dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
-+			return -ENODEV;
-+		}
-+		avail_gpios = ret;
-+
-+		gpios = devm_kcalloc(&pdev->dev, avail_gpios, sizeof(gpios[0]),
-+				     GFP_KERNEL);
-+		if (!gpios)
-+			return -ENOMEM;
-+
-+		ret = device_property_read_u16_array(&pdev->dev, "gpios", gpios,
-+						     avail_gpios);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "could not read list of GPIOs\n");
-+			return ret;
-+		}
-+	}
-+
- 	pins = devm_kcalloc(&pdev->dev, num_gpios,
- 		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
- 	groups = devm_kcalloc(&pdev->dev, num_gpios,
- 		sizeof(struct msm_pingroup), GFP_KERNEL);
--	names = devm_kcalloc(&pdev->dev, num_gpios, NAME_SIZE, GFP_KERNEL);
-+	names = devm_kcalloc(&pdev->dev, avail_gpios, NAME_SIZE, GFP_KERNEL);
+ unsigned int pm_suspend_global_flags;
+ EXPORT_SYMBOL_GPL(pm_suspend_global_flags);
+@@ -456,6 +458,8 @@ int suspend_devices_and_enter(suspend_state_t state)
+ 	if (!sleep_state_supported(state))
+ 		return -ENOSYS;
  
- 	if (!pins || !groups || !names)
- 		return -ENOMEM;
- 
-+	/*
-+	 * Initialize the array.  GPIOs not listed in the 'gpios' array
-+	 * still need a number, but nothing else.
-+	 */
- 	for (i = 0; i < num_gpios; i++) {
--		snprintf(names[i], NAME_SIZE, "gpio%u", i);
--
- 		pins[i].number = i;
--		pins[i].name = names[i];
--
--		groups[i].npins = 1;
--		groups[i].name = names[i];
- 		groups[i].pins = &pins[i].number;
-+	}
- 
--		groups[i].ctl_reg = 0x10000 * i;
--		groups[i].io_reg = 0x04 + 0x10000 * i;
--		groups[i].intr_cfg_reg = 0x08 + 0x10000 * i;
--		groups[i].intr_status_reg = 0x0c + 0x10000 * i;
--		groups[i].intr_target_reg = 0x08 + 0x10000 * i;
--
--		groups[i].mux_bit = 2;
--		groups[i].pull_bit = 0;
--		groups[i].drv_bit = 6;
--		groups[i].oe_bit = 9;
--		groups[i].in_bit = 0;
--		groups[i].out_bit = 1;
--		groups[i].intr_enable_bit = 0;
--		groups[i].intr_status_bit = 0;
--		groups[i].intr_target_bit = 5;
--		groups[i].intr_target_kpss_val = 1;
--		groups[i].intr_raw_status_bit = 4;
--		groups[i].intr_polarity_bit = 1;
--		groups[i].intr_detection_bit = 2;
--		groups[i].intr_detection_width = 2;
-+	/* Populate the entries that are meant to be exposes as GPIOs. */
-+	for (i = 0; i < avail_gpios; i++) {
-+		unsigned int gpio = gpios[i];
++	pm_suspend_target_state = state;
 +
-+		groups[gpio].npins = 1;
-+		snprintf(names[i], NAME_SIZE, "gpio%u", gpio);
-+		pins[gpio].name = names[i];
-+		groups[gpio].name = names[i];
-+
-+		groups[gpio].ctl_reg = 0x10000 * gpio;
-+		groups[gpio].io_reg = 0x04 + 0x10000 * gpio;
-+		groups[gpio].intr_cfg_reg = 0x08 + 0x10000 * gpio;
-+		groups[gpio].intr_status_reg = 0x0c + 0x10000 * gpio;
-+		groups[gpio].intr_target_reg = 0x08 + 0x10000 * gpio;
-+
-+		groups[gpio].mux_bit = 2;
-+		groups[gpio].pull_bit = 0;
-+		groups[gpio].drv_bit = 6;
-+		groups[gpio].oe_bit = 9;
-+		groups[gpio].in_bit = 0;
-+		groups[gpio].out_bit = 1;
-+		groups[gpio].intr_enable_bit = 0;
-+		groups[gpio].intr_status_bit = 0;
-+		groups[gpio].intr_target_bit = 5;
-+		groups[gpio].intr_target_kpss_val = 1;
-+		groups[gpio].intr_raw_status_bit = 4;
-+		groups[gpio].intr_polarity_bit = 1;
-+		groups[gpio].intr_detection_bit = 2;
-+		groups[gpio].intr_detection_width = 2;
- 	}
+ 	error = platform_suspend_begin(state);
+ 	if (error)
+ 		goto Close;
+@@ -485,6 +489,7 @@ int suspend_devices_and_enter(suspend_state_t state)
  
-+	devm_kfree(&pdev->dev, gpios);
-+
- 	qdf2xxx_pinctrl.pins = pins;
- 	qdf2xxx_pinctrl.groups = groups;
- 	qdf2xxx_pinctrl.npins = num_gpios;
-@@ -109,12 +182,6 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- 	return msm_pinctrl_probe(pdev, &qdf2xxx_pinctrl);
- }
+  Close:
+ 	platform_resume_end(state);
++	pm_suspend_target_state = PM_SUSPEND_ON;
+ 	return error;
  
--static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
--	{"QCOM8001"},
--	{},
--};
--MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
--
- static struct platform_driver qdf2xxx_pinctrl_driver = {
- 	.driver = {
- 		.name = "qdf2xxx-pinctrl",
+  Recover_platform:
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.9.3
