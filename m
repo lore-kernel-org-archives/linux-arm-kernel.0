@@ -1,73 +1,122 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 18 Jul 2017 12:59:48 +0200
-Subject: [PATCH v4 9/9] dt-bindings: serial: document rs485 bindings for
- various devices
-In-Reply-To: <20170718105948.21986-1-u.kleine-koenig@pengutronix.de>
-References: <20170718105948.21986-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170718105948.21986-10-u.kleine-koenig@pengutronix.de>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Tue, 18 Jul 2017 11:08:10 +0000
+Subject: [PATCH 6/7] staging: fsl-mc: rewrite mc command send/receive to
+ work on 32-bits
+In-Reply-To: <CAK8P3a3e+Gv2bdHKkRdNVp1e2-Z6j351cudLU4fuH2aZ8CSwmQ@mail.gmail.com>
+References: <20170717132646.3020-1-laurentiu.tudor@nxp.com>
+ <20170717132646.3020-7-laurentiu.tudor@nxp.com>
+ <CAK8P3a3KDh=MgfjG+sKNqcrQwq1yf-DgQN0=HigPaPYYJq0Uug@mail.gmail.com>
+ <596CC912.3020709@nxp.com>
+ <CAK8P3a3e+Gv2bdHKkRdNVp1e2-Z6j351cudLU4fuH2aZ8CSwmQ@mail.gmail.com>
+Message-ID: <596DEC19.6060301@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Atmel USART, Freescale UARTs and OMAP UART all support the rs485 binding
-described in rs485.txt, this commit just makes that explicit.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+On 07/17/2017 06:00 PM, Arnd Bergmann wrote:
+> On Mon, Jul 17, 2017 at 4:27 PM, Laurentiu Tudor
+> <laurentiu.tudor@nxp.com> wrote:
+>> Hi Arnd,
+>>
+>> On 07/17/2017 04:45 PM, Arnd Bergmann wrote:
+>>> On Mon, Jul 17, 2017 at 3:26 PM,  <laurentiu.tudor@nxp.com> wrote:
+>>>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>>>
+>>>> Split the 64-bit accesses in 32-bit accesses because there's no real
+>>>> constrain in MC to do only atomic 64-bit. There's only one place
+>>>> where ordering is important: when writing the MC command header the
+>>>> first 32-bit part of the header must be written last.
+>>>> We do this switch in order to allow compiling the driver on 32-bit.
+>>>>
+>>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>>> ---
+>>>>    drivers/staging/fsl-mc/bus/mc-sys.c | 31 ++++++++++++-------------------
+>>>>    1 file changed, 12 insertions(+), 19 deletions(-)
+>>>>
+>>>> diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
+>>>> index 195d9f3..dd2828e 100644
+>>>> --- a/drivers/staging/fsl-mc/bus/mc-sys.c
+>>>> +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
+>>>> @@ -124,14 +124,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
+>>>>    {
+>>>>           int i;
+>>>>
+>>>> -       /* copy command parameters into the portal */
+>>>> -       for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
+>>>> -               __raw_writeq(cmd->params[i], &portal->params[i]);
+>>>> -       /* ensure command params are committed before submitting it */
+>>>> -       wmb();
+>>>> -
+>>>> -       /* submit the command by writing the header */
+>>>> -       __raw_writeq(cmd->header, &portal->header);
+>>>> +       /*
+>>>> +        * copy command parameters into the portal. Final write
+>>>> +        * triggers the submission of the command.
+>>>> +        */
+>>>> +       for (i = sizeof(struct mc_command) / sizeof(u32) - 1; i >= 0; i--) {
+>>>> +               __raw_writel(((u32 *)cmd)[i], &((u32 *)portal)[i]);
+>>>> +               /* ensure command params are committed before submitting it */
+>>>> +               wmb();
+>>>> +       }
+>>>>    }
+>>>
+>>> What is the byte order requirement on this buffer?
+>>
+>> Endianness is handled by the callers so this function must leave
+>> the binary blob intact.
+>
+> Got it, the endianess looks correct indeed.
+>
+>>> If this is a byte string
+>>> rather than individual registers, you should probably just use
+>>> memcpy_toio()
+>>
+>> It's a header followed by an opaque command. The protocol for queueing a
+>> command says that the first 32-bit half of the header must be written
+>> last, this triggering the command handling in the MC.
+>
+> Strictly speaking the __raw_writel() won't guarantee that the
+> data is written as a single word, the compiler might decide to
+> split it up into byte-sized writes if it believes the destination pointer
+> is unaligned and the CPU has no efficient writes.
+>
+> I think this cannot happen on arm or powerpc, as we go through
+> inline assembly for the store, but it's not completely portable.
+
+Should i worry about portability? Slim changes that this driver
+will ever run on anything else other than ARM & ARM64.
+My current goal was just to make it compile on other arches.
+
+> Before your patch, both the compiler and the CPU could also
+> reorder the stores in theory (but normally won't), but the wmb()
+> will prevent that now.
+
+Ok, thanks for the info.
+
+>>> but if these are separate registers, then using the
+>>> __raw_* accessors is still wrong, at least on kernels that have a
+>>> different byteorder from the hardware.
+>>
+>> As mentioned above, endianness is handled by the caller. This function
+>> takes raw data and must leave it unchanged.
+>>
+>>> Also, are you sure that adding those six extra barriers has no
+>>> performance impact?
+>>
+>> This is a slow interface used in slow paths, so i don't think those
+>> extra barriers will have any performance impact.
+>
+> Ok.
+>
+> One other problem remains: most developers looking at this
+> code like Robin and me will immediately think there might be
+> an endianess bug here. As this is a slow path, how about
+> using an explicit conversion using
+>
+>       writeq(le64_to_cpup(buffer), pointer);
+
+Sure, sounds perfect. I'll do that in the next respin.
+
 ---
- Documentation/devicetree/bindings/serial/atmel-usart.txt  | 1 +
- Documentation/devicetree/bindings/serial/fsl-imx-uart.txt | 1 +
- Documentation/devicetree/bindings/serial/fsl-lpuart.txt   | 1 +
- Documentation/devicetree/bindings/serial/omap_serial.txt  | 1 +
- 4 files changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index e6e6142e33ac..7c0d6b2f53e4 100644
---- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -24,6 +24,7 @@ Optional properties:
- 	- dma-names: "rx" for RX channel, "tx" for TX channel.
- - atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
-   capable USARTs.
-+- rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
- 
- <chip> compatible description:
- - at91rm9200:  legacy USART support
-diff --git a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-index 574c3a2c77d5..860a9559839a 100644
---- a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-@@ -9,6 +9,7 @@ Optional properties:
- - fsl,irda-mode : Indicate the uart supports irda mode
- - fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
-                   in DCE mode by default.
-+- rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
- 
- Please check Documentation/devicetree/bindings/serial/serial.txt
- for the complete list of generic properties.
-diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-index a1252a047f78..59567b51cf09 100644
---- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-+++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-@@ -16,6 +16,7 @@ Required properties:
- Optional properties:
- - dmas: A list of two dma specifiers, one for each entry in dma-names.
- - dma-names: should contain "tx" and "rx".
-+- rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
- 
- Note: Optional properties for DMA support. Write them both or both not.
- 
-diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
-index 7a71b5de77d6..43eac675f21f 100644
---- a/Documentation/devicetree/bindings/serial/omap_serial.txt
-+++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
-@@ -19,6 +19,7 @@ Optional properties:
- - dmas : DMA specifier, consisting of a phandle to the DMA controller
-          node and a DMA channel number.
- - dma-names : "rx" for receive channel, "tx" for transmit channel.
-+- rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
- 
- Example:
- 
--- 
-2.11.0
+Thanks & Best Regards, Laurentiu
