@@ -1,74 +1,48 @@
-From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 11:58:41 -0500
-Subject: [RFC PATCH v2 15/38] KVM: arm64: Move exception macros and enums to a
- common file
-In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <1500397144-16232-16-git-send-email-jintack.lim@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 18 Jul 2017 17:57:18 +0100
+Subject: [PATCH 0/4] Optimise 64-bit IOVA allocations
+Message-ID: <cover.1500396007.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These macros and enums can be reused to inject exceptions
-for nested virtualization.
+Hi all,
 
-Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
----
- arch/arm64/include/asm/kvm_emulate.h | 12 ++++++++++++
- arch/arm64/kvm/inject_fault.c        | 12 ------------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+In the wake of the ARM SMMU optimisation efforts, it seems that certain
+workloads (e.g. storage I/O with large scatterlists) probably remain quite
+heavily influenced by IOVA allocation performance. Separately, Ard also
+reported massive performance drops for a graphical desktop on AMD Seattle
+when enabling SMMUs via IORT, which we traced to dma_32bit_pfn in the DMA
+ops domain getting initialised differently for ACPI vs. DT, and exposing
+the overhead of the rbtree slow path. Whilst we could go around trying to
+close up all the little gaps that lead to hitting the slowest case, it
+seems a much better idea to simply make said slowest case a lot less slow.
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 14c4ce9..94f98cc 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -31,6 +31,18 @@
- #include <asm/cputype.h>
- #include <asm/virt.h>
- 
-+#define CURRENT_EL_SP_EL0_VECTOR	0x0
-+#define CURRENT_EL_SP_ELx_VECTOR	0x200
-+#define LOWER_EL_AArch64_VECTOR		0x400
-+#define LOWER_EL_AArch32_VECTOR		0x600
-+
-+enum exception_type {
-+	except_type_sync	= 0,
-+	except_type_irq		= 0x80,
-+	except_type_fiq		= 0x100,
-+	except_type_serror	= 0x180,
-+};
-+
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
- 
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index da6a8cf..94679fb 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -28,11 +28,6 @@
- #define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
- 				 PSR_I_BIT | PSR_D_BIT)
- 
--#define CURRENT_EL_SP_EL0_VECTOR	0x0
--#define CURRENT_EL_SP_ELx_VECTOR	0x200
--#define LOWER_EL_AArch64_VECTOR		0x400
--#define LOWER_EL_AArch32_VECTOR		0x600
--
- static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
- {
- 	unsigned long cpsr;
-@@ -101,13 +96,6 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
- 		*fsr = 0x14;
- }
- 
--enum exception_type {
--	except_type_sync	= 0,
--	except_type_irq		= 0x80,
--	except_type_fiq		= 0x100,
--	except_type_serror	= 0x180,
--};
--
- static u64 get_except_vector(struct kvm_vcpu *vcpu, enum exception_type type)
- {
- 	u64 exc_offset;
+I had a go at rebasing Leizhen's last IOVA series[1], but ended up finding
+the changes rather too hard to follow, so I've taken the liberty here of
+picking the whole thing up and reimplementing the main part in a rather
+less invasive manner.
+
+Robin.
+
+[1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg17753.html
+
+Robin Murphy (1):
+  iommu/iova: Extend rbtree node caching
+
+Zhen Lei (3):
+  iommu/iova: Optimise rbtree searching
+  iommu/iova: Optimise the padding calculation
+  iommu/iova: Make dma_32bit_pfn implicit
+
+ drivers/gpu/drm/tegra/drm.c      |   3 +-
+ drivers/gpu/host1x/dev.c         |   3 +-
+ drivers/iommu/amd_iommu.c        |   7 +--
+ drivers/iommu/dma-iommu.c        |  18 +------
+ drivers/iommu/intel-iommu.c      |  11 ++--
+ drivers/iommu/iova.c             | 112 ++++++++++++++++-----------------------
+ drivers/misc/mic/scif/scif_rma.c |   3 +-
+ include/linux/iova.h             |   8 +--
+ 8 files changed, 60 insertions(+), 105 deletions(-)
+
 -- 
-1.9.1
+2.12.2.dirty
