@@ -1,93 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 18 Jul 2017 13:14:12 +0300
-Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail
- for runtime_pm users
-In-Reply-To: <20170718070522.6uu7s6o3ivpemslf@flea>
-References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
- <1823154.LT2zYSFJ4j@avalon> <20170718070522.6uu7s6o3ivpemslf@flea>
-Message-ID: <10955632.YI7NJnTkKU@avalon>
+From: jonas.gorski@gmail.com (Jonas Gorski)
+Date: Tue, 18 Jul 2017 12:17:21 +0200
+Subject: [PATCH 0/9] make clk_get_rate implementations behavior more consistent
+Message-ID: <20170718101730.2541-1-jonas.gorski@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+The common clock and several other clock API implementations allow
+calling clk_get_rate with a NULL pointer. While not specified as
+expected behavior of the API, device drivers have come to rely on that,
+causing them to OOPS when run on a platform with a different clock API
+implementation.
 
-On Tuesday 18 Jul 2017 09:05:22 Maxime Ripard wrote:
-> On Fri, Jul 14, 2017 at 02:43:12AM +0300, Laurent Pinchart wrote:
-> > On Thursday 13 Jul 2017 16:41:13 Maxime Ripard wrote:
-> >> The current drm_atomic_helper_commit_tail helper works only if the CRTC
-> >> is accessible, and documents an alternative implementation that is
-> >> supposed to be used if that happens.
-> >> 
-> >> That implementation is then duplicated by some drivers. Instead of
-> >> documenting it, let's implement an helper that all the relevant users
-> >> can use directly.
-> >> 
-> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >> ---
-> >> 
-> >>  drivers/gpu/drm/drm_atomic_helper.c        | 47 +++++++++++++++--------
-> >>  drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
-> >>  drivers/gpu/drm/rcar-du/rcar_du_kms.c      | 18 +---------
-> > 
-> > I've submitted "[PATCH] drm: rcar-du: Setup planes before enabling CRTC to
-> > avoid flicker" that changes the rcar-du implementation to the standard
-> > disable/update planes/enable order, so I'd appreciate if you could drop
-> > the rcar-du part of this patch to avoid conflicts.
-> 
-> I will.
-> 
-> > This being said, the reason why I switched back from the "runtime PM" to
-> > the "standard" order is probably of interest to you. Quoting the commit
-> > message,
-> >
-> >> Commit 52055bafa1ff ("drm: rcar-du: Move plane commit code from CRTC
-> >> start to CRTC resume") changed the order of the plane commit and CRTC
-> >> enable operations to accommodate the runtime PM requirements. However,
-> >> this introduced corruption in the first displayed frame, as the CRTC is
-> >> now enabled without any plane configured. On Gen2 hardware the first
-> >> frame will be black and likely unnoticed, but on Gen3 hardware we end up
-> >> starting the display before the VSP compositor, which is more
-> >> noticeable.
-> >> 
-> >> To fix this, revert the order of the commit operations back, and handle
-> >> runtime PM requirements in the CRTC .atomic_begin() and .atomic_enable()
-> >> helper operation handlers.
-> > 
-> > I believe that the "runtime PM" order is problematic in most drivers. The
-> > problem usually goes unnoticed as most monitors will not even display the
-> > first frame, and I assume many devices will just output it black, but it's
-> > an issue nonetheless.
-> > 
-> > Note that my driver hasn't lost the "runtime PM" requirements, so I had to
-> > support them with the "standard" order. The best way I've found was to
-> > runtime resume in the one of .atomic_begin() and .enable() that is run
-> > first. Not very neat, as similar code would be needed in most drivers. I
-> > wonder whether it wouldn't be useful to add resume/suspend helper
-> > callbacks for the CRTC.
-> 
-> I'm not sure it would apply. Our driver doesn't use runtime_pm at all,
-> but in order for the commits to happen, we need to have the CRTC
-> active, but it will remain powered up the whole time. I'm not sure if
-> we'll ever see such a frame.
-> 
-> But since this seems to be a pretty generic, maybe we should address
-> it in the helper itself?
+Fix this by making sure all clk_get_rate implementations handle
+NULL clocks instead of OOPSing.
 
-I think that would make sense.
+While some custom implementations even allow ERR_PTR()s, I decided
+against that as IIRC the usual idea is that errors should be handled and
+not silently carried over.
 
-There are a few options that result in too many combinations for separate 
-commit tail helpers to be provided in my opinion:
+Cc: adi-buildroot-devel at lists.sourceforge.net
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-m68k at lists.linux-m68k.org
+Cc: linux-mips at linux-mips.org
 
-- disable/enable/planes vs. disable/planes/enable
-- DRM_PLANE_COMMIT_ACTIVE_ONLY vs. all CRTCs
-- drm_atomic_helper_wait_for_vblanks vs drm_atomic_helper_wait_for_flip_done
+Jonas Gorski (9):
+  ARM: ep93xx: allow NULL clock for clk_get_rate
+  ARM: mmp: allow NULL clock for clk_get_rate
+  blackfin: bf609: allow NULL clock for clk_get_rate
+  m68k: allow NULL clock for clk_get_rate
+  MIPS: AR7: allow NULL clock for clk_get_rate
+  MIPS: BCM63XX: allow NULL clock for clk_get_rate
+  MIPS: Loongson 2F: allow NULL clock for clk_get_rate
+  MIPS: ralink: allow NULL clock for clk_get_rate
+  unicore32: allow NULL clock for clk_get_rate
 
-Maybe we could add a few CRTC commit helper flags along the line of 
-DRM_PLANE_COMMIT_ACTIVE_ONLY, add a field to the drm_crtc structure to store 
-them, and have drm_atomic_helper_commit_tail() use those flags to control the 
-sequence of operations.
+ arch/arm/mach-ep93xx/clock.c           | 3 +++
+ arch/arm/mach-mmp/clock.c              | 4 +++-
+ arch/blackfin/mach-bf609/clock.c       | 2 +-
+ arch/m68k/coldfire/clk.c               | 3 +++
+ arch/mips/ar7/clock.c                  | 3 +++
+ arch/mips/bcm63xx/clk.c                | 3 +++
+ arch/mips/loongson64/lemote-2f/clock.c | 3 +++
+ arch/mips/ralink/clk.c                 | 3 +++
+ arch/unicore32/kernel/clock.c          | 3 +++
+ 9 files changed, 25 insertions(+), 2 deletions(-)
 
 -- 
-Regards,
-
-Laurent Pinchart
+2.11.0
