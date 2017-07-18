@@ -1,55 +1,209 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Tue, 18 Jul 2017 10:28:07 +0800
-Subject: [PATCH v3 0/7] drm/rockchip: add all full framework vop support
-Message-ID: <1500344888-28165-1-git-send-email-mark.yao@rock-chips.com>
+Date: Tue, 18 Jul 2017 10:28:18 +0800
+Subject: [PATCH v3 1/7] drm/rockchip: vop: initialize registers directly
+In-Reply-To: <1500344888-28165-1-git-send-email-mark.yao@rock-chips.com>
+References: <1500344888-28165-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1500344898-28215-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches try to make all current rockchip full framework vop works
-on drm, fill missing vop on full framework.
-Vop Full framework now has following vops:
-IP version    chipname
-      3.1           rk3288
-      3.2           rk3368
-      3.4           rk3366
-      3.5           rk3399 big
-      3.6           rk3399 lit
-      3.7           rk3228
-      3.8           rk3328
+At present we are using init_table to initialize some
+registers, but the Register init table use un-document define,
+it is unreadable, and sometimes we only want to update tiny
+bits, init table method is not friendly, it's diffcult to
+reuse for difference chips.
 
-Group the vop register, it would make register  definition clearer and
-more easily to reuse same group register define for difference vops.
-
-Tested on rk3399 excavator board with kernel 4.12-rc1.
-
-And other chips works find on rockchip kernel 4.4:
-   https://github.com/rockchip-linux/kernel/tree/release-4.4/drivers/gpu/drm/rockchip
+To make it clean, initialize registers directly, and drops
+init_table mechanism out.
 
 Changes in v3:
-- group vop register instead using VOP_REG_VER mechanism
-- move write_relaxed flags to vop registers
-- Explain more on patch commit message
-- fix rk3328 overlay abnormal
+- Explain more in details
 
-Changes in v2:
-- rename rk322x to rk3228(Heiko St?bner)
-- correct some vop registers define
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  6 ++--
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 10 ++-----
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 43 +++--------------------------
+ 3 files changed, 10 insertions(+), 49 deletions(-)
 
-Mark Yao (7):
-  drm/rockchip: vop: initialize registers directly
-  drm/rockchip: vop: move write_relaxed flags to vop register
-  drm/rockchip: vop: move line_flag_num to interrupt registers
-  drm/rockchip: vop: group vop registers
-  drm/rockchip: vop: add a series of vop support
-  dt-bindings: display: fill Documents for series of vop
-  drm/rockchip: vop: rk3328: fix overlay abnormal
-
- .../bindings/display/rockchip/rockchip-vop.txt     |   4 +
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 109 ++-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |  81 +-
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c        | 374 ++++++---
- drivers/gpu/drm/rockchip/rockchip_vop_reg.h        | 905 ++++++++++++++++-----
- 5 files changed, 1074 insertions(+), 399 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 45589d6..7a5f809 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1393,7 +1393,6 @@ static void vop_destroy_crtc(struct vop *vop)
+ static int vop_initial(struct vop *vop)
+ {
+ 	const struct vop_data *vop_data = vop->data;
+-	const struct vop_reg_data *init_table = vop_data->init_table;
+ 	struct reset_control *ahb_rst;
+ 	int i, ret;
+ 
+@@ -1453,13 +1452,14 @@ static int vop_initial(struct vop *vop)
+ 
+ 	memcpy(vop->regsbak, vop->regs, vop->len);
+ 
+-	for (i = 0; i < vop_data->table_size; i++)
+-		vop_writel(vop, init_table[i].offset, init_table[i].value);
++	VOP_CTRL_SET(vop, global_regdone_en, 1);
++	VOP_CTRL_SET(vop, dsp_blank, 0);
+ 
+ 	for (i = 0; i < vop_data->win_size; i++) {
+ 		const struct vop_win_data *win = &vop_data->win[i];
+ 
+ 		VOP_WIN_SET(vop, win, enable, 0);
++		VOP_WIN_SET(vop, win, gate, 1);
+ 	}
+ 
+ 	vop_cfg_done(vop);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+index 9979fd0..084d3b2 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+@@ -24,11 +24,6 @@ enum vop_data_format {
+ 	VOP_FMT_YUV444SP,
+ };
+ 
+-struct vop_reg_data {
+-	uint32_t offset;
+-	uint32_t value;
+-};
+-
+ struct vop_reg {
+ 	uint32_t offset;
+ 	uint32_t shift;
+@@ -46,6 +41,7 @@ struct vop_ctrl {
+ 	struct vop_reg hdmi_en;
+ 	struct vop_reg mipi_en;
+ 	struct vop_reg dp_en;
++	struct vop_reg dsp_blank;
+ 	struct vop_reg out_mode;
+ 	struct vop_reg dither_down;
+ 	struct vop_reg dither_up;
+@@ -65,6 +61,7 @@ struct vop_ctrl {
+ 
+ 	struct vop_reg line_flag_num[2];
+ 
++	struct vop_reg global_regdone_en;
+ 	struct vop_reg cfg_done;
+ };
+ 
+@@ -115,6 +112,7 @@ struct vop_win_phy {
+ 	uint32_t nformats;
+ 
+ 	struct vop_reg enable;
++	struct vop_reg gate;
+ 	struct vop_reg format;
+ 	struct vop_reg rb_swap;
+ 	struct vop_reg act_info;
+@@ -136,8 +134,6 @@ struct vop_win_data {
+ };
+ 
+ struct vop_data {
+-	const struct vop_reg_data *init_table;
+-	unsigned int table_size;
+ 	const struct vop_ctrl *ctrl;
+ 	const struct vop_intr *intr;
+ 	const struct vop_win_data *win;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index bafd698..00e9d79 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -127,13 +127,7 @@
+ 	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
+ };
+ 
+-static const struct vop_reg_data rk3036_vop_init_reg_table[] = {
+-	{RK3036_DSP_CTRL1, 0x00000000},
+-};
+-
+ static const struct vop_data rk3036_vop = {
+-	.init_table = rk3036_vop_init_reg_table,
+-	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
+ 	.ctrl = &rk3036_ctrl_data,
+ 	.intr = &rk3036_intr,
+ 	.win = rk3036_vop_win_data,
+@@ -193,7 +187,8 @@
+ static const struct vop_win_phy rk3288_win23_data = {
+ 	.data_formats = formats_win_lite,
+ 	.nformats = ARRAY_SIZE(formats_win_lite),
+-	.enable = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 0),
++	.enable = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 4),
++	.gate = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 0),
+ 	.format = VOP_REG(RK3288_WIN2_CTRL0, 0x7, 1),
+ 	.rb_swap = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 12),
+ 	.dsp_info = VOP_REG(RK3288_WIN2_DSP_INFO0, 0x0fff0fff, 0),
+@@ -215,6 +210,7 @@
+ 	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0xf, 1),
+ 	.dither_up = VOP_REG(RK3288_DSP_CTRL1, 0x1, 6),
+ 	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
++	.dsp_blank = VOP_REG(RK3288_DSP_CTRL0, 0x3, 18),
+ 	.out_mode = VOP_REG(RK3288_DSP_CTRL0, 0xf, 0),
+ 	.pin_pol = VOP_REG(RK3288_DSP_CTRL0, 0xf, 4),
+ 	.htotal_pw = VOP_REG(RK3288_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
+@@ -224,22 +220,10 @@
+ 	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
+ 	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
+ 	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
++	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
+ 	.cfg_done = VOP_REG(RK3288_REG_CFG_DONE, 0x1, 0),
+ };
+ 
+-static const struct vop_reg_data rk3288_init_reg_table[] = {
+-	{RK3288_SYS_CTRL, 0x00c00000},
+-	{RK3288_DSP_CTRL0, 0x00000000},
+-	{RK3288_WIN0_CTRL0, 0x00000080},
+-	{RK3288_WIN1_CTRL0, 0x00000080},
+-	/* TODO: Win2/3 support multiple area function, but we haven't found
+-	 * a suitable way to use it yet, so let's just use them as other windows
+-	 * with only area 0 enabled.
+-	 */
+-	{RK3288_WIN2_CTRL0, 0x00000010},
+-	{RK3288_WIN3_CTRL0, 0x00000010},
+-};
+-
+ /*
+  * Note: rk3288 has a dedicated 'cursor' window, however, that window requires
+  * special support to get alpha blending working.  For now, just use overlay
+@@ -273,8 +257,6 @@
+ };
+ 
+ static const struct vop_data rk3288_vop = {
+-	.init_table = rk3288_init_reg_table,
+-	.table_size = ARRAY_SIZE(rk3288_init_reg_table),
+ 	.feature = VOP_FEATURE_OUTPUT_RGB10,
+ 	.intr = &rk3288_vop_intr,
+ 	.ctrl = &rk3288_ctrl_data,
+@@ -328,22 +310,7 @@
+ 	.clear = VOP_REG_MASK(RK3399_INTR_CLEAR0, 0xffff, 0),
+ };
+ 
+-static const struct vop_reg_data rk3399_init_reg_table[] = {
+-	{RK3399_SYS_CTRL, 0x2000f800},
+-	{RK3399_DSP_CTRL0, 0x00000000},
+-	{RK3399_WIN0_CTRL0, 0x00000080},
+-	{RK3399_WIN1_CTRL0, 0x00000080},
+-	/* TODO: Win2/3 support multiple area function, but we haven't found
+-	 * a suitable way to use it yet, so let's just use them as other windows
+-	 * with only area 0 enabled.
+-	 */
+-	{RK3399_WIN2_CTRL0, 0x00000010},
+-	{RK3399_WIN3_CTRL0, 0x00000010},
+-};
+-
+ static const struct vop_data rk3399_vop_big = {
+-	.init_table = rk3399_init_reg_table,
+-	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
+ 	.feature = VOP_FEATURE_OUTPUT_RGB10,
+ 	.intr = &rk3399_vop_intr,
+ 	.ctrl = &rk3399_ctrl_data,
+@@ -362,8 +329,6 @@
+ };
+ 
+ static const struct vop_data rk3399_vop_lit = {
+-	.init_table = rk3399_init_reg_table,
+-	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
+ 	.intr = &rk3399_vop_intr,
+ 	.ctrl = &rk3399_ctrl_data,
+ 	/*
 -- 
 1.9.1
