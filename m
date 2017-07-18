@@ -1,287 +1,122 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 18 Jul 2017 13:44:41 +0100
-Subject: [PATCH 1/2] iommu/arm-smmu: Track context bank state
-Message-ID: <71247263f4d88e7776f483fb1cc1139b516c0835.1500381551.git.robin.murphy@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 18 Jul 2017 15:47:29 +0300
+Subject: [PATCH 1/4] drm/atomic: implement drm_atomic_helper_commit_tail
+ for runtime_pm users
+In-Reply-To: <20170718120839.k7zsey67qgrtnfwe@phenom.ffwll.local>
+References: <cover.75b0c7f741ed33015a7ad44941bed1f6152a48a9.1499956639.git-series.maxime.ripard@free-electrons.com>
+ <10955632.YI7NJnTkKU@avalon>
+ <20170718120839.k7zsey67qgrtnfwe@phenom.ffwll.local>
+Message-ID: <2697690.BvagR2OUgd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Echoing what we do for Stream Map Entries, maintain a software shadow
-state for context bank configuration. With this in place, we are mere
-moments away from blissfully easy suspend/resume support.
+Hi Daniel,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+On Tuesday 18 Jul 2017 14:08:39 Daniel Vetter wrote:
+> On Tue, Jul 18, 2017 at 01:14:12PM +0300, Laurent Pinchart wrote:
+> > On Tuesday 18 Jul 2017 09:05:22 Maxime Ripard wrote:
+> >> On Fri, Jul 14, 2017 at 02:43:12AM +0300, Laurent Pinchart wrote:
+> >>> On Thursday 13 Jul 2017 16:41:13 Maxime Ripard wrote:
+> >>>> The current drm_atomic_helper_commit_tail helper works only if the
+> >>>> CRTC is accessible, and documents an alternative implementation that
+> >>>> is supposed to be used if that happens.
+> >>>> 
+> >>>> That implementation is then duplicated by some drivers. Instead of
+> >>>> documenting it, let's implement an helper that all the relevant users
+> >>>> can use directly.
+> >>>> 
+> >>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >>>> ---
+> >>>> 
+> >>>>  drivers/gpu/drm/drm_atomic_helper.c        | 47 +++++++++++++--------
+> >>>>  drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
+> >>>>  drivers/gpu/drm/rcar-du/rcar_du_kms.c      | 18 +---------
+> >>> 
+> >>> I've submitted "[PATCH] drm: rcar-du: Setup planes before enabling
+> >>> CRTC to avoid flicker" that changes the rcar-du implementation to the
+> >>> standard disable/update planes/enable order, so I'd appreciate if you
+> >>> could drop the rcar-du part of this patch to avoid conflicts.
+> >> 
+> >> I will.
+> >> 
+> >>> This being said, the reason why I switched back from the "runtime PM"
+> >>> to the "standard" order is probably of interest to you. Quoting the
+> >>> commit message,
+> >>> 
+> >>>> Commit 52055bafa1ff ("drm: rcar-du: Move plane commit code from CRTC
+> >>>> start to CRTC resume") changed the order of the plane commit and CRTC
+> >>>> enable operations to accommodate the runtime PM requirements.
+> >>>> However, this introduced corruption in the first displayed frame, as
+> >>>> the CRTC is now enabled without any plane configured. On Gen2
+> >>>> hardware the first frame will be black and likely unnoticed, but on
+> >>>> Gen3 hardware we end up starting the display before the VSP
+> >>>> compositor, which is more noticeable.
+> >>>> 
+> >>>> To fix this, revert the order of the commit operations back, and
+> >>>> handle runtime PM requirements in the CRTC .atomic_begin() and
+> >>>> .atomic_enable() helper operation handlers.
+> >>> 
+> >>> I believe that the "runtime PM" order is problematic in most drivers.
+> >>> The problem usually goes unnoticed as most monitors will not even
+> >>> display the first frame, and I assume many devices will just output it
+> >>> black, but it's an issue nonetheless.
+> >>> 
+> >>> Note that my driver hasn't lost the "runtime PM" requirements, so I
+> >>> had to support them with the "standard" order. The best way I've found
+> >>> was to runtime resume in the one of .atomic_begin() and .enable() that
+> >>> is run first. Not very neat, as similar code would be needed in most
+> >>> drivers. I wonder whether it wouldn't be useful to add resume/suspend
+> >>> helper callbacks for the CRTC.
+> >> 
+> >> I'm not sure it would apply. Our driver doesn't use runtime_pm at all,
+> >> but in order for the commits to happen, we need to have the CRTC
+> >> active, but it will remain powered up the whole time. I'm not sure if
+> >> we'll ever see such a frame.
+> >> 
+> >> But since this seems to be a pretty generic, maybe we should address
+> >> it in the helper itself?
+> > 
+> > I think that would make sense.
+> > 
+> > There are a few options that result in too many combinations for separate
+> > commit tail helpers to be provided in my opinion:
+> > 
+> > - disable/enable/planes vs. disable/planes/enable
+> > - DRM_PLANE_COMMIT_ACTIVE_ONLY vs. all CRTCs
+> > - drm_atomic_helper_wait_for_vblanks vs
+> > drm_atomic_helper_wait_for_flip_done
+> > 
+> > Maybe we could add a few CRTC commit helper flags along the line of
+> > DRM_PLANE_COMMIT_ACTIVE_ONLY, add a field to the drm_crtc structure to
+> > store them, and have drm_atomic_helper_commit_tail() use those flags to
+> > control the sequence of operations.
+> 
+> Why not write your own? Yes it's a bit of copypaste, but imo that's really
+> not horrible.
 
-Since the runtime PM discussion has come back again, I figured it was
-probably about time to finish off my plan for system PM. Lightly tested
-on Juno (MMU-401) with hibernation.
+I don't find it horrible either, it's not too much code. The question was more 
+about which version(s) to consider standard enough to provide a core helper 
+for.
 
-Robin.
+What bothers me a bit more with the copy&paste implementations isn't so much 
+the commit tail handling itself, but the consequences it has on the rest of 
+the driver. Drivers pick the order they want based on their requirements, and 
+that order then leads to different race conditions between the drivers. We 
+don't document the potential issues there, so new drivers (and for that 
+matter, possibly existing ones) will likely have bugs if the author is not 
+aware of the subtle issues related to the particular operation order they 
+happen to use.
 
- drivers/iommu/arm-smmu.c | 159 +++++++++++++++++++++++++++++------------------
- 1 file changed, 97 insertions(+), 62 deletions(-)
+> I'm already not happy with the flags for commit_planes because the docs for
+> them are not great and it's hard to know when to use them and when not to.
+> 
+> ->commit_tail was specifically done to allow drivers to overwrite the hw
+> commit stage without having to reinvent all the other commit tracking. I
+> expect most non-simple drivers to have their own commit_tail function.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index bc89b4d6c043..86897b7b81d8 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -338,6 +338,13 @@ struct arm_smmu_smr {
- 	bool				valid;
- };
- 
-+struct arm_smmu_cb {
-+	u64				ttbr[2];
-+	u32				tcr[2];
-+	u32				mair[2];
-+	struct arm_smmu_cfg		*cfg;
-+};
-+
- struct arm_smmu_master_cfg {
- 	struct arm_smmu_device		*smmu;
- 	s16				smendx[];
-@@ -380,6 +387,7 @@ struct arm_smmu_device {
- 	u32				num_context_banks;
- 	u32				num_s2_context_banks;
- 	DECLARE_BITMAP(context_map, ARM_SMMU_MAX_CBS);
-+	struct arm_smmu_cb		*cbs;
- 	atomic_t			irptndx;
- 
- 	u32				num_mapping_groups;
-@@ -768,17 +776,69 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
- static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 				       struct io_pgtable_cfg *pgtbl_cfg)
- {
--	u32 reg, reg2;
--	u64 reg64;
--	bool stage1;
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
--	struct arm_smmu_device *smmu = smmu_domain->smmu;
-+	struct arm_smmu_cb *cb = &smmu_domain->smmu->cbs[cfg->cbndx];
-+	bool stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
-+
-+	cb->cfg = cfg;
-+
-+	/* TTBCR */
-+	if (stage1) {
-+		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-+			cb->tcr[0] = pgtbl_cfg->arm_v7s_cfg.tcr;
-+		} else {
-+			cb->tcr[0] = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
-+			cb->tcr[1] = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
-+			cb->tcr[1] |= TTBCR2_SEP_UPSTREAM;
-+			if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-+				cb->tcr[1] |= TTBCR2_AS;
-+		}
-+	} else {
-+		cb->tcr[0] = pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
-+	}
-+
-+	/* TTBRs */
-+	if (stage1) {
-+		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-+			cb->ttbr[0] = pgtbl_cfg->arm_v7s_cfg.ttbr[0];
-+			cb->ttbr[1] = pgtbl_cfg->arm_v7s_cfg.ttbr[1];
-+		} else {
-+			cb->ttbr[0] = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-+			cb->ttbr[1] = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-+		}
-+	} else {
-+		cb->ttbr[0] = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-+	}
-+
-+	/* MAIRs (stage-1 only) */
-+	if (stage1) {
-+		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-+			cb->mair[0] = pgtbl_cfg->arm_v7s_cfg.prrr;
-+			cb->mair[1] = pgtbl_cfg->arm_v7s_cfg.nmrr;
-+		} else {
-+			cb->mair[0] = pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
-+			cb->mair[1] = pgtbl_cfg->arm_lpae_s1_cfg.mair[1];
-+		}
-+	}
-+}
-+
-+static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
-+{
-+	u32 reg;
-+	bool stage1;
-+	struct arm_smmu_cb *cb = &smmu->cbs[idx];
-+	struct arm_smmu_cfg *cfg = cb->cfg;
-+	struct arm_smmu_cfg default_cfg = {0};
- 	void __iomem *cb_base, *gr1_base;
- 
-+	if (!cfg)
-+		cfg = &default_cfg;
-+
- 	gr1_base = ARM_SMMU_GR1(smmu);
- 	stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
--	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
-+	cb_base = ARM_SMMU_CB(smmu, idx);
- 
-+	/* CBA2R */
- 	if (smmu->version > ARM_SMMU_V1) {
- 		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
- 			reg = CBA2R_RW64_64BIT;
-@@ -788,7 +848,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 		if (smmu->features & ARM_SMMU_FEAT_VMID16)
- 			reg |= cfg->vmid << CBA2R_VMID_SHIFT;
- 
--		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
-+		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(idx));
- 	}
- 
- 	/* CBAR */
-@@ -807,72 +867,43 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 		/* 8-bit VMIDs live in CBAR */
- 		reg |= cfg->vmid << CBAR_VMID_SHIFT;
- 	}
--	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
-+	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(idx));
- 
- 	/*
- 	 * TTBCR
- 	 * We must write this before the TTBRs, since it determines the
- 	 * access behaviour of some fields (in particular, ASID[15:8]).
- 	 */
--	if (stage1) {
--		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
--			reg = pgtbl_cfg->arm_v7s_cfg.tcr;
--			reg2 = 0;
--		} else {
--			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
--			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
--			reg2 |= TTBCR2_SEP_UPSTREAM;
--			if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
--				reg2 |= TTBCR2_AS;
--		}
--		if (smmu->version > ARM_SMMU_V1)
--			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
--	} else {
--		reg = pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
--	}
--	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBCR);
-+	if (stage1 && smmu->version > ARM_SMMU_V1)
-+		writel_relaxed(cb->tcr[1], cb_base + ARM_SMMU_CB_TTBCR2);
-+	writel_relaxed(cb->tcr[0], cb_base + ARM_SMMU_CB_TTBCR);
- 
- 	/* TTBRs */
--	if (stage1) {
--		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
--			reg = pgtbl_cfg->arm_v7s_cfg.ttbr[0];
--			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0);
--			reg = pgtbl_cfg->arm_v7s_cfg.ttbr[1];
--			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1);
--			writel_relaxed(cfg->asid, cb_base + ARM_SMMU_CB_CONTEXTIDR);
--		} else {
--			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
--			reg64 |= (u64)cfg->asid << TTBRn_ASID_SHIFT;
--			writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
--			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
--			reg64 |= (u64)cfg->asid << TTBRn_ASID_SHIFT;
--			writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR1);
--		}
-+	if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-+		writel_relaxed(cfg->asid, cb_base + ARM_SMMU_CB_CONTEXTIDR);
-+		writel_relaxed(cb->ttbr[0], cb_base + ARM_SMMU_CB_TTBR0);
-+		writel_relaxed(cb->ttbr[1], cb_base + ARM_SMMU_CB_TTBR1);
- 	} else {
--		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
--		writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
-+		writeq_relaxed(cb->ttbr[0], cb_base + ARM_SMMU_CB_TTBR0);
-+		writeq_relaxed(cb->ttbr[1], cb_base + ARM_SMMU_CB_TTBR1);
- 	}
- 
- 	/* MAIRs (stage-1 only) */
- 	if (stage1) {
--		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
--			reg = pgtbl_cfg->arm_v7s_cfg.prrr;
--			reg2 = pgtbl_cfg->arm_v7s_cfg.nmrr;
--		} else {
--			reg = pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
--			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.mair[1];
--		}
--		writel_relaxed(reg, cb_base + ARM_SMMU_CB_S1_MAIR0);
--		writel_relaxed(reg2, cb_base + ARM_SMMU_CB_S1_MAIR1);
-+		writel_relaxed(cb->mair[0], cb_base + ARM_SMMU_CB_S1_MAIR0);
-+		writel_relaxed(cb->mair[1], cb_base + ARM_SMMU_CB_S1_MAIR1);
- 	}
- 
- 	/* SCTLR */
--	reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
--	if (stage1)
--		reg |= SCTLR_S1_ASIDPNE;
--#ifdef __BIG_ENDIAN
--	reg |= SCTLR_E;
--#endif
-+	if (!cb->cfg) {
-+		reg = 0;
-+	} else {
-+		reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
-+		if (stage1)
-+			reg |= SCTLR_S1_ASIDPNE;
-+		if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
-+			reg |= SCTLR_E;
-+	}
- 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_SCTLR);
- }
- 
-@@ -1035,6 +1066,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 
- 	/* Initialise the context bank with our page table cfg */
- 	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
-+	arm_smmu_write_context_bank(smmu, cfg->cbndx);
- 
- 	/*
- 	 * Request context fault interrupt. Do this last to avoid the
-@@ -1067,7 +1099,6 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
--	void __iomem *cb_base;
- 	int irq;
- 
- 	if (!smmu || domain->type == IOMMU_DOMAIN_IDENTITY)
-@@ -1077,8 +1108,8 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- 	 * Disable the context bank and free the page tables before freeing
- 	 * it.
- 	 */
--	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
--	writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
-+	smmu->cbs[cfg->cbndx] = (struct arm_smmu_cb){0};
-+	arm_smmu_write_context_bank(smmu, cfg->cbndx);
- 
- 	if (cfg->irptndx != INVALID_IRPTNDX) {
- 		irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
-@@ -1722,7 +1753,6 @@ static struct iommu_ops arm_smmu_ops = {
- static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- {
- 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
--	void __iomem *cb_base;
- 	int i;
- 	u32 reg, major;
- 
-@@ -1758,8 +1788,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 
- 	/* Make sure all context banks are disabled and clear CB_FSR  */
- 	for (i = 0; i < smmu->num_context_banks; ++i) {
--		cb_base = ARM_SMMU_CB(smmu, i);
--		writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
-+		void __iomem *cb_base = ARM_SMMU_CB(smmu, i);
-+
-+		arm_smmu_write_context_bank(smmu, i);
- 		writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
- 		/*
- 		 * Disable MMU-500's not-particularly-beneficial next-page
-@@ -1964,6 +1995,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		smmu->cavium_id_base -= smmu->num_context_banks;
- 		dev_notice(smmu->dev, "\tenabling workaround for Cavium erratum 27704\n");
- 	}
-+	smmu->cbs = devm_kcalloc(smmu->dev, smmu->num_context_banks,
-+				 sizeof(*smmu->cbs), GFP_KERNEL);
-+	if (!smmu->cbs)
-+		return -ENOMEM;
- 
- 	/* ID2 */
- 	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID2);
+Maybe that should be all of them instead of most of them ?
+
 -- 
-2.12.2.dirty
+Regards,
+
+Laurent Pinchart
