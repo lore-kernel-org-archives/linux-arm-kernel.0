@@ -1,59 +1,33 @@
-From: ore@pengutronix.de (Oleksij Rempel)
-Date: Tue, 18 Jul 2017 06:53:54 +0200
-Subject: [PATCH v6 0/6] provide power off support for iMX6 with external
- PMIC
-In-Reply-To: <20170620140910.7568-1-o.rempel@pengutronix.de>
-References: <20170620140910.7568-1-o.rempel@pengutronix.de>
-Message-ID: <c64ce8db-eea6-3709-9c97-fda16e93481a@pengutronix.de>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 18 Jul 2017 06:59:02 +0200
+Subject: [PATCH v2 0/5] ARM: defconfig: Cleanup from old entries
+Message-ID: <1500353947-26122-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo all,
+Hi,
 
-Here Gentle Ping to the Old King
+Changes since v1:
+1. Rebase on Simon Horman's repo to avoid duplication.
+2. Add Liviu Dudau's ack for vexpress.
 
-DT is already ACKed.
+Best regards,
+Krzysztof
 
-On 20.06.2017 16:09, Oleksij Rempel wrote:
-> This patch series is providing power off support for Freescale/NXP iMX6 based
-> boards with external power management integrated circuit (PMIC).
->
-> changes:
-> v6:
->  - rename imx6_pm_poweroff to imx6_pm_stby_poweroff
->  - fix "MPIC_STBY_REQ" typo in the comment.
->
-> v5:
->  - remove useless includes from pm-imx6.c patch
->  - add Acked-by to "regulator: pfuze100: add fsl,pmic-stby-poweroff property"
->    patch
->
-> v4:
->  - update comment in "regulator: pfuze100: add fsl,pmic-stby-poweroff ..."
->    patch
->  - add Acked-by to "ARM: imx6q: provide documentation for new ..."
->    patch
->
-> v3:
->  - set pm_power_off_prepare = NULL on .remove.
->  - documentation and spelling fixes.
->  - use %pf instead of lookup_symbol_name.
->
-> Oleksij Rempel (6):
->   ARM: imx6q: provide documentation for new fsl,pmic-stby-poweroff
->     property
->   ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff"
->     is set
->   kernel/reboot.c: export pm_power_off_prepare
->   regulator: pfuze100: add fsl,pmic-stby-poweroff property
->   regulator: pfuze100-regulator: provide pm_power_off_prepare handler
->   ARM: dts: imx6: RIoTboard provide standby on power off option
->
->  .../devicetree/bindings/clock/imx6q-clock.txt      |  8 ++
->  .../devicetree/bindings/regulator/pfuze100.txt     |  7 ++
->  arch/arm/boot/dts/imx6dl-riotboard.dts             |  5 ++
->  arch/arm/mach-imx/pm-imx6.c                        | 25 ++++++
->  drivers/regulator/pfuze100-regulator.c             | 92 ++++++++++++++++++++++
->  kernel/reboot.c                                    |  1 +
->  6 files changed, 138 insertions(+)
->
+
+Krzysztof Kozlowski (5):
+  ARM: multi_v7_defconfig: Cleanup from non-existing options
+  ARM: ixp4xx_defconfig: Cleanup from non-existing options
+  ARM: vexpress_defconfig: Cleanup from non-existing options
+  ARM: ezx_defconfig: Cleanup from non-existing options
+  ARM: qcom_defconfig: Cleanup from non-existing options
+
+ arch/arm/configs/ezx_defconfig      | 1 -
+ arch/arm/configs/ixp4xx_defconfig   | 4 ----
+ arch/arm/configs/multi_v7_defconfig | 7 -------
+ arch/arm/configs/qcom_defconfig     | 1 -
+ arch/arm/configs/vexpress_defconfig | 1 -
+ 5 files changed, 14 deletions(-)
+
+-- 
+2.7.4
