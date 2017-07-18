@@ -1,57 +1,42 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Tue, 18 Jul 2017 10:00:35 -0500
-Subject: [PATCH 1/4] ARM: dts: keystone-k2g: Add PMMC node to support
- TI-SCI protocol
-In-Reply-To: <20170718032844.29490-2-s-anna@ti.com>
-References: <20170718032844.29490-1-s-anna@ti.com>
- <20170718032844.29490-2-s-anna@ti.com>
-Message-ID: <8b8c4eff-4f18-f0d2-e075-389921e5a990@ti.com>
+From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Tue, 18 Jul 2017 18:30:46 +0300
+Subject: [PATCH 0/4] crypto: caam - add Job Ring support for DPAA2 parts
+Message-ID: <20170718153050.15330-1-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2017 10:28 PM, Suman Anna wrote:
-> From: Nishanth Menon <nm@ti.com>
-> 
-> Texas Instrument's System Control Interface (TI-SCI) Message Protocol
-> is implemented in Keystone 2 generation 66AK2G SoC with the PMMC entity.
-> 
-> Add the ti-sci node representing this 66AK2G PMMC module.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> [s-anna at ti.com: add unit address to DT node]
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  arch/arm/boot/dts/keystone-k2g.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-> index a789f75a1ed5..7f0f4180b373 100644
-> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
-> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-> @@ -139,5 +139,19 @@
->  			interrupts = <GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH>,
->  				     <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
->  		};
-> +
-> +		pmmc: pmmc at 02921c00 {
-> +			compatible = "ti,k2g-sci";
-> +			/*
-> +			 * In case of rare platforms that does not use k2g as
-> +			 * system master, use /delete-property/
-> +			 */
+This patch set adds support for CAAM's legacy Job Ring backend / interface
+on platforms having DPAA2 (Datapath Acceleration Architecture v2), like
+LS1088A or LS2088A.
 
-This comment seems mis-worded, I believe this was meant to say "for
-platforms that do not use the *PMMC* as the system master".
+I would like to get the DT patches through the crypto list (to make sure
+they don't end up merged before driver support).
 
-Andrew
+Thanks,
+Horia
 
-> +			ti,system-reboot-controller;
-> +			mbox-names = "rx", "tx";
-> +			mboxes= <&msgmgr 5 2>,
-> +				<&msgmgr 0 0>;
-> +			reg-names = "debug_messages";
-> +			reg = <0x02921c00 0x400>;
-> +		};
->  	};
->  };
-> 
+Horia Geant? (4):
+  crypto: caam/jr - add support for DPAA2 parts
+  arm64: dts: freescale: ls208xa: share aliases node
+  arm64: dts: freescale: ls208xa: add crypto node
+  arm64: dts: freescale: ls1088a: add crypto node
+
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     | 43 ++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  |  5 --
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts  |  5 --
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts |  5 --
+ arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts  |  5 --
+ arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts  |  5 --
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     | 46 ++++++++++++
+ drivers/crypto/caam/caamhash.c                     |  7 +-
+ drivers/crypto/caam/ctrl.c                         | 45 +++++++-----
+ drivers/crypto/caam/ctrl.h                         |  2 +
+ drivers/crypto/caam/jr.c                           |  7 +-
+ drivers/crypto/caam/regs.h                         |  1 +
+ drivers/crypto/caam/sg_sw_qm2.h                    | 81 ++++++++++++++++++++++
+ drivers/crypto/caam/sg_sw_sec4.h                   | 30 ++++++--
+ 14 files changed, 237 insertions(+), 50 deletions(-)
+ create mode 100644 drivers/crypto/caam/sg_sw_qm2.h
+
+-- 
+2.12.0.264.gd6db3f216544
