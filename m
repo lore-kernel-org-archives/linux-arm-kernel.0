@@ -1,26 +1,28 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 18 Jul 2017 07:15:13 +0200
-Subject: [PATCH] arm64: dts: exynos: remove num-slots from exynos platforms
-In-Reply-To: <1499159859-67028-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1499159859-67028-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <20170718051513.GB22637@kozik-book>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Tue, 18 Jul 2017 14:24:32 +0900
+Subject: [PATCH] arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
+Message-ID: <1500355472-27521-1-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 04, 2017 at 05:17:39PM +0800, Shawn Lin wrote:
-> dwmmc driver deprecated num-slots and plan to get rid
-> of it finally. Just move a step to cleanup it from DT.
-> 
-> Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
-> 
->  arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 2 --
->  arch/arm64/boot/dts/exynos/exynos7-espresso.dts       | 2 --
->  2 files changed, 4 deletions(-)
-> 
+Enable the watchdog driver for UniPhier SoC
 
-Thanks, applied.
+Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6c7d147..5d204a4 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -310,6 +310,7 @@ CONFIG_WATCHDOG=y
+ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MESON_GXBB_WATCHDOG=m
+ CONFIG_MESON_WATCHDOG=m
++CONFIG_UNIPHIER_WATCHDOG=y
+ CONFIG_RENESAS_WDT=y
+ CONFIG_BCM2835_WDT=y
+ CONFIG_MFD_CROS_EC=y
+-- 
+2.7.4
