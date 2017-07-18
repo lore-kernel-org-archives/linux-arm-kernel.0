@@ -1,58 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 18 Jul 2017 15:34:13 +0200
-Subject: [PATCH 1/3] arm64: dts: marvell: use ICU for the CP110 slave RTC
-In-Reply-To: <20170718131034.25167-2-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Tue, 18 Jul 2017 15:10:32 +0200")
-References: <20170718131034.25167-1-thomas.petazzoni@free-electrons.com>
- <20170718131034.25167-2-thomas.petazzoni@free-electrons.com>
-Message-ID: <87pocx7tt6.fsf@free-electrons.com>
+From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
+Date: Tue, 18 Jul 2017 16:37:15 +0300
+Subject: [PATCH v2 0/7] staging: fsl-mc: make the driver compile on other
+ architectures
+Message-ID: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., juil. 18 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-> When the conversion of the Marvell CP110 Device Tree description from
-> using GIC interrupts to using ICU interrupts was done, the RTC on the
-> slave CP110 was left unchanged. This commit fixes that, so that all
-> devices on the CP properly get their interrupt through the ICU.
->
-> Fixes: 6ef84a827c375 ("arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Apart from a small change (first patch) which adds a missing comment,
+this series make the bus driver compile on other architectures, as per
+GregKH comment [1].
+Compiled tested on:
+ - booke powerpc (corenet{32,64}_smp_defconfig) with this ppc patch [2]
+ - x86 (i386_defconfig, x86_64_defconfig, needs CONFIG_OF)
+ - arm64 (defconfig)
 
-Applied on mvebu/fixes
+[1] https://www.spinics.net/lists/linux-driver-devel/msg100585.html
+[2] https://patchwork.ozlabs.org/patch/789474/
 
-Thanks,
+version 2 changes
+ - use writeq() / writeq_relaxed() / readq_relaxed() instead
+   of raw versions (Robin)
+ - use linux/io-64-nonatomic-hi-lo.h to make the driver compile
+   on 32-bit platforms (Robin)
+ - add extra LE <-> CPU so that standard device io may be used (Arnd)
 
-Gregory
+Laurentiu Tudor (7):
+  staging: fsl-mc: add missing fsl_mc comment in struct msi_desc
+  staging: fsl-mc: use generic memory barriers
+  staging: fsl-mc: drop useless gic v3 related #include
+  staging: fsl-mc: fix compilation with non-generic msi domain ops
+  staging: fsl-mc: fix formating of phys_addr_t on 32 bits
+  staging: fsl-mc: rewrite mc command send/receive to work on 32-bits
+  staging: fsl-mc: allow the driver compile multi-arch
 
-> ---
-> There's no need for a Cc: stable, because the ICU conversion was
-> merged in 4.13-rc1.
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 8c08a64..67936f7 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -64,7 +64,7 @@
->  				compatible = "marvell,armada-8k-rtc";
->  				reg = <0x284000 0x20>, <0x284080 0x24>;
->  				reg-names = "rtc", "rtc-soc";
-> -				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
->  			};
->  
->  			cps_ethernet: ethernet at 0 {
-> -- 
-> 2.9.4
->
+ drivers/staging/fsl-dpaa2/Kconfig                  |  2 +-
+ drivers/staging/fsl-mc/bus/Kconfig                 |  4 +-
+ drivers/staging/fsl-mc/bus/fsl-mc-msi.c            |  5 ++-
+ .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |  3 +-
+ drivers/staging/fsl-mc/bus/mc-io.c                 |  8 ++--
+ drivers/staging/fsl-mc/bus/mc-sys.c                | 45 +++++++++-------------
+ include/linux/msi.h                                |  1 +
+ 7 files changed, 32 insertions(+), 36 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.9.4
