@@ -1,143 +1,62 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 18 Jul 2017 12:37:37 -0700
-Subject: [PATCH] ARM: dts: BCM53573: Add Broadcom BCM947189ACDBMR board support
-Message-ID: <20170718193740.8610-1-f.fainelli@gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 18 Jul 2017 22:48:21 +0300
+Subject: [PATCH v6 1/3] clk: nxp: clk-lpc32xx: rename clk_gate_is_enabled()
+In-Reply-To: <1500364414-10021-2-git-send-email-gabriel.fernandez@st.com>
+References: <1500364414-10021-1-git-send-email-gabriel.fernandez@st.com>
+ <1500364414-10021-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20f6a994-26b4-578c-d641-395639ebac0f@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for the Broadcom reference board BCM947189ACDMBR which
-features the following:
+Hello Gabriel,
 
-* 128MB of DRAM
-* External MoCA support through a Broadcom BCM6802 chip
-* 1x external Gigabit PHY through the external BCM6802
-* 1x USB 2.0 port
-* 1x PCIE slot
-* Few configurable buttons and LEDs
+On 07/18/2017 10:53 AM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> We need to export clk_gate_is_enabled() from clk framework, then
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/Makefile            |  3 +-
- arch/arm/boot/dts/bcm947189acdbmr.dts | 97 +++++++++++++++++++++++++++++++++++
- 2 files changed, 99 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm947189acdbmr.dts
+first of all let's clarify if you really need to export clk_gate_is_enabled()
+from the CCF.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4b17f35dc9a7..236587e7f07d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -106,7 +106,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm953012hr.dtb \
- 	bcm953012k.dtb
- dtb-$(CONFIG_ARCH_BCM_53573) += \
--	bcm47189-tenda-ac9.dtb
-+	bcm47189-tenda-ac9.dtb \
-+	bcm947189acdbmr.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += \
- 	bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
-diff --git a/arch/arm/boot/dts/bcm947189acdbmr.dts b/arch/arm/boot/dts/bcm947189acdbmr.dts
-new file mode 100644
-index 000000000000..ef263412fea5
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm947189acdbmr.dts
-@@ -0,0 +1,97 @@
-+/*
-+ * Copyright (C) 2017 Broadcom
-+ * Author: Florian Fainelli <f.fainelli@gmail.com>
-+ *
-+ * Licensed under the ISC license.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm53573.dtsi"
-+
-+/ {
-+	compatible = "brcm,bcm947189acdbmr", "brcm,bcm47189", "brcm,bcm53573";
-+	model = "Broadcom BCM947189ACDBMR";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlycon";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		wps {
-+			label = "bcm53xx:blue:wps";
-+			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		5ghz {
-+			label = "bcm53xx:blue:5ghz";
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		2ghz {
-+			label = "bcm53xx:blue:2ghz";
-+			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 7 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		wps {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 9 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	spi {
-+		compatible = "spi-gpio";
-+		num-chipselects = <1>;
-+		gpio-sck = <&chipcommon 21 0>;
-+		gpio-miso = <&chipcommon 22 0>;
-+		gpio-mosi = <&chipcommon 23 0>;
-+		cs-gpios = <&chipcommon 24 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		/* External BCM6802 MoCA chip is connected */
-+	};
-+};
-+
-+&pcie0 {
-+	ranges = <0x00000000 0 0 0 0 0x00100000>;
-+	#address-cells = <3>;
-+	#size-cells = <2>;
-+
-+	bridge at 0,0,0 {
-+		reg = <0x0000 0 0 0 0>;
-+		ranges = <0x00000000 0 0 0 0 0 0 0x00100000>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+
-+		wifi at 0,1,0 {
-+			reg = <0x0000 0 0 0 0>;
-+			ranges = <0x00000000 0 0 0 0x00100000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+		};
-+	};
-+};
-+
-+&usb2 {
-+	vcc-gpio = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
-+};
--- 
-2.9.3
+> to avoid compilation issue we have to rename clk_gate_is_enabled()
+> in NXP LPC32xx clock driver.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  drivers/clk/nxp/clk-lpc32xx.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
+> index 5b98ff9..1cc71ad 100644
+> --- a/drivers/clk/nxp/clk-lpc32xx.c
+> +++ b/drivers/clk/nxp/clk-lpc32xx.c
+> @@ -903,7 +903,7 @@ static void clk_gate_disable(struct clk_hw *hw)
+>  	regmap_update_bits(clk_regmap, clk->reg, mask, val);
+>  }
+>  
+> -static int clk_gate_is_enabled(struct clk_hw *hw)
+> +static int __clk_gate_is_enabled(struct clk_hw *hw)
+>  {
+>  	struct lpc32xx_clk_gate *clk = to_lpc32xx_gate(hw);
+>  	u32 val;
+> @@ -918,7 +918,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+>  static const struct clk_ops lpc32xx_clk_gate_ops = {
+>  	.enable = clk_gate_enable,
+>  	.disable = clk_gate_disable,
+> -	.is_enabled = clk_gate_is_enabled,
+> +	.is_enabled = __clk_gate_is_enabled,
+
+In case if this change gets continuation, here I want to see the same
+prefixes for all functions and no underscores, namely it shall be
+* lpc32xx_clk_gate_enable(),
+* lpc32xx_clk_gate_disable(),
+* lpc32xx_clk_gate_is_enabled().
+
+>  };
+>  
+>  #define div_mask(width)	((1 << (width)) - 1)
+> 
+
+--
+With best wishes,
+Vladimir
