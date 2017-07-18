@@ -1,79 +1,69 @@
-From: florian.fainelli@broadcom.com (Florian Fainelli)
-Date: Tue, 18 Jul 2017 12:52:56 -0700
-Subject: [PATCH v3 0/4] Broadcom STB S2/S3/S5 support for ARM and MIPS
-In-Reply-To: <20170706222225.9758-1-f.fainelli@gmail.com>
-References: <20170706222225.9758-1-f.fainelli@gmail.com>
-Message-ID: <72d54e9c-6a50-2eac-52db-b1e8c234c552@broadcom.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 18 Jul 2017 22:53:31 +0300
+Subject: [PATCH v6 2/3] clk: gate: expose clk_gate_ops::is_enabled
+In-Reply-To: <1500364414-10021-3-git-send-email-gabriel.fernandez@st.com>
+References: <1500364414-10021-1-git-send-email-gabriel.fernandez@st.com>
+ <1500364414-10021-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <55bc0f3f-67ed-a15f-5b71-d87044fd5237@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2017 03:22 PM, Florian Fainelli wrote:
-> Hi,
+On 07/18/2017 10:53 AM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> This patch series adds support for S2/S3/S5 suspend/resume states on
-> ARM and MIPS based Broadcom STB SoCs.
+> This patch exposes clk_gate_ops::is_enabled as functions
+> that can be directly called and assigned in places like this so
+> we don't need wrapper functions that do nothing besides forward
+> the call.
 > 
-> This was submitted a long time ago by Brian, and I am now picking this
-> up and trying to get this included with support for our latest chips.
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Sugested by Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clk/clk-gate.c       | 3 ++-
+>  include/linux/clk-provider.h | 1 +
+>  2 files changed, 3 insertions(+), 1 deletion(-)
 > 
-> Provided that I can collect the necessary Acks from Rob (DT) and other
-> people (Rafael?) I would probably take this via the Broadcom ARM SoC
-> pull requests.
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> index 4e0c054a..dd82485 100644
+> --- a/drivers/clk/clk-gate.c
+> +++ b/drivers/clk/clk-gate.c
+> @@ -86,7 +86,7 @@ static void clk_gate_disable(struct clk_hw *hw)
+>  	clk_gate_endisable(hw, 0);
+>  }
+>  
+> -static int clk_gate_is_enabled(struct clk_hw *hw)
+> +int clk_gate_is_enabled(struct clk_hw *hw)
+>  {
+>  	u32 reg;
+>  	struct clk_gate *gate = to_clk_gate(hw);
+> @@ -101,6 +101,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+>  
+>  	return reg ? 1 : 0;
+>  }
+> +EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
+>  
+>  const struct clk_ops clk_gate_ops = {
+>  	.enable = clk_gate_enable,
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index c59c625..e9587ab 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
+>  		u8 clk_gate_flags, spinlock_t *lock);
+>  void clk_unregister_gate(struct clk *clk);
+>  void clk_hw_unregister_gate(struct clk_hw *hw);
+> +int clk_gate_is_enabled(struct clk_hw *hw);
 
-Rafael, any feedback on this?
+Here the prefix does not reflect the type of its argument, it might be
+acceptable for a veiled function, but it is not wanted for the exported
+function. Something like clk_hw_gate_is_enabled() is expected here, but
+again, let's firstly come to an agreement, that the export is needed.
 
-> 
-> Thank you!
-> 
-> Changes in v3:
-> 
-> - make SRAM mapping uncached
-> - make SWAP_STACK + brcmstb_pm_s3_finish a single asm volatile statement
-> - added Rob's Acked-by to first patch
-> 
-> Changes in v2:
-> 
-> - clarify the first patch's subject (Rob)
-> - removed patch #2 which was creating a bisectability problem (kbuild)
-> - added proper AFLAGS to get s2-arm.S to build properly (kbuild)
-> - improved MIPS power management binding document (Rob)
-> 
-> Brian Norris (1):
->   soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)
-> 
-> Florian Fainelli (2):
->   dt-bindings: ARM: brcmstb: Update Broadcom STB Power Management
->     binding
->   dt-bindings: Document MIPS Broadcom STB power management nodes
-> 
-> Justin Chen (1):
->   soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS)
-> 
->  .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   6 +-
->  .../devicetree/bindings/mips/brcm/soc.txt          | 153 ++++
->  drivers/soc/bcm/Kconfig                            |   2 +
->  drivers/soc/bcm/brcmstb/Kconfig                    |   9 +
->  drivers/soc/bcm/brcmstb/Makefile                   |   1 +
->  drivers/soc/bcm/brcmstb/pm/Makefile                |   3 +
->  drivers/soc/bcm/brcmstb/pm/aon_defs.h              | 113 +++
->  drivers/soc/bcm/brcmstb/pm/pm-arm.c                | 836 +++++++++++++++++++++
->  drivers/soc/bcm/brcmstb/pm/pm-mips.c               | 461 ++++++++++++
->  drivers/soc/bcm/brcmstb/pm/pm.h                    |  89 +++
->  drivers/soc/bcm/brcmstb/pm/s2-arm.S                |  76 ++
->  drivers/soc/bcm/brcmstb/pm/s2-mips.S               | 200 +++++
->  drivers/soc/bcm/brcmstb/pm/s3-mips.S               | 146 ++++
->  13 files changed, 2094 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/Makefile
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/aon_defs.h
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-arm.c
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-mips.c
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/pm.h
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-arm.S
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-mips.S
->  create mode 100644 drivers/soc/bcm/brcmstb/pm/s3-mips.S
+>  
+>  struct clk_div_table {
+>  	unsigned int	val;
 > 
 
-
--- 
-Florian
+--
+With best wishes,
+Vladimir
