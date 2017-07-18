@@ -1,67 +1,44 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Tue, 18 Jul 2017 09:53:31 +0200
-Subject: [PATCH v6 0/3] clk: stm32h7: Add stm32h743 clock driver
-Message-ID: <1500364414-10021-1-git-send-email-gabriel.fernandez@st.com>
+Date: Tue, 18 Jul 2017 09:53:32 +0200
+Subject: [PATCH v6 1/3] clk: nxp: clk-lpc32xx: rename clk_gate_is_enabled()
+In-Reply-To: <1500364414-10021-1-git-send-email-gabriel.fernandez@st.com>
+References: <1500364414-10021-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1500364414-10021-2-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-v6:
-  - rename clk_gate_is_enabled() in nxp lpc32xx driver.
-  - add EXPORT_SYMBOL_GPL(clk_gate_is_enabled)
+We need to export clk_gate_is_enabled() from clk framework, then
+to avoid compilation issue we have to rename clk_gate_is_enabled()
+in NXP LPC32xx clock driver.
 
-v5:
-  - return bool instead int for enable_power_domain_write_protection()
-  - add comment to explain use of CLK_OF_DECLARE_DRIVER()
-  - add comment to explain why we can't use read_poll_timeout()
-  - expose clk_gate_ops::is_enabled
-  - use of __clk_mux_determine_rate & clk_gate_is_enabled to avoid wrapper
-	function.
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+---
+ drivers/clk/nxp/clk-lpc32xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-v4:
-  - rename lock into stm32rcc_lock
-  - don't use clk_readl() 
-  - remove useless parentheses with GENMASK
-  - fix parents of timer_x clocks
-  - suppress pll configuration from DT
-  - fix kbuild warning
-
-v3:
-  - fix compatible string "stm32h7-pll" into "st,stm32h7-pll"
-  - fix bad parent name for mco2 clock
-  - set CLK_SET_RATE_PARENT for ltdc clock
-  - set CLK_IGNORE_UNUSED for pll1
-  - disable power domain write protection on disable ops if needed
-
-
-v2:
-  - rename compatible string "stm32,pll" into "stm32h7-pll"
-  - suppress "st,pllrge" property
-  - suppress "st, frac-status" property
-  - change management of "st,frac"  property
-	0 : enable 0 pll integer mode 
-	other values : enable pll in fractional mode (value is
-	the fractional factor)
-
-Gabriel Fernandez (3):
-  clk: nxp: clk-lpc32xx: rename clk_gate_is_enabled()
-  clk: gate: expose clk_gate_ops::is_enabled
-  clk: stm32h7: Add stm32h743 clock driver
-
- .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |   81 ++
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-gate.c                             |    3 +-
- drivers/clk/clk-stm32h7.c                          | 1522 ++++++++++++++++++++
- drivers/clk/nxp/clk-lpc32xx.c                      |    4 +-
- include/dt-bindings/clock/stm32h7-clks.h           |  165 +++
- include/dt-bindings/mfd/stm32h7-rcc.h              |  136 ++
- include/linux/clk-provider.h                       |    1 +
- 8 files changed, 1910 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
- create mode 100644 drivers/clk/clk-stm32h7.c
- create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
- create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
-
+diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
+index 5b98ff9..1cc71ad 100644
+--- a/drivers/clk/nxp/clk-lpc32xx.c
++++ b/drivers/clk/nxp/clk-lpc32xx.c
+@@ -903,7 +903,7 @@ static void clk_gate_disable(struct clk_hw *hw)
+ 	regmap_update_bits(clk_regmap, clk->reg, mask, val);
+ }
+ 
+-static int clk_gate_is_enabled(struct clk_hw *hw)
++static int __clk_gate_is_enabled(struct clk_hw *hw)
+ {
+ 	struct lpc32xx_clk_gate *clk = to_lpc32xx_gate(hw);
+ 	u32 val;
+@@ -918,7 +918,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+ static const struct clk_ops lpc32xx_clk_gate_ops = {
+ 	.enable = clk_gate_enable,
+ 	.disable = clk_gate_disable,
+-	.is_enabled = clk_gate_is_enabled,
++	.is_enabled = __clk_gate_is_enabled,
+ };
+ 
+ #define div_mask(width)	((1 << (width)) - 1)
 -- 
 1.9.1
