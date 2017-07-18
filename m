@@ -1,105 +1,39 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 18 Jul 2017 17:57:20 +0100
-Subject: [PATCH 2/4] iommu/iova: Optimise the padding calculation
-In-Reply-To: <cover.1500396007.git.robin.murphy@arm.com>
-References: <cover.1500396007.git.robin.murphy@arm.com>
-Message-ID: <eb5f8875f6429dd5826996576b7b506213ffb959.1500396007.git.robin.murphy@arm.com>
+From: jintack.lim@linaro.org (Jintack Lim)
+Date: Tue, 18 Jul 2017 11:58:49 -0500
+Subject: [RFC PATCH v2 23/38] KVM: arm64: Inject HVC exceptions to the virtual
+ EL2
+In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+Message-ID: <1500397144-16232-24-git-send-email-jintack.lim@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhen Lei <thunder.leizhen@huawei.com>
+Now that the psci call is done by the smc instruction when nested
+virtualization is enabled, it is clear that all hvc instruction from the
+VM (including from the virtual EL2) are supposed to handled in the
+virtual EL2.
 
-The mask for calculating the padding size doesn't change, so there's no
-need to recalculate it every loop iteration. Furthermore, Once we've
-done that, it becomes clear that we don't actually need to calculate a
-padding size at all - by flipping the arithmetic around, we can just
-combine the upper limit, size, and mask directly to check against the
-lower limit.
-
-For an arm64 build, this alone knocks 16% off the size of the entire
-alloc_iova() function!
-
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-[rm: simplified more of the arithmetic, rewrote commit message]
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
 ---
- drivers/iommu/iova.c | 40 ++++++++++++++--------------------------
- 1 file changed, 14 insertions(+), 26 deletions(-)
+ arch/arm64/kvm/handle_exit.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
-index 8f7552dc4e04..d094d1ca8f23 100644
---- a/drivers/iommu/iova.c
-+++ b/drivers/iommu/iova.c
-@@ -129,16 +129,6 @@ iova_insert_rbtree(struct rb_root *root, struct iova *iova,
- 	rb_insert_color(&iova->node, root);
- }
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 6cf6b93..8b398b2 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -42,6 +42,12 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			    kvm_vcpu_hvc_get_imm(vcpu));
+ 	vcpu->stat.hvc_exit_stat++;
  
--/*
-- * Computes the padding size required, to make the start address
-- * naturally aligned on the power-of-two order of its size
-- */
--static unsigned int
--iova_get_pad_size(unsigned int size, unsigned int limit_pfn)
--{
--	return (limit_pfn - size) & (__roundup_pow_of_two(size) - 1);
--}
--
- static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
- 		unsigned long size, unsigned long limit_pfn,
- 			struct iova *new, bool size_aligned)
-@@ -146,7 +136,10 @@ static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
- 	struct rb_node *prev, *curr = NULL;
- 	unsigned long flags;
- 	unsigned long saved_pfn;
--	unsigned int pad_size = 0;
-+	unsigned long align_mask = ~0UL;
++	/* Forward hvc instructions to the virtual EL2 if the guest has EL2. */
++	if (nested_virt_in_use(vcpu)) {
++		kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
++		return 1;
++	}
 +
-+	if (size_aligned)
-+		align_mask <<= __fls(size);
- 
- 	/* Walk the tree backwards */
- 	spin_lock_irqsave(&iovad->iova_rbtree_lock, flags);
-@@ -156,31 +149,26 @@ static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
- 	while (curr) {
- 		struct iova *curr_iova = rb_entry(curr, struct iova, node);
- 
--		if (limit_pfn <= curr_iova->pfn_lo) {
-+		if (limit_pfn <= curr_iova->pfn_lo)
- 			goto move_left;
--		} else if (limit_pfn > curr_iova->pfn_hi) {
--			if (size_aligned)
--				pad_size = iova_get_pad_size(size, limit_pfn);
--			if ((curr_iova->pfn_hi + size + pad_size) < limit_pfn)
--				break;	/* found a free slot */
--		}
-+
-+		if (((limit_pfn - size) & align_mask) > curr_iova->pfn_hi)
-+			break;	/* found a free slot */
-+
- 		limit_pfn = curr_iova->pfn_lo;
- move_left:
- 		prev = curr;
- 		curr = rb_prev(curr);
- 	}
- 
--	if (!curr) {
--		if (size_aligned)
--			pad_size = iova_get_pad_size(size, limit_pfn);
--		if ((iovad->start_pfn + size + pad_size) > limit_pfn) {
--			spin_unlock_irqrestore(&iovad->iova_rbtree_lock, flags);
--			return -ENOMEM;
--		}
-+	if (limit_pfn < size ||
-+	    (!curr && ((limit_pfn - size) & align_mask) < iovad->start_pfn)) {
-+		spin_unlock_irqrestore(&iovad->iova_rbtree_lock, flags);
-+		return -ENOMEM;
- 	}
- 
- 	/* pfn_lo will point to size aligned address if size_aligned is set */
--	new->pfn_lo = limit_pfn - (size + pad_size);
-+	new->pfn_lo = (limit_pfn - size) & align_mask;
- 	new->pfn_hi = new->pfn_lo + size - 1;
- 
- 	/* If we have 'prev', it's a valid place to start the insertion. */
+ 	ret = kvm_psci_call(vcpu);
+ 	if (ret < 0) {
+ 		kvm_inject_undefined(vcpu);
 -- 
-2.12.2.dirty
+1.9.1
