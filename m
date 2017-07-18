@@ -1,7 +1,7 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Jul 2017 16:42:54 -0500
-Subject: [PATCH] cpufreq: Convert to using %pOF instead of full_name
-Message-ID: <20170718214339.7774-14-robh@kernel.org>
+Date: Tue, 18 Jul 2017 16:42:51 -0500
+Subject: [PATCH] bus: Convert to using %pOF instead of full_name
+Message-ID: <20170718214339.7774-11-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,59 +10,135 @@ full_name to use %pOF instead. This is preparation to remove storing
 of the full path string for each node.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Cc: linux-pm at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: kernel at stlinux.com
 ---
- drivers/cpufreq/pmac64-cpufreq.c | 2 +-
- drivers/cpufreq/sti-cpufreq.c    | 8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/bus/arm-cci.c   | 12 ++++++------
+ drivers/bus/imx-weim.c  |  8 ++++----
+ drivers/bus/sunxi-rsb.c | 22 +++++++++++-----------
+ 3 files changed, 21 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/cpufreq/pmac64-cpufreq.c b/drivers/cpufreq/pmac64-cpufreq.c
-index 267e0894c62d..be623dd7b9f2 100644
---- a/drivers/cpufreq/pmac64-cpufreq.c
-+++ b/drivers/cpufreq/pmac64-cpufreq.c
-@@ -516,7 +516,7 @@ static int __init g5_pm72_cpufreq_init(struct device_node *cpunode)
- 		goto bail;
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index c49da15d9790..3c29d36702a8 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -2124,8 +2124,8 @@ int notrace __cci_control_port_by_device(struct device_node *dn, bool enable)
+ 		return -ENODEV;
+
+ 	port = __cci_ace_get_port(dn, ACE_LITE_PORT);
+-	if (WARN_ONCE(port < 0, "node %s ACE lite port look-up failure\n",
+-				dn->full_name))
++	if (WARN_ONCE(port < 0, "node %pOF ACE lite port look-up failure\n",
++				dn))
+ 		return -ENODEV;
+ 	cci_port_control(port, enable);
+ 	return 0;
+@@ -2200,14 +2200,14 @@ static int cci_probe_ports(struct device_node *np)
+
+ 		if (of_property_read_string(cp, "interface-type",
+ 					&match_str)) {
+-			WARN(1, "node %s missing interface-type property\n",
+-				  cp->full_name);
++			WARN(1, "node %pOF missing interface-type property\n",
++				  cp);
+ 			continue;
+ 		}
+ 		is_ace = strcmp(match_str, "ace") == 0;
+ 		if (!is_ace && strcmp(match_str, "ace-lite")) {
+-			WARN(1, "node %s containing invalid interface-type property, skipping it\n",
+-					cp->full_name);
++			WARN(1, "node %pOF containing invalid interface-type property, skipping it\n",
++					cp);
+ 			continue;
+ 		}
+
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index 4bd361d64270..3d56ebcda720 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -156,8 +156,8 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+
+ 		ret = weim_timing_setup(child, base, devtype);
+ 		if (ret)
+-			dev_warn(&pdev->dev, "%s set timing failed.\n",
+-				child->full_name);
++			dev_warn(&pdev->dev, "%pOF set timing failed.\n",
++				child);
+ 		else
+ 			have_child = 1;
+ 	}
+@@ -166,8 +166,8 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+ 		ret = of_platform_default_populate(pdev->dev.of_node,
+ 						   NULL, &pdev->dev);
+ 	if (ret)
+-		dev_err(&pdev->dev, "%s fail to create devices.\n",
+-			pdev->dev.of_node->full_name);
++		dev_err(&pdev->dev, "%pOF fail to create devices.\n",
++			pdev->dev.of_node);
+ 	return ret;
+ }
+
+diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+index 795c9d9c96a6..328ca93781cf 100644
+--- a/drivers/bus/sunxi-rsb.c
++++ b/drivers/bus/sunxi-rsb.c
+@@ -556,20 +556,20 @@ static int of_rsb_register_devices(struct sunxi_rsb *rsb)
+
+ 	/* Runtime addresses for all slaves should be set first */
+ 	for_each_available_child_of_node(np, child) {
+-		dev_dbg(dev, "setting child %s runtime address\n",
+-			child->full_name);
++		dev_dbg(dev, "setting child %pOF runtime address\n",
++			child);
+
+ 		ret = of_property_read_u32(child, "reg", &hwaddr);
+ 		if (ret) {
+-			dev_err(dev, "%s: invalid 'reg' property: %d\n",
+-				child->full_name, ret);
++			dev_err(dev, "%pOF: invalid 'reg' property: %d\n",
++				child, ret);
+ 			continue;
+ 		}
+
+ 		rtaddr = sunxi_rsb_get_rtaddr(hwaddr);
+ 		if (!rtaddr) {
+-			dev_err(dev, "%s: unknown hardware device address\n",
+-				child->full_name);
++			dev_err(dev, "%pOF: unknown hardware device address\n",
++				child);
+ 			continue;
+ 		}
+
+@@ -586,15 +586,15 @@ static int of_rsb_register_devices(struct sunxi_rsb *rsb)
+ 		/* send command */
+ 		ret = _sunxi_rsb_run_xfer(rsb);
+ 		if (ret)
+-			dev_warn(dev, "%s: set runtime address failed: %d\n",
+-				 child->full_name, ret);
++			dev_warn(dev, "%pOF: set runtime address failed: %d\n",
++				 child, ret);
  	}
 
--	DBG("cpufreq: i2c clock chip found: %s\n", hwclock->full_name);
-+	DBG("cpufreq: i2c clock chip found: %pOF\n", hwclock);
+ 	/* Then we start adding devices and probing them */
+ 	for_each_available_child_of_node(np, child) {
+ 		struct sunxi_rsb_device *rdev;
 
- 	/* Now get all the platform functions */
- 	pfunc_cpu_getfreq =
-diff --git a/drivers/cpufreq/sti-cpufreq.c b/drivers/cpufreq/sti-cpufreq.c
-index d2d0430d09d4..47105735df12 100644
---- a/drivers/cpufreq/sti-cpufreq.c
-+++ b/drivers/cpufreq/sti-cpufreq.c
-@@ -65,8 +65,8 @@ static int sti_cpufreq_fetch_major(void) {
- 	ret = of_property_read_u32_index(np, "st,syscfg",
- 					 MAJOR_ID_INDEX, &major_offset);
- 	if (ret) {
--		dev_err(dev, "No major number offset provided in %s [%d]\n",
--			np->full_name, ret);
-+		dev_err(dev, "No major number offset provided in %pOF [%d]\n",
-+			np, ret);
- 		return ret;
+-		dev_dbg(dev, "adding child %s\n", child->full_name);
++		dev_dbg(dev, "adding child %pOF\n", child);
+
+ 		ret = of_property_read_u32(child, "reg", &hwaddr);
+ 		if (ret)
+@@ -606,8 +606,8 @@ static int of_rsb_register_devices(struct sunxi_rsb *rsb)
+
+ 		rdev = sunxi_rsb_device_create(rsb, child, hwaddr, rtaddr);
+ 		if (IS_ERR(rdev))
+-			dev_err(dev, "failed to add child device %s: %ld\n",
+-				child->full_name, PTR_ERR(rdev));
++			dev_err(dev, "failed to add child device %pOF: %ld\n",
++				child, PTR_ERR(rdev));
  	}
 
-@@ -92,8 +92,8 @@ static int sti_cpufreq_fetch_minor(void)
- 					 MINOR_ID_INDEX, &minor_offset);
- 	if (ret) {
- 		dev_err(dev,
--			"No minor number offset provided %s [%d]\n",
--			np->full_name, ret);
-+			"No minor number offset provided %pOF [%d]\n",
-+			np, ret);
- 		return ret;
- 	}
-
+ 	return 0;
 --
 2.11.0
