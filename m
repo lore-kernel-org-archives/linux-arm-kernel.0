@@ -1,34 +1,46 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 18 Jul 2017 16:27:12 +0530
-Subject: [PATCH 0/4] gpio: davinci: Add keystone-k2g support and few clean ups
-Message-ID: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+Date: Tue, 18 Jul 2017 16:27:15 +0530
+Subject: [PATCH 3/4] gpio: davinci: Add a separate compatible for keystone-k2g
+ soc
+In-Reply-To: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1500375436-9435-4-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series adds support for keystone-k2g soc GPIO.
-Also does a couple of important return handling which were missed
-earlier in the driver probe.
+Add a separate compatible for keystone-k2g soc
 
-This is based on Suman's:
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ Documentation/devicetree/bindings/gpio/gpio-davinci.txt | 3 ++-
+ drivers/gpio/gpio-davinci.c                             | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
-http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2
-
-The driver patches should have no dependency but the device Tree
-will need the above set.
-
-Keerthy (4):
-  gpio: davinci: Use devm_gpiochip_add_data in place of
-    gpiochip_add_data
-  gpio: davinci: Handle the return value of davinci_gpio_irq_setup
-    function
-  gpio: davinci: Add a separate compatible for keystone-k2g soc
-  ARM: dts: keystone-k2g-evm: Add gpio nodes
-
- .../devicetree/bindings/gpio/gpio-davinci.txt      |  3 +-
- arch/arm/boot/dts/keystone-k2g.dtsi                | 42 ++++++++++++++++++++++
- drivers/gpio/gpio-davinci.c                        | 21 +++++++++--
- 3 files changed, 62 insertions(+), 4 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+index 5079ba7..1a5c1a2 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+@@ -1,7 +1,8 @@
+ Davinci/Keystone GPIO controller bindings
+ 
+ Required Properties:
+-- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
++- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio",
++	      "ti,keystone-k2g-gpio"
+ 
+ - reg: Physical base address of the controller and the size of memory mapped
+        registers.
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index 932f270..a8d8dd9 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -610,6 +610,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ static const struct of_device_id davinci_gpio_ids[] = {
+ 	{ .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
+ 	{ .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
++	{ .compatible = "ti,keystone-k2g-gpio", keystone_gpio_get_irq_chip},
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
 -- 
 1.9.1
