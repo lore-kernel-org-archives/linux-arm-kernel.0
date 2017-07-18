@@ -1,35 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Jul 2017 09:15:08 +0100
-Subject: [PATCH 2/3] mfd: syscon: atmel-smc: add helper to retrieve
- register layout
-In-Reply-To: <20170711074015.30440-3-ludovic.desroches@microchip.com>
-References: <20170711074015.30440-1-ludovic.desroches@microchip.com>
- <20170711074015.30440-3-ludovic.desroches@microchip.com>
-Message-ID: <20170718081508.yo6uld5ip5hr6ipk@dell>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 18 Jul 2017 10:22:20 +0200
+Subject: [PATCH 1/2] arm: dts: stm32: add cec for stm32f7 familly
+Message-ID: <1500366141-30706-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jul 2017, Ludovic Desroches wrote:
+add cec in devicetree for stm32f7 familly
 
-> For HSMC controller, the register layout depends on the device i.e. the
-> offset of setup, pulse, cycle, mode and timings registers is not the
-> same. An helper is added to provide the correct register layout.
-> 
-> Fixes: fe9d7cb22ef3 ("mfd: syscon: atmel-smc: Add new helpers to ease
-> SMC regs manipulation")
-> Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> ---
->  drivers/memory/atmel-ebi.c               | 13 +++++--
->  drivers/mfd/atmel-smc.c                  | 67 +++++++++++++++++++++++++-------
->  drivers/mtd/nand/atmel/nand-controller.c | 10 +++--
->  include/linux/mfd/syscon/atmel-smc.h     | 32 ++++++++++-----
->  4 files changed, 92 insertions(+), 30 deletions(-)
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+---
+ arch/arm/boot/dts/stm32f746.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Applied, thanks.
-
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index 0c3dd1f..770e474 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -167,6 +167,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		cec: cec at 40006c00 {
++			compatible = "st,stm32-cec";
++			reg = <0x40006C00 0x400>;
++			interrupts = <94>;
++			clocks = <&rcc 0 STM32F7_APB1_CLOCK(CEC)>, <&rcc 1 CLK_HDMI_CEC>;
++			clock-names = "cec", "hdmi-cec";
++			status = "disabled";
++		};
++
+ 		usart7: serial at 40007800 {
+ 			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+ 			reg = <0x40007800 0x400>;
+@@ -339,6 +348,15 @@
+ 				st,bank-name = "GPIOK";
+ 			};
+ 
++			cec_pins_a: cec at 0 {
++				pins {
++					pinmux = <STM32F746_PA15_FUNC_HDMI_CEC>;
++					slew-rate = <3>;
++					drive-open-drain;
++					bias-disable;
++				};
++			};
++
+ 			usart1_pins_a: usart1 at 0 {
+ 				pins1 {
+ 					pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
