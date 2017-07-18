@@ -1,149 +1,54 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 18 Jul 2017 13:18:42 +0300
-Subject: [PATCH 11/18] dt-bindings: display: Add Allwinner MIPI-DSI
- bindings
-In-Reply-To: <20170717184149.sv4xdspjwnhmctog@rob-hp-laptop>
-References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
- <41dca303c02faf350e765b81c36ddcddbba6f950.1499955058.git-series.maxime.ripard@free-electrons.com>
- <20170717184149.sv4xdspjwnhmctog@rob-hp-laptop>
-Message-ID: <4634787.BNPAe4WyE2@avalon>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Tue, 18 Jul 2017 15:49:13 +0530
+Subject: [PATCH 1/2] ARM: OMAP2+: hsmmc.c: Remove dead code
+In-Reply-To: <CAPDyKFpwb3T4PhQSyUwWDwpEnOwVDxLeK7hAMS0Q4P3tzPXXrQ@mail.gmail.com>
+References: <1500036404-5556-1-git-send-email-faiz_abbas@ti.com>
+ <1500036404-5556-2-git-send-email-faiz_abbas@ti.com>
+ <CAPDyKFpwb3T4PhQSyUwWDwpEnOwVDxLeK7hAMS0Q4P3tzPXXrQ@mail.gmail.com>
+Message-ID: <4d41e743-0971-18ea-59ef-6e2f869e42e8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 Jul 2017 13:41:49 Rob Herring wrote:
-> On Thu, Jul 13, 2017 at 04:13:06PM +0200, Maxime Ripard wrote:
-> > The Allwinner SoCs usually come with a DSI encoder. Add a binding for it.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> > 
-> >  Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 85
-> >  +++++++-
-> >  1 file changed, 85 insertions(+)
-> >  create mode 100644
-> >  Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt> 
-> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> > b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt new file
-> > mode 100644
-> > index 000000000000..2e7c5aa7020f
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> > @@ -0,0 +1,85 @@
-> > +Allwinner A31 DSI Encoder
-> > +=========================
-> > +
-> > +The DSI pipeline consists of two separate blocks: the DSI controller
-> > +itself, and its associated D-PHY.
-> > +
-> > +DSI Encoder
-> > +-----------
-> > +
-> > +The DSI Encoder generates the DSI signal from the TCON's.
-> > +
-> > +Required properties:
-> > +  - compatible: value must be one of:
-> > +    * allwinner,sun6i-a31-mipi-dsi
-> > +  - reg: base address and size of memory-mapped region
-> > +  - interrupts: interrupt associated to this IP
-> > +  - clocks: phandles to the clocks feeding the DSI encoder
-> > +    * bus: the DSI interface clock
-> > +    * mod: the DSI module clock
-> > +  - clock-names: the clock names mentioned above
-> > +  - phys: phandle to the D-PHY
-> > +  - phy-names: must be "dphy"
-> > +  - resets: phandle to the reset controller driving the encoder
-> > +
-> > +  - ports: A ports node with endpoint definitions as defined in
-> > +    Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> > +    port should be the input endpoint, usually coming from the
-> > +    associated TCON.
-> 
-> Output port for bridge/panel?
-> 
-> > +
-> > +D-PHY
-> > +-----
-> > +
-> > +Required properties:
-> > +  - compatible: value must be one of:
-> > +    * allwinner,sun6i-a31-mipi-dphy
-> > +  - reg: base address and size of memory-mapped region
-> > +  - clocks: phandles to the clocks feeding the DSI encoder
-> > +    * bus: the DSI interface clock
-> > +    * mod: the DSI module clock
-> > +  - clock-names: the clock names mentioned above
-> > +  - resets: phandle to the reset controller driving the encoder
-> > +
-> > +Example:
-> > +
-> > +dsi0: dsi at 01ca0000 {
-> 
-> Drop the leading 0.
-> 
-> > +	compatible = "allwinner,sun6i-a31-mipi-dsi";
-> > +	reg = <0x01ca0000 0x1000>;
-> > +	interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-> > +	clocks = <&ccu CLK_BUS_MIPI_DSI>,
-> > +		 <&ccu CLK_DSI_SCLK>;
-> > +	clock-names = "bus", "mod";
-> > +	resets = <&ccu RST_BUS_MIPI_DSI>;
-> > +	phys = <&dphy0>;
-> > +	phy-names = "dphy";
-> > 
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> 
-> Not needed.
-> 
-> > +
-> > +	ports {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		dsi0_in: port at 0 {
+Hi Ulfe,
 
-I don't think the label for the port is needed, you should only reference the 
-endpoint.
+I just wanted to make sure that no regressions happen on pandora board.
+I have tested this on dra71x-evm.
 
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			reg = <0>;
-> > +
-> > +			dsi0_in_tcon0: endpoint at 0 {
-> > +				reg = <0>;
-> 
-> Don't need reg when there's only 1 endpoint.
-
-And no reg for the port name either when there's a single port. This can all 
-be simplified to
-
-dsi0: dsi at 1ca0000 {
-	compatible = "allwinner,sun6i-a31-mipi-dsi";
-	reg = <0x01ca0000 0x1000>;
-	interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&ccu CLK_BUS_MIPI_DSI>,
-		 <&ccu CLK_DSI_SCLK>;
-	clock-names = "bus", "mod";
-	resets = <&ccu RST_BUS_MIPI_DSI>;
-	phys = <&dphy0>;
-	phy-names = "dphy";
-
-	port {
-		dsi0_in_tcon0: endpoint {
-			remote-endpoint = <&tcon0_out_dsi0>;
-		};
-	};
-};
-
-> > +				remote-endpoint = <&tcon0_out_dsi0>;
-> > +			};
-> > +		};
-> > +	};
-> > +};
-
-[snip]
-
--- 
 Regards,
+Faiz
 
-Laurent Pinchart
+On Monday 17 July 2017 06:38 PM, Ulf Hansson wrote:
+> On 14 July 2017 at 14:46, Faiz Abbas <faiz_abbas@ti.com> wrote:
+>> Most platforms using OMAP hsmmc driver have switched to device tree
+>> for passing platform data to omap_hsmmc.c driver.
+>>
+>> The hsmmc.c file in mach-omap2 exists only to support pandora board
+>> which uses wl1251 driver in legacy platform data mode.
+>>
+>> Hence, remove the dead code not used by the pandora board.
+>>
+>> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+> 
+> I just got an ack from Tony to pick this up. So I did that (including
+> the mmc change in patch 2) and intend to send this for 4.13 rcs, via
+> my fixes branch in my mmc tree.
+> 
+> However the below comment for testing puzzles me. Either it's dead
+> code or not, so then what is there to test? :-)
+> 
+> Anyway, it's available on my fixes and next branch, so let's see if
+> zero build reports some issues.
+> 
+>> ---
+>> This is only compile tested. Someone with a pandora board should help
+>> test this for functionality.
+>>
+>>  arch/arm/mach-omap2/hsmmc.c | 239 +-------------------------------------------
+>>  arch/arm/mach-omap2/hsmmc.h |   9 --
+>>  2 files changed, 2 insertions(+), 246 deletions(-)
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
