@@ -1,45 +1,180 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 18 Jul 2017 12:26:14 -0400
-Subject: [PATCH V3 1/2] dmaengine: qcom_hidma: introduce memset support
-In-Reply-To: <20170718161956.GV3053@localhost>
-References: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
- <20170718161956.GV3053@localhost>
-Message-ID: <29d47cc4-f618-7253-6f59-41f10e7b4b87@codeaurora.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 18 Jul 2017 18:29:13 +0200
+Subject: [PATCH v4 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
+ board dts and Makefile
+In-Reply-To: <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
+References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
+ <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
+Message-ID: <ddfb5e58-520f-1ef5-2351-d7545e17a429@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
 
-On 7/18/2017 12:19 PM, Vinod Koul wrote:
-> On Thu, Jun 29, 2017 at 10:30:57PM -0400, Sinan Kaya wrote:
+
+On 06/22/2017 11:32 AM, YT Shen wrote:
+> This adds basic chip support for Mediatek 2712
 > 
->> @@ -410,7 +410,40 @@ static int hidma_alloc_chan_resources(struct dma_chan *dmach)
->>  		return NULL;
->>  
->>  	hidma_ll_set_transfer_params(mdma->lldev, mdesc->tre_ch,
->> -				     src, dest, len, flags);
->> +				     src, dest, len, flags,
->> +				     HIDMA_TRE_MEMCPY);
->> +
->> +	/* Place descriptor in prepared list */
->> +	spin_lock_irqsave(&mchan->lock, irqflags);
->> +	list_add_tail(&mdesc->node, &mchan->prepared);
->> +	spin_unlock_irqrestore(&mchan->lock, irqflags);
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> ---
+>   arch/arm64/boot/dts/mediatek/Makefile       |   1 +
+>   arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  32 ++++++
+>   arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 172 ++++++++++++++++++++++++++++
+>   3 files changed, 205 insertions(+)
+>   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+>   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
 > 
-> This change looks suspicious, cna you clarify the need to do this?
-> 
-> 
+> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+> index 9fbfd32..fcc0604 100644
+> --- a/arch/arm64/boot/dts/mediatek/Makefile
+> +++ b/arch/arm64/boot/dts/mediatek/Makefile
+> @@ -1,3 +1,4 @@
+> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+>   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+>   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+>   dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+> diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+> new file mode 100644
+> index 0000000..8c804df
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+> @@ -0,0 +1,32 @@
+> +/*
+> + * Copyright (c) 2017 MediaTek Inc.
+> + * Author: YT Shen <yt.shen@mediatek.com>
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> + */
+> +
+> +/dts-v1/;
+> +#include "mt2712e.dtsi"
+> +
+> +/ {
+> +	model = "MediaTek MT2712 evaluation board";
+> +	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	memory at 40000000 {
+> +		device_type = "memory";
+> +		reg = <0 0x40000000 0 0x80000000>;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:921600n8";
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> new file mode 100644
+> index 0000000..461ee0f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> @@ -0,0 +1,172 @@
+> +/*
+> + * Copyright (c) 2017 MediaTek Inc.
+> + * Author: YT Shen <yt.shen@mediatek.com>
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	compatible = "mediatek,mt2712";
+> +	interrupt-parent = <&sysirq>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu-map {
+> +			cluster0 {
+> +				core0 {
+> +					cpu = <&cpu0>;
+> +				};
+> +				core1 {
+> +					cpu = <&cpu1>;
+> +				};
+> +			};
+> +
+> +			cluster1 {
+> +				core0 {
+> +					cpu = <&cpu2>;
+> +				};
+> +			};
+> +		};
+> +
+> +		cpu0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a35";
+> +			reg = <0x000>;
+> +		};
+> +
+> +		cpu1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a35";
+> +			reg = <0x001>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu2: cpu at 200 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a72";
+> +			reg = <0x200>;
+> +			enable-method = "psci";
+> +		};
+> +	};
+> +
+> +	psci {
+> +		compatible = "arm,psci-0.2";
+> +		method = "smc";
+> +	};
+> +
+> +	uart_clk: dummy26m {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <26000000>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13
+> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 14
+> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 11
+> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 10
+> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		compatible = "simple-bus";
+> +		ranges;
+> +
+> +		uart5: serial at 1000f000 {
+> +			compatible = "mediatek,mt2712-uart",
+> +				     "mediatek,mt6577-uart";
+> +			reg = <0 0x1000f000 0 0x400>;
+> +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
+> +			clocks = <&uart_clk>, <&uart_clk>;
+> +			clock-names = "baud", "bus";
+> +			status = "disabled";
+> +		};
 
-Diff looks weird for some reason. I noticed that too.
+So baud and bus clock are both 26 MHz?
 
-I just added HIDMA_TRE_MEMCPY parameter to hidma_ll_set_transfer_params() function call
-from hidma_prep_dma_memcpy() and created a new hidma_prep_dma_memset() function very
-similar to memcpy with HIDMA_TRE_MEMSET call difference.
-
-My suggestion is to use kdiff or another visual tool to look at the change.
-
-Sinan
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards,
+Matthias
