@@ -1,38 +1,51 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 18 Jul 2017 15:29:17 +0200
-Subject: [PATCH] ARM: shmobile: rcar-gen2: Correct arch timer frequency on
- RZ/G1E
-Message-ID: <1500384557-22123-1-git-send-email-geert+renesas@glider.be>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 18 Jul 2017 15:29:30 +0200
+Subject: [PATCH 0/3] Misc updates for Armada 7K/8K CP110 DT description
+In-Reply-To: <20170718131034.25167-1-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Tue, 18 Jul 2017 15:10:31 +0200")
+References: <20170718131034.25167-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <87wp757u11.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the datasheet, the frequency of the ARM architecture timer
-on RZ/G1E depends on the frequency of the ZS clock, just like on R-Car
-E2 and V2H.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Untested due to lack of hardware.
-
-v2:
-  - Rebased to avoid dependencies.
----
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 3bd505da31726869..7ab1690fab8299eb 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -70,7 +70,8 @@ void __init rcar_gen2_timer_init(void)
- 	void __iomem *base;
- 	u32 freq;
+Hi Thomas,
  
--	if (of_machine_is_compatible("renesas,r8a7792") ||
-+	if (of_machine_is_compatible("renesas,r8a7745") ||
-+	    of_machine_is_compatible("renesas,r8a7792") ||
- 	    of_machine_is_compatible("renesas,r8a7794")) {
- 		freq = 260000000 / 8;	/* ZS / 8 */
- 		/* CNTVOFF has to be initialized either from non-secure
+ On mar., juil. 18 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> Hello,
+>
+> Here are a few updates to the CP110 DT description. The first one is
+> really a fix, the next two are just improvements.
+
+I was writig the same series and I alreadu sent the same 1st patch!
+
+I will apply your version
+
+Thanks,
+
+Gregory
+
+>
+> Thanks!
+>
+> Thomas
+>
+> Thomas Petazzoni (3):
+>   arm64: dts: marvell: use ICU for the CP110 slave RTC
+>   arm64: dts: marvell: re-order RTC nodes in Marvell CP110 description
+>   arm64: dts: marvell: add description for SDHCI controller in CP110
+>     slave
+>
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      | 14 ++++++-------
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 24 +++++++++++++++-------
+>  2 files changed, 24 insertions(+), 14 deletions(-)
+>
+> -- 
+> 2.9.4
+>
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
