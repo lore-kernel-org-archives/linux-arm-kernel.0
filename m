@@ -1,26 +1,23 @@
-From: keith.busch@intel.com (Keith Busch)
-Date: Tue, 18 Jul 2017 10:36:17 -0400
-Subject: [PATCH] nvme: Acknowledge completion queue on each iteration
-In-Reply-To: <79413407294645f0e1252112c3435a29@codeaurora.org>
-References: <1500330983-27501-1-git-send-email-okaya@codeaurora.org>
- <20170717224551.GA1496@localhost.localdomain>
- <6d10032c-35ec-978c-6b8f-1ab9c07adf7f@codeaurora.org>
- <20170717225615.GB1496@localhost.localdomain>
- <79413407294645f0e1252112c3435a29@codeaurora.org>
-Message-ID: <20170718143617.GA7613@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jul 2017 16:28:10 +0200
+Subject: [PATCH v2 6/8] staging: fsl-mc: don't use raw device io functions
+In-Reply-To: <596E1A77.4030204@nxp.com>
+References: <20170718133723.12709-1-laurentiu.tudor@nxp.com>
+ <20170718133723.12709-7-laurentiu.tudor@nxp.com>
+ <CAK8P3a0zH1nVoppNkT=uVgFp-NUkmenZ0AVc9vOwHEe_VEt_cQ@mail.gmail.com>
+ <596E1A77.4030204@nxp.com>
+Message-ID: <CAK8P3a3hxA0Vi=BSuuhROQN7gieyyLeSRoRovjH4Vb9mQCAzuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 07:07:00PM -0400, okaya at codeaurora.org wrote:
-> Maybe, I need to understand the design better. I was curious why completion
-> and submission queues were protected by a single lock causing lock
-> contention.
+On Tue, Jul 18, 2017 at 4:26 PM, Laurentiu Tudor
+<laurentiu.tudor@nxp.com> wrote:
+>
+> Maybe i made an error in my previous emails, but the hi-lo variant is
+> the correct one. The command execution is triggered when the _first_
+> 32-bit half of the header (header&0xffffffff) is written, so that's why
+> it must be written last.
 
-Ideally the queues are tied to CPUs, so you couldn't have one thread
-submitting to a particular queue-pair while another thread is reaping
-completions from it. Such a setup wouldn't get lock contention.
+I'm pretty sure I just misremembered it then. Thanks for the clarification.
 
-Some machines have so many CPUs, though, that sharing hardware queues
-is required. We've experimented with separate submission and completion
-locks for such cases, but I've never seen an improved performance as a
-result.
+        Arnd
