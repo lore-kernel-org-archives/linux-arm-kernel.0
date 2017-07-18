@@ -1,43 +1,39 @@
 From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Tue, 18 Jul 2017 18:30:49 +0300
-Subject: [PATCH 3/4] arm64: dts: freescale: ls208xa: add crypto node
+Date: Tue, 18 Jul 2017 18:30:50 +0300
+Subject: [PATCH 4/4] arm64: dts: freescale: ls1088a: add crypto node
 In-Reply-To: <20170718153050.15330-1-horia.geanta@nxp.com>
 References: <20170718153050.15330-1-horia.geanta@nxp.com>
-Message-ID: <20170718153050.15330-4-horia.geanta@nxp.com>
+Message-ID: <20170718153050.15330-5-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS208xA has a SEC v5.1 security engine.
+LS1088A has a SEC v5.3 security engine.
 
 Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 41 ++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 43 ++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-index f135b987d13b..fc1234dc90f9 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-@@ -46,6 +46,7 @@
-  */
- 
- #include <dt-bindings/thermal/thermal.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
- 	compatible = "fsl,ls2080a";
-@@ -54,6 +55,7 @@
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index c144d06a6e33..6c22d75bc504 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -52,6 +52,10 @@
+ 	#address-cells = <2>;
  	#size-cells = <2>;
  
- 	aliases {
++	aliases {
 +		crypto = &crypto;
- 		serial0 = &serial0;
- 		serial1 = &serial1;
- 	};
-@@ -306,6 +308,45 @@
- 			clock-names = "apb_pclk", "wdog_clk";
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -369,6 +373,45 @@
+ 			dma-coherent;
+ 			status = "disabled";
  		};
- 
++
 +		crypto: crypto at 8000000 {
 +			compatible = "fsl,sec-v5.0", "fsl,sec-v4.0";
 +			fsl,sec-era = <8>;
@@ -76,9 +72,8 @@ index f135b987d13b..fc1234dc90f9 100644
 +				interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
 +			};
 +		};
-+
- 		fsl_mc: fsl-mc at 80c000000 {
- 			compatible = "fsl,qoriq-mc";
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+ 	};
+ 
+ };
 -- 
 2.12.0.264.gd6db3f216544
