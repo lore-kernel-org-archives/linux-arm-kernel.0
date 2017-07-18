@@ -1,46 +1,28 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 18 Jul 2017 14:02:53 +0800
-Subject: [PATCH 0/5] earlycon hang under some conditions
-Message-ID: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Tue, 18 Jul 2017 15:38:10 +0900
+Subject: [PATCH v2] arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
+Message-ID: <1500359890-30358-1-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was testing earlycon with 8250 dw serial console. And it hangs in
-these cases:
-1/ kernel hang when calling early write function after free_initmem:
-a) the earlycon not disabled after the init code(due to keep_bootcon or
-   not specify a real console to switch to)
-b) the early write func is marked as __init, for example 8250_early.
+Enable the watchdog driver for UniPhier SoC
 
-2/ kernel hang when calling early write function after disable unused
-clks/pm domain:
-a) the earlycon not disabled after the init code
-b) the disable unused clks/pm domain kill the requiered clks/pm
-   domain, since they are not referenced by the earlycon.
+Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-3/ kernel hang when calling early write function after the serial
-   console driver runtime suspended:
-a) the earlycon not disabled after the init code
-b) the serial console driver's runtime suspend kills the requiered
-   clks/pm domain, since they are not referenced by the earlycon.
-
-This serial fix 1/ case only.
-
-
-
-Jeffy Chen (5):
-  serial: arc: Remove __init marking from early write
-  serial: omap: Remove __init marking from early write
-  serial: xuartps: Remove __init marking from early write
-  serial: 8250_ingenic: Remove __init marking from early write
-  serial: 8250_early: Remove __init marking from early write
-
- drivers/tty/serial/8250/8250_early.c   |  8 ++++----
- drivers/tty/serial/8250/8250_ingenic.c |  8 ++++----
- drivers/tty/serial/arc_uart.c          |  4 ++--
- drivers/tty/serial/omap-serial.c       | 13 ++++++-------
- drivers/tty/serial/xilinx_uartps.c     |  2 +-
- 5 files changed, 17 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6c7d147..629c815 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -311,6 +311,7 @@ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MESON_GXBB_WATCHDOG=m
+ CONFIG_MESON_WATCHDOG=m
+ CONFIG_RENESAS_WDT=y
++CONFIG_UNIPHIER_WATCHDOG=y
+ CONFIG_BCM2835_WDT=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_I2C=y
 -- 
-2.1.4
+2.7.4
