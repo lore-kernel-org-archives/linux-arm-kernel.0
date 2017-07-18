@@ -1,22 +1,23 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 18 Jul 2017 11:02:24 +0800
-Subject: [linux-sunxi] [PATCH v6 4/9] arm64: allwinner: a64: add AXP803
- node to Pine64 device tree
-In-Reply-To: <CAGb2v67w=miCHB-3f39vrx_+iZuEJEo9UyrFLw6aPPYWPweJXQ@mail.gmail.com>
+Date: Tue, 18 Jul 2017 11:02:55 +0800
+Subject: [linux-sunxi] [PATCH v6 7/9] arm64: allwinner: a64: add DTSI file
+ for AXP803 PMIC
+In-Reply-To: <CAGb2v65xZC_iAf4HS6MWX5XbU-J0uUAN0FtAj6TxwD-peEt2mg@mail.gmail.com>
 References: <20170518071653.36561-1-icenowy@aosc.io>
- <20170518071653.36561-5-icenowy@aosc.io>
- <CAGb2v67w=miCHB-3f39vrx_+iZuEJEo9UyrFLw6aPPYWPweJXQ@mail.gmail.com>
-Message-ID: <CAGb2v65qryntOAjN4cQaumtca8=X00CWM9AYNWQTZpoN5MFwkA@mail.gmail.com>
+ <20170518071653.36561-8-icenowy@aosc.io>
+ <CAGb2v65xZC_iAf4HS6MWX5XbU-J0uUAN0FtAj6TxwD-peEt2mg@mail.gmail.com>
+Message-ID: <CAGb2v64vr8e8Qwj8FTTr5DuSKG8HvPSXrea_8U_E4=h33Oy-+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 10:28 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+On Fri, May 19, 2017 at 10:29 AM, Chen-Yu Tsai <wens@csie.org> wrote:
 > On Thu, May 18, 2017 at 3:16 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> The Pine64 (including Pine64+) boards have an AXP803 as its main PMIC.
->>
->> Add its device node.
+>> As nearly all A64 boards are using AXP803 PMIC, add a DTSI file for it,
+>> like the old DTSI files for AXP20x/22x, for the common parts of the
+>> PMIC.
 >>
 >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> Acked-by: Mark Brown <broonie@kernel.org>
 >
 > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
