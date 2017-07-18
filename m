@@ -1,7 +1,7 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 18 Jul 2017 12:36:09 -0700
+Date: Tue, 18 Jul 2017 12:37:37 -0700
 Subject: [PATCH] ARM: dts: BCM53573: Add Broadcom BCM947189ACDBMR board support
-Message-ID: <20170718193611.8543-1-f.fainelli@gmail.com>
+Message-ID: <20170718193740.8610-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
