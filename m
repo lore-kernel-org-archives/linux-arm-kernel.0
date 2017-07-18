@@ -1,24 +1,39 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 18 Jul 2017 14:35:29 +0200
-Subject: [PATCH 0/3] Allow to tune sampling time on STM32 ADC
-Message-ID: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
+Date: Tue, 18 Jul 2017 14:35:31 +0200
+Subject: [PATCH 2/3] dt-bindings: iio: adc: stm32: add optional min-sample-time
+In-Reply-To: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
+References: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1500381332-17086-3-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 STM32 ADC allows each channel to be sampled with a different sampling
-time. This series fixes common clock rate and adds optional device
-tree property, so minimum sampling time can be tuned. This is done via
-device tree as it's tightly coupled with hardware (analog source).
+time. There's an application note that deals with this: 'How to get
+the best ADC accuracy in STM32...' It basically depends on analog input
+signal electrical properties (depends on board).
 
-Fabrice Gasnier (3):
-  iio: adc: stm32: fix common clock rate
-  dt-bindings: iio: adc: stm32: add optional min-sample-time
-  iio: adc: stm32: add optional min-sample-time
+Add optional 'min-sample-time' property so this can be tuned in dt.
 
- .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   5 +
- drivers/iio/adc/stm32-adc-core.c                   |  10 +-
- drivers/iio/adc/stm32-adc.c                        | 134 ++++++++++++++++++++-
- 3 files changed, 140 insertions(+), 9 deletions(-)
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+index 8310073..9cd964b 100644
+--- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+@@ -74,6 +74,11 @@ Optional properties:
+   * can be 6, 8, 10 or 12 on stm32f4
+   * can be 8, 10, 12, 14 or 16 on stm32h7
+   Default is maximum resolution if unset.
++- min-sample-time: Minimum sampling time in nanoseconds.
++  Depending on hardware (board) e.g. high/low analog input source impedance,
++  fine tune of ADC sampling time may be recommended.
++  This can be either one value or an array that matches 'st,adc-channels' list,
++  to set sample time resp. for all channels, or independently for each channel.
+ 
+ Example:
+ 	adc: adc at 40012000 {
 -- 
 1.9.1
