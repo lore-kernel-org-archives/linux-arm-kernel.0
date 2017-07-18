@@ -1,40 +1,71 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 18 Jul 2017 11:51:30 +0200
-Subject: [PATCH] arm64: dts: marvell: mark the cp110 crypto engine as dma
- coherent
-In-Reply-To: <87o9si84ej.fsf@free-electrons.com>
-References: <20170717073516.26746-1-antoine.tenart@free-electrons.com>
- <87o9si84ej.fsf@free-electrons.com>
-Message-ID: <20170718095130.GC2563@kwain>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 18 Jul 2017 10:48:15 +0100
+Subject: [PATCH v4 18/18] coresight: Add support for Coresight SoC 600
+ components
+In-Reply-To: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
+References: <1500371295-30472-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500371295-30472-19-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Add the peripheral ids for the Coresight SoC 600 TPIU, replicator
+and funnel.
 
-On Tue, Jul 18, 2017 at 11:45:24AM +0200, Gregory CLEMENT wrote:
->  On lun., juil. 17 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-> 
-> > The crypto engines found on the cp110 master and slave are dma coherent.
-> > This patch adds the relevant property to their dt nodes.
-> 
-> Is it a fix?
-> 
-> Should it go to the current ans stable kernel?
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 5 +++++
+ drivers/hwtracing/coresight/coresight-funnel.c             | 5 +++++
+ drivers/hwtracing/coresight/coresight-tpiu.c               | 5 +++++
+ 3 files changed, 15 insertions(+)
 
-Yes I think that should go into stable. I forgot the stable tag, do you
-want me to send a v2 with it included?
-
-Thanks!
-Antoine
-
+diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+index 93c2206..1e4beb2 100644
+--- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+@@ -200,6 +200,11 @@ static struct amba_id replicator_ids[] = {
+ 		.id     = 0x000bb909,
+ 		.mask   = 0x000fffff,
+ 	},
++	{
++		/* Coresight SoC-600 */
++		.id     = 0x000bb9ec,
++		.mask   = 0x000fffff,
++	},
+ 	{ 0, 0 },
+ };
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index 6f7f3d3..df1cf73 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -251,6 +251,11 @@ static struct amba_id funnel_ids[] = {
+ 		.id     = 0x000bb908,
+ 		.mask   = 0x000fffff,
+ 	},
++	{
++		/* Coresight SoC-600 */
++		.id     = 0x000bb9eb,
++		.mask   = 0x000fffff,
++	},
+ 	{ 0, 0},
+ };
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 59c1510..eda5d5a 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -201,6 +201,11 @@ static struct amba_id tpiu_ids[] = {
+ 		.id	= 0x0004b912,
+ 		.mask	= 0x0007ffff,
+ 	},
++	{
++		/* Coresight SoC-600 */
++		.id	= 0x000bb9e7,
++		.mask	= 0x000fffff,
++	},
+ 	{ 0, 0},
+ };
+ 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170718/7ad85945/attachment-0001.sig>
+2.7.5
