@@ -1,100 +1,59 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 18 Jul 2017 14:55:30 +0300
-Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for
- Allwinner CSI
-In-Reply-To: <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
-References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
- <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
-Message-ID: <20170718115530.ssy7g5vv4siqnfpo@tarshish>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 18 Jul 2017 13:59:59 +0200
+Subject: [PATCH v2 0/7] [PATCH v2 0/7] Add support of OV9655 camera
+In-Reply-To: <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
+References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
+ <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
+Message-ID: <956f17e6-36dd-6733-0d35-9b801ed4244d@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
-
-I am trying to get this driver working on the Olimex A33 OLinuXino. I didn't 
-get it working yet, but I had some progress. See the comment below on one 
-issue I encountered.
-
-On Tue, Jun 27, 2017 at 07:07:34PM +0800, Yong Deng wrote:
-> Add binding documentation for Allwinner CSI.
+On 12/07/17 22:01, Sylwester Nawrocki wrote:
+> Hi Hugues,
 > 
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> ---
->  .../devicetree/bindings/media/sunxi-csi.txt        | 51 ++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sunxi-csi.txt
+> On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
+>> This patchset enables OV9655 camera support.
+>>
+>> OV9655 support has been tested using STM32F4DIS-CAM extension board
+>> plugged on connector P1 of STM32F746G-DISCO board.
+>> Due to lack of OV9650/52 hardware support, the modified related code
+>> could not have been checked for non-regression.
+>>
+>> First patches upgrade current support of OV9650/52 to prepare then
+>> introduction of OV9655 variant patch.
+>> Because of OV9655 register set slightly different from OV9650/9652,
+>> not all of the driver features are supported (controls). Supported
+>> resolutions are limited to VGA, QVGA, QQVGA.
+>> Supported format is limited to RGB565.
+>> Controls are limited to color bar test pattern for test purpose.
 > 
-> diff --git a/Documentation/devicetree/bindings/media/sunxi-csi.txt b/Documentation/devicetree/bindings/media/sunxi-csi.txt
-> new file mode 100644
-> index 0000000..770be0e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sunxi-csi.txt
-> @@ -0,0 +1,51 @@
-> +Allwinner V3s Camera Sensor Interface
-> +------------------------------
-> +
-> +Required properties:
-> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> +  - reg: base address and size of the memory-mapped region.
-> +  - interrupts: interrupt associated to this IP
-> +  - clocks: phandles to the clocks feeding the CSI
-> +    * ahb: the CSI interface clock
-> +    * mod: the CSI module clock
-> +    * ram: the CSI DRAM clock
-> +  - clock-names: the clock names mentioned above
-> +  - resets: phandles to the reset line driving the CSI
-> +
-> +- ports: A ports node with endpoint definitions as defined in
-> +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> +  first port should be the input endpoints, the second one the outputs
-> +
-> +Example:
-> +
-> +	csi1: csi at 01cb4000 {
-> +		compatible = "allwinner,sun8i-v3s-csi";
-> +		reg = <0x01cb4000 0x1000>;
+> I appreciate your efforts towards making a common driver but IMO it would be 
+> better to create a separate driver for the OV9655 sensor.  The original driver 
+> is 1576 lines of code, your patch set adds half of that (816).  There are
+> significant differences in the feature set of both sensors, there are 
+> differences in the register layout.  I would go for a separate driver, we  
+> would then have code easier to follow and wouldn't need to worry about possible
+> regressions.  I'm afraid I have lost the camera module and won't be able 
+> to test the patch set against regressions.
+> 
+> IMHO from maintenance POV it's better to make a separate driver. In the end 
+> of the day we wouldn't be adding much more code than it is being done now.
 
-You use platform_get_resource_byname() to get this IO resource. This requires 
-adding mandatory
+I agree. We do not have great experiences in the past with trying to support
+multiple variants in a single driver (unless the diffs are truly small).
 
-  reg-names = "csi";
+Regards,
 
-But is it actually needed? Wouldn't a simple platform_get_resource() be 
-enough?
+	Hans
 
-Thanks,
-baruch
-
-> +		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&ccu CLK_BUS_CSI>,
-> +			 <&ccu CLK_CSI1_SCLK>,
-> +			 <&ccu CLK_DRAM_CSI>;
-> +		clock-names = "ahb", "mod", "ram";
-> +		resets = <&ccu RST_BUS_CSI>;
-> +
-> +		port {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			/* Parallel bus endpoint */
-> +			csi1_0: endpoint at 0 {
-> +				reg = <0>;
-> +				remote = <&adv7611_1>;
-> +				bus-width = <16>;
-> +				data-shift = <0>;
-> +
-> +				/* If hsync-active/vsync-active are missing,
-> +				   embedded BT.656 sync is used */
-> +				hsync-active = <0>; /* Active low */
-> +				vsync-active = <0>; /* Active low */
-> +				data-active = <1>;  /* Active high */
-> +				pclk-sample = <1>;  /* Rising */
-> +			};
-> +		};
-> +	};
-> +
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+> 
+>>   .../devicetree/bindings/media/i2c/ov965x.txt       |  45 ++
+>>   drivers/media/i2c/Kconfig                          |   6 +-
+>>   drivers/media/i2c/ov9650.c                         | 816 +++++++++++++++++----
+>>   3 files changed, 736 insertions(+), 131 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/media/i2c/ov965x.txt
+> 
+> --
+> Thanks,
+> Sylwester
+> 
