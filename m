@@ -1,33 +1,33 @@
 From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 18 Jul 2017 15:22:17 +0200
-Subject: [PATCH v2 0/3] Fix SMC layout register for sama5d2
-Message-ID: <20170718132220.25018-1-ludovic.desroches@microchip.com>
+Date: Tue, 18 Jul 2017 15:22:20 +0200
+Subject: [PATCH v2 3/3] ARM: dts: at91: sama5d2: use sama5d2 compatible string
+ for SMC
+In-Reply-To: <20170718132220.25018-1-ludovic.desroches@microchip.com>
+References: <20170718132220.25018-1-ludovic.desroches@microchip.com>
+Message-ID: <20170718132220.25018-4-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+A new compatible string has been introduced for sama5d2 SMC to allow to
+manage the registers mapping change.
 
-The offset of some registers of the SMC is different between sama5d3/sama5d4
-and sama5d2. An helper function has been added to retrieve the correct layout
-with the help of a new compatible string for sama5d2. The atmel-ebi device will
-store the register layout to allow the nand controller to setup correctly the
-data interface.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes:
-- v2: rebase patches on top of v4.13-rc1 and collect acked-by
-
-Ludovic Desroches (3):
-  mfd: syscon: update Atmel SMC binding doc
-  mfd: syscon: atmel-smc: add helper to retrieve register layout
-  ARM: dts: at91: sama5d2: use sama5d2 compatible string for SMC
-
- .../devicetree/bindings/mfd/atmel-smc.txt          |  1 +
- arch/arm/boot/dts/sama5d2.dtsi                     |  2 +-
- drivers/memory/atmel-ebi.c                         | 13 +++--
- drivers/mfd/atmel-smc.c                            | 67 +++++++++++++++++-----
- drivers/mtd/nand/atmel/nand-controller.c           | 10 +++-
- include/linux/mfd/syscon/atmel-smc.h               | 32 ++++++++---
- 6 files changed, 94 insertions(+), 31 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index cc06da394366..3e6e2dbc2595 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1048,7 +1048,7 @@
+ 			};
+ 
+ 			hsmc: hsmc at f8014000 {
+-				compatible = "atmel,sama5d3-smc", "syscon", "simple-mfd";
++				compatible = "atmel,sama5d2-smc", "syscon", "simple-mfd";
+ 				reg = <0xf8014000 0x1000>;
+ 				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				clocks = <&hsmc_clk>;
 -- 
 2.12.2
