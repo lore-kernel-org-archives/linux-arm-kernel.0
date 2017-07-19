@@ -1,33 +1,30 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 19 Jul 2017 16:47:09 +0530
-Subject: [PATCH 0/5] FlexRM support in VFIO platform
-In-Reply-To: <0dc860ed-a40c-1bfd-f584-225807edb25b@arm.com>
+Date: Wed, 19 Jul 2017 16:49:00 +0530
+Subject: [PATCH 1/5] iommu: Add capability IOMMU_CAP_BYPASS
+In-Reply-To: <675744d3-b070-1245-6ebc-579c4b5f4a75@arm.com>
 References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <0dc860ed-a40c-1bfd-f584-225807edb25b@arm.com>
-Message-ID: <CAALAos_YTVRu_u8DycSXPgniGru20+fS6wfUskpV5uLRsazcNw@mail.gmail.com>
+ <1500456838-18405-2-git-send-email-anup.patel@broadcom.com>
+ <675744d3-b070-1245-6ebc-579c4b5f4a75@arm.com>
+Message-ID: <CAALAos_o25mtphxcVE0rr9dE8YAm-os2C_HD9oDnt41ZMDP8pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 4:27 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+On Wed, Jul 19, 2017 at 4:28 PM, Robin Murphy <robin.murphy@arm.com> wrote:
 > On 19/07/17 10:33, Anup Patel wrote:
->> This patchset primarily adds Broadcom FlexRM reset module for
->> VFIO platform driver. We also have minor improvments in IOMMU
->> and VFIO driver to allow VFIO no-IOMMU mode access to FlexRM.
+>> Some of the IOMMUs (such as ARM SMMU) are capable of bypassing
+>> transactions for which no IOMMU domain is configured.
+>>
+>> This patch adds IOMMU_CAP_BYPASS which can be used by IOMMU
+>> drivers to advertise transation bypass capability of an IOMMU.
 >
-> I'm struggling to understand the IOMMU changes here - what's the
-> FlexRM's hardware relationship with the IOMMU, and how is it different
-> from any other device? Furthermore, if there *is* a relevant IOMMU
-> present, why would no-IOMMU mode need to be involved at all?
+> Whatever the intended semantics of this are, I can't help thinking it
+> would be better served by allowing callers to explicitly allocate their
+> own IOMMU_DOMAIN_IDENTITY domains. That would also be useful for the
+> problem we have with legacy virtio devices behind real IOMMUs.
 
-We want to have FlexRM device accessible from user-space
-using VFIO platform with and without IOMMU.
-
-Currently, if IOMMU ops are available for platform bus then
-I cannot access FlexRM device using VFIO no-IOMMU mode.
-
-Since, SMMU can bypass transactions which do not match
-any SMRs, we should allow no-IOMMU mode for devices
-when IOMMU group is not available.
+We want to use VFIO no-IOMMU mode for FlexRM device but
+currently it does not allow on our SOC because IOMMU ops are
+registered for platform bus.
 
 Regards,
 Anup
