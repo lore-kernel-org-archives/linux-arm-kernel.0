@@ -1,99 +1,54 @@
-From: jintack.lim@linaro.org (Jintack Lim)
-Date: Wed, 19 Jul 2017 10:35:30 -0400
-Subject: [RFC PATCH v2 00/38] Nested Virtualization on KVM/ARM
-In-Reply-To: <20170719084938.GA11435@cbox>
-References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
- <CAHyh4xjkT+JNJL0kxmEjz4qU8kD2-ZwYgVB8VgwsSYjpjTc3LA@mail.gmail.com>
- <20170719084938.GA11435@cbox>
-Message-ID: <CAHyh4xjNMqzQpEQKfN7uKTsW-rDB5X6jjdFH3xW_Hee4NPfybg@mail.gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 19 Jul 2017 20:28:01 +0530
+Subject: USB 3.0 is broken on Odroid Xu4 on latest kernel
+Message-ID: <CANAwSgSoo7g=RN4wQ96+NJRYZYy2WeHwPA-xJ2JY7yt25irDfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 4:49 AM, Christoffer Dall <cdall@linaro.org> wrote:
-> Hi Jintack,
->
-> On Tue, Jul 18, 2017 at 10:23:05PM -0400, Jintack Lim wrote:
->> On Tue, Jul 18, 2017 at 12:58 PM, Jintack Lim <jintack.lim@linaro.org> wrote:
->> > Nested virtualization is the ability to run a virtual machine inside another
->> > virtual machine. In other words, it?s about running a hypervisor (the guest
->> > hypervisor) on top of another hypervisor (the host hypervisor).
->> >
->> > Supporting nested virtualization on ARM means that the hypervisor provides not
->> > only EL0/EL1 execution environment to VMs as it usually does but also the
->> > virtualization extensions including EL2 execution environment. Once the host
->> > hypervisor provides those execution environments to the VMs, then the guest
->> > hypervisor can run its own VMs (nested VMs) naturally.
->> >
->> > This series supports nested virtualization on arm64. ARM recently announced an
->> > extension (ARMv8.3) which has support for nested virtualization[1]. This patch
->> > set is based on the ARMv8.3 specification and tested on the FastModel with
->> > ARMv8.3 extension.
->> >
->> > The whole patch set to support nested virtualization is huge over 70
->> > patches, so I categorized them into four parts: CPU, memory, VGIC, and timer
->> > virtualization. This patch series is the first part.
->> >
->> > CPU virtualization patch series provides basic nested virtualization framework
->> > and instruction emulations including v8.1 VHE feature and v8.3 nested
->> > virtualization feature for VMs.
->> >
->> > This patch series again can be divided into four parts. Patch 1 to 5 introduces
->> > nested virtualization by discovering hardware feature, adding a kernel
->> > parameter and allowing the userspace to set the initial CPU mode to EL2.
->> >
->> > Patch 6 to 25 are to support the EL2 execution environment, the virtual EL2, to
->> > a VM on v8.0 architecture. We de-privilege the guest hypervisor and emulate the
->> > virtual EL2 mode in EL1 using the hardware features provided by ARMv8.3; The
->> > host hypervisor manages virtual EL2 register state for the guest hypervisor
->> > and shadow EL1 register state that reflects the virtual EL2 register state to
->> > run the guest hypervisor in EL1.
->> >
->> > Patch 26 to 33 add support for the virtual EL2 with Virtualization Host
->> > Extensions. These patches emulate newly defined registers and bits in v8.1 and
->> > allow the virtual EL2 to access EL2 register states via EL1 register accesses
->> > as in the real EL2.
->> >
->> > Patch 34 to 38 are to support for the virtual EL2 with nested virtualization.
->> > These enable recursive nested virtualization.
->> >
->> > This patch set is tested on the FastModel with the v8.3 extension for arm64 and
->> > a cubietruck for arm32. On the FastModel, the host and the guest kernels are
->> > compiled with and without VHE, so there are four combinations. I was able to
->> > boot SMP Linux in the nested VM on all four configurations and able to run
->> > hackbench. I also checked that regular VMs could boot when the nested
->> > virtualization kernel parameter was not set. On the cubietruck, I also verified
->> > that regular VMs could boot as well.
->> >
->> > I'll share my experiment setup shortly.
->>
->> I summarized my experiment setup here.
->>
->> https://github.com/columbia/nesting-pub/wiki/Nested-virtualization-on-ARM-setup
->>
->
-> Thanks for sharing this.
->
->> >
->> > Even though this work has some limitations and TODOs, I'd appreciate early
->> > feedback on this RFC. Specifically, I'm interested in:
->> >
->> > - Overall design to manage vcpu context for the virtual EL2
->> > - Verifying correct EL2 register configurations such as HCR_EL2, CPTR_EL2
->> >   (Patch 30 and 32)
->> > - Patch organization and coding style
->>
->> I also wonder if the hardware and/or KVM do not support nested
->> virtualization but the userspace uses nested virtualization option,
->> which one is better: giving an error or launching a regular VM
->> silently.
->>
->
-> I think KVM should complain to userspace if userspace tries to set a
-> feature it does not support, and I think userspace should give as
-> meaningful an error message as possible to the user when that happens.
->
+Hi Krzysztof,
 
-Ok, thanks. I'll work this out.
+Today I tried to compile the latest kernel for Odroid xu4.
+using exynos_defconfig I build and loaded the kernel.
+but to my surprise usb 3.0 device and missing.
 
-> Thanks,
-> -Christoffer
+odroid login: root
+Password:
+Last login: Wed Jul 19 14:01:44 UTC 2017 on ttySAC2
+Welcome to Ubuntu 16.04.2 LTS (GNU/Linux 4.13.0-rc1-xu4ml-27846-g74cbd96 armv7l)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+root at odroid:~# lsusb
+Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 002 Device 002: ID 0603:0002 Novatek Microelectronics Corp.
+Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+root at odroid:~# lsusb -t
+/:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+/:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+/:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+/:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
+    |__ Port 1: Dev 2, If 0, Class=Human Interface Device, Driver=usbhid, 1.5M
+    |__ Port 1: Dev 2, If 1, Class=Human Interface Device, Driver=usbhid, 1.5M
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
+
+Full dmesg can be found on blow link.
+https://pastebin.com/K3xfPCPe
+
+The reason for failed is below.
+
+[    7.187096] usb usb4-port1: connect-debounce failed
+
+I tried to debug this but failed to find the root cause.
+Nothing is connected to the UBS 3.0 port for the failure to cause.
+
+If I load old kernel it seen to work correctly.
+If you provoid some input I will give this a try.
+
+Best Regards
+-Anand
