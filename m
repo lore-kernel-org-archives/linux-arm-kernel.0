@@ -1,33 +1,35 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 19 Jul 2017 17:31:24 +0200
-Subject: [PATCH 0/2] Enable NAND support on Armada 7K/8K
-Message-ID: <20170719153126.16905-1-gregory.clement@free-electrons.com>
+Date: Wed, 19 Jul 2017 17:31:25 +0200
+Subject: [PATCH 1/2] mtd: nand: pxa3xx_nand: enable building on mvebu 64-bit
+ platforms
+In-Reply-To: <20170719153126.16905-1-gregory.clement@free-electrons.com>
+References: <20170719153126.16905-1-gregory.clement@free-electrons.com>
+Message-ID: <20170719153126.16905-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+The controller supported by the pxa3xx_nand driver is also available on
+the mvebu 64-bit SoCs, such as the Armada 7K and Armada 8K SoCs. This
+patch updates the Kconfig dependency to allow building the kernel for
+this SoC family too.
 
-this short series enables the NAND controller on the Armada 7K/8K
-SoCs. The IP used is the same that the other mvebu SoC, so we only
-need to be bale to build it for this SoCs and updating the device
-tree.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/mtd/nand/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The first patch should go to mtd and the second one to arm-soc through
-mvebu.
-
-The patches are completely independent.
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (2):
-  mtd: nand: pxa3xx_nand: enable building on mvebu 64-bit platforms
-  ARM64: dts: marvell: add NAND support on the CP110 master
-
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 14 ++++++++++++++
- drivers/mtd/nand/Kconfig                             |  2 +-
- 2 files changed, 15 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index dbfa72d61d5a..ca42503e42f7 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -315,7 +315,7 @@ config MTD_NAND_ATMEL
+ 
+ config MTD_NAND_PXA3xx
+ 	tristate "NAND support on PXA3xx and Armada 370/XP"
+-	depends on PXA3xx || ARCH_MMP || PLAT_ORION
++	depends on PXA3xx || ARCH_MMP || PLAT_ORION  || ARCH_MVEBU
+ 	help
+ 	  This enables the driver for the NAND flash device found on
+ 	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
 -- 
 2.13.2
