@@ -1,68 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 19 Jul 2017 13:38:25 +0200
-Subject: [PATCH v2] arm64: dts: marvell: mark the cp110 crypto engine as
- dma coherent
-In-Reply-To: <20170719090426.10228-1-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Wed, 19 Jul 2017 11:04:26 +0200")
-References: <20170719090426.10228-1-antoine.tenart@free-electrons.com>
-Message-ID: <87d18w7j2m.fsf@free-electrons.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Wed, 19 Jul 2017 17:09:05 +0530
+Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
+ SMMUv3 driver
+In-Reply-To: <20170719113325.GI13642@arm.com>
+References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+ <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
+ <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
+ <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
+ <20170719112524.GF13642@arm.com>
+ <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
+ <20170719113325.GI13642@arm.com>
+Message-ID: <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On mer., juil. 19 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-
-> The crypto engines found on the cp110 master and slave are dma coherent.
-> This patch adds the relevant property to their dt nodes.
+On Wed, Jul 19, 2017 at 5:03 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jul 19, 2017 at 05:01:11PM +0530, Anup Patel wrote:
+>> On Wed, Jul 19, 2017 at 4:55 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Wed, Jul 19, 2017 at 04:53:04PM +0530, Anup Patel wrote:
+>> >> On Wed, Jul 19, 2017 at 4:30 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>> >> > On 19/07/17 10:33, Anup Patel wrote:
+>> >> >> The ARM SMMUv3 support bypassing transactions for which domain
+>> >> >> is not configured. The patch adds corresponding IOMMU capability
+>> >> >> to advertise this fact.
+>> >> >>
+>> >> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> >> >> ---
+>> >> >>  drivers/iommu/arm-smmu-v3.c | 2 ++
+>> >> >>  1 file changed, 2 insertions(+)
+>> >> >>
+>> >> >> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> >> >> index 568c400..a6c7f66 100644
+>> >> >> --- a/drivers/iommu/arm-smmu-v3.c
+>> >> >> +++ b/drivers/iommu/arm-smmu-v3.c
+>> >> >> @@ -1423,6 +1423,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>> >> >>               return true;
+>> >> >>       case IOMMU_CAP_NOEXEC:
+>> >> >>               return true;
+>> >> >> +     case IOMMU_CAP_BYPASS:
+>> >> >> +             return true;
+>> >> >
+>> >> > And this is never true. If Linux knows a device masters through the
+>> >> > SMMU, it will always have a default domain of some sort (either identity
+>> >> > or DMA ops). If Linux doesn't know, then it won't have been able to
+>> >> > initialise the stream table for the relevant stream IDs, thus any
+>> >> > 'bypass' DMA is going to raise C_BAD_STE. SMMUv3 can effectively only
+>> >> > bypass unknown stream IDs if disabled entirely.
+>> >>
+>> >> What if we don't want to use IOMMU for certain device and
+>> >> due to this we never provide "iommus" DT attribute in the
+>> >> device DT node. Further, we want to access device without
+>> >> "iommus" DT attribute from user-space using VFIO no-IOMMU.
+>> >
+>> > Wait, you want to pass a device through to userspace but you don't want to
+>> > use the IOMMU? Why not?
+>> >
+>> > If you describe the SMMU in firmware with only a partial topology
+>> > description, then you will run into problems with unknown masters trying to
+>> > perform DMA. That's the IOMMU doing its job!
+>>
+>> We are keeping disable_bypass = false. In other words, we
+>> are using bypass mode for unmatched streams. The real
+>> reason is limited number of SMRs due to which we choose
+>> not to provide "iommus" DT attribute for certain devices.
 >
-> Cc: stable at vger.kernel.org # v4.12+
-> Fixes: 973020fd9498 ("arm64: marvell: dts: add crypto engine description for 7k/8k")
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Understood, but that's not robust for SMMUv3 and we *really* shouldn't have
+> a user ABI that changes behaviour based on a cmdline option. VFIO should be
+> requesting its own identity mappings, if that's what you need.
 
-Applied on mvebu/fixes
+Currently, the iommu_present() check in vfio_iommu_group_get()
+is preventing us allow no-IOMMU mode for certain devices.
 
-Thanks,
+Is there a better replacement of iommu_present() check in
+vfio_iommu_group_get()?
 
-Gregory
-> ---
->
-> Since v1: added the 'Fixes:' and 'Cc: stable' tags.
->
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
->  2 files changed, 2 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 726528ce54e9..4c68605675a8 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -270,6 +270,7 @@
->  				interrupt-names = "mem", "ring0", "ring1",
->  				"ring2", "ring3", "eip";
->  				clocks = <&cpm_clk 1 26>;
-> +				dma-coherent;
->  			};
->  		};
->  
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 95f8e5f607f6..0dbb59811d00 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -261,6 +261,7 @@
->  				interrupt-names = "mem", "ring0", "ring1",
->  						  "ring2", "ring3", "eip";
->  				clocks = <&cps_clk 1 26>;
-> +				dma-coherent;
->  				/*
->  				 * The cryptographic engine found on the cp110
->  				 * master is enabled by default at the SoC
-> -- 
-> 2.13.3
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Anup
