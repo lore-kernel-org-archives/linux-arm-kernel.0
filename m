@@ -1,20 +1,92 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 19 Jul 2017 11:37:22 +0200
-Subject: [PATCH 1/4] gpio: davinci: Use devm_gpiochip_add_data in place
- of gpiochip_add_data
-In-Reply-To: <1500375436-9435-2-git-send-email-j-keerthy@ti.com>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-2-git-send-email-j-keerthy@ti.com>
-Message-ID: <20170719093722.GW29638@localhost>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 19 Jul 2017 11:41:37 +0200
+Subject: [PATCH] media: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-33-robh@kernel.org>
+References: <CGME20170718215328epcas2p2e5e1d7df96fcd894e70a961df864abdd@epcas2p2.samsung.com>
+ <20170718214339.7774-33-robh@kernel.org>
+Message-ID: <564a6768-3b23-6dc7-ecb5-cb4f4359b633@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 04:27:13PM +0530, Keerthy wrote:
-> Use the devm version of gpiochip_add_data and pass on the
-> return value. Reset the static variables to 0 before returning.
+On 07/18/2017 11:43 PM, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-You need to describe not just what you do, but also why you it. In this
-case, your fixing memory leaks and the gpio chip being left registered
-if this driver is unbound.
+> ---
+>   drivers/media/i2c/s5c73m3/s5c73m3-core.c       |  3 +-
+>   drivers/media/i2c/s5k5baf.c                    |  7 ++--
+>   drivers/media/platform/am437x/am437x-vpfe.c    |  4 +-
+>   drivers/media/platform/atmel/atmel-isc.c       |  4 +-
+>   drivers/media/platform/davinci/vpif_capture.c  | 16 ++++----
+>   drivers/media/platform/exynos4-is/fimc-is.c    |  8 ++--
+>   drivers/media/platform/exynos4-is/fimc-lite.c  |  3 +-
+>   drivers/media/platform/exynos4-is/media-dev.c  |  8 ++--
+>   drivers/media/platform/exynos4-is/mipi-csis.c  |  4 +-
+>   drivers/media/platform/mtk-mdp/mtk_mdp_comp.c  |  6 +--
+>   drivers/media/platform/mtk-mdp/mtk_mdp_core.c  |  8 ++--
+>   drivers/media/platform/omap3isp/isp.c          |  8 ++--
+>   drivers/media/platform/pxa_camera.c            |  2 +-
+>   drivers/media/platform/rcar-vin/rcar-core.c    |  4 +-
+>   drivers/media/platform/soc_camera/soc_camera.c |  6 +--
+>   drivers/media/platform/xilinx/xilinx-vipp.c    | 52 +++++++++++++-------------
+>   drivers/media/v4l2-core/v4l2-async.c           |  4 +-
+>   drivers/media/v4l2-core/v4l2-clk.c             |  3 +-
+>   include/media/v4l2-clk.h                       |  4 +-
+>   19 files changed, 71 insertions(+), 83 deletions(-)
 
-Johan
+> diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+> index ac4704388920..9233ad0b1b6b 100644
+> --- a/drivers/media/platform/xilinx/xilinx-vipp.c
+> +++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+
+> @@ -144,9 +144,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+>   		remote = ent->entity;
+> 
+>   		if (link.remote_port >= remote->num_pads) {
+> -			dev_err(xdev->dev, "invalid port number %u on %s\n",
+> -				link.remote_port,
+> -				to_of_node(link.remote_node)->full_name);
+> +			dev_err(xdev->dev, "invalid port number %u on %pOF\n",
+> +				link.remote_port, link.remote_node);
+
+Shouldn't there be to_of_node(link.remote_node) instead of link.remote_node ?
+
+>   			v4l2_fwnode_put_link(&link);
+>   			ret = -EINVAL;
+>   			break;
+
+> @@ -242,17 +241,17 @@ static int xvip_graph_build_dma(struct xvip_composite_device *xdev)
+>   		ent = xvip_graph_find_entity(xdev,
+>   					     to_of_node(link.remote_node));
+>   		if (ent == NULL) {
+> -			dev_err(xdev->dev, "no entity found for %s\n",
+> -				to_of_node(link.remote_node)->full_name);
+> +			dev_err(xdev->dev, "no entity found for %pOF\n",
+> +				to_of_node(link.remote_node));
+>   			v4l2_fwnode_put_link(&link);
+>   			ret = -ENODEV;
+>   			break;
+>   		}
+
+> diff --git a/drivers/media/v4l2-core/v4l2-async.c b/drivers/media/v4l2-core/v4l2-async.c
+> index 851f128eba22..0a385d1ff28c 100644
+> --- a/drivers/media/v4l2-core/v4l2-async.c
+> +++ b/drivers/media/v4l2-core/v4l2-async.c
+> @@ -47,9 +47,7 @@ static bool match_fwnode(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
+>   	if (!is_of_node(sd->fwnode) || !is_of_node(asd->match.fwnode.fwnode))
+>   		return sd->fwnode == asd->match.fwnode.fwnode;
+> 
+> -	return !of_node_cmp(of_node_full_name(to_of_node(sd->fwnode)),
+> -			    of_node_full_name(
+> -				    to_of_node(asd->match.fwnode.fwnode)));
+> +	return to_of_node(sd->fwnode) == to_of_node(asd->match.fwnode.fwnode);
+
+I'm afraid this will not work, please see commit d2180e0cf77dc7a7049671d5d57d
+"[media] v4l: async: make v4l2 coexist with devicetree nodes in a dt overlay"
+
+--
+Regards,
+Sylwester
