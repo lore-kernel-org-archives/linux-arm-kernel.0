@@ -1,42 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 19 Jul 2017 10:35:20 -0500
-Subject: [PATCH] ARM: Convert to using %pOF instead of full_name
-In-Reply-To: <20170719062220.wefnkqhd7javbcee@pengutronix.de>
-References: <20170718214339.7774-1-robh@kernel.org>
- <20170719062220.wefnkqhd7javbcee@pengutronix.de>
-Message-ID: <CAL_JsqK1Y3xhZwNxme934UF_t=6ZdSyqBtrMmceUC798ftL+mQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Jul 2017 17:40:06 +0200
+Subject: [PATCH 1/2] mtd: nand: pxa3xx_nand: enable building on mvebu
+ 64-bit platforms
+In-Reply-To: <20170719153126.16905-2-gregory.clement@free-electrons.com>
+References: <20170719153126.16905-1-gregory.clement@free-electrons.com>
+ <20170719153126.16905-2-gregory.clement@free-electrons.com>
+Message-ID: <20170719174006.1ca20652@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 1:22 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Tue, Jul 18, 2017 at 04:42:41PM -0500, Rob Herring wrote:
->> Now that we have a custom printf format specifier, convert users of
->> full_name to use %pOF instead. This is preparation to remove storing
->
-> Oh nice. If the commit adding %pOF is already set in stone, i'd suggest
-> to mention the commit id here in the commit log.
+Hello,
 
-It is in 4.13, but I'm not really eager to update all 60 patches and
-I'd prefer consistency in the commit msg as quite a few have already
-been applied.
+On Wed, 19 Jul 2017 17:31:25 +0200, Gregory CLEMENT wrote:
 
->> of the full path string for each node.
+>  config MTD_NAND_PXA3xx
+>  	tristate "NAND support on PXA3xx and Armada 370/XP"
+> -	depends on PXA3xx || ARCH_MMP || PLAT_ORION
+> +	depends on PXA3xx || ARCH_MMP || PLAT_ORION  || ARCH_MVEBU
 
-[...]
+                                                   ^^^
 
->> @@ -103,8 +103,8 @@ void __init arm_dt_init_cpu_maps(void)
->>                */
->>               cell = of_get_property(cpu, "reg", &prop_bytes);
->>               if (!cell || prop_bytes < sizeof(*cell)) {
->> -                     pr_debug(" * %s missing reg property\n",
->> -                                  cpu->full_name);
->> +                     pr_debug(" * %pOF missing reg property\n",
->> +                                  cpu);
->
-> You could join lines here and in the next hunk. And there are two more
-> further down.
+Stupid minor nit: there are two spaces here, there should be one. No
+need to send a v2 just for this, I'm sure Boris will happily fix this
+when applying :-)
 
-Okay. I did that generally, but missed a few.
+Best regards,
 
-Rob
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
