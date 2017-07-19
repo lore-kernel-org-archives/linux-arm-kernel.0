@@ -1,45 +1,86 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 19 Jul 2017 16:58:40 +0530
-Subject: [PATCH 0/5] FlexRM support in VFIO platform
-In-Reply-To: <d4ef45d5-43cc-c632-082d-a92b8681faee@arm.com>
-References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <0dc860ed-a40c-1bfd-f584-225807edb25b@arm.com>
- <CAALAos_YTVRu_u8DycSXPgniGru20+fS6wfUskpV5uLRsazcNw@mail.gmail.com>
- <d4ef45d5-43cc-c632-082d-a92b8681faee@arm.com>
-Message-ID: <CAALAos923XEO_oxHpqJN+XSG2MGvTc6evCf6pSg++0Qcj54vXQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Jul 2017 13:28:56 +0200
+Subject: [PATCH 05/11] mmc: sunxi: Support controllers that can use both
+ old and new timings
+In-Reply-To: <CAGb2v67VmdfrMNLFH=6hhbGAHr15e0q4toDUbJ17d3exS3maFw@mail.gmail.com>
+References: <20170714064302.20383-1-wens@csie.org>
+ <20170714064302.20383-6-wens@csie.org>
+ <20170717091747.kcrlifbp7meihszm@flea>
+ <CAGb2v67VmdfrMNLFH=6hhbGAHr15e0q4toDUbJ17d3exS3maFw@mail.gmail.com>
+Message-ID: <20170719112856.7vjcsel5cj6f5s5h@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 4:55 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 19/07/17 12:17, Anup Patel wrote:
->> On Wed, Jul 19, 2017 at 4:27 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->>> On 19/07/17 10:33, Anup Patel wrote:
->>>> This patchset primarily adds Broadcom FlexRM reset module for
->>>> VFIO platform driver. We also have minor improvments in IOMMU
->>>> and VFIO driver to allow VFIO no-IOMMU mode access to FlexRM.
->>>
->>> I'm struggling to understand the IOMMU changes here - what's the
->>> FlexRM's hardware relationship with the IOMMU, and how is it different
->>> from any other device? Furthermore, if there *is* a relevant IOMMU
->>> present, why would no-IOMMU mode need to be involved at all?
->>
->> We want to have FlexRM device accessible from user-space
->> using VFIO platform with and without IOMMU.
->>
->> Currently, if IOMMU ops are available for platform bus then
->> I cannot access FlexRM device using VFIO no-IOMMU mode.
->
-> So does the FlexRM hardware master through the SMMU or not? If it does,
-> why do you need no-IOMMU mode? If it doesn't, then that's yet another
-> reason to fix the real problem, which is the utterly broken notion of
-> there being 'an IOMMU' on the platform 'bus', rather than papering over
-> it in VFIO.
->
+On Wed, Jul 19, 2017 at 04:59:23PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Jul 17, 2017 at 5:17 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Fri, Jul 14, 2017 at 02:42:56PM +0800, Chen-Yu Tsai wrote:
+> >> On the SoCs that introduced the new timing mode for MMC controllers,
+> >> both the old (where the clock delays are set in the CCU) and new
+> >> (where the clock delays are set in the MMC controller) timing modes
+> >> are available, and we have to support them both. However there are
+> >> two bits that control which mode is active. One is in the CCU, the
+> >> other is in the MMC controller. The settings on both sides must be
+> >> the same, or nothing will work.
+> >>
+> >> The CCU's get/set_phase callbacks return -ENOTSUPP when the new
+> >> timing mode is active. This provides a way to know which mode is
+> >> active on that side, and we can set the bit on the MMC controller
+> >> side accordingly.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  drivers/mmc/host/sunxi-mmc.c | 34 ++++++++++++++++++++++++++++++----
+> >>  1 file changed, 30 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> >> index 0fb4e4c119e1..56e45c65b52d 100644
+> >> --- a/drivers/mmc/host/sunxi-mmc.c
+> >> +++ b/drivers/mmc/host/sunxi-mmc.c
+> >> @@ -22,6 +22,7 @@
+> >>  #include <linux/err.h>
+> >>
+> >>  #include <linux/clk.h>
+> >> +#include <linux/clk/sunxi-ng.h>
+> >>  #include <linux/gpio.h>
+> >>  #include <linux/platform_device.h>
+> >>  #include <linux/spinlock.h>
+> >> @@ -259,7 +260,7 @@ struct sunxi_mmc_cfg {
+> >>       /* Does DATA0 needs to be masked while the clock is updated */
+> >>       bool mask_data0;
+> >>
+> >> -     bool needs_new_timings;
+> >> +     bool has_new_timings;
+> >
+> > I think we should have both, it's a bit different. Newer SoCs like the
+> > A64 can only operate using new timings, while the older ones can
+> > operate in both modes.
+> >
+> > In one case, we're forced to use it, in the other one it's a
+> > policy. We should differentiate both cases.
+> 
+> For the A64's case, the limit is implied by not having any clk_delays.
 
-We are not trying to paper-over the issue. The ARM SMMU will
-have limited number of SMRs so on a big SOC with large number
-of DMA-capable devices we can run-out of SMRs if we try to
-configure SMMU for all DMA-capable devices.
+FWIW, I'm really not a big fan of that either :)
 
-Regards,
-Anup
+Explicit is better than implicit.?
+
+> But yes, I'll keep "needs_new_timings", and rename the new option to
+> "has_timing_switch" to make things clearer.
+
+Great, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170719/f11c799e/attachment.sig>
