@@ -1,18 +1,33 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 19 Jul 2017 09:21:40 +0200
-Subject: [RFC PATCH 2/2] ARM: NOMMU: Wire-up default DMA interface
-In-Reply-To: <1500281885-3034-3-git-send-email-vladimir.murzin@arm.com>
-References: <1500281885-3034-1-git-send-email-vladimir.murzin@arm.com>
- <1500281885-3034-3-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20170719072140.GB20840@lst.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 19 Jul 2017 09:37:53 +0200
+Subject: [PATCH] pinctrl: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-43-robh@kernel.org>
+References: <20170718214339.7774-43-robh@kernel.org>
+Message-ID: <CAMuHMdXsmcN892-2qxx5W7LX976ARbPH33bWDZ5mTO_PPXL2kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 09:58:05AM +0100, Vladimir Murzin wrote:
-> The way how default DMA pool is exposed has changed and now we need to
-> use dedicated interface to work with it. This patch makes alloc/release
-> operations to use such interface. Since default DMA pool is not
-> handled by generic code anymore we have to implement our own mmap
-> operation.
+On Tue, Jul 18, 2017 at 11:43 PM, Rob Herring <robh@kernel.org> wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-Looks good to me.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+>  drivers/pinctrl/sh-pfc/pinctrl.c          |  2 +-
+
+For the sh-pfc part:
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
