@@ -1,127 +1,78 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Wed, 19 Jul 2017 23:22:53 +0200
-Subject: [PATCH 3/3] hwrng: mxc-fsl - add support for Freescale RNGC
-In-Reply-To: <CANc+2y7icNR3hJS0wCFd_-90X6bXkJYMEO6m53HDG8SBM0FZ2g@mail.gmail.com>
-References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
- <1500326163-4556-1-git-send-email-martin@kaiser.cx>
- <1500326163-4556-3-git-send-email-martin@kaiser.cx>
- <CANc+2y7icNR3hJS0wCFd_-90X6bXkJYMEO6m53HDG8SBM0FZ2g@mail.gmail.com>
-Message-ID: <20170719212253.GA13879@botnar.kaiser.cx>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 19 Jul 2017 23:29:01 +0200
+Subject: [PATCH 1/2] net: phy: at803x: Fix RGMII RX and TX clock delays
+ setup
+In-Reply-To: <abbcd40c-5ecd-2197-73d0-2046cf1e7b5c@gmail.com>
+References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
+ <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
+ <5ea9905f-e74a-4a43-dc5b-883ec9daf030@ti.com>
+ <abbcd40c-5ecd-2197-73d0-2046cf1e7b5c@gmail.com>
+Message-ID: <03f68f8b-edd6-f976-39d0-a580ccb888d5@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi PrasannaKumar,
+On 19/07/2017 21:30, Florian Fainelli wrote:
+> On 07/19/2017 12:24 PM, Grygorii Strashko wrote:
+>> Hi
+>>
+>> On 07/19/2017 10:31 AM, Marc Gonzalez wrote:
+>>> The current code supports enabling RGMII RX and TX clock delays.
+>>> The unstated assumption is that these settings are disabled by
+>>> default at reset, which is not the case.
+>>>
+>>> RX clock delay is enabled at reset. And TX clock delay "survives"
+>>> across SW resets. Thus, if the bootloader enables TX clock delay,
+>>> it will remain enabled at reset in Linux.
+>>>
+>>> Provide disable functions to configure the RGMII clock delays
+>>> exactly as specified in the fwspec.
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>>   drivers/net/phy/at803x.c | 32 ++++++++++++++++++++++++--------
+>>>   1 file changed, 24 insertions(+), 8 deletions(-)
+>> This patch breaks am335x-evm networking.
+>>
+>> To restore it I've had to apply below diff:
+>> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+>> index 200d6ab..9578bdf 100644
+>> --- a/arch/arm/boot/dts/am335x-evm.dts
+>> +++ b/arch/arm/boot/dts/am335x-evm.dts
+>> @@ -724,12 +724,12 @@
+>>  
+>>  &cpsw_emac0 {
+>>         phy_id = <&davinci_mdio>, <0>;
+>> -       phy-mode = "rgmii-txid";
+>> +       phy-mode = "rgmii-id";
+>>  };
+>>  
+>>  &cpsw_emac1 {
+>>         phy_id = <&davinci_mdio>, <1>;
+>> -       phy-mode = "rgmii-txid";
+>> +       phy-mode = "rgmii-id";
+>>  };
+>>  
+>>  &tscadc {
+>>
+>> Sry, can't comment here to much - not E-PHY expert.
+> 
+> It's useful feedback, since we had poorly defined "phy-mode" semantics
+> for too long, this is totally expected, Marc this is exactly why Mans is
+> suggesting additional MAC-specific properties to define delays.
 
-thanks for taking the time to review my submission.
+In the current situation, it is impossible to configure
+the at803x to disable RX clock delay or TX clock delay
+(in case the boot loader enabled it).
 
-Thus wrote PrasannaKumar Muralidharan (prasannatsmkumar at gmail.com):
+Are you saying that, because no one has had a problem
+so far, it is not possible to fix it now, as it would
+break boards like am335x-evm.dts which didn't request
+RX clock delay, but got one anyway?
 
-> Please combine above 2 comments.
+Does that mean we cannot support boards using AR8035
+that need the RX and TX clock delays disabled?
 
-ok, I'll do this.
+I'm not sure how the MAC-specific properties can save
+the day?
 
-> > +
-> > +/*
-> > + * Hardware driver for the Intel/AMD/VIA Random Number Generators (RNG)
-> > [...]
-
-> I feel this comment is because of copy paste. If that's the case please remove.
-
-A couple of files in drivers/char/hw_random have the same copyright
-statement. So it looks like copy&paste. I'll remove it.
-
-> > +
-> > +       while (max > sizeof(u32)) {
-
-> Should the condition be max >= sizeof(u32)?
-
-You're right. I'll fix this.
-
-> > +               status = __raw_readl(rngc->base + RNGC_STATUS);
-
-> Is there any specific reason for using __raw_readl? Why not just readl?
-> If there is no specific reason for using __raw_readl please use readl
-> in all the places.
-
-That looks like mxc-rnga.c was taken as a starting point. I'll change
-__raw_read() to readl and __raw_writel to writel.
-
-> > +               /* how many random numbers are in FIFO? [0-16] */
-> > +               level = (status & RNGC_STATUS_FIFO_LEVEL_MASK) >>
-> > +                       RNGC_STATUS_FIFO_LEVEL_SHIFT;
-> > +
-> > +               /* is there some error while reading this random number? */
-> > +               if (status & RNGC_STATUS_ERROR)
-> > +                       break;
-
-> Before calculating level error check can be done.
-
-Ok, I'll move the check right after reading the status register.
-
-> > +               if (__raw_readl(rngc->base + RNGC_ERROR) &
-> > +                   RNGC_ERROR_STATUS_BAD_KEY) {
-> > +                       dev_err(rngc->dev, "Can't start, Bad Keys.\n");
-> > +                       return -EIO;
-> > +               }
-> > +       }
-
-> What keys? What is the purpose of this check? At this point only clk
-> is enabled for RNGC so I am wondering why this check is required?
-
-The "key" is probably the internal state of the PRNG, which uses the
-mechanism described in FIPS 186-2.
-
-No idea why Freescale added this check before the self test. I guess
-that we can safely run the self test and check for errors afterwards.
-I'll remove the check.
-
-Interestingly, this "bad key" error status is one of the few differences
-between RNGB and RNGC, both of which should work with this driver...
-
-> > +
-> > +       /* mask all interrupts, will be unmasked soon */
-> > +       ctrl = __raw_readl(rngc->base + RNGC_CONTROL);
-> > +       __raw_writel(ctrl | RNGC_CTRL_MASK_DONE | RNGC_CTRL_MASK_ERROR,
-> > +                    rngc->base + RNGC_CONTROL);
-> > +
-> > +       /* verify if oscillator is working */
-> > +       osc = __raw_readl(rngc->base + RNGC_ERROR);
-> > +       if (osc & RNGC_ERROR_STATUS_OSC_ERR) {
-> > +               dev_err(rngc->dev, "RNGC Oscillator is dead!\n");
-> > +               return -EIO;
-> > +       }
-
-> Is this check useful? If clock is initialised properly I do not think
-> this case will happen. May be I am missing something. Please add a
-> comment if this check is valid.
-
-Agreed. Switching the clock on should be sufficient to get the
-oscillator to run. And if not, we should see an error after the self
-test.
-
-> RNG core can call init every time this rng device is selected as
-> current random number provider. Is self test required on every RNG
-> init?
-
-I'd say the self test should be run once when the driver is loaded. I'll
-try to move the self test to the probe function.
-
-> By default self test need not be run, a module parameter can be added
-> for enabling self test.
-
-Ok.
-
-> > +       rngc->rng.name = pdev->name;
-> > +       rngc->rng.init = mxc_rngc_init;
-> > +       rngc->rng.read = mxc_rngc_read;
-
-> Assiging a quality would be great. That will help in deciding which
-> rng device to use if there are mulitple rng devices.
-
-I doubt that I have enough info to set the quality. I'll see what I can
-dig up.
-
-I'll try to upload v4 as soon as possible.
-
-Thanks,
-Martin
+Regards.
