@@ -1,86 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 19 Jul 2017 13:28:56 +0200
-Subject: [PATCH 05/11] mmc: sunxi: Support controllers that can use both
- old and new timings
-In-Reply-To: <CAGb2v67VmdfrMNLFH=6hhbGAHr15e0q4toDUbJ17d3exS3maFw@mail.gmail.com>
-References: <20170714064302.20383-1-wens@csie.org>
- <20170714064302.20383-6-wens@csie.org>
- <20170717091747.kcrlifbp7meihszm@flea>
- <CAGb2v67VmdfrMNLFH=6hhbGAHr15e0q4toDUbJ17d3exS3maFw@mail.gmail.com>
-Message-ID: <20170719112856.7vjcsel5cj6f5s5h@flea>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 19 Jul 2017 12:29:14 +0100
+Subject: [PATCH 1/5] iommu: Add capability IOMMU_CAP_BYPASS
+In-Reply-To: <CAALAos8nf-d5i74J7-sAJb2o9eFj2PVDeLLVd=wun+gW1ihXSA@mail.gmail.com>
+References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+ <1500456838-18405-2-git-send-email-anup.patel@broadcom.com>
+ <675744d3-b070-1245-6ebc-579c4b5f4a75@arm.com>
+ <CAALAos_o25mtphxcVE0rr9dE8YAm-os2C_HD9oDnt41ZMDP8pA@mail.gmail.com>
+ <20170719112315.GE13642@arm.com>
+ <CAALAos8nf-d5i74J7-sAJb2o9eFj2PVDeLLVd=wun+gW1ihXSA@mail.gmail.com>
+Message-ID: <0945502b-3962-15cf-bc9f-6ae9c5470a30@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 04:59:23PM +0800, Chen-Yu Tsai wrote:
-> On Mon, Jul 17, 2017 at 5:17 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Fri, Jul 14, 2017 at 02:42:56PM +0800, Chen-Yu Tsai wrote:
-> >> On the SoCs that introduced the new timing mode for MMC controllers,
-> >> both the old (where the clock delays are set in the CCU) and new
-> >> (where the clock delays are set in the MMC controller) timing modes
-> >> are available, and we have to support them both. However there are
-> >> two bits that control which mode is active. One is in the CCU, the
-> >> other is in the MMC controller. The settings on both sides must be
-> >> the same, or nothing will work.
-> >>
-> >> The CCU's get/set_phase callbacks return -ENOTSUPP when the new
-> >> timing mode is active. This provides a way to know which mode is
-> >> active on that side, and we can set the bit on the MMC controller
-> >> side accordingly.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  drivers/mmc/host/sunxi-mmc.c | 34 ++++++++++++++++++++++++++++++----
-> >>  1 file changed, 30 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> >> index 0fb4e4c119e1..56e45c65b52d 100644
-> >> --- a/drivers/mmc/host/sunxi-mmc.c
-> >> +++ b/drivers/mmc/host/sunxi-mmc.c
-> >> @@ -22,6 +22,7 @@
-> >>  #include <linux/err.h>
-> >>
-> >>  #include <linux/clk.h>
-> >> +#include <linux/clk/sunxi-ng.h>
-> >>  #include <linux/gpio.h>
-> >>  #include <linux/platform_device.h>
-> >>  #include <linux/spinlock.h>
-> >> @@ -259,7 +260,7 @@ struct sunxi_mmc_cfg {
-> >>       /* Does DATA0 needs to be masked while the clock is updated */
-> >>       bool mask_data0;
-> >>
-> >> -     bool needs_new_timings;
-> >> +     bool has_new_timings;
-> >
-> > I think we should have both, it's a bit different. Newer SoCs like the
-> > A64 can only operate using new timings, while the older ones can
-> > operate in both modes.
-> >
-> > In one case, we're forced to use it, in the other one it's a
-> > policy. We should differentiate both cases.
+On 19/07/17 12:26, Anup Patel wrote:
+> On Wed, Jul 19, 2017 at 4:53 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Wed, Jul 19, 2017 at 04:49:00PM +0530, Anup Patel wrote:
+>>> On Wed, Jul 19, 2017 at 4:28 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>> On 19/07/17 10:33, Anup Patel wrote:
+>>>>> Some of the IOMMUs (such as ARM SMMU) are capable of bypassing
+>>>>> transactions for which no IOMMU domain is configured.
+>>>>>
+>>>>> This patch adds IOMMU_CAP_BYPASS which can be used by IOMMU
+>>>>> drivers to advertise transation bypass capability of an IOMMU.
+>>>>
+>>>> Whatever the intended semantics of this are, I can't help thinking it
+>>>> would be better served by allowing callers to explicitly allocate their
+>>>> own IOMMU_DOMAIN_IDENTITY domains. That would also be useful for the
+>>>> problem we have with legacy virtio devices behind real IOMMUs.
+>>>
+>>> We want to use VFIO no-IOMMU mode for FlexRM device but
+>>> currently it does not allow on our SOC because IOMMU ops are
+>>> registered for platform bus.
+>>
+>> Why do you want to use no-IOMMU mode if you have an IOMMU, and why you do
+>> think the individual IOMMU drivers are the place to implement this?
+>>
+>> NAK to the SMMU patches, for the reasons outlined by Robin.
 > 
-> For the A64's case, the limit is implied by not having any clk_delays.
+> We have limited number of SMRs on our SOC.
+> 
+> There are lot of devices for which we can potentially
+> configure SMMU but then due to limited number of
+> SMRs so we use SMMU only for certain devices.
 
-FWIW, I'm really not a big fan of that either :)
+Is the stream ID allocation so whacked out that you can't use masking?
 
-Explicit is better than implicit.?
-
-> But yes, I'll keep "needs_new_timings", and rename the new option to
-> "has_timing_switch" to make things clearer.
-
-Great, thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170719/f11c799e/attachment.sig>
+Robin.
+> For FlexRM device on our SOC, we don't intend to
+> use SMMU hence we need VFIO no-IOMMU mode
+> working for FlexRM device on our SOC.
+> 
+> Please re-consider your NAK.
+> 
+> Regards,
+> Anup
+> 
