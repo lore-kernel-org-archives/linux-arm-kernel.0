@@ -1,88 +1,58 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 19 Jul 2017 10:56:00 +0800
-Subject: [PATCH v16 2/7] power: add power sequence library
-In-Reply-To: <CAJZ5v0hGbJuqqY6Pq5cYPrawSGW-zdhYHj0ovhJ9zXRAkBPCRQ@mail.gmail.com>
-References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
- <10723509.cz5GGA4OTz@aspire.rjw.lan>
- <20170710022815.GA8720@b29397-desktop>
- <2659617.dvNVihq86F@aspire.rjw.lan>
- <20170718042955.GA12080@b29397-desktop>
- <CAJZ5v0hGbJuqqY6Pq5cYPrawSGW-zdhYHj0ovhJ9zXRAkBPCRQ@mail.gmail.com>
-Message-ID: <20170719025559.GC26218@b29397-desktop>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Wed, 19 Jul 2017 10:57:15 +0800
+Subject: [PATCH v4 0/7] drm/rockchip: add all full framework vop support
+Message-ID: <1500433036-13730-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 07:06:05PM +0200, Rafael J. Wysocki wrote:
-> On Tue, Jul 18, 2017 at 6:29 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> > On Mon, Jul 17, 2017 at 03:39:07PM +0200, Rafael J. Wysocki wrote:
-> >> > Sorry, I should describe more.
-> >> >
-> >> > Let's take USB bus as an example, when the new USB device is at the
-> >> > host port, the device structure at device model is not created until
-> >> > it is discoverable by the USB bus. If this new USB device needs to be
-> >> > powered on before can be discoverable by the bus, the device structure
-> >> > will be not created without powering on operation. The code usb_alloc_dev
-> >> > (drivers/usb/core/usb.c) is only called for discoverable device.
-> >> >
-> >> > Unlike the other bus, eg, platform bus, it creates device structure
-> >> > according to DT node. The USB bus was designed for hot plug model, the
-> >> > device structure is for discoverable device. In recent years, we begin
-> >> > to have some hard-wired USB device, Eg, onboard USB-hub, onboard USB 4G
-> >> > Modem, etc at the market. It needs some board level power operation before
-> >> > it can be found by the USB bus. This patch set is designed primarily for
-> >> > fix this kind of problem. You will see at at pwrseq_generic.c, we use DT
-> >> > version clock API of_clk_get and DT version gpio API of_get_named_gpio_flags
-> >> > instead of device structure version, like devm_clk_get and
-> >> > devm_gpiod_get_optional.
-> >> >
-> >> > MMC system has similar use case, it creates power sequence platform
-> >> > device for this issue, but all those power stuffs (clock, gpio, etc)
-> >> > may not be suitable as a dedicated virtual device at DT, they are belonged
-> >> > to one physical device, so this patch set is created to see if this issue
-> >> > can be fixed better.
-> >>
-> >> OK, thanks for the explanation.
-> >>
-> >> The above needs to be part of your problem statement.
-> >
-> > Ok, I will add it to cover letter.
-> >
-> >> >
-> >> > The bus will power up all device nodes in this bus according to DT
-> >> > information, the device structure has not created at this time.
-> >>
-> >> OK
-> >>
-> >> I still think that the information on power resources depended on by devices
-> >> should be used for power management as well as for the initial power-up.
-> >>
-> >> The most straightforward way to arrange for that would be to make it possible
-> >> to find the DT node matching the device after the device has been discovered
-> >> and struct device created for it, say by USB.  That would require adding some
-> >> more information on the device to the DT node, probably.
-> >
-> > After the device is created, the device node structure is under struct
-> > device, say dev->of_node. The most difficulty for this issue is the
-> > device creation is dynamic and is after the physical device is
-> > discovered by the bus, the initial power-up is needed before the device
-> > can be discovered by the bus.
-> 
-> So you power up all devices on the bus using the information from
-> of_nodes upfront.
-> 
+These patches try to make all current rockchip full framework vop works
+on drm, fill missing vop on full framework.
+Vop Full framework now has following vops:
+IP version    chipname
+      3.1           rk3288
+      3.2           rk3368
+      3.4           rk3366
+      3.5           rk3399 big
+      3.6           rk3399 lit
+      3.7           rk3228
+      3.8           rk3328
 
-I think your mean call pm_device_power_up(struct device *dev) for bus
-level device (eg, USB HUB for USB), yeah, I can do that. But we still
-have below problem:
+Group the vop register, it would make register  definition clearer and
+more easily to reuse same group register define for difference vops.
 
-Where we can put the kinds of power sequence implementation
-(eg, pwrseq_generic.c) and the match mechanism between device
-node and kinds of power sequence(eg, of_pwrseq_on at core.c)? These
-stuffs can be shared among subsystems, and is better to use
-one framework for it. MMC subsystem adds such things at its core
-folder (drivers/mmc/core/pwrseq*) currently.
+Tested on rk3399 excavator board with kernel 4.13-rc1.
+
+And other chips tested on rockchip kernel 4.4:
+   https://github.com/rockchip-linux/kernel/tree/release-4.4/drivers/gpu/drm/rockchip
+
+Changes in v4:
+- rebase to newest torvalds kernel, fix merge conflict 
+
+Changes in v3:
+- group vop register instead using VOP_REG_VER mechanism
+- move write_relaxed flags to vop registers
+- Explain more on patch commit message
+- fix rk3328 overlay abnormal
+
+Changes in v2:
+- rename rk322x to rk3228(Heiko St?bner)
+- correct some vop registers define
+
+Mark Yao (7):
+  drm/rockchip: vop: initialize registers directly
+  drm/rockchip: vop: move write_relaxed flags to vop register
+  drm/rockchip: vop: move line_flag_num to interrupt registers
+  drm/rockchip: vop: group vop registers
+  drm/rockchip: vop: add a series of vop support
+  dt-bindings: display: fill Documents for series of vop
+  drm/rockchip: vop: rk3328: fix overlay abnormal
+
+ .../bindings/display/rockchip/rockchip-vop.txt     |   4 +
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 109 ++-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |  81 +-
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        | 374 ++++++---
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.h        | 905 ++++++++++++++++-----
+ 5 files changed, 1074 insertions(+), 399 deletions(-)
 
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
