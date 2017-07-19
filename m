@@ -1,77 +1,96 @@
 From: dja@axtens.net (Daniel Axtens)
-Date: Wed, 19 Jul 2017 11:28:34 +1000
-Subject: [PATCH 1/4] powerpc: simplify and fix VGA default device behaviour
+Date: Wed, 19 Jul 2017 11:28:36 +1000
+Subject: [PATCH 2/3] vgaarb rework
 In-Reply-To: <20170719012839.20124-1-dja@axtens.net>
 References: <20170719012839.20124-1-dja@axtens.net>
-Message-ID: <20170719012839.20124-2-dja@axtens.net>
+Message-ID: <20170719012839.20124-4-dja@axtens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some powerpc devices provide a PCI display that isn't picked up by
-the VGA arbiter, presumably because it doesn't support the PCI
-legacy VGA ranges.
-
-Commit c2e1d84523ad ("powerpc: Set default VGA device") introduced
-an arch quirk to mark these devices as default to fix X autoconfig.
-
-The commit message stated that the patch:
-
-    Ensures a default VGA is always set if a graphics adapter is present,
-    even if firmware did not initialize it. If more than one graphics
-    adapter is present, ensure the one initialized by firmware is set
-    as the default VGA device.
-
-The patch used the following test to decide whether or not to mark
-a device as default:
-
-  pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-  if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
-          vga_set_default_device(pdev);
-
-This doesn't seem like it works quite as intended. Because of the
-logical OR, the default device will be set in 2 cases:
-
- 1) if there is no default device
-OR
- 2) if this device has normal memory/IO decoding turned on
-
-This will work as intended if there is only one device, but if
-there are multiple devices, we may override the device the VGA
-arbiter picked.
-
-Instead, set a device as default if there is no default device AND
-this device decodes.
-
-This will not change behaviour on single-headed systems.
-
-Cc: Brian King <brking@linux.vnet.ibm.com>
 Signed-off-by: Daniel Axtens <dja@axtens.net>
-
 ---
+ arch/powerpc/Kconfig             |  1 +
+ arch/powerpc/kernel/pci-common.c |  2 ++
+ drivers/gpu/vga/Kconfig          |  8 ++++++++
+ drivers/gpu/vga/vgaarb.c         | 21 +++++++++++++++++++++
+ 4 files changed, 32 insertions(+)
 
-Tested in TCG (the card provided by qemu doesn't automatically
-register with vgaarb, so the relevant code path has been tested)
-but I would appreciate any tests on real hardware.
----
- arch/powerpc/kernel/pci-common.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index 524f71104b75..f86e4c8a9cc6 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -83,6 +83,7 @@ config PPC
+ 	select BUILDTIME_EXTABLE_SORT
+ 	select ARCH_MIGHT_HAVE_PC_PARPORT
+ 	select ARCH_MIGHT_HAVE_PC_SERIO
++	select ARCH_WANT_VGA_ARB_FALLBACK
+ 	select BINFMT_ELF
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select OF
 diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-index 341a7469cab8..c95fdda3a2dc 100644
+index 07f05a0f59a2..e0f29a594aa1 100644
 --- a/arch/powerpc/kernel/pci-common.c
 +++ b/arch/powerpc/kernel/pci-common.c
-@@ -1746,8 +1746,11 @@ static void fixup_vga(struct pci_dev *pdev)
+@@ -1740,6 +1740,7 @@ static void fixup_hide_host_resource_fsl(struct pci_dev *dev)
+ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MOTOROLA, PCI_ANY_ID, fixup_hide_host_resource_fsl);
+ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_resource_fsl);
+ 
++#if !defined(CONFIG_ARCH_WANT_VGA_ARB_FALLBACK)
+ static void fixup_vga(struct pci_dev *pdev)
  {
  	u16 cmd;
+@@ -1754,3 +1755,4 @@ static void fixup_vga(struct pci_dev *pdev)
+ }
+ DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
+ 			      PCI_CLASS_DISPLAY_VGA, 8, fixup_vga);
++#endif
+diff --git a/drivers/gpu/vga/Kconfig b/drivers/gpu/vga/Kconfig
+index 29437eabe095..20f6c5a9a159 100644
+--- a/drivers/gpu/vga/Kconfig
++++ b/drivers/gpu/vga/Kconfig
+@@ -17,6 +17,14 @@ config VGA_ARB_MAX_GPUS
+ 	  Reserves space in the kernel to maintain resource locking for
+ 	  multiple GPUS.  The overhead for each GPU is very small.
  
++config ARCH_WANT_VGA_ARB_FALLBACK
++	bool
++	depends on !(X86 || IA64)
++	help
++	  Some architectures don't have a concept of "legacy" PCI addresses
++	  which the VGA arbiter relies on. Instead, they can fall back to
++	  selecting the first device that decodes memory and I/O.
++
+ config VGA_SWITCHEROO
+ 	bool "Laptop Hybrid Graphics - GPU switching support"
+ 	depends on X86
+diff --git a/drivers/gpu/vga/vgaarb.c b/drivers/gpu/vga/vgaarb.c
+index 0f5b2dd24507..02424dc3a58d 100644
+--- a/drivers/gpu/vga/vgaarb.c
++++ b/drivers/gpu/vga/vgaarb.c
+@@ -1472,3 +1472,24 @@ static int __init vga_arb_device_init(void)
+ 	return rc;
+ }
+ subsys_initcall(vga_arb_device_init);
++
++#if defined(CONFIG_ARCH_WANT_VGA_ARB_FALLBACK)
++static void vga_arb_fallback_fixup(struct pci_dev *pdev)
++{
++	u16 cmd;
++
 +	if (vga_default_device())
 +		return;
 +
- 	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
--	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
-+	if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY))
- 		vga_set_default_device(pdev);
- 
- }
++	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
++	if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
++		vgaarb_info(&pdev->dev, "[fallback]"
++			    " setting as default device\n");
++		vga_set_default_device(pdev);
++	}
++
++}
++DECLARE_PCI_FIXUP_CLASS_ENABLE(PCI_ANY_ID, PCI_ANY_ID,
++			       PCI_CLASS_DISPLAY_VGA, 8,
++			       vga_arb_fallback_fixup);
++#endif
 -- 
 2.11.0
