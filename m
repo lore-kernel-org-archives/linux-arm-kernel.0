@@ -1,108 +1,65 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 19 Jul 2017 11:50:39 -0700
-Subject: [kernel-hardening] Re: [PATCH v10 2/3] arm/syscalls: Check
- address limit on user-mode return
-In-Reply-To: <20170719183543.GT31807@n2100.armlinux.org.uk>
-References: <20170615011203.144108-1-thgarnie@google.com>
- <20170615011203.144108-2-thgarnie@google.com>
- <1500388566.11612.74.camel@nxp.com>
- <CAJcbSZEr8HPBwH1oVaHqPzAY4MS_=yqMoqPhcauuKu3cikB3uQ@mail.gmail.com>
- <1500398311.12096.30.camel@nxp.com>
- <CAJcbSZFr9KJTfGfiZo2fThoDkAE-D1OFf2YtELq4P6jX8syesQ@mail.gmail.com>
- <1500476300.22834.13.camel@nxp.com>
- <20170719170614.GS31807@n2100.armlinux.org.uk>
- <CAJcbSZHi6454skNpG8ecMnq90LdUfcxy2RYZD+7og1C1PeypvQ@mail.gmail.com>
- <20170719183543.GT31807@n2100.armlinux.org.uk>
-Message-ID: <CAJcbSZHMzrc8-VMQFXtacj7jYB9OqsqD92fXfQpL_DmomFK9Ow@mail.gmail.com>
+From: opendmb@gmail.com (Doug Berger)
+Date: Wed, 19 Jul 2017 12:07:28 -0700
+Subject: [PATCH v2 0/6] Add support for BCM7271 style interrupt controller
+Message-ID: <20170719190734.18566-1-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 11:35 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Jul 19, 2017 at 10:20:35AM -0700, Thomas Garnier wrote:
->> On Wed, Jul 19, 2017 at 10:06 AM, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->> > On Wed, Jul 19, 2017 at 05:58:20PM +0300, Leonard Crestez wrote:
->> > Probably best to revert.  I stopped looking at these patches during
->> > the discussion, as the discussion seemed to be mainly around other
->> > architectures, and I thought we had ARM settled.
->> >
->> > Looking at this patch now, there's several things I'm not happy with.
->> >
->> > The effect of adding a the new TIF flag for FSCHECK amongst the other
->> > flags is that we end up overflowing the 8-bit constant, and have to
->> > split the tests, meaning more instructions in the return path.  Eg:
->> >
->> > -       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
->> > +       tst     r1, #_TIF_SYSCALL_WORK
->> > +       bne     fast_work_pending
->> > +       tst     r1, #_TIF_WORK_MASK
->> >         bne     fast_work_pending
->> >
->> > should be written:
->> >
->> >         tst     r1, #_TIF_SYSCALL_WORK
->> >         tsteq   r1, #_TIF_WORK_MASK
->> >         bne     fast_work_pending
->> >
->> > and:
->> >
->> > -       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
->> > +       tst     r1, #_TIF_SYSCALL_WORK
->> > +       bne     fast_work_pending
->> > +       tst     r1, #_TIF_WORK_MASK
->> >
->> > should be:
->> >
->> >         tst     r1, #_TIF_SYSCALL_WORK
->> >         tsteq   r1, #_TIF_WORK_MASK
->> >
->> > There's no need for extra branches.
->> >
->> > Now, the next issue is that I don't think this TIF-flag approach is
->> > good for ARM - alignment faults can happen any time due to misaligned
->> > packets in the networking code, and we really don't want to be doing
->> > this check in a place that we can loop.
->> >
->> > My original suggestion for ARM was to do the address limit check after
->> > all work had been processed, with interrupts disabled (so no
->> > possibility of this kind of loop happening.)  However, that seems to
->> > have been replaced with this TIF approach, which is going to cause
->> > loops - I suspect if the probes code is enabled, this will suffer
->> > the same problem.  Remember, the various probes stuff can walk
->> > userspace stacks, which means they'll be using set_fs().
->> >
->> > I don't see why we've ended up with this (imho) sub-standard TIF-flag
->> > approach, and I think it's going to be very problematical.
->> >
->> > Can we please go back to the approach I suggested back in March for
->> > ARM that doesn't suffer from this problem?
->>
->> During the extensive thread discussion, Linus asked to move away from
->> architecture specific changes to this work flag system. I am glad to
->> fix the assembly as you asked on a separate patch.
->
-> Well, for the record, I don't think you've got to the bottom of the
-> "infinite loop" potential of Linus' approach.
->
-> Eg, perf will likely trigger this same issue.  Eg, perf record -a -g
-> will attempt to record the callchain both in kernel space and userspace
-> each time a perf interrupt happens.  If the perf interrupt frequency is
-> sufficiently high that we have multiple interrupts during the execution
-> of do_work_pending() and its called functions, then that will turn this
-> into an infinite loop yet again.
+This patch set extends the functionality of the irq-brcmstb-l2 interrupt
+controller driver to cover a hardware variant first introduced in the
+BCM7271 SoC.  The main difference between this variant and the block
+found in earlier brcmstb SoCs is that this variant only supports level
+sensitive interrupts and therefore does not latch the interrupt state
+based on edges.  Since there is no longer a need to ack interrupts with
+a register write to clear the latch the register map has been changed.
 
-Do you think it applies to the patch I just sent? The other approach
-is to check at the entrance, ignore _TIF_FSCHECK on the loop and clear
-it on exit.
+Therefore the change to add support for the new hardware block is to
+abstract the register accesses to accommodate different maps and to
+identify the block with a new device-tree compatible string.
 
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+I also took the opportunity to make some small efficiency enhancements
+to the driver.  One of these was to make use of the slightly more
+efficient irq_mask_ack method.  However, I discovered that the defined
+irq_gc_mask_disable_reg_and_ack() generic irq function was insufficient
+for my needs.  The first three commits of this set are intended to be a
+correction of the existing generic irq implementation to provide a
+function that can be used by interrupt controller drivers for their
+irq_mask_ack method when disable/enable registers are used for masking
+and interrupts are acknowledged by setting a bit in an ack register.
 
+I believe these first three commits should be added to the irq/core
+repository and possibly stable branches. The remaining commits should be
+added to the irqchip/core repository but I have included the complete
+set here for improved context since the irqchip patches are dependent on
+the irq patches.  This entire set is therefore based on the irq/core
+master branch.  Please let me know if you would like a different
+packaging.
 
+If the changes to genirq are not acceptable I can implement the
+irq_mask_ask method locally in the irq-brcmstb-l2 driver and submit
+that on its own.
+
+Changes in v2:
+
+- removed unused permutations of irq_mask_ack methods
+- added Reviewed-by and Acked-by responses from first submission
+
+Doug Berger (5):
+  genirq: generic chip: add irq_gc_mask_disable_and_ack_set()
+  genirq: generic chip: remove irq_gc_mask_disable_reg_and_ack()
+  irqchip: brcmstb-l2: Remove some processing from the handler
+  irqchip: brcmstb-l2: Abstract register accesses
+  irqchip: brcmstb-l2: Add support for the BCM7271 L2 controller
+
+Florian Fainelli (1):
+  irqchip/tango: Use irq_gc_mask_disable_and_ack_set
+
+ .../bindings/interrupt-controller/brcm,l2-intc.txt |   3 +-
+ drivers/irqchip/irq-brcmstb-l2.c                   | 145 ++++++++++++++-------
+ drivers/irqchip/irq-tango.c                        |   2 +-
+ include/linux/irq.h                                |   2 +-
+ kernel/irq/generic-chip.c                          |  15 ++-
+ 5 files changed, 114 insertions(+), 53 deletions(-)
 
 -- 
-Thomas
+2.13.0
