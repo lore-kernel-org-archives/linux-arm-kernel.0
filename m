@@ -1,121 +1,138 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 19 Jul 2017 23:06:53 +0200
-Subject: [PATCH v2 0/5] arm64: dts: rockchip: support mail and IPA thermal
- for rk3399
-In-Reply-To: <65759378-509b-3287-fd78-02361e89429b@rock-chips.com>
-References: <1500279271-15249-1-git-send-email-wxt@rock-chips.com>
- <65759378-509b-3287-fd78-02361e89429b@rock-chips.com>
-Message-ID: <3610458.AeGaZ0pxhP@phil>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 19 Jul 2017 23:15:42 +0200
+Subject: [PATCH 2/2] net: ethernet: nb8800: Fix RGMII TX clock delay setup
+In-Reply-To: <d8121f82-dffd-22c7-1209-a3c2329703e5@gmail.com>
+References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
+ <61b71d12-4e3a-edbe-1d69-c66e7cf46d8e@sigmadesigns.com>
+ <yw1xzic0qrcg.fsf@mansr.com> <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
+ <d8121f82-dffd-22c7-1209-a3c2329703e5@gmail.com>
+Message-ID: <05cbc32e-a4af-1c81-128b-bc5d2206d24a@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 19. Juli 2017, 17:06:59 CEST schrieb Caesar Wang:
-> Hi Rob & Heiko,
+On 19/07/2017 20:30, Florian Fainelli wrote:
+> On 07/19/2017 10:36 AM, Mason wrote:
+>> On 19/07/2017 19:17, M?ns Rullg?rd wrote:
+>>
+>>> Marc Gonzalez writes:
+>>>
+>>>> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
+>>>> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
+>>>> there are 4 RGMII phy-modes to handle:
+>>>>
+>>>> "rgmii" (RX and TX delays are added by the MAC when required)
+>>>> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
+>>>> 	the MAC should not add the RX or TX delays in this case)
+>>>> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
+>>>> 	the MAC should not add an RX delay in this case)
+>>>> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
+>>>> 	the MAC should not add an TX delay in this case)
+>>>>
+>>>> Let the MAC handle TX clock delay for rgmii and rgmii-rxid.
+>>>>
+>>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>>> ---
+>>>>  drivers/net/ethernet/aurora/nb8800.c | 8 +++++---
+>>>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+>>>> index 041cfb7952f8..f3ed320eb4ad 100644
+>>>> --- a/drivers/net/ethernet/aurora/nb8800.c
+>>>> +++ b/drivers/net/ethernet/aurora/nb8800.c
+>>>> @@ -609,7 +609,7 @@ static void nb8800_mac_config(struct net_device *dev)
+>>>>  		mac_mode |= HALF_DUPLEX;
+>>>>
+>>>>  	if (gigabit) {
+>>>> -		if (priv->phy_mode == PHY_INTERFACE_MODE_RGMII)
+>>>> +		if (phy_interface_is_rgmii(dev->phydev))
+>>>>  			mac_mode |= RGMII_MODE;
+>>>>
+>>>>  		mac_mode |= GMAC_MODE;
+>>>
+>>> This is a separate issue, and the change is obviously correct.
+>>>
+>>>> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
+>>>>  		break;
+>>>>
+>>>>  	case PHY_INTERFACE_MODE_RGMII:
+>>>> -		pad_mode = PAD_MODE_RGMII;
+>>>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
+>>>> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+>>>>  		break;
+>>>>
+>>>> +	case PHY_INTERFACE_MODE_RGMII_ID:
+>>>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
+>>>> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+>>>> +		pad_mode = PAD_MODE_RGMII;
+>>>>  		break;
+>>>
+>>> Won't this just make it break in a different set of circumstances?
+>>
+>> I don't think so, and here's my reasoning:
+>>
+>> AFAIU, the HW block always requires a TX clock delay
+>> (I don't know what the "safe" interval is. PHY adds
+>> 2.4 ns, MAC adds ~1 ns, both work.)
 > 
-> Do we have the chance to merge these patches?
+> The nominal delay should be 2ns because that's exactly what a 90 degrees
+> shift at a 125Mhz would be. The RGMII specification defines the following:
+> 
+> TskewT - Data to Clock output Skew (At Transmitter) Min: -500ns, Nom: 0,
+> Max: + 500 ns
+> TskewR - Data to Clock input Skew (At Receiver) Min: 1ns, Nom: 0, Max:
+> 2.6ns (see note 1)
+> 
+> note 1: This implies that PC board design will require clocks to be
+> routed such that an additional trace delay of greater than 1.5ns and
+> less than 2.0ns will be added to the associated clock signal. For 10/100
+> the Max value is unspecified.
+> 
+> So it seems to me like you are borderline spec in both delays you gave
+> here and the "HW block always requires a TX clock delay" statement is
+> true for a given board design only.
 
->From the mali-thermal thingy, it doesn't look like Rob likes that IPA stuff.
+I must confess that my understanding of clock delays,
+clock skew, routing, traces, etc is nil.
 
-So I'll most likely pick the other patches that rely on approved bindings
-after I return from my vacation and leave the thermal issue until it can
-be resolved.
+Is TskewT the TX clock delay?
+And TskewR the RX clock delay?
 
+Doesn't wire delay factor in too?
+(So longer wires require more delay.)
 
-Heiko
+>> RX clock delay seems to be "Don't Care" (tested both
+>> enabled and disabled by PHY)
+>> By "tested", I mean ability to ping remote system.
+> 
+> Can you do something a bit more stressful than just a ping, also if you
+> have the ability to change the inter-packet gap, do it, and see if you
+> start seeing FCS or any other decoding errors.
 
+Errr... "Inter-packet gap"?
+Is there supposed to be a HW knob to tweak how long
+the HW waits between sending two frames?
+
+>> If phy-mode is RGMII or RGMII_RXID, then don't add
+>> TX clock delay from PHY, therefore add it from MAC.
+>>
+>> If phy_mode is RGMII_ID or RGMII_TXID, then do add
+>> TX clock delay from PHY, therefore don't add it from MAC.
+>>
+>> What set of circumstances would create an issue?
 > 
-> I'm try to bring up the display and run webgl for testing with my github on
-> https://github.com/Caesar-github/rockchip/commits/gru/next-stable-chromeos
-> 
-> I believe the Rocky at RK will post patches to support the other SoCs after.
-> 
-> -Caesar
-> 
-> ? 2017?07?17? 16:14, Caesar Wang ??:
-> > This series patches supported the mail in devicetree and used the
-> > thermal IPA by default.
-> >
-> > Verified with kernel is based on Linus's master branch and Heiko's
-> > v4.14-armsoc-tmp/dts64 branch. ( The Linux version 4.12.0 for now).
-> >
-> > The most rockchip SoCs will be supported with IPA mode for thermal
-> > in later.
-> >
-> > ---
-> >
-> > History version:
-> > 1. The first version found on
-> > https://www.spinics.net/lists/arm-kernel/msg593118.html
-> >
-> > Tested on Kevin board with bringing up ChromeOS.
-> > OS VERSION:
-> >      CHROMEOS_RELEASE_DESCRIPTION=9693.1.0 (Official Build) dev-channel kevin test
-> >
-> > BIOS VERSION:
-> >      Google_Kevin.8785.211.2017_06_20_1043
-> >
-> > EC VERSION:
-> >      Build info:    kevin_v1.10.217-24514961d 2017-07-03 07:46:36 wxt at nb
-> >
-> > With the ARM's lastest mali driver TX011-SW-99002-r18p0-01rel0 on
-> > https://developer.arm.com/products/software/mali-drivers/midgard-kernel
-> >
-> >  From the bootup log:
-> >      localhost devfreq0 # dmesg |grep mali
-> >      [    0.933334] mali ff9a0000.gpu: GPU identified as 0x0860 r2p0 status 0
-> >      [    0.940830] mali ff9a0000.gpu: Protected mode not available
-> >      [    0.947334] mali ff9a0000.gpu: Using configured power model mali-simple-power-model, and fallback mali-simple-power-model
-> >      [    0.960083] mali ff9a0000.gpu: Probed as mali0
-> >
-> >      localhost devfreq0 # pwd
-> >      /sys/devices/platform/ff9a0000.gpu/devfreq/devfreq0
-> >      localhost devfreq0 # ls
-> >      available_frequencies  device    min_freq          subsystem    uevent
-> >      available_governors    governor  polling_interval  target_freq  userspace
-> >      cur_freq               max_freq  power             trans_stat
-> >
-> >      localhost ff9a0000.gpu # ls
-> >      core_availability_policy  gpuinfo               modalias       soft_job_timeout
-> >      core_mask                 js_scheduling_period  of_node        subsystem
-> >      devfreq                   js_timeouts           pm_poweroff    uevent
-> >      driver                    mem_pool_max_size     power
-> >      driver_override           mem_pool_size         power_policy
-> >      dvfs_period               misc                  reset_timeout
-> > ---
-> >
-> > And for thermal with IPA.
-> > Try to run 'md5sum /dev/zero &' and octane/benchmark scripts to go up the temperature.
-> >  From the scripts to have a look at the actual control.
-> > "
-> > while true; do grep "" /sys/class/thermal/thermal_zone[0-1]/temp /sys/devices/system/cpu/cpu[0-5]/cpufreq/scaling_cur_freq /sys/devices/platform/ff9a0000.gpu/devfreq/devfreq0/cur_freq;date;sleep .5; done &
-> > "
-> >
-> > -Caesar
-> >
-> >
-> > Changes in v2:
-> > As Heiko comments on https://patchwork.kernel.org/patch/9835939/
-> > - interrupt-name use the lower case.
-> > - use the correct compatible "arm,mali-t860"
-> > - remove the clock name, since the mali only have one input clock.
-> > - foo@ will produce warnings when used without reg property.
-> > - update the commit to explain the two passive trip points changed.
-> >
-> > Caesar Wang (5):
-> >    dt-bindings: gpu: add the RK3399 mali for rockchip specifics
-> >    dt-bindings: gpu: add a power_model optional properties for MALI
-> >    arm64: dts: rockchip: add ARM Mali GPU node for RK3399 SoCs
-> >    arm64: dts: rockchip: enable the GPU for RK3399-GRU
-> >    arm64: dts: rockchip: update the thermal zones for RK3399 SoCs
-> >
-> >   .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 13 ++++
-> >   arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |  5 ++
-> >   arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi   | 33 ++++++++++
-> >   arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       | 33 ++++++++++
-> >   arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 74 ++++++++++++----------
-> >   5 files changed, 125 insertions(+), 33 deletions(-)
-> >
-> 
-> 
-> 
-> 
+> Existing Device Tree sources that do not correspond to that description
+> you just did, I suppose they are all out of tree?
+
+The problem with PHY drivers is that there is no
+simple compatible string to grep for.
+
+The tango boards use "ethernet-phy-id004d.d072"
+but not a single other DT uses that string.
+For example, am335x-evm.dts doesn't seem to name the PHY.
+Hmmm, how does the at803x probe function match for that
+board?
+
+How does one estimate the impact of driver changes in
+the eth PHY layer?
+
+Regards.
