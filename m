@@ -1,79 +1,127 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 19 Jul 2017 11:36:13 +1000
-Subject: [PATCH 1/4] powerpc: simplify and fix VGA default device behaviour
-In-Reply-To: <20170719012839.20124-2-dja@axtens.net>
-References: <20170719012839.20124-1-dja@axtens.net>
- <20170719012839.20124-2-dja@axtens.net>
-Message-ID: <1500428173.3350.2.camel@kernel.crashing.org>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 18 Jul 2017 19:08:39 -0700
+Subject: [PATCH v2 1/3] mux: Add mux_control_get_optional() API
+In-Reply-To: <aac61f46-f963-2631-00e0-2d62baac6bf4@axentia.se>
+References: <20170714214005.14967-1-stephen.boyd@linaro.org>
+ <20170714214005.14967-2-stephen.boyd@linaro.org>
+ <aac61f46-f963-2631-00e0-2d62baac6bf4@axentia.se>
+Message-ID: <150043011983.23422.10872793103087420242@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-07-19 at 11:28 +1000, Daniel Axtens wrote:
-> Some powerpc devices provide a PCI display that isn't picked up by
-> the VGA arbiter, presumably because it doesn't support the PCI
-> legacy VGA ranges.
+Quoting Peter Rosin (2017-07-17 01:20:14)
+> On 2017-07-14 23:40, Stephen Boyd wrote:
+> > diff --git a/drivers/mux/mux-core.c b/drivers/mux/mux-core.c
+> > index 90b8995f07cb..a0e5bf16f02f 100644
+> > --- a/drivers/mux/mux-core.c
+> > +++ b/drivers/mux/mux-core.c
+> > @@ -289,6 +289,9 @@ EXPORT_SYMBOL_GPL(devm_mux_chip_register);
+> >   */
+> >  unsigned int mux_control_states(struct mux_control *mux)
+> >  {
+> > +     if (!mux)
+> > +             return 0;
+> > +
 > 
-> Commit c2e1d84523ad ("powerpc: Set default VGA device") introduced
-> an arch quirk to mark these devices as default to fix X autoconfig.
+> I don't think this is appropriate. For this function, it might be ok,
+> but...
 > 
-> The commit message stated that the patch:
+> >       return mux->states;
+> >  }
+> >  EXPORT_SYMBOL_GPL(mux_control_states);
+> > @@ -338,6 +341,9 @@ int mux_control_select(struct mux_control *mux, unsigned int state)
+> >  {
+> >       int ret;
+> >  
+> > +     if (!mux)
+> > +             return 0;
+> > +
 > 
->     Ensures a default VGA is always set if a graphics adapter is present,
->     even if firmware did not initialize it. If more than one graphics
->     adapter is present, ensure the one initialized by firmware is set
->     as the default VGA device.
+> ...here and for other cases below it's very odd to return "ok", when
+> -EINVAL or something seems much more appropriate. And if -EINVAL is
+> returned here, the benefit of returning fake values for anything
+> pretty much falls apart.
 > 
-> The patch used the following test to decide whether or not to mark
-> a device as default:
-> 
->   pci_read_config_word(pdev, PCI_COMMAND, &cmd);
->   if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
->           vga_set_default_device(pdev);
-> 
-> This doesn't seem like it works quite as intended. Because of the
-> logical OR, the default device will be set in 2 cases:
-> 
->  1) if there is no default device
-> OR
->  2) if this device has normal memory/IO decoding turned on
-> 
-> This will work as intended if there is only one device, but if
-> there are multiple devices, we may override the device the VGA
-> arbiter picked.
-> 
-> Instead, set a device as default if there is no default device AND
-> this device decodes.
-> 
-> This will not change behaviour on single-headed systems.
+> I simply don't like it, and prefer if the consumer code is arranged
+> to not call the mux functions when the optional get() does not find
+> the mux.
 
-Ack.
+Do you want the callers of the mux APIs to know that an optional mux
+isn't there, and then have checks at all callsites on optional muxes to
+make sure consumers don't call the mux functions? Won't that duplicate
+lots of checks in drivers for something the core could treat as a don't
+care case? Sorry, I don't understand why the consumer cares that it was
+there or not when it is optional.
 
-> Cc: Brian King <brking@linux.vnet.ibm.com>
-> Signed-off-by: Daniel Axtens <dja@axtens.net>
 > 
-> ---
+> >       ret = down_killable(&mux->lock);
+> >       if (ret < 0)
+> >               return ret;
+> > @@ -370,6 +376,9 @@ int mux_control_try_select(struct mux_control *mux, unsigned int state)
+> >  {
+> >       int ret;
+> >  
+> > +     if (!mux)
+> > +             return 0;
+> > +
+> >       if (down_trylock(&mux->lock))
+> >               return -EBUSY;
+> >  
+> > @@ -398,6 +407,9 @@ int mux_control_deselect(struct mux_control *mux)
+> >  {
+> >       int ret = 0;
+> >  
+> > +     if (!mux)
+> > +             return 0;
+> > +
+> >       if (mux->idle_state != MUX_IDLE_AS_IS &&
+> >           mux->idle_state != mux->cached_state)
+> >               ret = mux_control_set(mux, mux->idle_state);
+> > @@ -422,14 +434,8 @@ static struct mux_chip *of_find_mux_chip_by_node(struct device_node *np)
+> >       return dev ? to_mux_chip(dev) : NULL;
+> >  }
+> >  
+> > -/**
+> > - * mux_control_get() - Get the mux-control for a device.
+> > - * @dev: The device that needs a mux-control.
+> > - * @mux_name: The name identifying the mux-control.
+> > - *
+> > - * Return: A pointer to the mux-control, or an ERR_PTR with a negative errno.
+> > - */
+> > -struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
+> > +struct mux_control *
+> > +__mux_control_get(struct device *dev, const char *mux_name, bool optional)
+> >  {
+> >       struct device_node *np = dev->of_node;
+> >       struct of_phandle_args args;
+> > @@ -441,6 +447,8 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
+> >       if (mux_name) {
+> >               index = of_property_match_string(np, "mux-control-names",
+> >                                                mux_name);
+> > +             if (index == -EINVAL && optional)
+> > +                     return NULL;
 > 
-> Tested in TCG (the card provided by qemu doesn't automatically
-> register with vgaarb, so the relevant code path has been tested)
-> but I would appreciate any tests on real hardware.
-> ---
->  arch/powerpc/kernel/pci-common.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-> index 341a7469cab8..c95fdda3a2dc 100644
-> --- a/arch/powerpc/kernel/pci-common.c
-> +++ b/arch/powerpc/kernel/pci-common.c
-> @@ -1746,8 +1746,11 @@ static void fixup_vga(struct pci_dev *pdev)
->  {
->  	u16 cmd;
->  
-> +	if (vga_default_device())
-> +		return;
-> +
->  	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-> -	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
-> +	if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY))
->  		vga_set_default_device(pdev);
->  
->  }
+> What about -ENODATA?
+
+At this point in the code we're finding the index of a mux-control-names
+property so I was trying to handle the case where there isn't a
+mux-control-names property at all but we're looking for something
+optional anyway. If there is a property, then we would see some other
+error if something went wrong and then pass the error up. There is a
+hole where there isn't a mux-control-names property and we're looking
+for something that's optional, but there is a mux-control property. Do
+we care though? The DT seems broken then.
+
+> And if an optional mux is found here, but lookup
+> fails later in e.g. the of_parse_phandle_with_args call, then I think
+> an error should be returned. Because that seems like an indication that
+> DT specifies that there *should* be a mux, but then there isn't one.
+
+of_parse_phandle_with_args() would return ENOENT when there isn't a
+mux-control property in DT. So I've trapped that case and returned an
+"optional mux" pointer of NULL. I think we handle the case you mention,
+where some index is found but it returns an error, because that would
+return some error besides -ENOENT.
+
+Sorry, I'm not really following what you're suggesting. Maybe it got
+mixed up with the NULL vs. non-NULL return value from mux_control_get().
