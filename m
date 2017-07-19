@@ -1,71 +1,73 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 19 Jul 2017 08:01:53 +0200
-Subject: [PATCH] soc: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-49-robh@kernel.org>
-References: <20170718214339.7774-49-robh@kernel.org>
-Message-ID: <20170719060153.GD6246@kozik-book>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Jul 2017 08:20:06 +0200
+Subject: [PATCH] irqchip: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-30-robh@kernel.org>
+References: <20170718214339.7774-30-robh@kernel.org>
+Message-ID: <20170719062006.hivodv3zppq6swdo@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 04:43:29PM -0500, Rob Herring wrote:
+On Tue, Jul 18, 2017 at 04:43:10PM -0500, Rob Herring wrote:
 > Now that we have a custom printf format specifier, convert users of
 > full_name to use %pOF instead. This is preparation to remove storing
 > of the full path string for each node.
 > 
 > Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Scott Wood <oss@buserror.net>
-> Cc: Qiang Zhao <qiang.zhao@nxp.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: Baruch Siach <baruch@tkos.co.il>
+> Cc: Vladimir Zapolskiy <vz@mleia.com>
+> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
 > Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: linux-rpi-kernel at lists.infradead.org
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-tegra at vger.kernel.org
 > ---
->  drivers/soc/fsl/qbman/bman_ccsr.c    | 10 +++++-----
->  drivers/soc/fsl/qbman/bman_portal.c  |  8 +++-----
->  drivers/soc/fsl/qbman/qman_ccsr.c    | 12 ++++++------
->  drivers/soc/fsl/qbman/qman_portal.c  | 11 ++++-------
->  drivers/soc/fsl/qe/gpio.c            |  4 ++--
->  drivers/soc/mediatek/mtk-pmic-wrap.c |  4 ++--
->  drivers/soc/renesas/rcar-rst.c       |  4 ++--
->  drivers/soc/renesas/rcar-sysc.c      |  6 +++---
->  drivers/soc/samsung/pm_domains.c     |  8 ++++----
->  9 files changed, 31 insertions(+), 36 deletions(-)
-> 
+>  drivers/irqchip/irq-bcm2835.c            |  9 ++++-----
+>  drivers/irqchip/irq-bcm2836.c            |  5 ++---
+>  drivers/irqchip/irq-crossbar.c           |  6 +++---
+>  drivers/irqchip/irq-digicolor.c          |  8 ++++----
+>  drivers/irqchip/irq-dw-apb-ictl.c        | 12 ++++++------
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  2 +-
+>  drivers/irqchip/irq-gic-v3-its.c         |  6 +++---
+>  drivers/irqchip/irq-gic-v3.c             | 11 ++++-------
+>  drivers/irqchip/irq-imx-gpcv2.c          |  4 ++--
+>  drivers/irqchip/irq-lpc32xx.c            |  2 +-
+>  drivers/irqchip/irq-mtk-sysirq.c         |  3 +--
+>  drivers/irqchip/irq-mxs.c                |  4 ++--
+>  drivers/irqchip/irq-stm32-exti.c         |  8 ++++----
+>  drivers/irqchip/irq-sun4i.c              |  6 +++---
 
-(...)
+for sun4i:
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> diff --git a/drivers/soc/samsung/pm_domains.c b/drivers/soc/samsung/pm_domains.c
-> index a6a5d807cc2b..c630eba32066 100644
-> --- a/drivers/soc/samsung/pm_domains.c
-> +++ b/drivers/soc/samsung/pm_domains.c
-> @@ -237,11 +237,11 @@ static __init int exynos4_pm_init_power_domain(void)
->  			continue;
-> 
->  		if (of_genpd_add_subdomain(&parent, &child))
-> -			pr_warn("%s failed to add subdomain: %s\n",
-> -				parent.np->full_name, child.np->full_name);
-> +			pr_warn("%pOF failed to add subdomain: %pOF\n",
-> +				parent.np, child.np);
->  		else
-> -			pr_info("%s has as child subdomain: %s.\n",
-> -				parent.np->full_name, child.np->full_name);
-> +			pr_info("%pOF has as child subdomain: %pOF.\n",
-> +				parent.np, child.np);
->  	}
-> 
->  	return 0;
+Maxime
 
-I guess this will go through arm-soc?
-
-For Samsung, looks good:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-
-Best regards,
-Krzysztof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170719/bec97007/attachment.sig>
