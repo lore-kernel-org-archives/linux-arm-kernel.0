@@ -1,34 +1,37 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 19 Jul 2017 15:03:53 +0530
-Subject: [PATCH 0/5] FlexRM support in VFIO platform
-Message-ID: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+Date: Wed, 19 Jul 2017 15:03:54 +0530
+Subject: [PATCH 1/5] iommu: Add capability IOMMU_CAP_BYPASS
+In-Reply-To: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1500456838-18405-2-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset primarily adds Broadcom FlexRM reset module for
-VFIO platform driver. We also have minor improvments in IOMMU
-and VFIO driver to allow VFIO no-IOMMU mode access to FlexRM.
+Some of the IOMMUs (such as ARM SMMU) are capable of bypassing
+transactions for which no IOMMU domain is configured.
 
-The patches are based on Linux-4.13-rc1 and can also be
-found at flexrm-vfio-v1 branch of
-https://github.com/Broadcom/arm64-linux.git
+This patch adds IOMMU_CAP_BYPASS which can be used by IOMMU
+drivers to advertise transation bypass capability of an IOMMU.
 
-Anup Patel (5):
-  iommu: Add capability IOMMU_CAP_BYPASS
-  iommu/arm-smmu: add IOMMU_CAP_BYPASS to the ARM SMMU driver
-  iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM SMMUv3 driver
-  vfio: Allow No-IOMMU mode for IOMMUs with bypass capability
-  vfio: platform: reset: Add Broadcom FlexRM reset module
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+---
+ include/linux/iommu.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
- drivers/iommu/arm-smmu-v3.c                        |  2 +
- drivers/iommu/arm-smmu.c                           |  2 +
- drivers/vfio/platform/reset/Kconfig                |  9 +++
- drivers/vfio/platform/reset/Makefile               |  1 +
- .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 91 ++++++++++++++++++++++
- drivers/vfio/vfio.c                                | 13 +++-
- include/linux/iommu.h                              |  4 +
- 7 files changed, 119 insertions(+), 3 deletions(-)
- create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 2cb54ad..6bbb4cc 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -101,6 +101,10 @@ enum iommu_cap {
+ 					   transactions */
+ 	IOMMU_CAP_INTR_REMAP,		/* IOMMU supports interrupt isolation */
+ 	IOMMU_CAP_NOEXEC,		/* IOMMU_NOEXEC flag */
++	IOMMU_CAP_BYPASS,		/*
++					 * IOMMU can bypass transactions for
++					 * which domain is not configured
++					 */
+ };
+ 
+ /*
 -- 
 2.7.4
