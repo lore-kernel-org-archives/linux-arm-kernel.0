@@ -1,68 +1,55 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 18 Jul 2017 18:50:44 -0500
-Subject: [PATCH 1/4] ARM: dts: keystone-k2g: Add PMMC node to support
- TI-SCI protocol
-In-Reply-To: <8b8c4eff-4f18-f0d2-e075-389921e5a990@ti.com>
-References: <20170718032844.29490-1-s-anna@ti.com>
- <20170718032844.29490-2-s-anna@ti.com>
- <8b8c4eff-4f18-f0d2-e075-389921e5a990@ti.com>
-Message-ID: <4ff798de-9926-4bf8-74a5-572f0f0c1081@ti.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 19 Jul 2017 03:25:44 +0300
+Subject: [PATCH v6 2/3] clk: gate: expose clk_gate_ops::is_enabled
+In-Reply-To: <20170718225203.GD18179@codeaurora.org>
+References: <1500364414-10021-1-git-send-email-gabriel.fernandez@st.com>
+ <1500364414-10021-3-git-send-email-gabriel.fernandez@st.com>
+ <55bc0f3f-67ed-a15f-5b71-d87044fd5237@mleia.com>
+ <20170718225203.GD18179@codeaurora.org>
+Message-ID: <1ed5052f-7d42-b57f-d12f-5ea003a2c5a9@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2017 10:00 AM, Andrew F. Davis wrote:
-> On 07/17/2017 10:28 PM, Suman Anna wrote:
->> From: Nishanth Menon <nm@ti.com>
+On 07/19/2017 01:52 AM, Stephen Boyd wrote:
+> On 07/18, Vladimir Zapolskiy wrote:
+>> On 07/18/2017 10:53 AM, gabriel.fernandez at st.com wrote:
+>>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>  }
+>>> +EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
+>>>  
+>>>  const struct clk_ops clk_gate_ops = {
+>>>  	.enable = clk_gate_enable,
+>>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>>> index c59c625..e9587ab 100644
+>>> --- a/include/linux/clk-provider.h
+>>> +++ b/include/linux/clk-provider.h
+>>> @@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
+>>>  		u8 clk_gate_flags, spinlock_t *lock);
+>>>  void clk_unregister_gate(struct clk *clk);
+>>>  void clk_hw_unregister_gate(struct clk_hw *hw);
+>>> +int clk_gate_is_enabled(struct clk_hw *hw);
 >>
->> Texas Instrument's System Control Interface (TI-SCI) Message Protocol
->> is implemented in Keystone 2 generation 66AK2G SoC with the PMMC entity.
+>> Here the prefix does not reflect the type of its argument, it might be
+>> acceptable for a veiled function, but it is not wanted for the exported
+>> function. Something like clk_hw_gate_is_enabled() is expected here, but
+>> again, let's firstly come to an agreement, that the export is needed.
 >>
->> Add the ti-sci node representing this 66AK2G PMMC module.
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> [s-anna at ti.com: add unit address to DT node]
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>  arch/arm/boot/dts/keystone-k2g.dtsi | 14 ++++++++++++++
->>  1 file changed, 14 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
->> index a789f75a1ed5..7f0f4180b373 100644
->> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
->> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
->> @@ -139,5 +139,19 @@
->>  			interrupts = <GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH>,
->>  				     <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
->>  		};
->> +
->> +		pmmc: pmmc at 02921c00 {
->> +			compatible = "ti,k2g-sci";
->> +			/*
->> +			 * In case of rare platforms that does not use k2g as
->> +			 * system master, use /delete-property/
->> +			 */
 > 
-> This comment seems mis-worded, I believe this was meant to say "for
-> platforms that do not use the *PMMC* as the system master".
+> I'd prefer clk_gate_is_enabled() as it's not a struct clk_hw_gate,
+> it's a struct clk_gate
 
-The comment is for the system-reboot-controller property, and is meant
-to say that this property is to be deleted from this node if there is an
-external entity on the board other than the K2G SoC that is responsible
-for triggering a reboot.
+Formally it's a 'struct clk_hw', and 'struct clk_hw_gate' does not exist.
 
-regards
-Suman
+> and there isn't any requirement for function names to reflect the type
+> of the argument. That's what we have type analysis for.
 
-> 
-> Andrew
-> 
->> +			ti,system-reboot-controller;
->> +			mbox-names = "rx", "tx";
->> +			mboxes= <&msgmgr 5 2>,
->> +				<&msgmgr 0 0>;
->> +			reg-names = "debug_messages";
->> +			reg = <0x02921c00 0x400>;
->> +		};
->>  	};
->>  };
->>
+Sure, a function name can be selected arbitrary, however because in this
+particular case type analysis operates on 'struct clk_hw', it would fail
+to separate 'struct clk_gate' from 'struct clk_divider', a little hint
+in the naming may be helpful.
+
+I don't insist on my preference, of course your acceptance is sufficient.
+
+--
+With best wishes,
+Vladimir
