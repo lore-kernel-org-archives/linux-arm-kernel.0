@@ -1,23 +1,18 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 19 Jul 2017 14:42:30 +0300
-Subject: [PATCH v3 6/8] staging: fsl-mc: don't use raw device io functions
+Date: Wed, 19 Jul 2017 14:42:31 +0300
+Subject: [PATCH v3 7/8] staging: fsl-mc: make the driver compile on 32-bit
 In-Reply-To: <20170719114232.8347-1-laurentiu.tudor@nxp.com>
 References: <20170719114232.8347-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170719114232.8347-7-laurentiu.tudor@nxp.com>
+Message-ID: <20170719114232.8347-8-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-As raw device io functions are not portable and don't handle byte-order
-(triggering suspicion that endianness isn't handled well) switch to
-using the standard api.
-Since MC expects LE byte-order and the upper layers already take care
-of that, we need to trick the device io api by doing a LE -> CPU
-conversion just before calling it. This way, the CPU -> LE conversion
-done in the api puts the data back in the right byte-order. Obviously,
-for reads the extra step is mirrored: there's a CPU -> LE conversion
-following the API call.
+Since there's no real constrain in MC to do only atomic 64-bit we can
+enable this driver on 32-bit platforms too.
+Include linux/io-64-nonatomic-hi-lo.h to make quad device io apis used
+in the driver available on 32-bit platforms.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
@@ -28,55 +23,20 @@ Notes:
     -v2
       -new patch replacing https://lkml.org/lkml/2017/7/17/419
 
- drivers/staging/fsl-mc/bus/mc-sys.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+ drivers/staging/fsl-mc/bus/mc-sys.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
-index 195d9f3..8a6dc47 100644
+index 8a6dc47..7ce105b 100644
 --- a/drivers/staging/fsl-mc/bus/mc-sys.c
 +++ b/drivers/staging/fsl-mc/bus/mc-sys.c
-@@ -126,12 +126,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
+@@ -37,6 +37,7 @@
+ #include <linux/ioport.h>
+ #include <linux/device.h>
+ #include <linux/io.h>
++#include <linux/io-64-nonatomic-hi-lo.h>
+ #include "../include/mc.h"
  
- 	/* copy command parameters into the portal */
- 	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
--		__raw_writeq(cmd->params[i], &portal->params[i]);
--	/* ensure command params are committed before submitting it */
--	wmb();
-+		/*
-+		 * Data is already in the expected LE byte-order. Do an
-+		 * extra LE -> CPU conversion so that the CPU -> LE done in
-+		 * the device io write api puts it back in the right order.
-+		 */
-+		writeq_relaxed(le64_to_cpu(cmd->params[i]), &portal->params[i]);
- 
- 	/* submit the command by writing the header */
--	__raw_writeq(cmd->header, &portal->header);
-+	writeq(le64_to_cpu(cmd->header), &portal->header);
- }
- 
- /**
-@@ -151,14 +154,20 @@ static inline enum mc_cmd_status mc_read_response(struct mc_command __iomem *
- 	enum mc_cmd_status status;
- 
- 	/* Copy command response header from MC portal: */
--	resp->header = __raw_readq(&portal->header);
-+	resp->header = cpu_to_le64(readq_relaxed(&portal->header));
- 	status = mc_cmd_hdr_read_status(resp);
- 	if (status != MC_CMD_STATUS_OK)
- 		return status;
- 
- 	/* Copy command response data from MC portal: */
- 	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
--		resp->params[i] = __raw_readq(&portal->params[i]);
-+		/*
-+		 * Data is expected to be in LE byte-order. Do an
-+		 * extra CPU -> LE to revert the LE -> CPU done in
-+		 * the device io read api.
-+		 */
-+		resp->params[i] =
-+			cpu_to_le64(readq_relaxed(&portal->params[i]));
- 
- 	return status;
- }
+ #include "dpmcp.h"
 -- 
 2.9.4
