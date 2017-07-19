@@ -1,167 +1,127 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 20 Jul 2017 00:20:26 +0300
-Subject: [PATCH v7 3/3] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <1500474344-9832-4-git-send-email-gabriel.fernandez@st.com>
-References: <1500474344-9832-1-git-send-email-gabriel.fernandez@st.com>
- <1500474344-9832-4-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <d999fc79-7b14-da8e-965f-371cf4352dd1@mleia.com>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Wed, 19 Jul 2017 23:22:53 +0200
+Subject: [PATCH 3/3] hwrng: mxc-fsl - add support for Freescale RNGC
+In-Reply-To: <CANc+2y7icNR3hJS0wCFd_-90X6bXkJYMEO6m53HDG8SBM0FZ2g@mail.gmail.com>
+References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1500326163-4556-1-git-send-email-martin@kaiser.cx>
+ <1500326163-4556-3-git-send-email-martin@kaiser.cx>
+ <CANc+2y7icNR3hJS0wCFd_-90X6bXkJYMEO6m53HDG8SBM0FZ2g@mail.gmail.com>
+Message-ID: <20170719212253.GA13879@botnar.kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gabriel,
+Hi PrasannaKumar,
 
-On 07/19/2017 05:25 PM, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> This patch enables clocks for STM32H743 boards.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> for MFD changes:
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> for DT-Bindings
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |   82 ++
+thanks for taking the time to review my submission.
 
-I'll provide some review comments about device tree bindings only.
+Thus wrote PrasannaKumar Muralidharan (prasannatsmkumar at gmail.com):
 
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/clk-stm32h7.c                          | 1409 ++++++++++++++++++++
->  include/dt-bindings/clock/stm32h7-clks.h           |  165 +++
->  include/dt-bindings/mfd/stm32h7-rcc.h              |  136 ++
->  5 files changed, 1793 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->  create mode 100644 drivers/clk/clk-stm32h7.c
->  create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
->  create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
-> new file mode 100644
-> index 0000000..442c50c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
-> @@ -0,0 +1,82 @@
-> +STMicroelectronics STM32H7 Reset and Clock Controller
-> +=====================================================
-> +
-> +The RCC IP is both a reset and a clock controller.
-> +
-> +Please refer to clock-bindings.txt for common clock controller binding usage.
-> +Please also refer to reset.txt for common reset controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be:
-> +  "st,stm32h743-rcc"
-> +
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +
-> +- #reset-cells: 1, see below
-> +
-> +- #clock-cells : from common clock binding; shall be set to 1
-> +
-> +- clocks: External oscillator clock phandle
-> +  - high speed external clock signal (HSE)
-> +  - low speed external clock signal (LSE)
-> +  - external I2S clock (I2S_CKIN)
-> +
-> +Optional properties:
-> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
-> +  write protection (RTC clock).
-> +
-> +Example:
-> +
-> +	rcc: rcc at 58024400 {
+> Please combine above 2 comments.
 
-'rcc' as a generic device node name is awkward.
+ok, I'll do this.
 
-I believe the main function of the device is clock controller (unlikely
-a generic reset controller can be converted into a clock controller),
-the locations of the document and device driver also indicate that
-primarily it is a clock controller, so I suggest to replace device node
-name with 'clock-controller' like below:
+> > +
+> > +/*
+> > + * Hardware driver for the Intel/AMD/VIA Random Number Generators (RNG)
+> > [...]
 
-	rcc: clock-controller at 58024400 {
+> I feel this comment is because of copy paste. If that's the case please remove.
 
-> +		#reset-cells = <1>;
-> +		#clock-cells = <2>
+A couple of files in drivers/char/hw_random have the same copyright
+statement. So it looks like copy&paste. I'll remove it.
 
-Missing trailing semicolon       ^^^
+> > +
+> > +       while (max > sizeof(u32)) {
 
-My recommendation is to move #reset-cells and #clock-cells properties
-down after 'reg' or 'clocks' property in the list.
+> Should the condition be max >= sizeof(u32)?
 
-> +		compatible = "st,stm32h743-rcc", "st,stm32-rcc";
-> +		reg = <0x58024400 0x400>;
-> +		clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
-> +
-> +		st,syscfg = <&pwrcfg>;
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+You're right. I'll fix this.
 
-Please drop #address-cells and #size-cells properties completely, from
-the document the device node does not define any children subnodes.
+> > +               status = __raw_readl(rngc->base + RNGC_STATUS);
 
-> +	};
-> +
-> +The peripheral clock consumer should specify the desired clock by
-> +having the clock ID in its "clocks" phandle cell.
-> +
-> +All available clocks are defined as preprocessor macros in
-> +dt-bindings/clock/stm32h7-clks.h header and can be used in device
-> +tree sources.
-> +
-> +Example:
-> +
-> +		timer5: timer at 40000c00 {
-> +			compatible = "st,stm32-timer";
-> +			reg = <0x40000c00 0x400>;
-> +			interrupts = <50>;
-> +			clocks = <&rcc TIM5_CK>;
-> +
+> Is there any specific reason for using __raw_readl? Why not just readl?
+> If there is no specific reason for using __raw_readl please use readl
+> in all the places.
 
-Please remote the empty line above.
+That looks like mxc-rnga.c was taken as a starting point. I'll change
+__raw_read() to readl and __raw_writel to writel.
 
-> +		};
-> +
-> +Specifying softreset control of devices
-> +=======================================
-> +
-> +Device nodes should specify the reset channel required in their "resets"
-> +property, containing a phandle to the reset device node and an index specifying
-> +which channel to use.
-> +The index is the bit number within the RCC registers bank, starting from RCC
-> +base address.
-> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
-> +Where bit_offset is the bit offset within the register.
-> +
-> +For example, for CRC reset:
-> +  crc = AHB4RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x88 / 4 * 32 + 19 = 1107
-> +
-> +All available preprocessor macros for reset are defined dt-bindings//mfd/stm32h7-rcc.h
+> > +               /* how many random numbers are in FIFO? [0-16] */
+> > +               level = (status & RNGC_STATUS_FIFO_LEVEL_MASK) >>
+> > +                       RNGC_STATUS_FIFO_LEVEL_SHIFT;
+> > +
+> > +               /* is there some error while reading this random number? */
+> > +               if (status & RNGC_STATUS_ERROR)
+> > +                       break;
 
-Double slashes ---------->                                           ^^^^ 
+> Before calculating level error check can be done.
 
-I have doubts if it is permitted to add source paths into the device
-tree bindings documentation, because such information is specific to
-the Linux source code.
+Ok, I'll move the check right after reading the status register.
 
-Rob, can you clarify please?
+> > +               if (__raw_readl(rngc->base + RNGC_ERROR) &
+> > +                   RNGC_ERROR_STATUS_BAD_KEY) {
+> > +                       dev_err(rngc->dev, "Can't start, Bad Keys.\n");
+> > +                       return -EIO;
+> > +               }
+> > +       }
 
-> +header and can be used in device tree sources.
-> +
-> +example:
+> What keys? What is the purpose of this check? At this point only clk
+> is enabled for RNGC so I am wondering why this check is required?
 
-For unification, please capitalize it: 'Example:'
+The "key" is probably the internal state of the PRNG, which uses the
+mechanism described in FIPS 186-2.
 
-> +
-> +	timer2 {
-> +		resets	= <&rcc STM32H7_APB1L_RESET(TIM2)>;
-> +	};
+No idea why Freescale added this check before the self test. I guess
+that we can safely run the self test and check for errors afterwards.
+I'll remove the check.
 
---
-With best wishes,
-Vladimir
+Interestingly, this "bad key" error status is one of the few differences
+between RNGB and RNGC, both of which should work with this driver...
+
+> > +
+> > +       /* mask all interrupts, will be unmasked soon */
+> > +       ctrl = __raw_readl(rngc->base + RNGC_CONTROL);
+> > +       __raw_writel(ctrl | RNGC_CTRL_MASK_DONE | RNGC_CTRL_MASK_ERROR,
+> > +                    rngc->base + RNGC_CONTROL);
+> > +
+> > +       /* verify if oscillator is working */
+> > +       osc = __raw_readl(rngc->base + RNGC_ERROR);
+> > +       if (osc & RNGC_ERROR_STATUS_OSC_ERR) {
+> > +               dev_err(rngc->dev, "RNGC Oscillator is dead!\n");
+> > +               return -EIO;
+> > +       }
+
+> Is this check useful? If clock is initialised properly I do not think
+> this case will happen. May be I am missing something. Please add a
+> comment if this check is valid.
+
+Agreed. Switching the clock on should be sufficient to get the
+oscillator to run. And if not, we should see an error after the self
+test.
+
+> RNG core can call init every time this rng device is selected as
+> current random number provider. Is self test required on every RNG
+> init?
+
+I'd say the self test should be run once when the driver is loaded. I'll
+try to move the self test to the probe function.
+
+> By default self test need not be run, a module parameter can be added
+> for enabling self test.
+
+Ok.
+
+> > +       rngc->rng.name = pdev->name;
+> > +       rngc->rng.init = mxc_rngc_init;
+> > +       rngc->rng.read = mxc_rngc_read;
+
+> Assiging a quality would be great. That will help in deciding which
+> rng device to use if there are mulitple rng devices.
+
+I doubt that I have enough info to set the quality. I'll see what I can
+dig up.
+
+I'll try to upload v4 as soon as possible.
+
+Thanks,
+Martin
