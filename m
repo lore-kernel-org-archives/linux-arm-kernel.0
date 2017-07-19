@@ -1,45 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 19 Jul 2017 12:00:54 +0100
-Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
- SMMUv3 driver
-In-Reply-To: <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
-References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
-Message-ID: <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 19 Jul 2017 13:10:00 +0200
+Subject: [PATCH 2/4] gpio: davinci: Handle the return value of
+ davinci_gpio_irq_setup function
+In-Reply-To: <1500375436-9435-3-git-send-email-j-keerthy@ti.com>
+References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+ <1500375436-9435-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <20170719111000.GX29638@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/17 10:33, Anup Patel wrote:
-> The ARM SMMUv3 support bypassing transactions for which domain
-> is not configured. The patch adds corresponding IOMMU capability
-> to advertise this fact.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+On Tue, Jul 18, 2017 at 04:27:14PM +0530, Keerthy wrote:
+> Currently davinci_gpio_irq_setup return value is ignored. Handle the
+> return value appropriately.
+>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
 > ---
->  drivers/iommu/arm-smmu-v3.c | 2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/gpio/gpio-davinci.c | 18 +++++++++++++-----
+>  1 file changed, 13 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 568c400..a6c7f66 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1423,6 +1423,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
->  		return true;
->  	case IOMMU_CAP_NOEXEC:
->  		return true;
-> +	case IOMMU_CAP_BYPASS:
-> +		return true;
-
-And this is never true. If Linux knows a device masters through the
-SMMU, it will always have a default domain of some sort (either identity
-or DMA ops). If Linux doesn't know, then it won't have been able to
-initialise the stream table for the relevant stream IDs, thus any
-'bypass' DMA is going to raise C_BAD_STE. SMMUv3 can effectively only
-bypass unknown stream IDs if disabled entirely.
-
-Robin.
-
->  	default:
->  		return false;
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index 2c88054..932f270 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+> @@ -233,15 +233,23 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+>  		chips->regs[bank] = gpio_base + offset_array[bank];
+>  
+>  	ret = devm_gpiochip_add_data(dev, &chips->chip, chips);
+> +	if (ret)
+> +		goto err;
+> +
+> +	platform_set_drvdata(pdev, chips);
+> +	ret = davinci_gpio_irq_setup(pdev);
+>  	if (ret) {
+> -		ctrl_num = 0;
+> -		bank_base = 0;
+> -		return ret;
+> +		platform_set_drvdata(pdev, NULL);
+> +		goto err;
 >  	}
-> 
+>  
+> -	platform_set_drvdata(pdev, chips);
+> -	davinci_gpio_irq_setup(pdev);
+>  	return 0;
+
+There's a separate but related bug here too as the clk_prepare_enable()
+in davinci_gpio_irq_setup() is never balanced on driver unbind.
+
+Johan
