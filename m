@@ -1,70 +1,85 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Jul 2017 19:32:48 +0200
-Subject: [PATCH] rtc: sun6i: ensure clk_data is kfree'd on error
-In-Reply-To: <20170719165702.22220-1-colin.king@canonical.com>
-References: <20170719165702.22220-1-colin.king@canonical.com>
-Message-ID: <20170719173248.l4w5xc33enuor5if@piout.net>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 19 Jul 2017 19:36:43 +0200
+Subject: [PATCH 2/2] net: ethernet: nb8800: Fix RGMII TX clock delay setup
+In-Reply-To: <yw1xzic0qrcg.fsf@mansr.com>
+References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
+ <61b71d12-4e3a-edbe-1d69-c66e7cf46d8e@sigmadesigns.com>
+ <yw1xzic0qrcg.fsf@mansr.com>
+Message-ID: <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 19/07/2017 19:17, M?ns Rullg?rd wrote:
 
-On 19/07/2017 at 17:57:02 +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
+> Marc Gonzalez writes:
 > 
-> There are two error return paths that do not kfree clk_data and
-> we end up with a memory leak. Fix these with a kfree error exit
-> path.
+>> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
+>> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
+>> there are 4 RGMII phy-modes to handle:
+>>
+>> "rgmii" (RX and TX delays are added by the MAC when required)
+>> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
+>> 	the MAC should not add the RX or TX delays in this case)
+>> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
+>> 	the MAC should not add an RX delay in this case)
+>> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
+>> 	the MAC should not add an TX delay in this case)
+>>
+>> Let the MAC handle TX clock delay for rgmii and rgmii-rxid.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  drivers/net/ethernet/aurora/nb8800.c | 8 +++++---
+>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+>> index 041cfb7952f8..f3ed320eb4ad 100644
+>> --- a/drivers/net/ethernet/aurora/nb8800.c
+>> +++ b/drivers/net/ethernet/aurora/nb8800.c
+>> @@ -609,7 +609,7 @@ static void nb8800_mac_config(struct net_device *dev)
+>>  		mac_mode |= HALF_DUPLEX;
+>>
+>>  	if (gigabit) {
+>> -		if (priv->phy_mode == PHY_INTERFACE_MODE_RGMII)
+>> +		if (phy_interface_is_rgmii(dev->phydev))
+>>  			mac_mode |= RGMII_MODE;
+>>
+>>  		mac_mode |= GMAC_MODE;
 > 
-> Detected by CoverityScan, CID#1402959 ("Resource Leak")
+> This is a separate issue, and the change is obviously correct.
 > 
+>> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
+>>  		break;
+>>
+>>  	case PHY_INTERFACE_MODE_RGMII:
+>> -		pad_mode = PAD_MODE_RGMII;
+>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
+>> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+>>  		break;
+>>
+>> +	case PHY_INTERFACE_MODE_RGMII_ID:
+>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
+>> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+>> +		pad_mode = PAD_MODE_RGMII;
+>>  		break;
+> 
+> Won't this just make it break in a different set of circumstances?
 
-I think that patch fixes the same issue (and more):
-http://patchwork.ozlabs.org/patch/787151/
+I don't think so, and here's my reasoning:
 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/rtc/rtc-sun6i.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
-> index 39cbc1238b92..61502221ab6e 100644
-> --- a/drivers/rtc/rtc-sun6i.c
-> +++ b/drivers/rtc/rtc-sun6i.c
-> @@ -204,7 +204,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
->  	rtc->base = of_io_request_and_map(node, 0, of_node_full_name(node));
->  	if (IS_ERR(rtc->base)) {
->  		pr_crit("Can't map RTC registers");
-> -		return;
-> +		goto err;
->  	}
->  
->  	/* Switch to the external, more precise, oscillator */
-> @@ -216,7 +216,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
->  
->  	/* Deal with old DTs */
->  	if (!of_get_property(node, "clocks", NULL))
-> -		return;
-> +		goto err;
->  
->  	rtc->int_osc = clk_hw_register_fixed_rate_with_accuracy(NULL,
->  								"rtc-int-osc",
-> @@ -246,6 +246,10 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
->  	clk_data->num = 1;
->  	clk_data->hws[0] = &rtc->hw;
->  	of_clk_add_hw_provider(node, of_clk_hw_onecell_get, clk_data);
-> +	return;
-> +
-> +err:
-> +	kfree(clk_data);
->  }
->  CLK_OF_DECLARE_DRIVER(sun6i_rtc_clk, "allwinner,sun6i-a31-rtc",
->  		      sun6i_rtc_clk_init);
-> -- 
-> 2.11.0
-> 
+AFAIU, the HW block always requires a TX clock delay
+(I don't know what the "safe" interval is. PHY adds
+2.4 ns, MAC adds ~1 ns, both work.)
+RX clock delay seems to be "Don't Care" (tested both
+enabled and disabled by PHY)
+By "tested", I mean ability to ping remote system.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+If phy-mode is RGMII or RGMII_RXID, then don't add
+TX clock delay from PHY, therefore add it from MAC.
+
+If phy_mode is RGMII_ID or RGMII_TXID, then do add
+TX clock delay from PHY, therefore don't add it from MAC.
+
+What set of circumstances would create an issue?
+
+Regards.
