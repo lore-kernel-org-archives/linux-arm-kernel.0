@@ -1,106 +1,60 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 19 Jul 2017 09:36:59 +0530
-Subject: [PATCH 4/4] ARM: dts: keystone-k2g-evm: Add gpio nodes
-In-Reply-To: <1cd6ef99-a98e-7cdb-5c2a-f5cd057eef41@ti.com>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-5-git-send-email-j-keerthy@ti.com>
- <1cd6ef99-a98e-7cdb-5c2a-f5cd057eef41@ti.com>
-Message-ID: <87734375-8841-ce74-38eb-7ee5af1ad4f6@ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 19 Jul 2017 07:49:23 +0300
+Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for
+ Allwinner CSI
+In-Reply-To: <20170719092249.2fb6ec720ba1b194cea320c8@magewell.com>
+References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+ <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
+ <20170718115530.ssy7g5vv4siqnfpo@tarshish>
+ <20170719092249.2fb6ec720ba1b194cea320c8@magewell.com>
+Message-ID: <20170719044923.yae2ye4slvrmtyfe@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Yong,
 
+On Wed, Jul 19, 2017 at 09:22:49AM +0800, Yong wrote:
+> On Tue, 18 Jul 2017 14:55:30 +0300
+> Baruch Siach <baruch@tkos.co.il> wrote:
+> > I am trying to get this driver working on the Olimex A33 OLinuXino. I 
+> > didn't get it working yet, but I had some progress. See the comment below 
+> > on one issue I encountered.
+> > 
+> > On Tue, Jun 27, 2017 at 07:07:34PM +0800, Yong Deng wrote:
+> > > Add binding documentation for Allwinner CSI.
+> > > 
+> > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > > ---
 
-On Wednesday 19 July 2017 12:43 AM, Suman Anna wrote:
-> Hi Keerthy,
-> 
-> On 07/18/2017 05:57 AM, Keerthy wrote:
->> keystone-k2g has 2 instances of gpio. The first one has all the 144 GPIOs
-> 
-> Please use 66AK2G for keystone-k2g.
+[...]
 
-Okay
+> > > +Example:
+> > > +
+> > > +	csi1: csi at 01cb4000 {
+> > > +		compatible = "allwinner,sun8i-v3s-csi";
+> > > +		reg = <0x01cb4000 0x1000>;
+> > 
+> > You use platform_get_resource_byname() to get this IO resource. This requires 
+> > adding mandatory
+> > 
+> >   reg-names = "csi";
+> > 
+> > But is it actually needed? Wouldn't a simple platform_get_resource() be 
+> > enough?
+> 
+> You are right.
+> This will be fixed in the next version.
+> I am waiting for more comments for the sunxi-csi.h. It's pleasure if
+> you have any suggestions about it.
 
-> 
->> functional( 9 banks with 16 gpios = 144). The second instance has
->> only the GPIO0:GPIO67 functional and rest are marked reserved.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>  arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
->>  1 file changed, 42 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
->> index bf4d1fa..58ac3db 100644
->> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
->> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
->> @@ -15,6 +15,7 @@
->>  
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->>  #include <dt-bindings/pinctrl/keystone.h>
->> +#include <dt-bindings/gpio/gpio.h>
->>  
->>  / {
->>  	compatible = "ti,k2g","ti,keystone";
->> @@ -168,5 +169,46 @@
->>  				#reset-cells = <2>;
->>  			};
->>  		};
->> +
->> +		gpio0: gpio at 2603000 {
->> +			compatible = "ti,keystone-k2g-gpio";
->> +			reg = <0x02603000 0x100>;
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +
->> +			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <2>;
->> +			ti,ngpio = <144>;
->> +			ti,davinci-gpio-unbanked = <0>;
->> +			clocks = <&k2g_clks 0x001b 0x0>;
->> +			clock-names = "gpio";
-> 
-> I don't see the clocks and clock-names documented in the binding.
-> Looking at davinci_gpio_irq_setup(), these are required, and a specific
-> clock name is what the driver is looking for. And you have different
-> semantics for this on K2G and non-K2G SoCs. Davinci platforms are using
-> non-DT clocks, so their DT nodes didn't have them.
+You mean sunxi_csi.h, right?
 
-I will document the same.
+Why do you need the sunxi_csi_ops indirection? Do you expect to add 
+alternative implementations of these ops at some point?
 
-> 
-> regards
-> Suman
-> 
->> +		};
->> +
->> +		gpio1: gpio at 260a000 {
->> +			compatible = "ti,keystone-k2g-gpio";
->> +			reg = <0x0260a000 0x100>;
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <2>;
->> +			ti,ngpio = <68>;
->> +			ti,davinci-gpio-unbanked = <0>;
->> +			clocks = <&k2g_clks 0x001c 0x0>;
->> +			clock-names = "gpio";
->> +		};
->>  	};
->>  };
->>
-> 
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
