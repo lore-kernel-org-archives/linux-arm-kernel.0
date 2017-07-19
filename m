@@ -1,86 +1,79 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Wed, 19 Jul 2017 11:55:48 +1000
-Subject: [PATCH 0/4] Allow non-legacy cards to be vgaarb default
-In-Reply-To: <20170719012839.20124-1-dja@axtens.net>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 19 Jul 2017 11:36:13 +1000
+Subject: [PATCH 1/4] powerpc: simplify and fix VGA default device behaviour
+In-Reply-To: <20170719012839.20124-2-dja@axtens.net>
 References: <20170719012839.20124-1-dja@axtens.net>
-Message-ID: <87pocxkx5n.fsf@linkitivity.dja.id.au>
+ <20170719012839.20124-2-dja@axtens.net>
+Message-ID: <1500428173.3350.2.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apologies everyone - this got mixed in with another patch set. I'll do a
-v2 that isn't completely broken and confusing.
+On Wed, 2017-07-19 at 11:28 +1000, Daniel Axtens wrote:
+> Some powerpc devices provide a PCI display that isn't picked up by
+> the VGA arbiter, presumably because it doesn't support the PCI
+> legacy VGA ranges.
+> 
+> Commit c2e1d84523ad ("powerpc: Set default VGA device") introduced
+> an arch quirk to mark these devices as default to fix X autoconfig.
+> 
+> The commit message stated that the patch:
+> 
+>     Ensures a default VGA is always set if a graphics adapter is present,
+>     even if firmware did not initialize it. If more than one graphics
+>     adapter is present, ensure the one initialized by firmware is set
+>     as the default VGA device.
+> 
+> The patch used the following test to decide whether or not to mark
+> a device as default:
+> 
+>   pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+>   if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
+>           vga_set_default_device(pdev);
+> 
+> This doesn't seem like it works quite as intended. Because of the
+> logical OR, the default device will be set in 2 cases:
+> 
+>  1) if there is no default device
+> OR
+>  2) if this device has normal memory/IO decoding turned on
+> 
+> This will work as intended if there is only one device, but if
+> there are multiple devices, we may override the device the VGA
+> arbiter picked.
+> 
+> Instead, set a device as default if there is no default device AND
+> this device decodes.
+> 
+> This will not change behaviour on single-headed systems.
 
-Again, my apologies for the noise.
+Ack.
 
-Regards,
-Daniel
-
-Daniel Axtens <dja@axtens.net> writes:
-
-> Hi all,
->
-> Previously I posted a patch that provided a quirk for a hibmc card
-> behind a particular Huawei bridge that allowed it to be marked as the
-> default device in the VGA arbiter.[0] This lead to some discussion.[1]
-> It was broadly suggested that a more generic solution would be better,
-> something in the style of powerpc's fixup_vga() quirk.
->
-> Here is my suggested solution:
->
->  - Create a Kconfig option ARCH_WANT_VGA_ARB_FALLBACK
+> Cc: Brian King <brking@linux.vnet.ibm.com>
+> Signed-off-by: Daniel Axtens <dja@axtens.net>
+> 
+> ---
+> 
+> Tested in TCG (the card provided by qemu doesn't automatically
+> register with vgaarb, so the relevant code path has been tested)
+> but I would appreciate any tests on real hardware.
+> ---
+>  arch/powerpc/kernel/pci-common.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+> index 341a7469cab8..c95fdda3a2dc 100644
+> --- a/arch/powerpc/kernel/pci-common.c
+> +++ b/arch/powerpc/kernel/pci-common.c
+> @@ -1746,8 +1746,11 @@ static void fixup_vga(struct pci_dev *pdev)
+>  {
+>  	u16 cmd;
 >  
->  - if an arch selects that option, install PCI_FIXUP_CLASS_ENABLE
->    hook. This hook fires when a card is enabled, which will require
->    that a driver has been bound.
->
->  - if there is no default device when the hook fires, and the device
->    can control memory and I/O, mark it as default.
->
-> The patches are as follows:
->
->  (1) powerpc: simplify and fix VGA default device behaviour
->
->      This cleans up some quirks in the powerpc implementation of the
->      vga_fixup. It should make the behaviour match the original
->      intention.
->
->  (2) vgaarb: allow non-legacy cards to be marked as default
->
->      Add the Kconfig option, and create the fixup in vgaarb.c gated
->      behind the option. Nothing happens at this stage because no arch
->      has selected the option yet.
->
->  (3) powerpc: replace vga_fixup() with generic code
->
->      Select the option on powerpc and remove the old code. The only
->      change is that it moves from being a final fixup to an enable
->      fixup.
+> +	if (vga_default_device())
+> +		return;
+> +
+>  	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+> -	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
+> +	if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY))
+>  		vga_set_default_device(pdev);
 >  
->  (4) arm64: allow non-legacy VGA devices to be default
->
->      Select the option on arm64. This solves my problem with the D05,
->      but may cause other cards to be marked as default on other
->      boards. This shouldn't cause any real issues but is worth being
->      aware of.
->
-> Regards,
-> Daniel
->
-> [0]: https://patchwork.ozlabs.org/patch/787003/
-> [1]: https://www.spinics.net/lists/arm-kernel/msg593656.html
->
-> Daniel Axtens (4):
->   powerpc: simplify and fix VGA default device behaviour
->   vgaarb: allow non-legacy cards to be marked as default
->   powerpc: replace vga_fixup() with generic code
->   arm64: allow non-legacy VGA devices to be default
->
->  arch/arm64/Kconfig               |  1 +
->  arch/powerpc/Kconfig             |  1 +
->  arch/powerpc/kernel/pci-common.c | 12 ------------
->  drivers/gpu/vga/Kconfig          |  7 +++++++
->  drivers/gpu/vga/vgaarb.c         | 21 +++++++++++++++++++++
->  5 files changed, 30 insertions(+), 12 deletions(-)
->
-> -- 
-> 2.11.0
+>  }
