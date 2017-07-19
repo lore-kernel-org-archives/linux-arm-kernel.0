@@ -1,40 +1,55 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 19 Jul 2017 09:52:35 -0700
-Subject: [PATCH 0/6] FlexRM driver improvements
-In-Reply-To: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
-References: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <9563f619-bcac-01cb-11c2-211697d0ac68@broadcom.com>
+From: colin.king@canonical.com (Colin King)
+Date: Wed, 19 Jul 2017 17:57:02 +0100
+Subject: [PATCH] rtc: sun6i: ensure clk_data is kfree'd on error
+Message-ID: <20170719165702.22220-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch series all looks good.
+From: Colin Ian King <colin.king@canonical.com>
 
+There are two error return paths that do not kfree clk_data and
+we end up with a memory leak. Fix these with a kfree error exit
+path.
 
-On 17-07-19 02:55 AM, Anup Patel wrote:
-> This patchset does various improvments to Broadcom FlexRM
-> mailbox controller driver and also adds FlexRM DT nodes
-> for Stingray SOC.
->
-> The patches are based on Linux-4.13-rc1 and can also be
-> found at flexrm-imp-v1 branch of
-> https://github.com/Broadcom/arm64-linux.git
->
-> Anup Patel (6):
->    mailbox: bcm-flexrm-mailbox: Set IRQ affinity hint for FlexRM ring
->      IRQs
->    mailbox: bcm-flexrm-mailbox: Add debugfs support
->    mailbox: bcm-flexrm-mailbox: Fix mask used in CMPL_START_ADDR_VALUE()
->    mailbox: Make message send queue size dynamic in Linux mailbox
->    mailbox: bcm-flexrm-mailbox: Set msg_queue_len for each channel
->    arm64: dts: Add FlexRM DT nodes for Stingray
->
->   .../boot/dts/broadcom/stingray/stingray-fs4.dtsi   |  54 +++++++
->   .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |   2 +
->   drivers/mailbox/bcm-flexrm-mailbox.c               | 160 ++++++++++++++++++++-
->   drivers/mailbox/mailbox.c                          |  15 +-
->   include/linux/mailbox_controller.h                 |   5 +-
->   5 files changed, 227 insertions(+), 9 deletions(-)
->   create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
->
-Regards,
-  Scott
+Detected by CoverityScan, CID#1402959 ("Resource Leak")
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/rtc/rtc-sun6i.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index 39cbc1238b92..61502221ab6e 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -204,7 +204,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+ 	rtc->base = of_io_request_and_map(node, 0, of_node_full_name(node));
+ 	if (IS_ERR(rtc->base)) {
+ 		pr_crit("Can't map RTC registers");
+-		return;
++		goto err;
+ 	}
+ 
+ 	/* Switch to the external, more precise, oscillator */
+@@ -216,7 +216,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+ 
+ 	/* Deal with old DTs */
+ 	if (!of_get_property(node, "clocks", NULL))
+-		return;
++		goto err;
+ 
+ 	rtc->int_osc = clk_hw_register_fixed_rate_with_accuracy(NULL,
+ 								"rtc-int-osc",
+@@ -246,6 +246,10 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+ 	clk_data->num = 1;
+ 	clk_data->hws[0] = &rtc->hw;
+ 	of_clk_add_hw_provider(node, of_clk_hw_onecell_get, clk_data);
++	return;
++
++err:
++	kfree(clk_data);
+ }
+ CLK_OF_DECLARE_DRIVER(sun6i_rtc_clk, "allwinner,sun6i-a31-rtc",
+ 		      sun6i_rtc_clk_init);
+-- 
+2.11.0
