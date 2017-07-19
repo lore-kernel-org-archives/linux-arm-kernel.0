@@ -1,60 +1,43 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 19 Jul 2017 07:49:23 +0300
-Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for
- Allwinner CSI
-In-Reply-To: <20170719092249.2fb6ec720ba1b194cea320c8@magewell.com>
-References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
- <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
- <20170718115530.ssy7g5vv4siqnfpo@tarshish>
- <20170719092249.2fb6ec720ba1b194cea320c8@magewell.com>
-Message-ID: <20170719044923.yae2ye4slvrmtyfe@sapphire.tkos.co.il>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Wed, 19 Jul 2017 07:04:40 +0200
+Subject: [PATCH 1/9] ARM: ep93xx: allow NULL clock for clk_get_rate
+In-Reply-To: <20170718101730.2541-2-jonas.gorski@gmail.com>
+References: <20170718101730.2541-1-jonas.gorski@gmail.com>
+ <20170718101730.2541-2-jonas.gorski@gmail.com>
+Message-ID: <e700ebab-0fd1-f699-3b1c-d528bf003a8e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
-
-On Wed, Jul 19, 2017 at 09:22:49AM +0800, Yong wrote:
-> On Tue, 18 Jul 2017 14:55:30 +0300
-> Baruch Siach <baruch@tkos.co.il> wrote:
-> > I am trying to get this driver working on the Olimex A33 OLinuXino. I 
-> > didn't get it working yet, but I had some progress. See the comment below 
-> > on one issue I encountered.
-> > 
-> > On Tue, Jun 27, 2017 at 07:07:34PM +0800, Yong Deng wrote:
-> > > Add binding documentation for Allwinner CSI.
-> > > 
-> > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > > ---
-
-[...]
-
-> > > +Example:
-> > > +
-> > > +	csi1: csi at 01cb4000 {
-> > > +		compatible = "allwinner,sun8i-v3s-csi";
-> > > +		reg = <0x01cb4000 0x1000>;
-> > 
-> > You use platform_get_resource_byname() to get this IO resource. This requires 
-> > adding mandatory
-> > 
-> >   reg-names = "csi";
-> > 
-> > But is it actually needed? Wouldn't a simple platform_get_resource() be 
-> > enough?
+On 18/07/17 12:17, Jonas Gorski wrote:
+> Make the behaviour of clk_get_rate consistent with common clk's
+> clk_get_rate by accepting NULL clocks as parameter. Some device
+> drivers rely on this, and will cause an OOPS otherwise.
 > 
-> You are right.
-> This will be fixed in the next version.
-> I am waiting for more comments for the sunxi-csi.h. It's pleasure if
-> you have any suggestions about it.
+> Fixes: 1d81eedb8f6c ("[ARM] 3634/1: ep93xx: initial implementation of the clk_* API")
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Alexander Sverdlin <alexander.sverdlin@gmail.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Reported-by: Mathias Kresin <dev@kresin.me>
+> Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
 
-You mean sunxi_csi.h, right?
+Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 
-Why do you need the sunxi_csi_ops indirection? Do you expect to add 
-alternative implementations of these ops at some point?
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> ---
+>  arch/arm/mach-ep93xx/clock.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+> index 39ef3b613912..f0768befafe8 100644
+> --- a/arch/arm/mach-ep93xx/clock.c
+> +++ b/arch/arm/mach-ep93xx/clock.c
+> @@ -316,6 +316,9 @@ static unsigned long get_uart_rate(struct clk *clk)
+>  
+>  unsigned long clk_get_rate(struct clk *clk)
+>  {
+> +	if (!clk)
+> +		return 0;
+> +
+>  	if (clk->get_rate)
+>  		return clk->get_rate(clk);
