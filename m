@@ -1,76 +1,41 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Wed, 19 Jul 2017 10:25:41 -0500
-Subject: [PATCH 1/4] ARM: dts: keystone-k2g: Add PMMC node to support
- TI-SCI protocol
-In-Reply-To: <4ff798de-9926-4bf8-74a5-572f0f0c1081@ti.com>
-References: <20170718032844.29490-1-s-anna@ti.com>
- <20170718032844.29490-2-s-anna@ti.com>
- <8b8c4eff-4f18-f0d2-e075-389921e5a990@ti.com>
- <4ff798de-9926-4bf8-74a5-572f0f0c1081@ti.com>
-Message-ID: <d2cc6c0e-9f78-aac5-f20e-3695b36ec3a3@ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 19 Jul 2017 17:25:11 +0200
+Subject: [PATCH 007/102] bus: sunxi-rsb: explicitly request exclusive reset
+ control
+In-Reply-To: <20170719152646.25903-1-p.zabel@pengutronix.de>
+References: <20170719152646.25903-1-p.zabel@pengutronix.de>
+Message-ID: <20170719152646.25903-8-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2017 06:50 PM, Suman Anna wrote:
-> On 07/18/2017 10:00 AM, Andrew F. Davis wrote:
->> On 07/17/2017 10:28 PM, Suman Anna wrote:
->>> From: Nishanth Menon <nm@ti.com>
->>>
->>> Texas Instrument's System Control Interface (TI-SCI) Message Protocol
->>> is implemented in Keystone 2 generation 66AK2G SoC with the PMMC entity.
->>>
->>> Add the ti-sci node representing this 66AK2G PMMC module.
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> [s-anna at ti.com: add unit address to DT node]
->>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>> ---
->>>  arch/arm/boot/dts/keystone-k2g.dtsi | 14 ++++++++++++++
->>>  1 file changed, 14 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
->>> index a789f75a1ed5..7f0f4180b373 100644
->>> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
->>> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
->>> @@ -139,5 +139,19 @@
->>>  			interrupts = <GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH>,
->>>  				     <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
->>>  		};
->>> +
->>> +		pmmc: pmmc at 02921c00 {
->>> +			compatible = "ti,k2g-sci";
->>> +			/*
->>> +			 * In case of rare platforms that does not use k2g as
->>> +			 * system master, use /delete-property/
->>> +			 */
->>
->> This comment seems mis-worded, I believe this was meant to say "for
->> platforms that do not use the *PMMC* as the system master".
-> 
-> The comment is for the system-reboot-controller property, and is meant
-> to say that this property is to be deleted from this node if there is an
-> external entity on the board other than the K2G SoC that is responsible
-> for triggering a reboot.
-> 
+Commit a53e35db70d1 ("reset: Ensure drivers are explicit when requesting
+reset lines") started to transition the reset control request API calls
+to explicitly state whether the driver needs exclusive or shared reset
+control behavior. Convert all drivers requesting exclusive resets to the
+explicit API call so the temporary transition helpers can be removed.
 
-I see, that makes more sense, thanks for the clarification.
+No functional changes.
 
-Andrew
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/bus/sunxi-rsb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> regards
-> Suman
-> 
->>
->> Andrew
->>
->>> +			ti,system-reboot-controller;
->>> +			mbox-names = "rx", "tx";
->>> +			mboxes= <&msgmgr 5 2>,
->>> +				<&msgmgr 0 0>;
->>> +			reg-names = "debug_messages";
->>> +			reg = <0x02921c00 0x400>;
->>> +		};
->>>  	};
->>>  };
->>>
-> 
+diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+index 795c9d9c96a6d..c7f585a420d3e 100644
+--- a/drivers/bus/sunxi-rsb.c
++++ b/drivers/bus/sunxi-rsb.c
+@@ -670,7 +670,7 @@ static int sunxi_rsb_probe(struct platform_device *pdev)
+ 
+ 	p_clk_freq = clk_get_rate(rsb->clk);
+ 
+-	rsb->rstc = devm_reset_control_get(dev, NULL);
++	rsb->rstc = devm_reset_control_get_exclusive(dev, NULL);
+ 	if (IS_ERR(rsb->rstc)) {
+ 		ret = PTR_ERR(rsb->rstc);
+ 		dev_err(dev, "failed to retrieve reset controller: %d\n", ret);
+-- 
+2.11.0
