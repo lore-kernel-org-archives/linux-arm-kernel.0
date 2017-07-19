@@ -1,88 +1,121 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 19 Jul 2017 14:05:42 -0700
-Subject: [PATCH] media: Convert to using %pOF instead of full_name
-In-Reply-To: <CAL_JsqLDCgO60ECGB70pMNcaLg0zUcJ6_+50vH-evfGe-D266Q@mail.gmail.com>
-References: <CGME20170718215328epcas2p2e5e1d7df96fcd894e70a961df864abdd@epcas2p2.samsung.com>
- <20170718214339.7774-33-robh@kernel.org>
- <564a6768-3b23-6dc7-ecb5-cb4f4359b633@samsung.com>
- <CAL_JsqLDCgO60ECGB70pMNcaLg0zUcJ6_+50vH-evfGe-D266Q@mail.gmail.com>
-Message-ID: <596FC9A6.7090509@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 19 Jul 2017 23:06:53 +0200
+Subject: [PATCH v2 0/5] arm64: dts: rockchip: support mail and IPA thermal
+ for rk3399
+In-Reply-To: <65759378-509b-3287-fd78-02361e89429b@rock-chips.com>
+References: <1500279271-15249-1-git-send-email-wxt@rock-chips.com>
+ <65759378-509b-3287-fd78-02361e89429b@rock-chips.com>
+Message-ID: <3610458.AeGaZ0pxhP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/17 09:02, Rob Herring wrote:
-> On Wed, Jul 19, 2017 at 4:41 AM, Sylwester Nawrocki
-> <s.nawrocki@samsung.com> wrote:
->> On 07/18/2017 11:43 PM, Rob Herring wrote:
->>> Now that we have a custom printf format specifier, convert users of
->>> full_name to use %pOF instead. This is preparation to remove storing
->>> of the full path string for each node.
->>>
->>> Signed-off-by: Rob Herring <robh@kernel.org>
->>
->>> ---
-
-< snip >
-
->>> diff --git a/drivers/media/v4l2-core/v4l2-async.c b/drivers/media/v4l2-core/v4l2-async.c
->>> index 851f128eba22..0a385d1ff28c 100644
->>> --- a/drivers/media/v4l2-core/v4l2-async.c
->>> +++ b/drivers/media/v4l2-core/v4l2-async.c
->>> @@ -47,9 +47,7 @@ static bool match_fwnode(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
->>>       if (!is_of_node(sd->fwnode) || !is_of_node(asd->match.fwnode.fwnode))
->>>               return sd->fwnode == asd->match.fwnode.fwnode;
->>>
->>> -     return !of_node_cmp(of_node_full_name(to_of_node(sd->fwnode)),
->>> -                         of_node_full_name(
->>> -                                 to_of_node(asd->match.fwnode.fwnode)));
->>> +     return to_of_node(sd->fwnode) == to_of_node(asd->match.fwnode.fwnode);
->>
->> I'm afraid this will not work, please see commit d2180e0cf77dc7a7049671d5d57d
->> "[media] v4l: async: make v4l2 coexist with devicetree nodes in a dt overlay"
-
-Commit d2180e0cf77dc7a7049671d5d57d seems to have a fundamental
-misunderstanding of overlays, if I understand the implications of that
-commit.
-
-When an overlay (1) is removed, all uses and references to the nodes and
-properties in that overlay are no longer valid.  Any driver that uses any
-information from the overlay _must_ stop using any data from the overlay.
-Any driver that is bound to a new node in the overlay _must_ unbind.  Any
-driver that became bound to a pre-existing node that was modified by the
-overlay (became bound after the overlay was applied) _must_ adjust itself
-to account for any changes to that node when the overlay is removed.  One
-way to do this is to unbind when notified that the overlay is about to
-be removed, then to re-bind after the overlay is completely removed.
-
-If an overlay (2) is subsequently applied, a node with the same
-full_name as from overlay (1) may exist.  There is no guarantee
-that overlay (1) and overlay (2) are the same overlay, even if
-that node has the same full_name in both cases.
-
-
-> Maybe I'm missing something, but how does that work exactly? Before
-> the overlay is applied, the remote endpoint node (and its parent)
-> can't be resolved. In the commit example, the endpoint in the
-> media_bridge would also have to be part of the overlay. If you apply
-> and un-apply the overlay, then the of_node (and fw_node) in the
-> overlay is once again invalid. IOW, you should be in the same state as
-> before the overlay was applied. The node is still around because of
-> paranoia that actually freeing nodes would break things. It seems this
-> paranoia is real, so i think we need to do something to prevent this
-> from spreading.
-
-My understanding is that nodes from an un-applied overlay will be
-freed if the expanded device tree that was used to create it has
-its reference counts drop to zero.  But I wouldn't count on me
-remembering this correctly without actually walking through all
-the code.  And as far as I know, there is no example of this
-in the mainline tree.
-
-
-> Furthermore, it does not appear that any media driver supports
-> overlays and we have no general way to apply them in mainline yet
-> (other than an in kernel API). So really this scenario is not one we
-> have to support yet.
+Am Mittwoch, 19. Juli 2017, 17:06:59 CEST schrieb Caesar Wang:
+> Hi Rob & Heiko,
 > 
-> Rob
+> Do we have the chance to merge these patches?
+
+>From the mali-thermal thingy, it doesn't look like Rob likes that IPA stuff.
+
+So I'll most likely pick the other patches that rely on approved bindings
+after I return from my vacation and leave the thermal issue until it can
+be resolved.
+
+
+Heiko
+
+> 
+> I'm try to bring up the display and run webgl for testing with my github on
+> https://github.com/Caesar-github/rockchip/commits/gru/next-stable-chromeos
+> 
+> I believe the Rocky at RK will post patches to support the other SoCs after.
+> 
+> -Caesar
+> 
+> ? 2017?07?17? 16:14, Caesar Wang ??:
+> > This series patches supported the mail in devicetree and used the
+> > thermal IPA by default.
+> >
+> > Verified with kernel is based on Linus's master branch and Heiko's
+> > v4.14-armsoc-tmp/dts64 branch. ( The Linux version 4.12.0 for now).
+> >
+> > The most rockchip SoCs will be supported with IPA mode for thermal
+> > in later.
+> >
+> > ---
+> >
+> > History version:
+> > 1. The first version found on
+> > https://www.spinics.net/lists/arm-kernel/msg593118.html
+> >
+> > Tested on Kevin board with bringing up ChromeOS.
+> > OS VERSION:
+> >      CHROMEOS_RELEASE_DESCRIPTION=9693.1.0 (Official Build) dev-channel kevin test
+> >
+> > BIOS VERSION:
+> >      Google_Kevin.8785.211.2017_06_20_1043
+> >
+> > EC VERSION:
+> >      Build info:    kevin_v1.10.217-24514961d 2017-07-03 07:46:36 wxt at nb
+> >
+> > With the ARM's lastest mali driver TX011-SW-99002-r18p0-01rel0 on
+> > https://developer.arm.com/products/software/mali-drivers/midgard-kernel
+> >
+> >  From the bootup log:
+> >      localhost devfreq0 # dmesg |grep mali
+> >      [    0.933334] mali ff9a0000.gpu: GPU identified as 0x0860 r2p0 status 0
+> >      [    0.940830] mali ff9a0000.gpu: Protected mode not available
+> >      [    0.947334] mali ff9a0000.gpu: Using configured power model mali-simple-power-model, and fallback mali-simple-power-model
+> >      [    0.960083] mali ff9a0000.gpu: Probed as mali0
+> >
+> >      localhost devfreq0 # pwd
+> >      /sys/devices/platform/ff9a0000.gpu/devfreq/devfreq0
+> >      localhost devfreq0 # ls
+> >      available_frequencies  device    min_freq          subsystem    uevent
+> >      available_governors    governor  polling_interval  target_freq  userspace
+> >      cur_freq               max_freq  power             trans_stat
+> >
+> >      localhost ff9a0000.gpu # ls
+> >      core_availability_policy  gpuinfo               modalias       soft_job_timeout
+> >      core_mask                 js_scheduling_period  of_node        subsystem
+> >      devfreq                   js_timeouts           pm_poweroff    uevent
+> >      driver                    mem_pool_max_size     power
+> >      driver_override           mem_pool_size         power_policy
+> >      dvfs_period               misc                  reset_timeout
+> > ---
+> >
+> > And for thermal with IPA.
+> > Try to run 'md5sum /dev/zero &' and octane/benchmark scripts to go up the temperature.
+> >  From the scripts to have a look at the actual control.
+> > "
+> > while true; do grep "" /sys/class/thermal/thermal_zone[0-1]/temp /sys/devices/system/cpu/cpu[0-5]/cpufreq/scaling_cur_freq /sys/devices/platform/ff9a0000.gpu/devfreq/devfreq0/cur_freq;date;sleep .5; done &
+> > "
+> >
+> > -Caesar
+> >
+> >
+> > Changes in v2:
+> > As Heiko comments on https://patchwork.kernel.org/patch/9835939/
+> > - interrupt-name use the lower case.
+> > - use the correct compatible "arm,mali-t860"
+> > - remove the clock name, since the mali only have one input clock.
+> > - foo@ will produce warnings when used without reg property.
+> > - update the commit to explain the two passive trip points changed.
+> >
+> > Caesar Wang (5):
+> >    dt-bindings: gpu: add the RK3399 mali for rockchip specifics
+> >    dt-bindings: gpu: add a power_model optional properties for MALI
+> >    arm64: dts: rockchip: add ARM Mali GPU node for RK3399 SoCs
+> >    arm64: dts: rockchip: enable the GPU for RK3399-GRU
+> >    arm64: dts: rockchip: update the thermal zones for RK3399 SoCs
+> >
+> >   .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 13 ++++
+> >   arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |  5 ++
+> >   arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi   | 33 ++++++++++
+> >   arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       | 33 ++++++++++
+> >   arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 74 ++++++++++++----------
+> >   5 files changed, 125 insertions(+), 33 deletions(-)
+> >
+> 
+> 
+> 
 > 
