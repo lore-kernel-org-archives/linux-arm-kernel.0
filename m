@@ -1,30 +1,48 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 19 Jul 2017 16:49:00 +0530
-Subject: [PATCH 1/5] iommu: Add capability IOMMU_CAP_BYPASS
-In-Reply-To: <675744d3-b070-1245-6ebc-579c4b5f4a75@arm.com>
+Date: Wed, 19 Jul 2017 16:53:04 +0530
+Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
+ SMMUv3 driver
+In-Reply-To: <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
 References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <1500456838-18405-2-git-send-email-anup.patel@broadcom.com>
- <675744d3-b070-1245-6ebc-579c4b5f4a75@arm.com>
-Message-ID: <CAALAos_o25mtphxcVE0rr9dE8YAm-os2C_HD9oDnt41ZMDP8pA@mail.gmail.com>
+ <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
+ <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
+Message-ID: <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 4:28 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+On Wed, Jul 19, 2017 at 4:30 PM, Robin Murphy <robin.murphy@arm.com> wrote:
 > On 19/07/17 10:33, Anup Patel wrote:
->> Some of the IOMMUs (such as ARM SMMU) are capable of bypassing
->> transactions for which no IOMMU domain is configured.
+>> The ARM SMMUv3 support bypassing transactions for which domain
+>> is not configured. The patch adds corresponding IOMMU capability
+>> to advertise this fact.
 >>
->> This patch adds IOMMU_CAP_BYPASS which can be used by IOMMU
->> drivers to advertise transation bypass capability of an IOMMU.
+>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 568c400..a6c7f66 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -1423,6 +1423,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>>               return true;
+>>       case IOMMU_CAP_NOEXEC:
+>>               return true;
+>> +     case IOMMU_CAP_BYPASS:
+>> +             return true;
 >
-> Whatever the intended semantics of this are, I can't help thinking it
-> would be better served by allowing callers to explicitly allocate their
-> own IOMMU_DOMAIN_IDENTITY domains. That would also be useful for the
-> problem we have with legacy virtio devices behind real IOMMUs.
+> And this is never true. If Linux knows a device masters through the
+> SMMU, it will always have a default domain of some sort (either identity
+> or DMA ops). If Linux doesn't know, then it won't have been able to
+> initialise the stream table for the relevant stream IDs, thus any
+> 'bypass' DMA is going to raise C_BAD_STE. SMMUv3 can effectively only
+> bypass unknown stream IDs if disabled entirely.
 
-We want to use VFIO no-IOMMU mode for FlexRM device but
-currently it does not allow on our SOC because IOMMU ops are
-registered for platform bus.
+What if we don't want to use IOMMU for certain device and
+due to this we never provide "iommus" DT attribute in the
+device DT node. Further, we want to access device without
+"iommus" DT attribute from user-space using VFIO no-IOMMU.
 
 Regards,
 Anup
