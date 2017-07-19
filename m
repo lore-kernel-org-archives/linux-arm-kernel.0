@@ -1,113 +1,95 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 19 Jul 2017 11:30:33 -0700
-Subject: [PATCH 2/2] net: ethernet: nb8800: Fix RGMII TX clock delay setup
-In-Reply-To: <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
-References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
- <61b71d12-4e3a-edbe-1d69-c66e7cf46d8e@sigmadesigns.com>
- <yw1xzic0qrcg.fsf@mansr.com> <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
-Message-ID: <d8121f82-dffd-22c7-1209-a3c2329703e5@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Jul 2017 19:35:43 +0100
+Subject: [kernel-hardening] Re: [PATCH v10 2/3] arm/syscalls: Check
+ address limit on user-mode return
+In-Reply-To: <CAJcbSZHi6454skNpG8ecMnq90LdUfcxy2RYZD+7og1C1PeypvQ@mail.gmail.com>
+References: <20170615011203.144108-1-thgarnie@google.com>
+ <20170615011203.144108-2-thgarnie@google.com>
+ <1500388566.11612.74.camel@nxp.com>
+ <CAJcbSZEr8HPBwH1oVaHqPzAY4MS_=yqMoqPhcauuKu3cikB3uQ@mail.gmail.com>
+ <1500398311.12096.30.camel@nxp.com>
+ <CAJcbSZFr9KJTfGfiZo2fThoDkAE-D1OFf2YtELq4P6jX8syesQ@mail.gmail.com>
+ <1500476300.22834.13.camel@nxp.com>
+ <20170719170614.GS31807@n2100.armlinux.org.uk>
+ <CAJcbSZHi6454skNpG8ecMnq90LdUfcxy2RYZD+7og1C1PeypvQ@mail.gmail.com>
+Message-ID: <20170719183543.GT31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2017 10:36 AM, Mason wrote:
-> On 19/07/2017 19:17, M?ns Rullg?rd wrote:
+On Wed, Jul 19, 2017 at 10:20:35AM -0700, Thomas Garnier wrote:
+> On Wed, Jul 19, 2017 at 10:06 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Wed, Jul 19, 2017 at 05:58:20PM +0300, Leonard Crestez wrote:
+> > Probably best to revert.  I stopped looking at these patches during
+> > the discussion, as the discussion seemed to be mainly around other
+> > architectures, and I thought we had ARM settled.
+> >
+> > Looking at this patch now, there's several things I'm not happy with.
+> >
+> > The effect of adding a the new TIF flag for FSCHECK amongst the other
+> > flags is that we end up overflowing the 8-bit constant, and have to
+> > split the tests, meaning more instructions in the return path.  Eg:
+> >
+> > -       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+> > +       tst     r1, #_TIF_SYSCALL_WORK
+> > +       bne     fast_work_pending
+> > +       tst     r1, #_TIF_WORK_MASK
+> >         bne     fast_work_pending
+> >
+> > should be written:
+> >
+> >         tst     r1, #_TIF_SYSCALL_WORK
+> >         tsteq   r1, #_TIF_WORK_MASK
+> >         bne     fast_work_pending
+> >
+> > and:
+> >
+> > -       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+> > +       tst     r1, #_TIF_SYSCALL_WORK
+> > +       bne     fast_work_pending
+> > +       tst     r1, #_TIF_WORK_MASK
+> >
+> > should be:
+> >
+> >         tst     r1, #_TIF_SYSCALL_WORK
+> >         tsteq   r1, #_TIF_WORK_MASK
+> >
+> > There's no need for extra branches.
+> >
+> > Now, the next issue is that I don't think this TIF-flag approach is
+> > good for ARM - alignment faults can happen any time due to misaligned
+> > packets in the networking code, and we really don't want to be doing
+> > this check in a place that we can loop.
+> >
+> > My original suggestion for ARM was to do the address limit check after
+> > all work had been processed, with interrupts disabled (so no
+> > possibility of this kind of loop happening.)  However, that seems to
+> > have been replaced with this TIF approach, which is going to cause
+> > loops - I suspect if the probes code is enabled, this will suffer
+> > the same problem.  Remember, the various probes stuff can walk
+> > userspace stacks, which means they'll be using set_fs().
+> >
+> > I don't see why we've ended up with this (imho) sub-standard TIF-flag
+> > approach, and I think it's going to be very problematical.
+> >
+> > Can we please go back to the approach I suggested back in March for
+> > ARM that doesn't suffer from this problem?
 > 
->> Marc Gonzalez writes:
->>
->>> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
->>> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
->>> there are 4 RGMII phy-modes to handle:
->>>
->>> "rgmii" (RX and TX delays are added by the MAC when required)
->>> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
->>> 	the MAC should not add the RX or TX delays in this case)
->>> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
->>> 	the MAC should not add an RX delay in this case)
->>> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
->>> 	the MAC should not add an TX delay in this case)
->>>
->>> Let the MAC handle TX clock delay for rgmii and rgmii-rxid.
->>>
->>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>> ---
->>>  drivers/net/ethernet/aurora/nb8800.c | 8 +++++---
->>>  1 file changed, 5 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
->>> index 041cfb7952f8..f3ed320eb4ad 100644
->>> --- a/drivers/net/ethernet/aurora/nb8800.c
->>> +++ b/drivers/net/ethernet/aurora/nb8800.c
->>> @@ -609,7 +609,7 @@ static void nb8800_mac_config(struct net_device *dev)
->>>  		mac_mode |= HALF_DUPLEX;
->>>
->>>  	if (gigabit) {
->>> -		if (priv->phy_mode == PHY_INTERFACE_MODE_RGMII)
->>> +		if (phy_interface_is_rgmii(dev->phydev))
->>>  			mac_mode |= RGMII_MODE;
->>>
->>>  		mac_mode |= GMAC_MODE;
->>
->> This is a separate issue, and the change is obviously correct.
->>
->>> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
->>>  		break;
->>>
->>>  	case PHY_INTERFACE_MODE_RGMII:
->>> -		pad_mode = PAD_MODE_RGMII;
->>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
->>> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>>  		break;
->>>
->>> +	case PHY_INTERFACE_MODE_RGMII_ID:
->>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
->>> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>> +		pad_mode = PAD_MODE_RGMII;
->>>  		break;
->>
->> Won't this just make it break in a different set of circumstances?
-> 
-> I don't think so, and here's my reasoning:
-> 
-> AFAIU, the HW block always requires a TX clock delay
-> (I don't know what the "safe" interval is. PHY adds
-> 2.4 ns, MAC adds ~1 ns, both work.)
+> During the extensive thread discussion, Linus asked to move away from
+> architecture specific changes to this work flag system. I am glad to
+> fix the assembly as you asked on a separate patch.
 
-The nominal delay should be 2ns because that's exactly what a 90 degrees
-shift at a 125Mhz would be. The RGMII specification defines the following:
+Well, for the record, I don't think you've got to the bottom of the
+"infinite loop" potential of Linus' approach.
 
-TskewT - Data to Clock output Skew (At Transmitter) Min: -500ns, Nom: 0,
-Max: + 500 ns
-TskewR - Data to Clock input Skew (At Receiver) Min: 1ns, Nom: 0, Max:
-2.6ns (see note 1)
+Eg, perf will likely trigger this same issue.  Eg, perf record -a -g
+will attempt to record the callchain both in kernel space and userspace
+each time a perf interrupt happens.  If the perf interrupt frequency is
+sufficiently high that we have multiple interrupts during the execution
+of do_work_pending() and its called functions, then that will turn this
+into an infinite loop yet again.
 
-note 1: This implies that PC board design will require clocks to be
-routed such that an additional trace delay of greater than 1.5ns and
-less than 2.0ns will be added to the associated clock signal. For 10/100
-the Max value is unspecified.
-
-So it seems to me like you are borderline spec in both delays you gave
-here and the "HW block always requires a TX clock delay" statement is
-true for a given board design only.
-
-
-> RX clock delay seems to be "Don't Care" (tested both
-> enabled and disabled by PHY)
-> By "tested", I mean ability to ping remote system.
-
-Can you do something a bit more stressful than just a ping, also if you
-have the ability to change the inter-packet gap, do it, and see if you
-start seeing FCS or any other decoding errors.
-
-> 
-> If phy-mode is RGMII or RGMII_RXID, then don't add
-> TX clock delay from PHY, therefore add it from MAC.
-> 
-> If phy_mode is RGMII_ID or RGMII_TXID, then do add
-> TX clock delay from PHY, therefore don't add it from MAC.
-> 
-> What set of circumstances would create an issue?
-
-Existing Device Tree sources that do not correspond to that description
-you just did, I suppose they are all out of tree?
 -- 
-Florian
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
