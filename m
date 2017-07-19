@@ -1,33 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 19 Jul 2017 09:37:53 +0200
-Subject: [PATCH] pinctrl: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-43-robh@kernel.org>
-References: <20170718214339.7774-43-robh@kernel.org>
-Message-ID: <CAMuHMdXsmcN892-2qxx5W7LX976ARbPH33bWDZ5mTO_PPXL2kg@mail.gmail.com>
+From: maarten.lankhorst@linux.intel.com (Maarten Lankhorst)
+Date: Wed, 19 Jul 2017 09:40:46 +0200
+Subject: [PATCH 06/12] drm/mediatek: Handle drm_atomic_helper_swap_state
+ failure
+In-Reply-To: <20170719074052.2993-1-maarten.lankhorst@linux.intel.com>
+References: <20170719074052.2993-1-maarten.lankhorst@linux.intel.com>
+Message-ID: <20170719074052.2993-6-maarten.lankhorst@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 11:43 PM, Rob Herring <robh@kernel.org> wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
+drm_atomic_helper_swap_state() will be changed to interruptible waiting
+in the next few commits, so all drivers have to be changed to handling
+failure.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+Cc: CK Hu <ck.hu@mediatek.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mediatek at lists.infradead.org
+Link: http://patchwork.freedesktop.org/patch/msgid/20170711143314.2148-7-maarten.lankhorst at linux.intel.com
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
->  drivers/pinctrl/sh-pfc/pinctrl.c          |  2 +-
-
-For the sh-pfc part:
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index be0741638f94..b2596f35104b 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -109,7 +109,12 @@ static int mtk_atomic_commit(struct drm_device *drm,
+ 	mutex_lock(&private->commit.lock);
+ 	flush_work(&private->commit.work);
+ 
+-	drm_atomic_helper_swap_state(state, true);
++	ret = drm_atomic_helper_swap_state(state, true);
++	if (ret) {
++		mutex_unlock(&private->commit.lock);
++		drm_atomic_helper_cleanup_planes(drm, state);
++		return ret;
++	}
+ 
+ 	drm_atomic_state_get(state);
+ 	if (async)
+-- 
+2.11.0
