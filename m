@@ -1,191 +1,57 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Wed, 19 Jul 2017 14:48:04 +0800
-Subject: [PATCH v4 2/2] arm64: dts: Add Mediatek SoC MT2712 and
- evaluation board dts and Makefile
-In-Reply-To: <ddfb5e58-520f-1ef5-2351-d7545e17a429@gmail.com>
-References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
- <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
- <ddfb5e58-520f-1ef5-2351-d7545e17a429@gmail.com>
-Message-ID: <1500446884.14021.12.camel@mtksdaap41>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Jul 2017 08:50:19 +0200
+Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for
+ Allwinner CSI
+In-Reply-To: <20170719063349.m5yg4n2radkvy74r@sapphire.tkos.co.il>
+References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
+ <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
+ <20170718115530.ssy7g5vv4siqnfpo@tarshish>
+ <20170719092249.2fb6ec720ba1b194cea320c8@magewell.com>
+ <20170719044923.yae2ye4slvrmtyfe@sapphire.tkos.co.il>
+ <20170719142120.d00469cf9fce844d40b9988e@magewell.com>
+ <20170719063349.m5yg4n2radkvy74r@sapphire.tkos.co.il>
+Message-ID: <20170719065019.sc2xivtm4d77vrzw@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-07-18 at 18:29 +0200, Matthias Brugger wrote:
+On Wed, Jul 19, 2017 at 09:33:49AM +0300, Baruch Siach wrote:
+> Hi Yong,
 > 
-> On 06/22/2017 11:32 AM, YT Shen wrote:
-> > This adds basic chip support for Mediatek 2712
+> On Wed, Jul 19, 2017 at 02:21:20PM +0800, Yong wrote:
+> > On Wed, 19 Jul 2017 07:49:23 +0300
+> > Baruch Siach <baruch@tkos.co.il> wrote:
+> > > On Wed, Jul 19, 2017 at 09:22:49AM +0800, Yong wrote:
+> > > > I am waiting for more comments for the sunxi-csi.h. It's pleasure if
+> > > > you have any suggestions about it.
+> > > 
+> > > You mean sunxi_csi.h, right?
 > > 
-> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > ---
-> >   arch/arm64/boot/dts/mediatek/Makefile       |   1 +
-> >   arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  32 ++++++
-> >   arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 172 ++++++++++++++++++++++++++++
-> >   3 files changed, 205 insertions(+)
-> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> > Yes. My spelling mistake.
 > > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> > index 9fbfd32..fcc0604 100644
-> > --- a/arch/arm64/boot/dts/mediatek/Makefile
-> > +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> > @@ -1,3 +1,4 @@
-> > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> > new file mode 100644
-> > index 0000000..8c804df
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> > @@ -0,0 +1,32 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: YT Shen <yt.shen@mediatek.com>
-> > + *
-> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "mt2712e.dtsi"
-> > +
-> > +/ {
-> > +	model = "MediaTek MT2712 evaluation board";
-> > +	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +	};
-> > +
-> > +	memory at 40000000 {
-> > +		device_type = "memory";
-> > +		reg = <0 0x40000000 0 0x80000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:921600n8";
-> > +	};
-> > +};
-> > +
-> > +&uart0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > new file mode 100644
-> > index 0000000..461ee0f
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > @@ -0,0 +1,172 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: YT Shen <yt.shen@mediatek.com>
-> > + *
-> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> > + */
-> > +
-> > +#include <dt-bindings/interrupt-controller/irq.h>
-> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +
-> > +/ {
-> > +	compatible = "mediatek,mt2712";
-> > +	interrupt-parent = <&sysirq>;
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
-> > +
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu-map {
-> > +			cluster0 {
-> > +				core0 {
-> > +					cpu = <&cpu0>;
-> > +				};
-> > +				core1 {
-> > +					cpu = <&cpu1>;
-> > +				};
-> > +			};
-> > +
-> > +			cluster1 {
-> > +				core0 {
-> > +					cpu = <&cpu2>;
-> > +				};
-> > +			};
-> > +		};
-> > +
-> > +		cpu0: cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a35";
-> > +			reg = <0x000>;
-> > +		};
-> > +
-> > +		cpu1: cpu at 1 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a35";
-> > +			reg = <0x001>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu2: cpu at 200 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a72";
-> > +			reg = <0x200>;
-> > +			enable-method = "psci";
-> > +		};
-> > +	};
-> > +
-> > +	psci {
-> > +		compatible = "arm,psci-0.2";
-> > +		method = "smc";
-> > +	};
-> > +
-> > +	uart_clk: dummy26m {
-> > +		compatible = "fixed-clock";
-> > +		clock-frequency = <26000000>;
-> > +		#clock-cells = <0>;
-> > +	};
-> > +
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <GIC_PPI 13
-> > +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 14
-> > +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 11
-> > +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 10
-> > +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
-> > +	};
-> > +
-> > +	soc {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		compatible = "simple-bus";
-> > +		ranges;
-> > +
-> > +		uart5: serial at 1000f000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x1000f000 0 0x400>;
-> > +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>, <&uart_clk>;
-> > +			clock-names = "baud", "bus";
-> > +			status = "disabled";
-> > +		};
+> > > Why do you need the sunxi_csi_ops indirection? Do you expect to add 
+> > > alternative implementations of these ops at some point?
+> > 
+> > I want to seperate the sunxi_video.c and sunxi_csi_v3s.c. 
+> > sunxi_csi_v3s.c is Soc specific. Maybe there will be sunxi_csi_r40.c
+> > in the futrue. But the sunxi_video.c and sunxi_csi.c are common.
 > 
-> So baud and bus clock are both 26 MHz?
-We didn't have CCF clock support in this series.
-After we have clock source support, we could use the correct clocks to
-the UARTs and drop the 26MHz fixed rate UART clock.
+> I'd say it is a premature optimization. The file separation is fine, IMO, but 
+> the added csi_ops indirection makes the code less readable. Someone with 
+> access to R40 hardware with CSI setup would be a better position to abstract 
+> the platform specific code.
 
-The bus clock is 26MHz.  The baud clock could be from another clock
-source, using the same 26MHz fixed clock works also.
+I agree
 
+Maxime
 
-[1] https://patchwork.kernel.org/patch/9670877/
-[2] https://patchwork.kernel.org/patch/6436021/
-
-> Regards,
-> Matthias
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170719/02fa89d0/attachment-0001.sig>
