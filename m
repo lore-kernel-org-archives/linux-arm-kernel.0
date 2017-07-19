@@ -1,59 +1,87 @@
 From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 19 Jul 2017 17:33:27 +0200
-Subject: [PATCH 2/2] net: ethernet: nb8800: Fix RGMII TX clock delay setup
+Date: Wed, 19 Jul 2017 17:31:56 +0200
+Subject: [PATCH 1/2] net: phy: at803x: Fix RGMII RX and TX clock delays setup
 In-Reply-To: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
 References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
-Message-ID: <61b71d12-4e3a-edbe-1d69-c66e7cf46d8e@sigmadesigns.com>
+Message-ID: <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
-("Documentation: devicetree: clarify usage of the RGMII phy-modes")
-there are 4 RGMII phy-modes to handle:
+The current code supports enabling RGMII RX and TX clock delays.
+The unstated assumption is that these settings are disabled by
+default at reset, which is not the case.
 
-"rgmii" (RX and TX delays are added by the MAC when required)
-"rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
-	the MAC should not add the RX or TX delays in this case)
-"rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
-	the MAC should not add an RX delay in this case)
-"rgmii-txid" (RGMII with internal TX delay provided by the PHY,
-	the MAC should not add an TX delay in this case)
+RX clock delay is enabled at reset. And TX clock delay "survives"
+across SW resets. Thus, if the bootloader enables TX clock delay,
+it will remain enabled at reset in Linux.
 
-Let the MAC handle TX clock delay for rgmii and rgmii-rxid.
+Provide disable functions to configure the RGMII clock delays
+exactly as specified in the fwspec.
 
 Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 ---
- drivers/net/ethernet/aurora/nb8800.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/net/phy/at803x.c | 32 ++++++++++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-index 041cfb7952f8..f3ed320eb4ad 100644
---- a/drivers/net/ethernet/aurora/nb8800.c
-+++ b/drivers/net/ethernet/aurora/nb8800.c
-@@ -609,7 +609,7 @@ static void nb8800_mac_config(struct net_device *dev)
- 		mac_mode |= HALF_DUPLEX;
+diff --git a/drivers/net/phy/at803x.c b/drivers/net/phy/at803x.c
+index c1e52b9dc58d..9c96eaaaa2cb 100644
+--- a/drivers/net/phy/at803x.c
++++ b/drivers/net/phy/at803x.c
+@@ -117,12 +117,24 @@ static inline int at803x_enable_rx_delay(struct phy_device *phydev)
+ 					AT803X_DEBUG_RX_CLK_DLY_EN);
+ }
  
- 	if (gigabit) {
--		if (priv->phy_mode == PHY_INTERFACE_MODE_RGMII)
-+		if (phy_interface_is_rgmii(dev->phydev))
- 			mac_mode |= RGMII_MODE;
++static inline int at803x_disable_rx_delay(struct phy_device *phydev)
++{
++	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_0,
++					AT803X_DEBUG_RX_CLK_DLY_EN, 0);
++}
++
+ static inline int at803x_enable_tx_delay(struct phy_device *phydev)
+ {
+ 	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_5, 0,
+ 					AT803X_DEBUG_TX_CLK_DLY_EN);
+ }
  
- 		mac_mode |= GMAC_MODE;
-@@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
- 		break;
++static inline int at803x_disable_tx_delay(struct phy_device *phydev)
++{
++	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_5,
++					AT803X_DEBUG_TX_CLK_DLY_EN, 0);
++}
++
+ /* save relevant PHY registers to private copy */
+ static void at803x_context_save(struct phy_device *phydev,
+ 				struct at803x_context *context)
+@@ -284,18 +296,22 @@ static int at803x_config_init(struct phy_device *phydev)
+ 		return ret;
  
- 	case PHY_INTERFACE_MODE_RGMII:
--		pad_mode = PAD_MODE_RGMII;
-+	case PHY_INTERFACE_MODE_RGMII_RXID:
-+		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
- 		break;
+ 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+-			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
++			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
+ 		ret = at803x_enable_rx_delay(phydev);
+-		if (ret < 0)
+-			return ret;
+-	}
++	else
++		ret = at803x_disable_rx_delay(phydev);
++
++	if (ret < 0)
++		return ret;
  
-+	case PHY_INTERFACE_MODE_RGMII_ID:
- 	case PHY_INTERFACE_MODE_RGMII_TXID:
--		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
-+		pad_mode = PAD_MODE_RGMII;
- 		break;
+ 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID ||
+-			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
++			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
+ 		ret = at803x_enable_tx_delay(phydev);
+-		if (ret < 0)
+-			return ret;
+-	}
++	else
++		ret = at803x_disable_tx_delay(phydev);
++
++	if (ret < 0)
++		return ret;
  
- 	default:
+ 	return 0;
+ }
 -- 
 2.11.0
