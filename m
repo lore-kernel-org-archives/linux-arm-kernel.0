@@ -1,67 +1,88 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Wed, 19 Jul 2017 10:52:55 +0800
-Subject: [PATCH v4 7/7] drm/rockchip: vop: rk3328: fix overlay abnormal
-Message-ID: <1500432776-13322-1-git-send-email-mark.yao@rock-chips.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 19 Jul 2017 10:56:00 +0800
+Subject: [PATCH v16 2/7] power: add power sequence library
+In-Reply-To: <CAJZ5v0hGbJuqqY6Pq5cYPrawSGW-zdhYHj0ovhJ9zXRAkBPCRQ@mail.gmail.com>
+References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
+ <10723509.cz5GGA4OTz@aspire.rjw.lan>
+ <20170710022815.GA8720@b29397-desktop>
+ <2659617.dvNVihq86F@aspire.rjw.lan>
+ <20170718042955.GA12080@b29397-desktop>
+ <CAJZ5v0hGbJuqqY6Pq5cYPrawSGW-zdhYHj0ovhJ9zXRAkBPCRQ@mail.gmail.com>
+Message-ID: <20170719025559.GC26218@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's a hardware bug, all window's overlay channel reset
-value is same, hardware overlay would be die.
+On Tue, Jul 18, 2017 at 07:06:05PM +0200, Rafael J. Wysocki wrote:
+> On Tue, Jul 18, 2017 at 6:29 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
+> > On Mon, Jul 17, 2017 at 03:39:07PM +0200, Rafael J. Wysocki wrote:
+> >> > Sorry, I should describe more.
+> >> >
+> >> > Let's take USB bus as an example, when the new USB device is at the
+> >> > host port, the device structure at device model is not created until
+> >> > it is discoverable by the USB bus. If this new USB device needs to be
+> >> > powered on before can be discoverable by the bus, the device structure
+> >> > will be not created without powering on operation. The code usb_alloc_dev
+> >> > (drivers/usb/core/usb.c) is only called for discoverable device.
+> >> >
+> >> > Unlike the other bus, eg, platform bus, it creates device structure
+> >> > according to DT node. The USB bus was designed for hot plug model, the
+> >> > device structure is for discoverable device. In recent years, we begin
+> >> > to have some hard-wired USB device, Eg, onboard USB-hub, onboard USB 4G
+> >> > Modem, etc at the market. It needs some board level power operation before
+> >> > it can be found by the USB bus. This patch set is designed primarily for
+> >> > fix this kind of problem. You will see at at pwrseq_generic.c, we use DT
+> >> > version clock API of_clk_get and DT version gpio API of_get_named_gpio_flags
+> >> > instead of device structure version, like devm_clk_get and
+> >> > devm_gpiod_get_optional.
+> >> >
+> >> > MMC system has similar use case, it creates power sequence platform
+> >> > device for this issue, but all those power stuffs (clock, gpio, etc)
+> >> > may not be suitable as a dedicated virtual device at DT, they are belonged
+> >> > to one physical device, so this patch set is created to see if this issue
+> >> > can be fixed better.
+> >>
+> >> OK, thanks for the explanation.
+> >>
+> >> The above needs to be part of your problem statement.
+> >
+> > Ok, I will add it to cover letter.
+> >
+> >> >
+> >> > The bus will power up all device nodes in this bus according to DT
+> >> > information, the device structure has not created at this time.
+> >>
+> >> OK
+> >>
+> >> I still think that the information on power resources depended on by devices
+> >> should be used for power management as well as for the initial power-up.
+> >>
+> >> The most straightforward way to arrange for that would be to make it possible
+> >> to find the DT node matching the device after the device has been discovered
+> >> and struct device created for it, say by USB.  That would require adding some
+> >> more information on the device to the DT node, probably.
+> >
+> > After the device is created, the device node structure is under struct
+> > device, say dev->of_node. The most difficulty for this issue is the
+> > device creation is dynamic and is after the physical device is
+> > discovered by the bus, the initial power-up is needed before the device
+> > can be discovered by the bus.
+> 
+> So you power up all devices on the bus using the information from
+> of_nodes upfront.
+> 
 
-so we must initial difference id for each overlay channel.
+I think your mean call pm_device_power_up(struct device *dev) for bus
+level device (eg, USB HUB for USB), yeah, I can do that. But we still
+have below problem:
 
-The Channel register is supported on all vop will full design.
-Following is the details for this register
-VOP_WIN0_CTRL2
-  bit[7:4] win_rid_win0_cbr
-       axi read id of win0 cbr channel
-  bit[3:0] win_rid_win0_yrgb
-       axi read id of win0 yrgb channel
+Where we can put the kinds of power sequence implementation
+(eg, pwrseq_generic.c) and the match mechanism between device
+node and kinds of power sequence(eg, of_pwrseq_on at core.c)? These
+stuffs can be shared among subsystems, and is better to use
+one framework for it. MMC subsystem adds such things at its core
+folder (drivers/mmc/core/pwrseq*) currently.
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 ++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 1 +
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 1 +
- 3 files changed, 4 insertions(+)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 92d098b..e4b3388 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1452,7 +1452,9 @@ static int vop_initial(struct vop *vop)
- 
- 	for (i = 0; i < vop_data->win_size; i++) {
- 		const struct vop_win_data *win = &vop_data->win[i];
-+		int channel = i * 2 + 1;
- 
-+		VOP_WIN_SET(vop, win, channel, (channel + 1) << 4 | channel);
- 		VOP_WIN_SET(vop, win, enable, 0);
- 		VOP_WIN_SET(vop, win, gate, 1);
- 	}
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index 43d08c8..af1091f 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -141,6 +141,7 @@ struct vop_win_phy {
- 
- 	struct vop_reg dst_alpha_ctl;
- 	struct vop_reg src_alpha_ctl;
-+	struct vop_reg channel;
- };
- 
- struct vop_win_data {
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 99f8ba4..cc8d408 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -196,6 +196,7 @@
- 	.uv_vir = VOP_REG(RK3288_WIN0_VIR, 0x3fff, 16),
- 	.src_alpha_ctl = VOP_REG(RK3288_WIN0_SRC_ALPHA_CTRL, 0xff, 0),
- 	.dst_alpha_ctl = VOP_REG(RK3288_WIN0_DST_ALPHA_CTRL, 0xff, 0),
-+	.channel = VOP_REG(RK3288_WIN0_CTRL2, 0xff, 0),
- };
- 
- static const struct vop_win_phy rk3288_win23_data = {
 -- 
-1.9.1
+
+Best Regards,
+Peter Chen
