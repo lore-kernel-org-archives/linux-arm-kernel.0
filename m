@@ -1,146 +1,68 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 19 Jul 2017 10:15:36 +0200
-Subject: [v4.13 regression] ARM: zImage: Fix stack overflow in
- merge_fdt_bootargs()
-In-Reply-To: <257f11e3b0010a3a44c28b34a048278f7b960f3b.1500238579.git.rask@formelder.dk>
-References: <257f11e3b0010a3a44c28b34a048278f7b960f3b.1500238579.git.rask@formelder.dk>
-Message-ID: <20170719081536.GA17727@amd>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 19 Jul 2017 08:19:54 +0000
+Subject: [PATCH v2 0/4] Allow non-legacy cards to be vgaarb default
+In-Reply-To: <20170719021516.24718-1-dja@axtens.net>
+References: <20170719021516.24718-1-dja@axtens.net>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40B57B8A@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Daniel many thanks for your patch
 
-> This function is called very early on from head.S and currently sets up a
-> stack frame of more than 1024 bytes:
+> -----Original Message-----
+> From: Daniel Axtens [mailto:dja at axtens.net]
+> Sent: 19 July 2017 03:15
+> To: linux-pci at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; linux-
+> arm-kernel at lists.infradead.org
+> Cc: benh at kernel.crashing.org; Liuxinliang (Matthew Liu);
+> zourongrong at gmail.com; catalin.marinas at arm.com; will.deacon at arm.com;
+> Gabriele Paoloni; bhelgaas at google.com; airlied at linux.ie;
+> daniel.vetter at intel.com; alex.williamson at redhat.com; Daniel Axtens
+> Subject: [PATCH v2 0/4] Allow non-legacy cards to be vgaarb default
 > 
-> atags_to_fdt.c: In function ?merge_fdt_bootargs?:
-> atags_to_fdt.c:98:1: warning: the frame size of 1032 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+> [v2, in which I send the right patches. My apologies to you all.]
 > 
-> This causes a crash and failure to boot with some combinations of kernel
-> version, gcc version and dtb, such as kernel version 4.1-rc1 of 4.1.0,
-> gcc version 5.4.1 20161019 (Debian 5.4.1-3) and tegra20-trimslice.dtb.
-
+> Hi all,
 > 
-> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-> Fixes: d0f34a11ddab ("ARM: 7437/1: zImage: Allow DTB command line concatenation with ATAG_CMDLINE")
+> Previously I posted a patch that provided a quirk for a hibmc card
+> behind a particular Huawei bridge that allowed it to be marked as the
+> default device in the VGA arbiter.[0] This lead to some discussion.[1]
+> It was broadly suggested that a more generic solution would be better,
+> something in the style of powerpc's fixup_vga() quirk.
+> 
+> Here is my suggested solution:
+> 
+>  - Create a Kconfig option ARCH_WANT_VGA_ARB_FALLBACK and
 
-I tested that it does not break boot on N900. I hoped that it would
-fix boot on N950 (but no luck there so far).
-
-Tested-by: Pavel Machek <pavel@ucw.cz>
-
-AFAICT this is regression in v4.13-rc1. Thus it is quite surprising
-that there are no comments here.
-
-Genoud? Russell?
-
-								Pavel
-
+In my opinion we could avoid depending on a Kernel config options.
+I.e. we can have generic code that, after all PCI devs are enumerated:
+1) check if we have a default vga device
+2) if not check each registered PCI device and make default device the first
+   one that is a VGA device, capable to respond to IO and MEM requests
+   and that has a driver bound to it 
 
 > 
-> I have tested that this works properly when
-> a) only the FDT bootargs are provided,
-> b) only the ATAG command line is provided, and
-> c) both the FDT bootargs and the ATAG command line are provided.
+>  - if an arch selects that option, install PCI_FIXUP_CLASS_ENABLE
+>    hook. This hook fires when a card is enabled, which will require
+>    that a driver has been bound.
 > 
->  arch/arm/boot/compressed/atags_to_fdt.c | 59 +++++++++++++++++++--------------
->  1 file changed, 35 insertions(+), 24 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-> index 9448aa0c6686..ede23ef2e889 100644
-> --- a/arch/arm/boot/compressed/atags_to_fdt.c
-> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
-> @@ -55,6 +55,27 @@ static const void *getprop(const void *fdt, const char *node_path,
->  	return fdt_getprop(fdt, offset, property, len);
->  }
->  
-> +static void *getprop_w(void *fdt, const char *node_path,
-> +		       const char *property, int *len)
-> +{
-> +	int offset = fdt_path_offset(fdt, node_path);
-> +
-> +	if (offset == -FDT_ERR_NOTFOUND)
-> +		return NULL;
-> +
-> +	return fdt_getprop_w(fdt, offset, property, len);
-> +}
-> +
-> +static int appendprop_string(void *fdt, const char *node_path,
-> +			     const char *property, const char *string)
-> +{
-> +	int offset = node_offset(fdt, node_path);
-> +
-> +	if (offset < 0)
-> +		return offset;
-> +	return fdt_appendprop_string(fdt, offset, property, string);
-> +}
-> +
->  static uint32_t get_cell_size(const void *fdt)
->  {
->  	int len;
-> @@ -66,35 +87,25 @@ static uint32_t get_cell_size(const void *fdt)
->  	return cell_size;
->  }
->  
-> -static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
-> -{
-> -	char cmdline[COMMAND_LINE_SIZE];
-> -	const char *fdt_bootargs;
-> -	char *ptr = cmdline;
-> -	int len = 0;
-> -
-> -	/* copy the fdt command line into the buffer */
-> -	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
-> -	if (fdt_bootargs)
-> -		if (len < COMMAND_LINE_SIZE) {
-> -			memcpy(ptr, fdt_bootargs, len);
-> -			/* len is the length of the string
-> -			 * including the NULL terminator */
-> -			ptr += len - 1;
-> -		}
-> -
-> -	/* and append the ATAG_CMDLINE */
-> -	if (fdt_cmdline) {
-> -		len = strlen(fdt_cmdline);
-> -		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
-> -			*ptr++ = ' ';
-> -			memcpy(ptr, fdt_cmdline, len);
-> -			ptr += len;
-> -		}
-> -	}
-> -	*ptr = '\0';
-> -
-> -	setprop_string(fdt, "/chosen", "bootargs", cmdline);
-> +/* This is called early on from head.S, so it can't use much stack. */
-> +static void merge_fdt_bootargs(void *fdt, const char *atag_cmdline)
-> +{
-> +	char *fdt_bootargs;
-> +	int len = 0;
-> +
-> +	/* With no ATAG command line or an empty one, there is nothing to do. */
-> +	if (!atag_cmdline || strlen(atag_cmdline) == 0)
-> +		return;
-> +
-> +	fdt_bootargs = getprop_w(fdt, "/chosen", "bootargs", &len);
-> +
-> +	/* With no FDT command line or an empty one, just use the ATAG one. */
-> +	if (!fdt_bootargs || len <= 1) {
-> +		setprop_string(fdt, "/chosen", "bootargs", atag_cmdline);
-> +		return;
-> +	}
-> +	fdt_bootargs[len - 1] = ' ';
-> +	appendprop_string(fdt, "/chosen", "bootargs", atag_cmdline);
->  }
->  
->  /*
+>  - if there is no default device when the hook fires, and the device
+>    can control memory and I/O, mark it as default.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170719/36485afd/attachment.sig>
+I am worried that the patchset you proposed has a race condition with the
+VGA arbiter. In fact you see:
+subsys_initcall(vga_arb_device_init) is not guaranteed to be called before
+subsys_initcall(acpi_init)
+
+acpi_init->acpi_scan_init->acpi_pci_root_init() at this stage the PCI enumeration
+is done and as soon as a device is added the Kernel will look for a driver
+to bind to it and therefore you quirk could be called before the VGA arbiter...
+Do you agree?
+
+What about modifying vgaarb.c to add a late_initcall() checking what I suggested
+above?
+
+Thanks
+Gab
+
+[...]
