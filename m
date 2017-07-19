@@ -1,102 +1,158 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 19 Jul 2017 14:44:15 -0700
-Subject: [PATCH 1/2] net: phy: at803x: Fix RGMII RX and TX clock delays
- setup
-In-Reply-To: <03f68f8b-edd6-f976-39d0-a580ccb888d5@free.fr>
-References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
- <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
- <5ea9905f-e74a-4a43-dc5b-883ec9daf030@ti.com>
- <abbcd40c-5ecd-2197-73d0-2046cf1e7b5c@gmail.com>
- <03f68f8b-edd6-f976-39d0-a580ccb888d5@free.fr>
-Message-ID: <b3b785bf-750c-5f09-8c0c-2c49be48a26d@gmail.com>
+From: megi@xff.cz (=?UTF-8?Q?Ond=C5=99ej?= Jirman)
+Date: Thu, 20 Jul 2017 00:59:33 +0200
+Subject: [linux-sunxi] [PATCH v4 4/5] ARM: sunxi: h3/h5: switch
+ apb0-related clocks to r_ccu
+In-Reply-To: <20170404095100.18649-5-icenowy@aosc.io>
+References: <20170404095100.18649-1-icenowy@aosc.io>
+ <20170404095100.18649-5-icenowy@aosc.io>
+Message-ID: <1500505173.23770.1.camel@xff.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2017 02:29 PM, Mason wrote:
-> On 19/07/2017 21:30, Florian Fainelli wrote:
->> On 07/19/2017 12:24 PM, Grygorii Strashko wrote:
->>> Hi
->>>
->>> On 07/19/2017 10:31 AM, Marc Gonzalez wrote:
->>>> The current code supports enabling RGMII RX and TX clock delays.
->>>> The unstated assumption is that these settings are disabled by
->>>> default at reset, which is not the case.
->>>>
->>>> RX clock delay is enabled at reset. And TX clock delay "survives"
->>>> across SW resets. Thus, if the bootloader enables TX clock delay,
->>>> it will remain enabled at reset in Linux.
->>>>
->>>> Provide disable functions to configure the RGMII clock delays
->>>> exactly as specified in the fwspec.
->>>>
->>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>>> ---
->>>>   drivers/net/phy/at803x.c | 32 ++++++++++++++++++++++++--------
->>>>   1 file changed, 24 insertions(+), 8 deletions(-)
->>> This patch breaks am335x-evm networking.
->>>
->>> To restore it I've had to apply below diff:
->>> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
->>> index 200d6ab..9578bdf 100644
->>> --- a/arch/arm/boot/dts/am335x-evm.dts
->>> +++ b/arch/arm/boot/dts/am335x-evm.dts
->>> @@ -724,12 +724,12 @@
->>>  
->>>  &cpsw_emac0 {
->>>         phy_id = <&davinci_mdio>, <0>;
->>> -       phy-mode = "rgmii-txid";
->>> +       phy-mode = "rgmii-id";
->>>  };
->>>  
->>>  &cpsw_emac1 {
->>>         phy_id = <&davinci_mdio>, <1>;
->>> -       phy-mode = "rgmii-txid";
->>> +       phy-mode = "rgmii-id";
->>>  };
->>>  
->>>  &tscadc {
->>>
->>> Sry, can't comment here to much - not E-PHY expert.
->>
->> It's useful feedback, since we had poorly defined "phy-mode" semantics
->> for too long, this is totally expected, Marc this is exactly why Mans is
->> suggesting additional MAC-specific properties to define delays.
+Hi,
+
+Icenowy Zheng p??e v ?t 04. 04. 2017 v 17:50 +0800:
+> From: Icenowy Zheng <icenowy@aosc.xyz>
 > 
-> In the current situation, it is impossible to configure
-> the at803x to disable RX clock delay or TX clock delay
-> (in case the boot loader enabled it).
+> Now we have driver for the PRCM CCU, switch to use it instead of
+> old-style clock nodes for apb0-related clocks in sunxi-h3-h5.dtsi .
 > 
-> Are you saying that, because no one has had a problem
-> so far, it is not possible to fix it now, as it would
-> break boards like am335x-evm.dts which didn't request
-> RX clock delay, but got one anyway?
+> The mux 3 of R_CCU is still the internal oscillator, which is said to be
+> 16MHz plus minus 30%, and get a measured value of 15MHz~16MHz on my two
+> H3 boards and one H5 board.
 
-First it means that your patch as-is broke Grygorii's board, and you
-need to at least integrate his patch if you plan on having your own
-patch accepted. This will fix am335x-evm.dts, but we have no visibility
-into the other DTSes out there that may be using an at803x PHY. If you u
-break something you need to fix it, and touching how PHY delays are
+There's issue with the new r_ccu that breaks r_i2c. (no devices can be
+found on the bus). Reverting this patch fixes the issue with the I2C
+controller. (everything else being the same) 
 
+Here's the code I'm using: https://github.com/megous/linux/commits/oran
+ge-pi-4.12
+
+The last commit is the revert.
+
+The issue manifests itself by non-working DVFS, because kernel lacks
+access to SY8106A regulator, because r_i2c doesn't work with sunxi-ng
+clock driver (sun8i-r).
+
+Relevant difference in registers between working/non-working state is
+just this (diff -u):
+
+ 0x01f02400 = 0x00000000 
+ 0x01f02404 = 0x00000000 
+-0x01f02408 = 0x00000091 
++0x01f02408 = 0x00000095 DATA register inisde the I2C controller
+ 0x01f0240c = 0x00000044 
+ 0x01f02410 = 0x000000f8 
+-0x01f02414 = 0x00000059 
++0x01f02414 = 0x00000000 CLOCK setup register inside the I2C controller
+ 0x01f02418 = 0x00000000 
+ 0x01f0241c = 0x00000000 
+ 0x01f02420 = 0x0000003a 
+
+It looks like the new sunxi-ng clock driver causes the I2C driver to
+not correctly configure the CLOCK register. I don't know why and I'm
+not sure how to deal with this. Any ideas what can I do next?
+
+thank you and regards,
+  o.
+
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> Changes in v4:
+> - Temporarily dropped the CCU headers.
+> Changes in v3:
+> - Change osc32000 to iosc.
 > 
-> Does that mean we cannot support boards using AR8035
-> that need the RX and TX clock delays disabled?
-
-No, that is not what that means, it means that you cannot change how an
-existing PHY driver with active and existing deployments is interpreting
-the phy_interface_t value in a way that it breaks people setups, which
-your patch just did. Yes this makes it non-conforming to the revised
-definition of "phy-mode", but it is just how it is, people did not know
-any better before.
-
-See below for what you could do.
-
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 45 ++++++++++++--------------------------
+>  1 file changed, 14 insertions(+), 31 deletions(-)
 > 
-> I'm not sure how the MAC-specific properties can save
-> the day?
-
-If you introduced PHY and/or MAC specific properties to configure the
-delays in the appropriate unit of time (say ps), you could use a
-non-compliant 'phy-mode' just to satisfy the driver/PHY library and
-still override the delays you need.
--- 
-Florian
+> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> index 6640ebfa6419..1aeeacb3a884 100644
+> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> @@ -68,31 +68,12 @@
+>  			clock-output-names = "osc32k";
+>  		};
+>  
+> -		apb0: apb0_clk {
+> -			compatible = "fixed-factor-clock";
+> +		iosc: internal-osc-clk {
+>  			#clock-cells = <0>;
+> -			clock-div = <1>;
+> -			clock-mult = <1>;
+> -			clocks = <&osc24M>;
+> -			clock-output-names = "apb0";
+> -		};
+> -
+> -		apb0_gates: clk at 01f01428 {
+> -			compatible = "allwinner,sun8i-h3-apb0-gates-clk",
+> -				     "allwinner,sun4i-a10-gates-clk";
+> -			reg = <0x01f01428 0x4>;
+> -			#clock-cells = <1>;
+> -			clocks = <&apb0>;
+> -			clock-indices = <0>, <1>;
+> -			clock-output-names = "apb0_pio", "apb0_ir";
+> -		};
+> -
+> -		ir_clk: ir_clk at 01f01454 {
+> -			compatible = "allwinner,sun4i-a10-mod0-clk";
+> -			reg = <0x01f01454 0x4>;
+> -			#clock-cells = <0>;
+> -			clocks = <&osc32k>, <&osc24M>;
+> -			clock-output-names = "ir";
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <16000000>;
+> +			clock-accuracy = <300000000>;
+> +			clock-output-names = "iosc";
+>  		};
+>  	};
+>  
+> @@ -576,9 +557,12 @@
+>  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
+> -		apb0_reset: reset at 01f014b0 {
+> -			reg = <0x01f014b0 0x4>;
+> -			compatible = "allwinner,sun6i-a31-clock-reset";
+> +		r_ccu: clock at 1f01400 {
+> +			compatible = "allwinner,sun50i-a64-r-ccu";
+> +			reg = <0x01f01400 0x100>;
+> +			clocks = <&osc24M>, <&osc32k>, <&iosc>;
+> +			clock-names = "hosc", "losc", "iosc";
+> +			#clock-cells = <1>;
+>  			#reset-cells = <1>;
+>  		};
+>  
+> @@ -589,9 +573,9 @@
+>  
+>  		ir: ir at 01f02000 {
+>  			compatible = "allwinner,sun5i-a13-ir";
+> -			clocks = <&apb0_gates 1>, <&ir_clk>;
+> +			clocks = <&r_ccu 4>, <&r_ccu 11>;
+>  			clock-names = "apb", "ir";
+> -			resets = <&apb0_reset 1>;
+> +			resets = <&r_ccu 0>;
+>  			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>  			reg = <0x01f02000 0x40>;
+>  			status = "disabled";
+> @@ -601,9 +585,8 @@
+>  			compatible = "allwinner,sun8i-h3-r-pinctrl";
+>  			reg = <0x01f02c00 0x400>;
+>  			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+> -			clocks = <&apb0_gates 0>, <&osc24M>, <&osc32k>;
+> +			clocks = <&r_ccu 3>, <&osc24M>, <&osc32k>;
+>  			clock-names = "apb", "hosc", "losc";
+> -			resets = <&apb0_reset 0>;
+>  			gpio-controller;
+>  			#gpio-cells = <3>;
+>  			interrupt-controller;
+> -- 
+> 2.12.2
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 850 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/c8772b79/attachment-0001.sig>
