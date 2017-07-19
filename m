@@ -1,112 +1,165 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 19 Jul 2017 11:02:01 -0500
-Subject: [PATCH] media: Convert to using %pOF instead of full_name
-In-Reply-To: <564a6768-3b23-6dc7-ecb5-cb4f4359b633@samsung.com>
-References: <CGME20170718215328epcas2p2e5e1d7df96fcd894e70a961df864abdd@epcas2p2.samsung.com>
- <20170718214339.7774-33-robh@kernel.org>
- <564a6768-3b23-6dc7-ecb5-cb4f4359b633@samsung.com>
-Message-ID: <CAL_JsqLDCgO60ECGB70pMNcaLg0zUcJ6_+50vH-evfGe-D266Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Jul 2017 17:01:21 +0100
+Subject: [PATCH 00/11] ARMv8.3 pointer authentication userspace support
+Message-ID: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 4:41 AM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> On 07/18/2017 11:43 PM, Rob Herring wrote:
->> Now that we have a custom printf format specifier, convert users of
->> full_name to use %pOF instead. This is preparation to remove storing
->> of the full path string for each node.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->
->> ---
->>   drivers/media/i2c/s5c73m3/s5c73m3-core.c       |  3 +-
->>   drivers/media/i2c/s5k5baf.c                    |  7 ++--
->>   drivers/media/platform/am437x/am437x-vpfe.c    |  4 +-
->>   drivers/media/platform/atmel/atmel-isc.c       |  4 +-
->>   drivers/media/platform/davinci/vpif_capture.c  | 16 ++++----
->>   drivers/media/platform/exynos4-is/fimc-is.c    |  8 ++--
->>   drivers/media/platform/exynos4-is/fimc-lite.c  |  3 +-
->>   drivers/media/platform/exynos4-is/media-dev.c  |  8 ++--
->>   drivers/media/platform/exynos4-is/mipi-csis.c  |  4 +-
->>   drivers/media/platform/mtk-mdp/mtk_mdp_comp.c  |  6 +--
->>   drivers/media/platform/mtk-mdp/mtk_mdp_core.c  |  8 ++--
->>   drivers/media/platform/omap3isp/isp.c          |  8 ++--
->>   drivers/media/platform/pxa_camera.c            |  2 +-
->>   drivers/media/platform/rcar-vin/rcar-core.c    |  4 +-
->>   drivers/media/platform/soc_camera/soc_camera.c |  6 +--
->>   drivers/media/platform/xilinx/xilinx-vipp.c    | 52 +++++++++++++-------------
->>   drivers/media/v4l2-core/v4l2-async.c           |  4 +-
->>   drivers/media/v4l2-core/v4l2-clk.c             |  3 +-
->>   include/media/v4l2-clk.h                       |  4 +-
->>   19 files changed, 71 insertions(+), 83 deletions(-)
->
->> diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
->> index ac4704388920..9233ad0b1b6b 100644
->> --- a/drivers/media/platform/xilinx/xilinx-vipp.c
->> +++ b/drivers/media/platform/xilinx/xilinx-vipp.c
->
->> @@ -144,9 +144,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
->>               remote = ent->entity;
->>
->>               if (link.remote_port >= remote->num_pads) {
->> -                     dev_err(xdev->dev, "invalid port number %u on %s\n",
->> -                             link.remote_port,
->> -                             to_of_node(link.remote_node)->full_name);
->> +                     dev_err(xdev->dev, "invalid port number %u on %pOF\n",
->> +                             link.remote_port, link.remote_node);
->
-> Shouldn't there be to_of_node(link.remote_node) instead of link.remote_node ?
+This series adds support for the ARMv8.3 pointer authentication extension.
 
-Humm, yes. I thought I fixed that.
+Since RFC [1]:
+* Make the KVM context switch (semi-lazy)
+* Rebase to v4.13-rc1
+* Improve pointer authentication documentation
+* Add hwcap documentation
+* Various minor cleanups
 
->
->>                       v4l2_fwnode_put_link(&link);
->>                       ret = -EINVAL;
->>                       break;
->
->> @@ -242,17 +241,17 @@ static int xvip_graph_build_dma(struct xvip_composite_device *xdev)
->>               ent = xvip_graph_find_entity(xdev,
->>                                            to_of_node(link.remote_node));
->>               if (ent == NULL) {
->> -                     dev_err(xdev->dev, "no entity found for %s\n",
->> -                             to_of_node(link.remote_node)->full_name);
->> +                     dev_err(xdev->dev, "no entity found for %pOF\n",
->> +                             to_of_node(link.remote_node));
->>                       v4l2_fwnode_put_link(&link);
->>                       ret = -ENODEV;
->>                       break;
->>               }
->
->> diff --git a/drivers/media/v4l2-core/v4l2-async.c b/drivers/media/v4l2-core/v4l2-async.c
->> index 851f128eba22..0a385d1ff28c 100644
->> --- a/drivers/media/v4l2-core/v4l2-async.c
->> +++ b/drivers/media/v4l2-core/v4l2-async.c
->> @@ -47,9 +47,7 @@ static bool match_fwnode(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
->>       if (!is_of_node(sd->fwnode) || !is_of_node(asd->match.fwnode.fwnode))
->>               return sd->fwnode == asd->match.fwnode.fwnode;
->>
->> -     return !of_node_cmp(of_node_full_name(to_of_node(sd->fwnode)),
->> -                         of_node_full_name(
->> -                                 to_of_node(asd->match.fwnode.fwnode)));
->> +     return to_of_node(sd->fwnode) == to_of_node(asd->match.fwnode.fwnode);
->
-> I'm afraid this will not work, please see commit d2180e0cf77dc7a7049671d5d57d
-> "[media] v4l: async: make v4l2 coexist with devicetree nodes in a dt overlay"
+I've pushed the series to the arm64/pointer-auth branch [2] of my linux tree.
+I've also pushed out a necessary bootwrapper patch to the pointer-auth branch
+[3] of my bootwrapper repo.
 
-Maybe I'm missing something, but how does that work exactly? Before
-the overlay is applied, the remote endpoint node (and its parent)
-can't be resolved. In the commit example, the endpoint in the
-media_bridge would also have to be part of the overlay. If you apply
-and un-apply the overlay, then the of_node (and fw_node) in the
-overlay is once again invalid. IOW, you should be in the same state as
-before the overlay was applied. The node is still around because of
-paranoia that actually freeing nodes would break things. It seems this
-paranoia is real, so i think we need to do something to prevent this
-from spreading.
 
-Furthermore, it does not appear that any media driver supports
-overlays and we have no general way to apply them in mainline yet
-(other than an in kernel API). So really this scenario is not one we
-have to support yet.
+Extension Overview 
+==================
 
-Rob
+The ARMv8.3 pointer authentication extension adds functionality to detect
+modification of pointer values, mitigating certain classes of attack such as
+stack smashing, and making return oriented programming attacks harder
+
+The extension introduces the concept of a pointer authentication code (PAC),
+which is stored in some upper bits of pointers. Each PAC is derived from the
+original pointer, another 64-bit value (e.g. the stack pointer), and a secret
+128-bit key.
+
+New instructions are added which can be used to:
+
+* Insert a PAC into a pointer
+* Strip a PAC from a pointer
+* Authenticate strip a PAC from a pointer
+
+If authentication succeeds, the code is removed, yielding the original pointer.
+If authentication fails, bits are set in the pointer such that it is guaranteed
+to cause a fault if used.
+
+These instructions can make use of four keys:
+
+* APIAKey (A.K.A. Instruction A key)
+* APIBKey (A.K.A. Instruction B key)
+* APDAKey (A.K.A. Data A key)
+* APDBKey (A.K.A. Data B Key)
+
+A subset of these instruction encodings have been allocated from the HINT
+space, and will operate as NOPs on any ARMv8 parts which do not feature the
+extension (or if purposefully disabled by the kernel). Software using only this
+subset of the instructions should function correctly on all ARMv8-A parts.
+
+Additionally, instructions are added to authenticate small blocks of memory in
+similar fashion, using APGAKey (A.K.A. Generic key).
+
+
+This Series
+===========
+
+This series enables the use of instructions using APIAKey, which is initialised
+and maintained per-process (shared by all threads). This series does not add
+support for APIBKey, APDAKey, APDBKey, nor APGAKey. The series only supports
+the use of an architected algorithm.
+
+I've given this some basic testing with a homebrew test suite. More ideally,
+we'd add some tests to the kernel source tree.
+
+I've added some basic KVM support, but this doesn't cater for systems with
+mismatched support. Looking forward, we'll need ID register emulation in KVM so
+that we can hide features from guests to cater for such cases.
+
+
+Open questions
+==============
+
+* Should keys be per-thread rather than per-process?
+
+  My understanding is that glibc can't (currently) handle threads having
+  different keys, but it might be that another libc would prefer per-thread
+  keys. If desired, we could add a mechanism for a thread to re-initialize its
+  keys without an exec*().
+
+* Do we need a separate hwcap for XPAC* instructions?
+
+  Library code performing stack unwinding may need to interoperate with other
+  code which may or may not be using pointer authentication. It may be
+  desirable to use XPAC* rather than attempting authentication and/or acquiring
+  the PAC masks via ptrace.
+
+  As we may expose APIBKey (potentially separately from APIAKey) in future,
+  HWCAP_APIA cannot be used to determine when these instruction can/should be
+  used.
+
+* Should we expose a per-process data key now, to go with the insn key?
+
+  I don't currently have a use-case for this.
+
+* Should we expose generic authentication (i.e. APGAKey)?
+
+  I don't currently have a use-case for this.
+
+* Should the kernel remove PACs when unwinding user stacks?
+
+  This is simple to do, but it's arguably placing a policy in the kernel as to
+  what we expect user stacks to look like. Regardless, userspace will have to
+  perform this when unwinding with DWARF.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/498941.html
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/pointer-auth
+[3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/boot-wrapper-aarch64.git pointer-auth
+
+Mark Rutland (11):
+  arm64: docs: describe ELF hwcaps
+  asm-generic: mm_hooks: allow hooks to be overridden individually
+  arm64: add pointer authentication register bits
+  arm64/cpufeature: add ARMv8.3 id_aa64isar1 bits
+  arm64/cpufeature: detect pointer authentication
+  arm64: Don't trap host pointer auth use to EL2
+  arm64: add basic pointer authentication support
+  arm64: expose user PAC bit positions via ptrace
+  arm64/kvm: preserve host HCR_EL2 value
+  arm64/kvm: context-switch ptrauth registers
+  arm64: docs: document pointer authentication
+
+ Documentation/arm64/booting.txt                |   8 ++
+ Documentation/arm64/elf_hwcaps.txt             | 138 +++++++++++++++++++++++++
+ Documentation/arm64/pointer-authentication.txt |  85 +++++++++++++++
+ arch/arm64/Kconfig                             |  23 +++++
+ arch/arm64/include/asm/cpucaps.h               |   4 +-
+ arch/arm64/include/asm/esr.h                   |   3 +-
+ arch/arm64/include/asm/kvm_arm.h               |   3 +-
+ arch/arm64/include/asm/kvm_host.h              |  28 ++++-
+ arch/arm64/include/asm/kvm_hyp.h               |   7 ++
+ arch/arm64/include/asm/mmu.h                   |   5 +
+ arch/arm64/include/asm/mmu_context.h           |  25 ++++-
+ arch/arm64/include/asm/pointer_auth.h          |  97 +++++++++++++++++
+ arch/arm64/include/asm/sysreg.h                |  30 ++++++
+ arch/arm64/include/uapi/asm/hwcap.h            |   1 +
+ arch/arm64/include/uapi/asm/ptrace.h           |   5 +
+ arch/arm64/kernel/cpufeature.c                 |  39 ++++++-
+ arch/arm64/kernel/cpuinfo.c                    |   1 +
+ arch/arm64/kernel/head.S                       |  19 +++-
+ arch/arm64/kernel/ptrace.c                     |  39 +++++++
+ arch/arm64/kvm/handle_exit.c                   |  21 ++++
+ arch/arm64/kvm/hyp/Makefile                    |   1 +
+ arch/arm64/kvm/hyp/ptrauth-sr.c                |  91 ++++++++++++++++
+ arch/arm64/kvm/hyp/switch.c                    |   9 +-
+ arch/arm64/kvm/hyp/tlb.c                       |   6 +-
+ arch/arm64/kvm/sys_regs.c                      |  32 ++++++
+ include/asm-generic/mm_hooks.h                 |  11 ++
+ include/uapi/linux/elf.h                       |   1 +
+ 27 files changed, 719 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/arm64/elf_hwcaps.txt
+ create mode 100644 Documentation/arm64/pointer-authentication.txt
+ create mode 100644 arch/arm64/include/asm/pointer_auth.h
+ create mode 100644 arch/arm64/kvm/hyp/ptrauth-sr.c
+
+-- 
+1.9.1
