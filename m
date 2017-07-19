@@ -1,68 +1,59 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 19 Jul 2017 11:23:12 +0100
-Subject: [PATCH 0/4] Optimise 64-bit IOVA allocations
-In-Reply-To: <CAKv+Gu8x1ssF0g-e=ycpfy6jw8mNfVrx5VQJhjtz2D9Gd4zA-Q@mail.gmail.com>
-References: <cover.1500396007.git.robin.murphy@arm.com>
- <CAKv+Gu8x1ssF0g-e=ycpfy6jw8mNfVrx5VQJhjtz2D9Gd4zA-Q@mail.gmail.com>
-Message-ID: <19661034-093e-a744-b6fb-3d23a285ebe3@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 19 Jul 2017 12:24:58 +0200
+Subject: [PATCH] clk: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-12-robh@kernel.org>
+References: <20170718214339.7774-12-robh@kernel.org>
+Message-ID: <2fd832a5-ec78-7563-8349-4321db745767@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/17 09:37, Ard Biesheuvel wrote:
-> On 18 July 2017 at 17:57, Robin Murphy <robin.murphy@arm.com> wrote:
->> Hi all,
->>
->> In the wake of the ARM SMMU optimisation efforts, it seems that certain
->> workloads (e.g. storage I/O with large scatterlists) probably remain quite
->> heavily influenced by IOVA allocation performance. Separately, Ard also
->> reported massive performance drops for a graphical desktop on AMD Seattle
->> when enabling SMMUs via IORT, which we traced to dma_32bit_pfn in the DMA
->> ops domain getting initialised differently for ACPI vs. DT, and exposing
->> the overhead of the rbtree slow path. Whilst we could go around trying to
->> close up all the little gaps that lead to hitting the slowest case, it
->> seems a much better idea to simply make said slowest case a lot less slow.
->>
->> I had a go at rebasing Leizhen's last IOVA series[1], but ended up finding
->> the changes rather too hard to follow, so I've taken the liberty here of
->> picking the whole thing up and reimplementing the main part in a rather
->> less invasive manner.
->>
->> Robin.
->>
->> [1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg17753.html
->>
->> Robin Murphy (1):
->>   iommu/iova: Extend rbtree node caching
->>
->> Zhen Lei (3):
->>   iommu/iova: Optimise rbtree searching
->>   iommu/iova: Optimise the padding calculation
->>   iommu/iova: Make dma_32bit_pfn implicit
->>
->>  drivers/gpu/drm/tegra/drm.c      |   3 +-
->>  drivers/gpu/host1x/dev.c         |   3 +-
->>  drivers/iommu/amd_iommu.c        |   7 +--
->>  drivers/iommu/dma-iommu.c        |  18 +------
->>  drivers/iommu/intel-iommu.c      |  11 ++--
->>  drivers/iommu/iova.c             | 112 ++++++++++++++++-----------------------
->>  drivers/misc/mic/scif/scif_rma.c |   3 +-
->>  include/linux/iova.h             |   8 +--
->>  8 files changed, 60 insertions(+), 105 deletions(-)
->>
+
+
+On 07/18/2017 11:42 PM, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-> These patches look suspiciously like the ones I have been using over
-> the past couple of weeks (modulo the tegra and host1x changes) from
-> your git tree. They work fine on my AMD Overdrive B1, both in DT and
-> in ACPI/IORT modes, although it is difficult to quantify any
-> performance deltas on my setup.
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: "Emilio L?pez" <emilio@elopez.com.ar>
+> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: linux-clk at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-renesas-soc at vger.kernel.org
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> ---
+>   drivers/clk/berlin/bg2.c             |  3 +--
+>   drivers/clk/berlin/bg2q.c            |  7 +++----
+>   drivers/clk/clk-asm9260.c            |  4 ++--
+>   drivers/clk/clk-conf.c               | 16 ++++++++--------
+>   drivers/clk/clk-moxart.c             | 12 ++++++------
+>   drivers/clk/clk-qoriq.c              |  7 +++----
+>   drivers/clk/clk-stm32f4.c            |  4 ++--
+>   drivers/clk/clk-xgene.c              | 15 ++++++---------
+>   drivers/clk/clk.c                    |  4 ++--
+>   drivers/clk/clkdev.c                 |  4 ++--
+>   drivers/clk/mediatek/clk-cpumux.c    |  2 +-
+>   drivers/clk/mediatek/clk-mtk.c       |  2 +-
+>   drivers/clk/mediatek/reset.c         |  2 +-
 
-Indeed - this is a rebase (to account for those new callers) with a
-couple of trivial tweaks to error paths and corner cases that normal
-usage shouldn't have been hitting anyway. "No longer unusably awful" is
-a good enough performance delta for me :)
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+For the mediatek parts.
 
-Thanks!
-
-Robin.
+Thanks,
+Matthias
