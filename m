@@ -1,136 +1,176 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 19 Jul 2017 10:05:50 -0700
-Subject: [PATCH 2/2] arm64: dts: move rpi into rpi directory
-In-Reply-To: <1500483950-9217-1-git-send-email-scott.branden@broadcom.com>
-References: <1500483950-9217-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <1500483950-9217-3-git-send-email-scott.branden@broadcom.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Jul 2017 18:06:14 +0100
+Subject: [PATCH v10 2/3] arm/syscalls: Check address limit on user-mode
+ return
+In-Reply-To: <1500476300.22834.13.camel@nxp.com>
+References: <20170615011203.144108-1-thgarnie@google.com>
+ <20170615011203.144108-2-thgarnie@google.com>
+ <1500388566.11612.74.camel@nxp.com>
+ <CAJcbSZEr8HPBwH1oVaHqPzAY4MS_=yqMoqPhcauuKu3cikB3uQ@mail.gmail.com>
+ <1500398311.12096.30.camel@nxp.com>
+ <CAJcbSZFr9KJTfGfiZo2fThoDkAE-D1OFf2YtELq4P6jX8syesQ@mail.gmail.com>
+ <1500476300.22834.13.camel@nxp.com>
+Message-ID: <20170719170614.GS31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Place rpi into its own subdirectory.  This helps as the number
-of Broadcom boards grow and we can separate them per SoC.
+On Wed, Jul 19, 2017 at 05:58:20PM +0300, Leonard Crestez wrote:
+> On Tue, 2017-07-18 at 12:04 -0700, Thomas Garnier wrote:
+> > On Tue, Jul 18, 2017 at 10:18 AM, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> > > On Tue, 2017-07-18 at 09:04 -0700, Thomas Garnier wrote:
+> > > > On Tue, Jul 18, 2017 at 7:36 AM, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> > > > > On Wed, 2017-06-14 at 18:12 -0700, Thomas Garnier wrote:
+> > > > > > 
+> > > > > > Ensure the address limit is a user-mode segment before returning to
+> > > > > > user-mode. Otherwise a process can corrupt kernel-mode memory and
+> > > > > > elevate privileges [1].
+> > > > > > 
+> > > > > > The set_fs function sets the TIF_SETFS flag to force a slow path on
+> > > > > > return. In the slow path, the address limit is checked to be USER_DS if
+> > > > > > needed.
+> > > > > > 
+> > > > > > The TIF_SETFS flag is added to _TIF_WORK_MASK shifting _TIF_SYSCALL_WORK
+> > > > > > for arm instruction immediate support. The global work mask is too big
+> > > > > > to used on a single instruction so adapt ret_fast_syscall.
+> > > > > > 
+> > > > > > @@ -571,6 +572,10 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+> > > > > > ???????* Update the trace code with the current status.
+> > > > > > ???????*/
+> > > > > > ??????trace_hardirqs_off();
+> > > > > > +
+> > > > > > +?????/* Check valid user FS if needed */
+> > > > > > +?????addr_limit_user_check();
+> > > > > > +
+> > > > > > ??????do {
+> > > > > > ??????????????if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+> > > > > > ??????????????????????schedule();
+> > > > > This patch made it's way into linux-next next-20170717 and it seems to
+> > > > > cause hangs when booting some boards over NFS (found via bisection). I
+> > > > > don't know exactly what determines the issue but I can reproduce hangs
+> > > > > if even if I just boot with init=/bin/bash and do stuff like
+> > > > > 
+> > > > > # sleep 1 & sleep 1 & sleep 1 & wait; wait; wait; echo done!
+> > > > > 
+> > > > > When this happens sysrq-t shows a sleep task hung in the 'R' state
+> > > > > spinning in do_work_pending, so maybe there is a potential infinite
+> > > > > loop here?
+> > > > > 
+> > > > > The addr_limit_user_check at the start of do_work_pending will check
+> > > > > for TIF_FSCHECK once and clear it but the function loops while
+> > > > > (thread_flags & _TIF_WORK_MASK), so it if TIF_FSCHECK is set again then
+> > > > > the loop will never terminate. Does this make sense?
+> > > > 
+> > > > Yes, it does. Thanks for looking into this.
+> > > > 
+> > > > Can you try this change?
+> > > > 
+> > > > diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> > > > index 3a48b54c6405..bc6ad7789568 100644
+> > > > --- a/arch/arm/kernel/signal.c
+> > > > +++ b/arch/arm/kernel/signal.c
+> > > > @@ -573,12 +573,11 @@ do_work_pending(struct pt_regs *regs, unsigned
+> > > > int thread_flags, int syscall)
+> > > > ? */
+> > > > ? trace_hardirqs_off();
+> > > > 
+> > > > - /* Check valid user FS if needed */
+> > > > - addr_limit_user_check();
+> > > > -
+> > > > ? do {
+> > > > ? if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+> > > > ? schedule();
+> > > > + } else if (thread_flags & _TIF_FSCHECK) {
+> > > > + addr_limit_user_check();
+> > > > ? } else {
+> > > > ? if (unlikely(!user_mode(regs)))
+> > > > ? return 0;
+> > > This does seem to work, it no longer hangs on boot in my setup. This is
+> > > obviously only a very superficial test.
+> > > 
+> > > The new location of this check seems weird, it's not clear why it
+> > > should be on an else path. Perhaps it should be moved to right before
+> > > where current_thread_info()->flags is fetched again?
+> 
+> > I was hitting bug when I tried that.I think that's because you
+> > basically let the signal handler do pending work before you check the
+> > flag, that's not a good idea.
+> 
+> > > If the purpose is hardening against buggy kernel code doing bad set_fs
+> > > calls shouldn't this flag also be checked before looking at
+> > > TIF_NEED_RESCHED and calling schedule()?
+> > I am not sure to be honest. I expected schedule to only schedule the
+> > processor to another task which would be fine given only the current
+> > task have a bogus fs. I will put it first in case there is an edge
+> > case scenario I missed.
+> > 
+> > What do you think? Let me know and I will look at changes all
+> > architectures and testing them.
+> 
+> I don't know and I'd rather not guess on security issues. It's better
+> if someone else reviews the code.
+> 
+> Unless there is a very quick fix maybe this series should be removed or
+> reverted from linux-next? A diagnosis of "system calls can sometimes
+> hang on return" seems serious even for linux-next. Since it happens
+> very rarely in most setups I can easily imagine somebody spending a lot
+> of time digging at this.
 
-Signed-off-by: Scott Branden <scott.branden@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/Makefile                      | 3 +--
- arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi              | 1 -
- arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi     | 1 -
- arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi     | 1 -
- arch/arm64/boot/dts/broadcom/bcm283x.dtsi                  | 1 -
- arch/arm64/boot/dts/broadcom/rpi/Makefile                  | 5 +++++
- arch/arm64/boot/dts/broadcom/rpi/bcm2835-rpi.dtsi          | 1 +
- arch/arm64/boot/dts/broadcom/{ => rpi}/bcm2837-rpi-3-b.dts | 0
- arch/arm64/boot/dts/broadcom/{ => rpi}/bcm2837.dtsi        | 0
- arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-smsc9514.dtsi | 1 +
- arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-usb-host.dtsi | 1 +
- arch/arm64/boot/dts/broadcom/rpi/bcm283x.dtsi              | 1 +
- 12 files changed, 10 insertions(+), 6 deletions(-)
- delete mode 120000 arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
- delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
- delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
- delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x.dtsi
- create mode 100644 arch/arm64/boot/dts/broadcom/rpi/Makefile
- create mode 120000 arch/arm64/boot/dts/broadcom/rpi/bcm2835-rpi.dtsi
- rename arch/arm64/boot/dts/broadcom/{ => rpi}/bcm2837-rpi-3-b.dts (100%)
- rename arch/arm64/boot/dts/broadcom/{ => rpi}/bcm2837.dtsi (100%)
- create mode 120000 arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-smsc9514.dtsi
- create mode 120000 arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-usb-host.dtsi
- create mode 120000 arch/arm64/boot/dts/broadcom/rpi/bcm283x.dtsi
+Probably best to revert.  I stopped looking at these patches during
+the discussion, as the discussion seemed to be mainly around other
+architectures, and I thought we had ARM settled.
 
-diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-index 3eaef38..1708ff5 100644
---- a/arch/arm64/boot/dts/broadcom/Makefile
-+++ b/arch/arm64/boot/dts/broadcom/Makefile
-@@ -1,6 +1,5 @@
--dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
--
- dts-dirs	+= northstar2
-+dts-dirs	+= rpi
- dts-dirs	+= stingray
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi b/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
-deleted file mode 120000
-index 3937b77..0000000
---- a/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts/bcm2835-rpi.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
-deleted file mode 120000
-index dca7c05..0000000
---- a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
-deleted file mode 120000
-index cbeebe3..0000000
---- a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts/bcm283x-rpi-usb-host.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/bcm283x.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x.dtsi
-deleted file mode 120000
-index 5f54e4c..0000000
---- a/arch/arm64/boot/dts/broadcom/bcm283x.dtsi
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts/bcm283x.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/rpi/Makefile b/arch/arm64/boot/dts/broadcom/rpi/Makefile
-new file mode 100644
-index 0000000..d1a5606
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/rpi/Makefile
-@@ -0,0 +1,5 @@
-+dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
-+
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/broadcom/rpi/bcm2835-rpi.dtsi b/arch/arm64/boot/dts/broadcom/rpi/bcm2835-rpi.dtsi
-new file mode 120000
-index 0000000..06e5aa0
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/rpi/bcm2835-rpi.dtsi
-@@ -0,0 +1 @@
-+../../../../../arm/boot/dts/bcm2835-rpi.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/rpi/bcm2837-rpi-3-b.dts
-similarity index 100%
-rename from arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-rename to arch/arm64/boot/dts/broadcom/rpi/bcm2837-rpi-3-b.dts
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837.dtsi b/arch/arm64/boot/dts/broadcom/rpi/bcm2837.dtsi
-similarity index 100%
-rename from arch/arm64/boot/dts/broadcom/bcm2837.dtsi
-rename to arch/arm64/boot/dts/broadcom/rpi/bcm2837.dtsi
-diff --git a/arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-smsc9514.dtsi b/arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-smsc9514.dtsi
-new file mode 120000
-index 0000000..3eff817
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-smsc9514.dtsi
-@@ -0,0 +1 @@
-+../../../../../arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-usb-host.dtsi b/arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-usb-host.dtsi
-new file mode 120000
-index 0000000..2102a8c
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/rpi/bcm283x-rpi-usb-host.dtsi
-@@ -0,0 +1 @@
-+../../../../../arm/boot/dts/bcm283x-rpi-usb-host.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/rpi/bcm283x.dtsi b/arch/arm64/boot/dts/broadcom/rpi/bcm283x.dtsi
-new file mode 120000
-index 0000000..db7e86c
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/rpi/bcm283x.dtsi
-@@ -0,0 +1 @@
-+../../../../../arm/boot/dts/bcm283x.dtsi
-\ No newline at end of file
+Looking at this patch now, there's several things I'm not happy with.
+
+The effect of adding a the new TIF flag for FSCHECK amongst the other
+flags is that we end up overflowing the 8-bit constant, and have to
+split the tests, meaning more instructions in the return path.  Eg:
+
+-       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
++       tst     r1, #_TIF_SYSCALL_WORK
++       bne     fast_work_pending
++       tst     r1, #_TIF_WORK_MASK
+        bne     fast_work_pending
+
+should be written:
+
+	tst	r1, #_TIF_SYSCALL_WORK
+	tsteq	r1, #_TIF_WORK_MASK
+	bne	fast_work_pending
+
+and:
+
+-       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
++       tst     r1, #_TIF_SYSCALL_WORK
++       bne     fast_work_pending
++       tst     r1, #_TIF_WORK_MASK
+
+should be:
+
+	tst	r1, #_TIF_SYSCALL_WORK
+	tsteq	r1, #_TIF_WORK_MASK
+
+There's no need for extra branches.
+
+Now, the next issue is that I don't think this TIF-flag approach is
+good for ARM - alignment faults can happen any time due to misaligned
+packets in the networking code, and we really don't want to be doing
+this check in a place that we can loop.
+
+My original suggestion for ARM was to do the address limit check after
+all work had been processed, with interrupts disabled (so no
+possibility of this kind of loop happening.)  However, that seems to
+have been replaced with this TIF approach, which is going to cause
+loops - I suspect if the probes code is enabled, this will suffer
+the same problem.  Remember, the various probes stuff can walk
+userspace stacks, which means they'll be using set_fs().
+
+I don't see why we've ended up with this (imho) sub-standard TIF-flag
+approach, and I think it's going to be very problematical.
+
+Can we please go back to the approach I suggested back in March for
+ARM that doesn't suffer from this problem?
+
 -- 
-2.5.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
