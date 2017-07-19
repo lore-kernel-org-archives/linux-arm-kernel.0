@@ -1,58 +1,57 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 19 Jul 2017 10:21:21 +0200
-Subject: [PATCH] gpu: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-24-robh@kernel.org>
-References: <20170718214339.7774-24-robh@kernel.org>
-Message-ID: <1500452481.2364.20.camel@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Jul 2017 09:37:43 +0100
+Subject: [PATCH 0/4] Optimise 64-bit IOVA allocations
+In-Reply-To: <cover.1500396007.git.robin.murphy@arm.com>
+References: <cover.1500396007.git.robin.murphy@arm.com>
+Message-ID: <CAKv+Gu8x1ssF0g-e=ycpfy6jw8mNfVrx5VQJhjtz2D9Gd4zA-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-07-18 at 16:43 -0500, Rob Herring wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: Daniel Vetter <daniel.vetter@intel.com>
-> Cc: Jani Nikula <jani.nikula@linux.intel.com>
-> Cc: Sean Paul <seanpaul@chromium.org>
-> Cc: Inki Dae <inki.dae@samsung.com>
-> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-> Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Xinliang Liu <z.liuxinliang@hisilicon.com>
-> Cc: Rongrong Zou <zourongrong@gmail.com>
-> Cc: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Cc: Chen Feng <puck.chen@hisilicon.com>
-> Cc: CK Hu <ck.hu@mediatek.com>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Mark Yao <mark.yao@rock-chips.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Jyri Sarha <jsarha@ti.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-amlogic at lists.infradead.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-rockchip at lists.infradead.org
-> ---
+On 18 July 2017 at 17:57, Robin Murphy <robin.murphy@arm.com> wrote:
+> Hi all,
+>
+> In the wake of the ARM SMMU optimisation efforts, it seems that certain
+> workloads (e.g. storage I/O with large scatterlists) probably remain quite
+> heavily influenced by IOVA allocation performance. Separately, Ard also
+> reported massive performance drops for a graphical desktop on AMD Seattle
+> when enabling SMMUs via IORT, which we traced to dma_32bit_pfn in the DMA
+> ops domain getting initialised differently for ACPI vs. DT, and exposing
+> the overhead of the rbtree slow path. Whilst we could go around trying to
+> close up all the little gaps that lead to hitting the slowest case, it
+> seems a much better idea to simply make said slowest case a lot less slow.
+>
+> I had a go at rebasing Leizhen's last IOVA series[1], but ended up finding
+> the changes rather too hard to follow, so I've taken the liberty here of
+> picking the whole thing up and reimplementing the main part in a rather
+> less invasive manner.
+>
+> Robin.
+>
+> [1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg17753.html
+>
+> Robin Murphy (1):
+>   iommu/iova: Extend rbtree node caching
+>
+> Zhen Lei (3):
+>   iommu/iova: Optimise rbtree searching
+>   iommu/iova: Optimise the padding calculation
+>   iommu/iova: Make dma_32bit_pfn implicit
+>
+>  drivers/gpu/drm/tegra/drm.c      |   3 +-
+>  drivers/gpu/host1x/dev.c         |   3 +-
+>  drivers/iommu/amd_iommu.c        |   7 +--
+>  drivers/iommu/dma-iommu.c        |  18 +------
+>  drivers/iommu/intel-iommu.c      |  11 ++--
+>  drivers/iommu/iova.c             | 112 ++++++++++++++++-----------------------
+>  drivers/misc/mic/scif/scif_rma.c |   3 +-
+>  include/linux/iova.h             |   8 +--
+>  8 files changed, 60 insertions(+), 105 deletions(-)
+>
 
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+These patches look suspiciously like the ones I have been using over
+the past couple of weeks (modulo the tegra and host1x changes) from
+your git tree. They work fine on my AMD Overdrive B1, both in DT and
+in ACPI/IORT modes, although it is difficult to quantify any
+performance deltas on my setup.
 
-regards
-Philipp
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
