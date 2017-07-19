@@ -1,313 +1,207 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 19 Jul 2017 08:10:58 +0530
-Subject: [PATCH 1/2] iommu/arm-smmu: Track context bank state
-In-Reply-To: <71247263f4d88e7776f483fb1cc1139b516c0835.1500381551.git.robin.murphy@arm.com>
-References: <71247263f4d88e7776f483fb1cc1139b516c0835.1500381551.git.robin.murphy@arm.com>
-Message-ID: <22b7eea9-d194-d768-a10f-fc3c6fec9e4c@codeaurora.org>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Wed, 19 Jul 2017 10:52:21 +0800
+Subject: [PATCH v4 1/7] drm/rockchip: vop: initialize registers directly
+Message-ID: <1500432742-12999-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+At present we are using init_table to initialize some
+registers, but the Register init table use un-document define,
+it is unreadable, and sometimes we only want to update tiny
+bits, init table method is not friendly, it's diffcult to
+reuse for difference chips.
 
-On 7/18/2017 6:14 PM, Robin Murphy wrote:
-> Echoing what we do for Stream Map Entries, maintain a software shadow
-> state for context bank configuration. With this in place, we are mere
-> moments away from blissfully easy suspend/resume support.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> Since the runtime PM discussion has come back again, I figured it was
-> probably about time to finish off my plan for system PM. Lightly tested
-> on Juno (MMU-401) with hibernation.
-> 
-> Robin.
-> 
->  drivers/iommu/arm-smmu.c | 159 +++++++++++++++++++++++++++++------------------
->  1 file changed, 97 insertions(+), 62 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index bc89b4d6c043..86897b7b81d8 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -338,6 +338,13 @@ struct arm_smmu_smr {
->  	bool				valid;
->  };
->  
-> +struct arm_smmu_cb {
-> +	u64				ttbr[2];
-> +	u32				tcr[2];
-> +	u32				mair[2];
-> +	struct arm_smmu_cfg		*cfg;
-> +};
-> +
+To make it clean, initialize registers directly, and drops
+init_table mechanism out.
 
- When i was trying this sometime back [1], was
- saving and using the pgtbl->cfg and domain->cfg for
- restoring the context. But this looks correct to make
- a actual shadow once and use it later all the time.
- Will also try some testing today.
+Changes in v3:
+- Explain more in details
 
- Reviewed-by: sricharan at codeaurora.org
-
-[1] https://patchwork.kernel.org/patch/9389717/
-
-Regards,
- Sricharan
-
-
->  struct arm_smmu_master_cfg {
->  	struct arm_smmu_device		*smmu;
->  	s16				smendx[];
-> @@ -380,6 +387,7 @@ struct arm_smmu_device {
->  	u32				num_context_banks;
->  	u32				num_s2_context_banks;
->  	DECLARE_BITMAP(context_map, ARM_SMMU_MAX_CBS);
-> +	struct arm_smmu_cb		*cbs;
->  	atomic_t			irptndx;
->  
->  	u32				num_mapping_groups;
-> @@ -768,17 +776,69 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
->  static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->  				       struct io_pgtable_cfg *pgtbl_cfg)
->  {
-> -	u32 reg, reg2;
-> -	u64 reg64;
-> -	bool stage1;
->  	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
-> -	struct arm_smmu_device *smmu = smmu_domain->smmu;
-> +	struct arm_smmu_cb *cb = &smmu_domain->smmu->cbs[cfg->cbndx];
-> +	bool stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
-> +
-> +	cb->cfg = cfg;
-> +
-> +	/* TTBCR */
-> +	if (stage1) {
-> +		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-> +			cb->tcr[0] = pgtbl_cfg->arm_v7s_cfg.tcr;
-> +		} else {
-> +			cb->tcr[0] = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
-> +			cb->tcr[1] = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
-> +			cb->tcr[1] |= TTBCR2_SEP_UPSTREAM;
-> +			if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-> +				cb->tcr[1] |= TTBCR2_AS;
-> +		}
-> +	} else {
-> +		cb->tcr[0] = pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
-> +	}
-> +
-> +	/* TTBRs */
-> +	if (stage1) {
-> +		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-> +			cb->ttbr[0] = pgtbl_cfg->arm_v7s_cfg.ttbr[0];
-> +			cb->ttbr[1] = pgtbl_cfg->arm_v7s_cfg.ttbr[1];
-> +		} else {
-> +			cb->ttbr[0] = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-> +			cb->ttbr[1] = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-> +		}
-> +	} else {
-> +		cb->ttbr[0] = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-> +	}
-> +
-> +	/* MAIRs (stage-1 only) */
-> +	if (stage1) {
-> +		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-> +			cb->mair[0] = pgtbl_cfg->arm_v7s_cfg.prrr;
-> +			cb->mair[1] = pgtbl_cfg->arm_v7s_cfg.nmrr;
-> +		} else {
-> +			cb->mair[0] = pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
-> +			cb->mair[1] = pgtbl_cfg->arm_lpae_s1_cfg.mair[1];
-> +		}
-> +	}
-> +}
-> +
-> +static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
-> +{
-> +	u32 reg;
-> +	bool stage1;
-> +	struct arm_smmu_cb *cb = &smmu->cbs[idx];
-> +	struct arm_smmu_cfg *cfg = cb->cfg;
-> +	struct arm_smmu_cfg default_cfg = {0};
->  	void __iomem *cb_base, *gr1_base;
->  
-> +	if (!cfg)
-> +		cfg = &default_cfg;
-> +
->  	gr1_base = ARM_SMMU_GR1(smmu);
->  	stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
-> -	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
-> +	cb_base = ARM_SMMU_CB(smmu, idx);
->  
-> +	/* CBA2R */
->  	if (smmu->version > ARM_SMMU_V1) {
->  		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
->  			reg = CBA2R_RW64_64BIT;
-> @@ -788,7 +848,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->  		if (smmu->features & ARM_SMMU_FEAT_VMID16)
->  			reg |= cfg->vmid << CBA2R_VMID_SHIFT;
->  
-> -		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
-> +		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(idx));
->  	}
->  
->  	/* CBAR */
-> @@ -807,72 +867,43 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->  		/* 8-bit VMIDs live in CBAR */
->  		reg |= cfg->vmid << CBAR_VMID_SHIFT;
->  	}
-> -	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
-> +	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(idx));
->  
->  	/*
->  	 * TTBCR
->  	 * We must write this before the TTBRs, since it determines the
->  	 * access behaviour of some fields (in particular, ASID[15:8]).
->  	 */
-> -	if (stage1) {
-> -		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-> -			reg = pgtbl_cfg->arm_v7s_cfg.tcr;
-> -			reg2 = 0;
-> -		} else {
-> -			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
-> -			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
-> -			reg2 |= TTBCR2_SEP_UPSTREAM;
-> -			if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-> -				reg2 |= TTBCR2_AS;
-> -		}
-> -		if (smmu->version > ARM_SMMU_V1)
-> -			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
-> -	} else {
-> -		reg = pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
-> -	}
-> -	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBCR);
-> +	if (stage1 && smmu->version > ARM_SMMU_V1)
-> +		writel_relaxed(cb->tcr[1], cb_base + ARM_SMMU_CB_TTBCR2);
-> +	writel_relaxed(cb->tcr[0], cb_base + ARM_SMMU_CB_TTBCR);
->  
->  	/* TTBRs */
-> -	if (stage1) {
-> -		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-> -			reg = pgtbl_cfg->arm_v7s_cfg.ttbr[0];
-> -			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0);
-> -			reg = pgtbl_cfg->arm_v7s_cfg.ttbr[1];
-> -			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1);
-> -			writel_relaxed(cfg->asid, cb_base + ARM_SMMU_CB_CONTEXTIDR);
-> -		} else {
-> -			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-> -			reg64 |= (u64)cfg->asid << TTBRn_ASID_SHIFT;
-> -			writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
-> -			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-> -			reg64 |= (u64)cfg->asid << TTBRn_ASID_SHIFT;
-> -			writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR1);
-> -		}
-> +	if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-> +		writel_relaxed(cfg->asid, cb_base + ARM_SMMU_CB_CONTEXTIDR);
-> +		writel_relaxed(cb->ttbr[0], cb_base + ARM_SMMU_CB_TTBR0);
-> +		writel_relaxed(cb->ttbr[1], cb_base + ARM_SMMU_CB_TTBR1);
->  	} else {
-> -		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-> -		writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
-> +		writeq_relaxed(cb->ttbr[0], cb_base + ARM_SMMU_CB_TTBR0);
-> +		writeq_relaxed(cb->ttbr[1], cb_base + ARM_SMMU_CB_TTBR1);
->  	}
->  
->  	/* MAIRs (stage-1 only) */
->  	if (stage1) {
-> -		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
-> -			reg = pgtbl_cfg->arm_v7s_cfg.prrr;
-> -			reg2 = pgtbl_cfg->arm_v7s_cfg.nmrr;
-> -		} else {
-> -			reg = pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
-> -			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.mair[1];
-> -		}
-> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_S1_MAIR0);
-> -		writel_relaxed(reg2, cb_base + ARM_SMMU_CB_S1_MAIR1);
-> +		writel_relaxed(cb->mair[0], cb_base + ARM_SMMU_CB_S1_MAIR0);
-> +		writel_relaxed(cb->mair[1], cb_base + ARM_SMMU_CB_S1_MAIR1);
->  	}
->  
->  	/* SCTLR */
-> -	reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
-> -	if (stage1)
-> -		reg |= SCTLR_S1_ASIDPNE;
-> -#ifdef __BIG_ENDIAN
-> -	reg |= SCTLR_E;
-> -#endif
-> +	if (!cb->cfg) {
-> +		reg = 0;
-> +	} else {
-> +		reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
-> +		if (stage1)
-> +			reg |= SCTLR_S1_ASIDPNE;
-> +		if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
-> +			reg |= SCTLR_E;
-> +	}
->  	writel_relaxed(reg, cb_base + ARM_SMMU_CB_SCTLR);
->  }
->  
-> @@ -1035,6 +1066,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
->  
->  	/* Initialise the context bank with our page table cfg */
->  	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
-> +	arm_smmu_write_context_bank(smmu, cfg->cbndx);
->  
->  	/*
->  	 * Request context fault interrupt. Do this last to avoid the
-> @@ -1067,7 +1099,6 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
->  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->  	struct arm_smmu_device *smmu = smmu_domain->smmu;
->  	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
-> -	void __iomem *cb_base;
->  	int irq;
->  
->  	if (!smmu || domain->type == IOMMU_DOMAIN_IDENTITY)
-> @@ -1077,8 +1108,8 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
->  	 * Disable the context bank and free the page tables before freeing
->  	 * it.
->  	 */
-> -	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
-> -	writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
-> +	smmu->cbs[cfg->cbndx] = (struct arm_smmu_cb){0};
-> +	arm_smmu_write_context_bank(smmu, cfg->cbndx);
->  
->  	if (cfg->irptndx != INVALID_IRPTNDX) {
->  		irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
-> @@ -1722,7 +1753,6 @@ static struct iommu_ops arm_smmu_ops = {
->  static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->  {
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
-> -	void __iomem *cb_base;
->  	int i;
->  	u32 reg, major;
->  
-> @@ -1758,8 +1788,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->  
->  	/* Make sure all context banks are disabled and clear CB_FSR  */
->  	for (i = 0; i < smmu->num_context_banks; ++i) {
-> -		cb_base = ARM_SMMU_CB(smmu, i);
-> -		writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
-> +		void __iomem *cb_base = ARM_SMMU_CB(smmu, i);
-> +
-> +		arm_smmu_write_context_bank(smmu, i);
->  		writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
->  		/*
->  		 * Disable MMU-500's not-particularly-beneficial next-page
-> @@ -1964,6 +1995,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  		smmu->cavium_id_base -= smmu->num_context_banks;
->  		dev_notice(smmu->dev, "\tenabling workaround for Cavium erratum 27704\n");
->  	}
-> +	smmu->cbs = devm_kcalloc(smmu->dev, smmu->num_context_banks,
-> +				 sizeof(*smmu->cbs), GFP_KERNEL);
-> +	if (!smmu->cbs)
-> +		return -ENOMEM;
->  
->  	/* ID2 */
->  	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID2);
-> 
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
-This email has been checked for viruses by Avast antivirus software.
-https://www.avast.com/antivirus
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  6 ++--
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 10 ++-----
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 43 +++--------------------------
+ 3 files changed, 10 insertions(+), 49 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 5d45033..81164d6 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1395,7 +1395,6 @@ static void vop_destroy_crtc(struct vop *vop)
+ static int vop_initial(struct vop *vop)
+ {
+ 	const struct vop_data *vop_data = vop->data;
+-	const struct vop_reg_data *init_table = vop_data->init_table;
+ 	struct reset_control *ahb_rst;
+ 	int i, ret;
+ 
+@@ -1455,13 +1454,14 @@ static int vop_initial(struct vop *vop)
+ 
+ 	memcpy(vop->regsbak, vop->regs, vop->len);
+ 
+-	for (i = 0; i < vop_data->table_size; i++)
+-		vop_writel(vop, init_table[i].offset, init_table[i].value);
++	VOP_CTRL_SET(vop, global_regdone_en, 1);
++	VOP_CTRL_SET(vop, dsp_blank, 0);
+ 
+ 	for (i = 0; i < vop_data->win_size; i++) {
+ 		const struct vop_win_data *win = &vop_data->win[i];
+ 
+ 		VOP_WIN_SET(vop, win, enable, 0);
++		VOP_WIN_SET(vop, win, gate, 1);
+ 	}
+ 
+ 	vop_cfg_done(vop);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+index 9979fd0..084d3b2 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+@@ -24,11 +24,6 @@ enum vop_data_format {
+ 	VOP_FMT_YUV444SP,
+ };
+ 
+-struct vop_reg_data {
+-	uint32_t offset;
+-	uint32_t value;
+-};
+-
+ struct vop_reg {
+ 	uint32_t offset;
+ 	uint32_t shift;
+@@ -46,6 +41,7 @@ struct vop_ctrl {
+ 	struct vop_reg hdmi_en;
+ 	struct vop_reg mipi_en;
+ 	struct vop_reg dp_en;
++	struct vop_reg dsp_blank;
+ 	struct vop_reg out_mode;
+ 	struct vop_reg dither_down;
+ 	struct vop_reg dither_up;
+@@ -65,6 +61,7 @@ struct vop_ctrl {
+ 
+ 	struct vop_reg line_flag_num[2];
+ 
++	struct vop_reg global_regdone_en;
+ 	struct vop_reg cfg_done;
+ };
+ 
+@@ -115,6 +112,7 @@ struct vop_win_phy {
+ 	uint32_t nformats;
+ 
+ 	struct vop_reg enable;
++	struct vop_reg gate;
+ 	struct vop_reg format;
+ 	struct vop_reg rb_swap;
+ 	struct vop_reg act_info;
+@@ -136,8 +134,6 @@ struct vop_win_data {
+ };
+ 
+ struct vop_data {
+-	const struct vop_reg_data *init_table;
+-	unsigned int table_size;
+ 	const struct vop_ctrl *ctrl;
+ 	const struct vop_intr *intr;
+ 	const struct vop_win_data *win;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index bafd698..00e9d79 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -127,13 +127,7 @@
+ 	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
+ };
+ 
+-static const struct vop_reg_data rk3036_vop_init_reg_table[] = {
+-	{RK3036_DSP_CTRL1, 0x00000000},
+-};
+-
+ static const struct vop_data rk3036_vop = {
+-	.init_table = rk3036_vop_init_reg_table,
+-	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
+ 	.ctrl = &rk3036_ctrl_data,
+ 	.intr = &rk3036_intr,
+ 	.win = rk3036_vop_win_data,
+@@ -193,7 +187,8 @@
+ static const struct vop_win_phy rk3288_win23_data = {
+ 	.data_formats = formats_win_lite,
+ 	.nformats = ARRAY_SIZE(formats_win_lite),
+-	.enable = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 0),
++	.enable = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 4),
++	.gate = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 0),
+ 	.format = VOP_REG(RK3288_WIN2_CTRL0, 0x7, 1),
+ 	.rb_swap = VOP_REG(RK3288_WIN2_CTRL0, 0x1, 12),
+ 	.dsp_info = VOP_REG(RK3288_WIN2_DSP_INFO0, 0x0fff0fff, 0),
+@@ -215,6 +210,7 @@
+ 	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0xf, 1),
+ 	.dither_up = VOP_REG(RK3288_DSP_CTRL1, 0x1, 6),
+ 	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
++	.dsp_blank = VOP_REG(RK3288_DSP_CTRL0, 0x3, 18),
+ 	.out_mode = VOP_REG(RK3288_DSP_CTRL0, 0xf, 0),
+ 	.pin_pol = VOP_REG(RK3288_DSP_CTRL0, 0xf, 4),
+ 	.htotal_pw = VOP_REG(RK3288_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
+@@ -224,22 +220,10 @@
+ 	.hpost_st_end = VOP_REG(RK3288_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
+ 	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
+ 	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
++	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
+ 	.cfg_done = VOP_REG(RK3288_REG_CFG_DONE, 0x1, 0),
+ };
+ 
+-static const struct vop_reg_data rk3288_init_reg_table[] = {
+-	{RK3288_SYS_CTRL, 0x00c00000},
+-	{RK3288_DSP_CTRL0, 0x00000000},
+-	{RK3288_WIN0_CTRL0, 0x00000080},
+-	{RK3288_WIN1_CTRL0, 0x00000080},
+-	/* TODO: Win2/3 support multiple area function, but we haven't found
+-	 * a suitable way to use it yet, so let's just use them as other windows
+-	 * with only area 0 enabled.
+-	 */
+-	{RK3288_WIN2_CTRL0, 0x00000010},
+-	{RK3288_WIN3_CTRL0, 0x00000010},
+-};
+-
+ /*
+  * Note: rk3288 has a dedicated 'cursor' window, however, that window requires
+  * special support to get alpha blending working.  For now, just use overlay
+@@ -273,8 +257,6 @@
+ };
+ 
+ static const struct vop_data rk3288_vop = {
+-	.init_table = rk3288_init_reg_table,
+-	.table_size = ARRAY_SIZE(rk3288_init_reg_table),
+ 	.feature = VOP_FEATURE_OUTPUT_RGB10,
+ 	.intr = &rk3288_vop_intr,
+ 	.ctrl = &rk3288_ctrl_data,
+@@ -328,22 +310,7 @@
+ 	.clear = VOP_REG_MASK(RK3399_INTR_CLEAR0, 0xffff, 0),
+ };
+ 
+-static const struct vop_reg_data rk3399_init_reg_table[] = {
+-	{RK3399_SYS_CTRL, 0x2000f800},
+-	{RK3399_DSP_CTRL0, 0x00000000},
+-	{RK3399_WIN0_CTRL0, 0x00000080},
+-	{RK3399_WIN1_CTRL0, 0x00000080},
+-	/* TODO: Win2/3 support multiple area function, but we haven't found
+-	 * a suitable way to use it yet, so let's just use them as other windows
+-	 * with only area 0 enabled.
+-	 */
+-	{RK3399_WIN2_CTRL0, 0x00000010},
+-	{RK3399_WIN3_CTRL0, 0x00000010},
+-};
+-
+ static const struct vop_data rk3399_vop_big = {
+-	.init_table = rk3399_init_reg_table,
+-	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
+ 	.feature = VOP_FEATURE_OUTPUT_RGB10,
+ 	.intr = &rk3399_vop_intr,
+ 	.ctrl = &rk3399_ctrl_data,
+@@ -362,8 +329,6 @@
+ };
+ 
+ static const struct vop_data rk3399_vop_lit = {
+-	.init_table = rk3399_init_reg_table,
+-	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
+ 	.intr = &rk3399_vop_intr,
+ 	.ctrl = &rk3399_ctrl_data,
+ 	/*
+-- 
+1.9.1
