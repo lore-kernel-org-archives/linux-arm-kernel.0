@@ -1,41 +1,33 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 19 Jul 2017 12:37:39 +0200
-Subject: [PATCH] soc: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-49-robh@kernel.org>
-References: <20170718214339.7774-49-robh@kernel.org>
-Message-ID: <6e936e3c-0e46-4f06-5571-5942d6fb1778@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 19 Jul 2017 11:40:08 +0100
+Subject: [RFC PATCH 0/2] ARM: Fix unparseable signal frame with
+ CONFIG_IWMMXT
+In-Reply-To: <20170719092827.GA28445@n2100.armlinux.org.uk>
+References: <1498059983-13438-1-git-send-email-Dave.Martin@arm.com>
+ <20170626101304.GG4902@n2100.armlinux.org.uk>
+ <20170626133255.GH8543@e103592.cambridge.arm.com>
+ <20170626144001.GH4902@n2100.armlinux.org.uk>
+ <AM4PR08MB2659BFF0EAEB020F7571A115D5DF0@AM4PR08MB2659.eurprd08.prod.outlook.com>
+ <20170719092827.GA28445@n2100.armlinux.org.uk>
+Message-ID: <20170719104006.GF3966@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/18/2017 11:43 PM, Rob Herring wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
+On Wed, Jul 19, 2017 at 10:28:27AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 26, 2017 at 03:14:13PM +0000, Edmund Grimley-Evans wrote:
+> > As a user (I recently implemented a work-around for this problem in DynamoRIO: https://github.com/DynamoRIO/dynamorio/commit/0b75c635033d01ab04f955f5affe14a3ced9ab56) I'm happy with any of the proposed solutions, provided that in the "invalid magic number" case user space is not required to regenerate the bogus block with the same invalid magic number when invoking sigreturn.
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Scott Wood <oss@buserror.net>
-> Cc: Qiang Zhao <qiang.zhao@nxp.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> ---
->   drivers/soc/fsl/qbman/bman_ccsr.c    | 10 +++++-----
->   drivers/soc/fsl/qbman/bman_portal.c  |  8 +++-----
->   drivers/soc/fsl/qbman/qman_ccsr.c    | 12 ++++++------
->   drivers/soc/fsl/qbman/qman_portal.c  | 11 ++++-------
->   drivers/soc/fsl/qe/gpio.c            |  4 ++--
->   drivers/soc/mediatek/mtk-pmic-wrap.c |  4 ++--
+> I have to ask why a bug report was never sent to kernel people on this.
+> If no one tells people that software is buggy, that software stands
+> little chance of being fixed!
 
-For Mediatek:
+Partly because I fielded it before it got raised on the list.
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+However, it would have been good to have more discussion on the list and
+to get the DynamoRIO guys commenting on there -- since they are the ones
+actually trying to use this feature.
+
+I'll try to encourage that more in the future...
+
+Cheers
+---Dave
