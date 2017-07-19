@@ -1,78 +1,39 @@
-From: yong.deng@magewell.com (Yong)
-Date: Wed, 19 Jul 2017 14:21:20 +0800
-Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for
- Allwinner CSI
-In-Reply-To: <20170719044923.yae2ye4slvrmtyfe@sapphire.tkos.co.il>
-References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
- <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
- <20170718115530.ssy7g5vv4siqnfpo@tarshish>
- <20170719092249.2fb6ec720ba1b194cea320c8@magewell.com>
- <20170719044923.yae2ye4slvrmtyfe@sapphire.tkos.co.il>
-Message-ID: <20170719142120.d00469cf9fce844d40b9988e@magewell.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Jul 2017 08:22:00 +0200
+Subject: [PATCH] bus: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-11-robh@kernel.org>
+References: <20170718214339.7774-11-robh@kernel.org>
+Message-ID: <20170719062200.aixn34tcmxy3h6dl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
-
-On Wed, 19 Jul 2017 07:49:23 +0300
-Baruch Siach <baruch@tkos.co.il> wrote:
-
-> Hi Yong,
+On Tue, Jul 18, 2017 at 04:42:51PM -0500, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-> On Wed, Jul 19, 2017 at 09:22:49AM +0800, Yong wrote:
-> > On Tue, 18 Jul 2017 14:55:30 +0300
-> > Baruch Siach <baruch@tkos.co.il> wrote:
-> > > I am trying to get this driver working on the Olimex A33 OLinuXino. I 
-> > > didn't get it working yet, but I had some progress. See the comment below 
-> > > on one issue I encountered.
-> > > 
-> > > On Tue, Jun 27, 2017 at 07:07:34PM +0800, Yong Deng wrote:
-> > > > Add binding documentation for Allwinner CSI.
-> > > > 
-> > > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > > > ---
-> 
-> [...]
-> 
-> > > > +Example:
-> > > > +
-> > > > +	csi1: csi at 01cb4000 {
-> > > > +		compatible = "allwinner,sun8i-v3s-csi";
-> > > > +		reg = <0x01cb4000 0x1000>;
-> > > 
-> > > You use platform_get_resource_byname() to get this IO resource. This requires 
-> > > adding mandatory
-> > > 
-> > >   reg-names = "csi";
-> > > 
-> > > But is it actually needed? Wouldn't a simple platform_get_resource() be 
-> > > enough?
-> > 
-> > You are right.
-> > This will be fixed in the next version.
-> > I am waiting for more comments for the sunxi-csi.h. It's pleasure if
-> > you have any suggestions about it.
-> 
-> You mean sunxi_csi.h, right?
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/bus/arm-cci.c   | 12 ++++++------
+>  drivers/bus/imx-weim.c  |  8 ++++----
+>  drivers/bus/sunxi-rsb.c | 22 +++++++++++-----------
 
-Yes. My spelling mistake.
+for sunxi-rsb:
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> 
-> Why do you need the sunxi_csi_ops indirection? Do you expect to add 
-> alternative implementations of these ops at some point?
+Maxime
 
-I want to seperate the sunxi_video.c and sunxi_csi_v3s.c. 
-sunxi_csi_v3s.c is Soc specific. Maybe there will be sunxi_csi_r40.c
-in the futrue. But the sunxi_video.c and sunxi_csi.c are common.
-
-> 
-> baruch
-> 
-> -- 
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
-
-
-Thanks,
-Yong
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170719/7005f66d/attachment.sig>
