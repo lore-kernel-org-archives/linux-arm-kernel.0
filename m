@@ -1,97 +1,318 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 19 Jul 2017 15:25:42 +0530
-Subject: [PATCH 6/6] arm64: dts: Add FlexRM DT nodes for Stingray
-In-Reply-To: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
-References: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1500458142-19243-7-git-send-email-anup.patel@broadcom.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 19 Jul 2017 11:17:57 +0100
+Subject: [PATCH 1/2] iommu/arm-smmu: Track context bank state
+In-Reply-To: <22b7eea9-d194-d768-a10f-fc3c6fec9e4c@codeaurora.org>
+References: <71247263f4d88e7776f483fb1cc1139b516c0835.1500381551.git.robin.murphy@arm.com>
+ <22b7eea9-d194-d768-a10f-fc3c6fec9e4c@codeaurora.org>
+Message-ID: <b9db6ee3-3e50-61ee-46f1-3783ea5f3a0c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have two instances of FlexRM on Stingray. One for SBA RAID
-offload engine and another for SPU2 Crypto offload engine.
+On 19/07/17 03:40, Sricharan R wrote:
+> Hi Robin,
+> 
+> On 7/18/2017 6:14 PM, Robin Murphy wrote:
+>> Echoing what we do for Stream Map Entries, maintain a software shadow
+>> state for context bank configuration. With this in place, we are mere
+>> moments away from blissfully easy suspend/resume support.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> Since the runtime PM discussion has come back again, I figured it was
+>> probably about time to finish off my plan for system PM. Lightly tested
+>> on Juno (MMU-401) with hibernation.
+>>
+>> Robin.
+>>
+>>  drivers/iommu/arm-smmu.c | 159 +++++++++++++++++++++++++++++------------------
+>>  1 file changed, 97 insertions(+), 62 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index bc89b4d6c043..86897b7b81d8 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -338,6 +338,13 @@ struct arm_smmu_smr {
+>>  	bool				valid;
+>>  };
+>>  
+>> +struct arm_smmu_cb {
+>> +	u64				ttbr[2];
+>> +	u32				tcr[2];
+>> +	u32				mair[2];
+>> +	struct arm_smmu_cfg		*cfg;
+>> +};
+>> +
+> 
+>  When i was trying this sometime back [1], was
+>  saving and using the pgtbl->cfg and domain->cfg for
+>  restoring the context. But this looks correct to make
+>  a actual shadow once and use it later all the time.
 
-This patch adds FlexRM mailbox controller DT nodes for Stingray.
+Yeah, I did have a go at using the io_pgtable_cfg, but given the
+variable format of the registers involved it turned out simpler to
+shadow the raw register state directly.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
----
- .../boot/dts/broadcom/stingray/stingray-fs4.dtsi   | 54 ++++++++++++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |  2 +
- 2 files changed, 56 insertions(+)
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
+>  Will also try some testing today.
+> 
+>  Reviewed-by: sricharan at codeaurora.org
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
-new file mode 100644
-index 0000000..1f927c4
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
-@@ -0,0 +1,54 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+	fs4: fs4 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0x0 0x67000000 0x00800000>;
-+
-+		crypto_mbox: crypto_mbox at 00000000 {
-+			compatible = "brcm,iproc-flexrm-mbox";
-+			reg = <0x00000000 0x200000>;
-+			msi-parent = <&gic_its 0x4100>;
-+			#mbox-cells = <3>;
-+			dma-coherent;
-+		};
-+
-+		raid_mbox: raid_mbox at 00400000 {
-+			compatible = "brcm,iproc-flexrm-mbox";
-+			reg = <0x00400000 0x200000>;
-+			dma-coherent;
-+			msi-parent = <&gic_its 0x4300>;
-+			#mbox-cells = <3>;
-+		};
-+	};
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index 49933cf..a98fbe9a 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -261,6 +261,8 @@
- 		};
- 	};
- 
-+	#include "stingray-fs4.dtsi"
-+
- 	hsls {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
--- 
-2.7.4
+Thanks!
+
+Robin.
+
+> [1] https://patchwork.kernel.org/patch/9389717/
+> 
+> Regards,
+>  Sricharan
+> 
+> 
+>>  struct arm_smmu_master_cfg {
+>>  	struct arm_smmu_device		*smmu;
+>>  	s16				smendx[];
+>> @@ -380,6 +387,7 @@ struct arm_smmu_device {
+>>  	u32				num_context_banks;
+>>  	u32				num_s2_context_banks;
+>>  	DECLARE_BITMAP(context_map, ARM_SMMU_MAX_CBS);
+>> +	struct arm_smmu_cb		*cbs;
+>>  	atomic_t			irptndx;
+>>  
+>>  	u32				num_mapping_groups;
+>> @@ -768,17 +776,69 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
+>>  static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>>  				       struct io_pgtable_cfg *pgtbl_cfg)
+>>  {
+>> -	u32 reg, reg2;
+>> -	u64 reg64;
+>> -	bool stage1;
+>>  	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+>> -	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>> +	struct arm_smmu_cb *cb = &smmu_domain->smmu->cbs[cfg->cbndx];
+>> +	bool stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
+>> +
+>> +	cb->cfg = cfg;
+>> +
+>> +	/* TTBCR */
+>> +	if (stage1) {
+>> +		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
+>> +			cb->tcr[0] = pgtbl_cfg->arm_v7s_cfg.tcr;
+>> +		} else {
+>> +			cb->tcr[0] = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+>> +			cb->tcr[1] = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
+>> +			cb->tcr[1] |= TTBCR2_SEP_UPSTREAM;
+>> +			if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
+>> +				cb->tcr[1] |= TTBCR2_AS;
+>> +		}
+>> +	} else {
+>> +		cb->tcr[0] = pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
+>> +	}
+>> +
+>> +	/* TTBRs */
+>> +	if (stage1) {
+>> +		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
+>> +			cb->ttbr[0] = pgtbl_cfg->arm_v7s_cfg.ttbr[0];
+>> +			cb->ttbr[1] = pgtbl_cfg->arm_v7s_cfg.ttbr[1];
+>> +		} else {
+>> +			cb->ttbr[0] = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+>> +			cb->ttbr[1] = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+>> +		}
+>> +	} else {
+>> +		cb->ttbr[0] = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+>> +	}
+>> +
+>> +	/* MAIRs (stage-1 only) */
+>> +	if (stage1) {
+>> +		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
+>> +			cb->mair[0] = pgtbl_cfg->arm_v7s_cfg.prrr;
+>> +			cb->mair[1] = pgtbl_cfg->arm_v7s_cfg.nmrr;
+>> +		} else {
+>> +			cb->mair[0] = pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
+>> +			cb->mair[1] = pgtbl_cfg->arm_lpae_s1_cfg.mair[1];
+>> +		}
+>> +	}
+>> +}
+>> +
+>> +static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
+>> +{
+>> +	u32 reg;
+>> +	bool stage1;
+>> +	struct arm_smmu_cb *cb = &smmu->cbs[idx];
+>> +	struct arm_smmu_cfg *cfg = cb->cfg;
+>> +	struct arm_smmu_cfg default_cfg = {0};
+>>  	void __iomem *cb_base, *gr1_base;
+>>  
+>> +	if (!cfg)
+>> +		cfg = &default_cfg;
+>> +
+>>  	gr1_base = ARM_SMMU_GR1(smmu);
+>>  	stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
+>> -	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
+>> +	cb_base = ARM_SMMU_CB(smmu, idx);
+>>  
+>> +	/* CBA2R */
+>>  	if (smmu->version > ARM_SMMU_V1) {
+>>  		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
+>>  			reg = CBA2R_RW64_64BIT;
+>> @@ -788,7 +848,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>>  		if (smmu->features & ARM_SMMU_FEAT_VMID16)
+>>  			reg |= cfg->vmid << CBA2R_VMID_SHIFT;
+>>  
+>> -		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
+>> +		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(idx));
+>>  	}
+>>  
+>>  	/* CBAR */
+>> @@ -807,72 +867,43 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>>  		/* 8-bit VMIDs live in CBAR */
+>>  		reg |= cfg->vmid << CBAR_VMID_SHIFT;
+>>  	}
+>> -	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
+>> +	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(idx));
+>>  
+>>  	/*
+>>  	 * TTBCR
+>>  	 * We must write this before the TTBRs, since it determines the
+>>  	 * access behaviour of some fields (in particular, ASID[15:8]).
+>>  	 */
+>> -	if (stage1) {
+>> -		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
+>> -			reg = pgtbl_cfg->arm_v7s_cfg.tcr;
+>> -			reg2 = 0;
+>> -		} else {
+>> -			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+>> -			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
+>> -			reg2 |= TTBCR2_SEP_UPSTREAM;
+>> -			if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
+>> -				reg2 |= TTBCR2_AS;
+>> -		}
+>> -		if (smmu->version > ARM_SMMU_V1)
+>> -			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
+>> -	} else {
+>> -		reg = pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
+>> -	}
+>> -	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBCR);
+>> +	if (stage1 && smmu->version > ARM_SMMU_V1)
+>> +		writel_relaxed(cb->tcr[1], cb_base + ARM_SMMU_CB_TTBCR2);
+>> +	writel_relaxed(cb->tcr[0], cb_base + ARM_SMMU_CB_TTBCR);
+>>  
+>>  	/* TTBRs */
+>> -	if (stage1) {
+>> -		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
+>> -			reg = pgtbl_cfg->arm_v7s_cfg.ttbr[0];
+>> -			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0);
+>> -			reg = pgtbl_cfg->arm_v7s_cfg.ttbr[1];
+>> -			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1);
+>> -			writel_relaxed(cfg->asid, cb_base + ARM_SMMU_CB_CONTEXTIDR);
+>> -		} else {
+>> -			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+>> -			reg64 |= (u64)cfg->asid << TTBRn_ASID_SHIFT;
+>> -			writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
+>> -			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+>> -			reg64 |= (u64)cfg->asid << TTBRn_ASID_SHIFT;
+>> -			writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR1);
+>> -		}
+>> +	if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
+>> +		writel_relaxed(cfg->asid, cb_base + ARM_SMMU_CB_CONTEXTIDR);
+>> +		writel_relaxed(cb->ttbr[0], cb_base + ARM_SMMU_CB_TTBR0);
+>> +		writel_relaxed(cb->ttbr[1], cb_base + ARM_SMMU_CB_TTBR1);
+>>  	} else {
+>> -		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+>> -		writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
+>> +		writeq_relaxed(cb->ttbr[0], cb_base + ARM_SMMU_CB_TTBR0);
+>> +		writeq_relaxed(cb->ttbr[1], cb_base + ARM_SMMU_CB_TTBR1);
+>>  	}
+>>  
+>>  	/* MAIRs (stage-1 only) */
+>>  	if (stage1) {
+>> -		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
+>> -			reg = pgtbl_cfg->arm_v7s_cfg.prrr;
+>> -			reg2 = pgtbl_cfg->arm_v7s_cfg.nmrr;
+>> -		} else {
+>> -			reg = pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
+>> -			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.mair[1];
+>> -		}
+>> -		writel_relaxed(reg, cb_base + ARM_SMMU_CB_S1_MAIR0);
+>> -		writel_relaxed(reg2, cb_base + ARM_SMMU_CB_S1_MAIR1);
+>> +		writel_relaxed(cb->mair[0], cb_base + ARM_SMMU_CB_S1_MAIR0);
+>> +		writel_relaxed(cb->mair[1], cb_base + ARM_SMMU_CB_S1_MAIR1);
+>>  	}
+>>  
+>>  	/* SCTLR */
+>> -	reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
+>> -	if (stage1)
+>> -		reg |= SCTLR_S1_ASIDPNE;
+>> -#ifdef __BIG_ENDIAN
+>> -	reg |= SCTLR_E;
+>> -#endif
+>> +	if (!cb->cfg) {
+>> +		reg = 0;
+>> +	} else {
+>> +		reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
+>> +		if (stage1)
+>> +			reg |= SCTLR_S1_ASIDPNE;
+>> +		if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+>> +			reg |= SCTLR_E;
+>> +	}
+>>  	writel_relaxed(reg, cb_base + ARM_SMMU_CB_SCTLR);
+>>  }
+>>  
+>> @@ -1035,6 +1066,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>>  
+>>  	/* Initialise the context bank with our page table cfg */
+>>  	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
+>> +	arm_smmu_write_context_bank(smmu, cfg->cbndx);
+>>  
+>>  	/*
+>>  	 * Request context fault interrupt. Do this last to avoid the
+>> @@ -1067,7 +1099,6 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+>>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>>  	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>>  	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+>> -	void __iomem *cb_base;
+>>  	int irq;
+>>  
+>>  	if (!smmu || domain->type == IOMMU_DOMAIN_IDENTITY)
+>> @@ -1077,8 +1108,8 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+>>  	 * Disable the context bank and free the page tables before freeing
+>>  	 * it.
+>>  	 */
+>> -	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
+>> -	writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
+>> +	smmu->cbs[cfg->cbndx] = (struct arm_smmu_cb){0};
+>> +	arm_smmu_write_context_bank(smmu, cfg->cbndx);
+>>  
+>>  	if (cfg->irptndx != INVALID_IRPTNDX) {
+>>  		irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
+>> @@ -1722,7 +1753,6 @@ static struct iommu_ops arm_smmu_ops = {
+>>  static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>>  {
+>>  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+>> -	void __iomem *cb_base;
+>>  	int i;
+>>  	u32 reg, major;
+>>  
+>> @@ -1758,8 +1788,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>>  
+>>  	/* Make sure all context banks are disabled and clear CB_FSR  */
+>>  	for (i = 0; i < smmu->num_context_banks; ++i) {
+>> -		cb_base = ARM_SMMU_CB(smmu, i);
+>> -		writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
+>> +		void __iomem *cb_base = ARM_SMMU_CB(smmu, i);
+>> +
+>> +		arm_smmu_write_context_bank(smmu, i);
+>>  		writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
+>>  		/*
+>>  		 * Disable MMU-500's not-particularly-beneficial next-page
+>> @@ -1964,6 +1995,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>>  		smmu->cavium_id_base -= smmu->num_context_banks;
+>>  		dev_notice(smmu->dev, "\tenabling workaround for Cavium erratum 27704\n");
+>>  	}
+>> +	smmu->cbs = devm_kcalloc(smmu->dev, smmu->num_context_banks,
+>> +				 sizeof(*smmu->cbs), GFP_KERNEL);
+>> +	if (!smmu->cbs)
+>> +		return -ENOMEM;
+>>  
+>>  	/* ID2 */
+>>  	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID2);
+>>
+> 
