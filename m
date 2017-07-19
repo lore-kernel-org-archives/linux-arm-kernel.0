@@ -1,54 +1,51 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 19 Jul 2017 03:25:44 +0300
-Subject: [PATCH v6 2/3] clk: gate: expose clk_gate_ops::is_enabled
-In-Reply-To: <20170718225203.GD18179@codeaurora.org>
-References: <1500364414-10021-1-git-send-email-gabriel.fernandez@st.com>
- <1500364414-10021-3-git-send-email-gabriel.fernandez@st.com>
- <55bc0f3f-67ed-a15f-5b71-d87044fd5237@mleia.com>
- <20170718225203.GD18179@codeaurora.org>
-Message-ID: <1ed5052f-7d42-b57f-d12f-5ea003a2c5a9@mleia.com>
+Date: Wed, 19 Jul 2017 03:28:36 +0300
+Subject: [PATCH] irqchip: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-30-robh@kernel.org>
+References: <20170718214339.7774-30-robh@kernel.org>
+Message-ID: <123f1ec8-e1e1-1bf4-c47b-b97bdd8fd8db@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2017 01:52 AM, Stephen Boyd wrote:
-> On 07/18, Vladimir Zapolskiy wrote:
->> On 07/18/2017 10:53 AM, gabriel.fernandez at st.com wrote:
->>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>  }
->>> +EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
->>>  
->>>  const struct clk_ops clk_gate_ops = {
->>>  	.enable = clk_gate_enable,
->>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->>> index c59c625..e9587ab 100644
->>> --- a/include/linux/clk-provider.h
->>> +++ b/include/linux/clk-provider.h
->>> @@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
->>>  		u8 clk_gate_flags, spinlock_t *lock);
->>>  void clk_unregister_gate(struct clk *clk);
->>>  void clk_hw_unregister_gate(struct clk_hw *hw);
->>> +int clk_gate_is_enabled(struct clk_hw *hw);
->>
->> Here the prefix does not reflect the type of its argument, it might be
->> acceptable for a veiled function, but it is not wanted for the exported
->> function. Something like clk_hw_gate_is_enabled() is expected here, but
->> again, let's firstly come to an agreement, that the export is needed.
->>
+On 07/19/2017 12:43 AM, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-> I'd prefer clk_gate_is_enabled() as it's not a struct clk_hw_gate,
-> it's a struct clk_gate
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: Baruch Siach <baruch@tkos.co.il>
+> Cc: Vladimir Zapolskiy <vz@mleia.com>
+> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-tegra at vger.kernel.org
+> ---
 
-Formally it's a 'struct clk_hw', and 'struct clk_hw_gate' does not exist.
+For 
 
-> and there isn't any requirement for function names to reflect the type
-> of the argument. That's what we have type analysis for.
+>  drivers/irqchip/irq-lpc32xx.c            |  2 +-
 
-Sure, a function name can be selected arbitrary, however because in this
-particular case type analysis operates on 'struct clk_hw', it would fail
-to separate 'struct clk_gate' from 'struct clk_divider', a little hint
-in the naming may be helpful.
-
-I don't insist on my preference, of course your acceptance is sufficient.
+Acked-by: Vladimir Zapolskiy <vz@mleia.com>
 
 --
 With best wishes,
