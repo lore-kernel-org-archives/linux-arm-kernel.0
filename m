@@ -1,30 +1,106 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 19 Jul 2017 09:39:18 +0530
-Subject: [PATCH 1/2] dmaengine: qcom_hidma: correct overriding message
-In-Reply-To: <1500215438-30672-1-git-send-email-okaya@codeaurora.org>
-References: <1500215438-30672-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170719040917.GD3053@localhost>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 19 Jul 2017 09:36:59 +0530
+Subject: [PATCH 4/4] ARM: dts: keystone-k2g-evm: Add gpio nodes
+In-Reply-To: <1cd6ef99-a98e-7cdb-5c2a-f5cd057eef41@ti.com>
+References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+ <1500375436-9435-5-git-send-email-j-keerthy@ti.com>
+ <1cd6ef99-a98e-7cdb-5c2a-f5cd057eef41@ti.com>
+Message-ID: <87734375-8841-ce74-38eb-7ee5af1ad4f6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 16, 2017 at 10:30:37AM -0400, Sinan Kaya wrote:
-> A false overriding information is being presented during boot
-> under this scenario.
-> 
-> 1. First object checks for kernel command line value against zero.
-> 2. It doesn't find it, it sets the command line variable to the
-> value coming from ACPI/DT.
-> 3. Second object is being probed.
-> 4. Second object sees that the value of kernel command line
-> override is non-zero, it prints an overriding message even though
-> value matches ACPI/DT value.
-> 
-> hidma-mgmt QCOM8060:03: overriding max-write-burst-bytes: 1024
-> 
-> Add an additional check to verify that kernel command line value
-> is different from the ACPI/DT value.
 
-Applied both, thanks
 
--- 
-~Vinod
+On Wednesday 19 July 2017 12:43 AM, Suman Anna wrote:
+> Hi Keerthy,
+> 
+> On 07/18/2017 05:57 AM, Keerthy wrote:
+>> keystone-k2g has 2 instances of gpio. The first one has all the 144 GPIOs
+> 
+> Please use 66AK2G for keystone-k2g.
+
+Okay
+
+> 
+>> functional( 9 banks with 16 gpios = 144). The second instance has
+>> only the GPIO0:GPIO67 functional and rest are marked reserved.
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>  arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 42 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+>> index bf4d1fa..58ac3db 100644
+>> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
+>> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+>> @@ -15,6 +15,7 @@
+>>  
+>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>  #include <dt-bindings/pinctrl/keystone.h>
+>> +#include <dt-bindings/gpio/gpio.h>
+>>  
+>>  / {
+>>  	compatible = "ti,k2g","ti,keystone";
+>> @@ -168,5 +169,46 @@
+>>  				#reset-cells = <2>;
+>>  			};
+>>  		};
+>> +
+>> +		gpio0: gpio at 2603000 {
+>> +			compatible = "ti,keystone-k2g-gpio";
+>> +			reg = <0x02603000 0x100>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +
+>> +			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			ti,ngpio = <144>;
+>> +			ti,davinci-gpio-unbanked = <0>;
+>> +			clocks = <&k2g_clks 0x001b 0x0>;
+>> +			clock-names = "gpio";
+> 
+> I don't see the clocks and clock-names documented in the binding.
+> Looking at davinci_gpio_irq_setup(), these are required, and a specific
+> clock name is what the driver is looking for. And you have different
+> semantics for this on K2G and non-K2G SoCs. Davinci platforms are using
+> non-DT clocks, so their DT nodes didn't have them.
+
+I will document the same.
+
+> 
+> regards
+> Suman
+> 
+>> +		};
+>> +
+>> +		gpio1: gpio at 260a000 {
+>> +			compatible = "ti,keystone-k2g-gpio";
+>> +			reg = <0x0260a000 0x100>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
+>> +					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			ti,ngpio = <68>;
+>> +			ti,davinci-gpio-unbanked = <0>;
+>> +			clocks = <&k2g_clks 0x001c 0x0>;
+>> +			clock-names = "gpio";
+>> +		};
+>>  	};
+>>  };
+>>
+> 
