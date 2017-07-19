@@ -1,74 +1,77 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 19 Jul 2017 23:03:17 +0300
-Subject: [PATCH] gpu: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-24-robh@kernel.org>
-References: <20170718214339.7774-24-robh@kernel.org>
-Message-ID: <1822320.HPtxg24hjI@avalon>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 19 Jul 2017 15:11:43 -0500
+Subject: [PATCH 1/2] net: phy: at803x: Fix RGMII RX and TX clock delays
+ setup
+In-Reply-To: <abbcd40c-5ecd-2197-73d0-2046cf1e7b5c@gmail.com>
+References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
+ <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
+ <5ea9905f-e74a-4a43-dc5b-883ec9daf030@ti.com>
+ <abbcd40c-5ecd-2197-73d0-2046cf1e7b5c@gmail.com>
+Message-ID: <c653658c-9985-f157-fc44-4b8168c770c2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-Thank you for the patch.
 
-On Tuesday 18 Jul 2017 16:43:04 Rob Herring wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
+On 07/19/2017 02:30 PM, Florian Fainelli wrote:
+> On 07/19/2017 12:24 PM, Grygorii Strashko wrote:
+>> Hi
+>>
+>> On 07/19/2017 10:31 AM, Marc Gonzalez wrote:
+>>> The current code supports enabling RGMII RX and TX clock delays.
+>>> The unstated assumption is that these settings are disabled by
+>>> default at reset, which is not the case.
+>>>
+>>> RX clock delay is enabled at reset. And TX clock delay "survives"
+>>> across SW resets. Thus, if the bootloader enables TX clock delay,
+>>> it will remain enabled at reset in Linux.
+>>>
+>>> Provide disable functions to configure the RGMII clock delays
+>>> exactly as specified in the fwspec.
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>>    drivers/net/phy/at803x.c | 32 ++++++++++++++++++++++++--------
+>>>    1 file changed, 24 insertions(+), 8 deletions(-)
+>> This patch breaks am335x-evm networking.
+>>
+>> To restore it I've had to apply below diff:
+>> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+>> index 200d6ab..9578bdf 100644
+>> --- a/arch/arm/boot/dts/am335x-evm.dts
+>> +++ b/arch/arm/boot/dts/am335x-evm.dts
+>> @@ -724,12 +724,12 @@
+>>   
+>>   &cpsw_emac0 {
+>>          phy_id = <&davinci_mdio>, <0>;
+>> -       phy-mode = "rgmii-txid";
+>> +       phy-mode = "rgmii-id";
+>>   };
+>>   
+>>   &cpsw_emac1 {
+>>          phy_id = <&davinci_mdio>, <1>;
+>> -       phy-mode = "rgmii-txid";
+>> +       phy-mode = "rgmii-id";
+>>   };
+>>   
+>>   &tscadc {
+>>
+>> Sry, can't comment here to much - not E-PHY expert.
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: Daniel Vetter <daniel.vetter@intel.com>
-> Cc: Jani Nikula <jani.nikula@linux.intel.com>
-> Cc: Sean Paul <seanpaul@chromium.org>
-> Cc: Inki Dae <inki.dae@samsung.com>
-> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-> Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Xinliang Liu <z.liuxinliang@hisilicon.com>
-> Cc: Rongrong Zou <zourongrong@gmail.com>
-> Cc: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Cc: Chen Feng <puck.chen@hisilicon.com>
-> Cc: CK Hu <ck.hu@mediatek.com>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Mark Yao <mark.yao@rock-chips.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Jyri Sarha <jsarha@ti.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-amlogic at lists.infradead.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-rockchip at lists.infradead.org
-> ---
-[snip]
->  drivers/gpu/drm/drm_mipi_dsi.c                  |  6 +++---
->  drivers/gpu/drm/drm_modes.c                     |  4 ++--
->  drivers/gpu/drm/drm_of.c                        |  4 ++--
-[snip]
->  drivers/gpu/drm/panel/panel-lvds.c              | 16 ++++++++--------
->  drivers/gpu/drm/rcar-du/rcar_du_encoder.c       |  4 ++--
->  drivers/gpu/drm/rcar-du/rcar_du_kms.c           | 16 ++++++++--------
+> It's useful feedback, since we had poorly defined "phy-mode" semantics
+> for too long, this is totally expected, Marc this is exactly why Mans is
+> suggesting additional MAC-specific properties to define delays.
+> 
 
-For all the above,
+Yeah. original commit is pretty old and description is not very useful
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+commit 6d75afe2916adf9e9de6862275cdf89b9b7e4d0e
+Author: Mugunthan V N <mugunthanvnm@ti.com>
+Date:   Mon Jun 3 20:10:11 2013 +0000
+
+     ARM: dts: AM33XX: Add phy-mode to CPSW node
+
 
 -- 
-Regards,
-
-Laurent Pinchart
+regards,
+-grygorii
