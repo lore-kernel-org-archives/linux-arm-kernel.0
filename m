@@ -1,29 +1,113 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 19 Jul 2017 21:13:29 +0300
-Subject: USB 3.0 is broken on Odroid Xu4 on latest kernel
-In-Reply-To: <CANAwSgSoo7g=RN4wQ96+NJRYZYy2WeHwPA-xJ2JY7yt25irDfA@mail.gmail.com>
-References: <CANAwSgSoo7g=RN4wQ96+NJRYZYy2WeHwPA-xJ2JY7yt25irDfA@mail.gmail.com>
-Message-ID: <87zic0b8hi.fsf@linux.intel.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 19 Jul 2017 11:30:33 -0700
+Subject: [PATCH 2/2] net: ethernet: nb8800: Fix RGMII TX clock delay setup
+In-Reply-To: <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
+References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
+ <61b71d12-4e3a-edbe-1d69-c66e7cf46d8e@sigmadesigns.com>
+ <yw1xzic0qrcg.fsf@mansr.com> <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
+Message-ID: <d8121f82-dffd-22c7-1209-a3c2329703e5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/19/2017 10:36 AM, Mason wrote:
+> On 19/07/2017 19:17, M?ns Rullg?rd wrote:
+> 
+>> Marc Gonzalez writes:
+>>
+>>> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
+>>> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
+>>> there are 4 RGMII phy-modes to handle:
+>>>
+>>> "rgmii" (RX and TX delays are added by the MAC when required)
+>>> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
+>>> 	the MAC should not add the RX or TX delays in this case)
+>>> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
+>>> 	the MAC should not add an RX delay in this case)
+>>> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
+>>> 	the MAC should not add an TX delay in this case)
+>>>
+>>> Let the MAC handle TX clock delay for rgmii and rgmii-rxid.
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>>  drivers/net/ethernet/aurora/nb8800.c | 8 +++++---
+>>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+>>> index 041cfb7952f8..f3ed320eb4ad 100644
+>>> --- a/drivers/net/ethernet/aurora/nb8800.c
+>>> +++ b/drivers/net/ethernet/aurora/nb8800.c
+>>> @@ -609,7 +609,7 @@ static void nb8800_mac_config(struct net_device *dev)
+>>>  		mac_mode |= HALF_DUPLEX;
+>>>
+>>>  	if (gigabit) {
+>>> -		if (priv->phy_mode == PHY_INTERFACE_MODE_RGMII)
+>>> +		if (phy_interface_is_rgmii(dev->phydev))
+>>>  			mac_mode |= RGMII_MODE;
+>>>
+>>>  		mac_mode |= GMAC_MODE;
+>>
+>> This is a separate issue, and the change is obviously correct.
+>>
+>>> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
+>>>  		break;
+>>>
+>>>  	case PHY_INTERFACE_MODE_RGMII:
+>>> -		pad_mode = PAD_MODE_RGMII;
+>>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
+>>> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+>>>  		break;
+>>>
+>>> +	case PHY_INTERFACE_MODE_RGMII_ID:
+>>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
+>>> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+>>> +		pad_mode = PAD_MODE_RGMII;
+>>>  		break;
+>>
+>> Won't this just make it break in a different set of circumstances?
+> 
+> I don't think so, and here's my reasoning:
+> 
+> AFAIU, the HW block always requires a TX clock delay
+> (I don't know what the "safe" interval is. PHY adds
+> 2.4 ns, MAC adds ~1 ns, both work.)
 
-Hi,
+The nominal delay should be 2ns because that's exactly what a 90 degrees
+shift at a 125Mhz would be. The RGMII specification defines the following:
 
-Anand Moon <linux.amoon@gmail.com> writes:
-> Hi Krzysztof,
->
-> Today I tried to compile the latest kernel for Odroid xu4.
-> using exynos_defconfig I build and loaded the kernel.
-> but to my surprise usb 3.0 device and missing.
->
-> odroid login: root
-> Password:
-> Last login: Wed Jul 19 14:01:44 UTC 2017 on ttySAC2
-> Welcome to Ubuntu 16.04.2 LTS (GNU/Linux 4.13.0-rc1-xu4ml-27846-g74cbd96 armv7l)
+TskewT - Data to Clock output Skew (At Transmitter) Min: -500ns, Nom: 0,
+Max: + 500 ns
+TskewR - Data to Clock input Skew (At Receiver) Min: 1ns, Nom: 0, Max:
+2.6ns (see note 1)
 
-Dude, you have 27 thousand patches on top of v4.13-rc1??? Try vanilla
-v4.13-rc1 and try a git bisect.
+note 1: This implies that PC board design will require clocks to be
+routed such that an additional trace delay of greater than 1.5ns and
+less than 2.0ns will be added to the associated clock signal. For 10/100
+the Max value is unspecified.
 
+So it seems to me like you are borderline spec in both delays you gave
+here and the "HW block always requires a TX clock delay" statement is
+true for a given board design only.
+
+
+> RX clock delay seems to be "Don't Care" (tested both
+> enabled and disabled by PHY)
+> By "tested", I mean ability to ping remote system.
+
+Can you do something a bit more stressful than just a ping, also if you
+have the ability to change the inter-packet gap, do it, and see if you
+start seeing FCS or any other decoding errors.
+
+> 
+> If phy-mode is RGMII or RGMII_RXID, then don't add
+> TX clock delay from PHY, therefore add it from MAC.
+> 
+> If phy_mode is RGMII_ID or RGMII_TXID, then do add
+> TX clock delay from PHY, therefore don't add it from MAC.
+> 
+> What set of circumstances would create an issue?
+
+Existing Device Tree sources that do not correspond to that description
+you just did, I suppose they are all out of tree?
 -- 
-balbi
+Florian
