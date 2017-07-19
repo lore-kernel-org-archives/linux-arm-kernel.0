@@ -1,26 +1,67 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 19 Jul 2017 15:58:35 +0800
-Subject: [PATCH] clk: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-12-robh@kernel.org>
-References: <20170718214339.7774-12-robh@kernel.org>
-Message-ID: <1500451115.30067.1.camel@mtksdaap41>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 19 Jul 2017 11:00:33 +0300
+Subject: [PATCH] clk: gemini: Fix reset regression
+In-Reply-To: <CACRpkda3ZW4rQTwg8Y63uzzupCZAtTP6jv1ppsTXHuDDy0y8og@mail.gmail.com>
+References: <20170711122601.17745-1-linus.walleij@linaro.org>
+ <1499874682.6374.57.camel@pengutronix.de>
+ <CACRpkda3ZW4rQTwg8Y63uzzupCZAtTP6jv1ppsTXHuDDy0y8og@mail.gmail.com>
+Message-ID: <20170719080033.GD1002@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-07-18 at 16:42 -0500, Rob Herring wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
+On Tue, Jul 18, 2017 at 11:49:44AM +0200, Linus Walleij wrote:
+> On Wed, Jul 12, 2017 at 5:51 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
 > 
-> ---
->  drivers/clk/mediatek/clk-cpumux.c    |  2 +-
->  drivers/clk/mediatek/clk-mtk.c       |  2 +-
->  drivers/clk/mediatek/reset.c         |  2 +-
+> > From fab3a9a697e9797ba1c24874d7c43c09dd812e77 Mon Sep 17 00:00:00 2001
+> > From: Philipp Zabel <p.zabel@pengutronix.de>
+> > Date: Wed, 12 Jul 2017 17:29:28 +0200
+> > Subject: [PATCH] reset: make (de)assert report succeess for self-deasserting
+> >  reset drivers
+> >
+> > By now there are drivers using shared reset controls and (de)assert
+> > calls on platforms with self-deasserting reset lines and thus reset
+> > drivers that do not implement .assert() and .deassert().
+> > As long as the initial state of the reset line is deasserted, there
+> > is no reason for a reset_control_assert call to return an error for
+> > shared reset controls, or for a reset_control_deassert call to return
+> > an error for either shared or exclusive reset controls: after a call
+> > to reset_control_deassert the reset line is guaranteed to be deasserted,
+> > and after a call to reset_control_assert it is valid for the reset
+> > line to stay deasserted for shared reset controls.
+> >
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> This patch makes all kind of sense, and I follow your
+> reasoning.
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> In the back of my head I was thinking that the deassert/assert
+> pair matches a certain SoC driver design pattern I have seen
+> around:
+> 
+> When a driver use an IP block it enables the clock and takes
+> the block out of reset.
+> 
+> When it stops using it, it asserts reset and disables the clock.
+> 
+> This is not entirely self-evident, for example why is reset asserted
+> across say insmod/rmmod/insmod. Just disabling the clock would
+> be OK, I guess, in most cases. It is just one of those "dances"
+> that developers do, as if to clear the desk or something.
+> 
+> But I guess there must be cases where doing things in another way
+> creates problems or power leaks.
+> 
+> I would surely like to understand, from a silicon perspective, why
+> drivers are so often written like this. I could think of things like
+> little automata and gates inside the silicon that need to be reset
+> to minimize off-power consumption but I have no clue if it is
+> really so.
 
-For clk/mediatek:
-Acked-by: James Liao <jamesjj.liao@mediatek.com>
+At least doing it this way guarantees the hardware is in its initial state
+before the driver starts doing anything with it. Otherwise you would have
+to ensure the hw init sequence in the driver works for any hw state. That
+seems more complicated to me than just making sure it works correctly when
+the hw is in its initial stat, especially when there are DMA engines involved.
 
-
-Best regards,
-
-James
+Peter.
