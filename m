@@ -1,197 +1,85 @@
-From: jintack.lim@linaro.org (Jintack Lim)
-Date: Tue, 18 Jul 2017 22:23:05 -0400
-Subject: [RFC PATCH v2 00/38] Nested Virtualization on KVM/ARM
-In-Reply-To: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
-Message-ID: <CAHyh4xjkT+JNJL0kxmEjz4qU8kD2-ZwYgVB8VgwsSYjpjTc3LA@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 19 Jul 2017 10:05:26 +0800
+Subject: [PATCH v2 2/3] usb: chipidea: Hook into mux framework to toggle
+ usb switch
+In-Reply-To: <150042882207.23422.15172007883605080758@sboyd-linaro>
+References: <20170714214005.14967-1-stephen.boyd@linaro.org>
+ <20170714214005.14967-3-stephen.boyd@linaro.org>
+ <20170718044111.GA13320@b29397-desktop>
+ <150042882207.23422.15172007883605080758@sboyd-linaro>
+Message-ID: <20170719020526.GB26218@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 12:58 PM, Jintack Lim <jintack.lim@linaro.org> wrote:
-> Nested virtualization is the ability to run a virtual machine inside another
-> virtual machine. In other words, it?s about running a hypervisor (the guest
-> hypervisor) on top of another hypervisor (the host hypervisor).
->
-> Supporting nested virtualization on ARM means that the hypervisor provides not
-> only EL0/EL1 execution environment to VMs as it usually does but also the
-> virtualization extensions including EL2 execution environment. Once the host
-> hypervisor provides those execution environments to the VMs, then the guest
-> hypervisor can run its own VMs (nested VMs) naturally.
->
-> This series supports nested virtualization on arm64. ARM recently announced an
-> extension (ARMv8.3) which has support for nested virtualization[1]. This patch
-> set is based on the ARMv8.3 specification and tested on the FastModel with
-> ARMv8.3 extension.
->
-> The whole patch set to support nested virtualization is huge over 70
-> patches, so I categorized them into four parts: CPU, memory, VGIC, and timer
-> virtualization. This patch series is the first part.
->
-> CPU virtualization patch series provides basic nested virtualization framework
-> and instruction emulations including v8.1 VHE feature and v8.3 nested
-> virtualization feature for VMs.
->
-> This patch series again can be divided into four parts. Patch 1 to 5 introduces
-> nested virtualization by discovering hardware feature, adding a kernel
-> parameter and allowing the userspace to set the initial CPU mode to EL2.
->
-> Patch 6 to 25 are to support the EL2 execution environment, the virtual EL2, to
-> a VM on v8.0 architecture. We de-privilege the guest hypervisor and emulate the
-> virtual EL2 mode in EL1 using the hardware features provided by ARMv8.3; The
-> host hypervisor manages virtual EL2 register state for the guest hypervisor
-> and shadow EL1 register state that reflects the virtual EL2 register state to
-> run the guest hypervisor in EL1.
->
-> Patch 26 to 33 add support for the virtual EL2 with Virtualization Host
-> Extensions. These patches emulate newly defined registers and bits in v8.1 and
-> allow the virtual EL2 to access EL2 register states via EL1 register accesses
-> as in the real EL2.
->
-> Patch 34 to 38 are to support for the virtual EL2 with nested virtualization.
-> These enable recursive nested virtualization.
->
-> This patch set is tested on the FastModel with the v8.3 extension for arm64 and
-> a cubietruck for arm32. On the FastModel, the host and the guest kernels are
-> compiled with and without VHE, so there are four combinations. I was able to
-> boot SMP Linux in the nested VM on all four configurations and able to run
-> hackbench. I also checked that regular VMs could boot when the nested
-> virtualization kernel parameter was not set. On the cubietruck, I also verified
-> that regular VMs could boot as well.
->
-> I'll share my experiment setup shortly.
+On Tue, Jul 18, 2017 at 06:47:02PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2017-07-17 21:41:11)
+> > On Fri, Jul 14, 2017 at 02:40:04PM -0700, Stephen Boyd wrote:
+> > >  
+> > > @@ -175,6 +176,10 @@ static int host_start(struct ci_hdrc *ci)
+> > >               if (ci_otg_is_fsm_mode(ci)) {
+> > >                       otg->host = &hcd->self;
+> > >                       hcd->self.otg_port = 1;
+> > > +             } else {
+> > > +                     ret = mux_control_select(ci->platdata->usb_switch, 1);
+> > 
+> > It is better to use MACRO for 1 and 0.
+> > 
+> 
+> Ok.
+> 
+> > > +                     if (ret)
+> > > +                             goto disable_reg;
+> > >               }
+> > >       }
+> > >  
+> > > @@ -195,6 +200,8 @@ static void host_stop(struct ci_hdrc *ci)
+> > >       struct usb_hcd *hcd = ci->hcd;
+> > >  
+> > >       if (hcd) {
+> > > +             if (!ci_otg_is_fsm_mode(ci))
+> > > +                     mux_control_deselect(ci->platdata->usb_switch);
+> > >               if (ci->platdata->notify_event)
+> > >                       ci->platdata->notify_event(ci,
+> > >                               CI_HDRC_CONTROLLER_STOPPED_EVENT);
+> > > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > > index d68b125796f9..deb18099e168 100644
+> > > --- a/drivers/usb/chipidea/udc.c
+> > > +++ b/drivers/usb/chipidea/udc.c
+> > > @@ -22,6 +22,7 @@
+> > >  #include <linux/usb/gadget.h>
+> > >  #include <linux/usb/otg-fsm.h>
+> > >  #include <linux/usb/chipidea.h>
+> > > +#include <linux/mux/consumer.h>
+> > >  
+> > >  #include "ci.h"
+> > >  #include "udc.h"
+> > > @@ -1964,16 +1965,26 @@ void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
+> > >  
+> > >  static int udc_id_switch_for_device(struct ci_hdrc *ci)
+> > >  {
+> > > +     int ret = 0;
+> > > +
+> > >       if (ci->is_otg)
+> > >               /* Clear and enable BSV irq */
+> > >               hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
+> > >                                       OTGSC_BSVIS | OTGSC_BSVIE);
+> > >  
+> > > -     return 0;
+> > > +     if (!ci_otg_is_fsm_mode(ci))
+> > > +             ret = mux_control_select(ci->platdata->usb_switch, 0);
+> > > +
+> > > +     if (ci->is_otg && ret)
+> > > +             hw_write_otgsc(ci, OTGSC_BSVIE | OTGSC_BSVIS, OTGSC_BSVIS);
+> > 
+> > Should use !ret?
+> > 
+> 
+> No? This is intended to unwind the clearing and enabling of the BSV irq
+> on failure (ret is non-zero) and so we clear and disable the BSV irq.
 
-I summarized my experiment setup here.
+I see now, I did not notice we have already enabled BSV above.
 
-https://github.com/columbia/nesting-pub/wiki/Nested-virtualization-on-ARM-setup
+-- 
 
->
-> Even though this work has some limitations and TODOs, I'd appreciate early
-> feedback on this RFC. Specifically, I'm interested in:
->
-> - Overall design to manage vcpu context for the virtual EL2
-> - Verifying correct EL2 register configurations such as HCR_EL2, CPTR_EL2
->   (Patch 30 and 32)
-> - Patch organization and coding style
-
-I also wonder if the hardware and/or KVM do not support nested
-virtualization but the userspace uses nested virtualization option,
-which one is better: giving an error or launching a regular VM
-silently.
-
->
-> This patch series is based on kvm/next d38338e.
-> The whole patch series including memory, VGIC, and timer patches is available
-> here:
->
-> git at github.com:columbia/nesting-pub.git rfc-v2
->
-> Limitations:
-> - There are some cases that the target exception level of a VM is ambiguous when
->   emulating eret instruction. I'm discussing this issue with Christoffer and
->   Marc. Meanwhile, I added a temporary patch (not included in this
->   series. f1beaba in the repo) and used 4.10.0 kernel when testing the guest
->   hypervisor with VHE.
-> - Recursive nested virtualization is not tested yet.
-> - Other hypervisors (such as Xen) on KVM are not tested.
->
-> TODO:
-> - Submit memory, VGIC, and timer patches
-> - Evaluate regular VM performance to see if there's a negative impact.
-> - Test other hypervisors such as Xen on KVM
-> - Test recursive nested virtualization
->
-> v1-->v2:
-> - Added support for the virtual EL2 with VHE
-> - Rewrote commit messages and comments from the perspective of supporting
->   execution environments to VMs, rather than from the perspective of the guest
->   hypervisor running in them.
-> - Fixed a few bugs to make it run on the FastModel.
-> - Tested on ARMv8.3 with four configurations. (host/guest. with/without VHE.)
-> - Rebased to kvm/next
->
-> [1] https://www.community.arm.com/processors/b/blog/posts/armv8-a-architecture-2016-additions
->
-> Christoffer Dall (7):
->   KVM: arm64: Add KVM nesting feature
->   KVM: arm64: Allow userspace to set PSR_MODE_EL2x
->   KVM: arm64: Add vcpu_mode_el2 primitive to support nesting
->   KVM: arm/arm64: Add a framework to prepare virtual EL2 execution
->   arm64: Add missing TCR hw defines
->   KVM: arm64: Create shadow EL1 registers
->   KVM: arm64: Trap EL1 VM register accesses in virtual EL2
->
-> Jintack Lim (31):
->   arm64: Add ARM64_HAS_NESTED_VIRT feature
->   KVM: arm/arm64: Enable nested virtualization via command-line
->   KVM: arm/arm64: Check if nested virtualization is in use
->   KVM: arm64: Add EL2 system registers to vcpu context
->   KVM: arm64: Add EL2 special registers to vcpu context
->   KVM: arm64: Add the shadow context for virtual EL2 execution
->   KVM: arm64: Set vcpu context depending on the guest exception level
->   KVM: arm64: Synchronize EL1 system registers on virtual EL2 entry and
->     exit
->   KVM: arm64: Move exception macros and enums to a common file
->   KVM: arm64: Support to inject exceptions to the virtual EL2
->   KVM: arm64: Trap SPSR_EL1, ELR_EL1 and VBAR_EL1 from virtual EL2
->   KVM: arm64: Trap CPACR_EL1 access in virtual EL2
->   KVM: arm64: Handle eret instruction traps
->   KVM: arm64: Set a handler for the system instruction traps
->   KVM: arm64: Handle PSCI call via smc from the guest
->   KVM: arm64: Inject HVC exceptions to the virtual EL2
->   KVM: arm64: Respect virtual HCR_EL2.TWX setting
->   KVM: arm64: Respect virtual CPTR_EL2.TFP setting
->   KVM: arm64: Add macros to support the virtual EL2 with VHE
->   KVM: arm64: Add EL2 registers defined in ARMv8.1 to vcpu context
->   KVM: arm64: Emulate EL12 register accesses from the virtual EL2
->   KVM: arm64: Support a VM with VHE considering EL0 of the VHE host
->   KVM: arm64: Allow the virtual EL2 to access EL2 states without trap
->   KVM: arm64: Manage the shadow states when virtual E2H bit enabled
->   KVM: arm64: Trap and emulate CPTR_EL2 accesses via CPACR_EL1 from the
->     virtual EL2 with VHE
->   KVM: arm64: Emulate appropriate VM control system registers
->   KVM: arm64: Respect the virtual HCR_EL2.NV bit setting
->   KVM: arm64: Respect the virtual HCR_EL2.NV bit setting for EL12
->     register traps
->   KVM: arm64: Respect virtual HCR_EL2.TVM and TRVM settings
->   KVM: arm64: Respect the virtual HCR_EL2.NV1 bit setting
->   KVM: arm64: Respect the virtual CPTR_EL2.TCPAC setting
->
->  Documentation/admin-guide/kernel-parameters.txt |   4 +
->  arch/arm/include/asm/kvm_emulate.h              |  17 ++
->  arch/arm/include/asm/kvm_host.h                 |  15 +
->  arch/arm64/include/asm/cpucaps.h                |   3 +-
->  arch/arm64/include/asm/esr.h                    |   1 +
->  arch/arm64/include/asm/kvm_arm.h                |   2 +
->  arch/arm64/include/asm/kvm_coproc.h             |   3 +-
->  arch/arm64/include/asm/kvm_emulate.h            |  56 ++++
->  arch/arm64/include/asm/kvm_host.h               |  64 ++++-
->  arch/arm64/include/asm/kvm_hyp.h                |  24 --
->  arch/arm64/include/asm/pgtable-hwdef.h          |   6 +
->  arch/arm64/include/asm/sysreg.h                 |  70 +++++
->  arch/arm64/include/uapi/asm/kvm.h               |   1 +
->  arch/arm64/kernel/asm-offsets.c                 |   1 +
->  arch/arm64/kernel/cpufeature.c                  |  11 +
->  arch/arm64/kvm/Makefile                         |   5 +-
->  arch/arm64/kvm/context.c                        | 346 +++++++++++++++++++++++
->  arch/arm64/kvm/emulate-nested.c                 |  83 ++++++
->  arch/arm64/kvm/guest.c                          |   2 +
->  arch/arm64/kvm/handle_exit.c                    |  89 +++++-
->  arch/arm64/kvm/hyp/entry.S                      |  13 +
->  arch/arm64/kvm/hyp/hyp-entry.S                  |   2 +-
->  arch/arm64/kvm/hyp/switch.c                     |  33 ++-
->  arch/arm64/kvm/hyp/sysreg-sr.c                  | 117 ++++----
->  arch/arm64/kvm/inject_fault.c                   |  12 -
->  arch/arm64/kvm/nested.c                         |  63 +++++
->  arch/arm64/kvm/reset.c                          |   8 +
->  arch/arm64/kvm/sys_regs.c                       | 359 +++++++++++++++++++++++-
->  arch/arm64/kvm/sys_regs.h                       |   8 +
->  arch/arm64/kvm/trace.h                          |  43 ++-
->  virt/kvm/arm/arm.c                              |  20 ++
->  31 files changed, 1363 insertions(+), 118 deletions(-)
->  create mode 100644 arch/arm64/kvm/context.c
->  create mode 100644 arch/arm64/kvm/emulate-nested.c
->  create mode 100644 arch/arm64/kvm/nested.c
->
-> --
-> 1.9.1
->
+Best Regards,
+Peter Chen
