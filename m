@@ -1,46 +1,19 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Jul 2017 09:01:50 +0100
-Subject: [PATCH v2 4/4] arm64: allow non-legacy VGA devices to be default
-In-Reply-To: <20170719021516.24718-5-dja@axtens.net>
-References: <20170719021516.24718-1-dja@axtens.net>
- <20170719021516.24718-5-dja@axtens.net>
-Message-ID: <20170719080150.GB13642@arm.com>
+Date: Wed, 19 Jul 2017 09:03:29 +0100
+Subject: ARM v8.2/SMMU v3.1 support
+In-Reply-To: <CY1PR07MB216880E869712C948DBE8E1AE3A10@CY1PR07MB2168.namprd07.prod.outlook.com>
+References: <CY1PR07MB216880E869712C948DBE8E1AE3A10@CY1PR07MB2168.namprd07.prod.outlook.com>
+Message-ID: <20170719080328.GC13642@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 12:15:16PM +1000, Daniel Axtens wrote:
-> The VGA arbiter only marks a device as default if it can decode
-> legacy I/O and memory ranges. This is often not the case on arm64,
-> which doesn't use the legacy ranges.
+On Tue, Jul 18, 2017 at 12:00:06AM +0000, Kalra, Ashish wrote:
+> Is there any work ongoing for SMMU v3.1 & ARM v8.2 extensions for arm-smmu-v3
+> iommu driver, mainly
 > 
-> Enable the VGA arbiter to mark the first enabled VGA card as
-> default.
-> 
-> Signed-off-by: Daniel Axtens <dja@axtens.net>
+> adding support for 52-bit (ias, oas) addressing on 52-bit PA systems ?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+I think Steve (CC'd) has been looking at extending the io-pgtable code to
+handle 52-bit addressing. Which other v3.1 features are you interested in?
 
 Will
-
-> ---
-> 
-> Tested on a D05 using the hibmc card.
-> ---
->  arch/arm64/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index dfd908630631..cefcbd442e4f 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -28,6 +28,7 @@ config ARM64
->  	select ARCH_SUPPORTS_NUMA_BALANCING
->  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
->  	select ARCH_WANT_FRAME_POINTERS
-> +	select ARCH_WANT_VGA_ARB_FALLBACK
->  	select ARCH_HAS_UBSAN_SANITIZE_ALL
->  	select ARM_AMBA
->  	select ARM_ARCH_TIMER
-> -- 
-> 2.11.0
-> 
