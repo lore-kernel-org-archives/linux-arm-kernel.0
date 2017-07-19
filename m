@@ -1,282 +1,228 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Wed, 19 Jul 2017 21:31:01 +0800
-Subject: [PATCH v7 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170719120847.21183-2-jglauber@cavium.com>
-References: <20170719120847.21183-1-jglauber@cavium.com>
- <20170719120847.21183-2-jglauber@cavium.com>
-Message-ID: <20170719212722.000017e1@huawei.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Wed, 19 Jul 2017 13:49:59 +0000
+Subject: [PATCH v6 3/3] clk: stm32h7: Add stm32h743 clock driver
+In-Reply-To: <f8d47ea1-446a-f714-94ce-a819ed9256a3@mleia.com>
+References: <1500364414-10021-1-git-send-email-gabriel.fernandez@st.com>
+ <1500364414-10021-4-git-send-email-gabriel.fernandez@st.com>
+ <f8d47ea1-446a-f714-94ce-a819ed9256a3@mleia.com>
+Message-ID: <e704140b-8e89-9dd5-e563-6c82ba8acf23@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Jul 2017 14:08:45 +0200
-Jan Glauber <jglauber@cavium.com> wrote:
+Hi Vladimi,
 
-> Add support for the PMU counters on Cavium SOC memory controllers.
-> 
-> This patch also adds generic functions to allow supporting more
-> devices with PMU counters.
-> 
-> Properties of the LMC PMU counters:
-> - not stoppable
-> - fixed purpose
-> - read-only
-> - one PCI device per memory controller
-> 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-Hi Jan,
+Many thanks for the code review
 
-A few little things I noticed whilst taking a quick look.
+On 07/18/2017 10:19 PM, Vladimir Zapolskiy wrote:
+> Hello Gabriel,
+>
+> On 07/18/2017 10:53 AM, gabriel.fernandez at st.com wrote:
+>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>
+>> This patch enables clocks for STM32H743 boards.
+>>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>
+>> for MFD changes:
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> for DT-Bindings
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>>   .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |   81 ++
+>>   drivers/clk/Makefile                               |    1 +
+>>   drivers/clk/clk-stm32h7.c                          | 1522 ++++++++++++++++++++
+>>   include/dt-bindings/clock/stm32h7-clks.h           |  165 +++
+>>   include/dt-bindings/mfd/stm32h7-rcc.h              |  136 ++
+>>   5 files changed, 1905 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>>   create mode 100644 drivers/clk/clk-stm32h7.c
+>>   create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
+>>   create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>> new file mode 100644
+>> index 0000000..e41e4ac
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>> @@ -0,0 +1,81 @@
+>> +STMicroelectronics STM32H7 Reset and Clock Controller
+>> +=====================================================
+>> +
+>> +The RCC IP is both a reset and a clock controller.
+>> +
+>> +Please refer to clock-bindings.txt for common clock controller binding usage.
+>> +Please also refer to reset.txt for common reset controller binding usage.
+>> +
+>> +Required properties:
+>> +- compatible: Should be:
+>> +  "st,stm32h743-rcc"
+>> +
+>> +- reg: should be register base and length as documented in the
+>> +  datasheet
+>> +
+>> +- #reset-cells: 1, see below
+>> +
+>> +- #clock-cells : from common clock binding; shall be set to 1
+>> +
+>> +- clocks: External oscillator clock phandle
+>> +  - high speed external clock signal (HSE)
+>> +  - low speed external clock signal (LSE)
+>> +  - external I2S clock (I2S_CKIN)
+>> +
+>> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
+>> +  write protection (RTC clock).
+>> +
+> please make a clear decision if "st,syscfg" property is mandatory or not.
+>  From the driver code this property is optional, and the clock driver
+> is expected to work properly, if the property is omitted. Do I miss
+> anything?
+You right, in the driver code it's optional.
+I will change it in dt binding documentation.
 
-Jonathan
-> ---
->  drivers/perf/Kconfig       |   8 +
->  drivers/perf/Makefile      |   1 +
->  drivers/perf/cavium_pmu.c  | 416 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/cpuhotplug.h |   1 +
->  4 files changed, 426 insertions(+)
->  create mode 100644 drivers/perf/cavium_pmu.c
-<snip>
-> +
-> +/*
-> + * The pmu events are independent from CPUs. Provide a cpumask
-> + * nevertheless to prevent perf from adding the event per-cpu and just
-> + * set the mask to one online CPU. Use the same cpumask for all "uncore"
-> + * devices.
-> + *
-> + * There is a performance penalty for accessing a device from a CPU on
-> + * another socket, but we do not care.
-> + */
-> +static int cvm_pmu_offline_cpu(unsigned int old_cpu, struct hlist_node *node)
-> +{
-> +	struct cvm_pmu_dev *pmu_dev;
-> +	int new_cpu;
-> +
-> +	pmu_dev = hlist_entry_safe(node, struct cvm_pmu_dev, cpuhp_node);
-> +	if (!cpumask_test_and_clear_cpu(old_cpu, &pmu_dev->active_mask))
-> +		return 0;
-> +
-> +	new_cpu = cpumask_any_but(cpu_online_mask, old_cpu);
-> +	if (new_cpu >= nr_cpu_ids)
-> +		return 0;
-Blank line.
-> +	perf_pmu_migrate_context(&pmu_dev->pmu, old_cpu, new_cpu);
-> +	cpumask_set_cpu(new_cpu, &pmu_dev->active_mask);
-nitpick : blank line here would help readability.
-> +	return 0;
-> +}
-> +
-> +static ssize_t cvm_pmu_attr_show_cpumask(struct device *dev,
-> +					 struct device_attribute *attr,
-> +					 char *buf)
-> +{
-> +	struct pmu *pmu = dev_get_drvdata(dev);
-> +	struct cvm_pmu_dev *pmu_dev = container_of(pmu, struct cvm_pmu_dev, pmu);
-> +
-> +	return cpumap_print_to_pagebuf(true, buf, &pmu_dev->active_mask);
-> +}
-> +
-> +static DEVICE_ATTR(cpumask, S_IRUGO, cvm_pmu_attr_show_cpumask, NULL);
-> +
-> +static struct attribute *cvm_pmu_attrs[] = {
-> +	&dev_attr_cpumask.attr,
-> +	NULL,
-> +};
-> +
-> +static struct attribute_group cvm_pmu_attr_group = {
-> +	.attrs = cvm_pmu_attrs,
-> +};
-> +
-> +/*
-> + * LMC (memory controller) counters:
-> + * - not stoppable, always on, read-only
-> + * - one PCI device per memory controller
-> + */
-> +#define LMC_CONFIG_OFFSET		0x188
-> +#define LMC_CONFIG_RESET_BIT		BIT(17)
-> +
-> +/* LMC events */
-> +#define LMC_EVENT_IFB_CNT		0x1d0
-> +#define LMC_EVENT_OPS_CNT		0x1d8
-> +#define LMC_EVENT_DCLK_CNT		0x1e0
-> +#define LMC_EVENT_BANK_CONFLICT1	0x360
-> +#define LMC_EVENT_BANK_CONFLICT2	0x368
-> +
-> +#define CVM_PMU_LMC_EVENT_ATTR(_name, _id)						\
-> +	&((struct perf_pmu_events_attr[]) {						\
-> +		{									\
-> +			__ATTR(_name, S_IRUGO, cvm_pmu_event_sysfs_show, NULL),		\
-> +			_id,								\
-> +			"lmc_event=" __stringify(_id),					\
-> +		}									\
-> +	})[0].attr.attr
-> +
-> +/* map counter numbers to register offsets */
-> +static int lmc_events[] = {
-> +	LMC_EVENT_IFB_CNT,
-> +	LMC_EVENT_OPS_CNT,
-> +	LMC_EVENT_DCLK_CNT,
-> +	LMC_EVENT_BANK_CONFLICT1,
-> +	LMC_EVENT_BANK_CONFLICT2,
-> +};
-> +
-> +static int cvm_pmu_lmc_add(struct perf_event *event, int flags)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +
-> +	return cvm_pmu_add(event, flags, LMC_CONFIG_OFFSET,
-> +			   lmc_events[hwc->config]);
-> +}
-> +
-> +PMU_FORMAT_ATTR(lmc_event, "config:0-2");
-> +
-> +static struct attribute *cvm_pmu_lmc_format_attr[] = {
-> +	&format_attr_lmc_event.attr,
-> +	NULL,
-> +};
-> +
-> +static struct attribute_group cvm_pmu_lmc_format_group = {
-> +	.name = "format",
-> +	.attrs = cvm_pmu_lmc_format_attr,
-> +};
-> +
-> +static struct attribute *cvm_pmu_lmc_events_attr[] = {
-> +	CVM_PMU_LMC_EVENT_ATTR(ifb_cnt,		0),
-> +	CVM_PMU_LMC_EVENT_ATTR(ops_cnt,		1),
-> +	CVM_PMU_LMC_EVENT_ATTR(dclk_cnt,	2),
-> +	CVM_PMU_LMC_EVENT_ATTR(bank_conflict1,	3),
-> +	CVM_PMU_LMC_EVENT_ATTR(bank_conflict2,	4),
-> +	NULL,
-> +};
-> +
-> +static struct attribute_group cvm_pmu_lmc_events_group = {
-> +	.name = "events",
-> +	.attrs = cvm_pmu_lmc_events_attr,
-> +};
-> +
-> +static const struct attribute_group *cvm_pmu_lmc_attr_groups[] = {
-> +	&cvm_pmu_attr_group,
-> +	&cvm_pmu_lmc_format_group,
-> +	&cvm_pmu_lmc_events_group,
-> +	NULL,
-> +};
-> +
-> +static bool cvm_pmu_lmc_event_valid(u64 config)
-> +{
-> +	return (config < ARRAY_SIZE(lmc_events));
-> +}
-> +
-> +static int cvm_pmu_lmc_probe(struct pci_dev *pdev)
-> +{
-> +	struct cvm_pmu_dev *next, *lmc;
-> +	int nr = 0, ret = -ENOMEM;
-> +
-> +	lmc = kzalloc(sizeof(*lmc), GFP_KERNEL);
-> +	if (!lmc)
-> +		goto fail_nomem;
-cleaner to do a direct return here as nothing to unwind.
-return -ENOMEM;
-> +
-> +	lmc->map = ioremap(pci_resource_start(pdev, 0),
-> +			   pci_resource_len(pdev, 0));
-Might be overly paranoid, but ioremap can return NULL,
-so should really be checked.
+>
+>> diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
+>> new file mode 100644
+>> index 0000000..2608c40
+>> --- /dev/null
+>> +++ b/drivers/clk/clk-stm32h7.c
+> [snip]
+>
+>> +static const char * const ltdc_src[] = {"pll3_r"};
+>> +
+>> +/* Power domain helper */
+>> +static inline void disable_power_domain_write_protection(void)
+>> +{
+>> +	if (pdrm)
+>> +		regmap_update_bits(pdrm, 0x00, (1 << 8), (1 << 8));
+>> +}
+>> +
+>> +static inline void enable_power_domain_write_protection(void)
+>> +{
+>> +	if (pdrm)
+>> +		regmap_update_bits(pdrm, 0x00, (1 << 8), (0 << 8));
+> (0 << 8) is zero.
+ok
 
-> +	list_for_each_entry(next, &cvm_pmu_lmcs, entry)
-> +		nr++;
-> +	lmc->pmu_name = kasprintf(GFP_KERNEL, "lmc%d", nr);
-Check for error on the allocation.
-> +
-> +	lmc->pdev = pdev;
-> +	lmc->num_counters = ARRAY_SIZE(lmc_events);
-> +	lmc->pmu = (struct pmu) {
-> +		.task_ctx_nr    = perf_invalid_context,
-> +		.event_init	= cvm_pmu_event_init,
-> +		.add		= cvm_pmu_lmc_add,
-> +		.del		= cvm_pmu_del,
-> +		.start		= cvm_pmu_start,
-> +		.stop		= cvm_pmu_stop,
-> +		.read		= cvm_pmu_read,
-> +		.attr_groups	= cvm_pmu_lmc_attr_groups,
-> +	};
-> +
-> +	cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> +					 &lmc->cpuhp_node);
-This function can fail by the look of it.  Should be checking it's
-return value really.
+>
+>> +}
+> IMHO a version below is better:
+>
+> static inline void enable_power_domain_write_protection(bool enable)
+> {
+> 	if (pdrm)
+> 		regmap_update_bits(pdrm, 0x00, BIT(8), enable ? 0x0: BIT(8));
+> }
+>
+>> +
+>> +static inline bool is_enable_power_domain_write_protection(void)
+> is_enabled_...
+ok
 
-> +
-> +	/*
-> +	 * perf PMU is CPU dependent so pick a random CPU and migrate away
-> +	 * if it goes offline.
-> +	 */
-> +	cpumask_set_cpu(smp_processor_id(), &lmc->active_mask);
-> +
-> +	ret = perf_pmu_register(&lmc->pmu, lmc->pmu_name, -1);
-> +	if (ret)
-> +		goto fail_hp;
-> +
-> +	list_add(&lmc->entry, &cvm_pmu_lmcs);
-> +
-> +	lmc->event_valid = cvm_pmu_lmc_event_valid;
-These last two elements rather look like they might cause a
-potential race as the perf_pmu_register has made the counters
-available.
-> +	dev_info(&pdev->dev, "Enabled %s PMU with %d counters\n",
-> +		 lmc->pmu_name, lmc->num_counters);
-> +	return 0;
-> +
-> +fail_hp:
-> +	kfree(lmc->pmu_name);
-Convention is to unwind in the opposite order to the way things
-were created / set up.  Becomes more relevant once you are
-checking more error codes.
-> +	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> +				    &lmc->cpuhp_node);
-> +	iounmap(lmc->map);
-> +	kfree(lmc);
-> +fail_nomem:
-> +	return ret;
-> +}
-> +
-> +static int __init cvm_pmu_init(void)
-> +{
-> +	unsigned long implementor = read_cpuid_implementor();
-> +	unsigned int vendor_id = PCI_VENDOR_ID_CAVIUM;
-> +	struct pci_dev *pdev = NULL;
-> +	int rc;
-> +
-> +	if (implementor != ARM_CPU_IMP_CAVIUM)
-> +		return -ENODEV;
-> +
-> +	INIT_LIST_HEAD(&cvm_pmu_lmcs);
-> +
-> +	rc = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> +				     "perf/arm/cvm:online", NULL,
-> +				     cvm_pmu_offline_cpu);
-> +
-> +	/* detect LMC devices */
-> +	while ((pdev = pci_get_device(vendor_id, 0xa022, pdev))) {
-> +		if (!pdev)
-> +			break;
-> +		rc = cvm_pmu_lmc_probe(pdev);
-> +		if (rc)
-> +			return rc;
-> +	}
-> +	return 0;
-> +}
-A comment perhaps explaining why this is a late_initcall?  What
-dependency are we forcing to be true?
-> +late_initcall(cvm_pmu_init);
-> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-> index b56573b..78ac3d2 100644
-> --- a/include/linux/cpuhotplug.h
-> +++ b/include/linux/cpuhotplug.h
-> @@ -141,6 +141,7 @@ enum cpuhp_state {
->  	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
->  	CPUHP_AP_WORKQUEUE_ONLINE,
->  	CPUHP_AP_RCUTREE_ONLINE,
-> +	CPUHP_AP_PERF_ARM_CVM_ONLINE,
->  	CPUHP_AP_ONLINE_DYN,
->  	CPUHP_AP_ONLINE_DYN_END		= CPUHP_AP_ONLINE_DYN + 30,
->  	CPUHP_AP_X86_HPET_ONLINE,
+>> +{
+>> +	if (pdrm) {
+>> +		u32 val;
+>> +
+>> +		regmap_read(pdrm, 0x00, &val);
+>> +
+>> +		return !(val & 0x100);
+>> +	}
+>> +	return 0;
+>> +}
+> Please replace (1 << 8) and 0x100 all above with a macro or@least
+> BIT(8).
+ok
+
+>> +
+>> +/* Gate clock with ready bit and backup domain management */
+>> +struct stm32_ready_gate {
+>> +	struct	clk_gate gate;
+>> +	u8	bit_rdy;
+>> +	u8	backup_domain;
+>> +};
+>> +
+>> +#define to_ready_gate_clk(_rgate) container_of(_rgate, struct stm32_ready_gate,\
+>> +		gate)
+>> +
+>> +#define RGATE_TIMEOUT 10000
+>> +
+>> +static int ready_gate_clk_enable(struct clk_hw *hw)
+>> +{
+>> +	struct clk_gate *gate = to_clk_gate(hw);
+>> +	struct stm32_ready_gate *rgate = to_ready_gate_clk(gate);
+>> +	int dbp_status;
+>> +	int bit_status;
+>> +	unsigned int timeout = RGATE_TIMEOUT;
+>> +
+>> +	if (clk_gate_ops.is_enabled(hw))
+>> +		return 0;
+>> +
+>> +	dbp_status = is_enable_power_domain_write_protection();
+>> +
+>> +	if (rgate->backup_domain && dbp_status)
+>> +		disable_power_domain_write_protection();
+>> +
+>> +	clk_gate_ops.enable(hw);
+>> +
+>> +	/* We can't use readl_poll_timeout() because we can blocked if
+>> +	 * someone enables this clock before clocksource changes.
+>> +	 * Only jiffies counter is available. Jiffies are incremented by
+>> +	 * interruptions and enable op does not allow to be interrupted.
+>> +	 */
+>> +	do {
+>> +		bit_status = !(readl(gate->reg) & BIT(rgate->bit_rdy));
+>> +
+>> +		if (bit_status)
+>> +			udelay(100);
+>> +
+>> +	} while (bit_status && --timeout);
+>> +
+>> +	if (rgate->backup_domain && dbp_status)
+>> +		enable_power_domain_write_protection();
+>> +
+>> +	return bit_status;
+>> +}
+> I'm not convinced that the repetitive lockless pattern
+>
+> 	dbp_status = is_enable_power_domain_write_protection();
+> 	if (dbp_status)
+> 		disable_power_domain_write_protection();
+>
+> 	do_something();
+>
+> 	if (dbp_status)
+> 		enable_power_domain_write_protection();
+>
+> is correct in a concurrent environment.
+>
+> You still have a risk of running do_something() *after* a call of
+> enable_power_domain_write_protection().
+
+Humm, after long discussion with the hardware ip owner, he recommended
+to disable power domain write protection only one time at the init
+(don't disable/enable dynamically).
+
+Then i can suppress this code
+
+	dbp_status = is_enable_power_domain_write_protection();
+	if (dbp_status)
+		disable_power_domain_write_protection()
+...
+
+	if (dbp_status)
+		enable_power_domain_write_protection();
+
+
+Best regards
+
+Gabriel
+
+> The best option for you is either to switch to ordinary power domains
+> and use their API or to move the driver to use regmaps, and at least
+> in the latter case you don't need to wrap your code by CCF code (!),
+> and as a result you don't need to export truly internal to CCF function
+> clk_gate_is_enabled().
+>
+> --
+> With best wishes,
+> Vladimir
