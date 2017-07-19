@@ -1,99 +1,189 @@
-From: jglauber@cavium.com (Jan Glauber)
-Date: Wed, 19 Jul 2017 14:08:47 +0200
-Subject: [PATCH v7 3/3] perf: cavium: Add Documentation
-In-Reply-To: <20170719120847.21183-1-jglauber@cavium.com>
-References: <20170719120847.21183-1-jglauber@cavium.com>
-Message-ID: <20170719120847.21183-4-jglauber@cavium.com>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Wed, 19 Jul 2017 17:43:32 +0530
+Subject: [RFT PATCH v2 02/42] drivers: pci: host: iproc: Convert link
+ check to raw PCI config accessors
+In-Reply-To: <CAMSpPPe1fw7fuQMz969ZoRnuNYkaaDqdNnYugA=AvSUvufiKzQ@mail.gmail.com>
+References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+ <20170608141342.2018-3-lorenzo.pieralisi@arm.com>
+ <0eb77019-9945-592c-375d-e2de742b3237@broadcom.com>
+ <20170608163614.GB2216@red-moon>
+ <CAMSpPPe6bXfu=ntMedrt0w4UfqJLy1a9ZBu_kXy1j4B63x1Nww@mail.gmail.com>
+ <20170612161358.GA32043@red-moon>
+ <CAMSpPPc0uwV0JZYkegrCaemuoJ-wfWwkSXd7TMtFwENoLRXdBQ@mail.gmail.com>
+ <403daa9b-c0f6-971d-9312-ef103460d738@broadcom.com>
+ <CAMSpPPdDLjRURZowWAzSvagmmhmojwYFYoHVu3xYcH6i-guviQ@mail.gmail.com>
+ <3d90daa1-7090-337a-b5c1-967b7eaeb2d9@broadcom.com>
+ <20170614133938.GA30630@red-moon>
+ <CAMSpPPe1fw7fuQMz969ZoRnuNYkaaDqdNnYugA=AvSUvufiKzQ@mail.gmail.com>
+Message-ID: <CAMSpPPdzmQBOvhz2Cx+TnnNoX-N-0cr92O07GTzWwp1TKidPcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document Cavium SoC PMUs.
+On Wed, Jun 21, 2017 at 8:09 PM, Oza Oza <oza.oza@broadcom.com> wrote:
+> On Wed, Jun 14, 2017 at 7:09 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+>> On Tue, Jun 13, 2017 at 10:18:14AM -0700, Ray Jui wrote:
+>>> Hi Oza/Lorenzo,
+>>>
+>>> On 6/13/17 1:22 AM, Oza Oza wrote:
+>>> > On Tue, Jun 13, 2017 at 12:22 AM, Ray Jui <ray.jui@broadcom.com> wrote:
+>>> >>
+>>> >>
+>>> >> On 6/12/17 10:40 AM, Oza Oza wrote:
+>>> >>> On Mon, Jun 12, 2017 at 9:43 PM, Lorenzo Pieralisi
+>>> >>> <lorenzo.pieralisi@arm.com> wrote:
+>>> >>>> On Sun, Jun 11, 2017 at 09:42:34AM +0530, Oza Oza wrote:
+>>> >>>>> On Thu, Jun 8, 2017 at 10:06 PM, Lorenzo Pieralisi
+>>> >>>>> <lorenzo.pieralisi@arm.com> wrote:
+>>> >>>>>> [dropped rock-chips maintainers, email bounces]
+>>> >>>>>>
+>>> >>>>>> On Thu, Jun 08, 2017 at 08:56:05AM -0700, Ray Jui wrote:
+>>> >>>>>>> Hi Lorenzo,
+>>> >>>>>>>
+>>> >>>>>>> Thanks, I'll try my best to find time to test this along 15/42 and
+>>> >>>>>>> 33/42 patches. Hopefully I can get to that some time next week.
+>>> >>>>>>>
+>>> >>>>>>> I have not yet reviewed these patches in details. Do they have
+>>> >>>>>>> dependency on other patches to the generic framework code you
+>>> >>>>>>> changed?
+>>> >>>>>>>
+>>> >>>>>>> If so, is there a repo I can pull them?
+>>> >>>>>>
+>>> >>>>>> I added it in the cover letter but anyway here it is:
+>>> >>>>>>
+>>> >>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/pci-fixup-irqs-removal-v2
+>>> >>>>>
+>>> >>>>> Hi Lorenzo,
+>>> >>>>>
+>>> >>>>> I picked up your changes, and tested on iproc based SOC,
+>>> >>>>> and ran basic fio data transfer.. and it looks okay.
+>>> >>>>
+>>> >>>> Thank you. If you could also check it is all OK from a legacy
+>>> >>>> IRQ allocation (ie same as before applying series) I'd be grateful.
+>>> >>>>
+>>> >>>
+>>> >>> I disabled msi and it should default to legacy IRQ, looks like there
+>>> >>> is a problem, if I missed any change !
+>>> >>>
+>>> >>> before applying series:  cat /proc/interrupts
+>>> >>> 377:        168          0          0          0          0          0
+>>> >>>          0          0     dummy   1 Edge      nvme0q0, nvme0q1
+>>> >>>
+>>> >>> after applying series:
+>>> >>> root at bcm958742k:~# dmesg | grep nvme
+>>> >>> [    3.855466] nvme 0000:01:00.0: assign irq: got 0
+>>> >>> [    3.855469] nvme 0000:01:00.0: assigning IRQ 00
+>>> >>> [    3.855515] nvme nvme0: pci function 0000:01:00.0
+>>> >>> [    4.270850] nvme 0000:01:00.0: enabling device (0000 -> 0002)
+>>> >>> [    4.276787] nvme 0000:01:00.0: enabling bus mastering
+>>> >>> [    4.276817] nvme nvme0: Removing after probe failure status: -22
+>>> >>>
+>>> >>> here is my git status of your series, let me know if I am missing any
+>>> >>> change with respect to legacy IRQ ?
+>>> >>>
+>>> >>>  modified:   arch/arm/include/asm/mach/pci.h
+>>> >>>         modified:   arch/arm/kernel/bios32.c
+>>> >>>         modified:   arch/arm/mach-dove/pcie.c
+>>> >>>         modified:   arch/arm/mach-iop13xx/pci.c
+>>> >>>         modified:   arch/arm/mach-iop13xx/pci.h
+>>> >>>         modified:   arch/arm/mach-mv78xx0/pcie.c
+>>> >>>         modified:   arch/arm/mach-orion5x/common.h
+>>> >>>         modified:   arch/arm/mach-orion5x/pci.c
+>>> >>>         modified:   arch/arm64/kernel/pci.c
+>>> >>>         modified:   drivers/of/of_pci_irq.c
+>>> >>>         modified:   drivers/pci/Makefile
+>>> >>>         modified:   drivers/pci/host/pci-aardvark.c
+>>> >>>         modified:   drivers/pci/host/pci-ftpci100.c
+>>> >>>         modified:   drivers/pci/host/pci-host-common.c
+>>> >>>         modified:   drivers/pci/host/pci-tegra.c
+>>> >>>         modified:   drivers/pci/host/pci-versatile.c
+>>> >>>         modified:   drivers/pci/host/pci-xgene.c
+>>> >>>         modified:   drivers/pci/host/pcie-altera.c
+>>> >>>         modified:   drivers/pci/host/pcie-iproc-bcma.c
+>>> >>>         modified:   drivers/pci/host/pcie-iproc-platform.c
+>>> >>>         modified:   drivers/pci/host/pcie-iproc.c
+>>> >>>         modified:   drivers/pci/host/pcie-iproc.h
+>>> >>>         modified:   drivers/pci/host/pcie-rcar.c
+>>> >>>         modified:   drivers/pci/host/pcie-rockchip.c
+>>> >>>         modified:   drivers/pci/host/pcie-xilinx-nwl.c
+>>> >>>         modified:   drivers/pci/host/pcie-xilinx.c
+>>> >>>         modified:   drivers/pci/pci-driver.c
+>>> >>>         modified:   drivers/pci/probe.c
+>>> >>>         modified:   drivers/pci/setup-irq.c
+>>> >>>         modified:   include/linux/pci.h
+>>> >>>
+>>> >>
+>>> >> Did you test with or without my change in bcm/master to emulate legacy
+>>> >> interrupt through dummy IRQ domain?
+>>> >>
+>>> >> Thanks,
+>>> >>
+>>> >> Ray
+>>> >>
+>>> >>
+>>> >
+>>> > Hi Ray,
+>>> > yes irqdomain was missing, and with that legacy IRQ are fine now.
+>>> > please mainline those changes.
+>>> >
+>>> > Hi Lorenzo,
+>>> >
+>>> > Legacy IRQ is working fine as well wiht your patches.
+>>> >
+>>> > cat /proc/interrupts
+>>> > 122:        160          0          0          0          0          0
+>>> >          0          0     dummy   1 Edge      nvme0q0, nvme0q1
+>>> >
+>>> > NVMe data transfer is also fine.
+>>> >
+>>> > Regards,
+>>> > Oza.
+>>> >
+>>>
+>>> Okay, so I take this as Lorenzo's changes on iProc PCIe driver have been
+>>> sanity tested for link detection and legacy interrupt support. No
+>>> regression is seen. Thanks, Oza.
+>>
+>> Yes, that's how I take it too, I did not understand what was triggering
+>> the first regression reported - my series should work on top of mainline
+>> if the current code works and should not depend on any other patch
+>> being merged - please make sure that's the case to prevent unwanted
+>> regressions in case other patches do not make it into the mainline.
+>>
+>> Thank you very much for your help in testing it.
+>
+>
+> Hi Lorenzo,
+>
+> I have ported and tested my inbound memory patches on top of your
+> patches and that work fine as well.
+> This is mainly to do with IOVA reservations.
+>
+> Regards,
+> Oza.
+>
+>>
+>> Lorenzo
+>>
+>>>
+>>> I'll send out the INTx irqdomain support patch when I have time.
+>>>
+>>> Ray
+>>>
+>>>
+>>>
+>>>
 
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
----
- Documentation/perf/cavium-pmu.txt | 74 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
- create mode 100644 Documentation/perf/cavium-pmu.txt
+Hi Bjorn,
 
-diff --git a/Documentation/perf/cavium-pmu.txt b/Documentation/perf/cavium-pmu.txt
-new file mode 100644
-index 0000000..37669b9
---- /dev/null
-+++ b/Documentation/perf/cavium-pmu.txt
-@@ -0,0 +1,74 @@
-+Cavium ThunderX and OcteonTx Performance Monitoring Unit (PMU)
-+==============================================================
-+
-+Cavium SoCs contain various system devices such as L2 caches, processor
-+interconnect and memory controllers. Unfortunately the PMU counters
-+are not following a common design so each device has a slightly different
-+approach how to control and use the PMU counters.
-+
-+Common properties of all devices carrying PMU counters:
-+- The devices are PCI devices and the counters are embedded somewhere
-+  in the PCI register space.
-+- All counters are 64 bit wide.
-+- There are no overflow interrupts (unnecessary because of the 64 bit wide counters).
-+
-+Properties depending on the device type:
-+- How to start/stop the counters
-+- Programmable vs. fixed purpose counters
-+- Stoppable vs. always running counters
-+- Independent vs. grouped counters
-+- Read-only vs. writable counters
-+- PCI device to PMU group relationship
-+
-+
-+Devices with PMU counters
-+-------------------------
-+
-+Memory controller (LMC):
-+- one PCI device per LMC
-+- fixed-purpose counters
-+- always running counters without start/stop/reset control
-+- read-only counters
-+
-+CCPI interface controller (OCX) Transmit link (TLK) counters:
-+- writable counters
-+- only one PCI device exposes multiple TLK units (3 units on T88)
-+- start/stop control per unit
-+- only present on multi-socket systems
-+
-+PMU (perf) driver
-+-----------------
-+
-+The cavium-pmu driver registers several perf PMU drivers. Each of the perf
-+driver provides description of its available events and configuration options
-+in sysfs, see /sys/devices/<lmcX/ocx_tlkX>/.
-+
-+The "format" directory describes format of the config (event ID),
-+The "events" directory shows the names of the events and provides configuration
-+templates for all supported event types that can be used with perf tool. For
-+example, "lmc0/dclk_cnt/" is an equivalent of "lmc0/config=2/".
-+
-+Each perf driver also provides a "cpumask" sysfs attribute, which contains a
-+single CPU ID of the processor which will be used to handle all the PMU events.
-+
-+Example for perf tool use:
-+
-+ / # perf list | grep -e lmc
-+   lmc0/bank_conflict1/                               [Kernel PMU event]
-+   lmc0/bank_conflict2/                               [Kernel PMU event]
-+   lmc0/dclk_cnt/                                     [Kernel PMU event]
-+   lmc0/ifb_cnt/                                      [Kernel PMU event]
-+   lmc0/ops_cnt/                                      [Kernel PMU event]
-+
-+ / # perf stat -a -e lmc0/ops_cnt/,lmc0/dclk_cnt/ -- sleep 1
-+
-+   Performance counter stats for 'system wide':
-+
-+             176,133      lmc0/ops_cnt/                                               
-+         670,243,653      lmc0/dclk_cnt/                                              
-+
-+         1.005479295 seconds time elapsed
-+
-+The driver does not support sampling, therefore "perf record" will
-+not work. System wide mode ("-a") must be used as per-task (without "-a")
-+perf sessions are not supported.
--- 
-2.9.0.rc0.21.g7777322
+I have made v8 for inbound memory patches as you suggested, on top of
+Lorenzo's patches.
+but I can not post them since Lorenzo's patches have not made in.
+
+Also gentle reminder to review following series
+[PATCH v5 1/2] PCI: iproc: Retry request when CRS returned from EP
+
+because that also conflict with Lorenzo's changes.
+
+Regards,
+Oza.
