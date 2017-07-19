@@ -1,35 +1,51 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 20 Jul 2017 00:10:14 +0800
-Subject: [PATCH 0/5] AXP803 regulator support for Pine64 and SoPine
-Message-ID: <20170719161019.62133-1-icenowy@aosc.io>
+Date: Thu, 20 Jul 2017 00:10:16 +0800
+Subject: [PATCH 2/5] arm: allwinner: a64: drop the dummy vcc3v3 regulator in
+ Pine64 DT
+In-Reply-To: <20170719161019.62133-1-icenowy@aosc.io>
+References: <20170719161019.62133-1-icenowy@aosc.io>
+Message-ID: <20170719161019.62133-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine64 and SoPine w/ baseboard boards have an AXP803 PMIC, and the
-regulators of the PMIC are used.
+The Pine64 DT used to contain a dummy vcc3v3 regulator, in order to
+satisfy some device nodes when proper AXP803 regulator support is
+available. It's in fact the DCDC1 regulator of AXP803.
 
-This patchset adds the regulators to the device tree of these two boards.
+Drop the dummy regulator, and fix the reference of this regulator to
+DCDC1.
 
-The first patch introduces proper AXP803 regulators to Pine64 DT, and the
-second patch removed dummy regulators in the Pine64 DT.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-The third patch enables AXP803 PMIC for SoPine.
-
-The fourth patch and fifth patch are like the first and the second, but
-they're for SoPine w/ baseboard.
-
-Icenowy Zheng (5):
-  arm64: allwinner: a64: enable AXP803 regulators for Pine64
-  arm: allwinner: a64: drop the dummy vcc3v3 regulator in Pine64 DT
-  arm64: allwinner: a64: add AXP803 PMIC to SoPine DTSI
-  arm64: allwinner: a64: add AXP803 regulators support for SoPine
-  arm: allwinner: a64: drop vcc3v3 and vcc1v8 dummy regulators for
-    SoPine
-
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 105 +++++++++++++++++++--
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |  34 +++++--
- .../boot/dts/allwinner/sun50i-a64-sopine.dtsi      |  91 ++++++++++++++++--
- 3 files changed, 203 insertions(+), 27 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index ac31c9477b25..68a47d9b07d9 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -61,13 +61,6 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
+-
+-	reg_vcc3v3: vcc3v3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vcc3v3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-	};
+ };
+ 
+ &ehci0 {
+@@ -108,7 +101,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+ 	cd-inverted;
+ 	disable-wp;
 -- 
 2.13.0
