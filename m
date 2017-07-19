@@ -1,303 +1,133 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Jul 2017 17:01:28 +0100
-Subject: [PATCH 07/11] arm64: add basic pointer authentication support
+Date: Wed, 19 Jul 2017 17:01:30 +0100
+Subject: [PATCH 09/11] arm64/kvm: preserve host HCR_EL2 value
 In-Reply-To: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
 References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1500480092-28480-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1500480092-28480-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic support for pointer authentication, allowing
-userspace to make use of APIAKey. The kernel maintains an APIAKey value
-for each process (shared by all threads within), which is initialised to
-a random value at exec() time.
+When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
+is a constant value. This works today, as the host HCR_EL2 value is
+always the same, but this will get in the way of supporting extensions
+that require HCR_EL2 bits to be set conditionally for the host.
 
-Instructions using other keys (APIBKey, APDAKey, APDBKey) are disabled,
-and will behave as NOPs. These may be made use of in future patches.
+To allow such features to work without KVM having to explicitly handle
+every possible host feature combination, this patch has KVM save/restore
+the host HCR when switching to/from a guest HCR.
 
-No support is added for the generic key (APGAKey), though this cannot be
-trapped or made to behave as a NOP. Its presence is not advertised with
-a hwcap.
+For __{activate,deactivate}_traps(), the HCR save/restore is made common
+across the !VHE and VHE paths. As the host and guest HCR values must
+have E2H set when VHE is in use, register redirection should always be
+in effect at EL2, and this change should not adversely affect the VHE
+code.
+
+For the hyp TLB maintenance code, __tlb_switch_to_host_vhe() is updated
+to toggle the TGE bit with a RMW sequence, as we already do in
+__tlb_switch_to_guest_vhe().
+
+The now unused HCR_HOST_VHE_FLAGS definition is removed.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
 ---
- arch/arm64/Kconfig                    | 23 +++++++++
- arch/arm64/include/asm/mmu.h          |  5 ++
- arch/arm64/include/asm/mmu_context.h  | 25 +++++++++-
- arch/arm64/include/asm/pointer_auth.h | 89 +++++++++++++++++++++++++++++++++++
- arch/arm64/include/uapi/asm/hwcap.h   |  1 +
- arch/arm64/kernel/cpufeature.c        | 11 +++++
- arch/arm64/kernel/cpuinfo.c           |  1 +
- 7 files changed, 153 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/pointer_auth.h
+ arch/arm64/include/asm/kvm_arm.h  | 1 -
+ arch/arm64/include/asm/kvm_host.h | 5 ++++-
+ arch/arm64/kvm/hyp/switch.c       | 5 +++--
+ arch/arm64/kvm/hyp/tlb.c          | 6 +++++-
+ 4 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index dfd9086..15a9931 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -962,6 +962,29 @@ config ARM64_UAO
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index c1267e8..7b9c898 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -84,7 +84,6 @@
+ 			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
+ #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
+ #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+-#define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
  
- endmenu
+ /* TCR_EL2 Registers bits */
+ #define TCR_EL2_RES1		((1 << 31) | (1 << 23))
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index d686300..0d7c3dd 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -198,10 +198,13 @@ struct kvm_cpu_context {
+ struct kvm_vcpu_arch {
+ 	struct kvm_cpu_context ctxt;
  
-+menu "ARMv8.3 architectural features"
-+
-+config ARM64_POINTER_AUTHENTICATION
-+	bool "Enable support for pointer authentication"
-+	default y
-+	help
-+	  Pointer authentication (part of the ARMv8.3 Extensions) provides
-+	  instructions for signing and authenticating pointers against secret
-+	  keys, which can be used to mitigate Return Oriented Programming (ROP)
-+	  and other attacks.
-+
-+	  This option enables these instructions at EL0 (i.e. for userspace).
-+
-+	  Choosing this option will cause the kernel to initialise secret keys
-+	  for each process at exec() time, with these keys being
-+	  context-switched along with the process.
-+
-+	  The feature is detected at runtime. If the feature is not present in
-+	  hardware it will not be advertised to userspace nor will it be
-+	  enabled.
-+
-+endmenu
-+
- config ARM64_MODULE_CMODEL_LARGE
- 	bool
+-	/* HYP configuration */
++	/* Guest HYP configuration */
+ 	u64 hcr_el2;
+ 	u32 mdcr_el2;
  
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 5468c83..6a848f3 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -16,10 +16,15 @@
- #ifndef __ASM_MMU_H
- #define __ASM_MMU_H
++	/* Host HYP configuration */
++	u64 host_hcr_el2;
++
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
  
-+#include <asm/pointer_auth.h>
-+
- typedef struct {
- 	atomic64_t	id;
- 	void		*vdso;
- 	unsigned long	flags;
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+	struct ptrauth_keys	ptrauth_keys;
-+#endif
- } mm_context_t;
- 
- /*
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3257895a..06757a5 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -31,7 +31,6 @@
- #include <asm/cacheflush.h>
- #include <asm/cpufeature.h>
- #include <asm/proc-fns.h>
--#include <asm-generic/mm_hooks.h>
- #include <asm/cputype.h>
- #include <asm/pgtable.h>
- #include <asm/sysreg.h>
-@@ -154,7 +153,14 @@ static inline void cpu_replace_ttbr1(pgd_t *pgd)
- #define destroy_context(mm)		do { } while(0)
- void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
- 
--#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
-+static inline int init_new_context(struct task_struct *tsk,
-+			struct mm_struct *mm)
-+{
-+	atomic64_set(&mm->context.id, 0);
-+	mm_ctx_ptrauth_init(&mm->context);
-+
-+	return 0;
-+}
- 
- /*
-  * This is called when "tsk" is about to enter lazy TLB mode.
-@@ -200,6 +206,8 @@ static inline void __switch_mm(struct mm_struct *next)
- 		return;
- 	}
- 
-+	mm_ctx_ptrauth_switch(&next->context);
-+
- 	check_and_switch_context(next, cpu);
- }
- 
-@@ -226,6 +234,19 @@ static inline void __switch_mm(struct mm_struct *next)
- 
- void verify_cpu_asid_bits(void);
- 
-+static inline void arch_dup_mmap(struct mm_struct *oldmm,
-+				 struct mm_struct *mm)
-+{
-+	mm_ctx_ptrauth_dup(&oldmm->context, &mm->context);
-+}
-+#define arch_dup_mmap arch_dup_mmap
-+
-+/*
-+ * We need to override arch_dup_mmap before including the generic hooks, which
-+ * are otherwise sufficient for us.
-+ */
-+#include <asm-generic/mm_hooks.h>
-+
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* !__ASM_MMU_CONTEXT_H */
-diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-new file mode 100644
-index 0000000..964da0c
---- /dev/null
-+++ b/arch/arm64/include/asm/pointer_auth.h
-@@ -0,0 +1,89 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_POINTER_AUTH_H
-+#define __ASM_POINTER_AUTH_H
-+
-+#include <linux/random.h>
-+
-+#include <asm/cpufeature.h>
-+#include <asm/sysreg.h>
-+
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+/*
-+ * Each key is a 128-bit quantity which is split accross a pair of 64-bit
-+ * registers (Lo and Hi).
-+ */
-+struct ptrauth_key {
-+	unsigned long lo, hi;
-+};
-+
-+/*
-+ * We give each process its own instruction A key (APIAKey), which is shared by
-+ * all threads. This is inherited upon fork(), and reinitialised upon exec*().
-+ * All other keys are currently unused, with APIBKey, APDAKey, and APBAKey
-+ * instructions behaving as NOPs.
-+ */
-+struct ptrauth_keys {
-+	struct ptrauth_key apia;
-+};
-+
-+static inline void ptrauth_keys_init(struct ptrauth_keys *keys)
-+{
-+	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-+		return;
-+
-+	get_random_bytes(keys, sizeof(*keys));
-+}
-+
-+#define __ptrauth_key_install(k, v)			\
-+do {							\
-+	write_sysreg_s(v.lo, SYS_ ## k ## KEYLO_EL1);	\
-+	write_sysreg_s(v.hi, SYS_ ## k ## KEYHI_EL1);	\
-+} while (0)
-+
-+static inline void ptrauth_keys_switch(struct ptrauth_keys *keys)
-+{
-+	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-+		return;
-+
-+	__ptrauth_key_install(APIA, keys->apia);
-+}
-+
-+static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
-+				    struct ptrauth_keys *new)
-+{
-+	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-+		return;
-+
-+	*new = *old;
-+}
-+
-+#define mm_ctx_ptrauth_init(ctx) \
-+	ptrauth_keys_init(&(ctx)->ptrauth_keys)
-+
-+#define mm_ctx_ptrauth_switch(ctx) \
-+	ptrauth_keys_switch(&(ctx)->ptrauth_keys)
-+
-+#define mm_ctx_ptrauth_dup(oldctx, newctx) \
-+	ptrauth_keys_dup(&(oldctx)->ptrauth_keys, &(newctx)->ptrauth_keys)
-+
-+#else
-+#define mm_ctx_ptrauth_init(ctx)
-+#define mm_ctx_ptrauth_switch(ctx)
-+#define mm_ctx_ptrauth_dup(oldctx, newctx)
-+#endif
-+
-+#endif /* __ASM_POINTER_AUTH_H */
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index 4e187ce..0481c73 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -35,5 +35,6 @@
- #define HWCAP_JSCVT		(1 << 13)
- #define HWCAP_FCMA		(1 << 14)
- #define HWCAP_LRCPC		(1 << 15)
-+#define HWCAP_APIA		(1 << 16)
- 
- #endif /* _UAPI__ASM_HWCAP_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 4016b1e7..7e2885e 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -778,6 +778,15 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
- 	return is_kernel_in_hyp_mode();
- }
- 
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+static int cpu_enable_address_auth(void *__unused)
-+{
-+	config_sctlr_el1(0, SCTLR_ELx_ENIA);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_ARM64_POINTER_AUTHENTICATION */
-+
- static bool hyp_offset_low(const struct arm64_cpu_capabilities *entry,
- 			   int __unused)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 945e79c..6108813 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -71,6 +71,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
  {
-@@ -902,6 +911,7 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 		.field_pos = ID_AA64ISAR1_APA_SHIFT,
- 		.min_field_value = ID_AA64ISAR1_APA_ARCHITECTED,
- 		.matches = has_cpuid_feature,
-+		.enable = cpu_enable_address_auth,
- 	},
- 	{
- 		.desc = "Generic authentication (architected algorithm)",
-@@ -945,6 +955,7 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_JSCVT_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_JSCVT),
- 	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_FCMA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_FCMA),
- 	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_LRCPC_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_LRCPC),
-+	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_APA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_APIA),
- 	{},
- };
+ 	u64 val;
  
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index f495ee5..b5bd2d3 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -68,6 +68,7 @@
- 	"jscvt",
- 	"fcma",
- 	"lrcpc",
-+	"apia",
- 	NULL
- };
++	vcpu->arch.host_hcr_el2 = read_sysreg(hcr_el2);
++
+ 	/*
+ 	 * We are about to set CPTR_EL2.TFP to trap all floating point
+ 	 * register accesses to EL2, however, the ARM ARM clearly states that
+@@ -110,7 +112,6 @@ static void __hyp_text __deactivate_traps_vhe(void)
+ 		    MDCR_EL2_TPMS;
  
+ 	write_sysreg(mdcr_el2, mdcr_el2);
+-	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+ 	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
+ 	write_sysreg(vectors, vbar_el1);
+ }
+@@ -123,7 +124,6 @@ static void __hyp_text __deactivate_traps_nvhe(void)
+ 	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
+ 
+ 	write_sysreg(mdcr_el2, mdcr_el2);
+-	write_sysreg(HCR_RW, hcr_el2);
+ 	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+ }
+ 
+@@ -145,6 +145,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	__deactivate_traps_arch()();
+ 	write_sysreg(0, hstr_el2);
+ 	write_sysreg(0, pmuserenr_el0);
++	write_sysreg(vcpu->arch.host_hcr_el2, hcr_el2);
+ }
+ 
+ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index 73464a9..c2b0680 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -49,12 +49,16 @@ static hyp_alternate_select(__tlb_switch_to_guest,
+ 
+ static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
+ {
++	u64 val;
++
+ 	/*
+ 	 * We're done with the TLB operation, let's restore the host's
+ 	 * view of HCR_EL2.
+ 	 */
+ 	write_sysreg(0, vttbr_el2);
+-	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
++	val = read_sysreg(hcr_el2);
++	val |= HCR_TGE;
++	write_sysreg(val, hcr_el2);
+ }
+ 
+ static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
 -- 
 1.9.1
