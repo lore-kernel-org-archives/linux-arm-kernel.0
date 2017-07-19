@@ -1,76 +1,86 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 18 Jul 2017 18:47:02 -0700
-Subject: [PATCH v2 2/3] usb: chipidea: Hook into mux framework to toggle
- usb switch
-In-Reply-To: <20170718044111.GA13320@b29397-desktop>
-References: <20170714214005.14967-1-stephen.boyd@linaro.org>
- <20170714214005.14967-3-stephen.boyd@linaro.org>
- <20170718044111.GA13320@b29397-desktop>
-Message-ID: <150042882207.23422.15172007883605080758@sboyd-linaro>
+From: dja@axtens.net (Daniel Axtens)
+Date: Wed, 19 Jul 2017 11:55:48 +1000
+Subject: [PATCH 0/4] Allow non-legacy cards to be vgaarb default
+In-Reply-To: <20170719012839.20124-1-dja@axtens.net>
+References: <20170719012839.20124-1-dja@axtens.net>
+Message-ID: <87pocxkx5n.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2017-07-17 21:41:11)
-> On Fri, Jul 14, 2017 at 02:40:04PM -0700, Stephen Boyd wrote:
-> >  
-> > @@ -175,6 +176,10 @@ static int host_start(struct ci_hdrc *ci)
-> >               if (ci_otg_is_fsm_mode(ci)) {
-> >                       otg->host = &hcd->self;
-> >                       hcd->self.otg_port = 1;
-> > +             } else {
-> > +                     ret = mux_control_select(ci->platdata->usb_switch, 1);
-> 
-> It is better to use MACRO for 1 and 0.
-> 
+Apologies everyone - this got mixed in with another patch set. I'll do a
+v2 that isn't completely broken and confusing.
 
-Ok.
+Again, my apologies for the noise.
 
-> > +                     if (ret)
-> > +                             goto disable_reg;
-> >               }
-> >       }
-> >  
-> > @@ -195,6 +200,8 @@ static void host_stop(struct ci_hdrc *ci)
-> >       struct usb_hcd *hcd = ci->hcd;
-> >  
-> >       if (hcd) {
-> > +             if (!ci_otg_is_fsm_mode(ci))
-> > +                     mux_control_deselect(ci->platdata->usb_switch);
-> >               if (ci->platdata->notify_event)
-> >                       ci->platdata->notify_event(ci,
-> >                               CI_HDRC_CONTROLLER_STOPPED_EVENT);
-> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> > index d68b125796f9..deb18099e168 100644
-> > --- a/drivers/usb/chipidea/udc.c
-> > +++ b/drivers/usb/chipidea/udc.c
-> > @@ -22,6 +22,7 @@
-> >  #include <linux/usb/gadget.h>
-> >  #include <linux/usb/otg-fsm.h>
-> >  #include <linux/usb/chipidea.h>
-> > +#include <linux/mux/consumer.h>
-> >  
-> >  #include "ci.h"
-> >  #include "udc.h"
-> > @@ -1964,16 +1965,26 @@ void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
-> >  
-> >  static int udc_id_switch_for_device(struct ci_hdrc *ci)
-> >  {
-> > +     int ret = 0;
-> > +
-> >       if (ci->is_otg)
-> >               /* Clear and enable BSV irq */
-> >               hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
-> >                                       OTGSC_BSVIS | OTGSC_BSVIE);
-> >  
-> > -     return 0;
-> > +     if (!ci_otg_is_fsm_mode(ci))
-> > +             ret = mux_control_select(ci->platdata->usb_switch, 0);
-> > +
-> > +     if (ci->is_otg && ret)
-> > +             hw_write_otgsc(ci, OTGSC_BSVIE | OTGSC_BSVIS, OTGSC_BSVIS);
-> 
-> Should use !ret?
-> 
+Regards,
+Daniel
 
-No? This is intended to unwind the clearing and enabling of the BSV irq
-on failure (ret is non-zero) and so we clear and disable the BSV irq.
+Daniel Axtens <dja@axtens.net> writes:
+
+> Hi all,
+>
+> Previously I posted a patch that provided a quirk for a hibmc card
+> behind a particular Huawei bridge that allowed it to be marked as the
+> default device in the VGA arbiter.[0] This lead to some discussion.[1]
+> It was broadly suggested that a more generic solution would be better,
+> something in the style of powerpc's fixup_vga() quirk.
+>
+> Here is my suggested solution:
+>
+>  - Create a Kconfig option ARCH_WANT_VGA_ARB_FALLBACK
+>  
+>  - if an arch selects that option, install PCI_FIXUP_CLASS_ENABLE
+>    hook. This hook fires when a card is enabled, which will require
+>    that a driver has been bound.
+>
+>  - if there is no default device when the hook fires, and the device
+>    can control memory and I/O, mark it as default.
+>
+> The patches are as follows:
+>
+>  (1) powerpc: simplify and fix VGA default device behaviour
+>
+>      This cleans up some quirks in the powerpc implementation of the
+>      vga_fixup. It should make the behaviour match the original
+>      intention.
+>
+>  (2) vgaarb: allow non-legacy cards to be marked as default
+>
+>      Add the Kconfig option, and create the fixup in vgaarb.c gated
+>      behind the option. Nothing happens at this stage because no arch
+>      has selected the option yet.
+>
+>  (3) powerpc: replace vga_fixup() with generic code
+>
+>      Select the option on powerpc and remove the old code. The only
+>      change is that it moves from being a final fixup to an enable
+>      fixup.
+>  
+>  (4) arm64: allow non-legacy VGA devices to be default
+>
+>      Select the option on arm64. This solves my problem with the D05,
+>      but may cause other cards to be marked as default on other
+>      boards. This shouldn't cause any real issues but is worth being
+>      aware of.
+>
+> Regards,
+> Daniel
+>
+> [0]: https://patchwork.ozlabs.org/patch/787003/
+> [1]: https://www.spinics.net/lists/arm-kernel/msg593656.html
+>
+> Daniel Axtens (4):
+>   powerpc: simplify and fix VGA default device behaviour
+>   vgaarb: allow non-legacy cards to be marked as default
+>   powerpc: replace vga_fixup() with generic code
+>   arm64: allow non-legacy VGA devices to be default
+>
+>  arch/arm64/Kconfig               |  1 +
+>  arch/powerpc/Kconfig             |  1 +
+>  arch/powerpc/kernel/pci-common.c | 12 ------------
+>  drivers/gpu/vga/Kconfig          |  7 +++++++
+>  drivers/gpu/vga/vgaarb.c         | 21 +++++++++++++++++++++
+>  5 files changed, 30 insertions(+), 12 deletions(-)
+>
+> -- 
+> 2.11.0
