@@ -1,73 +1,34 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 19 Jul 2017 15:25:37 +0530
-Subject: [PATCH 1/6] mailbox: bcm-flexrm-mailbox: Set IRQ affinity hint for
- FlexRM ring IRQs
-In-Reply-To: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
-References: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1500458142-19243-2-git-send-email-anup.patel@broadcom.com>
+Date: Wed, 19 Jul 2017 15:25:36 +0530
+Subject: [PATCH 0/6] FlexRM driver improvements
+Message-ID: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set IRQ affinity hint for FlexRM ring IRQ at time of
-enabling ring (i.e. flexrm_startup()). The IRQ affinity hint will
-allow FlexRM driver to distribute FlexRM ring IRQs across online
-CPUs so that all FlexRM ring IRQs don't land in CPU0 by default.
+This patchset does various improvments to Broadcom FlexRM
+mailbox controller driver and also adds FlexRM DT nodes
+for Stingray SOC.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
----
- drivers/mailbox/bcm-flexrm-mailbox.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+The patches are based on Linux-4.13-rc1 and can also be
+found at flexrm-imp-v1 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
-index da67882..e8c3666 100644
---- a/drivers/mailbox/bcm-flexrm-mailbox.c
-+++ b/drivers/mailbox/bcm-flexrm-mailbox.c
-@@ -260,6 +260,7 @@ struct flexrm_ring {
- 	void __iomem *regs;
- 	bool irq_requested;
- 	unsigned int irq;
-+	cpumask_t irq_aff_hint;
- 	unsigned int msi_timer_val;
- 	unsigned int msi_count_threshold;
- 	struct ida requests_ida;
-@@ -1217,6 +1218,18 @@ static int flexrm_startup(struct mbox_chan *chan)
- 	}
- 	ring->irq_requested = true;
- 
-+	/* Set IRQ affinity hint */
-+	ring->irq_aff_hint = CPU_MASK_NONE;
-+	val = ring->mbox->num_rings;
-+	val = (num_online_cpus() < val) ? val / num_online_cpus() : 1;
-+	cpumask_set_cpu((ring->num / val) % num_online_cpus(),
-+			&ring->irq_aff_hint);
-+	ret = irq_set_affinity_hint(ring->irq, &ring->irq_aff_hint);
-+	if (ret) {
-+		dev_err(ring->mbox->dev, "failed to set IRQ affinity hint\n");
-+		goto fail_free_irq;
-+	}
-+
- 	/* Disable/inactivate ring */
- 	writel_relaxed(0x0, ring->regs + RING_CONTROL);
- 
-@@ -1261,6 +1274,9 @@ static int flexrm_startup(struct mbox_chan *chan)
- 
- 	return 0;
- 
-+fail_free_irq:
-+	free_irq(ring->irq, ring);
-+	ring->irq_requested = false;
- fail_free_cmpl_memory:
- 	dma_pool_free(ring->mbox->cmpl_pool,
- 		      ring->cmpl_base, ring->cmpl_dma_base);
-@@ -1314,6 +1330,7 @@ static void flexrm_shutdown(struct mbox_chan *chan)
- 
- 	/* Release IRQ */
- 	if (ring->irq_requested) {
-+		irq_set_affinity_hint(ring->irq, NULL);
- 		free_irq(ring->irq, ring);
- 		ring->irq_requested = false;
- 	}
+Anup Patel (6):
+  mailbox: bcm-flexrm-mailbox: Set IRQ affinity hint for FlexRM ring
+    IRQs
+  mailbox: bcm-flexrm-mailbox: Add debugfs support
+  mailbox: bcm-flexrm-mailbox: Fix mask used in CMPL_START_ADDR_VALUE()
+  mailbox: Make message send queue size dynamic in Linux mailbox
+  mailbox: bcm-flexrm-mailbox: Set msg_queue_len for each channel
+  arm64: dts: Add FlexRM DT nodes for Stingray
+
+ .../boot/dts/broadcom/stingray/stingray-fs4.dtsi   |  54 +++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |   2 +
+ drivers/mailbox/bcm-flexrm-mailbox.c               | 160 ++++++++++++++++++++-
+ drivers/mailbox/mailbox.c                          |  15 +-
+ include/linux/mailbox_controller.h                 |   5 +-
+ 5 files changed, 227 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
+
 -- 
 2.7.4
