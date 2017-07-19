@@ -1,112 +1,57 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Wed, 19 Jul 2017 12:07:33 -0700
-Subject: [PATCH v2 5/6] irqchip: brcmstb-l2: Abstract register accesses
-In-Reply-To: <20170719190734.18566-1-opendmb@gmail.com>
-References: <20170719190734.18566-1-opendmb@gmail.com>
-Message-ID: <20170719190734.18566-6-opendmb@gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 19 Jul 2017 14:24:10 -0500
+Subject: [PATCH 1/2] net: phy: at803x: Fix RGMII RX and TX clock delays
+ setup
+In-Reply-To: <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
+References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
+ <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
+Message-ID: <5ea9905f-e74a-4a43-dc5b-883ec9daf030@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added register block offsets to the brcmstb_l2_intc_data structure
-for the status and mask registers to support reading the active
-interupts in an abstracted way.  It seems like an irq_chip method
-should have been provided for this, but it's not there yet.
+Hi
 
-Abstracted the implementation of the handler, suspend, and resume
-functions to not use any hard coded register offsets.
+On 07/19/2017 10:31 AM, Marc Gonzalez wrote:
+> The current code supports enabling RGMII RX and TX clock delays.
+> The unstated assumption is that these settings are disabled by
+> default at reset, which is not the case.
+> 
+> RX clock delay is enabled at reset. And TX clock delay "survives"
+> across SW resets. Thus, if the bootloader enables TX clock delay,
+> it will remain enabled at reset in Linux.
+> 
+> Provide disable functions to configure the RGMII clock delays
+> exactly as specified in the fwspec.
+> 
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+>   drivers/net/phy/at803x.c | 32 ++++++++++++++++++++++++--------
+>   1 file changed, 24 insertions(+), 8 deletions(-)
+This patch breaks am335x-evm networking.
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Doug Berger <opendmb@gmail.com>
----
- drivers/irqchip/irq-brcmstb-l2.c | 29 ++++++++++++++++++++---------
- 1 file changed, 20 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
-index 977ae55d47d4..ce3850530e2b 100644
---- a/drivers/irqchip/irq-brcmstb-l2.c
-+++ b/drivers/irqchip/irq-brcmstb-l2.c
-@@ -43,6 +43,8 @@
- struct brcmstb_l2_intc_data {
- 	struct irq_domain *domain;
- 	struct irq_chip_generic *gc;
-+	int status_offset;
-+	int mask_offset;
- 	bool can_wake;
- 	u32 saved_mask; /* for suspend/resume */
+To restore it I've had to apply below diff:
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 200d6ab..9578bdf 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -724,12 +724,12 @@
+ 
+ &cpsw_emac0 {
+        phy_id = <&davinci_mdio>, <0>;
+-       phy-mode = "rgmii-txid";
++       phy-mode = "rgmii-id";
  };
-@@ -56,8 +58,8 @@ static void brcmstb_l2_intc_irq_handle(struct irq_desc *desc)
  
- 	chained_irq_enter(chip, desc);
+ &cpsw_emac1 {
+        phy_id = <&davinci_mdio>, <1>;
+-       phy-mode = "rgmii-txid";
++       phy-mode = "rgmii-id";
+ };
  
--	status = irq_reg_readl(b->gc, CPU_STATUS) &
--		~(irq_reg_readl(b->gc, CPU_MASK_STATUS));
-+	status = irq_reg_readl(b->gc, b->status_offset) &
-+		~(irq_reg_readl(b->gc, b->mask_offset));
- 
- 	if (status == 0) {
- 		raw_spin_lock(&desc->lock);
-@@ -78,16 +80,17 @@ static void brcmstb_l2_intc_irq_handle(struct irq_desc *desc)
- static void brcmstb_l2_intc_suspend(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
- 	struct brcmstb_l2_intc_data *b = gc->private;
- 
- 	irq_gc_lock(gc);
- 	/* Save the current mask */
--	b->saved_mask = irq_reg_readl(gc, CPU_MASK_STATUS);
-+	b->saved_mask = irq_reg_readl(gc, ct->regs.mask);
- 
- 	if (b->can_wake) {
- 		/* Program the wakeup mask */
--		irq_reg_writel(gc, ~gc->wake_active, CPU_MASK_SET);
--		irq_reg_writel(gc, gc->wake_active, CPU_MASK_CLEAR);
-+		irq_reg_writel(gc, ~gc->wake_active, ct->regs.disable);
-+		irq_reg_writel(gc, gc->wake_active, ct->regs.enable);
- 	}
- 	irq_gc_unlock(gc);
- }
-@@ -95,15 +98,19 @@ static void brcmstb_l2_intc_suspend(struct irq_data *d)
- static void brcmstb_l2_intc_resume(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
- 	struct brcmstb_l2_intc_data *b = gc->private;
- 
- 	irq_gc_lock(gc);
--	/* Clear unmasked non-wakeup interrupts */
--	irq_reg_writel(gc, ~b->saved_mask & ~gc->wake_active, CPU_CLEAR);
-+	if (ct->chip.irq_ack != irq_gc_noop) {
-+		/* Clear unmasked non-wakeup interrupts */
-+		irq_reg_writel(gc, ~b->saved_mask & ~gc->wake_active,
-+				ct->regs.ack);
-+	}
- 
- 	/* Restore the saved mask */
--	irq_reg_writel(gc, b->saved_mask, CPU_MASK_SET);
--	irq_reg_writel(gc, ~b->saved_mask, CPU_MASK_CLEAR);
-+	irq_reg_writel(gc, b->saved_mask, ct->regs.disable);
-+	irq_reg_writel(gc, ~b->saved_mask, ct->regs.enable);
- 	irq_gc_unlock(gc);
- }
- 
-@@ -173,6 +180,9 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 	data->gc = irq_get_domain_generic_chip(data->domain, 0);
- 	data->gc->reg_base = base;
- 	data->gc->private = data;
-+	data->status_offset = CPU_STATUS;
-+	data->mask_offset = CPU_MASK_STATUS;
-+
- 	ct = data->gc->chip_types;
- 
- 	ct->chip.irq_ack = irq_gc_ack_set_bit;
-@@ -181,6 +191,7 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 	ct->chip.irq_mask = irq_gc_mask_disable_reg;
- 	ct->chip.irq_mask_ack = irq_gc_mask_disable_and_ack_set;
- 	ct->regs.disable = CPU_MASK_SET;
-+	ct->regs.mask = CPU_MASK_STATUS;
- 
- 	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
- 	ct->regs.enable = CPU_MASK_CLEAR;
+ &tscadc {
+
+Sry, can't comment here to much - not E-PHY expert.
+
 -- 
-2.13.0
+regards,
+-grygorii
