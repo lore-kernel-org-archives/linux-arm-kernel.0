@@ -1,138 +1,167 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 19 Jul 2017 23:15:42 +0200
-Subject: [PATCH 2/2] net: ethernet: nb8800: Fix RGMII TX clock delay setup
-In-Reply-To: <d8121f82-dffd-22c7-1209-a3c2329703e5@gmail.com>
-References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
- <61b71d12-4e3a-edbe-1d69-c66e7cf46d8e@sigmadesigns.com>
- <yw1xzic0qrcg.fsf@mansr.com> <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
- <d8121f82-dffd-22c7-1209-a3c2329703e5@gmail.com>
-Message-ID: <05cbc32e-a4af-1c81-128b-bc5d2206d24a@free.fr>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 20 Jul 2017 00:20:26 +0300
+Subject: [PATCH v7 3/3] clk: stm32h7: Add stm32h743 clock driver
+In-Reply-To: <1500474344-9832-4-git-send-email-gabriel.fernandez@st.com>
+References: <1500474344-9832-1-git-send-email-gabriel.fernandez@st.com>
+ <1500474344-9832-4-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <d999fc79-7b14-da8e-965f-371cf4352dd1@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/2017 20:30, Florian Fainelli wrote:
-> On 07/19/2017 10:36 AM, Mason wrote:
->> On 19/07/2017 19:17, M?ns Rullg?rd wrote:
->>
->>> Marc Gonzalez writes:
->>>
->>>> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
->>>> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
->>>> there are 4 RGMII phy-modes to handle:
->>>>
->>>> "rgmii" (RX and TX delays are added by the MAC when required)
->>>> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
->>>> 	the MAC should not add the RX or TX delays in this case)
->>>> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
->>>> 	the MAC should not add an RX delay in this case)
->>>> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
->>>> 	the MAC should not add an TX delay in this case)
->>>>
->>>> Let the MAC handle TX clock delay for rgmii and rgmii-rxid.
->>>>
->>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>>> ---
->>>>  drivers/net/ethernet/aurora/nb8800.c | 8 +++++---
->>>>  1 file changed, 5 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
->>>> index 041cfb7952f8..f3ed320eb4ad 100644
->>>> --- a/drivers/net/ethernet/aurora/nb8800.c
->>>> +++ b/drivers/net/ethernet/aurora/nb8800.c
->>>> @@ -609,7 +609,7 @@ static void nb8800_mac_config(struct net_device *dev)
->>>>  		mac_mode |= HALF_DUPLEX;
->>>>
->>>>  	if (gigabit) {
->>>> -		if (priv->phy_mode == PHY_INTERFACE_MODE_RGMII)
->>>> +		if (phy_interface_is_rgmii(dev->phydev))
->>>>  			mac_mode |= RGMII_MODE;
->>>>
->>>>  		mac_mode |= GMAC_MODE;
->>>
->>> This is a separate issue, and the change is obviously correct.
->>>
->>>> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
->>>>  		break;
->>>>
->>>>  	case PHY_INTERFACE_MODE_RGMII:
->>>> -		pad_mode = PAD_MODE_RGMII;
->>>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
->>>> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>>>  		break;
->>>>
->>>> +	case PHY_INTERFACE_MODE_RGMII_ID:
->>>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
->>>> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>>> +		pad_mode = PAD_MODE_RGMII;
->>>>  		break;
->>>
->>> Won't this just make it break in a different set of circumstances?
->>
->> I don't think so, and here's my reasoning:
->>
->> AFAIU, the HW block always requires a TX clock delay
->> (I don't know what the "safe" interval is. PHY adds
->> 2.4 ns, MAC adds ~1 ns, both work.)
+Hello Gabriel,
+
+On 07/19/2017 05:25 PM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> The nominal delay should be 2ns because that's exactly what a 90 degrees
-> shift at a 125Mhz would be. The RGMII specification defines the following:
+> This patch enables clocks for STM32H743 boards.
 > 
-> TskewT - Data to Clock output Skew (At Transmitter) Min: -500ns, Nom: 0,
-> Max: + 500 ns
-> TskewR - Data to Clock input Skew (At Receiver) Min: 1ns, Nom: 0, Max:
-> 2.6ns (see note 1)
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> note 1: This implies that PC board design will require clocks to be
-> routed such that an additional trace delay of greater than 1.5ns and
-> less than 2.0ns will be added to the associated clock signal. For 10/100
-> the Max value is unspecified.
+> for MFD changes:
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 > 
-> So it seems to me like you are borderline spec in both delays you gave
-> here and the "HW block always requires a TX clock delay" statement is
-> true for a given board design only.
+> for DT-Bindings
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |   82 ++
 
-I must confess that my understanding of clock delays,
-clock skew, routing, traces, etc is nil.
+I'll provide some review comments about device tree bindings only.
 
-Is TskewT the TX clock delay?
-And TskewR the RX clock delay?
-
-Doesn't wire delay factor in too?
-(So longer wires require more delay.)
-
->> RX clock delay seems to be "Don't Care" (tested both
->> enabled and disabled by PHY)
->> By "tested", I mean ability to ping remote system.
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/clk-stm32h7.c                          | 1409 ++++++++++++++++++++
+>  include/dt-bindings/clock/stm32h7-clks.h           |  165 +++
+>  include/dt-bindings/mfd/stm32h7-rcc.h              |  136 ++
+>  5 files changed, 1793 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>  create mode 100644 drivers/clk/clk-stm32h7.c
+>  create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
+>  create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
 > 
-> Can you do something a bit more stressful than just a ping, also if you
-> have the ability to change the inter-packet gap, do it, and see if you
-> start seeing FCS or any other decoding errors.
+> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+> new file mode 100644
+> index 0000000..442c50c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+> @@ -0,0 +1,82 @@
+> +STMicroelectronics STM32H7 Reset and Clock Controller
+> +=====================================================
+> +
+> +The RCC IP is both a reset and a clock controller.
+> +
+> +Please refer to clock-bindings.txt for common clock controller binding usage.
+> +Please also refer to reset.txt for common reset controller binding usage.
+> +
+> +Required properties:
+> +- compatible: Should be:
+> +  "st,stm32h743-rcc"
+> +
+> +- reg: should be register base and length as documented in the
+> +  datasheet
+> +
+> +- #reset-cells: 1, see below
+> +
+> +- #clock-cells : from common clock binding; shall be set to 1
+> +
+> +- clocks: External oscillator clock phandle
+> +  - high speed external clock signal (HSE)
+> +  - low speed external clock signal (LSE)
+> +  - external I2S clock (I2S_CKIN)
+> +
+> +Optional properties:
+> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
+> +  write protection (RTC clock).
+> +
+> +Example:
+> +
+> +	rcc: rcc at 58024400 {
 
-Errr... "Inter-packet gap"?
-Is there supposed to be a HW knob to tweak how long
-the HW waits between sending two frames?
+'rcc' as a generic device node name is awkward.
 
->> If phy-mode is RGMII or RGMII_RXID, then don't add
->> TX clock delay from PHY, therefore add it from MAC.
->>
->> If phy_mode is RGMII_ID or RGMII_TXID, then do add
->> TX clock delay from PHY, therefore don't add it from MAC.
->>
->> What set of circumstances would create an issue?
-> 
-> Existing Device Tree sources that do not correspond to that description
-> you just did, I suppose they are all out of tree?
+I believe the main function of the device is clock controller (unlikely
+a generic reset controller can be converted into a clock controller),
+the locations of the document and device driver also indicate that
+primarily it is a clock controller, so I suggest to replace device node
+name with 'clock-controller' like below:
 
-The problem with PHY drivers is that there is no
-simple compatible string to grep for.
+	rcc: clock-controller at 58024400 {
 
-The tango boards use "ethernet-phy-id004d.d072"
-but not a single other DT uses that string.
-For example, am335x-evm.dts doesn't seem to name the PHY.
-Hmmm, how does the at803x probe function match for that
-board?
+> +		#reset-cells = <1>;
+> +		#clock-cells = <2>
 
-How does one estimate the impact of driver changes in
-the eth PHY layer?
+Missing trailing semicolon       ^^^
 
-Regards.
+My recommendation is to move #reset-cells and #clock-cells properties
+down after 'reg' or 'clocks' property in the list.
+
+> +		compatible = "st,stm32h743-rcc", "st,stm32-rcc";
+> +		reg = <0x58024400 0x400>;
+> +		clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
+> +
+> +		st,syscfg = <&pwrcfg>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+
+Please drop #address-cells and #size-cells properties completely, from
+the document the device node does not define any children subnodes.
+
+> +	};
+> +
+> +The peripheral clock consumer should specify the desired clock by
+> +having the clock ID in its "clocks" phandle cell.
+> +
+> +All available clocks are defined as preprocessor macros in
+> +dt-bindings/clock/stm32h7-clks.h header and can be used in device
+> +tree sources.
+> +
+> +Example:
+> +
+> +		timer5: timer at 40000c00 {
+> +			compatible = "st,stm32-timer";
+> +			reg = <0x40000c00 0x400>;
+> +			interrupts = <50>;
+> +			clocks = <&rcc TIM5_CK>;
+> +
+
+Please remote the empty line above.
+
+> +		};
+> +
+> +Specifying softreset control of devices
+> +=======================================
+> +
+> +Device nodes should specify the reset channel required in their "resets"
+> +property, containing a phandle to the reset device node and an index specifying
+> +which channel to use.
+> +The index is the bit number within the RCC registers bank, starting from RCC
+> +base address.
+> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
+> +Where bit_offset is the bit offset within the register.
+> +
+> +For example, for CRC reset:
+> +  crc = AHB4RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x88 / 4 * 32 + 19 = 1107
+> +
+> +All available preprocessor macros for reset are defined dt-bindings//mfd/stm32h7-rcc.h
+
+Double slashes ---------->                                           ^^^^ 
+
+I have doubts if it is permitted to add source paths into the device
+tree bindings documentation, because such information is specific to
+the Linux source code.
+
+Rob, can you clarify please?
+
+> +header and can be used in device tree sources.
+> +
+> +example:
+
+For unification, please capitalize it: 'Example:'
+
+> +
+> +	timer2 {
+> +		resets	= <&rcc STM32H7_APB1L_RESET(TIM2)>;
+> +	};
+
+--
+With best wishes,
+Vladimir
