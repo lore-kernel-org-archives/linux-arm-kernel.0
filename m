@@ -1,28 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 19 Jul 2017 10:01:16 +0200
-Subject: [PATCH] soc: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-49-robh@kernel.org>
-References: <20170718214339.7774-49-robh@kernel.org>
-Message-ID: <CAMuHMdUzoTMV3qvFckzHMDt6Xk8G9-PJDeVu-PCN-XhwUQx_uw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Jul 2017 09:01:50 +0100
+Subject: [PATCH v2 4/4] arm64: allow non-legacy VGA devices to be default
+In-Reply-To: <20170719021516.24718-5-dja@axtens.net>
+References: <20170719021516.24718-1-dja@axtens.net>
+ <20170719021516.24718-5-dja@axtens.net>
+Message-ID: <20170719080150.GB13642@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 11:43 PM, Rob Herring <robh@kernel.org> wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
+On Wed, Jul 19, 2017 at 12:15:16PM +1000, Daniel Axtens wrote:
+> The VGA arbiter only marks a device as default if it can decode
+> legacy I/O and memory ranges. This is often not the case on arm64,
+> which doesn't use the legacy ranges.
+> 
+> Enable the VGA arbiter to mark the first enabled VGA card as
+> default.
+> 
+> Signed-off-by: Daniel Axtens <dja@axtens.net>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Gr{oetje,eeting}s,
+Will
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+> 
+> Tested on a D05 using the hibmc card.
+> ---
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index dfd908630631..cefcbd442e4f 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -28,6 +28,7 @@ config ARM64
+>  	select ARCH_SUPPORTS_NUMA_BALANCING
+>  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+>  	select ARCH_WANT_FRAME_POINTERS
+> +	select ARCH_WANT_VGA_ARB_FALLBACK
+>  	select ARCH_HAS_UBSAN_SANITIZE_ALL
+>  	select ARM_AMBA
+>  	select ARM_ARCH_TIMER
+> -- 
+> 2.11.0
+> 
