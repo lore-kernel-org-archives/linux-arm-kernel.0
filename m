@@ -1,47 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 19 Jul 2017 17:31:26 +0200
-Subject: [PATCH 2/2] ARM64: dts: marvell: add NAND support on the CP110 master
-In-Reply-To: <20170719153126.16905-1-gregory.clement@free-electrons.com>
-References: <20170719153126.16905-1-gregory.clement@free-electrons.com>
-Message-ID: <20170719153126.16905-3-gregory.clement@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 19 Jul 2017 10:35:20 -0500
+Subject: [PATCH] ARM: Convert to using %pOF instead of full_name
+In-Reply-To: <20170719062220.wefnkqhd7javbcee@pengutronix.de>
+References: <20170718214339.7774-1-robh@kernel.org>
+ <20170719062220.wefnkqhd7javbcee@pengutronix.de>
+Message-ID: <CAL_JsqK1Y3xhZwNxme934UF_t=6ZdSyqBtrMmceUC798ftL+mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller used in A7K/A8K is present on the CP110 master
-part. It is compatible with the pxa-nand driver.
+On Wed, Jul 19, 2017 at 1:22 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Tue, Jul 18, 2017 at 04:42:41PM -0500, Rob Herring wrote:
+>> Now that we have a custom printf format specifier, convert users of
+>> full_name to use %pOF instead. This is preparation to remove storing
+>
+> Oh nice. If the commit adding %pOF is already set in stone, i'd suggest
+> to mention the commit id here in the commit log.
 
-Unlike most of the controller on the CP110 this one is only present on
-the master for the Armada 8K SoCs.
+It is in 4.13, but I'm not really eager to update all 60 patches and
+I'd prefer consistency in the commit msg as quite a few have already
+been applied.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+>> of the full path string for each node.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 726528ce54e9..9be4a442ded5 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -240,6 +240,20 @@
- 				status = "disabled";
- 			};
- 
-+			cpm_nand: nand at 720000 {
-+				/*
-+				 * For A7K/A8K this controller is only
-+				 * present on the CPM and not on the CPS
-+				 */
-+				compatible = "marvell,armada370-nand";
-+				reg = <0x720000 0x54>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&cpm_clk 1 2>;
-+				status = "disabled";
-+			};
-+
- 			cpm_trng: trng at 760000 {
- 				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
- 				reg = <0x760000 0x7d>;
--- 
-2.13.2
+[...]
+
+>> @@ -103,8 +103,8 @@ void __init arm_dt_init_cpu_maps(void)
+>>                */
+>>               cell = of_get_property(cpu, "reg", &prop_bytes);
+>>               if (!cell || prop_bytes < sizeof(*cell)) {
+>> -                     pr_debug(" * %s missing reg property\n",
+>> -                                  cpu->full_name);
+>> +                     pr_debug(" * %pOF missing reg property\n",
+>> +                                  cpu);
+>
+> You could join lines here and in the next hunk. And there are two more
+> further down.
+
+Okay. I did that generally, but missed a few.
+
+Rob
