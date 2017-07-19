@@ -1,189 +1,461 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 19 Jul 2017 10:20:35 -0700
-Subject: [kernel-hardening] Re: [PATCH v10 2/3] arm/syscalls: Check
- address limit on user-mode return
-In-Reply-To: <20170719170614.GS31807@n2100.armlinux.org.uk>
-References: <20170615011203.144108-1-thgarnie@google.com>
- <20170615011203.144108-2-thgarnie@google.com>
- <1500388566.11612.74.camel@nxp.com>
- <CAJcbSZEr8HPBwH1oVaHqPzAY4MS_=yqMoqPhcauuKu3cikB3uQ@mail.gmail.com>
- <1500398311.12096.30.camel@nxp.com>
- <CAJcbSZFr9KJTfGfiZo2fThoDkAE-D1OFf2YtELq4P6jX8syesQ@mail.gmail.com>
- <1500476300.22834.13.camel@nxp.com>
- <20170719170614.GS31807@n2100.armlinux.org.uk>
-Message-ID: <CAJcbSZHi6454skNpG8ecMnq90LdUfcxy2RYZD+7og1C1PeypvQ@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 20 Jul 2017 01:31:31 +0800
+Subject: [PATCH 7/7] staging: fsl-mc: allow the driver compile multi-arch
+In-Reply-To: <20170717132646.3020-8-laurentiu.tudor@nxp.com>
+Message-ID: <201707200109.nheGR4xf%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 10:06 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Jul 19, 2017 at 05:58:20PM +0300, Leonard Crestez wrote:
->> On Tue, 2017-07-18 at 12:04 -0700, Thomas Garnier wrote:
->> > On Tue, Jul 18, 2017 at 10:18 AM, Leonard Crestez <leonard.crestez@nxp.com> wrote:
->> > > On Tue, 2017-07-18 at 09:04 -0700, Thomas Garnier wrote:
->> > > > On Tue, Jul 18, 2017 at 7:36 AM, Leonard Crestez <leonard.crestez@nxp.com> wrote:
->> > > > > On Wed, 2017-06-14 at 18:12 -0700, Thomas Garnier wrote:
->> > > > > >
->> > > > > > Ensure the address limit is a user-mode segment before returning to
->> > > > > > user-mode. Otherwise a process can corrupt kernel-mode memory and
->> > > > > > elevate privileges [1].
->> > > > > >
->> > > > > > The set_fs function sets the TIF_SETFS flag to force a slow path on
->> > > > > > return. In the slow path, the address limit is checked to be USER_DS if
->> > > > > > needed.
->> > > > > >
->> > > > > > The TIF_SETFS flag is added to _TIF_WORK_MASK shifting _TIF_SYSCALL_WORK
->> > > > > > for arm instruction immediate support. The global work mask is too big
->> > > > > > to used on a single instruction so adapt ret_fast_syscall.
->> > > > > >
->> > > > > > @@ -571,6 +572,10 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
->> > > > > >        * Update the trace code with the current status.
->> > > > > >        */
->> > > > > >       trace_hardirqs_off();
->> > > > > > +
->> > > > > > +     /* Check valid user FS if needed */
->> > > > > > +     addr_limit_user_check();
->> > > > > > +
->> > > > > >       do {
->> > > > > >               if (likely(thread_flags & _TIF_NEED_RESCHED)) {
->> > > > > >                       schedule();
->> > > > > This patch made it's way into linux-next next-20170717 and it seems to
->> > > > > cause hangs when booting some boards over NFS (found via bisection). I
->> > > > > don't know exactly what determines the issue but I can reproduce hangs
->> > > > > if even if I just boot with init=/bin/bash and do stuff like
->> > > > >
->> > > > > # sleep 1 & sleep 1 & sleep 1 & wait; wait; wait; echo done!
->> > > > >
->> > > > > When this happens sysrq-t shows a sleep task hung in the 'R' state
->> > > > > spinning in do_work_pending, so maybe there is a potential infinite
->> > > > > loop here?
->> > > > >
->> > > > > The addr_limit_user_check at the start of do_work_pending will check
->> > > > > for TIF_FSCHECK once and clear it but the function loops while
->> > > > > (thread_flags & _TIF_WORK_MASK), so it if TIF_FSCHECK is set again then
->> > > > > the loop will never terminate. Does this make sense?
->> > > >
->> > > > Yes, it does. Thanks for looking into this.
->> > > >
->> > > > Can you try this change?
->> > > >
->> > > > diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
->> > > > index 3a48b54c6405..bc6ad7789568 100644
->> > > > --- a/arch/arm/kernel/signal.c
->> > > > +++ b/arch/arm/kernel/signal.c
->> > > > @@ -573,12 +573,11 @@ do_work_pending(struct pt_regs *regs, unsigned
->> > > > int thread_flags, int syscall)
->> > > >   */
->> > > >   trace_hardirqs_off();
->> > > >
->> > > > - /* Check valid user FS if needed */
->> > > > - addr_limit_user_check();
->> > > > -
->> > > >   do {
->> > > >   if (likely(thread_flags & _TIF_NEED_RESCHED)) {
->> > > >   schedule();
->> > > > + } else if (thread_flags & _TIF_FSCHECK) {
->> > > > + addr_limit_user_check();
->> > > >   } else {
->> > > >   if (unlikely(!user_mode(regs)))
->> > > >   return 0;
->> > > This does seem to work, it no longer hangs on boot in my setup. This is
->> > > obviously only a very superficial test.
->> > >
->> > > The new location of this check seems weird, it's not clear why it
->> > > should be on an else path. Perhaps it should be moved to right before
->> > > where current_thread_info()->flags is fetched again?
->>
->> > I was hitting bug when I tried that.I think that's because you
->> > basically let the signal handler do pending work before you check the
->> > flag, that's not a good idea.
->>
->> > > If the purpose is hardening against buggy kernel code doing bad set_fs
->> > > calls shouldn't this flag also be checked before looking at
->> > > TIF_NEED_RESCHED and calling schedule()?
->> > I am not sure to be honest. I expected schedule to only schedule the
->> > processor to another task which would be fine given only the current
->> > task have a bogus fs. I will put it first in case there is an edge
->> > case scenario I missed.
->> >
->> > What do you think? Let me know and I will look at changes all
->> > architectures and testing them.
->>
->> I don't know and I'd rather not guess on security issues. It's better
->> if someone else reviews the code.
->>
->> Unless there is a very quick fix maybe this series should be removed or
->> reverted from linux-next? A diagnosis of "system calls can sometimes
->> hang on return" seems serious even for linux-next. Since it happens
->> very rarely in most setups I can easily imagine somebody spending a lot
->> of time digging at this.
->
-> Probably best to revert.  I stopped looking at these patches during
-> the discussion, as the discussion seemed to be mainly around other
-> architectures, and I thought we had ARM settled.
->
-> Looking at this patch now, there's several things I'm not happy with.
->
-> The effect of adding a the new TIF flag for FSCHECK amongst the other
-> flags is that we end up overflowing the 8-bit constant, and have to
-> split the tests, meaning more instructions in the return path.  Eg:
->
-> -       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
-> +       tst     r1, #_TIF_SYSCALL_WORK
-> +       bne     fast_work_pending
-> +       tst     r1, #_TIF_WORK_MASK
->         bne     fast_work_pending
->
-> should be written:
->
->         tst     r1, #_TIF_SYSCALL_WORK
->         tsteq   r1, #_TIF_WORK_MASK
->         bne     fast_work_pending
->
-> and:
->
-> -       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
-> +       tst     r1, #_TIF_SYSCALL_WORK
-> +       bne     fast_work_pending
-> +       tst     r1, #_TIF_WORK_MASK
->
-> should be:
->
->         tst     r1, #_TIF_SYSCALL_WORK
->         tsteq   r1, #_TIF_WORK_MASK
->
-> There's no need for extra branches.
->
-> Now, the next issue is that I don't think this TIF-flag approach is
-> good for ARM - alignment faults can happen any time due to misaligned
-> packets in the networking code, and we really don't want to be doing
-> this check in a place that we can loop.
->
-> My original suggestion for ARM was to do the address limit check after
-> all work had been processed, with interrupts disabled (so no
-> possibility of this kind of loop happening.)  However, that seems to
-> have been replaced with this TIF approach, which is going to cause
-> loops - I suspect if the probes code is enabled, this will suffer
-> the same problem.  Remember, the various probes stuff can walk
-> userspace stacks, which means they'll be using set_fs().
->
-> I don't see why we've ended up with this (imho) sub-standard TIF-flag
-> approach, and I think it's going to be very problematical.
->
-> Can we please go back to the approach I suggested back in March for
-> ARM that doesn't suffer from this problem?
+Hi Laurentiu,
 
-During the extensive thread discussion, Linus asked to move away from
-architecture specific changes to this work flag system. I am glad to
-fix the assembly as you asked on a separate patch.
+[auto build test ERROR on staging/staging-testing]
+[also build test ERROR on v4.13-rc1 next-20170718]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+url:    https://github.com/0day-ci/linux/commits/laurentiu-tudor-nxp-com/staging-fsl-mc-make-the-driver-compile-on-other-architectures/20170718-021715
+config: sparc-allyesconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sparc 
 
+All error/warnings (new ones prefixed by >>):
 
+   In file included from kernel/irq/chip.c:14:0:
+>> include/linux/msi.h:225:10: error: unknown type name 'msi_alloc_info_t'
+             msi_alloc_info_t *arg);
+             ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:229:9: error: unknown type name 'msi_alloc_info_t'
+            msi_alloc_info_t *arg);
+            ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:238:12: error: unknown type name 'msi_alloc_info_t'
+               msi_alloc_info_t *arg);
+               ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:239:22: error: unknown type name 'msi_alloc_info_t'
+     void  (*msi_finish)(msi_alloc_info_t *arg, int retval);
+                         ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:240:20: error: unknown type name 'msi_alloc_info_t'
+     void  (*set_desc)(msi_alloc_info_t *arg,
+                       ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:308:18: error: unknown type name 'msi_alloc_info_t'
+           int nvec, msi_alloc_info_t *args);
+                     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:310:29: error: unknown type name 'msi_alloc_info_t'
+            int virq, int nvec, msi_alloc_info_t *args);
+                                ^~~~~~~~~~~~~~~~
+--
+   In file included from kernel/irq/msi.c:16:0:
+>> include/linux/msi.h:225:10: error: unknown type name 'msi_alloc_info_t'
+             msi_alloc_info_t *arg);
+             ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:229:9: error: unknown type name 'msi_alloc_info_t'
+            msi_alloc_info_t *arg);
+            ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:238:12: error: unknown type name 'msi_alloc_info_t'
+               msi_alloc_info_t *arg);
+               ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:239:22: error: unknown type name 'msi_alloc_info_t'
+     void  (*msi_finish)(msi_alloc_info_t *arg, int retval);
+                         ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:240:20: error: unknown type name 'msi_alloc_info_t'
+     void  (*set_desc)(msi_alloc_info_t *arg,
+                       ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:308:18: error: unknown type name 'msi_alloc_info_t'
+           int nvec, msi_alloc_info_t *args);
+                     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:310:29: error: unknown type name 'msi_alloc_info_t'
+            int virq, int nvec, msi_alloc_info_t *args);
+                                ^~~~~~~~~~~~~~~~
+   kernel/irq/msi.c: In function 'msi_domain_alloc':
+>> kernel/irq/msi.c:126:29: error: 'struct msi_domain_ops' has no member named 'get_hwirq'
+     irq_hw_number_t hwirq = ops->get_hwirq(info, arg);
+                                ^~
+>> kernel/irq/msi.c:139:12: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+      ret = ops->msi_init(domain, info, virq + i, hwirq + i, arg);
+               ^~
+   kernel/irq/msi.c: At top level:
+>> kernel/irq/msi.c:201:11: error: unknown type name 'msi_alloc_info_t'
+              msi_alloc_info_t *arg)
+              ^~~~~~~~~~~~~~~~
+>> kernel/irq/msi.c:221:2: error: unknown field 'get_hwirq' specified in initializer
+     .get_hwirq = msi_domain_ops_get_hwirq,
+     ^
+>> kernel/irq/msi.c:222:2: error: unknown field 'msi_init' specified in initializer
+     .msi_init = msi_domain_ops_init,
+     ^
+>> kernel/irq/msi.c:222:14: error: 'msi_domain_ops_init' undeclared here (not in a function)
+     .msi_init = msi_domain_ops_init,
+                 ^~~~~~~~~~~~~~~~~~~
+>> kernel/irq/msi.c:224:2: error: unknown field 'msi_prepare' specified in initializer
+     .msi_prepare = msi_domain_ops_prepare,
+     ^
+>> kernel/irq/msi.c:225:2: error: unknown field 'set_desc' specified in initializer
+     .set_desc = msi_domain_ops_set_desc,
+     ^
+   In file included from include/uapi/linux/posix_types.h:4:0,
+                    from include/uapi/linux/types.h:13,
+                    from include/linux/types.h:5,
+                    from kernel/irq/msi.c:12:
+   include/linux/stddef.h:7:14: warning: excess elements in struct initializer
+    #define NULL ((void *)0)
+                 ^
+>> kernel/irq/msi.c:195:34: note: in expansion of macro 'NULL'
+    #define msi_domain_ops_set_desc  NULL
+                                     ^~~~
+>> kernel/irq/msi.c:225:14: note: in expansion of macro 'msi_domain_ops_set_desc'
+     .set_desc = msi_domain_ops_set_desc,
+                 ^~~~~~~~~~~~~~~~~~~~~~~
+   include/linux/stddef.h:7:14: note: (near initialization for 'msi_domain_ops_default')
+    #define NULL ((void *)0)
+                 ^
+>> kernel/irq/msi.c:195:34: note: in expansion of macro 'NULL'
+    #define msi_domain_ops_set_desc  NULL
+                                     ^~~~
+>> kernel/irq/msi.c:225:14: note: in expansion of macro 'msi_domain_ops_set_desc'
+     .set_desc = msi_domain_ops_set_desc,
+                 ^~~~~~~~~~~~~~~~~~~~~~~
+   kernel/irq/msi.c: In function 'msi_domain_update_dom_ops':
+   kernel/irq/msi.c:237:9: error: 'struct msi_domain_ops' has no member named 'get_hwirq'
+     if (ops->get_hwirq == NULL)
+            ^~
+   kernel/irq/msi.c:238:6: error: 'struct msi_domain_ops' has no member named 'get_hwirq'
+      ops->get_hwirq = msi_domain_ops_default.get_hwirq;
+         ^~
+   kernel/irq/msi.c:238:42: error: 'struct msi_domain_ops' has no member named 'get_hwirq'
+      ops->get_hwirq = msi_domain_ops_default.get_hwirq;
+                                             ^
+   kernel/irq/msi.c:239:9: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+     if (ops->msi_init == NULL)
+            ^~
+   kernel/irq/msi.c:240:6: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+      ops->msi_init = msi_domain_ops_default.msi_init;
+         ^~
+   kernel/irq/msi.c:240:41: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+      ops->msi_init = msi_domain_ops_default.msi_init;
+                                            ^
+>> kernel/irq/msi.c:243:9: error: 'struct msi_domain_ops' has no member named 'msi_prepare'; did you mean 'msi_free'?
+     if (ops->msi_prepare == NULL)
+            ^~
+   kernel/irq/msi.c:244:6: error: 'struct msi_domain_ops' has no member named 'msi_prepare'; did you mean 'msi_free'?
+      ops->msi_prepare = msi_domain_ops_default.msi_prepare;
+         ^~
+   kernel/irq/msi.c:244:44: error: 'struct msi_domain_ops' has no member named 'msi_prepare'; did you mean 'msi_free'?
+      ops->msi_prepare = msi_domain_ops_default.msi_prepare;
+                                               ^
+>> kernel/irq/msi.c:245:9: error: 'struct msi_domain_ops' has no member named 'set_desc'
+     if (ops->set_desc == NULL)
+            ^~
+   kernel/irq/msi.c:246:6: error: 'struct msi_domain_ops' has no member named 'set_desc'
+      ops->set_desc = msi_domain_ops_default.set_desc;
+         ^~
+   kernel/irq/msi.c:246:41: error: 'struct msi_domain_ops' has no member named 'set_desc'
+      ops->set_desc = msi_domain_ops_default.set_desc;
+                                            ^
+   kernel/irq/msi.c: At top level:
+   kernel/irq/msi.c:285:18: error: unknown type name 'msi_alloc_info_t'
+           int nvec, msi_alloc_info_t *arg)
+                     ^~~~~~~~~~~~~~~~
+   kernel/irq/msi.c:299:29: error: unknown type name 'msi_alloc_info_t'
+            int virq, int nvec, msi_alloc_info_t *arg)
+                                ^~~~~~~~~~~~~~~~
+   kernel/irq/msi.c: In function 'msi_domain_alloc_irqs':
+   kernel/irq/msi.c:352:2: error: unknown type name 'msi_alloc_info_t'
+     msi_alloc_info_t arg;
+     ^~~~~~~~~~~~~~~~
+>> kernel/irq/msi.c:356:8: error: implicit declaration of function 'msi_domain_prepare_irqs' [-Werror=implicit-function-declaration]
+     ret = msi_domain_prepare_irqs(domain, dev, nvec, &arg);
+           ^~~~~~~~~~~~~~~~~~~~~~~
+   kernel/irq/msi.c:361:6: error: 'struct msi_domain_ops' has no member named 'set_desc'
+      ops->set_desc(&arg, desc);
+         ^~
+>> kernel/irq/msi.c:370:11: error: 'struct msi_domain_ops' has no member named 'msi_finish'; did you mean 'msi_free'?
+       if (ops->msi_finish)
+              ^~
+   kernel/irq/msi.c:371:8: error: 'struct msi_domain_ops' has no member named 'msi_finish'; did you mean 'msi_free'?
+        ops->msi_finish(&arg, ret);
+           ^~
+   kernel/irq/msi.c:379:9: error: 'struct msi_domain_ops' has no member named 'msi_finish'; did you mean 'msi_free'?
+     if (ops->msi_finish)
+            ^~
+   kernel/irq/msi.c:380:6: error: 'struct msi_domain_ops' has no member named 'msi_finish'; did you mean 'msi_free'?
+      ops->msi_finish(&arg, 0);
+         ^~
+   cc1: some warnings being treated as errors
+--
+   In file included from drivers//staging/fsl-mc/bus/fsl-mc-msi.c:17:0:
+>> include/linux/msi.h:225:10: error: unknown type name 'msi_alloc_info_t'
+             msi_alloc_info_t *arg);
+             ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:229:9: error: unknown type name 'msi_alloc_info_t'
+            msi_alloc_info_t *arg);
+            ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:238:12: error: unknown type name 'msi_alloc_info_t'
+               msi_alloc_info_t *arg);
+               ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:239:22: error: unknown type name 'msi_alloc_info_t'
+     void  (*msi_finish)(msi_alloc_info_t *arg, int retval);
+                         ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:240:20: error: unknown type name 'msi_alloc_info_t'
+     void  (*set_desc)(msi_alloc_info_t *arg,
+                       ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:308:18: error: unknown type name 'msi_alloc_info_t'
+           int nvec, msi_alloc_info_t *args);
+                     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:310:29: error: unknown type name 'msi_alloc_info_t'
+            int virq, int nvec, msi_alloc_info_t *args);
+                                ^~~~~~~~~~~~~~~~
+   drivers//staging/fsl-mc/bus/fsl-mc-msi.c: In function 'fsl_mc_msi_update_dom_ops':
+>> drivers//staging/fsl-mc/bus/fsl-mc-msi.c:56:10: error: 'struct msi_domain_ops' has no member named 'set_desc'
+     if (!ops->set_desc)
+             ^~
+   drivers//staging/fsl-mc/bus/fsl-mc-msi.c:57:6: error: 'struct msi_domain_ops' has no member named 'set_desc'
+      ops->set_desc = fsl_mc_msi_set_desc;
+         ^~
+--
+   In file included from drivers//staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c:15:0:
+>> include/linux/msi.h:225:10: error: unknown type name 'msi_alloc_info_t'
+             msi_alloc_info_t *arg);
+             ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:229:9: error: unknown type name 'msi_alloc_info_t'
+            msi_alloc_info_t *arg);
+            ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:238:12: error: unknown type name 'msi_alloc_info_t'
+               msi_alloc_info_t *arg);
+               ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:239:22: error: unknown type name 'msi_alloc_info_t'
+     void  (*msi_finish)(msi_alloc_info_t *arg, int retval);
+                         ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:240:20: error: unknown type name 'msi_alloc_info_t'
+     void  (*set_desc)(msi_alloc_info_t *arg,
+                       ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:308:18: error: unknown type name 'msi_alloc_info_t'
+           int nvec, msi_alloc_info_t *args);
+                     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:310:29: error: unknown type name 'msi_alloc_info_t'
+            int virq, int nvec, msi_alloc_info_t *args);
+                                ^~~~~~~~~~~~~~~~
+>> drivers//staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c:30:17: error: unknown type name 'msi_alloc_info_t'
+          int nvec, msi_alloc_info_t *info)
+                    ^~~~~~~~~~~~~~~~
+>> drivers//staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c:56:2: error: unknown field 'msi_prepare' specified in initializer
+     .msi_prepare = its_fsl_mc_msi_prepare,
+     ^
+>> drivers//staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c:56:17: error: 'its_fsl_mc_msi_prepare' undeclared here (not in a function)
+     .msi_prepare = its_fsl_mc_msi_prepare,
+                    ^~~~~~~~~~~~~~~~~~~~~~
+--
+   In file included from drivers//base/platform-msi.c:24:0:
+>> include/linux/msi.h:225:10: error: unknown type name 'msi_alloc_info_t'
+             msi_alloc_info_t *arg);
+             ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:229:9: error: unknown type name 'msi_alloc_info_t'
+            msi_alloc_info_t *arg);
+            ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:238:12: error: unknown type name 'msi_alloc_info_t'
+               msi_alloc_info_t *arg);
+               ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:239:22: error: unknown type name 'msi_alloc_info_t'
+     void  (*msi_finish)(msi_alloc_info_t *arg, int retval);
+                         ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:240:20: error: unknown type name 'msi_alloc_info_t'
+     void  (*set_desc)(msi_alloc_info_t *arg,
+                       ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:308:18: error: unknown type name 'msi_alloc_info_t'
+           int nvec, msi_alloc_info_t *args);
+                     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:310:29: error: unknown type name 'msi_alloc_info_t'
+            int virq, int nvec, msi_alloc_info_t *args);
+                                ^~~~~~~~~~~~~~~~
+>> drivers//base/platform-msi.c:37:2: error: unknown type name 'msi_alloc_info_t'
+     msi_alloc_info_t arg;
+     ^~~~~~~~~~~~~~~~
+   drivers//base/platform-msi.c: In function 'platform_msi_update_dom_ops':
+>> drivers//base/platform-msi.c:84:9: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+     if (ops->msi_init == NULL)
+            ^~
+   drivers//base/platform-msi.c:85:6: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+      ops->msi_init = platform_msi_init;
+         ^~
+>> drivers//base/platform-msi.c:86:9: error: 'struct msi_domain_ops' has no member named 'set_desc'
+     if (ops->set_desc == NULL)
+            ^~
+   drivers//base/platform-msi.c:87:6: error: 'struct msi_domain_ops' has no member named 'set_desc'
+      ops->set_desc = platform_msi_set_desc;
+         ^~
+   drivers//base/platform-msi.c: In function 'platform_msi_create_device_domain':
+>> drivers//base/platform-msi.c:352:8: error: implicit declaration of function 'msi_domain_prepare_irqs' [-Werror=implicit-function-declaration]
+     err = msi_domain_prepare_irqs(domain->parent, dev, nvec, &data->arg);
+           ^~~~~~~~~~~~~~~~~~~~~~~
+   drivers//base/platform-msi.c: In function 'platform_msi_domain_alloc':
+>> drivers//base/platform-msi.c:410:8: error: implicit declaration of function 'msi_domain_populate_irqs' [-Werror=implicit-function-declaration]
+     err = msi_domain_populate_irqs(domain->parent, data->dev,
+           ^~~~~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+--
+   In file included from kernel//irq/msi.c:16:0:
+>> include/linux/msi.h:225:10: error: unknown type name 'msi_alloc_info_t'
+             msi_alloc_info_t *arg);
+             ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:229:9: error: unknown type name 'msi_alloc_info_t'
+            msi_alloc_info_t *arg);
+            ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:238:12: error: unknown type name 'msi_alloc_info_t'
+               msi_alloc_info_t *arg);
+               ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:239:22: error: unknown type name 'msi_alloc_info_t'
+     void  (*msi_finish)(msi_alloc_info_t *arg, int retval);
+                         ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:240:20: error: unknown type name 'msi_alloc_info_t'
+     void  (*set_desc)(msi_alloc_info_t *arg,
+                       ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:308:18: error: unknown type name 'msi_alloc_info_t'
+           int nvec, msi_alloc_info_t *args);
+                     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:310:29: error: unknown type name 'msi_alloc_info_t'
+            int virq, int nvec, msi_alloc_info_t *args);
+                                ^~~~~~~~~~~~~~~~
+   kernel//irq/msi.c: In function 'msi_domain_alloc':
+   kernel//irq/msi.c:126:29: error: 'struct msi_domain_ops' has no member named 'get_hwirq'
+     irq_hw_number_t hwirq = ops->get_hwirq(info, arg);
+                                ^~
+   kernel//irq/msi.c:139:12: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+      ret = ops->msi_init(domain, info, virq + i, hwirq + i, arg);
+               ^~
+   kernel//irq/msi.c: At top level:
+   kernel//irq/msi.c:201:11: error: unknown type name 'msi_alloc_info_t'
+              msi_alloc_info_t *arg)
+              ^~~~~~~~~~~~~~~~
+   kernel//irq/msi.c:221:2: error: unknown field 'get_hwirq' specified in initializer
+     .get_hwirq = msi_domain_ops_get_hwirq,
+     ^
+   kernel//irq/msi.c:222:2: error: unknown field 'msi_init' specified in initializer
+     .msi_init = msi_domain_ops_init,
+     ^
+   kernel//irq/msi.c:222:14: error: 'msi_domain_ops_init' undeclared here (not in a function)
+     .msi_init = msi_domain_ops_init,
+                 ^~~~~~~~~~~~~~~~~~~
+   kernel//irq/msi.c:224:2: error: unknown field 'msi_prepare' specified in initializer
+     .msi_prepare = msi_domain_ops_prepare,
+     ^
+   kernel//irq/msi.c:225:2: error: unknown field 'set_desc' specified in initializer
+     .set_desc = msi_domain_ops_set_desc,
+     ^
+   In file included from include/uapi/linux/posix_types.h:4:0,
+                    from include/uapi/linux/types.h:13,
+                    from include/linux/types.h:5,
+                    from kernel//irq/msi.c:12:
+   include/linux/stddef.h:7:14: warning: excess elements in struct initializer
+    #define NULL ((void *)0)
+                 ^
+   kernel//irq/msi.c:195:34: note: in expansion of macro 'NULL'
+    #define msi_domain_ops_set_desc  NULL
+                                     ^~~~
+   kernel//irq/msi.c:225:14: note: in expansion of macro 'msi_domain_ops_set_desc'
+     .set_desc = msi_domain_ops_set_desc,
+                 ^~~~~~~~~~~~~~~~~~~~~~~
+   include/linux/stddef.h:7:14: note: (near initialization for 'msi_domain_ops_default')
+    #define NULL ((void *)0)
+                 ^
+   kernel//irq/msi.c:195:34: note: in expansion of macro 'NULL'
+    #define msi_domain_ops_set_desc  NULL
+                                     ^~~~
+   kernel//irq/msi.c:225:14: note: in expansion of macro 'msi_domain_ops_set_desc'
+     .set_desc = msi_domain_ops_set_desc,
+                 ^~~~~~~~~~~~~~~~~~~~~~~
+   kernel//irq/msi.c: In function 'msi_domain_update_dom_ops':
+   kernel//irq/msi.c:237:9: error: 'struct msi_domain_ops' has no member named 'get_hwirq'
+     if (ops->get_hwirq == NULL)
+            ^~
+   kernel//irq/msi.c:238:6: error: 'struct msi_domain_ops' has no member named 'get_hwirq'
+      ops->get_hwirq = msi_domain_ops_default.get_hwirq;
+         ^~
+   kernel//irq/msi.c:238:42: error: 'struct msi_domain_ops' has no member named 'get_hwirq'
+      ops->get_hwirq = msi_domain_ops_default.get_hwirq;
+                                             ^
+   kernel//irq/msi.c:239:9: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+     if (ops->msi_init == NULL)
+            ^~
+   kernel//irq/msi.c:240:6: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+      ops->msi_init = msi_domain_ops_default.msi_init;
+         ^~
+   kernel//irq/msi.c:240:41: error: 'struct msi_domain_ops' has no member named 'msi_init'; did you mean 'msi_free'?
+      ops->msi_init = msi_domain_ops_default.msi_init;
+                                            ^
+   kernel//irq/msi.c:243:9: error: 'struct msi_domain_ops' has no member named 'msi_prepare'; did you mean 'msi_free'?
+     if (ops->msi_prepare == NULL)
+            ^~
+   kernel//irq/msi.c:244:6: error: 'struct msi_domain_ops' has no member named 'msi_prepare'; did you mean 'msi_free'?
+      ops->msi_prepare = msi_domain_ops_default.msi_prepare;
+         ^~
+   kernel//irq/msi.c:244:44: error: 'struct msi_domain_ops' has no member named 'msi_prepare'; did you mean 'msi_free'?
+      ops->msi_prepare = msi_domain_ops_default.msi_prepare;
+                                               ^
+   kernel//irq/msi.c:245:9: error: 'struct msi_domain_ops' has no member named 'set_desc'
+     if (ops->set_desc == NULL)
+            ^~
+   kernel//irq/msi.c:246:6: error: 'struct msi_domain_ops' has no member named 'set_desc'
+..
 
--- 
-Thomas
+vim +/msi_alloc_info_t +225 include/linux/msi.h
+
+f3cf8bb0 Jiang Liu        2014-11-12  204  
+f3cf8bb0 Jiang Liu        2014-11-12  205  /**
+f3cf8bb0 Jiang Liu        2014-11-12  206   * struct msi_domain_ops - MSI interrupt domain callbacks
+f3cf8bb0 Jiang Liu        2014-11-12  207   * @get_hwirq:		Retrieve the resulting hw irq number
+f3cf8bb0 Jiang Liu        2014-11-12  208   * @msi_init:		Domain specific init function for MSI interrupts
+f3cf8bb0 Jiang Liu        2014-11-12  209   * @msi_free:		Domain specific function to free a MSI interrupts
+d9109698 Jiang Liu        2014-11-15  210   * @msi_check:		Callback for verification of the domain/info/dev data
+d9109698 Jiang Liu        2014-11-15  211   * @msi_prepare:	Prepare the allocation of the interrupts in the domain
+1d1e8cdc Thomas Petazzoni 2015-12-21  212   * @msi_finish:		Optional callback to finalize the allocation
+d9109698 Jiang Liu        2014-11-15  213   * @set_desc:		Set the msi descriptor for an interrupt
+d9109698 Jiang Liu        2014-11-15  214   * @handle_error:	Optional error handler if the allocation fails
+d9109698 Jiang Liu        2014-11-15  215   *
+d9109698 Jiang Liu        2014-11-15  216   * @get_hwirq, @msi_init and @msi_free are callbacks used by
+d9109698 Jiang Liu        2014-11-15  217   * msi_create_irq_domain() and related interfaces
+d9109698 Jiang Liu        2014-11-15  218   *
+d9109698 Jiang Liu        2014-11-15  219   * @msi_check, @msi_prepare, @msi_finish, @set_desc and @handle_error
+1d1e8cdc Thomas Petazzoni 2015-12-21  220   * are callbacks used by msi_domain_alloc_irqs() and related
+d9109698 Jiang Liu        2014-11-15  221   * interfaces which are based on msi_desc.
+f3cf8bb0 Jiang Liu        2014-11-12  222   */
+f3cf8bb0 Jiang Liu        2014-11-12  223  struct msi_domain_ops {
+aeeb5965 Jiang Liu        2014-11-15  224  	irq_hw_number_t	(*get_hwirq)(struct msi_domain_info *info,
+aeeb5965 Jiang Liu        2014-11-15 @225  				     msi_alloc_info_t *arg);
+f3cf8bb0 Jiang Liu        2014-11-12  226  	int		(*msi_init)(struct irq_domain *domain,
+f3cf8bb0 Jiang Liu        2014-11-12  227  				    struct msi_domain_info *info,
+f3cf8bb0 Jiang Liu        2014-11-12  228  				    unsigned int virq, irq_hw_number_t hwirq,
+aeeb5965 Jiang Liu        2014-11-15  229  				    msi_alloc_info_t *arg);
+f3cf8bb0 Jiang Liu        2014-11-12  230  	void		(*msi_free)(struct irq_domain *domain,
+f3cf8bb0 Jiang Liu        2014-11-12  231  				    struct msi_domain_info *info,
+f3cf8bb0 Jiang Liu        2014-11-12  232  				    unsigned int virq);
+d9109698 Jiang Liu        2014-11-15  233  	int		(*msi_check)(struct irq_domain *domain,
+d9109698 Jiang Liu        2014-11-15  234  				     struct msi_domain_info *info,
+d9109698 Jiang Liu        2014-11-15  235  				     struct device *dev);
+d9109698 Jiang Liu        2014-11-15  236  	int		(*msi_prepare)(struct irq_domain *domain,
+d9109698 Jiang Liu        2014-11-15  237  				       struct device *dev, int nvec,
+d9109698 Jiang Liu        2014-11-15  238  				       msi_alloc_info_t *arg);
+d9109698 Jiang Liu        2014-11-15  239  	void		(*msi_finish)(msi_alloc_info_t *arg, int retval);
+d9109698 Jiang Liu        2014-11-15  240  	void		(*set_desc)(msi_alloc_info_t *arg,
+d9109698 Jiang Liu        2014-11-15  241  				    struct msi_desc *desc);
+d9109698 Jiang Liu        2014-11-15  242  	int		(*handle_error)(struct irq_domain *domain,
+d9109698 Jiang Liu        2014-11-15  243  					struct msi_desc *desc, int error);
+f3cf8bb0 Jiang Liu        2014-11-12  244  };
+f3cf8bb0 Jiang Liu        2014-11-12  245  
+
+:::::: The code at line 225 was first introduced by commit
+:::::: aeeb59657c35da64068336c20068da237f41ab76 genirq: Provide default callbacks for msi_domain_ops
+
+:::::: TO: Jiang Liu <jiang.liu@linux.intel.com>
+:::::: CC: Thomas Gleixner <tglx@linutronix.de>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 51491 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/9560d1e2/attachment-0001.gz>
