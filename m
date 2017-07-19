@@ -1,55 +1,41 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 19 Jul 2017 06:37:22 -0400
-Subject: [PATCH] nvme: Acknowledge completion queue on each iteration
-In-Reply-To: <5595ca25-f616-c0f8-fb2c-241a951e8848@grimberg.me>
-References: <1500330983-27501-1-git-send-email-okaya@codeaurora.org>
- <5595ca25-f616-c0f8-fb2c-241a951e8848@grimberg.me>
-Message-ID: <933e9d49-ecfd-cc83-c116-29f97211480c@codeaurora.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 19 Jul 2017 12:37:39 +0200
+Subject: [PATCH] soc: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-49-robh@kernel.org>
+References: <20170718214339.7774-49-robh@kernel.org>
+Message-ID: <6e936e3c-0e46-4f06-5571-5942d6fb1778@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/19/2017 5:20 AM, Sagi Grimberg wrote:
->> Code is moving the completion queue doorbell after processing all completed
->> events and sending callbacks to the block layer on each iteration.
->>
->> This is causing a performance drop when a lot of jobs are queued towards
->> the HW. Move the completion queue doorbell on each loop instead and allow new
->> jobs to be queued by the HW.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>   drivers/nvme/host/pci.c | 5 ++---
->>   1 file changed, 2 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/nvme/host/pci.c b/drivers/nvme/host/pci.c
->> index d10d2f2..33d9b5b 100644
->> --- a/drivers/nvme/host/pci.c
->> +++ b/drivers/nvme/host/pci.c
->> @@ -810,13 +810,12 @@ static void nvme_process_cq(struct nvme_queue *nvmeq)
->>         while (nvme_read_cqe(nvmeq, &cqe)) {
->>           nvme_handle_cqe(nvmeq, &cqe);
->> +        nvme_ring_cq_doorbell(nvmeq);
->>           consumed++;
->>       }
->>   -    if (consumed) {
->> -        nvme_ring_cq_doorbell(nvmeq);
->> +    if (consumed)
->>           nvmeq->cqe_seen = 1;
->> -    }
->>   }
+
+
+On 07/18/2017 11:43 PM, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-> Agree with Keith that this is definitely not the way to go, it
-> adds mmio operations in the hot path with very little gain (if
-> at all).
-> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Scott Wood <oss@buserror.net>
+> Cc: Qiang Zhao <qiang.zhao@nxp.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-renesas-soc at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> ---
+>   drivers/soc/fsl/qbman/bman_ccsr.c    | 10 +++++-----
+>   drivers/soc/fsl/qbman/bman_portal.c  |  8 +++-----
+>   drivers/soc/fsl/qbman/qman_ccsr.c    | 12 ++++++------
+>   drivers/soc/fsl/qbman/qman_portal.c  | 11 ++++-------
+>   drivers/soc/fsl/qe/gpio.c            |  4 ++--
+>   drivers/soc/mediatek/mtk-pmic-wrap.c |  4 ++--
 
-Understood, different architectures might have different latency accessing the HW
-registers. It might be expansive on some platform like you indicated and this change
-would make it worse.
+For Mediatek:
 
-I'm doing a self NACK as well.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
