@@ -1,49 +1,127 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 19 Jul 2017 09:33:49 +0300
-Subject: [PATCH RFC 2/2] dt-bindings: add binding documentation for
- Allwinner CSI
-In-Reply-To: <20170719142120.d00469cf9fce844d40b9988e@magewell.com>
-References: <1498561654-14658-1-git-send-email-yong.deng@magewell.com>
- <1498561654-14658-3-git-send-email-yong.deng@magewell.com>
- <20170718115530.ssy7g5vv4siqnfpo@tarshish>
- <20170719092249.2fb6ec720ba1b194cea320c8@magewell.com>
- <20170719044923.yae2ye4slvrmtyfe@sapphire.tkos.co.il>
- <20170719142120.d00469cf9fce844d40b9988e@magewell.com>
-Message-ID: <20170719063349.m5yg4n2radkvy74r@sapphire.tkos.co.il>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 19 Jul 2017 12:06:42 +0530
+Subject: [PATCH] cpufreq: dt: Don't use generic platdev driver for tango
+In-Reply-To: <f6b9a4e6-bbff-fe92-6867-547c581db3c8@sigmadesigns.com>
+References: <f6b9a4e6-bbff-fe92-6867-547c581db3c8@sigmadesigns.com>
+Message-ID: <20170719063642.GC352@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
-
-On Wed, Jul 19, 2017 at 02:21:20PM +0800, Yong wrote:
-> On Wed, 19 Jul 2017 07:49:23 +0300
-> Baruch Siach <baruch@tkos.co.il> wrote:
-> > On Wed, Jul 19, 2017 at 09:22:49AM +0800, Yong wrote:
-> > > I am waiting for more comments for the sunxi-csi.h. It's pleasure if
-> > > you have any suggestions about it.
-> > 
-> > You mean sunxi_csi.h, right?
+On 18-07-17, 18:48, Marc Gonzalez wrote:
+> On tango platforms, firmware configures the CPU clock, and Linux is
+> then only allowed to use the cpu_clk_divider to change the frequency.
+> Build the OPP table dynamically at init, in order to support whatever
+> firmware throws at us.
 > 
-> Yes. My spelling mistake.
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+>  arch/arm/boot/dts/tango4-smp8758.dtsi |  1 -
+>  drivers/cpufreq/Kconfig.arm           |  5 +++++
+>  drivers/cpufreq/Makefile              |  1 +
+>  drivers/cpufreq/cpufreq-dt-platdev.c  |  2 --
+>  drivers/cpufreq/tango-cpufreq.c       | 38 +++++++++++++++++++++++++++++++++++
+>  5 files changed, 44 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/cpufreq/tango-cpufreq.c
 > 
-> > Why do you need the sunxi_csi_ops indirection? Do you expect to add 
-> > alternative implementations of these ops at some point?
-> 
-> I want to seperate the sunxi_video.c and sunxi_csi_v3s.c. 
-> sunxi_csi_v3s.c is Soc specific. Maybe there will be sunxi_csi_r40.c
-> in the futrue. But the sunxi_video.c and sunxi_csi.c are common.
+> diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
+> index d2e65c46bcc7..eca33d568690 100644
+> --- a/arch/arm/boot/dts/tango4-smp8758.dtsi
+> +++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
+> @@ -13,7 +13,6 @@
+>  			reg = <0>;
+>  			clocks = <&clkgen CPU_CLK>;
+>  			clock-latency = <1>;
+> -			operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
+>  		};
+>  
+>  		cpu1: cpu at 1 {
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 2011fec2d6ad..ea9ba00091bb 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -242,6 +242,11 @@ config ARM_STI_CPUFREQ
+>  	  this config option if you wish to add CPUFreq support for STi based
+>  	  SoCs.
+>  
+> +config ARM_TANGO_CPUFREQ
+> +	bool
+> +	depends on CPUFREQ_DT && ARCH_TANGO
+> +	default y
+> +
+>  config ARM_TEGRA20_CPUFREQ
+>  	bool "Tegra20 CPUFreq support"
+>  	depends on ARCH_TEGRA
+> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> index ab3a42cd29ef..bb9841f57787 100644
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+> @@ -75,6 +75,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
+>  obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
+>  obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+>  obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
+> +obj-$(CONFIG_ARM_TANGO_CPUFREQ)		+= tango-cpufreq.o
+>  obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
+>  obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
+>  obj-$(CONFIG_ARM_TEGRA186_CPUFREQ)	+= tegra186-cpufreq.o
+> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> index 1c262923fe58..6cbe77765f46 100644
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -80,8 +80,6 @@ static const struct of_device_id machines[] __initconst = {
+>  	{ .compatible = "rockchip,rk3368", },
+>  	{ .compatible = "rockchip,rk3399", },
+>  
+> -	{ .compatible = "sigma,tango4" },
+> -
+>  	{ .compatible = "socionext,uniphier-pro5", },
+>  	{ .compatible = "socionext,uniphier-pxs2", },
+>  	{ .compatible = "socionext,uniphier-ld6b", },
+> diff --git a/drivers/cpufreq/tango-cpufreq.c b/drivers/cpufreq/tango-cpufreq.c
+> new file mode 100644
+> index 000000000000..89a7f860bfe8
+> --- /dev/null
+> +++ b/drivers/cpufreq/tango-cpufreq.c
+> @@ -0,0 +1,38 @@
+> +#include <linux/of.h>
+> +#include <linux/cpu.h>
+> +#include <linux/clk.h>
+> +#include <linux/pm_opp.h>
+> +#include <linux/platform_device.h>
+> +
+> +static const struct of_device_id machines[] __initconst = {
+> +	{ .compatible = "sigma,tango4" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int __init tango_cpufreq_init(void)
+> +{
+> +	struct device *cpu_dev = get_cpu_device(0);
+> +	unsigned long max_freq;
+> +	struct clk *cpu_clk;
+> +	void *res;
+> +
+> +	if (!of_match_node(machines, of_root))
+> +		return -ENODEV;
+> +
+> +	cpu_clk = clk_get(cpu_dev, NULL);
+> +	if (IS_ERR(cpu_clk))
+> +		return -ENODEV;
+> +
+> +	max_freq = clk_get_rate(cpu_clk);
+> +
+> +	dev_pm_opp_add(cpu_dev, max_freq / 1, 0);
+> +	dev_pm_opp_add(cpu_dev, max_freq / 2, 0);
+> +	dev_pm_opp_add(cpu_dev, max_freq / 3, 0);
+> +	dev_pm_opp_add(cpu_dev, max_freq / 5, 0);
+> +	dev_pm_opp_add(cpu_dev, max_freq / 9, 0);
+> +
+> +	res = platform_device_register_data(NULL, "cpufreq-dt", -1, NULL, 0);
+> +
+> +	return PTR_ERR_OR_ZERO(res);
+> +}
+> +device_initcall(tango_cpufreq_init);
 
-I'd say it is a premature optimization. The file separation is fine, IMO, but 
-the added csi_ops indirection makes the code less readable. Someone with 
-access to R40 hardware with CSI setup would be a better position to abstract 
-the platform specific code.
-
-But I'd defer to the media maintainers on that.
-
-Thanks,
-baruch
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+viresh
