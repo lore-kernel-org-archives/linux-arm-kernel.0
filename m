@@ -1,87 +1,23 @@
 From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 19 Jul 2017 17:31:56 +0200
-Subject: [PATCH 1/2] net: phy: at803x: Fix RGMII RX and TX clock delays setup
-In-Reply-To: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
-References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
-Message-ID: <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
+Date: Wed, 19 Jul 2017 17:29:07 +0200
+Subject: [PATCH 0/2] Atheros 803x PHY RGMII clock delays
+Message-ID: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code supports enabling RGMII RX and TX clock delays.
-The unstated assumption is that these settings are disabled by
-default at reset, which is not the case.
+These patches address the quirks of the Atheros PHY, with respect
+to RGMII RX and TX clock delays.
 
-RX clock delay is enabled at reset. And TX clock delay "survives"
-across SW resets. Thus, if the bootloader enables TX clock delay,
-it will remain enabled at reset in Linux.
+Once the PHY driver is fixed, the second patch fixes the ethernet
+controller used on tango boards.
 
-Provide disable functions to configure the RGMII clock delays
-exactly as specified in the fwspec.
+Marc Gonzalez (2):
+  net: phy: at803x: Fix RGMII RX and TX clock delays setup
+  net: ethernet: nb8800: Fix RGMII TX clock delay setup
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- drivers/net/phy/at803x.c | 32 ++++++++++++++++++++++++--------
- 1 file changed, 24 insertions(+), 8 deletions(-)
+ drivers/net/ethernet/aurora/nb8800.c |  8 +++++---
+ drivers/net/phy/at803x.c             | 32 ++++++++++++++++++++++++--------
+ 2 files changed, 29 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/net/phy/at803x.c b/drivers/net/phy/at803x.c
-index c1e52b9dc58d..9c96eaaaa2cb 100644
---- a/drivers/net/phy/at803x.c
-+++ b/drivers/net/phy/at803x.c
-@@ -117,12 +117,24 @@ static inline int at803x_enable_rx_delay(struct phy_device *phydev)
- 					AT803X_DEBUG_RX_CLK_DLY_EN);
- }
- 
-+static inline int at803x_disable_rx_delay(struct phy_device *phydev)
-+{
-+	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_0,
-+					AT803X_DEBUG_RX_CLK_DLY_EN, 0);
-+}
-+
- static inline int at803x_enable_tx_delay(struct phy_device *phydev)
- {
- 	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_5, 0,
- 					AT803X_DEBUG_TX_CLK_DLY_EN);
- }
- 
-+static inline int at803x_disable_tx_delay(struct phy_device *phydev)
-+{
-+	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_5,
-+					AT803X_DEBUG_TX_CLK_DLY_EN, 0);
-+}
-+
- /* save relevant PHY registers to private copy */
- static void at803x_context_save(struct phy_device *phydev,
- 				struct at803x_context *context)
-@@ -284,18 +296,22 @@ static int at803x_config_init(struct phy_device *phydev)
- 		return ret;
- 
- 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
--			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
-+			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
- 		ret = at803x_enable_rx_delay(phydev);
--		if (ret < 0)
--			return ret;
--	}
-+	else
-+		ret = at803x_disable_rx_delay(phydev);
-+
-+	if (ret < 0)
-+		return ret;
- 
- 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID ||
--			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
-+			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
- 		ret = at803x_enable_tx_delay(phydev);
--		if (ret < 0)
--			return ret;
--	}
-+	else
-+		ret = at803x_disable_tx_delay(phydev);
-+
-+	if (ret < 0)
-+		return ret;
- 
- 	return 0;
- }
 -- 
 2.11.0
