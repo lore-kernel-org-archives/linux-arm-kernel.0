@@ -1,34 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 19 Jul 2017 15:05:42 +0100
-Subject: [PATCH 1/2] arm64: syscallno is secretly an int, make it official
-In-Reply-To: <20170719151455.06d93ff4@karo-electronics.de>
-References: <1500381724-19003-1-git-send-email-Dave.Martin@arm.com>
- <1500381724-19003-2-git-send-email-Dave.Martin@arm.com>
- <20170719151455.06d93ff4@karo-electronics.de>
-Message-ID: <20170719140541.GB1538@e103592.cambridge.arm.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Wed, 19 Jul 2017 16:25:43 +0200
+Subject: [PATCH v7 2/3] clk: gate: expose clk_gate_ops::is_enabled
+In-Reply-To: <1500474344-9832-1-git-send-email-gabriel.fernandez@st.com>
+References: <1500474344-9832-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1500474344-9832-3-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 03:14:55PM +0200, Lothar Wa?mann wrote:
-> Hi,
-> 
-> On Tue, 18 Jul 2017 13:41:43 +0100 Dave Martin wrote:
-> > The upper 32 bits of the syscallno field in struct pt_regs are handled
-> > inconsistently, being sometimes zero extended and sometimes
-> > sign-extended.  The reason for this appears to be that they are not
-> > intentionally significant at all.
-> > 
-> My english parser fails on "not intentionally significant at all".
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Hmmm, that was rather convoluted.
+This patch exposes clk_gate_ops::is_enabled as functions
+that can be directly called and assigned in places like this so
+we don't need wrapper functions that do nothing besides forward
+the call.
 
-How about:
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+Sugested by Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/clk-gate.c       | 3 ++-
+ include/linux/clk-provider.h | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
---8<--
-
-In fact, only the lower 32 bits seem to have any real significance for
-the behaviour of the code: it's been OK to handle the upper bits
-inconsistently because they don't matter.
-
-Cheers
----Dave
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 4e0c054a..dd82485 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -86,7 +86,7 @@ static void clk_gate_disable(struct clk_hw *hw)
+ 	clk_gate_endisable(hw, 0);
+ }
+ 
+-static int clk_gate_is_enabled(struct clk_hw *hw)
++int clk_gate_is_enabled(struct clk_hw *hw)
+ {
+ 	u32 reg;
+ 	struct clk_gate *gate = to_clk_gate(hw);
+@@ -101,6 +101,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+ 
+ 	return reg ? 1 : 0;
+ }
++EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
+ 
+ const struct clk_ops clk_gate_ops = {
+ 	.enable = clk_gate_enable,
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index c59c625..e9587ab 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
+ 		u8 clk_gate_flags, spinlock_t *lock);
+ void clk_unregister_gate(struct clk *clk);
+ void clk_hw_unregister_gate(struct clk_hw *hw);
++int clk_gate_is_enabled(struct clk_hw *hw);
+ 
+ struct clk_div_table {
+ 	unsigned int	val;
+-- 
+1.9.1
