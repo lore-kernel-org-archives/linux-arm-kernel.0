@@ -1,34 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 19 Jul 2017 10:28:51 -0500
-Subject: [PATCH] clocksource: Convert to using %pOF instead of full_name
-In-Reply-To: <b6f4661d-6655-0fb9-f212-2d777a12e11a@sigmadesigns.com>
-References: <20170718214339.7774-13-robh@kernel.org>
- <b6f4661d-6655-0fb9-f212-2d777a12e11a@sigmadesigns.com>
-Message-ID: <CAL_Jsq+qMn2HHeNx2PmYSJ-pYMRFPYXVHivBgX5vpjKngJHShg@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 19 Jul 2017 17:26:05 +0200
+Subject: [PATCH 061/102] phy: sun4i-usb: explicitly request exclusive reset
+ control
+In-Reply-To: <20170719152646.25903-1-p.zabel@pengutronix.de>
+References: <20170719152646.25903-1-p.zabel@pengutronix.de>
+Message-ID: <20170719152646.25903-62-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 3:55 AM, Marc Gonzalez
-<marc_gonzalez@sigmadesigns.com> wrote:
-> On 18/07/2017 23:42, Rob Herring wrote:
->
->> Now that we have a custom printf format specifier, convert users of
->> full_name to use %pOF instead. This is preparation to remove storing
->> of the full path string for each node.
->
-> Nice. For my own reference:
-> http://elixir.free-electrons.com/linux/v4.13-rc1/source/Documentation/printk-formats.txt#L349
->
-> About removing the full path. Does this mean that ultimately
-> %pOF will print just the name? And the 'f' spec will disappear?
+Commit a53e35db70d1 ("reset: Ensure drivers are explicit when requesting
+reset lines") started to transition the reset control request API calls
+to explicitly state whether the driver needs exclusive or shared reset
+control behavior. Convert all drivers requesting exclusive resets to the
+explicit API call so the temporary transition helpers can be removed.
 
-No, the vsprintf code is already designed to print the full path
-whether full_name is the full path or just the basename. %pOF is just
-the default. "f" is needed so you can combine it with the other
-specifiers.
+No functional changes.
 
-> Is this done to save memory?
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/phy/allwinner/phy-sun4i-usb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Yes. That's the next step.
-
-Rob
+diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
+index bbf06cfe5898c..6b3c76e279c9b 100644
+--- a/drivers/phy/allwinner/phy-sun4i-usb.c
++++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+@@ -707,7 +707,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		snprintf(name, sizeof(name), "usb%d_reset", i);
+-		phy->reset = devm_reset_control_get(dev, name);
++		phy->reset = devm_reset_control_get_exclusive(dev, name);
+ 		if (IS_ERR(phy->reset)) {
+ 			dev_err(dev, "failed to get reset %s\n", name);
+ 			return PTR_ERR(phy->reset);
+-- 
+2.11.0
