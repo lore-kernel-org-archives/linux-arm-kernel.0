@@ -1,74 +1,25 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 19 Jul 2017 11:26:30 +0200
-Subject: [PATCH v4 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
- board dts and Makefile
-In-Reply-To: <1500446884.14021.12.camel@mtksdaap41>
-References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
- <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
- <ddfb5e58-520f-1ef5-2351-d7545e17a429@gmail.com>
- <1500446884.14021.12.camel@mtksdaap41>
-Message-ID: <a470dfc9-71a4-6574-f342-fbd8d60aafce@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Jul 2017 10:28:27 +0100
+Subject: [RFC PATCH 0/2] ARM: Fix unparseable signal frame with
+ CONFIG_IWMMXT
+In-Reply-To: <AM4PR08MB2659BFF0EAEB020F7571A115D5DF0@AM4PR08MB2659.eurprd08.prod.outlook.com>
+References: <1498059983-13438-1-git-send-email-Dave.Martin@arm.com>
+ <20170626101304.GG4902@n2100.armlinux.org.uk>
+ <20170626133255.GH8543@e103592.cambridge.arm.com>
+ <20170626144001.GH4902@n2100.armlinux.org.uk>
+ <AM4PR08MB2659BFF0EAEB020F7571A115D5DF0@AM4PR08MB2659.eurprd08.prod.outlook.com>
+Message-ID: <20170719092827.GA28445@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 26, 2017 at 03:14:13PM +0000, Edmund Grimley-Evans wrote:
+> As a user (I recently implemented a work-around for this problem in DynamoRIO: https://github.com/DynamoRIO/dynamorio/commit/0b75c635033d01ab04f955f5affe14a3ced9ab56) I'm happy with any of the proposed solutions, provided that in the "invalid magic number" case user space is not required to regenerate the bogus block with the same invalid magic number when invoking sigreturn.
 
+I have to ask why a bug report was never sent to kernel people on this.
+If no one tells people that software is buggy, that software stands
+little chance of being fixed!
 
-On 07/19/2017 08:48 AM, YT Shen wrote:
-> On Tue, 2017-07-18 at 18:29 +0200, Matthias Brugger wrote:
->>
->> On 06/22/2017 11:32 AM, YT Shen wrote:
->>> This adds basic chip support for Mediatek 2712
-
-[...]
-
->>> +
->>> +	uart_clk: dummy26m {
->>> +		compatible = "fixed-clock";
->>> +		clock-frequency = <26000000>;
->>> +		#clock-cells = <0>;
->>> +	};
->>> +
-
-[...]
-
->>> +
->>> +	soc {
->>> +		#address-cells = <2>;
->>> +		#size-cells = <2>;
->>> +		compatible = "simple-bus";
->>> +		ranges;
->>> +
->>> +		uart5: serial at 1000f000 {
->>> +			compatible = "mediatek,mt2712-uart",
->>> +				     "mediatek,mt6577-uart";
->>> +			reg = <0 0x1000f000 0 0x400>;
->>> +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
->>> +			clocks = <&uart_clk>, <&uart_clk>;
->>> +			clock-names = "baud", "bus";
->>> +			status = "disabled";
->>> +		};
->>
->> So baud and bus clock are both 26 MHz?
-> We didn't have CCF clock support in this series.
-> After we have clock source support, we could use the correct clocks to
-> the UARTs and drop the 26MHz fixed rate UART clock.
-> 
-> The bus clock is 26MHz.  The baud clock could be from another clock
-> source, using the same 26MHz fixed clock works also.
-> 
-> 
-> [1] https://patchwork.kernel.org/patch/9670877/
-> [2] https://patchwork.kernel.org/patch/6436021/
-> 
-
-Yes, just using one 26 MHz clock works, but it uses an deprecated 
-binding, so we should not do this, as through copying from the source of 
-other SoCs we will keep it alive forever. Anyway that's not your case, 
-as you defined the two clocks.
-
-The device tree should reflect the HW, that's why I asked for the clock 
-frequency of both clocks. I searched the git history and it was never 
-done right before. So you could be the first :)
-
-Thanks,
-Matthias
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
