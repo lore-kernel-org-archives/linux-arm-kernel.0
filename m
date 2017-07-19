@@ -1,131 +1,74 @@
-From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Wed, 19 Jul 2017 17:22:52 +0800
-Subject: [PATCH] [media] mtk-vcodec: fix vp9 decode error
-Message-ID: <1500456172-49795-1-git-send-email-tiffany.lin@mediatek.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 19 Jul 2017 11:26:30 +0200
+Subject: [PATCH v4 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
+ board dts and Makefile
+In-Reply-To: <1500446884.14021.12.camel@mtksdaap41>
+References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
+ <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
+ <ddfb5e58-520f-1ef5-2351-d7545e17a429@gmail.com>
+ <1500446884.14021.12.camel@mtksdaap41>
+Message-ID: <a470dfc9-71a4-6574-f342-fbd8d60aafce@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix The camera has a blurry screen phenomenon when
-we video chat with apprtc using vp9 codec
 
-Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
----
- .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 37 ++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-index 1daee12..bc8349b 100644
---- a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-+++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-@@ -31,6 +31,7 @@
- #define MAX_NUM_REF_FRAMES 8
- #define VP9_MAX_FRM_BUF_NUM 9
- #define VP9_MAX_FRM_BUF_NODE_NUM (VP9_MAX_FRM_BUF_NUM * 2)
-+#define VP9_SEG_ID_SZ 0x12000
- 
- /**
-  * struct vp9_dram_buf - contains buffer info for vpu
-@@ -132,6 +133,7 @@ struct vp9_sf_ref_fb {
-  * @frm_num : decoded frame number, include sub-frame count (AP-R, VPU-W)
-  * @mv_buf : motion vector working buffer (AP-W, VPU-R)
-  * @frm_refs : maintain three reference buffer info (AP-R/W, VPU-R/W)
-+ * @seg_id_buf : segmentation map working buffer (AP-W, VPU-R)
-  */
- struct vdec_vp9_vsi {
- 	unsigned char sf_bs_buf[VP9_SUPER_FRAME_BS_SZ];
-@@ -167,11 +169,14 @@ struct vdec_vp9_vsi {
- 	struct vp9_dram_buf mv_buf;
- 
- 	struct vp9_ref_buf frm_refs[REFS_PER_FRAME];
-+	struct vp9_dram_buf seg_id_buf;
-+
- };
- 
- /*
-  * struct vdec_vp9_inst - vp9 decode instance
-  * @mv_buf : working buffer for mv
-+ * @seg_id_buf : working buffer for segmentation map
-  * @dec_fb : vdec_fb node to link fb to different fb_xxx_list
-  * @available_fb_node_list : current available vdec_fb node
-  * @fb_use_list : current used or referenced vdec_fb
-@@ -187,6 +192,7 @@ struct vdec_vp9_vsi {
-  */
- struct vdec_vp9_inst {
- 	struct mtk_vcodec_mem mv_buf;
-+	struct mtk_vcodec_mem seg_id_buf;
- 
- 	struct vdec_fb_node dec_fb[VP9_MAX_FRM_BUF_NODE_NUM];
- 	struct list_head available_fb_node_list;
-@@ -388,13 +394,11 @@ static bool vp9_alloc_work_buf(struct vdec_vp9_inst *inst)
- 			vsi->buf_h);
- 
- 	mem = &inst->mv_buf;
--
- 	if (mem->va)
- 		mtk_vcodec_mem_free(inst->ctx, mem);
- 
- 	mem->size = ((vsi->buf_w / 64) *
- 		    (vsi->buf_h / 64) + 2) * 36 * 16;
--
- 	result = mtk_vcodec_mem_alloc(inst->ctx, mem);
- 	if (result) {
- 		mem->size = 0;
-@@ -406,6 +410,24 @@ static bool vp9_alloc_work_buf(struct vdec_vp9_inst *inst)
- 	vsi->mv_buf.pa = (unsigned long)mem->dma_addr;
- 	vsi->mv_buf.sz = (unsigned int)mem->size;
- 
-+
-+	mem = &inst->seg_id_buf;
-+	if (mem->va)
-+		mtk_vcodec_mem_free(inst->ctx, mem);
-+
-+	mem->size = VP9_SEG_ID_SZ;
-+	result = mtk_vcodec_mem_alloc(inst->ctx, mem);
-+	if (result) {
-+		mem->size = 0;
-+		mtk_vcodec_err(inst, "Cannot allocate seg_id_buf");
-+		return false;
-+	}
-+	/* Set the va again */
-+	vsi->seg_id_buf.va = (unsigned long)mem->va;
-+	vsi->seg_id_buf.pa = (unsigned long)mem->dma_addr;
-+	vsi->seg_id_buf.sz = (unsigned int)mem->size;
-+
-+
- 	vp9_free_all_sf_ref_fb(inst);
- 	vsi->sf_next_ref_fb_idx = vp9_get_sf_ref_fb(inst);
- 
-@@ -653,6 +675,12 @@ static void vp9_reset(struct vdec_vp9_inst *inst)
- 	inst->vsi->mv_buf.va = (unsigned long)inst->mv_buf.va;
- 	inst->vsi->mv_buf.pa = (unsigned long)inst->mv_buf.dma_addr;
- 	inst->vsi->mv_buf.sz = (unsigned long)inst->mv_buf.size;
-+
-+	/* Set the va again, since vpu_dec_reset will clear seg_id_buf in vpu */
-+	inst->vsi->seg_id_buf.va = (unsigned long)inst->seg_id_buf.va;
-+	inst->vsi->seg_id_buf.pa = (unsigned long)inst->seg_id_buf.dma_addr;
-+	inst->vsi->seg_id_buf.sz = (unsigned long)inst->seg_id_buf.size;
-+
- }
- 
- static void init_all_fb_lists(struct vdec_vp9_inst *inst)
-@@ -752,6 +780,10 @@ static void vdec_vp9_deinit(unsigned long h_vdec)
- 	if (mem->va)
- 		mtk_vcodec_mem_free(inst->ctx, mem);
- 
-+	mem = &inst->seg_id_buf;
-+	if (mem->va)
-+		mtk_vcodec_mem_free(inst->ctx, mem);
-+
- 	vp9_free_all_sf_ref_fb(inst);
- 	vp9_free_inst(inst);
- }
-@@ -848,6 +880,7 @@ static int vdec_vp9_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
- 					vsi->sf_frm_sz[idx]);
- 			}
- 		}
-+		memset(inst->seg_id_buf.va, 0, inst->seg_id_buf.size);
- 		ret = vpu_dec_start(&inst->vpu, data, 3);
- 		if (ret) {
- 			mtk_vcodec_err(inst, "vpu_dec_start failed");
--- 
-1.9.1
+On 07/19/2017 08:48 AM, YT Shen wrote:
+> On Tue, 2017-07-18 at 18:29 +0200, Matthias Brugger wrote:
+>>
+>> On 06/22/2017 11:32 AM, YT Shen wrote:
+>>> This adds basic chip support for Mediatek 2712
+
+[...]
+
+>>> +
+>>> +	uart_clk: dummy26m {
+>>> +		compatible = "fixed-clock";
+>>> +		clock-frequency = <26000000>;
+>>> +		#clock-cells = <0>;
+>>> +	};
+>>> +
+
+[...]
+
+>>> +
+>>> +	soc {
+>>> +		#address-cells = <2>;
+>>> +		#size-cells = <2>;
+>>> +		compatible = "simple-bus";
+>>> +		ranges;
+>>> +
+>>> +		uart5: serial at 1000f000 {
+>>> +			compatible = "mediatek,mt2712-uart",
+>>> +				     "mediatek,mt6577-uart";
+>>> +			reg = <0 0x1000f000 0 0x400>;
+>>> +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
+>>> +			clocks = <&uart_clk>, <&uart_clk>;
+>>> +			clock-names = "baud", "bus";
+>>> +			status = "disabled";
+>>> +		};
+>>
+>> So baud and bus clock are both 26 MHz?
+> We didn't have CCF clock support in this series.
+> After we have clock source support, we could use the correct clocks to
+> the UARTs and drop the 26MHz fixed rate UART clock.
+> 
+> The bus clock is 26MHz.  The baud clock could be from another clock
+> source, using the same 26MHz fixed clock works also.
+> 
+> 
+> [1] https://patchwork.kernel.org/patch/9670877/
+> [2] https://patchwork.kernel.org/patch/6436021/
+> 
+
+Yes, just using one 26 MHz clock works, but it uses an deprecated 
+binding, so we should not do this, as through copying from the source of 
+other SoCs we will keep it alive forever. Anyway that's not your case, 
+as you defined the two clocks.
+
+The device tree should reflect the HW, that's why I asked for the clock 
+frequency of both clocks. I searched the git history and it was never 
+done right before. So you could be the first :)
+
+Thanks,
+Matthias
