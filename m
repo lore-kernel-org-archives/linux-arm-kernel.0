@@ -1,32 +1,38 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 19 Jul 2017 12:49:50 -0500
-Subject: [PATCH 1/2] net: phy: at803x: Fix RGMII RX and TX clock delays
- setup
-In-Reply-To: <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
-References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
- <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
-Message-ID: <d0b7027d-1306-a114-00c0-8e3cb01d4d0e@codeaurora.org>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Wed, 19 Jul 2017 10:58:58 -0700
+Subject: [PATCH 1/3] arm/syscalls: Move address limit check in loop
+Message-ID: <20170719175900.124074-1-thgarnie@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2017 10:31 AM, Marc Gonzalez wrote:
-> The current code supports enabling RGMII RX and TX clock delays.
-> The unstated assumption is that these settings are disabled by
-> default at reset, which is not the case.
-> 
-> RX clock delay is enabled at reset. And TX clock delay "survives"
-> across SW resets. Thus, if the bootloader enables TX clock delay,
-> it will remain enabled at reset in Linux.
-> 
-> Provide disable functions to configure the RGMII clock delays
-> exactly as specified in the fwspec.
+The work pending loop can call set_fs after addr_limit_user_check
+removed the _TIF_FSCHECK flag. To prevent the infinite loop, move
+the addr_limit_user_check call at the beginning of the loop.
 
-I only use SGMII mode, and I tested and can confirm that this patch does 
-not break SGMII, so:
+Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-mode return")
+Reported-by: Leonard Crestez <leonard.crestez@nxp.com>
+Signed-off-by: Thomas Garnier <thgarnie@google.com>
+---
+ arch/arm/kernel/signal.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Acked-by: Timur Tabi <timur@codeaurora.org>
-
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 3a48b54c6405..f4574287d14b 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -573,10 +573,10 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+ 	 */
+ 	trace_hardirqs_off();
+ 
+-	/* Check valid user FS if needed */
+-	addr_limit_user_check();
+-
+ 	do {
++		/* Check valid user FS if needed */
++		addr_limit_user_check();
++
+ 		if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+ 			schedule();
+ 		} else {
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.14.0.rc0.284.gd933b75aa4-goog
