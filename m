@@ -1,54 +1,118 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 19 Jul 2017 20:28:01 +0530
-Subject: USB 3.0 is broken on Odroid Xu4 on latest kernel
-Message-ID: <CANAwSgSoo7g=RN4wQ96+NJRYZYy2WeHwPA-xJ2JY7yt25irDfA@mail.gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 19 Jul 2017 17:58:20 +0300
+Subject: [PATCH v10 2/3] arm/syscalls: Check address limit on user-mode
+ return
+In-Reply-To: <CAJcbSZFr9KJTfGfiZo2fThoDkAE-D1OFf2YtELq4P6jX8syesQ@mail.gmail.com>
+References: <20170615011203.144108-1-thgarnie@google.com>
+ <20170615011203.144108-2-thgarnie@google.com>
+ <1500388566.11612.74.camel@nxp.com>
+ <CAJcbSZEr8HPBwH1oVaHqPzAY4MS_=yqMoqPhcauuKu3cikB3uQ@mail.gmail.com>
+ <1500398311.12096.30.camel@nxp.com>
+ <CAJcbSZFr9KJTfGfiZo2fThoDkAE-D1OFf2YtELq4P6jX8syesQ@mail.gmail.com>
+Message-ID: <1500476300.22834.13.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Tue, 2017-07-18 at 12:04 -0700, Thomas Garnier wrote:
+> On Tue, Jul 18, 2017 at 10:18 AM, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> > On Tue, 2017-07-18 at 09:04 -0700, Thomas Garnier wrote:
+> > > On Tue, Jul 18, 2017 at 7:36 AM, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> > > > On Wed, 2017-06-14 at 18:12 -0700, Thomas Garnier wrote:
+> > > > > 
+> > > > > Ensure the address limit is a user-mode segment before returning to
+> > > > > user-mode. Otherwise a process can corrupt kernel-mode memory and
+> > > > > elevate privileges [1].
+> > > > > 
+> > > > > The set_fs function sets the TIF_SETFS flag to force a slow path on
+> > > > > return. In the slow path, the address limit is checked to be USER_DS if
+> > > > > needed.
+> > > > > 
+> > > > > The TIF_SETFS flag is added to _TIF_WORK_MASK shifting _TIF_SYSCALL_WORK
+> > > > > for arm instruction immediate support. The global work mask is too big
+> > > > > to used on a single instruction so adapt ret_fast_syscall.
+> > > > > 
+> > > > > @@ -571,6 +572,10 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+> > > > > ???????* Update the trace code with the current status.
+> > > > > ???????*/
+> > > > > ??????trace_hardirqs_off();
+> > > > > +
+> > > > > +?????/* Check valid user FS if needed */
+> > > > > +?????addr_limit_user_check();
+> > > > > +
+> > > > > ??????do {
+> > > > > ??????????????if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+> > > > > ??????????????????????schedule();
+> > > > This patch made it's way into linux-next next-20170717 and it seems to
+> > > > cause hangs when booting some boards over NFS (found via bisection). I
+> > > > don't know exactly what determines the issue but I can reproduce hangs
+> > > > if even if I just boot with init=/bin/bash and do stuff like
+> > > > 
+> > > > # sleep 1 & sleep 1 & sleep 1 & wait; wait; wait; echo done!
+> > > > 
+> > > > When this happens sysrq-t shows a sleep task hung in the 'R' state
+> > > > spinning in do_work_pending, so maybe there is a potential infinite
+> > > > loop here?
+> > > > 
+> > > > The addr_limit_user_check at the start of do_work_pending will check
+> > > > for TIF_FSCHECK once and clear it but the function loops while
+> > > > (thread_flags & _TIF_WORK_MASK), so it if TIF_FSCHECK is set again then
+> > > > the loop will never terminate. Does this make sense?
+> > > 
+> > > Yes, it does. Thanks for looking into this.
+> > > 
+> > > Can you try this change?
+> > > 
+> > > diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> > > index 3a48b54c6405..bc6ad7789568 100644
+> > > --- a/arch/arm/kernel/signal.c
+> > > +++ b/arch/arm/kernel/signal.c
+> > > @@ -573,12 +573,11 @@ do_work_pending(struct pt_regs *regs, unsigned
+> > > int thread_flags, int syscall)
+> > > ? */
+> > > ? trace_hardirqs_off();
+> > > 
+> > > - /* Check valid user FS if needed */
+> > > - addr_limit_user_check();
+> > > -
+> > > ? do {
+> > > ? if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+> > > ? schedule();
+> > > + } else if (thread_flags & _TIF_FSCHECK) {
+> > > + addr_limit_user_check();
+> > > ? } else {
+> > > ? if (unlikely(!user_mode(regs)))
+> > > ? return 0;
+> > This does seem to work, it no longer hangs on boot in my setup. This is
+> > obviously only a very superficial test.
+> > 
+> > The new location of this check seems weird, it's not clear why it
+> > should be on an else path. Perhaps it should be moved to right before
+> > where current_thread_info()->flags is fetched again?
 
-Today I tried to compile the latest kernel for Odroid xu4.
-using exynos_defconfig I build and loaded the kernel.
-but to my surprise usb 3.0 device and missing.
+> I was hitting bug when I tried that.I think that's because you
+> basically let the signal handler do pending work before you check the
+> flag, that's not a good idea.
 
-odroid login: root
-Password:
-Last login: Wed Jul 19 14:01:44 UTC 2017 on ttySAC2
-Welcome to Ubuntu 16.04.2 LTS (GNU/Linux 4.13.0-rc1-xu4ml-27846-g74cbd96 armv7l)
+> > If the purpose is hardening against buggy kernel code doing bad set_fs
+> > calls shouldn't this flag also be checked before looking at
+> > TIF_NEED_RESCHED and calling schedule()?
+> I am not sure to be honest. I expected schedule to only schedule the
+> processor to another task which would be fine given only the current
+> task have a bogus fs. I will put it first in case there is an edge
+> case scenario I missed.
+> 
+> What do you think? Let me know and I will look at changes all
+> architectures and testing them.
 
- * Documentation:  https://help.ubuntu.com
- * Management:     https://landscape.canonical.com
- * Support:        https://ubuntu.com/advantage
-root at odroid:~# lsusb
-Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
-Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
-Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-Bus 002 Device 002: ID 0603:0002 Novatek Microelectronics Corp.
-Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
-Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-root at odroid:~# lsusb -t
-/:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
-/:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
-/:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
-/:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
-/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
-    |__ Port 1: Dev 2, If 0, Class=Human Interface Device, Driver=usbhid, 1.5M
-    |__ Port 1: Dev 2, If 1, Class=Human Interface Device, Driver=usbhid, 1.5M
-/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
+I don't know and I'd rather not guess on security issues. It's better
+if someone else reviews the code.
 
-Full dmesg can be found on blow link.
-https://pastebin.com/K3xfPCPe
+Unless there is a very quick fix maybe this series should be removed or
+reverted from linux-next? A diagnosis of "system calls can sometimes
+hang on return" seems serious even for linux-next. Since it happens
+very rarely in most setups I can easily imagine somebody spending a lot
+of time digging at this.
 
-The reason for failed is below.
-
-[    7.187096] usb usb4-port1: connect-debounce failed
-
-I tried to debug this but failed to find the root cause.
-Nothing is connected to the UBS 3.0 port for the failure to cause.
-
-If I load old kernel it seen to work correctly.
-If you provoid some input I will give this a try.
-
-Best Regards
--Anand
+--
+Regards,
+Leonard
