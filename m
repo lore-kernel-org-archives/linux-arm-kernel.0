@@ -1,77 +1,49 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 19 Jul 2017 15:11:43 -0500
-Subject: [PATCH 1/2] net: phy: at803x: Fix RGMII RX and TX clock delays
- setup
-In-Reply-To: <abbcd40c-5ecd-2197-73d0-2046cf1e7b5c@gmail.com>
-References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
- <33ed5f4f-9939-dc00-b973-db39c16f2393@sigmadesigns.com>
- <5ea9905f-e74a-4a43-dc5b-883ec9daf030@ti.com>
- <abbcd40c-5ecd-2197-73d0-2046cf1e7b5c@gmail.com>
-Message-ID: <c653658c-9985-f157-fc44-4b8168c770c2@ti.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 19 Jul 2017 22:20:09 +0200
+Subject: USB 3.0 is broken on Odroid Xu4 on latest kernel
+In-Reply-To: <87zic0b8hi.fsf@linux.intel.com>
+References: <CANAwSgSoo7g=RN4wQ96+NJRYZYy2WeHwPA-xJ2JY7yt25irDfA@mail.gmail.com>
+ <87zic0b8hi.fsf@linux.intel.com>
+Message-ID: <20170719202009.teh2nvsq47i5zpq4@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/19/2017 02:30 PM, Florian Fainelli wrote:
-> On 07/19/2017 12:24 PM, Grygorii Strashko wrote:
->> Hi
->>
->> On 07/19/2017 10:31 AM, Marc Gonzalez wrote:
->>> The current code supports enabling RGMII RX and TX clock delays.
->>> The unstated assumption is that these settings are disabled by
->>> default at reset, which is not the case.
->>>
->>> RX clock delay is enabled at reset. And TX clock delay "survives"
->>> across SW resets. Thus, if the bootloader enables TX clock delay,
->>> it will remain enabled at reset in Linux.
->>>
->>> Provide disable functions to configure the RGMII clock delays
->>> exactly as specified in the fwspec.
->>>
->>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>> ---
->>>    drivers/net/phy/at803x.c | 32 ++++++++++++++++++++++++--------
->>>    1 file changed, 24 insertions(+), 8 deletions(-)
->> This patch breaks am335x-evm networking.
->>
->> To restore it I've had to apply below diff:
->> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
->> index 200d6ab..9578bdf 100644
->> --- a/arch/arm/boot/dts/am335x-evm.dts
->> +++ b/arch/arm/boot/dts/am335x-evm.dts
->> @@ -724,12 +724,12 @@
->>   
->>   &cpsw_emac0 {
->>          phy_id = <&davinci_mdio>, <0>;
->> -       phy-mode = "rgmii-txid";
->> +       phy-mode = "rgmii-id";
->>   };
->>   
->>   &cpsw_emac1 {
->>          phy_id = <&davinci_mdio>, <1>;
->> -       phy-mode = "rgmii-txid";
->> +       phy-mode = "rgmii-id";
->>   };
->>   
->>   &tscadc {
->>
->> Sry, can't comment here to much - not E-PHY expert.
+On Wed, Jul 19, 2017 at 09:13:29PM +0300, Felipe Balbi wrote:
 > 
-> It's useful feedback, since we had poorly defined "phy-mode" semantics
-> for too long, this is totally expected, Marc this is exactly why Mans is
-> suggesting additional MAC-specific properties to define delays.
+> Hi,
 > 
+> Anand Moon <linux.amoon@gmail.com> writes:
+> > Hi Krzysztof,
+> >
+> > Today I tried to compile the latest kernel for Odroid xu4.
+> > using exynos_defconfig I build and loaded the kernel.
+> > but to my surprise usb 3.0 device and missing.
+> >
+> > odroid login: root
+> > Password:
+> > Last login: Wed Jul 19 14:01:44 UTC 2017 on ttySAC2
+> > Welcome to Ubuntu 16.04.2 LTS (GNU/Linux 4.13.0-rc1-xu4ml-27846-g74cbd96 armv7l)
+> 
+> Dude, you have 27 thousand patches on top of v4.13-rc1??? Try vanilla
+> v4.13-rc1 and try a git bisect.
 
-Yeah. original commit is pretty old and description is not very useful
+Hi Anand,
 
-commit 6d75afe2916adf9e9de6862275cdf89b9b7e4d0e
-Author: Mugunthan V N <mugunthanvnm@ti.com>
-Date:   Mon Jun 3 20:10:11 2013 +0000
+Beside Felipe's comment, I do not have XU4. I cannot reproduce it on
+XU3-Lite (but there is difference in USB2 and USB3, AFAIR).
 
-     ARM: dts: AM33XX: Add phy-mode to CPSW node
+$ uname -a
+Linux odroidxu3 4.13.0-rc1-00071-ge06fdaf40a5c #1051 SMP PREEMPT Wed Jul 19 22:07:41 CEST 2017 armv7l GNU/Linux
+$ lsusb
+Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+Bus 001 Device 003: ID 0424:ec00 Standard Microsystems Corp. SMSC9512/9514 Fast Ethernet Adapter
+Bus 001 Device 002: ID 0424:9514 Standard Microsystems Corp. SMC9514 Hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
 
+Try to follow Felipe's advice of using vanilla kernel from Linus and
+bisecting it.
 
--- 
-regards,
--grygorii
+Best regards,
+Krzysztof
