@@ -1,96 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Jul 2017 12:53:33 +0100
-Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
- SMMUv3 driver
-In-Reply-To: <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
-References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
- <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
- <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
- <20170719112524.GF13642@arm.com>
- <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
- <20170719113325.GI13642@arm.com>
- <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
-Message-ID: <20170719115333.GJ13642@arm.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Wed, 19 Jul 2017 15:55:13 +0300
+Subject: [PATCH] arm64: defconfig: enable missing HWSPINLOCK
+Message-ID: <20170719125513.20376-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 05:09:05PM +0530, Anup Patel wrote:
-> On Wed, Jul 19, 2017 at 5:03 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Jul 19, 2017 at 05:01:11PM +0530, Anup Patel wrote:
-> >> On Wed, Jul 19, 2017 at 4:55 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Wed, Jul 19, 2017 at 04:53:04PM +0530, Anup Patel wrote:
-> >> >> On Wed, Jul 19, 2017 at 4:30 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> >> >> > On 19/07/17 10:33, Anup Patel wrote:
-> >> >> >> The ARM SMMUv3 support bypassing transactions for which domain
-> >> >> >> is not configured. The patch adds corresponding IOMMU capability
-> >> >> >> to advertise this fact.
-> >> >> >>
-> >> >> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> >> >> >> ---
-> >> >> >>  drivers/iommu/arm-smmu-v3.c | 2 ++
-> >> >> >>  1 file changed, 2 insertions(+)
-> >> >> >>
-> >> >> >> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> >> >> >> index 568c400..a6c7f66 100644
-> >> >> >> --- a/drivers/iommu/arm-smmu-v3.c
-> >> >> >> +++ b/drivers/iommu/arm-smmu-v3.c
-> >> >> >> @@ -1423,6 +1423,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
-> >> >> >>               return true;
-> >> >> >>       case IOMMU_CAP_NOEXEC:
-> >> >> >>               return true;
-> >> >> >> +     case IOMMU_CAP_BYPASS:
-> >> >> >> +             return true;
-> >> >> >
-> >> >> > And this is never true. If Linux knows a device masters through the
-> >> >> > SMMU, it will always have a default domain of some sort (either identity
-> >> >> > or DMA ops). If Linux doesn't know, then it won't have been able to
-> >> >> > initialise the stream table for the relevant stream IDs, thus any
-> >> >> > 'bypass' DMA is going to raise C_BAD_STE. SMMUv3 can effectively only
-> >> >> > bypass unknown stream IDs if disabled entirely.
-> >> >>
-> >> >> What if we don't want to use IOMMU for certain device and
-> >> >> due to this we never provide "iommus" DT attribute in the
-> >> >> device DT node. Further, we want to access device without
-> >> >> "iommus" DT attribute from user-space using VFIO no-IOMMU.
-> >> >
-> >> > Wait, you want to pass a device through to userspace but you don't want to
-> >> > use the IOMMU? Why not?
-> >> >
-> >> > If you describe the SMMU in firmware with only a partial topology
-> >> > description, then you will run into problems with unknown masters trying to
-> >> > perform DMA. That's the IOMMU doing its job!
-> >>
-> >> We are keeping disable_bypass = false. In other words, we
-> >> are using bypass mode for unmatched streams. The real
-> >> reason is limited number of SMRs due to which we choose
-> >> not to provide "iommus" DT attribute for certain devices.
-> >
-> > Understood, but that's not robust for SMMUv3 and we *really* shouldn't have
-> > a user ABI that changes behaviour based on a cmdline option. VFIO should be
-> > requesting its own identity mappings, if that's what you need.
-> 
-> Currently, the iommu_present() check in vfio_iommu_group_get()
-> is preventing us allow no-IOMMU mode for certain devices.
-> 
-> Is there a better replacement of iommu_present() check in
-> vfio_iommu_group_get()?
+The hardware spinlock drivers now depend on HWSPINLOCK (instead of
+selecting it), so we need to explicitly enable it after commit
+35fc8a07d7f9 ("Make HWSPINLOCK a menuconfig to ease disabling")
 
-There are two things here:
+Without HWSPINLOCK, various drivers are left with unsatisfied
+dependencies and Qcom boards using shared memory based communication
+to request regulators are failing to boot and mount rootfs.
 
-  1. iommu_present() is pretty useless, because it applies to a "bus" which
-     doesn't actually tell you what you need to know for things like the
-     platform_bus, where some masters might be upstream of an SMMU and
-     others might not be.
+Fix this by explicitly enabling HWSPINLOCK in defconfig.
 
-  2. If a master *is* upstream of an IOMMU and you want to use no-IOMMU,
-     then the VFIO no-IOMMU code needs to be extended so that it creates
-     an IDENTITY domain on that IOMMU.
+Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-I think you need to solve both of those to make this robust. That way,
-VFIO can accurately tell whether a given master has an IOMMU or not and
-then figure out whether or not it needs to create an IDENTITY domain,
-or whether it can do like it does at the moment and ignore the IOMMU
-entirely (for the no-IOMMU case).
-
-Will
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6c7d147eed54..b4ca115b3be1 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -476,6 +476,7 @@ CONFIG_QCOM_CLK_SMD_RPM=y
+ CONFIG_MSM_GCC_8916=y
+ CONFIG_MSM_GCC_8994=y
+ CONFIG_MSM_MMCC_8996=y
++CONFIG_HWSPINLOCK=y
+ CONFIG_HWSPINLOCK_QCOM=y
+ CONFIG_ARM_MHU=y
+ CONFIG_PLATFORM_MHU=y
