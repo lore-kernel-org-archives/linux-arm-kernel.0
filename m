@@ -1,28 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 19 Jul 2017 11:02:44 +0200
-Subject: [PATCH] ARM: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-1-robh@kernel.org>
-References: <20170718214339.7774-1-robh@kernel.org>
-Message-ID: <CAMuHMdW+ERmY0-ptcTR5M-8fsgSO5D5X=Bkakvi-2kJPeC+LGA@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 19 Jul 2017 11:04:26 +0200
+Subject: [PATCH v2] arm64: dts: marvell: mark the cp110 crypto engine as dma
+ coherent
+Message-ID: <20170719090426.10228-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 11:42 PM, Rob Herring <robh@kernel.org> wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
+The crypto engines found on the cp110 master and slave are dma coherent.
+This patch adds the relevant property to their dt nodes.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: stable at vger.kernel.org # v4.12+
+Fixes: 973020fd9498 ("arm64: marvell: dts: add crypto engine description for 7k/8k")
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
 
-Gr{oetje,eeting}s,
+Since v1: added the 'Fixes:' and 'Cc: stable' tags.
 
-                        Geert
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
+ 2 files changed, 2 insertions(+)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 726528ce54e9..4c68605675a8 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -270,6 +270,7 @@
+ 				interrupt-names = "mem", "ring0", "ring1",
+ 				"ring2", "ring3", "eip";
+ 				clocks = <&cpm_clk 1 26>;
++				dma-coherent;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 95f8e5f607f6..0dbb59811d00 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -261,6 +261,7 @@
+ 				interrupt-names = "mem", "ring0", "ring1",
+ 						  "ring2", "ring3", "eip";
+ 				clocks = <&cps_clk 1 26>;
++				dma-coherent;
+ 				/*
+ 				 * The cryptographic engine found on the cp110
+ 				 * master is enabled by default at the SoC
+-- 
+2.13.3
