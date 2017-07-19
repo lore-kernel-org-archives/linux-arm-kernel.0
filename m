@@ -1,53 +1,30 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 19 Jul 2017 09:33:55 +0530
-Subject: [PATCH V3 1/2] dmaengine: qcom_hidma: introduce memset support
-In-Reply-To: <20170718164705.GY3053@localhost>
-References: <1498789858-18583-1-git-send-email-okaya@codeaurora.org>
- <20170718161956.GV3053@localhost>
- <29d47cc4-f618-7253-6f59-41f10e7b4b87@codeaurora.org>
- <20170718164705.GY3053@localhost>
-Message-ID: <20170719040354.GB3053@localhost>
+Date: Wed, 19 Jul 2017 09:39:18 +0530
+Subject: [PATCH 1/2] dmaengine: qcom_hidma: correct overriding message
+In-Reply-To: <1500215438-30672-1-git-send-email-okaya@codeaurora.org>
+References: <1500215438-30672-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170719040917.GD3053@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 10:17:06PM +0530, Vinod Koul wrote:
-> On Tue, Jul 18, 2017 at 12:26:14PM -0400, Sinan Kaya wrote:
-> > Hi Vinod,
-> > 
-> > On 7/18/2017 12:19 PM, Vinod Koul wrote:
-> > > On Thu, Jun 29, 2017 at 10:30:57PM -0400, Sinan Kaya wrote:
-> > > 
-> > >> @@ -410,7 +410,40 @@ static int hidma_alloc_chan_resources(struct dma_chan *dmach)
-> > >>  		return NULL;
-> > >>  
-> > >>  	hidma_ll_set_transfer_params(mdma->lldev, mdesc->tre_ch,
-> > >> -				     src, dest, len, flags);
-> > >> +				     src, dest, len, flags,
-> > >> +				     HIDMA_TRE_MEMCPY);
-> > >> +
-> > >> +	/* Place descriptor in prepared list */
-> > >> +	spin_lock_irqsave(&mchan->lock, irqflags);
-> > >> +	list_add_tail(&mdesc->node, &mchan->prepared);
-> > >> +	spin_unlock_irqrestore(&mchan->lock, irqflags);
-> > > 
-> > > This change looks suspicious, cna you clarify the need to do this?
-> > > 
-> > > 
-> > 
-> > Diff looks weird for some reason. I noticed that too.
-> > 
-> > I just added HIDMA_TRE_MEMCPY parameter to hidma_ll_set_transfer_params() function call
-> > from hidma_prep_dma_memcpy() and created a new hidma_prep_dma_memset() function very
-> > similar to memcpy with HIDMA_TRE_MEMSET call difference.
-> > 
-> > My suggestion is to use kdiff or another visual tool to look at the change.
+On Sun, Jul 16, 2017 at 10:30:37AM -0400, Sinan Kaya wrote:
+> A false overriding information is being presented during boot
+> under this scenario.
 > 
-> ah fine then, let me take a look at it again with rested pair of eyes in the
-> morn :)
+> 1. First object checks for kernel command line value against zero.
+> 2. It doesn't find it, it sets the command line variable to the
+> value coming from ACPI/DT.
+> 3. Second object is being probed.
+> 4. Second object sees that the value of kernel command line
+> override is non-zero, it prints an overriding message even though
+> value matches ACPI/DT value.
+> 
+> hidma-mgmt QCOM8060:03: overriding max-write-burst-bytes: 1024
+> 
+> Add an additional check to verify that kernel command line value
+> is different from the ACPI/DT value.
 
-Checked the context is fine, so
-
-Applied, thanks
+Applied both, thanks
 
 -- 
 ~Vinod
