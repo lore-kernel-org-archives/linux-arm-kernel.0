@@ -1,51 +1,33 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 19 Jul 2017 17:26:06 +0200
-Subject: [PATCH 062/102] phy: sun9i-usb: explicitly request exclusive reset
- control
-In-Reply-To: <20170719152646.25903-1-p.zabel@pengutronix.de>
-References: <20170719152646.25903-1-p.zabel@pengutronix.de>
-Message-ID: <20170719152646.25903-63-p.zabel@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 19 Jul 2017 17:31:24 +0200
+Subject: [PATCH 0/2] Enable NAND support on Armada 7K/8K
+Message-ID: <20170719153126.16905-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a53e35db70d1 ("reset: Ensure drivers are explicit when requesting
-reset lines") started to transition the reset control request API calls
-to explicitly state whether the driver needs exclusive or shared reset
-control behavior. Convert all drivers requesting exclusive resets to the
-explicit API call so the temporary transition helpers can be removed.
+Hi Boris,
 
-No functional changes.
+this short series enables the NAND controller on the Armada 7K/8K
+SoCs. The IP used is the same that the other mvebu SoC, so we only
+need to be bale to build it for this SoCs and updating the device
+tree.
 
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/phy/allwinner/phy-sun9i-usb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The first patch should go to mtd and the second one to arm-soc through
+mvebu.
 
-diff --git a/drivers/phy/allwinner/phy-sun9i-usb.c b/drivers/phy/allwinner/phy-sun9i-usb.c
-index 28fce4bce638e..a07aa04a88ed8 100644
---- a/drivers/phy/allwinner/phy-sun9i-usb.c
-+++ b/drivers/phy/allwinner/phy-sun9i-usb.c
-@@ -146,7 +146,7 @@ static int sun9i_usb_phy_probe(struct platform_device *pdev)
- 			return PTR_ERR(phy->hsic_clk);
- 		}
- 
--		phy->reset = devm_reset_control_get(dev, "hsic");
-+		phy->reset = devm_reset_control_get_exclusive(dev, "hsic");
- 		if (IS_ERR(phy->reset)) {
- 			dev_err(dev, "failed to get reset control\n");
- 			return PTR_ERR(phy->reset);
-@@ -158,7 +158,7 @@ static int sun9i_usb_phy_probe(struct platform_device *pdev)
- 			return PTR_ERR(phy->clk);
- 		}
- 
--		phy->reset = devm_reset_control_get(dev, "phy");
-+		phy->reset = devm_reset_control_get_exclusive(dev, "phy");
- 		if (IS_ERR(phy->reset)) {
- 			dev_err(dev, "failed to get reset control\n");
- 			return PTR_ERR(phy->reset);
+The patches are completely independent.
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (2):
+  mtd: nand: pxa3xx_nand: enable building on mvebu 64-bit platforms
+  ARM64: dts: marvell: add NAND support on the CP110 master
+
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 14 ++++++++++++++
+ drivers/mtd/nand/Kconfig                             |  2 +-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
 -- 
-2.11.0
+2.13.2
