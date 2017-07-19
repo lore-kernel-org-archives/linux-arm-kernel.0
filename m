@@ -1,221 +1,84 @@
-From: jacobchen110@gmail.com (Jacob Chen)
-Date: Wed, 19 Jul 2017 18:40:23 +0800
-Subject: [PATCH v2 2/6] [media] rockchip/rga: v4l2 m2m support
-In-Reply-To: <1500302710.21957.1.camel@ndufresne.ca>
-References: <1500101920-24039-1-git-send-email-jacob-chen@iotwrt.com>
- <2363665.x6z9MR1vqI@avalon> <1500137353.2353.1.camel@ndufresne.ca>
- <11368407.z8bSoa2YAE@avalon> <1500302710.21957.1.camel@ndufresne.ca>
-Message-ID: <CAFLEztR24XBFFtSitvKQ5iRA802nm1LHE2pJvUmZUbFd5F6-Tw@mail.gmail.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Wed, 19 Jul 2017 10:48:15 +0000
+Subject: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <20170714193322.GH26488@arm.com>
+References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
+ <20170623145801.325244-3-shameerali.kolothum.thodi@huawei.com>
+ <20170704173820.GO22175@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA83839DB59@FRAEML521-MBX.china.huawei.com>
+ <20170714193322.GH26488@arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8383B9D5A@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-2017-07-17 22:45 GMT+08:00 Nicolas Dufresne <nicolas@ndufresne.ca>:
-> Le lundi 17 juillet 2017 ? 05:37 +0300, Laurent Pinchart a ?crit :
->> Hi Nicolas,
->>
->> On Saturday 15 Jul 2017 12:49:13 Personnel wrote:
->>
->> You might want to fix your mailer to use your name :-)
->>
->> > Le samedi 15 juillet 2017 ? 12:42 +0300, Laurent Pinchart a ?crit :
->> > > On Saturday 15 Jul 2017 14:58:36 Jacob Chen wrote:
->> > > > Rockchip RGA is a separate 2D raster graphic acceleration unit. It
->> > > > accelerates 2D graphics operations, such as point/line drawing, image
->> > > > scaling, rotation, BitBLT, alpha blending and image blur/sharpness.
->> > > >
->> > > > The drvier is mostly based on s5p-g2d v4l2 m2m driver.
->> > > > And supports various operations from the rendering pipeline.
->> > > >
->> > > >  - copy
->> > > >  - fast solid color fill
->> > > >  - rotation
->> > > >  - flip
->> > > >  - alpha blending
->> > >
->> > > I notice that you don't support the drawing operations. How do you plan to
->> > > support them later through the V4L2 M2M API ? I hate stating the obvious,
->> > > but wouldn't the DRM API be better fit for a graphic accelerator ?
->> >
->> > It could fit, maybe, but it really lacks some framework. Also, DRM is
->> > not really meant for M2M operation, and it's also not great for multi-
->> > process.
->>
->> GPUs on embedded devices are mem-to-mem, and they're definitely shared between
->> multiple processes :-)
->>
->> > Until recently, there was competing drivers for Exynos, both
->> > implemented in V4L2 and DRM, for similar rational, all DRM ones are
->> > being deprecated/removed.
->> >
->> > I think 2D blitters in V4L2 are fine, but they terribly lack something
->> > to differentiate them from converters/scalers when looking up the HW
->> > list. Could be as simple as a capability flag, if I can suggest. For
->> > the reference, the 2D blitter on IMX6 has been used to implement a live
->> > video mixer in GStreamer.
->> >
->> > https://bugzilla.gnome.org/show_bug.cgi?id=772766
->>
->> If we decide that 2D blitters should be supported by V4L2 (and I'm open to get
->> convinced about that), we really need to define a proper API before merging a
->> bunch of drivers that will implement things in slightly different ways,
->> otherwise the future will be very painful.
->
-> Arguably, Jacob is not proposing anything new, as at least one other
-> driver has been merged.
->
->>
->> Among the issues that need to be solved are
->>
->> - stateful vs. stateless operation (as mentioned by Jacob in this mail
->> thread), a.k.a. the request API
->
-> Would it be possible to extend your thought. To me, Request API could
-> enable more use cases but is not strictly required.
->
->>
->> - exposing capabilities to userspace (a single capability flag would be enough
->> only if all blitters expose the same API, which I'm not sure we can assume)
->
-> I am just rethinking this. With this patch series, Jacob is trying to
-> generalize the Blit Operation controls (still need a name, blend mode
-> does not work). We can easily make a recommendation to set the default
-> operation to a copy operation (drivers always support that). This way,
-> the node will behave like a converter (scaler, colorspace converter,
-> rotator and/or etc.) Checking the presence of that control, we can
-> clearly and quickly figure-out what this node is about. The capability
-> remains a nice idea, but probably optional.
->
-> I totally agree we should document the behaviours and rationals for
-> picking a certain default. The control should maybe become a "menu"
-> too, so each driver can cherry-pick the blit operations they support
-> (using int with min/max requires userspace trial and error, we already
-> did that mistake for encoders profiles and level).
->
->>
->> - single input (a.k.a. in-place blitters as you mentioned below) vs. multiple
->> inputs
->
-> I do think the second is something you can build on top of the first by
-> cascading (what we do in the refereed GStreamer element). So far this
-> is applicable to Exynos, IMX6 and now Rockchip (probably more). The
-> "optimal" form for the second case seems like something that will be
-> implemented using much lower level kernel interface, like a GPU
-> programming interface (aka proprietary Adreno C2D API), or through
-> multiple nodes (multiple inputs and outputs). It's seems like the cut
-> between high-end and low-end.
->
->>
->> - API for 2D-accelerated operations other than blitting (filling, point and
->> line drawing, ...)
->
-> I doubt such hardware exist in a form that is not bound to the GPU. I'm
-> not ignoring your point, there is a clear overlap between how we
-> integrated GPUs and having this into V4L2.
->
-
-I think stateless and multiple inputs are optional, we don't have to
-support it right now.
-(Though we really need a stateless m2m API, too many hardwares need it, not just
-2d blitters, but also internal dsp, image process units.... It would
-be really great
- if people could convert their custom drivers to V4L2. )
 
 
-Agree that we should have API for more 2D-accelerated operations and
-capabilities,
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Friday, July 14, 2017 8:33 PM
+> To: Shameerali Kolothum Thodi
+> Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> sudeep.holla at arm.com; robin.murphy at arm.com; hanjun.guo at linaro.org;
+> Gabriele Paoloni; John Garry; Linuxarm; linux-acpi at vger.kernel.org;
+> iommu at lists.linux-foundation.org; Wangzhou (B); Guohanjun (Hanjun Guo);
+> linux-arm-kernel at lists.infradead.org; devel at acpica.org
+> Subject: Re: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based
+> HiSilicon erratum 161010801
+> 
+[...]
+> > > > -	list_add_tail(&region->list, head);
+> > > > +	if ((smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)) {
+> > > > +
+> > > > +		if (!is_of_node(smmu->dev->fwnode))
+> > > > +			resv = iort_iommu_its_get_resv_regions(dev, head);
+> > >
+> > > How does this work when we're not using ACPI? Shouldn't of vs ACPI
+> > > be abstracted from the driver?
+> >
+> > At present ARM_SMMU_OPT_RESV_HW_MSI is only set for ACPI and  DT
+> > support for this is a low priority for us at the moment. Is the
+> > suggestion is to have a common function outside the smmu driver for
+> > _iommu_its_get_resv_regions() ? I am not sure what is the best way here.
+> 
+> Right, something like that. The driver shouldn't need to care whether or not
+> it's using ACPI or DT when setting these options.
 
-What about this?
+Below is what I have in mind for the common function for msi reserve.
+But just wondering invoking iort_ functions from iommu code 
+is acceptable or not . Could you please take a look and let me know.
 
-#define V4L2_CID_2D_MODE
-enum v4l2_2d_mode {
-        V4L2_2D_MODE_COPY
-        V4L2_2D_MODE_FILLING
-        V4L2_2D_MODE_PORTERDUFF
-        /*
-        V4L2_2D_MODE_BITBLT
-        V4L2_2D_MODE_ALPHA_BLEND
-        other operations.....
-        */
-}
+Many thanks,
+Shameer
 
-
-/* for V4L2_2D_MODE_PORTERDUFF */
-#define V4L2_CID_2D_PORTERDUFF_MODE
-ATOP
-SRC
-.....
-
-
-/* for V4L2_2D_MODE_BITBLT */
-#define V4L2_2D_BITBLT_ROP
-XOR
-OR
-AND
-NOT
-....
-
-#define .......
-
-
-/* for V4L2_2D_MODE_ALPHA_BLEND */
-#define .......
-........
-
-/* for V4L2_2D_MODE_FILLING */
-V4L2_CID_BG_COLOR
-#define .......
-
-
-We use copy as the default mode for hardware that not support bitblt/alpha blend
-e.g : some image process units, used for image enhancement/noise reduction
-(Though BITBLT+copy rop or V4L2_2D_MODE_PORTERDUFF+SRC+MODE = copy)
-
-
-V4L2_2D_MODE_PORTERDUFF are used to wrap bitblt/alpha-blend.
-If driver need a more customizable API, they could implent  V4L2_2D_MODE_BITBLT/
-V4L2_2D_MODE_ALPHA_BLEND, or they just need implent V4L2_2D_MODE_PORTERDUFF.
-
-
-Driver return false in ioctl to show capabilities.
-
-
->>
->> > > Additionally, V4L2 M2M has one source and one destination. How do you
->> > > implement alpha blending in that case, which by definition requires at
->> > > least two sources ?
->> >
->> > This type of HW only do in-place blits. When using such a node, the
->> > buffer queued on the V4L2_CAPTURE contains the destination image, and
->> > the buffer queued on the V4L2_OUTPUT is the source image.
->> >
->> > > > The code in rga-hw.c is used to configure regs accroding to operations.
->> > > >
->> > > > The code in rga-buf.c is used to create private mmu table for RGA.
->> > > > The tables is stored in a list, and be removed when buffer is cleanup.
->> > >
->> > > Looking at the implementation it seems to be a scatter-gather list, not an
->> > > MMU. Is that right ? Does the hardware documentation refer to it as an MMU
->> > > ?
->> > >
->> > > > Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
->> > > > ---
->> > > >
->> > > >  drivers/media/platform/Kconfig                |  11 +
->> > > >  drivers/media/platform/Makefile               |   2 +
->> > > >  drivers/media/platform/rockchip-rga/Makefile  |   3 +
->> > > >  drivers/media/platform/rockchip-rga/rga-buf.c | 122 ++++
->> > > >  drivers/media/platform/rockchip-rga/rga-hw.c  | 652 ++++++++++++++++++
->> > > >  drivers/media/platform/rockchip-rga/rga-hw.h  | 437 ++++++++++++
->> > > >  drivers/media/platform/rockchip-rga/rga.c     | 958 +++++++++++++++++++
->> > > >  drivers/media/platform/rockchip-rga/rga.h     | 111 +++
->> > > >  8 files changed, 2296 insertions(+)
->> > > >  create mode 100644 drivers/media/platform/rockchip-rga/Makefile
->> > > >  create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
->> > > >  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
->> > > >  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
->> > > >  create mode 100644 drivers/media/platform/rockchip-rga/rga.c
->> > > >  create mode 100644 drivers/media/platform/rockchip-rga/rga.h
->>
->>
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -19,6 +19,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/acpi_iort.h>
+ #include <linux/device.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/gfp.h>
+@@ -198,6 +199,24 @@ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
+ }
+ EXPORT_SYMBOL(iommu_dma_get_resv_regions);
+ 
++/**
++ * iommu_dma_get_msi_resv_regions - Reserved region driver helper
++ * @dev: Device from iommu_get_resv_regions()
++ * @list: Reserved region list from iommu_get_resv_regions()
++ *
++ * IOMMU drivers can use this to implement their .get_resv_regions
++ * callback for HW MSI specific reservations. For now, this only
++ * covers ITS MSI region reservation using ACPI IORT helper function.
++ */
++int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list)
++{
++	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode))
++		return iort_iommu_its_get_resv_regions(dev, list);
++
++	return -ENODEV;
++}
++EXPORT_SYMBOL(iommu_dma_get_msi_resv_regions);
