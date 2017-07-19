@@ -1,51 +1,56 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Tue, 18 Jul 2017 23:25:24 -0400
-Subject: [PATCH v2] PCI: dwc: designware: test PCIE_ATU_ENABLE bit to
- check enabled or not
-In-Reply-To: <20170718064821.3668-1-jszhang@marvell.com>
-References: <20170718064821.3668-1-jszhang@marvell.com>
-Message-ID: <000001d3003e$a9ad0fe0$fd072fa0$@gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 19 Jul 2017 06:56:51 +0300
+Subject: [PATCH] irqchip: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-30-robh@kernel.org>
+References: <20170718214339.7774-30-robh@kernel.org>
+Message-ID: <20170719035651.32e4ium6bymztlqj@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 18, 2017 2:48 AM, Jisheng Zhang wrote:
+Hi Rob,
+
+On Tue, Jul 18, 2017 at 04:43:10PM -0500, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-> The ATU CTRL2 register is 32 bit, besides the enable bit, other bits
-> may also be set. To check whether the ATU is enabled or not, we should
-> test the enable bit.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Acked-by: Joao Pinto <jpinto@synopsys.com>
-
-Acked-by: Jingoo Han <jingoohan1@gmail.com>
-
-Best regards,
-Jingoo Han
-
-
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: Baruch Siach <baruch@tkos.co.il>
+> Cc: Vladimir Zapolskiy <vz@mleia.com>
+> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-tegra at vger.kernel.org
 > ---
-> Since v1:
->  - Add Joao's Ack
->  - Fix typo in commit msg, thank Jingoo
-> 
->  drivers/pci/dwc/pcie-designware.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-
-> designware.c
-> index 0e03af279259..6bf0b409050a 100644
-> --- a/drivers/pci/dwc/pcie-designware.c
-> +++ b/drivers/pci/dwc/pcie-designware.c
-> @@ -177,7 +177,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci,
-> int index, int type,
->  	 */
->  	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++)
-> {
->  		val = dw_pcie_readl_dbi(pci, PCIE_ATU_CR2);
-> -		if (val == PCIE_ATU_ENABLE)
-> +		if (val & PCIE_ATU_ENABLE)
->  			return;
-> 
->  		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-> --
-> 2.13.2
+
+>  drivers/irqchip/irq-digicolor.c          |  8 ++++----
+
+Acked-by: Baruch Siach <baruch@tkos.co.il>
+
+Thanks,
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
