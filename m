@@ -1,28 +1,46 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 19 Jul 2017 15:28:21 +0530
-Subject: [PATCH 1/4] gpio: davinci: Use devm_gpiochip_add_data in place of
- gpiochip_add_data
-In-Reply-To: <20170719093722.GW29638@localhost>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-2-git-send-email-j-keerthy@ti.com>
- <20170719093722.GW29638@localhost>
-Message-ID: <32f70ccc-e52e-af86-87ec-f7a243d518b0@ti.com>
+From: madhu.sk89@gmail.com (Madhu K)
+Date: Wed, 19 Jul 2017 15:35:20 +0530
+Subject: What is use of struct i2c_device_id if we are already using struct
+ of_device_id?
+Message-ID: <CAA2oCOm-xDd6GbowfXrL-QU5fDmmCkn7LmNS=Z==o_nM4DTomQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi All,
+
+I am kernel newbie, I am trying to understand some basics of linux
+device drivers, as part of my course, i came across below scenario
+where both i2c_device_id and of_device_id are used.
+
+what is the purpose of having both the structures?
+
+Below is the code
+
+static const struct i2c_device_id ad7879_id[] = {
+{ "ad7879", 0 },
+{ "ad7889", 0 },
+{ }
+};
+MODULE_DEVICE_TABLE(i2c, ad7879_id);
+
+#ifdef CONFIG_OF
+static const struct of_device_id ad7879_i2c_dt_ids[] = {
+{ .compatible = "adi,ad7879-1", },
+{ }
+};
+MODULE_DEVICE_TABLE(of, ad7879_i2c_dt_ids);
+#endif
+
+static struct i2c_driver ad7879_i2c_driver = {
+.driver = {
+.name = "ad7879",
+.pm = &ad7879_pm_ops,
+.of_match_table = of_match_ptr(ad7879_i2c_dt_ids),
+},
+.probe = ad7879_i2c_probe,
+.id_table = ad7879_id,
+};
 
 
-On Wednesday 19 July 2017 03:07 PM, Johan Hovold wrote:
-> On Tue, Jul 18, 2017 at 04:27:13PM +0530, Keerthy wrote:
->> Use the devm version of gpiochip_add_data and pass on the
->> return value. Reset the static variables to 0 before returning.
-> 
-> You need to describe not just what you do, but also why you it. In this
-> case, your fixing memory leaks and the gpio chip being left registered
-> if this driver is unbound.
-
-Sure i can add more description as mentioned above.
-
-> 
-> Johan
-> 
+Thanks & regards,
+Madhu
