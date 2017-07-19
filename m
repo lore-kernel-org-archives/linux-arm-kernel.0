@@ -1,40 +1,35 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 20 Jul 2017 00:10:17 +0800
-Subject: [PATCH 3/5] arm64: allwinner: a64: add AXP803 PMIC to SoPine DTSI
-In-Reply-To: <20170719161019.62133-1-icenowy@aosc.io>
-References: <20170719161019.62133-1-icenowy@aosc.io>
-Message-ID: <20170719161019.62133-4-icenowy@aosc.io>
+Date: Thu, 20 Jul 2017 00:10:14 +0800
+Subject: [PATCH 0/5] AXP803 regulator support for Pine64 and SoPine
+Message-ID: <20170719161019.62133-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoPine SoM has an AXP803 PMIC connected to the RSB bus of the A64
-SoC.
+The Pine64 and SoPine w/ baseboard boards have an AXP803 PMIC, and the
+regulators of the PMIC are used.
 
-Add its device tree node to the DTSI.
+This patchset adds the regulators to the device tree of these two boards.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+The first patch introduces proper AXP803 regulators to Pine64 DT, and the
+second patch removed dummy regulators in the Pine64 DT.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-index 475518b031dd..ab9464dd50c5 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-@@ -63,3 +63,14 @@
- 	bus-width = <4>;
- 	status = "okay";
- };
-+
-+&r_rsb {
-+	status = "okay";
-+
-+	axp803: pmic at 3a3 {
-+		compatible = "x-powers,axp803";
-+		reg = <0x3a3>;
-+		interrupt-parent = <&r_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
+The third patch enables AXP803 PMIC for SoPine.
+
+The fourth patch and fifth patch are like the first and the second, but
+they're for SoPine w/ baseboard.
+
+Icenowy Zheng (5):
+  arm64: allwinner: a64: enable AXP803 regulators for Pine64
+  arm: allwinner: a64: drop the dummy vcc3v3 regulator in Pine64 DT
+  arm64: allwinner: a64: add AXP803 PMIC to SoPine DTSI
+  arm64: allwinner: a64: add AXP803 regulators support for SoPine
+  arm: allwinner: a64: drop vcc3v3 and vcc1v8 dummy regulators for
+    SoPine
+
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 105 +++++++++++++++++++--
+ .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |  34 +++++--
+ .../boot/dts/allwinner/sun50i-a64-sopine.dtsi      |  91 ++++++++++++++++--
+ 3 files changed, 203 insertions(+), 27 deletions(-)
+
 -- 
 2.13.0
