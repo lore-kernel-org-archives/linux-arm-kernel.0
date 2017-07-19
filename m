@@ -1,78 +1,595 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 19 Jul 2017 17:09:05 +0530
-Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
- SMMUv3 driver
-In-Reply-To: <20170719113325.GI13642@arm.com>
-References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
- <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
- <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
- <20170719112524.GF13642@arm.com>
- <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
- <20170719113325.GI13642@arm.com>
-Message-ID: <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 19 Jul 2017 13:39:46 +0200
+Subject: [PATCH] media: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-33-robh@kernel.org>
+References: <20170718214339.7774-33-robh@kernel.org>
+Message-ID: <25ebfec0-3eaa-29c4-d8ae-b837bb01dd20@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 5:03 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jul 19, 2017 at 05:01:11PM +0530, Anup Patel wrote:
->> On Wed, Jul 19, 2017 at 4:55 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Wed, Jul 19, 2017 at 04:53:04PM +0530, Anup Patel wrote:
->> >> On Wed, Jul 19, 2017 at 4:30 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> >> > On 19/07/17 10:33, Anup Patel wrote:
->> >> >> The ARM SMMUv3 support bypassing transactions for which domain
->> >> >> is not configured. The patch adds corresponding IOMMU capability
->> >> >> to advertise this fact.
->> >> >>
->> >> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> >> >> ---
->> >> >>  drivers/iommu/arm-smmu-v3.c | 2 ++
->> >> >>  1 file changed, 2 insertions(+)
->> >> >>
->> >> >> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> >> >> index 568c400..a6c7f66 100644
->> >> >> --- a/drivers/iommu/arm-smmu-v3.c
->> >> >> +++ b/drivers/iommu/arm-smmu-v3.c
->> >> >> @@ -1423,6 +1423,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
->> >> >>               return true;
->> >> >>       case IOMMU_CAP_NOEXEC:
->> >> >>               return true;
->> >> >> +     case IOMMU_CAP_BYPASS:
->> >> >> +             return true;
->> >> >
->> >> > And this is never true. If Linux knows a device masters through the
->> >> > SMMU, it will always have a default domain of some sort (either identity
->> >> > or DMA ops). If Linux doesn't know, then it won't have been able to
->> >> > initialise the stream table for the relevant stream IDs, thus any
->> >> > 'bypass' DMA is going to raise C_BAD_STE. SMMUv3 can effectively only
->> >> > bypass unknown stream IDs if disabled entirely.
->> >>
->> >> What if we don't want to use IOMMU for certain device and
->> >> due to this we never provide "iommus" DT attribute in the
->> >> device DT node. Further, we want to access device without
->> >> "iommus" DT attribute from user-space using VFIO no-IOMMU.
->> >
->> > Wait, you want to pass a device through to userspace but you don't want to
->> > use the IOMMU? Why not?
->> >
->> > If you describe the SMMU in firmware with only a partial topology
->> > description, then you will run into problems with unknown masters trying to
->> > perform DMA. That's the IOMMU doing its job!
->>
->> We are keeping disable_bypass = false. In other words, we
->> are using bypass mode for unmatched streams. The real
->> reason is limited number of SMRs due to which we choose
->> not to provide "iommus" DT attribute for certain devices.
->
-> Understood, but that's not robust for SMMUv3 and we *really* shouldn't have
-> a user ABI that changes behaviour based on a cmdline option. VFIO should be
-> requesting its own identity mappings, if that's what you need.
+On 18/07/2017 at 23:43, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Andrzej Hajda <a.hajda@samsung.com>
+> Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
+> Cc: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+> Cc: Songjun Wu <songjun.wu@microchip.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> Cc: Houlong Wei <houlong.wei@mediatek.com>
+> Cc: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: "Niklas S?derlund" <niklas.soderlund@ragnatech.se>
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Cc: Hyun Kwon <hyun.kwon@xilinx.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: linux-media at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-renesas-soc at vger.kernel.org
+> ---
+>  drivers/media/i2c/s5c73m3/s5c73m3-core.c       |  3 +-
+>  drivers/media/i2c/s5k5baf.c                    |  7 ++--
+>  drivers/media/platform/am437x/am437x-vpfe.c    |  4 +-
+>  drivers/media/platform/atmel/atmel-isc.c       |  4 +-
 
-Currently, the iommu_present() check in vfio_iommu_group_get()
-is preventing us allow no-IOMMU mode for certain devices.
+Instead of Songjun, here is my:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Is there a better replacement of iommu_present() check in
-vfio_iommu_group_get()?
 
-Regards,
-Anup
+>  drivers/media/platform/davinci/vpif_capture.c  | 16 ++++----
+>  drivers/media/platform/exynos4-is/fimc-is.c    |  8 ++--
+>  drivers/media/platform/exynos4-is/fimc-lite.c  |  3 +-
+>  drivers/media/platform/exynos4-is/media-dev.c  |  8 ++--
+>  drivers/media/platform/exynos4-is/mipi-csis.c  |  4 +-
+>  drivers/media/platform/mtk-mdp/mtk_mdp_comp.c  |  6 +--
+>  drivers/media/platform/mtk-mdp/mtk_mdp_core.c  |  8 ++--
+>  drivers/media/platform/omap3isp/isp.c          |  8 ++--
+>  drivers/media/platform/pxa_camera.c            |  2 +-
+>  drivers/media/platform/rcar-vin/rcar-core.c    |  4 +-
+>  drivers/media/platform/soc_camera/soc_camera.c |  6 +--
+>  drivers/media/platform/xilinx/xilinx-vipp.c    | 52 +++++++++++++-------------
+>  drivers/media/v4l2-core/v4l2-async.c           |  4 +-
+>  drivers/media/v4l2-core/v4l2-clk.c             |  3 +-
+>  include/media/v4l2-clk.h                       |  4 +-
+>  19 files changed, 71 insertions(+), 83 deletions(-)
+> 
+> diff --git a/drivers/media/i2c/s5c73m3/s5c73m3-core.c b/drivers/media/i2c/s5c73m3/s5c73m3-core.c
+> index f434fb2ee6fc..cdc4f2392ef9 100644
+> --- a/drivers/media/i2c/s5c73m3/s5c73m3-core.c
+> +++ b/drivers/media/i2c/s5c73m3/s5c73m3-core.c
+> @@ -1635,8 +1635,7 @@ static int s5c73m3_get_platform_data(struct s5c73m3 *state)
+> 
+>  	node_ep = of_graph_get_next_endpoint(node, NULL);
+>  	if (!node_ep) {
+> -		dev_warn(dev, "no endpoint defined for node: %s\n",
+> -						node->full_name);
+> +		dev_warn(dev, "no endpoint defined for node: %pOF\n", node);
+>  		return 0;
+>  	}
+> 
+> diff --git a/drivers/media/i2c/s5k5baf.c b/drivers/media/i2c/s5k5baf.c
+> index 962051b9939d..9c22fc963901 100644
+> --- a/drivers/media/i2c/s5k5baf.c
+> +++ b/drivers/media/i2c/s5k5baf.c
+> @@ -1863,8 +1863,7 @@ static int s5k5baf_parse_device_node(struct s5k5baf *state, struct device *dev)
+> 
+>  	node_ep = of_graph_get_next_endpoint(node, NULL);
+>  	if (!node_ep) {
+> -		dev_err(dev, "no endpoint defined at node %s\n",
+> -			node->full_name);
+> +		dev_err(dev, "no endpoint defined at node %pOF\n", node);
+>  		return -EINVAL;
+>  	}
+> 
+> @@ -1882,8 +1881,8 @@ static int s5k5baf_parse_device_node(struct s5k5baf *state, struct device *dev)
+>  	case V4L2_MBUS_PARALLEL:
+>  		break;
+>  	default:
+> -		dev_err(dev, "unsupported bus in endpoint defined at node %s\n",
+> -			node->full_name);
+> +		dev_err(dev, "unsupported bus in endpoint defined at node %pOF\n",
+> +			node);
+>  		return -EINVAL;
+>  	}
+> 
+> diff --git a/drivers/media/platform/am437x/am437x-vpfe.c b/drivers/media/platform/am437x/am437x-vpfe.c
+> index 466aba8b0e00..dfcc484cab89 100644
+> --- a/drivers/media/platform/am437x/am437x-vpfe.c
+> +++ b/drivers/media/platform/am437x/am437x-vpfe.c
+> @@ -2490,8 +2490,8 @@ vpfe_get_pdata(struct platform_device *pdev)
+> 
+>  		rem = of_graph_get_remote_port_parent(endpoint);
+>  		if (!rem) {
+> -			dev_err(&pdev->dev, "Remote device at %s not found\n",
+> -				endpoint->full_name);
+> +			dev_err(&pdev->dev, "Remote device at %pOF not found\n",
+> +				endpoint);
+>  			goto done;
+>  		}
+> 
+> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+> index d6534252cdcd..b2c66b239cf2 100644
+> --- a/drivers/media/platform/atmel/atmel-isc.c
+> +++ b/drivers/media/platform/atmel/atmel-isc.c
+> @@ -1700,8 +1700,8 @@ static int isc_parse_dt(struct device *dev, struct isc_device *isc)
+> 
+>  		rem = of_graph_get_remote_port_parent(epn);
+>  		if (!rem) {
+> -			dev_notice(dev, "Remote device at %s not found\n",
+> -				   of_node_full_name(epn));
+> +			dev_notice(dev, "Remote device at %pOF not found\n",
+> +				   epn);
+>  			continue;
+>  		}
+> 
+> diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+> index d78580f9e431..0a7aefa22c67 100644
+> --- a/drivers/media/platform/davinci/vpif_capture.c
+> +++ b/drivers/media/platform/davinci/vpif_capture.c
+> @@ -1397,9 +1397,9 @@ static int vpif_async_bound(struct v4l2_async_notifier *notifier,
+>  			vpif_obj.config->chan_config->inputs[i].subdev_name =
+>  				(char *)to_of_node(subdev->fwnode)->full_name;
+>  			vpif_dbg(2, debug,
+> -				 "%s: setting input %d subdev_name = %s\n",
+> +				 "%s: setting input %d subdev_name = %pOF\n",
+>  				 __func__, i,
+> -				 to_of_node(subdev->fwnode)->full_name);
+> +				 to_of_node(subdev->fwnode));
+>  			return 0;
+>  		}
+>  	}
+> @@ -1557,8 +1557,8 @@ vpif_capture_get_pdata(struct platform_device *pdev)
+>  			dev_err(&pdev->dev, "Could not parse the endpoint\n");
+>  			goto done;
+>  		}
+> -		dev_dbg(&pdev->dev, "Endpoint %s, bus_width = %d\n",
+> -			endpoint->full_name, bus_cfg.bus.parallel.bus_width);
+> +		dev_dbg(&pdev->dev, "Endpoint %pOF, bus_width = %d\n",
+> +			endpoint, bus_cfg.bus.parallel.bus_width);
+>  		flags = bus_cfg.bus.parallel.flags;
+> 
+>  		if (flags & V4L2_MBUS_HSYNC_ACTIVE_HIGH)
+> @@ -1569,13 +1569,13 @@ vpif_capture_get_pdata(struct platform_device *pdev)
+> 
+>  		rem = of_graph_get_remote_port_parent(endpoint);
+>  		if (!rem) {
+> -			dev_dbg(&pdev->dev, "Remote device at %s not found\n",
+> -				endpoint->full_name);
+> +			dev_dbg(&pdev->dev, "Remote device at %pOF not found\n",
+> +				endpoint);
+>  			goto done;
+>  		}
+> 
+> -		dev_dbg(&pdev->dev, "Remote device %s, %s found\n",
+> -			rem->name, rem->full_name);
+> +		dev_dbg(&pdev->dev, "Remote device %s, %pOF found\n",
+> +			rem->name, rem);
+>  		sdinfo->name = rem->full_name;
+> 
+>  		pdata->asd[i] = devm_kzalloc(&pdev->dev,
+> diff --git a/drivers/media/platform/exynos4-is/fimc-is.c b/drivers/media/platform/exynos4-is/fimc-is.c
+> index 340d906db370..5ddb2321e9e4 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-is.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-is.c
+> @@ -174,8 +174,8 @@ static int fimc_is_parse_sensor_config(struct fimc_is *is, unsigned int index,
+> 
+>  	sensor->drvdata = fimc_is_sensor_get_drvdata(node);
+>  	if (!sensor->drvdata) {
+> -		dev_err(&is->pdev->dev, "no driver data found for: %s\n",
+> -							 node->full_name);
+> +		dev_err(&is->pdev->dev, "no driver data found for: %pOF\n",
+> +							 node);
+>  		return -EINVAL;
+>  	}
+> 
+> @@ -191,8 +191,8 @@ static int fimc_is_parse_sensor_config(struct fimc_is *is, unsigned int index,
+>  	/* Use MIPI-CSIS channel id to determine the ISP I2C bus index. */
+>  	ret = of_property_read_u32(port, "reg", &tmp);
+>  	if (ret < 0) {
+> -		dev_err(&is->pdev->dev, "reg property not found at: %s\n",
+> -							 port->full_name);
+> +		dev_err(&is->pdev->dev, "reg property not found at: %pOF\n",
+> +							 port);
+>  		of_node_put(port);
+>  		return ret;
+>  	}
+> diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
+> index 7d3ec5cc6608..388a964cbf76 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-lite.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-lite.c
+> @@ -1493,8 +1493,7 @@ static int fimc_lite_probe(struct platform_device *pdev)
+> 
+>  	if (!drv_data || fimc->index >= drv_data->num_instances ||
+>  						fimc->index < 0) {
+> -		dev_err(dev, "Wrong %s node alias\n",
+> -					dev->of_node->full_name);
+> +		dev_err(dev, "Wrong %pOF node alias\n", dev->of_node);
+>  		return -EINVAL;
+>  	}
+> 
+> diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+> index 7d1cf78846c4..d4656d5175d7 100644
+> --- a/drivers/media/platform/exynos4-is/media-dev.c
+> +++ b/drivers/media/platform/exynos4-is/media-dev.c
+> @@ -412,8 +412,8 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+>  	rem = of_graph_get_remote_port_parent(ep);
+>  	of_node_put(ep);
+>  	if (rem == NULL) {
+> -		v4l2_info(&fmd->v4l2_dev, "Remote device at %s not found\n",
+> -							ep->full_name);
+> +		v4l2_info(&fmd->v4l2_dev, "Remote device at %pOF not found\n",
+> +							ep);
+>  		return 0;
+>  	}
+> 
+> @@ -430,8 +430,8 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+>  		 */
+>  		pd->sensor_bus_type = FIMC_BUS_TYPE_MIPI_CSI2;
+>  	} else {
+> -		v4l2_err(&fmd->v4l2_dev, "Wrong port id (%u) at node %s\n",
+> -			 endpoint.base.port, rem->full_name);
+> +		v4l2_err(&fmd->v4l2_dev, "Wrong port id (%u) at node %pOF\n",
+> +			 endpoint.base.port, rem);
+>  	}
+>  	/*
+>  	 * For FIMC-IS handled sensors, that are placed under i2c-isp device
+> diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
+> index 98c89873c2dc..560aadabcb11 100644
+> --- a/drivers/media/platform/exynos4-is/mipi-csis.c
+> +++ b/drivers/media/platform/exynos4-is/mipi-csis.c
+> @@ -730,8 +730,8 @@ static int s5pcsis_parse_dt(struct platform_device *pdev,
+> 
+>  	node = of_graph_get_next_endpoint(node, NULL);
+>  	if (!node) {
+> -		dev_err(&pdev->dev, "No port node at %s\n",
+> -				pdev->dev.of_node->full_name);
+> +		dev_err(&pdev->dev, "No port node at %pOF\n",
+> +				pdev->dev.of_node);
+>  		return -EINVAL;
+>  	}
+>  	/* Get port node and validate MIPI-CSI channel id. */
+> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_comp.c b/drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
+> index aa8f9fd1f1a2..e728d32d9408 100644
+> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
+> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
+> @@ -134,15 +134,13 @@ int mtk_mdp_comp_init(struct device *dev, struct device_node *node,
+>  	larb_node = of_parse_phandle(node, "mediatek,larb", 0);
+>  	if (!larb_node) {
+>  		dev_err(dev,
+> -			"Missing mediadek,larb phandle in %s node\n",
+> -			node->full_name);
+> +			"Missing mediadek,larb phandle in %pOF node\n", node);
+>  		return -EINVAL;
+>  	}
+> 
+>  	larb_pdev = of_find_device_by_node(larb_node);
+>  	if (!larb_pdev) {
+> -		dev_warn(dev, "Waiting for larb device %s\n",
+> -			 larb_node->full_name);
+> +		dev_warn(dev, "Waiting for larb device %pOF\n", larb_node);
+>  		of_node_put(larb_node);
+>  		return -EPROBE_DEFER;
+>  	}
+> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+> index 81347558b24a..bbb24fb95b95 100644
+> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+> @@ -137,16 +137,16 @@ static int mtk_mdp_probe(struct platform_device *pdev)
+>  			continue;
+> 
+>  		if (!of_device_is_available(node)) {
+> -			dev_err(dev, "Skipping disabled component %s\n",
+> -				node->full_name);
+> +			dev_err(dev, "Skipping disabled component %pOF\n",
+> +				node);
+>  			continue;
+>  		}
+> 
+>  		comp_type = (enum mtk_mdp_comp_type)of_id->data;
+>  		comp_id = mtk_mdp_comp_get_id(dev, node, comp_type);
+>  		if (comp_id < 0) {
+> -			dev_warn(dev, "Skipping unknown component %s\n",
+> -				 node->full_name);
+> +			dev_warn(dev, "Skipping unknown component %pOF\n",
+> +				 node);
+>  			continue;
+>  		}
+> 
+> diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+> index 9df64c189883..afbc5b7942f8 100644
+> --- a/drivers/media/platform/omap3isp/isp.c
+> +++ b/drivers/media/platform/omap3isp/isp.c
+> @@ -2020,8 +2020,8 @@ static int isp_fwnode_parse(struct device *dev, struct fwnode_handle *fwnode,
+>  	if (ret)
+>  		return ret;
+> 
+> -	dev_dbg(dev, "parsing endpoint %s, interface %u\n",
+> -		to_of_node(fwnode)->full_name, vep.base.port);
+> +	dev_dbg(dev, "parsing endpoint %pOF, interface %u\n",
+> +		to_of_node(fwnode), vep.base.port);
+> 
+>  	switch (vep.base.port) {
+>  	case ISP_OF_PHY_PARALLEL:
+> @@ -2078,8 +2078,8 @@ static int isp_fwnode_parse(struct device *dev, struct fwnode_handle *fwnode,
+>  		break;
+> 
+>  	default:
+> -		dev_warn(dev, "%s: invalid interface %u\n",
+> -			 to_of_node(fwnode)->full_name, vep.base.port);
+> +		dev_warn(dev, "%pOF: invalid interface %u\n",
+> +			 to_of_node(fwnode), vep.base.port);
+>  		break;
+>  	}
+> 
+> diff --git a/drivers/media/platform/pxa_camera.c b/drivers/media/platform/pxa_camera.c
+> index 399095170b6e..787ae4c3c343 100644
+> --- a/drivers/media/platform/pxa_camera.c
+> +++ b/drivers/media/platform/pxa_camera.c
+> @@ -2328,7 +2328,7 @@ static int pxa_camera_pdata_from_dt(struct device *dev,
+>  		asd->match.fwnode.fwnode = of_fwnode_handle(remote);
+>  		of_node_put(remote);
+>  	} else {
+> -		dev_notice(dev, "no remote for %s\n", of_node_full_name(np));
+> +		dev_notice(dev, "no remote for %pOF\n", np);
+>  	}
+> 
+>  out:
+> diff --git a/drivers/media/platform/rcar-vin/rcar-core.c b/drivers/media/platform/rcar-vin/rcar-core.c
+> index 77dff047c41c..142de447aaaa 100644
+> --- a/drivers/media/platform/rcar-vin/rcar-core.c
+> +++ b/drivers/media/platform/rcar-vin/rcar-core.c
+> @@ -222,8 +222,8 @@ static int rvin_digital_graph_init(struct rvin_dev *vin)
+> 
+>  	subdevs[0] = &vin->digital.asd;
+> 
+> -	vin_dbg(vin, "Found digital subdevice %s\n",
+> -		of_node_full_name(to_of_node(subdevs[0]->match.fwnode.fwnode)));
+> +	vin_dbg(vin, "Found digital subdevice %pOF\n",
+> +		to_of_node(subdevs[0]->match.fwnode.fwnode));
+> 
+>  	vin->notifier.num_subdevs = 1;
+>  	vin->notifier.subdevs = subdevs;
+> diff --git a/drivers/media/platform/soc_camera/soc_camera.c b/drivers/media/platform/soc_camera/soc_camera.c
+> index 45a0429d75bb..8ba0cb88df64 100644
+> --- a/drivers/media/platform/soc_camera/soc_camera.c
+> +++ b/drivers/media/platform/soc_camera/soc_camera.c
+> @@ -1550,8 +1550,7 @@ static int soc_of_bind(struct soc_camera_host *ici,
+>  		v4l2_clk_name_i2c(clk_name, sizeof(clk_name),
+>  				  client->adapter->nr, client->addr);
+>  	else
+> -		v4l2_clk_name_of(clk_name, sizeof(clk_name),
+> -				 of_node_full_name(remote));
+> +		v4l2_clk_name_of(clk_name, sizeof(clk_name), remote);
+> 
+>  	icd->clk = v4l2_clk_register(&soc_camera_clk_ops, clk_name, icd);
+>  	if (IS_ERR(icd->clk)) {
+> @@ -1590,8 +1589,7 @@ static void scan_of_host(struct soc_camera_host *ici)
+> 
+>  		ren = of_graph_get_remote_port(epn);
+>  		if (!ren) {
+> -			dev_notice(dev, "no remote for %s\n",
+> -				   of_node_full_name(epn));
+> +			dev_notice(dev, "no remote for %pOF\n", epn);
+>  			continue;
+>  		}
+> 
+> diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+> index ac4704388920..9233ad0b1b6b 100644
+> --- a/drivers/media/platform/xilinx/xilinx-vipp.c
+> +++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+> @@ -90,12 +90,12 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+>  		of_node_put(ep);
+>  		ep = next;
+> 
+> -		dev_dbg(xdev->dev, "processing endpoint %s\n", ep->full_name);
+> +		dev_dbg(xdev->dev, "processing endpoint %pOF\n", ep);
+> 
+>  		ret = v4l2_fwnode_parse_link(of_fwnode_handle(ep), &link);
+>  		if (ret < 0) {
+> -			dev_err(xdev->dev, "failed to parse link for %s\n",
+> -				ep->full_name);
+> +			dev_err(xdev->dev, "failed to parse link for %pOF\n",
+> +				ep);
+>  			continue;
+>  		}
+> 
+> @@ -103,9 +103,9 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+>  		 * the link.
+>  		 */
+>  		if (link.local_port >= local->num_pads) {
+> -			dev_err(xdev->dev, "invalid port number %u for %s\n",
+> +			dev_err(xdev->dev, "invalid port number %u for %pOF\n",
+>  				link.local_port,
+> -				to_of_node(link.local_node)->full_name);
+> +				to_of_node(link.local_node));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -EINVAL;
+>  			break;
+> @@ -114,8 +114,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+>  		local_pad = &local->pads[link.local_port];
+> 
+>  		if (local_pad->flags & MEDIA_PAD_FL_SINK) {
+> -			dev_dbg(xdev->dev, "skipping sink port %s:%u\n",
+> -				to_of_node(link.local_node)->full_name,
+> +			dev_dbg(xdev->dev, "skipping sink port %pOF:%u\n",
+> +				to_of_node(link.local_node),
+>  				link.local_port);
+>  			v4l2_fwnode_put_link(&link);
+>  			continue;
+> @@ -123,8 +123,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+> 
+>  		/* Skip DMA engines, they will be processed separately. */
+>  		if (link.remote_node == of_fwnode_handle(xdev->dev->of_node)) {
+> -			dev_dbg(xdev->dev, "skipping DMA port %s:%u\n",
+> -				to_of_node(link.local_node)->full_name,
+> +			dev_dbg(xdev->dev, "skipping DMA port %pOF:%u\n",
+> +				to_of_node(link.local_node),
+>  				link.local_port);
+>  			v4l2_fwnode_put_link(&link);
+>  			continue;
+> @@ -134,8 +134,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+>  		ent = xvip_graph_find_entity(xdev,
+>  					     to_of_node(link.remote_node));
+>  		if (ent == NULL) {
+> -			dev_err(xdev->dev, "no entity found for %s\n",
+> -				to_of_node(link.remote_node)->full_name);
+> +			dev_err(xdev->dev, "no entity found for %pOF\n",
+> +				to_of_node(link.remote_node));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -ENODEV;
+>  			break;
+> @@ -144,9 +144,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+>  		remote = ent->entity;
+> 
+>  		if (link.remote_port >= remote->num_pads) {
+> -			dev_err(xdev->dev, "invalid port number %u on %s\n",
+> -				link.remote_port,
+> -				to_of_node(link.remote_node)->full_name);
+> +			dev_err(xdev->dev, "invalid port number %u on %pOF\n",
+> +				link.remote_port, link.remote_node);
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -EINVAL;
+>  			break;
+> @@ -216,12 +215,12 @@ static int xvip_graph_build_dma(struct xvip_composite_device *xdev)
+>  		of_node_put(ep);
+>  		ep = next;
+> 
+> -		dev_dbg(xdev->dev, "processing endpoint %s\n", ep->full_name);
+> +		dev_dbg(xdev->dev, "processing endpoint %pOF\n", ep);
+> 
+>  		ret = v4l2_fwnode_parse_link(of_fwnode_handle(ep), &link);
+>  		if (ret < 0) {
+> -			dev_err(xdev->dev, "failed to parse link for %s\n",
+> -				ep->full_name);
+> +			dev_err(xdev->dev, "failed to parse link for %pOF\n",
+> +				ep);
+>  			continue;
+>  		}
+> 
+> @@ -242,17 +241,17 @@ static int xvip_graph_build_dma(struct xvip_composite_device *xdev)
+>  		ent = xvip_graph_find_entity(xdev,
+>  					     to_of_node(link.remote_node));
+>  		if (ent == NULL) {
+> -			dev_err(xdev->dev, "no entity found for %s\n",
+> -				to_of_node(link.remote_node)->full_name);
+> +			dev_err(xdev->dev, "no entity found for %pOF\n",
+> +				to_of_node(link.remote_node));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -ENODEV;
+>  			break;
+>  		}
+> 
+>  		if (link.remote_port >= ent->entity->num_pads) {
+> -			dev_err(xdev->dev, "invalid port number %u on %s\n",
+> +			dev_err(xdev->dev, "invalid port number %u on %pOF\n",
+>  				link.remote_port,
+> -				to_of_node(link.remote_node)->full_name);
+> +				to_of_node(link.remote_node));
+>  			v4l2_fwnode_put_link(&link);
+>  			ret = -EINVAL;
+>  			break;
+> @@ -337,8 +336,8 @@ static int xvip_graph_notify_bound(struct v4l2_async_notifier *notifier,
+>  			continue;
+> 
+>  		if (entity->subdev) {
+> -			dev_err(xdev->dev, "duplicate subdev for node %s\n",
+> -				entity->node->full_name);
+> +			dev_err(xdev->dev, "duplicate subdev for node %pOF\n",
+> +				entity->node);
+>  			return -EINVAL;
+>  		}
+> 
+> @@ -360,14 +359,14 @@ static int xvip_graph_parse_one(struct xvip_composite_device *xdev,
+>  	struct device_node *ep = NULL;
+>  	int ret = 0;
+> 
+> -	dev_dbg(xdev->dev, "parsing node %s\n", node->full_name);
+> +	dev_dbg(xdev->dev, "parsing node %pOF\n", node);
+> 
+>  	while (1) {
+>  		ep = of_graph_get_next_endpoint(node, ep);
+>  		if (ep == NULL)
+>  			break;
+> 
+> -		dev_dbg(xdev->dev, "handling endpoint %s\n", ep->full_name);
+> +		dev_dbg(xdev->dev, "handling endpoint %pOF\n", ep);
+> 
+>  		remote = of_graph_get_remote_port_parent(ep);
+>  		if (remote == NULL) {
+> @@ -452,8 +451,7 @@ static int xvip_graph_dma_init_one(struct xvip_composite_device *xdev,
+> 
+>  	ret = xvip_dma_init(xdev, dma, type, index);
+>  	if (ret < 0) {
+> -		dev_err(xdev->dev, "%s initialization failed\n",
+> -			node->full_name);
+> +		dev_err(xdev->dev, "%pOF initialization failed\n", node);
+>  		return ret;
+>  	}
+> 
+> diff --git a/drivers/media/v4l2-core/v4l2-async.c b/drivers/media/v4l2-core/v4l2-async.c
+> index 851f128eba22..0a385d1ff28c 100644
+> --- a/drivers/media/v4l2-core/v4l2-async.c
+> +++ b/drivers/media/v4l2-core/v4l2-async.c
+> @@ -47,9 +47,7 @@ static bool match_fwnode(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
+>  	if (!is_of_node(sd->fwnode) || !is_of_node(asd->match.fwnode.fwnode))
+>  		return sd->fwnode == asd->match.fwnode.fwnode;
+> 
+> -	return !of_node_cmp(of_node_full_name(to_of_node(sd->fwnode)),
+> -			    of_node_full_name(
+> -				    to_of_node(asd->match.fwnode.fwnode)));
+> +	return to_of_node(sd->fwnode) == to_of_node(asd->match.fwnode.fwnode);
+>  }
+> 
+>  static bool match_custom(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
+> diff --git a/drivers/media/v4l2-core/v4l2-clk.c b/drivers/media/v4l2-core/v4l2-clk.c
+> index 297e10e69898..90628d7a04de 100644
+> --- a/drivers/media/v4l2-core/v4l2-clk.c
+> +++ b/drivers/media/v4l2-core/v4l2-clk.c
+> @@ -61,8 +61,7 @@ struct v4l2_clk *v4l2_clk_get(struct device *dev, const char *id)
+> 
+>  	/* if dev_name is not found, try use the OF name to find again  */
+>  	if (PTR_ERR(clk) == -ENODEV && dev->of_node) {
+> -		v4l2_clk_name_of(clk_name, sizeof(clk_name),
+> -				 of_node_full_name(dev->of_node));
+> +		v4l2_clk_name_of(clk_name, sizeof(clk_name), dev->of_node);
+>  		clk = v4l2_clk_find(clk_name);
+>  	}
+> 
+> diff --git a/include/media/v4l2-clk.h b/include/media/v4l2-clk.h
+> index 2b94662d005c..7ec857f805a6 100644
+> --- a/include/media/v4l2-clk.h
+> +++ b/include/media/v4l2-clk.h
+> @@ -70,7 +70,7 @@ static inline struct v4l2_clk *v4l2_clk_register_fixed(const char *dev_id,
+>  #define v4l2_clk_name_i2c(name, size, adap, client) snprintf(name, size, \
+>  			  "%d-%04x", adap, client)
+> 
+> -#define v4l2_clk_name_of(name, size, of_full_name) snprintf(name, size, \
+> -			  "of-%s", of_full_name)
+> +#define v4l2_clk_name_of(name, size, node) snprintf(name, size, \
+> +			  "of-%pOF", node)
+> 
+>  #endif
+> --
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Nicolas Ferre
