@@ -1,73 +1,75 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Jul 2017 17:01:26 +0100
-Subject: [PATCH 05/11] arm64/cpufeature: detect pointer authentication
+Date: Wed, 19 Jul 2017 17:01:23 +0100
+Subject: [PATCH 02/11] asm-generic: mm_hooks: allow hooks to be overridden
+ individually
 In-Reply-To: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
 References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1500480092-28480-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1500480092-28480-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So that we can dynamically handle the presence of pointer authentication
-functionality, wire up probing code in cpufeature.c.
+Currently, an architecture must either implement all of the mm hooks
+itself, or use all of those provided by the asm-generic implementation.
+When an architecture only needs to override a single hook, it must copy
+the stub implementations from the asm-generic version.
 
-Currently, this only detects the presence of an architected algorithm.
+To avoid this repetition, allow each hook to be overridden indiviually,
+by placing each under an #ifndef block. As architectures providing their
+own hooks can't include this file today, this shouldn't adversely affect
+any existing hooks.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arch at vger.kernel.org
 ---
- arch/arm64/include/asm/cpucaps.h |  4 +++-
- arch/arm64/kernel/cpufeature.c   | 22 ++++++++++++++++++++++
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ include/asm-generic/mm_hooks.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 8d2272c..903b458 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -39,7 +39,9 @@
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
- #define ARM64_WORKAROUND_858921			19
- #define ARM64_WORKAROUND_CAVIUM_30115		20
-+#define ARM64_HAS_ADDRESS_AUTH			21
-+#define ARM64_HAS_GENERIC_AUTH			22
+diff --git a/include/asm-generic/mm_hooks.h b/include/asm-generic/mm_hooks.h
+index 41e5b67..b4bf1b8 100644
+--- a/include/asm-generic/mm_hooks.h
++++ b/include/asm-generic/mm_hooks.h
+@@ -6,30 +6,41 @@
+ #ifndef _ASM_GENERIC_MM_HOOKS_H
+ #define _ASM_GENERIC_MM_HOOKS_H
  
--#define ARM64_NCAPS				21
-+#define ARM64_NCAPS				23
++#ifndef arch_dup_mmap
+ static inline void arch_dup_mmap(struct mm_struct *oldmm,
+ 				 struct mm_struct *mm)
+ {
+ }
++#endif
  
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index b23ad83..4016b1e7 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -892,6 +892,28 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 		.min_field_value = 0,
- 		.matches = has_no_fpsimd,
- 	},
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+	{
-+		.desc = "Address authentication (architected algorithm)",
-+		.capability = ARM64_HAS_ADDRESS_AUTH,
-+		.def_scope = SCOPE_SYSTEM,
-+		.sys_reg = SYS_ID_AA64ISAR1_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64ISAR1_APA_SHIFT,
-+		.min_field_value = ID_AA64ISAR1_APA_ARCHITECTED,
-+		.matches = has_cpuid_feature,
-+	},
-+	{
-+		.desc = "Generic authentication (architected algorithm)",
-+		.capability = ARM64_HAS_GENERIC_AUTH,
-+		.def_scope = SCOPE_SYSTEM,
-+		.sys_reg = SYS_ID_AA64ISAR1_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64ISAR1_GPA_SHIFT,
-+		.min_field_value = ID_AA64ISAR1_GPA_ARCHITECTED,
-+		.matches = has_cpuid_feature
-+	},
-+#endif /* CONFIG_ARM64_POINTER_AUTHENTICATION */
- 	{},
- };
++#ifndef arch_exit_mmap
+ static inline void arch_exit_mmap(struct mm_struct *mm)
+ {
+ }
++#endif
  
++#ifndef arch_unmap
+ static inline void arch_unmap(struct mm_struct *mm,
+ 			struct vm_area_struct *vma,
+ 			unsigned long start, unsigned long end)
+ {
+ }
++#endif
+ 
++#ifndef arch_bprm_mm_init
+ static inline void arch_bprm_mm_init(struct mm_struct *mm,
+ 				     struct vm_area_struct *vma)
+ {
+ }
++#endif
+ 
++#ifndef arch_vma_access_permitted
+ static inline bool arch_vma_access_permitted(struct vm_area_struct *vma,
+ 		bool write, bool execute, bool foreign)
+ {
+ 	/* by default, allow everything */
+ 	return true;
+ }
++#endif
++
+ #endif	/* _ASM_GENERIC_MM_HOOKS_H */
 -- 
 1.9.1
