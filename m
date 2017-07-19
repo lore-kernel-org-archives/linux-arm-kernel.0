@@ -1,41 +1,34 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 19 Jul 2017 17:25:54 +0200
-Subject: [PATCH 050/102] nvmem: lpc18xx-eeprom: explicitly request exclusive
- reset control
-In-Reply-To: <20170719152646.25903-1-p.zabel@pengutronix.de>
-References: <20170719152646.25903-1-p.zabel@pengutronix.de>
-Message-ID: <20170719152646.25903-51-p.zabel@pengutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 19 Jul 2017 10:28:51 -0500
+Subject: [PATCH] clocksource: Convert to using %pOF instead of full_name
+In-Reply-To: <b6f4661d-6655-0fb9-f212-2d777a12e11a@sigmadesigns.com>
+References: <20170718214339.7774-13-robh@kernel.org>
+ <b6f4661d-6655-0fb9-f212-2d777a12e11a@sigmadesigns.com>
+Message-ID: <CAL_Jsq+qMn2HHeNx2PmYSJ-pYMRFPYXVHivBgX5vpjKngJHShg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a53e35db70d1 ("reset: Ensure drivers are explicit when requesting
-reset lines") started to transition the reset control request API calls
-to explicitly state whether the driver needs exclusive or shared reset
-control behavior. Convert all drivers requesting exclusive resets to the
-explicit API call so the temporary transition helpers can be removed.
+On Wed, Jul 19, 2017 at 3:55 AM, Marc Gonzalez
+<marc_gonzalez@sigmadesigns.com> wrote:
+> On 18/07/2017 23:42, Rob Herring wrote:
+>
+>> Now that we have a custom printf format specifier, convert users of
+>> full_name to use %pOF instead. This is preparation to remove storing
+>> of the full path string for each node.
+>
+> Nice. For my own reference:
+> http://elixir.free-electrons.com/linux/v4.13-rc1/source/Documentation/printk-formats.txt#L349
+>
+> About removing the full path. Does this mean that ultimately
+> %pOF will print just the name? And the 'f' spec will disappear?
 
-No functional changes.
+No, the vsprintf code is already designed to print the full path
+whether full_name is the full path or just the basename. %pOF is just
+the default. "f" is needed so you can combine it with the other
+specifiers.
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Joachim Eastwood <manabian@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/nvmem/lpc18xx_eeprom.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Is this done to save memory?
 
-diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
-index c81ae4c6da74c..6c7e2c424a4e8 100644
---- a/drivers/nvmem/lpc18xx_eeprom.c
-+++ b/drivers/nvmem/lpc18xx_eeprom.c
-@@ -197,7 +197,7 @@ static int lpc18xx_eeprom_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	rst = devm_reset_control_get(dev, NULL);
-+	rst = devm_reset_control_get_exclusive(dev, NULL);
- 	if (IS_ERR(rst)) {
- 		dev_err(dev, "failed to get reset: %ld\n", PTR_ERR(rst));
- 		ret = PTR_ERR(rst);
--- 
-2.11.0
+Yes. That's the next step.
+
+Rob
