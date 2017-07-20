@@ -1,60 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Jul 2017 15:55:55 +0200
-Subject: [PATCH 10/18] drm/sun4i: tcon: Move out the tcon0 common setup
-In-Reply-To: <CAGb2v65TfUKyWg=vxWP-YhM3Be1i=N1OmNTO16aFk2VTCg4VXg@mail.gmail.com>
-References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
- <45529eeddc5d5eab9bcfa74982343eeb36fe11f6.1499955058.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65TfUKyWg=vxWP-YhM3Be1i=N1OmNTO16aFk2VTCg4VXg@mail.gmail.com>
-Message-ID: <20170720135555.u2xuubrt4tpjy6us@flea>
+From: Noel.Vellemans@visionBMS.com (Vellemans, Noel)
+Date: Thu, 20 Jul 2017 13:57:17 +0000
+Subject: IMX53 on recent 4.4.x kernels
+In-Reply-To: <CAOMZO5DrFnr6mr991ayMxLF0+jQddJyTbCbK1A5JVNAUVMDw3A@mail.gmail.com>
+References: <D24E577EA1E37B4788A3BFBC418F14A707591D67@wetsrvex01.loepfe.com>
+ <20170720123933.rioxhsthaaby4cnl@pengutronix.de>
+ <D24E577EA1E37B4788A3BFBC418F14A707592381@wetsrvex01.loepfe.com>
+ <CAOMZO5DrFnr6mr991ayMxLF0+jQddJyTbCbK1A5JVNAUVMDw3A@mail.gmail.com>
+Message-ID: <D24E577EA1E37B4788A3BFBC418F14A70759249B@wetsrvex01.loepfe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 11:41:36AM +0800, Chen-Yu Tsai wrote:
-> On Thu, Jul 13, 2017 at 10:13 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Some channel0 setup has to be done, no matter what the output interface is
-> > (RGB, CPU, LVDS). Move that code into a common function in order to avoid
-> > duplication.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 26 ++++++++++++++++----------
-> >  1 file changed, 16 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > index a3bbf9994cfa..f051862d635e 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > @@ -125,15 +125,26 @@ static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
-> >         return delay;
-> >  }
-> >
-> > -static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
-> > -                                struct drm_display_mode *mode)
-> > +static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
-> > +                                       struct drm_display_mode *mode)
-> > +{
-> > +       /* Configure the dot clock */
-> > +       clk_set_rate_protect(tcon->dclk, mode->crtc_clock * 1000);
-> 
-> I'd prefer not changing APIs in a code move. It also means we could
-> apply this sooner than later. Otherwise,
+Hi Robert... 
 
-You're right, I've changed it.
+I was mixing up 2 topic's .. ( my mistake sorry ) .
 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-Thanks!
-Maxime
+In short... I did a QUICK test on the 4.12 kernel as well ( but need to add lots of custom drivers ) in order to get it running on the same roofs.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/6a806c0a/attachment.sig>
+But,  I believe FABIO ESTEVAM ( who was trying to give me some first aid 'help' ) did some test on a 4.12 kernel ( for the performance issue) .. and it seems it is in the ALLMOST SAME SPEED range as the 4.4.x kernel ( there was  small improvement ) but it was certainly not at the same speed as the 2.6.35 kernel .
+
+( for the test program that looped for the Kernel time)
+
+Regards Noel
+
+NOTE: I'll try to get 4.12 ( or 4.13 ) running ( but needs a lot of patches.. that require manual rework if I want to run then om our hardware)
+
+
+
+
+_______________________
+Noel Vellemans
+BMS bvba
+
+-----Original Message-----
+From: Fabio Estevam [mailto:festevam at gmail.com] 
+Sent: Thursday, July 20, 2017 3:19 PM
+To: Vellemans, Noel
+Cc: Robert Schwebel; linux-arm-kernel at lists.infradead.org
+Subject: Re: IMX53 on recent 4.4.x kernels
+
+Hi Noel,
+
+On Thu, Jul 20, 2017 at 10:13 AM, Vellemans, Noel <Noel.Vellemans@visionbms.com> wrote:
+> Hi,
+>
+>
+>>>Please try a more recent kernel first. 4.4 is quite ancient, and MX53 is well supported on 4.12 or 4.13+.
+>>>Regards,
+>>>Robert
+>
+> I' already did ( maybe I was not clear enough in the previous mail , 
+> did test  4.4.x series and 4.12  kernel ! )
+>
+> 4.12 Has the exactly same problem  ( ONFI parameter page can not be 
+> read , on ONE of the boards)
+
+Looks like your mixing the performance thread with the mxc_nand one
+:-) These are completely different topics.
