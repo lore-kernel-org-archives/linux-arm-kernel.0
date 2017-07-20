@@ -1,184 +1,100 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Thu, 20 Jul 2017 15:07:05 -0400
-Subject: [PATCH 1/5] iommu/arm-smmu-v3: put off the execution of TLBI* to
- reduce lock confliction
-In-Reply-To: <20170718172055.00006e84@huawei.com>
-References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
- <1498484330-10840-2-git-send-email-thunder.leizhen@huawei.com>
- <20170628093207.GB11053@arm.com> <5954610F.9020807@huawei.com>
- <cd5b8ec5-f884-450c-df61-45d70bf40b10@huawei.com>
- <20170717222337.0000508f@huawei.com>
- <3cec10c5-82ca-2c54-dfdb-ac73b16e5bc6@codeaurora.org>
- <20170718172055.00006e84@huawei.com>
-Message-ID: <c1d85f28-c57b-4414-3504-16afb3a19ce0@codeaurora.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 20 Jul 2017 12:10:34 -0700
+Subject: [kernel-hardening] Re: [RFC PATCH 6/6] arm64: add VMAP_STACK and
+ detect out-of-bounds SP
+In-Reply-To: <CAKv+Gu88sHCmq8t9nAe3Dqx_Sg_+pArt6ev_wDrKLBYSOy2PuA@mail.gmail.com>
+References: <CAKv+Gu8jey+uPSFoCsjQn9BeGiChZpS=iZ0v9nEWvkwcO1gFYg@mail.gmail.com>
+ <20170713161050.GG26194@leverpostej> <20170713175543.GA32528@leverpostej>
+ <CAKv+Gu_v3PO7=JSgCTb3aZu3sg4cwYYjy68VJnr58vzaMYvhTw@mail.gmail.com>
+ <20170714103258.GA16128@leverpostej>
+ <CAKv+Gu-FvfPFQooCie6HwP=mBng3C0jp9p8WMkFwTxctDu4JBA@mail.gmail.com>
+ <CAKv+Gu96YHXDta7=YdYO4=wtR3mGVdkzAkG6tSzS-vo7toiPXA@mail.gmail.com>
+ <20170714140605.GB16687@leverpostej> <20170714212717.GB1086@leverpostej>
+ <CAKv+Gu9EB1nJPwvZh1Nti8tPVivqbwrE60t2v5zZp02DyaScxA@mail.gmail.com>
+ <39a5ad84-4124-5b33-146a-cd4e48f3762f@redhat.com>
+ <CAKv+Gu8vPNCK0J_bgfPDyos_hDrir_rKc154wfKtF_NqJ0LywQ@mail.gmail.com>
+ <aa086315-722b-bff3-90bb-f479229ed104@redhat.com>
+ <CAKv+Gu_JNNVvLaSt3PTOexJV4HzPUN0mLOm6YYRS8d=UOafopQ@mail.gmail.com>
+ <59706B82.1030601@arm.com>
+ <CAKv+Gu9oXbi7-R6ypaxq-gu-0RM85x=Sxde1L5+sn8QgEBsKBA@mail.gmail.com>
+ <CAKv+Gu88sHCmq8t9nAe3Dqx_Sg_+pArt6ev_wDrKLBYSOy2PuA@mail.gmail.com>
+Message-ID: <6fd9b78c-a807-1652-975c-53cb97ce7ca8@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
-
-[...]
->>>>>      
->>> Hi All,
+On 07/20/2017 10:30 AM, Ard Biesheuvel wrote:
+> On 20 July 2017 at 09:56, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 20 July 2017 at 09:36, James Morse <james.morse@arm.com> wrote:
+>>> Hi Ard,
 >>>
->>> I'm a bit of late entry to this discussion.  Just been running some more
->>> detailed tests on our d05 boards and wanted to bring some more numbers to
->>> the discussion.
+>>> On 20/07/17 06:35, Ard Biesheuvel wrote:
+>>>> On 20 July 2017 at 00:32, Laura Abbott <labbott@redhat.com> wrote:
+>>>>> I didn't notice any performance impact but I also wasn't trying that
+>>>>> hard. I did try this with a different configuration and ran into
+>>>>> stackspace errors almost immediately:
+>>>>>
+>>>>> [ 0.358026] smp: Brought up 1 node, 8 CPUs
+>>>>> [ 0.359359] SMP: Total of 8 processors activated.
+>>>>> [ 0.359542] CPU features: detected feature: 32-bit EL0 Support
+>>>>> [    0.361781] Insufficient stack space to handle exception!
 >>>
->>> All tests against 4.12 with the following additions:
->>> * Robin's series removing the io-pgtable spinlock (and a few recent fixes)
->>> * Cherry picked updates to the sas driver, merged prior to 4.13-rc1
->>> * An additional HNS (network card) bug fix that will be upstreamed shortly.
+>>> [...]
 >>>
->>> I've broken the results down into this patch and this patch + the remainder
->>> of the set. As leizhen mentioned we got a nice little performance
->>> bump from Robin's series so that was applied first (as it's in mainline now)
+>>>>> [    0.367382] Task stack: [0xffffff8008e80000..0xffffff8008e84000]
+>>>>> [    0.367519] IRQ stack:  [0xffffffc03bf62000..0xffffffc03bf66000]
+>>>>
+>>>> The IRQ stack is not 16K aligned ...
 >>>
->>> SAS tests were fio with noop scheduler, 4k block size and various io depths
->>> 1 process per disk.  Note this is probably a different setup to leizhen's
->>> original numbers.
+>>>>> [    0.367687] ESR: 0x00000000 -- Unknown/Uncategorized
+>>>>> [    0.367868] FAR: 0x0000000000000000
+>>>>> [    0.368059] Kernel panic - not syncing: kernel stack overflow
+>>>>> [    0.368252] CPU: 4 PID: 0 Comm: swapper/4 Not tainted 4.12.0-00018-ge9cf49d604ef-dirty #23
+>>>>> [    0.368427] Hardware name: linux,dummy-virt (DT)
+>>>>> [    0.368612] Call trace:
+>>>>> [    0.368774] [<ffffff8008087fd8>] dump_backtrace+0x0/0x228
+>>>>> [    0.368979] [<ffffff80080882c8>] show_stack+0x10/0x20
+>>>>> [    0.369270] [<ffffff80084602dc>] dump_stack+0x88/0xac
+>>>>> [    0.369459] [<ffffff800816328c>] panic+0x120/0x278
+>>>>> [    0.369582] [<ffffff8008088b40>] handle_bad_stack+0xd0/0xd8
+>>>>> [    0.369799] [<ffffff80080bfb94>] __do_softirq+0x74/0x210
+>>>>> [    0.370560] SMP: stopping secondary CPUs
+>>>>> [    0.384269] Rebooting in 5 seconds..
+>>>>>
+>>>>> The config is based on what I use for booting my Hikey android
+>>>>> board. I haven't been able to narrow down exactly which
+>>>>> set of configs set this off.
+>>>>>
+>>>>
+>>>> ... so for some reason, the percpu atom size change fails to take effect here.
 >>>
->>> Precentages are off the performance seen with the smmu disabled.
->>> SAS
->>> 4.12 - none of this series.
->>> SMMU disabled
->>> read io-depth 32 -   384K IOPS (100%)
->>> read io-depth 2048 - 950K IOPS (100%)
->>> rw io-depth 32 -     166K IOPS (100%)
->>> rw io-depth 2048 -   340K IOPS (100%)
+>>> I'm not completely up to speed with these series, so this may be noise:
 >>>
->>> SMMU enabled
->>> read io-depth 32 -   201K IOPS (52%)
->>> read io-depth 2048 - 306K IOPS (32%)
->>> rw io-depth 32 -     99K  IOPS (60%)
->>> rw io-depth 2048 -   150K IOPS (44%)
+>>> When we added the IRQ stack Jungseok Lee discovered that alignment greater than
+>>> PAGE_SIZE only applies to CPU0. Secondary CPUs read the per-cpu init data into a
+>>> page-aligned area, but any greater alignment requirement is lost.
 >>>
->>> Robin's recent series with fixes as seen on list (now merged)
->>> SMMU enabled.
->>> read io-depth 32 -   208K IOPS (54%)
->>> read io-depth 2048 - 335K IOPS (35%)
->>> rw io-depth 32 -     105K IOPS (63%)
->>> rw io-depth 2048 -   165K IOPS (49%)
+>>> Because of this the irqstack was only 16byte aligned, and struct thread_info had
+>>> to be be discovered without depending on stack alignment.
 >>>
->>> 4.12 + Robin's series + just this patch SMMU enabled
->>>
->>> (iommu/arm-smmu-v3: put of the execution of TLBI* to reduce lock conflict)
->>>
->>> read io-depth 32 -   225K IOPS (59%)
->>> read io-depth 2048 - 365K IOPS (38%)
->>> rw io-depth 32 -     110K IOPS (66%)
->>> rw io-depth 2048 -   179K IOPS (53%)
->>>
->>> 4.12 + Robin's series + Second part of this series
->>>
->>> (iommu/arm-smmu-v3: put of the execution of TLBI* to reduce lock conflict)
->>> (iommu: add a new member unmap_tlb_sync into struct iommu_ops)
->>> (iommu/arm-smmu-v3: add supprot for unmap an iova range with only on tlb sync)
->>> (iommu/arm-smmu: add support for unmap of a memory range with only one tlb sync)
->>>
->>> read io-depth 32 -    225K IOPS (59%)
->>> read io-depth 2048 -  833K IOPS (88%)
->>> rw io-depth 32 -      112K IOPS (67%)
->>> rw io-depth 2048 -    220K IOPS (65%)
->>>
->>> Robin's series gave us small gains across the board (3-5% recovered)
->>> relative to the no smmu performance (which we are taking as the ideal case)
->>>
->>> This first patch gets us back another 2-5% of the no smmu performance
->>>
->>> The next few patches get us very little advantage on the small io-depths
->>> but make a large difference to the larger io-depths - in particular the
->>> read IOPS which is over twice as fast as without the series.
->>>
->>> For HNS it seems that we are less dependent on the SMMU performance and
->>> can reach the non SMMU speed.
->>>
->>> Tests with
->>> iperf -t 30 -i 10 -c IPADDRESS -P 3 last 10 seconds taken to avoid any
->>> initial variability.
->>>
->>> The server end of the link was always running with smmu v3 disabled
->>> so as to act as a fast sink of the data. Some variation seen across
->>> repeat runs.
->>>
->>> Mainline v4.12 + network card fix
->>> NO SMMU
->>> 9.42 GBits/sec
->>>
->>> SMMU
->>> 4.36 GBits/sec (46%)
->>>
->>> Robin's io-pgtable spinlock series
->>>
->>> 6.68 to 7.34 (71% - 78% variation across runs)
->>>
->>> Just this patch SMMU enabled
->>>
->>> (iommu/arm-smmu-v3: put of the execution of TLBI* to reduce lock conflict)
->>>
->>> 7.96-8.8 GBits/sec (85% - 94%  some variation across runs)
->>>
->>> Full series
->>>
->>> (iommu/arm-smmu-v3: put of the execution of TLBI* to reduce lock conflict)
->>> (iommu: add a new member unmap_tlb_sync into struct iommu_ops)
->>> (iommu/arm-smmu-v3: add supprot for unmap an iova range with only on tlb sync)
->>> (iommu/arm-smmu: add support for unmap of a memory range with only one tlb sync)
->>>
->>> 9.42 GBits/Sec (100%)
->>>
->>> So HNS test shows a greater boost from Robin's series and this first patch.
->>> This is most likely because the HNS test is not putting as high a load on
->>> the SMMU and associated code as the SAS test.
->>>
->>> In both cases however, this shows that both parts of this patch
->>> series are beneficial.
->>>
->>> So on to the questions ;)
->>>
->>> Will, you mentioned that along with Robin and Nate you were working on
->>> a somewhat related strategy to improve the performance.  Any ETA on that?
 >>
->> The strategy I was working on is basically equivalent to the second
->> part of the series. I will test your patches out sometime this week, and
->> I'll also try to have our performance team run it through their whole
->> suite.
+>> We [attempted to] address that by increasing the per-CPU atom size to
+>> THREAD_ALIGN if CONFIG_VMAP_STACK=y, but as I am typing this, I wonder
+>> if that percolates all the way down to the actual vmap() calls. I will
+>> investigate ...
 > 
-> Thanks, that's excellent.  Look forward to hearing how it goes.
-
-I tested the patches with 4 NVME drives connected to a single SMMU and
-the results seem to be inline with those you've reported.
-
-FIO - 512k blocksize / io-depth 32 / 1 thread per drive
-  Baseline 4.13-rc1 w/SMMU enabled: 25% of SMMU bypass performance
-  Baseline + Patch 1              : 28%
-  Baseline + Patches 2-5          : 86%
-  Baseline + Complete series      : 100% [!!]
-
-I saw performance improvements across all of the other FIO profiles I
-tested, although not always as substantial as was seen in the 512k/32/1
-case. The performance of some of the profiles, especially those with
-many threads per drive, remains woeful (often below 20%), but hopefully
-Robin's iova series will help improve that.
-
+> The issue is easily reproducible in QEMU as well, when building from
+> the same config. I tracked it down to CONFIG_NUMA=y, which sets
+> CONFIG_NEED_PER_CPU_EMBED_FIRST_CHUNK=y, affecting the placement of
+> the static per-CPU data (including the IRQ stack).
 > 
-> Particularly useful would be to know if there are particular performance tests
-> that show up anything interesting that we might want to replicate.
+> However, what I hadn't realised is that the first chunk is referenced
+> via the linear mapping, so we will need to [vm]allocate the per-CPU
+> IRQ stacks explicitly, and record the address in a per-CPU pointer
+> variable instead.
 > 
-> Jonathan and Leizhen
->>
->>>
->>> As you might imagine, with the above numbers we are very keen to try and
->>> move forward with this as quickly as possible.
->>>
->>> If you want additional testing we would be happy to help.
->>>
->>> Thanks,
->>>
->>> Jonathan
-[...]
+> I have updated my branch accordingly.
+> 
+Yep, this version works, both in QEMU and booting Android.
 
--Nate
-
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks,
+Laura
