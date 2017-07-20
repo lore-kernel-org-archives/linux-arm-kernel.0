@@ -1,56 +1,45 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 20 Jul 2017 02:29:23 +0200
-Subject: [PATCH 2/9] arm: cache-l2x0: remove duplicate warning
-In-Reply-To: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <bc96e94b884f06bdd29f2c8c607c3e65a302ca62.1500510157.git.mirq-linux@rere.qmqm.pl>
+Date: Thu, 20 Jul 2017 02:29:22 +0200
+Subject: [PATCH 0/9] Bringing Asus TF300T support to mainline
+Message-ID: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Warning abound changing of AUX register in l2x0_of_init() is later
-repeated in __l2c_init().  Move whole thing over to __l2c_init().
+Here is a suprisingly small set of patches that enable Asus TF300T tablet
+to boot and have all cores available. TF300T is one of a consumer devices
+based on NVidia's Cardhu reference tablet.
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+This series is an arch-dependent part. TF parts were extracted from ASUS's
+GPL code dump.  The rest being driver code - a work in progress - is
+available in branch tf300t at:
+
+        https://rere.qmqm.pl/git/linux
+
+Best Regards,
+Micha? Miros?aw
+
 ---
- arch/arm/mm/cache-l2x0.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 808efbb89b88..ea1e70ff4568 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -819,6 +819,8 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 	if (old_aux != aux)
- 		pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
- 		        old_aux, aux);
-+	else if (aux_mask != ~0U && aux_val != 0)
-+		pr_alert("L2C: platform provided aux values match the hardware, so have no effect.  Please remove them.\n");
- 
- 	/* Determine the number of ways */
- 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
-@@ -1755,7 +1757,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- 	const struct l2c_init_data *data;
- 	struct device_node *np;
- 	struct resource res;
--	u32 cache_id, old_aux;
-+	u32 cache_id;
- 	u32 cache_level = 2;
- 	bool nosync = false;
- 
-@@ -1778,14 +1780,6 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- 	    of_property_read_bool(np, "arm,io-coherent"))
- 		data = &of_l2c310_coherent_data;
- 
--	old_aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
--	if (old_aux != ((old_aux & aux_mask) | aux_val)) {
--		pr_warn("L2C: platform modifies aux control register: 0x%08x -> 0x%08x\n",
--		        old_aux, (old_aux & aux_mask) | aux_val);
--	} else if (aux_mask != ~0U && aux_val != 0) {
--		pr_alert("L2C: platform provided aux values match the hardware, so have no effect.  Please remove them.\n");
--	}
--
- 	/* All L2 caches are unified, so this property should be specified */
- 	if (!of_property_read_bool(np, "cache-unified"))
- 		pr_err("L2C: device tree omits to specify unified cache\n");
+Micha? Miros?aw (9):
+  ARM: enable secure platform-only erratas
+  arm: cache-l2x0: remove duplicate warning
+  arm: cache-l2x0: share l2x0_base
+  ARM: trusted_foundations: enable L2x0 cache via firmware_ops
+  ARM: trusted_foundations: announce firmware version
+  ARM: init: update secondary_data register documentation
+  ARM: tegra: enable cache via TF
+  ARM: tegra: avoid touching Secure registers in reset handler
+  ARM: tegra: fix sleeping while atomic in CPU idle
+
+ arch/arm/Kconfig                           | 20 +++++++---
+ arch/arm/firmware/trusted_foundations.c    | 63 +++++++++++++++++++++++++++++-
+ arch/arm/include/asm/hardware/cache-l2x0.h |  6 ++-
+ arch/arm/kernel/head.S                     |  4 +-
+ arch/arm/mach-tegra/reset-handler.S        | 27 ++++++++++++-
+ arch/arm/mm/cache-l2x0-pmu.c               |  8 +---
+ arch/arm/mm/cache-l2x0.c                   | 26 ++++++------
+ drivers/soc/tegra/pmc.c                    |  2 -
+ 8 files changed, 125 insertions(+), 31 deletions(-)
+
 -- 
 2.11.0
