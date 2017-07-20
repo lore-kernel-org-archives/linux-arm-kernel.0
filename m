@@ -1,70 +1,119 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 20 Jul 2017 14:40:37 +0530
-Subject: [PATCH 2/4] gpio: davinci: Handle the return value of
- davinci_gpio_irq_setup function
-In-Reply-To: <cbea9082-3799-281b-1364-50e442f5362f@ti.com>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-3-git-send-email-j-keerthy@ti.com>
- <20170719111000.GX29638@localhost>
- <cbea9082-3799-281b-1364-50e442f5362f@ti.com>
-Message-ID: <cc66dfaf-05c5-8d55-03a6-556ec83c4487@ti.com>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Thu, 20 Jul 2017 09:17:38 +0000
+Subject: [PATCH v2 0/7] Add support of OV9655 camera
+In-Reply-To: <AB91B71D-E34B-4645-BD70-A87226BA34C5@goldelico.com>
+References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
+ <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
+ <956f17e6-36dd-6733-0d35-9b801ed4244d@xs4all.nl>
+ <BCD1BD18-96E3-4638-8935-B5C832D8EE52@goldelico.com>
+ <2dd3402e-55b0-231d-878f-5ba95ee8cb36@st.com>
+ <20170718195223.zrqfrefxxzqfsojd@valkosipuli.retiisi.org.uk>
+ <AB91B71D-E34B-4645-BD70-A87226BA34C5@goldelico.com>
+Message-ID: <8050f688-fc6e-c3c0-460a-93ad3ae8d735@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Thursday 20 July 2017 12:14 PM, Keerthy wrote:
+On 07/20/2017 10:37 AM, H. Nikolaus Schaller wrote:
+> Hi,
 > 
-> 
-> On Wednesday 19 July 2017 04:40 PM, Johan Hovold wrote:
->> On Tue, Jul 18, 2017 at 04:27:14PM +0530, Keerthy wrote:
->>> Currently davinci_gpio_irq_setup return value is ignored. Handle the
->>> return value appropriately.
+>> Am 18.07.2017 um 21:52 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
+>>
+>> On Tue, Jul 18, 2017 at 12:53:12PM +0000, Hugues FRUCHET wrote:
 >>>
->>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>> ---
->>>  drivers/gpio/gpio-davinci.c | 18 +++++++++++++-----
->>>  1 file changed, 13 insertions(+), 5 deletions(-)
 >>>
->>> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
->>> index 2c88054..932f270 100644
->>> --- a/drivers/gpio/gpio-davinci.c
->>> +++ b/drivers/gpio/gpio-davinci.c
->>> @@ -233,15 +233,23 @@ static int davinci_gpio_probe(struct platform_device *pdev)
->>>  		chips->regs[bank] = gpio_base + offset_array[bank];
->>>  
->>>  	ret = devm_gpiochip_add_data(dev, &chips->chip, chips);
->>> +	if (ret)
->>> +		goto err;
->>> +
->>> +	platform_set_drvdata(pdev, chips);
->>> +	ret = davinci_gpio_irq_setup(pdev);
->>>  	if (ret) {
->>> -		ctrl_num = 0;
->>> -		bank_base = 0;
->>> -		return ret;
->>> +		platform_set_drvdata(pdev, NULL);
->>> +		goto err;
->>>  	}
->>>  
->>> -	platform_set_drvdata(pdev, chips);
->>> -	davinci_gpio_irq_setup(pdev);
->>>  	return 0;
+>>> On 07/18/2017 02:17 PM, H. Nikolaus Schaller wrote:
+>>>> Hi,
+>>>>
+>>>>> Am 18.07.2017 um 13:59 schrieb Hans Verkuil <hverkuil@xs4all.nl>:
+>>>>>
+>>>>> On 12/07/17 22:01, Sylwester Nawrocki wrote:
+>>>>>> Hi Hugues,
+>>>>>>
+>>>>>> On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
+>>>>>>> This patchset enables OV9655 camera support.
+>>>>>>>
+>>>>>>> OV9655 support has been tested using STM32F4DIS-CAM extension board
+>>>>>>> plugged on connector P1 of STM32F746G-DISCO board.
+>>>>>>> Due to lack of OV9650/52 hardware support, the modified related code
+>>>>>>> could not have been checked for non-regression.
+>>>>>>>
+>>>>>>> First patches upgrade current support of OV9650/52 to prepare then
+>>>>>>> introduction of OV9655 variant patch.
+>>>>>>> Because of OV9655 register set slightly different from OV9650/9652,
+>>>>>>> not all of the driver features are supported (controls). Supported
+>>>>>>> resolutions are limited to VGA, QVGA, QQVGA.
+>>>>>>> Supported format is limited to RGB565.
+>>>>>>> Controls are limited to color bar test pattern for test purpose.
+>>>>>>
+>>>>>> I appreciate your efforts towards making a common driver but IMO it would be
+>>>>>> better to create a separate driver for the OV9655 sensor.  The original driver
+>>>>>> is 1576 lines of code, your patch set adds half of that (816).  There are
+>>>>>> significant differences in the feature set of both sensors, there are
+>>>>>> differences in the register layout.  I would go for a separate driver, we
+>>>>>> would then have code easier to follow and wouldn't need to worry about possible
+>>>>>> regressions.  I'm afraid I have lost the camera module and won't be able
+>>>>>> to test the patch set against regressions.
+>>>>>>
+>>>>>> IMHO from maintenance POV it's better to make a separate driver. In the end
+>>>>>> of the day we wouldn't be adding much more code than it is being done now.
+>>>>>
+>>>>> I agree. We do not have great experiences in the past with trying to support
+>>>>> multiple variants in a single driver (unless the diffs are truly small).
+>>>>
+>>>> Well,
+>>>> IMHO the diffs in ov965x are smaller (but untestable because nobody seems
+>>>> to have an ov9650/52 board) than within the bq27xxx chips, but I can dig out
+>>>> an old pdata based separate ov9655 driver and extend that to become DT compatible.
+>>>>
+>>>> I had abandoned that separate approach in favour of extending the ov965x driver.
+>>>>
+>>>> Have to discuss with Hugues how to proceed.
+>>>>
+>>>> BR and thanks,
+>>>> Nikolaus
+>>>>
+>>>
+>>> As Sylwester and Hans, I'm also in flavour of a separate driver, the
+>>> fact that register set seems similar but in fact is not and that we
+>>> cannot test for non-regression of 9650/52 are killer for me to continue
+>>> on a single driver.
+>>> We can now restart from a new fresh state of the art sensor driver
+>>> getting rid of legacy (pdata, old gpio, etc...).
 >>
->> There's a separate but related bug here too as the clk_prepare_enable()
->> in davinci_gpio_irq_setup() is never balanced on driver unbind.
+>> Agreed. I bet the result will look cleaner indeed although this wasn't one
+>> of the complex drivers.
 > 
-> Yes Johan. I will send that as a separate patch.
-
-This is already fixed in the latest kernel:
-
-commit 6dc0048cff988858254fcc26becfc1e9753efa79
-Author: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date:   Tue May 23 14:48:57 2017 +0530
-
-Regards,
-Keerthy
+> I finally managed to find the bug why mplayer did select-timeout on the GTA04.
+> Was a bug in pinmux setup of the GTA04 for the omap3isp.
 > 
->>
->> Johan
->>
+> And I have resurrected our years old 3.12 camera driver, which was based on the
+> MT9P031 code. It was already separate from ov9650/52.
+> 
+> I have extended it to support DT by including some parts of Hugues' work.
+> 
+> It still needs some cleanup and discussion but will be a simple patch (one
+> for ov9655.c + Kconfig + Makefile) and one for bindings (I hope it includes
+> all your comments).
+> 
+> I will post v1 in the next days.
+> 
+> BR,
+> Nikolaus
+> 
+
+Thanks Nikolaus,
+
+I was ready to push the new version in new file ov9655.c with all 
+comments included, but as my version is very minimal and I suspect that 
+yours is more complete, let's merge things together.
+Can I consider that you now take ownership of this driver upstream ?
+If so I'll send to you my current patchset so you can compare, 
+double-check review comments and add missing support on your side 
+(RGB565 and VGA/QVGA resolution matter on my side).
+
+Thanks again Nikolaus for this work,
+
+BR,
+Hugues.
