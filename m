@@ -1,148 +1,47 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 20 Jul 2017 17:35:34 +0800
-Subject: [PATCH v16 2/7] power: add power sequence library
-In-Reply-To: <4318803.QsccSH3mIv@aspire.rjw.lan>
-References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
- <CAJZ5v0hGbJuqqY6Pq5cYPrawSGW-zdhYHj0ovhJ9zXRAkBPCRQ@mail.gmail.com>
- <20170719025559.GC26218@b29397-desktop>
- <4318803.QsccSH3mIv@aspire.rjw.lan>
-Message-ID: <20170720093534.GA12449@b29397-desktop>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Thu, 20 Jul 2017 09:37:48 +0000
+Subject: [PATCH v2 0/4] Add STM32 MDMA driver
+In-Reply-To: <1499343941-6375-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1499343941-6375-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1fda0cc8-0b3c-70b0-0b34-b9b9a3ca6121@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 01:34:11PM +0200, Rafael J. Wysocki wrote:
-> On Wednesday, July 19, 2017 10:56:00 AM Peter Chen wrote:
-> > On Tue, Jul 18, 2017 at 07:06:05PM +0200, Rafael J. Wysocki wrote:
-> > > On Tue, Jul 18, 2017 at 6:29 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> > > > On Mon, Jul 17, 2017 at 03:39:07PM +0200, Rafael J. Wysocki wrote:
-> > > >> > Sorry, I should describe more.
-> > > >> >
-> > > >> > Let's take USB bus as an example, when the new USB device is at the
-> > > >> > host port, the device structure at device model is not created until
-> > > >> > it is discoverable by the USB bus. If this new USB device needs to be
-> > > >> > powered on before can be discoverable by the bus, the device structure
-> > > >> > will be not created without powering on operation. The code usb_alloc_dev
-> > > >> > (drivers/usb/core/usb.c) is only called for discoverable device.
-> > > >> >
-> > > >> > Unlike the other bus, eg, platform bus, it creates device structure
-> > > >> > according to DT node. The USB bus was designed for hot plug model, the
-> > > >> > device structure is for discoverable device. In recent years, we begin
-> > > >> > to have some hard-wired USB device, Eg, onboard USB-hub, onboard USB 4G
-> > > >> > Modem, etc at the market. It needs some board level power operation before
-> > > >> > it can be found by the USB bus. This patch set is designed primarily for
-> > > >> > fix this kind of problem. You will see at at pwrseq_generic.c, we use DT
-> > > >> > version clock API of_clk_get and DT version gpio API of_get_named_gpio_flags
-> > > >> > instead of device structure version, like devm_clk_get and
-> > > >> > devm_gpiod_get_optional.
-> > > >> >
-> > > >> > MMC system has similar use case, it creates power sequence platform
-> > > >> > device for this issue, but all those power stuffs (clock, gpio, etc)
-> > > >> > may not be suitable as a dedicated virtual device at DT, they are belonged
-> > > >> > to one physical device, so this patch set is created to see if this issue
-> > > >> > can be fixed better.
-> > > >>
-> > > >> OK, thanks for the explanation.
-> > > >>
-> > > >> The above needs to be part of your problem statement.
-> > > >
-> > > > Ok, I will add it to cover letter.
-> > > >
-> > > >> >
-> > > >> > The bus will power up all device nodes in this bus according to DT
-> > > >> > information, the device structure has not created at this time.
-> > > >>
-> > > >> OK
-> > > >>
-> > > >> I still think that the information on power resources depended on by devices
-> > > >> should be used for power management as well as for the initial power-up.
-> > > >>
-> > > >> The most straightforward way to arrange for that would be to make it possible
-> > > >> to find the DT node matching the device after the device has been discovered
-> > > >> and struct device created for it, say by USB.  That would require adding some
-> > > >> more information on the device to the DT node, probably.
-> > > >
-> > > > After the device is created, the device node structure is under struct
-> > > > device, say dev->of_node. The most difficulty for this issue is the
-> > > > device creation is dynamic and is after the physical device is
-> > > > discovered by the bus, the initial power-up is needed before the device
-> > > > can be discovered by the bus.
-> > > 
-> > > So you power up all devices on the bus using the information from
-> > > of_nodes upfront.
-> > > 
-> > 
-> > I think your mean call pm_device_power_up(struct device *dev) for bus
-> > level device (eg, USB HUB for USB), yeah, I can do that. But we still
-> > have below problem:
-> > 
-> > Where we can put the kinds of power sequence implementation
-> > (eg, pwrseq_generic.c) and the match mechanism between device
-> > node and kinds of power sequence(eg, of_pwrseq_on at core.c)? These
-> > stuffs can be shared among subsystems, and is better to use
-> > one framework for it. MMC subsystem adds such things at its core
-> > folder (drivers/mmc/core/pwrseq*) currently.
+
+
+On 07/06/2017 02:25 PM, Pierre-Yves MORDRET wrote:
+> This patchset adds support for the STM32 MDMA controller.
+> The Master Direct memory access (MDMA) provides high-speed data transfer
+> between memory and memory or between peripherals and memory.
+> Contrary to STM32 DMA, the STM32 MDMA controller supports hardware LLI and
+> uses a larger integrated FIFO (128 vs 16 bytes)
+
+Gentle ping for driver review since DT Bindings has been acked by Rob
+Herring.
+
+Thanks
+Py
+
+> ---
+>    Version history:
+>       v2:
+>           * change compatible into st,stm32h7-mdma to be more SoC specific
+>           * Add MDMA support in DT for H7
+>           * Add MDMA support in STM32 defconfig
+> ---
+> Pierre-Yves MORDRET (4):
+>    dt-bindings: Document the STM32 MDMA bindings
+>    dmaengine: Add STM32 MDMA driver
+>    ARM: dts: stm32: Add MDMA support for STM32H743 SoC
+>    ARM: configs: stm32: Add MDMA support in STM32 defconfig
 > 
-> The power sequence handling code can be generic IMO, because it doesn't
-> depend on what bus the devices are on.  It just needs to provide some
-> services to its users, but you need a clean interface between it and its
-> users, of course.
+>   .../devicetree/bindings/dma/stm32-mdma.txt         |   94 ++
+>   arch/arm/boot/dts/stm32h743.dtsi                   |   10 +
+>   arch/arm/configs/stm32_defconfig                   |    1 +
+>   drivers/dma/Kconfig                                |   12 +
+>   drivers/dma/Makefile                               |    1 +
+>   drivers/dma/stm32-mdma.c                           | 1536 ++++++++++++++++++++
+>   6 files changed, 1654 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
+>   create mode 100644 drivers/dma/stm32-mdma.c
 > 
-> There basically are two categories of devices, let's refer to them as USB-type
-> and MMC-type.  The difference between them, as far as power sequences go,
-> boils down to initialization and discovery.
-> 
-> For the USB-type ones you need an upfront power-up pass over of_nodes
-> under the bus controller.  That needs to be initiated by the controller driver,
-> but may be carried out by the common code.
-
-The upfront power-up can't use pm_device_power_up API, since the
-power sequence at device node is for the devices under the controller
-device, it has to use the power sequence APIs directly, eg,
-of_pwrseq_on_list or of_pwrseq_on.
-
-> 
-> After that, you need to match of_nodes to devices while discovering them.
-> That also needs to be initiated by the bus controller, but there may be
-> a helper function in the common code for that.  It may take a struct device
-> for the just discovered device and the bus controller's of_node as arguments,
-> look for an of_node under the bus controller matching the device and then
-> attach the power sequence information to the struct device as appropriate.
-> 
-
-Yes, we can have a helper at pwrseq core, eg dev_add_pwrseq(dev->of_node)
-to do that, and call it at device_pm_init. At dev_add_pwrseq, we search
-the global pwrseq list, and do match according to the address of
-of_node, if matches, return the pointer of struct pwrseq.
-
-> After the power sequence information has been attached to the struct
-> device, it can just be used for controlling its power state in a generic
-> fashion.
-
-At least for USB use case, there is a problem here for this patch set, it
-doesn't need to control power state (on/off) during its struct device
-life-cycle, after the struct device is de-inintialized (call put_device(dev)),
-its (initial) power state is still on, its power state will be off when its
-parent (USB HUB or controller device) is going to be deleted.
-
-So, it is hard for me to have the use case to call pm_device_power_up
-and pm_device_power_off, the only thing I can do at my patch set
-is to set dev.state->type = POWER_STATE_ON when tries to add
-struct pwrseq to struct device.
-
-> 
-> In the MMC-type devices case the discovery if through of_node lookup IIUC,
-> so then you may power up things as you discover them and attach the
-> power sequence information to their struct device objects right away.
-> 
-> Again, once you have done that, the power sequence information is
-> there and it can be used for controlling the power states of devices
-> generically.
-
-Like I mentioned above, I can implement these helpers for that, but I
-only can update power state information for device, but no place to
-call and define its dev.state->power_on and dev.state->power_off. 
-
--- 
-
-Best Regards,
-Peter Chen
