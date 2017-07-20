@@ -1,53 +1,138 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Jul 2017 15:45:12 +0100
-Subject: [PATCH 0/4] ACPI: DMA ranges management
-Message-ID: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
+Date: Thu, 20 Jul 2017 15:45:16 +0100
+Subject: [PATCH 4/4] ACPI: Make acpi_dma_configure() DMA regions aware
+In-Reply-To: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
+References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170720144517.32529-5-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported in:
+Current ACPI DMA configuration set-up device DMA capabilities through
+kernel defaults that do not take into account platform specific DMA
+configurations reported by firmware.
 
-http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+By leveraging the ACPI acpi_dev_get_dma_resources() API, add code
+in acpi_dma_configure() to retrieve the DMA regions to correctly
+set-up devices DMA parameters.
 
-the bus connecting devices to an IOMMU bus can be smaller in size than
-the IOMMU input address bits which results in devices DMA HW bugs in
-particular related to IOVA allocation (ie chopping of higher address
-bits owing to system bus HW capabilities mismatch with the IOMMU).
+Rework the ACPI IORT kernel API to make sure they can accommodate
+the DMA set-up required by firmware. By making devices DMA set-up
+ACPI IORT specific, the kernel is shielded from unwanted regressions
+that could be triggered by parsing DMA resources on arches that were
+previously ignoring them (ie x86/ia64), leaving kernel behaviour
+unchanged on those arches.
 
-Fortunately this problem can be solved through an already present but never
-used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-window for a specific bus in ACPI and therefore all upstream devices
-connected to it.
-
-This small patch series enables _DMA parsing in ACPI core code and
-use it in ACPI IORT code in order to detect DMA ranges for devices and
-update their data structures to make them work with their related DMA
-addressing restrictions.
-
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Feng Kan <fkan@apm.com>
-Cc: Jon Masters <jcm@redhat.com>
-Cc: Robert Moore <robert.moore@intel.com>
 Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+ drivers/acpi/arm64/iort.c | 27 +++++++++++++++++++++++++--
+ drivers/acpi/scan.c       | 12 ++++--------
+ include/linux/acpi_iort.h |  5 +++--
+ 3 files changed, 32 insertions(+), 12 deletions(-)
 
-Lorenzo Pieralisi (4):
-  ACPI: Allow _DMA method in walk resources
-  ACPI: Make acpi_dev_get_resources() method agnostic
-  ACPI: Introduce DMA ranges parsing
-  ACPI: Make acpi_dma_configure() DMA regions aware
-
- drivers/acpi/acpica/rsxface.c |  7 ++--
- drivers/acpi/arm64/iort.c     | 27 +++++++++++-
- drivers/acpi/resource.c       | 83 ++++++++++++++++++++++++++++---------
- drivers/acpi/scan.c           | 95 +++++++++++++++++++++++++++++++++++++++----
- include/acpi/acnames.h        |  1 +
- include/acpi/acpi_bus.h       |  2 +
- include/linux/acpi.h          |  8 ++++
- include/linux/acpi_iort.h     |  5 ++-
- 8 files changed, 194 insertions(+), 34 deletions(-)
-
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index a3215ee..9a7a65b 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -681,12 +681,17 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+ }
+ 
+ /**
+- * iort_set_dma_mask - Set-up dma mask for a device.
++ * iort_dma_setup() - Set-up device DMA parameters.
+  *
+  * @dev: device to configure
++ * @dma_addr: device DMA address result pointer
++ * @size: DMA range size result pointer
+  */
+-void iort_set_dma_mask(struct device *dev)
++void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
+ {
++	u64 mask, dmaaddr = 0, size = 0, offset = 0;
++	int ret;
++
+ 	/*
+ 	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+ 	 * setup the correct supported mask.
+@@ -700,6 +705,24 @@ void iort_set_dma_mask(struct device *dev)
+ 	 */
+ 	if (!dev->dma_mask)
+ 		dev->dma_mask = &dev->coherent_dma_mask;
++
++	ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
++	if (ret < 0)
++		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
++
++	mask = __roundup_pow_of_two(dmaaddr + size) - 1;
++	/*
++	 * Limit coherent and dma mask based on size and default mask
++	 * set by the driver.
++	 */
++	dev->coherent_dma_mask = mask;
++	*dev->dma_mask = mask;
++
++	*dma_addr = dmaaddr;
++	*dma_size = size;
++
++	dev->dma_pfn_offset = PFN_DOWN(offset);
++	dev_dbg(dev, "dma_pfn_offset(%#08llx)\n", offset);
+ }
+ 
+ /**
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index eb493c2..15d0059 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1450,20 +1450,16 @@ int acpi_dma_get_range(struct device *dev, u64 *dma_addr, u64 *offset,
+ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+ {
+ 	const struct iommu_ops *iommu;
+-	u64 size;
++	u64 dma_addr = 0, size = 0;
+ 
+-	iort_set_dma_mask(dev);
++	iort_dma_setup(dev, &dma_addr, &size);
+ 
+ 	iommu = iort_iommu_configure(dev);
+ 	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
+ 		return -EPROBE_DEFER;
+ 
+-	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+-	/*
+-	 * Assume dma valid range starts at 0 and covers the whole
+-	 * coherent_dma_mask.
+-	 */
+-	arch_setup_dma_ops(dev, 0, size, iommu, attr == DEV_DMA_COHERENT);
++	arch_setup_dma_ops(dev, dma_addr, size,
++				iommu, attr == DEV_DMA_COHERENT);
+ 
+ 	return 0;
+ }
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index 8379d40..8d3f0bf 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -36,7 +36,7 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+ void acpi_configure_pmsi_domain(struct device *dev);
+ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id);
+ /* IOMMU interface */
+-void iort_set_dma_mask(struct device *dev);
++void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *size);
+ const struct iommu_ops *iort_iommu_configure(struct device *dev);
+ #else
+ static inline void acpi_iort_init(void) { }
+@@ -47,7 +47,8 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+ { return NULL; }
+ static inline void acpi_configure_pmsi_domain(struct device *dev) { }
+ /* IOMMU interface */
+-static inline void iort_set_dma_mask(struct device *dev) { }
++static inline void iort_dma_setup(struct device *dev, u64 *dma_addr,
++				  u64 *size) { }
+ static inline
+ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ { return NULL; }
 -- 
 2.10.0
