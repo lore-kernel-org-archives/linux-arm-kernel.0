@@ -1,446 +1,108 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Thu, 20 Jul 2017 12:27:15 +0200
-Subject: [PATCH v4 3/3] hwrng: mxc-fsl - add support for Freescale RNGC
-In-Reply-To: <1500546435-29905-1-git-send-email-martin@kaiser.cx>
-References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
- <1500546435-29905-1-git-send-email-martin@kaiser.cx>
-Message-ID: <1500546435-29905-3-git-send-email-martin@kaiser.cx>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 20 Jul 2017 16:02:54 +0530
+Subject: [PATCH 2/2] ARM: kexec: fix failure to boot crash kernel
+In-Reply-To: <E1dY6XU-0003wa-Tl@rmk-PC.armlinux.org.uk>
+References: <E1dY6XU-0003wa-Tl@rmk-PC.armlinux.org.uk>
+Message-ID: <bc593ea3-eba8-9036-e622-dc01568847f8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-The driver is ported from Freescales Linux git and can be
-found in the
 
-	vendor/freescale/imx_2.6.35_maintain
+On Thursday 20 July 2017 01:40 PM, Russell King wrote:
+> When kexec was converted to DTB, the dtb address was passed between
+> machine_kexec_prepare() and machine_kexec() using a static variable.
+> This is bad news if you load a crash kernel followed by a normal
+> kernel or vice versa - the last loaded kernel overwrites the dtb
+> address.
+> 
+> This can result in kexec failures, as (eg) we try to boot the crash
+> kernel with the last loaded dtb.
+> 
+> Avoid this by defining a kimage architecture structure, and store
+> the address of to be passed in r2 to the new there, which will
 
-branch.
+Some word missing between 'new' and 'there'?
 
-According to that code, the RNGC is found on Freescales i.MX3/5 SoCs.
-The i.MX2x actually has an RNGB, which has no driver implementation
-in Freescales kernel. However as it turns out, the driver for the RNGC
-works fine on the (at least) i.MX25. So, they seem to be somewhat
-compatible.
+> either be the ATAGs or the dtb blob.
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Signed-off-by: Martin Kaiser <martin@kaiser.cx>
----
-Changes in v4:
-  - use readl, writel instead of the __raw versions
-  - move the self test to a separate function
-  - remove the error checks before the self test,
-    it'll fail when there are errors
-  - run the self test in the probe function, add a parameter to skip it
-  - read the error status register before we clear irq and error
-  - rewrite the irq handler to read and store error status
-  - helper functions for irq mask, unmask
-  - remove some more unused defines
-  - fix a bounds check in the read function
-  - read function: check status before the fifo level
-  - clean up the file header, add myself to the copyright notice
+Tested loading crash kernel on DRA7-EVM
 
-Changes in v3:
-   - use pdev->dev to request the irq, rngc->dev is not yet initialized
-   - remove unused defines for registers and fields
-   - use module_platform_driver_probe()
-   - clean up the error handling in the probe function,
-     disable the clock if necessary
-   - self-test must succeed in the first run
-   - check for errors after seeding, exit for errors unrelated to statistics
-   - set a timeout when waiting for a completion
+Now works with the sequence:
+		kexec -d -p
+		kexec -l
+		echo c > /proc/sysrq-trigger
 
-Changes in v2:
-  - remove irq variable from private struct
-  - move devm_request_irq from mxc_rngc_init to probe
-  - return irq in case of error
-  - handle irq 0 as error
+Without this patch as soon as we do kexec -l the crash kernel booting
+would fail without finding dtb.
 
- drivers/char/hw_random/Kconfig    |  13 ++
- drivers/char/hw_random/Makefile   |   1 +
- drivers/char/hw_random/mxc-rngc.c | 338 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 352 insertions(+)
- create mode 100644 drivers/char/hw_random/mxc-rngc.c
+Tested-by: Keerthy <j-keerthy@ti.com>
 
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index 1b223c3..ef057b7 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -255,6 +255,19 @@ config HW_RANDOM_MXC_RNGA
- 
- 	  If unsure, say Y.
- 
-+config HW_RANDOM_MXC_RNGC
-+	tristate "Freescale i.MX RNGC Random Number Generator"
-+	depends on ARCH_MXC
-+	default HW_RANDOM
-+	---help---
-+	  This driver provides kernel-side support for the Random Number
-+	  Generator hardware found on some Freescale i.MX processors.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called mxc-rngc.
-+
-+	  If unsure, say Y.
-+
- config HW_RANDOM_NOMADIK
- 	tristate "ST-Ericsson Nomadik Random Number Generator support"
- 	depends on ARCH_NOMADIK
-diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-index b085975..043b71d 100644
---- a/drivers/char/hw_random/Makefile
-+++ b/drivers/char/hw_random/Makefile
-@@ -20,6 +20,7 @@ obj-$(CONFIG_HW_RANDOM_PASEMI) += pasemi-rng.o
- obj-$(CONFIG_HW_RANDOM_VIRTIO) += virtio-rng.o
- obj-$(CONFIG_HW_RANDOM_TX4939) += tx4939-rng.o
- obj-$(CONFIG_HW_RANDOM_MXC_RNGA) += mxc-rnga.o
-+obj-$(CONFIG_HW_RANDOM_MXC_RNGC) += mxc-rngc.o
- obj-$(CONFIG_HW_RANDOM_OCTEON) += octeon-rng.o
- obj-$(CONFIG_HW_RANDOM_NOMADIK) += nomadik-rng.o
- obj-$(CONFIG_HW_RANDOM_PSERIES) += pseries-rng.o
-diff --git a/drivers/char/hw_random/mxc-rngc.c b/drivers/char/hw_random/mxc-rngc.c
-new file mode 100644
-index 0000000..5733a8e
---- /dev/null
-+++ b/drivers/char/hw_random/mxc-rngc.c
-@@ -0,0 +1,338 @@
-+/*
-+ * RNG driver for Freescale RNGC
-+ *
-+ * Copyright (C) 2008-2012 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2017 Martin Kaiser <martin@kaiser.cx>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
-+#include <linux/hw_random.h>
-+#include <linux/completion.h>
-+#include <linux/io.h>
-+
-+#define RNGC_COMMAND			0x0004
-+#define RNGC_CONTROL			0x0008
-+#define RNGC_STATUS			0x000C
-+#define RNGC_ERROR			0x0010
-+#define RNGC_FIFO			0x0014
-+
-+#define RNGC_CMD_CLR_ERR		0x00000020
-+#define RNGC_CMD_CLR_INT		0x00000010
-+#define RNGC_CMD_SEED			0x00000002
-+#define RNGC_CMD_SELF_TEST		0x00000001
-+
-+#define RNGC_CTRL_MASK_ERROR		0x00000040
-+#define RNGC_CTRL_MASK_DONE		0x00000020
-+
-+#define RNGC_STATUS_ERROR		0x00010000
-+#define RNGC_STATUS_FIFO_LEVEL_MASK	0x00000f00
-+#define RNGC_STATUS_FIFO_LEVEL_SHIFT	8
-+#define RNGC_STATUS_SEED_DONE		0x00000020
-+#define RNGC_STATUS_ST_DONE		0x00000010
-+
-+#define RNGC_ERROR_STATUS_STAT_ERR	0x00000008
-+
-+#define RNGC_TIMEOUT  3000 /* 3 sec */
-+
-+
-+static bool self_test = true;
-+module_param(self_test, bool, 0);
-+
-+struct mxc_rngc {
-+	struct device		*dev;
-+	struct clk		*clk;
-+	void __iomem		*base;
-+	struct hwrng		rng;
-+	struct completion	rng_self_testing;
-+	struct completion	rng_seed_done;
-+	/*
-+	 * err_reg is written only by the irq handler and read only
-+	 * when interrupts are masked, we need no spinlock
-+	 */
-+	u32			err_reg;
-+};
-+
-+
-+static inline void mxc_rngc_irq_mask_clear(struct mxc_rngc *rngc)
-+{
-+	u32 ctrl, cmd;
-+
-+	/* mask interrupts */
-+	ctrl = readl(rngc->base + RNGC_CONTROL);
-+	ctrl |= RNGC_CTRL_MASK_DONE | RNGC_CTRL_MASK_ERROR;
-+	writel(ctrl, rngc->base + RNGC_CONTROL);
-+
-+	/*
-+	 * CLR_INT clears the interrupt only if there's no error
-+	 * CLR_ERR clear the interrupt and the error register if there
-+	 * is an error
-+	 */
-+	cmd = readl(rngc->base + RNGC_COMMAND);
-+	cmd |= RNGC_CMD_CLR_INT | RNGC_CMD_CLR_ERR;
-+	writel(cmd, rngc->base + RNGC_COMMAND);
-+}
-+
-+static inline void mxc_rngc_irq_unmask(struct mxc_rngc *rngc)
-+{
-+	u32 ctrl;
-+
-+	ctrl = readl(rngc->base + RNGC_CONTROL);
-+	ctrl &= ~(RNGC_CTRL_MASK_DONE | RNGC_CTRL_MASK_ERROR);
-+	writel(ctrl, rngc->base + RNGC_CONTROL);
-+}
-+
-+static int mxc_rngc_self_test(struct mxc_rngc *rngc)
-+{
-+	u32 cmd;
-+	int ret;
-+
-+	mxc_rngc_irq_unmask(rngc);
-+
-+	/* run self test */
-+	cmd = readl(rngc->base + RNGC_COMMAND);
-+	writel(cmd | RNGC_CMD_SELF_TEST, rngc->base + RNGC_COMMAND);
-+
-+	ret = wait_for_completion_timeout(&rngc->rng_self_testing,
-+			RNGC_TIMEOUT);
-+
-+	if (!ret) {
-+		mxc_rngc_irq_mask_clear(rngc);
-+		return -ETIMEDOUT;
-+	}
-+
-+	if (rngc->err_reg != 0)
-+		return -EIO;
-+
-+	return 0;
-+}
-+
-+static int mxc_rngc_read(struct hwrng *rng, void *data, size_t max, bool wait)
-+{
-+	struct mxc_rngc *rngc = container_of(rng, struct mxc_rngc, rng);
-+	unsigned int status;
-+	unsigned int level;
-+	int retval = 0;
-+
-+	while (max >= sizeof(u32)) {
-+		status = readl(rngc->base + RNGC_STATUS);
-+
-+		/* is there some error while reading this random number? */
-+		if (status & RNGC_STATUS_ERROR)
-+			break;
-+
-+		/* how many random numbers are in FIFO? [0-16] */
-+		level = (status & RNGC_STATUS_FIFO_LEVEL_MASK) >>
-+			RNGC_STATUS_FIFO_LEVEL_SHIFT;
-+
-+		if (level) {
-+			/* retrieve a random number from FIFO */
-+			*(u32 *)data = readl(rngc->base + RNGC_FIFO);
-+
-+			retval += sizeof(u32);
-+			data += sizeof(u32);
-+			max -= sizeof(u32);
-+		}
-+	}
-+
-+	return retval ? retval : -EIO;
-+}
-+
-+static irqreturn_t mxc_rngc_irq(int irq, void *priv)
-+{
-+	struct mxc_rngc *rngc = (struct mxc_rngc *)priv;
-+	u32 status;
-+
-+	/*
-+	 * clearing the interrupt will also clear the error register
-+	 * read error and status before clearing
-+	 */
-+	status = readl(rngc->base + RNGC_STATUS);
-+	rngc->err_reg = readl(rngc->base + RNGC_ERROR);
-+
-+	mxc_rngc_irq_mask_clear(rngc);
-+
-+	if (status & RNGC_STATUS_SEED_DONE)
-+		complete(&rngc->rng_seed_done);
-+
-+	if (status & RNGC_STATUS_ST_DONE)
-+		complete(&rngc->rng_self_testing);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int mxc_rngc_init(struct hwrng *rng)
-+{
-+	struct mxc_rngc *rngc = container_of(rng, struct mxc_rngc, rng);
-+	u32 cmd;
-+	int ret;
-+
-+	/* clear error */
-+	cmd = readl(rngc->base + RNGC_COMMAND);
-+	writel(cmd | RNGC_CMD_CLR_ERR, rngc->base + RNGC_COMMAND);
-+
-+	/* create seed, repeat while there is some statistical error */
-+	do {
-+		mxc_rngc_irq_unmask(rngc);
-+
-+		/* seed creation */
-+		cmd = readl(rngc->base + RNGC_COMMAND);
-+		writel(cmd | RNGC_CMD_SEED, rngc->base + RNGC_COMMAND);
-+
-+		ret = wait_for_completion_timeout(&rngc->rng_seed_done,
-+				RNGC_TIMEOUT);
-+
-+		if (!ret) {
-+			mxc_rngc_irq_mask_clear(rngc);
-+			return -ETIMEDOUT;
-+		}
-+
-+	} while (rngc->err_reg == RNGC_ERROR_STATUS_STAT_ERR);
-+
-+	return rngc->err_reg ? -EIO : 0;
-+}
-+
-+static int mxc_rngc_probe(struct platform_device *pdev)
-+{
-+	struct mxc_rngc *rngc;
-+	struct resource *res;
-+	int ret;
-+	int irq;
-+
-+	rngc = devm_kzalloc(&pdev->dev, sizeof(*rngc), GFP_KERNEL);
-+	if (!rngc)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	rngc->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(rngc->base))
-+		return PTR_ERR(rngc->base);
-+
-+	rngc->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(rngc->clk)) {
-+		dev_err(&pdev->dev, "Can not get rng_clk\n");
-+		return PTR_ERR(rngc->clk);
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
-+		dev_err(&pdev->dev, "Couldn't get irq %d\n", irq);
-+		return irq;
-+	}
-+
-+	ret = clk_prepare_enable(rngc->clk);
-+	if (ret)
-+		return ret;
-+
-+	ret = devm_request_irq(&pdev->dev,
-+			irq, mxc_rngc_irq, 0, pdev->name, (void *)rngc);
-+	if (ret) {
-+		dev_err(rngc->dev, "Can't get interrupt working.\n");
-+		goto err;
-+	}
-+
-+	init_completion(&rngc->rng_self_testing);
-+	init_completion(&rngc->rng_seed_done);
-+
-+	rngc->rng.name = pdev->name;
-+	rngc->rng.init = mxc_rngc_init;
-+	rngc->rng.read = mxc_rngc_read;
-+
-+	rngc->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, rngc);
-+
-+	mxc_rngc_irq_mask_clear(rngc);
-+
-+	if (self_test) {
-+		ret = mxc_rngc_self_test(rngc);
-+		if (ret) {
-+			dev_err(rngc->dev, "FSL RNGC self test failed.\n");
-+			goto err;
-+		}
-+	}
-+
-+	ret = hwrng_register(&rngc->rng);
-+	if (ret) {
-+		dev_err(&pdev->dev, "FSL RNGC registering failed (%d)\n", ret);
-+		goto err;
-+	}
-+
-+	dev_info(&pdev->dev, "Freescale RNGC registered.\n");
-+	return 0;
-+
-+err:
-+	clk_disable_unprepare(rngc->clk);
-+
-+	return ret;
-+}
-+
-+static int __exit mxc_rngc_remove(struct platform_device *pdev)
-+{
-+	struct mxc_rngc *rngc = platform_get_drvdata(pdev);
-+
-+	hwrng_unregister(&rngc->rng);
-+
-+	clk_disable_unprepare(rngc->clk);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int mxc_rngc_suspend(struct device *dev)
-+{
-+	struct mxc_rngc *rngc = dev_get_drvdata(dev);
-+
-+	clk_disable_unprepare(rngc->clk);
-+
-+	return 0;
-+}
-+
-+static int mxc_rngc_resume(struct device *dev)
-+{
-+	struct mxc_rngc *rngc = dev_get_drvdata(dev);
-+
-+	clk_prepare_enable(rngc->clk);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops mxc_rngc_pm_ops = {
-+	.suspend	= mxc_rngc_suspend,
-+	.resume		= mxc_rngc_resume,
-+};
-+#endif
-+
-+static const struct of_device_id mxc_rngc_dt_ids[] = {
-+	{ .compatible = "fsl,imx25-rng", .data = NULL, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxc_rngc_dt_ids);
-+
-+static struct platform_driver mxc_rngc_driver = {
-+	.driver = {
-+		.name = "mxc_rngc",
-+#ifdef CONFIG_PM
-+		.pm = &mxc_rngc_pm_ops,
-+#endif
-+		.of_match_table = mxc_rngc_dt_ids,
-+	},
-+	.remove = __exit_p(mxc_rngc_remove),
-+};
-+
-+module_platform_driver_probe(mxc_rngc_driver, mxc_rngc_probe);
-+
-+MODULE_AUTHOR("Freescale Semiconductor, Inc.");
-+MODULE_DESCRIPTION("H/W RNGC driver for i.MX");
-+MODULE_LICENSE("GPL");
--- 
-2.1.4
+> 
+> Reported-by: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/include/asm/kexec.h    |  5 +++++
+>  arch/arm/kernel/machine_kexec.c | 11 ++++++-----
+>  2 files changed, 11 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kexec.h b/arch/arm/include/asm/kexec.h
+> index 1869af6bac5c..25021b798a1e 100644
+> --- a/arch/arm/include/asm/kexec.h
+> +++ b/arch/arm/include/asm/kexec.h
+> @@ -19,6 +19,11 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> +#define ARCH_HAS_KIMAGE_ARCH
+> +struct kimage_arch {
+> +	u32 kernel_r2;
+> +};
+> +
+>  /**
+>   * crash_setup_regs() - save registers for the panic kernel
+>   * @newregs: registers are saved here
+> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+> index 15495887ca14..fe1419eeb932 100644
+> --- a/arch/arm/kernel/machine_kexec.c
+> +++ b/arch/arm/kernel/machine_kexec.c
+> @@ -30,7 +30,6 @@ extern unsigned long kexec_boot_atags;
+>  
+>  static atomic_t waiting_for_crash_ipi;
+>  
+> -static unsigned long dt_mem;
+>  /*
+>   * Provide a dummy crash_notes definition while crash dump arrives to arm.
+>   * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
+> @@ -42,6 +41,9 @@ int machine_kexec_prepare(struct kimage *image)
+>  	__be32 header;
+>  	int i, err;
+>  
+> +	image->arch.kernel_r2 = image->start - KEXEC_ARM_ZIMAGE_OFFSET
+> +				     + KEXEC_ARM_ATAGS_OFFSET;
+> +
+>  	/*
+>  	 * Validate that if the current HW supports SMP, then the SW supports
+>  	 * and implements CPU hotplug for the current HW. If not, we won't be
+> @@ -66,8 +68,8 @@ int machine_kexec_prepare(struct kimage *image)
+>  		if (err)
+>  			return err;
+>  
+> -		if (be32_to_cpu(header) == OF_DT_HEADER)
+> -			dt_mem = current_segment->mem;
+> +		if (header == cpu_to_be32(OF_DT_HEADER))
+> +			image->arch.kernel_r2 = current_segment->mem;
+>  	}
+>  	return 0;
+>  }
+> @@ -165,8 +167,7 @@ void machine_kexec(struct kimage *image)
+>  	kexec_start_address = image->start;
+>  	kexec_indirection_page = page_list;
+>  	kexec_mach_type = machine_arch_type;
+> -	kexec_boot_atags = dt_mem ?: image->start - KEXEC_ARM_ZIMAGE_OFFSET
+> -				     + KEXEC_ARM_ATAGS_OFFSET;
+> +	kexec_boot_atags = image->arch.kernel_r2;
+>  
+>  	/* copy our kernel relocation code to the control code page */
+>  	reboot_entry = fncpy(reboot_code_buffer,
+> 
