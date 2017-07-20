@@ -1,61 +1,38 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 20 Jul 2017 11:17:20 +0100
-Subject: [PATCH v5 10/19] coresight replicator: Expose replicator management
- registers
-In-Reply-To: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
-References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500545849-23724-11-git-send-email-suzuki.poulose@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 20 Jul 2017 12:18:10 +0200
+Subject: [PATCH] MAINTAINERS: Add mediatek git repository
+In-Reply-To: <20170609084354.26499-1-matthias.bgg@gmail.com>
+References: <20170609084354.26499-1-matthias.bgg@gmail.com>
+Message-ID: <a0602546-11b4-87be-c738-9539208ce8cb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose the idfilter* registers of the programmable replicator.
+On 06/09/2017 10:43 AM, Matthias Brugger wrote:
+> Mediatek repository lives in github for quite a while.
+> Add the repository to the file.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>   MAINTAINERS | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index f7d568b8f133..41410639f650 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1554,6 +1554,7 @@ M:	Matthias Brugger <matthias.bgg@gmail.com>
+>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>   L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
+>   S:	Maintained
+> +T:	git https://github.com/mbgg/linux-mediatek.git for-next
+>   F:	arch/arm/boot/dts/mt6*
+>   F:	arch/arm/boot/dts/mt7*
+>   F:	arch/arm/boot/dts/mt8*
+> 
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- .../coresight/coresight-dynamic-replicator.c       | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index f8bf995..a0c5e44 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -95,6 +95,28 @@ static const struct coresight_ops replicator_cs_ops = {
- 	.link_ops	= &replicator_link_ops,
- };
- 
-+#define coresight_replicator_reg(name, offset) \
-+	coresight_simple_reg32(struct replicator_state, name, offset)
-+
-+coresight_replicator_reg(idfilter0, REPLICATOR_IDFILTER0);
-+coresight_replicator_reg(idfilter1, REPLICATOR_IDFILTER1);
-+
-+static struct attribute *replicator_mgmt_attrs[] = {
-+	&dev_attr_idfilter0.attr,
-+	&dev_attr_idfilter1.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group replicator_mgmt_group = {
-+	.attrs = replicator_mgmt_attrs,
-+	.name = "mgmt",
-+};
-+
-+static const struct attribute_group *replicator_groups[] = {
-+	&replicator_mgmt_group,
-+	NULL,
-+};
-+
- static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	int ret;
-@@ -139,6 +161,7 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
- 	desc.ops = &replicator_cs_ops;
- 	desc.pdata = adev->dev.platform_data;
- 	desc.dev = &adev->dev;
-+	desc.groups = replicator_groups;
- 	drvdata->csdev = coresight_register(&desc);
- 	if (IS_ERR(drvdata->csdev))
- 		return PTR_ERR(drvdata->csdev);
--- 
-2.7.5
+Looks like this got forgotten for v4.13-rc1.
+Shall I take it through my tree for the next merge window?
+
+Regards,
+Matthias
