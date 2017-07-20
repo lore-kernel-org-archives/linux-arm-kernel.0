@@ -1,590 +1,213 @@
-From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 20 Jul 2017 18:03:51 +0200
-Subject: [RFC WIP PATCH] arm: early console using bootloader framebuffer
-Message-ID: <2a6c81485f354415a9f91ff1ef28340844396c48.1500566451.git.mirq-linux@rere.qmqm.pl>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Thu, 20 Jul 2017 18:04:00 +0200
+Subject: [PATCH 03/12] ARM: normalize clk API for older platforms
+In-Reply-To: <20170720155132.3250812-1-arnd@arndb.de>
+References: <20170720154616.3250481-1-arnd@arndb.de>
+ <20170720155132.3250812-1-arnd@arndb.de>
+Message-ID: <89c62838-ce8c-cb83-fca9-73cbc41d590c@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HACK WARNING:
- - the asm code is not tested
- - maybe should use fixmap?
- - there's something similar called efifb in x86 arch
+Hello Arnd!
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
----
- arch/arm/Kconfig.debug          |  52 ++++++++++++-
- arch/arm/include/asm/bootfb.h   |  25 ++++++
- arch/arm/include/debug/bootfb.S | 143 ++++++++++++++++++++++++++++++++++
- arch/arm/kernel/Makefile        |   1 +
- arch/arm/kernel/bootfb.c        | 166 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/debug.S         |   4 +
- arch/arm/kernel/early_printk.c  |   9 +++
- arch/arm/kernel/setup.c         |  10 +++
- arch/arm/mm/mmu.c               |  14 ++++
- 9 files changed, 423 insertions(+), 1 deletion(-)
+I'd like to insist on a functional implementation at least for EP93xx,
+please see below:
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 447629d89884..4d0275497f87 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1347,6 +1347,14 @@ choice
- 		  options; the platform specific options are deprecated
- 		  and will be soon removed.
- 
-+	config DEBUG_LL_BOOT_FRAMEBUFFER
-+		bool "Kernel low-level debugging via bootloader framebuffer"
-+		select FONT_SUPPORT
-+		select FONT_8x8
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  writing to bootloader-configured framebuffer.
-+
- endchoice
- 
- config DEBUG_AT91_UART
-@@ -1466,6 +1474,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/bcm63xx.S" if DEBUG_BCM63XX_UART
- 	default "debug/digicolor.S" if DEBUG_DIGICOLOR_UA0
- 	default "debug/brcmstb.S" if DEBUG_BRCMSTB_UART
-+	default "debug/bootfb.S" if DEBUG_LL_BOOT_FRAMEBUFFER
- 	default "mach/debug-macro.S"
- 
- # Compatibility options for PL01x
-@@ -1733,9 +1742,50 @@ config DEBUG_UART_8250_FLOW_CONTROL
- 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	default y if ARCH_EBSA110 || DEBUG_FOOTBRIDGE_COM1 || DEBUG_GEMINI || ARCH_RPC
- 
-+
-+if DEBUG_LL_BOOT_FRAMEBUFFER
-+
-+config DEBUG_BOOTFB_PHYS
-+	hex "Physical base address of boot framebuffer"
-+	default 0xabc01000 if ARCH_TEGRA_3x_SOC
-+
-+config DEBUG_BOOTFB_VIRT
-+	hex "Virtual base address of boot framebuffer before init_paging()"
-+	default 0xdbc01000 if ARCH_TEGRA_3x_SOC
-+	default DEBUG_BOOTFB_PHYS if !MMU
-+
-+config DEBUG_BOOTFB_PGVIRT
-+	hex "Virtual base address of boot framebuffer after init_paging()"
-+	default 0xfc000000 if ARCH_TEGRA_3x_SOC
-+	default DEBUG_BOOTFB_PHYS if !MMU
-+
-+config DEBUG_BOOTFB_WIDTH
-+	int "Boot framebuffer width in pixels"
-+	default 1280
-+
-+config DEBUG_BOOTFB_HEIGHT
-+	int "Boot framebuffer height in pixels"
-+	default 800
-+
-+config DEBUG_BOOTFB_PIXEL_SIZE
-+	int "Boot framebuffer pixel size in bytes"
-+	range 1 4
-+	default 2
-+
-+config DEBUG_BOOTFB_STRIDE
-+	int "Boot framebuffer row size in bytes (>= HEIGHT * PIXEL_SIZE)"
-+	default 2560
-+
-+config DEBUG_BOOTFB_PAGE_DELAY_MS
-+	int "Additional delay after filling up screen page"
-+	default 0
-+
-+endif
-+
- config DEBUG_UNCOMPRESS
- 	bool
--	depends on ARCH_MULTIPLATFORM || PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
-+	depends on !DEBUG_LL_BOOT_FRAMEBUFFER && \
-+	           (ARCH_MULTIPLATFORM || PLAT_SAMSUNG || ARM_SINGLE_ARMV7M)
- 	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
- 		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM) && \
- 		     !DEBUG_BRCMSTB_UART
-diff --git a/arch/arm/include/asm/bootfb.h b/arch/arm/include/asm/bootfb.h
-new file mode 100644
-index 000000000000..085a6c8d39b2
---- /dev/null
-+++ b/arch/arm/include/asm/bootfb.h
-@@ -0,0 +1,25 @@
-+#ifndef _ASMARM_BOOTFB_H
-+#define _ASMARM_BOOTFB_H
-+
-+#define FONT_WIDTH 8
-+#define FONT_HEIGHT 8
-+#define FONT_CHAR_SHIFT 3
-+#define FONT_STRUCT_DATA_OFFSET 16
-+
-+#define FB_CHARS_WIDTH (CONFIG_DEBUG_BOOTFB_WIDTH / FONT_WIDTH)
-+#define FB_CHARS_HEIGHT (CONFIG_DEBUG_BOOTFB_HEIGHT / FONT_HEIGHT)
-+
-+#define LINE_END (FB_CHARS_WIDTH * FONT_WIDTH * CONFIG_DEBUG_BOOTFB_PIXEL_SIZE)
-+#define LINE_SKIP (CONFIG_DEBUG_BOOTFB_STRIDE - LINE_END)
-+
-+#define BOOTFB_SIZE (CONFIG_DEBUG_BOOTFB_STRIDE * FB_CHARS_HEIGHT * FONT_HEIGHT - LINE_SKIP)
-+#define BOOTFB_LEN PAGE_ALIGN(BOOTFB_SIZE + 4 + (CONFIG_DEBUG_BOOTFB_PHYS & ~PAGE_MASK))
-+
-+#ifndef __ASSEMBLY__
-+
-+extern void *bootfb_addr;
-+extern int bootfb_skip_for_pageinit;
-+
-+#endif /* !__ASSEMBLY__ */
-+
-+#endif /* _ASMARM_BOOTFB_H */
-diff --git a/arch/arm/include/debug/bootfb.S b/arch/arm/include/debug/bootfb.S
-new file mode 100644
-index 000000000000..2236d3b6a742
---- /dev/null
-+++ b/arch/arm/include/debug/bootfb.S
-@@ -0,0 +1,143 @@
-+/* arch/arm/include/debug/bootfb.S
-+ *
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 2017 Micha? Miros?aw
-+ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <asm/bootfb.h>
-+
-+	.extern font_vga_8x8
-+
-+
-+	.macro	addruart, rp, rv, tmp
-+	ldr	\rp, =CONFIG_DEBUG_BOOTFB_PHYS
-+	ldr	\rv, =CONFIG_DEBUG_BOOTFB_VIRT
-+	.endm
-+
-+
-+	.macro	pushbyte,rd,rx,tmpx,tmpy
-+// load Y and calculate line offset
-+	ldr	\tmpx, =BOOTFB_SIZE
-+	ldrh	\tmpy, [\rx, \tmpx]
-+	ldr	\tmpx, =CONFIG_DEBUG_BOOTFB_STRIDE
-+	mul	\tmpy, \tmpy, \tmpx
-+// load and add X offset
-+	ldr	\tmpx, =BOOTFB_SIZE
-+	add	\tmpx, \tmpx, #2
-+	ldrh	\tmpx, [\rx, \tmpx]
-+	add	\tmpy, \tmpy, \tmpx
-+
-+	paint	\rx, \tmpy, \rd, \tmpx
-+
-+// recover X offset (\rd is reused for Y)
-+	ldr	\tmpx, =BOOTFB_SIZE
-+	ldrh	\rd, [\rx, \tmpx]
-+	ldr	\tmpx, =CONFIG_DEBUG_BOOTFB_STRIDE
-+	mul	\tmpx, \tmpx, \rd
-+	rsb	\tmpx, \tmpx, \tmpy
-+
-+	teq	\tmpx, #LINE_END
-+	bne	1001f
-+// wrap to next line and save new Y
-+	add	\rd, #FONT_HEIGHT
-+	cmp	\rd, #(FB_CHARS_HEIGHT * FONT_HEIGHT)
-+	movhs	\rd, #0
-+	ldr	\tmpx, =BOOTFB_SIZE
-+	strh	\rd, [\rx, \tmpx]
-+	mov	\tmpx, #0
-+// save new X offset
-+1001:
-+	ldr	\tmpy, =BOOTFB_SIZE
-+	strh	\tmpx, [\rx, \tmpy]
-+	.endm
-+
-+
-+	.macro	paint,rx,roffs,rd,tmp
-+// print char or clear on LF, ignore CR
-+	teq	\rd, #10
-+	beq	1002f
-+	teq	\rd, #13
-+	beq	1004f
-+	wrchar	\rx, \roffs, \rd, \tmp
-+	b	1003f
-+1002:	clreol	\rx, \roffs, \rd, \tmp
-+1003:
-+// restore \rx
-+	ldr	\rd, =(CONFIG_DEBUG_BOOTFB_STRIDE * FONT_HEIGHT)
-+	sub	\rx, \rx, \roffs
-+	sub	\rx, \rx, \rd
-+1004:
-+	.endm
-+
-+
-+	.macro	wrchar,rx,roffs,rd,tmp
-+// get address of first line of glyph
-+	ldr	\tmp, =font_vga_8x8
-+	ldr	\tmp, [\tmp, #FONT_STRUCT_DATA_OFFSET]
-+	add	\rd, \tmp, \rd, lsl #FONT_CHAR_SHIFT
-+
-+	add	\rx, \rx, \roffs
-+	.rept	FONT_HEIGHT
-+
-+// paint one row
-+	ldrb	\tmp, [\rd], #1
-+	lsl	\tmp, \tmp, #24
-+	.rept	FONT_WIDTH
-+	asr	\tmp, \tmp, #24
-+	ror	\tmp, \tmp, #7
-+	.if CONFIG_DEBUG_BOOTFB_PIXEL_SIZE % 1
-+	strb	\tmp, [\rx], #1
-+	.elseif CONFIG_DEBUG_BOOTFB_PIXEL_SIZE == 2
-+	strh	\tmp, [\rx], #2
-+	.elseif CONFIG_DEBUG_BOOTFB_PIXEL_SIZE == 3
-+	strb	\tmp, [\rx], #1
-+	strb	\tmp, [\rx], #1
-+	strb	\tmp, [\rx], #1
-+	.elseif CONFIG_DEBUG_BOOTFB_PIXEL_SIZE == 4
-+	str	\tmp, [\rx], #4
-+	.else
-+	* CONFIG BUG *
-+	.endif
-+	.endr
-+
-+	ldr	\tmp, =(CONFIG_DEBUG_BOOTFB_STRIDE - FONT_WIDTH * CONFIG_DEBUG_BOOTFB_PIXEL_SIZE)
-+	add	\rx, \rx, \tmp
-+	.endr
-+
-+	add	\roffs, \roffs, #(FONT_WIDTH * CONFIG_DEBUG_BOOTFB_PIXEL_SIZE)
-+	add	\rx, \rx, #(FONT_WIDTH * CONFIG_DEBUG_BOOTFB_PIXEL_SIZE)
-+	.endm
-+
-+	.macro	clreol,rx,roffs,rd,tmp
-+// calc line end offset (\tmp has current X offset)
-+	rsb	\rd, \tmp, #LINE_END
-+// prepare loop
-+	add	\rx, \rx, \roffs
-+	add	\roffs, \roffs, \rd
-+// fill pixels to the end of line (\rd is mostly zero)
-+	.rept	FONT_HEIGHT
-+	mov	\tmp, \rd
-+1010:
-+	str	\tmp, [\rx], #4
-+	sub	\tmp, \tmp, #4
-+	bhi	1010b
-+	add	\rx, \rx, #CONFIG_DEBUG_BOOTFB_STRIDE
-+	sub	\rx, \rx, \rd
-+	.endr
-+	.endm
-+
-+	.macro	senduart, rd, rx, tmp1, tmp2
-+//	pushbyte \rd, \rx, \tmp1, \tmp2
-+	.endm
-+
-+	.macro	waituart, rd, rx
-+	.endm
-+
-+	.macro	busyuart, rd, rx
-+	.endm
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index ad325a8c7e1e..9846c2149925 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -86,6 +86,7 @@ obj-$(CONFIG_PARAVIRT)	+= paravirt.o
- head-y			:= head$(MMUEXT).o
- obj-$(CONFIG_DEBUG_LL)	+= debug.o
- obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-+obj-$(CONFIG_DEBUG_LL_BOOT_FRAMEBUFFER)	+= bootfb.o
- 
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
- AFLAGS_hyp-stub.o		:=-Wa,-march=armv7-a
-diff --git a/arch/arm/kernel/bootfb.c b/arch/arm/kernel/bootfb.c
-new file mode 100644
-index 000000000000..e25aec09d236
---- /dev/null
-+++ b/arch/arm/kernel/bootfb.c
-@@ -0,0 +1,166 @@
-+#include <linux/init.h>
-+#include <linux/mm.h>
-+#include <linux/io.h>
-+#include <linux/font.h>
-+#include <linux/delay.h>
-+#include <asm/early_ioremap.h>
-+#include <asm/bootfb.h>
-+
-+static const unsigned long base = CONFIG_DEBUG_BOOTFB_PHYS;
-+void *bootfb_addr = (void *)CONFIG_DEBUG_BOOTFB_VIRT;
-+int bootfb_skip_for_pageinit;
-+
-+static __ref void *map_bootfb(unsigned offs, unsigned len)
-+{
-+	if (bootfb_skip_for_pageinit)
-+		return NULL;
-+
-+	if (bootfb_addr)
-+		return bootfb_addr + offs;
-+	else
-+		return early_ioremap(base + offs, len);
-+}
-+
-+static __ref void unmap_bootfb(void *addr, unsigned long len)
-+{
-+	if (!bootfb_addr)
-+		early_iounmap(addr, len);
-+}
-+
-+void __ref make_square(unsigned long x, unsigned long y, unsigned long c)
-+{
-+	const int row = 1280;
-+	unsigned offs = y * 16 * row + x * 16;
-+
-+	for (y = 0; y < 16; ++y) {
-+		unsigned short *p = map_bootfb(offs*2, 16*2);
-+		if (p) {
-+			for (x = 0; x < 16; ++x)
-+				p[x] = c;
-+			unmap_bootfb(p, 16*2);
-+		}
-+		offs += row;
-+	}
-+}
-+
-+static void bootfb_paint_char(unsigned offs, unsigned char c, unsigned color)
-+{
-+	unsigned char *src, cline;
-+	unsigned char *dst;
-+	int x, y, z;
-+
-+	src = (unsigned char *)font_vga_8x8.data + c * 8;
-+
-+	for (y = 0; y < 8; ++y) {
-+		cline = src[y];
-+		dst = map_bootfb(offs, 8 * CONFIG_DEBUG_BOOTFB_PIXEL_SIZE);
-+		if (dst) {
-+			for (x = 0; x < 8; ++x) {
-+				for (z = 0; z < CONFIG_DEBUG_BOOTFB_PIXEL_SIZE; ++z)
-+					dst[x * CONFIG_DEBUG_BOOTFB_PIXEL_SIZE + z] = (cline & 0x80) ? color >> (8 * z) : 0;
-+				cline <<= 1;
-+			}
-+			unmap_bootfb(dst, 16);
-+		}
-+		offs += CONFIG_DEBUG_BOOTFB_STRIDE;
-+	}
-+}
-+
-+static void bootfb_clear_line(unsigned offs, unsigned len, unsigned color)
-+{
-+	unsigned char *dst;
-+	int x, y, z;
-+
-+	for (y = 0; y < 8; ++y, offs += CONFIG_DEBUG_BOOTFB_STRIDE) {
-+		dst = map_bootfb(offs, len);
-+		if (!dst)
-+			continue;
-+		for (x = 0; x < len; x += CONFIG_DEBUG_BOOTFB_PIXEL_SIZE) {
-+			for (z = 0; z < CONFIG_DEBUG_BOOTFB_PIXEL_SIZE; ++z)
-+				dst[x + z] = color >> (8 * z);
-+		}
-+		unmap_bootfb(dst, len);
-+	}
-+}
-+
-+struct bootfd_tmp
-+{
-+	unsigned short *ctl;
-+	unsigned short y, xoff;
-+	unsigned long cur_offset;
-+};
-+
-+static bool bootfb_start(struct bootfd_tmp *info)
-+{
-+	unsigned short *p = info->ctl = map_bootfb(BOOTFB_SIZE, 4);
-+	if (!p)
-+		return false;
-+
-+	info->y = p[0];
-+	info->xoff = p[1];
-+	if (info->y >= FB_CHARS_HEIGHT || info->xoff >= LINE_END)
-+		info->y = info->xoff = 0;
-+
-+	info->cur_offset = info->y * 8 * CONFIG_DEBUG_BOOTFB_STRIDE + info->xoff;
-+
-+	return true;
-+}
-+
-+static void bootfb_stop(struct bootfd_tmp *info)
-+{
-+	unsigned short *p = info->ctl;
-+	unsigned short y = info->y, xoff = info->xoff;
-+
-+	if (xoff >= LINE_END) {
-+		if (++y >= FB_CHARS_HEIGHT) {
-+			y = 0;
-+			if (CONFIG_DEBUG_BOOTFB_PAGE_DELAY_MS)
-+				mdelay(CONFIG_DEBUG_BOOTFB_PAGE_DELAY_MS);
-+		}
-+		p[0] = y;
-+		xoff = 0;
-+	}
-+
-+	p[1] = xoff;
-+	unmap_bootfb(p, 4);
-+
-+	info->cur_offset = y * 8 * CONFIG_DEBUG_BOOTFB_STRIDE + xoff;
-+	bootfb_paint_char(info->cur_offset, 254, 0xF000F000);
-+}
-+
-+static void bootfb_write_char(unsigned char c, unsigned color)
-+{
-+	struct bootfd_tmp bootfb;
-+
-+	if (!bootfb_start(&bootfb))
-+		return;
-+
-+	bootfb_paint_char(bootfb.cur_offset, c, color);
-+	bootfb.xoff += 8 * CONFIG_DEBUG_BOOTFB_PIXEL_SIZE;
-+
-+	bootfb_stop(&bootfb);
-+}
-+
-+static void bootfb_clear_after_eol(unsigned color)
-+{
-+	struct bootfd_tmp bootfb;
-+
-+	if (!bootfb_start(&bootfb))
-+		return;
-+
-+	bootfb_clear_line(bootfb.cur_offset, LINE_END - bootfb.xoff, color);
-+	bootfb.xoff = LINE_END;
-+
-+	bootfb_stop(&bootfb);
-+}
-+
-+void early_bootfb_write_char(char c)
-+{
-+	bootfb_write_char(c, ~0);
-+}
-+
-+void early_bootfb_eol(void)
-+{
-+	bootfb_write_char('#', 0x6A);
-+	bootfb_clear_after_eol(0);
-+}
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index ea9646cc2a0e..34d961326a1e 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -81,7 +81,11 @@ ENTRY(printascii)
- 		addruart_current r3, r1, r2
- 		b	2f
- 1:		waituart r2, r3
-+#ifdef CONFIG_DEBUG_LL_BOOT_FRAMEBUFFER
-+		senduart r1, r3, r2, ip
-+#else
- 		senduart r1, r3
-+#endif
- 		busyuart r2, r3
- 		teq	r1, #'\n'
- 		moveq	r1, #'\r'
-diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
-index 43076536965c..9cd3f381c64e 100644
---- a/arch/arm/kernel/early_printk.c
-+++ b/arch/arm/kernel/early_printk.c
-@@ -13,13 +13,22 @@
- #include <linux/init.h>
- 
- extern void printch(int);
-+extern void early_bootfb_write_char(int);
-+extern void early_bootfb_eol(void);
- 
- static void early_write(const char *s, unsigned n)
- {
- 	while (n-- > 0) {
-+#ifdef CONFIG_DEBUG_LL_BOOT_FRAMEBUFFER
-+		if (*s == '\n')
-+			early_bootfb_eol();
-+		else
-+			early_bootfb_write_char(*s);
-+#else
- 		if (*s == '\n')
- 			printch('\r');
- 		printch(*s);
-+#endif
- 		s++;
- 	}
- }
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 4e80bf7420d4..2601b8198f30 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -1058,6 +1058,9 @@ void __init hyp_mode_check(void)
- #endif
- }
- 
-+extern void *bootfb_addr;
-+extern int bootfb_skip_for_pageinit;
-+
- void __init setup_arch(char **cmdline_p)
- {
- 	const struct machine_desc *mdesc;
-@@ -1085,6 +1088,8 @@ void __init setup_arch(char **cmdline_p)
- 	early_fixmap_init();
- 	early_ioremap_init();
- 
-+	bootfb_addr = NULL;
-+
- 	parse_early_param();
- 
- #ifdef CONFIG_MMU
-@@ -1102,9 +1107,14 @@ void __init setup_arch(char **cmdline_p)
- 	/* Memory may have been removed so recalculate the bounds. */
- 	adjust_lowmem_bounds();
- 
-+	pr_crit("before early_ioremap_reset()\n");
-+	bootfb_skip_for_pageinit = 1;
-+
- 	early_ioremap_reset();
-+	pr_crit("after early_ioremap_reset()\n");
- 
- 	paging_init(mdesc);
-+	pr_crit("after paging_init()\n");
- 	request_standard_resources(mdesc);
- 
- 	if (mdesc->restart)
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e46a6a446cdd..fa404985521f 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -18,6 +18,7 @@
- #include <linux/vmalloc.h>
- #include <linux/sizes.h>
- 
-+#include <asm/bootfb.h>
- #include <asm/cp15.h>
- #include <asm/cputype.h>
- #include <asm/sections.h>
-@@ -1117,6 +1118,8 @@ void __init debug_ll_io_init(void)
- {
- 	struct map_desc map;
- 
-+	pr_crit("debug_ll_io_init() start\n");
-+#ifndef CONFIG_DEBUG_LL_BOOT_FRAMEBUFFER
- 	debug_ll_addr(&map.pfn, &map.virtual);
- 	if (!map.pfn || !map.virtual)
- 		return;
-@@ -1125,6 +1128,17 @@ void __init debug_ll_io_init(void)
- 	map.length = PAGE_SIZE;
- 	map.type = MT_DEVICE;
- 	iotable_init(&map, 1);
-+#else
-+	bootfb_addr = IOMEM(CONFIG_DEBUG_BOOTFB_PGVIRT);
-+	bootfb_skip_for_pageinit = 0;
-+
-+	map.pfn = __phys_to_pfn(CONFIG_DEBUG_BOOTFB_PHYS);
-+	map.virtual = CONFIG_DEBUG_BOOTFB_PGVIRT & PAGE_MASK;
-+	map.length = BOOTFB_LEN;
-+	map.type = MT_DEVICE_WC;
-+	iotable_init(&map, 1);
-+#endif
-+	pr_crit("debug_ll_io_init() done\n");
- }
- #endif
- 
+On 20/07/17 17:50, Arnd Bergmann wrote:
+> Six ARM platforms still provide their own variant of the clk API
+> rather than using the generic COMMON_CLK API. This generally works,
+> but it causes some link errors with drivers using the clk_set_rate,
+> clk_get_parent, clk_set_parent or clk_round_rate functions when
+> a platform lacks those interfaces.
+> 
+> OMAP1 implements the whole set already, but davinci, ep93xx, mmp,
+> sa1100 and w90x900 all lack at least one of the functions.
+> 
+> This adds empty stub implementations for each of them, and I
+> don't even try to do something useful here but instead just
+> print a WARN() message to make it obvious what is going on
+> if they ever end up being called.
+> 
+> The drivers that call these won't be used on these platforms
+> (otherwise we'd get a link error today), so the added code is harmless
+> bloat and will warn about accidental use.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-davinci/clock.c |  6 ++++++
+>  arch/arm/mach-ep93xx/clock.c  | 21 +++++++++++++++++++++
+>  arch/arm/mach-mmp/clock.c     | 22 ++++++++++++++++++++++
+>  arch/arm/mach-sa1100/clock.c  | 29 +++++++++++++++++++++++++++++
+>  arch/arm/mach-w90x900/clock.c | 29 +++++++++++++++++++++++++++++
+>  5 files changed, 107 insertions(+)
+> 
+> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+> index f5dce9b4e617..89586779526c 100644
+> --- a/arch/arm/mach-davinci/clock.c
+> +++ b/arch/arm/mach-davinci/clock.c
+> @@ -218,6 +218,12 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>  }
+>  EXPORT_SYMBOL(clk_set_parent);
+>  
+> +struct clk *clk_get_parent(struct clk *clk)
+> +{
+> +	return clk->parent;
+> +}
+> +EXPORT_SYMBOL(clk_get_parent);
+> +
+>  int clk_register(struct clk *clk)
+>  {
+>  	if (clk == NULL || IS_ERR(clk))
+> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+> index 39ef3b613912..c1c91fc6e178 100644
+> --- a/arch/arm/mach-ep93xx/clock.c
+> +++ b/arch/arm/mach-ep93xx/clock.c
+> @@ -323,6 +323,27 @@ unsigned long clk_get_rate(struct clk *clk)
+>  }
+>  EXPORT_SYMBOL(clk_get_rate);
+>  
+> +long clk_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_round_rate);
+> +
+> +int clk_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_set_parent);
+> +
+> +struct clk *clk_get_parent(struct clk *clk)
+> +{
+> +	WARN_ON(clk);
+> +	return NULL;
+> +}
+> +EXPORT_SYMBOL(clk_get_parent);
+> +
+
+I've sent the patch implementing this properly several times already
+(the last one "[PATCH v5 1/5] clk: ep93xx: Implement clk_get_parent()"
+on 04.06.2017) and this is really required for the ADC driver which
+comes along with the series.
+
+I don't mind if you take mine or implement it within your patch,
+but I'd like to see the working function merged. 
+
+>  static int set_keytchclk_rate(struct clk *clk, unsigned long rate)
+>  {
+>  	u32 val;
+> diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
+> index 28fe64c6e2f5..78513f74ae8d 100644
+> --- a/arch/arm/mach-mmp/clock.c
+> +++ b/arch/arm/mach-mmp/clock.c
+> @@ -106,3 +106,25 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>  	return ret;
+>  }
+>  EXPORT_SYMBOL(clk_set_rate);
+> +
+> +/* Dummy clk routine to build generic kernel parts that may be using them */
+> +long clk_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_round_rate);
+> +
+> +int clk_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_set_parent);
+> +
+> +struct clk *clk_get_parent(struct clk *clk)
+> +{
+> +	WARN_ON(clk);
+> +	return NULL;
+> +}
+> +EXPORT_SYMBOL(clk_get_parent);
+> diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
+> index 0db46895c82a..a602d876c231 100644
+> --- a/arch/arm/mach-sa1100/clock.c
+> +++ b/arch/arm/mach-sa1100/clock.c
+> @@ -35,6 +35,35 @@ struct clk clk_##_name = {				\
+>  
+>  static DEFINE_SPINLOCK(clocks_lock);
+>  
+> +/* Dummy clk routine to build generic kernel parts that may be using them */
+> +long clk_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_round_rate);
+> +
+> +int clk_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_set_rate);
+> +
+> +int clk_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_set_parent);
+> +
+> +struct clk *clk_get_parent(struct clk *clk)
+> +{
+> +	WARN_ON(clk);
+> +	return NULL;
+> +}
+> +EXPORT_SYMBOL(clk_get_parent);
+> +
+>  static void clk_gpio27_enable(struct clk *clk)
+>  {
+>  	/*
+> diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
+> index ac6fd1a2cb59..3f93fac98d97 100644
+> --- a/arch/arm/mach-w90x900/clock.c
+> +++ b/arch/arm/mach-w90x900/clock.c
+> @@ -93,3 +93,32 @@ void nuc900_subclk_enable(struct clk *clk, int enable)
+>  
+>  	__raw_writel(clken, W90X900_VA_CLKPWR + SUBCLK);
+>  }
+> +
+> +/* dummy functions, should not be called */
+> +long clk_round_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_round_rate);
+> +
+> +int clk_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_set_rate);
+> +
+> +int clk_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> +	WARN_ON(clk);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_set_parent);
+> +
+> +struct clk *clk_get_parent(struct clk *clk)
+> +{
+> +	WARN_ON(clk);
+> +	return NULL;
+> +}
+> +EXPORT_SYMBOL(clk_get_parent);
+> 
+
 -- 
-2.11.0
+Best regards,
+Alexander Sverdlin.
