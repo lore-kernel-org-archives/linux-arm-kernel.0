@@ -1,91 +1,61 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 20 Jul 2017 02:29:23 +0200
-Subject: [PATCH 1/9] ARM: enable secure platform-only erratas
+Date: Thu, 20 Jul 2017 02:29:25 +0200
+Subject: [PATCH 7/9] ARM: tegra: enable cache via TF
 In-Reply-To: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <77ce738c15b992a92bee3a18e5468342fb2dc5ab.1500510157.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <6a164b2270a3e996c083e94bf5b1e27028c1135e.1500510157.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow secure-only erratas to be used in multiarch kernel.
+Cache enable needs to go via firmware call with TF running.
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 ---
- arch/arm/Kconfig | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/reset-handler.S | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a208bfe367b5..a1eff866550b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -696,6 +696,14 @@ config ARCH_MULTI_CPU_AUTO
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index 805f306fa6f7..aae7f5961563 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -78,8 +78,20 @@ ENTRY(tegra_resume)
+ 	orr	r1, r1, #1
+ 	str	r1, [r0]
+ #endif
++#ifdef CONFIG_TRUSTED_FOUNDATIONS
++	adr	r3, __tegra_smc_stack
++	stmia	r3, {r4-r12, sp, lr}
  
- endmenu
+-#ifdef CONFIG_CACHE_L2X0
++	mov	r0, #3	// local wake
++	mov	r3, #0
++	mov	r4, #0
++	dsb
++	.arch_extension	sec
++	smc	#0
++
++	adr	r3, __tegra_smc_stack
++	ldmia	r3, {r4-r12, sp, pc}
++#elif defined(CONFIG_CACHE_L2X0)
+ 	/* L2 cache resume & re-enable */
+ 	bl	l2c310_early_resume
+ #endif
+@@ -92,6 +104,16 @@ end_ca9_scu_l2_resume:
+ ENDPROC(tegra_resume)
+ #endif
  
-+config ARCH_ASSUME_SECURE_PLATFORM
-+	bool "Enable ERRATAs using secure-only registers"
-+	default !ARCH_MULTIPLATFORM
-+	help
-+	  Allow erratas that need access to secure-only registers.
++#ifdef CONFIG_TRUSTED_FOUNDATIONS
++	.align L1_CACHE_SHIFT
++	.type __tegra_smc_stack, %object
++__tegra_smc_stack:
++	.rept 11
++	.long 0
++	.endr
++	.size __tegra_smc_stack, . - __tegra_smc_stack
++#endif /* CONFIG_TRUSTED_FOUNDATIONS */
 +
-+	  Beware: Resulting kernel won't boot on a CPU in non-Secure mode.
-+
- config ARCH_VIRT
- 	bool "Dummy Virtual Machine"
- 	depends on ARCH_MULTI_V7
-@@ -984,7 +992,7 @@ config ARM_ERRATA_430973
- config ARM_ERRATA_458693
- 	bool "ARM errata: Processor deadlock when a false hazard is created"
- 	depends on CPU_V7
--	depends on !ARCH_MULTIPLATFORM
-+	depends on ARCH_ASSUME_SECURE_PLATFORM
- 	help
- 	  This option enables the workaround for the 458693 Cortex-A8 (r2p0)
- 	  erratum. For very specific sequences of memory operations, it is
-@@ -998,7 +1006,7 @@ config ARM_ERRATA_458693
- config ARM_ERRATA_460075
- 	bool "ARM errata: Data written to the L2 cache can be overwritten with stale data"
- 	depends on CPU_V7
--	depends on !ARCH_MULTIPLATFORM
-+	depends on ARCH_ASSUME_SECURE_PLATFORM
- 	help
- 	  This option enables the workaround for the 460075 Cortex-A8 (r2p0)
- 	  erratum. Any asynchronous access to the L2 cache may encounter a
-@@ -1011,7 +1019,7 @@ config ARM_ERRATA_460075
- config ARM_ERRATA_742230
- 	bool "ARM errata: DMB operation may be faulty"
- 	depends on CPU_V7 && SMP
--	depends on !ARCH_MULTIPLATFORM
-+	depends on ARCH_ASSUME_SECURE_PLATFORM
- 	help
- 	  This option enables the workaround for the 742230 Cortex-A9
- 	  (r1p0..r2p2) erratum. Under rare circumstances, a DMB instruction
-@@ -1024,7 +1032,7 @@ config ARM_ERRATA_742230
- config ARM_ERRATA_742231
- 	bool "ARM errata: Incorrect hazard handling in the SCU may lead to data corruption"
- 	depends on CPU_V7 && SMP
--	depends on !ARCH_MULTIPLATFORM
-+	depends on ARCH_ASSUME_SECURE_PLATFORM
- 	help
- 	  This option enables the workaround for the 742231 Cortex-A9
- 	  (r2p0..r2p2) erratum. Under certain conditions, specific to the
-@@ -1062,7 +1070,7 @@ config ARM_ERRATA_720789
- config ARM_ERRATA_743622
- 	bool "ARM errata: Faulty hazard checking in the Store Buffer may lead to data corruption"
- 	depends on CPU_V7
--	depends on !ARCH_MULTIPLATFORM
-+	depends on ARCH_ASSUME_SECURE_PLATFORM
- 	help
- 	  This option enables the workaround for the 743622 Cortex-A9
- 	  (r2p*) erratum. Under very rare conditions, a faulty
-@@ -1076,7 +1084,7 @@ config ARM_ERRATA_743622
- config ARM_ERRATA_751472
- 	bool "ARM errata: Interrupted ICIALLUIS may prevent completion of broadcasted operation"
- 	depends on CPU_V7
--	depends on !ARCH_MULTIPLATFORM
-+	depends on ARCH_ASSUME_SECURE_PLATFORM
- 	help
- 	  This option enables the workaround for the 751472 Cortex-A9 (prior
- 	  to r3p0) erratum. An interrupted ICIALLUIS operation may prevent the
+ 	.align L1_CACHE_SHIFT
+ ENTRY(__tegra_cpu_reset_handler_start)
+ 
 -- 
 2.11.0
