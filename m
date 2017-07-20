@@ -1,93 +1,177 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 20 Jul 2017 10:18:16 +0530
-Subject: [PATCH v2 2/5] clk: Add clk_hw_get_clk() helper API to be used by clk
- providers
+Date: Thu, 20 Jul 2017 10:18:17 +0530
+Subject: [PATCH v2 3/5] clk: qcom: gdsc: Add support to control associated clks
 In-Reply-To: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
 References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1500526099-9935-3-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1500526099-9935-4-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we move towards a cleaner split to have clock providers use clk_hw
-for all clock operations, while consumers operate on the (per-user)
-struct clk handles, we still have cases where in a clock provider
-might want to call into high level clk apis which only operate on a
-struct clk handle.
-To facilitate such needs, have a clk_hw_get_clk() api which can be
-used from within clock providers to get access to struct clk handles.
+The devices within a gdsc power domain, quite often have additional
+clocks to be turned on/off along with the power domain itself.
+Add support for this by specifying a list of clk_hw pointers
+per gdsc which would be the clocks turned on/off along with the
+powerdomain on/off callbacks.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/clk.c            | 39 +++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |  5 +++++
- 2 files changed, 44 insertions(+)
+ drivers/clk/qcom/gdsc.c | 60 +++++++++++++++++++++++++++++++++++++++++++++++--
+ drivers/clk/qcom/gdsc.h |  8 +++++++
+ 2 files changed, 66 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index fc58c52..c9bbfb3 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -186,6 +186,45 @@ const char *clk_hw_get_name(const struct clk_hw *hw)
- }
- EXPORT_SYMBOL_GPL(clk_hw_get_name);
+diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
+index a4f3580..7e7c051 100644
+--- a/drivers/clk/qcom/gdsc.c
++++ b/drivers/clk/qcom/gdsc.c
+@@ -12,6 +12,8 @@
+  */
  
-+struct clk *clk_hw_get_clk(struct clk_hw *hw, const char *dev_id,
-+			   const char *con_id)
+ #include <linux/bitops.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/jiffies.h>
+@@ -21,6 +23,7 @@
+ #include <linux/regmap.h>
+ #include <linux/reset-controller.h>
+ #include <linux/slab.h>
++#include "common.h"
+ #include "gdsc.h"
+ 
+ #define PWR_ON_MASK		BIT(31)
+@@ -166,6 +169,29 @@ static inline void gdsc_assert_clamp_io(struct gdsc *sc)
+ 			   GMEM_CLAMP_IO_MASK, 1);
+ }
+ 
++static inline int gdsc_clk_enable(struct gdsc *sc)
 +{
-+	return __clk_create_clk(hw, dev_id, con_id);
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_get_clk);
++	int i, ret;
 +
-+void clk_hw_put_clk(struct clk *clk)
-+{
-+	__clk_free_clk(clk);
-+}
-+EXPORT_SYMBOL_GPL(clk_hw_put_clk);
-+
-+static void devm_clk_hw_put(struct device *dev, void *res)
-+{
-+	clk_hw_put_clk(*(struct clk **)res);
-+}
-+
-+struct clk *devm_clk_hw_get_clk(struct device *dev, struct clk_hw *hw,
-+				const char *con_id)
-+{
-+	struct clk **ptr, *clk;
-+
-+	ptr = devres_alloc(devm_clk_hw_put, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	clk = clk_hw_get_clk(hw, dev_name(dev), con_id);
-+	if (!IS_ERR(clk)) {
-+		*ptr = clk;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
++	for (i = 0; i < sc->clk_count; i++) {
++		ret = clk_prepare_enable(sc->clks[i]);
++		if (ret) {
++			for (i--; i >= 0; i--)
++				clk_disable_unprepare(sc->clks[i]);
++			return ret;
++		}
 +	}
-+
-+	return clk;
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(devm_clk_hw_get_clk);
 +
- struct clk_hw *__clk_get_hw(struct clk *clk)
++static inline void gdsc_clk_disable(struct gdsc *sc)
++{
++	int i;
++
++	for (i = 0; i < sc->clk_count; i++)
++		clk_disable_unprepare(sc->clks[i]);
++}
++
+ static int gdsc_enable(struct generic_pm_domain *domain)
  {
- 	return !clk ? NULL : clk->core->hw;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index c59c625..c85bfed 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -730,6 +730,11 @@ struct clk_hw *clk_hw_register_gpio_mux(struct device *dev, const char *name,
- /* helper functions */
- const char *__clk_get_name(const struct clk *clk);
- const char *clk_hw_get_name(const struct clk_hw *hw);
-+struct clk *clk_hw_get_clk(struct clk_hw *hw, const char *dev_id,
-+			   const char *con_id);
-+void clk_hw_put_clk(struct clk *clk);
-+struct clk *devm_clk_hw_get_clk(struct device *dev, struct clk_hw *hw,
-+				const char *con_id);
- struct clk_hw *__clk_get_hw(struct clk *clk);
- unsigned int clk_hw_get_num_parents(const struct clk_hw *hw);
- struct clk_hw *clk_hw_get_parent(const struct clk_hw *hw);
+ 	struct gdsc *sc = domain_to_gdsc(domain);
+@@ -193,6 +219,10 @@ static int gdsc_enable(struct generic_pm_domain *domain)
+ 	 */
+ 	udelay(1);
+ 
++	ret = gdsc_clk_enable(sc);
++	if (ret)
++		return ret;
++
+ 	/* Turn on HW trigger mode if supported */
+ 	if (sc->flags & HW_CTRL) {
+ 		ret = gdsc_hwctrl(sc, true);
+@@ -241,6 +271,8 @@ static int gdsc_disable(struct generic_pm_domain *domain)
+ 			return ret;
+ 	}
+ 
++	gdsc_clk_disable(sc);
++
+ 	if (sc->pwrsts & PWRSTS_OFF)
+ 		gdsc_clear_mem_on(sc);
+ 
+@@ -254,7 +286,27 @@ static int gdsc_disable(struct generic_pm_domain *domain)
+ 	return 0;
+ }
+ 
+-static int gdsc_init(struct gdsc *sc)
++static inline int gdsc_clk_get(struct device *dev, struct gdsc *sc)
++{
++	if (sc->clk_count) {
++		int i;
++
++		sc->clks = devm_kcalloc(dev, sc->clk_count, sizeof(*sc->clks),
++					GFP_KERNEL);
++		if (!sc->clks)
++			return -ENOMEM;
++
++		for (i = 0; i < sc->clk_count; i++) {
++			sc->clks[i] = devm_clk_hw_get_clk(dev, sc->clk_hws[i],
++							  NULL);
++			if (IS_ERR(sc->clks[i]))
++				return PTR_ERR(sc->clks[i]);
++		}
++	}
++	return 0;
++}
++
++static int gdsc_init(struct device *dev, struct gdsc *sc)
+ {
+ 	u32 mask, val;
+ 	int on, ret;
+@@ -284,6 +336,10 @@ static int gdsc_init(struct gdsc *sc)
+ 	if (on < 0)
+ 		return on;
+ 
++	ret = gdsc_clk_get(dev, sc);
++	if (ret)
++		return ret;
++
+ 	/*
+ 	 * Votable GDSCs can be ON due to Vote from other masters.
+ 	 * If a Votable GDSC is ON, make sure we have a Vote.
+@@ -327,7 +383,7 @@ int gdsc_register(struct gdsc_desc *desc,
+ 			continue;
+ 		scs[i]->regmap = regmap;
+ 		scs[i]->rcdev = rcdev;
+-		ret = gdsc_init(scs[i]);
++		ret = gdsc_init(dev, scs[i]);
+ 		if (ret)
+ 			return ret;
+ 		data->domains[i] = &scs[i]->pd;
+diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
+index 3964834..a7fd51b 100644
+--- a/drivers/clk/qcom/gdsc.h
++++ b/drivers/clk/qcom/gdsc.h
+@@ -17,6 +17,8 @@
+ #include <linux/err.h>
+ #include <linux/pm_domain.h>
+ 
++struct clk;
++struct clk_hw;
+ struct regmap;
+ struct reset_controller_dev;
+ 
+@@ -32,6 +34,9 @@
+  * @resets: ids of resets associated with this gdsc
+  * @reset_count: number of @resets
+  * @rcdev: reset controller
++ * @clk_count: number of gdsc clocks
++ * @clks: clk pointers for gdsc clocks
++ * @clk_hws: clk_hw pointers for gdsc clocks
+  */
+ struct gdsc {
+ 	struct generic_pm_domain	pd;
+@@ -56,6 +61,9 @@ struct gdsc {
+ 	struct reset_controller_dev	*rcdev;
+ 	unsigned int			*resets;
+ 	unsigned int			reset_count;
++	unsigned int			clk_count;
++	struct clk			**clks;
++	struct clk_hw			*clk_hws[];
+ };
+ 
+ struct gdsc_desc {
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
