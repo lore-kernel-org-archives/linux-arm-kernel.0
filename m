@@ -1,75 +1,81 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 20 Jul 2017 11:17:27 +0100
-Subject: [PATCH v5 17/19] coresight tmc: Support for save-restore in ETR
+Date: Thu, 20 Jul 2017 11:17:26 +0100
+Subject: [PATCH v5 16/19] coresigh tmc etr: Setup AXI cache encoding for read
+ transfers
 In-Reply-To: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500545849-23724-18-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500545849-23724-17-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Coresight SoC 600 TMC ETR supports save-restore feature,
-where the values of the RRP/RWP and STS.Full are retained
-when it leaves the Disabled state. Hence, we must program the
-RRP/RWP and STS.Full to a proper value. For now, set the RRP/RWP
-to the base address of the buffer and clear the STS.Full register.
-This can be later exploited for proper save-restore of ETR
-trace contexts (e.g, perf).
+If the ETR supports split cache encoding (i.e, separate bits for
+read and write transfers) unlike the older version (where read
+and write transfers use the same encoding in AXICTL[2-5]).
+This feature is not advertised and has to be described by the
+static mask associated with the device id.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 ++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc.h     |  9 +++++++++
- 2 files changed, 21 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c |  6 ++++++
+ drivers/hwtracing/coresight/coresight-tmc.h     | 10 +++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 40ddcf1..68fbc8f 100644
+index 880b535..40ddcf1 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -22,7 +22,7 @@
- 
- static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- {
--	u32 axictl;
-+	u32 axictl, sts;
- 
- 	/* Zero out the memory to help with debug */
- 	memset(drvdata->vaddr, 0, drvdata->size);
-@@ -47,6 +47,17 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- 
+@@ -39,6 +39,12 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ 	axictl &= ~TMC_AXICTL_CLEAR_MASK;
+ 	axictl |= (TMC_AXICTL_PROT_CTL_B1 | TMC_AXICTL_WR_BURST_16);
+ 	axictl |= TMC_AXICTL_AXCACHE_OS;
++
++	if (tmc_etr_has_cap(drvdata, TMC_ETR_AXI_ARCACHE)) {
++		axictl &= ~TMC_AXICTL_ARCACHE_MASK;
++		axictl |= TMC_AXICTL_ARCACHE_OS;
++	}
++
  	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
  	tmc_write_dba(drvdata, drvdata->paddr);
-+	/*
-+	 * If the TMC pointers must be programmed before the session,
-+	 * we have to set it properly (i.e, RRP/RWP to base address and
-+	 * STS to "not full").
-+	 */
-+	if (tmc_etr_has_cap(drvdata, TMC_ETR_SAVE_RESTORE)) {
-+		tmc_write_rrp(drvdata, drvdata->paddr);
-+		tmc_write_rwp(drvdata, drvdata->paddr);
-+		sts = readl_relaxed(drvdata->base + TMC_STS) & ~TMC_STS_FULL;
-+		writel_relaxed(sts, drvdata->base + TMC_STS);
-+	}
  
- 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
- 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index c691014..08f1aea 100644
+index a532972..c691014 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -120,6 +120,15 @@ enum tmc_mem_intf_width {
+@@ -60,13 +60,18 @@
+  *
+  * TMC AXICTL format for SoC-400
+  *	Bits [0-1]	: ProtCtrlBit0-1
+- *	Bits [2-5]	: CacheCtrlBits 0-3 (AxCACHE)
++ *	Bits [2-5]	: CacheCtrlBits 0-3 (AXCACHE)
+  *	Bit  6		: Reserved
+  *	Bit  7		: ScatterGatherMode
+  *	Bits [8-11]	: WrBurstLen
+  *	Bits [12-31]	: Reserved.
++ * TMC AXICTL format for SoC-600, as above except:
++ *	Bits [2-5]	: AXI WCACHE
++ *	Bits [16-19]	: AXI RCACHE
++ *	Bits [20-31]	: Reserved
+  */
+ #define TMC_AXICTL_CLEAR_MASK 0xfbf
++#define TMC_AXICTL_ARCACHE_MASK (0xf << 16)
+ 
+ #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
+ #define TMC_AXICTL_PROT_CTL_B1	BIT(1)
+@@ -74,6 +79,7 @@
+ #define TMC_AXICTL_WR_BURST_16	0xF00
+ /* Write-back Read and Write-allocate */
+ #define TMC_AXICTL_AXCACHE_OS	(0xf << 2)
++#define TMC_AXICTL_ARCACHE_OS	(0xf << 16)
+ 
+ /* TMC_FFCR - 0x304 */
+ #define TMC_FFCR_FLUSHMAN_BIT	6
+@@ -112,6 +118,8 @@ enum tmc_mem_intf_width {
+ 
+ /* TMC ETR Capability bit definitions */
  #define TMC_ETR_SG			(0x1U << 0)
- /* ETR has separate read/write cache encodings */
- #define TMC_ETR_AXI_ARCACHE		(0x1U << 1)
-+/*
-+ * TMC_ETR_SAVE_RESTORE - Values of RRP/RWP/STS.Full are
-+ * retained when TMC leaves Disabled state, allowing us to continue
-+ * the tracing from a point where we stopped. This also implies that
-+ * the RRP/RWP/STS.Full should always be programmed to the correct
-+ * value. Unfortunately this is not advertised by the hardware,
-+ * so we have to rely on PID of the IP to detect the functionality.
-+ */
-+#define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
++/* ETR has separate read/write cache encodings */
++#define TMC_ETR_AXI_ARCACHE		(0x1U << 1)
  
  /**
   * struct tmc_drvdata - specifics associated to an TMC component
