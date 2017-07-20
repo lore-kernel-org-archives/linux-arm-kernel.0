@@ -1,36 +1,38 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 20 Jul 2017 15:12:17 +0530
-Subject: [PATCH v2 2/3] gpio: davinci: Handle the return value of
- davinci_gpio_irq_setup function
+Date: Thu, 20 Jul 2017 15:13:44 +0530
+Subject: [PATCH v2 0/3] gpio: davinci: Add missing return checks
 In-Reply-To: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
 References: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1500543738-9696-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <fc3de1fa-35b0-fc09-7116-921d7d2bf8a9@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently davinci_gpio_irq_setup return value is ignored. Handle the
-return value appropriately.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- drivers/gpio/gpio-davinci.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-index 27499ec..d6fb1ce 100644
---- a/drivers/gpio/gpio-davinci.c
-+++ b/drivers/gpio/gpio-davinci.c
-@@ -237,7 +237,10 @@ static int davinci_gpio_probe(struct platform_device *pdev)
- 		goto err;
- 
- 	platform_set_drvdata(pdev, chips);
--	davinci_gpio_irq_setup(pdev);
-+	ret = davinci_gpio_irq_setup(pdev);
-+	if (ret)
-+		goto err;
-+
- 	return 0;
- 
- err:
--- 
-1.9.1
+On Thursday 20 July 2017 03:12 PM, Keerthy wrote:
+> The patch series does a couple of important return handling which were missed
+> earlier in the driver probe.
+> 
+> This is based on Suman's:
+> 
+> http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
+> http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2 
+> 
+
+My bad! The series has no dependency on the above. I have split the
+device tree patches to keep it independent.
+
+> Changes in v2:
+> 
+>   * Removed the device tree patch for to keep the series independent.
+> 
+> Keerthy (3):
+>   gpio: davinci: Use devm_gpiochip_add_data in place of
+>     gpiochip_add_data
+>   gpio: davinci: Handle the return value of davinci_gpio_irq_setup
+>     function
+>   gpio: davinci: Convert prinkt to dev_err
+> 
+>  drivers/gpio/gpio-davinci.c | 22 +++++++++++++++++-----
+>  1 file changed, 17 insertions(+), 5 deletions(-)
+> 
