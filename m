@@ -1,59 +1,68 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Jul 2017 15:01:15 +0200
-Subject: [PATCH v2 0/4] drm/sun4i: Fix a register access bug
-Message-ID: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
+Date: Thu, 20 Jul 2017 15:01:19 +0200
+Subject: [PATCH v2 4/4] drm/sun4i: make sure we don't have a commit pending
+In-Reply-To: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
+References: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <8763c55f9d77b270b3e6ae8a812c16fe79b5874c.1500555652.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner backend has a commit bit in order to push the new
-configuration to the actual hardware. We've always been using that bit.
+In the earlier display engine designs, any register access while a commit
+is pending is forbidden.
 
-However, we also should poll for that bit to clear, which we don't.
-Accessing any register while a commit is pending is forbidden, and will for
-example show a symptom of reading another, random, register.
+One of the symptoms is that reading a register will return another, random,
+register value which can lead to register corruptions if we ever do a
+read/modify/write cycle.
 
-If you get this during a read/modify/write cycle, this will result in
-random register corruption, which are pretty bad.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 14 ++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_crtc.c    |  1 +
+ 2 files changed, 15 insertions(+)
 
-This can be shown using the following program (while the backend is
-active):
-http://code.bulix.org/gdl44p-161437?raw
-
-Fortunately for us, this is not really likely to happen. The window where
-it can happen is quite thin, and it only happens during a modeset, since
-it's the only time we commit some new configuration.
-
-Unfortunately for us, QT does a ridiculous amount of modeset, and will just
-hit that window after a while, creating a distorded (since the register we
-read/modify/write also has scaling attributes) or with weird colors (since
-it also has a invertion of red and blue components). And might fix itself
-later on by reading another random register with proper values for these
-fields.
-
-Let me know what you think,
-Maxime
-
-Changes from v1:
-  - Renamed the function drm_atomic_helper_commit_tail_rpm
-  - Dropped the changes in the rcar-du driver
-  - Enhanced the documentation based on Daniel's comments
-
-Maxime Ripard (4):
-  drm/atomic: implement drm_atomic_helper_commit_tail for runtime_pm users
-  drm/sun4i: Use the runtime_pm commit_tail variant
-  drm/sun4i: engine: Add commit_poll function
-  drm/sun4i: make sure we don't have a commit pending
-
- drivers/gpu/drm/drm_atomic_helper.c        | 49 +++++++++++++++--------
- drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 21 +----------
- drivers/gpu/drm/sun4i/sun4i_backend.c      | 14 +++++++-
- drivers/gpu/drm/sun4i/sun4i_crtc.c         |  3 +-
- drivers/gpu/drm/sun4i/sun4i_framebuffer.c  |  6 +++-
- drivers/gpu/drm/sun4i/sunxi_engine.h       | 14 +++++++-
- include/drm/drm_atomic_helper.h            |  1 +-
- 8 files changed, 74 insertions(+), 61 deletions(-)
-
-base-commit: 5771a8c08880cdca3bfb4a3fc6d309d6bba20877
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index cf480218daa5..ce1f40f7511e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -67,6 +67,19 @@ static void sun4i_backend_commit(struct sunxi_engine *engine)
+ 		     SUN4I_BACKEND_REGBUFFCTL_LOADCTL);
+ }
+ 
++static int sun4i_backend_commit_poll(struct sunxi_engine *engine)
++{
++	u32 val;
++
++	DRM_DEBUG_DRIVER("Polling for the commit to end\n");
++
++	return regmap_read_poll_timeout(engine->regs,
++					SUN4I_BACKEND_REGBUFFCTL_REG,
++					val,
++					!(val & SUN4I_BACKEND_REGBUFFCTL_LOADCTL),
++					100, 50000);
++}
++
+ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
+ 				int layer, bool enable)
+ {
+@@ -330,6 +343,7 @@ static int sun4i_backend_of_get_id(struct device_node *node)
+ 
+ static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
+ 	.commit				= sun4i_backend_commit,
++	.commit_poll			= sun4i_backend_commit_poll,
+ 	.layers_init			= sun4i_layers_init,
+ 	.apply_color_correction		= sun4i_backend_apply_color_correction,
+ 	.disable_color_correction	= sun4i_backend_disable_color_correction,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 2eba1d8639d8..31550493fa1d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -34,6 +34,7 @@ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+ 				    struct drm_crtc_state *old_state)
+ {
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
++	struct sunxi_engine *engine = scrtc->engine;
+ 	struct drm_device *dev = crtc->dev;
+ 	unsigned long flags;
+ 
 -- 
 git-series 0.9.1
