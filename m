@@ -1,105 +1,129 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Jul 2017 11:44:42 +0800
-Subject: [PATCH v2 00/10] ARM: sun8i: a83t: Add support for MMC controllers
-Message-ID: <20170720034452.15920-1-wens@csie.org>
+Date: Thu, 20 Jul 2017 11:44:46 +0800
+Subject: [PATCH v2 04/10] mmc: sunxi: Support controllers that can use both
+ old and new timings
+In-Reply-To: <20170720034452.15920-1-wens@csie.org>
+References: <20170720034452.15920-1-wens@csie.org>
+Message-ID: <20170720034452.15920-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On the SoCs that introduced the new timing mode for MMC controllers,
+both the old (where the clock delays are set in the CCU) and new
+(where the clock delays are set in the MMC controller) timing modes
+are available, and we have to support them both. However there are
+two bits that control which mode is active. One is in the CCU, the
+other is in the MMC controller. The settings on both sides must be
+the same, or nothing will work.
 
-This is v2 of my MMC controller support series.
+The sunxi-ng clock driver provides an API to query and set the
+active timing mode. At probe time, we try to set the active mode
+to the "new timing mode". If it succeeds, we can then use the MMC
+controller in the new mode. If not, we fall back to the old mode.
 
-Changes since v1:
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/mmc/host/sunxi-mmc.c | 45 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 43 insertions(+), 2 deletions(-)
 
-  - Fix patches already applied have been dropped
-
-  - V2 now exports sunxi-ng mmc timing mode API functions
-    (in case mmc driver is built as a module)
-
-  - Added stub functions for the timing mode API functions,
-    in case sunxi-ng clk driver is not enabled
-
-  - Added special class of MP clocks that consider the timing mode
-    bit when calculating clock rates
-
-  - Convert A83T MMC2 clock to use special MP_MMC clock
-
-  - Keep feature bits for "has timing mode switch" and "needs new
-    timing mode" in the mmc driver separate.
-
-  - Add SoC specific compatible strings for MMC0/1 in the device tree
-
-  - Updated commit message for patch "mmc: sunxi: Support controllers
-    that can use both old and new timings"
-
-  - Added acks from Rob
-
-
-The MMC driver changes have compile time dependencies on the clk driver
-changes. What would be a good way to merge this? An immutable branch?
-
-The device tree changes don't depend on anything other than the
-"Switch to CCU device tree binding macros" patch from v1. I hope we
-can merge those ASAP, so I can send other patches on top of them.
-
-
-Original cover letter from v1:
-
-This series adds support for the MMC controllers on the A83T. The A83T's
-MMC controller adds what they call the "new timing mode". It moves the
-MMC clock delay lines into the controller itself. There are some minor
-changes to how the clock rate is calculated. The new mode give better
-performance and stability for eMMC applications. This mode is only
-found on the eMMC facing controller (or MMC2 on this chip).
-
-This mode is also found on the A64, but on that chip, the controller
-is fixed to that mode. On the A83t, the user is free to use the old
-or new mode, but the new mode is recommended. There are two switches,
-one in the clock controller, the other in the MMC controller, that
-must be set in tandem.
-
-The main part of this series adds custom functions to the sunxi-ng
-clk driver, allowing the MMC driver to query and configure the mode.
-The MMC driver can then support timing mode switching, and thus, the
-MMC2 controller on the A83t.
-
-The other bits are some related cleanups, and the usual device tree
-changes.
-
-Please have a look.
-
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (10):
-  clk: sunxi-ng: Add interface to query or configure MMC timing modes.
-  clk: sunxi-ng: Add MP_MMC clocks that support MMC timing modes
-    switching
-  clk: sunxi-ng: a83t: Support new timing mode for mmc2 clock
-  mmc: sunxi: Support controllers that can use both old and new timings
-  mmc: sunxi: Support MMC DDR52 transfer mode with new timing mode
-  mmc: sunxi: Add support for A83T eMMC (MMC2)
-  ARM: dts: sun8i: a83t: Add MMC controller device nodes
-  ARM: dts: sun8i: a83t: Add pingroup for 8-bit eMMC on mmc2
-  ARM: dts: sun8i: a83t: cubietruck-plus: Enable micro-SD card and eMMC
-  ARM: dts: sun8i: a83t: h8homlet: Enable micro-SD card and onboard eMMC
-
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |  1 +
- .../boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts  | 21 ++++++
- arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts   | 27 +++++++
- arch/arm/boot/dts/sun8i-a83t.dtsi                  | 68 ++++++++++++++++++
- drivers/clk/sunxi-ng/Makefile                      |  1 +
- drivers/clk/sunxi-ng/ccu-sun8i-a83t.c              | 15 ++--
- drivers/clk/sunxi-ng/ccu_common.h                  |  5 ++
- drivers/clk/sunxi-ng/ccu_mmc_timing.c              | 73 +++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_mp.c                      | 80 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_mp.h                      | 24 +++++++
- drivers/mmc/host/sunxi-mmc.c                       | 83 ++++++++++++++++++----
- include/linux/clk/sunxi-ng.h                       | 35 +++++++++
- 12 files changed, 411 insertions(+), 22 deletions(-)
- create mode 100644 drivers/clk/sunxi-ng/ccu_mmc_timing.c
- create mode 100644 include/linux/clk/sunxi-ng.h
-
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 0fb4e4c119e1..c8a60e43dc43 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -22,6 +22,7 @@
+ #include <linux/err.h>
+ 
+ #include <linux/clk.h>
++#include <linux/clk/sunxi-ng.h>
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+@@ -259,7 +260,11 @@ struct sunxi_mmc_cfg {
+ 	/* Does DATA0 needs to be masked while the clock is updated */
+ 	bool mask_data0;
+ 
++	/* hardware only supports new timing mode */
+ 	bool needs_new_timings;
++
++	/* hardware can switch between old and new timing modes */
++	bool has_timings_switch;
+ };
+ 
+ struct sunxi_mmc_host {
+@@ -293,6 +298,9 @@ struct sunxi_mmc_host {
+ 
+ 	/* vqmmc */
+ 	bool		vqmmc_enabled;
++
++	/* timings */
++	bool		use_new_timings;
+ };
+ 
+ static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
+@@ -714,7 +722,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
+ {
+ 	int index;
+ 
+-	if (!host->cfg->clk_delays)
++	if (host->use_new_timings)
+ 		return 0;
+ 
+ 	/* determine delays */
+@@ -765,6 +773,15 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	    ios->bus_width == MMC_BUS_WIDTH_8)
+ 		clock <<= 1;
+ 
++	if (host->use_new_timings) {
++		ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
++		if (ret) {
++			dev_err(mmc_dev(mmc),
++				"error setting new timing mode\n");
++			return ret;
++		}
++	}
++
+ 	rate = clk_round_rate(host->clk_mmc, clock);
+ 	if (rate < 0) {
+ 		dev_err(mmc_dev(mmc), "error rounding clk to %d: %ld\n",
+@@ -793,7 +810,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	}
+ 	mmc_writel(host, REG_CLKCR, rval);
+ 
+-	if (host->cfg->needs_new_timings) {
++	if (host->use_new_timings) {
+ 		/* Don't touch the delay bits */
+ 		rval = mmc_readl(host, REG_SD_NTSR);
+ 		rval |= SDXC_2X_TIMING_MODE;
+@@ -1262,6 +1279,30 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 		goto error_free_host;
+ 	}
+ 
++	if (host->cfg->has_timings_switch) {
++		/*
++		 * Supports both old and new timing modes.
++		 * Try setting the clk to new timing mode.
++		 */
++		sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
++
++		/* And check the result */
++		ret = sunxi_ccu_get_mmc_timing_mode(host->clk_mmc);
++		if (ret < 0) {
++			/*
++			 * For whatever reason we were not able to get
++			 * the current active mode. Default to old mode.
++			 */
++			dev_warn(&pdev->dev, "MMC clk timing mode unknown\n");
++			host->use_new_timings = false;
++		} else {
++			host->use_new_timings = !!ret;
++		}
++	} else if (host->cfg->needs_new_timings) {
++		/* Supports new timing mode only */
++		host->use_new_timings = true;
++	}
++
+ 	mmc->ops		= &sunxi_mmc_ops;
+ 	mmc->max_blk_count	= 8192;
+ 	mmc->max_blk_size	= 4096;
 -- 
 2.13.2
