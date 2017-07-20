@@ -1,75 +1,50 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 20 Jul 2017 10:55:40 +0800
-Subject: [PATCH 4/4] iommu/iova: Make dma_32bit_pfn implicit
-In-Reply-To: <201707192352.79mkRePJ%fengguang.wu@intel.com>
-References: <201707192352.79mkRePJ%fengguang.wu@intel.com>
-Message-ID: <59701BAC.7060800@huawei.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 20 Jul 2017 11:02:25 +0800
+Subject: [PATCH v5 0/2] Add Basic SoC support for MT7622
+In-Reply-To: <cover.1497631953.git.sean.wang@mediatek.com>
+References: <cover.1497631953.git.sean.wang@mediatek.com>
+Message-ID: <1500519745.25149.1.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Matthias
+
+just a gentle ping on this 
+
+	Sean
 
 
-On 2017/7/19 23:07, kbuild test robot wrote:
-> Hi Zhen,
+On Sat, 2017-06-17 at 01:06 +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> [auto build test WARNING on iommu/next]
-> [also build test WARNING on v4.13-rc1]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> Changes since v4:
+> - redefine the two dummy clocks with the correct frequency
+>   which is 25MHz and 280MHz respectively.
 > 
-> url:    https://github.com/0day-ci/linux/commits/Robin-Murphy/Optimise-64-bit-IOVA-allocations/20170719-060847
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
-> config: arm-multi_v7_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
+> Changes since v3:
+> - get rid of those accepted patches
+> - rebased to branch v4.12-next/dts64 in Matthias' tree
+> - fixed uart node in dts with two clocks as described in bindings documentation
 > 
-> All warnings (new ones prefixed by >>):
+> Changes since v2:
+> - merge back required basic clock nodes into the .dtsi file
+> - update the property of interrupts in timer nodes with 2 CPUs
 > 
->    drivers/iommu/iova.c: In function 'init_iova_domain':
->>> drivers/iommu/iova.c:53:41: warning: large integer implicitly truncated to unsigned type [-Woverflow]
->      iovad->dma_32bit_pfn = iova_pfn(iovad, 1ULL << 32);
-OK, I see. I think the problem is that "1ULL << 32" exceed the scope of 32bits general register. We should
-replace "1ULL << 32" with DMA_BIT_MASK(32), the latter will minus one to keep it can be safely stored in
-the general register.
-
-iovad->dma_32bit_pfn = iova_pfn(iovad, DMA_BIT_MASK(32)) + 1;
-
->                                             ^~~~
+> Changes since v1:
+> - update SPDX-License-Identifier
+> - remove next-level-cache property since cache geometry detection was removed since 4.12
 > 
-> vim +53 drivers/iommu/iova.c
+> This patch set adds basic SoC support for MediaTek MT7622
+> SoC based on 4.12-rc1.
 > 
->     35	
->     36	void
->     37	init_iova_domain(struct iova_domain *iovad, unsigned long granule,
->     38		unsigned long start_pfn)
->     39	{
->     40		/*
->     41		 * IOVA granularity will normally be equal to the smallest
->     42		 * supported IOMMU page size; both *must* be capable of
->     43		 * representing individual CPU pages exactly.
->     44		 */
->     45		BUG_ON((granule > PAGE_SIZE) || !is_power_of_2(granule));
->     46	
->     47		spin_lock_init(&iovad->iova_rbtree_lock);
->     48		iovad->rbroot = RB_ROOT;
->     49		iovad->cached_node = NULL;
->     50		iovad->cached32_node = NULL;
->     51		iovad->granule = granule;
->     52		iovad->start_pfn = start_pfn;
->   > 53		iovad->dma_32bit_pfn = iova_pfn(iovad, 1ULL << 32);
->     54		init_iova_rcaches(iovad);
->     55	}
->     56	EXPORT_SYMBOL_GPL(init_iova_domain);
->     57	
+> Sean Wang (2):
+>   arm64: dts: mt7622: add basic nodes to the mt7622.dtsi file
+>   arm64: dts: mt7622: add dts file for MT7622 reference board variant 1
 > 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>  arch/arm64/boot/dts/mediatek/Makefile        |   1 +
+>  arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  27 +++++++
+>  arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 110 +++++++++++++++++++++++++++
+>  3 files changed, 138 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
 > 
-
--- 
-Thanks!
-BestRegards
