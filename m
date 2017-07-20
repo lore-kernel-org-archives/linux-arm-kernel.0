@@ -1,61 +1,80 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 20 Jul 2017 02:29:25 +0200
-Subject: [PATCH 7/9] ARM: tegra: enable cache via TF
+Date: Thu, 20 Jul 2017 02:29:24 +0200
+Subject: [PATCH 5/9] ARM: trusted_foundations: announce firmware version
 In-Reply-To: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <6a164b2270a3e996c083e94bf5b1e27028c1135e.1500510157.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <90ad41ff1b54695154348c0c7f9333ed9e162ce3.1500510157.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cache enable needs to go via firmware call with TF running.
+Announce Trusted Foundations version for debugging and documentation.
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 ---
- arch/arm/mach-tegra/reset-handler.S | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ arch/arm/firmware/trusted_foundations.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 805f306fa6f7..aae7f5961563 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -78,8 +78,20 @@ ENTRY(tegra_resume)
- 	orr	r1, r1, #1
- 	str	r1, [r0]
- #endif
-+#ifdef CONFIG_TRUSTED_FOUNDATIONS
-+	adr	r3, __tegra_smc_stack
-+	stmia	r3, {r4-r12, sp, lr}
+diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+index 81ff71b87438..105655802dfd 100644
+--- a/arch/arm/firmware/trusted_foundations.c
++++ b/arch/arm/firmware/trusted_foundations.c
+@@ -30,6 +30,8 @@
+ #define TF_CACHE_FLUSH		2
+ #define TF_CACHE_REENABLE	4
  
--#ifdef CONFIG_CACHE_L2X0
-+	mov	r0, #3	// local wake
-+	mov	r3, #0
-+	mov	r4, #0
-+	dsb
-+	.arch_extension	sec
-+	smc	#0
++#define TF_GET_PROTOCOL_VERSION	0xfffffffb
 +
-+	adr	r3, __tegra_smc_stack
-+	ldmia	r3, {r4-r12, sp, pc}
-+#elif defined(CONFIG_CACHE_L2X0)
- 	/* L2 cache resume & re-enable */
- 	bl	l2c310_early_resume
- #endif
-@@ -92,6 +104,16 @@ end_ca9_scu_l2_resume:
- ENDPROC(tegra_resume)
- #endif
+ #define TF_CPU_PM		0xfffffffc
+ #define TF_CPU_PM_S3		0xffffffe3
+ #define TF_CPU_PM_S2		0xffffffe6
+@@ -39,7 +41,7 @@
  
-+#ifdef CONFIG_TRUSTED_FOUNDATIONS
-+	.align L1_CACHE_SHIFT
-+	.type __tegra_smc_stack, %object
-+__tegra_smc_stack:
-+	.rept 11
-+	.long 0
-+	.endr
-+	.size __tegra_smc_stack, . - __tegra_smc_stack
-+#endif /* CONFIG_TRUSTED_FOUNDATIONS */
+ static unsigned long cpu_boot_addr;
+ 
+-static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
++static u64 __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+ {
+ 	asm volatile(
+ 		".arch_extension	sec\n\t"
+@@ -54,6 +56,7 @@ static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+ 		:
+ 		: "r" (type), "r" (arg1), "r" (arg2)
+ 		: "memory");
++	return 0;  /* silence gcc warning */
+ }
+ 
+ static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+@@ -106,6 +109,11 @@ static int tf_init_cache(void)
+ }
+ #endif /* CONFIG_CACHE_L2X0 */
+ 
++static u32 tf_get_protocol_version(void)
++{
++	return tf_generic_smc(TF_GET_PROTOCOL_VERSION, 0, 0) >> 48;
++}
 +
- 	.align L1_CACHE_SHIFT
- ENTRY(__tegra_cpu_reset_handler_start)
+ static const struct firmware_ops trusted_foundations_ops = {
+ 	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
+ 	.prepare_idle = tf_prepare_idle,
+@@ -116,6 +124,12 @@ static const struct firmware_ops trusted_foundations_ops = {
  
+ void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
+ {
++	unsigned int protocol = tf_get_protocol_version();
++
++	pr_info("TF: version %u.%u, protocol %u.%u\n",
++		pd->version_major, pd->version_minor,
++		protocol >> 8, protocol & 0xFF);
++
+ 	/*
+ 	 * we are not using version information for now since currently
+ 	 * supported SMCs are compatible with all TF releases
+@@ -141,5 +155,6 @@ void of_register_trusted_foundations(void)
+ 				   &pdata.version_minor);
+ 	if (err != 0)
+ 		panic("Trusted Foundation: missing version-minor property\n");
++
+ 	register_trusted_foundations(&pdata);
+ }
 -- 
 2.11.0
