@@ -1,113 +1,95 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 20 Jul 2017 14:48:58 +0100
-Subject: [PATCH 2/2] ARM: NOMMU: Wire-up default DMA interface
-In-Reply-To: <1500545999-17177-3-git-send-email-vladimir.murzin@arm.com>
-References: <1500545999-17177-1-git-send-email-vladimir.murzin@arm.com>
- <1500545999-17177-3-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <3872d014-7782-eac1-29ce-098d7e70ae07@arm.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Thu, 20 Jul 2017 21:49:47 +0800
+Subject: [PATCH v3 2/6] perf: hisi: Add support for HiSilicon SoC uncore
+ PMU driver
+In-Reply-To: <c7fe3dc9-4510-1821-d2db-2e52f311aacd@hisilicon.com>
+References: <1500364799-90518-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1500364799-90518-3-git-send-email-zhangshaokun@hisilicon.com>
+ <20170719171912.000031dd@huawei.com>
+ <c7fe3dc9-4510-1821-d2db-2e52f311aacd@hisilicon.com>
+Message-ID: <20170720214904.0000601b@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/07/17 11:19, Vladimir Murzin wrote:
-> The way how default DMA pool is exposed has changed and now we need to
-> use dedicated interface to work with it. This patch makes alloc/release
-> operations to use such interface. Since, default DMA pool is not
-> handled by generic code anymore we have to implement our own mmap
-> operation.
+On Thu, 20 Jul 2017 21:03:19 +0800
+Zhangshaokun <zhangshaokun@hisilicon.com> wrote:
+
+> Hi Jonathan
 > 
-> Tested-by: Andras Szemzo <sza@esh.hu>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-
-Looks like the right thing to do :)
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> ---
->  arch/arm/mm/dma-mapping-nommu.c | 45 ++++++++++++++++++++++++++++++++---------
->  1 file changed, 36 insertions(+), 9 deletions(-)
+> On 2017/7/19 17:19, Jonathan Cameron wrote:
+> > On Tue, 18 Jul 2017 15:59:55 +0800
+> > Shaokun Zhang <zhangshaokun@hisilicon.com> wrote:
+> >   
+> >> This patch adds support HiSilicon SoC uncore PMU driver framework and
+> >> interfaces.
+> >>
+> >> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> >> Signed-off-by: Anurup M <anurup.m@huawei.com>    
+> > A couple of minor things inline.
+> > 
+<snip>
+> >> +/* Generic pmu struct for different pmu types */
+> >> +struct hisi_pmu {
+> >> +	const char *name;
+> >> +	struct pmu pmu;
+> >> +	const struct hisi_uncore_ops *ops;
+> >> +	struct hisi_pmu_hwevents pmu_events;
+> >> +	cpumask_t cpus;
+> >> +	struct device *dev;
+> >> +	struct hlist_node node;
+> >> +	u32 scl_id;
+> >> +	u32 ccl_id;
+> >> +	/* Hardware information for different pmu types */
+> >> +	void __iomem *base;
+> >> +	union {
+> >> +		u32 ddrc_chn_id;
+> >> +		u32 l3c_tag_id;
+> >> +		u32 hha_uid;
+> >> +	};
+> >> +	int num_counters;
+> >> +	int num_events;
+> >> +	int counter_bits;
+> >> +};
+> >> +
+> >> +int hisi_uncore_pmu_counter_valid(struct hisi_pmu *hisi_pmu, int idx);
+> >> +int hisi_uncore_pmu_get_event_idx(struct perf_event *event);
+> >> +void hisi_uncore_pmu_clear_event_idx(struct hisi_pmu *hisi_pmu, int idx);    
+> > The above is only used in hisi_uncore_pmu.c so doesn't need to be here
+> > and can be static.
+> >   
 > 
-> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-> index 90ee354..6db5fc2 100644
-> --- a/arch/arm/mm/dma-mapping-nommu.c
-> +++ b/arch/arm/mm/dma-mapping-nommu.c
-> @@ -40,9 +40,21 @@ static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
->  
->  {
->  	const struct dma_map_ops *ops = &dma_noop_ops;
-> +	void *ret;
->  
->  	/*
-> -	 * We are here because:
-> +	 * Try generic allocator first if we are advertised that
-> +	 * consistency is not required.
-> +	 */
-> +
-> +	if (attrs & DMA_ATTR_NON_CONSISTENT)
-> +		return ops->alloc(dev, size, dma_handle, gfp, attrs);
-> +
-> +	ret = dma_alloc_from_global_coherent(size, dma_handle);
-> +
-> +	/*
-> +	 * dma_alloc_from_global_coherent() may fail because:
-> +	 *
->  	 * - no consistent DMA region has been defined, so we can't
->  	 *   continue.
->  	 * - there is no space left in consistent DMA region, so we
-> @@ -50,11 +62,8 @@ static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
->  	 *   advertised that consistency is not required.
->  	 */
->  
-> -	if (attrs & DMA_ATTR_NON_CONSISTENT)
-> -		return ops->alloc(dev, size, dma_handle, gfp, attrs);
-> -
-> -	WARN_ON_ONCE(1);
-> -	return NULL;
-> +	WARN_ON_ONCE(ret == NULL);
-> +	return ret;
->  }
->  
->  static void arm_nommu_dma_free(struct device *dev, size_t size,
-> @@ -63,14 +72,31 @@ static void arm_nommu_dma_free(struct device *dev, size_t size,
->  {
->  	const struct dma_map_ops *ops = &dma_noop_ops;
->  
-> -	if (attrs & DMA_ATTR_NON_CONSISTENT)
-> +	if (attrs & DMA_ATTR_NON_CONSISTENT) {
->  		ops->free(dev, size, cpu_addr, dma_addr, attrs);
-> -	else
-> -		WARN_ON_ONCE(1);
-> +	} else {
-> +		int ret = dma_release_from_global_coherent(get_order(size),
-> +							   cpu_addr);
-> +
-> +		WARN_ON_ONCE(ret == 0);
-> +	}
->  
->  	return;
->  }
->  
-> +static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-> +			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
-> +			      unsigned long attrs)
-> +{
-> +	int ret;
-> +
-> +	if (dma_mmap_from_global_coherent(vma, cpu_addr, size, &ret))
-> +		return ret;
-> +
-> +	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
-> +}
-> +
-> +
->  static void __dma_page_cpu_to_dev(phys_addr_t paddr, size_t size,
->  				  enum dma_data_direction dir)
->  {
-> @@ -173,6 +199,7 @@ static void arm_nommu_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist
->  const struct dma_map_ops arm_nommu_dma_ops = {
->  	.alloc			= arm_nommu_dma_alloc,
->  	.free			= arm_nommu_dma_free,
-> +	.mmap			= arm_nommu_dma_mmap,
->  	.map_page		= arm_nommu_dma_map_page,
->  	.unmap_page		= arm_nommu_dma_unmap_page,
->  	.map_sg			= arm_nommu_dma_map_sg,
+> These functions would be called in L3C/HHA/DDR PMU driver. We want to give a
+> uncore perf framework in hisi_uncore_pmu.c for hisilicon uncore PMUs.
+> 
+For all but the one function above that is true.  I couldn't find this one being
+used anywhere in those drivers.
+
+
+> Thanks.
+> Shaokun
+> 
+> >> +void hisi_uncore_pmu_read(struct perf_event *event);
+> >> +int hisi_uncore_pmu_add(struct perf_event *event, int flags);
+> >> +void hisi_uncore_pmu_del(struct perf_event *event, int flags);
+> >> +void hisi_uncore_pmu_start(struct perf_event *event, int flags);
+> >> +void hisi_uncore_pmu_stop(struct perf_event *event, int flags);
+> >> +void hisi_uncore_pmu_set_event_period(struct perf_event *event);
+> >> +u64 hisi_uncore_pmu_event_update(struct perf_event *event);
+> >> +int hisi_uncore_pmu_event_init(struct perf_event *event);
+> >> +int hisi_uncore_pmu_setup(struct hisi_pmu *hisi_pmu, const char *pmu_name);
+> >> +void hisi_uncore_pmu_enable(struct pmu *pmu);
+> >> +void hisi_uncore_pmu_disable(struct pmu *pmu);
+> >> +struct hisi_pmu *hisi_pmu_alloc(struct device *dev, u32 num_cntrs);
+> >> +ssize_t hisi_event_sysfs_show(struct device *dev,
+> >> +			      struct device_attribute *attr, char *buf);
+> >> +ssize_t hisi_format_sysfs_show(struct device *dev,
+> >> +			       struct device_attribute *attr, char *buf);
+> >> +ssize_t hisi_cpumask_sysfs_show(struct device *dev,
+> >> +				struct device_attribute *attr, char *buf);
+> >> +void hisi_read_scl_and_ccl_id(u32 *scl_id, u32 *ccl_id);
+> >> +#endif /* __HISI_UNCORE_PMU_H__ */    
+> > 
+> > 
+> > .
+> >   
 > 
