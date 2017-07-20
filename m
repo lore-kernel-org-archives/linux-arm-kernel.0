@@ -1,136 +1,115 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Thu, 20 Jul 2017 21:43:34 +1000
-Subject: [PATCH] powerpc/asm/cacheflush: Cleanup cacheflush function params
-In-Reply-To: <20170720062850.2195-1-matthew.brown.dev@gmail.com>
-References: <20170720062850.2195-1-matthew.brown.dev@gmail.com>
-Message-ID: <87mv7zgwpl.fsf@concordia.ellerman.id.au>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 20 Jul 2017 14:51:06 +0300
+Subject: [PATCH v7 3/3] clk: stm32h7: Add stm32h743 clock driver
+In-Reply-To: <11c37627-a39b-7f2d-d0d4-af312eac8668@st.com>
+References: <1500474344-9832-1-git-send-email-gabriel.fernandez@st.com>
+ <1500474344-9832-4-git-send-email-gabriel.fernandez@st.com>
+ <d999fc79-7b14-da8e-965f-371cf4352dd1@mleia.com>
+ <11c37627-a39b-7f2d-d0d4-af312eac8668@st.com>
+Message-ID: <c5264416-754b-6ec8-f9fb-3b0ac2ba3a58@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+Hi Gabriel,
 
-Thanks for tackling this mess.
+On 07/20/2017 11:31 AM, Gabriel FERNANDEZ wrote:
+> Hi Vladimir,
+> 
+> 
+> On 07/19/2017 11:20 PM, Vladimir Zapolskiy wrote:
+>> Hello Gabriel,
+>>
+>> On 07/19/2017 05:25 PM, gabriel.fernandez at st.com wrote:
+>>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>
+>>> This patch enables clocks for STM32H743 boards.
+>>>
+>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>
+>>> for MFD changes:
+>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>>
+>>> for DT-Bindings
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> ---
+>>>   .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |   82 ++
+>> I'll provide some review comments about device tree bindings only.
+>>
+>>>   drivers/clk/Makefile                               |    1 +
+>>>   drivers/clk/clk-stm32h7.c                          | 1409 ++++++++++++++++++++
+>>>   include/dt-bindings/clock/stm32h7-clks.h           |  165 +++
+>>>   include/dt-bindings/mfd/stm32h7-rcc.h              |  136 ++
+>>>   5 files changed, 1793 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>>>   create mode 100644 drivers/clk/clk-stm32h7.c
+>>>   create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
+>>>   create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>>> new file mode 100644
+>>> index 0000000..442c50c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>>> @@ -0,0 +1,82 @@
+>>> +STMicroelectronics STM32H7 Reset and Clock Controller
+>>> +=====================================================
+>>> +
+>>> +The RCC IP is both a reset and a clock controller.
+>>> +
+>>> +Please refer to clock-bindings.txt for common clock controller binding usage.
+>>> +Please also refer to reset.txt for common reset controller binding usage.
+>>> +
+>>> +Required properties:
+>>> +- compatible: Should be:
+>>> +  "st,stm32h743-rcc"
+>>> +
+>>> +- reg: should be register base and length as documented in the
+>>> +  datasheet
+>>> +
+>>> +- #reset-cells: 1, see below
+>>> +
+>>> +- #clock-cells : from common clock binding; shall be set to 1
+>>> +
+>>> +- clocks: External oscillator clock phandle
+>>> +  - high speed external clock signal (HSE)
+>>> +  - low speed external clock signal (LSE)
+>>> +  - external I2S clock (I2S_CKIN)
+>>> +
+>>> +Optional properties:
+>>> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
+>>> +  write protection (RTC clock).
+>>> +
+>>> +Example:
+>>> +
+>>> +	rcc: rcc at 58024400 {
+>> 'rcc' as a generic device node name is awkward.
+>>
+>> I believe the main function of the device is clock controller (unlikely
+>> a generic reset controller can be converted into a clock controller),
+>> the locations of the document and device driver also indicate that
+>> primarily it is a clock controller, so I suggest to replace device node
+>> name with 'clock-controller' like below:
+> I prefer to keep rcc node name, to be coherent with the other ST 
+> platforms (STM32F4/F7)
 
-Matt Brown <matthew.brown.dev@gmail.com> writes:
-> The cacheflush prototypes currently use start and stop values and each
-> call requires typecasting the address to an unsigned long.
-> This patch changes the cacheflush prototypes to follow the x86 style of
-> using a base and size values, with base being a void pointer.
->
-> All callers of the cacheflush functions, including drivers, have been
-> modified to conform to the new prototypes.
->
-> The 64 bit cacheflush functions which were implemented in assembly code
-> (flush_dcache_range, flush_inval_dcache_range) have been translated into
-> C for readability and coherence.
->
-> Signed-off-by: Matt Brown <matthew.brown.dev@gmail.com>
-> ---
->  arch/powerpc/include/asm/cacheflush.h        | 47 +++++++++++++++++--------
->  arch/powerpc/kernel/misc_64.S                | 52 ----------------------------
->  arch/powerpc/mm/dma-noncoherent.c            | 15 ++++----
->  arch/powerpc/platforms/512x/mpc512x_shared.c | 10 +++---
->  arch/powerpc/platforms/85xx/smp.c            |  6 ++--
->  arch/powerpc/sysdev/dart_iommu.c             |  5 +--
->  drivers/ata/pata_bf54x.c                     |  3 +-
->  drivers/char/agp/uninorth-agp.c              |  6 ++--
->  drivers/gpu/drm/drm_cache.c                  |  3 +-
->  drivers/macintosh/smu.c                      | 15 ++++----
->  drivers/mmc/host/bfin_sdh.c                  |  3 +-
->  drivers/mtd/nand/bf5xx_nand.c                |  6 ++--
->  drivers/soc/fsl/qbman/dpaa_sys.h             |  2 +-
->  drivers/soc/fsl/qbman/qman_ccsr.c            |  3 +-
->  drivers/spi/spi-bfin5xx.c                    | 10 +++---
->  drivers/tty/serial/mpsc.c                    | 46 ++++++++----------------
->  drivers/usb/musb/blackfin.c                  |  6 ++--
+the thing is, a device node name is expected to comply with ePAPR or
+the devicetree specification, which says
 
-I think you want to trim that to powerpc only drivers for now at least.
+	The name of a node should be somewhat generic, reflecting
+	the function of the device and not its precise programming model.
 
-> diff --git a/arch/powerpc/include/asm/cacheflush.h b/arch/powerpc/include/asm/cacheflush.h
-> index 11843e3..b8f04c3 100644
-> --- a/arch/powerpc/include/asm/cacheflush.h
-> +++ b/arch/powerpc/include/asm/cacheflush.h
-> @@ -51,13 +51,13 @@ static inline void __flush_dcache_icache_phys(unsigned long physaddr)
->   * Write any modified data cache blocks out to memory and invalidate them.
->   * Does not invalidate the corresponding instruction cache blocks.
->   */
-> -static inline void flush_dcache_range(unsigned long start, unsigned long stop)
-> +static inline void flush_dcache_range(void *start, unsigned long size)
->  {
-> -	void *addr = (void *)(start & ~(L1_CACHE_BYTES - 1));
-> -	unsigned long size = stop - (unsigned long)addr + (L1_CACHE_BYTES - 1);
-> +	void *addr = (void *)((u32)start & ~(L1_CACHE_BYTES - 1));
+If devicetree and CCF maintainers are fine with 'rcc', I won't object,
+my role is just to emphasize the found issue and recommend to use another
+and more common name 'clock-controller', it is a simple and fortunately
+backward compatible change to other ST platforms as well.
 
-unsigned long would be nicer than u32.
+>> 	rcc: clock-controller at 58024400 {
+>>
+>>> +		#reset-cells = <1>;
+>>> +		#clock-cells = <2>
+>> Missing trailing semicolon       ^^^
+> ok
 
-And ALIGN_DOWN() should work here I think.
-
-> +	unsigned long len = size + (L1_CACHE_BYTES - 1);
-
-And ALIGN?
-
-> @@ -83,22 +83,39 @@ static inline void clean_dcache_range(unsigned long start, unsigned long stop)
->   * to invalidate the cache so the PPC core doesn't get stale data
->   * from the CPM (no cache snooping here :-).
->   */
-> -static inline void invalidate_dcache_range(unsigned long start,
-> -					   unsigned long stop)
-> +static inline void invalidate_dcache_range(void *start, unsigned long size)
->  {
-> -	void *addr = (void *)(start & ~(L1_CACHE_BYTES - 1));
-> -	unsigned long size = stop - (unsigned long)addr + (L1_CACHE_BYTES - 1);
-> +	void *addr = (void *)((u32)start & ~(L1_CACHE_BYTES - 1));
-> +	unsigned long len = size + (L1_CACHE_SHIFT - 1);
->  	unsigned long i;
->  
-> -	for (i = 0; i < size >> L1_CACHE_SHIFT; i++, addr += L1_CACHE_BYTES)
-> +	for (i = 0; i < len >> L1_CACHE_SHIFT; i++, addr += L1_CACHE_BYTES)
->  		dcbi(addr);
->  	mb();	/* sync */
->  }
->  
->  #endif /* CONFIG_PPC32 */
->  #ifdef CONFIG_PPC64
-> -extern void flush_dcache_range(unsigned long start, unsigned long stop);
-> -extern void flush_inval_dcache_range(unsigned long start, unsigned long stop);
-> +static inline void flush_dcache_range(void *start, unsigned long size)
-> +{
-> +	void *addr = (void *)((u64)start & ~(L1_CACHE_BYTES - 1));
-> +	unsigned long len = size + (L1_CACHE_BYTES - 1);
-> +	unsigned long i;
-> +
-> +	for (i = 0; i < len >> L1_CACHE_SHIFT; i++, addr += L1_CACHE_BYTES)
-> +		dcbf(addr);
-> +	mb();	/* sync */
-> +}
-
-I'd probably prefer a precursor patch to do the asm -> C conversion, but
-I guess that's a pain because then you have to implement both the old
-and new logic in C.
-
-Also L1_CACHE_SHIFT is not necessarily == DCACHEL1BLOCKSIZE.
-
-Finally it would be good to see what code the compiler generates out of
-this, and see how it compares to the asm version. Not because it's
-particularly performance critical (hopefully) but just so we know.
-
-> diff --git a/arch/powerpc/platforms/512x/mpc512x_shared.c b/arch/powerpc/platforms/512x/mpc512x_shared.c
-> index 6b4f4cb..0f3a7d9 100644
-> --- a/arch/powerpc/platforms/512x/mpc512x_shared.c
-> +++ b/arch/powerpc/platforms/512x/mpc512x_shared.c
-> @@ -254,8 +254,8 @@ static void __init mpc512x_init_diu(void)
->  	}
->  	memcpy(&diu_shared_fb.ad0, vaddr, sizeof(struct diu_ad));
->  	/* flush fb area descriptor */
-> -	dst = (unsigned long)&diu_shared_fb.ad0;
-> -	flush_dcache_range(dst, dst + sizeof(struct diu_ad) - 1);
-> +	dst = &diu_shared_fb.ad0;
-
-Do you even need dst anymore?
-
-> +	flush_dcache_range(dst, sizeof(struct diu_ad) - 1);
-                                                        ^
-                  You shouldn't be subtracting 1 any more.
-
-
-cheers
+--
+With best wishes,
+Vladimir
