@@ -1,171 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Jul 2017 15:34:48 +0200
-Subject: [PATCH 07/18] drm/sun4i: tcon: Don't rely on encoders to set the
- TCON mode
-In-Reply-To: <CAGb2v66d500j5YWFbTYn_BZcF_q=sM+hr2q+yJ88OmL_j4DVPg@mail.gmail.com>
-References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
- <31e3fd8540d85c8f4637af1083c5c2a436403cd2.1499955058.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v66d500j5YWFbTYn_BZcF_q=sM+hr2q+yJ88OmL_j4DVPg@mail.gmail.com>
-Message-ID: <20170720133448.uywpaps4xcbgk7rp@flea>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 20 Jul 2017 19:06:47 +0530
+Subject: [PATCH 00/16] omap_hsmmc: Add ADMA support and UHS/HS200/DDR
+ support
+In-Reply-To: <fc9c1576-7419-b174-ea42-97ccf4666cee@ti.com>
+References: <20170616124544.15046-1-kishon@ti.com>
+ <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
+ <fc9c1576-7419-b174-ea42-97ccf4666cee@ti.com>
+Message-ID: <27776609-2425-9423-3eaa-dc128c4b07f0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 11:56:18AM +0800, Chen-Yu Tsai wrote:
-> On Thu, Jul 13, 2017 at 10:13 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Just like we did for the TCON enable and disable, for historical reasons we
-> > used to rely on the encoders calling the TCON mode_set function, while the
-> > CRTC has a callback for that.
-> >
-> > Let's implement it in order to reduce the boilerplate code.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_crtc.c          | 11 ++++-
-> >  drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c  |  1 +-
-> >  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c      |  7 +---
-> >  drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c |  1 +-
-> >  drivers/gpu/drm/sun4i/sun4i_rgb.c           | 15 +------
-> >  drivers/gpu/drm/sun4i/sun4i_tcon.c          | 56 ++++++++++------------
-> >  drivers/gpu/drm/sun4i/sun4i_tcon.h          | 10 +----
-> >  drivers/gpu/drm/sun4i/sun4i_tv.c            |  6 +--
-> >  8 files changed, 40 insertions(+), 67 deletions(-)
-> >
-> 
-> [...]
-> 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > index dc70bc2a42a5..c4407910dfaf 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > @@ -106,29 +106,6 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
-> >  }
-> >  EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
-> >
-> > -void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
-> > -                       struct drm_encoder *encoder)
-> > -{
-> > -       u32 val;
-> > -
-> > -       if (!tcon->quirks->has_unknown_mux)
-> > -               return;
-> > -
-> > -       if (channel != 1)
-> > -               return;
-> > -
-> > -       if (encoder->encoder_type == DRM_MODE_ENCODER_TVDAC)
-> > -               val = 1;
-> > -       else
-> > -               val = 0;
-> > -
-> > -       /*
-> > -        * FIXME: Undocumented bits
-> > -        */
-> > -       regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, val);
-> > -}
-> > -EXPORT_SYMBOL(sun4i_tcon_set_mux);
-> > -
-> >  static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
-> >                                     int channel)
-> >  {
-> > @@ -147,8 +124,8 @@ static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
-> >         return delay;
-> >  }
-> >
-> > -void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
-> > -                         struct drm_display_mode *mode)
-> > +static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
-> > +                                struct drm_display_mode *mode)
-> 
-> Nit on the side: maybe we could mark mode as constant?
-> Since the function doesn't change it. Same applies to the
-> other mode_set functions. But this could be left to another
-> patch.
+Hi Ulf,
 
-We totally should. I'll do it.
-
-> >  {
-> >         unsigned int bp, hsync, vsync;
-> >         u8 clk_delay;
-> > @@ -221,10 +198,9 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
-> >         /* Enable the output on the pins */
-> >         regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0);
-> >  }
-> > -EXPORT_SYMBOL(sun4i_tcon0_mode_set);
-> >
-> > -void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
-> > -                         struct drm_display_mode *mode)
-> > +static void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
-> > +                                struct drm_display_mode *mode)
-> >  {
-> >         unsigned int bp, hsync, vsync, vtotal;
-> >         u8 clk_delay;
-> > @@ -312,7 +288,29 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
-> >                            SUN4I_TCON_GCTL_IOMAP_MASK,
-> >                            SUN4I_TCON_GCTL_IOMAP_TCON1);
-> >  }
-> > -EXPORT_SYMBOL(sun4i_tcon1_mode_set);
-> > +
-> > +void sun4i_tcon_mode_set(struct sun4i_tcon *tcon, struct drm_encoder *encoder,
-> > +                        struct drm_display_mode *mode)
+On Tuesday 11 July 2017 07:27 PM, Kishon Vijay Abraham I wrote:
+> Hi Ulf,
 > 
-> (also mark encoder as const?)
-
-Yep.
-
-> > +{
-> > +       switch (encoder->encoder_type) {
-> > +       case DRM_MODE_ENCODER_NONE:
-> > +               sun4i_tcon0_mode_set(tcon, mode);
-> > +               break;
-> > +       case DRM_MODE_ENCODER_TVDAC:
-> > +               /*
-> > +                * FIXME: Undocumented bits
-> > +                */
-> > +               if (tcon->quirks->has_unknown_mux)
-> > +                       regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
-> > +               /* Fallthrough */
-> > +       case DRM_MODE_ENCODER_TMDS:
-> > +               sun4i_tcon1_mode_set(tcon, mode);
+> On Tuesday 11 July 2017 06:40 PM, Ulf Hansson wrote:
+>> On 16 June 2017 at 14:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> This is the final part of the series originally sent as
+>>> part of [2].
+>>>
+>>> This series adds UHS, HS200, DDR mode and ADMA support to
+>>> omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
+>>> SoCs.
+>>>
+>>> Changes from [2]:
+>>> *) No more updating omap2plus_defconfig or multi_v7_defconfig is
+>>>    required, so those patches are removed.
+>>> *) Addressed Rob Herring's comment on implementing a function
+>>>    instead of having a macro while getting pinctrl state.
+>>>
+>>> This series is created on top of [3], [4], [5] AND [6]
+>>> (i.e after
+>>>   ARM: dts: omap3-overo: Remove "vqmmc-supply" property from MMC dt node
+>>>   omap_hsmmc: use mmc_regulator_get_supply() to get regulators
+>>>   omap*: Fixes/Cleanups for MMC devicetree node
+>>>   ARM: dts: Add iodelay data for MMC)
+>>>
+>>> The functionality implemented in this series was sent before ([1]) but
+>>> was never followed up since supporting high speed modes in dra7 required
+>>> IODelay values to be configured. With IODelay driver being merged into
+>>> kernel, sending it as a fresh series with support for configuring IODelay
+>>> values.
+>>
+>> Is it safe to queue this via mmc tree for 4.14 or is there a
+>> dependency I must consider? The above didn't quite tell me that, could
+>> you please elaborate.
 > 
-> IIRC you need to clear the mux bit here. So ...
+> There is a dependency with https://www.spinics.net/lists/arm-kernel/msg586215.html.
 > 
-> > +               break;
-> > +       default:
-> > +               DRM_DEBUG_DRIVER("Unknown encoder type, doing nothing...\n");
-> > +       }
+> I'll resend the series after all the platform data specific stuff is merged.
+>>
+>>>
+>>> Suggestions of migrating to sdhci driver (from omap_hsmmc driver) is not
+>>> addressed since
+>>> *) tuning ratio of MMC in dra7 is different from sdhci
+>>> *) IOdelay is required for dra7
+>>> *) GPIO based card detect is not supported in sdhci
+>>
+>> Lots of sdhci drivers calls mmc_of_parse(), and uses the mmc slot gpio
+>> APIs, so I don't this this is correct statement.
+>>
+>>> *) Some of the registers don't always have correct values as in sdhci
+>>>    (like PSTATE).
+>>> Supporting all of these in sdhci will result in adding lot of quirks in
+>>> sdhci driver.
+>>
+>> Is it really that much different? It would be nice if some really took
+>> on the challenge of converting omap_hsmmc into an sdhci variant.
 > 
-> I think keeping the muxing in a separate function would be cleaner.
-> The above is already slightly messy if you add the bit clearing part.
-> With all the other muxing possibilities in the other SoC this is
-> going to get really messy.
+> Okay. I'll give that a shot and see how far I can get.
 
-Ok.
+I created a sdhci variant and was able to get it working with high speed mode
+in dra7.
 
-> > +}
-> > +EXPORT_SYMBOL(sun4i_tcon_mode_set);
-> >
-> >  static void sun4i_tcon_finish_page_flip(struct drm_device *dev,
-> >                                         struct sun4i_crtc *scrtc)
-> 
-> [...]
-> 
-> Thanks for working on this. Now we've decoupled the TCON/CRTC code
-> from all the encoders.
+I have a query on sdhci_set_power_noreg() in sdhci.c. sdhci_set_power_noreg
+sets SDHCI_POWER_CONTROL based on *vdd* value. However SDHCI_POWER_CONTROL is
+for setting bus voltage and need not be based on *vdd*. IMHO
+SDHCI_POWER_CONTROL should be set based on "ios->signal_voltage".
 
-Yeah, I still have mixed feelings about this, but it was the sensible
-thing I guess.
+Let me know if my understanding is wrong.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/32a179b5/attachment-0001.sig>
+Thanks
+Kishon
