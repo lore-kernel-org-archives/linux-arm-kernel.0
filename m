@@ -1,50 +1,69 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jul 2017 17:45:55 +0200
-Subject: [PATCH 01/12] ARM: ixp4xx: fix ioport_unmap definition
+Date: Thu, 20 Jul 2017 17:51:42 +0200
+Subject: [PATCH 04/12] ARM: sa1100/pxa: fix MTD_XIP build
 In-Reply-To: <20170720154616.3250481-1-arnd@arndb.de>
 References: <20170720154616.3250481-1-arnd@arndb.de>
-Message-ID: <20170720154616.3250481-2-arnd@arndb.de>
+Message-ID: <20170720155209.3250880-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An empty macro definition can cause unexpected behavior, in
-case of the ixp4xx ioport_unmap, we get two warnings:
+In commit 3169663ac5902 "ARM: sa11x0/pxa: convert OS timer registers
+to IOMEM", the definition of the OSCR macro was changed to be an
+__iomem pointer, but the same register is also used by the XIP
+code. This patch does the corresponding change here as well.
 
-drivers/net/wireless/marvell/libertas/if_cs.c: In function 'if_cs_release':
-drivers/net/wireless/marvell/libertas/if_cs.c:826:3: error: suggest braces around empty body in an 'if' statement [-Werror=empty-body]
-   ioport_unmap(card->iobase);
-drivers/vfio/pci/vfio_pci_rdwr.c: In function 'vfio_pci_vga_rw':
-drivers/vfio/pci/vfio_pci_rdwr.c:230:15: error: the omitted middle operand in ?: will always be 'true', suggest explicit middle operand [-Werror=parentheses]
-   is_ioport ? ioport_unmap(iomem) : iounmap(iomem);
+On PXA, the IRQ register definitions were removed even earlier, in
+commit 5d284e353eb1 ("ARM: pxa: avoid accessing interrupt registers
+directly"). This patch unfortunately brings some of that back. An
+earlier version of my patch moved the code into an external function,
+which could not work for CONFIG_XIP_KERNEL+CONFIG_MTD_XIP, so this
+restores something close to the original code.
 
-This uses an inline function to define the macro in a safer way.
-
+Link: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241716.html
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-ixp4xx/include/mach/io.h | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+---
+ arch/arm/mach-pxa/include/mach/mtd-xip.h    | 10 +++++++---
+ arch/arm/mach-sa1100/include/mach/mtd-xip.h |  4 ++--
+ 2 files changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index 7a0c13bf4269..2f84c26a6758 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -523,8 +523,15 @@ static inline void iowrite32_rep(void __iomem *addr, const void *vaddr,
- #endif
- }
+diff --git a/arch/arm/mach-pxa/include/mach/mtd-xip.h b/arch/arm/mach-pxa/include/mach/mtd-xip.h
+index 990d2bf2fb45..f0d40bd36bac 100644
+--- a/arch/arm/mach-pxa/include/mach/mtd-xip.h
++++ b/arch/arm/mach-pxa/include/mach/mtd-xip.h
+@@ -17,11 +17,15 @@
  
--#define	ioport_map(port, nr)		((void __iomem*)(port + PIO_OFFSET))
--#define	ioport_unmap(addr)
-+#define ioport_map(port, nr) ioport_map(port, nr)
-+static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
-+{
-+	return ((void __iomem*)((port) + PIO_OFFSET));
-+}
-+#define	ioport_unmap(addr) ioport_unmap(addr)
-+static inline void ioport_unmap(void __iomem *addr)
-+{
-+}
- #endif /* CONFIG_PCI */
+ #include <mach/regs-ost.h>
  
- #endif /* __ASM_ARM_ARCH_IO_H */
+-#define xip_irqpending()	(ICIP & ICMR)
++/* restored July 2017, this did not build since 2011! */
++
++#define ICIP			io_p2v(0x40d00000)
++#define ICMR			io_p2v(0x40d00004)
++#define xip_irqpending()	readl(ICIP) & readl(ICMR)
+ 
+ /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
+-#define xip_currtime()		(OSCR)
+-#define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
++#define xip_currtime()		readl(OSCR)
++#define xip_elapsed_since(x)	(signed)((readl(OSCR) - (x)) / 4)
+ 
+ /*
+  * xip_cpu_idle() is used when waiting for a delay equal or larger than
+diff --git a/arch/arm/mach-sa1100/include/mach/mtd-xip.h b/arch/arm/mach-sa1100/include/mach/mtd-xip.h
+index b3d684098fbf..cb76096a2e36 100644
+--- a/arch/arm/mach-sa1100/include/mach/mtd-xip.h
++++ b/arch/arm/mach-sa1100/include/mach/mtd-xip.h
+@@ -20,7 +20,7 @@
+ #define xip_irqpending()	(ICIP & ICMR)
+ 
+ /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
+-#define xip_currtime()		(OSCR)
+-#define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
++#define xip_currtime()		readl_relaxed(OSCR)
++#define xip_elapsed_since(x)	(signed)((readl_relaxed(OSCR) - (x)) / 4)
+ 
+ #endif /* __ARCH_SA1100_MTD_XIP_H__ */
 -- 
 2.9.0
