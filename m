@@ -1,38 +1,81 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 20 Jul 2017 10:18:18 +0530
-Subject: [PATCH v2 4/5] clk: qcom: gcc-msm8996: Mark gcc_mmss_noc_cfg_ahb_clk
- as a critical clock
+Date: Thu, 20 Jul 2017 10:18:19 +0530
+Subject: [PATCH v2 5/5] clk: qcom: mmcc-8996: Associate all mmagic clks with
+ mmagic gdscs
 In-Reply-To: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
 References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1500526099-9935-5-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1500526099-9935-6-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we have gcc_mmss_noc_cfg_ahb_clk marked with a CLK_IGNORE_UNUSED. While
-this can prevent it from being disabled while its unused, it does not
-prevent it from being disabled when a child derived from the clock calls
-an explicit enable/disable.
-Mark this with a CLK_IS_CRITICAL and remove the CLK_IGNORE_UNUSED flag
-so its never disabled.
+With support added to control clocks associated with a gdsc from within
+the gdsc driver, associate all mmagic clock instances with the respective
+mmagic gdscs so devices inside these mmagic domains do not have to control
+them individually.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/gcc-msm8996.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/qcom/mmcc-msm8996.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/drivers/clk/qcom/gcc-msm8996.c b/drivers/clk/qcom/gcc-msm8996.c
-index 8abc200..8872985 100644
---- a/drivers/clk/qcom/gcc-msm8996.c
-+++ b/drivers/clk/qcom/gcc-msm8996.c
-@@ -1333,7 +1333,7 @@ enum {
- 			.name = "gcc_mmss_noc_cfg_ahb_clk",
- 			.parent_names = (const char *[]){ "config_noc_clk_src" },
- 			.num_parents = 1,
--			.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
-+			.flags = CLK_SET_RATE_PARENT | CLK_IS_CRITICAL,
- 			.ops = &clk_branch2_ops,
- 		},
+diff --git a/drivers/clk/qcom/mmcc-msm8996.c b/drivers/clk/qcom/mmcc-msm8996.c
+index 352394d..9d2d34b 100644
+--- a/drivers/clk/qcom/mmcc-msm8996.c
++++ b/drivers/clk/qcom/mmcc-msm8996.c
+@@ -2902,6 +2902,13 @@ enum {
+ 	.pd = {
+ 		.name = "mmagic_video",
  	},
++	.clk_hws = {
++		&mmss_mmagic_ahb_clk.clkr.hw,
++		&mmss_mmagic_cfg_ahb_clk.clkr.hw,
++		&mmagic_video_axi_clk.clkr.hw,
++		&mmagic_video_noc_cfg_ahb_clk.clkr.hw,
++	},
++	.clk_count = 4,
+ 	.pwrsts = PWRSTS_OFF_ON,
+ 	.flags = VOTABLE,
+ };
+@@ -2912,6 +2919,13 @@ enum {
+ 	.pd = {
+ 		.name = "mmagic_mdss",
+ 	},
++	.clk_hws = {
++		&mmss_mmagic_ahb_clk.clkr.hw,
++		&mmss_mmagic_cfg_ahb_clk.clkr.hw,
++		&mmagic_mdss_axi_clk.clkr.hw,
++		&mmagic_mdss_noc_cfg_ahb_clk.clkr.hw,
++	},
++	.clk_count = 4,
+ 	.pwrsts = PWRSTS_OFF_ON,
+ 	.flags = VOTABLE,
+ };
+@@ -2922,6 +2936,13 @@ enum {
+ 	.pd = {
+ 		.name = "mmagic_camss",
+ 	},
++	.clk_hws = {
++		&mmss_mmagic_ahb_clk.clkr.hw,
++		&mmss_mmagic_cfg_ahb_clk.clkr.hw,
++		&mmagic_camss_axi_clk.clkr.hw,
++		&mmagic_camss_noc_cfg_ahb_clk.clkr.hw,
++	},
++	.clk_count = 4,
+ 	.pwrsts = PWRSTS_OFF_ON,
+ 	.flags = VOTABLE,
+ };
+@@ -3056,6 +3077,11 @@ enum {
+ 	.pd = {
+ 		.name = "gpu_gx",
+ 	},
++	.clk_hws = {
++		&mmss_mmagic_ahb_clk.clkr.hw,
++		&mmss_mmagic_cfg_ahb_clk.clkr.hw,
++	},
++	.clk_count = 2,
+ 	.pwrsts = PWRSTS_OFF_ON,
+ 	.flags = CLAMP_IO,
+ };
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
