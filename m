@@ -1,58 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Jul 2017 15:08:01 +0200
-Subject: [PATCH 03/18] drm/sun4i: Realign Makefile padding and reorder it
-In-Reply-To: <CAGb2v67HmUpSaoJWS6jKg3JvsPmqMtv30EGdWE50YEPm2cyjcg@mail.gmail.com>
-References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
- <fd70853df9e7ee66a20df9d42921f1f6608a2bc9.1499955058.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67HmUpSaoJWS6jKg3JvsPmqMtv30EGdWE50YEPm2cyjcg@mail.gmail.com>
-Message-ID: <20170720130801.iyhlzu4zhbyso24y@flea>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Jul 2017 14:08:47 +0100
+Subject: [PATCH v3 1/6] Documentation: perf: hisi: Documentation for
+ HiSilicon SoC PMU driver
+In-Reply-To: <c5c552e2-94e2-9390-9cda-2573844b926d@hisilicon.com>
+References: <1500364799-90518-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1500364799-90518-2-git-send-email-zhangshaokun@hisilicon.com>
+ <20170719171748.00005866@huawei.com>
+ <c5c552e2-94e2-9390-9cda-2573844b926d@hisilicon.com>
+Message-ID: <20170720130847.GB16356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 11:13:53AM +0800, Chen-Yu Tsai wrote:
-> On Thu, Jul 13, 2017 at 10:12 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Some options were not padded as they should, and the order in the Makefile
-> > was chaotic. Fix that.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/Makefile | 26 +++++++++++++-------------
-> >  1 file changed, 13 insertions(+), 13 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-> > index e29fd3a2ba9c..42871ee7acf6 100644
-> > --- a/drivers/gpu/drm/sun4i/Makefile
-> > +++ b/drivers/gpu/drm/sun4i/Makefile
-> > @@ -1,23 +1,23 @@
-> > -sun4i-drm-y += sun4i_drv.o
-> > -sun4i-drm-y += sun4i_framebuffer.o
-> > +sun4i-backend-y                        += sun4i_backend.o sun4i_layer.o
-> >
-> > -sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
-> > -sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
-> > -sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
-> > +sun4i-drm-y                    += sun4i_drv.o
-> > +sun4i-drm-y                    += sun4i_framebuffer.o
+On Thu, Jul 20, 2017 at 08:54:36PM +0800, Zhangshaokun wrote:
+> On 2017/7/19 17:17, Jonathan Cameron wrote:
+> >> +Super CPU cluster (SCCL) and is made up of 6 CCLs. Each SCCL has two HHAs
+> >> +(0 - 1) and four DDRCs (0 - 3), respectively.
+> >> +
+> >> +HiSilicon SoC uncore PMU driver
+> >> +---------------------------------------
+> >> +Each device PMU has separate registers for event counting, control and
+> >> +interrupt, and the PMU driver shall register perf PMU drivers like L3C,
+> >> +HHA and DDRC etc. The available events and configuration options shall
+> >> +be described in the sysfs, see /sys/devices/hisi_*.  
+> > Is there not a subsystem directory that would make more sense to
+> > refer to than the full device list?
+> > 
 > 
-> I don't think this applies on top of Jonathan's HDMI I2C patch
-> you already have queued up.
-> 
-> Also you might want to leave a comment describe what the
-> ordering should be. Otherwise it will still be messed up
-> down the road.
+> For uncore devices, it is more reasonable to list in /sys/devices/***.
 
-Good point, I'll do that, thanks!
-Maxime
+The usual place for these things is /sys/bus/event_source/devices/<pmu name>.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/d022960e/attachment.sig>
+The events are described as files under the events directory (one file per
+event, which describes the encoding) and you can describe other things such
+as formatting and/or capabilities under other directories too.
+
+Take a look at some other PMU drivers to get an idea of how it works.
+
+Will
