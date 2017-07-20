@@ -1,82 +1,62 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jul 2017 17:45:54 +0200
-Subject: [PATCH 00/12] ARM: randconfig patches for platforms
-Message-ID: <20170720154616.3250481-1-arnd@arndb.de>
+Date: Thu, 20 Jul 2017 17:51:45 +0200
+Subject: [PATCH 07/12] ARM: omap1: avoid unused variable warning
+In-Reply-To: <20170720154616.3250481-1-arnd@arndb.de>
+References: <20170720154616.3250481-1-arnd@arndb.de>
+Message-ID: <20170720155209.3250880-4-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've gone through a lot of older patches in my randconfig test
-tree, to see which ones are still needed to fix warnings we
-get in mainline.
+The osk_mistral_init() contains code that is only compiled when
+CONFIG_PM is set, but it uses a variable that is declared outside
+of the #ifdef:
 
-It seems that I posted one series in early 2016 and applied
-the patches to my test tree, but never followed up on them.
-Some other patches in this series are newer than that and
-didn't make it in for some other reason.
+arch/arm/mach-omap1/board-osk.c: In function 'osk_mistral_init':
+arch/arm/mach-omap1/board-osk.c:513:7: warning: unused variable 'ret' [-Wunused-variable]
 
-Please have another look. If there are no objections, I'd
-add them to the fixes-non-critical branch for the next merge
-window. None of these seem to be of any importance other than
-to shut up the warnings.
+This removes the #ifdef around the user of the variable,
+make it always used.
 
-       Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Suggested-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/mach-omap1/board-osk.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Arnd Bergmann (12):
-  ARM: ixp4xx: fix ioport_unmap definition
-  ARM: ep93xx: use ARM_PATCH_PHYS_VIRT
-  ARM: normalize clk API for older platforms
-  ARM: sa1100/pxa: fix MTD_XIP build
-  ARM: mmp: mark usb_dma_mask as __maybe_unused
-  ARM: omap2: mark unused functions as __maybe_unused
-  ARM: omap1: avoid unused variable warning
-  ARM: sirf: mark sirfsoc_init_late as __maybe_unused
-  ARM: ixp4xx: use normal prototype for {read,write}s{b,w,l}
-  [v2] ARM: s3c24xx: make H1940BT depend on RFKILL
-  ARM: omap1/ams-delta: warn about failed regulator enable
-  ARM: rpc: rename RAM_SIZE macro
-
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Alexander Sverdlin <alexander.sverdlin@gmail.com>
-Cc: Imre Kaloz <kaloz@openwrt.org>
-Cc: Krzysztof Halasa <khalasa@piap.pl>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Barry Song <baohua@kernel.org>
-Cc: Daniel Mack <daniel@zonque.org>
-Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Wan ZongShun <mcuos.com@gmail.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-omap at vger.kernel.org
-Cc: linux-samsung-soc at vger.kernel.org
-
-
- arch/arm/Kconfig                            |  2 +-
- arch/arm/mach-davinci/clock.c               |  6 +++++
- arch/arm/mach-ep93xx/clock.c                | 21 ++++++++++++++++++
- arch/arm/mach-ixp4xx/include/mach/io.h      | 34 ++++++++++++++++++++++-------
- arch/arm/mach-mmp/clock.c                   | 22 +++++++++++++++++++
- arch/arm/mach-mmp/devices.c                 |  2 +-
- arch/arm/mach-omap1/board-ams-delta.c       | 12 ++++++++--
- arch/arm/mach-omap1/board-osk.c             |  4 ----
- arch/arm/mach-omap2/board-generic.c         |  2 +-
- arch/arm/mach-omap2/io.c                    |  2 +-
- arch/arm/mach-prima2/common.c               |  2 +-
- arch/arm/mach-pxa/include/mach/mtd-xip.h    | 10 ++++++---
- arch/arm/mach-rpc/include/mach/hardware.h   |  4 ++--
- arch/arm/mach-s3c24xx/Kconfig               |  2 +-
- arch/arm/mach-sa1100/clock.c                | 29 ++++++++++++++++++++++++
- arch/arm/mach-sa1100/include/mach/mtd-xip.h |  4 ++--
- arch/arm/mach-w90x900/clock.c               | 29 ++++++++++++++++++++++++
- 17 files changed, 160 insertions(+), 27 deletions(-)
-
+diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+index 4dfb99504810..95ac1929aede 100644
+--- a/arch/arm/mach-omap1/board-osk.c
++++ b/arch/arm/mach-omap1/board-osk.c
+@@ -441,13 +441,11 @@ static struct spi_board_info __initdata mistral_boardinfo[] = { {
+ 	.chip_select		= 0,
+ } };
+ 
+-#ifdef	CONFIG_PM
+ static irqreturn_t
+ osk_mistral_wake_interrupt(int irq, void *ignored)
+ {
+ 	return IRQ_HANDLED;
+ }
+-#endif
+ 
+ static void __init osk_mistral_init(void)
+ {
+@@ -515,7 +513,6 @@ static void __init osk_mistral_init(void)
+ 
+ 		gpio_direction_input(OMAP_MPUIO(2));
+ 		irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
+-#ifdef	CONFIG_PM
+ 		/* share the IRQ in case someone wants to use the
+ 		 * button for more than wakeup from system sleep.
+ 		 */
+@@ -529,7 +526,6 @@ static void __init osk_mistral_init(void)
+ 				ret);
+ 		} else
+ 			enable_irq_wake(irq);
+-#endif
+ 	} else
+ 		printk(KERN_ERR "OSK+Mistral: wakeup button is awol\n");
+ 
 -- 
 2.9.0
