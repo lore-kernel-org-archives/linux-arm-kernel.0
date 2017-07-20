@@ -1,43 +1,39 @@
-From: sza@esh.hu (=?utf-8?B?U3plbXrFkSBBbmRyw6Fz?=)
-Date: Thu, 20 Jul 2017 11:29:26 +0200
-Subject: [RFC PATCH 0/2] Introduce interface for default DMA pool
-In-Reply-To: <1500281885-3034-1-git-send-email-vladimir.murzin@arm.com>
-References: <1500281885-3034-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <8C5889D6-099B-4752-AC42-5363FBD235AA@esh.hu>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Jul 2017 10:31:44 +0100
+Subject: [PATCH 0/4] Improve syscall entry code
+Message-ID: <20170720093144.GV31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The system call entry code has become less optimal as various kernel
+features such as context tracking and irq tracing have been added.
 
-> On 2017. Jul 17., at 10:58, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
-> 
-> Hi,
-> 
-> This is follow-up for Christoph complain of overloading the current
-> dma coherent infrastructure with the global pool. To address that I
-> implemented Robin's idea of the new interface to the global pool and
-> wire up it with (only existent user) ARM NOMMU.  Since I have not
-> heard from Vitaly and/or George of their use of global pool, I'm
-> leaving ARM MMU part to them.
-> 
-> [1] https://lkml.org/lkml/2017/7/7/370
-> 
+For example, we stack the registers on SWI entry, but inside the
+enable_irq macro, we re-stack r0-r3, call the trace function, and
+unstack them.  This stacking and unstacking is unnecessary as we
+can merely reload them from the original entry stacking.  Similar
+happens within the ct_user_exit macro.  So, with both features
+enabled, we end up stacking and unstacking r0-r3 twice, which is
+completely unnecessary.
 
+We also need the 'lr' value for when we need to read the SWI
+instruction, but this will be clobbered by the function calls for
+these features.  Rather than stacking or re-reading that register,
+move it to another register if necessary.
 
-I?ve tested the patches on Atmel SAMV7 SoC, and it works for me
-without any issues, so you can add my Tested-by.
+We achieve this by:
 
-Thanks for the patches!
+1. use register aliases for the saved psr and pc values.
+2. move the get_thread_info later to free up a spare register (r9).
+3. use this spare register 'r9' to store the saved pc value if we
+   have any of these features enabled, otherwise just use 'lr'.
+4. switch to using the non-stacking variants of the trace and
+   context tracking macros, and reload r0-r3 where necessary.
 
+ arch/arm/kernel/entry-common.S | 44 +++++++++++++++++++++++++++++-------------
+ 1 file changed, 31 insertions(+), 13 deletions(-)
 
-Booting Linux on physical CPU 0x0
-Linux version 4.13.0-rc1 (root at devel) (gcc version 4.9.2 ( 4.9.2-10)) #3 Wed Jul 19 04:48:18 EDT 2017
-CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
-CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-OF: fdt: Machine model: SAME70-sampione board
-...
-Reserved memory: created DMA memory pool at 0x73e00000, size 2 MiB
-OF: reserved mem: initialized node linux,dma, compatible id shared-dma-pool
-Using ARMv7 PMSA Compliant MPU. Region independence: No, Used 4 of 16 regions
-...
-DMA: default coherent area is set
-...
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
