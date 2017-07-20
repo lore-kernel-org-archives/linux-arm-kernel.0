@@ -1,89 +1,65 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 20 Jul 2017 15:31:39 +0100
-Subject: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8383B9D5A@FRAEML521-MBX.china.huawei.com>
-References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
- <20170623145801.325244-3-shameerali.kolothum.thodi@huawei.com>
- <20170704173820.GO22175@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA83839DB59@FRAEML521-MBX.china.huawei.com>
- <20170714193322.GH26488@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8383B9D5A@FRAEML521-MBX.china.huawei.com>
-Message-ID: <f3ba9136-068a-280d-2849-f3a0081c1d90@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 20 Jul 2017 15:45:13 +0100
+Subject: [PATCH 1/4] ACPI: Allow _DMA method in walk resources
+In-Reply-To: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
+References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170720144517.32529-2-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/17 11:48, Shameerali Kolothum Thodi wrote:
-> 
-> 
->> -----Original Message-----
->> From: Will Deacon [mailto:will.deacon at arm.com]
->> Sent: Friday, July 14, 2017 8:33 PM
->> To: Shameerali Kolothum Thodi
->> Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
->> sudeep.holla at arm.com; robin.murphy at arm.com; hanjun.guo at linaro.org;
->> Gabriele Paoloni; John Garry; Linuxarm; linux-acpi at vger.kernel.org;
->> iommu at lists.linux-foundation.org; Wangzhou (B); Guohanjun (Hanjun Guo);
->> linux-arm-kernel at lists.infradead.org; devel at acpica.org
->> Subject: Re: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based
->> HiSilicon erratum 161010801
->>
-> [...]
->>>>> -	list_add_tail(&region->list, head);
->>>>> +	if ((smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)) {
->>>>> +
->>>>> +		if (!is_of_node(smmu->dev->fwnode))
->>>>> +			resv = iort_iommu_its_get_resv_regions(dev, head);
->>>>
->>>> How does this work when we're not using ACPI? Shouldn't of vs ACPI
->>>> be abstracted from the driver?
->>>
->>> At present ARM_SMMU_OPT_RESV_HW_MSI is only set for ACPI and  DT
->>> support for this is a low priority for us at the moment. Is the
->>> suggestion is to have a common function outside the smmu driver for
->>> _iommu_its_get_resv_regions() ? I am not sure what is the best way here.
->>
->> Right, something like that. The driver shouldn't need to care whether or not
->> it's using ACPI or DT when setting these options.
-> 
-> Below is what I have in mind for the common function for msi reserve.
-> But just wondering invoking iort_ functions from iommu code 
-> is acceptable or not . Could you please take a look and let me know.
+The _DMA object contains a resource template, this change adds support
+for the walk resources function so that ACPI devices containing a _DMA
+object can actually parse it to detect DMA ranges for the respective
+bus.
 
-At that point, it seems like we might as well just roll it into
-iommu_dma_get_resv_regions() directly[1]. It probably makes sense for
-any DT equivalent to be described generically, rather than
-SMMU-specific, so parsing that would fit into common code as well.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Robert Moore <robert.moore@intel.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+ drivers/acpi/acpica/rsxface.c | 7 ++++---
+ include/acpi/acnames.h        | 1 +
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-Then in the SMMU drivers we can skip creating the SW_MSI region if
-iommu-dma gave us back any real ones (and remove the apparently
-unnecessary resv_msi check in VFIO). Or be lazy and just leave it, as it
-doesn't seem to do much harm to have both.
-
-Robin.
-
-[1] This is what I hacked up locally on top of patch #1:
------>8-----
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 9d1cebe7f6cb..50292827da49 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-
-+#include <linux/acpi_iort.h>
- #include <linux/device.h>
- #include <linux/dma-iommu.h>
- #include <linux/gfp.h>
-@@ -174,6 +175,10 @@ void iommu_dma_get_resv_regions(struct device *dev,
-struct list_head *list)
- 	struct pci_host_bridge *bridge;
- 	struct resource_entry *window;
-
-+	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode) &&
-+		iort_iommu_its_get_resv_regions(dev, list) < 0)
-+		return;
-+
- 	if (!dev_is_pci(dev))
- 		return;
+diff --git a/drivers/acpi/acpica/rsxface.c b/drivers/acpi/acpica/rsxface.c
+index 59a4f9e..be65e65 100644
+--- a/drivers/acpi/acpica/rsxface.c
++++ b/drivers/acpi/acpica/rsxface.c
+@@ -615,7 +615,7 @@ ACPI_EXPORT_SYMBOL(acpi_walk_resource_buffer)
+  *                                device we are querying
+  *              name            - Method name of the resources we want.
+  *                                (METHOD_NAME__CRS, METHOD_NAME__PRS, or
+- *                                METHOD_NAME__AEI)
++ *                                METHOD_NAME__AEI or METHOD_NAME__DMA)
+  *              user_function   - Called for each resource
+  *              context         - Passed to user_function
+  *
+@@ -641,11 +641,12 @@ acpi_walk_resources(acpi_handle device_handle,
+ 	if (!device_handle || !user_function || !name ||
+ 	    (!ACPI_COMPARE_NAME(name, METHOD_NAME__CRS) &&
+ 	     !ACPI_COMPARE_NAME(name, METHOD_NAME__PRS) &&
+-	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI))) {
++	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI) &&
++	     !ACPI_COMPARE_NAME(name, METHOD_NAME__DMA))) {
+ 		return_ACPI_STATUS(AE_BAD_PARAMETER);
+ 	}
+ 
+-	/* Get the _CRS/_PRS/_AEI resource list */
++	/* Get the _CRS/_PRS/_AEI/_DMA resource list */
+ 
+ 	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
+ 	status = acpi_rs_get_method_data(device_handle, name, &buffer);
+diff --git a/include/acpi/acnames.h b/include/acpi/acnames.h
+index b421584..d8dd3bf 100644
+--- a/include/acpi/acnames.h
++++ b/include/acpi/acnames.h
+@@ -54,6 +54,7 @@
+ #define METHOD_NAME__CLS        "_CLS"
+ #define METHOD_NAME__CRS        "_CRS"
+ #define METHOD_NAME__DDN        "_DDN"
++#define METHOD_NAME__DMA        "_DMA"
+ #define METHOD_NAME__HID        "_HID"
+ #define METHOD_NAME__INI        "_INI"
+ #define METHOD_NAME__PLD        "_PLD"
+-- 
+2.10.0
