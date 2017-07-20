@@ -1,48 +1,43 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Thu, 20 Jul 2017 23:01:56 +1000
-Subject: [PATCH] powerpc/asm/cacheflush: Cleanup cacheflush function params
-In-Reply-To: <CAMuHMdXU-R8kBs_xp7XDK0pnC5fakpghchuEPD8jtEcHLmgyHg@mail.gmail.com>
-References: <20170720062850.2195-1-matthew.brown.dev@gmail.com>
- <87mv7zgwpl.fsf@concordia.ellerman.id.au>
- <CAMuHMdXU-R8kBs_xp7XDK0pnC5fakpghchuEPD8jtEcHLmgyHg@mail.gmail.com>
-Message-ID: <87h8y7gt2z.fsf@concordia.ellerman.id.au>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 20 Jul 2017 15:07:09 +0200
+Subject: [Patch v5 06/12] [media] v4l2-ioctl: add HEVC format description
+In-Reply-To: <1497849055-26583-7-git-send-email-smitha.t@samsung.com>
+References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170619052507epcas1p406fa9f6d84baa9c11050b1998021788a@epcas1p4.samsung.com>
+ <1497849055-26583-7-git-send-email-smitha.t@samsung.com>
+Message-ID: <e6e75cae-f195-af56-652e-37c3e51ad70f@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+On 19/06/17 07:10, Smitha T Murthy wrote:
+> HEVC is a video coding format
+> 
+> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> ---
+>  drivers/media/v4l2-core/v4l2-ioctl.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+> index e5a2187..4f6f8d9 100644
+> --- a/drivers/media/v4l2-core/v4l2-ioctl.c
+> +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+> @@ -1257,6 +1257,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+>  		case V4L2_PIX_FMT_VC1_ANNEX_L:	descr = "VC-1 (SMPTE 412M Annex L)"; break;
+>  		case V4L2_PIX_FMT_VP8:		descr = "VP8"; break;
+>  		case V4L2_PIX_FMT_VP9:		descr = "VP9"; break;
+> +		case V4L2_PIX_FMT_HEVC:		descr = "HEVC"; break;
 
-> On Thu, Jul 20, 2017 at 1:43 PM, Michael Ellerman <mpe@ellerman.id.au> wrote:
->> Matt Brown <matthew.brown.dev@gmail.com> writes:
->>> The cacheflush prototypes currently use start and stop values and each
->>> call requires typecasting the address to an unsigned long.
->>> This patch changes the cacheflush prototypes to follow the x86 style of
->>> using a base and size values, with base being a void pointer.
->>>
->>> All callers of the cacheflush functions, including drivers, have been
->>> modified to conform to the new prototypes.
->>>
->>> The 64 bit cacheflush functions which were implemented in assembly code
->>> (flush_dcache_range, flush_inval_dcache_range) have been translated into
->>> C for readability and coherence.
->
->>> --- a/arch/powerpc/include/asm/cacheflush.h
->>> +++ b/arch/powerpc/include/asm/cacheflush.h
->>> @@ -51,13 +51,13 @@ static inline void __flush_dcache_icache_phys(unsigned long physaddr)
->>>   * Write any modified data cache blocks out to memory and invalidate them.
->>>   * Does not invalidate the corresponding instruction cache blocks.
->>>   */
->>> -static inline void flush_dcache_range(unsigned long start, unsigned long stop)
->>> +static inline void flush_dcache_range(void *start, unsigned long size)
->>>  {
->>> -     void *addr = (void *)(start & ~(L1_CACHE_BYTES - 1));
->>> -     unsigned long size = stop - (unsigned long)addr + (L1_CACHE_BYTES - 1);
->>> +     void *addr = (void *)((u32)start & ~(L1_CACHE_BYTES - 1));
->>
->> unsigned long would be nicer than u32.
->
-> Indeed. That would make this work on ppc64, too.
-> After which ppc64 has an identical copy (u64 = unsigned long on ppc64) below?
+Add a little comment at the end of the line: /* aka H.265 */
 
-That was Matt's homework to notice that ;)
+After that you can add my:
 
-cheers
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+
+Regards,
+
+	Hans
+
+>  		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA YUV"; break;
+>  		case V4L2_PIX_FMT_WNVA:		descr = "WNVA"; break;
+>  		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA SN9C10X"; break;
+> 
