@@ -1,31 +1,36 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 20 Jul 2017 15:12:15 +0530
-Subject: [PATCH v2 0/3] gpio: davinci: Add missing return checks
-Message-ID: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
+Date: Thu, 20 Jul 2017 15:12:17 +0530
+Subject: [PATCH v2 2/3] gpio: davinci: Handle the return value of
+ davinci_gpio_irq_setup function
+In-Reply-To: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
+References: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1500543738-9696-3-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series does a couple of important return handling which were missed
-earlier in the driver probe.
+Currently davinci_gpio_irq_setup return value is ignored. Handle the
+return value appropriately.
 
-This is based on Suman's:
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ drivers/gpio/gpio-davinci.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
-http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2 
-
-Changes in v2:
-
-  * Removed the device tree patch for to keep the series independent.
-
-Keerthy (3):
-  gpio: davinci: Use devm_gpiochip_add_data in place of
-    gpiochip_add_data
-  gpio: davinci: Handle the return value of davinci_gpio_irq_setup
-    function
-  gpio: davinci: Convert prinkt to dev_err
-
- drivers/gpio/gpio-davinci.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index 27499ec..d6fb1ce 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -237,7 +237,10 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+ 		goto err;
+ 
+ 	platform_set_drvdata(pdev, chips);
+-	davinci_gpio_irq_setup(pdev);
++	ret = davinci_gpio_irq_setup(pdev);
++	if (ret)
++		goto err;
++
+ 	return 0;
+ 
+ err:
 -- 
 1.9.1
