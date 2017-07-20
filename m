@@ -1,52 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Jul 2017 14:07:46 +0200
-Subject: [PATCH] powerpc/asm/cacheflush: Cleanup cacheflush function params
-In-Reply-To: <87mv7zgwpl.fsf@concordia.ellerman.id.au>
-References: <20170720062850.2195-1-matthew.brown.dev@gmail.com>
- <87mv7zgwpl.fsf@concordia.ellerman.id.au>
-Message-ID: <CAMuHMdXU-R8kBs_xp7XDK0pnC5fakpghchuEPD8jtEcHLmgyHg@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 20 Jul 2017 14:08:57 +0200
+Subject: [PATCH 1/2] arm64: zynqmp: Remove leading 0s from mtd table for spi
+ flashes
+Message-ID: <26db4d8bc7cbcf95d2a60366e36c839ab3b5d6d9.1500552534.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 1:43 PM, Michael Ellerman <mpe@ellerman.id.au> wrote:
-> Matt Brown <matthew.brown.dev@gmail.com> writes:
->> The cacheflush prototypes currently use start and stop values and each
->> call requires typecasting the address to an unsigned long.
->> This patch changes the cacheflush prototypes to follow the x86 style of
->> using a base and size values, with base being a void pointer.
->>
->> All callers of the cacheflush functions, including drivers, have been
->> modified to conform to the new prototypes.
->>
->> The 64 bit cacheflush functions which were implemented in assembly code
->> (flush_dcache_range, flush_inval_dcache_range) have been translated into
->> C for readability and coherence.
+Warnings:
+arch/arm64/boot/dts/xilinx/zynqmp-ep108.dtb: Warning
+(unit_address_format): Node
+/amba/spi at ff040000/spi0_flash0 at 0/spi0_flash0 at 00000000 unit name should
+not have leading 0s
+arch/arm64/boot/dts/xilinx/zynqmp-ep108.dtb: Warning
+(unit_address_format): Node
+/amba/spi at ff050000/spi1_flash0 at 0/spi1_flash0 at 00000000 unit name should
+not have leading 0s
 
->> --- a/arch/powerpc/include/asm/cacheflush.h
->> +++ b/arch/powerpc/include/asm/cacheflush.h
->> @@ -51,13 +51,13 @@ static inline void __flush_dcache_icache_phys(unsigned long physaddr)
->>   * Write any modified data cache blocks out to memory and invalidate them.
->>   * Does not invalidate the corresponding instruction cache blocks.
->>   */
->> -static inline void flush_dcache_range(unsigned long start, unsigned long stop)
->> +static inline void flush_dcache_range(void *start, unsigned long size)
->>  {
->> -     void *addr = (void *)(start & ~(L1_CACHE_BYTES - 1));
->> -     unsigned long size = stop - (unsigned long)addr + (L1_CACHE_BYTES - 1);
->> +     void *addr = (void *)((u32)start & ~(L1_CACHE_BYTES - 1));
->
-> unsigned long would be nicer than u32.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Indeed. That would make this work on ppc64, too.
-After which ppc64 has an identical copy (u64 = unsigned long on ppc64) below?
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+index ef1b9e573af0..ee7fa27e1e23 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+@@ -92,7 +92,7 @@
+ 		spi-max-frequency = <50000000>;
+ 		reg = <0>;
+ 
+-		spi0_flash0 at 00000000 {
++		spi0_flash0 at 0 {
+ 			label = "spi0_flash0";
+ 			reg = <0x0 0x100000>;
+ 		};
+@@ -109,7 +109,7 @@
+ 		spi-max-frequency = <50000000>;
+ 		reg = <0>;
+ 
+-		spi1_flash0 at 00000000 {
++		spi1_flash0 at 0 {
+ 			label = "spi1_flash0";
+ 			reg = <0x0 0x100000>;
+ 		};
+-- 
+1.9.1
