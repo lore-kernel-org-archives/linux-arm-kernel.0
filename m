@@ -1,42 +1,25 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 20 Jul 2017 10:18:19 +0100
-Subject: [PATCH] ARM: always enable AEABI for ARMv6+
-Message-ID: <E1dY7b9-0004jY-ON@rmk-PC.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Jul 2017 10:19:10 +0100
+Subject: [PATCH v2 1/2] vfio: Allow No-IOMMU mode without checking
+ iommu_present()
+In-Reply-To: <1500525154-5200-2-git-send-email-anup.patel@broadcom.com>
+References: <1500525154-5200-1-git-send-email-anup.patel@broadcom.com>
+ <1500525154-5200-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20170720091909.GC17837@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Always enable AEABI for ARMv6+, as these use the double-word exclusives
-which must be passed an even register to avoid errors such as:
+On Thu, Jul 20, 2017 at 10:02:33AM +0530, Anup Patel wrote:
+> Not allowing No-IOMMU mode for devices already having
+> iommu_ops on their bus is very conservative.
+> 
+> We now have IOMMU (such as ARM SMMU) which can bypass
+> transcations when IOMMU is not configured for a given
+> device. In addition, it is not necessary to have all
+> devices on bus to be upstream to an IOMMU on that bus.
 
-/tmp/ccG2rCwe.s:905: Error: even register required -- `ldrexd r5,r6,[r7]'
-/tmp/ccG2rCwe.s:909: Error: even register required -- `strexd sl,r3,r4,[r7]'
+How does the SMMU know to bypass in these cases? As I explained before, the
+driver-specific command line option is the wrong way to go about arranging
+this.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 270ab2549def..edb88d430b24 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1542,7 +1542,6 @@ config THUMB2_KERNEL
- 	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
- 	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
- 	default y if CPU_THUMBONLY
--	select AEABI
- 	select ARM_ASM_UNIFIED
- 	select ARM_UNWIND
- 	help
-@@ -1605,7 +1604,8 @@ config ARM_PATCH_IDIV
- 	  code to do integer division.
- 
- config AEABI
--	bool "Use the ARM EABI to compile the kernel"
-+	bool "Use the ARM EABI to compile the kernel" if !CPU_V7 && !CPU_V7M && !CPU_V6 && !CPU_V6K
-+	default CPU_V7 || CPU_V7M || CPU_V6 || CPU_V6K
- 	help
- 	  This option allows for the kernel to be compiled using the latest
- 	  ARM ABI (aka EABI).  This is only useful if you are using a user
--- 
-2.7.4
+Will
