@@ -1,35 +1,57 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 20 Jul 2017 14:36:03 -0700
-Subject: [PATCH v5 1/1] acpi: apei: Enable APEI multiple GHES source to share
- an single external IRQ
-In-Reply-To: <1500586563-7088-1-git-send-email-lho@apm.com>
-References: <1500586563-7088-1-git-send-email-lho@apm.com>
-Message-ID: <1500586563-7088-2-git-send-email-lho@apm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 21 Jul 2017 07:07:15 +0800
+Subject: [PATCH 1/3] arm64: allwinner: a64: enable USB host controller for BPi
+ M64
+Message-ID: <20170720230717.58255-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows APEI generic error source table with external
-IRQ to share a single IRQ.
+Banana Pi M64 connects the USB host-only controller on A64 SoC to a USB
+hub, which provided the two USB Type-A ports on the board.
 
-Co-authored-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
+Enable the USB host controller.
+
+The OTG function of the Micro-USB port needs the drivevbus function of
+the AXP803 driver implemented, so it's not enabled now.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/acpi/apei/ghes.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index d661d45..eed09fc 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -1157,7 +1157,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 			       generic->header.source_id);
- 			goto err_edac_unreg;
- 		}
--		rc = request_irq(ghes->irq, ghes_irq_func, 0, "GHES IRQ", ghes);
-+		rc = request_irq(ghes->irq, ghes_irq_func, IRQF_SHARED,
-+				 "GHES IRQ", ghes);
- 		if (rc) {
- 			pr_err(GHES_PFX "Failed to register IRQ for generic hardware error source: %d\n",
- 			       generic->header.source_id);
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 0d1f026d831a..829922d077fb 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -67,6 +67,10 @@
+ 	};
+ };
+ 
++&ehci1 {
++	status = "okay";
++};
++
+ &emac {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&rgmii_pins>;
+@@ -122,6 +126,10 @@
+ 	status = "okay";
+ };
+ 
++&ohci1 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+@@ -133,3 +141,7 @@
+ 	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+ 	status = "okay";
+ };
++
++&usbphy {
++	status = "okay";
++};
 -- 
-1.8.3.1
+2.13.0
