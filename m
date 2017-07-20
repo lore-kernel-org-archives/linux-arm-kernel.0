@@ -1,183 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Jul 2017 09:55:28 +0100
-Subject: [PATCH v7 3/3] mfd: hi6421-pmic: add support for HiSilicon
- Hi6421v530
-In-Reply-To: <20170720073242.1758-4-guodong.xu@linaro.org>
-References: <20170720073242.1758-1-guodong.xu@linaro.org>
- <20170720073242.1758-4-guodong.xu@linaro.org>
-Message-ID: <20170720085528.6edgr2fiuhwpddb2@dell>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 20 Jul 2017 09:56:29 +0100
+Subject: [kernel-hardening] Re: [RFC PATCH 6/6] arm64: add VMAP_STACK and
+ detect out-of-bounds SP
+In-Reply-To: <59706B82.1030601@arm.com>
+References: <CAKv+Gu8jey+uPSFoCsjQn9BeGiChZpS=iZ0v9nEWvkwcO1gFYg@mail.gmail.com>
+ <20170713104950.GB26194@leverpostej>
+ <CAKv+Gu9eSX-f4uv3gaNw9_eKV0soe2-CqSnMaTjjEhMifxe_8g@mail.gmail.com>
+ <20170713161050.GG26194@leverpostej> <20170713175543.GA32528@leverpostej>
+ <CAKv+Gu_v3PO7=JSgCTb3aZu3sg4cwYYjy68VJnr58vzaMYvhTw@mail.gmail.com>
+ <20170714103258.GA16128@leverpostej>
+ <CAKv+Gu-FvfPFQooCie6HwP=mBng3C0jp9p8WMkFwTxctDu4JBA@mail.gmail.com>
+ <CAKv+Gu96YHXDta7=YdYO4=wtR3mGVdkzAkG6tSzS-vo7toiPXA@mail.gmail.com>
+ <20170714140605.GB16687@leverpostej> <20170714212717.GB1086@leverpostej>
+ <CAKv+Gu9EB1nJPwvZh1Nti8tPVivqbwrE60t2v5zZp02DyaScxA@mail.gmail.com>
+ <39a5ad84-4124-5b33-146a-cd4e48f3762f@redhat.com>
+ <CAKv+Gu8vPNCK0J_bgfPDyos_hDrir_rKc154wfKtF_NqJ0LywQ@mail.gmail.com>
+ <aa086315-722b-bff3-90bb-f479229ed104@redhat.com>
+ <CAKv+Gu_JNNVvLaSt3PTOexJV4HzPUN0mLOm6YYRS8d=UOafopQ@mail.gmail.com>
+ <59706B82.1030601@arm.com>
+Message-ID: <CAKv+Gu9oXbi7-R6ypaxq-gu-0RM85x=Sxde1L5+sn8QgEBsKBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jul 2017, Guodong Xu wrote:
+On 20 July 2017 at 09:36, James Morse <james.morse@arm.com> wrote:
+> Hi Ard,
+>
+> On 20/07/17 06:35, Ard Biesheuvel wrote:
+>> On 20 July 2017 at 00:32, Laura Abbott <labbott@redhat.com> wrote:
+>>> I didn't notice any performance impact but I also wasn't trying that
+>>> hard. I did try this with a different configuration and ran into
+>>> stackspace errors almost immediately:
+>>>
+>>> [ 0.358026] smp: Brought up 1 node, 8 CPUs
+>>> [ 0.359359] SMP: Total of 8 processors activated.
+>>> [ 0.359542] CPU features: detected feature: 32-bit EL0 Support
+>>> [    0.361781] Insufficient stack space to handle exception!
+>
+> [...]
+>
+>>> [    0.367382] Task stack: [0xffffff8008e80000..0xffffff8008e84000]
+>>> [    0.367519] IRQ stack:  [0xffffffc03bf62000..0xffffffc03bf66000]
+>>
+>> The IRQ stack is not 16K aligned ...
+>
+>>> [    0.367687] ESR: 0x00000000 -- Unknown/Uncategorized
+>>> [    0.367868] FAR: 0x0000000000000000
+>>> [    0.368059] Kernel panic - not syncing: kernel stack overflow
+>>> [    0.368252] CPU: 4 PID: 0 Comm: swapper/4 Not tainted 4.12.0-00018-ge9cf49d604ef-dirty #23
+>>> [    0.368427] Hardware name: linux,dummy-virt (DT)
+>>> [    0.368612] Call trace:
+>>> [    0.368774] [<ffffff8008087fd8>] dump_backtrace+0x0/0x228
+>>> [    0.368979] [<ffffff80080882c8>] show_stack+0x10/0x20
+>>> [    0.369270] [<ffffff80084602dc>] dump_stack+0x88/0xac
+>>> [    0.369459] [<ffffff800816328c>] panic+0x120/0x278
+>>> [    0.369582] [<ffffff8008088b40>] handle_bad_stack+0xd0/0xd8
+>>> [    0.369799] [<ffffff80080bfb94>] __do_softirq+0x74/0x210
+>>> [    0.370560] SMP: stopping secondary CPUs
+>>> [    0.384269] Rebooting in 5 seconds..
+>>>
+>>> The config is based on what I use for booting my Hikey android
+>>> board. I haven't been able to narrow down exactly which
+>>> set of configs set this off.
+>>>
+>>
+>> ... so for some reason, the percpu atom size change fails to take effect here.
+>
+> I'm not completely up to speed with these series, so this may be noise:
+>
+> When we added the IRQ stack Jungseok Lee discovered that alignment greater than
+> PAGE_SIZE only applies to CPU0. Secondary CPUs read the per-cpu init data into a
+> page-aligned area, but any greater alignment requirement is lost.
+>
+> Because of this the irqstack was only 16byte aligned, and struct thread_info had
+> to be be discovered without depending on stack alignment.
+>
 
-> Add support for HiSilicon Hi6421v530 PMIC. Hi6421v530 communicates with
-> main SoC via memory-mapped I/O.
-> 
-> Hi6421v530 and Hi6421 are PMIC chips from the same vendor, HiSilicon,
-> but at different revisions. They share the same memory-mapped I/O
-> design. They differ in integrated devices, such as regulator details,
-> LDO voltage points.
-> 
-> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/mfd/hi6421-pmic-core.c  | 70 ++++++++++++++++++++++++++++++-----------
->  include/linux/mfd/hi6421-pmic.h |  5 +++
->  2 files changed, 57 insertions(+), 18 deletions(-)
-
-Applied, thanks.
-
-> diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
-> index b1139d4..6fb7ba2 100644
-> --- a/drivers/mfd/hi6421-pmic-core.c
-> +++ b/drivers/mfd/hi6421-pmic-core.c
-> @@ -1,9 +1,9 @@
->  /*
-> - * Device driver for Hi6421 IC
-> + * Device driver for Hi6421 PMIC
->   *
->   * Copyright (c) <2011-2014> HiSilicon Technologies Co., Ltd.
->   *              http://www.hisilicon.com
-> - * Copyright (c) <2013-2014> Linaro Ltd.
-> + * Copyright (c) <2013-2017> Linaro Ltd.
->   *              http://www.linaro.org
->   *
->   * Author: Guodong Xu <guodong.xu@linaro.org>
-> @@ -16,16 +16,20 @@
->  #include <linux/device.h>
->  #include <linux/err.h>
->  #include <linux/mfd/core.h>
-> +#include <linux/mfd/hi6421-pmic.h>
->  #include <linux/module.h>
-> -#include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
-> -#include <linux/mfd/hi6421-pmic.h>
->  
->  static const struct mfd_cell hi6421_devs[] = {
->  	{ .name = "hi6421-regulator", },
->  };
->  
-> +static const struct mfd_cell hi6421v530_devs[] = {
-> +	{ .name = "hi6421v530-regulator", },
-> +};
-> +
->  static const struct regmap_config hi6421_regmap_config = {
->  	.reg_bits = 32,
->  	.reg_stride = 4,
-> @@ -33,12 +37,33 @@ static const struct regmap_config hi6421_regmap_config = {
->  	.max_register = HI6421_REG_TO_BUS_ADDR(HI6421_REG_MAX),
->  };
->  
-> +static const struct of_device_id of_hi6421_pmic_match[] = {
-> +	{
-> +		.compatible = "hisilicon,hi6421-pmic",
-> +		.data = (void *)HI6421
-> +	},
-> +	{
-> +		.compatible = "hisilicon,hi6421v530-pmic",
-> +		.data = (void *)HI6421_V530
-> +	},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, of_hi6421_pmic_match);
-> +
->  static int hi6421_pmic_probe(struct platform_device *pdev)
->  {
->  	struct hi6421_pmic *pmic;
->  	struct resource *res;
-> +	const struct of_device_id *id;
-> +	const struct mfd_cell *subdevs;
-> +	enum hi6421_type type;
->  	void __iomem *base;
-> -	int ret;
-> +	int n_subdevs, ret;
-> +
-> +	id = of_match_device(of_hi6421_pmic_match, &pdev->dev);
-> +	if (!id)
-> +		return -EINVAL;
-> +	type = (enum hi6421_type)id->data;
->  
->  	pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
->  	if (!pmic)
-> @@ -57,18 +82,33 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
->  		return PTR_ERR(pmic->regmap);
->  	}
->  
-> -	/* set over-current protection debounce 8ms */
-> -	regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
-> +	platform_set_drvdata(pdev, pmic);
-> +
-> +	switch (type) {
-> +	case HI6421:
-> +		/* set over-current protection debounce 8ms */
-> +		regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
->  				(HI6421_OCP_DEB_SEL_MASK
->  				 | HI6421_OCP_EN_DEBOUNCE_MASK
->  				 | HI6421_OCP_AUTO_STOP_MASK),
->  				(HI6421_OCP_DEB_SEL_8MS
->  				 | HI6421_OCP_EN_DEBOUNCE_ENABLE));
->  
-> -	platform_set_drvdata(pdev, pmic);
-> +		subdevs = hi6421_devs;
-> +		n_subdevs = ARRAY_SIZE(hi6421_devs);
-> +		break;
-> +	case HI6421_V530:
-> +		subdevs = hi6421v530_devs;
-> +		n_subdevs = ARRAY_SIZE(hi6421v530_devs);
-> +		break;
-> +	default:
-> +		dev_err(&pdev->dev, "Unknown device type %d\n",
-> +						(unsigned int)type);
-> +		return -EINVAL;
-> +	}
->  
-> -	ret = devm_mfd_add_devices(&pdev->dev, 0, hi6421_devs,
-> -				   ARRAY_SIZE(hi6421_devs), NULL, 0, NULL);
-> +	ret = devm_mfd_add_devices(&pdev->dev, PLATFORM_DEVID_NONE,
-> +				   subdevs, n_subdevs, NULL, 0, NULL);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Failed to add child devices: %d\n", ret);
->  		return ret;
-> @@ -77,16 +117,10 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id of_hi6421_pmic_match_tbl[] = {
-> -	{ .compatible = "hisilicon,hi6421-pmic", },
-> -	{ },
-> -};
-> -MODULE_DEVICE_TABLE(of, of_hi6421_pmic_match_tbl);
-> -
->  static struct platform_driver hi6421_pmic_driver = {
->  	.driver = {
-> -		.name	= "hi6421_pmic",
-> -		.of_match_table = of_hi6421_pmic_match_tbl,
-> +		.name = "hi6421_pmic",
-> +		.of_match_table = of_hi6421_pmic_match,
->  	},
->  	.probe	= hi6421_pmic_probe,
->  };
-> diff --git a/include/linux/mfd/hi6421-pmic.h b/include/linux/mfd/hi6421-pmic.h
-> index 587273e..2580c08 100644
-> --- a/include/linux/mfd/hi6421-pmic.h
-> +++ b/include/linux/mfd/hi6421-pmic.h
-> @@ -38,4 +38,9 @@ struct hi6421_pmic {
->  	struct regmap		*regmap;
->  };
->  
-> +enum hi6421_type {
-> +	HI6421 = 0,
-> +	HI6421_V530,
-> +};
-> +
->  #endif		/* __HI6421_PMIC_H */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+We [attempted to] address that by increasing the per-CPU atom size to
+THREAD_ALIGN if CONFIG_VMAP_STACK=y, but as I am typing this, I wonder
+if that percolates all the way down to the actual vmap() calls. I will
+investigate ...
