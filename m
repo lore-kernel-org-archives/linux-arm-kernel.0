@@ -1,78 +1,99 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 20 Jul 2017 09:36:18 +0100
-Subject: [kernel-hardening] Re: [RFC PATCH 6/6] arm64: add VMAP_STACK
- and detect out-of-bounds SP
-In-Reply-To: <CAKv+Gu_JNNVvLaSt3PTOexJV4HzPUN0mLOm6YYRS8d=UOafopQ@mail.gmail.com>
-References: <CAKv+Gu8jey+uPSFoCsjQn9BeGiChZpS=iZ0v9nEWvkwcO1gFYg@mail.gmail.com>
- <20170713104950.GB26194@leverpostej>
- <CAKv+Gu9eSX-f4uv3gaNw9_eKV0soe2-CqSnMaTjjEhMifxe_8g@mail.gmail.com>
- <20170713161050.GG26194@leverpostej> <20170713175543.GA32528@leverpostej>
- <CAKv+Gu_v3PO7=JSgCTb3aZu3sg4cwYYjy68VJnr58vzaMYvhTw@mail.gmail.com>
- <20170714103258.GA16128@leverpostej>
- <CAKv+Gu-FvfPFQooCie6HwP=mBng3C0jp9p8WMkFwTxctDu4JBA@mail.gmail.com>
- <CAKv+Gu96YHXDta7=YdYO4=wtR3mGVdkzAkG6tSzS-vo7toiPXA@mail.gmail.com>
- <20170714140605.GB16687@leverpostej> <20170714212717.GB1086@leverpostej>
- <CAKv+Gu9EB1nJPwvZh1Nti8tPVivqbwrE60t2v5zZp02DyaScxA@mail.gmail.com>
- <39a5ad84-4124-5b33-146a-cd4e48f3762f@redhat.com>
- <CAKv+Gu8vPNCK0J_bgfPDyos_hDrir_rKc154wfKtF_NqJ0LywQ@mail.gmail.com>
- <aa086315-722b-bff3-90bb-f479229ed104@redhat.com>
- <CAKv+Gu_JNNVvLaSt3PTOexJV4HzPUN0mLOm6YYRS8d=UOafopQ@mail.gmail.com>
-Message-ID: <59706B82.1030601@arm.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Thu, 20 Jul 2017 10:37:58 +0200
+Subject: [PATCH v2 0/7] Add support of OV9655 camera
+In-Reply-To: <20170718195223.zrqfrefxxzqfsojd@valkosipuli.retiisi.org.uk>
+References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
+ <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
+ <956f17e6-36dd-6733-0d35-9b801ed4244d@xs4all.nl>
+ <BCD1BD18-96E3-4638-8935-B5C832D8EE52@goldelico.com>
+ <2dd3402e-55b0-231d-878f-5ba95ee8cb36@st.com>
+ <20170718195223.zrqfrefxxzqfsojd@valkosipuli.retiisi.org.uk>
+Message-ID: <AB91B71D-E34B-4645-BD70-A87226BA34C5@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi,
 
-On 20/07/17 06:35, Ard Biesheuvel wrote:
-> On 20 July 2017 at 00:32, Laura Abbott <labbott@redhat.com> wrote:
->> I didn't notice any performance impact but I also wasn't trying that
->> hard. I did try this with a different configuration and ran into
->> stackspace errors almost immediately:
->>
->> [ 0.358026] smp: Brought up 1 node, 8 CPUs
->> [ 0.359359] SMP: Total of 8 processors activated.
->> [ 0.359542] CPU features: detected feature: 32-bit EL0 Support
->> [    0.361781] Insufficient stack space to handle exception!
-
-[...]
-
->> [    0.367382] Task stack: [0xffffff8008e80000..0xffffff8008e84000]
->> [    0.367519] IRQ stack:  [0xffffffc03bf62000..0xffffffc03bf66000]
+> Am 18.07.2017 um 21:52 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
 > 
-> The IRQ stack is not 16K aligned ...
-
->> [    0.367687] ESR: 0x00000000 -- Unknown/Uncategorized
->> [    0.367868] FAR: 0x0000000000000000
->> [    0.368059] Kernel panic - not syncing: kernel stack overflow
->> [    0.368252] CPU: 4 PID: 0 Comm: swapper/4 Not tainted 4.12.0-00018-ge9cf49d604ef-dirty #23
->> [    0.368427] Hardware name: linux,dummy-virt (DT)
->> [    0.368612] Call trace:
->> [    0.368774] [<ffffff8008087fd8>] dump_backtrace+0x0/0x228
->> [    0.368979] [<ffffff80080882c8>] show_stack+0x10/0x20
->> [    0.369270] [<ffffff80084602dc>] dump_stack+0x88/0xac
->> [    0.369459] [<ffffff800816328c>] panic+0x120/0x278
->> [    0.369582] [<ffffff8008088b40>] handle_bad_stack+0xd0/0xd8
->> [    0.369799] [<ffffff80080bfb94>] __do_softirq+0x74/0x210
->> [    0.370560] SMP: stopping secondary CPUs
->> [    0.384269] Rebooting in 5 seconds..
->>
->> The config is based on what I use for booting my Hikey android
->> board. I haven't been able to narrow down exactly which
->> set of configs set this off.
->>
+> On Tue, Jul 18, 2017 at 12:53:12PM +0000, Hugues FRUCHET wrote:
+>> 
+>> 
+>> On 07/18/2017 02:17 PM, H. Nikolaus Schaller wrote:
+>>> Hi,
+>>> 
+>>>> Am 18.07.2017 um 13:59 schrieb Hans Verkuil <hverkuil@xs4all.nl>:
+>>>> 
+>>>> On 12/07/17 22:01, Sylwester Nawrocki wrote:
+>>>>> Hi Hugues,
+>>>>> 
+>>>>> On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
+>>>>>> This patchset enables OV9655 camera support.
+>>>>>> 
+>>>>>> OV9655 support has been tested using STM32F4DIS-CAM extension board
+>>>>>> plugged on connector P1 of STM32F746G-DISCO board.
+>>>>>> Due to lack of OV9650/52 hardware support, the modified related code
+>>>>>> could not have been checked for non-regression.
+>>>>>> 
+>>>>>> First patches upgrade current support of OV9650/52 to prepare then
+>>>>>> introduction of OV9655 variant patch.
+>>>>>> Because of OV9655 register set slightly different from OV9650/9652,
+>>>>>> not all of the driver features are supported (controls). Supported
+>>>>>> resolutions are limited to VGA, QVGA, QQVGA.
+>>>>>> Supported format is limited to RGB565.
+>>>>>> Controls are limited to color bar test pattern for test purpose.
+>>>>> 
+>>>>> I appreciate your efforts towards making a common driver but IMO it would be
+>>>>> better to create a separate driver for the OV9655 sensor.  The original driver
+>>>>> is 1576 lines of code, your patch set adds half of that (816).  There are
+>>>>> significant differences in the feature set of both sensors, there are
+>>>>> differences in the register layout.  I would go for a separate driver, we
+>>>>> would then have code easier to follow and wouldn't need to worry about possible
+>>>>> regressions.  I'm afraid I have lost the camera module and won't be able
+>>>>> to test the patch set against regressions.
+>>>>> 
+>>>>> IMHO from maintenance POV it's better to make a separate driver. In the end
+>>>>> of the day we wouldn't be adding much more code than it is being done now.
+>>>> 
+>>>> I agree. We do not have great experiences in the past with trying to support
+>>>> multiple variants in a single driver (unless the diffs are truly small).
+>>> 
+>>> Well,
+>>> IMHO the diffs in ov965x are smaller (but untestable because nobody seems
+>>> to have an ov9650/52 board) than within the bq27xxx chips, but I can dig out
+>>> an old pdata based separate ov9655 driver and extend that to become DT compatible.
+>>> 
+>>> I had abandoned that separate approach in favour of extending the ov965x driver.
+>>> 
+>>> Have to discuss with Hugues how to proceed.
+>>> 
+>>> BR and thanks,
+>>> Nikolaus
+>>> 
+>> 
+>> As Sylwester and Hans, I'm also in flavour of a separate driver, the 
+>> fact that register set seems similar but in fact is not and that we 
+>> cannot test for non-regression of 9650/52 are killer for me to continue 
+>> on a single driver.
+>> We can now restart from a new fresh state of the art sensor driver 
+>> getting rid of legacy (pdata, old gpio, etc...).
 > 
-> ... so for some reason, the percpu atom size change fails to take effect here.
+> Agreed. I bet the result will look cleaner indeed although this wasn't one
+> of the complex drivers.
 
-I'm not completely up to speed with these series, so this may be noise:
+I finally managed to find the bug why mplayer did select-timeout on the GTA04.
+Was a bug in pinmux setup of the GTA04 for the omap3isp.
 
-When we added the IRQ stack Jungseok Lee discovered that alignment greater than
-PAGE_SIZE only applies to CPU0. Secondary CPUs read the per-cpu init data into a
-page-aligned area, but any greater alignment requirement is lost.
+And I have resurrected our years old 3.12 camera driver, which was based on the
+MT9P031 code. It was already separate from ov9650/52.
 
-Because of this the irqstack was only 16byte aligned, and struct thread_info had
-to be be discovered without depending on stack alignment.
+I have extended it to support DT by including some parts of Hugues' work.
 
+It still needs some cleanup and discussion but will be a simple patch (one
+for ov9655.c + Kconfig + Makefile) and one for bindings (I hope it includes
+all your comments).
 
-Thanks,
+I will post v1 in the next days.
 
-James
+BR,
+Nikolaus
