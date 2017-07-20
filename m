@@ -1,38 +1,76 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 20 Jul 2017 12:18:10 +0200
-Subject: [PATCH] MAINTAINERS: Add mediatek git repository
-In-Reply-To: <20170609084354.26499-1-matthias.bgg@gmail.com>
-References: <20170609084354.26499-1-matthias.bgg@gmail.com>
-Message-ID: <a0602546-11b4-87be-c738-9539208ce8cb@gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 20 Jul 2017 11:17:25 +0100
+Subject: [PATCH v5 15/19] coresight tmc etr: Cleanup AXICTL register handling
+In-Reply-To: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
+References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500545849-23724-16-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2017 10:43 AM, Matthias Brugger wrote:
-> Mediatek repository lives in github for quite a while.
-> Add the repository to the file.
-> 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->   MAINTAINERS | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index f7d568b8f133..41410639f650 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1554,6 +1554,7 @@ M:	Matthias Brugger <matthias.bgg@gmail.com>
->   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->   L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
->   S:	Maintained
-> +T:	git https://github.com/mbgg/linux-mediatek.git for-next
->   F:	arch/arm/boot/dts/mt6*
->   F:	arch/arm/boot/dts/mt7*
->   F:	arch/arm/boot/dts/mt8*
-> 
+This patch cleans up how we setup the AXICTL register on
+TMC ETR. At the moment we don't set the CacheCtrl bits, which
+drives the arcache and awcache bits on AXI bus specifying the
+cacheablitiy. Set this to Write-back Read and Write-allocate.
 
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 10 +++-------
+ drivers/hwtracing/coresight/coresight-tmc.h     | 17 ++++++++++++++++-
+ 2 files changed, 19 insertions(+), 8 deletions(-)
 
-Looks like this got forgotten for v4.13-rc1.
-Shall I take it through my tree for the next merge window?
-
-Regards,
-Matthias
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 9c39c89..880b535 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -36,13 +36,9 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ 	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
+ 
+ 	axictl = readl_relaxed(drvdata->base + TMC_AXICTL);
+-	axictl |= TMC_AXICTL_WR_BURST_16;
+-	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+-	axictl &= ~TMC_AXICTL_SCT_GAT_MODE;
+-	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+-	axictl = (axictl &
+-		  ~(TMC_AXICTL_PROT_CTL_B0 | TMC_AXICTL_PROT_CTL_B1)) |
+-		  TMC_AXICTL_PROT_CTL_B1;
++	axictl &= ~TMC_AXICTL_CLEAR_MASK;
++	axictl |= (TMC_AXICTL_PROT_CTL_B1 | TMC_AXICTL_WR_BURST_16);
++	axictl |= TMC_AXICTL_AXCACHE_OS;
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+ 	tmc_write_dba(drvdata, drvdata->paddr);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index 3e94b4b..a532972 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -55,11 +55,26 @@
+ #define TMC_STS_TMCREADY_BIT	2
+ #define TMC_STS_FULL		BIT(0)
+ #define TMC_STS_TRIGGERED	BIT(1)
+-/* TMC_AXICTL - 0x110 */
++/*
++ * TMC_AXICTL - 0x110
++ *
++ * TMC AXICTL format for SoC-400
++ *	Bits [0-1]	: ProtCtrlBit0-1
++ *	Bits [2-5]	: CacheCtrlBits 0-3 (AxCACHE)
++ *	Bit  6		: Reserved
++ *	Bit  7		: ScatterGatherMode
++ *	Bits [8-11]	: WrBurstLen
++ *	Bits [12-31]	: Reserved.
++ */
++#define TMC_AXICTL_CLEAR_MASK 0xfbf
++
+ #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
+ #define TMC_AXICTL_PROT_CTL_B1	BIT(1)
+ #define TMC_AXICTL_SCT_GAT_MODE	BIT(7)
+ #define TMC_AXICTL_WR_BURST_16	0xF00
++/* Write-back Read and Write-allocate */
++#define TMC_AXICTL_AXCACHE_OS	(0xf << 2)
++
+ /* TMC_FFCR - 0x304 */
+ #define TMC_FFCR_FLUSHMAN_BIT	6
+ #define TMC_FFCR_EN_FMT		BIT(0)
+-- 
+2.7.5
