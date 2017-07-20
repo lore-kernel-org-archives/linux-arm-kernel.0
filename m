@@ -1,40 +1,52 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Thu, 20 Jul 2017 18:07:53 +0200
-Subject: [PATCH 02/12] ARM: ep93xx: use ARM_PATCH_PHYS_VIRT
-In-Reply-To: <20170720154939.3250697-1-arnd@arndb.de>
-References: <20170720154616.3250481-1-arnd@arndb.de>
- <20170720154939.3250697-1-arnd@arndb.de>
-Message-ID: <1500566873.5716.3.camel@Nokia-N900>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 21 Jul 2017 01:08:59 +0900
+Subject: [PATCH v4 2/2] thermal: uniphier: add UniPhier thermal driver
+In-Reply-To: <1499392475-17304-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1499392475-17304-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1499392475-17304-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <CAK7LNASKqwWY4gorRZLd0GPXymm2WNdxuZr_OOs6g7uzaKSCMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu Jul 20 17:49:27 2017 Arnd Bergmann <arnd@arndb.de> wrote:
-> Just like ARCH_MULTIPLATFORM, we want to use ARM_PATCH_PHYS_VIRT
-> when possible, but that fails for NOMMU or XIP_KERNEL configurations.
-> Using 'imply' instead of 'select' gets this right and only uses
-> the symbol when we don't have to hardcode the address anyway.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+2017-07-07 10:54 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+> Add a thermal driver for on-chip PVT (Process, Voltage and Temperature)
+> monitoring unit implemented on UniPhier SoCs. This driver supports
+> temperature monitoring and alert function.
+>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 
-Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 
-> ---
->?  arch/arm/Kconfig | 2 +-
->?  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d6e6f40addf6..db856355bd24 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -406,7 +406,7 @@ config ARCH_EP93XX
->?  ??? bool "EP93xx-based"
->?  ??? select ARCH_HAS_HOLES_MEMORYMODEL
->?  ??? select ARM_AMBA
-> -??? select ARM_PATCH_PHYS_VIRT
-> +??? imply ARM_PATCH_PHYS_VIRT
->?  ??? select ARM_VIC
->?  ??? select AUTO_ZRELADDR
->?  ??? select CLKDEV_LOOKUP
-> -- 
-> 2.9.0
-> 
+Sparse reports several warnings.
+
+
+  CHECK   drivers/thermal/uniphier_thermal.c
+drivers/thermal/uniphier_thermal.c:276:52: warning: incorrect type in
+argument 1 (different base types)
+drivers/thermal/uniphier_thermal.c:276:52:    expected restricted
+__be32 const [usertype] *cell
+drivers/thermal/uniphier_thermal.c:276:52:    got unsigned int const
+[usertype] *[assigned] calib
+drivers/thermal/uniphier_thermal.c:277:58: warning: incorrect type in
+argument 1 (different base types)
+drivers/thermal/uniphier_thermal.c:277:58:    expected restricted
+__be32 const [usertype] *cell
+drivers/thermal/uniphier_thermal.c:277:58:    got unsigned int const
+[usertype] *
+drivers/thermal/uniphier_thermal.c:136:9: warning: cast truncates bits
+from constant value (fffffffff becomes ffffffff)
+drivers/thermal/uniphier_thermal.c:141:9: warning: cast truncates bits
+from constant value (7ffffffff becomes ffffffff)
+drivers/thermal/uniphier_thermal.c:153:9: warning: cast truncates bits
+from constant value (ffffffffff0001 becomes ffff0001)
+drivers/thermal/uniphier_thermal.c:170:9: warning: cast truncates bits
+from constant value (7ffffffffff becomes ffffffff)
+drivers/thermal/uniphier_thermal.c:185:9: warning: cast truncates bits
+from constant value (7ffffffffff becomes ffffffff)
+
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
