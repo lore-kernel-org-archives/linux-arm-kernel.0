@@ -1,115 +1,140 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 20 Jul 2017 21:37:09 +0200
-Subject: [PATCH 3/3] ARM: dts: bcm2835: Add Raspberry Pi Zero W
-In-Reply-To: <1500579429-9101-1-git-send-email-stefan.wahren@i2se.com>
-References: <1500579429-9101-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1500579429-9101-4-git-send-email-stefan.wahren@i2se.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 20 Jul 2017 22:52:48 +0300
+Subject: [PATCH v2 0/2] Introduce on-chip interconnect API
+Message-ID: <20170720195250.13462-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi Zero W has the same components like the Zero plus
-a Cypress CYW43438 wireless chip (wifi + bl).
+Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+graphics, modem). These cores are talking to each other and can generate a lot
+of data flowing through the on-chip interconnects. These interconnect buses
+could form different topologies such as crossbar, point to point buses,
+hierarchical buses or use the network-on-chip concept.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Reviewed-by: Eric Anholt <eric@anholt.net>
----
- arch/arm/boot/dts/Makefile               |  3 +-
- arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 73 ++++++++++++++++++++++++++++++++
- 2 files changed, 75 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+These buses have been sized usually to handle use cases with high data
+throughput but it is not necessary all the time and consume a lot of power.
+Furthermore, the priority between masters can vary depending on the running
+use case like video playback or cpu intensive tasks.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ec60f4f..f3bf9397 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -74,7 +74,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-a-plus.dtb \
- 	bcm2836-rpi-2-b.dtb \
- 	bcm2837-rpi-3-b.dtb \
--	bcm2835-rpi-zero.dtb
-+	bcm2835-rpi-zero.dtb \
-+	bcm2835-rpi-zero-w.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-asus-rt-ac56u.dtb \
- 	bcm4708-asus-rt-ac68u.dtb \
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-new file mode 100644
-index 0000000..9c6d714
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright (C) 2017 Stefan Wahren <stefan.wahren@i2se.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "bcm2835.dtsi"
-+#include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-usb-host.dtsi"
-+
-+/ {
-+	compatible = "raspberrypi,model-zero-w", "brcm,bcm2835";
-+	model = "Raspberry Pi Zero W";
-+
-+	aliases {
-+		uart0 = "/soc/serial at 7e201000";
-+		uart1 = "/soc/serial at 7e215040";
-+		serial0 = "/soc/serial at 7e201000";
-+		serial1 = "/soc/serial at 7e215040";
-+	};
-+
-+	leds {
-+		act {
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wl_on>;
-+		reset-gpios = <&gpio 41 GPIO_ACTIVE_LOW>;
-+	};
-+};
-+
-+&gpio {
-+	pinctrl-0 = <&gpioout &alt0>;
-+
-+	wl_on: wl-on {
-+		brcm,pins = <41>;
-+		brcm,function = <BCM2835_FSEL_GPIO_OUT>;
-+	};
-+};
-+
-+&hdmi {
-+	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
-+};
-+
-+&sdhci {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	pinctrl-0 = <&emmc_gpio34 &gpclk2_gpio43>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
--- 
-2.7.4
+Having an API to control the requirement of the system in term of bandwidth
+and QoS, so we can adapt the interconnect configuration to match those by
+scaling the frequencies, setting link priority and tuning QoS parameters.
+This configuration can be a static, one-time operation done at boot for some
+platforms or a dynamic set of operations that happen at run-time.
+
+This patchset introduce a new API to get the requirement and configure the
+interconnect buses across the entire chipset to fit with the current demand.
+The API is NOT for changing the performance of the endpoint devices, but only
+the interconnect path in between them.
+
+The API is using a consumer/provider-based model, where the providers are
+the interconnect buses and the consumers could be various drivers.
+The consumers request interconnect resources (path) to an endpoint and set
+the desired constraints on this data flow path. The provider(s) receive
+requests from consumers and aggregate these requests for all master-slave
+pairs on that path. Then the providers configure each participating in the
+topology node according to the requested data flow path, physical links and
+constraints. The topology could be complicated and multi-tiered and is SoC
+specific.
+
+Below is a simplified diagram of a real-world SoC topology. The interconnect
+providers are the NoCs.
+
+ +----------------+    +----------------+
+ | HW Accelerator |--->|      M NoC     |<---------------+
+ +----------------+    +----------------+                |
+                         |      |                    +------------+
+  +-----+  +-------------+      V       +------+     |            |
+  | DDR |  |                +--------+  | PCIe |     |            |
+  +-----+  |                | Slaves |  +------+     |            |
+    ^ ^    |                +--------+     |         |   C NoC    |
+    | |    V                               V         |            |
+ +------------------+   +------------------------+   |            |   +-----+
+ |                  |-->|                        |-->|            |-->| CPU |
+ |                  |-->|                        |<--|            |   +-----+
+ |     Mem NoC      |   |         S NoC          |   +------------+
+ |                  |<--|                        |---------+    |
+ |                  |<--|                        |<------+ |    |   +--------+
+ +------------------+   +------------------------+       | |    +-->| Slaves |
+   ^  ^    ^    ^          ^                             | |        +--------+
+   |  |    |    |          |                             | V
+ +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+ | CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
+ +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+           |
+       +-------+                                                                                                                                                          
+       | Modem |
+       +-------+
+
+This patchset does not implement all features but only main skeleton to check
+the validity of the proposal.
+
+TODO:
+ * Constraints are currently stored in internal data structure. Should PM QoS
+ be used instead?
+ * Extend interconect_set() to handle parameters such as latency and other QoS
+   values.
+ * Cache the path between the nodes instead of walking the graph on each get().
+ * Sync interconnect requests with the idle state of the device.
+ * Replace dev_id string names resource lookups with integer ids.
+
+Summary of the patches:
+Patch 1 introduces the interconnect API.
+Patch 2 creates the first vendor specific interconnect bus driver.
+
+Changes since patchset v1 (https://lkml.org/lkml/2017/6/27/890)
+* Updates in the documentation.
+* Changes in request aggregation, locking.
+* Dropped the aggregate() callback and use the default as it currently
+  sufficient for the single vendor driver. Will add it later when needed.
+* Dropped the dt-bindings draft patch for now.
+
+Changes since RFC v2 (https://lkml.org/lkml/2017/6/12/316)
+* Converted documentation to rst format.
+* Fixed an incorrect call to mutex_lock. Renamed max_bw to peak_bw.
+
+Changes since RFC v1 (https://lkml.org/lkml/2017/5/15/605)
+* Refactored code into shorter functions.
+* Added a new aggregate() API function.
+* Rearranged some structs to reduce padding bytes.
+
+Changes since RFC v0 (https://lkml.org/lkml/2017/3/1/599)
+* Removed DT support and added optional Patch 3 with new bindings proposal.
+* Converted the topology into internal driver data.
+* Made the framework modular.
+* interconnect_get() now takes (src and dst ports as arguments).
+* Removed public declarations of some structs.
+* Now passing prev/next nodes to the vendor driver.
+* Properly remove requests on _put().
+* Added refcounting.
+* Updated documentation.
+* Changed struct interconnect_path to use array instead of linked list.
+
+
+Georgi Djakov (2):
+  interconnect: Add generic on-chip interconnect API
+  interconnect: Add Qualcomm msm8916 interconnect provider driver
+
+ Documentation/interconnect/interconnect.rst      |  93 ++++++
+ drivers/Kconfig                                  |   2 +
+ drivers/Makefile                                 |   1 +
+ drivers/interconnect/Kconfig                     |  15 +
+ drivers/interconnect/Makefile                    |   2 +
+ drivers/interconnect/interconnect.c              | 389 ++++++++++++++++++++++
+ drivers/interconnect/qcom/Kconfig                |  12 +
+ drivers/interconnect/qcom/Makefile               |   2 +
+ drivers/interconnect/qcom/interconnect_msm8916.c | 390 +++++++++++++++++++++++
+ include/linux/interconnect-consumer.h            |  72 +++++
+ include/linux/interconnect-provider.h            | 117 +++++++
+ include/linux/interconnect/qcom-noc.h            |  92 ++++++
+ 12 files changed, 1187 insertions(+)
+ create mode 100644 Documentation/interconnect/interconnect.rst
+ create mode 100644 drivers/interconnect/Kconfig
+ create mode 100644 drivers/interconnect/Makefile
+ create mode 100644 drivers/interconnect/interconnect.c
+ create mode 100644 drivers/interconnect/qcom/Kconfig
+ create mode 100644 drivers/interconnect/qcom/Makefile
+ create mode 100644 drivers/interconnect/qcom/interconnect_msm8916.c
+ create mode 100644 include/linux/interconnect-consumer.h
+ create mode 100644 include/linux/interconnect-provider.h
+ create mode 100644 include/linux/interconnect/qcom-noc.h
