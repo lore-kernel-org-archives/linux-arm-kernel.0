@@ -1,40 +1,48 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
 Date: Thu, 20 Jul 2017 02:29:25 +0200
-Subject: [PATCH 8/9] ARM: tegra: avoid touching Secure registers in reset
- handler
+Subject: [PATCH 6/9] ARM: init: update secondary_data register documentation
 In-Reply-To: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <22bba1196e745a5bdf66bd449bee7ccc17bd4761.1500510157.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <a6e5e735ebae32a433e501188a86082efc8b0b52.1500510157.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows secondary CPUs to boot with Trusted Foundations firmware.
+Fix secondary_data pointer register and document other
+occurrences in SMP boot code.
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 ---
- arch/arm/mach-tegra/reset-handler.S | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/kernel/head.S | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index aae7f5961563..f642032a5a08 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -143,6 +143,8 @@ ENTRY(__tegra_cpu_reset_handler)
- 	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 04286fd9e09c..68b13db86bef 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -413,7 +413,7 @@ ENDPROC(secondary_startup)
+ ENDPROC(secondary_startup_arm)
  
- 	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
-+
-+#ifdef CONFIG_ARCH_ASSUME_SECURE_PLATFORM
- #ifdef CONFIG_ARCH_TEGRA_2x_SOC
- t20_check:
- 	cmp	r6, #TEGRA20
-@@ -172,6 +174,7 @@ t30_errata:
- 	b	after_errata
- after_t30_check:
- #endif
-+#endif	/* CONFIG_ARCH_ASSUME_SECURE_PLATFORM */
- after_errata:
- 	mrc	p15, 0, r10, c0, c0, 5		@ MPIDR
- 	and	r10, r10, #0x3			@ R10 = CPU number
+ 	/*
+-	 * r6  = &secondary_data
++	 * r7  = &secondary_data
+ 	 */
+ ENTRY(__secondary_switched)
+ 	ldr	sp, [r7, #12]			@ get secondary_data.stack
+@@ -443,6 +443,7 @@ __secondary_data:
+  *  r2  = atags or dtb pointer
+  *  r4  = TTBR pointer (low word)
+  *  r5  = TTBR pointer (high word if LPAE)
++ *  r7  = secondary_data pointer (SMP)
+  *  r9  = processor ID
+  *  r13 = *virtual* address to jump to upon completion
+  */
+@@ -480,6 +481,7 @@ ENDPROC(__enable_mmu)
+  *  r0  = cp#15 control register
+  *  r1  = machine ID
+  *  r2  = atags or dtb pointer
++ *  r7  = secondary_data pointer (SMP)
+  *  r9  = processor ID
+  *  r13 = *virtual* address to jump to upon completion
+  *
 -- 
 2.11.0
