@@ -1,151 +1,190 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Jul 2017 11:44:44 +0800
-Subject: [PATCH v2 02/10] clk: sunxi-ng: Add MP_MMC clocks that support MMC
- timing modes switching
+Date: Thu, 20 Jul 2017 11:44:43 +0800
+Subject: [PATCH v2 01/10] clk: sunxi-ng: Add interface to query or configure
+ MMC timing modes.
 In-Reply-To: <20170720034452.15920-1-wens@csie.org>
 References: <20170720034452.15920-1-wens@csie.org>
-Message-ID: <20170720034452.15920-3-wens@csie.org>
+Message-ID: <20170720034452.15920-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All of our MMC clocks are of the MP clock type. A few MMC clocks on some
-SoCs, such as MMC2 on the A83T, support new/old timing mode switching.
+Starting with the A83T SoC, Allwinner introduced a new timing mode for
+its MMC clocks. The new mode changes how the MMC controller sample and
+output clocks are delayed to match chip and board specifics. There are
+two controls for this, one on the CCU side controlling how the clocks
+behave, and one in the MMC controller controlling what inputs to take
+and how to route them.
 
->From a clock rate point of view, when the new timing mode is active. the
-output clock rate is halved.
+In the old mode, the MMC clock had 2 child clocks providing the output
+and sample clocks, which could be delayed by a number of clock cycles
+measured from the MMC clock's parent.
 
-This patch adds a special wrapper class of clocks, MP_MMC, around the
-generic MP type clocks. The rate related callbacks in ccu_mp_mmc_ops
-for this class look at the timing mode bit and apply the /2 post-divider
-when needed, before passing it through to the generic class ops,
-ccu_mp_ops.
+With the new mode, the 2 delay clocks are no longer active. Instead,
+the delays and associated controls are moved into the MMC controller.
+The output of the MMC clock is also halved.
+
+The difference in how things are wired between the modes means that the
+clock controls and the MMC controls must match. To achieve this in a
+clear, explicit way, we introduce two functions for the MMC driver to
+use: one queries the hardware for the current mode set, and the other
+allows the MMC driver to request a mode.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu_mp.c | 80 +++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_mp.h | 24 +++++++++++++
- 2 files changed, 104 insertions(+)
+ drivers/clk/sunxi-ng/Makefile         |  1 +
+ drivers/clk/sunxi-ng/ccu_common.h     |  5 +++
+ drivers/clk/sunxi-ng/ccu_mmc_timing.c | 73 +++++++++++++++++++++++++++++++++++
+ include/linux/clk/sunxi-ng.h          | 35 +++++++++++++++++
+ 4 files changed, 114 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_mmc_timing.c
+ create mode 100644 include/linux/clk/sunxi-ng.h
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
-index b917ad7a386c..688855e7dc8c 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.c
-+++ b/drivers/clk/sunxi-ng/ccu_mp.c
-@@ -172,3 +172,83 @@ const struct clk_ops ccu_mp_ops = {
- 	.recalc_rate	= ccu_mp_recalc_rate,
- 	.set_rate	= ccu_mp_set_rate,
- };
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 0c45fa50283d..45a5910379a5 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -1,5 +1,6 @@
+ # Common objects
+ lib-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
++lib-$(CONFIG_SUNXI_CCU)		+= ccu_mmc_timing.o
+ lib-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
+ 
+ # Base clock types
+diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
+index d6fdd7a789aa..1e2761c53f06 100644
+--- a/drivers/clk/sunxi-ng/ccu_common.h
++++ b/drivers/clk/sunxi-ng/ccu_common.h
+@@ -23,6 +23,11 @@
+ #define CCU_FEATURE_FIXED_POSTDIV	BIT(3)
+ #define CCU_FEATURE_ALL_PREDIV		BIT(4)
+ #define CCU_FEATURE_LOCK_REG		BIT(5)
++#define CCU_FEATURE_MMC_TIMING_SWITCH	BIT(6)
++#define CCU_FEATURE_MMC_ALWAYS_NEW	BIT(7)
 +
++/* MMC timing mode switch bit */
++#define CCU_MMC_NEW_TIMING_MODE		BIT(30)
+ 
+ struct device_node;
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_mmc_timing.c b/drivers/clk/sunxi-ng/ccu_mmc_timing.c
+new file mode 100644
+index 000000000000..c5e86061c613
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu_mmc_timing.c
+@@ -0,0 +1,73 @@
 +/*
-+ * Support for MMC timing mode switching
++ * Copyright (c) 2017 Chen-Yu Tsai. All rights reserved.
 + *
-+ * The MMC clocks on some SoCs support switching between old and
-+ * new timing modes. A platform specific API is provided to query
-+ * and set the timing mode on supported SoCs.
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
 + *
-+ * In addition, a special class of ccu_mp_ops is provided, which
-+ * takes in to account the timing mode switch. When the new timing
-+ * mode is active, the clock output rate is halved. This new class
-+ * is a wrapper around the generic ccu_mp_ops. When clock rates
-+ * are passed through to ccu_mp_ops callbacks, they are doubled
-+ * if the new timing mode bit is set, to account for the post
-+ * divider. Conversely, when clock rates are passed back, they
-+ * are halved if the mode bit is set.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+static unsigned long ccu_mp_mmc_recalc_rate(struct clk_hw *hw,
-+					    unsigned long parent_rate)
-+{
-+	unsigned long rate = ccu_mp_recalc_rate(hw, parent_rate);
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+	u32 val = readl(cm->base + cm->reg);
++#include <linux/clk-provider.h>
++#include <linux/clk/sunxi-ng.h>
 +
-+	if (val & CCU_MMC_NEW_TIMING_MODE)
-+		return rate / 2;
-+	return rate;
++#include "ccu_common.h"
++
++/**
++ * sunxi_ccu_set_mmc_timing_mode: Configure the MMC clock timing mode
++ * @clk: clock to be configured
++ * @new_mode: true for new timing mode introduced in A83T and later
++ *
++ * Returns 0 on success, -ENOTSUPP if the clock does not support
++ * switching modes.
++ */
++int sunxi_ccu_set_mmc_timing_mode(struct clk *clk, bool new_mode)
++{
++	struct clk_hw *hw = __clk_get_hw(clk);
++	struct ccu_common *cm = hw_to_ccu_common(hw);
++	unsigned long flags;
++	u32 val;
++
++	if (!(cm->features & CCU_FEATURE_MMC_TIMING_SWITCH))
++		return -ENOTSUPP;
++
++	spin_lock_irqsave(cm->lock, flags);
++
++	val = readl(cm->base + cm->reg);
++	if (new_mode)
++		val |= CCU_MMC_NEW_TIMING_MODE;
++	else
++		val &= ~CCU_MMC_NEW_TIMING_MODE;
++	writel(val, cm->base + cm->reg);
++
++	spin_unlock_irqrestore(cm->lock, flags);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(sunxi_ccu_set_mmc_timing_mode);
++
++/**
++ * sunxi_ccu_set_mmc_timing_mode: Get the current MMC clock timing mode
++ * @clk: clock to query
++ *
++ * Returns 0 if the clock is in old timing mode, > 0 if it is in
++ * new timing mode, and -ENOTSUPP if the clock does not support
++ * this function.
++ */
++int sunxi_ccu_get_mmc_timing_mode(struct clk *clk)
++{
++	struct clk_hw *hw = __clk_get_hw(clk);
++	struct ccu_common *cm = hw_to_ccu_common(hw);
++
++	if (cm->features & CCU_FEATURE_MMC_ALWAYS_NEW)
++		return 1;
++
++	if (!(cm->features & CCU_FEATURE_MMC_TIMING_SWITCH))
++		return -ENOTSUPP;
++
++	return !!(readl(cm->base + cm->reg) & CCU_MMC_NEW_TIMING_MODE);
++}
++EXPORT_SYMBOL_GPL(sunxi_ccu_get_mmc_timing_mode);
+diff --git a/include/linux/clk/sunxi-ng.h b/include/linux/clk/sunxi-ng.h
+new file mode 100644
+index 000000000000..990f760f70e5
+--- /dev/null
++++ b/include/linux/clk/sunxi-ng.h
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (c) 2017 Chen-Yu Tsai. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _LINUX_CLK_SUNXI_NG_H_
++#define _LINUX_CLK_SUNXI_NG_H_
++
++#include <linux/errno.h>
++
++#ifdef CONFIG_SUNXI_CCU
++int sunxi_ccu_set_mmc_timing_mode(struct clk *clk, bool new_mode);
++int sunxi_ccu_get_mmc_timing_mode(struct clk *clk);
++#else
++static inline int sunxi_ccu_set_mmc_timing_mode(struct clk *clk,
++						bool new_mode)
++{
++	return -ENOTSUPP;
 +}
 +
-+static int ccu_mp_mmc_determine_rate(struct clk_hw *hw,
-+				     struct clk_rate_request *req)
++static inline int sunxi_ccu_get_mmc_timing_mode(struct clk *clk)
 +{
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+	u32 val = readl(cm->base + cm->reg);
-+	int ret;
-+
-+	/* adjust the requested clock rate */
-+	if (val & CCU_MMC_NEW_TIMING_MODE) {
-+		req->rate *= 2;
-+		req->min_rate *= 2;
-+		req->max_rate *= 2;
-+	}
-+
-+	ret = ccu_mp_determine_rate(hw, req);
-+
-+	/* re-adjust the requested clock rate back */
-+	if (val & CCU_MMC_NEW_TIMING_MODE) {
-+		req->rate /= 2;
-+		req->min_rate /= 2;
-+		req->max_rate /= 2;
-+	}
-+
-+	return ret;
++	return -ENOTSUPP;
 +}
++#endif
 +
-+static int ccu_mp_mmc_set_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long parent_rate)
-+{
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+	u32 val = readl(cm->base + cm->reg);
-+
-+	if (val & CCU_MMC_NEW_TIMING_MODE)
-+		rate *= 2;
-+
-+	return ccu_mp_set_rate(hw, rate, parent_rate);
-+}
-+
-+const struct clk_ops ccu_mp_mmc_ops = {
-+	.disable	= ccu_mp_disable,
-+	.enable		= ccu_mp_enable,
-+	.is_enabled	= ccu_mp_is_enabled,
-+
-+	.get_parent	= ccu_mp_get_parent,
-+	.set_parent	= ccu_mp_set_parent,
-+
-+	.determine_rate	= ccu_mp_mmc_determine_rate,
-+	.recalc_rate	= ccu_mp_mmc_recalc_rate,
-+	.set_rate	= ccu_mp_mmc_set_rate,
-+};
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
-index 915625e97d98..e5e90cec648e 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.h
-+++ b/drivers/clk/sunxi-ng/ccu_mp.h
-@@ -74,4 +74,28 @@ static inline struct ccu_mp *hw_to_ccu_mp(struct clk_hw *hw)
- 
- extern const struct clk_ops ccu_mp_ops;
- 
-+/* Special class of M-P clock that supports MMC timing modes */
-+
-+#define SUNXI_CCU_MP_MMC_WITH_MUX_GATE(_struct, _name, _parents, _reg,	\
-+				       _mshift, _mwidth,		\
-+				       _pshift, _pwidth,		\
-+				       _muxshift, _muxwidth,		\
-+				       _gate, _flags)			\
-+	struct ccu_mp _struct = {					\
-+		.enable	= _gate,					\
-+		.m	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
-+		.p	= _SUNXI_CCU_DIV(_pshift, _pwidth),		\
-+		.mux	= _SUNXI_CCU_MUX(_muxshift, _muxwidth),		\
-+		.common	= {						\
-+			.reg		= _reg,				\
-+			.features	= CCU_FEATURE_MMC_TIMING_SWITCH, \
-+			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
-+							      _parents, \
-+							      &ccu_mp_mmc_ops, \
-+							      _flags),	\
-+		}							\
-+	}
-+
-+extern const struct clk_ops ccu_mp_mmc_ops;
-+
- #endif /* _CCU_MP_H_ */
++#endif
 -- 
 2.13.2
