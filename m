@@ -1,42 +1,69 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Thu, 20 Jul 2017 10:43:53 +0800
-Subject: [PATCH v5 6/7] dt-bindings: display: rockchip: fill Documents for vop
- series
+Date: Thu, 20 Jul 2017 10:44:02 +0800
+Subject: [PATCH v5 7/7] drm/rockchip: vop: rk3328: fix overlay abnormal
 In-Reply-To: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
 References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1500518633-30761-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1500518642-30821-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It's a hardware bug, all window's overlay channel reset
+value is same, hardware overlay would be die.
+
+so we must initial difference id for each overlay channel.
+
+The Channel register is supported on all vop will full design.
+Following is the details for this register
+VOP_WIN0_CTRL2
+  bit[7:4] win_rid_win0_cbr
+       axi read id of win0 cbr channel
+  bit[3:0] win_rid_win0_yrgb
+       axi read id of win0 yrgb channel
+
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
-Changes in v5:
-- clean document commit title
-- move changes description out of docummit commit msg
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 ++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 1 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 1 +
+ 3 files changed, 4 insertions(+)
 
-Changes in v2:
-- rename rk322x to rk3228
-- correct some vop registers define
-
- Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-index 9eb3f0a..5d835d9 100644
---- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-@@ -8,8 +8,12 @@ Required properties:
- - compatible: value should be one of the following
- 		"rockchip,rk3036-vop";
- 		"rockchip,rk3288-vop";
-+		"rockchip,rk3368-vop";
-+		"rockchip,rk3366-vop";
- 		"rockchip,rk3399-vop-big";
- 		"rockchip,rk3399-vop-lit";
-+		"rockchip,rk3228-vop";
-+		"rockchip,rk3328-vop";
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 92d098b..e4b3388 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1452,7 +1452,9 @@ static int vop_initial(struct vop *vop)
  
- - interrupts: should contain a list of all VOP IP block interrupts in the
- 		 order: VSYNC, LCD_SYSTEM. The interrupt specifier
+ 	for (i = 0; i < vop_data->win_size; i++) {
+ 		const struct vop_win_data *win = &vop_data->win[i];
++		int channel = i * 2 + 1;
+ 
++		VOP_WIN_SET(vop, win, channel, (channel + 1) << 4 | channel);
+ 		VOP_WIN_SET(vop, win, enable, 0);
+ 		VOP_WIN_SET(vop, win, gate, 1);
+ 	}
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+index 43d08c8..af1091f 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+@@ -141,6 +141,7 @@ struct vop_win_phy {
+ 
+ 	struct vop_reg dst_alpha_ctl;
+ 	struct vop_reg src_alpha_ctl;
++	struct vop_reg channel;
+ };
+ 
+ struct vop_win_data {
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index 99f8ba4..cc8d408 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -196,6 +196,7 @@
+ 	.uv_vir = VOP_REG(RK3288_WIN0_VIR, 0x3fff, 16),
+ 	.src_alpha_ctl = VOP_REG(RK3288_WIN0_SRC_ALPHA_CTRL, 0xff, 0),
+ 	.dst_alpha_ctl = VOP_REG(RK3288_WIN0_DST_ALPHA_CTRL, 0xff, 0),
++	.channel = VOP_REG(RK3288_WIN0_CTRL2, 0xff, 0),
+ };
+ 
+ static const struct vop_win_phy rk3288_win23_data = {
 -- 
 1.9.1
