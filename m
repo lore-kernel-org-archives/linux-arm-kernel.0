@@ -1,37 +1,93 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 20 Jul 2017 10:18:14 +0530
-Subject: [PATCH v2 0/5] clk: qcom: gdsc: Add support for clk control
-Message-ID: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
+Date: Thu, 20 Jul 2017 10:18:16 +0530
+Subject: [PATCH v2 2/5] clk: Add clk_hw_get_clk() helper API to be used by clk
+ providers
+In-Reply-To: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
+References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1500526099-9935-3-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series allows clocks associated with GDSCs to be controlled
-along with the powerdomains. To start with, some of the mmagic
-clocks are assocaited with the mmagic gdscs on msm8996 so the
-devices in these mmagic domains (vidc, mdss, their smmu instances etc)
-don't have to put these in their resp. DT bindings.
+As we move towards a cleaner split to have clock providers use clk_hw
+for all clock operations, while consumers operate on the (per-user)
+struct clk handles, we still have cases where in a clock provider
+might want to call into high level clk apis which only operate on a
+struct clk handle.
+To facilitate such needs, have a clk_hw_get_clk() api which can be
+used from within clock providers to get access to struct clk handles.
 
-changes in v2:
-* Fixed review comments from Stan
-* Added mmagic clocks needed by gpu
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+---
+ drivers/clk/clk.c            | 39 +++++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |  5 +++++
+ 2 files changed, 44 insertions(+)
 
-Rajendra Nayak (5):
-  arm64: qcom: Select PM_GENERIC_DOMAINS
-  clk: Add clk_hw_get_clk() helper API to be used by clk providers
-  clk: qcom: gdsc: Add support to control associated clks
-  clk: qcom: gcc-msm8996: Mark gcc_mmss_noc_cfg_ahb_clk as a critical
-    clock
-  clk: qcom: mmcc-8996: Associate all mmagic clks with mmagic gdscs
-
- arch/arm64/Kconfig.platforms    |  2 ++
- drivers/clk/clk.c               | 39 +++++++++++++++++++++++++++
- drivers/clk/qcom/gcc-msm8996.c  |  2 +-
- drivers/clk/qcom/gdsc.c         | 60 +++++++++++++++++++++++++++++++++++++++--
- drivers/clk/qcom/gdsc.h         |  8 ++++++
- drivers/clk/qcom/mmcc-msm8996.c | 26 ++++++++++++++++++
- include/linux/clk-provider.h    |  5 ++++
- 7 files changed, 139 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index fc58c52..c9bbfb3 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -186,6 +186,45 @@ const char *clk_hw_get_name(const struct clk_hw *hw)
+ }
+ EXPORT_SYMBOL_GPL(clk_hw_get_name);
+ 
++struct clk *clk_hw_get_clk(struct clk_hw *hw, const char *dev_id,
++			   const char *con_id)
++{
++	return __clk_create_clk(hw, dev_id, con_id);
++}
++EXPORT_SYMBOL_GPL(clk_hw_get_clk);
++
++void clk_hw_put_clk(struct clk *clk)
++{
++	__clk_free_clk(clk);
++}
++EXPORT_SYMBOL_GPL(clk_hw_put_clk);
++
++static void devm_clk_hw_put(struct device *dev, void *res)
++{
++	clk_hw_put_clk(*(struct clk **)res);
++}
++
++struct clk *devm_clk_hw_get_clk(struct device *dev, struct clk_hw *hw,
++				const char *con_id)
++{
++	struct clk **ptr, *clk;
++
++	ptr = devres_alloc(devm_clk_hw_put, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	clk = clk_hw_get_clk(hw, dev_name(dev), con_id);
++	if (!IS_ERR(clk)) {
++		*ptr = clk;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return clk;
++}
++EXPORT_SYMBOL_GPL(devm_clk_hw_get_clk);
++
+ struct clk_hw *__clk_get_hw(struct clk *clk)
+ {
+ 	return !clk ? NULL : clk->core->hw;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index c59c625..c85bfed 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -730,6 +730,11 @@ struct clk_hw *clk_hw_register_gpio_mux(struct device *dev, const char *name,
+ /* helper functions */
+ const char *__clk_get_name(const struct clk *clk);
+ const char *clk_hw_get_name(const struct clk_hw *hw);
++struct clk *clk_hw_get_clk(struct clk_hw *hw, const char *dev_id,
++			   const char *con_id);
++void clk_hw_put_clk(struct clk *clk);
++struct clk *devm_clk_hw_get_clk(struct device *dev, struct clk_hw *hw,
++				const char *con_id);
+ struct clk_hw *__clk_get_hw(struct clk *clk);
+ unsigned int clk_hw_get_num_parents(const struct clk_hw *hw);
+ struct clk_hw *clk_hw_get_parent(const struct clk_hw *hw);
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
