@@ -1,64 +1,49 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Jul 2017 11:44:48 +0800
-Subject: [PATCH v2 06/10] mmc: sunxi: Add support for A83T eMMC (MMC2)
+Date: Thu, 20 Jul 2017 11:44:45 +0800
+Subject: [PATCH v2 03/10] clk: sunxi-ng: a83t: Support new timing mode for
+ mmc2 clock
 In-Reply-To: <20170720034452.15920-1-wens@csie.org>
 References: <20170720034452.15920-1-wens@csie.org>
-Message-ID: <20170720034452.15920-7-wens@csie.org>
+Message-ID: <20170720034452.15920-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The third MMC controller (MMC2) on the Allwinner A83T SoC is slightly
-different. It supports a wider 8-bit bus, has a dedicated controllable
-reset pin for eMMC, and a "new timing mode" which is supposed to deliver
-better signals and thus better performance.
+The MMC2 clock supports a new timing mode. When the new mode is active,
+the output clock rate is halved.
 
-Add a compatible for this one to use the new timing mode not found in the
-other controllers.
+This patch sets the feature flag for the new timing mode, and adds
+a pre-divider based on the mode bit.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
- drivers/mmc/host/sunxi-mmc.c                        | 8 ++++++++
- 2 files changed, 9 insertions(+)
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-index 7d53a799f140..63b57e2a10fb 100644
---- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-@@ -12,6 +12,7 @@ Required properties:
-    * "allwinner,sun4i-a10-mmc"
-    * "allwinner,sun5i-a13-mmc"
-    * "allwinner,sun7i-a20-mmc"
-+   * "allwinner,sun8i-a83t-emmc"
-    * "allwinner,sun9i-a80-mmc"
-    * "allwinner,sun50i-a64-emmc"
-    * "allwinner,sun50i-a64-mmc"
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 11587a69a1fd..de187ed77040 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -1117,6 +1117,13 @@ static const struct sunxi_mmc_cfg sun7i_a20_cfg = {
- 	.can_calibrate = false,
- };
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+index 947f9f6e05d2..c5656e4f2a38 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+@@ -418,14 +418,13 @@ static SUNXI_CCU_PHASE(mmc1_sample_clk, "mmc1-sample", "mmc1",
+ static SUNXI_CCU_PHASE(mmc1_output_clk, "mmc1-output", "mmc1",
+ 		       0x08c, 8, 3, 0);
  
-+static const struct sunxi_mmc_cfg sun8i_a83t_emmc_cfg = {
-+	.idma_des_size_bits = 16,
-+	.clk_delays = sunxi_mmc_clk_delays,
-+	.can_calibrate = false,
-+	.has_timings_switch = true,
-+};
-+
- static const struct sunxi_mmc_cfg sun9i_a80_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = sun9i_mmc_clk_delays,
-@@ -1141,6 +1148,7 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
- 	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
- 	{ .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
-+	{ .compatible = "allwinner,sun8i-a83t-emmc", .data = &sun8i_a83t_emmc_cfg },
- 	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
- 	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
- 	{ .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
+-/* TODO Support MMC2 clock's new timing mode. */
+-static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mod0_default_parents,
+-				  0x090,
+-				  0, 4,		/* M */
+-				  16, 2,	/* P */
+-				  24, 2,	/* mux */
+-				  BIT(31),	/* gate */
+-				  0);
++static SUNXI_CCU_MP_MMC_WITH_MUX_GATE(mmc2_clk, "mmc2", mod0_default_parents,
++				      0x090,
++				      0, 4,	/* M */
++				      16, 2,	/* P */
++				      24, 2,	/* mux */
++				      BIT(31),	/* gate */
++				      CLK_GET_RATE_NOCACHE);
+ 
+ static SUNXI_CCU_PHASE(mmc2_sample_clk, "mmc2-sample", "mmc2",
+ 		       0x090, 20, 3, 0);
 -- 
 2.13.2
