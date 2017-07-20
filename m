@@ -1,44 +1,34 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 20 Jul 2017 14:17:08 +0200
-Subject: [PATCH 09/10] arm64: zynqmp: Add new uartps compatible string
+Date: Thu, 20 Jul 2017 14:17:09 +0200
+Subject: [PATCH 10/10] arm64: zynqmp: Set status disabled in dtsi
 In-Reply-To: <cover.1500552941.git.michal.simek@xilinx.com>
 References: <cover.1500552941.git.michal.simek@xilinx.com>
-Message-ID: <4babfd9b8311073566a5d5730353c035bb5afa2a.1500552941.git.michal.simek@xilinx.com>
+Message-ID: <e3533d223e5a6a1b39d401cc6ec4b481a8b60398.1500552941.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mainline kernel has r1p12 compatible string now. Use this new compatible
-string and also append generic compatible string.
-Keep in your mind that using this generic compatible string not all uart
-features will be available.
+From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
 
+Do not enable smmu via dtsi. Enable it in board file when needed.
+
+Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 4adf5285f56d..9304249a23ed 100644
+index 9304249a23ed..787463796348 100644
 --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
 +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -407,7 +407,7 @@
- 		};
- 
- 		uart0: serial at ff000000 {
--			compatible = "cdns,uart-r1p8";
-+			compatible = "cdns,uart-r1p12", "xlnx,xuartps";
- 			status = "disabled";
+@@ -339,6 +339,7 @@
+ 		smmu: smmu at fd800000 {
+ 			compatible = "arm,mmu-500";
+ 			reg = <0x0 0xfd800000 0x0 0x20000>;
++			status = "disabled";
+ 			#global-interrupts = <1>;
  			interrupt-parent = <&gic>;
- 			interrupts = <0 21 4>;
-@@ -416,7 +416,7 @@
- 		};
- 
- 		uart1: serial at ff010000 {
--			compatible = "cdns,uart-r1p8";
-+			compatible = "cdns,uart-r1p12", "xlnx,xuartps";
- 			status = "disabled";
- 			interrupt-parent = <&gic>;
- 			interrupts = <0 22 4>;
+ 			interrupts = <0 155 4>,
 -- 
 1.9.1
