@@ -1,60 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jul 2017 10:10:03 +0100
-Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
- SMMUv3 driver
-In-Reply-To: <CAALAos-YbVbgvPmDYXeWaF4y8MQ9i7CG3tgGuf-QLR6hmXo18Q@mail.gmail.com>
-References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
- <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
- <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
- <20170719112524.GF13642@arm.com>
- <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
- <20170719113325.GI13642@arm.com>
- <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
- <20170719115333.GJ13642@arm.com>
- <CAALAos-YbVbgvPmDYXeWaF4y8MQ9i7CG3tgGuf-QLR6hmXo18Q@mail.gmail.com>
-Message-ID: <20170720091003.GA17837@arm.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 20 Jul 2017 14:40:37 +0530
+Subject: [PATCH 2/4] gpio: davinci: Handle the return value of
+ davinci_gpio_irq_setup function
+In-Reply-To: <cbea9082-3799-281b-1364-50e442f5362f@ti.com>
+References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+ <1500375436-9435-3-git-send-email-j-keerthy@ti.com>
+ <20170719111000.GX29638@localhost>
+ <cbea9082-3799-281b-1364-50e442f5362f@ti.com>
+Message-ID: <cc66dfaf-05c5-8d55-03a6-556ec83c4487@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 09:32:00AM +0530, Anup Patel wrote:
-> On Wed, Jul 19, 2017 at 5:23 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > There are two things here:
-> >
-> >   1. iommu_present() is pretty useless, because it applies to a "bus" which
-> >      doesn't actually tell you what you need to know for things like the
-> >      platform_bus, where some masters might be upstream of an SMMU and
-> >      others might not be.
-> 
-> I agree with you. The iommu_present() check in vfio_iommu_group_get()
-> is not much useful. We only reach line which checks iommu_present()
-> when iommu_group_get() returns NULL for given "struct device *". If there
-> is no IOMMU group for a "struct device *" then it means there is no IOMMU
-> HW doing translations for such device.
-> 
-> If we drop the iommu_present() check (due to above reasons) in
-> vfio_iommu_group_get() then we don't require the IOMMU_CAP_BYPASS
-> and we can happily drop PATCH1, PATCH2, and PATCH3.
-> 
-> I will remove the iommu_present() check in vfio_iommu_group_get()
-> because it is only comes into actions when VFIO_NOIOMMU is
-> enabled. This will also help us drop PATCH1-to-PATCH3.
 
-I don't think that's the right answer. Whilst iommu_present has obvious
-shortcomings, its intention is clear: it should tell you whether a given
-*device* is upstream of an IOMMU. So the right fix is to make this
-per-device, instead of per-bus. Removing it altogether is worse than leaving
-it like it is.
 
-> >   2. If a master *is* upstream of an IOMMU and you want to use no-IOMMU,
-> >      then the VFIO no-IOMMU code needs to be extended so that it creates
-> >      an IDENTITY domain on that IOMMU.
+On Thursday 20 July 2017 12:14 PM, Keerthy wrote:
 > 
-> The VFIO no-IOMMU mode is equivalent to Linux UIO hence having
-> IDENTITY domain for VFIO no-IOMMU is not appropriate here.
+> 
+> On Wednesday 19 July 2017 04:40 PM, Johan Hovold wrote:
+>> On Tue, Jul 18, 2017 at 04:27:14PM +0530, Keerthy wrote:
+>>> Currently davinci_gpio_irq_setup return value is ignored. Handle the
+>>> return value appropriately.
+>>>
+>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>> ---
+>>>  drivers/gpio/gpio-davinci.c | 18 +++++++++++++-----
+>>>  1 file changed, 13 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+>>> index 2c88054..932f270 100644
+>>> --- a/drivers/gpio/gpio-davinci.c
+>>> +++ b/drivers/gpio/gpio-davinci.c
+>>> @@ -233,15 +233,23 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+>>>  		chips->regs[bank] = gpio_base + offset_array[bank];
+>>>  
+>>>  	ret = devm_gpiochip_add_data(dev, &chips->chip, chips);
+>>> +	if (ret)
+>>> +		goto err;
+>>> +
+>>> +	platform_set_drvdata(pdev, chips);
+>>> +	ret = davinci_gpio_irq_setup(pdev);
+>>>  	if (ret) {
+>>> -		ctrl_num = 0;
+>>> -		bank_base = 0;
+>>> -		return ret;
+>>> +		platform_set_drvdata(pdev, NULL);
+>>> +		goto err;
+>>>  	}
+>>>  
+>>> -	platform_set_drvdata(pdev, chips);
+>>> -	davinci_gpio_irq_setup(pdev);
+>>>  	return 0;
+>>
+>> There's a separate but related bug here too as the clk_prepare_enable()
+>> in davinci_gpio_irq_setup() is never balanced on driver unbind.
+> 
+> Yes Johan. I will send that as a separate patch.
 
-Can you elaborate on this please? I don't understand the argument you're
-making. It's like saying "I don't like eggs, therefore I don't drive a
-car".
+This is already fixed in the latest kernel:
 
-Will
+commit 6dc0048cff988858254fcc26becfc1e9753efa79
+Author: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Date:   Tue May 23 14:48:57 2017 +0530
+
+Regards,
+Keerthy
+> 
+>>
+>> Johan
+>>
