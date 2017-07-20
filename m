@@ -1,104 +1,194 @@
-From: robert.moore@intel.com (Moore, Robert)
-Date: Thu, 20 Jul 2017 15:50:16 +0000
-Subject: [PATCH 1/4] ACPI: Allow _DMA method in walk resources
-References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
- <20170720144517.32529-2-lorenzo.pieralisi@arm.com>
-Message-ID: <94F2FBAB4432B54E8AACC7DFDE6C92E37E5D914D@ORSMSX110.amr.corp.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Jul 2017 17:50:46 +0200
+Subject: [PATCH 03/12] ARM: normalize clk API for older platforms
+In-Reply-To: <20170720154616.3250481-1-arnd@arndb.de>
+References: <20170720154616.3250481-1-arnd@arndb.de>
+Message-ID: <20170720155132.3250812-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Could you post this as a pull request on our github?
+Six ARM platforms still provide their own variant of the clk API
+rather than using the generic COMMON_CLK API. This generally works,
+but it causes some link errors with drivers using the clk_set_rate,
+clk_get_parent, clk_set_parent or clk_round_rate functions when
+a platform lacks those interfaces.
 
-https://github.com/acpica/acpica
+OMAP1 implements the whole set already, but davinci, ep93xx, mmp,
+sa1100 and w90x900 all lack at least one of the functions.
 
-> -----Original Message-----
-> From: Moore, Robert
-> Sent: Thursday, July 20, 2017 8:49 AM
-> To: 'Lorenzo Pieralisi' <lorenzo.pieralisi@arm.com>; linux-
-> acpi at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> Zhang, Rui <rui.zhang@intel.com>; Rafael J. Wysocki <rjw@rjwysocki.net>;
-> Will Deacon <will.deacon@arm.com>; Robin Murphy <robin.murphy@arm.com>;
-> Hanjun Guo <hanjun.guo@linaro.org>; Feng Kan <fkan@apm.com>; Jon Masters
-> <jcm@redhat.com>; Nate Watterson <nwatters@codeaurora.org>
-> Subject: RE: [PATCH 1/4] ACPI: Allow _DMA method in walk resources
-> 
-> I think we can take this as-is into ACPICA.
-> Bob
-> 
-> 
-> > -----Original Message-----
-> > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > Sent: Thursday, July 20, 2017 7:45 AM
-> > To: linux-acpi at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org;
-> > linux-kernel at vger.kernel.org; Lorenzo Pieralisi
-> > <lorenzo.pieralisi@arm.com>; Moore, Robert <robert.moore@intel.com>;
-> Zhang, Rui <rui.zhang@intel.com>; Rafael J.
-> > Wysocki <rjw@rjwysocki.net>; Will Deacon <will.deacon@arm.com>; Robin
-> > Murphy <robin.murphy@arm.com>; Hanjun Guo <hanjun.guo@linaro.org>;
-> > Feng Kan <fkan@apm.com>; Jon Masters <jcm@redhat.com>; Nate Watterson
-> > <nwatters@codeaurora.org>
-> > Subject: [PATCH 1/4] ACPI: Allow _DMA method in walk resources
-> >
-> > The _DMA object contains a resource template, this change adds support
-> > for the walk resources function so that ACPI devices containing a _DMA
-> > object can actually parse it to detect DMA ranges for the respective
-> > bus.
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Robert Moore <robert.moore@intel.com>
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > ---
-> >  drivers/acpi/acpica/rsxface.c | 7 ++++---
-> >  include/acpi/acnames.h        | 1 +
-> >  2 files changed, 5 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/acpi/acpica/rsxface.c
-> > b/drivers/acpi/acpica/rsxface.c index 59a4f9e..be65e65 100644
-> > --- a/drivers/acpi/acpica/rsxface.c
-> > +++ b/drivers/acpi/acpica/rsxface.c
-> > @@ -615,7 +615,7 @@ ACPI_EXPORT_SYMBOL(acpi_walk_resource_buffer)
-> >   *                                device we are querying
-> >   *              name            - Method name of the resources we
-> want.
-> >   *                                (METHOD_NAME__CRS,
-> METHOD_NAME__PRS,
-> > or
-> > - *                                METHOD_NAME__AEI)
-> > + *                                METHOD_NAME__AEI or
-> METHOD_NAME__DMA)
-> >   *              user_function   - Called for each resource
-> >   *              context         - Passed to user_function
-> >   *
-> > @@ -641,11 +641,12 @@ acpi_walk_resources(acpi_handle device_handle,
-> >  	if (!device_handle || !user_function || !name ||
-> >  	    (!ACPI_COMPARE_NAME(name, METHOD_NAME__CRS) &&
-> >  	     !ACPI_COMPARE_NAME(name, METHOD_NAME__PRS) &&
-> > -	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI))) {
-> > +	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI) &&
-> > +	     !ACPI_COMPARE_NAME(name, METHOD_NAME__DMA))) {
-> >  		return_ACPI_STATUS(AE_BAD_PARAMETER);
-> >  	}
-> >
-> > -	/* Get the _CRS/_PRS/_AEI resource list */
-> > +	/* Get the _CRS/_PRS/_AEI/_DMA resource list */
-> >
-> >  	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
-> >  	status = acpi_rs_get_method_data(device_handle, name, &buffer);
-> diff
-> > --git a/include/acpi/acnames.h b/include/acpi/acnames.h index
-> > b421584..d8dd3bf 100644
-> > --- a/include/acpi/acnames.h
-> > +++ b/include/acpi/acnames.h
-> > @@ -54,6 +54,7 @@
-> >  #define METHOD_NAME__CLS        "_CLS"
-> >  #define METHOD_NAME__CRS        "_CRS"
-> >  #define METHOD_NAME__DDN        "_DDN"
-> > +#define METHOD_NAME__DMA        "_DMA"
-> >  #define METHOD_NAME__HID        "_HID"
-> >  #define METHOD_NAME__INI        "_INI"
-> >  #define METHOD_NAME__PLD        "_PLD"
-> > --
-> > 2.10.0
+This adds empty stub implementations for each of them, and I
+don't even try to do something useful here but instead just
+print a WARN() message to make it obvious what is going on
+if they ever end up being called.
+
+The drivers that call these won't be used on these platforms
+(otherwise we'd get a link error today), so the added code is harmless
+bloat and will warn about accidental use.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-davinci/clock.c |  6 ++++++
+ arch/arm/mach-ep93xx/clock.c  | 21 +++++++++++++++++++++
+ arch/arm/mach-mmp/clock.c     | 22 ++++++++++++++++++++++
+ arch/arm/mach-sa1100/clock.c  | 29 +++++++++++++++++++++++++++++
+ arch/arm/mach-w90x900/clock.c | 29 +++++++++++++++++++++++++++++
+ 5 files changed, 107 insertions(+)
+
+diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+index f5dce9b4e617..89586779526c 100644
+--- a/arch/arm/mach-davinci/clock.c
++++ b/arch/arm/mach-davinci/clock.c
+@@ -218,6 +218,12 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ }
+ EXPORT_SYMBOL(clk_set_parent);
+ 
++struct clk *clk_get_parent(struct clk *clk)
++{
++	return clk->parent;
++}
++EXPORT_SYMBOL(clk_get_parent);
++
+ int clk_register(struct clk *clk)
+ {
+ 	if (clk == NULL || IS_ERR(clk))
+diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+index 39ef3b613912..c1c91fc6e178 100644
+--- a/arch/arm/mach-ep93xx/clock.c
++++ b/arch/arm/mach-ep93xx/clock.c
+@@ -323,6 +323,27 @@ unsigned long clk_get_rate(struct clk *clk)
+ }
+ EXPORT_SYMBOL(clk_get_rate);
+ 
++long clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_round_rate);
++
++int clk_set_parent(struct clk *clk, struct clk *parent)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_set_parent);
++
++struct clk *clk_get_parent(struct clk *clk)
++{
++	WARN_ON(clk);
++	return NULL;
++}
++EXPORT_SYMBOL(clk_get_parent);
++
+ static int set_keytchclk_rate(struct clk *clk, unsigned long rate)
+ {
+ 	u32 val;
+diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
+index 28fe64c6e2f5..78513f74ae8d 100644
+--- a/arch/arm/mach-mmp/clock.c
++++ b/arch/arm/mach-mmp/clock.c
+@@ -106,3 +106,25 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 	return ret;
+ }
+ EXPORT_SYMBOL(clk_set_rate);
++
++/* Dummy clk routine to build generic kernel parts that may be using them */
++long clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_round_rate);
++
++int clk_set_parent(struct clk *clk, struct clk *parent)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_set_parent);
++
++struct clk *clk_get_parent(struct clk *clk)
++{
++	WARN_ON(clk);
++	return NULL;
++}
++EXPORT_SYMBOL(clk_get_parent);
+diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
+index 0db46895c82a..a602d876c231 100644
+--- a/arch/arm/mach-sa1100/clock.c
++++ b/arch/arm/mach-sa1100/clock.c
+@@ -35,6 +35,35 @@ struct clk clk_##_name = {				\
+ 
+ static DEFINE_SPINLOCK(clocks_lock);
+ 
++/* Dummy clk routine to build generic kernel parts that may be using them */
++long clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_round_rate);
++
++int clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_set_rate);
++
++int clk_set_parent(struct clk *clk, struct clk *parent)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_set_parent);
++
++struct clk *clk_get_parent(struct clk *clk)
++{
++	WARN_ON(clk);
++	return NULL;
++}
++EXPORT_SYMBOL(clk_get_parent);
++
+ static void clk_gpio27_enable(struct clk *clk)
+ {
+ 	/*
+diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
+index ac6fd1a2cb59..3f93fac98d97 100644
+--- a/arch/arm/mach-w90x900/clock.c
++++ b/arch/arm/mach-w90x900/clock.c
+@@ -93,3 +93,32 @@ void nuc900_subclk_enable(struct clk *clk, int enable)
+ 
+ 	__raw_writel(clken, W90X900_VA_CLKPWR + SUBCLK);
+ }
++
++/* dummy functions, should not be called */
++long clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_round_rate);
++
++int clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_set_rate);
++
++int clk_set_parent(struct clk *clk, struct clk *parent)
++{
++	WARN_ON(clk);
++	return 0;
++}
++EXPORT_SYMBOL(clk_set_parent);
++
++struct clk *clk_get_parent(struct clk *clk)
++{
++	WARN_ON(clk);
++	return NULL;
++}
++EXPORT_SYMBOL(clk_get_parent);
+-- 
+2.9.0
