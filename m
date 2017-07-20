@@ -1,83 +1,73 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 20 Jul 2017 12:03:59 +0100
-Subject: [PATCH 1/4] arm64/numa: Drop duplicate message
-In-Reply-To: <20170720110402.15313-1-punit.agrawal@arm.com>
-References: <20170720110402.15313-1-punit.agrawal@arm.com>
-Message-ID: <20170720110402.15313-2-punit.agrawal@arm.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Thu, 20 Jul 2017 16:38:09 +0530
+Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
+ SMMUv3 driver
+In-Reply-To: <20170720091003.GA17837@arm.com>
+References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+ <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
+ <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
+ <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
+ <20170719112524.GF13642@arm.com>
+ <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
+ <20170719113325.GI13642@arm.com>
+ <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
+ <20170719115333.GJ13642@arm.com>
+ <CAALAos-YbVbgvPmDYXeWaF4y8MQ9i7CG3tgGuf-QLR6hmXo18Q@mail.gmail.com>
+ <20170720091003.GA17837@arm.com>
+Message-ID: <CAALAos8571-UVp7Ky81qFESVcNcWx_H2VOemFt_++NFCxcMg3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting linux on a system without CONFIG_NUMA enabled, the
-following messages are printed during boot -
+On Thu, Jul 20, 2017 at 2:40 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Jul 20, 2017 at 09:32:00AM +0530, Anup Patel wrote:
+>> On Wed, Jul 19, 2017 at 5:23 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > There are two things here:
+>> >
+>> >   1. iommu_present() is pretty useless, because it applies to a "bus" which
+>> >      doesn't actually tell you what you need to know for things like the
+>> >      platform_bus, where some masters might be upstream of an SMMU and
+>> >      others might not be.
+>>
+>> I agree with you. The iommu_present() check in vfio_iommu_group_get()
+>> is not much useful. We only reach line which checks iommu_present()
+>> when iommu_group_get() returns NULL for given "struct device *". If there
+>> is no IOMMU group for a "struct device *" then it means there is no IOMMU
+>> HW doing translations for such device.
+>>
+>> If we drop the iommu_present() check (due to above reasons) in
+>> vfio_iommu_group_get() then we don't require the IOMMU_CAP_BYPASS
+>> and we can happily drop PATCH1, PATCH2, and PATCH3.
+>>
+>> I will remove the iommu_present() check in vfio_iommu_group_get()
+>> because it is only comes into actions when VFIO_NOIOMMU is
+>> enabled. This will also help us drop PATCH1-to-PATCH3.
+>
+> I don't think that's the right answer. Whilst iommu_present has obvious
+> shortcomings, its intention is clear: it should tell you whether a given
+> *device* is upstream of an IOMMU. So the right fix is to make this
+> per-device, instead of per-bus. Removing it altogether is worse than leaving
+> it like it is.
+>
+>> >   2. If a master *is* upstream of an IOMMU and you want to use no-IOMMU,
+>> >      then the VFIO no-IOMMU code needs to be extended so that it creates
+>> >      an IDENTITY domain on that IOMMU.
+>>
+>> The VFIO no-IOMMU mode is equivalent to Linux UIO hence having
+>> IDENTITY domain for VFIO no-IOMMU is not appropriate here.
+>
+> Can you elaborate on this please? I don't understand the argument you're
+> making. It's like saying "I don't like eggs, therefore I don't drive a
+> car".
+>
 
-NUMA: Faking a node at [mem 0x0000000000000000-0x00000083ffffffff]
-NUMA: Adding memblock [0x8000000000 - 0x8000e7ffff] on node 0
-NUMA: Adding memblock [0x8000e80000 - 0x83f65cffff] on node 0
-NUMA: Adding memblock [0x83f65d0000 - 0x83f665ffff] on node 0
-NUMA: Adding memblock [0x83f6660000 - 0x83f676ffff] on node 0
-NUMA: Adding memblock [0x83f6770000 - 0x83f678ffff] on node 0
-NUMA: Adding memblock [0x83f6790000 - 0x83fb82ffff] on node 0
-NUMA: Adding memblock [0x83fb830000 - 0x83fbc0ffff] on node 0
-NUMA: Adding memblock [0x83fbc10000 - 0x83fbdfffff] on node 0
-NUMA: Adding memblock [0x83fbe00000 - 0x83fbffffff] on node 0
-NUMA: Adding memblock [0x83fc000000 - 0x83fffbffff] on node 0
-NUMA: Adding memblock [0x83fffc0000 - 0x83fffdffff] on node 0
-NUMA: Adding memblock [0x83fffe0000 - 0x83ffffffff] on node 0
-NUMA: Initmem setup node 0 [mem 0x8000000000-0x83ffffffff]
-NUMA: NODE_DATA [mem 0x83fffec500-0x83fffedfff]
+Like I said, VFIO no-IOMMU mode for a device means device transactions
+will not go through any IOMMU. That's why having IDENTITY domain for
+device using VFIO no-IOMMU is not semantically correct. The analogy you
+proposed does not apply here.
 
-The information is then duplicated by core kernel messages right after
-the above output.
+Anyways, this patch has nothing to do with FlexRM support for
+VFIO platform hence I will drop it. Fixing VFIO no-IOMMU mode
+can be a separate patchset.
 
-Early memory node ranges
-  node   0: [mem 0x0000008000000000-0x0000008000e7ffff]
-  node   0: [mem 0x0000008000e80000-0x00000083f65cffff]
-  node   0: [mem 0x00000083f65d0000-0x00000083f665ffff]
-  node   0: [mem 0x00000083f6660000-0x00000083f676ffff]
-  node   0: [mem 0x00000083f6770000-0x00000083f678ffff]
-  node   0: [mem 0x00000083f6790000-0x00000083fb82ffff]
-  node   0: [mem 0x00000083fb830000-0x00000083fbc0ffff]
-  node   0: [mem 0x00000083fbc10000-0x00000083fbdfffff]
-  node   0: [mem 0x00000083fbe00000-0x00000083fbffffff]
-  node   0: [mem 0x00000083fc000000-0x00000083fffbffff]
-  node   0: [mem 0x00000083fffc0000-0x00000083fffdffff]
-  node   0: [mem 0x00000083fffe0000-0x00000083ffffffff]
-Initmem setup node 0 [mem 0x0000008000000000-0x00000083ffffffff]
-
-Remove the duplication of memblock layout information printed during
-boot by dropping the messages from arm64 numa initialisation.
-
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/numa.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
-
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index b388a99fea7b..dad128ba98bf 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -208,8 +208,6 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
- 	}
- 
- 	node_set(nid, numa_nodes_parsed);
--	pr_info("Adding memblock [0x%llx - 0x%llx] on node %d\n",
--			start, (end - 1), nid);
- 	return ret;
- }
- 
-@@ -223,10 +221,7 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
- 	void *nd;
- 	int tnid;
- 
--	if (start_pfn < end_pfn)
--		pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n", nid,
--			start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
--	else
-+	if (start_pfn >= end_pfn)
- 		pr_info("Initmem setup node %d [<memory-less node>]\n", nid);
- 
- 	nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
--- 
-2.11.0
+Regards,
+Anup
