@@ -1,72 +1,61 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 20 Jul 2017 11:17:28 +0100
-Subject: [PATCH v5 18/19] coresight tmc: Add support for Coresight SoC 600 TMC
-In-Reply-To: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
-References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500545849-23724-19-git-send-email-suzuki.poulose@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 20 Jul 2017 12:56:06 +0200
+Subject: [PATCH v5 0/2] Add Basic SoC support for MT7622
+In-Reply-To: <1500519745.25149.1.camel@mtkswgap22>
+References: <cover.1497631953.git.sean.wang@mediatek.com>
+ <1500519745.25149.1.camel@mtkswgap22>
+Message-ID: <ec966bea-eebc-c2e1-bb56-968c6cebe056@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coresight SoC 600 supports ETR save-restore which allows us
-to restore a trace session by retaining the RRP/RWP/STS.Full values
-when the TMC leaves the Disabled state. However, the TMC doesn't
-have a scatter-gather unit in built.
 
-Also, TMCs have different PIDs in different configurations (ETF,
-ETB & ETR), unlike the previous generation.
 
-While the DEVID exposes some of the features/changes in the TMC,
-it doesn't explicitly advertises the new save-restore feature
-as described above.
+On 07/20/2017 05:02 AM, Sean Wang wrote:
+> Hi, Matthias
+> 
+> just a gentle ping on this
+> 
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc.c | 16 ++++++++++++++++
- drivers/hwtracing/coresight/coresight-tmc.h |  4 ++++
- 2 files changed, 20 insertions(+)
+pushed now to v4.13-next/dts64
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index c4a5dea..e754a3e 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -442,6 +442,22 @@ static struct amba_id tmc_ids[] = {
- 		.id     = 0x000bb961,
- 		.mask   = 0x000fffff,
- 	},
-+	{
-+		/* Coresight SoC 600 TMC-ETR/ETS */
-+		.id	= 0x000bb9e8,
-+		.mask	= 0x000fffff,
-+		.data	= (void *)(unsigned long)CORESIGHT_SOC_600_ETR_CAPS,
-+	},
-+	{
-+		/* Coresight SoC 600 TMC-ETB */
-+		.id	= 0x000bb9e9,
-+		.mask	= 0x000fffff,
-+	},
-+	{
-+		/* Coresight SoC 600 TMC-ETF */
-+		.id	= 0x000bb9ea,
-+		.mask	= 0x000fffff,
-+	},
- 	{ 0, 0},
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 08f1aea..f24e89a 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -130,6 +130,10 @@ enum tmc_mem_intf_width {
-  */
- #define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
- 
-+/* Coresight SoC-600 TMC-ETR unadvertised capabilities */
-+#define CORESIGHT_SOC_600_ETR_CAPS	\
-+	(TMC_ETR_SAVE_RESTORE | TMC_ETR_AXI_ARCACHE)
-+
- /**
-  * struct tmc_drvdata - specifics associated to an TMC component
-  * @base:	memory mapped base address for this component.
--- 
-2.7.5
+Thanks!
+
+> 	Sean
+> 
+> 
+> On Sat, 2017-06-17 at 01:06 +0800, sean.wang at mediatek.com wrote:
+>> From: Sean Wang <sean.wang@mediatek.com>
+>>
+>> Changes since v4:
+>> - redefine the two dummy clocks with the correct frequency
+>>    which is 25MHz and 280MHz respectively.
+>>
+>> Changes since v3:
+>> - get rid of those accepted patches
+>> - rebased to branch v4.12-next/dts64 in Matthias' tree
+>> - fixed uart node in dts with two clocks as described in bindings documentation
+>>
+>> Changes since v2:
+>> - merge back required basic clock nodes into the .dtsi file
+>> - update the property of interrupts in timer nodes with 2 CPUs
+>>
+>> Changes since v1:
+>> - update SPDX-License-Identifier
+>> - remove next-level-cache property since cache geometry detection was removed since 4.12
+>>
+>> This patch set adds basic SoC support for MediaTek MT7622
+>> SoC based on 4.12-rc1.
+>>
+>> Sean Wang (2):
+>>    arm64: dts: mt7622: add basic nodes to the mt7622.dtsi file
+>>    arm64: dts: mt7622: add dts file for MT7622 reference board variant 1
+>>
+>>   arch/arm64/boot/dts/mediatek/Makefile        |   1 +
+>>   arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  27 +++++++
+>>   arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 110 +++++++++++++++++++++++++++
+>>   3 files changed, 138 insertions(+)
+>>   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+>>   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
+>>
+> 
+> 
