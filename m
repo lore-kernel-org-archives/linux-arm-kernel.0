@@ -1,28 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Jul 2017 10:19:04 -0300
-Subject: IMX53 on recent 4.4.x kernels
-In-Reply-To: <D24E577EA1E37B4788A3BFBC418F14A707592381@wetsrvex01.loepfe.com>
-References: <D24E577EA1E37B4788A3BFBC418F14A707591D67@wetsrvex01.loepfe.com>
- <20170720123933.rioxhsthaaby4cnl@pengutronix.de>
- <D24E577EA1E37B4788A3BFBC418F14A707592381@wetsrvex01.loepfe.com>
-Message-ID: <CAOMZO5DrFnr6mr991ayMxLF0+jQddJyTbCbK1A5JVNAUVMDw3A@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 20 Jul 2017 15:33:16 +0200
+Subject: [PATCH] arm: zynq: Label whole PL part as fpga_full region
+Message-ID: <226ad80923aeb24a1654db8414378db08381d10f.1500557594.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Noel,
+This will simplify dt overlay structure for the whole PL.
 
-On Thu, Jul 20, 2017 at 10:13 AM, Vellemans, Noel
-<Noel.Vellemans@visionbms.com> wrote:
-> Hi,
->
->
->>>Please try a more recent kernel first. 4.4 is quite ancient, and MX53 is well supported on 4.12 or 4.13+.
->>>Regards,
->>>Robert
->
-> I' already did ( maybe I was not clear enough in the previous mail , did test  4.4.x series and 4.12  kernel ! )
->
-> 4.12 Has the exactly same problem  ( ONFI parameter page can not be read , on ONE of the boards)
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Looks like your mixing the performance thread with the mxc_nand one
-:-) These are completely different topics.
+ arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index f3ac9bfe580e..0f79fe1ccd9d 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -42,6 +42,14 @@
+ 		};
+ 	};
+ 
++	fpga_full: fpga-full {
++		compatible = "fpga-region";
++		fpga-mgr = <&devcfg>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++	};
++
+ 	pmu at f8891000 {
+ 		compatible = "arm,cortex-a9-pmu";
+ 		interrupts = <0 5 4>, <0 6 4>;
+-- 
+1.9.1
