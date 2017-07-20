@@ -1,34 +1,70 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 20 Jul 2017 10:03:26 +0200
-Subject: [PATCH v2] PM / suspend: Add suspend_target_state()
-In-Reply-To: <2615c143-6cb2-1b89-d453-921306d665b6@gmail.com>
- <CAJZ5v0gJQHUMEXTbvb0q6rmW-1xuRWAwGMmo_CCE8mYj-xf5QA@mail.gmail.com>
- <20170717200628.7018-1-f.fainelli@gmail.com>
-Message-ID: <20170720080326.GA13103@amd>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 20 Jul 2017 09:10:23 +0100
+Subject: [PATCH 1/2] ARM: kexec: avoid allocating crashkernel region outside
+ lowmem
+Message-ID: <E1dY6XP-0003wT-Pw@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2017-07-17 13:06:28, Florian Fainelli wrote:
-> Have the core suspend/resume framework store the system-wide suspend
-> state (suspend_state_t) we are about to enter, and expose it to drivers
-> via suspend_target_state() in order to retrieve that. The state is
-> assigned in suspend_devices_and_enter().
-> 
-> This is useful for platform specific drivers that may need to take a
-> slightly different suspend/resume path based on the system's
-> suspend/resume state being entered.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Allocating the crashkernel region outside lowmem causes the kernel to
+oops while trying to kexec into the new kernel:
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
+Loading crashdump kernel...
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = edd70000
+[00000000] *pgd=de19e835
+Internal error: Oops: 817 [#2] SMP ARM
+Modules linked in: ...
+CPU: 0 PID: 689 Comm: sh Not tainted 4.12.0-rc3-next-20170601-04015-gc3a5a20
+Hardware name: Generic DRA74X (Flattened Device Tree)
+task: edb32f00 task.stack: edf18000
+PC is at memcpy+0x50/0x330
+LR is at 0xe3c34001
+pc : [<c04baf30>]    lr : [<e3c34001>]    psr: 800c0193
+sp : edf19c2c  ip : 0a000001  fp : c0553170
+r10: c055316e  r9 : 00000001  r8 : e3130001
+r7 : e4903004  r6 : 0a000014  r5 : e3500000  r4 : e59f106c
+r3 : e59f0074  r2 : ffffffe8  r1 : c010fb88  r0 : 00000000
+Flags: Nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+Control: 10c5387d  Table: add7006a  DAC: 00000051
+Process sh (pid: 689, stack limit = 0xedf18218)
+Stack: (0xedf19c2c to 0xedf1a000)
+...
+[<c04baf30>] (memcpy) from [<c010fae0>] (machine_kexec+0xa8/0x12c)
+[<c010fae0>] (machine_kexec) from [<c01e4104>] (__crash_kexec+0x5c/0x98)
+[<c01e4104>] (__crash_kexec) from [<c01e419c>] (crash_kexec+0x5c/0x68)
+[<c01e419c>] (crash_kexec) from [<c010c5c0>] (die+0x228/0x490)
+[<c010c5c0>] (die) from [<c011e520>] (__do_kernel_fault.part.0+0x54/0x1e4)
+[<c011e520>] (__do_kernel_fault.part.0) from [<c082412c>] (do_page_fault+0x1e8/0x400)
+[<c082412c>] (do_page_fault) from [<c010135c>] (do_DataAbort+0x38/0xb8)
+[<c010135c>] (do_DataAbort) from [<c0823584>] (__dabt_svc+0x64/0xa0)
 
+This is caused by image->control_code_page being a highmem page, so
+page_address(image->control_code_page) returns NULL.  In any case, we
+don't want the control page to be a highmem page.
+
+We already limit the crash kernel region to the top of 32-bit physical
+memory space.  Also limit it to the top of lowmem in physical space.
+
+Reported-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/kernel/setup.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 4e80bf7420d4..8e9a3e40d949 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -987,6 +987,9 @@ static void __init reserve_crashkernel(void)
+ 
+ 	if (crash_base <= 0) {
+ 		unsigned long long crash_max = idmap_to_phys((u32)~0);
++		unsigned long long lowmem_max = __pa(high_memory - 1) + 1;
++		if (crash_max > lowmem_max)
++			crash_max = lowmem_max;
+ 		crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
+ 						    crash_size, CRASH_ALIGN);
+ 		if (!crash_base) {
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/676f552a/attachment.sig>
+2.7.4
