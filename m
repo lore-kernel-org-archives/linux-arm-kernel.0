@@ -1,49 +1,89 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 20 Jul 2017 23:28:18 +0900
-Subject: [PATCH] kbuild: modpost: Warn about references from rodata to
- __init text
-In-Reply-To: <CAF6AEGuSwgyqf7pb15M0Pg1SJrQu9TVX76FV9jL=i5LNjFcdtA@mail.gmail.com>
-References: <20170630225822.25349-1-sboyd@codeaurora.org>
- <CAF6AEGuSwgyqf7pb15M0Pg1SJrQu9TVX76FV9jL=i5LNjFcdtA@mail.gmail.com>
-Message-ID: <CAK7LNAQ6y-budCyzFpHubqEtHGwtARNdGa3O3Wacs+55R87dMg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 20 Jul 2017 15:31:39 +0100
+Subject: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8383B9D5A@FRAEML521-MBX.china.huawei.com>
+References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
+ <20170623145801.325244-3-shameerali.kolothum.thodi@huawei.com>
+ <20170704173820.GO22175@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA83839DB59@FRAEML521-MBX.china.huawei.com>
+ <20170714193322.GH26488@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA8383B9D5A@FRAEML521-MBX.china.huawei.com>
+Message-ID: <f3ba9136-068a-280d-2849-f3a0081c1d90@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen, Rob,
-
-2017-07-01 8:59 GMT+09:00 Rob Clark <robdclark@gmail.com>:
-> On Fri, Jun 30, 2017 at 6:58 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> If we have a structure that's marked const it will be placed
->> into the .rodata section but it could reference an init section
->> function. Include the read only data section in the check we have
->> for read/write data sections referencing init sections so we can
->> find this class of problems. This exposes quite a few places
->> where const marked structures are referencing __init functions and
->> __init data that we were previously ignoring.
+On 19/07/17 11:48, Shameerali Kolothum Thodi wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Will Deacon [mailto:will.deacon at arm.com]
+>> Sent: Friday, July 14, 2017 8:33 PM
+>> To: Shameerali Kolothum Thodi
+>> Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+>> sudeep.holla at arm.com; robin.murphy at arm.com; hanjun.guo at linaro.org;
+>> Gabriele Paoloni; John Garry; Linuxarm; linux-acpi at vger.kernel.org;
+>> iommu at lists.linux-foundation.org; Wangzhou (B); Guohanjun (Hanjun Guo);
+>> linux-arm-kernel at lists.infradead.org; devel at acpica.org
+>> Subject: Re: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based
+>> HiSilicon erratum 161010801
 >>
->> Cc: Rob Clark <robdclark@gmail.com>
->> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
+> [...]
+>>>>> -	list_add_tail(&region->list, head);
+>>>>> +	if ((smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)) {
+>>>>> +
+>>>>> +		if (!is_of_node(smmu->dev->fwnode))
+>>>>> +			resv = iort_iommu_its_get_resv_regions(dev, head);
+>>>>
+>>>> How does this work when we're not using ACPI? Shouldn't of vs ACPI
+>>>> be abstracted from the driver?
+>>>
+>>> At present ARM_SMMU_OPT_RESV_HW_MSI is only set for ACPI and  DT
+>>> support for this is a low priority for us at the moment. Is the
+>>> suggestion is to have a common function outside the smmu driver for
+>>> _iommu_its_get_resv_regions() ? I am not sure what is the best way here.
 >>
->> Making this change leads to quite a few other errors even on the
->> multi_v7_defconfig for ARM[1]. I still need to do a build of the
->> allmodconfig to see how many other errors there, but it seems to
->> be quite a few. I suppose those will need to be fixed before we can
->> merge this?
->
-> thanks.. the explosions you get with these mistakes when building
-> drivers as modules in a distro kernel config are quite "fun" to
-> debug..
->
-> I'm not quite sure about the rules for whether merging this would
-> count as a regression, but I would argue those drivers are already
-> broken, just no one noticed yet.  Similar to when a new gcc gets more
-> clever about detecting bugs.  So I wouldn't be against merging this
-> first to force drivers to fix their crap ;-)
+>> Right, something like that. The driver shouldn't need to care whether or not
+>> it's using ACPI or DT when setting these options.
+> 
+> Below is what I have in mind for the common function for msi reserve.
+> But just wondering invoking iort_ functions from iommu code 
+> is acceptable or not . Could you please take a look and let me know.
 
-I applied this, but this way seems unacceptable.
-I cannot send a pull-req for this
-unless most of the warnings are fixed.
+At that point, it seems like we might as well just roll it into
+iommu_dma_get_resv_regions() directly[1]. It probably makes sense for
+any DT equivalent to be described generically, rather than
+SMMU-specific, so parsing that would fit into common code as well.
 
-Is there any activity for driver fixes?
+Then in the SMMU drivers we can skip creating the SW_MSI region if
+iommu-dma gave us back any real ones (and remove the apparently
+unnecessary resv_msi check in VFIO). Or be lazy and just leave it, as it
+doesn't seem to do much harm to have both.
+
+Robin.
+
+[1] This is what I hacked up locally on top of patch #1:
+----->8-----
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 9d1cebe7f6cb..50292827da49 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -19,6 +19,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+
++#include <linux/acpi_iort.h>
+ #include <linux/device.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/gfp.h>
+@@ -174,6 +175,10 @@ void iommu_dma_get_resv_regions(struct device *dev,
+struct list_head *list)
+ 	struct pci_host_bridge *bridge;
+ 	struct resource_entry *window;
+
++	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode) &&
++		iort_iommu_its_get_resv_regions(dev, list) < 0)
++		return;
++
+ 	if (!dev_is_pci(dev))
+ 		return;
