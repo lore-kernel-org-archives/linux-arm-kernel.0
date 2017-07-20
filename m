@@ -1,129 +1,115 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Jul 2017 11:44:46 +0800
-Subject: [PATCH v2 04/10] mmc: sunxi: Support controllers that can use both
- old and new timings
-In-Reply-To: <20170720034452.15920-1-wens@csie.org>
-References: <20170720034452.15920-1-wens@csie.org>
-Message-ID: <20170720034452.15920-5-wens@csie.org>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Thu, 20 Jul 2017 09:32:00 +0530
+Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
+ SMMUv3 driver
+In-Reply-To: <20170719115333.GJ13642@arm.com>
+References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+ <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
+ <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
+ <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
+ <20170719112524.GF13642@arm.com>
+ <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
+ <20170719113325.GI13642@arm.com>
+ <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
+ <20170719115333.GJ13642@arm.com>
+Message-ID: <CAALAos-YbVbgvPmDYXeWaF4y8MQ9i7CG3tgGuf-QLR6hmXo18Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the SoCs that introduced the new timing mode for MMC controllers,
-both the old (where the clock delays are set in the CCU) and new
-(where the clock delays are set in the MMC controller) timing modes
-are available, and we have to support them both. However there are
-two bits that control which mode is active. One is in the CCU, the
-other is in the MMC controller. The settings on both sides must be
-the same, or nothing will work.
+On Wed, Jul 19, 2017 at 5:23 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jul 19, 2017 at 05:09:05PM +0530, Anup Patel wrote:
+>> On Wed, Jul 19, 2017 at 5:03 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Wed, Jul 19, 2017 at 05:01:11PM +0530, Anup Patel wrote:
+>> >> On Wed, Jul 19, 2017 at 4:55 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> >> > On Wed, Jul 19, 2017 at 04:53:04PM +0530, Anup Patel wrote:
+>> >> >> On Wed, Jul 19, 2017 at 4:30 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>> >> >> > On 19/07/17 10:33, Anup Patel wrote:
+>> >> >> >> The ARM SMMUv3 support bypassing transactions for which domain
+>> >> >> >> is not configured. The patch adds corresponding IOMMU capability
+>> >> >> >> to advertise this fact.
+>> >> >> >>
+>> >> >> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> >> >> >> ---
+>> >> >> >>  drivers/iommu/arm-smmu-v3.c | 2 ++
+>> >> >> >>  1 file changed, 2 insertions(+)
+>> >> >> >>
+>> >> >> >> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> >> >> >> index 568c400..a6c7f66 100644
+>> >> >> >> --- a/drivers/iommu/arm-smmu-v3.c
+>> >> >> >> +++ b/drivers/iommu/arm-smmu-v3.c
+>> >> >> >> @@ -1423,6 +1423,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>> >> >> >>               return true;
+>> >> >> >>       case IOMMU_CAP_NOEXEC:
+>> >> >> >>               return true;
+>> >> >> >> +     case IOMMU_CAP_BYPASS:
+>> >> >> >> +             return true;
+>> >> >> >
+>> >> >> > And this is never true. If Linux knows a device masters through the
+>> >> >> > SMMU, it will always have a default domain of some sort (either identity
+>> >> >> > or DMA ops). If Linux doesn't know, then it won't have been able to
+>> >> >> > initialise the stream table for the relevant stream IDs, thus any
+>> >> >> > 'bypass' DMA is going to raise C_BAD_STE. SMMUv3 can effectively only
+>> >> >> > bypass unknown stream IDs if disabled entirely.
+>> >> >>
+>> >> >> What if we don't want to use IOMMU for certain device and
+>> >> >> due to this we never provide "iommus" DT attribute in the
+>> >> >> device DT node. Further, we want to access device without
+>> >> >> "iommus" DT attribute from user-space using VFIO no-IOMMU.
+>> >> >
+>> >> > Wait, you want to pass a device through to userspace but you don't want to
+>> >> > use the IOMMU? Why not?
+>> >> >
+>> >> > If you describe the SMMU in firmware with only a partial topology
+>> >> > description, then you will run into problems with unknown masters trying to
+>> >> > perform DMA. That's the IOMMU doing its job!
+>> >>
+>> >> We are keeping disable_bypass = false. In other words, we
+>> >> are using bypass mode for unmatched streams. The real
+>> >> reason is limited number of SMRs due to which we choose
+>> >> not to provide "iommus" DT attribute for certain devices.
+>> >
+>> > Understood, but that's not robust for SMMUv3 and we *really* shouldn't have
+>> > a user ABI that changes behaviour based on a cmdline option. VFIO should be
+>> > requesting its own identity mappings, if that's what you need.
+>>
+>> Currently, the iommu_present() check in vfio_iommu_group_get()
+>> is preventing us allow no-IOMMU mode for certain devices.
+>>
+>> Is there a better replacement of iommu_present() check in
+>> vfio_iommu_group_get()?
+>
+> There are two things here:
+>
+>   1. iommu_present() is pretty useless, because it applies to a "bus" which
+>      doesn't actually tell you what you need to know for things like the
+>      platform_bus, where some masters might be upstream of an SMMU and
+>      others might not be.
 
-The sunxi-ng clock driver provides an API to query and set the
-active timing mode. At probe time, we try to set the active mode
-to the "new timing mode". If it succeeds, we can then use the MMC
-controller in the new mode. If not, we fall back to the old mode.
+I agree with you. The iommu_present() check in vfio_iommu_group_get()
+is not much useful. We only reach line which checks iommu_present()
+when iommu_group_get() returns NULL for given "struct device *". If there
+is no IOMMU group for a "struct device *" then it means there is no IOMMU
+HW doing translations for such device.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/mmc/host/sunxi-mmc.c | 45 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 43 insertions(+), 2 deletions(-)
+If we drop the iommu_present() check (due to above reasons) in
+vfio_iommu_group_get() then we don't require the IOMMU_CAP_BYPASS
+and we can happily drop PATCH1, PATCH2, and PATCH3.
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 0fb4e4c119e1..c8a60e43dc43 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -22,6 +22,7 @@
- #include <linux/err.h>
- 
- #include <linux/clk.h>
-+#include <linux/clk/sunxi-ng.h>
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
-@@ -259,7 +260,11 @@ struct sunxi_mmc_cfg {
- 	/* Does DATA0 needs to be masked while the clock is updated */
- 	bool mask_data0;
- 
-+	/* hardware only supports new timing mode */
- 	bool needs_new_timings;
-+
-+	/* hardware can switch between old and new timing modes */
-+	bool has_timings_switch;
- };
- 
- struct sunxi_mmc_host {
-@@ -293,6 +298,9 @@ struct sunxi_mmc_host {
- 
- 	/* vqmmc */
- 	bool		vqmmc_enabled;
-+
-+	/* timings */
-+	bool		use_new_timings;
- };
- 
- static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
-@@ -714,7 +722,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
- {
- 	int index;
- 
--	if (!host->cfg->clk_delays)
-+	if (host->use_new_timings)
- 		return 0;
- 
- 	/* determine delays */
-@@ -765,6 +773,15 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	    ios->bus_width == MMC_BUS_WIDTH_8)
- 		clock <<= 1;
- 
-+	if (host->use_new_timings) {
-+		ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
-+		if (ret) {
-+			dev_err(mmc_dev(mmc),
-+				"error setting new timing mode\n");
-+			return ret;
-+		}
-+	}
-+
- 	rate = clk_round_rate(host->clk_mmc, clock);
- 	if (rate < 0) {
- 		dev_err(mmc_dev(mmc), "error rounding clk to %d: %ld\n",
-@@ -793,7 +810,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	}
- 	mmc_writel(host, REG_CLKCR, rval);
- 
--	if (host->cfg->needs_new_timings) {
-+	if (host->use_new_timings) {
- 		/* Don't touch the delay bits */
- 		rval = mmc_readl(host, REG_SD_NTSR);
- 		rval |= SDXC_2X_TIMING_MODE;
-@@ -1262,6 +1279,30 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
- 		goto error_free_host;
- 	}
- 
-+	if (host->cfg->has_timings_switch) {
-+		/*
-+		 * Supports both old and new timing modes.
-+		 * Try setting the clk to new timing mode.
-+		 */
-+		sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
-+
-+		/* And check the result */
-+		ret = sunxi_ccu_get_mmc_timing_mode(host->clk_mmc);
-+		if (ret < 0) {
-+			/*
-+			 * For whatever reason we were not able to get
-+			 * the current active mode. Default to old mode.
-+			 */
-+			dev_warn(&pdev->dev, "MMC clk timing mode unknown\n");
-+			host->use_new_timings = false;
-+		} else {
-+			host->use_new_timings = !!ret;
-+		}
-+	} else if (host->cfg->needs_new_timings) {
-+		/* Supports new timing mode only */
-+		host->use_new_timings = true;
-+	}
-+
- 	mmc->ops		= &sunxi_mmc_ops;
- 	mmc->max_blk_count	= 8192;
- 	mmc->max_blk_size	= 4096;
--- 
-2.13.2
+I will remove the iommu_present() check in vfio_iommu_group_get()
+because it is only comes into actions when VFIO_NOIOMMU is
+enabled. This will also help us drop PATCH1-to-PATCH3.
+
+>
+>   2. If a master *is* upstream of an IOMMU and you want to use no-IOMMU,
+>      then the VFIO no-IOMMU code needs to be extended so that it creates
+>      an IDENTITY domain on that IOMMU.
+
+The VFIO no-IOMMU mode is equivalent to Linux UIO hence having
+IDENTITY domain for VFIO no-IOMMU is not appropriate here.
+
+In fact, going forward it has been suggested to use VFIO no-IOMMU
+instead of Linux UIO for user-space poll-mode drivers so that we have
+one Linux interface for user-space poll-mode drivers.
+
+Regards,
+Anup
