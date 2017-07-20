@@ -1,200 +1,172 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 20 Jul 2017 01:16:08 +0000
-Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
-In-Reply-To: <1500460107.13757.6.camel@pengutronix.de>
-References: <8e6f731906fe5f8dce6f23b1e8ad084c8041f49e.1500457396.git.leonard.crestez@nxp.com>
- <1500460107.13757.6.camel@pengutronix.de>
-Message-ID: <AM3PR04MB131557FE521F61147DA5975DF5A70@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Thu, 20 Jul 2017 10:03:57 +0800
+Subject: [linux-sunxi] [PATCH v4 4/5] ARM: sunxi: h3/h5: switch
+ apb0-related clocks to r_ccu
+In-Reply-To: <1500505173.23770.1.camel@xff.cz>
+References: <20170404095100.18649-1-icenowy@aosc.io>
+ <20170404095100.18649-5-icenowy@aosc.io> <1500505173.23770.1.camel@xff.cz>
+Message-ID: <3299ee7dd04482f0a21752651335e223@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Best Regards!
-Anson Huang
-
-
-
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: 2017-07-19 6:28 PM
-> To: Leonard Crestez <leonard.crestez@nxp.com>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>; Rafael J. Wysocki
-> <rjw@rjwysocki.net>; Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> <fabio.estevam@nxp.com>; linux-pm at vger.kernel.org; Octavian Purdila
-> <octavian.purdila@nxp.com>; Anson Huang <anson.huang@nxp.com>; Jacky
-> Bai <ping.bai@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>;
-> kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
+? 2017-07-20 06:59?Ond?ej Jirman ???
+> Hi,
 > 
-> Hi Leonard,
+> Icenowy Zheng p??e v ?t 04. 04. 2017 v 17:50 +0800:
+>> From: Icenowy Zheng <icenowy@aosc.xyz>
+>> 
+>> Now we have driver for the PRCM CCU, switch to use it instead of
+>> old-style clock nodes for apb0-related clocks in sunxi-h3-h5.dtsi .
+>> 
+>> The mux 3 of R_CCU is still the internal oscillator, which is said to 
+>> be
+>> 16MHz plus minus 30%, and get a measured value of 15MHz~16MHz on my 
+>> two
+>> H3 boards and one H5 board.
 > 
-> Am Mittwoch, den 19.07.2017, 12:54 +0300 schrieb Leonard Crestez:
-> > This patch contains the minimal changes required to support imx6sx OPP
-> > of
-> > 198 Mhz. Without this patch cpufreq still reports success but the
-> > frequency is not changed, the "arm" clock will still be at 396000000 in
-> clk_summary.
-> >
-> > In order to do this PLL1 needs to be bypassed but still kept enabled.
-> > This is required despite the fact that the arm clk is configured to
-> > come from
-> > pll2_pfd2 and from the clk framework perspective pll1 and related
-> > clocks are unused.
+> There's issue with the new r_ccu that breaks r_i2c. (no devices can be
+> found on the bus). Reverting this patch fixes the issue with the I2C
+> controller. (everything else being the same)
 > 
-> I'm not really an expert for MX6SX, so a little background on why PLL1 needs to
-> be kept enabled would help to review this change.
+> Here's the code I'm using: https://github.com/megous/linux/commits/oran
+> ge-pi-4.12
+> 
+> The last commit is the revert.
+> 
+> The issue manifests itself by non-working DVFS, because kernel lacks
+> access to SY8106A regulator, because r_i2c doesn't work with sunxi-ng
+> clock driver (sun8i-r).
+> 
+> Relevant difference in registers between working/non-working state is
+> just this (diff -u):
+> 
+>  0x01f02400 = 0x00000000
+>  0x01f02404 = 0x00000000
+> -0x01f02408 = 0x00000091
+> +0x01f02408 = 0x00000095 DATA register inisde the I2C controller
+>  0x01f0240c = 0x00000044
+>  0x01f02410 = 0x000000f8
+> -0x01f02414 = 0x00000059
+> +0x01f02414 = 0x00000000 CLOCK setup register inside the I2C controller
+>  0x01f02418 = 0x00000000
+>  0x01f0241c = 0x00000000
+>  0x01f02420 = 0x0000003a
+> 
+> It looks like the new sunxi-ng clock driver causes the I2C driver to
+> not correctly configure the CLOCK register. I don't know why and I'm
+> not sure how to deal with this. Any ideas what can I do next?
+> 
+> thank you and regards,
+>   o.
 
-Hi, Lucas
-	The PLL1 needs to be enabled is because when ARM_PODF is changed in CCM,
-we need to check the busy bit of CCM_CDHIPR bit 16 arm_podf_busy, and this bit is
-sync with PLL1 clock, so if PLL1 NOT enabled, this bit will never get clear. This is hardware
-requirement.
+It seems to be a very very very weird problem -- the CPUS_CFG register
+seems to be not accessible in non-secure mode on H3, and if the r_ccu
+driver reads it a value of 0x0 is read out (which means that the parent
+of ar100 is osc32k), but the real initial value of the register is
+0x00010000 (which means the parent is osc24M).
 
-Anson.
+So the bus clock of r_i2c is wrongly claimed as 32kHz, not 24MHz, then
+the r_i2c fails to work.
+
+This clock problem doesn't exist for A64.
 
 > 
-> Thanks,
-> Lucas
-> 
-> > This patch adds pll1, pll_bypass and pll1_bypass_src clocks to the imx
-> > cpufreq driver as imx6sx-specific for the bypass logic.
-> >
-> > The definition of pll1_sys is changed to imx_clk_fixed_factor so that
-> > it's never disabled.
-> >
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > ---
-> >
-> > Some potential issues:
-> >
-> > In theory pll1_sys could be explictly kept enabled from cpufreq. It's
-> > not clear this would be better since the intention is to never let
-> > this be disabled.
-> >
-> > The new clocks are only added for imx6sx. The frequency changing code
-> > relies on the fact that the clk API simply does nothing when called
-> > with a null clk.
-> >
-> > Perhaps it might be better to accept ENOENT from clk_get on these new
-> > clocks instead of checking of_machine_is_compatible.
-> >
-> >  arch/arm/boot/dts/imx6sx.dtsi   |  8 ++++++--
-> >  drivers/clk/imx/clk-imx6sx.c    |  2 +-
-> >  drivers/cpufreq/imx6q-cpufreq.c | 33
-> > +++++++++++++++++++++++++++++++++
-> >  3 files changed, 40 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx6sx.dtsi
-> > b/arch/arm/boot/dts/imx6sx.dtsi index f16b9df..4394137 100644
-> > --- a/arch/arm/boot/dts/imx6sx.dtsi
-> > +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> > @@ -87,9 +87,13 @@
-> >  				 <&clks IMX6SX_CLK_PLL2_PFD2>,
-> >  				 <&clks IMX6SX_CLK_STEP>,
-> >  				 <&clks IMX6SX_CLK_PLL1_SW>,
-> > -				 <&clks IMX6SX_CLK_PLL1_SYS>;
-> > +				 <&clks IMX6SX_CLK_PLL1_SYS>,
-> > +				 <&clks IMX6SX_CLK_PLL1>,
-> > +				 <&clks IMX6SX_PLL1_BYPASS>,
-> > +				 <&clks IMX6SX_PLL1_BYPASS_SRC>;
-> >  			clock-names = "arm", "pll2_pfd2_396m", "step",
-> > -				      "pll1_sw", "pll1_sys";
-> > +				      "pll1_sw", "pll1_sys", "pll1",
-> > +				      "pll1_bypass", "pll1_bypass_src";
-> >  			arm-supply = <&reg_arm>;
-> >  			soc-supply = <&reg_soc>;
-> >  		};
-> > diff --git a/drivers/clk/imx/clk-imx6sx.c
-> > b/drivers/clk/imx/clk-imx6sx.c index b5c96de..aa63b92 100644
-> > --- a/drivers/clk/imx/clk-imx6sx.c
-> > +++ b/drivers/clk/imx/clk-imx6sx.c
-> > @@ -199,7 +199,7 @@ static void __init imx6sx_clocks_init(struct
-> device_node *ccm_node)
-> >  	clk_set_parent(clks[IMX6SX_PLL6_BYPASS], clks[IMX6SX_CLK_PLL6]);
-> >  	clk_set_parent(clks[IMX6SX_PLL7_BYPASS], clks[IMX6SX_CLK_PLL7]);
-> >
-> > -	clks[IMX6SX_CLK_PLL1_SYS]      = imx_clk_gate("pll1_sys",
-> "pll1_bypass", base + 0x00, 13);
-> > +	clks[IMX6SX_CLK_PLL1_SYS]      = imx_clk_fixed_factor("pll1_sys",
-> "pll1_bypass", 1, 1);
-> >  	clks[IMX6SX_CLK_PLL2_BUS]      = imx_clk_gate("pll2_bus",
-> "pll2_bypass", base + 0x30, 13);
-> >  	clks[IMX6SX_CLK_PLL3_USB_OTG]  = imx_clk_gate("pll3_usb_otg",
-> "pll3_bypass", base + 0x10, 13);
-> >  	clks[IMX6SX_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",
-> "pll4_bypass", base + 0x70, 13);
-> > diff --git a/drivers/cpufreq/imx6q-cpufreq.c
-> > b/drivers/cpufreq/imx6q-cpufreq.c index b6edd3c..caf727a 100644
-> > --- a/drivers/cpufreq/imx6q-cpufreq.c
-> > +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> > @@ -31,6 +31,9 @@ static struct clk *step_clk;  static struct clk
-> > *pll2_pfd2_396m_clk;
-> >
-> >  /* clk used by i.MX6UL */
-> > +static struct clk *pll1_bypass;
-> > +static struct clk *pll1_bypass_src;
-> > +static struct clk *pll1;
-> >  static struct clk *pll2_bus_clk;
-> >  static struct clk *secondary_sel_clk;
-> >
-> > @@ -122,8 +125,21 @@ static int imx6q_set_target(struct cpufreq_policy
-> *policy, unsigned int index)
-> >  		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-> >  		clk_set_parent(pll1_sw_clk, step_clk);
-> >  		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
-> > +			/*
-> > +			 * Ensure that pll1_bypass is set back to
-> > +			 * pll1. We have to do this first so that the
-> > +			 * change rate done to pll1_sys_clk done below
-> > +			 * can propagate up to pll1.
-> > +			 */
-> > +			clk_set_parent(pll1_bypass, pll1);
-> >  			clk_set_rate(pll1_sys_clk, new_freq * 1000);
-> >  			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> > +		} else {
-> > +			/*
-> > +			 * Need to ensure that PLL1 is bypassed and enabled
-> > +			 * before ARM-PODF is set.
-> > +			 */
-> > +			clk_set_parent(pll1_bypass, pll1_bypass_src);
-> >  		}
-> >  	}
-> >
-> > @@ -216,6 +232,17 @@ static int imx6q_cpufreq_probe(struct
-> platform_device *pdev)
-> >  		goto put_clk;
-> >  	}
-> >
-> > +	if (of_machine_is_compatible("fsl,imx6sx")) {
-> > +		pll1 = clk_get(cpu_dev, "pll1");
-> > +		pll1_bypass = clk_get(cpu_dev, "pll1_bypass");
-> > +		pll1_bypass_src = clk_get(cpu_dev, "pll1_bypass_src");
-> > +		if (IS_ERR(pll1) || IS_ERR(pll1_bypass) ||
-> IS_ERR(pll1_bypass_src)) {
-> > +			dev_err(cpu_dev, "failed to get clocks specific to
-> imx6sx\n");
-> > +			ret = -ENOENT;
-> > +			goto put_clk;
-> > +		}
-> > +	}
-> > +
-> >  	if (of_machine_is_compatible("fsl,imx6ul") ||
-> >  	    of_machine_is_compatible("fsl,imx6ull")) {
-> >  		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus"); @@ -380,6
-> +407,12 @@
-> > static int imx6q_cpufreq_probe(struct platform_device *pdev)
-> >  		clk_put(step_clk);
-> >  	if (!IS_ERR(pll2_pfd2_396m_clk))
-> >  		clk_put(pll2_pfd2_396m_clk);
-> > +	if (!IS_ERR(pll1))
-> > +		clk_put(pll1);
-> > +	if (!IS_ERR(pll1_bypass))
-> > +		clk_put(pll1_bypass);
-> > +	if (!IS_ERR(pll1_bypass_src))
-> > +		clk_put(pll1_bypass_src);
-> >  	if (!IS_ERR(pll2_bus_clk))
-> >  		clk_put(pll2_bus_clk);
-> >  	if (!IS_ERR(secondary_sel_clk))
-> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ---
+>> Changes in v4:
+>> - Temporarily dropped the CCU headers.
+>> Changes in v3:
+>> - Change osc32000 to iosc.
+>> 
+>>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 45 
+>> ++++++++++++--------------------------
+>>  1 file changed, 14 insertions(+), 31 deletions(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi 
+>> b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> index 6640ebfa6419..1aeeacb3a884 100644
+>> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> @@ -68,31 +68,12 @@
+>>  			clock-output-names = "osc32k";
+>>  		};
+>> 
+>> -		apb0: apb0_clk {
+>> -			compatible = "fixed-factor-clock";
+>> +		iosc: internal-osc-clk {
+>>  			#clock-cells = <0>;
+>> -			clock-div = <1>;
+>> -			clock-mult = <1>;
+>> -			clocks = <&osc24M>;
+>> -			clock-output-names = "apb0";
+>> -		};
+>> -
+>> -		apb0_gates: clk at 01f01428 {
+>> -			compatible = "allwinner,sun8i-h3-apb0-gates-clk",
+>> -				     "allwinner,sun4i-a10-gates-clk";
+>> -			reg = <0x01f01428 0x4>;
+>> -			#clock-cells = <1>;
+>> -			clocks = <&apb0>;
+>> -			clock-indices = <0>, <1>;
+>> -			clock-output-names = "apb0_pio", "apb0_ir";
+>> -		};
+>> -
+>> -		ir_clk: ir_clk at 01f01454 {
+>> -			compatible = "allwinner,sun4i-a10-mod0-clk";
+>> -			reg = <0x01f01454 0x4>;
+>> -			#clock-cells = <0>;
+>> -			clocks = <&osc32k>, <&osc24M>;
+>> -			clock-output-names = "ir";
+>> +			compatible = "fixed-clock";
+>> +			clock-frequency = <16000000>;
+>> +			clock-accuracy = <300000000>;
+>> +			clock-output-names = "iosc";
+>>  		};
+>>  	};
+>> 
+>> @@ -576,9 +557,12 @@
+>>  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>>  		};
+>> 
+>> -		apb0_reset: reset at 01f014b0 {
+>> -			reg = <0x01f014b0 0x4>;
+>> -			compatible = "allwinner,sun6i-a31-clock-reset";
+>> +		r_ccu: clock at 1f01400 {
+>> +			compatible = "allwinner,sun50i-a64-r-ccu";
+>> +			reg = <0x01f01400 0x100>;
+>> +			clocks = <&osc24M>, <&osc32k>, <&iosc>;
+>> +			clock-names = "hosc", "losc", "iosc";
+>> +			#clock-cells = <1>;
+>>  			#reset-cells = <1>;
+>>  		};
+>> 
+>> @@ -589,9 +573,9 @@
+>> 
+>>  		ir: ir at 01f02000 {
+>>  			compatible = "allwinner,sun5i-a13-ir";
+>> -			clocks = <&apb0_gates 1>, <&ir_clk>;
+>> +			clocks = <&r_ccu 4>, <&r_ccu 11>;
+>>  			clock-names = "apb", "ir";
+>> -			resets = <&apb0_reset 1>;
+>> +			resets = <&r_ccu 0>;
+>>  			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>>  			reg = <0x01f02000 0x40>;
+>>  			status = "disabled";
+>> @@ -601,9 +585,8 @@
+>>  			compatible = "allwinner,sun8i-h3-r-pinctrl";
+>>  			reg = <0x01f02c00 0x400>;
+>>  			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+>> -			clocks = <&apb0_gates 0>, <&osc24M>, <&osc32k>;
+>> +			clocks = <&r_ccu 3>, <&osc24M>, <&osc32k>;
+>>  			clock-names = "apb", "hosc", "losc";
+>> -			resets = <&apb0_reset 0>;
+>>  			gpio-controller;
+>>  			#gpio-cells = <3>;
+>>  			interrupt-controller;
+>> --
+>> 2.12.2
+>> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
