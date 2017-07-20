@@ -1,73 +1,74 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Thu, 20 Jul 2017 16:38:09 +0530
-Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
- SMMUv3 driver
-In-Reply-To: <20170720091003.GA17837@arm.com>
-References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
- <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
- <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
- <20170719112524.GF13642@arm.com>
- <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
- <20170719113325.GI13642@arm.com>
- <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
- <20170719115333.GJ13642@arm.com>
- <CAALAos-YbVbgvPmDYXeWaF4y8MQ9i7CG3tgGuf-QLR6hmXo18Q@mail.gmail.com>
- <20170720091003.GA17837@arm.com>
-Message-ID: <CAALAos8571-UVp7Ky81qFESVcNcWx_H2VOemFt_++NFCxcMg3w@mail.gmail.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Thu, 20 Jul 2017 08:15:38 -0300
+Subject: [PATCH] media: Convert to using %pOF instead of full_name
+In-Reply-To: <CAL_JsqLDCgO60ECGB70pMNcaLg0zUcJ6_+50vH-evfGe-D266Q@mail.gmail.com>
+References: <CGME20170718215328epcas2p2e5e1d7df96fcd894e70a961df864abdd@epcas2p2.samsung.com>
+ <20170718214339.7774-33-robh@kernel.org>
+ <564a6768-3b23-6dc7-ecb5-cb4f4359b633@samsung.com>
+ <CAL_JsqLDCgO60ECGB70pMNcaLg0zUcJ6_+50vH-evfGe-D266Q@mail.gmail.com>
+Message-ID: <20170720081508.33563afe@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 2:40 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Jul 20, 2017 at 09:32:00AM +0530, Anup Patel wrote:
->> On Wed, Jul 19, 2017 at 5:23 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > There are two things here:
->> >
->> >   1. iommu_present() is pretty useless, because it applies to a "bus" which
->> >      doesn't actually tell you what you need to know for things like the
->> >      platform_bus, where some masters might be upstream of an SMMU and
->> >      others might not be.
->>
->> I agree with you. The iommu_present() check in vfio_iommu_group_get()
->> is not much useful. We only reach line which checks iommu_present()
->> when iommu_group_get() returns NULL for given "struct device *". If there
->> is no IOMMU group for a "struct device *" then it means there is no IOMMU
->> HW doing translations for such device.
->>
->> If we drop the iommu_present() check (due to above reasons) in
->> vfio_iommu_group_get() then we don't require the IOMMU_CAP_BYPASS
->> and we can happily drop PATCH1, PATCH2, and PATCH3.
->>
->> I will remove the iommu_present() check in vfio_iommu_group_get()
->> because it is only comes into actions when VFIO_NOIOMMU is
->> enabled. This will also help us drop PATCH1-to-PATCH3.
->
-> I don't think that's the right answer. Whilst iommu_present has obvious
-> shortcomings, its intention is clear: it should tell you whether a given
-> *device* is upstream of an IOMMU. So the right fix is to make this
-> per-device, instead of per-bus. Removing it altogether is worse than leaving
-> it like it is.
->
->> >   2. If a master *is* upstream of an IOMMU and you want to use no-IOMMU,
->> >      then the VFIO no-IOMMU code needs to be extended so that it creates
->> >      an IDENTITY domain on that IOMMU.
->>
->> The VFIO no-IOMMU mode is equivalent to Linux UIO hence having
->> IDENTITY domain for VFIO no-IOMMU is not appropriate here.
->
-> Can you elaborate on this please? I don't understand the argument you're
-> making. It's like saying "I don't like eggs, therefore I don't drive a
-> car".
->
+Em Wed, 19 Jul 2017 11:02:01 -0500
+Rob Herring <robh@kernel.org> escreveu:
 
-Like I said, VFIO no-IOMMU mode for a device means device transactions
-will not go through any IOMMU. That's why having IDENTITY domain for
-device using VFIO no-IOMMU is not semantically correct. The analogy you
-proposed does not apply here.
+> On Wed, Jul 19, 2017 at 4:41 AM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+> > On 07/18/2017 11:43 PM, Rob Herring wrote:  
+> >> Now that we have a custom printf format specifier, convert users of
+> >> full_name to use %pOF instead. This is preparation to remove storing
+> >> of the full path string for each node.
+> >>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>  
+> >  
+> >> ---
+> >>   drivers/media/i2c/s5c73m3/s5c73m3-core.c       |  3 +-
+> >>   drivers/media/i2c/s5k5baf.c                    |  7 ++--
+> >>   drivers/media/platform/am437x/am437x-vpfe.c    |  4 +-
+> >>   drivers/media/platform/atmel/atmel-isc.c       |  4 +-
+> >>   drivers/media/platform/davinci/vpif_capture.c  | 16 ++++----
+> >>   drivers/media/platform/exynos4-is/fimc-is.c    |  8 ++--
+> >>   drivers/media/platform/exynos4-is/fimc-lite.c  |  3 +-
+> >>   drivers/media/platform/exynos4-is/media-dev.c  |  8 ++--
+> >>   drivers/media/platform/exynos4-is/mipi-csis.c  |  4 +-
+> >>   drivers/media/platform/mtk-mdp/mtk_mdp_comp.c  |  6 +--
+> >>   drivers/media/platform/mtk-mdp/mtk_mdp_core.c  |  8 ++--
+> >>   drivers/media/platform/omap3isp/isp.c          |  8 ++--
+> >>   drivers/media/platform/pxa_camera.c            |  2 +-
+> >>   drivers/media/platform/rcar-vin/rcar-core.c    |  4 +-
+> >>   drivers/media/platform/soc_camera/soc_camera.c |  6 +--
+> >>   drivers/media/platform/xilinx/xilinx-vipp.c    | 52 +++++++++++++-------------
+> >>   drivers/media/v4l2-core/v4l2-async.c           |  4 +-
+> >>   drivers/media/v4l2-core/v4l2-clk.c             |  3 +-
+> >>   include/media/v4l2-clk.h                       |  4 +-
+> >>   19 files changed, 71 insertions(+), 83 deletions(-)  
+> >  
+> >> diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+> >> index ac4704388920..9233ad0b1b6b 100644
+> >> --- a/drivers/media/platform/xilinx/xilinx-vipp.c
+> >> +++ b/drivers/media/platform/xilinx/xilinx-vipp.c  
+> >  
+> >> @@ -144,9 +144,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+> >>               remote = ent->entity;
+> >>
+> >>               if (link.remote_port >= remote->num_pads) {
+> >> -                     dev_err(xdev->dev, "invalid port number %u on %s\n",
+> >> -                             link.remote_port,
+> >> -                             to_of_node(link.remote_node)->full_name);
+> >> +                     dev_err(xdev->dev, "invalid port number %u on %pOF\n",
+> >> +                             link.remote_port, link.remote_node);  
+> >
+> > Shouldn't there be to_of_node(link.remote_node) instead of link.remote_node ?  
+> 
+> Humm, yes. I thought I fixed that.
 
-Anyways, this patch has nothing to do with FlexRM support for
-VFIO platform hence I will drop it. Fixing VFIO no-IOMMU mode
-can be a separate patchset.
+After such fix, I'm OK with this patch.
 
-Regards,
-Anup
+Are you planning to apply it on your tree, or via the media one?
+
+I guess it is probably better to apply via media, in order to avoid
+conflicts with other changes.
+
+Thanks,
+Mauro
