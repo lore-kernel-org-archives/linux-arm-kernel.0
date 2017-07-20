@@ -1,47 +1,61 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 20 Jul 2017 09:37:48 +0000
-Subject: [PATCH v2 0/4] Add STM32 MDMA driver
-In-Reply-To: <1499343941-6375-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1499343941-6375-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1fda0cc8-0b3c-70b0-0b34-b9b9a3ca6121@st.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 20 Jul 2017 15:12:16 +0530
+Subject: [PATCH v2 1/3] gpio: davinci: Use devm_gpiochip_add_data in place of
+ gpiochip_add_data
+In-Reply-To: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
+References: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1500543738-9696-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use the devm version of gpiochip_add_data and pass on the
+return value. This avoids memory leak due to gpiochip_add_data
+in case the driver is unbound.
 
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
 
-On 07/06/2017 02:25 PM, Pierre-Yves MORDRET wrote:
-> This patchset adds support for the STM32 MDMA controller.
-> The Master Direct memory access (MDMA) provides high-speed data transfer
-> between memory and memory or between peripherals and memory.
-> Contrary to STM32 DMA, the STM32 MDMA controller supports hardware LLI and
-> uses a larger integrated FIFO (128 vs 16 bytes)
+Changes in v2:
 
-Gentle ping for driver review since DT Bindings has been acked by Rob
-Herring.
+  * Restoring the previous values of ctrl_num and bank_base in case of an error.
 
-Thanks
-Py
+ drivers/gpio/gpio-davinci.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-> ---
->    Version history:
->       v2:
->           * change compatible into st,stm32h7-mdma to be more SoC specific
->           * Add MDMA support in DT for H7
->           * Add MDMA support in STM32 defconfig
-> ---
-> Pierre-Yves MORDRET (4):
->    dt-bindings: Document the STM32 MDMA bindings
->    dmaengine: Add STM32 MDMA driver
->    ARM: dts: stm32: Add MDMA support for STM32H743 SoC
->    ARM: configs: stm32: Add MDMA support in STM32 defconfig
-> 
->   .../devicetree/bindings/dma/stm32-mdma.txt         |   94 ++
->   arch/arm/boot/dts/stm32h743.dtsi                   |   10 +
->   arch/arm/configs/stm32_defconfig                   |    1 +
->   drivers/dma/Kconfig                                |   12 +
->   drivers/dma/Makefile                               |    1 +
->   drivers/dma/stm32-mdma.c                           | 1536 ++++++++++++++++++++
->   6 files changed, 1654 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
->   create mode 100644 drivers/dma/stm32-mdma.c
-> 
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index 65cb359..27499ec 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -166,7 +166,7 @@ static int davinci_gpio_get(struct gpio_chip *chip, unsigned offset)
+ static int davinci_gpio_probe(struct platform_device *pdev)
+ {
+ 	static int ctrl_num, bank_base;
+-	int gpio, bank;
++	int gpio, bank, ret = 0;
+ 	unsigned ngpio, nbank;
+ 	struct davinci_gpio_controller *chips;
+ 	struct davinci_gpio_platform_data *pdata;
+@@ -232,10 +232,20 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+ 	for (gpio = 0, bank = 0; gpio < ngpio; gpio += 32, bank++)
+ 		chips->regs[bank] = gpio_base + offset_array[bank];
+ 
+-	gpiochip_add_data(&chips->chip, chips);
++	ret = devm_gpiochip_add_data(dev, &chips->chip, chips);
++	if (ret)
++		goto err;
++
+ 	platform_set_drvdata(pdev, chips);
+ 	davinci_gpio_irq_setup(pdev);
+ 	return 0;
++
++err:
++	/* Revert the static variable increments */
++	ctrl_num--;
++	bank_base -= ngpio;
++
++	return ret;
+ }
+ 
+ /*--------------------------------------------------------------------------*/
+-- 
+1.9.1
