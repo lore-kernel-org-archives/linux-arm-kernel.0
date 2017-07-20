@@ -1,39 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jul 2017 14:14:06 +0100
-Subject: [PATCH v3 1/6] Documentation: perf: hisi: Documentation for
- HiSilicon SoC PMU driver
-In-Reply-To: <20170720130847.GB16356@arm.com>
-References: <1500364799-90518-1-git-send-email-zhangshaokun@hisilicon.com>
- <1500364799-90518-2-git-send-email-zhangshaokun@hisilicon.com>
- <20170719171748.00005866@huawei.com>
- <c5c552e2-94e2-9390-9cda-2573844b926d@hisilicon.com>
- <20170720130847.GB16356@arm.com>
-Message-ID: <20170720131406.GC16356@arm.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Thu, 20 Jul 2017 21:12:27 +0800
+Subject: [linux-sunxi] [PATCH 0/5] AXP803 regulator support for Pine64 and
+ SoPine
+In-Reply-To: <CAGb2v67hcD=uihh8CCwiNEm-29vc=d4nrqJTm+CAtmg_sWu8Qw@mail.gmail.com>
+References: <20170719161019.62133-1-icenowy@aosc.io>
+ <CAGb2v67hcD=uihh8CCwiNEm-29vc=d4nrqJTm+CAtmg_sWu8Qw@mail.gmail.com>
+Message-ID: <cf799802f412ad51a14091f4ee2bbaee@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 02:08:47PM +0100, Will Deacon wrote:
-> On Thu, Jul 20, 2017 at 08:54:36PM +0800, Zhangshaokun wrote:
-> > On 2017/7/19 17:17, Jonathan Cameron wrote:
-> > >> +Super CPU cluster (SCCL) and is made up of 6 CCLs. Each SCCL has two HHAs
-> > >> +(0 - 1) and four DDRCs (0 - 3), respectively.
-> > >> +
-> > >> +HiSilicon SoC uncore PMU driver
-> > >> +---------------------------------------
-> > >> +Each device PMU has separate registers for event counting, control and
-> > >> +interrupt, and the PMU driver shall register perf PMU drivers like L3C,
-> > >> +HHA and DDRC etc. The available events and configuration options shall
-> > >> +be described in the sysfs, see /sys/devices/hisi_*.  
-> > > Is there not a subsystem directory that would make more sense to
-> > > refer to than the full device list?
-> > > 
-> > 
-> > For uncore devices, it is more reasonable to list in /sys/devices/***.
+? 2017-07-20 12:11?Chen-Yu Tsai ???
+> On Thu, Jul 20, 2017 at 12:10 AM, Icenowy Zheng <icenowy@aosc.io> 
+> wrote:
+>> The Pine64 and SoPine w/ baseboard boards have an AXP803 PMIC, and the
+>> regulators of the PMIC are used.
+>> 
+>> This patchset adds the regulators to the device tree of these two 
+>> boards.
+>> 
+>> The first patch introduces proper AXP803 regulators to Pine64 DT, and 
+>> the
+>> second patch removed dummy regulators in the Pine64 DT.
+>> 
+>> The third patch enables AXP803 PMIC for SoPine.
+>> 
+>> The fourth patch and fifth patch are like the first and the second, 
+>> but
+>> they're for SoPine w/ baseboard.
+>> 
+>> Icenowy Zheng (5):
+>>   arm64: allwinner: a64: enable AXP803 regulators for Pine64
+>>   arm: allwinner: a64: drop the dummy vcc3v3 regulator in Pine64 DT
+>>   arm64: allwinner: a64: add AXP803 PMIC to SoPine DTSI
+>>   arm64: allwinner: a64: add AXP803 regulators support for SoPine
+>>   arm: allwinner: a64: drop vcc3v3 and vcc1v8 dummy regulators for
+>>     SoPine
 > 
-> The usual place for these things is /sys/bus/event_source/devices/<pmu name>.
+> The related drivers are all merged. There's really no reason to split
+> these into separate patches. Patch 1 & 2 can be squashed together.
+> Patch 3, 4 & 5 can be squashed together.
+> 
+> The patches themselves look good, though I have not checked them
+> against the schematics.
 
-... which are symlinks to directories under /sys/devices/! I didn't realise
-that, so I suspect you're ok. Still worth getting the format of things
-correct though, so perf can read/parse them with minimal effort.
+In fact I prefer to split out the patch that removes the dummy
+regulators, but if you think squashing them is better, I will
+do it.
 
-Will
+Squash 3 into 4 is of course okay.
+
+> 
+> ChenYu
+> 
+>> 
+>>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 105 
+>> +++++++++++++++++++--
+>>  .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |  34 +++++--
+>>  .../boot/dts/allwinner/sun50i-a64-sopine.dtsi      |  91 
+>> ++++++++++++++++--
+>>  3 files changed, 203 insertions(+), 27 deletions(-)
+>> 
+>> --
+>> 2.13.0
+>> 
+>> --
+>> You received this message because you are subscribed to the Google 
+>> Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send 
+>> an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
