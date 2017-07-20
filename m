@@ -1,54 +1,56 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jul 2017 17:53:45 +0200
-Subject: [PATCH 12/12] ARM: rpc: rename RAM_SIZE macro
+Date: Thu, 20 Jul 2017 17:51:44 +0200
+Subject: [PATCH 06/12] ARM: omap2: mark unused functions as __maybe_unused
 In-Reply-To: <20170720154616.3250481-1-arnd@arndb.de>
 References: <20170720154616.3250481-1-arnd@arndb.de>
-Message-ID: <20170720155410.3251043-3-arnd@arndb.de>
+Message-ID: <20170720155209.3250880-3-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RAM_SIZE macro in mach/hardware.h conflicts with macros of
-the same name in multiple drivers, leading to annoying build warnings:
+The omap_generic_init() and omap_hwmod_init_postsetup() functions are
+used in the initialization for all OMAP2+ SoC types, but in the
+extreme case that those are all disabled, we get a warning about
+unused code:
 
-In file included from drivers/net/ethernet/cirrus/cs89x0.c:79:0:
-drivers/net/ethernet/cirrus/cs89x0.h:324:0: error: "RAM_SIZE" redefined [-Werror]
- #define RAM_SIZE 0x1000       /*  The card has 4k bytes or RAM */
- ^
-In file included from /git/arm-soc/arch/arm/mach-rpc/include/mach/io.h:16:0,
-                 from /git/arm-soc/arch/arm/include/asm/io.h:194,
-                 from /git/arm-soc/include/linux/scatterlist.h:8,
-                 from /git/arm-soc/include/linux/dmaengine.h:24,
-                 from /git/arm-soc/include/linux/netdevice.h:38,
-                 from /git/arm-soc/drivers/net/ethernet/cirrus/cs89x0.c:54:
-arch/arm/mach-rpc/include/mach/hardware.h:28:0: note: this is the location of the previous definition
- #define RAM_SIZE  0x10000000
+arch/arm/mach-omap2/io.c:412:123: error: 'omap_hwmod_init_postsetup' defined but not used [-Werror=unused-function]
+arch/arm/mach-omap2/board-generic.c:30:123: error: 'omap_generic_init' defined but not used [-Werror=unused-function]
 
-We don't use RAM_SIZE/RAM_START at all, so we could just remove
-them, but it might be nice to leave them for documentation purposes,
-so this renames them to RPC_RAM_SIZE/RPC_RAM_START in order to
-avoid the build warnings
+This annotates both as __maybe_unused to shut up that warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
-I originally sent this in Feb 2016, but it got lost for some reason.
+Originally sent in Feb 2016, but it got lost for some reason.
 ---
- arch/arm/mach-rpc/include/mach/hardware.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-generic.c | 2 +-
+ arch/arm/mach-omap2/io.c            | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-rpc/include/mach/hardware.h b/arch/arm/mach-rpc/include/mach/hardware.h
-index aa79fa47373a..622d4e5df029 100644
---- a/arch/arm/mach-rpc/include/mach/hardware.h
-+++ b/arch/arm/mach-rpc/include/mach/hardware.h
-@@ -25,8 +25,8 @@
-  *  *_SIZE  is the size of the region
-  *  *_BASE  is the virtual address
-  */
--#define RAM_SIZE		0x10000000
--#define RAM_START		0x10000000
-+#define RPC_RAM_SIZE		0x10000000
-+#define RPC_RAM_START		0x10000000
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index dc9e34e670a2..b1e661bb5521 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -28,7 +28,7 @@ static const struct of_device_id omap_dt_match_table[] __initconst = {
+ 	{ }
+ };
  
- #define EASI_SIZE		0x08000000	/* EASI I/O */
- #define EASI_START		0x08000000
+-static void __init omap_generic_init(void)
++static void __init __maybe_unused omap_generic_init(void)
+ {
+ 	pdata_quirks_init(omap_dt_match_table);
+ 
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 1d739d1a0a65..1cd20e4d56b0 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -410,7 +410,7 @@ static int _set_hwmod_postsetup_state(struct omap_hwmod *oh, void *data)
+ 	return omap_hwmod_set_postsetup_state(oh, *(u8 *)data);
+ }
+ 
+-static void __init omap_hwmod_init_postsetup(void)
++static void __init __maybe_unused omap_hwmod_init_postsetup(void)
+ {
+ 	u8 postsetup_state;
+ 
 -- 
 2.9.0
