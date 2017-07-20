@@ -1,58 +1,73 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 20 Jul 2017 16:34:42 -0500
-Subject: [PATCH 2/4] gpio: davinci: Handle the return value of
- davinci_gpio_irq_setup function
-In-Reply-To: <20170720100509.GB2729@localhost>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-3-git-send-email-j-keerthy@ti.com>
- <20170719111000.GX29638@localhost>
- <cbea9082-3799-281b-1364-50e442f5362f@ti.com>
- <cc66dfaf-05c5-8d55-03a6-556ec83c4487@ti.com>
- <20170720095047.GA2729@localhost>
- <47055927-5102-b39f-fdbb-b5d89cb14632@ti.com>
- <20170720100509.GB2729@localhost>
-Message-ID: <02965359-ecf1-b934-6b7a-87162d7d00a4@ti.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 20 Jul 2017 16:34:30 -0500
+Subject: [PATCH v5 1/3] Documentation: devicetree: add Freescale RNGC
+ binding
+In-Reply-To: <1500582447-28607-1-git-send-email-martin@kaiser.cx>
+References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1500582447-28607-1-git-send-email-martin@kaiser.cx>
+Message-ID: <CAL_Jsq+-PYDw80EXC-eOvvQX7v8O9rVke_0XuM0_Du3xKj_ZWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 20, 2017 at 3:27 PM, Martin Kaiser <martin@kaiser.cx> wrote:
+> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>
+> Add binding documentation for the Freescale RNGC found on
+> some i.MX2/3 SoCs.
+>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> ---
+> Changes in v5:
+>   none
+>
+> Changes in v4:
+>   none
+>
+> Changes in v3:
+>   - add compatible string for imx35
+>   - remove imx5 from the commit message,
+>     I couldn't find an i.MX SOC that has RNGC
 
+3 versions in 3 days... Give folks time to review.
 
-On 07/20/2017 05:05 AM, Johan Hovold wrote:
-> On Thu, Jul 20, 2017 at 03:32:27PM +0530, Keerthy wrote:
->> On Thursday 20 July 2017 03:20 PM, Johan Hovold wrote:
->>> On Thu, Jul 20, 2017 at 02:40:37PM +0530, Keerthy wrote:
->>>> On Thursday 20 July 2017 12:14 PM, Keerthy wrote:
->>>>> On Wednesday 19 July 2017 04:40 PM, Johan Hovold wrote:
-> 
->>>>>> There's a separate but related bug here too as the clk_prepare_enable()
->>>>>> in davinci_gpio_irq_setup() is never balanced on driver unbind.
->>>>>
->>>>> Yes Johan. I will send that as a separate patch.
->>>>
->>>> This is already fixed in the latest kernel:
->>>>
->>>> commit 6dc0048cff988858254fcc26becfc1e9753efa79
->>>> Author: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>>> Date:   Tue May 23 14:48:57 2017 +0530
->>>
->>> That change only handles errors in davinci_gpio_irq_setup() (i.e. during
->>> probe) and not the imbalance at driver unbind that I was referring to.
->>
->> Okay got it. One more clk_unprepare_disable() call needs to be there in
->> probe err path.
-> 
-> No, you need to balance it on driver unbind, that is, in a new remove()
-> callback.
-> 
+> Changes in v2:
+>   none
+>
+>  Documentation/devicetree/bindings/rng/mxc_rngc.txt | 16 ++++++++++++++++
 
-Sry, but manual driver unbind for this driver is really smth unexpected ;(
-So, I'm not sure if it need to be implemented and even yes - it should not be
-a part of this patch. Probably, smth like "convert driver to be a module".
+Perhaps I wasn't clear. MXC is long dead. Use imx.
 
-By the way, I've tried to unbind gpio-omap, result - failure (expected),
-as unbind does not take into account module refcnt state.
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rng/mxc_rngc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/rng/mxc_rngc.txt b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
+> new file mode 100644
+> index 0000000..5a12ada
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
+> @@ -0,0 +1,16 @@
+> +Freescale RNGC (Random Number Generator Version C)
+> +
+> +Required properties:
+> +- compatible : Should be "fsl,imx25-rng" or "fsl,imx35-rng"
 
+rngc if that is what the block is called.
 
--- 
-regards,
--grygorii
+Reformat to 1 valid set of compatibles per line.
+
+> +- reg : Offset and length of the register set of this block
+> +- interrupts : the interrupt number for the RNG block
+> +- clocks: should contain the RNG clk source
+> +
+> +Example:
+> +
+> +rng at 53fb0000 {
+> +       compatible = "fsl,imx25-rng";
+> +       reg = <0x53fb0000 0x4000>;
+> +       interrupts = <22>;
+> +       clocks = <&trng_clk>;
+> +};
+> --
+> 2.1.4
+>
