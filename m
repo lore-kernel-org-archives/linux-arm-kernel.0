@@ -1,190 +1,39 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Jul 2017 11:44:43 +0800
-Subject: [PATCH v2 01/10] clk: sunxi-ng: Add interface to query or configure
- MMC timing modes.
+Date: Thu, 20 Jul 2017 11:44:50 +0800
+Subject: [PATCH v2 08/10] ARM: dts: sun8i: a83t: Add pingroup for 8-bit eMMC
+ on mmc2
 In-Reply-To: <20170720034452.15920-1-wens@csie.org>
 References: <20170720034452.15920-1-wens@csie.org>
-Message-ID: <20170720034452.15920-2-wens@csie.org>
+Message-ID: <20170720034452.15920-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with the A83T SoC, Allwinner introduced a new timing mode for
-its MMC clocks. The new mode changes how the MMC controller sample and
-output clocks are delayed to match chip and board specifics. There are
-two controls for this, one on the CCU side controlling how the clocks
-behave, and one in the MMC controller controlling what inputs to take
-and how to route them.
-
-In the old mode, the MMC clock had 2 child clocks providing the output
-and sample clocks, which could be delayed by a number of clock cycles
-measured from the MMC clock's parent.
-
-With the new mode, the 2 delay clocks are no longer active. Instead,
-the delays and associated controls are moved into the MMC controller.
-The output of the MMC clock is also halved.
-
-The difference in how things are wired between the modes means that the
-clock controls and the MMC controls must match. To achieve this in a
-clear, explicit way, we introduce two functions for the MMC driver to
-use: one queries the hardware for the current mode set, and the other
-allows the MMC driver to request a mode.
+mmc2 can support 8-bit eMMC chips, with a dedicated reset line.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/Makefile         |  1 +
- drivers/clk/sunxi-ng/ccu_common.h     |  5 +++
- drivers/clk/sunxi-ng/ccu_mmc_timing.c | 73 +++++++++++++++++++++++++++++++++++
- include/linux/clk/sunxi-ng.h          | 35 +++++++++++++++++
- 4 files changed, 114 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_mmc_timing.c
- create mode 100644 include/linux/clk/sunxi-ng.h
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 0c45fa50283d..45a5910379a5 100644
---- a/drivers/clk/sunxi-ng/Makefile
-+++ b/drivers/clk/sunxi-ng/Makefile
-@@ -1,5 +1,6 @@
- # Common objects
- lib-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_mmc_timing.o
- lib-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 21ab668abfac..d9b4372dbdf3 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -271,6 +271,15 @@
+ 				bias-pull-up;
+ 			};
  
- # Base clock types
-diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
-index d6fdd7a789aa..1e2761c53f06 100644
---- a/drivers/clk/sunxi-ng/ccu_common.h
-+++ b/drivers/clk/sunxi-ng/ccu_common.h
-@@ -23,6 +23,11 @@
- #define CCU_FEATURE_FIXED_POSTDIV	BIT(3)
- #define CCU_FEATURE_ALL_PREDIV		BIT(4)
- #define CCU_FEATURE_LOCK_REG		BIT(5)
-+#define CCU_FEATURE_MMC_TIMING_SWITCH	BIT(6)
-+#define CCU_FEATURE_MMC_ALWAYS_NEW	BIT(7)
++			mmc2_8bit_emmc_pins: mmc2-8bit-emmc-pins {
++				pins = "PC5", "PC6", "PC8", "PC9",
++				       "PC10", "PC11", "PC12", "PC13",
++				       "PC14", "PC15", "PC16";
++				function = "mmc2";
++				drive-strength = <30>;
++				bias-pull-up;
++			};
 +
-+/* MMC timing mode switch bit */
-+#define CCU_MMC_NEW_TIMING_MODE		BIT(30)
- 
- struct device_node;
- 
-diff --git a/drivers/clk/sunxi-ng/ccu_mmc_timing.c b/drivers/clk/sunxi-ng/ccu_mmc_timing.c
-new file mode 100644
-index 000000000000..c5e86061c613
---- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_mmc_timing.c
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright (c) 2017 Chen-Yu Tsai. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clk/sunxi-ng.h>
-+
-+#include "ccu_common.h"
-+
-+/**
-+ * sunxi_ccu_set_mmc_timing_mode: Configure the MMC clock timing mode
-+ * @clk: clock to be configured
-+ * @new_mode: true for new timing mode introduced in A83T and later
-+ *
-+ * Returns 0 on success, -ENOTSUPP if the clock does not support
-+ * switching modes.
-+ */
-+int sunxi_ccu_set_mmc_timing_mode(struct clk *clk, bool new_mode)
-+{
-+	struct clk_hw *hw = __clk_get_hw(clk);
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+	unsigned long flags;
-+	u32 val;
-+
-+	if (!(cm->features & CCU_FEATURE_MMC_TIMING_SWITCH))
-+		return -ENOTSUPP;
-+
-+	spin_lock_irqsave(cm->lock, flags);
-+
-+	val = readl(cm->base + cm->reg);
-+	if (new_mode)
-+		val |= CCU_MMC_NEW_TIMING_MODE;
-+	else
-+		val &= ~CCU_MMC_NEW_TIMING_MODE;
-+	writel(val, cm->base + cm->reg);
-+
-+	spin_unlock_irqrestore(cm->lock, flags);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(sunxi_ccu_set_mmc_timing_mode);
-+
-+/**
-+ * sunxi_ccu_set_mmc_timing_mode: Get the current MMC clock timing mode
-+ * @clk: clock to query
-+ *
-+ * Returns 0 if the clock is in old timing mode, > 0 if it is in
-+ * new timing mode, and -ENOTSUPP if the clock does not support
-+ * this function.
-+ */
-+int sunxi_ccu_get_mmc_timing_mode(struct clk *clk)
-+{
-+	struct clk_hw *hw = __clk_get_hw(clk);
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+
-+	if (cm->features & CCU_FEATURE_MMC_ALWAYS_NEW)
-+		return 1;
-+
-+	if (!(cm->features & CCU_FEATURE_MMC_TIMING_SWITCH))
-+		return -ENOTSUPP;
-+
-+	return !!(readl(cm->base + cm->reg) & CCU_MMC_NEW_TIMING_MODE);
-+}
-+EXPORT_SYMBOL_GPL(sunxi_ccu_get_mmc_timing_mode);
-diff --git a/include/linux/clk/sunxi-ng.h b/include/linux/clk/sunxi-ng.h
-new file mode 100644
-index 000000000000..990f760f70e5
---- /dev/null
-+++ b/include/linux/clk/sunxi-ng.h
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (c) 2017 Chen-Yu Tsai. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _LINUX_CLK_SUNXI_NG_H_
-+#define _LINUX_CLK_SUNXI_NG_H_
-+
-+#include <linux/errno.h>
-+
-+#ifdef CONFIG_SUNXI_CCU
-+int sunxi_ccu_set_mmc_timing_mode(struct clk *clk, bool new_mode);
-+int sunxi_ccu_get_mmc_timing_mode(struct clk *clk);
-+#else
-+static inline int sunxi_ccu_set_mmc_timing_mode(struct clk *clk,
-+						bool new_mode)
-+{
-+	return -ENOTSUPP;
-+}
-+
-+static inline int sunxi_ccu_get_mmc_timing_mode(struct clk *clk)
-+{
-+	return -ENOTSUPP;
-+}
-+#endif
-+
-+#endif
+ 			spdif_tx_pin: spdif-tx-pin {
+ 				pins = "PE18";
+ 				function = "spdif";
 -- 
 2.13.2
