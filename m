@@ -1,73 +1,36 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 20 Jul 2017 16:34:30 -0500
-Subject: [PATCH v5 1/3] Documentation: devicetree: add Freescale RNGC
- binding
-In-Reply-To: <1500582447-28607-1-git-send-email-martin@kaiser.cx>
-References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
- <1500582447-28607-1-git-send-email-martin@kaiser.cx>
-Message-ID: <CAL_Jsq+-PYDw80EXC-eOvvQX7v8O9rVke_0XuM0_Du3xKj_ZWQ@mail.gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 20 Jul 2017 14:36:02 -0700
+Subject: [PATCH v5 0/1] acpi: apei: Bug fix to enable APEI support for ARMv8
+Message-ID: <1500586563-7088-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 3:27 PM, Martin Kaiser <martin@kaiser.cx> wrote:
-> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->
-> Add binding documentation for the Freescale RNGC found on
-> some i.MX2/3 SoCs.
->
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
-> Changes in v5:
->   none
->
-> Changes in v4:
->   none
->
-> Changes in v3:
->   - add compatible string for imx35
->   - remove imx5 from the commit message,
->     I couldn't find an i.MX SOC that has RNGC
+v5:
+* Remove the patch set 1/2 as it was accepted
+* Fix the signed-off-by using Co-authored-by
 
-3 versions in 3 days... Give folks time to review.
+v4:
+* Update patch commit log for gsi.c patch
+* Make change to be 80 column aligned
 
-> Changes in v2:
->   none
->
->  Documentation/devicetree/bindings/rng/mxc_rngc.txt | 16 ++++++++++++++++
+v3
+* Change the title of the patch to reflect the patch
+* Completely dropped the driver. Instead, move completely to the FW by
+  accessing the GIC directly.
+* Fix a bug with function acpi_gsi_to_irq
+* Enable APEI multiple GHES source to share an single external IRQ
 
-Perhaps I wasn't clear. MXC is long dead. Use imx.
+v2
+* Make all code more generic naming
+* Still waiting for comment from Linaro folks on APEI
 
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rng/mxc_rngc.txt
->
-> diff --git a/Documentation/devicetree/bindings/rng/mxc_rngc.txt b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
-> new file mode 100644
-> index 0000000..5a12ada
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
-> @@ -0,0 +1,16 @@
-> +Freescale RNGC (Random Number Generator Version C)
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,imx25-rng" or "fsl,imx35-rng"
+---
+Loc Ho (1):
+  acpi: apei: Enable APEI multiple GHES source to share an single
+    external IRQ
 
-rngc if that is what the block is called.
+ drivers/acpi/apei/ghes.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Reformat to 1 valid set of compatibles per line.
-
-> +- reg : Offset and length of the register set of this block
-> +- interrupts : the interrupt number for the RNG block
-> +- clocks: should contain the RNG clk source
-> +
-> +Example:
-> +
-> +rng at 53fb0000 {
-> +       compatible = "fsl,imx25-rng";
-> +       reg = <0x53fb0000 0x4000>;
-> +       interrupts = <22>;
-> +       clocks = <&trng_clk>;
-> +};
-> --
-> 2.1.4
->
+-- 
+1.8.3.1
