@@ -1,35 +1,47 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Thu, 20 Jul 2017 10:02:32 +0530
-Subject: [PATCH v2 0/2] FlexRM support in VFIO platform
-Message-ID: <1500525154-5200-1-git-send-email-anup.patel@broadcom.com>
+Date: Thu, 20 Jul 2017 10:02:33 +0530
+Subject: [PATCH v2 1/2] vfio: Allow No-IOMMU mode without checking
+ iommu_present()
+In-Reply-To: <1500525154-5200-1-git-send-email-anup.patel@broadcom.com>
+References: <1500525154-5200-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1500525154-5200-2-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset primarily adds Broadcom FlexRM reset module for
-VFIO platform driver. We also have minor improvments in IOMMU
-and VFIO driver to allow VFIO no-IOMMU mode access to FlexRM.
+Not allowing No-IOMMU mode for devices already having
+iommu_ops on their bus is very conservative.
 
-The patches are based on Linux-4.13-rc1 and can also be
-found at flexrm-vfio-v2 branch of
-https://github.com/Broadcom/arm64-linux.git
+We now have IOMMU (such as ARM SMMU) which can bypass
+transcations when IOMMU is not configured for a given
+device. In addition, it is not necessary to have all
+devices on bus to be upstream to an IOMMU on that bus.
 
-Changes since v1:
- - Remove iommu_present() check in vfio_iommu_group_get()
- - Drop PATCH1-to-PATCH3 because IOMMU_CAP_BYPASS is not
-   required
- - Move additional comments out of license header in
-   vfio_platform_bcmflexrm.c
+Due above reasons, having iommu_present() check for
+VFIO No-IOMMU mode is not appropriate.
 
-Anup Patel (2):
-  vfio: Allow No-IOMMU mode without checking iommu_present()
-  vfio: platform: reset: Add Broadcom FlexRM reset module
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+---
+ drivers/vfio/vfio.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
- drivers/vfio/platform/reset/Kconfig                |  9 +++
- drivers/vfio/platform/reset/Makefile               |  1 +
- .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 93 ++++++++++++++++++++++
- drivers/vfio/vfio.c                                |  7 +-
- 4 files changed, 106 insertions(+), 4 deletions(-)
- create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-
+diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
+index 330d505..9d90de7 100644
+--- a/drivers/vfio/vfio.c
++++ b/drivers/vfio/vfio.c
+@@ -124,11 +124,10 @@ struct iommu_group *vfio_iommu_group_get(struct device *dev)
+ #ifdef CONFIG_VFIO_NOIOMMU
+ 	/*
+ 	 * With noiommu enabled, an IOMMU group will be created for a device
+-	 * that doesn't already have one and doesn't have an iommu_ops on their
+-	 * bus.  We set iommudata simply to be able to identify these groups
+-	 * as special use and for reclamation later.
++	 * that doesn't already have one.  We set iommudata simply to be able
++	 * to identify these groups as special use and for reclamation later.
+ 	 */
+-	if (group || !noiommu || iommu_present(dev->bus))
++	if (group || !noiommu)
+ 		return group;
+ 
+ 	group = iommu_group_alloc();
 -- 
 2.7.4
