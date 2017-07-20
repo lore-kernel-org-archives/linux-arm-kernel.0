@@ -1,35 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 20 Jul 2017 19:01:07 +0200
-Subject: [PATCH] pinctrl: sirf: atlas7: Initialize GPIO offset
-Message-ID: <20170720170107.14612-1-thierry.reding@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 21 Jul 2017 02:09:18 +0900
+Subject: [PATCH v4 2/2] thermal: uniphier: add UniPhier thermal driver
+In-Reply-To: <CAK7LNATDxacQXyJr=4b7zaWkX1Y6S8DMHEkQxECvmETemfGRfA@mail.gmail.com>
+References: <1499392475-17304-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1499392475-17304-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <CAK7LNASKqwWY4gorRZLd0GPXymm2WNdxuZr_OOs6g7uzaKSCMQ@mail.gmail.com>
+ <CAK7LNATDxacQXyJr=4b7zaWkX1Y6S8DMHEkQxECvmETemfGRfA@mail.gmail.com>
+Message-ID: <CAK7LNATDY4SdGHH1_K2GhFcsXMuG_9vGECWNtNfBJ_D=AO785w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+2017-07-21 1:53 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> 2017-07-21 1:08 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>> 2017-07-07 10:54 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+>>> Add a thermal driver for on-chip PVT (Process, Voltage and Temperature)
+>>> monitoring unit implemented on UniPhier SoCs. This driver supports
+>>> temperature monitoring and alert function.
+>>>
+>>> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+>>
+>>
+>> Sparse reports several warnings.
+>>
+>>
+>>   CHECK   drivers/thermal/uniphier_thermal.c
+>> drivers/thermal/uniphier_thermal.c:276:52: warning: incorrect type in
+>> argument 1 (different base types)
+>> drivers/thermal/uniphier_thermal.c:276:52:    expected restricted
+>> __be32 const [usertype] *cell
+>> drivers/thermal/uniphier_thermal.c:276:52:    got unsigned int const
+>> [usertype] *[assigned] calib
+>> drivers/thermal/uniphier_thermal.c:277:58: warning: incorrect type in
+>> argument 1 (different base types)
+>> drivers/thermal/uniphier_thermal.c:277:58:    expected restricted
+>> __be32 const [usertype] *cell
+>> drivers/thermal/uniphier_thermal.c:277:58:    got unsigned int const
+>> [usertype] *
+>> drivers/thermal/uniphier_thermal.c:136:9: warning: cast truncates bits
+>> from constant value (fffffffff becomes ffffffff)
+>> drivers/thermal/uniphier_thermal.c:141:9: warning: cast truncates bits
+>> from constant value (7ffffffff becomes ffffffff)
+>> drivers/thermal/uniphier_thermal.c:153:9: warning: cast truncates bits
+>> from constant value (ffffffffff0001 becomes ffff0001)
+>> drivers/thermal/uniphier_thermal.c:170:9: warning: cast truncates bits
+>> from constant value (7ffffffffff becomes ffffffff)
+>> drivers/thermal/uniphier_thermal.c:185:9: warning: cast truncates bits
+>> from constant value (7ffffffffff becomes ffffffff)
+>>
+>
+> Hmm.
+> The endian mismatch can be fixed by replacing u32 with __be32.
+>
+> I can not get the truncates bits warnings.
+> Why sparse complains about this...
 
-The GPIO offset is never initialized, which means that it will end up
-being zero as per the devm_kzalloc() of the parent structure.
+My bad - I was cross-compiling with ARCH=arm, so I think that's why.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-I have no idea how the driver could've ever worked for anything other
-than instances with a single bank, but maybe it did and I missed some
-detail.
+I think the incorrect type should be fixed.  (u32 -> __be32)
 
- drivers/pinctrl/sirf/pinctrl-atlas7.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-index 36b5c8d5471e..a2ca4a9472c7 100644
---- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
-+++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-@@ -6078,6 +6078,7 @@ static int atlas7_gpio_probe(struct platform_device *pdev)
- 		bank = &a7gc->banks[idx];
- 		/* Set ctrl registers' base of this bank */
- 		bank->base = ATLAS7_GPIO_BASE(a7gc, idx);
-+		bank->gpio_offset = idx * NGPIO_OF_BANK;
- 
- 		/* Get interrupt number from DTS */
- 		ret = of_irq_get(np, idx);
+
 -- 
-2.13.3
+Best Regards
+Masahiro Yamada
