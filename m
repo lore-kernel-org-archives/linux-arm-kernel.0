@@ -1,60 +1,185 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 21 Jul 2017 07:07:17 +0800
-Subject: [PATCH 3/3] arm64: allwinner: a64: add proper support for the Wi-Fi
- on BPi M64
+Date: Fri, 21 Jul 2017 07:07:16 +0800
+Subject: [PATCH 2/3] arm64: allwinner: a64: enable AXP803 for Banana Pi M64
 In-Reply-To: <20170720230717.58255-1-icenowy@aosc.io>
 References: <20170720230717.58255-1-icenowy@aosc.io>
-Message-ID: <20170720230717.58255-3-icenowy@aosc.io>
+Message-ID: <20170720230717.58255-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BPi M64 has an AP6212 Wi-Fi/Bluetooth combo module, and the Wi-Fi SDIO
-card is connected to the mmc1 controller.
+Banana Pi M64 board uses an AXP803 PMIC.
 
-The pwrseq of the mmc1 (used to reset the card) used to missing, and the
-out-of-band interrupt line of the card is not specified.
+Enable the PMIC and its regulators.
 
-Fix these issues for proper Wi-Fi support of BPi M64.
+As we have now proper regulators support, missing or dummy regulators
+are changed to the correct ones.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 116 +++++++++++++++++++--
+ 1 file changed, 106 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 51d67c0a0edf..037142231962 100644
+index 829922d077fb..51d67c0a0edf 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -58,6 +58,11 @@
+@@ -58,13 +58,6 @@
  	chosen {
  		stdout-path = "serial0:115200n8";
  	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-+	};
+-
+-	reg_vcc3v3: vcc3v3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vcc3v3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-	};
  };
  
  &ehci1 {
-@@ -106,9 +111,18 @@
+@@ -76,6 +69,7 @@
+ 	pinctrl-0 = <&rgmii_pins>;
+ 	phy-mode = "rgmii";
+ 	phy-handle = <&ext_rgmii_phy>;
++	phy-supply = <&reg_dc1sw>;
+ 	status = "okay";
+ };
+ 
+@@ -99,7 +93,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+ 	cd-inverted;
+ 	disable-wp;
+@@ -110,7 +104,8 @@
+ &mmc1 {
+ 	pinctrl-names = "default";
  	pinctrl-0 = <&mmc1_pins>;
- 	vmmc-supply = <&reg_dldo2>;
- 	vqmmc-supply = <&reg_dldo4>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dldo2>;
++	vqmmc-supply = <&reg_dldo4>;
  	bus-width = <4>;
  	non-removable;
  	status = "okay";
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
-+		interrupt-names = "host-wake";
-+	};
+@@ -119,7 +114,7 @@
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	cap-mmc-hw-reset;
+@@ -130,6 +125,107 @@
+ 	status = "okay";
  };
  
- &mmc2 {
++&r_rsb {
++	status = "okay";
++
++	axp803: pmic at 3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++#include "axp803.dtsi"
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dc1sw {
++	regulator-name = "vcc-phy";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-3v3";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-cpux";
++};
++
++/* DCDC3 is polyphased with DCDC2 */
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-hdmi-dsi";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&reg_dldo4 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi-io";
++};
++
++&reg_eldo1 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "cpvdd";
++};
++
++/*
++ * The A64 chip cannot work without this regulator off, although
++ * it seems to be only driving the AR100 core.
++ * Maybe we don't still know well about CPUs domain.
++ */
++&reg_fldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.13.0
