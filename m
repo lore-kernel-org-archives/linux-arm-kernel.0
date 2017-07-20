@@ -1,99 +1,43 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu, 20 Jul 2017 10:37:58 +0200
-Subject: [PATCH v2 0/7] Add support of OV9655 camera
-In-Reply-To: <20170718195223.zrqfrefxxzqfsojd@valkosipuli.retiisi.org.uk>
-References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
- <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
- <956f17e6-36dd-6733-0d35-9b801ed4244d@xs4all.nl>
- <BCD1BD18-96E3-4638-8935-B5C832D8EE52@goldelico.com>
- <2dd3402e-55b0-231d-878f-5ba95ee8cb36@st.com>
- <20170718195223.zrqfrefxxzqfsojd@valkosipuli.retiisi.org.uk>
-Message-ID: <AB91B71D-E34B-4645-BD70-A87226BA34C5@goldelico.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 20 Jul 2017 16:42:17 +0800
+Subject: [PATCH] regulator: fan53555: Use of_device_get_match_data() to
+ simplify probe
+Message-ID: <20170720084217.2584-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+if fan53555_regulator_probe() is called and the "client->dev.of_node"
+isn't NULL, it means OF registered a device with a valid compatible
+string, so match cannot be NULL.
 
-> Am 18.07.2017 um 21:52 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
-> 
-> On Tue, Jul 18, 2017 at 12:53:12PM +0000, Hugues FRUCHET wrote:
->> 
->> 
->> On 07/18/2017 02:17 PM, H. Nikolaus Schaller wrote:
->>> Hi,
->>> 
->>>> Am 18.07.2017 um 13:59 schrieb Hans Verkuil <hverkuil@xs4all.nl>:
->>>> 
->>>> On 12/07/17 22:01, Sylwester Nawrocki wrote:
->>>>> Hi Hugues,
->>>>> 
->>>>> On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
->>>>>> This patchset enables OV9655 camera support.
->>>>>> 
->>>>>> OV9655 support has been tested using STM32F4DIS-CAM extension board
->>>>>> plugged on connector P1 of STM32F746G-DISCO board.
->>>>>> Due to lack of OV9650/52 hardware support, the modified related code
->>>>>> could not have been checked for non-regression.
->>>>>> 
->>>>>> First patches upgrade current support of OV9650/52 to prepare then
->>>>>> introduction of OV9655 variant patch.
->>>>>> Because of OV9655 register set slightly different from OV9650/9652,
->>>>>> not all of the driver features are supported (controls). Supported
->>>>>> resolutions are limited to VGA, QVGA, QQVGA.
->>>>>> Supported format is limited to RGB565.
->>>>>> Controls are limited to color bar test pattern for test purpose.
->>>>> 
->>>>> I appreciate your efforts towards making a common driver but IMO it would be
->>>>> better to create a separate driver for the OV9655 sensor.  The original driver
->>>>> is 1576 lines of code, your patch set adds half of that (816).  There are
->>>>> significant differences in the feature set of both sensors, there are
->>>>> differences in the register layout.  I would go for a separate driver, we
->>>>> would then have code easier to follow and wouldn't need to worry about possible
->>>>> regressions.  I'm afraid I have lost the camera module and won't be able
->>>>> to test the patch set against regressions.
->>>>> 
->>>>> IMHO from maintenance POV it's better to make a separate driver. In the end
->>>>> of the day we wouldn't be adding much more code than it is being done now.
->>>> 
->>>> I agree. We do not have great experiences in the past with trying to support
->>>> multiple variants in a single driver (unless the diffs are truly small).
->>> 
->>> Well,
->>> IMHO the diffs in ov965x are smaller (but untestable because nobody seems
->>> to have an ov9650/52 board) than within the bq27xxx chips, but I can dig out
->>> an old pdata based separate ov9655 driver and extend that to become DT compatible.
->>> 
->>> I had abandoned that separate approach in favour of extending the ov965x driver.
->>> 
->>> Have to discuss with Hugues how to proceed.
->>> 
->>> BR and thanks,
->>> Nikolaus
->>> 
->> 
->> As Sylwester and Hans, I'm also in flavour of a separate driver, the 
->> fact that register set seems similar but in fact is not and that we 
->> cannot test for non-regression of 9650/52 are killer for me to continue 
->> on a single driver.
->> We can now restart from a new fresh state of the art sensor driver 
->> getting rid of legacy (pdata, old gpio, etc...).
-> 
-> Agreed. I bet the result will look cleaner indeed although this wasn't one
-> of the complex drivers.
+Use of_device_get_match_data() to retrieve the drvdata pointer.  No
+functional change intended.
 
-I finally managed to find the bug why mplayer did select-timeout on the GTA04.
-Was a bug in pinmux setup of the GTA04 for the omap3isp.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/regulator/fan53555.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-And I have resurrected our years old 3.12 camera driver, which was based on the
-MT9P031 code. It was already separate from ov9650/52.
-
-I have extended it to support DT by including some parts of Hugues' work.
-
-It still needs some cleanup and discussion but will be a simple patch (one
-for ov9655.c + Kconfig + Makefile) and one for bindings (I hope it includes
-all your comments).
-
-I will post v1 in the next days.
-
-BR,
-Nikolaus
+diff --git a/drivers/regulator/fan53555.c b/drivers/regulator/fan53555.c
+index 60f431831582..6b1c0e4672a2 100644
+--- a/drivers/regulator/fan53555.c
++++ b/drivers/regulator/fan53555.c
+@@ -407,14 +407,8 @@ static int fan53555_regulator_probe(struct i2c_client *client,
+ 
+ 	di->regulator = pdata->regulator;
+ 	if (client->dev.of_node) {
+-		const struct of_device_id *match;
+-
+-		match = of_match_device(of_match_ptr(fan53555_dt_ids),
+-					&client->dev);
+-		if (!match)
+-			return -ENODEV;
+-
+-		di->vendor = (unsigned long) match->data;
++		di->vendor =
++			(unsigned long)of_device_get_match_data(&client->dev);
+ 	} else {
+ 		/* if no ramp constraint set, get the pdata ramp_delay */
+ 		if (!di->regulator->constraints.ramp_delay) {
+-- 
+2.13.3
