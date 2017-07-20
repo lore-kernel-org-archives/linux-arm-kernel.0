@@ -1,52 +1,69 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 21 Jul 2017 00:18:41 +0100
-Subject: [PATCH 4/4] rtc: pl031: make interrupt optional
-In-Reply-To: <20170720231745.GE31807@n2100.armlinux.org.uk>
-References: <20170720231745.GE31807@n2100.armlinux.org.uk>
-Message-ID: <E1dYKiP-0001kg-BQ@rmk-PC.armlinux.org.uk>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Fri, 21 Jul 2017 01:50:36 +0200
+Subject: [PATCH] ARM64: dts: marvell: armada-37xx: Enable uSD on ESPRESSObin
+Message-ID: <1500594636-19911-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, the interrupt for the PL031 is optional.  Avoid
-trying to claim the interrupt if it's not specified.
+The ESPRESSObin board exposes one of the SDHCI interfaces
+via J1 uSD slot. This patch enables it.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Zbigniew Bodek <zbodek@gmail.com>
 ---
- drivers/rtc/rtc-pl031.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ .../boot/dts/marvell/armada-3720-espressobin.dts   | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 64c77ec1b4ea..82eb7da2c478 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -308,7 +308,8 @@ static int pl031_remove(struct amba_device *adev)
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+index b1af3f98..6d0caf1 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+@@ -45,6 +45,7 @@
  
- 	dev_pm_clear_wake_irq(&adev->dev);
- 	device_init_wakeup(&adev->dev, false);
--	free_irq(adev->irq[0], ldata);
-+	if (adev->irq[0])
-+		free_irq(adev->irq[0], ldata);
- 	rtc_device_unregister(ldata->rtc);
- 	amba_release_regions(adev);
+ /dts-v1/;
  
-@@ -389,12 +390,13 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto out;
- 	}
++#include <dt-bindings/gpio/gpio.h>
+ #include "armada-372x.dtsi"
  
--	if (request_irq(adev->irq[0], pl031_interrupt,
--			vendor->irqflags, "rtc-pl031", ldata)) {
--		ret = -EIO;
--		goto out_no_irq;
-+	if (adev->irq[0]) {
-+		ret = request_irq(adev->irq[0], pl031_interrupt,
-+				  vendor->irqflags, "rtc-pl031", ldata);
-+		if (ret)
-+			goto out_no_irq;
-+		dev_pm_set_wake_irq(&adev->dev, adev->irq[0]);
- 	}
--	dev_pm_set_wake_irq(&adev->dev, adev->irq[0]);
- 	return 0;
+ / {
+@@ -59,6 +60,20 @@
+ 		device_type = "memory";
+ 		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
+ 	};
++
++	vcc_sd_reg1: regulator {
++		compatible = "regulator-gpio";
++		regulator-name = "vcc_sd1";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++
++		gpios = <&gpionb 4 GPIO_ACTIVE_HIGH>;
++		gpios-states = <0>;
++		states = <1800000 0x1
++			  3300000 0x0>;
++		enable-active-high;
++	};
+ };
  
- out_no_irq:
+ /* J9 */
+@@ -71,6 +86,17 @@
+ 	status = "okay";
+ };
+ 
++/* J1 */
++&sdhci1 {
++	wp-inverted;
++	bus-width = <4>;
++	cd-gpios = <&gpionb 3 GPIO_ACTIVE_LOW>;
++	no-1-8-v;
++	marvell,pad-type = "sd";
++	vqmmc-supply = <&vcc_sd_reg1>;
++	status = "okay";
++};
++
+ /* Exported on the micro USB connector J5 through an FTDI */
+ &uart0 {
+ 	status = "okay";
 -- 
-2.7.4
+1.8.3.1
