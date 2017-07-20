@@ -1,40 +1,66 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Jul 2017 09:00:41 +0200
-Subject: [PATCH] powerpc/asm/cacheflush: Cleanup cacheflush function params
-In-Reply-To: <20170720062850.2195-1-matthew.brown.dev@gmail.com>
-References: <20170720062850.2195-1-matthew.brown.dev@gmail.com>
-Message-ID: <CAMuHMdVxnqD-90fDH+dqo8iJ94etcLHih27cqdVppi_AbFzbbw@mail.gmail.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Thu, 20 Jul 2017 15:32:39 +0800
+Subject: [PATCH v7 0/3] MFD: add driver for HiSilicon Hi6421v530 PMIC
+Message-ID: <20170720073242.1758-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 8:28 AM, Matt Brown <matthew.brown.dev@gmail.com> wrote:
-> The cacheflush prototypes currently use start and stop values and each
-> call requires typecasting the address to an unsigned long.
-> This patch changes the cacheflush prototypes to follow the x86 style of
-> using a base and size values, with base being a void pointer.
->
-> All callers of the cacheflush functions, including drivers, have been
-> modified to conform to the new prototypes.
->
-> The 64 bit cacheflush functions which were implemented in assembly code
-> (flush_dcache_range, flush_inval_dcache_range) have been translated into
-> C for readability and coherence.
->
-> Signed-off-by: Matt Brown <matthew.brown.dev@gmail.com>
+This patchset adds driver for HiSilicon Hi6421v530 PMIC.
 
->  drivers/spi/spi-bfin5xx.c                    | 10 +++---
->  drivers/usb/musb/blackfin.c                  |  6 ++--
+Mainline kernel already has driver support to a similar chip, Hi6421.
+Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
+they are at different revisions. They both use the same Memory-mapped
+I/O method to communicate with Main SoC. However, they differ quite a
+lot in their regulator designs. Eg. they have completely different LDO
+voltage points.
 
-These are used on blackfin, so changing them without changing the blackfin
-cache ops will break the build.
+Patch 1 and 2 are hi6421-pmic cleaning up.
+Patch 3 extends hi6421-pmic-core.c to support Hi6421v530 revision.
 
-Gr{oetje,eeting}s,
+Major changes in v7:
+ - rebase to v4.13-rc1 and resend MFD driver patches.
+ - As of v6, DTS and regulator parts have been merged into v4.13-rc1.
+   So they are not included in v7.
 
-                        Geert
+Major changes in v6:
+ - Patch 5, solve review comments from Mark Brown, add hi6421v530 regulator
+     driver to module device table.
+ - Add Acked-by from Arnd Bergmann
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Major changes in v5:
+ - Patch 3, solve review comments from Lee Johes
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Major changes in v4:
+ - put hi6421-pmic cleanup in separate patches.
+ - solve review comments from Lee Johes.
+ - regulator-name should not have '/' character. Otherwise it "Failed to
+     create debugfs directory"
+
+Major changes in v3:
+ - in hi6421-pmic-core.c
+    * use shorter license script.
+    * arrange #include in alphabetical order.
+    * using recommended error log messages from Lee Jones.
+ - in hi6421v530-regulator.c
+    * remove unused #include files
+    * arrange remaining ones in alphabetical order.
+
+Major changes in v2:
+ - instead of writing a new driver, extend hi6421-pmic-core.c
+     to support its v530 revision
+ - update hi6421v530-regulator.c to use modern regulator driver
+     design logics.
+
+*** BLURB HERE ***
+
+Guodong Xu (3):
+  mfd: hi6421-pmic: cleanup: change license text to shorter form
+  mfd: hi6421-pmic: cleanup: update dev_err messages
+  mfd: hi6421-pmic: add support for HiSilicon Hi6421v530
+
+ drivers/mfd/hi6421-pmic-core.c  | 89 ++++++++++++++++++++++++++---------------
+ include/linux/mfd/hi6421-pmic.h |  5 +++
+ 2 files changed, 62 insertions(+), 32 deletions(-)
+
+-- 
+2.10.2
