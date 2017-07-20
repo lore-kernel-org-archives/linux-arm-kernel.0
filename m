@@ -1,42 +1,34 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 20 Jul 2017 13:01:24 +0200
-Subject: [PATCH 0/2] fixed ethernet binding violation for reset signal
-In-Reply-To: <1500520073.25149.2.camel@mtkswgap22>
-References: <cover.1498030300.git.sean.wang@mediatek.com>
- <1500520073.25149.2.camel@mtkswgap22>
-Message-ID: <29c1debd-e7ac-9858-6969-cff37ae1d06f@gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 20 Jul 2017 12:03:58 +0100
+Subject: [PATCH 0/4] Drop uninformative messages from bootlog
+Message-ID: <20170720110402.15313-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+While booting v4.13-rc1 on an arm64 system, I noticed some messages
+that clutter the boot log without providing any useful
+information. This series trims some of the obvious offenders.
+
+The patches are spread across a few sub-systems - arm64/mm, mailbox,
+APEI and xen, and can be independently merged.
+
+Thanks,
+Punit
 
 
-On 07/20/2017 05:07 AM, Sean Wang wrote:
-> Hi, Matthias
-> 
-> just a gentle ping on this
-> 
+Punit Agrawal (4):
+  arm64/numa: Drop duplicate message
+  mailbox: pcc: Drop uninformative output during boot
+  ACPI / APEI: Drop uninformative messages during boot
+  xen: Drop un-informative message during boot
 
-Pushed now to v4.13-next/dts32
+ arch/arm64/mm/numa.c      | 7 +------
+ drivers/acpi/apei/ghes.c  | 9 +--------
+ drivers/mailbox/pcc.c     | 4 +---
+ drivers/xen/xenfs/super.c | 1 -
+ 4 files changed, 3 insertions(+), 18 deletions(-)
 
-Thanks!
-
-> 	Sean
-> 
-> 
-> On Wed, 2017-06-21 at 15:49 +0800, sean.wang at mediatek.com wrote:
->> From: Sean Wang <sean.wang@mediatek.com>
->>
->> Fixed binding violation and also updated related binding documentation to
->> reflect the reset signals the MediaTek Ethernet requires.
->>
->> Sean Wang (2):
->>    dt-bindings: net: mediatek: update documentation for reset signals
->>    arm: dts: mt7623: fixup binding violation missing reset in ethernet
->>      node
->>
->>   Documentation/devicetree/bindings/net/mediatek-net.txt | 6 ++++--
->>   arch/arm/boot/dts/mt7623.dtsi                          | 4 ++++
->>   2 files changed, 8 insertions(+), 2 deletions(-)
->>
-> 
-> 
+-- 
+2.11.0
