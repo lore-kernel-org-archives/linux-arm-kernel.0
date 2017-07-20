@@ -1,74 +1,171 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 20 Jul 2017 15:34:03 +0200
-Subject: [PATCH] arm: zynq: Use C pre-processor for includes in dts
-Message-ID: <8ae3984fe87ab188b5616c63d6ebe66603f030db.1500557621.git.michal.simek@xilinx.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Jul 2017 15:34:48 +0200
+Subject: [PATCH 07/18] drm/sun4i: tcon: Don't rely on encoders to set the
+ TCON mode
+In-Reply-To: <CAGb2v66d500j5YWFbTYn_BZcF_q=sM+hr2q+yJ88OmL_j4DVPg@mail.gmail.com>
+References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <31e3fd8540d85c8f4637af1083c5c2a436403cd2.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v66d500j5YWFbTYn_BZcF_q=sM+hr2q+yJ88OmL_j4DVPg@mail.gmail.com>
+Message-ID: <20170720133448.uywpaps4xcbgk7rp@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the dtsi include code to use the C pre-processor #include instead
-of the device tree /include/. This brings all Zynq device trees inline
-with each other.
+On Fri, Jul 14, 2017 at 11:56:18AM +0800, Chen-Yu Tsai wrote:
+> On Thu, Jul 13, 2017 at 10:13 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Just like we did for the TCON enable and disable, for historical reasons we
+> > used to rely on the encoders calling the TCON mode_set function, while the
+> > CRTC has a callback for that.
+> >
+> > Let's implement it in order to reduce the boilerplate code.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_crtc.c          | 11 ++++-
+> >  drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c  |  1 +-
+> >  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c      |  7 +---
+> >  drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c |  1 +-
+> >  drivers/gpu/drm/sun4i/sun4i_rgb.c           | 15 +------
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.c          | 56 ++++++++++------------
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.h          | 10 +----
+> >  drivers/gpu/drm/sun4i/sun4i_tv.c            |  6 +--
+> >  8 files changed, 40 insertions(+), 67 deletions(-)
+> >
+> 
+> [...]
+> 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > index dc70bc2a42a5..c4407910dfaf 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > @@ -106,29 +106,6 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+> >  }
+> >  EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
+> >
+> > -void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+> > -                       struct drm_encoder *encoder)
+> > -{
+> > -       u32 val;
+> > -
+> > -       if (!tcon->quirks->has_unknown_mux)
+> > -               return;
+> > -
+> > -       if (channel != 1)
+> > -               return;
+> > -
+> > -       if (encoder->encoder_type == DRM_MODE_ENCODER_TVDAC)
+> > -               val = 1;
+> > -       else
+> > -               val = 0;
+> > -
+> > -       /*
+> > -        * FIXME: Undocumented bits
+> > -        */
+> > -       regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, val);
+> > -}
+> > -EXPORT_SYMBOL(sun4i_tcon_set_mux);
+> > -
+> >  static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
+> >                                     int channel)
+> >  {
+> > @@ -147,8 +124,8 @@ static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
+> >         return delay;
+> >  }
+> >
+> > -void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> > -                         struct drm_display_mode *mode)
+> > +static void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> > +                                struct drm_display_mode *mode)
+> 
+> Nit on the side: maybe we could mark mode as constant?
+> Since the function doesn't change it. Same applies to the
+> other mode_set functions. But this could be left to another
+> patch.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+We totally should. I'll do it.
 
- arch/arm/boot/dts/zynq-zc702.dts | 2 +-
- arch/arm/boot/dts/zynq-zc706.dts | 2 +-
- arch/arm/boot/dts/zynq-zed.dts   | 2 +-
- arch/arm/boot/dts/zynq-zybo.dts  | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+> >  {
+> >         unsigned int bp, hsync, vsync;
+> >         u8 clk_delay;
+> > @@ -221,10 +198,9 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+> >         /* Enable the output on the pins */
+> >         regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0);
+> >  }
+> > -EXPORT_SYMBOL(sun4i_tcon0_mode_set);
+> >
+> > -void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+> > -                         struct drm_display_mode *mode)
+> > +static void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+> > +                                struct drm_display_mode *mode)
+> >  {
+> >         unsigned int bp, hsync, vsync, vtotal;
+> >         u8 clk_delay;
+> > @@ -312,7 +288,29 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+> >                            SUN4I_TCON_GCTL_IOMAP_MASK,
+> >                            SUN4I_TCON_GCTL_IOMAP_TCON1);
+> >  }
+> > -EXPORT_SYMBOL(sun4i_tcon1_mode_set);
+> > +
+> > +void sun4i_tcon_mode_set(struct sun4i_tcon *tcon, struct drm_encoder *encoder,
+> > +                        struct drm_display_mode *mode)
+> 
+> (also mark encoder as const?)
 
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 8ce0aff1db43..a096275d903d 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -12,7 +12,7 @@
-  * GNU General Public License for more details.
-  */
- /dts-v1/;
--/include/ "zynq-7000.dtsi"
-+#include "zynq-7000.dtsi"
- 
- / {
- 	model = "Zynq ZC702 Development Board";
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index 8d829cadc4e0..689ec9d6f7b9 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -12,7 +12,7 @@
-  * GNU General Public License for more details.
-  */
- /dts-v1/;
--/include/ "zynq-7000.dtsi"
-+#include "zynq-7000.dtsi"
- 
- / {
- 	model = "Zynq ZC706 Development Board";
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-index 4b5dbc2da1c0..c6a5749c8930 100644
---- a/arch/arm/boot/dts/zynq-zed.dts
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -12,7 +12,7 @@
-  * GNU General Public License for more details.
-  */
- /dts-v1/;
--/include/ "zynq-7000.dtsi"
-+#include "zynq-7000.dtsi"
- 
- / {
- 	model = "Zynq Zed Development Board";
-diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
-index 542c19dd5df1..8b42fb199a8e 100644
---- a/arch/arm/boot/dts/zynq-zybo.dts
-+++ b/arch/arm/boot/dts/zynq-zybo.dts
-@@ -12,7 +12,7 @@
-  * GNU General Public License for more details.
-  */
- /dts-v1/;
--/include/ "zynq-7000.dtsi"
-+#include "zynq-7000.dtsi"
- 
- / {
- 	model = "Zynq ZYBO Development Board";
+Yep.
+
+> > +{
+> > +       switch (encoder->encoder_type) {
+> > +       case DRM_MODE_ENCODER_NONE:
+> > +               sun4i_tcon0_mode_set(tcon, mode);
+> > +               break;
+> > +       case DRM_MODE_ENCODER_TVDAC:
+> > +               /*
+> > +                * FIXME: Undocumented bits
+> > +                */
+> > +               if (tcon->quirks->has_unknown_mux)
+> > +                       regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
+> > +               /* Fallthrough */
+> > +       case DRM_MODE_ENCODER_TMDS:
+> > +               sun4i_tcon1_mode_set(tcon, mode);
+> 
+> IIRC you need to clear the mux bit here. So ...
+> 
+> > +               break;
+> > +       default:
+> > +               DRM_DEBUG_DRIVER("Unknown encoder type, doing nothing...\n");
+> > +       }
+> 
+> I think keeping the muxing in a separate function would be cleaner.
+> The above is already slightly messy if you add the bit clearing part.
+> With all the other muxing possibilities in the other SoC this is
+> going to get really messy.
+
+Ok.
+
+> > +}
+> > +EXPORT_SYMBOL(sun4i_tcon_mode_set);
+> >
+> >  static void sun4i_tcon_finish_page_flip(struct drm_device *dev,
+> >                                         struct sun4i_crtc *scrtc)
+> 
+> [...]
+> 
+> Thanks for working on this. Now we've decoupled the TCON/CRTC code
+> from all the encoders.
+
+Yeah, I still have mixed feelings about this, but it was the sensible
+thing I guess.
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/32a179b5/attachment-0001.sig>
