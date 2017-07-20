@@ -1,100 +1,53 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Jul 2017 15:45:14 +0100
-Subject: [PATCH 2/4] ACPI: Make acpi_dev_get_resources() method agnostic
-In-Reply-To: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
-References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170720144517.32529-3-lorenzo.pieralisi@arm.com>
+Date: Thu, 20 Jul 2017 15:45:12 +0100
+Subject: [PATCH 0/4] ACPI: DMA ranges management
+Message-ID: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function acpi_dev_get_resources() is completely generic and
-can be used to parse resource objects that are not necessarily
-coming from the _CRS method but also from other objects eg _DMA
-that have the same _CRS resource format.
+As reported in:
 
-Create an acpi_dev_get_resources() helper, internal to the ACPI
-resources parsing compilation unit, acpi_dev_get_resources_method(),
-that takes a char* parameter to detect which ACPI method should be
-called to retrieve the resources list and make acpi_dev_get_resources()
-call it with a method name _CRS leaving the API behaviour unchanged.
+http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+the bus connecting devices to an IOMMU bus can be smaller in size than
+the IOMMU input address bits which results in devices DMA HW bugs in
+particular related to IOVA allocation (ie chopping of higher address
+bits owing to system bus HW capabilities mismatch with the IOMMU).
+
+Fortunately this problem can be solved through an already present but never
+used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+window for a specific bus in ACPI and therefore all upstream devices
+connected to it.
+
+This small patch series enables _DMA parsing in ACPI core code and
+use it in ACPI IORT code in order to detect DMA ranges for devices and
+update their data structures to make them work with their related DMA
+addressing restrictions.
+
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Feng Kan <fkan@apm.com>
+Cc: Jon Masters <jcm@redhat.com>
+Cc: Robert Moore <robert.moore@intel.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
----
- drivers/acpi/resource.c | 54 +++++++++++++++++++++++++++++--------------------
- 1 file changed, 32 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-index cd4c427..2b20a09 100644
---- a/drivers/acpi/resource.c
-+++ b/drivers/acpi/resource.c
-@@ -573,6 +573,36 @@ static acpi_status acpi_dev_process_resource(struct acpi_resource *ares,
- 	return AE_OK;
- }
- 
-+static
-+int acpi_dev_get_resources_method(struct acpi_device *adev,
-+				  struct list_head *list,
-+				  int (*preproc)(struct acpi_resource *, void *),
-+				  void *preproc_data, char *method)
-+{
-+	struct res_proc_context c;
-+	acpi_status status;
-+
-+	if (!adev || !adev->handle || !list_empty(list))
-+		return -EINVAL;
-+
-+	if (!acpi_has_method(adev->handle, method))
-+		return 0;
-+
-+	c.list = list;
-+	c.preproc = preproc;
-+	c.preproc_data = preproc_data;
-+	c.count = 0;
-+	c.error = 0;
-+	status = acpi_walk_resources(adev->handle, method,
-+				     acpi_dev_process_resource, &c);
-+	if (ACPI_FAILURE(status)) {
-+		acpi_dev_free_resource_list(list);
-+		return c.error ? c.error : -EIO;
-+	}
-+
-+	return c.count;
-+}
-+
- /**
-  * acpi_dev_get_resources - Get current resources of a device.
-  * @adev: ACPI device node to get the resources for.
-@@ -601,28 +631,8 @@ int acpi_dev_get_resources(struct acpi_device *adev, struct list_head *list,
- 			   int (*preproc)(struct acpi_resource *, void *),
- 			   void *preproc_data)
- {
--	struct res_proc_context c;
--	acpi_status status;
--
--	if (!adev || !adev->handle || !list_empty(list))
--		return -EINVAL;
--
--	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
--		return 0;
--
--	c.list = list;
--	c.preproc = preproc;
--	c.preproc_data = preproc_data;
--	c.count = 0;
--	c.error = 0;
--	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
--				     acpi_dev_process_resource, &c);
--	if (ACPI_FAILURE(status)) {
--		acpi_dev_free_resource_list(list);
--		return c.error ? c.error : -EIO;
--	}
--
--	return c.count;
-+	return acpi_dev_get_resources_method(adev, list, preproc,
-+					     preproc_data, METHOD_NAME__CRS);
- }
- EXPORT_SYMBOL_GPL(acpi_dev_get_resources);
- 
+Lorenzo Pieralisi (4):
+  ACPI: Allow _DMA method in walk resources
+  ACPI: Make acpi_dev_get_resources() method agnostic
+  ACPI: Introduce DMA ranges parsing
+  ACPI: Make acpi_dma_configure() DMA regions aware
+
+ drivers/acpi/acpica/rsxface.c |  7 ++--
+ drivers/acpi/arm64/iort.c     | 27 +++++++++++-
+ drivers/acpi/resource.c       | 83 ++++++++++++++++++++++++++++---------
+ drivers/acpi/scan.c           | 95 +++++++++++++++++++++++++++++++++++++++----
+ include/acpi/acnames.h        |  1 +
+ include/acpi/acpi_bus.h       |  2 +
+ include/linux/acpi.h          |  8 ++++
+ include/linux/acpi_iort.h     |  5 ++-
+ 8 files changed, 194 insertions(+), 34 deletions(-)
+
 -- 
 2.10.0
