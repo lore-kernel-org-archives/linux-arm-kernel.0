@@ -1,65 +1,75 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Thu, 20 Jul 2017 10:38:26 +0800
-Subject: [PATCH] usb: dts: fix the issue that usb is not detected on ls1088ardb
-Message-ID: <1500518306-9879-1-git-send-email-yinbo.zhu@nxp.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Thu, 20 Jul 2017 10:55:40 +0800
+Subject: [PATCH 4/4] iommu/iova: Make dma_32bit_pfn implicit
+In-Reply-To: <201707192352.79mkRePJ%fengguang.wu@intel.com>
+References: <201707192352.79mkRePJ%fengguang.wu@intel.com>
+Message-ID: <59701BAC.7060800@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "yinbo.zhu" <yinbo.zhu@nxp.com>
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 18 ++++++++++++++++++
- 2 files changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index e9276a5..d5c3d96 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -149,6 +149,14 @@
- 	status = "okay";
- };
- 
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
- &emdio1 {
- 	/* Freescale F104 PHY1 */
- 	mdio1_phy1: emdio1_phy at 1 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index 3a3be87..65b3059 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -566,6 +566,24 @@
- 			fsl,qspi-has-second-chip;
- 		};
- 
-+		usb0: usb3 at 3100000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3100000 0x0 0x10000>;
-+			interrupts = <0 80 0x4>; /* Level high type */
-+			dr_mode = "host";
-+			configure-gfladj;
-+			snps,dis_rxdet_inp3_quirk;
-+		};
-+
-+		usb1: usb3 at 3110000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3110000 0x0 0x10000>;
-+			interrupts = <0 81 0x4>; /* Level high type */
-+			dr_mode = "host";
-+			configure-gfladj;
-+			snps,dis_rxdet_inp3_quirk;
-+		};
-+
- 		pcie at 3400000 {
- 			compatible = "fsl,ls2088a-pcie", "fsl,ls1088a-pcie",
- 				     "snps,dw-pcie";
+On 2017/7/19 23:07, kbuild test robot wrote:
+> Hi Zhen,
+> 
+> [auto build test WARNING on iommu/next]
+> [also build test WARNING on v4.13-rc1]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Robin-Murphy/Optimise-64-bit-IOVA-allocations/20170719-060847
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
+> config: arm-multi_v7_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+>    drivers/iommu/iova.c: In function 'init_iova_domain':
+>>> drivers/iommu/iova.c:53:41: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+>      iovad->dma_32bit_pfn = iova_pfn(iovad, 1ULL << 32);
+OK, I see. I think the problem is that "1ULL << 32" exceed the scope of 32bits general register. We should
+replace "1ULL << 32" with DMA_BIT_MASK(32), the latter will minus one to keep it can be safely stored in
+the general register.
+
+iovad->dma_32bit_pfn = iova_pfn(iovad, DMA_BIT_MASK(32)) + 1;
+
+>                                             ^~~~
+> 
+> vim +53 drivers/iommu/iova.c
+> 
+>     35	
+>     36	void
+>     37	init_iova_domain(struct iova_domain *iovad, unsigned long granule,
+>     38		unsigned long start_pfn)
+>     39	{
+>     40		/*
+>     41		 * IOVA granularity will normally be equal to the smallest
+>     42		 * supported IOMMU page size; both *must* be capable of
+>     43		 * representing individual CPU pages exactly.
+>     44		 */
+>     45		BUG_ON((granule > PAGE_SIZE) || !is_power_of_2(granule));
+>     46	
+>     47		spin_lock_init(&iovad->iova_rbtree_lock);
+>     48		iovad->rbroot = RB_ROOT;
+>     49		iovad->cached_node = NULL;
+>     50		iovad->cached32_node = NULL;
+>     51		iovad->granule = granule;
+>     52		iovad->start_pfn = start_pfn;
+>   > 53		iovad->dma_32bit_pfn = iova_pfn(iovad, 1ULL << 32);
+>     54		init_iova_rcaches(iovad);
+>     55	}
+>     56	EXPORT_SYMBOL_GPL(init_iova_domain);
+>     57	
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
+
 -- 
-2.1.0.27.g96db324
+Thanks!
+BestRegards
