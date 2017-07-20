@@ -1,188 +1,152 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Thu, 20 Jul 2017 16:45:06 +0200
-Subject: [PATCH 08/11] ARM: OMAP2+: Remove unused legacy code for PRM
-In-Reply-To: <20170630104256.GG3730@atomide.com>
-References: <20170531225139.30723-1-tony@atomide.com>
- <20170531225139.30723-9-tony@atomide.com>
- <20170630104256.GG3730@atomide.com>
-Message-ID: <20170720144506.rjar4dxih6ixavcp@earth>
+From: Noel.Vellemans@visionBMS.com (Vellemans, Noel)
+Date: Thu, 20 Jul 2017 15:06:27 +0000
+Subject: IMX53 on recent 4.4.x kernels
+In-Reply-To: <20170720141528.kxrw5r4hpa2hebvd@pengutronix.de>
+References: <D24E577EA1E37B4788A3BFBC418F14A707591D67@wetsrvex01.loepfe.com>
+ <20170720123933.rioxhsthaaby4cnl@pengutronix.de>
+ <D24E577EA1E37B4788A3BFBC418F14A707592381@wetsrvex01.loepfe.com>
+ <CAOMZO5DrFnr6mr991ayMxLF0+jQddJyTbCbK1A5JVNAUVMDw3A@mail.gmail.com>
+ <D24E577EA1E37B4788A3BFBC418F14A70759249B@wetsrvex01.loepfe.com>
+ <20170720141528.kxrw5r4hpa2hebvd@pengutronix.de>
+Message-ID: <D24E577EA1E37B4788A3BFBC418F14A7075925A1@wetsrvex01.loepfe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi  , 
+
+>> I can't imagine any good reason why 4.x should be significantly slower than your old kernel. How did you measure that?
+
+Dito I can't imagine this too..... .. but... .. read on.
+
+Long story , it all stared ( some weeks ago) I started to measure because I had some performance issues on the NEW-kernels ( I've been porting a recent kernel to our own custom/designed hardware)  { ive been running 2.6.35 a couple of years... on this hardware... so I'm not new into this)
+
+Comparing systems is difficult I know.. but... What has been changed ? only the KERNEL ( same hardware, same gcc-compiler, same C-lib, same user-space applications) only the KERNEL has been upgraded (nothing else) , both boards I compare are identical .. running at the same clock-speed... same amount of ram / storage. ! 100% sure on this ! .
+
+
+How did I measure ( really measure) ?
+
+First of all I have IDENTICAL hardware ( 100% sure on this )
+
+2nd: I did BUILD the same rootfs  on  both compares ( identical hardware's , I' m  running identical rootfs - 100% sure) THE ONLY AND SINGLE DIFFERENCE is the KERNEL ! ( all the rest is identical 100% sure, even everything is built with the SAME compiler ! )
+
+3-thrid: - 2 options here  
+3.a: I did look at TOP HTOP for both system RUNNING IDENTICAL ROOTFS ( 4.4.x) vs ( 2.6.35) 
+-> I did look at TOP / HTOP and 4.4.x has WAY MORE CPU LOAD ( HTOP SHOW KERNEL LOADS VERY HIGH COMPARED TO 2.6.35)
+HTOP itself used most of the CPU time (0a1% on 2.6.35) while the SAME HTOP showed ( +30a40% load on 4.4.x)
+
+If you take a look with TOP and/or HTOP on 2 identical systems ... ( 2.6.35 vs 4.4.x) ( with only the kernel being changed) and you see 
+On the one system ( 2.6.35)  kernel times less than 10% , and on the 4.4.x system you see kernel times of +60% ( or higher) then there is a difference.. ( there is no doubt about that)
+
+3.b: stripped ROOTFS to minimum on BOTH ( running the same STRIPPED rootfs)
+And I did build a small TEST-tool that was probing for kernel time ( looping X times) as test result of this small test tool , I measured execution times on both Kernels ( it's a simple stupid loop probing for kernel time in a loop)
+
+The measured  RUNTIMES on 2.6.35 are in the 18000 ms range
+The measured  RUNTIMES on 4.4.x  are in the 61000 ms range ( see below)  { for the same TEST tool } 
+
+As said before , same  hardware, same bootloader, identical rootfs, ONLY and SINGLE difference is the KERNEL ! 
+
+
+For this SIMPLE TEST-tool  I get:
+
+for 2.6.35 => 18000 ms of runtime 
+# uname -a
+Linux OLD 2.6.35.3 #1 PREEMPT Tue Jun 14 13:45:24 CEST 2016 armv7l GNU/Linux #
+TestCode-1
+Going to loop 20000000 times.
+319456382-319438304 = >18078 ms
+
+ 
+for 4.4.x => 61000 ms of runtime !
+# uname -a
+Linux DU11 4.4.76 #1 PREEMPT Fri Jul 14 08:19:47 CEST 2017 armv7l GNU/Linux #
+TestCode-1
+Going to loop 20000000 times.
+230307-169002 = >61305 ms  ==> what is 3.39 times ( or 339%)  slower ( and this was a lucky shot , most of the time it is even slower) ! 
+
+The c-code is no rocket science ( just a simple loop probing for kernel time), it just shows you that the Newer Kernels (4.x ) are VERY SLOW compared to the 2.6.35.
+( I've been experimenting with almost every kernel config option I can think of .. no drastic improvements on 4.x kernel in terms of speed/load improvement)
+
+
+
+
+
+====BEGIN- Test-code=======================================================================================
+
+#include <stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<unistd.h>
+#include<fcntl.h>
+#include <time.h>
+#include <sys/times.h>
+
+
+
+#define MS_TICKTIME2 ({\
+				struct timespec tp;\
+				clock_gettime(4, &tp);\
+				(unsigned long)tp.tv_sec*1000+tp.tv_nsec/1000000;})
+
+
+
+int main(int argc, char* argv[])
+{
+	unsigned long mainloopcount=20000000;
+	unsigned long t2,t1;
+	printf("TestCode-1\n");
+	printf("Going to loop %ld times.\n",mainloopcount);
+	t1=MS_TICKTIME2;
+	do{
+				/* just do some call to the kernel .. */
+				volatile unsigned long t3=MS_TICKTIME2;
+				t3++; /* whatever increment this as dummy operation*/
+	}	while(--mainloopcount);
+	t2=MS_TICKTIME2;
+	printf("%ld-%ld = >%ld ms \n",t2,t1,((signed long)t2-(signed long)t1));
+
+	return 0;
+}
+
+
+_______________________
+Noel Vellemans
+BMS bvba
+-----Original Message-----
+From: Robert Schwebel [mailto:r.schwebel at pengutronix.de] 
+Sent: Thursday, July 20, 2017 4:15 PM
+To: Vellemans, Noel
+Cc: sales at pengutronix.de
+Subject: Re: IMX53 on recent 4.4.x kernels
+
 Hi,
 
-On Fri, Jun 30, 2017 at 03:42:56AM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [170531 15:55]:
-> > We are now booting all mach-omap2 in device tree only mode.
-> > Any code that is only called in legacy boot mode where
-> > of_have_populated_dt() is not set is safe to remove now.
-> ...
+On Thu, Jul 20, 2017 at 01:57:17PM +0000, Vellemans, Noel wrote:
+> In short... I did a QUICK test on the 4.12 kernel as well ( but need 
+> to add lots of custom drivers ) in order to get it running on the same 
+> roofs.
 > 
-> > diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-> > --- a/arch/arm/mach-omap2/prm44xx.c
-> > +++ b/arch/arm/mach-omap2/prm44xx.c
-> ...
+> But,  I believe FABIO ESTEVAM ( who was trying to give me some first 
+> aid 'help' ) did some test on a 4.12 kernel ( for the performance
+> issue) .. and it seems it is in the ALLMOST SAME SPEED range as the 
+> 4.4.x kernel ( there was  small improvement ) but it was certainly not 
+> at the same speed as the 2.6.35 kernel .
 > 
-> > -static int omap44xx_prm_late_init(void)
-> > -{
-> > -	int irq_num;
-> > -
-> > -	if (!(prm_features & PRM_HAS_IO_WAKEUP))
-> > -		return 0;
-> > -
-> > -	/* OMAP4+ is DT only now */
-> > -	if (!of_have_populated_dt())
-> > -		return 0;
+> ( for the test program that looped for the Kernel time)
 > 
-> Turns out I misread the above and this code is still needed for omap4 PRM
-> interrupts, so applying a partial revert below to fix it.
-
-I just spent a couple of hours to tracing this and now saw, that you
-already did so. Why was this not part of the pull request? :(
-
-> 8< ----------------------
-> From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Fri, 30 Jun 2017 03:37:03 -0700
-> Subject: [PATCH] ARM: OMAP4: Fix legacy code clean-up regression
+> Regards Noel
 > 
-> Commit 2a26d31b1bae ("ARM: OMAP2+: Remove unused legacy code for PRM")
-> removed PRM platform init code that I thought is unused. Turns out omap4
-> still needs this code, so let's do a partial revert to add it back.
-> 
-> I probably missed this earlier as the comments used to say
-> "OMAP4+ is DT only now" for !of_have_populated_dt() to exit early and
-> missed the negative test. Let's not add those lines back as they are
-> confusing and no longer needed as we only boot in device tree mode.
+> NOTE: I'll try to get 4.12 ( or 4.13 ) running ( but needs a lot of 
+> patches.. that require manual rework if I want to run then om our
+> hardware)
 
-haha, I came up with *exactly* the same patch and then noticed
-this mail when I checked for a Message-ID as reference :)
+I can't imagine any good reason why 4.x should be significantly slower than your old kernel. How did you measure that?
 
-> Without things things can mysterious fail for i2c, for example LM75
-> I2C temperature sensor can stop working as the PRM interrupts won't work.
+In case you need commercial help, please drop me a note. We do embedded Linux support and help customers with similar problems.
 
-Here is the demystification:
-
-Without this fix omap4_pmx_core and omap4_pmx_wakeup will not
-register themself as interrupt controller, due to missing parent
-interrupt. This means, that any device referencing an interrupt
-in one of those controllers will fail their probe routine with
--EPROBE_DEFER waiting for the interrupt controller to appear.
-At least for i2c this happens directly in the core, even before
-calling the driver's probe routine making this look quite
-mysterious.
-
-TLDR: Fix "wakeup-source;" using devices on omap4.
-
-> Fixes: 2a26d31b1bae ("ARM: OMAP2+: Remove unused legacy code for PRM")
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-Tested-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-
--- Sebastian
-
-> ---
->  arch/arm/mach-omap2/prm44xx.c | 55 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 55 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-> --- a/arch/arm/mach-omap2/prm44xx.c
-> +++ b/arch/arm/mach-omap2/prm44xx.c
-> @@ -337,6 +337,27 @@ static void omap44xx_prm_reconfigure_io_chain(void)
->  }
->  
->  /**
-> + * omap44xx_prm_enable_io_wakeup - enable wakeup events from I/O wakeup latches
-> + *
-> + * Activates the I/O wakeup event latches and allows events logged by
-> + * those latches to signal a wakeup event to the PRCM.  For I/O wakeups
-> + * to occur, WAKEUPENABLE bits must be set in the pad mux registers, and
-> + * omap44xx_prm_reconfigure_io_chain() must be called.  No return value.
-> + */
-> +static void __init omap44xx_prm_enable_io_wakeup(void)
-> +{
-> +	s32 inst = omap4_prmst_get_prm_dev_inst();
-> +
-> +	if (inst == PRM_INSTANCE_UNKNOWN)
-> +		return;
-> +
-> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
-> +				    OMAP4430_GLOBAL_WUEN_MASK,
-> +				    inst,
-> +				    omap4_prcm_irq_setup.pm_ctrl);
-> +}
-> +
-> +/**
->   * omap44xx_prm_read_reset_sources - return the last SoC reset source
->   *
->   * Return a u32 representing the last reset sources of the SoC.  The
-> @@ -668,6 +689,8 @@ struct pwrdm_ops omap4_pwrdm_operations = {
->  	.pwrdm_has_voltdm	= omap4_check_vcvp,
->  };
->  
-> +static int omap44xx_prm_late_init(void);
-> +
->  /*
->   * XXX document
->   */
-> @@ -675,6 +698,7 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
->  	.read_reset_sources = &omap44xx_prm_read_reset_sources,
->  	.was_any_context_lost_old = &omap44xx_prm_was_any_context_lost_old,
->  	.clear_context_loss_flags_old = &omap44xx_prm_clear_context_loss_flags_old,
-> +	.late_init = &omap44xx_prm_late_init,
->  	.assert_hardreset	= omap4_prminst_assert_hardreset,
->  	.deassert_hardreset	= omap4_prminst_deassert_hardreset,
->  	.is_hardreset_asserted	= omap4_prminst_is_hardreset_asserted,
-> @@ -711,6 +735,37 @@ int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
->  	return prm_register(&omap44xx_prm_ll_data);
->  }
->  
-> +static int omap44xx_prm_late_init(void)
-> +{
-> +	int irq_num;
-> +
-> +	if (!(prm_features & PRM_HAS_IO_WAKEUP))
-> +		return 0;
-> +
-> +	irq_num = of_irq_get(prm_init_data->np, 0);
-> +	/*
-> +	 * Already have OMAP4 IRQ num. For all other platforms, we need
-> +	 * IRQ numbers from DT
-> +	 */
-> +	if (irq_num < 0 && !(prm_init_data->flags & PRM_IRQ_DEFAULT)) {
-> +		if (irq_num == -EPROBE_DEFER)
-> +			return irq_num;
-> +
-> +		/* Have nothing to do */
-> +		return 0;
-> +	}
-> +
-> +	/* Once OMAP4 DT is filled as well */
-> +	if (irq_num >= 0) {
-> +		omap4_prcm_irq_setup.irq = irq_num;
-> +		omap4_prcm_irq_setup.xlate_irq = NULL;
-> +	}
-> +
-> +	omap44xx_prm_enable_io_wakeup();
-> +
-> +	return omap_prcm_register_chain_handler(&omap4_prcm_irq_setup);
-> +}
-> +
->  static void __exit omap44xx_prm_exit(void)
->  {
->  	prm_unregister(&omap44xx_prm_ll_data);
-> -- 
-> 2.13.1
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/174866bc/attachment.sig>
+Regards,
+Robert
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
