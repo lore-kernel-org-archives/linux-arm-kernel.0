@@ -1,144 +1,199 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 20 Jul 2017 13:04:03 -0500
-Subject: [PATCH v2] dt-bindings: Drop k2g genpd device ID macros
-Message-ID: <20170720180403.14279-1-d-gerlach@ti.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 20 Jul 2017 20:46:28 +0200
+Subject: [PATCH v2 1/4] drm/atomic: implement
+ drm_atomic_helper_commit_tail for runtime_pm users
+In-Reply-To: <a8f92dc70048bab746e94dadd1c23200626aff60.1500555652.git-series.maxime.ripard@free-electrons.com>
+References: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
+ <a8f92dc70048bab746e94dadd1c23200626aff60.1500555652.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170720184628.5vizn7hjdaaz7rqy@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7cc119f29b19 ("dt-bindings: Add TI SCI PM Domains") introduced a
-number of K2G_DEV_x macros to represent each device ID available on the
-K2G platform for use by the genpd, clock, and reset drivers. Rather than
-use these macros, which are only used in the device tree for property
-values and not actually used by the drivers, let's just use the device
-ID number directly in the device tree to avoid macro bloat.
+On Thu, Jul 20, 2017 at 03:01:16PM +0200, Maxime Ripard wrote:
+> The current drm_atomic_helper_commit_tail helper works only if the CRTC is
+> accessible, and documents an alternative implementation that is supposed to
+> be used if that happens.
+> 
+> That implementation is then duplicated by some drivers. Instead of
+> documenting it, let's implement an helper that all the relevant users can
+> use directly.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
-Santosh, Resend of https://www.spinics.net/lists/devicetree/msg177717.html
-rebased on v4.13-rc1 and with Rob's ack included, unchanged otherwise and
-ready for merge.
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
- .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  5 +-
- include/dt-bindings/genpd/k2g.h                    | 90 ----------------------
- 2 files changed, 3 insertions(+), 92 deletions(-)
- delete mode 100644 include/dt-bindings/genpd/k2g.h
+Should I throw this into drm-misc, or do you want to merge this through
+some driver tree?
+-Daniel
 
-diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-index c705db07d820..66e6265fb0aa 100644
---- a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-+++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-@@ -46,12 +46,13 @@ Required Properties:
- - power-domains: phandle pointing to the corresponding PM domain node
- 		 and an ID representing the device.
- 
--See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
-+See http://processors.wiki.ti.com/index.php/TISCI#66AK2G02_Data for the list
-+of valid identifiers for k2g.
- 
- Example (K2G):
- --------------------
- 	uart0: serial at 02530c00 {
- 		compatible = "ns16550a";
- 		...
--		power-domains = <&k2g_pds K2G_DEV_UART0>;
-+		power-domains = <&k2g_pds 0x002c>;
- 	};
-diff --git a/include/dt-bindings/genpd/k2g.h b/include/dt-bindings/genpd/k2g.h
-deleted file mode 100644
-index 1f31f17e19eb..000000000000
---- a/include/dt-bindings/genpd/k2g.h
-+++ /dev/null
-@@ -1,90 +0,0 @@
--/*
-- * TI K2G SoC Device definitions
-- *
-- * Copyright (C) 2015-2017 Texas Instruments Incorporated - http://www.ti.com/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef _DT_BINDINGS_GENPD_K2G_H
--#define _DT_BINDINGS_GENPD_K2G_H
--
--/* Documented in http://processors.wiki.ti.com/index.php/TISCI */
--
--#define K2G_DEV_PMMC0			0x0000
--#define K2G_DEV_MLB0			0x0001
--#define K2G_DEV_DSS0			0x0002
--#define K2G_DEV_MCBSP0			0x0003
--#define K2G_DEV_MCASP0			0x0004
--#define K2G_DEV_MCASP1			0x0005
--#define K2G_DEV_MCASP2			0x0006
--#define K2G_DEV_DCAN0			0x0008
--#define K2G_DEV_DCAN1			0x0009
--#define K2G_DEV_EMIF0			0x000a
--#define K2G_DEV_MMCHS0			0x000b
--#define K2G_DEV_MMCHS1			0x000c
--#define K2G_DEV_GPMC0			0x000d
--#define K2G_DEV_ELM0			0x000e
--#define K2G_DEV_SPI0			0x0010
--#define K2G_DEV_SPI1			0x0011
--#define K2G_DEV_SPI2			0x0012
--#define K2G_DEV_SPI3			0x0013
--#define K2G_DEV_ICSS0			0x0014
--#define K2G_DEV_ICSS1			0x0015
--#define K2G_DEV_USB0			0x0016
--#define K2G_DEV_USB1			0x0017
--#define K2G_DEV_NSS0			0x0018
--#define K2G_DEV_PCIE0			0x0019
--#define K2G_DEV_GPIO0			0x001b
--#define K2G_DEV_GPIO1			0x001c
--#define K2G_DEV_TIMER64_0		0x001d
--#define K2G_DEV_TIMER64_1		0x001e
--#define K2G_DEV_TIMER64_2		0x001f
--#define K2G_DEV_TIMER64_3		0x0020
--#define K2G_DEV_TIMER64_4		0x0021
--#define K2G_DEV_TIMER64_5		0x0022
--#define K2G_DEV_TIMER64_6		0x0023
--#define K2G_DEV_MSGMGR0			0x0025
--#define K2G_DEV_BOOTCFG0		0x0026
--#define K2G_DEV_ARM_BOOTROM0		0x0027
--#define K2G_DEV_DSP_BOOTROM0		0x0029
--#define K2G_DEV_DEBUGSS0		0x002b
--#define K2G_DEV_UART0			0x002c
--#define K2G_DEV_UART1			0x002d
--#define K2G_DEV_UART2			0x002e
--#define K2G_DEV_EHRPWM0			0x002f
--#define K2G_DEV_EHRPWM1			0x0030
--#define K2G_DEV_EHRPWM2			0x0031
--#define K2G_DEV_EHRPWM3			0x0032
--#define K2G_DEV_EHRPWM4			0x0033
--#define K2G_DEV_EHRPWM5			0x0034
--#define K2G_DEV_EQEP0			0x0035
--#define K2G_DEV_EQEP1			0x0036
--#define K2G_DEV_EQEP2			0x0037
--#define K2G_DEV_ECAP0			0x0038
--#define K2G_DEV_ECAP1			0x0039
--#define K2G_DEV_I2C0			0x003a
--#define K2G_DEV_I2C1			0x003b
--#define K2G_DEV_I2C2			0x003c
--#define K2G_DEV_EDMA0			0x003f
--#define K2G_DEV_SEMAPHORE0		0x0040
--#define K2G_DEV_INTC0			0x0041
--#define K2G_DEV_GIC0			0x0042
--#define K2G_DEV_QSPI0			0x0043
--#define K2G_DEV_ARM_64B_COUNTER0	0x0044
--#define K2G_DEV_TETRIS0			0x0045
--#define K2G_DEV_CGEM0			0x0046
--#define K2G_DEV_MSMC0			0x0047
--#define K2G_DEV_CBASS0			0x0049
--#define K2G_DEV_BOARD0			0x004c
--#define K2G_DEV_EDMA1			0x004f
--
--#endif
+> ---
+>  drivers/gpu/drm/drm_atomic_helper.c        | 49 +++++++++++++++--------
+>  drivers/gpu/drm/exynos/exynos_drm_fb.c     | 27 +-------------
+>  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 21 +----------
+>  include/drm/drm_atomic_helper.h            |  1 +-
+>  4 files changed, 37 insertions(+), 61 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+> index 86d3093c6c9b..d06a65ed3a57 100644
+> --- a/drivers/gpu/drm/drm_atomic_helper.c
+> +++ b/drivers/gpu/drm/drm_atomic_helper.c
+> @@ -1245,23 +1245,13 @@ EXPORT_SYMBOL(drm_atomic_helper_wait_for_vblanks);
+>   * @old_state: atomic state object with old state structures
+>   *
+>   * This is the default implementation for the
+> - * &drm_mode_config_helper_funcs.atomic_commit_tail hook.
+> + * &drm_mode_config_helper_funcs.atomic_commit_tail hook, for drivers
+> + * that do not support runtime_pm or do not need the CRTC to be
+> + * enabled to perform a commit. Otherwise, see
+> + * drm_atomic_helper_commit_tail_rpm().
+>   *
+>   * Note that the default ordering of how the various stages are called is to
+> - * match the legacy modeset helper library closest. One peculiarity of that is
+> - * that it doesn't mesh well with runtime PM at all.
+> - *
+> - * For drivers supporting runtime PM the recommended sequence is instead ::
+> - *
+> - *     drm_atomic_helper_commit_modeset_disables(dev, old_state);
+> - *
+> - *     drm_atomic_helper_commit_modeset_enables(dev, old_state);
+> - *
+> - *     drm_atomic_helper_commit_planes(dev, old_state,
+> - *                                     DRM_PLANE_COMMIT_ACTIVE_ONLY);
+> - *
+> - * for committing the atomic update to hardware.  See the kerneldoc entries for
+> - * these three functions for more details.
+> + * match the legacy modeset helper library closest.
+>   */
+>  void drm_atomic_helper_commit_tail(struct drm_atomic_state *old_state)
+>  {
+> @@ -1281,6 +1271,35 @@ void drm_atomic_helper_commit_tail(struct drm_atomic_state *old_state)
+>  }
+>  EXPORT_SYMBOL(drm_atomic_helper_commit_tail);
+>  
+> +/**
+> + * drm_atomic_helper_commit_tail_rpm - commit atomic update to hardware
+> + * @old_state: new modeset state to be committed
+> + *
+> + * This is an alternative implementation for the
+> + * &drm_mode_config_helper_funcs.atomic_commit_tail hook, for drivers
+> + * that support runtime_pm or need the CRTC to be enabled to perform a
+> + * commit. Otherwise, one should use the default implementation
+> + * drm_atomic_helper_commit_tail().
+> + */
+> +void drm_atomic_helper_commit_tail_rpm(struct drm_atomic_state *old_state)
+> +{
+> +	struct drm_device *dev = old_state->dev;
+> +
+> +	drm_atomic_helper_commit_modeset_disables(dev, old_state);
+> +
+> +	drm_atomic_helper_commit_modeset_enables(dev, old_state);
+> +
+> +	drm_atomic_helper_commit_planes(dev, old_state,
+> +					DRM_PLANE_COMMIT_ACTIVE_ONLY);
+> +
+> +	drm_atomic_helper_commit_hw_done(old_state);
+> +
+> +	drm_atomic_helper_wait_for_vblanks(dev, old_state);
+> +
+> +	drm_atomic_helper_cleanup_planes(dev, old_state);
+> +}
+> +EXPORT_SYMBOL(drm_atomic_helper_commit_tail_rpm);
+> +
+>  static void commit_tail(struct drm_atomic_state *old_state)
+>  {
+>  	struct drm_device *dev = old_state->dev;
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fb.c b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+> index d48fd7c918f8..ed1a648d518c 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fb.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+> @@ -187,33 +187,8 @@ dma_addr_t exynos_drm_fb_dma_addr(struct drm_framebuffer *fb, int index)
+>  	return exynos_fb->dma_addr[index];
+>  }
+>  
+> -static void exynos_drm_atomic_commit_tail(struct drm_atomic_state *state)
+> -{
+> -	struct drm_device *dev = state->dev;
+> -
+> -	drm_atomic_helper_commit_modeset_disables(dev, state);
+> -
+> -	drm_atomic_helper_commit_modeset_enables(dev, state);
+> -
+> -	/*
+> -	 * Exynos can't update planes with CRTCs and encoders disabled,
+> -	 * its updates routines, specially for FIMD, requires the clocks
+> -	 * to be enabled. So it is necessary to handle the modeset operations
+> -	 * *before* the commit_planes() step, this way it will always
+> -	 * have the relevant clocks enabled to perform the update.
+> -	 */
+> -	drm_atomic_helper_commit_planes(dev, state,
+> -					DRM_PLANE_COMMIT_ACTIVE_ONLY);
+> -
+> -	drm_atomic_helper_commit_hw_done(state);
+> -
+> -	drm_atomic_helper_wait_for_vblanks(dev, state);
+> -
+> -	drm_atomic_helper_cleanup_planes(dev, state);
+> -}
+> -
+>  static struct drm_mode_config_helper_funcs exynos_drm_mode_config_helpers = {
+> -	.atomic_commit_tail = exynos_drm_atomic_commit_tail,
+> +	.atomic_commit_tail = drm_atomic_helper_commit_tail_rpm,
+>  };
+>  
+>  static const struct drm_mode_config_funcs exynos_drm_mode_config_funcs = {
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> index 81f9548672b0..35ad386c401e 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> @@ -174,27 +174,8 @@ static void rockchip_drm_output_poll_changed(struct drm_device *dev)
+>  		drm_fb_helper_hotplug_event(fb_helper);
+>  }
+>  
+> -static void
+> -rockchip_atomic_commit_tail(struct drm_atomic_state *state)
+> -{
+> -	struct drm_device *dev = state->dev;
+> -
+> -	drm_atomic_helper_commit_modeset_disables(dev, state);
+> -
+> -	drm_atomic_helper_commit_modeset_enables(dev, state);
+> -
+> -	drm_atomic_helper_commit_planes(dev, state,
+> -					DRM_PLANE_COMMIT_ACTIVE_ONLY);
+> -
+> -	drm_atomic_helper_commit_hw_done(state);
+> -
+> -	drm_atomic_helper_wait_for_vblanks(dev, state);
+> -
+> -	drm_atomic_helper_cleanup_planes(dev, state);
+> -}
+> -
+>  static const struct drm_mode_config_helper_funcs rockchip_mode_config_helpers = {
+> -	.atomic_commit_tail = rockchip_atomic_commit_tail,
+> +	.atomic_commit_tail = drm_atomic_helper_commit_tail_rpm,
+>  };
+>  
+>  static const struct drm_mode_config_funcs rockchip_drm_mode_config_funcs = {
+> diff --git a/include/drm/drm_atomic_helper.h b/include/drm/drm_atomic_helper.h
+> index f0a8678ae98e..af4aaff9ec0b 100644
+> --- a/include/drm/drm_atomic_helper.h
+> +++ b/include/drm/drm_atomic_helper.h
+> @@ -41,6 +41,7 @@ int drm_atomic_helper_check_planes(struct drm_device *dev,
+>  int drm_atomic_helper_check(struct drm_device *dev,
+>  			    struct drm_atomic_state *state);
+>  void drm_atomic_helper_commit_tail(struct drm_atomic_state *state);
+> +void drm_atomic_helper_commit_tail_rpm(struct drm_atomic_state *state);
+>  int drm_atomic_helper_commit(struct drm_device *dev,
+>  			     struct drm_atomic_state *state,
+>  			     bool nonblock);
+> -- 
+> git-series 0.9.1
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
 -- 
-2.13.0
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
