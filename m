@@ -1,23 +1,53 @@
 From: adriana.reus@nxp.com (Adriana Reus)
-Date: Thu, 20 Jul 2017 18:06:40 +0300
-Subject: [PATCH V2 0/2] clk: imx: imx7d: Fixes for imx7d-ccm clock driver
-Message-ID: <1500563202-375-1-git-send-email-adriana.reus@nxp.com>
+Date: Thu, 20 Jul 2017 18:06:41 +0300
+Subject: [PATCH V2 1/2] clk: imx: imx7d: Fix parent clock for OCRAM_CLK
+In-Reply-To: <1500563202-375-1-git-send-email-adriana.reus@nxp.com>
+References: <1500563202-375-1-git-send-email-adriana.reus@nxp.com>
+Message-ID: <1500563202-375-2-git-send-email-adriana.reus@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first patch sets the OCRAM_CLK parent to main_axi_root_clk instead of
-axi_post_div.
+The parent of OCRAM_CLK should be axi_main_root_clk
+and not axi_post_div.
 
-The second patch removes the ARM_M0 clock.
-IMX7d does not have an M0 and this clock is not otherwise used.
+before:
 
-Adriana Reus (2):
-  clk: imx: imx7d: Fix parent clock for OCRAM_CLK
-  clk: imx: imx7d: Remove ARM_M0 clock
+    axi_src                     1       1       332307692       0 0
+      axi_cg                    1       1       332307692       0 0
+        axi_pre_div             1       1       332307692       0 0
+          axi_post_div          1       1       332307692       0 0
+            ocram_clk           0       0       332307692       0 0
+            main_axi_root_clk   1       1       332307692       0 0
 
- drivers/clk/imx/clk-imx7d.c             | 11 +----------
- include/dt-bindings/clock/imx7d-clock.h |  8 ++++----
- 2 files changed, 5 insertions(+), 14 deletions(-)
+after:
 
+    axi_src                     1       1       332307692       0 0
+      axi_cg                    1       1       332307692       0 0
+        axi_pre_div             1       1       332307692       0 0
+          axi_post_div          1       1       332307692       0 0
+            main_axi_root_clk   1       1       332307692       0 0
+              ocram_clk         0       0       332307692       0 0
+
+Fixes: 8f6d8094b215 ("ARM: imx: add imx7d clk tree support")
+Signed-off-by: Adriana Reus <adriana.reus@nxp.com>
+---
+ Changes since v1:
+  - added Fixes tag
+ drivers/clk/imx/clk-imx7d.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 3da1218..10f6a10 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -797,7 +797,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_MAIN_AXI_ROOT_CLK] = imx_clk_gate4("main_axi_root_clk", "axi_post_div", base + 0x4040, 0);
+ 	clks[IMX7D_DISP_AXI_ROOT_CLK] = imx_clk_gate4("disp_axi_root_clk", "disp_axi_post_div", base + 0x4050, 0);
+ 	clks[IMX7D_ENET_AXI_ROOT_CLK] = imx_clk_gate4("enet_axi_root_clk", "enet_axi_post_div", base + 0x4060, 0);
+-	clks[IMX7D_OCRAM_CLK] = imx_clk_gate4("ocram_clk", "axi_post_div", base + 0x4110, 0);
++	clks[IMX7D_OCRAM_CLK] = imx_clk_gate4("ocram_clk", "main_axi_root_clk", base + 0x4110, 0);
+ 	clks[IMX7D_OCRAM_S_CLK] = imx_clk_gate4("ocram_s_clk", "ahb_root_clk", base + 0x4120, 0);
+ 	clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate4("dram_root_clk", "dram_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
 -- 
 2.7.4
