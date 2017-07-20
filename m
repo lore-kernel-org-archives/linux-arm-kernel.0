@@ -1,49 +1,59 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 20 Jul 2017 14:57:50 -0500
-Subject: [PATCH v2 0/3] gpio: davinci: Add missing return checks
-In-Reply-To: <fc3de1fa-35b0-fc09-7116-921d7d2bf8a9@ti.com>
-References: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
- <fc3de1fa-35b0-fc09-7116-921d7d2bf8a9@ti.com>
-Message-ID: <7107e153-3341-2e64-04d5-a3ba98aa7190@ti.com>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Thu, 20 Jul 2017 22:27:25 +0200
+Subject: [PATCH v5 1/3] Documentation: devicetree: add Freescale RNGC binding
+In-Reply-To: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1500582447-28607-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Keerthy,
+From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-> 
-> On Thursday 20 July 2017 03:12 PM, Keerthy wrote:
->> The patch series does a couple of important return handling which were missed
->> earlier in the driver probe.
->>
->> This is based on Suman's:
->>
->> http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
->> http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2 
->>
-> 
-> My bad! The series has no dependency on the above. I have split the
-> device tree patches to keep it independent.
+Add binding documentation for the Freescale RNGC found on
+some i.MX2/3 SoCs.
 
-The new patches looks clean. The davinci_gpio_irq_setup() function
-though could also do with couple more cleanups. Not all failure paths
-are doing the necessary cleanup (there are some non devres functions
-also called, but not cleaned up).
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+Changes in v5:
+  none
 
-regards
-Suman
+Changes in v4:
+  none
 
-> 
->> Changes in v2:
->>
->>   * Removed the device tree patch for to keep the series independent.
->>
->> Keerthy (3):
->>   gpio: davinci: Use devm_gpiochip_add_data in place of
->>     gpiochip_add_data
->>   gpio: davinci: Handle the return value of davinci_gpio_irq_setup
->>     function
->>   gpio: davinci: Convert prinkt to dev_err
->>
->>  drivers/gpio/gpio-davinci.c | 22 +++++++++++++++++-----
->>  1 file changed, 17 insertions(+), 5 deletions(-)
->>
+Changes in v3:
+  - add compatible string for imx35
+  - remove imx5 from the commit message,
+    I couldn't find an i.MX SOC that has RNGC
+
+Changes in v2:
+  none
+
+ Documentation/devicetree/bindings/rng/mxc_rngc.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rng/mxc_rngc.txt
+
+diff --git a/Documentation/devicetree/bindings/rng/mxc_rngc.txt b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
+new file mode 100644
+index 0000000..5a12ada
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
+@@ -0,0 +1,16 @@
++Freescale RNGC (Random Number Generator Version C)
++
++Required properties:
++- compatible : Should be "fsl,imx25-rng" or "fsl,imx35-rng"
++- reg : Offset and length of the register set of this block
++- interrupts : the interrupt number for the RNG block
++- clocks: should contain the RNG clk source
++
++Example:
++
++rng at 53fb0000 {
++	compatible = "fsl,imx25-rng";
++	reg = <0x53fb0000 0x4000>;
++	interrupts = <22>;
++	clocks = <&trng_clk>;
++};
+-- 
+2.1.4
