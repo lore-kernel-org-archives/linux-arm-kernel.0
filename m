@@ -1,39 +1,47 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Jul 2017 10:31:44 +0100
-Subject: [PATCH 0/4] Improve syscall entry code
-Message-ID: <20170720093144.GV31807@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 20 Jul 2017 10:32:29 +0100
+Subject: [PATCH 2/4] ARM: obtain thread info structure later
+In-Reply-To: <20170720093144.GV31807@n2100.armlinux.org.uk>
+References: <20170720093144.GV31807@n2100.armlinux.org.uk>
+Message-ID: <E1dY7or-0004qi-EZ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system call entry code has become less optimal as various kernel
-features such as context tracking and irq tracing have been added.
+Obtain the thread info structure later in the syscall processing, so
+that we free up a register for earlier code.
 
-For example, we stack the registers on SWI entry, but inside the
-enable_irq macro, we re-stack r0-r3, call the trace function, and
-unstack them.  This stacking and unstacking is unnecessary as we
-can merely reload them from the original entry stacking.  Similar
-happens within the ct_user_exit macro.  So, with both features
-enabled, we end up stacking and unstacking r0-r3 twice, which is
-completely unnecessary.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/kernel/entry-common.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-We also need the 'lr' value for when we need to read the SWI
-instruction, but this will be clobbered by the function calls for
-these features.  Rather than stacking or re-reading that register,
-move it to another register if necessary.
-
-We achieve this by:
-
-1. use register aliases for the saved psr and pc values.
-2. move the get_thread_info later to free up a spare register (r9).
-3. use this spare register 'r9' to store the saved pc value if we
-   have any of these features enabled, otherwise just use 'lr'.
-4. switch to using the non-stacking variants of the trace and
-   context tracking macros, and reload r0-r3 where necessary.
-
- arch/arm/kernel/entry-common.S | 44 +++++++++++++++++++++++++++++-------------
- 1 file changed, 31 insertions(+), 13 deletions(-)
-
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 9abe47a206d9..374c28723547 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -152,7 +152,6 @@ ENTRY(vector_swi)
+ 	alignment_trap r10, ip, __cr_alignment
+ 	enable_irq
+ 	ct_user_exit
+-	get_thread_info tsk
+ 
+ 	/*
+ 	 * Get the system call number.
+@@ -209,6 +208,7 @@ ENTRY(vector_swi)
+ 	bic	scno, scno, #0xff000000		@ mask off SWI op-code
+ 	eor	scno, scno, #__NR_SYSCALL_BASE	@ check OS number
+ #endif
++	get_thread_info tsk
+ 
+ local_restart:
+ 	ldr	r10, [tsk, #TI_FLAGS]		@ check for syscall tracing
+@@ -240,6 +240,7 @@ ENTRY(vector_swi)
+ 9001:
+ 	sub	lr, saved_pc, #4
+ 	str	lr, [sp, #S_PC]
++	get_thread_info tsk
+ 	b	ret_fast_syscall
+ #endif
+ ENDPROC(vector_swi)
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
