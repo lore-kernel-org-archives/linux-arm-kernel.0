@@ -1,107 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jul 2017 17:51:47 +0200
-Subject: [PATCH 09/12] ARM: ixp4xx: use normal prototype for {read, write}s{b,
- w, l}
+Date: Thu, 20 Jul 2017 17:53:44 +0200
+Subject: [PATCH 11/12] ARM: omap1/ams-delta: warn about failed regulator enable
 In-Reply-To: <20170720154616.3250481-1-arnd@arndb.de>
 References: <20170720154616.3250481-1-arnd@arndb.de>
-Message-ID: <20170720155209.3250880-6-arnd@arndb.de>
+Message-ID: <20170720155410.3251043-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ixp4xx defines the arguments to its __indirect_writesb() and other
-functions as pointers to fixed-size data. This is not necessarily
-wrong, and it works most of the time, but it causes warnings in
-at least one driver:
+The modem pm handler in the ams-delta board uses regulator_enable()
+but does not check for a successful return code:
 
-drivers/net/ethernet/smsc/smc91x.c: In function 'smc_rcv':
-drivers/net/ethernet/smsc/smc91x.c:495:21: error: passing argument 2 of '__indirect_readsw' from incompatible pointer type [-Werror=incompatible-pointer-types]
-   SMC_PULL_DATA(lp, data, packet_len - 4);
+board-ams-delta.c:521:3: error: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Werror=unused-result]
 
-All other definitions of the same functions pass void pointers,
-so doing the same here avoids the warnings.
+It is not easy to propagate that return code to the callers in
+uart_configure_port/uart_suspend_port/uart_resume_port, unless
+we change all UART drivers, and it is unclear what those would
+do with the return code.
 
+Instead, this patch uses a runtime warning to replace the
+compiletime warning. I have checked that the regulator in question
+is hardcoded to a fixed-voltage GPIO regulator, and that should
+never fail to get enabled if I understand the code right.
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Link: https://patchwork.kernel.org/patch/8391981/
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Krzysztof Halasa <khalasa@piap.pl>
 ---
-Originally sent on Feb 2016, but it got lost
+Originally sent in Feb 2016, but it got lost for some reason
 ---
- arch/arm/mach-ixp4xx/include/mach/io.h | 23 +++++++++++++++++------
- 1 file changed, 17 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap1/board-ams-delta.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index 2f84c26a6758..844e8ac593e2 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -95,8 +95,10 @@ static inline void __indirect_writeb(u8 value, volatile void __iomem *p)
- }
- 
- static inline void __indirect_writesb(volatile void __iomem *bus_addr,
--				      const u8 *vaddr, int count)
-+				      const void *p, int count)
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 6613a6ff5dbc..6cbc69c92913 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -510,6 +510,7 @@ static void __init ams_delta_init(void)
+ static void modem_pm(struct uart_port *port, unsigned int state, unsigned old)
  {
-+	const u8 *vaddr = p;
+ 	struct modem_private_data *priv = port->private_data;
++	int ret;
+ 
+ 	if (IS_ERR(priv->regulator))
+ 		return;
+@@ -518,9 +519,16 @@ static void modem_pm(struct uart_port *port, unsigned int state, unsigned old)
+ 		return;
+ 
+ 	if (state == 0)
+-		regulator_enable(priv->regulator);
++		ret = regulator_enable(priv->regulator);
+ 	else if (old == 0)
+-		regulator_disable(priv->regulator);
++		ret = regulator_disable(priv->regulator);
++	else
++		ret = 0;
 +
- 	while (count--)
- 		writeb(*vaddr++, bus_addr);
- }
-@@ -118,8 +120,10 @@ static inline void __indirect_writew(u16 value, volatile void __iomem *p)
- }
- 
- static inline void __indirect_writesw(volatile void __iomem *bus_addr,
--				      const u16 *vaddr, int count)
-+				      const void *p, int count)
- {
-+	const u16 *vaddr = p;
-+
- 	while (count--)
- 		writew(*vaddr++, bus_addr);
- }
-@@ -137,8 +141,9 @@ static inline void __indirect_writel(u32 value, volatile void __iomem *p)
++	if (ret)
++		dev_warn(port->dev,
++			 "ams_delta modem_pm: failed to %sable regulator: %d\n",
++			 state ? "dis" : "en", ret);
  }
  
- static inline void __indirect_writesl(volatile void __iomem *bus_addr,
--				      const u32 *vaddr, int count)
-+				      const void *p, int count)
- {
-+	const u32 *vaddr = p;
- 	while (count--)
- 		writel(*vaddr++, bus_addr);
- }
-@@ -160,8 +165,10 @@ static inline u8 __indirect_readb(const volatile void __iomem *p)
- }
- 
- static inline void __indirect_readsb(const volatile void __iomem *bus_addr,
--				     u8 *vaddr, u32 count)
-+				     void *p, u32 count)
- {
-+	u8 *vaddr = p;
-+
- 	while (count--)
- 		*vaddr++ = readb(bus_addr);
- }
-@@ -183,8 +190,10 @@ static inline u16 __indirect_readw(const volatile void __iomem *p)
- }
- 
- static inline void __indirect_readsw(const volatile void __iomem *bus_addr,
--				     u16 *vaddr, u32 count)
-+				     void *p, u32 count)
- {
-+	u16 *vaddr = p;
-+
- 	while (count--)
- 		*vaddr++ = readw(bus_addr);
- }
-@@ -204,8 +213,10 @@ static inline u32 __indirect_readl(const volatile void __iomem *p)
- }
- 
- static inline void __indirect_readsl(const volatile void __iomem *bus_addr,
--				     u32 *vaddr, u32 count)
-+				     void *p, u32 count)
- {
-+	u32 *vaddr = p;
-+
- 	while (count--)
- 		*vaddr++ = readl(bus_addr);
- }
+ static struct plat_serial8250_port ams_delta_modem_ports[] = {
 -- 
 2.9.0
