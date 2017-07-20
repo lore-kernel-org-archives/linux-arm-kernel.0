@@ -1,149 +1,56 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 19 Jul 2017 17:01:33 -0700
-Subject: [PATCH] ARM: dts: bcm283x: Move the BCM2837 DT contents from
- arm64 to arm.
-In-Reply-To: <20170719201916.22369-1-eric@anholt.net>
-References: <20170719201916.22369-1-eric@anholt.net>
-Message-ID: <a2e79c17-f345-e7f2-8438-d4754e4ceb3a@broadcom.com>
+From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
+Date: Thu, 20 Jul 2017 02:29:23 +0200
+Subject: [PATCH 2/9] arm: cache-l2x0: remove duplicate warning
+In-Reply-To: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <bc96e94b884f06bdd29f2c8c607c3e65a302ca62.1500510157.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Warning abound changing of AUX register in l2x0_of_init() is later
+repeated in __l2c_init().  Move whole thing over to __l2c_init().
 
-suggestion inline
+Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+---
+ arch/arm/mm/cache-l2x0.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-
-On 17-07-19 01:19 PM, Eric Anholt wrote:
-> BCM2837 is somewhat unusual in that we build its DT on both arm32 and
-> arm64.  Most devices are being run in arm32 mode.
->
-> Having the body of the DT for 2837 separate from 2835/6 has been a
-> source of pain, as we often need to make changes that span both
-> directories simultaneously (for example, the thermal changes for 4.13,
-> and pinmuxing changes earlier).  Other changes are made more
-> complicated than they need to be, such as the SDHOST enabling, because
-> we end up splitting a single change into a 283[56] half and a 2837
-> half.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->
-> I had asked about what we could do about our DT merging troubles back
-> in https://lkml.org/lkml/2017/5/16/707 with no response.  I'm hoping
-> we can take this patch as a resolution to that, and submit (almost
-> all) future RPi DT changes through the arm32 dt tree.
->
->
->   arch/arm/boot/dts/bcm2837-rpi-3-b.dts              | 42 +++++++++++++++++++++-
->   .../dts/broadcom => arm/boot/dts}/bcm2837.dtsi     |  0
->   arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   | 42 +---------------------
->   3 files changed, 42 insertions(+), 42 deletions(-)
->   rename arch/{arm64/boot/dts/broadcom => arm/boot/dts}/bcm2837.dtsi (100%)
->
-> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> index c72a27d908b6..972f14db28ac 100644
-> --- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> @@ -1 +1,41 @@
-> -#include "arm64/broadcom/bcm2837-rpi-3-b.dts"
-> +/dts-v1/;
-> +#include "bcm2837.dtsi"
-> +#include "bcm2835-rpi.dtsi"
-> +#include "bcm283x-rpi-smsc9514.dtsi"
-> +#include "bcm283x-rpi-usb-host.dtsi"
-If you're moving this back to the arm directory why not change the 
-include path and remove the 4 symlinks in arm64/boot/dts/broadcom?
-
-+#include "arm/bcm2837.dtsi"
-+#include "arm/bcm2835-rpi.dtsi"
-+#include "arm/bcm283x-rpi-smsc9514.dtsi"
-+#include "arm/bcm283x-rpi-usb-host.dtsi"
-
-
-> +
-> +/ {
-> +	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
-> +	model = "Raspberry Pi 3 Model B";
-> +
-> +	memory {
-> +		reg = <0 0x40000000>;
-> +	};
-> +
-> +	leds {
-> +		act {
-> +			gpios = <&gpio 47 0>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +/* SDHCI is used to control the SDIO for wireless */
-> +&sdhci {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_gpio34>;
-> +	status = "okay";
-> +	bus-width = <4>;
-> +	non-removable;
-> +};
-> +
-> +/* SDHOST is used to drive the SD card */
-> +&sdhost {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sdhost_gpio48>;
-> +	status = "okay";
-> +	bus-width = <4>;
-> +};
-> diff --git a/arch/arm64/boot/dts/broadcom/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
-> similarity index 100%
-> rename from arch/arm64/boot/dts/broadcom/bcm2837.dtsi
-> rename to arch/arm/boot/dts/bcm2837.dtsi
-> diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-> index 972f14db28ac..699d340a3437 100644
-> --- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-> +++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-> @@ -1,41 +1 @@
-> -/dts-v1/;
-> -#include "bcm2837.dtsi"
-> -#include "bcm2835-rpi.dtsi"
-> -#include "bcm283x-rpi-smsc9514.dtsi"
-> -#include "bcm283x-rpi-usb-host.dtsi"
-> -
-> -/ {
-> -	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
-> -	model = "Raspberry Pi 3 Model B";
-> -
-> -	memory {
-> -		reg = <0 0x40000000>;
-> -	};
-> -
-> -	leds {
-> -		act {
-> -			gpios = <&gpio 47 0>;
-> -		};
-> -	};
-> -};
-> -
-> -&uart1 {
-> -	status = "okay";
-> -};
-> -
-> -/* SDHCI is used to control the SDIO for wireless */
-> -&sdhci {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&emmc_gpio34>;
-> -	status = "okay";
-> -	bus-width = <4>;
-> -	non-removable;
-> -};
-> -
-> -/* SDHOST is used to drive the SD card */
-> -&sdhost {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&sdhost_gpio48>;
-> -	status = "okay";
-> -	bus-width = <4>;
-> -};
-> +#include "arm/bcm2837-rpi-3-b.dts"
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 808efbb89b88..ea1e70ff4568 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -819,6 +819,8 @@ static int __init __l2c_init(const struct l2c_init_data *data,
+ 	if (old_aux != aux)
+ 		pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
+ 		        old_aux, aux);
++	else if (aux_mask != ~0U && aux_val != 0)
++		pr_alert("L2C: platform provided aux values match the hardware, so have no effect.  Please remove them.\n");
+ 
+ 	/* Determine the number of ways */
+ 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+@@ -1755,7 +1757,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	const struct l2c_init_data *data;
+ 	struct device_node *np;
+ 	struct resource res;
+-	u32 cache_id, old_aux;
++	u32 cache_id;
+ 	u32 cache_level = 2;
+ 	bool nosync = false;
+ 
+@@ -1778,14 +1780,6 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	    of_property_read_bool(np, "arm,io-coherent"))
+ 		data = &of_l2c310_coherent_data;
+ 
+-	old_aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+-	if (old_aux != ((old_aux & aux_mask) | aux_val)) {
+-		pr_warn("L2C: platform modifies aux control register: 0x%08x -> 0x%08x\n",
+-		        old_aux, (old_aux & aux_mask) | aux_val);
+-	} else if (aux_mask != ~0U && aux_val != 0) {
+-		pr_alert("L2C: platform provided aux values match the hardware, so have no effect.  Please remove them.\n");
+-	}
+-
+ 	/* All L2 caches are unified, so this property should be specified */
+ 	if (!of_property_read_bool(np, "cache-unified"))
+ 		pr_err("L2C: device tree omits to specify unified cache\n");
+-- 
+2.11.0
