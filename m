@@ -1,59 +1,84 @@
-From: Noel.Vellemans@visionBMS.com (Vellemans, Noel)
-Date: Thu, 20 Jul 2017 13:57:17 +0000
-Subject: IMX53 on recent 4.4.x kernels
-In-Reply-To: <CAOMZO5DrFnr6mr991ayMxLF0+jQddJyTbCbK1A5JVNAUVMDw3A@mail.gmail.com>
-References: <D24E577EA1E37B4788A3BFBC418F14A707591D67@wetsrvex01.loepfe.com>
- <20170720123933.rioxhsthaaby4cnl@pengutronix.de>
- <D24E577EA1E37B4788A3BFBC418F14A707592381@wetsrvex01.loepfe.com>
- <CAOMZO5DrFnr6mr991ayMxLF0+jQddJyTbCbK1A5JVNAUVMDw3A@mail.gmail.com>
-Message-ID: <D24E577EA1E37B4788A3BFBC418F14A70759249B@wetsrvex01.loepfe.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 20 Jul 2017 09:06:01 -0500
+Subject: [PATCH] media: Convert to using %pOF instead of full_name
+In-Reply-To: <20170720081508.33563afe@vento.lan>
+References: <CGME20170718215328epcas2p2e5e1d7df96fcd894e70a961df864abdd@epcas2p2.samsung.com>
+ <20170718214339.7774-33-robh@kernel.org>
+ <564a6768-3b23-6dc7-ecb5-cb4f4359b633@samsung.com>
+ <CAL_JsqLDCgO60ECGB70pMNcaLg0zUcJ6_+50vH-evfGe-D266Q@mail.gmail.com>
+ <20170720081508.33563afe@vento.lan>
+Message-ID: <CAL_JsqJcS_Ewfow0+iuUtLRab62m=AHO+bvbHXX-eSR0Hw_JaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert... 
-
-I was mixing up 2 topic's .. ( my mistake sorry ) .
-
-
-In short... I did a QUICK test on the 4.12 kernel as well ( but need to add lots of custom drivers ) in order to get it running on the same roofs.
-
-But,  I believe FABIO ESTEVAM ( who was trying to give me some first aid 'help' ) did some test on a 4.12 kernel ( for the performance issue) .. and it seems it is in the ALLMOST SAME SPEED range as the 4.4.x kernel ( there was  small improvement ) but it was certainly not at the same speed as the 2.6.35 kernel .
-
-( for the test program that looped for the Kernel time)
-
-Regards Noel
-
-NOTE: I'll try to get 4.12 ( or 4.13 ) running ( but needs a lot of patches.. that require manual rework if I want to run then om our hardware)
-
-
-
-
-_______________________
-Noel Vellemans
-BMS bvba
-
------Original Message-----
-From: Fabio Estevam [mailto:festevam at gmail.com] 
-Sent: Thursday, July 20, 2017 3:19 PM
-To: Vellemans, Noel
-Cc: Robert Schwebel; linux-arm-kernel at lists.infradead.org
-Subject: Re: IMX53 on recent 4.4.x kernels
-
-Hi Noel,
-
-On Thu, Jul 20, 2017 at 10:13 AM, Vellemans, Noel <Noel.Vellemans@visionbms.com> wrote:
-> Hi,
+On Thu, Jul 20, 2017 at 6:15 AM, Mauro Carvalho Chehab
+<mchehab@s-opensource.com> wrote:
+> Em Wed, 19 Jul 2017 11:02:01 -0500
+> Rob Herring <robh@kernel.org> escreveu:
 >
+>> On Wed, Jul 19, 2017 at 4:41 AM, Sylwester Nawrocki
+>> <s.nawrocki@samsung.com> wrote:
+>> > On 07/18/2017 11:43 PM, Rob Herring wrote:
+>> >> Now that we have a custom printf format specifier, convert users of
+>> >> full_name to use %pOF instead. This is preparation to remove storing
+>> >> of the full path string for each node.
+>> >>
+>> >> Signed-off-by: Rob Herring <robh@kernel.org>
+>> >
+>> >> ---
+>> >>   drivers/media/i2c/s5c73m3/s5c73m3-core.c       |  3 +-
+>> >>   drivers/media/i2c/s5k5baf.c                    |  7 ++--
+>> >>   drivers/media/platform/am437x/am437x-vpfe.c    |  4 +-
+>> >>   drivers/media/platform/atmel/atmel-isc.c       |  4 +-
+>> >>   drivers/media/platform/davinci/vpif_capture.c  | 16 ++++----
+>> >>   drivers/media/platform/exynos4-is/fimc-is.c    |  8 ++--
+>> >>   drivers/media/platform/exynos4-is/fimc-lite.c  |  3 +-
+>> >>   drivers/media/platform/exynos4-is/media-dev.c  |  8 ++--
+>> >>   drivers/media/platform/exynos4-is/mipi-csis.c  |  4 +-
+>> >>   drivers/media/platform/mtk-mdp/mtk_mdp_comp.c  |  6 +--
+>> >>   drivers/media/platform/mtk-mdp/mtk_mdp_core.c  |  8 ++--
+>> >>   drivers/media/platform/omap3isp/isp.c          |  8 ++--
+>> >>   drivers/media/platform/pxa_camera.c            |  2 +-
+>> >>   drivers/media/platform/rcar-vin/rcar-core.c    |  4 +-
+>> >>   drivers/media/platform/soc_camera/soc_camera.c |  6 +--
+>> >>   drivers/media/platform/xilinx/xilinx-vipp.c    | 52 +++++++++++++-------------
+>> >>   drivers/media/v4l2-core/v4l2-async.c           |  4 +-
+>> >>   drivers/media/v4l2-core/v4l2-clk.c             |  3 +-
+>> >>   include/media/v4l2-clk.h                       |  4 +-
+>> >>   19 files changed, 71 insertions(+), 83 deletions(-)
+>> >
+>> >> diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+>> >> index ac4704388920..9233ad0b1b6b 100644
+>> >> --- a/drivers/media/platform/xilinx/xilinx-vipp.c
+>> >> +++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+>> >
+>> >> @@ -144,9 +144,8 @@ static int xvip_graph_build_one(struct xvip_composite_device *xdev,
+>> >>               remote = ent->entity;
+>> >>
+>> >>               if (link.remote_port >= remote->num_pads) {
+>> >> -                     dev_err(xdev->dev, "invalid port number %u on %s\n",
+>> >> -                             link.remote_port,
+>> >> -                             to_of_node(link.remote_node)->full_name);
+>> >> +                     dev_err(xdev->dev, "invalid port number %u on %pOF\n",
+>> >> +                             link.remote_port, link.remote_node);
+>> >
+>> > Shouldn't there be to_of_node(link.remote_node) instead of link.remote_node ?
+>>
+>> Humm, yes. I thought I fixed that.
 >
->>>Please try a more recent kernel first. 4.4 is quite ancient, and MX53 is well supported on 4.12 or 4.13+.
->>>Regards,
->>>Robert
->
-> I' already did ( maybe I was not clear enough in the previous mail , 
-> did test  4.4.x series and 4.12  kernel ! )
->
-> 4.12 Has the exactly same problem  ( ONFI parameter page can not be 
-> read , on ONE of the boards)
+> After such fix, I'm OK with this patch.
 
-Looks like your mixing the performance thread with the mxc_nand one
-:-) These are completely different topics.
+I'll send a new version.
+
+I think I'll send a revert of the referenced commit. It won't apply
+cleanly, but at least it will capture the change in behavior and why
+it was wrong.
+
+> Are you planning to apply it on your tree, or via the media one?
+>
+> I guess it is probably better to apply via media, in order to avoid
+> conflicts with other changes.
+
+Yes, you can take it.
+
+Rob
