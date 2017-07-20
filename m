@@ -1,33 +1,165 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 20 Jul 2017 21:30:38 +0200
-Subject: [PATCH 10/12] [v2] ARM: s3c24xx: make H1940BT depend on RFKILL
-In-Reply-To: <20170720155410.3251043-1-arnd@arndb.de>
-References: <20170720154616.3250481-1-arnd@arndb.de>
- <20170720155410.3251043-1-arnd@arndb.de>
-Message-ID: <20170720193038.GA16488@kozik-book>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 20 Jul 2017 21:37:07 +0200
+Subject: [PATCH 1/3] ARM: bcm283x: Define UART pinmuxing on board level
+In-Reply-To: <1500579429-9101-1-git-send-email-stefan.wahren@i2se.com>
+References: <1500579429-9101-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1500579429-9101-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 05:53:43PM +0200, Arnd Bergmann wrote:
-> Bluetooth is only supported when network support is part of the kernel,
-> so it is a bit pointless to build the hi1940-bt support without networking.
-> If we try anyway, we get a Kconfig warning:
-> 
-> warning: (TOSA_BT && H1940BT) selects RFKILL which has unmet direct dependencies (NET)
-> 
-> This turns the 'select' into 'depends on' as Krzysztof suggested when
-> I first sent a fix.
-> 
-> Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Link: https://patchwork.kernel.org/patch/8164161/
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v1 was sent in Jan 2016, and instead added a dependency on CONFIG_NET
-> ---
->  arch/arm/mach-s3c24xx/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Until RPI 3 and Zero W the pl011 (uart0) was always on pin 14/15. So in
+order to take care of them and other boards in the future,
+we need to define UART pinmuxing on board level.
 
-Thanks, applied.
+This work based on Eric Anholt's patch "ARM: bcm2385: Don't force pl011
+onto pins 14/15." and Fabian Vogt's patch "ARM64: dts: bcm2837: assign
+uart0 to BT and uart1 to pin headers".
 
-Best regards,
-Krzysztof
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |  6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-a.dts      |  6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |  6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts |  6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      |  6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts   |  6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi.dtsi       |  2 +-
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts    |  6 ++++++
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts    | 10 ++++++++++
+ 9 files changed, 53 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+index d070454..9f86649 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+@@ -99,3 +99,9 @@
+ &hdmi {
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+index 46d078e..4b1af06 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+@@ -94,3 +94,9 @@
+ &hdmi {
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
+ };
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index 432088e..a846f1e 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -101,3 +101,9 @@
+ &hdmi {
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+index 4133bc2..e860964 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+@@ -94,3 +94,9 @@
+ &hdmi {
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 4d56fe3..5d77f3f 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -89,3 +89,9 @@
+ &hdmi {
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
+ };
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero.dts b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
+index 79a20d5..7036240 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-zero.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
+@@ -103,3 +103,9 @@
+ &hdmi {
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index e55b362..e36c392 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -39,7 +39,7 @@
+ 	};
+ 
+ 	alt0: alt0 {
+-		brcm,pins = <4 5 7 8 9 10 11 14 15>;
++		brcm,pins = <4 5 7 8 9 10 11>;
+ 		brcm,function = <BCM2835_FSEL_ALT0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+index bf19e8c..e8de414 100644
+--- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
++++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+@@ -39,3 +39,9 @@
+ &hdmi {
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+index 972f14d..20725ca 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -19,7 +19,17 @@
+ 	};
+ };
+ 
++/* uart0 communicates with the BT module */
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio32 &gpclk2_gpio43>;
++	status = "okay";
++};
++
++/* uart1 is mapped to the pin header */
+ &uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_gpio14>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.7.4
