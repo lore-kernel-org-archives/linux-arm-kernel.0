@@ -1,55 +1,52 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 21 Jul 2017 00:18:36 +0100
-Subject: [PATCH 3/4] rtc: pl031: avoid exposing alarm if no interrupt
+Date: Fri, 21 Jul 2017 00:18:41 +0100
+Subject: [PATCH 4/4] rtc: pl031: make interrupt optional
 In-Reply-To: <20170720231745.GE31807@n2100.armlinux.org.uk>
 References: <20170720231745.GE31807@n2100.armlinux.org.uk>
-Message-ID: <E1dYKiK-0001kZ-6E@rmk-PC.armlinux.org.uk>
+Message-ID: <E1dYKiP-0001kg-BQ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the RTC has no interrupt, there is little point in exposing the RTC
-alarm capabilities, as it can't be used as a wakeup source nor can it
-deliver an event to userspace.
+On some platforms, the interrupt for the PL031 is optional.  Avoid
+trying to claim the interrupt if it's not specified.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/rtc/rtc-pl031.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ drivers/rtc/rtc-pl031.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 5960fbd08b05..64c77ec1b4ea 100644
+index 64c77ec1b4ea..82eb7da2c478 100644
 --- a/drivers/rtc/rtc-pl031.c
 +++ b/drivers/rtc/rtc-pl031.c
-@@ -329,12 +329,14 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+@@ -308,7 +308,8 @@ static int pl031_remove(struct amba_device *adev)
  
- 	ldata = devm_kzalloc(&adev->dev, sizeof(struct pl031_local),
- 			     GFP_KERNEL);
--	if (!ldata) {
-+	ops = devm_kmemdup(&adev->dev, &vendor->ops, sizeof(vendor->ops),
-+			   GFP_KERNEL);
-+	if (!ldata || !ops) {
- 		ret = -ENOMEM;
+ 	dev_pm_clear_wake_irq(&adev->dev);
+ 	device_init_wakeup(&adev->dev, false);
+-	free_irq(adev->irq[0], ldata);
++	if (adev->irq[0])
++		free_irq(adev->irq[0], ldata);
+ 	rtc_device_unregister(ldata->rtc);
+ 	amba_release_regions(adev);
+ 
+@@ -389,12 +390,13 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
  		goto out;
  	}
--	ldata->vendor = vendor;
  
-+	ldata->vendor = vendor;
- 	ldata->base = devm_ioremap(&adev->dev, adev->res.start,
- 				   resource_size(&adev->res));
- 	if (!ldata->base) {
-@@ -372,6 +374,13 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 		}
+-	if (request_irq(adev->irq[0], pl031_interrupt,
+-			vendor->irqflags, "rtc-pl031", ldata)) {
+-		ret = -EIO;
+-		goto out_no_irq;
++	if (adev->irq[0]) {
++		ret = request_irq(adev->irq[0], pl031_interrupt,
++				  vendor->irqflags, "rtc-pl031", ldata);
++		if (ret)
++			goto out_no_irq;
++		dev_pm_set_wake_irq(&adev->dev, adev->irq[0]);
  	}
+-	dev_pm_set_wake_irq(&adev->dev, adev->irq[0]);
+ 	return 0;
  
-+	if (!adev->irq[0]) {
-+		/* When there's no interrupt, no point in exposing the alarm */
-+		ops->read_alarm = NULL;
-+		ops->set_alarm = NULL;
-+		ops->alarm_irq_enable = NULL;
-+	}
-+
- 	device_init_wakeup(&adev->dev, true);
- 	ldata->rtc = rtc_device_register("pl031", &adev->dev, ops,
- 					THIS_MODULE);
+ out_no_irq:
 -- 
 2.7.4
