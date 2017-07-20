@@ -1,88 +1,170 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 20 Jul 2017 09:10:28 +0100
-Subject: [PATCH 2/2] ARM: kexec: fix failure to boot crash kernel
-Message-ID: <E1dY6XU-0003wa-Tl@rmk-PC.armlinux.org.uk>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Thu, 20 Jul 2017 16:21:11 +0800
+Subject: [linux-sunxi] [PATCH v4 4/5] ARM: sunxi: h3/h5: switch
+ apb0-related clocks to r_ccu
+In-Reply-To: <1500505173.23770.1.camel@xff.cz>
+References: <20170404095100.18649-1-icenowy@aosc.io>
+ <20170404095100.18649-5-icenowy@aosc.io> <1500505173.23770.1.camel@xff.cz>
+Message-ID: <a934bb1292328400004e58c886ccd693@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kexec was converted to DTB, the dtb address was passed between
-machine_kexec_prepare() and machine_kexec() using a static variable.
-This is bad news if you load a crash kernel followed by a normal
-kernel or vice versa - the last loaded kernel overwrites the dtb
-address.
+? 2017-07-20 06:59?Ond?ej Jirman ???
+> Hi,
+> 
+> Icenowy Zheng p??e v ?t 04. 04. 2017 v 17:50 +0800:
+>> From: Icenowy Zheng <icenowy@aosc.xyz>
+>> 
+>> Now we have driver for the PRCM CCU, switch to use it instead of
+>> old-style clock nodes for apb0-related clocks in sunxi-h3-h5.dtsi .
+>> 
+>> The mux 3 of R_CCU is still the internal oscillator, which is said to 
+>> be
+>> 16MHz plus minus 30%, and get a measured value of 15MHz~16MHz on my 
+>> two
+>> H3 boards and one H5 board.
+> 
+> There's issue with the new r_ccu that breaks r_i2c. (no devices can be
+> found on the bus). Reverting this patch fixes the issue with the I2C
+> controller. (everything else being the same)
+> 
+> Here's the code I'm using: https://github.com/megous/linux/commits/oran
+> ge-pi-4.12
+> 
+> The last commit is the revert.
+> 
+> The issue manifests itself by non-working DVFS, because kernel lacks
+> access to SY8106A regulator, because r_i2c doesn't work with sunxi-ng
+> clock driver (sun8i-r).
+> 
+> Relevant difference in registers between working/non-working state is
+> just this (diff -u):
+> 
+>  0x01f02400 = 0x00000000
+>  0x01f02404 = 0x00000000
+> -0x01f02408 = 0x00000091
+> +0x01f02408 = 0x00000095 DATA register inisde the I2C controller
+>  0x01f0240c = 0x00000044
+>  0x01f02410 = 0x000000f8
+> -0x01f02414 = 0x00000059
+> +0x01f02414 = 0x00000000 CLOCK setup register inside the I2C controller
+>  0x01f02418 = 0x00000000
+>  0x01f0241c = 0x00000000
+>  0x01f02420 = 0x0000003a
+> 
+> It looks like the new sunxi-ng clock driver causes the I2C driver to
+> not correctly configure the CLOCK register. I don't know why and I'm
+> not sure how to deal with this. Any ideas what can I do next?
 
-This can result in kexec failures, as (eg) we try to boot the crash
-kernel with the last loaded dtb.
+Could you apply the patches at [1] and [2] to U-Boot and re-try with
+r_ccu? They switched the CPUs clock of r_ccu to non-secure mode, which
+makes it possible to be accessed from the kernel running in non-secure.
 
-Avoid this by defining a kimage architecture structure, and store
-the address of to be passed in r2 to the new there, which will
-either be the ATAGs or the dtb blob.
+I think these patches can solve this problem.
 
-Reported-by: Keerthy <j-keerthy@ti.com>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/include/asm/kexec.h    |  5 +++++
- arch/arm/kernel/machine_kexec.c | 11 ++++++-----
- 2 files changed, 11 insertions(+), 5 deletions(-)
+[1] https://patchwork.ozlabs.org/patch/791414/
+[2] https://patchwork.ozlabs.org/patch/791415/
 
-diff --git a/arch/arm/include/asm/kexec.h b/arch/arm/include/asm/kexec.h
-index 1869af6bac5c..25021b798a1e 100644
---- a/arch/arm/include/asm/kexec.h
-+++ b/arch/arm/include/asm/kexec.h
-@@ -19,6 +19,11 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#define ARCH_HAS_KIMAGE_ARCH
-+struct kimage_arch {
-+	u32 kernel_r2;
-+};
-+
- /**
-  * crash_setup_regs() - save registers for the panic kernel
-  * @newregs: registers are saved here
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 15495887ca14..fe1419eeb932 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -30,7 +30,6 @@ extern unsigned long kexec_boot_atags;
- 
- static atomic_t waiting_for_crash_ipi;
- 
--static unsigned long dt_mem;
- /*
-  * Provide a dummy crash_notes definition while crash dump arrives to arm.
-  * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
-@@ -42,6 +41,9 @@ int machine_kexec_prepare(struct kimage *image)
- 	__be32 header;
- 	int i, err;
- 
-+	image->arch.kernel_r2 = image->start - KEXEC_ARM_ZIMAGE_OFFSET
-+				     + KEXEC_ARM_ATAGS_OFFSET;
-+
- 	/*
- 	 * Validate that if the current HW supports SMP, then the SW supports
- 	 * and implements CPU hotplug for the current HW. If not, we won't be
-@@ -66,8 +68,8 @@ int machine_kexec_prepare(struct kimage *image)
- 		if (err)
- 			return err;
- 
--		if (be32_to_cpu(header) == OF_DT_HEADER)
--			dt_mem = current_segment->mem;
-+		if (header == cpu_to_be32(OF_DT_HEADER))
-+			image->arch.kernel_r2 = current_segment->mem;
- 	}
- 	return 0;
- }
-@@ -165,8 +167,7 @@ void machine_kexec(struct kimage *image)
- 	kexec_start_address = image->start;
- 	kexec_indirection_page = page_list;
- 	kexec_mach_type = machine_arch_type;
--	kexec_boot_atags = dt_mem ?: image->start - KEXEC_ARM_ZIMAGE_OFFSET
--				     + KEXEC_ARM_ATAGS_OFFSET;
-+	kexec_boot_atags = image->arch.kernel_r2;
- 
- 	/* copy our kernel relocation code to the control code page */
- 	reboot_entry = fncpy(reboot_code_buffer,
--- 
-2.7.4
+> 
+> thank you and regards,
+>   o.
+> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ---
+>> Changes in v4:
+>> - Temporarily dropped the CCU headers.
+>> Changes in v3:
+>> - Change osc32000 to iosc.
+>> 
+>>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 45 
+>> ++++++++++++--------------------------
+>>  1 file changed, 14 insertions(+), 31 deletions(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi 
+>> b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> index 6640ebfa6419..1aeeacb3a884 100644
+>> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> @@ -68,31 +68,12 @@
+>>  			clock-output-names = "osc32k";
+>>  		};
+>> 
+>> -		apb0: apb0_clk {
+>> -			compatible = "fixed-factor-clock";
+>> +		iosc: internal-osc-clk {
+>>  			#clock-cells = <0>;
+>> -			clock-div = <1>;
+>> -			clock-mult = <1>;
+>> -			clocks = <&osc24M>;
+>> -			clock-output-names = "apb0";
+>> -		};
+>> -
+>> -		apb0_gates: clk at 01f01428 {
+>> -			compatible = "allwinner,sun8i-h3-apb0-gates-clk",
+>> -				     "allwinner,sun4i-a10-gates-clk";
+>> -			reg = <0x01f01428 0x4>;
+>> -			#clock-cells = <1>;
+>> -			clocks = <&apb0>;
+>> -			clock-indices = <0>, <1>;
+>> -			clock-output-names = "apb0_pio", "apb0_ir";
+>> -		};
+>> -
+>> -		ir_clk: ir_clk at 01f01454 {
+>> -			compatible = "allwinner,sun4i-a10-mod0-clk";
+>> -			reg = <0x01f01454 0x4>;
+>> -			#clock-cells = <0>;
+>> -			clocks = <&osc32k>, <&osc24M>;
+>> -			clock-output-names = "ir";
+>> +			compatible = "fixed-clock";
+>> +			clock-frequency = <16000000>;
+>> +			clock-accuracy = <300000000>;
+>> +			clock-output-names = "iosc";
+>>  		};
+>>  	};
+>> 
+>> @@ -576,9 +557,12 @@
+>>  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>>  		};
+>> 
+>> -		apb0_reset: reset at 01f014b0 {
+>> -			reg = <0x01f014b0 0x4>;
+>> -			compatible = "allwinner,sun6i-a31-clock-reset";
+>> +		r_ccu: clock at 1f01400 {
+>> +			compatible = "allwinner,sun50i-a64-r-ccu";
+>> +			reg = <0x01f01400 0x100>;
+>> +			clocks = <&osc24M>, <&osc32k>, <&iosc>;
+>> +			clock-names = "hosc", "losc", "iosc";
+>> +			#clock-cells = <1>;
+>>  			#reset-cells = <1>;
+>>  		};
+>> 
+>> @@ -589,9 +573,9 @@
+>> 
+>>  		ir: ir at 01f02000 {
+>>  			compatible = "allwinner,sun5i-a13-ir";
+>> -			clocks = <&apb0_gates 1>, <&ir_clk>;
+>> +			clocks = <&r_ccu 4>, <&r_ccu 11>;
+>>  			clock-names = "apb", "ir";
+>> -			resets = <&apb0_reset 1>;
+>> +			resets = <&r_ccu 0>;
+>>  			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>>  			reg = <0x01f02000 0x40>;
+>>  			status = "disabled";
+>> @@ -601,9 +585,8 @@
+>>  			compatible = "allwinner,sun8i-h3-r-pinctrl";
+>>  			reg = <0x01f02c00 0x400>;
+>>  			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+>> -			clocks = <&apb0_gates 0>, <&osc24M>, <&osc32k>;
+>> +			clocks = <&r_ccu 3>, <&osc24M>, <&osc32k>;
+>>  			clock-names = "apb", "hosc", "losc";
+>> -			resets = <&apb0_reset 0>;
+>>  			gpio-controller;
+>>  			#gpio-cells = <3>;
+>>  			interrupt-controller;
+>> --
+>> 2.12.2
+>> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
