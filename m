@@ -1,183 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Jul 2017 15:20:44 +0200
-Subject: [PATCH 06/18] drm/sun4i: tcon: Don't rely on encoders to enable
- the TCON
-In-Reply-To: <CAGb2v67LNwLWWJEkw=FKE-kPkVHPK7XZC-OY02A1a94w6E5e1g@mail.gmail.com>
-References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
- <e8e204b4b366f609db5b7d848f8cfb88345cd2d7.1499955058.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67LNwLWWJEkw=FKE-kPkVHPK7XZC-OY02A1a94w6E5e1g@mail.gmail.com>
-Message-ID: <20170720132044.sisl3liag3amfvlr@flea>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 20 Jul 2017 15:32:08 +0200
+Subject: [PATCH] arm: zynq: Add adv7511 on i2c bus for zc70x
+Message-ID: <c6907f2c425af0dafa849f64873c30f13fef639d.1500557521.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+From: Christian Kohn <christian.kohn@xilinx.com>
 
-On Fri, Jul 14, 2017 at 11:40:07AM +0800, Chen-Yu Tsai wrote:
-> >  static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > index d9791292553e..dc70bc2a42a5 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > @@ -14,6 +14,7 @@
-> >  #include <drm/drm_atomic_helper.h>
-> >  #include <drm/drm_crtc.h>
-> >  #include <drm/drm_crtc_helper.h>
-> > +#include <drm/drm_encoder.h>
-> >  #include <drm/drm_modes.h>
-> >  #include <drm/drm_of.h>
-> >
-> > @@ -32,66 +33,62 @@
-> >  #include "sun4i_tcon.h"
-> >  #include "sunxi_engine.h"
-> >
-> > -void sun4i_tcon_disable(struct sun4i_tcon *tcon)
-> > +static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
-> > +                                         bool enabled)
-> >  {
-> > -       DRM_DEBUG_DRIVER("Disabling TCON\n");
-> > +       struct clk *clk;
-> >
-> > -       /* Disable the TCON */
-> > -       regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
-> > -                          SUN4I_TCON_GCTL_TCON_ENABLE, 0);
-> > -}
-> > -EXPORT_SYMBOL(sun4i_tcon_disable);
-> > -
-> > -void sun4i_tcon_enable(struct sun4i_tcon *tcon)
-> > -{
-> > -       DRM_DEBUG_DRIVER("Enabling TCON\n");
-> > -
-> > -       /* Enable the TCON */
-> > -       regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
-> > -                          SUN4I_TCON_GCTL_TCON_ENABLE,
-> > -                          SUN4I_TCON_GCTL_TCON_ENABLE);
-> > -}
-> > -EXPORT_SYMBOL(sun4i_tcon_enable);
-> > -
-> > -void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel)
-> > -{
-> > -       DRM_DEBUG_DRIVER("Disabling TCON channel %d\n", channel);
-> > -
-> > -       /* Disable the TCON's channel */
-> > -       if (channel == 0) {
-> > +       switch (channel) {
-> > +       case 0:
-> >                 regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
-> > -                                  SUN4I_TCON0_CTL_TCON_ENABLE, 0);
-> > -               clk_disable_unprepare(tcon->dclk);
-> > +                                  SUN4I_TCON0_CTL_TCON_ENABLE,
-> > +                                  enabled ? SUN4I_TCON0_CTL_TCON_ENABLE : 0);
-> > +               clk = tcon->dclk;
-> > +               break;
-> > +       case 1:
-> > +               WARN_ON(!tcon->quirks->has_channel_1);
-> > +               regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
-> > +                                  SUN4I_TCON1_CTL_TCON_ENABLE,
-> > +                                  enabled ? SUN4I_TCON1_CTL_TCON_ENABLE : 0);
-> > +               clk = tcon->sclk1;
-> > +               break;
-> > +       default:
-> > +               DRM_DEBUG_DRIVER("Unknown channel... doing nothing\n");
-> >                 return;
-> >         }
-> >
-> > -       WARN_ON(!tcon->quirks->has_channel_1);
-> > -       regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
-> > -                          SUN4I_TCON1_CTL_TCON_ENABLE, 0);
-> > -       clk_disable_unprepare(tcon->sclk1);
-> > +       if (enabled)
-> > +               clk_prepare_enable(clk);
-> 
-> I wonder if it's better to enable the clk before the TCON?
+Describe adv7511 on i2c bus.
 
-I think I kept the current behaviour, which seemed to work fine with
-that regard.
+Signed-off-by: Christian Kohn <christian.kohn@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-> 
-> > +       else
-> > +               clk_disable_unprepare(clk);
-> >  }
-> > -EXPORT_SYMBOL(sun4i_tcon_channel_disable);
-> >
-> > -void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel)
-> > +void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
-> > +                          struct drm_encoder *encoder,
-> > +                          bool enabled)
-> >  {
-> > -       DRM_DEBUG_DRIVER("Enabling TCON channel %d\n", channel);
-> > -
-> > -       /* Enable the TCON's channel */
-> > -       if (channel == 0) {
-> > -               regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
-> > -                                  SUN4I_TCON0_CTL_TCON_ENABLE,
-> > -                                  SUN4I_TCON0_CTL_TCON_ENABLE);
-> > -               clk_prepare_enable(tcon->dclk);
-> > +       int channel;
-> > +
-> > +       switch (encoder->encoder_type) {
-> > +       case DRM_MODE_ENCODER_NONE:
-> > +               channel = 0;
-> > +               break;
-> > +       case DRM_MODE_ENCODER_TMDS:
-> > +       case DRM_MODE_ENCODER_TVDAC:
-> > +               channel = 1;
-> > +               break;
-> > +       default:
-> > +               DRM_DEBUG_DRIVER("Unknown encoder type, doing nothing...\n");
-> 
-> We could simply add all the possible types, and print a big warning
-> if someone does something unexpected. IMHO this is better than having
-> the user enable some hidden debug flag to figure why the display isn't
-> working properly.
+ arch/arm/boot/dts/zynq-zc702.dts | 15 +++++++++++++++
+ arch/arm/boot/dts/zynq-zc706.dts | 15 +++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-I'm not sure about all types of encoders, but you're right, it should
-be a warning.
-
-> >                 return;
-> >         }
-> >
-> > -       WARN_ON(!tcon->quirks->has_channel_1);
-> > -       regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
-> > -                          SUN4I_TCON1_CTL_TCON_ENABLE,
-> > -                          SUN4I_TCON1_CTL_TCON_ENABLE);
-> > -       clk_prepare_enable(tcon->sclk1);
-> > +       sun4i_tcon_channel_set_status(tcon, channel, enabled);
-> > +
-> > +       regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
-> > +                          SUN4I_TCON_GCTL_TCON_ENABLE,
-> > +                          enabled ? SUN4I_TCON_GCTL_TCON_ENABLE : 0);
-> 
-> The global enable bit should be set first.
-
-ACK
-
-
-> Also the manual says "When it?s disabled, the module will be reset to
-> idle state."
-> so you might get away with just disabling the global enable bit and returning
-> directly after disabling the clock?
-
-I'd rather keep an explicit disable, just in case one SoC is broken,
-just like the DE is...
-
-> >  }
-> > -EXPORT_SYMBOL(sun4i_tcon_channel_enable);
-> > +EXPORT_SYMBOL(sun4i_tcon_set_status);
-> 
-> The TCON and CRTC code are part of the same module.
-> There is no need to export this function.
-
-Ah, right. I'll remove it. Thanks!
-Maxime
-
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index 0735909165fd..a096275d903d 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -132,6 +132,21 @@
+ 			};
+ 		};
+ 
++		i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++			adv7511: hdmi-tx at 39 {
++				compatible = "adi,adv7511";
++				reg = <0x39>;
++				adi,input-depth = <8>;
++				adi,input-colorspace = "yuv422";
++				adi,input-clock = "1x";
++				adi,input-style = <3>;
++				adi,input-justification = "right";
++			};
++		};
++
+ 		i2c at 2 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index 3f6e4cb958f6..689ec9d6f7b9 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -88,6 +88,21 @@
+ 			};
+ 		};
+ 
++		i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++			adv7511: hdmi-tx at 39 {
++				compatible = "adi,adv7511";
++				reg = <0x39>;
++				adi,input-depth = <8>;
++				adi,input-colorspace = "yuv422";
++				adi,input-clock = "1x";
++				adi,input-style = <3>;
++				adi,input-justification = "evenly";
++			};
++		};
++
+ 		i2c at 2 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/b07919ce/attachment-0001.sig>
+1.9.1
