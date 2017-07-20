@@ -1,85 +1,44 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 20 Jul 2017 19:06:47 +0530
-Subject: [PATCH 00/16] omap_hsmmc: Add ADMA support and UHS/HS200/DDR
- support
-In-Reply-To: <fc9c1576-7419-b174-ea42-97ccf4666cee@ti.com>
-References: <20170616124544.15046-1-kishon@ti.com>
- <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
- <fc9c1576-7419-b174-ea42-97ccf4666cee@ti.com>
-Message-ID: <27776609-2425-9423-3eaa-dc128c4b07f0@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Jul 2017 15:37:14 +0200
+Subject: [PATCH 13/18] dt-bindings: vendor: Add Huarui Lighting
+In-Reply-To: <CAGb2v66hWsuQQQQXJwKD-1aub_1aysQ_A9Kn2Ka5WSFMDYHN0Q@mail.gmail.com>
+References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <5b7ae43738fb5ea2fb1ebebddfc75d401da94677.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v66hWsuQQQQXJwKD-1aub_1aysQ_A9Kn2Ka5WSFMDYHN0Q@mail.gmail.com>
+Message-ID: <20170720133714.nffdm5y5cxzvz65c@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Chen-Yu,
 
-On Tuesday 11 July 2017 07:27 PM, Kishon Vijay Abraham I wrote:
-> Hi Ulf,
+On Fri, Jul 14, 2017 at 03:53:40PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Jul 13, 2017 at 10:13 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Huarui Lighting makes display panel, add it to the list of panels.
 > 
-> On Tuesday 11 July 2017 06:40 PM, Ulf Hansson wrote:
->> On 16 June 2017 at 14:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> This is the final part of the series originally sent as
->>> part of [2].
->>>
->>> This series adds UHS, HS200, DDR mode and ADMA support to
->>> omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
->>> SoCs.
->>>
->>> Changes from [2]:
->>> *) No more updating omap2plus_defconfig or multi_v7_defconfig is
->>>    required, so those patches are removed.
->>> *) Addressed Rob Herring's comment on implementing a function
->>>    instead of having a macro while getting pinctrl state.
->>>
->>> This series is created on top of [3], [4], [5] AND [6]
->>> (i.e after
->>>   ARM: dts: omap3-overo: Remove "vqmmc-supply" property from MMC dt node
->>>   omap_hsmmc: use mmc_regulator_get_supply() to get regulators
->>>   omap*: Fixes/Cleanups for MMC devicetree node
->>>   ARM: dts: Add iodelay data for MMC)
->>>
->>> The functionality implemented in this series was sent before ([1]) but
->>> was never followed up since supporting high speed modes in dra7 required
->>> IODelay values to be configured. With IODelay driver being merged into
->>> kernel, sending it as a fresh series with support for configuring IODelay
->>> values.
->>
->> Is it safe to queue this via mmc tree for 4.14 or is there a
->> dependency I must consider? The above didn't quite tell me that, could
->> you please elaborate.
+> I could not find any information on "Huarui Lighting" within the
+> context of LCD panels. The company I found makes LED lighting
+> fixtures, floodlights, and high power LED drivers.
 > 
-> There is a dependency with https://www.spinics.net/lists/arm-kernel/msg586215.html.
-> 
-> I'll resend the series after all the platform data specific stuff is merged.
->>
->>>
->>> Suggestions of migrating to sdhci driver (from omap_hsmmc driver) is not
->>> addressed since
->>> *) tuning ratio of MMC in dra7 is different from sdhci
->>> *) IOdelay is required for dra7
->>> *) GPIO based card detect is not supported in sdhci
->>
->> Lots of sdhci drivers calls mmc_of_parse(), and uses the mmc slot gpio
->> APIs, so I don't this this is correct statement.
->>
->>> *) Some of the registers don't always have correct values as in sdhci
->>>    (like PSTATE).
->>> Supporting all of these in sdhci will result in adding lot of quirks in
->>> sdhci driver.
->>
->> Is it really that much different? It would be nice if some really took
->> on the challenge of converting omap_hsmmc into an sdhci variant.
-> 
-> Okay. I'll give that a shot and see how far I can get.
+> This might not be a legitimate branding?
 
-I created a sdhci variant and was able to get it working with high speed mode
-in dra7.
+The references are sparse, but the only time I could find a vendor for
+that part was here, page 51:
+https://www.codico.com/shop/media/datasheets/Quectel_SC20_Hardware_Design_V1.2.pdf
 
-I have a query on sdhci_set_power_noreg() in sdhci.c. sdhci_set_power_noreg
-sets SDHCI_POWER_CONTROL based on *vdd* value. However SDHCI_POWER_CONTROL is
-for setting bus voltage and need not be based on *vdd*. IMHO
-SDHCI_POWER_CONTROL should be set based on "ios->signal_voltage".
+But maybe it's wrong. And since it has a BPi logo on it, maybe we
+should just use sinovoip as the vendor.
 
-Let me know if my understanding is wrong.
+Maxime
 
-Thanks
-Kishon
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/dffefbbd/attachment.sig>
