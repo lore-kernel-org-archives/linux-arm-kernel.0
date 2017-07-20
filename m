@@ -1,50 +1,200 @@
-From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 20 Jul 2017 02:29:26 +0200
-Subject: [PATCH 9/9] ARM: tegra: fix sleeping while atomic in CPU idle
-In-Reply-To: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <0a0600cdbcc9a71134105043c3e2ace84bab7c5a.1500510157.git.mirq-linux@rere.qmqm.pl>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Thu, 20 Jul 2017 01:16:08 +0000
+Subject: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
+In-Reply-To: <1500460107.13757.6.camel@pengutronix.de>
+References: <8e6f731906fe5f8dce6f23b1e8ad084c8041f49e.1500457396.git.leonard.crestez@nxp.com>
+ <1500460107.13757.6.camel@pengutronix.de>
+Message-ID: <AM3PR04MB131557FE521F61147DA5975DF5A70@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes unnecessary lock causing following BUG splat:
 
-BUG: sleeping function called from invalid context at /linux/kernel/locking/mutex.c:747
-in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
-no locks held by swapper/0/0.
-CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W 4.13.0-rc1mq-00016-gbf3f627c6b2b #1
-Hardware name: NVIDIA Tegra SoC (Flattened Device Tree)
-[<b0110a14>] (unwind_backtrace) from [<b010c710>] (show_stack+0x18/0x1c)
-[<b010c710>] (show_stack) from [<b068ada8>] (dump_stack+0x84/0x98)
-[<b068ada8>] (dump_stack) from [<b014ff54>] (___might_sleep+0x158/0x17c)
-[<b014ff54>] (___might_sleep) from [<b06a15c4>] (__mutex_lock+0x34/0x9a0)
-[<b06a15c4>] (__mutex_lock) from [<b06a30dc>] (mutex_lock_nested+0x24/0x2c)
-[<b06a30dc>] (mutex_lock_nested) from [<b041f6d8>] (tegra_powergate_is_powered+0x40/0xa4)
-[<b041f6d8>] (tegra_powergate_is_powered) from [<b04197e8>] (tegra30_cpu_rail_off_ready+0x28/0x6c)
-[<b04197e8>] (tegra30_cpu_rail_off_ready) from [<b011c73c>] (tegra30_idle_lp2+0x70/0x114)
-[<b011c73c>] (tegra30_idle_lp2) from [<b0516080>] (cpuidle_enter_state+0x12c/0x47c)
-[<b0516080>] (cpuidle_enter_state) from [<b0163394>] (do_idle+0x1b4/0x204)
-[<b0163394>] (do_idle) from [<b016368c>] (cpu_startup_entry+0x20/0x24)
-[<b016368c>] (cpu_startup_entry) from [<b0900dd8>] (start_kernel+0x39c/0x3a8)
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
----
- drivers/soc/tegra/pmc.c | 2 --
- 1 file changed, 2 deletions(-)
+Best Regards!
+Anson Huang
 
-diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index e233dd5dcab3..3e6ec9fdba41 100644
---- a/drivers/soc/tegra/pmc.c
-+++ b/drivers/soc/tegra/pmc.c
-@@ -526,9 +526,7 @@ int tegra_powergate_is_powered(unsigned int id)
- 	if (!tegra_powergate_is_valid(id))
- 		return -EINVAL;
- 
--	mutex_lock(&pmc->powergates_lock);
- 	status = tegra_powergate_state(id);
--	mutex_unlock(&pmc->powergates_lock);
- 
- 	return status;
- }
--- 
-2.11.0
+
+
+> -----Original Message-----
+> From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> Sent: 2017-07-19 6:28 PM
+> To: Leonard Crestez <leonard.crestez@nxp.com>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>; Rafael J. Wysocki
+> <rjw@rjwysocki.net>; Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+> <fabio.estevam@nxp.com>; linux-pm at vger.kernel.org; Octavian Purdila
+> <octavian.purdila@nxp.com>; Anson Huang <anson.huang@nxp.com>; Jacky
+> Bai <ping.bai@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>;
+> kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH] cpufreq: imx6q: Fix imx6sx low frequency support
+> 
+> Hi Leonard,
+> 
+> Am Mittwoch, den 19.07.2017, 12:54 +0300 schrieb Leonard Crestez:
+> > This patch contains the minimal changes required to support imx6sx OPP
+> > of
+> > 198 Mhz. Without this patch cpufreq still reports success but the
+> > frequency is not changed, the "arm" clock will still be at 396000000 in
+> clk_summary.
+> >
+> > In order to do this PLL1 needs to be bypassed but still kept enabled.
+> > This is required despite the fact that the arm clk is configured to
+> > come from
+> > pll2_pfd2 and from the clk framework perspective pll1 and related
+> > clocks are unused.
+> 
+> I'm not really an expert for MX6SX, so a little background on why PLL1 needs to
+> be kept enabled would help to review this change.
+
+Hi, Lucas
+	The PLL1 needs to be enabled is because when ARM_PODF is changed in CCM,
+we need to check the busy bit of CCM_CDHIPR bit 16 arm_podf_busy, and this bit is
+sync with PLL1 clock, so if PLL1 NOT enabled, this bit will never get clear. This is hardware
+requirement.
+
+Anson.
+
+> 
+> Thanks,
+> Lucas
+> 
+> > This patch adds pll1, pll_bypass and pll1_bypass_src clocks to the imx
+> > cpufreq driver as imx6sx-specific for the bypass logic.
+> >
+> > The definition of pll1_sys is changed to imx_clk_fixed_factor so that
+> > it's never disabled.
+> >
+> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> > ---
+> >
+> > Some potential issues:
+> >
+> > In theory pll1_sys could be explictly kept enabled from cpufreq. It's
+> > not clear this would be better since the intention is to never let
+> > this be disabled.
+> >
+> > The new clocks are only added for imx6sx. The frequency changing code
+> > relies on the fact that the clk API simply does nothing when called
+> > with a null clk.
+> >
+> > Perhaps it might be better to accept ENOENT from clk_get on these new
+> > clocks instead of checking of_machine_is_compatible.
+> >
+> >  arch/arm/boot/dts/imx6sx.dtsi   |  8 ++++++--
+> >  drivers/clk/imx/clk-imx6sx.c    |  2 +-
+> >  drivers/cpufreq/imx6q-cpufreq.c | 33
+> > +++++++++++++++++++++++++++++++++
+> >  3 files changed, 40 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx6sx.dtsi
+> > b/arch/arm/boot/dts/imx6sx.dtsi index f16b9df..4394137 100644
+> > --- a/arch/arm/boot/dts/imx6sx.dtsi
+> > +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> > @@ -87,9 +87,13 @@
+> >  				 <&clks IMX6SX_CLK_PLL2_PFD2>,
+> >  				 <&clks IMX6SX_CLK_STEP>,
+> >  				 <&clks IMX6SX_CLK_PLL1_SW>,
+> > -				 <&clks IMX6SX_CLK_PLL1_SYS>;
+> > +				 <&clks IMX6SX_CLK_PLL1_SYS>,
+> > +				 <&clks IMX6SX_CLK_PLL1>,
+> > +				 <&clks IMX6SX_PLL1_BYPASS>,
+> > +				 <&clks IMX6SX_PLL1_BYPASS_SRC>;
+> >  			clock-names = "arm", "pll2_pfd2_396m", "step",
+> > -				      "pll1_sw", "pll1_sys";
+> > +				      "pll1_sw", "pll1_sys", "pll1",
+> > +				      "pll1_bypass", "pll1_bypass_src";
+> >  			arm-supply = <&reg_arm>;
+> >  			soc-supply = <&reg_soc>;
+> >  		};
+> > diff --git a/drivers/clk/imx/clk-imx6sx.c
+> > b/drivers/clk/imx/clk-imx6sx.c index b5c96de..aa63b92 100644
+> > --- a/drivers/clk/imx/clk-imx6sx.c
+> > +++ b/drivers/clk/imx/clk-imx6sx.c
+> > @@ -199,7 +199,7 @@ static void __init imx6sx_clocks_init(struct
+> device_node *ccm_node)
+> >  	clk_set_parent(clks[IMX6SX_PLL6_BYPASS], clks[IMX6SX_CLK_PLL6]);
+> >  	clk_set_parent(clks[IMX6SX_PLL7_BYPASS], clks[IMX6SX_CLK_PLL7]);
+> >
+> > -	clks[IMX6SX_CLK_PLL1_SYS]      = imx_clk_gate("pll1_sys",
+> "pll1_bypass", base + 0x00, 13);
+> > +	clks[IMX6SX_CLK_PLL1_SYS]      = imx_clk_fixed_factor("pll1_sys",
+> "pll1_bypass", 1, 1);
+> >  	clks[IMX6SX_CLK_PLL2_BUS]      = imx_clk_gate("pll2_bus",
+> "pll2_bypass", base + 0x30, 13);
+> >  	clks[IMX6SX_CLK_PLL3_USB_OTG]  = imx_clk_gate("pll3_usb_otg",
+> "pll3_bypass", base + 0x10, 13);
+> >  	clks[IMX6SX_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",
+> "pll4_bypass", base + 0x70, 13);
+> > diff --git a/drivers/cpufreq/imx6q-cpufreq.c
+> > b/drivers/cpufreq/imx6q-cpufreq.c index b6edd3c..caf727a 100644
+> > --- a/drivers/cpufreq/imx6q-cpufreq.c
+> > +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> > @@ -31,6 +31,9 @@ static struct clk *step_clk;  static struct clk
+> > *pll2_pfd2_396m_clk;
+> >
+> >  /* clk used by i.MX6UL */
+> > +static struct clk *pll1_bypass;
+> > +static struct clk *pll1_bypass_src;
+> > +static struct clk *pll1;
+> >  static struct clk *pll2_bus_clk;
+> >  static struct clk *secondary_sel_clk;
+> >
+> > @@ -122,8 +125,21 @@ static int imx6q_set_target(struct cpufreq_policy
+> *policy, unsigned int index)
+> >  		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+> >  		clk_set_parent(pll1_sw_clk, step_clk);
+> >  		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+> > +			/*
+> > +			 * Ensure that pll1_bypass is set back to
+> > +			 * pll1. We have to do this first so that the
+> > +			 * change rate done to pll1_sys_clk done below
+> > +			 * can propagate up to pll1.
+> > +			 */
+> > +			clk_set_parent(pll1_bypass, pll1);
+> >  			clk_set_rate(pll1_sys_clk, new_freq * 1000);
+> >  			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+> > +		} else {
+> > +			/*
+> > +			 * Need to ensure that PLL1 is bypassed and enabled
+> > +			 * before ARM-PODF is set.
+> > +			 */
+> > +			clk_set_parent(pll1_bypass, pll1_bypass_src);
+> >  		}
+> >  	}
+> >
+> > @@ -216,6 +232,17 @@ static int imx6q_cpufreq_probe(struct
+> platform_device *pdev)
+> >  		goto put_clk;
+> >  	}
+> >
+> > +	if (of_machine_is_compatible("fsl,imx6sx")) {
+> > +		pll1 = clk_get(cpu_dev, "pll1");
+> > +		pll1_bypass = clk_get(cpu_dev, "pll1_bypass");
+> > +		pll1_bypass_src = clk_get(cpu_dev, "pll1_bypass_src");
+> > +		if (IS_ERR(pll1) || IS_ERR(pll1_bypass) ||
+> IS_ERR(pll1_bypass_src)) {
+> > +			dev_err(cpu_dev, "failed to get clocks specific to
+> imx6sx\n");
+> > +			ret = -ENOENT;
+> > +			goto put_clk;
+> > +		}
+> > +	}
+> > +
+> >  	if (of_machine_is_compatible("fsl,imx6ul") ||
+> >  	    of_machine_is_compatible("fsl,imx6ull")) {
+> >  		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus"); @@ -380,6
+> +407,12 @@
+> > static int imx6q_cpufreq_probe(struct platform_device *pdev)
+> >  		clk_put(step_clk);
+> >  	if (!IS_ERR(pll2_pfd2_396m_clk))
+> >  		clk_put(pll2_pfd2_396m_clk);
+> > +	if (!IS_ERR(pll1))
+> > +		clk_put(pll1);
+> > +	if (!IS_ERR(pll1_bypass))
+> > +		clk_put(pll1_bypass);
+> > +	if (!IS_ERR(pll1_bypass_src))
+> > +		clk_put(pll1_bypass_src);
+> >  	if (!IS_ERR(pll2_bus_clk))
+> >  		clk_put(pll2_bus_clk);
+> >  	if (!IS_ERR(secondary_sel_clk))
+> 
