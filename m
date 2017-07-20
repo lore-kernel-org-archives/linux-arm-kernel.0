@@ -1,62 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jul 2017 17:51:45 +0200
-Subject: [PATCH 07/12] ARM: omap1: avoid unused variable warning
+Date: Thu, 20 Jul 2017 17:51:46 +0200
+Subject: [PATCH 08/12] ARM: sirf: mark sirfsoc_init_late as __maybe_unused
 In-Reply-To: <20170720154616.3250481-1-arnd@arndb.de>
 References: <20170720154616.3250481-1-arnd@arndb.de>
-Message-ID: <20170720155209.3250880-4-arnd@arndb.de>
+Message-ID: <20170720155209.3250880-5-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The osk_mistral_init() contains code that is only compiled when
-CONFIG_PM is set, but it uses a variable that is declared outside
-of the #ifdef:
+sirfsoc_init_late is called by each of the three individual
+SoC definitions, but in a randconfig build, we can encounter
+a situation where they are all disabled:
 
-arch/arm/mach-omap1/board-osk.c: In function 'osk_mistral_init':
-arch/arm/mach-omap1/board-osk.c:513:7: warning: unused variable 'ret' [-Wunused-variable]
+arch/arm/mach-prima2/common.c:18:123: warning: 'sirfsoc_init_late' defined but not used [-Wunused-function]
 
-This removes the #ifdef around the user of the variable,
-make it always used.
+While that is not a useful configuration, the warning also
+doesn't help, so this patch marks the function as __maybe_unused
+to let the compiler know it is there intentionally.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Suggested-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 ---
- arch/arm/mach-omap1/board-osk.c | 4 ----
- 1 file changed, 4 deletions(-)
+Originally submitted Feb 2016, but it got lost
+---
+ arch/arm/mach-prima2/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
-index 4dfb99504810..95ac1929aede 100644
---- a/arch/arm/mach-omap1/board-osk.c
-+++ b/arch/arm/mach-omap1/board-osk.c
-@@ -441,13 +441,11 @@ static struct spi_board_info __initdata mistral_boardinfo[] = { {
- 	.chip_select		= 0,
- } };
+diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
+index 8cadb302a7d2..ffe05c27087e 100644
+--- a/arch/arm/mach-prima2/common.c
++++ b/arch/arm/mach-prima2/common.c
+@@ -15,7 +15,7 @@
+ #include <linux/of_platform.h>
+ #include "common.h"
  
--#ifdef	CONFIG_PM
- static irqreturn_t
- osk_mistral_wake_interrupt(int irq, void *ignored)
+-static void __init sirfsoc_init_late(void)
++static void __init __maybe_unused sirfsoc_init_late(void)
  {
- 	return IRQ_HANDLED;
+ 	sirfsoc_pm_init();
  }
--#endif
- 
- static void __init osk_mistral_init(void)
- {
-@@ -515,7 +513,6 @@ static void __init osk_mistral_init(void)
- 
- 		gpio_direction_input(OMAP_MPUIO(2));
- 		irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
--#ifdef	CONFIG_PM
- 		/* share the IRQ in case someone wants to use the
- 		 * button for more than wakeup from system sleep.
- 		 */
-@@ -529,7 +526,6 @@ static void __init osk_mistral_init(void)
- 				ret);
- 		} else
- 			enable_irq_wake(irq);
--#endif
- 	} else
- 		printk(KERN_ERR "OSK+Mistral: wakeup button is awol\n");
- 
 -- 
 2.9.0
