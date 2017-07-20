@@ -1,113 +1,72 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 20 Jul 2017 11:17:22 +0100
-Subject: [PATCH v5 12/19] coresight tmc etr: Add capabilitiy information
+Date: Thu, 20 Jul 2017 11:17:28 +0100
+Subject: [PATCH v5 18/19] coresight tmc: Add support for Coresight SoC 600 TMC
 In-Reply-To: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500545849-23724-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500545849-23724-19-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With new version of TMC ETR, there are differing set of
-features supported by the TMC. Add the capability of a
-given TMC ETR for making safer decisions at runtime.
+The coresight SoC 600 supports ETR save-restore which allows us
+to restore a trace session by retaining the RRP/RWP/STS.Full values
+when the TMC leaves the Disabled state. However, the TMC doesn't
+have a scatter-gather unit in built.
 
-The device configuration register of the TMC (DEVID) lists
-some of the capabilities. So, we can detect some of them at
-probe. However, some of the features (or changes in behavior)
-are not advertised and we have to depend on the PID to infer
-the features. So we use a static description of the "unadvertised"
-capabilities attached to the PID. Combining both, the static
-and the dynamic capabilities, we maintain a bitmask of the
-available features which can be later checked to take
-appropriate actions.
+Also, TMCs have different PIDs in different configurations (ETF,
+ETB & ETR), unlike the previous generation.
+
+While the DEVID exposes some of the features/changes in the TMC,
+it doesn't explicitly advertises the new save-restore feature
+as described above.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 20 +++++++++++++++-----
- drivers/hwtracing/coresight/coresight-tmc.h | 20 ++++++++++++++++++++
- 2 files changed, 35 insertions(+), 5 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 16 ++++++++++++++++
+ drivers/hwtracing/coresight/coresight-tmc.h |  4 ++++
+ 2 files changed, 20 insertions(+)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 743edbb..4e7cd9a 100644
+index c4a5dea..e754a3e 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -299,6 +299,20 @@ const struct attribute_group *coresight_tmc_groups[] = {
- 	NULL,
+@@ -442,6 +442,22 @@ static struct amba_id tmc_ids[] = {
+ 		.id     = 0x000bb961,
+ 		.mask   = 0x000fffff,
+ 	},
++	{
++		/* Coresight SoC 600 TMC-ETR/ETS */
++		.id	= 0x000bb9e8,
++		.mask	= 0x000fffff,
++		.data	= (void *)(unsigned long)CORESIGHT_SOC_600_ETR_CAPS,
++	},
++	{
++		/* Coresight SoC 600 TMC-ETB */
++		.id	= 0x000bb9e9,
++		.mask	= 0x000fffff,
++	},
++	{
++		/* Coresight SoC 600 TMC-ETF */
++		.id	= 0x000bb9ea,
++		.mask	= 0x000fffff,
++	},
+ 	{ 0, 0},
  };
  
-+/* Detect and initialise the capabilities of a TMC ETR */
-+static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
-+			     u32 devid, void *dev_caps)
-+{
-+	/* Set the unadvertised capabilities */
-+	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
-+
-+	/*
-+	 * ETR configuration uses a 40-bit AXI master in place of
-+	 * the embedded SRAM of ETB/ETF.
-+	 */
-+	return dma_set_mask_and_coherent(drvdata->dev, DMA_BIT_MASK(40));
-+}
-+
- static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	int ret = 0;
-@@ -370,11 +384,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 		desc.type = CORESIGHT_DEV_TYPE_SINK;
- 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
- 		desc.ops = &tmc_etr_cs_ops;
--		/*
--		 * ETR configuration uses a 40-bit AXI master in place of
--		 * the embedded SRAM of ETB/ETF.
--		 */
--		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
-+		ret = tmc_etr_setup_caps(drvdata, devid, id->data);
- 		if (ret)
- 			goto out;
- 		break;
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index c78de00..7b20863 100644
+index 08f1aea..f24e89a 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -105,6 +105,8 @@ enum tmc_mem_intf_width {
-  * @config_type: TMC variant, must be of type @tmc_config_type.
-  * @memwidth:	width of the memory interface databus, in bytes.
-  * @trigger_cntr: amount of words to store after a trigger.
-+ * @etr_caps:	Bitmask of capabilities of the TMC ETR, inferred from the
-+ *		device configuration register (DEVID)
+@@ -130,6 +130,10 @@ enum tmc_mem_intf_width {
   */
- struct tmc_drvdata {
- 	void __iomem		*base;
-@@ -122,6 +124,7 @@ struct tmc_drvdata {
- 	enum tmc_config_type	config_type;
- 	enum tmc_mem_intf_width	memwidth;
- 	u32			trigger_cntr;
-+	u32			etr_caps;
- };
+ #define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
  
- /* Generic functions */
-@@ -158,4 +161,21 @@ TMC_REG_PAIR(rrp, TMC_RRP, TMC_RRPHI)
- TMC_REG_PAIR(rwp, TMC_RWP, TMC_RWPHI)
- TMC_REG_PAIR(dba, TMC_DBALO, TMC_DBAHI)
- 
-+/* Initialise the caps from unadvertised static capabilities of the device */
-+static inline void tmc_etr_init_caps(struct tmc_drvdata *drvdata, u32 dev_caps)
-+{
-+	WARN_ON(drvdata->etr_caps);
-+	drvdata->etr_caps = dev_caps;
-+}
++/* Coresight SoC-600 TMC-ETR unadvertised capabilities */
++#define CORESIGHT_SOC_600_ETR_CAPS	\
++	(TMC_ETR_SAVE_RESTORE | TMC_ETR_AXI_ARCACHE)
 +
-+static inline void tmc_etr_set_cap(struct tmc_drvdata *drvdata, u32 cap)
-+{
-+	drvdata->etr_caps |= cap;
-+}
-+
-+static inline bool tmc_etr_has_cap(struct tmc_drvdata *drvdata, u32 cap)
-+{
-+	return !!(drvdata->etr_caps & cap);
-+}
-+
- #endif
+ /**
+  * struct tmc_drvdata - specifics associated to an TMC component
+  * @base:	memory mapped base address for this component.
 -- 
 2.7.5
