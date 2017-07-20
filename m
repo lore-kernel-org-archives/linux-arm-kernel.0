@@ -1,62 +1,62 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 20 Jul 2017 22:30:45 +0200
-Subject: [PATCH v3 06/12] mfd: wm97xx-core: core support for wm97xx Codec
-In-Reply-To: <20170703090840.s5oae5qxd4fi6rhr@localhost.localdomain> (Charles
- Keepax's message of "Mon, 3 Jul 2017 10:08:40 +0100")
-References: <20170630194408.24978-1-robert.jarzmik@free.fr>
- <20170630194408.24978-7-robert.jarzmik@free.fr>
- <20170703090840.s5oae5qxd4fi6rhr@localhost.localdomain>
-Message-ID: <8760emsvey.fsf@belgarion.home>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 20 Jul 2017 22:35:46 +0200
+Subject: [PATCH] iommu: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-29-robh@kernel.org>
+References: <20170718214339.7774-29-robh@kernel.org>
+Message-ID: <3567821.Si31GJ2fDW@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Charles Keepax <ckeepax@opensource.cirrus.com> writes:
+Am Dienstag, 18. Juli 2017, 16:43:09 CEST schrieb Rob Herring:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: iommu at lists.linux-foundation.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> ---
+>  drivers/iommu/rockchip-iommu.c  | 10 +++++-----
 
-> On Fri, Jun 30, 2017 at 09:44:02PM +0200, Robert Jarzmik wrote:
->> The WM9705, WM9712 and WM9713 are highly integrated codecs, with an
->> audio codec, DAC and ADC, GPIO unit and a touchscreen interface.
-...
->> +static const struct reg_default wm97xx_reg_defaults[] = {
->> +};
->
-> Should we not have some defaults in here?
-Most certainly, I'll copy-paste the ones from :
- - sound/soc/codecs/wm9705.c
- - sound/soc/codecs/wm9712.c
->> +static int wm9705_register(struct wm97xx_priv *wm97xx)
->> +{
->> +	return 0;
->> +}
->> +
->> +static int wm9712_register(struct wm97xx_priv *wm97xx)
->> +{
->> +	return 0;
->> +}
->> +
->
-> So are we only adding stubs for the 9705 and 9712? If so we
-> should probably make that clear in the commit message at least.
-Mmmh, I think I've been too lazy here.
-I'll add the true functions, which will be on par with wm9713_register(), adding
-2 sub-cells, the codec and the touchscreen.
+for the Rockchip-related part
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-...zip..
->> +	codec_pdata.ac97 = wm97xx->ac97;
->> +	codec_pdata.regmap = devm_regmap_init_ac97(wm97xx->ac97,
->> +						   &wm9713_regmap_config);
->> +	codec_pdata.batt_pdata = pdata->batt_pdata;
->> +	if (IS_ERR(codec_pdata.regmap))
->> +		return PTR_ERR(codec_pdata.regmap);
->> +
->> +	return devm_mfd_add_devices(wm97xx->dev, -1, cells,
->
-> Should probably use the define PLATFORM_DEVID_NONE here.
-Yeah sure.
 
-> Other than those minor comments looks ok to me.
-Thanks Charles, I'll include them for next iteration.
-
-Cheers.
-
--- 
-Robert
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 4ba48a26b389..1b8155dada26 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -1008,20 +1008,20 @@ static int rk_iommu_group_set_iommudata(struct iommu_group *group,
+>  	ret = of_parse_phandle_with_args(np, "iommus", "#iommu-cells", 0,
+>  					 &args);
+>  	if (ret) {
+> -		dev_err(dev, "of_parse_phandle_with_args(%s) => %d\n",
+> -			np->full_name, ret);
+> +		dev_err(dev, "of_parse_phandle_with_args(%pOF) => %d\n",
+> +			np, ret);
+>  		return ret;
+>  	}
+>  	if (args.args_count != 0) {
+> -		dev_err(dev, "incorrect number of iommu params found for %s (found %d, expected 0)\n",
+> -			args.np->full_name, args.args_count);
+> +		dev_err(dev, "incorrect number of iommu params found for %pOF (found %d, expected 0)\n",
+> +			args.np, args.args_count);
+>  		return -EINVAL;
+>  	}
+> 
+>  	pd = of_find_device_by_node(args.np);
+>  	of_node_put(args.np);
+>  	if (!pd) {
+> -		dev_err(dev, "iommu %s not found\n", args.np->full_name);
+> +		dev_err(dev, "iommu %pOF not found\n", args.np);
+>  		return -EPROBE_DEFER;
+>  	}
+> 
+> --
+> 2.11.0
+> 
+> 
+> 
