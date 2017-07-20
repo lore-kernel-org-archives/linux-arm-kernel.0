@@ -1,51 +1,31 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 20 Jul 2017 09:42:29 +0000
-Subject: [PATCH v3 0/5] Add STM32 DMAMUX support
-In-Reply-To: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <f84dd329-43e7-6d8a-81c9-841ba8e97db4@st.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 20 Jul 2017 15:12:15 +0530
+Subject: [PATCH v2 0/3] gpio: davinci: Add missing return checks
+Message-ID: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The patch series does a couple of important return handling which were missed
+earlier in the driver probe.
 
+This is based on Suman's:
 
-On 07/06/2017 02:20 PM, Pierre-Yves MORDRET wrote:
-> This patchset adds support for the STM32 DMA multiplexer.
-> It allows to map any peripheral DMA request to any channel of the product
-> DMAs.
-> This IP has been introduced with STM32H7 SoC.
-> 
+http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
+http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2 
 
-Gentle ping for driver review since DT Bindings has been acked by Rob
-Herring.
+Changes in v2:
 
-Thanks
-Py
+  * Removed the device tree patch for to keep the series independent.
 
-> ---
->   Version history:
->      v3:
->          * change compatible to st,stm32h7-dmamux to be mode Soc specific
->          * add verbosity in dma-cells
-> ---
-> 
-> Pierre-Yves MORDRET (5):
->    dt-bindings: Document the STM32 DMAMUX bindings
->    dmaengine: Add STM32 DMAMUX driver
->    dt-bindings: stm32-dma: Add property to handle STM32 DMAMUX
->    dmaengine: stm32-dma: Add support for STM32 DMAMUX
->    ARM: configs: stm32: Add DMAMUX support in STM32 defconfig
-> 
->   .../devicetree/bindings/dma/stm32-dma.txt          |   5 +-
->   .../devicetree/bindings/dma/stm32-dmamux.txt       |  60 +++++
->   arch/arm/configs/stm32_defconfig                   |   1 +
->   drivers/dma/Kconfig                                |   9 +
->   drivers/dma/Makefile                               |   1 +
->   drivers/dma/stm32-dma.c                            |  44 ++--
->   drivers/dma/stm32-dmamux.c                         | 253 +++++++++++++++++++++
->   include/linux/dma/stm32-dmamux.h                   |  21 ++
->   8 files changed, 380 insertions(+), 14 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
->   create mode 100644 drivers/dma/stm32-dmamux.c
->   create mode 100644 include/linux/dma/stm32-dmamux.h
-> 
+Keerthy (3):
+  gpio: davinci: Use devm_gpiochip_add_data in place of
+    gpiochip_add_data
+  gpio: davinci: Handle the return value of davinci_gpio_irq_setup
+    function
+  gpio: davinci: Convert prinkt to dev_err
+
+ drivers/gpio/gpio-davinci.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
+
+-- 
+1.9.1
