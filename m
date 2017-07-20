@@ -1,105 +1,104 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Jul 2017 17:27:51 +0100
-Subject: [RFC WIP PATCH] arm: early console using bootloader framebuffer
-In-Reply-To: <2a6c81485f354415a9f91ff1ef28340844396c48.1500566451.git.mirq-linux@rere.qmqm.pl>
-References: <2a6c81485f354415a9f91ff1ef28340844396c48.1500566451.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <20170720162751.GD31807@n2100.armlinux.org.uk>
+From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Thu, 20 Jul 2017 18:28:52 +0200
+Subject: [PATCH 9/9] ARM: tegra: fix sleeping while atomic in CPU idle
+In-Reply-To: <378bf911-147e-f800-2de4-591e160528f0@nvidia.com>
+References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
+ <0a0600cdbcc9a71134105043c3e2ace84bab7c5a.1500510157.git.mirq-linux@rere.qmqm.pl>
+ <378bf911-147e-f800-2de4-591e160528f0@nvidia.com>
+Message-ID: <20170720162852.rh565t5as2tbe6np@qmqm.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 06:03:51PM +0200, Micha? Miros?aw wrote:
-> HACK WARNING:
->  - the asm code is not tested
->  - maybe should use fixmap?
->  - there's something similar called efifb in x86 arch
-
-Hi.
-
-I guess this is useful for some people, but I have concerns.
-
-This shouldn't be done in terms of the "DEBUG_LL" stuff.  The DEBUG_LL
-stuff is not designed to be multi-platform, it's designed as a last-ditch
-method of debugging when other forms of kernel output have failed.  The
-main requirement of the DEBUG_LL stuff is that it's usable from very
-early on in the kernel assembly code, like from the first few
-instructions in head.S, when the MMU is off.  This imposes quite a few
-restrictions on the code.
-
-Your code is not going to work with the MMU off, since you get the
-virtual address of the 8x8 font, which is meaningless.
-
-Rather than trying to bolt a framebuffer into the DEBUG_LL stuff,
-please instead make the early printk support switchable between a
-"DEBUG_LL" implementation and a framebuffer implementation.  It can
-then live in early_printk.c rather than being spread around.
-
-It seems that you may have already realised that, but not cleaned the
-patch up - it's difficult to tell.  So, I think you need to remove
-everything you don't need and re-submit.
-
-> +	.macro	senduart, rd, rx, tmp1, tmp2
-> +//	pushbyte \rd, \rx, \tmp1, \tmp2
-> +	.endm
-
-This commenting out disables the framebuffer code.
-
-> +static void bootfb_stop(struct bootfd_tmp *info)
-> +{
-> +	unsigned short *p = info->ctl;
-> +	unsigned short y = info->y, xoff = info->xoff;
-> +
-> +	if (xoff >= LINE_END) {
-> +		if (++y >= FB_CHARS_HEIGHT) {
-> +			y = 0;
-> +			if (CONFIG_DEBUG_BOOTFB_PAGE_DELAY_MS)
-> +				mdelay(CONFIG_DEBUG_BOOTFB_PAGE_DELAY_MS);
-
-printk() can be called in non-schedulable contexts, mdelay requires a
-context that can schedule.  Therefore, you can't use mdelay() here.
-
-> diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-> index ea9646cc2a0e..34d961326a1e 100644
-> --- a/arch/arm/kernel/debug.S
-> +++ b/arch/arm/kernel/debug.S
-> @@ -81,7 +81,11 @@ ENTRY(printascii)
->  		addruart_current r3, r1, r2
->  		b	2f
->  1:		waituart r2, r3
-> +#ifdef CONFIG_DEBUG_LL_BOOT_FRAMEBUFFER
-> +		senduart r1, r3, r2, ip
-
-You can't use ip here.
-
->  static void early_write(const char *s, unsigned n)
->  {
->  	while (n-- > 0) {
-> +#ifdef CONFIG_DEBUG_LL_BOOT_FRAMEBUFFER
-> +		if (*s == '\n')
-> +			early_bootfb_eol();
-> +		else
-> +			early_bootfb_write_char(*s);
-> +#else
-
-It would be nice if this were boot time selectable between implementations.
-
-> @@ -1102,9 +1107,14 @@ void __init setup_arch(char **cmdline_p)
->  	/* Memory may have been removed so recalculate the bounds. */
->  	adjust_lowmem_bounds();
+On Thu, Jul 20, 2017 at 01:45:12PM +0100, Jon Hunter wrote:
+> 
+> On 20/07/17 01:29, Micha? Miros?aw wrote:
+> > This removes unnecessary lock causing following BUG splat:
+> > 
+> > BUG: sleeping function called from invalid context at /linux/kernel/locking/mutex.c:747
+> > in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
+> > no locks held by swapper/0/0.
+> > CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W 4.13.0-rc1mq-00016-gbf3f627c6b2b #1
+> > Hardware name: NVIDIA Tegra SoC (Flattened Device Tree)
+> > [<b0110a14>] (unwind_backtrace) from [<b010c710>] (show_stack+0x18/0x1c)
+> > [<b010c710>] (show_stack) from [<b068ada8>] (dump_stack+0x84/0x98)
+> > [<b068ada8>] (dump_stack) from [<b014ff54>] (___might_sleep+0x158/0x17c)
+> > [<b014ff54>] (___might_sleep) from [<b06a15c4>] (__mutex_lock+0x34/0x9a0)
+> > [<b06a15c4>] (__mutex_lock) from [<b06a30dc>] (mutex_lock_nested+0x24/0x2c)
+> > [<b06a30dc>] (mutex_lock_nested) from [<b041f6d8>] (tegra_powergate_is_powered+0x40/0xa4)
+> > [<b041f6d8>] (tegra_powergate_is_powered) from [<b04197e8>] (tegra30_cpu_rail_off_ready+0x28/0x6c)
+> > [<b04197e8>] (tegra30_cpu_rail_off_ready) from [<b011c73c>] (tegra30_idle_lp2+0x70/0x114)
+> > [<b011c73c>] (tegra30_idle_lp2) from [<b0516080>] (cpuidle_enter_state+0x12c/0x47c)
+> > [<b0516080>] (cpuidle_enter_state) from [<b0163394>] (do_idle+0x1b4/0x204)
+> > [<b0163394>] (do_idle) from [<b016368c>] (cpu_startup_entry+0x20/0x24)
+> > [<b016368c>] (cpu_startup_entry) from [<b0900dd8>] (start_kernel+0x39c/0x3a8)
+> > 
+> > Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+> > ---
+> >  drivers/soc/tegra/pmc.c | 2 --
+> >  1 file changed, 2 deletions(-)
+> > 
+> > diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+> > index e233dd5dcab3..3e6ec9fdba41 100644
+> > --- a/drivers/soc/tegra/pmc.c
+> > +++ b/drivers/soc/tegra/pmc.c
+> > @@ -526,9 +526,7 @@ int tegra_powergate_is_powered(unsigned int id)
+> >  	if (!tegra_powergate_is_valid(id))
+> >  		return -EINVAL;
+> >  
+> > -	mutex_lock(&pmc->powergates_lock);
+> >  	status = tegra_powergate_state(id);
+> > -	mutex_unlock(&pmc->powergates_lock);
+> >  
+> >  	return status;
+> >  }
+> 
+> Thanks for the fix. However, I would prefer that we fix this the following
+> way ...
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+> index a2d163f759b4..546d2b121c39 100644
+> --- a/drivers/clk/tegra/clk-tegra30.c
+> +++ b/drivers/clk/tegra/clk-tegra30.c
+> @@ -1152,9 +1152,9 @@ static bool tegra30_cpu_rail_off_ready(void)
 >  
-> +	pr_crit("before early_ioremap_reset()\n");
-> +	bootfb_skip_for_pageinit = 1;
-> +
->  	early_ioremap_reset();
-> +	pr_crit("after early_ioremap_reset()\n");
+>         cpu_rst_status = readl(clk_base +
+>                                 TEGRA30_CLK_RST_CONTROLLER_CPU_CMPLX_STATUS);
+> -       cpu_pwr_status = tegra_powergate_is_powered(TEGRA_POWERGATE_CPU1) ||
+> -                        tegra_powergate_is_powered(TEGRA_POWERGATE_CPU2) ||
+> -                        tegra_powergate_is_powered(TEGRA_POWERGATE_CPU3);
+> +       cpu_pwr_status = tegra_pmc_cpu_is_powered(1) ||
+> +                        tegra_pmc_cpu_is_powered(2) ||
+> +                        tegra_pmc_cpu_is_powered(3);
 >  
->  	paging_init(mdesc);
-> +	pr_crit("after paging_init()\n");
->  	request_standard_resources(mdesc);
+>         if (((cpu_rst_status & 0xE) != 0xE) || cpu_pwr_status)
+>                 return false;
+> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+> index e233dd5dcab3..f61371ea3fe0 100644
+> --- a/drivers/soc/tegra/pmc.c
+> +++ b/drivers/soc/tegra/pmc.c
+> @@ -605,7 +605,7 @@ bool tegra_pmc_cpu_is_powered(unsigned int cpuid)
+>         if (id < 0)
+>                 return false;
+>  
+> -       return tegra_powergate_is_powered(id);
+> +       return tegra_powergate_state(id);
+>  }
+> 
+> 
+> Could you try the above and make sure that this works? 
 
-These pr_crit()s clearly don't belong in a production version of the
-patch.
+Something ate TABs in your patch, but yes, it works.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> I would prefer to leave the mutex in tegra_powergate_is_powered() so it could
+> be used by any driver. Or maybe we could even get rid of
+> tegra_powergate_is_powered() if we don't really need it.
+
+This mutex does not protect anything here, though - there is only one register
+read inside the locked section, and after unlock other CPU might change
+it before the read value gets returned.
+
+Code size-wise it would be better to remove tegra_pmc_cpu_is_powered()
+instead.
+
+Best Regards,
+Micha??Miros?aw
