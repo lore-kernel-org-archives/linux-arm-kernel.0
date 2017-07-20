@@ -1,96 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Jul 2017 23:16:59 +0800
-Subject: [PATCH 09/18] drm/sun4i: tcon: Adjust dotclock dividers range
-In-Reply-To: <20170720145500.kpwj7iscrwyjqi5q@flea>
-References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
- <74db696da66cffafe1e729fe2df73b437c8fd483.1499955058.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67WtqukOHPNkyzA+s8GAUR6fnomvT6Sqp8547euHH3G-Q@mail.gmail.com>
- <20170720145500.kpwj7iscrwyjqi5q@flea>
-Message-ID: <CAGb2v67zXwvC7cGTDpr+UrbU9rXKM01M5Z14AidEUWRQp95ZNg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Jul 2017 16:24:37 +0100
+Subject: IMX53 on recent 4.4.x kernels
+In-Reply-To: <1500563640.26680.12.camel@pengutronix.de>
+References: <D24E577EA1E37B4788A3BFBC418F14A707591D67@wetsrvex01.loepfe.com>
+ <20170720123933.rioxhsthaaby4cnl@pengutronix.de>
+ <D24E577EA1E37B4788A3BFBC418F14A707592381@wetsrvex01.loepfe.com>
+ <CAOMZO5DrFnr6mr991ayMxLF0+jQddJyTbCbK1A5JVNAUVMDw3A@mail.gmail.com>
+ <D24E577EA1E37B4788A3BFBC418F14A70759249B@wetsrvex01.loepfe.com>
+ <20170720141528.kxrw5r4hpa2hebvd@pengutronix.de>
+ <D24E577EA1E37B4788A3BFBC418F14A7075925A1@wetsrvex01.loepfe.com>
+ <1500563640.26680.12.camel@pengutronix.de>
+Message-ID: <20170720152437.GC31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 10:55 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Jul 14, 2017 at 12:14:37PM +0800, Chen-Yu Tsai wrote:
->> On Thu, Jul 13, 2017 at 10:13 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > It seems like the dotclock dividers are a bit less strict range, and can
->> > operate even with a smaller than 6 divider. Loose the boundaries a bit.
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  drivers/gpu/drm/sun4i/sun4i_dotclock.c | 20 +++++++++++++++++++-
->> >  1 file changed, 19 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
->> > index d401156490f3..0b844c0dd102 100644
->> > --- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
->> > +++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
->> > @@ -77,7 +77,25 @@ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
->> >         u8 best_div = 1;
->> >         int i;
->> >
->> > -       for (i = 6; i <= 127; i++) {
->> > +       /*
->> > +        * There's something odd here.
->> > +        *
->> > +        * In the A13 user manual, this is stated to be >= 6 when
->> > +        * dclk1 and dclk2 are used (without any hint on how to use
->> > +        * them), and >= 4 when only dclk is used.
->>
->> You set it in TCON0_IO_POL_REG, which sets the clock phase delay.
->
-> oh, so it's d for delay? I assumed it was for dotclock.
+On Thu, Jul 20, 2017 at 05:14:00PM +0200, Lucas Stach wrote:
+> Am Donnerstag, den 20.07.2017, 15:06 +0000 schrieb Vellemans, Noel:
+> > Hi  , 
+> [...]
+> > 
+> > ====BEGIN- Test-code=======================================================================================
+> > 
+> > #include <stdio.h>
+> > #include<stdlib.h>
+> > #include<string.h>
+> > #include<unistd.h>
+> > #include<fcntl.h>
+> > #include <time.h>
+> > #include <sys/times.h>
+> > 
+> > 
+> > 
+> > #define MS_TICKTIME2 ({\
+> > 				struct timespec tp;\
+> > 				clock_gettime(4, &tp);\
+> > 				(unsigned long)tp.tv_sec*1000+tp.tv_nsec/1000000;})
+> 
+> clock_gettime is one of the things which get optimized into "not a
+> syscall at all" if your kernel provides a VDSO. Are you sure your new
+> kernel configuration has CONFIG_VDSO enabled?
 
-The manual says "data clock" for register 0x44 (TCON0_DCLK_REG)
+It won't be on imx53 - you need something way more modern (with an
+architected timer).
 
->
->> I think we were setting this before, but you removed it as part of
->> the previous TCON clean up patches?
->
-> Hmmm, I might have.. :)
->
->> In the A33, there are even more options, like DCLK / 2 (with 0 or 90
->> degree phase delay).
->
-> Where did you find this documentation? I was under the impression that
-> all that DCLK stuff was in the higher bits of the DCLK register, but
-> apparently there's more to it.
+As "getting time" is one of the most used syscalls, I wanted older
+systems to be unaffected by VDSO, and pushed for the VDSO to be
+omitted unless we had an architected timer.  If you look at
+patch_vdso() in arch/arm/kernel/signal.c, we disable
+__vdso_gettimeofday and __vdso_clock_gettime if we have no
+architected timer or the architected timer is not functional.
 
-Same section, TCON0_IO_POL_REG register bits.
+PS, am I talking to your sales department?  Your message had a
+Reply-to set...
 
-The bits in TCON0_IO_POL_REG are likely a mux, letting you select which
-one that is actually used on the external (with regard to the TCON) pin.
-
->
->> > +        *
->> > +        * In the A33 user manual, when only dclk is used, it is set
->> > +        * to be >= 6 in the former case, and >= 1 in the
->> > +        * latter. There's also some (obscure) explanations about the
->> > +        * dclk1 and dclk2 vs dclk that seems to be in the upper 4
->> > +        * bits. What those clocks are and what bit does what is not
->> > +        * really clear.
->>
->> Looks like mux bits to me. How they differ from TCON0_IO_POL_REG is
->> beyond me ATM.
->
-> It might be some additional dividers too.
-
-Might be something like this:
-
-TCON CH0 clk ----- dclk_en   - no delay        --------------[mux]--- dclk out
-               \\- dclk1_en  - 1/3 phase delay --------------////
-                \- dclk2_en  - 2/3 phase delay --------------///
-                 \ dclkm2_en - /2 divider - no delay --------//
-                                          \ 90 degree delay -/
-
-ChenYu
-
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
