@@ -1,59 +1,118 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Jul 2017 16:24:37 +0100
-Subject: IMX53 on recent 4.4.x kernels
-In-Reply-To: <1500563640.26680.12.camel@pengutronix.de>
-References: <D24E577EA1E37B4788A3BFBC418F14A707591D67@wetsrvex01.loepfe.com>
- <20170720123933.rioxhsthaaby4cnl@pengutronix.de>
- <D24E577EA1E37B4788A3BFBC418F14A707592381@wetsrvex01.loepfe.com>
- <CAOMZO5DrFnr6mr991ayMxLF0+jQddJyTbCbK1A5JVNAUVMDw3A@mail.gmail.com>
- <D24E577EA1E37B4788A3BFBC418F14A70759249B@wetsrvex01.loepfe.com>
- <20170720141528.kxrw5r4hpa2hebvd@pengutronix.de>
- <D24E577EA1E37B4788A3BFBC418F14A7075925A1@wetsrvex01.loepfe.com>
- <1500563640.26680.12.camel@pengutronix.de>
-Message-ID: <20170720152437.GC31807@n2100.armlinux.org.uk>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Thu, 20 Jul 2017 15:30:01 +0000
+Subject: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <f3ba9136-068a-280d-2849-f3a0081c1d90@arm.com>
+References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
+ <20170623145801.325244-3-shameerali.kolothum.thodi@huawei.com>
+ <20170704173820.GO22175@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA83839DB59@FRAEML521-MBX.china.huawei.com>
+ <20170714193322.GH26488@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA8383B9D5A@FRAEML521-MBX.china.huawei.com>
+ <f3ba9136-068a-280d-2849-f3a0081c1d90@arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8383BAE56@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 05:14:00PM +0200, Lucas Stach wrote:
-> Am Donnerstag, den 20.07.2017, 15:06 +0000 schrieb Vellemans, Noel:
-> > Hi  , 
-> [...]
-> > 
-> > ====BEGIN- Test-code=======================================================================================
-> > 
-> > #include <stdio.h>
-> > #include<stdlib.h>
-> > #include<string.h>
-> > #include<unistd.h>
-> > #include<fcntl.h>
-> > #include <time.h>
-> > #include <sys/times.h>
-> > 
-> > 
-> > 
-> > #define MS_TICKTIME2 ({\
-> > 				struct timespec tp;\
-> > 				clock_gettime(4, &tp);\
-> > 				(unsigned long)tp.tv_sec*1000+tp.tv_nsec/1000000;})
+
+
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Thursday, July 20, 2017 3:32 PM
+> To: Shameerali Kolothum Thodi; Will Deacon
+> Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> sudeep.holla at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
+> Garry; Linuxarm; linux-acpi at vger.kernel.org; iommu at lists.linux-
+> foundation.org; Wangzhou (B); Guohanjun (Hanjun Guo); linux-arm-
+> kernel at lists.infradead.org; devel at acpica.org
+> Subject: Re: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based
+> HiSilicon erratum 161010801
 > 
-> clock_gettime is one of the things which get optimized into "not a
-> syscall at all" if your kernel provides a VDSO. Are you sure your new
-> kernel configuration has CONFIG_VDSO enabled?
+> On 19/07/17 11:48, Shameerali Kolothum Thodi wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Will Deacon [mailto:will.deacon at arm.com]
+> >> Sent: Friday, July 14, 2017 8:33 PM
+> >> To: Shameerali Kolothum Thodi
+> >> Cc: lorenzo.pieralisi at arm.com; marc.zyngier at arm.com;
+> >> sudeep.holla at arm.com; robin.murphy at arm.com;
+> hanjun.guo at linaro.org;
+> >> Gabriele Paoloni; John Garry; Linuxarm; linux-acpi at vger.kernel.org;
+> >> iommu at lists.linux-foundation.org; Wangzhou (B); Guohanjun (Hanjun
+> Guo);
+> >> linux-arm-kernel at lists.infradead.org; devel at acpica.org
+> >> Subject: Re: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based
+> >> HiSilicon erratum 161010801
+> >>
+> > [...]
+> >>>>> -	list_add_tail(&region->list, head);
+> >>>>> +	if ((smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)) {
+> >>>>> +
+> >>>>> +		if (!is_of_node(smmu->dev->fwnode))
+> >>>>> +			resv =
+> iort_iommu_its_get_resv_regions(dev, head);
+> >>>>
+> >>>> How does this work when we're not using ACPI? Shouldn't of vs ACPI
+> >>>> be abstracted from the driver?
+> >>>
+> >>> At present ARM_SMMU_OPT_RESV_HW_MSI is only set for ACPI and
+> DT
+> >>> support for this is a low priority for us at the moment. Is the
+> >>> suggestion is to have a common function outside the smmu driver for
+> >>> _iommu_its_get_resv_regions() ? I am not sure what is the best way
+> here.
+> >>
+> >> Right, something like that. The driver shouldn't need to care whether or
+> not
+> >> it's using ACPI or DT when setting these options.
+> >
+> > Below is what I have in mind for the common function for msi reserve.
+> > But just wondering invoking iort_ functions from iommu code
+> > is acceptable or not . Could you please take a look and let me know.
+> 
+> At that point, it seems like we might as well just roll it into
+> iommu_dma_get_resv_regions() directly[1]. It probably makes sense for
+> any DT equivalent to be described generically, rather than
+> SMMU-specific, so parsing that would fit into common code as well.
+> 
+> Then in the SMMU drivers we can skip creating the SW_MSI region if
+> iommu-dma gave us back any real ones (and remove the apparently
+> unnecessary resv_msi check in VFIO). Or be lazy and just leave it, as it
+> doesn't seem to do much harm to have both.
 
-It won't be on imx53 - you need something way more modern (with an
-architected timer).
+Ok, If I read that correctly, we don?t need any changes to SMMU driver for
+now and this will be a generic change rather than a HiSi quirk.
 
-As "getting time" is one of the most used syscalls, I wanted older
-systems to be unaffected by VDSO, and pushed for the VDSO to be
-omitted unless we had an architected timer.  If you look at
-patch_vdso() in arch/arm/kernel/signal.c, we disable
-__vdso_gettimeofday and __vdso_clock_gettime if we have no
-architected timer or the architected timer is not functional.
+So is it ok, if I just send the patch#1 rebased on 4.13-rc1?  
 
-PS, am I talking to your sales department?  Your message had a
-Reply-to set...
+Thanks,
+Shameer
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> 
+> [1] This is what I hacked up locally on top of patch #1:
+> ----->8-----
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index 9d1cebe7f6cb..50292827da49 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -19,6 +19,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> 
+> +#include <linux/acpi_iort.h>
+>  #include <linux/device.h>
+>  #include <linux/dma-iommu.h>
+>  #include <linux/gfp.h>
+> @@ -174,6 +175,10 @@ void iommu_dma_get_resv_regions(struct device
+> *dev,
+> struct list_head *list)
+>  	struct pci_host_bridge *bridge;
+>  	struct resource_entry *window;
+> 
+> +	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode) &&
+> +		iort_iommu_its_get_resv_regions(dev, list) < 0)
+> +		return;
+> +
+>  	if (!dev_is_pci(dev))
+>  		return;
