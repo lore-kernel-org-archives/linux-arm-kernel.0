@@ -1,86 +1,55 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 21 Jul 2017 00:18:31 +0100
-Subject: [PATCH 2/4] rtc: pl031: use devm_* for allocating memory and mapping
- resource
+Date: Fri, 21 Jul 2017 00:18:36 +0100
+Subject: [PATCH 3/4] rtc: pl031: avoid exposing alarm if no interrupt
 In-Reply-To: <20170720231745.GE31807@n2100.armlinux.org.uk>
 References: <20170720231745.GE31807@n2100.armlinux.org.uk>
-Message-ID: <E1dYKiF-0001kS-1w@rmk-PC.armlinux.org.uk>
+Message-ID: <E1dYKiK-0001kZ-6E@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the devm_* APIs for allocating memory and mapping the memory in
-the probe function to relieve the driver from having to deal with
-this in the cleanup paths.
+If the RTC has no interrupt, there is little point in exposing the RTC
+alarm capabilities, as it can't be used as a wakeup source nor can it
+deliver an event to userspace.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/rtc/rtc-pl031.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+ drivers/rtc/rtc-pl031.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 0d87b90b1903..5960fbd08b05 100644
+index 5960fbd08b05..64c77ec1b4ea 100644
 --- a/drivers/rtc/rtc-pl031.c
 +++ b/drivers/rtc/rtc-pl031.c
-@@ -310,8 +310,6 @@ static int pl031_remove(struct amba_device *adev)
- 	device_init_wakeup(&adev->dev, false);
- 	free_irq(adev->irq[0], ldata);
- 	rtc_device_unregister(ldata->rtc);
--	iounmap(ldata->base);
--	kfree(ldata);
- 	amba_release_regions(adev);
+@@ -329,12 +329,14 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
  
- 	return 0;
-@@ -322,25 +320,26 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 	int ret;
- 	struct pl031_local *ldata;
- 	struct pl031_vendor_data *vendor = id->data;
--	struct rtc_class_ops *ops = &vendor->ops;
-+	struct rtc_class_ops *ops;
- 	unsigned long time, data;
- 
- 	ret = amba_request_regions(adev, NULL);
- 	if (ret)
- 		goto err_req;
- 
--	ldata = kzalloc(sizeof(struct pl031_local), GFP_KERNEL);
-+	ldata = devm_kzalloc(&adev->dev, sizeof(struct pl031_local),
-+			     GFP_KERNEL);
- 	if (!ldata) {
+ 	ldata = devm_kzalloc(&adev->dev, sizeof(struct pl031_local),
+ 			     GFP_KERNEL);
+-	if (!ldata) {
++	ops = devm_kmemdup(&adev->dev, &vendor->ops, sizeof(vendor->ops),
++			   GFP_KERNEL);
++	if (!ldata || !ops) {
  		ret = -ENOMEM;
  		goto out;
  	}
- 	ldata->vendor = vendor;
+-	ldata->vendor = vendor;
  
--	ldata->base = ioremap(adev->res.start, resource_size(&adev->res));
--
-+	ldata->base = devm_ioremap(&adev->dev, adev->res.start,
-+				   resource_size(&adev->res));
++	ldata->vendor = vendor;
+ 	ldata->base = devm_ioremap(&adev->dev, adev->res.start,
+ 				   resource_size(&adev->res));
  	if (!ldata->base) {
- 		ret = -ENOMEM;
--		goto out_no_remap;
-+		goto out;
+@@ -372,6 +374,13 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+ 		}
  	}
  
- 	amba_set_drvdata(adev, ldata);
-@@ -378,7 +377,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
++	if (!adev->irq[0]) {
++		/* When there's no interrupt, no point in exposing the alarm */
++		ops->read_alarm = NULL;
++		ops->set_alarm = NULL;
++		ops->alarm_irq_enable = NULL;
++	}
++
+ 	device_init_wakeup(&adev->dev, true);
+ 	ldata->rtc = rtc_device_register("pl031", &adev->dev, ops,
  					THIS_MODULE);
- 	if (IS_ERR(ldata->rtc)) {
- 		ret = PTR_ERR(ldata->rtc);
--		goto out_no_rtc;
-+		goto out;
- 	}
- 
- 	if (request_irq(adev->irq[0], pl031_interrupt,
-@@ -391,10 +390,6 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 
- out_no_irq:
- 	rtc_device_unregister(ldata->rtc);
--out_no_rtc:
--	iounmap(ldata->base);
--out_no_remap:
--	kfree(ldata);
- out:
- 	amba_release_regions(adev);
- err_req:
 -- 
 2.7.4
