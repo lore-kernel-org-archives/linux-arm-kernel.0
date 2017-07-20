@@ -1,55 +1,47 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 20 Jul 2017 15:40:22 +0530
-Subject: [PATCH 2/4] gpio: davinci: Handle the return value of
- davinci_gpio_irq_setup function
-In-Reply-To: <20170720100509.GB2729@localhost>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-3-git-send-email-j-keerthy@ti.com>
- <20170719111000.GX29638@localhost>
- <cbea9082-3799-281b-1364-50e442f5362f@ti.com>
- <cc66dfaf-05c5-8d55-03a6-556ec83c4487@ti.com>
- <20170720095047.GA2729@localhost>
- <47055927-5102-b39f-fdbb-b5d89cb14632@ti.com>
- <20170720100509.GB2729@localhost>
-Message-ID: <574e0ecc-df20-e2da-46a5-a90a80cc57e3@ti.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Thu, 20 Jul 2017 18:13:41 +0800
+Subject: [PATCH] ARM: dts: enable sdmmc for rockchip rv1108 evb
+Message-ID: <1500545621-20746-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable sdmmc on rv1108 evaluation board. Also
+add pinctrl for sdmmc controller.
 
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-On Thursday 20 July 2017 03:35 PM, Johan Hovold wrote:
-> On Thu, Jul 20, 2017 at 03:32:27PM +0530, Keerthy wrote:
->> On Thursday 20 July 2017 03:20 PM, Johan Hovold wrote:
->>> On Thu, Jul 20, 2017 at 02:40:37PM +0530, Keerthy wrote:
->>>> On Thursday 20 July 2017 12:14 PM, Keerthy wrote:
->>>>> On Wednesday 19 July 2017 04:40 PM, Johan Hovold wrote:
-> 
->>>>>> There's a separate but related bug here too as the clk_prepare_enable()
->>>>>> in davinci_gpio_irq_setup() is never balanced on driver unbind.
->>>>>
->>>>> Yes Johan. I will send that as a separate patch.
->>>>
->>>> This is already fixed in the latest kernel:
->>>>
->>>> commit 6dc0048cff988858254fcc26becfc1e9753efa79
->>>> Author: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>>> Date:   Tue May 23 14:48:57 2017 +0530
->>>
->>> That change only handles errors in davinci_gpio_irq_setup() (i.e. during
->>> probe) and not the imbalance at driver unbind that I was referring to.
->>
->> Okay got it. One more clk_unprepare_disable() call needs to be there in
->> probe err path.
-> 
-> No, you need to balance it on driver unbind, that is, in a new remove()
-> callback.
+ arch/arm/boot/dts/rv1108-evb.dts | 4 ++++
+ arch/arm/boot/dts/rv1108.dtsi    | 2 ++
+ 2 files changed, 6 insertions(+)
 
-Okay yes davinci_gpio_irq_setup is the last call in probe so no need of
-that in probe error path. I will add a new remove() to balance.
-
-Thanks,
-Keerthy
-
-> 
-> Johan
-> 
+diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
+index 58cf4ac..58ee0fb 100644
+--- a/arch/arm/boot/dts/rv1108-evb.dts
++++ b/arch/arm/boot/dts/rv1108-evb.dts
+@@ -56,6 +56,10 @@
+ 	};
+ };
+ 
++&sdmmc {
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index 437098b..0da144c 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -202,6 +202,8 @@
+ 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
+ 			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0x30130000 0x4000>;
+-- 
+2.7.4
