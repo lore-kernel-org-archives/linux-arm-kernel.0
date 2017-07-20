@@ -1,44 +1,58 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 20 Jul 2017 15:07:50 +0200
-Subject: [Patch v5 05/12] [media] videodev2.h: Add v4l2 definition for HEVC
-In-Reply-To: <1497849055-26583-6-git-send-email-smitha.t@samsung.com>
-References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <CGME20170619052505epcas5p33a78ee709263cc9ae33cd9383794ca06@epcas5p3.samsung.com>
- <1497849055-26583-6-git-send-email-smitha.t@samsung.com>
-Message-ID: <56ed9e37-36a6-0c2e-e416-00b068d7fefc@xs4all.nl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Jul 2017 15:08:01 +0200
+Subject: [PATCH 03/18] drm/sun4i: Realign Makefile padding and reorder it
+In-Reply-To: <CAGb2v67HmUpSaoJWS6jKg3JvsPmqMtv30EGdWE50YEPm2cyjcg@mail.gmail.com>
+References: <cover.a5e7407c191c66e264164d017f64582039c56acb.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <fd70853df9e7ee66a20df9d42921f1f6608a2bc9.1499955058.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67HmUpSaoJWS6jKg3JvsPmqMtv30EGdWE50YEPm2cyjcg@mail.gmail.com>
+Message-ID: <20170720130801.iyhlzu4zhbyso24y@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/17 07:10, Smitha T Murthy wrote:
-> Add V4L2 definition for HEVC compressed format
+On Fri, Jul 14, 2017 at 11:13:53AM +0800, Chen-Yu Tsai wrote:
+> On Thu, Jul 13, 2017 at 10:12 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Some options were not padded as they should, and the order in the Makefile
+> > was chaotic. Fix that.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/Makefile | 26 +++++++++++++-------------
+> >  1 file changed, 13 insertions(+), 13 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+> > index e29fd3a2ba9c..42871ee7acf6 100644
+> > --- a/drivers/gpu/drm/sun4i/Makefile
+> > +++ b/drivers/gpu/drm/sun4i/Makefile
+> > @@ -1,23 +1,23 @@
+> > -sun4i-drm-y += sun4i_drv.o
+> > -sun4i-drm-y += sun4i_framebuffer.o
+> > +sun4i-backend-y                        += sun4i_backend.o sun4i_layer.o
+> >
+> > -sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
+> > -sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
+> > -sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
+> > +sun4i-drm-y                    += sun4i_drv.o
+> > +sun4i-drm-y                    += sun4i_framebuffer.o
 > 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> ---
->  include/uapi/linux/videodev2.h | 1 +
->  1 file changed, 1 insertion(+)
+> I don't think this applies on top of Jonathan's HDMI I2C patch
+> you already have queued up.
 > 
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index 2b8feb8..488de3d 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -629,6 +629,7 @@ struct v4l2_pix_format {
->  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
->  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
->  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
-> +#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC */
+> Also you might want to leave a comment describe what the
+> ordering should be. Otherwise it will still be messed up
+> down the road.
 
-Change the comment to: /* HEVC aka H.265 */
+Good point, I'll do that, thanks!
+Maxime
 
-After that you can add my:
-
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-
-Regards,
-
-	Hans
-
->  
->  /*  Vendor-specific formats   */
->  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170720/d022960e/attachment.sig>
