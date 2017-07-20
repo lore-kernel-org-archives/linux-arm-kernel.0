@@ -1,62 +1,22 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 20 Jul 2017 22:35:46 +0200
-Subject: [PATCH] iommu: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-29-robh@kernel.org>
-References: <20170718214339.7774-29-robh@kernel.org>
-Message-ID: <3567821.Si31GJ2fDW@phil>
+Date: Thu, 20 Jul 2017 22:44:29 +0200
+Subject: [PATCH v1 0/3] soc: rockchip: Modify power domain driver for
+ rk3366 SoC
+In-Reply-To: <1500015763-4940-1-git-send-email-zhangqing@rock-chips.com>
+References: <1500015763-4940-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1659764.yKAhNPUJR3@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 18. Juli 2017, 16:43:09 CEST schrieb Rob Herring:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
+Am Freitag, 14. Juli 2017, 15:02:40 CEST schrieb Elaine Zhang:
+> support rk3366 SoC power domain setting.
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: iommu at lists.linux-foundation.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> ---
->  drivers/iommu/rockchip-iommu.c  | 10 +++++-----
+> Elaine Zhang (3):
+>   dt-bindings: power: add RK3366 SoCs header for power-domain
+>   dt-bindings: add binding for rk3366 power domains
+>   soc: rockchip: power-domain: add power domain support for rk3366
 
-for the Rockchip-related part
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+applied all 3 for 4.14
 
-
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 4ba48a26b389..1b8155dada26 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -1008,20 +1008,20 @@ static int rk_iommu_group_set_iommudata(struct iommu_group *group,
->  	ret = of_parse_phandle_with_args(np, "iommus", "#iommu-cells", 0,
->  					 &args);
->  	if (ret) {
-> -		dev_err(dev, "of_parse_phandle_with_args(%s) => %d\n",
-> -			np->full_name, ret);
-> +		dev_err(dev, "of_parse_phandle_with_args(%pOF) => %d\n",
-> +			np, ret);
->  		return ret;
->  	}
->  	if (args.args_count != 0) {
-> -		dev_err(dev, "incorrect number of iommu params found for %s (found %d, expected 0)\n",
-> -			args.np->full_name, args.args_count);
-> +		dev_err(dev, "incorrect number of iommu params found for %pOF (found %d, expected 0)\n",
-> +			args.np, args.args_count);
->  		return -EINVAL;
->  	}
-> 
->  	pd = of_find_device_by_node(args.np);
->  	of_node_put(args.np);
->  	if (!pd) {
-> -		dev_err(dev, "iommu %s not found\n", args.np->full_name);
-> +		dev_err(dev, "iommu %pOF not found\n", args.np);
->  		return -EPROBE_DEFER;
->  	}
-> 
-> --
-> 2.11.0
-> 
-> 
-> 
+Thanks
+Heiko
