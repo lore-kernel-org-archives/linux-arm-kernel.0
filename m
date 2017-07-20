@@ -1,66 +1,44 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 20 Jul 2017 15:32:39 +0800
-Subject: [PATCH v7 0/3] MFD: add driver for HiSilicon Hi6421v530 PMIC
-Message-ID: <20170720073242.1758-1-guodong.xu@linaro.org>
+Date: Thu, 20 Jul 2017 15:32:40 +0800
+Subject: [PATCH v7 1/3] mfd: hi6421-pmic: cleanup: change license text to
+ shorter form
+In-Reply-To: <20170720073242.1758-1-guodong.xu@linaro.org>
+References: <20170720073242.1758-1-guodong.xu@linaro.org>
+Message-ID: <20170720073242.1758-2-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds driver for HiSilicon Hi6421v530 PMIC.
+Change license text to a shorter form of GPLv2.
 
-Mainline kernel already has driver support to a similar chip, Hi6421.
-Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
-they are at different revisions. They both use the same Memory-mapped
-I/O method to communicate with Main SoC. However, they differ quite a
-lot in their regulator designs. Eg. they have completely different LDO
-voltage points.
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/mfd/hi6421-pmic-core.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-Patch 1 and 2 are hi6421-pmic cleaning up.
-Patch 3 extends hi6421-pmic-core.c to support Hi6421v530 revision.
-
-Major changes in v7:
- - rebase to v4.13-rc1 and resend MFD driver patches.
- - As of v6, DTS and regulator parts have been merged into v4.13-rc1.
-   So they are not included in v7.
-
-Major changes in v6:
- - Patch 5, solve review comments from Mark Brown, add hi6421v530 regulator
-     driver to module device table.
- - Add Acked-by from Arnd Bergmann
-
-Major changes in v5:
- - Patch 3, solve review comments from Lee Johes
-
-Major changes in v4:
- - put hi6421-pmic cleanup in separate patches.
- - solve review comments from Lee Johes.
- - regulator-name should not have '/' character. Otherwise it "Failed to
-     create debugfs directory"
-
-Major changes in v3:
- - in hi6421-pmic-core.c
-    * use shorter license script.
-    * arrange #include in alphabetical order.
-    * using recommended error log messages from Lee Jones.
- - in hi6421v530-regulator.c
-    * remove unused #include files
-    * arrange remaining ones in alphabetical order.
-
-Major changes in v2:
- - instead of writing a new driver, extend hi6421-pmic-core.c
-     to support its v530 revision
- - update hi6421v530-regulator.c to use modern regulator driver
-     design logics.
-
-*** BLURB HERE ***
-
-Guodong Xu (3):
-  mfd: hi6421-pmic: cleanup: change license text to shorter form
-  mfd: hi6421-pmic: cleanup: update dev_err messages
-  mfd: hi6421-pmic: add support for HiSilicon Hi6421v530
-
- drivers/mfd/hi6421-pmic-core.c  | 89 ++++++++++++++++++++++++++---------------
- include/linux/mfd/hi6421-pmic.h |  5 +++
- 2 files changed, 62 insertions(+), 32 deletions(-)
-
+diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
+index 3fd703f..ad9e3d8 100644
+--- a/drivers/mfd/hi6421-pmic-core.c
++++ b/drivers/mfd/hi6421-pmic-core.c
+@@ -9,17 +9,8 @@
+  * Author: Guodong Xu <guodong.xu@linaro.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/device.h>
 -- 
 2.10.2
