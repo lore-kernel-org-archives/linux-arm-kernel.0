@@ -1,69 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Jul 2017 17:51:42 +0200
-Subject: [PATCH 04/12] ARM: sa1100/pxa: fix MTD_XIP build
+Date: Thu, 20 Jul 2017 17:51:43 +0200
+Subject: [PATCH 05/12] ARM: mmp: mark usb_dma_mask as __maybe_unused
 In-Reply-To: <20170720154616.3250481-1-arnd@arndb.de>
 References: <20170720154616.3250481-1-arnd@arndb.de>
-Message-ID: <20170720155209.3250880-1-arnd@arndb.de>
+Message-ID: <20170720155209.3250880-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 3169663ac5902 "ARM: sa11x0/pxa: convert OS timer registers
-to IOMEM", the definition of the OSCR macro was changed to be an
-__iomem pointer, but the same register is also used by the XIP
-code. This patch does the corresponding change here as well.
+This variable may be used by some devices that each have their
+on Kconfig symbol, or by none of them, and that causes a build
+warning:
 
-On PXA, the IRQ register definitions were removed even earlier, in
-commit 5d284e353eb1 ("ARM: pxa: avoid accessing interrupt registers
-directly"). This patch unfortunately brings some of that back. An
-earlier version of my patch moved the code into an external function,
-which could not work for CONFIG_XIP_KERNEL+CONFIG_MTD_XIP, so this
-restores something close to the original code.
+arch/arm/mach-mmp/devices.c:241:12: error: 'usb_dma_mask' defined but not used [-Werror=unused-variable]
 
-Link: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241716.html
+Marking it __maybe_unused avoids the warning.
+
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
 ---
+Originally sent in Feb 2016, this went missing for some reason.
 ---
- arch/arm/mach-pxa/include/mach/mtd-xip.h    | 10 +++++++---
- arch/arm/mach-sa1100/include/mach/mtd-xip.h |  4 ++--
- 2 files changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/mach-mmp/devices.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/mtd-xip.h b/arch/arm/mach-pxa/include/mach/mtd-xip.h
-index 990d2bf2fb45..f0d40bd36bac 100644
---- a/arch/arm/mach-pxa/include/mach/mtd-xip.h
-+++ b/arch/arm/mach-pxa/include/mach/mtd-xip.h
-@@ -17,11 +17,15 @@
+diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
+index 3330ac7cfbef..671c7a09ab3d 100644
+--- a/arch/arm/mach-mmp/devices.c
++++ b/arch/arm/mach-mmp/devices.c
+@@ -238,7 +238,7 @@ void pxa_usb_phy_deinit(void __iomem *phy_reg)
+ #endif
  
- #include <mach/regs-ost.h>
+ #if IS_ENABLED(CONFIG_USB_SUPPORT)
+-static u64 usb_dma_mask = ~(u32)0;
++static u64 __maybe_unused usb_dma_mask = ~(u32)0;
  
--#define xip_irqpending()	(ICIP & ICMR)
-+/* restored July 2017, this did not build since 2011! */
-+
-+#define ICIP			io_p2v(0x40d00000)
-+#define ICMR			io_p2v(0x40d00004)
-+#define xip_irqpending()	readl(ICIP) & readl(ICMR)
- 
- /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
--#define xip_currtime()		(OSCR)
--#define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
-+#define xip_currtime()		readl(OSCR)
-+#define xip_elapsed_since(x)	(signed)((readl(OSCR) - (x)) / 4)
- 
- /*
-  * xip_cpu_idle() is used when waiting for a delay equal or larger than
-diff --git a/arch/arm/mach-sa1100/include/mach/mtd-xip.h b/arch/arm/mach-sa1100/include/mach/mtd-xip.h
-index b3d684098fbf..cb76096a2e36 100644
---- a/arch/arm/mach-sa1100/include/mach/mtd-xip.h
-+++ b/arch/arm/mach-sa1100/include/mach/mtd-xip.h
-@@ -20,7 +20,7 @@
- #define xip_irqpending()	(ICIP & ICMR)
- 
- /* we sample OSCR and convert desired delta to usec (1/4 ~= 1000000/3686400) */
--#define xip_currtime()		(OSCR)
--#define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
-+#define xip_currtime()		readl_relaxed(OSCR)
-+#define xip_elapsed_since(x)	(signed)((readl_relaxed(OSCR) - (x)) / 4)
- 
- #endif /* __ARCH_SA1100_MTD_XIP_H__ */
+ #if IS_ENABLED(CONFIG_USB_MV_UDC)
+ struct resource pxa168_u2o_resources[] = {
 -- 
 2.9.0
