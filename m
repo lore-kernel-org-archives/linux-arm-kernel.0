@@ -1,108 +1,59 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 20 Jul 2017 16:02:54 +0530
-Subject: [PATCH 2/2] ARM: kexec: fix failure to boot crash kernel
-In-Reply-To: <E1dY6XU-0003wa-Tl@rmk-PC.armlinux.org.uk>
-References: <E1dY6XU-0003wa-Tl@rmk-PC.armlinux.org.uk>
-Message-ID: <bc593ea3-eba8-9036-e622-dc01568847f8@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 20 Jul 2017 12:22:34 +0200
+Subject: [PATCH] media: Convert to using %pOF instead of full_name
+In-Reply-To: <CAL_JsqLDCgO60ECGB70pMNcaLg0zUcJ6_+50vH-evfGe-D266Q@mail.gmail.com>
+References: <CGME20170718215328epcas2p2e5e1d7df96fcd894e70a961df864abdd@epcas2p2.samsung.com>
+ <20170718214339.7774-33-robh@kernel.org>
+ <564a6768-3b23-6dc7-ecb5-cb4f4359b633@samsung.com>
+ <CAL_JsqLDCgO60ECGB70pMNcaLg0zUcJ6_+50vH-evfGe-D266Q@mail.gmail.com>
+Message-ID: <7b004361-f103-f804-3884-299eb5607648@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thursday 20 July 2017 01:40 PM, Russell King wrote:
-> When kexec was converted to DTB, the dtb address was passed between
-> machine_kexec_prepare() and machine_kexec() using a static variable.
-> This is bad news if you load a crash kernel followed by a normal
-> kernel or vice versa - the last loaded kernel overwrites the dtb
-> address.
+On 07/19/2017 06:02 PM, Rob Herring wrote:
+>>> diff --git a/drivers/media/v4l2-core/v4l2-async.c b/drivers/media/v4l2-core/v4l2-async.c
+>>> index 851f128eba22..0a385d1ff28c 100644
+>>> --- a/drivers/media/v4l2-core/v4l2-async.c
+>>> +++ b/drivers/media/v4l2-core/v4l2-async.c
+>>> @@ -47,9 +47,7 @@ static bool match_fwnode(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
+>>>        if (!is_of_node(sd->fwnode) || !is_of_node(asd->match.fwnode.fwnode))
+>>>                return sd->fwnode == asd->match.fwnode.fwnode;
+>>>
+>>> -     return !of_node_cmp(of_node_full_name(to_of_node(sd->fwnode)),
+>>> -                         of_node_full_name(
+>>> -                                 to_of_node(asd->match.fwnode.fwnode)));
+>>> +     return to_of_node(sd->fwnode) == to_of_node(asd->match.fwnode.fwnode);
+ >>
+>> I'm afraid this will not work, please see commit d2180e0cf77dc7a7049671d5d57d
+>> "[media] v4l: async: make v4l2 coexist with devicetree nodes in a dt overlay"
+ >
+> Maybe I'm missing something, but how does that work exactly? Before
+> the overlay is applied, the remote endpoint node (and its parent)
+> can't be resolved. In the commit example, the endpoint in the
+> media_bridge would also have to be part of the overlay. If you apply
+> and un-apply the overlay, then the of_node (and fw_node) in the
+> overlay is once again invalid. IOW, you should be in the same state as
+> before the overlay was applied. The node is still around because of
+> paranoia that actually freeing nodes would break things. It seems this
+> paranoia is real, so i think we need to do something to prevent this
+> from spreading.
 > 
-> This can result in kexec failures, as (eg) we try to boot the crash
-> kernel with the last loaded dtb.
-> 
-> Avoid this by defining a kimage architecture structure, and store
-> the address of to be passed in r2 to the new there, which will
+> Furthermore, it does not appear that any media driver supports
+> overlays and we have no general way to apply them in mainline yet
+> (other than an in kernel API). So really this scenario is not one we
+> have to support yet.
 
-Some word missing between 'new' and 'there'?
+Indeed, the motivation of the above mentioned commit was some out of
+tree driver. I don't know was the exact use case, assuming that the
+endpoint in the bridge node was also part of the overlay the bridge
+driver must have not been rescanning device tree after overlay un-apply
+and apply. Currently there is no other way to do this than to unbind
+and bind. So the bridge driver must have been referencing an already
+invalid node as you point out.
 
-> either be the ATAGs or the dtb blob.
+I haven't been following DT overlays very closely, as Frank explains
+your change seems to be actually an improvement of current code.
 
-Tested loading crash kernel on DRA7-EVM
-
-Now works with the sequence:
-		kexec -d -p
-		kexec -l
-		echo c > /proc/sysrq-trigger
-
-Without this patch as soon as we do kexec -l the crash kernel booting
-would fail without finding dtb.
-
-Tested-by: Keerthy <j-keerthy@ti.com>
-
-> 
-> Reported-by: Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/include/asm/kexec.h    |  5 +++++
->  arch/arm/kernel/machine_kexec.c | 11 ++++++-----
->  2 files changed, 11 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kexec.h b/arch/arm/include/asm/kexec.h
-> index 1869af6bac5c..25021b798a1e 100644
-> --- a/arch/arm/include/asm/kexec.h
-> +++ b/arch/arm/include/asm/kexec.h
-> @@ -19,6 +19,11 @@
->  
->  #ifndef __ASSEMBLY__
->  
-> +#define ARCH_HAS_KIMAGE_ARCH
-> +struct kimage_arch {
-> +	u32 kernel_r2;
-> +};
-> +
->  /**
->   * crash_setup_regs() - save registers for the panic kernel
->   * @newregs: registers are saved here
-> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-> index 15495887ca14..fe1419eeb932 100644
-> --- a/arch/arm/kernel/machine_kexec.c
-> +++ b/arch/arm/kernel/machine_kexec.c
-> @@ -30,7 +30,6 @@ extern unsigned long kexec_boot_atags;
->  
->  static atomic_t waiting_for_crash_ipi;
->  
-> -static unsigned long dt_mem;
->  /*
->   * Provide a dummy crash_notes definition while crash dump arrives to arm.
->   * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
-> @@ -42,6 +41,9 @@ int machine_kexec_prepare(struct kimage *image)
->  	__be32 header;
->  	int i, err;
->  
-> +	image->arch.kernel_r2 = image->start - KEXEC_ARM_ZIMAGE_OFFSET
-> +				     + KEXEC_ARM_ATAGS_OFFSET;
-> +
->  	/*
->  	 * Validate that if the current HW supports SMP, then the SW supports
->  	 * and implements CPU hotplug for the current HW. If not, we won't be
-> @@ -66,8 +68,8 @@ int machine_kexec_prepare(struct kimage *image)
->  		if (err)
->  			return err;
->  
-> -		if (be32_to_cpu(header) == OF_DT_HEADER)
-> -			dt_mem = current_segment->mem;
-> +		if (header == cpu_to_be32(OF_DT_HEADER))
-> +			image->arch.kernel_r2 = current_segment->mem;
->  	}
->  	return 0;
->  }
-> @@ -165,8 +167,7 @@ void machine_kexec(struct kimage *image)
->  	kexec_start_address = image->start;
->  	kexec_indirection_page = page_list;
->  	kexec_mach_type = machine_arch_type;
-> -	kexec_boot_atags = dt_mem ?: image->start - KEXEC_ARM_ZIMAGE_OFFSET
-> -				     + KEXEC_ARM_ATAGS_OFFSET;
-> +	kexec_boot_atags = image->arch.kernel_r2;
->  
->  	/* copy our kernel relocation code to the control code page */
->  	reboot_entry = fncpy(reboot_code_buffer,
-> 
+-- 
+Thanks,
+Sylwester
