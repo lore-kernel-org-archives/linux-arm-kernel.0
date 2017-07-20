@@ -1,119 +1,42 @@
-From: hugues.fruchet@st.com (Hugues FRUCHET)
-Date: Thu, 20 Jul 2017 09:17:38 +0000
-Subject: [PATCH v2 0/7] Add support of OV9655 camera
-In-Reply-To: <AB91B71D-E34B-4645-BD70-A87226BA34C5@goldelico.com>
-References: <1499073368-31905-1-git-send-email-hugues.fruchet@st.com>
- <8157da84-1484-8375-1f2b-9831973915b4@kernel.org>
- <956f17e6-36dd-6733-0d35-9b801ed4244d@xs4all.nl>
- <BCD1BD18-96E3-4638-8935-B5C832D8EE52@goldelico.com>
- <2dd3402e-55b0-231d-878f-5ba95ee8cb36@st.com>
- <20170718195223.zrqfrefxxzqfsojd@valkosipuli.retiisi.org.uk>
- <AB91B71D-E34B-4645-BD70-A87226BA34C5@goldelico.com>
-Message-ID: <8050f688-fc6e-c3c0-460a-93ad3ae8d735@st.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 20 Jul 2017 10:18:19 +0100
+Subject: [PATCH] ARM: always enable AEABI for ARMv6+
+Message-ID: <E1dY7b9-0004jY-ON@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Always enable AEABI for ARMv6+, as these use the double-word exclusives
+which must be passed an even register to avoid errors such as:
 
+/tmp/ccG2rCwe.s:905: Error: even register required -- `ldrexd r5,r6,[r7]'
+/tmp/ccG2rCwe.s:909: Error: even register required -- `strexd sl,r3,r4,[r7]'
 
-On 07/20/2017 10:37 AM, H. Nikolaus Schaller wrote:
-> Hi,
-> 
->> Am 18.07.2017 um 21:52 schrieb Sakari Ailus <sakari.ailus@iki.fi>:
->>
->> On Tue, Jul 18, 2017 at 12:53:12PM +0000, Hugues FRUCHET wrote:
->>>
->>>
->>> On 07/18/2017 02:17 PM, H. Nikolaus Schaller wrote:
->>>> Hi,
->>>>
->>>>> Am 18.07.2017 um 13:59 schrieb Hans Verkuil <hverkuil@xs4all.nl>:
->>>>>
->>>>> On 12/07/17 22:01, Sylwester Nawrocki wrote:
->>>>>> Hi Hugues,
->>>>>>
->>>>>> On 07/03/2017 11:16 AM, Hugues Fruchet wrote:
->>>>>>> This patchset enables OV9655 camera support.
->>>>>>>
->>>>>>> OV9655 support has been tested using STM32F4DIS-CAM extension board
->>>>>>> plugged on connector P1 of STM32F746G-DISCO board.
->>>>>>> Due to lack of OV9650/52 hardware support, the modified related code
->>>>>>> could not have been checked for non-regression.
->>>>>>>
->>>>>>> First patches upgrade current support of OV9650/52 to prepare then
->>>>>>> introduction of OV9655 variant patch.
->>>>>>> Because of OV9655 register set slightly different from OV9650/9652,
->>>>>>> not all of the driver features are supported (controls). Supported
->>>>>>> resolutions are limited to VGA, QVGA, QQVGA.
->>>>>>> Supported format is limited to RGB565.
->>>>>>> Controls are limited to color bar test pattern for test purpose.
->>>>>>
->>>>>> I appreciate your efforts towards making a common driver but IMO it would be
->>>>>> better to create a separate driver for the OV9655 sensor.  The original driver
->>>>>> is 1576 lines of code, your patch set adds half of that (816).  There are
->>>>>> significant differences in the feature set of both sensors, there are
->>>>>> differences in the register layout.  I would go for a separate driver, we
->>>>>> would then have code easier to follow and wouldn't need to worry about possible
->>>>>> regressions.  I'm afraid I have lost the camera module and won't be able
->>>>>> to test the patch set against regressions.
->>>>>>
->>>>>> IMHO from maintenance POV it's better to make a separate driver. In the end
->>>>>> of the day we wouldn't be adding much more code than it is being done now.
->>>>>
->>>>> I agree. We do not have great experiences in the past with trying to support
->>>>> multiple variants in a single driver (unless the diffs are truly small).
->>>>
->>>> Well,
->>>> IMHO the diffs in ov965x are smaller (but untestable because nobody seems
->>>> to have an ov9650/52 board) than within the bq27xxx chips, but I can dig out
->>>> an old pdata based separate ov9655 driver and extend that to become DT compatible.
->>>>
->>>> I had abandoned that separate approach in favour of extending the ov965x driver.
->>>>
->>>> Have to discuss with Hugues how to proceed.
->>>>
->>>> BR and thanks,
->>>> Nikolaus
->>>>
->>>
->>> As Sylwester and Hans, I'm also in flavour of a separate driver, the
->>> fact that register set seems similar but in fact is not and that we
->>> cannot test for non-regression of 9650/52 are killer for me to continue
->>> on a single driver.
->>> We can now restart from a new fresh state of the art sensor driver
->>> getting rid of legacy (pdata, old gpio, etc...).
->>
->> Agreed. I bet the result will look cleaner indeed although this wasn't one
->> of the complex drivers.
-> 
-> I finally managed to find the bug why mplayer did select-timeout on the GTA04.
-> Was a bug in pinmux setup of the GTA04 for the omap3isp.
-> 
-> And I have resurrected our years old 3.12 camera driver, which was based on the
-> MT9P031 code. It was already separate from ov9650/52.
-> 
-> I have extended it to support DT by including some parts of Hugues' work.
-> 
-> It still needs some cleanup and discussion but will be a simple patch (one
-> for ov9655.c + Kconfig + Makefile) and one for bindings (I hope it includes
-> all your comments).
-> 
-> I will post v1 in the next days.
-> 
-> BR,
-> Nikolaus
-> 
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks Nikolaus,
-
-I was ready to push the new version in new file ov9655.c with all 
-comments included, but as my version is very minimal and I suspect that 
-yours is more complete, let's merge things together.
-Can I consider that you now take ownership of this driver upstream ?
-If so I'll send to you my current patchset so you can compare, 
-double-check review comments and add missing support on your side 
-(RGB565 and VGA/QVGA resolution matter on my side).
-
-Thanks again Nikolaus for this work,
-
-BR,
-Hugues.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 270ab2549def..edb88d430b24 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1542,7 +1542,6 @@ config THUMB2_KERNEL
+ 	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
+ 	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
+ 	default y if CPU_THUMBONLY
+-	select AEABI
+ 	select ARM_ASM_UNIFIED
+ 	select ARM_UNWIND
+ 	help
+@@ -1605,7 +1604,8 @@ config ARM_PATCH_IDIV
+ 	  code to do integer division.
+ 
+ config AEABI
+-	bool "Use the ARM EABI to compile the kernel"
++	bool "Use the ARM EABI to compile the kernel" if !CPU_V7 && !CPU_V7M && !CPU_V6 && !CPU_V6K
++	default CPU_V7 || CPU_V7M || CPU_V6 || CPU_V6K
+ 	help
+ 	  This option allows for the kernel to be compiled using the latest
+ 	  ARM ABI (aka EABI).  This is only useful if you are using a user
+-- 
+2.7.4
