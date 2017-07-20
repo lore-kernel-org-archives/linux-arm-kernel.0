@@ -1,53 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Jul 2017 15:01:17 +0200
-Subject: [PATCH v2 2/4] drm/sun4i: Use the runtime_pm commit_tail variant
+Date: Thu, 20 Jul 2017 15:01:18 +0200
+Subject: [PATCH v2 3/4] drm/sun4i: engine: Add commit_poll function
 In-Reply-To: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
 References: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <79d61e6736618dea1753d9a9b3fbde43cdee5929.1500555652.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <d491c6e69f269959915d6ba88ab80f5573021fee.1500555652.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The backend (planes) commit can only happen when the TCON (CRTC) is
-enabled, which is not guaranteed with the default commit_tail helper.
+On the earlier Allwinner chips, with the first iteration of the display
+engine, the backend commit bit needs to be polled before making any
+register access to the backend.
 
-Let's use the runtime_pm version that is designed specifically to deal with
-that case.
+Add an operation for that, that will be called in atomic_begin in order to
+be sure to have that bit cleared before we do any modifications.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_framebuffer.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c   |  2 ++
+ drivers/gpu/drm/sun4i/sunxi_engine.h | 14 ++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-index 9872e0fc03b0..53ab61665390 100644
---- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-@@ -10,6 +10,7 @@
-  * the License, or (at your option) any later version.
-  */
- 
-+#include <drm/drm_atomic.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_fb_cma_helper.h>
- #include <drm/drmP.h>
-@@ -31,6 +32,10 @@ static const struct drm_mode_config_funcs sun4i_de_mode_config_funcs = {
- 	.fb_create		= drm_fb_cma_create,
- };
- 
-+static struct drm_mode_config_helper_funcs sun4i_de_mode_config_helpers = {
-+	.atomic_commit_tail	= drm_atomic_helper_commit_tail_rpm,
-+};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index f8c70439d1e2..2eba1d8639d8 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -45,6 +45,8 @@ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+ 		spin_unlock_irqrestore(&dev->event_lock, flags);
+ 		crtc->state->event = NULL;
+ 	 }
 +
- struct drm_fbdev_cma *sun4i_framebuffer_init(struct drm_device *drm)
- {
- 	drm_mode_config_reset(drm);
-@@ -39,6 +44,7 @@ struct drm_fbdev_cma *sun4i_framebuffer_init(struct drm_device *drm)
- 	drm->mode_config.max_height = 8192;
- 
- 	drm->mode_config.funcs = &sun4i_de_mode_config_funcs;
-+	drm->mode_config.helper_private = &sun4i_de_mode_config_helpers;
- 
- 	return drm_fbdev_cma_init(drm, 32, drm->mode_config.num_connector);
++	WARN_ON(sunxi_engine_commit_poll(engine));
  }
+ 
+ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
+diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
+index 4cb70ae65c79..6618e182613c 100644
+--- a/drivers/gpu/drm/sun4i/sunxi_engine.h
++++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
+@@ -17,6 +17,7 @@ struct sunxi_engine;
+ 
+ struct sunxi_engine_ops {
+ 	void (*commit)(struct sunxi_engine *engine);
++	int (*commit_poll)(struct sunxi_engine *engine);
+ 	struct drm_plane **(*layers_init)(struct drm_device *drm,
+ 					  struct sunxi_engine *engine);
+ 
+@@ -55,6 +56,19 @@ sunxi_engine_commit(struct sunxi_engine *engine)
+ }
+ 
+ /**
++ * sunxi_engine_commit_poll() - wait for all changes to be committed
++ * @engine:	pointer to the engine
++ */
++static inline int
++sunxi_engine_commit_poll(struct sunxi_engine *engine)
++{
++	if (engine->ops && engine->ops->commit_poll)
++		return engine->ops->commit_poll(engine);
++
++	return 0;
++}
++
++/**
+  * sunxi_engine_layers_init() - Create planes (layers) for the engine
+  * @drm:	pointer to the drm_device for which planes will be created
+  * @engine:	pointer to the engine
 -- 
 git-series 0.9.1
