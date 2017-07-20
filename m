@@ -1,57 +1,60 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 21 Jul 2017 07:07:15 +0800
-Subject: [PATCH 1/3] arm64: allwinner: a64: enable USB host controller for BPi
- M64
-Message-ID: <20170720230717.58255-1-icenowy@aosc.io>
+Date: Fri, 21 Jul 2017 07:07:17 +0800
+Subject: [PATCH 3/3] arm64: allwinner: a64: add proper support for the Wi-Fi
+ on BPi M64
+In-Reply-To: <20170720230717.58255-1-icenowy@aosc.io>
+References: <20170720230717.58255-1-icenowy@aosc.io>
+Message-ID: <20170720230717.58255-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banana Pi M64 connects the USB host-only controller on A64 SoC to a USB
-hub, which provided the two USB Type-A ports on the board.
+BPi M64 has an AP6212 Wi-Fi/Bluetooth combo module, and the Wi-Fi SDIO
+card is connected to the mmc1 controller.
 
-Enable the USB host controller.
+The pwrseq of the mmc1 (used to reset the card) used to missing, and the
+out-of-band interrupt line of the card is not specified.
 
-The OTG function of the Micro-USB port needs the drivevbus function of
-the AXP803 driver implemented, so it's not enabled now.
+Fix these issues for proper Wi-Fi support of BPi M64.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 0d1f026d831a..829922d077fb 100644
+index 51d67c0a0edf..037142231962 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -67,6 +67,10 @@
+@@ -58,6 +58,11 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
  	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
++	};
  };
  
-+&ehci1 {
-+	status = "okay";
-+};
-+
- &emac {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&rgmii_pins>;
-@@ -122,6 +126,10 @@
+ &ehci1 {
+@@ -106,9 +111,18 @@
+ 	pinctrl-0 = <&mmc1_pins>;
+ 	vmmc-supply = <&reg_dldo2>;
+ 	vqmmc-supply = <&reg_dldo4>;
++	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+ 	non-removable;
  	status = "okay";
++
++	brcmf: wifi at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++		interrupt-parent = <&r_pio>;
++		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
++		interrupt-names = "host-wake";
++	};
  };
  
-+&ohci1 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-@@ -133,3 +141,7 @@
- 	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
- 	status = "okay";
- };
-+
-+&usbphy {
-+	status = "okay";
-+};
+ &mmc2 {
 -- 
 2.13.0
