@@ -1,176 +1,79 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 21 Jul 2017 11:57:14 +0800
-Subject: [PATCH 3/3] soc: mediatek: add SCPSYS power domain driver for
- MediaTek MT7622 SoC
-In-Reply-To: <cover.1500608650.git.sean.wang@mediatek.com>
-References: <cover.1500608650.git.sean.wang@mediatek.com>
-Message-ID: <284911261d7e423e5bb47625858b3284be713a1b.1500608650.git.sean.wang@mediatek.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Jul 2017 22:55:10 -0700
+Subject: [PATCH 08/11] ARM: OMAP2+: Remove unused legacy code for PRM
+In-Reply-To: <20170720144506.rjar4dxih6ixavcp@earth>
+References: <20170531225139.30723-1-tony@atomide.com>
+ <20170531225139.30723-9-tony@atomide.com>
+ <20170630104256.GG3730@atomide.com>
+ <20170720144506.rjar4dxih6ixavcp@earth>
+Message-ID: <20170721055510.GO10026@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen Zhong <chen.zhong@mediatek.com>
+* Sebastian Reichel <sebastian.reichel@collabora.co.uk> [170720 07:45]:
+> Hi,
+> 
+> On Fri, Jun 30, 2017 at 03:42:56AM -0700, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [170531 15:55]:
+> > > We are now booting all mach-omap2 in device tree only mode.
+> > > Any code that is only called in legacy boot mode where
+> > > of_have_populated_dt() is not set is safe to remove now.
+> > ...
+> > 
+> > > diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+> > > --- a/arch/arm/mach-omap2/prm44xx.c
+> > > +++ b/arch/arm/mach-omap2/prm44xx.c
+> > ...
+> > 
+> > > -static int omap44xx_prm_late_init(void)
+> > > -{
+> > > -	int irq_num;
+> > > -
+> > > -	if (!(prm_features & PRM_HAS_IO_WAKEUP))
+> > > -		return 0;
+> > > -
+> > > -	/* OMAP4+ is DT only now */
+> > > -	if (!of_have_populated_dt())
+> > > -		return 0;
+> > 
+> > Turns out I misread the above and this code is still needed for omap4 PRM
+> > interrupts, so applying a partial revert below to fix it.
+> 
+> I just spent a couple of hours to tracing this and now saw, that you
+> already did so. Why was this not part of the pull request? :(
 
-Add SCPSYS power domain driver for MT7622 SoC having four power domains
-which are respectively ETHSYS for Ethernet including embedded switch,
-WBSYS for WIFI and Bluetooth, HIF0SYS for PCI-E and SATA, and HIF1SYS for
-USB. Those functions could be selectively powered gated when the
-corresponding function is no longer to use in order to reach more minimal
-power dissipation.
+Sorry I did not notice until I had sent out a pull request. I did
+send a pull request for this and few other fixes on the 6th that is
+still pending.
 
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/soc/mediatek/mtk-scpsys.c     | 76 +++++++++++++++++++++++++++++++++++
- include/linux/soc/mediatek/infracfg.h |  8 +++-
- 2 files changed, 83 insertions(+), 1 deletion(-)
+> > I probably missed this earlier as the comments used to say
+> > "OMAP4+ is DT only now" for !of_have_populated_dt() to exit early and
+> > missed the negative test. Let's not add those lines back as they are
+> > confusing and no longer needed as we only boot in device tree mode.
+> 
+> haha, I came up with *exactly* the same patch and then noticed
+> this mail when I checked for a Message-ID as reference :)
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index beb7916..8a0ca02 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -21,6 +21,7 @@
- #include <linux/soc/mediatek/infracfg.h>
- 
- #include <dt-bindings/power/mt2701-power.h>
-+#include <dt-bindings/power/mt7622-power.h>
- #include <dt-bindings/power/mt8173-power.h>
- 
- #define SPM_VDE_PWR_CON			0x0210
-@@ -38,6 +39,11 @@
- #define SPM_MFG_2D_PWR_CON		0x02c0
- #define SPM_MFG_ASYNC_PWR_CON		0x02c4
- #define SPM_USB_PWR_CON			0x02cc
-+#define SPM_ETHSYS_PWR_CON		0x02e0	/* MT7622 */
-+#define SPM_HIF0_PWR_CON		0x02e4	/* MT7622 */
-+#define SPM_HIF1_PWR_CON		0x02e8	/* MT7622 */
-+#define SPM_WB_PWR_CON			0x02ec	/* MT7622 */
-+
- 
- #define SPM_PWR_STATUS			0x060c
- #define SPM_PWR_STATUS_2ND		0x0610
-@@ -63,6 +69,10 @@
- #define PWR_STATUS_MFG_ASYNC		BIT(23)
- #define PWR_STATUS_AUDIO		BIT(24)
- #define PWR_STATUS_USB			BIT(25)
-+#define PWR_STATUS_ETHSYS		BIT(24)	/* MT7622 */
-+#define PWR_STATUS_HIF0			BIT(25)	/* MT7622 */
-+#define PWR_STATUS_HIF1			BIT(26)	/* MT7622 */
-+#define PWR_STATUS_WB			BIT(27)	/* MT7622 */
- 
- enum clk_id {
- 	CLK_NONE,
-@@ -71,6 +81,7 @@ enum clk_id {
- 	CLK_VENC,
- 	CLK_VENC_LT,
- 	CLK_ETHIF,
-+	CLK_HIFSEL,
- 	CLK_MAX,
- };
- 
-@@ -81,6 +92,7 @@ static const char * const clk_names[] = {
- 	"venc",
- 	"venc_lt",
- 	"ethif",
-+	"hif_sel",
- 	NULL,
- };
- 
-@@ -567,6 +579,67 @@ static int __init scpsys_probe_mt2701(struct platform_device *pdev)
- }
- 
- /*
-+ * MT7622 power domain support
-+ */
-+static const struct scp_domain_data scp_domain_data_mt7622[] = {
-+	[MT7622_POWER_DOMAIN_ETHSYS] = {
-+		.name = "ethsys",
-+		.sta_mask = PWR_STATUS_ETHSYS,
-+		.ctl_offs = SPM_ETHSYS_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = {CLK_NONE},
-+		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_ETHSYS,
-+		.active_wakeup = true,
-+	},
-+	[MT7622_POWER_DOMAIN_HIF0] = {
-+		.name = "hif0",
-+		.sta_mask = PWR_STATUS_HIF0,
-+		.ctl_offs = SPM_HIF0_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = {CLK_HIFSEL},
-+		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF0,
-+		.active_wakeup = true,
-+	},
-+	[MT7622_POWER_DOMAIN_HIF1] = {
-+		.name = "hif1",
-+		.sta_mask = PWR_STATUS_HIF1,
-+		.ctl_offs = SPM_HIF1_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = {CLK_HIFSEL},
-+		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF1,
-+		.active_wakeup = true,
-+	},
-+	[MT7622_POWER_DOMAIN_WB] = {
-+		.name = "wb",
-+		.sta_mask = PWR_STATUS_WB,
-+		.ctl_offs = SPM_WB_PWR_CON,
-+		.sram_pdn_bits = 0,
-+		.sram_pdn_ack_bits = 0,
-+		.clk_id = {CLK_NONE},
-+		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
-+		.active_wakeup = true,
-+	},
-+};
-+
-+#define NUM_DOMAINS_MT7622	ARRAY_SIZE(scp_domain_data_mt7622)
-+
-+static int __init scpsys_probe_mt7622(struct platform_device *pdev)
-+{
-+	struct scp *scp;
-+
-+	scp = init_scp(pdev, scp_domain_data_mt7622, NUM_DOMAINS_MT7622);
-+	if (IS_ERR(scp))
-+		return PTR_ERR(scp);
-+
-+	mtk_register_power_domains(pdev, scp, NUM_DOMAINS_MT7622);
-+
-+	return 0;
-+}
-+
-+/*
-  * MT8173 power domain support
-  */
- 
-@@ -698,6 +771,9 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
- 		.compatible = "mediatek,mt2701-scpsys",
- 		.data = scpsys_probe_mt2701,
- 	}, {
-+		.compatible = "mediatek,mt7622-scpsys",
-+		.data = scpsys_probe_mt7622,
-+	}, {
- 		.compatible = "mediatek,mt8173-scpsys",
- 		.data = scpsys_probe_mt8173,
- 	}, {
-diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
-index a5714e9..c1e5062 100644
---- a/include/linux/soc/mediatek/infracfg.h
-+++ b/include/linux/soc/mediatek/infracfg.h
-@@ -20,7 +20,13 @@
- #define MT8173_TOP_AXI_PROT_EN_MFG_M1		BIT(22)
- #define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT	BIT(23)
- 
-+#define MT7622_TOP_AXI_PROT_EN_ETHSYS		(BIT(3) | BIT(17))
-+#define MT7622_TOP_AXI_PROT_EN_HIF0		(BIT(24) | BIT(25))
-+#define MT7622_TOP_AXI_PROT_EN_HIF1		(BIT(26) | BIT(27) | \
-+						 BIT(28))
-+#define MT7622_TOP_AXI_PROT_EN_WB		(BIT(2) | BIT(6) | \
-+						 BIT(7) | BIT(8))
-+
- int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
- int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
--
- #endif /* __SOC_MEDIATEK_INFRACFG_H */
--- 
-2.7.4
+Sorry to hear about the duplicate work.
+
+> > Without things things can mysterious fail for i2c, for example LM75
+> > I2C temperature sensor can stop working as the PRM interrupts won't work.
+> 
+> Here is the demystification:
+> 
+> Without this fix omap4_pmx_core and omap4_pmx_wakeup will not
+> register themself as interrupt controller, due to missing parent
+> interrupt. This means, that any device referencing an interrupt
+> in one of those controllers will fail their probe routine with
+> -EPROBE_DEFER waiting for the interrupt controller to appear.
+> At least for i2c this happens directly in the core, even before
+> calling the driver's probe routine making this look quite
+> mysterious.
+> 
+> TLDR: Fix "wakeup-source;" using devices on omap4.
+
+Yup.
+
+Regards,
+
+Tony
