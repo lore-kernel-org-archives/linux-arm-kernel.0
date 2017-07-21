@@ -1,72 +1,23 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 21 Jul 2017 15:16:04 +0200
-Subject: [PATCH v2 0/4] RGMII RX and TX clock delays using Atheros 8035
-In-Reply-To: <2711b987-a9db-e1d0-5346-a9d43309aaa2@sigmadesigns.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 21 Jul 2017 08:20:39 -0500
+Subject: [PATCH v2 1/4] net: phy: at803x: Document RGMII RX and TX clock
+ delay issues
+In-Reply-To: <051653a2-946f-6a0b-4cff-b403d1197038@sigmadesigns.com>
 References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
- <2711b987-a9db-e1d0-5346-a9d43309aaa2@sigmadesigns.com>
-Message-ID: <2cbfd70a-70db-f3d7-40d0-3adc4f56a8d1@sigmadesigns.com>
+ <051653a2-946f-6a0b-4cff-b403d1197038@sigmadesigns.com>
+Message-ID: <a9d3777c-1752-d79b-8302-d09c5f736a9f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/2017 14:47, Marc Gonzalez wrote:
+On 7/21/17 6:25 AM, Marc Gonzalez wrote:
+> +	 * NB: This code assumes that RGMII RX clock delay is disabled
+> +	 * at reset, but actually, RX clock delay is enabled at reset.
 
-> fping caps at 1000 packets per second, which limits
-> its usefulness as a benchmarking tool.
+Could we change this to say, "RX clock delay is enabled at reset on some 
+systems."?  Otherwise, it implies that the code is wrong 100% of the 
+time and should be fixed, not documented.
 
-"Normal" ping is slightly faster (5000 packets per second).
-
-time ping -f -c 60000 -s 1450 -q 172.27.64.1
-
---- 172.27.64.1 ping statistics ---
-60000 packets transmitted, 60000 received, 0% packet loss, time 12059ms
-rtt min/avg/max/mdev = 0.159/0.167/3.536/0.021 ms, ipg/ewma 0.201/0.166 ms
-
-real    0m12.067s
-user    0m0.899s
-sys     0m1.886s
-
-NIC statistics:
-     rx_bytes_ok: 89760375
-     rx_frames_ok: 60003
-     rx_undersize_frames: 0
-     rx_fragment_frames: 0
-     rx_64_byte_frames: 2
-     rx_127_byte_frames: 0
-     rx_255_byte_frames: 1
-     rx_511_byte_frames: 0
-     rx_1023_byte_frames: 0
-     rx_max_size_frames: 60000
-     rx_oversize_frames: 0
-     rx_bad_fcs_frames: 0
-     rx_broadcast_frames: 1
-     rx_multicast_frames: 0
-     rx_control_frames: 0
-     rx_pause_frames: 0
-     rx_unsup_control_frames: 0
-     rx_align_error_frames: 0
-     rx_overrun_frames: 0
-     rx_jabber_frames: 0
-     rx_bytes: 89760375
-     rx_frames: 60003
-     tx_bytes_ok: 89760128
-     tx_frames_ok: 60002
-     tx_64_byte_frames: 2
-     tx_127_byte_frames: 0
-     tx_255_byte_frames: 0
-     tx_511_byte_frames: 0
-     tx_1023_byte_frames: 0
-     tx_max_size_frames: 60000
-     tx_oversize_frames: 0
-     tx_broadcast_frames: 1
-     tx_multicast_frames: 0
-     tx_control_frames: 0
-     tx_pause_frames: 0
-     tx_underrun_frames: 0
-     tx_single_collision_frames: 0
-     tx_multi_collision_frames: 0
-     tx_deferred_collision_frames: 0
-     tx_late_collision_frames: 0
-     tx_excessive_collision_frames: 0
-     tx_bytes: 89760128
-     tx_frames: 60002
-     tx_collisions: 0
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
