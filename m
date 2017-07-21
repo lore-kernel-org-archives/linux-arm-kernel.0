@@ -1,97 +1,249 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 21 Jul 2017 16:11:03 -0300
-Subject: [PATCH v1] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
-In-Reply-To: <20170721183740.GQ4134@kernel.org>
-References: <1499878883-3066-1-git-send-email-mike.leach@linaro.org>
- <CANLsYkxDLVONpuQpF6Zo-gUPf+WVt2v+DLNduq0mDMk0XAZ5hw@mail.gmail.com>
- <20170721161916.GH4134@kernel.org>
- <20170721183533.GP4134@kernel.org>
- <20170721183740.GQ4134@kernel.org>
-Message-ID: <20170721191103.GR4134@kernel.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 21 Jul 2017 14:28:32 -0500
+Subject: [PATCH v2] ARM: Convert to using %pOF instead of full_name
+Message-ID: <20170721192835.25555-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, Jul 21, 2017 at 03:37:40PM -0300, Arnaldo Carvalho de Melo escreveu:
-> Em Fri, Jul 21, 2017 at 03:35:33PM -0300, Arnaldo Carvalho de Melo escreveu:
-> > Em Fri, Jul 21, 2017 at 01:19:16PM -0300, Arnaldo Carvalho de Melo escreveu:
-> > > Em Fri, Jul 21, 2017 at 08:50:09AM -0600, Mathieu Poirier escreveu:
-> > > > On 12 July 2017 at 11:01, Mike Leach <mike.leach@linaro.org> wrote:
-> > > > > The value passed into the perf.data file for the CONFIGR register in ETMv4
-> > > > > was incorrectly being set to the command line options/ETMv3 value.
-> > > > >
-> > > > >                 info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
-> > > > >                                                 coresight_get_trace_id(cpu);
-> > > > 
-> > > > I have tested this patch on my side and things work as advertised now.
-> > > > 
-> > > > Arnaldo, if you want to pick this up through your tree then:
-> > > > 
-> > > > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > > > 
-> > > > Otherwise I'll get this, whatever you prefer.
-> > > 
-> > > I'll get it, thanks for the ping,
-> > 
-> > It is breaking the build in one of my containers, one with fedora 24 and
-> > a android toolchain from http://dl.google.com/android/repository/android-ndk-r12b-linux-x86_64.zip
-> > 
-> > arch/arm/util/cs-etm.c: In function 'cs_etmv4_get_config':^M
-> > arch/arm/util/cs-etm.c:289:24: error: 'ETM_OPT_RETSTK' undeclared (first use in this function)^M
-> >   if (config_opts & BIT(ETM_OPT_RETSTK))
-> > 
-> > It builds as
-> > 
-> > NDK=/opt/android-ndk-r12b/
-> > NDK_TOOLCHAIN=${NDK}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-
-> > NDK_SYSROOT=${NDK}/platforms/android-24/arch-arm
-> > make -C /git/linux/tools/perf O=/tmp/build/perf WERROR=0 CFLAGS=${CFLAGS} ARCH=arm CROSS_COMPILE=${NDK_TOOLCHAIN} EXTRA_CFLAGS="-pie --sysroot=${NDK_SYSROOT}" 
-> > Ideas?
-> 
-> Ok, it also fails on:
-> 
->   14 debian:experimental-x-arm64: FAIL
+Now that we have a custom printf format specifier, convert users of
+full_name to use %pOF instead. This is preparation to remove storing
+of the full path string for each node.
 
-Ok, we need a definition for ETM_OPT_RETSTK, just like we have for the
-other two...
+Signed-off-by: Rob Herring <robh@kernel.org>
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-omap at vger.kernel.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-renesas-soc at vger.kernel.org
+---
+v2:
+- Merge several 2 line prints to single line.
+- Add acks
 
-Nuked it from my perf/core branch, please resubmit.
+ arch/arm/kernel/cpuidle.c            | 4 ++--
+ arch/arm/kernel/devtree.c            | 5 ++---
+ arch/arm/kernel/topology.c           | 3 +--
+ arch/arm/mach-exynos/suspend.c       | 7 +++----
+ arch/arm/mach-imx/gpc.c              | 4 ++--
+ arch/arm/mach-mvebu/kirkwood.c       | 3 +--
+ arch/arm/mach-omap2/omap-wakeupgen.c | 4 ++--
+ arch/arm/mach-omap2/omap_hwmod.c     | 4 ++--
+ arch/arm/mach-rockchip/platsmp.c     | 4 ++--
+ arch/arm/mach-shmobile/pm-rmobile.c  | 7 +++----
+ 10 files changed, 20 insertions(+), 25 deletions(-)
 
-- Arnaldo
+diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+index a3308ad1a024..fda5579123a8 100644
+--- a/arch/arm/kernel/cpuidle.c
++++ b/arch/arm/kernel/cpuidle.c
+@@ -101,8 +101,8 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
  
-> 
-> Same problem:
-> 
->   CC       /tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o
->   CC       /tmp/build/perf/util/config.o
-> arch/arm64/util/../../arm/util/cs-etm.c: In function 'cs_etmv4_get_config':
-> arch/arm64/util/../../arm/util/cs-etm.c:289:24: error: 'ETM_OPT_RETSTK' undeclared (first use in this function)
->   if (config_opts & BIT(ETM_OPT_RETSTK))
->                         ^
-> arch/arm64/util/../../arm/util/cs-etm.c:270:25: note: in definition of macro 'BIT'
->  #define BIT(N) (1UL << (N))
->                          ^
-> arch/arm64/util/../../arm/util/cs-etm.c:289:24: note: each undeclared identifier is reported only once for each function it appears in
->   if (config_opts & BIT(ETM_OPT_RETSTK))
->                         ^
-> arch/arm64/util/../../arm/util/cs-etm.c:270:25: note: in definition of macro 'BIT'
->  #define BIT(N) (1UL << (N))
->                          ^
-> mv: cannot stat '/tmp/build/perf/arch/arm64/util/../../arm/util/.cs-etm.o.tmp': No such file or directory
-> /git/linux/tools/build/Makefile.build:101: recipe for target '/tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o' failed
-> make[6]: *** [/tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o] Error 1
-> /git/linux/tools/build/Makefile.build:144: recipe for target 'util' failed
-> make[5]: *** [util] Error 2
-> /git/linux/tools/build/Makefile.build:144: recipe for target 'arm64' failed
-> make[4]: *** [arm64] Error 2
-> /git/linux/tools/build/Makefile.build:144: recipe for target 'arch' failed
-> make[3]: *** [arch] Error 2
-> make[3]: *** Waiting for unfinished jobs....
->   CC       /tmp/build/perf/util/ctype.o
-> 
-> Builds with:
-> 
-> ARCH=arm64
-> TARGET=aarch64-linux-gnu
-> make ARCH=${ARCH} CROSS_COMPILE=${TARGET}- -C /git/linux/tools/perf O=/tmp/build/perf
-> 
-> - Arnaldo
+ 	ops = arm_cpuidle_get_ops(enable_method);
+ 	if (!ops) {
+-		pr_warn("%s: unsupported enable-method property: %s\n",
+-			dn->full_name, enable_method);
++		pr_warn("%pOF: unsupported enable-method property: %s\n",
++			dn, enable_method);
+ 		return -EOPNOTSUPP;
+ 	}
+ 
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index f676febbb270..ecaa68dd1af5 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -95,7 +95,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 		if (of_node_cmp(cpu->type, "cpu"))
+ 			continue;
+ 
+-		pr_debug(" * %s...\n", cpu->full_name);
++		pr_debug(" * %pOF...\n", cpu);
+ 		/*
+ 		 * A device tree containing CPU nodes with missing "reg"
+ 		 * properties is considered invalid to build the
+@@ -103,8 +103,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 		 */
+ 		cell = of_get_property(cpu, "reg", &prop_bytes);
+ 		if (!cell || prop_bytes < sizeof(*cell)) {
+-			pr_debug(" * %s missing reg property\n",
+-				     cpu->full_name);
++			pr_debug(" * %pOF missing reg property\n", cpu);
+ 			of_node_put(cpu);
+ 			return;
+ 		}
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index bf949a763dbe..24ac3cab411d 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -127,8 +127,7 @@ static void __init parse_dt_topology(void)
+ 
+ 		rate = of_get_property(cn, "clock-frequency", &len);
+ 		if (!rate || len != 4) {
+-			pr_err("%s missing clock-frequency property\n",
+-				cn->full_name);
++			pr_err("%pOF missing clock-frequency property\n", cn);
+ 			continue;
+ 		}
+ 
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 748cfb8d5212..b529ba04ed16 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -187,21 +187,20 @@ static int __init exynos_pmu_irq_init(struct device_node *node,
+ 	struct irq_domain *parent_domain, *domain;
+ 
+ 	if (!parent) {
+-		pr_err("%s: no parent, giving up\n", node->full_name);
++		pr_err("%pOF: no parent, giving up\n", node);
+ 		return -ENODEV;
+ 	}
+ 
+ 	parent_domain = irq_find_host(parent);
+ 	if (!parent_domain) {
+-		pr_err("%s: unable to obtain parent domain\n", node->full_name);
++		pr_err("%pOF: unable to obtain parent domain\n", node);
+ 		return -ENXIO;
+ 	}
+ 
+ 	pmu_base_addr = of_iomap(node, 0);
+ 
+ 	if (!pmu_base_addr) {
+-		pr_err("%s: failed to find exynos pmu register\n",
+-		       node->full_name);
++		pr_err("%pOF: failed to find exynos pmu register\n", node);
+ 		return -ENOMEM;
+ 	}
+ 
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 93f584ba0130..de535cb679b3 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -224,13 +224,13 @@ static int __init imx_gpc_init(struct device_node *node,
+ 	int i;
+ 
+ 	if (!parent) {
+-		pr_err("%s: no parent, giving up\n", node->full_name);
++		pr_err("%pOF: no parent, giving up\n", node);
+ 		return -ENODEV;
+ 	}
+ 
+ 	parent_domain = irq_find_host(parent);
+ 	if (!parent_domain) {
+-		pr_err("%s: unable to obtain parent domain\n", node->full_name);
++		pr_err("%pOF: unable to obtain parent domain\n", node);
+ 		return -ENXIO;
+ 	}
+ 
+diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
+index 7d9f2fd9e450..0aa88105d46e 100644
+--- a/arch/arm/mach-mvebu/kirkwood.c
++++ b/arch/arm/mach-mvebu/kirkwood.c
+@@ -107,8 +107,7 @@ static void __init kirkwood_dt_eth_fixup(void)
+ 		clk_prepare_enable(clk);
+ 
+ 		/* store MAC address register contents in local-mac-address */
+-		pr_err(FW_INFO "%s: local-mac-address is not set\n",
+-		       np->full_name);
++		pr_err(FW_INFO "%pOF: local-mac-address is not set\n", np);
+ 
+ 		pmac = kzalloc(sizeof(*pmac) + 6, GFP_KERNEL);
+ 		if (!pmac)
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+index 33ed5d53fa45..4bb6751864a5 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -522,13 +522,13 @@ static int __init wakeupgen_init(struct device_node *node,
+ 	u32 val;
+ 
+ 	if (!parent) {
+-		pr_err("%s: no parent, giving up\n", node->full_name);
++		pr_err("%pOF: no parent, giving up\n", node);
+ 		return -ENODEV;
+ 	}
+ 
+ 	parent_domain = irq_find_host(parent);
+ 	if (!parent_domain) {
+-		pr_err("%s: unable to obtain parent domain\n", node->full_name);
++		pr_err("%pOF: unable to obtain parent domain\n", node);
+ 		return -ENXIO;
+ 	}
+ 	/* Not supported on OMAP4 ES1.0 silicon */
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 3b47ded5fa0c..2dbd63239c54 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2417,8 +2417,8 @@ static int __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
+ 		if (mem)
+ 			pr_err("omap_hwmod: %s: Could not ioremap\n", oh->name);
+ 		else
+-			pr_err("omap_hwmod: %s: Missing dt reg%i for %s\n",
+-			       oh->name, index, np->full_name);
++			pr_err("omap_hwmod: %s: Missing dt reg%i for %pOF\n",
++			       oh->name, index, np);
+ 		return -ENXIO;
+ 	}
+ 
+diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+index 3abafdbdd7f4..2b5b0e43d657 100644
+--- a/arch/arm/mach-rockchip/platsmp.c
++++ b/arch/arm/mach-rockchip/platsmp.c
+@@ -182,8 +182,8 @@ static int __init rockchip_smp_prepare_sram(struct device_node *node)
+ 
+ 	ret = of_address_to_resource(node, 0, &res);
+ 	if (ret < 0) {
+-		pr_err("%s: could not get address for node %s\n",
+-		       __func__, node->full_name);
++		pr_err("%s: could not get address for node %pOF\n",
++		       __func__, node);
+ 		return ret;
+ 	}
+ 
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index 699429f28b73..3a4ed4c33a68 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -195,8 +195,7 @@ static void __init add_special_pd(struct device_node *np, enum pd_types type)
+ 		return;
+ 	}
+ 
+-	pr_debug("Special PM domain %s type %d for %s\n", pd->name, type,
+-		 np->full_name);
++	pr_debug("Special PM domain %s type %d for %pOF\n", pd->name, type, np);
+ 
+ 	special_pds[num_special_pds].pd = pd;
+ 	special_pds[num_special_pds].type = type;
+@@ -331,13 +330,13 @@ static int __init rmobile_init_pm_domains(void)
+ 	for_each_compatible_node(np, NULL, "renesas,sysc-rmobile") {
+ 		base = of_iomap(np, 0);
+ 		if (!base) {
+-			pr_warn("%s cannot map reg 0\n", np->full_name);
++			pr_warn("%pOF cannot map reg 0\n", np);
+ 			continue;
+ 		}
+ 
+ 		pmd = of_get_child_by_name(np, "pm-domains");
+ 		if (!pmd) {
+-			pr_warn("%s lacks pm-domains node\n", np->full_name);
++			pr_warn("%pOF lacks pm-domains node\n", np);
+ 			continue;
+ 		}
+ 
+-- 
+2.11.0
