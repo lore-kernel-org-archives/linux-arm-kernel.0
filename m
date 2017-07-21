@@ -1,100 +1,56 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 21 Jul 2017 14:32:26 +0800
-Subject: [PATCH v4 2/2] arm64: dts: Add Mediatek SoC MT2712 and
- evaluation board dts and Makefile
-In-Reply-To: <a470dfc9-71a4-6574-f342-fbd8d60aafce@gmail.com>
-References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
- <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
- <ddfb5e58-520f-1ef5-2351-d7545e17a429@gmail.com>
- <1500446884.14021.12.camel@mtksdaap41>
- <a470dfc9-71a4-6574-f342-fbd8d60aafce@gmail.com>
-Message-ID: <1500618746.14868.13.camel@mtksdaap41>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 21 Jul 2017 12:06:12 +0530
+Subject: [PATCH v2 0/4] Add STM32 MDMA driver
+In-Reply-To: <1fda0cc8-0b3c-70b0-0b34-b9b9a3ca6121@st.com>
+References: <1499343941-6375-1-git-send-email-pierre-yves.mordret@st.com>
+ <1fda0cc8-0b3c-70b0-0b34-b9b9a3ca6121@st.com>
+Message-ID: <20170721063612.GN3053@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-07-19 at 11:26 +0200, Matthias Brugger wrote:
+On Thu, Jul 20, 2017 at 09:37:48AM +0000, Pierre Yves MORDRET wrote:
 > 
-> On 07/19/2017 08:48 AM, YT Shen wrote:
-> > On Tue, 2017-07-18 at 18:29 +0200, Matthias Brugger wrote:
-> >>
-> >> On 06/22/2017 11:32 AM, YT Shen wrote:
-> >>> This adds basic chip support for Mediatek 2712
 > 
-> [...]
+> On 07/06/2017 02:25 PM, Pierre-Yves MORDRET wrote:
+> > This patchset adds support for the STM32 MDMA controller.
+> > The Master Direct memory access (MDMA) provides high-speed data transfer
+> > between memory and memory or between peripherals and memory.
+> > Contrary to STM32 DMA, the STM32 MDMA controller supports hardware LLI and
+> > uses a larger integrated FIFO (128 vs 16 bytes)
 > 
-> >>> +
-> >>> +	uart_clk: dummy26m {
-> >>> +		compatible = "fixed-clock";
-> >>> +		clock-frequency = <26000000>;
-> >>> +		#clock-cells = <0>;
-> >>> +	};
-> >>> +
+> Gentle ping for driver review since DT Bindings has been acked by Rob
+> Herring.
+
+Please allow reasonable time for review, this was sent during merge window
+and I dont apply patches during that time.
+
 > 
-> [...]
+> Thanks
+> Py
 > 
-> >>> +
-> >>> +	soc {
-> >>> +		#address-cells = <2>;
-> >>> +		#size-cells = <2>;
-> >>> +		compatible = "simple-bus";
-> >>> +		ranges;
-> >>> +
-> >>> +		uart5: serial at 1000f000 {
-> >>> +			compatible = "mediatek,mt2712-uart",
-> >>> +				     "mediatek,mt6577-uart";
-> >>> +			reg = <0 0x1000f000 0 0x400>;
-> >>> +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-> >>> +			clocks = <&uart_clk>, <&uart_clk>;
-> >>> +			clock-names = "baud", "bus";
-> >>> +			status = "disabled";
-> >>> +		};
-> >>
-> >> So baud and bus clock are both 26 MHz?
-> > We didn't have CCF clock support in this series.
-> > After we have clock source support, we could use the correct clocks to
-> > the UARTs and drop the 26MHz fixed rate UART clock.
+> > ---
+> >    Version history:
+> >       v2:
+> >           * change compatible into st,stm32h7-mdma to be more SoC specific
+> >           * Add MDMA support in DT for H7
+> >           * Add MDMA support in STM32 defconfig
+> > ---
+> > Pierre-Yves MORDRET (4):
+> >    dt-bindings: Document the STM32 MDMA bindings
+> >    dmaengine: Add STM32 MDMA driver
+> >    ARM: dts: stm32: Add MDMA support for STM32H743 SoC
+> >    ARM: configs: stm32: Add MDMA support in STM32 defconfig
 > > 
-> > The bus clock is 26MHz.  The baud clock could be from another clock
-> > source, using the same 26MHz fixed clock works also.
+> >   .../devicetree/bindings/dma/stm32-mdma.txt         |   94 ++
+> >   arch/arm/boot/dts/stm32h743.dtsi                   |   10 +
+> >   arch/arm/configs/stm32_defconfig                   |    1 +
+> >   drivers/dma/Kconfig                                |   12 +
+> >   drivers/dma/Makefile                               |    1 +
+> >   drivers/dma/stm32-mdma.c                           | 1536 ++++++++++++++++++++
+> >   6 files changed, 1654 insertions(+)
+> >   create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
+> >   create mode 100644 drivers/dma/stm32-mdma.c
 > > 
-> > 
-> > [1] https://patchwork.kernel.org/patch/9670877/
-> > [2] https://patchwork.kernel.org/patch/6436021/
-> > 
-> 
-> Yes, just using one 26 MHz clock works, but it uses an deprecated 
-> binding, so we should not do this, as through copying from the source of 
-> other SoCs we will keep it alive forever. Anyway that's not your case, 
-> as you defined the two clocks.
-> 
-> The device tree should reflect the HW, that's why I asked for the clock 
-> frequency of both clocks. I searched the git history and it was never 
-> done right before. So you could be the first :)
-> 
-> Thanks,
-> Matthias
-Ok, I want to make it clear.  The following example
 
-        baud_clk: dummy26m {
-                compatible = "fixed-clock";
-                clock-frequency = <26000000>;
-                #clock-cells = <0>;
-        };
-
-        sys_clk: dummyclk {
-                compatible = "fixed-clock";
-                clock-frequency = <26000000>;
-                #clock-cells = <0>;
-        };
-
-	uart0: serial at 11002000 {
-[...]
-                clocks = <&baud_clk>, <&sys_clk>;
-[...]
-	}
-
-Do you think it is clear to reflect the HW that the baud clock and sys
-clock can be different source or we need to choose another frequency?
-Thanks.
-
-yt.shen
+-- 
+~Vinod
