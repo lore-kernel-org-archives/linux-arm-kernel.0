@@ -1,69 +1,204 @@
-From: qiaozhou@asrmicro.com (=?gb2312?B?WmhvdSBRaWFvKNbcx8gp?=)
-Date: Fri, 21 Jul 2017 07:38:42 +0000
-Subject: [PATCH V2] arm64: traps: disable irq in die()
-In-Reply-To: <1499419774-14563-1-git-send-email-qiaozhou@asrmicro.com>
-References: <1499419774-14563-1-git-send-email-qiaozhou@asrmicro.com>
-Message-ID: <fae0379a29ec447e9dcc743d7aee194f@mail2012.asrmicro.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 21 Jul 2017 15:42:07 +0800
+Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: a64: enable AXP803
+ for Banana Pi M64
+In-Reply-To: <20170720230717.58255-2-icenowy@aosc.io>
+References: <20170720230717.58255-1-icenowy@aosc.io>
+ <20170720230717.58255-2-icenowy@aosc.io>
+Message-ID: <CAGb2v67Ntz_Qr0ek5sb-RRPnb0W-vEjx4_XC+SzHJDcr7ZLrkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maintainers,
+On Fri, Jul 21, 2017 at 7:07 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Banana Pi M64 board uses an AXP803 PMIC.
+>
+> Enable the PMIC and its regulators.
+>
+> As we have now proper regulators support, missing or dummy regulators
+> are changed to the correct ones.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 116 +++++++++++++++++++--
+>  1 file changed, 106 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> index 829922d077fb..51d67c0a0edf 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> @@ -58,13 +58,6 @@
+>         chosen {
+>                 stdout-path = "serial0:115200n8";
+>         };
+> -
+> -       reg_vcc3v3: vcc3v3 {
+> -               compatible = "regulator-fixed";
+> -               regulator-name = "vcc3v3";
+> -               regulator-min-microvolt = <3300000>;
+> -               regulator-max-microvolt = <3300000>;
+> -       };
+>  };
+>
+>  &ehci1 {
+> @@ -76,6 +69,7 @@
+>         pinctrl-0 = <&rgmii_pins>;
+>         phy-mode = "rgmii";
+>         phy-handle = <&ext_rgmii_phy>;
+> +       phy-supply = <&reg_dc1sw>;
+>         status = "okay";
+>  };
+>
+> @@ -99,7 +93,7 @@
+>  &mmc0 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc0_pins>;
+> -       vmmc-supply = <&reg_vcc3v3>;
+> +       vmmc-supply = <&reg_dcdc1>;
+>         cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+>         cd-inverted;
+>         disable-wp;
+> @@ -110,7 +104,8 @@
+>  &mmc1 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc1_pins>;
+> -       vmmc-supply = <&reg_vcc3v3>;
+> +       vmmc-supply = <&reg_dldo2>;
+> +       vqmmc-supply = <&reg_dldo4>;
+>         bus-width = <4>;
+>         non-removable;
+>         status = "okay";
+> @@ -119,7 +114,7 @@
+>  &mmc2 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc2_pins>;
+> -       vmmc-supply = <&reg_vcc3v3>;
+> +       vmmc-supply = <&reg_dcdc1>;
+>         bus-width = <8>;
+>         non-removable;
+>         cap-mmc-hw-reset;
+> @@ -130,6 +125,107 @@
+>         status = "okay";
+>  };
+>
+> +&r_rsb {
+> +       status = "okay";
+> +
+> +       axp803: pmic at 3a3 {
+> +               compatible = "x-powers,axp803";
+> +               reg = <0x3a3>;
+> +               interrupt-parent = <&r_intc>;
+> +               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +       };
+> +};
+> +
+> +#include "axp803.dtsi"
+> +
+> +&reg_aldo2 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <1800000>;
+> +       regulator-max-microvolt = <3300000>;
+> +       regulator-name = "vcc-pl";
+> +};
+> +
+> +&reg_aldo3 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <3000000>;
+> +       regulator-max-microvolt = <3000000>;
+> +       regulator-name = "vcc-pll-avcc";
+> +};
+> +
+> +&reg_dc1sw {
+> +       regulator-name = "vcc-phy";
+> +};
+> +
+> +&reg_dcdc1 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <3300000>;
+> +       regulator-max-microvolt = <3300000>;
+> +       regulator-name = "vcc-3v3";
+> +};
+> +
+> +&reg_dcdc2 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <1000000>;
 
-Could you please help to take a look and give some comments? Thanks in advance.
+The datasheet says the minimum voltage is 1.04V.
 
-Best Regards
-Qiao
+> +       regulator-max-microvolt = <1300000>;
+> +       regulator-name = "vdd-cpux";
+> +};
+> +
+> +/* DCDC3 is polyphased with DCDC2 */
+> +
+> +&reg_dcdc5 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <1500000>;
+> +       regulator-max-microvolt = <1500000>;
+> +       regulator-name = "vcc-dram";
+> +};
+> +
+> +&reg_dcdc6 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <1100000>;
+> +       regulator-max-microvolt = <1100000>;
+> +       regulator-name = "vdd-sys";
+> +};
+> +
+> +&reg_dldo1 {
+> +       regulator-min-microvolt = <3300000>;
+> +       regulator-max-microvolt = <3300000>;
+> +       regulator-name = "vcc-hdmi-dsi";
+> +};
+> +
+> +&reg_dldo2 {
+> +       regulator-min-microvolt = <3300000>;
+> +       regulator-max-microvolt = <3300000>;
+> +       regulator-name = "vcc-wifi";
+> +};
+> +
+> +&reg_dldo4 {
+> +       regulator-min-microvolt = <1800000>;
+> +       regulator-max-microvolt = <3300000>;
+> +       regulator-name = "vcc-wifi-io";
+> +};
+> +
+> +&reg_eldo1 {
+> +       regulator-min-microvolt = <1800000>;
+> +       regulator-max-microvolt = <1800000>;
+> +       regulator-name = "cpvdd";
+> +};
+> +
 
------Original Message-----
-From: Zhou Qiao
-Sent: Friday, July 07, 2017 5:30 PM
-To: catalin.marinas at arm.com; will.deacon at arm.com; mark.rutland at arm.com; suzuki.poulose at arm.com; mingo at kernel.org; marc.zyngier at arm.com; andre.przywara at arm.com; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-Cc: Zhou Qiao
-Subject: [PATCH V2] arm64: traps: disable irq in die()
+It looks like you are missing a few regulators? I assume you
+would add them once the peripherals that use them are added?
 
-In current die(), the irq is disabled for __die() handle, not including the possible panic() handling. Since the log in __die() can take several hundreds ms, new irq might come and interrupt current die().
+Otherwise this patch looks good.
 
-If the process calling die() holds some critical resource, and some other process scheduled later also needs it, then it would deadlock.
-The first panic will not be executed.
+ChenYu
 
-So here disable irq for the whole flow of die().
-
-Signed-off-by: Qiao Zhou <qiaozhou@asrmicro.com>
----
- arch/arm64/kernel/traps.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c index 0805b44..2e2ff88 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -274,10 +274,12 @@ static DEFINE_RAW_SPINLOCK(die_lock);  void die(const char *str, struct pt_regs *regs, int err)  {
- 	int ret;
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&die_lock, flags);
- 
- 	oops_enter();
- 
--	raw_spin_lock_irq(&die_lock);
- 	console_verbose();
- 	bust_spinlocks(1);
- 	ret = __die(str, err, regs);
-@@ -287,13 +289,15 @@ void die(const char *str, struct pt_regs *regs, int err)
- 
- 	bust_spinlocks(0);
- 	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
--	raw_spin_unlock_irq(&die_lock);
- 	oops_exit();
- 
- 	if (in_interrupt())
- 		panic("Fatal exception in interrupt");
- 	if (panic_on_oops)
- 		panic("Fatal exception");
-+
-+	raw_spin_unlock_irqrestore(&die_lock, flags);
-+
- 	if (ret != NOTIFY_STOP)
- 		do_exit(SIGSEGV);
- }
---
-2.7.4
+> +/*
+> + * The A64 chip cannot work without this regulator off, although
+> + * it seems to be only driving the AR100 core.
+> + * Maybe we don't still know well about CPUs domain.
+> + */
+> +&reg_fldo2 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <1100000>;
+> +       regulator-max-microvolt = <1100000>;
+> +       regulator-name = "vdd-cpus";
+> +};
+> +
+> +&reg_rtc_ldo {
+> +       regulator-name = "vcc-rtc";
+> +};
+> +
+>  &uart0 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&uart0_pins_a>;
+> --
+> 2.13.0
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
