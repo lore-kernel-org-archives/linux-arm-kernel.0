@@ -1,31 +1,58 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 21 Jul 2017 11:32:23 +0200
-Subject: [RFC PATCH 0/4] serial: uartps: Dynamic allocation
-Message-ID: <cover.1500629544.git.michal.simek@xilinx.com>
+Date: Fri, 21 Jul 2017 11:32:24 +0200
+Subject: [RFC PATCH 1/4] serial: uartps: Remove console_initcall from the
+ driver
+In-Reply-To: <cover.1500629544.git.michal.simek@xilinx.com>
+References: <cover.1500629544.git.michal.simek@xilinx.com>
+Message-ID: <bd75a2ab5838ae1cf44af667e24be2f02c2e9f3c.1500629544.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+register_console() is called from
+uart_add_one_port()->uart_configure_port()
+that's why register_console() is called twice.
 
-this is the initial version before next step which is move
-uart_register_driver to probe function.
-I was able to get rid of static array with uart_port structures.
-It was wired with console which is also fixed.
-And the next step is the most complicated one handle .nr in uart_driver
-structure in more generic way.
+This patch remove console_initcall to call register_console() only from
+one location.
 
-Thanks,
-Michal
+Also based on my tests cdns_uart_console_setup() is not called
+from the first register_console() call.
 
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Michal Simek (4):
-  serial: uartps: Remove console_initcall from the driver
-  serial: uartps: Use dynamic array for console port
-  serial: uartps: Move cnds_uart_get_port to probe
-  serial: uartps: Remove static port array
+I am not quite sure about this because console_initcall is called
+early but I can see any difference in usage.
+pl011 is not calling this but others are doing it.
 
- drivers/tty/serial/xilinx_uartps.c | 102 +++++++++++++++----------------------
- 1 file changed, 40 insertions(+), 62 deletions(-)
+---
+ drivers/tty/serial/xilinx_uartps.c | 14 --------------
+ 1 file changed, 14 deletions(-)
 
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index fde55dcdea5a..4614349403c1 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1298,20 +1298,6 @@ static int __init cdns_uart_console_setup(struct console *co, char *options)
+ 	.index	= -1, /* Specified on the cmdline (e.g. console=ttyPS ) */
+ 	.data	= &cdns_uart_uart_driver,
+ };
+-
+-/**
+- * cdns_uart_console_init - Initialization call
+- *
+- * Return: 0 on success, negative errno otherwise
+- */
+-static int __init cdns_uart_console_init(void)
+-{
+-	register_console(&cdns_uart_console);
+-	return 0;
+-}
+-
+-console_initcall(cdns_uart_console_init);
+-
+ #endif /* CONFIG_SERIAL_XILINX_PS_UART_CONSOLE */
+ 
+ static struct uart_driver cdns_uart_uart_driver = {
 -- 
 1.9.1
