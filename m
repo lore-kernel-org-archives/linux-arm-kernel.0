@@ -1,67 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Jul 2017 18:15:41 +0100
-Subject: [PATCH 15/16] clocksource/arm_arch_timer: Add helper to disable VDSO
- fastpath
+Date: Fri, 21 Jul 2017 18:15:40 +0100
+Subject: [PATCH 14/16] ARM: Handle trapping of CNTFRQ from userspace
 In-Reply-To: <20170721171542.27639-1-marc.zyngier@arm.com>
 References: <20170721171542.27639-1-marc.zyngier@arm.com>
-Message-ID: <20170721171542.27639-16-marc.zyngier@arm.com>
+Message-ID: <20170721171542.27639-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are going to add more paths where we have to disable the
-counter access in the VDSO, let's add a helper that does exactly that.
+As we're about to enable trapping of some of the userspace-visible
+timer registers, let's add a handler for CNTFRQ.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
+ arch/arm/kernel/traps.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index aae87c4c546e..4f4633157978 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -188,6 +188,22 @@ struct ate_acpi_oem_info {
- 	u32 oem_revision;
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index bda12a243b40..1c1b86af20e9 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -755,9 +755,26 @@ static struct undef_hook cntvct_hook = {
+ 	.fn		= read_cntvct_trap,
  };
  
-+static void __maybe_unused disable_vdso(void)
++static int read_cntfrq_trap(struct pt_regs *regs, unsigned int instr)
 +{
-+	/*
-+	 * Don't use the vdso fastpath if errata require using the
-+	 * out-of-line counter accessor and/or trap its access. We may
-+	 * change our mind pretty late in the game (with a per-CPU
-+	 * erratum, for example), so change both the default value and
-+	 * the vdso itself.
-+	 */
-+	if (vdso_default) {
-+		pr_info("Disabling VDSO direct access\n");
-+		clocksource_counter.archdata.vdso_direct = false;
-+		vdso_default = false;
-+	}
++	int reg = (instr >> 12) & 15;
++	if (reg == 15)
++		return 1;
++	regs->uregs[reg] = arch_timer_get_rate();
++	regs->ARM_pc += 4;
++	return 0;
 +}
 +
- #ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-@@ -457,16 +473,8 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
- 
- 	static_branch_enable(&arch_timer_read_ool_enabled);
- 
--	/*
--	 * Don't use the vdso fastpath if errata require using the
--	 * out-of-line counter accessor. We may change our mind pretty
--	 * late in the game (with a per-CPU erratum, for example), so
--	 * change both the default value and the vdso itself.
--	 */
--	if (wa->read_cntvct_el0) {
--		clocksource_counter.archdata.vdso_direct = false;
--		vdso_default = false;
--	}
-+	if (wa->read_cntvct_el0)
-+		disable_vdso();
++static struct undef_hook cntfrq_hook = {
++	.instr_mask	= 0x0fff0fff,
++	.instr_val	= 0x0e1e0f10,
++	.fn		= read_cntfrq_trap,
++};
++
+ static int __init arch_timer_hook_init(void)
+ {
+ 	register_undef_hook(&cntvct_hook);
++	register_undef_hook(&cntfrq_hook);
+ 	return 0;
  }
  
- static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
 -- 
 2.11.0
