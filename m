@@ -1,139 +1,63 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 21 Jul 2017 15:24:28 +0100
-Subject: [PATCH v2 3/4] net: ethernet: nb8800: Fix RGMII TX clock delay
- setup
-In-Reply-To: <168bfa24-1dfe-e389-ab75-367e6bd2141a@sigmadesigns.com> (Marc
- Gonzalez's message of "Fri, 21 Jul 2017 16:18:09 +0200")
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 21 Jul 2017 16:36:41 +0200
+Subject: [PATCH v2 1/4] net: phy: at803x: Document RGMII RX and TX clock
+ delay issues
+In-Reply-To: <1c35e791-c181-2855-8463-b3b0ef5367a2@codeaurora.org>
 References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
- <5a68bec8-0b1d-bcfe-65fb-b10399ec75be@sigmadesigns.com>
- <yw1xy3riosag.fsf@mansr.com>
- <53fbf5e1-8d37-9734-be3f-77128ada9dfb@sigmadesigns.com>
- <yw1xtw25q4vb.fsf@mansr.com>
- <168bfa24-1dfe-e389-ab75-367e6bd2141a@sigmadesigns.com>
-Message-ID: <yw1xpoctq34z.fsf@mansr.com>
+ <051653a2-946f-6a0b-4cff-b403d1197038@sigmadesigns.com>
+ <a9d3777c-1752-d79b-8302-d09c5f736a9f@codeaurora.org>
+ <db666f79-5ee3-f136-527e-aeb9cc6425b7@sigmadesigns.com>
+ <1c35e791-c181-2855-8463-b3b0ef5367a2@codeaurora.org>
+Message-ID: <ee921ae6-4501-8406-2deb-91e884c802d3@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+On 21/07/2017 16:06, Timur Tabi wrote:
 
-> On 21/07/2017 15:47, M?ns Rullg?rd wrote:
+> On 7/21/17 8:29 AM, Marc Gonzalez wrote:
 >
->> Marc Gonzalez wrote:
->> 
->>> On 21/07/2017 15:04, M?ns Rullg?rd wrote:
->>>
->>>> Marc Gonzalez wrote:
->>>>
->>>>> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
->>>>> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
->>>>> there are 4 RGMII modes to handle:
->>>>>
->>>>> "rgmii" (RX and TX delays are added by the MAC when required)
->>>>> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
->>>>> 	the MAC should not add the RX or TX delays in this case)
->>>>> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
->>>>> 	the MAC should not add an RX delay in this case)
->>>>> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
->>>>> 	the MAC should not add an TX delay in this case)
->>>>>
->>>>> Add TX delay in the MAC only for rgmii and rgmii-rxid.
->>>>>
->>>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>>>> ---
->>>>>  drivers/net/ethernet/aurora/nb8800.c | 6 ++++--
->>>>>  1 file changed, 4 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
->>>>> index ded041dbafe7..f3ed320eb4ad 100644
->>>>> --- a/drivers/net/ethernet/aurora/nb8800.c
->>>>> +++ b/drivers/net/ethernet/aurora/nb8800.c
->>>>> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
->>>>>  		break;
->>>>>
->>>>>  	case PHY_INTERFACE_MODE_RGMII:
->>>>> -		pad_mode = PAD_MODE_RGMII;
->>>>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
->>>>> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>>>>  		break;
->>>>>
->>>>> +	case PHY_INTERFACE_MODE_RGMII_ID:
->>>>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
->>>>> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>>>> +		pad_mode = PAD_MODE_RGMII;
->>>>>  		break;
->>>>>
->>>>>  	default:
->>>>
->>>> I still don't like this.  Having both the MAC and PHY drivers react to
->>>> the phy-connection-type property is bound to cause trouble somewhere.
->>>>
->>>> The only way out of the current mess is to define new properties for
->>>> both MAC and PHY that override the existing ones if present.
->>>
->>> Do you mean defining 4 new bindings and their corresponding
->>> phy_interface_t enum values? For example:
->>>
->>> "rgmii-v2"
->>> "rgmii-id-v2"
->>> "rgmii-rxid-v2"
->>> "rgmii-txid-v2"
->>>
->>> 	PHY_INTERFACE_MODE_RGMII_V2,
->>> 	PHY_INTERFACE_MODE_RGMII_ID_V2,
->>> 	PHY_INTERFACE_MODE_RGMII_RXID_V2,
->>> 	PHY_INTERFACE_MODE_RGMII_TXID_V2,
->>>
->>> And then handling these new enums in the at803x and nb8800 drivers?
->> 
->> It has already been suggested to add new properties specifying desired
->> delays in picoseconds.  If present on the MAC node, the MAC driver
->> should attempt to provide the delay, and if present on the PHY node, the
->> PHY driver is responsible.
->
-> Sorry, I had already forgotten about Florian's suggestion:
->> If you introduced PHY and/or MAC specific properties to configure the
->> delays in the appropriate unit of time (say ps), you could use a
->> non-compliant 'phy-mode' just to satisfy the driver/PHY library and
->> still override the delays you need.
->
-> So we would need two properties (RX and TX).
-> "rgmii_rx_skew_ps" and "rgmii_tx_skew_ps"
->
-> but it's not clear to me how the MAC probe function communicates
-> the arguments to the phy driver. Looks like we would need to add
-> two fields to struct phy_device, and maybe define a new phy-mode
-> to instruct the PHY driver to look for the two fields.
+>> I don't understand what you're saying.
+>>
+>> It is a correct observation that the code enabling
+>> RGMII RX clock delay is a NOP, since that bit will
+>> always be set at that point.
+>>
+>> The spec for the 8035 (I haven't checked for 8030 and 8031,
+>> is that what you meant by "other systems"?) states that
+>> Sel_clk125m_dsp, which is described as:
+>> "Control bit for rgmii interface rx clock delay"
+>> is 1 after HW reset, 1 after SW reset.
+>>
+>> So my statement "RX clock delay is enabled at reset"
+>> is universally true. It's not just on some systems.
+> 
+> Ok, taken out of context, the comment doesn't really explain why the 
+> code is the way it is.  I'm not really happy about the word "assumes". 
 
-There's no need for the drivers to communicate.  The location of the
-properties in the device tree determines which driver should deal with
-it.
+If a HW setting defaults to 0 at reset, and some init is called
+right after reset, then you know the setting's value is 0.
+If you need that value to be 1, all you need is a function
+setting it to 1. This is the current situation.
 
-> I don't have time to work on that for now, but I do need to
-> fix the nb8800 driver now. Can we apply the following patch
-> in the interim?
->
-> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-> index ded041dbafe7..e94159507847 100644
-> --- a/drivers/net/ethernet/aurora/nb8800.c
-> +++ b/drivers/net/ethernet/aurora/nb8800.c
-> @@ -1268,11 +1268,10 @@ static int nb8800_tangox_init(struct net_device *dev)
->                 break;
->
->         case PHY_INTERFACE_MODE_RGMII:
-> -               pad_mode = PAD_MODE_RGMII;
-> -               break;
-> -
-> +       case PHY_INTERFACE_MODE_RGMII_ID:
-> +       case PHY_INTERFACE_MODE_RGMII_RXID:
->         case PHY_INTERFACE_MODE_RGMII_TXID:
-> -               pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
-> +               pad_mode = PAD_MODE_RGMII;
->                 break;
->
->         default:
+Commit 2e5f9f281ee8 assumes 0 at reset, and provides a function
+setting the value to 1.
 
-Simply stop reacting to the delay aspect of the phy-connection-type
-property?  Yes, I'm fine with that.
+Reality is different. The HW setting defaults to 1 at reset.
+So it turns out that the function setting the value to 1
+is pointless, because the value is already 1. There is
+however no way to set the value to 0.
 
--- 
-M?ns Rullg?rd
+Does that explain why I wrote "assume"?
+
+Also the commit message:
+"The current code supports enabling RGMII RX and TX clock delays.
+The unstated assumption is that these settings are disabled by
+default at reset, which is not the case."
+
+> Maybe you should add a sentence explaining when the code is NOT a no-op.
+
+The code is *NEVER* NOT a no-op.
+I.e. the code enabling RX clock delay is ALWAYS a no-op.
+I don't understand what you think is unclear in my comment.
+
+Regards.
