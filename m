@@ -1,69 +1,32 @@
 From: code@mmayer.net (Markus Mayer)
-Date: Fri, 21 Jul 2017 12:27:32 -0700
-Subject: [PATCH v2 1/4] Documentation: devicetree: add binding for Broadcom
- STB AVS TMON
+Date: Fri, 21 Jul 2017 12:27:34 -0700
+Subject: [PATCH v2 3/4] ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
 In-Reply-To: <20170721192735.6546-1-code@mmayer.net>
 References: <20170721192735.6546-1-code@mmayer.net>
-Message-ID: <20170721192735.6546-2-code@mmayer.net>
+Message-ID: <20170721192735.6546-4-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brian Norris <computersforpeace@gmail.com>
+From: Markus Mayer <mmayer@broadcom.com>
 
-Add binding for Broadcom STB thermal.
+Turn on CONFIG_BRCMSTB_THERMAL as module.
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
 Signed-off-by: Markus Mayer <mmayer@broadcom.com>
 ---
- .../devicetree/bindings/thermal/brcm,avs-tmon.txt    | 20 ++++++++++++++++++++
- MAINTAINERS                                          |  8 ++++++++
- 2 files changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt b/Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
-new file mode 100644
-index 0000000..9d43553
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
-@@ -0,0 +1,20 @@
-+* Broadcom STB thermal management
-+
-+Thermal management core, provided by the AVS TMON hardware block.
-+
-+Required properties:
-+- compatible: must be "brcm,avs-tmon" and/or "brcm,avs-tmon-bcm7445"
-+- reg: address range for the AVS TMON registers
-+- interrupts: temperature monitor interrupt, for high/low threshold triggers
-+- interrupt-names: should be "tmon"
-+- interrupt-parent: the parent interrupt controller
-+
-+Example:
-+
-+	thermal at f04d1500 {
-+		compatible = "brcm,avs-tmon-bcm7445", "brcm,avs-tmon";
-+		reg = <0xf04d1500 0x28>;
-+		interrupts = <0x6>;
-+		interrupt-names = "tmon";
-+		interrupt-parent = <&avs_host_l2_intc>;
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 205d397..a683d4c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2928,6 +2928,14 @@ S:	Maintained
- F:	Documentation/devicetree/bindings/cpufreq/brcm,stb-avs-cpu-freq.txt
- F:	drivers/cpufreq/brcmstb*
- 
-+BROADCOM STB AVS TMON DRIVER
-+M:	Markus Mayer <mmayer@broadcom.com>
-+M:	bcm-kernel-feedback-list at broadcom.com
-+L:	linux-pm at vger.kernel.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
-+F:	drivers/thermal/broadcom/brcmstb*
-+
- BROADCOM SPECIFIC AMBA DRIVER (BCMA)
- M:	Rafa? Mi?ecki <zajec5@gmail.com>
- L:	linux-wireless at vger.kernel.org
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 4d19c1b..230f7fa 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -455,6 +455,7 @@ CONFIG_SENSORS_NTC_THERMISTOR=m
+ CONFIG_SENSORS_PWM_FAN=m
+ CONFIG_SENSORS_INA2XX=m
+ CONFIG_CPU_THERMAL=y
++CONFIG_BRCMSTB_THERMAL=m
+ CONFIG_ROCKCHIP_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
 -- 
 2.7.4
