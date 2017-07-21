@@ -1,223 +1,82 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 21 Jul 2017 15:44:07 +0800
-Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: a64: enable AXP803
- for Banana Pi M64
-In-Reply-To: <CAGb2v67Ntz_Qr0ek5sb-RRPnb0W-vEjx4_XC+SzHJDcr7ZLrkg@mail.gmail.com>
-References: <20170720230717.58255-1-icenowy@aosc.io>
- <20170720230717.58255-2-icenowy@aosc.io>
- <CAGb2v67Ntz_Qr0ek5sb-RRPnb0W-vEjx4_XC+SzHJDcr7ZLrkg@mail.gmail.com>
-Message-ID: <DA3547F4-D0C7-46A9-8C7F-3F1AD7CBCB11@aosc.io>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 21 Jul 2017 09:46:01 +0200
+Subject: [PATCH 2/4] gpio: davinci: Handle the return value of
+ davinci_gpio_irq_setup function
+In-Reply-To: <02965359-ecf1-b934-6b7a-87162d7d00a4@ti.com>
+References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
+ <1500375436-9435-3-git-send-email-j-keerthy@ti.com>
+ <20170719111000.GX29638@localhost>
+ <cbea9082-3799-281b-1364-50e442f5362f@ti.com>
+ <cc66dfaf-05c5-8d55-03a6-556ec83c4487@ti.com>
+ <20170720095047.GA2729@localhost>
+ <47055927-5102-b39f-fdbb-b5d89cb14632@ti.com>
+ <20170720100509.GB2729@localhost>
+ <02965359-ecf1-b934-6b7a-87162d7d00a4@ti.com>
+Message-ID: <20170721074601.GC2729@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 20, 2017 at 04:34:42PM -0500, Grygorii Strashko wrote:
+> 
+> 
+> On 07/20/2017 05:05 AM, Johan Hovold wrote:
+> > On Thu, Jul 20, 2017 at 03:32:27PM +0530, Keerthy wrote:
+> >> On Thursday 20 July 2017 03:20 PM, Johan Hovold wrote:
+> >>> On Thu, Jul 20, 2017 at 02:40:37PM +0530, Keerthy wrote:
+> >>>> On Thursday 20 July 2017 12:14 PM, Keerthy wrote:
+> >>>>> On Wednesday 19 July 2017 04:40 PM, Johan Hovold wrote:
+> > 
+> >>>>>> There's a separate but related bug here too as the clk_prepare_enable()
+> >>>>>> in davinci_gpio_irq_setup() is never balanced on driver unbind.
+> >>>>>
+> >>>>> Yes Johan. I will send that as a separate patch.
+> >>>>
+> >>>> This is already fixed in the latest kernel:
+> >>>>
+> >>>> commit 6dc0048cff988858254fcc26becfc1e9753efa79
+> >>>> Author: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> >>>> Date:   Tue May 23 14:48:57 2017 +0530
+> >>>
+> >>> That change only handles errors in davinci_gpio_irq_setup() (i.e. during
+> >>> probe) and not the imbalance at driver unbind that I was referring to.
+> >>
+> >> Okay got it. One more clk_unprepare_disable() call needs to be there in
+> >> probe err path.
+> > 
+> > No, you need to balance it on driver unbind, that is, in a new remove()
+> > callback.
+> > 
+> 
+> Sry, but manual driver unbind for this driver is really smth unexpected ;(
 
+It certainly wouldn't be something often used (e.g. besides during
+development) but that doesn't mean it should not be implemented.
 
-? 2017?7?21? GMT+08:00 ??3:42:07, Chen-Yu Tsai <wens@csie.org> ??:
->On Fri, Jul 21, 2017 at 7:07 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> Banana Pi M64 board uses an AXP803 PMIC.
->>
->> Enable the PMIC and its regulators.
->>
->> As we have now proper regulators support, missing or dummy regulators
->> are changed to the correct ones.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 116
->+++++++++++++++++++--
->>  1 file changed, 106 insertions(+), 10 deletions(-)
->>
->> diff --git
->a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
->b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
->> index 829922d077fb..51d67c0a0edf 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
->> @@ -58,13 +58,6 @@
->>         chosen {
->>                 stdout-path = "serial0:115200n8";
->>         };
->> -
->> -       reg_vcc3v3: vcc3v3 {
->> -               compatible = "regulator-fixed";
->> -               regulator-name = "vcc3v3";
->> -               regulator-min-microvolt = <3300000>;
->> -               regulator-max-microvolt = <3300000>;
->> -       };
->>  };
->>
->>  &ehci1 {
->> @@ -76,6 +69,7 @@
->>         pinctrl-0 = <&rgmii_pins>;
->>         phy-mode = "rgmii";
->>         phy-handle = <&ext_rgmii_phy>;
->> +       phy-supply = <&reg_dc1sw>;
->>         status = "okay";
->>  };
->>
->> @@ -99,7 +93,7 @@
->>  &mmc0 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&mmc0_pins>;
->> -       vmmc-supply = <&reg_vcc3v3>;
->> +       vmmc-supply = <&reg_dcdc1>;
->>         cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
->>         cd-inverted;
->>         disable-wp;
->> @@ -110,7 +104,8 @@
->>  &mmc1 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&mmc1_pins>;
->> -       vmmc-supply = <&reg_vcc3v3>;
->> +       vmmc-supply = <&reg_dldo2>;
->> +       vqmmc-supply = <&reg_dldo4>;
->>         bus-width = <4>;
->>         non-removable;
->>         status = "okay";
->> @@ -119,7 +114,7 @@
->>  &mmc2 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&mmc2_pins>;
->> -       vmmc-supply = <&reg_vcc3v3>;
->> +       vmmc-supply = <&reg_dcdc1>;
->>         bus-width = <8>;
->>         non-removable;
->>         cap-mmc-hw-reset;
->> @@ -130,6 +125,107 @@
->>         status = "okay";
->>  };
->>
->> +&r_rsb {
->> +       status = "okay";
->> +
->> +       axp803: pmic at 3a3 {
->> +               compatible = "x-powers,axp803";
->> +               reg = <0x3a3>;
->> +               interrupt-parent = <&r_intc>;
->> +               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->> +       };
->> +};
->> +
->> +#include "axp803.dtsi"
->> +
->> +&reg_aldo2 {
->> +       regulator-always-on;
->> +       regulator-min-microvolt = <1800000>;
->> +       regulator-max-microvolt = <3300000>;
->> +       regulator-name = "vcc-pl";
->> +};
->> +
->> +&reg_aldo3 {
->> +       regulator-always-on;
->> +       regulator-min-microvolt = <3000000>;
->> +       regulator-max-microvolt = <3000000>;
->> +       regulator-name = "vcc-pll-avcc";
->> +};
->> +
->> +&reg_dc1sw {
->> +       regulator-name = "vcc-phy";
->> +};
->> +
->> +&reg_dcdc1 {
->> +       regulator-always-on;
->> +       regulator-min-microvolt = <3300000>;
->> +       regulator-max-microvolt = <3300000>;
->> +       regulator-name = "vcc-3v3";
->> +};
->> +
->> +&reg_dcdc2 {
->> +       regulator-always-on;
->> +       regulator-min-microvolt = <1000000>;
+> So, I'm not sure if it need to be implemented and even yes - it should not be
+> a part of this patch.
+
+That's why I said "separate, but related" above.
+
+> Probably, smth like "convert driver to be a module".
 >
->The datasheet says the minimum voltage is 1.04V.
+> By the way, I've tried to unbind gpio-omap, result - failure (expected),
+> as unbind does not take into account module refcnt state.
 
-A64 datasheet?
+Indeed. We also have CONFIG_DEBUG_TEST_DRIVER_REMOVE which would try to
+unbind this driver during probe if enabled.
 
-Maybe I need to fix all A64 AXP patches.
+Getting into the habit of properly cleaning up allocated and enabled
+resources is only a good thing; it shows that the author has thought
+this through and serves as documentation of what needs to be released in
+both probe error paths and driver unbind callbacks.
 
->
->> +       regulator-max-microvolt = <1300000>;
->> +       regulator-name = "vdd-cpux";
->> +};
->> +
->> +/* DCDC3 is polyphased with DCDC2 */
->> +
->> +&reg_dcdc5 {
->> +       regulator-always-on;
->> +       regulator-min-microvolt = <1500000>;
->> +       regulator-max-microvolt = <1500000>;
->> +       regulator-name = "vcc-dram";
->> +};
->> +
->> +&reg_dcdc6 {
->> +       regulator-always-on;
->> +       regulator-min-microvolt = <1100000>;
->> +       regulator-max-microvolt = <1100000>;
->> +       regulator-name = "vdd-sys";
->> +};
->> +
->> +&reg_dldo1 {
->> +       regulator-min-microvolt = <3300000>;
->> +       regulator-max-microvolt = <3300000>;
->> +       regulator-name = "vcc-hdmi-dsi";
->> +};
->> +
->> +&reg_dldo2 {
->> +       regulator-min-microvolt = <3300000>;
->> +       regulator-max-microvolt = <3300000>;
->> +       regulator-name = "vcc-wifi";
->> +};
->> +
->> +&reg_dldo4 {
->> +       regulator-min-microvolt = <1800000>;
->> +       regulator-max-microvolt = <3300000>;
->> +       regulator-name = "vcc-wifi-io";
->> +};
->> +
->> +&reg_eldo1 {
->> +       regulator-min-microvolt = <1800000>;
->> +       regulator-max-microvolt = <1800000>;
->> +       regulator-name = "cpvdd";
->> +};
->> +
->
->It looks like you are missing a few regulators? I assume you
->would add them once the peripherals that use them are added?
+Assumptions also change over time (e.g. deferred probe and
+CONFIG_DEBUG_TEST_DRIVER_REMOVE), and by not taking such shortcuts we
+are also preventing incomplete code from being copied and reproduced in
+other drivers (e.g. on hotpluggable buses).
 
-Yes.
+So, just add the remove callback (in a separate patch) and everything is
+good.
 
-I mainly dropped CSI part, as it seems so complicate.
-
->
->Otherwise this patch looks good.
->
->ChenYu
->
->> +/*
->> + * The A64 chip cannot work without this regulator off, although
->> + * it seems to be only driving the AR100 core.
->> + * Maybe we don't still know well about CPUs domain.
->> + */
->> +&reg_fldo2 {
->> +       regulator-always-on;
->> +       regulator-min-microvolt = <1100000>;
->> +       regulator-max-microvolt = <1100000>;
->> +       regulator-name = "vdd-cpus";
->> +};
->> +
->> +&reg_rtc_ldo {
->> +       regulator-name = "vcc-rtc";
->> +};
->> +
->>  &uart0 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&uart0_pins_a>;
->> --
->> 2.13.0
->>
->> --
->> You received this message because you are subscribed to the Google
->Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it,
->send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+Thanks,
+Johan
