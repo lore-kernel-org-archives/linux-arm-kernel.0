@@ -1,65 +1,82 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 21 Jul 2017 20:15:03 +0900
-Subject: [PATCH v4 2/2] thermal: uniphier: add UniPhier thermal driver
-In-Reply-To: <CAK7LNATDY4SdGHH1_K2GhFcsXMuG_9vGECWNtNfBJ_D=AO785w@mail.gmail.com>
-References: <CAK7LNATDxacQXyJr=4b7zaWkX1Y6S8DMHEkQxECvmETemfGRfA@mail.gmail.com>
- <CAK7LNATDY4SdGHH1_K2GhFcsXMuG_9vGECWNtNfBJ_D=AO785w@mail.gmail.com>
-Message-ID: <20170721201503.BC76.4A936039@socionext.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 21 Jul 2017 12:20:08 +0100
+Subject: [PATCH] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+In-Reply-To: <5971D208.3040005@huawei.com>
+References: <1500630715-2156-1-git-send-email-guohanjun@huawei.com>
+ <5971D208.3040005@huawei.com>
+Message-ID: <84d411ff-596b-c451-29fb-f506abc4fb04@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Jul 2017 02:09:18 +0900 <yamada.masahiro@socionext.com> wrote:
+On 21/07/17 11:06, Hanjun Guo wrote:
+> On 2017/7/21 17:51, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> When running 4.13-rc1 on top of D05, I got the boot log:
+>>
+>> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+>> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+>> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+>> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+>> [    0.000000] SRAT: ITS affinity exceeding max count[4]
+>>
+>> This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
 
-> 2017-07-21 1:53 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> > 2017-07-21 1:08 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> >> 2017-07-07 10:54 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> >>> Add a thermal driver for on-chip PVT (Process, Voltage and Temperature)
-> >>> monitoring unit implemented on UniPhier SoCs. This driver supports
-> >>> temperature monitoring and alert function.
-> >>>
-> >>> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> >>
-> >>
-> >> Sparse reports several warnings.
-> >>
-> >>
-> >>   CHECK   drivers/thermal/uniphier_thermal.c
-> >> drivers/thermal/uniphier_thermal.c:276:52: warning: incorrect type in
-> >> argument 1 (different base types)
-> >> drivers/thermal/uniphier_thermal.c:276:52:    expected restricted
-> >> __be32 const [usertype] *cell
-> >> drivers/thermal/uniphier_thermal.c:276:52:    got unsigned int const
-> >> [usertype] *[assigned] calib
-> >> drivers/thermal/uniphier_thermal.c:277:58: warning: incorrect type in
-> >> argument 1 (different base types)
-> >> drivers/thermal/uniphier_thermal.c:277:58:    expected restricted
-> >> __be32 const [usertype] *cell
-> >> drivers/thermal/uniphier_thermal.c:277:58:    got unsigned int const
-> >> [usertype] *
-> >> drivers/thermal/uniphier_thermal.c:136:9: warning: cast truncates bits
-> >> from constant value (fffffffff becomes ffffffff)
-> >> drivers/thermal/uniphier_thermal.c:141:9: warning: cast truncates bits
-> >> from constant value (7ffffffff becomes ffffffff)
-> >> drivers/thermal/uniphier_thermal.c:153:9: warning: cast truncates bits
-> >> from constant value (ffffffffff0001 becomes ffff0001)
-> >> drivers/thermal/uniphier_thermal.c:170:9: warning: cast truncates bits
-> >> from constant value (7ffffffffff becomes ffffffff)
-> >> drivers/thermal/uniphier_thermal.c:185:9: warning: cast truncates bits
-> >> from constant value (7ffffffffff becomes ffffffff)
-> >>
-> >
-> > Hmm.
-> > The endian mismatch can be fixed by replacing u32 with __be32.
-> >
-> > I can not get the truncates bits warnings.
-> > Why sparse complains about this...
+I'm not seeing this on the D05 I have access to. Actually, I'm not
+seeing any data related to SRAT and the ITS. Is that a different firmware?
+
+>>
+>> So dynamically alloc the memory needed instead of using
+>> its_srat_maps[MAX_NUMNODES], which count the number of
+>> ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+>> then build the mapping of numa node to ITS ID.
+>>
+>> After doing this, I got what I wanted:
+>>
+>> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+>> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+>> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+>> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+>> [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+>> [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+>> [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+>> [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+>>
+>> Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 28 +++++++++++++++++++++-------
+>>  1 file changed, 21 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 3ccdf76..fb1c090 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -1847,7 +1847,7 @@ struct its_srat_map {
+>>  	u32	its_id;
+>>  };
+>>  
+>> -static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
+>> +static struct its_srat_map *its_srat_maps __initdata;
+>>  static int its_in_srat __initdata;
+>>  
+>>  static int __init acpi_get_its_numa_node(u32 its_id)
+>> @@ -1861,6 +1861,12 @@ static int __init acpi_get_its_numa_node(u32 its_id)
+>>  	return NUMA_NO_NODE;
+>>  }
 > 
-> My bad - I was cross-compiling with ARCH=arm, so I think that's why.
-> 
-> I think the incorrect type should be fixed.  (u32 -> __be32)
+> Oops, need to check if the its_srat_maps valid or not here, please
+> comment on what else I'm missing or wrong, then I will prepare another
+> version.
 
-Thanks for your pointing out.
-I'll fix it next.
+Please post a patch that has all of the fixes, and I'll review that.
 
-Best Regards,
-Kunihiko Hayashi
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
