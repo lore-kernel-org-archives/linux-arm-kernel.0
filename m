@@ -1,70 +1,83 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Jul 2017 18:14:32 +0100
-Subject: [PATCH 00/16] arm/arm64: Workaround misprogrammed CNTFRQ
-Message-ID: <20170721171448.27548-1-marc.zyngier@arm.com>
+Date: Fri, 21 Jul 2017 18:14:34 +0100
+Subject: [PATCH 02/16] arm64: Add decoding macros for CP15_32 and CP15_64 traps
+In-Reply-To: <20170721171448.27548-1-marc.zyngier@arm.com>
+References: <20170721171448.27548-1-marc.zyngier@arm.com>
+Message-ID: <20170721171448.27548-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is an unfortunate situation that CNTFRQ{,_EL0} is often
-misprogrammed from the firmware side, leaving it up to the kernel to
-work around it. This is usually done by providing an alternative
-frequency in the Device Tree.
+So far, we don't have anything to help decoding ESR_ELx when dealing
+with ESR_ELx_EC_CP15_{32,64}. As we're about to handle some of those,
+let's add some useful macros.
 
-Unfortunately, CNTFRQ is accessible from EL0, giving userspace the
-wrong frequency, and potentially a different frequency per CPU, which
-is definitely not what you want. A possible workaround is to trap this
-into the kernel and to emulate it (together with the VDSO being
-disabled), and this is what this series is achieving.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/esr.h | 52 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-As it is obvious from the shortlog below, most of the required code is
-actually architecture specific, and required to handle these traps
-properly.
-
-On arm64, we mostly have things in order already for AArch64 code. But
-we lack the infrastructure to deal with cp15 traps from a 32bit
-userspace. We could do it by reading userspace the userspace code and
-use the undef_hook mechanism, but that's clearly very ugly.
-
-Instead, we mimic the way we trap system register accesses for 64bit
-code. An added complexity comes from the fact that we need to handle
-condition execution in both ARM and Thumb modes (including the IT
-state) when trapping such accesses.
-
-32bit ARM is also lacking any form of conditional Thumb handling, so
-we add that before adding the undef handlers.
-
-This has been tested as KVM guests, using kvmtool and the
---override-bad-firmware-cntfrq option to trick the VM into using a
-different frequency.
-
-Marc Zyngier (16):
-  arm64: Use arch_timer_get_rate when trapping CNTFRQ_EL0
-  arm64: Add decoding macros for CP15_32 and CP15_64 traps
-  arm64: compat: Add separate CP15 trapping hook
-  arm64: compat: Add condition code checks and IT advance
-  arm64: compat: Add cp15_32 and cp15_64 handler arrays
-  arm64: compat: Add CNTVCT trap handler
-  arm64: compat: Add CNTFRQ trap handler
-  ARM: Let arm_check_condition work with Thumb
-  ARM: Check condition code before trying to handle an UNDEF
-  ARM: Add arm_advance_itstate helper
-  ARM: Advance the IT state on successful emulation of an UNDEF
-  ARM: Simplify condition checks in swp_handler
-  ARM: Handle trapping of CNTVCT from userspace
-  ARM: Handle trapping of CNTFRQ from userspace
-  clocksource/arm_arch_timer: Add helper to disable VDSO fastpath
-  clocksource/arm_arch_timer: Trap user access to CNT{VCT,FRQ} if CNTFRQ
-    is invalid
-
- arch/arm/include/asm/opcodes.h       |   2 +
- arch/arm/kernel/opcodes.c            |  68 +++++++++++++++-
- arch/arm/kernel/swp_emulate.c        |  15 +---
- arch/arm/kernel/traps.c              |  64 ++++++++++++++-
- arch/arm64/include/asm/esr.h         |  58 +++++++++++++
- arch/arm64/kernel/entry.S            |  14 +++-
- arch/arm64/kernel/traps.c            | 152 ++++++++++++++++++++++++++++++++++-
- drivers/clocksource/arm_arch_timer.c |  56 +++++++++----
- 8 files changed, 397 insertions(+), 32 deletions(-)
-
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 8cabd57b6348..fc71b89c99f9 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -206,6 +206,58 @@
+ 		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
+ 		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
+ 
++#define ESR_ELx_CP15_32_ISS_COND_SHIFT	20
++#define ESR_ELx_CP15_32_ISS_COND_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_COND_SHIFT)
++
++#define ESR_ELx_CP15_32_ISS_DIR_MASK	0x1
++#define ESR_ELx_CP15_32_ISS_DIR_READ	0x1
++#define ESR_ELx_CP15_32_ISS_DIR_WRITE	0x0
++
++#define ESR_ELx_CP15_32_ISS_RT_SHIFT	5
++#define ESR_ELx_CP15_32_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_CP15_32_ISS_RT_SHIFT)
++#define ESR_ELx_CP15_32_ISS_CRM_SHIFT	1
++#define ESR_ELx_CP15_32_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_CRM_SHIFT)
++#define ESR_ELx_CP15_32_ISS_CRN_SHIFT	10
++#define ESR_ELx_CP15_32_ISS_CRN_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_CRN_SHIFT)
++#define ESR_ELx_CP15_32_ISS_OP1_SHIFT	14
++#define ESR_ELx_CP15_32_ISS_OP1_MASK	(UL(0x7) << ESR_ELx_CP15_32_ISS_OP1_SHIFT)
++#define ESR_ELx_CP15_32_ISS_OP2_SHIFT	17
++#define ESR_ELx_CP15_32_ISS_OP2_MASK	(UL(0x7) << ESR_ELx_CP15_32_ISS_OP2_SHIFT)
++
++#define ESR_ELx_CP15_32_ISS_SYS_MASK	(ESR_ELx_CP15_32_ISS_OP1_MASK | \
++					 ESR_ELx_CP15_32_ISS_OP2_MASK | \
++					 ESR_ELx_CP15_32_ISS_CRN_MASK | \
++					 ESR_ELx_CP15_32_ISS_CRM_MASK | \
++					 ESR_ELx_CP15_32_ISS_DIR_MASK)
++#define ESR_ELx_CP15_32_ISS_SYS_VAL(op1, op2, crn, crm) \
++					(((op1) << ESR_ELx_CP15_32_ISS_OP1_SHIFT) | \
++					 ((op2) << ESR_ELx_CP15_32_ISS_OP2_SHIFT) | \
++					 ((crn) << ESR_ELx_CP15_32_ISS_CRN_SHIFT) | \
++					 ((crm) << ESR_ELx_CP15_32_ISS_CRM_SHIFT))
++
++#define ESR_ELx_CP15_64_ISS_DIR_MASK	0x1
++#define ESR_ELx_CP15_64_ISS_DIR_READ	0x1
++#define ESR_ELx_CP15_64_ISS_DIR_WRITE	0x0
++
++#define ESR_ELx_CP15_64_ISS_RT_SHIFT	5
++#define ESR_ELx_CP15_64_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_CP15_64_ISS_RT_SHIFT)
++
++#define ESR_ELx_CP15_64_ISS_RT2_SHIFT	10
++#define ESR_ELx_CP15_64_ISS_RT2_MASK	(UL(0x1f) << ESR_ELx_CP15_64_ISS_RT2_SHIFT)
++
++#define ESR_ELx_CP15_64_ISS_OP1_SHIFT	16
++#define ESR_ELx_CP15_64_ISS_OP1_MASK	(UL(0xf) << ESR_ELx_CP15_64_ISS_OP1_SHIFT)
++#define ESR_ELx_CP15_64_ISS_CRM_SHIFT	1
++#define ESR_ELx_CP15_64_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_CP15_64_ISS_CRM_SHIFT)
++
++#define ESR_ELx_CP15_64_ISS_SYS_VAL(op1, crm) \
++					(((op1) << ESR_ELx_CP15_64_ISS_OP1_SHIFT) | \
++					 ((crm) << ESR_ELx_CP15_64_ISS_CRM_SHIFT))
++
++#define ESR_ELx_CP15_64_ISS_SYS_MASK	(ESR_ELx_CP15_64_ISS_OP1_MASK |	\
++					 ESR_ELx_CP15_64_ISS_CRM_MASK | \
++					 ESR_ELx_CP15_64_ISS_DIR_MASK)
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
 -- 
 2.11.0
