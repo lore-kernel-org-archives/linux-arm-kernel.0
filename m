@@ -1,33 +1,65 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 21 Jul 2017 14:12:32 +0100
-Subject: [PATCH v2 4/8] ARM: NOMMU: Disallow MPU for XIP
-In-Reply-To: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
-References: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1500642756-9264-5-git-send-email-vladimir.murzin@arm.com>
+Date: Fri, 21 Jul 2017 14:12:28 +0100
+Subject: [PATCH v2 0/8] ARM: NOMMU: MPU updates
+Message-ID: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that MPU never worked with XIP, so we just disallow such
-combination.
+Hi,
 
-Tested-by: Szemz? Andr?s <sza@esh.hu>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/Kconfig-nommu | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This is an update of the existent MPU code which consist set of
+clean-ups and enhancements. The most significant changes are in the
+way how MPU settings sync-up for secondaries (PATCH 3/8), more
+flexible layout for memory (PATCH 7/8) and support for XIP (PATCH
+8/8). Since there is no in-tree user of MPU, support for M-class has
+been added (PATCH 6/8).
 
-diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
-index b757634..6d18395 100644
---- a/arch/arm/Kconfig-nommu
-+++ b/arch/arm/Kconfig-nommu
-@@ -52,7 +52,7 @@ config REMAP_VECTORS_TO_RAM
- 
- config ARM_MPU
-        bool 'Use the ARM v7 PMSA Compliant MPU'
--       depends on CPU_V7
-+       depends on !XIP_KERNEL && CPU_V7
-        default y
-        help
-          Some ARM systems without an MMU have instead a Memory Protection
+There is also practical benefit of patch set:
+
+"These MPU patches introduce a nice feature that it simplifies the
+bootloader: do not need to setup the MPU, for example for coherent DMA
+region, which is described in device-tree too." Andr?s Szemz?
+
+Changelog:
+           v1 -> v2
+              - support for XIP (PATCH 7/8)
+	      - rebased on 4.13-rc1
+
+        RFC v2 -> v1
+               - dropped RFC tag
+	       - Tested-by from Andr?s
+	       - rebased on 4.12-rc5
+
+           RFC -> RFC v2
+	       - fixed MPU enable for v7m (PATCH 6/7)
+
+Thanks!
+
+Vladimir Murzin (8):
+  ARM: NOMMU: Move out MPU setup in separate module
+  ARM: NOMMU: Update MPU accessors to use cp15 helpers
+  ARM: NOMMU: Rework MPU to be mostly done in C
+  ARM: NOMMU: Disallow MPU for XIP
+  ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+  ARM: V7M: Add support for MPU to M-class
+  ARM: NOMMU: Use more MPU regions to cover memory
+  ARM: NOMMU: Support MPU in XIP configuration
+
+ arch/arm/Kconfig                  |   9 -
+ arch/arm/Kconfig-nommu            |  17 +-
+ arch/arm/include/asm/cputype.h    |  10 +
+ arch/arm/include/asm/mpu.h        |  24 +-
+ arch/arm/include/asm/smp.h        |   2 +-
+ arch/arm/include/asm/v7m.h        |  10 +
+ arch/arm/kernel/asm-offsets.c     |  11 +
+ arch/arm/kernel/head-nommu.S      | 138 ++++++++---
+ arch/arm/kernel/smp.c             |   2 +-
+ arch/arm/kernel/vmlinux-xip.lds.S |   3 +
+ arch/arm/mm/Makefile              |   1 +
+ arch/arm/mm/nommu.c               | 254 +-------------------
+ arch/arm/mm/pmsa-v7.c             | 471 ++++++++++++++++++++++++++++++++++++++
+ 13 files changed, 651 insertions(+), 301 deletions(-)
+ create mode 100644 arch/arm/mm/pmsa-v7.c
+
 -- 
 2.0.0
