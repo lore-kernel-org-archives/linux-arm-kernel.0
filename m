@@ -1,60 +1,95 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 21 Jul 2017 11:32:27 +0200
-Subject: [RFC PATCH 4/4] serial: uartps: Remove static port array
+Date: Fri, 21 Jul 2017 11:32:25 +0200
+Subject: [RFC PATCH 2/4] serial: uartps: Use dynamic array for console port
 In-Reply-To: <cover.1500629544.git.michal.simek@xilinx.com>
 References: <cover.1500629544.git.michal.simek@xilinx.com>
-Message-ID: <1764822fbab7d1072270436e3b6160353c06c553.1500629544.git.michal.simek@xilinx.com>
+Message-ID: <d12d636176b330f5ccfe1325286f902ee0f10680.1500629544.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allocate uart port structure dynamically.
+Driver console functions are using pointer to static array with fixed
+size. There can be only one serial console at the time which is found
+by register_console(). register_console() is filling cons->index to
+port->line value.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/tty/serial/xilinx_uartps.c | 16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
+ drivers/tty/serial/xilinx_uartps.c | 29 ++++++++++++++++++++++++-----
+ 1 file changed, 24 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 4fb74baeae35..1c9ec8c4c2b6 100644
+index 4614349403c1..e6470a3111ce 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1102,8 +1102,6 @@ static void cdns_uart_pm(struct uart_port *port, unsigned int state,
- #endif
- };
+@@ -1211,6 +1211,10 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
+ OF_EARLYCON_DECLARE(cdns, "cdns,uart-r1p12", cdns_early_console_setup);
+ OF_EARLYCON_DECLARE(cdns, "xlnx,zynqmp-uart", cdns_early_console_setup);
  
--static struct uart_port cdns_uart_port[CDNS_UART_NR_PORTS];
--
- #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
++
++/* Static pointer to console port */
++static struct uart_port *console_port;
++
  /**
-  * cdns_uart_console_wait_tx - Wait for the TX to be full
-@@ -1443,6 +1441,9 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 			GFP_KERNEL);
- 	if (!cdns_uart_data)
- 		return -ENOMEM;
-+	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
-+	if (!port)
-+		return -ENOMEM;
+  * cdns_uart_console_write - perform write operation
+  * @co: Console handle
+@@ -1220,7 +1224,7 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
+ static void cdns_uart_console_write(struct console *co, const char *s,
+ 				unsigned int count)
+ {
+-	struct uart_port *port = &cdns_uart_port[co->index];
++	struct uart_port *port = console_port;
+ 	unsigned long flags;
+ 	unsigned int imr, ctrl;
+ 	int locked = 1;
+@@ -1266,15 +1270,13 @@ static void cdns_uart_console_write(struct console *co, const char *s,
+  */
+ static int __init cdns_uart_console_setup(struct console *co, char *options)
+ {
+-	struct uart_port *port = &cdns_uart_port[co->index];
++	struct uart_port *port = console_port;
++
+ 	int baud = 9600;
+ 	int bits = 8;
+ 	int parity = 'n';
+ 	int flow = 'n';
  
- 	match = of_match_node(cdns_uart_of_match, pdev->dev.of_node);
- 	if (match && match->data) {
-@@ -1508,16 +1509,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	if (id < 0)
- 		id = 0;
- 
--	/* Try the given port id if failed use default method */
--	if (cdns_uart_port[id].mapbase != 0) {
--		/* Find the next unused port */
--		for (id = 0; id < CDNS_UART_NR_PORTS; id++)
--			if (cdns_uart_port[id].mapbase == 0)
--				break;
--	}
+-	if (co->index < 0 || co->index >= CDNS_UART_NR_PORTS)
+-		return -EINVAL;
 -
--	port = &cdns_uart_port[id];
--	if (!port || id >= CDNS_UART_NR_PORTS) {
-+	if (id >= CDNS_UART_NR_PORTS) {
- 		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
- 		rc = -ENODEV;
- 		goto err_out_notif_unreg;
+ 	if (!port->membase) {
+ 		pr_debug("console on " CDNS_UART_TTY_NAME "%i not present\n",
+ 			 co->index);
+@@ -1570,6 +1572,17 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 	pm_runtime_set_active(&pdev->dev);
+ 	pm_runtime_enable(&pdev->dev);
+ 
++#ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
++	/*
++	 * If console hasn't been found yet try to assign this port
++	 * because it is required to be assigned for console setup function.
++	 * If register_console() don't assign value, then console_port pointer
++	 * is cleanup.
++	 */
++	if (cdns_uart_uart_driver.cons->index == -1)
++		console_port = port;
++#endif
++
+ 	rc = uart_add_one_port(&cdns_uart_uart_driver, port);
+ 	if (rc) {
+ 		dev_err(&pdev->dev,
+@@ -1577,6 +1590,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 		goto err_out_pm_disable;
+ 	}
+ 
++#ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
++	/* This is not port which is used for console that's why clean it up */
++	if (cdns_uart_uart_driver.cons->index == -1)
++		console_port = NULL;
++#endif
++
+ 	return 0;
+ 
+ err_out_pm_disable:
 -- 
 1.9.1
