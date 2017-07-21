@@ -1,29 +1,34 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 21 Jul 2017 13:19:16 -0300
-Subject: [PATCH v1] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
-In-Reply-To: <CANLsYkxDLVONpuQpF6Zo-gUPf+WVt2v+DLNduq0mDMk0XAZ5hw@mail.gmail.com>
-References: <1499878883-3066-1-git-send-email-mike.leach@linaro.org>
- <CANLsYkxDLVONpuQpF6Zo-gUPf+WVt2v+DLNduq0mDMk0XAZ5hw@mail.gmail.com>
-Message-ID: <20170721161916.GH4134@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Jul 2017 18:19:35 +0200
+Subject: [PATCH] clk: sunxi-ng: sun5i: Add clk_set_rate_parent to the CPU clock
+Message-ID: <20170721161935.18411-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, Jul 21, 2017 at 08:50:09AM -0600, Mathieu Poirier escreveu:
-> On 12 July 2017 at 11:01, Mike Leach <mike.leach@linaro.org> wrote:
-> > The value passed into the perf.data file for the CONFIGR register in ETMv4
-> > was incorrectly being set to the command line options/ETMv3 value.
-> >
-> >                 info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
-> >                                                 coresight_get_trace_id(cpu);
-> 
-> I have tested this patch on my side and things work as advertised now.
-> 
-> Arnaldo, if you want to pick this up through your tree then:
-> 
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> 
-> Otherwise I'll get this, whatever you prefer.
+The current CPU clock is missing the option to change the rate of its
+parents, leading to improper rates calculated by cpufreq, and eventually
+crashes.
 
-I'll get it, thanks for the ping,
+Cc: <stable@vger.kernel.org>
+Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+Reported-by: Kevin Hilman <khilman@baylibre.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-- Arnaldo
+diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c b/drivers/clk/sunxi-ng/ccu-sun5i.c
+index 5372bf8be5e6..31d7ffda9aab 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun5i.c
++++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
+@@ -184,7 +184,7 @@ static struct ccu_mux cpu_clk = {
+ 		.hw.init	= CLK_HW_INIT_PARENTS("cpu",
+ 						      cpu_parents,
+ 						      &ccu_mux_ops,
+-						      CLK_IS_CRITICAL),
++						      CLK_SET_RATE_PARENT | CLK_IS_CRITICAL),
+ 	}
+ };
+ 
+-- 
+2.13.3
