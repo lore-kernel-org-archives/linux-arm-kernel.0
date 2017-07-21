@@ -1,105 +1,64 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 21 Jul 2017 11:32:26 +0200
-Subject: [RFC PATCH 3/4] serial: uartps: Move cnds_uart_get_port to probe
-In-Reply-To: <cover.1500629544.git.michal.simek@xilinx.com>
-References: <cover.1500629544.git.michal.simek@xilinx.com>
-Message-ID: <d636a88da35ed3ba333d1e6523cf140ec1e57a0a.1500629544.git.michal.simek@xilinx.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 21 Jul 2017 15:14:46 +0530
+Subject: [PATCH 03/12] ARM: normalize clk API for older platforms
+In-Reply-To: <CAK8P3a3C7xVmr6ZuJekhq8bdwqmoPeAkAqxJ+BUi9VrxkQpQZA@mail.gmail.com>
+References: <20170720154616.3250481-1-arnd@arndb.de>
+ <20170720155132.3250812-1-arnd@arndb.de>
+ <b26930f6-3c57-7931-7f74-d0e07adb9cd7@ti.com>
+ <CAK8P3a3C7xVmr6ZuJekhq8bdwqmoPeAkAqxJ+BUi9VrxkQpQZA@mail.gmail.com>
+Message-ID: <e5b9e449-62c8-948d-e6c0-fc5a575038b6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-c&p this function to probe as preparation for removing
-cdns_uart_port[] static array.
+On Friday 21 July 2017 01:47 PM, Arnd Bergmann wrote:
+> On Fri, Jul 21, 2017 at 10:05 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> 
+>>> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+>>> index f5dce9b4e617..89586779526c 100644
+>>> --- a/arch/arm/mach-davinci/clock.c
+>>> +++ b/arch/arm/mach-davinci/clock.c
+>>> @@ -218,6 +218,12 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>>>  }
+>>>  EXPORT_SYMBOL(clk_set_parent);
+>>>
+>>> +struct clk *clk_get_parent(struct clk *clk)
+>>> +{
+>>> +     return clk->parent;
+>>> +}
+>>> +EXPORT_SYMBOL(clk_get_parent);
+>>
+>> For mach-davinci change:
+>>
+>> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> 
+> Thanks!
+> 
+>>> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+>>> index 39ef3b613912..c1c91fc6e178 100644
+>>> --- a/arch/arm/mach-ep93xx/clock.c
+>>> +++ b/arch/arm/mach-ep93xx/clock.c
+>>> @@ -323,6 +323,27 @@ unsigned long clk_get_rate(struct clk *clk)
+>>>  }
+>>>  EXPORT_SYMBOL(clk_get_rate);
+>>>
+>>> +long clk_round_rate(struct clk *clk, unsigned long rate)
+>>> +{
+>>> +     WARN_ON(clk);
+>>> +     return 0;
+>>> +}
+>>> +EXPORT_SYMBOL(clk_round_rate);
+>>
+>> Its probably better to WARN_ON_ONCE(). Also, since NULL clk is valid, it
+>> should be probably be WARN_ON_ONCE(1).
+> 
+> I thought about trying to make it as correct as possible, but then went for
+> the opposite approach and instead just made the functions as small as
+> possible to avoid bloat while having the warning in there along with an
+> obviously wrong implementation. Apparently the davinci version unlike
+> the others ended up being a correct one after all (let me know if you
+> want to have a NULL pointer check there).
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Yeah, that would be better. Thanks!
 
- drivers/tty/serial/xilinx_uartps.c | 61 +++++++++++++-------------------------
- 1 file changed, 21 insertions(+), 40 deletions(-)
-
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index e6470a3111ce..4fb74baeae35 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1104,43 +1104,6 @@ static void cdns_uart_pm(struct uart_port *port, unsigned int state,
- 
- static struct uart_port cdns_uart_port[CDNS_UART_NR_PORTS];
- 
--/**
-- * cdns_uart_get_port - Configure the port from platform device resource info
-- * @id: Port id
-- *
-- * Return: a pointer to a uart_port or NULL for failure
-- */
--static struct uart_port *cdns_uart_get_port(int id)
--{
--	struct uart_port *port;
--
--	/* Try the given port id if failed use default method */
--	if (cdns_uart_port[id].mapbase != 0) {
--		/* Find the next unused port */
--		for (id = 0; id < CDNS_UART_NR_PORTS; id++)
--			if (cdns_uart_port[id].mapbase == 0)
--				break;
--	}
--
--	if (id >= CDNS_UART_NR_PORTS)
--		return NULL;
--
--	port = &cdns_uart_port[id];
--
--	/* At this point, we've got an empty uart_port struct, initialize it */
--	spin_lock_init(&port->lock);
--	port->membase	= NULL;
--	port->irq	= 0;
--	port->type	= PORT_UNKNOWN;
--	port->iotype	= UPIO_MEM32;
--	port->flags	= UPF_BOOT_AUTOCONF;
--	port->ops	= &cdns_uart_ops;
--	port->fifosize	= CDNS_UART_FIFO_SIZE;
--	port->line	= id;
--	port->dev	= NULL;
--	return port;
--}
--
- #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
- /**
-  * cdns_uart_console_wait_tx - Wait for the TX to be full
-@@ -1545,15 +1508,33 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	if (id < 0)
- 		id = 0;
- 
--	/* Initialize the port structure */
--	port = cdns_uart_get_port(id);
-+	/* Try the given port id if failed use default method */
-+	if (cdns_uart_port[id].mapbase != 0) {
-+		/* Find the next unused port */
-+		for (id = 0; id < CDNS_UART_NR_PORTS; id++)
-+			if (cdns_uart_port[id].mapbase == 0)
-+				break;
-+	}
- 
--	if (!port) {
-+	port = &cdns_uart_port[id];
-+	if (!port || id >= CDNS_UART_NR_PORTS) {
- 		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
- 		rc = -ENODEV;
- 		goto err_out_notif_unreg;
- 	}
- 
-+	/* At this point, we've got an empty uart_port struct, initialize it */
-+	spin_lock_init(&port->lock);
-+	port->membase	= NULL;
-+	port->irq	= 0;
-+	port->type	= PORT_UNKNOWN;
-+	port->iotype	= UPIO_MEM32;
-+	port->flags	= UPF_BOOT_AUTOCONF;
-+	port->ops	= &cdns_uart_ops;
-+	port->fifosize	= CDNS_UART_FIFO_SIZE;
-+	port->line	= id;
-+	port->dev	= NULL;
-+
- 	/*
- 	 * Register the port.
- 	 * This function also registers this device with the tty layer
--- 
-1.9.1
+Regards,
+Sekhar
