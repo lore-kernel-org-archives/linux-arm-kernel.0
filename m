@@ -1,34 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 21 Jul 2017 11:05:47 -0300
-Subject: USB PHY reset for Nitrogen6x/MAX
-In-Reply-To: <CAAMH-ytNeNc=XOOoEOztL_6Y4jcHHyQ+12pFTaNN-1MQ9kQjFw@mail.gmail.com>
-References: <CAAMH-ytNeNc=XOOoEOztL_6Y4jcHHyQ+12pFTaNN-1MQ9kQjFw@mail.gmail.com>
-Message-ID: <CAOMZO5D8BZ5pkYri8GU4C=Ag13b7fv7Ze_r2zkjFtyCewcgt0w@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 21 Jul 2017 09:06:44 -0500
+Subject: [PATCH v2 1/4] net: phy: at803x: Document RGMII RX and TX clock
+ delay issues
+In-Reply-To: <db666f79-5ee3-f136-527e-aeb9cc6425b7@sigmadesigns.com>
+References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
+ <051653a2-946f-6a0b-4cff-b403d1197038@sigmadesigns.com>
+ <a9d3777c-1752-d79b-8302-d09c5f736a9f@codeaurora.org>
+ <db666f79-5ee3-f136-527e-aeb9cc6425b7@sigmadesigns.com>
+Message-ID: <1c35e791-c181-2855-8463-b3b0ef5367a2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
+On 7/21/17 8:29 AM, Marc Gonzalez wrote:
+> I don't understand what you're saying.
+> 
+> It is a correct observation that the code enabling
+> RGMII RX clock delay is a NOP, since that bit will
+> always be set at that point.
+> 
+> The spec for the 8035 (I haven't checked for 8030 and 8031,
+> is that what you meant by "other systems"?) states that
+> Sel_clk125m_dsp, which is described as:
+> "Control bit for rgmii interface rx clock delay"
+> is 1 after HW reset, 1 after SW reset.
+> 
+> So my statement "RX clock delay is enabled at reset"
+> is universally true. It's not just on some systems.
 
-On Fri, Jul 21, 2017 at 6:25 AM, Gary Bisson
-<gary.bisson@boundarydevices.com> wrote:
-> Hi Shawn, Fabio,
->
-> Last October I offered the following two patches that add regulators
-> to fix USB PHY reset on 2 of our boards:
-> https://patchwork.kernel.org/patch/9395531/
-> https://patchwork.kernel.org/patch/9395539/
->
-> At the time you preferred to wait for Peter's pwrseq sub-system to get
-> in to have a proper reset sequence.
->
-> Since then, it seems that it's still going to take a long time before
-> Peter's series makes it to mainline and many customers of ours
-> complained about USB.
+Ok, taken out of context, the comment doesn't really explain why the 
+code is the way it is.  I'm not really happy about the word "assumes". 
+Maybe you should add a sentence explaining when the code is NOT a no-op.
 
-Yes, it seems that it may take some more time for Peter's pwrseq to be accepted.
-
-> Would you consider adding back those two patches for next cycle. We
-> can still modify them to use pwrseq in the future.
-
-What if you resend the patches stating that it is a temporary
-workaround until the generic pwrseq bindings are accepted?
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
