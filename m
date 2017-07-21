@@ -1,83 +1,79 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Jul 2017 18:15:28 +0100
-Subject: [PATCH 02/16] arm64: Add decoding macros for CP15_32 and CP15_64 traps
+Date: Fri, 21 Jul 2017 18:15:29 +0100
+Subject: [PATCH 03/16] arm64: compat: Add separate CP15 trapping hook
 In-Reply-To: <20170721171542.27639-1-marc.zyngier@arm.com>
 References: <20170721171542.27639-1-marc.zyngier@arm.com>
-Message-ID: <20170721171542.27639-3-marc.zyngier@arm.com>
+Message-ID: <20170721171542.27639-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we don't have anything to help decoding ESR_ELx when dealing
-with ESR_ELx_EC_CP15_{32,64}. As we're about to handle some of those,
-let's add some useful macros.
+Instead of directly generating an UNDEF when trapping a CP15 access,
+let's add a new entry point to that effect (which only generates an
+UNDEF for now).
 
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/esr.h | 52 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/arm64/kernel/entry.S | 14 ++++++++++++--
+ arch/arm64/kernel/traps.c | 13 +++++++++++++
+ 2 files changed, 25 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index 8cabd57b6348..fc71b89c99f9 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -206,6 +206,58 @@
- 		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
- 		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index b738880350f9..d78fe4594338 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -560,9 +560,9 @@ el0_sync_compat:
+ 	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL0
+ 	b.eq	el0_undef
+ 	cmp	x24, #ESR_ELx_EC_CP15_32	// CP15 MRC/MCR trap
+-	b.eq	el0_undef
++	b.eq	el0_cp15
+ 	cmp	x24, #ESR_ELx_EC_CP15_64	// CP15 MRRC/MCRR trap
+-	b.eq	el0_undef
++	b.eq	el0_cp15
+ 	cmp	x24, #ESR_ELx_EC_CP14_MR	// CP14 MRC/MCR trap
+ 	b.eq	el0_undef
+ 	cmp	x24, #ESR_ELx_EC_CP14_LS	// CP14 LDC/STC trap
+@@ -585,6 +585,16 @@ el0_svc_compat:
+ el0_irq_compat:
+ 	kernel_entry 0, 32
+ 	b	el0_irq_naked
++el0_cp15:
++	/*
++	 * Trapped CP15 (MRC, MCR, MRRC, MCRR) instructions
++	 */
++	enable_dbg_and_irq
++	ct_user_exit
++	mov	x0, x25
++	mov	x1, sp
++	bl	do_cp15instr
++	b	ret_to_user
+ #endif
  
-+#define ESR_ELx_CP15_32_ISS_COND_SHIFT	20
-+#define ESR_ELx_CP15_32_ISS_COND_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_COND_SHIFT)
-+
-+#define ESR_ELx_CP15_32_ISS_DIR_MASK	0x1
-+#define ESR_ELx_CP15_32_ISS_DIR_READ	0x1
-+#define ESR_ELx_CP15_32_ISS_DIR_WRITE	0x0
-+
-+#define ESR_ELx_CP15_32_ISS_RT_SHIFT	5
-+#define ESR_ELx_CP15_32_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_CP15_32_ISS_RT_SHIFT)
-+#define ESR_ELx_CP15_32_ISS_CRM_SHIFT	1
-+#define ESR_ELx_CP15_32_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_CRM_SHIFT)
-+#define ESR_ELx_CP15_32_ISS_CRN_SHIFT	10
-+#define ESR_ELx_CP15_32_ISS_CRN_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_CRN_SHIFT)
-+#define ESR_ELx_CP15_32_ISS_OP1_SHIFT	14
-+#define ESR_ELx_CP15_32_ISS_OP1_MASK	(UL(0x7) << ESR_ELx_CP15_32_ISS_OP1_SHIFT)
-+#define ESR_ELx_CP15_32_ISS_OP2_SHIFT	17
-+#define ESR_ELx_CP15_32_ISS_OP2_MASK	(UL(0x7) << ESR_ELx_CP15_32_ISS_OP2_SHIFT)
-+
-+#define ESR_ELx_CP15_32_ISS_SYS_MASK	(ESR_ELx_CP15_32_ISS_OP1_MASK | \
-+					 ESR_ELx_CP15_32_ISS_OP2_MASK | \
-+					 ESR_ELx_CP15_32_ISS_CRN_MASK | \
-+					 ESR_ELx_CP15_32_ISS_CRM_MASK | \
-+					 ESR_ELx_CP15_32_ISS_DIR_MASK)
-+#define ESR_ELx_CP15_32_ISS_SYS_VAL(op1, op2, crn, crm) \
-+					(((op1) << ESR_ELx_CP15_32_ISS_OP1_SHIFT) | \
-+					 ((op2) << ESR_ELx_CP15_32_ISS_OP2_SHIFT) | \
-+					 ((crn) << ESR_ELx_CP15_32_ISS_CRN_SHIFT) | \
-+					 ((crm) << ESR_ELx_CP15_32_ISS_CRM_SHIFT))
-+
-+#define ESR_ELx_CP15_64_ISS_DIR_MASK	0x1
-+#define ESR_ELx_CP15_64_ISS_DIR_READ	0x1
-+#define ESR_ELx_CP15_64_ISS_DIR_WRITE	0x0
-+
-+#define ESR_ELx_CP15_64_ISS_RT_SHIFT	5
-+#define ESR_ELx_CP15_64_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_CP15_64_ISS_RT_SHIFT)
-+
-+#define ESR_ELx_CP15_64_ISS_RT2_SHIFT	10
-+#define ESR_ELx_CP15_64_ISS_RT2_MASK	(UL(0x1f) << ESR_ELx_CP15_64_ISS_RT2_SHIFT)
-+
-+#define ESR_ELx_CP15_64_ISS_OP1_SHIFT	16
-+#define ESR_ELx_CP15_64_ISS_OP1_MASK	(UL(0xf) << ESR_ELx_CP15_64_ISS_OP1_SHIFT)
-+#define ESR_ELx_CP15_64_ISS_CRM_SHIFT	1
-+#define ESR_ELx_CP15_64_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_CP15_64_ISS_CRM_SHIFT)
-+
-+#define ESR_ELx_CP15_64_ISS_SYS_VAL(op1, crm) \
-+					(((op1) << ESR_ELx_CP15_64_ISS_OP1_SHIFT) | \
-+					 ((crm) << ESR_ELx_CP15_64_ISS_CRM_SHIFT))
-+
-+#define ESR_ELx_CP15_64_ISS_SYS_MASK	(ESR_ELx_CP15_64_ISS_OP1_MASK |	\
-+					 ESR_ELx_CP15_64_ISS_CRM_MASK | \
-+					 ESR_ELx_CP15_64_ISS_DIR_MASK)
-+
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
+ el0_da:
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index b02295673216..19e4f8d9a73c 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -556,6 +556,19 @@ static struct sys64_hook sys64_hooks[] = {
+ 	{},
+ };
  
++
++#ifdef CONFIG_COMPAT
++asmlinkage void __exception do_cp15instr(unsigned int esr, struct pt_regs *regs)
++{
++	/*
++	 * New cp15 instructions may previously have been undefined at
++	 * EL0. Fall back to our usual undefined instruction handler
++	 * so that we handle these consistently.
++	 */
++	do_undefinstr(regs);
++}
++#endif
++
+ asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
+ {
+ 	struct sys64_hook *hook;
 -- 
 2.11.0
