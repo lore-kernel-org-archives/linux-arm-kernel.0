@@ -1,50 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Jul 2017 18:15:40 +0100
-Subject: [PATCH 14/16] ARM: Handle trapping of CNTFRQ from userspace
+Date: Fri, 21 Jul 2017 18:15:38 +0100
+Subject: [PATCH 12/16] ARM: Simplify condition checks in swp_handler
 In-Reply-To: <20170721171542.27639-1-marc.zyngier@arm.com>
 References: <20170721171542.27639-1-marc.zyngier@arm.com>
-Message-ID: <20170721171542.27639-15-marc.zyngier@arm.com>
+Message-ID: <20170721171542.27639-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to enable trapping of some of the userspace-visible
-timer registers, let's add a handler for CNTFRQ.
+We now check the validity of the condition code before calling
+the UNDEF handlers, so we can simplify swp_handler by only
+checking for ARM_OPCODE_CONDTEST_UNCOND, which indicates that
+this is not a SWP instruction.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/traps.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/kernel/swp_emulate.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index bda12a243b40..1c1b86af20e9 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -755,9 +755,26 @@ static struct undef_hook cntvct_hook = {
- 	.fn		= read_cntvct_trap,
- };
+diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+index 3bda08bee674..2683c559e0ff 100644
+--- a/arch/arm/kernel/swp_emulate.c
++++ b/arch/arm/kernel/swp_emulate.c
+@@ -179,20 +179,9 @@ static int swp_handler(struct pt_regs *regs, unsigned int instr)
  
-+static int read_cntfrq_trap(struct pt_regs *regs, unsigned int instr)
-+{
-+	int reg = (instr >> 12) & 15;
-+	if (reg == 15)
-+		return 1;
-+	regs->uregs[reg] = arch_timer_get_rate();
-+	regs->ARM_pc += 4;
-+	return 0;
-+}
-+
-+static struct undef_hook cntfrq_hook = {
-+	.instr_mask	= 0x0fff0fff,
-+	.instr_val	= 0x0e1e0f10,
-+	.fn		= read_cntfrq_trap,
-+};
-+
- static int __init arch_timer_hook_init(void)
- {
- 	register_undef_hook(&cntvct_hook);
-+	register_undef_hook(&cntfrq_hook);
- 	return 0;
- }
+ 	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->ARM_pc);
  
+-	res = arm_check_condition(instr, regs->ARM_cpsr);
+-	switch (res) {
+-	case ARM_OPCODE_CONDTEST_PASS:
+-		break;
+-	case ARM_OPCODE_CONDTEST_FAIL:
+-		/* Condition failed - return to next instruction */
+-		regs->ARM_pc += 4;
+-		return 0;
+-	case ARM_OPCODE_CONDTEST_UNCOND:
+-		/* If unconditional encoding - not a SWP, undef */
++	/* If unconditional encoding - not a SWP, undef */
++	if (arm_check_condition(instr, regs->ARM_cpsr) == ARM_OPCODE_CONDTEST_UNCOND)
+ 		return -EFAULT;
+-	default:
+-		return -EINVAL;
+-	}
+ 
+ 	if (current->pid != previous_pid) {
+ 		pr_debug("\"%s\" (%ld) uses deprecated SWP{B} instruction\n",
 -- 
 2.11.0
