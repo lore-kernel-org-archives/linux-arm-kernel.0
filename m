@@ -1,64 +1,83 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 21 Jul 2017 15:14:46 +0530
-Subject: [PATCH 03/12] ARM: normalize clk API for older platforms
-In-Reply-To: <CAK8P3a3C7xVmr6ZuJekhq8bdwqmoPeAkAqxJ+BUi9VrxkQpQZA@mail.gmail.com>
-References: <20170720154616.3250481-1-arnd@arndb.de>
- <20170720155132.3250812-1-arnd@arndb.de>
- <b26930f6-3c57-7931-7f74-d0e07adb9cd7@ti.com>
- <CAK8P3a3C7xVmr6ZuJekhq8bdwqmoPeAkAqxJ+BUi9VrxkQpQZA@mail.gmail.com>
-Message-ID: <e5b9e449-62c8-948d-e6c0-fc5a575038b6@ti.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Fri, 21 Jul 2017 17:48:25 +0800
+Subject: [PATCH 0/4] Optimise 64-bit IOVA allocations
+In-Reply-To: <19661034-093e-a744-b6fb-3d23a285ebe3@arm.com>
+References: <cover.1500396007.git.robin.murphy@arm.com>
+ <CAKv+Gu8x1ssF0g-e=ycpfy6jw8mNfVrx5VQJhjtz2D9Gd4zA-Q@mail.gmail.com>
+ <19661034-093e-a744-b6fb-3d23a285ebe3@arm.com>
+Message-ID: <5971CDE9.5040600@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 July 2017 01:47 PM, Arnd Bergmann wrote:
-> On Fri, Jul 21, 2017 at 10:05 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> 
->>> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
->>> index f5dce9b4e617..89586779526c 100644
->>> --- a/arch/arm/mach-davinci/clock.c
->>> +++ b/arch/arm/mach-davinci/clock.c
->>> @@ -218,6 +218,12 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
->>>  }
->>>  EXPORT_SYMBOL(clk_set_parent);
+
+
+On 2017/7/19 18:23, Robin Murphy wrote:
+> On 19/07/17 09:37, Ard Biesheuvel wrote:
+>> On 18 July 2017 at 17:57, Robin Murphy <robin.murphy@arm.com> wrote:
+>>> Hi all,
 >>>
->>> +struct clk *clk_get_parent(struct clk *clk)
->>> +{
->>> +     return clk->parent;
->>> +}
->>> +EXPORT_SYMBOL(clk_get_parent);
+>>> In the wake of the ARM SMMU optimisation efforts, it seems that certain
+>>> workloads (e.g. storage I/O with large scatterlists) probably remain quite
+>>> heavily influenced by IOVA allocation performance. Separately, Ard also
+>>> reported massive performance drops for a graphical desktop on AMD Seattle
+>>> when enabling SMMUs via IORT, which we traced to dma_32bit_pfn in the DMA
+>>> ops domain getting initialised differently for ACPI vs. DT, and exposing
+>>> the overhead of the rbtree slow path. Whilst we could go around trying to
+>>> close up all the little gaps that lead to hitting the slowest case, it
+>>> seems a much better idea to simply make said slowest case a lot less slow.
+>>>
+>>> I had a go at rebasing Leizhen's last IOVA series[1], but ended up finding
+>>> the changes rather too hard to follow, so I've taken the liberty here of
+>>> picking the whole thing up and reimplementing the main part in a rather
+>>> less invasive manner.
+>>>
+>>> Robin.
+>>>
+>>> [1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg17753.html
+>>>
+>>> Robin Murphy (1):
+>>>   iommu/iova: Extend rbtree node caching
+>>>
+>>> Zhen Lei (3):
+>>>   iommu/iova: Optimise rbtree searching
+>>>   iommu/iova: Optimise the padding calculation
+>>>   iommu/iova: Make dma_32bit_pfn implicit
+>>>
+>>>  drivers/gpu/drm/tegra/drm.c      |   3 +-
+>>>  drivers/gpu/host1x/dev.c         |   3 +-
+>>>  drivers/iommu/amd_iommu.c        |   7 +--
+>>>  drivers/iommu/dma-iommu.c        |  18 +------
+>>>  drivers/iommu/intel-iommu.c      |  11 ++--
+>>>  drivers/iommu/iova.c             | 112 ++++++++++++++++-----------------------
+>>>  drivers/misc/mic/scif/scif_rma.c |   3 +-
+>>>  include/linux/iova.h             |   8 +--
+>>>  8 files changed, 60 insertions(+), 105 deletions(-)
+>>>
 >>
->> For mach-davinci change:
->>
->> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>> These patches look suspiciously like the ones I have been using over
+>> the past couple of weeks (modulo the tegra and host1x changes) from
+>> your git tree. They work fine on my AMD Overdrive B1, both in DT and
+>> in ACPI/IORT modes, although it is difficult to quantify any
+>> performance deltas on my setup.
+> 
+> Indeed - this is a rebase (to account for those new callers) with a
+> couple of trivial tweaks to error paths and corner cases that normal
+> usage shouldn't have been hitting anyway. "No longer unusably awful" is
+> a good enough performance delta for me :)
+> 
+>> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+I got the same performance data compared with my patch version. It works well.
+
+Tested-by: Zhen Lei <thunder.leizhen@huawei.com>
+
 > 
 > Thanks!
 > 
->>> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
->>> index 39ef3b613912..c1c91fc6e178 100644
->>> --- a/arch/arm/mach-ep93xx/clock.c
->>> +++ b/arch/arm/mach-ep93xx/clock.c
->>> @@ -323,6 +323,27 @@ unsigned long clk_get_rate(struct clk *clk)
->>>  }
->>>  EXPORT_SYMBOL(clk_get_rate);
->>>
->>> +long clk_round_rate(struct clk *clk, unsigned long rate)
->>> +{
->>> +     WARN_ON(clk);
->>> +     return 0;
->>> +}
->>> +EXPORT_SYMBOL(clk_round_rate);
->>
->> Its probably better to WARN_ON_ONCE(). Also, since NULL clk is valid, it
->> should be probably be WARN_ON_ONCE(1).
+> Robin.
 > 
-> I thought about trying to make it as correct as possible, but then went for
-> the opposite approach and instead just made the functions as small as
-> possible to avoid bloat while having the warning in there along with an
-> obviously wrong implementation. Apparently the davinci version unlike
-> the others ended up being a correct one after all (let me know if you
-> want to have a NULL pointer check there).
+> .
+> 
 
-Yeah, that would be better. Thanks!
-
-Regards,
-Sekhar
+-- 
+Thanks!
+BestRegards
