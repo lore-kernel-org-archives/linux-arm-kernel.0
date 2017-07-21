@@ -1,33 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 21 Jul 2017 13:12:34 +0100
-Subject: [PATCH 0/4] IOMMU group cleanup
-Message-ID: <cover.1500637633.git.robin.murphy@arm.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Fri, 21 Jul 2017 14:21:53 +0200
+Subject: [PATCH 01/12] ARM: ixp4xx: fix ioport_unmap definition
+In-Reply-To: <20170720154616.3250481-2-arnd@arndb.de> (Arnd Bergmann's message
+ of "Thu, 20 Jul 2017 17:45:55 +0200")
+References: <20170720154616.3250481-1-arnd@arndb.de>
+ <20170720154616.3250481-2-arnd@arndb.de>
+Message-ID: <m3lgnif09q.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Prompted by some discussion around the questionable usefulness of
-iommu_present() for SoC topologies, I took a look at what was left to
-finish off the intention of making groups mandatory. Turns out it
-wasn't much, so here it is. As well as the general rationalisation
-aspect, between this and the probe-deferral changes in 4.12, we should
-now be able to rely on the presence of a group unambiguously indicating
-whether a given device is associated with an IOMMU or not.
+> An empty macro definition can cause unexpected behavior, in
+> case of the ixp4xx ioport_unmap, we get two warnings:
+>
+> drivers/net/wireless/marvell/libertas/if_cs.c: In function 'if_cs_release':
+> drivers/net/wireless/marvell/libertas/if_cs.c:826:3: error: suggest braces around empty body in an 'if' statement [-Werror=empty-body]
+>    ioport_unmap(card->iobase);
+> drivers/vfio/pci/vfio_pci_rdwr.c: In function 'vfio_pci_vga_rw':
+> drivers/vfio/pci/vfio_pci_rdwr.c:230:15: error: the omitted middle operand in ?: will always be 'true', suggest explicit middle operand [-Werror=parentheses]
+>    is_ioport ? ioport_unmap(iomem) : iounmap(iomem);
+>
+> This uses an inline function to define the macro in a safer way.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-ixp4xx/include/mach/io.h | 11 +++++++++--
 
-Robin.
+Acked-by: Krzysztof Halasa <khalasa@piap.pl>
 
-Robin Murphy (4):
-  iommu/msm: Add iommu_group support
-  iommu/tegra-smmu: Add iommu_group support
-  iommu/tegra-gart: Add iommu_group support
-  iommu: Finish making iommu_group support mandatory
+In fact, the old code contained another bug (missing parentheses):
 
- drivers/iommu/iommu.c      | 19 ++++---------------
- drivers/iommu/msm_iommu.c  | 15 ++++++++++++++-
- drivers/iommu/tegra-gart.c | 19 +++++++++++++++++++
- drivers/iommu/tegra-smmu.c |  9 +++++++++
- 4 files changed, 46 insertions(+), 16 deletions(-)
-
+> --- a/arch/arm/mach-ixp4xx/include/mach/io.h
+>  
+> -#define	ioport_map(port, nr)		((void __iomem*)(port + PIO_OFFSET))
+                                                                 ^^^^
 -- 
-2.12.2.dirty
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
