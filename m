@@ -1,70 +1,41 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 21 Jul 2017 22:24:17 +0900
-Subject: [PATCH v5 0/2] add UniPhier thermal support
-In-Reply-To: <1500636105-11520-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1500636105-11520-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNARchNY8wA56+spLCUh99tsGpPQ9VuYc5ymnOL3cu0bd8g@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 21 Jul 2017 15:29:32 +0200
+Subject: [PATCH v2 1/4] net: phy: at803x: Document RGMII RX and TX clock
+ delay issues
+In-Reply-To: <a9d3777c-1752-d79b-8302-d09c5f736a9f@codeaurora.org>
+References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
+ <051653a2-946f-6a0b-4cff-b403d1197038@sigmadesigns.com>
+ <a9d3777c-1752-d79b-8302-d09c5f736a9f@codeaurora.org>
+Message-ID: <db666f79-5ee3-f136-527e-aeb9cc6425b7@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-07-21 20:21 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> This series adds support for CPU temperature monitor modules implemented
-> on UniPhier LD20 and PXs2 SoCs. This driver supports temperature monitoring
-> and alert function on the module.
+On 21/07/2017 15:20, Timur Tabi wrote:
+
+> On 7/21/17 6:25 AM, Marc Gonzalez wrote:
 >
-> Changes in v4:
-> - fix warnings from sparse by replacing u32 with __be32
+>> +	 * NB: This code assumes that RGMII RX clock delay is disabled
+>> +	 * at reset, but actually, RX clock delay is enabled at reset.
+> 
+> Could we change this to say, "RX clock delay is enabled at reset on some 
+> systems."?  Otherwise, it implies that the code is wrong 100% of the 
+> time and should be fixed, not documented.
 
-Nit.
+I don't understand what you're saying.
 
-Your subject prefix indicates this patch is v5.
+It is a correct observation that the code enabling
+RGMII RX clock delay is a NOP, since that bit will
+always be set at that point.
 
-Do you mean "Changes in v5" or "Changes since v4" ?
+The spec for the 8035 (I haven't checked for 8030 and 8031,
+is that what you meant by "other systems"?) states that
+Sel_clk125m_dsp, which is described as:
+"Control bit for rgmii interface rx clock delay"
+is 1 after HW reset, 1 after SW reset.
 
+So my statement "RX clock delay is enabled at reset"
+is universally true. It's not just on some systems.
 
+What am I missing?
 
-
-
-
-> Changes in v3:
-> - remove TMOD_MASK and use TMOD_WIDTH representing the bit width of TMOD
->
-> Changes in v2:
-> - add nsleep after starting and stopping PVT
-> - replace temperature calculation with sign_extend32()
->
-> Changes in v1:
-> - separate dts from this patchset as another patchset
-> - remove 'reg' description on the dt-bindings document
-> - fix the order of calling initialization functions
-> - replace mask bits to use GENMASK
-> - fix calculation of temperature because of not considering a negative value
-> - use devm_request_threaded_irq() instead of devm_request_irq() and
->   separate a thread function from the interrupt handler
-> - add dependency to Kconfig
-> - set 120C to CRITICAL_TEMP_LIMIT as maximum temperature
-> - shrink each line of parameters to save the number of lines
-> - improve some comments and copyright description
->
-> Kunihiko Hayashi (2):
->   dt-bindings: thermal: add binding documentation for UniPhier thermal
->     monitor
->   thermal: uniphier: add UniPhier thermal driver
->
->  .../bindings/thermal/uniphier-thermal.txt          |  64 ++++
->  drivers/thermal/Kconfig                            |   8 +
->  drivers/thermal/Makefile                           |   1 +
->  drivers/thermal/uniphier_thermal.c                 | 386 +++++++++++++++++++++
->  4 files changed, 459 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
->  create mode 100644 drivers/thermal/uniphier_thermal.c
->
-> --
-> 2.7.4
->
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Regards.
