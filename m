@@ -1,57 +1,107 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Fri, 21 Jul 2017 11:57:36 +0200
-Subject: bluetooth in v4.13-rc1: lock init missing somewhere?
-In-Reply-To: <20170721085551.GA22993@amd>
-References: <20170721085551.GA22993@amd>
-Message-ID: <022531FF-11AA-4D6B-A92B-146F5E6BE31F@holtmann.org>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 21 Jul 2017 17:51:55 +0800
+Subject: [PATCH] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+Message-ID: <1500630715-2156-1-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-> Is bluetooth expected to work on n900?
-> 
-> It looks like lock init is missing somewhere:
-> 
-> [  402.901031] of_get_named_gpiod_flags: parsed
-> 'bluetooth-wakeup-gpios' property of node
-> '/ocp at 68000000/serial at 4806c000/bluetooth[0]' - status (0)
-> [  403.042022] BUG: rwlock bad magic on CPU#0, kworker/u3:0/3898,
-> c34b8848
-> [  403.042053] CPU: 0 PID: 3898 Comm: kworker/u3:0 Tainted: G        W
-> 4.13.0-rc1-12941-g013595c-dirty #92
-> [  403.042083] Hardware name: Nokia RX-51 board
-> [  403.042114] Workqueue: hci0 hci_power_on
-> [  403.042205] [<c010d5dc>] (unwind_backtrace) from [<c010ae18>]
-> (show_stack+0x10/0x14)
-> [  403.042327] [<c010ae18>] (show_stack) from [<c0154d74>]
-> (do_raw_read_lock+0x20/0x2c)
-> [  403.042358] [<c0154d74>] (do_raw_read_lock) from [<c04ea070>]
-> (hci_uart_tx_wakeup+0x14/0x84)
-> [  403.042419] [<c04ea070>] (hci_uart_tx_wakeup) from [<bf00089c>]
-> (nokia_setup+0x210/0x640 [hci_nokia])
-> [  403.042449] [<bf00089c>] (nokia_setup [hci_nokia]) from
-> [<c04ea6fc>] (hci_uart_setup+0x7c/0x15c)
-> [  403.042480] [<c04ea6fc>] (hci_uart_setup) from [<c063c1a0>]
-> (hci_dev_do_open+0x420/0x5a0)
-> [  403.042510] [<c063c1a0>] (hci_dev_do_open) from [<c063db40>]
-> (hci_power_on+0x30/0x228)
-> [  403.042541] [<c063db40>] (hci_power_on) from [<c013ad5c>]
-> (process_one_work+0x10c/0x330)
-> [  403.042572] [<c013ad5c>] (process_one_work) from [<c013b120>]
-> (worker_thread+0x168/0x498)
-> [  403.042602] [<c013b120>] (worker_thread) from [<c014035c>]
-> (kthread+0x10c/0x148)
-> [  403.042633] [<c014035c>] (kthread) from [<c01076b8>]
-> (ret_from_fork+0x14/0x3c)
-> root at n900:/my/modules#
-> 
-> If I put the driver built-in, firmware loading failed. But I can't get
-> it to "hciconfig up" phase even with driver being modular. .. that
-> worked at one point IIRC.
+When running 4.13-rc1 on top of D05, I got the boot log:
 
-any chance you can test this with "btmgmt power on" and have "btmon" run in the background. I wonder how far it gets with the init sequence.
+[    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+[    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+[    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+[    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+[    0.000000] SRAT: ITS affinity exceeding max count[4]
 
-Regards
+This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
 
-Marcel
+So dynamically alloc the memory needed instead of using
+its_srat_maps[MAX_NUMNODES], which count the number of
+ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+then build the mapping of numa node to ITS ID.
+
+After doing this, I got what I wanted:
+
+[    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+[    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+[    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+[    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+[    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+[    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+[    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+[    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+
+Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 28 +++++++++++++++++++++-------
+ 1 file changed, 21 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 3ccdf76..fb1c090 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1847,7 +1847,7 @@ struct its_srat_map {
+ 	u32	its_id;
+ };
+ 
+-static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
++static struct its_srat_map *its_srat_maps __initdata;
+ static int its_in_srat __initdata;
+ 
+ static int __init acpi_get_its_numa_node(u32 its_id)
+@@ -1861,6 +1861,12 @@ static int __init acpi_get_its_numa_node(u32 its_id)
+ 	return NUMA_NO_NODE;
+ }
+ 
++static int __init gic_acpi_match_srat_its(struct acpi_subtable_header *header,
++					  const unsigned long end)
++{
++	return 0;
++}
++
+ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+ 			 const unsigned long end)
+ {
+@@ -1877,12 +1883,6 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (its_in_srat >= MAX_NUMNODES) {
+-		pr_err("SRAT: ITS affinity exceeding max count[%d]\n",
+-				MAX_NUMNODES);
+-		return -EINVAL;
+-	}
+-
+ 	node = acpi_map_pxm_to_node(its_affinity->proximity_domain);
+ 
+ 	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+@@ -1901,6 +1901,20 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+ 
+ static void __init acpi_table_parse_srat_its(void)
+ {
++	int count;
++
++	count = acpi_table_parse_entries(ACPI_SIG_SRAT,
++			sizeof(struct acpi_table_srat),
++			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
++			gic_acpi_match_srat_its, 0);
++	if (count <= 0)
++		return;
++
++	its_srat_maps = kmalloc(count * sizeof(struct its_srat_map),
++				GFP_KERNEL);
++	if (!its_srat_maps)
++		return;
++
+ 	acpi_table_parse_entries(ACPI_SIG_SRAT,
+ 			sizeof(struct acpi_table_srat),
+ 			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+-- 
+1.7.12.4
