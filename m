@@ -1,32 +1,50 @@
 From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 21 Jul 2017 13:25:52 +0200
-Subject: [PATCH v2 2/4] net: ethernet: nb8800: Set RGMII_MODE for all RGMII
- modes
+Date: Fri, 21 Jul 2017 13:26:30 +0200
+Subject: [PATCH v2 3/4] net: ethernet: nb8800: Fix RGMII TX clock delay setup
 In-Reply-To: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
 References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
-Message-ID: <237905ff-385e-fa2f-bbbf-6c550a48e15c@sigmadesigns.com>
+Message-ID: <5a68bec8-0b1d-bcfe-65fb-b10399ec75be@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 4 RGMII phy-modes to handle.
+According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
+("Documentation: devicetree: clarify usage of the RGMII phy-modes")
+there are 4 RGMII modes to handle:
+
+"rgmii" (RX and TX delays are added by the MAC when required)
+"rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
+	the MAC should not add the RX or TX delays in this case)
+"rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
+	the MAC should not add an RX delay in this case)
+"rgmii-txid" (RGMII with internal TX delay provided by the PHY,
+	the MAC should not add an TX delay in this case)
+
+Add TX delay in the MAC only for rgmii and rgmii-rxid.
 
 Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 ---
- drivers/net/ethernet/aurora/nb8800.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/aurora/nb8800.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-index 041cfb7952f8..ded041dbafe7 100644
+index ded041dbafe7..f3ed320eb4ad 100644
 --- a/drivers/net/ethernet/aurora/nb8800.c
 +++ b/drivers/net/ethernet/aurora/nb8800.c
-@@ -609,7 +609,7 @@ static void nb8800_mac_config(struct net_device *dev)
- 		mac_mode |= HALF_DUPLEX;
+@@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
+ 		break;
  
- 	if (gigabit) {
--		if (priv->phy_mode == PHY_INTERFACE_MODE_RGMII)
-+		if (phy_interface_is_rgmii(dev->phydev))
- 			mac_mode |= RGMII_MODE;
+ 	case PHY_INTERFACE_MODE_RGMII:
+-		pad_mode = PAD_MODE_RGMII;
++	case PHY_INTERFACE_MODE_RGMII_RXID:
++		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+ 		break;
  
- 		mac_mode |= GMAC_MODE;
++	case PHY_INTERFACE_MODE_RGMII_ID:
+ 	case PHY_INTERFACE_MODE_RGMII_TXID:
+-		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
++		pad_mode = PAD_MODE_RGMII;
+ 		break;
+ 
+ 	default:
 -- 
 2.11.0
