@@ -1,101 +1,69 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Fri, 21 Jul 2017 09:36:57 +0200
-Subject: [PATCH v2] mfd: mc13xxx: Set the irq type.
-In-Reply-To: <20170105075159.GH24225@dell>
-References: <1483112613-18092-1-git-send-email-lilja.magnus@gmail.com>
- <20170104110959.GZ27589@dell>
- <CAM=E1R59oKhT3b8=nJ3Utg4cPi0Z6oiLkj8DU7grg6T+2CoMAw@mail.gmail.com>
- <20170105075159.GH24225@dell>
-Message-ID: <CAM=E1R4SajN07gAW8tu4TREFssH0dLTuip3Ez3XfWXT0i0Sx_w@mail.gmail.com>
+From: qiaozhou@asrmicro.com (=?gb2312?B?WmhvdSBRaWFvKNbcx8gp?=)
+Date: Fri, 21 Jul 2017 07:38:42 +0000
+Subject: [PATCH V2] arm64: traps: disable irq in die()
+In-Reply-To: <1499419774-14563-1-git-send-email-qiaozhou@asrmicro.com>
+References: <1499419774-14563-1-git-send-email-qiaozhou@asrmicro.com>
+Message-ID: <fae0379a29ec447e9dcc743d7aee194f@mail2012.asrmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee, Thomas,
+Hi Maintainers,
 
-I don't think I saw an answer from Thomas in this matter.
+Could you please help to take a look and give some comments? Thanks in advance.
 
-( http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/476699.html
-)
+Best Regards
+Qiao
 
-Regards, Magnus
+-----Original Message-----
+From: Zhou Qiao
+Sent: Friday, July 07, 2017 5:30 PM
+To: catalin.marinas at arm.com; will.deacon at arm.com; mark.rutland at arm.com; suzuki.poulose at arm.com; mingo at kernel.org; marc.zyngier at arm.com; andre.przywara at arm.com; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+Cc: Zhou Qiao
+Subject: [PATCH V2] arm64: traps: disable irq in die()
 
-On 5 January 2017 at 08:51, Lee Jones <lee.jones@linaro.org> wrote:
-> Thomas,
->
-> On Wed, 04 Jan 2017, Magnus Lilja wrote:
->> On 4 January 2017 at 12:09, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Fri, 30 Dec 2016, Magnus Lilja wrote:
->> >
->> >> Commit 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for
->> >> interrupts") removed the passing of the IRQF_TRIGGER_HIGH flag when
->> >> registering the interrupt.
->> >> This commit fixes that problem by setting the IRQF_TRIGGER_HIGH flag in
->> >> case no irq type is set via irqd framework (e.g. device tree). In the
->> >> latter case the irq flag from irqd is used.
->> >
->> > This looks like a hack.
->> >
->> > Why can't you set the trigger type in Device Tree instead?
->>
->> The i.MX31 PDK board has not, like many (all?) i.MX31 boards, not been
->> converted to use device tree yet. I think there is work in progress in
->> this area. However, as the IRQF_TRIGGER problem also affects several
->> stable kernel series (since 3.18.x) I thought it was worthwhile to fix
->> this.
->
-> I would like Thomas' advice on this.
->
->> >> Tested on i.MX31 PDK hardware.
->> >>
->> >> Fixes: 10f9edaeaa30 ("mfd: mc13xxx: Use regmap irq framework for interrupts")
->> >> Cc: <stable@vger.kernel.org> # 3.18.x
->> >> Cc: Lee Jones <lee.jones@linaro.org>
->> >> Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
->> >> ---
->> >> Changes from v1 (which was part of a patch series):
->> >>   - Now uses irqd_-functions to check if irq type is defined
->> >>   - Added Fixes: and Cc: to stable kernel.
->> >>
->> >>  drivers/mfd/mc13xxx-core.c | 8 +++++++-
->> >>  1 file changed, 7 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
->> >> index d7f54e4..e1757ea 100644
->> >> --- a/drivers/mfd/mc13xxx-core.c
->> >> +++ b/drivers/mfd/mc13xxx-core.c
->> >> @@ -15,6 +15,7 @@
->> >>  #include <linux/of_device.h>
->> >>  #include <linux/platform_device.h>
->> >>  #include <linux/mfd/core.h>
->> >> +#include <linux/irq.h>
->> >>
->> >>  #include "mc13xxx.h"
->> >>
->> >> @@ -410,6 +411,7 @@ int mc13xxx_common_init(struct device *dev)
->> >>       struct mc13xxx *mc13xxx = dev_get_drvdata(dev);
->> >>       u32 revision;
->> >>       int i, ret;
->> >> +     unsigned int flags;
->> >>
->> >>       mc13xxx->dev = dev;
->> >>
->> >> @@ -440,7 +442,11 @@ int mc13xxx_common_init(struct device *dev)
->> >>       mc13xxx->irq_chip.irqs = mc13xxx->irqs;
->> >>       mc13xxx->irq_chip.num_irqs = ARRAY_SIZE(mc13xxx->irqs);
->> >>
->> >> -     ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq, IRQF_ONESHOT,
->> >> +     flags = irqd_get_trigger_type(irq_get_irq_data(mc13xxx->irq));
->> >> +     flags = (flags == IRQ_TYPE_NONE) ? IRQF_TRIGGER_HIGH : flags;
->> >> +
->> >> +     ret = regmap_add_irq_chip(mc13xxx->regmap, mc13xxx->irq,
->> >> +                               IRQF_ONESHOT | flags,
->> >>                                 0, &mc13xxx->irq_chip, &mc13xxx->irq_data);
->> >>       if (ret)
->> >>               return ret;
->> >
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+In current die(), the irq is disabled for __die() handle, not including the possible panic() handling. Since the log in __die() can take several hundreds ms, new irq might come and interrupt current die().
+
+If the process calling die() holds some critical resource, and some other process scheduled later also needs it, then it would deadlock.
+The first panic will not be executed.
+
+So here disable irq for the whole flow of die().
+
+Signed-off-by: Qiao Zhou <qiaozhou@asrmicro.com>
+---
+ arch/arm64/kernel/traps.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c index 0805b44..2e2ff88 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -274,10 +274,12 @@ static DEFINE_RAW_SPINLOCK(die_lock);  void die(const char *str, struct pt_regs *regs, int err)  {
+ 	int ret;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&die_lock, flags);
+ 
+ 	oops_enter();
+ 
+-	raw_spin_lock_irq(&die_lock);
+ 	console_verbose();
+ 	bust_spinlocks(1);
+ 	ret = __die(str, err, regs);
+@@ -287,13 +289,15 @@ void die(const char *str, struct pt_regs *regs, int err)
+ 
+ 	bust_spinlocks(0);
+ 	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
+-	raw_spin_unlock_irq(&die_lock);
+ 	oops_exit();
+ 
+ 	if (in_interrupt())
+ 		panic("Fatal exception in interrupt");
+ 	if (panic_on_oops)
+ 		panic("Fatal exception");
++
++	raw_spin_unlock_irqrestore(&die_lock, flags);
++
+ 	if (ret != NOTIFY_STOP)
+ 		do_exit(SIGSEGV);
+ }
+--
+2.7.4
