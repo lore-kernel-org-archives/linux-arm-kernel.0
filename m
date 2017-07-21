@@ -1,53 +1,51 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 21 Jul 2017 13:37:12 -0700
-Subject: [PATCH v7 3/3] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <c5264416-754b-6ec8-f9fb-3b0ac2ba3a58@mleia.com>
-References: <1500474344-9832-1-git-send-email-gabriel.fernandez@st.com>
- <1500474344-9832-4-git-send-email-gabriel.fernandez@st.com>
- <d999fc79-7b14-da8e-965f-371cf4352dd1@mleia.com>
- <11c37627-a39b-7f2d-d0d4-af312eac8668@st.com>
- <c5264416-754b-6ec8-f9fb-3b0ac2ba3a58@mleia.com>
-Message-ID: <20170721203712.GH19878@codeaurora.org>
+Date: Fri, 21 Jul 2017 13:38:47 -0700
+Subject: [PATCHv1 1/4] ARM: dts: socfpga: update documentation for clock
+ bindings
+In-Reply-To: <20170710155134.d6egwhncc3mw5ch5@rob-hp-laptop>
+References: <1499454199-31901-1-git-send-email-dinguyen@kernel.org>
+ <20170710155134.d6egwhncc3mw5ch5@rob-hp-laptop>
+Message-ID: <20170721203847.GI19878@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20, Vladimir Zapolskiy wrote:
-> Hi Gabriel,
-> 
-> On 07/20/2017 11:31 AM, Gabriel FERNANDEZ wrote:
-> > Hi Vladimir,
+On 07/10, Rob Herring wrote:
+> On Fri, Jul 07, 2017 at 02:03:16PM -0500, Dinh Nguyen wrote:
+> > Update the bindings document for the Arria10 and Stratix10 clock bindings.
 > > 
+> > Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+> > ---
+> >  Documentation/devicetree/bindings/clock/altr_socfpga.txt | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
 > > 
-> > On 07/19/2017 11:20 PM, Vladimir Zapolskiy wrote:
-> >> Hello Gabriel,
-> >>
-> >> On 07/19/2017 05:25 PM, gabriel.fernandez at st.com wrote:
-> >>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> >>> +
-> >>> +	rcc: rcc at 58024400 {
-> >> 'rcc' as a generic device node name is awkward.
-> >>
-> >> I believe the main function of the device is clock controller (unlikely
-> >> a generic reset controller can be converted into a clock controller),
-> >> the locations of the document and device driver also indicate that
-> >> primarily it is a clock controller, so I suggest to replace device node
-> >> name with 'clock-controller' like below:
-> > I prefer to keep rcc node name, to be coherent with the other ST 
-> > platforms (STM32F4/F7)
+> > diff --git a/Documentation/devicetree/bindings/clock/altr_socfpga.txt b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+> > index f72e80e..1c32658 100644
+> > --- a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+> > +++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+> > @@ -12,6 +12,20 @@ Required properties:
+> >  	"altr,socfpga-gate-clk" - Clocks that directly feed peripherals and
+> >  		can get gated.
+> >  
+> > +	For Arria10:
+> > +	"altr,socfpga-a10-pll-clock" - for a PLL clock
+> > +	"altr,socfpga-a10-perip-clock" - The peripheral clock divided from the
+> > +		PLL clock.
+> > +	"altr,socfpga-a10-gate-clk" - Clocks that directly feed peripherals and
+> > +		can get gated.
+> > +
+> > +	For Stratix10:
+> > +	"altr,socfpga-s10-pll-clock" - for a PLL clock
+> > +	"altr,socfpga-s10-perip-clock" - The peripheral clock divided from the
+> > +		PLL clock.
+> > +	"altr,socfpga-s10-gate-clk" - Clocks that directly feed peripherals and
+> > +		can get gated.
 > 
-> the thing is, a device node name is expected to comply with ePAPR or
-> the devicetree specification, which says
-> 
-> 	The name of a node should be somewhat generic, reflecting
-> 	the function of the device and not its precise programming model.
-> 
-> If devicetree and CCF maintainers are fine with 'rcc', I won't object,
-> my role is just to emphasize the found issue and recommend to use another
-> and more common name 'clock-controller', it is a simple and fortunately
-> backward compatible change to other ST platforms as well.
+> We're generally not doing a clock per node clock providers on new 
+> platforms and doing a single (or few) clock controller nodes instead. It 
+> doesn't look like there's much or any reuse here from older platforms 
+> which would be the main reason to keep this style.
 
-Yes. It should be generic so clock-controller or
-clock-reset-controller is appropriate here.
+Agreed. Can this be rewritten to new style binding?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
