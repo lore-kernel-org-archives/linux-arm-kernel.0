@@ -1,39 +1,36 @@
 From: lho@apm.com (Loc Ho)
-Date: Fri, 21 Jul 2017 11:24:36 -0700
-Subject: [PATCH v6 0/1] acpi: apei: Bug fix to enable APEI support for ARMv8
-Message-ID: <1500661477-6536-1-git-send-email-lho@apm.com>
+Date: Fri, 21 Jul 2017 11:24:37 -0700
+Subject: [PATCH v6 1/1] acpi: apei: Enable APEI multiple GHES source to share
+ a single external IRQ
+In-Reply-To: <1500661477-6536-1-git-send-email-lho@apm.com>
+References: <1500661477-6536-1-git-send-email-lho@apm.com>
+Message-ID: <1500661477-6536-2-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v6:
-* Update the patch description
+X-Gene platforms describe multiple GHES error sources with the same hardware
+error notification type (external interrupt) and interrupt number.
+Change the GHES interrupt request to support sharing the same IRQ.
 
-v5:
-* Remove the patch set 1/2 as it was accepted
-* Fix the signed-off-by using Co-authored-by
-
-v4:
-* Update patch commit log for gsi.c patch
-* Make change to be 80 column aligned
-
-v3
-* Change the title of the patch to reflect the patch
-* Completely dropped the driver. Instead, move completely to the FW by
-  accessing the GIC directly.
-* Fix a bug with function acpi_gsi_to_irq
-* Enable APEI multiple GHES source to share an single external IRQ
-
-v2
-* Make all code more generic naming
-* Still waiting for comment from Linaro folks on APEI
-
+Co-authored-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Loc Ho <lho@apm.com>
 ---
-Loc Ho (1):
-  acpi: apei: Enable APEI multiple GHES source to share an single
-    external IRQ
-
  drivers/acpi/apei/ghes.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index d661d45..eed09fc 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -1157,7 +1157,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 			       generic->header.source_id);
+ 			goto err_edac_unreg;
+ 		}
+-		rc = request_irq(ghes->irq, ghes_irq_func, 0, "GHES IRQ", ghes);
++		rc = request_irq(ghes->irq, ghes_irq_func, IRQF_SHARED,
++				 "GHES IRQ", ghes);
+ 		if (rc) {
+ 			pr_err(GHES_PFX "Failed to register IRQ for generic hardware error source: %d\n",
+ 			       generic->header.source_id);
 -- 
 1.8.3.1
