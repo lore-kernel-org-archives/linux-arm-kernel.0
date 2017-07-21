@@ -1,109 +1,67 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 21 Jul 2017 18:05:24 +0100
-Subject: [PATCH 01/11] arm64: docs: describe ELF hwcaps
-In-Reply-To: <1500480092-28480-2-git-send-email-mark.rutland@arm.com>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <1500480092-28480-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170721170523.GD1538@e103592.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 21 Jul 2017 22:47:35 +0530
+Subject: [PATCH v2 2/4] dmaengine: Add STM32 MDMA driver
+In-Reply-To: <3c04c9bf-572d-98a6-ff62-83498bbc7fdf@st.com>
+References: <1499343941-6375-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343941-6375-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170721075547.GO3053@localhost>
+ <ee278ecf-02a3-7799-888a-9590d1105bb3@st.com>
+ <20170721095411.GR3053@localhost>
+ <3c04c9bf-572d-98a6-ff62-83498bbc7fdf@st.com>
+Message-ID: <20170721171735.GS3053@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 05:01:22PM +0100, Mark Rutland wrote:
-> We don't document our ELF hwcaps, leaving developers to interpret them
-> according to hearsay, guesswork, or (in exceptional cases) inspection of
-> the current kernel code.
+On Fri, Jul 21, 2017 at 10:32:49AM +0000, Pierre Yves MORDRET wrote:
+> >>>> +static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
+> >>>> +				     enum dma_transfer_direction direction,
+> >>>> +				     u32 *mdma_ccr, u32 *mdma_ctcr,
+> >>>> +				     u32 *mdma_ctbr, u32 buf_len)
+> >>>> +{
+> >>>> +	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
+> >>>> +	struct stm32_mdma_chan_config *chan_config = &chan->chan_config;
+> >>>> +	enum dma_slave_buswidth src_addr_width, dst_addr_width;
+> >>>> +	phys_addr_t src_addr, dst_addr;
+> >>>> +	int src_bus_width, dst_bus_width;
+> >>>> +	u32 src_maxburst, dst_maxburst, src_best_burst, dst_best_burst;
+> >>>> +	u32 ccr, ctcr, ctbr, tlen;
+> >>>> +
+> >>>> +	src_addr_width = chan->dma_config.src_addr_width;
+> >>>> +	dst_addr_width = chan->dma_config.dst_addr_width;
+> >>>> +	src_maxburst = chan->dma_config.src_maxburst;
+> >>>> +	dst_maxburst = chan->dma_config.dst_maxburst;
+> >>>> +	src_addr = chan->dma_config.src_addr;
+> >>>> +	dst_addr = chan->dma_config.dst_addr;
+> >>>
+> >>> this doesn't seem right to me, only the periphral address would come from
+> >>> slave_config, the memory address is passed as an arg to transfer..
+> >>>
+> >>> ...
+> >>>
+> >>
+> >> Correct. But these locals are managed in the case statement below. if direction
+> >> is Mem2Dev only dst_addr(Peripheral) is considered. In the other way around with
+> >> Dev2Mem direction only src_addr(Peripheral) is considered.
+> >> However to disambiguate I can move src_addr & dst_addr affectation in the
+> >> corresponding case statement if you'd like.
+> > 
+> > But below you are over writing both, so in effect this is wasted cycles..
+> > anyway latter one is more clear, so lets remove from here.
+> > 
 > 
-> This is less than optimal, and it would be far better if we had some
-> definitive description of each of the ELF hwcaps that developers could
-> refer to.
-> 
-> This patch adds a document describing the (native) arm64 ELF hwcaps.
+> Sorry I don't follow ... or miss something
+> For instance if direction is Mem2Dev ..._xfer_param is going to configure 
+> Destination Bus width and Addr given by slave_config. ..._setup_xfer in its turn 
+> will configure source given as parameter.
+> Don't the see the over-writing
 
-Minor nit: what do the hwcaps have to do with ELF really?  Can we just
-call them "hwcaps"?
+ah re-looking at it, yes you are right.
 
-I'm not sure of the history here.
+The above two assignments threw me off, I should have read it properly.
 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  Documentation/arm64/elf_hwcaps.txt | 133 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 133 insertions(+)
->  create mode 100644 Documentation/arm64/elf_hwcaps.txt
-> 
-> diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
-> new file mode 100644
-> index 0000000..7bc2921
-> --- /dev/null
-> +++ b/Documentation/arm64/elf_hwcaps.txt
-> @@ -0,0 +1,133 @@
-> +ARM64 ELF hwcaps
-> +================
-> +
-> +This document describes the usage and semantics of the arm64 ELF hwcaps.
-> +
-> +
-> +1. Introduction
-> +---------------
-> +
-> +Some hardware or software features are only available on some CPU
-> +implementations, and/or with certain kernel configurations, but have no
-> +architected discovery mechanism available to userspace code at EL0. The
-> +kernel exposes the presence of these features to userspace through a set
-> +of flags called hwcaps, exposed in the auxilliary vector.
-> +
-> +Userspace software can test for features by acquiring the AT_HWCAP entry
-> +of the auxilliary vector, and testing whether the relevant flags are
-> +set, e.g.
-> +
-> +bool floating_point_is_present(void)
-> +{
-> +	unsigned long hwcaps = getauxval(AT_HWCAP);
-> +	if (hwcaps & HWCAP_FP)
-> +		return true;
-> +
-> +	return false;
-> +}
-> +
-> +Where software relies on a feature described by a hwcap, it should check
-> +the relevant hwcap flag to verify that the feature is present before
-> +attempting to make use of the feature.
-> +
-> +Features cannot be probed reliably through other means. When a feature
-> +is not available, attempting to use it may result in unpredictable
+But I think calculating for src and dstn always might not be optimal as you
+would use one only, so should these be moved to respective case where they
+are used...
 
-This says that features cannot be probed reliably via the (emulated) ID
-registers available with HWCAP_CPUID.
-
-So, what use is the ID register emulation?
-
-For each of hwcaps and cpuid, a particular feature may be reported as
-present (y), absent (n), or not described at all (x):
-
-hwcap>    x n y
-cpuid:
-   x      N N Y
-   n      N N
-   y      Y   Y
-
-I've filled in the straightforward cases, where software may (Y) or must
-not (N) use the feature.
-
-In the cases left blank, hwcap and cpuid disagree.
-
-Are we confident that should never be observed -- i.e., it's a kernel
-bug if seen?  If so, we can fill Ys in there.  But we need to be clear
-about cases where the hwcap doesn't mean exactly the same as the
-corresponding CPUID feature.  The hwcap may tell software it can assume
-that certain kernel ABI extensions related to that CPU feature are
-available for example.
-
-This also affects how HWCAP_CPUID is described below.
-
-[...]
-
-Cheers
----Dave
+-- 
+~Vinod
