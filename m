@@ -1,34 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Jul 2017 18:19:35 +0200
-Subject: [PATCH] clk: sunxi-ng: sun5i: Add clk_set_rate_parent to the CPU clock
-Message-ID: <20170721161935.18411-1-maxime.ripard@free-electrons.com>
+Date: Fri, 21 Jul 2017 18:20:02 +0200
+Subject: [PATCH 1/4] arm: multi_v7: Add AXP20X_POWER
+Message-ID: <20170721162005.18892-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current CPU clock is missing the option to change the rate of its
-parents, leading to improper rates calculated by cpufreq, and eventually
-crashes.
+The multi_v7 defconfig is missing the AXP209 USB power supply driver,
+resulting in non-working USB controllers because the USB PHY will always
+return EPROBE_DEFER.
 
-Cc: <stable@vger.kernel.org>
-Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
-Reported-by: Kevin Hilman <khilman@baylibre.com>
+Make sure it's selected.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
+ arch/arm/configs/multi_v7_defconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c b/drivers/clk/sunxi-ng/ccu-sun5i.c
-index 5372bf8be5e6..31d7ffda9aab 100644
---- a/drivers/clk/sunxi-ng/ccu-sun5i.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
-@@ -184,7 +184,7 @@ static struct ccu_mux cpu_clk = {
- 		.hw.init	= CLK_HW_INIT_PARENTS("cpu",
- 						      cpu_parents,
- 						      &ccu_mux_ops,
--						      CLK_IS_CRITICAL),
-+						      CLK_SET_RATE_PARENT | CLK_IS_CRITICAL),
- 	}
- };
- 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 4d19c1b4b8e7..6bab339a8dd8 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -432,6 +432,7 @@ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
+ CONFIG_BATTERY_ACT8945A=y
+ CONFIG_BATTERY_SBS=y
++CONFIG_AXP20X_POWER=y
+ CONFIG_BATTERY_MAX17040=m
+ CONFIG_BATTERY_MAX17042=m
+ CONFIG_CHARGER_MAX14577=m
+@@ -439,7 +440,6 @@ CONFIG_CHARGER_MAX77693=m
+ CONFIG_CHARGER_MAX8997=m
+ CONFIG_CHARGER_MAX8998=m
+ CONFIG_CHARGER_TPS65090=y
+-CONFIG_AXP20X_POWER=m
+ CONFIG_POWER_RESET_AS3722=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_GPIO_RESTART=y
 -- 
 2.13.3
