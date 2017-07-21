@@ -1,69 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jul 2017 17:22:48 +0200
-Subject: [PATCH v2 3/3] ARM: w90x900: normalize clk API
-In-Reply-To: <20170721152250.3310552-1-arnd@arndb.de>
-References: <20170721152250.3310552-1-arnd@arndb.de>
-Message-ID: <20170721152250.3310552-4-arnd@arndb.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 21 Jul 2017 21:16:24 +0530
+Subject: [PATCH v2 6/7] mailbox: bcm-flexrm-mailbox: Set msg_queue_len for
+ each channel
+In-Reply-To: <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
+References: <1500620142-910-1-git-send-email-anup.patel@broadcom.com>
+ <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
+Message-ID: <CABb+yY1Pxhgvvit=0eZr66DpLJ3MDEvRPx9dwDPJM8PwiKXiew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-w90x900 still provides its own variant of the clk API rather than using
-the generic COMMON_CLK API. This generally works, but it causes some link
-errors with drivers using the clk_set_rate, clk_get_parent, clk_set_parent
-or clk_round_rate functions when a platform lacks those interfaces.
+Hi Anup,
 
-This adds empty stub implementations for each of them, and I don't even
-try to do something useful here but instead just print a WARN() message
-to make it obvious what is going on if they ever end up being called.
+On Fri, Jul 21, 2017 at 12:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+> The Broadcom FlexRM ring (i.e. mailbox channel) can handle
+> larger number of messages queued in one FlexRM ring hence
+> this patch sets msg_queue_len for each mailbox channel to
+> be same as RING_MAX_REQ_COUNT.
+>
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  drivers/mailbox/bcm-flexrm-mailbox.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
+> index 9873818..20055a0 100644
+> --- a/drivers/mailbox/bcm-flexrm-mailbox.c
+> +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
+> @@ -1683,8 +1683,11 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
+>                 ret = -ENOMEM;
+>                 goto fail_free_debugfs_root;
+>         }
+> -       for (index = 0; index < mbox->num_rings; index++)
+> +       for (index = 0; index < mbox->num_rings; index++) {
+> +               mbox->controller.chans[index].msg_queue_len =
+> +                                               RING_MAX_REQ_COUNT;
+>                 mbox->controller.chans[index].con_priv = &mbox->rings[index];
+> +       }
+>
+While writing mailbox.c I wasn't unaware that there is the option to
+choose the queue length at runtime.
+The idea was to keep the code as simple as possible. I am open to
+making it a runtime thing, but first, please help me understand how
+that is useful here.
 
-The drivers that call these won't be used on these platforms (otherwise
-we'd get a link error today), so the added code is harmless bloat and
-will warn about accidental use.
+I understand FlexRm has a ring buffer of RING_MAX_REQ_COUNT(1024)
+elements. Any message submitted to mailbox api can be immediately
+written onto the ringbuffer if there is some space.
+Is there any mechanism to report back to a client driver, if its
+message in ringbuffer failed "to be sent"?
+If there isn't any, then I think, in flexrm_last_tx_done() you should
+simply return true if there is some space left in the rung-buffer,
+false otherwise.
 
-A while ago there was a proposal to change w90x900 to use the common-clk
-implementation, which would be the way it should be handled properly.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-w90x900/clock.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
-
-diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
-index ac6fd1a2cb59..3f93fac98d97 100644
---- a/arch/arm/mach-w90x900/clock.c
-+++ b/arch/arm/mach-w90x900/clock.c
-@@ -93,3 +93,32 @@ void nuc900_subclk_enable(struct clk *clk, int enable)
- 
- 	__raw_writel(clken, W90X900_VA_CLKPWR + SUBCLK);
- }
-+
-+/* dummy functions, should not be called */
-+long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	WARN_ON(clk);
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_round_rate);
-+
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	WARN_ON(clk);
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_set_rate);
-+
-+int clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	WARN_ON(clk);
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_set_parent);
-+
-+struct clk *clk_get_parent(struct clk *clk)
-+{
-+	WARN_ON(clk);
-+	return NULL;
-+}
-+EXPORT_SYMBOL(clk_get_parent);
--- 
-2.9.0
+Thanks
