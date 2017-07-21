@@ -1,21 +1,57 @@
-From: qiaozhou@asrmicro.com (qiaozhou)
-Date: Fri, 21 Jul 2017 17:57:04 +0800
-Subject: [PATCH V2] arm64: traps: disable irq in die()
-In-Reply-To: <20170721083226.GA18719@arm.com>
-References: <1499419774-14563-1-git-send-email-qiaozhou@asrmicro.com>
- <fae0379a29ec447e9dcc743d7aee194f@mail2012.asrmicro.com>
- <20170721083226.GA18719@arm.com>
-Message-ID: <64fda152-9a6d-7b4b-8aa8-2d61a2bd15b7@asrmicro.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Fri, 21 Jul 2017 11:57:36 +0200
+Subject: bluetooth in v4.13-rc1: lock init missing somewhere?
+In-Reply-To: <20170721085551.GA22993@amd>
+References: <20170721085551.GA22993@amd>
+Message-ID: <022531FF-11AA-4D6B-A92B-146F5E6BE31F@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?07?21? 16:32, Will Deacon wrote:
-> On Fri, Jul 21, 2017 at 07:38:42AM +0000, Zhou Qiao(??) wrote:
->> Could you please help to take a look and give some comments? Thanks in
->> advance.
-> I've queued this on the arm64 for-next/fixes/core branch.
-Got it. Thanks!
->
-> Will
-Best Regards
-Qiao
+Hi Pavel,
+
+> Is bluetooth expected to work on n900?
+> 
+> It looks like lock init is missing somewhere:
+> 
+> [  402.901031] of_get_named_gpiod_flags: parsed
+> 'bluetooth-wakeup-gpios' property of node
+> '/ocp at 68000000/serial at 4806c000/bluetooth[0]' - status (0)
+> [  403.042022] BUG: rwlock bad magic on CPU#0, kworker/u3:0/3898,
+> c34b8848
+> [  403.042053] CPU: 0 PID: 3898 Comm: kworker/u3:0 Tainted: G        W
+> 4.13.0-rc1-12941-g013595c-dirty #92
+> [  403.042083] Hardware name: Nokia RX-51 board
+> [  403.042114] Workqueue: hci0 hci_power_on
+> [  403.042205] [<c010d5dc>] (unwind_backtrace) from [<c010ae18>]
+> (show_stack+0x10/0x14)
+> [  403.042327] [<c010ae18>] (show_stack) from [<c0154d74>]
+> (do_raw_read_lock+0x20/0x2c)
+> [  403.042358] [<c0154d74>] (do_raw_read_lock) from [<c04ea070>]
+> (hci_uart_tx_wakeup+0x14/0x84)
+> [  403.042419] [<c04ea070>] (hci_uart_tx_wakeup) from [<bf00089c>]
+> (nokia_setup+0x210/0x640 [hci_nokia])
+> [  403.042449] [<bf00089c>] (nokia_setup [hci_nokia]) from
+> [<c04ea6fc>] (hci_uart_setup+0x7c/0x15c)
+> [  403.042480] [<c04ea6fc>] (hci_uart_setup) from [<c063c1a0>]
+> (hci_dev_do_open+0x420/0x5a0)
+> [  403.042510] [<c063c1a0>] (hci_dev_do_open) from [<c063db40>]
+> (hci_power_on+0x30/0x228)
+> [  403.042541] [<c063db40>] (hci_power_on) from [<c013ad5c>]
+> (process_one_work+0x10c/0x330)
+> [  403.042572] [<c013ad5c>] (process_one_work) from [<c013b120>]
+> (worker_thread+0x168/0x498)
+> [  403.042602] [<c013b120>] (worker_thread) from [<c014035c>]
+> (kthread+0x10c/0x148)
+> [  403.042633] [<c014035c>] (kthread) from [<c01076b8>]
+> (ret_from_fork+0x14/0x3c)
+> root at n900:/my/modules#
+> 
+> If I put the driver built-in, firmware loading failed. But I can't get
+> it to "hciconfig up" phase even with driver being modular. .. that
+> worked at one point IIRC.
+
+any chance you can test this with "btmgmt power on" and have "btmon" run in the background. I wonder how far it gets with the init sequence.
+
+Regards
+
+Marcel
