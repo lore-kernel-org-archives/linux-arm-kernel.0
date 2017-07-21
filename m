@@ -1,46 +1,81 @@
-From: rafal@milecki.pl (=?UTF-8?Q?Rafa=C5=82_Mi=C5=82ecki?=)
-Date: Fri, 21 Jul 2017 22:04:42 +0200
-Subject: [PATCH v2 2/4] thermal: add brcmstb AVS TMON driver
-In-Reply-To: <20170721192735.6546-3-code@mmayer.net>
-References: <20170721192735.6546-1-code@mmayer.net>
- <20170721192735.6546-3-code@mmayer.net>
-Message-ID: <1b44dcc1381fda8ab3f29c97718e9999@milecki.pl>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Fri, 21 Jul 2017 21:53:30 +0200
+Subject: [PATCH v2] cpufreq: s5pv210: add missing of_node_put
+Message-ID: <1500666810-21841-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm far from being thermal expert, to me it looks OK, only 1 trivial 
-issue
-noticed (see below).
+for_each_compatible_node performs an of_node_get on each iteration, so a
+return from the loop requires an of_node_put.
 
+The semantic patch that fixes this problem is as follows
+(http://coccinelle.lip6.fr):
 
-On 2017-07-21 21:27, Markus Mayer wrote:
-> +static void avs_tmon_trip_enable(struct brcmstb_thermal_priv *priv,
-> +				 enum avs_tmon_trip_type type, int en)
-> +{
-> +	struct avs_tmon_trip *trip = &avs_tmon_trips[type];
-> +	u32 val = __raw_readl(priv->tmon_base + trip->enable_offs);
-> +
-> +	pr_debug("%sable trip, type %d\n", en ? "en" : "dis", type);
+// <smpl>
+@@
+local idexpression n;
+expression e,e1,e2;
+statement S;
+iterator i1;
+iterator name for_each_compatible_node;
+@@
 
-This probably could be dev_dbg?
+ for_each_compatible_node(n,e1,e2) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
+   return n;
+|
+   i1(...,n,...) S
+|
++  of_node_put(n);
+?  return ...;
+)
+   ...
+ }
+// </smpl>
 
+Additionally, call of_node_put on the previous value of np, obtained from
+of_find_compatible_node, that is no longer accessible at the point of the
+for_each_compatible_node.
 
-> +static void avs_tmon_set_trip_temp(struct brcmstb_thermal_priv *priv,
-> +				   enum avs_tmon_trip_type type,
-> +				   int temp)
-> +{
-> +	struct avs_tmon_trip *trip = &avs_tmon_trips[type];
-> +	u32 val, orig;
-> +
-> +	pr_debug("set temp %d to %d\n", type, temp);
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Same here.
+---
 
+v2: add the of_node_put for the call to of_find_compatible_node as well.
 
-> +static int brcmstb_set_trips(void *data, int low, int high)
-> +{
-> +	struct brcmstb_thermal_priv *priv = data;
-> +
-> +	pr_debug("set trips %d <--> %d\n", low, high);
+ drivers/cpufreq/s5pv210-cpufreq.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-And the last time here.
+diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
+index f82074e..5d31c2d 100644
+--- a/drivers/cpufreq/s5pv210-cpufreq.c
++++ b/drivers/cpufreq/s5pv210-cpufreq.c
+@@ -602,6 +602,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	clk_base = of_iomap(np, 0);
++	of_node_put(np);
+ 	if (!clk_base) {
+ 		pr_err("%s: failed to map clock registers\n", __func__);
+ 		return -EFAULT;
+@@ -612,6 +613,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+ 		if (id < 0 || id >= ARRAY_SIZE(dmc_base)) {
+ 			pr_err("%s: failed to get alias of dmc node '%s'\n",
+ 				__func__, np->name);
++			of_node_put(np);
+ 			return id;
+ 		}
+ 
+@@ -619,6 +621,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+ 		if (!dmc_base[id]) {
+ 			pr_err("%s: failed to map dmc%d registers\n",
+ 				__func__, id);
++			of_node_put(np);
+ 			return -EFAULT;
+ 		}
+ 	}
