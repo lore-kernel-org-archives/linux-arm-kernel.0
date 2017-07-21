@@ -1,81 +1,96 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 21 Jul 2017 15:43:02 +0200
-Subject: [PATCH v2 3/4] net: ethernet: nb8800: Fix RGMII TX clock delay
- setup
-In-Reply-To: <yw1xy3riosag.fsf@mansr.com>
-References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
- <5a68bec8-0b1d-bcfe-65fb-b10399ec75be@sigmadesigns.com>
- <yw1xy3riosag.fsf@mansr.com>
-Message-ID: <53fbf5e1-8d37-9734-be3f-77128ada9dfb@sigmadesigns.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri, 21 Jul 2017 19:14:09 +0530
+Subject: USB 3.0 is broken on Odroid Xu4 on latest kernel
+In-Reply-To: <CANAwSgR=GaE6UaC5PE1aHoVTJ-QKE6Euc-YO9+t7BKb963sUXQ@mail.gmail.com>
+References: <CANAwSgSoo7g=RN4wQ96+NJRYZYy2WeHwPA-xJ2JY7yt25irDfA@mail.gmail.com>
+ <29c0eb80-f880-ce45-8dfd-0e148b278a1b@fivetechno.de>
+ <CANAwSgR=GaE6UaC5PE1aHoVTJ-QKE6Euc-YO9+t7BKb963sUXQ@mail.gmail.com>
+Message-ID: <CANAwSgTVZJ9L8VMjCgx7+LVO7wircrzvTHHqaVbCA7M1fH+7bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/2017 15:04, M?ns Rullg?rd wrote:
+Hi All,
 
-> Marc Gonzalez wrote:
-> 
->> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
->> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
->> there are 4 RGMII modes to handle:
+On 21 July 2017 at 16:10, Anand Moon <linux.amoon@gmail.com> wrote:
+> Hi Markus Reichl/ Felipe/ Krzysztof / Jochen,
+>
+> On 21 July 2017 at 14:56, Markus Reichl <m.reichl@fivetechno.de> wrote:
+>> Hi Anand,
 >>
->> "rgmii" (RX and TX delays are added by the MAC when required)
->> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
->> 	the MAC should not add the RX or TX delays in this case)
->> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
->> 	the MAC should not add an RX delay in this case)
->> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
->> 	the MAC should not add an TX delay in this case)
+>> the issue below is fixed with
+>> 4.13.0-rc1-next-20170721.
 >>
->> Add TX delay in the MAC only for rgmii and rgmii-rxid.
+>> Gru?,
+>> --
+>> Markus Reichl
 >>
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->> ---
->>  drivers/net/ethernet/aurora/nb8800.c | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
->> index ded041dbafe7..f3ed320eb4ad 100644
->> --- a/drivers/net/ethernet/aurora/nb8800.c
->> +++ b/drivers/net/ethernet/aurora/nb8800.c
->> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
->>  		break;
->>
->>  	case PHY_INTERFACE_MODE_RGMII:
->> -		pad_mode = PAD_MODE_RGMII;
->> +	case PHY_INTERFACE_MODE_RGMII_RXID:
->> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>  		break;
->>
->> +	case PHY_INTERFACE_MODE_RGMII_ID:
->>  	case PHY_INTERFACE_MODE_RGMII_TXID:
->> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->> +		pad_mode = PAD_MODE_RGMII;
->>  		break;
->>
->>  	default:
-> 
-> I still don't like this.  Having both the MAC and PHY drivers react to
-> the phy-connection-type property is bound to cause trouble somewhere.
-> 
-> The only way out of the current mess is to define new properties for
-> both MAC and PHY that override the existing ones if present.
+>> Am 19.07.2017 um 16:58 schrieb Anand Moon:
+>>> Hi Krzysztof,
+>>>
+>>> Today I tried to compile the latest kernel for Odroid xu4.
+>>> using exynos_defconfig I build and loaded the kernel.
+>>> but to my surprise usb 3.0 device and missing.
+>>>
+>>> odroid login: root
+>>> Password:
+>>> Last login: Wed Jul 19 14:01:44 UTC 2017 on ttySAC2
+>>> Welcome to Ubuntu 16.04.2 LTS (GNU/Linux 4.13.0-rc1-xu4ml-27846-g74cbd96 armv7l)
+>>>
+>>>  * Documentation:  https://help.ubuntu.com
+>>>  * Management:     https://landscape.canonical.com
+>>>  * Support:        https://ubuntu.com/advantage
+>>> root at odroid:~# lsusb
+>>> Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+>>> Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+>>> Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+>>> Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+>>> Bus 002 Device 002: ID 0603:0002 Novatek Microelectronics Corp.
+>>> Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+>>> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+>>> root at odroid:~# lsusb -t
+>>> /:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+>>> /:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+>>> /:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+>>> /:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+>>> /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
+>>>     |__ Port 1: Dev 2, If 0, Class=Human Interface Device, Driver=usbhid, 1.5M
+>>>     |__ Port 1: Dev 2, If 1, Class=Human Interface Device, Driver=usbhid, 1.5M
+>>> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
+>>>
+>>> Full dmesg can be found on blow link.
+>>> https://pastebin.com/K3xfPCPe
+>>>
+>>> The reason for failed is below.
+>>>
+>>> [    7.187096] usb usb4-port1: connect-debounce failed
+>>>
+>>> I tried to debug this but failed to find the root cause.
+>>> Nothing is connected to the UBS 3.0 port for the failure to cause.
+>>>
+>>> If I load old kernel it seen to work correctly.
+>>> If you provoid some input I will give this a try.
+>>>
+>
+> Thanks for your tips and input.
+>
+> I was going to 'git bisect' over this weekend.
+> But I will now check the 4.13.0-rc1-next-20170721
+> and let you all know if this resolves the issue.
+>
 
-Do you mean defining 4 new bindings and their corresponding
-phy_interface_t enum values? For example:
+Just build and tested the 4.13.0-rc1-next-20170721.
+so kernel is good enough to enumerate the usbdrd_dwc3_1 (usb port 6,5)
+but this failed to enumerate the usbdrd_dwc3_10 (usb port 4,3).
 
-"rgmii-v2"
-"rgmii-id-v2"
-"rgmii-rxid-v2"
-"rgmii-txid-v2"
+root at odroidxu4q:~# lsusb -t
+/:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+/:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Vendor Specific Class, Driver=r8152, 480M
+/:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+/:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 480M
+/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
 
-	PHY_INTERFACE_MODE_RGMII_V2,
-	PHY_INTERFACE_MODE_RGMII_ID_V2,
-	PHY_INTERFACE_MODE_RGMII_RXID_V2,
-	PHY_INTERFACE_MODE_RGMII_TXID_V2,
-
-And then handling these new enums in the at803x and nb8800 drivers?
-
-FWIW, PAD_MODE_GTX_CLK_DELAY is broken in tango5 (doesn't add any
-delay). I'm considering removing MAC-side TX delay altogether.
-
-Regards.
+Best Regards
+-Anand
