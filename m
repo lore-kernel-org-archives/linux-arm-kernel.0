@@ -1,82 +1,48 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 21 Jul 2017 09:46:01 +0200
-Subject: [PATCH 2/4] gpio: davinci: Handle the return value of
- davinci_gpio_irq_setup function
-In-Reply-To: <02965359-ecf1-b934-6b7a-87162d7d00a4@ti.com>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-3-git-send-email-j-keerthy@ti.com>
- <20170719111000.GX29638@localhost>
- <cbea9082-3799-281b-1364-50e442f5362f@ti.com>
- <cc66dfaf-05c5-8d55-03a6-556ec83c4487@ti.com>
- <20170720095047.GA2729@localhost>
- <47055927-5102-b39f-fdbb-b5d89cb14632@ti.com>
- <20170720100509.GB2729@localhost>
- <02965359-ecf1-b934-6b7a-87162d7d00a4@ti.com>
-Message-ID: <20170721074601.GC2729@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Jul 2017 09:50:10 +0200
+Subject: [PATCH v5 0/5] iio: ADC driver for EP93xx SoC
+In-Reply-To: <20170611151837.35fc64a4@kernel.org>
+References: <20170603232652.21401-1-alexander.sverdlin@gmail.com>
+ <20170611151837.35fc64a4@kernel.org>
+Message-ID: <CAK8P3a0OvkRJOgxyEqr+imGxf2bCrbFLNFndRJc4fvTLyYjLXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 04:34:42PM -0500, Grygorii Strashko wrote:
-> 
-> 
-> On 07/20/2017 05:05 AM, Johan Hovold wrote:
-> > On Thu, Jul 20, 2017 at 03:32:27PM +0530, Keerthy wrote:
-> >> On Thursday 20 July 2017 03:20 PM, Johan Hovold wrote:
-> >>> On Thu, Jul 20, 2017 at 02:40:37PM +0530, Keerthy wrote:
-> >>>> On Thursday 20 July 2017 12:14 PM, Keerthy wrote:
-> >>>>> On Wednesday 19 July 2017 04:40 PM, Johan Hovold wrote:
-> > 
-> >>>>>> There's a separate but related bug here too as the clk_prepare_enable()
-> >>>>>> in davinci_gpio_irq_setup() is never balanced on driver unbind.
-> >>>>>
-> >>>>> Yes Johan. I will send that as a separate patch.
-> >>>>
-> >>>> This is already fixed in the latest kernel:
-> >>>>
-> >>>> commit 6dc0048cff988858254fcc26becfc1e9753efa79
-> >>>> Author: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> >>>> Date:   Tue May 23 14:48:57 2017 +0530
-> >>>
-> >>> That change only handles errors in davinci_gpio_irq_setup() (i.e. during
-> >>> probe) and not the imbalance at driver unbind that I was referring to.
-> >>
-> >> Okay got it. One more clk_unprepare_disable() call needs to be there in
-> >> probe err path.
-> > 
-> > No, you need to balance it on driver unbind, that is, in a new remove()
-> > callback.
-> > 
-> 
-> Sry, but manual driver unbind for this driver is really smth unexpected ;(
-
-It certainly wouldn't be something often used (e.g. besides during
-development) but that doesn't mean it should not be implemented.
-
-> So, I'm not sure if it need to be implemented and even yes - it should not be
-> a part of this patch.
-
-That's why I said "separate, but related" above.
-
-> Probably, smth like "convert driver to be a module".
+On Sun, Jun 11, 2017 at 4:18 PM, Jonathan Cameron <jic23@kernel.org> wrote:
+> On Sun,  4 Jun 2017 01:26:47 +0200
+> Alexander Sverdlin <alexander.sverdlin@gmail.com> wrote:
 >
-> By the way, I've tried to unbind gpio-omap, result - failure (expected),
-> as unbind does not take into account module refcnt state.
+>> This series prepares the necessary infrastructure for ADC platform device on
+>> Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device using
+>> IIO subsystem.
+> The reason these have been reposted is because the EP93xx don't
+> have an actual tree as such.  They are typically handled
+> directly through the arm-soc tree.
+>
+> As such I'm looking for a route to get this applied.
+> The dependencies are such that the whole series should go through
+> either arm-soc or iio.  I don't really mind which.
+> Either I need Acks for applying the patches that touch
+> the arch bits (we have Ryan's but I'd like a more general
+> arm-soc one given this will be in your area), or
+> I will probably ack the driver in a minute so the log can
+> go through arm-soc.
+>
+> Anyhow, don't really mind but let's get this moving!
 
-Indeed. We also have CONFIG_DEBUG_TEST_DRIVER_REMOVE which would try to
-unbind this driver during probe if enabled.
+Alexander just pointed me to the series, I had missed it earlier.
 
-Getting into the habit of properly cleaning up allocated and enabled
-resources is only a good thing; it shows that the author has thought
-this through and serves as documentation of what needs to be released in
-both probe error paths and driver unbind callbacks.
+The patches for arch/arm/mach-ep93xx look reasonable to me,
+with one minor complaint: please use "ARM:" as the subject prefix.
 
-Assumptions also change over time (e.g. deferred probe and
-CONFIG_DEBUG_TEST_DRIVER_REMOVE), and by not taking such shortcuts we
-are also preventing incomplete code from being copied and reproduced in
-other drivers (e.g. on hotpluggable buses).
+Alexander, can you send a pull request for the first four patches
+to arm at kernel.org, or a set of patches if that is easier for you?
 
-So, just add the remove callback (in a separate patch) and everything is
-good.
+I think the adc driver can just get merged through the iio tree,
+as there is no strict build-time dependency. I realize the driver
+will fail to link when built on ep93xx or another platform that lacks
+the clk_get_parent() implementation, but I think that's ok since
+we have an old bug in several platforms concerning this, and
+I have proposed a fix for it already.
 
-Thanks,
-Johan
+       Arnd
