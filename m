@@ -1,88 +1,130 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 21 Jul 2017 14:47:04 +0100
-Subject: [PATCH v2 3/4] net: ethernet: nb8800: Fix RGMII TX clock delay
- setup
-In-Reply-To: <53fbf5e1-8d37-9734-be3f-77128ada9dfb@sigmadesigns.com> (Marc
- Gonzalez's message of "Fri, 21 Jul 2017 15:43:02 +0200")
-References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
- <5a68bec8-0b1d-bcfe-65fb-b10399ec75be@sigmadesigns.com>
- <yw1xy3riosag.fsf@mansr.com>
- <53fbf5e1-8d37-9734-be3f-77128ada9dfb@sigmadesigns.com>
-Message-ID: <yw1xtw25q4vb.fsf@mansr.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Fri, 21 Jul 2017 21:51:16 +0800
+Subject: [linux-sunxi] [PATCH 2/5] arm: allwinner: a64: drop the dummy
+ vcc3v3 regulator in Pine64 DT
+In-Reply-To: <493424f1-6df3-ec19-a7cf-f76706cb2c51@arm.com>
+References: <20170719161019.62133-1-icenowy@aosc.io>
+ <20170719161019.62133-3-icenowy@aosc.io>
+ <4e2c9486-9c0d-14e9-62e7-8642758c5472@arm.com>
+ <7FACC99F-F900-437B-9642-741D7D980D25@aosc.io>
+ <493424f1-6df3-ec19-a7cf-f76706cb2c51@arm.com>
+Message-ID: <a03e16d6ce509ce9fe2723682bae4768@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
-
-> On 21/07/2017 15:04, M?ns Rullg?rd wrote:
->
->> Marc Gonzalez wrote:
+? 2017-07-21 21:02?Andre Przywara ???
+> Hi,
+> 
+> On 21/07/17 13:49, Icenowy Zheng wrote:
 >> 
->>> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
->>> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
->>> there are 4 RGMII modes to handle:
->>>
->>> "rgmii" (RX and TX delays are added by the MAC when required)
->>> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
->>> 	the MAC should not add the RX or TX delays in this case)
->>> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
->>> 	the MAC should not add an RX delay in this case)
->>> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
->>> 	the MAC should not add an TX delay in this case)
->>>
->>> Add TX delay in the MAC only for rgmii and rgmii-rxid.
->>>
->>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>> ---
->>>  drivers/net/ethernet/aurora/nb8800.c | 6 ++++--
->>>  1 file changed, 4 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
->>> index ded041dbafe7..f3ed320eb4ad 100644
->>> --- a/drivers/net/ethernet/aurora/nb8800.c
->>> +++ b/drivers/net/ethernet/aurora/nb8800.c
->>> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
->>>  		break;
->>>
->>>  	case PHY_INTERFACE_MODE_RGMII:
->>> -		pad_mode = PAD_MODE_RGMII;
->>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
->>> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>>  		break;
->>>
->>> +	case PHY_INTERFACE_MODE_RGMII_ID:
->>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
->>> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->>> +		pad_mode = PAD_MODE_RGMII;
->>>  		break;
->>>
->>>  	default:
 >> 
->> I still don't like this.  Having both the MAC and PHY drivers react to
->> the phy-connection-type property is bound to cause trouble somewhere.
+>> ? 2017?7?21? GMT+08:00 ??8:45:39, Andre Przywara 
+>> <andre.przywara@arm.com> ??:
+>>> Hi,
+>>> 
+>>> On 19/07/17 17:10, Icenowy Zheng wrote:
+>>>> The Pine64 DT used to contain a dummy vcc3v3 regulator, in order to
+>>>> satisfy some device nodes when proper AXP803 regulator support is
+>>>> available. It's in fact the DCDC1 regulator of AXP803.
+>>>> 
+>>>> Drop the dummy regulator, and fix the reference of this regulator to
+>>>> DCDC1.
+>>> 
+>>> Do we really need to have this?
+>>> While I see that this is technically correct, it breaks older 
+>>> kernels,
+>>> which miss the AXP driver. So we can't use this DT for syncing it 
+>>> into
+>>> U-Boot anymore, while still expecting various kernels (for instance
+>>> from
+>>> distribution installers) to work via UEFI (for which U-Boot provides
+>>> the
+>>> DT). That would be a shame, because we start to see generic arm64
+>>> distribution installers to work out of the box.
+>>> 
+>>> I see these solutions:
+>>> 1) We drop this patch, instead add a comment that technically it's
+>>> DCDC1. I believe we can't really turn off DCDC1 anyway.
+>>> 2) We keep theses patches, but don't sync them to U-Boot to have a
+>>> universal DT in there which works with every kernel.
+>>> 3) We keep these patches *and* sync them to U-Boot, but add the fixed
+>>> regulator back in via a U-Boot specific .dtsi "overlay" snippet. This
+>>> would take care of the parts that break compatibility. The end result
+>>> would be similar to 2), then.
+>>> 
+>>> The easiest and most maintainable would be 1), but I am OK with 3) as
+>>> well, though I am not sure this won't get messy in the future and 
+>>> will
+>>> work for every change that we make.
+>>> 
+>>> What do you think?
 >> 
->> The only way out of the current mess is to define new properties for
->> both MAC and PHY that override the existing ones if present.
->
-> Do you mean defining 4 new bindings and their corresponding
-> phy_interface_t enum values? For example:
->
-> "rgmii-v2"
-> "rgmii-id-v2"
-> "rgmii-rxid-v2"
-> "rgmii-txid-v2"
->
-> 	PHY_INTERFACE_MODE_RGMII_V2,
-> 	PHY_INTERFACE_MODE_RGMII_ID_V2,
-> 	PHY_INTERFACE_MODE_RGMII_RXID_V2,
-> 	PHY_INTERFACE_MODE_RGMII_TXID_V2,
->
-> And then handling these new enums in the at803x and nb8800 drivers?
+>> 4) Do nothing.
+>> 
+>> We only promise old DTs will run with newer kernel, but
+>> we don't promise newer DTs to run with old kernel.And
+>> U-Boot is intended to update less frequently than Linux.
+>> 
+>> When updateing U-Boot, please update kernel as well.
+> 
+> Which means you tie your firmware to a kernel. I know this is the old
+> embedded approach, but we should really get rid of this, as I don't see
+> how this will work nicely with the Pinebook, for instance (which is not
+> really "embedded" anymore).
+> U-Boot sits on the SPI flash there, and you are expected to just run 
+> any
+> (not only Linux) distribution from a USB pen drive, for instance, with
+> that one firmware version, using UEFI. This already works today, but is
+> only sustainable if we have forward DT compatibility as well.
 
-It has already been suggested to add new properties specifying desired
-delays in picoseconds.  If present on the MAC node, the MAC driver
-should attempt to provide the delay, and if present on the PHY node, the
-PHY driver is responsible.
+Old firmware suit both old and new kernels, and for newer firmwares,
+use newer kernels.
 
--- 
-M?ns Rullg?rd
+This is an intended behavior, and will exist not only on ARM if the
+firmware gains something new.
+
+> 
+> 
+> Cheers,
+> Andre.
+> 
+>>> 
+>>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>>> ---
+>>>>  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 9 +--------
+>>>>  1 file changed, 1 insertion(+), 8 deletions(-)
+>>>> 
+>>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>>>> index ac31c9477b25..68a47d9b07d9 100644
+>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>>>> @@ -61,13 +61,6 @@
+>>>>  	chosen {
+>>>>  		stdout-path = "serial0:115200n8";
+>>>>  	};
+>>>> -
+>>>> -	reg_vcc3v3: vcc3v3 {
+>>>> -		compatible = "regulator-fixed";
+>>>> -		regulator-name = "vcc3v3";
+>>>> -		regulator-min-microvolt = <3300000>;
+>>>> -		regulator-max-microvolt = <3300000>;
+>>>> -	};
+>>>>  };
+>>>> 
+>>>>  &ehci0 {
+>>>> @@ -108,7 +101,7 @@
+>>>>  &mmc0 {
+>>>>  	pinctrl-names = "default";
+>>>>  	pinctrl-0 = <&mmc0_pins>;
+>>>> -	vmmc-supply = <&reg_vcc3v3>;
+>>>> +	vmmc-supply = <&reg_dcdc1>;
+>>>>  	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+>>>>  	cd-inverted;
+>>>>  	disable-wp;
+>>>> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
