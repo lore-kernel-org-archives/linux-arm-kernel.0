@@ -1,62 +1,104 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 21 Jul 2017 10:55:51 +0200
-Subject: bluetooth in v4.13-rc1: lock init missing somewhere?
-Message-ID: <20170721085551.GA22993@amd>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 21 Jul 2017 10:05:33 +0100
+Subject: [PATCH 0/4] Allow non-legacy cards to be vgaarb default
+In-Reply-To: <87pocusm2x.fsf@linkitivity.dja.id.au>
+References: <20170719012839.20124-1-dja@axtens.net>
+ <CAKv+Gu-SgeLXVEj_VtZHchaNmOwWO+GmfTg5CYcnOF43AJZGnA@mail.gmail.com>
+ <87pocusm2x.fsf@linkitivity.dja.id.au>
+Message-ID: <CAKv+Gu-O7cyJSgDrqSNi6F_n9eBnFEgz==aqowMqhy+81YK=CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+(+ Hans)
 
-Is bluetooth expected to work on n900?
+On 21 July 2017 at 00:52, Daniel Axtens <dja@axtens.net> wrote:
+> Hi Ard,
+>
+>> (+ Laszlo)
+>>
+>> On 19 July 2017 at 02:28, Daniel Axtens <dja@axtens.net> wrote:
+>>> Hi all,
+>>>
+>>> Previously I posted a patch that provided a quirk for a hibmc card
+>>> behind a particular Huawei bridge that allowed it to be marked as the
+>>> default device in the VGA arbiter.[0] This lead to some discussion.[1]
+>>> It was broadly suggested that a more generic solution would be better,
+>>> something in the style of powerpc's fixup_vga() quirk.
+>>>
+>>> Here is my suggested solution:
+>>>
+>>>  - Create a Kconfig option ARCH_WANT_VGA_ARB_FALLBACK
+>>>
+>>>  - if an arch selects that option, install PCI_FIXUP_CLASS_ENABLE
+>>>    hook. This hook fires when a card is enabled, which will require
+>>>    that a driver has been bound.
+>>>
+>>>  - if there is no default device when the hook fires, and the device
+>>>    can control memory and I/O, mark it as default.
+>>>
+>>> The patches are as follows:
+>>>
+>>>  (1) powerpc: simplify and fix VGA default device behaviour
+>>>
+>>>      This cleans up some quirks in the powerpc implementation of the
+>>>      vga_fixup. It should make the behaviour match the original
+>>>      intention.
+>>>
+>>>  (2) vgaarb: allow non-legacy cards to be marked as default
+>>>
+>>>      Add the Kconfig option, and create the fixup in vgaarb.c gated
+>>>      behind the option. Nothing happens at this stage because no arch
+>>>      has selected the option yet.
+>>>
+>>>  (3) powerpc: replace vga_fixup() with generic code
+>>>
+>>>      Select the option on powerpc and remove the old code. The only
+>>>      change is that it moves from being a final fixup to an enable
+>>>      fixup.
+>>>
+>>>  (4) arm64: allow non-legacy VGA devices to be default
+>>>
+>>>      Select the option on arm64. This solves my problem with the D05,
+>>>      but may cause other cards to be marked as default on other
+>>>      boards. This shouldn't cause any real issues but is worth being
+>>>      aware of.
+>>>
+>>
+>> Hi Daniel,
+>>
+>> Given that the whole point of the VGA arbiter is the ability to share
+>> the legacy mem+io ranges between different cards, why do we care about
+>> the VGA arbiter in the first place on arm64?
+>>
+>> AFAIK, there have been some recent changes in Xorg to address the
+>> auto-detection problem. I don't remember the exact details, but I have
+>> added Laszlo, who was involved with this at the time.
+>
+> I haven't been able to locate those changes - I remember that the call
+> to pci_device_is_boot_vga() in xf86pciBus.c [0] was critical and that is
+> still there in the latest git.
+>
+> Indeed, the reason we care about the vga arbiter at all is because of
+> that Xorg dependency on the boot VGA card. pci_device_is_boot_vga()
+> reads a sysfs file, and that sysfs file is populated based on the
+> vga_default_driver(), so it's very difficult to extricate ourselves from
+> the vga arbiter and its concept of the default device.
+>
+> We could make this method an 'either/or' rather than a fallback - so
+> platforms who didn't care about legacy resources didn't bother with
+> those tests, but I'm not sure what benefit that would give and I find it
+> harder to be confident of an absence of unexpected consequences.
+>
 
-It looks like lock init is missing somewhere:
+I was referring to this commit
 
-[  402.901031] of_get_named_gpiod_flags: parsed
-'bluetooth-wakeup-gpios' property of node
-'/ocp at 68000000/serial at 4806c000/bluetooth[0]' - status (0)
-[  403.042022] BUG: rwlock bad magic on CPU#0, kworker/u3:0/3898,
-c34b8848
-[  403.042053] CPU: 0 PID: 3898 Comm: kworker/u3:0 Tainted: G        W
-4.13.0-rc1-12941-g013595c-dirty #92
-[  403.042083] Hardware name: Nokia RX-51 board
-[  403.042114] Workqueue: hci0 hci_power_on
-[  403.042205] [<c010d5dc>] (unwind_backtrace) from [<c010ae18>]
-(show_stack+0x10/0x14)
-[  403.042327] [<c010ae18>] (show_stack) from [<c0154d74>]
-(do_raw_read_lock+0x20/0x2c)
-[  403.042358] [<c0154d74>] (do_raw_read_lock) from [<c04ea070>]
-(hci_uart_tx_wakeup+0x14/0x84)
-[  403.042419] [<c04ea070>] (hci_uart_tx_wakeup) from [<bf00089c>]
-(nokia_setup+0x210/0x640 [hci_nokia])
-[  403.042449] [<bf00089c>] (nokia_setup [hci_nokia]) from
-[<c04ea6fc>] (hci_uart_setup+0x7c/0x15c)
-[  403.042480] [<c04ea6fc>] (hci_uart_setup) from [<c063c1a0>]
-(hci_dev_do_open+0x420/0x5a0)
-[  403.042510] [<c063c1a0>] (hci_dev_do_open) from [<c063db40>]
-(hci_power_on+0x30/0x228)
-[  403.042541] [<c063db40>] (hci_power_on) from [<c013ad5c>]
-(process_one_work+0x10c/0x330)
-[  403.042572] [<c013ad5c>] (process_one_work) from [<c013b120>]
-(worker_thread+0x168/0x498)
-[  403.042602] [<c013b120>] (worker_thread) from [<c014035c>]
-(kthread+0x10c/0x148)
-[  403.042633] [<c014035c>] (kthread) from [<c01076b8>]
-(ret_from_fork+0x14/0x3c)
-root at n900:/my/modules#
+https://cgit.freedesktop.org/xorg/xserver/commit/?id=ca8d88e50310a0d440a127c22a0a383cc149f408
 
-If I put the driver built-in, firmware loading failed. But I can't get
-it to "hciconfig up" phase even with driver being modular. .. that
-worked at one point IIRC.
+but reading the commit log, it may have less to do with this issue
+than I thought originally.
 
-Best regards,
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170721/a6e56968/attachment.sig>
+But the fact remains that we are going about this the wrong way.
+Whether a graphics card decodes legacy VGA ranges or not has *nothing*
+to do with whether or not it is in fact the primary device on a
+non-x86 system, and so I still think the VGA arbiter should be omitted
+entirely for such platforms, and Xorg should be fixed instead.
