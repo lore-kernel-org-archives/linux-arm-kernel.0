@@ -1,74 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Jul 2017 18:15:31 +0100
-Subject: [PATCH 05/16] arm64: compat: Add cp15_32 and cp15_64 handler arrays
+Date: Fri, 21 Jul 2017 18:15:41 +0100
+Subject: [PATCH 15/16] clocksource/arm_arch_timer: Add helper to disable VDSO
+ fastpath
 In-Reply-To: <20170721171542.27639-1-marc.zyngier@arm.com>
 References: <20170721171542.27639-1-marc.zyngier@arm.com>
-Message-ID: <20170721171542.27639-6-marc.zyngier@arm.com>
+Message-ID: <20170721171542.27639-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're now ready to start handling CP15 access. Let's add (empty)
-arrays for both 32 and 64bit accessors, and the code that deals
-with them.
+As we are going to add more paths where we have to disable the
+counter access in the VDSO, let's add a helper that does exactly that.
 
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/traps.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index c89458f975bf..ac91f4ead737 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -558,6 +558,14 @@ static struct sys64_hook sys64_hooks[] = {
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index aae87c4c546e..4f4633157978 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -188,6 +188,22 @@ struct ate_acpi_oem_info {
+ 	u32 oem_revision;
+ };
  
- 
- #ifdef CONFIG_COMPAT
-+static struct sys64_hook cp15_32_hooks[] = {
-+	{},
-+};
-+
-+static struct sys64_hook cp15_64_hooks[] = {
-+	{},
-+};
-+
- #define PSTATE_IT_1_0_SHIFT	25
- #define PSTATE_IT_1_0_MASK	(0x3 << PSTATE_IT_1_0_SHIFT)
- #define PSTATE_IT_7_2_SHIFT	10
-@@ -629,6 +637,8 @@ static void advance_itstate(struct pt_regs *regs)
- 
- asmlinkage void __exception do_cp15instr(unsigned int esr, struct pt_regs *regs)
- {
-+	struct sys64_hook *hook, *hook_base;
-+
- 	if (!cp15_cond_valid(esr, regs)) {
- 		advance_itstate(regs);
- 		/*
-@@ -639,6 +649,25 @@ asmlinkage void __exception do_cp15instr(unsigned int esr, struct pt_regs *regs)
- 		return;
- 	}
- 
-+	switch (ESR_ELx_EC(esr)) {
-+	case ESR_ELx_EC_CP15_32:
-+		hook_base = cp15_32_hooks;
-+		break;
-+	case ESR_ELx_EC_CP15_64:
-+		hook_base = cp15_64_hooks;
-+		break;
-+	default:
-+		do_undefinstr(regs);
-+		return;
++static void __maybe_unused disable_vdso(void)
++{
++	/*
++	 * Don't use the vdso fastpath if errata require using the
++	 * out-of-line counter accessor and/or trap its access. We may
++	 * change our mind pretty late in the game (with a per-CPU
++	 * erratum, for example), so change both the default value and
++	 * the vdso itself.
++	 */
++	if (vdso_default) {
++		pr_info("Disabling VDSO direct access\n");
++		clocksource_counter.archdata.vdso_direct = false;
++		vdso_default = false;
 +	}
++}
 +
-+	for (hook = hook_base; hook->handler; hook++)
-+		if ((hook->esr_mask & esr) == hook->esr_val) {
-+			hook->handler(esr, regs);
-+			advance_itstate(regs);
-+			return;
-+		}
-+
- 	/*
- 	 * New cp15 instructions may previously have been undefined at
- 	 * EL0. Fall back to our usual undefined instruction handler
+ #ifdef CONFIG_FSL_ERRATUM_A008585
+ /*
+  * The number of retries is an arbitrary value well beyond the highest number
+@@ -457,16 +473,8 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
+ 
+ 	static_branch_enable(&arch_timer_read_ool_enabled);
+ 
+-	/*
+-	 * Don't use the vdso fastpath if errata require using the
+-	 * out-of-line counter accessor. We may change our mind pretty
+-	 * late in the game (with a per-CPU erratum, for example), so
+-	 * change both the default value and the vdso itself.
+-	 */
+-	if (wa->read_cntvct_el0) {
+-		clocksource_counter.archdata.vdso_direct = false;
+-		vdso_default = false;
+-	}
++	if (wa->read_cntvct_el0)
++		disable_vdso();
+ }
+ 
+ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
 -- 
 2.11.0
