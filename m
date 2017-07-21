@@ -1,62 +1,117 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 21 Jul 2017 14:04:07 +0100
-Subject: [PATCH v2 3/4] net: ethernet: nb8800: Fix RGMII TX clock delay
- setup
-In-Reply-To: <5a68bec8-0b1d-bcfe-65fb-b10399ec75be@sigmadesigns.com> (Marc
- Gonzalez's message of "Fri, 21 Jul 2017 13:26:30 +0200")
-References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
- <5a68bec8-0b1d-bcfe-65fb-b10399ec75be@sigmadesigns.com>
-Message-ID: <yw1xy3riosag.fsf@mansr.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 21 Jul 2017 14:12:30 +0100
+Subject: [PATCH v2 2/8] ARM: NOMMU: Update MPU accessors to use cp15 helpers
+In-Reply-To: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
+References: <1500642756-9264-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1500642756-9264-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+Currently, inline assembly for accessing to MPU's cp15 lacks volatile
+keyword which opens possibility to compiler to optimise such accesses
+as soon as we start using them more intensively. Rather than fixing
+inline asm, lets move MPU accessors to use cp15 helpers which do the
+right thing.
 
-> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
-> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
-> there are 4 RGMII modes to handle:
->
-> "rgmii" (RX and TX delays are added by the MAC when required)
-> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
-> 	the MAC should not add the RX or TX delays in this case)
-> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
-> 	the MAC should not add an RX delay in this case)
-> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
-> 	the MAC should not add an TX delay in this case)
->
-> Add TX delay in the MAC only for rgmii and rgmii-rxid.
->
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
->  drivers/net/ethernet/aurora/nb8800.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-> index ded041dbafe7..f3ed320eb4ad 100644
-> --- a/drivers/net/ethernet/aurora/nb8800.c
-> +++ b/drivers/net/ethernet/aurora/nb8800.c
-> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
->  		break;
->
->  	case PHY_INTERFACE_MODE_RGMII:
-> -		pad_mode = PAD_MODE_RGMII;
-> +	case PHY_INTERFACE_MODE_RGMII_RXID:
-> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
->  		break;
->
-> +	case PHY_INTERFACE_MODE_RGMII_ID:
->  	case PHY_INTERFACE_MODE_RGMII_TXID:
-> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
-> +		pad_mode = PAD_MODE_RGMII;
->  		break;
->
->  	default:
+Tested-by: Szemz? Andr?s <sza@esh.hu>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm/mm/pmsa-v7.c | 48 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 26 insertions(+), 22 deletions(-)
 
-I still don't like this.  Having both the MAC and PHY drivers react to
-the phy-connection-type property is bound to cause trouble somewhere.
-
-The only way out of the current mess is to define new properties for
-both MAC and PHY that override the existing ones if present.
-
+diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
+index ee3cf51..5b55f8f 100644
+--- a/arch/arm/mm/pmsa-v7.c
++++ b/arch/arm/mm/pmsa-v7.c
+@@ -12,63 +12,67 @@
+ 
+ #include "mm.h"
+ 
++#define DRBAR	__ACCESS_CP15(c6, 0, c1, 0)
++#define IRBAR	__ACCESS_CP15(c6, 0, c1, 1)
++#define DRSR	__ACCESS_CP15(c6, 0, c1, 2)
++#define IRSR	__ACCESS_CP15(c6, 0, c1, 3)
++#define DRACR	__ACCESS_CP15(c6, 0, c1, 4)
++#define IRACR	__ACCESS_CP15(c6, 0, c1, 5)
++#define RNGNR	__ACCESS_CP15(c6, 0, c2, 0)
++
+ /* Region number */
+-static void rgnr_write(u32 v)
++static inline void rgnr_write(u32 v)
+ {
+-	asm("mcr        p15, 0, %0, c6, c2, 0" : : "r" (v));
++	write_sysreg(v, RNGNR);
+ }
+ 
+ /* Data-side / unified region attributes */
+ 
+ /* Region access control register */
+-static void dracr_write(u32 v)
++static inline void dracr_write(u32 v)
+ {
+-	asm("mcr        p15, 0, %0, c6, c1, 4" : : "r" (v));
++	write_sysreg(v, DRACR);
+ }
+ 
+ /* Region size register */
+-static void drsr_write(u32 v)
++static inline void drsr_write(u32 v)
+ {
+-	asm("mcr        p15, 0, %0, c6, c1, 2" : : "r" (v));
++	write_sysreg(v, DRSR);
+ }
+ 
+ /* Region base address register */
+-static void drbar_write(u32 v)
++static inline void drbar_write(u32 v)
+ {
+-	asm("mcr        p15, 0, %0, c6, c1, 0" : : "r" (v));
++	write_sysreg(v, DRBAR);
+ }
+ 
+-static u32 drbar_read(void)
++static inline u32 drbar_read(void)
+ {
+-	u32 v;
+-	asm("mrc        p15, 0, %0, c6, c1, 0" : "=r" (v));
+-	return v;
++	return read_sysreg(DRBAR);
+ }
+ /* Optional instruction-side region attributes */
+ 
+ /* I-side Region access control register */
+-static void iracr_write(u32 v)
++static inline void iracr_write(u32 v)
+ {
+-	asm("mcr        p15, 0, %0, c6, c1, 5" : : "r" (v));
++	write_sysreg(v, IRACR);
+ }
+ 
+ /* I-side Region size register */
+-static void irsr_write(u32 v)
++static inline void irsr_write(u32 v)
+ {
+-	asm("mcr        p15, 0, %0, c6, c1, 3" : : "r" (v));
++	write_sysreg(v, IRSR);
+ }
+ 
+ /* I-side Region base address register */
+-static void irbar_write(u32 v)
++static inline void irbar_write(u32 v)
+ {
+-	asm("mcr        p15, 0, %0, c6, c1, 1" : : "r" (v));
++	write_sysreg(v, IRBAR);
+ }
+ 
+-static unsigned long irbar_read(void)
++static inline u32 irbar_read(void)
+ {
+-	unsigned long v;
+-	asm("mrc        p15, 0, %0, c6, c1, 1" : "=r" (v));
+-	return v;
++	return read_sysreg(IRBAR);
+ }
+ 
+ /* MPU initialisation functions */
 -- 
-M?ns Rullg?rd
+2.0.0
