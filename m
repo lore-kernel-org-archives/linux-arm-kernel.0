@@ -1,49 +1,29 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 21 Jul 2017 17:03:01 +0100
-Subject: [PATCH] firmware: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-21-robh@kernel.org>
-References: <20170718214339.7774-21-robh@kernel.org>
-Message-ID: <6445babc-73d3-005c-8b83-22290c5d8bab@arm.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Fri, 21 Jul 2017 13:19:16 -0300
+Subject: [PATCH v1] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
+In-Reply-To: <CANLsYkxDLVONpuQpF6Zo-gUPf+WVt2v+DLNduq0mDMk0XAZ5hw@mail.gmail.com>
+References: <1499878883-3066-1-git-send-email-mike.leach@linaro.org>
+ <CANLsYkxDLVONpuQpF6Zo-gUPf+WVt2v+DLNduq0mDMk0XAZ5hw@mail.gmail.com>
+Message-ID: <20170721161916.GH4134@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 18/07/17 22:43, Rob Herring wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
+Em Fri, Jul 21, 2017 at 08:50:09AM -0600, Mathieu Poirier escreveu:
+> On 12 July 2017 at 11:01, Mike Leach <mike.leach@linaro.org> wrote:
+> > The value passed into the perf.data file for the CONFIGR register in ETMv4
+> > was incorrectly being set to the command line options/ETMv3 value.
+> >
+> >                 info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
+> >                                                 coresight_get_trace_id(cpu);
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/firmware/arm_scpi.c | 2 +-
->  drivers/firmware/psci.c     | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
+> I have tested this patch on my side and things work as advertised now.
 > 
-> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-> index 8043e51de897..59190c374696 100644
-> --- a/drivers/firmware/arm_scpi.c
-> +++ b/drivers/firmware/arm_scpi.c
-> @@ -965,7 +965,7 @@ static int scpi_probe(struct platform_device *pdev)
+> Arnaldo, if you want to pick this up through your tree then:
 > 
->  	count = of_count_phandle_with_args(np, "mboxes", "#mbox-cells");
->  	if (count < 0) {
-> -		dev_err(dev, "no mboxes property in '%s'\n", np->full_name);
-> +		dev_err(dev, "no mboxes property in '%pOF'\n", np);
->  		return -ENODEV;
->  	}
+> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > 
+> Otherwise I'll get this, whatever you prefer.
 
-(For the SCPI part)
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+I'll get it, thanks for the ping,
 
-I assume you will ask ARM-SoC guys to pick this up. Let us know if you
-think otherwise.
-
--- 
-Regards,
-Sudeep
+- Arnaldo
