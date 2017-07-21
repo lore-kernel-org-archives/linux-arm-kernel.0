@@ -1,77 +1,76 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 21 Jul 2017 16:10:12 +0530
-Subject: USB 3.0 is broken on Odroid Xu4 on latest kernel
-In-Reply-To: <29c0eb80-f880-ce45-8dfd-0e148b278a1b@fivetechno.de>
-References: <CANAwSgSoo7g=RN4wQ96+NJRYZYy2WeHwPA-xJ2JY7yt25irDfA@mail.gmail.com>
- <29c0eb80-f880-ce45-8dfd-0e148b278a1b@fivetechno.de>
-Message-ID: <CANAwSgR=GaE6UaC5PE1aHoVTJ-QKE6Euc-YO9+t7BKb963sUXQ@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 21 Jul 2017 18:50:36 +0800
+Subject: [PATCH] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+In-Reply-To: <5971D208.3040005@huawei.com>
+References: <1500630715-2156-1-git-send-email-guohanjun@huawei.com>
+ <5971D208.3040005@huawei.com>
+Message-ID: <CAGHbJ3AfXMHy5+ZNQnPBiNEOvxTNgELMWvvgRZmYM5dHdzN4-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus Reichl/ Felipe/ Krzysztof / Jochen,
-
-On 21 July 2017 at 14:56, Markus Reichl <m.reichl@fivetechno.de> wrote:
-> Hi Anand,
+On 21 July 2017 at 18:06, Hanjun Guo <guohanjun@huawei.com> wrote:
 >
-> the issue below is fixed with
-> 4.13.0-rc1-next-20170721.
+> On 2017/7/21 17:51, Hanjun Guo wrote:
+> > From: Hanjun Guo <hanjun.guo@linaro.org>
+> >
+> > When running 4.13-rc1 on top of D05, I got the boot log:
+> >
+> > [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+> > [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+> > [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+> > [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+> > [    0.000000] SRAT: ITS affinity exceeding max count[4]
+> >
+> > This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
+> >
+> > So dynamically alloc the memory needed instead of using
+> > its_srat_maps[MAX_NUMNODES], which count the number of
+> > ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+> > then build the mapping of numa node to ITS ID.
+> >
+> > After doing this, I got what I wanted:
+> >
+> > [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+> > [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+> > [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+> > [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+> > [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+> > [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+> > [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+> > [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+> >
+> > Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
+> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  drivers/irqchip/irq-gic-v3-its.c | 28 +++++++++++++++++++++-------
+> >  1 file changed, 21 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> > index 3ccdf76..fb1c090 100644
+> > --- a/drivers/irqchip/irq-gic-v3-its.c
+> > +++ b/drivers/irqchip/irq-gic-v3-its.c
+> > @@ -1847,7 +1847,7 @@ struct its_srat_map {
+> >       u32     its_id;
+> >  };
+> >
+> > -static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
+> > +static struct its_srat_map *its_srat_maps __initdata;
+> >  static int its_in_srat __initdata;
+> >
+> >  static int __init acpi_get_its_numa_node(u32 its_id)
+> > @@ -1861,6 +1861,12 @@ static int __init acpi_get_its_numa_node(u32 its_id)
+> >       return NUMA_NO_NODE;
+> >  }
 >
-> Gru?,
-> --
-> Markus Reichl
->
-> Am 19.07.2017 um 16:58 schrieb Anand Moon:
->> Hi Krzysztof,
->>
->> Today I tried to compile the latest kernel for Odroid xu4.
->> using exynos_defconfig I build and loaded the kernel.
->> but to my surprise usb 3.0 device and missing.
->>
->> odroid login: root
->> Password:
->> Last login: Wed Jul 19 14:01:44 UTC 2017 on ttySAC2
->> Welcome to Ubuntu 16.04.2 LTS (GNU/Linux 4.13.0-rc1-xu4ml-27846-g74cbd96 armv7l)
->>
->>  * Documentation:  https://help.ubuntu.com
->>  * Management:     https://landscape.canonical.com
->>  * Support:        https://ubuntu.com/advantage
->> root at odroid:~# lsusb
->> Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
->> Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
->> Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
->> Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
->> Bus 002 Device 002: ID 0603:0002 Novatek Microelectronics Corp.
->> Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
->> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
->> root at odroid:~# lsusb -t
->> /:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
->> /:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
->> /:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
->> /:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
->> /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
->>     |__ Port 1: Dev 2, If 0, Class=Human Interface Device, Driver=usbhid, 1.5M
->>     |__ Port 1: Dev 2, If 1, Class=Human Interface Device, Driver=usbhid, 1.5M
->> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
->>
->> Full dmesg can be found on blow link.
->> https://pastebin.com/K3xfPCPe
->>
->> The reason for failed is below.
->>
->> [    7.187096] usb usb4-port1: connect-debounce failed
->>
->> I tried to debug this but failed to find the root cause.
->> Nothing is connected to the UBS 3.0 port for the failure to cause.
->>
->> If I load old kernel it seen to work correctly.
->> If you provoid some input I will give this a try.
->>
+> Oops, need to check if the its_srat_maps valid or not here, please
+> comment on what else I'm missing or wrong, then I will prepare another
 
-Thanks for your tips and input.
+                                                                   ^^^
+And need to free the memory.
 
-I was going to 'git bisect' over this weekend.
-But I will now check the 4.13.0-rc1-next-20170721
-and let you all know if this resolves the issue.
-
-Best Regards
--Anand
+Thanks
+Hanjun
