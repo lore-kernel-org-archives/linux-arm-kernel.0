@@ -1,18 +1,17 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 21 Jul 2017 15:01:54 -0700
-Subject: [PATCH 1/2] clk: qoriq: add clock configuration for ls1088a soc
-In-Reply-To: <1491445283-13053-1-git-send-email-andy.tang@nxp.com>
+Date: Fri, 21 Jul 2017 15:02:01 -0700
+Subject: [PATCH 2/2] clk: qoriq: add pll clock to clock lookup table
+In-Reply-To: <1491445283-13053-2-git-send-email-andy.tang@nxp.com>
 References: <1491445283-13053-1-git-send-email-andy.tang@nxp.com>
-Message-ID: <20170721220154.GL19878@codeaurora.org>
+ <1491445283-13053-2-git-send-email-andy.tang@nxp.com>
+Message-ID: <20170721220201.GM19878@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/06, Yuantian Tang wrote:
-> Clock on ls1088a chip takes primary clocking input from the external
-> SYSCLK signal. The SYSCLK input (frequency) is multiplied using
-> multiple phase locked loops (PLL) to create a variety of frequencies
-> which can then be passed to a variety of internal logic, including
-> cores and peripheral IP modules.
+> Register each PLL and its division clocks to clock
+> lookup table to facilitate the clock look up for
+> clock consumer.
 > 
 > Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
 > ---
