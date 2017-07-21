@@ -1,63 +1,95 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 21 Jul 2017 16:36:41 +0200
-Subject: [PATCH v2 1/4] net: phy: at803x: Document RGMII RX and TX clock
- delay issues
-In-Reply-To: <1c35e791-c181-2855-8463-b3b0ef5367a2@codeaurora.org>
-References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
- <051653a2-946f-6a0b-4cff-b403d1197038@sigmadesigns.com>
- <a9d3777c-1752-d79b-8302-d09c5f736a9f@codeaurora.org>
- <db666f79-5ee3-f136-527e-aeb9cc6425b7@sigmadesigns.com>
- <1c35e791-c181-2855-8463-b3b0ef5367a2@codeaurora.org>
-Message-ID: <ee921ae6-4501-8406-2deb-91e884c802d3@sigmadesigns.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Jul 2017 16:38:58 +0200
+Subject: [linux-sunxi] [PATCH 2/5] arm: allwinner: a64: drop the dummy
+ vcc3v3 regulator in Pine64 DT
+In-Reply-To: <493424f1-6df3-ec19-a7cf-f76706cb2c51@arm.com>
+References: <20170719161019.62133-1-icenowy@aosc.io>
+ <20170719161019.62133-3-icenowy@aosc.io>
+ <4e2c9486-9c0d-14e9-62e7-8642758c5472@arm.com>
+ <7FACC99F-F900-437B-9642-741D7D980D25@aosc.io>
+ <493424f1-6df3-ec19-a7cf-f76706cb2c51@arm.com>
+Message-ID: <20170721143858.3hufnu7v3ki6xmgf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/2017 16:06, Timur Tabi wrote:
-
-> On 7/21/17 8:29 AM, Marc Gonzalez wrote:
->
->> I don't understand what you're saying.
->>
->> It is a correct observation that the code enabling
->> RGMII RX clock delay is a NOP, since that bit will
->> always be set at that point.
->>
->> The spec for the 8035 (I haven't checked for 8030 and 8031,
->> is that what you meant by "other systems"?) states that
->> Sel_clk125m_dsp, which is described as:
->> "Control bit for rgmii interface rx clock delay"
->> is 1 after HW reset, 1 after SW reset.
->>
->> So my statement "RX clock delay is enabled at reset"
->> is universally true. It's not just on some systems.
+On Fri, Jul 21, 2017 at 02:02:18PM +0100, Andre Przywara wrote:
+> Hi,
 > 
-> Ok, taken out of context, the comment doesn't really explain why the 
-> code is the way it is.  I'm not really happy about the word "assumes". 
+> On 21/07/17 13:49, Icenowy Zheng wrote:
+> > 
+> > 
+> > ? 2017?7?21? GMT+08:00 ??8:45:39, Andre Przywara <andre.przywara@arm.com> ??:
+> >> Hi,
+> >>
+> >> On 19/07/17 17:10, Icenowy Zheng wrote:
+> >>> The Pine64 DT used to contain a dummy vcc3v3 regulator, in order to
+> >>> satisfy some device nodes when proper AXP803 regulator support is
+> >>> available. It's in fact the DCDC1 regulator of AXP803.
+> >>>
+> >>> Drop the dummy regulator, and fix the reference of this regulator to
+> >>> DCDC1.
+> >>
+> >> Do we really need to have this?
+> >> While I see that this is technically correct, it breaks older kernels,
+> >> which miss the AXP driver. So we can't use this DT for syncing it into
+> >> U-Boot anymore, while still expecting various kernels (for instance
+> >> from
+> >> distribution installers) to work via UEFI (for which U-Boot provides
+> >> the
+> >> DT). That would be a shame, because we start to see generic arm64
+> >> distribution installers to work out of the box.
+> >>
+> >> I see these solutions:
+> >> 1) We drop this patch, instead add a comment that technically it's
+> >> DCDC1. I believe we can't really turn off DCDC1 anyway.
+> >> 2) We keep theses patches, but don't sync them to U-Boot to have a
+> >> universal DT in there which works with every kernel.
+> >> 3) We keep these patches *and* sync them to U-Boot, but add the fixed
+> >> regulator back in via a U-Boot specific .dtsi "overlay" snippet. This
+> >> would take care of the parts that break compatibility. The end result
+> >> would be similar to 2), then.
+> >>
+> >> The easiest and most maintainable would be 1), but I am OK with 3) as
+> >> well, though I am not sure this won't get messy in the future and will
+> >> work for every change that we make.
+> >>
+> >> What do you think?
+> > 
+> > 4) Do nothing.
+> > 
+> > We only promise old DTs will run with newer kernel, but
+> > we don't promise newer DTs to run with old kernel.And
+> > U-Boot is intended to update less frequently than Linux.
+> > 
+> > When updateing U-Boot, please update kernel as well.
+> 
+> Which means you tie your firmware to a kernel. I know this is the old
+> embedded approach, but we should really get rid of this, as I don't see
+> how this will work nicely with the Pinebook, for instance (which is not
+> really "embedded" anymore).
+>
+> U-Boot sits on the SPI flash there, and you are expected to just run any
+> (not only Linux) distribution from a USB pen drive, for instance, with
+> that one firmware version, using UEFI. This already works today, but is
+> only sustainable if we have forward DT compatibility as well.
 
-If a HW setting defaults to 0 at reset, and some init is called
-right after reset, then you know the setting's value is 0.
-If you need that value to be 1, all you need is a function
-setting it to 1. This is the current situation.
+We've been discussing this over and over and over again. You're using
+the pinebook as an example, fine. Please give me the full documented,
+reviewed and acked-by binding for all the features the pinebook has.
 
-Commit 2e5f9f281ee8 assumes 0 at reset, and provides a function
-setting the value to 1.
+If you can't, this discussion is pointless, since you will expect
+changes in the DT.
 
-Reality is different. The HW setting defaults to 1 at reset.
-So it turns out that the function setting the value to 1
-is pointless, because the value is already 1. There is
-however no way to set the value to 0.
+Maxime
 
-Does that explain why I wrote "assume"?
-
-Also the commit message:
-"The current code supports enabling RGMII RX and TX clock delays.
-The unstated assumption is that these settings are disabled by
-default at reset, which is not the case."
-
-> Maybe you should add a sentence explaining when the code is NOT a no-op.
-
-The code is *NEVER* NOT a no-op.
-I.e. the code enabling RX clock delay is ALWAYS a no-op.
-I don't understand what you think is unclear in my comment.
-
-Regards.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170721/d8151a6f/attachment.sig>
