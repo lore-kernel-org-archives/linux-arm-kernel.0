@@ -1,49 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Jul 2017 18:15:35 +0100
-Subject: [PATCH 09/16] ARM: Check condition code before trying to handle an
- UNDEF
+Date: Fri, 21 Jul 2017 18:15:33 +0100
+Subject: [PATCH 07/16] arm64: compat: Add CNTFRQ trap handler
 In-Reply-To: <20170721171542.27639-1-marc.zyngier@arm.com>
 References: <20170721171542.27639-1-marc.zyngier@arm.com>
-Message-ID: <20170721171542.27639-10-marc.zyngier@arm.com>
+Message-ID: <20170721171542.27639-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As indicated in the ARMv7 ARM in B1.9.2, an instruction that
-would cause an UNDEF can trap even if it fails its condition
-code. Yes, this is annoying.
+Just like CNTVCT, we need to handle userspace trapping into the
+kernel if we're decided that the timer wasn't fit for purpose...
+64bit userspace is already dealt with, but we're missing the
+equivalent compat handling.
 
-Add a arm_check_condition call before trying to handle an
-UNDEF, and move the PC by the right amount if the condition
-check fails.
-
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/traps.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/include/asm/esr.h |  3 +++
+ arch/arm64/kernel/traps.c    | 13 +++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 948c648fea00..ca51e80a60b6 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -462,6 +462,19 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 		instr = __mem_to_opcode_arm(instr);
- 	}
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 43e629fe73dd..64ef4075b597 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -261,6 +261,9 @@
+ #define ESR_ELx_CP15_64_ISS_SYS_CNTVCT	(ESR_ELx_CP15_64_ISS_SYS_VAL(1, 14) | \
+ 					 ESR_ELx_CP15_64_ISS_DIR_READ)
  
-+	/*
-+	 * An UNDEF is allowed to trap even when failing its condition
-+	 * code (see B1.9.2 in the ARMv7 ARM).
-+	 */
-+	if (arm_check_condition(instr, regs->ARM_cpsr) == ARM_OPCODE_CONDTEST_FAIL) {
-+		if (thumb_mode(regs) && !is_wide_instruction(instr))
-+			regs->ARM_pc += 2;
-+		else
-+			regs->ARM_pc +=4;
++#define ESR_ELx_CP15_32_ISS_SYS_CNTFRQ	(ESR_ELx_CP15_32_ISS_SYS_VAL(0, 0, 14, 0) |\
++					 ESR_ELx_CP15_32_ISS_DIR_READ)
 +
-+		return;
-+	}
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 70efd63a5545..07846d747188 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -558,7 +558,20 @@ static struct sys64_hook sys64_hooks[] = {
+ 
+ 
+ #ifdef CONFIG_COMPAT
++static void compat_cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
++{
++	int reg = (esr & ESR_ELx_CP15_32_ISS_RT_MASK) >> ESR_ELx_CP15_32_ISS_RT_SHIFT;
 +
- 	if (call_undef_hook(regs, instr) == 0)
- 		return;
++	regs->user_regs.regs[reg] = arch_timer_get_rate();
++	regs->pc += 4;
++}
++
+ static struct sys64_hook cp15_32_hooks[] = {
++	{
++		.esr_mask = ESR_ELx_CP15_32_ISS_SYS_MASK,
++		.esr_val = ESR_ELx_CP15_32_ISS_SYS_CNTFRQ,
++		.handler = compat_cntfrq_read_handler,
++	},
+ 	{},
+ };
  
 -- 
 2.11.0
