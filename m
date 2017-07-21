@@ -1,37 +1,69 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 21 Jul 2017 09:06:44 -0500
-Subject: [PATCH v2 1/4] net: phy: at803x: Document RGMII RX and TX clock
- delay issues
-In-Reply-To: <db666f79-5ee3-f136-527e-aeb9cc6425b7@sigmadesigns.com>
-References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
- <051653a2-946f-6a0b-4cff-b403d1197038@sigmadesigns.com>
- <a9d3777c-1752-d79b-8302-d09c5f736a9f@codeaurora.org>
- <db666f79-5ee3-f136-527e-aeb9cc6425b7@sigmadesigns.com>
-Message-ID: <1c35e791-c181-2855-8463-b3b0ef5367a2@codeaurora.org>
+From: alcooperx@gmail.com (Al Cooper)
+Date: Fri, 21 Jul 2017 10:10:22 -0400
+Subject: [PATCH v4 0/4] Add Broadcom STB USB phy driver
+Message-ID: <1500646226-10659-1-git-send-email-alcooperx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/21/17 8:29 AM, Marc Gonzalez wrote:
-> I don't understand what you're saying.
-> 
-> It is a correct observation that the code enabling
-> RGMII RX clock delay is a NOP, since that bit will
-> always be set at that point.
-> 
-> The spec for the 8035 (I haven't checked for 8030 and 8031,
-> is that what you meant by "other systems"?) states that
-> Sel_clk125m_dsp, which is described as:
-> "Control bit for rgmii interface rx clock delay"
-> is 1 after HW reset, 1 after SW reset.
-> 
-> So my statement "RX clock delay is enabled at reset"
-> is universally true. It's not just on some systems.
+Add a new USB Phy driver for Broadcom STB SoCs. This driver
+supports Broadcom STB ARM SoCs. This driver in
+combination with the Broadcom STB ohci, ehci and xhci
+drivers will enable USB1.1, USB2.0 and USB3.0 support.
+This Phy driver also supports the Broadcom BDC gadget
+driver.
 
-Ok, taken out of context, the comment doesn't really explain why the 
-code is the way it is.  I'm not really happy about the word "assumes". 
-Maybe you should add a sentence explaining when the code is NOT a no-op.
+Changes since v3:
+- Removed MIPS support because there is such a small
+  amount of code that is common to both ARM and MIPS.
+  I'll create a separate MIPS driver in the future.
+- Have the Kconfig selection for this driver also select
+  "CONFIG_SOC_BRCMSTB" which contains needed functions.
+- Change device tree properties to use "brcm,has_xhci" and
+  "brcm,has_eohci" to determine if the phy contains
+  a xhci phy, and e/ohci phy or both.
+- Change the phy xlate routine to return an error instead
+  of NULL for a requested phy that doesn't exist.
+- Moved some probe functionality into it's own funtion to
+  simplify the many "if (has_xhci)" statements.
+
+Changes since v2:
+- Fix kbuild errors by changing Kconfig so the driver
+  only builds for ARCH_BRCMSTB || BMIPS_GENERIC systems
+
+Changes since v1:
+- Rebased to next
+- Add Kconfig entry to build the driver
+- Commented all delays
+- Split out sysfs functionality in separate patch
+- Removed parsing of old obselete device tree properties
+- Changed device property "device" to "dr_mode" using
+  standard values "host" and "peripheral" along with new
+  values "drd" and "typec-pd"
+- Add ability to handle the standard PHY_TYPE_USB2 and
+  PHY_TYPE_USB3 arguments passed in by phy consumers.
+- Moved phy_provider_register() to end of probe routine
+
+Al Cooper (4):
+  soc: brcmstb: Add Product ID and Family ID helper functions
+  dt-bindings: Add Broadcom STB USB PHY binding document
+  phy: usb: phy-brcm-usb: Add Broadcom STB USB phy driver
+  phy: usb: phy-brcm-usb: Add ability to force DRD mode to host or
+    device
+
+ .../bindings/phy/brcm,brcmstb-usb-phy.txt          |   43 +
+ MAINTAINERS                                        |    7 +
+ drivers/phy/broadcom/Kconfig                       |   13 +
+ drivers/phy/broadcom/Makefile                      |    3 +
+ drivers/phy/broadcom/phy-brcm-usb-init.c           | 1034 ++++++++++++++++++++
+ drivers/phy/broadcom/phy-brcm-usb-init.h           |   50 +
+ drivers/phy/broadcom/phy-brcm-usb.c                |  460 +++++++++
+ drivers/soc/bcm/brcmstb/common.c                   |   12 +
+ include/linux/soc/brcmstb/brcmstb.h                |   10 +
+ 9 files changed, 1632 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
+ create mode 100644 drivers/phy/broadcom/phy-brcm-usb-init.c
+ create mode 100644 drivers/phy/broadcom/phy-brcm-usb-init.h
+ create mode 100644 drivers/phy/broadcom/phy-brcm-usb.c
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+1.9.0.138.g2de3478
