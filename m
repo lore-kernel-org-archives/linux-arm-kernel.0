@@ -1,26 +1,32 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 20 Jul 2017 18:02:57 -0700
-Subject: [PATCH RESEND] ARM64: dts: meson-gxl-s905x-libretech-cc: fixup
- board definition
-In-Reply-To: <20170717160301.32729-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Mon, 17 Jul 2017 18:03:01 +0200")
-References: <20170717160301.32729-1-jbrunet@baylibre.com>
-Message-ID: <7hvammsita.fsf@baylibre.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Fri, 21 Jul 2017 10:32:42 +0800
+Subject: [PATCH 0/5] PCI: MediaTek: Add support for new generation host
+ controller
+Message-ID: <cover.1500601172.git.honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-> The libretech CC derives less from the p212 than initially thought.
-> Several voltage regulators are different and the capabilities of the
-> sdcard and emmc also differ.
->
-> Deriving from the p212 is not convient anymore so the libretech is now
-> derived from s905x definition directly.
->
-> Fixes: cd84aff1d981 ("ARM64: dts: meson-gxl: Add Libre Technology CC support")
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+MediaTek's PCIe host controller has two generation HWs, the new
+generation HW has two root ports, it shares most probing flow with the
+legacy controller. But the read/write config space logical is different
+from the lagacy controller.
+This patchset abstract the common probing flow, and add support for the
+new generation controller.
 
-Applied to v4.13/fixes,
+Ryder Lee (5):
+  PCI: mediatek: Add a structure to abstract the controller generations
+  PCI: mediatek: switch to use platform_get_resource_byname()
+  dt-bindings: PCI: rename and cleanup MediaTek binding text
+  PCI: mediatek: Add new generation controller support
+  dt-bindings: PCI: add support for new generation controller
 
-Kevin
+ ...{mediatek,mt7623-pcie.txt => mediatek-pcie.txt} | 113 +++-
+ drivers/pci/host/Kconfig                           |   5 +-
+ drivers/pci/host/pcie-mediatek.c                   | 578 +++++++++++++++++++--
+ 3 files changed, 629 insertions(+), 67 deletions(-)
+ rename Documentation/devicetree/bindings/pci/{mediatek,mt7623-pcie.txt => mediatek-pcie.txt} (59%)
+
+-- 
+2.6.4
