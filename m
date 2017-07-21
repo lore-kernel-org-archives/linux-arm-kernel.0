@@ -1,65 +1,112 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Jul 2017 22:47:18 +0200
-Subject: [PATCH] drm: exynos: mark pm functions as __maybe_unused
-Message-ID: <20170721204751.3370881-1-arnd@arndb.de>
+Date: Fri, 21 Jul 2017 23:12:06 +0200
+Subject: [PATCH] [RESEND] drm/rockchip: fix Kconfig dependencies
+Message-ID: <20170721211214.3386387-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rework of the exynos DRM clock handling introduced
-warnings for configurations that have CONFIG_PM disabled:
+A bug that I had fixed earlier just came back, with CONFIG_EXTCON=m,
+the rockchip drm driver will fail to link:
 
-drivers/gpu/drm/exynos/exynos_hdmi.c:736:13: error: 'hdmi_clk_disable_gates' defined but not used [-Werror=unused-function]
- static void hdmi_clk_disable_gates(struct hdmi_context *hdata)
-             ^~~~~~~~~~~~~~~~~~~~~~
-drivers/gpu/drm/exynos/exynos_hdmi.c:717:12: error: 'hdmi_clk_enable_gates' defined but not used [-Werror=unused-function]
- static int hdmi_clk_enable_gates(struct hdmi_context *hdata)
+drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_get_port_lanes':
+cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x30): undefined reference to `extcon_get_state'
+cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x6c): undefined reference to `extcon_get_property'
+drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_check_sink_connection':
+cdn-dp-core.c:(.text.cdn_dp_check_sink_connection+0x80): undefined reference to `extcon_get_state'
+drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_enable':
+cdn-dp-core.c:(.text.cdn_dp_enable+0x748): undefined reference to `extcon_get_property'
 
-The problem is that the PM functions themselves are inside of
-an #ifdef, but some functions they call are not.
+The problem is that that the sub-drivers are now all linked into the
+main rockchip drm module, which breaks all the Kconfig dependencies
+that are specified in the options for those sub-drivers.
 
-This patch removes the #ifdef and instead marks the PM functions
-as __maybe_unused, which is a more reliable way to get it right.
+This clarifies the dependency to ensure that we can only turn on the DP
+driver when EXTCON is reachable. As the 'select' statements can now
+cause additional options to become built-in when they should be
+loadable modules, I'm moving those into the main driver config option.
+The dependency on DRM_ROCKCHIP can be reduced into a single 'if'
+statement here for brevity, but this has no functional effect.
 
-Link: https://patchwork.kernel.org/patch/8436281/
-Fixes: 9be7e9898444 ("drm/exynos/hdmi: clock code re-factoring")
+Fixes: b6705157b2db ("drm/rockchip: add extcon dependency for DP")
+Fixes: 8820b68bd378 ("drm/rockchip: Refactor the component match logic.")
+Link: https://patchwork.kernel.org/patch/9648761/
+Acked-by: Guenter Roeck <groeck@chromium.org>
+Tested-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-Sent originally in Feb 2016 without reply. Found the patch
-again in my backlog now, it's still needed.
+Originally submitted on March 28, got two positive replies, but the
+patch was never applied in mainline.
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/rockchip/Kconfig | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 06bfbe400cf1..02a00f1c6d5b 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -1934,8 +1934,7 @@ static int hdmi_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 50c41c0a50ef..dcc539ba85d6 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -5,6 +5,10 @@ config DRM_ROCKCHIP
+ 	select DRM_KMS_HELPER
+ 	select DRM_PANEL
+ 	select VIDEOMODE_HELPERS
++	select DRM_ANALOGIX_DP if ROCKCHIP_ANALOGIX_DP
++	select DRM_DW_HDMI if ROCKCHIP_DW_HDMI
++	select DRM_MIPI_DSI if ROCKCHIP_DW_MIPI_DSI
++	select SND_SOC_HDMI_CODEC if ROCKCHIP_CDN_DP && SND_SOC
+ 	help
+ 	  Choose this option if you have a Rockchip soc chipset.
+ 	  This driver provides kernel mode setting and buffer
+@@ -12,10 +16,10 @@ config DRM_ROCKCHIP
+ 	  2D or 3D acceleration; acceleration is performed by other
+ 	  IP found on the SoC.
  
--#ifdef CONFIG_PM
--static int exynos_hdmi_suspend(struct device *dev)
-+static int __maybe_unused exynos_hdmi_suspend(struct device *dev)
- {
- 	struct hdmi_context *hdata = dev_get_drvdata(dev);
++if DRM_ROCKCHIP
++
+ config ROCKCHIP_ANALOGIX_DP
+ 	bool "Rockchip specific extensions for Analogix DP driver"
+-	depends on DRM_ROCKCHIP
+-	select DRM_ANALOGIX_DP
+ 	help
+ 	  This selects support for Rockchip SoC specific extensions
+ 	  for the Analogix Core DP driver. If you want to enable DP
+@@ -23,9 +27,7 @@ config ROCKCHIP_ANALOGIX_DP
  
-@@ -1944,7 +1943,7 @@ static int exynos_hdmi_suspend(struct device *dev)
- 	return 0;
- }
+ config ROCKCHIP_CDN_DP
+         bool "Rockchip cdn DP"
+-        depends on DRM_ROCKCHIP
+-	depends on EXTCON
+-	select SND_SOC_HDMI_CODEC if SND_SOC
++	depends on EXTCON=y || (EXTCON=m && DRM_ROCKCHIP=m)
+         help
+ 	  This selects support for Rockchip SoC specific extensions
+ 	  for the cdn DP driver. If you want to enable Dp on
+@@ -34,8 +36,6 @@ config ROCKCHIP_CDN_DP
  
--static int exynos_hdmi_resume(struct device *dev)
-+static int __maybe_unused exynos_hdmi_resume(struct device *dev)
- {
- 	struct hdmi_context *hdata = dev_get_drvdata(dev);
- 	int ret;
-@@ -1955,7 +1954,6 @@ static int exynos_hdmi_resume(struct device *dev)
+ config ROCKCHIP_DW_HDMI
+         bool "Rockchip specific extensions for Synopsys DW HDMI"
+-        depends on DRM_ROCKCHIP
+-        select DRM_DW_HDMI
+         help
+ 	  This selects support for Rockchip SoC specific extensions
+ 	  for the Synopsys DesignWare HDMI driver. If you want to
+@@ -44,8 +44,6 @@ config ROCKCHIP_DW_HDMI
  
- 	return 0;
- }
--#endif
+ config ROCKCHIP_DW_MIPI_DSI
+ 	bool "Rockchip specific extensions for Synopsys DW MIPI DSI"
+-	depends on DRM_ROCKCHIP
+-	select DRM_MIPI_DSI
+ 	help
+ 	 This selects support for Rockchip SoC specific extensions
+ 	 for the Synopsys DesignWare HDMI driver. If you want to
+@@ -54,8 +52,9 @@ config ROCKCHIP_DW_MIPI_DSI
  
- static const struct dev_pm_ops exynos_hdmi_pm_ops = {
- 	SET_RUNTIME_PM_OPS(exynos_hdmi_suspend, exynos_hdmi_resume, NULL)
+ config ROCKCHIP_INNO_HDMI
+ 	bool "Rockchip specific extensions for Innosilicon HDMI"
+-	depends on DRM_ROCKCHIP
+ 	help
+ 	  This selects support for Rockchip SoC specific extensions
+ 	  for the Innosilicon HDMI driver. If you want to enable
+ 	  HDMI on RK3036 based SoC, you should select this option.
++
++endif
 -- 
 2.9.0
