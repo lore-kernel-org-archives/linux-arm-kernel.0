@@ -1,81 +1,74 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Jul 2017 18:15:34 +0100
-Subject: [PATCH 08/16] ARM: Let arm_check_condition work with Thumb
+Date: Fri, 21 Jul 2017 18:15:42 +0100
+Subject: [PATCH 16/16] clocksource/arm_arch_timer: Trap user access to CNT{VCT,
+ FRQ} if CNTFRQ is invalid
 In-Reply-To: <20170721171542.27639-1-marc.zyngier@arm.com>
 References: <20170721171542.27639-1-marc.zyngier@arm.com>
-Message-ID: <20170721171542.27639-9-marc.zyngier@arm.com>
+Message-ID: <20170721171542.27639-17-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_check_condition indicates whether a trapped conditional
-instruction would have failed or passed its condition check.
+If we end-up in a situation where any of the CPUs doesn't have its
+CNTFRQ register correctly programmed, we cannot reliably expose this
+register to userspace. It means that in this case, we have to trap
+it, and CNTVCT at the same time (since they are controlled by the
+same trapping bit).
 
-This works perfectly well for ARM code, but it ignores entirely
-the Thumb mode, where the condition code is not encoded in the
-intruction, but in the IT state contained in the PSR.
+It also means that there is no point in enabling the VDSO access to
+the counter, since we're going to enter the kernel.
 
-This patch adds the necessary decoding, allowing arm_check_condition
-to correctly behave when presented with a Thumb instruction.
-
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/opcodes.c | 34 +++++++++++++++++++++++++++++++++-
- 1 file changed, 33 insertions(+), 1 deletion(-)
+ drivers/clocksource/arm_arch_timer.c | 28 ++++++++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/opcodes.c b/arch/arm/kernel/opcodes.c
-index f8179c6a817f..827318ee5ff7 100644
---- a/arch/arm/kernel/opcodes.c
-+++ b/arch/arm/kernel/opcodes.c
-@@ -38,6 +38,21 @@ static const unsigned short cc_map[16] = {
- 	0			/* NV                     */
- };
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 4f4633157978..37404a6a1bfa 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -759,6 +759,25 @@ static void arch_timer_configure_evtstream(void)
+ 	arch_timer_evtstrm_enable(min(pos, 15));
+ }
  
-+#define PSR_IT_1_0_SHIFT	25
-+#define PSR_IT_1_0_MASK		(0x3 << PSR_IT_1_0_SHIFT)
-+#define PSR_IT_7_2_SHIFT	10
-+#define PSR_IT_7_2_MASK		(0x3f << PSR_IT_7_2_SHIFT)
-+
-+static u32 psr_get_it_state(u32 psr)
++static bool cntfrq_valid(void)
 +{
-+	u32 it;
++	u32 freq = arch_timer_get_cntfrq();
 +
-+	it  = (psr & PSR_IT_1_0_MASK) >> PSR_IT_1_0_SHIFT;
-+	it |= ((psr & PSR_IT_7_2_MASK) >> PSR_IT_7_2_SHIFT) << 2;
-+
-+	return it;
-+}
-+
- /*
-  * Returns:
-  * ARM_OPCODE_CONDTEST_FAIL   - if condition fails
-@@ -54,10 +69,27 @@ static const unsigned short cc_map[16] = {
-  */
- asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr)
- {
--	u32 cc_bits  = opcode >> 28;
-+	u32 cc_bits;
- 	u32 psr_cond = psr >> 28;
- 	unsigned int ret;
- 
-+	/*
-+	 * If the CPU is in Thumb mode Thumb, extract the condition
-+	 * code from psr. Otherwise, extract the condition code from
-+	 * the instruction itself.
-+	 */
-+	if (psr & PSR_T_BIT) {
-+		u32 it;
-+
-+		it = psr_get_it_state(psr);
-+		if (!it)
-+			return ARM_OPCODE_CONDTEST_PASS;
-+
-+		cc_bits = it >> 4;
-+	} else {
-+		cc_bits  = opcode >> 28;
++	if (freq != arch_timer_rate) {
++		/*
++		 * If any of the CPUs disagrees on what CNTFRQ should
++		 * actually be, we end-up disabling the vdso fastpath
++		 * for the whole system.
++		 */
++		pr_warn("CPU%d: Invalid CNTFRQ (%u, expected %u)\n",
++			smp_processor_id(), freq, arch_timer_rate);
++		disable_vdso();
++		return false;
 +	}
 +
- 	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
- 		if ((cc_map[cc_bits] >> (psr_cond)) & 1)
- 			ret = ARM_OPCODE_CONDTEST_PASS;
++	return true;
++}
++
+ static void arch_counter_set_user_access(void)
+ {
+ 	u32 cntkctl = arch_timer_get_cntkctl();
+@@ -773,11 +792,12 @@ static void arch_counter_set_user_access(void)
+ 
+ 	/*
+ 	 * Enable user access to the virtual counter if it doesn't
+-	 * need to be workaround. The vdso may have been already
+-	 * disabled though.
++	 * need to be workaround, and that the frequency has been
++	 * correctly set. The vdso may have been already disabled
++	 * though.
+ 	 */
+-	if (arch_timer_this_cpu_has_cntvct_wa())
+-		pr_info("CPU%d: Trapping CNTVCT access\n", smp_processor_id());
++	if (arch_timer_this_cpu_has_cntvct_wa() || !cntfrq_valid())
++		pr_info("CPU%d: Trapping CNTVCT/CNTFRQ access\n", smp_processor_id());
+ 	else
+ 		cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+ 
 -- 
 2.11.0
