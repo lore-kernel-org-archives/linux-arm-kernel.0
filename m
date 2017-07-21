@@ -1,84 +1,81 @@
-From: masami.hiramatsu@linaro.org (Masami Hiramatsu)
-Date: Fri, 21 Jul 2017 22:34:49 +0900
-Subject: [PATCH v5 0/2] add UniPhier thermal support
-In-Reply-To: <CAK7LNARchNY8wA56+spLCUh99tsGpPQ9VuYc5ymnOL3cu0bd8g@mail.gmail.com>
-References: <1500636105-11520-1-git-send-email-hayashi.kunihiko@socionext.com>
- <CAK7LNARchNY8wA56+spLCUh99tsGpPQ9VuYc5ymnOL3cu0bd8g@mail.gmail.com>
-Message-ID: <CAA93ih2rYfMasZGzZ6K4nUWJx64KmmW8VWx8MZCscSag2z0-5w@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 21 Jul 2017 15:43:02 +0200
+Subject: [PATCH v2 3/4] net: ethernet: nb8800: Fix RGMII TX clock delay
+ setup
+In-Reply-To: <yw1xy3riosag.fsf@mansr.com>
+References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
+ <5a68bec8-0b1d-bcfe-65fb-b10399ec75be@sigmadesigns.com>
+ <yw1xy3riosag.fsf@mansr.com>
+Message-ID: <53fbf5e1-8d37-9734-be3f-77128ada9dfb@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 21/07/2017 15:04, M?ns Rullg?rd wrote:
 
-2017-07-21 22:24 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> 2017-07-21 20:21 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
->> This series adds support for CPU temperature monitor modules implemented
->> on UniPhier LD20 and PXs2 SoCs. This driver supports temperature monitoring
->> and alert function on the module.
+> Marc Gonzalez wrote:
+> 
+>> According to commit e5f3a4a56ce2a707b2fb8ce37e4414dcac89c672
+>> ("Documentation: devicetree: clarify usage of the RGMII phy-modes")
+>> there are 4 RGMII modes to handle:
 >>
->> Changes in v4:
->> - fix warnings from sparse by replacing u32 with __be32
->
-> Nit.
->
-> Your subject prefix indicates this patch is v5.
->
-> Do you mean "Changes in v5" or "Changes since v4" ?
+>> "rgmii" (RX and TX delays are added by the MAC when required)
+>> "rgmii-id" (RGMII with internal RX and TX delays provided by the PHY,
+>> 	the MAC should not add the RX or TX delays in this case)
+>> "rgmii-rxid" (RGMII with internal RX delay provided by the PHY,
+>> 	the MAC should not add an RX delay in this case)
+>> "rgmii-txid" (RGMII with internal TX delay provided by the PHY,
+>> 	the MAC should not add an TX delay in this case)
+>>
+>> Add TX delay in the MAC only for rgmii and rgmii-rxid.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  drivers/net/ethernet/aurora/nb8800.c | 6 ++++--
+>>  1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+>> index ded041dbafe7..f3ed320eb4ad 100644
+>> --- a/drivers/net/ethernet/aurora/nb8800.c
+>> +++ b/drivers/net/ethernet/aurora/nb8800.c
+>> @@ -1268,11 +1268,13 @@ static int nb8800_tangox_init(struct net_device *dev)
+>>  		break;
+>>
+>>  	case PHY_INTERFACE_MODE_RGMII:
+>> -		pad_mode = PAD_MODE_RGMII;
+>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
+>> +		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+>>  		break;
+>>
+>> +	case PHY_INTERFACE_MODE_RGMII_ID:
+>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
+>> -		pad_mode = PAD_MODE_RGMII | PAD_MODE_GTX_CLK_DELAY;
+>> +		pad_mode = PAD_MODE_RGMII;
+>>  		break;
+>>
+>>  	default:
+> 
+> I still don't like this.  Having both the MAC and PHY drivers react to
+> the phy-connection-type property is bound to cause trouble somewhere.
+> 
+> The only way out of the current mess is to define new properties for
+> both MAC and PHY that override the existing ones if present.
 
-I've checked all previous series and it seems to mean "Changes from vN".
+Do you mean defining 4 new bindings and their corresponding
+phy_interface_t enum values? For example:
 
-Thanks,
+"rgmii-v2"
+"rgmii-id-v2"
+"rgmii-rxid-v2"
+"rgmii-txid-v2"
 
->
->
->
->
->
->
->> Changes in v3:
->> - remove TMOD_MASK and use TMOD_WIDTH representing the bit width of TMOD
->>
->> Changes in v2:
->> - add nsleep after starting and stopping PVT
->> - replace temperature calculation with sign_extend32()
->>
->> Changes in v1:
->> - separate dts from this patchset as another patchset
->> - remove 'reg' description on the dt-bindings document
->> - fix the order of calling initialization functions
->> - replace mask bits to use GENMASK
->> - fix calculation of temperature because of not considering a negative value
->> - use devm_request_threaded_irq() instead of devm_request_irq() and
->>   separate a thread function from the interrupt handler
->> - add dependency to Kconfig
->> - set 120C to CRITICAL_TEMP_LIMIT as maximum temperature
->> - shrink each line of parameters to save the number of lines
->> - improve some comments and copyright description
->>
->> Kunihiko Hayashi (2):
->>   dt-bindings: thermal: add binding documentation for UniPhier thermal
->>     monitor
->>   thermal: uniphier: add UniPhier thermal driver
->>
->>  .../bindings/thermal/uniphier-thermal.txt          |  64 ++++
->>  drivers/thermal/Kconfig                            |   8 +
->>  drivers/thermal/Makefile                           |   1 +
->>  drivers/thermal/uniphier_thermal.c                 | 386 +++++++++++++++++++++
->>  4 files changed, 459 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
->>  create mode 100644 drivers/thermal/uniphier_thermal.c
->>
->> --
->> 2.7.4
->>
->
->
->
-> --
-> Best Regards
-> Masahiro Yamada
+	PHY_INTERFACE_MODE_RGMII_V2,
+	PHY_INTERFACE_MODE_RGMII_ID_V2,
+	PHY_INTERFACE_MODE_RGMII_RXID_V2,
+	PHY_INTERFACE_MODE_RGMII_TXID_V2,
 
+And then handling these new enums in the at803x and nb8800 drivers?
 
+FWIW, PAD_MODE_GTX_CLK_DELAY is broken in tango5 (doesn't add any
+delay). I'm considering removing MAC-side TX delay altogether.
 
--- 
-Masami Hiramatsu
+Regards.
