@@ -1,81 +1,118 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 21 Jul 2017 13:45:39 +0100
-Subject: [linux-sunxi] [PATCH 2/5] arm: allwinner: a64: drop the dummy
- vcc3v3 regulator in Pine64 DT
-In-Reply-To: <20170719161019.62133-3-icenowy@aosc.io>
-References: <20170719161019.62133-1-icenowy@aosc.io>
- <20170719161019.62133-3-icenowy@aosc.io>
-Message-ID: <4e2c9486-9c0d-14e9-62e7-8642758c5472@arm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 21 Jul 2017 14:47:53 +0200
+Subject: [PATCH v2 0/4] RGMII RX and TX clock delays using Atheros 8035
+In-Reply-To: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
+References: <2617d673-ef81-5e7f-4730-ed3aa3f1c2c6@sigmadesigns.com>
+Message-ID: <2711b987-a9db-e1d0-5346-a9d43309aaa2@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 21/07/2017 13:22, Marc Gonzalez wrote:
 
-On 19/07/17 17:10, Icenowy Zheng wrote:
-> The Pine64 DT used to contain a dummy vcc3v3 regulator, in order to
-> satisfy some device nodes when proper AXP803 regulator support is
-> available. It's in fact the DCDC1 regulator of AXP803.
+> Changes from v1
+> - Drop support for disabling RX and TX clock delays
+> (it breaks some boards). Document the issues instead.
+> - Split the MAC patch in two unrelated parts
+> - Fix the vantage 1172 DTS
 > 
-> Drop the dummy regulator, and fix the reference of this regulator to
-> DCDC1.
-
-Do we really need to have this?
-While I see that this is technically correct, it breaks older kernels,
-which miss the AXP driver. So we can't use this DT for syncing it into
-U-Boot anymore, while still expecting various kernels (for instance from
-distribution installers) to work via UEFI (for which U-Boot provides the
-DT). That would be a shame, because we start to see generic arm64
-distribution installers to work out of the box.
-
-I see these solutions:
-1) We drop this patch, instead add a comment that technically it's
-DCDC1. I believe we can't really turn off DCDC1 anyway.
-2) We keep theses patches, but don't sync them to U-Boot to have a
-universal DT in there which works with every kernel.
-3) We keep these patches *and* sync them to U-Boot, but add the fixed
-regulator back in via a U-Boot specific .dtsi "overlay" snippet. This
-would take care of the parts that break compatibility. The end result
-would be similar to 2), then.
-
-The easiest and most maintainable would be 1), but I am OK with 3) as
-well, though I am not sure this won't get messy in the future and will
-work for every change that we make.
-
-What do you think?
-
-Cheers,
-Andre.
-
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 9 +--------
->  1 file changed, 1 insertion(+), 8 deletions(-)
+> Marc Gonzalez (4):
+>   net: phy: at803x: Document RGMII RX and TX clock delay issues
+>   net: ethernet: nb8800: Set RGMII_MODE for all RGMII modes
+>   net: ethernet: nb8800: Fix RGMII TX clock delay setup
+>   ARM: dts: tango4: Add RGMII RX and TX clock delays
 > 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> index ac31c9477b25..68a47d9b07d9 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> @@ -61,13 +61,6 @@
->  	chosen {
->  		stdout-path = "serial0:115200n8";
->  	};
-> -
-> -	reg_vcc3v3: vcc3v3 {
-> -		compatible = "regulator-fixed";
-> -		regulator-name = "vcc3v3";
-> -		regulator-min-microvolt = <3300000>;
-> -		regulator-max-microvolt = <3300000>;
-> -	};
->  };
->  
->  &ehci0 {
-> @@ -108,7 +101,7 @@
->  &mmc0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&mmc0_pins>;
-> -	vmmc-supply = <&reg_vcc3v3>;
-> +	vmmc-supply = <&reg_dcdc1>;
->  	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
->  	cd-inverted;
->  	disable-wp;
-> 
+>  arch/arm/boot/dts/tango4-vantage-1172.dts |  2 +-
+>  drivers/net/ethernet/aurora/nb8800.c      |  8 +++++---
+>  drivers/net/phy/at803x.c                  | 12 ++++++++++++
+>  3 files changed, 18 insertions(+), 4 deletions(-)
+
+Rudimentary test:
+
+ip addr add 172.27.64.45/18 brd 172.27.127.255 dev eth0
+ip link set eth0 up
+sleep 10 ## autoneg should be complete
+time fping -c 10000 -b 1450 -p 1 -i 1 -q 172.27.64.1
+ethtool -S eth0
+cat /proc/interrupts
+
+# test_eth.sh 
+[   13.276242] ENTER at803x_enable_rx_delay
+[   13.280283] BEFORE=82ee
+[   13.282735]  AFTER=82ee
+[   13.285462] ENTER at803x_enable_tx_delay
+[   13.289567] BEFORE=2d47
+[   13.292018]  AFTER=2d47
+[   16.663266] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
+172.27.64.1 : xmt/rcv/%loss = 10000/10000/0%, min/avg/max = 0.18/0.21/3.79
+
+real    0m10.688s
+user    0m0.106s
+sys     0m0.472s
+
+NIC statistics:
+     rx_bytes_ok: 14960128
+     rx_frames_ok: 10002
+     rx_undersize_frames: 0
+     rx_fragment_frames: 0
+     rx_64_byte_frames: 2
+     rx_127_byte_frames: 0
+     rx_255_byte_frames: 0
+     rx_511_byte_frames: 0
+     rx_1023_byte_frames: 0
+     rx_max_size_frames: 10000
+     rx_oversize_frames: 0
+     rx_bad_fcs_frames: 0
+     rx_broadcast_frames: 0
+     rx_multicast_frames: 0
+     rx_control_frames: 0
+     rx_pause_frames: 0
+     rx_unsup_control_frames: 0
+     rx_align_error_frames: 0
+     rx_overrun_frames: 0
+     rx_jabber_frames: 0
+     rx_bytes: 14960128
+     rx_frames: 10002
+     tx_bytes_ok: 14960128
+     tx_frames_ok: 10002
+     tx_64_byte_frames: 2
+     tx_127_byte_frames: 0
+     tx_255_byte_frames: 0
+     tx_511_byte_frames: 0
+     tx_1023_byte_frames: 0
+     tx_max_size_frames: 10000
+     tx_oversize_frames: 0
+     tx_broadcast_frames: 1
+     tx_multicast_frames: 0
+     tx_control_frames: 0
+     tx_pause_frames: 0
+     tx_underrun_frames: 0
+     tx_single_collision_frames: 0
+     tx_multi_collision_frames: 0
+     tx_deferred_collision_frames: 0
+     tx_late_collision_frames: 0
+     tx_excessive_collision_frames: 0
+     tx_bytes: 14960128
+     tx_frames: 10002
+     tx_collisions: 0
+
+            CPU0       CPU1       
+  19:      10825        983     GIC-0  29 Edge      twd
+  20:         85          0      irq0   1 Level     ttyS0
+  21:          0          0      irq0  60 Level     mmc0
+  22:        228          0      irq0   8 Level     mmc1
+  25:      20005          0      irq0  38 Level     eth0
+  28:          1          0      irq0  37 Edge      26000.nb8800-mii:04
+IPI0:          0          0  CPU wakeup interrupts
+IPI1:          0          0  Timer broadcast interrupts
+IPI2:       1183       1725  Rescheduling interrupts
+IPI3:          0          1  Function call interrupts
+IPI4:          0          0  CPU stop interrupts
+IPI5:          1          0  IRQ work interrupts
+IPI6:          0          0  completion interrupts
+Err:           0
+
+
+fping caps at 1000 packets per second, which limits
+its usefulness as a benchmarking tool.
+
+Regards.
