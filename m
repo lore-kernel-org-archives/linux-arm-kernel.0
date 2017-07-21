@@ -1,144 +1,62 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 21 Jul 2017 23:10:26 +0800
-Subject: [linux-sunxi] [PATCH 2/5] arm: allwinner: a64: drop the dummy
- vcc3v3 regulator in Pine64 DT
-In-Reply-To: <0d30c993-a3a4-3923-b112-e65d1ea97cce@arm.com>
-References: <20170719161019.62133-1-icenowy@aosc.io>
- <20170719161019.62133-3-icenowy@aosc.io>
- <4e2c9486-9c0d-14e9-62e7-8642758c5472@arm.com>
- <7FACC99F-F900-437B-9642-741D7D980D25@aosc.io>
- <493424f1-6df3-ec19-a7cf-f76706cb2c51@arm.com>
- <20170721143858.3hufnu7v3ki6xmgf@flea>
- <0d30c993-a3a4-3923-b112-e65d1ea97cce@arm.com>
-Message-ID: <7F9AC1B3-5F96-4B77-B87B-A12723473496@aosc.io>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Fri, 21 Jul 2017 17:18:17 +0200
+Subject: Warning dump on OMAP-L138 when g_zero module is removed
+In-Reply-To: <d3e5f067-81eb-80bb-c8e9-c7f147fe0145@ti.com>
+References: <748a9491-e834-34cb-993f-e8c7e2538961@ti.com>
+ <260e5199-624d-b402-5481-2d818d282ce7@baylibre.com>
+ <d3e5f067-81eb-80bb-c8e9-c7f147fe0145@ti.com>
+Message-ID: <7c53882e-b70b-91dc-df2f-9f67fdd3cf40@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sekhar,
 
-
-? 2017?7?21? GMT+08:00 ??11:08:42, Andre Przywara <andre.przywara@arm.com> ??:
->Hi,
->
->On 21/07/17 15:38, Maxime Ripard wrote:
->> On Fri, Jul 21, 2017 at 02:02:18PM +0100, Andre Przywara wrote:
->>> Hi,
+On 07/10/2017 01:00 PM, Sekhar Nori wrote:
+> On Thursday 06 July 2017 10:43 PM, Alexandre Bailon wrote:
+>> On 06/29/2017 03:50 PM, Sekhar Nori wrote:
+>>> Hi Alexandre, Bin,
 >>>
->>> On 21/07/17 13:49, Icenowy Zheng wrote:
->>>>
->>>>
->>>> ? 2017?7?21? GMT+08:00 ??8:45:39, Andre Przywara
-><andre.przywara@arm.com> ??:
->>>>> Hi,
->>>>>
->>>>> On 19/07/17 17:10, Icenowy Zheng wrote:
->>>>>> The Pine64 DT used to contain a dummy vcc3v3 regulator, in order
->to
->>>>>> satisfy some device nodes when proper AXP803 regulator support is
->>>>>> available. It's in fact the DCDC1 regulator of AXP803.
->>>>>>
->>>>>> Drop the dummy regulator, and fix the reference of this regulator
->to
->>>>>> DCDC1.
->>>>>
->>>>> Do we really need to have this?
->>>>> While I see that this is technically correct, it breaks older
->kernels,
->>>>> which miss the AXP driver. So we can't use this DT for syncing it
->into
->>>>> U-Boot anymore, while still expecting various kernels (for
->instance
->>>>> from
->>>>> distribution installers) to work via UEFI (for which U-Boot
->provides
->>>>> the
->>>>> DT). That would be a shame, because we start to see generic arm64
->>>>> distribution installers to work out of the box.
->>>>>
->>>>> I see these solutions:
->>>>> 1) We drop this patch, instead add a comment that technically it's
->>>>> DCDC1. I believe we can't really turn off DCDC1 anyway.
->>>>> 2) We keep theses patches, but don't sync them to U-Boot to have a
->>>>> universal DT in there which works with every kernel.
->>>>> 3) We keep these patches *and* sync them to U-Boot, but add the
->fixed
->>>>> regulator back in via a U-Boot specific .dtsi "overlay" snippet.
->This
->>>>> would take care of the parts that break compatibility. The end
->result
->>>>> would be similar to 2), then.
->>>>>
->>>>> The easiest and most maintainable would be 1), but I am OK with 3)
->as
->>>>> well, though I am not sure this won't get messy in the future and
->will
->>>>> work for every change that we make.
->>>>>
->>>>> What do you think?
->>>>
->>>> 4) Do nothing.
->>>>
->>>> We only promise old DTs will run with newer kernel, but
->>>> we don't promise newer DTs to run with old kernel.And
->>>> U-Boot is intended to update less frequently than Linux.
->>>>
->>>> When updateing U-Boot, please update kernel as well.
+>>> With latest linux-next, I see a warning dump when I remove g_zero[1] on 
+>>> OMAP-L138 LCDK board. I am building the kernel with davinci_all_defconfig.
 >>>
->>> Which means you tie your firmware to a kernel. I know this is the
->old
->>> embedded approach, but we should really get rid of this, as I don't
->see
->>> how this will work nicely with the Pinebook, for instance (which is
->not
->>> really "embedded" anymore).
+>>> It is not present in latest mainline because the warnings are introduced
+>>> with CPPI DMA getting enabled in latest -next.
 >>>
->>> U-Boot sits on the SPI flash there, and you are expected to just run
->any
->>> (not only Linux) distribution from a USB pen drive, for instance,
->with
->>> that one firmware version, using UEFI. This already works today, but
->is
->>> only sustainable if we have forward DT compatibility as well.
->> 
->> We've been discussing this over and over and over again.
->
->Don't tell me ;-)
->But apart from "We don't care" I haven't got a real solution out of
->this
->discussion.
->
->> You're using the pinebook as an example, fine.
->
->I believe the current approach for supporting Allwinner boards is
->rooted
->in some embedded world, where shipping firmware together with some
->kernel is standard, especially if there is no on-board storage anyway.
->
->But the Pinebook is clearly not embedded and comes with SPI flash to
->boot from, so people might expect to install some Linux distribution on
->it.
+>>> Subsequent insertion of g_ether leads to a warning too[2], although the 
+>>> gadget seems to work (ping test).
+>>>
+>>> Since these are pretty annoying, it will be nice to get rid of them. I 
+>>> have not been able to debug any further. But if you have
+>>> ideas/experiments to try, I can do that.
+> 
+>> I got a lot of these warnings during development but it was only for the
+>> host mode.
+>> If I remember correctly, the cause was a race between the teardown
+>> function and the interrupt handler.
+>> The teardwon descriptor was pop from the queue by the interrupt handler,
+>> preventing cppi41_tear_down_chan() to get it, which will result after
+>> some retries to a couple of warnings.
+>>
+>> I will take a look to see if that is the same issue.
+That is not the same issue. Still, for some reasons, we never get the
+teardown descriptor.
+Two possibilities:
+ - Like the issue I had, the teardown is pop at the wrong place.
+ - The teardown doesn't complete or the descriptor is not queued.
 
-In fact current version of Pinebook has no SPI Flash.
+I think we should eliminate the first one before to work on the second one.
+I think adding some logs to cppi41_pop_desc() could help to figure out
+what is happening.
+> 
+> Thanks! I also see similar warnings under fast ping traffic and g_ether
+> inserted on LCDK. They dont come immediately though. Only after an hour
+> or so under traffic.
+I would not have expected to have them during a ping but this probably
+happens because some USB packet have timed out, which cause may a teardown.
+> 
+> I can those provide logs too if its going to be helpful.
+Currently, I think we should focus on the warnings that happens during
+the rmmod as they are always reproducible.
 
->And with the UEFI support in U-Boot we have a good solution for this
->(check the debian-testing arm64 installer), and so far this works:
->every
->extension we did to the DT was still fine with older kernels - this
->particular feature might not work (say Ethernet in kernels < 2.13-rc1),
->but at least it doesn't hurt or introduces regressions.
->
->> Please give me the full documented,
->> reviewed and acked-by binding for all the features the pinebook has.
->> 
->> If you can't, this discussion is pointless, since you will expect
->> changes in the DT.
->
->It's not about *changes* per se, it's about breaking compatibility,
->which can be avoided.
->As long as we just *add* features (DE2/HDMI, for instance) and don't
->introduce regressions, touching the DT is fine.
->
->And yes: I expect some hiccups with this, but also would hope for
->finding some solutions (like the ones sketched in my original email).
->
->Cheers,
->Andre.
+Thanks,
+Alexandre
