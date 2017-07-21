@@ -1,197 +1,83 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 21 Jul 2017 10:32:43 +0800
-Subject: [PATCH 1/5] PCI: mediatek: Add a structure to abstract the controller
- generations
+Date: Fri, 21 Jul 2017 10:32:45 +0800
+Subject: [PATCH 3/5] dt-bindings: PCI: rename and cleanup MediaTek binding text
 In-Reply-To: <cover.1500601172.git.honghui.zhang@mediatek.com>
 References: <cover.1500601172.git.honghui.zhang@mediatek.com>
-Message-ID: <f98c990c366927b8550d28667b8cdbfc07e6adf0.1500601172.git.honghui.zhang@mediatek.com>
+Message-ID: <c49a1c3ecda24bfb95fe108ff3fd76c04a905676.1500601172.git.honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ryder Lee <ryder.lee@mediatek.com>
 
-Introduce a structure "mtk_pcie_soc" to abstract the differences between
-controller generations, and the .startup() hook is used to encapsulate
-some SoC-dependent related setting. In doing so, the common code which
-will be reused by future chips.
-
-In addition, we change the approaches to waiting Gen2 training by using
-readl_poll_timeout() calls.
+In order to accommodate other SoC generations, this patch updates filename
+to make it more generic, regroups specific properties by SoCs, and removes
+redundant descriptions.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- drivers/pci/host/pcie-mediatek.c | 81 +++++++++++++++++++++++-----------------
- 1 file changed, 47 insertions(+), 34 deletions(-)
+ ...{mediatek,mt7623-pcie.txt => mediatek-pcie.txt} | 29 +++++++++++-----------
+ 1 file changed, 14 insertions(+), 15 deletions(-)
+ rename Documentation/devicetree/bindings/pci/{mediatek,mt7623-pcie.txt => mediatek-pcie.txt} (91%)
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index 5a9d858..d6ac342 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/clk.h>
- #include <linux/delay.h>
-+#include <linux/iopoll.h>
- #include <linux/kernel.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
-@@ -63,6 +64,18 @@
- #define PCIE_FC_CREDIT_MASK	(GENMASK(31, 31) | GENMASK(28, 16))
- #define PCIE_FC_CREDIT_VAL(x)	((x) << 16)
- 
-+struct mtk_pcie_port;
-+
-+/**
-+ * struct mtk_pcie_soc - differentiate between host generations
-+ * @ops: pointer to configuration access functions
-+ * @startup: pointer to controller setting functions
-+ */
-+struct mtk_pcie_soc {
-+	struct pci_ops *ops;
-+	int (*startup)(struct mtk_pcie_port *port);
-+};
-+
- /**
-  * struct mtk_pcie_port - PCIe port information
-  * @base: IO mapped register base
-@@ -96,6 +109,7 @@ struct mtk_pcie_port {
-  * @busn: bus range
-  * @offset: IO / Memory offset
-  * @ports: pointer to PCIe port information
-+ * @soc: pointer to SoC-dependent operations
-  */
- struct mtk_pcie {
- 	struct device *dev;
-@@ -111,13 +125,9 @@ struct mtk_pcie {
- 		resource_size_t io;
- 	} offset;
- 	struct list_head ports;
-+	const struct mtk_pcie_soc *soc;
- };
- 
--static inline bool mtk_pcie_link_up(struct mtk_pcie_port *port)
--{
--	return !!(readl(port->base + PCIE_LINK_STATUS) & PCIE_PORT_LINKUP);
--}
+diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
+similarity index 91%
+rename from Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+rename to Documentation/devicetree/bindings/pci/mediatek-pcie.txt
+index fe80dda..294f4a3 100644
+--- a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
+@@ -1,18 +1,13 @@
+-MediaTek Gen2 PCIe controller which is available on MT7623 series SoCs
 -
- static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
- {
- 	struct device *dev = pcie->dev;
-@@ -171,12 +181,30 @@ static struct pci_ops mtk_pcie_ops = {
- 	.write = pci_generic_config_write,
- };
+-PCIe subsys supports single root complex (RC) with 3 Root Ports. Each root
+-ports supports a Gen2 1-lane Link and has PIPE interface to PHY.
++MediaTek Gen2 PCIe controller
  
--static void mtk_pcie_configure_rc(struct mtk_pcie_port *port)
-+static int mtk_pcie_startup_ports(struct mtk_pcie_port *port)
- {
- 	struct mtk_pcie *pcie = port->pcie;
- 	u32 func = PCI_FUNC(port->index << 3);
- 	u32 slot = PCI_SLOT(port->index << 3);
- 	u32 val;
-+	int err;
+ Required properties:
+-- compatible: Should contain "mediatek,mt7623-pcie".
++- compatible: Should contain one of the following string:
++	"mediatek,mt7623-pcie"
++	"mediatek,mt2701-pcie"
+ - device_type: Must be "pci"
+ - reg: Base addresses and lengths of the PCIe controller.
+ - #address-cells: Address representation for root ports (must be 3)
+ - #size-cells: Size representation for root ports (must be 2)
+-- #interrupt-cells: Size representation for interrupts (must be 1)
+-- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
+-  Please refer to the standard PCI bus binding document for a more detailed
+-  explanation.
+ - clocks: Must contain an entry for each entry in clock-names.
+   See ../clocks/clock-bindings.txt for details.
+ - clock-names: Must include the following entries:
+@@ -20,12 +15,6 @@ Required properties:
+   - sys_ck0 :for clock of Port0
+   - sys_ck1 :for clock of Port1
+   - sys_ck2 :for clock of Port2
+-- resets: Must contain an entry for each entry in reset-names.
+-  See ../reset/reset.txt for details.
+-- reset-names: Must include the following entries:
+-  - pcie-rst0 :port0 reset
+-  - pcie-rst1 :port1 reset
+-  - pcie-rst2 :port2 reset
+ - phys: List of PHY specifiers (used by generic PHY framework).
+ - phy-names : Must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
+   number of PHYs as specified in *phys* property.
+@@ -34,6 +23,16 @@ Required properties:
+ - bus-range: Range of bus numbers associated with this controller.
+ - ranges: Ranges for the PCI memory and I/O regions.
+ 
++Required properties for MT7623/MT2701:
++- #interrupt-cells: Size representation for interrupts (must be 1)
++- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
++  Please refer to the standard PCI bus binding document for a more detailed
++  explanation.
++- resets: Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names: Must be "pcie-rst0", "pcie-rst1", "pcie-rstN".. based on the
++  number of root ports.
 +
-+	/* assert port PERST_N */
-+	val = readl(pcie->base + PCIE_SYS_CFG);
-+	val |= PCIE_PORT_PERST(port->index);
-+	writel(val, pcie->base + PCIE_SYS_CFG);
-+
-+	/* de-assert port PERST_N */
-+	val = readl(pcie->base + PCIE_SYS_CFG);
-+	val &= ~PCIE_PORT_PERST(port->index);
-+	writel(val, pcie->base + PCIE_SYS_CFG);
-+
-+	/* 100ms timeout value should be enough for Gen1/2 training */
-+	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS, val,
-+				 !!(val & PCIE_PORT_LINKUP), 20,
-+				 100 * USEC_PER_MSEC);
-+	if (err)
-+		return -ETIMEDOUT;
- 
- 	/* enable interrupt */
- 	val = readl(pcie->base + PCIE_INT_ENABLE);
-@@ -209,30 +237,14 @@ static void mtk_pcie_configure_rc(struct mtk_pcie_port *port)
- 	writel(PCIE_CONF_ADDR(PCIE_FTS_NUM, func, slot, 0),
- 	       pcie->base + PCIE_CFG_ADDR);
- 	writel(val, pcie->base + PCIE_CFG_DATA);
--}
- 
--static void mtk_pcie_assert_ports(struct mtk_pcie_port *port)
--{
--	struct mtk_pcie *pcie = port->pcie;
--	u32 val;
--
--	/* assert port PERST_N */
--	val = readl(pcie->base + PCIE_SYS_CFG);
--	val |= PCIE_PORT_PERST(port->index);
--	writel(val, pcie->base + PCIE_SYS_CFG);
--
--	/* de-assert port PERST_N */
--	val = readl(pcie->base + PCIE_SYS_CFG);
--	val &= ~PCIE_PORT_PERST(port->index);
--	writel(val, pcie->base + PCIE_SYS_CFG);
--
--	/* PCIe v2.0 need at least 100ms delay to train from Gen1 to Gen2 */
--	msleep(100);
-+	return 0;
- }
- 
- static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
- {
--	struct device *dev = port->pcie->dev;
-+	struct mtk_pcie *pcie = port->pcie;
-+	struct device *dev = pcie->dev;
- 	int err;
- 
- 	err = clk_prepare_enable(port->sys_ck);
-@@ -250,13 +262,8 @@ static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
- 		goto err_phy_on;
- 	}
- 
--	mtk_pcie_assert_ports(port);
--
--	/* if link up, then setup root port configuration space */
--	if (mtk_pcie_link_up(port)) {
--		mtk_pcie_configure_rc(port);
-+	if (!pcie->soc->startup(port))
- 		return;
--	}
- 
- 	dev_info(dev, "Port%d link down\n", port->index);
- 
-@@ -480,7 +487,7 @@ static int mtk_pcie_register_host(struct pci_host_bridge *host)
- 
- 	host->busnr = pcie->busn.start;
- 	host->dev.parent = pcie->dev;
--	host->ops = &mtk_pcie_ops;
-+	host->ops = pcie->soc->ops;
- 	host->map_irq = of_irq_parse_and_map_pci;
- 	host->swizzle_irq = pci_common_swizzle;
- 
-@@ -513,6 +520,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	pcie = pci_host_bridge_priv(host);
- 
- 	pcie->dev = dev;
-+	pcie->soc = of_device_get_match_data(dev);
- 	platform_set_drvdata(pdev, pcie);
- 	INIT_LIST_HEAD(&pcie->ports);
- 
-@@ -537,9 +545,14 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return err;
- }
- 
-+static struct mtk_pcie_soc mtk_pcie_soc_v1 = {
-+	.ops = &mtk_pcie_ops,
-+	.startup = mtk_pcie_startup_ports,
-+};
-+
- static const struct of_device_id mtk_pcie_ids[] = {
--	{ .compatible = "mediatek,mt7623-pcie"},
--	{ .compatible = "mediatek,mt2701-pcie"},
-+	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
-+	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
- 	{},
- };
+ In addition, the device tree node must have sub-nodes describing each
+ PCIe port interface, having the following mandatory properties:
  
 -- 
 2.6.4
