@@ -1,10 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 21 Jul 2017 22:21:05 +0900
+Date: Fri, 21 Jul 2017 22:21:04 +0900
 Subject: [PATCH v5 2/2] thermal: uniphier: add UniPhier thermal driver
 In-Reply-To: <1500636105-11520-3-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1500636105-11520-1-git-send-email-hayashi.kunihiko@socionext.com>
  <1500636105-11520-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNATDnAbByOZN2YDUfnTQLwMiSPVZtz5rfewUzrC9uGUCHw@mail.gmail.com>
+Message-ID: <CAK7LNASjwCCcRFk-3pXgBXBB4Nbx8Z-SY842=TZytqgqw6tfqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
