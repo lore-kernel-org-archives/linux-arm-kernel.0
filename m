@@ -1,46 +1,100 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 21 Jul 2017 11:56:07 +0530
-Subject: [PATCH 0/6] FlexRM driver improvements
-In-Reply-To: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
-References: <1500458142-19243-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <CAALAos8s880_waXZb+8hP2SYLYJ+-udmHMU_hZLWk+Wk5jS4qw@mail.gmail.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 21 Jul 2017 14:32:26 +0800
+Subject: [PATCH v4 2/2] arm64: dts: Add Mediatek SoC MT2712 and
+ evaluation board dts and Makefile
+In-Reply-To: <a470dfc9-71a4-6574-f342-fbd8d60aafce@gmail.com>
+References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
+ <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
+ <ddfb5e58-520f-1ef5-2351-d7545e17a429@gmail.com>
+ <1500446884.14021.12.camel@mtksdaap41>
+ <a470dfc9-71a4-6574-f342-fbd8d60aafce@gmail.com>
+Message-ID: <1500618746.14868.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 3:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
-> This patchset does various improvments to Broadcom FlexRM
-> mailbox controller driver and also adds FlexRM DT nodes
-> for Stingray SOC.
->
-> The patches are based on Linux-4.13-rc1 and can also be
-> found at flexrm-imp-v1 branch of
-> https://github.com/Broadcom/arm64-linux.git
->
-> Anup Patel (6):
->   mailbox: bcm-flexrm-mailbox: Set IRQ affinity hint for FlexRM ring
->     IRQs
->   mailbox: bcm-flexrm-mailbox: Add debugfs support
->   mailbox: bcm-flexrm-mailbox: Fix mask used in CMPL_START_ADDR_VALUE()
->   mailbox: Make message send queue size dynamic in Linux mailbox
->   mailbox: bcm-flexrm-mailbox: Set msg_queue_len for each channel
->   arm64: dts: Add FlexRM DT nodes for Stingray
+On Wed, 2017-07-19 at 11:26 +0200, Matthias Brugger wrote:
+> 
+> On 07/19/2017 08:48 AM, YT Shen wrote:
+> > On Tue, 2017-07-18 at 18:29 +0200, Matthias Brugger wrote:
+> >>
+> >> On 06/22/2017 11:32 AM, YT Shen wrote:
+> >>> This adds basic chip support for Mediatek 2712
+> 
+> [...]
+> 
+> >>> +
+> >>> +	uart_clk: dummy26m {
+> >>> +		compatible = "fixed-clock";
+> >>> +		clock-frequency = <26000000>;
+> >>> +		#clock-cells = <0>;
+> >>> +	};
+> >>> +
+> 
+> [...]
+> 
+> >>> +
+> >>> +	soc {
+> >>> +		#address-cells = <2>;
+> >>> +		#size-cells = <2>;
+> >>> +		compatible = "simple-bus";
+> >>> +		ranges;
+> >>> +
+> >>> +		uart5: serial at 1000f000 {
+> >>> +			compatible = "mediatek,mt2712-uart",
+> >>> +				     "mediatek,mt6577-uart";
+> >>> +			reg = <0 0x1000f000 0 0x400>;
+> >>> +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
+> >>> +			clocks = <&uart_clk>, <&uart_clk>;
+> >>> +			clock-names = "baud", "bus";
+> >>> +			status = "disabled";
+> >>> +		};
+> >>
+> >> So baud and bus clock are both 26 MHz?
+> > We didn't have CCF clock support in this series.
+> > After we have clock source support, we could use the correct clocks to
+> > the UARTs and drop the 26MHz fixed rate UART clock.
+> > 
+> > The bus clock is 26MHz.  The baud clock could be from another clock
+> > source, using the same 26MHz fixed clock works also.
+> > 
+> > 
+> > [1] https://patchwork.kernel.org/patch/9670877/
+> > [2] https://patchwork.kernel.org/patch/6436021/
+> > 
+> 
+> Yes, just using one 26 MHz clock works, but it uses an deprecated 
+> binding, so we should not do this, as through copying from the source of 
+> other SoCs we will keep it alive forever. Anyway that's not your case, 
+> as you defined the two clocks.
+> 
+> The device tree should reflect the HW, that's why I asked for the clock 
+> frequency of both clocks. I searched the git history and it was never 
+> done right before. So you could be the first :)
+> 
+> Thanks,
+> Matthias
+Ok, I want to make it clear.  The following example
 
-One patch was missed-out in this series which was about
-using bitmap instead of IDA to avoid locking issues. I will
-send revised patchset to include this patch.
+        baud_clk: dummy26m {
+                compatible = "fixed-clock";
+                clock-frequency = <26000000>;
+                #clock-cells = <0>;
+        };
 
->
->  .../boot/dts/broadcom/stingray/stingray-fs4.dtsi   |  54 +++++++
->  .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |   2 +
->  drivers/mailbox/bcm-flexrm-mailbox.c               | 160 ++++++++++++++++++++-
->  drivers/mailbox/mailbox.c                          |  15 +-
->  include/linux/mailbox_controller.h                 |   5 +-
->  5 files changed, 227 insertions(+), 9 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
->
-> --
-> 2.7.4
->
+        sys_clk: dummyclk {
+                compatible = "fixed-clock";
+                clock-frequency = <26000000>;
+                #clock-cells = <0>;
+        };
 
-Regards,
-Anup
+	uart0: serial at 11002000 {
+[...]
+                clocks = <&baud_clk>, <&sys_clk>;
+[...]
+	}
+
+Do you think it is clear to reflect the HW that the baud clock and sys
+clock can be different source or we need to choose another frequency?
+Thanks.
+
+yt.shen
