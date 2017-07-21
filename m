@@ -1,42 +1,48 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Fri, 21 Jul 2017 14:21:53 +0200
-Subject: [PATCH 01/12] ARM: ixp4xx: fix ioport_unmap definition
-In-Reply-To: <20170720154616.3250481-2-arnd@arndb.de> (Arnd Bergmann's message
- of "Thu, 20 Jul 2017 17:45:55 +0200")
-References: <20170720154616.3250481-1-arnd@arndb.de>
- <20170720154616.3250481-2-arnd@arndb.de>
-Message-ID: <m3lgnif09q.fsf@t19.piap.pl>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 21 Jul 2017 14:34:13 +0200
+Subject: [RFC PATCH v2] ARM: dts: stm32: change pinctrl bindings definition
+Message-ID: <1500640454-19656-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Initially each pin was declared in "include/dt-bindings/stm32f429-pinfunc.h"
+and each definition contained SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
+Since this approach was approved, the number of supported MCU has
+increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a new
+file in "include/dt-bindings" each time a new STM32 SOC arrives I propose
+a new approach which consist to use a macro to define pin muxing in device
+tree. All STM32 DT will use the common macro to define pinmux. Furthermore, it
+will make maintenance and integration of new SOC easier.
 
-> An empty macro definition can cause unexpected behavior, in
-> case of the ixp4xx ioport_unmap, we get two warnings:
->
-> drivers/net/wireless/marvell/libertas/if_cs.c: In function 'if_cs_release':
-> drivers/net/wireless/marvell/libertas/if_cs.c:826:3: error: suggest braces around empty body in an 'if' statement [-Werror=empty-body]
->    ioport_unmap(card->iobase);
-> drivers/vfio/pci/vfio_pci_rdwr.c: In function 'vfio_pci_vga_rw':
-> drivers/vfio/pci/vfio_pci_rdwr.c:230:15: error: the omitted middle operand in ?: will always be 'true', suggest explicit middle operand [-Werror=parentheses]
->    is_ioport ? ioport_unmap(iomem) : iounmap(iomem);
->
-> This uses an inline function to define the macro in a safer way.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-ixp4xx/include/mach/io.h | 11 +++++++++--
+To check that patch generate same dtb than befrore I used dtc binary to (re)generate dts files
+(before and after apply the series).
+Example on stm32f469-disco:
 
-Acked-by: Krzysztof Halasa <khalasa@piap.pl>
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
+stm32f469-disco-after.dtb
 
-In fact, the old code contained another bug (missing parentheses):
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
+stm32f469-disco-before.dtb
 
-> --- a/arch/arm/mach-ixp4xx/include/mach/io.h
->  
-> -#define	ioport_map(port, nr)		((void __iomem*)(port + PIO_OFFSET))
-                                                                 ^^^^
+Then diff -u stm32f469-disco-before.dts stm32f469-disco-after.dts
+
+
+Changes since v1:
+ -According to Vikas Manocha review, use generic macro to define port.
+
+
+Regards
+Alex
+
+Alexandre Torgue (1):
+  ARM: dts: stm32: change pinctrl bindings definition
+
+ arch/arm/boot/dts/stm32f429.dtsi                |  176 ++--
+ include/dt-bindings/pinctrl/stm32-pinfunc.h     |   31 +
+ include/dt-bindings/pinctrl/stm32f429-pinfunc.h | 1239 -----------------------
+ 3 files changed, 119 insertions(+), 1327 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/stm32-pinfunc.h
+ delete mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+2.7.4
