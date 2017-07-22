@@ -1,220 +1,134 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 22 Jul 2017 14:29:51 +0200
-Subject: No Ethernet on Raspberry Pi 3 in v4.13-rc1
-Message-ID: <5650979e-ea55-0337-2edd-d2c3e8ad0e37@suse.de>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Sat, 22 Jul 2017 15:02:26 +0200 (CEST)
+Subject: [PATCH v2] ARM: zImage: Fix stack overflow in merge_fdt_bootargs()
+Message-ID: <e116599d71f0fe70b083eed29c66e09ad600c1cf.1500726646.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This function is called very early on from head.S and currently sets up a
+stack frame of more than 1024 bytes:
 
-With arm64 4.13-rc1 I get no eth0 device on Pi3 (openSUSE Tumbleweed).
-The v4.13-rc1 DT works okay with a 4.12 kernel.
+atags_to_fdt.c: In function ?merge_fdt_bootargs?:
+atags_to_fdt.c:98:1: warning: the frame size of 1032 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 
-Possibly related:
+This causes a crash and failure to boot with some combinations of kernel
+version, gcc version and dtb, such as kernel version 4.1-rc1 or 4.1.0,
+gcc version 5.4.1 20161019 (Debian 5.4.1-3) and tegra20-trimslice.dtb.
 
-[   15.916350] OF: /soc/usb at 7e980000: could not get #phy-cells for /phy
+With this patch, merge_fdt_bootargs() is rewritten to not use a large buffer,
+thereby solving the problem of the stack overflow.
 
-[   16.496662] usb 1-1: new high-speed USB device number 2 using dwc2
-[   16.502988] dwc2 3f980000.usb: Cannot do DMA to address
-0x00000000335da400
-[   16.510035] Unable to handle kernel paging request at virtual address
-ffff800000000000
-[   16.518103] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff0000096ac000
-[   16.524995] [ffff800000000000] *pgd=0000000036ff7003,
-*pud=0000000036ff6003, *pmd=0000000036ff5003, *pte=0000000000000000
-[   16.536229] Internal error: Oops: 96000147 [#1] SMP
-[   16.536243] Modules linked in: brcmutil cfg80211 soundcore
-drm_kms_helper rfkill drm fb_sys_fops syscopyarea dwc2 sysfillrect
-sysimgblt udc_core usbcore i2c_bcm2835 bcm2835_rng spi_bcm2835
-pwm_bcm2835 bcm2835_wdt uio_pdrv_genirq uio crc32_ce phy_generic
-leds_gpio mmc_block sdhci_iproc sdhci_pltfm sdhci bcm2835 mmc_core
-bcm2835_dma sg efivarfs
-[   16.536335] CPU: 1 PID: 34 Comm: kworker/1:1 Not tainted
-4.13.0-rc1-2.g9c198f2-default #1
-[   16.536338] Hardware name: raspberrypi rpi/rpi, BIOS 2017.07-rc3
-07/10/2017
-[   16.536560] Workqueue: usb_hub_wq hub_event [usbcore]
-[   16.536568] task: ffff800034cc6100 task.stack: ffff800034ccc000
-[   16.536585] PC is at __clean_dcache_area_poc+0x20/0x40
-[   16.536592] LR is at __swiotlb_map_page+0x9c/0xb8
-[   16.536597] pc : [<ffff00000809c160>] lr : [<ffff00000809a254>]
-pstate: 80000145
-[   16.536600] sp : ffff800034ccf8f0
-[   16.536603] x29: ffff800034ccf8f0 x28: ffff000000b2cfe8
-[   16.536611] x27: 0000000000000080 x26: ffff8000335a6800
-[   16.536619] x25: 0000000080000080 x24: 0000000000000400
-[   16.536626] x23: 0000000000000001 x22: 0000000000000008
-[   16.536633] x21: 00000000c0000000 x20: 0000000000000000
-[   16.536640] x19: ffff800034cf0c10 x18: ffffffffffffffff
-[   16.536647] x17: 0000000000003000 x16: ffff7e0000bd0080
-[   16.536654] x15: ffff000009429c08 x14: ffff0000895ba17f
-[   16.536662] x13: ffff0000095ba18d x12: ffff000009450000
-[   16.536669] x11: ffff00000942a078 x10: ffff000008624e28
-[   16.536676] x9 : 00000000ffffffd0 x8 : 0000000000000017
-[   16.536683] x7 : 3030303030307830 x6 : 00000000000000f6
-[   16.536690] x5 : 0000000000000000 x4 : 0000000000000002
-[   16.536696] x3 : 000000000000003f x2 : 0000000000000040
-[   16.536703] x1 : ffff800000000008 x0 : ffff800000000000
-[   16.536712] Process kworker/1:1 (pid: 34, stack limit =
-0xffff800034ccc000)
-[   16.536718] Stack: (0xffff800034ccf8f0 to 0xffff800034cd0000)
-[   16.536724] f8e0:                                   ffff800034ccf930
-ffff000000b028c0
-[   16.536732] f900: ffff800026549100 0000000001400000 ffff80003446fc00
-0000000001400000
-[   16.536739] f920: 0000000000000002 0000000000000000 ffff800034ccf980
-ffff000000b9784c
-[   16.536746] f940: ffff800026549100 0000000001400000 ffff80003446fc00
-0000000001400000
-[   16.536754] f960: ffff800034ccfa80 ffff000008669290 0000000000000006
-ffff8000335a6898
-[   16.536761] f980: ffff800034ccf9b0 ffff000000b038d8 ffff800026549100
-ffff80003446fc00
-[   16.536769] f9a0: ffff000009429c08 ffff800032b65800 ffff800034ccfa90
-ffff000000b0574c
-[   16.536776] f9c0: ffff800026549100 ffff8000335a6800 0000000000000000
-0000000001400000
-[   16.536783] f9e0: ffff800034ccfaf0 00000000ffffffd8 ffff800036f60080
-4554535953425553
-[   16.536791] fa00: 4544006273753d4d ffff000000b2cfe8 ffff00312d313a62
-ffff800034ccfb00
-[   16.536799] fa20: ffff800034ccfa50 ffff00000814c7f4 ffff800034ccfa50
-ffff00000814c804
-[   16.536807] fa40: ffff800036f60080 0000000000000000 ffff800034ccfa80
-ffff00000814de54
-[   16.536814] fa60: ffff800034ccfb00 0000000000000032 ffff80002649c400
-0000000000040d00
-[   16.536821] fa80: ffff800034ccfb20 0000000000040d00 ffff800034ccfaf0
-ffff000000b06184
-[   16.536829] faa0: ffff800026549100 ffff800034ccfb38 0000000000000000
-ffff800034ccfbcc
-[   16.536836] fac0: 0000000000001388 ffff800033175800 ffff800034ccfaf0
-ffff000000b06170
-[   16.536843] fae0: ffff800026549100 0000000001400000 ffff800034ccfb60
-ffff000000b06324
-[   16.536850] fb00: ffff8000335da400 0000000000000040 0000000000000000
-0000000000000100
-[   16.536858] fb20: 0000000000000006 ffff800033175800 0000000080000080
-ffff800000000000
-[   16.536865] fb40: ffff800000000000 ffff800034ccfb48 ffff800034ccfb48
-0000000000000040
-[   16.536873] fb60: ffff800034ccfbe0 ffff000000afaa54 ffff8000335a6800
-ffff8000264ac000
-[   16.536879] fb80: ffff80003446fc00 0000000000000001 0000000000000003
-0000000000000002
-[   16.536887] fba0: ffff800033175800 0000000080000080 0000000000000000
-0000000000000002
-[   16.536894] fbc0: 0000000000000000 ffff800032b65800 ffff800000001388
-ffff800032b65800
-[   16.536901] fbe0: ffff800034ccfc50 ffff000000afe7d0 ffff8000264ac000
-0000000000000001
-[   16.536909] fc00: ffff800032b65800 0000000000000000 ffff80002649c400
-ffff80003446fc30
-[   16.536916] fc20: ffff80003446fc00 ffff80003446fc00 ffff8000335a6800
-ffff80002649c718
-[   16.536924] fc40: 0000000300000001 0000003200000000 ffff800034ccfce0
-ffff000000aff714
-[   16.536931] fc60: ffff8000264ac000 0000000000000001 ffff8000264ac058
-ffff80002649c718
-[   16.536939] fc80: ffff80002649c718 0000000000000101 0000000000000000
-ffff80002649c408
-[   16.536946] fca0: 0000000000000000 0000000000000000 ffff000000b2ed28
-0000006400aff34c
-[   16.536953] fcc0: ffff800000000002 ffff000000b2d018 ffff8000264ac000
-0000000000000004
-[   16.536961] fce0: ffff800034ccfdc0 ffff0000080e8c0c ffff8000264ac1d0
-ffff8000357a4f00
-[   16.536968] fd00: ffff7dffbffa9100 0000000000000000 ffff800036f67980
-0000000000000000
-[   16.536975] fd20: 00000000fffffef7 ffff000008b77728 0000000000000000
-0000000000000000
-[   16.536982] fd40: ffff8000264ac170 ffff8000357a4f00 ffff800036f6bd00
-0000000000000000
-[   16.536990] fd60: ffff000000b2efc8 ffff800032b658f8 ffff8000344a5c00
-ffff8000264ac058
-[   16.536997] fd80: ffff8000264ac1d0 0000000000000000 ffff800032b65800
-ffff8000264ac070
-[   16.537004] fda0: ffff8000264ac060 ffff8000344a5c30 ffff8000264ac1d0
-ffff800000000101
-[   16.537012] fdc0: ffff800034ccfe10 ffff0000080e8ec0 ffff8000357a4f00
-ffff800036f67980
-[   16.537020] fde0: ffff8000357a4f30 ffff0000095b5800 ffff800036f679a0
-ffff000009427000
-[   16.537027] fe00: ffff8000357a4f00 ffff0000080e8f54 ffff800034ccfe70
-ffff0000080effa8
-[   16.537035] fe20: ffff8000357a0680 ffff800034c46680 ffff800034cc6100
-ffff000008b77728
-[   16.537042] fe40: ffff800035703d00 ffff8000357a4f00 ffff0000080e8e70
-ffff800034c46680
-[   16.537050] fe60: ffff800034ccfe70 ffff0000080eff4c 0000000000000000
-ffff0000080836c0
-[   16.537057] fe80: ffff0000080efe70 ffff8000357a0680 0000000000000000
-0000000000000000
-[   16.537063] fea0: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537070] fec0: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537076] fee0: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537083] ff00: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537089] ff20: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537096] ff40: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537102] ff60: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537109] ff80: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537116] ffa0: 0000000000000000 0000000000000000 0000000000000000
-0000000000000000
-[   16.537122] ffc0: 0000000000000000 0000000000000005 0000000000000000
-0000000000000000
-[   16.537129] ffe0: 0000000000000000 0000000000000000 57810d82330b7058
-a6c1bc314470bbc6
-[   16.537133] Call trace:
-[   16.537139] Exception stack(0xffff800034ccf720 to 0xffff800034ccf850)
-[   16.537147] f720: ffff800034cf0c10 0001000000000000 ffff800034ccf8f0
-ffff00000809c160
-[   16.537154] f740: ffff800034ccf7b0 ffff800034ccf7b0 ffff800034ccf780
-00000000ffffffd8
-[   16.537162] f760: ffff800034ccf7b0 ffff800034ccf7b0 ffff800034ccf780
-00000000ffffffd8
-[   16.537169] f780: ffff0000096940a8 ffff000000bac320 ffff800034cec780
-ffff800034ccf800
-[   16.537176] f7a0: ffff00000968e0a0 0000000000000008 ffff800034ccf7e0
-ffff000008669664
-[   16.537183] f7c0: ffff800000000000 ffff800000000008 0000000000000040
-000000000000003f
-[   16.537190] f7e0: 0000000000000002 0000000000000000 00000000000000f6
-3030303030307830
-[   16.537197] f800: 0000000000000017 00000000ffffffd0 ffff000008624e28
-ffff00000942a078
-[   16.537204] f820: ffff000009450000 ffff0000095ba18d ffff0000895ba17f
-ffff000009429c08
-[   16.537209] f840: ffff7e0000bd0080 0000000000003000
-[   16.537219] [<ffff00000809c160>] __clean_dcache_area_poc+0x20/0x40
-[   16.537422] [<ffff000000b028c0>] usb_hcd_map_urb_for_dma+0x1e8/0x598
-[usbcore]
-[   16.537544] [<ffff000000b9784c>] dwc2_map_urb_for_dma+0x54/0xf0 [dwc2]
-[   16.537726] [<ffff000000b038d8>] usb_hcd_submit_urb+0xc0/0xb10 [usbcore]
-[   16.537902] [<ffff000000b0574c>] usb_submit_urb+0x23c/0x588 [usbcore]
-[   16.538078] [<ffff000000b06184>] usb_start_wait_urb+0x54/0x148 [usbcore]
-[   16.538253] [<ffff000000b06324>] usb_control_msg+0xac/0x108 [usbcore]
-[   16.538427] [<ffff000000afaa54>] hub_port_init+0x194/0xb38 [usbcore]
-[   16.538602] [<ffff000000afe7d0>] hub_port_connect+0x128/0x8e8 [usbcore]
-[   16.538777] [<ffff000000aff714>] hub_event+0x784/0xa38 [usbcore]
-[   16.538792] [<ffff0000080e8c0c>] process_one_work+0x1e4/0x448
-[   16.538800] [<ffff0000080e8ec0>] worker_thread+0x50/0x488
-[   16.538811] [<ffff0000080effa8>] kthread+0x138/0x140
-[   16.538821] [<ffff0000080836c0>] ret_from_fork+0x10/0x50
-[   16.538831] Code: 9ac32042 8b010001 d1000443 8a230000 (d50b7a20)
-[   16.538883] ---[ end trace 7c524f10d9e752dc ]---
+As a side effect of this rewrite, you no longer get a space added in front
+of the kernel command line when no bootargs property was found in the FDT.
 
-Regards,
-Andreas
+Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+Tested-by: Pavel Machek <pavel@ucw.cz>
+Tested-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Fixes: d0f34a11ddab ("ARM: 7437/1: zImage: Allow DTB command line concatenation with ATAG_CMDLINE")
+---
 
+I have tested that this works properly when
+a) only the FDT bootargs are provided,
+b) only the ATAG command line is provided, and
+c) both the FDT bootargs and the ATAG command line are provided.
+
+Changes from v1 to v2:
+The original "bootargs" NUL terminator is changed into a space only when
+appenprop_string() succeeds. Commented by Richard Genoud.
+
+ arch/arm/boot/compressed/atags_to_fdt.c | 59 +++++++++++++++++++++------------
+ 1 file changed, 37 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+index 9448aa0c6686..87a5fba5a28e 100644
+--- a/arch/arm/boot/compressed/atags_to_fdt.c
++++ b/arch/arm/boot/compressed/atags_to_fdt.c
+@@ -55,6 +55,29 @@ static const void *getprop(const void *fdt, const char *node_path,
+ 	return fdt_getprop(fdt, offset, property, len);
+ }
+ 
++static int appendprop_string(void *fdt, const char *node_path,
++			     const char *property, const char *string)
++{
++	int offset = node_offset(fdt, node_path);
++
++	if (offset < 0)
++		return offset;
++	return fdt_appendprop_string(fdt, offset, property, string);
++}
++
++static int setprop_inplace_partial(void *fdt, const char *node_path,
++				   const char *property, unsigned int idx,
++				   const void *val, int len)
++{
++	int offset = node_offset(fdt, node_path);
++
++	if (offset < 0)
++		return offset;
++	return fdt_setprop_inplace_namelen_partial(fdt, offset, property,
++						   strlen(property), idx,
++						   val, len);
++}
++
+ static uint32_t get_cell_size(const void *fdt)
+ {
+ 	int len;
+@@ -66,35 +89,27 @@ static uint32_t get_cell_size(const void *fdt)
+ 	return cell_size;
+ }
+ 
+-static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+-{
+-	char cmdline[COMMAND_LINE_SIZE];
+-	const char *fdt_bootargs;
+-	char *ptr = cmdline;
+-	int len = 0;
+-
+-	/* copy the fdt command line into the buffer */
+-	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
+-	if (fdt_bootargs)
+-		if (len < COMMAND_LINE_SIZE) {
+-			memcpy(ptr, fdt_bootargs, len);
+-			/* len is the length of the string
+-			 * including the NULL terminator */
+-			ptr += len - 1;
+-		}
+-
+-	/* and append the ATAG_CMDLINE */
+-	if (fdt_cmdline) {
+-		len = strlen(fdt_cmdline);
+-		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
+-			*ptr++ = ' ';
+-			memcpy(ptr, fdt_cmdline, len);
+-			ptr += len;
+-		}
+-	}
+-	*ptr = '\0';
+-
+-	setprop_string(fdt, "/chosen", "bootargs", cmdline);
++/* This is called early on from head.S, so it can't use much stack. */
++static void merge_fdt_bootargs(void *fdt, const char *atag_cmdline)
++{
++	const char *fdt_bootargs;
++	int len = 0;
++
++	/* With no ATAG command line or an empty one, there is nothing to do. */
++	if (!atag_cmdline || strlen(atag_cmdline) == 0)
++		return;
++
++	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
++
++	/* With no FDT command line or an empty one, just use the ATAG one. */
++	if (!fdt_bootargs || len <= 1) {
++		setprop_string(fdt, "/chosen", "bootargs", atag_cmdline);
++		return;
++	}
++	if (appendprop_string(fdt, "/chosen", "bootargs", atag_cmdline) < 0)
++		return;
++	/* Replace the previous NUL terminator with a space. */
++	setprop_inplace_partial(fdt, "/chosen", "bootargs", len - 1, " ", 1);
+ }
+ 
+ /*
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.13.2
