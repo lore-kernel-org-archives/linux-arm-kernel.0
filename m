@@ -1,22 +1,144 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 22 Jul 2017 22:47:35 +0200
-Subject: [PATCH] ARM: dts: enable sdmmc for rockchip rv1108 evb
-In-Reply-To: <1500545621-20746-1-git-send-email-andy.yan@rock-chips.com>
-References: <1500545621-20746-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <14029252.zVFmYa7h66@phil>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 22 Jul 2017 22:01:23 +0100
+Subject: [PATCH] iio: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-28-robh@kernel.org>
+References: <20170718214339.7774-28-robh@kernel.org>
+Message-ID: <20170722220123.702ab8d9@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 20. Juli 2017, 18:13:41 CEST schrieb Andy Yan:
-> Enable sdmmc on rv1108 evaluation board. Also
-> add pinctrl for sdmmc controller.
+On Tue, 18 Jul 2017 16:43:08 -0500
+Rob Herring <robh@kernel.org> wrote:
+
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Hartmut Knaack <knaack.h@gmx.de>
+> Cc: Lars-Peter Clausen <lars@metafoo.de>
+> Cc: Peter Meerwald-Stadler <pmeerw@pmeerw.net>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: linux-iio at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-amlogic at lists.infradead.org
+Applied to the togreg branch of iio.git and pushed out as testing
+for the autobuilders to play with it.
 
-applied for 4.14, after adapting the subject to
-	ARM: dts: rockchip: enable sdmmc for rv1108 evb
+Thanks,
 
-and moving the pinctrl properties down some lines
-
-
-Heiko
+Jonathan
+> ---
+>  drivers/iio/adc/max9611.c      |  4 ++--
+>  drivers/iio/adc/meson_saradc.c |  8 ++++----
+>  drivers/iio/adc/ti-ads1015.c   | 16 ++++++++--------
+>  drivers/iio/inkern.c           |  4 ++--
+>  4 files changed, 16 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/max9611.c b/drivers/iio/adc/max9611.c
+> index b0526e4b9530..b1dd17cbce58 100644
+> --- a/drivers/iio/adc/max9611.c
+> +++ b/drivers/iio/adc/max9611.c
+> @@ -549,8 +549,8 @@ static int max9611_probe(struct i2c_client *client,
+>  	ret = of_property_read_u32(of_node, shunt_res_prop, &of_shunt);
+>  	if (ret) {
+>  		dev_err(&client->dev,
+> -			"Missing %s property for %s node\n",
+> -			shunt_res_prop, of_node->full_name);
+> +			"Missing %s property for %pOF node\n",
+> +			shunt_res_prop, of_node);
+>  		return ret;
+>  	}
+>  	max9611->shunt_resistor_uohm = of_shunt;
+> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+> index 83da50ed73ab..9dffbb3bf62f 100644
+> --- a/drivers/iio/adc/meson_saradc.c
+> +++ b/drivers/iio/adc/meson_saradc.c
+> @@ -572,8 +572,8 @@ static int meson_sar_adc_clk_init(struct iio_dev *indio_dev,
+>  	struct clk_init_data init;
+>  	const char *clk_parents[1];
+> 
+> -	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%s#adc_div",
+> -				   of_node_full_name(indio_dev->dev.of_node));
+> +	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%pOF#adc_div",
+> +				   indio_dev->dev.of_node);
+>  	init.flags = 0;
+>  	init.ops = &clk_divider_ops;
+>  	clk_parents[0] = __clk_get_name(priv->clkin);
+> @@ -591,8 +591,8 @@ static int meson_sar_adc_clk_init(struct iio_dev *indio_dev,
+>  	if (WARN_ON(IS_ERR(priv->adc_div_clk)))
+>  		return PTR_ERR(priv->adc_div_clk);
+> 
+> -	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%s#adc_en",
+> -				   of_node_full_name(indio_dev->dev.of_node));
+> +	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%pOF#adc_en",
+> +				   indio_dev->dev.of_node);
+>  	init.flags = CLK_SET_RATE_PARENT;
+>  	init.ops = &clk_gate_ops;
+>  	clk_parents[0] = __clk_get_name(priv->adc_div_clk);
+> diff --git a/drivers/iio/adc/ti-ads1015.c b/drivers/iio/adc/ti-ads1015.c
+> index 884b8e461b17..7972845b3823 100644
+> --- a/drivers/iio/adc/ti-ads1015.c
+> +++ b/drivers/iio/adc/ti-ads1015.c
+> @@ -505,24 +505,24 @@ static int ads1015_get_channels_config_of(struct i2c_client *client)
+>  		unsigned int data_rate = ADS1015_DEFAULT_DATA_RATE;
+> 
+>  		if (of_property_read_u32(node, "reg", &pval)) {
+> -			dev_err(&client->dev, "invalid reg on %s\n",
+> -				node->full_name);
+> +			dev_err(&client->dev, "invalid reg on %pOF\n",
+> +				node);
+>  			continue;
+>  		}
+> 
+>  		channel = pval;
+>  		if (channel >= ADS1015_CHANNELS) {
+>  			dev_err(&client->dev,
+> -				"invalid channel index %d on %s\n",
+> -				channel, node->full_name);
+> +				"invalid channel index %d on %pOF\n",
+> +				channel, node);
+>  			continue;
+>  		}
+> 
+>  		if (!of_property_read_u32(node, "ti,gain", &pval)) {
+>  			pga = pval;
+>  			if (pga > 6) {
+> -				dev_err(&client->dev, "invalid gain on %s\n",
+> -					node->full_name);
+> +				dev_err(&client->dev, "invalid gain on %pOF\n",
+> +					node);
+>  				of_node_put(node);
+>  				return -EINVAL;
+>  			}
+> @@ -532,8 +532,8 @@ static int ads1015_get_channels_config_of(struct i2c_client *client)
+>  			data_rate = pval;
+>  			if (data_rate > 7) {
+>  				dev_err(&client->dev,
+> -					"invalid data_rate on %s\n",
+> -					node->full_name);
+> +					"invalid data_rate on %pOF\n",
+> +					node);
+>  				of_node_put(node);
+>  				return -EINVAL;
+>  			}
+> diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
+> index da3d06b073bb..617372cc73e6 100644
+> --- a/drivers/iio/inkern.c
+> +++ b/drivers/iio/inkern.c
+> @@ -205,8 +205,8 @@ static struct iio_channel *of_iio_channel_get_by_name(struct device_node *np,
+>  		if (!IS_ERR(chan) || PTR_ERR(chan) == -EPROBE_DEFER)
+>  			break;
+>  		else if (name && index >= 0) {
+> -			pr_err("ERROR: could not get IIO channel %s:%s(%i)\n",
+> -				np->full_name, name ? name : "", index);
+> +			pr_err("ERROR: could not get IIO channel %pOF:%s(%i)\n",
+> +				np, name ? name : "", index);
+>  			return NULL;
+>  		}
+> 
+> --
+> 2.11.0
+> 
