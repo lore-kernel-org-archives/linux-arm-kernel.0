@@ -1,58 +1,71 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Sat, 22 Jul 2017 14:01:09 +0200
-Subject: [PATCH v8 2/3] clk: gate: expose clk_gate_ops::is_enabled
+Date: Sat, 22 Jul 2017 14:01:08 +0200
+Subject: [PATCH v8 1/3] clk: nxp: clk-lpc32xx: rename clk_gate_is_enabled()
 In-Reply-To: <1500724870-9071-1-git-send-email-gabriel.fernandez@st.com>
 References: <1500724870-9071-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1500724870-9071-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1500724870-9071-2-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch exposes clk_gate_ops::is_enabled as functions
-that can be directly called and assigned in places like this so
-we don't need wrapper functions that do nothing besides forward
-the call.
+We need to export clk_gate_is_enabled() from clk framework, then
+to avoid compilation issue we have to rename clk_gate_is_enabled()
+in NXP LPC32xx clock driver.
+We changed all gate op with 'lpc32xx_' prefix:
+lpc32xx_clk_gate_enable(),
+lpc32xx_clk_gate_disable(),
+lpc32xx_clk_gate_is_enabled().
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- drivers/clk/clk-gate.c       | 3 ++-
- include/linux/clk-provider.h | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ drivers/clk/nxp/clk-lpc32xx.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index 4e0c054a..dd82485 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -86,7 +86,7 @@ static void clk_gate_disable(struct clk_hw *hw)
- 	clk_gate_endisable(hw, 0);
+diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
+index 5b98ff9..7b359af 100644
+--- a/drivers/clk/nxp/clk-lpc32xx.c
++++ b/drivers/clk/nxp/clk-lpc32xx.c
+@@ -885,7 +885,7 @@ static unsigned long clk_usb_i2c_recalc_rate(struct clk_hw *hw,
+ 	.recalc_rate = clk_usb_i2c_recalc_rate,
+ };
+ 
+-static int clk_gate_enable(struct clk_hw *hw)
++static int lpc32xx_clk_gate_enable(struct clk_hw *hw)
+ {
+ 	struct lpc32xx_clk_gate *clk = to_lpc32xx_gate(hw);
+ 	u32 mask = BIT(clk->bit_idx);
+@@ -894,7 +894,7 @@ static int clk_gate_enable(struct clk_hw *hw)
+ 	return regmap_update_bits(clk_regmap, clk->reg, mask, val);
+ }
+ 
+-static void clk_gate_disable(struct clk_hw *hw)
++static void lpc32xx_clk_gate_disable(struct clk_hw *hw)
+ {
+ 	struct lpc32xx_clk_gate *clk = to_lpc32xx_gate(hw);
+ 	u32 mask = BIT(clk->bit_idx);
+@@ -903,7 +903,7 @@ static void clk_gate_disable(struct clk_hw *hw)
+ 	regmap_update_bits(clk_regmap, clk->reg, mask, val);
  }
  
 -static int clk_gate_is_enabled(struct clk_hw *hw)
-+int clk_gate_is_enabled(struct clk_hw *hw)
++static int lpc32xx_clk_gate_is_enabled(struct clk_hw *hw)
  {
- 	u32 reg;
- 	struct clk_gate *gate = to_clk_gate(hw);
-@@ -101,6 +101,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
- 
- 	return reg ? 1 : 0;
+ 	struct lpc32xx_clk_gate *clk = to_lpc32xx_gate(hw);
+ 	u32 val;
+@@ -916,9 +916,9 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
  }
-+EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
  
- const struct clk_ops clk_gate_ops = {
- 	.enable = clk_gate_enable,
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index c59c625..e9587ab 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
- 		u8 clk_gate_flags, spinlock_t *lock);
- void clk_unregister_gate(struct clk *clk);
- void clk_hw_unregister_gate(struct clk_hw *hw);
-+int clk_gate_is_enabled(struct clk_hw *hw);
+ static const struct clk_ops lpc32xx_clk_gate_ops = {
+-	.enable = clk_gate_enable,
+-	.disable = clk_gate_disable,
+-	.is_enabled = clk_gate_is_enabled,
++	.enable = lpc32xx_clk_gate_enable,
++	.disable = lpc32xx_clk_gate_disable,
++	.is_enabled = lpc32xx_clk_gate_is_enabled,
+ };
  
- struct clk_div_table {
- 	unsigned int	val;
+ #define div_mask(width)	((1 << (width)) - 1)
 -- 
 1.9.1
