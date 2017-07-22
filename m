@@ -1,73 +1,50 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sat, 22 Jul 2017 12:21:33 +0530
-Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
-References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
- <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20170722065133.GT3053@localhost>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sat, 22 Jul 2017 08:53:50 +0200
+Subject: [PATCH v2 0/2] ASoC: Add I2S support for Allwinner H3 SoCs
+Message-ID: <20170722065352.7635-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 02:20:20PM +0200, Pierre-Yves MORDRET wrote:
-> +static int stm32_dmamux_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct device_node *dma_node;
-> +	struct stm32_dmamux_data *stm32_dmamux;
-> +	struct resource *res;
-> +	void __iomem *iomem;
-> +	int i, ret;
-> +
-> +	if (!node)
-> +		return -ENODEV;
-> +
-> +	stm32_dmamux = devm_kzalloc(&pdev->dev, sizeof(*stm32_dmamux),
-> +				    GFP_KERNEL);
-> +	if (!stm32_dmamux)
-> +		return -ENOMEM;
-> +
-> +	dma_node = of_parse_phandle(node, "dma-masters", 0);
-> +	if (!dma_node) {
-> +		dev_err(&pdev->dev, "Can't get DMA master node\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (device_property_read_u32(&pdev->dev, "dma-channels",
-> +				     &stm32_dmamux->dmamux_channels))
-> +		stm32_dmamux->dmamux_channels = STM32_DMAMUX_MAX_CHANNELS;
-> +
-> +	if (device_property_read_u32(&pdev->dev, "dma-requests",
-> +				     &stm32_dmamux->dmamux_requests))
-> +		stm32_dmamux->dmamux_requests = STM32_DMAMUX_MAX_REQUESTS;
+From: Marcus Cooper <codekipper@gmail.com>
 
-I think defaults should be warned here too
+Hi All,
+please find attached a series of patches to bring i2s support to the
+Allwinner H3 SoC. This has been tested with the following setups:
 
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENODEV;
-> +
-> +	iomem = devm_ioremap_resource(&pdev->dev, res);
-> +	if (!iomem)
-> +		return -ENOMEM;
-> +
-> +	spin_lock_init(&stm32_dmamux->lock);
-> +
-> +	stm32_dmamux->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(stm32_dmamux->clk)) {
-> +		dev_info(&pdev->dev, "Missing controller clock\n");
+A20 Olimex EVB connected to a pcm5102
+Orange Pi 2 connected to a uda1380
+Orange Pi 2 hdmi audio playback
+Pine 64 connected to the audio DAC board
 
-Can you check for EPROBE_DEFER and print only for if that is not the error
-otherwise we end up sapmming with defered probe issues
+To get i2s working some additional patches are required which will be
+delivered later. For now they have been pushed here
 
-> +
-> +#ifndef __DMA_STM32_DMAMUX_H
-> +#define __DMA_STM32_DMAMUX_H
-> +
-> +#if defined(CONFIG_STM32_DMAMUX)
-> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
+https://github.com/codekipper/linux-sunxi/commits/sunxi-audio-h3
 
-Why do we need a custom API in this case?
+I don't own a A33 device which uses the i2s block for the audio codec
+so if someone could test against that it would be much appreciated.
+
+I'm also wondering if there is a preferred way of setting the lrclk
+size in the dts?..currently it is set to the sample width but for example
+the pcm5102a wants it to be 32 bits whatever the sample rate.
+
+Thanks in advance,
+CK
+
+v2 changes compared to v1 are:
+ - massive refactoring to remove duplicate code making use of regmap_fields.
+ - extending the clock divisors.
+ - removed code that should be delivered when we support 20/24bits
+
+---
+
+Marcus Cooper (2):
+  ASoC: sun4i-i2s: Add more quirks for newer SoCs
+  ASoC: sun4i-i2s: Add support for H3
+
+ .../devicetree/bindings/sound/sun4i-i2s.txt        |   2 +
+ sound/soc/sunxi/sun4i-i2s.c                        | 469 ++++++++++++++++++---
+ 2 files changed, 407 insertions(+), 64 deletions(-)
 
 -- 
-~Vinod
+2.13.3
