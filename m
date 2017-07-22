@@ -1,38 +1,35 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 22 Jul 2017 10:28:49 +0800
-Subject: [PATCH 0/3] Add ethernet0 alias for several A64 boards
-Message-ID: <20170722022852.7868-1-icenowy@aosc.io>
+Date: Sat, 22 Jul 2017 10:28:50 +0800
+Subject: [PATCH 1/3] arm64: allwinner: a64: add ethernet0 alias for BPi M64
+ EMAC node
+In-Reply-To: <20170722022852.7868-1-icenowy@aosc.io>
+References: <20170722022852.7868-1-icenowy@aosc.io>
+Message-ID: <20170722022852.7868-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 SoC has an EMAC which is used to provide Ethernet
-function on several boards.
+The Banana Pi M64 board uses the A64 chip's EMAC to provide Ethernet
+link.
 
-The EMAC itself doesn't have a fixed MAC address, but the sunxi
-mainline U-Boot have the ability to generate one based on the eFUSE
-SID in the chip, and add the generated MAC address to the device
-tree when booting.
+Add the ethernet0 alias in the device tree, in order to let U-Boot
+generate a MAC address from the chip's SID.
 
-The MAC address setting step is based on the device tree's aliases,
-and device tree nodes prefixed "ethernet" will get the MAC address
-added. However, in several A64 boards' device tree, the alias is not
-set up, so that the U-Boot won't set the MAC address.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-Add the ethernet0 aliases to these boards.
-
-I hope this patchset can be queued in 4.13, otherwise 4.13 kernels
-won't get non-volatile MAC addresses, and will use random ones
-instead, which is annoying to many users.
-
-Icenowy Zheng (3):
-  arm64: allwinner: a64: add ethernet0 alias for BPi M64 EMAC node
-  arm64: allwinner: a64: add ethernet0 alias for Pine64 EMAC node
-  arm64: allwinner: a64: add ethernet0 alias for SoPine EMAC node
-
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts     | 1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts           | 1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts | 1 +
- 3 files changed, 3 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 0d1f026d831a..ba2fde2909f9 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -51,6 +51,7 @@
+ 	compatible = "sinovoip,bananapi-m64", "allwinner,sun50i-a64";
+ 
+ 	aliases {
++		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 	};
 -- 
 2.13.0
