@@ -1,46 +1,30 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Sat, 22 Jul 2017 07:59:54 +0200
-Subject: [PATCH v6 1/1] acpi: apei: Enable APEI multiple GHES source to
- share a single external IRQ
-In-Reply-To: <1500661477-6536-2-git-send-email-lho@apm.com>
-References: <1500661477-6536-1-git-send-email-lho@apm.com>
- <1500661477-6536-2-git-send-email-lho@apm.com>
-Message-ID: <20170722055954.GA2082@nazgul.tnic>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Sat, 22 Jul 2017 08:42:11 +0200
+Subject: [PATCH v2] media: Convert to using %pOF instead of full_name
+In-Reply-To: <20170721192835.25555-2-robh@kernel.org>
+References: <20170721192835.25555-1-robh@kernel.org>
+ <CGME20170721192855epcas5p40919807b161c8dee900b5661ea5128aa@epcas5p4.samsung.com>
+ <20170721192835.25555-2-robh@kernel.org>
+Message-ID: <97f42d10-d2ed-c5bb-9562-5515d5f13f7d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 21, 2017 at 11:24:37AM -0700, Loc Ho wrote:
-> X-Gene platforms describe multiple GHES error sources with the same hardware
-> error notification type (external interrupt) and interrupt number.
-> Change the GHES interrupt request to support sharing the same IRQ.
+On 07/21/2017 09:28 PM, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-> Co-authored-by: Tuan Phan <tphan@apm.com>
-> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Rob Herring<robh@kernel.org>
+> Acked-by: Niklas S?derlund<niklas.soderlund+renesas@ragnatech.se>
+> Acked-by: Laurent Pinchart<laurent.pinchart@ideasonboard.com>
+> Reviewed-by: Matthias Brugger<matthias.bgg@gmail.com>
+> Acked-by: Nicolas Ferre<nicolas.ferre@microchip.com>
+> Acked-by: Lad, Prabhakar<prabhakar.csengg@gmail.com>
+
 > ---
->  drivers/acpi/apei/ghes.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index d661d45..eed09fc 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -1157,7 +1157,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  			       generic->header.source_id);
->  			goto err_edac_unreg;
->  		}
-> -		rc = request_irq(ghes->irq, ghes_irq_func, 0, "GHES IRQ", ghes);
-> +		rc = request_irq(ghes->irq, ghes_irq_func, IRQF_SHARED,
-> +				 "GHES IRQ", ghes);
->  		if (rc) {
->  			pr_err(GHES_PFX "Failed to register IRQ for generic hardware error source: %d\n",
->  			       generic->header.source_id);
-> -- 
+> v2:
+> - Fix missing to_of_node() in xilinx-vipp.c
+> - Drop v4l2-async.c changes. Doing as revert instead.
+> - Add acks
 
-Acked-by: Borislav Petkov <bp@suse.de>
-
--- 
-Regards/Gruss,
-    Boris.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
