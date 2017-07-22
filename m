@@ -1,78 +1,58 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Sat, 22 Jul 2017 14:01:07 +0200
-Subject: [PATCH v8 0/3] clk: stm32h7: Add stm32h743 clock driver
-Message-ID: <1500724870-9071-1-git-send-email-gabriel.fernandez@st.com>
+Date: Sat, 22 Jul 2017 14:01:09 +0200
+Subject: [PATCH v8 2/3] clk: gate: expose clk_gate_ops::is_enabled
+In-Reply-To: <1500724870-9071-1-git-send-email-gabriel.fernandez@st.com>
+References: <1500724870-9071-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1500724870-9071-3-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-v8:
-  - Documentation remarks from Valdimir:
-	- rename 'rcc' node name into 'reset-clock-controller'
-	- delete source paths into the device tree bindings documentation
-	- other cosmetic changes
-v7:
-  - Documentation: put 'st,syscfg' phandle in optional section
-  - rename nxp gate op with lpc32xx_ prefix
-  - Suppress useless code to disable/enable backup domain write protection
-    (backup domaine write is disable at the init and never enabled)
+This patch exposes clk_gate_ops::is_enabled as functions
+that can be directly called and assigned in places like this so
+we don't need wrapper functions that do nothing besides forward
+the call.
 
-v6:
-  - rename clk_gate_is_enabled() in nxp lpc32xx driver.
-  - add EXPORT_SYMBOL_GPL(clk_gate_is_enabled)
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/clk-gate.c       | 3 ++-
+ include/linux/clk-provider.h | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-v5:
-  - return bool instead int for enable_power_domain_write_protection()
-  - add comment to explain use of CLK_OF_DECLARE_DRIVER()
-  - add comment to explain why we can't use read_poll_timeout()
-  - expose clk_gate_ops::is_enabled
-  - use of __clk_mux_determine_rate & clk_gate_is_enabled to avoid wrapper
-	function.
-
-v4:
-  - rename lock into stm32rcc_lock
-  - don't use clk_readl() 
-  - remove useless parentheses with GENMASK
-  - fix parents of timer_x clocks
-  - suppress pll configuration from DT
-  - fix kbuild warning
-
-v3:
-  - fix compatible string "stm32h7-pll" into "st,stm32h7-pll"
-  - fix bad parent name for mco2 clock
-  - set CLK_SET_RATE_PARENT for ltdc clock
-  - set CLK_IGNORE_UNUSED for pll1
-  - disable power domain write protection on disable ops if needed
-
-
-v2:
-  - rename compatible string "stm32,pll" into "stm32h7-pll"
-  - suppress "st,pllrge" property
-  - suppress "st, frac-status" property
-  - change management of "st,frac"  property
-	0 : enable 0 pll integer mode 
-	other values : enable pll in fractional mode (value is
-	the fractional factor)
-
-Gabriel Fernandez (3):
-  clk: nxp: clk-lpc32xx: rename clk_gate_is_enabled()
-  clk: gate: expose clk_gate_ops::is_enabled
-  clk: stm32h7: Add stm32h743 clock driver
-
- .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |   71 +
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-gate.c                             |    3 +-
- drivers/clk/clk-stm32h7.c                          | 1410 ++++++++++++++++++++
- drivers/clk/nxp/clk-lpc32xx.c                      |   12 +-
- include/dt-bindings/clock/stm32h7-clks.h           |  165 +++
- include/dt-bindings/mfd/stm32h7-rcc.h              |  136 ++
- include/linux/clk-provider.h                       |    1 +
- 8 files changed, 1792 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
- create mode 100644 drivers/clk/clk-stm32h7.c
- create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
- create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
-
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 4e0c054a..dd82485 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -86,7 +86,7 @@ static void clk_gate_disable(struct clk_hw *hw)
+ 	clk_gate_endisable(hw, 0);
+ }
+ 
+-static int clk_gate_is_enabled(struct clk_hw *hw)
++int clk_gate_is_enabled(struct clk_hw *hw)
+ {
+ 	u32 reg;
+ 	struct clk_gate *gate = to_clk_gate(hw);
+@@ -101,6 +101,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
+ 
+ 	return reg ? 1 : 0;
+ }
++EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
+ 
+ const struct clk_ops clk_gate_ops = {
+ 	.enable = clk_gate_enable,
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index c59c625..e9587ab 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
+ 		u8 clk_gate_flags, spinlock_t *lock);
+ void clk_unregister_gate(struct clk *clk);
+ void clk_hw_unregister_gate(struct clk_hw *hw);
++int clk_gate_is_enabled(struct clk_hw *hw);
+ 
+ struct clk_div_table {
+ 	unsigned int	val;
 -- 
 1.9.1
