@@ -1,152 +1,145 @@
-From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Sat, 22 Jul 2017 23:27:11 +0200
-Subject: [PATCH] arm: dts: qcom: add and enable both wifi blocks on the IPQ4019
-Message-ID: <20170722212711.18865-1-chunkeey@googlemail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 22 Jul 2017 23:39:33 +0200
+Subject: [PATCH v2 3/5] arm64: dts: rockchip: add ARM Mali GPU node for
+ RK3399 SoCs
+In-Reply-To: <1500279271-15249-4-git-send-email-wxt@rock-chips.com>
+References: <1500279271-15249-1-git-send-email-wxt@rock-chips.com>
+ <1500279271-15249-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <10008554.Km5xa7dVsC@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds and enables the device-tree definitions for
-both qcom,ipq4019-wifi blocks for the IPQ4019.
+Am Montag, 17. Juli 2017, 16:14:29 CEST schrieb Caesar Wang:
+> Add Mali GPU device tree node for the RK3399 SoCs, with devfreq
+> opp table.
+> 
+> RK3399 and RK3399-OP1 SoCs have a different recommendation table with
+> gpu opp. Also, the ARM's mali driver found on
+> https://developer.arm.com/products/software/mali-drivers/midgard-kernel.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v2:
+> As Heiko comments on https://patchwork.kernel.org/patch/9835939/
+> - interrupt-name use the lower case.
+> - use the correct compatible "arm,mali-t860"
+> - remove the clock name, since the mali only have one input clock.
+> 
+>  arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi | 33 ++++++++++++++++++++++++
+>  arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi     | 33 ++++++++++++++++++++++++
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi         | 12 +++++++++
+>  3 files changed, 78 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
+> index be7fe63..d8a120f 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
+> @@ -118,6 +118,35 @@
+>  			opp-microvolt = <1250000>;
+>  		};
+>  	};
+> +
+> +	gpu_opp_table: opp-table2 {
+> +		compatible = "operating-points-v2";
+> +
+> +		opp00 {
+> +			opp-hz = /bits/ 64 <200000000>;
+> +			opp-microvolt = <800000>;
+> +		};
+> +		opp01 {
+> +			opp-hz = /bits/ 64 <297000000>;
+> +			opp-microvolt = <800000>;
+> +		};
+> +		opp02 {
+> +			opp-hz = /bits/ 64 <400000000>;
+> +			opp-microvolt = <825000>;
+> +		};
+> +		opp03 {
+> +			opp-hz = /bits/ 64 <500000000>;
+> +			opp-microvolt = <850000>;
+> +		};
+> +		opp04 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <925000>;
+> +		};
+> +		opp05 {
+> +			opp-hz = /bits/ 64 <800000000>;
+> +			opp-microvolt = <1075000>;
+> +		};
+> +	};
+>  };
+>  
+>  &cpu_l0 {
+> @@ -143,3 +172,7 @@
+>  &cpu_b1 {
+>  	operating-points-v2 = <&cluster1_opp>;
+>  };
+> +
+> +&gpu {
+> +	operating-points-v2 = <&gpu_opp_table>;
+> +};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+> index c83460d..81617bc 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+> @@ -110,6 +110,35 @@
+>  			opp-microvolt = <1200000>;
+>  		};
+>  	};
+> +
+> +	gpu_opp_table: opp-table2 {
+> +		compatible = "operating-points-v2";
+> +
+> +		opp00 {
+> +			opp-hz = /bits/ 64 <200000000>;
+> +			opp-microvolt = <800000>;
+> +		};
+> +		opp01 {
+> +			opp-hz = /bits/ 64 <297000000>;
+> +			opp-microvolt = <800000>;
+> +		};
+> +		opp02 {
+> +			opp-hz = /bits/ 64 <400000000>;
+> +			opp-microvolt = <825000>;
+> +		};
+> +		opp03 {
+> +			opp-hz = /bits/ 64 <500000000>;
+> +			opp-microvolt = <875000>;
+> +		};
+> +		opp04 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <925000>;
+> +		};
+> +		opp05 {
+> +			opp-hz = /bits/ 64 <800000000>;
+> +			opp-microvolt = <1100000>;
+> +		};
+> +	};
+>  };
+>  
+>  &cpu_l0 {
+> @@ -135,3 +164,7 @@
+>  &cpu_b1 {
+>  	operating-points-v2 = <&cluster1_opp>;
+>  };
+> +
+> +&gpu {
+> +	operating-points-v2 = <&gpu_opp_table>;
+> +};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 1cbd7a2..77d67cb 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -1443,6 +1443,18 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	gpu: gpu at ff9a0000 {
+> +		compatible = "arm,rk3399-mali", "arm,mali-t860";
 
-Support for these have been added into the ath10k driver since:
-commit 280e762e9c72 ("ath10k: enable ipq4019 device probe in ahb module")
+applied for 4.14 after fixing the compatible to rockchip,rk3399-mali
 
-The binding documentation was added in:
-commit a47aaa69de88 ("dt: bindings: add new dt entry for pre calibration in qcom, ath10k.txt")
 
-This has been tested on an ASUS RT-AC58U (IPQ4019),
-an AVM Fritz!Box 4040 (IPQ4018), a Compex WPJ428 (IPQ4028)
-and a Cisco Meraki MR33 (IPQ4029).
-
-| a000000.wifi: qca4019 hw1.0 target 0x01000000 chip_id 0x003b00ff [...]
-| a000000.wifi: kconfig debug 0 debugfs 1 tracing 0 dfs 1 testmode 1
-| a000000.wifi: firmware ver 10.4-3.4-00082 api 5 features no-p2p,mfp,[...]
-| a000000.wifi: board_file api 2 bmi_id 0:16 crc32 5773b188
-| a000000.wifi: htt-ver 2.2 wmi-op 6 htt-op 4 cal pre-cal-file [...]
-...
-| a800000.wifi: qca4019 hw1.0 target 0x01000000 chip_id 0x003b00ff sub 0000:0000
-| a800000.wifi: kconfig debug 0 debugfs 1 tracing 0 dfs 1 testmode 1
-| a800000.wifi: firmware ver 10.4-3.4-00082 api 5 features no-p2p, [...]
-| a800000.wifi: board_file api 2 bmi_id 0:17 crc32 5773b188
-| a800000.wifi: htt-ver 2.2 wmi-op 6 htt-op 4 cal pre-cal-file [...]
-
-Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
----
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi |  8 +++
- arch/arm/boot/dts/qcom-ipq4019.dtsi           | 84 +++++++++++++++++++++++++++
- 2 files changed, 92 insertions(+)
-
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-index c25d8f5c669d..cfa0c9970d5b 100644
---- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-@@ -112,5 +112,13 @@
- 		watchdog at b017000 {
- 			status = "ok";
- 		};
-+
-+		wifi at a000000 {
-+			status = "ok";
-+		};
-+
-+		wifi at a800000 {
-+			status = "ok";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-index d1a56331ce96..1ddcc96b510c 100644
---- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -291,5 +291,89 @@
- 			compatible = "qcom,pshold";
- 			reg = <0x4ab000 0x4>;
- 		};
-+
-+		wifi0: wifi at a000000 {
-+			compatible = "qcom,ipq4019-wifi";
-+			reg = <0xa000000 0x200000>;
-+			resets = <&gcc WIFI0_CPU_INIT_RESET>,
-+				 <&gcc WIFI0_RADIO_SRIF_RESET>,
-+				 <&gcc WIFI0_RADIO_WARM_RESET>,
-+				 <&gcc WIFI0_RADIO_COLD_RESET>,
-+				 <&gcc WIFI0_CORE_WARM_RESET>,
-+				 <&gcc WIFI0_CORE_COLD_RESET>;
-+			reset-names = "wifi_cpu_init", "wifi_radio_srif",
-+				      "wifi_radio_warm", "wifi_radio_cold",
-+				      "wifi_core_warm", "wifi_core_cold";
-+			clocks = <&gcc GCC_WCSS2G_CLK>,
-+				 <&gcc GCC_WCSS2G_REF_CLK>,
-+				 <&gcc GCC_WCSS2G_RTC_CLK>;
-+			clock-names = "wifi_wcss_cmd", "wifi_wcss_ref",
-+				      "wifi_wcss_rtc";
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 37 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 38 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 39 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 40 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 41 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 42 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 43 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 44 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 45 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 46 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 47 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 168 IRQ_TYPE_NONE>;
-+			interrupt-names =  "msi0",  "msi1",  "msi2",  "msi3",
-+					   "msi4",  "msi5",  "msi6",  "msi7",
-+					   "msi8",  "msi9", "msi10", "msi11",
-+					  "msi12", "msi13", "msi14", "msi15",
-+					  "legacy";
-+			status = "disabled";
-+		};
-+
-+		wifi1: wifi at a800000 {
-+			compatible = "qcom,ipq4019-wifi";
-+			reg = <0xa800000 0x200000>;
-+			resets = <&gcc WIFI1_CPU_INIT_RESET>,
-+				 <&gcc WIFI1_RADIO_SRIF_RESET>,
-+				 <&gcc WIFI1_RADIO_WARM_RESET>,
-+				 <&gcc WIFI1_RADIO_COLD_RESET>,
-+				 <&gcc WIFI1_CORE_WARM_RESET>,
-+				 <&gcc WIFI1_CORE_COLD_RESET>;
-+			reset-names = "wifi_cpu_init", "wifi_radio_srif",
-+				      "wifi_radio_warm", "wifi_radio_cold",
-+				      "wifi_core_warm", "wifi_core_cold";
-+			clocks = <&gcc GCC_WCSS5G_CLK>,
-+				 <&gcc GCC_WCSS5G_REF_CLK>,
-+				 <&gcc GCC_WCSS5G_RTC_CLK>;
-+			clock-names = "wifi_wcss_cmd", "wifi_wcss_ref",
-+				      "wifi_wcss_rtc";
-+			interrupts = <GIC_SPI 48 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 49 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 50 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 51 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 52 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 53 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 54 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 55 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 56 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 57 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 58 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 59 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 60 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 61 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 62 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 63 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 169 IRQ_TYPE_NONE>;
-+			interrupt-names =  "msi0",  "msi1",  "msi2",  "msi3",
-+					   "msi4",  "msi5",  "msi6",  "msi7",
-+					   "msi8",  "msi9", "msi10", "msi11",
-+					  "msi12", "msi13", "msi14", "msi15",
-+					  "legacy";
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-2.13.3
+Heiko
