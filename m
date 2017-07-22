@@ -1,35 +1,46 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Sat, 22 Jul 2017 12:19:38 +0800
-Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
-References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
- <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
- <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
- <0260e398-bd8e-6615-6d5c-1f7c07b6fc09@huawei.com>
- <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
-Message-ID: <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
+From: bp@suse.de (Borislav Petkov)
+Date: Sat, 22 Jul 2017 07:59:54 +0200
+Subject: [PATCH v6 1/1] acpi: apei: Enable APEI multiple GHES source to
+ share a single external IRQ
+In-Reply-To: <1500661477-6536-2-git-send-email-lho@apm.com>
+References: <1500661477-6536-1-git-send-email-lho@apm.com>
+ <1500661477-6536-2-git-send-email-lho@apm.com>
+Message-ID: <20170722055954.GA2082@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan, Bjorn:
-
-On 2017/7/14 21:54, Sinan Kaya wrote:
-> On 7/13/2017 9:26 PM, Ding Tianhong wrote:
->> There is no code to enable the PCIe Relaxed Ordering bit in the configuration space,
->> it is only be enable by default according to the PCIe Standard Specification, what we
->> do is to distinguish the RC problematic platform and clear the Relaxed Ordering bit
->> to tell the PCIe EP don't send any TLPs with Relaxed Ordering Attributes to the Root
->> Complex.
+On Fri, Jul 21, 2017 at 11:24:37AM -0700, Loc Ho wrote:
+> X-Gene platforms describe multiple GHES error sources with the same hardware
+> error notification type (external interrupt) and interrupt number.
+> Change the GHES interrupt request to support sharing the same IRQ.
 > 
-> Maybe, you should change the patch commit as 
-> "Disable PCIe Relaxed Ordering if not supported"...
-
-I agree that to use the new commit title as your suggested, thanks. :)
-
-@Bjorn do you want me to spawn a new patchset with the new commit title
-and the Reviewed-by from Casey on the patch 3, or maybe you could pick this
-up and modify it own ? thanks.
-
-Ding
-
+> Co-authored-by: Tuan Phan <tphan@apm.com>
+> Signed-off-by: Loc Ho <lho@apm.com>
+> ---
+>  drivers/acpi/apei/ghes.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index d661d45..eed09fc 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -1157,7 +1157,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  			       generic->header.source_id);
+>  			goto err_edac_unreg;
+>  		}
+> -		rc = request_irq(ghes->irq, ghes_irq_func, 0, "GHES IRQ", ghes);
+> +		rc = request_irq(ghes->irq, ghes_irq_func, IRQF_SHARED,
+> +				 "GHES IRQ", ghes);
+>  		if (rc) {
+>  			pr_err(GHES_PFX "Failed to register IRQ for generic hardware error source: %d\n",
+>  			       generic->header.source_id);
+> -- 
+
+Acked-by: Borislav Petkov <bp@suse.de>
+
+-- 
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
