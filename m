@@ -1,70 +1,75 @@
-From: dan.j.williams@gmail.com (Dan Williams)
-Date: Sat, 22 Jul 2017 09:21:31 -0700
-Subject: [PATCH v4 1/5] mm: add mkwrite param to vm_insert_mixed()
-In-Reply-To: <20170721223956.29485-2-ross.zwisler@linux.intel.com>
-References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
- <20170721223956.29485-2-ross.zwisler@linux.intel.com>
-Message-ID: <CAA9_cmdoEVx88FCuCSOB1Qmom_X8uJPB4-uUx7MA3X5H4fZ=GQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 22 Jul 2017 10:01:10 -0700
+Subject: [PATCH v4 1/4] soc: brcmstb: Add Product ID and Family ID helper
+ functions
+In-Reply-To: <1500646226-10659-2-git-send-email-alcooperx@gmail.com>
+References: <1500646226-10659-1-git-send-email-alcooperx@gmail.com>
+ <1500646226-10659-2-git-send-email-alcooperx@gmail.com>
+Message-ID: <48c39931-6323-625a-3632-7c5ba3f3ca6b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 21, 2017 at 3:39 PM, Ross Zwisler
-<ross.zwisler@linux.intel.com> wrote:
-> To be able to use the common 4k zero page in DAX we need to have our PTE
-> fault path look more like our PMD fault path where a PTE entry can be
-> marked as dirty and writeable as it is first inserted, rather than waiting
-> for a follow-up dax_pfn_mkwrite() => finish_mkwrite_fault() call.
->
-> Right now we can rely on having a dax_pfn_mkwrite() call because we can
-> distinguish between these two cases in do_wp_page():
->
->         case 1: 4k zero page => writable DAX storage
->         case 2: read-only DAX storage => writeable DAX storage
->
-> This distinction is made by via vm_normal_page().  vm_normal_page() returns
-> false for the common 4k zero page, though, just as it does for DAX ptes.
-> Instead of special casing the DAX + 4k zero page case, we will simplify our
-> DAX PTE page fault sequence so that it matches our DAX PMD sequence, and
-> get rid of the dax_pfn_mkwrite() helper.  We will instead use
-> dax_iomap_fault() to handle write-protection faults.
->
-> This means that insert_pfn() needs to follow the lead of insert_pfn_pmd()
-> and allow us to pass in a 'mkwrite' flag.  If 'mkwrite' is set insert_pfn()
-> will do the work that was previously done by wp_page_reuse() as part of the
-> dax_pfn_mkwrite() call path.
->
-> Signed-off-by: Ross Zwisler <ross.zwisler@linux.intel.com>
+
+
+On 07/21/2017 07:10 AM, Al Cooper wrote:
+> Signed-off-by: Al Cooper <alcooperx@gmail.com>
+
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+
 > ---
->  drivers/dax/device.c                    |  2 +-
->  drivers/gpu/drm/exynos/exynos_drm_gem.c |  3 ++-
->  drivers/gpu/drm/gma500/framebuffer.c    |  2 +-
->  drivers/gpu/drm/msm/msm_gem.c           |  3 ++-
->  drivers/gpu/drm/omapdrm/omap_gem.c      |  6 ++++--
->  drivers/gpu/drm/ttm/ttm_bo_vm.c         |  2 +-
->  fs/dax.c                                |  2 +-
->  include/linux/mm.h                      |  2 +-
->  mm/memory.c                             | 27 +++++++++++++++++++++------
->  9 files changed, 34 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/dax/device.c b/drivers/dax/device.c
-> index e9f3b3e..3973521 100644
-> --- a/drivers/dax/device.c
-> +++ b/drivers/dax/device.c
-> @@ -273,7 +273,7 @@ static int __dev_dax_pte_fault(struct dev_dax *dev_dax, struct vm_fault *vmf)
->
->         pfn = phys_to_pfn_t(phys, dax_region->pfn_flags);
->
-> -       rc = vm_insert_mixed(vmf->vma, vmf->address, pfn);
-> +       rc = vm_insert_mixed(vmf->vma, vmf->address, pfn, false);
+>  drivers/soc/bcm/brcmstb/common.c    | 12 ++++++++++++
+>  include/linux/soc/brcmstb/brcmstb.h | 10 ++++++++++
+>  2 files changed, 22 insertions(+)
+> 
+> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+> index b6195fd..184dbf5 100644
+> --- a/drivers/soc/bcm/brcmstb/common.c
+> +++ b/drivers/soc/bcm/brcmstb/common.c
+> @@ -40,6 +40,18 @@ bool soc_is_brcmstb(void)
+>  	return of_match_node(brcmstb_machine_match, root) != NULL;
+>  }
+>  
+> +u32 brcmstb_get_family_id(void)
+> +{
+> +	return family_id;
+> +}
+> +EXPORT_SYMBOL(brcmstb_get_family_id);
+> +
+> +u32 brcmstb_get_product_id(void)
+> +{
+> +	return product_id;
+> +}
+> +EXPORT_SYMBOL(brcmstb_get_product_id);
+> +
+>  static const struct of_device_id sun_top_ctrl_match[] = {
+>  	{ .compatible = "brcm,bcm7125-sun-top-ctrl", },
+>  	{ .compatible = "brcm,bcm7346-sun-top-ctrl", },
+> diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
+> index 337ce41..23e4dc9 100644
+> --- a/include/linux/soc/brcmstb/brcmstb.h
+> +++ b/include/linux/soc/brcmstb/brcmstb.h
+> @@ -1,10 +1,20 @@
+>  #ifndef __BRCMSTB_SOC_H
+>  #define __BRCMSTB_SOC_H
+>  
+> +#define BRCM_ID(reg)	((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
+> +#define BRCM_REV(reg)	((u32)reg & 0xff)
+> +
+>  /*
+>   * Bus Interface Unit control register setup, must happen early during boot,
+>   * before SMP is brought up, called by machine entry point.
+>   */
+>  void brcmstb_biuctrl_init(void);
+>  
+> +/*
+> + * Helper functions for getting family or product id from the
+> + * SoC driver.
+> + */
+> +u32 brcmstb_get_family_id(void);
+> +u32 brcmstb_get_product_id(void);
+> +
+>  #endif /* __BRCMSTB_SOC_H */
+> 
 
-Ugh, I generally find bool flags unreadable. They place a tax on
-jumping to function definition to recall what true and false mean. If
-we want to go this 'add an argument' route can we at least add an enum
-like:
-
-enum {
-    PTE_MKDIRTY,
-    PTE_MKCLEAN,
-};
-
-...to differentiate the two cases?
+-- 
+Florian
