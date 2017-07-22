@@ -1,93 +1,106 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 22 Jul 2017 21:19:39 +0200
-Subject: [PATCH v4 0/7] SMP and CPU hotplug support for Meson8/Meson8b
-Message-ID: <20170722191946.22938-1-martin.blumenstingl@googlemail.com>
+Date: Sat, 22 Jul 2017 21:19:41 +0200
+Subject: [PATCH v4 2/7] ARM: smp_scu: add a helper for powering on a specific
+ CPU
+In-Reply-To: <20170722191946.22938-1-martin.blumenstingl@googlemail.com>
+References: <20170722191946.22938-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170722191946.22938-3-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for booting the secondary CPU cores (and
-taking them offline again) on Amlogic Meson8 and Meson8b SoCs.
-It is based on an earlier version from Carlo Caione - this helped me
-a lot to get a better understanding of how SMP/CPU hotplug works
-(compared to the code found in Amlogic's GPL kernel sources from
-year 2015).
+To boot the secondary CPUs on the Amlogic Meson8/Meson8m2 (Cortex-A9)
+and Meson8b (Cortex-A5) SoCs we have to enable SCU mode SCU_PM_NORMAL,
+otherwise the secondary cores will not start.
+This patch adds a scu_cpu_power_enable() function which can be used to
+enable SCU_PM_NORMAL for a specific (logical) CPU. An internal helper
+function is also created, to avoid code duplication with
+scu_power_mode().
 
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ arch/arm/include/asm/smp_scu.h |  6 ++++++
+ arch/arm/kernel/smp_scu.c      | 39 +++++++++++++++++++++++++++++----------
+ 2 files changed, 35 insertions(+), 10 deletions(-)
 
-The .dts changes from series depend on:
-- "add the reset controller to the Meson8b clkc" version 2, see [1]
-- "ARM: dts: meson: add a node which describes the SRAM", see [2]
-
-
-Changes since v3 from [3]:
-- added Rob's ACK to patch #1
-- replaced a msleep(10) with usleep_range(10000, 15000) in patch #4
-- removed all "pen" code from patch #4 as that code was not needed
-  at all (it was left-over while trying to fix Meson8 secondary CPU
-  boot - which turned out to have nothing to do with this "pen" code)
-- removed all memory barrier operations as they were added based on
-  the code in the Amlogic GPL kernel tree (while trying to fix the
-  Meson8 secondary CPU boot - just like the "pen" code). Everything
-  still works fine with these on my Meson8m2 and Meson8b boards.
-- added PATCH #5 as we now have to export the reset identifiers
-  (just like we do it with the clock identifiers / preprocessor
-  macros) - this is the result of a change in the reset controller
-  patch in version 2, see [1]
-- use the reset line preprocessor macros (from patch #5) in patches
-  #6 and #7
-
-Changes since v2 from [0]:
-- added support for Meson8 (which requires a slightly different
-  enable-method)
-- implemented CPU hotplug support which allows taking a CPU core
-  offline for both, Meson8 and Meson8b
-- add a function to smp_scu.c which allows enabling a CPU core from
-  a different CPU (previously only the power mode for the current CPU
-  could be changed). Without this the CPU cores on Meson8 won't come
-  up (Amlogic's vendor GPL kernel sources also enable power through
-  SCU as very first step for Meson8b as well)
-- add a function to smp_scu.c to get the power status of a CPU core
-  (which is needed because the code in .cpu_kill needs to wait until
-  the core is actually powered off)
-- dropped patch "ARM: DTS: meson8b: Extend L2 cache controller node"
-  as it is already applied (for both, Meson8 and Meson8b)
-- dropped the patches which implement the reset controller which is
-  built into the clock-controller, these are a separate series: [1]
-- moved the enable-method property to each CPU node
-
-
-[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390355.html
-[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004352.html
-[2] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004282.html
-[3] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004297.html
-
-Carlo Caione (2):
-  dt-bindings: Amlogic: Add Meson8 and Meson8b SMP related documentation
-  ARM: dts: meson8b: add support for booting the secondary CPU cores
-
-Martin Blumenstingl (5):
-  ARM: smp_scu: add a helper for powering on a specific CPU
-  ARM: smp_scu: allow the platform code to read the SCU CPU status
-  ARM: meson: Add SMP bringup code for Meson8 and Meson8b
-  clk: meson: meson8b: export the CPU soft reset lines
-  ARM: dts: meson8: add support for booting the secondary CPU cores
-
- .../devicetree/bindings/arm/amlogic/pmu.txt        |  18 +
- .../devicetree/bindings/arm/amlogic/smp-sram.txt   |  32 ++
- Documentation/devicetree/bindings/arm/cpus.txt     |   2 +
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/meson8.dtsi                      |  20 +
- arch/arm/boot/dts/meson8b.dtsi                     |  20 +
- arch/arm/include/asm/smp_scu.h                     |  12 +
- arch/arm/kernel/smp_scu.c                          |  47 ++-
- arch/arm/mach-meson/Kconfig                        |   1 +
- arch/arm/mach-meson/Makefile                       |   1 +
- arch/arm/mach-meson/platsmp.c                      | 440 +++++++++++++++++++++
- drivers/clk/meson/meson8b.h                        |   8 +-
- include/dt-bindings/clock/meson8b-clkc.h           |   7 +-
- 13 files changed, 598 insertions(+), 11 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
- create mode 100644 arch/arm/mach-meson/platsmp.c
-
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index bfe163c40024..11e636f33ed9 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -26,6 +26,7 @@ static inline unsigned long scu_a9_get_base(void)
+ #ifdef CONFIG_HAVE_ARM_SCU
+ unsigned int scu_get_core_count(void __iomem *);
+ int scu_power_mode(void __iomem *, unsigned int);
++int scu_cpu_power_enable(void __iomem *, unsigned int);
+ #else
+ static inline unsigned int scu_get_core_count(void __iomem *scu_base)
+ {
+@@ -35,6 +36,11 @@ static inline int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ {
+ 	return -EINVAL;
+ }
++static inline int scu_cpu_power_enable(void __iomem *scu_base,
++				       unsigned int mode)
++{
++	return -EINVAL;
++}
+ #endif
+ 
+ #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 72f9241ad5db..ef09121b18eb 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -72,18 +72,12 @@ void scu_enable(void __iomem *scu_base)
+ }
+ #endif
+ 
+-/*
+- * Set the executing CPUs power mode as defined.  This will be in
+- * preparation for it executing a WFI instruction.
+- *
+- * This function must be called with preemption disabled, and as it
+- * has the side effect of disabling coherency, caches must have been
+- * flushed.  Interrupts must also have been disabled.
+- */
+-int scu_power_mode(void __iomem *scu_base, unsigned int mode)
++static int scu_set_power_mode_internal(void __iomem *scu_base,
++				       unsigned int logical_cpu,
++				       unsigned int mode)
+ {
+ 	unsigned int val;
+-	int cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(smp_processor_id()), 0);
++	int cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(logical_cpu), 0);
+ 
+ 	if (mode > 3 || mode == 1 || cpu > 3)
+ 		return -EINVAL;
+@@ -94,3 +88,28 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ 
+ 	return 0;
+ }
++
++/*
++ * Set the executing CPUs power mode as defined.  This will be in
++ * preparation for it executing a WFI instruction.
++ *
++ * This function must be called with preemption disabled, and as it
++ * has the side effect of disabling coherency, caches must have been
++ * flushed.  Interrupts must also have been disabled.
++ */
++int scu_power_mode(void __iomem *scu_base, unsigned int mode)
++{
++	return scu_set_power_mode_internal(scu_base, smp_processor_id(), mode);
++}
++
++/*
++ * Set the executing CPUs power mode to SCU_PM_NORMAL.
++ *
++ * This function must be called with preemption disabled, and as it
++ * has the side effect of disabling coherency, caches must have been
++ * flushed. Interrupts must also have been disabled.
++ */
++int scu_cpu_power_enable(void __iomem *scu_base, unsigned int cpu)
++{
++	return scu_set_power_mode_internal(scu_base, cpu, SCU_PM_NORMAL);
++}
 -- 
 2.13.3
