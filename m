@@ -1,35 +1,26 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 22 Jul 2017 10:28:52 +0800
-Subject: [PATCH 3/3] arm64: allwinner: a64: add ethernet0 alias for SoPine
- EMAC node
-In-Reply-To: <20170722022852.7868-1-icenowy@aosc.io>
-References: <20170722022852.7868-1-icenowy@aosc.io>
-Message-ID: <20170722022852.7868-4-icenowy@aosc.io>
+Date: Sat, 22 Jul 2017 10:50:52 +0800
+Subject: [PATCH v3 0/2] Last step to working Allwinner R40 pinctrl
+Message-ID: <20170722025054.32645-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoPine official baseboard uses the A64 chip's EMAC to provide an
-Ethernet link.
+This patchset contains only two patches.
 
-Add the ethernet0 alias in the device tree, in order to let U-Boot
-generate a MAC address from the chip's SID.
+The first one is a minor fix for the A10 pinctrl driver, add a function
+of a pin, which used to be missing in A10/A20 pinctrl driver. Thanks for
+Chen-Yu for discovering it when reviewing my R40 pinctrl patchset.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts | 1 +
- 1 file changed, 1 insertion(+)
+The second one is the real R40 pinctrl part, with fixes suggested by
+Chen-Yu and Maxime.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index 17eb1cc5bf6b..216e3a5dafae 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -53,6 +53,7 @@
- 		     "allwinner,sun50i-a64";
- 
- 	aliases {
-+		ethernet0 = &emac;
- 		serial0 = &uart0;
- 	};
- 
+Icenowy Zheng (2):
+  pinctrl: sunxi: add a missing function of A10/A20 pinctrl driver
+  pinctrl: sunxi: add support of R40 to A10 pinctrl driver
+
+ drivers/pinctrl/sunxi/Kconfig             |   2 +-
+ drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 274 +++++++++++++++++++++---------
+ 2 files changed, 197 insertions(+), 79 deletions(-)
+
 -- 
 2.13.0
