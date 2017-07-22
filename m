@@ -1,125 +1,93 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Sat, 22 Jul 2017 12:14:30 -0700
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from
- module to built-in
-In-Reply-To: <20170721141719.7quea4zf64q6xeqk@flea> (Maxime Ripard's message
- of "Fri, 21 Jul 2017 16:17:19 +0200")
-References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
- <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
- <20170210084213.uzf25soh7bl73a6g@lukather>
- <CAOi56cV=UBEFQ6V4LLNrHDaDJgb33mrCA6Z+vj_3VziOpkRcvQ@mail.gmail.com>
- <CAOi56cXLo5LaT8CgfwB991gq+gCv4OY3VNkGWviooq43=6Wayg@mail.gmail.com>
- <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
- <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
- <20170610161714.wiztqlnwz5qu73fz@flea.home>
- <m2d1a750hj.fsf@baylibre.com>
- <20170614070712.yos54lelz5adrlq6@flea.lan>
- <20170721141719.7quea4zf64q6xeqk@flea>
-Message-ID: <7ha83ws2qx.fsf@baylibre.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 22 Jul 2017 21:19:39 +0200
+Subject: [PATCH v4 0/7] SMP and CPU hotplug support for Meson8/Meson8b
+Message-ID: <20170722191946.22938-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+This patchset adds support for booting the secondary CPU cores (and
+taking them offline again) on Amlogic Meson8 and Meson8b SoCs.
+It is based on an earlier version from Carlo Caione - this helped me
+a lot to get a better understanding of how SMP/CPU hotplug works
+(compared to the code found in Amlogic's GPL kernel sources from
+year 2015).
 
-> Hi,
->
-> On Wed, Jun 14, 2017 at 09:07:12AM +0200, Maxime Ripard wrote:
->> On Tue, Jun 13, 2017 at 09:14:00AM -0700, Kevin Hilman wrote:
->> > Maxime Ripard <maxime.ripard@free-electrons.com> writes:
->> > 
->> > > On Tue, Jun 06, 2017 at 12:45:17PM -0700, Kevin Hilman wrote:
->> > >> On Mon, May 22, 2017 at 12:44 AM, Maxime Ripard
->> > >> <maxime.ripard@free-electrons.com> wrote:
->> > >> > Hi Kevin,
->> > >> >
->> > >> > On Thu, May 18, 2017 at 11:59:50AM -0700, Kevin Hilman wrote:
->> > >> >> On Fri, Mar 17, 2017 at 10:39 AM, Kevin Hilman <khilman@baylibre.com> wrote:
->> > >> >> > On Fri, Feb 10, 2017 at 12:42 AM, Maxime Ripard
->> > >> >> > <maxime.ripard@free-electrons.com> wrote:
->> > >> >> >> On Wed, Feb 08, 2017 at 11:09:31PM +0100, Rask Ingemann Lambertsen wrote:
->> > >> >> >>> The AXP20X regulator support is currently built as a module, which means
->> > >> >> >>> it's not available until the root fs has been mounted, but the boot loader
->> > >> >> >>> might not have enabled the required regulators, so build their drivers
->> > >> >> >>> into the kernel.
->> > >> >> >>>
->> > >> >> >>> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
->> > >> >> >>
->> > >> >> >> Queued for 4.12.
->> > >> >> >
->> > >> >> > Hello, kernelci.org is reporting boot failures on sun5i-r8-chip in
->> > >> >> > linux-next[1]  for a few days and with a variety of defconfigs. I
->> > >> >> > bisected it[2] down to this patch.
->> > >> >> >
->> > >> >> > I verified that reverting this patch on top of next-20170310 makes my
->> > >> >> > chip board boot again.
->> > >> >>
->> > >> >> FYI... this board is still broken in linux-next (and now in mainline),
->> > >> >> and reverting $SUBJECT patch still makes it work.
->> > >> >>
->> > >> >> Is nobody else using mainline on this board?
->> > >> >
->> > >> > I thought about that during the weekend, and it might just be a
->> > >> > symptom.
->> > >> >
->> > >> > The CHIP has brown out issues, especially when you enable the WiFi
->> > >> > chip, which should happen around the time of the failure when the PMIC
->> > >> > regulator support is compiled as a module.
->> > >> >
->> > >> > We mitigate that in upstream's U-Boot by enabling the two regulators
->> > >> > for the WiFi chip in U-boot, which levels a bit the current over the
->> > >> > boot.
->> > >> >
->> > >> > You have a few ways to prevent that from happening. Having a better
->> > >> > power supply / cable will help, I'm not sure how reasonable that is.
->> > >> >
->> > >> > Another thing that can work is, if your USB plugs can take it, to
->> > >> > increase the overcurrent trigger in the PMIC, ideally in U-Boot.
->> > >> >
->> > >> > The last, and probably cleaner one, would be to just power it through
->> > >> > the 5v input on its header, and not the USB. There's not current
->> > >> > limitation there, so it shouldn't cause any problems anymore.
->> > >> 
->> > >> I'm now powering the board via the header (5V to the CHG-IN pin) and
->> > >> it doesn't change anything.  Still fails in the same way, and
->> > >> reverting $SUBJECT defconfig patch makes it work again.
->> > >
->> > > I tried it today with sunxi_defconfig that has AXP20X_REGULATOR
->> > > built-in as well. It can boot fine on my CHIP here.
->> > 
->> > What about multi_v7_defconfig?
->> 
->> It seems to work in our farm.
->> 
->> It's lagging behind at the moment, so it hasn't been published yet,
->> but here is the last multi_v7 boot.
->> http://code.bulix.org/a43kkf-147625?raw
->
-> A bit of an update for that. It turned out that our farm also had this
-> issue. We tried to power it through the 5V plug, and it didn't change
-> anything.
->
-> After wasting way too much time on this, we started digging into it
-> today with Chen-Yu.
->
-> We found out after enabling DEBUG_DRIVER that the last line was always
-> a cpufreq rate change. Removing the handle on the CPU regulator wasn't
-> changing anything, which left us with the other option: the clocks.
->
-> It turns out that in 4.12 we also switched to a new clock framework
-> for the sun5i family. A few printk down the line, the clock
-> calculation were not propagated to the PLL, resulting in a CPU crash.
->
-> Now, you might ask why it was crashing in multi_v7, and not in
-> sunxi_defconfig. The default governor in multi_v7 is ondemand, the one
-> in sunxi is performance, and therefore it never changes the CPU clock
-> rate.
->
-> And I guess reverting the regulator option patch just prevented the
-> cpufreq-dt from probing since it was missing the CPU regulator
-> described in DT.
->
-> I'll send a patch addressing this, cc'd to stable.
 
-Yay, thanks spending the extra time to dig into it.
+The .dts changes from series depend on:
+- "add the reset controller to the Meson8b clkc" version 2, see [1]
+- "ARM: dts: meson: add a node which describes the SRAM", see [2]
 
-Kevin
+
+Changes since v3 from [3]:
+- added Rob's ACK to patch #1
+- replaced a msleep(10) with usleep_range(10000, 15000) in patch #4
+- removed all "pen" code from patch #4 as that code was not needed
+  at all (it was left-over while trying to fix Meson8 secondary CPU
+  boot - which turned out to have nothing to do with this "pen" code)
+- removed all memory barrier operations as they were added based on
+  the code in the Amlogic GPL kernel tree (while trying to fix the
+  Meson8 secondary CPU boot - just like the "pen" code). Everything
+  still works fine with these on my Meson8m2 and Meson8b boards.
+- added PATCH #5 as we now have to export the reset identifiers
+  (just like we do it with the clock identifiers / preprocessor
+  macros) - this is the result of a change in the reset controller
+  patch in version 2, see [1]
+- use the reset line preprocessor macros (from patch #5) in patches
+  #6 and #7
+
+Changes since v2 from [0]:
+- added support for Meson8 (which requires a slightly different
+  enable-method)
+- implemented CPU hotplug support which allows taking a CPU core
+  offline for both, Meson8 and Meson8b
+- add a function to smp_scu.c which allows enabling a CPU core from
+  a different CPU (previously only the power mode for the current CPU
+  could be changed). Without this the CPU cores on Meson8 won't come
+  up (Amlogic's vendor GPL kernel sources also enable power through
+  SCU as very first step for Meson8b as well)
+- add a function to smp_scu.c to get the power status of a CPU core
+  (which is needed because the code in .cpu_kill needs to wait until
+  the core is actually powered off)
+- dropped patch "ARM: DTS: meson8b: Extend L2 cache controller node"
+  as it is already applied (for both, Meson8 and Meson8b)
+- dropped the patches which implement the reset controller which is
+  built into the clock-controller, these are a separate series: [1]
+- moved the enable-method property to each CPU node
+
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390355.html
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004352.html
+[2] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004282.html
+[3] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004297.html
+
+Carlo Caione (2):
+  dt-bindings: Amlogic: Add Meson8 and Meson8b SMP related documentation
+  ARM: dts: meson8b: add support for booting the secondary CPU cores
+
+Martin Blumenstingl (5):
+  ARM: smp_scu: add a helper for powering on a specific CPU
+  ARM: smp_scu: allow the platform code to read the SCU CPU status
+  ARM: meson: Add SMP bringup code for Meson8 and Meson8b
+  clk: meson: meson8b: export the CPU soft reset lines
+  ARM: dts: meson8: add support for booting the secondary CPU cores
+
+ .../devicetree/bindings/arm/amlogic/pmu.txt        |  18 +
+ .../devicetree/bindings/arm/amlogic/smp-sram.txt   |  32 ++
+ Documentation/devicetree/bindings/arm/cpus.txt     |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/meson8.dtsi                      |  20 +
+ arch/arm/boot/dts/meson8b.dtsi                     |  20 +
+ arch/arm/include/asm/smp_scu.h                     |  12 +
+ arch/arm/kernel/smp_scu.c                          |  47 ++-
+ arch/arm/mach-meson/Kconfig                        |   1 +
+ arch/arm/mach-meson/Makefile                       |   1 +
+ arch/arm/mach-meson/platsmp.c                      | 440 +++++++++++++++++++++
+ drivers/clk/meson/meson8b.h                        |   8 +-
+ include/dt-bindings/clock/meson8b-clkc.h           |   7 +-
+ 13 files changed, 598 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
+ create mode 100644 arch/arm/mach-meson/platsmp.c
+
+-- 
+2.13.3
