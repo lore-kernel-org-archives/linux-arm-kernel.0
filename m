@@ -1,66 +1,19 @@
-From: akurz@blala.de (Alexander Kurz)
-Date: Sun, 23 Jul 2017 18:49:12 +0200
-Subject: [PATCH v2] ARM: dts: imx6qdl-wandboard: enable USB OTG
-Message-ID: <1500828552-16237-1-git-send-email-akurz@blala.de>
+From: joseph.kogut@gmail.com (Joseph Kogut)
+Date: Sun, 23 Jul 2017 10:03:00 -0700
+Subject: [PATCH] ARM64: meson-gxl: disable broken eee
+In-Reply-To: <7ho9scsdbp.fsf@baylibre.com>
+References: <20170707013257.18250-1-joseph.kogut@gmail.com>
+ <7ho9scsdbp.fsf@baylibre.com>
+Message-ID: <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB OTG (dual-role) on the Wandboard.
-Note, that the USB_OTG_VBUS current is quite limited due to a 22R resistor
-in the power line. Hence, the overcurrent signal of 1A will never be
-triggered on this board.
+Hi Kevin,
 
-Signed-off-by: Alexander Kurz <akurz@blala.de>
----
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+I tested on a P212 reference board, which is currently the only GXL
+based board I have.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index b4fa7f1..f1abde8 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -34,6 +34,16 @@
- 			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
-+
-+		reg_usb_otg_vbus: usb_otg_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usbotgvbus>;
-+			gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
-+		};
- 	};
- 
- 	sound {
-@@ -170,6 +180,12 @@
- 			>;
- 		};
- 
-+		pinctrl_usbotgvbus: usbotgvbusgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x130b0
-+			>;
-+		};
-+
- 		pinctrl_usdhc1: usdhc1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_CMD__SD1_CMD		0x17059
-@@ -244,10 +260,11 @@
- };
- 
- &usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbotg>;
- 	disable-over-current;
--	dr_mode = "peripheral";
-+	dr_mode = "otg";
- 	status = "okay";
- };
- 
--- 
-2.1.4
+Before applying the patch, high activity on the ethernet interface
+would cause the link to break, requiring the interface to be brought
+down and back up before it would work again. After applying the patch,
+I could not get the link to break with any transfers.
