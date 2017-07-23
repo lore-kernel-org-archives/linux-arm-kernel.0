@@ -1,45 +1,44 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 23 Jul 2017 23:02:53 +0200 (CEST)
-Subject: No Ethernet on Raspberry Pi 3 in v4.13-rc1
-In-Reply-To: <dff231c6-feb4-fc15-75e9-cc5696ad2e55@suse.de>
-References: <5650979e-ea55-0337-2edd-d2c3e8ad0e37@suse.de>
- <634582831.41619.1500728895557@email.1und1.de>
- <dff231c6-feb4-fc15-75e9-cc5696ad2e55@suse.de>
-Message-ID: <1115544947.95458.1500843773126@email.1und1.de>
+From: dja@axtens.net (Daniel Axtens)
+Date: Mon, 24 Jul 2017 09:15:02 +1000
+Subject: [PATCH 0/4] Allow non-legacy cards to be vgaarb default
+In-Reply-To: <CAKv+Gu-O7cyJSgDrqSNi6F_n9eBnFEgz==aqowMqhy+81YK=CQ@mail.gmail.com>
+References: <20170719012839.20124-1-dja@axtens.net>
+ <CAKv+Gu-SgeLXVEj_VtZHchaNmOwWO+GmfTg5CYcnOF43AJZGnA@mail.gmail.com>
+ <87pocusm2x.fsf@linkitivity.dja.id.au>
+ <CAKv+Gu-O7cyJSgDrqSNi6F_n9eBnFEgz==aqowMqhy+81YK=CQ@mail.gmail.com>
+Message-ID: <87r2x6vj7t.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard,
 
-> Andreas F?rber <afaerber@suse.de> hat am 22. Juli 2017 um 15:33 geschrieben:
-> 
-> 
-> Hi Stefan,
-> 
-> Am 22.07.2017 um 15:08 schrieb Stefan Wahren:
-> > Andreas F?rber <afaerber@suse.de> hat am 22. Juli 2017 um 14:29 geschrieben:
-> >> With arm64 4.13-rc1 I get no eth0 device on Pi3 (openSUSE Tumbleweed).
-> >> The v4.13-rc1 DT works okay with a 4.12 kernel.
-> > 
-> > do you use arm64/defconfig or a modified one?
-> 
-> I had updated our custom config via oldconfig, the result is here:
-> 
-> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default
+> But the fact remains that we are going about this the wrong way.
+> Whether a graphics card decodes legacy VGA ranges or not has *nothing*
+> to do with whether or not it is in fact the primary device on a
+> non-x86 system, and so I still think the VGA arbiter should be omitted
+> entirely for such platforms, and Xorg should be fixed instead.
 
-There seems to be multiple issues. Using the arm64/defconfig USB seems to completly broken (4.10, 4.11, 4.12).
+OK, I see where you're coming from. I've been trying to keep my changes
+small as I don't want to end up on the hook for the almost limitless
+range of problems that changing this sort of code can have, but I do
+take your point that it's a bit of an ugly hack of a solution.
 
-Since i don't know the reason, i would start bisecting based on the custom config.
+Say we were to change Xorg instead. What would correct Xorg behaviour
+look like? Xorg would need to honour the boot_vga file if it existed so
+as not to break x86, etc. So your proposed Xorg - if it couldn't find a
+default card that way, and if there was no helpful config file info,
+would arbitrarily pick a card that has an Xorg driver? In other words,
+much like the proposed kernel approach but at a different level of the
+stack?
 
-> 
-> Regards,
-> Andreas
-> 
-> -- 
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-> HRB 21284 (AG N?rnberg)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Are there other graphical applications we care about (other than Xorg)
+that would need to be patched? I'm happy to do the Xorg patch, but I
+don't know if anything other than Xorg keys off the boot_vga file.
+
+I'm not fundamentally opposed to this approach if the Xorg community is
+happy with it, the kernel community is happy with it, and no-one expects
+me to provide patches to any other user-space applications that depend
+on boot_vga.
+
+Regards,
+Daniel
