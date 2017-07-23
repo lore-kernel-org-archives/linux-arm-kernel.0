@@ -1,117 +1,80 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Sun, 23 Jul 2017 20:44:38 +0200
-Subject: bluetooth in v4.13-rc1: lock init missing somewhere?
-In-Reply-To: <20170723082654.GA31857@amd>
-References: <20170721085551.GA22993@amd>
- <022531FF-11AA-4D6B-A92B-146F5E6BE31F@holtmann.org>
- <20170721111058.GB9448@amd>
- <D0C772B3-4C90-414C-84E5-1DE14054A40A@holtmann.org>
- <20170723082654.GA31857@amd>
-Message-ID: <6609C072-31C4-41DE-986E-D6E9C49CA1DE@holtmann.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 23 Jul 2017 17:29:43 -0300
+Subject: [PATCH v2] ARM: dts: imx6qdl-wandboard: enable USB OTG
+In-Reply-To: <1500828552-16237-1-git-send-email-akurz@blala.de>
+References: <1500828552-16237-1-git-send-email-akurz@blala.de>
+Message-ID: <CAOMZO5DKVJN1JFBthotvnufodnN1JDd=hO12PGjLV1KFMQfs7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+[Adding Shawn]
 
->>> I guess output just after boot will be more interesting?
->>> 
->>> root at n900:/my/modules# insmod hci_nokia.ko
->>> root at n900:/my/modules#
->>> Message from syslogd at localhost at Jul 19 12:24:00 ...
->>> kernel:[  174.363037] BUG: rwlock bad magic on CPU#0,
->>> kworker/u3:0/3027, c2665a48
->>> 
->>> root at n900:/my/modules# ../bluez-5.26/tools/btmgmt public-addr
->>> 01:02:03:04:05:06
->>> Set Public Address for hci0 failed with status 0x0b (Rejected)
->>> root at n900:/my/modules# ../bluez-5.26/tools/btmgmt power on
->>> Set Powered for hci0 failed with status 0x11 (Invalid Index)
->>> root at n900:/my/modules#
->> 
->> if you manage to get a recent btmon then it will also decode all the
->> the unknown packets. That would be interesting since it tells you
->> exactly what mgmt sends and what also legacy tools do at any given
->> time.
-> 
-> Let me try:
-> 
-> pavel at n900:/my/bluez$ autoconf
-> configure.ac:4: error: possibly undefined macro: AM_INIT_AUTOMAKE
->      If this token and others are legitimate, please use m4_pattern_allow.
->      See the Autoconf documentation.
-> configure.ac:11: error: possibly undefined macro: AM_MAINTAINER_MODE
-> configure.ac:24: error: possibly undefined macro: AM_PROG_CC_C_O
-> configure.ac:25: error: possibly undefined macro: AC_PROG_CC_PIE
-> configure.ac:32: error: possibly undefined macro: AC_DISABLE_STATIC
-> configure.ac:33: error: possibly undefined macro: AC_PROG_LIBTOOL
-> configure.ac:41: error: possibly undefined macro: AM_CONDITIONAL
-> pavel at n900:/my/bluez$ ./configure 
-> ./configure: line 2189: syntax error near unexpected token `foreign'
-> ./configure: line 2189: `AM_INIT_AUTOMAKE(foreign subdir-objects color-tests silent-rules'
-> pavel at n900:/my/bluez$ 
-> 
-> automake; autoconf results in less warnings out of autoconf.
-> 
-> In the end I just deleted the offending line.
-> 
-> But then it ends here:
-> 
-> ./configure: line 4043: AM_PROG_CC_C_O: command not found
-> ./configure: line 4044: AC_PROG_CC_PIE: command not found
-> configure: error: cannot find install-sh, install.sh, or shtool in "."
-> "./.." "./../.."
-> pavel at n900:/my/bluez$
+On Sun, Jul 23, 2017 at 1:49 PM, Alexander Kurz <akurz@blala.de> wrote:
+> Enable USB OTG (dual-role) on the Wandboard.
+> Note, that the USB_OTG_VBUS current is quite limited due to a 22R resistor
+> in the power line. Hence, the overcurrent signal of 1A will never be
+> triggered on this board.
+>
+> Signed-off-by: Alexander Kurz <akurz@blala.de>
 
-you have you tried ./bootstrap or ./bootstrap-configure?
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
->>> While btmon says:
->>> 
->>> ...begining of buffer lost :-(
->> 
->> I really need to find my patches for the monitor ring-buffer and
->> replay support so that you can keep these in kernel memory and
->> configure this with a kernel cmdline option. In theory however
->> starting btmon before insmod should be plenty to get the full
->> trace.
-> 
-> That was my fault, not kernel fault. I just relied on scrollback
-> buffer, and it was not big enough.
-> 
->> 
->> Actually I just realize that this is special anyway. Since this is Nokia manufacture ID, but Broadcom vendor decoding. I think that we need to add some special handling for this to make sure user space is able to decode this properly.
->> 
-> 
-> Aha. Ok, I guess I can test out the patches... if I manage to compile
-> it. Adding a hint how to compile from git (-> configure not present)
-> would be nice.
-
-you can hack btmon to treat Nokia ID 2 as Broadcom ID 15 and then you would see the decoding.
-
->> While we do this the btbcm_set_bdaddr might be actually empty.
->> 
->> config BT_HCIUART_NOKIA                                                          
->>        tristate "UART Nokia H4+ protocol support"                               
->>        depends on BT_HCIUART                                                    
->>        depends on BT_HCIUART_SERDEV                                             
->>        depends on PM                                                            
->>        select BT_HCIUART_H4                                                     
->> 
->> This is missing the select BT_BCM like what we have for the hci_bcm.c support.
->> 
->> config BT_HCIUART_BCM                                                            
->>        bool "Broadcom protocol support"                                         
->>        depends on BT_HCIUART                                                    
->>        select BT_HCIUART_H4                                                     
->>        select BT_BCM
->> 
->> Can you try to enable btbcm.ko module and load that first.
-> 
-> Actually, I guess I can just make it build-in. But I'm not sure how it
-> is supposed to help: I'd expect undefined symbols on broken
-> dependency, not silent failure.
-
-The helper modules are designed to be selected. So they fail gracefully if not. So this is just a bug. Make sure to have btbcm built-in or btbcm.ko available.
-
-Regards
-
-Marcel
+> ---
+>  arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> index b4fa7f1..f1abde8 100644
+> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> @@ -34,6 +34,16 @@
+>                         regulator-max-microvolt = <3300000>;
+>                         regulator-always-on;
+>                 };
+> +
+> +               reg_usb_otg_vbus: usb_otg_vbus {
+> +                       compatible = "regulator-fixed";
+> +                       regulator-name = "usb_otg_vbus";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_usbotgvbus>;
+> +                       gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
+> +               };
+>         };
+>
+>         sound {
+> @@ -170,6 +180,12 @@
+>                         >;
+>                 };
+>
+> +               pinctrl_usbotgvbus: usbotgvbusgrp {
+> +                       fsl,pins = <
+> +                               MX6QDL_PAD_EIM_D22__GPIO3_IO22          0x130b0
+> +                       >;
+> +               };
+> +
+>                 pinctrl_usdhc1: usdhc1grp {
+>                         fsl,pins = <
+>                                 MX6QDL_PAD_SD1_CMD__SD1_CMD             0x17059
+> @@ -244,10 +260,11 @@
+>  };
+>
+>  &usbotg {
+> +       vbus-supply = <&reg_usb_otg_vbus>;
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_usbotg>;
+>         disable-over-current;
+> -       dr_mode = "peripheral";
+> +       dr_mode = "otg";
+>         status = "okay";
+>  };
+>
+> --
+> 2.1.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
