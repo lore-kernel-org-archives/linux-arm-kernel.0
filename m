@@ -1,36 +1,81 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 23 Jul 2017 18:27:45 +0800
-Subject: [PATCH 06/10] clk: sunxi-ng: allow set parent clock (PLL_CPUX) for
- CPUX clock on H3
-In-Reply-To: <20170723102749.17323-1-icenowy@aosc.io>
-References: <20170723102749.17323-1-icenowy@aosc.io>
-Message-ID: <20170723102749.17323-7-icenowy@aosc.io>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 23 Jul 2017 11:51:48 +0100
+Subject: [PATCH 1/3] iio: adc: stm32: fix common clock rate
+In-Reply-To: <1500381332-17086-2-git-send-email-fabrice.gasnier@st.com>
+References: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
+ <1500381332-17086-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170723115148.07db4374@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPUX clock, which is the main clock of the ARM core on Allwinner H3,
-can be adjusted by changing the frequency of the PLL_CPUX clock.
+On Tue, 18 Jul 2017 14:35:30 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-Allowing setting parent clock for the CPUX clock, thus the PLL_CPUX
-clock can be adjusted when adjusting the CPUX clock.
+> Fixes commit 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
+> 
+> Fix common clock rate used then by stm32-adc sub-devices: take common
+> prescaler into account.
+> Fix ADC max clock rate on STM32H7 (fADC from datasheet)
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Patch itself is fine, but the description could do with
+information on what the result of this being wrong is.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I have no idea if this is a patch I should be sending upstream
+asap or should hold for the next merge window.
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 406d0aac9fd6..4cdbc88f2783 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -135,7 +135,7 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_de_clk, "pll-de",
- static const char * const cpux_parents[] = { "osc32k", "osc24M",
- 					     "pll-cpux" , "pll-cpux" };
- static SUNXI_CCU_MUX(cpux_clk, "cpux", cpux_parents,
--		     0x050, 16, 2, CLK_IS_CRITICAL);
-+		     0x050, 16, 2, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT);
- 
- static SUNXI_CCU_M(axi_clk, "axi", "cpux", 0x050, 0, 2, 0);
- 
--- 
-2.13.0
+Thanks,
+
+Jonathan
+> ---
+>  drivers/iio/adc/stm32-adc-core.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
+> index e09233b..6096763 100644
+> --- a/drivers/iio/adc/stm32-adc-core.c
+> +++ b/drivers/iio/adc/stm32-adc-core.c
+> @@ -64,7 +64,7 @@
+>  #define STM32H7_CKMODE_MASK		GENMASK(17, 16)
+>  
+>  /* STM32 H7 maximum analog clock rate (from datasheet) */
+> -#define STM32H7_ADC_MAX_CLK_RATE	72000000
+> +#define STM32H7_ADC_MAX_CLK_RATE	36000000
+>  
+>  /**
+>   * stm32_adc_common_regs - stm32 common registers, compatible dependent data
+> @@ -148,14 +148,14 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
+>  		return -EINVAL;
+>  	}
+>  
+> -	priv->common.rate = rate;
+> +	priv->common.rate = rate / stm32f4_pclk_div[i];
+>  	val = readl_relaxed(priv->common.base + STM32F4_ADC_CCR);
+>  	val &= ~STM32F4_ADC_ADCPRE_MASK;
+>  	val |= i << STM32F4_ADC_ADCPRE_SHIFT;
+>  	writel_relaxed(val, priv->common.base + STM32F4_ADC_CCR);
+>  
+>  	dev_dbg(&pdev->dev, "Using analog clock source at %ld kHz\n",
+> -		rate / (stm32f4_pclk_div[i] * 1000));
+> +		priv->common.rate / 1000);
+>  
+>  	return 0;
+>  }
+> @@ -250,7 +250,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
+>  
+>  out:
+>  	/* rate used later by each ADC instance to control BOOST mode */
+> -	priv->common.rate = rate;
+> +	priv->common.rate = rate / div;
+>  
+>  	/* Set common clock mode and prescaler */
+>  	val = readl_relaxed(priv->common.base + STM32H7_ADC_CCR);
+> @@ -260,7 +260,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
+>  	writel_relaxed(val, priv->common.base + STM32H7_ADC_CCR);
+>  
+>  	dev_dbg(&pdev->dev, "Using %s clock/%d source at %ld kHz\n",
+> -		ckmode ? "bus" : "adc", div, rate / (div * 1000));
+> +		ckmode ? "bus" : "adc", div, priv->common.rate / 1000);
+>  
+>  	return 0;
+>  }
