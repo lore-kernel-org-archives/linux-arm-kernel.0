@@ -1,44 +1,39 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 23 Jul 2017 00:01:10 +0200
-Subject: [PATCH v6 1/1] acpi: apei: Enable APEI multiple GHES source to
- share a single external IRQ
-In-Reply-To: <20170722055954.GA2082@nazgul.tnic>
-References: <1500661477-6536-1-git-send-email-lho@apm.com>
- <1500661477-6536-2-git-send-email-lho@apm.com>
- <20170722055954.GA2082@nazgul.tnic>
-Message-ID: <1893763.BLgt1zgLk5@aspire.rjw.lan>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 23 Jul 2017 08:36:13 +0800
+Subject: [PATCH v2 07/10] ARM: dts: sun8i: a83t: Add MMC controller
+ device nodes
+In-Reply-To: <20170720034452.15920-8-wens@csie.org>
+Message-ID: <201707230832.hsaOQVRK%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 22, 2017 07:59:54 AM Borislav Petkov wrote:
-> On Fri, Jul 21, 2017 at 11:24:37AM -0700, Loc Ho wrote:
-> > X-Gene platforms describe multiple GHES error sources with the same hardware
-> > error notification type (external interrupt) and interrupt number.
-> > Change the GHES interrupt request to support sharing the same IRQ.
-> > 
-> > Co-authored-by: Tuan Phan <tphan@apm.com>
-> > Signed-off-by: Loc Ho <lho@apm.com>
-> > ---
-> >  drivers/acpi/apei/ghes.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> > index d661d45..eed09fc 100644
-> > --- a/drivers/acpi/apei/ghes.c
-> > +++ b/drivers/acpi/apei/ghes.c
-> > @@ -1157,7 +1157,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
-> >  			       generic->header.source_id);
-> >  			goto err_edac_unreg;
-> >  		}
-> > -		rc = request_irq(ghes->irq, ghes_irq_func, 0, "GHES IRQ", ghes);
-> > +		rc = request_irq(ghes->irq, ghes_irq_func, IRQF_SHARED,
-> > +				 "GHES IRQ", ghes);
-> >  		if (rc) {
-> >  			pr_err(GHES_PFX "Failed to register IRQ for generic hardware error source: %d\n",
-> >  			       generic->header.source_id);
-> 
-> Acked-by: Borislav Petkov <bp@suse.de>
+Hi Chen-Yu,
 
-OK
+[auto build test ERROR on next-20170719]
+[cannot apply to clk/clk-next robh/for-next linus/master v4.13-rc1 v4.12 v4.12-rc7 v4.13-rc1]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Should I apply this or will Tony do that?
+url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-sun8i-a83t-Add-support-for-MMC-controllers/20170723-054406
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/sun8i-a83t.dtsi:187.19-20 syntax error
+>> FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23057 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170723/77ae89c1/attachment-0001.gz>
