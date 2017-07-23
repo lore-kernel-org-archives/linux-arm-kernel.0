@@ -1,79 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 23 Jul 2017 17:29:43 -0300
-Subject: [PATCH v2] ARM: dts: imx6qdl-wandboard: enable USB OTG
-In-Reply-To: <1500828552-16237-1-git-send-email-akurz@blala.de>
-References: <1500828552-16237-1-git-send-email-akurz@blala.de>
-Message-ID: <CAOMZO5DKVJN1JFBthotvnufodnN1JDd=hO12PGjLV1KFMQfs7A@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 23 Jul 2017 23:02:53 +0200 (CEST)
+Subject: No Ethernet on Raspberry Pi 3 in v4.13-rc1
+In-Reply-To: <dff231c6-feb4-fc15-75e9-cc5696ad2e55@suse.de>
+References: <5650979e-ea55-0337-2edd-d2c3e8ad0e37@suse.de>
+ <634582831.41619.1500728895557@email.1und1.de>
+ <dff231c6-feb4-fc15-75e9-cc5696ad2e55@suse.de>
+Message-ID: <1115544947.95458.1500843773126@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Shawn]
 
-On Sun, Jul 23, 2017 at 1:49 PM, Alexander Kurz <akurz@blala.de> wrote:
-> Enable USB OTG (dual-role) on the Wandboard.
-> Note, that the USB_OTG_VBUS current is quite limited due to a 22R resistor
-> in the power line. Hence, the overcurrent signal of 1A will never be
-> triggered on this board.
->
-> Signed-off-by: Alexander Kurz <akurz@blala.de>
+> Andreas F?rber <afaerber@suse.de> hat am 22. Juli 2017 um 15:33 geschrieben:
+> 
+> 
+> Hi Stefan,
+> 
+> Am 22.07.2017 um 15:08 schrieb Stefan Wahren:
+> > Andreas F?rber <afaerber@suse.de> hat am 22. Juli 2017 um 14:29 geschrieben:
+> >> With arm64 4.13-rc1 I get no eth0 device on Pi3 (openSUSE Tumbleweed).
+> >> The v4.13-rc1 DT works okay with a 4.12 kernel.
+> > 
+> > do you use arm64/defconfig or a modified one?
+> 
+> I had updated our custom config via oldconfig, the result is here:
+> 
+> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+There seems to be multiple issues. Using the arm64/defconfig USB seems to completly broken (4.10, 4.11, 4.12).
 
-> ---
->  arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> index b4fa7f1..f1abde8 100644
-> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> @@ -34,6 +34,16 @@
->                         regulator-max-microvolt = <3300000>;
->                         regulator-always-on;
->                 };
-> +
-> +               reg_usb_otg_vbus: usb_otg_vbus {
-> +                       compatible = "regulator-fixed";
-> +                       regulator-name = "usb_otg_vbus";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&pinctrl_usbotgvbus>;
-> +                       gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
-> +               };
->         };
->
->         sound {
-> @@ -170,6 +180,12 @@
->                         >;
->                 };
->
-> +               pinctrl_usbotgvbus: usbotgvbusgrp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_EIM_D22__GPIO3_IO22          0x130b0
-> +                       >;
-> +               };
-> +
->                 pinctrl_usdhc1: usdhc1grp {
->                         fsl,pins = <
->                                 MX6QDL_PAD_SD1_CMD__SD1_CMD             0x17059
-> @@ -244,10 +260,11 @@
->  };
->
->  &usbotg {
-> +       vbus-supply = <&reg_usb_otg_vbus>;
->         pinctrl-names = "default";
->         pinctrl-0 = <&pinctrl_usbotg>;
->         disable-over-current;
-> -       dr_mode = "peripheral";
-> +       dr_mode = "otg";
->         status = "okay";
->  };
->
-> --
-> 2.1.4
->
->
+Since i don't know the reason, i would start bisecting based on the custom config.
+
+> 
+> Regards,
+> Andreas
+> 
+> -- 
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+> HRB 21284 (AG N?rnberg)
+> 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
