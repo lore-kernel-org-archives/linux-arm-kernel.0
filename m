@@ -1,36 +1,67 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 23 Jul 2017 17:53:03 +0200
-Subject: [PATCH 04/12] ARM: sa1100/pxa: fix MTD_XIP build
-In-Reply-To: <20170720155209.3250880-1-arnd@arndb.de> (Arnd Bergmann's message
- of "Thu, 20 Jul 2017 17:51:42 +0200")
-References: <20170720154616.3250481-1-arnd@arndb.de>
- <20170720155209.3250880-1-arnd@arndb.de>
-Message-ID: <871sp7rvz4.fsf@belgarion.home>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 23 Jul 2017 09:33:40 -0700
+Subject: [PATCH v4 4/7] ARM: meson: Add SMP bringup code for Meson8 and
+ Meson8b
+In-Reply-To: <20170722191946.22938-5-martin.blumenstingl@googlemail.com>
+References: <20170722191946.22938-1-martin.blumenstingl@googlemail.com>
+ <20170722191946.22938-5-martin.blumenstingl@googlemail.com>
+Message-ID: <7B0CB90C-DFC3-4ECD-B342-A26BEEE52852@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On July 22, 2017 12:19:43 PM PDT, Martin Blumenstingl <martin.blumenstingl@googlemail.com> wrote:
+>This adds the necessary SMP-operations and startup code to use the
+>additional cores on the Amlogic Meson8/Meson8m2 (both are using the
+>same
+>sequence) and Meson8b (using a slightly difference sequence) SoCs.
+>
+>Signed-off-by: Carlo Caione <carlo@endlessm.com>
+>[add Meson8/Meson8m2 support and allow taking CPU cores offline as
+>well]
+>Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>---
 
-Hi Arnd,
+>+static void meson_smp_begin_secondary_boot(unsigned int cpu)
+>+{
+>+	/*
+>+	 * Set the entry point before powering on the CPU through the SCU.
+>This
+>+	 * is needed if the CPU is in "warm" state (= after rebooting the
+>+	 * system without power-cycling, or when taking the CPU offline and
+>+	 * then taking it online again.
+>+	 */
+>+	writel(virt_to_phys(secondary_startup),
+>+	       sram_base + MESON_SMP_SRAM_CPU_CTRL_ADDR_REG(cpu));
 
-> -#define xip_irqpending()	(ICIP & ICMR)
-> +/* restored July 2017, this did not build since 2011! */
-> +
-> +#define ICIP			io_p2v(0x40d00000)
-> +#define ICMR			io_p2v(0x40d00004)
-Okay, I suppose the IO mapping is guaranteed to work, ie. io_p2v() is behaving
-correctly when xip_irqpending() is used, right ? I'm not challenging this, I'm
-just ensuring this _could_ work (if anybody had the silly idea to make it work
-again, and I admit I don't have that much courage).
+Please use __pa_symbol() since secondary startup is a kernel image symbol.
 
-> +#define xip_irqpending()	readl(ICIP) & readl(ICMR)
-This is not strictly equivalent to (ICIP & ICMR), I would have put for priority
-reasons :
-+#define xip_irqpending()	(readl(ICIP) & readl(ICMR))
+>+
+>+	/*
+>+	 * SCU Power on CPU (needs to be done before starting the CPU,
+>+	 * otherwise the secondary CPU will not start).
+>+	 */
+>+	scu_cpu_power_enable(scu_base, cpu);
+>+}
+>+
+>+static int meson_smp_finalize_secondary_boot(unsigned int cpu)
+>+{
+>+	unsigned long timeout;
+>+
+>+	timeout = jiffies + (10 * HZ);
+>+	while (readl(sram_base + MESON_SMP_SRAM_CPU_CTRL_ADDR_REG(cpu))) {
+>+		if (!time_before(jiffies, timeout)) {
+>+			pr_err("Timeout while waiting for CPU%d status\n",
+>+			       cpu);
+>+			return -ETIMEDOUT;
+>+		}
+>+	}
+>+
+>+	writel(virt_to_phys(secondary_startup),
+>+	       sram_base + MESON_SMP_SRAM_CPU_CTRL_ADDR_REG(cpu));
 
-..zip..
+Same here.
 
-Cheers.
+Thanks!
 
 -- 
-Robert
+Florian
