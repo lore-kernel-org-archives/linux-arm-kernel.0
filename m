@@ -1,19 +1,56 @@
-From: joseph.kogut@gmail.com (Joseph Kogut)
-Date: Sun, 23 Jul 2017 10:03:00 -0700
-Subject: [PATCH] ARM64: meson-gxl: disable broken eee
-In-Reply-To: <7ho9scsdbp.fsf@baylibre.com>
-References: <20170707013257.18250-1-joseph.kogut@gmail.com>
- <7ho9scsdbp.fsf@baylibre.com>
-Message-ID: <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Sun, 23 Jul 2017 19:49:05 +0200
+Subject: [PATCH v6 2/3] ARM: i.MX25: add RNGB node to dtsi
+In-Reply-To: <1500832146-8660-1-git-send-email-martin@kaiser.cx>
+References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1500832146-8660-1-git-send-email-martin@kaiser.cx>
+Message-ID: <1500832146-8660-2-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-I tested on a P212 reference board, which is currently the only GXL
-based board I have.
+Add a devicetree entry for the Random Number Generator Version B (RNGB).
+The driver for RNGC supports version B as well.
 
-Before applying the patch, high activity on the ethernet interface
-would cause the link to break, requiring the interface to be brought
-down and back up before it would work again. After applying the patch,
-I could not get the link to break with any transfers.
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+Changes in v6:
+  - use rngb instead of just rng
+
+Changes in v5:
+  none
+
+Changes in v4:
+  none
+
+Changes in v3:
+  - remove clock-names from dtsi
+
+Changes in v2:
+  - remove interrupt-names from dtsi
+
+ arch/arm/boot/dts/imx25.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index dfcc8e0..d8d3163 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -451,6 +451,13 @@
+ 				interrupt-names = "scm", "smn";
+ 			};
+ 
++			rngb: rngb at 53fb0000 {
++				compatible = "fsl,imx25-rngb";
++				reg = <0x53fb0000 0x4000>;
++				clocks = <&clks 109>;
++				interrupts = <22>;
++			};
++
+ 			esdhc1: esdhc at 53fb4000 {
+ 				compatible = "fsl,imx25-esdhc";
+ 				reg = <0x53fb4000 0x4000>;
+-- 
+2.1.4
