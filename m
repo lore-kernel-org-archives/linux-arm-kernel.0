@@ -1,44 +1,24 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 23 Jul 2017 22:13:54 +0800
-Subject: [PATCH v3 5/5] ARM: sun8i: h3: add partial CPU thermal zone
-In-Reply-To: <20170723141354.42646-1-icenowy@aosc.io>
-References: <20170723141354.42646-1-icenowy@aosc.io>
-Message-ID: <20170723141354.42646-6-icenowy@aosc.io>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sun, 23 Jul 2017 16:49:48 +0200
+Subject: [linux-sunxi][PATCH 0/2] Beelink X2 updates
+Message-ID: <20170723144950.29330-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because of the restriction of the OF thermal framework, the thermal
-sensor will fail to probe if the thermal zone doesn't exist.
+From: Marcus Cooper <codekipper@gmail.com>
 
-Add a partial thermal zone which claims the H3 THS as the thermal sensor.
+Hi all,
+as support for sun8i H3 usb otg and ethernet patches has made it into mainline
+then these patches extend the functionality of the device.
+BR,
+CK 
 
-The cooling device (CPU DVFS) is still not added as it's not ready, and
-the trip points are also not added yet.
+Marcus Cooper (2):
+  ARM: dts: sun8i: h3: Enable USB OTG on the Beelink X2
+  ARM: dts: sun8i: h3: Enable dwac-sun8i on the Beelink X2
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts | 32 +++++++++++++++++++++++++++++--
+ 1 file changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index efe3a8e4f2af..551efecaab5d 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -125,6 +125,15 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu-thermal {
-+			/* milliseconds */
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+			thermal-sensors = <&ths>;
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
 -- 
-2.13.0
+2.13.3
