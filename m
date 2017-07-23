@@ -1,54 +1,48 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 23 Jul 2017 18:27:44 +0800
-Subject: [PATCH 05/10] clk: sunxi-ng: h3: gate then ungate PLL CPU clk after
- rate change
+Date: Sun, 23 Jul 2017 18:27:46 +0800
+Subject: [PATCH 07/10] cpufreq: dt: Add support for some new Allwinner SoCs
 In-Reply-To: <20170723102749.17323-1-icenowy@aosc.io>
 References: <20170723102749.17323-1-icenowy@aosc.io>
-Message-ID: <20170723102749.17323-6-icenowy@aosc.io>
+Message-ID: <20170723102749.17323-8-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
+Some new Allwinner SoCs get supported in the kernel after the
+compatibles are added to cpufreq-dt-platdev driver.
 
-This patch utilizes the new PLL clk notifier to gate then ungate the
-PLL CPU clock after rate changes. This should prevent any system hangs
-resulting from cpufreq changes to the clk.
+Add their compatible strings in the cpufreq-dt-platdev driver.
 
-Reported-by: Ondrej Jirman <megous@megous.com>
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Tested-by: Icenowy Zheng <icenowy@aosc.io>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/cpufreq/cpufreq-dt-platdev.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 62e4f0d2b2fc..406d0aac9fd6 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -1103,6 +1103,13 @@ static const struct sunxi_ccu_desc sun50i_h5_ccu_desc = {
- 	.num_resets	= ARRAY_SIZE(sun50i_h5_ccu_resets),
- };
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 2eb40d46d357..c3851453e84a 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -24,7 +24,11 @@ static const struct of_device_id machines[] __initconst = {
+ 	{ .compatible = "allwinner,sun8i-a23", },
+ 	{ .compatible = "allwinner,sun8i-a33", },
+ 	{ .compatible = "allwinner,sun8i-a83t", },
++	{ .compatible = "allwinner,sun8i-h2-plus", },
+ 	{ .compatible = "allwinner,sun8i-h3", },
++	{ .compatible = "allwinner,sun8i-v3s", },
++	{ .compatible = "allwinner,sun50i-a64", },
++	{ .compatible = "allwinner,sun50i-h5", },
  
-+static struct ccu_pll_nb sun8i_h3_pll_cpu_nb = {
-+	.common	= &pll_cpux_clk.common,
-+	/* copy from pll_cpux_clk */
-+	.enable	= BIT(31),
-+	.lock	= BIT(28),
-+};
+ 	{ .compatible = "apm,xgene-shadowcat", },
+ 
+@@ -43,6 +47,8 @@ static const struct of_device_id machines[] __initconst = {
+ 	{ .compatible = "marvell,pxa250", },
+ 	{ .compatible = "marvell,pxa270", },
+ 
++	{ .compatible = "nextthing,gr8", },
 +
- static struct ccu_mux_nb sun8i_h3_cpu_nb = {
- 	.common		= &cpux_clk.common,
- 	.cm		= &cpux_clk.mux,
-@@ -1130,6 +1137,10 @@ static void __init sunxi_h3_h5_ccu_init(struct device_node *node,
- 
- 	sunxi_ccu_probe(node, reg, desc);
- 
-+	/* Gate then ungate PLL CPU after any rate changes */
-+	ccu_pll_notifier_register(&sun8i_h3_pll_cpu_nb);
-+
-+	/* Reparent CPU during PLL CPU rate changes */
- 	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
- 				  &sun8i_h3_cpu_nb);
- }
+ 	{ .compatible = "samsung,exynos3250", },
+ 	{ .compatible = "samsung,exynos4210", },
+ 	{ .compatible = "samsung,exynos4212", },
 -- 
 2.13.0
