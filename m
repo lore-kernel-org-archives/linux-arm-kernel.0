@@ -1,44 +1,281 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Mon, 24 Jul 2017 09:15:02 +1000
-Subject: [PATCH 0/4] Allow non-legacy cards to be vgaarb default
-In-Reply-To: <CAKv+Gu-O7cyJSgDrqSNi6F_n9eBnFEgz==aqowMqhy+81YK=CQ@mail.gmail.com>
-References: <20170719012839.20124-1-dja@axtens.net>
- <CAKv+Gu-SgeLXVEj_VtZHchaNmOwWO+GmfTg5CYcnOF43AJZGnA@mail.gmail.com>
- <87pocusm2x.fsf@linkitivity.dja.id.au>
- <CAKv+Gu-O7cyJSgDrqSNi6F_n9eBnFEgz==aqowMqhy+81YK=CQ@mail.gmail.com>
-Message-ID: <87r2x6vj7t.fsf@linkitivity.dja.id.au>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Mon, 24 Jul 2017 00:20:08 +0100
+Subject: [PATCH 1/8] mailbox: introduce ARM SMC based mailbox
+In-Reply-To: <CABb+yY18Aye3wr2A9-+jemqc=VSRyUA+xzKGo9s0G4KCt1ovyA@mail.gmail.com>
+References: <20170630095608.24943-1-andre.przywara@arm.com>
+ <20170630095608.24943-2-andre.przywara@arm.com>
+ <CABb+yY18Aye3wr2A9-+jemqc=VSRyUA+xzKGo9s0G4KCt1ovyA@mail.gmail.com>
+Message-ID: <22d23c1d-ea8d-9829-4624-6305cd83ad4a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On 02/07/17 06:55, Jassi Brar wrote:
 
-> But the fact remains that we are going about this the wrong way.
-> Whether a graphics card decodes legacy VGA ranges or not has *nothing*
-> to do with whether or not it is in fact the primary device on a
-> non-x86 system, and so I still think the VGA arbiter should be omitted
-> entirely for such platforms, and Xorg should be fixed instead.
+Hi Jassi,
 
-OK, I see where you're coming from. I've been trying to keep my changes
-small as I don't want to end up on the hook for the almost limitless
-range of problems that changing this sort of code can have, but I do
-take your point that it's a bit of an ugly hack of a solution.
+thank you very much for having a look!
 
-Say we were to change Xorg instead. What would correct Xorg behaviour
-look like? Xorg would need to honour the boot_vga file if it existed so
-as not to break x86, etc. So your proposed Xorg - if it couldn't find a
-default card that way, and if there was no helpful config file info,
-would arbitrarily pick a card that has an Xorg driver? In other words,
-much like the proposed kernel approach but at a different level of the
-stack?
+> On Fri, Jun 30, 2017 at 3:26 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> This mailbox driver implements a mailbox which signals transmitted data
+>> via an ARM smc (secure monitor call) instruction. The mailbox receiver
+>> is implemented in firmware and can synchronously return data when it
+>> returns execution to the non-secure world again.
+>> An asynchronous receive path is not implemented.
+>> This allows the usage of a mailbox to trigger firmware actions on SoCs
+>> which either don't have a separate management processor or on which such
+>> a core is not available. A user of this mailbox could be the SCP
+>> interface.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  drivers/mailbox/Kconfig           |   8 ++
+>>  drivers/mailbox/Makefile          |   2 +
+>>  drivers/mailbox/arm-smc-mailbox.c | 172 ++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 182 insertions(+)
+>>  create mode 100644 drivers/mailbox/arm-smc-mailbox.c
+>>
+>> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+>> index c5731e5..5664b7f 100644
+>> --- a/drivers/mailbox/Kconfig
+>> +++ b/drivers/mailbox/Kconfig
+>> @@ -170,4 +170,12 @@ config BCM_FLEXRM_MBOX
+>>           Mailbox implementation of the Broadcom FlexRM ring manager,
+>>           which provides access to various offload engines on Broadcom
+>>           SoCs. Say Y here if you want to use the Broadcom FlexRM.
+>> +
+>> +config ARM_SMC_MBOX
+>> +       tristate "Generic ARM smc mailbox"
+>> +       depends on OF && HAVE_ARM_SMCCC
+>> +       help
+>> +         Generic mailbox driver which uses ARM smc calls to call into
+>> +         firmware for triggering mailboxes.
+>> +
+>>  endif
+>> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+>> index d54e412..8ec6869 100644
+>> --- a/drivers/mailbox/Makefile
+>> +++ b/drivers/mailbox/Makefile
+>> @@ -35,3 +35,5 @@ obj-$(CONFIG_BCM_FLEXRM_MBOX) += bcm-flexrm-mailbox.o
+>>  obj-$(CONFIG_QCOM_APCS_IPC)    += qcom-apcs-ipc-mailbox.o
+>>
+>>  obj-$(CONFIG_TEGRA_HSP_MBOX)   += tegra-hsp.o
+>> +
+>> +obj-$(CONFIG_ARM_SMC_MBOX)     += arm-smc-mailbox.o
+>> diff --git a/drivers/mailbox/arm-smc-mailbox.c b/drivers/mailbox/arm-smc-mailbox.c
+>> new file mode 100644
+>> index 0000000..578aed2
+>> --- /dev/null
+>> +++ b/drivers/mailbox/arm-smc-mailbox.c
+>> @@ -0,0 +1,172 @@
+>> +/*
+>> + *  Copyright (C) 2016,2017 ARM Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This device provides a mechanism for emulating a mailbox by using
+>> + * smc calls, allowing a "mailbox" consumer to sit in firmware running
+>> + * on the same core.
+>> + */
+>> +
+>> +#include <linux/device.h>
+>> +#include <linux/dma-mapping.h>
+>> +#include <linux/err.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/mailbox_controller.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/arm-smccc.h>
+>> +
+> Please have relook at what headers are really needed.
 
-Are there other graphical applications we care about (other than Xorg)
-that would need to be patched? I'm happy to do the Xorg patch, but I
-don't know if anything other than Xorg keys off the boot_vga file.
+Good point, indeed many of them are not needed.
 
-I'm not fundamentally opposed to this approach if the Xorg community is
-happy with it, the kernel community is happy with it, and no-one expects
-me to provide patches to any other user-space applications that depend
-on boot_vga.
+>> +#define ARM_SMC_MBOX_SMC               (0 << 0)
+>> +#define ARM_SMC_MBOX_HVC               (1 << 0)
+>> +#define ARM_SMC_MBOX_METHOD_MASK       (1 << 0)
+>> +
+> Maybe have only
+>    #define ARM_SMC_MBOX_HVC    BIT(0)
+> 
+>> +struct arm_smc_chan_data {
+>> +       u32 function_id;
+>> +       u32 flags;
+>> +};
+>> +
+>> +static int arm_smc_send_data(struct mbox_chan *link, void *data)
+>> +{
+>> +       struct arm_smc_chan_data *chan_data = link->con_priv;
+>> +       u32 function_id = chan_data->function_id;
+>> +       struct arm_smccc_res res;
+>> +       u32 msg = *(u32 *)data;
+>> +
+>> +       if ((chan_data->flags & ARM_SMC_MBOX_METHOD_MASK) == ARM_SMC_MBOX_SMC)
+>> +               arm_smccc_smc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
+>> +       else
+>> +               arm_smccc_hvc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
+>> +
+>        if (chan_data->flags & ARM_SMC_MBOX_HVC)
+>                arm_smccc_hvc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
+>        else
+>                arm_smccc_smc(function_id, msg, 0, 0, 0, 0, 0, 0, &res);
+> 
+> is simpler.
 
-Regards,
-Daniel
+Yeah, makes sense, I changed that.
+
+>> +       mbox_chan_received_data(link, (void *)res.a0);
+>> +
+> Or you can update the 'data' with value from 'a0' ?
+
+Mmh, I am a bit puzzled by this. Why would this be needed or useful? I
+see that the SCPI firmware driver (as the user of the mailbox API) is
+expecting the return value from a0 as returned above, translating the
+firmware error codes into Linux' ones.
+What am I missing here?
+
+>> +       return 0;
+>> +}
+>> +
+>> +static int arm_smc_startup(struct mbox_chan *link)
+>> +{
+>> +       return 0;
+>> +}
+>> +
+>> +static void arm_smc_shutdown(struct mbox_chan *link)
+>> +{
+>> +}
+>> +
+> startup and shutdown can be omitted now.
+
+Ah, thanks for the heads up, removed them.
+
+>> +/* This mailbox is synchronous, so we are always done. */
+>> +static bool arm_smc_last_tx_done(struct mbox_chan *link)
+>> +{
+>> +       return true;
+>> +}
+>> +
+>> +static const struct mbox_chan_ops arm_smc_mbox_chan_ops = {
+>> +       .send_data      = arm_smc_send_data,
+>> +       .startup        = arm_smc_startup,
+>> +       .shutdown       = arm_smc_shutdown,
+>> +       .last_tx_done   = arm_smc_last_tx_done
+>> +};
+>> +
+>> +static int arm_smc_mbox_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device *dev = &pdev->dev;
+>> +       struct mbox_controller *mbox;
+>> +       struct arm_smc_chan_data *chan_data;
+>> +       const char *method;
+>> +       bool use_hvc = false;
+>> +       int ret = 0, i;
+>> +
+> No need to initialise 'ret'
+
+Indeed!
+
+Thanks for the comments!
+
+Cheers,
+Andre.
+
+>> +       ret = of_property_count_elems_of_size(dev->of_node, "arm,smc-func-ids",
+>> +                                             sizeof(u32));
+>> +       if (ret < 0)
+>> +               return ret;
+>> +
+>> +       if (!of_property_read_string(dev->of_node, "method", &method)) {
+>> +               if (!strcmp("hvc", method)) {
+>> +                       use_hvc = true;
+>> +               } else if (!strcmp("smc", method)) {
+>> +                       use_hvc = false;
+>> +               } else {
+>> +                       dev_warn(dev, "invalid \"method\" property: %s\n",
+>> +                                method);
+>> +
+>> +                       return -EINVAL;
+>> +               }
+>> +       }
+>> +
+>> +       mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
+>> +       if (!mbox)
+>> +               return -ENOMEM;
+>> +
+>> +       mbox->num_chans = ret;
+>> +       mbox->chans = devm_kcalloc(dev, mbox->num_chans, sizeof(*mbox->chans),
+>> +                                  GFP_KERNEL);
+>> +       if (!mbox->chans)
+>> +               return -ENOMEM;
+>> +
+>> +       chan_data = devm_kcalloc(dev, mbox->num_chans, sizeof(*chan_data),
+>> +                                GFP_KERNEL);
+>> +       if (!chan_data)
+>> +               return -ENOMEM;
+>> +
+>> +       for (i = 0; i < mbox->num_chans; i++) {
+>> +               u32 function_id;
+>> +
+>> +               ret = of_property_read_u32_index(dev->of_node,
+>> +                                                "arm,smc-func-ids", i,
+>> +                                                &function_id);
+>> +               if (ret)
+>> +                       return ret;
+>> +
+>> +               chan_data[i].function_id = function_id;
+>> +               if (use_hvc)
+>> +                       chan_data[i].flags |= ARM_SMC_MBOX_HVC;
+>> +               mbox->chans[i].con_priv = &chan_data[i];
+>> +       }
+>> +
+>> +       mbox->txdone_poll = true;
+>> +       mbox->txdone_irq = false;
+>> +       mbox->txpoll_period = 1;
+>> +       mbox->ops = &arm_smc_mbox_chan_ops;
+>> +       mbox->dev = dev;
+>> +
+>> +       ret = mbox_controller_register(mbox);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       platform_set_drvdata(pdev, mbox);
+>> +       dev_info(dev, "ARM SMC mailbox enabled with %d chan%s.\n",
+>> +                mbox->num_chans, mbox->num_chans == 1 ? "" : "s");
+>> +
+>> +       return ret;
+>> +}
+>> +
+>> +static int arm_smc_mbox_remove(struct platform_device *pdev)
+>> +{
+>> +       struct mbox_controller *mbox = platform_get_drvdata(pdev);
+>> +
+>> +       mbox_controller_unregister(mbox);
+>> +       return 0;
+>> +}
+>> +
+>> +static const struct of_device_id arm_smc_mbox_of_match[] = {
+>> +       { .compatible = "arm,smc-mbox", },
+>> +       {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, arm_smc_mbox_of_match);
+>> +
+>> +static struct platform_driver arm_smc_mbox_driver = {
+>> +       .driver = {
+>> +               .name = "arm-smc-mbox",
+>> +               .of_match_table = arm_smc_mbox_of_match,
+>> +       },
+>> +       .probe          = arm_smc_mbox_probe,
+>> +       .remove         = arm_smc_mbox_remove,
+>> +};
+>> +module_platform_driver(arm_smc_mbox_driver);
+>> +
+>> +MODULE_AUTHOR("Andre Przywara <andre.przywara@arm.com>");
+>> +MODULE_DESCRIPTION("Generic ARM smc mailbox driver");
+>> +MODULE_LICENSE("GPL v2");
+>> --
+>> 2.9.0
+>>
