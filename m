@@ -1,62 +1,36 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 23 Jul 2017 18:27:49 +0800
-Subject: [PATCH 10/10] ARM: dts: sun8i: Add SY8106A regulator to Orange Pi PC
+Date: Sun, 23 Jul 2017 18:27:45 +0800
+Subject: [PATCH 06/10] clk: sunxi-ng: allow set parent clock (PLL_CPUX) for
+ CPUX clock on H3
 In-Reply-To: <20170723102749.17323-1-icenowy@aosc.io>
 References: <20170723102749.17323-1-icenowy@aosc.io>
-Message-ID: <20170723102749.17323-11-icenowy@aosc.io>
+Message-ID: <20170723102749.17323-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ondrej Jirman <megous@megous.com>
+The CPUX clock, which is the main clock of the ARM core on Allwinner H3,
+can be adjusted by changing the frequency of the PLL_CPUX clock.
 
-Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
-Orange Pi PC, then set the power supply of the ARM cores to this
-regulator, in order to enable DVFS.
+Allowing setting parent clock for the CPUX clock, thus the PLL_CPUX
+clock can be adjusted when adjusting the CPUX clock.
 
-Signed-off-by: Ondrej Jirman <megous@megous.com>
-[Icenowy: Enable DVFS in this patch, slight changes and change commit
- message]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index 998b60f8d295..d855f8b6254e 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -98,6 +98,10 @@
- 	status = "okay";
- };
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+index 406d0aac9fd6..4cdbc88f2783 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+@@ -135,7 +135,7 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_de_clk, "pll-de",
+ static const char * const cpux_parents[] = { "osc32k", "osc24M",
+ 					     "pll-cpux" , "pll-cpux" };
+ static SUNXI_CCU_MUX(cpux_clk, "cpux", cpux_parents,
+-		     0x050, 16, 2, CLK_IS_CRITICAL);
++		     0x050, 16, 2, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT);
  
-+&cpu0 {
-+	cpu-supply = <&reg_sy8106a>;
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -160,6 +164,21 @@
- 	};
- };
+ static SUNXI_CCU_M(axi_clk, "axi", "cpux", 0x050, 0, 2, 0);
  
-+&r_i2c {
-+	status = "okay";
-+
-+	reg_sy8106a: regulator at 65 {
-+		compatible = "silergy,sy8106a";
-+		reg = <0x65>;
-+		regulator-name = "vdd-cpux";
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <1400000>;
-+		regulator-ramp-delay = <200>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
- &r_pio {
- 	leds_r_opc: led_pins at 0 {
- 		pins = "PL10";
 -- 
 2.13.0
