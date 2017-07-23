@@ -1,120 +1,65 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 23 Jul 2017 10:26:54 +0200
-Subject: bluetooth in v4.13-rc1: lock init missing somewhere?
-In-Reply-To: <D0C772B3-4C90-414C-84E5-1DE14054A40A@holtmann.org>
-References: <20170721085551.GA22993@amd>
- <022531FF-11AA-4D6B-A92B-146F5E6BE31F@holtmann.org>
- <20170721111058.GB9448@amd>
- <D0C772B3-4C90-414C-84E5-1DE14054A40A@holtmann.org>
-Message-ID: <20170723082654.GA31857@amd>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 23 Jul 2017 18:27:39 +0800
+Subject: [PATCH 00/10] A trial to Allwinner H3 DVFS support
+Message-ID: <20170723102749.17323-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This patchset is a trial for DVFS support for Allwinner H3 SoC,
+considering two kinds of adjustable regulators used on H3 boards:
+SY8106A I2C-controlled regulator and SY8113B regulator (controllable
+by GPIO with some special designs on the board).
 
-> > I guess output just after boot will be more interesting?
-> > 
-> > root at n900:/my/modules# insmod hci_nokia.ko
-> > root at n900:/my/modules#
-> > Message from syslogd at localhost at Jul 19 12:24:00 ...
-> > kernel:[  174.363037] BUG: rwlock bad magic on CPU#0,
-> > kworker/u3:0/3027, c2665a48
-> > 
-> > root at n900:/my/modules# ../bluez-5.26/tools/btmgmt public-addr
-> > 01:02:03:04:05:06
-> > Set Public Address for hci0 failed with status 0x0b (Rejected)
-> > root at n900:/my/modules# ../bluez-5.26/tools/btmgmt power on
-> > Set Powered for hci0 failed with status 0x11 (Invalid Index)
-> > root at n900:/my/modules#
-> 
-> if you manage to get a recent btmon then it will also decode all the
- > the unknown packets. That would be interesting since it tells you
- > exactly what mgmt sends and what also legacy tools do at any given
- > time.
+PATCH 1 and PATCH 2 are for the SY8106A regulator, then PATCH 3 and
+PATCH 4 are for the r_i2c bus, which is used by boards with SY8106A
+to communicate with the regulator.
 
-Let me try:
+PATCH 5 and 6 are CCU fixes for H3 DVFS.
 
-pavel at n900:/my/bluez$ autoconf
-configure.ac:4: error: possibly undefined macro: AM_INIT_AUTOMAKE
-      If this token and others are legitimate, please use m4_pattern_allow.
-      See the Autoconf documentation.
-configure.ac:11: error: possibly undefined macro: AM_MAINTAINER_MODE
-configure.ac:24: error: possibly undefined macro: AM_PROG_CC_C_O
-configure.ac:25: error: possibly undefined macro: AC_PROG_CC_PIE
-configure.ac:32: error: possibly undefined macro: AC_DISABLE_STATIC
-configure.ac:33: error: possibly undefined macro: AC_PROG_LIBTOOL
-configure.ac:41: error: possibly undefined macro: AM_CONDITIONAL
-pavel at n900:/my/bluez$ ./configure 
-./configure: line 2189: syntax error near unexpected token `foreign'
-./configure: line 2189: `AM_INIT_AUTOMAKE(foreign subdir-objects color-tests silent-rules'
-pavel at n900:/my/bluez$ 
+PATCH 7 is adding new compatible strings to the cpufreq-dt driver.
 
-automake; autoconf results in less warnings out of autoconf.
+PATCH 8 adds the opp-v2 table for H3 SoC (without OPPs higher than
+1.008GHz).
 
-In the end I just deleted the offending line.
+PATCH 9 and 10 finally adds DVFS support for two boards, Orange Pi
+Zero (SY8113B) and Orange Pi PC (SY8106A).
 
-But then it ends here:
+Tested on these boards mentioned.
 
-./configure: line 4043: AM_PROG_CC_C_O: command not found
-./configure: line 4044: AC_PROG_CC_PIE: command not found
-configure: error: cannot find install-sh, install.sh, or shtool in "."
-"./.." "./../.."
-pavel at n900:/my/bluez$
+PATCH 9 and 10 finally adds DVFS support for two boards, Orange Pi
+Zero (SY8113B) and Orange Pi PC (SY8106A).
 
+Tested on these boards mentioned.
 
-> > While btmon says:
-> > 
-> > ...begining of buffer lost :-(
-> 
-> I really need to find my patches for the monitor ring-buffer and
- > replay support so that you can keep these in kernel memory and
- > configure this with a kernel cmdline option. In theory however
- > starting btmon before insmod should be plenty to get the full
- > trace.
+Chen-Yu Tsai (1):
+  clk: sunxi-ng: h3: gate then ungate PLL CPU clk after rate change
 
-That was my fault, not kernel fault. I just relied on scrollback
-buffer, and it was not big enough.
+Icenowy Zheng (4):
+  clk: sunxi-ng: allow set parent clock (PLL_CPUX) for CPUX clock on H3
+  cpufreq: dt: Add support for some new Allwinner SoCs
+  ARM: sun8i: h3: add operating-points-v2 table for CPU
+  ARM: sun8i: h2+: add SY8113B regulator used by Orange Pi Zero board
 
-> 
-> Actually I just realize that this is special anyway. Since this is Nokia manufacture ID, but Broadcom vendor decoding. I think that we need to add some special handling for this to make sure user space is able to decode this properly.
-> 
+Ondrej Jirman (5):
+  dt-bindings: add binding for the SY8160A voltage regulator
+  regulator: add support for SY8106A regulator
+  ARM: sunxi: h3/h5: Add r_i2c pinmux node
+  ARM: sunxi: h3/h5: Add r_i2c I2C controller
+  ARM: dts: sun8i: Add SY8106A regulator to Orange Pi PC
 
-Aha. Ok, I guess I can test out the patches... if I manage to compile
-it. Adding a hint how to compile from git (-> configure not present)
-would be nice.
+ .../bindings/regulator/sy8106a-regulator.txt       |  21 +++
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  |  21 +++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  19 +++
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  38 ++++-
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  19 +++
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |  13 +-
+ drivers/cpufreq/cpufreq-dt-platdev.c               |   6 +
+ drivers/regulator/Kconfig                          |   8 +-
+ drivers/regulator/Makefile                         |   2 +-
+ drivers/regulator/sy8106a-regulator.c              | 163 +++++++++++++++++++++
+ 10 files changed, 306 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/regulator/sy8106a-regulator.txt
+ create mode 100644 drivers/regulator/sy8106a-regulator.c
 
-> While we do this the btbcm_set_bdaddr might be actually empty.
-> 
-> config BT_HCIUART_NOKIA                                                          
->         tristate "UART Nokia H4+ protocol support"                               
->         depends on BT_HCIUART                                                    
->         depends on BT_HCIUART_SERDEV                                             
->         depends on PM                                                            
->         select BT_HCIUART_H4                                                     
-> 
-> This is missing the select BT_BCM like what we have for the hci_bcm.c support.
-> 
-> config BT_HCIUART_BCM                                                            
->         bool "Broadcom protocol support"                                         
->         depends on BT_HCIUART                                                    
->         select BT_HCIUART_H4                                                     
->         select BT_BCM
-> 
-> Can you try to enable btbcm.ko module and load that first.
-
-Actually, I guess I can just make it build-in. But I'm not sure how it
-is supposed to help: I'd expect undefined symbols on broken
-dependency, not silent failure.
-
-Thanks,
-								Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170723/c593afd2/attachment.sig>
+2.13.0
