@@ -1,49 +1,54 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 23 Jul 2017 18:27:43 +0800
-Subject: [PATCH 04/10] ARM: sunxi: h3/h5: Add r_i2c I2C controller
+Date: Sun, 23 Jul 2017 18:27:44 +0800
+Subject: [PATCH 05/10] clk: sunxi-ng: h3: gate then ungate PLL CPU clk after
+ rate change
 In-Reply-To: <20170723102749.17323-1-icenowy@aosc.io>
 References: <20170723102749.17323-1-icenowy@aosc.io>
-Message-ID: <20170723102749.17323-5-icenowy@aosc.io>
+Message-ID: <20170723102749.17323-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ondrej Jirman <megous@megous.com>
+From: Chen-Yu Tsai <wens@csie.org>
 
-Allwinner H3/H5 SoCs have an I2C controller at PL GPIO bank.
+This patch utilizes the new PLL clk notifier to gate then ungate the
+PLL CPU clock after rate changes. This should prevent any system hangs
+resulting from cpufreq changes to the clk.
 
-Add support for it in the device tree.
-
-Signed-off-by: Ondrej Jirman <megous@megous.com>
-[Icenowy: Change to use r_ccu and change pinmux node name]
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Reported-by: Ondrej Jirman <megous@megous.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Tested-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index b240099bc865..65643c4710a3 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -624,6 +624,20 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+index 62e4f0d2b2fc..406d0aac9fd6 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+@@ -1103,6 +1103,13 @@ static const struct sunxi_ccu_desc sun50i_h5_ccu_desc = {
+ 	.num_resets	= ARRAY_SIZE(sun50i_h5_ccu_resets),
+ };
  
-+		r_i2c: i2c at 01f02400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01f02400 0x400>;
-+			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_i2c_pins>;
-+			clocks = <&r_ccu CLK_APB0_I2C>;
-+			clock-frequency = <100000>;
-+			resets = <&r_ccu RST_APB0_I2C>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
++static struct ccu_pll_nb sun8i_h3_pll_cpu_nb = {
++	.common	= &pll_cpux_clk.common,
++	/* copy from pll_cpux_clk */
++	.enable	= BIT(31),
++	.lock	= BIT(28),
++};
 +
- 		r_pio: pinctrl at 01f02c00 {
- 			compatible = "allwinner,sun8i-h3-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
+ static struct ccu_mux_nb sun8i_h3_cpu_nb = {
+ 	.common		= &cpux_clk.common,
+ 	.cm		= &cpux_clk.mux,
+@@ -1130,6 +1137,10 @@ static void __init sunxi_h3_h5_ccu_init(struct device_node *node,
+ 
+ 	sunxi_ccu_probe(node, reg, desc);
+ 
++	/* Gate then ungate PLL CPU after any rate changes */
++	ccu_pll_notifier_register(&sun8i_h3_pll_cpu_nb);
++
++	/* Reparent CPU during PLL CPU rate changes */
+ 	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
+ 				  &sun8i_h3_cpu_nb);
+ }
 -- 
 2.13.0
