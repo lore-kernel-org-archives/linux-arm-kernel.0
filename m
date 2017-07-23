@@ -1,23 +1,26 @@
 From: martin@kaiser.cx (Martin Kaiser)
-Date: Sun, 23 Jul 2017 19:49:05 +0200
-Subject: [PATCH v6 2/3] ARM: i.MX25: add RNGB node to dtsi
-In-Reply-To: <1500832146-8660-1-git-send-email-martin@kaiser.cx>
+Date: Sun, 23 Jul 2017 19:49:04 +0200
+Subject: [PATCH v6 1/3] Documentation: devicetree: add Freescale RNGC binding
+In-Reply-To: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
- <1500832146-8660-1-git-send-email-martin@kaiser.cx>
-Message-ID: <1500832146-8660-2-git-send-email-martin@kaiser.cx>
+Message-ID: <1500832146-8660-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-Add a devicetree entry for the Random Number Generator Version B (RNGB).
-The driver for RNGC supports version B as well.
+Add binding documentation for the Freescale RNGC found on
+some i.MX2/3 SoCs.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 ---
 Changes in v6:
-  - use rngb instead of just rng
+  - be more precise about rngc and rngb
+  - get rid of mxc, rename the file to imx-rngc.txt
+  - reformat the compatible strings
+  - use RNGC instead of RNG
+  - clarify that clock is not optional (remove "should contain")
 
 Changes in v5:
   none
@@ -26,31 +29,43 @@ Changes in v4:
   none
 
 Changes in v3:
-  - remove clock-names from dtsi
+  - add compatible string for imx35
+  - remove imx5 from the commit message,
+    I couldn't find an i.MX SOC that has RNGC
 
 Changes in v2:
-  - remove interrupt-names from dtsi
+  none
 
- arch/arm/boot/dts/imx25.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/rng/imx-rngc.txt | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rng/imx-rngc.txt
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index dfcc8e0..d8d3163 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -451,6 +451,13 @@
- 				interrupt-names = "scm", "smn";
- 			};
- 
-+			rngb: rngb at 53fb0000 {
-+				compatible = "fsl,imx25-rngb";
-+				reg = <0x53fb0000 0x4000>;
-+				clocks = <&clks 109>;
-+				interrupts = <22>;
-+			};
+diff --git a/Documentation/devicetree/bindings/rng/imx-rngc.txt b/Documentation/devicetree/bindings/rng/imx-rngc.txt
+new file mode 100644
+index 0000000..93c7174
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rng/imx-rngc.txt
+@@ -0,0 +1,21 @@
++Freescale RNGC (Random Number Generator Version C)
 +
- 			esdhc1: esdhc at 53fb4000 {
- 				compatible = "fsl,imx25-esdhc";
- 				reg = <0x53fb4000 0x4000>;
++The driver also supports version B, which is mostly compatible
++to version C.
++
++Required properties:
++- compatible : should be one of
++               "fsl,imx25-rngb"
++               "fsl,imx35-rngc"
++- reg : offset and length of the register set of this block
++- interrupts : the interrupt number for the RNGC block
++- clocks : the RNGC clk source
++
++Example:
++
++rng at 53fb0000 {
++	compatible = "fsl,imx25-rngb";
++	reg = <0x53fb0000 0x4000>;
++	interrupts = <22>;
++	clocks = <&trng_clk>;
++};
 -- 
 2.1.4
