@@ -1,103 +1,68 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 24 Jul 2017 21:30:22 +0800
-Subject: [PATCH v7 3/3] perf: cavium: Add Documentation
-In-Reply-To: <20170719120847.21183-4-jglauber@cavium.com>
-References: <20170719120847.21183-1-jglauber@cavium.com>
- <20170719120847.21183-4-jglauber@cavium.com>
-Message-ID: <20170724213022.0000196f@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Jul 2017 14:35:08 +0100
+Subject: [PATCH 00/16] arm/arm64: Workaround misprogrammed CNTFRQ
+In-Reply-To: <20170724131252.GG29919@arm.com>
+References: <20170721171542.27639-1-marc.zyngier@arm.com>
+ <20170724121958.GC29919@arm.com>
+ <c3c34b9b-3872-bbb1-28cf-07aa6c739e94@arm.com>
+ <20170724131252.GG29919@arm.com>
+Message-ID: <780a5b17-e25c-188e-70cc-e0ffab5f3da9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Jul 2017 14:08:47 +0200
-Jan Glauber <jglauber@cavium.com> wrote:
+On 24/07/17 14:12, Will Deacon wrote:
+> On Mon, Jul 24, 2017 at 01:48:37PM +0100, Marc Zyngier wrote:
+>> On 24/07/17 13:19, Will Deacon wrote:
+>>> On Fri, Jul 21, 2017 at 06:15:26PM +0100, Marc Zyngier wrote:
+>>>> It is an unfortunate situation that CNTFRQ{,_EL0} is often
+>>>> misprogrammed from the firmware side, leaving it up to the kernel to
+>>>> work around it. This is usually done by providing an alternative
+>>>> frequency in the Device Tree.
+>>>>
+>>>> Unfortunately, CNTFRQ is accessible from EL0, giving userspace the
+>>>> wrong frequency, and potentially a different frequency per CPU, which
+>>>> is definitely not what you want. A possible workaround is to trap this
+>>>> into the kernel and to emulate it (together with the VDSO being
+>>>> disabled), and this is what this series is achieving.
+>>>
+>>> Which userspace is actually affected by a broken CNTFRQ register? I suspect
+>>> most users will be more upset at losing their (perfectly functional) vDSO
+>>> acceleration than they are about having a broken CNTFRQ value that is hardly
+>>> ever used, especially since this affects quite a few systems.
+>>
+>> OpenMPI is one of the things I'm aware of (we broke it when implementing
+>> the first set of timer workarounds), and from trawling the Debian code
+>> search, at least HHVM is another candidate. How this will affect them is
+>> anybody's guess.
+> 
+> The latest mcrouter sources pulled into HHVM don't use cntfrq, but you're
+> right about OpenMPI. However, these things are using the counter directly
+> as a performance optimisation: the moment we start trapping then they've
+> lost. I doubt it's much better than giving the wrong data for the
+> frequency (i.e. they're just as broken in both cases).
+> 
+> So, if they want to run on these systems, their best bet is to use the
+> vDSO-accelerated clock_gettime implementation. Yes, there's a dispatch cost
+> compared to an inline asm, but it will beat the pants off a trap to the
+> kernel. The problem is that this patch series prevents them from doing that
+> and just means they're screwed whatever they do. We can point at the broken
+> firmware, but it doesn't feel to me like this workaround is really helping
+> anybody :/.
 
-> Document Cavium SoC PMUs.
-> 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-And just to finish - the utterly trivial ;)
-> ---
->  Documentation/perf/cavium-pmu.txt | 74 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 74 insertions(+)
->  create mode 100644 Documentation/perf/cavium-pmu.txt
-> 
-> diff --git a/Documentation/perf/cavium-pmu.txt b/Documentation/perf/cavium-pmu.txt
-> new file mode 100644
-> index 0000000..37669b9
-> --- /dev/null
-> +++ b/Documentation/perf/cavium-pmu.txt
-> @@ -0,0 +1,74 @@
-> +Cavium ThunderX and OcteonTx Performance Monitoring Unit (PMU)
-> +==============================================================
-> +
-> +Cavium SoCs contain various system devices such as L2 caches, processor
-> +interconnect and memory controllers. Unfortunately the PMU counters
-> +are not following a common design so each device has a slightly different
-> +approach how to control and use the PMU counters.
-> +
-> +Common properties of all devices carrying PMU counters:
-> +- The devices are PCI devices and the counters are embedded somewhere
-> +  in the PCI register space.
-> +- All counters are 64 bit wide.
-> +- There are no overflow interrupts (unnecessary because of the 64 bit wide counters).
-Too long a line > 80 chars.
-> +
-> +Properties depending on the device type:
-> +- How to start/stop the counters
-> +- Programmable vs. fixed purpose counters
-> +- Stoppable vs. always running counters
-> +- Independent vs. grouped counters
-> +- Read-only vs. writable counters
-> +- PCI device to PMU group relationship
-> +
-> +
-> +Devices with PMU counters
-> +-------------------------
-> +
-> +Memory controller (LMC):
-> +- one PCI device per LMC
-> +- fixed-purpose counters
-> +- always running counters without start/stop/reset control
-> +- read-only counters
-> +
-> +CCPI interface controller (OCX) Transmit link (TLK) counters:
-> +- writable counters
-> +- only one PCI device exposes multiple TLK units (3 units on T88)
-> +- start/stop control per unit
-> +- only present on multi-socket systems
-> +
-> +PMU (perf) driver
-> +-----------------
-> +
-> +The cavium-pmu driver registers several perf PMU drivers. Each of the perf
-> +driver provides description of its available events and configuration options
-> +in sysfs, see /sys/devices/<lmcX/ocx_tlkX>/.
-> +
-> +The "format" directory describes format of the config (event ID),
-> +The "events" directory shows the names of the events and provides configuration
-> +templates for all supported event types that can be used with perf tool. For
-> +example, "lmc0/dclk_cnt/" is an equivalent of "lmc0/config=2/".
-> +
-> +Each perf driver also provides a "cpumask" sysfs attribute, which contains a
-> +single CPU ID of the processor which will be used to handle all the PMU events.
-> +
-> +Example for perf tool use:
-> +
-> + / # perf list | grep -e lmc
-> +   lmc0/bank_conflict1/                               [Kernel PMU event]
-> +   lmc0/bank_conflict2/                               [Kernel PMU event]
-> +   lmc0/dclk_cnt/                                     [Kernel PMU event]
-> +   lmc0/ifb_cnt/                                      [Kernel PMU event]
-> +   lmc0/ops_cnt/                                      [Kernel PMU event]
-> +
-> + / # perf stat -a -e lmc0/ops_cnt/,lmc0/dclk_cnt/ -- sleep 1
-> +
-> +   Performance counter stats for 'system wide':
-> +
-> +             176,133      lmc0/ops_cnt/                                               
-> +         670,243,653      lmc0/dclk_cnt/                                              
-> +
-> +         1.005479295 seconds time elapsed
-> +
-> +The driver does not support sampling, therefore "perf record" will
-> +not work. System wide mode ("-a") must be used as per-task (without "-a")
-> +perf sessions are not supported.
+Fair enough.
+
+It still remains that our trapping story is inconsistent. When we
+workaround timer issues, we do disable the VDSO and trap both cntvct and
+cntfrq. These will trap to EL1, and we'll deliver a SIGILL to userspace,
+while 64bit userspace will just work. Is that something we want to address?
+
+With a 32bit kernel, we don't trap anything yet (because we don't work
+around any of the errata existing on 64bit systems), so I guess this
+could be postponed until we actually make these workarounds available on
+32bit (for KVM guests).
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
