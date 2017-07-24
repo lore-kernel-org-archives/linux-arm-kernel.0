@@ -1,88 +1,59 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 24 Jul 2017 23:04:18 +0800
-Subject: [PATCH 2/3] dt-bindings: iio: adc: stm32: add optional
- min-sample-time
-In-Reply-To: <81cabf83-689c-277a-5cf9-510df5cc9045@st.com>
-References: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
- <1500381332-17086-3-git-send-email-fabrice.gasnier@st.com>
- <20170723115337.1e34e173@kernel.org>
- <81cabf83-689c-277a-5cf9-510df5cc9045@st.com>
-Message-ID: <20170724230418.000078b1@huawei.com>
+From: ross.zwisler@linux.intel.com (Ross Zwisler)
+Date: Mon, 24 Jul 2017 09:23:57 -0600
+Subject: [PATCH v4 1/5] mm: add mkwrite param to vm_insert_mixed()
+In-Reply-To: <20170724112530.GI652@quack2.suse.cz>
+References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
+ <20170721223956.29485-2-ross.zwisler@linux.intel.com>
+ <20170724112530.GI652@quack2.suse.cz>
+Message-ID: <20170724152357.GB1639@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Jul 2017 09:55:37 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+On Mon, Jul 24, 2017 at 01:25:30PM +0200, Jan Kara wrote:
+> > @@ -1658,14 +1658,28 @@ static int insert_pfn(struct vm_area_struct *vma, unsigned long addr,
+> >  	if (!pte)
+> >  		goto out;
+> >  	retval = -EBUSY;
+> > -	if (!pte_none(*pte))
+> > -		goto out_unlock;
+> > +	if (!pte_none(*pte)) {
+> > +		if (mkwrite) {
+> > +			if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
+> 
+> Is the WARN_ON_ONCE() really appropriate here? Your testcase with private
+> mappings has triggered this situation if I'm right...
 
-> On 07/23/2017 12:53 PM, Jonathan Cameron wrote:
-> > On Tue, 18 Jul 2017 14:35:31 +0200
-> > Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> >   
-> >> STM32 ADC allows each channel to be sampled with a different sampling
-> >> time. There's an application note that deals with this: 'How to get
-> >> the best ADC accuracy in STM32...' It basically depends on analog input
-> >> signal electrical properties (depends on board).
-> >>
-> >> Add optional 'min-sample-time' property so this can be tuned in dt.
-> >>
-> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>  
-> > 
-> > This isn't yet very standard, so I think it needs a manufacturer
-> > prefix, e.g. st,min-sample-time.  Also convention is I believe
-> > to include the units as part of the naming where appropriate.
-> > 
-> > Hence st,min-sample-time-nsecs  
-> 
-> Hi Jonathan,
-> 
-> I originally used st,... form, when writing this patch, until I found
-> out there's 'min-sample-time' in vf610 adc dt-bindings:
-> - Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
-> It looks like to me very similar.
-> 
-> I also agree it misses '-nsecs' units. Sure, I can use your suggestion
-> above...
-> 
-> Please can you just confirm if I should use same property as vf610 adc,
-> or 'st,min-sample-time-nsecs' ?
-st,min-sample-time-nsecs.
+Yep, I think this WARN_ON_ONCE() is correct.  The test with private mappings
+had collisions between read-only DAX mappings which were being faulted in via
+insert_pfn(), and read/write COW page cache mappings which were being faulted
+in by wp_page_copy().
 
-We might well add a generic option in future, but the burden of
-supporting this old one will be trivial anyway so not a problem.
+I was hitting a false-positive warning when I had the WARN_ON_ONCE() in
+insert_pfn() outside of the mkwrite case, i.e.:
 
-Jonathan
-> 
-> Thanks for reviewing,
-> Best regards,
-> Fabrice
-> 
-> > 
-> > Otherwise, seems good to me.
-> > 
-> > Jonathan  
-> >> ---
-> >>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 5 +++++
-> >>  1 file changed, 5 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> >> index 8310073..9cd964b 100644
-> >> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> >> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> >> @@ -74,6 +74,11 @@ Optional properties:
-> >>    * can be 6, 8, 10 or 12 on stm32f4
-> >>    * can be 8, 10, 12, 14 or 16 on stm32h7
-> >>    Default is maximum resolution if unset.
-> >> +- min-sample-time: Minimum sampling time in nanoseconds.
-> >> +  Depending on hardware (board) e.g. high/low analog input source impedance,
-> >> +  fine tune of ADC sampling time may be recommended.
-> >> +  This can be either one value or an array that matches 'st,adc-channels' list,
-> >> +  to set sample time resp. for all channels, or independently for each channel.
-> >>  
-> >>  Example:
-> >>  	adc: adc at 40012000 {  
-> >   
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	if (!pte_none(*pte)) {
+		if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
+			goto out_unlock;
+		if (mkwrite) {
+			entry = *pte;
+			goto out_mkwrite;
+		} else
+			goto out_unlock;
+	}
+
+This was triggering when one thread was faulting in a read-only DAX mapping
+when another thread had already faulted in a read-write COW page cache page.
+
+The patches I sent out have the warning in the mkwrite case, which would mean
+that we were getting a fault for a read/write PTE in insert_pfn() and the PFN
+didn't match what was already in the PTE.
+
+This can't ever happen in the private mapping case because we will never
+install a read/write PTE for normal storage, only for COW page cache pages.
+Essentially I don't think we should ever be able to hit this warning, and if
+we do I'd like to get the bug report so that I can track down how it was
+happening and make sure that it's safe.  It is in the mkwrite path of
+insert_pfn() which is currently only used by the DAX code.
+
+Does that make sense to you, or would you recommend leaving it out?  (If so,
+why?)
