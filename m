@@ -1,113 +1,96 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 24 Jul 2017 11:28:03 +0100
-Subject: [PATCH resend 01/18] crypto/algapi - use separate dst and src
- operands for __crypto_xor()
-In-Reply-To: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
-References: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170724102820.16534-2-ard.biesheuvel@linaro.org>
+Date: Mon, 24 Jul 2017 11:28:02 +0100
+Subject: [PATCH resend 00/18] crypto: ARM/arm64 roundup for v4.14
+Message-ID: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation of introducing crypto_xor_cpy(), which will use separate
-operands for input and output, modify the __crypto_xor() implementation,
-which it will share with the existing crypto_xor(), which provides the
-actual functionality when not using the inline version.
+This is a resend of all the patches I sent out recently that I would
+like to be considered for v4.14. Their main purpose is to prepare the
+arm64 crypto code to deal with situations where the SIMD register file
+is unavailable, which never occurs at present, but this will change in
+the future when support for SVE is added.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- crypto/algapi.c         | 25 ++++++++++++--------
- include/crypto/algapi.h |  4 ++--
- 2 files changed, 17 insertions(+), 12 deletions(-)
+Patches #1 and #2 have been sent out last week as 'crypto/algapi - refactor
+crypto_xor() to avoid memcpy()s' (v2). This version of #2 fixes an error
+caught by kbuild. The non-SIMD fallback code added in the remaining patches
+relies on crypto_xor() extensively, which is why these patches have been
+included here.
 
-diff --git a/crypto/algapi.c b/crypto/algapi.c
-index e4cc7615a139..aa699ff6c876 100644
---- a/crypto/algapi.c
-+++ b/crypto/algapi.c
-@@ -975,13 +975,15 @@ void crypto_inc(u8 *a, unsigned int size)
- }
- EXPORT_SYMBOL_GPL(crypto_inc);
- 
--void __crypto_xor(u8 *dst, const u8 *src, unsigned int len)
-+void __crypto_xor(u8 *dst, const u8 *src1, const u8 *src2, unsigned int len)
- {
- 	int relalign = 0;
- 
- 	if (!IS_ENABLED(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)) {
- 		int size = sizeof(unsigned long);
--		int d = ((unsigned long)dst ^ (unsigned long)src) & (size - 1);
-+		int d = (((unsigned long)dst ^ (unsigned long)src1) |
-+			 ((unsigned long)dst ^ (unsigned long)src2)) &
-+			(size - 1);
- 
- 		relalign = d ? 1 << __ffs(d) : size;
- 
-@@ -992,34 +994,37 @@ void __crypto_xor(u8 *dst, const u8 *src, unsigned int len)
- 		 * process the remainder of the input using optimal strides.
- 		 */
- 		while (((unsigned long)dst & (relalign - 1)) && len > 0) {
--			*dst++ ^= *src++;
-+			*dst++ = *src1++ ^ *src2++;
- 			len--;
- 		}
- 	}
- 
- 	while (IS_ENABLED(CONFIG_64BIT) && len >= 8 && !(relalign & 7)) {
--		*(u64 *)dst ^= *(u64 *)src;
-+		*(u64 *)dst = *(u64 *)src1 ^  *(u64 *)src2;
- 		dst += 8;
--		src += 8;
-+		src1 += 8;
-+		src2 += 8;
- 		len -= 8;
- 	}
- 
- 	while (len >= 4 && !(relalign & 3)) {
--		*(u32 *)dst ^= *(u32 *)src;
-+		*(u32 *)dst = *(u32 *)src1 ^ *(u32 *)src2;
- 		dst += 4;
--		src += 4;
-+		src1 += 4;
-+		src2 += 4;
- 		len -= 4;
- 	}
- 
- 	while (len >= 2 && !(relalign & 1)) {
--		*(u16 *)dst ^= *(u16 *)src;
-+		*(u16 *)dst = *(u16 *)src1 ^ *(u16 *)src2;
- 		dst += 2;
--		src += 2;
-+		src1 += 2;
-+		src2 += 2;
- 		len -= 2;
- 	}
- 
- 	while (len--)
--		*dst++ ^= *src++;
-+		*dst++ = *src1++ ^ *src2++;
- }
- EXPORT_SYMBOL_GPL(__crypto_xor);
- 
-diff --git a/include/crypto/algapi.h b/include/crypto/algapi.h
-index 436c4c2683c7..fd547f946bf8 100644
---- a/include/crypto/algapi.h
-+++ b/include/crypto/algapi.h
-@@ -192,7 +192,7 @@ static inline unsigned int crypto_queue_len(struct crypto_queue *queue)
- }
- 
- void crypto_inc(u8 *a, unsigned int size);
--void __crypto_xor(u8 *dst, const u8 *src, unsigned int size);
-+void __crypto_xor(u8 *dst, const u8 *src1, const u8 *src2, unsigned int size);
- 
- static inline void crypto_xor(u8 *dst, const u8 *src, unsigned int size)
- {
-@@ -207,7 +207,7 @@ static inline void crypto_xor(u8 *dst, const u8 *src, unsigned int size)
- 			size -= sizeof(unsigned long);
- 		}
- 	} else {
--		__crypto_xor(dst, src, size);
-+		__crypto_xor(dst, dst, src, size);
- 	}
- }
- 
+Patches #3 - #13 implement the non-SIMD fallbacks for the various NEON
+based drivers.
+
+Patch #14 implements AES-GCM natively instead of relying on the generic
+GCM module to wire accelerated AES-CTR and GHASH together, resulting in
+a ~37% speedup.
+
+Patches #15 and #16 implement an accelerated GHASH algorithm for ARM cores
+that lack the 64x64 PMULL instruction.
+
+Patches #17 and #18 update the scalar AES implementations to stop using
+the expanded lookup tables for the final round. This reduces the Dcache
+footprint, and thus the key correlated jitter.
+
+This supersedes all other crypto patches I have outstanding, including the
+AES refactor ones which I will rework later.
+
+Ard Biesheuvel (18):
+  crypto/algapi - use separate dst and src operands for __crypto_xor()
+  crypto/algapi - make crypto_xor() take separate dst and src arguments
+  crypto: arm64/ghash-ce - add non-SIMD scalar fallback
+  crypto: arm64/crct10dif - add non-SIMD generic fallback
+  crypto: arm64/crc32 - add non-SIMD scalar fallback
+  crypto: arm64/sha1-ce - add non-SIMD generic fallback
+  crypto: arm64/sha2-ce - add non-SIMD scalar fallback
+  crypto: arm64/aes-ce-cipher - match round key endianness with generic
+    code
+  crypto: arm64/aes-ce-cipher: add non-SIMD generic fallback
+  crypto: arm64/aes-ce-ccm: add non-SIMD generic fallback
+  crypto: arm64/aes-blk - add a non-SIMD fallback for synchronous CTR
+  crypto: arm64/chacha20 - take may_use_simd() into account
+  crypto: arm64/aes-bs - implement non-SIMD fallback for AES-CTR
+  crypto: arm64/gcm - implement native driver using v8 Crypto Extensions
+  crypto: arm/ghash - add NEON accelerated fallback for vmull.p64
+  crypto: arm64/ghash - add NEON accelerated fallback for 64-bit PMULL
+  crypto: arm/aes - avoid expanded lookup tables in the final round
+  crypto: arm64/aes - avoid expanded lookup tables in the final round
+
+ arch/arm/crypto/Kconfig                |   5 +-
+ arch/arm/crypto/aes-ce-glue.c          |   4 +-
+ arch/arm/crypto/aes-cipher-core.S      |  88 +++-
+ arch/arm/crypto/aes-neonbs-glue.c      |   5 +-
+ arch/arm/crypto/ghash-ce-core.S        | 234 +++++++--
+ arch/arm/crypto/ghash-ce-glue.c        |  24 +-
+ arch/arm64/crypto/Kconfig              |  22 +-
+ arch/arm64/crypto/aes-ce-ccm-core.S    |  30 +-
+ arch/arm64/crypto/aes-ce-ccm-glue.c    | 174 +++++--
+ arch/arm64/crypto/aes-ce-cipher.c      |  55 ++-
+ arch/arm64/crypto/aes-ce.S             |  12 +-
+ arch/arm64/crypto/aes-cipher-core.S    | 152 ++++--
+ arch/arm64/crypto/aes-ctr-fallback.h   |  53 ++
+ arch/arm64/crypto/aes-glue.c           |  63 ++-
+ arch/arm64/crypto/aes-neonbs-glue.c    |  53 +-
+ arch/arm64/crypto/chacha20-neon-glue.c |   5 +-
+ arch/arm64/crypto/crc32-ce-glue.c      |  11 +-
+ arch/arm64/crypto/crct10dif-ce-glue.c  |  13 +-
+ arch/arm64/crypto/ghash-ce-core.S      | 401 ++++++++++++++-
+ arch/arm64/crypto/ghash-ce-glue.c      | 517 ++++++++++++++++++--
+ arch/arm64/crypto/sha1-ce-glue.c       |  18 +-
+ arch/arm64/crypto/sha2-ce-glue.c       |  30 +-
+ arch/arm64/crypto/sha256-glue.c        |   1 +
+ arch/sparc/crypto/aes_glue.c           |   3 +-
+ arch/x86/crypto/aesni-intel_glue.c     |   4 +-
+ arch/x86/crypto/blowfish_glue.c        |   3 +-
+ arch/x86/crypto/cast5_avx_glue.c       |   3 +-
+ arch/x86/crypto/des3_ede_glue.c        |   3 +-
+ crypto/algapi.c                        |  25 +-
+ crypto/ctr.c                           |   3 +-
+ crypto/pcbc.c                          |  12 +-
+ drivers/crypto/vmx/aes_ctr.c           |   3 +-
+ drivers/md/dm-crypt.c                  |  11 +-
+ include/crypto/algapi.h                |  23 +-
+ 34 files changed, 1719 insertions(+), 344 deletions(-)
+ create mode 100644 arch/arm64/crypto/aes-ctr-fallback.h
+
 -- 
 2.9.3
