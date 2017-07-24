@@ -1,28 +1,53 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 24 Jul 2017 06:49:25 +0200
-Subject: [PATCH] soc/samsung: use kbasename instead of open coding
-In-Reply-To: <20170718214339.7774-50-robh@kernel.org>
-References: <20170718214339.7774-50-robh@kernel.org>
-Message-ID: <20170724044925.GA20898@kozik-book>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Mon, 24 Jul 2017 09:58:45 +0530
+Subject: [Patch v5 06/12] [media] v4l2-ioctl: add HEVC format description
+In-Reply-To: <e6e75cae-f195-af56-652e-37c3e51ad70f@xs4all.nl>
+References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170619052507epcas1p406fa9f6d84baa9c11050b1998021788a@epcas1p4.samsung.com>
+ <1497849055-26583-7-git-send-email-smitha.t@samsung.com>
+ <e6e75cae-f195-af56-652e-37c3e51ad70f@xs4all.nl>
+Message-ID: <1500870525.16819.1817.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 04:43:30PM -0500, Rob Herring wrote:
-> In preparation to not store the full path of nodes in full_name, use
-> kbasename instead as it will work either with the full path or not.
+On Thu, 2017-07-20 at 15:07 +0200, Hans Verkuil wrote:
+> On 19/06/17 07:10, Smitha T Murthy wrote:
+> > HEVC is a video coding format
+> > 
+> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> > ---
+> >  drivers/media/v4l2-core/v4l2-ioctl.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+> > index e5a2187..4f6f8d9 100644
+> > --- a/drivers/media/v4l2-core/v4l2-ioctl.c
+> > +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+> > @@ -1257,6 +1257,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+> >  		case V4L2_PIX_FMT_VC1_ANNEX_L:	descr = "VC-1 (SMPTE 412M Annex L)"; break;
+> >  		case V4L2_PIX_FMT_VP8:		descr = "VP8"; break;
+> >  		case V4L2_PIX_FMT_VP9:		descr = "VP9"; break;
+> > +		case V4L2_PIX_FMT_HEVC:		descr = "HEVC"; break;
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> ---
->  drivers/soc/samsung/pm_domains.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Add a little comment at the end of the line: /* aka H.265 */
 > 
+> After that you can add my:
+> 
+> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+> 
+> Regards,
+> 
+> 	Hans
+> 
+Ok I will make the change. Thanks for the review.
 
-Thanks, applied, with slightly changed title.
+Regards,
+Smitha
 
-Best regards,
-Krzysztof
+> >  		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA YUV"; break;
+> >  		case V4L2_PIX_FMT_WNVA:		descr = "WNVA"; break;
+> >  		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA SN9C10X"; break;
+> > 
+> 
+> 
+> 
