@@ -1,57 +1,75 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Jul 2017 15:48:42 +0200
-Subject: [PATCH net-next 12/18] Documentation/bindings: net: marvell-pp2: add
- the interrupt-names
+Date: Mon, 24 Jul 2017 15:48:36 +0200
+Subject: [PATCH net-next 06/18] net: mvpp2: initialize the XLG MAC when using
+ a port
 In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
 References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170724134848.19330-13-antoine.tenart@free-electrons.com>
+Message-ID: <20170724134848.19330-7-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An interrupt-names property can be used in the PPv2 port description
-bindings when more than a single interrupt (for rx) is used. Document
-this new optional property.
+This adds a routine to initialize the XLG MAC at the port level when
+using a port and the XAUI/10GKR interface mode. This wasn't done until
+this commit, and the mvpp2 driver was relying on the bootloader/firmware
+initialization. This doesn't mean everything is configured in the mvpp2
+driver now, but it helps reducing the gap.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- Documentation/devicetree/bindings/net/marvell-pp2.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/net/ethernet/marvell/mvpp2.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-index 18ec66e51b0a..553aadceeeee 100644
---- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-@@ -42,6 +42,9 @@ Optional properties (port):
- - phy: a phandle to a phy node defining the PHY address (as the reg
-   property, a single integer).
- - marvell,system-controller: a phandle to the system controller.
-+- interrupt-names: if more than a single interrupt for rx is given, must
-+                   be the name associated to the interrupts listed. Valid
-+                   names are: "rx-shared", "link".
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index 2573b0c27300..b3601561bbae 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -354,6 +354,7 @@
+ #define MVPP22_XLG_CTRL0_REG			0x100
+ #define     MVPP22_XLG_CTRL0_PORT_EN		BIT(0)
+ #define     MVPP22_XLG_CTRL0_MAC_RESET_DIS	BIT(1)
++#define     MVPP22_XLG_CTRL0_RX_FLOW_CTRL_EN	BIT(7)
+ #define     MVPP22_XLG_CTRL0_MIB_CNT_DIS	BIT(14)
  
- Example for marvell,armada-375-pp2:
+ #define MVPP22_XLG_CTRL3_REG			0x11c
+@@ -361,6 +362,11 @@
+ #define     MVPP22_XLG_CTRL3_MACMODESELECT_GMAC	(0 << 13)
+ #define     MVPP22_XLG_CTRL3_MACMODESELECT_10G	(1 << 13)
  
-@@ -82,18 +85,21 @@ cpm_ethernet: ethernet at 0 {
++#define MVPP22_XLG_CTRL4_REG			0x184
++#define     MVPP22_XLG_CTRL4_FWD_FC		BIT(5)
++#define     MVPP22_XLG_CTRL4_FWD_PFC		BIT(6)
++#define     MVPP22_XLG_CTRL4_MACMODSELECT_GMAC	BIT(12)
++
+ /* SMI registers. PPv2.2 only, relative to priv->iface_base. */
+ #define MVPP22_SMI_MISC_CFG_REG			0x1204
+ #define     MVPP22_SMI_POLLING_EN		BIT(10)
+@@ -4257,6 +4263,18 @@ static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
+ 	writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
+ }
  
- 	eth0: eth0 {
- 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "rx-shared";
- 		port-id = <0>;
- 		gop-port-id = <0>;
- 	};
++static void mvpp2_port_mii_xlg_configure(struct mvpp2_port *port)
++{
++	u32 val = readl(port->base + MVPP22_XLG_CTRL0_REG);
++	val |= MVPP22_XLG_CTRL0_RX_FLOW_CTRL_EN;
++	writel(val, port->base + MVPP22_XLG_CTRL0_REG);
++
++	val = readl(port->base + MVPP22_XLG_CTRL4_REG);
++	val &= ~MVPP22_XLG_CTRL4_MACMODSELECT_GMAC;
++	val |= MVPP22_XLG_CTRL4_FWD_FC | MVPP22_XLG_CTRL4_FWD_PFC;
++	writel(val, port->base + MVPP22_XLG_CTRL4_REG);
++}
++
+ static void mvpp22_port_mii_set(struct mvpp2_port *port)
+ {
+ 	u32 val;
+@@ -4284,6 +4302,8 @@ static void mvpp2_port_mii_set(struct mvpp2_port *port)
+ 	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+ 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII)
+ 		mvpp2_port_mii_gmac_configure(port);
++	else if (port->phy_interface == PHY_INTERFACE_MODE_10GKR)
++		mvpp2_port_mii_xlg_configure(port);
+ }
  
- 	eth1: eth1 {
- 		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "rx-shared";
- 		port-id = <1>;
- 		gop-port-id = <2>;
- 	};
- 
- 	eth2: eth2 {
- 		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "rx-shared";
- 		port-id = <2>;
- 		gop-port-id = <3>;
- 	};
+ static void mvpp2_port_fc_adv_enable(struct mvpp2_port *port)
 -- 
 2.13.3
