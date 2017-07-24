@@ -1,99 +1,79 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 24 Jul 2017 10:41:05 +0200
+Date: Mon, 24 Jul 2017 10:47:58 +0200
 Subject: [PATCH 3/4] arm: sunxi: Add AXP20X_ADC
-In-Reply-To: <20170724081013.uyfaetzkj5iz7uhj@flea>
+In-Reply-To: <20170724081846.b2rokuwhyuymj3sj@flea>
 References: <20170721162005.18892-1-maxime.ripard@free-electrons.com>
  <20170721162005.18892-3-maxime.ripard@free-electrons.com>
  <CAGb2v64tx6M1CJSKr_wgD4LM+-ER+Yqpj-hUftptj41PVhbBBA@mail.gmail.com>
- <be7d4295-8759-f57e-a600-358c7344251c@free-electrons.com>
- <20170724081013.uyfaetzkj5iz7uhj@flea>
-Message-ID: <1dd83dbc-ebd2-3f40-d42c-c14a934d3535@free-electrons.com>
+ <20170724081846.b2rokuwhyuymj3sj@flea>
+Message-ID: <bc2f080e-2270-4c07-68da-9b43039dccf6@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Maxime,
 
-On 24/07/2017 10:10, Maxime Ripard wrote:
-> On Mon, Jul 24, 2017 at 08:43:56AM +0200, Quentin Schulz wrote:
->> Hi all,
->>
->> I've been Cc'ed by Chen-Yu I think, thanks for the heads-up.
->>
->> On 22/07/2017 04:19, Chen-Yu Tsai wrote:
->>> On Sat, Jul 22, 2017 at 12:20 AM, Maxime Ripard
->>> <maxime.ripard@free-electrons.com> wrote:
->>>> The APX20X_POWER option, that is a dependency of the USB controllers
->>>> depends on IIO and AXP20X_ADC. Add it so that we can get a working USB
->>>> back.
->>>
->>> The statement is only half true. AXP20X_POWER can fall back to reading
->>> the ADC registers directly if AXP20X_ADC is not enabled.
->>
->> For any PMIC using "x-powers,axp202-usb-power-supply" compatible, that
->> is true, the others imperatively use IIO channels as there was no prior
->> support to this driver.
->>
->> The switch between reading IIO channels or directly reading the
->> registers is done at probe by checking IS_ENABLED(AXP20X_ADC)
->> (IS_ENABLED returns 1 when Kconfig is set to y or m). The goal was to
->> not break the existing system when users would update to a newer kernel
->> (as they may not have selected AXP20X_ADC).
->>
->> Since there is no hard dependency between AXP20X_ADC and AXP20X_POWER, I
->> think we may have a problem when AXP20X_ADC is built as a module. Then
->> AXP20X_POWER probing is deferred since it waits for the IIO channels.
->> Also, if you do a modprobe on AXP20X_POWER it'll not probe AXP20X_ADC
->> because the dependency is not declared. I don't know if there is a way
->> to declare this dependency programatically only when AXP20X_ADC is built
->> as a module?
->>
->>> Is there a plan
->>> to remove this feature?
->>>
->>
->> As said above (and in the commit log[1]), I added the condition for
->> backward compatibility so anyone could still use AXP20X_POWER without
->> the ADC, but maybe that is irrelevant?
+On 24/07/2017 10:18, Maxime Ripard wrote:
+> Hi,
 > 
-> The only compatibility we care about is the DT one. We don't care
-> about config options.
+> On Sat, Jul 22, 2017 at 10:19:08AM +0800, Chen-Yu Tsai wrote:
+>> On Sat, Jul 22, 2017 at 12:20 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>> The APX20X_POWER option, that is a dependency of the USB controllers
+>>> depends on IIO and AXP20X_ADC. Add it so that we can get a working USB
+>>> back.
+>>
+>> The statement is only half true. AXP20X_POWER can fall back to reading
+>> the ADC registers directly if AXP20X_ADC is not enabled. Is there a plan
+>> to remove this feature?
+> 
+> I never really considered this a feature, but some compatibility for
+> older DTs to be honest :)
 > 
 
-ACK.
-
->> This could solve a bit of the "complexity" of the driver, now that
->> we know we want to enforce AXP20X_ADC to be built with
->> AXP20X_POWER. I'm obviously okay to remove this feature if my point
->> of backward compatibility is irrelevant.
->>
->> But now, we still have the problem that AXP20X_ADC is not needed for
->> AXP20X_POWER for AXP22X (and those that don't have voltage/current
->> sensing). We don't really need to force AXP20X_ADC to be built when the
->> user want AXP20X_POWER.
->>
->> 1) We force AXP20X_ADC to be built whenever AXP20X_POWER is built, even
->> for PMICs that don't have any voltage/current sensing. This way, we can
->> enforce the dependency in Kconfig and everything's easy,
-> 
-> That's backward. The dependency is from AXP20X_POWER to
-> AXP20X_ADC. That's it, we should express it as such.
-> 
-
-You want AXP20X_POWER to depends on AXP20X_ADC (AXP20X_ADC built when
-AXP20X_POWER is built, which is what I said). We agree on the same thing
-here.
-
->> 2) We programmatically set the dependency between AXP20X_ADC and
->> AXP20X_POWER depending on the compatible used (AXP20X set the
->> dependency, not AXP22X).
-> 
-> Why not just adding a depends on?
-> 
-
-Because there is no dependency for AXP22X PMICs' USB power supply driver
-on AXP20X_ADC. AXP22X PMICs do not receive any information from the ADC.
+Have nothing to do with backward compatibility for DT as the DT hasn't
+changed. The IIO channels are exposed via an IIO map in the ADC driver
+and retrieved from the map in the USB power supply driver. No need for
+DT, no changes in DT.
 
 Quentin
+
+>> Also, AXP20X_ADC is only really needed if the hardware is AXP20x, and
+>> not the later ones that don't have voltage/current sensing. I would
+>> like to change the hard dependency on AXP20X_ADC to the "imply"
+>> keyword in Kconfig for the AC and battery power supply drivers.
+> 
+> I'm not sure. It's also needed when you want to read the battery
+> voltage and current, or the AC-IN voltage. And that's a feature found
+> on all PMICs.
+>> And since the battery and the AC-IN power supplies also have a
+> dependency on AXP20X_ADC, I guess we can just add a depnds on. In most
+> configuration, it's going to be enabled anyway.
+> 
+>> That is another discussion though.
+> 
+> Indeed.
+> 
+>> So I think the description should be something like
+>>
+>>     AXP20X_POWER depends on IIO. Even though it does not depend on
+>>     AXP20X_ADC, it is the new, preferred way of getting power supply
+>>     readings. The other AXP power supply drivers use it as well.
+>>
+>>     Enable both options.
+> 
+> That works for me.
+> 
+> With that comment, do I have your Acked-By?
+> 
+> Maxime
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
 Quentin Schulz, Free Electrons
@@ -106,4 +86,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170724/77511074/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170724/b1c053d3/attachment.sig>
