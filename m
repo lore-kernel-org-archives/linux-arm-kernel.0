@@ -1,113 +1,77 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 24 Jul 2017 10:37:42 +0100
-Subject: [PATCH] arm64: use WFE for long delays
-Message-ID: <1500889062-30476-1-git-send-email-julien.thierry@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Jul 2017 11:44:24 +0200
+Subject: [PATCH 3/4] arm: sunxi: Add AXP20X_ADC
+In-Reply-To: <CAGb2v65DT+Tmf5t2TLPi9BCq8u-6r1K-o=7sGXqKp-nYY25VZA@mail.gmail.com>
+References: <20170721162005.18892-1-maxime.ripard@free-electrons.com>
+ <20170721162005.18892-3-maxime.ripard@free-electrons.com>
+ <CAGb2v64tx6M1CJSKr_wgD4LM+-ER+Yqpj-hUftptj41PVhbBBA@mail.gmail.com>
+ <20170724081846.b2rokuwhyuymj3sj@flea>
+ <CAGb2v65DT+Tmf5t2TLPi9BCq8u-6r1K-o=7sGXqKp-nYY25VZA@mail.gmail.com>
+Message-ID: <20170724094424.4kyxphvkf74qahdy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current delay implementation uses the yield instruction, which is a hint
-that it is beneficial to schedule another thread. As this is a hint, it may be
-implemented as a NOP, causing all delays to be busy loops. This is the case for
-many existing CPUs.
+On Mon, Jul 24, 2017 at 04:22:09PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Jul 24, 2017 at 4:18 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Sat, Jul 22, 2017 at 10:19:08AM +0800, Chen-Yu Tsai wrote:
+> >> On Sat, Jul 22, 2017 at 12:20 AM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > The APX20X_POWER option, that is a dependency of the USB controllers
+> >> > depends on IIO and AXP20X_ADC. Add it so that we can get a working USB
+> >> > back.
+> >>
+> >> The statement is only half true. AXP20X_POWER can fall back to reading
+> >> the ADC registers directly if AXP20X_ADC is not enabled. Is there a plan
+> >> to remove this feature?
+> >
+> > I never really considered this a feature, but some compatibility for
+> > older DTs to be honest :)
+> >
+> >> Also, AXP20X_ADC is only really needed if the hardware is AXP20x, and
+> >> not the later ones that don't have voltage/current sensing. I would
+> >> like to change the hard dependency on AXP20X_ADC to the "imply"
+> >> keyword in Kconfig for the AC and battery power supply drivers.
+> >
+> > I'm not sure. It's also needed when you want to read the battery
+> > voltage and current, or the AC-IN voltage. And that's a feature found
+> > on all PMICs.
+> >
+> > And since the battery and the AC-IN power supplies also have a
+> > dependency on AXP20X_ADC, I guess we can just add a depnds on. In most
+> > configuration, it's going to be enabled anyway.
+> >
+> >> That is another discussion though.
+> >
+> > Indeed.
+> >
+> >> So I think the description should be something like
+> >>
+> >>     AXP20X_POWER depends on IIO. Even though it does not depend on
+> >>     AXP20X_ADC, it is the new, preferred way of getting power supply
+> >>     readings. The other AXP power supply drivers use it as well.
+> >>
+> >>     Enable both options.
+> >
+> > That works for me.
+> >
+> > With that comment, do I have your Acked-By?
+> 
+> Yes. We'll figure out the rest later on.
 
-Taking advantage of the generic timer sending periodic events to all cores, we
-can use WFE during delays to reduce power consumption. This is beneficial only
-for delays longer than the period of the timer event stream.
+Applied with that commit log, thanks!
+Maxime
 
-If timer event stream is not enabled, delays will behave as yield/busy loops.
-
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/lib/delay.c      | 25 ++++++++++++++++++++-----
- include/asm-generic/delay.h |  9 +++++++--
- 2 files changed, 27 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
-index dad4ec9..fdfe6ef 100644
---- a/arch/arm64/lib/delay.c
-+++ b/arch/arm64/lib/delay.c
-@@ -24,10 +24,28 @@
- #include <linux/module.h>
- #include <linux/timex.h>
-
-+#include <clocksource/arm_arch_timer.h>
-+
-+#define USECS_TO_CYCLES(TIME_USECS)			\
-+	(xloops_to_cycles(usecs_to_xloops(TIME_USECS)))
-+
-+static inline unsigned long xloops_to_cycles(unsigned long xloops)
-+{
-+	return (xloops * loops_per_jiffy * HZ) >> 32;
-+}
-+
- void __delay(unsigned long cycles)
- {
- 	cycles_t start = get_cycles();
-
-+	if (elf_hwcap & HWCAP_EVTSTRM) {
-+		const cycles_t timer_evt_period =
-+			USECS_TO_CYCLES(1000000 / ARCH_TIMER_EVT_STREAM_FREQ);
-+
-+		while (get_cycles() - start + timer_evt_period < cycles)
-+			wfe();
-+	}
-+
- 	while ((get_cycles() - start) < cycles)
- 		cpu_relax();
- }
-@@ -35,16 +53,13 @@ void __delay(unsigned long cycles)
-
- inline void __const_udelay(unsigned long xloops)
- {
--	unsigned long loops;
--
--	loops = xloops * loops_per_jiffy * HZ;
--	__delay(loops >> 32);
-+	__delay(xloops_to_cycles(xloops));
- }
- EXPORT_SYMBOL(__const_udelay);
-
- void __udelay(unsigned long usecs)
- {
--	__const_udelay(usecs * 0x10C7UL); /* 2**32 / 1000000 (rounded up) */
-+	__const_udelay(usecs_to_xloops(usecs));
- }
- EXPORT_SYMBOL(__udelay);
-
-diff --git a/include/asm-generic/delay.h b/include/asm-generic/delay.h
-index 0f79054..1538e58 100644
---- a/include/asm-generic/delay.h
-+++ b/include/asm-generic/delay.h
-@@ -10,19 +10,24 @@
- extern void __const_udelay(unsigned long xloops);
- extern void __delay(unsigned long loops);
-
-+/* 0x10c7 is 2**32 / 1000000 (rounded up) */
-+static inline unsigned long usecs_to_xloops(unsigned long usecs)
-+{
-+	return usecs * 0x10C7UL;
-+}
-+
- /*
-  * The weird n/20000 thing suppresses a "comparison is always false due to
-  * limited range of data type" warning with non-const 8-bit arguments.
-  */
-
--/* 0x10c7 is 2**32 / 1000000 (rounded up) */
- #define udelay(n)							\
- 	({								\
- 		if (__builtin_constant_p(n)) {				\
- 			if ((n) / 20000 >= 1)				\
- 				 __bad_udelay();			\
- 			else						\
--				__const_udelay((n) * 0x10c7ul);		\
-+				__const_udelay(usecs_to_xloops(n));	\
- 		} else {						\
- 			__udelay(n);					\
- 		}							\
---
-1.9.1
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170724/53283b0f/attachment.sig>
