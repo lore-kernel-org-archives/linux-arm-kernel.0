@@ -1,70 +1,62 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 24 Jul 2017 17:42:14 +0100
-Subject: [PATCH v2 2/6] of: Add helper for mapping device node to logical
- CPU number
-In-Reply-To: <1500892161-17634-3-git-send-email-suzuki.poulose@arm.com>
-References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
- <1500892161-17634-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <7ec47d12-3b6b-82c0-ba15-5664b5169974@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 24 Jul 2017 19:49:03 +0300
+Subject: [PATCH net-next 09/18] net: mvpp2: use named interrupts
+In-Reply-To: <20170724134848.19330-10-antoine.tenart@free-electrons.com>
+References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+ <20170724134848.19330-10-antoine.tenart@free-electrons.com>
+Message-ID: <80d4b082-a5ed-73da-0634-8295996dc29d@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/24/2017 04:48 PM, Antoine Tenart wrote:
 
-
-On 24/07/17 11:29, Suzuki K Poulose wrote:
-> Add a helper to map a device node to a logical CPU number to avoid
-> duplication. Currently this is open coded in different places (e.g
-> gic-v3, coresight). The helper tries to map device node to a "possible"
-> logical CPU id, which may not be online yet. It is the responsibility
-> of the user to make sure that the CPU is online. The helper uses
-> of_get_cpu_node() which uses arch specific backends to match the phyiscal
-> ids.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> This patch update the Marvell PPv2 driver to use named interrupts. A
+> compatibility path is kept to allow using device trees using the old dt
+> bindings. This change is needed as other interrupts will be used by the
+> PPv2 driver at some point.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
->  drivers/of/base.c         | 26 ++++++++++++++++++++++++++
->  include/linux/of_device.h |  7 +++++++
->  2 files changed, 33 insertions(+)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 686628d..639af23 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -420,6 +420,32 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
->  EXPORT_SYMBOL(of_get_cpu_node);
->  
->  /**
-> + * of_device_node_get_cpu: Get the logical CPU number for a given device_node
-> + *
-> + * @cpu_node: Pointer to the device_node for CPU.
-> + *
-> + * Returns the logical CPU number of the given CPU device_node.
-> + * Returns >= nr_cpu_ids if CPU is not found.
-> + */
-> +int of_device_node_get_cpu(struct device_node *cpu_node)
-> +{
-> +	int cpu, thread;
-> +	bool found = false;
-> +	struct device_node *np;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		np = of_get_cpu_node(cpu, &thread);
+>  drivers/net/ethernet/marvell/mvpp2.c | 18 ++++++++++++++----
+>  1 file changed, 14 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+> index f6eb98d38ced..77eef2cc40a1 100644
+> --- a/drivers/net/ethernet/marvell/mvpp2.c
+> +++ b/drivers/net/ethernet/marvell/mvpp2.c
+> @@ -6789,10 +6789,20 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+>
+>  	port = netdev_priv(dev);
+>
+> -	port->irq = irq_of_parse_and_map(port_node, 0);
+> -	if (port->irq <= 0) {
+> -		err = -EINVAL;
+> -		goto err_free_netdev;
+> +	if (of_get_property(port_node, "interrupt-names", NULL)) {
+> +		port->irq = of_irq_get_byname(port_node, "rx-shared");
+> +		if (port->irq <= 0) {
+> +			err = (port->irq == -EPROBE_DEFER) ?
+> +			      -EPROBE_DEFER : -EINVAL;
 
-Ideally, we should be able to use of_cpu_device_node_get instead of
-of_get_cpu_node which parses the device tree. Not sure if that's the
-case here too.
+    Perhaps better:
 
-Sorry for following up on this so late. I had a patch in my tree
-for-a-while to address that. Just posted it[1] now seeing this patch now.
+		err = port->irq ?: -EINVAL;
 
-You can move to of_cpu_device_node_get if all users of this function are
-called after CPU's are registered. Otherwise, you can keep it as is for
-now and it can be changed once [1] lands.
+> +			goto err_free_netdev;
+> +		}
+> +	} else {
+> +		/* kept for dt compatibility */
+> +		port->irq = irq_of_parse_and_map(port_node, 0);
+> +		if (port->irq <= 0) {
 
--- 
-Regards,
-Sudeep
+    Note that irq_of_parse_and_map() returns *unsigned int*, so negative error 
+codes are not possible, 0 indicates bad IRQ.
 
-[1] https://marc.info/?l=devicetree&m=150090452130567&w=2
+> +			err = -EINVAL;
+> +			goto err_free_netdev;
+> +		}
+>  	}
+>
+>  	if (of_property_read_bool(port_node, "marvell,loopback"))
+
+MBR, Sergei
