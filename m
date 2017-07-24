@@ -1,141 +1,27 @@
-From: jack@suse.cz (Jan Kara)
-Date: Mon, 24 Jul 2017 13:48:59 +0200
-Subject: [PATCH v4 5/5] dax: move all DAX radix tree defs to fs/dax.c
-In-Reply-To: <20170721223956.29485-6-ross.zwisler@linux.intel.com>
-References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
- <20170721223956.29485-6-ross.zwisler@linux.intel.com>
-Message-ID: <20170724114859.GM652@quack2.suse.cz>
+From: yao.qi@arm.com (Yao Qi)
+Date: Mon, 24 Jul 2017 12:52:12 +0100
+Subject: [PATCH 00/11] ARMv8.3 pointer authentication userspace support
+In-Reply-To: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <46daaf0b-6b90-61cc-a25f-4177641d1613@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 21-07-17 16:39:55, Ross Zwisler wrote:
-> Now that we no longer insert struct page pointers in DAX radix trees the
-> page cache code no longer needs to know anything about DAX exceptional
-> entries.  Move all the DAX exceptional entry definitions from dax.h to
-> fs/dax.c.
-> 
-> Signed-off-by: Ross Zwisler <ross.zwisler@linux.intel.com>
-> Suggested-by: Jan Kara <jack@suse.cz>
+On 19/07/17 17:01, Mark Rutland wrote:
+> * Should the kernel remove PACs when unwinding user stacks?
+>
+>   This is simple to do, but it's arguably placing a policy in the kernel as to
+>   what we expect user stacks to look like. Regardless, userspace will have to
+>   perform this when unwinding with DWARF.
 
-Looks good. You can add:
+I am not sure what do you mean.  Do you mean stripping a PAC from a
+pointer during unwinding, so that user space can unwind the program
+without being aware of PAC?  Can kernel remove PAC from all instruction
+pointers?  Note that user space debugger may try to unwind in coredump,
+so if the contents dumped into coredump including PAC bits, debuggers
+still have to be aware of PAC (unless kernel can remove all PAC bits
+during coredump too).
 
-Reviewed-by: Jan Kara <jack@suse.cz>
-
-								Honza
-
-
-> ---
->  fs/dax.c            | 34 ++++++++++++++++++++++++++++++++++
->  include/linux/dax.h | 41 -----------------------------------------
->  2 files changed, 34 insertions(+), 41 deletions(-)
-> 
-> diff --git a/fs/dax.c b/fs/dax.c
-> index 0e27d90..e7acc45 100644
-> --- a/fs/dax.c
-> +++ b/fs/dax.c
-> @@ -54,6 +54,40 @@ static int __init init_dax_wait_table(void)
->  }
->  fs_initcall(init_dax_wait_table);
->  
-> +/*
-> + * We use lowest available bit in exceptional entry for locking, one bit for
-> + * the entry size (PMD) and two more to tell us if the entry is a zero page or
-> + * an empty entry that is just used for locking.  In total four special bits.
-> + *
-> + * If the PMD bit isn't set the entry has size PAGE_SIZE, and if the ZERO_PAGE
-> + * and EMPTY bits aren't set the entry is a normal DAX entry with a filesystem
-> + * block allocation.
-> + */
-> +#define RADIX_DAX_SHIFT		(RADIX_TREE_EXCEPTIONAL_SHIFT + 4)
-> +#define RADIX_DAX_ENTRY_LOCK	(1 << RADIX_TREE_EXCEPTIONAL_SHIFT)
-> +#define RADIX_DAX_PMD		(1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 1))
-> +#define RADIX_DAX_ZERO_PAGE	(1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 2))
-> +#define RADIX_DAX_EMPTY		(1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 3))
-> +
-> +static unsigned long dax_radix_sector(void *entry)
-> +{
-> +	return (unsigned long)entry >> RADIX_DAX_SHIFT;
-> +}
-> +
-> +static void *dax_radix_locked_entry(sector_t sector, unsigned long flags)
-> +{
-> +	return (void *)(RADIX_TREE_EXCEPTIONAL_ENTRY | flags |
-> +			((unsigned long)sector << RADIX_DAX_SHIFT) |
-> +			RADIX_DAX_ENTRY_LOCK);
-> +}
-> +
-> +static unsigned int dax_radix_order(void *entry)
-> +{
-> +	if ((unsigned long)entry & RADIX_DAX_PMD)
-> +		return PMD_SHIFT - PAGE_SHIFT;
-> +	return 0;
-> +}
-> +
->  static int dax_is_pmd_entry(void *entry)
->  {
->  	return (unsigned long)entry & RADIX_DAX_PMD;
-> diff --git a/include/linux/dax.h b/include/linux/dax.h
-> index afa99bb..d0e3272 100644
-> --- a/include/linux/dax.h
-> +++ b/include/linux/dax.h
-> @@ -88,33 +88,6 @@ void dax_flush(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
->  		size_t size);
->  void dax_write_cache(struct dax_device *dax_dev, bool wc);
->  
-> -/*
-> - * We use lowest available bit in exceptional entry for locking, one bit for
-> - * the entry size (PMD) and two more to tell us if the entry is a zero page or
-> - * an empty entry that is just used for locking.  In total four special bits.
-> - *
-> - * If the PMD bit isn't set the entry has size PAGE_SIZE, and if the ZERO_PAGE
-> - * and EMPTY bits aren't set the entry is a normal DAX entry with a filesystem
-> - * block allocation.
-> - */
-> -#define RADIX_DAX_SHIFT	(RADIX_TREE_EXCEPTIONAL_SHIFT + 4)
-> -#define RADIX_DAX_ENTRY_LOCK (1 << RADIX_TREE_EXCEPTIONAL_SHIFT)
-> -#define RADIX_DAX_PMD (1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 1))
-> -#define RADIX_DAX_ZERO_PAGE (1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 2))
-> -#define RADIX_DAX_EMPTY (1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 3))
-> -
-> -static inline unsigned long dax_radix_sector(void *entry)
-> -{
-> -	return (unsigned long)entry >> RADIX_DAX_SHIFT;
-> -}
-> -
-> -static inline void *dax_radix_locked_entry(sector_t sector, unsigned long flags)
-> -{
-> -	return (void *)(RADIX_TREE_EXCEPTIONAL_ENTRY | flags |
-> -			((unsigned long)sector << RADIX_DAX_SHIFT) |
-> -			RADIX_DAX_ENTRY_LOCK);
-> -}
-> -
->  ssize_t dax_iomap_rw(struct kiocb *iocb, struct iov_iter *iter,
->  		const struct iomap_ops *ops);
->  int dax_iomap_fault(struct vm_fault *vmf, enum page_entry_size pe_size,
-> @@ -136,20 +109,6 @@ static inline int __dax_zero_page_range(struct block_device *bdev,
->  }
->  #endif
->  
-> -#ifdef CONFIG_FS_DAX_PMD
-> -static inline unsigned int dax_radix_order(void *entry)
-> -{
-> -	if ((unsigned long)entry & RADIX_DAX_PMD)
-> -		return PMD_SHIFT - PAGE_SHIFT;
-> -	return 0;
-> -}
-> -#else
-> -static inline unsigned int dax_radix_order(void *entry)
-> -{
-> -	return 0;
-> -}
-> -#endif
-> -
->  static inline bool dax_mapping(struct address_space *mapping)
->  {
->  	return mapping->host && IS_DAX(mapping->host);
-> -- 
-> 2.9.4
-> 
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+IMO, kernel needs to tell the truth to reflect the process/task state
+to the user space, and leave the user space to consume.
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
