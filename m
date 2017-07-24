@@ -1,20 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 24 Jul 2017 15:06:13 -0500
-Subject: [PATCH 4/4] soc: renesas: rcar-rst: Add support for R-Car D3
-In-Reply-To: <1500554094-22198-5-git-send-email-geert+renesas@glider.be>
-References: <1500554094-22198-1-git-send-email-geert+renesas@glider.be>
- <1500554094-22198-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170724200613.wpwsn4m4r2rhwwik@rob-hp-laptop>
+Date: Mon, 24 Jul 2017 15:18:39 -0500
+Subject: [PATCH 2/3] dt-bindings: bcm: Add Raspberry Pi Zero W
+In-Reply-To: <1500579429-9101-3-git-send-email-stefan.wahren@i2se.com>
+References: <1500579429-9101-1-git-send-email-stefan.wahren@i2se.com>
+ <1500579429-9101-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20170724201839.474rhadxcggz2lpe@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 02:34:54PM +0200, Geert Uytterhoeven wrote:
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: devicetree at vger.kernel.org
+On Thu, Jul 20, 2017 at 09:37:08PM +0200, Stefan Wahren wrote:
+> This adds the root properties for the Raspberry Pi Zero W.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Reviewed-by: Eric Anholt <eric@anholt.net>
 > ---
->  Documentation/devicetree/bindings/reset/renesas,rst.txt | 1 +
->  drivers/soc/renesas/Kconfig                             | 2 +-
->  drivers/soc/renesas/rcar-rst.c                          | 1 +
->  3 files changed, 3 insertions(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
