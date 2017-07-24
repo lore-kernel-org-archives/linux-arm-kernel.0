@@ -1,50 +1,102 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Jul 2017 14:12:53 +0100
-Subject: [PATCH 00/16] arm/arm64: Workaround misprogrammed CNTFRQ
-In-Reply-To: <c3c34b9b-3872-bbb1-28cf-07aa6c739e94@arm.com>
-References: <20170721171542.27639-1-marc.zyngier@arm.com>
- <20170724121958.GC29919@arm.com>
- <c3c34b9b-3872-bbb1-28cf-07aa6c739e94@arm.com>
-Message-ID: <20170724131252.GG29919@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Jul 2017 14:14:16 +0100
+Subject: [PATCH v2 2/6] of: Add helper for mapping device node to logical
+ CPU number
+In-Reply-To: <1500892161-17634-3-git-send-email-suzuki.poulose@arm.com>
+References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
+ <1500892161-17634-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <ff7f1757-0beb-b87c-8965-d9fb29e6de47@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 01:48:37PM +0100, Marc Zyngier wrote:
-> On 24/07/17 13:19, Will Deacon wrote:
-> > On Fri, Jul 21, 2017 at 06:15:26PM +0100, Marc Zyngier wrote:
-> >> It is an unfortunate situation that CNTFRQ{,_EL0} is often
-> >> misprogrammed from the firmware side, leaving it up to the kernel to
-> >> work around it. This is usually done by providing an alternative
-> >> frequency in the Device Tree.
-> >>
-> >> Unfortunately, CNTFRQ is accessible from EL0, giving userspace the
-> >> wrong frequency, and potentially a different frequency per CPU, which
-> >> is definitely not what you want. A possible workaround is to trap this
-> >> into the kernel and to emulate it (together with the VDSO being
-> >> disabled), and this is what this series is achieving.
-> > 
-> > Which userspace is actually affected by a broken CNTFRQ register? I suspect
-> > most users will be more upset at losing their (perfectly functional) vDSO
-> > acceleration than they are about having a broken CNTFRQ value that is hardly
-> > ever used, especially since this affects quite a few systems.
+On 24/07/17 11:29, Suzuki K Poulose wrote:
+> Add a helper to map a device node to a logical CPU number to avoid
+> duplication. Currently this is open coded in different places (e.g
+> gic-v3, coresight). The helper tries to map device node to a "possible"
+> logical CPU id, which may not be online yet. It is the responsibility
+> of the user to make sure that the CPU is online. The helper uses
+> of_get_cpu_node() which uses arch specific backends to match the phyiscal
+> ids.
 > 
-> OpenMPI is one of the things I'm aware of (we broke it when implementing
-> the first set of timer workarounds), and from trawling the Debian code
-> search, at least HHVM is another candidate. How this will affect them is
-> anybody's guess.
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/of/base.c         | 26 ++++++++++++++++++++++++++
+>  include/linux/of_device.h |  7 +++++++
+>  2 files changed, 33 insertions(+)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 686628d..639af23 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -420,6 +420,32 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
+>  EXPORT_SYMBOL(of_get_cpu_node);
+>  
+>  /**
+> + * of_device_node_get_cpu: Get the logical CPU number for a given device_node
+> + *
+> + * @cpu_node: Pointer to the device_node for CPU.
+> + *
+> + * Returns the logical CPU number of the given CPU device_node.
+> + * Returns >= nr_cpu_ids if CPU is not found.
+> + */
+> +int of_device_node_get_cpu(struct device_node *cpu_node)
+> +{
+> +	int cpu, thread;
+> +	bool found = false;
+> +	struct device_node *np;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		np = of_get_cpu_node(cpu, &thread);
 
-The latest mcrouter sources pulled into HHVM don't use cntfrq, but you're
-right about OpenMPI. However, these things are using the counter directly
-as a performance optimisation: the moment we start trapping then they've
-lost. I doubt it's much better than giving the wrong data for the
-frequency (i.e. they're just as broken in both cases).
+nit: Since you don't need the thread here, you can pass NULL instead.
 
-So, if they want to run on these systems, their best bet is to use the
-vDSO-accelerated clock_gettime implementation. Yes, there's a dispatch cost
-compared to an inline asm, but it will beat the pants off a trap to the
-kernel. The problem is that this patch series prevents them from doing that
-and just means they're screwed whatever they do. We can point at the broken
-firmware, but it doesn't feel to me like this workaround is really helping
-anybody :/.
+> +		found = (cpu_node == np);
+> +		of_node_put(np);
+> +		if (found)
+> +			break;
+> +	}
+> +
+> +	return cpu;
+> +}
+> +EXPORT_SYMBOL(of_device_node_get_cpu);
+> +
+> +/**
+>   * __of_device_is_compatible() - Check if the node matches given constraints
+>   * @device: pointer to node
+>   * @compat: required compatible string, NULL or "" for any match
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index b4ad8b4..00a4ba9 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -40,6 +40,8 @@ extern int of_device_request_module(struct device *dev);
+>  extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
+>  extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
+>  
+> +extern int of_device_node_get_cpu(struct device_node *np);
+> +
+>  static inline void of_device_node_put(struct device *dev)
+>  {
+>  	of_node_put(dev->of_node);
+> @@ -110,6 +112,11 @@ static inline int of_dma_configure(struct device *dev, struct device_node *np)
+>  }
+>  static inline void of_dma_deconfigure(struct device *dev)
+>  {}
+> +
+> +static inline int of_device_node_get_cpu(struct device_node *np)
+> +{
+> +	return nr_cpu_ids;
+> +}
+>  #endif /* CONFIG_OF */
+>  
+>  #endif /* _LINUX_OF_DEVICE_H */
+> 
 
-Will
+FWIW:
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
