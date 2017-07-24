@@ -1,161 +1,45 @@
-From: wzz@rock-chips.com (zain wang)
-Date: Mon, 24 Jul 2017 09:23:13 +0800
-Subject: [RESEND PATCH 1/2] crypto: rockchip - move the crypto completion from
- interrupt context
-In-Reply-To: <1500859394-1799-1-git-send-email-wzz@rock-chips.com>
-References: <1500859394-1799-1-git-send-email-wzz@rock-chips.com>
-Message-ID: <1500859394-1799-2-git-send-email-wzz@rock-chips.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 24 Jul 2017 09:58:18 +0800
+Subject: [PATCH] [RESEND] drm/rockchip: fix Kconfig dependencies
+In-Reply-To: <20170721211214.3386387-1-arnd@arndb.de>
+References: <20170721211214.3386387-1-arnd@arndb.de>
+Message-ID: <5975543A.80407@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's illegal to call the completion function from hardirq context,
-it will cause runtime tests to fail. Let's build a new task (done_task)
-for moving update operation from hardirq context.
+On 2017?07?22? 05:12, Arnd Bergmann wrote:
+> A bug that I had fixed earlier just came back, with CONFIG_EXTCON=m,
+> the rockchip drm driver will fail to link:
+>
+> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_get_port_lanes':
+> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x30): undefined reference to `extcon_get_state'
+> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x6c): undefined reference to `extcon_get_property'
+> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_check_sink_connection':
+> cdn-dp-core.c:(.text.cdn_dp_check_sink_connection+0x80): undefined reference to `extcon_get_state'
+> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_enable':
+> cdn-dp-core.c:(.text.cdn_dp_enable+0x748): undefined reference to `extcon_get_property'
+>
+> The problem is that that the sub-drivers are now all linked into the
+> main rockchip drm module, which breaks all the Kconfig dependencies
+> that are specified in the options for those sub-drivers.
+>
+> This clarifies the dependency to ensure that we can only turn on the DP
+> driver when EXTCON is reachable. As the 'select' statements can now
+> cause additional options to become built-in when they should be
+> loadable modules, I'm moving those into the main driver config option.
+> The dependency on DRM_ROCKCHIP can be reduced into a single 'if'
+> statement here for brevity, but this has no functional effect.
+>
+> Fixes: b6705157b2db ("drm/rockchip: add extcon dependency for DP")
+> Fixes: 8820b68bd378 ("drm/rockchip: Refactor the component match logic.")
+> Link:https://patchwork.kernel.org/patch/9648761/
+> Acked-by: Guenter Roeck<groeck@chromium.org>
+> Tested-by: Jeffy Chen<jeffy.chen@rock-chips.com>
+> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
 
-Signed-off-by: zain wang <wzz@rock-chips.com>
----
- drivers/crypto/rockchip/rk3288_crypto.c            | 39 ++++++++++++++++------
- drivers/crypto/rockchip/rk3288_crypto.h            |  4 ++-
- drivers/crypto/rockchip/rk3288_crypto_ablkcipher.c |  2 +-
- drivers/crypto/rockchip/rk3288_crypto_ahash.c      |  2 +-
- 4 files changed, 33 insertions(+), 14 deletions(-)
+Pushed to drm-misc-fixes.
 
-diff --git a/drivers/crypto/rockchip/rk3288_crypto.c b/drivers/crypto/rockchip/rk3288_crypto.c
-index d0f80c6..c2b1dd7 100644
---- a/drivers/crypto/rockchip/rk3288_crypto.c
-+++ b/drivers/crypto/rockchip/rk3288_crypto.c
-@@ -169,24 +169,22 @@ static irqreturn_t rk_crypto_irq_handle(int irq, void *dev_id)
- {
- 	struct rk_crypto_info *dev  = platform_get_drvdata(dev_id);
- 	u32 interrupt_status;
--	int err = 0;
- 
- 	spin_lock(&dev->lock);
- 	interrupt_status = CRYPTO_READ(dev, RK_CRYPTO_INTSTS);
- 	CRYPTO_WRITE(dev, RK_CRYPTO_INTSTS, interrupt_status);
-+
- 	if (interrupt_status & 0x0a) {
- 		dev_warn(dev->dev, "DMA Error\n");
--		err = -EFAULT;
--	} else if (interrupt_status & 0x05) {
--		err = dev->update(dev);
-+		dev->err = -EFAULT;
- 	}
--	if (err)
--		dev->complete(dev, err);
-+	tasklet_schedule(&dev->done_task);
-+
- 	spin_unlock(&dev->lock);
- 	return IRQ_HANDLED;
- }
- 
--static void rk_crypto_tasklet_cb(unsigned long data)
-+static void rk_crypto_queue_task_cb(unsigned long data)
- {
- 	struct rk_crypto_info *dev = (struct rk_crypto_info *)data;
- 	struct crypto_async_request *async_req, *backlog;
-@@ -210,11 +208,26 @@ static void rk_crypto_tasklet_cb(unsigned long data)
- 		dev->ablk_req = ablkcipher_request_cast(async_req);
- 	else
- 		dev->ahash_req = ahash_request_cast(async_req);
-+	dev->err = 0;
- 	err = dev->start(dev);
- 	if (err)
- 		dev->complete(dev, err);
- }
- 
-+static void rk_crypto_done_task_cb(unsigned long data)
-+{
-+	struct rk_crypto_info *dev = (struct rk_crypto_info *)data;
-+
-+	if (dev->err) {
-+		dev->complete(dev, dev->err);
-+		return;
-+	}
-+
-+	dev->err = dev->update(dev);
-+	if (dev->err)
-+		dev->complete(dev, dev->err);
-+}
-+
- static struct rk_crypto_tmp *rk_cipher_algs[] = {
- 	&rk_ecb_aes_alg,
- 	&rk_cbc_aes_alg,
-@@ -361,8 +374,10 @@ static int rk_crypto_probe(struct platform_device *pdev)
- 	crypto_info->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, crypto_info);
- 
--	tasklet_init(&crypto_info->crypto_tasklet,
--		     rk_crypto_tasklet_cb, (unsigned long)crypto_info);
-+	tasklet_init(&crypto_info->queue_task,
-+		     rk_crypto_queue_task_cb, (unsigned long)crypto_info);
-+	tasklet_init(&crypto_info->done_task,
-+		     rk_crypto_done_task_cb, (unsigned long)crypto_info);
- 	crypto_init_queue(&crypto_info->queue, 50);
- 
- 	crypto_info->enable_clk = rk_crypto_enable_clk;
-@@ -380,7 +395,8 @@ static int rk_crypto_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_register_alg:
--	tasklet_kill(&crypto_info->crypto_tasklet);
-+	tasklet_kill(&crypto_info->queue_task);
-+	tasklet_kill(&crypto_info->done_task);
- err_crypto:
- 	return err;
- }
-@@ -390,7 +406,8 @@ static int rk_crypto_remove(struct platform_device *pdev)
- 	struct rk_crypto_info *crypto_tmp = platform_get_drvdata(pdev);
- 
- 	rk_crypto_unregister();
--	tasklet_kill(&crypto_tmp->crypto_tasklet);
-+	tasklet_kill(&crypto_tmp->done_task);
-+	tasklet_kill(&crypto_tmp->queue_task);
- 	return 0;
- }
- 
-diff --git a/drivers/crypto/rockchip/rk3288_crypto.h b/drivers/crypto/rockchip/rk3288_crypto.h
-index d7b71fe..65ad1c2 100644
---- a/drivers/crypto/rockchip/rk3288_crypto.h
-+++ b/drivers/crypto/rockchip/rk3288_crypto.h
-@@ -190,9 +190,11 @@ struct rk_crypto_info {
- 	void __iomem			*reg;
- 	int				irq;
- 	struct crypto_queue		queue;
--	struct tasklet_struct		crypto_tasklet;
-+	struct tasklet_struct		queue_task;
-+	struct tasklet_struct		done_task;
- 	struct ablkcipher_request	*ablk_req;
- 	struct ahash_request		*ahash_req;
-+	int 				err;
- 	/* device lock */
- 	spinlock_t			lock;
- 
-diff --git a/drivers/crypto/rockchip/rk3288_crypto_ablkcipher.c b/drivers/crypto/rockchip/rk3288_crypto_ablkcipher.c
-index b5a3afe..8787e44 100644
---- a/drivers/crypto/rockchip/rk3288_crypto_ablkcipher.c
-+++ b/drivers/crypto/rockchip/rk3288_crypto_ablkcipher.c
-@@ -42,7 +42,7 @@ static int rk_handle_req(struct rk_crypto_info *dev,
- 	spin_lock_irqsave(&dev->lock, flags);
- 	err = ablkcipher_enqueue_request(&dev->queue, req);
- 	spin_unlock_irqrestore(&dev->lock, flags);
--	tasklet_schedule(&dev->crypto_tasklet);
-+	tasklet_schedule(&dev->queue_task);
- 	return err;
- }
- 
-diff --git a/drivers/crypto/rockchip/rk3288_crypto_ahash.c b/drivers/crypto/rockchip/rk3288_crypto_ahash.c
-index 7185882..9b55585 100644
---- a/drivers/crypto/rockchip/rk3288_crypto_ahash.c
-+++ b/drivers/crypto/rockchip/rk3288_crypto_ahash.c
-@@ -204,7 +204,7 @@ static int rk_ahash_digest(struct ahash_request *req)
- 	ret = crypto_enqueue_request(&dev->queue, &req->base);
- 	spin_unlock_irqrestore(&dev->lock, flags);
- 
--	tasklet_schedule(&dev->crypto_tasklet);
-+	tasklet_schedule(&dev->queue_task);
- 
- 	/*
- 	 * it will take some time to process date after last dma transmission.
+Thanks.
+
 -- 
-1.9.1
+?ark Yao
