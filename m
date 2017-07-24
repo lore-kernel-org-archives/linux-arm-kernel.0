@@ -1,161 +1,106 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Jul 2017 12:32:10 -0700
-Subject: Problem with PHY state machine when using interrupts
-In-Reply-To: <e6a7a5df-b735-6f9c-6a2b-cded86ec6525@free.fr>
-References: <65b9f1f5-724c-cd03-1c39-59405e773efa@free.fr>
- <849513d9-c981-ec20-5a10-08c663d0aa37@free.fr>
- <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
- <e6a7a5df-b735-6f9c-6a2b-cded86ec6525@free.fr>
-Message-ID: <b0410a73-ff2d-ca06-93fa-17af2040c41c@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 24 Jul 2017 13:37:53 -0600
+Subject: [PATCH v1] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
+In-Reply-To: <20170721191103.GR4134@kernel.org>
+References: <1499878883-3066-1-git-send-email-mike.leach@linaro.org>
+ <CANLsYkxDLVONpuQpF6Zo-gUPf+WVt2v+DLNduq0mDMk0XAZ5hw@mail.gmail.com>
+ <20170721161916.GH4134@kernel.org> <20170721183533.GP4134@kernel.org>
+ <20170721183740.GQ4134@kernel.org> <20170721191103.GR4134@kernel.org>
+Message-ID: <CANLsYkx0AW0R21m04rE987bDtYmsd=r_w2ipWyPLs=StENhEiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2017 12:13 PM, Mason wrote:
-> On 24/07/2017 18:49, Florian Fainelli wrote:
-> 
->> On 07/24/2017 08:01 AM, Mason wrote:
+On 21 July 2017 at 13:11, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> Em Fri, Jul 21, 2017 at 03:37:40PM -0300, Arnaldo Carvalho de Melo escreveu:
+>> Em Fri, Jul 21, 2017 at 03:35:33PM -0300, Arnaldo Carvalho de Melo escreveu:
+>> > Em Fri, Jul 21, 2017 at 01:19:16PM -0300, Arnaldo Carvalho de Melo escreveu:
+>> > > Em Fri, Jul 21, 2017 at 08:50:09AM -0600, Mathieu Poirier escreveu:
+>> > > > On 12 July 2017 at 11:01, Mike Leach <mike.leach@linaro.org> wrote:
+>> > > > > The value passed into the perf.data file for the CONFIGR register in ETMv4
+>> > > > > was incorrectly being set to the command line options/ETMv3 value.
+>> > > > >
+>> > > > >                 info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
+>> > > > >                                                 coresight_get_trace_id(cpu);
+>> > > >
+>> > > > I have tested this patch on my side and things work as advertised now.
+>> > > >
+>> > > > Arnaldo, if you want to pick this up through your tree then:
+>> > > >
+>> > > > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> > > >
+>> > > > Otherwise I'll get this, whatever you prefer.
+>> > >
+>> > > I'll get it, thanks for the ping,
+>> >
+>> > It is breaking the build in one of my containers, one with fedora 24 and
+>> > a android toolchain from http://dl.google.com/android/repository/android-ndk-r12b-linux-x86_64.zip
+>> >
+>> > arch/arm/util/cs-etm.c: In function 'cs_etmv4_get_config':^M
+>> > arch/arm/util/cs-etm.c:289:24: error: 'ETM_OPT_RETSTK' undeclared (first use in this function)^M
+>> >   if (config_opts & BIT(ETM_OPT_RETSTK))
+>> >
+>> > It builds as
+>> >
+>> > NDK=/opt/android-ndk-r12b/
+>> > NDK_TOOLCHAIN=${NDK}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-
+>> > NDK_SYSROOT=${NDK}/platforms/android-24/arch-arm
+>> > make -C /git/linux/tools/perf O=/tmp/build/perf WERROR=0 CFLAGS=${CFLAGS} ARCH=arm CROSS_COMPILE=${NDK_TOOLCHAIN} EXTRA_CFLAGS="-pie --sysroot=${NDK_SYSROOT}"
+>> > Ideas?
 >>
->>>> When I set the link down via 'ip link set eth0 down'
->>>> (as opposed to pulling the Ethernet cable) things don't happen as expected:
->>>>
->>>> The driver's adjust_link() callback is never called, and doesn't
->>>> get a chance make some required changes. And when I set the link
->>>> up again, there is no network connectivity.
->>>>
->>>> I get this problem only if I enable interrupts on my PHY.
->>>> If I use polling, things work as expected.
->>>>
->>>>
->>>> When I set the link down, devinet_ioctl() eventually calls
->>>> ndo_set_rx_mode() and ndo_stop()
->>>>
->>>> In ndo_stop() the driver calls
->>>> phy_stop(phydev);
->>>> which disables interrupts and sets the state to HALTED.
->>>>
->>>> In phy_state_machine()
->>>> the PHY_HALTED case does call the adjust_link() callback:
->>>>
->>>> 		if (phydev->link) {
->>>> 			phydev->link = 0;
->>>> 			netif_carrier_off(phydev->attached_dev);
->>>> 			phy_adjust_link(phydev);
->>>> 			do_suspend = true;
->>>> 		}
->>>>
->>>> But it's not called when I use interrupts...
->>>>
->>>> Perhaps because there are no interrupts generated?
->>>> Or even if there were, they have been turned off by phy_stop?
->>>>
->>>> Basically, it seems like when I use interrupts,
->>>> the phy_state_machine() is not called on link down,
->>>> which breaks the MAC driver's expectations.
->>>>
->>>> Am I barking up the wrong tree?
->>>
->>> FWIW, the patch below solves my issue.
->>> Basically, we reset the MAC in open(), instead of probe().
->>>
->>> I also had to solve the issue of adjust_link() not being
->>> called by calling it explicitly in stop() instead of
->>> relying on phy_stop() to do it indirectly.
+>> Ok, it also fails on:
 >>
->> Which is of course absolutely not how it is intended to be used.
->> phy_stop() does the following:
+>>   14 debian:experimental-x-arm64: FAIL
+>
+> Ok, we need a definition for ETM_OPT_RETSTK, just like we have for the
+> other two...
+>
+> Nuked it from my perf/core branch, please resubmit.
+
+Symbol ETM_OPT_RETSTK was added as part of another patch [1] that is
+already in my CoreSight tree.  Do you mind if we make this one go
+through my tree then?
+
+Thanks,
+Mathieu
+
+[1]. https://www.spinics.net/lists/arm-kernel/msg593008.html
+
+> - Arnaldo
+>
 >>
->> - if the PHY was already HALTED do nothing and exit
->> - if it was not and an interrupt is valid for this PHY:  disable and
->> clear these interrupts
->> - set state to PHY_HALTED
+>> Same problem:
 >>
->> somehow an interrupt should be generated from doing this such that
->> phy_change(), invoked from phy_interrupt() should have a chance to run
->> and make the PHY state machine transition properly to PHY_HALTED.
-> 
-> I'm totally confused. Are you saying that phy_stop itself
-> should trigger an interrupt, or that the process of setting
-> the link down should generate an interrupt *before* we reach
-> phy_stop?
-
-My reading of the code, and because I don't actually have a system where
-PHY interrupts proper are used (only polling or PHY_IGNORE INTERRUPT) is
-that, yes, somehow calling phy_stop() should result in a PHY interrupt
-to be generated making the state machine move to PHY_HALTED.
-
-> 
-> I'm also perplex over this synchronous IRQ business.
-> Should I be looking for a way to trigger an IRQ in
-> software in the Atheros PHY?
-
-No, first understand the problem and what is going on before trying to
-workaround things in the PHY driver, there were questions for you as to
-what state the PHY state machine is left in we need to see that to
-understand how to possibly fix what you are seeing.
-
-> 
-> Before I forget: there is also an issue when using the PHY
-> in polling mode. The ndo_stop callback runs through phy_stop
-> and phy_disconnect too fast for the adjust_link() callback
-> to be called. My patch fixed that too, by calling
-> nb8800_link_reconfigure() explicitly.
-
-Most, if not all drivers should have this:
-
-ndo_open() calls phy_connect() or phy_attach() + phy_start() because
-that allows you to properly manage the PHY's power state and the state
-machine, the reciprocal is to have ndo_stop() call phy_disconnect() (and
-just that) which properly waits for the PHY state machine to be fully
-stopped.
-
-phy_stop() returns immediately but the PHY state machine only gets
-stopped asynchronously at a later time, either with an interrupt or with
-an explicit work queue scheduling. If you call phy_disconnect() right
-after, this cancels the work queue and it may not have run the
-adjust_link callback yet.
-
-> 
-> 
->> So from there can you check a few things:
+>>   CC       /tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o
+>>   CC       /tmp/build/perf/util/config.o
+>> arch/arm64/util/../../arm/util/cs-etm.c: In function 'cs_etmv4_get_config':
+>> arch/arm64/util/../../arm/util/cs-etm.c:289:24: error: 'ETM_OPT_RETSTK' undeclared (first use in this function)
+>>   if (config_opts & BIT(ETM_OPT_RETSTK))
+>>                         ^
+>> arch/arm64/util/../../arm/util/cs-etm.c:270:25: note: in definition of macro 'BIT'
+>>  #define BIT(N) (1UL << (N))
+>>                          ^
+>> arch/arm64/util/../../arm/util/cs-etm.c:289:24: note: each undeclared identifier is reported only once for each function it appears in
+>>   if (config_opts & BIT(ETM_OPT_RETSTK))
+>>                         ^
+>> arch/arm64/util/../../arm/util/cs-etm.c:270:25: note: in definition of macro 'BIT'
+>>  #define BIT(N) (1UL << (N))
+>>                          ^
+>> mv: cannot stat '/tmp/build/perf/arch/arm64/util/../../arm/util/.cs-etm.o.tmp': No such file or directory
+>> /git/linux/tools/build/Makefile.build:101: recipe for target '/tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o' failed
+>> make[6]: *** [/tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o] Error 1
+>> /git/linux/tools/build/Makefile.build:144: recipe for target 'util' failed
+>> make[5]: *** [util] Error 2
+>> /git/linux/tools/build/Makefile.build:144: recipe for target 'arm64' failed
+>> make[4]: *** [arm64] Error 2
+>> /git/linux/tools/build/Makefile.build:144: recipe for target 'arch' failed
+>> make[3]: *** [arch] Error 2
+>> make[3]: *** Waiting for unfinished jobs....
+>>   CC       /tmp/build/perf/util/ctype.o
 >>
->> - is such an interrupt actually generated?
->> - if you turn on dynamic debug prints for drivers/net/phy/phy.c where do
->> we leave the PHY state machine and what state is it in when you call
->> ifconfig up again?
-> 
-> The only interrupts I've ever seen the PHY generate are
-> on plugging/unplugging the Ethernet cable.
-> 
-> Looking at the driver and datasheet...
-> http://elixir.free-electrons.com/linux/v4.13-rc2/source/drivers/net/phy/at803x.c#L312
-> 		value |= AT803X_INTR_ENABLE_AUTONEG_ERR;
-> 		value |= AT803X_INTR_ENABLE_SPEED_CHANGED;
-> 		value |= AT803X_INTR_ENABLE_DUPLEX_CHANGED;
-> 		value |= AT803X_INTR_ENABLE_LINK_FAIL;
-> 		value |= AT803X_INTR_ENABLE_LINK_SUCCESS;
-> 
-> And the interrupts reasons supported by the PHY are:
-> #define AT803X_INTR_ENABLE_AUTONEG_ERR		BIT(15)
-> #define AT803X_INTR_ENABLE_SPEED_CHANGED	BIT(14)
-> #define AT803X_INTR_ENABLE_DUPLEX_CHANGED	BIT(13)
-> #define AT803X_INTR_ENABLE_PAGE_RECEIVED	BIT(12)
-> #define AT803X_INTR_ENABLE_LINK_FAIL		BIT(11)
-> #define AT803X_INTR_ENABLE_LINK_SUCCESS		BIT(10)
-> #define AT803X_INTR_ENABLE_WIRESPEED_DOWNGRADE	BIT(5)
-> #define AT803X_INTR_ENABLE_POLARITY_CHANGED	BIT(1)
-> #define AT803X_INTR_ENABLE_WOL			BIT(0)
-> 
-> These all seem to be external reasons (from the peer).
-> 
-> I did enable debug logs in drivers/net/phy/phy.c
-> to trace the state machine, and it is not called
-> at all on set link down, so it remains in state
-> RUNNING (both in polling and interrupt modes).
-> 
-> IIRC, this used to work on the 2-core board, but breaks
-> on the 4-core board. Could this be some kind of race?
-
-See what I just replied, phy_stop() then phy_disconnect() is "racy"
-because there is a work queue involved. If I can read the code so can you.
--- 
-Florian
+>> Builds with:
+>>
+>> ARCH=arm64
+>> TARGET=aarch64-linux-gnu
+>> make ARCH=${ARCH} CROSS_COMPILE=${TARGET}- -C /git/linux/tools/perf O=/tmp/build/perf
+>>
+>> - Arnaldo
