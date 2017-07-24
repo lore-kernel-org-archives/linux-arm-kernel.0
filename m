@@ -1,99 +1,65 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 24 Jul 2017 21:59:00 +0800
-Subject: [PATCH v3 05/10] mmc: sunxi: Support MMC DDR52 transfer mode with new
- timing mode
+Date: Mon, 24 Jul 2017 21:59:04 +0800
+Subject: [PATCH v3 09/10] ARM: dts: sun8i: a83t: cubietruck-plus: Enable
+ micro-SD card and eMMC
 In-Reply-To: <20170724135905.28855-1-wens@csie.org>
 References: <20170724135905.28855-1-wens@csie.org>
-Message-ID: <20170724135905.28855-6-wens@csie.org>
+Message-ID: <20170724135905.28855-10-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC controller can support DDR52 transfers under the new timing
-mode. According to the BSP kernel, the module clock has to be double
-the card clock, regardless of the bus width. The default timings in
-the hardware can be used.
-
-This also reworks the code setting the internal divider, getting rid
-of a extra conditional.
+Now that we support the MMC controllers on the A83T SoC, we can enable
+them on some boards.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 30 ++++++++++++++++++------------
- 1 file changed, 18 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 27 ++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index c8a60e43dc43..11587a69a1fd 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -755,7 +755,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- {
- 	struct mmc_host *mmc = host->mmc;
- 	long rate;
--	u32 rval, clock = ios->clock;
-+	u32 rval, clock = ios->clock, div = 1;
- 	int ret;
+diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+index cff33454fc24..163ddf8868b5 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+@@ -83,6 +83,13 @@
+ 		};
+ 	};
  
- 	ret = sunxi_mmc_oclk_onoff(host, 0);
-@@ -768,10 +768,21 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	if (!ios->clock)
- 		return 0;
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
+ 	sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "On-board SPDIF";
+@@ -102,6 +109,26 @@
+ 	};
+ };
  
--	/* 8 bit DDR requires a higher module clock */
-+	/*
-+	 * Under the old timing mode, 8 bit DDR requires the module
-+	 * clock to be double the card clock. Under the new timing
-+	 * mode, all DDR modes require a doubled module clock.
-+	 *
-+	 * We currently only support the standard MMC DDR52 mode.
-+	 * This block should be updated once support for other DDR
-+	 * modes is added.
-+	 */
- 	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
--	    ios->bus_width == MMC_BUS_WIDTH_8)
-+	    (host->use_new_timings ||
-+	     ios->bus_width == MMC_BUS_WIDTH_8)) {
-+		div = 2;
- 		clock <<= 1;
-+	}
- 
- 	if (host->use_new_timings) {
- 		ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
-@@ -799,15 +810,10 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		return ret;
- 	}
- 
--	/* clear internal divider */
-+	/* set internal divider */
- 	rval = mmc_readl(host, REG_CLKCR);
- 	rval &= ~0xff;
--	/* set internal divider for 8 bit eMMC DDR, so card clock is right */
--	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
--	    ios->bus_width == MMC_BUS_WIDTH_8) {
--		rval |= 1;
--		rate >>= 1;
--	}
-+	rval |= div - 1;
- 	mmc_writel(host, REG_CLKCR, rval);
- 
- 	if (host->use_new_timings) {
-@@ -838,7 +844,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		return ret;
- 
- 	/* And we just enabled our clock back */
--	mmc->actual_clock = rate;
-+	mmc->actual_clock = rate / div;
- 
- 	return 0;
- }
-@@ -1315,7 +1321,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
- 	mmc->caps	       |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
- 				  MMC_CAP_ERASE | MMC_CAP_SDIO_IRQ;
- 
--	if (host->cfg->clk_delays)
-+	if (host->cfg->clk_delays || host->use_new_timings)
- 		mmc->caps      |= MMC_CAP_1_8V_DDR;
- 
- 	ret = mmc_of_parse(mmc);
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	status = "okay";
++};
++
+ &spdif {
+ 	status = "okay";
+ };
 -- 
 2.13.3
