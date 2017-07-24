@@ -1,113 +1,52 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 24 Jul 2017 22:49:26 +0200
-Subject: [PATCH v4 10/12] ASoC: wm9705: add private structure
-In-Reply-To: <20170724204928.29505-1-robert.jarzmik@free.fr>
-References: <20170724204928.29505-1-robert.jarzmik@free.fr>
-Message-ID: <20170724204928.29505-11-robert.jarzmik@free.fr>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Jul 2017 14:01:55 -0700
+Subject: [PATCH v2 0/4] thermal: add brcmstb AVS TMON driver
+In-Reply-To: <20170721192735.6546-1-code@mmayer.net>
+References: <20170721192735.6546-1-code@mmayer.net>
+Message-ID: <d2696633-574c-9505-c887-77f6c291e209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a private data structure. This is a preparation for a codec which
-would need an another data on top of snd_ac97, which will be the case
-when an MFD wm97xx device will probe wm9705.
+On 07/21/2017 12:27 PM, Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
+> 
+> This series adds the brcmstb AVS TMON driver.
+> 
+> The driver was originally written by Brian Norris.
+> 
+> v1 of this series can be found at https://lkml.org/lkml/2017/6/5/921
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
----
- sound/soc/codecs/wm9705.c | 36 ++++++++++++++++++++++++------------
- 1 file changed, 24 insertions(+), 12 deletions(-)
+Rui, Eduardo, I can take patches 3 and 4 through the Broadcom ARM/ARM64
+SoC pull requests while you take patches 1 and 2, thanks!
 
-diff --git a/sound/soc/codecs/wm9705.c b/sound/soc/codecs/wm9705.c
-index f6d5c0f2aea5..08477d040028 100644
---- a/sound/soc/codecs/wm9705.c
-+++ b/sound/soc/codecs/wm9705.c
-@@ -24,6 +24,10 @@
- #define WM9705_VENDOR_ID 0x574d4c05
- #define WM9705_VENDOR_ID_MASK 0xffffffff
- 
-+struct wm9705_priv {
-+	struct snd_ac97 *ac97;
-+};
-+
- static const struct reg_default wm9705_reg_defaults[] = {
- 	{ 0x02, 0x8000 },
- 	{ 0x04, 0x8000 },
-@@ -292,10 +296,10 @@ static int wm9705_soc_suspend(struct snd_soc_codec *codec)
- 
- static int wm9705_soc_resume(struct snd_soc_codec *codec)
- {
--	struct snd_ac97 *ac97 = snd_soc_codec_get_drvdata(codec);
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 	int ret;
- 
--	ret = snd_ac97_reset(ac97, true, WM9705_VENDOR_ID,
-+	ret = snd_ac97_reset(wm9705->ac97, true, WM9705_VENDOR_ID,
- 		WM9705_VENDOR_ID_MASK);
- 	if (ret < 0)
- 		return ret;
-@@ -311,38 +315,38 @@ static int wm9705_soc_resume(struct snd_soc_codec *codec)
- 
- static int wm9705_soc_probe(struct snd_soc_codec *codec)
- {
--	struct snd_ac97 *ac97;
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 	struct regmap *regmap;
- 	int ret;
- 
--	ac97 = snd_soc_new_ac97_codec(codec, WM9705_VENDOR_ID,
--		WM9705_VENDOR_ID_MASK);
--	if (IS_ERR(ac97)) {
-+	wm9705->ac97 = snd_soc_new_ac97_codec(codec, WM9705_VENDOR_ID,
-+					      WM9705_VENDOR_ID_MASK);
-+	if (IS_ERR(wm9705->ac97)) {
- 		dev_err(codec->dev, "Failed to register AC97 codec\n");
--		return PTR_ERR(ac97);
-+		return PTR_ERR(wm9705->ac97);
- 	}
- 
--	regmap = regmap_init_ac97(ac97, &wm9705_regmap_config);
-+	regmap = regmap_init_ac97(wm9705->ac97, &wm9705_regmap_config);
- 	if (IS_ERR(regmap)) {
- 		ret = PTR_ERR(regmap);
- 		goto err_free_ac97_codec;
- 	}
- 
--	snd_soc_codec_set_drvdata(codec, ac97);
-+	snd_soc_codec_set_drvdata(codec, wm9705->ac97);
- 	snd_soc_codec_init_regmap(codec, regmap);
- 
- 	return 0;
- err_free_ac97_codec:
--	snd_soc_free_ac97_codec(ac97);
-+	snd_soc_free_ac97_codec(wm9705->ac97);
- 	return ret;
- }
- 
- static int wm9705_soc_remove(struct snd_soc_codec *codec)
- {
--	struct snd_ac97 *ac97 = snd_soc_codec_get_drvdata(codec);
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 
- 	snd_soc_codec_exit_regmap(codec);
--	snd_soc_free_ac97_codec(ac97);
-+	snd_soc_free_ac97_codec(wm9705->ac97);
- 	return 0;
- }
- 
-@@ -364,6 +368,14 @@ static const struct snd_soc_codec_driver soc_codec_dev_wm9705 = {
- 
- static int wm9705_probe(struct platform_device *pdev)
- {
-+	struct wm9705_priv *wm9705;
-+
-+	wm9705 = devm_kzalloc(&pdev->dev, sizeof(*wm9705), GFP_KERNEL);
-+	if (wm9705 == NULL)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, wm9705);
-+
- 	return snd_soc_register_codec(&pdev->dev,
- 			&soc_codec_dev_wm9705, wm9705_dai, ARRAY_SIZE(wm9705_dai));
- }
+> 
+> Changes since v1:
+> - Fixed wording in binding document
+> - Fixed lincensing to consistently mention GPL v2
+> - Use thermal_zone_get_slope() and thermal_zone_get_offset()
+> - Some minor clean-ups
+> 
+> Brian Norris (2):
+>   Documentation: devicetree: add binding for Broadcom STB AVS TMON
+>   thermal: add brcmstb AVS TMON driver
+> 
+> Markus Mayer (2):
+>   ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
+>   arm64: defconfig: add CONFIG_BRCMSTB_THERMAL
+> 
+>  .../devicetree/bindings/thermal/brcm,avs-tmon.txt  |  20 ++
+>  MAINTAINERS                                        |   8 +
+>  arch/arm/configs/multi_v7_defconfig                |   1 +
+>  arch/arm64/configs/defconfig                       |   1 +
+>  drivers/thermal/Kconfig                            |   2 +-
+>  drivers/thermal/broadcom/Kconfig                   |   7 +
+>  drivers/thermal/broadcom/Makefile                  |   1 +
+>  drivers/thermal/broadcom/brcmstb_thermal.c         | 386 +++++++++++++++++++++
+>  8 files changed, 425 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+>  create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
+> 
+
+
 -- 
-2.11.0
+Florian
