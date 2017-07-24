@@ -1,233 +1,30 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 24 Jul 2017 12:22:24 +0100
-Subject: No Ethernet on Raspberry Pi 3 in v4.13-rc1
-In-Reply-To: <5650979e-ea55-0337-2edd-d2c3e8ad0e37@suse.de>
-References: <5650979e-ea55-0337-2edd-d2c3e8ad0e37@suse.de>
-Message-ID: <b849a4dc-a095-6bb4-caf1-a1f7470bed91@arm.com>
+From: jack@suse.cz (Jan Kara)
+Date: Mon, 24 Jul 2017 13:25:30 +0200
+Subject: [PATCH v4 1/5] mm: add mkwrite param to vm_insert_mixed()
+In-Reply-To: <20170721223956.29485-2-ross.zwisler@linux.intel.com>
+References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
+ <20170721223956.29485-2-ross.zwisler@linux.intel.com>
+Message-ID: <20170724112530.GI652@quack2.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+> @@ -1658,14 +1658,28 @@ static int insert_pfn(struct vm_area_struct *vma, unsigned long addr,
+>  	if (!pte)
+>  		goto out;
+>  	retval = -EBUSY;
+> -	if (!pte_none(*pte))
+> -		goto out_unlock;
+> +	if (!pte_none(*pte)) {
+> +		if (mkwrite) {
+> +			if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
 
-On 22/07/17 13:29, Andreas F?rber wrote:
-> Hello,
-> 
-> With arm64 4.13-rc1 I get no eth0 device on Pi3 (openSUSE Tumbleweed).
-> The v4.13-rc1 DT works okay with a 4.12 kernel.
-> 
-> Possibly related:
-> 
-> [   15.916350] OF: /soc/usb at 7e980000: could not get #phy-cells for /phy
-> 
-> [   16.496662] usb 1-1: new high-speed USB device number 2 using dwc2
-> [   16.502988] dwc2 3f980000.usb: Cannot do DMA to address
-> 0x00000000335da400
+Is the WARN_ON_ONCE() really appropriate here? Your testcase with private
+mappings has triggered this situation if I'm right...
 
-This is from SWIOTLB's map_single(), which means whatever device was
-passed into dma_map_single() when mapping the URB had a DMA mask smaller
-than 30 bits (or none at all), which sounds wrong and is almost
-certainly the root of the problem (i.e. it probably wasn't the actual
-HCD device described in DT and set up by of_dma_configure()). However,
-arm64's __swiotlb_map_page() still shouldn't be trying to perform cache
-maintenance on the error value returned, which looks to be where the
-actual splat below hails from - leave that one with me ;)
+Otherwise the patch looks good to me.
 
-Robin.
+								Honza
 
-> [   16.510035] Unable to handle kernel paging request at virtual address
-> ffff800000000000
-> [   16.518103] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff0000096ac000
-> [   16.524995] [ffff800000000000] *pgd=0000000036ff7003,
-> *pud=0000000036ff6003, *pmd=0000000036ff5003, *pte=0000000000000000
-> [   16.536229] Internal error: Oops: 96000147 [#1] SMP
-> [   16.536243] Modules linked in: brcmutil cfg80211 soundcore
-> drm_kms_helper rfkill drm fb_sys_fops syscopyarea dwc2 sysfillrect
-> sysimgblt udc_core usbcore i2c_bcm2835 bcm2835_rng spi_bcm2835
-> pwm_bcm2835 bcm2835_wdt uio_pdrv_genirq uio crc32_ce phy_generic
-> leds_gpio mmc_block sdhci_iproc sdhci_pltfm sdhci bcm2835 mmc_core
-> bcm2835_dma sg efivarfs
-> [   16.536335] CPU: 1 PID: 34 Comm: kworker/1:1 Not tainted
-> 4.13.0-rc1-2.g9c198f2-default #1
-> [   16.536338] Hardware name: raspberrypi rpi/rpi, BIOS 2017.07-rc3
-> 07/10/2017
-> [   16.536560] Workqueue: usb_hub_wq hub_event [usbcore]
-> [   16.536568] task: ffff800034cc6100 task.stack: ffff800034ccc000
-> [   16.536585] PC is at __clean_dcache_area_poc+0x20/0x40
-> [   16.536592] LR is at __swiotlb_map_page+0x9c/0xb8
-> [   16.536597] pc : [<ffff00000809c160>] lr : [<ffff00000809a254>]
-> pstate: 80000145
-> [   16.536600] sp : ffff800034ccf8f0
-> [   16.536603] x29: ffff800034ccf8f0 x28: ffff000000b2cfe8
-> [   16.536611] x27: 0000000000000080 x26: ffff8000335a6800
-> [   16.536619] x25: 0000000080000080 x24: 0000000000000400
-> [   16.536626] x23: 0000000000000001 x22: 0000000000000008
-> [   16.536633] x21: 00000000c0000000 x20: 0000000000000000
-> [   16.536640] x19: ffff800034cf0c10 x18: ffffffffffffffff
-> [   16.536647] x17: 0000000000003000 x16: ffff7e0000bd0080
-> [   16.536654] x15: ffff000009429c08 x14: ffff0000895ba17f
-> [   16.536662] x13: ffff0000095ba18d x12: ffff000009450000
-> [   16.536669] x11: ffff00000942a078 x10: ffff000008624e28
-> [   16.536676] x9 : 00000000ffffffd0 x8 : 0000000000000017
-> [   16.536683] x7 : 3030303030307830 x6 : 00000000000000f6
-> [   16.536690] x5 : 0000000000000000 x4 : 0000000000000002
-> [   16.536696] x3 : 000000000000003f x2 : 0000000000000040
-> [   16.536703] x1 : ffff800000000008 x0 : ffff800000000000
-> [   16.536712] Process kworker/1:1 (pid: 34, stack limit =
-> 0xffff800034ccc000)
-> [   16.536718] Stack: (0xffff800034ccf8f0 to 0xffff800034cd0000)
-> [   16.536724] f8e0:                                   ffff800034ccf930
-> ffff000000b028c0
-> [   16.536732] f900: ffff800026549100 0000000001400000 ffff80003446fc00
-> 0000000001400000
-> [   16.536739] f920: 0000000000000002 0000000000000000 ffff800034ccf980
-> ffff000000b9784c
-> [   16.536746] f940: ffff800026549100 0000000001400000 ffff80003446fc00
-> 0000000001400000
-> [   16.536754] f960: ffff800034ccfa80 ffff000008669290 0000000000000006
-> ffff8000335a6898
-> [   16.536761] f980: ffff800034ccf9b0 ffff000000b038d8 ffff800026549100
-> ffff80003446fc00
-> [   16.536769] f9a0: ffff000009429c08 ffff800032b65800 ffff800034ccfa90
-> ffff000000b0574c
-> [   16.536776] f9c0: ffff800026549100 ffff8000335a6800 0000000000000000
-> 0000000001400000
-> [   16.536783] f9e0: ffff800034ccfaf0 00000000ffffffd8 ffff800036f60080
-> 4554535953425553
-> [   16.536791] fa00: 4544006273753d4d ffff000000b2cfe8 ffff00312d313a62
-> ffff800034ccfb00
-> [   16.536799] fa20: ffff800034ccfa50 ffff00000814c7f4 ffff800034ccfa50
-> ffff00000814c804
-> [   16.536807] fa40: ffff800036f60080 0000000000000000 ffff800034ccfa80
-> ffff00000814de54
-> [   16.536814] fa60: ffff800034ccfb00 0000000000000032 ffff80002649c400
-> 0000000000040d00
-> [   16.536821] fa80: ffff800034ccfb20 0000000000040d00 ffff800034ccfaf0
-> ffff000000b06184
-> [   16.536829] faa0: ffff800026549100 ffff800034ccfb38 0000000000000000
-> ffff800034ccfbcc
-> [   16.536836] fac0: 0000000000001388 ffff800033175800 ffff800034ccfaf0
-> ffff000000b06170
-> [   16.536843] fae0: ffff800026549100 0000000001400000 ffff800034ccfb60
-> ffff000000b06324
-> [   16.536850] fb00: ffff8000335da400 0000000000000040 0000000000000000
-> 0000000000000100
-> [   16.536858] fb20: 0000000000000006 ffff800033175800 0000000080000080
-> ffff800000000000
-> [   16.536865] fb40: ffff800000000000 ffff800034ccfb48 ffff800034ccfb48
-> 0000000000000040
-> [   16.536873] fb60: ffff800034ccfbe0 ffff000000afaa54 ffff8000335a6800
-> ffff8000264ac000
-> [   16.536879] fb80: ffff80003446fc00 0000000000000001 0000000000000003
-> 0000000000000002
-> [   16.536887] fba0: ffff800033175800 0000000080000080 0000000000000000
-> 0000000000000002
-> [   16.536894] fbc0: 0000000000000000 ffff800032b65800 ffff800000001388
-> ffff800032b65800
-> [   16.536901] fbe0: ffff800034ccfc50 ffff000000afe7d0 ffff8000264ac000
-> 0000000000000001
-> [   16.536909] fc00: ffff800032b65800 0000000000000000 ffff80002649c400
-> ffff80003446fc30
-> [   16.536916] fc20: ffff80003446fc00 ffff80003446fc00 ffff8000335a6800
-> ffff80002649c718
-> [   16.536924] fc40: 0000000300000001 0000003200000000 ffff800034ccfce0
-> ffff000000aff714
-> [   16.536931] fc60: ffff8000264ac000 0000000000000001 ffff8000264ac058
-> ffff80002649c718
-> [   16.536939] fc80: ffff80002649c718 0000000000000101 0000000000000000
-> ffff80002649c408
-> [   16.536946] fca0: 0000000000000000 0000000000000000 ffff000000b2ed28
-> 0000006400aff34c
-> [   16.536953] fcc0: ffff800000000002 ffff000000b2d018 ffff8000264ac000
-> 0000000000000004
-> [   16.536961] fce0: ffff800034ccfdc0 ffff0000080e8c0c ffff8000264ac1d0
-> ffff8000357a4f00
-> [   16.536968] fd00: ffff7dffbffa9100 0000000000000000 ffff800036f67980
-> 0000000000000000
-> [   16.536975] fd20: 00000000fffffef7 ffff000008b77728 0000000000000000
-> 0000000000000000
-> [   16.536982] fd40: ffff8000264ac170 ffff8000357a4f00 ffff800036f6bd00
-> 0000000000000000
-> [   16.536990] fd60: ffff000000b2efc8 ffff800032b658f8 ffff8000344a5c00
-> ffff8000264ac058
-> [   16.536997] fd80: ffff8000264ac1d0 0000000000000000 ffff800032b65800
-> ffff8000264ac070
-> [   16.537004] fda0: ffff8000264ac060 ffff8000344a5c30 ffff8000264ac1d0
-> ffff800000000101
-> [   16.537012] fdc0: ffff800034ccfe10 ffff0000080e8ec0 ffff8000357a4f00
-> ffff800036f67980
-> [   16.537020] fde0: ffff8000357a4f30 ffff0000095b5800 ffff800036f679a0
-> ffff000009427000
-> [   16.537027] fe00: ffff8000357a4f00 ffff0000080e8f54 ffff800034ccfe70
-> ffff0000080effa8
-> [   16.537035] fe20: ffff8000357a0680 ffff800034c46680 ffff800034cc6100
-> ffff000008b77728
-> [   16.537042] fe40: ffff800035703d00 ffff8000357a4f00 ffff0000080e8e70
-> ffff800034c46680
-> [   16.537050] fe60: ffff800034ccfe70 ffff0000080eff4c 0000000000000000
-> ffff0000080836c0
-> [   16.537057] fe80: ffff0000080efe70 ffff8000357a0680 0000000000000000
-> 0000000000000000
-> [   16.537063] fea0: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537070] fec0: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537076] fee0: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537083] ff00: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537089] ff20: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537096] ff40: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537102] ff60: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537109] ff80: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537116] ffa0: 0000000000000000 0000000000000000 0000000000000000
-> 0000000000000000
-> [   16.537122] ffc0: 0000000000000000 0000000000000005 0000000000000000
-> 0000000000000000
-> [   16.537129] ffe0: 0000000000000000 0000000000000000 57810d82330b7058
-> a6c1bc314470bbc6
-> [   16.537133] Call trace:
-> [   16.537139] Exception stack(0xffff800034ccf720 to 0xffff800034ccf850)
-> [   16.537147] f720: ffff800034cf0c10 0001000000000000 ffff800034ccf8f0
-> ffff00000809c160
-> [   16.537154] f740: ffff800034ccf7b0 ffff800034ccf7b0 ffff800034ccf780
-> 00000000ffffffd8
-> [   16.537162] f760: ffff800034ccf7b0 ffff800034ccf7b0 ffff800034ccf780
-> 00000000ffffffd8
-> [   16.537169] f780: ffff0000096940a8 ffff000000bac320 ffff800034cec780
-> ffff800034ccf800
-> [   16.537176] f7a0: ffff00000968e0a0 0000000000000008 ffff800034ccf7e0
-> ffff000008669664
-> [   16.537183] f7c0: ffff800000000000 ffff800000000008 0000000000000040
-> 000000000000003f
-> [   16.537190] f7e0: 0000000000000002 0000000000000000 00000000000000f6
-> 3030303030307830
-> [   16.537197] f800: 0000000000000017 00000000ffffffd0 ffff000008624e28
-> ffff00000942a078
-> [   16.537204] f820: ffff000009450000 ffff0000095ba18d ffff0000895ba17f
-> ffff000009429c08
-> [   16.537209] f840: ffff7e0000bd0080 0000000000003000
-> [   16.537219] [<ffff00000809c160>] __clean_dcache_area_poc+0x20/0x40
-> [   16.537422] [<ffff000000b028c0>] usb_hcd_map_urb_for_dma+0x1e8/0x598
-> [usbcore]
-> [   16.537544] [<ffff000000b9784c>] dwc2_map_urb_for_dma+0x54/0xf0 [dwc2]
-> [   16.537726] [<ffff000000b038d8>] usb_hcd_submit_urb+0xc0/0xb10 [usbcore]
-> [   16.537902] [<ffff000000b0574c>] usb_submit_urb+0x23c/0x588 [usbcore]
-> [   16.538078] [<ffff000000b06184>] usb_start_wait_urb+0x54/0x148 [usbcore]
-> [   16.538253] [<ffff000000b06324>] usb_control_msg+0xac/0x108 [usbcore]
-> [   16.538427] [<ffff000000afaa54>] hub_port_init+0x194/0xb38 [usbcore]
-> [   16.538602] [<ffff000000afe7d0>] hub_port_connect+0x128/0x8e8 [usbcore]
-> [   16.538777] [<ffff000000aff714>] hub_event+0x784/0xa38 [usbcore]
-> [   16.538792] [<ffff0000080e8c0c>] process_one_work+0x1e4/0x448
-> [   16.538800] [<ffff0000080e8ec0>] worker_thread+0x50/0x488
-> [   16.538811] [<ffff0000080effa8>] kthread+0x138/0x140
-> [   16.538821] [<ffff0000080836c0>] ret_from_fork+0x10/0x50
-> [   16.538831] Code: 9ac32042 8b010001 d1000443 8a230000 (d50b7a20)
-> [   16.538883] ---[ end trace 7c524f10d9e752dc ]---
-> 
-> Regards,
-> Andreas
-> 
+-- 
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
