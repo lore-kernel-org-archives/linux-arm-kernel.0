@@ -1,83 +1,42 @@
-From: ross.zwisler@linux.intel.com (Ross Zwisler)
-Date: Mon, 24 Jul 2017 09:13:03 -0600
-Subject: [PATCH v4 1/5] mm: add mkwrite param to vm_insert_mixed()
-In-Reply-To: <20170724111531.GG652@quack2.suse.cz>
-References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
- <20170721223956.29485-2-ross.zwisler@linux.intel.com>
- <CAA9_cmdoEVx88FCuCSOB1Qmom_X8uJPB4-uUx7MA3X5H4fZ=GQ@mail.gmail.com>
- <20170724111531.GG652@quack2.suse.cz>
-Message-ID: <20170724151303.GA1639@linux.intel.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Mon, 24 Jul 2017 09:05:16 -0600
+Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
+In-Reply-To: <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
+References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
+ <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
+ <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
+ <0260e398-bd8e-6615-6d5c-1f7c07b6fc09@huawei.com>
+ <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
+ <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
+Message-ID: <20170724090516.2e0f0d2a@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 01:15:31PM +0200, Jan Kara wrote:
-> On Sat 22-07-17 09:21:31, Dan Williams wrote:
-> > On Fri, Jul 21, 2017 at 3:39 PM, Ross Zwisler
-> > <ross.zwisler@linux.intel.com> wrote:
-> > > To be able to use the common 4k zero page in DAX we need to have our PTE
-> > > fault path look more like our PMD fault path where a PTE entry can be
-> > > marked as dirty and writeable as it is first inserted, rather than waiting
-> > > for a follow-up dax_pfn_mkwrite() => finish_mkwrite_fault() call.
-> > >
-> > > Right now we can rely on having a dax_pfn_mkwrite() call because we can
-> > > distinguish between these two cases in do_wp_page():
-> > >
-> > >         case 1: 4k zero page => writable DAX storage
-> > >         case 2: read-only DAX storage => writeable DAX storage
-> > >
-> > > This distinction is made by via vm_normal_page().  vm_normal_page() returns
-> > > false for the common 4k zero page, though, just as it does for DAX ptes.
-> > > Instead of special casing the DAX + 4k zero page case, we will simplify our
-> > > DAX PTE page fault sequence so that it matches our DAX PMD sequence, and
-> > > get rid of the dax_pfn_mkwrite() helper.  We will instead use
-> > > dax_iomap_fault() to handle write-protection faults.
-> > >
-> > > This means that insert_pfn() needs to follow the lead of insert_pfn_pmd()
-> > > and allow us to pass in a 'mkwrite' flag.  If 'mkwrite' is set insert_pfn()
-> > > will do the work that was previously done by wp_page_reuse() as part of the
-> > > dax_pfn_mkwrite() call path.
-> > >
-> > > Signed-off-by: Ross Zwisler <ross.zwisler@linux.intel.com>
-> > > ---
-> > >  drivers/dax/device.c                    |  2 +-
-> > >  drivers/gpu/drm/exynos/exynos_drm_gem.c |  3 ++-
-> > >  drivers/gpu/drm/gma500/framebuffer.c    |  2 +-
-> > >  drivers/gpu/drm/msm/msm_gem.c           |  3 ++-
-> > >  drivers/gpu/drm/omapdrm/omap_gem.c      |  6 ++++--
-> > >  drivers/gpu/drm/ttm/ttm_bo_vm.c         |  2 +-
-> > >  fs/dax.c                                |  2 +-
-> > >  include/linux/mm.h                      |  2 +-
-> > >  mm/memory.c                             | 27 +++++++++++++++++++++------
-> > >  9 files changed, 34 insertions(+), 15 deletions(-)
-> > >
-> > > diff --git a/drivers/dax/device.c b/drivers/dax/device.c
-> > > index e9f3b3e..3973521 100644
-> > > --- a/drivers/dax/device.c
-> > > +++ b/drivers/dax/device.c
-> > > @@ -273,7 +273,7 @@ static int __dev_dax_pte_fault(struct dev_dax *dev_dax, struct vm_fault *vmf)
-> > >
-> > >         pfn = phys_to_pfn_t(phys, dax_region->pfn_flags);
-> > >
-> > > -       rc = vm_insert_mixed(vmf->vma, vmf->address, pfn);
-> > > +       rc = vm_insert_mixed(vmf->vma, vmf->address, pfn, false);
-> > 
-> > Ugh, I generally find bool flags unreadable. They place a tax on
-> > jumping to function definition to recall what true and false mean. If
-> > we want to go this 'add an argument' route can we at least add an enum
-> > like:
-> > 
-> > enum {
-> >     PTE_MKDIRTY,
-> >     PTE_MKCLEAN,
-> > };
-> > 
-> > ...to differentiate the two cases?
-> 
-> So how I usually deal with this is that I create e.g.:
-> 
-> __vm_insert_mixed() that takes the bool argument, make vm_insert_mixed()
-> pass false, and vm_insert_mixed_mkwrite() pass true. That way there's no
-> code duplication, old call sites can stay unchanged, the naming clearly
-> says what's going on...
+On Sat, 22 Jul 2017 12:19:38 +0800
+Ding Tianhong <dingtianhong@huawei.com> wrote:
 
-Ah, that does seem cleaner.  I'll try that for v5.
+> Hi Sinan, Bjorn:
+> 
+> On 2017/7/14 21:54, Sinan Kaya wrote:
+> > On 7/13/2017 9:26 PM, Ding Tianhong wrote:  
+> >> There is no code to enable the PCIe Relaxed Ordering bit in the configuration space,
+> >> it is only be enable by default according to the PCIe Standard Specification, what we
+> >> do is to distinguish the RC problematic platform and clear the Relaxed Ordering bit
+> >> to tell the PCIe EP don't send any TLPs with Relaxed Ordering Attributes to the Root
+> >> Complex.  
+> > 
+> > Maybe, you should change the patch commit as 
+> > "Disable PCIe Relaxed Ordering if not supported"...  
+> 
+> I agree that to use the new commit title as your suggested, thanks. :)
+> 
+> @Bjorn do you want me to spawn a new patchset with the new commit title
+> and the Reviewed-by from Casey on the patch 3, or maybe you could pick this
+> up and modify it own ? thanks.
+
+Hi Ding,
+
+Bjorn is currently on holiday so it might be a good idea to respin the
+series with any updates so nothing is lost.  Thanks,
+
+Alex
