@@ -1,79 +1,40 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 24 Jul 2017 18:10:38 +0200
-Subject: [PATCH v2 1/3] iio: adc: stm32: fix common clock rate
-In-Reply-To: <1500912640-23927-1-git-send-email-fabrice.gasnier@st.com>
-References: <1500912640-23927-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1500912640-23927-2-git-send-email-fabrice.gasnier@st.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 24 Jul 2017 11:14:11 -0500
+Subject: [PATCH] Documentation: mtk-quadspi: update DT bindings
+In-Reply-To: <1500607619-21969-2-git-send-email-guochun.mao@mediatek.com>
+References: <1500607619-21969-1-git-send-email-guochun.mao@mediatek.com>
+ <1500607619-21969-2-git-send-email-guochun.mao@mediatek.com>
+Message-ID: <20170724161411.6fjl7eee4auvco5z@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes: 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
+On Fri, Jul 21, 2017 at 11:26:59AM +0800, Guochun Mao wrote:
+> Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
+> for nor flash node's compatible.
 
-ADC clock input is provided to internal prescaler (that decreases its
-frequency). It's then used as reference clock for conversions.
+The subject could be improved because it is exactly the same as the last 
+patch adding the 2701 and 7623. Also, use "dt-bindings: mtd: ..." for 
+the subject prefix.
 
-- Fix common clock rate used then by stm32-adc sub-devices. Take common
-  prescaler into account. Currently, rate is used to set "boost" mode.
-  It may unnecessarily be set. This impacts power consumption.
-- Fix ADC max clock rate on STM32H7 (fADC from datasheet). Currently,
-  prescaler may be set too low. This can result in ADC reference
-  clock used for conversion to exceed max allowed clock frequency.
-
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
-Changes in v2:
-- Better description of wrong things being fixed.
----
- drivers/iio/adc/stm32-adc-core.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-index e09233b..6096763 100644
---- a/drivers/iio/adc/stm32-adc-core.c
-+++ b/drivers/iio/adc/stm32-adc-core.c
-@@ -64,7 +64,7 @@
- #define STM32H7_CKMODE_MASK		GENMASK(17, 16)
- 
- /* STM32 H7 maximum analog clock rate (from datasheet) */
--#define STM32H7_ADC_MAX_CLK_RATE	72000000
-+#define STM32H7_ADC_MAX_CLK_RATE	36000000
- 
- /**
-  * stm32_adc_common_regs - stm32 common registers, compatible dependent data
-@@ -148,14 +148,14 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
- 		return -EINVAL;
- 	}
- 
--	priv->common.rate = rate;
-+	priv->common.rate = rate / stm32f4_pclk_div[i];
- 	val = readl_relaxed(priv->common.base + STM32F4_ADC_CCR);
- 	val &= ~STM32F4_ADC_ADCPRE_MASK;
- 	val |= i << STM32F4_ADC_ADCPRE_SHIFT;
- 	writel_relaxed(val, priv->common.base + STM32F4_ADC_CCR);
- 
- 	dev_dbg(&pdev->dev, "Using analog clock source at %ld kHz\n",
--		rate / (stm32f4_pclk_div[i] * 1000));
-+		priv->common.rate / 1000);
- 
- 	return 0;
- }
-@@ -250,7 +250,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
- 
- out:
- 	/* rate used later by each ADC instance to control BOOST mode */
--	priv->common.rate = rate;
-+	priv->common.rate = rate / div;
- 
- 	/* Set common clock mode and prescaler */
- 	val = readl_relaxed(priv->common.base + STM32H7_ADC_CCR);
-@@ -260,7 +260,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
- 	writel_relaxed(val, priv->common.base + STM32H7_ADC_CCR);
- 
- 	dev_dbg(&pdev->dev, "Using %s clock/%d source at %ld kHz\n",
--		ckmode ? "bus" : "adc", div, rate / (div * 1000));
-+		ckmode ? "bus" : "adc", div, priv->common.rate / 1000);
- 
- 	return 0;
- }
--- 
-1.9.1
+> 
+> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> ---
+>  .../devicetree/bindings/mtd/mtk-quadspi.txt        |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> index 5ded66a..9845ff4 100644
+> --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> @@ -3,6 +3,8 @@
+>  Required properties:
+>  - compatible: 	  The possible values are:
+>  		  "mediatek,mt2701-nor"
+> +		  "mediatek,mt2712-nor"
+> +		  "mediatek,mt7622-nor"
+>  		  "mediatek,mt7623-nor"
+>  		  "mediatek,mt8173-nor"
+>  		  For mt8173, compatible should be "mediatek,mt8173-nor".
+> -- 
+> 1.7.9.5
+> 
