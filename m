@@ -1,56 +1,49 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 24 Jul 2017 11:24:06 -0600
-Subject: [PATCH v2 1/2] vfio: Allow No-IOMMU mode without checking
- iommu_present()
-In-Reply-To: <1500525154-5200-2-git-send-email-anup.patel@broadcom.com>
-References: <1500525154-5200-1-git-send-email-anup.patel@broadcom.com>
- <1500525154-5200-2-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170724112406.42b69c8b@w520.home>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 24 Jul 2017 18:30:41 +0100
+Subject: [PATCH 3/9] firmware: arm_scmi: add basic driver infrastructure
+ for SCMI
+In-Reply-To: <CABb+yY0tX3kgAPTYOSqVMXwVPXFBYGwdwo5gy+TgdtRpZkwx6Q@mail.gmail.com>
+References: <1498492513-29771-4-git-send-email-sudeep.holla@arm.com>
+ <1499446341-5956-1-git-send-email-jaswinder.singh@linaro.org>
+ <5f2e4f3c-297b-c5f8-9244-399c1c4e2c21@arm.com>
+ <CABb+yY3Xo-meg5bTZ5Cj1DAvf_0yOw0QB5Kq6U7VG+L_L+Mo3w@mail.gmail.com>
+ <f165d171-a55b-662f-888c-3be2c3e8f11a@arm.com>
+ <CABb+yY3NNUE7YXAhBLpMzVZkB7Kgx6iZk8a--crHa9Wpw6Ls4Q@mail.gmail.com>
+ <cd935dab-06b8-a91b-d393-cfc2f085c600@arm.com>
+ <CABb+yY0tX3kgAPTYOSqVMXwVPXFBYGwdwo5gy+TgdtRpZkwx6Q@mail.gmail.com>
+Message-ID: <39eeddc1-99fb-092a-a833-cf4024695d87@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jul 2017 10:02:33 +0530
-Anup Patel <anup.patel@broadcom.com> wrote:
 
-> Not allowing No-IOMMU mode for devices already having
-> iommu_ops on their bus is very conservative.
-> 
-> We now have IOMMU (such as ARM SMMU) which can bypass
-> transcations when IOMMU is not configured for a given
-> device. In addition, it is not necessary to have all
-> devices on bus to be upstream to an IOMMU on that bus.
-> 
-> Due above reasons, having iommu_present() check for
-> VFIO No-IOMMU mode is not appropriate.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> ---
->  drivers/vfio/vfio.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
-> index 330d505..9d90de7 100644
-> --- a/drivers/vfio/vfio.c
-> +++ b/drivers/vfio/vfio.c
-> @@ -124,11 +124,10 @@ struct iommu_group *vfio_iommu_group_get(struct device *dev)
->  #ifdef CONFIG_VFIO_NOIOMMU
->  	/*
->  	 * With noiommu enabled, an IOMMU group will be created for a device
-> -	 * that doesn't already have one and doesn't have an iommu_ops on their
-> -	 * bus.  We set iommudata simply to be able to identify these groups
-> -	 * as special use and for reclamation later.
-> +	 * that doesn't already have one.  We set iommudata simply to be able
-> +	 * to identify these groups as special use and for reclamation later.
->  	 */
-> -	if (group || !noiommu || iommu_present(dev->bus))
-> +	if (group || !noiommu)
->  		return group;
->  
->  	group = iommu_group_alloc();
 
-Nak, no-iommu is intentionally conservative.  How do we tell the
-difference between the iommu_ops available to us with a fake group vs
-a proper group created by the iommu if we ignore iommu_present()?  If
-an iommu exists, use it.  Thanks,
+On 24/07/17 18:21, Jassi Brar wrote:
+> On Mon, Jul 24, 2017 at 9:51 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 24/07/17 16:41, Jassi Brar wrote:
+> 
+>>> SCMI  calls
+>>>     mbox_send_message(struct mbox_chan *chan, struct scmi_xfer *xfer);
+>>>
+>>> whereas the API expects
+>>>     mbox_send_message(struct mbox_chan *chan, struct controller_specific *xfer);
+>>>
+>>
+>> That's not hard to change ...
+> 
+> Cool, please change it and lets move on.
+> 
 
-Alex
+But tell me why first ? You said it needs to work with any controller.
+And now you say I need to change it to some controller_specific ptr,
+won't that make it controller specific protocol ?
+
+You responded on something you wanted ignoring all the other parts,
+still waiting for those response.
+
+1. Tell me how my changes to MHU and SCMI are related ?
+2. How my MHU changes and PCC are different ? Why do you think
+   this SCMI is FUBAR design which the clients using PCC are not ?
+
+-- 
+Regards,
+Sudeep
