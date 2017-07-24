@@ -1,50 +1,57 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Jul 2017 15:48:39 +0200
-Subject: [PATCH net-next 09/18] net: mvpp2: use named interrupts
+Date: Mon, 24 Jul 2017 15:48:42 +0200
+Subject: [PATCH net-next 12/18] Documentation/bindings: net: marvell-pp2: add
+ the interrupt-names
 In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
 References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170724134848.19330-10-antoine.tenart@free-electrons.com>
+Message-ID: <20170724134848.19330-13-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch update the Marvell PPv2 driver to use named interrupts. A
-compatibility path is kept to allow using device trees using the old dt
-bindings. This change is needed as other interrupts will be used by the
-PPv2 driver at some point.
+An interrupt-names property can be used in the PPv2 port description
+bindings when more than a single interrupt (for rx) is used. Document
+this new optional property.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/net/marvell-pp2.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index f6eb98d38ced..77eef2cc40a1 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -6789,10 +6789,20 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+index 18ec66e51b0a..553aadceeeee 100644
+--- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
++++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+@@ -42,6 +42,9 @@ Optional properties (port):
+ - phy: a phandle to a phy node defining the PHY address (as the reg
+   property, a single integer).
+ - marvell,system-controller: a phandle to the system controller.
++- interrupt-names: if more than a single interrupt for rx is given, must
++                   be the name associated to the interrupts listed. Valid
++                   names are: "rx-shared", "link".
  
- 	port = netdev_priv(dev);
+ Example for marvell,armada-375-pp2:
  
--	port->irq = irq_of_parse_and_map(port_node, 0);
--	if (port->irq <= 0) {
--		err = -EINVAL;
--		goto err_free_netdev;
-+	if (of_get_property(port_node, "interrupt-names", NULL)) {
-+		port->irq = of_irq_get_byname(port_node, "rx-shared");
-+		if (port->irq <= 0) {
-+			err = (port->irq == -EPROBE_DEFER) ?
-+			      -EPROBE_DEFER : -EINVAL;
-+			goto err_free_netdev;
-+		}
-+	} else {
-+		/* kept for dt compatibility */
-+		port->irq = irq_of_parse_and_map(port_node, 0);
-+		if (port->irq <= 0) {
-+			err = -EINVAL;
-+			goto err_free_netdev;
-+		}
- 	}
+@@ -82,18 +85,21 @@ cpm_ethernet: ethernet at 0 {
  
- 	if (of_property_read_bool(port_node, "marvell,loopback"))
+ 	eth0: eth0 {
+ 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "rx-shared";
+ 		port-id = <0>;
+ 		gop-port-id = <0>;
+ 	};
+ 
+ 	eth1: eth1 {
+ 		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "rx-shared";
+ 		port-id = <1>;
+ 		gop-port-id = <2>;
+ 	};
+ 
+ 	eth2: eth2 {
+ 		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "rx-shared";
+ 		port-id = <2>;
+ 		gop-port-id = <3>;
+ 	};
 -- 
 2.13.3
