@@ -1,39 +1,32 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Jul 2017 15:48:47 +0200
-Subject: [PATCH net-next 17/18] arm64: dts: marvell: 7040-db: enable the SFP
- port
+Date: Mon, 24 Jul 2017 15:48:41 +0200
+Subject: [PATCH net-next 11/18] Documentation/bindings: net: marvell-pp2: add
+ the system controller
 In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
 References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170724134848.19330-18-antoine.tenart@free-electrons.com>
+Message-ID: <20170724134848.19330-12-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the SFP port on the Armada 7040 DB as this port
-is now supported by the PPv2 driver (since the PHY is now optional).
+This patch documents the new marvell,system-controller property used by
+the Marvell ppv2 network driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
+ Documentation/devicetree/bindings/net/marvell-pp2.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-@Dave: Hi! This patch should go through the mvebu tree. Thanks!
-
- arch/arm64/boot/dts/marvell/armada-7040-db.dts | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 92c761c380d3..fa55e49e228e 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -176,6 +176,11 @@
- 	status = "okay";
- };
+diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+index 6b4956beff8c..18ec66e51b0a 100644
+--- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
++++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+@@ -41,6 +41,7 @@ Optional properties (port):
+ - marvell,loopback: port is loopback mode
+ - phy: a phandle to a phy node defining the PHY address (as the reg
+   property, a single integer).
++- marvell,system-controller: a phandle to the system controller.
  
-+&cpm_eth0 {
-+	status = "okay";
-+	phy-mode = "10gbase-kr";
-+};
-+
- &cpm_eth1 {
- 	status = "okay";
- 	phy = <&phy0>;
+ Example for marvell,armada-375-pp2:
+ 
 -- 
 2.13.3
