@@ -1,27 +1,60 @@
-From: yao.qi@arm.com (Yao Qi)
-Date: Mon, 24 Jul 2017 12:52:12 +0100
-Subject: [PATCH 00/11] ARMv8.3 pointer authentication userspace support
-In-Reply-To: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <46daaf0b-6b90-61cc-a25f-4177641d1613@arm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 24 Jul 2017 13:46:15 +0200
+Subject: [PATCH 07/10] cpufreq: dt: Add support for some new Allwinner SoCs
+In-Reply-To: <20170724085349.GT352@vireshk-i7>
+References: <20170723102749.17323-1-icenowy@aosc.io>
+ <20170723102749.17323-8-icenowy@aosc.io> <20170724085349.GT352@vireshk-i7>
+Message-ID: <2436327.OLdY8skjMP@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/17 17:01, Mark Rutland wrote:
-> * Should the kernel remove PACs when unwinding user stacks?
->
->   This is simple to do, but it's arguably placing a policy in the kernel as to
->   what we expect user stacks to look like. Regardless, userspace will have to
->   perform this when unwinding with DWARF.
+On Monday, July 24, 2017 02:23:49 PM Viresh Kumar wrote:
+> On 23-07-17, 18:27, Icenowy Zheng wrote:
+> > Some new Allwinner SoCs get supported in the kernel after the
+> > compatibles are added to cpufreq-dt-platdev driver.
+> > 
+> > Add their compatible strings in the cpufreq-dt-platdev driver.
+> > 
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > ---
+> >  drivers/cpufreq/cpufreq-dt-platdev.c | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > index 2eb40d46d357..c3851453e84a 100644
+> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > @@ -24,7 +24,11 @@ static const struct of_device_id machines[] __initconst = {
+> >  	{ .compatible = "allwinner,sun8i-a23", },
+> >  	{ .compatible = "allwinner,sun8i-a33", },
+> >  	{ .compatible = "allwinner,sun8i-a83t", },
+> > +	{ .compatible = "allwinner,sun8i-h2-plus", },
+> >  	{ .compatible = "allwinner,sun8i-h3", },
+> > +	{ .compatible = "allwinner,sun8i-v3s", },
+> > +	{ .compatible = "allwinner,sun50i-a64", },
+> > +	{ .compatible = "allwinner,sun50i-h5", },
+> >  
+> >  	{ .compatible = "apm,xgene-shadowcat", },
+> >  
+> > @@ -43,6 +47,8 @@ static const struct of_device_id machines[] __initconst = {
+> >  	{ .compatible = "marvell,pxa250", },
+> >  	{ .compatible = "marvell,pxa270", },
+> >  
+> > +	{ .compatible = "nextthing,gr8", },
+> > +
+> >  	{ .compatible = "samsung,exynos3250", },
+> >  	{ .compatible = "samsung,exynos4210", },
+> >  	{ .compatible = "samsung,exynos4212", },
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> 
 
-I am not sure what do you mean.  Do you mean stripping a PAC from a
-pointer during unwinding, so that user space can unwind the program
-without being aware of PAC?  Can kernel remove PAC from all instruction
-pointers?  Note that user space debugger may try to unwind in coredump,
-so if the contents dumped into coredump including PAC bits, debuggers
-still have to be aware of PAC (unless kernel can remove all PAC bits
-during coredump too).
+OK
 
-IMO, kernel needs to tell the truth to reflect the process/task state
-to the user space, and leave the user space to consume.
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+I'm assuming this will go in via arm-soc along with the rest of the series.
+
+Thanks,
+Rafael
