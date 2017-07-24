@@ -1,84 +1,76 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 24 Jul 2017 14:00:50 +0200
-Subject: [PATCH 3/3] dt-bindings: clock: amlogic,gxbb-aoclkc: Update
- bindings
-In-Reply-To: <1a971e80-1f91-c446-7e28-d193354b2859@baylibre.com>
-References: <1499336663-23875-1-git-send-email-narmstrong@baylibre.com>
- <1499336663-23875-4-git-send-email-narmstrong@baylibre.com>
- <20170710035031.rdbi64ookkbq6zeo@rob-hp-laptop>
- <20170721204439.GJ19878@codeaurora.org>
- <1a971e80-1f91-c446-7e28-d193354b2859@baylibre.com>
-Message-ID: <1500897650.2401.1.camel@baylibre.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 24 Jul 2017 14:06:04 +0200
+Subject: [PATCH] ARM64: meson-gxl: disable broken eee
+In-Reply-To: <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
+References: <20170707013257.18250-1-joseph.kogut@gmail.com>
+ <7ho9scsdbp.fsf@baylibre.com>
+ <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
+Message-ID: <cf71b3c2-29d7-3bdb-0d00-872f5e1267e2@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-07-24 at 13:47 +0200, Neil Armstrong wrote:
-> On 07/21/2017 10:44 PM, Stephen Boyd wrote:
-> > On 07/09, Rob Herring wrote:
-> > > On Thu, Jul 06, 2017 at 12:24:23PM +0200, Neil Armstrong wrote:
-> > > > On the first revision of the bindings, only the gates + resets were
-> > > > known
-> > > > in the AO Clock HW, but more registers used to configures AO clock are
-> > > > known
-> > > > to be spread among the AO register space.
-> > > > This patch adds these registers to the Ao Clock bindings with direct
-> > > > access
-> > > > and shared extcon access.
-> > > > 
-> > > > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > > > ---
-> > > > ?.../devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt?????????| 11
-> > > > +++++++++--
-> > > > ?1 file changed, 9 insertions(+), 2 deletions(-)
-> > > 
-> > > This looks like the binding might be too specific with a reg list of?
-> > > single registers, and you should define a system controller node?
-> > > instead. Depends on what else is in the "A0" block.
-> > > 
-> > 
-> > Agreed. Why can't we expand the size in DT and then access the
-> > registers directly in the driver. Hopefully it keeps working to
-> > apply the dts patch without the driver patch too (and
-> > vice-versa), because the kernel can only make a mapping as small
-> > as a page which would cover these newly added reg properties
-> > anyway.
-> > 
+On 07/23/2017 07:03 PM, Joseph Kogut wrote:
+> Hi Kevin,
 > 
-> Hi Rob, Stephen,
+> I tested on a P212 reference board, which is currently the only GXL
+> based board I have.
 > 
-> Thanks for your feedback, but on these Amlogic platforms, the AO register bank
-> is
-> filled with interleaved registers used for various purposes.
+> Before applying the patch, high activity on the ethernet interface
+> would cause the link to break, requiring the interface to be brought
+> down and back up before it would work again. After applying the patch,
+> I could not get the link to break with any transfers.
 > 
-> For instance, the first 1k of registers are :
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> 0-c RTI_STATUS
-> c-14 RTI_PWR_CNTL
-> 14-1c PIN_MUX
-> 1c RTI_STATUS
-> 24-30 GPIO
-> 30 JTAG_CONFIG
-> 34 WD
-> 38-40 CPU_CTRL
-> 40 RTI_GEN_CTRL
-> 44 CPU_CTRL
-> 4c-58 TIMER
-> 58 OSCIN
-> 60 AHB2DDR
-> ...
-> 
-> 
-> And so on, and the clock related registers are split among this space.
-> 
-> For sure, this could be declared as an system controller node, but this would
-> imply completely
-> re-designing the actual clock driver and drop the actual bindings.
-> (and with re-writting the clock gate code to use regmap registers access)
 
-Maybe it is time to investigate having the regmap clock from qcom available to
-every other platform ?
+Hi Joseph,
 
-> 
-> Anyway, I'm open to suggestions...
-> 
-> Neil
+[please keep the history of the conversation when replying]
+
+Is it a original P212 board, or a board based on the P212 ref design ?
+
+I'm currently testing the v4.13-rc2 on the official P212 board we received from Amlogic
+and using iperf3 in both directions, I have an issue after a few minutes running iperf3 with :
+
+# while true ; do iperf3 -c 192.168.1.21 ; iperf3 -c 192.168.1.21 -R ; done
+
+That cycles between the two iperf directions.
+
+After a few minutes, it stalls with :
+
+Connecting to host 192.168.1.21, port 5201
+[  4] local 192.168.1.183 port 51286 connected to 192.168.1.21 port 5201
+[ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
+[  4]   0.00-1.00   sec  1.64 MBytes  13.7 Mbits/sec    2   1.41 KBytes
+[  4]   1.00-2.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
+[  4]   2.00-3.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+[  4]   3.00-4.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
+[  4]   4.00-5.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+[  4]   5.00-6.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+[  4]   6.00-7.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
+[  4]   7.00-8.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+[  4]   8.00-9.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+
+
+And then, after:
+# ifconfig eth0 down
+# ifconfig eth0 up
+
+It cycles between :
+[ 1483.009919] meson8b-dwmac c9410000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
+[ 1487.105725] meson8b-dwmac c9410000.ethernet eth0: Link is Down
+[ 1490.177943] meson8b-dwmac c9410000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
+[ 1494.273713] meson8b-dwmac c9410000.ethernet eth0: Link is Down
+
+and so on.
+
+And this patch does not fix this at all.
+
+It seems to be more a PHY driver issue here.
+
+Could you share the results with the same command ?
+
+Neil
