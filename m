@@ -1,133 +1,112 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 24 Jul 2017 23:06:06 +0800
-Subject: [PATCH 3/3] iio: adc: stm32: add optional min-sample-time
-In-Reply-To: <80041c76-4428-9330-6dcb-4ca0f718d2e3@st.com>
-References: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
- <1500381332-17086-4-git-send-email-fabrice.gasnier@st.com>
- <20170723120022.7d06063e@kernel.org>
- <80041c76-4428-9330-6dcb-4ca0f718d2e3@st.com>
-Message-ID: <20170724230606.00001044@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 24 Jul 2017 16:10:53 +0100
+Subject: [PATCH] arm64: acpi/gtdt: validate CNTFRQ after having enabled the
+ frame
+Message-ID: <20170724151053.17769-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Jul 2017 10:16:00 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+The ACPI GTDT code validates the CNTFRQ field of each MMIO timer
+frame against the CNTFRQ system register of the current CPU, to
+ensure that they are equal, which is mandated by the architecture.
 
-> On 07/23/2017 01:00 PM, Jonathan Cameron wrote:
-> > On Tue, 18 Jul 2017 14:35:32 +0200
-> > Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> >   
-> >> STM32 ADC allows each channel to be sampled with a different sampling time,
-> >> by setting SMPR registers. Basically, value depends on local electrical
-> >> properties. Selecting correct value for sampling time highly depends on
-> >> analog source impedance. There is a manual that may help in this process:
-> >> 'How to get the best ADC accuracy in STM32...'
-> >>
-> >> This patch allows to configure min-sample-time via device tree, either for:
-> >> - all channels at once:
-> >> min-sample-time = <10000>; /* nanosecs */
-> >>
-> >> - independently for each channel (must match "st,adc-channels" list):
-> >> st,adc-channels = <0 1>;
-> >> min-sample-time = <5000 10000>; /* nanosecs */
-> >>
-> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>  
-> > 
-> > On question inline which may well just be down to me missing what
-> > happens when you query index element 2 from a 1 element device tree
-> > array.  
-> 
-> Hi Jonathan,
-> 
-> I should probably comment on it, please see inline.
-> 
-<snip>
-> >>  }
-> >> @@ -1538,8 +1651,8 @@ static int stm32_adc_chan_of_init(struct iio_dev *indio_dev)
-> >>  	struct property *prop;
-> >>  	const __be32 *cur;
-> >>  	struct iio_chan_spec *channels;
-> >> -	int scan_index = 0, num_channels;
-> >> -	u32 val;
-> >> +	int scan_index = 0, num_channels, ret;
-> >> +	u32 val, smp = 0;
-> >>  
-> >>  	num_channels = of_property_count_u32_elems(node, "st,adc-channels");
-> >>  	if (num_channels < 0 ||
-> >> @@ -1548,6 +1661,13 @@ static int stm32_adc_chan_of_init(struct iio_dev *indio_dev)
-> >>  		return num_channels < 0 ? num_channels : -EINVAL;
-> >>  	}
-> >>  
-> >> +	/* Optional sample time is provided either for each, or all channels */
-> >> +	ret = of_property_count_u32_elems(node, "min-sample-time");
-> >> +	if (ret > 1 && ret != num_channels) {
-> >> +		dev_err(&indio_dev->dev, "Invalid min-sample-time\n");
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >>  	channels = devm_kcalloc(&indio_dev->dev, num_channels,
-> >>  				sizeof(struct iio_chan_spec), GFP_KERNEL);
-> >>  	if (!channels)
-> >> @@ -1558,9 +1678,13 @@ static int stm32_adc_chan_of_init(struct iio_dev *indio_dev)
-> >>  			dev_err(&indio_dev->dev, "Invalid channel %d\n", val);
-> >>  			return -EINVAL;
-> >>  		}
-> >> +
-> >> +		of_property_read_u32_index(node, "min-sample-time", scan_index,
-> >> +					   &smp);
-> >> +  
-> > I might be missing something, but doesn't this fail for the single shared
-> > value case?  
-> 
-> Yes, this fails in the single shared value case, with index >= 1.
-> Rewinding... when index is 0, it picks up 1st (shared) value.
-> Then fails for other index values.
-> 
-> of_property_read_u32_index() documentation states out value remains
-> untouched in case of error:
-> /**
->  * of_property_read_u32_index...
-> [...]
->  * The out_value is modified only if a valid u32 value can be decoded.
-> 
-> This is what I use here (as far as I tested it, it worked like a charm).
-> Do you wish I add a comment to describe this ?
-Probably best or I'll forget sometime down the line and think it looks
-crazy again ;)
+However, reading the CNTFRQ field of a frame is not possible until
+the RFRQ bit in the frame's CNTACRn register is set, and doing so
+before that willl produce the following error:
 
-Thanks for the explanation.
+  arch_timer: [Firmware Bug]: CNTFRQ mismatch: frame @ 0x00000000e0be0000: (0x00000000), CPU: (0x0ee6b280)
+  arch_timer: Disabling MMIO timers due to CNTFRQ mismatch
+  arch_timer: Failed to initialize memory-mapped timer.
 
-Jonathan
-> 
-> Please let me know,
-> Best Regards,
-> Fabrice
-> 
-> >>  		stm32_adc_chan_init_one(indio_dev, &channels[scan_index],
-> >>  					&adc_info->channels[val],
-> >> -					scan_index);
-> >> +					scan_index, smp);
-> >>  		scan_index++;
-> >>  	}
-> >>  
-> >> @@ -1755,6 +1879,7 @@ static int stm32_adc_remove(struct platform_device *pdev)
-> >>  	.clk_required = true,
-> >>  	.start_conv = stm32f4_adc_start_conv,
-> >>  	.stop_conv = stm32f4_adc_stop_conv,
-> >> +	.smp_cycles = stm32f4_adc_smp_cycles,
-> >>  };
-> >>  
-> >>  static const struct stm32_adc_cfg stm32h7_adc_cfg = {
-> >> @@ -1766,6 +1891,7 @@ static int stm32_adc_remove(struct platform_device *pdev)
-> >>  	.stop_conv = stm32h7_adc_stop_conv,
-> >>  	.prepare = stm32h7_adc_prepare,
-> >>  	.unprepare = stm32h7_adc_unprepare,
-> >> +	.smp_cycles = stm32h7_adc_smp_cycles,
-> >>  };
-> >>  
-> >>  static const struct of_device_id stm32_adc_of_match[] = {  
-> >   
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The reason is that the CNTFRQ field is RES0 if access is not enabled.
+
+So move the validation of CNTFRQ into the loop that iterates over the
+timers to find the best frame, and only validate the frame that has
+been selected as the best frame (and has thus been enabled).
+
+(Note that there is no point in trying other frames of the same timer
+if the validation fails, since they are all architecturally guaranteed
+to have the same value for CNTFRQ)
+
+Oh, and while we're at it, fix the bogus 'i = i' initializer in the
+for() loop that iterates over the timers.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/clocksource/arm_arch_timer.c | 44 ++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 8b5c30062d99..8fb632633331 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -1387,22 +1387,12 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+ 
+ #ifdef CONFIG_ACPI_GTDT
+ static int __init
+-arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
++arch_timer_mem_verify_cntfrq(struct arch_timer_mem_frame *frame)
+ {
+-	struct arch_timer_mem_frame *frame;
+ 	u32 rate;
+-	int i;
+-
+-	for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
+-		frame = &timer_mem->frame[i];
+-
+-		if (!frame->valid)
+-			continue;
+-
+-		rate = arch_timer_mem_frame_get_cntfrq(frame);
+-		if (rate == arch_timer_rate)
+-			continue;
+ 
++	rate = arch_timer_mem_frame_get_cntfrq(frame);
++	if (rate != arch_timer_rate) {
+ 		pr_err(FW_BUG "CNTFRQ mismatch: frame @ %pa: (0x%08lx), CPU: (0x%08lx)\n",
+ 			&frame->cntbase,
+ 			(unsigned long)rate, (unsigned long)arch_timer_rate);
+@@ -1428,24 +1418,30 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+ 	if (ret || !timer_count)
+ 		goto out;
+ 
+-	for (i = 0; i < timer_count; i++) {
+-		ret = arch_timer_mem_verify_cntfrq(&timers[i]);
+-		if (ret) {
+-			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
+-			goto out;
+-		}
+-	}
+-
+ 	/*
+ 	 * While unlikely, it's theoretically possible that none of the frames
+-	 * in a timer expose the combination of feature we want.
++	 * in a timer expose the combination of features we want.
+ 	 */
+-	for (i = i; i < timer_count; i++) {
++	for (i = 0; i < timer_count; i++) {
+ 		timer = &timers[i];
+ 
+ 		frame = arch_timer_mem_find_best_frame(timer);
+-		if (frame)
++		if (!frame)
++			continue;
++
++		/* validate CNTFRQ after having enabled the frame */
++		ret = arch_timer_mem_verify_cntfrq(frame);
++		if (!ret)
+ 			break;
++
++		/*
++		 * If this timer provides a suitable frame but with the wrong
++		 * value for the CNTFRQ field, there is no point in trying other
++		 * frames of the same timer, given that they are architecturally
++		 * guaranteed to carry the same CNTFRQ value. So just carry on
++		 * with the next timer instead.
++		 */
++		frame = NULL;
+ 	}
+ 
+ 	if (frame)
+-- 
+2.9.3
