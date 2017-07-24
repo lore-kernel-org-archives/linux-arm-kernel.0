@@ -1,9 +1,7 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 24 Jul 2017 21:08:53 +0200
-Subject: [GIT PULL 2/5] ARM: dts: exynos: Updates for v4.14
-In-Reply-To: <20170724190856.19055-1-krzk@kernel.org>
-References: <20170724190856.19055-1-krzk@kernel.org>
-Message-ID: <20170724190856.19055-2-krzk@kernel.org>
+Date: Mon, 24 Jul 2017 21:08:52 +0200
+Subject: [GIT PULL 1/5] ARM: s3c24xx: Early stuff for v4.14
+Message-ID: <20170724190856.19055-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,39 +12,32 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.14
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.14
 
-for you to fetch changes up to 9d2770b8e49a1726310e706ae23b52c83b33a986:
+for you to fetch changes up to f991ce429a420dbb42b3e4b5a47490c84390d7e1:
 
-  ARM: dts: exynos: Remove num-slots from exynos platforms (2017-07-18 07:14:22 +0200)
-
-----------------------------------------------------------------
-Samsung DTS ARM changes for v4.13
-
-Remove deprecated and unneeded properties from Exynos boards.
+  ARM: s3c24xx: make H1940BT depend on RFKILL (2017-07-20 20:26:24 +0200)
 
 ----------------------------------------------------------------
-Hoegeun Kwon (1):
-      ARM: dts: exynos: Remove the OF graph from DSI node
+Samsung mach/soc changes for v4.14
 
-Shawn Lin (1):
-      ARM: dts: exynos: Remove num-slots from exynos platforms
+Only for S3C24xx platform:
+1. Cleanup from non-existent CONFIG entries.
+2. Fix unmet NET dependency when H1940 bluetooth chip is selected..
 
- arch/arm/boot/dts/exynos3250-artik5-eval.dts    |  1 -
- arch/arm/boot/dts/exynos3250-artik5.dtsi        |  1 -
- arch/arm/boot/dts/exynos3250-monk.dts           |  1 -
- arch/arm/boot/dts/exynos3250-rinato.dts         | 22 ----------------------
- arch/arm/boot/dts/exynos4210-trats.dts          | 21 ---------------------
- arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi |  1 -
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  1 -
- arch/arm/boot/dts/exynos4412-origen.dts         |  1 -
- arch/arm/boot/dts/exynos4412-trats2.dts         | 22 ----------------------
- arch/arm/boot/dts/exynos5250-arndale.dts        |  2 --
- arch/arm/boot/dts/exynos5250-smdk5250.dts       |  2 --
- arch/arm/boot/dts/exynos5250-snow-common.dtsi   |  3 ---
- arch/arm/boot/dts/exynos5250-spring.dts         |  2 --
- arch/arm/boot/dts/exynos5260-xyref5260.dts      |  2 --
- arch/arm/boot/dts/exynos5410-smdk5410.dts       |  2 --
- arch/arm/boot/dts/exynos5420-peach-pit.dts      |  3 ---
- arch/arm/boot/dts/exynos5800-peach-pi.dts       |  3 ---
- 17 files changed, 90 deletions(-)
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: s3c24xx: make H1940BT depend on RFKILL
+
+Krzysztof Kozlowski (3):
+      ARM: s3c24xx: Remove non-existing CONFIG_CPU_S3C2413
+      ARM: s3c24xx: Remove non-existing SND_SOC_SMDK2443_WM9710
+      ARM: s3c24xx: Do not confuse local define with Kconfig
+
+ arch/arm/mach-s3c24xx/Kconfig                   |  2 +-
+ arch/arm/mach-s3c24xx/common.c                  |  2 +-
+ arch/arm/mach-s3c24xx/include/mach/regs-clock.h |  4 ++--
+ arch/arm/mach-s3c24xx/mach-smdk2443.c           |  8 --------
+ arch/arm/mach-s3c24xx/sleep.S                   | 11 ++++++-----
+ arch/arm/plat-samsung/include/plat/map-s3c.h    |  2 +-
+ 6 files changed, 11 insertions(+), 18 deletions(-)
