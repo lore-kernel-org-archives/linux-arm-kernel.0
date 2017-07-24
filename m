@@ -1,74 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 24 Jul 2017 12:09:14 +0800
-Subject: [linux-sunxi] [PATCH 09/10] ARM: sun8i: h2+: add SY8113B
- regulator used by Orange Pi Zero board
-In-Reply-To: <20170723102749.17323-10-icenowy@aosc.io>
-References: <20170723102749.17323-1-icenowy@aosc.io>
- <20170723102749.17323-10-icenowy@aosc.io>
-Message-ID: <CAGb2v65B10VuG6YDKuFmx-7Z5R-PRLiN51g484MA_959y=Le5Q@mail.gmail.com>
+From: matthew.brown.dev@gmail.com (Matt Brown)
+Date: Mon, 24 Jul 2017 14:31:09 +1000
+Subject: [PATCH] powerpc/asm/cacheflush: Cleanup cacheflush function params
+In-Reply-To: <87h8y7gt2z.fsf@concordia.ellerman.id.au>
+References: <20170720062850.2195-1-matthew.brown.dev@gmail.com>
+ <87mv7zgwpl.fsf@concordia.ellerman.id.au>
+ <CAMuHMdXU-R8kBs_xp7XDK0pnC5fakpghchuEPD8jtEcHLmgyHg@mail.gmail.com>
+ <87h8y7gt2z.fsf@concordia.ellerman.id.au>
+Message-ID: <CAPoR37a2_7Gq0DL1DsHNK4Vmq5KR1NdfAZVbep0S6zUnfACgDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 23, 2017 at 6:27 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Orange Pi Zero board has a SY8113B regulator, which is controlled via
-> GPIO and capable of outputing 1.1V when the PL6 GPIO is set to output 0
-> or 1.3V when the PL6 GPIO is set to input or output 1, and the output is
-> the power supply of the ARM cores in H2+ SoC.
->
-> Add the device tree node of this regulator and set the cpu's cpu-supply
-> property to it.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> index 6713d0f2b3f4..28b4433bd7f7 100644
-> --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> @@ -94,6 +94,27 @@
->                 reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>;
->                 post-power-on-delay-ms = <200>;
->         };
-> +
-> +       reg_sy8113b: gpio-regulator {
-> +               compatible = "regulator-gpio";
-> +
+I've realised that changing the arguments for the cacheflush functions
+is much more work than its worth, due to other archs using these
+functions.
+The next patch will just translate the asm cacheflush functions to c,
+keeping the existing parameters.
+So this won't have any effect on the drivers.
 
-No need for the newline.
+Thanks,
+Matt Brown
 
-> +               regulator-name = "vdd-cpux";
-> +               regulator-type = "voltage";
-> +               regulator-boot-on;
-> +               regulator-always-on;
-> +               regulator-min-microvolt = <1100000>;
-> +               regulator-max-microvolt = <1300000>;
-> +               regulator-ramp-delay = <50>; /* 4ms */
-
-You should also add "enable-active-high". The driver might not
-honor the GPIO_ACTIVE_HIGH flag. AFAIK this was a problem with
-the old GPIO API.
-
-ChenYu
-
-> +
-> +               gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
-> +               gpios-states = <0x1>;
-> +               states = <1100000 0x0
-> +                         1300000 0x1>;
-> +       };
-> +};
-> +
-> +&cpu0 {
-> +       cpu-supply = <&reg_sy8113b>;
->  };
+On Thu, Jul 20, 2017 at 11:01 PM, Michael Ellerman <mpe@ellerman.id.au> wrote:
+> Geert Uytterhoeven <geert@linux-m68k.org> writes:
 >
->  &ehci0 {
-> --
-> 2.13.0
+>> On Thu, Jul 20, 2017 at 1:43 PM, Michael Ellerman <mpe@ellerman.id.au> wrote:
+>>> Matt Brown <matthew.brown.dev@gmail.com> writes:
+>>>> The cacheflush prototypes currently use start and stop values and each
+>>>> call requires typecasting the address to an unsigned long.
+>>>> This patch changes the cacheflush prototypes to follow the x86 style of
+>>>> using a base and size values, with base being a void pointer.
+>>>>
+>>>> All callers of the cacheflush functions, including drivers, have been
+>>>> modified to conform to the new prototypes.
+>>>>
+>>>> The 64 bit cacheflush functions which were implemented in assembly code
+>>>> (flush_dcache_range, flush_inval_dcache_range) have been translated into
+>>>> C for readability and coherence.
+>>
+>>>> --- a/arch/powerpc/include/asm/cacheflush.h
+>>>> +++ b/arch/powerpc/include/asm/cacheflush.h
+>>>> @@ -51,13 +51,13 @@ static inline void __flush_dcache_icache_phys(unsigned long physaddr)
+>>>>   * Write any modified data cache blocks out to memory and invalidate them.
+>>>>   * Does not invalidate the corresponding instruction cache blocks.
+>>>>   */
+>>>> -static inline void flush_dcache_range(unsigned long start, unsigned long stop)
+>>>> +static inline void flush_dcache_range(void *start, unsigned long size)
+>>>>  {
+>>>> -     void *addr = (void *)(start & ~(L1_CACHE_BYTES - 1));
+>>>> -     unsigned long size = stop - (unsigned long)addr + (L1_CACHE_BYTES - 1);
+>>>> +     void *addr = (void *)((u32)start & ~(L1_CACHE_BYTES - 1));
+>>>
+>>> unsigned long would be nicer than u32.
+>>
+>> Indeed. That would make this work on ppc64, too.
+>> After which ppc64 has an identical copy (u64 = unsigned long on ppc64) below?
 >
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> That was Matt's homework to notice that ;)
+>
+> cheers
