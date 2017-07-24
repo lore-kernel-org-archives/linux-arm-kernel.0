@@ -1,75 +1,50 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Jul 2017 15:48:36 +0200
-Subject: [PATCH net-next 06/18] net: mvpp2: initialize the XLG MAC when using
- a port
+Date: Mon, 24 Jul 2017 15:48:45 +0200
+Subject: [PATCH net-next 15/18] arm64: dts: marvell: add a reference to the
+ sysctrl syscon in the ppv2 node
 In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
 References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170724134848.19330-7-antoine.tenart@free-electrons.com>
+Message-ID: <20170724134848.19330-16-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a routine to initialize the XLG MAC at the port level when
-using a port and the XAUI/10GKR interface mode. This wasn't done until
-this commit, and the mvpp2 driver was relying on the bootloader/firmware
-initialization. This doesn't mean everything is configured in the mvpp2
-driver now, but it helps reducing the gap.
+The network driver on Marvell SoC (7k/8k) needs to access some registers
+in the system controller to configure its ports at runtime. This patch
+adds a phandle reference to the syscon system controller node in the
+ppv2 node.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 2573b0c27300..b3601561bbae 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -354,6 +354,7 @@
- #define MVPP22_XLG_CTRL0_REG			0x100
- #define     MVPP22_XLG_CTRL0_PORT_EN		BIT(0)
- #define     MVPP22_XLG_CTRL0_MAC_RESET_DIS	BIT(1)
-+#define     MVPP22_XLG_CTRL0_RX_FLOW_CTRL_EN	BIT(7)
- #define     MVPP22_XLG_CTRL0_MIB_CNT_DIS	BIT(14)
+@Dave: Hi! This patch should go through the mvebu tree. Thanks!
+
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index ebbdb3c97b7f..9278ba63b8ee 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -65,6 +65,7 @@
+ 				reg = <0x0 0x100000>, <0x129000 0xb000>;
+ 				clocks = <&cpm_clk 1 3>, <&cpm_clk 1 9>, <&cpm_clk 1 5>;
+ 				clock-names = "pp_clk", "gop_clk", "mg_clk";
++				marvell,system-controller = <&cpm_syscon0>;
+ 				status = "disabled";
+ 				dma-coherent;
  
- #define MVPP22_XLG_CTRL3_REG			0x11c
-@@ -361,6 +362,11 @@
- #define     MVPP22_XLG_CTRL3_MACMODESELECT_GMAC	(0 << 13)
- #define     MVPP22_XLG_CTRL3_MACMODESELECT_10G	(1 << 13)
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index a9ac5fc6def7..3515817b85f3 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -72,6 +72,7 @@
+ 				reg = <0x0 0x100000>, <0x129000 0xb000>;
+ 				clocks = <&cps_clk 1 3>, <&cps_clk 1 9>, <&cps_clk 1 5>;
+ 				clock-names = "pp_clk", "gop_clk", "mg_clk";
++				marvell,system-controller = <&cps_syscon0>;
+ 				status = "disabled";
+ 				dma-coherent;
  
-+#define MVPP22_XLG_CTRL4_REG			0x184
-+#define     MVPP22_XLG_CTRL4_FWD_FC		BIT(5)
-+#define     MVPP22_XLG_CTRL4_FWD_PFC		BIT(6)
-+#define     MVPP22_XLG_CTRL4_MACMODSELECT_GMAC	BIT(12)
-+
- /* SMI registers. PPv2.2 only, relative to priv->iface_base. */
- #define MVPP22_SMI_MISC_CFG_REG			0x1204
- #define     MVPP22_SMI_POLLING_EN		BIT(10)
-@@ -4257,6 +4263,18 @@ static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
- 	writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
- }
- 
-+static void mvpp2_port_mii_xlg_configure(struct mvpp2_port *port)
-+{
-+	u32 val = readl(port->base + MVPP22_XLG_CTRL0_REG);
-+	val |= MVPP22_XLG_CTRL0_RX_FLOW_CTRL_EN;
-+	writel(val, port->base + MVPP22_XLG_CTRL0_REG);
-+
-+	val = readl(port->base + MVPP22_XLG_CTRL4_REG);
-+	val &= ~MVPP22_XLG_CTRL4_MACMODSELECT_GMAC;
-+	val |= MVPP22_XLG_CTRL4_FWD_FC | MVPP22_XLG_CTRL4_FWD_PFC;
-+	writel(val, port->base + MVPP22_XLG_CTRL4_REG);
-+}
-+
- static void mvpp22_port_mii_set(struct mvpp2_port *port)
- {
- 	u32 val;
-@@ -4284,6 +4302,8 @@ static void mvpp2_port_mii_set(struct mvpp2_port *port)
- 	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
- 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII)
- 		mvpp2_port_mii_gmac_configure(port);
-+	else if (port->phy_interface == PHY_INTERFACE_MODE_10GKR)
-+		mvpp2_port_mii_xlg_configure(port);
- }
- 
- static void mvpp2_port_fc_adv_enable(struct mvpp2_port *port)
 -- 
 2.13.3
