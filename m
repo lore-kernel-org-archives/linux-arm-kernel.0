@@ -1,28 +1,27 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 24 Jul 2017 15:01:59 +0200
-Subject: [PATCH 0/2] ARM: add missing includes to header files
-In-Reply-To: <20170706151607.GC23750@n2100.armlinux.org.uk>
-References: <20170704132542.27644-1-johan@kernel.org>
- <20170706151607.GC23750@n2100.armlinux.org.uk>
-Message-ID: <20170724130159.GI2729@localhost>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 24 Jul 2017 10:03:14 -0300
+Subject: [PATCH v2 1/2] ARM: dts: imx6qdl-sabrelite: fix USB PHY reset
+In-Reply-To: <20170724125958.11939-2-gary.bisson@boundarydevices.com>
+References: <20170724085005.22101-1-gary.bisson@boundarydevices.com>
+ <20170724125958.11939-1-gary.bisson@boundarydevices.com>
+ <20170724125958.11939-2-gary.bisson@boundarydevices.com>
+Message-ID: <CAOMZO5CnJv6qfn5qWuJ-NkLWhenGV8pX8shS0u7+a7tymNSJdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 06, 2017 at 04:16:07PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jul 04, 2017 at 03:25:40PM +0200, Johan Hovold wrote:
-> > Add two missing include directives to two header files to avoid
-> > compile breakage when the required symbols have not already been
-> > defined.
-> > 
-> > The missing SCU include broke compilation of the (not-yet-merged)
-> > suspend support for am335x when !CONFIG_HAVE_ARM_SCU for example:
-> > 
-> > 	https://lkml.kernel.org/r/20170704131441.GH27842 at localhost
-> 
-> These look reasonable, please send them to the patch system for merging
-> after this merge window, thanks.
+On Mon, Jul 24, 2017 at 9:59 AM, Gary Bisson
+<gary.bisson@boundarydevices.com> wrote:
+> Declared as a regulator since the driver doesn't have a reset-gpios
+> property for this.
+>
+> This ensures that the PHY is woken up, not depending on the state the
+> second stage bootloader leaves the pin.
+>
+> This is a workaround until a proper mechanism is provided to reset such
+> devices like the pwrseq library [1] for instance.
+>
+> [1] https://lkml.org/lkml/2017/2/10/779
+>
+> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 
-These two are now in your patch tracker (since a week).
-
-Thanks,
-Johan
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
