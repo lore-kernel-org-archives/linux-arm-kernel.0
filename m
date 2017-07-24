@@ -1,45 +1,75 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jul 2017 17:34:27 +0100
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <20170724130717.GH31807@n2100.armlinux.org.uk>
-References: <20170609133822.GR4902@n2100.armlinux.org.uk>
- <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
- <20170609141056.GS4902@n2100.armlinux.org.uk>
- <b46f25c1-45fd-2917-6559-218f6887a882@xs4all.nl>
- <20170717090516.GJ31807@n2100.armlinux.org.uk>
- <e80b0213-7632-faf4-5d57-06509912990d@xs4all.nl>
- <20170717120513.GK31807@n2100.armlinux.org.uk>
- <35c2af77-b717-b86a-1f19-b3571d2fe156@xs4all.nl>
- <fba25a7e-671a-f7f4-93d6-68b004191675@xs4all.nl>
- <20170724130717.GH31807@n2100.armlinux.org.uk>
-Message-ID: <20170724163427.GI31807@n2100.armlinux.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 24 Jul 2017 22:06:39 +0530
+Subject: [PATCH v2 6/7] mailbox: bcm-flexrm-mailbox: Set msg_queue_len for
+ each channel
+In-Reply-To: <CAALAos_yh0bCMZFrSmf-c92pNMBGhLT05YFF0duhmpxgYec+_w@mail.gmail.com>
+References: <1500620142-910-1-git-send-email-anup.patel@broadcom.com>
+ <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
+ <CABb+yY1Pxhgvvit=0eZr66DpLJ3MDEvRPx9dwDPJM8PwiKXiew@mail.gmail.com>
+ <CAALAos_yh0bCMZFrSmf-c92pNMBGhLT05YFF0duhmpxgYec+_w@mail.gmail.com>
+Message-ID: <CABb+yY3d1FvfB-NBVHLNfoFXGn9-8nFEdKBhXt4sBTr1vodhYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 02:07:17PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 24, 2017 at 02:16:40PM +0200, Hans Verkuil wrote:
-> > Just to make sure you aren't waiting for me to do anything: as far as I can tell
-> > the Kconfig above will ensure the right dependencies. If you have an example
-> > where this fails, then let me know. I am not planning on making any changes.
-> > Frankly, I wouldn't know what to change since AFAICT it is all working with
-> > the above Kconfig.
-> 
-> No, I just haven't got around to it yet - I've been busy all last week
-> trying to work out what's been causing a USB host driver to fail for a 
-> client, and as such haven't had any chance to look at much else post
-> merge window yet.
-
-It's going to be a while yet - today I've attempted to bring my tree
-forward to v4.13-rc2, but it's proven a long and difficult task to get
-anywhere close to finishing that... and I've just ended up rewinding
-back to this morning's state (because I ended up having to drop some
-branches that other stuff depended upon.)
-
-I'll have another go later in the week.
-
-Until I can do this, I can't do anything else with mainline work.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+On Mon, Jul 24, 2017 at 9:26 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+> Hi Jassi,
+>
+> Sorry for the delayed response...
+>
+> On Fri, Jul 21, 2017 at 9:16 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> Hi Anup,
+>>
+>> On Fri, Jul 21, 2017 at 12:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>> The Broadcom FlexRM ring (i.e. mailbox channel) can handle
+>>> larger number of messages queued in one FlexRM ring hence
+>>> this patch sets msg_queue_len for each mailbox channel to
+>>> be same as RING_MAX_REQ_COUNT.
+>>>
+>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>> ---
+>>>  drivers/mailbox/bcm-flexrm-mailbox.c | 5 ++++-
+>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>> index 9873818..20055a0 100644
+>>> --- a/drivers/mailbox/bcm-flexrm-mailbox.c
+>>> +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>> @@ -1683,8 +1683,11 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
+>>>                 ret = -ENOMEM;
+>>>                 goto fail_free_debugfs_root;
+>>>         }
+>>> -       for (index = 0; index < mbox->num_rings; index++)
+>>> +       for (index = 0; index < mbox->num_rings; index++) {
+>>> +               mbox->controller.chans[index].msg_queue_len =
+>>> +                                               RING_MAX_REQ_COUNT;
+>>>                 mbox->controller.chans[index].con_priv = &mbox->rings[index];
+>>> +       }
+>>>
+>> While writing mailbox.c I wasn't unaware that there is the option to
+>> choose the queue length at runtime.
+>> The idea was to keep the code as simple as possible. I am open to
+>> making it a runtime thing, but first, please help me understand how
+>> that is useful here.
+>>
+>> I understand FlexRm has a ring buffer of RING_MAX_REQ_COUNT(1024)
+>> elements. Any message submitted to mailbox api can be immediately
+>> written onto the ringbuffer if there is some space.
+>> Is there any mechanism to report back to a client driver, if its
+>> message in ringbuffer failed "to be sent"?
+>> If there isn't any, then I think, in flexrm_last_tx_done() you should
+>> simply return true if there is some space left in the rung-buffer,
+>> false otherwise.
+>
+> Yes, we have error code in "struct brcm_message" to report back
+> errors from send_message. In our mailbox clients, we check
+> return value of mbox_send_message() and also the error code
+> in "struct brcm_message".
+>
+I meant after the message has been accepted in the ringbuffer but the
+remote failed to receive it.
+There seems no such provision. IIANW, then you should be able to
+consider every message as "sent successfully" once it is in the ring
+buffer i.e, immediately after mbox_send_message() returns 0.
+In that case I would think you don't need more than a couple of
+entries out of MBOX_TX_QUEUE_LEN ?
