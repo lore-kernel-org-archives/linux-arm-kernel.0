@@ -1,70 +1,70 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 24 Jul 2017 17:49:32 +0200
-Subject: [PATCH] gpio: mvebu: Fix cause computation in irq handler
-In-Reply-To: <20170712112229.858-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 12 Jul 2017 13:22:29 +0200")
-References: <20170712112229.858-1-gregory.clement@free-electrons.com>
-Message-ID: <874lu14yyb.fsf@free-electrons.com>
+From: jack@suse.cz (Jan Kara)
+Date: Mon, 24 Jul 2017 17:59:06 +0200
+Subject: [PATCH v4 1/5] mm: add mkwrite param to vm_insert_mixed()
+In-Reply-To: <20170724152357.GB1639@linux.intel.com>
+References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
+ <20170721223956.29485-2-ross.zwisler@linux.intel.com>
+ <20170724112530.GI652@quack2.suse.cz>
+ <20170724152357.GB1639@linux.intel.com>
+Message-ID: <20170724155906.GR652@quack2.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On mer., juil. 12 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Mon 24-07-17 09:23:57, Ross Zwisler wrote:
+> On Mon, Jul 24, 2017 at 01:25:30PM +0200, Jan Kara wrote:
+> > > @@ -1658,14 +1658,28 @@ static int insert_pfn(struct vm_area_struct *vma, unsigned long addr,
+> > >  	if (!pte)
+> > >  		goto out;
+> > >  	retval = -EBUSY;
+> > > -	if (!pte_none(*pte))
+> > > -		goto out_unlock;
+> > > +	if (!pte_none(*pte)) {
+> > > +		if (mkwrite) {
+> > > +			if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
+> > 
+> > Is the WARN_ON_ONCE() really appropriate here? Your testcase with private
+> > mappings has triggered this situation if I'm right...
+> 
+> Yep, I think this WARN_ON_ONCE() is correct.  The test with private mappings
+> had collisions between read-only DAX mappings which were being faulted in via
+> insert_pfn(), and read/write COW page cache mappings which were being faulted
+> in by wp_page_copy().
+> 
+> I was hitting a false-positive warning when I had the WARN_ON_ONCE() in
+> insert_pfn() outside of the mkwrite case, i.e.:
+> 
+> 	if (!pte_none(*pte)) {
+> 		if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
+> 			goto out_unlock;
+> 		if (mkwrite) {
+> 			entry = *pte;
+> 			goto out_mkwrite;
+> 		} else
+> 			goto out_unlock;
+> 	}
+> 
+> This was triggering when one thread was faulting in a read-only DAX mapping
+> when another thread had already faulted in a read-write COW page cache page.
+> 
+> The patches I sent out have the warning in the mkwrite case, which would mean
+> that we were getting a fault for a read/write PTE in insert_pfn() and the PFN
+> didn't match what was already in the PTE.
+> 
+> This can't ever happen in the private mapping case because we will never
+> install a read/write PTE for normal storage, only for COW page cache pages.
+> Essentially I don't think we should ever be able to hit this warning, and if
+> we do I'd like to get the bug report so that I can track down how it was
+> happening and make sure that it's safe.  It is in the mkwrite path of
+> insert_pfn() which is currently only used by the DAX code.
+> 
+> Does that make sense to you, or would you recommend leaving it out?  (If so,
+> why?)
 
-> When switching to regmap, the way to compute the irq cause was
-> reorganized. However while doing it, a typo was introduced: a 'xor'
-> replaced a 'and'.
->
-> This lead to wrong behavior in the interrupt handler ans one of the
-> symptom was wrong irq handler called on the Armada 388 GP:
-> "->handle_irq():  c016303c,
-> handle_bad_irq+0x0/0x278
-> ->irq_data.chip(): c0b0ec0c,
-> 0xc0b0ec0c
-> ->action():   (null)
->    IRQ_NOPROBE set
->  IRQ_NOREQUEST set
-> unexpected IRQ trap at vector 00
-> irq 0, desc: ee804800, depth: 1, count: 0, unhandled: 0"
->
-> Fixes: 2233bf7a92e7 ("gpio: mvebu: switch to regmap for register access")
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Ah, OK, makes sense. So feel free to add:
 
-Would it be possible to push this fix on the current kernel (v4.13-rc) ?
+Reviewed-by: Jan Kara <jack@suse.cz>
 
-Indeed currently due to this bug, the Armada 388 GP board does not boot
-anymore because this board uses a gpio interrupt. So it prevents to have
-continuous integration on this one with kci for instance.
-
-Thanks,
-
-Gregory
-
-
-> ---
->  drivers/gpio/gpio-mvebu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-> index e338c3743562..45c65f805fd6 100644
-> --- a/drivers/gpio/gpio-mvebu.c
-> +++ b/drivers/gpio/gpio-mvebu.c
-> @@ -557,7 +557,7 @@ static void mvebu_gpio_irq_handler(struct irq_desc *desc)
->  	edge_cause = mvebu_gpio_read_edge_cause(mvchip);
->  	edge_mask  = mvebu_gpio_read_edge_mask(mvchip);
->  
-> -	cause = (data_in ^ level_mask) | (edge_cause & edge_mask);
-> +	cause = (data_in & level_mask) | (edge_cause & edge_mask);
->  
->  	for (i = 0; i < mvchip->chip.ngpio; i++) {
->  		int irq;
-> -- 
-> 2.13.2
->
-
+								Honza
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
