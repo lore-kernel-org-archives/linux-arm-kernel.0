@@ -1,70 +1,115 @@
-From: jack@suse.cz (Jan Kara)
-Date: Mon, 24 Jul 2017 17:59:06 +0200
-Subject: [PATCH v4 1/5] mm: add mkwrite param to vm_insert_mixed()
-In-Reply-To: <20170724152357.GB1639@linux.intel.com>
-References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
- <20170721223956.29485-2-ross.zwisler@linux.intel.com>
- <20170724112530.GI652@quack2.suse.cz>
- <20170724152357.GB1639@linux.intel.com>
-Message-ID: <20170724155906.GR652@quack2.suse.cz>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 24 Jul 2017 18:09:30 +0200
+Subject: [PATCH] ARM64: meson-gxl: disable broken eee
+In-Reply-To: <7519c9ee-54f0-d5fb-1683-11d6e24f0822@baylibre.com>
+References: <20170707013257.18250-1-joseph.kogut@gmail.com>
+ <7ho9scsdbp.fsf@baylibre.com>
+ <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
+ <cf71b3c2-29d7-3bdb-0d00-872f5e1267e2@baylibre.com>
+ <7519c9ee-54f0-d5fb-1683-11d6e24f0822@baylibre.com>
+Message-ID: <1500912570.2401.3.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 24-07-17 09:23:57, Ross Zwisler wrote:
-> On Mon, Jul 24, 2017 at 01:25:30PM +0200, Jan Kara wrote:
-> > > @@ -1658,14 +1658,28 @@ static int insert_pfn(struct vm_area_struct *vma, unsigned long addr,
-> > >  	if (!pte)
-> > >  		goto out;
-> > >  	retval = -EBUSY;
-> > > -	if (!pte_none(*pte))
-> > > -		goto out_unlock;
-> > > +	if (!pte_none(*pte)) {
-> > > +		if (mkwrite) {
-> > > +			if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
+On Mon, 2017-07-24 at 14:26 +0200, Neil Armstrong wrote:
+> On 07/24/2017 02:06 PM, Neil Armstrong wrote:
+> > On 07/23/2017 07:03 PM, Joseph Kogut wrote:
+> > > Hi Kevin,
+> > > 
+> > > I tested on a P212 reference board, which is currently the only GXL
+> > > based board I have.
+> > > 
+> > > Before applying the patch, high activity on the ethernet interface
+> > > would cause the link to break, requiring the interface to be brought
+> > > down and back up before it would work again. After applying the patch,
+> > > I could not get the link to break with any transfers.
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 
 > > 
-> > Is the WARN_ON_ONCE() really appropriate here? Your testcase with private
-> > mappings has triggered this situation if I'm right...
-> 
-> Yep, I think this WARN_ON_ONCE() is correct.  The test with private mappings
-> had collisions between read-only DAX mappings which were being faulted in via
-> insert_pfn(), and read/write COW page cache mappings which were being faulted
-> in by wp_page_copy().
-> 
-> I was hitting a false-positive warning when I had the WARN_ON_ONCE() in
-> insert_pfn() outside of the mkwrite case, i.e.:
-> 
-> 	if (!pte_none(*pte)) {
-> 		if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
-> 			goto out_unlock;
-> 		if (mkwrite) {
-> 			entry = *pte;
-> 			goto out_mkwrite;
-> 		} else
-> 			goto out_unlock;
-> 	}
-> 
-> This was triggering when one thread was faulting in a read-only DAX mapping
-> when another thread had already faulted in a read-write COW page cache page.
-> 
-> The patches I sent out have the warning in the mkwrite case, which would mean
-> that we were getting a fault for a read/write PTE in insert_pfn() and the PFN
-> didn't match what was already in the PTE.
-> 
-> This can't ever happen in the private mapping case because we will never
-> install a read/write PTE for normal storage, only for COW page cache pages.
-> Essentially I don't think we should ever be able to hit this warning, and if
-> we do I'd like to get the bug report so that I can track down how it was
-> happening and make sure that it's safe.  It is in the mkwrite path of
-> insert_pfn() which is currently only used by the DAX code.
-> 
-> Does that make sense to you, or would you recommend leaving it out?  (If so,
-> why?)
+> > Hi Joseph,
+> > 
+> > [please keep the history of the conversation when replying]
+> > 
+> > Is it a original P212 board, or a board based on the P212 ref design ?
+> > 
+> > I'm currently testing the v4.13-rc2 on the official P212 board we received
+> > from Amlogic
+> > and using iperf3 in both directions, I have an issue after a few minutes
+> > running iperf3 with :
+> > 
+> > # while true ; do iperf3 -c 192.168.1.21 ; iperf3 -c 192.168.1.21 -R ; done
+> > 
+> > That cycles between the two iperf directions.
+> > 
+> > After a few minutes, it stalls with :
+> > 
+> > Connecting to host 192.168.1.21, port 5201
+> > [??4] local 192.168.1.183 port 51286 connected to 192.168.1.21 port 5201
+> > [ ID] Interval???????????Transfer?????Bandwidth???????Retr??Cwnd
+> > [??4]???0.00-1.00???sec??1.64 MBytes??13.7 Mbits/sec????2???1.41 KBytes
+> > [??4]???1.00-2.00???sec??0.00 Bytes??0.00 bits/sec????1???1.41 KBytes
+> > [??4]???2.00-3.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
+> > [??4]???3.00-4.00???sec??0.00 Bytes??0.00 bits/sec????1???1.41 KBytes
+> > [??4]???4.00-5.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
+> > [??4]???5.00-6.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
+> > [??4]???6.00-7.00???sec??0.00 Bytes??0.00 bits/sec????1???1.41 KBytes
+> > [??4]???7.00-8.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
+> > [??4]???8.00-9.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
+> > 
 
-Ah, OK, makes sense. So feel free to add:
+Same kind of test shows no issue on the libretech-cc and the khadas-vim
+In this case, I don't think meson-gxl.dtsi is where you should make your change.
 
-Reviewed-by: Jan Kara <jack@suse.cz>
+> > 
+> > And then, after:
+> > # ifconfig eth0 down
+> > # ifconfig eth0 up
+> > 
+> > It cycles between :
+> > [ 1483.009919] meson8b-dwmac c9410000.ethernet eth0: Link is Up -
+> > 100Mbps/Full - flow control rx/tx
+> > [ 1487.105725] meson8b-dwmac c9410000.ethernet eth0: Link is Down
+> > [ 1490.177943] meson8b-dwmac c9410000.ethernet eth0: Link is Up -
+> > 100Mbps/Full - flow control rx/tx
+> > [ 1494.273713] meson8b-dwmac c9410000.ethernet eth0: Link is Down
 
-								Honza
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+This does not look like the issue we had on the odroid-c2.
+However, I have seen behavior like this (link down/up flickering) when the rgmii
+ delays are way off.
+
+Maybe you could try playing with "amlogic,tx-delay-ns" property ?
+
+> > 
+> > and so on.
+> > 
+> > And this patch does not fix this at all.
+> > 
+> > It seems to be more a PHY driver issue here.
+> > 
+> > Could you share the results with the same command ?
+> > 
+> > Neil
+> > 
+> 
+> I forgot to precise, this issue occurs when the "GXL PHY driver" is disabled,
+> only relying on the
+> Generic PHY Driver.
+> 
+> [??630.767538] Generic PHY 0.e40908ff:08: attached PHY driver [Generic PHY]
+> (mii_bus:phy_addr=0.e40908ff:08, irq=-1)
+> 
+> 
+> When the PHY driver is loaded the issue disappears, with and without your
+> patch.
+> 
+> [???25.355620] Meson GXL Internal PHY 0.e40908ff:08: attached PHY driver
+> [Meson GXL Internal PHY] (mii_bus:phy_addr=0.e40908ff:08, irq=-1)
+> 
+> Could you please check the PHY Driver is loaded ?
+> 
+> Thanks,
+> Neil
