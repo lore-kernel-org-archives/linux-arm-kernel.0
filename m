@@ -1,76 +1,133 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 24 Jul 2017 14:06:04 +0200
-Subject: [PATCH] ARM64: meson-gxl: disable broken eee
-In-Reply-To: <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
-References: <20170707013257.18250-1-joseph.kogut@gmail.com>
- <7ho9scsdbp.fsf@baylibre.com>
- <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
-Message-ID: <cf71b3c2-29d7-3bdb-0d00-872f5e1267e2@baylibre.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 24 Jul 2017 14:16:40 +0200
+Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
+In-Reply-To: <35c2af77-b717-b86a-1f19-b3571d2fe156@xs4all.nl>
+References: <20170530142218.GS22219@n2100.armlinux.org.uk>
+ <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
+ <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
+ <20170609133822.GR4902@n2100.armlinux.org.uk>
+ <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
+ <20170609141056.GS4902@n2100.armlinux.org.uk>
+ <b46f25c1-45fd-2917-6559-218f6887a882@xs4all.nl>
+ <20170717090516.GJ31807@n2100.armlinux.org.uk>
+ <e80b0213-7632-faf4-5d57-06509912990d@xs4all.nl>
+ <20170717120513.GK31807@n2100.armlinux.org.uk>
+ <35c2af77-b717-b86a-1f19-b3571d2fe156@xs4all.nl>
+Message-ID: <fba25a7e-671a-f7f4-93d6-68b004191675@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2017 07:03 PM, Joseph Kogut wrote:
-> Hi Kevin,
+Hi Russell,
+
+On 07/17/2017 02:23 PM, Hans Verkuil wrote:
+> On 17/07/17 14:05, Russell King - ARM Linux wrote:
+>> On Mon, Jul 17, 2017 at 01:39:48PM +0200, Hans Verkuil wrote:
+>>> On 17/07/17 11:05, Russell King - ARM Linux wrote:
+>>>> On Mon, Jul 17, 2017 at 10:56:47AM +0200, Hans Verkuil wrote:
+>>>>> Hi Russell,
+>>>>>
+>>>>> On 09/06/17 16:10, Russell King - ARM Linux wrote:
+>>>>>> On Fri, Jun 09, 2017 at 03:56:39PM +0200, Neil Armstrong wrote:
+>>>>>>> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is
+>>>>>>> not used, but a custom one, so this notifier is actually useful for
+>>>>>>> this platform and maybe others.
+>>>>>>
+>>>>>> Is the CEC controller configured into dw-hdmi (is the config bit set?)
+>>>>>> I'm just wondering if we're going to end up with two CEC drivers trying
+>>>>>> to bind to the same notifier.
+>>>>>>
+>>>>>>> Should we really wait until I push the Amlogic AO CEC driver ? Having a
+>>>>>>> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
+>>>>>>
+>>>>>> It sounds like this adds additional information that has been missing
+>>>>>> from the review of my patches - and I suspect changes Hans' comments.
+>>>>>> So, I'll wait, it seems pointless to try and update the patches when
+>>>>>> it's not clear how to proceed due to other dependencies, especially
+>>>>>> when it means that their existing state is what's required (I'm pleased
+>>>>>> that I've held off modifying the patches so far.)
+>>>>>>
+>>>>>> If that means having to wait another kernel revision, then I guess that's
+>>>>>> what will have to happen.
+>>>>>
+>>>>> Can you respin your patch series, keeping the notifier support? The CEC
+>>>>> kernel config handling has been cleaned up (just select CEC_CORE and
+>>>>> CEC_NOTIFIER) so you should be good to go.
+>>>>
+>>>> Not yet - the change to the way you're dealing with Kconfig in CEC is
+>>>> fundamentally broken, and needs fixing before we can merge dw-hdmi-cec
+>>>> support.
+>>>>
+>>>> As a result of these Kconfig changes, dw-hdmi-cec now fails if:
+>>>>
+>>>> 1. You build the CEC part as a module
+>>>> 2. You build the HDMI part into the kernel
+>>>>
+>>>> This results in CEC_NOTIFIER=y and CEC_CORE=m, which, when the HDMI part
+>>>> gets built, results in the stubs in the notifier code being used, rather
+>>>> than the real functions.  This in turn causes the CEC part to never
+>>>> receive a physical address, which is therefore non-functional.
+>>>>
+>>>> I did have a patch to fix this, but it was never committed, and I got
+>>>> busy with other stuff (so it ended up being git reset --hard away.)
+>>>>
+>>>
+>>> This is more a DRM_DW_HDMI issue than a CEC issue IMHO.
+>>>
+>>> This will fix this:
+>>>
+>>> config DRM_DW_HDMI
+>>>          tristate
+>>>          select DRM_KMS_HELPER
+>>>          select REGMAP_MMIO
+>>>          select CEC_CORE if CEC_NOTIFIER			<<<<<<
+>>>
+>>> config DRM_DW_HDMI_CEC
+>>>          tristate "Synopsis Designware CEC interface"
+>>>          depends on DRM_DW_HDMI
+>>>          select CEC_CORE
+>>>          select CEC_NOTIFIER
+>>>          help
+>>>            Support the CE interface which is part of the Synopsis
+>>>            Designware HDMI block.
+>>>
+>>> This makes sense: if DRM_DW_HDMI_CEC is disabled but another CEC module is
+>>> used instead (as is apparently the case for amlogic), then the
+>>>
+>>> 	select CEC_CORE if CEC_NOTIFIER
+>>>
+>>> line ensures that CONFIG_CEC_CORE has the right m/y value.
+>>
+>> I disagree with this approach.
+>>
+>> If DRM_DW_HDMI=y and DRM_DW_HDMI_CEC=n, but some other driver is enabled
+>> that selects CEC_NOTIFIER, then we end up with CEC_CORE forced enabled
+>> through dw-hdmi, even though we haven't asked for the CEC part to be
+>> enabled.
 > 
-> I tested on a P212 reference board, which is currently the only GXL
-> based board I have.
+> If CEC_NOTIFIER is enabled by a CEC driver, then CEC_CORE will also be
+> enabled (without CEC_CORE that driver wouldn't compile, obviously).
 > 
-> Before applying the patch, high activity on the ethernet interface
-> would cause the link to break, requiring the interface to be brought
-> down and back up before it would work again. After applying the patch,
-> I could not get the link to break with any transfers.
+> So I don't see the problem. All the select...if does is make sure that
+> the CEC_CORE can be reached from the HDMI driver if someone enabled the
+> CEC notifier (and thus CEC_CORE).
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> You might as well have CEC_NOTIFIER itself select CEC_CORE, and be done
+>> with it, because that's basically what this boils down to.
 > 
+> That makes no sense.
+> 
+> If CEC_NOTIFIER is set, then both the CEC driver and the HDMI driver have to
+> select CEC_CORE to ensure the right dependency. If CEC_NOTIFIER is not set,
+> then only the CEC driver has to select CEC_CORE. In that case the CEC code
+> is typically either integrated into the HDMI driver or it is a standalone
+> device like the USB pulse8-cec driver.
 
-Hi Joseph,
+Just to make sure you aren't waiting for me to do anything: as far as I can tell
+the Kconfig above will ensure the right dependencies. If you have an example
+where this fails, then let me know. I am not planning on making any changes.
+Frankly, I wouldn't know what to change since AFAICT it is all working with
+the above Kconfig.
 
-[please keep the history of the conversation when replying]
+Regards,
 
-Is it a original P212 board, or a board based on the P212 ref design ?
-
-I'm currently testing the v4.13-rc2 on the official P212 board we received from Amlogic
-and using iperf3 in both directions, I have an issue after a few minutes running iperf3 with :
-
-# while true ; do iperf3 -c 192.168.1.21 ; iperf3 -c 192.168.1.21 -R ; done
-
-That cycles between the two iperf directions.
-
-After a few minutes, it stalls with :
-
-Connecting to host 192.168.1.21, port 5201
-[  4] local 192.168.1.183 port 51286 connected to 192.168.1.21 port 5201
-[ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
-[  4]   0.00-1.00   sec  1.64 MBytes  13.7 Mbits/sec    2   1.41 KBytes
-[  4]   1.00-2.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
-[  4]   2.00-3.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
-[  4]   3.00-4.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
-[  4]   4.00-5.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
-[  4]   5.00-6.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
-[  4]   6.00-7.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
-[  4]   7.00-8.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
-[  4]   8.00-9.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
-
-
-And then, after:
-# ifconfig eth0 down
-# ifconfig eth0 up
-
-It cycles between :
-[ 1483.009919] meson8b-dwmac c9410000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
-[ 1487.105725] meson8b-dwmac c9410000.ethernet eth0: Link is Down
-[ 1490.177943] meson8b-dwmac c9410000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
-[ 1494.273713] meson8b-dwmac c9410000.ethernet eth0: Link is Down
-
-and so on.
-
-And this patch does not fix this at all.
-
-It seems to be more a PHY driver issue here.
-
-Could you share the results with the same command ?
-
-Neil
+	Hans
