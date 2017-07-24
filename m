@@ -1,53 +1,153 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 24 Jul 2017 18:38:23 +0100
-Subject: [PATCH 1/8] mailbox: introduce ARM SMC based mailbox
-In-Reply-To: <CABb+yY2hjfXdiCSZXd5TJf8=janwjWEo2oSqrxdoWc=1oUtteQ@mail.gmail.com>
-References: <20170630095608.24943-1-andre.przywara@arm.com>
- <20170630095608.24943-2-andre.przywara@arm.com>
- <CABb+yY18Aye3wr2A9-+jemqc=VSRyUA+xzKGo9s0G4KCt1ovyA@mail.gmail.com>
- <22d23c1d-ea8d-9829-4624-6305cd83ad4a@arm.com>
- <CABb+yY2hjfXdiCSZXd5TJf8=janwjWEo2oSqrxdoWc=1oUtteQ@mail.gmail.com>
-Message-ID: <0aaba7fb-2183-2d4d-ba04-64b30cd0ae10@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Jul 2017 10:39:54 -0700
+Subject: [PATCH] ARM: dts: BCM53573: Add Broadcom BCM947189ACDBMR board
+ support
+In-Reply-To: <20170718193740.8610-1-f.fainelli@gmail.com>
+References: <20170718193740.8610-1-f.fainelli@gmail.com>
+Message-ID: <bb5387cf-5d31-3a03-1bb9-1327768271ec@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/18/2017 12:37 PM, Florian Fainelli wrote:
+> Adds support for the Broadcom reference board BCM947189ACDMBR which
+> features the following:
+> 
+> * 128MB of DRAM
+> * External MoCA support through a Broadcom BCM6802 chip
+> * 1x external Gigabit PHY through the external BCM6802
+> * 1x USB 2.0 port
+> * 1x PCIE slot
+> * Few configurable buttons and LEDs
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+
+Rafal, any feedback on this?
+
+> ---
+>  arch/arm/boot/dts/Makefile            |  3 +-
+>  arch/arm/boot/dts/bcm947189acdbmr.dts | 97 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 99 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/bcm947189acdbmr.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 4b17f35dc9a7..236587e7f07d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -106,7 +106,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>  	bcm953012hr.dtb \
+>  	bcm953012k.dtb
+>  dtb-$(CONFIG_ARCH_BCM_53573) += \
+> -	bcm47189-tenda-ac9.dtb
+> +	bcm47189-tenda-ac9.dtb \
+> +	bcm947189acdbmr.dtb
+>  dtb-$(CONFIG_ARCH_BCM_63XX) += \
+>  	bcm963138dvt.dtb
+>  dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+> diff --git a/arch/arm/boot/dts/bcm947189acdbmr.dts b/arch/arm/boot/dts/bcm947189acdbmr.dts
+> new file mode 100644
+> index 000000000000..ef263412fea5
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm947189acdbmr.dts
+> @@ -0,0 +1,97 @@
+> +/*
+> + * Copyright (C) 2017 Broadcom
+> + * Author: Florian Fainelli <f.fainelli@gmail.com>
+> + *
+> + * Licensed under the ISC license.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm53573.dtsi"
+> +
+> +/ {
+> +	compatible = "brcm,bcm947189acdbmr", "brcm,bcm47189", "brcm,bcm53573";
+> +	model = "Broadcom BCM947189ACDBMR";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlycon";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x00000000 0x08000000>;
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		wps {
+> +			label = "bcm53xx:blue:wps";
+> +			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		5ghz {
+> +			label = "bcm53xx:blue:5ghz";
+> +			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		2ghz {
+> +			label = "bcm53xx:blue:2ghz";
+> +			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		restart {
+> +			label = "Reset";
+> +			linux,code = <KEY_RESTART>;
+> +			gpios = <&chipcommon 7 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		wps {
+> +			label = "WPS";
+> +			linux,code = <KEY_WPS_BUTTON>;
+> +			gpios = <&chipcommon 9 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	spi {
+> +		compatible = "spi-gpio";
+> +		num-chipselects = <1>;
+> +		gpio-sck = <&chipcommon 21 0>;
+> +		gpio-miso = <&chipcommon 22 0>;
+> +		gpio-mosi = <&chipcommon 23 0>;
+> +		cs-gpios = <&chipcommon 24 0>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		/* External BCM6802 MoCA chip is connected */
+> +	};
+> +};
+> +
+> +&pcie0 {
+> +	ranges = <0x00000000 0 0 0 0 0x00100000>;
+> +	#address-cells = <3>;
+> +	#size-cells = <2>;
+> +
+> +	bridge at 0,0,0 {
+> +		reg = <0x0000 0 0 0 0>;
+> +		ranges = <0x00000000 0 0 0 0 0 0 0x00100000>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +
+> +		wifi at 0,1,0 {
+> +			reg = <0x0000 0 0 0 0>;
+> +			ranges = <0x00000000 0 0 0 0x00100000>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +		};
+> +	};
+> +};
+> +
+> +&usb2 {
+> +	vcc-gpio = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
+> +};
+> 
 
 
-On 24/07/17 18:20, Jassi Brar wrote:
-> On Mon, Jul 24, 2017 at 4:50 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
->> On 02/07/17 06:55, Jassi Brar wrote:
->>
->>>> +       mbox_chan_received_data(link, (void *)res.a0);
->>>> +
->>> Or you can update the 'data' with value from 'a0' ?
->>
->> Mmh, I am a bit puzzled by this. Why would this be needed or useful?
->>
-> I meant instead of calling mbox_chan_received_data(), simply update
-> the value at 'data' with res.a0
-> 
-> Technically the firmware does not "send" us a message. It only updates
-> the structure we share with it. So maybe we could reflect that by
-> updating the data pointer the client driver asked to send.
-> Also it is optional for clients to provide the rx_callback(). By
-> calling mbox_chan_received_data() you mandate clients provide that
-> callback.
-> 
-> Nothing serious, just that looking closely, updating 'data' seems a
-> better option.
-> 
->> I see that the SCPI firmware driver (as the user of the mailbox API) is
->> expecting the return value from a0 as returned above, translating the
->> firmware error codes into Linux' ones.
->>
-> I am afraid, SCPI driver is not the golden example for client drivers
-> to follow. It is supposed to work only with MHU, and then, it is
-> likely to break if some other protocol is running parallel to it.
-> 
-
-Not sure why do you say it works only with ARM MHU ? AmLogic uses it
-with their mailbox driver. However they followed an interim version of
-the SCPI spec which is termed "legacy" in the driver.
 -- 
-Regards,
-Sudeep
+Florian
