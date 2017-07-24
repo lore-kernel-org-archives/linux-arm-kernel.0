@@ -1,58 +1,140 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 24 Jul 2017 17:21:38 +0100
-Subject: [PATCH 3/9] firmware: arm_scmi: add basic driver infrastructure
- for SCMI
-In-Reply-To: <CABb+yY3NNUE7YXAhBLpMzVZkB7Kgx6iZk8a--crHa9Wpw6Ls4Q@mail.gmail.com>
-References: <1498492513-29771-4-git-send-email-sudeep.holla@arm.com>
- <1499446341-5956-1-git-send-email-jaswinder.singh@linaro.org>
- <5f2e4f3c-297b-c5f8-9244-399c1c4e2c21@arm.com>
- <CABb+yY3Xo-meg5bTZ5Cj1DAvf_0yOw0QB5Kq6U7VG+L_L+Mo3w@mail.gmail.com>
- <f165d171-a55b-662f-888c-3be2c3e8f11a@arm.com>
- <CABb+yY3NNUE7YXAhBLpMzVZkB7Kgx6iZk8a--crHa9Wpw6Ls4Q@mail.gmail.com>
-Message-ID: <cd935dab-06b8-a91b-d393-cfc2f085c600@arm.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Mon, 24 Jul 2017 19:29:14 +0300
+Subject: [PATCH v2 1/5] arm64: tegra: Add BPMP thermal sensor to Tegra186
+Message-ID: <20170724162918.21050-1-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds the thermal sensor device provided by the BPMP, and the
+relevant thermal sensors to the Tegra186 device tree.
 
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+v2:
+- added trips and cooling-maps nodes
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 103 +++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
 
-On 24/07/17 16:41, Jassi Brar wrote:
-> On Mon, Jul 24, 2017 at 3:20 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->>
->> On 08/07/17 06:32, Jassi Brar wrote:
->>> Hi Roy, Matt, Nishant, Harb Abdulhamid, Loc,
->>>
->>> I have a gut feeling you guys were part of the SCMI spec committee. If
->>> so, could you please chime in?
->>>
->>
->> I take complete silence as no objection.
->>
-> I take it as no self respecting developer/architect would stand by
-> your FUBAR implementation of SCMI.
->
-
-Wow really ? This is exactly how ACPI PCC works today IIUC.
-
-> SCMI  calls
->     mbox_send_message(struct mbox_chan *chan, struct scmi_xfer *xfer);
-> 
-> whereas the API expects
->     mbox_send_message(struct mbox_chan *chan, struct controller_specific *xfer);
-> 
-
-That's not hard to change but you seem to have combined my ARM MHU
-changes into this which is totally wrong and now I say also stupid after
-mentioning the same thing so many times. Consider them independently and
-try to understand.
-
-> As the maintainer I have tried to explain it to you in a dozen ways.
-> If you still can't see how it's broken, you can't be helped.
-> 
-
-Sorry but you wanted driver to explain initially. I posted them. But you
-haven't answer my specific questions yet.
-
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+index 0b0552c9f7dd..6adcf25e13d1 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+@@ -4,6 +4,7 @@
+ #include <dt-bindings/mailbox/tegra186-hsp.h>
+ #include <dt-bindings/power/tegra186-powergate.h>
+ #include <dt-bindings/reset/tegra186-reset.h>
++#include <dt-bindings/thermal/tegra186-bpmp-thermal.h>
+ 
+ / {
+ 	compatible = "nvidia,tegra186";
+@@ -451,6 +452,108 @@
+ 			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
++
++		bpmp_thermal: thermal {
++			compatible = "nvidia,tegra186-bpmp-thermal";
++			#thermal-sensor-cells = <1>;
++		};
++	};
++
++	thermal-zones {
++		a57 {
++			polling-delay = <0>;
++			polling-delay-passive = <1000>;
++
++			thermal-sensors =
++				<&bpmp_thermal TEGRA186_BPMP_THERMAL_ZONE_CPU>;
++
++			trips {
++				critical {
++					temperature = <101000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
++
++		denver {
++			polling-delay = <0>;
++			polling-delay-passive = <1000>;
++
++			thermal-sensors =
++				<&bpmp_thermal TEGRA186_BPMP_THERMAL_ZONE_AUX>;
++
++			trips {
++				critical {
++					temperature = <101000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
++
++		gpu {
++			polling-delay = <0>;
++			polling-delay-passive = <1000>;
++
++			thermal-sensors =
++				<&bpmp_thermal TEGRA186_BPMP_THERMAL_ZONE_GPU>;
++
++			trips {
++				critical {
++					temperature = <101000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
++
++		pll {
++			polling-delay = <0>;
++			polling-delay-passive = <1000>;
++
++			thermal-sensors =
++				<&bpmp_thermal TEGRA186_BPMP_THERMAL_ZONE_PLLX>;
++
++			trips {
++				critical {
++					temperature = <101000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
++
++		always_on {
++			polling-delay = <0>;
++			polling-delay-passive = <1000>;
++
++			thermal-sensors =
++				<&bpmp_thermal TEGRA186_BPMP_THERMAL_ZONE_AO>;
++
++			trips {
++				critical {
++					temperature = <101000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
+ 	};
+ 
+ 	timer {
 -- 
-Regards,
-Sudeep
+2.13.3
