@@ -1,90 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Jul 2017 09:49:35 -0700
-Subject: Problem with PHY state machine when using interrupts
-In-Reply-To: <849513d9-c981-ec20-5a10-08c663d0aa37@free.fr>
-References: <65b9f1f5-724c-cd03-1c39-59405e773efa@free.fr>
- <849513d9-c981-ec20-5a10-08c663d0aa37@free.fr>
-Message-ID: <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Mon, 24 Jul 2017 10:07:09 -0700
+Subject: [PATCH 1/3] arm/syscalls: Move address limit check in loop
+In-Reply-To: <20170719175900.124074-1-thgarnie@google.com>
+References: <20170719175900.124074-1-thgarnie@google.com>
+Message-ID: <CAJcbSZFw9GhVvNfYi1oHhpintHSzGcHvGjg5LtRViNBPDzLHaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2017 08:01 AM, Mason wrote:
-> On 24/07/2017 13:07, Mason wrote:
-> 
->> When I set the link down via 'ip link set eth0 down'
->> (as opposed to pulling the Ethernet cable) things don't happen as expected:
->>
->> The driver's adjust_link() callback is never called, and doesn't
->> get a chance make some required changes. And when I set the link
->> up again, there is no network connectivity.
->>
->> I get this problem only if I enable interrupts on my PHY.
->> If I use polling, things work as expected.
->>
->>
->> When I set the link down, devinet_ioctl() eventually calls
->> ndo_set_rx_mode() and ndo_stop()
->>
->> In ndo_stop() the driver calls
->> phy_stop(phydev);
->> which disables interrupts and sets the state to HALTED.
->>
->> In phy_state_machine()
->> the PHY_HALTED case does call the adjust_link() callback:
->>
->> 		if (phydev->link) {
->> 			phydev->link = 0;
->> 			netif_carrier_off(phydev->attached_dev);
->> 			phy_adjust_link(phydev);
->> 			do_suspend = true;
->> 		}
->>
->> But it's not called when I use interrupts...
->>
->> Perhaps because there are no interrupts generated?
->> Or even if there were, they have been turned off by phy_stop?
->>
->> Basically, it seems like when I use interrupts,
->> the phy_state_machine() is not called on link down,
->> which breaks the MAC driver's expectations.
->>
->> Am I barking up the wrong tree?
-> 
-> FWIW, the patch below solves my issue.
-> Basically, we reset the MAC in open(), instead of probe().
-> 
-> I also had to solve the issue of adjust_link() not being
-> called by calling it explicitly in stop() instead of
-> relying on phy_stop() to do it indirectly.
+On Wed, Jul 19, 2017 at 10:58 AM, Thomas Garnier <thgarnie@google.com> wrote:
+> The work pending loop can call set_fs after addr_limit_user_check
+> removed the _TIF_FSCHECK flag. To prevent the infinite loop, move
+> the addr_limit_user_check call at the beginning of the loop.
+>
+> Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-mode return")
+> Reported-by: Leonard Crestez <leonard.crestez@nxp.com>
+> Signed-off-by: Thomas Garnier <thgarnie@google.com>
 
-Which is of course absolutely not how it is intended to be used.
-phy_stop() does the following:
+Any comments on this patch set?
 
-- if the PHY was already HALTED do nothing and exit
-- if it was not and an interrupt is valid for this PHY:  disable and
-clear these interrupts
-- set state to PHY_HALTED
-
-somehow an interrupt should be generated from doing this such that
-phy_change(), invoked from phy_interrupt() should have a chance to run
-and make the PHY state machine transition properly to PHY_HALTED.
-
-So from there can you check a few things:
-
-- is such an interrupt actually generated?
-- if you turn on dynamic debug prints for drivers/net/phy/phy.c where do
-we leave the PHY state machine and what state is it in when you call
-ifconfig up again?
-
-> 
-> With this code, I think it is easy to handle suspend/resume:
-> on suspend, I will stop() and on resume, I will start(),
-> and everything should work as expected.
-> 
-> I'd like to hear comments on the patch, so I can turn it
-> into a formal submission.
+> ---
+>  arch/arm/kernel/signal.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 3a48b54c6405..f4574287d14b 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -573,10 +573,10 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+>          */
+>         trace_hardirqs_off();
+>
+> -       /* Check valid user FS if needed */
+> -       addr_limit_user_check();
+> -
+>         do {
+> +               /* Check valid user FS if needed */
+> +               addr_limit_user_check();
+> +
+>                 if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+>                         schedule();
+>                 } else {
+> --
+> 2.14.0.rc0.284.gd933b75aa4-goog
+>
 
 
 
 -- 
-Florian
+Thomas
