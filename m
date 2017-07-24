@@ -1,61 +1,86 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 24 Jul 2017 20:42:15 +0200
-Subject: [PATCH 3/4] ACPI: Introduce DMA ranges parsing
-In-Reply-To: <20170724104048.GD13145@red-moon>
-References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
- <20170720144517.32529-4-lorenzo.pieralisi@arm.com>
- <37547189.Yunjf1Ri5r@aspire.rjw.lan>
- <20170724104048.GD13145@red-moon>
-Message-ID: <CAJZ5v0h_ySMbtGfs5_E+PCJko+3_aDo=1joDaA1_2wCT5tZe=Q@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Mon, 24 Jul 2017 13:06:56 -0600
+Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
+ SMMUv3 driver
+In-Reply-To: <6468f359-1682-b9b0-5a4d-72738939cb84@arm.com>
+References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+ <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
+ <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
+ <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
+ <20170719112524.GF13642@arm.com>
+ <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
+ <20170719113325.GI13642@arm.com>
+ <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
+ <20170719115333.GJ13642@arm.com>
+ <CAALAos-YbVbgvPmDYXeWaF4y8MQ9i7CG3tgGuf-QLR6hmXo18Q@mail.gmail.com>
+ <20170720091003.GA17837@arm.com>
+ <8e82d8f5-e5e2-dd09-c774-29f9eda2ecdd@arm.com>
+ <20170724111621.7f1c3a85@w520.home>
+ <6468f359-1682-b9b0-5a4d-72738939cb84@arm.com>
+Message-ID: <20170724130656.5240ae0d@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 12:40 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Sat, Jul 22, 2017 at 12:15:42AM +0200, Rafael J. Wysocki wrote:
->
+On Mon, 24 Jul 2017 18:23:20 +0100
+Robin Murphy <robin.murphy@arm.com> wrote:
 
-[cut]
+> On 24/07/17 18:16, Alex Williamson wrote:
+> > On Thu, 20 Jul 2017 12:17:12 +0100
+> > Robin Murphy <robin.murphy@arm.com> wrote:
+> >   
+> >> On 20/07/17 10:10, Will Deacon wrote:  
+> >>> On Thu, Jul 20, 2017 at 09:32:00AM +0530, Anup Patel wrote:    
+> >>>> On Wed, Jul 19, 2017 at 5:23 PM, Will Deacon <will.deacon@arm.com> wrote:    
+> >>>>> There are two things here:
+> >>>>>
+> >>>>>   1. iommu_present() is pretty useless, because it applies to a "bus" which
+> >>>>>      doesn't actually tell you what you need to know for things like the
+> >>>>>      platform_bus, where some masters might be upstream of an SMMU and
+> >>>>>      others might not be.    
+> >>>>
+> >>>> I agree with you. The iommu_present() check in vfio_iommu_group_get()
+> >>>> is not much useful. We only reach line which checks iommu_present()
+> >>>> when iommu_group_get() returns NULL for given "struct device *". If there
+> >>>> is no IOMMU group for a "struct device *" then it means there is no IOMMU
+> >>>> HW doing translations for such device.
+> >>>>
+> >>>> If we drop the iommu_present() check (due to above reasons) in
+> >>>> vfio_iommu_group_get() then we don't require the IOMMU_CAP_BYPASS
+> >>>> and we can happily drop PATCH1, PATCH2, and PATCH3.
+> >>>>
+> >>>> I will remove the iommu_present() check in vfio_iommu_group_get()
+> >>>> because it is only comes into actions when VFIO_NOIOMMU is
+> >>>> enabled. This will also help us drop PATCH1-to-PATCH3.    
+> >>>
+> >>> I don't think that's the right answer. Whilst iommu_present has obvious
+> >>> shortcomings, its intention is clear: it should tell you whether a given
+> >>> *device* is upstream of an IOMMU. So the right fix is to make this
+> >>> per-device, instead of per-bus. Removing it altogether is worse than leaving
+> >>> it like it is.    
+> >>
+> >> Not really - if there is an IOMMU up and running to the point of setting
+> >> bus ops, every device it cares about can be expected to have a group
+> >> already (there are only a couple of drivers left that don't use groups,
+> >> and they're hardly relevant to VFIO). Thus iommu_group_get() already is
+> >> the de-facto per-device IOMMU check.
+> >>
+> >> And having looked into it, I'm now spinning a couple of patches to
+> >> finish off making groups truly mandatory so that that can be less
+> >> de-facto ;)  
+> > 
+> > No, look at vfio-noiommu and even vfio-mdev devices for devices which
+> > have an iommu group but there is no physical iommu supporting them.
+> > iommu_present() is how we can distinguish these groups and therefore
+> > not generate a segfault in trying to use the full IOMMU API on them.  
+> 
+> OK, so that means that the combination of vfio-noiommu and vfio-platform
+> is simply unusable, because iommu_present(&platform_bus_type) can give
+> such dangerous false positives too.
 
->
->> > +           return -EINVAL;
->> > +   }
->> > +
->> > +   ret = acpi_dev_get_dma_resources(adev, &list);
->> > +   if (ret > 0) {
->> > +           list_for_each_entry(rentry, &list, node) {
->> > +                   if (dma_offset && rentry->offset != dma_offset) {
->> > +                           ret = -EINVAL;
->> > +                           pr_warn("Can't handle multiple windows with different offsets\n");
->> > +                           goto out;
->> > +                   }
->> > +                   dma_offset = rentry->offset;
->> > +
->> > +                   /* Take lower and upper limits */
->> > +                   if (rentry->res->start < dma_start)
->> > +                           dma_start = rentry->res->start;
->> > +                   if (rentry->res->end > dma_end)
->> > +                           dma_end = rentry->res->end;
->> > +           }
->> > +
->> > +           if (dma_start >= dma_end) {
->> > +                   ret = -EINVAL;
->> > +                   pr_warn("Invalid DMA regions configuration\n");
->>
->> dev_warn()?
->>
->> And why _warn() and not _info()?
->
-> Mmm..ok for the dev_ prefix - basically this would be a FW_BUG (I think
-> this specific error condition is overkill TBH, the ACPI resource
-> validation code should catch it before we even get here) not sure
-> about downgrading it to _info() though, I would leave it at this
-> loglevel - in particular in the offset check above:
->
->         if (dma_offset && rentry->offset != dma_offset) {
->                 ret = -EINVAL;
->                 pr_warn("Can't handle multiple windows with different offsets\n");
->                 goto out;
->         }
+Yep, this kinda falls apart since platform_bus_type doesn't really map
+to a physical bus, nor does the presence of a group canonically
+demonstrate that an iommu is present since anyone can create a group
+for a device.  We really do need to migrate to per-device iommu_ops.
+Thanks,
 
-Well, so the "why" question above still has no answer ...
+Alex
