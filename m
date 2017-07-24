@@ -1,65 +1,53 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 24 Jul 2017 11:29:18 +0100
-Subject: [PATCH v2 3/6] coresight: of: Use of_device_node_get_cpu helper
-In-Reply-To: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
-References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1500892161-17634-4-git-send-email-suzuki.poulose@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 24 Jul 2017 11:54:58 +0100
+Subject: [PATCH 04/11] arm64/cpufeature: add ARMv8.3 id_aa64isar1 bits
+In-Reply-To: <1500480092-28480-5-git-send-email-mark.rutland@arm.com>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+ <1500480092-28480-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <915a28c3-ec4d-2c19-17d1-ed47a6396ff9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reuse the new generic helper, of_device_node_get_cpu() to map a
-given CPU phandle to a logical CPU number.
+On 19/07/17 17:01, Mark Rutland wrote:
+> From ARMv8.3 onwards, ID_AA64ISAR1 is no longer entirely RES0, and now
+> has four fields describing the presence of pointer authentication
+> functionality:
+>
+> * APA - address authentication present, using an architected algorithm
+> * API - address authentication present, using an IMP DEF algorithm
+> * GPA - generic authentication present, using an architected algorithm
+> * GPI - generic authentication present, using an IMP DEF algoithm
+>
+> This patch adds the requisite definitions so that we can identify the
+> presence of this functionality. For the timebeing, the features are
+> hidden from userspace.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/cpufeature.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 9f9e0064..b23ad83 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -120,7 +120,11 @@ static int __init register_cpu_hwcaps_dumper(void)
+>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_LRCPC_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
+> -	ARM64_FTR_END,
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_GPI_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_GPA_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_API_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_APA_SHIFT, 4, 0),
+> +	ARM64_FTR_END
+>  };
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Leo Yan <leo.yan@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/of_coresight.c | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+minor nit: Could we keep the fields in the order of their positions in the register ?
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index a187941..42ce9f8 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -16,6 +16,7 @@
- #include <linux/clk.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-@@ -104,26 +105,17 @@ static int of_coresight_alloc_memory(struct device *dev,
- int of_coresight_get_cpu(const struct device_node *node)
- {
- 	int cpu;
--	bool found;
--	struct device_node *dn, *np;
-+	struct device_node *dn;
- 
- 	dn = of_parse_phandle(node, "cpu", 0);
--
- 	/* Affinity defaults to CPU0 */
- 	if (!dn)
- 		return 0;
--
--	for_each_possible_cpu(cpu) {
--		np = of_cpu_device_node_get(cpu);
--		found = (dn == np);
--		of_node_put(np);
--		if (found)
--			break;
--	}
--	of_node_put(dn);
--
-+	cpu = of_device_node_get_cpu(dn);
- 	/* Affinity to CPU0 if no cpu nodes are found */
--	return found ? cpu : 0;
-+	if (cpu >= nr_cpu_ids)
-+		return 0;
-+	return cpu;
- }
- EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
- 
--- 
-2.7.5
+With that,
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
