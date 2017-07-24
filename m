@@ -1,66 +1,113 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 24 Jul 2017 10:55:53 +0100
-Subject: [PATCH 1/4] iommu/msm: Add iommu_group support
-In-Reply-To: <f5071164-c965-b6bf-c330-90ff6ea0c956@codeaurora.org>
-References: <cover.1500637633.git.robin.murphy@arm.com>
- <b87d44e09fa18efbb9daf6258c1f8ecbedaac23c.1500637633.git.robin.murphy@arm.com>
- <f5071164-c965-b6bf-c330-90ff6ea0c956@codeaurora.org>
-Message-ID: <e148ac58-2fda-454f-c8b1-e01dd1c1347c@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 24 Jul 2017 11:28:03 +0100
+Subject: [PATCH resend 01/18] crypto/algapi - use separate dst and src
+ operands for __crypto_xor()
+In-Reply-To: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
+References: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170724102820.16534-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/17 08:34, Sricharan R wrote:
-> Hi Robin,
-> 
->> As the last step to making groups mandatory, clean up the remaining
->> drivers by adding basic support. Whilst it may not perfectly reflect the
->> isolation capabilities of the hardware, using generic_device_group()
->> should at least maintain existing behaviour with respect to the API.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  drivers/iommu/msm_iommu.c | 15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
->> index d0448353d501..04f4d51ffacb 100644
->> --- a/drivers/iommu/msm_iommu.c
->> +++ b/drivers/iommu/msm_iommu.c
->> @@ -393,6 +393,7 @@ static struct msm_iommu_dev *find_iommu_for_dev(struct device *dev)
->>  static int msm_iommu_add_device(struct device *dev)
->>  {
->>  	struct msm_iommu_dev *iommu;
->> +	struct iommu_group *group;
->>  	unsigned long flags;
->>  	int ret = 0;
->>  
->> @@ -406,7 +407,16 @@ static int msm_iommu_add_device(struct device *dev)
->>  
->>  	spin_unlock_irqrestore(&msm_iommu_lock, flags);
->>  
->> -	return ret;
->> +	if (ret)
->> +		return ret;
->> +
->> +	group = iommu_group_get_for_dev(dev);
->> +	if (IS_ERR(group))
->> +		return PTR_ERR(group);
->> +
->> +	iommu_group_put(group);
->> +
->> +	return 0;
->>  }
->>  
-> 
->  While this is correct for completing the group support, this adds the default domain and
->  that might break in the driver while attaching a private domain. The msm_iomm_attach_dev
->  needs to be fixed by calling msm_iommu_detach_dev while trying to attach a new domain when
->  already connected to a default one. But let me test and confirm this.
+In preparation of introducing crypto_xor_cpy(), which will use separate
+operands for input and output, modify the __crypto_xor() implementation,
+which it will share with the existing crypto_xor(), which provides the
+actual functionality when not using the inline version.
 
-The default domain shouldn't matter, since msm_iommu_domain_alloc() will
-refuse to create DMA ops or identity domains in the first place. In the
-absence of a default domain, __iommu_detach_group() will still end up
-calling ops->detach_dev, so I don't think the ultimate behaviour is any
-different with this change. Testing is of course welcome, though ;)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ crypto/algapi.c         | 25 ++++++++++++--------
+ include/crypto/algapi.h |  4 ++--
+ 2 files changed, 17 insertions(+), 12 deletions(-)
 
-Robin.
+diff --git a/crypto/algapi.c b/crypto/algapi.c
+index e4cc7615a139..aa699ff6c876 100644
+--- a/crypto/algapi.c
++++ b/crypto/algapi.c
+@@ -975,13 +975,15 @@ void crypto_inc(u8 *a, unsigned int size)
+ }
+ EXPORT_SYMBOL_GPL(crypto_inc);
+ 
+-void __crypto_xor(u8 *dst, const u8 *src, unsigned int len)
++void __crypto_xor(u8 *dst, const u8 *src1, const u8 *src2, unsigned int len)
+ {
+ 	int relalign = 0;
+ 
+ 	if (!IS_ENABLED(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)) {
+ 		int size = sizeof(unsigned long);
+-		int d = ((unsigned long)dst ^ (unsigned long)src) & (size - 1);
++		int d = (((unsigned long)dst ^ (unsigned long)src1) |
++			 ((unsigned long)dst ^ (unsigned long)src2)) &
++			(size - 1);
+ 
+ 		relalign = d ? 1 << __ffs(d) : size;
+ 
+@@ -992,34 +994,37 @@ void __crypto_xor(u8 *dst, const u8 *src, unsigned int len)
+ 		 * process the remainder of the input using optimal strides.
+ 		 */
+ 		while (((unsigned long)dst & (relalign - 1)) && len > 0) {
+-			*dst++ ^= *src++;
++			*dst++ = *src1++ ^ *src2++;
+ 			len--;
+ 		}
+ 	}
+ 
+ 	while (IS_ENABLED(CONFIG_64BIT) && len >= 8 && !(relalign & 7)) {
+-		*(u64 *)dst ^= *(u64 *)src;
++		*(u64 *)dst = *(u64 *)src1 ^  *(u64 *)src2;
+ 		dst += 8;
+-		src += 8;
++		src1 += 8;
++		src2 += 8;
+ 		len -= 8;
+ 	}
+ 
+ 	while (len >= 4 && !(relalign & 3)) {
+-		*(u32 *)dst ^= *(u32 *)src;
++		*(u32 *)dst = *(u32 *)src1 ^ *(u32 *)src2;
+ 		dst += 4;
+-		src += 4;
++		src1 += 4;
++		src2 += 4;
+ 		len -= 4;
+ 	}
+ 
+ 	while (len >= 2 && !(relalign & 1)) {
+-		*(u16 *)dst ^= *(u16 *)src;
++		*(u16 *)dst = *(u16 *)src1 ^ *(u16 *)src2;
+ 		dst += 2;
+-		src += 2;
++		src1 += 2;
++		src2 += 2;
+ 		len -= 2;
+ 	}
+ 
+ 	while (len--)
+-		*dst++ ^= *src++;
++		*dst++ = *src1++ ^ *src2++;
+ }
+ EXPORT_SYMBOL_GPL(__crypto_xor);
+ 
+diff --git a/include/crypto/algapi.h b/include/crypto/algapi.h
+index 436c4c2683c7..fd547f946bf8 100644
+--- a/include/crypto/algapi.h
++++ b/include/crypto/algapi.h
+@@ -192,7 +192,7 @@ static inline unsigned int crypto_queue_len(struct crypto_queue *queue)
+ }
+ 
+ void crypto_inc(u8 *a, unsigned int size);
+-void __crypto_xor(u8 *dst, const u8 *src, unsigned int size);
++void __crypto_xor(u8 *dst, const u8 *src1, const u8 *src2, unsigned int size);
+ 
+ static inline void crypto_xor(u8 *dst, const u8 *src, unsigned int size)
+ {
+@@ -207,7 +207,7 @@ static inline void crypto_xor(u8 *dst, const u8 *src, unsigned int size)
+ 			size -= sizeof(unsigned long);
+ 		}
+ 	} else {
+-		__crypto_xor(dst, src, size);
++		__crypto_xor(dst, dst, src, size);
+ 	}
+ }
+ 
+-- 
+2.9.3
