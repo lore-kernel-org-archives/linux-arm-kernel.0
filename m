@@ -1,164 +1,99 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 24 Jul 2017 21:58:57 +0800
-Subject: [PATCH v3 02/10] clk: sunxi-ng: Add MP_MMC clocks that support MMC
- timing modes switching
+Date: Mon, 24 Jul 2017 21:59:00 +0800
+Subject: [PATCH v3 05/10] mmc: sunxi: Support MMC DDR52 transfer mode with new
+ timing mode
 In-Reply-To: <20170724135905.28855-1-wens@csie.org>
 References: <20170724135905.28855-1-wens@csie.org>
-Message-ID: <20170724135905.28855-3-wens@csie.org>
+Message-ID: <20170724135905.28855-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All of our MMC clocks are of the MP clock type. A few MMC clocks on some
-SoCs, such as MMC2 on the A83T, support new/old timing mode switching.
+The MMC controller can support DDR52 transfers under the new timing
+mode. According to the BSP kernel, the module clock has to be double
+the card clock, regardless of the bus width. The default timings in
+the hardware can be used.
 
->From a clock rate point of view, when the new timing mode is active. the
-output clock rate is halved.
-
-This patch adds a special wrapper class of clocks, MP_MMC, around the
-generic MP type clocks. The rate related callbacks in ccu_mp_mmc_ops
-for this class look at the timing mode bit and apply the /2 post-divider
-when needed, before passing it through to the generic class ops,
-ccu_mp_ops.
+This also reworks the code setting the internal divider, getting rid
+of a extra conditional.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_mp.c | 80 +++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_mp.h | 30 ++++++++++++++++
- 2 files changed, 110 insertions(+)
+ drivers/mmc/host/sunxi-mmc.c | 30 ++++++++++++++++++------------
+ 1 file changed, 18 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
-index b917ad7a386c..688855e7dc8c 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.c
-+++ b/drivers/clk/sunxi-ng/ccu_mp.c
-@@ -172,3 +172,83 @@ const struct clk_ops ccu_mp_ops = {
- 	.recalc_rate	= ccu_mp_recalc_rate,
- 	.set_rate	= ccu_mp_set_rate,
- };
-+
-+/*
-+ * Support for MMC timing mode switching
-+ *
-+ * The MMC clocks on some SoCs support switching between old and
-+ * new timing modes. A platform specific API is provided to query
-+ * and set the timing mode on supported SoCs.
-+ *
-+ * In addition, a special class of ccu_mp_ops is provided, which
-+ * takes in to account the timing mode switch. When the new timing
-+ * mode is active, the clock output rate is halved. This new class
-+ * is a wrapper around the generic ccu_mp_ops. When clock rates
-+ * are passed through to ccu_mp_ops callbacks, they are doubled
-+ * if the new timing mode bit is set, to account for the post
-+ * divider. Conversely, when clock rates are passed back, they
-+ * are halved if the mode bit is set.
-+ */
-+
-+static unsigned long ccu_mp_mmc_recalc_rate(struct clk_hw *hw,
-+					    unsigned long parent_rate)
-+{
-+	unsigned long rate = ccu_mp_recalc_rate(hw, parent_rate);
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+	u32 val = readl(cm->base + cm->reg);
-+
-+	if (val & CCU_MMC_NEW_TIMING_MODE)
-+		return rate / 2;
-+	return rate;
-+}
-+
-+static int ccu_mp_mmc_determine_rate(struct clk_hw *hw,
-+				     struct clk_rate_request *req)
-+{
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+	u32 val = readl(cm->base + cm->reg);
-+	int ret;
-+
-+	/* adjust the requested clock rate */
-+	if (val & CCU_MMC_NEW_TIMING_MODE) {
-+		req->rate *= 2;
-+		req->min_rate *= 2;
-+		req->max_rate *= 2;
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index c8a60e43dc43..11587a69a1fd 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -755,7 +755,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ {
+ 	struct mmc_host *mmc = host->mmc;
+ 	long rate;
+-	u32 rval, clock = ios->clock;
++	u32 rval, clock = ios->clock, div = 1;
+ 	int ret;
+ 
+ 	ret = sunxi_mmc_oclk_onoff(host, 0);
+@@ -768,10 +768,21 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	if (!ios->clock)
+ 		return 0;
+ 
+-	/* 8 bit DDR requires a higher module clock */
++	/*
++	 * Under the old timing mode, 8 bit DDR requires the module
++	 * clock to be double the card clock. Under the new timing
++	 * mode, all DDR modes require a doubled module clock.
++	 *
++	 * We currently only support the standard MMC DDR52 mode.
++	 * This block should be updated once support for other DDR
++	 * modes is added.
++	 */
+ 	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
+-	    ios->bus_width == MMC_BUS_WIDTH_8)
++	    (host->use_new_timings ||
++	     ios->bus_width == MMC_BUS_WIDTH_8)) {
++		div = 2;
+ 		clock <<= 1;
 +	}
-+
-+	ret = ccu_mp_determine_rate(hw, req);
-+
-+	/* re-adjust the requested clock rate back */
-+	if (val & CCU_MMC_NEW_TIMING_MODE) {
-+		req->rate /= 2;
-+		req->min_rate /= 2;
-+		req->max_rate /= 2;
-+	}
-+
-+	return ret;
-+}
-+
-+static int ccu_mp_mmc_set_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long parent_rate)
-+{
-+	struct ccu_common *cm = hw_to_ccu_common(hw);
-+	u32 val = readl(cm->base + cm->reg);
-+
-+	if (val & CCU_MMC_NEW_TIMING_MODE)
-+		rate *= 2;
-+
-+	return ccu_mp_set_rate(hw, rate, parent_rate);
-+}
-+
-+const struct clk_ops ccu_mp_mmc_ops = {
-+	.disable	= ccu_mp_disable,
-+	.enable		= ccu_mp_enable,
-+	.is_enabled	= ccu_mp_is_enabled,
-+
-+	.get_parent	= ccu_mp_get_parent,
-+	.set_parent	= ccu_mp_set_parent,
-+
-+	.determine_rate	= ccu_mp_mmc_determine_rate,
-+	.recalc_rate	= ccu_mp_mmc_recalc_rate,
-+	.set_rate	= ccu_mp_mmc_set_rate,
-+};
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
-index 915625e97d98..aaef11d747ea 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.h
-+++ b/drivers/clk/sunxi-ng/ccu_mp.h
-@@ -14,6 +14,7 @@
- #ifndef _CCU_MP_H_
- #define _CCU_MP_H_
  
-+#include <linux/bitops.h>
- #include <linux/clk-provider.h>
+ 	if (host->use_new_timings) {
+ 		ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
+@@ -799,15 +810,10 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 		return ret;
+ 	}
  
- #include "ccu_common.h"
-@@ -74,4 +75,33 @@ static inline struct ccu_mp *hw_to_ccu_mp(struct clk_hw *hw)
+-	/* clear internal divider */
++	/* set internal divider */
+ 	rval = mmc_readl(host, REG_CLKCR);
+ 	rval &= ~0xff;
+-	/* set internal divider for 8 bit eMMC DDR, so card clock is right */
+-	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
+-	    ios->bus_width == MMC_BUS_WIDTH_8) {
+-		rval |= 1;
+-		rate >>= 1;
+-	}
++	rval |= div - 1;
+ 	mmc_writel(host, REG_CLKCR, rval);
  
- extern const struct clk_ops ccu_mp_ops;
+ 	if (host->use_new_timings) {
+@@ -838,7 +844,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 		return ret;
  
-+/*
-+ * Special class of M-P clock that supports MMC timing modes
-+ *
-+ * Since the MMC clock registers all follow the same layout, we can
-+ * simplify the macro for this particular case. In addition, as
-+ * switching modes also affects the output clock rate, we need to
-+ * have CLK_GET_RATE_NOCACHE for all these types of clocks.
-+ */
-+
-+#define SUNXI_CCU_MP_MMC_WITH_MUX_GATE(_struct, _name, _parents, _reg,	\
-+				       _flags)				\
-+	struct ccu_mp _struct = {					\
-+		.enable	= BIT(31),					\
-+		.m	= _SUNXI_CCU_DIV(0, 4),				\
-+		.p	= _SUNXI_CCU_DIV(16, 2),			\
-+		.mux	= _SUNXI_CCU_MUX(24, 2),			\
-+		.common	= {						\
-+			.reg		= _reg,				\
-+			.features	= CCU_FEATURE_MMC_TIMING_SWITCH, \
-+			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
-+							      _parents, \
-+							      &ccu_mp_mmc_ops, \
-+							      CLK_GET_RATE_NOCACHE | \
-+							      _flags),	\
-+		}							\
-+	}
-+
-+extern const struct clk_ops ccu_mp_mmc_ops;
-+
- #endif /* _CCU_MP_H_ */
+ 	/* And we just enabled our clock back */
+-	mmc->actual_clock = rate;
++	mmc->actual_clock = rate / div;
+ 
+ 	return 0;
+ }
+@@ -1315,7 +1321,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 	mmc->caps	       |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+ 				  MMC_CAP_ERASE | MMC_CAP_SDIO_IRQ;
+ 
+-	if (host->cfg->clk_delays)
++	if (host->cfg->clk_delays || host->use_new_timings)
+ 		mmc->caps      |= MMC_CAP_1_8V_DDR;
+ 
+ 	ret = mmc_of_parse(mmc);
 -- 
 2.13.3
