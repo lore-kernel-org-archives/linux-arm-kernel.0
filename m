@@ -1,11 +1,19 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 24 Jul 2017 21:08:54 +0200
-Subject: [GIT PULL 3/5] arm64: dts: exynos: Updates for v4.14
+Date: Mon, 24 Jul 2017 21:08:56 +0200
+Subject: [GIT PULL 5/5] ARM: defconfig: Cleanups for v4.14
 In-Reply-To: <20170724190856.19055-1-krzk@kernel.org>
 References: <20170724190856.19055-1-krzk@kernel.org>
-Message-ID: <20170724190856.19055-3-krzk@kernel.org>
+Message-ID: <20170724190856.19055-5-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi,
+
+Non-Samsung cleanups for defconfigs
+
+
+Best regards,
+Krzysztof
 
 
 The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
@@ -14,31 +22,28 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.14
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-arm-cleanups-4.14
 
-for you to fetch changes up to 10acba1293db5c28d1b81d673e75c2415cb96f62:
+for you to fetch changes up to c1bdf1b9a11416e183484df42616c0bab125204a:
 
-  arm64: dts: exynos: Remove num-slots from exynos platforms (2017-07-18 07:16:14 +0200)
-
-----------------------------------------------------------------
-Samsung DTS ARM64 changes for v4.14
-
-1. Remove deprecated and unneeded properties from Exynos boards.
-2. Implement proper (working) support for USB On-The-Go on Exynos5433
-   TM2/TM2E boards.
+  ARM: qcom_defconfig: Cleanup from non-existing options (2017-07-18 17:51:33 +0200)
 
 ----------------------------------------------------------------
-Dongwoo Lee (2):
-      arm64: dts: exynos: Fix wrong label for USB 3.0 controller node
-      arm64: dts: exynos: Add extcon property for TM2 and TM2E
+Bunch of ARM defconfig cleanups for v4.14
 
-Hoegeun Kwon (1):
-      arm64: dts: exynos: Remove the OF graph from DSI node
+Cleanup ARMv7 defconfigs from options not existing anymore.
 
-Shawn Lin (1):
-      arm64: dts: exynos: Remove num-slots from exynos platforms
+----------------------------------------------------------------
+Krzysztof Kozlowski (5):
+      ARM: multi_v7_defconfig: Cleanup from non-existing options
+      ARM: ixp4xx_defconfig: Cleanup from non-existing options
+      ARM: vexpress_defconfig: Cleanup from non-existing options
+      ARM: ezx_defconfig: Cleanup from non-existing options
+      ARM: qcom_defconfig: Cleanup from non-existing options
 
- arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 19 ++-----------------
- arch/arm64/boot/dts/exynos/exynos5433.dtsi            |  4 ++--
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts       |  2 --
- 3 files changed, 4 insertions(+), 21 deletions(-)
+ arch/arm/configs/ezx_defconfig      | 1 -
+ arch/arm/configs/ixp4xx_defconfig   | 4 ----
+ arch/arm/configs/multi_v7_defconfig | 7 -------
+ arch/arm/configs/qcom_defconfig     | 1 -
+ arch/arm/configs/vexpress_defconfig | 1 -
+ 5 files changed, 14 deletions(-)
