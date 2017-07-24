@@ -1,19 +1,11 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 24 Jul 2017 21:08:56 +0200
-Subject: [GIT PULL 5/5] ARM: defconfig: Cleanups for v4.14
+Date: Mon, 24 Jul 2017 21:08:55 +0200
+Subject: [GIT PULL 4/5] ARM: defconfig: Exynos updates for v4.14
 In-Reply-To: <20170724190856.19055-1-krzk@kernel.org>
 References: <20170724190856.19055-1-krzk@kernel.org>
-Message-ID: <20170724190856.19055-5-krzk@kernel.org>
+Message-ID: <20170724190856.19055-4-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi,
-
-Non-Samsung cleanups for defconfigs
-
-
-Best regards,
-Krzysztof
 
 
 The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
@@ -22,28 +14,26 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-arm-cleanups-4.14
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.14
 
-for you to fetch changes up to c1bdf1b9a11416e183484df42616c0bab125204a:
+for you to fetch changes up to 57ee24144e57b762dc46f171e1f138ccfc464867:
 
-  ARM: qcom_defconfig: Cleanup from non-existing options (2017-07-18 17:51:33 +0200)
-
-----------------------------------------------------------------
-Bunch of ARM defconfig cleanups for v4.14
-
-Cleanup ARMv7 defconfigs from options not existing anymore.
+  ARM: exynos_defconfig: Enable locking test options (2017-07-18 17:58:46 +0200)
 
 ----------------------------------------------------------------
-Krzysztof Kozlowski (5):
-      ARM: multi_v7_defconfig: Cleanup from non-existing options
-      ARM: ixp4xx_defconfig: Cleanup from non-existing options
-      ARM: vexpress_defconfig: Cleanup from non-existing options
-      ARM: ezx_defconfig: Cleanup from non-existing options
-      ARM: qcom_defconfig: Cleanup from non-existing options
+Samsung defconfig changes for v4.14
 
- arch/arm/configs/ezx_defconfig      | 1 -
- arch/arm/configs/ixp4xx_defconfig   | 4 ----
- arch/arm/configs/multi_v7_defconfig | 7 -------
- arch/arm/configs/qcom_defconfig     | 1 -
- arch/arm/configs/vexpress_defconfig | 1 -
- 5 files changed, 14 deletions(-)
+1. Enable some drivers useful on our boards (communication: Bluetooth,
+   WiFi, NFC, USB; codepages and crypto algorithms).
+2. Enable debugging and lock testing options. These might have impact on
+   performance but we use the exynos_defconfig a lot during development
+   so they should bring benefits of detecting early locking issues.
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (3):
+      ARM: exynos_defconfig: Enable Bluetooth, mac80211, NFC and more USB drivers
+      ARM: exynos_defconfig: Enable NLS_UTF8 and some crypto algorithms
+      ARM: exynos_defconfig: Enable locking test options
+
+ arch/arm/configs/exynos_defconfig | 79 ++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 73 insertions(+), 6 deletions(-)
