@@ -1,182 +1,119 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 24 Jul 2017 10:21:18 +0100
-Subject: [PATCH v2] arm64: Decode information from ESR upon mem faults
-Message-ID: <1500888078-50231-1-git-send-email-julien.thierry@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Jul 2017 11:33:16 +0200
+Subject: [PATCH 3/4] arm: sunxi: Add AXP20X_ADC
+In-Reply-To: <1dd83dbc-ebd2-3f40-d42c-c14a934d3535@free-electrons.com>
+References: <20170721162005.18892-1-maxime.ripard@free-electrons.com>
+ <20170721162005.18892-3-maxime.ripard@free-electrons.com>
+ <CAGb2v64tx6M1CJSKr_wgD4LM+-ER+Yqpj-hUftptj41PVhbBBA@mail.gmail.com>
+ <be7d4295-8759-f57e-a600-358c7344251c@free-electrons.com>
+ <20170724081013.uyfaetzkj5iz7uhj@flea>
+ <1dd83dbc-ebd2-3f40-d42c-c14a934d3535@free-electrons.com>
+Message-ID: <20170724093316.zejftqcdccgokttm@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When receiving unhandled faults from the CPU, description is very sparse.
-Adding information about faults decoded from ESR.
+On Mon, Jul 24, 2017 at 10:41:05AM +0200, Quentin Schulz wrote:
+> Hi Maxime,
+> 
+> On 24/07/2017 10:10, Maxime Ripard wrote:
+> > On Mon, Jul 24, 2017 at 08:43:56AM +0200, Quentin Schulz wrote:
+> >> Hi all,
+> >>
+> >> I've been Cc'ed by Chen-Yu I think, thanks for the heads-up.
+> >>
+> >> On 22/07/2017 04:19, Chen-Yu Tsai wrote:
+> >>> On Sat, Jul 22, 2017 at 12:20 AM, Maxime Ripard
+> >>> <maxime.ripard@free-electrons.com> wrote:
+> >>>> The APX20X_POWER option, that is a dependency of the USB controllers
+> >>>> depends on IIO and AXP20X_ADC. Add it so that we can get a working USB
+> >>>> back.
+> >>>
+> >>> The statement is only half true. AXP20X_POWER can fall back to reading
+> >>> the ADC registers directly if AXP20X_ADC is not enabled.
+> >>
+> >> For any PMIC using "x-powers,axp202-usb-power-supply" compatible, that
+> >> is true, the others imperatively use IIO channels as there was no prior
+> >> support to this driver.
+> >>
+> >> The switch between reading IIO channels or directly reading the
+> >> registers is done at probe by checking IS_ENABLED(AXP20X_ADC)
+> >> (IS_ENABLED returns 1 when Kconfig is set to y or m). The goal was to
+> >> not break the existing system when users would update to a newer kernel
+> >> (as they may not have selected AXP20X_ADC).
+> >>
+> >> Since there is no hard dependency between AXP20X_ADC and AXP20X_POWER, I
+> >> think we may have a problem when AXP20X_ADC is built as a module. Then
+> >> AXP20X_POWER probing is deferred since it waits for the IIO channels.
+> >> Also, if you do a modprobe on AXP20X_POWER it'll not probe AXP20X_ADC
+> >> because the dependency is not declared. I don't know if there is a way
+> >> to declare this dependency programatically only when AXP20X_ADC is built
+> >> as a module?
+> >>
+> >>> Is there a plan
+> >>> to remove this feature?
+> >>>
+> >>
+> >> As said above (and in the commit log[1]), I added the condition for
+> >> backward compatibility so anyone could still use AXP20X_POWER without
+> >> the ADC, but maybe that is irrelevant?
+> > 
+> > The only compatibility we care about is the DT one. We don't care
+> > about config options.
+> > 
+> 
+> ACK.
+> 
+> >> This could solve a bit of the "complexity" of the driver, now that
+> >> we know we want to enforce AXP20X_ADC to be built with
+> >> AXP20X_POWER. I'm obviously okay to remove this feature if my point
+> >> of backward compatibility is irrelevant.
+> >>
+> >> But now, we still have the problem that AXP20X_ADC is not needed for
+> >> AXP20X_POWER for AXP22X (and those that don't have voltage/current
+> >> sensing). We don't really need to force AXP20X_ADC to be built when the
+> >> user want AXP20X_POWER.
+> >>
+> >> 1) We force AXP20X_ADC to be built whenever AXP20X_POWER is built, even
+> >> for PMICs that don't have any voltage/current sensing. This way, we can
+> >> enforce the dependency in Kconfig and everything's easy,
+> > 
+> > That's backward. The dependency is from AXP20X_POWER to
+> > AXP20X_ADC. That's it, we should express it as such.
+> > 
+> 
+> You want AXP20X_POWER to depends on AXP20X_ADC (AXP20X_ADC built when
+> AXP20X_POWER is built, which is what I said). We agree on the same thing
+> here.
 
-Added defines to esr.h corresponding ESR fields. Values are based on ARM
-Archtecture Reference Manual (DDI 0487B.a), section D7.2.28 ESR_ELx, Exception
-Syndrome Register (ELx) (pages D7-2275 to D7-2280).
+Not really, or at least it's not what it sounded like. "Forcing
+AXP20X_ADC to be built whenever AXP20X_POWER is built" is a select
+dependency, not a depends on.
 
-New output is of the form:
-[   77.818059] Mem abort info:
-[   77.820826]   Exception class = DABT (current EL), IL = 32 bits
-[   77.826706]   SET = 0, FnV = 0
-[   77.829742]   EA = 0, S1PTW = 0
-[   77.832849] Data abort info:
-[   77.835713]   ISV = 0, ISS = 0x00000070
-[   77.839522]   CM = 0, WnR = 1
+Anyway... it's great to know that we were both thinking to add a
+depends on.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/include/asm/esr.h | 38 ++++++++++++++++++++++++++---------
- arch/arm64/mm/fault.c        | 47 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+), 9 deletions(-)
+> >> 2) We programmatically set the dependency between AXP20X_ADC and
+> >> AXP20X_POWER depending on the compatible used (AXP20X set the
+> >> dependency, not AXP22X).
+> > 
+> > Why not just adding a depends on?
+> > 
+> 
+> Because there is no dependency for AXP22X PMICs' USB power supply driver
+> on AXP20X_ADC. AXP22X PMICs do not receive any information from the ADC.
 
-* V2:
-  - Slight change of display format so info spans over fewer lines
-  - When ISV is 0, display raw value of ISS
+You won't be able to deal with all cases properly...
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index 85997c0..1aad4fe 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -76,15 +76,23 @@
- #define ESR_ELx_EC_MASK		(UL(0x3F) << ESR_ELx_EC_SHIFT)
- #define ESR_ELx_EC(esr)		(((esr) & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT)
+Maxime
 
--#define ESR_ELx_IL		(UL(1) << 25)
-+#define ESR_ELx_IL_SHIFT	(25)
-+#define ESR_ELx_IL		(UL(1) << ESR_ELx_IL_SHIFT)
- #define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
-
- /* ISS field definitions shared by different classes */
--#define ESR_ELx_WNR		(UL(1) << 6)
-+#define ESR_ELx_WNR_SHIFT	(6)
-+#define ESR_ELx_WNR		(UL(1) << ESR_ELx_WNR_SHIFT)
-
- /* Shared ISS field definitions for Data/Instruction aborts */
--#define ESR_ELx_EA		(UL(1) << 9)
--#define ESR_ELx_S1PTW		(UL(1) << 7)
-+#define ESR_ELx_SET_SHIFT	(11)
-+#define ESR_ELx_SET_MASK	(UL(3) << ESR_ELx_SET_SHIFT)
-+#define ESR_ELx_FNV_SHIFT	(10)
-+#define ESR_ELx_FNV		(UL(1) << ESR_ELx_FNV_SHIFT)
-+#define ESR_ELx_EA_SHIFT	(9)
-+#define ESR_ELx_EA		(UL(1) << ESR_ELx_EA_SHIFT)
-+#define ESR_ELx_S1PTW_SHIFT	(7)
-+#define ESR_ELx_S1PTW		(UL(1) << ESR_ELx_S1PTW_SHIFT)
-
- /* Shared ISS fault status code(IFSC/DFSC) for Data/Instruction aborts */
- #define ESR_ELx_FSC		(0x3F)
-@@ -95,15 +103,20 @@
- #define ESR_ELx_FSC_PERM	(0x0C)
-
- /* ISS field definitions for Data Aborts */
--#define ESR_ELx_ISV		(UL(1) << 24)
-+#define ESR_ELx_ISV_SHIFT	(24)
-+#define ESR_ELx_ISV		(UL(1) << ESR_ELx_ISV_SHIFT)
- #define ESR_ELx_SAS_SHIFT	(22)
- #define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
--#define ESR_ELx_SSE		(UL(1) << 21)
-+#define ESR_ELx_SSE_SHIFT	(21)
-+#define ESR_ELx_SSE		(UL(1) << ESR_ELx_SSE_SHIFT)
- #define ESR_ELx_SRT_SHIFT	(16)
- #define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
--#define ESR_ELx_SF 		(UL(1) << 15)
--#define ESR_ELx_AR 		(UL(1) << 14)
--#define ESR_ELx_CM 		(UL(1) << 8)
-+#define ESR_ELx_SF_SHIFT	(15)
-+#define ESR_ELx_SF 		(UL(1) << ESR_ELx_SF_SHIFT)
-+#define ESR_ELx_AR_SHIFT	(14)
-+#define ESR_ELx_AR 		(UL(1) << ESR_ELx_AR_SHIFT)
-+#define ESR_ELx_CM_SHIFT	(8)
-+#define ESR_ELx_CM 		(UL(1) << ESR_ELx_CM_SHIFT)
-
- /* ISS field definitions for exceptions taken in to Hyp */
- #define ESR_ELx_CV		(UL(1) << 24)
-@@ -184,6 +197,13 @@
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
-
-+static inline bool esr_is_data_abort(u32 esr)
-+{
-+	const u32 ec = ESR_ELx_EC(esr);
-+
-+	return ec == ESR_ELx_EC_DABT_LOW || ec == ESR_ELx_EC_DABT_CUR;
-+}
-+
- const char *esr_get_class_string(u32 esr);
- #endif /* __ASSEMBLY */
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 37b95df..6702ea5 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -79,6 +79,49 @@ static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
- }
- #endif
-
-+static void data_abort_decode(unsigned int esr)
-+{
-+	pr_alert("Data abort info:\n");
-+
-+	if (esr & ESR_ELx_ISV) {
-+		pr_alert("  Access size = %u byte(s)\n",
-+			 1U << ((esr & ESR_ELx_SAS) >> ESR_ELx_SAS_SHIFT));
-+		pr_alert("  SSE = %lu, SRT = %lu\n",
-+			 (esr & ESR_ELx_SSE) >> ESR_ELx_SSE_SHIFT,
-+			 (esr & ESR_ELx_SRT_MASK) >> ESR_ELx_SRT_SHIFT);
-+		pr_alert("  SF = %lu, AR = %lu\n",
-+			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
-+			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
-+	} else {
-+		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
-+	}
-+
-+	pr_alert("  CM = %lu, WnR = %lu\n",
-+		 (esr & ESR_ELx_CM) >> ESR_ELx_CM_SHIFT,
-+		 (esr & ESR_ELx_WNR) >> ESR_ELx_WNR_SHIFT);
-+}
-+
-+/*
-+ * Decode mem abort information
-+ */
-+static void mem_abort_decode(unsigned int esr)
-+{
-+	pr_alert("Mem abort info:\n");
-+
-+	pr_alert("  Exception class = %s, IL = %lu bits\n",
-+		 esr_get_class_string(esr),
-+		 (esr & ESR_ELx_IL) ? 32 : 16);
-+	pr_alert("  SET = %lu, FnV = %lu\n",
-+		 (esr & ESR_ELx_SET_MASK) >> ESR_ELx_SET_SHIFT,
-+		 (esr & ESR_ELx_FNV) >> ESR_ELx_FNV_SHIFT);
-+	pr_alert("  EA = %lu, S1PTW = %lu\n",
-+		 (esr & ESR_ELx_EA) >> ESR_ELx_EA_SHIFT,
-+		 (esr & ESR_ELx_S1PTW) >> ESR_ELx_S1PTW_SHIFT);
-+
-+	if (esr_is_data_abort(esr))
-+		data_abort_decode(esr);
-+}
-+
- /*
-  * Dump out the page tables associated with 'addr' in mm 'mm'.
-  */
-@@ -227,6 +270,8 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
- 	pr_alert("Unable to handle kernel %s at virtual address %08lx\n", msg,
- 		 addr);
-
-+	mem_abort_decode(esr);
-+
- 	show_pte(mm, addr);
- 	die("Oops", regs, esr);
- 	bust_spinlocks(0);
-@@ -604,6 +649,8 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
- 		 inf->name, esr, addr);
-
-+	mem_abort_decode(esr);
-+
- 	info.si_signo = inf->sig;
- 	info.si_errno = 0;
- 	info.si_code  = inf->code;
---
-1.9.1
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170724/f3f736d5/attachment-0001.sig>
