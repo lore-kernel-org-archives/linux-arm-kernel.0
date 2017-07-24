@@ -1,119 +1,107 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Jul 2017 11:33:16 +0200
-Subject: [PATCH 3/4] arm: sunxi: Add AXP20X_ADC
-In-Reply-To: <1dd83dbc-ebd2-3f40-d42c-c14a934d3535@free-electrons.com>
-References: <20170721162005.18892-1-maxime.ripard@free-electrons.com>
- <20170721162005.18892-3-maxime.ripard@free-electrons.com>
- <CAGb2v64tx6M1CJSKr_wgD4LM+-ER+Yqpj-hUftptj41PVhbBBA@mail.gmail.com>
- <be7d4295-8759-f57e-a600-358c7344251c@free-electrons.com>
- <20170724081013.uyfaetzkj5iz7uhj@flea>
- <1dd83dbc-ebd2-3f40-d42c-c14a934d3535@free-electrons.com>
-Message-ID: <20170724093316.zejftqcdccgokttm@flea>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Mon, 24 Jul 2017 09:34:18 +0000
+Subject: [PATCH v2 2/4] dmaengine: Add STM32 MDMA driver
+In-Reply-To: <20170721171735.GS3053@localhost>
+References: <1499343941-6375-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343941-6375-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170721075547.GO3053@localhost>
+ <ee278ecf-02a3-7799-888a-9590d1105bb3@st.com>
+ <20170721095411.GR3053@localhost>
+ <3c04c9bf-572d-98a6-ff62-83498bbc7fdf@st.com>
+ <20170721171735.GS3053@localhost>
+Message-ID: <320f8def-19a4-0491-e879-b41815889e15@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 10:41:05AM +0200, Quentin Schulz wrote:
-> Hi Maxime,
+
+On 07/21/2017 12:32 PM, Pierre Yves MORDRET wrote:
+ >
+ >
+ > On 07/21/2017 11:54 AM, Vinod Koul wrote:
+ >> On Fri, Jul 21, 2017 at 09:30:00AM +0000, Pierre Yves MORDRET wrote:
+ >>>>> +static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 
+tlen)
+ >>>>> +{
+ >>>>> +	enum dma_slave_buswidth max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
+ >>>>> +
+ >>>>> +	while (((buf_len % max_width) || (tlen < max_width)) &&
+ >>>>> +	       (max_width > DMA_SLAVE_BUSWIDTH_1_BYTE))
+ >>>>> +		max_width = max_width >> 1;
+ >>>>
+ >>>> ok, this is a bit hard to read...
+ >>>
+ >>> This code snippet has already been reworked and optimized. Would you mind to
+ >>> provide me a example with your expectation ? Thanks
+ >>
+ >> Code is optimized yes, but readable no
+ >>
+ >> I would like readability to be improved upon...
+ >>
+ >
+ > gotcha
+ >
+
+Doest he code snippet below has a better looking for you ?
+
+	for (max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
+	     max_width > DMA_SLAVE_BUSWIDTH_1_BYTE; max_width >>= 1)
+		if (((buf_len % max_width) == 0) && (tlen >= max_width))
+			break;
+
+On 07/21/2017 07:17 PM, Vinod Koul wrote:
+> On Fri, Jul 21, 2017 at 10:32:49AM +0000, Pierre Yves MORDRET wrote:
+>>>>>> +static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
+>>>>>> +				     enum dma_transfer_direction direction,
+>>>>>> +				     u32 *mdma_ccr, u32 *mdma_ctcr,
+>>>>>> +				     u32 *mdma_ctbr, u32 buf_len)
+>>>>>> +{
+>>>>>> +	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
+>>>>>> +	struct stm32_mdma_chan_config *chan_config = &chan->chan_config;
+>>>>>> +	enum dma_slave_buswidth src_addr_width, dst_addr_width;
+>>>>>> +	phys_addr_t src_addr, dst_addr;
+>>>>>> +	int src_bus_width, dst_bus_width;
+>>>>>> +	u32 src_maxburst, dst_maxburst, src_best_burst, dst_best_burst;
+>>>>>> +	u32 ccr, ctcr, ctbr, tlen;
+>>>>>> +
+>>>>>> +	src_addr_width = chan->dma_config.src_addr_width;
+>>>>>> +	dst_addr_width = chan->dma_config.dst_addr_width;
+>>>>>> +	src_maxburst = chan->dma_config.src_maxburst;
+>>>>>> +	dst_maxburst = chan->dma_config.dst_maxburst;
+>>>>>> +	src_addr = chan->dma_config.src_addr;
+>>>>>> +	dst_addr = chan->dma_config.dst_addr;
+>>>>>
+>>>>> this doesn't seem right to me, only the periphral address would come from
+>>>>> slave_config, the memory address is passed as an arg to transfer..
+>>>>>
+>>>>> ...
+>>>>>
+>>>>
+>>>> Correct. But these locals are managed in the case statement below. if direction
+>>>> is Mem2Dev only dst_addr(Peripheral) is considered. In the other way around with
+>>>> Dev2Mem direction only src_addr(Peripheral) is considered.
+>>>> However to disambiguate I can move src_addr & dst_addr affectation in the
+>>>> corresponding case statement if you'd like.
+>>>
+>>> But below you are over writing both, so in effect this is wasted cycles..
+>>> anyway latter one is more clear, so lets remove from here.
+>>>
+>>
+>> Sorry I don't follow ... or miss something
+>> For instance if direction is Mem2Dev ..._xfer_param is going to configure
+>> Destination Bus width and Addr given by slave_config. ..._setup_xfer in its turn
+>> will configure source given as parameter.
+>> Don't the see the over-writing
 > 
-> On 24/07/2017 10:10, Maxime Ripard wrote:
-> > On Mon, Jul 24, 2017 at 08:43:56AM +0200, Quentin Schulz wrote:
-> >> Hi all,
-> >>
-> >> I've been Cc'ed by Chen-Yu I think, thanks for the heads-up.
-> >>
-> >> On 22/07/2017 04:19, Chen-Yu Tsai wrote:
-> >>> On Sat, Jul 22, 2017 at 12:20 AM, Maxime Ripard
-> >>> <maxime.ripard@free-electrons.com> wrote:
-> >>>> The APX20X_POWER option, that is a dependency of the USB controllers
-> >>>> depends on IIO and AXP20X_ADC. Add it so that we can get a working USB
-> >>>> back.
-> >>>
-> >>> The statement is only half true. AXP20X_POWER can fall back to reading
-> >>> the ADC registers directly if AXP20X_ADC is not enabled.
-> >>
-> >> For any PMIC using "x-powers,axp202-usb-power-supply" compatible, that
-> >> is true, the others imperatively use IIO channels as there was no prior
-> >> support to this driver.
-> >>
-> >> The switch between reading IIO channels or directly reading the
-> >> registers is done at probe by checking IS_ENABLED(AXP20X_ADC)
-> >> (IS_ENABLED returns 1 when Kconfig is set to y or m). The goal was to
-> >> not break the existing system when users would update to a newer kernel
-> >> (as they may not have selected AXP20X_ADC).
-> >>
-> >> Since there is no hard dependency between AXP20X_ADC and AXP20X_POWER, I
-> >> think we may have a problem when AXP20X_ADC is built as a module. Then
-> >> AXP20X_POWER probing is deferred since it waits for the IIO channels.
-> >> Also, if you do a modprobe on AXP20X_POWER it'll not probe AXP20X_ADC
-> >> because the dependency is not declared. I don't know if there is a way
-> >> to declare this dependency programatically only when AXP20X_ADC is built
-> >> as a module?
-> >>
-> >>> Is there a plan
-> >>> to remove this feature?
-> >>>
-> >>
-> >> As said above (and in the commit log[1]), I added the condition for
-> >> backward compatibility so anyone could still use AXP20X_POWER without
-> >> the ADC, but maybe that is irrelevant?
-> > 
-> > The only compatibility we care about is the DT one. We don't care
-> > about config options.
-> > 
+> ah re-looking at it, yes you are right.
 > 
-> ACK.
+> The above two assignments threw me off, I should have read it properly.
 > 
-> >> This could solve a bit of the "complexity" of the driver, now that
-> >> we know we want to enforce AXP20X_ADC to be built with
-> >> AXP20X_POWER. I'm obviously okay to remove this feature if my point
-> >> of backward compatibility is irrelevant.
-> >>
-> >> But now, we still have the problem that AXP20X_ADC is not needed for
-> >> AXP20X_POWER for AXP22X (and those that don't have voltage/current
-> >> sensing). We don't really need to force AXP20X_ADC to be built when the
-> >> user want AXP20X_POWER.
-> >>
-> >> 1) We force AXP20X_ADC to be built whenever AXP20X_POWER is built, even
-> >> for PMICs that don't have any voltage/current sensing. This way, we can
-> >> enforce the dependency in Kconfig and everything's easy,
-> > 
-> > That's backward. The dependency is from AXP20X_POWER to
-> > AXP20X_ADC. That's it, we should express it as such.
-> > 
+> But I think calculating for src and dstn always might not be optimal as you
+> would use one only, so should these be moved to respective case where they
+> are used...
 > 
-> You want AXP20X_POWER to depends on AXP20X_ADC (AXP20X_ADC built when
-> AXP20X_POWER is built, which is what I said). We agree on the same thing
-> here.
 
-Not really, or at least it's not what it sounded like. "Forcing
-AXP20X_ADC to be built whenever AXP20X_POWER is built" is a select
-dependency, not a depends on.
+Agree. This is my planned btw
 
-Anyway... it's great to know that we were both thinking to add a
-depends on.
-
-> >> 2) We programmatically set the dependency between AXP20X_ADC and
-> >> AXP20X_POWER depending on the compatible used (AXP20X set the
-> >> dependency, not AXP22X).
-> > 
-> > Why not just adding a depends on?
-> > 
-> 
-> Because there is no dependency for AXP22X PMICs' USB power supply driver
-> on AXP20X_ADC. AXP22X PMICs do not receive any information from the ADC.
-
-You won't be able to deal with all cases properly...
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170724/f3f736d5/attachment-0001.sig>
+Thanks
+Py.
