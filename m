@@ -1,82 +1,72 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Jul 2017 15:48:43 +0200
-Subject: [PATCH net-next 13/18] arm64: dts: marvell: cp110: use named
- interrupts for the Ethernet ports
+Date: Mon, 24 Jul 2017 15:48:46 +0200
+Subject: [PATCH net-next 16/18] arm64: dts: marvell: mcbin: enable more
+ networking ports
 In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
 References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170724134848.19330-14-antoine.tenart@free-electrons.com>
+Message-ID: <20170724134848.19330-17-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PPv2 driver now uses named interrupts. Add the interrupt-names
-property to the Ethernet ports to use this new functionality. This is
-needed as other interrupt descriptions will be added to the Ethernet
-ports at some point.
+This patch enables the two GE/SFP ports. They are configured in 10GKR
+mode by default. To do this the cpm_xdmio is enabled as well, and two
+phy descriptions are added.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
 
 @Dave: Hi! This patch should go through the mvebu tree. Thanks!
 
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +++
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +++
- 2 files changed, 6 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 30 +++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 4c68605675a8..13763eefeb6e 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -70,6 +70,7 @@
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index abd39d1c1739..6cb4b000e1ac 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -127,6 +127,30 @@
+ 	};
+ };
  
- 				cpm_eth0: eth0 {
- 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>;
-+					interrupt-names = "rx-shared";
- 					port-id = <0>;
- 					gop-port-id = <0>;
- 					status = "disabled";
-@@ -77,6 +78,7 @@
++&cpm_xmdio {
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		compatible = "ethernet-phy-ieee802.3-c45";
++		reg = <0>;
++	};
++
++	phy1: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c45";
++		reg = <8>;
++	};
++};
++
++&cpm_ethernet {
++	status = "okay";
++};
++
++&cpm_eth0 {
++	status = "okay";
++	phy = <&phy0>;
++	phy-mode = "10gbase-kr";
++};
++
+ &cpm_sata0 {
+ 	/* CPM Lane 0 - U29 */
+ 	status = "okay";
+@@ -154,6 +178,12 @@
+ 	status = "okay";
+ };
  
- 				cpm_eth1: eth1 {
- 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>;
-+					interrupt-names = "rx-shared";
- 					port-id = <1>;
- 					gop-port-id = <2>;
- 					status = "disabled";
-@@ -84,6 +86,7 @@
- 
- 				cpm_eth2: eth2 {
- 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>;
-+					interrupt-names = "rx-shared";
- 					port-id = <2>;
- 					gop-port-id = <3>;
- 					status = "disabled";
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 0dbb59811d00..0382cffef189 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -77,6 +77,7 @@
- 
- 				cps_eth0: eth0 {
- 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>;
-+					interrupt-names = "rx-shared";
- 					port-id = <0>;
- 					gop-port-id = <0>;
- 					status = "disabled";
-@@ -84,6 +85,7 @@
- 
- 				cps_eth1: eth1 {
- 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>;
-+					interrupt-names = "rx-shared";
- 					port-id = <1>;
- 					gop-port-id = <2>;
- 					status = "disabled";
-@@ -91,6 +93,7 @@
- 
- 				cps_eth2: eth2 {
- 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>;
-+					interrupt-names = "rx-shared";
- 					port-id = <2>;
- 					gop-port-id = <3>;
- 					status = "disabled";
++&cps_eth0 {
++	status = "okay";
++	phy = <&phy1>;
++	phy-mode = "10gbase-kr";
++};
++
+ &cps_eth1 {
+ 	/* CPS Lane 0 - J5 (Gigabit RJ45) */
+ 	status = "okay";
 -- 
 2.13.3
