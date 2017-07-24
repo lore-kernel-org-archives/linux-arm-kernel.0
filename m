@@ -1,72 +1,141 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 24 Jul 2017 13:47:12 +0200
-Subject: [PATCH 3/3] dt-bindings: clock: amlogic,gxbb-aoclkc: Update
- bindings
-In-Reply-To: <20170721204439.GJ19878@codeaurora.org>
-References: <1499336663-23875-1-git-send-email-narmstrong@baylibre.com>
- <1499336663-23875-4-git-send-email-narmstrong@baylibre.com>
- <20170710035031.rdbi64ookkbq6zeo@rob-hp-laptop>
- <20170721204439.GJ19878@codeaurora.org>
-Message-ID: <1a971e80-1f91-c446-7e28-d193354b2859@baylibre.com>
+From: jack@suse.cz (Jan Kara)
+Date: Mon, 24 Jul 2017 13:48:59 +0200
+Subject: [PATCH v4 5/5] dax: move all DAX radix tree defs to fs/dax.c
+In-Reply-To: <20170721223956.29485-6-ross.zwisler@linux.intel.com>
+References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
+ <20170721223956.29485-6-ross.zwisler@linux.intel.com>
+Message-ID: <20170724114859.GM652@quack2.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2017 10:44 PM, Stephen Boyd wrote:
-> On 07/09, Rob Herring wrote:
->> On Thu, Jul 06, 2017 at 12:24:23PM +0200, Neil Armstrong wrote:
->>> On the first revision of the bindings, only the gates + resets were known
->>> in the AO Clock HW, but more registers used to configures AO clock are known
->>> to be spread among the AO register space.
->>> This patch adds these registers to the Ao Clock bindings with direct access
->>> and shared extcon access.
->>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>> ---
->>>  .../devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt         | 11 +++++++++--
->>>  1 file changed, 9 insertions(+), 2 deletions(-)
->>
->> This looks like the binding might be too specific with a reg list of 
->> single registers, and you should define a system controller node 
->> instead. Depends on what else is in the "A0" block.
->>
+On Fri 21-07-17 16:39:55, Ross Zwisler wrote:
+> Now that we no longer insert struct page pointers in DAX radix trees the
+> page cache code no longer needs to know anything about DAX exceptional
+> entries.  Move all the DAX exceptional entry definitions from dax.h to
+> fs/dax.c.
 > 
-> Agreed. Why can't we expand the size in DT and then access the
-> registers directly in the driver. Hopefully it keeps working to
-> apply the dts patch without the driver patch too (and
-> vice-versa), because the kernel can only make a mapping as small
-> as a page which would cover these newly added reg properties
-> anyway.
+> Signed-off-by: Ross Zwisler <ross.zwisler@linux.intel.com>
+> Suggested-by: Jan Kara <jack@suse.cz>
+
+Looks good. You can add:
+
+Reviewed-by: Jan Kara <jack@suse.cz>
+
+								Honza
+
+
+> ---
+>  fs/dax.c            | 34 ++++++++++++++++++++++++++++++++++
+>  include/linux/dax.h | 41 -----------------------------------------
+>  2 files changed, 34 insertions(+), 41 deletions(-)
 > 
-
-Hi Rob, Stephen,
-
-Thanks for your feedback, but on these Amlogic platforms, the AO register bank is
-filled with interleaved registers used for various purposes.
-
-For instance, the first 1k of registers are :
-
-0-c RTI_STATUS
-c-14 RTI_PWR_CNTL
-14-1c PIN_MUX
-1c RTI_STATUS
-24-30 GPIO
-30 JTAG_CONFIG
-34 WD
-38-40 CPU_CTRL
-40 RTI_GEN_CTRL
-44 CPU_CTRL
-4c-58 TIMER
-58 OSCIN
-60 AHB2DDR
-...
-
-
-And so on, and the clock related registers are split among this space.
-
-For sure, this could be declared as an system controller node, but this would imply completely
-re-designing the actual clock driver and drop the actual bindings.
-(and with re-writting the clock gate code to use regmap registers access)
-
-Anyway, I'm open to suggestions...
-
-Neil
+> diff --git a/fs/dax.c b/fs/dax.c
+> index 0e27d90..e7acc45 100644
+> --- a/fs/dax.c
+> +++ b/fs/dax.c
+> @@ -54,6 +54,40 @@ static int __init init_dax_wait_table(void)
+>  }
+>  fs_initcall(init_dax_wait_table);
+>  
+> +/*
+> + * We use lowest available bit in exceptional entry for locking, one bit for
+> + * the entry size (PMD) and two more to tell us if the entry is a zero page or
+> + * an empty entry that is just used for locking.  In total four special bits.
+> + *
+> + * If the PMD bit isn't set the entry has size PAGE_SIZE, and if the ZERO_PAGE
+> + * and EMPTY bits aren't set the entry is a normal DAX entry with a filesystem
+> + * block allocation.
+> + */
+> +#define RADIX_DAX_SHIFT		(RADIX_TREE_EXCEPTIONAL_SHIFT + 4)
+> +#define RADIX_DAX_ENTRY_LOCK	(1 << RADIX_TREE_EXCEPTIONAL_SHIFT)
+> +#define RADIX_DAX_PMD		(1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 1))
+> +#define RADIX_DAX_ZERO_PAGE	(1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 2))
+> +#define RADIX_DAX_EMPTY		(1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 3))
+> +
+> +static unsigned long dax_radix_sector(void *entry)
+> +{
+> +	return (unsigned long)entry >> RADIX_DAX_SHIFT;
+> +}
+> +
+> +static void *dax_radix_locked_entry(sector_t sector, unsigned long flags)
+> +{
+> +	return (void *)(RADIX_TREE_EXCEPTIONAL_ENTRY | flags |
+> +			((unsigned long)sector << RADIX_DAX_SHIFT) |
+> +			RADIX_DAX_ENTRY_LOCK);
+> +}
+> +
+> +static unsigned int dax_radix_order(void *entry)
+> +{
+> +	if ((unsigned long)entry & RADIX_DAX_PMD)
+> +		return PMD_SHIFT - PAGE_SHIFT;
+> +	return 0;
+> +}
+> +
+>  static int dax_is_pmd_entry(void *entry)
+>  {
+>  	return (unsigned long)entry & RADIX_DAX_PMD;
+> diff --git a/include/linux/dax.h b/include/linux/dax.h
+> index afa99bb..d0e3272 100644
+> --- a/include/linux/dax.h
+> +++ b/include/linux/dax.h
+> @@ -88,33 +88,6 @@ void dax_flush(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
+>  		size_t size);
+>  void dax_write_cache(struct dax_device *dax_dev, bool wc);
+>  
+> -/*
+> - * We use lowest available bit in exceptional entry for locking, one bit for
+> - * the entry size (PMD) and two more to tell us if the entry is a zero page or
+> - * an empty entry that is just used for locking.  In total four special bits.
+> - *
+> - * If the PMD bit isn't set the entry has size PAGE_SIZE, and if the ZERO_PAGE
+> - * and EMPTY bits aren't set the entry is a normal DAX entry with a filesystem
+> - * block allocation.
+> - */
+> -#define RADIX_DAX_SHIFT	(RADIX_TREE_EXCEPTIONAL_SHIFT + 4)
+> -#define RADIX_DAX_ENTRY_LOCK (1 << RADIX_TREE_EXCEPTIONAL_SHIFT)
+> -#define RADIX_DAX_PMD (1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 1))
+> -#define RADIX_DAX_ZERO_PAGE (1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 2))
+> -#define RADIX_DAX_EMPTY (1 << (RADIX_TREE_EXCEPTIONAL_SHIFT + 3))
+> -
+> -static inline unsigned long dax_radix_sector(void *entry)
+> -{
+> -	return (unsigned long)entry >> RADIX_DAX_SHIFT;
+> -}
+> -
+> -static inline void *dax_radix_locked_entry(sector_t sector, unsigned long flags)
+> -{
+> -	return (void *)(RADIX_TREE_EXCEPTIONAL_ENTRY | flags |
+> -			((unsigned long)sector << RADIX_DAX_SHIFT) |
+> -			RADIX_DAX_ENTRY_LOCK);
+> -}
+> -
+>  ssize_t dax_iomap_rw(struct kiocb *iocb, struct iov_iter *iter,
+>  		const struct iomap_ops *ops);
+>  int dax_iomap_fault(struct vm_fault *vmf, enum page_entry_size pe_size,
+> @@ -136,20 +109,6 @@ static inline int __dax_zero_page_range(struct block_device *bdev,
+>  }
+>  #endif
+>  
+> -#ifdef CONFIG_FS_DAX_PMD
+> -static inline unsigned int dax_radix_order(void *entry)
+> -{
+> -	if ((unsigned long)entry & RADIX_DAX_PMD)
+> -		return PMD_SHIFT - PAGE_SHIFT;
+> -	return 0;
+> -}
+> -#else
+> -static inline unsigned int dax_radix_order(void *entry)
+> -{
+> -	return 0;
+> -}
+> -#endif
+> -
+>  static inline bool dax_mapping(struct address_space *mapping)
+>  {
+>  	return mapping->host && IS_DAX(mapping->host);
+> -- 
+> 2.9.4
+> 
+-- 
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
