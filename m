@@ -1,9 +1,9 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Tue, 25 Jul 2017 06:10:40 +0800
+Date: Tue, 25 Jul 2017 06:14:36 +0800
 Subject: [PATCH v3 3/5] iio: adc: sun4i-gpadc-iio: add support for H3
  thermal sensor
 In-Reply-To: <20170723141354.42646-4-icenowy@aosc.io>
-Message-ID: <201707250656.l5bNDgGa%fengguang.wu@intel.com>
+Message-ID: <201707250651.1AOl3egI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,38 +15,50 @@ Hi Icenowy,
 
 url:    https://github.com/0day-ci/linux/commits/Icenowy-Zheng/IIO-based-thermal-sensor-driver-for-Allwinner-H3-SoC/20170725-035642
 base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: tile-allmodconfig (attached as .config)
-compiler: tilegx-linux-gcc (GCC) 4.6.2
+config: sparc64-allmodconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
 reproduce:
         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=tile 
+        make.cross ARCH=sparc64 
 
 All warnings (new ones prefixed by >>):
 
+   In file included from include/linux/kernel.h:10:0,
+                    from include/linux/clk.h:16,
+                    from drivers/iio/adc/sun4i-gpadc-iio.c:25:
    drivers/iio/adc/sun4i-gpadc-iio.c: In function 'sun8i_h3_gpadc_sample_start':
->> drivers/iio/adc/sun4i-gpadc-iio.c:415:8: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+   include/linux/bitops.h:6:19: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+    #define BIT(nr)   (1UL << (nr))
+                      ^
+>> include/linux/mfd/sun4i-gpadc.h:57:45: note: in expansion of macro 'BIT'
+    #define SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN  BIT(0)
+                                                ^~~
+>> drivers/iio/adc/sun4i-gpadc-iio.c:414:8: note: in expansion of macro 'SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN'
+           SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN |
+           ^
+--
+   In file included from include/linux/kernel.h:10:0,
+                    from include/linux/clk.h:16,
+                    from drivers/iio//adc/sun4i-gpadc-iio.c:25:
+   drivers/iio//adc/sun4i-gpadc-iio.c: In function 'sun8i_h3_gpadc_sample_start':
+   include/linux/bitops.h:6:19: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+    #define BIT(nr)   (1UL << (nr))
+                      ^
+>> include/linux/mfd/sun4i-gpadc.h:57:45: note: in expansion of macro 'BIT'
+    #define SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN  BIT(0)
+                                                ^~~
+   drivers/iio//adc/sun4i-gpadc-iio.c:414:8: note: in expansion of macro 'SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN'
+           SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN |
+           ^
 
-vim +415 drivers/iio/adc/sun4i-gpadc-iio.c
+vim +/BIT +57 include/linux/mfd/sun4i-gpadc.h
 
-   410	
-   411	static int sun8i_h3_gpadc_sample_start(struct sun4i_gpadc_iio *info)
-   412	{
-   413		regmap_write(info->regmap, SUN8I_H3_GPADC_CTRL2,
-   414			     SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN |
- > 415			     SUN8I_H3_GPADC_CTRL2_T_ACQ1(31));
-   416		regmap_write(info->regmap, SUN4I_GPADC_CTRL0,
-   417			     SUN4I_GPADC_CTRL0_T_ACQ(31));
-   418		regmap_write(info->regmap, SUN8I_H3_GPADC_CTRL3,
-   419			     SUN4I_GPADC_CTRL3_FILTER_EN |
-   420			     SUN4I_GPADC_CTRL3_FILTER_TYPE(1));
-   421		regmap_write(info->regmap, SUN8I_H3_GPADC_INTC,
-   422			     SUN8I_H3_GPADC_INTC_TEMP_PERIOD(800));
-   423	
-   424		return 0;
-   425	}
-   426	
+    56	
+  > 57	#define SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN		BIT(0)
+    58	#define SUN8I_H3_GPADC_CTRL2_T_ACQ1(x)			((GENMASK(15, 0) * (x)) << 16)
+    59	
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -55,6 +67,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 49775 bytes
+Size: 51321 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/2a09c8c9/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/0e4dc25e/attachment-0001.gz>
