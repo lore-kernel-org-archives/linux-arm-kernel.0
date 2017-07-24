@@ -1,252 +1,129 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Jul 2017 18:54:46 +0100
-Subject: [PATCH 3/4] arm64: unwind: reference pt_regs via embedded stack
- frame
-In-Reply-To: <20170724112623.26109-4-ard.biesheuvel@linaro.org>
-References: <20170724112623.26109-1-ard.biesheuvel@linaro.org>
- <20170724112623.26109-4-ard.biesheuvel@linaro.org>
-Message-ID: <20170724175446.GE9726@leverpostej>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 24 Jul 2017 20:20:45 +0200
+Subject: [PATCH] ARM64: meson-gxl: disable broken eee
+In-Reply-To: <1500912570.2401.3.camel@baylibre.com>
+References: <20170707013257.18250-1-joseph.kogut@gmail.com>
+ <7ho9scsdbp.fsf@baylibre.com>
+ <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
+ <cf71b3c2-29d7-3bdb-0d00-872f5e1267e2@baylibre.com>
+ <7519c9ee-54f0-d5fb-1683-11d6e24f0822@baylibre.com>
+ <1500912570.2401.3.camel@baylibre.com>
+Message-ID: <CAFBinCBy6Ce79Tf2seQi4m3aNGOa0r00zjt=eZP-dYy+6WLo8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Mon, Jul 24, 2017 at 6:09 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Mon, 2017-07-24 at 14:26 +0200, Neil Armstrong wrote:
+>> On 07/24/2017 02:06 PM, Neil Armstrong wrote:
+>> > On 07/23/2017 07:03 PM, Joseph Kogut wrote:
+>> > > Hi Kevin,
+>> > >
+>> > > I tested on a P212 reference board, which is currently the only GXL
+>> > > based board I have.
+>> > >
+>> > > Before applying the patch, high activity on the ethernet interface
+>> > > would cause the link to break, requiring the interface to be brought
+>> > > down and back up before it would work again. After applying the patch,
+>> > > I could not get the link to break with any transfers.
+>> > >
+>> > > _______________________________________________
+>> > > linux-arm-kernel mailing list
+>> > > linux-arm-kernel at lists.infradead.org
+>> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> > >
+>> >
+>> > Hi Joseph,
+>> >
+>> > [please keep the history of the conversation when replying]
+>> >
+>> > Is it a original P212 board, or a board based on the P212 ref design ?
+>> >
+>> > I'm currently testing the v4.13-rc2 on the official P212 board we received
+>> > from Amlogic
+>> > and using iperf3 in both directions, I have an issue after a few minutes
+>> > running iperf3 with :
+>> >
+>> > # while true ; do iperf3 -c 192.168.1.21 ; iperf3 -c 192.168.1.21 -R ; done
+>> >
+>> > That cycles between the two iperf directions.
+>> >
+>> > After a few minutes, it stalls with :
+>> >
+>> > Connecting to host 192.168.1.21, port 5201
+>> > [  4] local 192.168.1.183 port 51286 connected to 192.168.1.21 port 5201
+>> > [ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
+>> > [  4]   0.00-1.00   sec  1.64 MBytes  13.7 Mbits/sec    2   1.41 KBytes
+>> > [  4]   1.00-2.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
+>> > [  4]   2.00-3.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+>> > [  4]   3.00-4.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
+>> > [  4]   4.00-5.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+>> > [  4]   5.00-6.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+>> > [  4]   6.00-7.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
+>> > [  4]   7.00-8.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+>> > [  4]   8.00-9.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+>> >
+>
+> Same kind of test shows no issue on the libretech-cc and the khadas-vim
+> In this case, I don't think meson-gxl.dtsi is where you should make your change.
+>
+>> >
+>> > And then, after:
+>> > # ifconfig eth0 down
+>> > # ifconfig eth0 up
+>> >
+>> > It cycles between :
+>> > [ 1483.009919] meson8b-dwmac c9410000.ethernet eth0: Link is Up -
+>> > 100Mbps/Full - flow control rx/tx
+>> > [ 1487.105725] meson8b-dwmac c9410000.ethernet eth0: Link is Down
+>> > [ 1490.177943] meson8b-dwmac c9410000.ethernet eth0: Link is Up -
+>> > 100Mbps/Full - flow control rx/tx
+>> > [ 1494.273713] meson8b-dwmac c9410000.ethernet eth0: Link is Down
+>
+> This does not look like the issue we had on the odroid-c2.
+> However, I have seen behavior like this (link down/up flickering) when the rgmii
+>  delays are way off.
+>
+> Maybe you could try playing with "amlogic,tx-delay-ns" property ?
+we need to change dwmac-meson8b.c so it applies the TX delay also for
+RMII PHYs. currently the TX delay is always set to 0 for RMII PHYs,
+see: [0]
 
-This series looks good. I've tested the whole thing with perf top -g and
-sysrq-L.
+>> >
+>> > and so on.
+>> >
+>> > And this patch does not fix this at all.
+>> >
+>> > It seems to be more a PHY driver issue here.
+>> >
+>> > Could you share the results with the same command ?
+>> >
+>> > Neil
+>> >
+>>
+>> I forgot to precise, this issue occurs when the "GXL PHY driver" is disabled,
+>> only relying on the
+>> Generic PHY Driver.
+>>
+>> [  630.767538] Generic PHY 0.e40908ff:08: attached PHY driver [Generic PHY]
+>> (mii_bus:phy_addr=0.e40908ff:08, irq=-1)
+>>
+>>
+>> When the PHY driver is loaded the issue disappears, with and without your
+>> patch.
+>>
+>> [   25.355620] Meson GXL Internal PHY 0.e40908ff:08: attached PHY driver
+>> [Meson GXL Internal PHY] (mii_bus:phy_addr=0.e40908ff:08, irq=-1)
+>>
+>> Could you please check the PHY Driver is loaded ?
+>>
+>> Thanks,
+>> Neil
+>
+>
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
 
-In the process of reviewing this, I spotted some other (existing) bugs
-in this area.
 
-On Mon, Jul 24, 2017 at 12:26:22PM +0100, Ard Biesheuvel wrote:
-> @@ -203,20 +193,13 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->  		ret = unwind_frame(tsk, &frame);
->  		if (ret < 0)
->  			break;
-> -		stack = frame.sp;
->  		if (in_exception_text(where)) {
-> -			/*
-> -			 * If we switched to the irq_stack before calling this
-> -			 * exception handler, then the pt_regs will be on the
-> -			 * task stack. The easiest way to tell is if the large
-> -			 * pt_regs would overlap with the end of the irq_stack.
-> -			 */
-> -			if (stack < irq_stack_ptr &&
-> -			    (stack + sizeof(struct pt_regs)) > irq_stack_ptr)
-> -				stack = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
-> +			stack = frame.fp - offsetof(struct pt_regs, stackframe);
->  
-> -			dump_mem("", "Exception stack", stack,
-> -				 stack + sizeof(struct pt_regs));
-> +			if (on_task_stack(tsk, stack) ||
-> +			    (tsk == current && !preemptible() && on_irq_stack(stack)))
-> +				dump_mem("", "Exception stack", stack,
-> +					 stack + sizeof(struct pt_regs));
-
-So here, we're using information from three records (where the last
-might have been faked from the current FP + LR). We look at the previous
-frame's LR value to determine whether the current frame's fp points to a
-next frame that's associated with some regs:
-
-         +----+----------------+
-         | fp | interrupted PC | /* embedded in pt_regs */
-         +----+----------------+
-           /\
-           ||
-         +----+----------------+
-where => | fp | < entry PC >   |
-         +----+----------------+
-           /\
-           ||
-         +----+----------------+
-         | fp | where          | /* "where" is in exception text */
-         +----+----------------+
-
-Which (IIUC) has three problems, inherited from the existing approach.
-
-1) Several C functions called from exception entry assembly are missing
-   __exception annotations. e.g. bad_mode.
-   
-   So we can miss exception regs in some cases.
-
-2) Several functions may be called either from the exception entry
-   assembly, or from other C code. e.g. do_undefinstr, and any cascaded
-   irqchip handlers.
-   
-   So we can spuriously decide part of the stack is a pt_regs.
-
-3) The entry assembly can enable exceptions before calling C code, so if
-   an exception is taken at the right time, these will eb in the
-   backtrace without a surrounding frame in the exception text.
-
-   So we can miss exception regs in some cases (distinct from (1)).
-
-... given that, I don't think we can rely on in_exception_text(). I
-think we have to look at whether the current frame's PC/LR is in
-.entry.text.
-
-Fixup to that effect below, tested with sysrq-L and perf top -g. Note
-that cpu_switch_to and ret_from_fork have to be moved into .text to
-avoid false positives. I also killed 'where' since it's no longer
-necessary to remember the previous frame.
-
-There's another bug -- we always dump the exception regs, even when
-skipping frames. The sqsrq-L handler tries to skip frames, so you get
-the regs for irq_entry, but without an irq_entry backtrace, which is
-confusing. That's simple enough to fix up separately, I guess.
-
-Thanks,
-Mark.
-
----->8----
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 02e9035..4136168 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -60,4 +60,9 @@ static inline int in_exception_text(unsigned long ptr)
- 	return in ? : __in_irqentry_text(ptr);
- }
- 
-+static inline int in_entry_text(unsigned long ptr)
-+{
-+	return ptr >= (unsigned long)&__entry_text_start &&
-+	       ptr < (unsigned long)&__entry_text_end;
-+}
- #endif
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 32f3b24..3d25ec5 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -707,38 +707,6 @@ el0_irq_naked:
- ENDPROC(el0_irq)
- 
- /*
-- * Register switch for AArch64. The callee-saved registers need to be saved
-- * and restored. On entry:
-- *   x0 = previous task_struct (must be preserved across the switch)
-- *   x1 = next task_struct
-- * Previous and next are guaranteed not to be the same.
-- *
-- */
--ENTRY(cpu_switch_to)
--	mov	x10, #THREAD_CPU_CONTEXT
--	add	x8, x0, x10
--	mov	x9, sp
--	stp	x19, x20, [x8], #16		// store callee-saved registers
--	stp	x21, x22, [x8], #16
--	stp	x23, x24, [x8], #16
--	stp	x25, x26, [x8], #16
--	stp	x27, x28, [x8], #16
--	stp	x29, x9, [x8], #16
--	str	lr, [x8]
--	add	x8, x1, x10
--	ldp	x19, x20, [x8], #16		// restore callee-saved registers
--	ldp	x21, x22, [x8], #16
--	ldp	x23, x24, [x8], #16
--	ldp	x25, x26, [x8], #16
--	ldp	x27, x28, [x8], #16
--	ldp	x29, x9, [x8], #16
--	ldr	lr, [x8]
--	mov	sp, x9
--	msr	sp_el0, x1
--	ret
--ENDPROC(cpu_switch_to)
--
--/*
-  * This is the fast syscall return path.  We do as little as possible here,
-  * and this includes saving x0 back into the kernel stack.
-  */
-@@ -781,18 +749,6 @@ finish_ret_to_user:
- ENDPROC(ret_to_user)
- 
- /*
-- * This is how we return from a fork.
-- */
--ENTRY(ret_from_fork)
--	bl	schedule_tail
--	cbz	x19, 1f				// not a kernel thread
--	mov	x0, x20
--	blr	x19
--1:	get_thread_info tsk
--	b	ret_to_user
--ENDPROC(ret_from_fork)
--
--/*
-  * SVC handler.
-  */
- 	.align	6
-@@ -865,3 +821,47 @@ ENTRY(sys_rt_sigreturn_wrapper)
- 	mov	x0, sp
- 	b	sys_rt_sigreturn
- ENDPROC(sys_rt_sigreturn_wrapper)
-+
-+/*
-+ * Register switch for AArch64. The callee-saved registers need to be saved
-+ * and restored. On entry:
-+ *   x0 = previous task_struct (must be preserved across the switch)
-+ *   x1 = next task_struct
-+ * Previous and next are guaranteed not to be the same.
-+ *
-+ */
-+ENTRY(cpu_switch_to)
-+	mov	x10, #THREAD_CPU_CONTEXT
-+	add	x8, x0, x10
-+	mov	x9, sp
-+	stp	x19, x20, [x8], #16		// store callee-saved registers
-+	stp	x21, x22, [x8], #16
-+	stp	x23, x24, [x8], #16
-+	stp	x25, x26, [x8], #16
-+	stp	x27, x28, [x8], #16
-+	stp	x29, x9, [x8], #16
-+	str	lr, [x8]
-+	add	x8, x1, x10
-+	ldp	x19, x20, [x8], #16		// restore callee-saved registers
-+	ldp	x21, x22, [x8], #16
-+	ldp	x23, x24, [x8], #16
-+	ldp	x25, x26, [x8], #16
-+	ldp	x27, x28, [x8], #16
-+	ldp	x29, x9, [x8], #16
-+	ldr	lr, [x8]
-+	mov	sp, x9
-+	msr	sp_el0, x1
-+	ret
-+ENDPROC(cpu_switch_to)
-+
-+/*
-+ * This is how we return from a fork.
-+ */
-+ENTRY(ret_from_fork)
-+	bl	schedule_tail
-+	cbz	x19, 1f				// not a kernel thread
-+	mov	x0, x20
-+	blr	x19
-+1:	get_thread_info tsk
-+	b	ret_to_user
-+ENDPROC(ret_from_fork)
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 9ba060b..63cbfb0 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -170,13 +170,12 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 	skip = !!regs;
- 	printk("Call trace:\n");
- 	while (1) {
--		unsigned long where = frame.pc;
- 		unsigned long stack;
- 		int ret;
- 
- 		/* skip until specified stack frame */
- 		if (!skip) {
--			dump_backtrace_entry(where);
-+			dump_backtrace_entry(frame.pc);
- 		} else if (frame.fp == regs->regs[29]) {
- 			skip = 0;
- 			/*
-@@ -191,7 +190,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		ret = unwind_frame(tsk, &frame);
- 		if (ret < 0)
- 			break;
--		if (in_exception_text(where)) {
-+		if (in_entry_text(frame.pc)) {
- 			stack = frame.fp - offsetof(struct pt_regs, stackframe);
- 
- 			if (on_task_stack(tsk, stack) ||
+[0] https://github.com/torvalds/linux/blob/master/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c#L222
