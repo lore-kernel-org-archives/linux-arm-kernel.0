@@ -1,29 +1,45 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 24 Jul 2017 13:41:44 -0700 (PDT)
-Subject: [PATCH] net: Convert to using %pOF instead of full_name
-In-Reply-To: <CAL_JsqJbEq0_yQ-T8-SGTQbRRxHs-MMCuBrK6d8_2jGQ_-7QkA@mail.gmail.com>
-References: <20170718214339.7774-39-robh@kernel.org>
- <20170718.145146.1983238254018568174.davem@davemloft.net>
- <CAL_JsqJbEq0_yQ-T8-SGTQbRRxHs-MMCuBrK6d8_2jGQ_-7QkA@mail.gmail.com>
-Message-ID: <20170724.134144.562191102829366953.davem@davemloft.net>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 24 Jul 2017 22:49:19 +0200
+Subject: [PATCH v4 03/12] ASoC: add new ac97 bus support
+In-Reply-To: <20170724204928.29505-1-robert.jarzmik@free.fr>
+References: <20170724204928.29505-1-robert.jarzmik@free.fr>
+Message-ID: <20170724204928.29505-4-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
-Date: Wed, 19 Jul 2017 10:09:13 -0500
+Add the new ac97 bus support, with ac97 bus automatic probing.
 
-> On Tue, Jul 18, 2017 at 4:51 PM, David Miller <davem@davemloft.net> wrote:
->> From: Rob Herring <robh@kernel.org>
->> Date: Tue, 18 Jul 2017 16:43:19 -0500
->>
->>> Now that we have a custom printf format specifier, convert users of
->>> full_name to use %pOF instead. This is preparation to remove storing
->>> of the full path string for each node.
->>>
->>> Signed-off-by: Rob Herring <robh@kernel.org>
->>
->> Acked-by: David S. Miller <davem@davemloft.net>
-> 
-> The dependency went into 4.13. You can take this thru netdev.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+---
+ sound/Kconfig  | 2 ++
+ sound/Makefile | 1 +
+ 2 files changed, 3 insertions(+)
 
-Ok, applied to net-next.
+diff --git a/sound/Kconfig b/sound/Kconfig
+index ee2e69a9ecd1..141b145c4195 100644
+--- a/sound/Kconfig
++++ b/sound/Kconfig
+@@ -80,6 +80,8 @@ source "sound/hda/Kconfig"
+ 
+ source "sound/ppc/Kconfig"
+ 
++source "sound/ac97/Kconfig"
++
+ source "sound/aoa/Kconfig"
+ 
+ source "sound/arm/Kconfig"
+diff --git a/sound/Makefile b/sound/Makefile
+index 6de45d2c32f7..c03b0bed65d5 100644
+--- a/sound/Makefile
++++ b/sound/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_SND_AOA) += aoa/
+ 
+ # This one must be compilable even if sound is configured out
+ obj-$(CONFIG_AC97_BUS) += ac97_bus.o
++obj-$(CONFIG_AC97_BUS_NEW) += ac97/
+ 
+ ifeq ($(CONFIG_SND),y)
+   obj-y += last.o
+-- 
+2.11.0
