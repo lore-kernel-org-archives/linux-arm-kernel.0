@@ -1,142 +1,92 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 24 Jul 2017 13:44:54 +0300
-Subject: [PATCH] spi: pxa2xx: Only claim CS GPIOs when the slave device is
- created
-In-Reply-To: <90b3e14d-0077-9a25-9d90-ab340577af57@web.de>
-References: <90b3e14d-0077-9a25-9d90-ab340577af57@web.de>
-Message-ID: <CAHp75VfpJzOdhMyZoMGnC4CQc5kGxq1k-__dpmVAOaxaD04w6Q@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 24 Jul 2017 11:37:24 +0100
+Subject: [PATCH 06/11] arm64: Don't trap host pointer auth use to EL2
+In-Reply-To: <1500480092-28480-7-git-send-email-mark.rutland@arm.com>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+ <1500480092-28480-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170724103648.GA6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Cc: Mika
-
-On Sat, Jul 8, 2017 at 11:41 AM, Jan Kiszka <jan.kiszka@web.de> wrote:
-> From: Jan Kiszka <jan.kiszka@siemens.com>
->
-> Avoid hogging chip select GPIOs just because they are listed for the
-> master. They might be mulitplexed and, if no slave device is attached,
-> used for different purposes. Moreover, this strategy avoids having to
-> allocate a cs_gpiods structure.
->
-> Tested on the IOT2000 where the second SPI bus is connected to an
-> Arduino-compatible connector and multiplexed between SPI, GPIO and PWM
-> usage.
->
-
-This breaks all systems which are using _DSD.
-
-While I'm looking for fix, I get feeling that the approach itself is not right,
-
-So, for now I would vote for immediate revert and then rethink what we
-can do here.
-
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+On Wed, Jul 19, 2017 at 05:01:27PM +0100, Mark Rutland wrote:
+> To allow EL0 (and/or EL1) to use pointer authentication functionality,
+> we must ensure that pointer authentication instructions and accesses to
+> pointer authentication keys are not trapped to EL2 (where we will not be
+> able to handle them).
+> 
+> This patch ensures that HCR_EL2 is configured appropriately when the
+> kernel is booted at EL2. For non-VHE kernels we set HCR_EL2.{API,APK},
+> ensuring that EL1 can access keys and permit EL0 use of instructions.
+> For VHE kernels, EL2 access is controlled by EL3, and we need not set
+> anything.
+> 
+> This does not enable support for KVM guests, since KVM manages HCR_EL2
+> itself.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
 > ---
->  drivers/spi/spi-pxa2xx.c | 59 +++++++++++++++++-------------------------------
->  1 file changed, 21 insertions(+), 38 deletions(-)
->
-> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-> index 38d053682892..be991266a6ce 100644
-> --- a/drivers/spi/spi-pxa2xx.c
-> +++ b/drivers/spi/spi-pxa2xx.c
-> @@ -1213,21 +1213,33 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
->                     struct pxa2xx_spi_chip *chip_info)
->  {
->         struct driver_data *drv_data = spi_master_get_devdata(spi->master);
-> +       struct device *pdev = &drv_data->pdev->dev;
-> +       struct gpio_desc *gpiod;
->         int err = 0;
-> +       int count;
->
->         if (chip == NULL)
->                 return 0;
->
-> -       if (drv_data->cs_gpiods) {
-> -               struct gpio_desc *gpiod;
-> +       count = gpiod_count(pdev, "cs");
-> +       if (count > 0) {
-> +               if (spi->chip_select >= count)
-> +                       return -EINVAL;
-> +
-> +               gpiod = gpiod_get_index(pdev, "cs", spi->chip_select,
-> +                                       GPIOD_OUT_HIGH);
-> +               if (IS_ERR(gpiod)) {
-> +                       /* Means use native chip select */
-> +                       if (PTR_ERR(gpiod) == -ENOENT)
-> +                               return 0;
->
-> -               gpiod = drv_data->cs_gpiods[spi->chip_select];
-> -               if (gpiod) {
-> -                       chip->gpio_cs = desc_to_gpio(gpiod);
-> -                       chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
-> -                       gpiod_set_value(gpiod, chip->gpio_cs_inverted);
-> +                       return PTR_ERR(gpiod);
->                 }
->
-> +               chip->gpio_cs = desc_to_gpio(gpiod);
-> +               chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
-> +               gpiod_set_value(gpiod, chip->gpio_cs_inverted);
-> +
->                 return 0;
->         }
->
-> @@ -1415,8 +1427,7 @@ static void cleanup(struct spi_device *spi)
->         if (!chip)
->                 return;
->
-> -       if (drv_data->ssp_type != CE4100_SSP && !drv_data->cs_gpiods &&
-> -           gpio_is_valid(chip->gpio_cs))
-> +       if (drv_data->ssp_type != CE4100_SSP && gpio_is_valid(chip->gpio_cs))
->                 gpio_free(chip->gpio_cs);
->
->         kfree(chip);
-> @@ -1752,38 +1763,10 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
->         master->num_chipselect = platform_info->num_chipselect;
->
->         count = gpiod_count(&pdev->dev, "cs");
-> -       if (count > 0) {
-> -               int i;
-> -
-> +       if (count > 0)
->                 master->num_chipselect = max_t(int, count,
->                         master->num_chipselect);
->
-> -               drv_data->cs_gpiods = devm_kcalloc(&pdev->dev,
-> -                       master->num_chipselect, sizeof(struct gpio_desc *),
-> -                       GFP_KERNEL);
-> -               if (!drv_data->cs_gpiods) {
-> -                       status = -ENOMEM;
-> -                       goto out_error_clock_enabled;
-> -               }
-> -
-> -               for (i = 0; i < master->num_chipselect; i++) {
-> -                       struct gpio_desc *gpiod;
-> -
-> -                       gpiod = devm_gpiod_get_index(dev, "cs", i,
-> -                                                    GPIOD_OUT_HIGH);
-> -                       if (IS_ERR(gpiod)) {
-> -                               /* Means use native chip select */
-> -                               if (PTR_ERR(gpiod) == -ENOENT)
-> -                                       continue;
-> -
-> -                               status = (int)PTR_ERR(gpiod);
-> -                               goto out_error_clock_enabled;
-> -                       } else {
-> -                               drv_data->cs_gpiods[i] = gpiod;
-> -                       }
-> -               }
-> -       }
-> -
->         tasklet_init(&drv_data->pump_transfers, pump_transfers,
->                      (unsigned long)drv_data);
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  arch/arm64/include/asm/kvm_arm.h |  2 ++
+>  arch/arm64/kernel/head.S         | 19 +++++++++++++++++--
+>  2 files changed, 19 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 61d694c..c1267e8 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -23,6 +23,8 @@
+>  #include <asm/types.h>
+>  
+>  /* Hyp Configuration Register (HCR) bits */
+> +#define HCR_API		(UL(1) << 41)
+> +#define HCR_APK		(UL(1) << 40)
+>  #define HCR_E2H		(UL(1) << 34)
+>  #define HCR_ID		(UL(1) << 33)
+>  #define HCR_CD		(UL(1) << 32)
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 973df7d..8b8e8d7 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -412,10 +412,25 @@ CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
+>  
+>  	/* Hyp configuration. */
+>  	mov	x0, #HCR_RW			// 64-bit EL1
+> -	cbz	x2, set_hcr
+> +	cbz	x2, 1f
 
+Can we keep the label name here?  It still seems appropriate.
 
+>  	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
+>  	orr	x0, x0, #HCR_E2H
+> -set_hcr:
+> +1:
+> +#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
+> +	/*
+> +	 * Disable pointer authentication traps to EL2. The HCR_EL2.{APK,API}
+> +	 * bits exist iff at least one authentication mechanism is implemented.
+> +	 */
+> +	mrs	x1, id_aa64isar1_el1
+> +	mov_q	x3, ((0xf << ID_AA64ISAR1_GPI_SHIFT) | \
+> +		     (0xf << ID_AA64ISAR1_GPA_SHIFT) | \
+> +		     (0xf << ID_AA64ISAR1_API_SHIFT) | \
+> +		     (0xf << ID_AA64ISAR1_APA_SHIFT))
 
--- 
-With Best Regards,
-Andy Shevchenko
+Redundant outer (), I think -- mov_q protects its argument.
+
+> +	and	x1, x1, x3
+> +	cbz	x1, 1f
+
+tst + b.eq?
+
+> +	orr	x0, x0, #(HCR_APK | HCR_API)
+> +1:
+> +#endif
+>  	msr	hcr_el2, x0
+>  	isb
+
+Cheers
+---Dave
