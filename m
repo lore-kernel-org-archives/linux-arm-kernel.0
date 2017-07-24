@@ -1,139 +1,55 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 24 Jul 2017 11:47:29 +0100
-Subject: [PATCH 01/11] arm64: docs: describe ELF hwcaps
-In-Reply-To: <20170721170523.GD1538@e103592.cambridge.arm.com>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <1500480092-28480-2-git-send-email-mark.rutland@arm.com>
- <20170721170523.GD1538@e103592.cambridge.arm.com>
-Message-ID: <fcf947a4-3670-3b1e-fc5a-f5da8a58e7ba@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 24 Jul 2017 14:02:57 +0300
+Subject: [PATCH] spi: pxa2xx: Only claim CS GPIOs when the slave device is
+ created
+In-Reply-To: <59066818-a284-4da0-d05f-d2503aeee44b@web.de>
+References: <90b3e14d-0077-9a25-9d90-ab340577af57@web.de>
+ <CAHp75VfpJzOdhMyZoMGnC4CQc5kGxq1k-__dpmVAOaxaD04w6Q@mail.gmail.com>
+ <59066818-a284-4da0-d05f-d2503aeee44b@web.de>
+Message-ID: <CAHp75Vf0NuOAvsJDxeB=5uqhMFpQ54vZzegJe=EYZDd3Bd6erw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/17 18:05, Dave Martin wrote:
-> On Wed, Jul 19, 2017 at 05:01:22PM +0100, Mark Rutland wrote:
->> We don't document our ELF hwcaps, leaving developers to interpret them
->> according to hearsay, guesswork, or (in exceptional cases) inspection of
->> the current kernel code.
+On Mon, Jul 24, 2017 at 1:53 PM, Jan Kiszka <jan.kiszka@web.de> wrote:
+> On 2017-07-24 12:44, Andy Shevchenko wrote:
+>> +Cc: Mika
 >>
->> This is less than optimal, and it would be far better if we had some
->> definitive description of each of the ELF hwcaps that developers could
->> refer to.
+>> On Sat, Jul 8, 2017 at 11:41 AM, Jan Kiszka <jan.kiszka@web.de> wrote:
+>>> From: Jan Kiszka <jan.kiszka@siemens.com>
+>>>
+>>> Avoid hogging chip select GPIOs just because they are listed for the
+>>> master. They might be mulitplexed and, if no slave device is attached,
+>>> used for different purposes. Moreover, this strategy avoids having to
+>>> allocate a cs_gpiods structure.
+>>>
+>>> Tested on the IOT2000 where the second SPI bus is connected to an
+>>> Arduino-compatible connector and multiplexed between SPI, GPIO and PWM
+>>> usage.
+
+>> This breaks all systems which are using _DSD.
+>
+> Err, can you elaborate? Worked fine here with _DSD on the IOT2000.
+
+Sure, the setup() function can be called several times for the same
+chip (as written in the comment inside the function).
+Definitely your code doesn't follow this, since gpiod_get_index() is
+returning -EBUSY when called 2+ time, that's what I got on all my
+tests.
+
+>> While I'm looking for fix, I get feeling that the approach itself is not right,
 >>
->> This patch adds a document describing the (native) arm64 ELF hwcaps.
+>> So, for now I would vote for immediate revert and then rethink what we
+>> can do here.
 >
-> Minor nit: what do the hwcaps have to do with ELF really?  Can we just
-> call them "hwcaps"?
->
-> I'm not sure of the history here.
+> I'm fine with reverting because the patch wasn't clean anyway (mixed old
+> and new GPIO API) - aside from whatever you found in addition.
 
-Dave,
+> I had an
+> update pending but, as you are looking into this anyway, I'm sure your
+> patches will be more holistic.
 
-This is something that I requested to avoid confusing it with the CPU hwcaps,
-(stored in the variable named hwcaps), we maintain in the kernel for capabilities.
-Though, what we describe in this document is not specific to ELF format as
-you have mentioned, it is easy to get confused with the former.
+Please, send it as RFC, because it might have something we can use/re-use.
 
->
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Dave Martin <Dave.Martin@arm.com>
->> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>  Documentation/arm64/elf_hwcaps.txt | 133 +++++++++++++++++++++++++++++++++++++
->>  1 file changed, 133 insertions(+)
->>  create mode 100644 Documentation/arm64/elf_hwcaps.txt
->>
->> diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
->> new file mode 100644
->> index 0000000..7bc2921
->> --- /dev/null
->> +++ b/Documentation/arm64/elf_hwcaps.txt
->> @@ -0,0 +1,133 @@
->> +ARM64 ELF hwcaps
->> +================
->> +
->> +This document describes the usage and semantics of the arm64 ELF hwcaps.
->> +
->> +
->> +1. Introduction
->> +---------------
->> +
->> +Some hardware or software features are only available on some CPU
->> +implementations, and/or with certain kernel configurations, but have no
->> +architected discovery mechanism available to userspace code at EL0. The
->> +kernel exposes the presence of these features to userspace through a set
->> +of flags called hwcaps, exposed in the auxilliary vector.
->> +
->> +Userspace software can test for features by acquiring the AT_HWCAP entry
->> +of the auxilliary vector, and testing whether the relevant flags are
->> +set, e.g.
->> +
->> +bool floating_point_is_present(void)
->> +{
->> +	unsigned long hwcaps = getauxval(AT_HWCAP);
->> +	if (hwcaps & HWCAP_FP)
->> +		return true;
->> +
->> +	return false;
->> +}
->> +
->> +Where software relies on a feature described by a hwcap, it should check
->> +the relevant hwcap flag to verify that the feature is present before
->> +attempting to make use of the feature.
->> +
->> +Features cannot be probed reliably through other means. When a feature
->> +is not available, attempting to use it may result in unpredictable
->
-> This says that features cannot be probed reliably via the (emulated) ID
-> registers available with HWCAP_CPUID.
->
-> So, what use is the ID register emulation?
->
-> For each of hwcaps and cpuid, a particular feature may be reported as
-> present (y), absent (n), or not described at all (x):
->
-> hwcap>    x n y
-> cpuid:
->    x      N N Y
->    n      N N
->    y      Y   Y
->
-> I've filled in the straightforward cases, where software may (Y) or must
-> not (N) use the feature.
->
-> In the cases left blank, hwcap and cpuid disagree.
->
-> Are we confident that should never be observed -- i.e., it's a kernel
-> bug if seen?  If so, we can fill Ys in there.  But we need to be clear
-
-CPUID=> n and HWCAP=> Y is Kernel bug, indeed, as both HWCAP and CPUID uses the
-same underlying data for the decision. However, the other case is a bit complicated,
-depending on whether we decide to continue adding (we do add at the moment) "new HWCAP"
-bits for the newer features.
-If we do add the new HWCAPs, that could possible create conflicts on older kernels
-which doesn't know about the feature, while the CPUID could expose the feature.
-If we don't add the HWCAP, there is no reliable way for the userspace to decide if
-the kernel supports the feature or not.
-
-So, in either case, we need to cap the value exposed by CPUID to the "kernel supported
-feature level" to avoid problems like this.
-
-Thoughts ?
-
-Suzuki
-
-
-
-> about cases where the hwcap doesn't mean exactly the same as the
-> corresponding CPUID feature.  The hwcap may tell software it can assume
-> that certain kernel ABI extensions related to that CPU feature are
-> available for example.
->
-> This also affects how HWCAP_CPUID is described below.
->
-> [...]
->
-> Cheers
-> ---Dave
->
+-- 
+With Best Regards,
+Andy Shevchenko
