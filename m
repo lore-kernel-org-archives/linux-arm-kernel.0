@@ -1,64 +1,115 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 24 Jul 2017 16:50:49 -0700
-Subject: [PATCH 0/5] earlycon hang under some conditions
-In-Reply-To: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <CAD=FV=W5+jEE21DC6=cr=5koYeDAShVbqtad-Dy2oaRVzwQSVA@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 25 Jul 2017 01:56:57 +0200
+Subject: [PATCH net-next 00/18] net: mvpp2: MAC/GoP configuration and
+ optional PHYs
+In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+Message-ID: <CAPv3WKcFezu3O6wtLs==gd0F7Za=dAww3Mn0A_x4FameSOF7Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Antoine,
 
-On Mon, Jul 17, 2017 at 11:02 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
-> I was testing earlycon with 8250 dw serial console. And it hangs in
-> these cases:
-> 1/ kernel hang when calling early write function after free_initmem:
-> a) the earlycon not disabled after the init code(due to keep_bootcon or
->    not specify a real console to switch to)
-> b) the early write func is marked as __init, for example 8250_early.
->
-> 2/ kernel hang when calling early write function after disable unused
-> clks/pm domain:
-> a) the earlycon not disabled after the init code
-> b) the disable unused clks/pm domain kill the requiered clks/pm
->    domain, since they are not referenced by the earlycon.
->
-> 3/ kernel hang when calling early write function after the serial
->    console driver runtime suspended:
-> a) the earlycon not disabled after the init code
-> b) the serial console driver's runtime suspend kills the requiered
->    clks/pm domain, since they are not referenced by the earlycon.
->
-> This serial fix 1/ case only.
->
->
->
-> Jeffy Chen (5):
->   serial: arc: Remove __init marking from early write
->   serial: omap: Remove __init marking from early write
->   serial: xuartps: Remove __init marking from early write
->   serial: 8250_ingenic: Remove __init marking from early write
->   serial: 8250_early: Remove __init marking from early write
->
->  drivers/tty/serial/8250/8250_early.c   |  8 ++++----
->  drivers/tty/serial/8250/8250_ingenic.c |  8 ++++----
->  drivers/tty/serial/arc_uart.c          |  4 ++--
->  drivers/tty/serial/omap-serial.c       | 13 ++++++-------
->  drivers/tty/serial/xilinx_uartps.c     |  2 +-
->  5 files changed, 17 insertions(+), 18 deletions(-)
+I stressed 10G interfaces with bidirectional traffic on A8040-DB, did
+some up/down sequences and overall it seems stable (of course I needed
+fix mentioned in patch 10/18). In a spare moment I'll give other
+changes a scroll.
 
-I looked through all 5 patches and they seem sane to me.  I didn't go
-through and test them since Brian already tested the patches for the
-one UART driver I'd have access to anyway.
+Best regards,
+Marcin
 
-As per my previous email, I don't see any need to solve all the
-world'd problems with this patch series, plus the keep_bootcon seems
-to be an experts / debugging type option and it seems sane if you need
-to take care in using it.
-
-So officially for the series (FWIW since I'm just an interested 3rd party):
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
-
-
--Doug
+2017-07-24 15:48 GMT+02:00 Antoine Tenart <antoine.tenart@free-electrons.com>:
+> Hi all,
+>
+> This series aim two things: making the PPv2 driver less depending on
+> the firmware/bootloader initialization[1], and making the PPv2 driver
+> work when no Ethernet PHY is connected between a port and the physical
+> layer[2]. A few patches cleanup some small parts of the driver, and
+> newly supported interfaces are described in the device trees[3].
+>
+> [1] The current implementation of the PPv2 driver relies on the
+>     firmware/bootloader initialization to configure some parts, as the
+>     Group of Ports (GoP) and the MACs (GMAC and/or XLG MAC --for 10G--).
+>     The drawback is the kernel must be configured to match exactly what
+>     the bootloader configures which is not convenient and is an issue
+>     when using boards having an Ethernet port and an SFP port wired to
+>     the same GoP port, as no dynamic configuration can be done.
+>
+>     This series adds the GoP and GMAC/XLG MAC initializations so that
+>     the PPV2 does not have to rely on a previous initialization. One
+>     part is still missing from this series, and that would be the
+>     'comphy' which provides shared serdes PHYs and which must be
+>     configured as well for a full kernel initialization to work. This
+>     comphy support will be part of a following up series. (This
+>     series was also tested with this 'comphy' support, as it's nearly
+>     ready).
+>
+>     Patches 3-7, 11 and 14-15.
+>
+> [2] While the documentation states the phy property in a port node is
+>     optional, it is not in the current driver's implementation. This is
+>     needed when no PHY is connected between a GoP port and the physical
+>     layer (as for the two SFP ports on the 8040-db). One other feature
+>     is missing to be able to use such ports: the port link interrupt
+>     which allows not to rely on the phylib link event callback.
+>
+>     This series makes the phy optional in the PPv2 driver, and then adds
+>     the support for the GoP port link interrupt to handle link status
+>     changes on such ports.
+>
+>     Patches 8-10, 12-14.
+>
+> [3] With the port link interrupt and optional PHY support, the two SFP
+>     ports on the Marvell Armada 8040 DB can be described and used; as
+>     well as the SFP port on the 7040 DB..
+>
+>     Cosmetic changes / fixes.
+>
+>     Patches 1, 2 and 16-18.
+>
+> I intentionally grouped all these patches into one series, as we would
+> end up with series depending on each others (and I already did not
+> include all my patches in this one). If that's an issue for this series
+> to be reviewed/merged, I can easily split it into two series, with a
+> dependency of one on the other.
+>
+> @Dave: Patches 13 to 18 should go through the mvebu tree, thanks :)
+>
+> Thanks!
+> Antoine
+>
+>
+> Antoine Tenart (18):
+>   net: mvpp2: unify register definitions coding style
+>   net: mvpp2: fix the synchronization module bypass macro name
+>   net: mvpp2: set the SMI PHY address when connecting to the PHY
+>   net: mvpp2: move the mii configuration in the ndo_open path
+>   net: mvpp2: initialize the GMAC when using a port
+>   net: mvpp2: initialize the XLG MAC when using a port
+>   net: mvpp2: initialize the GoP
+>   net: mvpp2: make the phy optional
+>   net: mvpp2: use named interrupts
+>   net: mvpp2: use the GoP interrupt for link status changes
+>   Documentation/bindings: net: marvell-pp2: add the system controller
+>   Documentation/bindings: net: marvell-pp2: add the interrupt-names
+>   arm64: dts: marvell: cp110: use named interrupts for the Ethernet
+>     ports
+>   arm64: dts: marvell: cp110: add PPv2 port interrupts
+>   arm64: dts: marvell: add a reference to the sysctrl syscon in the ppv2
+>     node
+>   arm64: dts: marvell: mcbin: enable more networking ports
+>   arm64: dts: marvell: 7040-db: enable the SFP port
+>   arm64: dts: marvell: 8040-db: enable the SFP ports
+>
+>  .../devicetree/bindings/net/marvell-pp2.txt        |   7 +
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts     |   5 +
+>  arch/arm64/boot/dts/marvell/armada-8040-db.dts     |  10 +
+>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  30 ++
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      |  13 +-
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  13 +-
+>  drivers/net/ethernet/marvell/mvpp2.c               | 587 ++++++++++++++++++---
+>  7 files changed, 575 insertions(+), 90 deletions(-)
+>
+> --
+> 2.13.3
+>
