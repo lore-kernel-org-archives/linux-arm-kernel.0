@@ -1,213 +1,80 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 24 Jul 2017 17:16:02 -0500
-Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
- from suspend_noirq
-In-Reply-To: <20170724095201.21601-1-johan@kernel.org>
-References: <20170724095201.21601-1-johan@kernel.org>
-Message-ID: <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 25 Jul 2017 00:30:45 +0200
+Subject: [PATCH 2/2] net: ethernet: nb8800: Fix RGMII TX clock delay setup
+In-Reply-To: <5c48496e-8c67-5af5-e0c5-7b0c298adc84@gmail.com>
+References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
+ <61b71d12-4e3a-edbe-1d69-c66e7cf46d8e@sigmadesigns.com>
+ <yw1xzic0qrcg.fsf@mansr.com> <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
+ <d8121f82-dffd-22c7-1209-a3c2329703e5@gmail.com>
+ <05cbc32e-a4af-1c81-128b-bc5d2206d24a@free.fr>
+ <bf484952-15ae-b385-6b54-4d07b3bc2b29@gmail.com>
+ <54f5bd21-766d-d9de-3b15-a01fd5ee6035@free.fr>
+ <54ca7197-780a-68b1-0cf2-88ccc7ce4201@free.fr>
+ <5c48496e-8c67-5af5-e0c5-7b0c298adc84@gmail.com>
+Message-ID: <22140d1e-e9e2-314b-0927-50ed0d3b1b93@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/24/2017 04:52 AM, Johan Hovold wrote:
-> Since commit a8636c89648a ("PM / Runtime: Don't allow to suspend a
-> device with an active child"), which went into 4.10, it is no longer
-> permitted to set RPM_SUSPENDED state for a device with active children
-> (unless power.ignore_children is set).
+On 24/07/2017 23:49, Florian Fainelli wrote:
+> On 07/24/2017 02:21 PM, Mason wrote:
+>> On 20/07/2017 14:33, Mason wrote:
+>>
+>>> As [Florian] pointed out, the spec states that the
+>>> "Data to Clock input Skew (at Receiver)"
+>>> must be within [ 1.0, 2.6 ] ns.
+>>>
+>>> I understand that 2 ns is 1/4 of a 125 MHz period,
+>>> but it's not clear to me why the above interval is
+>>> centered at 1.8 instead of 2.0 ns.
+>>>
+>>> Also, the AR8035 PHY offers 4 possible TX clock delays:
+>>> { 0.25, 1.3, 2.4, 3.4 } according to their doc.
+>>> The two extremes are outside the interval, when would
+>>> they be useful? In case the transmitter adds "bad" skew?
+>>>
+>>> Why doesn't the PHY support 1.8/2.0? Is it perhaps
+>>> unable to, because of PLL limitations?
+>>
+>> I haven't yet found answers for these questions.
+>>
+>> - Why is the interval centered at 1.8 instead of 2.0 ns?
 > 
-> This specifically means that the attempts to do just that from the omap
-> pm-domain suspend_noirq callback have since been failing whenever a
-> child is active, for example:
+> Presumably because this is almost the middle of the available range and
+> it still provides a value that is within the specification...
+
+I was talking about the RGMII spec.
+If - theoretically - the best results are achieved
+by having a 2 ns skew between clock and data,
+it seems odd for the RGMII spec to define an
+interval of [ 1.0, 2.6 ] ns for acceptable values.
+I would have expected [ 1.2, 2.8 ] ns.
+
+>> - What use are 0.25 ns and 3.4 ns skew?
 > 
->    am335x-usb-childs 47400000.usb: runtime PM trying to suspend
->      device but active child
+> Accounting for extreme PCB traces lengths possibly, or just exposing the
+> raw values that the HW supports by increments of 0.25 ns, just because
+> the HW supports it.
+
+The AR8035 doesn't support increments of 0.25 ns,
+it supports just 4 values: 0.25, 1.3, 2.4, 3.4
+Two of which are outside the acceptable range
+defined in the RGMII spec. Odd.
+Giving it more thought, I don't think trace length
+factors in, unless the data and clock lines have
+very different length (signal propagation).
+
+>> - Why doesn't the PHY support a "recommended" value like 1.8 ns?
+>>
+>> Does anyone have pointers to good resources?
 > 
-> Silence this warning by dropping the broken pm_runtime_set_suspended()
-> call from the omap suspend_noirq callback along with the redundant
-> pm_runtime_set_active() in resume_noirq.
-> 
-> This effectively reverts commit 3522bf7bfa24 ("ARM: OMAP2+: omap_device:
-> maintain sane runtime pm status around suspend/resume"), which started
-> updating the RPM state after the runtime_suspend callback (!) for active
-> omap devices had been called during system suspend. The rationale was
-> that a later pm_runtime_get_sync() would then fail (even after runtime
-> pm had been disabled) and that this in turn would avoid any external
-> aborts when accessing registers with clocks disabled. (See also commit
-> 6f3c77b040fc ("PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
-> even when disabled, v2").
-> 
-> But during the suspend_noirq phase all children would already have been
-> suspended and their drivers would specifically not attempt any further
-> register accesses. And if this was all just a workaround for random
-> device drivers doing cross-tree calls during system suspend, those
-> drivers should be fixed and updated to explicitly model such
-> dependencies using device-links instead (and either way, any such calls
-> have been causing crashes since 4.10).
+> The PHY datasheet and the RGMII specification really ought to be the
+> starting points, there is not much more to it. Maybe go ask your support
+> person at Qualcomm/Atheros about their PHY design?
 
-I'd like to provide some background and comments here.
+Sadly, I rarely have access to support for the blocks
+we use. I had to download the datasheet off the internet.
+But I was only asking out of personal curiosity, since
+this is outside my field. I don't think any customer
+has complained about the default settings.
 
-1) OMAP platform is PM runtime centric - in other words all device's
-PM operations (power on/off) are done through PM runtime calls and devices
-drivers do not really change device's Power states during suspend/resume
-- just do preparation for suspend. The final disabling of devices is done
-form _od_suspend_noirq() or if device driver calls pm_runtime_force_suspend()
-directly during suspend.
-
-2) Initially all this suspend_noirq code was introduced due to commit
-
-commit 1e2ef05bb8cf851a694d38e9170c89e7ff052741
-Author: Rafael J. Wysocki <rjw@sisk.pl>
-Date:   Wed Jul 6 10:51:58 2011 +0200
-
-    PM: Limit race conditions between runtime PM and system sleep (v2)
-
-which blocks PM runtime during suspend resume. And, at that time, there were
-no pm_runtime_force_suspend/resume() neither proper support for power domains.
-
-As result, below two calls really switch OFF device and its state should be 
-RPM_SUSPENDED as it will reflect real PM state of HW:
-	m_generic_runtime_suspend(dev)
-	omap_device_idle(pdev);
-
-In general, now the code in _od_resume/resume_noirq() callback is
-equivalent to pm_runtime_force_suspend/resume().
-
-3) It's expected to ignore -EBUSY return code from pm_generic_runtime_suspend(dev)
-in _od_suspend_noirq(), as such code (-EBUSY) tells OMAP device framework that 
-device should be kept active during suspend (for example 
-serial device in case of "no_console_suspend").
-
-commit 4b7ec5accecdb136c7afaf8739a06d5335cc05aa
-Author: Sourav Poddar <sourav.poddar@ti.com>
-Date:   Sat Apr 27 01:55:34 2013 +0530
-
-    arm: omap2+: omap_device: remove no_idle_on_suspend
-
-As result, when "runtime PM trying to suspend device but active child" happens
-the OMAP device framework will ignore it and gracefully continue to suspend where
-target device will finally powered off (depending on suspend mode and device). 
-On resume, target device will not be powered on, because its state was not marked as
-OMAP_DEVICE_SUSPENDED, so further attempts to power on device with pm_runtime_get_sync()
-will be a NOP (because device state is RPM_ACTIVE) and any access to the device will fail
-(system crash).
-
-4) Unfortunately, commit a8636c89648a ("PM / Runtime: Don't allow to suspend a
- device with an active child") "breaks" OMAP suspend functionality (or
- makes visible more fundamental issues of PM runtime vs Sys suspend), because
- not all Kernel subsystem (especially USB) maintain their devices PM runtime
- state properly during suspend, which cause pm_runtime_set_suspended() (or
- pm_runtime_force_suspend()) to return -EBUSY and, as result, misbehave of
- OMAP device framework. 
-
-
-My personal thought here is that removing of pm_runtime_set_active() will not fix
-root cause of the problem, but rather hide it :( and, probably, real fix will be 
-to update USB framework to ensure that all suspend devices are also PM runtime suspend
-(not sure how) or add few more pm_suspend_ignore_children() calls 
- (for example as I've tried to do in [2], but this was unfinished).
-
-I've found very simple steps to reproduce suspend failure on am335x-evm (should also
-work on BBB) -  do below sequence with USB device plugged:
-
-   echo platform > /sys/power/pm_test 
-   echo 1 > /sys/power/pm_print_times 
-   [ echo 0 > /sys/module/printk/parameters/console_suspend ]
-   echo mem > /sys/power/state 
-
-[   95.499685] calling  47400000.usb+ @ 733, parent: ocp
-[   95.504818] am335x-usb-childs 47400000.usb: runtime PM trying to suspend device but active child
-[   95.513750] am335x-usb-childs 47400000.usb: omap device suspend failure 0
-
-Below I've attached possible patch which converts OMAP device to
-use pm_runtime_force_suspend/resume().
-
-
-Related discussion:
-[1] https://patchwork.kernel.org/patch/9642979/
-[2] https://patchwork.kernel.org/patch/9660517/
-
-regards,
--grygorii
-
-----
->From 05cd6c19f898ca28480b9ca8dca5b987190351d9 Mon Sep 17 00:00:00 2001
-From: Grygorii Strashko <grygorii.strashko@ti.com>
-Date: Mon, 24 Jul 2017 16:54:48 -0500
-Subject: [PATCH] ARM: OMAP2+: omap_device: use pm runtime force api in noirq
- callbacks
-
-The current implementation of _od_suspend_noirq and _od_resume_noirq
-callbacks is duing actually the same things as
-pm_runtime_force_suspend/resume() when it disables currently active
-devices, so convert those callbacks to use
-pm_runtime_force_suspend/resume().
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/mach-omap2/omap_device.c | 41 +++++++++++++++++++++------------------
- 1 file changed, 22 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index ef9ffb8..b91b0cd 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -670,12 +670,21 @@ static int _od_suspend_noirq(struct device *dev)
- 
- 	ret = pm_generic_suspend_noirq(dev);
- 
--	if (!ret && !pm_runtime_status_suspended(dev)) {
--		if (pm_generic_runtime_suspend(dev) == 0) {
--			pm_runtime_set_suspended(dev);
--			omap_device_idle(pdev);
--			od->flags |= OMAP_DEVICE_SUSPENDED;
-+	if (!ret) {
-+		ret = pm_runtime_force_suspend(dev);
-+		if (ret == -EBUSY) {
-+			/*
-+			 * In case of error pm_runtime_force_suspend will
-+			 * not call pm_runtime_disable() and it's required to
-+			 * make additional call to pm_runtime_disable() here
-+			 * to balance it with pm_runtime_enable() call in
-+			 * pm_runtime_force_resume()
-+			 */
-+			pm_runtime_disable(dev);
-+			return 0;
- 		}
-+		if (ret)
-+			dev_err(dev, "omap device suspend failure %d", ret);
- 	}
- 
- 	return ret;
-@@ -685,21 +694,15 @@ static int _od_resume_noirq(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_device *od = to_omap_device(pdev);
-+	int ret;
- 
--	if (od->flags & OMAP_DEVICE_SUSPENDED) {
--		od->flags &= ~OMAP_DEVICE_SUSPENDED;
--		omap_device_enable(pdev);
--		/*
--		 * XXX: we run before core runtime pm has resumed itself. At
--		 * this point in time, we just restore the runtime pm state and
--		 * considering symmetric operations in resume, we donot expect
--		 * to fail. If we failed, something changed in core runtime_pm
--		 * framework OR some device driver messed things up, hence, WARN
--		 */
--		WARN(pm_runtime_set_active(dev),
--		     "Could not set %s runtime state active\n", dev_name(dev));
--		pm_generic_runtime_resume(dev);
--	}
-+	/* Don't attempt late suspend on a driver that is not bound */
-+	if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER)
-+		return 0;
-+
-+	ret = pm_runtime_force_resume(dev);
-+	if (ret)
-+		dev_err(dev, "omap device resume failure %d", ret);
- 
- 	return pm_generic_resume_noirq(dev);
- }
--- 
-2.10.1
+Regards.
