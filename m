@@ -1,62 +1,182 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 24 Jul 2017 10:22:39 +0100
-Subject: [PATCH 2/4] ACPI: Make acpi_dev_get_resources() method agnostic
-In-Reply-To: <24234737.CuhWYzNn5W@aspire.rjw.lan>
-References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
- <20170720144517.32529-3-lorenzo.pieralisi@arm.com>
- <24234737.CuhWYzNn5W@aspire.rjw.lan>
-Message-ID: <20170724092239.GC13145@red-moon>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 24 Jul 2017 10:21:18 +0100
+Subject: [PATCH v2] arm64: Decode information from ESR upon mem faults
+Message-ID: <1500888078-50231-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 22, 2017 at 12:05:39AM +0200, Rafael J. Wysocki wrote:
-> On Thursday, July 20, 2017 03:45:14 PM Lorenzo Pieralisi wrote:
-> > The function acpi_dev_get_resources() is completely generic and
-> > can be used to parse resource objects that are not necessarily
-> > coming from the _CRS method but also from other objects eg _DMA
-> > that have the same _CRS resource format.
-> > 
-> > Create an acpi_dev_get_resources() helper, internal to the ACPI
-> > resources parsing compilation unit, acpi_dev_get_resources_method(),
-> > that takes a char* parameter to detect which ACPI method should be
-> > called to retrieve the resources list and make acpi_dev_get_resources()
-> > call it with a method name _CRS leaving the API behaviour unchanged.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > ---
-> >  drivers/acpi/resource.c | 54 +++++++++++++++++++++++++++++--------------------
-> >  1 file changed, 32 insertions(+), 22 deletions(-)
-> > 
-> > diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-> > index cd4c427..2b20a09 100644
-> > --- a/drivers/acpi/resource.c
-> > +++ b/drivers/acpi/resource.c
-> > @@ -573,6 +573,36 @@ static acpi_status acpi_dev_process_resource(struct acpi_resource *ares,
-> >  	return AE_OK;
-> >  }
-> >  
-> > +static
-> > +int acpi_dev_get_resources_method(struct acpi_device *adev,
-> 
-> Do not break lines like this, please.
-> 
-> It should be
-> 
-> static int acpi_dev_get...
-> 
-> Also I would call it differently, maybe simply __acpi_dev_get_resources()?
+When receiving unhandled faults from the CPU, description is very sparse.
+Adding information about faults decoded from ESR.
 
-Ok, it was how I wanted to call it but was not sure you would be happy
-with it, I will rename it.
+Added defines to esr.h corresponding ESR fields. Values are based on ARM
+Archtecture Reference Manual (DDI 0487B.a), section D7.2.28 ESR_ELx, Exception
+Syndrome Register (ELx) (pages D7-2275 to D7-2280).
 
-> > +				  struct list_head *list,
-> > +				  int (*preproc)(struct acpi_resource *, void *),
-> > +				  void *preproc_data, char *method)
-> 
-> const char *method ?
+New output is of the form:
+[   77.818059] Mem abort info:
+[   77.820826]   Exception class = DABT (current EL), IL = 32 bits
+[   77.826706]   SET = 0, FnV = 0
+[   77.829742]   EA = 0, S1PTW = 0
+[   77.832849] Data abort info:
+[   77.835713]   ISV = 0, ISS = 0x00000070
+[   77.839522]   CM = 0, WnR = 1
 
-Yes, will update.
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/include/asm/esr.h | 38 ++++++++++++++++++++++++++---------
+ arch/arm64/mm/fault.c        | 47 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+), 9 deletions(-)
 
-Thanks !
-Lorenzo
+* V2:
+  - Slight change of display format so info spans over fewer lines
+  - When ISV is 0, display raw value of ISS
+
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 85997c0..1aad4fe 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -76,15 +76,23 @@
+ #define ESR_ELx_EC_MASK		(UL(0x3F) << ESR_ELx_EC_SHIFT)
+ #define ESR_ELx_EC(esr)		(((esr) & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT)
+
+-#define ESR_ELx_IL		(UL(1) << 25)
++#define ESR_ELx_IL_SHIFT	(25)
++#define ESR_ELx_IL		(UL(1) << ESR_ELx_IL_SHIFT)
+ #define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
+
+ /* ISS field definitions shared by different classes */
+-#define ESR_ELx_WNR		(UL(1) << 6)
++#define ESR_ELx_WNR_SHIFT	(6)
++#define ESR_ELx_WNR		(UL(1) << ESR_ELx_WNR_SHIFT)
+
+ /* Shared ISS field definitions for Data/Instruction aborts */
+-#define ESR_ELx_EA		(UL(1) << 9)
+-#define ESR_ELx_S1PTW		(UL(1) << 7)
++#define ESR_ELx_SET_SHIFT	(11)
++#define ESR_ELx_SET_MASK	(UL(3) << ESR_ELx_SET_SHIFT)
++#define ESR_ELx_FNV_SHIFT	(10)
++#define ESR_ELx_FNV		(UL(1) << ESR_ELx_FNV_SHIFT)
++#define ESR_ELx_EA_SHIFT	(9)
++#define ESR_ELx_EA		(UL(1) << ESR_ELx_EA_SHIFT)
++#define ESR_ELx_S1PTW_SHIFT	(7)
++#define ESR_ELx_S1PTW		(UL(1) << ESR_ELx_S1PTW_SHIFT)
+
+ /* Shared ISS fault status code(IFSC/DFSC) for Data/Instruction aborts */
+ #define ESR_ELx_FSC		(0x3F)
+@@ -95,15 +103,20 @@
+ #define ESR_ELx_FSC_PERM	(0x0C)
+
+ /* ISS field definitions for Data Aborts */
+-#define ESR_ELx_ISV		(UL(1) << 24)
++#define ESR_ELx_ISV_SHIFT	(24)
++#define ESR_ELx_ISV		(UL(1) << ESR_ELx_ISV_SHIFT)
+ #define ESR_ELx_SAS_SHIFT	(22)
+ #define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
+-#define ESR_ELx_SSE		(UL(1) << 21)
++#define ESR_ELx_SSE_SHIFT	(21)
++#define ESR_ELx_SSE		(UL(1) << ESR_ELx_SSE_SHIFT)
+ #define ESR_ELx_SRT_SHIFT	(16)
+ #define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
+-#define ESR_ELx_SF 		(UL(1) << 15)
+-#define ESR_ELx_AR 		(UL(1) << 14)
+-#define ESR_ELx_CM 		(UL(1) << 8)
++#define ESR_ELx_SF_SHIFT	(15)
++#define ESR_ELx_SF 		(UL(1) << ESR_ELx_SF_SHIFT)
++#define ESR_ELx_AR_SHIFT	(14)
++#define ESR_ELx_AR 		(UL(1) << ESR_ELx_AR_SHIFT)
++#define ESR_ELx_CM_SHIFT	(8)
++#define ESR_ELx_CM 		(UL(1) << ESR_ELx_CM_SHIFT)
+
+ /* ISS field definitions for exceptions taken in to Hyp */
+ #define ESR_ELx_CV		(UL(1) << 24)
+@@ -184,6 +197,13 @@
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+
++static inline bool esr_is_data_abort(u32 esr)
++{
++	const u32 ec = ESR_ELx_EC(esr);
++
++	return ec == ESR_ELx_EC_DABT_LOW || ec == ESR_ELx_EC_DABT_CUR;
++}
++
+ const char *esr_get_class_string(u32 esr);
+ #endif /* __ASSEMBLY */
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 37b95df..6702ea5 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -79,6 +79,49 @@ static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
+ }
+ #endif
+
++static void data_abort_decode(unsigned int esr)
++{
++	pr_alert("Data abort info:\n");
++
++	if (esr & ESR_ELx_ISV) {
++		pr_alert("  Access size = %u byte(s)\n",
++			 1U << ((esr & ESR_ELx_SAS) >> ESR_ELx_SAS_SHIFT));
++		pr_alert("  SSE = %lu, SRT = %lu\n",
++			 (esr & ESR_ELx_SSE) >> ESR_ELx_SSE_SHIFT,
++			 (esr & ESR_ELx_SRT_MASK) >> ESR_ELx_SRT_SHIFT);
++		pr_alert("  SF = %lu, AR = %lu\n",
++			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
++			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
++	} else {
++		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
++	}
++
++	pr_alert("  CM = %lu, WnR = %lu\n",
++		 (esr & ESR_ELx_CM) >> ESR_ELx_CM_SHIFT,
++		 (esr & ESR_ELx_WNR) >> ESR_ELx_WNR_SHIFT);
++}
++
++/*
++ * Decode mem abort information
++ */
++static void mem_abort_decode(unsigned int esr)
++{
++	pr_alert("Mem abort info:\n");
++
++	pr_alert("  Exception class = %s, IL = %lu bits\n",
++		 esr_get_class_string(esr),
++		 (esr & ESR_ELx_IL) ? 32 : 16);
++	pr_alert("  SET = %lu, FnV = %lu\n",
++		 (esr & ESR_ELx_SET_MASK) >> ESR_ELx_SET_SHIFT,
++		 (esr & ESR_ELx_FNV) >> ESR_ELx_FNV_SHIFT);
++	pr_alert("  EA = %lu, S1PTW = %lu\n",
++		 (esr & ESR_ELx_EA) >> ESR_ELx_EA_SHIFT,
++		 (esr & ESR_ELx_S1PTW) >> ESR_ELx_S1PTW_SHIFT);
++
++	if (esr_is_data_abort(esr))
++		data_abort_decode(esr);
++}
++
+ /*
+  * Dump out the page tables associated with 'addr' in mm 'mm'.
+  */
+@@ -227,6 +270,8 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+ 	pr_alert("Unable to handle kernel %s at virtual address %08lx\n", msg,
+ 		 addr);
+
++	mem_abort_decode(esr);
++
+ 	show_pte(mm, addr);
+ 	die("Oops", regs, esr);
+ 	bust_spinlocks(0);
+@@ -604,6 +649,8 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+ 	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
+ 		 inf->name, esr, addr);
+
++	mem_abort_decode(esr);
++
+ 	info.si_signo = inf->sig;
+ 	info.si_errno = 0;
+ 	info.si_code  = inf->code;
+--
+1.9.1
