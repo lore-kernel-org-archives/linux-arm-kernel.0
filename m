@@ -1,36 +1,128 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 24 Jul 2017 22:55:32 +0200
-Subject: [PATCH v4] PM / suspend: Export pm_suspend_target_state
-In-Reply-To: <20170718001925.25286-1-f.fainelli@gmail.com>
-References: <20170717221059.6523-1-f.fainelli@gmail.com>
- <20170718001925.25286-1-f.fainelli@gmail.com>
-Message-ID: <6617312.jcY15JS4JA@aspire.rjw.lan>
+Date: Mon, 24 Jul 2017 22:58 +0200
+Subject: [PATCH] cpufreq: dt: Don't use generic platdev driver for tango
+In-Reply-To: <20170719063642.GC352@vireshk-i7>
+References: <f6b9a4e6-bbff-fe92-6867-547c581db3c8@sigmadesigns.com>
+ <20170719063642.GC352@vireshk-i7>
+Message-ID: <2368956.PorkSL9Oxq@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 17, 2017 05:19:25 PM Florian Fainelli wrote:
-> Have the core suspend/resume framework store the system-wide suspend
-> state (suspend_state_t) we are about to enter, and expose it to drivers
-> via pm_suspend_target_state in order to retrieve that. The state is
-> assigned in suspend_devices_and_enter().
+On Wednesday, July 19, 2017 12:06:42 PM Viresh Kumar wrote:
+> On 18-07-17, 18:48, Marc Gonzalez wrote:
+> > On tango platforms, firmware configures the CPU clock, and Linux is
+> > then only allowed to use the cpu_clk_divider to change the frequency.
+> > Build the OPP table dynamically at init, in order to support whatever
+> > firmware throws at us.
+> > 
+> > Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> > ---
+> >  arch/arm/boot/dts/tango4-smp8758.dtsi |  1 -
+> >  drivers/cpufreq/Kconfig.arm           |  5 +++++
+> >  drivers/cpufreq/Makefile              |  1 +
+> >  drivers/cpufreq/cpufreq-dt-platdev.c  |  2 --
+> >  drivers/cpufreq/tango-cpufreq.c       | 38 +++++++++++++++++++++++++++++++++++
+> >  5 files changed, 44 insertions(+), 3 deletions(-)
+> >  create mode 100644 drivers/cpufreq/tango-cpufreq.c
+> > 
+> > diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
+> > index d2e65c46bcc7..eca33d568690 100644
+> > --- a/arch/arm/boot/dts/tango4-smp8758.dtsi
+> > +++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
+> > @@ -13,7 +13,6 @@
+> >  			reg = <0>;
+> >  			clocks = <&clkgen CPU_CLK>;
+> >  			clock-latency = <1>;
+> > -			operating-points = <1215000 0 607500 0 405000 0 243000 0 135000 0>;
+> >  		};
+> >  
+> >  		cpu1: cpu at 1 {
+> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > index 2011fec2d6ad..ea9ba00091bb 100644
+> > --- a/drivers/cpufreq/Kconfig.arm
+> > +++ b/drivers/cpufreq/Kconfig.arm
+> > @@ -242,6 +242,11 @@ config ARM_STI_CPUFREQ
+> >  	  this config option if you wish to add CPUFreq support for STi based
+> >  	  SoCs.
+> >  
+> > +config ARM_TANGO_CPUFREQ
+> > +	bool
+> > +	depends on CPUFREQ_DT && ARCH_TANGO
+> > +	default y
+> > +
+> >  config ARM_TEGRA20_CPUFREQ
+> >  	bool "Tegra20 CPUFreq support"
+> >  	depends on ARCH_TEGRA
+> > diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> > index ab3a42cd29ef..bb9841f57787 100644
+> > --- a/drivers/cpufreq/Makefile
+> > +++ b/drivers/cpufreq/Makefile
+> > @@ -75,6 +75,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
+> >  obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
+> >  obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+> >  obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
+> > +obj-$(CONFIG_ARM_TANGO_CPUFREQ)		+= tango-cpufreq.o
+> >  obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
+> >  obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
+> >  obj-$(CONFIG_ARM_TEGRA186_CPUFREQ)	+= tegra186-cpufreq.o
+> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > index 1c262923fe58..6cbe77765f46 100644
+> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > @@ -80,8 +80,6 @@ static const struct of_device_id machines[] __initconst = {
+> >  	{ .compatible = "rockchip,rk3368", },
+> >  	{ .compatible = "rockchip,rk3399", },
+> >  
+> > -	{ .compatible = "sigma,tango4" },
+> > -
+> >  	{ .compatible = "socionext,uniphier-pro5", },
+> >  	{ .compatible = "socionext,uniphier-pxs2", },
+> >  	{ .compatible = "socionext,uniphier-ld6b", },
+> > diff --git a/drivers/cpufreq/tango-cpufreq.c b/drivers/cpufreq/tango-cpufreq.c
+> > new file mode 100644
+> > index 000000000000..89a7f860bfe8
+> > --- /dev/null
+> > +++ b/drivers/cpufreq/tango-cpufreq.c
+> > @@ -0,0 +1,38 @@
+> > +#include <linux/of.h>
+> > +#include <linux/cpu.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/pm_opp.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +static const struct of_device_id machines[] __initconst = {
+> > +	{ .compatible = "sigma,tango4" },
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> > +static int __init tango_cpufreq_init(void)
+> > +{
+> > +	struct device *cpu_dev = get_cpu_device(0);
+> > +	unsigned long max_freq;
+> > +	struct clk *cpu_clk;
+> > +	void *res;
+> > +
+> > +	if (!of_match_node(machines, of_root))
+> > +		return -ENODEV;
+> > +
+> > +	cpu_clk = clk_get(cpu_dev, NULL);
+> > +	if (IS_ERR(cpu_clk))
+> > +		return -ENODEV;
+> > +
+> > +	max_freq = clk_get_rate(cpu_clk);
+> > +
+> > +	dev_pm_opp_add(cpu_dev, max_freq / 1, 0);
+> > +	dev_pm_opp_add(cpu_dev, max_freq / 2, 0);
+> > +	dev_pm_opp_add(cpu_dev, max_freq / 3, 0);
+> > +	dev_pm_opp_add(cpu_dev, max_freq / 5, 0);
+> > +	dev_pm_opp_add(cpu_dev, max_freq / 9, 0);
+> > +
+> > +	res = platform_device_register_data(NULL, "cpufreq-dt", -1, NULL, 0);
+> > +
+> > +	return PTR_ERR_OR_ZERO(res);
+> > +}
+> > +device_initcall(tango_cpufreq_init);
 > 
-> This is useful for platform specific drivers that may need to take a
-> slightly different suspend/resume path based on the system's
-> suspend/resume state being entered.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
-> Changes in v4:
-> - clear pm_suspend_target_state in Close label
-> 
-> Changes in v3:
-> 
-> - just export pm_suspend_target_state without a helper function
-> 
-> Changes in v2:
-> 
-> - rename platform_suspend_target_state() -> suspend_target_state()
-> - directly export the suspend_state_t value and assign it in
->   suspend_devices_and_enter()
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Applied, thanks!
+Patch applied, thanks!
