@@ -1,147 +1,61 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 24 Jul 2017 20:32:01 +0200
-Subject: [PATCH] ARM64: meson-gxl: disable broken eee
-In-Reply-To: <CAFBinCBy6Ce79Tf2seQi4m3aNGOa0r00zjt=eZP-dYy+6WLo8w@mail.gmail.com>
-References: <20170707013257.18250-1-joseph.kogut@gmail.com>
- <7ho9scsdbp.fsf@baylibre.com>
- <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
- <cf71b3c2-29d7-3bdb-0d00-872f5e1267e2@baylibre.com>
- <7519c9ee-54f0-d5fb-1683-11d6e24f0822@baylibre.com>
- <1500912570.2401.3.camel@baylibre.com>
- <CAFBinCBy6Ce79Tf2seQi4m3aNGOa0r00zjt=eZP-dYy+6WLo8w@mail.gmail.com>
-Message-ID: <1500921121.2401.5.camel@baylibre.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 25 Jul 2017 02:31:45 +0800
+Subject: [xlnx:master 798/812] drivers/dma//xilinx/xilinx_frmbuf.c:285:6:
+ error: redefinition of 'xilinx_xdma_drm_config'
+Message-ID: <201707250243.Azr7TUnG%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-07-24 at 20:20 +0200, Martin Blumenstingl wrote:
-> On Mon, Jul 24, 2017 at 6:09 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> > On Mon, 2017-07-24 at 14:26 +0200, Neil Armstrong wrote:
-> > > On 07/24/2017 02:06 PM, Neil Armstrong wrote:
-> > > > On 07/23/2017 07:03 PM, Joseph Kogut wrote:
-> > > > > Hi Kevin,
-> > > > > 
-> > > > > I tested on a P212 reference board, which is currently the only GXL
-> > > > > based board I have.
-> > > > > 
-> > > > > Before applying the patch, high activity on the ethernet interface
-> > > > > would cause the link to break, requiring the interface to be brought
-> > > > > down and back up before it would work again. After applying the patch,
-> > > > > I could not get the link to break with any transfers.
-> > > > > 
-> > > > > _______________________________________________
-> > > > > linux-arm-kernel mailing list
-> > > > > linux-arm-kernel at lists.infradead.org
-> > > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > > > 
-> > > > 
-> > > > Hi Joseph,
-> > > > 
-> > > > [please keep the history of the conversation when replying]
-> > > > 
-> > > > Is it a original P212 board, or a board based on the P212 ref design ?
-> > > > 
-> > > > I'm currently testing the v4.13-rc2 on the official P212 board we
-> > > > received
-> > > > from Amlogic
-> > > > and using iperf3 in both directions, I have an issue after a few minutes
-> > > > running iperf3 with :
-> > > > 
-> > > > # while true ; do iperf3 -c 192.168.1.21 ; iperf3 -c 192.168.1.21 -R ;
-> > > > done
-> > > > 
-> > > > That cycles between the two iperf directions.
-> > > > 
-> > > > After a few minutes, it stalls with :
-> > > > 
-> > > > Connecting to host 192.168.1.21, port 5201
-> > > > [??4] local 192.168.1.183 port 51286 connected to 192.168.1.21 port 5201
-> > > > [ ID] Interval???????????Transfer?????Bandwidth???????Retr??Cwnd
-> > > > [??4]???0.00-1.00???sec??1.64 MBytes??13.7 Mbits/sec????2???1.41 KBytes
-> > > > [??4]???1.00-2.00???sec??0.00 Bytes??0.00 bits/sec????1???1.41 KBytes
-> > > > [??4]???2.00-3.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
-> > > > [??4]???3.00-4.00???sec??0.00 Bytes??0.00 bits/sec????1???1.41 KBytes
-> > > > [??4]???4.00-5.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
-> > > > [??4]???5.00-6.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
-> > > > [??4]???6.00-7.00???sec??0.00 Bytes??0.00 bits/sec????1???1.41 KBytes
-> > > > [??4]???7.00-8.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
-> > > > [??4]???8.00-9.00???sec??0.00 Bytes??0.00 bits/sec????0???1.41 KBytes
-> > > > 
-> > 
-> > Same kind of test shows no issue on the libretech-cc and the khadas-vim
-> > In this case, I don't think meson-gxl.dtsi is where you should make your
-> > change.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   5a5db6231107b7dbf97af0ae9a451d79e9d38203
+commit: 166f3acd1fdde298178852d6db7c29ce80b13d76 [798/812] dma: xilinx: New driver for Video Framebuffer IP
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 166f3acd1fdde298178852d6db7c29ce80b13d76
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-ahahah, silly me ! I forgot that it was 100MBps PHY.
-tx delay makes no sense here, 2ns delay would not make much difference on a
-25MHz clock
+All errors (new ones prefixed by >>):
 
-Sorry for the confusion
+>> drivers/dma//xilinx/xilinx_frmbuf.c:285:6: error: redefinition of 'xilinx_xdma_drm_config'
+    void xilinx_xdma_drm_config(struct dma_chan *chan, u32 drm_fourcc)
+         ^~~~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/dma//xilinx/xilinx_frmbuf.c:24:0:
+   include/linux/dma/xilinx_frmbuf.h:52:20: note: previous definition of 'xilinx_xdma_drm_config' was here
+    static inline void xilinx_xdma_drm_config(struct dma_chan *chan, u32 drm_fourcc)
+                       ^~~~~~~~~~~~~~~~~~~~~~
+>> drivers/dma//xilinx/xilinx_frmbuf.c:291:6: error: redefinition of 'xilinx_xdma_v4l2_config'
+    void xilinx_xdma_v4l2_config(struct dma_chan *chan, u32 v4l2_fourcc)
+         ^~~~~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/dma//xilinx/xilinx_frmbuf.c:24:0:
+   include/linux/dma/xilinx_frmbuf.h:55:20: note: previous definition of 'xilinx_xdma_v4l2_config' was here
+    static inline void xilinx_xdma_v4l2_config(struct dma_chan *chan,
+                       ^~~~~~~~~~~~~~~~~~~~~~~
 
+vim +/xilinx_xdma_drm_config +285 drivers/dma//xilinx/xilinx_frmbuf.c
 
-> > 
-> > > > 
-> > > > And then, after:
-> > > > # ifconfig eth0 down
-> > > > # ifconfig eth0 up
-> > > > 
-> > > > It cycles between :
-> > > > [ 1483.009919] meson8b-dwmac c9410000.ethernet eth0: Link is Up -
-> > > > 100Mbps/Full - flow control rx/tx
-> > > > [ 1487.105725] meson8b-dwmac c9410000.ethernet eth0: Link is Down
-> > > > [ 1490.177943] meson8b-dwmac c9410000.ethernet eth0: Link is Up -
-> > > > 100Mbps/Full - flow control rx/tx
-> > > > [ 1494.273713] meson8b-dwmac c9410000.ethernet eth0: Link is Down
-> > 
-> > This does not look like the issue we had on the odroid-c2.
-> > However, I have seen behavior like this (link down/up flickering) when the
-> > rgmii
-> > ?delays are way off.
-> > 
-> > Maybe you could try playing with "amlogic,tx-delay-ns" property ?
-> 
-> we need to change dwmac-meson8b.c so it applies the TX delay also for
-> RMII PHYs. currently the TX delay is always set to 0 for RMII PHYs,
-> see: [0]
-> 
-> > > > 
-> > > > and so on.
-> > > > 
-> > > > And this patch does not fix this at all.
-> > > > 
-> > > > It seems to be more a PHY driver issue here.
-> > > > 
-> > > > Could you share the results with the same command ?
-> > > > 
-> > > > Neil
-> > > > 
-> > > 
-> > > I forgot to precise, this issue occurs when the "GXL PHY driver" is
-> > > disabled,
-> > > only relying on the
-> > > Generic PHY Driver.
-> > > 
-> > > [??630.767538] Generic PHY 0.e40908ff:08: attached PHY driver [Generic
-> > > PHY]
-> > > (mii_bus:phy_addr=0.e40908ff:08, irq=-1)
-> > > 
-> > > 
-> > > When the PHY driver is loaded the issue disappears, with and without your
-> > > patch.
-> > > 
-> > > [???25.355620] Meson GXL Internal PHY 0.e40908ff:08: attached PHY driver
-> > > [Meson GXL Internal PHY] (mii_bus:phy_addr=0.e40908ff:08, irq=-1)
-> > > 
-> > > Could you please check the PHY Driver is loaded ?
-> > > 
-> > > Thanks,
-> > > Neil
-> > 
-> > 
-> > _______________________________________________
-> > linux-amlogic mailing list
-> > linux-amlogic at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-amlogic
-> 
-> 
-> [0] https://github.com/torvalds/linux/blob/master/drivers/net/ethernet/stmicro
-> /stmmac/dwmac-meson8b.c#L222
+   284	
+ > 285	void xilinx_xdma_drm_config(struct dma_chan *chan, u32 drm_fourcc)
+   286	{
+   287		xilinx_xdma_set_config(chan, drm_fourcc, XDMA_DRM);
+   288	
+   289	} EXPORT_SYMBOL_GPL(xilinx_xdma_drm_config);
+   290	
+ > 291	void xilinx_xdma_v4l2_config(struct dma_chan *chan, u32 v4l2_fourcc)
+   292	{
+   293		xilinx_xdma_set_config(chan, v4l2_fourcc, XDMA_V4L2);
+   294	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 45292 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/7a6e1ecd/attachment-0001.gz>
