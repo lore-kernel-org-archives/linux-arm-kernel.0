@@ -1,72 +1,89 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Mon, 24 Jul 2017 10:50:05 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-nitrogen6x: fix USB PHY reset
-In-Reply-To: <20170724085005.22101-1-gary.bisson@boundarydevices.com>
-References: <20170724085005.22101-1-gary.bisson@boundarydevices.com>
-Message-ID: <20170724085005.22101-3-gary.bisson@boundarydevices.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 24 Jul 2017 14:22:16 +0530
+Subject: [PATCH v2] cpufreq: s5pv210: add missing of_node_put
+In-Reply-To: <1500666810-21841-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1500666810-21841-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20170724085216.GS352@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declared as a regulator since the driver doesn't have a reset-gpios
-property for this.
+On 21-07-17, 21:53, Julia Lawall wrote:
+> for_each_compatible_node performs an of_node_get on each iteration, so a
+> return from the loop requires an of_node_put.
+> 
+> The semantic patch that fixes this problem is as follows
+> (http://coccinelle.lip6.fr):
+> 
+> // <smpl>
+> @@
+> local idexpression n;
+> expression e,e1,e2;
+> statement S;
+> iterator i1;
+> iterator name for_each_compatible_node;
+> @@
+> 
+>  for_each_compatible_node(n,e1,e2) {
+>    ...
+> (
+>    of_node_put(n);
+> |
+>    e = n
+> |
+>    return n;
+> |
+>    i1(...,n,...) S
+> |
+> +  of_node_put(n);
+> ?  return ...;
+> )
+>    ...
+>  }
+> // </smpl>
+> 
+> Additionally, call of_node_put on the previous value of np, obtained from
+> of_find_compatible_node, that is no longer accessible at the point of the
+> for_each_compatible_node.
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> ---
+> 
+> v2: add the of_node_put for the call to of_find_compatible_node as well.
+> 
+>  drivers/cpufreq/s5pv210-cpufreq.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
+> index f82074e..5d31c2d 100644
+> --- a/drivers/cpufreq/s5pv210-cpufreq.c
+> +++ b/drivers/cpufreq/s5pv210-cpufreq.c
+> @@ -602,6 +602,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	clk_base = of_iomap(np, 0);
+> +	of_node_put(np);
+>  	if (!clk_base) {
+>  		pr_err("%s: failed to map clock registers\n", __func__);
+>  		return -EFAULT;
+> @@ -612,6 +613,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+>  		if (id < 0 || id >= ARRAY_SIZE(dmc_base)) {
+>  			pr_err("%s: failed to get alias of dmc node '%s'\n",
+>  				__func__, np->name);
+> +			of_node_put(np);
+>  			return id;
+>  		}
+>  
+> @@ -619,6 +621,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+>  		if (!dmc_base[id]) {
+>  			pr_err("%s: failed to map dmc%d registers\n",
+>  				__func__, id);
+> +			of_node_put(np);
+>  			return -EFAULT;
+>  		}
+>  	}
 
-This ensures that the PHY is woken up, not depending on the state the
-second stage bootloader leaves the pin.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-This is a workaround until a proper mechanism is provided to reset such
-devices like the pwrseq library [1] for instance.
-
-[1] https://lkml.org/lkml/2017/2/10/779
-
-Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
----
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index f22e5879340b..989376643cf6 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -108,6 +108,19 @@
- 			startup-delay-us = <70000>;
- 			enable-active-high;
- 		};
-+
-+		reg_usb_h1_vbus: regulator at 5 {
-+			compatible = "regulator-fixed";
-+			reg = <5>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usbh1>;
-+			regulator-name = "usb_h1_vbus";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			regulator-always-on;
-+		};
- 	};
- 
- 	gpio-keys {
-@@ -515,6 +528,12 @@
- 			>;
- 		};
- 
-+		pinctrl_usbh1: usbh1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x030b0
-+			>;
-+		};
-+
- 		pinctrl_usbotg: usbotggrp {
- 			fsl,pins = <
- 				MX6QDL_PAD_GPIO_1__USB_OTG_ID	0x17059
-@@ -629,6 +648,7 @@
- };
- 
- &usbh1 {
-+	vbus-supply = <&reg_usb_h1_vbus>;
- 	status = "okay";
- };
- 
 -- 
-2.11.0
+viresh
