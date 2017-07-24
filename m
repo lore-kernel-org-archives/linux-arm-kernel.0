@@ -1,57 +1,79 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Jul 2017 14:49:22 -0700
-Subject: [PATCH 2/2] net: ethernet: nb8800: Fix RGMII TX clock delay setup
-In-Reply-To: <54ca7197-780a-68b1-0cf2-88ccc7ce4201@free.fr>
-References: <b332dc3e-4478-e34b-2b3f-226aad8a11d4@sigmadesigns.com>
- <61b71d12-4e3a-edbe-1d69-c66e7cf46d8e@sigmadesigns.com>
- <yw1xzic0qrcg.fsf@mansr.com> <001a7afd-364d-359e-1478-e057c9083f73@free.fr>
- <d8121f82-dffd-22c7-1209-a3c2329703e5@gmail.com>
- <05cbc32e-a4af-1c81-128b-bc5d2206d24a@free.fr>
- <bf484952-15ae-b385-6b54-4d07b3bc2b29@gmail.com>
- <54f5bd21-766d-d9de-3b15-a01fd5ee6035@free.fr>
- <54ca7197-780a-68b1-0cf2-88ccc7ce4201@free.fr>
-Message-ID: <5c48496e-8c67-5af5-e0c5-7b0c298adc84@gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 25 Jul 2017 05:57:14 +0800
+Subject: [xlnx:master 789/812] drivers/mtd/nand/arasan_nand.c:355:16:
+ warning: right shift count >= width of type
+Message-ID: <201707250511.3YFzeXiG%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2017 02:21 PM, Mason wrote:
-> On 20/07/2017 14:33, Mason wrote:
-> 
->> As [Florian] pointed out, the spec states that the
->> "Data to Clock input Skew (at Receiver)"
->> must be within [ 1.0, 2.6 ] ns.
->>
->> I understand that 2 ns is 1/4 of a 125 MHz period,
->> but it's not clear to me why the above interval is
->> centered at 1.8 instead of 2.0 ns.
->>
->> Also, the AR8035 PHY offers 4 possible TX clock delays:
->> { 0.25, 1.3, 2.4, 3.4 } according to their doc.
->> The two extremes are outside the interval, when would
->> they be useful? In case the transmitter adds "bad" skew?
->>
->> Why doesn't the PHY support 1.8/2.0? Is it perhaps
->> unable to, because of PLL limitations?
-> 
-> I haven't yet found answers for these questions.
-> 
-> - Why is the interval centered at 1.8 instead of 2.0 ns?
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   5a5db6231107b7dbf97af0ae9a451d79e9d38203
+commit: c66ee9b2e7c09629a109e942e9fa03f1a1c8ea47 [789/812] mtd: nand: arasan_nand: Add 64bit dma support
+config: blackfin-allyesconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout c66ee9b2e7c09629a109e942e9fa03f1a1c8ea47
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-Presumably because this is almost the middle of the available range and
-it still provides a value that is within the specification...
+All warnings (new ones prefixed by >>):
 
-> - What use are 0.25 ns and 3.4 ns skew?
+   drivers/mtd/nand/arasan_nand.c: In function 'anfc_rw_buf_dma':
+>> drivers/mtd/nand/arasan_nand.c:355:16: warning: right shift count >= width of type [-Wshift-count-overflow]
+     writel((paddr >> 32), nfc->base + DMA_ADDR1_OFST);
+                   ^~
 
-Accounting for extreme PCB traces lengths possibly, or just exposing the
-raw values that the HW supports by increments of 0.25 ns, just because
-the HW supports it.
+vim +355 drivers/mtd/nand/arasan_nand.c
 
-> - Why doesn't the PHY support a "recommended" value like 1.8 ns?
-> 
-> Does anyone have pointers to good resources?
+   323	
+   324	static void anfc_rw_buf_dma(struct mtd_info *mtd, uint8_t *buf, int len,
+   325				    int operation, u32 prog)
+   326	{
+   327		dma_addr_t paddr;
+   328		struct nand_chip *chip = mtd_to_nand(mtd);
+   329		struct anfc *nfc = to_anfc(chip->controller);
+   330		struct anfc_nand_chip *achip = to_anfc_nand(chip);
+   331		u32 eccintr = 0, dir;
+   332		u32 pktsize = len, pktcount = 1;
+   333	
+   334		if ((nfc->curr_cmd == NAND_CMD_READ0) ||
+   335			((nfc->curr_cmd == NAND_CMD_SEQIN) && !nfc->iswriteoob)) {
+   336			pktsize = achip->pktsize;
+   337			pktcount = DIV_ROUND_UP(mtd->writesize, pktsize);
+   338		}
+   339		anfc_setpktszcnt(nfc, pktsize, pktcount);
+   340	
+   341		if (!achip->bch && (nfc->curr_cmd == NAND_CMD_READ0))
+   342			eccintr = MBIT_ERROR;
+   343	
+   344		if (operation)
+   345			dir = DMA_FROM_DEVICE;
+   346		else
+   347			dir = DMA_TO_DEVICE;
+   348	
+   349		paddr = dma_map_single(nfc->dev, buf, len, dir);
+   350		if (dma_mapping_error(nfc->dev, paddr)) {
+   351			dev_err(nfc->dev, "Read buffer mapping error");
+   352			return;
+   353		}
+   354		writel(paddr, nfc->base + DMA_ADDR0_OFST);
+ > 355		writel((paddr >> 32), nfc->base + DMA_ADDR1_OFST);
+   356		anfc_enable_intrs(nfc, (XFER_COMPLETE | eccintr));
+   357		writel(prog, nfc->base + PROG_OFST);
+   358		anfc_wait_for_event(nfc);
+   359		dma_unmap_single(nfc->dev, paddr, len, dir);
+   360	}
+   361	
 
-The PHY datasheet and the RGMII specification really ought to be the
-starting points, there is not much more to it. Maybe go ask your support
-person at Qualcomm/Atheros about their PHY design?
--- 
-Florian
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 42461 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/c65d872e/attachment-0001.gz>
