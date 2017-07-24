@@ -1,242 +1,206 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 24 Jul 2017 12:26:22 +0100
-Subject: [PATCH 3/4] arm64: unwind: reference pt_regs via embedded stack frame
-In-Reply-To: <20170724112623.26109-1-ard.biesheuvel@linaro.org>
-References: <20170724112623.26109-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170724112623.26109-4-ard.biesheuvel@linaro.org>
+From: jack@suse.cz (Jan Kara)
+Date: Mon, 24 Jul 2017 13:35:42 +0200
+Subject: [PATCH v4 2/5] dax: relocate some dax functions
+In-Reply-To: <20170721223956.29485-3-ross.zwisler@linux.intel.com>
+References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
+ <20170721223956.29485-3-ross.zwisler@linux.intel.com>
+Message-ID: <20170724113542.GJ652@quack2.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it turns out, the unwind code is slightly broken, and probably has
-been for a while. The problem is in the dumping of the exception stack,
-which is intended to dump the contents of the pt_regs struct at each
-level in the call stack where an exception was taken and routed to a
-routine marked as __exception (which means its stack frame is right
-below the pt_regs struct on the stack).
+On Fri 21-07-17 16:39:52, Ross Zwisler wrote:
+> dax_load_hole() will soon need to call dax_insert_mapping_entry(), so it
+> needs to be moved lower in dax.c so the definition exists.
+> 
+> dax_wake_mapping_entry_waiter() will soon be removed from dax.h and be made
+> static to dax.c, so we need to move its definition above all its callers.
+> 
+> Signed-off-by: Ross Zwisler <ross.zwisler@linux.intel.com>
 
-'Right below the pt_regs struct' is ill defined, though: the unwind
-code assigns 'frame pointer + 0x10' to the .sp member of the stackframe
-struct at each level, and dump_backtrace() happily dereferences that as
-the pt_regs pointer when encountering an __exception routine. However,
-the actual size of the stack frame created by this routine (which could
-be one of many __exception routines we have in the kernel) is not known,
-and so frame.sp is pretty useless to figure out where struct pt_regs
-really is.
+Looks good. You can add:
 
-So it seems the only way to ensure that we can find our struct pt_regs
-when walking the stack frames is to put it at a known fixed offset of
-the stack frame pointer that is passed to such __exception routines.
-The simplest way to do that is to put it inside pt_regs itself, which is
-the main change implemented by this patch. As a bonus, doing this allows
-us to get rid of a fair amount of cruft related to walking from one stack
-to the other, which is especially nice since we intend to introduce yet
-another stack for overflow handling once we add support for vmapped
-stacks. It also fixes an inconsistency where we only add a stack frame
-pointing to ELR_EL1 if we are executing from the IRQ stack but not when
-we are executing from the task stack.
+Reviewed-by: Jan Kara <jack@suse.cz>
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/irq.h    | 25 ----------------
- arch/arm64/include/asm/ptrace.h |  1 +
- arch/arm64/kernel/asm-offsets.c |  1 +
- arch/arm64/kernel/entry.S       | 16 +++++------
- arch/arm64/kernel/stacktrace.c  | 30 --------------------
- arch/arm64/kernel/traps.c       | 27 ++++--------------
- 6 files changed, 15 insertions(+), 85 deletions(-)
+								Honza
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index 57deb5abfc24..8ba89c4ca183 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -16,31 +16,6 @@ struct pt_regs;
- 
- DECLARE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack);
- 
--/*
-- * The highest address on the stack, and the first to be used. Used to
-- * find the dummy-stack frame put down by el?_irq() in entry.S, which
-- * is structured as follows:
-- *
-- *       ------------
-- *       |          |  <- irq_stack_ptr
-- *   top ------------
-- *       |   x19    | <- irq_stack_ptr - 0x08
-- *       ------------
-- *       |   x29    | <- irq_stack_ptr - 0x10
-- *       ------------
-- *
-- * where x19 holds a copy of the task stack pointer where the struct pt_regs
-- * from kernel_entry can be found.
-- *
-- */
--#define IRQ_STACK_PTR(cpu) ((unsigned long)per_cpu(irq_stack, cpu) + IRQ_STACK_START_SP)
--
--/*
-- * The offset from irq_stack_ptr where entry.S will store the original
-- * stack pointer. Used by unwind_frame() and dump_backtrace().
-- */
--#define IRQ_STACK_TO_TASK_STACK(ptr) (*((unsigned long *)((ptr) - 0x08)))
--
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
- static inline int nr_legacy_irqs(void)
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 11403fdd0a50..ee72aa979078 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -119,6 +119,7 @@ struct pt_regs {
- 	u64 syscallno;
- 	u64 orig_addr_limit;
- 	u64 unused;	// maintain 16 byte alignment
-+	u64 stackframe[2];
- };
- 
- #define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index b3bb7ef97bc8..71bf088f1e4b 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -75,6 +75,7 @@ int main(void)
-   DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
-   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
-   DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
-+  DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
-   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
-   BLANK();
-   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index b738880350f9..32f3b2413e5f 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -111,6 +111,14 @@
- 	mrs	x23, spsr_el1
- 	stp	lr, x21, [sp, #S_LR]
- 
-+	/*
-+	 * In order to be able to dump the contents of struct pt_regs@the
-+	 * time the exception was taken (in case we attempt to walk the call
-+	 * stack later), chain it together with the stack frames.
-+	 */
-+	stp	x29, x22, [sp, #S_STACKFRAME]
-+	add	x29, sp, #S_STACKFRAME
-+
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- 	/*
- 	 * Set the TTBR0 PAN bit in SPSR. When the exception is taken from
-@@ -265,14 +273,6 @@ alternative_else_nop_endif
- 
- 	/* switch to the irq stack */
- 	mov	sp, x26
--
--	/*
--	 * Add a dummy stack frame, this non-standard format is fixed up
--	 * by unwind_frame()
--	 */
--	stp     x29, x19, [sp, #-16]!
--	mov	x29, sp
--
- 9998:
- 	.endm
- 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index beaf51fb3088..b079af1ad145 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -75,36 +75,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 	}
- #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
- 
--	/*
--	 * Check whether we are going to walk through from interrupt stack
--	 * to task stack.
--	 * If we reach the end of the stack - and its an interrupt stack,
--	 * unpack the dummy frame to find the original elr.
--	 *
--	 * Check the frame->fp we read from the bottom of the irq_stack,
--	 * and the original task stack pointer are both in current->stack.
--	 */
--	if (frame->sp == IRQ_STACK_PTR()) {
--		struct pt_regs *irq_args;
--		unsigned long orig_sp = IRQ_STACK_TO_TASK_STACK(frame->sp);
--
--		if (object_is_on_stack((void *)orig_sp) &&
--		   object_is_on_stack((void *)frame->fp)) {
--			frame->sp = orig_sp;
--
--			/* orig_sp is the saved pt_regs, find the elr */
--			irq_args = (struct pt_regs *)orig_sp;
--			frame->pc = irq_args->pc;
--		} else {
--			/*
--			 * This frame has a non-standard format, and we
--			 * didn't fix it, because the data looked wrong.
--			 * Refuse to output this frame.
--			 */
--			return -EINVAL;
--		}
--	}
--
- 	return 0;
- }
- 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 7ba80f2a6177..f2b284669587 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -143,7 +143,6 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
- void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- {
- 	struct stackframe frame;
--	unsigned long irq_stack_ptr;
- 	int skip;
- 
- 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
-@@ -154,15 +153,6 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 	if (!try_get_task_stack(tsk))
- 		return;
- 
--	/*
--	 * Switching between stacks is valid when tracing current and in
--	 * non-preemptible context.
--	 */
--	if (tsk == current && !preemptible())
--		irq_stack_ptr = IRQ_STACK_PTR();
--	else
--		irq_stack_ptr = 0;
--
- 	if (tsk == current) {
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
- 		frame.sp = current_stack_pointer;
-@@ -203,20 +193,13 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		ret = unwind_frame(tsk, &frame);
- 		if (ret < 0)
- 			break;
--		stack = frame.sp;
- 		if (in_exception_text(where)) {
--			/*
--			 * If we switched to the irq_stack before calling this
--			 * exception handler, then the pt_regs will be on the
--			 * task stack. The easiest way to tell is if the large
--			 * pt_regs would overlap with the end of the irq_stack.
--			 */
--			if (stack < irq_stack_ptr &&
--			    (stack + sizeof(struct pt_regs)) > irq_stack_ptr)
--				stack = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
-+			stack = frame.fp - offsetof(struct pt_regs, stackframe);
- 
--			dump_mem("", "Exception stack", stack,
--				 stack + sizeof(struct pt_regs));
-+			if (on_task_stack(tsk, stack) ||
-+			    (tsk == current && !preemptible() && on_irq_stack(stack)))
-+				dump_mem("", "Exception stack", stack,
-+					 stack + sizeof(struct pt_regs));
- 		}
- 	}
- 
+
+> ---
+>  fs/dax.c | 138 +++++++++++++++++++++++++++++++--------------------------------
+>  1 file changed, 69 insertions(+), 69 deletions(-)
+> 
+> diff --git a/fs/dax.c b/fs/dax.c
+> index c844a51..779dc5e 100644
+> --- a/fs/dax.c
+> +++ b/fs/dax.c
+> @@ -121,6 +121,31 @@ static int wake_exceptional_entry_func(wait_queue_entry_t *wait, unsigned int mo
+>  }
+>  
+>  /*
+> + * We do not necessarily hold the mapping->tree_lock when we call this
+> + * function so it is possible that 'entry' is no longer a valid item in the
+> + * radix tree.  This is okay because all we really need to do is to find the
+> + * correct waitqueue where tasks might be waiting for that old 'entry' and
+> + * wake them.
+> + */
+> +void dax_wake_mapping_entry_waiter(struct address_space *mapping,
+> +		pgoff_t index, void *entry, bool wake_all)
+> +{
+> +	struct exceptional_entry_key key;
+> +	wait_queue_head_t *wq;
+> +
+> +	wq = dax_entry_waitqueue(mapping, index, entry, &key);
+> +
+> +	/*
+> +	 * Checking for locked entry and prepare_to_wait_exclusive() happens
+> +	 * under mapping->tree_lock, ditto for entry handling in our callers.
+> +	 * So at this point all tasks that could have seen our entry locked
+> +	 * must be in the waitqueue and the following check will see them.
+> +	 */
+> +	if (waitqueue_active(wq))
+> +		__wake_up(wq, TASK_NORMAL, wake_all ? 0 : 1, &key);
+> +}
+> +
+> +/*
+>   * Check whether the given slot is locked. The function must be called with
+>   * mapping->tree_lock held
+>   */
+> @@ -392,31 +417,6 @@ static void *grab_mapping_entry(struct address_space *mapping, pgoff_t index,
+>  	return entry;
+>  }
+>  
+> -/*
+> - * We do not necessarily hold the mapping->tree_lock when we call this
+> - * function so it is possible that 'entry' is no longer a valid item in the
+> - * radix tree.  This is okay because all we really need to do is to find the
+> - * correct waitqueue where tasks might be waiting for that old 'entry' and
+> - * wake them.
+> - */
+> -void dax_wake_mapping_entry_waiter(struct address_space *mapping,
+> -		pgoff_t index, void *entry, bool wake_all)
+> -{
+> -	struct exceptional_entry_key key;
+> -	wait_queue_head_t *wq;
+> -
+> -	wq = dax_entry_waitqueue(mapping, index, entry, &key);
+> -
+> -	/*
+> -	 * Checking for locked entry and prepare_to_wait_exclusive() happens
+> -	 * under mapping->tree_lock, ditto for entry handling in our callers.
+> -	 * So at this point all tasks that could have seen our entry locked
+> -	 * must be in the waitqueue and the following check will see them.
+> -	 */
+> -	if (waitqueue_active(wq))
+> -		__wake_up(wq, TASK_NORMAL, wake_all ? 0 : 1, &key);
+> -}
+> -
+>  static int __dax_invalidate_mapping_entry(struct address_space *mapping,
+>  					  pgoff_t index, bool trunc)
+>  {
+> @@ -468,50 +468,6 @@ int dax_invalidate_mapping_entry_sync(struct address_space *mapping,
+>  	return __dax_invalidate_mapping_entry(mapping, index, false);
+>  }
+>  
+> -/*
+> - * The user has performed a load from a hole in the file.  Allocating
+> - * a new page in the file would cause excessive storage usage for
+> - * workloads with sparse files.  We allocate a page cache page instead.
+> - * We'll kick it out of the page cache if it's ever written to,
+> - * otherwise it will simply fall out of the page cache under memory
+> - * pressure without ever having been dirtied.
+> - */
+> -static int dax_load_hole(struct address_space *mapping, void **entry,
+> -			 struct vm_fault *vmf)
+> -{
+> -	struct inode *inode = mapping->host;
+> -	struct page *page;
+> -	int ret;
+> -
+> -	/* Hole page already exists? Return it...  */
+> -	if (!radix_tree_exceptional_entry(*entry)) {
+> -		page = *entry;
+> -		goto finish_fault;
+> -	}
+> -
+> -	/* This will replace locked radix tree entry with a hole page */
+> -	page = find_or_create_page(mapping, vmf->pgoff,
+> -				   vmf->gfp_mask | __GFP_ZERO);
+> -	if (!page) {
+> -		ret = VM_FAULT_OOM;
+> -		goto out;
+> -	}
+> -
+> -finish_fault:
+> -	vmf->page = page;
+> -	ret = finish_fault(vmf);
+> -	vmf->page = NULL;
+> -	*entry = page;
+> -	if (!ret) {
+> -		/* Grab reference for PTE that is now referencing the page */
+> -		get_page(page);
+> -		ret = VM_FAULT_NOPAGE;
+> -	}
+> -out:
+> -	trace_dax_load_hole(inode, vmf, ret);
+> -	return ret;
+> -}
+> -
+>  static int copy_user_dax(struct block_device *bdev, struct dax_device *dax_dev,
+>  		sector_t sector, size_t size, struct page *to,
+>  		unsigned long vaddr)
+> @@ -938,6 +894,50 @@ int dax_pfn_mkwrite(struct vm_fault *vmf)
+>  }
+>  EXPORT_SYMBOL_GPL(dax_pfn_mkwrite);
+>  
+> +/*
+> + * The user has performed a load from a hole in the file.  Allocating
+> + * a new page in the file would cause excessive storage usage for
+> + * workloads with sparse files.  We allocate a page cache page instead.
+> + * We'll kick it out of the page cache if it's ever written to,
+> + * otherwise it will simply fall out of the page cache under memory
+> + * pressure without ever having been dirtied.
+> + */
+> +static int dax_load_hole(struct address_space *mapping, void **entry,
+> +			 struct vm_fault *vmf)
+> +{
+> +	struct inode *inode = mapping->host;
+> +	struct page *page;
+> +	int ret;
+> +
+> +	/* Hole page already exists? Return it...  */
+> +	if (!radix_tree_exceptional_entry(*entry)) {
+> +		page = *entry;
+> +		goto finish_fault;
+> +	}
+> +
+> +	/* This will replace locked radix tree entry with a hole page */
+> +	page = find_or_create_page(mapping, vmf->pgoff,
+> +				   vmf->gfp_mask | __GFP_ZERO);
+> +	if (!page) {
+> +		ret = VM_FAULT_OOM;
+> +		goto out;
+> +	}
+> +
+> +finish_fault:
+> +	vmf->page = page;
+> +	ret = finish_fault(vmf);
+> +	vmf->page = NULL;
+> +	*entry = page;
+> +	if (!ret) {
+> +		/* Grab reference for PTE that is now referencing the page */
+> +		get_page(page);
+> +		ret = VM_FAULT_NOPAGE;
+> +	}
+> +out:
+> +	trace_dax_load_hole(inode, vmf, ret);
+> +	return ret;
+> +}
+> +
+>  static bool dax_range_is_aligned(struct block_device *bdev,
+>  				 unsigned int offset, unsigned int length)
+>  {
+> -- 
+> 2.9.4
+> 
 -- 
-2.9.3
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
