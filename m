@@ -1,71 +1,43 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 24 Jul 2017 11:16:21 -0600
-Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
- SMMUv3 driver
-In-Reply-To: <8e82d8f5-e5e2-dd09-c774-29f9eda2ecdd@arm.com>
-References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
- <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
- <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
- <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
- <20170719112524.GF13642@arm.com>
- <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
- <20170719113325.GI13642@arm.com>
- <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
- <20170719115333.GJ13642@arm.com>
- <CAALAos-YbVbgvPmDYXeWaF4y8MQ9i7CG3tgGuf-QLR6hmXo18Q@mail.gmail.com>
- <20170720091003.GA17837@arm.com>
- <8e82d8f5-e5e2-dd09-c774-29f9eda2ecdd@arm.com>
-Message-ID: <20170724111621.7f1c3a85@w520.home>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 24 Jul 2017 22:50:29 +0530
+Subject: [PATCH 1/8] mailbox: introduce ARM SMC based mailbox
+In-Reply-To: <22d23c1d-ea8d-9829-4624-6305cd83ad4a@arm.com>
+References: <20170630095608.24943-1-andre.przywara@arm.com>
+ <20170630095608.24943-2-andre.przywara@arm.com>
+ <CABb+yY18Aye3wr2A9-+jemqc=VSRyUA+xzKGo9s0G4KCt1ovyA@mail.gmail.com>
+ <22d23c1d-ea8d-9829-4624-6305cd83ad4a@arm.com>
+Message-ID: <CABb+yY2hjfXdiCSZXd5TJf8=janwjWEo2oSqrxdoWc=1oUtteQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jul 2017 12:17:12 +0100
-Robin Murphy <robin.murphy@arm.com> wrote:
+On Mon, Jul 24, 2017 at 4:50 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
+> On 02/07/17 06:55, Jassi Brar wrote:
+>
+>>> +       mbox_chan_received_data(link, (void *)res.a0);
+>>> +
+>> Or you can update the 'data' with value from 'a0' ?
+>
+> Mmh, I am a bit puzzled by this. Why would this be needed or useful?
+>
+I meant instead of calling mbox_chan_received_data(), simply update
+the value at 'data' with res.a0
 
-> On 20/07/17 10:10, Will Deacon wrote:
-> > On Thu, Jul 20, 2017 at 09:32:00AM +0530, Anup Patel wrote:  
-> >> On Wed, Jul 19, 2017 at 5:23 PM, Will Deacon <will.deacon@arm.com> wrote:  
-> >>> There are two things here:
-> >>>
-> >>>   1. iommu_present() is pretty useless, because it applies to a "bus" which
-> >>>      doesn't actually tell you what you need to know for things like the
-> >>>      platform_bus, where some masters might be upstream of an SMMU and
-> >>>      others might not be.  
-> >>
-> >> I agree with you. The iommu_present() check in vfio_iommu_group_get()
-> >> is not much useful. We only reach line which checks iommu_present()
-> >> when iommu_group_get() returns NULL for given "struct device *". If there
-> >> is no IOMMU group for a "struct device *" then it means there is no IOMMU
-> >> HW doing translations for such device.
-> >>
-> >> If we drop the iommu_present() check (due to above reasons) in
-> >> vfio_iommu_group_get() then we don't require the IOMMU_CAP_BYPASS
-> >> and we can happily drop PATCH1, PATCH2, and PATCH3.
-> >>
-> >> I will remove the iommu_present() check in vfio_iommu_group_get()
-> >> because it is only comes into actions when VFIO_NOIOMMU is
-> >> enabled. This will also help us drop PATCH1-to-PATCH3.  
-> > 
-> > I don't think that's the right answer. Whilst iommu_present has obvious
-> > shortcomings, its intention is clear: it should tell you whether a given
-> > *device* is upstream of an IOMMU. So the right fix is to make this
-> > per-device, instead of per-bus. Removing it altogether is worse than leaving
-> > it like it is.  
-> 
-> Not really - if there is an IOMMU up and running to the point of setting
-> bus ops, every device it cares about can be expected to have a group
-> already (there are only a couple of drivers left that don't use groups,
-> and they're hardly relevant to VFIO). Thus iommu_group_get() already is
-> the de-facto per-device IOMMU check.
-> 
-> And having looked into it, I'm now spinning a couple of patches to
-> finish off making groups truly mandatory so that that can be less
-> de-facto ;)
+Technically the firmware does not "send" us a message. It only updates
+the structure we share with it. So maybe we could reflect that by
+updating the data pointer the client driver asked to send.
+Also it is optional for clients to provide the rx_callback(). By
+calling mbox_chan_received_data() you mandate clients provide that
+callback.
 
-No, look at vfio-noiommu and even vfio-mdev devices for devices which
-have an iommu group but there is no physical iommu supporting them.
-iommu_present() is how we can distinguish these groups and therefore
-not generate a segfault in trying to use the full IOMMU API on them.
-Thanks,
+Nothing serious, just that looking closely, updating 'data' seems a
+better option.
 
-Alex
+> I see that the SCPI firmware driver (as the user of the mailbox API) is
+> expecting the return value from a0 as returned above, translating the
+> firmware error codes into Linux' ones.
+>
+I am afraid, SCPI driver is not the golden example for client drivers
+to follow. It is supposed to work only with MHU, and then, it is
+likely to break if some other protocol is running parallel to it.
+
+Thanks
