@@ -1,50 +1,84 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 24 Jul 2017 14:14:48 +0300
-Subject: [PATCH] spi: pxa2xx: Only claim CS GPIOs when the slave device is
- created
-In-Reply-To: <db94e41e-5772-ec74-8587-3192dc866040@web.de>
-References: <90b3e14d-0077-9a25-9d90-ab340577af57@web.de>
- <CAHp75VfpJzOdhMyZoMGnC4CQc5kGxq1k-__dpmVAOaxaD04w6Q@mail.gmail.com>
- <59066818-a284-4da0-d05f-d2503aeee44b@web.de>
- <CAHp75Vf0NuOAvsJDxeB=5uqhMFpQ54vZzegJe=EYZDd3Bd6erw@mail.gmail.com>
- <db94e41e-5772-ec74-8587-3192dc866040@web.de>
-Message-ID: <CAHp75Vc9hVRCEgmjMNO0wDRzMB7SvyJAzr3BPQr5L909xzn5Ow@mail.gmail.com>
+From: jack@suse.cz (Jan Kara)
+Date: Mon, 24 Jul 2017 13:15:31 +0200
+Subject: [PATCH v4 1/5] mm: add mkwrite param to vm_insert_mixed()
+In-Reply-To: <CAA9_cmdoEVx88FCuCSOB1Qmom_X8uJPB4-uUx7MA3X5H4fZ=GQ@mail.gmail.com>
+References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
+ <20170721223956.29485-2-ross.zwisler@linux.intel.com>
+ <CAA9_cmdoEVx88FCuCSOB1Qmom_X8uJPB4-uUx7MA3X5H4fZ=GQ@mail.gmail.com>
+Message-ID: <20170724111531.GG652@quack2.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 2:06 PM, Jan Kiszka <jan.kiszka@web.de> wrote:
-> On 2017-07-24 13:02, Andy Shevchenko wrote:
->> On Mon, Jul 24, 2017 at 1:53 PM, Jan Kiszka <jan.kiszka@web.de> wrote:
->>> On 2017-07-24 12:44, Andy Shevchenko wrote:
->>>> +Cc: Mika
->>>>
->>>> On Sat, Jul 8, 2017 at 11:41 AM, Jan Kiszka <jan.kiszka@web.de> wrote:
->>>>> From: Jan Kiszka <jan.kiszka@siemens.com>
->>>>>
->>>>> Avoid hogging chip select GPIOs just because they are listed for the
->>>>> master. They might be mulitplexed and, if no slave device is attached,
->>>>> used for different purposes. Moreover, this strategy avoids having to
->>>>> allocate a cs_gpiods structure.
->>>>>
->>>>> Tested on the IOT2000 where the second SPI bus is connected to an
->>>>> Arduino-compatible connector and multiplexed between SPI, GPIO and PWM
->>>>> usage.
->>
->>>> This breaks all systems which are using _DSD.
->>>
->>> Err, can you elaborate? Worked fine here with _DSD on the IOT2000.
->>
->> Sure, the setup() function can be called several times for the same
->> chip (as written in the comment inside the function).
->> Definitely your code doesn't follow this, since gpiod_get_index() is
->> returning -EBUSY when called 2+ time, that's what I got on all my
->> tests.
->
-> Ah, multiple devices on the same controller - I only had one.
+On Sat 22-07-17 09:21:31, Dan Williams wrote:
+> On Fri, Jul 21, 2017 at 3:39 PM, Ross Zwisler
+> <ross.zwisler@linux.intel.com> wrote:
+> > To be able to use the common 4k zero page in DAX we need to have our PTE
+> > fault path look more like our PMD fault path where a PTE entry can be
+> > marked as dirty and writeable as it is first inserted, rather than waiting
+> > for a follow-up dax_pfn_mkwrite() => finish_mkwrite_fault() call.
+> >
+> > Right now we can rely on having a dax_pfn_mkwrite() call because we can
+> > distinguish between these two cases in do_wp_page():
+> >
+> >         case 1: 4k zero page => writable DAX storage
+> >         case 2: read-only DAX storage => writeable DAX storage
+> >
+> > This distinction is made by via vm_normal_page().  vm_normal_page() returns
+> > false for the common 4k zero page, though, just as it does for DAX ptes.
+> > Instead of special casing the DAX + 4k zero page case, we will simplify our
+> > DAX PTE page fault sequence so that it matches our DAX PMD sequence, and
+> > get rid of the dax_pfn_mkwrite() helper.  We will instead use
+> > dax_iomap_fault() to handle write-protection faults.
+> >
+> > This means that insert_pfn() needs to follow the lead of insert_pfn_pmd()
+> > and allow us to pass in a 'mkwrite' flag.  If 'mkwrite' is set insert_pfn()
+> > will do the work that was previously done by wp_page_reuse() as part of the
+> > dax_pfn_mkwrite() call path.
+> >
+> > Signed-off-by: Ross Zwisler <ross.zwisler@linux.intel.com>
+> > ---
+> >  drivers/dax/device.c                    |  2 +-
+> >  drivers/gpu/drm/exynos/exynos_drm_gem.c |  3 ++-
+> >  drivers/gpu/drm/gma500/framebuffer.c    |  2 +-
+> >  drivers/gpu/drm/msm/msm_gem.c           |  3 ++-
+> >  drivers/gpu/drm/omapdrm/omap_gem.c      |  6 ++++--
+> >  drivers/gpu/drm/ttm/ttm_bo_vm.c         |  2 +-
+> >  fs/dax.c                                |  2 +-
+> >  include/linux/mm.h                      |  2 +-
+> >  mm/memory.c                             | 27 +++++++++++++++++++++------
+> >  9 files changed, 34 insertions(+), 15 deletions(-)
+> >
+> > diff --git a/drivers/dax/device.c b/drivers/dax/device.c
+> > index e9f3b3e..3973521 100644
+> > --- a/drivers/dax/device.c
+> > +++ b/drivers/dax/device.c
+> > @@ -273,7 +273,7 @@ static int __dev_dax_pte_fault(struct dev_dax *dev_dax, struct vm_fault *vmf)
+> >
+> >         pfn = phys_to_pfn_t(phys, dax_region->pfn_flags);
+> >
+> > -       rc = vm_insert_mixed(vmf->vma, vmf->address, pfn);
+> > +       rc = vm_insert_mixed(vmf->vma, vmf->address, pfn, false);
+> 
+> Ugh, I generally find bool flags unreadable. They place a tax on
+> jumping to function definition to recall what true and false mean. If
+> we want to go this 'add an argument' route can we at least add an enum
+> like:
+> 
+> enum {
+>     PTE_MKDIRTY,
+>     PTE_MKCLEAN,
+> };
+> 
+> ...to differentiate the two cases?
 
-Nope, one. Since we are talking about recurrent call to
-gpiod_get_index() with the same index.
+So how I usually deal with this is that I create e.g.:
 
+__vm_insert_mixed() that takes the bool argument, make vm_insert_mixed()
+pass false, and vm_insert_mixed_mkwrite() pass true. That way there's no
+code duplication, old call sites can stay unchanged, the naming clearly
+says what's going on...
+
+								Honza
 -- 
-With Best Regards,
-Andy Shevchenko
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
