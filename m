@@ -1,61 +1,43 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Jul 2017 15:48:33 +0200
-Subject: [PATCH net-next 03/18] net: mvpp2: set the SMI PHY address when
- connecting to the PHY
+Date: Mon, 24 Jul 2017 15:48:32 +0200
+Subject: [PATCH net-next 02/18] net: mvpp2: fix the synchronization module
+ bypass macro name
 In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
 References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170724134848.19330-4-antoine.tenart@free-electrons.com>
+Message-ID: <20170724134848.19330-3-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When connecting to the PHY, explicitly set the SMI PHY address in the
-controller registers to configure a given port to be connected to the
-selected PHY.
+The macro defining the bit to toggle to bypass or not the
+synchronization module is wrongly named. Writing 1 will disable bypass.
+This patch s/MVPP22_CTRL4_SYNC_BYPASS/MVPP22_CTRL4_SYNC_BYPASS_DIS/.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/net/ethernet/marvell/mvpp2.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 1e592abc9067..6ffff929b22a 100644
+index ee4ea195eb0b..1e592abc9067 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -359,6 +359,8 @@
- #define MVPP22_SMI_MISC_CFG_REG			0x1204
- #define     MVPP22_SMI_POLLING_EN		BIT(10)
+@@ -339,7 +339,7 @@
+ #define MVPP22_GMAC_CTRL_4_REG			0x90
+ #define     MVPP22_CTRL4_EXT_PIN_GMII_SEL	BIT(0)
+ #define     MVPP22_CTRL4_DP_CLK_SEL		BIT(5)
+-#define     MVPP22_CTRL4_SYNC_BYPASS		BIT(6)
++#define     MVPP22_CTRL4_SYNC_BYPASS_DIS	BIT(6)
+ #define     MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE	BIT(7)
  
-+#define MVPP22_SMI_PHY_ADDR(port)		(0x120c + (port) * 0x4)
-+
- #define MVPP22_GMAC_BASE(port)		(0x7000 + (port) * 0x1000 + 0xe00)
- 
- #define MVPP2_CAUSE_TXQ_SENT_DESC_ALL_MASK	0xff
-@@ -5939,7 +5941,9 @@ static void mvpp21_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
- 
- static int mvpp2_phy_connect(struct mvpp2_port *port)
- {
-+	struct mvpp2 *priv = port->priv;
- 	struct phy_device *phy_dev;
-+	u32 phy_addr;
- 
- 	phy_dev = of_phy_connect(port->dev, port->phy_node, mvpp2_link_event, 0,
- 				 port->phy_interface);
-@@ -5954,6 +5958,16 @@ static int mvpp2_phy_connect(struct mvpp2_port *port)
- 	port->duplex  = 0;
- 	port->speed   = 0;
- 
-+	if (priv->hw_version != MVPP22)
-+		return 0;
-+
-+	/* Set the SMI PHY address */
-+	if (of_property_read_u32(port->phy_node, "reg", &phy_addr)) {
-+		netdev_err(port->dev, "cannot find the PHY address\n");
-+		return -EINVAL;
-+	}
-+
-+	writel(phy_addr, priv->iface_base + MVPP22_SMI_PHY_ADDR(port->gop_id));
- 	return 0;
+ /* Per-port XGMAC registers. PPv2.2 only, only for GOP port 0,
+@@ -4195,7 +4195,7 @@ static void mvpp22_port_mii_set(struct mvpp2_port *port)
+ 	else
+ 		val &= ~MVPP22_CTRL4_EXT_PIN_GMII_SEL;
+ 	val &= ~MVPP22_CTRL4_DP_CLK_SEL;
+-	val |= MVPP22_CTRL4_SYNC_BYPASS;
++	val |= MVPP22_CTRL4_SYNC_BYPASS_DIS;
+ 	val |= MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE;
+ 	writel(val, port->base + MVPP22_GMAC_CTRL_4_REG);
  }
- 
 -- 
 2.13.3
