@@ -1,32 +1,44 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Jul 2017 15:48:41 +0200
-Subject: [PATCH net-next 11/18] Documentation/bindings: net: marvell-pp2: add
- the system controller
-In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
-References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170724134848.19330-12-antoine.tenart@free-electrons.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 24 Jul 2017 21:58:58 +0800
+Subject: [PATCH v3 03/10] clk: sunxi-ng: a83t: Support new timing mode for
+ mmc2 clock
+In-Reply-To: <20170724135905.28855-1-wens@csie.org>
+References: <20170724135905.28855-1-wens@csie.org>
+Message-ID: <20170724135905.28855-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents the new marvell,system-controller property used by
-the Marvell ppv2 network driver.
+The MMC2 clock supports a new timing mode. When the new mode is active,
+the output clock rate is halved.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+This patch sets the feature flag for the new timing mode, and adds
+a pre-divider based on the mode bit.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/net/marvell-pp2.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-index 6b4956beff8c..18ec66e51b0a 100644
---- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-@@ -41,6 +41,7 @@ Optional properties (port):
- - marvell,loopback: port is loopback mode
- - phy: a phandle to a phy node defining the PHY address (as the reg
-   property, a single integer).
-+- marvell,system-controller: a phandle to the system controller.
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+index 947f9f6e05d2..e43acebdfbcd 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+@@ -418,14 +418,8 @@ static SUNXI_CCU_PHASE(mmc1_sample_clk, "mmc1-sample", "mmc1",
+ static SUNXI_CCU_PHASE(mmc1_output_clk, "mmc1-output", "mmc1",
+ 		       0x08c, 8, 3, 0);
  
- Example for marvell,armada-375-pp2:
+-/* TODO Support MMC2 clock's new timing mode. */
+-static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mod0_default_parents,
+-				  0x090,
+-				  0, 4,		/* M */
+-				  16, 2,	/* P */
+-				  24, 2,	/* mux */
+-				  BIT(31),	/* gate */
+-				  0);
++static SUNXI_CCU_MP_MMC_WITH_MUX_GATE(mmc2_clk, "mmc2", mod0_default_parents,
++				      0x090, 0);
  
+ static SUNXI_CCU_PHASE(mmc2_sample_clk, "mmc2-sample", "mmc2",
+ 		       0x090, 20, 3, 0);
 -- 
 2.13.3
