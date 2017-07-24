@@ -1,88 +1,72 @@
-From: jack@suse.cz (Jan Kara)
-Date: Mon, 24 Jul 2017 13:47:38 +0200
-Subject: [PATCH v4 4/5] dax: remove DAX code from page_cache_tree_insert()
-In-Reply-To: <20170721223956.29485-5-ross.zwisler@linux.intel.com>
-References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
- <20170721223956.29485-5-ross.zwisler@linux.intel.com>
-Message-ID: <20170724114738.GL652@quack2.suse.cz>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 24 Jul 2017 13:47:12 +0200
+Subject: [PATCH 3/3] dt-bindings: clock: amlogic,gxbb-aoclkc: Update
+ bindings
+In-Reply-To: <20170721204439.GJ19878@codeaurora.org>
+References: <1499336663-23875-1-git-send-email-narmstrong@baylibre.com>
+ <1499336663-23875-4-git-send-email-narmstrong@baylibre.com>
+ <20170710035031.rdbi64ookkbq6zeo@rob-hp-laptop>
+ <20170721204439.GJ19878@codeaurora.org>
+Message-ID: <1a971e80-1f91-c446-7e28-d193354b2859@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 21-07-17 16:39:54, Ross Zwisler wrote:
-> Now that we no longer insert struct page pointers in DAX radix trees we can
-> remove the special casing for DAX in page_cache_tree_insert().  This also
-> allows us to make dax_wake_mapping_entry_waiter() local to fs/dax.c,
-> removing it from dax.h.
+On 07/21/2017 10:44 PM, Stephen Boyd wrote:
+> On 07/09, Rob Herring wrote:
+>> On Thu, Jul 06, 2017 at 12:24:23PM +0200, Neil Armstrong wrote:
+>>> On the first revision of the bindings, only the gates + resets were known
+>>> in the AO Clock HW, but more registers used to configures AO clock are known
+>>> to be spread among the AO register space.
+>>> This patch adds these registers to the Ao Clock bindings with direct access
+>>> and shared extcon access.
+>>>
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>> ---
+>>>  .../devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt         | 11 +++++++++--
+>>>  1 file changed, 9 insertions(+), 2 deletions(-)
+>>
+>> This looks like the binding might be too specific with a reg list of 
+>> single registers, and you should define a system controller node 
+>> instead. Depends on what else is in the "A0" block.
+>>
 > 
-> Signed-off-by: Ross Zwisler <ross.zwisler@linux.intel.com>
-> Suggested-by: Jan Kara <jack@suse.cz>
-
-Looks good. You can add:
-
-Reviewed-by: Jan Kara <jack@suse.cz>
-
-								Honza
-
-
-> ---
->  fs/dax.c            |  2 +-
->  include/linux/dax.h |  2 --
->  mm/filemap.c        | 13 ++-----------
->  3 files changed, 3 insertions(+), 14 deletions(-)
+> Agreed. Why can't we expand the size in DT and then access the
+> registers directly in the driver. Hopefully it keeps working to
+> apply the dts patch without the driver patch too (and
+> vice-versa), because the kernel can only make a mapping as small
+> as a page which would cover these newly added reg properties
+> anyway.
 > 
-> diff --git a/fs/dax.c b/fs/dax.c
-> index fb0e4c1..0e27d90 100644
-> --- a/fs/dax.c
-> +++ b/fs/dax.c
-> @@ -127,7 +127,7 @@ static int wake_exceptional_entry_func(wait_queue_entry_t *wait, unsigned int mo
->   * correct waitqueue where tasks might be waiting for that old 'entry' and
->   * wake them.
->   */
-> -void dax_wake_mapping_entry_waiter(struct address_space *mapping,
-> +static void dax_wake_mapping_entry_waiter(struct address_space *mapping,
->  		pgoff_t index, void *entry, bool wake_all)
->  {
->  	struct exceptional_entry_key key;
-> diff --git a/include/linux/dax.h b/include/linux/dax.h
-> index 29cced8..afa99bb 100644
-> --- a/include/linux/dax.h
-> +++ b/include/linux/dax.h
-> @@ -122,8 +122,6 @@ int dax_iomap_fault(struct vm_fault *vmf, enum page_entry_size pe_size,
->  int dax_delete_mapping_entry(struct address_space *mapping, pgoff_t index);
->  int dax_invalidate_mapping_entry_sync(struct address_space *mapping,
->  				      pgoff_t index);
-> -void dax_wake_mapping_entry_waiter(struct address_space *mapping,
-> -		pgoff_t index, void *entry, bool wake_all);
->  
->  #ifdef CONFIG_FS_DAX
->  int __dax_zero_page_range(struct block_device *bdev,
-> diff --git a/mm/filemap.c b/mm/filemap.c
-> index a497024..1bf1265 100644
-> --- a/mm/filemap.c
-> +++ b/mm/filemap.c
-> @@ -130,17 +130,8 @@ static int page_cache_tree_insert(struct address_space *mapping,
->  			return -EEXIST;
->  
->  		mapping->nrexceptional--;
-> -		if (!dax_mapping(mapping)) {
-> -			if (shadowp)
-> -				*shadowp = p;
-> -		} else {
-> -			/* DAX can replace empty locked entry with a hole */
-> -			WARN_ON_ONCE(p !=
-> -				dax_radix_locked_entry(0, RADIX_DAX_EMPTY));
-> -			/* Wakeup waiters for exceptional entry lock */
-> -			dax_wake_mapping_entry_waiter(mapping, page->index, p,
-> -						      true);
-> -		}
-> +		if (shadowp)
-> +			*shadowp = p;
->  	}
->  	__radix_tree_replace(&mapping->page_tree, node, slot, page,
->  			     workingset_update_node, mapping);
-> -- 
-> 2.9.4
-> 
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+
+Hi Rob, Stephen,
+
+Thanks for your feedback, but on these Amlogic platforms, the AO register bank is
+filled with interleaved registers used for various purposes.
+
+For instance, the first 1k of registers are :
+
+0-c RTI_STATUS
+c-14 RTI_PWR_CNTL
+14-1c PIN_MUX
+1c RTI_STATUS
+24-30 GPIO
+30 JTAG_CONFIG
+34 WD
+38-40 CPU_CTRL
+40 RTI_GEN_CTRL
+44 CPU_CTRL
+4c-58 TIMER
+58 OSCIN
+60 AHB2DDR
+...
+
+
+And so on, and the clock related registers are split among this space.
+
+For sure, this could be declared as an system controller node, but this would imply completely
+re-designing the actual clock driver and drop the actual bindings.
+(and with re-writting the clock gate code to use regmap registers access)
+
+Anyway, I'm open to suggestions...
+
+Neil
