@@ -1,62 +1,70 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 24 Jul 2017 16:15:01 +0100
-Subject: [PATCH v2 2/6] of: Add helper for mapping device node to logical
- CPU number
-In-Reply-To: <ff7f1757-0beb-b87c-8965-d9fb29e6de47@arm.com>
-References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
- <1500892161-17634-3-git-send-email-suzuki.poulose@arm.com>
- <ff7f1757-0beb-b87c-8965-d9fb29e6de47@arm.com>
-Message-ID: <b0484d86-0c0c-7c7f-6196-7c68c717a219@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 24 Jul 2017 17:19:59 +0200
+Subject: [PATCH 2/2] ARM64: dts: marvell: add NAND support on the CP110
+ master
+In-Reply-To: <20170719153126.16905-3-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Wed, 19 Jul 2017 17:31:26 +0200")
+References: <20170719153126.16905-1-gregory.clement@free-electrons.com>
+ <20170719153126.16905-3-gregory.clement@free-electrons.com>
+Message-ID: <878tjd50bk.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
+ 
+ On mer., juil. 19 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-
-On 24/07/17 14:14, Marc Zyngier wrote:
-> On 24/07/17 11:29, Suzuki K Poulose wrote:
->> Add a helper to map a device node to a logical CPU number to avoid
->> duplication. Currently this is open coded in different places (e.g
->> gic-v3, coresight). The helper tries to map device node to a "possible"
->> logical CPU id, which may not be online yet. It is the responsibility
->> of the user to make sure that the CPU is online. The helper uses
->> of_get_cpu_node() which uses arch specific backends to match the phyiscal
->> ids.
->>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>  drivers/of/base.c         | 26 ++++++++++++++++++++++++++
->>  include/linux/of_device.h |  7 +++++++
->>  2 files changed, 33 insertions(+)
->>
->> diff --git a/drivers/of/base.c b/drivers/of/base.c
->> index 686628d..639af23 100644
->> --- a/drivers/of/base.c
->> +++ b/drivers/of/base.c
-
->> +int of_device_node_get_cpu(struct device_node *cpu_node)
->> +{
->> +	int cpu, thread;
->> +	bool found = false;
->> +	struct device_node *np;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		np = of_get_cpu_node(cpu, &thread);
+> The NAND controller used in A7K/A8K is present on the CP110 master
+> part. It is compatible with the pxa-nand driver.
 >
-> nit: Since you don't need the thread here, you can pass NULL instead.
->
+> Unlike most of the controller on the CP110 this one is only present on
+> the master for the Armada 8K SoCs.
 
-Sure, will do that in the next version.
+Actually this is wrong. The controller is present on both CP, but
+because of the muxing only the one present on the CPS is available on
+the Armada 8K.
 
+I will send a new version fixing it.
+
+Gregory
 
 >
-> FWIW:
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 >
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index 726528ce54e9..9be4a442ded5 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -240,6 +240,20 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			cpm_nand: nand at 720000 {
+> +				/*
+> +				 * For A7K/A8K this controller is only
+> +				 * present on the CPM and not on the CPS
+> +				 */
+> +				compatible = "marvell,armada370-nand";
+> +				reg = <0x720000 0x54>;
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&cpm_clk 1 2>;
+> +				status = "disabled";
+> +			};
+> +
+>  			cpm_trng: trng at 760000 {
+>  				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
+>  				reg = <0x760000 0x7d>;
+> -- 
+> 2.13.2
 >
 
-Thanks for taking a look.
-
-Suzuki
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
