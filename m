@@ -1,59 +1,24 @@
-From: ross.zwisler@linux.intel.com (Ross Zwisler)
-Date: Mon, 24 Jul 2017 09:23:57 -0600
-Subject: [PATCH v4 1/5] mm: add mkwrite param to vm_insert_mixed()
-In-Reply-To: <20170724112530.GI652@quack2.suse.cz>
-References: <20170721223956.29485-1-ross.zwisler@linux.intel.com>
- <20170721223956.29485-2-ross.zwisler@linux.intel.com>
- <20170724112530.GI652@quack2.suse.cz>
-Message-ID: <20170724152357.GB1639@linux.intel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 24 Jul 2017 12:26:58 -0300
+Subject: [PATCH 0/5] ARM: dts: imx6: RDU2: Ethernet switch and PHYs
+In-Reply-To: <1500323104-11583-1-git-send-email-andrew@lunn.ch>
+References: <1500323104-11583-1-git-send-email-andrew@lunn.ch>
+Message-ID: <CAOMZO5DK1Lw-uWVa4Azi22JsisRv4+6nOO-pZcYR-jvX7FQdSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 01:25:30PM +0200, Jan Kara wrote:
-> > @@ -1658,14 +1658,28 @@ static int insert_pfn(struct vm_area_struct *vma, unsigned long addr,
-> >  	if (!pte)
-> >  		goto out;
-> >  	retval = -EBUSY;
-> > -	if (!pte_none(*pte))
-> > -		goto out_unlock;
-> > +	if (!pte_none(*pte)) {
-> > +		if (mkwrite) {
-> > +			if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
-> 
-> Is the WARN_ON_ONCE() really appropriate here? Your testcase with private
-> mappings has triggered this situation if I'm right...
+On Mon, Jul 17, 2017 at 5:24 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> This patchset extends the RDU2 to support its Ethernet switch, the
+> PHYs within the switch, the switches EEPROM, and the Micrel
+> PHY connected to the FEC.
+>
+> Andrew Lunn (5):
+>   ARM: dts: imx6: RDU2: Add Micrel PHY to FEC
+>   ARM: dts: imx6: RDU2: Add DSA support for the Marvell 88E6352
+>   ARM: dts: imx6: RDU2: Add Switch EEPROM
+>   ARM: dts: imx6: RDU2: Add Switch interrupts
+>   ARM: dts: imx6: RDU2: Add Micrel PHY interrupt
 
-Yep, I think this WARN_ON_ONCE() is correct.  The test with private mappings
-had collisions between read-only DAX mappings which were being faulted in via
-insert_pfn(), and read/write COW page cache mappings which were being faulted
-in by wp_page_copy().
+Series looks good:
 
-I was hitting a false-positive warning when I had the WARN_ON_ONCE() in
-insert_pfn() outside of the mkwrite case, i.e.:
-
-	if (!pte_none(*pte)) {
-		if (WARN_ON_ONCE(pte_pfn(*pte) != pfn_t_to_pfn(pfn)))
-			goto out_unlock;
-		if (mkwrite) {
-			entry = *pte;
-			goto out_mkwrite;
-		} else
-			goto out_unlock;
-	}
-
-This was triggering when one thread was faulting in a read-only DAX mapping
-when another thread had already faulted in a read-write COW page cache page.
-
-The patches I sent out have the warning in the mkwrite case, which would mean
-that we were getting a fault for a read/write PTE in insert_pfn() and the PFN
-didn't match what was already in the PTE.
-
-This can't ever happen in the private mapping case because we will never
-install a read/write PTE for normal storage, only for COW page cache pages.
-Essentially I don't think we should ever be able to hit this warning, and if
-we do I'd like to get the bug report so that I can track down how it was
-happening and make sure that it's safe.  It is in the mkwrite path of
-insert_pfn() which is currently only used by the DAX code.
-
-Does that make sense to you, or would you recommend leaving it out?  (If so,
-why?)
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
