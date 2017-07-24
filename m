@@ -1,33 +1,122 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Jul 2017 16:03:44 +0100
-Subject: [linux-sunxi] [PATCH 02/10] regulator: add support for SY8106A
- regulator
-In-Reply-To: <CAGb2v640bB27M_Xd4r-oQ=acgfpHEwoV2tSk3vH0VZc7R-de6w@mail.gmail.com>
-References: <20170723102749.17323-1-icenowy@aosc.io>
- <20170723102749.17323-3-icenowy@aosc.io>
- <CAGb2v640bB27M_Xd4r-oQ=acgfpHEwoV2tSk3vH0VZc7R-de6w@mail.gmail.com>
-Message-ID: <20170724150344.4zq6md7eidxzikot@sirena.org.uk>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Mon, 24 Jul 2017 23:03:01 +0800
+Subject: [PATCH 1/3] iio: adc: stm32: fix common clock rate
+In-Reply-To: <0385445a-8be9-6e67-b19d-b72466c23e34@st.com>
+References: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
+ <1500381332-17086-2-git-send-email-fabrice.gasnier@st.com>
+ <20170723115148.07db4374@kernel.org>
+ <0385445a-8be9-6e67-b19d-b72466c23e34@st.com>
+Message-ID: <20170724230301.00007791@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 11:03:24AM +0800, Chen-Yu Tsai wrote:
-> On Sun, Jul 23, 2017 at 6:27 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> > From: Ondrej Jirman <megous@megous.com>
-> >
-> > SY8106A is an I2C attached single output regulator made by Silergy Corp,
-> > which is used on several Allwinner H3/H5 SBCs to control the power
-> > supply of the ARM cores.
-> >
-> > Add a driver for it.
+On Mon, 24 Jul 2017 09:43:18 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-Please delete unneeded context from mails when replying.  Doing this
-makes it much easier to find your reply in the message, helping ensure
-it won't be missed by people scrolling through the irrelevant quoted
-material.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170724/e233edca/attachment.sig>
+> On 07/23/2017 12:51 PM, Jonathan Cameron wrote:
+> > On Tue, 18 Jul 2017 14:35:30 +0200
+> > Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+> >   
+> >> Fixes commit 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
+> >>
+> >> Fix common clock rate used then by stm32-adc sub-devices: take common
+> >> prescaler into account.
+> >> Fix ADC max clock rate on STM32H7 (fADC from datasheet)
+> >>
+> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>  
+> > Patch itself is fine, but the description could do with
+> > information on what the result of this being wrong is.  
+> 
+> Hi Jonathan,
+> 
+> I agree with you and will improve description in v2. I'm thinking of:
+> 
+> Fixes: 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
+> 
+> ADC clock input is provided to internal prescaler (that decreases its
+> frequency). It's then used as reference clock for conversions.
+> 
+> - Fix common clock rate used then by stm32-adc sub-devices. Take common
+> prescaler into account. Currently, rate is used to set "boost" mode. It
+> may unnecessarily be set. This impacts power consumption.
+> - Fix ADC max clock rate on STM32H7 (fADC from datasheet). Currently,
+> prescaler may be set too low. This can result in ADC reference clock
+> used for conversion to exceed max allowed clock frequency.
+> 
+> > 
+> > I have no idea if this is a patch I should be sending upstream
+> > asap or should hold for the next merge window.  
+> 
+> Probably yes... I hope the description is better above? Just to mention
+> this impacts stm32h7 adc, device tree node to use it is not yet integrated.
+
+Description is much better thanks.  I'll wait for v2 and merge this as a
+fix.
+
+Jonathan
+> 
+> Thanks for your review,
+> Best Regards,
+> Fabrice
+> > 
+> > Thanks,
+> > 
+> > Jonathan  
+> >> ---
+> >>  drivers/iio/adc/stm32-adc-core.c | 10 +++++-----
+> >>  1 file changed, 5 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
+> >> index e09233b..6096763 100644
+> >> --- a/drivers/iio/adc/stm32-adc-core.c
+> >> +++ b/drivers/iio/adc/stm32-adc-core.c
+> >> @@ -64,7 +64,7 @@
+> >>  #define STM32H7_CKMODE_MASK		GENMASK(17, 16)
+> >>  
+> >>  /* STM32 H7 maximum analog clock rate (from datasheet) */
+> >> -#define STM32H7_ADC_MAX_CLK_RATE	72000000
+> >> +#define STM32H7_ADC_MAX_CLK_RATE	36000000
+> >>  
+> >>  /**
+> >>   * stm32_adc_common_regs - stm32 common registers, compatible dependent data
+> >> @@ -148,14 +148,14 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
+> >>  		return -EINVAL;
+> >>  	}
+> >>  
+> >> -	priv->common.rate = rate;
+> >> +	priv->common.rate = rate / stm32f4_pclk_div[i];
+> >>  	val = readl_relaxed(priv->common.base + STM32F4_ADC_CCR);
+> >>  	val &= ~STM32F4_ADC_ADCPRE_MASK;
+> >>  	val |= i << STM32F4_ADC_ADCPRE_SHIFT;
+> >>  	writel_relaxed(val, priv->common.base + STM32F4_ADC_CCR);
+> >>  
+> >>  	dev_dbg(&pdev->dev, "Using analog clock source at %ld kHz\n",
+> >> -		rate / (stm32f4_pclk_div[i] * 1000));
+> >> +		priv->common.rate / 1000);
+> >>  
+> >>  	return 0;
+> >>  }
+> >> @@ -250,7 +250,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
+> >>  
+> >>  out:
+> >>  	/* rate used later by each ADC instance to control BOOST mode */
+> >> -	priv->common.rate = rate;
+> >> +	priv->common.rate = rate / div;
+> >>  
+> >>  	/* Set common clock mode and prescaler */
+> >>  	val = readl_relaxed(priv->common.base + STM32H7_ADC_CCR);
+> >> @@ -260,7 +260,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
+> >>  	writel_relaxed(val, priv->common.base + STM32H7_ADC_CCR);
+> >>  
+> >>  	dev_dbg(&pdev->dev, "Using %s clock/%d source at %ld kHz\n",
+> >> -		ckmode ? "bus" : "adc", div, rate / (div * 1000));
+> >> +		ckmode ? "bus" : "adc", div, priv->common.rate / 1000);
+> >>  
+> >>  	return 0;
+> >>  }  
+> >   
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
