@@ -1,45 +1,284 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 24 Jul 2017 09:58:18 +0800
-Subject: [PATCH] [RESEND] drm/rockchip: fix Kconfig dependencies
-In-Reply-To: <20170721211214.3386387-1-arnd@arndb.de>
-References: <20170721211214.3386387-1-arnd@arndb.de>
-Message-ID: <5975543A.80407@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 24 Jul 2017 11:03:24 +0800
+Subject: [linux-sunxi] [PATCH 02/10] regulator: add support for SY8106A
+ regulator
+In-Reply-To: <20170723102749.17323-3-icenowy@aosc.io>
+References: <20170723102749.17323-1-icenowy@aosc.io>
+ <20170723102749.17323-3-icenowy@aosc.io>
+Message-ID: <CAGb2v640bB27M_Xd4r-oQ=acgfpHEwoV2tSk3vH0VZc7R-de6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?07?22? 05:12, Arnd Bergmann wrote:
-> A bug that I had fixed earlier just came back, with CONFIG_EXTCON=m,
-> the rockchip drm driver will fail to link:
+On Sun, Jul 23, 2017 at 6:27 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> From: Ondrej Jirman <megous@megous.com>
 >
-> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_get_port_lanes':
-> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x30): undefined reference to `extcon_get_state'
-> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x6c): undefined reference to `extcon_get_property'
-> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_check_sink_connection':
-> cdn-dp-core.c:(.text.cdn_dp_check_sink_connection+0x80): undefined reference to `extcon_get_state'
-> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_enable':
-> cdn-dp-core.c:(.text.cdn_dp_enable+0x748): undefined reference to `extcon_get_property'
+> SY8106A is an I2C attached single output regulator made by Silergy Corp,
+> which is used on several Allwinner H3/H5 SBCs to control the power
+> supply of the ARM cores.
 >
-> The problem is that that the sub-drivers are now all linked into the
-> main rockchip drm module, which breaks all the Kconfig dependencies
-> that are specified in the options for those sub-drivers.
+> Add a driver for it.
 >
-> This clarifies the dependency to ensure that we can only turn on the DP
-> driver when EXTCON is reachable. As the 'select' statements can now
-> cause additional options to become built-in when they should be
-> loadable modules, I'm moving those into the main driver config option.
-> The dependency on DRM_ROCKCHIP can be reduced into a single 'if'
-> statement here for brevity, but this has no functional effect.
+> Signed-off-by: Ondrej Jirman <megous@megous.com>
+> [Icenowy: Change commit message]
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  drivers/regulator/Kconfig             |   8 +-
+>  drivers/regulator/Makefile            |   2 +-
+>  drivers/regulator/sy8106a-regulator.c | 163 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 171 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/regulator/sy8106a-regulator.c
 >
-> Fixes: b6705157b2db ("drm/rockchip: add extcon dependency for DP")
-> Fixes: 8820b68bd378 ("drm/rockchip: Refactor the component match logic.")
-> Link:https://patchwork.kernel.org/patch/9648761/
-> Acked-by: Guenter Roeck<groeck@chromium.org>
-> Tested-by: Jeffy Chen<jeffy.chen@rock-chips.com>
-> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
+> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> index 99b9362331b5..1efa73e18d07 100644
+> --- a/drivers/regulator/Kconfig
+> +++ b/drivers/regulator/Kconfig
+> @@ -764,6 +764,13 @@ config REGULATOR_STW481X_VMMC
+>           This driver supports the internal VMMC regulator in the STw481x
+>           PMIC chips.
+>
+> +config REGULATOR_SY8106A
+> +       tristate "Silergy SY8106A regulator"
+> +       depends on I2C && (OF || COMPILE_TEST)
+> +       select REGMAP_I2C
+> +       help
+> +         This driver supports SY8106A single output regulator.
+> +
+>  config REGULATOR_TPS51632
+>         tristate "TI TPS51632 Power Regulator"
+>         depends on I2C
+> @@ -938,4 +945,3 @@ config REGULATOR_WM8994
+>           WM8994 CODEC.
+>
+>  endif
+> -
+> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> index 95b1e86ae692..f5120252f86a 100644
+> --- a/drivers/regulator/Makefile
+> +++ b/drivers/regulator/Makefile
+> @@ -95,6 +95,7 @@ obj-$(CONFIG_REGULATOR_S2MPS11) += s2mps11.o
+>  obj-$(CONFIG_REGULATOR_S5M8767) += s5m8767.o
+>  obj-$(CONFIG_REGULATOR_SKY81452) += sky81452-regulator.o
+>  obj-$(CONFIG_REGULATOR_STW481X_VMMC) += stw481x-vmmc.o
+> +obj-$(CONFIG_REGULATOR_SY8106A) += sy8106a-regulator.o
+>  obj-$(CONFIG_REGULATOR_TI_ABB) += ti-abb-regulator.o
+>  obj-$(CONFIG_REGULATOR_TPS6105X) += tps6105x-regulator.o
+>  obj-$(CONFIG_REGULATOR_TPS62360) += tps62360-regulator.o
+> @@ -120,5 +121,4 @@ obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
+>  obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
+>  obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
+>
+> -
+>  ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
+> diff --git a/drivers/regulator/sy8106a-regulator.c b/drivers/regulator/sy8106a-regulator.c
+> new file mode 100644
+> index 000000000000..1df889f68b3d
+> --- /dev/null
+> +++ b/drivers/regulator/sy8106a-regulator.c
+> @@ -0,0 +1,163 @@
+> +/*
+> + * sy8106a-regulator.c - Regulator device driver for SY8106A
+> + *
+> + * Copyright (C) 2016 Ond?ej Jirman <megous@megous.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU Library General Public
+> + * License as published by the Free Software Foundation; either
+> + * version 2 of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * Library General Public License for more details.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/i2c.h>
+> +#include <linux/module.h>
+> +#include <linux/regmap.h>
+> +#include <linux/regulator/driver.h>
+> +#include <linux/regulator/of_regulator.h>
+> +
+> +#define SY8106A_REG_VOUT1_SEL          0x01
+> +#define SY8106A_REG_VOUT_COM           0x02
+> +#define SY8106A_REG_VOUT1_SEL_MASK     0x7f
+> +#define SY8106A_DISABLE_REG            BIT(0)
+> +#define SY8106A_GO_BIT                 BIT(7)
+> +
+> +struct sy8106a {
+> +       struct regulator_dev *rdev;
+> +       struct regmap *regmap;
+> +};
+> +
+> +static const struct regmap_config sy8106a_regmap_config = {
+> +       .reg_bits = 8,
+> +       .val_bits = 8,
+> +};
+> +
+> +static int sy8106a_set_voltage_sel(struct regulator_dev *rdev, unsigned int sel)
+> +{
+> +       /* We use our set_voltage_sel in order to avoid unnecessary I2C
+> +        * chatter, because the regulator_get_voltage_sel_regmap using
+> +        * apply_bit would perform 4 unnecessary transfers instead of one,
+> +        * increasing the chance of error.
+> +        */
+> +       return regmap_write(rdev->regmap, rdev->desc->vsel_reg,
+> +                           sel | SY8106A_GO_BIT);
 
-Pushed to drm-misc-fixes.
+There should also be an explanation of what the "go bit" does.
+In this case it enables control of the voltage over I2C.
 
-Thanks.
+> +}
+> +
+> +static const struct regulator_ops sy8106a_ops = {
+> +       .is_enabled = regulator_is_enabled_regmap,
+> +       .set_voltage_sel = sy8106a_set_voltage_sel,
+> +       .set_voltage_time_sel = regulator_set_voltage_time_sel,
+> +       .get_voltage_sel = regulator_get_voltage_sel_regmap,
+> +       .list_voltage = regulator_list_voltage_linear,
 
--- 
-?ark Yao
+No enable/disable ops?
+
+> +};
+> +
+> +/* Default limits measured in millivolts and milliamps */
+> +#define SY8106A_MIN_MV         680
+> +#define SY8106A_MAX_MV         1950
+> +#define SY8106A_STEP_MV                10
+> +
+> +static const struct regulator_desc sy8106a_reg = {
+> +       .name = "SY8106A",
+> +       .id = 0,
+> +       .ops = &sy8106a_ops,
+> +       .type = REGULATOR_VOLTAGE,
+> +       .n_voltages = ((SY8106A_MAX_MV - SY8106A_MIN_MV) / SY8106A_STEP_MV) + 1,
+> +       .min_uV = (SY8106A_MIN_MV * 1000),
+> +       .uV_step = (SY8106A_STEP_MV * 1000),
+> +       .vsel_reg = SY8106A_REG_VOUT1_SEL,
+> +       .vsel_mask = SY8106A_REG_VOUT1_SEL_MASK,
+> +       .enable_reg = SY8106A_REG_VOUT_COM,
+> +       .enable_mask = SY8106A_DISABLE_REG,
+> +       .disable_val = SY8106A_DISABLE_REG,
+> +       .enable_is_inverted = 1,
+
+As the regulator core helpers currently are, there is no way to disable
+this regulator. regulator_disable_regmap looks like:
+
+        if (rdev->desc->enable_is_inverted) {
+                val = rdev->desc->enable_val;
+                if (!val)
+                        val = rdev->desc->enable_mask;
+        } else {
+                val = rdev->desc->disable_val;
+        }
+
+        return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+                                  rdev->desc->enable_mask, val);
+
+Note the fallback to enable_mask if enable_val is not set. The enable
+helper has a similar structure. This regulator uses an enable value
+of 0, and disable value of 1, it is impossible to get it right. As
+it is now, it doesn't really make sense to me.
+
+The code was introduced in ca5d1b3524b4 ("regulator: helpers: Modify
+helpers enabling multi-bit control"). I wonder if it was an unintended
+consequence of the change? (original author CC-ed)
+
+> +       .owner = THIS_MODULE,
+> +};
+> +
+> +/*
+> + * I2C driver interface functions
+> + */
+> +static int sy8106a_i2c_probe(struct i2c_client *i2c,
+> +                           const struct i2c_device_id *id)
+> +{
+> +       struct sy8106a *chip;
+> +       struct device *dev = &i2c->dev;
+> +       struct regulator_dev *rdev = NULL;
+> +       struct regulator_config config = { };
+> +       unsigned int selector;
+> +       int error;
+> +
+> +       chip = devm_kzalloc(&i2c->dev, sizeof(struct sy8106a), GFP_KERNEL);
+> +       if (!chip)
+> +               return -ENOMEM;
+> +
+> +       chip->regmap = devm_regmap_init_i2c(i2c, &sy8106a_regmap_config);
+> +       if (IS_ERR(chip->regmap)) {
+> +               error = PTR_ERR(chip->regmap);
+> +               dev_err(&i2c->dev, "Failed to allocate register map: %d\n",
+> +                       error);
+> +               return error;
+> +       }
+> +
+> +       config.dev = &i2c->dev;
+> +       config.regmap = chip->regmap;
+> +       config.driver_data = chip;
+> +
+> +       config.of_node = dev->of_node;
+> +       config.init_data = of_get_regulator_init_data(dev, dev->of_node,
+> +                                                     &sy8106a_reg);
+> +
+> +       if (!config.init_data)
+> +               return -ENOMEM;
+> +
+> +       /* Probe regulator */
+> +       error = regmap_read(chip->regmap, SY8106A_REG_VOUT1_SEL, &selector);
+> +       if (error) {
+> +               dev_err(&i2c->dev, "Failed to read voltage at probe time: %d\n", error);
+> +               return error;
+> +       }
+> +
+> +       rdev = devm_regulator_register(&i2c->dev, &sy8106a_reg, &config);
+> +       if (IS_ERR(rdev)) {
+> +               error = PTR_ERR(rdev);
+> +               dev_err(&i2c->dev, "Failed to register SY8106A regulator: %d\n", error);
+> +               return error;
+> +       }
+> +
+> +       chip->rdev = rdev;
+> +
+> +       i2c_set_clientdata(i2c, chip);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id sy8106a_i2c_of_match[] = {
+> +       { .compatible = "silergy,sy8106a" },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(of, sy8106a_i2c_of_match);
+> +
+> +static const struct i2c_device_id sy8106a_i2c_id[] = {
+> +       { "sy8106a", 0 },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(i2c, sy8106a_i2c_id);
+> +
+> +static struct i2c_driver sy8106a_regulator_driver = {
+> +       .driver = {
+> +               .name = "sy8106a",
+> +               .of_match_table = of_match_ptr(sy8106a_i2c_of_match),
+> +       },
+> +       .probe = sy8106a_i2c_probe,
+> +       .id_table = sy8106a_i2c_id,
+> +};
+> +
+> +module_i2c_driver(sy8106a_regulator_driver);
+> +
+> +MODULE_AUTHOR("Ond?ej Jirman <megous@megous.com>");
+> +MODULE_DESCRIPTION("Regulator device driver for Silergy SY8106A");
+> +MODULE_LICENSE("GPL v2");
+
+This should be "GPL", to match what the license at the very top says.
+
+Regards
+ChenYu
+
+> --
+> 2.13.0
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
