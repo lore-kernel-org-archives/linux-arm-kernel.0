@@ -1,39 +1,129 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 24 Jul 2017 21:08:55 +0200
-Subject: [GIT PULL 4/5] ARM: defconfig: Exynos updates for v4.14
-In-Reply-To: <20170724190856.19055-1-krzk@kernel.org>
-References: <20170724190856.19055-1-krzk@kernel.org>
-Message-ID: <20170724190856.19055-4-krzk@kernel.org>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 24 Jul 2017 21:13:12 +0200
+Subject: Problem with PHY state machine when using interrupts
+In-Reply-To: <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
+References: <65b9f1f5-724c-cd03-1c39-59405e773efa@free.fr>
+ <849513d9-c981-ec20-5a10-08c663d0aa37@free.fr>
+ <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
+Message-ID: <e6a7a5df-b735-6f9c-6a2b-cded86ec6525@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24/07/2017 18:49, Florian Fainelli wrote:
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> On 07/24/2017 08:01 AM, Mason wrote:
+>
+>>> When I set the link down via 'ip link set eth0 down'
+>>> (as opposed to pulling the Ethernet cable) things don't happen as expected:
+>>>
+>>> The driver's adjust_link() callback is never called, and doesn't
+>>> get a chance make some required changes. And when I set the link
+>>> up again, there is no network connectivity.
+>>>
+>>> I get this problem only if I enable interrupts on my PHY.
+>>> If I use polling, things work as expected.
+>>>
+>>>
+>>> When I set the link down, devinet_ioctl() eventually calls
+>>> ndo_set_rx_mode() and ndo_stop()
+>>>
+>>> In ndo_stop() the driver calls
+>>> phy_stop(phydev);
+>>> which disables interrupts and sets the state to HALTED.
+>>>
+>>> In phy_state_machine()
+>>> the PHY_HALTED case does call the adjust_link() callback:
+>>>
+>>> 		if (phydev->link) {
+>>> 			phydev->link = 0;
+>>> 			netif_carrier_off(phydev->attached_dev);
+>>> 			phy_adjust_link(phydev);
+>>> 			do_suspend = true;
+>>> 		}
+>>>
+>>> But it's not called when I use interrupts...
+>>>
+>>> Perhaps because there are no interrupts generated?
+>>> Or even if there were, they have been turned off by phy_stop?
+>>>
+>>> Basically, it seems like when I use interrupts,
+>>> the phy_state_machine() is not called on link down,
+>>> which breaks the MAC driver's expectations.
+>>>
+>>> Am I barking up the wrong tree?
+>>
+>> FWIW, the patch below solves my issue.
+>> Basically, we reset the MAC in open(), instead of probe().
+>>
+>> I also had to solve the issue of adjust_link() not being
+>> called by calling it explicitly in stop() instead of
+>> relying on phy_stop() to do it indirectly.
+> 
+> Which is of course absolutely not how it is intended to be used.
+> phy_stop() does the following:
+> 
+> - if the PHY was already HALTED do nothing and exit
+> - if it was not and an interrupt is valid for this PHY:  disable and
+> clear these interrupts
+> - set state to PHY_HALTED
+> 
+> somehow an interrupt should be generated from doing this such that
+> phy_change(), invoked from phy_interrupt() should have a chance to run
+> and make the PHY state machine transition properly to PHY_HALTED.
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+I'm totally confused. Are you saying that phy_stop itself
+should trigger an interrupt, or that the process of setting
+the link down should generate an interrupt *before* we reach
+phy_stop?
 
-are available in the git repository at:
+I'm also perplex over this synchronous IRQ business.
+Should I be looking for a way to trigger an IRQ in
+software in the Atheros PHY?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.14
+Before I forget: there is also an issue when using the PHY
+in polling mode. The ndo_stop callback runs through phy_stop
+and phy_disconnect too fast for the adjust_link() callback
+to be called. My patch fixed that too, by calling
+nb8800_link_reconfigure() explicitly.
 
-for you to fetch changes up to 57ee24144e57b762dc46f171e1f138ccfc464867:
 
-  ARM: exynos_defconfig: Enable locking test options (2017-07-18 17:58:46 +0200)
+> So from there can you check a few things:
+> 
+> - is such an interrupt actually generated?
+> - if you turn on dynamic debug prints for drivers/net/phy/phy.c where do
+> we leave the PHY state machine and what state is it in when you call
+> ifconfig up again?
 
-----------------------------------------------------------------
-Samsung defconfig changes for v4.14
+The only interrupts I've ever seen the PHY generate are
+on plugging/unplugging the Ethernet cable.
 
-1. Enable some drivers useful on our boards (communication: Bluetooth,
-   WiFi, NFC, USB; codepages and crypto algorithms).
-2. Enable debugging and lock testing options. These might have impact on
-   performance but we use the exynos_defconfig a lot during development
-   so they should bring benefits of detecting early locking issues.
+Looking at the driver and datasheet...
+http://elixir.free-electrons.com/linux/v4.13-rc2/source/drivers/net/phy/at803x.c#L312
+		value |= AT803X_INTR_ENABLE_AUTONEG_ERR;
+		value |= AT803X_INTR_ENABLE_SPEED_CHANGED;
+		value |= AT803X_INTR_ENABLE_DUPLEX_CHANGED;
+		value |= AT803X_INTR_ENABLE_LINK_FAIL;
+		value |= AT803X_INTR_ENABLE_LINK_SUCCESS;
 
-----------------------------------------------------------------
-Krzysztof Kozlowski (3):
-      ARM: exynos_defconfig: Enable Bluetooth, mac80211, NFC and more USB drivers
-      ARM: exynos_defconfig: Enable NLS_UTF8 and some crypto algorithms
-      ARM: exynos_defconfig: Enable locking test options
+And the interrupts reasons supported by the PHY are:
+#define AT803X_INTR_ENABLE_AUTONEG_ERR		BIT(15)
+#define AT803X_INTR_ENABLE_SPEED_CHANGED	BIT(14)
+#define AT803X_INTR_ENABLE_DUPLEX_CHANGED	BIT(13)
+#define AT803X_INTR_ENABLE_PAGE_RECEIVED	BIT(12)
+#define AT803X_INTR_ENABLE_LINK_FAIL		BIT(11)
+#define AT803X_INTR_ENABLE_LINK_SUCCESS		BIT(10)
+#define AT803X_INTR_ENABLE_WIRESPEED_DOWNGRADE	BIT(5)
+#define AT803X_INTR_ENABLE_POLARITY_CHANGED	BIT(1)
+#define AT803X_INTR_ENABLE_WOL			BIT(0)
 
- arch/arm/configs/exynos_defconfig | 79 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 73 insertions(+), 6 deletions(-)
+These all seem to be external reasons (from the peer).
+
+I did enable debug logs in drivers/net/phy/phy.c
+to trace the state machine, and it is not called
+at all on set link down, so it remains in state
+RUNNING (both in polling and interrupt modes).
+
+IIRC, this used to work on the 2-core board, but breaks
+on the 4-core board. Could this be some kind of race?
+
+Regards.
