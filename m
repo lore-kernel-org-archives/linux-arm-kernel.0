@@ -1,58 +1,90 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 24 Jul 2017 11:29:15 +0100
-Subject: [PATCH v2 0/6] perf: Support for ARM DynamIQ Shared Unit PMU
-Message-ID: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
+Date: Mon, 24 Jul 2017 11:29:17 +0100
+Subject: [PATCH v2 2/6] of: Add helper for mapping device node to logical CPU
+ number
+In-Reply-To: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
+References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1500892161-17634-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the PMU in ARM DynamIQ Shared Unit (DSU).
-The DSU integrates one or more cores with an L3 memory system, control
-logic, and external interfaces to form a multicore cluster. The PMU
-allows counting the various events related to L3, SCU etc, using 32bit
-independent counters along with providing a 64bit cycle counter.
+Add a helper to map a device node to a logical CPU number to avoid
+duplication. Currently this is open coded in different places (e.g
+gic-v3, coresight). The helper tries to map device node to a "possible"
+logical CPU id, which may not be online yet. It is the responsibility
+of the user to make sure that the CPU is online. The helper uses
+of_get_cpu_node() which uses arch specific backends to match the phyiscal
+ids.
 
-The PMU can only be accessed via CPU system registers, which are common
-to the cores connected to the same DSU. The PMU registers follow the
-semantics of the ARMv8 PMU, mostly, with the exception that
-the counters record the cluster wide events.
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/of/base.c         | 26 ++++++++++++++++++++++++++
+ include/linux/of_device.h |  7 +++++++
+ 2 files changed, 33 insertions(+)
 
-Tested on a Fast model with DSU. The driver only supports ARM64 at the
-moment. It can be extended to support ARM32 by providing register
-accessors like we do in arch/arm64/include/arm_dsu_pmu.h.
-
-The firmware should setup appropriate bits in the ACTLR_EL3/EL2 to
-allow EL1 access to the PMU registers.
-
-Series applies on v4.13-rc2 and is also available at:
-
-  git://linux-arm.org/linux-skp.git 4.13/dsu-v2
-
-Changes since V1:
- - Use the new of_device_node_get_cpu() helper for Coresight
- - Rebased to 4.13-rc2
-
-Suzuki K Poulose (6):
-  perf: Export perf_event_update_userpage
-  of: Add helper for mapping device node to logical CPU number
-  coresight: of: Use of_device_node_get_cpu helper
-  irqchip: gic-v3: Use of_device_node_get_cpu helper
-  dt-bindings: Document devicetree binding for ARM DSU PMU
-  perf: ARM DynamIQ Shared Unit PMU support
-
- .../devicetree/bindings/arm/arm-dsu-pmu.txt        |  28 +
- arch/arm64/include/asm/arm_dsu_pmu.h               | 124 +++
- drivers/hwtracing/coresight/of_coresight.c         |  20 +-
- drivers/irqchip/irq-gic-v3.c                       |  30 +-
- drivers/of/base.c                                  |  26 +
- drivers/perf/Kconfig                               |   9 +
- drivers/perf/Makefile                              |   1 +
- drivers/perf/arm_dsu_pmu.c                         | 877 +++++++++++++++++++++
- include/linux/of_device.h                          |   7 +
- kernel/events/core.c                               |   1 +
- 10 files changed, 1082 insertions(+), 41 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
- create mode 100644 arch/arm64/include/asm/arm_dsu_pmu.h
- create mode 100644 drivers/perf/arm_dsu_pmu.c
-
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 686628d..639af23 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -420,6 +420,32 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
+ EXPORT_SYMBOL(of_get_cpu_node);
+ 
+ /**
++ * of_device_node_get_cpu: Get the logical CPU number for a given device_node
++ *
++ * @cpu_node: Pointer to the device_node for CPU.
++ *
++ * Returns the logical CPU number of the given CPU device_node.
++ * Returns >= nr_cpu_ids if CPU is not found.
++ */
++int of_device_node_get_cpu(struct device_node *cpu_node)
++{
++	int cpu, thread;
++	bool found = false;
++	struct device_node *np;
++
++	for_each_possible_cpu(cpu) {
++		np = of_get_cpu_node(cpu, &thread);
++		found = (cpu_node == np);
++		of_node_put(np);
++		if (found)
++			break;
++	}
++
++	return cpu;
++}
++EXPORT_SYMBOL(of_device_node_get_cpu);
++
++/**
+  * __of_device_is_compatible() - Check if the node matches given constraints
+  * @device: pointer to node
+  * @compat: required compatible string, NULL or "" for any match
+diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+index b4ad8b4..00a4ba9 100644
+--- a/include/linux/of_device.h
++++ b/include/linux/of_device.h
+@@ -40,6 +40,8 @@ extern int of_device_request_module(struct device *dev);
+ extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
+ extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
+ 
++extern int of_device_node_get_cpu(struct device_node *np);
++
+ static inline void of_device_node_put(struct device *dev)
+ {
+ 	of_node_put(dev->of_node);
+@@ -110,6 +112,11 @@ static inline int of_dma_configure(struct device *dev, struct device_node *np)
+ }
+ static inline void of_dma_deconfigure(struct device *dev)
+ {}
++
++static inline int of_device_node_get_cpu(struct device_node *np)
++{
++	return nr_cpu_ids;
++}
+ #endif /* CONFIG_OF */
+ 
+ #endif /* _LINUX_OF_DEVICE_H */
 -- 
 2.7.5
