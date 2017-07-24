@@ -1,79 +1,103 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 24 Jul 2017 11:12:48 -0600
-Subject: [PATCH v5 18/19] coresight tmc: Add support for Coresight SoC 600
- TMC
-In-Reply-To: <1500545849-23724-19-git-send-email-suzuki.poulose@arm.com>
+Date: Mon, 24 Jul 2017 11:15:38 -0600
+Subject: [PATCH v5 00/19] coresight: Support for ARM Coresight SoC-600
+In-Reply-To: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
 References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
- <1500545849-23724-19-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkzMSTXaCk5d_J8Ea4wpoqbfnDx0jCrwodxkSc7hrzLEgQ@mail.gmail.com>
+Message-ID: <CANLsYkxGey6K=ybLnzNGj6utvwJXn=c+WXryr0YB6uEqcT-zmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 20 July 2017 at 04:17, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> The coresight SoC 600 supports ETR save-restore which allows us
-> to restore a trace session by retaining the RRP/RWP/STS.Full values
-> when the TMC leaves the Disabled state. However, the TMC doesn't
-> have a scatter-gather unit in built.
+> This series adds support for ARM Coresight SoC-600 IP, which implements
+> Coresight V3 architecture. It also does some clean up of the replicator
+> driver namings used in the driver to prevent confusions to the user.
 >
-> Also, TMCs have different PIDs in different configurations (ETF,
-> ETB & ETR), unlike the previous generation.
+> The SoC-600 comes with an improved TMC which supports new features,
+> including Save-Restore, Software FIFO2 mode (for streaming the trace
+> data over functional I/O like USB/PCI), and other changes AXICTL settings.
 >
-> While the DEVID exposes some of the features/changes in the TMC,
-> it doesn't explicitly advertises the new save-restore feature
-> as described above.
+> This series supports Save-Restore feature of the new ETR by reusing
+> the driver to perform additional setups required in case we are dealing
+> with an IP which supports it. Towards this we keep track of the
+> capabilities of the given TMC ETR. Some of the features are advertised
+> via DEVID register (address width, scatter gather support), while some
+> are not (save-restore). So we attach a static capability mask with the
+> device PID for the unadvertised features and detect the rest at device
+> probe. The driver now detects the AXI address width if advertised via
+> DEVID.
 >
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc.c | 16 ++++++++++++++++
->  drivers/hwtracing/coresight/coresight-tmc.h |  4 ++++
->  2 files changed, 20 insertions(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-> index c4a5dea..e754a3e 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-> @@ -442,6 +442,22 @@ static struct amba_id tmc_ids[] = {
->                 .id     = 0x000bb961,
->                 .mask   = 0x000fffff,
->         },
-> +       {
-> +               /* Coresight SoC 600 TMC-ETR/ETS */
-> +               .id     = 0x000bb9e8,
-> +               .mask   = 0x000fffff,
-> +               .data   = (void *)(unsigned long)CORESIGHT_SOC_600_ETR_CAPS,
+> Tested on Juno (with Coresight SoC 400) and an FPGA based system
+> for SoC 600.
 
-It the casting to unsigned long mandatory?
+Good day,
 
-> +       },
-> +       {
-> +               /* Coresight SoC 600 TMC-ETB */
-> +               .id     = 0x000bb9e9,
-> +               .mask   = 0x000fffff,
-> +       },
-> +       {
-> +               /* Coresight SoC 600 TMC-ETF */
-> +               .id     = 0x000bb9ea,
-> +               .mask   = 0x000fffff,
-> +       },
->         { 0, 0},
->  };
+Other than the two remarks I'm good with this set.  Since going for
+another iteration is time consuming for both of us I can make the
+modifications on my side - just let me know.
+
+Thanks,
+Mathieu
+
 >
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-> index 08f1aea..f24e89a 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.h
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-> @@ -130,6 +130,10 @@ enum tmc_mem_intf_width {
->   */
->  #define TMC_ETR_SAVE_RESTORE           (0x1U << 2)
+> Applies on Mathieu's coresight/next tree
 >
-> +/* Coresight SoC-600 TMC-ETR unadvertised capabilities */
-> +#define CORESIGHT_SOC_600_ETR_CAPS     \
-> +       (TMC_ETR_SAVE_RESTORE | TMC_ETR_AXI_ARCACHE)
-> +
->  /**
->   * struct tmc_drvdata - specifics associated to an TMC component
->   * @base:      memory mapped base address for this component.
+> Changes since V4:
+>  - Rebased to coresight/next to avoid conflicts
+>  - Added a new set of macros for plain register access, no functional
+>    changes. (Patch 7)
+>
+> Changes since V3:
+>  - Rebased to v4.13-rc1
+>  - Rename AxCACHE => AXCACHE, suggested by Mathieu
+>  - Fix checkpatch warnings against space in comments.
+>  - Remove device initialisation message for replicator.
+>  - Add Reviewed-by tags for the DTS changes.
+>
+> Suzuki K Poulose (19):
+>   coresight replicator: Cleanup programmable replicator naming
+>   arm64: juno: dts: Use the new coresight replicator string
+>   arm: qcom-msm8974: dts: Update coresight replicator
+>   arm64: qcom-msm8916: dts: Update coresight replicator
+>   coresight: Extend the PIDR mask to cover relevant bits in PIDR2
+>   coresight: Add support for reading 64bit registers
+>   coresight: Use the new helper for defining registers
+>   coresight tmc: Add helpers for accessing 64bit registers
+>   coresight tmc: Expose DBA and AXICTL
+>   coresight replicator: Expose replicator management registers
+>   coresight tmc: Handle configuration types properly
+>   coresight tmc etr: Add capabilitiy information
+>   coresight tmc: Detect support for scatter gather
+>   coresight tmc etr: Detect address width at runtime
+>   coresight tmc etr: Cleanup AXICTL register handling
+>   coresigh tmc etr: Setup AXI cache encoding for read transfers
+>   coresight tmc: Support for save-restore in ETR
+>   coresight tmc: Add support for Coresight SoC 600 TMC
+>   coresight: Add support for Coresight SoC 600 components
+>
+>  .../devicetree/bindings/arm/coresight.txt          |   4 +-
+>  arch/arm/boot/dts/qcom-msm8974.dtsi                |   2 +-
+>  arch/arm64/boot/dts/arm/juno-base.dtsi             |   2 +-
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi              |   2 +-
+>  drivers/hwtracing/coresight/Kconfig                |  10 +-
+>  drivers/hwtracing/coresight/Makefile               |   2 +-
+>  .../coresight/coresight-dynamic-replicator.c       | 222 +++++++++++++++++++++
+>  drivers/hwtracing/coresight/coresight-etb10.c      |  26 +--
+>  .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  26 +--
+>  drivers/hwtracing/coresight/coresight-etm3x.c      |  24 +--
+>  .../hwtracing/coresight/coresight-etm4x-sysfs.c    |  24 +--
+>  drivers/hwtracing/coresight/coresight-funnel.c     |   9 +-
+>  drivers/hwtracing/coresight/coresight-priv.h       |  37 +++-
+>  .../coresight/coresight-replicator-qcom.c          | 196 ------------------
+>  drivers/hwtracing/coresight/coresight-stm.c        |  38 ++--
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c    |   8 +-
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c    |  37 ++--
+>  drivers/hwtracing/coresight/coresight-tmc.c        | 110 +++++++---
+>  drivers/hwtracing/coresight/coresight-tmc.h        |  86 +++++++-
+>  drivers/hwtracing/coresight/coresight-tpiu.c       |   9 +-
+>  20 files changed, 548 insertions(+), 326 deletions(-)
+>  create mode 100644 drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+>  delete mode 100644 drivers/hwtracing/coresight/coresight-replicator-qcom.c
+>
 > --
 > 2.7.5
 >
