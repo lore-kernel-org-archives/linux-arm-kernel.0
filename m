@@ -1,129 +1,145 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 24 Jul 2017 21:13:12 +0200
-Subject: Problem with PHY state machine when using interrupts
-In-Reply-To: <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
-References: <65b9f1f5-724c-cd03-1c39-59405e773efa@free.fr>
- <849513d9-c981-ec20-5a10-08c663d0aa37@free.fr>
- <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
-Message-ID: <e6a7a5df-b735-6f9c-6a2b-cded86ec6525@free.fr>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 24 Jul 2017 21:21:09 +0200
+Subject: [PATCH 2/7] memory: atmel-ebi: Simplify SMC config code
+In-Reply-To: <11729837.oM7xt5LlYB@ada>
+References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
+ <16727676.CMj9rWYKWZ@ada> <20170302133013.4dee0b4a@bbrezillon>
+ <11729837.oM7xt5LlYB@ada>
+Message-ID: <20170724212109.586e3512@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/2017 18:49, Florian Fainelli wrote:
+Hi Alexander,
 
-> On 07/24/2017 08:01 AM, Mason wrote:
->
->>> When I set the link down via 'ip link set eth0 down'
->>> (as opposed to pulling the Ethernet cable) things don't happen as expected:
->>>
->>> The driver's adjust_link() callback is never called, and doesn't
->>> get a chance make some required changes. And when I set the link
->>> up again, there is no network connectivity.
->>>
->>> I get this problem only if I enable interrupts on my PHY.
->>> If I use polling, things work as expected.
->>>
->>>
->>> When I set the link down, devinet_ioctl() eventually calls
->>> ndo_set_rx_mode() and ndo_stop()
->>>
->>> In ndo_stop() the driver calls
->>> phy_stop(phydev);
->>> which disables interrupts and sets the state to HALTED.
->>>
->>> In phy_state_machine()
->>> the PHY_HALTED case does call the adjust_link() callback:
->>>
->>> 		if (phydev->link) {
->>> 			phydev->link = 0;
->>> 			netif_carrier_off(phydev->attached_dev);
->>> 			phy_adjust_link(phydev);
->>> 			do_suspend = true;
->>> 		}
->>>
->>> But it's not called when I use interrupts...
->>>
->>> Perhaps because there are no interrupts generated?
->>> Or even if there were, they have been turned off by phy_stop?
->>>
->>> Basically, it seems like when I use interrupts,
->>> the phy_state_machine() is not called on link down,
->>> which breaks the MAC driver's expectations.
->>>
->>> Am I barking up the wrong tree?
->>
->> FWIW, the patch below solves my issue.
->> Basically, we reset the MAC in open(), instead of probe().
->>
->> I also had to solve the issue of adjust_link() not being
->> called by calling it explicitly in stop() instead of
->> relying on phy_stop() to do it indirectly.
+Le Mon, 24 Jul 2017 11:12:18 +0200,
+Alexander Dahl <ada@thorsis.com> a ?crit :
+
+> Hello Boris,
 > 
-> Which is of course absolutely not how it is intended to be used.
-> phy_stop() does the following:
+> while testing v4.13-rc2 on an at91sam9g20 baed platform I'm coming back 
+> to this topic. Meanwhile the whole new SMC and NAND below EBI stuff is 
+> in mainline, this TDF bug however is still in there. See below (all 
+> quoted code parts from v4.13-rc2):
 > 
-> - if the PHY was already HALTED do nothing and exit
-> - if it was not and an interrupt is valid for this PHY:  disable and
-> clear these interrupts
-> - set state to PHY_HALTED
+> Am Donnerstag, 2. M?rz 2017, 13:30:13 schrieb Boris Brezillon:
+> > Alexander Dahl <ada@thorsis.com> wrote:  
+> > > #define ATMEL_SMC_MODE_TDF(x)           (((x) - 1) << 16)  
 > 
-> somehow an interrupt should be generated from doing this such that
-> phy_change(), invoked from phy_interrupt() should have a chance to run
-> and make the PHY state machine transition properly to PHY_HALTED.
-
-I'm totally confused. Are you saying that phy_stop itself
-should trigger an interrupt, or that the process of setting
-the link down should generate an interrupt *before* we reach
-phy_stop?
-
-I'm also perplex over this synchronous IRQ business.
-Should I be looking for a way to trigger an IRQ in
-software in the Atheros PHY?
-
-Before I forget: there is also an issue when using the PHY
-in polling mode. The ndo_stop callback runs through phy_stop
-and phy_disconnect too fast for the adjust_link() callback
-to be called. My patch fixed that too, by calling
-nb8800_link_reconfigure() explicitly.
-
-
-> So from there can you check a few things:
+> [?]
 > 
-> - is such an interrupt actually generated?
-> - if you turn on dynamic debug prints for drivers/net/phy/phy.c where do
-> we leave the PHY state machine and what state is it in when you call
-> ifconfig up again?
+> > > The hardware manual (AT91SAM9G20) says values from 0 to 15 (4bit,
+> > > 0x0 to 0xF) are possible and I guess the goal is to set it to a
+> > > value corresponding to the value in ns from the dts or to 15 if
+> > > it's greater (or -EINVAL in the new version).
+> > > 
+> > > However how can one set it to zero? Put in zero to the div you get
+> > > zero for ncycles or val and that goes as x into (((x) - 1) << 16)
+> > > which results in 0xF ending up as TDF_CYCLES in the mode register,
+> > > right?  
+> > 
+> > Indeed.
+> >   
+> > > I can of course set a slightly greater value, which ends up in a
+> > > calculated register value of zero, but that seems more a hack to me
+> > > and is not obvious if I just look at the DTS.  
+> > 
+> > No, we should fix the bug.
+> >   
+> > > If I'm right this might be topic of another bugfix patch, or should
+> > > it be done right in a v2 of this one?  
+> > 
+> > It should be done right in a v2. Something like:
+> > 
+> > 		if (ncycles < ATMEL_SMC_MODE_TDF_MIN)
+> > 			ncycles = ATMEL_SMC_MODE_TDF_MIN;
+> > 
+> > with
+> > 
+> > #define ATMEL_SMC_MODE_TDF_MIN 1  
+> 
+> I checked the SAMA5D3x datasheet today and it has the same mode register 
+> layout regarding the TDF parts. So allowed are register values from 0 to 
+> 15 ending up in 0 to 15 clock cycles of Data Float Time.
+> 
+> The code in include/linux/mfd/syscon/atmel-smc.h is this:
+> 
+> #define ATMEL_SMC_MODE_TDF_MASK			GENMASK(19, 16)
+> #define ATMEL_SMC_MODE_TDF(x)			(((x) - 1) << 16)
+> #define ATMEL_SMC_MODE_TDF_MAX			16
+> #define ATMEL_SMC_MODE_TDF_MIN			1
+> #define ATMEL_SMC_MODE_TDFMODE_OPTIMIZED	BIT(20)
+> 
+> This ATMEL_SMC_MODE_TDF() is used in drivers/memory/atmel-ebi.c to setup 
+> the external memory interface with timings from dts. A line there inside 
+> an ebi node may look like this (see for example 
+> arch/arm/boot/dts/sama5d3xcm.dtsi):
+> 
+> atmel,smc-tdf-ns = <0>;
+> 
+> The value is expected in nanoseconds and I would expect a direct mapping 
+> from 0ns to a register value of 0. This is not the case in code 
+> (drivers/memory/atmel-ebi.c):
+> 
+> 		if (ncycles > ATMEL_SMC_MODE_TDF_MAX ||
+> 		    ncycles < ATMEL_SMC_MODE_TDF_MIN) {
+> 			ret = -EINVAL;
+> 			goto out;
+> 		}
+> 
+> ATMEL_SMC_MODE_TDF_MIN is 1, so a possible 0 value from dts is not 
+> allowed in here and atmel_ebi_xslate_smc_timings() fails. In fact to get 
+> a register value of 0 for 0 TDF clock cycles I would have to set e.g. 
+> 8ns in dts. So this didn't make it in some v2 and is still broken.
 
-The only interrupts I've ever seen the PHY generate are
-on plugging/unplugging the Ethernet cable.
+Yep, sorry about that.
 
-Looking at the driver and datasheet...
-http://elixir.free-electrons.com/linux/v4.13-rc2/source/drivers/net/phy/at803x.c#L312
-		value |= AT803X_INTR_ENABLE_AUTONEG_ERR;
-		value |= AT803X_INTR_ENABLE_SPEED_CHANGED;
-		value |= AT803X_INTR_ENABLE_DUPLEX_CHANGED;
-		value |= AT803X_INTR_ENABLE_LINK_FAIL;
-		value |= AT803X_INTR_ENABLE_LINK_SUCCESS;
+> 
+> I could fix this and provide a patch, but I'm not sure about the second 
+> place where ATMEL_SMC_MODE_TDF() is used which is the NAND driver in 
+> drivers/mtd/nand/atmel/nand-controller.c. I'm not familiar enough with 
+> NAND to judge if this "min = 1, max = 16, decrease by 1 for applying to 
+> register" approach is needed there. I would say no, because it also is a 
+> counterintuitive offset, but I would prefer a explanation why the code 
+> is like this, before touching and breaking anything. ;-)
 
-And the interrupts reasons supported by the PHY are:
-#define AT803X_INTR_ENABLE_AUTONEG_ERR		BIT(15)
-#define AT803X_INTR_ENABLE_SPEED_CHANGED	BIT(14)
-#define AT803X_INTR_ENABLE_DUPLEX_CHANGED	BIT(13)
-#define AT803X_INTR_ENABLE_PAGE_RECEIVED	BIT(12)
-#define AT803X_INTR_ENABLE_LINK_FAIL		BIT(11)
-#define AT803X_INTR_ENABLE_LINK_SUCCESS		BIT(10)
-#define AT803X_INTR_ENABLE_WIRESPEED_DOWNGRADE	BIT(5)
-#define AT803X_INTR_ENABLE_POLARITY_CHANGED	BIT(1)
-#define AT803X_INTR_ENABLE_WOL			BIT(0)
+There is a good reason for this "- 1": the doc says the exact number of
+tDF cycles is TDF_CYCLES + 1. When you are expressing timings in ns it does
+matter, because you don't want to wait more than necessary. Say the master
+clk period is X ns and you want a tDF of X ns. If you divide tDF_ns by the
+clk period you get one, and you only want to wait 1 cycle, not two.
 
-These all seem to be external reasons (from the peer).
+The NAND driver seems to do the right thing already [1].
 
-I did enable debug logs in drivers/net/phy/phy.c
-to trace the state machine, and it is not called
-at all on set link down, so it remains in state
-RUNNING (both in polling and interrupt modes).
+Below is my suggestion below to fix the problem. Did you have something else
+in mind? In any case, can you send a patch to fix it (either using my
+suggestion or something else if you prefer).
 
-IIRC, this used to work on the 2-core board, but breaks
-on the 4-core board. Could this be some kind of race?
+Regards,
 
-Regards.
+Boris
+
+
+[1]http://elixir.free-electrons.com/linux/v4.13-rc1/source/drivers/mtd/nand/atmel/nand-controller.c#L1309
+
+--->8---
+diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
+index 99e644cda4d1..d94604590d02 100644
+--- a/drivers/memory/atmel-ebi.c
++++ b/drivers/memory/atmel-ebi.c
+@@ -120,12 +120,14 @@ static int atmel_ebi_xslate_smc_timings(struct atmel_ebi_dev *ebid,
+        if (!ret) {
+                required = true;
+                ncycles = DIV_ROUND_UP(val, clk_period_ns);
+-               if (ncycles > ATMEL_SMC_MODE_TDF_MAX ||
+-                   ncycles < ATMEL_SMC_MODE_TDF_MIN) {
++               if (ncycles > ATMEL_SMC_MODE_TDF_MAX) {
+                        ret = -EINVAL;
+                        goto out;
+                }
+ 
++               if (ncycles < ATMEL_SMC_MODE_TDF_MIN)
++                       ncycles = ATMEL_SMC_MODE_TDF_MIN;
++
+                smcconf->mode |= ATMEL_SMC_MODE_TDF(ncycles);
+        }
+ 
