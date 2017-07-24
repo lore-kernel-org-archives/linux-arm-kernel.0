@@ -1,70 +1,88 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 24 Jul 2017 17:19:59 +0200
-Subject: [PATCH 2/2] ARM64: dts: marvell: add NAND support on the CP110
- master
-In-Reply-To: <20170719153126.16905-3-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 19 Jul 2017 17:31:26 +0200")
-References: <20170719153126.16905-1-gregory.clement@free-electrons.com>
- <20170719153126.16905-3-gregory.clement@free-electrons.com>
-Message-ID: <878tjd50bk.fsf@free-electrons.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Mon, 24 Jul 2017 23:04:18 +0800
+Subject: [PATCH 2/3] dt-bindings: iio: adc: stm32: add optional
+ min-sample-time
+In-Reply-To: <81cabf83-689c-277a-5cf9-510df5cc9045@st.com>
+References: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
+ <1500381332-17086-3-git-send-email-fabrice.gasnier@st.com>
+ <20170723115337.1e34e173@kernel.org>
+ <81cabf83-689c-277a-5cf9-510df5cc9045@st.com>
+Message-ID: <20170724230418.000078b1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mer., juil. 19 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Mon, 24 Jul 2017 09:55:37 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> The NAND controller used in A7K/A8K is present on the CP110 master
-> part. It is compatible with the pxa-nand driver.
->
-> Unlike most of the controller on the CP110 this one is only present on
-> the master for the Armada 8K SoCs.
+> On 07/23/2017 12:53 PM, Jonathan Cameron wrote:
+> > On Tue, 18 Jul 2017 14:35:31 +0200
+> > Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+> >   
+> >> STM32 ADC allows each channel to be sampled with a different sampling
+> >> time. There's an application note that deals with this: 'How to get
+> >> the best ADC accuracy in STM32...' It basically depends on analog input
+> >> signal electrical properties (depends on board).
+> >>
+> >> Add optional 'min-sample-time' property so this can be tuned in dt.
+> >>
+> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>  
+> > 
+> > This isn't yet very standard, so I think it needs a manufacturer
+> > prefix, e.g. st,min-sample-time.  Also convention is I believe
+> > to include the units as part of the naming where appropriate.
+> > 
+> > Hence st,min-sample-time-nsecs  
+> 
+> Hi Jonathan,
+> 
+> I originally used st,... form, when writing this patch, until I found
+> out there's 'min-sample-time' in vf610 adc dt-bindings:
+> - Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> It looks like to me very similar.
+> 
+> I also agree it misses '-nsecs' units. Sure, I can use your suggestion
+> above...
+> 
+> Please can you just confirm if I should use same property as vf610 adc,
+> or 'st,min-sample-time-nsecs' ?
+st,min-sample-time-nsecs.
 
-Actually this is wrong. The controller is present on both CP, but
-because of the muxing only the one present on the CPS is available on
-the Armada 8K.
+We might well add a generic option in future, but the burden of
+supporting this old one will be trivial anyway so not a problem.
 
-I will send a new version fixing it.
-
-Gregory
-
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 726528ce54e9..9be4a442ded5 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -240,6 +240,20 @@
->  				status = "disabled";
->  			};
->  
-> +			cpm_nand: nand at 720000 {
-> +				/*
-> +				 * For A7K/A8K this controller is only
-> +				 * present on the CPM and not on the CPS
-> +				 */
-> +				compatible = "marvell,armada370-nand";
-> +				reg = <0x720000 0x54>;
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&cpm_clk 1 2>;
-> +				status = "disabled";
-> +			};
-> +
->  			cpm_trng: trng at 760000 {
->  				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
->  				reg = <0x760000 0x7d>;
-> -- 
-> 2.13.2
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jonathan
+> 
+> Thanks for reviewing,
+> Best regards,
+> Fabrice
+> 
+> > 
+> > Otherwise, seems good to me.
+> > 
+> > Jonathan  
+> >> ---
+> >>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 5 +++++
+> >>  1 file changed, 5 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> >> index 8310073..9cd964b 100644
+> >> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> >> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> >> @@ -74,6 +74,11 @@ Optional properties:
+> >>    * can be 6, 8, 10 or 12 on stm32f4
+> >>    * can be 8, 10, 12, 14 or 16 on stm32h7
+> >>    Default is maximum resolution if unset.
+> >> +- min-sample-time: Minimum sampling time in nanoseconds.
+> >> +  Depending on hardware (board) e.g. high/low analog input source impedance,
+> >> +  fine tune of ADC sampling time may be recommended.
+> >> +  This can be either one value or an array that matches 'st,adc-channels' list,
+> >> +  to set sample time resp. for all channels, or independently for each channel.
+> >>  
+> >>  Example:
+> >>  	adc: adc at 40012000 {  
+> >   
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
