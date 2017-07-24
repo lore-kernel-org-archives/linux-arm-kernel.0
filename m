@@ -1,51 +1,142 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 24 Jul 2017 11:28:14 +0100
-Subject: [PATCH resend 12/18] crypto: arm64/chacha20 - take may_use_simd()
- into account
+Date: Mon, 24 Jul 2017 11:28:15 +0100
+Subject: [PATCH resend 13/18] crypto: arm64/aes-bs - implement non-SIMD
+ fallback for AES-CTR
 In-Reply-To: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
 References: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170724102820.16534-13-ard.biesheuvel@linaro.org>
+Message-ID: <20170724102820.16534-14-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To accommodate systems that disallow the use of kernel mode NEON in
-some circumstances, take the return value of may_use_simd into
-account when deciding whether to invoke the C fallback routine.
+Of the various chaining modes implemented by the bit sliced AES driver,
+only CTR is exposed as a synchronous cipher, and requires a fallback in
+order to remain usable once we update the kernel mode NEON handling logic
+to disallow nested use. So wire up the existing CTR fallback C code.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/chacha20-neon-glue.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/crypto/Kconfig           |  1 +
+ arch/arm64/crypto/aes-neonbs-glue.c | 48 ++++++++++++++++++--
+ 2 files changed, 44 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/crypto/chacha20-neon-glue.c b/arch/arm64/crypto/chacha20-neon-glue.c
-index a7cd575ea223..cbdb75d15cd0 100644
---- a/arch/arm64/crypto/chacha20-neon-glue.c
-+++ b/arch/arm64/crypto/chacha20-neon-glue.c
+diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+index a068dcbe2518..f9e264b83366 100644
+--- a/arch/arm64/crypto/Kconfig
++++ b/arch/arm64/crypto/Kconfig
+@@ -89,6 +89,7 @@ config CRYPTO_AES_ARM64_BS
+ 	depends on KERNEL_MODE_NEON
+ 	select CRYPTO_BLKCIPHER
+ 	select CRYPTO_AES_ARM64_NEON_BLK
++	select CRYPTO_AES_ARM64
+ 	select CRYPTO_SIMD
+ 
+ endif
+diff --git a/arch/arm64/crypto/aes-neonbs-glue.c b/arch/arm64/crypto/aes-neonbs-glue.c
+index 9001aec16007..c55d68ccb89f 100644
+--- a/arch/arm64/crypto/aes-neonbs-glue.c
++++ b/arch/arm64/crypto/aes-neonbs-glue.c
 @@ -1,7 +1,7 @@
  /*
-  * ChaCha20 256-bit cipher algorithm, RFC7539, arm64 NEON functions
+  * Bit sliced AES using NEON instructions
   *
-- * Copyright (C) 2016 Linaro, Ltd. <ard.biesheuvel@linaro.org>
-+ * Copyright (C) 2016 - 2017 Linaro, Ltd. <ard.biesheuvel@linaro.org>
+- * Copyright (C) 2016 Linaro Ltd <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2016 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
   *
   * This program is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License version 2 as
-@@ -26,6 +26,7 @@
+@@ -9,12 +9,15 @@
+  */
  
- #include <asm/hwcap.h>
  #include <asm/neon.h>
 +#include <asm/simd.h>
+ #include <crypto/aes.h>
+ #include <crypto/internal/simd.h>
+ #include <crypto/internal/skcipher.h>
+ #include <crypto/xts.h>
+ #include <linux/module.h>
  
- asmlinkage void chacha20_block_xor_neon(u32 *state, u8 *dst, const u8 *src);
- asmlinkage void chacha20_4block_xor_neon(u32 *state, u8 *dst, const u8 *src);
-@@ -64,7 +65,7 @@ static int chacha20_neon(struct skcipher_request *req)
- 	u32 state[16];
- 	int err;
++#include "aes-ctr-fallback.h"
++
+ MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+ MODULE_LICENSE("GPL v2");
  
--	if (req->cryptlen <= CHACHA20_BLOCK_SIZE)
-+	if (!may_use_simd() || req->cryptlen <= CHACHA20_BLOCK_SIZE)
- 		return crypto_chacha20_crypt(req);
+@@ -58,6 +61,11 @@ struct aesbs_cbc_ctx {
+ 	u32			enc[AES_MAX_KEYLENGTH_U32];
+ };
  
- 	err = skcipher_walk_virt(&walk, req, true);
++struct aesbs_ctr_ctx {
++	struct aesbs_ctx	key;		/* must be first member */
++	struct crypto_aes_ctx	fallback;
++};
++
+ struct aesbs_xts_ctx {
+ 	struct aesbs_ctx	key;
+ 	u32			twkey[AES_MAX_KEYLENGTH_U32];
+@@ -196,6 +204,25 @@ static int cbc_decrypt(struct skcipher_request *req)
+ 	return err;
+ }
+ 
++static int aesbs_ctr_setkey_sync(struct crypto_skcipher *tfm, const u8 *in_key,
++				 unsigned int key_len)
++{
++	struct aesbs_ctr_ctx *ctx = crypto_skcipher_ctx(tfm);
++	int err;
++
++	err = crypto_aes_expand_key(&ctx->fallback, in_key, key_len);
++	if (err)
++		return err;
++
++	ctx->key.rounds = 6 + key_len / 4;
++
++	kernel_neon_begin();
++	aesbs_convert_key(ctx->key.rk, ctx->fallback.key_enc, ctx->key.rounds);
++	kernel_neon_end();
++
++	return 0;
++}
++
+ static int ctr_encrypt(struct skcipher_request *req)
+ {
+ 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+@@ -259,6 +286,17 @@ static int aesbs_xts_setkey(struct crypto_skcipher *tfm, const u8 *in_key,
+ 	return aesbs_setkey(tfm, in_key, key_len);
+ }
+ 
++static int ctr_encrypt_sync(struct skcipher_request *req)
++{
++	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
++	struct aesbs_ctr_ctx *ctx = crypto_skcipher_ctx(tfm);
++
++	if (!may_use_simd())
++		return aes_ctr_encrypt_fallback(&ctx->fallback, req);
++
++	return ctr_encrypt(req);
++}
++
+ static int __xts_crypt(struct skcipher_request *req,
+ 		       void (*fn)(u8 out[], u8 const in[], u8 const rk[],
+ 				  int rounds, int blocks, u8 iv[]))
+@@ -355,7 +393,7 @@ static struct skcipher_alg aes_algs[] = { {
+ 	.base.cra_driver_name	= "ctr-aes-neonbs",
+ 	.base.cra_priority	= 250 - 1,
+ 	.base.cra_blocksize	= 1,
+-	.base.cra_ctxsize	= sizeof(struct aesbs_ctx),
++	.base.cra_ctxsize	= sizeof(struct aesbs_ctr_ctx),
+ 	.base.cra_module	= THIS_MODULE,
+ 
+ 	.min_keysize		= AES_MIN_KEY_SIZE,
+@@ -363,9 +401,9 @@ static struct skcipher_alg aes_algs[] = { {
+ 	.chunksize		= AES_BLOCK_SIZE,
+ 	.walksize		= 8 * AES_BLOCK_SIZE,
+ 	.ivsize			= AES_BLOCK_SIZE,
+-	.setkey			= aesbs_setkey,
+-	.encrypt		= ctr_encrypt,
+-	.decrypt		= ctr_encrypt,
++	.setkey			= aesbs_ctr_setkey_sync,
++	.encrypt		= ctr_encrypt_sync,
++	.decrypt		= ctr_encrypt_sync,
+ }, {
+ 	.base.cra_name		= "__xts(aes)",
+ 	.base.cra_driver_name	= "__xts-aes-neonbs",
 -- 
 2.9.3
