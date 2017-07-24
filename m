@@ -1,59 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Jul 2017 13:29:43 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.13
-Message-ID: <20170724122943.GE29919@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Jul 2017 13:48:37 +0100
+Subject: [PATCH 00/16] arm/arm64: Workaround misprogrammed CNTFRQ
+In-Reply-To: <20170724121958.GC29919@arm.com>
+References: <20170721171542.27639-1-marc.zyngier@arm.com>
+ <20170724121958.GC29919@arm.com>
+Message-ID: <c3c34b9b-3872-bbb1-28cf-07aa6c739e94@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On 24/07/17 13:19, Will Deacon wrote:
+> On Fri, Jul 21, 2017 at 06:15:26PM +0100, Marc Zyngier wrote:
+>> It is an unfortunate situation that CNTFRQ{,_EL0} is often
+>> misprogrammed from the firmware side, leaving it up to the kernel to
+>> work around it. This is usually done by providing an alternative
+>> frequency in the Device Tree.
+>>
+>> Unfortunately, CNTFRQ is accessible from EL0, giving userspace the
+>> wrong frequency, and potentially a different frequency per CPU, which
+>> is definitely not what you want. A possible workaround is to trap this
+>> into the kernel and to emulate it (together with the VDSO being
+>> disabled), and this is what this series is achieving.
+> 
+> Which userspace is actually affected by a broken CNTFRQ register? I suspect
+> most users will be more upset at losing their (perfectly functional) vDSO
+> acceleration than they are about having a broken CNTFRQ value that is hardly
+> ever used, especially since this affects quite a few systems.
 
-Please can you pull these arm-smmu/io-pgtable fixes for 4.13? The two main
-things are:
+OpenMPI is one of the things I'm aware of (we broke it when implementing
+the first set of timer workarounds), and from trawling the Debian code
+search, at least HHVM is another candidate. How this will affect them is
+anybody's guess.
 
-  1. Ensure that we reject out-of-range map/unmap requests in the io-pgtable
-     code (rather than operate on silently truncated addresses).
-
-  2. Serialise TLB sync operations on arm-smmu, otherwise we can limit
-     forward progress and cause timeouts in the driver (as observed by Ray).
-     This undoes a previous micro-optimisation that is no longer sensible
-     with the pgtable locsk removed, but which is required for correctness
-     on the MTK IOMMU, so the MTK driver is updated to keep things working
-     there.
-
-Thanks,
-
-Will
-
---->8
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
-
-for you to fetch changes up to 76557391433c77d330cede1a531b358d2f90df66:
-
-  iommu/io-pgtable: Sanitise map/unmap addresses (2017-07-20 10:30:28 +0100)
-
-----------------------------------------------------------------
-Robin Murphy (3):
-      iommu/mtk: Avoid redundant TLB syncs locally
-      Revert "iommu/io-pgtable: Avoid redundant TLB syncs"
-      iommu/io-pgtable: Sanitise map/unmap addresses
-
-Vivek Gautam (1):
-      iommu/arm-smmu: Fix the error path in arm_smmu_add_device
-
-Will Deacon (1):
-      iommu/arm-smmu: Reintroduce locking around TLB sync operations
-
- drivers/iommu/arm-smmu.c           | 18 +++++++++++++-----
- drivers/iommu/io-pgtable-arm-v7s.c |  6 ++++++
- drivers/iommu/io-pgtable-arm.c     |  7 +++++++
- drivers/iommu/io-pgtable.h         |  9 +--------
- drivers/iommu/mtk_iommu.c          |  6 ++++++
- drivers/iommu/mtk_iommu.h          |  1 +
- 6 files changed, 34 insertions(+), 13 deletions(-)
+	M.
+-- 
+Jazz is not dead. It just smells funny...
