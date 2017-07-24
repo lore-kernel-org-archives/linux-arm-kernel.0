@@ -1,68 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Jul 2017 14:35:08 +0100
-Subject: [PATCH 00/16] arm/arm64: Workaround misprogrammed CNTFRQ
-In-Reply-To: <20170724131252.GG29919@arm.com>
-References: <20170721171542.27639-1-marc.zyngier@arm.com>
- <20170724121958.GC29919@arm.com>
- <c3c34b9b-3872-bbb1-28cf-07aa6c739e94@arm.com>
- <20170724131252.GG29919@arm.com>
-Message-ID: <780a5b17-e25c-188e-70cc-e0ffab5f3da9@arm.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 24 Jul 2017 15:48:33 +0200
+Subject: [PATCH net-next 03/18] net: mvpp2: set the SMI PHY address when
+ connecting to the PHY
+In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170724134848.19330-4-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/17 14:12, Will Deacon wrote:
-> On Mon, Jul 24, 2017 at 01:48:37PM +0100, Marc Zyngier wrote:
->> On 24/07/17 13:19, Will Deacon wrote:
->>> On Fri, Jul 21, 2017 at 06:15:26PM +0100, Marc Zyngier wrote:
->>>> It is an unfortunate situation that CNTFRQ{,_EL0} is often
->>>> misprogrammed from the firmware side, leaving it up to the kernel to
->>>> work around it. This is usually done by providing an alternative
->>>> frequency in the Device Tree.
->>>>
->>>> Unfortunately, CNTFRQ is accessible from EL0, giving userspace the
->>>> wrong frequency, and potentially a different frequency per CPU, which
->>>> is definitely not what you want. A possible workaround is to trap this
->>>> into the kernel and to emulate it (together with the VDSO being
->>>> disabled), and this is what this series is achieving.
->>>
->>> Which userspace is actually affected by a broken CNTFRQ register? I suspect
->>> most users will be more upset at losing their (perfectly functional) vDSO
->>> acceleration than they are about having a broken CNTFRQ value that is hardly
->>> ever used, especially since this affects quite a few systems.
->>
->> OpenMPI is one of the things I'm aware of (we broke it when implementing
->> the first set of timer workarounds), and from trawling the Debian code
->> search, at least HHVM is another candidate. How this will affect them is
->> anybody's guess.
-> 
-> The latest mcrouter sources pulled into HHVM don't use cntfrq, but you're
-> right about OpenMPI. However, these things are using the counter directly
-> as a performance optimisation: the moment we start trapping then they've
-> lost. I doubt it's much better than giving the wrong data for the
-> frequency (i.e. they're just as broken in both cases).
-> 
-> So, if they want to run on these systems, their best bet is to use the
-> vDSO-accelerated clock_gettime implementation. Yes, there's a dispatch cost
-> compared to an inline asm, but it will beat the pants off a trap to the
-> kernel. The problem is that this patch series prevents them from doing that
-> and just means they're screwed whatever they do. We can point at the broken
-> firmware, but it doesn't feel to me like this workaround is really helping
-> anybody :/.
+When connecting to the PHY, explicitly set the SMI PHY address in the
+controller registers to configure a given port to be connected to the
+selected PHY.
 
-Fair enough.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-It still remains that our trapping story is inconsistent. When we
-workaround timer issues, we do disable the VDSO and trap both cntvct and
-cntfrq. These will trap to EL1, and we'll deliver a SIGILL to userspace,
-while 64bit userspace will just work. Is that something we want to address?
-
-With a 32bit kernel, we don't trap anything yet (because we don't work
-around any of the errata existing on 64bit systems), so I guess this
-could be postponed until we actually make these workarounds available on
-32bit (for KVM guests).
-
-Thanks,
-
-	M.
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index 1e592abc9067..6ffff929b22a 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -359,6 +359,8 @@
+ #define MVPP22_SMI_MISC_CFG_REG			0x1204
+ #define     MVPP22_SMI_POLLING_EN		BIT(10)
+ 
++#define MVPP22_SMI_PHY_ADDR(port)		(0x120c + (port) * 0x4)
++
+ #define MVPP22_GMAC_BASE(port)		(0x7000 + (port) * 0x1000 + 0xe00)
+ 
+ #define MVPP2_CAUSE_TXQ_SENT_DESC_ALL_MASK	0xff
+@@ -5939,7 +5941,9 @@ static void mvpp21_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
+ 
+ static int mvpp2_phy_connect(struct mvpp2_port *port)
+ {
++	struct mvpp2 *priv = port->priv;
+ 	struct phy_device *phy_dev;
++	u32 phy_addr;
+ 
+ 	phy_dev = of_phy_connect(port->dev, port->phy_node, mvpp2_link_event, 0,
+ 				 port->phy_interface);
+@@ -5954,6 +5958,16 @@ static int mvpp2_phy_connect(struct mvpp2_port *port)
+ 	port->duplex  = 0;
+ 	port->speed   = 0;
+ 
++	if (priv->hw_version != MVPP22)
++		return 0;
++
++	/* Set the SMI PHY address */
++	if (of_property_read_u32(port->phy_node, "reg", &phy_addr)) {
++		netdev_err(port->dev, "cannot find the PHY address\n");
++		return -EINVAL;
++	}
++
++	writel(phy_addr, priv->iface_base + MVPP22_SMI_PHY_ADDR(port->gop_id));
+ 	return 0;
+ }
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.13.3
