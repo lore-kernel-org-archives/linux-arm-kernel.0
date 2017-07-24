@@ -1,7 +1,9 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 24 Jul 2017 21:08:52 +0200
-Subject: [GIT PULL 1/5] ARM: s3c24xx: Early stuff for v4.14
-Message-ID: <20170724190856.19055-1-krzk@kernel.org>
+Date: Mon, 24 Jul 2017 21:08:54 +0200
+Subject: [GIT PULL 3/5] arm64: dts: exynos: Updates for v4.14
+In-Reply-To: <20170724190856.19055-1-krzk@kernel.org>
+References: <20170724190856.19055-1-krzk@kernel.org>
+Message-ID: <20170724190856.19055-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,32 +14,31 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.14
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.14
 
-for you to fetch changes up to f991ce429a420dbb42b3e4b5a47490c84390d7e1:
+for you to fetch changes up to 10acba1293db5c28d1b81d673e75c2415cb96f62:
 
-  ARM: s3c24xx: make H1940BT depend on RFKILL (2017-07-20 20:26:24 +0200)
-
-----------------------------------------------------------------
-Samsung mach/soc changes for v4.14
-
-Only for S3C24xx platform:
-1. Cleanup from non-existent CONFIG entries.
-2. Fix unmet NET dependency when H1940 bluetooth chip is selected..
+  arm64: dts: exynos: Remove num-slots from exynos platforms (2017-07-18 07:16:14 +0200)
 
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: s3c24xx: make H1940BT depend on RFKILL
+Samsung DTS ARM64 changes for v4.14
 
-Krzysztof Kozlowski (3):
-      ARM: s3c24xx: Remove non-existing CONFIG_CPU_S3C2413
-      ARM: s3c24xx: Remove non-existing SND_SOC_SMDK2443_WM9710
-      ARM: s3c24xx: Do not confuse local define with Kconfig
+1. Remove deprecated and unneeded properties from Exynos boards.
+2. Implement proper (working) support for USB On-The-Go on Exynos5433
+   TM2/TM2E boards.
 
- arch/arm/mach-s3c24xx/Kconfig                   |  2 +-
- arch/arm/mach-s3c24xx/common.c                  |  2 +-
- arch/arm/mach-s3c24xx/include/mach/regs-clock.h |  4 ++--
- arch/arm/mach-s3c24xx/mach-smdk2443.c           |  8 --------
- arch/arm/mach-s3c24xx/sleep.S                   | 11 ++++++-----
- arch/arm/plat-samsung/include/plat/map-s3c.h    |  2 +-
- 6 files changed, 11 insertions(+), 18 deletions(-)
+----------------------------------------------------------------
+Dongwoo Lee (2):
+      arm64: dts: exynos: Fix wrong label for USB 3.0 controller node
+      arm64: dts: exynos: Add extcon property for TM2 and TM2E
+
+Hoegeun Kwon (1):
+      arm64: dts: exynos: Remove the OF graph from DSI node
+
+Shawn Lin (1):
+      arm64: dts: exynos: Remove num-slots from exynos platforms
+
+ arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 19 ++-----------------
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi            |  4 ++--
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts       |  2 --
+ 3 files changed, 4 insertions(+), 21 deletions(-)
