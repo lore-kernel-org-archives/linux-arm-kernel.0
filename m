@@ -1,108 +1,149 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 24 Jul 2017 09:43:18 +0200
-Subject: [PATCH 1/3] iio: adc: stm32: fix common clock rate
-In-Reply-To: <20170723115148.07db4374@kernel.org>
-References: <1500381332-17086-1-git-send-email-fabrice.gasnier@st.com>
- <1500381332-17086-2-git-send-email-fabrice.gasnier@st.com>
- <20170723115148.07db4374@kernel.org>
-Message-ID: <0385445a-8be9-6e67-b19d-b72466c23e34@st.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 24 Jul 2017 15:48:54 +0800
+Subject: [PATCH 3/4] arm: sunxi: Add AXP20X_ADC
+In-Reply-To: <be7d4295-8759-f57e-a600-358c7344251c@free-electrons.com>
+References: <20170721162005.18892-1-maxime.ripard@free-electrons.com>
+ <20170721162005.18892-3-maxime.ripard@free-electrons.com>
+ <CAGb2v64tx6M1CJSKr_wgD4LM+-ER+Yqpj-hUftptj41PVhbBBA@mail.gmail.com>
+ <be7d4295-8759-f57e-a600-358c7344251c@free-electrons.com>
+Message-ID: <CAGb2v64zOTtRJkej2j4vMrN42GibzGEe7YfQGbNKzoDST8ZTzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2017 12:51 PM, Jonathan Cameron wrote:
-> On Tue, 18 Jul 2017 14:35:30 +0200
-> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> 
->> Fixes commit 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
+On Mon, Jul 24, 2017 at 2:43 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> Hi all,
+>
+> I've been Cc'ed by Chen-Yu I think, thanks for the heads-up.
+>
+> On 22/07/2017 04:19, Chen-Yu Tsai wrote:
+>> On Sat, Jul 22, 2017 at 12:20 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>> The APX20X_POWER option, that is a dependency of the USB controllers
+>>> depends on IIO and AXP20X_ADC. Add it so that we can get a working USB
+>>> back.
 >>
->> Fix common clock rate used then by stm32-adc sub-devices: take common
->> prescaler into account.
->> Fix ADC max clock rate on STM32H7 (fADC from datasheet)
+>> The statement is only half true. AXP20X_POWER can fall back to reading
+>> the ADC registers directly if AXP20X_ADC is not enabled.
+>
+> For any PMIC using "x-powers,axp202-usb-power-supply" compatible, that
+> is true, the others imperatively use IIO channels as there was no prior
+> support to this driver.
+>
+> The switch between reading IIO channels or directly reading the
+> registers is done at probe by checking IS_ENABLED(AXP20X_ADC)
+> (IS_ENABLED returns 1 when Kconfig is set to y or m). The goal was to
+> not break the existing system when users would update to a newer kernel
+> (as they may not have selected AXP20X_ADC).
+>
+> Since there is no hard dependency between AXP20X_ADC and AXP20X_POWER, I
+> think we may have a problem when AXP20X_ADC is built as a module. Then
+> AXP20X_POWER probing is deferred since it waits for the IIO channels.
+> Also, if you do a modprobe on AXP20X_POWER it'll not probe AXP20X_ADC
+> because the dependency is not declared. I don't know if there is a way
+> to declare this dependency programatically only when AXP20X_ADC is built
+> as a module?
+
+There's request_module(), which actually asks the kernel to load a
+module, or MODULE_SOFTDEP, which looks like an additional tag for
+modprobe. The former gives you more control. The latter doesn't seem
+to be used a lot.
+
+>
+>> Is there a plan
+>> to remove this feature?
 >>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Patch itself is fine, but the description could do with
-> information on what the result of this being wrong is.
+>
+> As said above (and in the commit log[1]), I added the condition for
+> backward compatibility so anyone could still use AXP20X_POWER without
+> the ADC, but maybe that is irrelevant? This could solve a bit of the
+> "complexity" of the driver, now that we know we want to enforce
+> AXP20X_ADC to be built with AXP20X_POWER. I'm obviously okay to remove
+> this feature if my point of backward compatibility is irrelevant.
 
-Hi Jonathan,
+It was a good idea, considering we haven't added the new symbols to
+any of the defconfigs. Alternatively, we could have all the AXP20X
+sub-drivers have "default MFD_AXP20X". This way no one forgets to
+enable new drivers.
 
-I agree with you and will improve description in v2. I'm thinking of:
+>
+> But now, we still have the problem that AXP20X_ADC is not needed for
+> AXP20X_POWER for AXP22X (and those that don't have voltage/current
+> sensing). We don't really need to force AXP20X_ADC to be built when the
+> user want AXP20X_POWER.
+>
+> 1) We force AXP20X_ADC to be built whenever AXP20X_POWER is built, even
+> for PMICs that don't have any voltage/current sensing. This way, we can
+> enforce the dependency in Kconfig and everything's easy,
+>
+> 2) We programmatically set the dependency between AXP20X_ADC and
+> AXP20X_POWER depending on the compatible used (AXP20X set the
+> dependency, not AXP22X).
 
-Fixes: 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
+We could also look at it this way: does the user need/want the additional
+voltage/current information? If not, then even IIO is not a requirement.
+We could wrap all the related blocks in "if (IS_ENABLED(CONFIG_IIO))",
+and also trim the exposed power supply properties along with.
 
-ADC clock input is provided to internal prescaler (that decreases its
-frequency). It's then used as reference clock for conversions.
+The hard dependency can then be dropped to a soft "implies".
 
-- Fix common clock rate used then by stm32-adc sub-devices. Take common
-prescaler into account. Currently, rate is used to set "boost" mode. It
-may unnecessarily be set. This impacts power consumption.
-- Fix ADC max clock rate on STM32H7 (fADC from datasheet). Currently,
-prescaler may be set too low. This can result in ADC reference clock
-used for conversion to exceed max allowed clock frequency.
+I have to say your first option is easier.
 
-> 
-> I have no idea if this is a patch I should be sending upstream
-> asap or should hold for the next merge window.
+Regards
+ChenYu
 
-Probably yes... I hope the description is better above? Just to mention
-this impacts stm32h7 adc, device tree node to use it is not yet integrated.
-
-Thanks for your review,
-Best Regards,
-Fabrice
-> 
+>
+> [1]
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=33863c938caa2538397170f1a355885f1ea1564e
+>
 > Thanks,
-> 
-> Jonathan
->> ---
->>  drivers/iio/adc/stm32-adc-core.c | 10 +++++-----
->>  1 file changed, 5 insertions(+), 5 deletions(-)
+> Quentin
+>
+>> Also, AXP20X_ADC is only really needed if the hardware is AXP20x, and
+>> not the later ones that don't have voltage/current sensing. I would
+>> like to change the hard dependency on AXP20X_ADC to the "imply"
+>> keyword in Kconfig for the AC and battery power supply drivers.
+>> That is another discussion though.
 >>
->> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
->> index e09233b..6096763 100644
->> --- a/drivers/iio/adc/stm32-adc-core.c
->> +++ b/drivers/iio/adc/stm32-adc-core.c
->> @@ -64,7 +64,7 @@
->>  #define STM32H7_CKMODE_MASK		GENMASK(17, 16)
->>  
->>  /* STM32 H7 maximum analog clock rate (from datasheet) */
->> -#define STM32H7_ADC_MAX_CLK_RATE	72000000
->> +#define STM32H7_ADC_MAX_CLK_RATE	36000000
->>  
->>  /**
->>   * stm32_adc_common_regs - stm32 common registers, compatible dependent data
->> @@ -148,14 +148,14 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
->>  		return -EINVAL;
->>  	}
->>  
->> -	priv->common.rate = rate;
->> +	priv->common.rate = rate / stm32f4_pclk_div[i];
->>  	val = readl_relaxed(priv->common.base + STM32F4_ADC_CCR);
->>  	val &= ~STM32F4_ADC_ADCPRE_MASK;
->>  	val |= i << STM32F4_ADC_ADCPRE_SHIFT;
->>  	writel_relaxed(val, priv->common.base + STM32F4_ADC_CCR);
->>  
->>  	dev_dbg(&pdev->dev, "Using analog clock source at %ld kHz\n",
->> -		rate / (stm32f4_pclk_div[i] * 1000));
->> +		priv->common.rate / 1000);
->>  
->>  	return 0;
->>  }
->> @@ -250,7 +250,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
->>  
->>  out:
->>  	/* rate used later by each ADC instance to control BOOST mode */
->> -	priv->common.rate = rate;
->> +	priv->common.rate = rate / div;
->>  
->>  	/* Set common clock mode and prescaler */
->>  	val = readl_relaxed(priv->common.base + STM32H7_ADC_CCR);
->> @@ -260,7 +260,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
->>  	writel_relaxed(val, priv->common.base + STM32H7_ADC_CCR);
->>  
->>  	dev_dbg(&pdev->dev, "Using %s clock/%d source at %ld kHz\n",
->> -		ckmode ? "bus" : "adc", div, rate / (div * 1000));
->> +		ckmode ? "bus" : "adc", div, priv->common.rate / 1000);
->>  
->>  	return 0;
->>  }
-> 
+>> So I think the description should be something like
+>>
+>>     AXP20X_POWER depends on IIO. Even though it does not depend on
+>>     AXP20X_ADC, it is the new, preferred way of getting power supply
+>>     readings. The other AXP power supply drivers use it as well.
+>>
+>>     Enable both options.
+>>
+>> ChenYu
+>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> ---
+>>>  arch/arm/configs/sunxi_defconfig | 2 ++
+>>>  1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+>>> index 400eb9366a66..456988dd7b0e 100644
+>>> --- a/arch/arm/configs/sunxi_defconfig
+>>> +++ b/arch/arm/configs/sunxi_defconfig
+>>> @@ -127,6 +127,8 @@ CONFIG_DMADEVICES=y
+>>>  CONFIG_DMA_SUN6I=y
+>>>  # CONFIG_IOMMU_SUPPORT is not set
+>>>  CONFIG_EXTCON=y
+>>> +CONFIG_IIO=y
+>>> +CONFIG_AXP20X_ADC=y
+>>>  CONFIG_PWM=y
+>>>  CONFIG_PWM_SUN4I=y
+>>>  CONFIG_PHY_SUN4I_USB=y
+>>> --
+>>> 2.13.3
+>>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> --
+> Quentin Schulz, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
