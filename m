@@ -1,86 +1,66 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 24 Jul 2017 11:52:01 +0200
-Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update from
- suspend_noirq
-Message-ID: <20170724095201.21601-1-johan@kernel.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 24 Jul 2017 10:55:53 +0100
+Subject: [PATCH 1/4] iommu/msm: Add iommu_group support
+In-Reply-To: <f5071164-c965-b6bf-c330-90ff6ea0c956@codeaurora.org>
+References: <cover.1500637633.git.robin.murphy@arm.com>
+ <b87d44e09fa18efbb9daf6258c1f8ecbedaac23c.1500637633.git.robin.murphy@arm.com>
+ <f5071164-c965-b6bf-c330-90ff6ea0c956@codeaurora.org>
+Message-ID: <e148ac58-2fda-454f-c8b1-e01dd1c1347c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit a8636c89648a ("PM / Runtime: Don't allow to suspend a
-device with an active child"), which went into 4.10, it is no longer
-permitted to set RPM_SUSPENDED state for a device with active children
-(unless power.ignore_children is set).
+On 24/07/17 08:34, Sricharan R wrote:
+> Hi Robin,
+> 
+>> As the last step to making groups mandatory, clean up the remaining
+>> drivers by adding basic support. Whilst it may not perfectly reflect the
+>> isolation capabilities of the hardware, using generic_device_group()
+>> should at least maintain existing behaviour with respect to the API.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>  drivers/iommu/msm_iommu.c | 15 ++++++++++++++-
+>>  1 file changed, 14 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+>> index d0448353d501..04f4d51ffacb 100644
+>> --- a/drivers/iommu/msm_iommu.c
+>> +++ b/drivers/iommu/msm_iommu.c
+>> @@ -393,6 +393,7 @@ static struct msm_iommu_dev *find_iommu_for_dev(struct device *dev)
+>>  static int msm_iommu_add_device(struct device *dev)
+>>  {
+>>  	struct msm_iommu_dev *iommu;
+>> +	struct iommu_group *group;
+>>  	unsigned long flags;
+>>  	int ret = 0;
+>>  
+>> @@ -406,7 +407,16 @@ static int msm_iommu_add_device(struct device *dev)
+>>  
+>>  	spin_unlock_irqrestore(&msm_iommu_lock, flags);
+>>  
+>> -	return ret;
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	group = iommu_group_get_for_dev(dev);
+>> +	if (IS_ERR(group))
+>> +		return PTR_ERR(group);
+>> +
+>> +	iommu_group_put(group);
+>> +
+>> +	return 0;
+>>  }
+>>  
+> 
+>  While this is correct for completing the group support, this adds the default domain and
+>  that might break in the driver while attaching a private domain. The msm_iomm_attach_dev
+>  needs to be fixed by calling msm_iommu_detach_dev while trying to attach a new domain when
+>  already connected to a default one. But let me test and confirm this.
 
-This specifically means that the attempts to do just that from the omap
-pm-domain suspend_noirq callback have since been failing whenever a
-child is active, for example:
+The default domain shouldn't matter, since msm_iommu_domain_alloc() will
+refuse to create DMA ops or identity domains in the first place. In the
+absence of a default domain, __iommu_detach_group() will still end up
+calling ops->detach_dev, so I don't think the ultimate behaviour is any
+different with this change. Testing is of course welcome, though ;)
 
-  am335x-usb-childs 47400000.usb: runtime PM trying to suspend
-    device but active child
-
-Silence this warning by dropping the broken pm_runtime_set_suspended()
-call from the omap suspend_noirq callback along with the redundant
-pm_runtime_set_active() in resume_noirq.
-
-This effectively reverts commit 3522bf7bfa24 ("ARM: OMAP2+: omap_device:
-maintain sane runtime pm status around suspend/resume"), which started
-updating the RPM state after the runtime_suspend callback (!) for active
-omap devices had been called during system suspend. The rationale was
-that a later pm_runtime_get_sync() would then fail (even after runtime
-pm had been disabled) and that this in turn would avoid any external
-aborts when accessing registers with clocks disabled. (See also commit
-6f3c77b040fc ("PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
-even when disabled, v2").
-
-But during the suspend_noirq phase all children would already have been
-suspended and their drivers would specifically not attempt any further
-register accesses. And if this was all just a workaround for random
-device drivers doing cross-tree calls during system suspend, those
-drivers should be fixed and updated to explicitly model such
-dependencies using device-links instead (and either way, any such calls
-have been causing crashes since 4.10).
-
-Fixes: 3522bf7bfa24 ("ARM: OMAP2+: omap_device: maintain sane runtime pm status around suspend/resume")
-Fixes: a8636c89648a ("PM / Runtime: Don't allow to suspend a device with an active child")
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Dave Gerlach <d-gerlach@ti.com>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Johan Hovold <johan@kernel.org>
----
- arch/arm/mach-omap2/omap_device.c | 10 ----------
- 1 file changed, 10 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index ef9ffb8ac912..acbede082b5b 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -672,7 +672,6 @@ static int _od_suspend_noirq(struct device *dev)
- 
- 	if (!ret && !pm_runtime_status_suspended(dev)) {
- 		if (pm_generic_runtime_suspend(dev) == 0) {
--			pm_runtime_set_suspended(dev);
- 			omap_device_idle(pdev);
- 			od->flags |= OMAP_DEVICE_SUSPENDED;
- 		}
-@@ -689,15 +688,6 @@ static int _od_resume_noirq(struct device *dev)
- 	if (od->flags & OMAP_DEVICE_SUSPENDED) {
- 		od->flags &= ~OMAP_DEVICE_SUSPENDED;
- 		omap_device_enable(pdev);
--		/*
--		 * XXX: we run before core runtime pm has resumed itself. At
--		 * this point in time, we just restore the runtime pm state and
--		 * considering symmetric operations in resume, we donot expect
--		 * to fail. If we failed, something changed in core runtime_pm
--		 * framework OR some device driver messed things up, hence, WARN
--		 */
--		WARN(pm_runtime_set_active(dev),
--		     "Could not set %s runtime state active\n", dev_name(dev));
- 		pm_generic_runtime_resume(dev);
- 	}
- 
--- 
-2.13.3
+Robin.
