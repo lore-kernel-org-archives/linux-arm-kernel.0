@@ -1,101 +1,184 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Jul 2017 15:48:30 +0200
-Subject: [PATCH net-next 00/18] net: mvpp2: MAC/GoP configuration and optional
- PHYs
-Message-ID: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+Date: Mon, 24 Jul 2017 15:48:35 +0200
+Subject: [PATCH net-next 05/18] net: mvpp2: initialize the GMAC when using a
+ port
+In-Reply-To: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170724134848.19330-6-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This adds a routine to initialize the GMAC at the port level when using
+a port. This wasn't done until this commit, and the mvpp2 driver was
+relying on the bootloader/firmware initialization. This doesn't mean
+everything is configured in the mvpp2 driver now, but it helps reducing
+the gap.
 
-This series aim two things: making the PPv2 driver less depending on
-the firmware/bootloader initialization[1], and making the PPv2 driver
-work when no Ethernet PHY is connected between a port and the physical
-layer[2]. A few patches cleanup some small parts of the driver, and
-newly supported interfaces are described in the device trees[3].
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 112 +++++++++++++++++++++++++++--------
+ 1 file changed, 87 insertions(+), 25 deletions(-)
 
-[1] The current implementation of the PPv2 driver relies on the
-    firmware/bootloader initialization to configure some parts, as the
-    Group of Ports (GoP) and the MACs (GMAC and/or XLG MAC --for 10G--).
-    The drawback is the kernel must be configured to match exactly what
-    the bootloader configures which is not convenient and is an issue
-    when using boards having an Ethernet port and an SFP port wired to
-    the same GoP port, as no dynamic configuration can be done.
-
-    This series adds the GoP and GMAC/XLG MAC initializations so that
-    the PPV2 does not have to rely on a previous initialization. One
-    part is still missing from this series, and that would be the
-    'comphy' which provides shared serdes PHYs and which must be
-    configured as well for a full kernel initialization to work. This
-    comphy support will be part of a following up series. (This
-    series was also tested with this 'comphy' support, as it's nearly
-    ready).
-
-    Patches 3-7, 11 and 14-15.
-
-[2] While the documentation states the phy property in a port node is
-    optional, it is not in the current driver's implementation. This is
-    needed when no PHY is connected between a GoP port and the physical
-    layer (as for the two SFP ports on the 8040-db). One other feature
-    is missing to be able to use such ports: the port link interrupt
-    which allows not to rely on the phylib link event callback.
-
-    This series makes the phy optional in the PPv2 driver, and then adds
-    the support for the GoP port link interrupt to handle link status
-    changes on such ports.
-
-    Patches 8-10, 12-14.
-
-[3] With the port link interrupt and optional PHY support, the two SFP
-    ports on the Marvell Armada 8040 DB can be described and used; as
-    well as the SFP port on the 7040 DB..
-
-    Cosmetic changes / fixes.
-
-    Patches 1, 2 and 16-18.
-
-I intentionally grouped all these patches into one series, as we would
-end up with series depending on each others (and I already did not
-include all my patches in this one). If that's an issue for this series
-to be reviewed/merged, I can easily split it into two series, with a
-dependency of one on the other.
-
-@Dave: Patches 13 to 18 should go through the mvebu tree, thanks :)
-
-Thanks!
-Antoine
-
-
-Antoine Tenart (18):
-  net: mvpp2: unify register definitions coding style
-  net: mvpp2: fix the synchronization module bypass macro name
-  net: mvpp2: set the SMI PHY address when connecting to the PHY
-  net: mvpp2: move the mii configuration in the ndo_open path
-  net: mvpp2: initialize the GMAC when using a port
-  net: mvpp2: initialize the XLG MAC when using a port
-  net: mvpp2: initialize the GoP
-  net: mvpp2: make the phy optional
-  net: mvpp2: use named interrupts
-  net: mvpp2: use the GoP interrupt for link status changes
-  Documentation/bindings: net: marvell-pp2: add the system controller
-  Documentation/bindings: net: marvell-pp2: add the interrupt-names
-  arm64: dts: marvell: cp110: use named interrupts for the Ethernet
-    ports
-  arm64: dts: marvell: cp110: add PPv2 port interrupts
-  arm64: dts: marvell: add a reference to the sysctrl syscon in the ppv2
-    node
-  arm64: dts: marvell: mcbin: enable more networking ports
-  arm64: dts: marvell: 7040-db: enable the SFP port
-  arm64: dts: marvell: 8040-db: enable the SFP ports
-
- .../devicetree/bindings/net/marvell-pp2.txt        |   7 +
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     |   5 +
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     |  10 +
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  30 ++
- .../boot/dts/marvell/armada-cp110-master.dtsi      |  13 +-
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  13 +-
- drivers/net/ethernet/marvell/mvpp2.c               | 587 ++++++++++++++++++---
- 7 files changed, 575 insertions(+), 90 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index 9d204ffb9b89..2573b0c27300 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -308,6 +308,7 @@
+ /* Per-port registers */
+ #define MVPP2_GMAC_CTRL_0_REG			0x0
+ #define     MVPP2_GMAC_PORT_EN_MASK		BIT(0)
++#define     MVPP2_GMAC_PORT_TYPE_MASK		BIT(1)
+ #define     MVPP2_GMAC_MAX_RX_SIZE_OFFS		2
+ #define     MVPP2_GMAC_MAX_RX_SIZE_MASK		0x7ffc
+ #define     MVPP2_GMAC_MIB_CNTR_EN_MASK		BIT(15)
+@@ -319,16 +320,21 @@
+ #define     MVPP2_GMAC_SA_LOW_OFFS		7
+ #define MVPP2_GMAC_CTRL_2_REG			0x8
+ #define     MVPP2_GMAC_INBAND_AN_MASK		BIT(0)
++#define     MVPP2_GMAC_FLOW_CTRL_MASK		GENMASK(2, 1)
+ #define     MVPP2_GMAC_PCS_ENABLE_MASK		BIT(3)
+ #define     MVPP2_GMAC_PORT_RGMII_MASK		BIT(4)
++#define     MVPP2_GMAC_DISABLE_PADDING		BIT(5)
+ #define     MVPP2_GMAC_PORT_RESET_MASK		BIT(6)
+ #define MVPP2_GMAC_AUTONEG_CONFIG		0xc
+ #define     MVPP2_GMAC_FORCE_LINK_DOWN		BIT(0)
+ #define     MVPP2_GMAC_FORCE_LINK_PASS		BIT(1)
++#define     MVPP2_GMAC_IN_BAND_AUTONEG		BIT(2)
++#define     MVPP2_GMAC_IN_BAND_AUTONEG_BYPASS	BIT(3)
+ #define     MVPP2_GMAC_CONFIG_MII_SPEED	BIT(5)
+ #define     MVPP2_GMAC_CONFIG_GMII_SPEED	BIT(6)
+ #define     MVPP2_GMAC_AN_SPEED_EN		BIT(7)
+ #define     MVPP2_GMAC_FC_ADV_EN		BIT(9)
++#define     MVPP2_GMAC_FLOW_CTRL_AUTONEG	BIT(11)
+ #define     MVPP2_GMAC_CONFIG_FULL_DUPLEX	BIT(12)
+ #define     MVPP2_GMAC_AN_DUPLEX_EN		BIT(13)
+ #define MVPP2_GMAC_PORT_FIFO_CFG_1_REG		0x1c
+@@ -4173,6 +4179,84 @@ static void mvpp2_interrupts_unmask(void *arg)
+ 
+ /* Port configuration routines */
+ 
++static void mvpp2_port_mii_gmac_configure_mode(struct mvpp2_port *port)
++{
++	u32 val;
++
++	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
++		val = readl(port->base + MVPP22_GMAC_CTRL_4_REG);
++		val |= MVPP22_CTRL4_SYNC_BYPASS_DIS | MVPP22_CTRL4_DP_CLK_SEL |
++		       MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE;
++		val &= ~MVPP22_CTRL4_EXT_PIN_GMII_SEL;
++		writel(val, port->base + MVPP22_GMAC_CTRL_4_REG);
++
++		val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
++		val |= MVPP2_GMAC_DISABLE_PADDING;
++		val &= ~MVPP2_GMAC_FLOW_CTRL_MASK;
++		writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
++	} else if (port->phy_interface == PHY_INTERFACE_MODE_RGMII) {
++		val = readl(port->base + MVPP22_GMAC_CTRL_4_REG);
++		val |= MVPP22_CTRL4_EXT_PIN_GMII_SEL |
++		       MVPP22_CTRL4_SYNC_BYPASS_DIS |
++		       MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE;
++		val &= ~MVPP22_CTRL4_DP_CLK_SEL;
++		writel(val, port->base + MVPP22_GMAC_CTRL_4_REG);
++
++		val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
++		val &= ~MVPP2_GMAC_DISABLE_PADDING;
++		writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
++	}
++
++	/* The port is connected to a copper PHY */
++	val = readl(port->base + MVPP2_GMAC_CTRL_0_REG);
++	val &= ~MVPP2_GMAC_PORT_TYPE_MASK;
++	writel(val, port->base + MVPP2_GMAC_CTRL_0_REG);
++
++	val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
++	val |= MVPP2_GMAC_IN_BAND_AUTONEG |
++	       MVPP2_GMAC_IN_BAND_AUTONEG_BYPASS |
++	       MVPP2_GMAC_AN_SPEED_EN | MVPP2_GMAC_FLOW_CTRL_AUTONEG |
++	       MVPP2_GMAC_AN_DUPLEX_EN;
++	writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
++}
++
++static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
++{
++	u32 val;
++
++	/* Force link down */
++	val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
++	val |= MVPP2_GMAC_FORCE_LINK_DOWN;
++	writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
++
++	/* Set the GMAC in a reset state */
++	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
++	val |= MVPP2_GMAC_PORT_RESET_MASK;
++	writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
++
++	/* Configure the PCS and in-band AN */
++	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
++	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
++	        val |= MVPP2_GMAC_INBAND_AN_MASK | MVPP2_GMAC_PCS_ENABLE_MASK;
++	} else if (port->phy_interface == PHY_INTERFACE_MODE_RGMII) {
++	        val |= MVPP2_GMAC_PORT_RGMII_MASK;
++		val &= ~MVPP2_GMAC_PCS_ENABLE_MASK;
++	}
++	writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
++
++	mvpp2_port_mii_gmac_configure_mode(port);
++
++	/* Unset the GMAC reset state */
++	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
++	val &= ~MVPP2_GMAC_PORT_RESET_MASK;
++	writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
++
++	/* Stop forcing link down */
++	val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
++	val &= ~MVPP2_GMAC_FORCE_LINK_DOWN;
++	writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
++}
++
+ static void mvpp22_port_mii_set(struct mvpp2_port *port)
+ {
+ 	u32 val;
+@@ -4190,38 +4274,16 @@ static void mvpp22_port_mii_set(struct mvpp2_port *port)
+ 
+ 		writel(val, port->base + MVPP22_XLG_CTRL3_REG);
+ 	}
+-
+-	val = readl(port->base + MVPP22_GMAC_CTRL_4_REG);
+-	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII)
+-		val |= MVPP22_CTRL4_EXT_PIN_GMII_SEL;
+-	else
+-		val &= ~MVPP22_CTRL4_EXT_PIN_GMII_SEL;
+-	val &= ~MVPP22_CTRL4_DP_CLK_SEL;
+-	val |= MVPP22_CTRL4_SYNC_BYPASS_DIS;
+-	val |= MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE;
+-	writel(val, port->base + MVPP22_GMAC_CTRL_4_REG);
+ }
+ 
+ static void mvpp2_port_mii_set(struct mvpp2_port *port)
+ {
+-	u32 val;
+-
+ 	if (port->priv->hw_version == MVPP22)
+ 		mvpp22_port_mii_set(port);
+ 
+-	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
+-
+-	switch (port->phy_interface) {
+-	case PHY_INTERFACE_MODE_SGMII:
+-		val |= MVPP2_GMAC_INBAND_AN_MASK;
+-		break;
+-	case PHY_INTERFACE_MODE_RGMII:
+-		val |= MVPP2_GMAC_PORT_RGMII_MASK;
+-	default:
+-		val &= ~MVPP2_GMAC_PCS_ENABLE_MASK;
+-	}
+-
+-	writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
++	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
++	    port->phy_interface == PHY_INTERFACE_MODE_SGMII)
++		mvpp2_port_mii_gmac_configure(port);
+ }
+ 
+ static void mvpp2_port_fc_adv_enable(struct mvpp2_port *port)
 -- 
 2.13.3
