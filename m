@@ -1,154 +1,64 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Jul 2017 15:59:32 -0700
-Subject: Problem with PHY state machine when using interrupts
-In-Reply-To: <843eb3cd-3cc0-0b06-2aa8-709f25308437@free.fr>
-References: <65b9f1f5-724c-cd03-1c39-59405e773efa@free.fr>
- <849513d9-c981-ec20-5a10-08c663d0aa37@free.fr>
- <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
- <e6a7a5df-b735-6f9c-6a2b-cded86ec6525@free.fr>
- <b0410a73-ff2d-ca06-93fa-17af2040c41c@gmail.com>
- <0f56083f-d43e-a141-1470-b76546af6d58@gmail.com>
- <c81e12bc-0f89-5eab-547e-f0c1ec389ad8@free.fr>
- <62085f48-df18-f987-f521-dcdfbd7f574b@gmail.com>
- <843eb3cd-3cc0-0b06-2aa8-709f25308437@free.fr>
-Message-ID: <93dcc629-8a9e-9576-7074-aaf2b31b9bfb@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 24 Jul 2017 16:50:49 -0700
+Subject: [PATCH 0/5] earlycon hang under some conditions
+In-Reply-To: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <CAD=FV=W5+jEE21DC6=cr=5koYeDAShVbqtad-Dy2oaRVzwQSVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2017 03:53 PM, Mason wrote:
-> On 25/07/2017 00:36, Florian Fainelli wrote:
->> On 07/24/2017 02:20 PM, Mason wrote:
->>> On 24/07/2017 21:53, Florian Fainelli wrote:
->>>
->>>> Well now that I see the possible interrupts generated, I indeed don't
->>>> see how you can get a link down notification unless you somehow force
->>>> the link down yourself, which would certainly happen in phy_suspend()
->>>> when we set BMCR.pwrdwn, but that may be too late.
->>>>
->>>> You should still expect the adjust_link() function to be called though
->>>> with PHY_HALTED being set and that takes care of doing phydev->link = 0
->>>> and netif_carrier_off(). If that still does not work, then see whether
->>>> removing the call to phy_stop() does help (it really should).
->>>
->>> The only functions setting phydev->state to PHY_HALTED
->>> are phy_error() and phy_stop() AFAICT.
->>>
->>> I am aware that when phy_state_machine() handles the
->>> PHY_HALTED state, it will set phydev->link = 0;
->>> and call netif_carrier_off() -- because that's where
->>> I copied that code from.
->>>
->>> My issue is that phy_state_machine() does not run when
->>> I run 'ip set link dev eth0 down' from the command line.
->>
->> Yes, that much is clear, which is why I suggested earlier you try the
->> patch at the end now.
->>
->>>
->>> If I'm reading the code right, phy_disconnect() actually
->>> stops the state machine.
->>>
->>> In interrupt mode, phy_state_machine() doesn't run
->>> because no interrupt is generated.
->>>
->>> In polling mode, phy_state_machine() doesn't run
->>> because phy_disconnect() stops the state machine.
->>>
->>> Introducing a sleep before phy_disconnect() gives
->>> the state machine a chance to run in polling mode,
->>> but it doesn't feel right, and doesn't fix the
->>> other mode, which I'm using.
->>
->> There are several problems it seems:
->>
->> - the PHY state machine cannot move solely based on the PHY generating
->> interrupts during phy_stop() if none of the changing conditions for the
->> HW have changed, come to think about it, I doubt any PHY would be
->> capable of doing something like that
->>
->> - there is an expectation from your driver to have adjust_link() run
->> sometime during ndo_stop() to do something, but why?
->>
->> What is special about nb8800 that interrupts should be generated during
->> ndo_stop(), and why do you think this is going to solve your problem?
->>
->>>
->>> Looking at bcm_enet_stop() it calls phy_stop() and
->>> phy_disconnect() just like the nb8800 driver...
->>>
->>> I'm stumped.
->>
->> My suggestion of not using phy_stop() was not a good one, but
->> functionally there is little difference in doing phy_stop() +
->> phy_disconnect() or just phy_disconnect() alone. What matters is that we
->> restart the PHY properly when phy_connect() or phy_start() is called.
->>
->> What I understand now from your "bug report" is that you want
->> adjust_link to run with phydev->link = 0 to do something during
->> ndo_close() but you have not explained why, but I suspect such that upon
->> ndo_open() things work again.
->>
->> What I suspect your bug is, is that the really was no change in link
->> status, no interrupt was generated because there should not be one, yet
->> some of what nb8800_stop() does is not properly balanced by
->> nb8800_open(). How about the following patch:
->>
->> diff --git a/drivers/net/ethernet/aurora/nb8800.c
->> b/drivers/net/ethernet/aurora/nb8800.c
->> index 041cfb7952f8..b07dea3ab019 100644
->> --- a/drivers/net/ethernet/aurora/nb8800.c
->> +++ b/drivers/net/ethernet/aurora/nb8800.c
->> @@ -972,6 +972,10 @@ static int nb8800_open(struct net_device *dev)
->>         nb8800_mac_rx(dev, true);
->>         nb8800_mac_tx(dev, true);
->>
->> +       priv->speed = -1;
->> +       priv->link = -1;
->> +       priv->duplex = -1;
->> +
->>         phydev = of_phy_connect(dev, priv->phy_node,
->>                                 nb8800_link_reconfigure, 0,
->>                                 priv->phy_mode);
->>
-> 
-> I will test your two patches ASAP.
-> 
-> For the record, I have two (maybe related) issues:
-> 
-> 1) After a sequence of
-> ip set link dev eth0 up
-> ip set link dev eth0 down
-> ip set link dev eth0 up
-> RX engine is hosed, thus network connectivity is borked.
-> The work-around is resetting the MAC in ndo_open
-> => mac_init in my proposed patch.
-> This is by far the biggest issue.
-> Also, resetting the MAC in ndo_open will make it easy
-> to implement suspend/resume, as I can just ndo_stop
-> in suspend, and ndo_open in resume.
+Hi,
 
-OK.
+On Mon, Jul 17, 2017 at 11:02 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> I was testing earlycon with 8250 dw serial console. And it hangs in
+> these cases:
+> 1/ kernel hang when calling early write function after free_initmem:
+> a) the earlycon not disabled after the init code(due to keep_bootcon or
+>    not specify a real console to switch to)
+> b) the early write func is marked as __init, for example 8250_early.
+>
+> 2/ kernel hang when calling early write function after disable unused
+> clks/pm domain:
+> a) the earlycon not disabled after the init code
+> b) the disable unused clks/pm domain kill the requiered clks/pm
+>    domain, since they are not referenced by the earlycon.
+>
+> 3/ kernel hang when calling early write function after the serial
+>    console driver runtime suspended:
+> a) the earlycon not disabled after the init code
+> b) the serial console driver's runtime suspend kills the requiered
+>    clks/pm domain, since they are not referenced by the earlycon.
+>
+> This serial fix 1/ case only.
+>
+>
+>
+> Jeffy Chen (5):
+>   serial: arc: Remove __init marking from early write
+>   serial: omap: Remove __init marking from early write
+>   serial: xuartps: Remove __init marking from early write
+>   serial: 8250_ingenic: Remove __init marking from early write
+>   serial: 8250_early: Remove __init marking from early write
+>
+>  drivers/tty/serial/8250/8250_early.c   |  8 ++++----
+>  drivers/tty/serial/8250/8250_ingenic.c |  8 ++++----
+>  drivers/tty/serial/arc_uart.c          |  4 ++--
+>  drivers/tty/serial/omap-serial.c       | 13 ++++++-------
+>  drivers/tty/serial/xilinx_uartps.c     |  2 +-
+>  5 files changed, 17 insertions(+), 18 deletions(-)
 
-> 
-> 2) The system does not print "Link down" when I run
-> 'ip set link dev eth0 down'
-> This is a symptom of nb8800_link_reconfigure()
-> not being called at all (or being called
-> with phydev->link == priv->link when I tried
-> skipping phy_stop)
+I looked through all 5 patches and they seem sane to me.  I didn't go
+through and test them since Brian already tested the patches for the
+one UART driver I'd have access to anyway.
 
-Correct, and there is actually a timing hazard that I could also
-reproduce here in that phy_stop() + phy_disconnect(), will try to cook a
-patch fixing that as well, since that seems highly undesirable.
+As per my previous email, I don't see any need to solve all the
+world'd problems with this patch series, plus the keep_bootcon seems
+to be an experts / debugging type option and it seems sane if you need
+to take care in using it.
 
-> 
-> Again, thanks for your patches and suggestions,
-> which I will test in the morning.
-> 
-> I will also try to understand why I didn't have
-> these issues on the other board...
+So officially for the series (FWIW since I'm just an interested 3rd party):
 
-The timing hazard would most certainly be more prominent on certain
-configurations that others.
--- 
-Florian
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+
+
+-Doug
