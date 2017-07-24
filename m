@@ -1,131 +1,142 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 24 Jul 2017 11:40:48 +0100
-Subject: [PATCH 3/4] ACPI: Introduce DMA ranges parsing
-In-Reply-To: <37547189.Yunjf1Ri5r@aspire.rjw.lan>
-References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
- <20170720144517.32529-4-lorenzo.pieralisi@arm.com>
- <37547189.Yunjf1Ri5r@aspire.rjw.lan>
-Message-ID: <20170724104048.GD13145@red-moon>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 24 Jul 2017 13:44:54 +0300
+Subject: [PATCH] spi: pxa2xx: Only claim CS GPIOs when the slave device is
+ created
+In-Reply-To: <90b3e14d-0077-9a25-9d90-ab340577af57@web.de>
+References: <90b3e14d-0077-9a25-9d90-ab340577af57@web.de>
+Message-ID: <CAHp75VfpJzOdhMyZoMGnC4CQc5kGxq1k-__dpmVAOaxaD04w6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 22, 2017 at 12:15:42AM +0200, Rafael J. Wysocki wrote:
++Cc: Mika
 
-[...]
+On Sat, Jul 8, 2017 at 11:41 AM, Jan Kiszka <jan.kiszka@web.de> wrote:
+> From: Jan Kiszka <jan.kiszka@siemens.com>
+>
+> Avoid hogging chip select GPIOs just because they are listed for the
+> master. They might be mulitplexed and, if no slave device is attached,
+> used for different purposes. Moreover, this strategy avoids having to
+> allocate a cs_gpiods structure.
+>
+> Tested on the IOT2000 where the second SPI bus is connected to an
+> Arduino-compatible connector and multiplexed between SPI, GPIO and PWM
+> usage.
+>
 
-> > + * acpi_dma_get_range() - Get device DMA parameters.
-> > + *
-> > + * @dev: device to configure
-> > + * @dma_addr: pointer device DMA address result
-> > + * @offset: pointer to the DMA offset result
-> > + * @size: pointer to DMA range size result
-> > + *
-> > + * Evaluate DMA regions and return respectively DMA region start, offset
-> > + * and size in dma_addr, offset and size on parsing success; it does not
-> > + * update the passed in values on failure.
-> > + *
-> > + * Return 0 on success, < 0 on failure.
-> > + */
-> > +int acpi_dma_get_range(struct device *dev, u64 *dma_addr, u64 *offset,
-> > +		       u64 *size)
-> > +{
-> > +	struct acpi_device *adev;
-> > +	LIST_HEAD(list);
-> > +	struct resource_entry *rentry;
-> > +	int ret;
-> > +	struct device *dma_dev = dev;
-> > +	struct acpi_buffer name_buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-> > +	u64 dma_start = U64_MAX, dma_end = 0, dma_offset = 0;
-> > +
-> > +	/*
-> > +	 * Walk the device tree chasing an ACPI companion with a _DMA
-> > +	 * object while we go. Stop if we find a device with an ACPI
-> > +	 * companion containing a _DMA method.
-> > +	 */
-> > +	do {
-> > +		if (has_acpi_companion(dma_dev)) {
-> > +			adev = ACPI_COMPANION(dma_dev);
-> > +
-> > +			if (acpi_has_method(adev->handle, METHOD_NAME__DMA))
-> > +				break;
-> 
-> Why don't you do
-> 
-> 	adev = ACPI_COMPANION(dma_dev);
-> 	if (adev && acpi_has_method(adev->handle, METHOD_NAME__DMA))
-> 		break;
-> 
-> instead?
+This breaks all systems which are using _DSD.
 
-Yes, it is better.
+While I'm looking for fix, I get feeling that the approach itself is not right,
 
-> > +		}
-> > +	} while ((dma_dev = dma_dev->parent));
-> 
-> We had a rule to avoid things like this once and it wasn't a bad one. :-)
-> 
-> Why don't you just do
-> 
-> 		dma_dev = dma_dev->parent;
-> 	} while (dma_dev);
-> 
-> ?
+So, for now I would vote for immediate revert and then rethink what we
+can do here.
 
-Yes I should have done that in the first place, will update.
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> ---
+>  drivers/spi/spi-pxa2xx.c | 59 +++++++++++++++++-------------------------------
+>  1 file changed, 21 insertions(+), 38 deletions(-)
+>
+> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+> index 38d053682892..be991266a6ce 100644
+> --- a/drivers/spi/spi-pxa2xx.c
+> +++ b/drivers/spi/spi-pxa2xx.c
+> @@ -1213,21 +1213,33 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
+>                     struct pxa2xx_spi_chip *chip_info)
+>  {
+>         struct driver_data *drv_data = spi_master_get_devdata(spi->master);
+> +       struct device *pdev = &drv_data->pdev->dev;
+> +       struct gpio_desc *gpiod;
+>         int err = 0;
+> +       int count;
+>
+>         if (chip == NULL)
+>                 return 0;
+>
+> -       if (drv_data->cs_gpiods) {
+> -               struct gpio_desc *gpiod;
+> +       count = gpiod_count(pdev, "cs");
+> +       if (count > 0) {
+> +               if (spi->chip_select >= count)
+> +                       return -EINVAL;
+> +
+> +               gpiod = gpiod_get_index(pdev, "cs", spi->chip_select,
+> +                                       GPIOD_OUT_HIGH);
+> +               if (IS_ERR(gpiod)) {
+> +                       /* Means use native chip select */
+> +                       if (PTR_ERR(gpiod) == -ENOENT)
+> +                               return 0;
+>
+> -               gpiod = drv_data->cs_gpiods[spi->chip_select];
+> -               if (gpiod) {
+> -                       chip->gpio_cs = desc_to_gpio(gpiod);
+> -                       chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
+> -                       gpiod_set_value(gpiod, chip->gpio_cs_inverted);
+> +                       return PTR_ERR(gpiod);
+>                 }
+>
+> +               chip->gpio_cs = desc_to_gpio(gpiod);
+> +               chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
+> +               gpiod_set_value(gpiod, chip->gpio_cs_inverted);
+> +
+>                 return 0;
+>         }
+>
+> @@ -1415,8 +1427,7 @@ static void cleanup(struct spi_device *spi)
+>         if (!chip)
+>                 return;
+>
+> -       if (drv_data->ssp_type != CE4100_SSP && !drv_data->cs_gpiods &&
+> -           gpio_is_valid(chip->gpio_cs))
+> +       if (drv_data->ssp_type != CE4100_SSP && gpio_is_valid(chip->gpio_cs))
+>                 gpio_free(chip->gpio_cs);
+>
+>         kfree(chip);
+> @@ -1752,38 +1763,10 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
+>         master->num_chipselect = platform_info->num_chipselect;
+>
+>         count = gpiod_count(&pdev->dev, "cs");
+> -       if (count > 0) {
+> -               int i;
+> -
+> +       if (count > 0)
+>                 master->num_chipselect = max_t(int, count,
+>                         master->num_chipselect);
+>
+> -               drv_data->cs_gpiods = devm_kcalloc(&pdev->dev,
+> -                       master->num_chipselect, sizeof(struct gpio_desc *),
+> -                       GFP_KERNEL);
+> -               if (!drv_data->cs_gpiods) {
+> -                       status = -ENOMEM;
+> -                       goto out_error_clock_enabled;
+> -               }
+> -
+> -               for (i = 0; i < master->num_chipselect; i++) {
+> -                       struct gpio_desc *gpiod;
+> -
+> -                       gpiod = devm_gpiod_get_index(dev, "cs", i,
+> -                                                    GPIOD_OUT_HIGH);
+> -                       if (IS_ERR(gpiod)) {
+> -                               /* Means use native chip select */
+> -                               if (PTR_ERR(gpiod) == -ENOENT)
+> -                                       continue;
+> -
+> -                               status = (int)PTR_ERR(gpiod);
+> -                               goto out_error_clock_enabled;
+> -                       } else {
+> -                               drv_data->cs_gpiods[i] = gpiod;
+> -                       }
+> -               }
+> -       }
+> -
+>         tasklet_init(&drv_data->pump_transfers, pump_transfers,
+>                      (unsigned long)drv_data);
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-> > +
-> > +	if (!dma_dev)
-> > +		return -ENODEV;
-> > +
-> > +	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS)) {
-> > +		acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &name_buffer);
-> > +		pr_warn(FW_BUG "%s: _DMA object only valid in object with valid _CRS\n",
-> > +				(char *)name_buffer.pointer);
-> > +		kfree(name_buffer.pointer);
-> 
-> We have acpi_handle_warn() and friends for stuff like that ...
 
-I will update to it.
 
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	ret = acpi_dev_get_dma_resources(adev, &list);
-> > +	if (ret > 0) {
-> > +		list_for_each_entry(rentry, &list, node) {
-> > +			if (dma_offset && rentry->offset != dma_offset) {
-> > +				ret = -EINVAL;
-> > +				pr_warn("Can't handle multiple windows with different offsets\n");
-> > +				goto out;
-> > +			}
-> > +			dma_offset = rentry->offset;
-> > +
-> > +			/* Take lower and upper limits */
-> > +			if (rentry->res->start < dma_start)
-> > +				dma_start = rentry->res->start;
-> > +			if (rentry->res->end > dma_end)
-> > +				dma_end = rentry->res->end;
-> > +		}
-> > +
-> > +		if (dma_start >= dma_end) {
-> > +			ret = -EINVAL;
-> > +			pr_warn("Invalid DMA regions configuration\n");
-> 
-> dev_warn()?
-> 
-> And why _warn() and not _info()?
-
-Mmm..ok for the dev_ prefix - basically this would be a FW_BUG (I think
-this specific error condition is overkill TBH, the ACPI resource
-validation code should catch it before we even get here) not sure
-about downgrading it to _info() though, I would leave it at this
-loglevel - in particular in the offset check above:
-
-	if (dma_offset && rentry->offset != dma_offset) {
-		ret = -EINVAL;
-		pr_warn("Can't handle multiple windows with different offsets\n");
-		goto out;
-	}
-
-Thanks,
-Lorenzo
+-- 
+With Best Regards,
+Andy Shevchenko
