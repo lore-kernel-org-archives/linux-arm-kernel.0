@@ -1,45 +1,187 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Jul 2017 01:56:18 -0700
-Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
- from suspend_noirq
-In-Reply-To: <20170725071048.GP10026@atomide.com>
-References: <20170724095201.21601-1-johan@kernel.org>
- <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
- <20170725071048.GP10026@atomide.com>
-Message-ID: <20170725085617.GR10026@atomide.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 25 Jul 2017 10:56:30 +0200
+Subject: [PATCH 3/3] soc: mediatek: add SCPSYS power domain driver for
+ MediaTek MT7622 SoC
+In-Reply-To: <284911261d7e423e5bb47625858b3284be713a1b.1500608650.git.sean.wang@mediatek.com>
+References: <cover.1500608650.git.sean.wang@mediatek.com>
+ <284911261d7e423e5bb47625858b3284be713a1b.1500608650.git.sean.wang@mediatek.com>
+Message-ID: <a44d92b0-41e6-8bb3-fd3f-9add05040b91@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170725 00:11]:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [170724 15:17]:
-> > My personal thought here is that removing of pm_runtime_set_active() will not fix
-> > root cause of the problem, but rather hide it :( and, probably, real fix will be 
-> > to update USB framework to ensure that all suspend devices are also PM runtime suspend
-> > (not sure how) or add few more pm_suspend_ignore_children() calls 
-> >  (for example as I've tried to do in [2], but this was unfinished).
-> > 
-> > I've found very simple steps to reproduce suspend failure on am335x-evm (should also
-> > work on BBB) -  do below sequence with USB device plugged:
-> > 
-> >    echo platform > /sys/power/pm_test 
-> >    echo 1 > /sys/power/pm_print_times 
-> >    [ echo 0 > /sys/module/printk/parameters/console_suspend ]
-> >    echo mem > /sys/power/state 
-> > 
-> > [   95.499685] calling  47400000.usb+ @ 733, parent: ocp
-> > [   95.504818] am335x-usb-childs 47400000.usb: runtime PM trying to suspend device but active child
-> > [   95.513750] am335x-usb-childs 47400000.usb: omap device suspend failure 0
-> > 
-> > Below I've attached possible patch which converts OMAP device to
-> > use pm_runtime_force_suspend/resume().
-> 
-> It seems to almost work for my PM test cases.. It seems that serial console
-> somehow won't get restored after suspend/resume cycle on omap3 though.
-> 
-> The system enters off mode during suspend, and wakes up properly so I can
-> ssh to it after resume. But the serial console no longer works after resume.
-> This is with 8250-omap driver.
 
-And FYI, on omap4 this produces a bunch of L3 irq errors on suspend.
 
-Tony
+On 07/21/2017 05:57 AM, sean.wang at mediatek.com wrote:
+> From: Chen Zhong <chen.zhong@mediatek.com>
+> 
+> Add SCPSYS power domain driver for MT7622 SoC having four power domains
+> which are respectively ETHSYS for Ethernet including embedded switch,
+> WBSYS for WIFI and Bluetooth, HIF0SYS for PCI-E and SATA, and HIF1SYS for
+> USB. Those functions could be selectively powered gated when the
+> corresponding function is no longer to use in order to reach more minimal
+> power dissipation.
+> 
+> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>   drivers/soc/mediatek/mtk-scpsys.c     | 76 +++++++++++++++++++++++++++++++++++
+>   include/linux/soc/mediatek/infracfg.h |  8 +++-
+>   2 files changed, 83 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index beb7916..8a0ca02 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -21,6 +21,7 @@
+>   #include <linux/soc/mediatek/infracfg.h>
+>   
+>   #include <dt-bindings/power/mt2701-power.h>
+> +#include <dt-bindings/power/mt7622-power.h>
+>   #include <dt-bindings/power/mt8173-power.h>
+>   
+>   #define SPM_VDE_PWR_CON			0x0210
+> @@ -38,6 +39,11 @@
+>   #define SPM_MFG_2D_PWR_CON		0x02c0
+>   #define SPM_MFG_ASYNC_PWR_CON		0x02c4
+>   #define SPM_USB_PWR_CON			0x02cc
+> +#define SPM_ETHSYS_PWR_CON		0x02e0	/* MT7622 */
+> +#define SPM_HIF0_PWR_CON		0x02e4	/* MT7622 */
+> +#define SPM_HIF1_PWR_CON		0x02e8	/* MT7622 */
+> +#define SPM_WB_PWR_CON			0x02ec	/* MT7622 */
+> +
+>   
+>   #define SPM_PWR_STATUS			0x060c
+>   #define SPM_PWR_STATUS_2ND		0x0610
+> @@ -63,6 +69,10 @@
+>   #define PWR_STATUS_MFG_ASYNC		BIT(23)
+>   #define PWR_STATUS_AUDIO		BIT(24)
+>   #define PWR_STATUS_USB			BIT(25)
+> +#define PWR_STATUS_ETHSYS		BIT(24)	/* MT7622 */
+> +#define PWR_STATUS_HIF0			BIT(25)	/* MT7622 */
+> +#define PWR_STATUS_HIF1			BIT(26)	/* MT7622 */
+> +#define PWR_STATUS_WB			BIT(27)	/* MT7622 */
+>   
+>   enum clk_id {
+>   	CLK_NONE,
+> @@ -71,6 +81,7 @@ enum clk_id {
+>   	CLK_VENC,
+>   	CLK_VENC_LT,
+>   	CLK_ETHIF,
+> +	CLK_HIFSEL,
+>   	CLK_MAX,
+>   };
+>   
+> @@ -81,6 +92,7 @@ static const char * const clk_names[] = {
+>   	"venc",
+>   	"venc_lt",
+>   	"ethif",
+> +	"hif_sel",
+>   	NULL,
+>   };
+>   
+> @@ -567,6 +579,67 @@ static int __init scpsys_probe_mt2701(struct platform_device *pdev)
+>   }
+>   
+>   /*
+> + * MT7622 power domain support
+> + */
+> +static const struct scp_domain_data scp_domain_data_mt7622[] = {
+> +	[MT7622_POWER_DOMAIN_ETHSYS] = {
+> +		.name = "ethsys",
+> +		.sta_mask = PWR_STATUS_ETHSYS,
+> +		.ctl_offs = SPM_ETHSYS_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> +		.clk_id = {CLK_NONE},
+> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_ETHSYS,
+> +		.active_wakeup = true,
+> +	},
+> +	[MT7622_POWER_DOMAIN_HIF0] = {
+> +		.name = "hif0",
+> +		.sta_mask = PWR_STATUS_HIF0,
+> +		.ctl_offs = SPM_HIF0_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> +		.clk_id = {CLK_HIFSEL},
+> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF0,
+> +		.active_wakeup = true,
+> +	},
+> +	[MT7622_POWER_DOMAIN_HIF1] = {
+> +		.name = "hif1",
+> +		.sta_mask = PWR_STATUS_HIF1,
+> +		.ctl_offs = SPM_HIF1_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> +		.clk_id = {CLK_HIFSEL},
+> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF1,
+> +		.active_wakeup = true,
+> +	},
+> +	[MT7622_POWER_DOMAIN_WB] = {
+> +		.name = "wb",
+> +		.sta_mask = PWR_STATUS_WB,
+> +		.ctl_offs = SPM_WB_PWR_CON,
+> +		.sram_pdn_bits = 0,
+> +		.sram_pdn_ack_bits = 0,
+> +		.clk_id = {CLK_NONE},
+> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
+> +		.active_wakeup = true,
+> +	},
+> +};
+> +
+> +#define NUM_DOMAINS_MT7622	ARRAY_SIZE(scp_domain_data_mt7622)
+> +
+> +static int __init scpsys_probe_mt7622(struct platform_device *pdev)
+> +{
+> +	struct scp *scp;
+> +
+> +	scp = init_scp(pdev, scp_domain_data_mt7622, NUM_DOMAINS_MT7622);
+
+This does not look correct, init_scp awaits 4 arguments.
+
+Apart, please rebase your patches against v4.13-rc1 as this does not apply cleanly.
+
+Thanks,
+Matthias
+
+> +	if (IS_ERR(scp))
+> +		return PTR_ERR(scp);
+> +
+> +	mtk_register_power_domains(pdev, scp, NUM_DOMAINS_MT7622);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+>    * MT8173 power domain support
+>    */
+>   
+> @@ -698,6 +771,9 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
+>   		.compatible = "mediatek,mt2701-scpsys",
+>   		.data = scpsys_probe_mt2701,
+>   	}, {
+> +		.compatible = "mediatek,mt7622-scpsys",
+> +		.data = scpsys_probe_mt7622,
+> +	}, {
+>   		.compatible = "mediatek,mt8173-scpsys",
+>   		.data = scpsys_probe_mt8173,
+>   	}, {
+> diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
+> index a5714e9..c1e5062 100644
+> --- a/include/linux/soc/mediatek/infracfg.h
+> +++ b/include/linux/soc/mediatek/infracfg.h
+> @@ -20,7 +20,13 @@
+>   #define MT8173_TOP_AXI_PROT_EN_MFG_M1		BIT(22)
+>   #define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT	BIT(23)
+>   
+> +#define MT7622_TOP_AXI_PROT_EN_ETHSYS		(BIT(3) | BIT(17))
+> +#define MT7622_TOP_AXI_PROT_EN_HIF0		(BIT(24) | BIT(25))
+> +#define MT7622_TOP_AXI_PROT_EN_HIF1		(BIT(26) | BIT(27) | \
+> +						 BIT(28))
+> +#define MT7622_TOP_AXI_PROT_EN_WB		(BIT(2) | BIT(6) | \
+> +						 BIT(7) | BIT(8))
+> +
+>   int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
+>   int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
+> -
+>   #endif /* __SOC_MEDIATEK_INFRACFG_H */
+> 
