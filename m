@@ -1,75 +1,57 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 25 Jul 2017 21:56:38 +0200 (CEST)
-Subject: No Ethernet on Raspberry Pi 3 in v4.13-rc1
-In-Reply-To: <38cfb4d7-c356-d2b2-0367-69ef3417d941@arm.com>
-References: <5650979e-ea55-0337-2edd-d2c3e8ad0e37@suse.de>
- <b849a4dc-a095-6bb4-caf1-a1f7470bed91@arm.com>
- <1435162494.87709.1500959996834@email.1und1.de>
- <38cfb4d7-c356-d2b2-0367-69ef3417d941@arm.com>
-Message-ID: <1594564275.116129.1501012598860@email.1und1.de>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Tue, 25 Jul 2017 13:01:17 -0700
+Subject: [PATCH 1/3] arm/syscalls: Move address limit check in loop
+In-Reply-To: <20170725103828.GJ31807@n2100.armlinux.org.uk>
+References: <20170719175900.124074-1-thgarnie@google.com>
+ <CAJcbSZFw9GhVvNfYi1oHhpintHSzGcHvGjg5LtRViNBPDzLHaA@mail.gmail.com>
+ <1500978481.30745.10.camel@nxp.com>
+ <20170725103828.GJ31807@n2100.armlinux.org.uk>
+Message-ID: <CAJcbSZF1ddWuQ-c2Xyr1Nvrjzg2TZZNHPfSo7R6Vqg2mnhiPOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jul 25, 2017 at 3:38 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Jul 25, 2017 at 01:28:01PM +0300, Leonard Crestez wrote:
+>> On Mon, 2017-07-24 at 10:07 -0700, Thomas Garnier wrote:
+>> > On Wed, Jul 19, 2017 at 10:58 AM, Thomas Garnier <thgarnie@google.com
+>> > > wrote:
+>> > >
+>> > > The work pending loop can call set_fs after addr_limit_user_check
+>> > > removed the _TIF_FSCHECK flag. To prevent the infinite loop, move
+>> > > the addr_limit_user_check call at the beginning of the loop.
+>> > >
+>> > > Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-
+>> > > mode return")
+>> > > Reported-by: Leonard Crestez <leonard.crestez@nxp.com>
+>> > > Signed-off-by: Thomas Garnier <thgarnie@google.com>
+>>
+>> > Any comments on this patch set?
+>>
+>> Tested-by: Leonard Crestez <leonard.crestez@nxp.com>
+>>
+>> This appears to fix the original issue of failing to boot from NFS when
+>> there are lots of alignment faults. But this is a very basic test
+>> relative to the reach of this change.
+>>
+>> However the original patch has been in linux-next for a while and
+>> apparently nobody else noticed system calls randomly hanging on arm.
+>>
+>> I assume maintainers need to give their opinion.
+>
+> I've already stated my opinion, which is different from what Linus has
+> requested of Thomas.  IMHO, the current approach is going to keep on
+> causing problems along the lines that I've already pointed out.
 
-> Robin Murphy <robin.murphy@arm.com> hat am 25. Juli 2017 um 15:21 geschrieben:
-> 
-> 
-> Hi Stefan,
-> 
-> On 25/07/17 06:19, Stefan Wahren wrote:
-> >>> With arm64 4.13-rc1 I get no eth0 device on Pi3 (openSUSE Tumbleweed).
-> >>> The v4.13-rc1 DT works okay with a 4.12 kernel.
-> >>>
-> >>> Possibly related:
-> >>>
-> >>> [   15.916350] OF: /soc/usb at 7e980000: could not get #phy-cells for /phy
-> >>>
-> >>> [   16.496662] usb 1-1: new high-speed USB device number 2 using dwc2
-> >>> [   16.502988] dwc2 3f980000.usb: Cannot do DMA to address
-> >>> 0x00000000335da400
-> >>
-> >> This is from SWIOTLB's map_single(), which means whatever device was
-> >> passed into dma_map_single() when mapping the URB had a DMA mask smaller
-> >> than 30 bits (or none at all), which sounds wrong and is almost
-> >> certainly the root of the problem (i.e. it probably wasn't the actual
-> >> HCD device described in DT and set up by of_dma_configure()). 
-> > 
-> > how can i figure out what's cause this issue (bcm283x or dwc2 specific)?
-> > 
-> > The dwc2 hcd already check the DMA mask on probe [1] and i never saw a warning in error case.
-> 
-> I'll admit I'm a little stumped, since the two commits to dwc2 since
-> 4.12 seem entirely inconsequential.
-> 
-> The only way I can see this happening is if the first dma_capable()
-> check in swiotlb_map_page() fails, and since swiotlb_force must be set
-> to SWIOTLB_NOFORCE in order to print the error later, and the address
-> and size look reasonable, that only leaves dev->dma_mask as the culprit.
-> 
-> From the subsequent fallout (which on closer inspection looks more to do
-> with calling into uninitialised SWIOTLB state than the arm64 DMA code
-> actually doing anything wrong), I'd guess dev->dma_pfn_offset is
-> probably 0 as well, which further points to the wrong device. Maybe
-> something's changed lower down in the USB core? Turning on tracing and
-> booting with "tp_printk trace_event=swiotlb_bounced" on the command line
-> should shed a bit more light on what's going on.
-> 
+I understand. Do you think this problem apply to arm64 as well?
 
-FWIW, i added some dev_info before and after dma_set_mask in dwc2 (error case):
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 
-[    5.471761] dwc2 3f980000.usb: before mask: FFFFFFFF
-[    5.491016] dwc2 3f980000.usb: before coherent mask: FFFFFFFF
-[    5.513379] dwc2 3f980000.usb: after mask: FFFFFFFF
-[    5.532572] dwc2 3f980000.usb: after coherent mask: FFFFFFFF
-[    5.555039] dwc2 3f980000.usb: DWC OTG Controller
-[    5.575855] dwc2 3f980000.usb: new USB bus registered, assigned bus number 1
-[    5.605944] dwc2 3f980000.usb: irq 41, io mem 0x3f980000
 
-which doesn't match the tracing outputs.
 
-> Robin.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Thomas
