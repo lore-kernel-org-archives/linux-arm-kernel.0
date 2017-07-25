@@ -1,98 +1,87 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 25 Jul 2017 17:33:50 +0200
-Subject: [PATCH v4 5/9] clk: at91: clk-generated: create function to find
- best_diff
-In-Reply-To: <8fe980cd3343111a57bd1b099beaaf51b95396d4.1500968090.git-series.quentin.schulz@free-electrons.com>
-References: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
- <8fe980cd3343111a57bd1b099beaaf51b95396d4.1500968090.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <f384980c-6a01-6879-e60c-d261fb4ae388@microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Jul 2017 16:36:15 +0100
+Subject: [PATCH] drivers/perf: arm_pmu: Request PMU SPIs with IRQF_PER_CPU
+Message-ID: <1500996975-28857-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/2017 at 09:37, Quentin Schulz wrote:
-> The way to find the best_diff and do the appropriate process afterwards
-> can be re-used.
-> 
-> This patch prepares the driver for an upcoming patch that will allow
-> clk_generated to determine the rate of the audio_pll.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Since the PMU register interface is banked per CPU, CPU PMU interrrupts
+cannot be handled by a CPU other than the one with the PMU asserting the
+interrupt. This means that migrating PMU SPIs, as we do during a CPU
+hotplug operation doesn't make any sense and can lead to the IRQ being
+disabled entirely if we route a spurious IRQ to the new affinity target.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+This has been observed in practice on AMD Seattle, where CPUs on the
+non-boot cluster appear to take a spurious PMU IRQ when coming online,
+which is routed to CPU0 where it cannot be handled.
 
-> ---
->  drivers/clk/at91/clk-generated.c | 41 +++++++++++++++++++++------------
->  1 file changed, 27 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-> index ef4b4e0..7260e49 100644
-> --- a/drivers/clk/at91/clk-generated.c
-> +++ b/drivers/clk/at91/clk-generated.c
-> @@ -99,15 +99,36 @@ clk_generated_recalc_rate(struct clk_hw *hw,
->  	return DIV_ROUND_CLOSEST(parent_rate, gck->gckdiv + 1);
->  }
->  
-> +static void clk_generated_best_diff(struct clk_rate_request *req,
-> +				    struct clk_hw *parent,
-> +				    unsigned long parent_rate, u32 div,
-> +				    int *best_diff, long *best_rate)
-> +{
-> +	unsigned long tmp_rate;
-> +	int tmp_diff;
-> +
-> +	if (!div)
-> +		tmp_rate = parent_rate;
-> +	else
-> +		tmp_rate = parent_rate / div;
-> +	tmp_diff = abs(req->rate - tmp_rate);
-> +
-> +	if (*best_diff < 0 || *best_diff > tmp_diff) {
-> +		*best_rate = tmp_rate;
-> +		*best_diff = tmp_diff;
-> +		req->best_parent_rate = parent_rate;
-> +		req->best_parent_hw = parent;
-> +	}
-> +}
-> +
->  static int clk_generated_determine_rate(struct clk_hw *hw,
->  					struct clk_rate_request *req)
->  {
->  	struct clk_generated *gck = to_clk_generated(hw);
->  	struct clk_hw *parent = NULL;
->  	long best_rate = -EINVAL;
-> -	unsigned long tmp_rate, min_rate;
-> +	unsigned long min_rate;
->  	int best_diff = -1;
-> -	int tmp_diff;
->  	int i;
->  
->  	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
-> @@ -125,18 +146,10 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
->  			continue;
->  
->  		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
-> -		if (!div)
-> -			tmp_rate = parent_rate;
-> -		else
-> -			tmp_rate = parent_rate / div;
-> -		tmp_diff = abs(req->rate - tmp_rate);
-> -
-> -		if (best_diff < 0 || best_diff > tmp_diff) {
-> -			best_rate = tmp_rate;
-> -			best_diff = tmp_diff;
-> -			req->best_parent_rate = parent_rate;
-> -			req->best_parent_hw = parent;
-> -		}
-> +
-> +		clk_generated_best_diff(req, parent, parent_rate, div,
-> +					&best_diff, &best_rate);
-> +
->  
->  		if (!best_diff)
->  			break;
-> 
+This patch passes IRQF_PERCPU for PMU SPIs and forcefullt sets their
+affinity prior to requesting them, ensuring that they cannot
+be migrated during hotplug events.
 
+Cc: Mark Rutland <mark.rutland@arm.com>
+Fixes: 3cf7ee98b848 ("drivers/perf: arm_pmu: move irq request/free into probe")
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/perf/arm_pmu.c | 30 +++++++++++++++++-------------
+ 1 file changed, 17 insertions(+), 13 deletions(-)
 
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index dc459eb1246b..fa18e4858141 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -569,22 +569,32 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 		if (irq != other_irq) {
+ 			pr_warn("mismatched PPIs detected.\n");
+ 			err = -EINVAL;
++			goto err_out;
+ 		}
+ 	} else {
++		err = irq_force_affinity(irq, cpumask_of(cpu));
++
++		if (err && num_possible_cpus() > 1) {
++			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
++				irq, cpu);
++			goto err_out;
++		}
++
+ 		err = request_irq(irq, handler,
+-				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
++				  IRQF_PERCPU | IRQF_NOBALANCING | IRQF_NO_THREAD,
++				  "arm-pmu",
+ 				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+ 	}
+ 
+-	if (err) {
+-		pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-			irq);
+-		return err;
+-	}
++	if (err)
++		goto err_out;
+ 
+ 	cpumask_set_cpu(cpu, &armpmu->active_irqs);
+-
+ 	return 0;
++
++err_out:
++	pr_err("unable to request IRQ%d for ARM PMU counters\n", irq);
++	return err;
+ }
+ 
+ int armpmu_request_irqs(struct arm_pmu *armpmu)
+@@ -628,12 +638,6 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
+ 			enable_percpu_irq(irq, IRQ_TYPE_NONE);
+ 			return 0;
+ 		}
+-
+-		if (irq_force_affinity(irq, cpumask_of(cpu)) &&
+-		    num_possible_cpus() > 1) {
+-			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
+-				irq, cpu);
+-		}
+ 	}
+ 
+ 	return 0;
 -- 
-Nicolas Ferre
+2.1.4
