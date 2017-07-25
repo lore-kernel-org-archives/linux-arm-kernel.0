@@ -1,34 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Jul 2017 16:12:20 +0100
-Subject: [kernel-hardening] [PATCH 00/11] ARMv8.3 pointer authentication
- userspace support
-In-Reply-To: <b28dcd14-7b4c-b4f3-830b-dbd436200df9@huawei.com>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <b28dcd14-7b4c-b4f3-830b-dbd436200df9@huawei.com>
-Message-ID: <20170725151220.GB20857@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Jul 2017 17:14:57 +0200
+Subject: [PATCH 04/12] ARM: sa1100/pxa: fix MTD_XIP build
+In-Reply-To: <871sp7rvz4.fsf@belgarion.home>
+References: <20170720154616.3250481-1-arnd@arndb.de>
+ <20170720155209.3250880-1-arnd@arndb.de>
+ <871sp7rvz4.fsf@belgarion.home>
+Message-ID: <CAK8P3a1aP0XnX+iM8L+OXCxonfE6pmN0+Kk6EVLNREkzme+YQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 10:12:24PM +0800, Li Kun wrote:
-> Hi Mark,
+On Sun, Jul 23, 2017 at 5:53 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
+> Hi Arnd,
+>
+>> -#define xip_irqpending()     (ICIP & ICMR)
+>> +/* restored July 2017, this did not build since 2011! */
+>> +
+>> +#define ICIP                 io_p2v(0x40d00000)
+>> +#define ICMR                 io_p2v(0x40d00004)
+> Okay, I suppose the IO mapping is guaranteed to work, ie. io_p2v() is behaving
+> correctly when xip_irqpending() is used, right ? I'm not challenging this, I'm
+> just ensuring this _could_ work (if anybody had the silly idea to make it work
+> again, and I admit I don't have that much courage).
 
-Hi,
+Good thinking ;-)
 
-> Could you please give us some information about the impact to
-> performance to help us evaluating the influence to the system?
+I double-checked this and found that it is correct, and we still map that memory
+in the same place in pxa_map_io().
 
-I'm afraid I don't have any performance details to share, as this series
-has been developed and tested using models, and the performance impact
-of pointer authentication will be very much dependent on the
-microarchitecture.
+>> +#define xip_irqpending()     readl(ICIP) & readl(ICMR)
+> This is not strictly equivalent to (ICIP & ICMR), I would have put for priority
+> reasons :
+> +#define xip_irqpending()       (readl(ICIP) & readl(ICMR))
 
-I have assumed that this shouldn't regress performance on systems
-without pointer authentication functionality, but I haven't yet
-attempted to verify that.
+Ok, I've changed that and will resend.
 
->From this series, I'd expect the largest cost to be the semi-lazy KVM
-context-switch, for guests which are continuously using pointer
-authentication.
-
-Thanks,
-Mark.
+      Arnd
