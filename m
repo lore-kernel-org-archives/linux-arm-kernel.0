@@ -1,135 +1,158 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Jul 2017 11:55:43 +0100
-Subject: [PATCH 6/6] arm64: uaccess: Implement *_flushcache variants
-In-Reply-To: <cover.1500397441.git.robin.murphy@arm.com>
-References: <cover.1500397441.git.robin.murphy@arm.com>
-Message-ID: <a82a48f72b8099c1ef6a32a63819619637797ef8.1500397441.git.robin.murphy@arm.com>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 25 Jul 2017 12:02:19 +0100
+Subject: [PATCH v2] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+In-Reply-To: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
+References: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <b5545a3e-74a9-0bff-afc7-309c653ca2b3@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the set of copy functions with guarantees of a clean cache
-upon completion necessary to support the pmem driver.
+On 22/07/2017 04:54, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+>
+> When running 4.13-rc1 on top of D05, I got the boot log:
+>
+> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+> [    0.000000] SRAT: ITS affinity exceeding max count[4]
+>
+> This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
+>
+> So dynamically alloc the memory needed instead of using
+> its_srat_maps[MAX_NUMNODES], which count the number of
+> ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+> then build the mapping of numa node to ITS ID. Of course,
+> its_srat_maps will be freed after ITS probing because
+> we don't need that after boot.
+>
+> After doing this, I got what I wanted:
+>
+> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+> [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+> [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+> [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+> [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+>
+> Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>
+> v1->v2:
+>   - Add NULL check in acpi_get_its_numa_node() for no ITS affinity case;
+>   - Free the its_srat_maps after ITS probing.
+>
+>  drivers/irqchip/irq-gic-v3-its.c | 39 ++++++++++++++++++++++++++++++++-------
+>  1 file changed, 32 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 3ccdf76..1d692aa 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1847,13 +1847,16 @@ struct its_srat_map {
+>  	u32	its_id;
+>  };
+>
+> -static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
+> +static struct its_srat_map *its_srat_maps __initdata;
+>  static int its_in_srat __initdata;
+>
+>  static int __init acpi_get_its_numa_node(u32 its_id)
+>  {
+>  	int i;
+>
+> +	if (!its_srat_maps)
+> +		return NUMA_NO_NODE;
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/Kconfig                  |  1 +
- arch/arm64/include/asm/string.h     |  4 ++++
- arch/arm64/include/asm/uaccess.h    | 12 ++++++++++
- arch/arm64/lib/Makefile             |  2 ++
- arch/arm64/lib/uaccess_flushcache.c | 47 +++++++++++++++++++++++++++++++++++++
- 5 files changed, 66 insertions(+)
- create mode 100644 arch/arm64/lib/uaccess_flushcache.c
+Question: Does !its_srat_maps always imply its_in_srat == 0, so we could 
+just fall through the for loop and return NUMA_NO_NODE without this check?
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0b0576a54724..e43a63b3d14b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -963,6 +963,7 @@ config ARM64_UAO
- config ARM64_PMEM
- 	bool "Enable support for persistent memory"
- 	select ARCH_HAS_PMEM_API
-+	select ARCH_HAS_UACCESS_FLUSHCACHE
- 	help
- 	  Say Y to enable support for the persistent memory API based on the
- 	  ARMv8.2 DCPoP feature.
-diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
-index d0aa42907569..dd95d33a5bd5 100644
---- a/arch/arm64/include/asm/string.h
-+++ b/arch/arm64/include/asm/string.h
-@@ -52,6 +52,10 @@ extern void *__memset(void *, int, __kernel_size_t);
- #define __HAVE_ARCH_MEMCMP
- extern int memcmp(const void *, const void *, size_t);
- 
-+#ifdef CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE
-+#define __HAVE_ARCH_MEMCPY_FLUSHCACHE
-+void memcpy_flushcache(void *dst, const void *src, size_t cnt);
-+#endif
- 
- #if defined(CONFIG_KASAN) && !defined(__SANITIZE_ADDRESS__)
- 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 8f0a1de11e4a..bb056fee297c 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -347,4 +347,16 @@ extern long strncpy_from_user(char *dest, const char __user *src, long count);
- 
- extern __must_check long strnlen_user(const char __user *str, long n);
- 
-+#ifdef CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE
-+struct page;
-+void memcpy_page_flushcache(char *to, struct page *page, size_t offset, size_t len);
-+extern unsigned long __must_check __copy_user_flushcache(void *to, const void __user *from, unsigned long n);
-+
-+static inline int __copy_from_user_flushcache(void *dst, const void __user *src, unsigned size)
-+{
-+	kasan_check_write(dst, size);
-+	return __copy_user_flushcache(dst, src, size);
-+}
-+#endif
-+
- #endif /* __ASM_UACCESS_H */
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index c86b7909ef31..a0abc142c92b 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -17,3 +17,5 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
- 		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
- 		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
- 		   -fcall-saved-x18
-+
-+lib-$(CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE) += uaccess_flushcache.o
-diff --git a/arch/arm64/lib/uaccess_flushcache.c b/arch/arm64/lib/uaccess_flushcache.c
-new file mode 100644
-index 000000000000..b6ceafdb8b72
---- /dev/null
-+++ b/arch/arm64/lib/uaccess_flushcache.c
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/uaccess.h>
-+#include <asm/barrier.h>
-+#include <asm/cacheflush.h>
-+
-+void memcpy_flushcache(void *dst, const void *src, size_t cnt)
-+{
-+	/*
-+	 * We assume this should not be called with @dst pointing to
-+	 * non-cacheable memory, such that we don't need an explicit
-+	 * barrier to order the cache maintenance against the memcpy.
-+	 */
-+	memcpy(dst, src, cnt);
-+	__clean_dcache_area_pop(dst, cnt);
-+}
-+EXPORT_SYMBOL_GPL(memcpy_flushcache);
-+
-+void memcpy_page_flushcache(char *to, struct page *page, size_t offset,
-+			    size_t len)
-+{
-+	memcpy_flushcache(to, page_address(page) + offset, len);
-+}
-+
-+unsigned long __copy_user_flushcache(void *to, const void __user *from,
-+				     unsigned long n)
-+{
-+	unsigned long rc = __arch_copy_from_user(to, from, n);
-+
-+	/* See above */
-+	__clean_dcache_area_pop(to, n - rc);
-+	return rc;
-+}
--- 
-2.12.2.dirty
+Or should we be safe/explicit/or falling through loops is a bad coding 
+style?
+
+Cheers,
+John
+
+> +
+>  	for (i = 0; i < its_in_srat; i++) {
+>  		if (its_id == its_srat_maps[i].its_id)
+>  			return its_srat_maps[i].numa_node;
+> @@ -1861,6 +1864,12 @@ static int __init acpi_get_its_numa_node(u32 its_id)
+>  	return NUMA_NO_NODE;
+>  }
+>
+> +static int __init gic_acpi_match_srat_its(struct acpi_subtable_header *header,
+> +					  const unsigned long end)
+> +{
+> +	return 0;
+> +}
+> +
+>  static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>  			 const unsigned long end)
+>  {
+> @@ -1877,12 +1886,6 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>  		return -EINVAL;
+>  	}
+>
+> -	if (its_in_srat >= MAX_NUMNODES) {
+> -		pr_err("SRAT: ITS affinity exceeding max count[%d]\n",
+> -				MAX_NUMNODES);
+> -		return -EINVAL;
+> -	}
+> -
+>  	node = acpi_map_pxm_to_node(its_affinity->proximity_domain);
+>
+>  	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+> @@ -1901,14 +1904,35 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>
+>  static void __init acpi_table_parse_srat_its(void)
+>  {
+> +	int count;
+> +
+> +	count = acpi_table_parse_entries(ACPI_SIG_SRAT,
+> +			sizeof(struct acpi_table_srat),
+> +			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+> +			gic_acpi_match_srat_its, 0);
+> +	if (count <= 0)
+> +		return;
+> +
+> +	its_srat_maps = kmalloc(count * sizeof(struct its_srat_map),
+> +				GFP_KERNEL);
+> +	if (!its_srat_maps)
+> +		return;
+> +
+>  	acpi_table_parse_entries(ACPI_SIG_SRAT,
+>  			sizeof(struct acpi_table_srat),
+>  			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+>  			gic_acpi_parse_srat_its, 0);
+>  }
+> +
+> +/* free the its_srat_maps after ITS probing */
+> +static void __init acpi_its_srat_maps_free(void)
+> +{
+> +	kfree(its_srat_maps);
+> +}
+>  #else
+>  static void __init acpi_table_parse_srat_its(void)	{ }
+>  static int __init acpi_get_its_numa_node(u32 its_id) { return NUMA_NO_NODE; }
+> +static void __init acpi_its_srat_maps_free(void) { }
+>  #endif
+>
+>  static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+> @@ -1955,6 +1979,7 @@ static void __init its_acpi_probe(void)
+>  	acpi_table_parse_srat_its();
+>  	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+>  			      gic_acpi_parse_madt_its, 0);
+> +	acpi_its_srat_maps_free();
+>  }
+>  #else
+>  static void __init its_acpi_probe(void) { }
+>
