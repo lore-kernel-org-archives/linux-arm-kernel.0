@@ -1,145 +1,158 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Tue, 25 Jul 2017 23:56:34 +0800
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170725150422.4775-2-jglauber@cavium.com>
-References: <20170725150422.4775-1-jglauber@cavium.com>
- <20170725150422.4775-2-jglauber@cavium.com>
-Message-ID: <20170725235634.00002574@huawei.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 25 Jul 2017 17:01:52 +0100
+Subject: [PATCH v4] acpi/iort: numa: Add numa node mapping for smmuv3
+ devices
+In-Reply-To: <20170725151305.GU17961@rric.localdomain>
+References: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
+ <20170725151305.GU17961@rric.localdomain>
+Message-ID: <20170725160152.GA19744@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jul 2017 17:04:20 +0200
-Jan Glauber <jglauber@cavium.com> wrote:
-
-> Add support for the PMU counters on Cavium SOC memory controllers.
+On Tue, Jul 25, 2017 at 05:13:05PM +0200, Robert Richter wrote:
+> On 25.07.17 10:32:37, Ganapatrao Kulkarni wrote:
+> > ARM IORT specification(rev. C) has added  provision to define proximity
+> > domain in SMMUv3 IORT table. Adding required code to parse Proximity
+> > domain and set numa_node of smmv3 platform devices.
+> > 
+> > Add code to parse proximity domain in SMMUv3 IORT table to
+> > set numa node mapping for smmuv3 devices.
+> > 
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > ---
+> > 
+> > This patch has dependency on header file patch [1], which is
+> > already merged to linux-pm.
+> > 
+> > [1] https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&id=c944230064eb65e4fa018d86779b4fd200b1d7e7
+> > 
+> > v4:
+> >   - Fix compilation issue in !CONFIG_NUMA
+> > 
+> > v3:
+> >   - Addressed Lorenzo Pieralisi comment.
+> > 
+> > v2:
+> >   - Changed as per Lorenzo Pieralisi and Hanjun Guo suggestions.
+> > 
+> > v1:
+> >   - Initial patch
+> > 
+> >  drivers/acpi/arm64/iort.c | 33 +++++++++++++++++++++++++++++++--
+> >  1 file changed, 31 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> > index a3215ee..c5c82c3 100644
+> > --- a/drivers/acpi/arm64/iort.c
+> > +++ b/drivers/acpi/arm64/iort.c
+> > @@ -908,6 +908,28 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
+> >  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
+> >  }
+> >  
+> > +#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170629)
 > 
-> This patch also adds generic functions to allow supporting more
-> devices with PMU counters.
+> This acpica version check was very unhandy for backports when we did
+> this last time. If we backport just c944230064 and this single patch
+> it wont work as the version check prevents the code from being
+> enabled. Isn't there another way to handle cross tree dependencies of
+> pull requests? E.g. we could base this patch on acpica (ab539eaa50)
+> and remove the check.
+
+I think I will send this patch (and other IORT ones) via arm64,
+if acpica goes via the ACPI tree I do not think there is much else
+we can do (that is not complicated).
+
+> Alternatively we could do in this case:
 > 
-> Properties of the LMC PMU counters:
-> - not stoppable
-> - fixed purpose
-> - read-only
-> - one PCI device per memory controller
+> #if defined(CONFIG_ACPI_NUMA) && defined(ACPI_IORT_SMMU_V3_PXM_VALID)
+
+This would do, agreed on all other changes requested, I will send it
+to Catalin as soon as I collect all IORT patches for v4.14.
+
+Thanks !
+Lorenzo
+
+> > +/*
+> > + * set numa proximity domain for smmuv3 device
+> > + */
+> > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
+> > +		struct device *dev)
+> > +{
+> > +	struct acpi_iort_smmu_v3 *smmu;
+> > +
+> > +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+> > +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
+> > +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
+> > +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
 > 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-One trivial point inline which, whilst it obviously makes to actual
-difference, makes review a tiny bit easier.
-
-Otherwise looks good to me, but I'm somewhat new to this area
-so who knows what I've missed ;)
-
-> ---
->  drivers/perf/Kconfig       |   8 +
->  drivers/perf/Makefile      |   1 +
->  drivers/perf/cavium_pmu.c  | 424 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/cpuhotplug.h |   1 +
->  4 files changed, 434 insertions(+)
->  create mode 100644 drivers/perf/cavium_pmu.c
-<snip>
-> +static int cvm_pmu_lmc_probe(struct pci_dev *pdev)
-> +{
-> +	struct cvm_pmu_dev *next, *lmc;
-> +	int nr = 0, ret = -ENOMEM;
-> +
-> +	lmc = kzalloc(sizeof(*lmc), GFP_KERNEL);
-> +	if (!lmc)
-> +		return -ENOMEM;
-> +
-> +	lmc->map = ioremap(pci_resource_start(pdev, 0),
-> +			   pci_resource_len(pdev, 0));
-> +	if (!lmc->map)
-> +		goto fail_ioremap;
-> +
-> +	list_for_each_entry(next, &cvm_pmu_lmcs, entry)
-> +		nr++;
-> +	lmc->pmu_name = kasprintf(GFP_KERNEL, "lmc%d", nr);
-> +	if (!lmc->pmu_name)
-> +		goto fail_kasprintf;
-> +
-> +	lmc->pdev = pdev;
-> +	lmc->num_counters = ARRAY_SIZE(lmc_events);
-> +	lmc->pmu = (struct pmu) {
-> +		.task_ctx_nr    = perf_invalid_context,
-> +		.event_init	= cvm_pmu_event_init,
-> +		.add		= cvm_pmu_lmc_add,
-> +		.del		= cvm_pmu_del,
-> +		.start		= cvm_pmu_start,
-> +		.stop		= cvm_pmu_stop,
-> +		.read		= cvm_pmu_read,
-> +		.attr_groups	= cvm_pmu_lmc_attr_groups,
-> +	};
-> +
-> +	cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> +					 &lmc->cpuhp_node);
-> +
-> +	/*
-> +	 * perf PMU is CPU dependent so pick a random CPU and migrate away
-> +	 * if it goes offline.
-> +	 */
-> +	cpumask_set_cpu(smp_processor_id(), &lmc->active_mask);
-> +
-> +	list_add(&lmc->entry, &cvm_pmu_lmcs);
-> +	lmc->event_valid = cvm_pmu_lmc_event_valid;
-> +
-> +	ret = perf_pmu_register(&lmc->pmu, lmc->pmu_name, -1);
-> +	if (ret)
-> +		goto fail_pmu;
-> +
-> +	dev_info(&pdev->dev, "Enabled %s PMU with %d counters\n",
-> +		 lmc->pmu_name, lmc->num_counters);
-> +	return 0;
-> +
-> +fail_pmu:
-> +	kfree(lmc->pmu_name);
-> +	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> +				    &lmc->cpuhp_node);
-Expected order to unwind the above would be the reverse of this.
-
-> +fail_kasprintf:
-> +	iounmap(lmc->map);
-> +fail_ioremap:
-> +	kfree(lmc);
-> +	return ret;
-> +}
-> +
-> +static int __init cvm_pmu_init(void)
-> +{
-> +	unsigned long implementor = read_cpuid_implementor();
-> +	unsigned int vendor_id = PCI_VENDOR_ID_CAVIUM;
-> +	struct pci_dev *pdev = NULL;
-> +	int rc;
-> +
-> +	if (implementor != ARM_CPU_IMP_CAVIUM)
-> +		return -ENODEV;
-> +
-> +	INIT_LIST_HEAD(&cvm_pmu_lmcs);
-> +
-> +	rc = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> +				     "perf/arm/cvm:online", NULL,
-> +				     cvm_pmu_offline_cpu);
-> +
-> +	/* detect LMC devices */
-> +	while ((pdev = pci_get_device(vendor_id, 0xa022, pdev))) {
-> +		if (!pdev)
-> +			break;
-> +		rc = cvm_pmu_lmc_probe(pdev);
-> +		if (rc)
-> +			return rc;
-> +	}
-> +	return 0;
-> +}
-> +late_initcall(cvm_pmu_init);	/* should come after PCI init */
-> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-> index b56573b..78ac3d2 100644
-> --- a/include/linux/cpuhotplug.h
-> +++ b/include/linux/cpuhotplug.h
-> @@ -141,6 +141,7 @@ enum cpuhp_state {
->  	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
->  	CPUHP_AP_WORKQUEUE_ONLINE,
->  	CPUHP_AP_RCUTREE_ONLINE,
-> +	CPUHP_AP_PERF_ARM_CVM_ONLINE,
->  	CPUHP_AP_ONLINE_DYN,
->  	CPUHP_AP_ONLINE_DYN_END		= CPUHP_AP_ONLINE_DYN + 30,
->  	CPUHP_AP_X86_HPET_ONLINE,
+> Better use dev_info() here.
+> 
+> > +			smmu->base_address,
+> > +			smmu->pxm);
+> > +	}
+> > +}
+> > +#else
+> > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
+> > +		struct device *dev) { }
+> 
+> Just do:
+> 
+> #define arm_smmu_v3_set_proximity NULL
+> 
+> > +#endif
+> > +
+> >  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
+> >  {
+> >  	struct acpi_iort_smmu *smmu;
+> > @@ -977,20 +999,24 @@ struct iort_iommu_config {
+> >  	int (*iommu_count_resources)(struct acpi_iort_node *node);
+> >  	void (*iommu_init_resources)(struct resource *res,
+> >  				     struct acpi_iort_node *node);
+> > +	void (*iommu_set_proximity)(struct acpi_iort_node *node,
+> > +				     struct device *dev);
+> 
+> Wrt pseudo-OO programming this is more a method for struct dev than
+> node, so swap args: iommu_set_proximity(dev, node)
+> 
+> >  };
+> >  
+> >  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
+> >  	.name = "arm-smmu-v3",
+> >  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
+> >  	.iommu_count_resources = arm_smmu_v3_count_resources,
+> > -	.iommu_init_resources = arm_smmu_v3_init_resources
+> > +	.iommu_init_resources = arm_smmu_v3_init_resources,
+> > +	.iommu_set_proximity = arm_smmu_v3_set_proximity
+> 
+> Add comma at the end here.
+> 
+> >  };
+> >  
+> >  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
+> >  	.name = "arm-smmu",
+> >  	.iommu_is_coherent = arm_smmu_is_coherent,
+> >  	.iommu_count_resources = arm_smmu_count_resources,
+> > -	.iommu_init_resources = arm_smmu_init_resources
+> > +	.iommu_init_resources = arm_smmu_init_resources,
+> > +	.iommu_set_proximity = NULL
+> 
+> No need for null assignment.
+> 
+> -Robert
+> 
+> >  };
+> >  
+> >  static __init
+> > @@ -1028,6 +1054,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+> >  	if (!pdev)
+> >  		return -ENOMEM;
+> >  
+> > +	if (ops->iommu_set_proximity)
+> > +		ops->iommu_set_proximity(node, &pdev->dev);
+> > +
+> >  	count = ops->iommu_count_resources(node);
+> >  
+> >  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
+> > -- 
+> > 2.9.4
+> > 
