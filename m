@@ -1,49 +1,122 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 25 Jul 2017 17:55:03 +0200
-Subject: [PATCH 2/8] net: mvpp2: remove RX queue group reset code
+Date: Tue, 25 Jul 2017 17:55:09 +0200
+Subject: [PATCH 8/8] arm64: dts: marvell: add TX interrupts for PPv2.2
 In-Reply-To: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
 References: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170725155509.10574-3-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170725155509.10574-9-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RX queue group allocation is anyway re-done later in
-mvpp2_port_init(), so resetting it in mvpp2_init() is not very useful,
-and will be annoying as we are going to rework the RX queue group
-allocation logic.
+This commit updates the Marvell Armada 7K/8K Device Tree to describe
+the TX interrupts of the Ethernet controllers, in both the master and
+slave CP110s.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 17 -----------------
- 1 file changed, 17 deletions(-)
+Dave: please do *not* apply this patch. It will go through the ARM
+mvebu maintainers. Thanks!
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index f5c84f4..eb8853f 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -7253,23 +7253,6 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
- 	/* Rx Fifo Init */
- 	mvpp2_rx_fifo_init(priv);
+ .../arm64/boot/dts/marvell/armada-cp110-master.dtsi | 21 ++++++++++++++++++---
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 21 ++++++++++++++++++---
+ 2 files changed, 36 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 9278ba6..d192cea 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -71,8 +71,13 @@
  
--	/* Reset Rx queue group interrupt configuration */
--	for (i = 0; i < MVPP2_MAX_PORTS; i++) {
--		if (priv->hw_version == MVPP21) {
--			mvpp2_write(priv, MVPP21_ISR_RXQ_GROUP_REG(i),
--				    rxq_number);
--			continue;
--		} else {
--			u32 val;
--
--			val = (i << MVPP22_ISR_RXQ_GROUP_INDEX_GROUP_OFFSET);
--			mvpp2_write(priv, MVPP22_ISR_RXQ_GROUP_INDEX_REG, val);
--
--			val = (rxq_number << MVPP22_ISR_RXQ_SUB_GROUP_SIZE_OFFSET);
--			mvpp2_write(priv, MVPP22_ISR_RXQ_SUB_GROUP_CONFIG_REG, val);
--		}
--	}
--
- 	if (priv->hw_version == MVPP21)
- 		writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
- 		       priv->lms_base + MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG);
+ 				cpm_eth0: eth0 {
+ 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;
+-					interrupt-names = "rx-shared", "link";
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared", "link";
+ 					port-id = <0>;
+ 					gop-port-id = <0>;
+ 					status = "disabled";
+@@ -80,8 +85,13 @@
+ 
+ 				cpm_eth1: eth1 {
+ 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;
+-					interrupt-names = "rx-shared", "link";
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared", "link";
+ 					port-id = <1>;
+ 					gop-port-id = <2>;
+ 					status = "disabled";
+@@ -89,8 +99,13 @@
+ 
+ 				cpm_eth2: eth2 {
+ 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;
+-					interrupt-names = "rx-shared", "link";
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared", "link";
+ 					port-id = <2>;
+ 					gop-port-id = <3>;
+ 					status = "disabled";
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 3515817..8bde91b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -78,8 +78,13 @@
+ 
+ 				cps_eth0: eth0 {
+ 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;
+-					interrupt-names = "rx-shared", "link";
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared", "link";
+ 					port-id = <0>;
+ 					gop-port-id = <0>;
+ 					status = "disabled";
+@@ -87,8 +92,13 @@
+ 
+ 				cps_eth1: eth1 {
+ 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;
+-					interrupt-names = "rx-shared", "link";
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared", "link";
+ 					port-id = <1>;
+ 					gop-port-id = <2>;
+ 					status = "disabled";
+@@ -96,8 +106,13 @@
+ 
+ 				cps_eth2: eth2 {
+ 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
++						     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;
+-					interrupt-names = "rx-shared", "link";
++					interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++							  "tx-cpu3", "rx-shared", "link";
+ 					port-id = <2>;
+ 					gop-port-id = <3>;
+ 					status = "disabled";
 -- 
 2.9.4
