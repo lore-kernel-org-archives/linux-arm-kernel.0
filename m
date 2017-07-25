@@ -1,79 +1,127 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 25 Jul 2017 21:41:56 +0800
-Subject: [PATCH V4 RESEND 6/6] pinctrl: pinctrl-imx7ulp: add
- gpio_set_direction support
-In-Reply-To: <1500990116-3620-1-git-send-email-aisheng.dong@nxp.com>
-References: <1500990116-3620-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1500990116-3620-7-git-send-email-aisheng.dong@nxp.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 25 Jul 2017 06:46:26 -0700
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n  - any one
+ else seeing this?
+In-Reply-To: <20170725222654.5a968588@roar.ozlabs.ibm.com>
+References: <20170725193039.00007c80@huawei.com>
+ <20170725222654.5a968588@roar.ozlabs.ibm.com>
+Message-ID: <20170725134626.GL3730@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio_set_direction support. This makes the driver support
-GPIO input/output dynamically change from userspace.
+On Tue, Jul 25, 2017 at 10:26:54PM +1000, Nicholas Piggin wrote:
+> On Tue, 25 Jul 2017 19:32:10 +0800
+> Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+> 
+> > Hi All,
+> > 
+> > We observed a regression on our d05 boards (but curiously not
+> > the fairly similar but single socket / smaller core count
+> > d03), initially seen with linux-next prior to the merge window
+> > and still present in v4.13-rc2.
+> > 
+> > The symptom is:
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Fugang Duan <fugang.duan@nxp.com>
-Cc: Bai Ping <ping.bai@nxp.com>
-Acked-by: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Adding Dave Miller and the sparclinux at vger.kernel.org email on CC, as
+they have been seeing something similar, and you might well have saved
+them the trouble of bisecting.
 
----
-ChangeLog:
- * New patch. Derived from the original:
-   [PATCH 1/2] pinctrl: pinctrl-imx: add IBE and OBE SoC property
----
- drivers/pinctrl/freescale/pinctrl-imx7ulp.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+[ . . . ]
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-index 96127dc..b7bebb2 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-@@ -259,6 +259,8 @@ static const struct pinctrl_pin_desc imx7ulp_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(IMX7ULP_PAD_PTF19),
- };
- 
-+#define BM_OBE_ENABLED		BIT(17)
-+#define BM_IBE_ENABLED		BIT(16)
- #define BM_LK_ENABLED		BIT(15)
- #define BM_MUX_MODE		0xf00
- #define BP_MUX_MODE		8
-@@ -300,10 +302,34 @@ static void imx7ulp_cfg_params_fixup(unsigned long *configs,
- 	}
- }
- 
-+static int imx7ulp_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-+					  struct pinctrl_gpio_range *range,
-+					  unsigned offset, bool input)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+	u32 reg;
-+
-+	pin_reg = &info->pin_regs[offset];
-+	if (pin_reg->mux_reg == -1)
-+		return -EINVAL;
-+
-+	reg = readl(ipctl->base + pin_reg->mux_reg);
-+	if (input)
-+		reg = (reg & ~BM_OBE_ENABLED) | BM_IBE_ENABLED;
-+	else
-+		reg = (reg & ~BM_IBE_ENABLED) | BM_OBE_ENABLED;
-+	writel(reg, ipctl->base + pin_reg->mux_reg);
-+
-+	return 0;
-+}
-+
- static struct imx_pinctrl_soc_info imx7ulp_pinctrl_info = {
- 	.pins = imx7ulp_pinctrl_pads,
- 	.npins = ARRAY_SIZE(imx7ulp_pinctrl_pads),
- 	.flags = ZERO_OFFSET_VALID | SHARE_MUX_CONF_REG,
-+	.gpio_set_direction = imx7ulp_pmx_gpio_set_direction,
- 	.mux_mask = BM_MUX_MODE,
- 	.mux_shift = BP_MUX_MODE,
- 	.generic_pinconf = true,
--- 
-2.7.4
+> > [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
+
+This is the cause from an RCU perspective.  You had a lot of idle CPUs,
+and RCU is not permitted to disturb them -- the battery-powered embedded
+guys get very annoyed by that sort of thing.  What happens instead is
+that each CPU updates a per-CPU state variable when entering or exiting
+idle, and the grace-period kthread ("rcu_preempt kthread" in the above
+message) checks these state variables, and if when sees an idle CPU,
+it reports a quiescent state on that CPU's behalf.
+
+But the grace-period kthread can only do this work if it gets a chance
+to run.  And the message above says that this kthread hasn't had a chance
+to run for a full 5,663 jiffies.  For completeness, the "g1566 c1565"
+says that grace period #1566 is in progress, the "f0x0" says that no one
+is needing another grace period #1567.  The "RCU_GP_WAIT_FQS(3)" says
+that the grace-period kthread has fully initialized the current grace
+period and is sleeping for a few jiffies waiting to scan for idle tasks.
+Finally, the "->state=0x1" says that the grace-period kthread is in
+TASK_INTERRUPTIBLE state, in other words, still sleeping.
+
+So my first question is "What did commit 05a4a9527 (kernel/watchdog:
+split up config options) do to prevent the grace-period kthread from
+getting a chance to run?"  I must confess that I don't see anything
+obvious in that commit, so my second question is "Are we sure that
+reverting this commit makes the problem go away?" and my third is "Is
+this an intermittent problem that led to a false bisection?"
+
+[ . . . ]
+
+> > Reducing the RCU CPU stall timeout makes it happen more often,
+> > but we are seeing even with the default value of 24 seconds.
+> > 
+> > Tends to occur after a period or relatively low usage, but has
+> > also been seen mid way through performance tests.
+> > 
+> > This was not seen with v4.12 so a bisection run later lead to
+> > commit 05a4a9527 (kernel/watchdog: split up config options).
+> > 
+> > Which was odd until we discovered that a side effect of this patch
+> > was to change whether the softlockup detector was enabled or not in
+> > the arm64 defconfig.
+> > 
+> > On 4.13-rc2 enabling the softlockup detector indeed stopped us
+> > seeing the rcu issue. Disabling the equivalent on 4.12 made the
+> > issue occur there as well.
+> > 
+> > Clearly the softlockup detector results in a thread on every cpu,
+> > which might be related but beyond that we are still looking into
+> > the issue.
+> > 
+> > So the obvious question is whether anyone else is seeing this as
+> > it might help us to focus in on where to look!
+> 
+> Huh. Something similar has been seen very intermittently on powerpc
+> as well. We couldn't reproduce it reliably to bisect it already, so
+> this is a good help.
+> 
+> http://marc.info/?l=linuxppc-embedded&m=149872815523646&w=2
+> 
+> It looks like the watchdog patch has a similar effect on powerpc in
+> that it stops enabling the softlockup detector by default. Haven't
+> confirmed, but it looks like the same thing.
+> 
+> A bug in RCU stall detection?
+
+Well, if I am expected to make grace periods complete when my grace-period
+kthreads aren't getting any CPU time, I will have to make some substantial
+changes.  ;-)
+
+One possibility is that the timer isn't firing and another is that the
+timer's wakeup is being lost somehow.
+
+So another thing to try is to boot with rcutree.rcu_kick_kthreads=1.
+This will cause RCU to do redundant wakeups on the grace-period kthread
+if the grace period is moving slowly.  This is of course a crude hack,
+which is why this boot parameter will also cause a splat if it ever has
+to do anything.
+
+Does this help at all?
+
+							Thanx, Paul
+
+> > In the meantime we'll carry on digging.
+> > 
+> > Thanks,
+> > 
+> > Jonathan
+> > 
+> > p.s. As a more general question, do we want to have the
+> > soft lockup detector enabledon arm64 by default?
+> 
+> I've cc'ed Don. My patch should not have changed defconfigs, I
+> should have been more careful with that.
+> 
+> Thanks,
+> Nick
+> 
