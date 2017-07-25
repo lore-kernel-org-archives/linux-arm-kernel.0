@@ -1,71 +1,46 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 25 Jul 2017 10:14:44 -0600
-Subject: [PATCH v2 3/6] coresight: of: Use of_device_node_get_cpu helper
-In-Reply-To: <1500892161-17634-4-git-send-email-suzuki.poulose@arm.com>
-References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
- <1500892161-17634-4-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkx_6vVgkra-3r-pq5WHFSvYcYfdCwoVANG3WC_KYTk_RA@mail.gmail.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 25 Jul 2017 17:20:09 +0100
+Subject: [PATCH] scripts/dtc: fix '%zx' warning
+Message-ID: <E1da2Z7-0008GG-AV@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2017 at 04:29, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> Reuse the new generic helper, of_device_node_get_cpu() to map a
-> given CPU phandle to a logical CPU number.
->
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Leo Yan <leo.yan@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/of_coresight.c | 20 ++++++--------------
->  1 file changed, 6 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index a187941..42ce9f8 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -16,6 +16,7 @@
->  #include <linux/clk.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_graph.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> @@ -104,26 +105,17 @@ static int of_coresight_alloc_memory(struct device *dev,
->  int of_coresight_get_cpu(const struct device_node *node)
->  {
->         int cpu;
-> -       bool found;
-> -       struct device_node *dn, *np;
-> +       struct device_node *dn;
->
->         dn = of_parse_phandle(node, "cpu", 0);
-> -
->         /* Affinity defaults to CPU0 */
->         if (!dn)
->                 return 0;
-> -
-> -       for_each_possible_cpu(cpu) {
-> -               np = of_cpu_device_node_get(cpu);
-> -               found = (dn == np);
-> -               of_node_put(np);
-> -               if (found)
-> -                       break;
-> -       }
-> -       of_node_put(dn);
-> -
-> +       cpu = of_device_node_get_cpu(dn);
->         /* Affinity to CPU0 if no cpu nodes are found */
-> -       return found ? cpu : 0;
-> +       if (cpu >= nr_cpu_ids)
-> +               return 0;
-> +       return cpu;
->  }
->  EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
->
+dtc uses an incorrect format specifier for printing a uint64_t value.
+uint64_t may be either 'unsigned long' or 'unsigned long long' depending
+on the host architecture.
 
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro,org>
+Fix this by using %llx and casting to unsigned long long, which ensures
+that we always have a wide enough variable to print 64 bits of hex.
 
-> --
-> 2.7.5
->
+  HOSTCC  scripts/dtc/checks.o
+scripts/dtc/checks.c: In function 'check_simple_bus_reg':
+scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
+  snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
+  ^
+scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
+
+Fixes: 828d4cdd012c ("dtc: check.c fix compile error")
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ scripts/dtc/checks.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+I've been carrying this patch for some time, but I guess hardly anyone
+builds DT based kernels on 32-bit x86 boxes anymore as it has remained
+unfixed.
+
+diff --git a/scripts/dtc/checks.c b/scripts/dtc/checks.c
+index 4b72b530c84f..62ea8f83d4a0 100644
+--- a/scripts/dtc/checks.c
++++ b/scripts/dtc/checks.c
+@@ -873,7 +873,7 @@ static void check_simple_bus_reg(struct check *c, struct dt_info *dti, struct no
+ 	while (size--)
+ 		reg = (reg << 32) | fdt32_to_cpu(*(cells++));
+ 
+-	snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
++	snprintf(unit_addr, sizeof(unit_addr), "%llx", (unsigned long long)reg);
+ 	if (!streq(unitname, unit_addr))
+ 		FAIL(c, dti, "Node %s simple-bus unit address format error, expected \"%s\"",
+ 		     node->fullpath, unit_addr);
+-- 
+2.7.4
