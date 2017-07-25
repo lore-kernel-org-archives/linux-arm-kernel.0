@@ -1,147 +1,112 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 25 Jul 2017 17:40:14 +0200
-Subject: [PATCH v4 8/9] ASoC: atmel-classd: remove aclk clock
-In-Reply-To: <645aa35fec4a2384ca2f3039615ee6598602f9e2.1500968090.git-series.quentin.schulz@free-electrons.com>
+Date: Tue, 25 Jul 2017 17:44:19 +0200
+Subject: [PATCH v4 0/9] add support for Sama5d2 audio PLLs and enable
+ ClassD
+In-Reply-To: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
 References: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
- <645aa35fec4a2384ca2f3039615ee6598602f9e2.1500968090.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <97863fa5-06aa-598b-050f-4454c720420a@microchip.com>
+Message-ID: <194d2fc6-4c88-bc3b-1127-b4c0bdb7c6a1@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 25/07/2017 at 09:37, Quentin Schulz wrote:
-> Since gclk (generated-clk) is now able to determine the rate of the
-> audio_pll, there is no need for classd to have a direct phandle to the
-> audio_pll while already having a phandle to gclk.
+> This patch series adds support for the audio PLLs and enables ClassD that
+> can be found in ATMEL Sama5d2 SoC.
 > 
-> Thus, remove all mentions to aclk in classd driver and update macros and
-> variable names.
+> There are two audio PLLs (PMC and PAD) that shares the same parent (FRAC).
+> FRAC can output between 620 and 700MHz and only multiply the rate of its
+> parent. The two audio PLLs then divide the FRAC rate to best match the
+> asked rate.
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Mark Brown <broonie@kernel.org>
+> I basically took an old patch series posted by Nicolas on December, 6th
+> 2016[1][2][3] and the comments Boris did on the first version[4] Nicolas
+> sent on July, 15th 2015.
+> 
+> I also fixed the function used to compute the divisors, removed useless
+> spinlocks and added a range to the audio frac PLL to stay within vendor's
+> supported range. Clocks that are children of gclk (generated-clk) are now
+> able to propagate rate to the audio PLL clocks when needed.
+> 
+> However, there are multiple children clocks that could technically
+> change the rate of audio_pll (via gck). With the rate locking introduced
+> in Jerome Brunet's patch series[5], the first consumer to enable the clock
+> will be the one definitely setting the rate of the clock. Without the rate
+> locking, the last consumer to set the rate will be able to mess with the
+> rate.
+> Since audio IPs are most likely to request the same rate, we enforce
+> that the only clks able to modify gck rate are those of audio IPs.
+> 
+> To remain consistent, we deny other clocks to be children of audio_pll.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Quentin,
 
-> ---
->  sound/soc/atmel/atmel-classd.c | 47 ++++++++++-------------------------
->  1 file changed, 14 insertions(+), 33 deletions(-)
+Thanks for having revived this series. Everything's okay on my side for
+this v4. I think that my tag isn't missing from any patch of this
+series. Now we surely need to define which path it must take...
+
+Best regards,
+
+
+> v4:
+>  - initialized the clk_init_data structure,
+>  - switched to of_clk_parent_fill instead of manually setting
+>  parent_names,
+>  - removed include of clkdev.h in favor of slab.h,
+>  - removed unnecessary second cast in operation,
+>  - used clamp instead of two conditions,
+>  - removed dependency on clock-output-names, the name is gotten from DT
+>  node,
+>  - merged all three drivers for audio PLLs (FRAC, PMC, PAD) into one,
 > 
-> diff --git a/sound/soc/atmel/atmel-classd.c b/sound/soc/atmel/atmel-classd.c
-> index b7ef8c5..be6b775 100644
-> --- a/sound/soc/atmel/atmel-classd.c
-> +++ b/sound/soc/atmel/atmel-classd.c
-> @@ -32,7 +32,6 @@ struct atmel_classd {
->  	struct regmap *regmap;
->  	struct clk *pclk;
->  	struct clk *gclk;
-> -	struct clk *aclk;
->  	int irq;
->  	const struct atmel_classd_pdata *pdata;
->  };
-> @@ -330,11 +329,6 @@ static int atmel_classd_codec_dai_startup(struct snd_pcm_substream *substream,
->  {
->  	struct snd_soc_pcm_runtime *rtd = substream->private_data;
->  	struct atmel_classd *dd = snd_soc_card_get_drvdata(rtd->card);
-> -	int ret;
-> -
-> -	ret = clk_prepare_enable(dd->aclk);
-> -	if (ret)
-> -		return ret;
->  
->  	return clk_prepare_enable(dd->gclk);
->  }
-> @@ -357,31 +351,31 @@ static int atmel_classd_codec_dai_digital_mute(struct snd_soc_dai *codec_dai,
->  	return 0;
->  }
->  
-> -#define CLASSD_ACLK_RATE_11M2896_MPY_8 (112896 * 100 * 8)
-> -#define CLASSD_ACLK_RATE_12M288_MPY_8  (12288 * 1000 * 8)
-> +#define CLASSD_GCLK_RATE_11M2896_MPY_8 (112896 * 100 * 8)
-> +#define CLASSD_GCLK_RATE_12M288_MPY_8  (12288 * 1000 * 8)
->  
->  static struct {
->  	int rate;
->  	int sample_rate;
->  	int dsp_clk;
-> -	unsigned long aclk_rate;
-> +	unsigned long gclk_rate;
->  } const sample_rates[] = {
->  	{ 8000,  CLASSD_INTPMR_FRAME_8K,
-> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
->  	{ 16000, CLASSD_INTPMR_FRAME_16K,
-> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
->  	{ 32000, CLASSD_INTPMR_FRAME_32K,
-> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
->  	{ 48000, CLASSD_INTPMR_FRAME_48K,
-> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
->  	{ 96000, CLASSD_INTPMR_FRAME_96K,
-> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
-> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
->  	{ 22050, CLASSD_INTPMR_FRAME_22K,
-> -	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
-> +	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
->  	{ 44100, CLASSD_INTPMR_FRAME_44K,
-> -	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
-> +	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
->  	{ 88200, CLASSD_INTPMR_FRAME_88K,
-> -	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
-> +	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
->  };
->  
->  static int
-> @@ -410,13 +404,12 @@ atmel_classd_codec_dai_hw_params(struct snd_pcm_substream *substream,
->  	}
->  
->  	dev_dbg(codec->dev,
-> -		"Selected SAMPLE_RATE of %dHz, ACLK_RATE of %ldHz\n",
-> -		sample_rates[best].rate, sample_rates[best].aclk_rate);
-> +		"Selected SAMPLE_RATE of %dHz, GCLK_RATE of %ldHz\n",
-> +		sample_rates[best].rate, sample_rates[best].gclk_rate);
->  
->  	clk_disable_unprepare(dd->gclk);
-> -	clk_disable_unprepare(dd->aclk);
->  
-> -	ret = clk_set_rate(dd->aclk, sample_rates[best].aclk_rate);
-> +	ret = clk_set_rate(dd->gclk, sample_rates[best].gclk_rate);
->  	if (ret)
->  		return ret;
->  
-> @@ -426,10 +419,6 @@ atmel_classd_codec_dai_hw_params(struct snd_pcm_substream *substream,
->  
->  	snd_soc_update_bits(codec, CLASSD_INTPMR, mask, val);
->  
-> -	ret = clk_prepare_enable(dd->aclk);
-> -	if (ret)
-> -		return ret;
-> -
->  	return clk_prepare_enable(dd->gclk);
->  }
->  
-> @@ -441,7 +430,6 @@ atmel_classd_codec_dai_shutdown(struct snd_pcm_substream *substream,
->  	struct atmel_classd *dd = snd_soc_card_get_drvdata(rtd->card);
->  
->  	clk_disable_unprepare(dd->gclk);
-> -	clk_disable_unprepare(dd->aclk);
->  }
->  
->  static int atmel_classd_codec_dai_prepare(struct snd_pcm_substream *substream,
-> @@ -596,13 +584,6 @@ static int atmel_classd_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	dd->aclk = devm_clk_get(dev, "aclk");
-> -	if (IS_ERR(dd->aclk)) {
-> -		ret = PTR_ERR(dd->aclk);
-> -		dev_err(dev, "failed to get audio clock: %d\n", ret);
-> -		return ret;
-> -	}
-> -
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	io_base = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(io_base)) {
+> v3:
+>  - added a flag per generated clock to know which one is allowed to
+>  modify audio_pll rate,
+>  - set the flag in setup function depending on the compatible and the
+>  clock ID,
+> 
+> v2:
+>  - split big patch containing dt-binding, pll drivers and classd
+>  modifications,
+>  - removed unused AUDIO_PLL_*FOUT* defines from clk-audio-pll-pmc,
+>  - added conditions for audio pll rate setting restriction for SSC and
+>  I2S,
+>  - renamed all mentions of ACLK to GCLK in classD driver,
+> 
+> Thanks,
+> Quentin
+> 
+> [1] https://patchwork.kernel.org/patch/9462351/
+> [2] https://patchwork.kernel.org/patch/9462347/
+> [3] https://patchwork.kernel.org/patch/9462349/
+> [4] https://www.spinics.net/lists/arm-kernel/msg436120.html
+> [5] http://www.spinics.net/lists/linux-clk/msg17927.html
+> 
+> Cyrille Pitchen (2):
+>   ARM: dts: at91: sama5d2: add classd nodes
+>   ARM: dts: at91: sama5d2_xplained: add pin muxing and enable classd
+> 
+> Quentin Schulz (7):
+>   clk: at91: clk-generated: remove useless divisor loop
+>   dt-bindings: clk: at91: add audio plls to the compatible list
+>   clk: at91: add audio pll clock drivers
+>   clk: at91: clk-generated: create function to find best_diff
+>   clk: at91: clk-generated: make gclk determine audio_pll rate
+>   ASoC: atmel-classd: remove aclk clock from DT binding
+>   ASoC: atmel-classd: remove aclk clock
+> 
+>  Documentation/devicetree/bindings/clock/at91-clock.txt   |  10 +-
+>  Documentation/devicetree/bindings/sound/atmel-classd.txt |   9 +-
+>  arch/arm/boot/dts/at91-sama5d2_xplained.dts              |  16 +-
+>  arch/arm/boot/dts/sama5d2.dtsi                           |  39 +-
+>  arch/arm/mach-at91/Kconfig                               |   4 +-
+>  drivers/clk/at91/Makefile                                |   1 +-
+>  drivers/clk/at91/clk-audio-pll.c                         | 531 ++++++++-
+>  drivers/clk/at91/clk-generated.c                         | 101 +-
+>  include/linux/clk/at91_pmc.h                             |  25 +-
+>  sound/soc/atmel/atmel-classd.c                           |  47 +-
+>  10 files changed, 724 insertions(+), 59 deletions(-)
+>  create mode 100644 drivers/clk/at91/clk-audio-pll.c
+> 
+> base-commit: 047a0f692a9354d730dad30f25e1ebd8437b32b1
 > 
 
 
