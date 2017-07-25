@@ -1,159 +1,237 @@
-From: crow@linux.org.ba (crow)
-Date: Tue, 25 Jul 2017 19:03:14 +0200
-Subject: [PATCH] ARM64: meson-gxl: disable broken eee
-In-Reply-To: <1500921121.2401.5.camel@baylibre.com>
-References: <20170707013257.18250-1-joseph.kogut@gmail.com>
- <7ho9scsdbp.fsf@baylibre.com>
- <CAMWSM7hB1e8gJEY3RvQ6UyWsZC0qB-rV2PTxun_4mdzO0e8X-A@mail.gmail.com>
- <cf71b3c2-29d7-3bdb-0d00-872f5e1267e2@baylibre.com>
- <7519c9ee-54f0-d5fb-1683-11d6e24f0822@baylibre.com>
- <1500912570.2401.3.camel@baylibre.com>
- <CAFBinCBy6Ce79Tf2seQi4m3aNGOa0r00zjt=eZP-dYy+6WLo8w@mail.gmail.com>
- <1500921121.2401.5.camel@baylibre.com>
-Message-ID: <CAG_g8w6Xp18zuGyVvh77ekmc9uc7wOq7RUe1+DQOo=V=Ti87og@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 25 Jul 2017 18:11:00 +0100
+Subject: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to reserve
+ HW ITS address regions for IOMMU drivers
+In-Reply-To: <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
+References: <20170725111732.41792-1-shameerali.kolothum.thodi@huawei.com>
+ <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170725171100.GA1663@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jul 25, 2017 at 12:17:31PM +0100, Shameer Kolothum wrote:
+> The helper function retrieves ITS address regions through IORT
+> device <-> ITS mappings and reserves it so that these regions
+> will not be translated by IOMMU and will be excluded from IOVA
+> allocations. IOMMU drivers can use this to implement their
+> .get_resv_regions callback.
+> 
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> ---
+>  drivers/acpi/arm64/iort.c        | 91 ++++++++++++++++++++++++++++++++++++++--
+>  drivers/irqchip/irq-gic-v3-its.c |  3 +-
+>  include/linux/acpi_iort.h        |  8 +++-
+>  3 files changed, 97 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index a3215ee..e28f30c 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -39,6 +39,7 @@
+>  struct iort_its_msi_chip {
+>  	struct list_head	list;
+>  	struct fwnode_handle	*fw_node;
+> +	phys_addr_t		base_addr;
+>  	u32			translation_id;
+>  };
+>  
+> @@ -136,14 +137,16 @@ typedef acpi_status (*iort_find_node_callback)
+>  static DEFINE_SPINLOCK(iort_msi_chip_lock);
+>  
+>  /**
+> - * iort_register_domain_token() - register domain token and related ITS ID
+> - * to the list from where we can get it back later on.
+> + * iort_register_domain_token() - register domain token along with related
+> + * ITS ID and base address to the list from where we can get it back later on.
+>   * @trans_id: ITS ID.
+> + * @base: ITS base address.
+>   * @fw_node: Domain token.
+>   *
+>   * Returns: 0 on success, -ENOMEM if no memory when allocating list element
+>   */
+> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+> +int iort_register_domain_token(int trans_id, phys_addr_t base,
+> +			       struct fwnode_handle *fw_node)
+>  {
+>  	struct iort_its_msi_chip *its_msi_chip;
+>  
+> @@ -153,6 +156,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+>  
+>  	its_msi_chip->fw_node = fw_node;
+>  	its_msi_chip->translation_id = trans_id;
+> +	its_msi_chip->base_addr = base;
+>  
+>  	spin_lock(&iort_msi_chip_lock);
+>  	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+> @@ -481,6 +485,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+>  	return -ENODEV;
+>  }
+>  
+> +static int iort_find_its_base(u32 its_id, phys_addr_t *base)
 
-On Mon, Jul 24, 2017 at 8:32 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> On Mon, 2017-07-24 at 20:20 +0200, Martin Blumenstingl wrote:
->> On Mon, Jul 24, 2017 at 6:09 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
->> > On Mon, 2017-07-24 at 14:26 +0200, Neil Armstrong wrote:
->> > > On 07/24/2017 02:06 PM, Neil Armstrong wrote:
->> > > > On 07/23/2017 07:03 PM, Joseph Kogut wrote:
->> > > > > Hi Kevin,
->> > > > >
->> > > > > I tested on a P212 reference board, which is currently the only GXL
->> > > > > based board I have.
->> > > > >
->> > > > > Before applying the patch, high activity on the ethernet interface
->> > > > > would cause the link to break, requiring the interface to be brought
->> > > > > down and back up before it would work again. After applying the patch,
->> > > > > I could not get the link to break with any transfers.
->> > > > >
->> > > > > _______________________________________________
->> > > > > linux-arm-kernel mailing list
->> > > > > linux-arm-kernel at lists.infradead.org
->> > > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> > > > >
->> > > >
->> > > > Hi Joseph,
->> > > >
->> > > > [please keep the history of the conversation when replying]
->> > > >
->> > > > Is it a original P212 board, or a board based on the P212 ref design ?
->> > > >
->> > > > I'm currently testing the v4.13-rc2 on the official P212 board we
->> > > > received
->> > > > from Amlogic
->> > > > and using iperf3 in both directions, I have an issue after a few minutes
->> > > > running iperf3 with :
->> > > >
->> > > > # while true ; do iperf3 -c 192.168.1.21 ; iperf3 -c 192.168.1.21 -R ;
->> > > > done
->> > > >
->> > > > That cycles between the two iperf directions.
->> > > >
->> > > > After a few minutes, it stalls with :
->> > > >
->> > > > Connecting to host 192.168.1.21, port 5201
->> > > > [  4] local 192.168.1.183 port 51286 connected to 192.168.1.21 port 5201
->> > > > [ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
->> > > > [  4]   0.00-1.00   sec  1.64 MBytes  13.7 Mbits/sec    2   1.41 KBytes
->> > > > [  4]   1.00-2.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
->> > > > [  4]   2.00-3.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
->> > > > [  4]   3.00-4.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
->> > > > [  4]   4.00-5.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
->> > > > [  4]   5.00-6.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
->> > > > [  4]   6.00-7.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
->> > > > [  4]   7.00-8.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
->> > > > [  4]   8.00-9.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
->> > > >
->> >
->> > Same kind of test shows no issue on the libretech-cc and the khadas-vim
->> > In this case, I don't think meson-gxl.dtsi is where you should make your
->> > change.
+You have to tag it as __maybe_unused for the !IOMMU_API case.
 
-I am using mainline Kernel on Khadas VIM Pro and have such problems. I
-did send today an update [0] to my older mailinglist post.
+> +{
+> +	struct iort_its_msi_chip *its_msi_chip;
+> +	bool match = false;
+> +
+> +	spin_lock(&iort_msi_chip_lock);
+> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
+> +		if (its_msi_chip->translation_id == its_id) {
+> +			*base = its_msi_chip->base_addr;
+> +			match = true;
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&iort_msi_chip_lock);
+> +
+> +	return match ? 0 : -ENODEV;
+> +}
+> +
+>  /**
+>   * iort_dev_find_its_id() - Find the ITS identifier for a device
+>   * @dev: The device.
+> @@ -639,6 +661,67 @@ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+>  
+>  	return err;
+>  }
+> +
+> +/**
+> + * iort_iommu_its_get_resv_regions - Reserved region driver helper
+> + * @dev: Device from iommu_get_resv_regions()
+> + * @list: Reserved region list from iommu_get_resv_regions()
+> + *
+> + * Returns: Number of reserved regions on success(0 if no associated ITS),
+> + *          appropriate error value otherwise.
+> + *
+> + * IOMMU drivers can use this to implement their .get_resv_regions callback
+> + * for reserving the HW ITS address regions.
 
-> ahahah, silly me ! I forgot that it was 100MBps PHY.
-> tx delay makes no sense here, 2ns delay would not make much difference on a
-> 25MHz clock
->
-> Sorry for the confusion
->
->
->> >
->> > > >
->> > > > And then, after:
->> > > > # ifconfig eth0 down
->> > > > # ifconfig eth0 up
->> > > >
->> > > > It cycles between :
->> > > > [ 1483.009919] meson8b-dwmac c9410000.ethernet eth0: Link is Up -
->> > > > 100Mbps/Full - flow control rx/tx
->> > > > [ 1487.105725] meson8b-dwmac c9410000.ethernet eth0: Link is Down
->> > > > [ 1490.177943] meson8b-dwmac c9410000.ethernet eth0: Link is Up -
->> > > > 100Mbps/Full - flow control rx/tx
->> > > > [ 1494.273713] meson8b-dwmac c9410000.ethernet eth0: Link is Down
->> >
->> > This does not look like the issue we had on the odroid-c2.
->> > However, I have seen behavior like this (link down/up flickering) when the
->> > rgmii
->> >  delays are way off.
->> >
->> > Maybe you could try playing with "amlogic,tx-delay-ns" property ?
->>
->> we need to change dwmac-meson8b.c so it applies the TX delay also for
->> RMII PHYs. currently the TX delay is always set to 0 for RMII PHYs,
->> see: [0]
->>
->> > > >
->> > > > and so on.
->> > > >
->> > > > And this patch does not fix this at all.
->> > > >
->> > > > It seems to be more a PHY driver issue here.
->> > > >
->> > > > Could you share the results with the same command ?
->> > > >
->> > > > Neil
->> > > >
->> > >
->> > > I forgot to precise, this issue occurs when the "GXL PHY driver" is
->> > > disabled,
->> > > only relying on the
->> > > Generic PHY Driver.
->> > >
->> > > [  630.767538] Generic PHY 0.e40908ff:08: attached PHY driver [Generic
->> > > PHY]
->> > > (mii_bus:phy_addr=0.e40908ff:08, irq=-1)
->> > >
->> > >
->> > > When the PHY driver is loaded the issue disappears, with and without your
->> > > patch.
->> > >
->> > > [   25.355620] Meson GXL Internal PHY 0.e40908ff:08: attached PHY driver
->> > > [Meson GXL Internal PHY] (mii_bus:phy_addr=0.e40908ff:08, irq=-1)
->> > >
->> > > Could you please check the PHY Driver is loaded ?
->> > >
->> > > Thanks,
->> > > Neil
->> >
->> >
->> > _______________________________________________
->> > linux-amlogic mailing list
->> > linux-amlogic at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-amlogic
->>
->>
->> [0] https://github.com/torvalds/linux/blob/master/drivers/net/ethernet/stmicro
->> /stmmac/dwmac-meson8b.c#L222
->
+Stale comment.
 
-Regards,
+> + */
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
+> +{
+> +	int i;
+> +	struct acpi_iort_its_group *its;
+> +	struct acpi_iort_node *node, *its_node = NULL;
+> +	int resv = 0;
 
-[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-July/004393.html
+Nit: int i, resv = 0;
+
+I can make these changes but I suspect this series will go via IOMMU
+tree, let me know how you want to handle it.
+
+Lorenzo
+
+> +	node = iort_find_dev_node(dev);
+> +	if (!node)
+> +		return -ENODEV;
+> +
+> +	if (dev_is_pci(dev)) {
+> +		u32 rid;
+> +
+> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
+> +		its_node = iort_node_map_id(node, rid, NULL, IORT_MSI_TYPE);
+> +	} else {
+> +		for (i = 0; i < node->mapping_count; i++) {
+> +			its_node = iort_node_map_platform_id(node, NULL,
+> +							 IORT_MSI_TYPE, i);
+> +			if (its_node)
+> +				break;
+> +		}
+> +	}
+> +
+> +	if (!its_node)
+> +		return 0;
+> +
+> +	/* Move to ITS specific data */
+> +	its = (struct acpi_iort_its_group *)its_node->node_data;
+> +
+> +	for (i = 0; i < its->its_count; i++) {
+> +		phys_addr_t base;
+> +
+> +		if (!iort_find_its_base(its->identifiers[i], &base)) {
+> +			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +			struct iommu_resv_region *region;
+> +
+> +			region = iommu_alloc_resv_region(base, SZ_128K, prot,
+> +							 IOMMU_RESV_MSI);
+> +			if (region) {
+> +				list_add_tail(&region->list, head);
+> +				resv++;
+> +			}
+> +		}
+> +	}
+> +
+> +	return (resv == its->its_count) ? resv : -ENODEV;
+> +}
+>  #else
+>  static inline
+>  const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
+> @@ -646,6 +729,8 @@ const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
+>  static inline
+>  int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+>  { return 0; }
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
+> +{ return -ENODEV; }
+>  #endif
+>  
+>  static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 6893287..77322b3 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1928,7 +1928,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>  		return -ENOMEM;
+>  	}
+>  
+> -	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
+> +	err = iort_register_domain_token(its_entry->translation_id, res.start,
+> +					 dom_handle);
+>  	if (err) {
+>  		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
+>  		       &res.start, its_entry->translation_id);
+> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+> index 8379d40..56bb6c7 100644
+> --- a/include/linux/acpi_iort.h
+> +++ b/include/linux/acpi_iort.h
+> @@ -26,7 +26,8 @@
+>  #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
+>  #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
+>  
+> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
+> +int iort_register_domain_token(int trans_id, phys_addr_t base,
+> +			       struct fwnode_handle *fw_node);
+>  void iort_deregister_domain_token(int trans_id);
+>  struct fwnode_handle *iort_find_domain_token(int trans_id);
+>  #ifdef CONFIG_ACPI_IORT
+> @@ -38,8 +39,10 @@
+>  /* IOMMU interface */
+>  void iort_set_dma_mask(struct device *dev);
+>  const struct iommu_ops *iort_iommu_configure(struct device *dev);
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head);
+>  #else
+>  static inline void acpi_iort_init(void) { }
+> +static inline bool iort_node_match(u8 type) { return false; }
+>  static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+>  { return req_id; }
+>  static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+> @@ -51,6 +54,9 @@ static inline void iort_set_dma_mask(struct device *dev) { }
+>  static inline
+>  const struct iommu_ops *iort_iommu_configure(struct device *dev)
+>  { return NULL; }
+> +static inline
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
+> +{ return -ENODEV; }
+>  #endif
+>  
+>  #endif /* __ACPI_IORT_H__ */
+> -- 
+> 1.9.1
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
