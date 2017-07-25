@@ -1,53 +1,53 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Jul 2017 11:55:37 +0100
-Subject: [PATCH 0/6] arm64 pmem support
-Message-ID: <cover.1500397441.git.robin.murphy@arm.com>
+Date: Tue, 25 Jul 2017 11:55:41 +0100
+Subject: [PATCH 4/6] arm64: Handle trapped DC CVAP
+In-Reply-To: <cover.1500397441.git.robin.murphy@arm.com>
+References: <cover.1500397441.git.robin.murphy@arm.com>
+Message-ID: <181991f972700b41a9fef9b5bbc1d23d0b5f0083.1500397441.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Cache clean to PoP is subject to the same access controls as to PoC, so
+if we are trapping userspace cache maintenance with SCTLR_EL1.UCI, we
+need to be prepared to handle it. To avoid getting into complicated
+fights with binutils about ARMv8.2 options, we'll just cheat and use the
+raw SYS instruction rather than the 'proper' DC alias.
 
-With the latest updates to the pmem API, the arch code contribution
-becomes very straightforward to wire up - I think there's about as
-much code here to just cope with the existence of our new instruction
-as there is to actually make use of it. I don't have access to any
-NVDIMMs nor suitable hardware to put them in, so this is written purely
-to spec - the extent of testing has been the feature detection on a
-v8.2 Fast Model vs. v8.0 systems.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/include/asm/esr.h | 3 ++-
+ arch/arm64/kernel/traps.c    | 3 +++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-Patch #1 could go in as a fix ahead of the rest; it just needs to come
-before patch #5 to prevent that blowing up the build.
-
-Robin.
-
-Robin Murphy (6):
-  arm64: mm: Fix set_memory_valid() declaration
-  arm64: Convert __inval_cache_range() to area-based
-  arm64: Expose DC CVAP to userspace
-  arm64: Handle trapped DC CVAP
-  arm64: Implement pmem API support
-  arm64: uaccess: Implement *_flushcache variants
-
- Documentation/arm64/cpu-feature-registers.txt |  2 ++
- arch/arm64/Kconfig                            | 12 +++++++
- arch/arm64/include/asm/assembler.h            |  6 ++++
- arch/arm64/include/asm/cacheflush.h           |  4 ++-
- arch/arm64/include/asm/cpucaps.h              |  3 +-
- arch/arm64/include/asm/esr.h                  |  3 +-
- arch/arm64/include/asm/string.h               |  4 +++
- arch/arm64/include/asm/sysreg.h               |  1 +
- arch/arm64/include/asm/uaccess.h              | 12 +++++++
- arch/arm64/include/uapi/asm/hwcap.h           |  1 +
- arch/arm64/kernel/cpufeature.c                | 13 ++++++++
- arch/arm64/kernel/cpuinfo.c                   |  1 +
- arch/arm64/kernel/head.S                      | 18 +++++-----
- arch/arm64/kernel/traps.c                     |  3 ++
- arch/arm64/lib/Makefile                       |  2 ++
- arch/arm64/lib/uaccess_flushcache.c           | 47 +++++++++++++++++++++++++++
- arch/arm64/mm/cache.S                         | 37 ++++++++++++++++-----
- arch/arm64/mm/pageattr.c                      | 18 ++++++++++
- 18 files changed, 166 insertions(+), 21 deletions(-)
- create mode 100644 arch/arm64/lib/uaccess_flushcache.c
-
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 8cabd57b6348..2636df9a4d6b 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -157,9 +157,10 @@
+ /*
+  * User space cache operations have the following sysreg encoding
+  * in System instructions.
+- * op0=1, op1=3, op2=1, crn=7, crm={ 5, 10, 11, 14 }, WRITE (L=0)
++ * op0=1, op1=3, op2=1, crn=7, crm={ 5, 10, 11, 12, 14 }, WRITE (L=0)
+  */
+ #define ESR_ELx_SYS64_ISS_CRM_DC_CIVAC	14
++#define ESR_ELx_SYS64_ISS_CRM_DC_CVAP	12
+ #define ESR_ELx_SYS64_ISS_CRM_DC_CVAU	11
+ #define ESR_ELx_SYS64_ISS_CRM_DC_CVAC	10
+ #define ESR_ELx_SYS64_ISS_CRM_IC_IVAU	5
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index c7c7088097be..dc53a8ba1882 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -480,6 +480,9 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+ 	case ESR_ELx_SYS64_ISS_CRM_DC_CVAC:	/* DC CVAC, gets promoted */
+ 		__user_cache_maint("dc civac", address, ret);
+ 		break;
++	case ESR_ELx_SYS64_ISS_CRM_DC_CVAP:	/* DC CVAP */
++		__user_cache_maint("sys 3, c7, c12, 1", address, ret);
++		break;
+ 	case ESR_ELx_SYS64_ISS_CRM_DC_CIVAC:	/* DC CIVAC */
+ 		__user_cache_maint("dc civac", address, ret);
+ 		break;
 -- 
 2.12.2.dirty
