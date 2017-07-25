@@ -1,19 +1,46 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 25 Jul 2017 15:01:17 +0200
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.13
-In-Reply-To: <20170724122943.GE29919@arm.com>
-References: <20170724122943.GE29919@arm.com>
-Message-ID: <20170725130117.GB30429@8bytes.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Jul 2017 14:08:51 +0100
+Subject: [PATCH] arm64: sysreg: Fix unprotected macro argmuent in
+ write_sysreg
+In-Reply-To: <1500983561-5723-1-git-send-email-Dave.Martin@arm.com>
+References: <1500983561-5723-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170725130849.GA8358@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 01:29:43PM +0100, Will Deacon wrote:
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+On Tue, Jul 25, 2017 at 12:52:41PM +0100, Dave Martin wrote:
+> write_sysreg() may misparse the value argument because it is used
+> without parentheses to protect it.
 > 
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> This patch adds the ( ) in order to avoid any surprises.
 > 
-> are available in the git repository at:
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/include/asm/sysreg.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 16e44fa..822eebc 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -492,7 +492,7 @@ asm(
+>   * the "%x0" template means XZR.
+>   */
+>  #define write_sysreg(v, r) do {					\
+> -	u64 __val = (u64)v;					\
+> +	u64 __val = (u64)(v);					\
+>  	asm volatile("msr " __stringify(r) ", %x0"		\
+>  		     : : "rZ" (__val));				\
+>  } while (0)
 
-Pulled into iommu/fixes, thanks Will.
+Looks sensible.
+
+It looks like write_sysreg_s() will need the same fixup; could you do
+that too?
+
+With that:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
