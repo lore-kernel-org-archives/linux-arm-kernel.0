@@ -1,46 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Jul 2017 14:25:51 +0100
-Subject: [PATCH V2 4/4] arm64: disable irq between breakpoint and step
- exception
-In-Reply-To: <8f9c3073792c107e3d928e413499572ec75c5175.1499416107.git.panand@redhat.com>
-References: <cover.1499416107.git.panand@redhat.com>
- <8f9c3073792c107e3d928e413499572ec75c5175.1499416107.git.panand@redhat.com>
-Message-ID: <20170725132551.GB28815@arm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 25 Jul 2017 15:26:40 +0200
+Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
+ callback
+In-Reply-To: <yw1xfudkodvv.fsf@mansr.com>
+References: <20170719190734.18566-1-opendmb@gmail.com>
+ <20170719190734.18566-3-opendmb@gmail.com>
+ <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
+ <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
+ <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
+ <yw1xfudkodvv.fsf@mansr.com>
+Message-ID: <6f0092f7-692f-4a15-1d95-40f4e59c8585@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 07, 2017 at 05:34:00PM +0530, Pratyush Anand wrote:
-> If an interrupt is generated between breakpoint and step handler then
-> step handler can not get correct step address. This situation can easily
-> be invoked by samples/hw_breakpoint/data_breakpoint.c. It can also be
-> reproduced if we insert any printk() statement or dump_stack() in perf
-> overflow_handler. So, it seems that perf is working fine just luckily.
-> If the CPU which is handling perf breakpoint handler receives any
-> interrupt then, perf step handler will not execute sanely.
-> 
-> This patch improves do_debug_exception() handling, which enforces now,
-> that exception handler function:
-> - should return 0 for any software breakpoint and hw
-> breakpoint/watchpoint handler if it does not expect a single step stage
-> - should return 1 if it expects single step.
-> - A single step handler should always return 0.
-> - All handler should return a -ve error in any other case.
-> 
-> Now, we can know in do_debug_exception() that whether a step exception
-> will be followed or not. If there will a step exception then disable
-> irq. Re-enable it after single step handling.
+On 25/07/2017 15:16, M?ns Rullg?rd wrote:
 
-AFAICT, this is only a problem for kernel-mode breakpoints where we end up
-stepping into the interrupt handler when trying to step over a breakpoint.
+> What happened to the patch adding the proper combined function?
 
-We'd probably be better off getting all users of kernel step (kprobes, kgdb
-and perf) to run the step with irqs disabled, but I still have reservations
-about that:
+It appears you're not CCed on v2.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/508066.html
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/510814.html
+https://patchwork.kernel.org/patch/9859799/
 
-Wouldn't it be better to follow kprobes/kgdb and have perf run the step with
-irqs disabled?
+Doug wrote:
+> Yes, you understand correctly.  The irq_mask_ack method is entirely
+> optional and I assume that is why this issue went undetected for so
+> long; however, it is slightly more efficient to combine the functions
+> (even if the ack is unnecessary) which is why I chose to do so for my
+> changes to the irqchip-brcmstb-l2 driver where I first discovered this
+> issue.  How much value the improved efficiency has is certainly
+> debatable, but interrupt handling is one area where people might care
+> about such a small difference.  As the irqchip-tango driver maintainer
+> you are welcome to decide whether or not the irq_mask_ack method makes
+> sense to you.
 
-Will
+My preference goes to leaving the irq_mask_ack callback undefined,
+and let the irqchip framework use irq_mask and irq_ack instead.
+
+Regards.
