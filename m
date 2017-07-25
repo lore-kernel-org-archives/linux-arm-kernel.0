@@ -1,53 +1,97 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 25 Jul 2017 07:19:56 +0200 (CEST)
-Subject: No Ethernet on Raspberry Pi 3 in v4.13-rc1
-In-Reply-To: <b849a4dc-a095-6bb4-caf1-a1f7470bed91@arm.com>
-References: <5650979e-ea55-0337-2edd-d2c3e8ad0e37@suse.de>
- <b849a4dc-a095-6bb4-caf1-a1f7470bed91@arm.com>
-Message-ID: <1435162494.87709.1500959996834@email.1und1.de>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 25 Jul 2017 11:11:21 +0530
+Subject: [PATCH v2 6/7] mailbox: bcm-flexrm-mailbox: Set msg_queue_len for
+ each channel
+In-Reply-To: <CABb+yY3d1FvfB-NBVHLNfoFXGn9-8nFEdKBhXt4sBTr1vodhYw@mail.gmail.com>
+References: <1500620142-910-1-git-send-email-anup.patel@broadcom.com>
+ <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
+ <CABb+yY1Pxhgvvit=0eZr66DpLJ3MDEvRPx9dwDPJM8PwiKXiew@mail.gmail.com>
+ <CAALAos_yh0bCMZFrSmf-c92pNMBGhLT05YFF0duhmpxgYec+_w@mail.gmail.com>
+ <CABb+yY3d1FvfB-NBVHLNfoFXGn9-8nFEdKBhXt4sBTr1vodhYw@mail.gmail.com>
+Message-ID: <CAALAos9T0YtCvgjGCMVPn=dw2JKY=jTxz-v431NgpBCKFo1vVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, Jul 24, 2017 at 10:06 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Mon, Jul 24, 2017 at 9:26 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>> Hi Jassi,
+>>
+>> Sorry for the delayed response...
+>>
+>> On Fri, Jul 21, 2017 at 9:16 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> Hi Anup,
+>>>
+>>> On Fri, Jul 21, 2017 at 12:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>> The Broadcom FlexRM ring (i.e. mailbox channel) can handle
+>>>> larger number of messages queued in one FlexRM ring hence
+>>>> this patch sets msg_queue_len for each mailbox channel to
+>>>> be same as RING_MAX_REQ_COUNT.
+>>>>
+>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>> ---
+>>>>  drivers/mailbox/bcm-flexrm-mailbox.c | 5 ++++-
+>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>> index 9873818..20055a0 100644
+>>>> --- a/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>> +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>> @@ -1683,8 +1683,11 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
+>>>>                 ret = -ENOMEM;
+>>>>                 goto fail_free_debugfs_root;
+>>>>         }
+>>>> -       for (index = 0; index < mbox->num_rings; index++)
+>>>> +       for (index = 0; index < mbox->num_rings; index++) {
+>>>> +               mbox->controller.chans[index].msg_queue_len =
+>>>> +                                               RING_MAX_REQ_COUNT;
+>>>>                 mbox->controller.chans[index].con_priv = &mbox->rings[index];
+>>>> +       }
+>>>>
+>>> While writing mailbox.c I wasn't unaware that there is the option to
+>>> choose the queue length at runtime.
+>>> The idea was to keep the code as simple as possible. I am open to
+>>> making it a runtime thing, but first, please help me understand how
+>>> that is useful here.
+>>>
+>>> I understand FlexRm has a ring buffer of RING_MAX_REQ_COUNT(1024)
+>>> elements. Any message submitted to mailbox api can be immediately
+>>> written onto the ringbuffer if there is some space.
+>>> Is there any mechanism to report back to a client driver, if its
+>>> message in ringbuffer failed "to be sent"?
+>>> If there isn't any, then I think, in flexrm_last_tx_done() you should
+>>> simply return true if there is some space left in the rung-buffer,
+>>> false otherwise.
+>>
+>> Yes, we have error code in "struct brcm_message" to report back
+>> errors from send_message. In our mailbox clients, we check
+>> return value of mbox_send_message() and also the error code
+>> in "struct brcm_message".
+>>
+> I meant after the message has been accepted in the ringbuffer but the
+> remote failed to receive it.
 
-> Robin Murphy <robin.murphy@arm.com> hat am 24. Juli 2017 um 13:22 geschrieben:
-> 
-> 
-> Hi Andreas,
-> 
-> On 22/07/17 13:29, Andreas F?rber wrote:
-> > Hello,
-> > 
-> > With arm64 4.13-rc1 I get no eth0 device on Pi3 (openSUSE Tumbleweed).
-> > The v4.13-rc1 DT works okay with a 4.12 kernel.
-> > 
-> > Possibly related:
-> > 
-> > [   15.916350] OF: /soc/usb at 7e980000: could not get #phy-cells for /phy
-> > 
-> > [   16.496662] usb 1-1: new high-speed USB device number 2 using dwc2
-> > [   16.502988] dwc2 3f980000.usb: Cannot do DMA to address
-> > 0x00000000335da400
-> 
-> This is from SWIOTLB's map_single(), which means whatever device was
-> passed into dma_map_single() when mapping the URB had a DMA mask smaller
-> than 30 bits (or none at all), which sounds wrong and is almost
-> certainly the root of the problem (i.e. it probably wasn't the actual
-> HCD device described in DT and set up by of_dma_configure()). 
+Yes, even this case is handled.
 
-how can i figure out what's cause this issue (bcm283x or dwc2 specific)?
+In case of IO errors after message has been put in ring buffer, we get
+completion message with error code and mailbox client drivers will
+receive back "struct brcm_message" with error set.
 
-The dwc2 hcd already check the DMA mask on probe [1] and i never saw a warning in error case.
+You can refer flexrm_process_completions() for more details.
 
-Regards
-Stefan
+> There seems no such provision. IIANW, then you should be able to
+> consider every message as "sent successfully" once it is in the ring
+> buffer i.e, immediately after mbox_send_message() returns 0.
+> In that case I would think you don't need more than a couple of
+> entries out of MBOX_TX_QUEUE_LEN ?
 
-[1] - http://elixir.free-electrons.com/linux/latest/source/drivers/usb/dwc2/hcd.c#L5096
+What I am trying to suggest is that we can take upto 1024 messages
+in a FlexRM ring but the MBOX_TX_QUEUE_LEN limits us queuing
+more messages. This issue manifest easily when multiple CPUs
+queues to same FlexRM ring (i.e. same mailbox channel).
 
-> However,
-> arm64's __swiotlb_map_page() still shouldn't be trying to perform cache
-> maintenance on the error value returned, which looks to be where the
-> actual splat below hails from - leave that one with me ;)
-> 
-> Robin.
->
+Another quick fix is to make MBOX_TX_QUEUE_LEN as 1024 but
+it will not be generic fix.
+
+Regards,
+Anup
