@@ -1,91 +1,34 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 25 Jul 2017 15:45:51 +0200
-Subject: [PATCH v2 1/2] platform: Add Amlogic Meson AO CEC Controller
- driver
-In-Reply-To: <f6e40d38-fe18-49e6-0ee1-a4467666777c@baylibre.com>
-References: <1499673696-21372-1-git-send-email-narmstrong@baylibre.com>
- <1499673696-21372-2-git-send-email-narmstrong@baylibre.com>
- <b5cb7021-4c9e-98b2-5fd1-11effda3fd30@xs4all.nl>
- <f6e40d38-fe18-49e6-0ee1-a4467666777c@baylibre.com>
-Message-ID: <6f93edd0-098e-6cbc-9eea-99dd68ab3420@xs4all.nl>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 25 Jul 2017 21:50:02 +0800
+Subject: [PATCH 0/4] crypto: caam - add Job Ring support for DPAA2 parts
+In-Reply-To: <VI1PR0401MB2591E386907CD8EA92DED08498B80@VI1PR0401MB2591.eurprd04.prod.outlook.com>
+References: <20170718153050.15330-1-horia.geanta@nxp.com>
+ <20170725132129.GB29754@dragon>
+ <VI1PR0401MB2591E386907CD8EA92DED08498B80@VI1PR0401MB2591.eurprd04.prod.outlook.com>
+Message-ID: <20170725135000.GC29754@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/17 14:34, Neil Armstrong wrote:
-> Hi Hans,
-
->>> +static int meson_ao_cec_probe(struct platform_device *pdev)
->>> +{
->>> +	struct meson_ao_cec_device *ao_cec;
->>> +	struct platform_device *hdmi_dev;
->>> +	struct device_node *np;
->>> +	struct resource *res;
->>> +	int ret, irq;
->>> +
->>> +	np = of_parse_phandle(pdev->dev.of_node, "hdmi-phandle", 0);
->>> +	if (!np) {
->>> +		dev_err(&pdev->dev, "Failed to find hdmi node\n");
->>> +		return -ENODEV;
->>> +	}
->>> +
->>> +	hdmi_dev = of_find_device_by_node(np);
->>> +	if (hdmi_dev == NULL)
->>> +		return -EPROBE_DEFER;
->>> +
->>> +	ao_cec = devm_kzalloc(&pdev->dev, sizeof(*ao_cec), GFP_KERNEL);
->>> +	if (!ao_cec)
->>> +		return -ENOMEM;
->>> +
->>> +	spin_lock_init(&ao_cec->cec_reg_lock);
->>> +
->>> +	ao_cec->notify = cec_notifier_get(&hdmi_dev->dev);
->>> +	if (!ao_cec->notify)
->>> +		return -ENOMEM;
->>> +
->>> +	ao_cec->adap = cec_allocate_adapter(&meson_ao_cec_ops, ao_cec,
->>> +					    "meson_ao_cec",
->>> +					    CEC_CAP_LOG_ADDRS |
->>> +					    CEC_CAP_TRANSMIT |
->>> +					    CEC_CAP_RC |
->>> +					    CEC_CAP_PASSTHROUGH,
->>> +					    1); /* Use 1 for now */
->>
->> I recommend that you add support for 2 logical addresses. More isn't allowed
->> by the CEC 2.0 spec anyway (no such restriction for CEC 1.4, but more than
->> two really isn't needed).
+On Tue, Jul 25, 2017 at 01:31:52PM +0000, Horia Geant? wrote:
+> On 7/25/2017 4:22 PM, Shawn Guo wrote:
+> > On Tue, Jul 18, 2017 at 06:30:46PM +0300, Horia Geant? wrote:
+> >> This patch set adds support for CAAM's legacy Job Ring backend / interface
+> >> on platforms having DPAA2 (Datapath Acceleration Architecture v2), like
+> >> LS1088A or LS2088A.
+> >>
+> >> I would like to get the DT patches through the crypto list (to make sure
+> >> they don't end up merged before driver support).
+> > 
+> > Unless it's really urgent (usually critical bug fix), the DTS patches
+> > should go through arm-soc tree.  We usually take DTS patches after the
+> > driver counterpart has been accepted by subsystem maintainers, or in the
+> > best case, has landed on mainline.
 > 
-> I know, but in the "communication" register with the suspend/poweroff firmware
-> that  handles the wake up, only a single logical address is supported...
+> Thanks for the clarification.
 > 
-> What should I do in this case ? Which logical adress should I pass to the firmware when implementing ir ?
+> Do I have to re-post the DTS patches once the driver is accepted or a
+> ping should suffice or...?
 
-Ah, OK. Interesting.
+A ping is sufficient.
 
->From cec-adap.c:
-
-                if (log_addrs->num_log_addrs == 2) {
-                        if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_AUDIOSYSTEM) |
-                                           (1 << CEC_LOG_ADDR_TYPE_TV)))) {
-                                dprintk(1, "two LAs is only allowed for audiosystem and TV\n");
-                                return -EINVAL;
-                        }
-                        if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_PLAYBACK) |
-                                           (1 << CEC_LOG_ADDR_TYPE_RECORD)))) {
-                                dprintk(1, "an audiosystem/TV can only be combined with record or playback\n");
-                                return -EINVAL;
-                        }
-                }
-
-So you would store the TV or AUDIOSYSTEM logical address in the firmware, since those
-describe the system best.
-
-I.e. it is a TV/Audiosystem with recording/playback capabilities.
-
-The problem is that for CEC 1.4 no such restriction is imposed (the test above is
-specific to CEC 2.0). But I think it makes sense to just check if TV/Audiosystem
-is selected and pick that as the LA to store in the firmware, and otherwise just
-pick the first LA (log_addr[0]).
-
-Regards,
-
-	Hans
+Shawn
