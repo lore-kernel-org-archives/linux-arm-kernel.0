@@ -1,34 +1,49 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Tue, 25 Jul 2017 10:10:17 +0800
-Subject: [PATCH] dt-bindings: mtd: add new compatible strings for mtk nor
- controller
-In-Reply-To: <1500948617-19627-1-git-send-email-guochun.mao@mediatek.com>
-References: <1500948617-19627-1-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <1500948617-19627-2-git-send-email-guochun.mao@mediatek.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Tue, 25 Jul 2017 11:04:24 +0800
+Subject: [PATCH 0/3] Add ethernet0 alias for several A64 boards
+In-Reply-To: <20170724075823.7ttjq4tnvoupo776@flea>
+References: <20170722022852.7868-1-icenowy@aosc.io>
+ <20170724075823.7ttjq4tnvoupo776@flea>
+Message-ID: <f4016e61dbe4655a0e672c3377f35dd2@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
-for nor flash node's compatible strings.
+? 2017-07-24 15:58?Maxime Ripard ???
+> On Sat, Jul 22, 2017 at 10:28:49AM +0800, Icenowy Zheng wrote:
+>> Allwinner A64 SoC has an EMAC which is used to provide Ethernet
+>> function on several boards.
+>> 
+>> The EMAC itself doesn't have a fixed MAC address, but the sunxi
+>> mainline U-Boot have the ability to generate one based on the eFUSE
+>> SID in the chip, and add the generated MAC address to the device
+>> tree when booting.
+>> 
+>> The MAC address setting step is based on the device tree's aliases,
+>> and device tree nodes prefixed "ethernet" will get the MAC address
+>> added. However, in several A64 boards' device tree, the alias is not
+>> set up, so that the U-Boot won't set the MAC address.
+>> 
+>> Add the ethernet0 aliases to these boards.
+>> 
+>> I hope this patchset can be queued in 4.13, otherwise 4.13 kernels
+>> won't get non-volatile MAC addresses, and will use random ones
+>> instead, which is annoying to many users.
+>> 
+>> Icenowy Zheng (3):
+>>   arm64: allwinner: a64: add ethernet0 alias for BPi M64 EMAC node
+>>   arm64: allwinner: a64: add ethernet0 alias for Pine64 EMAC node
+>>   arm64: allwinner: a64: add ethernet0 alias for SoPine EMAC node
+> 
+> Applied all three, thanks!
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
----
- .../devicetree/bindings/mtd/mtk-quadspi.txt        |    2 ++
- 1 file changed, 2 insertions(+)
+Sorry, but could you queue them to 4.13?
 
-diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-index 5ded66a..9845ff4 100644
---- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-@@ -3,6 +3,8 @@
- Required properties:
- - compatible: 	  The possible values are:
- 		  "mediatek,mt2701-nor"
-+		  "mediatek,mt2712-nor"
-+		  "mediatek,mt7622-nor"
- 		  "mediatek,mt7623-nor"
- 		  "mediatek,mt8173-nor"
- 		  For mt8173, compatible should be "mediatek,mt8173-nor".
--- 
-1.7.9.5
+Otherwise 4.13 kernel release will have annoying random MAC problem,
+which heavily affects headless usages.
+
+> Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
