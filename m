@@ -1,24 +1,20 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 25 Jul 2017 17:28:02 +0200
-Subject: [PATCH v4 1/9] clk: at91: clk-generated: remove useless divisor
- loop
-In-Reply-To: <b9d92004d22f745e8acde0599359d67538c006a9.1500968090.git-series.quentin.schulz@free-electrons.com>
+Date: Tue, 25 Jul 2017 17:33:50 +0200
+Subject: [PATCH v4 5/9] clk: at91: clk-generated: create function to find
+ best_diff
+In-Reply-To: <8fe980cd3343111a57bd1b099beaaf51b95396d4.1500968090.git-series.quentin.schulz@free-electrons.com>
 References: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
- <b9d92004d22f745e8acde0599359d67538c006a9.1500968090.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <4bffddd0-cf9d-8f68-204a-f754f7f384d5@microchip.com>
+ <8fe980cd3343111a57bd1b099beaaf51b95396d4.1500968090.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <f384980c-6a01-6879-e60c-d261fb4ae388@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 25/07/2017 at 09:37, Quentin Schulz wrote:
-> The driver requests the current clk rate of each of its parent clocks to
-> decide whether a clock rate is suitable or not. It does not request
-> determine_rate from a parent clock which could request a rate change in
-> parent clock (i.e. there is no parent rate propagation).
+> The way to find the best_diff and do the appropriate process afterwards
+> can be re-used.
 > 
-> We know the rate we want (passed along req argument of the function) and
-> the parent clock rate, thus we know the closest rounded divisor, we
-> don't need to iterate over the available divisors to find the best one
-> for a given clock.
+> This patch prepares the driver for an upcoming patch that will allow
+> clk_generated to determine the rate of the audio_pll.
 > 
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
@@ -26,45 +22,75 @@ On 25/07/2017 at 09:37, Quentin Schulz wrote:
 Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
 > ---
->  drivers/clk/at91/clk-generated.c | 25 ++++++++++++-------------
->  1 file changed, 12 insertions(+), 13 deletions(-)
+>  drivers/clk/at91/clk-generated.c | 41 +++++++++++++++++++++------------
+>  1 file changed, 27 insertions(+), 14 deletions(-)
 > 
 > diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-> index f0b7ae9..ef4b4e0 100644
+> index ef4b4e0..7260e49 100644
 > --- a/drivers/clk/at91/clk-generated.c
 > +++ b/drivers/clk/at91/clk-generated.c
-> @@ -124,19 +124,18 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
->  		    (gck->range.max && min_rate > gck->range.max))
+> @@ -99,15 +99,36 @@ clk_generated_recalc_rate(struct clk_hw *hw,
+>  	return DIV_ROUND_CLOSEST(parent_rate, gck->gckdiv + 1);
+>  }
+>  
+> +static void clk_generated_best_diff(struct clk_rate_request *req,
+> +				    struct clk_hw *parent,
+> +				    unsigned long parent_rate, u32 div,
+> +				    int *best_diff, long *best_rate)
+> +{
+> +	unsigned long tmp_rate;
+> +	int tmp_diff;
+> +
+> +	if (!div)
+> +		tmp_rate = parent_rate;
+> +	else
+> +		tmp_rate = parent_rate / div;
+> +	tmp_diff = abs(req->rate - tmp_rate);
+> +
+> +	if (*best_diff < 0 || *best_diff > tmp_diff) {
+> +		*best_rate = tmp_rate;
+> +		*best_diff = tmp_diff;
+> +		req->best_parent_rate = parent_rate;
+> +		req->best_parent_hw = parent;
+> +	}
+> +}
+> +
+>  static int clk_generated_determine_rate(struct clk_hw *hw,
+>  					struct clk_rate_request *req)
+>  {
+>  	struct clk_generated *gck = to_clk_generated(hw);
+>  	struct clk_hw *parent = NULL;
+>  	long best_rate = -EINVAL;
+> -	unsigned long tmp_rate, min_rate;
+> +	unsigned long min_rate;
+>  	int best_diff = -1;
+> -	int tmp_diff;
+>  	int i;
+>  
+>  	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+> @@ -125,18 +146,10 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
 >  			continue;
 >  
-> -		for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
-> -			tmp_rate = DIV_ROUND_CLOSEST(parent_rate, div);
-> -			tmp_diff = abs(req->rate - tmp_rate);
+>  		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
+> -		if (!div)
+> -			tmp_rate = parent_rate;
+> -		else
+> -			tmp_rate = parent_rate / div;
+> -		tmp_diff = abs(req->rate - tmp_rate);
 > -
-> -			if (best_diff < 0 || best_diff > tmp_diff) {
-> -				best_rate = tmp_rate;
-> -				best_diff = tmp_diff;
-> -				req->best_parent_rate = parent_rate;
-> -				req->best_parent_hw = parent;
-> -			}
-> -
-> -			if (!best_diff || tmp_rate < req->rate)
-> -				break;
-> +		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
-> +		if (!div)
-> +			tmp_rate = parent_rate;
-> +		else
-> +			tmp_rate = parent_rate / div;
-> +		tmp_diff = abs(req->rate - tmp_rate);
+> -		if (best_diff < 0 || best_diff > tmp_diff) {
+> -			best_rate = tmp_rate;
+> -			best_diff = tmp_diff;
+> -			req->best_parent_rate = parent_rate;
+> -			req->best_parent_hw = parent;
+> -		}
 > +
-> +		if (best_diff < 0 || best_diff > tmp_diff) {
-> +			best_rate = tmp_rate;
-> +			best_diff = tmp_diff;
-> +			req->best_parent_rate = parent_rate;
-> +			req->best_parent_hw = parent;
->  		}
+> +		clk_generated_best_diff(req, parent, parent_rate, div,
+> +					&best_diff, &best_rate);
+> +
 >  
 >  		if (!best_diff)
+>  			break;
 > 
 
 
