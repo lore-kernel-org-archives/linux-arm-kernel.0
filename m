@@ -1,60 +1,53 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 25 Jul 2017 17:45:05 +0200
-Subject: [PATCH v4 2/9] dt-bindings: clk: at91: add audio plls to the
- compatible list
-In-Reply-To: <ab59b9d6b4bcd3a26672ce83e379f49c551eb9ba.1500968090.git-series.quentin.schulz@free-electrons.com>
-References: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
- <ab59b9d6b4bcd3a26672ce83e379f49c551eb9ba.1500968090.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <edbdb328-7684-3087-79ec-63fcc9ff1b37@microchip.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 25 Jul 2017 17:55:01 +0200
+Subject: [PATCH 0/8] net: mvpp2: add TX interrupts support
+Message-ID: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/2017 at 09:37, Quentin Schulz wrote:
-> This new clock driver set allows to have a fractional divided clock that
-> would generate a precise clock particularly suitable for audio
-> applications.
-> 
-> The main audio pll clock has two children clocks: one that is connected
-> to the PMC, the other that can directly drive a pad. As these two routes
-> have different enable bits and different dividers and divider formulas,
-> they are handled by two different drivers.
-> 
-> This adds the audio plls (frac, pad and pmc) to the compatible list of
-> at91 clocks in DT binding.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Hello,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+So far, the mvpp2 driver was using an hrtimer to handle TX
+completion. This patch series adds support for using TX interrupts
+(for each CPU) on PPv2.2, the variant of the IP used on Marvell Armada
+7K/8K.
 
-> ---
->  Documentation/devicetree/bindings/clock/at91-clock.txt | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
-> index 5f3ad65..51c259a 100644
-> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
-> @@ -81,6 +81,16 @@ Required properties:
->  	"atmel,sama5d2-clk-generated":
->  		at91 generated clock
->  
-> +	"atmel,sama5d2-clk-audio-pll-frac":
-> +		at91 audio fractional pll
-> +
-> +	"atmel,sama5d2-clk-audio-pll-pad":
-> +		at91 audio pll CLK_AUDIO output pin
-> +
-> +	"atmel,sama5d2-clk-audio-pll-pmc"
-> +		at91 audio pll output on AUDIOPLLCLK that feeds the PMC
-> +		and can be used by peripheral clock or generic clock
-> +
->  Required properties for SCKC node:
->  - reg : defines the IO memory reserved for the SCKC.
->  - #size-cells : shall be 0 (reg is used to encode clk id).
-> 
+This series has been tested on Marvell Armada 7K (PPv2.2) and Armada
+375 (PPv2.1).
 
+Dave:
+
+ - This series depends on the previous series sent by Antoine T?nart
+   "net: mvpp2: MAC/GoP configuration and optional PHYs". Functionally
+   speaking there is no real dependency, but we touch in a few areas
+   the same piece of code, so I based my patch series on top of
+   Antoine's.
+
+ - Please do not apply the last patch of this series "arm64: dts:
+   marvell: add TX interrupts for PPv2.2", it will be taken by the ARM
+   mvebu maintainers.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (8):
+  net: mvpp2: fix MVPP21_ISR_RXQ_GROUP_REG definition
+  net: mvpp2: remove RX queue group reset code
+  net: mvpp2: introduce per-port nrxqs/ntxqs variables
+  net: mvpp2: move from cpu-centric naming to "software thread" naming
+  net: mvpp2: introduce queue_vector concept
+  net: mvpp2: add support for TX interrupts and RX queue distribution
+    modes
+  dt-bindings: net: marvell-pp2: update interrupt-names with TX
+    interrupts
+  arm64: dts: marvell: add TX interrupts for PPv2.2
+
+ .../devicetree/bindings/net/marvell-pp2.txt        |  33 +-
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |  21 +-
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  21 +-
+ drivers/net/ethernet/marvell/mvpp2.c               | 638 +++++++++++++++------
+ 4 files changed, 534 insertions(+), 179 deletions(-)
 
 -- 
-Nicolas Ferre
+2.9.4
