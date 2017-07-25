@@ -1,163 +1,135 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Jul 2017 11:55:42 +0100
-Subject: [PATCH 5/6] arm64: Implement pmem API support
+Date: Tue, 25 Jul 2017 11:55:43 +0100
+Subject: [PATCH 6/6] arm64: uaccess: Implement *_flushcache variants
 In-Reply-To: <cover.1500397441.git.robin.murphy@arm.com>
 References: <cover.1500397441.git.robin.murphy@arm.com>
-Message-ID: <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
+Message-ID: <a82a48f72b8099c1ef6a32a63819619637797ef8.1500397441.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a clean-to-point-of-persistence cache maintenance helper, and wire
-up the basic architectural support for the pmem driver based on it.
+Implement the set of copy functions with guarantees of a clean cache
+upon completion necessary to support the pmem driver.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/Kconfig                  | 11 +++++++++++
- arch/arm64/include/asm/assembler.h  |  6 ++++++
- arch/arm64/include/asm/cacheflush.h |  1 +
- arch/arm64/include/asm/cpucaps.h    |  3 ++-
- arch/arm64/kernel/cpufeature.c      | 11 +++++++++++
- arch/arm64/mm/cache.S               | 14 ++++++++++++++
- arch/arm64/mm/pageattr.c            | 18 ++++++++++++++++++
- 7 files changed, 63 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig                  |  1 +
+ arch/arm64/include/asm/string.h     |  4 ++++
+ arch/arm64/include/asm/uaccess.h    | 12 ++++++++++
+ arch/arm64/lib/Makefile             |  2 ++
+ arch/arm64/lib/uaccess_flushcache.c | 47 +++++++++++++++++++++++++++++++++++++
+ 5 files changed, 66 insertions(+)
+ create mode 100644 arch/arm64/lib/uaccess_flushcache.c
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index dfd908630631..0b0576a54724 100644
+index 0b0576a54724..e43a63b3d14b 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -960,6 +960,17 @@ config ARM64_UAO
- 	  regular load/store instructions if the cpu does not implement the
- 	  feature.
+@@ -963,6 +963,7 @@ config ARM64_UAO
+ config ARM64_PMEM
+ 	bool "Enable support for persistent memory"
+ 	select ARCH_HAS_PMEM_API
++	select ARCH_HAS_UACCESS_FLUSHCACHE
+ 	help
+ 	  Say Y to enable support for the persistent memory API based on the
+ 	  ARMv8.2 DCPoP feature.
+diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
+index d0aa42907569..dd95d33a5bd5 100644
+--- a/arch/arm64/include/asm/string.h
++++ b/arch/arm64/include/asm/string.h
+@@ -52,6 +52,10 @@ extern void *__memset(void *, int, __kernel_size_t);
+ #define __HAVE_ARCH_MEMCMP
+ extern int memcmp(const void *, const void *, size_t);
  
-+config ARM64_PMEM
-+	bool "Enable support for persistent memory"
-+	select ARCH_HAS_PMEM_API
-+	help
-+	  Say Y to enable support for the persistent memory API based on the
-+	  ARMv8.2 DCPoP feature.
-+
-+	  The feature is detected at runtime, and the kernel will use DC CVAC
-+	  operations if DC CVAP is not supported (following the behaviour of
-+	  DC CVAP itself if the system does not define a point of persistence).
-+
- endmenu
- 
- config ARM64_MODULE_CMODEL_LARGE
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 1b67c3782d00..5d8903c45031 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -353,6 +353,12 @@ alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
- alternative_else
- 	dc	civac, \kaddr
- alternative_endif
-+	.elseif	(\op == cvap)
-+alternative_if ARM64_HAS_DCPOP
-+	sys 3, c7, c12, 1, \kaddr	// dc cvap
-+alternative_else
-+	dc	cvac, \kaddr
-+alternative_endif
- 	.else
- 	dc	\op, \kaddr
- 	.endif
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index b4b43a94dffd..76d1cc85d5b1 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -69,6 +69,7 @@ extern void flush_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
- extern void __inval_dcache_area(void *addr, size_t len);
- extern void __clean_dcache_area_poc(void *addr, size_t len);
-+extern void __clean_dcache_area_pop(void *addr, size_t len);
- extern void __clean_dcache_area_pou(void *addr, size_t len);
- extern long __flush_cache_user_range(unsigned long start, unsigned long end);
- extern void sync_icache_aliases(void *kaddr, unsigned long len);
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 8d2272c6822c..8da621627d7c 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -39,7 +39,8 @@
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
- #define ARM64_WORKAROUND_858921			19
- #define ARM64_WORKAROUND_CAVIUM_30115		20
-+#define ARM64_HAS_DCPOP				21
- 
--#define ARM64_NCAPS				21
-+#define ARM64_NCAPS				22
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a2542ef3ff25..cd52d365d1f0 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -889,6 +889,17 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.min_field_value = 0,
- 		.matches = has_no_fpsimd,
- 	},
-+#ifdef CONFIG_ARM64_PMEM
-+	{
-+		.desc = "Data cache clean to Point of Persistence",
-+		.capability = ARM64_HAS_DCPOP,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64ISAR1_EL1,
-+		.field_pos = ID_AA64ISAR1_DPB_SHIFT,
-+		.min_field_value = 1,
-+	},
++#ifdef CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE
++#define __HAVE_ARCH_MEMCPY_FLUSHCACHE
++void memcpy_flushcache(void *dst, const void *src, size_t cnt);
 +#endif
- 	{},
- };
  
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index ed47fbbb4b05..7f1dbe962cf5 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -172,6 +172,20 @@ ENDPIPROC(__clean_dcache_area_poc)
- ENDPROC(__dma_clean_area)
+ #if defined(CONFIG_KASAN) && !defined(__SANITIZE_ADDRESS__)
  
- /*
-+ *	__clean_dcache_area_pop(kaddr, size)
-+ *
-+ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-+ * 	are cleaned to the PoP.
-+ *
-+ *	- kaddr   - kernel address
-+ *	- size    - size in question
-+ */
-+ENTRY(__clean_dcache_area_pop)
-+	dcache_by_line_op cvap, sy, x0, x1, x2, x3
-+	ret
-+ENDPIPROC(__clean_dcache_area_pop)
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 8f0a1de11e4a..bb056fee297c 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -347,4 +347,16 @@ extern long strncpy_from_user(char *dest, const char __user *src, long count);
+ 
+ extern __must_check long strnlen_user(const char __user *str, long n);
+ 
++#ifdef CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE
++struct page;
++void memcpy_page_flushcache(char *to, struct page *page, size_t offset, size_t len);
++extern unsigned long __must_check __copy_user_flushcache(void *to, const void __user *from, unsigned long n);
 +
++static inline int __copy_from_user_flushcache(void *dst, const void __user *src, unsigned size)
++{
++	kasan_check_write(dst, size);
++	return __copy_user_flushcache(dst, src, size);
++}
++#endif
++
+ #endif /* __ASM_UACCESS_H */
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index c86b7909ef31..a0abc142c92b 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -17,3 +17,5 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
+ 		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
+ 		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
+ 		   -fcall-saved-x18
++
++lib-$(CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE) += uaccess_flushcache.o
+diff --git a/arch/arm64/lib/uaccess_flushcache.c b/arch/arm64/lib/uaccess_flushcache.c
+new file mode 100644
+index 000000000000..b6ceafdb8b72
+--- /dev/null
++++ b/arch/arm64/lib/uaccess_flushcache.c
+@@ -0,0 +1,47 @@
 +/*
-  *	__dma_flush_area(start, size)
-  *
-  *	clean & invalidate D / U line
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index a682a0a2a0fa..a461a00ceb3e 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -183,3 +183,21 @@ bool kernel_page_present(struct page *page)
- }
- #endif /* CONFIG_HIBERNATION */
- #endif /* CONFIG_DEBUG_PAGEALLOC */
++ * Copyright (C) 2017 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+#ifdef CONFIG_ARCH_HAS_PMEM_API
++#include <linux/uaccess.h>
++#include <asm/barrier.h>
 +#include <asm/cacheflush.h>
 +
-+static inline void arch_wb_cache_pmem(void *addr, size_t size)
++void memcpy_flushcache(void *dst, const void *src, size_t cnt)
 +{
-+	/* Ensure order against any prior non-cacheable writes */
-+	dmb(sy);
-+	__clean_dcache_area_pop(addr, size);
++	/*
++	 * We assume this should not be called with @dst pointing to
++	 * non-cacheable memory, such that we don't need an explicit
++	 * barrier to order the cache maintenance against the memcpy.
++	 */
++	memcpy(dst, src, cnt);
++	__clean_dcache_area_pop(dst, cnt);
 +}
-+EXPORT_SYMBOL_GPL(arch_wb_cache_pmem);
++EXPORT_SYMBOL_GPL(memcpy_flushcache);
 +
-+static inline void arch_invalidate_pmem(void *addr, size_t size)
++void memcpy_page_flushcache(char *to, struct page *page, size_t offset,
++			    size_t len)
 +{
-+	__inval_dcache_area(addr, size);
++	memcpy_flushcache(to, page_address(page) + offset, len);
 +}
-+EXPORT_SYMBOL_GPL(arch_invalidate_pmem);
-+#endif
++
++unsigned long __copy_user_flushcache(void *to, const void __user *from,
++				     unsigned long n)
++{
++	unsigned long rc = __arch_copy_from_user(to, from, n);
++
++	/* See above */
++	__clean_dcache_area_pop(to, n - rc);
++	return rc;
++}
 -- 
 2.12.2.dirty
