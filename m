@@ -1,38 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 25 Jul 2017 19:28:42 +0200
-Subject: [PATCH v2] ARM: sa1100/pxa: fix MTD_XIP build
-In-Reply-To: <20170725152616.4143857-1-arnd@arndb.de> (Arnd Bergmann's message
- of "Tue, 25 Jul 2017 17:25:47 +0200")
-References: <20170725152616.4143857-1-arnd@arndb.de>
-Message-ID: <87shhkqvcl.fsf@belgarion.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 25 Jul 2017 10:29:48 -0700
+Subject: [PATCH 3/5] arm64: dts: msm8996: Add modem smp2p nodes
+In-Reply-To: <20170725054705.20674-4-bjorn.andersson@linaro.org>
+References: <20170725054705.20674-1-bjorn.andersson@linaro.org>
+ <20170725054705.20674-4-bjorn.andersson@linaro.org>
+Message-ID: <0425e832-4784-2127-72f1-8944ee2033fa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> In commit 3169663ac5902 "ARM: sa11x0/pxa: convert OS timer registers
-> to IOMEM", the definition of the OSCR macro was changed to be an
-> __iomem pointer, but the same register is also used by the XIP
-> code. This patch does the corresponding change here as well.
->
-> On PXA, the IRQ register definitions were removed even earlier, in
-> commit 5d284e353eb1 ("ARM: pxa: avoid accessing interrupt registers
-> directly"). This patch unfortunately brings some of that back. An
-> earlier version of my patch moved the code into an external function,
-> which could not work for CONFIG_XIP_KERNEL+CONFIG_MTD_XIP, so this
-> restores something close to the original code.
->
-> Link: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241716.html
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+On 07/24/2017 10:47 PM, Bjorn Andersson wrote:
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 > ---
+>  arch/arm64/boot/dts/qcom/msm8996.dtsi | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 >
-> v2: add back outer () as Robert suggested
-For mach-pxa :
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> index 8ebef05e1750..7d909546ca24 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> @@ -662,6 +662,30 @@
+>  		};
+>  	};
+>  
+> +	modem-smp2p {
+> +		compatible = "qcom,smp2p";
+> +		qcom,smem = <435>, <428>;
+> +
+> +		interrupts = <0 451 IRQ_TYPE_EDGE_RISING>;
 
-Cheers.
+s/0/GIC_SPI/?
 
---
-Robert
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
