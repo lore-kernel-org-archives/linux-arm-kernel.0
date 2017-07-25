@@ -1,363 +1,317 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Jul 2017 19:15:36 +0100
-Subject: [PATCH v2] arm64: kernel: implement fast refcount checking
-Message-ID: <20170725181536.21092-1-ard.biesheuvel@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 25 Jul 2017 20:44:38 +0200 (CEST)
+Subject: No Ethernet on Raspberry Pi 3 in v4.13-rc1
+In-Reply-To: <38cfb4d7-c356-d2b2-0367-69ef3417d941@arm.com>
+References: <5650979e-ea55-0337-2edd-d2c3e8ad0e37@suse.de>
+ <b849a4dc-a095-6bb4-caf1-a1f7470bed91@arm.com>
+ <1435162494.87709.1500959996834@email.1und1.de>
+ <38cfb4d7-c356-d2b2-0367-69ef3417d941@arm.com>
+Message-ID: <378781535.113835.1501008278477@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support to arm64 for fast refcount checking, as proposed by
-Kees for x86 based on the implementation by grsecurity/PaX.
 
-The general approach is identical: the existing atomic_t helpers are
-cloned for refcount_t, with a single branch instruction added that
-jumps to an out of line handler if overflow and/or decrement to
-zero is detected.
+> Robin Murphy <robin.murphy@arm.com> hat am 25. Juli 2017 um 15:21 geschrieben:
+> 
+> From the subsequent fallout (which on closer inspection looks more to do
+> with calling into uninitialised SWIOTLB state than the arm64 DMA code
+> actually doing anything wrong), I'd guess dev->dma_pfn_offset is
+> probably 0 as well, which further points to the wrong device. Maybe
+> something's changed lower down in the USB core? Turning on tracing and
+> booting with "tp_printk trace_event=swiotlb_bounced" on the command line
+> should shed a bit more light on what's going on.
 
-One complication that we have to deal with on arm64 is the fact that
-is has two atomics implementations: the original LL/SC implementation
-using load/store exclusive loops, and the newer LSE one that do mostly
-the same in a single instruction. So we need to clone some parts of
-both for the refcount handlers, but we also need to deal with the way
-LSE builds fall back to LL/SC at runtime if the hardware does not
-support it.
+I took a slightly different config which also works with 4.12 and break with 4.13-rc1:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-This is a quick v2 after I sent the original RFC patch only 6 hours ago.
-However, as Kees pointed out, it appears I am not the only person looking
-into this for arm64, and so it makes sense to share my latest before going
-on travel for the rest of the week.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.13.0-rc1-ARCH (stefan at Latitude-E4310) (gcc version 6.3.1 20170109 (Linaro GCC 6.3-2017.02)) #34 SMP Tue Jul 25 20:31:35 CEST 2017
+[    0.000000] Boot CPU: AArch64 Processor [410fd034]
+[    0.000000] Machine model: Raspberry Pi 3 Model B Rev 1.2
+[    0.000000] efi: Getting EFI parameters from FDT:
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Failed to reserve 512 MiB
+[    0.000000] percpu: Embedded 3 pages/cpu @ffff80003ae90000 s125336 r8192 d63080 u196608
+[    0.000000] Detected VIPT I-cache on CPU0
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping off.  Total pages: 15089
+[    0.000000] Kernel command line: earlyprintk console=ttyAMA0 bcm2708_fb.fbwidth=656 bcm2708_fb.fbheight=416 bcm2708_fb.fbswap=1 dma.dmachans=0x7f35 bcm2709.boardrev=0xa02082 bcm2709.serial=0x53a68e44 bcm2709.uart_clock=48000000 smsc95xx.macaddr=B8:27:EB:A6:8E:44 vc_mem.mem_base=0x3dc00000 vc_mem.mem_size=0x3f000000  dwc_otg.lpm_enable=0 console=ttyS0,115200 console=tty1 root=PARTUUID=29cb32be-02 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait tp_printk trace_event=swiotlb_bounced
+[    0.000000] PID hash table entries: 4096 (order: -1, 32768 bytes)
+[    0.000000] Dentry cache hash table entries: 131072 (order: 4, 1048576 bytes)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 3, 524288 bytes)
+[    0.000000] Memory: 939712K/966656K available (11836K kernel code, 2400K rwdata, 5376K rodata, 1600K init, 1269K bss, 26944K reserved, 0K cma-reserved)
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
+[    0.000000]     vmalloc : 0xffff000008000000 - 0xffff7bdfffff0000   (126847 GB)
+[    0.000000]       .text : 0xffff000008080000 - 0xffff000008c10000   ( 11840 KB)
+[    0.000000]     .rodata : 0xffff000008c10000 - 0xffff000009160000   (  5440 KB)
+[    0.000000]       .init : 0xffff000009160000 - 0xffff0000092f0000   (  1600 KB)
+[    0.000000]       .data : 0xffff0000092f0000 - 0xffff000009548200   (  2401 KB)
+[    0.000000]        .bss : 0xffff000009548200 - 0xffff000009685988   (  1270 KB)
+[    0.000000]     fixed   : 0xffff7fdffe7d0000 - 0xffff7fdffec00000   (  4288 KB)
+[    0.000000]     PCI I/O : 0xffff7fdffee00000 - 0xffff7fdfffe00000   (    16 MB)
+[    0.000000]     vmemmap : 0xffff7fe000000000 - 0xffff800000000000   (   128 GB maximum)
+[    0.000000]               0xffff7fe000000000 - 0xffff7fe0000ec000   (     0 MB actual)
+[    0.000000]     memory  : 0xffff800000000000 - 0xffff80003b000000   (   944 MB)
+[    0.000000] random: get_random_u64 called from cache_random_seq_create+0x60/0x118 with crng_init=0
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
+[    0.000000] ftrace: allocating 43369 entries in 11 pages
+[    0.000000] Hierarchical RCU implementation.
+[    0.000000]  RCU restricting CPUs from NR_CPUS=8 to nr_cpu_ids=4.
+[    0.000000]  Tasks RCU enabled.
+[    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=4
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] arch_timer: WARNING: Invalid trigger for IRQ2, assuming level low
+[    0.000000] arch_timer: WARNING: Please fix your firmware
+[    0.000000] arch_timer: cp15 timer(s) running at 19.20MHz (phys).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x46d987e47, max_idle_ns: 440795202767 ns
+[    0.000006] sched_clock: 56 bits at 19MHz, resolution 52ns, wraps every 4398046511078ns
+[    0.000180] Console: colour dummy device 80x25
+[    0.001202] console [tty1] enabled
+[    0.001246] Calibrating delay loop (skipped), value calculated using timer frequency.. 38.40 BogoMIPS (lpj=192000)
+[    0.001296] pid_max: default: 32768 minimum: 301
+[    0.002076] Security Framework initialized
+[    0.002106] Yama: becoming mindful.
+[    0.002325] Mount-cache hash table entries: 8192 (order: 0, 65536 bytes)
+[    0.002417] Mountpoint-cache hash table entries: 8192 (order: 0, 65536 bytes)
+[    0.004540] ASID allocator initialised with 65536 entries
+[    0.004664] Hierarchical SRCU implementation.
+[    0.010622] EFI services will not be available.
+[    0.010923] smp: Bringing up secondary CPUs ...
+[    0.011453] Detected VIPT I-cache on CPU1
+[    0.011509] arch_timer: WARNING: Invalid trigger for IRQ2, assuming level low
+[    0.011512] arch_timer: WARNING: Please fix your firmware
+[    0.011528] CPU1: Booted secondary processor [410fd034]
+[    0.012110] Detected VIPT I-cache on CPU2
+[    0.012141] arch_timer: WARNING: Invalid trigger for IRQ2, assuming level low
+[    0.012144] arch_timer: WARNING: Please fix your firmware
+[    0.012154] CPU2: Booted secondary processor [410fd034]
+[    0.012684] Detected VIPT I-cache on CPU3
+[    0.012715] arch_timer: WARNING: Invalid trigger for IRQ2, assuming level low
+[    0.012717] arch_timer: WARNING: Please fix your firmware
+[    0.012727] CPU3: Booted secondary processor [410fd034]
+[    0.012834] smp: Brought up 1 node, 4 CPUs
+[    0.013114] SMP: Total of 4 processors activated.
+[    0.013142] CPU features: detected feature: 32-bit EL0 Support
+[    0.013307] CPU: All CPU(s) started at EL2
+[    0.015793] devtmpfs: initialized
+[    0.022239] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
+[    0.022309] futex hash table entries: 1024 (order: 1, 131072 bytes)
+[    0.022999] pinctrl core: initialized pinctrl subsystem
+[    0.023916] DMI not present or invalid.
+[    0.024474] NET: Registered protocol family 16
+[    0.028000] cpuidle: using governor ladder
+[    0.028269] cpuidle: using governor menu
+[    0.029692] vdso: 2 pages (1 code @ ffff000008c20000, 1 data @ ffff000009310000)
+[    0.029739] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.030383] DMA: preallocated 256 KiB pool for atomic allocations
+[    0.030911] Serial: AMBA PL011 UART driver
+[    0.049727] HugeTLB registered 512 MiB page size, pre-allocated 0 pages
+[    0.051674] ACPI: Interpreter disabled.
+[    0.052370] vgaarb: loaded
+[    0.053556] SCSI subsystem initialized
+[    0.053990] usbcore: registered new interface driver usbfs
+[    0.054069] usbcore: registered new interface driver hub
+[    0.054178] usbcore: registered new device driver usb
+[    0.054675] EDAC MC: Ver: 3.0.0
+[    0.055011] dmi: Firmware registration failed.
+[    0.055611] Advanced Linux Sound Architecture Driver Initialized.
+[    0.056114] NetLabel: Initializing
+[    0.056140] NetLabel:  domain hash size = 128
+[    0.056164] NetLabel:  protocols = UNLABELED CIPSOv4 CALIPSO
+[    0.056279] NetLabel:  unlabeled traffic allowed by default
+[    0.057594] clocksource: Switched to clocksource arch_sys_counter
+[    0.182792] VFS: Disk quotas dquot_6.6.0
+[    0.182999] VFS: Dquot-cache hash table entries: 8192 (order 0, 65536 bytes)
+[    0.184087] simple-framebuffer 3db75000.framebuffer: framebuffer at 0x3db75000, 0x85400 bytes, mapped to 0xffff000009805000
+[    0.184142] simple-framebuffer 3db75000.framebuffer: format=r5g6b5, mode=656x416x16, linelength=1312
+[    0.187891] Console: switching to colour frame buffer device 82x26
+[    0.191335] simple-framebuffer 3db75000.framebuffer: fb0: simplefb registered!
+[    0.193151] pnp: PnP ACPI: disabled
+[    0.203229] NET: Registered protocol family 2
+[    0.205911] TCP established hash table entries: 8192 (order: 0, 65536 bytes)
+[    0.207946] TCP bind hash table entries: 8192 (order: 1, 131072 bytes)
+[    0.210134] TCP: Hash tables configured (established 8192 bind 8192)
+[    0.212244] UDP hash table entries: 2048 (order: 0, 65536 bytes)
+[    0.214363] UDP-Lite hash table entries: 2048 (order: 0, 65536 bytes)
+[    0.216763] NET: Registered protocol family 1
+[    0.219246] RPC: Registered named UNIX socket transport module.
+[    0.221261] RPC: Registered udp transport module.
+[    0.223251] RPC: Registered tcp transport module.
+[    0.225191] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    0.228900] kvm [1]: 8-bit VMID
+[    0.230805] kvm [1]: IDype id_legacy registered
+[    0.283590] nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+[    0.285369] SGI XFS with ACLs, security attributes, no debug enabled
+[    0.303717] NET: Registered protocol family 38
+[    0.305462] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 246)
+[    0.308778] io scheduler noop registered
+[    0.310387] io scheduler deadline registered (default)
+[    0.312143] io scheduler cfq registered
+[    0.313777] io scheduler mq-deadline registered
+[    0.315373] io scheduler kyber registered
+[    0.317182] io scheduler bfq registered
+[    0.319158] atomic64_test: passed
+[    0.328445] ipmi message handler version 39.2
+[    0.337902] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    0.341209] console [ttyS0] disabled
+[    0.342867] 3f215040.serial: ttyS0 at MMIO 0x0 (irq = 61, base_baud = 31250000) is a 16550
+[    1.197104] console [ttyS0] enabled
+[    1.203172] msm_serial: driver initialized
+[    1.209904] bcm2835-rng 3f104000.rng: hwrng registered
+[    1.217568] cacheinfo: Unable to detect cache hierarchy for CPU 0
+[    1.228419] libphy: Fixed MDIO Bus: probed
+[    1.235986] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[    1.244308] ehci-pci: EHCI PCI platform driver
+[    1.250478] ehci-platform: EHCI generic platform driver
+[    1.257466] ehci-orion: EHCI orion driver
+[    1.263190] ehci-msm: Qualcomm On-Chip EHCI Host Controller
+[    1.270538] tegra-ehci: Tegra EHCI driver
+[    1.276353] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+[    1.284312] ohci-pci: OHCI PCI platform driver
+[    1.290560] ohci-platform: OHCI generic platform driver
+[    1.297709] uhci_hcd: USB Universal Host Controller Interface driver
+[    1.306437] usbcore: registered new interface driver uas
+[    1.313751] usbcore: registered new interface driver usb-storage
+[    1.321640] usbcore: registered new interface driver ums-alauda
+[    1.329376] usbcore: registered new interface driver ums-cypress
+[    1.337103] usbcore: registered new interface driver ums-datafab
+[    1.344744] usbcore: registered new interface driver ums_eneub6250
+[    1.352544] usbcore: registered new interface driver ums-freecom
+[    1.360120] usbcore: registered new interface driver ums-isd200
+[    1.367552] usbcore: registered new interface driver ums-jumpshot
+[    1.375110] usbcore: registered new interface driver ums-karma
+[    1.382334] usbcore: registered new interface driver ums-onetouch
+[    1.389768] usbcore: registered new interface driver ums-realtek
+[    1.397021] usbcore: registered new interface driver ums-sddr09
+[    1.404156] usbcore: registered new interface driver ums-sddr55
+[    1.411253] usbcore: registered new interface driver ums-usbat
+[    1.418273] usbcore: registered new interface driver usbserial
+[    1.425152] usbcore: registered new interface driver usbserial_generic
+[    1.432693] usbserial: USB Serial support registered for generic
+[    1.440885] mousedev: PS/2 mouse device common for all mice
+[    1.450044] device-mapper: uevent: version 1.0.3
+[    1.455933] device-mapper: ioctl: 4.36.0-ioctl (2017-06-09) initialised: dm-devel at redhat.com
+[    1.466760] Machine is not compatible with mt8173-cpufreq
+[    1.473600] sdhci: Secure Digital Host Controller Interface driver
+[    1.480990] sdhci: Copyright(c) Pierre Ossman
+[    1.487095] Synopsys Designware Multimedia Card Interface Driver
+[    1.495432] sdhci-pltfm: SDHCI platform and OF driver helper
+[    1.567684] mmc0: SDHCI controller on 3f300000.sdhci [3f300000.sdhci] using PIO
+[    1.577297] ledtrig-cpu: registered to indicate activity on CPUs
+[    1.585085] dmi-sysfs: dmi entry is absent.
+[    1.591052] hidraw: raw HID events driver (C) Jiri Kosina
+[    1.598237] usbcore: registered new interface driver usbhid
+[    1.605490] usbhid: USB HID core driver
+[    1.611683] bcm2835-mbox 3f00b880.mailbox: mailbox enabled
+[    1.617090] mmc0: new high speed SDHC card at address 0001
+[    1.617693] mmcblk0: mmc0:0001 00000 29.8 GiB
+[    1.622335]  mmcblk0: p1 p2
+[    1.639605] drop_monitor: Initializing network drop monitor service
+[    1.648144] ip_tables: (C) 2000-2006 Netfilter Core Team
+[    1.655402] Initializing XFRM netlink socket
+[    1.662316] NET: Registered protocol family 10
+[    1.670909] Segment Routing with IPv6
+[    1.676458] mip6: Mobile IPv6
+[    1.681189] NET: Registered protocol family 17
+[    1.687471] Key type dns_resolver registered
+[    1.694865] registered taskstats version 1
+[    1.700808] zswap: loaded using pool lzo/zbud
+[    1.708435] Key type big_key registered
+[    1.715236] Key type encrypted registered
+[    1.724312] 3f201000.serial: ttyAMA0 at MMIO 0x3f201000 (irq = 72, base_baud = 0) is a PL011 rev2
+[    5.265460] console [ttyAMA0] enabled
+[    5.284373] raspberrypi-firmware soc:firmware: Attached to firmware from 2017-05-15 16:57
+[    5.347032] dwc2 3f980000.usb: 3f980000.usb supply vusb_d not found, using dummy regulator
+[    5.383637] dwc2 3f980000.usb: 3f980000.usb supply vusb_a not found, using dummy regulator
+[    5.471022] dwc2 3f980000.usb: DWC OTG Controller
+[    5.491923] dwc2 3f980000.usb: new USB bus registered, assigned bus number 1
+[    5.522064] dwc2 3f980000.usb: irq 41, io mem 0x3f980000
+[    5.545422] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002
+[    5.574537] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    5.605424] usb usb1: Product: DWC OTG Controller
+[    5.626188] usb usb1: Manufacturer: Linux 4.13.0-rc1-ARCH dwc2_hsotg
+[    5.653623] usb usb1: SerialNumber: 3f980000.usb
+[    5.674597] hub 1-0:1.0: USB hub found
+[    5.691583] hub 1-0:1.0: 1 port detected
+[    5.709740] hctosys: unable to open rtc device (rtc0)
+[    5.732170] ALSA device list:
+[    5.745944]   No soundcards found.
+[    5.761534] md: Waiting for all devices to be available before autodetect
+[    5.790696] md: If you don't use raid, use raid=noautodetect
+[    5.815981] md: Autodetecting RAID arrays.
+[    5.834224] md: autorun ...
+[    5.847116] md: ... autorun DONE.
+[    5.894169] EXT4-fs (mmcblk0p2): mounted filesystem with ordered data mode. Opts: (null)
+[    5.930036] VFS: Mounted root (ext4 filesystem) readonly on device 179:2.
+[    5.968062] devtmpfs: mounted
+[    5.989908] Freeing unused kernel memory: 1600K
+[    6.137682] usb 1-1: new high-speed USB device number 2 using dwc2
+[    6.137736] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d79d80 size=8 NO_FORCE
+[    6.137754] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d79d80
+[    6.137771] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d72700 size=64 NO_FORCE
+[    6.137779] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d72700
+[    6.138562] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d79d80 size=8 NO_FORCE
+[    6.138570] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d79d80
+[    6.138581] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d72700 size=64 NO_FORCE
+[    6.138589] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d72700
+[    6.138655] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d79d80 size=8 NO_FORCE
+[    6.138663] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d79d80
+[    6.138674] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d72700 size=64 NO_FORCE
+[    6.138681] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d72700
+[    6.357642] usb 1-1: device descriptor read/64, error -32
+[    6.420281] systemd[1]: System time before build time, advancing clock.
+[    6.497649] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7d400 size=8 NO_FORCE
+[    6.497671] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d7d400
+[    6.497686] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76080 size=64 NO_FORCE
+[    6.497693] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d76080
+[    6.497801] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7d400 size=8 NO_FORCE
+[    6.497809] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d7d400
+[    6.497820] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76080 size=64 NO_FORCE
+[    6.497827] dwc2 3f980000.usb: Cannot do DMA to address 0x0000000024d76080
+[    6.497884] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7d400 size=8 NO_FORCE
+[    6.497895] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76080 size=64 NO_FORCE
+[    6.767606] usb 1-1: device descriptor read/64, error -32
+[    7.103734] systemd[1]: systemd 233 running in system mode. (+PAM -AUDIT -SELINUX -IMA -APPARMOR +SMACK -SYSVINIT +UTMP +LIBCRYPTSETUP +GCRYPT +GNUTLS +ACL +XZ +LZ4 -SECCOMP +BLKID +ELFUTILS +KMOD +IDN default-hierarchy=hybrid)
+[    7.157624] usb 1-1: new high-speed USB device number 3 using dwc2
+[    7.157664] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76c80 size=8 NO_FORCE
+[    7.157686] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7f880 size=64 NO_FORCE
+[    7.304546] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76c80 size=8 NO_FORCE
+[    7.305253] systemd[1]: Detected architecture arm64.
+[    7.369500] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7f880 size=64 NO_FORCE
+[    7.369680] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76c80 size=8 NO_FORCE
+[    7.369692] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7f880 size=64 NO_FORCE
+[    7.505581] systemd[1]: Set hostname to <alarm>.
+[    7.577794] usb 1-1: device descriptor read/64, error -32
+[    7.629650] uart-pl011 3f201000.serial: no DMA platform data
+[    7.717682] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76c80 size=8 NO_FORCE
+[    7.759839] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7f880 size=64 NO_FORCE
+[    7.802399] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76c80 size=8 NO_FORCE
+[    7.844561] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7f880 size=64 NO_FORCE
+[    7.887138] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d76c80 size=8 NO_FORCE
+[    7.929426] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7f880 size=64 NO_FORCE
+[    7.994968] systemd[1]: Listening on Process Core Dump Socket.
+[    8.023899] systemd[1]: Started Forward Password Requests to Wall Directory Watch.
+[    8.062090] systemd[1]: Listening on Journal Socket.
+[    8.087225] systemd[1]: Listening on Journal Socket (/dev/log).
+[    8.156061] systemd[1]: Listening on udev Control Socket.
+[    8.177613] usb 1-1: device descriptor read/64, error -32
+[    8.208056] systemd[1]: Set up automount Arbitrary Executable File Formats File System Automount Point.
+[    8.253168] systemd[1]: Listening on Device-mapper event daemon FIFOs.
+[    8.507731] usb 1-1: new high-speed USB device number 4 using dwc2
+[    8.547742] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d77380 size=8 NO_FORCE
+[    8.596619] systemd-journald[198]: Received request to flush runtime journal from PID 1
+[    8.807702] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7d080 size=8 NO_FORCE
+[    9.067672] usb 1-1: device not accepting address 4, error -32
+[    9.307662] usb 1-1: new high-speed USB device number 5 using dwc2
+[    9.334282] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7d700 size=8 NO_FORCE
+[    9.587730] swiotlb_bounced: dev_name: 3f980000.usb dma_mask=7fffffff dev_addr=e4d7dd00 size=8 NO_FORCE
+[    9.847705] usb 1-1: device not accepting address 5, error -32
+[    9.881425] usb usb1-port1: unable to enumerate USB device
+[   11.287698] random: crng init done
 
-v2: - Avoid adrp instructions, it does not always work in modules. Instead,
-      use a 32-bit offset in the out-of-line sequence that we can dereference
-      in the handler.
-    - Use release semantics for sub/dec
-    - Switch to b.mi / b.ls which better matches the x86 code (we don't
-      actually detect signed overflow, i.e., from 0x7fffffff to 0x80000000)
-    - Write a commit log
-
-Now tested using lkdtm: not all tests work as expected (the SATURATE ones
-seem broken) but Kees has this covered already.
-
- arch/arm64/Kconfig                    |  1 +
- arch/arm64/include/asm/atomic.h       | 15 ++++
- arch/arm64/include/asm/atomic_ll_sc.h | 28 +++++++
- arch/arm64/include/asm/atomic_lse.h   | 52 ++++++++++++
- arch/arm64/include/asm/brk-imm.h      |  1 +
- arch/arm64/include/asm/refcount.h     | 88 ++++++++++++++++++++
- arch/arm64/kernel/traps.c             | 37 ++++++++
- arch/arm64/lib/atomic_ll_sc.c         |  6 ++
- 8 files changed, 228 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index dfd908630631..53b9a8f5277b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -16,6 +16,7 @@ config ARM64
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
- 	select ARCH_HAS_KCOV
-+	select ARCH_HAS_REFCOUNT
- 	select ARCH_HAS_SET_MEMORY
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_STRICT_KERNEL_RWX
-diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-index c0235e0ff849..93a0313ab0ae 100644
---- a/arch/arm64/include/asm/atomic.h
-+++ b/arch/arm64/include/asm/atomic.h
-@@ -24,10 +24,25 @@
- #include <linux/types.h>
- 
- #include <asm/barrier.h>
-+#include <asm/brk-imm.h>
- #include <asm/lse.h>
- 
- #ifdef __KERNEL__
- 
-+#define REFCOUNT_CHECK(cond)						\
-+"22:	b." #cond "	33f\n"						\
-+"	.pushsection	\".text.unlikely\"\n"				\
-+"33:	mov		x16, %[counter]\n"				\
-+"	adr		x17, 44f\n"					\
-+"	brk		%[brk_imm]\n"					\
-+"44:	.long		22b - .\n"					\
-+"	.popsection\n"
-+
-+#define REFCOUNT_INPUTS(r)						\
-+	[counter] "r" (&(r)->counter), [brk_imm] "i" (REFCOUNT_BRK_IMM),
-+
-+#define REFCOUNT_CLOBBERS	: "cc", "x16", "x17"
-+
- #define __ARM64_IN_ATOMIC_IMPL
- 
- #if defined(CONFIG_ARM64_LSE_ATOMICS) && defined(CONFIG_AS_LSE)
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index f5a2d09afb38..99d0beb70ef1 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -327,4 +327,32 @@ __CMPXCHG_DBL(_mb, dmb ish, l, "memory")
- 
- #undef __CMPXCHG_DBL
- 
-+#define REFCOUNT_OP(op, asm_op, cond, l, clobber...)			\
-+__LL_SC_INLINE int							\
-+__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))			\
-+{									\
-+	unsigned long tmp;						\
-+	int result;							\
-+									\
-+	asm volatile("// refcount_" #op "\n"				\
-+"	prfm		pstl1strm, %2\n"				\
-+"1:	ldxr		%w0, %2\n"					\
-+"	" #asm_op "	%w0, %w0, %w[i]\n"				\
-+"	st" #l "xr	%w1, %w0, %2\n"					\
-+"	cbnz		%w1, 1b\n"					\
-+	REFCOUNT_CHECK(cond)						\
-+	: "=&r" (result), "=&r" (tmp), "+Q" (r->counter)		\
-+	: REFCOUNT_INPUTS(r) [i] "Ir" (i)				\
-+	clobber);							\
-+									\
-+	return result;							\
-+}									\
-+__LL_SC_EXPORT(__refcount_##op);
-+
-+REFCOUNT_OP(add_lt, adds, mi,  , REFCOUNT_CLOBBERS);
-+REFCOUNT_OP(sub_lt_neg, adds, mi, l, REFCOUNT_CLOBBERS);
-+REFCOUNT_OP(sub_le_neg, adds, ls, l, REFCOUNT_CLOBBERS);
-+REFCOUNT_OP(sub_lt, subs, mi, l, REFCOUNT_CLOBBERS);
-+REFCOUNT_OP(sub_le, subs, ls, l, REFCOUNT_CLOBBERS);
-+
- #endif	/* __ASM_ATOMIC_LL_SC_H */
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index 99fa69c9c3cf..0551dfe6679a 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -531,4 +531,56 @@ __CMPXCHG_DBL(_mb, al, "memory")
- #undef __LL_SC_CMPXCHG_DBL
- #undef __CMPXCHG_DBL
- 
-+#define REFCOUNT_ADD_OP(op, rel, cond)					\
-+static inline int __refcount_##op(int i, atomic_t *r)			\
-+{									\
-+	register int w0 asm ("w0") = i;					\
-+	register atomic_t *x1 asm ("x1") = r;				\
-+									\
-+	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
-+	/* LL/SC */							\
-+	__LL_SC_CALL(__refcount_##op)					\
-+	__nops(1),							\
-+	/* LSE atomics */						\
-+	"	ldadd" #rel "	%w[i], w30, %[v]\n"			\
-+	"	adds		%w[i], %w[i], w30")			\
-+	REFCOUNT_CHECK(cond)						\
-+	: [i] "+r" (w0), [v] "+Q" (r->counter)				\
-+	: REFCOUNT_INPUTS(r) "r" (x1)					\
-+	: __LL_SC_CLOBBERS, "cc");					\
-+									\
-+	return w0;							\
-+}
-+
-+#define REFCOUNT_SUB_OP(op, cond, fbop)					\
-+static inline int __refcount_##op(int i, atomic_t *r)			\
-+{									\
-+	register int w0 asm ("w0") = i;					\
-+	register atomic_t *x1 asm ("x1") = r;				\
-+									\
-+	if (__builtin_constant_p(i))					\
-+		return __refcount_##fbop(-i, r);			\
-+									\
-+	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
-+	/* LL/SC */							\
-+	__LL_SC_CALL(__refcount_##op)					\
-+	__nops(2),							\
-+	/* LSE atomics */						\
-+	"	neg	%w[i], %w[i]\n"					\
-+	"	ldaddl	%w[i], w30, %[v]\n"				\
-+	"	adds	%w[i], %w[i], w30")				\
-+	REFCOUNT_CHECK(cond)						\
-+	: [i] "+r" (w0), [v] "+Q" (r->counter)				\
-+	: REFCOUNT_INPUTS(r) "r" (x1)					\
-+	: __LL_SC_CLOBBERS, "cc");					\
-+									\
-+	return w0;							\
-+}
-+
-+REFCOUNT_ADD_OP(add_lt, , mi);
-+REFCOUNT_ADD_OP(sub_lt_neg, l, mi);
-+REFCOUNT_ADD_OP(sub_le_neg, l, ls);
-+REFCOUNT_SUB_OP(sub_lt, mi, sub_lt_neg);
-+REFCOUNT_SUB_OP(sub_le, ls, sub_le_neg);
-+
- #endif	/* __ASM_ATOMIC_LSE_H */
-diff --git a/arch/arm64/include/asm/brk-imm.h b/arch/arm64/include/asm/brk-imm.h
-index ed693c5bcec0..0bce57737ff1 100644
---- a/arch/arm64/include/asm/brk-imm.h
-+++ b/arch/arm64/include/asm/brk-imm.h
-@@ -18,6 +18,7 @@
-  * 0x800: kernel-mode BUG() and WARN() traps
-  */
- #define FAULT_BRK_IMM			0x100
-+#define REFCOUNT_BRK_IMM		0x101
- #define KGDB_DYN_DBG_BRK_IMM		0x400
- #define KGDB_COMPILED_DBG_BRK_IMM	0x401
- #define BUG_BRK_IMM			0x800
-diff --git a/arch/arm64/include/asm/refcount.h b/arch/arm64/include/asm/refcount.h
-new file mode 100644
-index 000000000000..575c199cb34a
---- /dev/null
-+++ b/arch/arm64/include/asm/refcount.h
-@@ -0,0 +1,88 @@
-+/*
-+ * arm64-specific implementation of refcount_t. Based on x86 version and
-+ * PAX_REFCOUNT from PaX/grsecurity.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_REFCOUNT_H
-+#define __ASM_REFCOUNT_H
-+
-+#include <linux/refcount.h>
-+
-+#include <asm/atomic.h>
-+#include <asm/uaccess.h>
-+
-+static __always_inline void refcount_add(int i, refcount_t *r)
-+{
-+	__refcount_add_lt(i, &r->refs);
-+}
-+
-+static __always_inline void refcount_inc(refcount_t *r)
-+{
-+	__refcount_add_lt(1, &r->refs);
-+}
-+
-+static __always_inline void refcount_dec(refcount_t *r)
-+{
-+	__refcount_sub_le(1, &r->refs);
-+}
-+
-+static __always_inline __must_check bool refcount_sub_and_test(unsigned int i,
-+							       refcount_t *r)
-+{
-+	return __refcount_sub_lt(i, &r->refs) == 0;
-+}
-+
-+static __always_inline __must_check bool refcount_dec_and_test(refcount_t *r)
-+{
-+	return __refcount_sub_lt(1, &r->refs) == 0;
-+}
-+
-+/**
-+ * __refcount_add_unless - add unless the number is already a given value
-+ * @r: pointer of type refcount_t
-+ * @a: the amount to add to v...
-+ * @u: ...unless v is equal to u.
-+ *
-+ * Atomically adds @a to @r, so long as @r was not already @u.
-+ * Returns the old value of @r.
-+ */
-+static __always_inline __must_check int __refcount_add_unless(refcount_t *r,
-+							      int a, int u)
-+{
-+	int c, new;
-+
-+	c = atomic_read(&(r->refs));
-+	do {
-+		if (unlikely(c == u))
-+			break;
-+
-+		asm volatile(
-+			"adds	%0, %0, %2	;"
-+			REFCOUNT_CHECK(lt)
-+			: "=r" (new)
-+			: "0" (c), "Ir" (a),
-+			  [counter] "r" (&r->refs.counter),
-+			  [brk_imm] "i" (REFCOUNT_BRK_IMM)
-+			: "cc", "x16", "x17");
-+
-+	} while (!atomic_try_cmpxchg(&(r->refs), &c, new));
-+
-+	return c;
-+}
-+
-+static __always_inline __must_check
-+bool refcount_add_not_zero(unsigned int i, refcount_t *r)
-+{
-+	return __refcount_add_unless(r, i, 0) != 0;
-+}
-+
-+static __always_inline __must_check bool refcount_inc_not_zero(refcount_t *r)
-+{
-+	return refcount_add_not_zero(1, r);
-+}
-+
-+#endif
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index c7c7088097be..69040206a559 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -758,8 +758,45 @@ int __init early_brk64(unsigned long addr, unsigned int esr,
- 	return bug_handler(regs, esr) != DBG_HOOK_HANDLED;
- }
- 
-+static int refcount_overflow_handler(struct pt_regs *regs, unsigned int esr)
-+{
-+	/* First unconditionally saturate the refcount. */
-+	*(int *)regs->regs[16] = INT_MIN / 2;
-+
-+	/*
-+	 * This function has been called because either a negative refcount
-+	 * value was seen by any of the refcount functions, or a zero
-+	 * refcount value was seen by refcount_dec().
-+	 *
-+	 * Duplicate the condition check against PSTATE based on the
-+	 * instructions that could have brought us here:
-+	 *
-+	 *   b.mi  =>  N == 1
-+	 *   b.ls  =>  C == 0 || Z == 1
-+	 */
-+	if (regs->pstate & (PSR_N_BIT | PSR_Z_BIT) ||
-+	    !(regs->pstate & PSR_C_BIT)) {
-+		bool zero = regs->pstate & PSR_Z_BIT;
-+
-+		/* point pc to the branch instruction that brought us here */
-+		regs->pc = regs->regs[17] + *(s32 *)regs->regs[17];
-+		refcount_error_report(regs, zero ? "hit zero" : "overflow");
-+	}
-+
-+	/* advance pc and proceed */
-+	regs->pc += 4;
-+	return DBG_HOOK_HANDLED;
-+}
-+
-+static struct break_hook refcount_break_hook = {
-+	.esr_val	= 0xf2000000 | REFCOUNT_BRK_IMM,
-+	.esr_mask	= 0xffffffff,
-+	.fn		= refcount_overflow_handler,
-+};
-+
- /* This registration must happen early, before debug_traps_init(). */
- void __init trap_init(void)
- {
- 	register_break_hook(&bug_break_hook);
-+	register_break_hook(&refcount_break_hook);
- }
-diff --git a/arch/arm64/lib/atomic_ll_sc.c b/arch/arm64/lib/atomic_ll_sc.c
-index b0c538b0da28..5f038abdc635 100644
---- a/arch/arm64/lib/atomic_ll_sc.c
-+++ b/arch/arm64/lib/atomic_ll_sc.c
-@@ -1,3 +1,9 @@
- #include <asm/atomic.h>
- #define __ARM64_IN_ATOMIC_IMPL
-+#undef REFCOUNT_CHECK
-+#undef REFCOUNT_INPUTS
-+#undef REFCOUNT_CLOBBERS
-+#define REFCOUNT_CHECK(cond)
-+#define REFCOUNT_INPUTS(r)
-+#define REFCOUNT_CLOBBERS : "cc"
- #include <asm/atomic_ll_sc.h>
--- 
-2.9.3
+> 
+> Robin.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
