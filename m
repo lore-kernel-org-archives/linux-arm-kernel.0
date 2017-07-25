@@ -1,97 +1,184 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Jul 2017 14:58:34 +0100
-Subject: [PATCH 3/4] arm64: unwind: reference pt_regs via embedded stack
- frame
-In-Reply-To: <20170725131303.GA28815@arm.com>
-References: <20170724112623.26109-1-ard.biesheuvel@linaro.org>
- <20170724112623.26109-4-ard.biesheuvel@linaro.org>
- <20170724175446.GE9726@leverpostej>
- <20170725131303.GA28815@arm.com>
-Message-ID: <20170725135833.GA8372@leverpostej>
+From: hw.likun@huawei.com (Li Kun)
+Date: Tue, 25 Jul 2017 22:12:24 +0800
+Subject: [kernel-hardening] [PATCH 00/11] ARMv8.3 pointer authentication
+ userspace support
+In-Reply-To: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <b28dcd14-7b4c-b4f3-830b-dbd436200df9@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 02:13:03PM +0100, Will Deacon wrote:
-> On Mon, Jul 24, 2017 at 06:54:46PM +0100, Mark Rutland wrote:
-> > On Mon, Jul 24, 2017 at 12:26:22PM +0100, Ard Biesheuvel wrote:
+Hi Mark,
 
-> > So here, we're using information from three records (where the last
-> > might have been faked from the current FP + LR). We look at the previous
-> > frame's LR value to determine whether the current frame's fp points to a
-> > next frame that's associated with some regs:
-> > 
-> >          +----+----------------+
-> >          | fp | interrupted PC | /* embedded in pt_regs */
-> >          +----+----------------+
-> >            /\
-> >            ||
-> >          +----+----------------+
-> > where => | fp | < entry PC >   |
-> >          +----+----------------+
-> >            /\
-> >            ||
-> >          +----+----------------+
-> >          | fp | where          | /* "where" is in exception text */
-> >          +----+----------------+
-> > 
-> > Which (IIUC) has three problems, inherited from the existing approach.
-> > 
-> > 1) Several C functions called from exception entry assembly are missing
-> >    __exception annotations. e.g. bad_mode.
-> >    
-> >    So we can miss exception regs in some cases.
-> > 
-> > 2) Several functions may be called either from the exception entry
-> >    assembly, or from other C code. e.g. do_undefinstr, and any cascaded
-> >    irqchip handlers.
-> >    
-> >    So we can spuriously decide part of the stack is a pt_regs.
-> > 
-> > 3) The entry assembly can enable exceptions before calling C code, so if
-> >    an exception is taken at the right time, these will eb in the
-> >    backtrace without a surrounding frame in the exception text.
-> > 
-> >    So we can miss exception regs in some cases (distinct from (1)).
-> > 
-> > ... given that, I don't think we can rely on in_exception_text(). I
-> > think we have to look at whether the current frame's PC/LR is in
-> > .entry.text.
-> 
-> Looking around, I think most (all?) users of in_exception_text and the
-> associated linker script labels suffer from similar problems. AFAICT, these
-> are:
-> 
->   kprobes	- Used to blacklist probes, but omits entry code
->   ftrace	- For graph tracer backtracing; attempted to hack around the
-> 		  problem in 9a5ad7d0e3e1 but still excludes .entry.text
->   kasan		- Duplicates ftrace stuff in core code, but also checks
-> 		  against softirqentry
-> 
-> So it looks like we should either include the entry text in these sections
-> or avoid using these functions altogether (eventually removing them). It
-> needn't hold this series up, but worth considering.
-> 
-> What do you think?
+Could you please give us some information about the impact to 
+performance to help us evaluating
 
-Agreed; this is currently a mess, and I don't think it's possible to
-make portable inferences based on these sections. This will all need an
-audit.
+the influence to the system?
 
-As you say, I think that needn't hold this series up, as those are
-orthogonal issues. I'm happy to dig into those in the coming weeks.
+Thanks a lot.
 
-The kasan case isn't too problematic. It only affects where an
-alloc/free stacktrace gets trimmed for an alloc/free in an IRQ handler,
-so in the worst case we just lose a few frames beyond the inner irqchip
-handler in the dumped backtrace.
 
-For kprobes/ftrace, I'd need to do some further digging.
+Best Regards
 
-I'd looked at cleaning up .irqentry.text in the past (as part of further
-arm64/entry-deasm work). It's typically used to find the task->IRQ (or
-X->IRQ) transition. That can be cleaned up by having a single
-(annotated) arch-specific entry point that invokes (unannotated) irqchip
-handlers. This would fix kasan, at least.
 
-Thanks,
-Mark.
+? 2017/7/20 0:01, Mark Rutland ??:
+> This series adds support for the ARMv8.3 pointer authentication extension.
+>
+> Since RFC [1]:
+> * Make the KVM context switch (semi-lazy)
+> * Rebase to v4.13-rc1
+> * Improve pointer authentication documentation
+> * Add hwcap documentation
+> * Various minor cleanups
+>
+> I've pushed the series to the arm64/pointer-auth branch [2] of my linux tree.
+> I've also pushed out a necessary bootwrapper patch to the pointer-auth branch
+> [3] of my bootwrapper repo.
+>
+>
+> Extension Overview
+> ==================
+>
+> The ARMv8.3 pointer authentication extension adds functionality to detect
+> modification of pointer values, mitigating certain classes of attack such as
+> stack smashing, and making return oriented programming attacks harder
+>
+> The extension introduces the concept of a pointer authentication code (PAC),
+> which is stored in some upper bits of pointers. Each PAC is derived from the
+> original pointer, another 64-bit value (e.g. the stack pointer), and a secret
+> 128-bit key.
+>
+> New instructions are added which can be used to:
+>
+> * Insert a PAC into a pointer
+> * Strip a PAC from a pointer
+> * Authenticate strip a PAC from a pointer
+>
+> If authentication succeeds, the code is removed, yielding the original pointer.
+> If authentication fails, bits are set in the pointer such that it is guaranteed
+> to cause a fault if used.
+>
+> These instructions can make use of four keys:
+>
+> * APIAKey (A.K.A. Instruction A key)
+> * APIBKey (A.K.A. Instruction B key)
+> * APDAKey (A.K.A. Data A key)
+> * APDBKey (A.K.A. Data B Key)
+>
+> A subset of these instruction encodings have been allocated from the HINT
+> space, and will operate as NOPs on any ARMv8 parts which do not feature the
+> extension (or if purposefully disabled by the kernel). Software using only this
+> subset of the instructions should function correctly on all ARMv8-A parts.
+>
+> Additionally, instructions are added to authenticate small blocks of memory in
+> similar fashion, using APGAKey (A.K.A. Generic key).
+>
+>
+> This Series
+> ===========
+>
+> This series enables the use of instructions using APIAKey, which is initialised
+> and maintained per-process (shared by all threads). This series does not add
+> support for APIBKey, APDAKey, APDBKey, nor APGAKey. The series only supports
+> the use of an architected algorithm.
+>
+> I've given this some basic testing with a homebrew test suite. More ideally,
+> we'd add some tests to the kernel source tree.
+>
+> I've added some basic KVM support, but this doesn't cater for systems with
+> mismatched support. Looking forward, we'll need ID register emulation in KVM so
+> that we can hide features from guests to cater for such cases.
+>
+>
+> Open questions
+> ==============
+>
+> * Should keys be per-thread rather than per-process?
+>
+>    My understanding is that glibc can't (currently) handle threads having
+>    different keys, but it might be that another libc would prefer per-thread
+>    keys. If desired, we could add a mechanism for a thread to re-initialize its
+>    keys without an exec*().
+>
+> * Do we need a separate hwcap for XPAC* instructions?
+>
+>    Library code performing stack unwinding may need to interoperate with other
+>    code which may or may not be using pointer authentication. It may be
+>    desirable to use XPAC* rather than attempting authentication and/or acquiring
+>    the PAC masks via ptrace.
+>
+>    As we may expose APIBKey (potentially separately from APIAKey) in future,
+>    HWCAP_APIA cannot be used to determine when these instruction can/should be
+>    used.
+>
+> * Should we expose a per-process data key now, to go with the insn key?
+>
+>    I don't currently have a use-case for this.
+>
+> * Should we expose generic authentication (i.e. APGAKey)?
+>
+>    I don't currently have a use-case for this.
+>
+> * Should the kernel remove PACs when unwinding user stacks?
+>
+>    This is simple to do, but it's arguably placing a policy in the kernel as to
+>    what we expect user stacks to look like. Regardless, userspace will have to
+>    perform this when unwinding with DWARF.
+>
+> Thanks,
+> Mark.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/498941.html
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/pointer-auth
+> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/boot-wrapper-aarch64.git pointer-auth
+>
+> Mark Rutland (11):
+>    arm64: docs: describe ELF hwcaps
+>    asm-generic: mm_hooks: allow hooks to be overridden individually
+>    arm64: add pointer authentication register bits
+>    arm64/cpufeature: add ARMv8.3 id_aa64isar1 bits
+>    arm64/cpufeature: detect pointer authentication
+>    arm64: Don't trap host pointer auth use to EL2
+>    arm64: add basic pointer authentication support
+>    arm64: expose user PAC bit positions via ptrace
+>    arm64/kvm: preserve host HCR_EL2 value
+>    arm64/kvm: context-switch ptrauth registers
+>    arm64: docs: document pointer authentication
+>
+>   Documentation/arm64/booting.txt                |   8 ++
+>   Documentation/arm64/elf_hwcaps.txt             | 138 +++++++++++++++++++++++++
+>   Documentation/arm64/pointer-authentication.txt |  85 +++++++++++++++
+>   arch/arm64/Kconfig                             |  23 +++++
+>   arch/arm64/include/asm/cpucaps.h               |   4 +-
+>   arch/arm64/include/asm/esr.h                   |   3 +-
+>   arch/arm64/include/asm/kvm_arm.h               |   3 +-
+>   arch/arm64/include/asm/kvm_host.h              |  28 ++++-
+>   arch/arm64/include/asm/kvm_hyp.h               |   7 ++
+>   arch/arm64/include/asm/mmu.h                   |   5 +
+>   arch/arm64/include/asm/mmu_context.h           |  25 ++++-
+>   arch/arm64/include/asm/pointer_auth.h          |  97 +++++++++++++++++
+>   arch/arm64/include/asm/sysreg.h                |  30 ++++++
+>   arch/arm64/include/uapi/asm/hwcap.h            |   1 +
+>   arch/arm64/include/uapi/asm/ptrace.h           |   5 +
+>   arch/arm64/kernel/cpufeature.c                 |  39 ++++++-
+>   arch/arm64/kernel/cpuinfo.c                    |   1 +
+>   arch/arm64/kernel/head.S                       |  19 +++-
+>   arch/arm64/kernel/ptrace.c                     |  39 +++++++
+>   arch/arm64/kvm/handle_exit.c                   |  21 ++++
+>   arch/arm64/kvm/hyp/Makefile                    |   1 +
+>   arch/arm64/kvm/hyp/ptrauth-sr.c                |  91 ++++++++++++++++
+>   arch/arm64/kvm/hyp/switch.c                    |   9 +-
+>   arch/arm64/kvm/hyp/tlb.c                       |   6 +-
+>   arch/arm64/kvm/sys_regs.c                      |  32 ++++++
+>   include/asm-generic/mm_hooks.h                 |  11 ++
+>   include/uapi/linux/elf.h                       |   1 +
+>   27 files changed, 719 insertions(+), 13 deletions(-)
+>   create mode 100644 Documentation/arm64/elf_hwcaps.txt
+>   create mode 100644 Documentation/arm64/pointer-authentication.txt
+>   create mode 100644 arch/arm64/include/asm/pointer_auth.h
+>   create mode 100644 arch/arm64/kvm/hyp/ptrauth-sr.c
+>
+
+-- 
+Best Regards
+Li Kun
