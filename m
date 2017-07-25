@@ -1,53 +1,100 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Jul 2017 17:04:20 +0100
-Subject: [PATCH V2 1/4] hw_breakpoint: Add step_needed event attribute
-In-Reply-To: <20170725141423.ufucj2wl35bdxafh@hirez.programming.kicks-ass.net>
-References: <cover.1499416107.git.panand@redhat.com>
- <9d4f76f3a0bffe93a6d5146c9b53ee7b985f22da.1499416107.git.panand@redhat.com>
- <20170725132737.GC28815@arm.com>
- <20170725141423.ufucj2wl35bdxafh@hirez.programming.kicks-ass.net>
-Message-ID: <20170725160419.GC12749@leverpostej>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 25 Jul 2017 21:37:31 +0530
+Subject: [PATCH v2 6/7] mailbox: bcm-flexrm-mailbox: Set msg_queue_len for
+ each channel
+In-Reply-To: <CAALAos9T0YtCvgjGCMVPn=dw2JKY=jTxz-v431NgpBCKFo1vVQ@mail.gmail.com>
+References: <1500620142-910-1-git-send-email-anup.patel@broadcom.com>
+ <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
+ <CABb+yY1Pxhgvvit=0eZr66DpLJ3MDEvRPx9dwDPJM8PwiKXiew@mail.gmail.com>
+ <CAALAos_yh0bCMZFrSmf-c92pNMBGhLT05YFF0duhmpxgYec+_w@mail.gmail.com>
+ <CABb+yY3d1FvfB-NBVHLNfoFXGn9-8nFEdKBhXt4sBTr1vodhYw@mail.gmail.com>
+ <CAALAos9T0YtCvgjGCMVPn=dw2JKY=jTxz-v431NgpBCKFo1vVQ@mail.gmail.com>
+Message-ID: <CABb+yY2x1Wb=RZhq+eUnM0wkcih4YkFDrKRgqhs1erGQGH3tdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 04:14:23PM +0200, Peter Zijlstra wrote:
-> On Tue, Jul 25, 2017 at 02:27:38PM +0100, Will Deacon wrote:
-> > On Fri, Jul 07, 2017 at 05:33:57PM +0530, Pratyush Anand wrote:
-> > > Architecture like ARM64 currently allows to use default hw breakpoint
-> > > single step handler only to perf. However, some other users like few
-> > > systemtap tests or kernel test in
-> > > samples/hw_breakpoint/data_breakpoint.c can also work with default step
-> > > handler implementation. At the same time, some other like GDB/ptrace may
-> > > implement their own step handler.
-> > > 
-> > > Therefore, this patch introduces a new perf_event_attr bit field, so
-> > > that arch specific code(specially on arm64) can make a decision to
-> > > enable single stepping.
-> > > 
-> > > Any architecture which is not using this field will not have any
-> > > side effect.
-> 
-> > > diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-> > > index b1c0b187acfe..00935808de0d 100644
-> > > --- a/include/uapi/linux/perf_event.h
-> > > +++ b/include/uapi/linux/perf_event.h
-> > > @@ -345,7 +345,8 @@ struct perf_event_attr {
-> > >  				context_switch :  1, /* context switch data */
-> > >  				write_backward :  1, /* Write ring buffer from end to beginning */
-> > >  				namespaces     :  1, /* include namespaces data */
-> > > -				__reserved_1   : 35;
-> > > +				step_needed    :  1, /* Use arch step handler */
-> > > +				__reserved_1   : 34;
-> > 
-> > This needs documenting properly, as I really have no idea how userspace is
-> > going to use it sensibley, especially as you silently overwrite it in some
-> > cases below.
-> 
-> This is not something userspace _can_ use sensibly afaict. Therefore it
-> should probably not live here.
+On Tue, Jul 25, 2017 at 11:11 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+> On Mon, Jul 24, 2017 at 10:06 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Mon, Jul 24, 2017 at 9:26 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>> Hi Jassi,
+>>>
+>>> Sorry for the delayed response...
+>>>
+>>> On Fri, Jul 21, 2017 at 9:16 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>> Hi Anup,
+>>>>
+>>>> On Fri, Jul 21, 2017 at 12:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>>> The Broadcom FlexRM ring (i.e. mailbox channel) can handle
+>>>>> larger number of messages queued in one FlexRM ring hence
+>>>>> this patch sets msg_queue_len for each mailbox channel to
+>>>>> be same as RING_MAX_REQ_COUNT.
+>>>>>
+>>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>> ---
+>>>>>  drivers/mailbox/bcm-flexrm-mailbox.c | 5 ++++-
+>>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>> index 9873818..20055a0 100644
+>>>>> --- a/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>> +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>> @@ -1683,8 +1683,11 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
+>>>>>                 ret = -ENOMEM;
+>>>>>                 goto fail_free_debugfs_root;
+>>>>>         }
+>>>>> -       for (index = 0; index < mbox->num_rings; index++)
+>>>>> +       for (index = 0; index < mbox->num_rings; index++) {
+>>>>> +               mbox->controller.chans[index].msg_queue_len =
+>>>>> +                                               RING_MAX_REQ_COUNT;
+>>>>>                 mbox->controller.chans[index].con_priv = &mbox->rings[index];
+>>>>> +       }
+>>>>>
+>>>> While writing mailbox.c I wasn't unaware that there is the option to
+>>>> choose the queue length at runtime.
+>>>> The idea was to keep the code as simple as possible. I am open to
+>>>> making it a runtime thing, but first, please help me understand how
+>>>> that is useful here.
+>>>>
+>>>> I understand FlexRm has a ring buffer of RING_MAX_REQ_COUNT(1024)
+>>>> elements. Any message submitted to mailbox api can be immediately
+>>>> written onto the ringbuffer if there is some space.
+>>>> Is there any mechanism to report back to a client driver, if its
+>>>> message in ringbuffer failed "to be sent"?
+>>>> If there isn't any, then I think, in flexrm_last_tx_done() you should
+>>>> simply return true if there is some space left in the rung-buffer,
+>>>> false otherwise.
+>>>
+>>> Yes, we have error code in "struct brcm_message" to report back
+>>> errors from send_message. In our mailbox clients, we check
+>>> return value of mbox_send_message() and also the error code
+>>> in "struct brcm_message".
+>>>
+>> I meant after the message has been accepted in the ringbuffer but the
+>> remote failed to receive it.
+>
+> Yes, even this case is handled.
+>
+> In case of IO errors after message has been put in ring buffer, we get
+> completion message with error code and mailbox client drivers will
+> receive back "struct brcm_message" with error set.
+>
+> You can refer flexrm_process_completions() for more details.
+>
+>> There seems no such provision. IIANW, then you should be able to
+>> consider every message as "sent successfully" once it is in the ring
+>> buffer i.e, immediately after mbox_send_message() returns 0.
+>> In that case I would think you don't need more than a couple of
+>> entries out of MBOX_TX_QUEUE_LEN ?
+>
+> What I am trying to suggest is that we can take upto 1024 messages
+> in a FlexRM ring but the MBOX_TX_QUEUE_LEN limits us queuing
+> more messages. This issue manifest easily when multiple CPUs
+> queues to same FlexRM ring (i.e. same mailbox channel).
+>
+OK then, I guess we have to make the queue length a runtime decision.
 
-Indeed. When I suggested this, I meant that it would be a
-kernel-internal flag, and not UAPI.
+BTW, is it a practical use case that needs to queue upto 1024
+requests? Or are you just testing?
 
-Thanks,
-Mark.
+Thanks
