@@ -1,261 +1,73 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 25 Jul 2017 23:42:10 +0200
-Subject: [PATCH v4 02/12] ALSA: ac97: add an ac97 bus
-In-Reply-To: <20170724204928.29505-3-robert.jarzmik@free.fr>
-References: <20170724204928.29505-1-robert.jarzmik@free.fr>
- <20170724204928.29505-3-robert.jarzmik@free.fr>
-Message-ID: <s5h60eg8a8d.wl-tiwai@suse.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 25 Jul 2017 23:47:09 +0200
+Subject: [PATCH v5 2/7] drm/rockchip: vop: move write_relaxed flags to vop
+ register
+In-Reply-To: <1500518608-30538-1-git-send-email-mark.yao@rock-chips.com>
+References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
+ <1500518608-30538-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <2048476.V4PpOSpEqb@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Jul 2017 22:49:18 +0200,
-Robert Jarzmik wrote:
+Hi Mark,
+
+Am Donnerstag, 20. Juli 2017, 10:43:27 CEST schrieb Mark Yao:
+> Since the drm atomic framework, only a small part of the vop
+> register needs sync write, Currently seems only following registers
+> need sync write:
+>    cfg_done, standby and interrupt related register.
 > 
-> AC97 is a bus for sound usage. It enables for a AC97 AC-Link to link one
-> controller to 0 to 4 AC97 codecs.
+> All ctrl registers are using the sync write method that is
+> inefficient, hardcode the write_relaxed flags to vop registers,
+> then can only do synchronize write for those actual needed register.
 > 
-> The goal of this new implementation is to implement a device/driver
-> model for AC97, with an automatic scan of the bus and automatic
-> discovery of AC97 codec devices.
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 > ---
-> Since RFCv1:
->  - Takashi's review
->    - changed the codec.h guard ... a better name could be found ...
->    - added the AC97_* macros missing parenthesis
->    - constantified the id_table in the codec driver structure
->    - changed the 4 codecs linked list into an array
->    - enabled the ac97 bus to be a module
->    - added a slots_available to snd_ac97_controller_register() to have a
->      way to prevent scanning and probing of unconnected codecs
->    - removed useless ac97 bus index
->    - all exported functions begin with snd_ac97_*()
->    - change bus operations to controller+slot parameters instead of
->      codec device
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 14 +++-------
+>  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 42 ++++++++++++++++-------------
+>  2 files changed, 28 insertions(+), 28 deletions(-)
 > 
->  - Mark's review
->    - changed ac97_digital_controller into ac97_controller
->    - rename ac97_digital_controller_*() into ac97_controller_*()
->    - add the ac97 ac-link clock to the codec device (ie. the AC'97
->      BIT_CLK)
-> 
-> Since RFCv2:
->  - more snd_ac97 namespace review
->  - change the compat allocation prototype to force the user to provide
->    and ac97_codec_device structure pointer
-> 
-> Since v1:
->  - took into account all Lars comments
-> 
-> Since v3:
->  - took into account Takashi's comments (ac97bus naming and module_exit)
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 81164d6..784a2b7 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -42,18 +42,12 @@
+>  #include "rockchip_drm_psr.h"
+>  #include "rockchip_drm_vop.h"
+>  
+> -#define __REG_SET_RELAXED(x, off, mask, shift, v, write_mask) \
+> -		vop_mask_write(x, off, mask, shift, v, write_mask, true)
+> -
+> -#define __REG_SET_NORMAL(x, off, mask, shift, v, write_mask) \
+> -		vop_mask_write(x, off, mask, shift, v, write_mask, false)
+> -
+>  #define REG_SET(x, base, reg, v, mode) \
+> -		__REG_SET_##mode(x, base + reg.offset, \
+> -				 reg.mask, reg.shift, v, reg.write_mask)
+> +		vop_mask_write(x, base + reg.offset, reg.mask, reg.shift, \
+> +			       v, reg.write_mask, reg.relaxed)
+>  #define REG_SET_MASK(x, base, reg, mask, v, mode) \
+> -		__REG_SET_##mode(x, base + reg.offset, \
+> -				 mask, reg.shift, v, reg.write_mask)
+> +		vop_mask_write(x, base + reg.offset, \
+> +			       mask, reg.shift, v, reg.write_mask, reg.relaxed)
 
-It looks mostly OK, but some nitpicking:
+you only introduce the relaxed element of struct vop_reg in patch4.
+So using it here produces a compile error
 
+../drivers/gpu/drm/rockchip/rockchip_drm_vop.c: In function ?vop_cfg_done?:
+../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:47:33: error: ?const struct vop_reg? has no member named ?relaxed?
+           v, reg.write_mask, reg.relaxed)
+                                 ^
+../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:59:3: note: in expansion of macro ?REG_SET?
+   REG_SET(x, 0, (x)->data->ctrl->name, v, NORMAL)
+   ^~~~~~~
+../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:201:2: note: in expansion of macro ?VOP_CTRL_SET?
+  VOP_CTRL_SET(vop, cfg_done, 1);
+  ^~~~~~~~~~~~
 
-> diff --git a/include/sound/ac97/compat.h b/include/sound/ac97/compat.h
-> new file mode 100644
-> index 000000000000..d876464bf7e4
-> --- /dev/null
-> +++ b/include/sound/ac97/compat.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This file is for backward compatibility with snd_ac97 structure and its
-> + * multiple usages, such as the snd_ac97_bus and snd_ac97_build_ops.
-> + *
-> + */
-> +#ifndef AC97_COMPAT_H
-> +#define AC97_COMPAT_H
-> +
-> +#include <sound/ac97_codec.h>
-> +#include <sound/soc.h>
-
-Is this inclusion needed?  The code here doesn't look ASoC-specific at
-all.
-
-> --- /dev/null
-> +++ b/include/sound/ac97/controller.h
-> @@ -0,0 +1,84 @@
-> +/*
-> + *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef AC97_CONTROLLER_H
-> +#define AC97_CONTROLLER_H
-> +
-> +#include <linux/list.h>
-> +
-> +#define AC97_BUS_MAX_CODECS 4
-> +#define AC97_SLOTS_AVAILABLE_ALL 0xf
-> +
-> +struct device;
-
-You need the definition struct device in below (it's no pointer), thus
-you have to include <linux/device.h> instead.
-
-> +
-> +/**
-> + * struct ac97_controller - The AC97 controller of the AC-Link
-> + * @ops:		the AC97 operations.
-> + * @controllers:	linked list of all existing controllers.
-> + * @adap:		the shell device ac97-%d, ie. ac97 adapter
-> + * @nr:			the number of the shell device
-> + * @parent:		the device providing the AC97 controller.
-> + * @slots_available:	the mask of accessible/scanable codecs.
-> + * @codecs:		the 4 possible AC97 codecs (NULL if none found).
-> + * @codecs_pdata:	platform_data for each codec (NULL if no pdata).
-> + *
-> + * This structure is internal to AC97 bus, and should not be used by the
-> + * controllers themselves, excepting for using @dev.
-> + */
-> +struct ac97_controller {
-> +	const struct ac97_controller_ops *ops;
-
-The struct isn't declared beforehand?  GCC will warn.
-
-> +	struct list_head controllers;
-> +	struct device adap;
-> +	int nr;
-> +	struct device *parent;
-> +	unsigned short slots_available;
-
-I'd move parent field below, so that 64bit pointer can be aligned
-better.
-
-> +static int ac97_codec_add(struct ac97_controller *ac97_ctrl, int idx,
-> +		   unsigned int vendor_id)
-> +{
-> +	struct ac97_codec_device *codec;
-> +	int ret;
-> +
-> +	codec = kzalloc(sizeof(*codec), GFP_KERNEL);
-> +	if (!codec)
-> +		return -ENOMEM;
-> +	ac97_ctrl->codecs[idx] = codec;
-> +	codec->vendor_id = vendor_id;
-> +	codec->dev.release = ac97_codec_release;
-> +	codec->dev.bus = &ac97_bus_type;
-> +	codec->dev.parent = &ac97_ctrl->adap;
-> +	codec->num = idx;
-> +	codec->ac97_ctrl = ac97_ctrl;
-> +
-> +	device_initialize(&codec->dev);
-> +	dev_set_name(&codec->dev, "%s:%u", dev_name(ac97_ctrl->parent), idx);
-> +
-> +	ret = device_add(&codec->dev);
-> +	if (ret)
-> +		goto err_free_codec;
-> +
-> +	return 0;
-> +err_free_codec:
-> +	kfree(codec);
-
-This may leave the device name string.  You need to call
-put_device() even if device_add() returns an error.
+when only patches 1+2 are applied. So the relaxed field addition should
+definitly move into this patch to not break bisectability.
 
 
-> +	ac97_ctrl->codecs[idx] = NULL;
-> +
-> +	return ret;
-> +}
-> +
-> +unsigned int snd_ac97_bus_scan_one(struct ac97_controller *adrv,
-> +				   unsigned int codec_num)
-> +{
-> +	unsigned short vid1, vid2;
-> +	int ret;
-> +
-> +	ret = adrv->ops->read(adrv, codec_num, AC97_VENDOR_ID1);
-> +	vid1 = (ret & 0xffff);
-> +	if (ret < 0)
-> +		return 0;
-> +
-> +	ret = adrv->ops->read(adrv, codec_num, AC97_VENDOR_ID2);
-> +	vid2 = (ret & 0xffff);
-> +	if (ret < 0)
-> +		return 0;
-> +
-> +	dev_dbg(&adrv->adap, "%s(codec_num=%u): vendor_id=0x%08x\n",
-> +		__func__, codec_num, AC97_ID(vid1, vid2));
-> +	return AC97_ID(vid1, vid2);
-> +}
-> +
-> +static int ac97_bus_scan(struct ac97_controller *ac97_ctrl)
-> +{
-> +	int ret, i;
-> +	unsigned int vendor_id;
-> +
-> +	for (i = 0; i < AC97_BUS_MAX_CODECS; i++) {
-> +		if (ac97_codec_find(ac97_ctrl, i))
-> +			continue;
-> +		if (!(ac97_ctrl->slots_available & BIT(i)))
-> +			continue;
-> +		vendor_id = snd_ac97_bus_scan_one(ac97_ctrl, i);
-> +		if (!vendor_id)
-> +			continue;
-> +
-> +		ret = ac97_codec_add(ac97_ctrl, i, vendor_id);
-> +		if (ret < 0)
-> +			return ret;
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int ac97_bus_reset(struct ac97_controller *ac97_ctrl)
-> +{
-> +	ac97_ctrl->ops->reset(ac97_ctrl);
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * snd_ac97_codec_driver_register - register an AC97 codec driver
-> + * @dev: AC97 driver codec to register
-> + *
-> + * Register an AC97 codec driver to the ac97 bus driver, aka. the AC97 digital
-> + * controller.
-> + *
-> + * Returns 0 on success or error code
-> + */
-> +int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
-> +{
-> +	int ret;
-> +
-> +	drv->driver.bus = &ac97_bus_type;
-> +	ret = driver_register(&drv->driver);
-> +
-> +	return ret;
-
-This can be simplified.
-
-> +}
-> +EXPORT_SYMBOL(snd_ac97_codec_driver_register);
-
-No GPL?  (Ditto for other entries, too)
-
-> +int snd_ac97_reset(struct snd_ac97 *ac97, bool try_warm, unsigned int id,
-> +	unsigned int id_mask)
-> +{
-> +	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
-> +	struct ac97_controller *actrl = adev->ac97_ctrl;
-> +
-> +	if (try_warm) {
-> +		compat_ac97_warm_reset(ac97);
-> +		if (snd_ac97_bus_scan_one(actrl, adev->num) == adev->vendor_id)
-
-Can we ignore id_mask here?  I'm not quite sure whether it's fixed...
-
-
-thanks,
-
-Takashi
+Heiko
