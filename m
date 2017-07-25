@@ -1,41 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Jul 2017 18:20:02 +0100
-Subject: [RFC PATCH untested] arm64: kernel: implement fast refcount
- checking
-In-Reply-To: <CAGXu5jLNB5dmA0o=n_nn=4NRu3LjuNf5PGRopATuRiq0aJ1ECA@mail.gmail.com>
-References: <20170725114901.31403-1-ard.biesheuvel@linaro.org>
- <CAGXu5jLNB5dmA0o=n_nn=4NRu3LjuNf5PGRopATuRiq0aJ1ECA@mail.gmail.com>
-Message-ID: <CAKv+Gu8L1M6iO-pELrVvouxgh+t1qjzD4fOu3Fw+LeiWMZWzpA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 25 Jul 2017 19:28:42 +0200
+Subject: [PATCH v2] ARM: sa1100/pxa: fix MTD_XIP build
+In-Reply-To: <20170725152616.4143857-1-arnd@arndb.de> (Arnd Bergmann's message
+ of "Tue, 25 Jul 2017 17:25:47 +0200")
+References: <20170725152616.4143857-1-arnd@arndb.de>
+Message-ID: <87shhkqvcl.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 July 2017 at 18:13, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, Jul 25, 2017 at 4:49 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> Hi all,
->>
->> I had a stab at porting the fast refcount checks to arm64. It is slightly
->> less straight-forward than x86 given that we need to support both LSE and
->> LL/SC, and fallback to the latter if running a kernel built with support
->> for the former on hardware that does not support it.
->>
->> It is build tested with and without LSE support, and boots fine on non-LSE
->> hardware in both cases.
->
-> Ah! Very cool. Hopefully you and Li can compare notes; I think they've
-> been working on an implementation too.
->
+Arnd Bergmann <arnd@arndb.de> writes:
 
-I wasn't aware of that.
-
->> Suggestions welcome as to how to test and/or benchmark this,
+> In commit 3169663ac5902 "ARM: sa11x0/pxa: convert OS timer registers
+> to IOMEM", the definition of the OSCR macro was changed to be an
+> __iomem pointer, but the same register is also used by the XIP
+> code. This patch does the corresponding change here as well.
 >
-> I'll post a patch for LKDTM that I've been using. It's more
-> comprehensive than the existing ATOMIC checks (which predated the
-> refcount-only protection).
+> On PXA, the IRQ register definitions were removed even earlier, in
+> commit 5d284e353eb1 ("ARM: pxa: avoid accessing interrupt registers
+> directly"). This patch unfortunately brings some of that back. An
+> earlier version of my patch moved the code into an external function,
+> which could not work for CONFIG_XIP_KERNEL+CONFIG_MTD_XIP, so this
+> restores something close to the original code.
 >
+> Link: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241716.html
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>
+> v2: add back outer () as Robert suggested
+For mach-pxa :
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-OK. One thing I couldn't figure out: is refcount_t signed or not? The
-saturate tests set the initial value to UINT_MAX - 1, but this is
-interpreted as a negative value and so the refcount manipulations that
-are expected to succeed also fail in my case.
+Cheers.
+
+--
+Robert
