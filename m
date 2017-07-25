@@ -1,94 +1,149 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Jul 2017 10:49:24 +0100
-Subject: [PATCH v2 2/6] of: Add helper for mapping device node to logical
- CPU number
-In-Reply-To: <18f06d4c-f063-30f7-70e8-aacd6e7a129b@arm.com>
-References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
- <1500892161-17634-3-git-send-email-suzuki.poulose@arm.com>
- <7ec47d12-3b6b-82c0-ba15-5664b5169974@arm.com>
- <18f06d4c-f063-30f7-70e8-aacd6e7a129b@arm.com>
-Message-ID: <d62f2333-b819-8f67-7163-8ea138605522@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Jul 2017 10:53:55 +0100
+Subject: [PATCH 3/4] arm64: unwind: reference pt_regs via embedded stack
+ frame
+In-Reply-To: <CAKv+Gu_Xcdrn7rKc3F-e2QmUpjMUVhx-Qdrgn8NHZ1h2G+=YOw@mail.gmail.com>
+References: <20170724112623.26109-1-ard.biesheuvel@linaro.org>
+ <20170724112623.26109-4-ard.biesheuvel@linaro.org>
+ <20170724175446.GE9726@leverpostej>
+ <CAKv+Gu-esyxJOjf74uXwCqt9bgNqRjS5p9nQ-TNafVyqps4O_Q@mail.gmail.com>
+ <CAKv+Gu_Xcdrn7rKc3F-e2QmUpjMUVhx-Qdrgn8NHZ1h2G+=YOw@mail.gmail.com>
+Message-ID: <20170725095354.GA25283@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 24, 2017 at 08:09:08PM +0100, Ard Biesheuvel wrote:
+> On 24 July 2017 at 19:34, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 24 July 2017 at 18:54, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> So here, we're using information from three records (where the last
+> >> might have been faked from the current FP + LR). We look at the previous
+> >> frame's LR value to determine whether the current frame's fp points to a
+> >> next frame that's associated with some regs:
+> >>
+> >>          +----+----------------+
+> >>          | fp | interrupted PC | /* embedded in pt_regs */
+> >>          +----+----------------+
+> >>            /\
+> >>            ||
+> >>          +----+----------------+
+> >> where => | fp | < entry PC >   |
+> >>          +----+----------------+
+> >>            /\
+> >>            ||
+> >>          +----+----------------+
+> >>          | fp | where          | /* "where" is in exception text */
+> >>          +----+----------------+
+> >>
+> >> Which (IIUC) has three problems, inherited from the existing approach.
 
+> >> 3) The entry assembly can enable exceptions before calling C code, so if
+> >>    an exception is taken at the right time, these will eb in the
+> >>    backtrace without a surrounding frame in the exception text.
 
-On 25/07/17 10:27, Suzuki K Poulose wrote:
-> On 24/07/17 17:42, Sudeep Holla wrote:
->>
->>
->> On 24/07/17 11:29, Suzuki K Poulose wrote:
->>> Add a helper to map a device node to a logical CPU number to avoid
->>> duplication. Currently this is open coded in different places (e.g
->>> gic-v3, coresight). The helper tries to map device node to a "possible"
->>> logical CPU id, which may not be online yet. It is the responsibility
->>> of the user to make sure that the CPU is online. The helper uses
->>> of_get_cpu_node() which uses arch specific backends to match the
->>> phyiscal
->>> ids.
->>>
->>> Cc: Rob Herring <robh+dt@kernel.org>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> ---
->>>  drivers/of/base.c         | 26 ++++++++++++++++++++++++++
->>>  include/linux/of_device.h |  7 +++++++
->>>  2 files changed, 33 insertions(+)
->>>
->>> diff --git a/drivers/of/base.c b/drivers/of/base.c
->>> index 686628d..639af23 100644
->>> --- a/drivers/of/base.c
->>> +++ b/drivers/of/base.c
->>> @@ -420,6 +420,32 @@ struct device_node *of_get_cpu_node(int cpu,
->>> unsigned int *thread)
->>>  EXPORT_SYMBOL(of_get_cpu_node);
->>>
->>>  /**
->>> + * of_device_node_get_cpu: Get the logical CPU number for a given
->>> device_node
->>> + *
->>> + * @cpu_node: Pointer to the device_node for CPU.
->>> + *
->>> + * Returns the logical CPU number of the given CPU device_node.
->>> + * Returns >= nr_cpu_ids if CPU is not found.
->>> + */
->>> +int of_device_node_get_cpu(struct device_node *cpu_node)
->>> +{
->>> +    int cpu, thread;
->>> +    bool found = false;
->>> +    struct device_node *np;
->>> +
->>> +    for_each_possible_cpu(cpu) {
->>> +        np = of_get_cpu_node(cpu, &thread);
->>
->> Ideally, we should be able to use of_cpu_device_node_get instead of
->> of_get_cpu_node which parses the device tree. Not sure if that's the
->> case here too.
->>
->> Sorry for following up on this so late. I had a patch in my tree
->> for-a-while to address that. Just posted it[1] now seeing this patch now.
->>
->> You can move to of_cpu_device_node_get if all users of this function are
->> called after CPU's are registered. Otherwise, you can keep it as is for
->> now and it can be changed once [1] lands.
+[...]
+
+> > I guess that's an improvement, yes. At least we won't have false
+> > positives where a stack frame is misidentified as being on embedded in
+> > pt_regs. But it does rely on the bl instruction being used even in
+> > cases where we know we won't be returning, i.e., jumps to bad_mode,
+> > do_sp_pc_abort and do_undef_instr from .entry.text
+
+Good point, yes.
+
+This would be good for backtracing, regardless.
+
+> I guess we could do something along the lines of
 > 
-> As you mentioned offline, since GIC uses this, we need to stick to 
-> of_get_cpu_node.
-
-Agreed.
-
-> In fact, I started off with the of_cpu_device_node_get() and switched
-> to the former.
+> """
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 45947b36f1ff..37f67c2080dc 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -60,6 +60,22 @@
+>  #endif
+>         .endm
 > 
-
-Ah OK.
-
-> It would be really nice to have your patch, which streamlines the 
-> interface and we could switch to that.
+> +       .macro          b_e, target, b=b
+> +       .pushsection    ".rodata.entrycalls", "a", @progbits
+> +       .align          2
+> +       .long           6767f - .
+> +       .popsection
+> +6767:  \b              \target
+> +       .endm
+> +
+> +       .macro          bl_e, target
+> +       b_e             \target, bl
+> +       .endm
+> +
+> +       .macro          blr_e, target
+> +       b_e             \target, blr
+> +       .endm
+> +
+>  /*
+>   * Bad Abort numbers
+>   *-----------------
+> @@ -352,7 +368,7 @@ tsk .req    x28             // current thread_info
+>         ldr_l   x1, handle_arch_irq
+>         mov     x0, sp
+>         irq_stack_entry
+> -       blr     x1
+> +       blr_e   x1
+>         irq_stack_exit
+>         .endm
 > 
+> @@ -381,7 +397,7 @@ __bad_stack:
+>         mov     x0, sp
+> 
+>         /* Time to die */
+> -       bl      handle_bad_stack
+> +       bl_e    handle_bad_stack
+>         nop                             // ensure lr points somewhere sane
+>  ENDPROC(__bad_stack)
+>  #endif /* CONFIG_VMAP_STACK */
+> @@ -429,7 +445,7 @@ END(vectors)
+>         mov     x0, sp
+>         mov     x1, #\reason
+>         mrs     x2, esr_el1
+> -       b       bad_mode
+> +       b_e     bad_mode
+>         .endm
+> 
+>  el0_sync_invalid:
+> """
+> 
+> etc to explicitly record the places where we call out of the entry
+> code with a pt_regs struct on the top of the stack.
+> 
+> Then, we can use
+> 
+> static bool is_entry_call(unsigned long pc)
+> {
+>     extern s32 __entrycalls_start[], __entrycalls_end[];
+>     s32 *p;
+> 
+>     for (p = __entrycalls_start; p < __entrycalls_end; p++)
+>         if ((unsigned long)p + *p == pc - 4)
+>             return true;
+>     return false;
+> }
+> 
+> to identify values of frame.pc that coincide with such calls.
 
-Yes, I will wait for that patch to land in the mainline, I can follow up
-and remove the use of of_get_cpu_node wherever required.
--- 
-Regards,
-Sudeep
+Unfortunately, I believe that fails for case (3), where entry code is
+interrupted before calling C code. e.g. if an interrupt was taken during
+data abort handling:
+
+	kernel_entry 1
+	...
+el1_da:
+	...
+	enable_irq
+	< interrupted here >
+	...
+	bl      do_mem_abort
+
+... as we'd dump the regs for the interrupt, but not those for the data
+abort.
+
+Thanks,
+Mark.
