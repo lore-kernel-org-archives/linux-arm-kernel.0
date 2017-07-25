@@ -1,139 +1,53 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Jul 2017 11:55:39 +0100
-Subject: [PATCH 2/6] arm64: Convert __inval_cache_range() to area-based
-In-Reply-To: <cover.1500397441.git.robin.murphy@arm.com>
-References: <cover.1500397441.git.robin.murphy@arm.com>
-Message-ID: <d8ee26edfc114ba4d93b042a22b159ba90936b6c.1500397441.git.robin.murphy@arm.com>
+Date: Tue, 25 Jul 2017 11:55:37 +0100
+Subject: [PATCH 0/6] arm64 pmem support
+Message-ID: <cover.1500397441.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__inval_cache_range() is already the odd one out among our data cache
-maintenance routines as the only remaining range-based one; as we're
-going to want an invalidation routine to call from C code for the pmem
-API, let's tweak the prototype and name to bring it in line with the
-clean operations, and to make its relationship with __dma_inv_area()
-neatly mirror that of __clean_dcache_area_poc() and __dma_clean_area().
-The loop clearing the early page tables gets mildly massaged in the
-process for the sake of consistency.
+Hi all,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/include/asm/cacheflush.h |  1 +
- arch/arm64/kernel/head.S            | 18 +++++++++---------
- arch/arm64/mm/cache.S               | 23 ++++++++++++++---------
- 3 files changed, 24 insertions(+), 18 deletions(-)
+With the latest updates to the pmem API, the arch code contribution
+becomes very straightforward to wire up - I think there's about as
+much code here to just cope with the existence of our new instruction
+as there is to actually make use of it. I don't have access to any
+NVDIMMs nor suitable hardware to put them in, so this is written purely
+to spec - the extent of testing has been the feature detection on a
+v8.2 Fast Model vs. v8.0 systems.
 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 4d4f650c290e..b4b43a94dffd 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -67,6 +67,7 @@
-  */
- extern void flush_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
-+extern void __inval_dcache_area(void *addr, size_t len);
- extern void __clean_dcache_area_poc(void *addr, size_t len);
- extern void __clean_dcache_area_pou(void *addr, size_t len);
- extern long __flush_cache_user_range(unsigned long start, unsigned long end);
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 973df7de7bf8..73a0531e0187 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -143,8 +143,8 @@ preserve_boot_args:
- 	dmb	sy				// needed before dc ivac with
- 						// MMU off
- 
--	add	x1, x0, #0x20			// 4 x 8 bytes
--	b	__inval_cache_range		// tail call
-+	mov	x1, #0x20			// 4 x 8 bytes
-+	b	__inval_dcache_area		// tail call
- ENDPROC(preserve_boot_args)
- 
- /*
-@@ -221,20 +221,20 @@ __create_page_tables:
- 	 * dirty cache lines being evicted.
- 	 */
- 	adrp	x0, idmap_pg_dir
--	adrp	x1, swapper_pg_dir + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
--	bl	__inval_cache_range
-+	ldr	x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-+	bl	__inval_dcache_area
- 
- 	/*
- 	 * Clear the idmap and swapper page tables.
- 	 */
- 	adrp	x0, idmap_pg_dir
--	adrp	x6, swapper_pg_dir + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
-+	ldr	x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
- 1:	stp	xzr, xzr, [x0], #16
- 	stp	xzr, xzr, [x0], #16
- 	stp	xzr, xzr, [x0], #16
- 	stp	xzr, xzr, [x0], #16
--	cmp	x0, x6
--	b.lo	1b
-+	subs	x1, x1, #64
-+	b.ne	1b
- 
- 	mov	x7, SWAPPER_MM_MMUFLAGS
- 
-@@ -307,9 +307,9 @@ __create_page_tables:
- 	 * tables again to remove any speculatively loaded cache lines.
- 	 */
- 	adrp	x0, idmap_pg_dir
--	adrp	x1, swapper_pg_dir + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
-+	ldr	x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
- 	dmb	sy
--	bl	__inval_cache_range
-+	bl	__inval_dcache_area
- 
- 	ret	x28
- ENDPROC(__create_page_tables)
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 83c27b6e6dca..ed47fbbb4b05 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -109,20 +109,25 @@ ENTRY(__clean_dcache_area_pou)
- ENDPROC(__clean_dcache_area_pou)
- 
- /*
-+ *	__inval_dcache_area(kaddr, size)
-+ *
-+ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-+ * 	are invalidated. Any partial lines at the ends of the interval are
-+ *	also cleaned to PoC to prevent data loss.
-+ *
-+ *	- kaddr   - kernel address
-+ *	- size    - size in question
-+ */
-+ENTRY(__inval_dcache_area)
-+	/* FALLTHROUGH */
-+
-+/*
-  *	__dma_inv_area(start, size)
-  *	- start   - virtual start address of region
-  *	- size    - size in question
-  */
- __dma_inv_area:
- 	add	x1, x1, x0
--	/* FALLTHROUGH */
--
--/*
-- *	__inval_cache_range(start, end)
-- *	- start   - start address of region
-- *	- end     - end address of region
-- */
--ENTRY(__inval_cache_range)
- 	dcache_line_size x2, x3
- 	sub	x3, x2, #1
- 	tst	x1, x3				// end cache line aligned?
-@@ -140,7 +145,7 @@ ENTRY(__inval_cache_range)
- 	b.lo	2b
- 	dsb	sy
- 	ret
--ENDPIPROC(__inval_cache_range)
-+ENDPIPROC(__inval_dcache_area)
- ENDPROC(__dma_inv_area)
- 
- /*
+Patch #1 could go in as a fix ahead of the rest; it just needs to come
+before patch #5 to prevent that blowing up the build.
+
+Robin.
+
+Robin Murphy (6):
+  arm64: mm: Fix set_memory_valid() declaration
+  arm64: Convert __inval_cache_range() to area-based
+  arm64: Expose DC CVAP to userspace
+  arm64: Handle trapped DC CVAP
+  arm64: Implement pmem API support
+  arm64: uaccess: Implement *_flushcache variants
+
+ Documentation/arm64/cpu-feature-registers.txt |  2 ++
+ arch/arm64/Kconfig                            | 12 +++++++
+ arch/arm64/include/asm/assembler.h            |  6 ++++
+ arch/arm64/include/asm/cacheflush.h           |  4 ++-
+ arch/arm64/include/asm/cpucaps.h              |  3 +-
+ arch/arm64/include/asm/esr.h                  |  3 +-
+ arch/arm64/include/asm/string.h               |  4 +++
+ arch/arm64/include/asm/sysreg.h               |  1 +
+ arch/arm64/include/asm/uaccess.h              | 12 +++++++
+ arch/arm64/include/uapi/asm/hwcap.h           |  1 +
+ arch/arm64/kernel/cpufeature.c                | 13 ++++++++
+ arch/arm64/kernel/cpuinfo.c                   |  1 +
+ arch/arm64/kernel/head.S                      | 18 +++++-----
+ arch/arm64/kernel/traps.c                     |  3 ++
+ arch/arm64/lib/Makefile                       |  2 ++
+ arch/arm64/lib/uaccess_flushcache.c           | 47 +++++++++++++++++++++++++++
+ arch/arm64/mm/cache.S                         | 37 ++++++++++++++++-----
+ arch/arm64/mm/pageattr.c                      | 18 ++++++++++
+ 18 files changed, 166 insertions(+), 21 deletions(-)
+ create mode 100644 arch/arm64/lib/uaccess_flushcache.c
+
 -- 
 2.12.2.dirty
