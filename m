@@ -1,58 +1,46 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 25 Jul 2017 14:25:15 +0100
-Subject: [PATCH] arm64: sysreg: Fix unprotected macro argmuent in
- write_sysreg
-In-Reply-To: <20170725130849.GA8358@leverpostej>
-References: <1500983561-5723-1-git-send-email-Dave.Martin@arm.com>
- <20170725130849.GA8358@leverpostej>
-Message-ID: <20170725132515.GC6321@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Jul 2017 14:25:51 +0100
+Subject: [PATCH V2 4/4] arm64: disable irq between breakpoint and step
+ exception
+In-Reply-To: <8f9c3073792c107e3d928e413499572ec75c5175.1499416107.git.panand@redhat.com>
+References: <cover.1499416107.git.panand@redhat.com>
+ <8f9c3073792c107e3d928e413499572ec75c5175.1499416107.git.panand@redhat.com>
+Message-ID: <20170725132551.GB28815@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 02:08:51PM +0100, Mark Rutland wrote:
-> On Tue, Jul 25, 2017 at 12:52:41PM +0100, Dave Martin wrote:
-> > write_sysreg() may misparse the value argument because it is used
-> > without parentheses to protect it.
-> > 
-> > This patch adds the ( ) in order to avoid any surprises.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/include/asm/sysreg.h | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> > index 16e44fa..822eebc 100644
-> > --- a/arch/arm64/include/asm/sysreg.h
-> > +++ b/arch/arm64/include/asm/sysreg.h
-> > @@ -492,7 +492,7 @@ asm(
-> >   * the "%x0" template means XZR.
-> >   */
-> >  #define write_sysreg(v, r) do {					\
-> > -	u64 __val = (u64)v;					\
-> > +	u64 __val = (u64)(v);					\
-> >  	asm volatile("msr " __stringify(r) ", %x0"		\
-> >  		     : : "rZ" (__val));				\
-> >  } while (0)
+On Fri, Jul 07, 2017 at 05:34:00PM +0530, Pratyush Anand wrote:
+> If an interrupt is generated between breakpoint and step handler then
+> step handler can not get correct step address. This situation can easily
+> be invoked by samples/hw_breakpoint/data_breakpoint.c. It can also be
+> reproduced if we insert any printk() statement or dump_stack() in perf
+> overflow_handler. So, it seems that perf is working fine just luckily.
+> If the CPU which is handling perf breakpoint handler receives any
+> interrupt then, perf step handler will not execute sanely.
 > 
-> Looks sensible.
+> This patch improves do_debug_exception() handling, which enforces now,
+> that exception handler function:
+> - should return 0 for any software breakpoint and hw
+> breakpoint/watchpoint handler if it does not expect a single step stage
+> - should return 1 if it expects single step.
+> - A single step handler should always return 0.
+> - All handler should return a -ve error in any other case.
 > 
-> It looks like write_sysreg_s() will need the same fixup; could you do
-> that too?
-> 
-> With that:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Now, we can know in do_debug_exception() that whether a step exception
+> will be followed or not. If there will a step exception then disable
+> irq. Re-enable it after single step handling.
 
-Agreed, especially if somebody else does it...
+AFAICT, this is only a problem for kernel-mode breakpoints where we end up
+stepping into the interrupt handler when trying to step over a breakpoint.
 
-Note that there are some
+We'd probably be better off getting all users of kernel step (kprobes, kgdb
+and perf) to run the step with irqs disabled, but I still have reservations
+about that:
 
-	write_sysreg(1 << n, SYS_FOO)
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/508066.html
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/510814.html
 
-whose parse will be changed by this.  However, n <= 30 in every case
-I've found, which should mean there is no change to the result -- i.e.,
-(u64)((int)1 << n) == (u64)1 << n if n <= 30.
+Wouldn't it be better to follow kprobes/kgdb and have perf run the step with
+irqs disabled?
 
-Cheers
----Dave
+Will
