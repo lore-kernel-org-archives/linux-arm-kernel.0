@@ -1,32 +1,51 @@
 From: rocky.hao@rock-chips.com (Rocky Hao)
-Date: Tue, 25 Jul 2017 17:09:44 +0800
-Subject: [PATCH 1/5] dt-bindings: rockchip-thermal: Support the RK3328 SoC
- compatible
+Date: Tue, 25 Jul 2017 17:09:46 +0800
+Subject: [PATCH 3/5] arm64: dts: rockchip: add tsadc node for rk3328 SoC
 In-Reply-To: <1500973788-14627-1-git-send-email-rocky.hao@rock-chips.com>
 References: <1500973788-14627-1-git-send-email-rocky.hao@rock-chips.com>
-Message-ID: <1500973788-14627-2-git-send-email-rocky.hao@rock-chips.com>
+Message-ID: <1500973788-14627-4-git-send-email-rocky.hao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-attempt to new compatible for thermal founding on RK3328 SoC.
+add tsadc needed main information for rk3328 SoC.
+50000Hz is the max clock rate supported by tsadc module.
 
-Change-Id: Ie6f6d7b4e545891a0035851a923c0412f584140c
+Change-Id: I2429c24edccd4c797e2f4577151be76372adfbe5
 Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
 ---
- Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-index 43003aec94bd..e3a6234fb1ac 100644
---- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible : should be "rockchip,<name>-tsadc"
-    "rockchip,rk3228-tsadc": found on RK3228 SoCs
-    "rockchip,rk3288-tsadc": found on RK3288 SoCs
-+   "rockchip,rk3328-tsadc": found on RK3328 SoCs
-    "rockchip,rk3368-tsadc": found on RK3368 SoCs
-    "rockchip,rk3399-tsadc": found on RK3399 SoCs
- - reg : physical base address of the controller and length of memory mapped
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index db4b2708084d..186fb93fdffd 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -308,6 +308,26 @@
+ 		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
+ 
++	tsadc: tsadc at ff250000 {
++		compatible = "rockchip,rk3328-tsadc";
++		reg = <0x0 0xff250000 0x0 0x100>;
++		interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH 0>;
++		rockchip,grf = <&grf>;
++		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
++		clock-names = "tsadc", "apb_pclk";
++		assigned-clocks = <&cru SCLK_TSADC>;
++		assigned-clock-rates = <50000>;
++		resets = <&cru SRST_TSADC>;
++		reset-names = "tsadc-apb";
++		pinctrl-names = "init", "default", "sleep";
++		pinctrl-0 = <&otp_gpio>;
++		pinctrl-1 = <&otp_out>;
++		pinctrl-2 = <&otp_gpio>;
++		#thermal-sensor-cells = <1>;
++		rockchip,hw-tshut-temp = <100000>;
++		status = "disabled";
++	};
++
+ 	saradc: adc at ff280000 {
+ 		compatible = "rockchip,rk3328-saradc", "rockchip,rk3399-saradc";
+ 		reg = <0x0 0xff280000 0x0 0x100>;
 -- 
 1.9.1
