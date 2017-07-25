@@ -1,47 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Jul 2017 08:57:34 +0200
-Subject: [PATCH v2 1/4] drm/atomic: implement
- drm_atomic_helper_commit_tail for runtime_pm users
-In-Reply-To: <20170720184628.5vizn7hjdaaz7rqy@phenom.ffwll.local>
-References: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
- <a8f92dc70048bab746e94dadd1c23200626aff60.1500555652.git-series.maxime.ripard@free-electrons.com>
- <20170720184628.5vizn7hjdaaz7rqy@phenom.ffwll.local>
-Message-ID: <20170725065734.kbtb2mrfsjwm2szz@flea>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Jul 2017 00:10:49 -0700
+Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
+ from suspend_noirq
+In-Reply-To: <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
+References: <20170724095201.21601-1-johan@kernel.org>
+ <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
+Message-ID: <20170725071048.GP10026@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Thu, Jul 20, 2017 at 08:46:28PM +0200, Daniel Vetter wrote:
-> On Thu, Jul 20, 2017 at 03:01:16PM +0200, Maxime Ripard wrote:
-> > The current drm_atomic_helper_commit_tail helper works only if the CRTC is
-> > accessible, and documents an alternative implementation that is supposed to
-> > be used if that happens.
-> > 
-> > That implementation is then duplicated by some drivers. Instead of
-> > documenting it, let's implement an helper that all the relevant users can
-> > use directly.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+* Grygorii Strashko <grygorii.strashko@ti.com> [170724 15:17]:
+> My personal thought here is that removing of pm_runtime_set_active() will not fix
+> root cause of the problem, but rather hide it :( and, probably, real fix will be 
+> to update USB framework to ensure that all suspend devices are also PM runtime suspend
+> (not sure how) or add few more pm_suspend_ignore_children() calls 
+>  (for example as I've tried to do in [2], but this was unfinished).
 > 
-> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> I've found very simple steps to reproduce suspend failure on am335x-evm (should also
+> work on BBB) -  do below sequence with USB device plugged:
 > 
-> Should I throw this into drm-misc, or do you want to merge this through
-> some driver tree?
+>    echo platform > /sys/power/pm_test 
+>    echo 1 > /sys/power/pm_print_times 
+>    [ echo 0 > /sys/module/printk/parameters/console_suspend ]
+>    echo mem > /sys/power/state 
+> 
+> [   95.499685] calling  47400000.usb+ @ 733, parent: ocp
+> [   95.504818] am335x-usb-childs 47400000.usb: runtime PM trying to suspend device but active child
+> [   95.513750] am335x-usb-childs 47400000.usb: omap device suspend failure 0
+> 
+> Below I've attached possible patch which converts OMAP device to
+> use pm_runtime_force_suspend/resume().
 
-Yes, you can put them in drm-misc, it will the be the easiest option.
+It seems to almost work for my PM test cases.. It seems that serial console
+somehow won't get restored after suspend/resume cycle on omap3 though.
 
-Thanks!
-Maxime
+The system enters off mode during suspend, and wakes up properly so I can
+ssh to it after resume. But the serial console no longer works after resume.
+This is with 8250-omap driver.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/7ada811f/attachment.sig>
+Regards,
+
+Tony
