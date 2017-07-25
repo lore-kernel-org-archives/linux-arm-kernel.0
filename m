@@ -1,187 +1,96 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 25 Jul 2017 10:56:30 +0200
-Subject: [PATCH 3/3] soc: mediatek: add SCPSYS power domain driver for
- MediaTek MT7622 SoC
-In-Reply-To: <284911261d7e423e5bb47625858b3284be713a1b.1500608650.git.sean.wang@mediatek.com>
-References: <cover.1500608650.git.sean.wang@mediatek.com>
- <284911261d7e423e5bb47625858b3284be713a1b.1500608650.git.sean.wang@mediatek.com>
-Message-ID: <a44d92b0-41e6-8bb3-fd3f-9add05040b91@gmail.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 25 Jul 2017 14:29:33 +0530
+Subject: [PATCH 3/5] iommu/arm-smmu-v3: add IOMMU_CAP_BYPASS to the ARM
+ SMMUv3 driver
+In-Reply-To: <20170724130656.5240ae0d@w520.home>
+References: <1500456838-18405-1-git-send-email-anup.patel@broadcom.com>
+ <1500456838-18405-4-git-send-email-anup.patel@broadcom.com>
+ <ace28bd1-2dd3-482c-d11b-539c055ee9b7@arm.com>
+ <CAALAos8y0kLGrbwgz3u=ZVyteSicuPyQZ3Yp=LPZohXzVaE5NQ@mail.gmail.com>
+ <20170719112524.GF13642@arm.com>
+ <CAALAos_xGCt7U1Oz5uCf9Q4hP6fdn4fcymFNQP5xO_UBduSY3g@mail.gmail.com>
+ <20170719113325.GI13642@arm.com>
+ <CAALAos99HWLoW=0P-dvFA+oNsF03TRNzNbfppyQNtqmcRELXXQ@mail.gmail.com>
+ <20170719115333.GJ13642@arm.com>
+ <CAALAos-YbVbgvPmDYXeWaF4y8MQ9i7CG3tgGuf-QLR6hmXo18Q@mail.gmail.com>
+ <20170720091003.GA17837@arm.com>
+ <8e82d8f5-e5e2-dd09-c774-29f9eda2ecdd@arm.com>
+ <20170724111621.7f1c3a85@w520.home>
+ <6468f359-1682-b9b0-5a4d-72738939cb84@arm.com>
+ <20170724130656.5240ae0d@w520.home>
+Message-ID: <CAALAos8pLM203B5aRhDy0tkwQoWt3Nym8h2vYC7wLFq-5PpzVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jul 25, 2017 at 12:36 AM, Alex Williamson
+<alex.williamson@redhat.com> wrote:
+> On Mon, 24 Jul 2017 18:23:20 +0100
+> Robin Murphy <robin.murphy@arm.com> wrote:
+>
+>> On 24/07/17 18:16, Alex Williamson wrote:
+>> > On Thu, 20 Jul 2017 12:17:12 +0100
+>> > Robin Murphy <robin.murphy@arm.com> wrote:
+>> >
+>> >> On 20/07/17 10:10, Will Deacon wrote:
+>> >>> On Thu, Jul 20, 2017 at 09:32:00AM +0530, Anup Patel wrote:
+>> >>>> On Wed, Jul 19, 2017 at 5:23 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> >>>>> There are two things here:
+>> >>>>>
+>> >>>>>   1. iommu_present() is pretty useless, because it applies to a "bus" which
+>> >>>>>      doesn't actually tell you what you need to know for things like the
+>> >>>>>      platform_bus, where some masters might be upstream of an SMMU and
+>> >>>>>      others might not be.
+>> >>>>
+>> >>>> I agree with you. The iommu_present() check in vfio_iommu_group_get()
+>> >>>> is not much useful. We only reach line which checks iommu_present()
+>> >>>> when iommu_group_get() returns NULL for given "struct device *". If there
+>> >>>> is no IOMMU group for a "struct device *" then it means there is no IOMMU
+>> >>>> HW doing translations for such device.
+>> >>>>
+>> >>>> If we drop the iommu_present() check (due to above reasons) in
+>> >>>> vfio_iommu_group_get() then we don't require the IOMMU_CAP_BYPASS
+>> >>>> and we can happily drop PATCH1, PATCH2, and PATCH3.
+>> >>>>
+>> >>>> I will remove the iommu_present() check in vfio_iommu_group_get()
+>> >>>> because it is only comes into actions when VFIO_NOIOMMU is
+>> >>>> enabled. This will also help us drop PATCH1-to-PATCH3.
+>> >>>
+>> >>> I don't think that's the right answer. Whilst iommu_present has obvious
+>> >>> shortcomings, its intention is clear: it should tell you whether a given
+>> >>> *device* is upstream of an IOMMU. So the right fix is to make this
+>> >>> per-device, instead of per-bus. Removing it altogether is worse than leaving
+>> >>> it like it is.
+>> >>
+>> >> Not really - if there is an IOMMU up and running to the point of setting
+>> >> bus ops, every device it cares about can be expected to have a group
+>> >> already (there are only a couple of drivers left that don't use groups,
+>> >> and they're hardly relevant to VFIO). Thus iommu_group_get() already is
+>> >> the de-facto per-device IOMMU check.
+>> >>
+>> >> And having looked into it, I'm now spinning a couple of patches to
+>> >> finish off making groups truly mandatory so that that can be less
+>> >> de-facto ;)
+>> >
+>> > No, look at vfio-noiommu and even vfio-mdev devices for devices which
+>> > have an iommu group but there is no physical iommu supporting them.
+>> > iommu_present() is how we can distinguish these groups and therefore
+>> > not generate a segfault in trying to use the full IOMMU API on them.
+>>
+>> OK, so that means that the combination of vfio-noiommu and vfio-platform
+>> is simply unusable, because iommu_present(&platform_bus_type) can give
+>> such dangerous false positives too.
+>
+> Yep, this kinda falls apart since platform_bus_type doesn't really map
+> to a physical bus, nor does the presence of a group canonically
+> demonstrate that an iommu is present since anyone can create a group
+> for a device.  We really do need to migrate to per-device iommu_ops.
+> Thanks,
 
+Yes, per-device iommu_ops will make things much cleaner. That's why
+I have dropped VFIO no-IOMMU and IOMMU_CAP_BYPASS related
+patches.
 
-On 07/21/2017 05:57 AM, sean.wang at mediatek.com wrote:
-> From: Chen Zhong <chen.zhong@mediatek.com>
-> 
-> Add SCPSYS power domain driver for MT7622 SoC having four power domains
-> which are respectively ETHSYS for Ethernet including embedded switch,
-> WBSYS for WIFI and Bluetooth, HIF0SYS for PCI-E and SATA, and HIF1SYS for
-> USB. Those functions could be selectively powered gated when the
-> corresponding function is no longer to use in order to reach more minimal
-> power dissipation.
-> 
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->   drivers/soc/mediatek/mtk-scpsys.c     | 76 +++++++++++++++++++++++++++++++++++
->   include/linux/soc/mediatek/infracfg.h |  8 +++-
->   2 files changed, 83 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index beb7916..8a0ca02 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -21,6 +21,7 @@
->   #include <linux/soc/mediatek/infracfg.h>
->   
->   #include <dt-bindings/power/mt2701-power.h>
-> +#include <dt-bindings/power/mt7622-power.h>
->   #include <dt-bindings/power/mt8173-power.h>
->   
->   #define SPM_VDE_PWR_CON			0x0210
-> @@ -38,6 +39,11 @@
->   #define SPM_MFG_2D_PWR_CON		0x02c0
->   #define SPM_MFG_ASYNC_PWR_CON		0x02c4
->   #define SPM_USB_PWR_CON			0x02cc
-> +#define SPM_ETHSYS_PWR_CON		0x02e0	/* MT7622 */
-> +#define SPM_HIF0_PWR_CON		0x02e4	/* MT7622 */
-> +#define SPM_HIF1_PWR_CON		0x02e8	/* MT7622 */
-> +#define SPM_WB_PWR_CON			0x02ec	/* MT7622 */
-> +
->   
->   #define SPM_PWR_STATUS			0x060c
->   #define SPM_PWR_STATUS_2ND		0x0610
-> @@ -63,6 +69,10 @@
->   #define PWR_STATUS_MFG_ASYNC		BIT(23)
->   #define PWR_STATUS_AUDIO		BIT(24)
->   #define PWR_STATUS_USB			BIT(25)
-> +#define PWR_STATUS_ETHSYS		BIT(24)	/* MT7622 */
-> +#define PWR_STATUS_HIF0			BIT(25)	/* MT7622 */
-> +#define PWR_STATUS_HIF1			BIT(26)	/* MT7622 */
-> +#define PWR_STATUS_WB			BIT(27)	/* MT7622 */
->   
->   enum clk_id {
->   	CLK_NONE,
-> @@ -71,6 +81,7 @@ enum clk_id {
->   	CLK_VENC,
->   	CLK_VENC_LT,
->   	CLK_ETHIF,
-> +	CLK_HIFSEL,
->   	CLK_MAX,
->   };
->   
-> @@ -81,6 +92,7 @@ static const char * const clk_names[] = {
->   	"venc",
->   	"venc_lt",
->   	"ethif",
-> +	"hif_sel",
->   	NULL,
->   };
->   
-> @@ -567,6 +579,67 @@ static int __init scpsys_probe_mt2701(struct platform_device *pdev)
->   }
->   
->   /*
-> + * MT7622 power domain support
-> + */
-> +static const struct scp_domain_data scp_domain_data_mt7622[] = {
-> +	[MT7622_POWER_DOMAIN_ETHSYS] = {
-> +		.name = "ethsys",
-> +		.sta_mask = PWR_STATUS_ETHSYS,
-> +		.ctl_offs = SPM_ETHSYS_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.sram_pdn_ack_bits = GENMASK(15, 12),
-> +		.clk_id = {CLK_NONE},
-> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_ETHSYS,
-> +		.active_wakeup = true,
-> +	},
-> +	[MT7622_POWER_DOMAIN_HIF0] = {
-> +		.name = "hif0",
-> +		.sta_mask = PWR_STATUS_HIF0,
-> +		.ctl_offs = SPM_HIF0_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.sram_pdn_ack_bits = GENMASK(15, 12),
-> +		.clk_id = {CLK_HIFSEL},
-> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF0,
-> +		.active_wakeup = true,
-> +	},
-> +	[MT7622_POWER_DOMAIN_HIF1] = {
-> +		.name = "hif1",
-> +		.sta_mask = PWR_STATUS_HIF1,
-> +		.ctl_offs = SPM_HIF1_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.sram_pdn_ack_bits = GENMASK(15, 12),
-> +		.clk_id = {CLK_HIFSEL},
-> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF1,
-> +		.active_wakeup = true,
-> +	},
-> +	[MT7622_POWER_DOMAIN_WB] = {
-> +		.name = "wb",
-> +		.sta_mask = PWR_STATUS_WB,
-> +		.ctl_offs = SPM_WB_PWR_CON,
-> +		.sram_pdn_bits = 0,
-> +		.sram_pdn_ack_bits = 0,
-> +		.clk_id = {CLK_NONE},
-> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
-> +		.active_wakeup = true,
-> +	},
-> +};
-> +
-> +#define NUM_DOMAINS_MT7622	ARRAY_SIZE(scp_domain_data_mt7622)
-> +
-> +static int __init scpsys_probe_mt7622(struct platform_device *pdev)
-> +{
-> +	struct scp *scp;
-> +
-> +	scp = init_scp(pdev, scp_domain_data_mt7622, NUM_DOMAINS_MT7622);
+Can you please have a look at FlexRM platform reset driver?
 
-This does not look correct, init_scp awaits 4 arguments.
-
-Apart, please rebase your patches against v4.13-rc1 as this does not apply cleanly.
-
-Thanks,
-Matthias
-
-> +	if (IS_ERR(scp))
-> +		return PTR_ERR(scp);
-> +
-> +	mtk_register_power_domains(pdev, scp, NUM_DOMAINS_MT7622);
-> +
-> +	return 0;
-> +}
-> +
-> +/*
->    * MT8173 power domain support
->    */
->   
-> @@ -698,6 +771,9 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
->   		.compatible = "mediatek,mt2701-scpsys",
->   		.data = scpsys_probe_mt2701,
->   	}, {
-> +		.compatible = "mediatek,mt7622-scpsys",
-> +		.data = scpsys_probe_mt7622,
-> +	}, {
->   		.compatible = "mediatek,mt8173-scpsys",
->   		.data = scpsys_probe_mt8173,
->   	}, {
-> diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
-> index a5714e9..c1e5062 100644
-> --- a/include/linux/soc/mediatek/infracfg.h
-> +++ b/include/linux/soc/mediatek/infracfg.h
-> @@ -20,7 +20,13 @@
->   #define MT8173_TOP_AXI_PROT_EN_MFG_M1		BIT(22)
->   #define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT	BIT(23)
->   
-> +#define MT7622_TOP_AXI_PROT_EN_ETHSYS		(BIT(3) | BIT(17))
-> +#define MT7622_TOP_AXI_PROT_EN_HIF0		(BIT(24) | BIT(25))
-> +#define MT7622_TOP_AXI_PROT_EN_HIF1		(BIT(26) | BIT(27) | \
-> +						 BIT(28))
-> +#define MT7622_TOP_AXI_PROT_EN_WB		(BIT(2) | BIT(6) | \
-> +						 BIT(7) | BIT(8))
-> +
->   int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
->   int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
-> -
->   #endif /* __SOC_MEDIATEK_INFRACFG_H */
-> 
+Regards,
+Anup
