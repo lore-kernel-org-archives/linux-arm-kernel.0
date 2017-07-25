@@ -1,109 +1,61 @@
-From: borneo.antonio@gmail.com (Antonio Borneo)
-Date: Tue, 25 Jul 2017 23:49:52 +0200
-Subject: [PATCH] ASoC: fix balance of of_node_get()/of_node_put()
-Message-ID: <20170725214952.6491-1-borneo.antonio@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 25 Jul 2017 23:54:19 +0200
+Subject: [PATCH v5 3/7] drm/rockchip: vop: move line_flag_num to interrupt
+ registers
+In-Reply-To: <1500518613-30590-1-git-send-email-mark.yao@rock-chips.com>
+References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
+ <1500518613-30590-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1816316.NCRF09CkBJ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Hikey target board, enabling CONFIG_OF_DYNAMIC triggers several
-errors at kernel boot, like the following one
-OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0/endpoint
-each followed by stack dump.
+Hi Mark,
 
-Fixed by:
-- removing of_node_put() in the body of of_for_each_phandle(){},
-  since already provided at each iteration. Add it in case the
-  loop is break out;
-- adding of_node_get() before calling of_graph_get_port_parent()
-  or asoc_graph_card_dai_link_of().
+Am Donnerstag, 20. Juli 2017, 10:43:32 CEST schrieb Mark Yao:
+> In the hardware design process, the design of line flags
+> register is associated with the interrupt register,
+> placing the line flags in the interrupt definition is
+> more reasonable, and it would make multi-vop define easilier.
+> 
+> Changes in v3:
+> - Explain more in details, introduce why we need this patch
+> 
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Reviewed-by: Sean Paul <seanpaul@chromium.org>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 4 ++--
+>  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 8 ++++----
+>  3 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 784a2b7..4f6c7bc 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -982,7 +982,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+>  	VOP_CTRL_SET(vop, vact_st_end, val);
+>  	VOP_CTRL_SET(vop, vpost_st_end, val);
+>  
+> -	VOP_CTRL_SET(vop, line_flag_num[0], vact_end);
+> +	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
 
-Tested with kernel v4.13-rc1 with hikey_defconfig taken from
-https://git.linaro.org/people/john.stultz/android-dev.git
-branch dev/hikey-mainline-WIP
+With patches applied up to this one I end up with
 
-Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
----
-To: Liam Girdwood <lgirdwood@gmail.com>
-To: Mark Brown <broonie@kernel.org>
-To: Jaroslav Kysela <perex@perex.cz>
-To: Takashi Iwai <tiwai@suse.com>
-To: alsa-devel at alsa-project.org
-Cc: linux-kernel at vger.kernel.org
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
----
- sound/soc/generic/audio-graph-card.c  | 14 +++++++++-----
- sound/soc/generic/simple-card-utils.c |  5 +++++
- sound/soc/soc-core.c                  |  5 +++++
- 3 files changed, 19 insertions(+), 5 deletions(-)
+  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_vop.o
+../drivers/gpu/drm/rockchip/rockchip_drm_vop.c: In function ?vop_crtc_enable?:
+../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:46: error: macro "VOP_INTR_SET" requires 4 arguments, but only 3 given
+  VOP_INTR_SET(vop, line_flag_num[0], vact_end);
+                                              ^
+../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:2: error: ?VOP_INTR_SET? undeclared (first use in this function)
+  VOP_INTR_SET(vop, line_flag_num[0], vact_end);
+  ^~~~~~~~~~~~
+../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:2: note: each undeclared identifier is reported only once for each function it appears in
 
-diff --git a/sound/soc/generic/audio-graph-card.c b/sound/soc/generic/audio-graph-card.c
-index c0f08a6..7574c5f 100644
---- a/sound/soc/generic/audio-graph-card.c
-+++ b/sound/soc/generic/audio-graph-card.c
-@@ -228,10 +228,16 @@ static int asoc_graph_card_parse_of(struct graph_card_data *priv)
- 	 */
- 
- 	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
-+		/*
-+		 * asoc_graph_card_dai_link_of() will call
-+		 * of_node_put(). So, call of_node_get() here
-+		 */
-+		of_node_get(it.node);
- 		ret = asoc_graph_card_dai_link_of(it.node, priv, idx++);
--		of_node_put(it.node);
--		if (ret < 0)
-+		if (ret < 0) {
-+			of_node_put(it.node);
- 			return ret;
-+		}
- 	}
- 
- 	return asoc_simple_card_parse_card_name(card, NULL);
-@@ -244,10 +250,8 @@ static int asoc_graph_get_dais_count(struct device *dev)
- 	int count = 0;
- 	int rc;
- 
--	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
-+	of_for_each_phandle(&it, rc, node, "dais", NULL, 0)
- 		count++;
--		of_node_put(it.node);
--	}
- 
- 	return count;
- }
-diff --git a/sound/soc/generic/simple-card-utils.c b/sound/soc/generic/simple-card-utils.c
-index 26d64fa..144954b 100644
---- a/sound/soc/generic/simple-card-utils.c
-+++ b/sound/soc/generic/simple-card-utils.c
-@@ -250,6 +250,11 @@ static int asoc_simple_card_get_dai_id(struct device_node *ep)
- 	if (ret != -ENOTSUPP)
- 		return ret;
- 
-+	/*
-+	 * of_graph_get_port_parent() will call
-+	 * of_node_put(). So, call of_node_get() here
-+	 */
-+	of_node_get(ep);
- 	node = of_graph_get_port_parent(ep);
- 
- 	/*
-diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-index 921622a..a0f39de 100644
---- a/sound/soc/soc-core.c
-+++ b/sound/soc/soc-core.c
-@@ -4087,6 +4087,11 @@ int snd_soc_get_dai_id(struct device_node *ep)
- 	struct device_node *node;
- 	int ret;
- 
-+	/*
-+	 * of_graph_get_port_parent() will call
-+	 * of_node_put(). So, call of_node_get() here
-+	 */
-+	of_node_get(ep);
- 	node = of_graph_get_port_parent(ep);
- 
- 	/*
--- 
-1.9.1
+In patch4 you replace this again, with 
+-	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
++	VOP_REG_SET(vop, intr, line_flag_num[0], vact_end);
+
+but this intermediate breakage should not happen, to keep bisectability.
+
+
+Heiko
