@@ -1,36 +1,162 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue, 25 Jul 2017 15:46:09 +0530
-Subject: [PATCH 10/11] ASoC: pxa: Handle return value of clk_prepare_enable.
-Message-ID: <1500977770-28142-1-git-send-email-arvind.yadav.cs@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 25 Jul 2017 11:47:58 +0100
+Subject: [PATCH v2] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+In-Reply-To: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
+References: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <20170725104758.GC19302@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+On Sat, Jul 22, 2017 at 11:54:12AM +0800, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> When running 4.13-rc1 on top of D05, I got the boot log:
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- sound/soc/pxa/pxa2xx-i2s.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Nit: You should stick to what the problem is and why you need to solve
+it, "Fixes:" tag gives the commit history you need, the rest (eg "When
+running 4.13-rc1") does not belong in the commit log.
 
-diff --git a/sound/soc/pxa/pxa2xx-i2s.c b/sound/soc/pxa/pxa2xx-i2s.c
-index 3fb60ba..2312c22 100644
---- a/sound/soc/pxa/pxa2xx-i2s.c
-+++ b/sound/soc/pxa/pxa2xx-i2s.c
-@@ -164,10 +164,14 @@ static int pxa2xx_i2s_hw_params(struct snd_pcm_substream *substream,
- 				struct snd_soc_dai *dai)
- {
- 	struct snd_dmaengine_dai_dma_data *dma_data;
-+	int ret;
- 
- 	if (WARN_ON(IS_ERR(clk_i2s)))
- 		return -EINVAL;
--	clk_prepare_enable(clk_i2s);
-+	ret = clk_prepare_enable(clk_i2s);
-+	if (ret)
-+		return ret;
-+
- 	clk_ena = 1;
- 	pxa_i2s_wait();
- 
--- 
-1.9.1
+> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+> [    0.000000] SRAT: ITS affinity exceeding max count[4]
+> 
+> This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
+> 
+> So dynamically alloc the memory needed instead of using
+> its_srat_maps[MAX_NUMNODES], which count the number of
+> ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+> then build the mapping of numa node to ITS ID. Of course,
+> its_srat_maps will be freed after ITS probing because
+> we don't need that after boot.
+> 
+> After doing this, I got what I wanted:
+> 
+> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+> [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+> [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+> [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+> [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+
+Question (unrelated): how are PCI devices (or better PCI host bridges)
+mapped to ITSs ? I ask because in IORT we currently ignore the notion
+of ITS groups - so it is just out of curiosity (I suspect you have
+a static 1:1 mapping PCI-host-bridge->ITS).
+
+> Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> 
+> v1->v2:
+>   - Add NULL check in acpi_get_its_numa_node() for no ITS affinity case;
+>   - Free the its_srat_maps after ITS probing.
+> 
+>  drivers/irqchip/irq-gic-v3-its.c | 39 ++++++++++++++++++++++++++++++++-------
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+>  1 file changed, 32 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 3ccdf76..1d692aa 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1847,13 +1847,16 @@ struct its_srat_map {
+>  	u32	its_id;
+>  };
+>  
+> -static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
+> +static struct its_srat_map *its_srat_maps __initdata;
+>  static int its_in_srat __initdata;
+>  
+>  static int __init acpi_get_its_numa_node(u32 its_id)
+>  {
+>  	int i;
+>  
+> +	if (!its_srat_maps)
+> +		return NUMA_NO_NODE;
+> +
+>  	for (i = 0; i < its_in_srat; i++) {
+>  		if (its_id == its_srat_maps[i].its_id)
+>  			return its_srat_maps[i].numa_node;
+> @@ -1861,6 +1864,12 @@ static int __init acpi_get_its_numa_node(u32 its_id)
+>  	return NUMA_NO_NODE;
+>  }
+>  
+> +static int __init gic_acpi_match_srat_its(struct acpi_subtable_header *header,
+> +					  const unsigned long end)
+> +{
+> +	return 0;
+> +}
+> +
+>  static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>  			 const unsigned long end)
+>  {
+> @@ -1877,12 +1886,6 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (its_in_srat >= MAX_NUMNODES) {
+> -		pr_err("SRAT: ITS affinity exceeding max count[%d]\n",
+> -				MAX_NUMNODES);
+> -		return -EINVAL;
+> -	}
+> -
+>  	node = acpi_map_pxm_to_node(its_affinity->proximity_domain);
+>  
+>  	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+> @@ -1901,14 +1904,35 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>  
+>  static void __init acpi_table_parse_srat_its(void)
+>  {
+> +	int count;
+> +
+> +	count = acpi_table_parse_entries(ACPI_SIG_SRAT,
+> +			sizeof(struct acpi_table_srat),
+> +			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+> +			gic_acpi_match_srat_its, 0);
+> +	if (count <= 0)
+> +		return;
+> +
+> +	its_srat_maps = kmalloc(count * sizeof(struct its_srat_map),
+> +				GFP_KERNEL);
+> +	if (!its_srat_maps)
+> +		return;
+> +
+>  	acpi_table_parse_entries(ACPI_SIG_SRAT,
+>  			sizeof(struct acpi_table_srat),
+>  			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+>  			gic_acpi_parse_srat_its, 0);
+>  }
+> +
+> +/* free the its_srat_maps after ITS probing */
+> +static void __init acpi_its_srat_maps_free(void)
+> +{
+> +	kfree(its_srat_maps);
+> +}
+>  #else
+>  static void __init acpi_table_parse_srat_its(void)	{ }
+>  static int __init acpi_get_its_numa_node(u32 its_id) { return NUMA_NO_NODE; }
+> +static void __init acpi_its_srat_maps_free(void) { }
+>  #endif
+>  
+>  static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+> @@ -1955,6 +1979,7 @@ static void __init its_acpi_probe(void)
+>  	acpi_table_parse_srat_its();
+>  	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+>  			      gic_acpi_parse_madt_its, 0);
+> +	acpi_its_srat_maps_free();
+>  }
+>  #else
+>  static void __init its_acpi_probe(void) { }
+> -- 
+> 1.7.12.4
+> 
