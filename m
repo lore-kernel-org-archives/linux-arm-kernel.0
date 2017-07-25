@@ -1,59 +1,109 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 25 Jul 2017 08:52:53 +0530
-Subject: [PATCH 3/4] gpio: davinci: Add a separate compatible for
- keystone-k2g soc
-In-Reply-To: <20170724182427.64u5zmr2jl3hk5lh@rob-hp-laptop>
-References: <1500375436-9435-1-git-send-email-j-keerthy@ti.com>
- <1500375436-9435-4-git-send-email-j-keerthy@ti.com>
- <20170724182427.64u5zmr2jl3hk5lh@rob-hp-laptop>
-Message-ID: <decf6160-621a-8d73-8694-e5091ea50d27@ti.com>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Tue, 25 Jul 2017 10:32:37 +0530
+Subject: [PATCH v4] acpi/iort: numa: Add numa node mapping for smmuv3 devices
+Message-ID: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARM IORT specification(rev. C) has added  provision to define proximity
+domain in SMMUv3 IORT table. Adding required code to parse Proximity
+domain and set numa_node of smmv3 platform devices.
 
+Add code to parse proximity domain in SMMUv3 IORT table to
+set numa node mapping for smmuv3 devices.
 
-On Monday 24 July 2017 11:54 PM, Rob Herring wrote:
-> On Tue, Jul 18, 2017 at 04:27:15PM +0530, Keerthy wrote:
->> Add a separate compatible for keystone-k2g soc
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>  Documentation/devicetree/bindings/gpio/gpio-davinci.txt | 3 ++-
->>  drivers/gpio/gpio-davinci.c                             | 1 +
->>  2 files changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->> index 5079ba7..1a5c1a2 100644
->> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->> @@ -1,7 +1,8 @@
->>  Davinci/Keystone GPIO controller bindings
->>  
->>  Required Properties:
->> -- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
->> +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio",
->> +	      "ti,keystone-k2g-gpio"
-> 
-> Reformat to one valid combination per line.
+Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+---
 
-Sure Rob. Thanks for reviewing.
+This patch has dependency on header file patch [1], which is
+already merged to linux-pm.
 
-> 
->>  
->>  - reg: Physical base address of the controller and the size of memory mapped
->>         registers.
->> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
->> index 932f270..a8d8dd9 100644
->> --- a/drivers/gpio/gpio-davinci.c
->> +++ b/drivers/gpio/gpio-davinci.c
->> @@ -610,6 +610,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->>  static const struct of_device_id davinci_gpio_ids[] = {
->>  	{ .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
->>  	{ .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
->> +	{ .compatible = "ti,keystone-k2g-gpio", keystone_gpio_get_irq_chip},
->>  	{ /* sentinel */ },
->>  };
->>  MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
->> -- 
->> 1.9.1
->>
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&id=c944230064eb65e4fa018d86779b4fd200b1d7e7
+
+v4:
+  - Fix compilation issue in !CONFIG_NUMA
+
+v3:
+  - Addressed Lorenzo Pieralisi comment.
+
+v2:
+  - Changed as per Lorenzo Pieralisi and Hanjun Guo suggestions.
+
+v1:
+  - Initial patch
+
+ drivers/acpi/arm64/iort.c | 33 +++++++++++++++++++++++++++++++--
+ 1 file changed, 31 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index a3215ee..c5c82c3 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -908,6 +908,28 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
+ 	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
+ }
+ 
++#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170629)
++/*
++ * set numa proximity domain for smmuv3 device
++ */
++static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
++		struct device *dev)
++{
++	struct acpi_iort_smmu_v3 *smmu;
++
++	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
++	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
++		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
++		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
++			smmu->base_address,
++			smmu->pxm);
++	}
++}
++#else
++static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
++		struct device *dev) { }
++#endif
++
+ static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
+ {
+ 	struct acpi_iort_smmu *smmu;
+@@ -977,20 +999,24 @@ struct iort_iommu_config {
+ 	int (*iommu_count_resources)(struct acpi_iort_node *node);
+ 	void (*iommu_init_resources)(struct resource *res,
+ 				     struct acpi_iort_node *node);
++	void (*iommu_set_proximity)(struct acpi_iort_node *node,
++				     struct device *dev);
+ };
+ 
+ static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
+ 	.name = "arm-smmu-v3",
+ 	.iommu_is_coherent = arm_smmu_v3_is_coherent,
+ 	.iommu_count_resources = arm_smmu_v3_count_resources,
+-	.iommu_init_resources = arm_smmu_v3_init_resources
++	.iommu_init_resources = arm_smmu_v3_init_resources,
++	.iommu_set_proximity = arm_smmu_v3_set_proximity
+ };
+ 
+ static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
+ 	.name = "arm-smmu",
+ 	.iommu_is_coherent = arm_smmu_is_coherent,
+ 	.iommu_count_resources = arm_smmu_count_resources,
+-	.iommu_init_resources = arm_smmu_init_resources
++	.iommu_init_resources = arm_smmu_init_resources,
++	.iommu_set_proximity = NULL
+ };
+ 
+ static __init
+@@ -1028,6 +1054,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+ 	if (!pdev)
+ 		return -ENOMEM;
+ 
++	if (ops->iommu_set_proximity)
++		ops->iommu_set_proximity(node, &pdev->dev);
++
+ 	count = ops->iommu_count_resources(node);
+ 
+ 	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
+-- 
+2.9.4
