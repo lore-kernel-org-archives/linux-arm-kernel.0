@@ -1,33 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Jul 2017 09:39:07 +0200
-Subject: [PATCH v3 10/10] ARM: dts: sun8i: a83t: h8homlet: Enable
- micro-SD card and onboard eMMC
-In-Reply-To: <20170724135905.28855-11-wens@csie.org>
-References: <20170724135905.28855-1-wens@csie.org>
- <20170724135905.28855-11-wens@csie.org>
-Message-ID: <20170725073907.ykcarlb6fv2tlytc@flea>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 25 Jul 2017 09:37:03 +0200
+Subject: [PATCH v4 2/9] dt-bindings: clk: at91: add audio plls to the
+ compatible list
+In-Reply-To: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
+References: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <ab59b9d6b4bcd3a26672ce83e379f49c551eb9ba.1500968090.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 09:59:05PM +0800, Chen-Yu Tsai wrote:
-> The H8 homlet has a micro-SD card slot connected to mmc0,
-> and onboard eMMC from FORESEE, connected to mmc2.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This new clock driver set allows to have a fractional divided clock that
+would generate a precise clock particularly suitable for audio
+applications.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The main audio pll clock has two children clocks: one that is connected
+to the PMC, the other that can directly drive a pad. As these two routes
+have different enable bits and different dividers and divider formulas,
+they are handled by two different drivers.
 
-Thanks!
-Maxime
+This adds the audio plls (frac, pad and pmc) to the compatible list of
+at91 clocks in DT binding.
 
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ Documentation/devicetree/bindings/clock/at91-clock.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+index 5f3ad65..51c259a 100644
+--- a/Documentation/devicetree/bindings/clock/at91-clock.txt
++++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+@@ -81,6 +81,16 @@ Required properties:
+ 	"atmel,sama5d2-clk-generated":
+ 		at91 generated clock
+ 
++	"atmel,sama5d2-clk-audio-pll-frac":
++		at91 audio fractional pll
++
++	"atmel,sama5d2-clk-audio-pll-pad":
++		at91 audio pll CLK_AUDIO output pin
++
++	"atmel,sama5d2-clk-audio-pll-pmc"
++		at91 audio pll output on AUDIOPLLCLK that feeds the PMC
++		and can be used by peripheral clock or generic clock
++
+ Required properties for SCKC node:
+ - reg : defines the IO memory reserved for the SCKC.
+ - #size-cells : shall be 0 (reg is used to encode clk id).
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/b47576b9/attachment-0001.sig>
+git-series 0.9.1
