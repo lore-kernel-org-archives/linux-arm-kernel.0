@@ -1,86 +1,53 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 25 Jul 2017 19:38:51 +0200
-Subject: [RESEND PATCH v2 1/2] drm/exynos/decon: Move headers from global to
- local place
-Message-ID: <1501004332-8093-1-git-send-email-krzk@kernel.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 25 Jul 2017 12:41:27 -0500
+Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
+ from suspend_noirq
+In-Reply-To: <20170725085617.GR10026@atomide.com>
+References: <20170724095201.21601-1-johan@kernel.org>
+ <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
+ <20170725071048.GP10026@atomide.com> <20170725085617.GR10026@atomide.com>
+Message-ID: <9b846eee-4e44-6909-60d8-99ee86e6a212@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DECON headers contain only defines for registers.  There are no
-other drivers using them so this should be put locally to the Exynos DRM
-driver.  Keeping headers local helps managing the code.
 
-Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
----
+On 07/25/2017 03:56 AM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [170725 00:11]:
+>> * Grygorii Strashko <grygorii.strashko@ti.com> [170724 15:17]:
+>>> My personal thought here is that removing of pm_runtime_set_active() will not fix
+>>> root cause of the problem, but rather hide it :( and, probably, real fix will be
+>>> to update USB framework to ensure that all suspend devices are also PM runtime suspend
+>>> (not sure how) or add few more pm_suspend_ignore_children() calls
+>>>   (for example as I've tried to do in [2], but this was unfinished).
+>>>
+>>> I've found very simple steps to reproduce suspend failure on am335x-evm (should also
+>>> work on BBB) -  do below sequence with USB device plugged:
+>>>
+>>>     echo platform > /sys/power/pm_test
+>>>     echo 1 > /sys/power/pm_print_times
+>>>     [ echo 0 > /sys/module/printk/parameters/console_suspend ]
+>>>     echo mem > /sys/power/state
+>>>
+>>> [   95.499685] calling  47400000.usb+ @ 733, parent: ocp
+>>> [   95.504818] am335x-usb-childs 47400000.usb: runtime PM trying to suspend device but active child
+>>> [   95.513750] am335x-usb-childs 47400000.usb: omap device suspend failure 0
+>>>
+>>> Below I've attached possible patch which converts OMAP device to
+>>> use pm_runtime_force_suspend/resume().
+>>
+>> It seems to almost work for my PM test cases.. It seems that serial console
+>> somehow won't get restored after suspend/resume cycle on omap3 though.
+>>
+>> The system enters off mode during suspend, and wakes up properly so I can
+>> ssh to it after resume. But the serial console no longer works after resume.
+>> This is with 8250-omap driver.
+> 
+> And FYI, on omap4 this produces a bunch of L3 irq errors on suspend.
+> 
 
-Changes since v1:
-1. Just re-order patches in patchset.
----
- drivers/gpu/drm/exynos/exynos5433_drm_decon.c                          | 3 +--
- drivers/gpu/drm/exynos/exynos7_drm_decon.c                             | 2 +-
- .../exynos5433_decon.h => drivers/gpu/drm/exynos/regs-decon5433.h      | 0
- include/video/exynos7_decon.h => drivers/gpu/drm/exynos/regs-decon7.h  | 3 +--
- 4 files changed, 3 insertions(+), 5 deletions(-)
- rename include/video/exynos5433_decon.h => drivers/gpu/drm/exynos/regs-decon5433.h (100%)
- rename include/video/exynos7_decon.h => drivers/gpu/drm/exynos/regs-decon7.h (99%)
+Ok. This was a risky change even if it looks obvious :(
 
-diff --git a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-index 5792ca88ab7a..5aca8c16f2bc 100644
---- a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-@@ -19,13 +19,12 @@
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
- 
--#include <video/exynos5433_decon.h>
--
- #include "exynos_drm_drv.h"
- #include "exynos_drm_crtc.h"
- #include "exynos_drm_fb.h"
- #include "exynos_drm_plane.h"
- #include "exynos_drm_iommu.h"
-+#include "regs-decon5433.h"
- 
- #define DSD_CFG_MUX 0x1004
- #define DSD_CFG_MUX_TE_UNMASK_GLOBAL BIT(13)
-diff --git a/drivers/gpu/drm/exynos/exynos7_drm_decon.c b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-index 3e88269fdc2e..387e436c97d2 100644
---- a/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-@@ -25,13 +25,13 @@
- 
- #include <video/of_display_timing.h>
- #include <video/of_videomode.h>
--#include <video/exynos7_decon.h>
- 
- #include "exynos_drm_crtc.h"
- #include "exynos_drm_plane.h"
- #include "exynos_drm_drv.h"
- #include "exynos_drm_fb.h"
- #include "exynos_drm_iommu.h"
-+#include "regs-decon7.h"
- 
- /*
-  * DECON stands for Display and Enhancement controller.
-diff --git a/include/video/exynos5433_decon.h b/drivers/gpu/drm/exynos/regs-decon5433.h
-similarity index 100%
-rename from include/video/exynos5433_decon.h
-rename to drivers/gpu/drm/exynos/regs-decon5433.h
-diff --git a/include/video/exynos7_decon.h b/drivers/gpu/drm/exynos/regs-decon7.h
-similarity index 99%
-rename from include/video/exynos7_decon.h
-rename to drivers/gpu/drm/exynos/regs-decon7.h
-index a62b11b613f6..339ea1007ff5 100644
---- a/include/video/exynos7_decon.h
-+++ b/drivers/gpu/drm/exynos/regs-decon7.h
-@@ -1,5 +1,4 @@
--/* include/video/exynos7_decon.h
-- *
-+/*
-  * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-  * Author: Ajay Kumar <ajaykumar.rs@samsung.com>
-  *
 -- 
-2.7.4
+regards,
+-grygorii
