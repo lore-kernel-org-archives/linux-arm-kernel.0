@@ -1,63 +1,47 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 24 Jul 2017 23:30:08 -0700
-Subject: [PATCH 5/5] arm64: dts: msm8996: Add QFPROM node
-In-Reply-To: <CAFp+6iHdfA9d-unYEHSBF8d06ArLEWnmN1jpSxcLdyB9peSzsQ@mail.gmail.com>
-References: <20170725054705.20674-1-bjorn.andersson@linaro.org>
- <20170725054705.20674-6-bjorn.andersson@linaro.org>
- <CAFp+6iHdfA9d-unYEHSBF8d06ArLEWnmN1jpSxcLdyB9peSzsQ@mail.gmail.com>
-Message-ID: <20170725063008.GB2016@tuxbook>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 25 Jul 2017 08:57:34 +0200
+Subject: [PATCH v2 1/4] drm/atomic: implement
+ drm_atomic_helper_commit_tail for runtime_pm users
+In-Reply-To: <20170720184628.5vizn7hjdaaz7rqy@phenom.ffwll.local>
+References: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
+ <a8f92dc70048bab746e94dadd1c23200626aff60.1500555652.git-series.maxime.ripard@free-electrons.com>
+ <20170720184628.5vizn7hjdaaz7rqy@phenom.ffwll.local>
+Message-ID: <20170725065734.kbtb2mrfsjwm2szz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 24 Jul 23:09 PDT 2017, Vivek Gautam wrote:
+Hi Daniel,
 
-> Hi Bjorn,
+On Thu, Jul 20, 2017 at 08:46:28PM +0200, Daniel Vetter wrote:
+> On Thu, Jul 20, 2017 at 03:01:16PM +0200, Maxime Ripard wrote:
+> > The current drm_atomic_helper_commit_tail helper works only if the CRTC is
+> > accessible, and documents an alternative implementation that is supposed to
+> > be used if that happens.
+> > 
+> > That implementation is then duplicated by some drivers. Instead of
+> > documenting it, let's implement an helper that all the relevant users can
+> > use directly.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
+> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 > 
-> On Tue, Jul 25, 2017 at 11:17 AM, Bjorn Andersson
-> <bjorn.andersson@linaro.org> wrote:
-> > From: Vivek Gautam <vivek.gautam@codeaurora.org>
-> >
-> > Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/qcom/msm8996.dtsi | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> > index 395666dcce1b..d0865d2f731e 100644
-> > --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> > @@ -496,6 +496,17 @@
-> >                         status = "disabled";
-> >                 };
-> >
-> > +               qfprom: qfprom at 74000 {
-> > +                       compatible = "qcom,qfprom";
-> > +                       reg = <0x00074000 0x8ff>;
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <1>;
-> > +                       qusb2p_hstx_trim: hstx_trim at 24e {
-> > +                               reg = <0x24e 0x2>;
-> > +                               bits = <5 4>;
-> > +                       };
-> 
-> There's one more part to it which will be used by the secondary
-> USB2 controller.
-> I was hoping to add this patch along with the USB device tree patches.
-> Let me know if you are not using this patch for anything now, i can
-> submit it along with the usb series.
-> 
+> Should I throw this into drm-misc, or do you want to merge this through
+> some driver tree?
 
-I omitted this due to the rpmcc dependency. But I must have looked at
-the wrong node, as there is no such dependency.
+Yes, you can put them in drm-misc, it will the be the easiest option.
 
-So this should be replaced by the full 0387312d9f35 ("arm64: dts:
-msm8996: Add device node for qcom qusb2 phy"), which has a commit
-message as well.
+Thanks!
+Maxime
 
-
-Thanks for spotting my mistake.
-
-Regards,
-Bjorn
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/7ada811f/attachment.sig>
