@@ -1,56 +1,94 @@
-From: karthik@techveda.org (karthik at techveda.org)
-Date: Tue, 25 Jul 2017 15:17:29 +0530
-Subject: [RESEND PATCH] arm: dts: omap3: Remove needless interrupt-parent
- property
-Message-ID: <1500976049-5825-1-git-send-email-karthik@techveda.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Jul 2017 10:49:24 +0100
+Subject: [PATCH v2 2/6] of: Add helper for mapping device node to logical
+ CPU number
+In-Reply-To: <18f06d4c-f063-30f7-70e8-aacd6e7a129b@arm.com>
+References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
+ <1500892161-17634-3-git-send-email-suzuki.poulose@arm.com>
+ <7ec47d12-3b6b-82c0-ba15-5664b5169974@arm.com>
+ <18f06d4c-f063-30f7-70e8-aacd6e7a129b@arm.com>
+Message-ID: <d62f2333-b819-8f67-7163-8ea138605522@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Karthik Tummala <karthik@techveda.org>
 
-All nodes inhert "interrupt-parent" property from root
-node. Removed the aforementioned property from usbhsohci,
-usbhsehci, ssi_port1, ssi_port2 nodes to avoid duplication.
 
-Signed-off-by: Karthik Tummala <karthik@techveda.org>
----
- arch/arm/boot/dts/omap3.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+On 25/07/17 10:27, Suzuki K Poulose wrote:
+> On 24/07/17 17:42, Sudeep Holla wrote:
+>>
+>>
+>> On 24/07/17 11:29, Suzuki K Poulose wrote:
+>>> Add a helper to map a device node to a logical CPU number to avoid
+>>> duplication. Currently this is open coded in different places (e.g
+>>> gic-v3, coresight). The helper tries to map device node to a "possible"
+>>> logical CPU id, which may not be online yet. It is the responsibility
+>>> of the user to make sure that the CPU is online. The helper uses
+>>> of_get_cpu_node() which uses arch specific backends to match the
+>>> phyiscal
+>>> ids.
+>>>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>>  drivers/of/base.c         | 26 ++++++++++++++++++++++++++
+>>>  include/linux/of_device.h |  7 +++++++
+>>>  2 files changed, 33 insertions(+)
+>>>
+>>> diff --git a/drivers/of/base.c b/drivers/of/base.c
+>>> index 686628d..639af23 100644
+>>> --- a/drivers/of/base.c
+>>> +++ b/drivers/of/base.c
+>>> @@ -420,6 +420,32 @@ struct device_node *of_get_cpu_node(int cpu,
+>>> unsigned int *thread)
+>>>  EXPORT_SYMBOL(of_get_cpu_node);
+>>>
+>>>  /**
+>>> + * of_device_node_get_cpu: Get the logical CPU number for a given
+>>> device_node
+>>> + *
+>>> + * @cpu_node: Pointer to the device_node for CPU.
+>>> + *
+>>> + * Returns the logical CPU number of the given CPU device_node.
+>>> + * Returns >= nr_cpu_ids if CPU is not found.
+>>> + */
+>>> +int of_device_node_get_cpu(struct device_node *cpu_node)
+>>> +{
+>>> +    int cpu, thread;
+>>> +    bool found = false;
+>>> +    struct device_node *np;
+>>> +
+>>> +    for_each_possible_cpu(cpu) {
+>>> +        np = of_get_cpu_node(cpu, &thread);
+>>
+>> Ideally, we should be able to use of_cpu_device_node_get instead of
+>> of_get_cpu_node which parses the device tree. Not sure if that's the
+>> case here too.
+>>
+>> Sorry for following up on this so late. I had a patch in my tree
+>> for-a-while to address that. Just posted it[1] now seeing this patch now.
+>>
+>> You can move to of_cpu_device_node_get if all users of this function are
+>> called after CPU's are registered. Otherwise, you can keep it as is for
+>> now and it can be changed once [1] lands.
+> 
+> As you mentioned offline, since GIC uses this, we need to stick to 
+> of_get_cpu_node.
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a3ff493..bdaf30c 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -713,14 +713,12 @@
- 			usbhsohci: ohci at 48064400 {
- 				compatible = "ti,ohci-omap3";
- 				reg = <0x48064400 0x400>;
--				interrupt-parent = <&intc>;
- 				interrupts = <76>;
- 			};
- 
- 			usbhsehci: ehci at 48064800 {
- 				compatible = "ti,ehci-omap";
- 				reg = <0x48064800 0x400>;
--				interrupt-parent = <&intc>;
- 				interrupts = <77>;
- 			};
- 		};
-@@ -831,7 +829,6 @@
- 				reg-names = "tx",
- 					    "rx";
- 
--				interrupt-parent = <&intc>;
- 				interrupts = <67>,
- 					     <68>;
- 			};
-@@ -844,7 +841,6 @@
- 				reg-names = "tx",
- 					    "rx";
- 
--				interrupt-parent = <&intc>;
- 				interrupts = <69>,
- 					     <70>;
- 			};
+Agreed.
+
+> In fact, I started off with the of_cpu_device_node_get() and switched
+> to the former.
+> 
+
+Ah OK.
+
+> It would be really nice to have your patch, which streamlines the 
+> interface and we could switch to that.
+> 
+
+Yes, I will wait for that patch to land in the mainline, I can follow up
+and remove the use of of_get_cpu_node wherever required.
 -- 
-1.9.1
+Regards,
+Sudeep
