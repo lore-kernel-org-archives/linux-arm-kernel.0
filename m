@@ -1,221 +1,275 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 25 Jul 2017 13:41:32 +0200
-Subject: Problem with PHY state machine when using interrupts
-In-Reply-To: <1c00935b-3a3c-4268-db99-a0487ddece76@free.fr>
-References: <65b9f1f5-724c-cd03-1c39-59405e773efa@free.fr>
- <849513d9-c981-ec20-5a10-08c663d0aa37@free.fr>
- <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
- <e6a7a5df-b735-6f9c-6a2b-cded86ec6525@free.fr>
- <b0410a73-ff2d-ca06-93fa-17af2040c41c@gmail.com>
- <0f56083f-d43e-a141-1470-b76546af6d58@gmail.com>
- <c81e12bc-0f89-5eab-547e-f0c1ec389ad8@free.fr>
- <62085f48-df18-f987-f521-dcdfbd7f574b@gmail.com>
- <eb09bda5-c972-0c2c-2693-982c02c8c87c@gmail.com>
- <1c00935b-3a3c-4268-db99-a0487ddece76@free.fr>
-Message-ID: <e2f4ef4a-c667-3bdf-e4ea-2767dc6a4922@free.fr>
+From: P.Bruenn@beckhoff.com (=?iso-8859-1?Q?Patrick_Br=FCnn?=)
+Date: Tue, 25 Jul 2017 11:41:56 +0000
+Subject: [PATCH v4 2/2] ARM: dts: imx: add CX9020 Embedded PC device tree
+In-Reply-To: <20170725075934.GA20064@dragon>
+References: <20170712090408.12212-1-linux-kernel-dev@beckhoff.com>
+ <20170721040640.31424-1-linux-kernel-dev@beckhoff.com>
+ <20170721040640.31424-3-linux-kernel-dev@beckhoff.com>
+ <20170725075934.GA20064@dragon>
+Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E0182B4CFE8@nt-mail04>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/2017 12:51, Mason wrote:
+>From: Shawn Guo [mailto:shawnguo at kernel.org]
+>On Fri, Jul 21, 2017 at 06:06:40AM +0200, linux-kernel-dev at beckhoff.com
+>wrote:
+>> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+>>
+>> The CX9020 differs from i.MX53 Quick Start Board by:
+>> - use uart2 instead of uart1
+>> - DVI-D connector instead of VGA
+>> - no audio
+>> - no SATA connector
+>> - CCAT FPGA connected to emi
+>> - enable rtc
+>>
+>> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+>
+>Where is the patch 1/2?
+>
+You can find a copy here [1], or wait for the next revision, I will try to improve my git send-mail skills until then.
+I used git send-email with "--to-cmd ./scripts/get_maintainer.pl" to send the series. I just
+discovered it would have been better to use To: and Cc: in the cover letter and send with
+"--to-cover --cc-cover".
+I will drop "--in-reply-to" for the next revision, too...
+Is there something like patman [2] from the u-boot project for the kernel, that I am missing?
+>>
+>> ---
+>>
+>> v4:
+>> - move alternative UART2 pinmux settings to imx53-pinfunc.h
+>> - fix copyright notice and model name to clearify cx9020 is a
+>>   Beckhoff board and not from Freescale/NXP/Qualcomm
+>> - add "bhf,cx9020" compatible
+>> - remove ccat node and pin configuration as long as the ccat
+>>   driver is not mainlined
+>> - use dvi-connector + ti,tfp410 instead of panel-simple
+>> - add newlines between property list and child nodes
+>> - replace underscores in node names with hypens
+>> - replace magic number 0 with polarity defines from
+>>   include/dt-bindings/gpio/gpio.h
+>> - move rtc node into imx53.dtsi, change it's name into 'srtc',
+>>   to avoid a conflict with 'rtc' node in imx53-m53.dtsi
+>> - rename regulator-3p2v
+>> - drop imx53-qsb container node
+>> - make iomux configuration explicit
+>> - remove unused audmux
+>> - remove unused led_pin_gpio3_23 configuration
+>> - use blue gpio-leds as disk-activity indicators for mmc0 and mmc1
+>> - add mmc indicator leds to sdhc pingroups
+>> - keep node names in alphabetical order
+>> - remove unused sata and ssi2
+>> - remove unused pin configs from hoggrp
+>> - add entry for imx53-cx9020.dts to MAINTAINERS
+>>
+>> v3: add missig changelog
+>> v2:
+>> - keep alphabetic order of dts/Makefile
+>> - configure uart2 with 'fsl,dte-mode'
+>> - use display-0 and panel-0 as node names
+>> - remove unnecessary "simple-bus" for fixed regulators
+>>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> ---
+>>  MAINTAINERS                        |   1 +
+>
+>I do not take the changes on this file.
+>
+Do you mean you keep maintainership for imx53-cx9020.dts, or do you
+mean I should group it in the patch which adds imx53-cx9020.dts?
+I am fine with both and would be glad to have your guidance. I just
+didn't understand clearly what was meant.
 
-> Moving the call to phy_stop() down after all the MAC tear down
-> avoids the hang.
-> 
-> As far as I understand, when we are shutting everything down,
-> we don't need the phy_state_machine to run asynchronously.
-> We can run it synchronously one last time after the delayed
-> stuff has been disabled.
+>>  arch/arm/boot/dts/Makefile         |   1 +
+>>  arch/arm/boot/dts/imx53-cx9020.dts | 295
+>+++++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/imx53-pinfunc.h  |   4 +
+>>  arch/arm/boot/dts/imx53.dtsi       |   9 ++
+>
+>Please have separate patches for imx53-pinfunc.h and imx53.dtsi.  Do not
+>mix them up with board support dts changes.
+>
+Okay, I will split it into three patches?
+1. Adding SRTC to imx53.dtsi
+2. Adding UART2 pinmux settings to imx53-pinfunc.h
+3. Adding CX9020 board support
 
-Below is my current WIP diff. (It conflates the two issues
-I've been discussing. Splitting the diff required.)
+>>  5 files changed, 310 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/imx53-cx9020.dts
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 1bf282843dc2..1bd06328f79b 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -1176,6 +1176,7 @@ ARM/BECKHOFF SUPPORT
+>>  M:  Patrick Bruenn <p.bruenn@beckhoff.com>
+>>  S:  Maintained
+>>  F:  Documentation/devicetree/bindings/arm/bhf.txt
+>> +F:  arch/arm/boot/dts/imx53-cx9020.dts
+>>
+>>  ARM/CALXEDA HIGHBANK ARCHITECTURE
+>>  M:  Rob Herring <robh@kernel.org>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 4b17f35dc9a7..f0ba9be523e0 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -340,6 +340,7 @@ dtb-$(CONFIG_SOC_IMX51) += \
+>>      imx51-ts4800.dtb
+>>  dtb-$(CONFIG_SOC_IMX53) += \
+>>      imx53-ard.dtb \
+>> +    imx53-cx9020.dtb \
+>>      imx53-m53evk.dtb \
+>>      imx53-mba53.dtb \
+>>      imx53-qsb.dtb \
+>> diff --git a/arch/arm/boot/dts/imx53-cx9020.dts
+>b/arch/arm/boot/dts/imx53-cx9020.dts
+>> new file mode 100644
+>> index 000000000000..c4f9c89668c2
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx53-cx9020.dts
+>> @@ -0,0 +1,295 @@
+>> +/*
+>> + * Copyright 2017 Beckhoff Automation GmbH & Co. KG
+>> + * based on imx53-qsb.dts
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "imx53.dtsi"
+>> +
+>> +/ {
+>> +    model = "Beckhoff CX9020 Embedded PC";
+>> +    compatible = "bhf,cx9020", "fsl,imx53";
+>> +
+>> +    chosen {
+>> +            stdout-path = &uart2;
+>> +    };
+>> +
+>> +    memory {
+>> +            reg = <0x70000000 0x20000000>,
+>> +                  <0xb0000000 0x20000000>;
+>> +    };
+>> +
+>> +    display-0 {
+>> +            #address-cells =<1>;
+>> +            #size-cells = <0>;
+>> +            compatible = "fsl,imx-parallel-display";
+>> +            interface-pix-fmt = "rgb24";
+>> +            pinctrl-names = "default";
+>> +            pinctrl-0 = <&pinctrl_ipu_disp0>;
+>> +            status = "okay";
+>
+>This status line is not necessary.  We usually use "okay" to toggle the
+>status which is set "disabled" in <soc>.dtsi.
+>
+I will drop it in v5
+>> +
+>> +            port at 0 {
+>> +                    reg = <0>;
+>> +
+>> +                    display0_in: endpoint {
+>> +                            remote-endpoint = <&ipu_di0_disp0>;
+>> +                    };
+>> +            };
+>> +
+>> +            port at 1 {
+>> +                    reg = <1>;
+>> +
+>> +                    display0_out: endpoint {
+>> +                            remote-endpoint = <&tfp410_in>;
+>> +                    };
+>> +            };
+>> +    };
+>> +
+>> +    dvi-connector {
+>> +            compatible = "dvi-connector";
+>> +            ddc-i2c-bus = <&i2c2>;
+>> +            digital;
+>> +
+>> +            port {
+>> +                    dvi_connector_in: endpoint {
+>> +                            remote-endpoint = <&tfp410_out>;
+>> +                    };
+>> +            };
+>> +    };
+>> +
+>> +    dvi-converter {
+>> +            #address-cells = <1>;
+>> +            #size-cells = <0>;
+>> +            compatible = "ti,tfp410";
+>> +
+>> +            port at 0 {
+>> +                    reg = <0>;
+>> +
+>> +                    tfp410_in: endpoint {
+>> +                            remote-endpoint = <&display0_out>;
+>> +                    };
+>> +            };
+>> +
+>> +            port at 1 {
+>> +                    reg = <1>;
+>> +
+>> +                    tfp410_out: endpoint {
+>> +                            remote-endpoint = <&dvi_connector_in>;
+>> +                    };
+>> +            };
+>> +    };
+>> +
+>> +    leds {
+>> +            compatible = "gpio-leds";
+>> +
+>> +            pwr-r {
+>> +                    gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+>> +                    default-state = "off";
+>> +            };
+>> +
+>> +            pwr-g {
+>> +                    gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>;
+>> +                    default-state = "on";
+>> +            };
+>> +
+>> +            pwr-b {
+>> +                    gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
+>> +                    default-state = "off";
+>> +            };
+>> +
+>> +            sd1-b {
+>> +                    linux,default-trigger = "mmc0";
+>> +                    gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
+>> +            };
+>> +
+>> +            sd2-b {
+>> +                    linux,default-trigger = "mmc1";
+>> +                    gpios = <&gpio3 17 GPIO_ACTIVE_HIGH>;
+>> +            };
+>> +    };
+>> +
+>> +    regulator-3p2v {
+>> +            compatible = "regulator-fixed";
+>> +            regulator-name = "3P2V";
+>> +            regulator-min-microvolt = <3200000>;
+>> +            regulator-max-microvolt = <3200000>;
+>> +            regulator-always-on;
+>> +    };
+>> +
+>> +    reg_usb_vbus: regulator {
+>
+>The node name "regulator" is too generic.  The "regulator-vbus"
+>might be the one you want to use.
+>
+Okay, I will call it " regulator-vbus" in the next version
+>Shawn
+>
+Thanks a lot for your time and patience,
+Patrick
 
-Tested in interrupt mode:
-
-# ip link set eth0 up
-[   11.107547] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change UP -> AN
-[   14.530329] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
-[   14.538136] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change AN -> RUNNING
-# ip link set eth0 down
-[   23.801018] nb8800 26000.ethernet eth0: Link is Down
-# ip link set eth0 up
-[   28.740870] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change UP -> AN
-[   31.431528] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
-[   31.439350] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change AN -> RUNNING
-
-Works as expected.
-
-Tested in polling mode:
-
-# ip link set eth0 up
-[   23.001199] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change UP -> AN
-[   24.024315] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change AN -> NOLINK
-[   27.064355] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
-[   27.072156] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change NOLINK -> RUNNING
-# ip link set eth0 down
-[   42.134617] nb8800 26000.ethernet eth0: Link is Down
-# ip link set eth0 up
-[   48.381185] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change UP -> AN
-[   49.410976] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change AN -> NOLINK
-[   51.437686] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
-[   51.445486] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state change NOLINK -> RUNNING
-
-Works as expected.
-
-Also tested on my old board, no regression seen.
-
-Can you confirm that the changes to drivers/net/phy/phy.c
-look reasonable?
-
-Regards.
-
-
-diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-index e94159507847..b5eba7958871 100644
---- a/drivers/net/ethernet/aurora/nb8800.c
-+++ b/drivers/net/ethernet/aurora/nb8800.c
-@@ -41,6 +41,7 @@
- 
- static void nb8800_tx_done(struct net_device *dev);
- static int nb8800_dma_stop(struct net_device *dev);
-+static int nb8800_init(struct net_device *dev);
- 
- static inline u8 nb8800_readb(struct nb8800_priv *priv, int reg)
- {
-@@ -957,6 +958,9 @@ static int nb8800_open(struct net_device *dev)
- 	struct phy_device *phydev;
- 	int err;
- 
-+	nb8800_init(dev);
-+	priv->speed = 0;
-+
- 	/* clear any pending interrupts */
- 	nb8800_writel(priv, NB8800_RXC_SR, 0xf);
- 	nb8800_writel(priv, NB8800_TXC_SR, 0xf);
-@@ -1004,8 +1008,6 @@ static int nb8800_stop(struct net_device *dev)
- 	struct nb8800_priv *priv = netdev_priv(dev);
- 	struct phy_device *phydev = dev->phydev;
- 
--	phy_stop(phydev);
--
- 	netif_stop_queue(dev);
- 	napi_disable(&priv->napi);
- 
-@@ -1013,6 +1015,7 @@ static int nb8800_stop(struct net_device *dev)
- 	nb8800_mac_rx(dev, false);
- 	nb8800_mac_tx(dev, false);
- 
-+	phy_stop(phydev);
- 	phy_disconnect(phydev);
- 
- 	free_irq(dev->irq, dev);
-@@ -1350,6 +1353,21 @@ static int nb8800_tango4_init(struct net_device *dev)
- };
- MODULE_DEVICE_TABLE(of, nb8800_dt_ids);
- 
-+static int nb8800_init(struct net_device *dev)
-+{
-+#ifndef RESET_IN_PROBE
-+	struct nb8800_priv *priv = netdev_priv(dev);
-+	const struct nb8800_ops *ops = priv->ops;
-+
-+	ops->reset(dev);
-+	nb8800_hw_init(dev);
-+	ops->init(dev);
-+	nb8800_update_mac_addr(dev);
-+#endif
-+
-+	return 0;
-+}
-+
- static int nb8800_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match;
-@@ -1389,6 +1407,7 @@ static int nb8800_probe(struct platform_device *pdev)
- 
- 	priv = netdev_priv(dev);
- 	priv->base = base;
-+	priv->ops = ops;
- 
- 	priv->phy_mode = of_get_phy_mode(pdev->dev.of_node);
- 	if (priv->phy_mode < 0)
-@@ -1407,11 +1426,13 @@ static int nb8800_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&priv->tx_lock);
- 
-+#ifdef RESET_IN_PROBE
- 	if (ops && ops->reset) {
- 		ret = ops->reset(dev);
- 		if (ret)
- 			goto err_disable_clk;
- 	}
-+#endif
- 
- 	bus = devm_mdiobus_alloc(&pdev->dev);
- 	if (!bus) {
-@@ -1454,6 +1475,7 @@ static int nb8800_probe(struct platform_device *pdev)
- 
- 	priv->mii_bus = bus;
- 
-+#ifdef RESET_IN_PROBE
- 	ret = nb8800_hw_init(dev);
- 	if (ret)
- 		goto err_deregister_fixed_link;
-@@ -1463,6 +1485,7 @@ static int nb8800_probe(struct platform_device *pdev)
- 		if (ret)
- 			goto err_deregister_fixed_link;
- 	}
-+#endif
- 
- 	dev->netdev_ops = &nb8800_netdev_ops;
- 	dev->ethtool_ops = &nb8800_ethtool_ops;
-@@ -1476,7 +1499,9 @@ static int nb8800_probe(struct platform_device *pdev)
- 	if (!is_valid_ether_addr(dev->dev_addr))
- 		eth_hw_addr_random(dev);
- 
-+#ifdef RESET_IN_PROBE
- 	nb8800_update_mac_addr(dev);
-+#endif
- 
- 	netif_carrier_off(dev);
- 
-diff --git a/drivers/net/ethernet/aurora/nb8800.h b/drivers/net/ethernet/aurora/nb8800.h
-index 6ec4a956e1e5..d5f4481a2c7b 100644
---- a/drivers/net/ethernet/aurora/nb8800.h
-+++ b/drivers/net/ethernet/aurora/nb8800.h
-@@ -305,6 +305,7 @@ struct nb8800_priv {
- 	dma_addr_t			tx_desc_dma;
- 
- 	struct clk			*clk;
-+	const struct nb8800_ops		*ops;
- };
- 
- struct nb8800_ops {
-diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
-index d0626bf5c540..3bc505b56c71 100644
---- a/drivers/net/phy/phy.c
-+++ b/drivers/net/phy/phy.c
-@@ -14,6 +14,7 @@
-  */
- 
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+#define DEBUG
- 
- #include <linux/kernel.h>
- #include <linux/string.h>
-@@ -743,12 +744,16 @@ void phy_trigger_machine(struct phy_device *phydev, bool sync)
-  */
- void phy_stop_machine(struct phy_device *phydev)
- {
-+	flush_delayed_work(&phydev->state_queue);
- 	cancel_delayed_work_sync(&phydev->state_queue);
- 
- 	mutex_lock(&phydev->lock);
- 	if (phydev->state > PHY_UP && phydev->state != PHY_HALTED)
- 		phydev->state = PHY_UP;
- 	mutex_unlock(&phydev->lock);
-+
-+	/* Now we can run the state machine synchronously */
-+	phy_state_machine(&phydev->state_queue.work);
- }
- 
- /**
+[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1450310.html
+[2] http://git.denx.de/?p=u-boot.git;a=blob;f=tools/patman/README
+Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
+Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
