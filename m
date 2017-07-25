@@ -1,512 +1,320 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 25 Jul 2017 16:29:52 +0800
-Subject: [PATCH 1/4] ARM: sun9i: Support SMP on A80 with Multi-Cluster
- Power Management (MCPM)
-In-Reply-To: <20170725074759.5mqrwcp7djeju33g@flea>
-References: <20170725050919.16036-1-wens@csie.org>
- <20170725050919.16036-2-wens@csie.org>
- <20170725074759.5mqrwcp7djeju33g@flea>
-Message-ID: <CAGb2v67tGuivydj1r+uD=5aw+yYZyBabbNsKwik9ZONNQmc=jQ@mail.gmail.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Tue, 25 Jul 2017 16:33:43 +0800
+Subject: [PATCH v2 6/6] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <7ac78a73-b06f-3af0-251e-41b0cc3013c5@arm.com>
+References: <1500892161-17634-1-git-send-email-suzuki.poulose@arm.com>
+ <1500892161-17634-7-git-send-email-suzuki.poulose@arm.com>
+ <20170724224953.00003297@huawei.com>
+ <7ac78a73-b06f-3af0-251e-41b0cc3013c5@arm.com>
+Message-ID: <20170725163343.0000598c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-         default ARCH_SUNXI
-On Tue, Jul 25, 2017 at 3:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Chen-Yu,
+On Mon, 24 Jul 2017 16:44:51 +0100
+Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+
+> Hi Jonathan,
+> 
+> 
+> On 24/07/17 15:50, Jonathan Cameron wrote:
+> > On Mon, 24 Jul 2017 11:29:21 +0100
+> > Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> >  
+> >> Add support for the Cluster PMU part of the ARM DynamIQ Shared Unit (DSU).
+> >> The DSU integrates one or more cores with an L3 memory system, control
+> >> logic, and external interfaces to form a multicore cluster. The PMU
+> >> allows counting the various events related to L3, SCU etc, along with
+> >> providing a cycle counter.
+> >>
+> >> The PMU can be accessed via system registers, which are common
+> >> to the cores in the same cluster. The PMU registers follow the
+> >> semantics of the ARMv8 PMU, mostly, with the exception that
+> >> the counters record the cluster wide events.
+> >>
+> >> This driver is mostly based on the ARMv8 and CCI PMU drivers.
+> >>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>  
+> > A few quick comments.  
+> 
+> Thanks for the detailed look. Comments in line. Btw, please could you leave a
+> blank line after the quoted text and before your comment (like what I have
+> don here) ? That way, it is way may much easier to find your comments.
+
+Sure
+
+> 
+> >
+> > Jonathan  
+> >> ---  
+> 
+> >>
+> >> diff --git a/arch/arm64/include/asm/arm_dsu_pmu.h b/arch/arm64/include/asm/arm_dsu_pmu.h
+> >> new file mode 100644
+> >> index 0000000..e7276fd
+> >> --- /dev/null
+> >> +++ b/arch/arm64/include/asm/arm_dsu_pmu.h
+> >> @@ -0,0 +1,124 @@  
+> > <snip>  
+> >> +static inline void __dsu_pmu_counter_interrupt_disable(int counter)
+> >> +{
+> >> +	write_sysreg_s(BIT(counter), CLUSTERPMINTENCLR_EL1);
+> >> +	isb();
+> >> +}
+> >> +
+> >> +
+> >> +static inline u32 __dsu_pmu_read_pmceid(int n)
+> >> +{
+> >> +	switch (n) {
+> >> +	case 0:
+> >> +		return read_sysreg_s(CLUSTERPMCEID0_EL1);
+> >> +	case 1:
+> >> +		return read_sysreg_s(CLUSTERPMCEID1_EL1);
+> >> +	default:
+> >> +		BUILD_BUG();
+> >> +		return 0;
+> >> +	}
+> >> +}  
+> > What is the benefit of having this lot in a header?  Is it to support future
+> > additional drivers? If not, why not just push them down into the c code.  
+> 
+> As I mentioned in the cover letter, this is to keep the architecture specific code
+> separate so that we could easily add support for this on arm32 kernel.
+> 
+
+Fair enough I suppose though I'd personally have done this as
+a prepatch to series that adds arm32 support.
+
+> >> --- /dev/null
+> >> +++ b/drivers/perf/arm_dsu_pmu.c  
+> > <snip>  
+> >> +
+> >> +/*
+> >> + * Make sure the group of events can be scheduled at once
+> >> + * on the PMU.
+> >> + */
+> >> +static int dsu_pmu_validate_group(struct perf_event *event)
+> >> +{
+> >> +	struct perf_event *sibling, *leader = event->group_leader;
+> >> +	struct dsu_hw_events fake_hw;
+> >> +
+> >> +	if (event->group_leader == event)
+> >> +		return 0;
+> >> +
+> >> +	memset(fake_hw.used_mask, 0, sizeof(fake_hw.used_mask));
+> >> +	if (!dsu_pmu_validate_event(event->pmu, &fake_hw, leader))
+> >> +		return -EINVAL;
+> >> +	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
+> >> +		if (!dsu_pmu_validate_event(event->pmu, &fake_hw, sibling))
+> >> +			return -EINVAL;
+> >> +	}
+> >> +	if (dsu_pmu_validate_event(event->pmu, &fake_hw, event))  
+> > Perhaps a comment to say why in this case validate_event has the opposite
+> > meaning to the others cases above? (not !dsu_pmu_validate_event())  
+> 
+> Ah! Thanks for spotting. Thats a mistake. It should be !dsu_pmu_validate_event().
+> I will fix it in the next version. We are making sure that the event can be
+> scheduled, with the other events in the group already added.
+> 
+> >> +
+> >> +static struct dsu_pmu *dsu_pmu_alloc(struct platform_device *pdev)
+> >> +{
+> >> +	struct dsu_pmu *dsu_pmu;
+> >> +
+> >> +	dsu_pmu = devm_kzalloc(&pdev->dev, sizeof(*dsu_pmu), GFP_KERNEL);
+> >> +	if (!dsu_pmu)
+> >> +		return ERR_PTR(-ENOMEM);  
+> > A blank line here would make it a little more readable  
+> >> +	raw_spin_lock_init(&dsu_pmu->pmu_lock);  
+> > And one here.  
+> >> +	return dsu_pmu;  
+> 
+> It doesn't look that complex here, given it doesn't take the lock.
+> If it does help the reading, I could add it.
+> 
+
+It was indeed a really minor point!
+
+> >> +}
+> >> +
+> >> +/**
+> >> + * dsu_pmu_dt_get_cpus: Get the list of CPUs in the cluster.
+> >> + */
+> >> +static int dsu_pmu_dt_get_cpus(struct device_node *dev, cpumask_t *mask)
+> >> +{
+> >> +	int i = 0, n, cpu;
+> >> +	struct device_node *cpu_node;
+> >> +
+> >> +	n = of_count_phandle_with_args(dev, "cpus", NULL);
+> >> +	if (n <= 0)
+> >> +		goto out;
+> >> +	for (; i < n; i++) {
+> >> +		cpu_node = of_parse_phandle(dev, "cpus", i);
+> >> +		if (!cpu_node)
+> >> +			break;
+> >> +		cpu = of_device_node_get_cpu(cpu_node);
+> >> +		of_node_put(cpu_node);
+> >> +		if (cpu >= nr_cpu_ids)
+> >> +			break;  
+> > It rather seems like this is an error we would not want to skip over.  
+> 
+> Ok. That makes sense to me. I can return -EINVAL here.
+> 
+> >> +		cpumask_set_cpu(cpu, mask);
+> >> +	}
+> >> +out:
+> >> +	return i > 0;  
+> > Cleaner to actually return appropriate errors from within
+> > this function and pass them all the way up.  
+> 
+> Sure, will do.
+> 
+> >> +static int dsu_pmu_probe(struct platform_device *pdev)
+> >> +{
+> >> +	int irq, rc, cpu;
+> >> +	struct dsu_pmu *dsu_pmu;
+> >> +	char *name;
+> >> +
+> >> +	static atomic_t pmu_idx = ATOMIC_INIT(-1);
+> >> +
+> >> +  
+> > One blank line only.  
+> 
+> Ok.
+> 
+> >> +	/*
+> >> +	 * Find one CPU in the DSU to handle the IRQs.
+> >> +	 * It is highly unlikely that we would fail
+> >> +	 * to find one, given the probing has succeeded.
+> >> +	 */
+> >> +	cpu = dsu_pmu_get_online_cpu(dsu_pmu);
+> >> +	if (cpu >= nr_cpu_ids)
+> >> +		return -ENODEV;
+> >> +	cpumask_set_cpu(cpu, &dsu_pmu->active_cpu);
+> >> +	rc = irq_set_affinity_hint(irq, &dsu_pmu->active_cpu);
+> >> +	if (rc) {
+> >> +		dev_warn(&pdev->dev, "Failed to force IRQ affinity for %d\n",
+> >> +					 irq);
+> >> +		return rc;
+> >> +	}  
+> 
+> > It is a little unusual that you have the above two elements inline
+> > here, but have a function to unwind them.  Just makes it a little
+> > harder to read and leads to missing things like...  
+> 
+> The unwinding was added as a function to reuse the code. The "setup" steps
+> undone by the unwind doesn't look separate from what we do in the probe,
+> hence didn't go for a separate function.
+> 
+> >> +
+> >> +	platform_set_drvdata(pdev, dsu_pmu);
+> >> +	rc = cpuhp_state_add_instance(dsu_pmu_cpuhp_state,
+> >> +						&dsu_pmu->cpuhp_node);
+> >> +	if (rc)  
+> > I believe irq_set_affinity_hit(dsu_pmu->irq, NULL) would make sense
+> > here.  
+> 
+> Yes, you're right. Otherwise we could hit a WARN_ON. I will rearrange
+> the probe code to a cleaner state.
 >
-> On Tue, Jul 25, 2017 at 01:09:16PM +0800, Chen-Yu Tsai wrote:
->> The A80 is a big.LITTLE SoC with 1 cluster of 4 Cortex-A7s and
->> 1 cluster of 4 Cortex-A15s.
->>
->> This patch adds support to bring up the second cluster and thus all
->> cores using the common MCPM code. Core/cluster power down has not
->> been implemented, thus CPU hotplugging and big.LITTLE switcher is
->> not supported.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/mach-sunxi/Kconfig  |  10 ++
->>  arch/arm/mach-sunxi/Makefile |   1 +
->>  arch/arm/mach-sunxi/mcpm.c   | 391 +++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 402 insertions(+)
->>  create mode 100644 arch/arm/mach-sunxi/mcpm.c
->>
->> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
->> index 58153cdf025b..177380548d99 100644
->> --- a/arch/arm/mach-sunxi/Kconfig
->> +++ b/arch/arm/mach-sunxi/Kconfig
->> @@ -47,5 +47,15 @@ config MACH_SUN9I
->>       bool "Allwinner (sun9i) SoCs support"
->>       default ARCH_SUNXI
->>       select ARM_GIC
->> +     imply MCPM
->> +
->> +config SUN9I_A80_MCPM
->> +     bool "Allwinner A80 Multi-Cluster PM support"
->> +     depends on MCPM && MACH_SUN9I
->> +     default MACH_SUN9I
->> +     select ARM_CCI400_PORT_CTRL
->> +     help
->> +       This is needed to provide CPU and cluster power management
->> +       on Allwinner A80 implementing big.LITTLE.
->
-> Do we really need an option for that? we don't provide the option to
-> disable the CPU SMP operations for the rest of the SoCs.
 
-It was an option as it also required MCPM and CCI400 support to be built.
-We could hide it. Or, using mach-hisi as a reference, we could do:
+Cool
+ 
+> >> +		return rc;
+> >> +
+> >> +	dsu_pmu->irq = irq;
+> >> +	dsu_pmu->pmu = (struct pmu) {
+> >> +		.task_ctx_nr	= perf_invalid_context,
+> >> +
+> >> +		.pmu_enable	= dsu_pmu_enable,
+> >> +		.pmu_disable	= dsu_pmu_disable,
+> >> +		.event_init	= dsu_pmu_event_init,
+> >> +		.add		= dsu_pmu_add,
+> >> +		.del		= dsu_pmu_del,
+> >> +		.start		= dsu_pmu_start,
+> >> +		.stop		= dsu_pmu_stop,
+> >> +		.read		= dsu_pmu_read,
+> >> +
+> >> +		.attr_groups	= dsu_pmu_attr_groups,
+> >> +	};
+> >> +
+> >> +	rc = perf_pmu_register(&dsu_pmu->pmu, name, -1);
+> >> +
+> >> +	if (!rc)
+> >> +		dev_info(&pdev->dev, "Registered %s with %d event counters",
+> >> +				name, dsu_pmu->num_counters);
+> >> +	else
+> >> +		dsu_pmu_cleanup_dev(dsu_pmu);  
+> > It is cleaner to have the error handled as the 'exceptional'
+> > element.  Slightly more code, but easier to read.
+> > i.e.
+> >
+> > 	if (rc) {
+> > 		dsu_pmu_cleanup_dev(dsu_pmu);
+> > 		return rc;
+> > 	}
+> >
+> > 	dev_info(...)  
+> 
+> Ok.
+> 
+> >  
+> >> +	return rc;
+> >> +}
+> >> +
+> >> +static int dsu_pmu_device_remove(struct platform_device *pdev)  
+> > The difference in naming style between this and probe is a little
+> > confusing.
+> >  
+> 
+> Ok
+> 
+> > Why not dsu_pmu_remove?  
+> 
+> Because it is callback for the platform device, which should eventually
+> remove the PMU and any other cleanups. I could rename the probe to match it,
+> i.e, dsu_pmu_device_probe().
+> 
 
-config MACH_SUN9I
-        default ARCH_SUNXI
-        select ARM_GIC
-        select MCPM if SMP
-        select ARM_CCI400_PORT_CTRL if SMP
+Just as good.
 
-and in the Makefile:
+> 
+> >> +{
+> >> +	struct dsu_pmu *dsu_pmu = platform_get_drvdata(pdev);
+> >> +
+> >> +	dsu_pmu_cleanup_dev(dsu_pmu);
+> >> +	perf_pmu_unregister(&dsu_pmu->pmu);  
+> > The remove order should be the reverse of probe.
+> > It just makes it more 'obviously' right and saves reviewer time.
+> > If there is a reason not to do this, there should be a comment saying
+> > why.
+> >  
+> 
+> No, you're right. It should be in the reverse order, I will fix it.
+> 
+> >> +
+> >> +
+> >> +static int __init dsu_pmu_init(void)
+> >> +{
+> >> +	int ret;
+> >> +
+> >> +	ret = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN,
+> >> +					DRVNAME,
+> >> +					NULL,
+> >> +					dsu_pmu_cpu_teardown);
+> >> +	if (ret < 0)
+> >> +		return ret;
+> >> +	dsu_pmu_cpuhp_state = ret;  
+> > I'm just curious - what prevents this initialization being done in probe
+> > rather than init?
+> >  
+> 
+> Because, you need to do that only one per system and rather than one per DSU.
+> There could be multiple DSUs connected via other links on a bigger platform.
+> 
+That makes sense.  Thanks for the explanation.
 
-obj-$(CONFIG_MCPM) += sun9i-mcpm.o
-
->
->>  endif
->> diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
->> index 27b168f121a1..e8558912c714 100644
->> --- a/arch/arm/mach-sunxi/Makefile
->> +++ b/arch/arm/mach-sunxi/Makefile
->> @@ -1,2 +1,3 @@
->>  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
->>  obj-$(CONFIG_SMP) += platsmp.o
->> +obj-$(CONFIG_SUN9I_A80_MCPM) += mcpm.o
->> diff --git a/arch/arm/mach-sunxi/mcpm.c b/arch/arm/mach-sunxi/mcpm.c
->> new file mode 100644
->> index 000000000000..4b6e1d6ae379
->> --- /dev/null
->> +++ b/arch/arm/mach-sunxi/mcpm.c
->> @@ -0,0 +1,391 @@
->> +/*
->> + * Copyright (c) 2015 Chen-Yu Tsai
->> + *
->> + * Chen-Yu Tsai <wens@csie.org>
->> + *
->> + * arch/arm/mach-sunxi/mcpm.c
->> + *
->> + * Based on arch/arm/mach-exynos/mcpm-exynos.c and Allwinner code
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/arm-cci.h>
->> +#include <linux/delay.h>
->> +#include <linux/io.h>
->> +#include <linux/of_address.h>
->> +
->> +#include <asm/cputype.h>
->> +#include <asm/cp15.h>
->> +#include <asm/mcpm.h>
->> +
->> +#define SUNXI_CPUS_PER_CLUSTER               4
->> +#define SUNXI_NR_CLUSTERS            2
->> +
->> +#define SUN9I_A80_A15_CLUSTER                1
->
-> Don't we have a way to derive that from the DT ?
-
-Indeed we can.
-
-It would be slighty more complicated though:
-
-node = of_cpu_device_node_get(cluster * SUNXI_CPUS_PER_CLUSTER + cpu);
-if (of_device_is_compatible(node, "arm,cortex-a15")) {
-        ...
-}
-
->
->> +#define CPUCFG_CX_CTRL_REG0(c)               (0x10 * (c))
->> +#define CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE(n)        BIT(n)
->> +#define CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE_ALL       0xf
->> +#define CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A7        BIT(4)
->> +#define CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A15       BIT(0)
->> +#define CPUCFG_CX_CTRL_REG1(c)               (0x10 * (c) + 0x4)
->> +#define CPUCFG_CX_CTRL_REG1_ACINACTM BIT(0)
->> +#define CPUCFG_CX_RST_CTRL(c)                (0x80 + 0x4 * (c))
->> +#define CPUCFG_CX_RST_CTRL_DBG_SOC_RST       BIT(24)
->> +#define CPUCFG_CX_RST_CTRL_ETM_RST(n)        BIT(20 + (n))
->> +#define CPUCFG_CX_RST_CTRL_ETM_RST_ALL       (0xf << 20)
->> +#define CPUCFG_CX_RST_CTRL_DBG_RST(n)        BIT(16 + (n))
->> +#define CPUCFG_CX_RST_CTRL_DBG_RST_ALL       (0xf << 16)
->> +#define CPUCFG_CX_RST_CTRL_H_RST     BIT(12)
->> +#define CPUCFG_CX_RST_CTRL_L2_RST    BIT(8)
->> +#define CPUCFG_CX_RST_CTRL_CX_RST(n) BIT(4 + (n))
->> +#define CPUCFG_CX_RST_CTRL_CORE_RST(n)       BIT(n)
->> +
->> +#define PRCM_CPU_PO_RST_CTRL(c)              (0x4 + 0x4 * (c))
->> +#define PRCM_CPU_PO_RST_CTRL_CORE(n) BIT(n)
->> +#define PRCM_CPU_PO_RST_CTRL_CORE_ALL        0xf
->> +#define PRCM_PWROFF_GATING_REG(c)    (0x100 + 0x4 * (c))
->> +#define PRCM_PWROFF_GATING_REG_CLUSTER       BIT(4)
->> +#define PRCM_PWROFF_GATING_REG_CORE(n)       BIT(n)
->> +#define PRCM_PWR_SWITCH_REG(c, cpu)  (0x140 + 0x10 * (c) + 0x4 * (cpu))
->> +#define PRCM_CPU_SOFT_ENTRY_REG              0x164
->> +
->> +static void __iomem *cpucfg_base;
->> +static void __iomem *prcm_base;
->> +
->> +static int sunxi_cpu_power_switch_set(unsigned int cpu, unsigned int cluster,
->> +                                   bool enable)
->> +{
->> +     u32 reg;
->> +
->> +     /* control sequence from Allwinner A80 user manual v1.2 PRCM section */
->> +     reg = readl(prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
->> +     if (enable) {
->> +             if (reg == 0x00) {
->> +                     pr_debug("power clamp for cluster %u cpu %u already open\n",
->> +                              cluster, cpu);
->> +                     return 0;
->> +             }
->> +
->> +             writel(0xff, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
->> +             udelay(10);
->> +             writel(0xfe, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
->> +             udelay(10);
->> +             writel(0xf8, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
->> +             udelay(10);
->> +             writel(0xf0, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
->> +             udelay(10);
->> +             writel(0x00, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
->> +             udelay(10);
->> +     } else {
->> +             writel(0xff, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
->> +             udelay(10);
->> +     }
->> +
->> +     return 0;
->> +}
->> +
->> +static int sunxi_cpu_powerup(unsigned int cpu, unsigned int cluster)
->> +{
->> +     u32 reg;
->> +
->> +     pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
->> +     if (cpu >= SUNXI_CPUS_PER_CLUSTER || cluster >= SUNXI_NR_CLUSTERS)
->> +             return -EINVAL;
->> +
->> +     /* assert processor power-on reset */
->> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->> +     reg &= ~PRCM_CPU_PO_RST_CTRL_CORE(cpu);
->> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->> +
->> +     /* Cortex-A7: hold L1 reset disable signal low */
->> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
->> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
->> +             reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
->> +             reg &= ~CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE(cpu);
->> +             writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
->> +     }
->> +
->> +     /* assert processor related resets */
->> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_RST(cpu);
->> +
->> +     /*
->> +      * Allwinner code also asserts resets for NEON on A15. According
->> +      * to ARM manuals, asserting power-on reset is sufficient.
->> +      */
->> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
->> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
->> +             reg &= ~CPUCFG_CX_RST_CTRL_ETM_RST(cpu);
->> +     }
->> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->> +
->> +     /* open power switch */
->> +     sunxi_cpu_power_switch_set(cpu, cluster, true);
->> +
->> +     /* clear processor power gate */
->> +     reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->> +     reg &= ~PRCM_PWROFF_GATING_REG_CORE(cpu);
->> +     writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->> +     udelay(20);
->> +
->> +     /* de-assert processor power-on reset */
->> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->> +     reg |= PRCM_CPU_PO_RST_CTRL_CORE(cpu);
->> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->> +
->> +     /* de-assert all processor resets */
->> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->> +     reg |= CPUCFG_CX_RST_CTRL_DBG_RST(cpu);
->> +     reg |= CPUCFG_CX_RST_CTRL_CORE_RST(cpu);
->> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
->> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
->> +             reg |= CPUCFG_CX_RST_CTRL_ETM_RST(cpu);
->> +     } else {
->> +             reg |= CPUCFG_CX_RST_CTRL_CX_RST(cpu); /* NEON */
->> +     }
->> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->> +
->> +     return 0;
->> +}
->> +
->> +static int sunxi_cluster_powerup(unsigned int cluster)
->> +{
->> +     u32 reg;
->> +
->> +     pr_debug("%s: cluster %u\n", __func__, cluster);
->> +     if (cluster >= SUNXI_NR_CLUSTERS)
->> +             return -EINVAL;
->> +
->> +     /* assert ACINACTM */
->> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->> +     reg |= CPUCFG_CX_CTRL_REG1_ACINACTM;
->> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->> +
->> +     /* assert cluster processor power-on resets */
->> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->> +     reg &= ~PRCM_CPU_PO_RST_CTRL_CORE_ALL;
->> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->> +
->> +     /* assert cluster resets */
->> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_SOC_RST;
->> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_RST_ALL;
->> +     reg &= ~CPUCFG_CX_RST_CTRL_H_RST;
->> +     reg &= ~CPUCFG_CX_RST_CTRL_L2_RST;
->> +
->> +     /*
->> +      * Allwinner code also asserts resets for NEON on A15. According
->> +      * to ARM manuals, asserting power-on reset is sufficient.
->> +      */
->> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
->> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
->> +             reg &= ~CPUCFG_CX_RST_CTRL_ETM_RST_ALL;
->> +     }
->> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->> +
->> +     /* hold L1/L2 reset disable signals low */
->> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
->> +     if (of_machine_is_compatible("allwinner,sun9i-a80") &&
->> +                     cluster == SUN9I_A80_A15_CLUSTER) {
->> +             /* Cortex-A15: hold L2RSTDISABLE low */
->> +             reg &= ~CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A15;
->> +     } else {
->> +             /* Cortex-A7: hold L1RSTDISABLE and L2RSTDISABLE low */
->> +             reg &= ~CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE_ALL;
->> +             reg &= ~CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A7;
->> +     }
->> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
->> +
->> +     /* clear cluster power gate */
->> +     reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->> +     reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
->> +     writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->> +     udelay(20);
->> +
->> +     /* de-assert cluster resets */
->> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->> +     reg |= CPUCFG_CX_RST_CTRL_DBG_SOC_RST;
->> +     reg |= CPUCFG_CX_RST_CTRL_H_RST;
->> +     reg |= CPUCFG_CX_RST_CTRL_L2_RST;
->> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->> +
->> +     /* de-assert ACINACTM */
->> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->> +     reg &= ~CPUCFG_CX_CTRL_REG1_ACINACTM;
->> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->> +
->> +     return 0;
->> +}
->> +
->> +static void sunxi_cpu_cache_disable(void)
->> +{
->> +     /* Disable and flush the local CPU cache. */
->> +     v7_exit_coherency_flush(louis);
->> +}
->> +
->> +/*
->> + * This bit is shared between the initial mcpm_sync_init call to enable
->> + * CCI-400 and proper cluster cache disable before power down.
->> + */
->> +static void sunxi_cluster_cache_disable_without_axi(void)
->> +{
->> +     if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
->> +             /*
->> +              * On the Cortex-A15 we need to disable
->> +              * L2 prefetching before flushing the cache.
->> +              */
->> +             asm volatile(
->> +             "mcr    p15, 1, %0, c15, c0, 3\n"
->> +             "isb\n"
->> +             "dsb"
->> +             : : "r" (0x400));
->> +     }
->> +
->> +     /* Flush all cache levels for this cluster. */
->> +     v7_exit_coherency_flush(all);
->> +
->> +     /*
->> +      * Disable cluster-level coherency by masking
->> +      * incoming snoops and DVM messages:
->> +      */
->> +     cci_disable_port_by_cpu(read_cpuid_mpidr());
->> +}
->> +
->> +static void sunxi_cluster_cache_disable(void)
->> +{
->> +     unsigned int cluster = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 1);
->> +     u32 reg;
->> +
->> +     pr_info("%s: cluster %u\n", __func__, cluster);
->> +
->> +     sunxi_cluster_cache_disable_without_axi();
->> +
->> +     /* last man standing, assert ACINACTM */
->> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->> +     reg |= CPUCFG_CX_CTRL_REG1_ACINACTM;
->> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->> +}
->> +
->> +static const struct mcpm_platform_ops sunxi_power_ops = {
->> +     .cpu_powerup            = sunxi_cpu_powerup,
->> +     .cluster_powerup        = sunxi_cluster_powerup,
->> +     .cpu_cache_disable      = sunxi_cpu_cache_disable,
->> +     .cluster_cache_disable  = sunxi_cluster_cache_disable,
->> +};
->> +
->> +/*
->> + * Enable cluster-level coherency, in preparation for turning on the MMU.
->> + *
->> + * Also enable regional clock gating and L2 data latency settings for
->> + * Cortex-A15.
->> + */
->> +static void __naked sunxi_power_up_setup(unsigned int affinity_level)
->> +{
->> +     asm volatile (
->> +             "mrc    p15, 0, r1, c0, c0, 0\n"
->> +             "movw   r2, #" __stringify(ARM_CPU_PART_MASK & 0xffff) "\n"
->> +             "movt   r2, #" __stringify(ARM_CPU_PART_MASK >> 16) "\n"
->> +             "and    r1, r1, r2\n"
->> +             "movw   r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 & 0xffff) "\n"
->> +             "movt   r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 >> 16) "\n"
->> +             "cmp    r1, r2\n"
->> +             "bne    not_a15\n"
->> +
->> +             /* The following is Cortex-A15 specific */
->> +
->> +             /* L2CTRL: Enable CPU regional clock gates */
->> +             "mrc p15, 1, r1, c15, c0, 4\n"
->> +             "orr r1, r1, #(0x1<<31)\n"
->> +             "mcr p15, 1, r1, c15, c0, 4\n"
->> +
->> +             /* L2ACTLR */
->> +             "mrc p15, 1, r1, c15, c0, 0\n"
->> +             /* Enable L2, GIC, and Timer regional clock gates */
->> +             "orr r1, r1, #(0x1<<26)\n"
->> +             /* Disable clean/evict from being pushed to external */
->> +             "orr r1, r1, #(0x1<<3)\n"
->> +             "mcr p15, 1, r1, c15, c0, 0\n"
->> +
->> +             /* L2 data RAM latency */
->> +             "mrc p15, 1, r1, c9, c0, 2\n"
->> +             "bic r1, r1, #(0x7<<0)\n"
->> +             "orr r1, r1, #(0x3<<0)\n"
->> +             "mcr p15, 1, r1, c9, c0, 2\n"
->> +
->> +             /* End of Cortex-A15 specific setup */
->> +             "not_a15:\n"
->> +
->> +             "cmp    r0, #1\n"
->> +             "bxne   lr\n"
->> +             "b      cci_enable_port_for_self"
->> +     );
->> +}
->> +
->> +static void sunxi_mcpm_setup_entry_point(void)
->> +{
->> +     __raw_writel(virt_to_phys(mcpm_entry_point),
->> +                  prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
->> +}
->> +
->> +static int __init sunxi_mcpm_init(void)
->> +{
->> +     struct device_node *node;
->> +     int ret;
->> +
->> +     if (!of_machine_is_compatible("allwinner,sun9i-a80"))
->> +             return -ENODEV;
->> +
->> +     if (!cci_probed())
->> +             return -ENODEV;
->> +
->> +     node = of_find_compatible_node(NULL, NULL,
->> +                     "allwinner,sun9i-a80-cpucfg");
->> +     if (!node)
->> +             return -ENODEV;
->> +
->> +     cpucfg_base = of_iomap(node, 0);
->> +     of_node_put(node);
->> +     if (!cpucfg_base) {
->> +             pr_err("%s: failed to map CPUCFG registers\n", __func__);
->> +             return -ENOMEM;
->> +     }
->
-> Can't we request the region as well?
-
-Yes we can! But only for the CPUCFG registers. The PRCM block is
-shared with all the PRCM block clock drivers. :(
-
->
->> +
->> +     node = of_find_compatible_node(NULL, NULL,
->> +                     "allwinner,sun9i-a80-prcm");
->> +     if (!node)
->> +             return -ENODEV;
->> +
->> +     prcm_base = of_iomap(node, 0);
->> +
->> +     of_node_put(node);
->> +     if (!prcm_base) {
->> +             pr_err("%s: failed to map PRCM registers\n", __func__);
->> +             iounmap(prcm_base);
->> +             return -ENOMEM;
->> +     }
->> +
->> +     ret = mcpm_platform_register(&sunxi_power_ops);
->> +     if (!ret)
->> +             ret = mcpm_sync_init(sunxi_power_up_setup);
->> +     if (!ret)
->> +             /* do not disable AXI master as no one will re-enable it */
->> +             ret = mcpm_loopback(sunxi_cluster_cache_disable_without_axi);
->> +     if (ret) {
->> +             iounmap(cpucfg_base);
->> +             iounmap(prcm_base);
->> +             return ret;
->> +     }
->> +
->> +     mcpm_smp_set_ops();
->> +
->> +     pr_info("sunxi MCPM support installed\n");
->> +
->> +     sunxi_mcpm_setup_entry_point();
->> +
->> +     return ret;
->> +}
->
-> It looks mostly good, and I would replace the sunxi by sun9i, and call
-> that file sun9i-mcpm.c
-
-I was hoping to reuse the file for the A83T, so it was sunxi-mcpm.c
-or just mcpm. Most of the stuff is similiar, except the A83T has two
-revisions and one of them has two gate/power bits swapped. :(
-
-ChenYu
-
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Jonathan
+> 
+> Suzuki
