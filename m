@@ -1,104 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Jul 2017 14:27:38 +0100
-Subject: [PATCH V2 1/4] hw_breakpoint: Add step_needed event attribute
-In-Reply-To: <9d4f76f3a0bffe93a6d5146c9b53ee7b985f22da.1499416107.git.panand@redhat.com>
-References: <cover.1499416107.git.panand@redhat.com>
- <9d4f76f3a0bffe93a6d5146c9b53ee7b985f22da.1499416107.git.panand@redhat.com>
-Message-ID: <20170725132737.GC28815@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Jul 2017 14:36:14 +0100
+Subject: [PATCH] KVM: arm/arm64: Fix guest external abort matching
+In-Reply-To: <20170718123741.11537-1-james.morse@arm.com>
+References: <20170718123741.11537-1-james.morse@arm.com>
+Message-ID: <b884d460-2e01-5db9-123b-58a88c03e388@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 07, 2017 at 05:33:57PM +0530, Pratyush Anand wrote:
-> Architecture like ARM64 currently allows to use default hw breakpoint
-> single step handler only to perf. However, some other users like few
-> systemtap tests or kernel test in
-> samples/hw_breakpoint/data_breakpoint.c can also work with default step
-> handler implementation. At the same time, some other like GDB/ptrace may
-> implement their own step handler.
+On 18/07/17 13:37, James Morse wrote:
+> The ARM-ARM has two bits in the ESR/HSR relevant to external aborts.
+> A range of {I,D}FSC values (of which bit 5 is always set) and bit 9 'EA'
+> which provides:
+>> an IMPLEMENTATION DEFINED classification of External Aborts.
 > 
-> Therefore, this patch introduces a new perf_event_attr bit field, so
-> that arch specific code(specially on arm64) can make a decision to
-> enable single stepping.
+> This bit is in addition to the {I,D}FSC range, and has an implementation
+> defined meaning. KVM should always ignore this bit when handling external
+> aborts from a guest.
 > 
-> Any architecture which is not using this field will not have any
-> side effect.
+> Remove the ESR_ELx_EA definition and rewrite its helper
+> kvm_vcpu_dabt_isextabt() to check the {I,D}FSC range. This merges
+> kvm_vcpu_dabt_isextabt() and the recently added is_abort_sea() helper.
 > 
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> ---
->  include/linux/hw_breakpoint.h         | 6 ++++++
->  include/uapi/linux/perf_event.h       | 3 ++-
->  kernel/events/core.c                  | 2 ++
->  tools/include/uapi/linux/perf_event.h | 3 ++-
->  4 files changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/hw_breakpoint.h b/include/linux/hw_breakpoint.h
-> index 0464c85e63fd..6173ae048cbc 100644
-> --- a/include/linux/hw_breakpoint.h
-> +++ b/include/linux/hw_breakpoint.h
-> @@ -38,6 +38,12 @@ static inline int hw_breakpoint_type(struct perf_event *bp)
->  	return bp->attr.bp_type;
->  }
->  
-> +static inline bool
-> +hw_breakpoint_needs_single_step(struct perf_event *bp)
-> +{
-> +	return bp->attr.step_needed;
-> +}
-> +
->  static inline unsigned long hw_breakpoint_len(struct perf_event *bp)
->  {
->  	return bp->attr.bp_len;
-> diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-> index b1c0b187acfe..00935808de0d 100644
-> --- a/include/uapi/linux/perf_event.h
-> +++ b/include/uapi/linux/perf_event.h
-> @@ -345,7 +345,8 @@ struct perf_event_attr {
->  				context_switch :  1, /* context switch data */
->  				write_backward :  1, /* Write ring buffer from end to beginning */
->  				namespaces     :  1, /* include namespaces data */
-> -				__reserved_1   : 35;
-> +				step_needed    :  1, /* Use arch step handler */
-> +				__reserved_1   : 34;
+> Reported-by: gengdongjiu <gengdj.1984@gmail.com>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> CC: gengdongjiu <gengdj.1984@gmail.com>
+> CC: Tyler Baicar <tbaicar@codeaurora.org>
 
-This needs documenting properly, as I really have no idea how userspace is
-going to use it sensibley, especially as you silently overwrite it in some
-cases below.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Will
-
->  
->  	union {
->  		__u32		wakeup_events;	  /* wakeup every n events */
-> diff --git a/kernel/events/core.c b/kernel/events/core.c
-> index 6c4e523dc1e2..220e26941475 100644
-> --- a/kernel/events/core.c
-> +++ b/kernel/events/core.c
-> @@ -9444,9 +9444,11 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
->  	} else if (is_write_backward(event)){
->  		event->overflow_handler = perf_event_output_backward;
->  		event->overflow_handler_context = NULL;
-> +		event->attr.step_needed = 1;
->  	} else {
->  		event->overflow_handler = perf_event_output_forward;
->  		event->overflow_handler_context = NULL;
-> +		event->attr.step_needed = 1;
->  	}
->  
->  	perf_event__state_init(event);
-> diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
-> index b1c0b187acfe..00935808de0d 100644
-> --- a/tools/include/uapi/linux/perf_event.h
-> +++ b/tools/include/uapi/linux/perf_event.h
-> @@ -345,7 +345,8 @@ struct perf_event_attr {
->  				context_switch :  1, /* context switch data */
->  				write_backward :  1, /* Write ring buffer from end to beginning */
->  				namespaces     :  1, /* include namespaces data */
-> -				__reserved_1   : 35;
-> +				step_needed    :  1, /* Use arch step handler */
-> +				__reserved_1   : 34;
->  
->  	union {
->  		__u32		wakeup_events;	  /* wakeup every n events */
-> -- 
-> 2.9.3
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
