@@ -1,182 +1,146 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 25 Jul 2017 08:12:45 -0700
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n  - any one
- else seeing this?
-In-Reply-To: <20170725224245.00004e7e@huawei.com>
-References: <20170725193039.00007c80@huawei.com>
- <20170725222654.5a968588@roar.ozlabs.ibm.com>
- <20170725134626.GL3730@linux.vnet.ibm.com>
- <20170725224245.00004e7e@huawei.com>
-Message-ID: <20170725151245.GO3730@linux.vnet.ibm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Tue, 25 Jul 2017 17:13:05 +0200
+Subject: [PATCH v4] acpi/iort: numa: Add numa node mapping for smmuv3
+ devices
+In-Reply-To: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
+References: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170725151305.GU17961@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 10:42:45PM +0800, Jonathan Cameron wrote:
-> On Tue, 25 Jul 2017 06:46:26 -0700
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+On 25.07.17 10:32:37, Ganapatrao Kulkarni wrote:
+> ARM IORT specification(rev. C) has added  provision to define proximity
+> domain in SMMUv3 IORT table. Adding required code to parse Proximity
+> domain and set numa_node of smmv3 platform devices.
 > 
-> > On Tue, Jul 25, 2017 at 10:26:54PM +1000, Nicholas Piggin wrote:
-> > > On Tue, 25 Jul 2017 19:32:10 +0800
-> > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
-> > >   
-> > > > Hi All,
-> > > > 
-> > > > We observed a regression on our d05 boards (but curiously not
-> > > > the fairly similar but single socket / smaller core count
-> > > > d03), initially seen with linux-next prior to the merge window
-> > > > and still present in v4.13-rc2.
-> > > > 
-> > > > The symptom is:  
-> > 
-> > Adding Dave Miller and the sparclinux at vger.kernel.org email on CC, as
-> > they have been seeing something similar, and you might well have saved
-> > them the trouble of bisecting.
-> > 
-> > [ . . . ]
-> > 
-> > > > [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1  
-> > 
-> > This is the cause from an RCU perspective.  You had a lot of idle CPUs,
-> > and RCU is not permitted to disturb them -- the battery-powered embedded
-> > guys get very annoyed by that sort of thing.  What happens instead is
-> > that each CPU updates a per-CPU state variable when entering or exiting
-> > idle, and the grace-period kthread ("rcu_preempt kthread" in the above
-> > message) checks these state variables, and if when sees an idle CPU,
-> > it reports a quiescent state on that CPU's behalf.
-> > 
-> > But the grace-period kthread can only do this work if it gets a chance
-> > to run.  And the message above says that this kthread hasn't had a chance
-> > to run for a full 5,663 jiffies.  For completeness, the "g1566 c1565"
-> > says that grace period #1566 is in progress, the "f0x0" says that no one
-> > is needing another grace period #1567.  The "RCU_GP_WAIT_FQS(3)" says
-> > that the grace-period kthread has fully initialized the current grace
-> > period and is sleeping for a few jiffies waiting to scan for idle tasks.
-> > Finally, the "->state=0x1" says that the grace-period kthread is in
-> > TASK_INTERRUPTIBLE state, in other words, still sleeping.
+> Add code to parse proximity domain in SMMUv3 IORT table to
+> set numa node mapping for smmuv3 devices.
 > 
-> Thanks for the explanation!
-> > 
-> > So my first question is "What did commit 05a4a9527 (kernel/watchdog:
-> > split up config options) do to prevent the grace-period kthread from
-> > getting a chance to run?" 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
 > 
-> As far as we can tell it was a side effect of that patch.
+> This patch has dependency on header file patch [1], which is
+> already merged to linux-pm.
 > 
-> The real cause is that patch changed the result of defconfigs to stop running
-> the softlockup detector - now CONFIG_SOFTLOCKUP_DETECTOR
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&id=c944230064eb65e4fa018d86779b4fd200b1d7e7
 > 
-> Enabling that on 4.13-rc2 (and presumably everything in between)
-> means we don't see the problem any more.
+> v4:
+>   - Fix compilation issue in !CONFIG_NUMA
 > 
-> > I must confess that I don't see anything
-> > obvious in that commit, so my second question is "Are we sure that
-> > reverting this commit makes the problem go away?"
+> v3:
+>   - Addressed Lorenzo Pieralisi comment.
 > 
-> Simply enabling CONFIG_SOFTLOCKUP_DETECTOR seems to make it go away.
-> That detector fires up a thread on every cpu, which may be relevant.
+> v2:
+>   - Changed as per Lorenzo Pieralisi and Hanjun Guo suggestions.
+> 
+> v1:
+>   - Initial patch
+> 
+>  drivers/acpi/arm64/iort.c | 33 +++++++++++++++++++++++++++++++--
+>  1 file changed, 31 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index a3215ee..c5c82c3 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -908,6 +908,28 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
+>  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
+>  }
+>  
+> +#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170629)
 
-Interesting...  Why should it be necessary to fire up a thread on every
-CPU in order to make sure that RCU's grace-period kthreads get some
-CPU time?  Especially give how many idle CPUs you had on your system.
+This acpica version check was very unhandy for backports when we did
+this last time. If we backport just c944230064 and this single patch
+it wont work as the version check prevents the code from being
+enabled. Isn't there another way to handle cross tree dependencies of
+pull requests? E.g. we could base this patch on acpica (ab539eaa50)
+and remove the check.
 
-So I have to ask if there is some other bug that the softlockup detector
-is masking.
+Alternatively we could do in this case:
 
-> > and my third is "Is
-> > this an intermittent problem that led to a false bisection?"
-> 
-> Whilst it is a bit slow to occur, we verified with long runs on either
-> side of that patch and since with the option enabled on latest mainline.
-> 
-> Also can cause the issue before that patch by disabling the previous
-> relevant option on 4.12.
+#if defined(CONFIG_ACPI_NUMA) && defined(ACPI_IORT_SMMU_V3_PXM_VALID)
 
-OK, thank you -- hard to argue with that!  ;-)
+> +/*
+> + * set numa proximity domain for smmuv3 device
+> + */
+> +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
+> +		struct device *dev)
+> +{
+> +	struct acpi_iort_smmu_v3 *smmu;
+> +
+> +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+> +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
+> +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
+> +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
 
-Except that I am still puzzled as to why per-CPU softlockup threads
-are needed for RCU's kthreads to get their wakeups.  We really should
-be able to disable softlockup and still have kthreads get wakeups and
-access to CPU, after all.
+Better use dev_info() here.
 
-> > [ . . . ]
-> > 
-> > > > Reducing the RCU CPU stall timeout makes it happen more often,
-> > > > but we are seeing even with the default value of 24 seconds.
-> > > > 
-> > > > Tends to occur after a period or relatively low usage, but has
-> > > > also been seen mid way through performance tests.
-> > > > 
-> > > > This was not seen with v4.12 so a bisection run later lead to
-> > > > commit 05a4a9527 (kernel/watchdog: split up config options).
-> > > > 
-> > > > Which was odd until we discovered that a side effect of this patch
-> > > > was to change whether the softlockup detector was enabled or not in
-> > > > the arm64 defconfig.
-> > > > 
-> > > > On 4.13-rc2 enabling the softlockup detector indeed stopped us
-> > > > seeing the rcu issue. Disabling the equivalent on 4.12 made the
-> > > > issue occur there as well.
-> > > > 
-> > > > Clearly the softlockup detector results in a thread on every cpu,
-> > > > which might be related but beyond that we are still looking into
-> > > > the issue.
-> > > > 
-> > > > So the obvious question is whether anyone else is seeing this as
-> > > > it might help us to focus in on where to look!  
-> > > 
-> > > Huh. Something similar has been seen very intermittently on powerpc
-> > > as well. We couldn't reproduce it reliably to bisect it already, so
-> > > this is a good help.
-> > > 
-> > > http://marc.info/?l=linuxppc-embedded&m=149872815523646&w=2
-> > > 
-> > > It looks like the watchdog patch has a similar effect on powerpc in
-> > > that it stops enabling the softlockup detector by default. Haven't
-> > > confirmed, but it looks like the same thing.
-> > > 
-> > > A bug in RCU stall detection?  
-> > 
-> > Well, if I am expected to make grace periods complete when my grace-period
-> > kthreads aren't getting any CPU time, I will have to make some substantial
-> > changes.  ;-)
-> > 
-> > One possibility is that the timer isn't firing and another is that the
-> > timer's wakeup is being lost somehow.
-> > 
-> > So another thing to try is to boot with rcutree.rcu_kick_kthreads=1.
-> > This will cause RCU to do redundant wakeups on the grace-period kthread
-> > if the grace period is moving slowly.  This is of course a crude hack,
-> > which is why this boot parameter will also cause a splat if it ever has
-> > to do anything.
-> 
-> Running that now will let you know how it goes.  Not seen the issue yet
-> but might just be a 'lucky' run - will give it a few hours.
+> +			smmu->base_address,
+> +			smmu->pxm);
+> +	}
+> +}
+> +#else
+> +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
+> +		struct device *dev) { }
 
-Thank you very much!
+Just do:
 
-							Thanx, Paul
+#define arm_smmu_v3_set_proximity NULL
 
-> Jonathan
-> > 
-> > Does this help at all?
-> > 
-> > 							Thanx, Paul
-> > 
-> > > > In the meantime we'll carry on digging.
-> > > > 
-> > > > Thanks,
-> > > > 
-> > > > Jonathan
-> > > > 
-> > > > p.s. As a more general question, do we want to have the
-> > > > soft lockup detector enabledon arm64 by default?  
-> > > 
-> > > I've cc'ed Don. My patch should not have changed defconfigs, I
-> > > should have been more careful with that.
-> > > 
-> > > Thanks,
-> > > Nick
-> > >   
-> > 
-> 
+> +#endif
+> +
+>  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
+>  {
+>  	struct acpi_iort_smmu *smmu;
+> @@ -977,20 +999,24 @@ struct iort_iommu_config {
+>  	int (*iommu_count_resources)(struct acpi_iort_node *node);
+>  	void (*iommu_init_resources)(struct resource *res,
+>  				     struct acpi_iort_node *node);
+> +	void (*iommu_set_proximity)(struct acpi_iort_node *node,
+> +				     struct device *dev);
+
+Wrt pseudo-OO programming this is more a method for struct dev than
+node, so swap args: iommu_set_proximity(dev, node)
+
+>  };
+>  
+>  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
+>  	.name = "arm-smmu-v3",
+>  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
+>  	.iommu_count_resources = arm_smmu_v3_count_resources,
+> -	.iommu_init_resources = arm_smmu_v3_init_resources
+> +	.iommu_init_resources = arm_smmu_v3_init_resources,
+> +	.iommu_set_proximity = arm_smmu_v3_set_proximity
+
+Add comma at the end here.
+
+>  };
+>  
+>  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
+>  	.name = "arm-smmu",
+>  	.iommu_is_coherent = arm_smmu_is_coherent,
+>  	.iommu_count_resources = arm_smmu_count_resources,
+> -	.iommu_init_resources = arm_smmu_init_resources
+> +	.iommu_init_resources = arm_smmu_init_resources,
+> +	.iommu_set_proximity = NULL
+
+No need for null assignment.
+
+-Robert
+
+>  };
+>  
+>  static __init
+> @@ -1028,6 +1054,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+>  	if (!pdev)
+>  		return -ENOMEM;
+>  
+> +	if (ops->iommu_set_proximity)
+> +		ops->iommu_set_proximity(node, &pdev->dev);
+> +
+>  	count = ops->iommu_count_resources(node);
+>  
+>  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
+> -- 
+> 2.9.4
 > 
