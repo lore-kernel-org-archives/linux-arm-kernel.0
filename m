@@ -1,49 +1,52 @@
 From: ada@thorsis.com (Alexander Dahl)
-Date: Tue, 25 Jul 2017 14:00:23 +0200
-Subject: [PATCH 2/3] memory: atmel-ebi: Allow t_DF timings of zero ns
+Date: Tue, 25 Jul 2017 14:00:22 +0200
+Subject: [PATCH 1/3] memory: atmel-ebi: Fix smc timing return value evaluation
 In-Reply-To: <1500984024-26403-1-git-send-email-ada@thorsis.com>
 References: <1500984024-26403-1-git-send-email-ada@thorsis.com>
-Message-ID: <1500984024-26403-3-git-send-email-ada@thorsis.com>
+Message-ID: <1500984024-26403-2-git-send-email-ada@thorsis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported in [1] and in [2] it's not possible to set the device tree
-property 'atmel,smc-tdf-ns' to zero, although the SoC allows a setting
-of 0ns for the t_DF time.
+Setting optional EBI/SMC properties through device tree always fails due
+to wrong evaluation of the return value of
+atmel_ebi_xslate_smc_timings().
 
-Allow this setting by doing the same thing as in the atmel nand
-controller driver by setting ncycles to ATMEL_SMC_MODE_TDF_MIN if zero
-is set in the dts.
+If you put some of those properties in your dts file, but not
+'atmel,smc-tdf-ns' the local variable 'required' in
+atmel_ebi_xslate_smc_timings() stays on 'false' after the first 'if'
+block. This leads to setting 'ret' to -EINVAL in the first run of the
+following 'for' loop which is then the return value of this function.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/490966.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520652.html
+However if you set 'atmel,smc-tdf-ns' in the dts file and everything in
+atmel_ebi_xslate_smc_timings() works well, it returns the content of
+'required' which is 'true' then.
 
-Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+So the function atmel_ebi_xslate_smc_timings() always returns non-zero
+which lets its call in atmel_ebi_xslate_smc_config() always fail and
+thus returning -EINVAL, so the EBI configuration for this node fails.
+
+Judging from the following code evaluating the local 'required' variable
+in atmel_ebi_xslate_smc_config() and the call of caps->xlate_config in
+atmel_ebi_dev_setup() it's probably right to only let the call fail if a
+negative error code is returned.
+
 Signed-off-by: Alexander Dahl <ada@thorsis.com>
 ---
- drivers/memory/atmel-ebi.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/memory/atmel-ebi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
-index 1cf34d2..f8a01ae 100644
+index 99e644c..1cf34d2 100644
 --- a/drivers/memory/atmel-ebi.c
 +++ b/drivers/memory/atmel-ebi.c
-@@ -120,12 +120,14 @@ static int atmel_ebi_xslate_smc_timings(struct atmel_ebi_dev *ebid,
- 	if (!ret) {
- 		required = true;
- 		ncycles = DIV_ROUND_UP(val, clk_period_ns);
--		if (ncycles > ATMEL_SMC_MODE_TDF_MAX ||
--		    ncycles < ATMEL_SMC_MODE_TDF_MIN) {
-+		if (ncycles > ATMEL_SMC_MODE_TDF_MAX) {
- 			ret = -EINVAL;
- 			goto out;
- 		}
- 
-+		if (ncycles < ATMEL_SMC_MODE_TDF_MIN)
-+			ncycles = ATMEL_SMC_MODE_TDF_MIN;
-+
- 		smcconf->mode |= ATMEL_SMC_MODE_TDF(ncycles);
+@@ -263,7 +263,7 @@ static int atmel_ebi_xslate_smc_config(struct atmel_ebi_dev *ebid,
  	}
  
+ 	ret = atmel_ebi_xslate_smc_timings(ebid, np, &conf->smcconf);
+-	if (ret)
++	if (ret < 0)
+ 		return -EINVAL;
+ 
+ 	if ((ret > 0 && !required) || (!ret && required)) {
 -- 
 2.1.4
