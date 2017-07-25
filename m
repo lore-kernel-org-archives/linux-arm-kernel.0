@@ -1,158 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 25 Jul 2017 17:01:52 +0100
-Subject: [PATCH v4] acpi/iort: numa: Add numa node mapping for smmuv3
- devices
-In-Reply-To: <20170725151305.GU17961@rric.localdomain>
-References: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
- <20170725151305.GU17961@rric.localdomain>
-Message-ID: <20170725160152.GA19744@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Jul 2017 17:01:16 +0100
+Subject: [PATCH 00/11] ARMv8.3 pointer authentication userspace support
+In-Reply-To: <bb507ee1-c7ba-4c73-0d0f-058c4821793c@arm.com>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+ <bb507ee1-c7ba-4c73-0d0f-058c4821793c@arm.com>
+Message-ID: <20170725160116.GB12749@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 05:13:05PM +0200, Robert Richter wrote:
-> On 25.07.17 10:32:37, Ganapatrao Kulkarni wrote:
-> > ARM IORT specification(rev. C) has added  provision to define proximity
-> > domain in SMMUv3 IORT table. Adding required code to parse Proximity
-> > domain and set numa_node of smmv3 platform devices.
-> > 
-> > Add code to parse proximity domain in SMMUv3 IORT table to
-> > set numa node mapping for smmuv3 devices.
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > ---
-> > 
-> > This patch has dependency on header file patch [1], which is
-> > already merged to linux-pm.
-> > 
-> > [1] https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&id=c944230064eb65e4fa018d86779b4fd200b1d7e7
-> > 
-> > v4:
-> >   - Fix compilation issue in !CONFIG_NUMA
-> > 
-> > v3:
-> >   - Addressed Lorenzo Pieralisi comment.
-> > 
-> > v2:
-> >   - Changed as per Lorenzo Pieralisi and Hanjun Guo suggestions.
-> > 
-> > v1:
-> >   - Initial patch
-> > 
-> >  drivers/acpi/arm64/iort.c | 33 +++++++++++++++++++++++++++++++--
-> >  1 file changed, 31 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > index a3215ee..c5c82c3 100644
-> > --- a/drivers/acpi/arm64/iort.c
-> > +++ b/drivers/acpi/arm64/iort.c
-> > @@ -908,6 +908,28 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
-> >  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
-> >  }
-> >  
-> > +#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170629)
-> 
-> This acpica version check was very unhandy for backports when we did
-> this last time. If we backport just c944230064 and this single patch
-> it wont work as the version check prevents the code from being
-> enabled. Isn't there another way to handle cross tree dependencies of
-> pull requests? E.g. we could base this patch on acpica (ab539eaa50)
-> and remove the check.
+Hi,
 
-I think I will send this patch (and other IORT ones) via arm64,
-if acpica goes via the ACPI tree I do not think there is much else
-we can do (that is not complicated).
+On Tue, Jul 25, 2017 at 12:32:10PM +0100, Yao Qi wrote:
+> On 19/07/17 17:01, Mark Rutland wrote:
+> > If authentication fails, bits are set in the pointer such that it is
+> > guaranteed to cause a fault if used.
+> 
+> How does user space know the fault is caused by authentication fail?
 
-> Alternatively we could do in this case:
-> 
-> #if defined(CONFIG_ACPI_NUMA) && defined(ACPI_IORT_SMMU_V3_PXM_VALID)
+Strictly speaking, it does not, and neither does the kernel.
 
-This would do, agreed on all other changes requested, I will send it
-to Catalin as soon as I collect all IORT patches for v4.14.
+In general, it cannot know whether this is the case, as an
+authentication failure does not result in an immediate exception.
 
-Thanks !
-Lorenzo
+> When GDB is debugging a program, and it failed in pointer
+> authentication, I assume GDB only knows that the program receives signal
+> SIGSEGV, but how does GDB or user know why does the program get SIGSEGV?
 
-> > +/*
-> > + * set numa proximity domain for smmuv3 device
-> > + */
-> > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
-> > +		struct device *dev)
-> > +{
-> > +	struct acpi_iort_smmu_v3 *smmu;
-> > +
-> > +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-> > +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
-> > +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
-> > +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
-> 
-> Better use dev_info() here.
-> 
-> > +			smmu->base_address,
-> > +			smmu->pxm);
-> > +	}
-> > +}
-> > +#else
-> > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
-> > +		struct device *dev) { }
-> 
-> Just do:
-> 
-> #define arm_smmu_v3_set_proximity NULL
-> 
-> > +#endif
-> > +
-> >  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
-> >  {
-> >  	struct acpi_iort_smmu *smmu;
-> > @@ -977,20 +999,24 @@ struct iort_iommu_config {
-> >  	int (*iommu_count_resources)(struct acpi_iort_node *node);
-> >  	void (*iommu_init_resources)(struct resource *res,
-> >  				     struct acpi_iort_node *node);
-> > +	void (*iommu_set_proximity)(struct acpi_iort_node *node,
-> > +				     struct device *dev);
-> 
-> Wrt pseudo-OO programming this is more a method for struct dev than
-> node, so swap args: iommu_set_proximity(dev, node)
-> 
-> >  };
-> >  
-> >  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
-> >  	.name = "arm-smmu-v3",
-> >  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
-> >  	.iommu_count_resources = arm_smmu_v3_count_resources,
-> > -	.iommu_init_resources = arm_smmu_v3_init_resources
-> > +	.iommu_init_resources = arm_smmu_v3_init_resources,
-> > +	.iommu_set_proximity = arm_smmu_v3_set_proximity
-> 
-> Add comma at the end here.
-> 
-> >  };
-> >  
-> >  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
-> >  	.name = "arm-smmu",
-> >  	.iommu_is_coherent = arm_smmu_is_coherent,
-> >  	.iommu_count_resources = arm_smmu_count_resources,
-> > -	.iommu_init_resources = arm_smmu_init_resources
-> > +	.iommu_init_resources = arm_smmu_init_resources,
-> > +	.iommu_set_proximity = NULL
-> 
-> No need for null assignment.
-> 
-> -Robert
-> 
-> >  };
-> >  
-> >  static __init
-> > @@ -1028,6 +1054,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
-> >  	if (!pdev)
-> >  		return -ENOMEM;
-> >  
-> > +	if (ops->iommu_set_proximity)
-> > +		ops->iommu_set_proximity(node, &pdev->dev);
-> > +
-> >  	count = ops->iommu_count_resources(node);
-> >  
-> >  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
-> > -- 
-> > 2.9.4
-> > 
+I think in practice, the user has to determine this for themselves. I do
+not believe that it is possible to reliably determine whether a given
+fault was caused by an authentication failure.
+
+For example, consider an authentication failure in a function epilogue:
+
+	ldp	x29, x30, [sp], #FRAME_SIZE
+	autiasp
+	ret
+
+When AUTIASP fails to authenticate the x30 value, it ensures that x30 is
+a faulting value, by forcing some of the high bits to particular values,
+but that's all. A user can set those bits in the same way.
+
+The RET loads the LR value into the PC, which subsequently triggers an
+instruction abort for the PC value (i.e. we branch to the bogus address
+*then* take a fault at that address).
+
+At that point, we have no information to determine what the CPU was
+executing before it branched to the bogus address. So we cannot know how
+the address was generated, and therefore cannot know if it was an
+authentication failure.
+
+For data pointers, you could generate bogus pointers with a large
+out-of-bounds array index, whereby the bogus pointer looked like the
+result of a pointer authentication failure.
+
+Thanks,
+Mark.
