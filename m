@@ -1,29 +1,91 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 25 Jul 2017 21:47:16 +0800
-Subject: [PATCH RESEND 0/2] gpio: add imx7ulp gpio support
-Message-ID: <1500990438-3894-1-git-send-email-aisheng.dong@nxp.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 25 Jul 2017 15:45:51 +0200
+Subject: [PATCH v2 1/2] platform: Add Amlogic Meson AO CEC Controller
+ driver
+In-Reply-To: <f6e40d38-fe18-49e6-0ee1-a4467666777c@baylibre.com>
+References: <1499673696-21372-1-git-send-email-narmstrong@baylibre.com>
+ <1499673696-21372-2-git-send-email-narmstrong@baylibre.com>
+ <b5cb7021-4c9e-98b2-5fd1-11effda3fd30@xs4all.nl>
+ <f6e40d38-fe18-49e6-0ee1-a4467666777c@baylibre.com>
+Message-ID: <6f93edd0-098e-6cbc-9eea-99dd68ab3420@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a rebased version against 4.13-rc2 Linus master branch with
-latest ACKs collected.
+On 07/25/17 14:34, Neil Armstrong wrote:
+> Hi Hans,
 
-The Rapid General-Purpose Input and Output with 2 Ports (RGPIO2P)
-on MX7ULP is similar to GPIO on Vibrid. But unlike Vibrid, the
-RGPIO2P has an extra Port Data Direction Register (PDDR) used
-to configure the individual port pins for input or output.
+>>> +static int meson_ao_cec_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct meson_ao_cec_device *ao_cec;
+>>> +	struct platform_device *hdmi_dev;
+>>> +	struct device_node *np;
+>>> +	struct resource *res;
+>>> +	int ret, irq;
+>>> +
+>>> +	np = of_parse_phandle(pdev->dev.of_node, "hdmi-phandle", 0);
+>>> +	if (!np) {
+>>> +		dev_err(&pdev->dev, "Failed to find hdmi node\n");
+>>> +		return -ENODEV;
+>>> +	}
+>>> +
+>>> +	hdmi_dev = of_find_device_by_node(np);
+>>> +	if (hdmi_dev == NULL)
+>>> +		return -EPROBE_DEFER;
+>>> +
+>>> +	ao_cec = devm_kzalloc(&pdev->dev, sizeof(*ao_cec), GFP_KERNEL);
+>>> +	if (!ao_cec)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	spin_lock_init(&ao_cec->cec_reg_lock);
+>>> +
+>>> +	ao_cec->notify = cec_notifier_get(&hdmi_dev->dev);
+>>> +	if (!ao_cec->notify)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	ao_cec->adap = cec_allocate_adapter(&meson_ao_cec_ops, ao_cec,
+>>> +					    "meson_ao_cec",
+>>> +					    CEC_CAP_LOG_ADDRS |
+>>> +					    CEC_CAP_TRANSMIT |
+>>> +					    CEC_CAP_RC |
+>>> +					    CEC_CAP_PASSTHROUGH,
+>>> +					    1); /* Use 1 for now */
+>>
+>> I recommend that you add support for 2 logical addresses. More isn't allowed
+>> by the CEC 2.0 spec anyway (no such restriction for CEC 1.4, but more than
+>> two really isn't needed).
+> 
+> I know, but in the "communication" register with the suspend/poweroff firmware
+> that  handles the wake up, only a single logical address is supported...
+> 
+> What should I do in this case ? Which logical adress should I pass to the firmware when implementing ir ?
 
-We introduce a FSL_GPIO_HAVE_PDDR with fsl_gpio_soc_data data
-to distinguish this differences. And we support getting the output
-status by checking the GPIO direction in PDDR.
+Ah, OK. Interesting.
 
-Dong Aisheng (2):
-  dt-bindings: gpio-vf610: add imx7ulp support
-  gpio: gpio-vf610: add imx7ulp support
+>From cec-adap.c:
 
- .../devicetree/bindings/gpio/gpio-vf610.txt        |  4 +-
- drivers/gpio/gpio-vf610.c                          | 49 ++++++++++++++++++++--
- 2 files changed, 49 insertions(+), 4 deletions(-)
+                if (log_addrs->num_log_addrs == 2) {
+                        if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_AUDIOSYSTEM) |
+                                           (1 << CEC_LOG_ADDR_TYPE_TV)))) {
+                                dprintk(1, "two LAs is only allowed for audiosystem and TV\n");
+                                return -EINVAL;
+                        }
+                        if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_PLAYBACK) |
+                                           (1 << CEC_LOG_ADDR_TYPE_RECORD)))) {
+                                dprintk(1, "an audiosystem/TV can only be combined with record or playback\n");
+                                return -EINVAL;
+                        }
+                }
 
--- 
-2.7.4
+So you would store the TV or AUDIOSYSTEM logical address in the firmware, since those
+describe the system best.
+
+I.e. it is a TV/Audiosystem with recording/playback capabilities.
+
+The problem is that for CEC 1.4 no such restriction is imposed (the test above is
+specific to CEC 2.0). But I think it makes sense to just check if TV/Audiosystem
+is selected and pick that as the LA to store in the firmware, and otherwise just
+pick the first LA (log_addr[0]).
+
+Regards,
+
+	Hans
