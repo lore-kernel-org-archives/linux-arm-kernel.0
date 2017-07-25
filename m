@@ -1,58 +1,75 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 26 Jul 2017 00:36:48 +0200
-Subject: [PATCH v5 1/7] drm/rockchip: vop: initialize registers directly
-In-Reply-To: <1500518603-30486-1-git-send-email-mark.yao@rock-chips.com>
-References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
- <1500518603-30486-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <3165793.eZGRgZzZRy@phil>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 26 Jul 2017 07:54:31 +0800
+Subject: [PATCH 0/3] Add ethernet0 alias for several A64 boards
+In-Reply-To: <20170725143127.ioojcafwaeimvren@flea>
+References: <20170722022852.7868-1-icenowy@aosc.io>
+ <20170724075823.7ttjq4tnvoupo776@flea>
+ <f4016e61dbe4655a0e672c3377f35dd2@aosc.io>
+ <20170725031819.ryllvq5a3tdwyblj@angband.pl>
+ <20170725143127.ioojcafwaeimvren@flea>
+Message-ID: <00809C21-F663-4A54-8A9C-31A39739F539@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-Am Donnerstag, 20. Juli 2017, 10:43:22 CEST schrieb Mark Yao:
-> At present we are using init_table to initialize some
-> registers, but the Register init table use un-document define,
-> it is unreadable, and sometimes we only want to update tiny
-> bits, init table method is not friendly, it's diffcult to
-> reuse for difference chips.
-> 
-> To make it clean, initialize registers directly, and drops
-> init_table mechanism out.
-> 
-> Changes in v3:
-> - Explain more in details
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-
-[...]
-
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> index bafd698..00e9d79 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> @@ -127,13 +127,7 @@
->  	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
->  };
->  
-> -static const struct vop_reg_data rk3036_vop_init_reg_table[] = {
-> -	{RK3036_DSP_CTRL1, 0x00000000},
-> -};
-> -
->  static const struct vop_data rk3036_vop = {
-> -	.init_table = rk3036_vop_init_reg_table,
-> -	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
->  	.ctrl = &rk3036_ctrl_data,
->  	.intr = &rk3036_intr,
->  	.win = rk3036_vop_win_data,
-
-This seems to break vop initialization on my rk3036 kylin board.
-
-Before, kylin was able to bring output to the hdmi but with this
-patch applied this stops working. As the init-value is to zero it seems
-there is still something turned on, that should be turned off instead.
-
-rk3288 seems to stay in working condition though.
 
 
-Heiko
+? 2017?7?25? GMT+08:00 ??10:31:27, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+>On Tue, Jul 25, 2017 at 05:18:19AM +0200, Adam Borowski wrote:
+>> On Tue, Jul 25, 2017 at 11:04:24AM +0800, icenowy at aosc.io wrote:
+>> > ? 2017-07-24 15:58?Maxime Ripard ???
+>> > > On Sat, Jul 22, 2017 at 10:28:49AM +0800, Icenowy Zheng wrote:
+>> > > > Allwinner A64 SoC has an EMAC which is used to provide Ethernet
+>> > > > function on several boards.
+>> > > > 
+>> > > > The EMAC itself doesn't have a fixed MAC address, but the sunxi
+>> > > > mainline U-Boot have the ability to generate one based on the
+>eFUSE
+>> > > > SID in the chip, and add the generated MAC address to the
+>device
+>> > > > tree when booting.
+>> > > > 
+>> > > > The MAC address setting step is based on the device tree's
+>aliases,
+>> > > > and device tree nodes prefixed "ethernet" will get the MAC
+>address
+>> > > > added. However, in several A64 boards' device tree, the alias
+>is not
+>> > > > set up, so that the U-Boot won't set the MAC address.
+>> > > > 
+>> > > > Add the ethernet0 aliases to these boards.
+>> > > > 
+>> > > > I hope this patchset can be queued in 4.13, otherwise 4.13
+>kernels
+>> > > > won't get non-volatile MAC addresses, and will use random ones
+>> > > > instead, which is annoying to many users.
+>> > > > 
+>> > > > Icenowy Zheng (3):
+>> > > >   arm64: allwinner: a64: add ethernet0 alias for BPi M64 EMAC
+>node
+>> > > >   arm64: allwinner: a64: add ethernet0 alias for Pine64 EMAC
+>node
+>> > > >   arm64: allwinner: a64: add ethernet0 alias for SoPine EMAC
+>node
+>> > > 
+>> > > Applied all three, thanks!
+>> > 
+>> > Sorry, but could you queue them to 4.13?
+>> > 
+>> > Otherwise 4.13 kernel release will have annoying random MAC
+>problem,
+>> > which heavily affects headless usages.
+>> 
+>> Perhaps it would be better to reword the commit subject as "fix
+>missing
+>> ethernet0 alias ..."?  That'd convey that the previous behaviour is a
+>defect
+>> that needs these patches as a fix.
+>
+>Yes, definitely.
+>
+>That and having a fixes: tag.
+
+Should I resend them with different commit message?
+
+>
+>Maxime
