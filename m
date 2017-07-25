@@ -1,162 +1,149 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 25 Jul 2017 16:39:18 +0100
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170725150422.4775-2-jglauber@cavium.com>
-References: <20170725150422.4775-1-jglauber@cavium.com>
- <20170725150422.4775-2-jglauber@cavium.com>
-Message-ID: <72145781-e9ec-036f-f752-b4756fef08ee@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 25 Jul 2017 17:40:14 +0200
+Subject: [PATCH v4 8/9] ASoC: atmel-classd: remove aclk clock
+In-Reply-To: <645aa35fec4a2384ca2f3039615ee6598602f9e2.1500968090.git-series.quentin.schulz@free-electrons.com>
+References: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
+ <645aa35fec4a2384ca2f3039615ee6598602f9e2.1500968090.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <97863fa5-06aa-598b-050f-4454c720420a@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/17 16:04, Jan Glauber wrote:
-> Add support for the PMU counters on Cavium SOC memory controllers.
->
-> This patch also adds generic functions to allow supporting more
-> devices with PMU counters.
->
-> Properties of the LMC PMU counters:
-> - not stoppable
-> - fixed purpose
-> - read-only
-> - one PCI device per memory controller
->
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
+On 25/07/2017 at 09:37, Quentin Schulz wrote:
+> Since gclk (generated-clk) is now able to determine the rate of the
+> audio_pll, there is no need for classd to have a direct phandle to the
+> audio_pll while already having a phandle to gclk.
+> 
+> Thus, remove all mentions to aclk in classd driver and update macros and
+> variable names.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Mark Brown <broonie@kernel.org>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
 > ---
->  drivers/perf/Kconfig       |   8 +
->  drivers/perf/Makefile      |   1 +
->  drivers/perf/cavium_pmu.c  | 424 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/cpuhotplug.h |   1 +
->  4 files changed, 434 insertions(+)
->  create mode 100644 drivers/perf/cavium_pmu.c
->
-> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-> index e5197ff..a46c3f0 100644
-> --- a/drivers/perf/Kconfig
-> +++ b/drivers/perf/Kconfig
-> @@ -43,4 +43,12 @@ config XGENE_PMU
->          help
->            Say y if you want to use APM X-Gene SoC performance monitors.
->
-> +config CAVIUM_PMU
-> +	bool "Cavium SOC PMU"
+>  sound/soc/atmel/atmel-classd.c | 47 ++++++++++-------------------------
+>  1 file changed, 14 insertions(+), 33 deletions(-)
+> 
+> diff --git a/sound/soc/atmel/atmel-classd.c b/sound/soc/atmel/atmel-classd.c
+> index b7ef8c5..be6b775 100644
+> --- a/sound/soc/atmel/atmel-classd.c
+> +++ b/sound/soc/atmel/atmel-classd.c
+> @@ -32,7 +32,6 @@ struct atmel_classd {
+>  	struct regmap *regmap;
+>  	struct clk *pclk;
+>  	struct clk *gclk;
+> -	struct clk *aclk;
+>  	int irq;
+>  	const struct atmel_classd_pdata *pdata;
+>  };
+> @@ -330,11 +329,6 @@ static int atmel_classd_codec_dai_startup(struct snd_pcm_substream *substream,
+>  {
+>  	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>  	struct atmel_classd *dd = snd_soc_card_get_drvdata(rtd->card);
+> -	int ret;
+> -
+> -	ret = clk_prepare_enable(dd->aclk);
+> -	if (ret)
+> -		return ret;
+>  
+>  	return clk_prepare_enable(dd->gclk);
+>  }
+> @@ -357,31 +351,31 @@ static int atmel_classd_codec_dai_digital_mute(struct snd_soc_dai *codec_dai,
+>  	return 0;
+>  }
+>  
+> -#define CLASSD_ACLK_RATE_11M2896_MPY_8 (112896 * 100 * 8)
+> -#define CLASSD_ACLK_RATE_12M288_MPY_8  (12288 * 1000 * 8)
+> +#define CLASSD_GCLK_RATE_11M2896_MPY_8 (112896 * 100 * 8)
+> +#define CLASSD_GCLK_RATE_12M288_MPY_8  (12288 * 1000 * 8)
+>  
+>  static struct {
+>  	int rate;
+>  	int sample_rate;
+>  	int dsp_clk;
+> -	unsigned long aclk_rate;
+> +	unsigned long gclk_rate;
+>  } const sample_rates[] = {
+>  	{ 8000,  CLASSD_INTPMR_FRAME_8K,
+> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
+> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
+>  	{ 16000, CLASSD_INTPMR_FRAME_16K,
+> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
+> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
+>  	{ 32000, CLASSD_INTPMR_FRAME_32K,
+> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
+> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
+>  	{ 48000, CLASSD_INTPMR_FRAME_48K,
+> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
+> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
+>  	{ 96000, CLASSD_INTPMR_FRAME_96K,
+> -	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_ACLK_RATE_12M288_MPY_8 },
+> +	CLASSD_INTPMR_DSP_CLK_FREQ_12M288, CLASSD_GCLK_RATE_12M288_MPY_8 },
+>  	{ 22050, CLASSD_INTPMR_FRAME_22K,
+> -	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
+> +	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
+>  	{ 44100, CLASSD_INTPMR_FRAME_44K,
+> -	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
+> +	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
+>  	{ 88200, CLASSD_INTPMR_FRAME_88K,
+> -	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_ACLK_RATE_11M2896_MPY_8 },
+> +	CLASSD_INTPMR_DSP_CLK_FREQ_11M2896, CLASSD_GCLK_RATE_11M2896_MPY_8 },
+>  };
+>  
+>  static int
+> @@ -410,13 +404,12 @@ atmel_classd_codec_dai_hw_params(struct snd_pcm_substream *substream,
+>  	}
+>  
+>  	dev_dbg(codec->dev,
+> -		"Selected SAMPLE_RATE of %dHz, ACLK_RATE of %ldHz\n",
+> -		sample_rates[best].rate, sample_rates[best].aclk_rate);
+> +		"Selected SAMPLE_RATE of %dHz, GCLK_RATE of %ldHz\n",
+> +		sample_rates[best].rate, sample_rates[best].gclk_rate);
+>  
+>  	clk_disable_unprepare(dd->gclk);
+> -	clk_disable_unprepare(dd->aclk);
+>  
+> -	ret = clk_set_rate(dd->aclk, sample_rates[best].aclk_rate);
+> +	ret = clk_set_rate(dd->gclk, sample_rates[best].gclk_rate);
+>  	if (ret)
+>  		return ret;
+>  
+> @@ -426,10 +419,6 @@ atmel_classd_codec_dai_hw_params(struct snd_pcm_substream *substream,
+>  
+>  	snd_soc_update_bits(codec, CLASSD_INTPMR, mask, val);
+>  
+> -	ret = clk_prepare_enable(dd->aclk);
+> -	if (ret)
+> -		return ret;
+> -
+>  	return clk_prepare_enable(dd->gclk);
+>  }
+>  
+> @@ -441,7 +430,6 @@ atmel_classd_codec_dai_shutdown(struct snd_pcm_substream *substream,
+>  	struct atmel_classd *dd = snd_soc_card_get_drvdata(rtd->card);
+>  
+>  	clk_disable_unprepare(dd->gclk);
+> -	clk_disable_unprepare(dd->aclk);
+>  }
+>  
+>  static int atmel_classd_codec_dai_prepare(struct snd_pcm_substream *substream,
+> @@ -596,13 +584,6 @@ static int atmel_classd_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> -	dd->aclk = devm_clk_get(dev, "aclk");
+> -	if (IS_ERR(dd->aclk)) {
+> -		ret = PTR_ERR(dd->aclk);
+> -		dev_err(dev, "failed to get audio clock: %d\n", ret);
+> -		return ret;
+> -	}
+> -
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	io_base = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(io_base)) {
+> 
 
-Is there any specific reason why this can't be built as a module ?
 
-
-> +#define to_pmu_dev(x) container_of((x), struct cvm_pmu_dev, pmu)
-> +
-> +static int cvm_pmu_event_init(struct perf_event *event)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct cvm_pmu_dev *pmu_dev;
-> +	struct perf_event *sibling;
-> +
-> +	if (event->attr.type != event->pmu->type)
-> +		return -ENOENT;
-> +
-> +	/* we do not support sampling */
-> +	if (is_sampling_event(event))
-> +		return -EINVAL;
-> +
-> +	/* PMU counters do not support any these bits */
-> +	if (event->attr.exclude_user	||
-> +	    event->attr.exclude_kernel	||
-> +	    event->attr.exclude_host	||
-> +	    event->attr.exclude_guest	||
-> +	    event->attr.exclude_hv	||
-> +	    event->attr.exclude_idle)
-> +		return -EINVAL;
-> +
-> +	pmu_dev = to_pmu_dev(event->pmu);
-> +	if (!pmu_dev->event_valid(event->attr.config))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Forbid groups containing mixed PMUs, software events are acceptable.
-> +	 */
-> +	if (event->group_leader->pmu != event->pmu &&
-> +	    !is_software_event(event->group_leader))
-> +		return -EINVAL;
-> +
-> +	list_for_each_entry(sibling, &event->group_leader->sibling_list,
-> +			    group_entry)
-> +		if (sibling->pmu != event->pmu &&
-> +		    !is_software_event(sibling))
-> +			return -EINVAL;
-
-Do we also need to check if the events in the same group can be scheduled
-at once ? i.e, there is enough resources to schedule the requested events from
-the group.
-
-> +
-> +	hwc->config = event->attr.config;
-> +	hwc->idx = -1;
-> +	return 0;
-> +}
-> +
-...
-
-> +static int cvm_pmu_add(struct perf_event *event, int flags, u64 config_base,
-> +		       u64 event_base)
-> +{
-> +	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
-> +	struct hw_perf_event *hwc = &event->hw;
-> +
-> +	if (!cmpxchg(&pmu_dev->events[hwc->config], NULL, event))
-> +		hwc->idx = hwc->config;
-> +
-> +	if (hwc->idx == -1)
-> +		return -EBUSY;
-> +
-> +	hwc->config_base = config_base;
-> +	hwc->event_base = event_base;
-> +	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
-> +
-> +	if (flags & PERF_EF_START)
-> +		pmu_dev->pmu.start(event, PERF_EF_RELOAD);
-> +
-> +	return 0;
-> +}
-> +
-> +static void cvm_pmu_del(struct perf_event *event, int flags)
-> +{
-> +	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	int i;
-> +
-> +	event->pmu->stop(event, PERF_EF_UPDATE);
-> +
-> +	/*
-> +	 * For programmable counters we need to check where we installed it.
-> +	 * To keep this function generic always test the more complicated
-> +	 * case (free running counters won't need the loop).
-> +	 */
-> +	for (i = 0; i < pmu_dev->num_counters; i++)
-> +		if (cmpxchg(&pmu_dev->events[i], event, NULL) == event)
-> +			break;
-
-I couldn't see why hwc->config wouldn't give us the index where we installed
-the event in pmu_dev->events. What am I missing ?
-
-> +static int __init cvm_pmu_init(void)
-> +{
-> +	unsigned long implementor = read_cpuid_implementor();
-> +	unsigned int vendor_id = PCI_VENDOR_ID_CAVIUM;
-> +	struct pci_dev *pdev = NULL;
-> +	int rc;
-> +
-> +	if (implementor != ARM_CPU_IMP_CAVIUM)
-> +		return -ENODEV;
-
-As I mentioned in the beginning, it would be better to modularize it right
-from the start, when we can, than coming back to this at a later point in time.
-
-Btw, perf_event_update_userpage() is being exported for use from module.
-See [0].
-
-[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520682.html
-
-Cheers
-
-Suzuki
+-- 
+Nicolas Ferre
