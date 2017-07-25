@@ -1,41 +1,40 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 25 Jul 2017 10:09:24 +0200
-Subject: [PATCH v2 1/4] drm/atomic: implement
- drm_atomic_helper_commit_tail for runtime_pm users
-In-Reply-To: <20170725065734.kbtb2mrfsjwm2szz@flea>
-References: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
- <a8f92dc70048bab746e94dadd1c23200626aff60.1500555652.git-series.maxime.ripard@free-electrons.com>
- <20170720184628.5vizn7hjdaaz7rqy@phenom.ffwll.local>
- <20170725065734.kbtb2mrfsjwm2szz@flea>
-Message-ID: <20170725080924.edh4h6njfxlwma7o@phenom.ffwll.local>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 25 Jul 2017 16:10:24 +0800
+Subject: [PATCH 3/3] usb: mtu3: fix ip sleep auto-exit issue when enable DRD
+ mode
+In-Reply-To: <1500970224-23791-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1500970224-23791-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1500970224-23791-3-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 08:57:34AM +0200, Maxime Ripard wrote:
-> Hi Daniel,
-> 
-> On Thu, Jul 20, 2017 at 08:46:28PM +0200, Daniel Vetter wrote:
-> > On Thu, Jul 20, 2017 at 03:01:16PM +0200, Maxime Ripard wrote:
-> > > The current drm_atomic_helper_commit_tail helper works only if the CRTC is
-> > > accessible, and documents an alternative implementation that is supposed to
-> > > be used if that happens.
-> > > 
-> > > That implementation is then duplicated by some drivers. Instead of
-> > > documenting it, let's implement an helper that all the relevant users can
-> > > use directly.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > 
-> > Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> > 
-> > Should I throw this into drm-misc, or do you want to merge this through
-> > some driver tree?
-> 
-> Yes, you can put them in drm-misc, it will the be the easiest option.
+Ip sleep will auto exit if vbus comparison circuit of u2 phy is
+disabled when system tries to enter suspend mode, so get vbus-valid
+status from mac but not from u2 phy when enable DRD mode to fix
+the issue.
 
-Merged, thanks.
--Daniel
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/mtu3/mtu3_hw_regs.h |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/usb/mtu3/mtu3_hw_regs.h b/drivers/usb/mtu3/mtu3_hw_regs.h
+index 2123672..06b2966 100644
+--- a/drivers/usb/mtu3/mtu3_hw_regs.h
++++ b/drivers/usb/mtu3/mtu3_hw_regs.h
+@@ -462,10 +462,12 @@
+ #define SSUSB_U3_PORT_DIS		BIT(0)
+ 
+ /* U3D_SSUSB_U2_CTRL_0P */
++#define SSUSB_U2_PORT_VBUSVALID	BIT(9)
+ #define SSUSB_U2_PORT_OTG_SEL		BIT(7)
+-#define SSUSB_U2_PORT_HOST_SEL		BIT(2)
++#define SSUSB_U2_PORT_HOST		BIT(2)
+ #define SSUSB_U2_PORT_PDN		BIT(1)
+ #define SSUSB_U2_PORT_DIS		BIT(0)
++#define SSUSB_U2_PORT_HOST_SEL	(SSUSB_U2_PORT_VBUSVALID | SSUSB_U2_PORT_HOST)
+ 
+ /* U3D_SSUSB_DEV_RST_CTRL */
+ #define SSUSB_DEV_SW_RST		BIT(0)
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+1.7.9.5
