@@ -1,157 +1,194 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 25 Jul 2017 17:15:24 +0800
-Subject: [PATCH v2 5/5] arm64: dts: rockchip: update the thermal zones for
- RK3399 SoCs
-In-Reply-To: <1703106.KNjF1lku9f@phil>
-References: <1500279271-15249-1-git-send-email-wxt@rock-chips.com>
- <1500279271-15249-6-git-send-email-wxt@rock-chips.com>
- <1703106.KNjF1lku9f@phil>
-Message-ID: <b20c304e-87ed-8a39-faf2-f8cd90d4c98e@rock-chips.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Tue, 25 Jul 2017 18:19:18 +0900
+Subject: [PATCH v5 2/2] thermal: uniphier: add UniPhier thermal driver
+In-Reply-To: <CAK7LNATDnAbByOZN2YDUfnTQLwMiSPVZtz5rfewUzrC9uGUCHw@mail.gmail.com>
+References: <1500636105-11520-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <CAK7LNATDnAbByOZN2YDUfnTQLwMiSPVZtz5rfewUzrC9uGUCHw@mail.gmail.com>
+Message-ID: <20170725181918.7EA9.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Fri, 21 Jul 2017 22:21:05 +0900 <yamada.masahiro@socionext.com> wrote:
 
-Thanks your comments.
+> 2017-07-21 20:21 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+> 
+> > +static int uniphier_tm_initialize_sensor(struct uniphier_tm_dev *tdev)
+> > +{
+> > +       struct regmap *map = tdev->regmap;
+> > +       u32 val;
+> > +       int ret;
+> > +
+> > +       /* stop PVT */
+> > +       regmap_write_bits(map, tdev->data->block_base + PVTCTLEN,
+> > +                         PVTCTLEN_EN, 0);
+> > +
+> > +       /*
+> > +        * set default value if missing calibrated value
+> > +        *
+> > +        * Since SoC has a calibrated value that was set in advance,
+> > +        * TMODCOEF shows non-zero and PVT refers the value internally.
+> > +        *
+> > +        * However, some boards don't have the calibrated value.
+> > +        * In that case, TMODCOEF shows zero and the driver has to set
+> > +        * default value manually.
+> > +        */
+> > +       ret = regmap_read(map, tdev->data->map_base + TMODCOEF, &val);
+> > +       if (ret)
+> > +               return ret;
+> > +       if (!val)
+> > +               regmap_write(map, tdev->data->tmod_setup_addr,
+> > +                           TMODSETUP0_EN | TMODSETUP0_VAL(tdev->tmod_calib0) |
+> > +                           TMODSETUP1_EN | TMODSETUP1_VAL(tdev->tmod_calib1));
+> 
+> 
+> This code is strange.
+> 
+> What if TMODCOEF has no calibrated value and
+> "socionext,tmod-calibration" is not set either?
+> 
+> 
+> ->tmod_setupaddr will be set to zero
+> and the sensor would not work, right?
 
-? 2017?07?23? 05:48, Heiko Stuebner ??:
+Yes. When both are true, the sensor would not work.
 
-> Hi Caesar,
->
-> Am Montag, 17. Juli 2017, 16:14:31 CEST schrieb Caesar Wang:
->> As RK3399 had used the Power allocator thermal governor by default,
->> enabled this to manage thermals by dynamically allocating and limiting
->> power to devices.
->>
->> Also, this patch supported the dynamic-power-coefficient/sustainable_power
->> and GPU's power model for needed parameters with thermal IPA.
->>
->> The Thermal power allocator governor works optimatly with two passive trip
->> points, for the better performance we will use the trip-point0 with 70
->> degree above which the governor control starts operating and trip-point1
->> with 85 degree is the target temperature by controlling.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>
->> ---
->>
->> Changes in v2:
->> - foo@ will produce warnings when used without reg property.
->> - update the commit to explain the two passive trip points changed.
->>
->>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 62 +++++++++++++++-----------------
->>   1 file changed, 29 insertions(+), 33 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> index 77d67cb..6d8a5eb 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -147,7 +147,7 @@
->>   			enable-method = "psci";
->>   			#cooling-cells = <2>; /* min followed by max */
->>   			clocks = <&cru ARMCLKB>;
->> -			dynamic-power-coefficient = <100>;
->> +			dynamic-power-coefficient = <436>;
->>   		};
->>   
->>   		cpu_b1: cpu at 101 {
->> @@ -156,7 +156,7 @@
->>   			reg = <0x0 0x101>;
->>   			enable-method = "psci";
->>   			clocks = <&cru ARMCLKB>;
->> -			dynamic-power-coefficient = <100>;
->> +			dynamic-power-coefficient = <436>;
-> Adjusting the coefficients should be a separate patch and the
-> commit message should explain how they were calculated and
-> why they are the exacter ones over the old values.
+> > +       /* get tmod-calibration values */
+> > +       calib = of_get_property(dev->of_node, "socionext,tmod-calibration",
+> > +                               NULL);
+> > +       if (calib) {
+> > +               tdev->tmod_calib0 = of_read_number(calib, 1);
+> > +               tdev->tmod_calib1 = of_read_number(calib + 1, 1);
+> > +       }
+> 
+> 
+> From your DT change (https://patchwork.kernel.org/patch/9826391/),
+> this property seems a pair of u32 values, like follows:
+> 
+> socionext,tmod-calibration = <0x0f22 0x68ee>;
+> 
+> 
+> Why do you need to use of_read_number() to retrieve each u32 value?
+> 
+> See the comment and return value (u64):
+> 
+> ------------------>8-----------------
+> /* Helper to read a big number; size is in cells (not bytes) */
+> static inline u64 of_read_number(const __be32 *cell, int size)
+> ------------------8<-----------------
+> 
+> 
+> Also, you are not checking the length of the property.
+> of_read_number() may over-run the property.
+> 
+> 
+> 
+> of_property_read_u32_array() will be a better choice.
+> 
+> 
+> I'd propose the code like follows:
 
-Okay, i don't know why the dynamic-power-coefficient is 100 for 
-b-cluster before.:-)
+Thank you for your examples.
+Surely the driver needs to get the value from the register,
+and when failed, tries to get the value from DT, and at last
+should issue an error when failed.
 
->
->
->>   		};
->>   	};
->>   
->> @@ -690,24 +690,25 @@
->>   	};
->>   
->>   	thermal_zones: thermal-zones {
->> -		cpu_thermal: cpu {
->> +		soc_thermal: soc-thermal {
->>   			polling-delay-passive = <100>;
->>   			polling-delay = <1000>;
->> +			sustainable-power = <1000>;
->>   
->>   			thermal-sensors = <&tsadc 0>;
->>   
->>   			trips {
->> -				cpu_alert0: cpu_alert0 {
->> +				threshold: trip-point0 {
->>   					temperature = <70000>;
->>   					hysteresis = <2000>;
->>   					type = "passive";
->>   				};
->> -				cpu_alert1: cpu_alert1 {
->> -					temperature = <75000>;
->> +				target: trip-point1 {
->> +					temperature = <85000>;
->>   					hysteresis = <2000>;
->>   					type = "passive";
->>   				};
->> -				cpu_crit: cpu_crit {
->> +				soc_crit: soc-crit {
->>   					temperature = <95000>;
->>   					hysteresis = <2000>;
->>   					type = "critical";
->> @@ -716,45 +717,31 @@
->>   
->>   			cooling-maps {
->>   				map0 {
->> -					trip = <&cpu_alert0>;
->> +					trip = <&target>;
-> still both maps use &target as trip point. Is that intentional
-> and if so, why is the &threshold trip point never referenced?
+I'll try to apply your recommended code.
 
-For the power allocator governor, the &threshold trip point just control 
-starts operating, not need for map.
-For other governor (e.g: step_wise) will need the first trip point. 
-Looks like we have to think about how to support them.
+> 
+> diff --git a/drivers/thermal/uniphier_thermal.c
+> b/drivers/thermal/uniphier_thermal.c
+> index 1a77c5bf6930..eea8a3053584 100644
+> --- a/drivers/thermal/uniphier_thermal.c
+> +++ b/drivers/thermal/uniphier_thermal.c
+> @@ -94,16 +94,16 @@ struct uniphier_tm_soc_data {
+>  struct uniphier_tm_dev {
+>         struct regmap *regmap;
+>         bool alert_en[ALERT_CH_NUM];
+> -       u32 tmod_calib0;
+> -       u32 tmod_calib1;
+>         struct thermal_zone_device *tz_dev;
+>         const struct uniphier_tm_soc_data *data;
+>  };
+> 
+> -static int uniphier_tm_initialize_sensor(struct uniphier_tm_dev *tdev)
+> +static int uniphier_tm_initialize_sensor(struct uniphier_tm_dev *tdev,
+> +                                        struct device *dev)
+>  {
+>         struct regmap *map = tdev->regmap;
+>         u32 val;
+> +       u32 tmod_val[2];
+>         int ret;
+> 
+>         /* stop PVT */
+> @@ -123,10 +123,22 @@ static int uniphier_tm_initialize_sensor(struct
+> uniphier_tm_dev *tdev)
+>         ret = regmap_read(map, tdev->data->map_base + TMODCOEF, &val);
+>         if (ret)
+>                 return ret;
+> -       if (!val)
+> +       if (!val) {
+> +               /*
+> +                * No preset value found in the register.
+> +                * Look for the fall-back values in DT.
+> +                */
+> +               ret = of_property_read_u32_array(dev->of_node,
+> +                                                "socionext,tmod-calibration",
+> +                                                tmod_val,
+> ARRAY_SIZE(tmod_val));
+> +               if (ret) {
+> +                       dev_err(dev, "neither register nor DT has
+> calibrated values.\n");
+> +                       return ret;
+> +               }
+>                 regmap_write(map, tdev->data->tmod_setup_addr,
+> -                           TMODSETUP0_EN | TMODSETUP0_VAL(tdev->tmod_calib0) |
+> -                           TMODSETUP1_EN | TMODSETUP1_VAL(tdev->tmod_calib1));
+> +                            TMODSETUP0_EN | TMODSETUP0_VAL(tmod_val[0]) |
+> +                            TMODSETUP1_EN | TMODSETUP1_VAL(tmod_val[1]));
+> +       }
+> 
+>         /* select temperature mode */
+>         regmap_write_bits(map, tdev->data->block_base + PVTCTLMODE,
+> @@ -254,7 +266,6 @@ static int uniphier_tm_probe(struct platform_device *pdev)
+>         struct device_node *parent;
+>         struct uniphier_tm_dev *tdev;
+>         const struct thermal_trip *trips;
+> -       const __be32 *calib;
+>         int i, ret, irq, ntrips, crit_temp = INT_MAX;
+> 
+>         tdev = devm_kzalloc(dev, sizeof(*tdev), GFP_KERNEL);
+> @@ -269,14 +280,6 @@ static int uniphier_tm_probe(struct platform_device *pdev)
+>         if (irq < 0)
+>                 return irq;
+> 
+> -       /* get tmod-calibration values */
+> -       calib = of_get_property(dev->of_node, "socionext,tmod-calibration",
+> -                               NULL);
+> -       if (calib) {
+> -               tdev->tmod_calib0 = of_read_number(calib, 1);
+> -               tdev->tmod_calib1 = of_read_number(calib + 1, 1);
+> -       }
+> -
+>         /* get regmap from syscon node */
+>         parent = of_get_parent(dev->of_node); /* parent should be syscon node */
+>         regmap = syscon_node_to_regmap(parent);
+> @@ -288,7 +291,7 @@ static int uniphier_tm_probe(struct platform_device *pdev)
+>         }
+>         tdev->regmap = regmap;
+> 
+> -       ret = uniphier_tm_initialize_sensor(tdev);
+> +       ret = uniphier_tm_initialize_sensor(tdev, dev);
+>         if (ret) {
+>                 dev_err(dev, "failed to initialize sensor\n");
+>                 return ret;
+> 
+> 
+> 
+> 
+> -- 
+> Best Regards
+> Masahiro Yamada
 
-
->   		};
->   	};
->   
-> @@ -1451,8 +1438,17 @@
->   			     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH 0>;
->   		interrupt-names = "gpu", "job", "mmu";
->   		clocks = <&cru ACLK_GPU>;
-> +		#cooling-cells = <2>;
->   		power-domains = <&power RK3399_PD_GPU>;
->   		status = "disabled";
-> +
-> +		gpu_power_model: power_model {
-> +			compatible = "arm,mali-simple-power-model";
-> +			static-coefficient = <1079403>;
-> +			dynamic-coefficient = <977>;
-> +			ts = <32000 4700 (-80) 2>;
-> +			thermal-zone = "gpu-thermal";
-> +		};
-> You might want to have the gpu thermal work without the
-> power-model-thingy for now, so most likely just drop that
-> gpu-related change for now.
-
-Well,  I guess the mediatek/hisilicon/rockchip ARM SoCs should support 
-the gpu's power mode with private kernel,
-not in the upstream kernel.
-
--Caesar
-
->
->
-> Heiko
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+--
+Best Regards,
+Kunihiko Hayashi
