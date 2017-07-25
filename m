@@ -1,358 +1,490 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Jul 2017 15:37:11 +0100
-Subject: [RFC PATCH untested] arm64: kernel: implement fast refcount
- checking
-In-Reply-To: <20170725114901.31403-1-ard.biesheuvel@linaro.org>
-References: <20170725114901.31403-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu86xZWua0d0UsPpz8xhbNx14EqTVeFGUweN9o69AWUXiA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 25 Jul 2017 16:40:06 +0200
+Subject: [PATCH 1/4] ARM: sun9i: Support SMP on A80 with Multi-Cluster
+ Power Management (MCPM)
+In-Reply-To: <CAGb2v67tGuivydj1r+uD=5aw+yYZyBabbNsKwik9ZONNQmc=jQ@mail.gmail.com>
+References: <20170725050919.16036-1-wens@csie.org>
+ <20170725050919.16036-2-wens@csie.org>
+ <20170725074759.5mqrwcp7djeju33g@flea>
+ <CAGb2v67tGuivydj1r+uD=5aw+yYZyBabbNsKwik9ZONNQmc=jQ@mail.gmail.com>
+Message-ID: <20170725144006.3bz45ozpv6dwu6k4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 July 2017 at 12:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Hi all,
->
-> I had a stab at porting the fast refcount checks to arm64. It is slightly
-> less straight-forward than x86 given that we need to support both LSE and
-> LL/SC, and fallback to the latter if running a kernel built with support
-> for the former on hardware that does not support it.
->
-> It is build tested with and without LSE support, and boots fine on non-LSE
-> hardware in both cases.
->
-> Suggestions welcome as to how to test and/or benchmark this,
->
+On Tue, Jul 25, 2017 at 04:29:52PM +0800, Chen-Yu Tsai wrote:
+>          default ARCH_SUNXI
+> On Tue, Jul 25, 2017 at 3:47 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Chen-Yu,
+> >
+> > On Tue, Jul 25, 2017 at 01:09:16PM +0800, Chen-Yu Tsai wrote:
+> >> The A80 is a big.LITTLE SoC with 1 cluster of 4 Cortex-A7s and
+> >> 1 cluster of 4 Cortex-A15s.
+> >>
+> >> This patch adds support to bring up the second cluster and thus all
+> >> cores using the common MCPM code. Core/cluster power down has not
+> >> been implemented, thus CPU hotplugging and big.LITTLE switcher is
+> >> not supported.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  arch/arm/mach-sunxi/Kconfig  |  10 ++
+> >>  arch/arm/mach-sunxi/Makefile |   1 +
+> >>  arch/arm/mach-sunxi/mcpm.c   | 391 +++++++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 402 insertions(+)
+> >>  create mode 100644 arch/arm/mach-sunxi/mcpm.c
+> >>
+> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> >> index 58153cdf025b..177380548d99 100644
+> >> --- a/arch/arm/mach-sunxi/Kconfig
+> >> +++ b/arch/arm/mach-sunxi/Kconfig
+> >> @@ -47,5 +47,15 @@ config MACH_SUN9I
+> >>       bool "Allwinner (sun9i) SoCs support"
+> >>       default ARCH_SUNXI
+> >>       select ARM_GIC
+> >> +     imply MCPM
+> >> +
+> >> +config SUN9I_A80_MCPM
+> >> +     bool "Allwinner A80 Multi-Cluster PM support"
+> >> +     depends on MCPM && MACH_SUN9I
+> >> +     default MACH_SUN9I
+> >> +     select ARM_CCI400_PORT_CTRL
+> >> +     help
+> >> +       This is needed to provide CPU and cluster power management
+> >> +       on Allwinner A80 implementing big.LITTLE.
+> >
+> > Do we really need an option for that? we don't provide the option to
+> > disable the CPU SMP operations for the rest of the SoCs.
+> 
+> It was an option as it also required MCPM and CCI400 support to be built.
+> We could hide it. Or, using mach-hisi as a reference, we could do:
+> 
+> config MACH_SUN9I
+>         default ARCH_SUNXI
+>         select ARM_GIC
+>         select MCPM if SMP
+>         select ARM_CCI400_PORT_CTRL if SMP
+> 
+> and in the Makefile:
+> 
+> obj-$(CONFIG_MCPM) += sun9i-mcpm.o
 
-I discovered this awesome tool called lkdtm, and noticed that the
-patch does not quite work in its current form: the condition check is
-incorrect, and it uses adrp instruction, which is not allowed in
-modules in a standard build.
+I guess a hidden option would work for me.
 
-Updated patch here:
-https://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git/log/?h=arm64-fast-refcount
+> >> +#define SUNXI_CPUS_PER_CLUSTER               4
+> >> +#define SUNXI_NR_CLUSTERS            2
+> >> +
+> >> +#define SUN9I_A80_A15_CLUSTER                1
+> >
+> > Don't we have a way to derive that from the DT ?
+> 
+> Indeed we can.
+> 
+> It would be slighty more complicated though:
+> 
+> node = of_cpu_device_node_get(cluster * SUNXI_CPUS_PER_CLUSTER + cpu);
+> if (of_device_is_compatible(node, "arm,cortex-a15")) {
+>         ...
+> }
 
+There's no helper to create that map?
 
-> ---------8<----------------
-> This adds support to arm64 for fast refcount checking, as proposed by
-> Kees for x86.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/Kconfig                    |  1 +
->  arch/arm64/include/asm/atomic.h       | 15 ++++
->  arch/arm64/include/asm/atomic_ll_sc.h | 27 ++++++
->  arch/arm64/include/asm/atomic_lse.h   | 51 ++++++++++++
->  arch/arm64/include/asm/brk-imm.h      |  1 +
->  arch/arm64/include/asm/refcount.h     | 88 ++++++++++++++++++++
->  arch/arm64/kernel/traps.c             | 35 ++++++++
->  arch/arm64/lib/atomic_ll_sc.c         |  6 ++
->  8 files changed, 224 insertions(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index dfd908630631..53b9a8f5277b 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -16,6 +16,7 @@ config ARM64
->         select ARCH_HAS_GCOV_PROFILE_ALL
->         select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
->         select ARCH_HAS_KCOV
-> +       select ARCH_HAS_REFCOUNT
->         select ARCH_HAS_SET_MEMORY
->         select ARCH_HAS_SG_CHAIN
->         select ARCH_HAS_STRICT_KERNEL_RWX
-> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-> index c0235e0ff849..66dc66399630 100644
-> --- a/arch/arm64/include/asm/atomic.h
-> +++ b/arch/arm64/include/asm/atomic.h
-> @@ -24,10 +24,25 @@
->  #include <linux/types.h>
->
->  #include <asm/barrier.h>
-> +#include <asm/brk-imm.h>
->  #include <asm/lse.h>
->
->  #ifdef __KERNEL__
->
-> +#define REFCOUNT_CHECK(cond)                                           \
-> +"22:   b." #cond "     33f\n"                                          \
-> +"      .pushsection    \".text.unlikely\"\n"                           \
-> +"33:   mov             x16, %[counter]\n"                              \
-> +"      adrp            x17, 22b\n"                                     \
-> +"      add             x17, x17, :lo12:22b\n"                          \
-> +"      brk             %[brk_imm]\n"                                   \
-> +"      .popsection\n"
-> +
-> +#define REFCOUNT_INPUTS(r)                                             \
-> +       [counter] "r" (&(r)->counter), [brk_imm] "i" (REFCOUNT_BRK_IMM),
-> +
-> +#define REFCOUNT_CLOBBERS      : "cc", "x16", "x17"
-> +
->  #define __ARM64_IN_ATOMIC_IMPL
->
->  #if defined(CONFIG_ARM64_LSE_ATOMICS) && defined(CONFIG_AS_LSE)
-> diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-> index f5a2d09afb38..7b1cb901986c 100644
-> --- a/arch/arm64/include/asm/atomic_ll_sc.h
-> +++ b/arch/arm64/include/asm/atomic_ll_sc.h
-> @@ -327,4 +327,31 @@ __CMPXCHG_DBL(_mb, dmb ish, l, "memory")
->
->  #undef __CMPXCHG_DBL
->
-> +#define REFCOUNT_OP(op, asm_op, cond, clobber...)                      \
-> +__LL_SC_INLINE int                                                     \
-> +__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))                    \
-> +{                                                                      \
-> +       unsigned long tmp;                                              \
-> +       int result;                                                     \
-> +                                                                       \
-> +       asm volatile("// refcount_" #op "\n"                            \
-> +"      prfm            pstl1strm, %2\n"                                \
-> +"1:    ldxr            %w0, %2\n"                                      \
-> +"      " #asm_op "     %w0, %w0, %w[i]\n"                              \
-> +"      stxr            %w1, %w0, %2\n"                                 \
-> +"      cbnz            %w1, 1b\n"                                      \
-> +       REFCOUNT_CHECK(cond)                                            \
-> +       : "=&r" (result), "=&r" (tmp), "+Q" (r->counter)                \
-> +       : REFCOUNT_INPUTS(r) [i] "Ir" (i)                               \
-> +       clobber);                                                       \
-> +                                                                       \
-> +       return result;                                                  \
-> +}                                                                      \
-> +__LL_SC_EXPORT(__refcount_##op);
-> +
-> +REFCOUNT_OP(add_lt, adds, lt, REFCOUNT_CLOBBERS);
-> +REFCOUNT_OP(add_le, adds, le, REFCOUNT_CLOBBERS);
-> +REFCOUNT_OP(sub_lt, subs, lt, REFCOUNT_CLOBBERS);
-> +REFCOUNT_OP(sub_le, subs, le, REFCOUNT_CLOBBERS);
-> +
->  #endif /* __ASM_ATOMIC_LL_SC_H */
-> diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-> index 99fa69c9c3cf..f64bb51f1860 100644
-> --- a/arch/arm64/include/asm/atomic_lse.h
-> +++ b/arch/arm64/include/asm/atomic_lse.h
-> @@ -531,4 +531,55 @@ __CMPXCHG_DBL(_mb, al, "memory")
->  #undef __LL_SC_CMPXCHG_DBL
->  #undef __CMPXCHG_DBL
->
-> +#define REFCOUNT_ADD_OP(op, cond)                                      \
-> +static inline int __refcount_##op(int i, atomic_t *r)                  \
-> +{                                                                      \
-> +       register int w0 asm ("w0") = i;                                 \
-> +       register atomic_t *x1 asm ("x1") = r;                           \
-> +                                                                       \
-> +       asm volatile(ARM64_LSE_ATOMIC_INSN(                             \
-> +       /* LL/SC */                                                     \
-> +       __LL_SC_CALL(__refcount_##op)                                   \
-> +       __nops(1),                                                      \
-> +       /* LSE atomics */                                               \
-> +       "       ldadd   %w[i], w30, %[v]\n"                             \
-> +       "       adds    %w[i], %w[i], w30")                             \
-> +       REFCOUNT_CHECK(cond)                                            \
-> +       : [i] "+r" (w0), [v] "+Q" (r->counter)                          \
-> +       : REFCOUNT_INPUTS(r) "r" (x1)                                   \
-> +       : __LL_SC_CLOBBERS, "cc");                                      \
-> +                                                                       \
-> +       return w0;                                                      \
-> +}
-> +
-> +#define REFCOUNT_SUB_OP(op, cond, fbop)                                        \
-> +static inline int __refcount_##op(int i, atomic_t *r)                  \
-> +{                                                                      \
-> +       register int w0 asm ("w0") = i;                                 \
-> +       register atomic_t *x1 asm ("x1") = r;                           \
-> +                                                                       \
-> +       if (__builtin_constant_p(i))                                    \
-> +               return __refcount_##fbop(-i, r);                        \
-> +                                                                       \
-> +       asm volatile(ARM64_LSE_ATOMIC_INSN(                             \
-> +       /* LL/SC */                                                     \
-> +       __LL_SC_CALL(__refcount_##op)                                   \
-> +       __nops(2),                                                      \
-> +       /* LSE atomics */                                               \
-> +       "       neg     %w[i], %w[i]\n"                                 \
-> +       "       ldadd   %w[i], w30, %[v]\n"                             \
-> +       "       adds    %w[i], %w[i], w30")                             \
-> +       REFCOUNT_CHECK(cond)                                            \
-> +       : [i] "+r" (w0), [v] "+Q" (r->counter)                          \
-> +       : REFCOUNT_INPUTS(r) "r" (x1)                                   \
-> +       : __LL_SC_CLOBBERS, "cc");                                      \
-> +                                                                       \
-> +       return w0;                                                      \
-> +}
-> +
-> +REFCOUNT_ADD_OP(add_lt, lt);
-> +REFCOUNT_ADD_OP(add_le, le);
-> +REFCOUNT_SUB_OP(sub_lt, lt, add_lt);
-> +REFCOUNT_SUB_OP(sub_le, le, add_le);
-> +
->  #endif /* __ASM_ATOMIC_LSE_H */
-> diff --git a/arch/arm64/include/asm/brk-imm.h b/arch/arm64/include/asm/brk-imm.h
-> index ed693c5bcec0..0bce57737ff1 100644
-> --- a/arch/arm64/include/asm/brk-imm.h
-> +++ b/arch/arm64/include/asm/brk-imm.h
-> @@ -18,6 +18,7 @@
->   * 0x800: kernel-mode BUG() and WARN() traps
->   */
->  #define FAULT_BRK_IMM                  0x100
-> +#define REFCOUNT_BRK_IMM               0x101
->  #define KGDB_DYN_DBG_BRK_IMM           0x400
->  #define KGDB_COMPILED_DBG_BRK_IMM      0x401
->  #define BUG_BRK_IMM                    0x800
-> diff --git a/arch/arm64/include/asm/refcount.h b/arch/arm64/include/asm/refcount.h
-> new file mode 100644
-> index 000000000000..3d69537ff2e7
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/refcount.h
-> @@ -0,0 +1,88 @@
-> +/*
-> + * arm64-specific implementation of refcount_t. Based on x86 version and
-> + * PAX_REFCOUNT from PaX/grsecurity.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_REFCOUNT_H
-> +#define __ASM_REFCOUNT_H
-> +
-> +#include <linux/refcount.h>
-> +
-> +#include <asm/atomic.h>
-> +#include <asm/uaccess.h>
-> +
-> +static __always_inline void refcount_add(int i, refcount_t *r)
-> +{
-> +       __refcount_add_lt(i, &r->refs);
-> +}
-> +
-> +static __always_inline void refcount_inc(refcount_t *r)
-> +{
-> +       __refcount_add_lt(1, &r->refs);
-> +}
-> +
-> +static __always_inline void refcount_dec(refcount_t *r)
-> +{
-> +       __refcount_sub_le(1, &r->refs);
-> +}
-> +
-> +static __always_inline __must_check bool refcount_sub_and_test(unsigned int i,
-> +                                                              refcount_t *r)
-> +{
-> +       return __refcount_sub_lt(i, &r->refs) == 0;
-> +}
-> +
-> +static __always_inline __must_check bool refcount_dec_and_test(refcount_t *r)
-> +{
-> +       return __refcount_sub_lt(1, &r->refs) == 0;
-> +}
-> +
-> +/**
-> + * __refcount_add_unless - add unless the number is already a given value
-> + * @r: pointer of type refcount_t
-> + * @a: the amount to add to v...
-> + * @u: ...unless v is equal to u.
-> + *
-> + * Atomically adds @a to @r, so long as @r was not already @u.
-> + * Returns the old value of @r.
-> + */
-> +static __always_inline __must_check
-> +int __refcount_add_unless(refcount_t *r, int a, int u)
-> +{
-> +       int c, new;
-> +
-> +       c = atomic_read(&(r->refs));
-> +       do {
-> +               if (unlikely(c == u))
-> +                       break;
-> +
-> +               asm volatile(
-> +                       "adds   %0, %0, %2      ;"
-> +                       REFCOUNT_CHECK(lt)
-> +                       : "=r" (new)
-> +                       : "0" (c), "Ir" (a),
-> +                         [counter] "r" (&r->refs.counter),
-> +                         [brk_imm] "i" (REFCOUNT_BRK_IMM)
-> +                       : "cc", "x16", "x17");
-> +
-> +       } while (!atomic_try_cmpxchg(&(r->refs), &c, new));
-> +
-> +       return c;
-> +}
-> +
-> +static __always_inline __must_check
-> +bool refcount_add_not_zero(unsigned int i, refcount_t *r)
-> +{
-> +       return __refcount_add_unless(r, i, 0) != 0;
-> +}
-> +
-> +static __always_inline __must_check bool refcount_inc_not_zero(refcount_t *r)
-> +{
-> +       return refcount_add_not_zero(1, r);
-> +}
-> +
-> +#endif
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index c7c7088097be..6b5a3658d050 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -758,8 +758,43 @@ int __init early_brk64(unsigned long addr, unsigned int esr,
->         return bug_handler(regs, esr) != DBG_HOOK_HANDLED;
->  }
->
-> +static int refcount_overflow_handler(struct pt_regs *regs, unsigned int esr)
-> +{
-> +       /* First unconditionally saturate the refcount. */
-> +       *(int *)regs->regs[16] = INT_MIN / 2;
-> +
-> +       /*
-> +        * This function has been called because either a negative refcount
-> +        * value was seen by any of the refcount functions, or a zero
-> +        * refcount value was seen by refcount_dec().
-> +        *
-> +        * If we crossed from INT_MAX to INT_MIN, V (oVerflow: signed overflow)
-> +        * will be set. Additionally, seeing the refcount reach 0 will set Z
-> +        * (Zero: result was zero). In each of these cases we want a report,
-> +        * since it's a boundary condition.
-> +        */
-> +       if (regs->pstate & (PSR_Z_BIT | PSR_V_BIT)) {
-> +               bool zero = regs->pstate & PSR_Z_BIT;
-> +
-> +               /* point pc to the branch instruction that brought us here */
-> +               regs->pc = regs->regs[17];
-> +               refcount_error_report(regs, zero ? "hit zero" : "overflow");
-> +       }
-> +
-> +       /* advance pc and proceed */
-> +       regs->pc += 4;
-> +       return DBG_HOOK_HANDLED;
-> +}
-> +
-> +static struct break_hook refcount_break_hook = {
-> +       .esr_val        = 0xf2000000 | REFCOUNT_BRK_IMM,
-> +       .esr_mask       = 0xffffffff,
-> +       .fn             = refcount_overflow_handler,
-> +};
-> +
->  /* This registration must happen early, before debug_traps_init(). */
->  void __init trap_init(void)
->  {
->         register_break_hook(&bug_break_hook);
-> +       register_break_hook(&refcount_break_hook);
->  }
-> diff --git a/arch/arm64/lib/atomic_ll_sc.c b/arch/arm64/lib/atomic_ll_sc.c
-> index b0c538b0da28..5f038abdc635 100644
-> --- a/arch/arm64/lib/atomic_ll_sc.c
-> +++ b/arch/arm64/lib/atomic_ll_sc.c
-> @@ -1,3 +1,9 @@
->  #include <asm/atomic.h>
->  #define __ARM64_IN_ATOMIC_IMPL
-> +#undef REFCOUNT_CHECK
-> +#undef REFCOUNT_INPUTS
-> +#undef REFCOUNT_CLOBBERS
-> +#define REFCOUNT_CHECK(cond)
-> +#define REFCOUNT_INPUTS(r)
-> +#define REFCOUNT_CLOBBERS : "cc"
->  #include <asm/atomic_ll_sc.h>
-> --
-> 2.9.3
->
+We'll use it for A83T too, so the complexity will be reduced anyway.
+
+> >
+> >> +#define CPUCFG_CX_CTRL_REG0(c)               (0x10 * (c))
+> >> +#define CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE(n)        BIT(n)
+> >> +#define CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE_ALL       0xf
+> >> +#define CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A7        BIT(4)
+> >> +#define CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A15       BIT(0)
+> >> +#define CPUCFG_CX_CTRL_REG1(c)               (0x10 * (c) + 0x4)
+> >> +#define CPUCFG_CX_CTRL_REG1_ACINACTM BIT(0)
+> >> +#define CPUCFG_CX_RST_CTRL(c)                (0x80 + 0x4 * (c))
+> >> +#define CPUCFG_CX_RST_CTRL_DBG_SOC_RST       BIT(24)
+> >> +#define CPUCFG_CX_RST_CTRL_ETM_RST(n)        BIT(20 + (n))
+> >> +#define CPUCFG_CX_RST_CTRL_ETM_RST_ALL       (0xf << 20)
+> >> +#define CPUCFG_CX_RST_CTRL_DBG_RST(n)        BIT(16 + (n))
+> >> +#define CPUCFG_CX_RST_CTRL_DBG_RST_ALL       (0xf << 16)
+> >> +#define CPUCFG_CX_RST_CTRL_H_RST     BIT(12)
+> >> +#define CPUCFG_CX_RST_CTRL_L2_RST    BIT(8)
+> >> +#define CPUCFG_CX_RST_CTRL_CX_RST(n) BIT(4 + (n))
+> >> +#define CPUCFG_CX_RST_CTRL_CORE_RST(n)       BIT(n)
+> >> +
+> >> +#define PRCM_CPU_PO_RST_CTRL(c)              (0x4 + 0x4 * (c))
+> >> +#define PRCM_CPU_PO_RST_CTRL_CORE(n) BIT(n)
+> >> +#define PRCM_CPU_PO_RST_CTRL_CORE_ALL        0xf
+> >> +#define PRCM_PWROFF_GATING_REG(c)    (0x100 + 0x4 * (c))
+> >> +#define PRCM_PWROFF_GATING_REG_CLUSTER       BIT(4)
+> >> +#define PRCM_PWROFF_GATING_REG_CORE(n)       BIT(n)
+> >> +#define PRCM_PWR_SWITCH_REG(c, cpu)  (0x140 + 0x10 * (c) + 0x4 * (cpu))
+> >> +#define PRCM_CPU_SOFT_ENTRY_REG              0x164
+> >> +
+> >> +static void __iomem *cpucfg_base;
+> >> +static void __iomem *prcm_base;
+> >> +
+> >> +static int sunxi_cpu_power_switch_set(unsigned int cpu, unsigned int cluster,
+> >> +                                   bool enable)
+> >> +{
+> >> +     u32 reg;
+> >> +
+> >> +     /* control sequence from Allwinner A80 user manual v1.2 PRCM section */
+> >> +     reg = readl(prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+> >> +     if (enable) {
+> >> +             if (reg == 0x00) {
+> >> +                     pr_debug("power clamp for cluster %u cpu %u already open\n",
+> >> +                              cluster, cpu);
+> >> +                     return 0;
+> >> +             }
+> >> +
+> >> +             writel(0xff, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+> >> +             udelay(10);
+> >> +             writel(0xfe, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+> >> +             udelay(10);
+> >> +             writel(0xf8, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+> >> +             udelay(10);
+> >> +             writel(0xf0, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+> >> +             udelay(10);
+> >> +             writel(0x00, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+> >> +             udelay(10);
+> >> +     } else {
+> >> +             writel(0xff, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+> >> +             udelay(10);
+> >> +     }
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static int sunxi_cpu_powerup(unsigned int cpu, unsigned int cluster)
+> >> +{
+> >> +     u32 reg;
+> >> +
+> >> +     pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> >> +     if (cpu >= SUNXI_CPUS_PER_CLUSTER || cluster >= SUNXI_NR_CLUSTERS)
+> >> +             return -EINVAL;
+> >> +
+> >> +     /* assert processor power-on reset */
+> >> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+> >> +     reg &= ~PRCM_CPU_PO_RST_CTRL_CORE(cpu);
+> >> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+> >> +
+> >> +     /* Cortex-A7: hold L1 reset disable signal low */
+> >> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
+> >> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
+> >> +             reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
+> >> +             reg &= ~CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE(cpu);
+> >> +             writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
+> >> +     }
+> >> +
+> >> +     /* assert processor related resets */
+> >> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+> >> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_RST(cpu);
+> >> +
+> >> +     /*
+> >> +      * Allwinner code also asserts resets for NEON on A15. According
+> >> +      * to ARM manuals, asserting power-on reset is sufficient.
+> >> +      */
+> >> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
+> >> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
+> >> +             reg &= ~CPUCFG_CX_RST_CTRL_ETM_RST(cpu);
+> >> +     }
+> >> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+> >> +
+> >> +     /* open power switch */
+> >> +     sunxi_cpu_power_switch_set(cpu, cluster, true);
+> >> +
+> >> +     /* clear processor power gate */
+> >> +     reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+> >> +     reg &= ~PRCM_PWROFF_GATING_REG_CORE(cpu);
+> >> +     writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+> >> +     udelay(20);
+> >> +
+> >> +     /* de-assert processor power-on reset */
+> >> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+> >> +     reg |= PRCM_CPU_PO_RST_CTRL_CORE(cpu);
+> >> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+> >> +
+> >> +     /* de-assert all processor resets */
+> >> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+> >> +     reg |= CPUCFG_CX_RST_CTRL_DBG_RST(cpu);
+> >> +     reg |= CPUCFG_CX_RST_CTRL_CORE_RST(cpu);
+> >> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
+> >> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
+> >> +             reg |= CPUCFG_CX_RST_CTRL_ETM_RST(cpu);
+> >> +     } else {
+> >> +             reg |= CPUCFG_CX_RST_CTRL_CX_RST(cpu); /* NEON */
+> >> +     }
+> >> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static int sunxi_cluster_powerup(unsigned int cluster)
+> >> +{
+> >> +     u32 reg;
+> >> +
+> >> +     pr_debug("%s: cluster %u\n", __func__, cluster);
+> >> +     if (cluster >= SUNXI_NR_CLUSTERS)
+> >> +             return -EINVAL;
+> >> +
+> >> +     /* assert ACINACTM */
+> >> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+> >> +     reg |= CPUCFG_CX_CTRL_REG1_ACINACTM;
+> >> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+> >> +
+> >> +     /* assert cluster processor power-on resets */
+> >> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+> >> +     reg &= ~PRCM_CPU_PO_RST_CTRL_CORE_ALL;
+> >> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+> >> +
+> >> +     /* assert cluster resets */
+> >> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+> >> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_SOC_RST;
+> >> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_RST_ALL;
+> >> +     reg &= ~CPUCFG_CX_RST_CTRL_H_RST;
+> >> +     reg &= ~CPUCFG_CX_RST_CTRL_L2_RST;
+> >> +
+> >> +     /*
+> >> +      * Allwinner code also asserts resets for NEON on A15. According
+> >> +      * to ARM manuals, asserting power-on reset is sufficient.
+> >> +      */
+> >> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
+> >> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
+> >> +             reg &= ~CPUCFG_CX_RST_CTRL_ETM_RST_ALL;
+> >> +     }
+> >> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+> >> +
+> >> +     /* hold L1/L2 reset disable signals low */
+> >> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
+> >> +     if (of_machine_is_compatible("allwinner,sun9i-a80") &&
+> >> +                     cluster == SUN9I_A80_A15_CLUSTER) {
+> >> +             /* Cortex-A15: hold L2RSTDISABLE low */
+> >> +             reg &= ~CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A15;
+> >> +     } else {
+> >> +             /* Cortex-A7: hold L1RSTDISABLE and L2RSTDISABLE low */
+> >> +             reg &= ~CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE_ALL;
+> >> +             reg &= ~CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A7;
+> >> +     }
+> >> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
+> >> +
+> >> +     /* clear cluster power gate */
+> >> +     reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+> >> +     reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
+> >> +     writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+> >> +     udelay(20);
+> >> +
+> >> +     /* de-assert cluster resets */
+> >> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+> >> +     reg |= CPUCFG_CX_RST_CTRL_DBG_SOC_RST;
+> >> +     reg |= CPUCFG_CX_RST_CTRL_H_RST;
+> >> +     reg |= CPUCFG_CX_RST_CTRL_L2_RST;
+> >> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+> >> +
+> >> +     /* de-assert ACINACTM */
+> >> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+> >> +     reg &= ~CPUCFG_CX_CTRL_REG1_ACINACTM;
+> >> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static void sunxi_cpu_cache_disable(void)
+> >> +{
+> >> +     /* Disable and flush the local CPU cache. */
+> >> +     v7_exit_coherency_flush(louis);
+> >> +}
+> >> +
+> >> +/*
+> >> + * This bit is shared between the initial mcpm_sync_init call to enable
+> >> + * CCI-400 and proper cluster cache disable before power down.
+> >> + */
+> >> +static void sunxi_cluster_cache_disable_without_axi(void)
+> >> +{
+> >> +     if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
+> >> +             /*
+> >> +              * On the Cortex-A15 we need to disable
+> >> +              * L2 prefetching before flushing the cache.
+> >> +              */
+> >> +             asm volatile(
+> >> +             "mcr    p15, 1, %0, c15, c0, 3\n"
+> >> +             "isb\n"
+> >> +             "dsb"
+> >> +             : : "r" (0x400));
+> >> +     }
+> >> +
+> >> +     /* Flush all cache levels for this cluster. */
+> >> +     v7_exit_coherency_flush(all);
+> >> +
+> >> +     /*
+> >> +      * Disable cluster-level coherency by masking
+> >> +      * incoming snoops and DVM messages:
+> >> +      */
+> >> +     cci_disable_port_by_cpu(read_cpuid_mpidr());
+> >> +}
+> >> +
+> >> +static void sunxi_cluster_cache_disable(void)
+> >> +{
+> >> +     unsigned int cluster = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 1);
+> >> +     u32 reg;
+> >> +
+> >> +     pr_info("%s: cluster %u\n", __func__, cluster);
+> >> +
+> >> +     sunxi_cluster_cache_disable_without_axi();
+> >> +
+> >> +     /* last man standing, assert ACINACTM */
+> >> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+> >> +     reg |= CPUCFG_CX_CTRL_REG1_ACINACTM;
+> >> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+> >> +}
+> >> +
+> >> +static const struct mcpm_platform_ops sunxi_power_ops = {
+> >> +     .cpu_powerup            = sunxi_cpu_powerup,
+> >> +     .cluster_powerup        = sunxi_cluster_powerup,
+> >> +     .cpu_cache_disable      = sunxi_cpu_cache_disable,
+> >> +     .cluster_cache_disable  = sunxi_cluster_cache_disable,
+> >> +};
+> >> +
+> >> +/*
+> >> + * Enable cluster-level coherency, in preparation for turning on the MMU.
+> >> + *
+> >> + * Also enable regional clock gating and L2 data latency settings for
+> >> + * Cortex-A15.
+> >> + */
+> >> +static void __naked sunxi_power_up_setup(unsigned int affinity_level)
+> >> +{
+> >> +     asm volatile (
+> >> +             "mrc    p15, 0, r1, c0, c0, 0\n"
+> >> +             "movw   r2, #" __stringify(ARM_CPU_PART_MASK & 0xffff) "\n"
+> >> +             "movt   r2, #" __stringify(ARM_CPU_PART_MASK >> 16) "\n"
+> >> +             "and    r1, r1, r2\n"
+> >> +             "movw   r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 & 0xffff) "\n"
+> >> +             "movt   r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 >> 16) "\n"
+> >> +             "cmp    r1, r2\n"
+> >> +             "bne    not_a15\n"
+> >> +
+> >> +             /* The following is Cortex-A15 specific */
+> >> +
+> >> +             /* L2CTRL: Enable CPU regional clock gates */
+> >> +             "mrc p15, 1, r1, c15, c0, 4\n"
+> >> +             "orr r1, r1, #(0x1<<31)\n"
+> >> +             "mcr p15, 1, r1, c15, c0, 4\n"
+> >> +
+> >> +             /* L2ACTLR */
+> >> +             "mrc p15, 1, r1, c15, c0, 0\n"
+> >> +             /* Enable L2, GIC, and Timer regional clock gates */
+> >> +             "orr r1, r1, #(0x1<<26)\n"
+> >> +             /* Disable clean/evict from being pushed to external */
+> >> +             "orr r1, r1, #(0x1<<3)\n"
+> >> +             "mcr p15, 1, r1, c15, c0, 0\n"
+> >> +
+> >> +             /* L2 data RAM latency */
+> >> +             "mrc p15, 1, r1, c9, c0, 2\n"
+> >> +             "bic r1, r1, #(0x7<<0)\n"
+> >> +             "orr r1, r1, #(0x3<<0)\n"
+> >> +             "mcr p15, 1, r1, c9, c0, 2\n"
+> >> +
+> >> +             /* End of Cortex-A15 specific setup */
+> >> +             "not_a15:\n"
+> >> +
+> >> +             "cmp    r0, #1\n"
+> >> +             "bxne   lr\n"
+> >> +             "b      cci_enable_port_for_self"
+> >> +     );
+> >> +}
+> >> +
+> >> +static void sunxi_mcpm_setup_entry_point(void)
+> >> +{
+> >> +     __raw_writel(virt_to_phys(mcpm_entry_point),
+> >> +                  prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
+> >> +}
+> >> +
+> >> +static int __init sunxi_mcpm_init(void)
+> >> +{
+> >> +     struct device_node *node;
+> >> +     int ret;
+> >> +
+> >> +     if (!of_machine_is_compatible("allwinner,sun9i-a80"))
+> >> +             return -ENODEV;
+> >> +
+> >> +     if (!cci_probed())
+> >> +             return -ENODEV;
+> >> +
+> >> +     node = of_find_compatible_node(NULL, NULL,
+> >> +                     "allwinner,sun9i-a80-cpucfg");
+> >> +     if (!node)
+> >> +             return -ENODEV;
+> >> +
+> >> +     cpucfg_base = of_iomap(node, 0);
+> >> +     of_node_put(node);
+> >> +     if (!cpucfg_base) {
+> >> +             pr_err("%s: failed to map CPUCFG registers\n", __func__);
+> >> +             return -ENOMEM;
+> >> +     }
+> >
+> > Can't we request the region as well?
+> 
+> Yes we can! But only for the CPUCFG registers. The PRCM block is
+> shared with all the PRCM block clock drivers. :(
+
+Yeah, I know :/
+
+> >
+> >> +
+> >> +     node = of_find_compatible_node(NULL, NULL,
+> >> +                     "allwinner,sun9i-a80-prcm");
+> >> +     if (!node)
+> >> +             return -ENODEV;
+> >> +
+> >> +     prcm_base = of_iomap(node, 0);
+> >> +
+> >> +     of_node_put(node);
+> >> +     if (!prcm_base) {
+> >> +             pr_err("%s: failed to map PRCM registers\n", __func__);
+> >> +             iounmap(prcm_base);
+> >> +             return -ENOMEM;
+> >> +     }
+> >> +
+> >> +     ret = mcpm_platform_register(&sunxi_power_ops);
+> >> +     if (!ret)
+> >> +             ret = mcpm_sync_init(sunxi_power_up_setup);
+> >> +     if (!ret)
+> >> +             /* do not disable AXI master as no one will re-enable it */
+> >> +             ret = mcpm_loopback(sunxi_cluster_cache_disable_without_axi);
+> >> +     if (ret) {
+> >> +             iounmap(cpucfg_base);
+> >> +             iounmap(prcm_base);
+> >> +             return ret;
+> >> +     }
+> >> +
+> >> +     mcpm_smp_set_ops();
+> >> +
+> >> +     pr_info("sunxi MCPM support installed\n");
+> >> +
+> >> +     sunxi_mcpm_setup_entry_point();
+> >> +
+> >> +     return ret;
+> >> +}
+> >
+> > It looks mostly good, and I would replace the sunxi by sun9i, and call
+> > that file sun9i-mcpm.c
+> 
+> I was hoping to reuse the file for the A83T, so it was sunxi-mcpm.c
+> or just mcpm. Most of the stuff is similiar, except the A83T has two
+> revisions and one of them has two gate/power bits swapped. :(
+
+Hmmm, that's true.
+
+What about just mcpm then?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/37b95049/attachment-0001.sig>
