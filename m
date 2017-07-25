@@ -1,161 +1,408 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Tue, 25 Jul 2017 17:42:50 +0800
-Subject: [PATCH v2] clk: rockchip: rk3128: modify rk3128 clk driver to support
- rk3126
-Message-ID: <1500975770-25046-1-git-send-email-zhangqing@rock-chips.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Tue, 25 Jul 2017 15:08:29 +0530
+Subject: [PATCH 5/8] drm: Nuke drm_atomic_helper_plane_set_property
+In-Reply-To: <20170725080122.20548-6-daniel.vetter@ffwll.ch>
+References: <20170725080122.20548-1-daniel.vetter@ffwll.ch>
+ <20170725080122.20548-6-daniel.vetter@ffwll.ch>
+Message-ID: <a3114777-aa4d-7a65-27a8-892130cacf88@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rk3128 and rk3126 have some gate registers describe differences.
-So need to make some distinctions.
-The RK3126 and RK3128 Same clock description we move it to
-the common clock branches.
-And the different clks description use the own clock branches.
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- drivers/clk/rockchip/clk-rk3128.c | 69 +++++++++++++++++++++++++++++++--------
- 1 file changed, 55 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3128.c b/drivers/clk/rockchip/clk-rk3128.c
-index e243f2eae68f..62d7854e4b87 100644
---- a/drivers/clk/rockchip/clk-rk3128.c
-+++ b/drivers/clk/rockchip/clk-rk3128.c
-@@ -201,7 +201,7 @@ enum rk3128_plls {
- 	MUX(SCLK_UART2, "sclk_uart2", mux_uart2_p, CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(15), 8, 2, MFLAGS);
- 
--static struct rockchip_clk_branch rk3128_clk_branches[] __initdata = {
-+static struct rockchip_clk_branch common_clk_branches[] __initdata = {
- 	/*
- 	 * Clock-Architecture Diagram 1
- 	 */
-@@ -459,10 +459,6 @@ enum rk3128_plls {
- 			RK2928_CLKSEL_CON(2), 14, 2, MFLAGS, 8, 5, DFLAGS,
- 			RK2928_CLKGATE_CON(10), 15, GFLAGS),
- 
--	COMPOSITE(SCLK_SFC, "sclk_sfc", mux_sclk_sfc_src_p, 0,
--			RK2928_CLKSEL_CON(11), 14, 2, MFLAGS, 8, 5, DFLAGS,
--			RK2928_CLKGATE_CON(3), 15, GFLAGS),
--
- 	COMPOSITE_NOMUX(PCLK_PMU_PRE, "pclk_pmu_pre", "cpll", 0,
- 			RK2928_CLKSEL_CON(29), 8, 6, DFLAGS,
- 			RK2928_CLKGATE_CON(1), 0, GFLAGS),
-@@ -495,7 +491,6 @@ enum rk3128_plls {
- 	GATE(ACLK_DMAC, "aclk_dmac", "aclk_peri", 0, RK2928_CLKGATE_CON(5), 1, GFLAGS),
- 	GATE(0, "aclk_peri_niu", "aclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(9), 15, GFLAGS),
- 	GATE(0, "aclk_cpu_to_peri", "aclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 2, GFLAGS),
--	GATE(HCLK_GPS, "hclk_gps", "aclk_peri", 0, RK2928_CLKGATE_CON(3), 14, GFLAGS),
- 
- 	GATE(HCLK_I2S_8CH, "hclk_i2s_8ch", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 4, GFLAGS),
- 	GATE(0, "hclk_peri_matrix", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 0, GFLAGS),
-@@ -541,7 +536,6 @@ enum rk3128_plls {
- 	GATE(0, "hclk_rom", "hclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(5), 6, GFLAGS),
- 	GATE(HCLK_CRYPTO, "hclk_crypto", "hclk_cpu", 0, RK2928_CLKGATE_CON(3), 5, GFLAGS),
- 
--	GATE(PCLK_HDMI, "pclk_hdmi", "pclk_cpu", 0, RK2928_CLKGATE_CON(3), 8, GFLAGS),
- 	GATE(PCLK_ACODEC, "pclk_acodec", "pclk_cpu", 0, RK2928_CLKGATE_CON(5), 14, GFLAGS),
- 	GATE(0, "pclk_ddrupctl", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(5), 7, GFLAGS),
- 	GATE(0, "pclk_grf", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(5), 4, GFLAGS),
-@@ -561,6 +555,21 @@ enum rk3128_plls {
- 	MMC(SCLK_EMMC_SAMPLE,  "emmc_sample",  "sclk_emmc",  RK3228_EMMC_CON1,  0),
- };
- 
-+static struct rockchip_clk_branch rk3126_clk_branches[] __initdata = {
-+	GATE(0, "pclk_stimer", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 15, GFLAGS),
-+	GATE(0, "pclk_s_efuse", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 14, GFLAGS),
-+	GATE(0, "pclk_sgrf", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 8, GFLAGS),
-+};
-+
-+static struct rockchip_clk_branch rk3128_clk_branches[] __initdata = {
-+	COMPOSITE(SCLK_SFC, "sclk_sfc", mux_sclk_sfc_src_p, 0,
-+			RK2928_CLKSEL_CON(11), 14, 2, MFLAGS, 8, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(3), 15, GFLAGS),
-+
-+	GATE(HCLK_GPS, "hclk_gps", "aclk_peri", 0, RK2928_CLKGATE_CON(3), 14, GFLAGS),
-+	GATE(PCLK_HDMI, "pclk_hdmi", "pclk_cpu", 0, RK2928_CLKGATE_CON(3), 8, GFLAGS),
-+};
-+
- static const char *const rk3128_critical_clocks[] __initconst = {
- 	"aclk_cpu",
- 	"hclk_cpu",
-@@ -570,7 +579,7 @@ enum rk3128_plls {
- 	"pclk_peri",
- };
- 
--static void __init rk3128_clk_init(struct device_node *np)
-+static struct rockchip_clk_provider *__init rk3128_common_clk_init(struct device_node *np)
- {
- 	struct rockchip_clk_provider *ctx;
- 	void __iomem *reg_base;
-@@ -578,23 +587,21 @@ static void __init rk3128_clk_init(struct device_node *np)
- 	reg_base = of_iomap(np, 0);
- 	if (!reg_base) {
- 		pr_err("%s: could not map cru region\n", __func__);
--		return;
-+		return ERR_PTR(-ENOMEM);
- 	}
- 
- 	ctx = rockchip_clk_init(np, reg_base, CLK_NR_CLKS);
- 	if (IS_ERR(ctx)) {
- 		pr_err("%s: rockchip clk init failed\n", __func__);
- 		iounmap(reg_base);
--		return;
-+		return ERR_PTR(-ENOMEM);
- 	}
- 
- 	rockchip_clk_register_plls(ctx, rk3128_pll_clks,
- 				   ARRAY_SIZE(rk3128_pll_clks),
- 				   RK3128_GRF_SOC_STATUS0);
--	rockchip_clk_register_branches(ctx, rk3128_clk_branches,
--				  ARRAY_SIZE(rk3128_clk_branches));
--	rockchip_clk_protect_critical(rk3128_critical_clocks,
--				      ARRAY_SIZE(rk3128_critical_clocks));
-+	rockchip_clk_register_branches(ctx, common_clk_branches,
-+				  ARRAY_SIZE(common_clk_branches));
- 
- 	rockchip_clk_register_armclk(ctx, ARMCLK, "armclk",
- 			mux_armclk_p, ARRAY_SIZE(mux_armclk_p),
-@@ -606,6 +613,40 @@ static void __init rk3128_clk_init(struct device_node *np)
- 
- 	rockchip_register_restart_notifier(ctx, RK2928_GLB_SRST_FST, NULL);
- 
-+	return ctx;
-+}
-+
-+static void __init rk3126_clk_init(struct device_node *np)
-+{
-+	struct rockchip_clk_provider *ctx;
-+
-+	ctx = rk3128_common_clk_init(np);
-+	if (IS_ERR(ctx))
-+		return;
-+
-+	rockchip_clk_register_branches(ctx, rk3126_clk_branches,
-+				       ARRAY_SIZE(rk3126_clk_branches));
-+	rockchip_clk_protect_critical(rk3128_critical_clocks,
-+				      ARRAY_SIZE(rk3128_critical_clocks));
-+
-+	rockchip_clk_of_add_provider(np, ctx);
-+}
-+
-+CLK_OF_DECLARE(rk3126_cru, "rockchip,rk3126-cru", rk3126_clk_init);
-+
-+static void __init rk3128_clk_init(struct device_node *np)
-+{
-+	struct rockchip_clk_provider *ctx;
-+
-+	ctx = rk3128_common_clk_init(np);
-+	if (IS_ERR(ctx))
-+		return;
-+
-+	rockchip_clk_register_branches(ctx, rk3128_clk_branches,
-+				       ARRAY_SIZE(rk3128_clk_branches));
-+	rockchip_clk_protect_critical(rk3128_critical_clocks,
-+				      ARRAY_SIZE(rk3128_critical_clocks));
-+
- 	rockchip_clk_of_add_provider(np, ctx);
- }
- 
+On 07/25/2017 01:31 PM, Daniel Vetter wrote:
+> It's dead code, the core handles all this directly now. This also
+> allows us to unexport drm_atomic_helper_plane_set_property.
+> 
+
+Reviewed-by: Archit Taneja <architt@codeaurora.org>
+
+> Signed-off-by: Daniel Vetter <daniel.vetter@intel.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Brian Starkey <brian.starkey@arm.com>
+> Cc: Mali DP Maintainers <malidp@foss.arm.com>
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Daniel Vetter <daniel.vetter@intel.com>
+> Cc: Jani Nikula <jani.nikula@linux.intel.com>
+> Cc: Sean Paul <seanpaul@chromium.org>
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: Inki Dae <inki.dae@samsung.com>
+> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+> Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Ben Skeggs <bskeggs@redhat.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> Cc: Vincent Abriou <vincent.abriou@st.com>
+> Cc: Yannick Fertre <yannick.fertre@st.com>
+> Cc: Philippe Cornu <philippe.cornu@st.com>
+> Cc: Jyri Sarha <jsarha@ti.com>
+> Cc: "Ville Syrj?l?" <ville.syrjala@linux.intel.com>
+> Cc: Rongrong Zou <zourongrong@gmail.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Alexey Brodkin <abrodkin@synopsys.com>
+> Cc: Eric Engestrom <eric@engestrom.ch>
+> Cc: Chris Wilson <chris@chris-wilson.co.uk>
+> Cc: Rob Clark <robdclark@gmail.com>
+> Cc: Archit Taneja <architt@codeaurora.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: intel-gfx at lists.freedesktop.org
+> Cc: nouveau at lists.freedesktop.org
+> Cc: linux-renesas-soc at vger.kernel.org
+> Cc: Thomas Hellstrom <thellstrom@vmware.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   drivers/gpu/drm/arm/malidp_planes.c             |  1 -
+>   drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c |  1 -
+>   drivers/gpu/drm/drm_atomic.c                    |  3 +-
+>   drivers/gpu/drm/drm_atomic_helper.c             | 55 -------------------------
+>   drivers/gpu/drm/exynos/exynos_drm_plane.c       |  1 -
+>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c  |  1 -
+>   drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c |  1 -
+>   drivers/gpu/drm/i915/intel_display.c            |  2 -
+>   drivers/gpu/drm/msm/mdp/mdp5/mdp5_plane.c       |  2 -
+>   drivers/gpu/drm/nouveau/nv50_display.c          |  1 -
+>   drivers/gpu/drm/omapdrm/omap_plane.c            |  1 -
+>   drivers/gpu/drm/rcar-du/rcar_du_plane.c         |  1 -
+>   drivers/gpu/drm/rcar-du/rcar_du_vsp.c           |  1 -
+>   drivers/gpu/drm/sti/sti_cursor.c                |  1 -
+>   drivers/gpu/drm/sti/sti_gdp.c                   |  1 -
+>   drivers/gpu/drm/sti/sti_hqvdp.c                 |  1 -
+>   drivers/gpu/drm/stm/ltdc.c                      |  1 -
+>   drivers/gpu/drm/tilcdc/tilcdc_plane.c           |  1 -
+>   include/drm/drm_atomic.h                        |  3 --
+>   include/drm/drm_atomic_helper.h                 |  3 --
+>   20 files changed, 1 insertion(+), 81 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/arm/malidp_planes.c b/drivers/gpu/drm/arm/malidp_planes.c
+> index 600fa7bd7f52..0f0f8234fe21 100644
+> --- a/drivers/gpu/drm/arm/malidp_planes.c
+> +++ b/drivers/gpu/drm/arm/malidp_planes.c
+> @@ -128,7 +128,6 @@ static void malidp_plane_atomic_print_state(struct drm_printer *p,
+>   static const struct drm_plane_funcs malidp_de_plane_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.destroy = malidp_de_plane_destroy,
+>   	.reset = malidp_plane_reset,
+>   	.atomic_duplicate_state = malidp_duplicate_plane_state,
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> index b5bd9b005225..9cd9e23e75c6 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> @@ -1052,7 +1052,6 @@ static void atmel_hlcdc_plane_atomic_destroy_state(struct drm_plane *p,
+>   static struct drm_plane_funcs layer_plane_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.destroy = atmel_hlcdc_plane_destroy,
+>   	.reset = atmel_hlcdc_plane_reset,
+>   	.atomic_duplicate_state = atmel_hlcdc_plane_atomic_duplicate_state,
+> diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
+> index 0fd14aff7add..395438a7a576 100644
+> --- a/drivers/gpu/drm/drm_atomic.c
+> +++ b/drivers/gpu/drm/drm_atomic.c
+> @@ -713,7 +713,7 @@ EXPORT_SYMBOL(drm_atomic_get_plane_state);
+>    * RETURNS:
+>    * Zero on success, error code on failure
+>    */
+> -int drm_atomic_plane_set_property(struct drm_plane *plane,
+> +static int drm_atomic_plane_set_property(struct drm_plane *plane,
+>   		struct drm_plane_state *state, struct drm_property *property,
+>   		uint64_t val)
+>   {
+> @@ -770,7 +770,6 @@ int drm_atomic_plane_set_property(struct drm_plane *plane,
+>   
+>   	return 0;
+>   }
+> -EXPORT_SYMBOL(drm_atomic_plane_set_property);
+>   
+>   /**
+>    * drm_atomic_plane_get_property - get property value from plane state
+> diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+> index 22245aa8b1aa..0482e39a7889 100644
+> --- a/drivers/gpu/drm/drm_atomic_helper.c
+> +++ b/drivers/gpu/drm/drm_atomic_helper.c
+> @@ -2968,61 +2968,6 @@ int drm_atomic_helper_resume(struct drm_device *dev,
+>   EXPORT_SYMBOL(drm_atomic_helper_resume);
+>   
+>   /**
+> - * drm_atomic_helper_plane_set_property - helper for plane properties
+> - * @plane: DRM plane
+> - * @property: DRM property
+> - * @val: value of property
+> - *
+> - * Provides a default plane set_property handler using the atomic driver
+> - * interface.
+> - *
+> - * RETURNS:
+> - * Zero on success, error code on failure
+> - */
+> -int
+> -drm_atomic_helper_plane_set_property(struct drm_plane *plane,
+> -				    struct drm_property *property,
+> -				    uint64_t val)
+> -{
+> -	struct drm_atomic_state *state;
+> -	struct drm_plane_state *plane_state;
+> -	int ret = 0;
+> -
+> -	state = drm_atomic_state_alloc(plane->dev);
+> -	if (!state)
+> -		return -ENOMEM;
+> -
+> -	/* ->set_property is always called with all locks held. */
+> -	state->acquire_ctx = plane->dev->mode_config.acquire_ctx;
+> -retry:
+> -	plane_state = drm_atomic_get_plane_state(state, plane);
+> -	if (IS_ERR(plane_state)) {
+> -		ret = PTR_ERR(plane_state);
+> -		goto fail;
+> -	}
+> -
+> -	ret = drm_atomic_plane_set_property(plane, plane_state,
+> -			property, val);
+> -	if (ret)
+> -		goto fail;
+> -
+> -	ret = drm_atomic_commit(state);
+> -fail:
+> -	if (ret == -EDEADLK)
+> -		goto backoff;
+> -
+> -	drm_atomic_state_put(state);
+> -	return ret;
+> -
+> -backoff:
+> -	drm_atomic_state_clear(state);
+> -	drm_atomic_legacy_backoff(state);
+> -
+> -	goto retry;
+> -}
+> -EXPORT_SYMBOL(drm_atomic_helper_plane_set_property);
+> -
+> -/**
+>    * drm_atomic_helper_connector_set_property - helper for connector properties
+>    * @connector: DRM connector
+>    * @property: DRM property
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+> index 611b6fd65433..5e686ee74900 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+> @@ -173,7 +173,6 @@ static struct drm_plane_funcs exynos_plane_funcs = {
+>   	.update_plane	= drm_atomic_helper_update_plane,
+>   	.disable_plane	= drm_atomic_helper_disable_plane,
+>   	.destroy	= drm_plane_cleanup,
+> -	.set_property	= drm_atomic_helper_plane_set_property,
+>   	.reset		= exynos_drm_plane_reset,
+>   	.atomic_duplicate_state = exynos_drm_plane_duplicate_state,
+>   	.atomic_destroy_state = exynos_drm_plane_destroy_state,
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+> index 54a4542a40f1..0bbd3c3480ee 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+> @@ -150,7 +150,6 @@ static const u32 channel_formats1[] = {
+>   static struct drm_plane_funcs hibmc_plane_funcs = {
+>   	.update_plane	= drm_atomic_helper_update_plane,
+>   	.disable_plane	= drm_atomic_helper_disable_plane,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.destroy = drm_plane_cleanup,
+>   	.reset = drm_atomic_helper_plane_reset,
+>   	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+> diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+> index 961551135a39..8df42fddd8f7 100644
+> --- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+> +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+> @@ -889,7 +889,6 @@ static const struct drm_plane_helper_funcs ade_plane_helper_funcs = {
+>   static struct drm_plane_funcs ade_plane_funcs = {
+>   	.update_plane	= drm_atomic_helper_update_plane,
+>   	.disable_plane	= drm_atomic_helper_disable_plane,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.destroy = drm_plane_cleanup,
+>   	.reset = drm_atomic_helper_plane_reset,
+>   	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+> diff --git a/drivers/gpu/drm/i915/intel_display.c b/drivers/gpu/drm/i915/intel_display.c
+> index b4d0c5298a53..e908982f6864 100644
+> --- a/drivers/gpu/drm/i915/intel_display.c
+> +++ b/drivers/gpu/drm/i915/intel_display.c
+> @@ -12649,7 +12649,6 @@ const struct drm_plane_funcs intel_plane_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.destroy = intel_plane_destroy,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.atomic_get_property = intel_plane_atomic_get_property,
+>   	.atomic_set_property = intel_plane_atomic_set_property,
+>   	.atomic_duplicate_state = intel_plane_duplicate_state,
+> @@ -12784,7 +12783,6 @@ static const struct drm_plane_funcs intel_cursor_plane_funcs = {
+>   	.update_plane = intel_legacy_cursor_update,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.destroy = intel_plane_destroy,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.atomic_get_property = intel_plane_atomic_get_property,
+>   	.atomic_set_property = intel_plane_atomic_set_property,
+>   	.atomic_duplicate_state = intel_plane_duplicate_state,
+> diff --git a/drivers/gpu/drm/msm/mdp/mdp5/mdp5_plane.c b/drivers/gpu/drm/msm/mdp/mdp5/mdp5_plane.c
+> index fe3a4de1a433..a60750b66b47 100644
+> --- a/drivers/gpu/drm/msm/mdp/mdp5/mdp5_plane.c
+> +++ b/drivers/gpu/drm/msm/mdp/mdp5/mdp5_plane.c
+> @@ -246,7 +246,6 @@ static const struct drm_plane_funcs mdp5_plane_funcs = {
+>   		.update_plane = drm_atomic_helper_update_plane,
+>   		.disable_plane = drm_atomic_helper_disable_plane,
+>   		.destroy = mdp5_plane_destroy,
+> -		.set_property = drm_atomic_helper_plane_set_property,
+>   		.atomic_set_property = mdp5_plane_atomic_set_property,
+>   		.atomic_get_property = mdp5_plane_atomic_get_property,
+>   		.reset = mdp5_plane_reset,
+> @@ -259,7 +258,6 @@ static const struct drm_plane_funcs mdp5_cursor_plane_funcs = {
+>   		.update_plane = mdp5_update_cursor_plane_legacy,
+>   		.disable_plane = drm_atomic_helper_disable_plane,
+>   		.destroy = mdp5_plane_destroy,
+> -		.set_property = drm_atomic_helper_plane_set_property,
+>   		.atomic_set_property = mdp5_plane_atomic_set_property,
+>   		.atomic_get_property = mdp5_plane_atomic_get_property,
+>   		.reset = mdp5_plane_reset,
+> diff --git a/drivers/gpu/drm/nouveau/nv50_display.c b/drivers/gpu/drm/nouveau/nv50_display.c
+> index aa6fc525c539..e2029f05bf7b 100644
+> --- a/drivers/gpu/drm/nouveau/nv50_display.c
+> +++ b/drivers/gpu/drm/nouveau/nv50_display.c
+> @@ -1055,7 +1055,6 @@ nv50_wndw = {
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.destroy = nv50_wndw_destroy,
+>   	.reset = nv50_wndw_reset,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.atomic_duplicate_state = nv50_wndw_atomic_duplicate_state,
+>   	.atomic_destroy_state = nv50_wndw_atomic_destroy_state,
+>   };
+> diff --git a/drivers/gpu/drm/omapdrm/omap_plane.c b/drivers/gpu/drm/omapdrm/omap_plane.c
+> index 2160f64548e0..c29b66a36907 100644
+> --- a/drivers/gpu/drm/omapdrm/omap_plane.c
+> +++ b/drivers/gpu/drm/omapdrm/omap_plane.c
+> @@ -235,7 +235,6 @@ static const struct drm_plane_funcs omap_plane_funcs = {
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.reset = omap_plane_reset,
+>   	.destroy = omap_plane_destroy,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+>   	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+>   	.atomic_set_property = omap_plane_atomic_set_property,
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.c b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+> index dcde6288da6c..985ce332eb0a 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+> @@ -698,7 +698,6 @@ static const struct drm_plane_funcs rcar_du_plane_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.reset = rcar_du_plane_reset,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.destroy = drm_plane_cleanup,
+>   	.atomic_duplicate_state = rcar_du_plane_atomic_duplicate_state,
+>   	.atomic_destroy_state = rcar_du_plane_atomic_destroy_state,
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+> index f870445ebc8d..caa82f2f2567 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+> @@ -383,7 +383,6 @@ static const struct drm_plane_funcs rcar_du_vsp_plane_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.reset = rcar_du_vsp_plane_reset,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.destroy = drm_plane_cleanup,
+>   	.atomic_duplicate_state = rcar_du_vsp_plane_atomic_duplicate_state,
+>   	.atomic_destroy_state = rcar_du_vsp_plane_atomic_destroy_state,
+> diff --git a/drivers/gpu/drm/sti/sti_cursor.c b/drivers/gpu/drm/sti/sti_cursor.c
+> index 5b3a41f74f21..9baa5e62a8e5 100644
+> --- a/drivers/gpu/drm/sti/sti_cursor.c
+> +++ b/drivers/gpu/drm/sti/sti_cursor.c
+> @@ -348,7 +348,6 @@ static const struct drm_plane_funcs sti_cursor_plane_helpers_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.destroy = sti_cursor_destroy,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.reset = sti_plane_reset,
+>   	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+>   	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+> diff --git a/drivers/gpu/drm/sti/sti_gdp.c b/drivers/gpu/drm/sti/sti_gdp.c
+> index 5ee0503945c8..66c5224011d2 100644
+> --- a/drivers/gpu/drm/sti/sti_gdp.c
+> +++ b/drivers/gpu/drm/sti/sti_gdp.c
+> @@ -895,7 +895,6 @@ static const struct drm_plane_funcs sti_gdp_plane_helpers_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.destroy = sti_gdp_destroy,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.reset = sti_plane_reset,
+>   	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+>   	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+> diff --git a/drivers/gpu/drm/sti/sti_hqvdp.c b/drivers/gpu/drm/sti/sti_hqvdp.c
+> index 53a46dda8bd5..bec3ccfec3b5 100644
+> --- a/drivers/gpu/drm/sti/sti_hqvdp.c
+> +++ b/drivers/gpu/drm/sti/sti_hqvdp.c
+> @@ -1276,7 +1276,6 @@ static const struct drm_plane_funcs sti_hqvdp_plane_helpers_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.destroy = sti_hqvdp_destroy,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.reset = sti_plane_reset,
+>   	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+>   	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+> diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
+> index 04cc66d6b96f..76820bcbfed0 100644
+> --- a/drivers/gpu/drm/stm/ltdc.c
+> +++ b/drivers/gpu/drm/stm/ltdc.c
+> @@ -697,7 +697,6 @@ static const struct drm_plane_funcs ltdc_plane_funcs = {
+>   	.update_plane = drm_atomic_helper_update_plane,
+>   	.disable_plane = drm_atomic_helper_disable_plane,
+>   	.destroy = drm_plane_cleanup,
+> -	.set_property = drm_atomic_helper_plane_set_property,
+>   	.reset = drm_atomic_helper_plane_reset,
+>   	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+>   	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_plane.c b/drivers/gpu/drm/tilcdc/tilcdc_plane.c
+> index ba0d66c0d8ac..7667b038ae7f 100644
+> --- a/drivers/gpu/drm/tilcdc/tilcdc_plane.c
+> +++ b/drivers/gpu/drm/tilcdc/tilcdc_plane.c
+> @@ -28,7 +28,6 @@ static struct drm_plane_funcs tilcdc_plane_funcs = {
+>   	.update_plane	= drm_atomic_helper_update_plane,
+>   	.disable_plane	= drm_atomic_helper_disable_plane,
+>   	.destroy	= drm_plane_cleanup,
+> -	.set_property	= drm_atomic_helper_plane_set_property,
+>   	.reset		= drm_atomic_helper_plane_reset,
+>   	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+>   	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+> diff --git a/include/drm/drm_atomic.h b/include/drm/drm_atomic.h
+> index 7cd0f303f5a3..1f6a2c768e4b 100644
+> --- a/include/drm/drm_atomic.h
+> +++ b/include/drm/drm_atomic.h
+> @@ -315,9 +315,6 @@ int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
+>   struct drm_plane_state * __must_check
+>   drm_atomic_get_plane_state(struct drm_atomic_state *state,
+>   			   struct drm_plane *plane);
+> -int drm_atomic_plane_set_property(struct drm_plane *plane,
+> -		struct drm_plane_state *state, struct drm_property *property,
+> -		uint64_t val);
+>   struct drm_connector_state * __must_check
+>   drm_atomic_get_connector_state(struct drm_atomic_state *state,
+>   			       struct drm_connector *connector);
+> diff --git a/include/drm/drm_atomic_helper.h b/include/drm/drm_atomic_helper.h
+> index e5c835d94540..a62aeb816dd8 100644
+> --- a/include/drm/drm_atomic_helper.h
+> +++ b/include/drm/drm_atomic_helper.h
+> @@ -124,9 +124,6 @@ int drm_atomic_helper_commit_duplicated_state(struct drm_atomic_state *state,
+>   int drm_atomic_helper_resume(struct drm_device *dev,
+>   			     struct drm_atomic_state *state);
+>   
+> -int drm_atomic_helper_plane_set_property(struct drm_plane *plane,
+> -					struct drm_property *property,
+> -					uint64_t val);
+>   int drm_atomic_helper_connector_set_property(struct drm_connector *connector,
+>   					struct drm_property *property,
+>   					uint64_t val);
+> 
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
