@@ -1,93 +1,139 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Jul 2017 11:55:40 +0100
-Subject: [PATCH 3/6] arm64: Expose DC CVAP to userspace
+Date: Tue, 25 Jul 2017 11:55:39 +0100
+Subject: [PATCH 2/6] arm64: Convert __inval_cache_range() to area-based
 In-Reply-To: <cover.1500397441.git.robin.murphy@arm.com>
 References: <cover.1500397441.git.robin.murphy@arm.com>
-Message-ID: <7e93a60998fab0000cefd2ab25da254b119be080.1500397441.git.robin.murphy@arm.com>
+Message-ID: <d8ee26edfc114ba4d93b042a22b159ba90936b6c.1500397441.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8.2-DCPoP feature introduces persistent memory support to the
-architecture, by defining a point of persistence in the memory
-hierarchy, and a corresponding cache maintenance operation, DC CVAP.
-Expose the support via HWCAP and MRS emulation.
+__inval_cache_range() is already the odd one out among our data cache
+maintenance routines as the only remaining range-based one; as we're
+going to want an invalidation routine to call from C code for the pmem
+API, let's tweak the prototype and name to bring it in line with the
+clean operations, and to make its relationship with __dma_inv_area()
+neatly mirror that of __clean_dcache_area_poc() and __dma_clean_area().
+The loop clearing the early page tables gets mildly massaged in the
+process for the sake of consistency.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- Documentation/arm64/cpu-feature-registers.txt | 2 ++
- arch/arm64/include/asm/sysreg.h               | 1 +
- arch/arm64/include/uapi/asm/hwcap.h           | 1 +
- arch/arm64/kernel/cpufeature.c                | 2 ++
- arch/arm64/kernel/cpuinfo.c                   | 1 +
- 5 files changed, 7 insertions(+)
+ arch/arm64/include/asm/cacheflush.h |  1 +
+ arch/arm64/kernel/head.S            | 18 +++++++++---------
+ arch/arm64/mm/cache.S               | 23 ++++++++++++++---------
+ 3 files changed, 24 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-index d1c97f9f51cc..dad411d635d8 100644
---- a/Documentation/arm64/cpu-feature-registers.txt
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -179,6 +179,8 @@ infrastructure:
-      | FCMA                         | [19-16] |    y    |
-      |--------------------------------------------------|
-      | JSCVT                        | [15-12] |    y    |
-+     |--------------------------------------------------|
-+     | DPB                          | [3-0]   |    y    |
-      x--------------------------------------------------x
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index 4d4f650c290e..b4b43a94dffd 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -67,6 +67,7 @@
+  */
+ extern void flush_icache_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
++extern void __inval_dcache_area(void *addr, size_t len);
+ extern void __clean_dcache_area_poc(void *addr, size_t len);
+ extern void __clean_dcache_area_pou(void *addr, size_t len);
+ extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 973df7de7bf8..73a0531e0187 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -143,8 +143,8 @@ preserve_boot_args:
+ 	dmb	sy				// needed before dc ivac with
+ 						// MMU off
  
- Appendix I: Example
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 16e44fa9b3b6..1974731baa91 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -329,6 +329,7 @@
- #define ID_AA64ISAR1_LRCPC_SHIFT	20
- #define ID_AA64ISAR1_FCMA_SHIFT		16
- #define ID_AA64ISAR1_JSCVT_SHIFT	12
-+#define ID_AA64ISAR1_DPB_SHIFT		0
+-	add	x1, x0, #0x20			// 4 x 8 bytes
+-	b	__inval_cache_range		// tail call
++	mov	x1, #0x20			// 4 x 8 bytes
++	b	__inval_dcache_area		// tail call
+ ENDPROC(preserve_boot_args)
  
- /* id_aa64pfr0 */
- #define ID_AA64PFR0_GIC_SHIFT		24
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index 4e187ce2a811..4b9344cba83a 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -35,5 +35,6 @@
- #define HWCAP_JSCVT		(1 << 13)
- #define HWCAP_FCMA		(1 << 14)
- #define HWCAP_LRCPC		(1 << 15)
-+#define HWCAP_DCPOP		(1 << 16)
+ /*
+@@ -221,20 +221,20 @@ __create_page_tables:
+ 	 * dirty cache lines being evicted.
+ 	 */
+ 	adrp	x0, idmap_pg_dir
+-	adrp	x1, swapper_pg_dir + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
+-	bl	__inval_cache_range
++	ldr	x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	bl	__inval_dcache_area
  
- #endif /* _UAPI__ASM_HWCAP_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9f9e0064c8c1..a2542ef3ff25 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -120,6 +120,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_LRCPC_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_DPB_SHIFT, 4, 0),
- 	ARM64_FTR_END,
- };
+ 	/*
+ 	 * Clear the idmap and swapper page tables.
+ 	 */
+ 	adrp	x0, idmap_pg_dir
+-	adrp	x6, swapper_pg_dir + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
++	ldr	x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
+ 1:	stp	xzr, xzr, [x0], #16
+ 	stp	xzr, xzr, [x0], #16
+ 	stp	xzr, xzr, [x0], #16
+ 	stp	xzr, xzr, [x0], #16
+-	cmp	x0, x6
+-	b.lo	1b
++	subs	x1, x1, #64
++	b.ne	1b
  
-@@ -916,6 +917,7 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_ASIMDHP),
-+	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_DPB_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_DCPOP),
- 	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_JSCVT_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_JSCVT),
- 	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_FCMA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_FCMA),
- 	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_LRCPC_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_LRCPC),
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index f495ee5049fd..311885962830 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -68,6 +68,7 @@ static const char *const hwcap_str[] = {
- 	"jscvt",
- 	"fcma",
- 	"lrcpc",
-+	"dcpop",
- 	NULL
- };
+ 	mov	x7, SWAPPER_MM_MMUFLAGS
  
+@@ -307,9 +307,9 @@ __create_page_tables:
+ 	 * tables again to remove any speculatively loaded cache lines.
+ 	 */
+ 	adrp	x0, idmap_pg_dir
+-	adrp	x1, swapper_pg_dir + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
++	ldr	x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
+ 	dmb	sy
+-	bl	__inval_cache_range
++	bl	__inval_dcache_area
+ 
+ 	ret	x28
+ ENDPROC(__create_page_tables)
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 83c27b6e6dca..ed47fbbb4b05 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -109,20 +109,25 @@ ENTRY(__clean_dcache_area_pou)
+ ENDPROC(__clean_dcache_area_pou)
+ 
+ /*
++ *	__inval_dcache_area(kaddr, size)
++ *
++ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
++ * 	are invalidated. Any partial lines at the ends of the interval are
++ *	also cleaned to PoC to prevent data loss.
++ *
++ *	- kaddr   - kernel address
++ *	- size    - size in question
++ */
++ENTRY(__inval_dcache_area)
++	/* FALLTHROUGH */
++
++/*
+  *	__dma_inv_area(start, size)
+  *	- start   - virtual start address of region
+  *	- size    - size in question
+  */
+ __dma_inv_area:
+ 	add	x1, x1, x0
+-	/* FALLTHROUGH */
+-
+-/*
+- *	__inval_cache_range(start, end)
+- *	- start   - start address of region
+- *	- end     - end address of region
+- */
+-ENTRY(__inval_cache_range)
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	tst	x1, x3				// end cache line aligned?
+@@ -140,7 +145,7 @@ ENTRY(__inval_cache_range)
+ 	b.lo	2b
+ 	dsb	sy
+ 	ret
+-ENDPIPROC(__inval_cache_range)
++ENDPIPROC(__inval_dcache_area)
+ ENDPROC(__dma_inv_area)
+ 
+ /*
 -- 
 2.12.2.dirty
