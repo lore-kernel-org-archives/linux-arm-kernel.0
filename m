@@ -1,112 +1,200 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 25 Jul 2017 10:04:59 +0800
-Subject: [xlnx:master 789/812] arch/sh/include/asm/io.h:45:62: note: in
- expansion of macro 'ioswabl'
-Message-ID: <201707251054.Rb2dJKxI%fengguang.wu@intel.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Tue, 25 Jul 2017 10:09:42 +0800
+Subject: [PATCH 5/5] dt-bindings: PCI: add support for new generation
+ controller
+In-Reply-To: <20170724202652.4ofxdafajnhgm7wg@rob-hp-laptop>
+References: <cover.1500601172.git.honghui.zhang@mediatek.com>
+ <3b449a88bd2f57ee005674d0161192ee01167e5a.1500601172.git.honghui.zhang@mediatek.com>
+ <20170724202652.4ofxdafajnhgm7wg@rob-hp-laptop>
+Message-ID: <1500948582.8594.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   5a5db6231107b7dbf97af0ae9a451d79e9d38203
-commit: c66ee9b2e7c09629a109e942e9fa03f1a1c8ea47 [789/812] mtd: nand: arasan_nand: Add 64bit dma support
-config: sh-allmodconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 6.3.0-18) 6.3.0 20170516
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout c66ee9b2e7c09629a109e942e9fa03f1a1c8ea47
-        # save the attached .config to linux build tree
-        make.cross ARCH=sh 
+On Mon, 2017-07-24 at 15:26 -0500, Rob Herring wrote:
+> On Fri, Jul 21, 2017 at 10:34:49AM +0800, honghui.zhang at mediatek.com wrote:
+> > From: Ryder Lee <ryder.lee@mediatek.com>
+> > 
+> > Add support for MediaTek new generation controller and update related
+> > properities.
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/pci/mediatek-pcie.txt      | 84 ++++++++++++++++++++--
+> >  1 file changed, 79 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
+> > index 294f4a3..a1f3767 100644
+> > --- a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
+> > +++ b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
+> > @@ -4,17 +4,27 @@ Required properties:
+> >  - compatible: Should contain one of the following string:
+> >  	"mediatek,mt7623-pcie"
+> >  	"mediatek,mt2701-pcie"
+> > +	"mediatek,generic-pcie-v2"
+> 
+> No, please use SoC specific compatible strings.
+> 
+Thanks, I will rewrite it as below:
+"mediatek,mt2701-pcie"
+"mediatek,mt7623-pcie"
+"mediatek,mt2712-pcie"
+"mediatek,mt7622-pcie"
 
-All warnings (new ones prefixed by >>):
+> >  - device_type: Must be "pci"
+> > -- reg: Base addresses and lengths of the PCIe controller.
+> > +- reg: Base addresses and lengths of the PICe subsys and root ports.
+> > +- reg-names: Names of the above areas to use during resource look-up.
+> >  - #address-cells: Address representation for root ports (must be 3)
+> >  - #size-cells: Size representation for root ports (must be 2)
+> >  - clocks: Must contain an entry for each entry in clock-names.
+> >    See ../clocks/clock-bindings.txt for details.
+> >  - clock-names: Must include the following entries:
+> >    - free_ck :for reference clock of PCIe subsys
+> > -  - sys_ck0 :for clock of Port0
+> > -  - sys_ck1 :for clock of Port1
+> > -  - sys_ck2 :for clock of Port2
+> > +  - sys_ckN :transaction layer and data link layer clock
+> > +  The "sys_ck" might be divided into the following parts in some v2 chips:
+> 
+> Please be specific about what clocks apply to which compatible. Each 
+> valid combination of clocks should correspond to at least one 
+> compatible.
+> 
 
-   In file included from include/linux/scatterlist.h:8:0,
-                    from include/linux/dma-mapping.h:10,
-                    from drivers/mtd//nand/arasan_nand.c:13:
-   drivers/mtd//nand/arasan_nand.c: In function 'anfc_rw_buf_dma':
-   drivers/mtd//nand/arasan_nand.c:355:16: warning: right shift count >= width of type [-Wshift-count-overflow]
-     writel((paddr >> 32), nfc->base + DMA_ADDR1_OFST);
-                   ^
-   arch/sh/include/asm/io.h:30:77: note: in definition of macro '__raw_writel'
-    #define __raw_writel(v,a) (__chk_io_ptr(a), *(volatile u32 __force *)(a) = (v))
-                                                                                ^
->> arch/sh/include/asm/io.h:45:62: note: in expansion of macro 'ioswabl'
-    #define writel_relaxed(v,c) ((void)__raw_writel((__force u32)ioswabl(v),c))
-                                                                 ^~~~~~~
->> arch/sh/include/asm/io.h:55:32: note: in expansion of macro 'writel_relaxed'
-    #define writel(v,a)  ({ wmb(); writel_relaxed((v),(a)); })
-                                   ^~~~~~~~~~~~~~
->> drivers/mtd//nand/arasan_nand.c:355:2: note: in expansion of macro 'writel'
-     writel((paddr >> 32), nfc->base + DMA_ADDR1_OFST);
-     ^~~~~~
---
-   In file included from include/linux/scatterlist.h:8:0,
-                    from include/linux/dma-mapping.h:10,
-                    from drivers/mtd/nand/arasan_nand.c:13:
-   drivers/mtd/nand/arasan_nand.c: In function 'anfc_rw_buf_dma':
-   drivers/mtd/nand/arasan_nand.c:355:16: warning: right shift count >= width of type [-Wshift-count-overflow]
-     writel((paddr >> 32), nfc->base + DMA_ADDR1_OFST);
-                   ^
-   arch/sh/include/asm/io.h:30:77: note: in definition of macro '__raw_writel'
-    #define __raw_writel(v,a) (__chk_io_ptr(a), *(volatile u32 __force *)(a) = (v))
-                                                                                ^
->> arch/sh/include/asm/io.h:45:62: note: in expansion of macro 'ioswabl'
-    #define writel_relaxed(v,c) ((void)__raw_writel((__force u32)ioswabl(v),c))
-                                                                 ^~~~~~~
->> arch/sh/include/asm/io.h:55:32: note: in expansion of macro 'writel_relaxed'
-    #define writel(v,a)  ({ wmb(); writel_relaxed((v),(a)); })
-                                   ^~~~~~~~~~~~~~
-   drivers/mtd/nand/arasan_nand.c:355:2: note: in expansion of macro 'writel'
-     writel((paddr >> 32), nfc->base + DMA_ADDR1_OFST);
-     ^~~~~~
+Thanks, I will change it in the next version.
 
-vim +/ioswabl +45 arch/sh/include/asm/io.h
+> > +    - ahb_ckN :AHB slave interface operating clock for CSR access and RC
+> > +	       initiated MMIO access
+> > +    - axi_ckN :application layer MMIO channel operating clock
+> > +    - aux_ckN :pe2_mac_bridge and pe2_mac_core operating clock when
+> > +	       pcie_mac_ck/pcie_pipe_ck is turned off
+> > +    - obff_ckN :OBFF functional block operating clock
+> > +    - pipe_ckN :pe2_mac_bridge and pe2_mac_core operating clock when
+> > +		pcie_mac_ck/pcie_pipe_ck is turned off
+> > +  where N starting from 0 to the maximum number of root ports.
+> >  - phys: List of PHY specifiers (used by generic PHY framework).
+> >  - phy-names : Must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
+> >    number of PHYs as specified in *phys* property.
+> > @@ -33,6 +43,9 @@ Required properties for MT7623/MT2701:
+> >  - reset-names: Must be "pcie-rst0", "pcie-rst1", "pcie-rstN".. based on the
+> >    number of root ports.
+> >  
+> > +Required properties for mediatek generic-pcie-v2:
+> > +-interrupts: A list of interrupt outputs of the controller.
+> > +
+> 
+> How mnay interrupts? Not sure why you moved this in the previous patch 
+> if all versions have some interrupts.
+> 
+There would be 1 interrupt per port for the new SoCs.
+The legacy controller(7623, 2701) does not have a interrupt status
+register to identify the interrupt source, so we use interrupt-map to
+bind the interrupt to each port, thus we do not need the "interrupt"
+property.
+But the new SoCs doest not have this problem, and support msi. So we use
+the standard "interrupt" property.
 
-b66c1a39 include/asm-sh/io.h      Paul Mundt 2006-01-16  27  
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  28  #define __raw_writeb(v,a)	(__chk_io_ptr(a), *(volatile u8  __force *)(a) = (v))
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  29  #define __raw_writew(v,a)	(__chk_io_ptr(a), *(volatile u16 __force *)(a) = (v))
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04 @30  #define __raw_writel(v,a)	(__chk_io_ptr(a), *(volatile u32 __force *)(a) = (v))
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  31  #define __raw_writeq(v,a)	(__chk_io_ptr(a), *(volatile u64 __force *)(a) = (v))
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  32  
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  33  #define __raw_readb(a)		(__chk_io_ptr(a), *(volatile u8  __force *)(a))
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  34  #define __raw_readw(a)		(__chk_io_ptr(a), *(volatile u16 __force *)(a))
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  35  #define __raw_readl(a)		(__chk_io_ptr(a), *(volatile u32 __force *)(a))
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  36  #define __raw_readq(a)		(__chk_io_ptr(a), *(volatile u64 __force *)(a))
-14866543 arch/sh/include/asm/io.h Paul Mundt 2008-10-04  37  
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29  38  #define readb_relaxed(c)	({ u8  __v = ioswabb(__raw_readb(c)); __v; })
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29  39  #define readw_relaxed(c)	({ u16 __v = ioswabw(__raw_readw(c)); __v; })
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29  40  #define readl_relaxed(c)	({ u32 __v = ioswabl(__raw_readl(c)); __v; })
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29  41  #define readq_relaxed(c)	({ u64 __v = ioswabq(__raw_readq(c)); __v; })
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29  42  
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29  43  #define writeb_relaxed(v,c)	((void)__raw_writeb((__force  u8)ioswabb(v),c))
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29  44  #define writew_relaxed(v,c)	((void)__raw_writew((__force u16)ioswabw(v),c))
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29 @45  #define writel_relaxed(v,c)	((void)__raw_writel((__force u32)ioswabl(v),c))
-b7e68d68 arch/sh/include/asm/io.h Paul Mundt 2012-03-29  46  #define writeq_relaxed(v,c)	((void)__raw_writeq((__force u64)ioswabq(v),c))
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  47  
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  48  #define readb(a)		({ u8  r_ = readb_relaxed(a); rmb(); r_; })
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  49  #define readw(a)		({ u16 r_ = readw_relaxed(a); rmb(); r_; })
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  50  #define readl(a)		({ u32 r_ = readl_relaxed(a); rmb(); r_; })
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  51  #define readq(a)		({ u64 r_ = readq_relaxed(a); rmb(); r_; })
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  52  
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  53  #define writeb(v,a)		({ wmb(); writeb_relaxed((v),(a)); })
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  54  #define writew(v,a)		({ wmb(); writew_relaxed((v),(a)); })
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01 @55  #define writel(v,a)		({ wmb(); writel_relaxed((v),(a)); })
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  56  #define writeq(v,a)		({ wmb(); writeq_relaxed((v),(a)); })
-37b7a978 arch/sh/include/asm/io.h Paul Mundt 2010-11-01  57  
+How about:
+Requirted properties for "medaitek,mt2712-pcie" and
+"mediatek,mt7622-pcie"
+-interrupts: A list for interrupt outputs of the controller, there must
+be one interrupt for each port.
+ 
+> >  In addition, the device tree node must have sub-nodes describing each
+> >  PCIe port interface, having the following mandatory properties:
+> >  
+> > @@ -50,7 +63,7 @@ Required properties:
+> >    property is sufficient.
+> >  - num-lanes: Number of lanes to use for this port.
+> >  
+> > -Examples:
+> > +Examples for mt7623:
+> >  
+> >  	hifsys: syscon at 1a000000 {
+> >  		compatible = "mediatek,mt7623-hifsys",
+> > @@ -68,6 +81,7 @@ Examples:
+> >  		      <0 0x1a142000 0 0x1000>, /* Port0 registers */
+> >  		      <0 0x1a143000 0 0x1000>, /* Port1 registers */
+> >  		      <0 0x1a144000 0 0x1000>; /* Port2 registers */
+> > +		reg-names = "subsys", "port0", "port1", "port2";
+> >  		#address-cells = <3>;
+> >  		#size-cells = <2>;
+> >  		#interrupt-cells = <1>;
+> > @@ -127,3 +141,63 @@ Examples:
+> >  			num-lanes = <1>;
+> >  		};
+> >  	};
+> > +
+> > +Examples for mt2712:
+> > +	pcie: pcie at 0x11700000 {
+> 
+> Drop the '0x'.
 
-:::::: The code at line 45 was first introduced by commit
-:::::: b7e68d6876dfbab087bc3859211a9efc74cbe30c sh: Support I/O space swapping where needed.
+OK, thanks.
 
-:::::: TO: Paul Mundt <lethal@linux-sh.org>
-:::::: CC: Paul Mundt <lethal@linux-sh.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 42414 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/af91fd10/attachment-0001.gz>
+> 
+> > +		compatible = "mediatek,generic-pcie-v2";
+> > +		device_type = "pci";
+> > +		reg = <0 0x11700000 0 0x1000>,
+> > +		      <0 0x112FF000 0 0x1000>;
+> > +		reg-names = "port0", "port1";
+> > +		#address-cells = <3>;
+> > +		#size-cells = <2>;
+> > +		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&pericfg CLK_PERI_PCIE0>,
+> > +			 <&pericfg CLK_PERI_PCIE1>,
+> > +			 <&topckgen CLK_TOP_PE2_MAC_P0_SEL>,
+> > +			 <&topckgen CLK_TOP_PE2_MAC_P1_SEL>;
+> > +		clock-names = "sys_ck0", "sys_ck1", "ahb0", "ahb1";
+> > +		bus-range = <0x00 0xff>;
+> > +		ranges = <0x82000000 0 0x20000000  0x0 0x20000000  0 0x10000000>;
+> > +
+> > +		pcie0: pcie at 0,0 {
+> > +			device_type = "pci";
+> > +			reg = <0x0000 0 0 0 0>;
+> > +			#address-cells = <3>;
+> > +			#size-cells = <2>;
+> > +			#interrupt-cells = <1>;
+> > +			ranges;
+> > +			num-lanes = <1>;
+> > +			interrupt-map-mask = <0 0 0 7>;
+> > +			interrupt-map = <0 0 0 1 &pcie_intc0 0>,
+> > +					<0 0 0 2 &pcie_intc0 1>,
+> > +					<0 0 0 3 &pcie_intc0 2>,
+> > +					<0 0 0 4 &pcie_intc0 3>;
+> > +			pcie_intc0: interrupt-controller {
+> > +				interrupt-controller;
+> > +				#address-cells = <0>;
+> > +				#interrupt-cells = <1>;
+> > +			};
+> > +		};
+> > +
+> > +		pcie1: pcie at 1,0 {
+> > +			device_type = "pci";
+> > +			reg = <0x0800 0 0 0 0>;
+> > +			#address-cells = <3>;
+> > +			#size-cells = <2>;
+> > +			#interrupt-cells = <1>;
+> > +			ranges;
+> > +			num-lanes = <1>;
+> > +			interrupt-map-mask = <0 0 0 7>;
+> > +			interrupt-map = <0 0 0 1 &pcie_intc1 0>,
+> > +					<0 0 0 2 &pcie_intc1 1>,
+> > +					<0 0 0 3 &pcie_intc1 2>,
+> > +					<0 0 0 4 &pcie_intc1 3>;
+> > +			pcie_intc1: interrupt-controller {
+> > +				interrupt-controller;
+> > +				#address-cells = <0>;
+> > +				#interrupt-cells = <1>;
+> > +			};
+> > +		};
+> > +	};
+> > -- 
+> > 2.6.4
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
