@@ -1,122 +1,100 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 25 Jul 2017 23:18:08 +0800
-Subject: [PATCH 1/4] ARM: sun9i: Support SMP on A80 with Multi-Cluster
- Power Management (MCPM)
-In-Reply-To: <20170725144006.3bz45ozpv6dwu6k4@flea>
-References: <20170725050919.16036-1-wens@csie.org>
- <20170725050919.16036-2-wens@csie.org>
- <20170725074759.5mqrwcp7djeju33g@flea>
- <CAGb2v67tGuivydj1r+uD=5aw+yYZyBabbNsKwik9ZONNQmc=jQ@mail.gmail.com>
- <20170725144006.3bz45ozpv6dwu6k4@flea>
-Message-ID: <CAGb2v65wdwJNrNvrG4pDy7=7n0mw4k7q_PNJ6Hth=PH6pkGK3A@mail.gmail.com>
+From: jglauber@cavium.com (Jan Glauber)
+Date: Tue, 25 Jul 2017 17:04:22 +0200
+Subject: [PATCH v8 3/3] perf: cavium: Add Documentation
+In-Reply-To: <20170725150422.4775-1-jglauber@cavium.com>
+References: <20170725150422.4775-1-jglauber@cavium.com>
+Message-ID: <20170725150422.4775-4-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 10:40 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Jul 25, 2017 at 04:29:52PM +0800, Chen-Yu Tsai wrote:
->>          default ARCH_SUNXI
->> On Tue, Jul 25, 2017 at 3:47 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi Chen-Yu,
->> >
->> > On Tue, Jul 25, 2017 at 01:09:16PM +0800, Chen-Yu Tsai wrote:
->> >> The A80 is a big.LITTLE SoC with 1 cluster of 4 Cortex-A7s and
->> >> 1 cluster of 4 Cortex-A15s.
->> >>
->> >> This patch adds support to bring up the second cluster and thus all
->> >> cores using the common MCPM code. Core/cluster power down has not
->> >> been implemented, thus CPU hotplugging and big.LITTLE switcher is
->> >> not supported.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> ---
->> >>  arch/arm/mach-sunxi/Kconfig  |  10 ++
->> >>  arch/arm/mach-sunxi/Makefile |   1 +
->> >>  arch/arm/mach-sunxi/mcpm.c   | 391 +++++++++++++++++++++++++++++++++++++++++++
->> >>  3 files changed, 402 insertions(+)
->> >>  create mode 100644 arch/arm/mach-sunxi/mcpm.c
->> >>
->> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
->> >> index 58153cdf025b..177380548d99 100644
->> >> --- a/arch/arm/mach-sunxi/Kconfig
->> >> +++ b/arch/arm/mach-sunxi/Kconfig
->> >> @@ -47,5 +47,15 @@ config MACH_SUN9I
->> >>       bool "Allwinner (sun9i) SoCs support"
->> >>       default ARCH_SUNXI
->> >>       select ARM_GIC
->> >> +     imply MCPM
->> >> +
->> >> +config SUN9I_A80_MCPM
->> >> +     bool "Allwinner A80 Multi-Cluster PM support"
->> >> +     depends on MCPM && MACH_SUN9I
->> >> +     default MACH_SUN9I
->> >> +     select ARM_CCI400_PORT_CTRL
->> >> +     help
->> >> +       This is needed to provide CPU and cluster power management
->> >> +       on Allwinner A80 implementing big.LITTLE.
->> >
->> > Do we really need an option for that? we don't provide the option to
->> > disable the CPU SMP operations for the rest of the SoCs.
->>
->> It was an option as it also required MCPM and CCI400 support to be built.
->> We could hide it. Or, using mach-hisi as a reference, we could do:
->>
->> config MACH_SUN9I
->>         default ARCH_SUNXI
->>         select ARM_GIC
->>         select MCPM if SMP
->>         select ARM_CCI400_PORT_CTRL if SMP
->>
->> and in the Makefile:
->>
->> obj-$(CONFIG_MCPM) += sun9i-mcpm.o
->
-> I guess a hidden option would work for me.
+Document Cavium SoC PMUs.
 
-I kind of prefer mach-hisi's solution though.
+Signed-off-by: Jan Glauber <jglauber@cavium.com>
+---
+ Documentation/perf/cavium-pmu.txt | 75 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/perf/cavium-pmu.txt
 
->
->> >> +#define SUNXI_CPUS_PER_CLUSTER               4
->> >> +#define SUNXI_NR_CLUSTERS            2
->> >> +
->> >> +#define SUN9I_A80_A15_CLUSTER                1
->> >
->> > Don't we have a way to derive that from the DT ?
->>
->> Indeed we can.
->>
->> It would be slighty more complicated though:
->>
->> node = of_cpu_device_node_get(cluster * SUNXI_CPUS_PER_CLUSTER + cpu);
->> if (of_device_is_compatible(node, "arm,cortex-a15")) {
->>         ...
->> }
->
-> There's no helper to create that map?
-
-Are you referring to the topology map? That one only stores topology,
-not what type of cores they are. The CPU capacity part doesn't either.
-It only stores the results.
-
-> We'll use it for A83T too, so the complexity will be reduced anyway.
-
-I'll just put it in a helper function.
-
-[...]
-
->> >
->> > It looks mostly good, and I would replace the sunxi by sun9i, and call
->> > that file sun9i-mcpm.c
->>
->> I was hoping to reuse the file for the A83T, so it was sunxi-mcpm.c
->> or just mcpm. Most of the stuff is similiar, except the A83T has two
->> revisions and one of them has two gate/power bits swapped. :(
->
-> Hmmm, that's true.
->
-> What about just mcpm then?
-
-Works for me. I don't need to change anything. :)
-
-ChenYu
+diff --git a/Documentation/perf/cavium-pmu.txt b/Documentation/perf/cavium-pmu.txt
+new file mode 100644
+index 0000000..6fbf824
+--- /dev/null
++++ b/Documentation/perf/cavium-pmu.txt
+@@ -0,0 +1,75 @@
++Cavium ThunderX and OcteonTx Performance Monitoring Unit (PMU)
++==============================================================
++
++Cavium SoCs contain various system devices such as L2 caches, processor
++interconnect and memory controllers. Unfortunately the PMU counters
++are not following a common design so each device has a slightly different
++approach how to control and use the PMU counters.
++
++Common properties of all devices carrying PMU counters:
++- The devices are PCI devices and the counters are embedded somewhere
++  in the PCI register space.
++- All counters are 64 bit wide.
++- There are no overflow interrupts (unnecessary because of the 64 bit wide
++  counters).
++
++Properties depending on the device type:
++- How to start/stop the counters
++- Programmable vs. fixed purpose counters
++- Stoppable vs. always running counters
++- Independent vs. grouped counters
++- Read-only vs. writable counters
++- PCI device to PMU group relationship
++
++
++Devices with PMU counters
++-------------------------
++
++Memory controller (LMC):
++- one PCI device per LMC
++- fixed-purpose counters
++- always running counters without start/stop/reset control
++- read-only counters
++
++CCPI interface controller (OCX) Transmit link (TLK) counters:
++- writable counters
++- only one PCI device exposes multiple TLK units (3 units on T88)
++- start/stop control per unit
++- only present on multi-socket systems
++
++PMU (perf) driver
++-----------------
++
++The cavium-pmu driver registers several perf PMU drivers. Each of the perf
++driver provides description of its available events and configuration options
++in sysfs, see /sys/devices/<lmcX/ocx_tlkX>/.
++
++The "format" directory describes format of the config (event ID),
++The "events" directory shows the names of the events and provides configuration
++templates for all supported event types that can be used with perf tool. For
++example, "lmc0/dclk_cnt/" is an equivalent of "lmc0/config=2/".
++
++Each perf driver also provides a "cpumask" sysfs attribute, which contains a
++single CPU ID of the processor which will be used to handle all the PMU events.
++
++Example for perf tool use:
++
++ / # perf list | grep -e lmc
++   lmc0/bank_conflict1/                               [Kernel PMU event]
++   lmc0/bank_conflict2/                               [Kernel PMU event]
++   lmc0/dclk_cnt/                                     [Kernel PMU event]
++   lmc0/ifb_cnt/                                      [Kernel PMU event]
++   lmc0/ops_cnt/                                      [Kernel PMU event]
++
++ / # perf stat -a -e lmc0/ops_cnt/,lmc0/dclk_cnt/ -- sleep 1
++
++   Performance counter stats for 'system wide':
++
++             176,133      lmc0/ops_cnt/                                               
++         670,243,653      lmc0/dclk_cnt/                                              
++
++         1.005479295 seconds time elapsed
++
++The driver does not support sampling, therefore "perf record" will
++not work. System wide mode ("-a") must be used as per-task (without "-a")
++perf sessions are not supported.
+-- 
+2.9.0.rc0.21.g7777322
