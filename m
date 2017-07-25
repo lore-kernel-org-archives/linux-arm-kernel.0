@@ -1,163 +1,512 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 25 Jul 2017 10:24:44 +0200
-Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
- from suspend_noirq
-In-Reply-To: <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
-References: <20170724095201.21601-1-johan@kernel.org>
- <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
-Message-ID: <20170725082444.GL2729@localhost>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 25 Jul 2017 16:29:52 +0800
+Subject: [PATCH 1/4] ARM: sun9i: Support SMP on A80 with Multi-Cluster
+ Power Management (MCPM)
+In-Reply-To: <20170725074759.5mqrwcp7djeju33g@flea>
+References: <20170725050919.16036-1-wens@csie.org>
+ <20170725050919.16036-2-wens@csie.org>
+ <20170725074759.5mqrwcp7djeju33g@flea>
+Message-ID: <CAGb2v67tGuivydj1r+uD=5aw+yYZyBabbNsKwik9ZONNQmc=jQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 05:16:02PM -0500, Grygorii Strashko wrote:
-> On 07/24/2017 04:52 AM, Johan Hovold wrote:
-> > Since commit a8636c89648a ("PM / Runtime: Don't allow to suspend a
-> > device with an active child"), which went into 4.10, it is no longer
-> > permitted to set RPM_SUSPENDED state for a device with active children
-> > (unless power.ignore_children is set).
-> > 
-> > This specifically means that the attempts to do just that from the omap
-> > pm-domain suspend_noirq callback have since been failing whenever a
-> > child is active, for example:
-> > 
-> >    am335x-usb-childs 47400000.usb: runtime PM trying to suspend
-> >      device but active child
-> > 
-> > Silence this warning by dropping the broken pm_runtime_set_suspended()
-> > call from the omap suspend_noirq callback along with the redundant
-> > pm_runtime_set_active() in resume_noirq.
-> > 
-> > This effectively reverts commit 3522bf7bfa24 ("ARM: OMAP2+: omap_device:
-> > maintain sane runtime pm status around suspend/resume"), which started
-> > updating the RPM state after the runtime_suspend callback (!) for active
-> > omap devices had been called during system suspend. The rationale was
-> > that a later pm_runtime_get_sync() would then fail (even after runtime
-> > pm had been disabled) and that this in turn would avoid any external
-> > aborts when accessing registers with clocks disabled. (See also commit
-> > 6f3c77b040fc ("PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
-> > even when disabled, v2").
-> > 
-> > But during the suspend_noirq phase all children would already have been
-> > suspended and their drivers would specifically not attempt any further
-> > register accesses. And if this was all just a workaround for random
-> > device drivers doing cross-tree calls during system suspend, those
-> > drivers should be fixed and updated to explicitly model such
-> > dependencies using device-links instead (and either way, any such calls
-> > have been causing crashes since 4.10).
-> 
-> I'd like to provide some background and comments here.
-> 
-> 1) OMAP platform is PM runtime centric - in other words all device's
-> PM operations (power on/off) are done through PM runtime calls and
-> devices drivers do not really change device's Power states during
-> suspend/resume - just do preparation for suspend. The final disabling
-> of devices is done form _od_suspend_noirq() or if device driver calls
-> pm_runtime_force_suspend() directly during suspend.
-> 
-> 2) Initially all this suspend_noirq code was introduced due to commit
-> 
-> commit 1e2ef05bb8cf851a694d38e9170c89e7ff052741
-> Author: Rafael J. Wysocki <rjw@sisk.pl>
-> Date:   Wed Jul 6 10:51:58 2011 +0200
-> 
->     PM: Limit race conditions between runtime PM and system sleep (v2)
-> 
-> which blocks PM runtime during suspend resume. And, at that time,
-> there were no pm_runtime_force_suspend/resume() neither proper support
-> for power domains.
-> 
-> As result, below two calls really switch OFF device and its state
-> should be RPM_SUSPENDED as it will reflect real PM state of HW:
-> 	m_generic_runtime_suspend(dev)
-> 	omap_device_idle(pdev);
+         default ARCH_SUNXI
+On Tue, Jul 25, 2017 at 3:47 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+> On Tue, Jul 25, 2017 at 01:09:16PM +0800, Chen-Yu Tsai wrote:
+>> The A80 is a big.LITTLE SoC with 1 cluster of 4 Cortex-A7s and
+>> 1 cluster of 4 Cortex-A15s.
+>>
+>> This patch adds support to bring up the second cluster and thus all
+>> cores using the common MCPM code. Core/cluster power down has not
+>> been implemented, thus CPU hotplugging and big.LITTLE switcher is
+>> not supported.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/mach-sunxi/Kconfig  |  10 ++
+>>  arch/arm/mach-sunxi/Makefile |   1 +
+>>  arch/arm/mach-sunxi/mcpm.c   | 391 +++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 402 insertions(+)
+>>  create mode 100644 arch/arm/mach-sunxi/mcpm.c
+>>
+>> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+>> index 58153cdf025b..177380548d99 100644
+>> --- a/arch/arm/mach-sunxi/Kconfig
+>> +++ b/arch/arm/mach-sunxi/Kconfig
+>> @@ -47,5 +47,15 @@ config MACH_SUN9I
+>>       bool "Allwinner (sun9i) SoCs support"
+>>       default ARCH_SUNXI
+>>       select ARM_GIC
+>> +     imply MCPM
+>> +
+>> +config SUN9I_A80_MCPM
+>> +     bool "Allwinner A80 Multi-Cluster PM support"
+>> +     depends on MCPM && MACH_SUN9I
+>> +     default MACH_SUN9I
+>> +     select ARM_CCI400_PORT_CTRL
+>> +     help
+>> +       This is needed to provide CPU and cluster power management
+>> +       on Allwinner A80 implementing big.LITTLE.
+>
+> Do we really need an option for that? we don't provide the option to
+> disable the CPU SMP operations for the rest of the SoCs.
 
-That's the point to be discussed; does the runtime status really need to
-reflect the hardware state *during* suspend?
+It was an option as it also required MCPM and CCI400 support to be built.
+We could hide it. Or, using mach-hisi as a reference, we could do:
 
-As you've noticed, not all subsystems enforce that, even if omap seems
-to have been expecting it.
+config MACH_SUN9I
+        default ARCH_SUNXI
+        select ARM_GIC
+        select MCPM if SMP
+        select ARM_CCI400_PORT_CTRL if SMP
 
-And as I mentioned in the commit message, at least the point about
-wanting to have late pm_runtime_get_sync() fail during suspend appears
-to be moot.
+and in the Makefile:
 
-> In general, now the code in _od_resume/resume_noirq() callback is
-> equivalent to pm_runtime_force_suspend/resume().
-> 
-> 3) It's expected to ignore -EBUSY return code from
-> pm_generic_runtime_suspend(dev) in _od_suspend_noirq(), as such code
-> (-EBUSY) tells OMAP device framework that device should be kept active
-> during suspend (for example serial device in case of
-> "no_console_suspend").
-> 
-> commit 4b7ec5accecdb136c7afaf8739a06d5335cc05aa
-> Author: Sourav Poddar <sourav.poddar@ti.com>
-> Date:   Sat Apr 27 01:55:34 2013 +0530
-> 
->     arm: omap2+: omap_device: remove no_idle_on_suspend
-> 
-> As result, when "runtime PM trying to suspend device but active child"
-> happens the OMAP device framework will ignore it and gracefully
-> continue to suspend where target device will finally powered off
-> (depending on suspend mode and device).  On resume, target device will
-> not be powered on, because its state was not marked as
-> OMAP_DEVICE_SUSPENDED, so further attempts to power on device with
-> pm_runtime_get_sync() will be a NOP (because device state is
-> RPM_ACTIVE) and any access to the device will fail (system crash).
+obj-$(CONFIG_MCPM) += sun9i-mcpm.o
 
-I believe you're mistaken here; _od_suspend_noirq() will continue to
-power-off *and* set OMAP_DEVICE_SUSPENDED, so that device is again
-powered during resume_noirq also after this patch has been applied.
+>
+>>  endif
+>> diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
+>> index 27b168f121a1..e8558912c714 100644
+>> --- a/arch/arm/mach-sunxi/Makefile
+>> +++ b/arch/arm/mach-sunxi/Makefile
+>> @@ -1,2 +1,3 @@
+>>  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
+>>  obj-$(CONFIG_SMP) += platsmp.o
+>> +obj-$(CONFIG_SUN9I_A80_MCPM) += mcpm.o
+>> diff --git a/arch/arm/mach-sunxi/mcpm.c b/arch/arm/mach-sunxi/mcpm.c
+>> new file mode 100644
+>> index 000000000000..4b6e1d6ae379
+>> --- /dev/null
+>> +++ b/arch/arm/mach-sunxi/mcpm.c
+>> @@ -0,0 +1,391 @@
+>> +/*
+>> + * Copyright (c) 2015 Chen-Yu Tsai
+>> + *
+>> + * Chen-Yu Tsai <wens@csie.org>
+>> + *
+>> + * arch/arm/mach-sunxi/mcpm.c
+>> + *
+>> + * Based on arch/arm/mach-exynos/mcpm-exynos.c and Allwinner code
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/arm-cci.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/io.h>
+>> +#include <linux/of_address.h>
+>> +
+>> +#include <asm/cputype.h>
+>> +#include <asm/cp15.h>
+>> +#include <asm/mcpm.h>
+>> +
+>> +#define SUNXI_CPUS_PER_CLUSTER               4
+>> +#define SUNXI_NR_CLUSTERS            2
+>> +
+>> +#define SUN9I_A80_A15_CLUSTER                1
+>
+> Don't we have a way to derive that from the DT ?
 
-Specifically, note that the return value of pm_runtime_set_suspended()
-was never checked, so the only difference here would be that the error
-message is suppressed.
+Indeed we can.
 
-> 4) Unfortunately, commit a8636c89648a ("PM / Runtime: Don't allow to
-> suspend a device with an active child") "breaks" OMAP suspend
-> functionality (or makes visible more fundamental issues of PM runtime
-> vs Sys suspend), because not all Kernel subsystem (especially USB)
-> maintain their devices PM runtime state properly during suspend, which
-> cause pm_runtime_set_suspended() (or pm_runtime_force_suspend()) to
-> return -EBUSY and, as result, misbehave of OMAP device framework.
+It would be slighty more complicated though:
 
-Again, the return value of pm_runtime_set_suspended() was never checked
-so the only thing commit a8636c89648a ("PM / Runtime: Don't allow to
-suspend a device with an active child") did was to trigger those error
-messages and leave the runtime PM state at RPM_ACTIVE. The latter does
-not seems to have any other side effects, and specifically, the device
-would still be powered off.
+node = of_cpu_device_node_get(cluster * SUNXI_CPUS_PER_CLUSTER + cpu);
+if (of_device_is_compatible(node, "arm,cortex-a15")) {
+        ...
+}
 
-> My personal thought here is that removing of pm_runtime_set_active()
-> will not fix root cause of the problem, but rather hide it :( and,
-> probably, real fix will be to update USB framework to ensure that all
-> suspend devices are also PM runtime suspend (not sure how) or add few
-> more pm_suspend_ignore_children() calls (for example as I've tried to
-> do in [2], but this was unfinished).
-> 
-> I've found very simple steps to reproduce suspend failure on
-> am335x-evm (should also > work on BBB) -  do below sequence with USB
-> device plugged:
-> 
->    echo platform > /sys/power/pm_test 
->    echo 1 > /sys/power/pm_print_times 
->    [ echo 0 > /sys/module/printk/parameters/console_suspend ]
->    echo mem > /sys/power/state 
-> 
-> [   95.499685] calling  47400000.usb+ @ 733, parent: ocp
-> [   95.504818] am335x-usb-childs 47400000.usb: runtime PM trying to suspend device but active child
-> [   95.513750] am335x-usb-childs 47400000.usb: omap device suspend failure 0
-> 
-> Below I've attached possible patch which converts OMAP device to
-> use pm_runtime_force_suspend/resume().
+>
+>> +#define CPUCFG_CX_CTRL_REG0(c)               (0x10 * (c))
+>> +#define CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE(n)        BIT(n)
+>> +#define CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE_ALL       0xf
+>> +#define CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A7        BIT(4)
+>> +#define CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A15       BIT(0)
+>> +#define CPUCFG_CX_CTRL_REG1(c)               (0x10 * (c) + 0x4)
+>> +#define CPUCFG_CX_CTRL_REG1_ACINACTM BIT(0)
+>> +#define CPUCFG_CX_RST_CTRL(c)                (0x80 + 0x4 * (c))
+>> +#define CPUCFG_CX_RST_CTRL_DBG_SOC_RST       BIT(24)
+>> +#define CPUCFG_CX_RST_CTRL_ETM_RST(n)        BIT(20 + (n))
+>> +#define CPUCFG_CX_RST_CTRL_ETM_RST_ALL       (0xf << 20)
+>> +#define CPUCFG_CX_RST_CTRL_DBG_RST(n)        BIT(16 + (n))
+>> +#define CPUCFG_CX_RST_CTRL_DBG_RST_ALL       (0xf << 16)
+>> +#define CPUCFG_CX_RST_CTRL_H_RST     BIT(12)
+>> +#define CPUCFG_CX_RST_CTRL_L2_RST    BIT(8)
+>> +#define CPUCFG_CX_RST_CTRL_CX_RST(n) BIT(4 + (n))
+>> +#define CPUCFG_CX_RST_CTRL_CORE_RST(n)       BIT(n)
+>> +
+>> +#define PRCM_CPU_PO_RST_CTRL(c)              (0x4 + 0x4 * (c))
+>> +#define PRCM_CPU_PO_RST_CTRL_CORE(n) BIT(n)
+>> +#define PRCM_CPU_PO_RST_CTRL_CORE_ALL        0xf
+>> +#define PRCM_PWROFF_GATING_REG(c)    (0x100 + 0x4 * (c))
+>> +#define PRCM_PWROFF_GATING_REG_CLUSTER       BIT(4)
+>> +#define PRCM_PWROFF_GATING_REG_CORE(n)       BIT(n)
+>> +#define PRCM_PWR_SWITCH_REG(c, cpu)  (0x140 + 0x10 * (c) + 0x4 * (cpu))
+>> +#define PRCM_CPU_SOFT_ENTRY_REG              0x164
+>> +
+>> +static void __iomem *cpucfg_base;
+>> +static void __iomem *prcm_base;
+>> +
+>> +static int sunxi_cpu_power_switch_set(unsigned int cpu, unsigned int cluster,
+>> +                                   bool enable)
+>> +{
+>> +     u32 reg;
+>> +
+>> +     /* control sequence from Allwinner A80 user manual v1.2 PRCM section */
+>> +     reg = readl(prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+>> +     if (enable) {
+>> +             if (reg == 0x00) {
+>> +                     pr_debug("power clamp for cluster %u cpu %u already open\n",
+>> +                              cluster, cpu);
+>> +                     return 0;
+>> +             }
+>> +
+>> +             writel(0xff, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+>> +             udelay(10);
+>> +             writel(0xfe, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+>> +             udelay(10);
+>> +             writel(0xf8, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+>> +             udelay(10);
+>> +             writel(0xf0, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+>> +             udelay(10);
+>> +             writel(0x00, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+>> +             udelay(10);
+>> +     } else {
+>> +             writel(0xff, prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
+>> +             udelay(10);
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sunxi_cpu_powerup(unsigned int cpu, unsigned int cluster)
+>> +{
+>> +     u32 reg;
+>> +
+>> +     pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+>> +     if (cpu >= SUNXI_CPUS_PER_CLUSTER || cluster >= SUNXI_NR_CLUSTERS)
+>> +             return -EINVAL;
+>> +
+>> +     /* assert processor power-on reset */
+>> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+>> +     reg &= ~PRCM_CPU_PO_RST_CTRL_CORE(cpu);
+>> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+>> +
+>> +     /* Cortex-A7: hold L1 reset disable signal low */
+>> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
+>> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
+>> +             reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
+>> +             reg &= ~CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE(cpu);
+>> +             writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
+>> +     }
+>> +
+>> +     /* assert processor related resets */
+>> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+>> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_RST(cpu);
+>> +
+>> +     /*
+>> +      * Allwinner code also asserts resets for NEON on A15. According
+>> +      * to ARM manuals, asserting power-on reset is sufficient.
+>> +      */
+>> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
+>> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
+>> +             reg &= ~CPUCFG_CX_RST_CTRL_ETM_RST(cpu);
+>> +     }
+>> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+>> +
+>> +     /* open power switch */
+>> +     sunxi_cpu_power_switch_set(cpu, cluster, true);
+>> +
+>> +     /* clear processor power gate */
+>> +     reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+>> +     reg &= ~PRCM_PWROFF_GATING_REG_CORE(cpu);
+>> +     writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+>> +     udelay(20);
+>> +
+>> +     /* de-assert processor power-on reset */
+>> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+>> +     reg |= PRCM_CPU_PO_RST_CTRL_CORE(cpu);
+>> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+>> +
+>> +     /* de-assert all processor resets */
+>> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+>> +     reg |= CPUCFG_CX_RST_CTRL_DBG_RST(cpu);
+>> +     reg |= CPUCFG_CX_RST_CTRL_CORE_RST(cpu);
+>> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
+>> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
+>> +             reg |= CPUCFG_CX_RST_CTRL_ETM_RST(cpu);
+>> +     } else {
+>> +             reg |= CPUCFG_CX_RST_CTRL_CX_RST(cpu); /* NEON */
+>> +     }
+>> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sunxi_cluster_powerup(unsigned int cluster)
+>> +{
+>> +     u32 reg;
+>> +
+>> +     pr_debug("%s: cluster %u\n", __func__, cluster);
+>> +     if (cluster >= SUNXI_NR_CLUSTERS)
+>> +             return -EINVAL;
+>> +
+>> +     /* assert ACINACTM */
+>> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+>> +     reg |= CPUCFG_CX_CTRL_REG1_ACINACTM;
+>> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+>> +
+>> +     /* assert cluster processor power-on resets */
+>> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+>> +     reg &= ~PRCM_CPU_PO_RST_CTRL_CORE_ALL;
+>> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
+>> +
+>> +     /* assert cluster resets */
+>> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+>> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_SOC_RST;
+>> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_RST_ALL;
+>> +     reg &= ~CPUCFG_CX_RST_CTRL_H_RST;
+>> +     reg &= ~CPUCFG_CX_RST_CTRL_L2_RST;
+>> +
+>> +     /*
+>> +      * Allwinner code also asserts resets for NEON on A15. According
+>> +      * to ARM manuals, asserting power-on reset is sufficient.
+>> +      */
+>> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
+>> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
+>> +             reg &= ~CPUCFG_CX_RST_CTRL_ETM_RST_ALL;
+>> +     }
+>> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+>> +
+>> +     /* hold L1/L2 reset disable signals low */
+>> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
+>> +     if (of_machine_is_compatible("allwinner,sun9i-a80") &&
+>> +                     cluster == SUN9I_A80_A15_CLUSTER) {
+>> +             /* Cortex-A15: hold L2RSTDISABLE low */
+>> +             reg &= ~CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A15;
+>> +     } else {
+>> +             /* Cortex-A7: hold L1RSTDISABLE and L2RSTDISABLE low */
+>> +             reg &= ~CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE_ALL;
+>> +             reg &= ~CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A7;
+>> +     }
+>> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
+>> +
+>> +     /* clear cluster power gate */
+>> +     reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+>> +     reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
+>> +     writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+>> +     udelay(20);
+>> +
+>> +     /* de-assert cluster resets */
+>> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+>> +     reg |= CPUCFG_CX_RST_CTRL_DBG_SOC_RST;
+>> +     reg |= CPUCFG_CX_RST_CTRL_H_RST;
+>> +     reg |= CPUCFG_CX_RST_CTRL_L2_RST;
+>> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
+>> +
+>> +     /* de-assert ACINACTM */
+>> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+>> +     reg &= ~CPUCFG_CX_CTRL_REG1_ACINACTM;
+>> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static void sunxi_cpu_cache_disable(void)
+>> +{
+>> +     /* Disable and flush the local CPU cache. */
+>> +     v7_exit_coherency_flush(louis);
+>> +}
+>> +
+>> +/*
+>> + * This bit is shared between the initial mcpm_sync_init call to enable
+>> + * CCI-400 and proper cluster cache disable before power down.
+>> + */
+>> +static void sunxi_cluster_cache_disable_without_axi(void)
+>> +{
+>> +     if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
+>> +             /*
+>> +              * On the Cortex-A15 we need to disable
+>> +              * L2 prefetching before flushing the cache.
+>> +              */
+>> +             asm volatile(
+>> +             "mcr    p15, 1, %0, c15, c0, 3\n"
+>> +             "isb\n"
+>> +             "dsb"
+>> +             : : "r" (0x400));
+>> +     }
+>> +
+>> +     /* Flush all cache levels for this cluster. */
+>> +     v7_exit_coherency_flush(all);
+>> +
+>> +     /*
+>> +      * Disable cluster-level coherency by masking
+>> +      * incoming snoops and DVM messages:
+>> +      */
+>> +     cci_disable_port_by_cpu(read_cpuid_mpidr());
+>> +}
+>> +
+>> +static void sunxi_cluster_cache_disable(void)
+>> +{
+>> +     unsigned int cluster = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 1);
+>> +     u32 reg;
+>> +
+>> +     pr_info("%s: cluster %u\n", __func__, cluster);
+>> +
+>> +     sunxi_cluster_cache_disable_without_axi();
+>> +
+>> +     /* last man standing, assert ACINACTM */
+>> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+>> +     reg |= CPUCFG_CX_CTRL_REG1_ACINACTM;
+>> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
+>> +}
+>> +
+>> +static const struct mcpm_platform_ops sunxi_power_ops = {
+>> +     .cpu_powerup            = sunxi_cpu_powerup,
+>> +     .cluster_powerup        = sunxi_cluster_powerup,
+>> +     .cpu_cache_disable      = sunxi_cpu_cache_disable,
+>> +     .cluster_cache_disable  = sunxi_cluster_cache_disable,
+>> +};
+>> +
+>> +/*
+>> + * Enable cluster-level coherency, in preparation for turning on the MMU.
+>> + *
+>> + * Also enable regional clock gating and L2 data latency settings for
+>> + * Cortex-A15.
+>> + */
+>> +static void __naked sunxi_power_up_setup(unsigned int affinity_level)
+>> +{
+>> +     asm volatile (
+>> +             "mrc    p15, 0, r1, c0, c0, 0\n"
+>> +             "movw   r2, #" __stringify(ARM_CPU_PART_MASK & 0xffff) "\n"
+>> +             "movt   r2, #" __stringify(ARM_CPU_PART_MASK >> 16) "\n"
+>> +             "and    r1, r1, r2\n"
+>> +             "movw   r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 & 0xffff) "\n"
+>> +             "movt   r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 >> 16) "\n"
+>> +             "cmp    r1, r2\n"
+>> +             "bne    not_a15\n"
+>> +
+>> +             /* The following is Cortex-A15 specific */
+>> +
+>> +             /* L2CTRL: Enable CPU regional clock gates */
+>> +             "mrc p15, 1, r1, c15, c0, 4\n"
+>> +             "orr r1, r1, #(0x1<<31)\n"
+>> +             "mcr p15, 1, r1, c15, c0, 4\n"
+>> +
+>> +             /* L2ACTLR */
+>> +             "mrc p15, 1, r1, c15, c0, 0\n"
+>> +             /* Enable L2, GIC, and Timer regional clock gates */
+>> +             "orr r1, r1, #(0x1<<26)\n"
+>> +             /* Disable clean/evict from being pushed to external */
+>> +             "orr r1, r1, #(0x1<<3)\n"
+>> +             "mcr p15, 1, r1, c15, c0, 0\n"
+>> +
+>> +             /* L2 data RAM latency */
+>> +             "mrc p15, 1, r1, c9, c0, 2\n"
+>> +             "bic r1, r1, #(0x7<<0)\n"
+>> +             "orr r1, r1, #(0x3<<0)\n"
+>> +             "mcr p15, 1, r1, c9, c0, 2\n"
+>> +
+>> +             /* End of Cortex-A15 specific setup */
+>> +             "not_a15:\n"
+>> +
+>> +             "cmp    r0, #1\n"
+>> +             "bxne   lr\n"
+>> +             "b      cci_enable_port_for_self"
+>> +     );
+>> +}
+>> +
+>> +static void sunxi_mcpm_setup_entry_point(void)
+>> +{
+>> +     __raw_writel(virt_to_phys(mcpm_entry_point),
+>> +                  prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
+>> +}
+>> +
+>> +static int __init sunxi_mcpm_init(void)
+>> +{
+>> +     struct device_node *node;
+>> +     int ret;
+>> +
+>> +     if (!of_machine_is_compatible("allwinner,sun9i-a80"))
+>> +             return -ENODEV;
+>> +
+>> +     if (!cci_probed())
+>> +             return -ENODEV;
+>> +
+>> +     node = of_find_compatible_node(NULL, NULL,
+>> +                     "allwinner,sun9i-a80-cpucfg");
+>> +     if (!node)
+>> +             return -ENODEV;
+>> +
+>> +     cpucfg_base = of_iomap(node, 0);
+>> +     of_node_put(node);
+>> +     if (!cpucfg_base) {
+>> +             pr_err("%s: failed to map CPUCFG registers\n", __func__);
+>> +             return -ENOMEM;
+>> +     }
+>
+> Can't we request the region as well?
 
-What code are you running above? The OMAP PM code should not be failing
-due to that error message at least (as mentioned twice above).
+Yes we can! But only for the CPUCFG registers. The PRCM block is
+shared with all the PRCM block clock drivers. :(
 
-I have musb suspend working on BBB with the patch I posted yesterday
-which keeps the controller at RPM_ACTIVE during suspend:
+>
+>> +
+>> +     node = of_find_compatible_node(NULL, NULL,
+>> +                     "allwinner,sun9i-a80-prcm");
+>> +     if (!node)
+>> +             return -ENODEV;
+>> +
+>> +     prcm_base = of_iomap(node, 0);
+>> +
+>> +     of_node_put(node);
+>> +     if (!prcm_base) {
+>> +             pr_err("%s: failed to map PRCM registers\n", __func__);
+>> +             iounmap(prcm_base);
+>> +             return -ENOMEM;
+>> +     }
+>> +
+>> +     ret = mcpm_platform_register(&sunxi_power_ops);
+>> +     if (!ret)
+>> +             ret = mcpm_sync_init(sunxi_power_up_setup);
+>> +     if (!ret)
+>> +             /* do not disable AXI master as no one will re-enable it */
+>> +             ret = mcpm_loopback(sunxi_cluster_cache_disable_without_axi);
+>> +     if (ret) {
+>> +             iounmap(cpucfg_base);
+>> +             iounmap(prcm_base);
+>> +             return ret;
+>> +     }
+>> +
+>> +     mcpm_smp_set_ops();
+>> +
+>> +     pr_info("sunxi MCPM support installed\n");
+>> +
+>> +     sunxi_mcpm_setup_entry_point();
+>> +
+>> +     return ret;
+>> +}
+>
+> It looks mostly good, and I would replace the sunxi by sun9i, and call
+> that file sun9i-mcpm.c
 
-	https://marc.info/?i=20170724094939.21477-1-johan%40kernel.org
+I was hoping to reuse the file for the A83T, so it was sunxi-mcpm.c
+or just mcpm. Most of the stuff is similiar, except the A83T has two
+revisions and one of them has two gate/power bits swapped. :(
 
-Thanks,
-Johan
+ChenYu
+
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
