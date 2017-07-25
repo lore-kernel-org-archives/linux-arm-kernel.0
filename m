@@ -1,97 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Jul 2017 14:13:03 +0100
-Subject: [PATCH 3/4] arm64: unwind: reference pt_regs via embedded stack
- frame
-In-Reply-To: <20170724175446.GE9726@leverpostej>
-References: <20170724112623.26109-1-ard.biesheuvel@linaro.org>
- <20170724112623.26109-4-ard.biesheuvel@linaro.org>
- <20170724175446.GE9726@leverpostej>
-Message-ID: <20170725131303.GA28815@arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 25 Jul 2017 14:16:36 +0100
+Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
+ callback
+In-Reply-To: <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com> (Marc
+ Gonzalez's message of "Tue, 25 Jul 2017 15:08:49 +0200")
+References: <20170719190734.18566-1-opendmb@gmail.com>
+ <20170719190734.18566-3-opendmb@gmail.com>
+ <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
+ <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
+ <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
+Message-ID: <yw1xfudkodvv.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 06:54:46PM +0100, Mark Rutland wrote:
-> On Mon, Jul 24, 2017 at 12:26:22PM +0100, Ard Biesheuvel wrote:
-> > @@ -203,20 +193,13 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
-> >  		ret = unwind_frame(tsk, &frame);
-> >  		if (ret < 0)
-> >  			break;
-> > -		stack = frame.sp;
-> >  		if (in_exception_text(where)) {
-> > -			/*
-> > -			 * If we switched to the irq_stack before calling this
-> > -			 * exception handler, then the pt_regs will be on the
-> > -			 * task stack. The easiest way to tell is if the large
-> > -			 * pt_regs would overlap with the end of the irq_stack.
-> > -			 */
-> > -			if (stack < irq_stack_ptr &&
-> > -			    (stack + sizeof(struct pt_regs)) > irq_stack_ptr)
-> > -				stack = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
-> > +			stack = frame.fp - offsetof(struct pt_regs, stackframe);
-> >  
-> > -			dump_mem("", "Exception stack", stack,
-> > -				 stack + sizeof(struct pt_regs));
-> > +			if (on_task_stack(tsk, stack) ||
-> > +			    (tsk == current && !preemptible() && on_irq_stack(stack)))
-> > +				dump_mem("", "Exception stack", stack,
-> > +					 stack + sizeof(struct pt_regs));
-> 
-> So here, we're using information from three records (where the last
-> might have been faked from the current FP + LR). We look at the previous
-> frame's LR value to determine whether the current frame's fp points to a
-> next frame that's associated with some regs:
-> 
->          +----+----------------+
->          | fp | interrupted PC | /* embedded in pt_regs */
->          +----+----------------+
->            /\
->            ||
->          +----+----------------+
-> where => | fp | < entry PC >   |
->          +----+----------------+
->            /\
->            ||
->          +----+----------------+
->          | fp | where          | /* "where" is in exception text */
->          +----+----------------+
-> 
-> Which (IIUC) has three problems, inherited from the existing approach.
-> 
-> 1) Several C functions called from exception entry assembly are missing
->    __exception annotations. e.g. bad_mode.
->    
->    So we can miss exception regs in some cases.
-> 
-> 2) Several functions may be called either from the exception entry
->    assembly, or from other C code. e.g. do_undefinstr, and any cascaded
->    irqchip handlers.
->    
->    So we can spuriously decide part of the stack is a pt_regs.
-> 
-> 3) The entry assembly can enable exceptions before calling C code, so if
->    an exception is taken at the right time, these will eb in the
->    backtrace without a surrounding frame in the exception text.
-> 
->    So we can miss exception regs in some cases (distinct from (1)).
-> 
-> ... given that, I don't think we can rely on in_exception_text(). I
-> think we have to look at whether the current frame's PC/LR is in
-> .entry.text.
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-Looking around, I think most (all?) users of in_exception_text and the
-associated linker script labels suffer from similar problems. AFAICT, these
-are:
+> irq_gc_mask_disable_reg_and_ack() is not equivalent to
+> irq_gc_mask_disable_reg() and irq_gc_ack_set_bit().
+>
+> Leave the irq_mask_ack callback undefined, and let the irqchip
+> framework use irq_mask and irq_ack instead.
+>
+> Reported-by: Doug Berger <opendmb@gmail.com>
+> Fixes: 4bba66899ac6 ("irqchip/tango: Add support for Sigma Designs SMP86xx/SMP87xx interrupt controller")
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> Cc: stable at vger.kernel.org
+> ---
+> As discussed previously, it is acceptable for tango to rely
+> on mask_ack_irq() doing the right thing(TM).
+> ---
+>  drivers/irqchip/irq-tango.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/irqchip/irq-tango.c b/drivers/irqchip/irq-tango.c
+> index bdbb5c0ff7fe..825085cdab99 100644
+> --- a/drivers/irqchip/irq-tango.c
+> +++ b/drivers/irqchip/irq-tango.c
+> @@ -141,7 +141,6 @@ static void __init tangox_irq_init_chip(struct irq_chip_generic *gc,
+>  	for (i = 0; i < 2; i++) {
+>  		ct[i].chip.irq_ack = irq_gc_ack_set_bit;
+>  		ct[i].chip.irq_mask = irq_gc_mask_disable_reg;
+> -		ct[i].chip.irq_mask_ack = irq_gc_mask_disable_reg_and_ack;
+>  		ct[i].chip.irq_unmask = irq_gc_unmask_enable_reg;
+>  		ct[i].chip.irq_set_type = tangox_irq_set_type;
+>  		ct[i].chip.name = gc->domain->name;
+> -- 
 
-  kprobes	- Used to blacklist probes, but omits entry code
-  ftrace	- For graph tracer backtracing; attempted to hack around the
-		  problem in 9a5ad7d0e3e1 but still excludes .entry.text
-  kasan		- Duplicates ftrace stuff in core code, but also checks
-		  against softirqentry
+What happened to the patch adding the proper combined function?
 
-So it looks like we should either include the entry text in these sections
-or avoid using these functions altogether (eventually removing them). It
-needn't hold this series up, but worth considering.
-
-What do you think?
-
-Will
+-- 
+M?ns Rullg?rd
