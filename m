@@ -1,555 +1,180 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Tue, 25 Jul 2017 20:13:06 +0800
-Subject: [PATCH 1/4] ARM: sun9i: Support SMP on A80 with Multi-Cluster
- Power Management (MCPM)
-In-Reply-To: <CAGb2v67tGuivydj1r+uD=5aw+yYZyBabbNsKwik9ZONNQmc=jQ@mail.gmail.com>
-References: <20170725050919.16036-1-wens@csie.org>
- <20170725050919.16036-2-wens@csie.org>
- <20170725074759.5mqrwcp7djeju33g@flea>
- <CAGb2v67tGuivydj1r+uD=5aw+yYZyBabbNsKwik9ZONNQmc=jQ@mail.gmail.com>
-Message-ID: <c7c2678810aa4e14c91ac1a3fd526b32@aosc.io>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Tue, 25 Jul 2017 22:26:54 +1000
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n  - any one
+ else seeing this?
+In-Reply-To: <20170725193039.00007c80@huawei.com>
+References: <20170725193039.00007c80@huawei.com>
+Message-ID: <20170725222654.5a968588@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-07-25 16:29?Chen-Yu Tsai ???
-> default ARCH_SUNXI
-> On Tue, Jul 25, 2017 at 3:47 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Hi Chen-Yu,
->> 
->> On Tue, Jul 25, 2017 at 01:09:16PM +0800, Chen-Yu Tsai wrote:
->>> The A80 is a big.LITTLE SoC with 1 cluster of 4 Cortex-A7s and
->>> 1 cluster of 4 Cortex-A15s.
->>> 
->>> This patch adds support to bring up the second cluster and thus all
->>> cores using the common MCPM code. Core/cluster power down has not
->>> been implemented, thus CPU hotplugging and big.LITTLE switcher is
->>> not supported.
->>> 
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>>  arch/arm/mach-sunxi/Kconfig  |  10 ++
->>>  arch/arm/mach-sunxi/Makefile |   1 +
->>>  arch/arm/mach-sunxi/mcpm.c   | 391 
->>> +++++++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 402 insertions(+)
->>>  create mode 100644 arch/arm/mach-sunxi/mcpm.c
->>> 
->>> diff --git a/arch/arm/mach-sunxi/Kconfig 
->>> b/arch/arm/mach-sunxi/Kconfig
->>> index 58153cdf025b..177380548d99 100644
->>> --- a/arch/arm/mach-sunxi/Kconfig
->>> +++ b/arch/arm/mach-sunxi/Kconfig
->>> @@ -47,5 +47,15 @@ config MACH_SUN9I
->>>       bool "Allwinner (sun9i) SoCs support"
->>>       default ARCH_SUNXI
->>>       select ARM_GIC
->>> +     imply MCPM
->>> +
->>> +config SUN9I_A80_MCPM
->>> +     bool "Allwinner A80 Multi-Cluster PM support"
->>> +     depends on MCPM && MACH_SUN9I
->>> +     default MACH_SUN9I
->>> +     select ARM_CCI400_PORT_CTRL
->>> +     help
->>> +       This is needed to provide CPU and cluster power management
->>> +       on Allwinner A80 implementing big.LITTLE.
->> 
->> Do we really need an option for that? we don't provide the option to
->> disable the CPU SMP operations for the rest of the SoCs.
-> 
-> It was an option as it also required MCPM and CCI400 support to be 
-> built.
-> We could hide it. Or, using mach-hisi as a reference, we could do:
+On Tue, 25 Jul 2017 19:32:10 +0800
+Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
 
-I think a hidden config option is a proper way, as we can then select
-this config option in MACH_SUN8I when introducing A83T support.
+> Hi All,
+> 
+> We observed a regression on our d05 boards (but curiously not
+> the fairly similar but single socket / smaller core count
+> d03), initially seen with linux-next prior to the merge window
+> and still present in v4.13-rc2.
+> 
+> The symptom is:
+> 
+> [ 1982.959365] INFO: rcu_preempt detected stalls on CPUs/tasks:
+> [ 1982.965021] 	2-...: (10 GPs behind) idle=1d4/0/0 softirq=306/306 fqs=0 
+> [ 1982.971624] 	3-...: (2 GPs behind) idle=700/0/0 softirq=307/307 fqs=0 
+> [ 1982.978139] 	4-...: (20 GPs behind) idle=9f4/0/0 softirq=651/652 fqs=0 
+> [ 1982.984740] 	5-...: (18 GPs behind) idle=a78/0/0 softirq=369/371 fqs=0 
+> [ 1982.991342] 	6-...: (26 GPs behind) idle=e5c/0/0 softirq=217/219 fqs=0 
+> [ 1982.997944] 	7-...: (1438 GPs behind) idle=eb4/0/0 softirq=260/260 fqs=0 
+> [ 1983.004719] 	8-...: (18 GPs behind) idle=830/0/0 softirq=1609/1609 fqs=0 
+> [ 1983.011494] 	9-...: (18 GPs behind) idle=e9c/0/0 softirq=242/242 fqs=0 
+> [ 1983.018095] 	10-...: (1434 GPs behind) idle=ca0/0/0 softirq=210/212 fqs=0 
+> [ 1983.024957] 	11-...: (1106 GPs behind) idle=ee0/0/0 softirq=188/191 fqs=0 
+> [ 1983.031819] 	12-...: (1636 GPs behind) idle=c58/0/0 softirq=215/216 fqs=0 
+> [ 1983.038680] 	13-...: (1114 GPs behind) idle=c20/0/0 softirq=170/170 fqs=0 
+> [ 1983.045542] 	14-...: (1106 GPs behind) idle=d90/0/0 softirq=176/178 fqs=0 
+> [ 1983.052403] 	15-...: (1858 GPs behind) idle=900/0/0 softirq=184/185 fqs=0 
+> [ 1983.059266] 	16-...: (1621 GPs behind) idle=f04/0/0 softirq=204/206 fqs=0 
+> [ 1983.066127] 	17-...: (1433 GPs behind) idle=d30/0/0 softirq=202/202 fqs=0 
+> [ 1983.072988] 	18-...: (18 GPs behind) idle=2d4/0/0 softirq=218/220 fqs=0 
+> [ 1983.079676] 	19-...: (19 GPs behind) idle=bbc/0/0 softirq=178/180 fqs=0 
+> [ 1983.086364] 	20-...: (0 ticks this GP) idle=ee0/0/0 softirq=231/231 fqs=0 
+> [ 1983.093226] 	21-...: (4 GPs behind) idle=140/0/0 softirq=208/208 fqs=0 
+> [ 1983.099827] 	22-...: (5 GPs behind) idle=100/0/0 softirq=186/188 fqs=0 
+> [ 1983.106428] 	23-...: (1635 GPs behind) idle=fd4/0/0 softirq=1220/1221 fqs=0 
+> [ 1983.113463] 	24-...: (1112 GPs behind) idle=ca8/0/0 softirq=231/233 fqs=0 
+> [ 1983.120325] 	25-...: (1637 GPs behind) idle=9c4/0/0 softirq=164/166 fqs=0 
+> [ 1983.127187] 	27-...: (0 ticks this GP) idle=b08/0/0 softirq=182/182 fqs=0 
+> [ 1983.134048] 	28-...: (1110 GPs behind) idle=d28/0/0 softirq=179/181 fqs=0 
+> [ 1983.140909] 	29-...: (8 GPs behind) idle=1dc/0/0 softirq=196/198 fqs=0 
+> [ 1983.147511] 	31-...: (1434 GPs behind) idle=74c/0/0 softirq=160/161 fqs=0 
+> [ 1983.154373] 	32-...: (1432 GPs behind) idle=7d4/0/0 softirq=164/164 fqs=0 
+> [ 1983.161234] 	33-...: (1632 GPs behind) idle=4dc/0/0 softirq=130/132 fqs=0 
+> [ 1983.168096] 	34-...: (57 GPs behind) idle=3b0/0/0 softirq=411/411 fqs=0 
+> [ 1983.174784] 	35-...: (1599 GPs behind) idle=8a0/0/0 softirq=177/179 fqs=0 
+> [ 1983.181646] 	36-...: (1603 GPs behind) idle=520/0/0 softirq=132/134 fqs=0 
+> [ 1983.188507] 	37-...: (8 GPs behind) idle=02c/0/0 softirq=176/178 fqs=0 
+> [ 1983.195108] 	38-...: (1442 GPs behind) idle=d8c/0/0 softirq=3189/3190 fqs=0 
+> [ 1983.202144] 	39-...: (1431 GPs behind) idle=444/0/0 softirq=117/117 fqs=0 
+> [ 1983.209005] 	40-...: (4 GPs behind) idle=688/0/0 softirq=134/136 fqs=0 
+> [ 1983.215606] 	41-...: (1599 GPs behind) idle=554/0/0 softirq=2707/2711 fqs=0 
+> [ 1983.222642] 	42-...: (1430 GPs behind) idle=15c/0/0 softirq=110/111 fqs=0 
+> [ 1983.229503] 	43-...: (4 GPs behind) idle=054/0/0 softirq=101/103 fqs=0 
+> [ 1983.236104] 	46-...: (1117 GPs behind) idle=558/0/0 softirq=251/253 fqs=0 
+> [ 1983.242966] 	47-...: (1118 GPs behind) idle=5f0/0/0 softirq=110/112 fqs=0 
+> [ 1983.249827] 	48-...: (1621 GPs behind) idle=ef4/0/0 softirq=241/242 fqs=0 
+> [ 1983.256689] 	49-...: (1648 GPs behind) idle=92c/0/0 softirq=207/208 fqs=0 
+> [ 1983.263550] 	52-...: (1439 GPs behind) idle=e40/0/0 softirq=261/263 fqs=0 
+> [ 1983.270412] 	54-...: (1434 GPs behind) idle=650/0/0 softirq=258/260 fqs=0 
+> [ 1983.277273] 	55-...: (1646 GPs behind) idle=5e0/0/0 softirq=178/178 fqs=0 
+> [ 1983.284135] 	56-...: (1646 GPs behind) idle=800/0/0 softirq=249/249 fqs=0 
+> [ 1983.290996] 	57-...: (1599 GPs behind) idle=c48/0/0 softirq=222/224 fqs=0 
+> [ 1983.297858] 	58-...: (1648 GPs behind) idle=3e8/0/0 softirq=235/235 fqs=0 
+> [ 1983.304719] 	59-...: (1434 GPs behind) idle=720/0/0 softirq=201/203 fqs=0 
+> [ 1983.311581] 	60-...: (1647 GPs behind) idle=c80/0/0 softirq=250/250 fqs=0 
+> [ 1983.318443] 	61-...: (1598 GPs behind) idle=b18/0/0 softirq=208/208 fqs=0 
+> [ 1983.325304] 	62-...: (1112 GPs behind) idle=0a4/0/0 softirq=620/620 fqs=0 
+> [ 1983.332166] 	63-...: (1109 GPs behind) idle=4b0/0/0 softirq=187/188 fqs=0 
+> [ 1983.339026] 	(detected by 44, t=5335 jiffies, g=1566, c=1565, q=220)
+> [ 1983.345371] Task dump for CPU 2:
+> [ 1983.348587] swapper/2       R  running task        0     0      1 0x00000000
+> [ 1983.355626] Call trace:
+> [ 1983.358072] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+> [ 1983.363199] [<7fffffffffffffff>] 0x7fffffffffffffff
+> [ 1983.368062] Task dump for CPU 3:
+> [ 1983.371278] swapper/3       R  running task        0     0      1 0x00000000
+> [ 1983.378315] Call trace:
+> [ 1983.380750] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+> [ 1983.385881] [<ffff000008ea9000>] page_wait_table+0x1280/0x1800
+> [ 1983.391699] Task dump for CPU 4:
+> [ 1983.394915] swapper/4       R  running task        0     0      1 0x00000000
+> [ 1983.401951] Call trace:
+> [ 1983.404386] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+> [ 1983.409510] [<7fffffffffffffff>] 0x7fffffffffffffff
+> [ 1983.414374] Task dump for CPU 5:
+> [ 1983.417590] swapper/5       R  running task        0     0      1 0x00000000
+> [ 1983.424626] Call trace:
+> [ 1983.427060] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+> [ 1983.432185] [<7fffffffffffffff>] 0x7fffffffffffffff
+> [ 1983.437049] Task dump for CPU 6:
+> [ 1983.440265] swapper/6       R  running task        0     0      1 0x00000000
+> 
+> <snip>  Mixture of the two forms above for all the cpus
+> 
+> [ 1984.568746] Call trace:
+> [ 1984.571180] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+> [ 1984.576305] [<ffff000008ea9000>] page_wait_table+0x1280/0x1800
+> [ 1984.582124] Task dump for CPU 62:
+> [ 1984.585426] swapper/62      R  running task        0     0      1 0x00000000
+> [ 1984.592461] Call trace:
+> [ 1984.594895] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+> [ 1984.600020] [<ffff000008ea9000>] page_wait_table+0x1280/0x1800
+> [ 1984.605839] Task dump for CPU 63:
+> [ 1984.609141] swapper/63      R  running task        0     0      1 0x00000000
+> [ 1984.616176] Call trace:
+> [ 1984.618611] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+> [ 1984.623735] [<7fffffffffffffff>] 0x7fffffffffffffff
+> [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
+> [ 1984.638153] rcu_preempt     S    0     9      2 0x00000000
+> [ 1984.643626] Call trace:
+> [ 1984.646059] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+> [ 1984.651189] [<ffff000008962274>] __schedule+0x19c/0x5d8
+> [ 1984.656400] [<ffff0000089626e8>] schedule+0x38/0xa0
+> [ 1984.661266] [<ffff000008965844>] schedule_timeout+0x124/0x218
+> [ 1984.667002] [<ffff000008121424>] rcu_gp_kthread+0x4fc/0x748
+> [ 1984.672564] [<ffff0000080df0b4>] kthread+0xfc/0x128
+> [ 1984.677429] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
+> 
+> 
+> Reducing the RCU CPU stall timeout makes it happen more often,
+> but we are seeing even with the default value of 24 seconds.
+> 
+> Tends to occur after a period or relatively low usage, but has
+> also been seen mid way through performance tests.
+> 
+> This was not seen with v4.12 so a bisection run later lead to
+> commit 05a4a9527 (kernel/watchdog: split up config options).
+> 
+> Which was odd until we discovered that a side effect of this patch
+> was to change whether the softlockup detector was enabled or not in
+> the arm64 defconfig.
+> 
+> On 4.13-rc2 enabling the softlockup detector indeed stopped us
+> seeing the rcu issue. Disabling the equivalent on 4.12 made the
+> issue occur there as well.
+> 
+> Clearly the softlockup detector results in a thread on every cpu,
+> which might be related but beyond that we are still looking into
+> the issue.
+> 
+> So the obvious question is whether anyone else is seeing this as
+> it might help us to focus in on where to look!
+
+Huh. Something similar has been seen very intermittently on powerpc
+as well. We couldn't reproduce it reliably to bisect it already, so
+this is a good help.
+
+http://marc.info/?l=linuxppc-embedded&m=149872815523646&w=2
+
+It looks like the watchdog patch has a similar effect on powerpc in
+that it stops enabling the softlockup detector by default. Haven't
+confirmed, but it looks like the same thing.
+
+A bug in RCU stall detection?
 
 > 
-> config MACH_SUN9I
->         default ARCH_SUNXI
->         select ARM_GIC
->         select MCPM if SMP
->         select ARM_CCI400_PORT_CTRL if SMP
+> In the meantime we'll carry on digging.
 > 
-> and in the Makefile:
+> Thanks,
 > 
-> obj-$(CONFIG_MCPM) += sun9i-mcpm.o
+> Jonathan
 > 
->> 
->>>  endif
->>> diff --git a/arch/arm/mach-sunxi/Makefile 
->>> b/arch/arm/mach-sunxi/Makefile
->>> index 27b168f121a1..e8558912c714 100644
->>> --- a/arch/arm/mach-sunxi/Makefile
->>> +++ b/arch/arm/mach-sunxi/Makefile
->>> @@ -1,2 +1,3 @@
->>>  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
->>>  obj-$(CONFIG_SMP) += platsmp.o
->>> +obj-$(CONFIG_SUN9I_A80_MCPM) += mcpm.o
->>> diff --git a/arch/arm/mach-sunxi/mcpm.c b/arch/arm/mach-sunxi/mcpm.c
->>> new file mode 100644
->>> index 000000000000..4b6e1d6ae379
->>> --- /dev/null
->>> +++ b/arch/arm/mach-sunxi/mcpm.c
->>> @@ -0,0 +1,391 @@
->>> +/*
->>> + * Copyright (c) 2015 Chen-Yu Tsai
->>> + *
->>> + * Chen-Yu Tsai <wens@csie.org>
->>> + *
->>> + * arch/arm/mach-sunxi/mcpm.c
->>> + *
->>> + * Based on arch/arm/mach-exynos/mcpm-exynos.c and Allwinner code
->>> + *
->>> + * This program is free software; you can redistribute it and/or 
->>> modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +#include <linux/arm-cci.h>
->>> +#include <linux/delay.h>
->>> +#include <linux/io.h>
->>> +#include <linux/of_address.h>
->>> +
->>> +#include <asm/cputype.h>
->>> +#include <asm/cp15.h>
->>> +#include <asm/mcpm.h>
->>> +
->>> +#define SUNXI_CPUS_PER_CLUSTER               4
->>> +#define SUNXI_NR_CLUSTERS            2
->>> +
->>> +#define SUN9I_A80_A15_CLUSTER                1
->> 
->> Don't we have a way to derive that from the DT ?
-> 
-> Indeed we can.
-> 
-> It would be slighty more complicated though:
-> 
-> node = of_cpu_device_node_get(cluster * SUNXI_CPUS_PER_CLUSTER + cpu);
-> if (of_device_is_compatible(node, "arm,cortex-a15")) {
->         ...
-> }
-> 
->> 
->>> +#define CPUCFG_CX_CTRL_REG0(c)               (0x10 * (c))
->>> +#define CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE(n)        BIT(n)
->>> +#define CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE_ALL       0xf
->>> +#define CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A7        BIT(4)
->>> +#define CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A15       BIT(0)
->>> +#define CPUCFG_CX_CTRL_REG1(c)               (0x10 * (c) + 0x4)
->>> +#define CPUCFG_CX_CTRL_REG1_ACINACTM BIT(0)
->>> +#define CPUCFG_CX_RST_CTRL(c)                (0x80 + 0x4 * (c))
->>> +#define CPUCFG_CX_RST_CTRL_DBG_SOC_RST       BIT(24)
->>> +#define CPUCFG_CX_RST_CTRL_ETM_RST(n)        BIT(20 + (n))
->>> +#define CPUCFG_CX_RST_CTRL_ETM_RST_ALL       (0xf << 20)
->>> +#define CPUCFG_CX_RST_CTRL_DBG_RST(n)        BIT(16 + (n))
->>> +#define CPUCFG_CX_RST_CTRL_DBG_RST_ALL       (0xf << 16)
->>> +#define CPUCFG_CX_RST_CTRL_H_RST     BIT(12)
->>> +#define CPUCFG_CX_RST_CTRL_L2_RST    BIT(8)
->>> +#define CPUCFG_CX_RST_CTRL_CX_RST(n) BIT(4 + (n))
->>> +#define CPUCFG_CX_RST_CTRL_CORE_RST(n)       BIT(n)
->>> +
->>> +#define PRCM_CPU_PO_RST_CTRL(c)              (0x4 + 0x4 * (c))
->>> +#define PRCM_CPU_PO_RST_CTRL_CORE(n) BIT(n)
->>> +#define PRCM_CPU_PO_RST_CTRL_CORE_ALL        0xf
->>> +#define PRCM_PWROFF_GATING_REG(c)    (0x100 + 0x4 * (c))
->>> +#define PRCM_PWROFF_GATING_REG_CLUSTER       BIT(4)
->>> +#define PRCM_PWROFF_GATING_REG_CORE(n)       BIT(n)
->>> +#define PRCM_PWR_SWITCH_REG(c, cpu)  (0x140 + 0x10 * (c) + 0x4 * 
->>> (cpu))
->>> +#define PRCM_CPU_SOFT_ENTRY_REG              0x164
->>> +
->>> +static void __iomem *cpucfg_base;
->>> +static void __iomem *prcm_base;
->>> +
->>> +static int sunxi_cpu_power_switch_set(unsigned int cpu, unsigned int 
->>> cluster,
->>> +                                   bool enable)
->>> +{
->>> +     u32 reg;
->>> +
->>> +     /* control sequence from Allwinner A80 user manual v1.2 PRCM 
->>> section */
->>> +     reg = readl(prcm_base + PRCM_PWR_SWITCH_REG(cluster, cpu));
->>> +     if (enable) {
->>> +             if (reg == 0x00) {
->>> +                     pr_debug("power clamp for cluster %u cpu %u 
->>> already open\n",
->>> +                              cluster, cpu);
->>> +                     return 0;
->>> +             }
->>> +
->>> +             writel(0xff, prcm_base + PRCM_PWR_SWITCH_REG(cluster, 
->>> cpu));
->>> +             udelay(10);
->>> +             writel(0xfe, prcm_base + PRCM_PWR_SWITCH_REG(cluster, 
->>> cpu));
->>> +             udelay(10);
->>> +             writel(0xf8, prcm_base + PRCM_PWR_SWITCH_REG(cluster, 
->>> cpu));
->>> +             udelay(10);
->>> +             writel(0xf0, prcm_base + PRCM_PWR_SWITCH_REG(cluster, 
->>> cpu));
->>> +             udelay(10);
->>> +             writel(0x00, prcm_base + PRCM_PWR_SWITCH_REG(cluster, 
->>> cpu));
->>> +             udelay(10);
->>> +     } else {
->>> +             writel(0xff, prcm_base + PRCM_PWR_SWITCH_REG(cluster, 
->>> cpu));
->>> +             udelay(10);
->>> +     }
->>> +
->>> +     return 0;
->>> +}
->>> +
->>> +static int sunxi_cpu_powerup(unsigned int cpu, unsigned int cluster)
->>> +{
->>> +     u32 reg;
->>> +
->>> +     pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
->>> +     if (cpu >= SUNXI_CPUS_PER_CLUSTER || cluster >= 
->>> SUNXI_NR_CLUSTERS)
->>> +             return -EINVAL;
->>> +
->>> +     /* assert processor power-on reset */
->>> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->>> +     reg &= ~PRCM_CPU_PO_RST_CTRL_CORE(cpu);
->>> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->>> +
->>> +     /* Cortex-A7: hold L1 reset disable signal low */
->>> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
->>> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
->>> +             reg = readl(cpucfg_base + 
->>> CPUCFG_CX_CTRL_REG0(cluster));
->>> +             reg &= ~CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE(cpu);
->>> +             writel(reg, cpucfg_base + 
->>> CPUCFG_CX_CTRL_REG0(cluster));
->>> +     }
->>> +
->>> +     /* assert processor related resets */
->>> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->>> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_RST(cpu);
->>> +
->>> +     /*
->>> +      * Allwinner code also asserts resets for NEON on A15. 
->>> According
->>> +      * to ARM manuals, asserting power-on reset is sufficient.
->>> +      */
->>> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
->>> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
->>> +             reg &= ~CPUCFG_CX_RST_CTRL_ETM_RST(cpu);
->>> +     }
->>> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->>> +
->>> +     /* open power switch */
->>> +     sunxi_cpu_power_switch_set(cpu, cluster, true);
->>> +
->>> +     /* clear processor power gate */
->>> +     reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->>> +     reg &= ~PRCM_PWROFF_GATING_REG_CORE(cpu);
->>> +     writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->>> +     udelay(20);
->>> +
->>> +     /* de-assert processor power-on reset */
->>> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->>> +     reg |= PRCM_CPU_PO_RST_CTRL_CORE(cpu);
->>> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->>> +
->>> +     /* de-assert all processor resets */
->>> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->>> +     reg |= CPUCFG_CX_RST_CTRL_DBG_RST(cpu);
->>> +     reg |= CPUCFG_CX_RST_CTRL_CORE_RST(cpu);
->>> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
->>> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
->>> +             reg |= CPUCFG_CX_RST_CTRL_ETM_RST(cpu);
->>> +     } else {
->>> +             reg |= CPUCFG_CX_RST_CTRL_CX_RST(cpu); /* NEON */
->>> +     }
->>> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->>> +
->>> +     return 0;
->>> +}
->>> +
->>> +static int sunxi_cluster_powerup(unsigned int cluster)
->>> +{
->>> +     u32 reg;
->>> +
->>> +     pr_debug("%s: cluster %u\n", __func__, cluster);
->>> +     if (cluster >= SUNXI_NR_CLUSTERS)
->>> +             return -EINVAL;
->>> +
->>> +     /* assert ACINACTM */
->>> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->>> +     reg |= CPUCFG_CX_CTRL_REG1_ACINACTM;
->>> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->>> +
->>> +     /* assert cluster processor power-on resets */
->>> +     reg = readl(prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->>> +     reg &= ~PRCM_CPU_PO_RST_CTRL_CORE_ALL;
->>> +     writel(reg, prcm_base + PRCM_CPU_PO_RST_CTRL(cluster));
->>> +
->>> +     /* assert cluster resets */
->>> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->>> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_SOC_RST;
->>> +     reg &= ~CPUCFG_CX_RST_CTRL_DBG_RST_ALL;
->>> +     reg &= ~CPUCFG_CX_RST_CTRL_H_RST;
->>> +     reg &= ~CPUCFG_CX_RST_CTRL_L2_RST;
->>> +
->>> +     /*
->>> +      * Allwinner code also asserts resets for NEON on A15. 
->>> According
->>> +      * to ARM manuals, asserting power-on reset is sufficient.
->>> +      */
->>> +     if (!(of_machine_is_compatible("allwinner,sun9i-a80") &&
->>> +                     cluster == SUN9I_A80_A15_CLUSTER)) {
->>> +             reg &= ~CPUCFG_CX_RST_CTRL_ETM_RST_ALL;
->>> +     }
->>> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->>> +
->>> +     /* hold L1/L2 reset disable signals low */
->>> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
->>> +     if (of_machine_is_compatible("allwinner,sun9i-a80") &&
->>> +                     cluster == SUN9I_A80_A15_CLUSTER) {
->>> +             /* Cortex-A15: hold L2RSTDISABLE low */
->>> +             reg &= ~CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A15;
->>> +     } else {
->>> +             /* Cortex-A7: hold L1RSTDISABLE and L2RSTDISABLE low */
->>> +             reg &= ~CPUCFG_CX_CTRL_REG0_L1_RST_DISABLE_ALL;
->>> +             reg &= ~CPUCFG_CX_CTRL_REG0_L2_RST_DISABLE_A7;
->>> +     }
->>> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG0(cluster));
->>> +
->>> +     /* clear cluster power gate */
->>> +     reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->>> +     reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
->>> +     writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->>> +     udelay(20);
->>> +
->>> +     /* de-assert cluster resets */
->>> +     reg = readl(cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->>> +     reg |= CPUCFG_CX_RST_CTRL_DBG_SOC_RST;
->>> +     reg |= CPUCFG_CX_RST_CTRL_H_RST;
->>> +     reg |= CPUCFG_CX_RST_CTRL_L2_RST;
->>> +     writel(reg, cpucfg_base + CPUCFG_CX_RST_CTRL(cluster));
->>> +
->>> +     /* de-assert ACINACTM */
->>> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->>> +     reg &= ~CPUCFG_CX_CTRL_REG1_ACINACTM;
->>> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->>> +
->>> +     return 0;
->>> +}
->>> +
->>> +static void sunxi_cpu_cache_disable(void)
->>> +{
->>> +     /* Disable and flush the local CPU cache. */
->>> +     v7_exit_coherency_flush(louis);
->>> +}
->>> +
->>> +/*
->>> + * This bit is shared between the initial mcpm_sync_init call to 
->>> enable
->>> + * CCI-400 and proper cluster cache disable before power down.
->>> + */
->>> +static void sunxi_cluster_cache_disable_without_axi(void)
->>> +{
->>> +     if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
->>> +             /*
->>> +              * On the Cortex-A15 we need to disable
->>> +              * L2 prefetching before flushing the cache.
->>> +              */
->>> +             asm volatile(
->>> +             "mcr    p15, 1, %0, c15, c0, 3\n"
->>> +             "isb\n"
->>> +             "dsb"
->>> +             : : "r" (0x400));
->>> +     }
->>> +
->>> +     /* Flush all cache levels for this cluster. */
->>> +     v7_exit_coherency_flush(all);
->>> +
->>> +     /*
->>> +      * Disable cluster-level coherency by masking
->>> +      * incoming snoops and DVM messages:
->>> +      */
->>> +     cci_disable_port_by_cpu(read_cpuid_mpidr());
->>> +}
->>> +
->>> +static void sunxi_cluster_cache_disable(void)
->>> +{
->>> +     unsigned int cluster = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 
->>> 1);
->>> +     u32 reg;
->>> +
->>> +     pr_info("%s: cluster %u\n", __func__, cluster);
->>> +
->>> +     sunxi_cluster_cache_disable_without_axi();
->>> +
->>> +     /* last man standing, assert ACINACTM */
->>> +     reg = readl(cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->>> +     reg |= CPUCFG_CX_CTRL_REG1_ACINACTM;
->>> +     writel(reg, cpucfg_base + CPUCFG_CX_CTRL_REG1(cluster));
->>> +}
->>> +
->>> +static const struct mcpm_platform_ops sunxi_power_ops = {
->>> +     .cpu_powerup            = sunxi_cpu_powerup,
->>> +     .cluster_powerup        = sunxi_cluster_powerup,
->>> +     .cpu_cache_disable      = sunxi_cpu_cache_disable,
->>> +     .cluster_cache_disable  = sunxi_cluster_cache_disable,
->>> +};
->>> +
->>> +/*
->>> + * Enable cluster-level coherency, in preparation for turning on the 
->>> MMU.
->>> + *
->>> + * Also enable regional clock gating and L2 data latency settings 
->>> for
->>> + * Cortex-A15.
->>> + */
->>> +static void __naked sunxi_power_up_setup(unsigned int 
->>> affinity_level)
->>> +{
->>> +     asm volatile (
->>> +             "mrc    p15, 0, r1, c0, c0, 0\n"
->>> +             "movw   r2, #" __stringify(ARM_CPU_PART_MASK & 0xffff) 
->>> "\n"
->>> +             "movt   r2, #" __stringify(ARM_CPU_PART_MASK >> 16) 
->>> "\n"
->>> +             "and    r1, r1, r2\n"
->>> +             "movw   r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 & 
->>> 0xffff) "\n"
->>> +             "movt   r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 >> 
->>> 16) "\n"
->>> +             "cmp    r1, r2\n"
->>> +             "bne    not_a15\n"
->>> +
->>> +             /* The following is Cortex-A15 specific */
->>> +
->>> +             /* L2CTRL: Enable CPU regional clock gates */
->>> +             "mrc p15, 1, r1, c15, c0, 4\n"
->>> +             "orr r1, r1, #(0x1<<31)\n"
->>> +             "mcr p15, 1, r1, c15, c0, 4\n"
->>> +
->>> +             /* L2ACTLR */
->>> +             "mrc p15, 1, r1, c15, c0, 0\n"
->>> +             /* Enable L2, GIC, and Timer regional clock gates */
->>> +             "orr r1, r1, #(0x1<<26)\n"
->>> +             /* Disable clean/evict from being pushed to external */
->>> +             "orr r1, r1, #(0x1<<3)\n"
->>> +             "mcr p15, 1, r1, c15, c0, 0\n"
->>> +
->>> +             /* L2 data RAM latency */
->>> +             "mrc p15, 1, r1, c9, c0, 2\n"
->>> +             "bic r1, r1, #(0x7<<0)\n"
->>> +             "orr r1, r1, #(0x3<<0)\n"
->>> +             "mcr p15, 1, r1, c9, c0, 2\n"
->>> +
->>> +             /* End of Cortex-A15 specific setup */
->>> +             "not_a15:\n"
->>> +
->>> +             "cmp    r0, #1\n"
->>> +             "bxne   lr\n"
->>> +             "b      cci_enable_port_for_self"
->>> +     );
->>> +}
->>> +
->>> +static void sunxi_mcpm_setup_entry_point(void)
->>> +{
->>> +     __raw_writel(virt_to_phys(mcpm_entry_point),
->>> +                  prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
->>> +}
->>> +
->>> +static int __init sunxi_mcpm_init(void)
->>> +{
->>> +     struct device_node *node;
->>> +     int ret;
->>> +
->>> +     if (!of_machine_is_compatible("allwinner,sun9i-a80"))
->>> +             return -ENODEV;
->>> +
->>> +     if (!cci_probed())
->>> +             return -ENODEV;
->>> +
->>> +     node = of_find_compatible_node(NULL, NULL,
->>> +                     "allwinner,sun9i-a80-cpucfg");
->>> +     if (!node)
->>> +             return -ENODEV;
->>> +
->>> +     cpucfg_base = of_iomap(node, 0);
->>> +     of_node_put(node);
->>> +     if (!cpucfg_base) {
->>> +             pr_err("%s: failed to map CPUCFG registers\n", 
->>> __func__);
->>> +             return -ENOMEM;
->>> +     }
->> 
->> Can't we request the region as well?
-> 
-> Yes we can! But only for the CPUCFG registers. The PRCM block is
-> shared with all the PRCM block clock drivers. :(
-> 
->> 
->>> +
->>> +     node = of_find_compatible_node(NULL, NULL,
->>> +                     "allwinner,sun9i-a80-prcm");
->>> +     if (!node)
->>> +             return -ENODEV;
->>> +
->>> +     prcm_base = of_iomap(node, 0);
->>> +
->>> +     of_node_put(node);
->>> +     if (!prcm_base) {
->>> +             pr_err("%s: failed to map PRCM registers\n", __func__);
->>> +             iounmap(prcm_base);
->>> +             return -ENOMEM;
->>> +     }
->>> +
->>> +     ret = mcpm_platform_register(&sunxi_power_ops);
->>> +     if (!ret)
->>> +             ret = mcpm_sync_init(sunxi_power_up_setup);
->>> +     if (!ret)
->>> +             /* do not disable AXI master as no one will re-enable 
->>> it */
->>> +             ret = 
->>> mcpm_loopback(sunxi_cluster_cache_disable_without_axi);
->>> +     if (ret) {
->>> +             iounmap(cpucfg_base);
->>> +             iounmap(prcm_base);
->>> +             return ret;
->>> +     }
->>> +
->>> +     mcpm_smp_set_ops();
->>> +
->>> +     pr_info("sunxi MCPM support installed\n");
->>> +
->>> +     sunxi_mcpm_setup_entry_point();
->>> +
->>> +     return ret;
->>> +}
->> 
->> It looks mostly good, and I would replace the sunxi by sun9i, and call
->> that file sun9i-mcpm.c
-> 
-> I was hoping to reuse the file for the A83T, so it was sunxi-mcpm.c
-> or just mcpm. Most of the stuff is similiar, except the A83T has two
-> revisions and one of them has two gate/power bits swapped. :(
-> 
-> ChenYu
-> 
->> 
->> Thanks!
->> Maxime
->> 
->> --
->> Maxime Ripard, Free Electrons
->> Embedded Linux and Kernel engineering
->> http://free-electrons.com
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> p.s. As a more general question, do we want to have the
+> soft lockup detector enabledon arm64 by default?
+
+I've cc'ed Don. My patch should not have changed defconfigs, I
+should have been more careful with that.
+
+Thanks,
+Nick
