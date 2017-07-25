@@ -1,33 +1,44 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 25 Jul 2017 16:15:02 +0200
-Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
- callback
-In-Reply-To: <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
-References: <20170719190734.18566-1-opendmb@gmail.com>
- <20170719190734.18566-3-opendmb@gmail.com>
- <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
- <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
- <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
-Message-ID: <2928ba37-6bb9-1004-bc85-0c13ad513a2c@sigmadesigns.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 25 Jul 2017 16:30:16 +0200
+Subject: [PATCH 1/4] arm: multi_v7: Add AXP20X_POWER
+In-Reply-To: <CAGb2v65TMPh8iVAzM=8bakqh15r01AumAUJdpqm8hWh+kxWKjg@mail.gmail.com>
+References: <20170721162005.18892-1-maxime.ripard@free-electrons.com>
+ <CAGb2v65TMPh8iVAzM=8bakqh15r01AumAUJdpqm8hWh+kxWKjg@mail.gmail.com>
+Message-ID: <20170725143016.4std25kzz64gx7or@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/2017 15:08, Marc Gonzalez wrote:
-
-> irq_gc_mask_disable_reg_and_ack() is not equivalent to
-> irq_gc_mask_disable_reg() and irq_gc_ack_set_bit().
+On Mon, Jul 24, 2017 at 04:14:17PM +0800, Chen-Yu Tsai wrote:
+> On Sat, Jul 22, 2017 at 12:20 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The multi_v7 defconfig is missing the AXP209 USB power supply driver,
+> > resulting in non-working USB controllers because the USB PHY will always
+> > return EPROBE_DEFER.
+> >
+> > Make sure it's selected.
 > 
-> Leave the irq_mask_ack callback undefined, and let the irqchip
-> framework use irq_mask and irq_ack instead.
+> This seems weird. You only change it from a module to built-in.
+> AFAIK, the module does have proper module aliases, and the mfd
+> core does give out proper uevents for modaliases.
 > 
-> Reported-by: Doug Berger <opendmb@gmail.com>
-> Fixes: 4bba66899ac6 ("irqchip/tango: Add support for Sigma Designs SMP86xx/SMP87xx interrupt controller")
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> Cc: stable at vger.kernel.org
+> Is the module not getting loaded? Or is it loaded too late?
 
-FWIW, the lockup reported in the thread below disappears
-once the patch is applied.
+Nevermind, after reading this back, the commit log is wrong, like you
+suggested. The only odd thing is that everything else in order to have
+USB working without modules is there but the PHY.
 
-https://lkml.org/lkml/2016/10/21/709
+But I guess it's fine.
 
-Regards.
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/07cba3fc/attachment.sig>
