@@ -1,68 +1,195 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Jul 2017 12:46:57 +0100
-Subject: [PATCH 00/16] arm/arm64: Workaround misprogrammed CNTFRQ
-In-Reply-To: <780a5b17-e25c-188e-70cc-e0ffab5f3da9@arm.com>
-References: <20170721171542.27639-1-marc.zyngier@arm.com>
- <20170724121958.GC29919@arm.com>
- <c3c34b9b-3872-bbb1-28cf-07aa6c739e94@arm.com>
- <20170724131252.GG29919@arm.com>
- <780a5b17-e25c-188e-70cc-e0ffab5f3da9@arm.com>
-Message-ID: <20170725114656.GA27768@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 25 Jul 2017 20:45:03 +0800
+Subject: [PATCH v2 2/3] arm64: allwinner: a64: enable AXP803 for Banana Pi M64
+In-Reply-To: <20170725124504.40242-1-icenowy@aosc.io>
+References: <20170725124504.40242-1-icenowy@aosc.io>
+Message-ID: <20170725124504.40242-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 02:35:08PM +0100, Marc Zyngier wrote:
-> On 24/07/17 14:12, Will Deacon wrote:
-> > On Mon, Jul 24, 2017 at 01:48:37PM +0100, Marc Zyngier wrote:
-> >> On 24/07/17 13:19, Will Deacon wrote:
-> >>> On Fri, Jul 21, 2017 at 06:15:26PM +0100, Marc Zyngier wrote:
-> >>>> It is an unfortunate situation that CNTFRQ{,_EL0} is often
-> >>>> misprogrammed from the firmware side, leaving it up to the kernel to
-> >>>> work around it. This is usually done by providing an alternative
-> >>>> frequency in the Device Tree.
-> >>>>
-> >>>> Unfortunately, CNTFRQ is accessible from EL0, giving userspace the
-> >>>> wrong frequency, and potentially a different frequency per CPU, which
-> >>>> is definitely not what you want. A possible workaround is to trap this
-> >>>> into the kernel and to emulate it (together with the VDSO being
-> >>>> disabled), and this is what this series is achieving.
-> >>>
-> >>> Which userspace is actually affected by a broken CNTFRQ register? I suspect
-> >>> most users will be more upset at losing their (perfectly functional) vDSO
-> >>> acceleration than they are about having a broken CNTFRQ value that is hardly
-> >>> ever used, especially since this affects quite a few systems.
-> >>
-> >> OpenMPI is one of the things I'm aware of (we broke it when implementing
-> >> the first set of timer workarounds), and from trawling the Debian code
-> >> search, at least HHVM is another candidate. How this will affect them is
-> >> anybody's guess.
-> > 
-> > The latest mcrouter sources pulled into HHVM don't use cntfrq, but you're
-> > right about OpenMPI. However, these things are using the counter directly
-> > as a performance optimisation: the moment we start trapping then they've
-> > lost. I doubt it's much better than giving the wrong data for the
-> > frequency (i.e. they're just as broken in both cases).
-> > 
-> > So, if they want to run on these systems, their best bet is to use the
-> > vDSO-accelerated clock_gettime implementation. Yes, there's a dispatch cost
-> > compared to an inline asm, but it will beat the pants off a trap to the
-> > kernel. The problem is that this patch series prevents them from doing that
-> > and just means they're screwed whatever they do. We can point at the broken
-> > firmware, but it doesn't feel to me like this workaround is really helping
-> > anybody :/.
-> 
-> Fair enough.
-> 
-> It still remains that our trapping story is inconsistent. When we
-> workaround timer issues, we do disable the VDSO and trap both cntvct and
-> cntfrq. These will trap to EL1, and we'll deliver a SIGILL to userspace,
-> while 64bit userspace will just work. Is that something we want to address?
+Banana Pi M64 board uses an AXP803 PMIC.
 
-That's a good question, and I guess it depends on whether or not we have
-people asking for that. Are we aware of userspace that is being broken by
-this? If so, then we can address it, otherwise we can wait until somebody
-shouts. It's not unlikely that any 32-bit code trying to use the counter
-registers directly already handles SIGILL, since that's what will happen
-on older CPUs without the arch timer anyway.
+Enable the PMIC and its regulators.
 
-Will
+As we have now proper regulators support, missing or dummy regulators
+are changed to the correct ones.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v2:
+- Changed vdd-cpux constraints.
+- Added vcc-1v2-hsic regulator.
+
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 122 +++++++++++++++++++--
+ 1 file changed, 112 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index a4a7b9cb59b9..ec72ca8c8b30 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -59,13 +59,6 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
+-
+-	reg_vcc3v3: vcc3v3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vcc3v3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-	};
+ };
+ 
+ &ehci1 {
+@@ -77,6 +70,7 @@
+ 	pinctrl-0 = <&rgmii_pins>;
+ 	phy-mode = "rgmii";
+ 	phy-handle = <&ext_rgmii_phy>;
++	phy-supply = <&reg_dc1sw>;
+ 	status = "okay";
+ };
+ 
+@@ -100,7 +94,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+ 	cd-inverted;
+ 	disable-wp;
+@@ -111,7 +105,8 @@
+ &mmc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dldo2>;
++	vqmmc-supply = <&reg_dldo4>;
+ 	bus-width = <4>;
+ 	non-removable;
+ 	status = "okay";
+@@ -120,7 +115,7 @@
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins>;
+-	vmmc-supply = <&reg_vcc3v3>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	cap-mmc-hw-reset;
+@@ -131,6 +126,113 @@
+ 	status = "okay";
+ };
+ 
++&r_rsb {
++	status = "okay";
++
++	axp803: pmic at 3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++#include "axp803.dtsi"
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dc1sw {
++	regulator-name = "vcc-phy";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-3v3";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1040000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-cpux";
++};
++
++/* DCDC3 is polyphased with DCDC2 */
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-hdmi-dsi";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&reg_dldo4 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi-io";
++};
++
++&reg_eldo1 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "cpvdd";
++};
++
++&reg_fldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-1v2-hsic";
++};
++
++/*
++ * The A64 chip cannot work without this regulator off, although
++ * it seems to be only driving the AR100 core.
++ * Maybe we don't still know well about CPUs domain.
++ */
++&reg_fldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-- 
+2.13.0
