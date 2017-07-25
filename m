@@ -1,99 +1,261 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 25 Jul 2017 14:10:29 -0700 (PDT)
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170725175207.000001cb@huawei.com>
-References: <20170725224245.00004e7e@huawei.com>
- <20170725151245.GO3730@linux.vnet.ibm.com>
- <20170725175207.000001cb@huawei.com>
-Message-ID: <20170725.141029.676882447882600000.davem@davemloft.net>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 25 Jul 2017 23:42:10 +0200
+Subject: [PATCH v4 02/12] ALSA: ac97: add an ac97 bus
+In-Reply-To: <20170724204928.29505-3-robert.jarzmik@free.fr>
+References: <20170724204928.29505-1-robert.jarzmik@free.fr>
+ <20170724204928.29505-3-robert.jarzmik@free.fr>
+Message-ID: <s5h60eg8a8d.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-Date: Wed, 26 Jul 2017 00:52:07 +0800
-
-> On Tue, 25 Jul 2017 08:12:45 -0700
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+On Mon, 24 Jul 2017 22:49:18 +0200,
+Robert Jarzmik wrote:
 > 
->> On Tue, Jul 25, 2017 at 10:42:45PM +0800, Jonathan Cameron wrote:
->> > On Tue, 25 Jul 2017 06:46:26 -0700
->> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
->> >   
->> > > On Tue, Jul 25, 2017 at 10:26:54PM +1000, Nicholas Piggin wrote:  
->> > > > On Tue, 25 Jul 2017 19:32:10 +0800
->> > > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
->> > > >     
->> > > > > Hi All,
->> > > > > 
->> > > > > We observed a regression on our d05 boards (but curiously not
->> > > > > the fairly similar but single socket / smaller core count
->> > > > > d03), initially seen with linux-next prior to the merge window
->> > > > > and still present in v4.13-rc2.
->> > > > > 
->> > > > > The symptom is:    
->> > > 
->> > > Adding Dave Miller and the sparclinux at vger.kernel.org email on CC, as
->> > > they have been seeing something similar, and you might well have saved
->> > > them the trouble of bisecting.
->> > > 
->> > > [ . . . ]
->> > >   
->> > > > > [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1    
->> > > 
->> > > This is the cause from an RCU perspective.  You had a lot of idle CPUs,
->> > > and RCU is not permitted to disturb them -- the battery-powered embedded
->> > > guys get very annoyed by that sort of thing.  What happens instead is
->> > > that each CPU updates a per-CPU state variable when entering or exiting
->> > > idle, and the grace-period kthread ("rcu_preempt kthread" in the above
->> > > message) checks these state variables, and if when sees an idle CPU,
->> > > it reports a quiescent state on that CPU's behalf.
->> > > 
->> > > But the grace-period kthread can only do this work if it gets a chance
->> > > to run.  And the message above says that this kthread hasn't had a chance
->> > > to run for a full 5,663 jiffies.  For completeness, the "g1566 c1565"
->> > > says that grace period #1566 is in progress, the "f0x0" says that no one
->> > > is needing another grace period #1567.  The "RCU_GP_WAIT_FQS(3)" says
->> > > that the grace-period kthread has fully initialized the current grace
->> > > period and is sleeping for a few jiffies waiting to scan for idle tasks.
->> > > Finally, the "->state=0x1" says that the grace-period kthread is in
->> > > TASK_INTERRUPTIBLE state, in other words, still sleeping.  
->> > 
->> > Thanks for the explanation!  
->> > > 
->> > > So my first question is "What did commit 05a4a9527 (kernel/watchdog:
->> > > split up config options) do to prevent the grace-period kthread from
->> > > getting a chance to run?"   
->> > 
->> > As far as we can tell it was a side effect of that patch.
->> > 
->> > The real cause is that patch changed the result of defconfigs to stop running
->> > the softlockup detector - now CONFIG_SOFTLOCKUP_DETECTOR
->> > 
->> > Enabling that on 4.13-rc2 (and presumably everything in between)
->> > means we don't see the problem any more.
->> >   
->> > > I must confess that I don't see anything
->> > > obvious in that commit, so my second question is "Are we sure that
->> > > reverting this commit makes the problem go away?"  
->> > 
->> > Simply enabling CONFIG_SOFTLOCKUP_DETECTOR seems to make it go away.
->> > That detector fires up a thread on every cpu, which may be relevant.  
->> 
->> Interesting...  Why should it be necessary to fire up a thread on every
->> CPU in order to make sure that RCU's grace-period kthreads get some
->> CPU time?  Especially give how many idle CPUs you had on your system.
->> 
->> So I have to ask if there is some other bug that the softlockup detector
->> is masking.
-> I am thinking the same.  We can try going back further than 4.12 tomorrow
-> (we think we can realistically go back to 4.8 and possibly 4.6
-> with this board)
+> AC97 is a bus for sound usage. It enables for a AC97 AC-Link to link one
+> controller to 0 to 4 AC97 codecs.
+> 
+> The goal of this new implementation is to implement a device/driver
+> model for AC97, with an automatic scan of the bus and automatic
+> discovery of AC97 codec devices.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> Since RFCv1:
+>  - Takashi's review
+>    - changed the codec.h guard ... a better name could be found ...
+>    - added the AC97_* macros missing parenthesis
+>    - constantified the id_table in the codec driver structure
+>    - changed the 4 codecs linked list into an array
+>    - enabled the ac97 bus to be a module
+>    - added a slots_available to snd_ac97_controller_register() to have a
+>      way to prevent scanning and probing of unconnected codecs
+>    - removed useless ac97 bus index
+>    - all exported functions begin with snd_ac97_*()
+>    - change bus operations to controller+slot parameters instead of
+>      codec device
+> 
+>  - Mark's review
+>    - changed ac97_digital_controller into ac97_controller
+>    - rename ac97_digital_controller_*() into ac97_controller_*()
+>    - add the ac97 ac-link clock to the codec device (ie. the AC'97
+>      BIT_CLK)
+> 
+> Since RFCv2:
+>  - more snd_ac97 namespace review
+>  - change the compat allocation prototype to force the user to provide
+>    and ac97_codec_device structure pointer
+> 
+> Since v1:
+>  - took into account all Lars comments
+> 
+> Since v3:
+>  - took into account Takashi's comments (ac97bus naming and module_exit)
 
-Just to report, turning softlockup back on fixes things for me on
-sparc64 too.
+It looks mostly OK, but some nitpicking:
 
-The thing about softlockup is it runs an hrtimer, which seems to run
-about every 4 seconds.
 
-So I wonder if this is a NO_HZ problem.
+> diff --git a/include/sound/ac97/compat.h b/include/sound/ac97/compat.h
+> new file mode 100644
+> index 000000000000..d876464bf7e4
+> --- /dev/null
+> +++ b/include/sound/ac97/compat.h
+> @@ -0,0 +1,21 @@
+> +/*
+> + *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This file is for backward compatibility with snd_ac97 structure and its
+> + * multiple usages, such as the snd_ac97_bus and snd_ac97_build_ops.
+> + *
+> + */
+> +#ifndef AC97_COMPAT_H
+> +#define AC97_COMPAT_H
+> +
+> +#include <sound/ac97_codec.h>
+> +#include <sound/soc.h>
+
+Is this inclusion needed?  The code here doesn't look ASoC-specific at
+all.
+
+> --- /dev/null
+> +++ b/include/sound/ac97/controller.h
+> @@ -0,0 +1,84 @@
+> +/*
+> + *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef AC97_CONTROLLER_H
+> +#define AC97_CONTROLLER_H
+> +
+> +#include <linux/list.h>
+> +
+> +#define AC97_BUS_MAX_CODECS 4
+> +#define AC97_SLOTS_AVAILABLE_ALL 0xf
+> +
+> +struct device;
+
+You need the definition struct device in below (it's no pointer), thus
+you have to include <linux/device.h> instead.
+
+> +
+> +/**
+> + * struct ac97_controller - The AC97 controller of the AC-Link
+> + * @ops:		the AC97 operations.
+> + * @controllers:	linked list of all existing controllers.
+> + * @adap:		the shell device ac97-%d, ie. ac97 adapter
+> + * @nr:			the number of the shell device
+> + * @parent:		the device providing the AC97 controller.
+> + * @slots_available:	the mask of accessible/scanable codecs.
+> + * @codecs:		the 4 possible AC97 codecs (NULL if none found).
+> + * @codecs_pdata:	platform_data for each codec (NULL if no pdata).
+> + *
+> + * This structure is internal to AC97 bus, and should not be used by the
+> + * controllers themselves, excepting for using @dev.
+> + */
+> +struct ac97_controller {
+> +	const struct ac97_controller_ops *ops;
+
+The struct isn't declared beforehand?  GCC will warn.
+
+> +	struct list_head controllers;
+> +	struct device adap;
+> +	int nr;
+> +	struct device *parent;
+> +	unsigned short slots_available;
+
+I'd move parent field below, so that 64bit pointer can be aligned
+better.
+
+> +static int ac97_codec_add(struct ac97_controller *ac97_ctrl, int idx,
+> +		   unsigned int vendor_id)
+> +{
+> +	struct ac97_codec_device *codec;
+> +	int ret;
+> +
+> +	codec = kzalloc(sizeof(*codec), GFP_KERNEL);
+> +	if (!codec)
+> +		return -ENOMEM;
+> +	ac97_ctrl->codecs[idx] = codec;
+> +	codec->vendor_id = vendor_id;
+> +	codec->dev.release = ac97_codec_release;
+> +	codec->dev.bus = &ac97_bus_type;
+> +	codec->dev.parent = &ac97_ctrl->adap;
+> +	codec->num = idx;
+> +	codec->ac97_ctrl = ac97_ctrl;
+> +
+> +	device_initialize(&codec->dev);
+> +	dev_set_name(&codec->dev, "%s:%u", dev_name(ac97_ctrl->parent), idx);
+> +
+> +	ret = device_add(&codec->dev);
+> +	if (ret)
+> +		goto err_free_codec;
+> +
+> +	return 0;
+> +err_free_codec:
+> +	kfree(codec);
+
+This may leave the device name string.  You need to call
+put_device() even if device_add() returns an error.
+
+
+> +	ac97_ctrl->codecs[idx] = NULL;
+> +
+> +	return ret;
+> +}
+> +
+> +unsigned int snd_ac97_bus_scan_one(struct ac97_controller *adrv,
+> +				   unsigned int codec_num)
+> +{
+> +	unsigned short vid1, vid2;
+> +	int ret;
+> +
+> +	ret = adrv->ops->read(adrv, codec_num, AC97_VENDOR_ID1);
+> +	vid1 = (ret & 0xffff);
+> +	if (ret < 0)
+> +		return 0;
+> +
+> +	ret = adrv->ops->read(adrv, codec_num, AC97_VENDOR_ID2);
+> +	vid2 = (ret & 0xffff);
+> +	if (ret < 0)
+> +		return 0;
+> +
+> +	dev_dbg(&adrv->adap, "%s(codec_num=%u): vendor_id=0x%08x\n",
+> +		__func__, codec_num, AC97_ID(vid1, vid2));
+> +	return AC97_ID(vid1, vid2);
+> +}
+> +
+> +static int ac97_bus_scan(struct ac97_controller *ac97_ctrl)
+> +{
+> +	int ret, i;
+> +	unsigned int vendor_id;
+> +
+> +	for (i = 0; i < AC97_BUS_MAX_CODECS; i++) {
+> +		if (ac97_codec_find(ac97_ctrl, i))
+> +			continue;
+> +		if (!(ac97_ctrl->slots_available & BIT(i)))
+> +			continue;
+> +		vendor_id = snd_ac97_bus_scan_one(ac97_ctrl, i);
+> +		if (!vendor_id)
+> +			continue;
+> +
+> +		ret = ac97_codec_add(ac97_ctrl, i, vendor_id);
+> +		if (ret < 0)
+> +			return ret;
+> +	}
+> +	return 0;
+> +}
+> +
+> +static int ac97_bus_reset(struct ac97_controller *ac97_ctrl)
+> +{
+> +	ac97_ctrl->ops->reset(ac97_ctrl);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * snd_ac97_codec_driver_register - register an AC97 codec driver
+> + * @dev: AC97 driver codec to register
+> + *
+> + * Register an AC97 codec driver to the ac97 bus driver, aka. the AC97 digital
+> + * controller.
+> + *
+> + * Returns 0 on success or error code
+> + */
+> +int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
+> +{
+> +	int ret;
+> +
+> +	drv->driver.bus = &ac97_bus_type;
+> +	ret = driver_register(&drv->driver);
+> +
+> +	return ret;
+
+This can be simplified.
+
+> +}
+> +EXPORT_SYMBOL(snd_ac97_codec_driver_register);
+
+No GPL?  (Ditto for other entries, too)
+
+> +int snd_ac97_reset(struct snd_ac97 *ac97, bool try_warm, unsigned int id,
+> +	unsigned int id_mask)
+> +{
+> +	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
+> +	struct ac97_controller *actrl = adev->ac97_ctrl;
+> +
+> +	if (try_warm) {
+> +		compat_ac97_warm_reset(ac97);
+> +		if (snd_ac97_bus_scan_one(actrl, adev->num) == adev->vendor_id)
+
+Can we ignore id_mask here?  I'm not quite sure whether it's fixed...
+
+
+thanks,
+
+Takashi
