@@ -1,65 +1,97 @@
-From: Jiong.Wang@arm.com (Jiong Wang)
-Date: Tue, 25 Jul 2017 14:00:56 +0000
-Subject: [PATCH 00/11] ARMv8.3 pointer authentication userspace support
-In-Reply-To: <20170725120630.GA8116@leverpostej>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <20170721170509.GC1538@e103592.cambridge.arm.com>,
- <20170725120630.GA8116@leverpostej>
-Message-ID: <DB6PR0802MB2405BBA6E6D545F35F0154A39FB80@DB6PR0802MB2405.eurprd08.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Jul 2017 14:58:34 +0100
+Subject: [PATCH 3/4] arm64: unwind: reference pt_regs via embedded stack
+ frame
+In-Reply-To: <20170725131303.GA28815@arm.com>
+References: <20170724112623.26109-1-ard.biesheuvel@linaro.org>
+ <20170724112623.26109-4-ard.biesheuvel@linaro.org>
+ <20170724175446.GE9726@leverpostej>
+ <20170725131303.GA28815@arm.com>
+Message-ID: <20170725135833.GA8372@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > * Should the kernel remove PACs when unwinding user stacks?
-> >
-> >   This is simple to do, but it's arguably placing a policy in the kernel as to
-> >   what we expect user stacks to look like. Regardless, userspace will have to
-> >   perform this when unwinding with DWARF.
->>
->> Not sure.  This is arguably not more gross than related things the
->> kernel already does, and may be inefficient for userspace to do e.g.,
->> when capturing perf backtraces.  Still gross though.
->>
->> Side question: do you know whether there will be DWARF / ELF annotations
->> for this?  Since ptr auth is a compile-time option, it is plausible that
->> an attribute could be added to indicate that an image uses it.
+On Tue, Jul 25, 2017 at 02:13:03PM +0100, Will Deacon wrote:
+> On Mon, Jul 24, 2017 at 06:54:46PM +0100, Mark Rutland wrote:
+> > On Mon, Jul 24, 2017 at 12:26:22PM +0100, Ard Biesheuvel wrote:
 
-> Jiong, Yao, can you answer this?
->
-> I think that there's DWARF metadata for unwinding, but I'm not sure
-> there's an ELF annotation on an image.
->
-> Note that you may link with libraries which may or may not use pointer
-> auth, so a single process can have a mixture of code using pointer auth,
-> and code which does not.
+> > So here, we're using information from three records (where the last
+> > might have been faked from the current FP + LR). We look at the previous
+> > frame's LR value to determine whether the current frame's fp points to a
+> > next frame that's associated with some regs:
+> > 
+> >          +----+----------------+
+> >          | fp | interrupted PC | /* embedded in pt_regs */
+> >          +----+----------------+
+> >            /\
+> >            ||
+> >          +----+----------------+
+> > where => | fp | < entry PC >   |
+> >          +----+----------------+
+> >            /\
+> >            ||
+> >          +----+----------------+
+> >          | fp | where          | /* "where" is in exception text */
+> >          +----+----------------+
+> > 
+> > Which (IIUC) has three problems, inherited from the existing approach.
+> > 
+> > 1) Several C functions called from exception entry assembly are missing
+> >    __exception annotations. e.g. bad_mode.
+> >    
+> >    So we can miss exception regs in some cases.
+> > 
+> > 2) Several functions may be called either from the exception entry
+> >    assembly, or from other C code. e.g. do_undefinstr, and any cascaded
+> >    irqchip handlers.
+> >    
+> >    So we can spuriously decide part of the stack is a pt_regs.
+> > 
+> > 3) The entry assembly can enable exceptions before calling C code, so if
+> >    an exception is taken at the right time, these will eb in the
+> >    backtrace without a surrounding frame in the exception text.
+> > 
+> >    So we can miss exception regs in some cases (distinct from (1)).
+> > 
+> > ... given that, I don't think we can rely on in_exception_text(). I
+> > think we have to look at whether the current frame's PC/LR is in
+> > .entry.text.
+> 
+> Looking around, I think most (all?) users of in_exception_text and the
+> associated linker script labels suffer from similar problems. AFAICT, these
+> are:
+> 
+>   kprobes	- Used to blacklist probes, but omits entry code
+>   ftrace	- For graph tracer backtracing; attempted to hack around the
+> 		  problem in 9a5ad7d0e3e1 but still excludes .entry.text
+>   kasan		- Duplicates ftrace stuff in core code, but also checks
+> 		  against softirqentry
+> 
+> So it looks like we should either include the entry text in these sections
+> or avoid using these functions altogether (eventually removing them). It
+> needn't hold this series up, but worth considering.
+> 
+> What do you think?
 
-Yes, there is new DWARF frame information for pointer authentication to describe
-the signing status at instruction level.  There is no ELF annotation on an image.
+Agreed; this is currently a mess, and I don't think it's possible to
+make portable inferences based on these sections. This will all need an
+audit.
 
-As the use cases of pointer authentication extension in GCC are about return
-address signing.  The DWARF extension is mostly around describing signed LR so
-the unwinder could have a way to figure out the original value of it to continue
-unwinding.
+As you say, I think that needn't hold this series up, as those are
+orthogonal issues. I'm happy to dig into those in the coming weeks.
 
-In general, whenever return address, i.e. LR register, is mangled or restored by
-hardware instruction, compiler (or assembly writer) is expected to generate a
-DW_CFA_AARCH64_negate_ra_state CFA instruction.
+The kasan case isn't too problematic. It only affects where an
+alloc/free stacktrace gets trimmed for an alloc/free in an IRQ handler,
+so in the worst case we just lose a few frames beyond the inner irqchip
+handler in the dumped backtrace.
 
-For DWARF unwinder, during unwinding, whenever a DW_CFA_AARCH64_negate_ra_state
-is hit, the unwinder toggle the LR signing status and kept it in bit zero (lsb)
-of a new DWARF register AARCH64_DWARF_PAUTH_RA_STATE whose value must be honored
-later when unwinding the value of LR. If the lsb of AARCH64_DWARF_PAUTH_RA_STATE
-is set, it means the return address is mangled, then the unwinder needs to
-restore LR by either masking off the signature (userspace unwinders need ptrace
-interface to get this) or executing signature strip instruction (can only be
-done by native unwinder) or executing authentication instruction (can only be
-done by native unwinder).
+For kprobes/ftrace, I'd need to do some further digging.
 
-Please see the following links for more details:
-  https://gcc.gnu.org/ml/gcc-patches/2017-01/msg00376.html
-  https://gcc.gnu.org/ml/gcc-patches/2016-11/msg03010.html
+I'd looked at cleaning up .irqentry.text in the past (as part of further
+arm64/entry-deasm work). It's typically used to find the task->IRQ (or
+X->IRQ) transition. That can be cleaned up by having a single
+(annotated) arch-specific entry point that invokes (unannotated) irqchip
+handlers. This would fix kasan, at least.
 
-
-Regards,
-Jiong
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Thanks,
+Mark.
