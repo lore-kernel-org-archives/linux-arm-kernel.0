@@ -1,175 +1,98 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 25 Jul 2017 18:06:12 -0400
-Subject: [PATCH 3/3] ARM: dts: NSP: Add USB3 and USB3 PHY to NSP
-In-Reply-To: <1501020372-19607-1-git-send-email-jon.mason@broadcom.com>
-References: <1501020372-19607-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1501020372-19607-4-git-send-email-jon.mason@broadcom.com>
+From: dja@axtens.net (Daniel Axtens)
+Date: Wed, 26 Jul 2017 08:20:18 +1000
+Subject: [PATCH 0/4] Allow non-legacy cards to be vgaarb default
+In-Reply-To: <a61222c6-e548-1e3b-f6f7-63952b90ac13@redhat.com>
+References: <20170719012839.20124-1-dja@axtens.net>
+ <CAKv+Gu-SgeLXVEj_VtZHchaNmOwWO+GmfTg5CYcnOF43AJZGnA@mail.gmail.com>
+ <87pocusm2x.fsf@linkitivity.dja.id.au>
+ <CAKv+Gu-O7cyJSgDrqSNi6F_n9eBnFEgz==aqowMqhy+81YK=CQ@mail.gmail.com>
+ <87r2x6vj7t.fsf@linkitivity.dja.id.au>
+ <a61222c6-e548-1e3b-f6f7-63952b90ac13@redhat.com>
+Message-ID: <87lgncupjx.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses the existing Northstar USB3 PHY driver to enable the USB3
-ports on NSP.
+Hi Laszlo,
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi     | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm958522er.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958525er.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958525xmc.dts |  8 ++++++++
- arch/arm/boot/dts/bcm958622hr.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958623hr.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958625hr.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958625k.dts   |  8 ++++++++
- 8 files changed, 75 insertions(+)
+Thanks for your input!
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 770aa2e7970c..8ba53b834cc8 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -303,6 +303,16 @@
- 			#size-cells = <0>;
- 		};
- 
-+		xhci: usb at 29000 {
-+			compatible = "generic-xhci";
-+			reg = <0x29000 0x1000>;
-+			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
-+			phys = <&usb3_phy>;
-+			phy-names = "usb3-phy";
-+			dma-coherent;
-+			status = "disabled";
-+		};
-+
- 		ehci0: usb at 2a000 {
- 			compatible = "generic-ehci";
- 			reg = <0x2a000 0x100>;
-@@ -471,6 +481,15 @@
- 				phy-names = "sata-phy";
- 			};
- 		};
-+
-+		usb3_phy: usb3-phy at 104000 {
-+			compatible = "brcm,ns-bx-usb3-phy";
-+			reg = <0x104000 0x1000>,
-+			      <0x032000 0x1000>;
-+			reg-names = "dmp", "ccb-mii";
-+			#phy-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
- 
- 	pcie0: pcie at 18012000 {
-diff --git a/arch/arm/boot/dts/bcm958522er.dts b/arch/arm/boot/dts/bcm958522er.dts
-index f5c42962c201..f9dd342cc2ae 100644
---- a/arch/arm/boot/dts/bcm958522er.dts
-+++ b/arch/arm/boot/dts/bcm958522er.dts
-@@ -170,3 +170,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958525er.dts b/arch/arm/boot/dts/bcm958525er.dts
-index efcb1f67bdad..374508a9cfbf 100644
---- a/arch/arm/boot/dts/bcm958525er.dts
-+++ b/arch/arm/boot/dts/bcm958525er.dts
-@@ -182,3 +182,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958525xmc.dts b/arch/arm/boot/dts/bcm958525xmc.dts
-index b335ce02e32f..403250c5ad8e 100644
---- a/arch/arm/boot/dts/bcm958525xmc.dts
-+++ b/arch/arm/boot/dts/bcm958525xmc.dts
-@@ -202,3 +202,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958622hr.dts b/arch/arm/boot/dts/bcm958622hr.dts
-index 16ab2d82a14b..fd8b8c689ffe 100644
---- a/arch/arm/boot/dts/bcm958622hr.dts
-+++ b/arch/arm/boot/dts/bcm958622hr.dts
-@@ -219,3 +219,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958623hr.dts b/arch/arm/boot/dts/bcm958623hr.dts
-index 9b921c6aa8f8..3bc50849d013 100644
---- a/arch/arm/boot/dts/bcm958623hr.dts
-+++ b/arch/arm/boot/dts/bcm958623hr.dts
-@@ -227,3 +227,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
-index 006b08e41a3b..d94d14b3c745 100644
---- a/arch/arm/boot/dts/bcm958625hr.dts
-+++ b/arch/arm/boot/dts/bcm958625hr.dts
-@@ -229,3 +229,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index 64740f85cf4c..2cf2392483b2 100644
---- a/arch/arm/boot/dts/bcm958625k.dts
-+++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -264,3 +264,11 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
--- 
-2.7.4
+>> Are there other graphical applications we care about (other than Xorg)
+>> that would need to be patched? I'm happy to do the Xorg patch, but I
+>> don't know if anything other than Xorg keys off the boot_vga file.
+>> 
+>> I'm not fundamentally opposed to this approach if the Xorg community is
+>> happy with it, the kernel community is happy with it, and no-one expects
+>> me to provide patches to any other user-space applications that depend
+>> on boot_vga.
+>
+> Ard both identified the Xorg commit that I would have, and CC'd Hans
+> which I would have recommended as well.
+>
+> I assume the symptom is that now there's a class of platform GPU devices
+> that is neither PCI nor legacy VGA, so neither the kernel's boot_vga
+> logic matches it, nor Xorg's commit in question.
+>
+> I agree that it should be possible to add more logic to Xorg to detect
+> this kind device as primary. However, I share Daniel's worry that it
+> wouldn't cover all user space apps -- I see "Wayland this, Wayland that"
+> on reddit every week.
+>
+> Having practically zero background in gfx development (either kernel or
+> Xorg), I think the problem is that vga_default_device() /
+> vga_set_default_device(), which -- apparently -- "boot_vga" is based
+> upon, come from "drivers/gpu/vga/vgaarb.c". Namely, the concept of
+> "primary / boot display device" is tied to the VGA arbiter, plus only a
+> PCI device can currently be marked as primary/boot display device.
+
+You're right, the issue is that the primary/boot device is tied to the
+VGA arbiter.
+
+>
+> Can these concepts be split from each other? (I can fully imagine that
+> this would result in a userspace visible interface change (or addition),
+> so that e.g. "/sys/devices/**/boot_gpu" would have to be consulted by
+> display servers.)
+
+Yes, they can be split or a way of marking the default vga device that
+doesn't depend on the arbiter can be added.
+
+(But there is some question about what it actually means to be a boot
+vga card - it's better defined on an x86 system, but on a ppc or arm64
+system we're reduced to guessing based on the first driver loaded.)
+
+> (Sorry if I'm totally wrong.)
+>
+> ... Hm, reading the thread starter at
+> <https://www.mail-archive.com/linuxppc-dev@lists.ozlabs.org/msg120851.html>,
+> and the references within... It looks like this work is motivated by
+> hardware that is supposed to be PCI, but actually breaks the specs. Is
+> that correct? If so, then I don't think I can suggest anything useful.
+> Specs exist so that hardware vendors and software authors follow them.
+> If hardware does not conform, then software should either refuse to work
+> with it, or handle it with quirks, on a case-by-case basis. I guess this
+> means that I don't agree with the
+>
+>   broad[] suggest[ion] that a more generic solution would be better
+>
+> which seems to disqualify me from the discussion, as it must have been
+> suggested by people with incomparably more experience than what I have :)
+
+Originally this was brought to the fore through a PCI bridge that wasn't
+spec compliant, and originally I proposed a simple quirk: [0]. However,
+that highlighted the related issue that platforms that don't use legacy
+resources still go through the VGA arbiter process which is built around
+legacy resource arbitration. Changing that behaviour also fixes the
+issue with the non-spec-compliant bridge because the new model doesn't
+rely upon the particular part of the spec that the bridge violates.
+
+I'm not fussy about how we solve this problem, so long as we solve this
+problem somehow.
+
+Regards,
+Daniel
+
+[0]: https://patchwork.ozlabs.org/patch/787003/
+
+>
+> Thanks
+> Laszlo
