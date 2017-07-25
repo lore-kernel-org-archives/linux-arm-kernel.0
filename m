@@ -1,157 +1,78 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Tue, 25 Jul 2017 22:42:45 +0800
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n  - any one
- else seeing this?
-In-Reply-To: <20170725134626.GL3730@linux.vnet.ibm.com>
-References: <20170725193039.00007c80@huawei.com>
- <20170725222654.5a968588@roar.ozlabs.ibm.com>
- <20170725134626.GL3730@linux.vnet.ibm.com>
-Message-ID: <20170725224245.00004e7e@huawei.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 25 Jul 2017 09:44:10 -0500
+Subject: [PATCH v3 0/4] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume support
+Message-ID: <20170725144414.7129-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jul 2017 06:46:26 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+Hi,
+This series contains the remaining code to enable suspend to mem and standby on
+am335x and am437x platforms. It depends on the ti-emif-sram series sent here
+[1]. Changes are based on comments given for V2 of this series which can
+be found here [2].
 
-> On Tue, Jul 25, 2017 at 10:26:54PM +1000, Nicholas Piggin wrote:
-> > On Tue, 25 Jul 2017 19:32:10 +0800
-> > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
-> >   
-> > > Hi All,
-> > > 
-> > > We observed a regression on our d05 boards (but curiously not
-> > > the fairly similar but single socket / smaller core count
-> > > d03), initially seen with linux-next prior to the merge window
-> > > and still present in v4.13-rc2.
-> > > 
-> > > The symptom is:  
-> 
-> Adding Dave Miller and the sparclinux at vger.kernel.org email on CC, as
-> they have been seeing something similar, and you might well have saved
-> them the trouble of bisecting.
-> 
-> [ . . . ]
-> 
-> > > [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1  
-> 
-> This is the cause from an RCU perspective.  You had a lot of idle CPUs,
-> and RCU is not permitted to disturb them -- the battery-powered embedded
-> guys get very annoyed by that sort of thing.  What happens instead is
-> that each CPU updates a per-CPU state variable when entering or exiting
-> idle, and the grace-period kthread ("rcu_preempt kthread" in the above
-> message) checks these state variables, and if when sees an idle CPU,
-> it reports a quiescent state on that CPU's behalf.
-> 
-> But the grace-period kthread can only do this work if it gets a chance
-> to run.  And the message above says that this kthread hasn't had a chance
-> to run for a full 5,663 jiffies.  For completeness, the "g1566 c1565"
-> says that grace period #1566 is in progress, the "f0x0" says that no one
-> is needing another grace period #1567.  The "RCU_GP_WAIT_FQS(3)" says
-> that the grace-period kthread has fully initialized the current grace
-> period and is sleeping for a few jiffies waiting to scan for idle tasks.
-> Finally, the "->state=0x1" says that the grace-period kthread is in
-> TASK_INTERRUPTIBLE state, in other words, still sleeping.
-Thanks for the explanation!
-> 
-> So my first question is "What did commit 05a4a9527 (kernel/watchdog:
-> split up config options) do to prevent the grace-period kthread from
-> getting a chance to run?" 
+This code also depends on firmware for the wkup_m3 that is available here [3]
+that can either be placed in /lib/firmware or built in to the kernel.
 
-As far as we can tell it was a side effect of that patch.
+Changes from v2 are described in the patches but summary is:
+* Squash patch 5 into patch 3 since they touch the same platform
+  code and don't need to be two patches.
+* Fix small ASM bug to program EMIF for self refresh then save context
+  so that we save the exact state of the emif before suspending.
+* Add missing of_node_put in patch 4
+* Avoid extern definition for asm-offsets definition and use a stub instead
+  of defining out in asm-offsets.
+* Use dev_err and friends in pm33xx driver for PM messages.
+* General code cleanups.
 
-The real cause is that patch changed the result of defconfigs to stop running
-the softlockup detector - now CONFIG_SOFTLOCKUP_DETECTOR
+For testing the drivers required are:
 
-Enabling that on 4.13-rc2 (and presumably everything in between)
-means we don't see the problem any more.
+CONFIG_MAILBOX
+CONFIG_OMAP2PLUS_MBOX
+CONFIG_WKUP_M3_RPROC
+CONFIG_SOC_TI
+CONFIG_WKUP_M3_IPC
+CONFIG_TI_EMIF_SRAM
+CONFIG_AMX3_PM
 
-> I must confess that I don't see anything
-> obvious in that commit, so my second question is "Are we sure that
-> reverting this commit makes the problem go away?"
-Simply enabling CONFIG_SOFTLOCKUP_DETECTOR seems to make it go away.
-That detector fires up a thread on every cpu, which may be relevant.
+There is still a device tree patch series to follow that will completely enable
+PM but I will wait to send that until this series and the emif series have been
+reviewed, until then all patches have been pushed here for use [4].
 
-> and my third is "Is
-> this an intermittent problem that led to a false bisection?"
-Whilst it is a bit slow to occur, we verified with long runs on either
-side of that patch and since with the option enabled on latest mainline.
+Regards,
+Dave
 
-Also can cause the issue before that patch by disabling the previous
-relevant option on 4.12.
+[1] https://www.spinics.net/lists/linux-omap/msg138314.html
+[2] https://www.spinics.net/lists/arm-kernel/msg582309.html
+[3] https://git.ti.com/processor-firmware/ti-amx3-cm3-pm-firmware/blobs/7eb9c0856a9e8b3b42bf64f761da135852b8eea7/bin/am335x-pm-firmware.elf
+[4] https://github.com/dgerlach/linux-pm/tree/upstream/v4.13/amx3-suspend-v3
 
-> 
-> [ . . . ]
-> 
-> > > Reducing the RCU CPU stall timeout makes it happen more often,
-> > > but we are seeing even with the default value of 24 seconds.
-> > > 
-> > > Tends to occur after a period or relatively low usage, but has
-> > > also been seen mid way through performance tests.
-> > > 
-> > > This was not seen with v4.12 so a bisection run later lead to
-> > > commit 05a4a9527 (kernel/watchdog: split up config options).
-> > > 
-> > > Which was odd until we discovered that a side effect of this patch
-> > > was to change whether the softlockup detector was enabled or not in
-> > > the arm64 defconfig.
-> > > 
-> > > On 4.13-rc2 enabling the softlockup detector indeed stopped us
-> > > seeing the rcu issue. Disabling the equivalent on 4.12 made the
-> > > issue occur there as well.
-> > > 
-> > > Clearly the softlockup detector results in a thread on every cpu,
-> > > which might be related but beyond that we are still looking into
-> > > the issue.
-> > > 
-> > > So the obvious question is whether anyone else is seeing this as
-> > > it might help us to focus in on where to look!  
-> > 
-> > Huh. Something similar has been seen very intermittently on powerpc
-> > as well. We couldn't reproduce it reliably to bisect it already, so
-> > this is a good help.
-> > 
-> > http://marc.info/?l=linuxppc-embedded&m=149872815523646&w=2
-> > 
-> > It looks like the watchdog patch has a similar effect on powerpc in
-> > that it stops enabling the softlockup detector by default. Haven't
-> > confirmed, but it looks like the same thing.
-> > 
-> > A bug in RCU stall detection?  
-> 
-> Well, if I am expected to make grace periods complete when my grace-period
-> kthreads aren't getting any CPU time, I will have to make some substantial
-> changes.  ;-)
-> 
-> One possibility is that the timer isn't firing and another is that the
-> timer's wakeup is being lost somehow.
-> 
-> So another thing to try is to boot with rcutree.rcu_kick_kthreads=1.
-> This will cause RCU to do redundant wakeups on the grace-period kthread
-> if the grace period is moving slowly.  This is of course a crude hack,
-> which is why this boot parameter will also cause a splat if it ever has
-> to do anything.
-Running that now will let you know how it goes.  Not seen the issue yet
-but might just be a 'lucky' run - will give it a few hours.
+Dave Gerlach (4):
+  ARM: OMAP2+: Introduce low-level suspend code for AM33XX
+  ARM: OMAP2+: Introduce low-level suspend code for AM43XX
+  ARM: OMAP2+: pm33xx-core: Add platform code needed for PM
+  soc: ti: Add pm33xx driver for basic suspend support
 
-Jonathan
-> 
-> Does this help at all?
-> 
-> 							Thanx, Paul
-> 
-> > > In the meantime we'll carry on digging.
-> > > 
-> > > Thanks,
-> > > 
-> > > Jonathan
-> > > 
-> > > p.s. As a more general question, do we want to have the
-> > > soft lockup detector enabledon arm64 by default?  
-> > 
-> > I've cc'ed Don. My patch should not have changed defconfigs, I
-> > should have been more careful with that.
-> > 
-> > Thanks,
-> > Nick
-> >   
-> 
+ Documentation/devicetree/bindings/arm/omap/mpu.txt |  16 +
+ arch/arm/kernel/asm-offsets.c                      |   2 +
+ arch/arm/mach-omap2/Kconfig                        |   1 +
+ arch/arm/mach-omap2/Makefile                       |   4 +
+ arch/arm/mach-omap2/common.h                       |   7 +
+ arch/arm/mach-omap2/io.c                           |   2 +
+ arch/arm/mach-omap2/pm.h                           |   3 +
+ arch/arm/mach-omap2/pm33xx-core.c                  | 197 +++++++++++
+ arch/arm/mach-omap2/sleep33xx.S                    | 221 ++++++++++++
+ arch/arm/mach-omap2/sleep43xx.S                    | 394 +++++++++++++++++++++
+ drivers/soc/ti/Kconfig                             |   9 +
+ drivers/soc/ti/Makefile                            |   1 +
+ drivers/soc/ti/pm33xx.c                            | 357 +++++++++++++++++++
+ include/linux/platform_data/pm33xx.h               |  74 ++++
+ 14 files changed, 1288 insertions(+)
+ create mode 100644 arch/arm/mach-omap2/pm33xx-core.c
+ create mode 100644 arch/arm/mach-omap2/sleep33xx.S
+ create mode 100644 arch/arm/mach-omap2/sleep43xx.S
+ create mode 100644 drivers/soc/ti/pm33xx.c
+ create mode 100644 include/linux/platform_data/pm33xx.h
+
+-- 
+2.13.0
