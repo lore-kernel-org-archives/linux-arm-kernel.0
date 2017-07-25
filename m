@@ -1,45 +1,33 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 25 Jul 2017 16:14:23 +0200
-Subject: [PATCH V2 1/4] hw_breakpoint: Add step_needed event attribute
-In-Reply-To: <20170725132737.GC28815@arm.com>
-References: <cover.1499416107.git.panand@redhat.com>
- <9d4f76f3a0bffe93a6d5146c9b53ee7b985f22da.1499416107.git.panand@redhat.com>
- <20170725132737.GC28815@arm.com>
-Message-ID: <20170725141423.ufucj2wl35bdxafh@hirez.programming.kicks-ass.net>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 25 Jul 2017 16:15:02 +0200
+Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
+ callback
+In-Reply-To: <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
+References: <20170719190734.18566-1-opendmb@gmail.com>
+ <20170719190734.18566-3-opendmb@gmail.com>
+ <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
+ <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
+ <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
+Message-ID: <2928ba37-6bb9-1004-bc85-0c13ad513a2c@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 02:27:38PM +0100, Will Deacon wrote:
-> On Fri, Jul 07, 2017 at 05:33:57PM +0530, Pratyush Anand wrote:
-> > Architecture like ARM64 currently allows to use default hw breakpoint
-> > single step handler only to perf. However, some other users like few
-> > systemtap tests or kernel test in
-> > samples/hw_breakpoint/data_breakpoint.c can also work with default step
-> > handler implementation. At the same time, some other like GDB/ptrace may
-> > implement their own step handler.
-> > 
-> > Therefore, this patch introduces a new perf_event_attr bit field, so
-> > that arch specific code(specially on arm64) can make a decision to
-> > enable single stepping.
-> > 
-> > Any architecture which is not using this field will not have any
-> > side effect.
+On 25/07/2017 15:08, Marc Gonzalez wrote:
 
-> > diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-> > index b1c0b187acfe..00935808de0d 100644
-> > --- a/include/uapi/linux/perf_event.h
-> > +++ b/include/uapi/linux/perf_event.h
-> > @@ -345,7 +345,8 @@ struct perf_event_attr {
-> >  				context_switch :  1, /* context switch data */
-> >  				write_backward :  1, /* Write ring buffer from end to beginning */
-> >  				namespaces     :  1, /* include namespaces data */
-> > -				__reserved_1   : 35;
-> > +				step_needed    :  1, /* Use arch step handler */
-> > +				__reserved_1   : 34;
+> irq_gc_mask_disable_reg_and_ack() is not equivalent to
+> irq_gc_mask_disable_reg() and irq_gc_ack_set_bit().
 > 
-> This needs documenting properly, as I really have no idea how userspace is
-> going to use it sensibley, especially as you silently overwrite it in some
-> cases below.
+> Leave the irq_mask_ack callback undefined, and let the irqchip
+> framework use irq_mask and irq_ack instead.
+> 
+> Reported-by: Doug Berger <opendmb@gmail.com>
+> Fixes: 4bba66899ac6 ("irqchip/tango: Add support for Sigma Designs SMP86xx/SMP87xx interrupt controller")
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> Cc: stable at vger.kernel.org
 
-This is not something userspace _can_ use sensibly afaict. Therefore it
-should probably not live here.
+FWIW, the lockup reported in the thread below disappears
+once the patch is applied.
+
+https://lkml.org/lkml/2016/10/21/709
+
+Regards.
