@@ -1,101 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Jul 2017 17:26:25 +0100
-Subject: [PATCH] drivers/perf: arm_pmu: Request PMU SPIs with IRQF_PER_CPU
-In-Reply-To: <1500996975-28857-1-git-send-email-will.deacon@arm.com>
-References: <1500996975-28857-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20170725162624.GE12749@leverpostej>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Tue, 25 Jul 2017 09:47:22 -0700
+Subject: [PATCH 01/10] arm64: zynqmp: Add references to cpu nodes
+In-Reply-To: <b9a61dfe7f5d4309b3131c1b9a82890888838087.1500552941.git.michal.simek@xilinx.com>
+References: <cover.1500552941.git.michal.simek@xilinx.com>
+ <b9a61dfe7f5d4309b3131c1b9a82890888838087.1500552941.git.michal.simek@xilinx.com>
+Message-ID: <20170725164722.GA30669@tyrael.ni.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 04:36:15PM +0100, Will Deacon wrote:
-> Since the PMU register interface is banked per CPU, CPU PMU interrrupts
-> cannot be handled by a CPU other than the one with the PMU asserting the
-> interrupt. This means that migrating PMU SPIs, as we do during a CPU
-> hotplug operation doesn't make any sense and can lead to the IRQ being
-> disabled entirely if we route a spurious IRQ to the new affinity target.
+On Thu, Jul 20, 2017 at 02:17:00PM +0200, Michal Simek wrote:
+> Add missing references to all cpu nodes.
 > 
-> This has been observed in practice on AMD Seattle, where CPUs on the
-> non-boot cluster appear to take a spurious PMU IRQ when coming online,
-> which is routed to CPU0 where it cannot be handled.
-> 
-> This patch passes IRQF_PERCPU for PMU SPIs and forcefullt sets their
-
-forcefully
-
-> affinity prior to requesting them, ensuring that they cannot
-> be migrated during hotplug events.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Fixes: 3cf7ee98b848 ("drivers/perf: arm_pmu: move irq request/free into probe")
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-The patch itself looks good to me.
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Reviewed-by: Moritz Fischer <mdf@kernel.org>
 > ---
->  drivers/perf/arm_pmu.c | 30 +++++++++++++++++-------------
->  1 file changed, 17 insertions(+), 13 deletions(-)
 > 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index dc459eb1246b..fa18e4858141 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -569,22 +569,32 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
->  		if (irq != other_irq) {
->  			pr_warn("mismatched PPIs detected.\n");
->  			err = -EINVAL;
-> +			goto err_out;
->  		}
->  	} else {
-> +		err = irq_force_affinity(irq, cpumask_of(cpu));
-> +
-> +		if (err && num_possible_cpus() > 1) {
-> +			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
-> +				irq, cpu);
-> +			goto err_out;
-> +		}
-> +
->  		err = request_irq(irq, handler,
-> -				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
-> +				  IRQF_PERCPU | IRQF_NOBALANCING | IRQF_NO_THREAD,
-> +				  "arm-pmu",
->  				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
->  	}
+>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> index 1a3f5e928bb9..4f7d9905e235 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> @@ -20,28 +20,28 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
 >  
-> -	if (err) {
-> -		pr_err("unable to request IRQ%d for ARM PMU counters\n",
-> -			irq);
-> -		return err;
-> -	}
-> +	if (err)
-> +		goto err_out;
+> -		cpu at 0 {
+> +		cpu0: cpu at 0 {
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			reg = <0x0>;
+>  		};
 >  
->  	cpumask_set_cpu(cpu, &armpmu->active_irqs);
-> -
->  	return 0;
-> +
-> +err_out:
-> +	pr_err("unable to request IRQ%d for ARM PMU counters\n", irq);
-> +	return err;
->  }
+> -		cpu at 1 {
+> +		cpu1: cpu at 1 {
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			reg = <0x1>;
+>  		};
 >  
->  int armpmu_request_irqs(struct arm_pmu *armpmu)
-> @@ -628,12 +638,6 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
->  			enable_percpu_irq(irq, IRQ_TYPE_NONE);
->  			return 0;
->  		}
-> -
-> -		if (irq_force_affinity(irq, cpumask_of(cpu)) &&
-> -		    num_possible_cpus() > 1) {
-> -			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
-> -				irq, cpu);
-> -		}
->  	}
+> -		cpu at 2 {
+> +		cpu2: cpu at 2 {
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			reg = <0x2>;
+>  		};
 >  
->  	return 0;
+> -		cpu at 3 {
+> +		cpu3: cpu at 3 {
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			device_type = "cpu";
+>  			enable-method = "psci";
 > -- 
-> 2.1.4
+> 1.9.1
 > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/16e6bc08/attachment.sig>
