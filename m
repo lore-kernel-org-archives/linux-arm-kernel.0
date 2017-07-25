@@ -1,17 +1,17 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Jul 2017 09:38:49 +0200
-Subject: [PATCH v3 09/10] ARM: dts: sun8i: a83t: cubietruck-plus: Enable
- micro-SD card and eMMC
-In-Reply-To: <20170724135905.28855-10-wens@csie.org>
+Date: Tue, 25 Jul 2017 09:39:07 +0200
+Subject: [PATCH v3 10/10] ARM: dts: sun8i: a83t: h8homlet: Enable
+ micro-SD card and onboard eMMC
+In-Reply-To: <20170724135905.28855-11-wens@csie.org>
 References: <20170724135905.28855-1-wens@csie.org>
- <20170724135905.28855-10-wens@csie.org>
-Message-ID: <20170725073849.f3c6kee4s3bsspta@flea>
+ <20170724135905.28855-11-wens@csie.org>
+Message-ID: <20170725073907.ykcarlb6fv2tlytc@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 09:59:04PM +0800, Chen-Yu Tsai wrote:
-> Now that we support the MMC controllers on the A83T SoC, we can enable
-> them on some boards.
+On Mon, Jul 24, 2017 at 09:59:05PM +0800, Chen-Yu Tsai wrote:
+> The H8 homlet has a micro-SD card slot connected to mmc0,
+> and onboard eMMC from FORESEE, connected to mmc2.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
@@ -30,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/c528fd0e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/b47576b9/attachment-0001.sig>
