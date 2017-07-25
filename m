@@ -1,28 +1,56 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 25 Jul 2017 13:44:12 +0200
-Subject: [PATCH v1] pwm : pwm-vt8500 - Undo preparation of a clock source.
-In-Reply-To: <1493971214-3763-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1493971214-3763-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20170725114412.GC22355@ulmo>
+From: zhangshaokun@hisilicon.com (Shaokun Zhang)
+Date: Tue, 25 Jul 2017 20:10:36 +0800
+Subject: [PATCH v4 0/6] Add HiSilicon SoC uncore Performance Monitoring Unit
+ driver
+Message-ID: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 05, 2017 at 01:30:14PM +0530, Arvind Yadav wrote:
-> Undo preparation of a clock source, if vt8500_pwm_probe is not
-> successful.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/pwm/pwm-vt8500.c | 1 +
->  1 file changed, 1 insertion(+)
+This patchset adds support for HiSilicon SoC uncore PMUs driver. It
+includes L3C, Hydra Home Agent (HHA) and DDRC.
 
-Applied, thanks.
+Changes in v4:
+* remove redundant code and comments
+* reverse the functions order in exit function
+* remove some GPL information
+* revise including header file
+* fix Jonathan's other comments
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170725/841160eb/attachment.sig>
+Changes in v3:
+* rebase to 4.13-rc1
+* add dev_err if ioremap fails for PMUs
+ 
+Changes in v2:
+* fix kbuild test robot error
+* make hisi_uncore_ops static
+
+Shaokun Zhang (6):
+  Documentation: perf: hisi: Documentation for HiSilicon SoC PMU driver
+  perf: hisi: Add support for HiSilicon SoC uncore PMU driver
+  perf: hisi: Add support for HiSilicon SoC L3C PMU driver
+  perf: hisi: Add support for HiSilicon SoC HHA PMU driver
+  perf: hisi: Add support for HiSilicon SoC DDRC PMU driver
+  arm64: MAINTAINERS: hisi: Add HiSilicon SoC PMU support
+
+ Documentation/perf/hisi-pmu.txt               |  52 +++
+ MAINTAINERS                                   |   7 +
+ drivers/perf/Kconfig                          |   7 +
+ drivers/perf/Makefile                         |   1 +
+ drivers/perf/hisilicon/Makefile               |   1 +
+ drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 420 ++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_hha_pmu.c  | 436 +++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c  | 538 ++++++++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c      | 398 +++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h      | 103 +++++
+ include/linux/cpuhotplug.h                    |   1 +
+ 11 files changed, 1964 insertions(+)
+ create mode 100644 Documentation/perf/hisi-pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+
+-- 
+1.9.1
