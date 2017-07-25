@@ -1,180 +1,927 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Tue, 25 Jul 2017 22:26:54 +1000
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n  - any one
- else seeing this?
-In-Reply-To: <20170725193039.00007c80@huawei.com>
-References: <20170725193039.00007c80@huawei.com>
-Message-ID: <20170725222654.5a968588@roar.ozlabs.ibm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 25 Jul 2017 14:34:25 +0200
+Subject: [PATCH v2 1/2] platform: Add Amlogic Meson AO CEC Controller
+ driver
+In-Reply-To: <b5cb7021-4c9e-98b2-5fd1-11effda3fd30@xs4all.nl>
+References: <1499673696-21372-1-git-send-email-narmstrong@baylibre.com>
+ <1499673696-21372-2-git-send-email-narmstrong@baylibre.com>
+ <b5cb7021-4c9e-98b2-5fd1-11effda3fd30@xs4all.nl>
+Message-ID: <f6e40d38-fe18-49e6-0ee1-a4467666777c@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jul 2017 19:32:10 +0800
-Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+Hi Hans,
 
-> Hi All,
+On 07/17/2017 10:01 AM, Hans Verkuil wrote:
+> On 10/07/17 10:01, Neil Armstrong wrote:
+>> The Amlogic SoC embeds a standalone CEC controller, this patch adds a driver
+>> for such controller.
+>> The controller does not need HPD to be active, and could support up to max
+>> 5 logical addresses, but only 1 is handled since the Suspend firmware can
+>> make use of this unique logical address to wake up the device.
+>>
+>> The Suspend firmware configuration will be added in an other patchset.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/media/platform/Kconfig        |  11 +
+>>  drivers/media/platform/Makefile       |   2 +
+>>  drivers/media/platform/meson/Makefile |   1 +
+>>  drivers/media/platform/meson/ao-cec.c | 781 ++++++++++++++++++++++++++++++++++
+>>  4 files changed, 795 insertions(+)
+>>  create mode 100644 drivers/media/platform/meson/Makefile
+>>  create mode 100644 drivers/media/platform/meson/ao-cec.c
+>>
+>> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+>> index 1313cd5..1e67381 100644
+>> --- a/drivers/media/platform/Kconfig
+>> +++ b/drivers/media/platform/Kconfig
+>> @@ -536,6 +536,17 @@ menuconfig CEC_PLATFORM_DRIVERS
+>>  
+>>  if CEC_PLATFORM_DRIVERS
+>>  
+>> +config VIDEO_MESON_AO_CEC
+>> +	tristate "Amlogic Meson AO CEC driver"
+>> +	depends on ARCH_MESON || COMPILE_TEST
+>> +	select CEC_CORE
+>> +	select CEC_NOTIFIER
+>> +	---help---
+>> +	  This is a driver for Amlogic Meson SoCs AO CEC interface. It uses the
+>> +	  generic CEC framework interface.
+>> +	  CEC bus is present in the HDMI connector and enables communication
+>> +	  between compatible devices.
+>> +
+>>  config VIDEO_SAMSUNG_S5P_CEC
+>>         tristate "Samsung S5P CEC driver"
+>>         depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
+>> diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
+>> index 9beadc7..a52d7b6 100644
+>> --- a/drivers/media/platform/Makefile
+>> +++ b/drivers/media/platform/Makefile
+>> @@ -86,3 +86,5 @@ obj-$(CONFIG_VIDEO_MEDIATEK_MDP)	+= mtk-mdp/
+>>  obj-$(CONFIG_VIDEO_MEDIATEK_JPEG)	+= mtk-jpeg/
+>>  
+>>  obj-$(CONFIG_VIDEO_QCOM_VENUS)		+= qcom/venus/
+>> +
+>> +obj-y					+= meson/
+>> diff --git a/drivers/media/platform/meson/Makefile b/drivers/media/platform/meson/Makefile
+>> new file mode 100644
+>> index 0000000..597beb8
+>> --- /dev/null
+>> +++ b/drivers/media/platform/meson/Makefile
+>> @@ -0,0 +1 @@
+>> +obj-$(CONFIG_VIDEO_MESON_AO_CEC)	+= ao-cec.o
+>> diff --git a/drivers/media/platform/meson/ao-cec.c b/drivers/media/platform/meson/ao-cec.c
+>> new file mode 100644
+>> index 0000000..cdc1f61
+>> --- /dev/null
+>> +++ b/drivers/media/platform/meson/ao-cec.c
+>> @@ -0,0 +1,781 @@
+>> +/*
+>> + * Driver for Amlogic Meson AO CEC Controller
+>> + *
+>> + * Copyright (C) 2015 Amlogic, Inc. All rights reserved
+>> + * Copyright (C) 2017 BayLibre, SAS
+>> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+>> + *
+>> + * SPDX-License-Identifier: GPL-2.0+
+>> + */
+>> +
+>> +#include <linux/bitfield.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/device.h>
+>> +#include <linux/io.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/types.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/reset.h>
+>> +#include <media/cec.h>
+>> +#include <media/cec-notifier.h>
+>> +
+>> +/* CEC Registers */
+>> +
+>> +/*
+>> + * [2:1] cntl_clk
+>> + *  - 0 = Disable clk (Power-off mode)
+>> + *  - 1 = Enable gated clock (Normal mode)
+>> + *  - 2 = Enable free-run clk (Debug mode)
+>> + */
+>> +#define CEC_GEN_CNTL_REG		0x00
+>> +
+>> +#define CEC_GEN_CNTL_RESET		BIT(0)
+>> +#define CEC_GEN_CNTL_CLK_DISABLE	0
+>> +#define CEC_GEN_CNTL_CLK_ENABLE		1
+>> +#define CEC_GEN_CNTL_CLK_ENABLE_DBG	2
+>> +#define CEC_GEN_CNTL_CLK_CTRL_MASK	GENMASK(2, 1)
+>> +
+>> +/*
+>> + * [7:0] cec_reg_addr
+>> + * [15:8] cec_reg_wrdata
+>> + * [16] cec_reg_wr
+>> + *  - 0 = Read
+>> + *  - 1 = Write
+>> + * [23] bus free
+>> + * [31:24] cec_reg_rddata
+>> + */
+>> +#define CEC_RW_REG			0x04
+>> +
+>> +#define CEC_RW_ADDR			GENMASK(7, 0)
+>> +#define CEC_RW_WR_DATA			GENMASK(15, 8)
+>> +#define CEC_RW_WRITE_EN			BIT(16)
+>> +#define CEC_RW_BUS_BUSY			BIT(23)
+>> +#define CEC_RW_RD_DATA			GENMASK(31, 24)
+>> +
+>> +/*
+>> + * [1] tx intr
+>> + * [2] rx intr
+>> + */
+>> +#define CEC_INTR_MASKN_REG		0x08
+>> +#define CEC_INTR_CLR_REG		0x0c
+>> +#define CEC_INTR_STAT_REG		0x10
+>> +
+>> +#define CEC_INTR_TX			BIT(1)
+>> +#define CEC_INTR_RX			BIT(2)
+>> +
+>> +/* CEC Commands */
+>> +
+>> +#define CEC_TX_MSG_0_HEADER		0x00
+>> +#define CEC_TX_MSG_1_OPCODE		0x01
+>> +#define CEC_TX_MSG_2_OP1		0x02
+>> +#define CEC_TX_MSG_3_OP2		0x03
+>> +#define CEC_TX_MSG_4_OP3		0x04
+>> +#define CEC_TX_MSG_5_OP4		0x05
+>> +#define CEC_TX_MSG_6_OP5		0x06
+>> +#define CEC_TX_MSG_7_OP6		0x07
+>> +#define CEC_TX_MSG_8_OP7		0x08
+>> +#define CEC_TX_MSG_9_OP8		0x09
+>> +#define CEC_TX_MSG_A_OP9		0x0A
+>> +#define CEC_TX_MSG_B_OP10		0x0B
+>> +#define CEC_TX_MSG_C_OP11		0x0C
+>> +#define CEC_TX_MSG_D_OP12		0x0D
+>> +#define CEC_TX_MSG_E_OP13		0x0E
+>> +#define CEC_TX_MSG_F_OP14		0x0F
+>> +#define CEC_TX_MSG_LENGTH		0x10
+>> +#define CEC_TX_MSG_CMD			0x11
+>> +#define CEC_TX_WRITE_BUF		0x12
+>> +#define CEC_TX_CLEAR_BUF		0x13
+>> +#define CEC_RX_MSG_CMD			0x14
+>> +#define CEC_RX_CLEAR_BUF		0x15
+>> +#define CEC_LOGICAL_ADDR0		0x16
+>> +#define CEC_LOGICAL_ADDR1		0x17
+>> +#define CEC_LOGICAL_ADDR2		0x18
+>> +#define CEC_LOGICAL_ADDR3		0x19
+>> +#define CEC_LOGICAL_ADDR4		0x1A
+>> +#define CEC_CLOCK_DIV_H			0x1B
+>> +#define CEC_CLOCK_DIV_L			0x1C
+>> +#define CEC_QUIESCENT_25MS_BIT7_0	0x20
+>> +#define CEC_QUIESCENT_25MS_BIT11_8	0x21
+>> +#define CEC_STARTBITMINL2H_3MS5_BIT7_0	0x22
+>> +#define CEC_STARTBITMINL2H_3MS5_BIT8	0x23
+>> +#define CEC_STARTBITMAXL2H_3MS9_BIT7_0	0x24
+>> +#define CEC_STARTBITMAXL2H_3MS9_BIT8	0x25
+>> +#define CEC_STARTBITMINH_0MS6_BIT7_0	0x26
+>> +#define CEC_STARTBITMINH_0MS6_BIT8	0x27
+>> +#define CEC_STARTBITMAXH_1MS0_BIT7_0	0x28
+>> +#define CEC_STARTBITMAXH_1MS0_BIT8	0x29
+>> +#define CEC_STARTBITMINTOT_4MS3_BIT7_0	0x2A
+>> +#define CEC_STARTBITMINTOT_4MS3_BIT9_8	0x2B
+>> +#define CEC_STARTBITMAXTOT_4MS7_BIT7_0	0x2C
+>> +#define CEC_STARTBITMAXTOT_4MS7_BIT9_8	0x2D
+>> +#define CEC_LOGIC1MINL2H_0MS4_BIT7_0	0x2E
+>> +#define CEC_LOGIC1MINL2H_0MS4_BIT8	0x2F
+>> +#define CEC_LOGIC1MAXL2H_0MS8_BIT7_0	0x30
+>> +#define CEC_LOGIC1MAXL2H_0MS8_BIT8	0x31
+>> +#define CEC_LOGIC0MINL2H_1MS3_BIT7_0	0x32
+>> +#define CEC_LOGIC0MINL2H_1MS3_BIT8	0x33
+>> +#define CEC_LOGIC0MAXL2H_1MS7_BIT7_0	0x34
+>> +#define CEC_LOGIC0MAXL2H_1MS7_BIT8	0x35
+>> +#define CEC_LOGICMINTOTAL_2MS05_BIT7_0	0x36
+>> +#define CEC_LOGICMINTOTAL_2MS05_BIT9_8	0x37
+>> +#define CEC_LOGICMAXHIGH_2MS8_BIT7_0	0x38
+>> +#define CEC_LOGICMAXHIGH_2MS8_BIT8	0x39
+>> +#define CEC_LOGICERRLOW_3MS4_BIT7_0	0x3A
+>> +#define CEC_LOGICERRLOW_3MS4_BIT8	0x3B
+>> +#define CEC_NOMSMPPOINT_1MS05		0x3C
+>> +#define CEC_DELCNTR_LOGICERR		0x3E
+>> +#define CEC_TXTIME_17MS_BIT7_0		0x40
+>> +#define CEC_TXTIME_17MS_BIT10_8		0x41
+>> +#define CEC_TXTIME_2BIT_BIT7_0		0x42
+>> +#define CEC_TXTIME_2BIT_BIT10_8		0x43
+>> +#define CEC_TXTIME_4BIT_BIT7_0		0x44
+>> +#define CEC_TXTIME_4BIT_BIT10_8		0x45
+>> +#define CEC_STARTBITNOML2H_3MS7_BIT7_0	0x46
+>> +#define CEC_STARTBITNOML2H_3MS7_BIT8	0x47
+>> +#define CEC_STARTBITNOMH_0MS8_BIT7_0	0x48
+>> +#define CEC_STARTBITNOMH_0MS8_BIT8	0x49
+>> +#define CEC_LOGIC1NOML2H_0MS6_BIT7_0	0x4A
+>> +#define CEC_LOGIC1NOML2H_0MS6_BIT8	0x4B
+>> +#define CEC_LOGIC0NOML2H_1MS5_BIT7_0	0x4C
+>> +#define CEC_LOGIC0NOML2H_1MS5_BIT8	0x4D
+>> +#define CEC_LOGIC1NOMH_1MS8_BIT7_0	0x4E
+>> +#define CEC_LOGIC1NOMH_1MS8_BIT8	0x4F
+>> +#define CEC_LOGIC0NOMH_0MS9_BIT7_0	0x50
+>> +#define CEC_LOGIC0NOMH_0MS9_BIT8	0x51
+>> +#define CEC_LOGICERRLOW_3MS6_BIT7_0	0x52
+>> +#define CEC_LOGICERRLOW_3MS6_BIT8	0x53
+>> +#define CEC_CHKCONTENTION_0MS1		0x54
+>> +#define CEC_PREPARENXTBIT_0MS05_BIT7_0	0x56
+>> +#define CEC_PREPARENXTBIT_0MS05_BIT8	0x57
+>> +#define CEC_NOMSMPACKPOINT_0MS45	0x58
+>> +#define CEC_ACK0NOML2H_1MS5_BIT7_0	0x5A
+>> +#define CEC_ACK0NOML2H_1MS5_BIT8	0x5B
+>> +#define CEC_BUGFIX_DISABLE_0		0x60
+>> +#define CEC_BUGFIX_DISABLE_1		0x61
+>> +#define CEC_RX_MSG_0_HEADER		0x80
+>> +#define CEC_RX_MSG_1_OPCODE		0x81
+>> +#define CEC_RX_MSG_2_OP1		0x82
+>> +#define CEC_RX_MSG_3_OP2		0x83
+>> +#define CEC_RX_MSG_4_OP3		0x84
+>> +#define CEC_RX_MSG_5_OP4		0x85
+>> +#define CEC_RX_MSG_6_OP5		0x86
+>> +#define CEC_RX_MSG_7_OP6		0x87
+>> +#define CEC_RX_MSG_8_OP7		0x88
+>> +#define CEC_RX_MSG_9_OP8		0x89
+>> +#define CEC_RX_MSG_A_OP9		0x8A
+>> +#define CEC_RX_MSG_B_OP10		0x8B
+>> +#define CEC_RX_MSG_C_OP11		0x8C
+>> +#define CEC_RX_MSG_D_OP12		0x8D
+>> +#define CEC_RX_MSG_E_OP13		0x8E
+>> +#define CEC_RX_MSG_F_OP14		0x8F
+>> +#define CEC_RX_MSG_LENGTH		0x90
+>> +#define CEC_RX_MSG_STATUS		0x91
+>> +#define CEC_RX_NUM_MSG			0x92
+>> +#define CEC_TX_MSG_STATUS		0x93
+>> +#define CEC_TX_NUM_MSG			0x94
+>> +
+>> +
+>> +/* CEC_TX_MSG_CMD definition */
+>> +#define TX_NO_OP	0  /* No transaction */
+>> +#define TX_REQ_CURRENT	1  /* Transmit earliest message in buffer */
+>> +#define TX_ABORT	2  /* Abort transmitting earliest message */
+>> +#define TX_REQ_NEXT	3  /* Overwrite earliest msg, transmit next */
+>> +
+>> +/* tx_msg_status definition */
+>> +#define TX_IDLE		0  /* No transaction */
+>> +#define TX_BUSY		1  /* Transmitter is busy */
+>> +#define TX_DONE		2  /* Message successfully transmitted */
+>> +#define TX_ERROR	3  /* Message transmitted with error */
+>> +
+>> +/* rx_msg_cmd */
+>> +#define RX_NO_OP	0  /* No transaction */
+>> +#define RX_ACK_CURRENT	1  /* Read earliest message in buffer */
+>> +#define RX_DISABLE	2  /* Disable receiving latest message */
+>> +#define RX_ACK_NEXT	3  /* Clear earliest msg, read next */
+>> +
+>> +/* rx_msg_status */
+>> +#define RX_IDLE		0  /* No transaction */
+>> +#define RX_BUSY		1  /* Receiver is busy */
+>> +#define RX_DONE		2  /* Message has been received successfully */
+>> +#define RX_ERROR	3  /* Message has been received with error */
+>> +
+>> +/* RX_CLEAR_BUF options */
+>> +#define CLEAR_START	1
+>> +#define CLEAR_STOP	0
+>> +
+>> +/* CEC_LOGICAL_ADDRx options */
+>> +#define LOGICAL_ADDR_MASK	0xf
+>> +#define LOGICAL_ADDR_VALID	BIT(4)
+>> +#define LOGICAL_ADDR_DISABLE	0
+>> +
+>> +#define CEC_CLK_RATE		32768
+>> +
+>> +struct meson_ao_cec_device {
+>> +	struct platform_device		*pdev;
+>> +	void __iomem			*base;
+>> +	struct clk			*core;
+>> +	spinlock_t			cec_reg_lock;
+>> +	struct cec_notifier		*notify;
+>> +	struct cec_adapter		*adap;
+>> +	struct cec_msg			rx_msg;
+>> +};
+>> +
+>> +#define writel_bits_relaxed(mask, val, addr) \
+>> +	writel_relaxed((readl_relaxed(addr) & ~(mask)) | (val), addr)
+>> +
+>> +static inline int meson_ao_cec_wait_busy(struct meson_ao_cec_device *ao_cec)
+>> +{
+>> +	ktime_t timeout = ktime_add_us(ktime_get(), 5000);
+>> +
+>> +	while (readl_relaxed(ao_cec->base + CEC_RW_REG) & CEC_RW_BUS_BUSY) {
+>> +		if (ktime_compare(ktime_get(), timeout) > 0)
+>> +			return -ETIMEDOUT;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int meson_ao_cec_read(struct meson_ao_cec_device *ao_cec,
+>> +			     unsigned long address, u8 *data)
+>> +{
+>> +	unsigned long flags;
+>> +	u32 reg = FIELD_PREP(CEC_RW_ADDR, address);
+>> +	int ret = 0;
+>> +
+>> +	spin_lock_irqsave(&ao_cec->cec_reg_lock, flags);
+>> +
+>> +	ret = meson_ao_cec_wait_busy(ao_cec);
+>> +	if (ret)
+>> +		goto read_out;
+>> +
+>> +	writel_relaxed(reg, ao_cec->base + CEC_RW_REG);
+>> +
+>> +	ret = meson_ao_cec_wait_busy(ao_cec);
+>> +	if (ret)
+>> +		goto read_out;
+>> +
+>> +	*data = FIELD_GET(CEC_RW_RD_DATA,
+>> +			  readl_relaxed(ao_cec->base + CEC_RW_REG));
+>> +
+>> +read_out:
+>> +	spin_unlock_irqrestore(&ao_cec->cec_reg_lock, flags);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int meson_ao_cec_write(struct meson_ao_cec_device *ao_cec,
+>> +			      unsigned long address, u8 data)
 > 
-> We observed a regression on our d05 boards (but curiously not
-> the fairly similar but single socket / smaller core count
-> d03), initially seen with linux-next prior to the merge window
-> and still present in v4.13-rc2.
+> I suggest a different prototype for the write functions:
 > 
-> The symptom is:
+> static void meson_ao_cec_write(struct meson_ao_cec_device *ao_cec,
+> 			      unsigned long address, u8 data, int *res);
 > 
-> [ 1982.959365] INFO: rcu_preempt detected stalls on CPUs/tasks:
-> [ 1982.965021] 	2-...: (10 GPs behind) idle=1d4/0/0 softirq=306/306 fqs=0 
-> [ 1982.971624] 	3-...: (2 GPs behind) idle=700/0/0 softirq=307/307 fqs=0 
-> [ 1982.978139] 	4-...: (20 GPs behind) idle=9f4/0/0 softirq=651/652 fqs=0 
-> [ 1982.984740] 	5-...: (18 GPs behind) idle=a78/0/0 softirq=369/371 fqs=0 
-> [ 1982.991342] 	6-...: (26 GPs behind) idle=e5c/0/0 softirq=217/219 fqs=0 
-> [ 1982.997944] 	7-...: (1438 GPs behind) idle=eb4/0/0 softirq=260/260 fqs=0 
-> [ 1983.004719] 	8-...: (18 GPs behind) idle=830/0/0 softirq=1609/1609 fqs=0 
-> [ 1983.011494] 	9-...: (18 GPs behind) idle=e9c/0/0 softirq=242/242 fqs=0 
-> [ 1983.018095] 	10-...: (1434 GPs behind) idle=ca0/0/0 softirq=210/212 fqs=0 
-> [ 1983.024957] 	11-...: (1106 GPs behind) idle=ee0/0/0 softirq=188/191 fqs=0 
-> [ 1983.031819] 	12-...: (1636 GPs behind) idle=c58/0/0 softirq=215/216 fqs=0 
-> [ 1983.038680] 	13-...: (1114 GPs behind) idle=c20/0/0 softirq=170/170 fqs=0 
-> [ 1983.045542] 	14-...: (1106 GPs behind) idle=d90/0/0 softirq=176/178 fqs=0 
-> [ 1983.052403] 	15-...: (1858 GPs behind) idle=900/0/0 softirq=184/185 fqs=0 
-> [ 1983.059266] 	16-...: (1621 GPs behind) idle=f04/0/0 softirq=204/206 fqs=0 
-> [ 1983.066127] 	17-...: (1433 GPs behind) idle=d30/0/0 softirq=202/202 fqs=0 
-> [ 1983.072988] 	18-...: (18 GPs behind) idle=2d4/0/0 softirq=218/220 fqs=0 
-> [ 1983.079676] 	19-...: (19 GPs behind) idle=bbc/0/0 softirq=178/180 fqs=0 
-> [ 1983.086364] 	20-...: (0 ticks this GP) idle=ee0/0/0 softirq=231/231 fqs=0 
-> [ 1983.093226] 	21-...: (4 GPs behind) idle=140/0/0 softirq=208/208 fqs=0 
-> [ 1983.099827] 	22-...: (5 GPs behind) idle=100/0/0 softirq=186/188 fqs=0 
-> [ 1983.106428] 	23-...: (1635 GPs behind) idle=fd4/0/0 softirq=1220/1221 fqs=0 
-> [ 1983.113463] 	24-...: (1112 GPs behind) idle=ca8/0/0 softirq=231/233 fqs=0 
-> [ 1983.120325] 	25-...: (1637 GPs behind) idle=9c4/0/0 softirq=164/166 fqs=0 
-> [ 1983.127187] 	27-...: (0 ticks this GP) idle=b08/0/0 softirq=182/182 fqs=0 
-> [ 1983.134048] 	28-...: (1110 GPs behind) idle=d28/0/0 softirq=179/181 fqs=0 
-> [ 1983.140909] 	29-...: (8 GPs behind) idle=1dc/0/0 softirq=196/198 fqs=0 
-> [ 1983.147511] 	31-...: (1434 GPs behind) idle=74c/0/0 softirq=160/161 fqs=0 
-> [ 1983.154373] 	32-...: (1432 GPs behind) idle=7d4/0/0 softirq=164/164 fqs=0 
-> [ 1983.161234] 	33-...: (1632 GPs behind) idle=4dc/0/0 softirq=130/132 fqs=0 
-> [ 1983.168096] 	34-...: (57 GPs behind) idle=3b0/0/0 softirq=411/411 fqs=0 
-> [ 1983.174784] 	35-...: (1599 GPs behind) idle=8a0/0/0 softirq=177/179 fqs=0 
-> [ 1983.181646] 	36-...: (1603 GPs behind) idle=520/0/0 softirq=132/134 fqs=0 
-> [ 1983.188507] 	37-...: (8 GPs behind) idle=02c/0/0 softirq=176/178 fqs=0 
-> [ 1983.195108] 	38-...: (1442 GPs behind) idle=d8c/0/0 softirq=3189/3190 fqs=0 
-> [ 1983.202144] 	39-...: (1431 GPs behind) idle=444/0/0 softirq=117/117 fqs=0 
-> [ 1983.209005] 	40-...: (4 GPs behind) idle=688/0/0 softirq=134/136 fqs=0 
-> [ 1983.215606] 	41-...: (1599 GPs behind) idle=554/0/0 softirq=2707/2711 fqs=0 
-> [ 1983.222642] 	42-...: (1430 GPs behind) idle=15c/0/0 softirq=110/111 fqs=0 
-> [ 1983.229503] 	43-...: (4 GPs behind) idle=054/0/0 softirq=101/103 fqs=0 
-> [ 1983.236104] 	46-...: (1117 GPs behind) idle=558/0/0 softirq=251/253 fqs=0 
-> [ 1983.242966] 	47-...: (1118 GPs behind) idle=5f0/0/0 softirq=110/112 fqs=0 
-> [ 1983.249827] 	48-...: (1621 GPs behind) idle=ef4/0/0 softirq=241/242 fqs=0 
-> [ 1983.256689] 	49-...: (1648 GPs behind) idle=92c/0/0 softirq=207/208 fqs=0 
-> [ 1983.263550] 	52-...: (1439 GPs behind) idle=e40/0/0 softirq=261/263 fqs=0 
-> [ 1983.270412] 	54-...: (1434 GPs behind) idle=650/0/0 softirq=258/260 fqs=0 
-> [ 1983.277273] 	55-...: (1646 GPs behind) idle=5e0/0/0 softirq=178/178 fqs=0 
-> [ 1983.284135] 	56-...: (1646 GPs behind) idle=800/0/0 softirq=249/249 fqs=0 
-> [ 1983.290996] 	57-...: (1599 GPs behind) idle=c48/0/0 softirq=222/224 fqs=0 
-> [ 1983.297858] 	58-...: (1648 GPs behind) idle=3e8/0/0 softirq=235/235 fqs=0 
-> [ 1983.304719] 	59-...: (1434 GPs behind) idle=720/0/0 softirq=201/203 fqs=0 
-> [ 1983.311581] 	60-...: (1647 GPs behind) idle=c80/0/0 softirq=250/250 fqs=0 
-> [ 1983.318443] 	61-...: (1598 GPs behind) idle=b18/0/0 softirq=208/208 fqs=0 
-> [ 1983.325304] 	62-...: (1112 GPs behind) idle=0a4/0/0 softirq=620/620 fqs=0 
-> [ 1983.332166] 	63-...: (1109 GPs behind) idle=4b0/0/0 softirq=187/188 fqs=0 
-> [ 1983.339026] 	(detected by 44, t=5335 jiffies, g=1566, c=1565, q=220)
-> [ 1983.345371] Task dump for CPU 2:
-> [ 1983.348587] swapper/2       R  running task        0     0      1 0x00000000
-> [ 1983.355626] Call trace:
-> [ 1983.358072] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> [ 1983.363199] [<7fffffffffffffff>] 0x7fffffffffffffff
-> [ 1983.368062] Task dump for CPU 3:
-> [ 1983.371278] swapper/3       R  running task        0     0      1 0x00000000
-> [ 1983.378315] Call trace:
-> [ 1983.380750] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> [ 1983.385881] [<ffff000008ea9000>] page_wait_table+0x1280/0x1800
-> [ 1983.391699] Task dump for CPU 4:
-> [ 1983.394915] swapper/4       R  running task        0     0      1 0x00000000
-> [ 1983.401951] Call trace:
-> [ 1983.404386] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> [ 1983.409510] [<7fffffffffffffff>] 0x7fffffffffffffff
-> [ 1983.414374] Task dump for CPU 5:
-> [ 1983.417590] swapper/5       R  running task        0     0      1 0x00000000
-> [ 1983.424626] Call trace:
-> [ 1983.427060] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> [ 1983.432185] [<7fffffffffffffff>] 0x7fffffffffffffff
-> [ 1983.437049] Task dump for CPU 6:
-> [ 1983.440265] swapper/6       R  running task        0     0      1 0x00000000
+> and that the write function starts with:
 > 
-> <snip>  Mixture of the two forms above for all the cpus
+> 	if (*res)
+> 		return;
 > 
-> [ 1984.568746] Call trace:
-> [ 1984.571180] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> [ 1984.576305] [<ffff000008ea9000>] page_wait_table+0x1280/0x1800
-> [ 1984.582124] Task dump for CPU 62:
-> [ 1984.585426] swapper/62      R  running task        0     0      1 0x00000000
-> [ 1984.592461] Call trace:
-> [ 1984.594895] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> [ 1984.600020] [<ffff000008ea9000>] page_wait_table+0x1280/0x1800
-> [ 1984.605839] Task dump for CPU 63:
-> [ 1984.609141] swapper/63      R  running task        0     0      1 0x00000000
-> [ 1984.616176] Call trace:
-> [ 1984.618611] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> [ 1984.623735] [<7fffffffffffffff>] 0x7fffffffffffffff
-> [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
-> [ 1984.638153] rcu_preempt     S    0     9      2 0x00000000
-> [ 1984.643626] Call trace:
-> [ 1984.646059] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> [ 1984.651189] [<ffff000008962274>] __schedule+0x19c/0x5d8
-> [ 1984.656400] [<ffff0000089626e8>] schedule+0x38/0xa0
-> [ 1984.661266] [<ffff000008965844>] schedule_timeout+0x124/0x218
-> [ 1984.667002] [<ffff000008121424>] rcu_gp_kthread+0x4fc/0x748
-> [ 1984.672564] [<ffff0000080df0b4>] kthread+0xfc/0x128
-> [ 1984.677429] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
+> This makes it possible to replace awkward code like this:
 > 
+> 	int ret;
 > 
-> Reducing the RCU CPU stall timeout makes it happen more often,
-> but we are seeing even with the default value of 24 seconds.
+> 	ret = meson_ao_cec_write(ao_cec, CEC_RX_MSG_CMD, RX_DISABLE);
+> 	if (ret)
+> 		return ret;
+> 	ret = meson_ao_cec_write(ao_cec, CEC_TX_MSG_CMD, TX_ABORT);
+> 	if (ret)
+> 		return ret;
 > 
-> Tends to occur after a period or relatively low usage, but has
-> also been seen mid way through performance tests.
+> to this:
 > 
-> This was not seen with v4.12 so a bisection run later lead to
-> commit 05a4a9527 (kernel/watchdog: split up config options).
+> 	int ret = 0;
 > 
-> Which was odd until we discovered that a side effect of this patch
-> was to change whether the softlockup detector was enabled or not in
-> the arm64 defconfig.
+> 	meson_ao_cec_write(ao_cec, CEC_RX_MSG_CMD, RX_DISABLE, &ret);
+> 	meson_ao_cec_write(ao_cec, CEC_TX_MSG_CMD, TX_ABORT, &ret);
+> 	...
+> 	return ret;
 > 
-> On 4.13-rc2 enabling the softlockup detector indeed stopped us
-> seeing the rcu issue. Disabling the equivalent on 4.12 made the
-> issue occur there as well.
-> 
-> Clearly the softlockup detector results in a thread on every cpu,
-> which might be related but beyond that we are still looking into
-> the issue.
-> 
-> So the obvious question is whether anyone else is seeing this as
-> it might help us to focus in on where to look!
+> The read() function isn't called that often, so I leave it up to you to decide
+> whether or not to change that function to something similar.
 
-Huh. Something similar has been seen very intermittently on powerpc
-as well. We couldn't reproduce it reliably to bisect it already, so
-this is a good help.
 
-http://marc.info/?l=linuxppc-embedded&m=149872815523646&w=2
-
-It looks like the watchdog patch has a similar effect on powerpc in
-that it stops enabling the softlockup detector by default. Haven't
-confirmed, but it looks like the same thing.
-
-A bug in RCU stall detection?
+Sure, it moves the ugliness elsewhere, but I'll try it anyway.
 
 > 
-> In the meantime we'll carry on digging.
+>> +{
+>> +	unsigned long flags;
+>> +	u32 reg = FIELD_PREP(CEC_RW_ADDR, address) |
+>> +		  FIELD_PREP(CEC_RW_WR_DATA, data) |
+>> +		  CEC_RW_WRITE_EN;
+>> +	int ret = 0;
+>> +
+>> +	spin_lock_irqsave(&ao_cec->cec_reg_lock, flags);
+>> +
+>> +	ret = meson_ao_cec_wait_busy(ao_cec);
+>> +	if (ret)
+>> +		goto write_out;
+>> +
+>> +	writel_relaxed(reg, ao_cec->base + CEC_RW_REG);
+>> +
+>> +write_out:
+>> +	spin_unlock_irqrestore(&ao_cec->cec_reg_lock, flags);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static inline void meson_ao_cec_irq_setup(struct meson_ao_cec_device *ao_cec,
+>> +				      bool enable)
+>> +{
+>> +	u32 cfg = CEC_INTR_TX | CEC_INTR_RX;
+>> +
+>> +	writel_bits_relaxed(cfg, enable ? cfg : 0,
+>> +			    ao_cec->base + CEC_INTR_MASKN_REG);
+>> +}
+>> +
+>> +static inline int meson_ao_cec_clear(struct meson_ao_cec_device *ao_cec)
+>> +{
+>> +	int ret;
+>> +
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_RX_MSG_CMD, RX_DISABLE);
+>> +	if (ret)
+>> +		return ret;
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_TX_MSG_CMD, TX_ABORT);
+>> +	if (ret)
+>> +		return ret;
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_RX_CLEAR_BUF, 1);
+>> +	if (ret)
+>> +		return ret;
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_TX_CLEAR_BUF, 1);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	udelay(100);
+>> +
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_RX_CLEAR_BUF, 0);
+>> +	if (ret)
+>> +		return ret;
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_TX_CLEAR_BUF, 0);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	udelay(100);
+>> +
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_RX_MSG_CMD, RX_NO_OP);
+>> +	if (ret)
+>> +		return ret;
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_TX_MSG_CMD, TX_NO_OP);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int meson_ao_cec_arbit_bit_time_set(struct meson_ao_cec_device *ao_cec,
+>> +					   unsigned int bit_set,
+>> +					   unsigned int time_set)
+>> +{
+>> +	int ret;
+>> +
+>> +	switch (bit_set) {
+>> +	case CEC_SIGNAL_FREE_TIME_RETRY:
+>> +		ret = meson_ao_cec_write(ao_cec, CEC_TXTIME_4BIT_BIT7_0,
+>> +				   time_set & 0xff);
+>> +		if (ret)
+>> +			return ret;
+>> +		ret = meson_ao_cec_write(ao_cec, CEC_TXTIME_4BIT_BIT10_8,
+>> +				   (time_set >> 8) & 0x7);
+>> +		if (ret)
+>> +			return ret;
+>> +		break;
+>> +
+>> +	case CEC_SIGNAL_FREE_TIME_NEW_INITIATOR:
+>> +		ret = meson_ao_cec_write(ao_cec, CEC_TXTIME_2BIT_BIT7_0,
+>> +				   time_set & 0xff);
+>> +		if (ret)
+>> +			return ret;
+>> +		ret = meson_ao_cec_write(ao_cec, CEC_TXTIME_2BIT_BIT10_8,
+>> +				   (time_set >> 8) & 0x7);
+>> +		if (ret)
+>> +			return ret;
+>> +		break;
+>> +
+>> +	case CEC_SIGNAL_FREE_TIME_NEXT_XFER:
+>> +		ret = meson_ao_cec_write(ao_cec, CEC_TXTIME_17MS_BIT7_0,
+>> +				   time_set & 0xff);
+>> +		if (ret)
+>> +			return ret;
+>> +		ret = meson_ao_cec_write(ao_cec, CEC_TXTIME_17MS_BIT10_8,
+>> +				   (time_set >> 8) & 0x7);
+>> +		if (ret)
+>> +			return ret;
+>> +		break;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static irqreturn_t meson_ao_cec_irq(int irq, void *data)
+>> +{
+>> +	struct meson_ao_cec_device *ao_cec = data;
+>> +	u32 stat = readl_relaxed(ao_cec->base + CEC_INTR_STAT_REG);
+>> +
+>> +	if (stat)
+>> +		return IRQ_WAKE_THREAD;
+>> +
+>> +	return IRQ_NONE;
+>> +}
+>> +
+>> +static void meson_ao_cec_irq_tx(struct meson_ao_cec_device *ao_cec)
+>> +{
+>> +	unsigned long tx_status = 0;
+>> +	u8 stat;
+>> +	int ret;
+>> +
+>> +	ret = meson_ao_cec_read(ao_cec, CEC_TX_MSG_STATUS, &stat);
+>> +	if (ret)
+>> +		goto tx_reg_err;
+>> +
+>> +	switch (stat) {
+>> +	case TX_DONE:
+>> +		tx_status = CEC_TX_STATUS_OK;
+>> +		break;
+>> +
+>> +	case TX_BUSY:
+>> +		tx_status = CEC_TX_STATUS_ARB_LOST;
+>> +		break;
+>> +
+>> +	case TX_IDLE:
+>> +		tx_status = CEC_TX_STATUS_LOW_DRIVE;
+>> +		break;
+>> +
+>> +	case TX_ERROR:
+>> +	default:
+>> +		tx_status = CEC_TX_STATUS_NACK;
+>> +		break;
+>> +	}
+>> +
+>> +	/* Clear Interruption */
+>> +	writel_relaxed(CEC_INTR_TX, ao_cec->base + CEC_INTR_CLR_REG);
+>> +
+>> +	/* Stop TX */
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_TX_MSG_CMD, TX_NO_OP);
+>> +	if (ret)
+>> +		goto tx_reg_err;
+>> +
+>> +	cec_transmit_attempt_done(ao_cec->adap, tx_status);
+>> +	return;
+>> +
+>> +tx_reg_err:
+>> +	cec_transmit_attempt_done(ao_cec->adap, CEC_TX_STATUS_ERROR);
+>> +}
+>> +
+>> +static void meson_ao_cec_irq_rx(struct meson_ao_cec_device *ao_cec)
+>> +{
+>> +	int i, ret;
+>> +	u8 reg;
+>> +
+>> +	ret = meson_ao_cec_read(ao_cec, CEC_RX_MSG_STATUS, &reg);
+>> +	if (ret)
+>> +		goto rx_out;
+>> +
+>> +	/* RX Error */
+>> +	if (reg != RX_DONE)
+>> +		goto rx_out;
+>> +
+>> +	ret = meson_ao_cec_read(ao_cec, CEC_RX_NUM_MSG, &reg);
+>> +	if (ret || reg != 1)
+>> +		goto rx_out;
+>> +
+>> +	ret = meson_ao_cec_read(ao_cec, CEC_RX_MSG_LENGTH, &reg);
+>> +	if (ret)
+>> +		goto rx_out;
+>> +
+>> +	ao_cec->rx_msg.len = reg + 1;
+>> +	if (ao_cec->rx_msg.len > CEC_MAX_MSG_SIZE)
+>> +		ao_cec->rx_msg.len = CEC_MAX_MSG_SIZE;
+>> +
+>> +	for (i = 0; i < ao_cec->rx_msg.len; i++) {
+>> +		u8 byte;
+>> +
+>> +		ret = meson_ao_cec_read(ao_cec, CEC_RX_MSG_0_HEADER + i, &byte);
+>> +		if (ret)
+>> +			goto rx_out;
+>> +
+>> +		ao_cec->rx_msg.msg[i] = byte;
+>> +	}
+>> +
+>> +	cec_received_msg(ao_cec->adap, &ao_cec->rx_msg);
+>> +
+>> +rx_out:
+>> +	/* Clear Interruption */
+>> +	writel_relaxed(CEC_INTR_RX, ao_cec->base + CEC_INTR_CLR_REG);
+>> +
+>> +	/* Return if previous read errors */
+>> +	if (ret)
+>> +		return;
+>> +
+>> +	/* Ack RX message */
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_RX_MSG_CMD, RX_ACK_CURRENT);
+>> +	if (ret)
+>> +		return;
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_RX_MSG_CMD, RX_NO_OP);
+>> +	if (ret)
+>> +		return;
+>> +
+>> +	/* Clear RX buffer */
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_RX_CLEAR_BUF, CLEAR_START);
+>> +	if (ret)
+>> +		return;
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_RX_CLEAR_BUF, CLEAR_STOP);
+>> +	if (ret)
+>> +		return;
+>> +}
+>> +
+>> +static irqreturn_t meson_ao_cec_irq_thread(int irq, void *data)
+>> +{
+>> +	struct meson_ao_cec_device *ao_cec = data;
+>> +	u32 stat = readl_relaxed(ao_cec->base + CEC_INTR_STAT_REG);
+>> +
+>> +	if (stat & CEC_INTR_TX)
+>> +		meson_ao_cec_irq_tx(ao_cec);
+>> +
+>> +	meson_ao_cec_irq_rx(ao_cec);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int meson_ao_cec_set_log_addr(struct cec_adapter *adap, u8 logical_addr)
+>> +{
+>> +	struct meson_ao_cec_device *ao_cec = adap->priv;
+>> +	int ret;
+>> +
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_LOGICAL_ADDR0,
+>> +				 LOGICAL_ADDR_DISABLE);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = meson_ao_cec_clear(ao_cec);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	if (logical_addr == CEC_LOG_ADDR_INVALID)
+>> +		return 0;
+>> +
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_LOGICAL_ADDR0,
+>> +			   logical_addr & LOGICAL_ADDR_MASK);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	udelay(100);
+>> +
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_LOGICAL_ADDR0,
+>> +			   (logical_addr & LOGICAL_ADDR_MASK) |
+>> +			   LOGICAL_ADDR_VALID);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int meson_ao_cec_transmit(struct cec_adapter *adap, u8 attempts,
+>> +				 u32 signal_free_time, struct cec_msg *msg)
+>> +{
+>> +	struct meson_ao_cec_device *ao_cec = adap->priv;
+>> +	int i, ret;
+>> +	u8 reg;
+>> +
+>> +	ret = meson_ao_cec_read(ao_cec, CEC_TX_MSG_STATUS, &reg);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	if (reg == TX_BUSY) {
+>> +		dev_err(&ao_cec->pdev->dev, "%s: busy TX\n", __func__);
 > 
-> Thanks,
+> s/busy TX/busy TX: aborting/
 > 
-> Jonathan
-> 
-> p.s. As a more general question, do we want to have the
-> soft lockup detector enabledon arm64 by default?
+> to make it clear that this TX is aborted.
 
-I've cc'ed Don. My patch should not have changed defconfigs, I
-should have been more careful with that.
+
+OK
+
+> 
+>> +		ret = meson_ao_cec_write(ao_cec, CEC_TX_MSG_CMD, TX_ABORT);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>> +	for (i = 0; i < msg->len; i++) {
+>> +		ret = meson_ao_cec_write(ao_cec, CEC_TX_MSG_0_HEADER + i,
+>> +					 msg->msg[i]);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_TX_MSG_LENGTH, msg->len - 1);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = meson_ao_cec_write(ao_cec, CEC_TX_MSG_CMD, TX_REQ_CURRENT);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int meson_ao_cec_adap_enable(struct cec_adapter *adap, bool enable)
+>> +{
+>> +	struct meson_ao_cec_device *ao_cec = adap->priv;
+>> +	int ret;
+>> +
+>> +	meson_ao_cec_irq_setup(ao_cec, false);
+>> +
+>> +	writel_bits_relaxed(CEC_GEN_CNTL_RESET, CEC_GEN_CNTL_RESET,
+>> +			    ao_cec->base + CEC_GEN_CNTL_REG);
+>> +
+>> +	if (!enable)
+>> +		return 0;
+>> +
+>> +	/* Enable gated clock (Normal mode). */
+>> +	writel_bits_relaxed(CEC_GEN_CNTL_CLK_CTRL_MASK,
+>> +			    FIELD_PREP(CEC_GEN_CNTL_CLK_CTRL_MASK,
+>> +				       CEC_GEN_CNTL_CLK_ENABLE),
+>> +			    ao_cec->base + CEC_GEN_CNTL_REG);
+>> +
+>> +	udelay(100);
+>> +
+>> +	/* Release Reset */
+>> +	writel_bits_relaxed(CEC_GEN_CNTL_RESET, 0,
+>> +			    ao_cec->base + CEC_GEN_CNTL_REG);
+>> +
+>> +	/* Clear buffers */
+>> +	ret = meson_ao_cec_clear(ao_cec);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	/* CEC arbitration 3/5/7 bit time set. */
+>> +	ret = meson_ao_cec_arbit_bit_time_set(ao_cec,
+>> +					CEC_SIGNAL_FREE_TIME_RETRY,
+>> +					0x118);
+>> +	if (ret)
+>> +		return ret;
+>> +	ret = meson_ao_cec_arbit_bit_time_set(ao_cec,
+>> +					CEC_SIGNAL_FREE_TIME_NEW_INITIATOR,
+>> +					0x000);
+>> +	if (ret)
+>> +		return ret;
+>> +	ret = meson_ao_cec_arbit_bit_time_set(ao_cec,
+>> +					CEC_SIGNAL_FREE_TIME_NEXT_XFER,
+>> +					0x2aa);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	meson_ao_cec_irq_setup(ao_cec, true);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct cec_adap_ops meson_ao_cec_ops = {
+>> +	.adap_enable = meson_ao_cec_adap_enable,
+>> +	.adap_log_addr = meson_ao_cec_set_log_addr,
+>> +	.adap_transmit = meson_ao_cec_transmit,
+>> +};
+>> +
+>> +static int meson_ao_cec_probe(struct platform_device *pdev)
+>> +{
+>> +	struct meson_ao_cec_device *ao_cec;
+>> +	struct platform_device *hdmi_dev;
+>> +	struct device_node *np;
+>> +	struct resource *res;
+>> +	int ret, irq;
+>> +
+>> +	np = of_parse_phandle(pdev->dev.of_node, "hdmi-phandle", 0);
+>> +	if (!np) {
+>> +		dev_err(&pdev->dev, "Failed to find hdmi node\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	hdmi_dev = of_find_device_by_node(np);
+>> +	if (hdmi_dev == NULL)
+>> +		return -EPROBE_DEFER;
+>> +
+>> +	ao_cec = devm_kzalloc(&pdev->dev, sizeof(*ao_cec), GFP_KERNEL);
+>> +	if (!ao_cec)
+>> +		return -ENOMEM;
+>> +
+>> +	spin_lock_init(&ao_cec->cec_reg_lock);
+>> +
+>> +	ao_cec->notify = cec_notifier_get(&hdmi_dev->dev);
+>> +	if (!ao_cec->notify)
+>> +		return -ENOMEM;
+>> +
+>> +	ao_cec->adap = cec_allocate_adapter(&meson_ao_cec_ops, ao_cec,
+>> +					    "meson_ao_cec",
+>> +					    CEC_CAP_LOG_ADDRS |
+>> +					    CEC_CAP_TRANSMIT |
+>> +					    CEC_CAP_RC |
+>> +					    CEC_CAP_PASSTHROUGH,
+>> +					    1); /* Use 1 for now */
+> 
+> I recommend that you add support for 2 logical addresses. More isn't allowed
+> by the CEC 2.0 spec anyway (no such restriction for CEC 1.4, but more than
+> two really isn't needed).
+
+I know, but in the "communication" register with the suspend/poweroff firmware
+that  handles the wake up, only a single logical address is supported...
+
+What should I do in this case ? Which logical adress should I pass to the firmware when implementing ir ?
+
+> 
+>> +	if (IS_ERR(ao_cec->adap)) {
+>> +		ret = PTR_ERR(ao_cec->adap);
+>> +		goto out_probe_notify;
+>> +	}
+>> +
+>> +	ao_cec->adap->owner = THIS_MODULE;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	ao_cec->base = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(ao_cec->base)) {
+>> +		ret = PTR_ERR(ao_cec->base);
+>> +		goto out_probe_adapter;
+>> +	}
+>> +
+>> +	irq = platform_get_irq(pdev, 0);
+>> +	ret = devm_request_threaded_irq(&pdev->dev, irq,
+>> +					meson_ao_cec_irq,
+>> +					meson_ao_cec_irq_thread,
+>> +					0, NULL, ao_cec);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "irq request failed\n");
+>> +		goto out_probe_adapter;
+>> +	}
+>> +
+>> +	ao_cec->core = devm_clk_get(&pdev->dev, "core");
+>> +	if (IS_ERR(ao_cec->core)) {
+>> +		dev_err(&pdev->dev, "core clock request failed\n");
+>> +		ret = PTR_ERR(ao_cec->core);
+>> +		goto out_probe_adapter;
+>> +	}
+>> +
+>> +	ret = clk_prepare_enable(ao_cec->core);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "core clock enable failed\n");
+>> +		goto out_probe_adapter;
+>> +	}
+>> +
+>> +	ret = clk_set_rate(ao_cec->core, CEC_CLK_RATE);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "core clock set rate failed\n");
+>> +		goto out_probe_clk;
+>> +	}
+>> +
+>> +	device_reset_optional(&pdev->dev);
+>> +
+>> +	ao_cec->pdev = pdev;
+>> +	platform_set_drvdata(pdev, ao_cec);
+>> +
+>> +	ret = cec_register_adapter(ao_cec->adap, &pdev->dev);
+>> +	if (ret < 0) {
+>> +		cec_notifier_put(ao_cec->notify);
+>> +		goto out_probe_clk;
+>> +	}
+>> +
+>> +	/* Setup Hardware */
+>> +	writel_relaxed(CEC_GEN_CNTL_RESET,
+>> +		       ao_cec->base + CEC_GEN_CNTL_REG);
+>> +
+>> +	cec_register_cec_notifier(ao_cec->adap, ao_cec->notify);
+>> +
+>> +	return 0;
+>> +
+>> +out_probe_clk:
+>> +	clk_disable_unprepare(ao_cec->core);
+>> +
+>> +out_probe_adapter:
+>> +	cec_delete_adapter(ao_cec->adap);
+>> +
+>> +out_probe_notify:
+>> +	cec_notifier_put(ao_cec->notify);
+>> +
+>> +	dev_err(&pdev->dev, "CEC controller registration failed\n");
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int meson_ao_cec_remove(struct platform_device *pdev)
+>> +{
+>> +	struct meson_ao_cec_device *ao_cec = platform_get_drvdata(pdev);
+>> +
+>> +	clk_disable_unprepare(ao_cec->core);
+>> +
+>> +	cec_unregister_adapter(ao_cec->adap);
+>> +
+>> +	cec_notifier_put(ao_cec->notify);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id meson_ao_cec_of_match[] = {
+>> +	{ .compatible = "amlogic,meson-gx-ao-cec", },
+>> +	{ /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, meson_ao_cec_of_match);
+>> +
+>> +static struct platform_driver meson_ao_cec_driver = {
+>> +	.probe   = meson_ao_cec_probe,
+>> +	.remove  = meson_ao_cec_remove,
+>> +	.driver  = {
+>> +		.name = "meson-ao-cec",
+>> +		.of_match_table = of_match_ptr(meson_ao_cec_of_match),
+>> +	},
+>> +};
+>> +
+>> +module_platform_driver(meson_ao_cec_driver);
+>> +
+>> +MODULE_DESCRIPTION("Meson AO CEC Controller driver");
+>> +MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
+>> +MODULE_LICENSE("GPL");
+>>
+> 
+> Regards,
+> 
+> 	Hans
+> 
 
 Thanks,
-Nick
+Neil
