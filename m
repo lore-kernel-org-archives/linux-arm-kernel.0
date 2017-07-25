@@ -1,100 +1,56 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Tue, 25 Jul 2017 17:04:22 +0200
-Subject: [PATCH v8 3/3] perf: cavium: Add Documentation
-In-Reply-To: <20170725150422.4775-1-jglauber@cavium.com>
-References: <20170725150422.4775-1-jglauber@cavium.com>
-Message-ID: <20170725150422.4775-4-jglauber@cavium.com>
+Date: Tue, 25 Jul 2017 17:04:19 +0200
+Subject: [PATCH v8 0/3] Cavium ARM64 uncore PMU support
+Message-ID: <20170725150422.4775-1-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document Cavium SoC PMUs.
+Add support for various PMU counters found on the Cavium ThunderX and
+OcteonTx SoC.
 
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
----
- Documentation/perf/cavium-pmu.txt | 75 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+The driver provides common "uncore" functions to avoid code duplication and
+support adding more device PMUs (like L2 cache) in the future.
+
+Changes to v7:
+- Check return code of kasprintf
+- Check return code of ioremap
+- Add some more comments
+- Only call perf_pmu_register after event_init() assignment and list_add
+- Various cosmetics
+
+Changes to v6:
+- Make driver stand-alone again without hooking into EDAC
+- depend on ARCH_THUNDER
+
+Changes to v5:
+- Only allow built-in CONFIG_CAVIUM_PMU
+- Drop unneeded export of perf_event_update_userpage()
+- Simplify callbacks in edac code, move CONFIG_CAVIUM_PMU check
+  to header file
+- Fix some sparse static warnings
+- Add documentation
+- Fix OCX TLK event_valid check
+- Add group validation in event_init
+- Add a guard variable to prevent calling init twice
+- Use kasprintf and fix pmu name allocation
+- Remove unneeded check for embedded pmu
+- Loop around local64_cmpxchg
+- Simplify cvm_pmu_lmc_event_valid
+- Fix list_add error case
+
+Jan Glauber (3):
+  perf: cavium: Support memory controller PMU counters
+  perf: cavium: Support transmit-link PMU counters
+  perf: cavium: Add Documentation
+
+ Documentation/perf/cavium-pmu.txt |  75 +++++
+ drivers/perf/Kconfig              |   8 +
+ drivers/perf/Makefile             |   1 +
+ drivers/perf/cavium_pmu.c         | 646 ++++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h        |   1 +
+ 5 files changed, 731 insertions(+)
  create mode 100644 Documentation/perf/cavium-pmu.txt
+ create mode 100644 drivers/perf/cavium_pmu.c
 
-diff --git a/Documentation/perf/cavium-pmu.txt b/Documentation/perf/cavium-pmu.txt
-new file mode 100644
-index 0000000..6fbf824
---- /dev/null
-+++ b/Documentation/perf/cavium-pmu.txt
-@@ -0,0 +1,75 @@
-+Cavium ThunderX and OcteonTx Performance Monitoring Unit (PMU)
-+==============================================================
-+
-+Cavium SoCs contain various system devices such as L2 caches, processor
-+interconnect and memory controllers. Unfortunately the PMU counters
-+are not following a common design so each device has a slightly different
-+approach how to control and use the PMU counters.
-+
-+Common properties of all devices carrying PMU counters:
-+- The devices are PCI devices and the counters are embedded somewhere
-+  in the PCI register space.
-+- All counters are 64 bit wide.
-+- There are no overflow interrupts (unnecessary because of the 64 bit wide
-+  counters).
-+
-+Properties depending on the device type:
-+- How to start/stop the counters
-+- Programmable vs. fixed purpose counters
-+- Stoppable vs. always running counters
-+- Independent vs. grouped counters
-+- Read-only vs. writable counters
-+- PCI device to PMU group relationship
-+
-+
-+Devices with PMU counters
-+-------------------------
-+
-+Memory controller (LMC):
-+- one PCI device per LMC
-+- fixed-purpose counters
-+- always running counters without start/stop/reset control
-+- read-only counters
-+
-+CCPI interface controller (OCX) Transmit link (TLK) counters:
-+- writable counters
-+- only one PCI device exposes multiple TLK units (3 units on T88)
-+- start/stop control per unit
-+- only present on multi-socket systems
-+
-+PMU (perf) driver
-+-----------------
-+
-+The cavium-pmu driver registers several perf PMU drivers. Each of the perf
-+driver provides description of its available events and configuration options
-+in sysfs, see /sys/devices/<lmcX/ocx_tlkX>/.
-+
-+The "format" directory describes format of the config (event ID),
-+The "events" directory shows the names of the events and provides configuration
-+templates for all supported event types that can be used with perf tool. For
-+example, "lmc0/dclk_cnt/" is an equivalent of "lmc0/config=2/".
-+
-+Each perf driver also provides a "cpumask" sysfs attribute, which contains a
-+single CPU ID of the processor which will be used to handle all the PMU events.
-+
-+Example for perf tool use:
-+
-+ / # perf list | grep -e lmc
-+   lmc0/bank_conflict1/                               [Kernel PMU event]
-+   lmc0/bank_conflict2/                               [Kernel PMU event]
-+   lmc0/dclk_cnt/                                     [Kernel PMU event]
-+   lmc0/ifb_cnt/                                      [Kernel PMU event]
-+   lmc0/ops_cnt/                                      [Kernel PMU event]
-+
-+ / # perf stat -a -e lmc0/ops_cnt/,lmc0/dclk_cnt/ -- sleep 1
-+
-+   Performance counter stats for 'system wide':
-+
-+             176,133      lmc0/ops_cnt/                                               
-+         670,243,653      lmc0/dclk_cnt/                                              
-+
-+         1.005479295 seconds time elapsed
-+
-+The driver does not support sampling, therefore "perf record" will
-+not work. System wide mode ("-a") must be used as per-task (without "-a")
-+perf sessions are not supported.
 -- 
 2.9.0.rc0.21.g7777322
