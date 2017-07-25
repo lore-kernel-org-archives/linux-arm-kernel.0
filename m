@@ -1,61 +1,26 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 25 Jul 2017 23:54:19 +0200
-Subject: [PATCH v5 3/7] drm/rockchip: vop: move line_flag_num to interrupt
- registers
-In-Reply-To: <1500518613-30590-1-git-send-email-mark.yao@rock-chips.com>
-References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
- <1500518613-30590-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1816316.NCRF09CkBJ@phil>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue, 25 Jul 2017 18:06:09 -0400
+Subject: [PATCH 0/3] ARM: dts: NSP: dma-coherent and USB3 changes
+Message-ID: <1501020372-19607-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Add dma-coherent to the relevant DT entries, and add USB3 support
 
-Am Donnerstag, 20. Juli 2017, 10:43:32 CEST schrieb Mark Yao:
-> In the hardware design process, the design of line flags
-> register is associated with the interrupt register,
-> placing the line flags in the interrupt definition is
-> more reasonable, and it would make multi-vop define easilier.
-> 
-> Changes in v3:
-> - Explain more in details, introduce why we need this patch
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 4 ++--
->  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 8 ++++----
->  3 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 784a2b7..4f6c7bc 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -982,7 +982,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
->  	VOP_CTRL_SET(vop, vact_st_end, val);
->  	VOP_CTRL_SET(vop, vpost_st_end, val);
->  
-> -	VOP_CTRL_SET(vop, line_flag_num[0], vact_end);
-> +	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
+Jon Mason (3):
+  ARM: dts: NSP: Add dma-coherent to relevant DT entries
+  ARM: dts: NSP: Rearrage USB entries
+  ARM: dts: NSP: Add USB3 and USB3 PHY to NSP
 
-With patches applied up to this one I end up with
+ arch/arm/boot/dts/bcm-nsp.dtsi     | 61 +++++++++++++++++++++++++++++---------
+ arch/arm/boot/dts/bcm958522er.dts  |  8 +++++
+ arch/arm/boot/dts/bcm958525er.dts  |  8 +++++
+ arch/arm/boot/dts/bcm958525xmc.dts |  8 +++++
+ arch/arm/boot/dts/bcm958622hr.dts  |  8 +++++
+ arch/arm/boot/dts/bcm958623hr.dts  |  8 +++++
+ arch/arm/boot/dts/bcm958625hr.dts  |  8 +++++
+ arch/arm/boot/dts/bcm958625k.dts   |  8 +++++
+ 8 files changed, 103 insertions(+), 14 deletions(-)
 
-  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_vop.o
-../drivers/gpu/drm/rockchip/rockchip_drm_vop.c: In function ?vop_crtc_enable?:
-../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:46: error: macro "VOP_INTR_SET" requires 4 arguments, but only 3 given
-  VOP_INTR_SET(vop, line_flag_num[0], vact_end);
-                                              ^
-../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:2: error: ?VOP_INTR_SET? undeclared (first use in this function)
-  VOP_INTR_SET(vop, line_flag_num[0], vact_end);
-  ^~~~~~~~~~~~
-../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:2: note: each undeclared identifier is reported only once for each function it appears in
-
-In patch4 you replace this again, with 
--	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
-+	VOP_REG_SET(vop, intr, line_flag_num[0], vact_end);
-
-but this intermediate breakage should not happen, to keep bisectability.
-
-
-Heiko
+-- 
+2.7.4
