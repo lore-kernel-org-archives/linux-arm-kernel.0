@@ -1,98 +1,185 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 25 Jul 2017 10:55:17 -0700
-Subject: Problem with PHY state machine when using interrupts
-In-Reply-To: <e2f4ef4a-c667-3bdf-e4ea-2767dc6a4922@free.fr>
-References: <65b9f1f5-724c-cd03-1c39-59405e773efa@free.fr>
- <849513d9-c981-ec20-5a10-08c663d0aa37@free.fr>
- <02e9e171-ec22-e491-5bc8-ef4b3ad7fec2@gmail.com>
- <e6a7a5df-b735-6f9c-6a2b-cded86ec6525@free.fr>
- <b0410a73-ff2d-ca06-93fa-17af2040c41c@gmail.com>
- <0f56083f-d43e-a141-1470-b76546af6d58@gmail.com>
- <c81e12bc-0f89-5eab-547e-f0c1ec389ad8@free.fr>
- <62085f48-df18-f987-f521-dcdfbd7f574b@gmail.com>
- <eb09bda5-c972-0c2c-2693-982c02c8c87c@gmail.com>
- <1c00935b-3a3c-4268-db99-a0487ddece76@free.fr>
- <e2f4ef4a-c667-3bdf-e4ea-2767dc6a4922@free.fr>
-Message-ID: <E5207219-42E8-42FB-9E92-D3F424E2AD8C@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 25 Jul 2017 19:15:18 +0100
+Subject: [PATCH] iommu/of: Handle PCI aliases properly
+In-Reply-To: <20170531175230.16529-3-robin.murphy@arm.com>
+References: <20170531175230.16529-3-robin.murphy@arm.com>
+Message-ID: <09c528ce-32b2-f6ff-d6c8-93e6af8dc450@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On July 25, 2017 4:41:32 AM PDT, Mason <slash.tmp@free.fr> wrote:
->On 25/07/2017 12:51, Mason wrote:
->
->> Moving the call to phy_stop() down after all the MAC tear down
->> avoids the hang.
->> 
->> As far as I understand, when we are shutting everything down,
->> we don't need the phy_state_machine to run asynchronously.
->> We can run it synchronously one last time after the delayed
->> stuff has been disabled.
->
->Below is my current WIP diff. (It conflates the two issues
->I've been discussing. Splitting the diff required.)
->
->Tested in interrupt mode:
->
-># ip link set eth0 up
->[   11.107547] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change UP -> AN
->[   14.530329] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full -
->flow control rx/tx
->[   14.538136] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change AN -> RUNNING
-># ip link set eth0 down
->[   23.801018] nb8800 26000.ethernet eth0: Link is Down
-># ip link set eth0 up
->[   28.740870] Atheros 8035 ethernet UP26000.nb8800-mii:04: PHY state
->change UP -> AN
->[   31.431528] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full -
->flow control rx/tx
->[   31.439350] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change AN -> RUNNING
->
->Works as expected.
+On 31/05/17 18:52, Robin Murphy wrote:
+> When a PCI device has DMA quirks, we need to ensure that an upstream
+> IOMMU knows about all possible aliases, since the presence of a DMA
+> quirk does not preclude the device still also emitting transactions
+> (e.g. MSIs) on its 'real' RID. Similarly, the rules for bridge aliasing
+> are relatively complex, and some bridges may only take ownership of
+> transactions under particular transient circumstances, leading again to
+> multiple RIDs potentially being seen at the IOMMU for the given device.
+> 
+> Take all this into account in the OF code by translating every RID
+> produced by the alias walk, not just whichever one comes out last.
+> Happily, this also makes things tidy enough that we can reduce the
+> number of both total lines of code, and confusing levels of indirection,
+> by pulling the "iommus"/"iommu-map" parsing helpers back in-line again.
 
-It does indeed, although this probably also contains your change that only logs the PHY state machine transitions, which makes me wonder why the UP -> HALTED state is not logged?
+Any comments on this? It should still apply as-is; I don't recall any
+conflicts when I rebased a local branch onto 4.13-rc1.
 
->
->Tested in polling mode:
->
-># ip link set eth0 up
->[   23.001199] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change UP -> AN
->[   24.024315] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change AN -> NOLINK
->[   27.064355] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full -
->flow control rx/tx
->[   27.072156] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change NOLINK -> RUNNING
-># ip link set eth0 down
->[   42.134617] nb8800 26000.ethernet eth0: Link is Down
-># ip link set eth0 up
->[   48.381185] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change UP -> AN
->[   49.410976] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change AN -> NOLINK
->[   51.437686] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full -
->flow control rx/tx
->[   51.445486] Atheros 8035 ethernet 26000.nb8800-mii:04: PHY state
->change NOLINK -> RUNNING
->
->Works as expected.
->
->Also tested on my old board, no regression seen.
->
->Can you confirm that the changes to drivers/net/phy/phy.c
->look reasonable?
+Robin.
 
-The flush is correct, but I am not sure about the explicit state change, in two ways:
-
-- in polling mode, we should already be reaching that state with the flush call AFAICT
-- in interrupt driven mode (phy_interrupt_is_valid or PHY_IGNORE_INTERRUPT) we do indeed need to make sure the HALTED state is reached
-
-Not sure why I did not see the interrupt imbalance problem with phy_mac_interrupt...
-
-I am out today but will follow up tomorrow. thanks!
-
--- 
-Florian
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> This applies on top of the fix currently queued in the IOMMU tree:
+> "iommu/of: Ignore all errors except EPROBE_DEFER"
+> 
+>  drivers/iommu/of_iommu.c | 104 +++++++++++++++++++++--------------------------
+>  1 file changed, 47 insertions(+), 57 deletions(-)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 19779b88a479..1fbd7a142b30 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -140,75 +140,39 @@ static const struct iommu_ops
+>  	return ops;
+>  }
+>  
+> -static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+> -{
+> -	struct of_phandle_args *iommu_spec = data;
+> +struct of_pci_iommu_alias_info {
+> +	struct device *dev;
+> +	struct device_node *np;
+> +};
+>  
+> -	iommu_spec->args[0] = alias;
+> -	return iommu_spec->np == pdev->bus->dev.of_node;
+> -}
+> -
+> -static const struct iommu_ops
+> -*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
+> +static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
+>  {
+> +	struct of_pci_iommu_alias_info *info = data;
+>  	const struct iommu_ops *ops;
+> -	struct of_phandle_args iommu_spec;
+> +	struct of_phandle_args iommu_spec = { .args_count = 1 };
+>  	int err;
+>  
+> -	/*
+> -	 * Start by tracing the RID alias down the PCI topology as
+> -	 * far as the host bridge whose OF node we have...
+> -	 * (we're not even attempting to handle multi-alias devices yet)
+> -	 */
+> -	iommu_spec.args_count = 1;
+> -	iommu_spec.np = bridge_np;
+> -	pci_for_each_dma_alias(pdev, __get_pci_rid, &iommu_spec);
+> -	/*
+> -	 * ...then find out what that becomes once it escapes the PCI
+> -	 * bus into the system beyond, and which IOMMU it ends up at.
+> -	 */
+> -	iommu_spec.np = NULL;
+> -	err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+> +	err = of_pci_map_rid(info->np, alias, "iommu-map",
+>  			     "iommu-map-mask", &iommu_spec.np,
+>  			     iommu_spec.args);
+>  	if (err)
+> -		return err == -ENODEV ? NULL : ERR_PTR(err);
+> -
+> -	ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
+> +		return err == -ENODEV ? 1 : err;
+>  
+> +	ops = of_iommu_xlate(info->dev, &iommu_spec);
+>  	of_node_put(iommu_spec.np);
+> -	return ops;
+> -}
+>  
+> -static const struct iommu_ops
+> -*of_platform_iommu_init(struct device *dev, struct device_node *np)
+> -{
+> -	struct of_phandle_args iommu_spec;
+> -	const struct iommu_ops *ops = NULL;
+> -	int idx = 0;
+> +	if (IS_ERR(ops))
+> +		return PTR_ERR(ops);
+>  
+> -	/*
+> -	 * We don't currently walk up the tree looking for a parent IOMMU.
+> -	 * See the `Notes:' section of
+> -	 * Documentation/devicetree/bindings/iommu/iommu.txt
+> -	 */
+> -	while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
+> -					   idx, &iommu_spec)) {
+> -		ops = of_iommu_xlate(dev, &iommu_spec);
+> -		of_node_put(iommu_spec.np);
+> -		idx++;
+> -		if (IS_ERR_OR_NULL(ops))
+> -			break;
+> -	}
+> -
+> -	return ops;
+> +	return info->np == pdev->bus->dev.of_node;
+>  }
+>  
+>  const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  					   struct device_node *master_np)
+>  {
+> -	const struct iommu_ops *ops;
+> +	const struct iommu_ops *ops = NULL;
+>  	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> +	int err;
+>  
+>  	if (!master_np)
+>  		return NULL;
+> @@ -221,18 +185,44 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  		iommu_fwspec_free(dev);
+>  	}
+>  
+> -	if (dev_is_pci(dev))
+> -		ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+> -	else
+> -		ops = of_platform_iommu_init(dev, master_np);
+> +	/*
+> +	 * We don't currently walk up the tree looking for a parent IOMMU.
+> +	 * See the `Notes:' section of
+> +	 * Documentation/devicetree/bindings/iommu/iommu.txt
+> +	 */
+> +	if (dev_is_pci(dev)) {
+> +		struct of_pci_iommu_alias_info info = {
+> +			.dev = dev,
+> +			.np = master_np,
+> +		};
+> +
+> +		err = pci_for_each_dma_alias(to_pci_dev(dev),
+> +					     of_pci_iommu_init, &info);
+> +		if (err) /* err > 0 means the walk stopped, but non-fatally */
+> +			ops = ERR_PTR(min(err, 0));
+> +		else /* success implies both fwspec and ops are now valid */
+> +			ops = dev->iommu_fwspec->ops;
+> +	} else {
+> +		struct of_phandle_args iommu_spec;
+> +		int idx = 0;
+> +
+> +		while (!of_parse_phandle_with_args(master_np, "iommus",
+> +						   "#iommu-cells",
+> +						   idx, &iommu_spec)) {
+> +			ops = of_iommu_xlate(dev, &iommu_spec);
+> +			of_node_put(iommu_spec.np);
+> +			idx++;
+> +			if (IS_ERR_OR_NULL(ops))
+> +				break;
+> +		}
+> +	}
+>  	/*
+>  	 * If we have reason to believe the IOMMU driver missed the initial
+>  	 * add_device callback for dev, replay it to get things in order.
+>  	 */
+>  	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
+>  	    dev->bus && !dev->iommu_group) {
+> -		int err = ops->add_device(dev);
+> -
+> +		err = ops->add_device(dev);
+>  		if (err)
+>  			ops = ERR_PTR(err);
+>  	}
+> 
