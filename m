@@ -1,270 +1,253 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 25 Jul 2017 16:26:50 +0100
-Subject: [PATCH 07/11] arm64: add basic pointer authentication support
-In-Reply-To: <1500480092-28480-8-git-send-email-mark.rutland@arm.com>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <1500480092-28480-8-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170725152649.GE6321@e103592.cambridge.arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 25 Jul 2017 17:26:47 +0200
+Subject: [PATCH v5] irqchip: Add support for tango interrupt router
+In-Reply-To: <e4a201b1-64e7-32a1-9cad-e632eeb156f6@free.fr>
+References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
+ <20170606175219.34ef62b9@free-electrons.com>
+ <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
+ <dfb86360-2247-65bb-602b-5c21029709fd@free.fr>
+ <c0bd235a-9035-2002-31eb-e68710b076fd@free.fr>
+ <24f34220-a017-f4e0-b72e-d1fdb014c0e1@free.fr>
+ <9f384711-eef0-5117-b89c-9d2dc16e5ae5@free.fr>
+ <afcc2b79-61ff-b54d-eac1-ea7f3ee6b6b2@free.fr>
+ <e4a201b1-64e7-32a1-9cad-e632eeb156f6@free.fr>
+Message-ID: <473118cd-20dc-3534-d0d8-88799e3d2c3b@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 05:01:28PM +0100, Mark Rutland wrote:
-> This patch adds basic support for pointer authentication, allowing
-> userspace to make use of APIAKey. The kernel maintains an APIAKey value
-> for each process (shared by all threads within), which is initialised to
-> a random value at exec() time.
-> 
-> Instructions using other keys (APIBKey, APDAKey, APDBKey) are disabled,
-> and will behave as NOPs. These may be made use of in future patches.
-> 
-> No support is added for the generic key (APGAKey), though this cannot be
-> trapped or made to behave as a NOP. Its presence is not advertised with
-> a hwcap.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/Kconfig                    | 23 +++++++++
->  arch/arm64/include/asm/mmu.h          |  5 ++
->  arch/arm64/include/asm/mmu_context.h  | 25 +++++++++-
->  arch/arm64/include/asm/pointer_auth.h | 89 +++++++++++++++++++++++++++++++++++
->  arch/arm64/include/uapi/asm/hwcap.h   |  1 +
->  arch/arm64/kernel/cpufeature.c        | 11 +++++
->  arch/arm64/kernel/cpuinfo.c           |  1 +
->  7 files changed, 153 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm64/include/asm/pointer_auth.h
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index dfd9086..15a9931 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -962,6 +962,29 @@ config ARM64_UAO
->  
->  endmenu
->  
-> +menu "ARMv8.3 architectural features"
-> +
-> +config ARM64_POINTER_AUTHENTICATION
-> +	bool "Enable support for pointer authentication"
-> +	default y
-> +	help
-> +	  Pointer authentication (part of the ARMv8.3 Extensions) provides
-> +	  instructions for signing and authenticating pointers against secret
-> +	  keys, which can be used to mitigate Return Oriented Programming (ROP)
-> +	  and other attacks.
-> +
-> +	  This option enables these instructions at EL0 (i.e. for userspace).
-> +
-> +	  Choosing this option will cause the kernel to initialise secret keys
-> +	  for each process at exec() time, with these keys being
-> +	  context-switched along with the process.
-> +
-> +	  The feature is detected at runtime. If the feature is not present in
-> +	  hardware it will not be advertised to userspace nor will it be
-> +	  enabled.
+This controller maps 128 input lines to 24 output lines.
+The output lines are routed to GIC SPI 0 to 23.
+This driver muxes LEVEL_HIGH IRQs onto output line 0,
+and gives every EDGE_RISING IRQ a dedicated output line.
+---
+Changes from v4 to v5:
+- maz said "data->mask is definitely off limits. it is an internal
+data structure for the generic irqchip, and drivers have no business
+touching that." Use an array instead.
+---
+ .../interrupt-controller/sigma,smp8759-intc.txt    |  18 +++
+ drivers/irqchip/Makefile                           |   2 +-
+ drivers/irqchip/irq-smp8759.c                      | 174 +++++++++++++++++++++
+ 3 files changed, 193 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
+ create mode 100644 drivers/irqchip/irq-smp8759.c
 
-Should we describe which keys are supported here, or will this option
-always turn on all the keys/instructions that the kernel implements to
-date?
-
-> +
-> +endmenu
-> +
->  config ARM64_MODULE_CMODEL_LARGE
->  	bool
->  
-> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> index 5468c83..6a848f3 100644
-> --- a/arch/arm64/include/asm/mmu.h
-> +++ b/arch/arm64/include/asm/mmu.h
-> @@ -16,10 +16,15 @@
->  #ifndef __ASM_MMU_H
->  #define __ASM_MMU_H
->  
-> +#include <asm/pointer_auth.h>
-> +
->  typedef struct {
->  	atomic64_t	id;
->  	void		*vdso;
->  	unsigned long	flags;
-> +#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-> +	struct ptrauth_keys	ptrauth_keys;
-> +#endif
->  } mm_context_t;
->  
->  /*
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index 3257895a..06757a5 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -31,7 +31,6 @@
->  #include <asm/cacheflush.h>
->  #include <asm/cpufeature.h>
->  #include <asm/proc-fns.h>
-> -#include <asm-generic/mm_hooks.h>
->  #include <asm/cputype.h>
->  #include <asm/pgtable.h>
->  #include <asm/sysreg.h>
-> @@ -154,7 +153,14 @@ static inline void cpu_replace_ttbr1(pgd_t *pgd)
->  #define destroy_context(mm)		do { } while(0)
->  void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
->  
-> -#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
-> +static inline int init_new_context(struct task_struct *tsk,
-> +			struct mm_struct *mm)
-> +{
-> +	atomic64_set(&mm->context.id, 0);
-> +	mm_ctx_ptrauth_init(&mm->context);
-
-For this stuff in general, I wonder whether we should move this code
-away from mm and to thread_strct and the process/thread paths, otherwise
-we'll just have to move it all around later if ptrauth is ever to be
-supported per-thread.
-
-This would also remove the need to have individually overridable arch
-mm hooks.
-
-Adding an extra 16 bytes to thread_struct is probably not the end of the
-world.  thread_struct is already well over half a K.  We could de-dupe
-by refcounting or similar, but it may not be worth the complexity.
-
-> +
-> +	return 0;
-> +}
->  
->  /*
->   * This is called when "tsk" is about to enter lazy TLB mode.
-> @@ -200,6 +206,8 @@ static inline void __switch_mm(struct mm_struct *next)
->  		return;
->  	}
->  
-> +	mm_ctx_ptrauth_switch(&next->context);
-> +
->  	check_and_switch_context(next, cpu);
->  }
->  
-> @@ -226,6 +234,19 @@ static inline void __switch_mm(struct mm_struct *next)
->  
->  void verify_cpu_asid_bits(void);
->  
-> +static inline void arch_dup_mmap(struct mm_struct *oldmm,
-> +				 struct mm_struct *mm)
-> +{
-> +	mm_ctx_ptrauth_dup(&oldmm->context, &mm->context);
-> +}
-> +#define arch_dup_mmap arch_dup_mmap
-> +
-> +/*
-> + * We need to override arch_dup_mmap before including the generic hooks, which
-> + * are otherwise sufficient for us.
-> + */
-> +#include <asm-generic/mm_hooks.h>
-> +
->  #endif /* !__ASSEMBLY__ */
->  
->  #endif /* !__ASM_MMU_CONTEXT_H */
-> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-> new file mode 100644
-> index 0000000..964da0c
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/pointer_auth.h
-> @@ -0,0 +1,89 @@
-> +/*
-> + * Copyright (C) 2016 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_POINTER_AUTH_H
-> +#define __ASM_POINTER_AUTH_H
-> +
-> +#include <linux/random.h>
-> +
-> +#include <asm/cpufeature.h>
-> +#include <asm/sysreg.h>
-> +
-> +#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-> +/*
-> + * Each key is a 128-bit quantity which is split accross a pair of 64-bit
-> + * registers (Lo and Hi).
-> + */
-> +struct ptrauth_key {
-> +	unsigned long lo, hi;
-> +};
-> +
-> +/*
-> + * We give each process its own instruction A key (APIAKey), which is shared by
-> + * all threads. This is inherited upon fork(), and reinitialised upon exec*().
-> + * All other keys are currently unused, with APIBKey, APDAKey, and APBAKey
-> + * instructions behaving as NOPs.
-> + */
-> +struct ptrauth_keys {
-> +	struct ptrauth_key apia;
-> +};
-> +
-> +static inline void ptrauth_keys_init(struct ptrauth_keys *keys)
-> +{
-> +	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-> +		return;
-> +
-> +	get_random_bytes(keys, sizeof(*keys));
-> +}
-> +
-> +#define __ptrauth_key_install(k, v)			\
-> +do {							\
-> +	write_sysreg_s(v.lo, SYS_ ## k ## KEYLO_EL1);	\
-> +	write_sysreg_s(v.hi, SYS_ ## k ## KEYHI_EL1);	\
-
-(v)
-
-though moderately crazy usage would be required in order for this to go
-wrong.
-
-> +} while (0)
-> +
-> +static inline void ptrauth_keys_switch(struct ptrauth_keys *keys)
-> +{
-> +	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-> +		return;
-> +
-> +	__ptrauth_key_install(APIA, keys->apia);
-> +}
-> +
-> +static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
-> +				    struct ptrauth_keys *new)
-> +{
-> +	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-> +		return;
-> +
-> +	*new = *old;
-
-This seems an odd thing to do.  Surely, by design we never want two
-processes to share the same keys?  Don't we always proceed to nuke
-the keys via mm_ctx_ptrauth_init() anyway?
-
-> +}
-> +
-> +#define mm_ctx_ptrauth_init(ctx) \
-> +	ptrauth_keys_init(&(ctx)->ptrauth_keys)
-> +
-> +#define mm_ctx_ptrauth_switch(ctx) \
-> +	ptrauth_keys_switch(&(ctx)->ptrauth_keys)
-> +
-> +#define mm_ctx_ptrauth_dup(oldctx, newctx) \
-> +	ptrauth_keys_dup(&(oldctx)->ptrauth_keys, &(newctx)->ptrauth_keys)
-
-[...]
-
-Cheers
----Dave
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
+new file mode 100644
+index 000000000000..9ec922f3c0a4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/sigma,smp8759-intc.txt
+@@ -0,0 +1,18 @@
++Sigma Designs SMP8759 interrupt router
++
++Required properties:
++- compatible: "sigma,smp8759-intc"
++- reg: address/size of register area
++- interrupt-controller
++- #interrupt-cells: <2>  (hwirq and trigger_type)
++- interrupt-parent: parent phandle
++
++Example:
++
++	interrupt-controller at 6f800 {
++		compatible = "sigma,smp8759-intc";
++		reg = <0x6f800 0x430>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-parent = <&gic>;
++	};
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index e4dbfc85abdb..013104923b71 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -47,7 +47,7 @@ obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+ obj-$(CONFIG_ARCH_NSPIRE)		+= irq-zevio.o
+ obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
+ obj-$(CONFIG_ST_IRQCHIP)		+= irq-st.o
+-obj-$(CONFIG_TANGO_IRQ)			+= irq-tango.o
++obj-$(CONFIG_TANGO_IRQ)			+= irq-tango.o irq-smp8759.o
+ obj-$(CONFIG_TB10X_IRQC)		+= irq-tb10x.o
+ obj-$(CONFIG_TS4800_IRQ)		+= irq-ts4800.o
+ obj-$(CONFIG_XTENSA)			+= irq-xtensa-pic.o
+diff --git a/drivers/irqchip/irq-smp8759.c b/drivers/irqchip/irq-smp8759.c
+new file mode 100644
+index 000000000000..2219c449b29e
+--- /dev/null
++++ b/drivers/irqchip/irq-smp8759.c
+@@ -0,0 +1,174 @@
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++#include <linux/irqchip.h>
++#include <linux/irqchip/chained_irq.h>
++
++/*
++ * This controller maps IRQ_MAX input lines to SPI_MAX output lines.
++ * The output lines are routed to GIC SPI 0 to 23.
++ * This driver muxes LEVEL_HIGH IRQs onto output line 0,
++ * and gives every EDGE_RISING IRQ a dedicated output line.
++ */
++#define IRQ_MAX		128
++#define SPI_MAX		24
++#define LEVEL_SPI	0
++#define IRQ_ENABLE	BIT(31)
++#define STATUS		0x420
++
++struct tango_intc {
++	void __iomem *base;
++	struct irq_domain *dom;
++	u8 spi_to_tango_irq[SPI_MAX];
++	u8 tango_irq_to_spi[IRQ_MAX];
++	DECLARE_BITMAP(enabled_level, IRQ_MAX);
++	spinlock_t lock;
++};
++
++static void tango_level_isr(struct irq_desc *desc)
++{
++	uint pos, virq;
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct tango_intc *intc = irq_desc_get_handler_data(desc);
++	DECLARE_BITMAP(status, IRQ_MAX);
++
++	chained_irq_enter(chip, desc);
++
++	spin_lock(&intc->lock);
++	memcpy_fromio(status, intc->base + STATUS, IRQ_MAX / BITS_PER_BYTE);
++	bitmap_and(status, status, intc->enabled_level, IRQ_MAX);
++	spin_unlock(&intc->lock);
++
++	for_each_set_bit(pos, status, IRQ_MAX) {
++		virq = irq_find_mapping(intc->dom, pos);
++		generic_handle_irq(virq);
++	}
++
++	chained_irq_exit(chip, desc);
++}
++
++static void tango_edge_isr(struct irq_desc *desc)
++{
++	uint virq;
++	struct irq_data *data = irq_desc_get_irq_data(desc);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct tango_intc *intc = irq_desc_get_handler_data(desc);
++	int tango_irq = intc->spi_to_tango_irq[data->hwirq - 32];
++
++	chained_irq_enter(chip, desc);
++	virq = irq_find_mapping(intc->dom, tango_irq);
++	generic_handle_irq(virq);
++	chained_irq_exit(chip, desc);
++}
++
++static void tango_mask(struct irq_data *data)
++{
++	unsigned long flags;
++	struct tango_intc *intc = data->chip_data;
++	u32 spi = intc->tango_irq_to_spi[data->hwirq];
++
++	spin_lock_irqsave(&intc->lock, flags);
++	writel_relaxed(0, intc->base + data->hwirq * 4);
++	if (spi == LEVEL_SPI)
++		__clear_bit(data->hwirq, intc->enabled_level);
++	spin_unlock_irqrestore(&intc->lock, flags);
++}
++
++static void tango_unmask(struct irq_data *data)
++{
++	unsigned long flags;
++	struct tango_intc *intc = data->chip_data;
++	u32 spi = intc->tango_irq_to_spi[data->hwirq];
++
++	spin_lock_irqsave(&intc->lock, flags);
++	writel_relaxed(IRQ_ENABLE | spi, intc->base + data->hwirq * 4);
++	if (spi == LEVEL_SPI)
++		__set_bit(data->hwirq, intc->enabled_level);
++	spin_unlock_irqrestore(&intc->lock, flags);
++}
++
++static int tango_set_type(struct irq_data *data, uint flow_type)
++{
++	return 0;
++}
++
++static struct irq_chip tango_chip = {
++	.name		= "tango",
++	.irq_mask	= tango_mask,
++	.irq_unmask	= tango_unmask,
++	.irq_set_type	= tango_set_type,
++};
++
++static int tango_alloc(struct irq_domain *dom, uint virq, uint n, void *arg)
++{
++	int spi;
++	struct irq_fwspec *fwspec = arg;
++	struct tango_intc *intc = dom->host_data;
++	u32 hwirq = fwspec->param[0], trigger = fwspec->param[1];
++
++	if (trigger & IRQ_TYPE_EDGE_FALLING || trigger & IRQ_TYPE_LEVEL_LOW)
++		return -EINVAL;
++
++	if (trigger & IRQ_TYPE_LEVEL_HIGH)
++		intc->tango_irq_to_spi[hwirq] = LEVEL_SPI;
++
++	if (trigger & IRQ_TYPE_EDGE_RISING) {
++		for (spi = 1; spi < SPI_MAX; ++spi) {
++			if (intc->spi_to_tango_irq[spi] == 0) {
++				intc->tango_irq_to_spi[hwirq] = spi;
++				intc->spi_to_tango_irq[spi] = hwirq;
++				break;
++			}
++		}
++		if (spi == SPI_MAX)
++			return -ENOSPC;
++	}
++
++	irq_domain_set_hwirq_and_chip(dom, virq, hwirq, &tango_chip, intc);
++	irq_set_handler(virq, handle_simple_irq);
++
++	return 0;
++}
++
++static struct irq_domain_ops dom_ops = {
++	.xlate	= irq_domain_xlate_twocell,
++	.alloc	= tango_alloc,
++};
++
++static int __init map_irq(struct device_node *gic, int spi, int trigger)
++{
++	struct of_phandle_args irq_data = { gic, 3, { 0, spi, trigger }};
++	return irq_create_of_mapping(&irq_data);
++}
++
++static int __init tango_irq_init(struct device_node *node, struct device_node *parent)
++{
++	int spi, virq;
++	struct tango_intc *intc;
++
++	intc = kzalloc(sizeof(*intc), GFP_KERNEL);
++	if (!intc)
++		panic("%s: Failed to kalloc\n", node->name);
++
++	virq = map_irq(parent, LEVEL_SPI, IRQ_TYPE_LEVEL_HIGH);
++	if (!virq)
++		panic("%s: Failed to map IRQ %d\n", node->name, LEVEL_SPI);
++
++	irq_set_chained_handler_and_data(virq, tango_level_isr, intc);
++
++	for (spi = 1; spi < SPI_MAX; ++spi) {
++		virq = map_irq(parent, spi, IRQ_TYPE_EDGE_RISING);
++		if (!virq)
++			panic("%s: Failed to map IRQ %d\n", node->name, spi);
++
++		irq_set_chained_handler_and_data(virq, tango_edge_isr, intc);
++	}
++
++	spin_lock_init(&intc->lock);
++	intc->base = of_iomap(node, 0);
++	intc->dom = irq_domain_add_linear(node, IRQ_MAX, &dom_ops, intc);
++	if (!intc->base || !intc->dom)
++		panic("%s: Failed to setup IRQ controller\n", node->name);
++
++	return 0;
++}
++IRQCHIP_DECLARE(tango_intc, "sigma,smp8759-intc", tango_irq_init);
+-- 
+2.11.0
