@@ -1,159 +1,96 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 26 Jul 2017 11:06:43 +0530
-Subject: [PATCH 5/6] dma: bcm-sba-raid: Add debugfs support
+Date: Wed, 26 Jul 2017 11:06:44 +0530
+Subject: [PATCH 6/6] arm64: dts: Add SBA-RAID DT nodes for Stingray SoC
 In-Reply-To: <1501047404-14456-1-git-send-email-anup.patel@broadcom.com>
 References: <1501047404-14456-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1501047404-14456-6-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1501047404-14456-7-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds debugfs support to report stats via debugfs
-which in-turn will help debug hang situations.
+This patch adds Broadcom SBA-RAID DT nodes for Stingray SoC.
+
+The Stingray SoC has total 32 SBA-RAID FlexRM rings and it has
+8 CPUs so we create 8 SBA-RAID instances (one for each CPU).
+This way Linux DMAENGINE will have one SBA-RAID DMA device for
+each CPU.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- drivers/dma/bcm-sba-raid.c | 82 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 81 insertions(+), 1 deletion(-)
+ .../boot/dts/broadcom/stingray/stingray-fs4.dtsi   | 64 ++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-index b92c756..dd1e89e 100644
---- a/drivers/dma/bcm-sba-raid.c
-+++ b/drivers/dma/bcm-sba-raid.c
-@@ -36,6 +36,7 @@
-  */
- 
- #include <linux/bitops.h>
-+#include <linux/debugfs.h>
- #include <linux/dma-mapping.h>
- #include <linux/dmaengine.h>
- #include <linux/list.h>
-@@ -161,6 +162,9 @@ struct sba_device {
- 	struct list_head reqs_completed_list;
- 	struct list_head reqs_aborted_list;
- 	struct list_head reqs_free_list;
-+	/* DebugFS directory entries */
-+	struct dentry *root;
-+	struct dentry *stats;
- };
- 
- /* ====== Command helper routines ===== */
-@@ -485,6 +489,45 @@ static void sba_process_received_request(struct sba_device *sba,
- 	}
- }
- 
-+static void sba_write_stats_in_seqfile(struct sba_device *sba,
-+				       struct seq_file *file)
-+{
-+	unsigned long flags;
-+	struct sba_request *req;
-+	u32 free_count = 0, alloced_count = 0, pending_count = 0;
-+	u32 active_count = 0, aborted_count = 0, completed_count = 0;
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
+index 1f927c4..8bf1dc6 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
+@@ -51,4 +51,68 @@
+ 			msi-parent = <&gic_its 0x4300>;
+ 			#mbox-cells = <3>;
+ 		};
 +
-+	spin_lock_irqsave(&sba->reqs_lock, flags);
++		raid0: raid at 0 {
++			compatible = "brcm,iproc-sba-v2";
++			mboxes = <&raid_mbox 0 0x1 0xff00>,
++				 <&raid_mbox 1 0x1 0xff00>,
++				 <&raid_mbox 2 0x1 0xff00>,
++				 <&raid_mbox 3 0x1 0xff00>;
++		};
 +
-+	list_for_each_entry(req, &sba->reqs_free_list, node)
-+		free_count++;
++		raid1: raid at 1 {
++			compatible = "brcm,iproc-sba-v2";
++			mboxes = <&raid_mbox 4 0x1 0xff00>,
++				 <&raid_mbox 5 0x1 0xff00>,
++				 <&raid_mbox 6 0x1 0xff00>,
++				 <&raid_mbox 7 0x1 0xff00>;
++		};
 +
-+	list_for_each_entry(req, &sba->reqs_alloc_list, node)
-+		alloced_count++;
++		raid2: raid at 2 {
++			compatible = "brcm,iproc-sba-v2";
++			mboxes = <&raid_mbox 8 0x1 0xff00>,
++				 <&raid_mbox 9 0x1 0xff00>,
++				 <&raid_mbox 10 0x1 0xff00>,
++				 <&raid_mbox 11 0x1 0xff00>;
++		};
 +
-+	list_for_each_entry(req, &sba->reqs_pending_list, node)
-+		pending_count++;
++		raid3: raid at 3 {
++			compatible = "brcm,iproc-sba-v2";
++			mboxes = <&raid_mbox 12 0x1 0xff00>,
++				 <&raid_mbox 13 0x1 0xff00>,
++				 <&raid_mbox 14 0x1 0xff00>,
++				 <&raid_mbox 15 0x1 0xff00>;
++		};
 +
-+	list_for_each_entry(req, &sba->reqs_active_list, node)
-+		active_count++;
++		raid4: raid at 4 {
++			compatible = "brcm,iproc-sba-v2";
++			mboxes = <&raid_mbox 16 0x1 0xff00>,
++				 <&raid_mbox 17 0x1 0xff00>,
++				 <&raid_mbox 18 0x1 0xff00>,
++				 <&raid_mbox 19 0x1 0xff00>;
++		};
 +
-+	list_for_each_entry(req, &sba->reqs_aborted_list, node)
-+		aborted_count++;
++		raid5: raid at 5 {
++			compatible = "brcm,iproc-sba-v2";
++			mboxes = <&raid_mbox 20 0x1 0xff00>,
++				 <&raid_mbox 21 0x1 0xff00>,
++				 <&raid_mbox 22 0x1 0xff00>,
++				 <&raid_mbox 23 0x1 0xff00>;
++		};
 +
-+	list_for_each_entry(req, &sba->reqs_completed_list, node)
-+		completed_count++;
++		raid6: raid at 6 {
++			compatible = "brcm,iproc-sba-v2";
++			mboxes = <&raid_mbox 24 0x1 0xff00>,
++				 <&raid_mbox 25 0x1 0xff00>,
++				 <&raid_mbox 26 0x1 0xff00>,
++				 <&raid_mbox 27 0x1 0xff00>;
++		};
 +
-+	spin_unlock_irqrestore(&sba->reqs_lock, flags);
-+
-+	seq_printf(file, "maximum requests   = %d\n", sba->max_req);
-+	seq_printf(file, "free requests      = %d\n", free_count);
-+	seq_printf(file, "alloced requests   = %d\n", alloced_count);
-+	seq_printf(file, "pending requests   = %d\n", pending_count);
-+	seq_printf(file, "active requests    = %d\n", active_count);
-+	seq_printf(file, "aborted requests   = %d\n", aborted_count);
-+	seq_printf(file, "completed requests = %d\n", completed_count);
-+}
-+
- /* ====== DMAENGINE callbacks ===== */
- 
- static void sba_free_chan_resources(struct dma_chan *dchan)
-@@ -1450,6 +1493,19 @@ static void sba_receive_message(struct mbox_client *cl, void *msg)
- 	sba_process_received_request(sba, req);
- }
- 
-+/* ====== Debugfs callbacks ====== */
-+
-+static int sba_debugfs_stats_show(struct seq_file *file, void *offset)
-+{
-+	struct platform_device *pdev = to_platform_device(file->private);
-+	struct sba_device *sba = platform_get_drvdata(pdev);
-+
-+	/* Write stats in file */
-+	sba_write_stats_in_seqfile(sba, file);
-+
-+	return 0;
-+}
-+
- /* ====== Platform driver routines ===== */
- 
- static int sba_prealloc_channel_resources(struct sba_device *sba)
-@@ -1721,10 +1777,30 @@ static int sba_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto fail_free_mchans;
- 
-+	/* Check availability of debugfs */
-+	if (!debugfs_initialized())
-+		goto skip_debugfs;
-+
-+	/* Create debugfs root entry */
-+	sba->root = debugfs_create_dir(dev_name(sba->dev), NULL);
-+	if (IS_ERR_OR_NULL(sba->root)) {
-+		ret = PTR_ERR_OR_ZERO(sba->root);
-+		goto fail_free_resources;
-+	}
-+
-+	/* Create debugfs stats entry */
-+	sba->stats = debugfs_create_devm_seqfile(sba->dev, "stats", sba->root,
-+						 sba_debugfs_stats_show);
-+	if (IS_ERR_OR_NULL(sba->stats)) {
-+		ret = PTR_ERR_OR_ZERO(sba->stats);
-+		goto fail_free_debugfs_root;
-+	}
-+skip_debugfs:
-+
- 	/* Register DMA device with linux async framework */
- 	ret = sba_async_register(sba);
- 	if (ret)
--		goto fail_free_resources;
-+		goto fail_free_debugfs_root;
- 
- 	/* Print device info */
- 	dev_info(sba->dev, "%s using SBAv%d and %d mailbox channels",
-@@ -1733,6 +1809,8 @@ static int sba_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+fail_free_debugfs_root:
-+	debugfs_remove_recursive(sba->root);
- fail_free_resources:
- 	sba_freeup_channel_resources(sba);
- fail_free_mchans:
-@@ -1748,6 +1826,8 @@ static int sba_remove(struct platform_device *pdev)
- 
- 	dma_async_device_unregister(&sba->dma_dev);
- 
-+	debugfs_remove_recursive(sba->root);
-+
- 	sba_freeup_channel_resources(sba);
- 
- 	for (i = 0; i < sba->mchans_count; i++)
++		raid7: raid at 7 {
++			compatible = "brcm,iproc-sba-v2";
++			mboxes = <&raid_mbox 28 0x1 0xff00>,
++				 <&raid_mbox 29 0x1 0xff00>,
++				 <&raid_mbox 30 0x1 0xff00>,
++				 <&raid_mbox 31 0x1 0xff00>;
++		};
+ 	};
 -- 
 2.7.4
