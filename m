@@ -1,77 +1,82 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Wed, 26 Jul 2017 15:10:58 +0200
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
-References: <20170725150422.4775-1-jglauber@cavium.com>
- <20170725150422.4775-2-jglauber@cavium.com>
- <72145781-e9ec-036f-f752-b4756fef08ee@arm.com>
- <20170726111946.GA6273@hc>
- <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
-Message-ID: <20170726131058.GA8665@hc>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Jul 2017 14:25:39 +0100
+Subject: [PATCH v2] arm64: kernel: implement fast refcount checking
+In-Reply-To: <34605822-8f95-f963-48c4-65d724eae0c7@huawei.com>
+References: <20170725181536.21092-1-ard.biesheuvel@linaro.org>
+ <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
+ <CAKv+Gu8djcgmovajhUUpniHwEVDupCWW3L__3JtqZ0GCM3=U2w@mail.gmail.com>
+ <34605822-8f95-f963-48c4-65d724eae0c7@huawei.com>
+Message-ID: <48B13266-4D48-40AD-A205-169D907FAD68@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 01:47:35PM +0100, Suzuki K Poulose wrote:
-> On 26/07/17 12:19, Jan Glauber wrote:
-> >On Tue, Jul 25, 2017 at 04:39:18PM +0100, Suzuki K Poulose wrote:
-> >>On 25/07/17 16:04, Jan Glauber wrote:
-> >>>Add support for the PMU counters on Cavium SOC memory controllers.
-> >>>
-> >>>This patch also adds generic functions to allow supporting more
-> >>>devices with PMU counters.
-> >>>
-> >>>Properties of the LMC PMU counters:
-> >>>- not stoppable
-> >>>- fixed purpose
-> >>>- read-only
-> >>>- one PCI device per memory controller
-> >>>
-> >>>Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> >>>---
-> >>>drivers/perf/Kconfig       |   8 +
-> >>>drivers/perf/Makefile      |   1 +
-> >>>drivers/perf/cavium_pmu.c  | 424 +++++++++++++++++++++++++++++++++++++++++++++
-> >>>include/linux/cpuhotplug.h |   1 +
-> >>>4 files changed, 434 insertions(+)
-> >>>create mode 100644 drivers/perf/cavium_pmu.c
-> >>>
-> >>>diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-> >>>index e5197ff..a46c3f0 100644
-> >>>--- a/drivers/perf/Kconfig
-> >>>+++ b/drivers/perf/Kconfig
-> >>>@@ -43,4 +43,12 @@ config XGENE_PMU
-> >>>        help
-> >>>          Say y if you want to use APM X-Gene SoC performance monitors.
-> >>>
-> >>>+config CAVIUM_PMU
-> >>>+	bool "Cavium SOC PMU"
-> >>
-> >>Is there any specific reason why this can't be built as a module ?
-> >
-> >Yes. I don't know how to load the module automatically. I can't make it
-> >a pci driver as the EDAC driver "owns" the device (and having two
-> >drivers for one device wont work as far as I know). I tried to hook
-> >into the EDAC driver but the EDAC maintainer was not overly welcoming
-> >that approach.
-> 
-> >
-> >And while it would be possible to have it a s a module I think it is of
-> >no use if it requires manualy loading. But maybe there is a simple
-> >solution I'm missing here?
+
+> On 26 Jul 2017, at 10:21, Li Kun <hw.likun@huawei.com> wrote:
 > 
 > 
-> If you are talking about a Cavium specific EDAC driver, may be we could
-> make that depend on this driver "at runtime" via symbols (may be even,
-> trigger the probe of PMU), which will be referenced only when CONFIG_CAVIUM_PMU
-> is defined. It is not the perfect solution, but that should do the trick.
+> 
+>> ? 2017/7/26 16:40, Ard Biesheuvel ??:
+>>> On 26 July 2017 at 05:11, Li Kun <hw.likun@huawei.com> wrote:
+>>> Hi Ard?
+>>> 
+>>> 
+>>>> on 2017/7/26 2:15, Ard Biesheuvel wrote:
+>>>> +#define REFCOUNT_OP(op, asm_op, cond, l, clobber...)                   \
+>>>> +__LL_SC_INLINE int                                                     \
+>>>> +__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))                    \
+>>>> +{                                                                      \
+>>>> +       unsigned long tmp;                                              \
+>>>> +       int result;                                                     \
+>>>> +                                                                       \
+>>>> +       asm volatile("// refcount_" #op "\n"                            \
+>>>> +"      prfm            pstl1strm, %2\n"                                \
+>>>> +"1:    ldxr            %w0, %2\n"                                      \
+>>>> +"      " #asm_op "     %w0, %w0, %w[i]\n"                              \
+>>>> +"      st" #l "xr      %w1, %w0, %2\n"                                 \
+>>>> +"      cbnz            %w1, 1b\n"                                      \
+>>>> +       REFCOUNT_CHECK(cond)                                            \
+>>>> +       : "=&r" (result), "=&r" (tmp), "+Q" (r->counter)                \
+>>>> +       : REFCOUNT_INPUTS(r) [i] "Ir" (i)                               \
+>>>> +       clobber);                                                       \
+>>>> +                                                                       \
+>>>> +       return result;                                                  \
+>>>> +}                                                                      \
+>>>> +__LL_SC_EXPORT(__refcount_##op);
+>>>> +
+>>>> +REFCOUNT_OP(add_lt, adds, mi,  , REFCOUNT_CLOBBERS);
+>>>> +REFCOUNT_OP(sub_lt_neg, adds, mi, l, REFCOUNT_CLOBBERS);
+>>>> +REFCOUNT_OP(sub_le_neg, adds, ls, l, REFCOUNT_CLOBBERS);
+>>>> +REFCOUNT_OP(sub_lt, subs, mi, l, REFCOUNT_CLOBBERS);
+>>>> +REFCOUNT_OP(sub_le, subs, ls, l, REFCOUNT_CLOBBERS);
+>>>> +
+>>> I'm not quite sure if we use b.lt to judge whether the result of adds is
+>>> less than zero is correct or not.
+>>> The b.lt means N!=V, take an extreme example, if we operate like below, the
+>>> b.lt will also be true.
+>>> 
+>>> refcount_set(&ref_c,0x80000000);
+>>> refcount_dec_and_test(&ref_c);
+>>> 
+>>> maybe we should use PL/NE/MI/EQ to judge the LT_ZERO or LE_ZERO condition ?
+>>> 
+>> The lt/le is confusing here: the actual condition coded used are mi
+>> for negative and ls for negative or zero.
+>> 
+>> I started out using lt and le, because it matches the x86 code, but I
+>> moved to mi and ls instead. (I don't think it makes sense to deviate
+>> from that just because the flags and predicates work a bit
+>> differently.)
+>> 
+>> However, I see now that there is one instance of REFCOUNT_CHECK(lt)
+>> remaining (in refcount.h). That should mi as well.
+> Sorry for having  misunderstood your implementation.
+> If we want to catch the refcount_sub operate on negetive value(like -1 to -2 ), i think b.ls can't achieve that.
 
-I think that is roughly what I proposed in v6. Can you have a look at:
+You are right. Decrementing a refcount which is already negative will not be caught. Is that a problem?
 
-https://lkml.org/lkml/2017/6/23/333
-https://patchwork.kernel.org/patch/9806427/
+> I think (b.eq || b.mi ) may be better than b.ls for this case.
+> 
 
-Probably there is a better way to do it. Or maybe we just keep it as
-built-in for the time being.
+At the expense of one more instruction, yes. I tend to agree, though. The atomics are fairly costly to begin with, so one more predicted non-taken branch won't really make a difference.
 
---Jan
+In fact, I realised that we could easily implement the add-from-zero case as well: both ll/sc and lse versions have the old count in a register already, so all we need is a cbz in the right place.
