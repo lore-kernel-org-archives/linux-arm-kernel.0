@@ -1,96 +1,80 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 26 Jul 2017 11:06:44 +0530
-Subject: [PATCH 6/6] arm64: dts: Add SBA-RAID DT nodes for Stingray SoC
-In-Reply-To: <1501047404-14456-1-git-send-email-anup.patel@broadcom.com>
-References: <1501047404-14456-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1501047404-14456-7-git-send-email-anup.patel@broadcom.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 26 Jul 2017 11:12:03 +0530
+Subject: [PATCH V2 1/4] hw_breakpoint: Add step_needed event attribute
+In-Reply-To: <20170725132737.GC28815@arm.com>
+References: <cover.1499416107.git.panand@redhat.com>
+ <9d4f76f3a0bffe93a6d5146c9b53ee7b985f22da.1499416107.git.panand@redhat.com>
+ <20170725132737.GC28815@arm.com>
+Message-ID: <70b51184-dbe0-6d0b-c853-be5b556927f1@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Broadcom SBA-RAID DT nodes for Stingray SoC.
 
-The Stingray SoC has total 32 SBA-RAID FlexRM rings and it has
-8 CPUs so we create 8 SBA-RAID instances (one for each CPU).
-This way Linux DMAENGINE will have one SBA-RAID DMA device for
-each CPU.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
----
- .../boot/dts/broadcom/stingray/stingray-fs4.dtsi   | 64 ++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+On Tuesday 25 July 2017 06:57 PM, Will Deacon wrote:
+> On Fri, Jul 07, 2017 at 05:33:57PM +0530, Pratyush Anand wrote:
+>> Architecture like ARM64 currently allows to use default hw breakpoint
+>> single step handler only to perf. However, some other users like few
+>> systemtap tests or kernel test in
+>> samples/hw_breakpoint/data_breakpoint.c can also work with default step
+>> handler implementation. At the same time, some other like GDB/ptrace may
+>> implement their own step handler.
+>>
+>> Therefore, this patch introduces a new perf_event_attr bit field, so
+>> that arch specific code(specially on arm64) can make a decision to
+>> enable single stepping.
+>>
+>> Any architecture which is not using this field will not have any
+>> side effect.
+>>
+>> Signed-off-by: Pratyush Anand <panand@redhat.com>
+>> ---
+>>   include/linux/hw_breakpoint.h         | 6 ++++++
+>>   include/uapi/linux/perf_event.h       | 3 ++-
+>>   kernel/events/core.c                  | 2 ++
+>>   tools/include/uapi/linux/perf_event.h | 3 ++-
+>>   4 files changed, 12 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/include/linux/hw_breakpoint.h b/include/linux/hw_breakpoint.h
+>> index 0464c85e63fd..6173ae048cbc 100644
+>> --- a/include/linux/hw_breakpoint.h
+>> +++ b/include/linux/hw_breakpoint.h
+>> @@ -38,6 +38,12 @@ static inline int hw_breakpoint_type(struct perf_event *bp)
+>>   	return bp->attr.bp_type;
+>>   }
+>>   
+>> +static inline bool
+>> +hw_breakpoint_needs_single_step(struct perf_event *bp)
+>> +{
+>> +	return bp->attr.step_needed;
+>> +}
+>> +
+>>   static inline unsigned long hw_breakpoint_len(struct perf_event *bp)
+>>   {
+>>   	return bp->attr.bp_len;
+>> diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
+>> index b1c0b187acfe..00935808de0d 100644
+>> --- a/include/uapi/linux/perf_event.h
+>> +++ b/include/uapi/linux/perf_event.h
+>> @@ -345,7 +345,8 @@ struct perf_event_attr {
+>>   				context_switch :  1, /* context switch data */
+>>   				write_backward :  1, /* Write ring buffer from end to beginning */
+>>   				namespaces     :  1, /* include namespaces data */
+>> -				__reserved_1   : 35;
+>> +				step_needed    :  1, /* Use arch step handler */
+>> +				__reserved_1   : 34;
+> 
+> This needs documenting properly, as I really have no idea how userspace is
+> going to use it sensibley, especially as you silently overwrite it in some
+> cases below.
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
-index 1f927c4..8bf1dc6 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
-@@ -51,4 +51,68 @@
- 			msi-parent = <&gic_its 0x4300>;
- 			#mbox-cells = <3>;
- 		};
-+
-+		raid0: raid at 0 {
-+			compatible = "brcm,iproc-sba-v2";
-+			mboxes = <&raid_mbox 0 0x1 0xff00>,
-+				 <&raid_mbox 1 0x1 0xff00>,
-+				 <&raid_mbox 2 0x1 0xff00>,
-+				 <&raid_mbox 3 0x1 0xff00>;
-+		};
-+
-+		raid1: raid at 1 {
-+			compatible = "brcm,iproc-sba-v2";
-+			mboxes = <&raid_mbox 4 0x1 0xff00>,
-+				 <&raid_mbox 5 0x1 0xff00>,
-+				 <&raid_mbox 6 0x1 0xff00>,
-+				 <&raid_mbox 7 0x1 0xff00>;
-+		};
-+
-+		raid2: raid at 2 {
-+			compatible = "brcm,iproc-sba-v2";
-+			mboxes = <&raid_mbox 8 0x1 0xff00>,
-+				 <&raid_mbox 9 0x1 0xff00>,
-+				 <&raid_mbox 10 0x1 0xff00>,
-+				 <&raid_mbox 11 0x1 0xff00>;
-+		};
-+
-+		raid3: raid at 3 {
-+			compatible = "brcm,iproc-sba-v2";
-+			mboxes = <&raid_mbox 12 0x1 0xff00>,
-+				 <&raid_mbox 13 0x1 0xff00>,
-+				 <&raid_mbox 14 0x1 0xff00>,
-+				 <&raid_mbox 15 0x1 0xff00>;
-+		};
-+
-+		raid4: raid at 4 {
-+			compatible = "brcm,iproc-sba-v2";
-+			mboxes = <&raid_mbox 16 0x1 0xff00>,
-+				 <&raid_mbox 17 0x1 0xff00>,
-+				 <&raid_mbox 18 0x1 0xff00>,
-+				 <&raid_mbox 19 0x1 0xff00>;
-+		};
-+
-+		raid5: raid at 5 {
-+			compatible = "brcm,iproc-sba-v2";
-+			mboxes = <&raid_mbox 20 0x1 0xff00>,
-+				 <&raid_mbox 21 0x1 0xff00>,
-+				 <&raid_mbox 22 0x1 0xff00>,
-+				 <&raid_mbox 23 0x1 0xff00>;
-+		};
-+
-+		raid6: raid at 6 {
-+			compatible = "brcm,iproc-sba-v2";
-+			mboxes = <&raid_mbox 24 0x1 0xff00>,
-+				 <&raid_mbox 25 0x1 0xff00>,
-+				 <&raid_mbox 26 0x1 0xff00>,
-+				 <&raid_mbox 27 0x1 0xff00>;
-+		};
-+
-+		raid7: raid at 7 {
-+			compatible = "brcm,iproc-sba-v2";
-+			mboxes = <&raid_mbox 28 0x1 0xff00>,
-+				 <&raid_mbox 29 0x1 0xff00>,
-+				 <&raid_mbox 30 0x1 0xff00>,
-+				 <&raid_mbox 31 0x1 0xff00>;
-+		};
- 	};
+I too had thought to put it under include/linux/perf_event.h : struct 
+perf_event. But, see hw_break_module_init() which does not have knowledge of 
+this structure, and we need to have some way so that none-perf kernel module 
+implementation can tell that it needs default arch step handler.
+
+Do you see any alternative?
+
 -- 
-2.7.4
+Regards
+Pratyush
