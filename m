@@ -1,71 +1,72 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Wed, 26 Jul 2017 20:37:40 +0800
-Subject: [PATCH v2] memory: mtk-smi: Use of_device_get_match_data helper
-Message-ID: <1501072660-10435-1-git-send-email-honghui.zhang@mediatek.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Wed, 26 Jul 2017 20:42:23 +0800
+Subject: [linux-sunxi] [PATCH 10/10] ARM: dts: sun8i: Add SY8106A
+ regulator to Orange Pi PC
+In-Reply-To: <20170726114420.ipirqgbluqmggcjy@flea>
+References: <20170723102749.17323-1-icenowy@aosc.io>
+ <20170723102749.17323-11-icenowy@aosc.io>
+ <CAGb2v66AGjazHT-+hWVLyNBLDw=DJ5yTmNxF-_=BtZFfjnni-A@mail.gmail.com>
+ <25C8A89C-8495-4787-934C-8E9667CD70BF@aosc.io>
+ <CAGb2v64xXOmC44TKrSDZFAh6i_rgFEccCHj4EG+1fxFJd9fjjw@mail.gmail.com>
+ <82507f40a1ddba8517cf09f51d3afa33@aosc.io>
+ <1501064628.14577.1.camel@megous.com> <20170726114420.ipirqgbluqmggcjy@flea>
+Message-ID: <5d25fc45c7beb2e3958f16fd741f0620@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+? 2017-07-26 19:44?Maxime Ripard ???
+> Hi,
+> 
+> On Wed, Jul 26, 2017 at 12:23:48PM +0200, Ond?ej Jirman wrote:
+>> Hi,
+>> 
+>> icenowy at aosc.io p??e v St 26. 07. 2017 v 15:36 +0800:
+>> >
+>> > > > >
+>> > > > > Otherwse
+>> > > > >
+>> > > > > > +               regulator-max-microvolt = <1400000>;
+>> > > > > > +               regulator-ramp-delay = <200>;
+>> > > > >
+>> > > > > Is this an actual constraint of the SoC? Or is it a characteristic
+>> > > > > of the regulator? If it is the latter, it belongs in the driver.
+>> > > > > AFAIK the regulator supports varying the ramp delay (slew rate).
+>> >
+>> > I don't know...
+>> >
+>> > Maybe I should ask Ondrej?
+>> 
+>> It is probably neither.
+>> 
+>> It is used to calculate a delay inserted by the kernel between setting
+>> a new target voltage over I2C and changing the frequency of the CPU.
+>> The actual delay is calculated by the difference between previous and
+>> the new voltage.
+>> 
+>> I don't remember seeing anything in the datasheet of the regulator.
+>> This is just some low value that works.
+>> 
+>> It would probably be dependent on the capacitance on the output of the
+>> regulator, actual load (which varies), etc. So it is a board specific
+>> value. One could measure it with an oscilloscope if there's a need to
+>> optimize this.
+> 
+> If this is a reasonable default, then this should be in the
+> driver. You can't expect anyone to properly calculate a ramp delay and
+> have access to both a scope and the CPU power lines.
 
-Replace custom code with generic helper to retrieve driver data.
+It seems that in regulator_desc structure a default value of ramp delay
+can be set, and the ones specified in dt can override it.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/memory/mtk-smi.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+So just add .ramp_delay = 200 in the driver's regulator_desc part?
 
-diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-index 4afbc41..2b798bb4 100644
---- a/drivers/memory/mtk-smi.c
-+++ b/drivers/memory/mtk-smi.c
-@@ -240,20 +240,15 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *smi_node;
- 	struct platform_device *smi_pdev;
--	const struct of_device_id *of_id;
- 
- 	if (!dev->pm_domain)
- 		return -EPROBE_DEFER;
- 
--	of_id = of_match_node(mtk_smi_larb_of_ids, pdev->dev.of_node);
--	if (!of_id)
--		return -EINVAL;
--
- 	larb = devm_kzalloc(dev, sizeof(*larb), GFP_KERNEL);
- 	if (!larb)
- 		return -ENOMEM;
- 
--	larb->larb_gen = of_id->data;
-+	larb->larb_gen = of_device_get_match_data(dev);
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	larb->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(larb->base))
-@@ -319,7 +314,6 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct mtk_smi *common;
- 	struct resource *res;
--	const struct of_device_id *of_id;
- 	enum mtk_smi_gen smi_gen;
- 
- 	if (!dev->pm_domain)
-@@ -338,17 +332,13 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
- 	if (IS_ERR(common->clk_smi))
- 		return PTR_ERR(common->clk_smi);
- 
--	of_id = of_match_node(mtk_smi_common_of_ids, pdev->dev.of_node);
--	if (!of_id)
--		return -EINVAL;
--
- 	/*
- 	 * for mtk smi gen 1, we need to get the ao(always on) base to config
- 	 * m4u port, and we need to enable the aync clock for transform the smi
- 	 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
- 	 * base.
- 	 */
--	smi_gen = (enum mtk_smi_gen)of_id->data;
-+	smi_gen = (enum mtk_smi_gen)of_device_get_match_data(dev);
- 	if (smi_gen == MTK_SMI_GEN1) {
- 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 		common->smi_ao_base = devm_ioremap_resource(dev, res);
--- 
-2.6.4
+Should a comment be added that explains it's only an experienced value
+on Allwinner H3/H5 boards VDD-CPUX usage?
+
+> 
+> Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
