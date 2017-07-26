@@ -1,89 +1,40 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 26 Jul 2017 22:40:28 +0530
-Subject: [PATCH 2/6] dma: bcm-sba-raid: Peek mbox when we are left with
- no free requests
-In-Reply-To: <1501047404-14456-3-git-send-email-anup.patel@broadcom.com>
-References: <1501047404-14456-1-git-send-email-anup.patel@broadcom.com>
- <1501047404-14456-3-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170726171028.GJ3053@localhost>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 26 Jul 2017 10:11:55 -0700
+Subject: [PATCH v1 1/2] remoteproc: dt: Provide bindings for iMX6SX/7D
+ Remote Processor Controller driver
+In-Reply-To: <ebaaf7ba-e177-0b90-bb0a-9371923bce44@rempel-privat.de>
+References: <20170710144220.31594-1-o.rempel@pengutronix.de>
+ <20170710144220.31594-2-o.rempel@pengutronix.de>
+ <20170710221408.GD1618@tuxbook>
+ <91bfe236-0410-b26e-7ef6-73d14ebf120d@pengutronix.de>
+ <20170718163814.GD20973@minitux>
+ <ebaaf7ba-e177-0b90-bb0a-9371923bce44@rempel-privat.de>
+Message-ID: <20170726171155.GE20643@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 11:06:40AM +0530, Anup Patel wrote:
-> We should peek mbox channels when we are left with no free
-> sba_requests in sba_alloc_request()
+On Sun 23 Jul 22:56 PDT 2017, Oleksij Rempel wrote:
 
-and why is the world should we do that, how does that help??
-
+> Am 18.07.2017 um 18:38 schrieb Bjorn Andersson:
+> > On Tue 18 Jul 01:45 PDT 2017, Oleksij Rempel wrote:
+> >> On 11.07.2017 00:14, Bjorn Andersson wrote:
+[..]
+> >>> Also, as you warn about the user needing to pick the values for "ddr",
+> >>> does that mean that it's a carveout of System RAM?
+> >>
+> >> Yes, it is a part of System RAM.
+> >>
+> > 
+> > Then there will be an associated reserved-memory region for the
+> > region(s), you should add a label to this and use "memory-region" to get
+> > hold of the addresses instead.
 > 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  drivers/dma/bcm-sba-raid.c | 25 ++++++++++++++++++++-----
->  1 file changed, 20 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-> index 6d15fed..321420b 100644
-> --- a/drivers/dma/bcm-sba-raid.c
-> +++ b/drivers/dma/bcm-sba-raid.c
-> @@ -199,6 +199,14 @@ static inline u32 __pure sba_cmd_pq_c_mdata(u32 d, u32 b1, u32 b0)
->  
->  /* ====== General helper routines ===== */
->  
-> +static void sba_peek_mchans(struct sba_device *sba)
-> +{
-> +	int mchan_idx;
-> +
-> +	for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
-> +		mbox_client_peek_data(sba->mchans[mchan_idx]);
-> +}
-> +
->  static struct sba_request *sba_alloc_request(struct sba_device *sba)
->  {
->  	unsigned long flags;
-> @@ -210,8 +218,17 @@ static struct sba_request *sba_alloc_request(struct sba_device *sba)
->  	if (req)
->  		list_move_tail(&req->node, &sba->reqs_alloc_list);
->  	spin_unlock_irqrestore(&sba->reqs_lock, flags);
-> -	if (!req)
-> +
-> +	if (!req) {
-> +		/*
-> +		 * We have no more free requests so, we peek
-> +		 * mailbox channels hoping few active requests
-> +		 * would have completed which will create more
-> +		 * room for new requests.
-> +		 */
-> +		sba_peek_mchans(sba);
->  		return NULL;
-> +	}
->  
->  	req->flags = SBA_REQUEST_STATE_ALLOCED;
->  	req->first = req;
-> @@ -558,17 +575,15 @@ static enum dma_status sba_tx_status(struct dma_chan *dchan,
->  				     dma_cookie_t cookie,
->  				     struct dma_tx_state *txstate)
->  {
-> -	int mchan_idx;
->  	enum dma_status ret;
->  	struct sba_device *sba = to_sba_device(dchan);
->  
-> -	for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
-> -		mbox_client_peek_data(sba->mchans[mchan_idx]);
-> -
->  	ret = dma_cookie_status(dchan, cookie, txstate);
->  	if (ret == DMA_COMPLETE)
->  		return ret;
->  
-> +	sba_peek_mchans(sba);
-> +
->  	return dma_cookie_status(dchan, cookie, txstate);
->  }
->  
-> -- 
-> 2.7.4
+> Ok. Should only system memory region be assigned over reserved-memory or
+> all of named regions?
 > 
 
--- 
-~Vinod
+You can do it either way, but unless you see a strong reason against it
+I would recommend just having a single region, for simplicity.
+
+Regards,
+Bjorn
