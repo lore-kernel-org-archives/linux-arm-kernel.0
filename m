@@ -1,54 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Jul 2017 10:32:42 +0200
-Subject: [PATCH v2 0/9] mfd: axp20x: Add basic support for AXP813
-In-Reply-To: <20170726082832.16789-1-wens@csie.org>
-References: <20170726082832.16789-1-wens@csie.org>
-Message-ID: <20170726083242.k35gnk22h35as55n@flea>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 26 Jul 2017 10:35:21 +0200
+Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
+ from suspend_noirq
+In-Reply-To: <20170726081716.GB10026@atomide.com>
+References: <20170724095201.21601-1-johan@kernel.org>
+ <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
+ <20170725082444.GL2729@localhost>
+ <3f0f8ed2-9466-d5c9-10e4-de95e5155653@ti.com>
+ <20170726075004.GD27516@localhost>
+ <20170726081716.GB10026@atomide.com>
+Message-ID: <20170726083521.GE27516@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 04:28:23PM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
+On Wed, Jul 26, 2017 at 01:17:17AM -0700, Tony Lindgren wrote: > * Johan Hovold <johan@kernel.org> [170726 00:51]:
+> > On Tue, Jul 25, 2017 at 12:48:40PM -0500, Grygorii Strashko wrote:
+> > > So, thank you for your patches and sorry for the noise.
+> > > 
+> > > Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > 
+> > Thanks for testing.
 > 
-> This is v2 of my AXP813 support series. The device tree patches are
-> based on my A83T MMC support series. These will go through the sunxi
-> tree. The dt-binding and mfd patches are based on v4.13-rc1. These
-> will go through Lee's mfd tree.
-> 
-> Changes since v1:
-> 
->   - Provided relative path for ac100.txt in dt-bindings/mfd/axp20x.txt
-> 
->   - Added Rob's acks to dt-binding patches
-> 
->   - Added Quentin's "mfd: axp20x: use correct platform device id for
->     many PEK" patch to this series. This patch depends on mfd changes
->     in this series. It is included so Lee can take them together in
->     one go.
-> 
->   - Added Lee's mfd-acks to mfd patches
-> 
->   - Added axp818 compatible with axp813 fallback. The two chips are
->     identical except for the markings. The added compatible matches
->     what is actually on the board, to avoid confusing readers.
-> 
->   - Fixed up device tree patches to mention which board is changed
-> 
->   - Added device tree patches for the H8 homlet
+> So does the patch description need updating?
 
-For the whole serie,
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+I don't think so.
 
-Maxime
+I did notice that I left out a "would" in the final sentence
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/8696d85a/attachment.sig>
+	"and either way, any such calls *would* have been causing
+	crashes since 4.10"
+	
+which perhaps you could add when applying?
+
+> And this is needed as a fix for the -rc cycle in addition to your musb
+> patch?
+
+Unlike the musb patch, this one is not critical and could possibly wait
+for 4.14. But since all it does is to get rid of a (since 4.10) broken
+state update, and thereby those warning messages on suspend, I'd say
+it's -rc material.
+
+Thanks,
+Johan
