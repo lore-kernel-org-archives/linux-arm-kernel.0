@@ -1,91 +1,129 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 26 Jul 2017 17:47:56 +0800
-Subject: [PATCH v2] irqchip/gic-v3-its: Allow GIC ITS number more than
- MAX_NUMNODES
-In-Reply-To: <b5545a3e-74a9-0bff-afc7-309c653ca2b3@huawei.com>
-References: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
- <b5545a3e-74a9-0bff-afc7-309c653ca2b3@huawei.com>
-Message-ID: <dca3922b-2a60-d7b6-b3f5-46e26324e17e@linaro.org>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Wed, 26 Jul 2017 11:48:19 +0200
+Subject: [PATCH v3 1/4] dt-bindings: Document the STM32 MDMA bindings
+In-Reply-To: <1501062502-18778-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1501062502-18778-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1501062502-18778-2-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/7/25 19:02, John Garry wrote:
-> On 22/07/2017 04:54, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> When running 4.13-rc1 on top of D05, I got the boot log:
->>
->> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
->> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
->> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
->> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
->> [    0.000000] SRAT: ITS affinity exceeding max count[4]
->>
->> This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
->>
->> So dynamically alloc the memory needed instead of using
->> its_srat_maps[MAX_NUMNODES], which count the number of
->> ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
->> then build the mapping of numa node to ITS ID. Of course,
->> its_srat_maps will be freed after ITS probing because
->> we don't need that after boot.
->>
->> After doing this, I got what I wanted:
->>
->> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
->> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
->> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
->> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
->> [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
->> [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
->> [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
->> [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
->>
->> Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>
->> v1->v2:
->>   - Add NULL check in acpi_get_its_numa_node() for no ITS affinity case;
->>   - Free the its_srat_maps after ITS probing.
->>
->>  drivers/irqchip/irq-gic-v3-its.c | 39 
->> ++++++++++++++++++++++++++++++++-------
->>  1 file changed, 32 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c 
->> b/drivers/irqchip/irq-gic-v3-its.c
->> index 3ccdf76..1d692aa 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -1847,13 +1847,16 @@ struct its_srat_map {
->>      u32    its_id;
->>  };
->>
->> -static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
->> +static struct its_srat_map *its_srat_maps __initdata;
->>  static int its_in_srat __initdata;
->>
->>  static int __init acpi_get_its_numa_node(u32 its_id)
->>  {
->>      int i;
->>
->> +    if (!its_srat_maps)
->> +        return NUMA_NO_NODE;
-> 
-> Question: Does !its_srat_maps always imply its_in_srat == 0, so we could 
-> just fall through the for loop and return NUMA_NO_NODE without this check?
-> 
-> Or should we be safe/explicit/or falling through loops is a bad coding 
-> style?
+This patch adds documentation of device tree bindings for the STM32 MDMA
+controller.
 
-Hmm, you are right, I missed that point, its_in_srat will
-always be 0 if its_srat_maps be NULL, removed the NULL
-check and tested it on D03 (without ITS NUMA) and D03 boots
-OK, will remove the check in the new version.
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+  Version history:
+     v3:
+         * None
+     v2:
+         * change compatible into st,stm32h7-mdma to be more SoC specific
+---
+---
+ .../devicetree/bindings/dma/stm32-mdma.txt         | 94 ++++++++++++++++++++++
+ 1 file changed, 94 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
 
-Thanks
-Hanjun
+diff --git a/Documentation/devicetree/bindings/dma/stm32-mdma.txt b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
+new file mode 100644
+index 0000000..d18772d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
+@@ -0,0 +1,94 @@
++* STMicroelectronics STM32 MDMA controller
++
++The STM32 MDMA is a general-purpose direct memory access controller capable of
++supporting 64 independent DMA channels with 256 HW requests.
++
++Required properties:
++- compatible: Should be "st,stm32h7-mdma"
++- reg: Should contain MDMA registers location and length. This should include
++  all of the per-channel registers.
++- interrupts: Should contain the MDMA interrupt.
++- clocks: Should contain the input clock of the DMA instance.
++- resets: Reference to a reset controller asserting the DMA controller.
++- #dma-cells : Must be <5>. See DMA client paragraph for more details.
++
++Optional properties:
++- dma-channels: Number of DMA channels supported by the controller.
++- dma-requests: Number of DMA request signals supported by the controller.
++- st,ahb-addr-masks: Array of u32 mask to list memory devices addressed via
++  AHB bus.
++
++Example:
++
++	mdma1: dma at 52000000 {
++		compatible = "st,stm32h7-mdma";
++		reg = <0x52000000 0x1000>;
++		interrupts = <122>;
++		clocks = <&timer_clk>;
++		resets = <&rcc 992>;
++		#dma-cells = <5>;
++		dma-channels = <16>;
++		dma-requests = <32>;
++		st,ahb-addr-masks = <0x20000000>, <0x00000000>;
++	};
++
++* DMA client
++
++DMA clients connected to the STM32 MDMA controller must use the format
++described in the dma.txt file, using a five-cell specifier for each channel:
++a phandle to the MDMA controller plus the following five integer cells:
++
++1. The request line number
++2. The priority level
++	0x00: Low
++	0x01: Medium
++	0x10: High
++	0x11: Very high
++3. A 32bit mask specifying the DMA channel configuration
++ -bit 0-1: Source increment mode
++	0x00: Source address pointer is fixed
++	0x10: Source address pointer is incremented after each data transfer
++	0x11: Source address pointer is decremented after each data transfer
++ -bit 2-3: Destination increment mode
++	0x00: Destination address pointer is fixed
++	0x10: Destination address pointer is incremented after each data
++	transfer
++	0x11: Destination address pointer is decremented after each data
++	transfer
++ -bit 8-9: Source increment offset size
++	0x00: byte (8bit)
++	0x01: half-word (16bit)
++	0x10: word (32bit)
++	0x11: double-word (64bit)
++ -bit 10-11: Destination increment offset size
++	0x00: byte (8bit)
++	0x01: half-word (16bit)
++	0x10: word (32bit)
++	0x11: double-word (64bit)
++-bit 25-18: The number of bytes to be transferred in a single transfer
++	(min = 1 byte, max = 128 bytes)
++-bit 29:28: Trigger Mode
++	0x00: Each MDMA request triggers a buffer transfer (max 128 bytes)
++	0x01: Each MDMA request triggers a block transfer (max 64K bytes)
++	0x10: Each MDMA request triggers a repeated block transfer
++	0x11: Each MDMA request triggers a linked list transfer
++4. A 32bit value specifying the register to be used to acknowledge the request
++   if no HW ack signal is used by the MDMA client
++5. A 32bit mask specifying the value to be written to acknowledge the request
++   if no HW ack signal is used by the MDMA client
++
++Example:
++
++	i2c4: i2c at 5c002000 {
++		compatible = "st,stm32f7-i2c";
++		reg = <0x5c002000 0x400>;
++		interrupts = <95>,
++			     <96>;
++		clocks = <&timer_clk>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dmas = <&mdma1 36 0x0 0x40008 0x0 0x0>,
++		       <&mdma1 37 0x0 0x40002 0x0 0x0>;
++		dma-names = "rx", "tx";
++		status = "disabled";
++	};
+-- 
+2.7.4
