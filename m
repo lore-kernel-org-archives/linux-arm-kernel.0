@@ -1,68 +1,72 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 26 Jul 2017 10:59:31 +0530
-Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
-References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
- <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
- <20170722065133.GT3053@localhost>
- <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
-Message-ID: <20170726052930.GF3053@localhost>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 26 Jul 2017 11:06:02 +0530
+Subject: [PATCH V2 4/4] arm64: disable irq between breakpoint and step
+ exception
+In-Reply-To: <20170725132551.GB28815@arm.com>
+References: <cover.1499416107.git.panand@redhat.com>
+ <8f9c3073792c107e3d928e413499572ec75c5175.1499416107.git.panand@redhat.com>
+ <20170725132551.GB28815@arm.com>
+Message-ID: <db8f4516-f16a-adb7-bbca-d38e1acad02b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 01:55:10PM +0000, Pierre Yves MORDRET wrote:
+Hi Will,
 
-> >> +
-> >> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >> +	if (!res)
-> >> +		return -ENODEV;
-> >> +
-> >> +	iomem = devm_ioremap_resource(&pdev->dev, res);
-> >> +	if (!iomem)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	spin_lock_init(&stm32_dmamux->lock);
-> >> +
-> >> +	stm32_dmamux->clk = devm_clk_get(&pdev->dev, NULL);
-> >> +	if (IS_ERR(stm32_dmamux->clk)) {
-> >> +		dev_info(&pdev->dev, "Missing controller clock\n");
-> > 
-> > Can you check for EPROBE_DEFER and print only for if that is not the error
-> > otherwise we end up sapmming with defered probe issues
-> > 
-> 
-> This is what you meant ?
-> 	if (IS_ERR(stm32_dmamux->clk) != EPROBE_DEFER) {
-> 		dev_info(&pdev->dev, "Missing controller clock\n");
-> 		return PTR_ERR(stm32_dmamux->clk);
-> 	}
-> 
-> OR
-> 
-> 	if (IS_ERR(stm32_dmamux->clk)) {
-> 		if (IS_ERR(stm32_dmamux->clk) != EPROBE_DEFER)
-> 			dev_info(&pdev->dev, "Missing controller clock\n");
-> 		return PTR_ERR(stm32_dmamux->clk);
-> 	}
+Thanks for your review.
 
-This one please
+On Tuesday 25 July 2017 06:55 PM, Will Deacon wrote:
+> On Fri, Jul 07, 2017 at 05:34:00PM +0530, Pratyush Anand wrote:
+>> If an interrupt is generated between breakpoint and step handler then
+>> step handler can not get correct step address. This situation can easily
+>> be invoked by samples/hw_breakpoint/data_breakpoint.c. It can also be
+>> reproduced if we insert any printk() statement or dump_stack() in perf
+>> overflow_handler. So, it seems that perf is working fine just luckily.
+>> If the CPU which is handling perf breakpoint handler receives any
+>> interrupt then, perf step handler will not execute sanely.
+>>
+>> This patch improves do_debug_exception() handling, which enforces now,
+>> that exception handler function:
+>> - should return 0 for any software breakpoint and hw
+>> breakpoint/watchpoint handler if it does not expect a single step stage
+>> - should return 1 if it expects single step.
+>> - A single step handler should always return 0.
+>> - All handler should return a -ve error in any other case.
+>>
+>> Now, we can know in do_debug_exception() that whether a step exception
+>> will be followed or not. If there will a step exception then disable
+>> irq. Re-enable it after single step handling.
+> 
+> AFAICT, this is only a problem for kernel-mode breakpoints where we end up
+> stepping into the interrupt handler when trying to step over a breakpoint.
+
+I think yes.
 
 > 
-> >> +
-> >> +#ifndef __DMA_STM32_DMAMUX_H
-> >> +#define __DMA_STM32_DMAMUX_H
-> >> +
-> >> +#if defined(CONFIG_STM32_DMAMUX)
-> >> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
-> > 
-> > Why do we need a custom API in this case?
-> > 
+> We'd probably be better off getting all users of kernel step (kprobes, kgdb
+> and perf) to run the step with irqs disabled,
+
+
+That should be doable. We can easily manage all of them in 
+do_debug_exception() if individual brk handlers return correct value as per 
+the rule mentioned in the commit log of this patch.
+
+I think, I can take care of kprobes and kgdb as well in next version of patch.
+
+> but I still have reservations
+> about that:
+
+So, IIUC, you have concern about faulting of a instruction being stepped. 
+Since we will have a notion of *irq_en_needed*, so I think, if needed we can 
+re-enable interrupt in fault handler do_mem_abort().
+
+Whats your opinion here?
+
 > 
-> This API is called by DMA when a slave is requested by client. DMA can work
-> without DMAMUX this API has been put in place to configure DMAMUX whether client
-> is requesting a DMAMUX Channel instead of a DMA one.
-
-You mean the dmaengine driver right?
-
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/508066.html
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/510814.html
+>
+> Wouldn't it be better to follow kprobes/kgdb and have perf run the step with
+> irqs disabled?
 -- 
-~Vinod
+Regards
+Pratyush
