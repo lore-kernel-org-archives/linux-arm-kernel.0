@@ -1,66 +1,37 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 26 Jul 2017 16:09:39 -0500
-Subject: [PATCH v2] ARM: dts: spear13xx: fix PCI bus dtc warnings
+Date: Wed, 26 Jul 2017 16:09:42 -0500
+Subject: [PATCH v2] arm64: dts: xilinx: fix PCI bus dtc warnings
 In-Reply-To: <20170726210943.6875-1-robh@kernel.org>
 References: <20170726210943.6875-1-robh@kernel.org>
-Message-ID: <20170726210943.6875-3-robh@kernel.org>
+Message-ID: <20170726210943.6875-6-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 dtc recently added PCI bus checks. Fix these warnings.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
 ---
 v2:
 - rebase on v4.13-rc2
 
-Please take via sub-arch tree.
+Michal, you said you applied v1, but it looks like it never was.
 
- arch/arm/boot/dts/spear1310.dtsi | 3 +++
- arch/arm/boot/dts/spear1340.dtsi | 1 +
- 2 files changed, 4 insertions(+)
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
-index 54bc6d3cf290..40f4ad3c34c6 100644
---- a/arch/arm/boot/dts/spear1310.dtsi
-+++ b/arch/arm/boot/dts/spear1310.dtsi
-@@ -98,6 +98,7 @@
- 			device_type = "pci";
- 			ranges = <0x81000000 0 0	 0x80020000 0 0x00010000   /* downstream I/O */
- 				0x82000000 0 0x80030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 54dc28351c8c..1a3f5e928bb9 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -221,6 +221,7 @@
+ 				  0x43000000 0x00000006 0x00000000 0x00000006
+ 				  0x00000000 0x00000002 0x00000000>;
+ 				  /* prefetchable memory */
 +			bus-range = <0x00 0xff>;
- 			status = "disabled";
- 		};
- 
-@@ -116,6 +117,7 @@
- 			device_type = "pci";
- 			ranges = <0x81000000 0 0  0x90020000 0 0x00010000   /* downstream I/O */
- 				0x82000000 0 0x90030000 0x90030000 0 0x0ffd0000>; /* non-prefetchable memory */
-+			bus-range = <0x00 0xff>;
- 			status = "disabled";
- 		};
- 
-@@ -134,6 +136,7 @@
- 			device_type = "pci";
- 			ranges = <0x81000000 0 0	 0xc0020000 0 0x00010000   /* downstream I/O */
- 				0x82000000 0 0xc0030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
-+			bus-range = <0x00 0xff>;
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
-index df2232d767ed..5f347054527d 100644
---- a/arch/arm/boot/dts/spear1340.dtsi
-+++ b/arch/arm/boot/dts/spear1340.dtsi
-@@ -63,6 +63,7 @@
- 			device_type = "pci";
- 			ranges = <0x81000000 0 0	 0x80020000 0 0x00010000   /* downstream I/O */
- 				0x82000000 0 0x80030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
-+			bus-range = <0x00 0xff>;
- 			status = "disabled";
- 		};
- 
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+ 			interrupt-map = <0x0 0x0 0x0 0x1 &pcie_intc 0x1>,
+ 					<0x0 0x0 0x0 0x2 &pcie_intc 0x2>,
 -- 
 2.11.0
