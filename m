@@ -1,69 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Jul 2017 09:40:41 +0100
-Subject: [PATCH v2] arm64: kernel: implement fast refcount checking
-In-Reply-To: <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
-References: <20170725181536.21092-1-ard.biesheuvel@linaro.org>
- <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
-Message-ID: <CAKv+Gu8djcgmovajhUUpniHwEVDupCWW3L__3JtqZ0GCM3=U2w@mail.gmail.com>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Wed, 26 Jul 2017 10:43:05 +0200
+Subject: [PATCH] arm: fix sparse flags for build on 64bit machines
+In-Reply-To: <20170726013020.GL2146@codeaurora.org>
+References: <20170726013020.GL2146@codeaurora.org>
+Message-ID: <20170726084305.38537-1-luc.vanoostenryck@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 July 2017 at 05:11, Li Kun <hw.likun@huawei.com> wrote:
-> Hi Ard?
->
->
-> on 2017/7/26 2:15, Ard Biesheuvel wrote:
->>
->> +#define REFCOUNT_OP(op, asm_op, cond, l, clobber...)                   \
->> +__LL_SC_INLINE int                                                     \
->> +__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))                    \
->> +{                                                                      \
->> +       unsigned long tmp;                                              \
->> +       int result;                                                     \
->> +                                                                       \
->> +       asm volatile("// refcount_" #op "\n"                            \
->> +"      prfm            pstl1strm, %2\n"                                \
->> +"1:    ldxr            %w0, %2\n"                                      \
->> +"      " #asm_op "     %w0, %w0, %w[i]\n"                              \
->> +"      st" #l "xr      %w1, %w0, %2\n"                                 \
->> +"      cbnz            %w1, 1b\n"                                      \
->> +       REFCOUNT_CHECK(cond)                                            \
->> +       : "=&r" (result), "=&r" (tmp), "+Q" (r->counter)                \
->> +       : REFCOUNT_INPUTS(r) [i] "Ir" (i)                               \
->> +       clobber);                                                       \
->> +                                                                       \
->> +       return result;                                                  \
->> +}                                                                      \
->> +__LL_SC_EXPORT(__refcount_##op);
->> +
->> +REFCOUNT_OP(add_lt, adds, mi,  , REFCOUNT_CLOBBERS);
->> +REFCOUNT_OP(sub_lt_neg, adds, mi, l, REFCOUNT_CLOBBERS);
->> +REFCOUNT_OP(sub_le_neg, adds, ls, l, REFCOUNT_CLOBBERS);
->> +REFCOUNT_OP(sub_lt, subs, mi, l, REFCOUNT_CLOBBERS);
->> +REFCOUNT_OP(sub_le, subs, ls, l, REFCOUNT_CLOBBERS);
->> +
->
-> I'm not quite sure if we use b.lt to judge whether the result of adds is
-> less than zero is correct or not.
-> The b.lt means N!=V, take an extreme example, if we operate like below, the
-> b.lt will also be true.
->
-> refcount_set(&ref_c,0x80000000);
-> refcount_dec_and_test(&ref_c);
->
-> maybe we should use PL/NE/MI/EQ to judge the LT_ZERO or LE_ZERO condition ?
->
+By default sparse uses the characteristics of the build
+machine to infer things like the wordsize.
+This is fine when doing native builds but for ARM it's,
+I suspect, very rarely the case and if the build are done
+on a 64bit machine we get a bunch of warnings like:
+  'cast truncates bits from constant value (... becomes ...)'
 
-The lt/le is confusing here: the actual condition coded used are mi
-for negative and ls for negative or zero.
+Fix this by adding the -m32 flags for sparse.
 
-I started out using lt and le, because it matches the x86 code, but I
-moved to mi and ls instead. (I don't think it makes sense to deviate
-from that just because the flags and predicates work a bit
-differently.)
+Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+---
+ arch/arm/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-However, I see now that there is one instance of REFCOUNT_CHECK(lt)
-remaining (in refcount.h). That should mi as well.
-
-Thanks,
-Ard.
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 65f4e2a4e..121fd65f8 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -131,7 +131,7 @@ endif
+ KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
+ KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
+ 
+-CHECKFLAGS	+= -D__arm__
++CHECKFLAGS	+= -D__arm__ -m32
+ 
+ #Default value
+ head-y		:= arch/arm/kernel/head$(MMUEXT).o
+-- 
+2.13.2
