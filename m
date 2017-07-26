@@ -1,26 +1,74 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Wed, 26 Jul 2017 23:56:58 +0300
-Subject: [PATCH 3/4] iommu/tegra-gart: Add iommu_group support
-In-Reply-To: <9c3fa9661e8177f0ccea960dd584a05fc19f92c8.1500637633.git.robin.murphy@arm.com>
-References: <cover.1500637633.git.robin.murphy@arm.com>
- <9c3fa9661e8177f0ccea960dd584a05fc19f92c8.1500637633.git.robin.murphy@arm.com>
-Message-ID: <e1de80c6-33fd-6bd5-bc28-8b3d3043ca4f@gmail.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Wed, 26 Jul 2017 14:02:42 -0700
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170726200802.GA17722@kroah.com>
+References: <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
+ <20170726145522.GC28875@nazgul.tnic> <20170726151314.GA10696@hc>
+ <20170726153502.GE28875@nazgul.tnic> <20170726154515.GA11453@hc>
+ <20170726155548.GF28875@nazgul.tnic> <20170726161949.GB15426@kroah.com>
+ <20170726163049.GG28875@nazgul.tnic> <20170726173353.GB21705@kroah.com>
+ <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+ <20170726200802.GA17722@kroah.com>
+Message-ID: <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.07.2017 15:12, Robin Murphy wrote:
-> As the last step to making groups mandatory, clean up the remaining
-> drivers by adding basic support. Whilst it may not perfectly reflect the
-> isolation capabilities of the hardware, using generic_device_group()
-> should at least maintain existing behaviour with respect to the API.
+On 07/26/2017 01:08 PM, Greg KH wrote:
+> On Wed, Jul 26, 2017 at 01:02:38PM -0700, David Daney wrote:
+>> On 07/26/2017 10:33 AM, Greg KH wrote:
+>>> On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
+>>>> On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
+>>>>> On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
+>>>>>> On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
+>>>>>>> The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
+>>>>>>> I'm not aware of other ways to access these devices. Please enlighten
+>>>>>>> me if I'm missing something.
+>>>>>>
+>>>>>> Me enlighten you on Cavium hardware?! You're funny.
+>>>>>>
+>>>>>> So I don't know whether the PCI hotplug code can run more than one
+>>>>>> function upon PCI ID detection. Probably Greg will say, write a
+>>>>>> multiplexer wrapper. :-)
+>>>>>
+>>>>> -ENOCONTEXT....
+>>>>>
+>>>>> Anyway, pci questions are best asked on the linux-pci at vger list.  And
+>>>>> yes, all PCI devices end up with a 'struct pci_dev *' automatically.
+>>>>
+>>>> Simple: so they have a PCI ID of a memory contoller and want to hotplug
+>>>> two drivers for it. And those two drivers should remain independent from
+>>>> each other.
+>>>
+>>> Hahahahaha, no.  That's crazy, you were right in guessing what my answer
+>>> was going to be :)
+>>>
+>>
+>>
+>> Just to be clear about the situation, the device is a memory controller.  It
+>> has two main behaviors we are interested in:
+>>
+>> A) Error Detection And Correction (EDAC).  This should be connected to the
+>> kernel's EDAC subsystem.  An existing driver (drivers/edac/thunderx_edac.c)
+>> does exactly this.
+>>
+>> B) Performance Counters for actions taken in the corresponding memory. This
+>> should be connected to the kernel's perf framework as an uncore-PMU (the
+>> subject of this patch set).
+>>
+>> It is a single PCI device.  What should the driver architecture look like to
+>> connect it to two different kernel subsystems?
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/tegra-gart.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> Modify the drivers/edac/thunderx_edac.c code to add support for
+> performance counters.
 > 
 
-Tested-by: Dmitry Osipenko <digetx@gmail.com>
+Thanks Greg.  This adds some clarity to the situation.
 
--- 
-Dmitry
+This technique does slightly complicate the mapping of files and 
+directories in the kernel source tree to maintainers.
+
+Also, if a given configuration disables CONFIG_EDAC there is some 
+hackery needed to get the perf portion of the driver included.
+
+David Daney
