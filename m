@@ -1,45 +1,29 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 26 Jul 2017 13:35:33 -0700 (PDT)
-Subject: [PATCH 0/8] net: mvpp2: add TX interrupts support
-In-Reply-To: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
-References: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170726.133533.262039701450895012.davem@davemloft.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 26 Jul 2017 22:38:41 +0200
+Subject: [PATCH 0/3] memory: atmel-ebi: Fix setting EBI timings through dts
+In-Reply-To: <1500984024-26403-1-git-send-email-ada@thorsis.com>
+References: <1500984024-26403-1-git-send-email-ada@thorsis.com>
+Message-ID: <20170726203841.yj3tvaokhx4buekx@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Tue, 25 Jul 2017 17:55:01 +0200
-
+On 25/07/2017 at 14:00:21 +0200, Alexander Dahl wrote:
 > Hello,
 > 
-> So far, the mvpp2 driver was using an hrtimer to handle TX
-> completion. This patch series adds support for using TX interrupts
-> (for each CPU) on PPv2.2, the variant of the IP used on Marvell Armada
-> 7K/8K.
+> this small patch series based on v4.13-rc2 fixes three things I found
+> when trying to run the latest rc on an at91samg20 based platform with
+> a SRAM like memory connected to the EBI interface, for which the
+> timings should be set through dts. 
 > 
-> This series has been tested on Marvell Armada 7K (PPv2.2) and Armada
-> 375 (PPv2.1).
+> For all register settings of interest I checked the hardware manuals
+> of the at91sam9g20 and the sama5d3x to not cause regressions, as well
+> as the actual register settings in the running system. (I used the
+> devmem tool from busybox for that.)
 > 
-> Dave:
-> 
->  - This series depends on the previous series sent by Antoine T?nart
->    "net: mvpp2: MAC/GoP configuration and optional PHYs". Functionally
->    speaking there is no real dependency, but we touch in a few areas
->    the same piece of code, so I based my patch series on top of
->    Antoine's.
-> 
->  - Please do not apply the last patch of this series "arm64: dts:
->    marvell: add TX interrupts for PPv2.2", it will be taken by the ARM
->    mvebu maintainers.
 
-Please don't do things this way.
+All applied, thanks.
 
-Patiently wait for Antione's series to make it into my tree, then
-submit your's.
-
-Also, if we're continually going to elide the DTS file patches, just
-don't bother adding them to the series.  That way you don't have to
-give me special instructions, and I don't have the possibility of
-making a mistake and applying it accidently.
-
-Thanks.
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
