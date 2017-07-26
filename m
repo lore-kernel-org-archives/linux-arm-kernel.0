@@ -1,8 +1,10 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 26 Jul 2017 15:55:15 +0200
+Date: Wed, 26 Jul 2017 15:55:19 +0200
 Subject: [PATCH RESEND v3 0/3] Add support for es8323 and hdmi audio to the
  firefly-rk3288
-Message-ID: <20170726135526.475-1-romain.perier@collabora.com>
+In-Reply-To: <20170726135526.475-1-romain.perier@collabora.com>
+References: <20170726135526.475-1-romain.perier@collabora.com>
+Message-ID: <20170726135526.475-5-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
