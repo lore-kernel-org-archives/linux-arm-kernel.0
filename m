@@ -1,11 +1,11 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 26 Jul 2017 17:47:31 +0800
+Date: Wed, 26 Jul 2017 17:47:56 +0800
 Subject: [PATCH v2] irqchip/gic-v3-its: Allow GIC ITS number more than
  MAX_NUMNODES
 In-Reply-To: <b5545a3e-74a9-0bff-afc7-309c653ca2b3@huawei.com>
 References: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
  <b5545a3e-74a9-0bff-afc7-309c653ca2b3@huawei.com>
-Message-ID: <33afd72e-d8de-a8c5-9339-1a98a188ded0@linaro.org>
+Message-ID: <dca3922b-2a60-d7b6-b3f5-46e26324e17e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
