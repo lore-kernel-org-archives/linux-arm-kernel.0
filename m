@@ -1,69 +1,83 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Wed, 26 Jul 2017 22:03:34 +1000
-Subject: [BUG] v4.12 breaks pxa25x
-In-Reply-To: <20170726114139.GN31807@n2100.armlinux.org.uk>
-References: <87inirsgzk.fsf@belgarion.home>
- <20170717081518.GI31807@n2100.armlinux.org.uk>
- <87eftfrs0e.fsf@belgarion.home> <87o9s7qw64.fsf@belgarion.home>
- <20170726114139.GN31807@n2100.armlinux.org.uk>
-Message-ID: <20170726220334.2961ae22@roar.ozlabs.ibm.com>
+From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
+Date: Wed, 26 Jul 2017 14:05:30 +0200
+Subject: [PATCH v5 0/4] ARM: dts: imx: add CX9020 Embedded PC device tree
+Message-ID: <20170726120534.5516-1-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jul 2017 12:41:39 +0100
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-> On Wed, Jul 26, 2017 at 01:23:15PM +0200, Robert Jarzmik wrote:
-> > Robert Jarzmik <robert.jarzmik@free.fr> writes:  
-> > > Sure, it like this :
-> > > c06f22c8 D user_pmd_table
-> > > c06f22cc d __warned.19178
-> > > c06f22cd d clean_addr
-> > >
-> > > And I have no idea how to link that __warned.19178 with the WARN_xxx() statement ...
-> > >
-> > > This bisection I made points me to :
-> > > # first bad commit: [799c43415442414b1032580c47684cb709dfed6d] kbuild: thin archives make default for all archs
-> > >
-> > > Reverting this commit makes my kernel boot again.  
-> > 
-> > Hi Russell,
-> > 
-> > I think I know where this is comming from.
-> >   - in file: ~/mio_linux/kernel/include/asm-generic/vmlinux.lds.h:206
-> >   - the definition of DATA_DATA looks like :
-> >     (*.data .data.[0-9a-zA-Z_]*)
-> >     ...
-> >     *(.data.unlikely)
-> >     ...
-> > 
-> > This doesn't look good to me, as .data.unlikely fullfills the first wildcard,
-> > and the linker is allowed to mix .data and .data.unlikely symbols to its
-> > pleasure, while .data.unlikely symbols (at least in my case) are not 4 bytes
-> > multiples.  
-> 
-> Obviously, the mixing of .data.unlikely with the normal .data sections
-> is undesirable - that looks like it's come from commit b67067f1176d
-> ("kbuild: allow archs to select link dead code/data elimination") dated
-> 2016, which according to git describe --contains was merged in v4.9-rc1.
-> So it's unlikely to be directly caused by this, although this commit is
-> implicated.
-> 
-> I wonder if Nick realised this side effect (that .data.unlikely is no
-> longer grouped together) - maybe we need to rename .data.unlikely?
-> (Adding Nick and Michal).
+The CX9020 differs from i.MX53 Quick Start Board by:
+- use uart2 instead of uart1
+- DVI-D connector instead of VGA
+- no audio
+- no SATA connector
+- CCAT FPGA connected to emi
+- enable rtc
 
-I did to some degree -- hence TEXT was not done that way -- but obviously
-did not look closely enough.
+v5:
+- rebased on v4.13-rc2
+- don't take maintainership for imx53-cx9020.dtsi, keep it to
+  ARM/FREESCALE IMX maintainers
+- add explicit pinmux settings for pwr leds (EIM_D22 - D24)
+- remove display0->status="okay"
+- use "regulator-vbus" as name for usb_vbus regulator node
+- use correct reset values for explicit pinmux settings of:
+  MX53_PAD_GPIO_0__CCM_CLKO
+  MX53_PAD_GPIO_16__I2C3_SDA
+  MX53_PAD_GPIO_1__ESDHC1_CD
+  MX53_PAD_GPIO_3__GPIO1_3
+  MX53_PAD_GPIO_8__GPIO1_8
 
-The right short term fix I think is to make those wildcards depend only on
-CONFIG_LD_DEAD_CODE_DATA_ELIMINATION.
+v4:
+- move alternative UART2 pinmux settings to imx53-pinfunc.h
+- fix copyright notice and model name to clearify cx9020 is a
+  Beckhoff board and not from Freescale/NXP/Qualcomm
+- add "bhf,cx9020" compatible
+- remove ccat node and pin configuration as long as the ccat
+  driver is not mainlined
+- use dvi-connector + ti,tfp410 instead of panel-simple
+- add newlines between property list and child nodes
+- replace underscores in node names with hypens
+- replace magic number 0 with polarity defines from
+  include/dt-bindings/gpio/gpio.h
+- move rtc node into imx53.dtsi, change it's name into 'srtc',
+  to avoid a conflict with 'rtc' node in imx53-m53.dtsi
+- rename regulator-3p2v
+- drop imx53-qsb container node
+- make iomux configuration explicit
+- remove unused audmux
+- remove unused led_pin_gpio3_23 configuration
+- use blue gpio-leds as disk-activity indicators for mmc0 and mmc1
+- add mmc indicator leds to sdhc pingroups
+- keep node names in alphabetical order
+- remove unused sata and ssi2
+- remove unused pin configs from hoggrp
+- add entry for Beckhoff related files to MAINTAINERS
 
-One way to avoid clashes with compiler generated section names is to use
-".." as separators in our section names.
+v3: add missig changelog
+v2:
+- keep alphabetic order of dts/Makefile
+- configure uart2 with 'fsl,dte-mode'
+- use display-0 and panel-0 as node names
+- remove unnecessary "simple-bus" for fixed regulators
 
-Anyway I'll code up a fix for the linker script that we can get into 4.12,
-thanks for pointing it out.
+Patrick Bruenn (4):
+  dt-bindings: arm: Add entry for Beckhoff CX9020
+  ARM: dts: imx53: add srtc node
+  ARM: dts: imx53: add alternative UART2 configuration
+  ARM: dts: imx: add CX9020 Embedded PC device tree
 
-Thanks,
-Nick
+ Documentation/devicetree/bindings/arm/bhf.txt      |   6 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   5 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/imx53-cx9020.dts                 | 297 +++++++++++++++++++++
+ arch/arm/boot/dts/imx53-pinfunc.h                  |   4 +
+ arch/arm/boot/dts/imx53.dtsi                       |   9 +
+ 7 files changed, 323 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bhf.txt
+ create mode 100644 arch/arm/boot/dts/imx53-cx9020.dts
+
+-- 
+2.11.0
