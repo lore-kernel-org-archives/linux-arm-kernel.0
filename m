@@ -1,46 +1,71 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Wed, 26 Jul 2017 11:48:18 +0200
-Subject: [PATCH v3 0/4] Add STM32 MDMA driver
-Message-ID: <1501062502-18778-1-git-send-email-pierre-yves.mordret@st.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Wed, 26 Jul 2017 17:52:05 +0800
+Subject: [PATCH] memory: mtk-smi: Use of_device_get_match_data helper
+Message-ID: <1501062725-8571-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the STM32 MDMA controller.
-The Master Direct memory access (MDMA) provides high-speed data transfer
-between memory and memory or between peripherals and memory.
-Contrary to STM32 DMA, the STM32 MDMA controller supports hardware LLI and
-uses a larger integrated FIFO (128 vs 16 bytes)
----
-  Version history:
-     v3:
-         * Update header template
-         * Unsigned expression compared with zero
-         * Rework stm32_mdma_get_max_width
-         * moved to src/dst case where they are used in set_xfer
-         * Change of_property_* with device_property_*
-         * Add dev_warn whether default value is used
-         * Indentation
-         * Add MODULE_*
-     v2:
-         * change compatible into st,stm32h7-mdma to be more SoC specific
-         * Add MDMA support in DT for H7
-         * Add MDMA support in STM32 defconfig
----
-Pierre-Yves MORDRET (4):
-  dt-bindings: Document the STM32 MDMA bindings
-  dmaengine: Add STM32 MDMA driver
-  ARM: dts: stm32: Add MDMA support for STM32H743 SoC
-  ARM: configs: stm32: Add MDMA support in STM32 defconfig
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
- .../devicetree/bindings/dma/stm32-mdma.txt         |   94 ++
- arch/arm/boot/dts/stm32h743.dtsi                   |   10 +
- arch/arm/configs/stm32_defconfig                   |    1 +
- drivers/dma/Kconfig                                |   12 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/stm32-mdma.c                           | 1565 ++++++++++++++++++++
- 6 files changed, 1683 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
- create mode 100644 drivers/dma/stm32-mdma.c
+Replace custom code with generic helper to retrieve driver data.
 
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/memory/mtk-smi.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index 4afbc41..69249f5 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -240,20 +240,15 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *smi_node;
+ 	struct platform_device *smi_pdev;
+-	const struct of_device_id *of_id;
+ 
+ 	if (!dev->pm_domain)
+ 		return -EPROBE_DEFER;
+ 
+-	of_id = of_match_node(mtk_smi_larb_of_ids, pdev->dev.of_node);
+-	if (!of_id)
+-		return -EINVAL;
+-
+ 	larb = devm_kzalloc(dev, sizeof(*larb), GFP_KERNEL);
+ 	if (!larb)
+ 		return -ENOMEM;
+ 
+-	larb->larb_gen = of_id->data;
++	larb->larb_gen = of_device_get_match_data(dev);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	larb->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(larb->base))
+@@ -319,7 +314,6 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct mtk_smi *common;
+ 	struct resource *res;
+-	const struct of_device_id *of_id;
+ 	enum mtk_smi_gen smi_gen;
+ 
+ 	if (!dev->pm_domain)
+@@ -338,17 +332,13 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	if (IS_ERR(common->clk_smi))
+ 		return PTR_ERR(common->clk_smi);
+ 
+-	of_id = of_match_node(mtk_smi_common_of_ids, pdev->dev.of_node);
+-	if (!of_id)
+-		return -EINVAL;
+-
+ 	/*
+ 	 * for mtk smi gen 1, we need to get the ao(always on) base to config
+ 	 * m4u port, and we need to enable the aync clock for transform the smi
+ 	 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
+ 	 * base.
+ 	 */
+-	smi_gen = (enum mtk_smi_gen)of_id->data;
++	smi_gen = of_device_get_match_data(dev);
+ 	if (smi_gen == MTK_SMI_GEN1) {
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 		common->smi_ao_base = devm_ioremap_resource(dev, res);
 -- 
-2.7.4
+2.6.4
