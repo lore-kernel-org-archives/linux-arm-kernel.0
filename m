@@ -1,69 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Jul 2017 13:44:20 +0200
-Subject: [linux-sunxi] [PATCH 10/10] ARM: dts: sun8i: Add SY8106A
- regulator to Orange Pi PC
-In-Reply-To: <1501064628.14577.1.camel@megous.com>
-References: <20170723102749.17323-1-icenowy@aosc.io>
- <20170723102749.17323-11-icenowy@aosc.io>
- <CAGb2v66AGjazHT-+hWVLyNBLDw=DJ5yTmNxF-_=BtZFfjnni-A@mail.gmail.com>
- <25C8A89C-8495-4787-934C-8E9667CD70BF@aosc.io>
- <CAGb2v64xXOmC44TKrSDZFAh6i_rgFEccCHj4EG+1fxFJd9fjjw@mail.gmail.com>
- <82507f40a1ddba8517cf09f51d3afa33@aosc.io>
- <1501064628.14577.1.camel@megous.com>
-Message-ID: <20170726114420.ipirqgbluqmggcjy@flea>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Jul 2017 13:02:08 +0100
+Subject: [PATCH 1/3] arm/syscalls: Move address limit check in loop
+In-Reply-To: <CAJcbSZF1ddWuQ-c2Xyr1Nvrjzg2TZZNHPfSo7R6Vqg2mnhiPOg@mail.gmail.com>
+References: <20170719175900.124074-1-thgarnie@google.com>
+ <CAJcbSZFw9GhVvNfYi1oHhpintHSzGcHvGjg5LtRViNBPDzLHaA@mail.gmail.com>
+ <1500978481.30745.10.camel@nxp.com>
+ <20170725103828.GJ31807@n2100.armlinux.org.uk>
+ <CAJcbSZF1ddWuQ-c2Xyr1Nvrjzg2TZZNHPfSo7R6Vqg2mnhiPOg@mail.gmail.com>
+Message-ID: <20170726120208.GB2115@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 25, 2017 at 01:01:17PM -0700, Thomas Garnier wrote:
+> On Tue, Jul 25, 2017 at 3:38 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Tue, Jul 25, 2017 at 01:28:01PM +0300, Leonard Crestez wrote:
+> >> On Mon, 2017-07-24 at 10:07 -0700, Thomas Garnier wrote:
+> >> > On Wed, Jul 19, 2017 at 10:58 AM, Thomas Garnier <thgarnie@google.com
+> >> > > wrote:
+> >> > >
+> >> > > The work pending loop can call set_fs after addr_limit_user_check
+> >> > > removed the _TIF_FSCHECK flag. To prevent the infinite loop, move
+> >> > > the addr_limit_user_check call at the beginning of the loop.
+> >> > >
+> >> > > Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-
+> >> > > mode return")
+> >> > > Reported-by: Leonard Crestez <leonard.crestez@nxp.com>
+> >> > > Signed-off-by: Thomas Garnier <thgarnie@google.com>
+> >>
+> >> > Any comments on this patch set?
+> >>
+> >> Tested-by: Leonard Crestez <leonard.crestez@nxp.com>
+> >>
+> >> This appears to fix the original issue of failing to boot from NFS when
+> >> there are lots of alignment faults. But this is a very basic test
+> >> relative to the reach of this change.
+> >>
+> >> However the original patch has been in linux-next for a while and
+> >> apparently nobody else noticed system calls randomly hanging on arm.
+> >>
+> >> I assume maintainers need to give their opinion.
+> >
+> > I've already stated my opinion, which is different from what Linus has
+> > requested of Thomas.  IMHO, the current approach is going to keep on
+> > causing problems along the lines that I've already pointed out.
+> 
+> I understand. Do you think this problem apply to arm64 as well?
 
-On Wed, Jul 26, 2017 at 12:23:48PM +0200, Ond?ej Jirman wrote:
-> Hi,
-> 
-> icenowy at aosc.io p??e v St 26. 07. 2017 v 15:36 +0800:
-> > 
-> > > > > 
-> > > > > Otherwse
-> > > > > 
-> > > > > > +               regulator-max-microvolt = <1400000>;
-> > > > > > +               regulator-ramp-delay = <200>;
-> > > > > 
-> > > > > Is this an actual constraint of the SoC? Or is it a characteristic
-> > > > > of the regulator? If it is the latter, it belongs in the driver.
-> > > > > AFAIK the regulator supports varying the ramp delay (slew rate).
-> > 
-> > I don't know...
-> > 
-> > Maybe I should ask Ondrej?
-> 
-> It is probably neither.
-> 
-> It is used to calculate a delay inserted by the kernel between setting
-> a new target voltage over I2C and changing the frequency of the CPU.
-> The actual delay is calculated by the difference between previous and
-> the new voltage.
-> 
-> I don't remember seeing anything in the datasheet of the regulator.
-> This is just some low value that works.
-> 
-> It would probably be dependent on the capacitance on the output of the
-> regulator, actual load (which varies), etc. So it is a board specific
-> value. One could measure it with an oscilloscope if there's a need to
-> optimize this.
+It's probably less of an issue for arm64 because we don't take alignment
+faults from the kernel and I think the perf case would resolve itself by
+throttling the event. However, I also don't see the advantage of doing
+this in the work loop as opposed to leaving it until we're actually doing
+the return to userspace.
 
-If this is a reasonable default, then this should be in the
-driver. You can't expect anyone to properly calculate a ramp delay and
-have access to both a scope and the CPU power lines.
+I looked to see what you've done for x86, but it looks like you check/clear
+the flag before the work pending loop (exit_to_usermode_loop), which
+subsequently re-enables interrupts and exits when
+EXIT_TO_USERMODE_LOOP_FLAGS are all clear. Since TIF_FSCHECK isn't included
+in those flags, what stops it being set again by an irq and remaining set
+for the return to userspace?
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/9e71852b/attachment.sig>
+Will
