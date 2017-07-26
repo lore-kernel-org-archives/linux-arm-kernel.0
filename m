@@ -1,39 +1,59 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 26 Jul 2017 18:23:23 +0200
-Subject: [PATCH 2/2] arm: dts: stm32: enable cec for stm32f769 discovery
-In-Reply-To: <1500366141-30706-2-git-send-email-benjamin.gaignard@linaro.org>
-References: <1500366141-30706-1-git-send-email-benjamin.gaignard@linaro.org>
- <1500366141-30706-2-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <39dfcc52-3c31-975e-387b-83284e9c9437@st.com>
+Date: Wed, 26 Jul 2017 18:24:23 +0200
+Subject: [PATCH] ARM: dts: stm32: reorder stm32h743 nodes
+In-Reply-To: <1500560225-31872-1-git-send-email-alexandre.torgue@st.com>
+References: <1500560225-31872-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <8218cfb4-fede-9286-98f4-fd041a9429f5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
 
-On 07/18/2017 10:22 AM, Benjamin Gaignard wrote:
-> enable cec for stm32f769 discovery board
+
+On 07/20/2017 04:17 PM, Alexandre Torgue wrote:
+> Reorder nodes to keep coherency with others platforms (stm32f4/stm32f7).
+> Nodes are ordered following base address.
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> ---
->   arch/arm/boot/dts/stm32f769-disco.dts | 6 ++++++
->   1 file changed, 6 insertions(+)
+> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
 > 
-> diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
-> index 166728a..14e54da 100644
-> --- a/arch/arm/boot/dts/stm32f769-disco.dts
-> +++ b/arch/arm/boot/dts/stm32f769-disco.dts
-> @@ -72,3 +72,9 @@
->   	pinctrl-names = "default";
->   	status = "okay";
->   };
+> diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+> index 36a99db..343bf4a 100644
+> --- a/arch/arm/boot/dts/stm32h743.dtsi
+> +++ b/arch/arm/boot/dts/stm32h743.dtsi
+> @@ -59,13 +59,11 @@
+>   	};
+>   
+>   	soc {
+> -		usart1: serial at 40011000 {
+> -			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+> -			reg = <0x40011000 0x400>;
+> -			interrupts = <37>;
+> -			status = "disabled";
+> +		timer5: timer at 40000c00 {
+> +			compatible = "st,stm32-timer";
+> +			reg = <0x40000c00 0x400>;
+> +			interrupts = <50>;
+>   			clocks = <&timer_clk>;
+> -
+>   		};
+>   
+>   		usart2: serial at 40004400 {
+> @@ -76,11 +74,13 @@
+>   			clocks = <&timer_clk>;
+>   		};
+>   
+> -		timer5: timer at 40000c00 {
+> -			compatible = "st,stm32-timer";
+> -			reg = <0x40000c00 0x400>;
+> -			interrupts = <50>;
+> +		usart1: serial at 40011000 {
+> +			compatible = "st,stm32f7-usart", "st,stm32f7-uart";
+> +			reg = <0x40011000 0x400>;
+> +			interrupts = <37>;
+> +			status = "disabled";
+>   			clocks = <&timer_clk>;
 > +
-> +&cec {
-> +	pinctrl-0 = <&cec_pins_a>;
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
+>   		};
+>   	};
+>   };
 > 
-After minor changes, applied on stm32-dt-for-v4.14 branch.
-
-Thanks
-Alex
+Applied on stm32-dt-for-v4.14 branch.
