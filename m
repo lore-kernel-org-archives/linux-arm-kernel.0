@@ -1,68 +1,81 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 26 Jul 2017 10:01:37 +0100
-Subject: [PATCH v7 0/3] nvmem: upstream snvs_lpgpr driver
-In-Reply-To: <07198c02-ac87-ec1f-accd-75ad6fd0ac30@pengutronix.de>
-References: <20170620070932.10353-1-o.rempel@pengutronix.de>
- <07198c02-ac87-ec1f-accd-75ad6fd0ac30@pengutronix.de>
-Message-ID: <e0abdef9-91af-8c7b-957c-b55be48ca7b4@linaro.org>
+From: hw.likun@huawei.com (Li Kun)
+Date: Wed, 26 Jul 2017 17:21:38 +0800
+Subject: [PATCH v2] arm64: kernel: implement fast refcount checking
+In-Reply-To: <CAKv+Gu8djcgmovajhUUpniHwEVDupCWW3L__3JtqZ0GCM3=U2w@mail.gmail.com>
+References: <20170725181536.21092-1-ard.biesheuvel@linaro.org>
+ <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
+ <CAKv+Gu8djcgmovajhUUpniHwEVDupCWW3L__3JtqZ0GCM3=U2w@mail.gmail.com>
+Message-ID: <34605822-8f95-f963-48c4-65d724eae0c7@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 18/07/17 05:52, Oleksij Rempel wrote:
-> Hallo all,
-> 
-> Here Gentle Ping to the Old King ;)
-> 
-> DT is already ACKed.
+? 2017/7/26 16:40, Ard Biesheuvel ??:
+> On 26 July 2017 at 05:11, Li Kun <hw.likun@huawei.com> wrote:
+>> Hi Ard?
+>>
+>>
+>> on 2017/7/26 2:15, Ard Biesheuvel wrote:
+>>> +#define REFCOUNT_OP(op, asm_op, cond, l, clobber...)                   \
+>>> +__LL_SC_INLINE int                                                     \
+>>> +__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))                    \
+>>> +{                                                                      \
+>>> +       unsigned long tmp;                                              \
+>>> +       int result;                                                     \
+>>> +                                                                       \
+>>> +       asm volatile("// refcount_" #op "\n"                            \
+>>> +"      prfm            pstl1strm, %2\n"                                \
+>>> +"1:    ldxr            %w0, %2\n"                                      \
+>>> +"      " #asm_op "     %w0, %w0, %w[i]\n"                              \
+>>> +"      st" #l "xr      %w1, %w0, %2\n"                                 \
+>>> +"      cbnz            %w1, 1b\n"                                      \
+>>> +       REFCOUNT_CHECK(cond)                                            \
+>>> +       : "=&r" (result), "=&r" (tmp), "+Q" (r->counter)                \
+>>> +       : REFCOUNT_INPUTS(r) [i] "Ir" (i)                               \
+>>> +       clobber);                                                       \
+>>> +                                                                       \
+>>> +       return result;                                                  \
+>>> +}                                                                      \
+>>> +__LL_SC_EXPORT(__refcount_##op);
+>>> +
+>>> +REFCOUNT_OP(add_lt, adds, mi,  , REFCOUNT_CLOBBERS);
+>>> +REFCOUNT_OP(sub_lt_neg, adds, mi, l, REFCOUNT_CLOBBERS);
+>>> +REFCOUNT_OP(sub_le_neg, adds, ls, l, REFCOUNT_CLOBBERS);
+>>> +REFCOUNT_OP(sub_lt, subs, mi, l, REFCOUNT_CLOBBERS);
+>>> +REFCOUNT_OP(sub_le, subs, ls, l, REFCOUNT_CLOBBERS);
+>>> +
+>> I'm not quite sure if we use b.lt to judge whether the result of adds is
+>> less than zero is correct or not.
+>> The b.lt means N!=V, take an extreme example, if we operate like below, the
+>> b.lt will also be true.
+>>
+>> refcount_set(&ref_c,0x80000000);
+>> refcount_dec_and_test(&ref_c);
+>>
+>> maybe we should use PL/NE/MI/EQ to judge the LT_ZERO or LE_ZERO condition ?
+>>
+> The lt/le is confusing here: the actual condition coded used are mi
+> for negative and ls for negative or zero.
+>
+> I started out using lt and le, because it matches the x86 code, but I
+> moved to mi and ls instead. (I don't think it makes sense to deviate
+> from that just because the flags and predicates work a bit
+> differently.)
+>
+> However, I see now that there is one instance of REFCOUNT_CHECK(lt)
+> remaining (in refcount.h). That should mi as well.
+Sorry for having  misunderstood your implementation.
+If we want to catch the refcount_sub operate on negetive value(like -1 
+to -2 ), i think b.ls can't achieve that.
+I think (b.eq || b.mi ) may be better than b.ls for this case.
 
-Thanks for patience, As this is a new driver it will be queued for 4.14 
-just before 4.13-rc5 is released.
+Best Regards,
+Li Kun
+>
+> Thanks,
+> Ard.
 
-thanks,
-srini
-> 
-> On 20.06.2017 09:09, Oleksij Rempel wrote:
->> changes v7:
->>  - split imx6ul patch and squash it with with main patches.
->>  - spell fixes in the binding documentation
->>  - return regmap_bulk_read directly.
->>
->> changes v6:
->>  - check if device is writable by reading GPR_SL and GPR_HL bits
->>  - use regmap_bulk_* functions instead of while() { regmap_read/write }
->>  - add patch for imx6ul
->>
->> changes v5:
->>  - use dcfg->offset instead of priv->offset.
->>
->> changes v4:
->>  - change dependencies in Kconfig
->>  - remove unused includes and order them alphabetically
->>  - set MODULE_LICENSE = GPL v2
->>  - remove unused int err variable
->>
->> changes v3:
->>  - remove regmap and offset properties.
->>
->> changes v2:
->>  - correct typos: Registe, parrent...
->>
->> Oleksij Rempel (3):
->>   nvmem: dt: document SNVS LPGPR binding
->>   nvmem: add snvs_lpgpr driver
->>   ARM: dts: imx6qdl.dtsi/imx6ul.dtsi: add "fsl,imx6q-snvs-lpgpr" node
->>
->>  .../devicetree/bindings/nvmem/snvs-lpgpr.txt       |  20 +++
->>  arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +
->>  arch/arm/boot/dts/imx6ul.dtsi                      |   4 +
->>  drivers/nvmem/Kconfig                              |  10 ++
->>  drivers/nvmem/Makefile                             |   2 +
->>  drivers/nvmem/snvs_lpgpr.c                         | 155 
->> +++++++++++++++++++++
->>  6 files changed, 195 insertions(+)
->>  create mode 100644 
->> Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
->>  create mode 100644 drivers/nvmem/snvs_lpgpr.c
->>
+-- 
+Best Regards
+Li Kun
