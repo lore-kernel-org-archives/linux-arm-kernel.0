@@ -1,53 +1,38 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Wed, 26 Jul 2017 19:05:49 +0000
-Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <CAKgT0Udn2vh6NaqZyiF69nXVnz2sT=e0ZgiDjWznhGZz-Gk+qQ@mail.gmail.com>
-References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
- <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
- <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
- <0260e398-bd8e-6615-6d5c-1f7c07b6fc09@huawei.com>
- <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
- <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
- <20170724090516.2e0f0d2a@w520.home>
- <MWHPR12MB1600065968964410EDFBDA3BC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0UeAad6WArvrE71MFJywDs1wOnCF-iJRnbNLrL+knqhXeA@mail.gmail.com>
- <CAKgT0Uf5hdXUXja_jUB6_kBg6pyX8zXuOMOGzCVNgeBFMUsWqQ@mail.gmail.com>,
- <CAKgT0Udn2vh6NaqZyiF69nXVnz2sT=e0ZgiDjWznhGZz-Gk+qQ@mail.gmail.com>
-Message-ID: <MWHPR12MB16007782C422082A92F4765DC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Jul 2017 20:38:20 +0100
+Subject: [PATCH net-next 10/18] net: mvpp2: use the GoP interrupt for
+ link status changes
+In-Reply-To: <20170726162648.GK12049@lunn.ch>
+References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+ <20170724134848.19330-11-antoine.tenart@free-electrons.com>
+ <20170726162648.GK12049@lunn.ch>
+Message-ID: <20170726193820.GR31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-| From: Alexander Duyck <alexander.duyck@gmail.com>
-| Sent: Wednesday, July 26, 2017 11:44 AM
-| 
-| On Jul 26, 2017 11:26 AM, "Casey Leedom" <leedom@chelsio.com> wrote:
-| |
-| | ? ? I think that the patch will need to be extended to modify
-| | ? ? drivers/pci.c/iov.c:sriov_enable() to explicitly turn off
-| | ? ? Relaxed Ordering Enable if the Root Complex is marked
-| ? ? for no RO TLPs.
-| 
-| I'm not sure that would be an issue. Wouldn't most VFs inherit the PF's settings?
+On Wed, Jul 26, 2017 at 06:26:48PM +0200, Andrew Lunn wrote:
+> And this is another bit of code you probably need to change in a while
+> with phylink lands.
 
-Ah yes, you're right.  This is covered in section 3.5.4 of the Single Root I/O
-Virtualization and Sharing Specification, Revision 1.0 (September 11, 2007),
-governing the PCIe Capability Device Control register.  It states that the VF
-version of that register shall follow the setting of the corresponding PF.
+The way the MAC driver handles link up/down and configuration events
+changes significantly when a MAC driver switches to phylink, since
+a directly connected SFP cage needs to have the MAC reconfigured
+between SGMII and 1000base-X modes.  If you add SFP+ into that, also
+10Gbase-KR as well.
 
-So we should enhance the cxgb4vf/sge.c:t4vf_sge_alloc_rxq() in the same
-way we did for the cxgb4 driver, but that's not critical since the Relaxed
-Ordering Enable supersedes the internal chip's desire to use the Relaxed
-Ordering Attribute.
+Note also that the "link up" condition for SFP (and probably SFF) is
+more complex than just "is the module reporting that it's receiving
+a signal" - especially with 1000base-X, there's negotiation to be
+performed, so you also need to know (if the module is connected
+directly to the MAC) whether the Serdes is in sync and has finished
+negotiation (and itself says it has link with the remote end.)
 
-Ding, send me a note if you'd like me to work that up for you.
+With the Marvell 88x3310 PHY, the MAC driver already needs to switch
+between 10Gbase-KR and SGMII modes, as the 88x3310 automatically
+makes that switch on its MAC facing interface without software
+intervention.
 
-| Also I thought most of the VF configuration space is read only.
-
-Yes, but not all of it.  And when a VF is exported to a Virtual Machine,
-then the Hypervisor captures and interprets all accesses to the VF's
-PCIe Configuration Space from the VM.
-
-Thanks again for reminding me of the subtle aspect of the SR_IOV
-specification that I forgot.
-
-Casey
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
