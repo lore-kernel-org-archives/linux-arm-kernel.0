@@ -1,91 +1,70 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 26 Jul 2017 15:55:18 +0200
-Subject: [PATCH RESEND v3 3/3] arm: dts: Add support for ES8323 to the
- Firefly-RK3288
+Date: Wed, 26 Jul 2017 15:55:25 +0200
+Subject: [PATCH RESEND v3 2/3] arm: dts: rockchip: Don't set otp-gpio pinctrl
+ by default in rk3288.dtsi
 In-Reply-To: <20170726135526.475-1-romain.perier@collabora.com>
 References: <20170726135526.475-1-romain.perier@collabora.com>
-Message-ID: <20170726135526.475-4-romain.perier@collabora.com>
+Message-ID: <20170726135526.475-11-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the DT definition of the es8388 i2c device found at
-address 0x10. It also adds the definition for connecting the Rockchip
-I2S to the es8323 analog output.
+The tsadc supports two reset methods: the cru and the otp_gpio. All
+boards except veyron and the evb simply use the cru-method and reuse the
+pin for something else. On the Firefly-RK3288 this is for example the
+case with the headphone. To prevent pinctrl-conflicts with these don't
+set the otp-gpio pinctrl by default but only in the boards using it.
 
 Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
- arch/arm/boot/dts/rk3288-firefly.dtsi | 38 +++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm/boot/dts/rk3288-evb.dtsi    | 4 ++++
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 4 ++++
+ arch/arm/boot/dts/rk3288.dtsi        | 4 ----
+ 3 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 32dabae12e67..24e3fe77bc42 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -116,6 +116,19 @@
- 		};
- 	};
- 
-+	sound-i2s {
-+		compatible = "rockchip,rk3288-hdmi-analog";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&phone_ctl>, <&hp_det>;
-+		rockchip,audio-codec = <&es8323>;
-+		rockchip,hp-det-gpios = <&gpio7 15 GPIO_ACTIVE_HIGH>;
-+		rockchip,hp-en-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
-+		rockchip,i2s-controller = <&i2s>;
-+		rockchip,model = "I2S";
-+		rockchip,routing = "Analog", "LOUT2",
-+				   "Analog", "ROUT2";
-+	};
-+
- 	vbat_wl: vcc_sys: vsys-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc_sys";
-@@ -389,6 +402,17 @@
- 
- &i2c2 {
- 	status = "okay";
-+
-+	es8323: es8323 at 10 {
-+		compatible = "everest,es8323", "everest,es8328";
-+		reg = <0x10>;
-+		AVDD-supply = <&vcca_33>;
-+		DVDD-supply = <&vcca_33>;
-+		HPVDD-supply = <&vcca_33>;
-+		PVDD-supply = <&vcca_33>;
-+		clocks = <&cru SCLK_I2S0_OUT>;
-+		clock-names = "i2s_clk_out";
-+	};
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index 0dec94c3583b..28a69334b2d1 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -290,6 +290,10 @@
  };
  
- &i2c4 {
-@@ -399,6 +423,10 @@
+ &tsadc {
++	pinctrl-names = "init", "default", "sleep";
++	pinctrl-0 = <&otp_gpio>;
++	pinctrl-1 = <&otp_out>;
++	pinctrl-2 = <&otp_gpio>;
+ 	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
+ 	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
  	status = "okay";
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index d709fa1847f9..697c9a78cb7e 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -398,6 +398,10 @@
+ &tsadc {
+ 	status = "okay";
+ 
++	pinctrl-names = "init", "default", "sleep";
++	pinctrl-0 = <&otp_gpio>;
++	pinctrl-1 = <&otp_out>;
++	pinctrl-2 = <&otp_gpio>;
+ 	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
+ 	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
  };
- 
-+&i2s {
-+	status = "okay";
-+};
-+
- &io_domains {
- 	status = "okay";
- 
-@@ -501,6 +529,16 @@
- 		};
- 	};
- 
-+	headphone {
-+		hp_det: hp-det {
-+			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		phone_ctl: phone-ctl {
-+			rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
- 	usb_host {
- 		host_vbus_drv: host-vbus-drv {
- 			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 2484f11761ea..3a752c0cbc73 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -541,10 +541,6 @@
+ 		clock-names = "tsadc", "apb_pclk";
+ 		resets = <&cru SRST_TSADC>;
+ 		reset-names = "tsadc-apb";
+-		pinctrl-names = "init", "default", "sleep";
+-		pinctrl-0 = <&otp_gpio>;
+-		pinctrl-1 = <&otp_out>;
+-		pinctrl-2 = <&otp_gpio>;
+ 		#thermal-sensor-cells = <1>;
+ 		rockchip,hw-tshut-temp = <95000>;
+ 		status = "disabled";
 -- 
 2.11.0
