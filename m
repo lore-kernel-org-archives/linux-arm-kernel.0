@@ -1,93 +1,196 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 26 Jul 2017 12:15:24 +0530
-Subject: [PATCH v3 2/2] ARM: dts: keystone-k2g-evm: Add gpio nodes
-In-Reply-To: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
-References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1501051524-5990-2-git-send-email-j-keerthy@ti.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Wed, 26 Jul 2017 14:19:12 +0800
+Subject: [PATCH v6 2/7] drm/rockchip: vop: move write_relaxed flags to vop
+ register
+In-Reply-To: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
+References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1501049953-5946-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-66AK2G has 2 instances of gpio. The first one has all the 144 GPIOs
-functional( 9 banks with 16 gpios = 144). The second instance has
-only the GPIO0:GPIO67 functional and rest are marked reserved.
+Since the drm atomic framework, only a small part of the vop
+register needs sync write, Currently seems only following registers
+need sync write:
+   cfg_done, standby and interrupt related register.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
+All ctrl registers are using the sync write method that is
+inefficient, hardcode the write_relaxed flags to vop registers,
+then can only do synchronize write for those actual needed register.
+
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
+Changes in v6:
+- fix compile error
 
-The patch depends on the below series:
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 28 ++++++++-----------
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  1 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 42 ++++++++++++++++-------------
+ 3 files changed, 36 insertions(+), 35 deletions(-)
 
-http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
-http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2
-
-Driver patches related are already posted:
-
-https://www.spinics.net/lists/arm-kernel/msg594862.html
-
-Changes in v2:
-
-  * Split the documentation part into a separate patch.
-
- arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index bf4d1fa..f9ff299 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -15,6 +15,7 @@
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 81164d6..a792ea3 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -42,33 +42,27 @@
+ #include "rockchip_drm_psr.h"
+ #include "rockchip_drm_vop.h"
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/keystone.h>
-+#include <dt-bindings/gpio/gpio.h>
+-#define __REG_SET_RELAXED(x, off, mask, shift, v, write_mask) \
+-		vop_mask_write(x, off, mask, shift, v, write_mask, true)
+-
+-#define __REG_SET_NORMAL(x, off, mask, shift, v, write_mask) \
+-		vop_mask_write(x, off, mask, shift, v, write_mask, false)
+-
+-#define REG_SET(x, base, reg, v, mode) \
+-		__REG_SET_##mode(x, base + reg.offset, \
+-				 reg.mask, reg.shift, v, reg.write_mask)
+-#define REG_SET_MASK(x, base, reg, mask, v, mode) \
+-		__REG_SET_##mode(x, base + reg.offset, \
+-				 mask, reg.shift, v, reg.write_mask)
++#define REG_SET(x, base, reg, v) \
++		vop_mask_write(x, base + reg.offset, reg.mask, reg.shift, \
++			       v, reg.write_mask, reg.relaxed)
++#define REG_SET_MASK(x, base, reg, mask, v) \
++		vop_mask_write(x, base + reg.offset, \
++			       mask, reg.shift, v, reg.write_mask, reg.relaxed)
  
- / {
- 	compatible = "ti,k2g","ti,keystone";
-@@ -168,5 +169,46 @@
- 				#reset-cells = <2>;
- 			};
- 		};
-+
-+		gpio0: gpio at 2603000 {
-+			compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
-+			reg = <0x02603000 0x100>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+
-+			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			ti,ngpio = <144>;
-+			ti,davinci-gpio-unbanked = <0>;
-+			clocks = <&k2g_clks 0x001b 0x0>;
-+			clock-names = "gpio";
-+		};
-+
-+		gpio1: gpio at 260a000 {
-+			compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
-+			reg = <0x0260a000 0x100>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			ti,ngpio = <68>;
-+			ti,davinci-gpio-unbanked = <0>;
-+			clocks = <&k2g_clks 0x001c 0x0>;
-+			clock-names = "gpio";
-+		};
- 	};
+ #define VOP_WIN_SET(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->name, v, RELAXED)
++		REG_SET(x, win->base, win->phy->name, v)
+ #define VOP_SCL_SET(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->scl->name, v, RELAXED)
++		REG_SET(x, win->base, win->phy->scl->name, v)
+ #define VOP_SCL_SET_EXT(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->scl->ext->name, v, RELAXED)
++		REG_SET(x, win->base, win->phy->scl->ext->name, v)
+ #define VOP_CTRL_SET(x, name, v) \
+-		REG_SET(x, 0, (x)->data->ctrl->name, v, NORMAL)
++		REG_SET(x, 0, (x)->data->ctrl->name, v)
+ 
+ #define VOP_INTR_GET(vop, name) \
+ 		vop_read_reg(vop, 0, &vop->data->ctrl->name)
+ 
+ #define VOP_INTR_SET(vop, name, mask, v) \
+-		REG_SET_MASK(vop, 0, vop->data->intr->name, mask, v, NORMAL)
++		REG_SET_MASK(vop, 0, vop->data->intr->name, mask, v)
+ #define VOP_INTR_SET_TYPE(vop, name, type, v) \
+ 	do { \
+ 		int i, reg = 0, mask = 0; \
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+index 084d3b2..056b974 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+@@ -29,6 +29,7 @@ struct vop_reg {
+ 	uint32_t shift;
+ 	uint32_t mask;
+ 	bool write_mask;
++	bool relaxed;
  };
+ 
+ struct vop_ctrl {
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index 58da855..d7974da 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -20,17 +20,23 @@
+ #include "rockchip_drm_vop.h"
+ #include "rockchip_vop_reg.h"
+ 
+-#define VOP_REG(off, _mask, s) \
+-		{.offset = off, \
++#define _VOP_REG(off, _mask, _shift, _write_mask, _relaxed) \
++		{ \
++		 .offset = off, \
+ 		 .mask = _mask, \
+-		 .shift = s, \
+-		 .write_mask = false,}
++		 .shift = _shift, \
++		 .write_mask = _write_mask, \
++		 .relaxed = _relaxed, \
++		}
+ 
+-#define VOP_REG_MASK(off, _mask, s) \
+-		{.offset = off, \
+-		 .mask = _mask, \
+-		 .shift = s, \
+-		 .write_mask = true,}
++#define VOP_REG(off, _mask, _shift) \
++		_VOP_REG(off, _mask, _shift, false, true)
++
++#define VOP_REG_SYNC(off, _mask, _shift) \
++		_VOP_REG(off, _mask, _shift, false, false)
++
++#define VOP_REG_MASK_SYNC(off, _mask, _shift) \
++		_VOP_REG(off, _mask, _shift, true, false)
+ 
+ static const uint32_t formats_win_full[] = {
+ 	DRM_FORMAT_XRGB8888,
+@@ -116,7 +122,7 @@
+ };
+ 
+ static const struct vop_ctrl rk3036_ctrl_data = {
+-	.standby = VOP_REG(RK3036_SYS_CTRL, 0x1, 30),
++	.standby = VOP_REG_SYNC(RK3036_SYS_CTRL, 0x1, 30),
+ 	.out_mode = VOP_REG(RK3036_DSP_CTRL0, 0xf, 0),
+ 	.pin_pol = VOP_REG(RK3036_DSP_CTRL0, 0xf, 4),
+ 	.dsp_blank = VOP_REG(RK3036_DSP_CTRL1, 0x1, 24),
+@@ -125,7 +131,7 @@
+ 	.vtotal_pw = VOP_REG(RK3036_DSP_VTOTAL_VS_END, 0x1fff1fff, 0),
+ 	.vact_st_end = VOP_REG(RK3036_DSP_VACT_ST_END, 0x1fff1fff, 0),
+ 	.line_flag_num[0] = VOP_REG(RK3036_INT_STATUS, 0xfff, 12),
+-	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
++	.cfg_done = VOP_REG_SYNC(RK3036_REG_CFG_DONE, 0x1, 0),
+ };
+ 
+ static const struct vop_data rk3036_vop = {
+@@ -201,7 +207,7 @@
+ };
+ 
+ static const struct vop_ctrl rk3288_ctrl_data = {
+-	.standby = VOP_REG(RK3288_SYS_CTRL, 0x1, 22),
++	.standby = VOP_REG_SYNC(RK3288_SYS_CTRL, 0x1, 22),
+ 	.gate_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 23),
+ 	.mmu_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 20),
+ 	.rgb_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 12),
+@@ -222,7 +228,7 @@
+ 	.vpost_st_end = VOP_REG(RK3288_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
+ 	.line_flag_num[0] = VOP_REG(RK3288_INTR_CTRL0, 0x1fff, 12),
+ 	.global_regdone_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 11),
+-	.cfg_done = VOP_REG(RK3288_REG_CFG_DONE, 0x1, 0),
++	.cfg_done = VOP_REG_SYNC(RK3288_REG_CFG_DONE, 0x1, 0),
+ };
+ 
+ /*
+@@ -266,7 +272,7 @@
+ };
+ 
+ static const struct vop_ctrl rk3399_ctrl_data = {
+-	.standby = VOP_REG(RK3399_SYS_CTRL, 0x1, 22),
++	.standby = VOP_REG_SYNC(RK3399_SYS_CTRL, 0x1, 22),
+ 	.gate_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 23),
+ 	.dp_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 11),
+ 	.rgb_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 12),
+@@ -290,7 +296,7 @@
+ 	.vpost_st_end = VOP_REG(RK3399_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
+ 	.line_flag_num[0] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 0),
+ 	.line_flag_num[1] = VOP_REG(RK3399_LINE_FLAG, 0xffff, 16),
+-	.cfg_done = VOP_REG_MASK(RK3399_REG_CFG_DONE, 0x1, 0),
++	.cfg_done = VOP_REG_MASK_SYNC(RK3399_REG_CFG_DONE, 0x1, 0),
+ };
+ 
+ static const int rk3399_vop_intrs[] = {
+@@ -306,9 +312,9 @@
+ static const struct vop_intr rk3399_vop_intr = {
+ 	.intrs = rk3399_vop_intrs,
+ 	.nintrs = ARRAY_SIZE(rk3399_vop_intrs),
+-	.status = VOP_REG_MASK(RK3399_INTR_STATUS0, 0xffff, 0),
+-	.enable = VOP_REG_MASK(RK3399_INTR_EN0, 0xffff, 0),
+-	.clear = VOP_REG_MASK(RK3399_INTR_CLEAR0, 0xffff, 0),
++	.status = VOP_REG_MASK_SYNC(RK3399_INTR_STATUS0, 0xffff, 0),
++	.enable = VOP_REG_MASK_SYNC(RK3399_INTR_EN0, 0xffff, 0),
++	.clear = VOP_REG_MASK_SYNC(RK3399_INTR_CLEAR0, 0xffff, 0),
+ };
+ 
+ static const struct vop_data rk3399_vop_big = {
 -- 
 1.9.1
