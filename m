@@ -1,123 +1,146 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 26 Jul 2017 18:59:58 +0530
-Subject: [PATCH v3 2/2] ARM: dts: keystone-k2g-evm: Add gpio nodes
-In-Reply-To: <1fb21a17-c38e-539f-7cd3-b72bd819a531@ti.com>
+Date: Wed, 26 Jul 2017 19:03:46 +0530
+Subject: [PATCH v3 1/2] gpio: davinci: Add keystone-k2g compatible
+In-Reply-To: <5aa0d273-8e05-a5ff-7931-b9a94acade36@ti.com>
 References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
- <1501051524-5990-2-git-send-email-j-keerthy@ti.com>
- <1fb21a17-c38e-539f-7cd3-b72bd819a531@ti.com>
-Message-ID: <ecb45045-057a-98c1-9c22-bc6c0df6f5bd@ti.com>
+ <5aa0d273-8e05-a5ff-7931-b9a94acade36@ti.com>
+Message-ID: <2fb85c37-7273-42dc-0681-50dc5399caba@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Wednesday 26 July 2017 06:33 PM, Suman Anna wrote:
+On Wednesday 26 July 2017 06:30 PM, Suman Anna wrote:
 > Hi Keerthy,
 > 
 > On 07/26/2017 01:45 AM, Keerthy wrote:
->> 66AK2G has 2 instances of gpio. The first one has all the 144 GPIOs
->> functional( 9 banks with 16 gpios = 144). The second instance has
+>> The patch adds keystone-k2g compatible, specific properties and
+>> an example.
 > 
-> nit, space before ( and not after.
+> Please update patch header to "dt-bindings: gpio: davinci: ...."
 
-Sure.
-
-> 
->> only the GPIO0:GPIO67 functional and rest are marked reserved.
-> 
-> s/keystone-k2g-evm/keystone-k2g/ on the patch header please, otherwise
-> this patch looks good.
-
-Okay.
+Okay
 
 > 
 >>
 >> Signed-off-by: Keerthy <j-keerthy@ti.com>
 >> ---
 >>
->> The patch depends on the below series:
+>> Changes in v3:
 >>
->> http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
->> http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2
+>>   * Added details about family of SoCs corresponding to compatibles.
+>>
+>>  .../devicetree/bindings/gpio/gpio-davinci.txt      | 40 +++++++++++++++++++++-
+>>  1 file changed, 39 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> index 5079ba7..fb9efee 100644
+>> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> @@ -1,7 +1,10 @@
+>>  Davinci/Keystone GPIO controller bindings
+>>  
+>>  Required Properties:
+>> -- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+>> +- compatible: should be "ti,dm6441-gpio": for Davinci da850 SoCs 
+>> +			"ti,keystone-gpio": for Keystone 2 66AK2H/K, 66AK2L,
+>> +						66AK2E SoCs
+>> +			"ti,keystone-k2g-gpio", "ti,keystone-gpio": for 66AK2G
+>>  
+>>  - reg: Physical base address of the controller and the size of memory mapped
+>>         registers.
+>> @@ -26,6 +29,17 @@ The GPIO controller also acts as an interrupt controller. It uses the default
+>>  two cells specifier as described in Documentation/devicetree/bindings/
+>>  interrupt-controller/interrupts.txt.
+>>  
+>> +Required Properties specific to keystone-k2g
 > 
-> FYI, these are already picked up my Santosh and are part of linux-next.
+> Thanks for updating the binding for the clocks, but clocks are not
+> specific to K2G. They also apply to other K2 SoCs. Davinci platforms do
+> not have DT clocks atm, so the Davinci portion can be updated later if
+> and when they get added.
 
-Yes saw that now. I will send v4.
+Yes. I can add that information.
 
+> 
+>> +
+>> +- clocks: Should contain devices input clock. The first parameter
+>> +           is a handle to k2g_clks. The second parameter is the
+>> +           device ID and the third parameter is the clock ID. One can
+>> +           refer: http://processors.wiki.ti.com/index.php/TISCI#66AK2G02_Data
+> 
+> No need for this link here, just refer to the appropriate clock
+> bindings. Some thing like the following would be better
+> 
+> - clocks:               Should contain the device's input clock, and
+>                         should be defined as per the appropriate clock
+> bindings consumer usage in,
+> 
+> Documentation/devicetree/bindings/clock/keystone-gate.txt
+>                             for 66AK2HK/66AK2L/66AK2E SoCs or,
+> 
+> Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>                             for 66AK2G SoCs
+
+Okay
+
+> 
+>> +
+>> +           Example: <&k2g_clks 0x001c 0x0>;
+> 
+> This can be dropped as well, below example already demonstrates it.
+
+Okay
+
+> 
+>> +
+>> +- clock-names: The driver expects the clock name to be "gpio";
+> 
+> Just say, Should be "gpio". No need of mentioning about the driver.
+
+Okay
+
+> 
+>> +
+>>  Example:
+>>  
+>>  gpio: gpio at 1e26000 {
+>> @@ -60,3 +74,27 @@ leds {
+>>  		...
+>>  	};
+>>  };
+>> +
+>> +Example for keystone-k2g:
+> 
+> s/keystone-k2g/66AK2G/
+
+oops missed out here. I will correct this.
+
+> 
+>> +
+>> +gpio0: gpio at 2603000 {
+>> +	compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
+>> +	reg = <0x02603000 0x100>;
+>> +	gpio-controller;
+>> +	#gpio-cells = <2>;
+>> +	interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
+>> +	interrupt-controller;
+>> +	#interrupt-cells = <2>;
+>> +	ti,ngpio = <144>;
+>> +	ti,davinci-gpio-unbanked = <0>;
+>> +	clocks = <&k2g_clks 0x001b 0x0>;
+>> +	clock-names = "gpio";
+>> +};
+>>
 > 
 > regards
 > Suman
-> 
->>
->> Driver patches related are already posted:
->>
->> https://www.spinics.net/lists/arm-kernel/msg594862.html
->>
->> Changes in v2:
->>
->>   * Split the documentation part into a separate patch.
->>
->>  arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
->>  1 file changed, 42 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
->> index bf4d1fa..f9ff299 100644
->> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
->> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
->> @@ -15,6 +15,7 @@
->>  
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->>  #include <dt-bindings/pinctrl/keystone.h>
->> +#include <dt-bindings/gpio/gpio.h>
->>  
->>  / {
->>  	compatible = "ti,k2g","ti,keystone";
->> @@ -168,5 +169,46 @@
->>  				#reset-cells = <2>;
->>  			};
->>  		};
->> +
->> +		gpio0: gpio at 2603000 {
->> +			compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
->> +			reg = <0x02603000 0x100>;
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +
->> +			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <2>;
->> +			ti,ngpio = <144>;
->> +			ti,davinci-gpio-unbanked = <0>;
->> +			clocks = <&k2g_clks 0x001b 0x0>;
->> +			clock-names = "gpio";
->> +		};
->> +
->> +		gpio1: gpio at 260a000 {
->> +			compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
->> +			reg = <0x0260a000 0x100>;
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
->> +					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <2>;
->> +			ti,ngpio = <68>;
->> +			ti,davinci-gpio-unbanked = <0>;
->> +			clocks = <&k2g_clks 0x001c 0x0>;
->> +			clock-names = "gpio";
->> +		};
->>  	};
->>  };
->>
 > 
