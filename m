@@ -1,80 +1,59 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 26 Jul 2017 13:23:15 +0200
-Subject: [BUG] v4.12 breaks pxa25x
-In-Reply-To: <87eftfrs0e.fsf@belgarion.home> (Robert Jarzmik's message of
- "Mon, 17 Jul 2017 17:40:33 +0200")
-References: <87inirsgzk.fsf@belgarion.home>
- <20170717081518.GI31807@n2100.armlinux.org.uk>
- <87eftfrs0e.fsf@belgarion.home>
-Message-ID: <87o9s7qw64.fsf@belgarion.home>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 26 Jul 2017 12:37:28 +0100
+Subject: [PATCH] ASoC: fix balance of of_node_get()/of_node_put()
+In-Reply-To: <20170725214952.6491-1-borneo.antonio@gmail.com>
+References: <20170725214952.6491-1-borneo.antonio@gmail.com>
+Message-ID: <20170726113728.fpj3kboxib5tnmzv@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On Tue, Jul 25, 2017 at 11:49:52PM +0200, Antonio Borneo wrote:
 
-> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
->
->> On Mon, Jul 17, 2017 at 08:41:03AM +0200, Robert Jarzmik wrote:
->>
->>> [    0.000000] Unhandled fault: alignment exception (0x003) at 0xc06f82cd
->>> [    0.000000] pgd = c0004000
->>> [    0.000000] [c06f82cd] *pgd=a060040e(bad)
->>> [    0.000000] Internal error: : 3 [#1] ARM
->>> [    0.000000] Modules linked in:
->>> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.12.0-11927-g6bf3d68 #4582
->>> [    0.000000] Hardware name: Intel DBPXA250 Development Platform (aka Lubbock)
->>> [    0.000000] task: c06f6fd8 task.stack: c06f2000
->>> [    0.000000] PC is at __flush_whole_cache+0x4/0x60
->>> [    0.000000] LR is at paging_init+0x4b4/0x590
->>> [    0.000000] pc : [<c0019e24>]    lr : [<c049d274>]    psr: 600000d3
->>> [    0.000000] sp : c06f3f38  ip : 00000000  fp : c0700000
->>> [    0.000000] r10: a4000000  r9 : c06f82c0  r8 : c0723540
->>> [    0.000000] r7 : fe100000  r6 : fe200000  r5 : c06f82a0  r4 : c0705ef4
->>> [    0.000000] r3 : 00000000  r2 : 00000004  r1 : c06f82cd  r0 : c06f82c0
->>
->> Looks like the .data section has become misaligned somehow.  r1 is the
->> address of "clean_addr" which is clearly not 32-bit aligned.
->>
->> Please can you check in System.map to see what's immediately before it?
-> Sure, it like this :
-> c06f22c8 D user_pmd_table
-> c06f22cc d __warned.19178
-> c06f22cd d clean_addr
->
-> And I have no idea how to link that __warned.19178 with the WARN_xxx() statement ...
->
-> This bisection I made points me to :
-> # first bad commit: [799c43415442414b1032580c47684cb709dfed6d] kbuild: thin archives make default for all archs
->
-> Reverting this commit makes my kernel boot again.
+> Fixed by:
+> - removing of_node_put() in the body of of_for_each_phandle(){},
+>   since already provided at each iteration. Add it in case the
+>   loop is break out;
+> - adding of_node_get() before calling of_graph_get_port_parent()
+>   or asoc_graph_card_dai_link_of().
 
-Hi Russell,
+>  sound/soc/generic/audio-graph-card.c  | 14 +++++++++-----
+>  sound/soc/generic/simple-card-utils.c |  5 +++++
+>  sound/soc/soc-core.c                  |  5 +++++
+>  3 files changed, 19 insertions(+), 5 deletions(-)
 
-I think I know where this is comming from.
-  - in file: ~/mio_linux/kernel/include/asm-generic/vmlinux.lds.h:206
-  - the definition of DATA_DATA looks like :
-    (*.data .data.[0-9a-zA-Z_]*)
-    ...
-    *(.data.unlikely)
-    ...
+This is a series of different changes to fix different (although
+related) problems which should be being submitted individually.  Sending
+multiple changes in one patch makes it harder to review things and for
+fixes like this makes it harder to backport the fixes where not all the
+code being fixed was introduced in a single kernel version.
 
-This doesn't look good to me, as .data.unlikely fullfills the first wildcard,
-and the linker is allowed to mix .data and .data.unlikely symbols to its
-pleasure, while .data.unlikely symbols (at least in my case) are not 4 bytes
-multiples.
+>  	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
+> +		/*
+> +		 * asoc_graph_card_dai_link_of() will call
+> +		 * of_node_put(). So, call of_node_get() here
+> +		 */
+> +		of_node_get(it.node);
+>  		ret = asoc_graph_card_dai_link_of(it.node, priv, idx++);
 
-I'm clearly not a ld specialist, as I would have put a *(.data.unlikely) first
-in DATA_DATA, an align statement, then continued with the current wildcards, but
-that might not be the right approach.
+Why is this the most sensible fix?  It is really not at all obvious why
+asoc_graph_card_dai_link_of() would drop a reference, or in what
+situations callers might have a reference they're OK with dropping.
 
-If you suggest something else, I'll send a patch for it. If not, I'll send a
-patch for my idea. And lastly, if it doesn't fit you, I'll have to modify the
-PXA kconfig to toggle the default flag which triggers the error.
+> +	/*
+> +	 * of_graph_get_port_parent() will call
+> +	 * of_node_put(). So, call of_node_get() here
+> +	 */
+> +	of_node_get(ep);
+>  	node = of_graph_get_port_parent(ep);
 
-Cheers.
-
--- 
-Robert
-
-PS: In the meantime, I'll corner down which exact instruction and code is
-creating the .data.unlikely 1 byte data.
+Same here, why does this make sense?  It is not in the least bit obvious
+to me why looking up the parent of a node would cause us to drop the
+reference to the current node, this seems like an error prone and
+confusing API which would be better fixed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/8cd234f7/attachment.sig>
