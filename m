@@ -1,78 +1,60 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Jul 2017 19:18:25 +0100
-Subject: [PATCHv2 2/7] arm64: consistently use bl for C exception entry
-In-Reply-To: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
-References: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1501093110-3844-3-git-send-email-mark.rutland@arm.com>
+Date: Wed, 26 Jul 2017 19:18:23 +0100
+Subject: [PATCHv2 0/7] arm64: unwind: fix broken exception stack dump
+Message-ID: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In most cases, our exception entry assembly branches to C handlers with
-a BL instruction, but in cases where we do not expect to return, we use
-B instead.
+These patches correct our exception stack dumping code to correctly identify
+frames associated with exceptions, for which there is a corresponding pt_regs.
 
-While this is correct today, it means that backtraces for fatal
-exceptions miss the entry assembly (as the LR is stale at the point we
-call C code), while non-fatal exceptions have the entry assembly in the
-LR. In subsequent patches, we will need the LR to be set in these cases
-in order to backtrace reliably.
+Ard and I ran into these issues while working on vmap'd stacks, and these
+patches will be a pre-requisite for overflow handling to function correctly.
 
-This patch updates these sites to use a BL, ensuring consistency, and
-preparing for backtrace rework. An ASM_BUG() is added after each of
-these new BLs, which both catches unexpected returns, and ensures that
-the LR value doesn't point to another function label.
+This is a follow up to Ard's v1 [1]. I've pushed this out to my
+arm64/exception-stack branch [2].
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/entry.S | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+Since v1:
+* Identify exception frames based on .entry.text
+* Add ASM_BUG()
+* Use BL to ensure all exception frames can be identified
+* Minor fixups
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index b738880..660612a 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -351,7 +351,8 @@ END(vectors)
- 	mov	x0, sp
- 	mov	x1, #\reason
- 	mrs	x2, esr_el1
--	b	bad_mode
-+	bl	bad_mode
-+	ASM_BUG()
- 	.endm
- 
- el0_sync_invalid:
-@@ -448,14 +449,16 @@ el1_sp_pc:
- 	mrs	x0, far_el1
- 	enable_dbg
- 	mov	x2, sp
--	b	do_sp_pc_abort
-+	bl	do_sp_pc_abort
-+	ASM_BUG()
- el1_undef:
- 	/*
- 	 * Undefined instruction
- 	 */
- 	enable_dbg
- 	mov	x0, sp
--	b	do_undefinstr
-+	bl	do_undefinstr
-+	ASM_BUG()
- el1_dbg:
- 	/*
- 	 * Debug exception handling
-@@ -473,7 +476,8 @@ el1_inv:
- 	mov	x0, sp
- 	mov	x2, x1
- 	mov	x1, #BAD_SYNC
--	b	bad_mode
-+	bl	bad_mode
-+	ASM_BUG()
- ENDPROC(el1_sync)
- 
- 	.align	6
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520705.html
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/exception-stack
+
+Ard Biesheuvel (3):
+  arm64: unwind: disregard frame.sp when validating frame pointer
+  arm64: unwind: reference pt_regs via embedded stack frame
+  arm64: unwind: remove sp from struct stackframe
+
+Mark Rutland (4):
+  arm64: Add ASM_BUG()
+  arm64: consistently use bl for C exception entry
+  arm64: move non-entry code out of .entry.text
+  arm64: unwind: avoid percpu indirection for irq stack
+
+ arch/arm64/include/asm/asm-bug.h    |  54 +++++++++++++++++
+ arch/arm64/include/asm/assembler.h  |  11 ++++
+ arch/arm64/include/asm/bug.h        |  35 +----------
+ arch/arm64/include/asm/irq.h        |  39 ++++--------
+ arch/arm64/include/asm/ptrace.h     |   1 +
+ arch/arm64/include/asm/stacktrace.h |   1 -
+ arch/arm64/include/asm/traps.h      |   5 ++
+ arch/arm64/kernel/asm-offsets.c     |   1 +
+ arch/arm64/kernel/entry.S           | 118 +++++++++++++++++++-----------------
+ arch/arm64/kernel/perf_callchain.c  |   1 -
+ arch/arm64/kernel/process.c         |   5 +-
+ arch/arm64/kernel/ptrace.c          |   2 +-
+ arch/arm64/kernel/return_address.c  |   1 -
+ arch/arm64/kernel/stacktrace.c      |  54 ++---------------
+ arch/arm64/kernel/time.c            |   1 -
+ arch/arm64/kernel/traps.c           |  34 +++--------
+ 16 files changed, 162 insertions(+), 201 deletions(-)
+ create mode 100644 arch/arm64/include/asm/asm-bug.h
+
 -- 
 1.9.1
