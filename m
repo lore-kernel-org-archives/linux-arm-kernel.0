@@ -1,75 +1,81 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 26 Jul 2017 15:16:49 +0100
-Subject: Applied "ASoC: sun4i-spdif: Handle return value of
- clk_prepare_enable." to the asoc tree
-In-Reply-To: <1500977718-28010-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <E1daN7J-0003SG-Kd@debutante>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Wed, 26 Jul 2017 07:20:22 -0700
+Subject: [PATCH 1/3] arm/syscalls: Move address limit check in loop
+In-Reply-To: <20170726120208.GB2115@arm.com>
+References: <20170719175900.124074-1-thgarnie@google.com>
+ <CAJcbSZFw9GhVvNfYi1oHhpintHSzGcHvGjg5LtRViNBPDzLHaA@mail.gmail.com>
+ <1500978481.30745.10.camel@nxp.com>
+ <20170725103828.GJ31807@n2100.armlinux.org.uk>
+ <CAJcbSZF1ddWuQ-c2Xyr1Nvrjzg2TZZNHPfSo7R6Vqg2mnhiPOg@mail.gmail.com>
+ <20170726120208.GB2115@arm.com>
+Message-ID: <CAJcbSZG6qsaVGY7Weh6n+xs5XaDg+=h8SDUYJfMUTWbdYOd7rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Wed, Jul 26, 2017 at 5:02 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 25, 2017 at 01:01:17PM -0700, Thomas Garnier wrote:
+>> On Tue, Jul 25, 2017 at 3:38 AM, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>> > On Tue, Jul 25, 2017 at 01:28:01PM +0300, Leonard Crestez wrote:
+>> >> On Mon, 2017-07-24 at 10:07 -0700, Thomas Garnier wrote:
+>> >> > On Wed, Jul 19, 2017 at 10:58 AM, Thomas Garnier <thgarnie@google.com
+>> >> > > wrote:
+>> >> > >
+>> >> > > The work pending loop can call set_fs after addr_limit_user_check
+>> >> > > removed the _TIF_FSCHECK flag. To prevent the infinite loop, move
+>> >> > > the addr_limit_user_check call at the beginning of the loop.
+>> >> > >
+>> >> > > Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-
+>> >> > > mode return")
+>> >> > > Reported-by: Leonard Crestez <leonard.crestez@nxp.com>
+>> >> > > Signed-off-by: Thomas Garnier <thgarnie@google.com>
+>> >>
+>> >> > Any comments on this patch set?
+>> >>
+>> >> Tested-by: Leonard Crestez <leonard.crestez@nxp.com>
+>> >>
+>> >> This appears to fix the original issue of failing to boot from NFS when
+>> >> there are lots of alignment faults. But this is a very basic test
+>> >> relative to the reach of this change.
+>> >>
+>> >> However the original patch has been in linux-next for a while and
+>> >> apparently nobody else noticed system calls randomly hanging on arm.
+>> >>
+>> >> I assume maintainers need to give their opinion.
+>> >
+>> > I've already stated my opinion, which is different from what Linus has
+>> > requested of Thomas.  IMHO, the current approach is going to keep on
+>> > causing problems along the lines that I've already pointed out.
+>>
+>> I understand. Do you think this problem apply to arm64 as well?
+>
+> It's probably less of an issue for arm64 because we don't take alignment
+> faults from the kernel and I think the perf case would resolve itself by
+> throttling the event. However, I also don't see the advantage of doing
+> this in the work loop as opposed to leaving it until we're actually doing
+> the return to userspace.
 
-   ASoC: sun4i-spdif: Handle return value of clk_prepare_enable.
+I think the idea is doing the check as early as possible to catch any
+error before any additional logic.
 
-has been applied to the asoc tree at
+>
+> I looked to see what you've done for x86, but it looks like you check/clear
+> the flag before the work pending loop (exit_to_usermode_loop), which
+> subsequently re-enables interrupts and exits when
+> EXIT_TO_USERMODE_LOOP_FLAGS are all clear. Since TIF_FSCHECK isn't included
+> in those flags, what stops it being set again by an irq and remaining set
+> for the return to userspace?
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Nothing, I plan to improve the x86 logic later. I focused on ARM/ARM64
+right now based on Leonard report.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+For the next iteration, I plan on having an updated version of the
+previous implementation for ARM. I will send it soon.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+>
+> Will
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
 
-Thanks,
-Mark
-
->From 3643e9172649f97f2e6301582890202abcc0f97e Mon Sep 17 00:00:00 2001
-From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Tue, 25 Jul 2017 15:45:18 +0530
-Subject: [PATCH] ASoC: sun4i-spdif: Handle return value of clk_prepare_enable.
-
-clk_prepare_enable() can fail here and we must check its return value.
-
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/sunxi/sun4i-spdif.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
-index c49f3757b686..b4af4aabead1 100644
---- a/sound/soc/sunxi/sun4i-spdif.c
-+++ b/sound/soc/sunxi/sun4i-spdif.c
-@@ -458,11 +458,16 @@ static int sun4i_spdif_runtime_suspend(struct device *dev)
- static int sun4i_spdif_runtime_resume(struct device *dev)
- {
- 	struct sun4i_spdif_dev *host  = dev_get_drvdata(dev);
-+	int ret;
- 
--	clk_prepare_enable(host->spdif_clk);
--	clk_prepare_enable(host->apb_clk);
-+	ret = clk_prepare_enable(host->spdif_clk);
-+	if (ret)
-+		return ret;
-+	ret = clk_prepare_enable(host->apb_clk);
-+	if (ret)
-+		clk_disable_unprepare(host->spdif_clk);
- 
--	return 0;
-+	return ret;
- }
- 
- static int sun4i_spdif_probe(struct platform_device *pdev)
 -- 
-2.13.2
+Thomas
