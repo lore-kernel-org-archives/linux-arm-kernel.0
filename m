@@ -1,38 +1,53 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Jul 2017 20:38:20 +0100
-Subject: [PATCH net-next 10/18] net: mvpp2: use the GoP interrupt for
- link status changes
-In-Reply-To: <20170726162648.GK12049@lunn.ch>
-References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
- <20170724134848.19330-11-antoine.tenart@free-electrons.com>
- <20170726162648.GK12049@lunn.ch>
-Message-ID: <20170726193820.GR31807@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 26 Jul 2017 21:45:22 +0200
+Subject: [PATCH v3 00/10] ARM: sun8i: a83t: Add support for MMC controllers
+In-Reply-To: <CAGb2v66DQ3H2Mta7h+t1P+UzSRLnMABRebeYcopaPkN0gOiwxA@mail.gmail.com>
+References: <20170724135905.28855-1-wens@csie.org>
+ <CAGb2v66DQ3H2Mta7h+t1P+UzSRLnMABRebeYcopaPkN0gOiwxA@mail.gmail.com>
+Message-ID: <20170726194522.7d64f7c2danrknfi@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 06:26:48PM +0200, Andrew Lunn wrote:
-> And this is another bit of code you probably need to change in a while
-> with phylink lands.
+On Wed, Jul 26, 2017 at 10:09:41PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Jul 24, 2017 at 9:58 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> > Hi everyone,
+> >
+> > This is v3 of my MMC controller support series.
+> >
+> 
+> [...]
+> 
+> > Chen-Yu Tsai (10):
+> >   clk: sunxi-ng: Add interface to query or configure MMC timing modes.
+> >   clk: sunxi-ng: Add MP_MMC clocks that support MMC timing modes
+> >     switching
+> >   clk: sunxi-ng: a83t: Support new timing mode for mmc2 clock
+> >   mmc: sunxi: Support controllers that can use both old and new timings
+> >   mmc: sunxi: Support MMC DDR52 transfer mode with new timing mode
+> >   mmc: sunxi: Add support for A83T eMMC (MMC2)
+> 
+> So this series seems to be ready for inclusion, unless Ulf has further
+> concerns about the clk usage.
+> 
+> The first mmc patch have build time dependencies on the first clk patch.
+> Shall we put the clk patch on a separate immutable branch for both trees
+> to pull? Or we could just merge everything through the mmc tree? I don't
+> think we'll touch this part of the sunxi-ng clk driver for the remainder
+> of this cycle.
 
-The way the MAC driver handles link up/down and configuration events
-changes significantly when a MAC driver switches to phylink, since
-a directly connected SFP cage needs to have the MAC reconfigured
-between SGMII and 1000base-X modes.  If you add SFP+ into that, also
-10Gbase-KR as well.
+I guess the easiest would be for it to go through Ulf tree, unless he
+says otherwise of course :)
 
-Note also that the "link up" condition for SFP (and probably SFF) is
-more complex than just "is the module reporting that it's receiving
-a signal" - especially with 1000base-X, there's negotiation to be
-performed, so you also need to know (if the module is connected
-directly to the MAC) whether the Serdes is in sync and has finished
-negotiation (and itself says it has link with the remote end.)
-
-With the Marvell 88x3310 PHY, the MAC driver already needs to switch
-between 10Gbase-KR and SGMII modes, as the 88x3310 automatically
-makes that switch on its MAC facing interface without software
-intervention.
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/b8392cda/attachment.sig>
