@@ -1,31 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 26 Jul 2017 18:26:48 +0200
-Subject: [PATCH net-next 10/18] net: mvpp2: use the GoP interrupt for
- link status changes
-In-Reply-To: <20170724134848.19330-11-antoine.tenart@free-electrons.com>
-References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
- <20170724134848.19330-11-antoine.tenart@free-electrons.com>
-Message-ID: <20170726162648.GK12049@lunn.ch>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Wed, 26 Jul 2017 17:25:15 +0100
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170726154623.GB11453@hc>
+References: <20170725150422.4775-1-jglauber@cavium.com>
+ <20170725150422.4775-2-jglauber@cavium.com>
+ <72145781-e9ec-036f-f752-b4756fef08ee@arm.com>
+ <20170726111946.GA6273@hc>
+ <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
+ <20170726131058.GA8665@hc>
+ <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
+ <20170726145522.GC28875@nazgul.tnic> <20170726151314.GA10696@hc>
+ <0a0daa94-bad7-cbb5-e421-f8e9d6c79d54@arm.com>
+ <20170726154623.GB11453@hc>
+Message-ID: <20170726172515.0000185c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 03:48:40PM +0200, Antoine Tenart wrote:
-> This patch adds the GoP link interrupt support for when a port isn't
-> connected to a PHY. Because of this the phylib callback is never called
-> and the link status management isn't done. This patch use the GoP link
-> interrupt in such cases to still have a minimal link management. Without
-> this patch ports not connected to a PHY cannot work.
+On Wed, 26 Jul 2017 17:46:23 +0200
+Jan Glauber <jan.glauber@caviumnetworks.com> wrote:
 
-Hi Antoine
+> On Wed, Jul 26, 2017 at 04:17:11PM +0100, Suzuki K Poulose wrote:
+> > How about adding a soc specific (wrapper) driver for the memory controller, which
+> > could use the PCI id and trigger EDAC and PMU drivers (based on what is
+> > selected by configs)  ?  
+> 
+> Sounds good to me. Is there a driver that already does this?
+Sounds like a classic MFD (multifunction device). There are quite a few pci
+devices to be found under drivers/mfd/ than may provide some inspiration.
 
-When is a GoP link interrupt signalled? When is a port without a PHY
-actually up/down?
-
-With SFF/SFP ports, you generally need a gpio line the fibre module
-can use to indicate if it has link. Fixed-phy has such support, and
-your link_change function will get called when the link changes.
-
-And this is another bit of code you probably need to change in a while
-with phylink lands.
-
-     Andrew
+Jonathan
+> 
+> --Jan
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
