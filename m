@@ -1,77 +1,73 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 26 Jul 2017 02:23:10 +0200
-Subject: [PATCH 2/4] ACPI: Make acpi_dev_get_resources() method agnostic
-In-Reply-To: <20170725091538.GB17133@red-moon>
+Date: Wed, 26 Jul 2017 02:27:08 +0200
+Subject: [PATCH 3/4] ACPI: Introduce DMA ranges parsing
+In-Reply-To: <20170725090615.GA17133@red-moon>
 References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
- <24234737.CuhWYzNn5W@aspire.rjw.lan> <20170725091538.GB17133@red-moon>
-Message-ID: <3012251.02VKL2APyL@aspire.rjw.lan>
+ <CAJZ5v0h_ySMbtGfs5_E+PCJko+3_aDo=1joDaA1_2wCT5tZe=Q@mail.gmail.com>
+ <20170725090615.GA17133@red-moon>
+Message-ID: <3695178.yaaBKZ8vrz@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 25, 2017 10:15:38 AM Lorenzo Pieralisi wrote:
-> On Sat, Jul 22, 2017 at 12:05:39AM +0200, Rafael J. Wysocki wrote:
-> > On Thursday, July 20, 2017 03:45:14 PM Lorenzo Pieralisi wrote:
-> > > The function acpi_dev_get_resources() is completely generic and
-> > > can be used to parse resource objects that are not necessarily
-> > > coming from the _CRS method but also from other objects eg _DMA
-> > > that have the same _CRS resource format.
-> > > 
-> > > Create an acpi_dev_get_resources() helper, internal to the ACPI
-> > > resources parsing compilation unit, acpi_dev_get_resources_method(),
-> > > that takes a char* parameter to detect which ACPI method should be
-> > > called to retrieve the resources list and make acpi_dev_get_resources()
-> > > call it with a method name _CRS leaving the API behaviour unchanged.
-> > > 
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > > ---
-> > >  drivers/acpi/resource.c | 54 +++++++++++++++++++++++++++++--------------------
-> > >  1 file changed, 32 insertions(+), 22 deletions(-)
-> > > 
-> > > diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-> > > index cd4c427..2b20a09 100644
-> > > --- a/drivers/acpi/resource.c
-> > > +++ b/drivers/acpi/resource.c
-> > > @@ -573,6 +573,36 @@ static acpi_status acpi_dev_process_resource(struct acpi_resource *ares,
-> > >  	return AE_OK;
-> > >  }
-> > >  
-> > > +static
-> > > +int acpi_dev_get_resources_method(struct acpi_device *adev,
+On Tuesday, July 25, 2017 10:06:15 AM Lorenzo Pieralisi wrote:
+> On Mon, Jul 24, 2017 at 08:42:15PM +0200, Rafael J. Wysocki wrote:
+> > On Mon, Jul 24, 2017 at 12:40 PM, Lorenzo Pieralisi
+> > <lorenzo.pieralisi@arm.com> wrote:
+> > > On Sat, Jul 22, 2017 at 12:15:42AM +0200, Rafael J. Wysocki wrote:
+> > >
 > > 
-> > Do not break lines like this, please.
+> > [cut]
 > > 
-> > It should be
+> > >
+> > >> > +           return -EINVAL;
+> > >> > +   }
+> > >> > +
+> > >> > +   ret = acpi_dev_get_dma_resources(adev, &list);
+> > >> > +   if (ret > 0) {
+> > >> > +           list_for_each_entry(rentry, &list, node) {
+> > >> > +                   if (dma_offset && rentry->offset != dma_offset) {
+> > >> > +                           ret = -EINVAL;
+> > >> > +                           pr_warn("Can't handle multiple windows with different offsets\n");
+> > >> > +                           goto out;
+> > >> > +                   }
+> > >> > +                   dma_offset = rentry->offset;
+> > >> > +
+> > >> > +                   /* Take lower and upper limits */
+> > >> > +                   if (rentry->res->start < dma_start)
+> > >> > +                           dma_start = rentry->res->start;
+> > >> > +                   if (rentry->res->end > dma_end)
+> > >> > +                           dma_end = rentry->res->end;
+> > >> > +           }
+> > >> > +
+> > >> > +           if (dma_start >= dma_end) {
+> > >> > +                   ret = -EINVAL;
+> > >> > +                   pr_warn("Invalid DMA regions configuration\n");
+> > >>
+> > >> dev_warn()?
+> > >>
+> > >> And why _warn() and not _info()?
+> > >
+> > > Mmm..ok for the dev_ prefix - basically this would be a FW_BUG (I think
+> > > this specific error condition is overkill TBH, the ACPI resource
+> > > validation code should catch it before we even get here) not sure
+> > > about downgrading it to _info() though, I would leave it at this
+> > > loglevel - in particular in the offset check above:
+> > >
+> > >         if (dma_offset && rentry->offset != dma_offset) {
+> > >                 ret = -EINVAL;
+> > >                 pr_warn("Can't handle multiple windows with different offsets\n");
+> > >                 goto out;
+> > >         }
 > > 
-> > static int acpi_dev_get...
-> > 
-> > Also I would call it differently, maybe simply __acpi_dev_get_resources()?
-> > 
-> > > +				  struct list_head *list,
-> > > +				  int (*preproc)(struct acpi_resource *, void *),
-> > > +				  void *preproc_data, char *method)
-> > 
-> > const char *method ?
+> > Well, so the "why" question above still has no answer ...
 > 
-> drivers/acpi/resource.c: In function '__acpi_dev_get_resources':
-> drivers/acpi/resource.c:587:37: warning: passing argument 2 of
-> 'acpi_has_method' discards 'const' qualifier from pointer target type
-> [-Wdiscarded-qualifiers]
->   if (!acpi_has_method(adev->handle, method))
->                                        ^~~~~~
-> In file included from ./include/linux/acpi.h:44:0,
->                  from drivers/acpi/resource.c:21:
-> 		 ./include/acpi/acpi_bus.h:55:6: note: expected 'char *'
-> 		 but argument is of type 'const char *'
-> 		  bool acpi_has_method(acpi_handle handle, char *name);
-> 
-> Same problem with acpi_walk_resources().
-> 
-> So either I fiddle (eg cast the const away) with the method string 
-> in __acpi_dev_get_resources() or I can add an int/bool to detect
-> which method to use ( _CRS or _DMA) instead of passing a const char *.
+> It is a firmware misconfiguration, we end up dismissing firmware
+> information and use the device with default/possibly misconfigured
+> DMA windows (ie offset == 0) for that platform, that's the reason
+> why I thought it would deserve a _warn rather than _info loglevel.
 
-No, that'd be overkill.  Let's keep the (char *) in there.
+Well, _warn only makes it slightly more visible for people with somewhat
+unusual logging configurations, but fair enough.
 
 Thanks,
 Rafael
