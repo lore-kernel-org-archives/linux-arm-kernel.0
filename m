@@ -1,91 +1,57 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 26 Jul 2017 15:55:22 +0200
-Subject: [PATCH RESEND v3 3/3] arm: dts: Add support for ES8323 to the
- Firefly-RK3288
+Date: Wed, 26 Jul 2017 15:55:24 +0200
+Subject: [PATCH RESEND v3 1/3] SoC: es8328-i2c: Add compatible for ES8323
 In-Reply-To: <20170726135526.475-1-romain.perier@collabora.com>
 References: <20170726135526.475-1-romain.perier@collabora.com>
-Message-ID: <20170726135526.475-8-romain.perier@collabora.com>
+Message-ID: <20170726135526.475-10-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the DT definition of the es8388 i2c device found at
-address 0x10. It also adds the definition for connecting the Rockchip
-I2S to the es8323 analog output.
+This commit adds a compatible string for everest,es8323. This is an
+audio codec that is compatible with es8328 and can be found for example
+on the Firefly-RK3288 board.
 
 Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
- arch/arm/boot/dts/rk3288-firefly.dtsi | 38 +++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ Documentation/devicetree/bindings/sound/es8328.txt | 5 ++++-
+ sound/soc/codecs/es8328-i2c.c                      | 2 ++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 32dabae12e67..24e3fe77bc42 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -116,6 +116,19 @@
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/sound/es8328.txt b/Documentation/devicetree/bindings/sound/es8328.txt
+index 33fbf058c997..86b6d6e99732 100644
+--- a/Documentation/devicetree/bindings/sound/es8328.txt
++++ b/Documentation/devicetree/bindings/sound/es8328.txt
+@@ -4,7 +4,10 @@ This device supports both I2C and SPI.
  
-+	sound-i2s {
-+		compatible = "rockchip,rk3288-hdmi-analog";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&phone_ctl>, <&hp_det>;
-+		rockchip,audio-codec = <&es8323>;
-+		rockchip,hp-det-gpios = <&gpio7 15 GPIO_ACTIVE_HIGH>;
-+		rockchip,hp-en-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
-+		rockchip,i2s-controller = <&i2s>;
-+		rockchip,model = "I2S";
-+		rockchip,routing = "Analog", "LOUT2",
-+				   "Analog", "ROUT2";
-+	};
-+
- 	vbat_wl: vcc_sys: vsys-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc_sys";
-@@ -389,6 +402,17 @@
+ Required properties:
  
- &i2c2 {
- 	status = "okay";
-+
-+	es8323: es8323 at 10 {
-+		compatible = "everest,es8323", "everest,es8328";
-+		reg = <0x10>;
-+		AVDD-supply = <&vcca_33>;
-+		DVDD-supply = <&vcca_33>;
-+		HPVDD-supply = <&vcca_33>;
-+		PVDD-supply = <&vcca_33>;
-+		clocks = <&cru SCLK_I2S0_OUT>;
-+		clock-names = "i2s_clk_out";
-+	};
- };
+-  - compatible  : Should be "everest,es8328" or "everest,es8388"
++  - compatible  : Should be one of the following:
++	- "everest,es8323"
++	- "everest,es8328"
++	- "everest,es8388"
+   - DVDD-supply : Regulator providing digital core supply voltage 1.8 - 3.6V
+   - AVDD-supply : Regulator providing analog supply voltage 3.3V
+   - PVDD-supply : Regulator providing digital IO supply voltage 1.8 - 3.6V
+diff --git a/sound/soc/codecs/es8328-i2c.c b/sound/soc/codecs/es8328-i2c.c
+index 318ab28c5351..be3f03c35137 100644
+--- a/sound/soc/codecs/es8328-i2c.c
++++ b/sound/soc/codecs/es8328-i2c.c
+@@ -19,6 +19,7 @@
+ #include "es8328.h"
  
- &i2c4 {
-@@ -399,6 +423,10 @@
- 	status = "okay";
- };
+ static const struct i2c_device_id es8328_id[] = {
++	{ "es8323", 0 },
+ 	{ "es8328", 0 },
+ 	{ "es8388", 0 },
+ 	{ }
+@@ -26,6 +27,7 @@ static const struct i2c_device_id es8328_id[] = {
+ MODULE_DEVICE_TABLE(i2c, es8328_id);
  
-+&i2s {
-+	status = "okay";
-+};
-+
- &io_domains {
- 	status = "okay";
- 
-@@ -501,6 +529,16 @@
- 		};
- 	};
- 
-+	headphone {
-+		hp_det: hp-det {
-+			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		phone_ctl: phone-ctl {
-+			rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
- 	usb_host {
- 		host_vbus_drv: host-vbus-drv {
- 			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
+ static const struct of_device_id es8328_of_match[] = {
++	{ .compatible = "everest,es8323", },
+ 	{ .compatible = "everest,es8328", },
+ 	{ .compatible = "everest,es8388", },
+ 	{ }
 -- 
 2.11.0
