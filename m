@@ -1,91 +1,266 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 26 Jul 2017 10:00:50 -0700
-Subject: [PATCH v2 2/3] arm/syscalls: Optimize address limit check
-In-Reply-To: <20170726170051.28328-1-thgarnie@google.com>
-References: <20170726170051.28328-1-thgarnie@google.com>
-Message-ID: <20170726170051.28328-2-thgarnie@google.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 26 Jul 2017 22:39:32 +0530
+Subject: [PATCH 1/6] dma: bcm-sba-raid: Improve memory allocation in SBA
+ RAID driver
+In-Reply-To: <1501047404-14456-2-git-send-email-anup.patel@broadcom.com>
+References: <1501047404-14456-1-git-send-email-anup.patel@broadcom.com>
+ <1501047404-14456-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20170726170932.GI3053@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable the generic address limit check in favor of an architecture
-specific optimized implementation. The generic implementation using
-pending work flags did not work well with ARM and alignment faults.
+On Wed, Jul 26, 2017 at 11:06:39AM +0530, Anup Patel wrote:
+> This patch improves memory allocation in SBA RAID driver in
+> following ways:
+> 1. Simplify struct sba_request to reduce memory consumption
 
-The address limit is checked on each syscall return path to user-mode
-path as well as the irq user-mode return function. If the address limit
-was changed, a function is called to stop the kernel with an explicit
-message.
+what is the simplification?? You need to document that
 
-The address limit check has to be done before any pending work because
-they can reset the address limit. For example the lkdtm address limit
-check does not work because the signal to kill the process will reset
-the user-mode address limit.
+> 2. Allocate sba resources before registering dma device
 
-Signed-off-by: Thomas Garnier <thgarnie@google.com>
----
- arch/arm/kernel/entry-common.S | 11 +++++++++++
- arch/arm/kernel/signal.c       |  5 +++++
- 2 files changed, 16 insertions(+)
+what is the motivation for that
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 0b60adf4a5d9..99c908226065 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -12,6 +12,7 @@
- #include <asm/unistd.h>
- #include <asm/ftrace.h>
- #include <asm/unwind.h>
-+#include <asm/memory.h>
- #ifdef CONFIG_AEABI
- #include <asm/unistd-oabi.h>
- #endif
-@@ -48,10 +49,14 @@ ret_fast_syscall:
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)
- 	disable_irq_notrace			@ disable interrupts
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
-+	cmp	r2, #TASK_SIZE
-+	blne	addr_limit_check_failed
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
- 	bne	fast_work_pending
- 
-+
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
- 
-@@ -74,6 +79,9 @@ ret_fast_syscall:
-  UNWIND(.cantunwind	)
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
- 	disable_irq_notrace			@ disable interrupts
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
-+	cmp	r2, #TASK_SIZE
-+	blne	addr_limit_check_failed
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
- 	beq	no_work_pending
-@@ -106,6 +114,9 @@ ENTRY(ret_to_user)
- ret_slow_syscall:
- 	disable_irq_notrace			@ disable interrupts
- ENTRY(ret_to_user_from_irq)
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
-+	cmp	r2, #TASK_SIZE
-+	blne	addr_limit_check_failed
- 	ldr	r1, [tsk, #TI_FLAGS]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	slow_work_pending
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 5814298ef0b7..5769c15cff89 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -673,3 +673,8 @@ struct page *get_signal_page(void)
- 
- 	return page;
- }
-+
-+asmlinkage void addr_limit_check_failed(void)
-+{
-+	panic("Incorrect address limit while returning to user-mode.");
-+}
+So, reading this log doesnt help me to know what to expect in this patch
+
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+> ---
+>  drivers/dma/bcm-sba-raid.c | 439 +++++++++++++++++++++++----------------------
+>  1 file changed, 226 insertions(+), 213 deletions(-)
+> 
+> diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
+> index e41bbc7..6d15fed 100644
+> --- a/drivers/dma/bcm-sba-raid.c
+> +++ b/drivers/dma/bcm-sba-raid.c
+> @@ -48,7 +48,8 @@
+>  
+>  #include "dmaengine.h"
+>  
+> -/* SBA command related defines */
+> +/* ====== Driver macros and defines ===== */
+
+why this noise, seems unrelated to the change!
+
+> +
+>  #define SBA_TYPE_SHIFT					48
+>  #define SBA_TYPE_MASK					GENMASK(1, 0)
+>  #define SBA_TYPE_A					0x0
+> @@ -82,39 +83,41 @@
+>  #define SBA_CMD_WRITE_BUFFER				0xc
+>  #define SBA_CMD_GALOIS					0xe
+>  
+> -/* Driver helper macros */
+> +#define SBA_MAX_REQ_PER_MBOX_CHANNEL			8192
+> +
+>  #define to_sba_request(tx)		\
+>  	container_of(tx, struct sba_request, tx)
+>  #define to_sba_device(dchan)		\
+>  	container_of(dchan, struct sba_device, dma_chan)
+>  
+> -enum sba_request_state {
+> -	SBA_REQUEST_STATE_FREE = 1,
+> -	SBA_REQUEST_STATE_ALLOCED = 2,
+> -	SBA_REQUEST_STATE_PENDING = 3,
+> -	SBA_REQUEST_STATE_ACTIVE = 4,
+> -	SBA_REQUEST_STATE_RECEIVED = 5,
+> -	SBA_REQUEST_STATE_COMPLETED = 6,
+> -	SBA_REQUEST_STATE_ABORTED = 7,
+> +/* ===== Driver data structures ===== */
+> +
+> +enum sba_request_flags {
+> +	SBA_REQUEST_STATE_FREE		= 0x001,
+> +	SBA_REQUEST_STATE_ALLOCED	= 0x002,
+> +	SBA_REQUEST_STATE_PENDING	= 0x004,
+> +	SBA_REQUEST_STATE_ACTIVE	= 0x008,
+> +	SBA_REQUEST_STATE_RECEIVED	= 0x010,
+> +	SBA_REQUEST_STATE_COMPLETED	= 0x020,
+> +	SBA_REQUEST_STATE_ABORTED	= 0x040,
+> +	SBA_REQUEST_STATE_MASK		= 0x0ff,
+> +	SBA_REQUEST_FENCE		= 0x100,
+
+how does this help in mem alloctn?
+
+>  };
+>  
+>  struct sba_request {
+>  	/* Global state */
+>  	struct list_head node;
+>  	struct sba_device *sba;
+> -	enum sba_request_state state;
+> -	bool fence;
+> +	u32 flags;
+>  	/* Chained requests management */
+>  	struct sba_request *first;
+>  	struct list_head next;
+> -	unsigned int next_count;
+>  	atomic_t next_pending_count;
+>  	/* BRCM message data */
+> -	void *resp;
+> -	dma_addr_t resp_dma;
+> -	struct brcm_sba_command *cmds;
+>  	struct brcm_message msg;
+>  	struct dma_async_tx_descriptor tx;
+> +	/* SBA commands */
+> +	struct brcm_sba_command cmds[0];
+>  };
+>  
+>  enum sba_version {
+> @@ -128,11 +131,11 @@ struct sba_device {
+>  	/* DT configuration parameters */
+>  	enum sba_version ver;
+>  	/* Derived configuration parameters */
+> -	u32 max_req;
+>  	u32 hw_buf_size;
+>  	u32 hw_resp_size;
+>  	u32 max_pq_coefs;
+>  	u32 max_pq_srcs;
+> +	u32 max_req;
+>  	u32 max_cmd_per_req;
+>  	u32 max_xor_srcs;
+>  	u32 max_resp_pool_size;
+> @@ -152,7 +155,6 @@ struct sba_device {
+>  	void *cmds_base;
+>  	dma_addr_t cmds_dma_base;
+>  	spinlock_t reqs_lock;
+> -	struct sba_request *reqs;
+>  	bool reqs_fence;
+>  	struct list_head reqs_alloc_list;
+>  	struct list_head reqs_pending_list;
+> @@ -161,10 +163,9 @@ struct sba_device {
+>  	struct list_head reqs_completed_list;
+>  	struct list_head reqs_aborted_list;
+>  	struct list_head reqs_free_list;
+> -	int reqs_free_count;
+>  };
+>  
+> -/* ====== SBA command helper routines ===== */
+> +/* ====== Command helper routines ===== */
+
+more noise..
+
+>  
+>  static inline u64 __pure sba_cmd_enc(u64 cmd, u32 val, u32 shift, u32 mask)
+>  {
+> @@ -196,7 +197,7 @@ static inline u32 __pure sba_cmd_pq_c_mdata(u32 d, u32 b1, u32 b0)
+>  	       ((d & SBA_C_MDATA_DNUM_MASK) << SBA_C_MDATA_DNUM_SHIFT);
+>  }
+>  
+> -/* ====== Channel resource management routines ===== */
+> +/* ====== General helper routines ===== */
+
+and it keeps getting more interesting, sigh!!!
+
+>  
+>  static struct sba_request *sba_alloc_request(struct sba_device *sba)
+>  {
+> @@ -204,24 +205,20 @@ static struct sba_request *sba_alloc_request(struct sba_device *sba)
+>  	struct sba_request *req = NULL;
+>  
+>  	spin_lock_irqsave(&sba->reqs_lock, flags);
+> -
+>  	req = list_first_entry_or_null(&sba->reqs_free_list,
+>  				       struct sba_request, node);
+> -	if (req) {
+> +	if (req)
+>  		list_move_tail(&req->node, &sba->reqs_alloc_list);
+> -		req->state = SBA_REQUEST_STATE_ALLOCED;
+> -		req->fence = false;
+> -		req->first = req;
+> -		INIT_LIST_HEAD(&req->next);
+> -		req->next_count = 1;
+> -		atomic_set(&req->next_pending_count, 1);
+> -
+> -		sba->reqs_free_count--;
+> +	spin_unlock_irqrestore(&sba->reqs_lock, flags);
+> +	if (!req)
+> +		return NULL;
+>  
+> -		dma_async_tx_descriptor_init(&req->tx, &sba->dma_chan);
+> -	}
+> +	req->flags = SBA_REQUEST_STATE_ALLOCED;
+> +	req->first = req;
+> +	INIT_LIST_HEAD(&req->next);
+> +	atomic_set(&req->next_pending_count, 1);
+
+Cant fathom how this helps w/ mem allocation
+
+>  
+> -	spin_unlock_irqrestore(&sba->reqs_lock, flags);
+> +	dma_async_tx_descriptor_init(&req->tx, &sba->dma_chan);
+>  
+>  	return req;
+>  }
+> @@ -231,7 +228,8 @@ static void _sba_pending_request(struct sba_device *sba,
+>  				 struct sba_request *req)
+>  {
+>  	lockdep_assert_held(&sba->reqs_lock);
+> -	req->state = SBA_REQUEST_STATE_PENDING;
+> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
+> +	req->flags |= SBA_REQUEST_STATE_PENDING;
+>  	list_move_tail(&req->node, &sba->reqs_pending_list);
+>  	if (list_empty(&sba->reqs_active_list))
+>  		sba->reqs_fence = false;
+> @@ -246,9 +244,10 @@ static bool _sba_active_request(struct sba_device *sba,
+>  		sba->reqs_fence = false;
+>  	if (sba->reqs_fence)
+>  		return false;
+> -	req->state = SBA_REQUEST_STATE_ACTIVE;
+> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
+> +	req->flags |= SBA_REQUEST_STATE_ACTIVE;
+>  	list_move_tail(&req->node, &sba->reqs_active_list);
+> -	if (req->fence)
+> +	if (req->flags & SBA_REQUEST_FENCE)
+>  		sba->reqs_fence = true;
+>  	return true;
+>  }
+> @@ -258,7 +257,8 @@ static void _sba_abort_request(struct sba_device *sba,
+>  			       struct sba_request *req)
+>  {
+>  	lockdep_assert_held(&sba->reqs_lock);
+> -	req->state = SBA_REQUEST_STATE_ABORTED;
+> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
+> +	req->flags |= SBA_REQUEST_STATE_ABORTED;
+>  	list_move_tail(&req->node, &sba->reqs_aborted_list);
+>  	if (list_empty(&sba->reqs_active_list))
+>  		sba->reqs_fence = false;
+> @@ -269,42 +269,34 @@ static void _sba_free_request(struct sba_device *sba,
+>  			      struct sba_request *req)
+>  {
+>  	lockdep_assert_held(&sba->reqs_lock);
+> -	req->state = SBA_REQUEST_STATE_FREE;
+> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
+> +	req->flags |= SBA_REQUEST_STATE_FREE;
+>  	list_move_tail(&req->node, &sba->reqs_free_list);
+>  	if (list_empty(&sba->reqs_active_list))
+>  		sba->reqs_fence = false;
+> -	sba->reqs_free_count++;
+>  }
+>  
+> -static void sba_received_request(struct sba_request *req)
+> +/* Note: Must be called with sba->reqs_lock held */
+> +static void _sba_complete_request(struct sba_device *sba,
+> +				  struct sba_request *req)
+>  {
+> -	unsigned long flags;
+> -	struct sba_device *sba = req->sba;
+> -
+> -	spin_lock_irqsave(&sba->reqs_lock, flags);
+> -	req->state = SBA_REQUEST_STATE_RECEIVED;
+> -	list_move_tail(&req->node, &sba->reqs_received_list);
+> -	spin_unlock_irqrestore(&sba->reqs_lock, flags);
+> +	lockdep_assert_held(&sba->reqs_lock);
+> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
+> +	req->flags |= SBA_REQUEST_STATE_COMPLETED;
+> +	list_move_tail(&req->node, &sba->reqs_completed_list);
+> +	if (list_empty(&sba->reqs_active_list))
+> +		sba->reqs_fence = false;
+
+Ok am going to stop here, sorry can't review it further.
+
+Please split stuff up, make logical incremental patchsets and resubmit...
+
 -- 
-2.14.0.rc0.400.g1c36432dff-goog
+~Vinod
