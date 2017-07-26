@@ -1,80 +1,78 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 26 Jul 2017 11:12:03 +0530
-Subject: [PATCH V2 1/4] hw_breakpoint: Add step_needed event attribute
-In-Reply-To: <20170725132737.GC28815@arm.com>
-References: <cover.1499416107.git.panand@redhat.com>
- <9d4f76f3a0bffe93a6d5146c9b53ee7b985f22da.1499416107.git.panand@redhat.com>
- <20170725132737.GC28815@arm.com>
-Message-ID: <70b51184-dbe0-6d0b-c853-be5b556927f1@redhat.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 26 Jul 2017 11:20:27 +0530
+Subject: [PATCH v2 1/2] gpio: davinci: Add keystone-k2g compatible
+Message-ID: <1501048228-3492-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The patch adds keystone-k2g compatible, specific properties and
+an example.
 
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ .../devicetree/bindings/gpio/gpio-davinci.txt      | 39 +++++++++++++++++++++-
+ 1 file changed, 38 insertions(+), 1 deletion(-)
 
-On Tuesday 25 July 2017 06:57 PM, Will Deacon wrote:
-> On Fri, Jul 07, 2017 at 05:33:57PM +0530, Pratyush Anand wrote:
->> Architecture like ARM64 currently allows to use default hw breakpoint
->> single step handler only to perf. However, some other users like few
->> systemtap tests or kernel test in
->> samples/hw_breakpoint/data_breakpoint.c can also work with default step
->> handler implementation. At the same time, some other like GDB/ptrace may
->> implement their own step handler.
->>
->> Therefore, this patch introduces a new perf_event_attr bit field, so
->> that arch specific code(specially on arm64) can make a decision to
->> enable single stepping.
->>
->> Any architecture which is not using this field will not have any
->> side effect.
->>
->> Signed-off-by: Pratyush Anand <panand@redhat.com>
->> ---
->>   include/linux/hw_breakpoint.h         | 6 ++++++
->>   include/uapi/linux/perf_event.h       | 3 ++-
->>   kernel/events/core.c                  | 2 ++
->>   tools/include/uapi/linux/perf_event.h | 3 ++-
->>   4 files changed, 12 insertions(+), 2 deletions(-)
->>
->> diff --git a/include/linux/hw_breakpoint.h b/include/linux/hw_breakpoint.h
->> index 0464c85e63fd..6173ae048cbc 100644
->> --- a/include/linux/hw_breakpoint.h
->> +++ b/include/linux/hw_breakpoint.h
->> @@ -38,6 +38,12 @@ static inline int hw_breakpoint_type(struct perf_event *bp)
->>   	return bp->attr.bp_type;
->>   }
->>   
->> +static inline bool
->> +hw_breakpoint_needs_single_step(struct perf_event *bp)
->> +{
->> +	return bp->attr.step_needed;
->> +}
->> +
->>   static inline unsigned long hw_breakpoint_len(struct perf_event *bp)
->>   {
->>   	return bp->attr.bp_len;
->> diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
->> index b1c0b187acfe..00935808de0d 100644
->> --- a/include/uapi/linux/perf_event.h
->> +++ b/include/uapi/linux/perf_event.h
->> @@ -345,7 +345,8 @@ struct perf_event_attr {
->>   				context_switch :  1, /* context switch data */
->>   				write_backward :  1, /* Write ring buffer from end to beginning */
->>   				namespaces     :  1, /* include namespaces data */
->> -				__reserved_1   : 35;
->> +				step_needed    :  1, /* Use arch step handler */
->> +				__reserved_1   : 34;
-> 
-> This needs documenting properly, as I really have no idea how userspace is
-> going to use it sensibley, especially as you silently overwrite it in some
-> cases below.
-
-I too had thought to put it under include/linux/perf_event.h : struct 
-perf_event. But, see hw_break_module_init() which does not have knowledge of 
-this structure, and we need to have some way so that none-perf kernel module 
-implementation can tell that it needs default arch step handler.
-
-Do you see any alternative?
-
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+index 5079ba7..9f4f612 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+@@ -1,7 +1,9 @@
+ Davinci/Keystone GPIO controller bindings
+ 
+ Required Properties:
+-- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
++- compatible: should be "ti,dm6441-gpio",
++			 "ti,keystone-gpio",
++			 "ti,keystone-k2g-gpio"
+ 
+ - reg: Physical base address of the controller and the size of memory mapped
+        registers.
+@@ -26,6 +28,17 @@ The GPIO controller also acts as an interrupt controller. It uses the default
+ two cells specifier as described in Documentation/devicetree/bindings/
+ interrupt-controller/interrupts.txt.
+ 
++Required Properties specific to keystone-k2g
++
++- clocks: Should contain devices input clock. The first parameter
++           is a handle to k2g_clks. The second parameter is the
++           device ID and the third parameter is the clock ID. One can
++           refer: http://processors.wiki.ti.com/index.php/TISCI#66AK2G02_Data
++
++           Example: <&k2g_clks 0x001c 0x0>;
++
++- clock-names: The driver expects the clock name to be "gpio";
++
+ Example:
+ 
+ gpio: gpio at 1e26000 {
+@@ -60,3 +73,27 @@ leds {
+ 		...
+ 	};
+ };
++
++Example for keystone-k2g:
++
++gpio0: gpio at 2603000 {
++	compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
++	reg = <0x02603000 0x100>;
++	gpio-controller;
++	#gpio-cells = <2>;
++	interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	ti,ngpio = <144>;
++	ti,davinci-gpio-unbanked = <0>;
++	clocks = <&k2g_clks 0x001b 0x0>;
++	clock-names = "gpio";
++};
 -- 
-Regards
-Pratyush
+1.9.1
