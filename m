@@ -1,72 +1,291 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Wed, 26 Jul 2017 17:13:14 +0200
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170726145522.GC28875@nazgul.tnic>
-References: <20170725150422.4775-1-jglauber@cavium.com>
- <20170725150422.4775-2-jglauber@cavium.com>
- <72145781-e9ec-036f-f752-b4756fef08ee@arm.com>
- <20170726111946.GA6273@hc>
- <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
- <20170726131058.GA8665@hc>
- <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
- <20170726145522.GC28875@nazgul.tnic>
-Message-ID: <20170726151314.GA10696@hc>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 26 Jul 2017 16:13:49 +0100
+Subject: ARM64 board Hikey960 boot failure due to f2545b2d4ce1
+ (jump_label: Reorder hotplug lock and jump_label_lock)
+In-Reply-To: <20170724143417.GA12788@leoy-ThinkPad-T440>
+References: <20170724143417.GA12788@leoy-ThinkPad-T440>
+Message-ID: <7e5cfa7c-b7a0-12bc-dad6-4355f23b5f21@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 04:55:22PM +0200, Borislav Petkov wrote:
-> On Wed, Jul 26, 2017 at 03:35:25PM +0100, Suzuki K Poulose wrote:
-> > So the Cavium EDACs, which appear as PCI devices have a PMU attached to it.
+[+Mark]
+
+Hi Leo,
+
+On 24/07/17 15:34, Leo Yan wrote:
+> Hi all,
 > 
-> Cavium EDACs?
+> We found the mainline arm64 kernel boot failure on Hikey960 board,
+> this is caused by patch f2545b2d4ce1 (jump_label: Reorder hotplug lock
+> and jump_label_lock), this patch adds locking cpus_read_lock() in
+> function static_key_slow_inc() and introduce the dead lock issue by
+> acquiring lock twice. Below are detailed flow:
 > 
-> So let me set something straight first: An EDAC driver simply talks to
-> some RAS IP block and reports errors. It shouldn't have anything to do
-> with a PMU.
+> arch_timer_register()
+>  `> cpuhp_setup_state()
+>      `> __cpuhp_setup_state()
+>         cpus_read_lock()
+>          `> __cpuhp_setup_state_cpuslocked()
+>              `> cpuhp_issue_call()
+>                  `> arch_timer_starting_cpu()
+>                      `> __arch_timer_setup()
+>                          `> arch_timer_check_ool_workaround()
+>                              `> arch_timer_enable_workaround()
+>                                  `> static_branch_enable()
+>                                      `> static_key_enable()
+>                                          `> static_key_slow_inc()
+>                                              `> cpus_read_lock()
 > 
-> > In order to build this PMU driver as a module, we need a way to load the module
-> > automatically based on the PCI id. However, since the EDAC driver already
-> > registers with that PCI id, we cannot use the same for the PMU. Ideally,
-> 
-> So this is strange. There's a single PCI ID but multiple functionalities
-> behind it?
+> So finally there have called cpus_read_lock() twice, and kernel report
+> log as below. So I am not sure what's the best way to fix this issue,
+> could you give some suggestion for this? Thanks.
 
-Yes, but I would still not call a memory controller a RAS IP block.
-There are a number of registers on the memory controller (or on the OCX
-TLK interconnect), and while some of them are RAS related there are also
-other registers in the same device like the counters we want to access
-via PMU code.
+[...]
 
-> > the PMU driver should be loaded when the EDAC driver is loaded. But looking
-> > at the links above, it looks like you don't like the idea of triggering a
-> > probe of the PMU component from the EDAC driver. We may be able to get rid
-> > of the PMU specific information from the EDAC driver by maintaining the PCI
-> > id of the device in the PMU driver. But we may still need to make sure that
-> > the PMU driver gets a chance to probe the PMU when the device is available.
-> > 
-> > What do you think is the best option here ?
-> 
-> Can either of the two - EDAC or PMU driver - use an alternate detection
-> method?
+Thanks for this. Unfortunately, there is no easy fix for this.
+Can you give the patch below a go and let us know if that solves
+the issue you observed? I only tested in on a model...
 
-I'm currently using pci_get_device(vendor-ID, device-ID, ...) which
-works fine.
+Should this be considered an acceptable solution, I'll split that
+into individual patches and repost it as a proper series.
 
-> For example, we moved the main x86 EDAC drivers we moved to x86 CPU
-> family, model, stepping detection from PCI IDs because the PCI IDs were
-> clumsy to use.
+Thanks,
 
-I'm also looking for CPU implementor (MIDR), I could check for the model
-too but I still need to detect devices based on PCI IDs as the model
-check is not sufficient here (only multi-socket ThunderX has OCX TLK
-devices).
+	M.
 
---Jan
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index aae87c4c546e..44232f378543 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -455,7 +455,11 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
+ 			per_cpu(timer_unstable_counter_workaround, i) = wa;
+ 	}
+ 
+-	static_branch_enable(&arch_timer_read_ool_enabled);
++	/*
++	 * Use the _locked version, as we're called from the CPU
++	 * hotplug framework. Otherwise, we end-up in deadlock-land.
++	 */
++	static_branch_enable_locked(&arch_timer_read_ool_enabled);
+ 
+ 	/*
+ 	 * Don't use the vdso fastpath if errata require using the
+diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
+index 2afd74b9d844..5cfbf9ff3fe8 100644
+--- a/include/linux/jump_label.h
++++ b/include/linux/jump_label.h
+@@ -159,10 +159,14 @@ extern void arch_jump_label_transform_static(struct jump_entry *entry,
+ extern int jump_label_text_reserved(void *start, void *end);
+ extern void static_key_slow_inc(struct static_key *key);
+ extern void static_key_slow_dec(struct static_key *key);
++extern void static_key_slow_inc_locked(struct static_key *key);
++extern void static_key_slow_dec_locked(struct static_key *key);
+ extern void jump_label_apply_nops(struct module *mod);
+ extern int static_key_count(struct static_key *key);
+ extern void static_key_enable(struct static_key *key);
+ extern void static_key_disable(struct static_key *key);
++extern void static_key_enable_locked(struct static_key *key);
++extern void static_key_disable_locked(struct static_key *key);
+ 
+ /*
+  * We should be using ATOMIC_INIT() for initializing .enabled, but
+@@ -213,12 +217,16 @@ static inline void static_key_slow_inc(struct static_key *key)
+ 	atomic_inc(&key->enabled);
+ }
+ 
++#define static_key_slow_inc_locked(k)	static_key_slow_inc((k))
++
+ static inline void static_key_slow_dec(struct static_key *key)
+ {
+ 	STATIC_KEY_CHECK_USE();
+ 	atomic_dec(&key->enabled);
+ }
+ 
++#define static_key_slow_dec_locked(k)	static_key_slow_inc((k))
++
+ static inline int jump_label_text_reserved(void *start, void *end)
+ {
+ 	return 0;
+@@ -415,6 +423,8 @@ extern bool ____wrong_branch_error(void);
+ 
+ #define static_branch_enable(x)		static_key_enable(&(x)->key)
+ #define static_branch_disable(x)	static_key_disable(&(x)->key)
++#define static_branch_enable_locked(x)	static_key_enable_locked(&(x)->key)
++#define static_branch_disable_locked(x)	static_key_disable_locked(&(x)->key)
+ 
+ #endif /* __ASSEMBLY__ */
+ 
+diff --git a/kernel/jump_label.c b/kernel/jump_label.c
+index d11c506a6ac3..f543f765a738 100644
+--- a/kernel/jump_label.c
++++ b/kernel/jump_label.c
+@@ -57,6 +57,11 @@ jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
+ }
+ 
+ static void jump_label_update(struct static_key *key);
++static void static_key_slow_inc_with_lock(struct static_key *key, bool lock);
++static void __static_key_slow_dec_with_lock(struct static_key *key,
++					    bool lock,
++					    unsigned long rate_limit,
++					    struct delayed_work *work);
+ 
+ /*
+  * There are similar definitions for the !HAVE_JUMP_LABEL case in jump_label.h.
+@@ -79,29 +84,53 @@ int static_key_count(struct static_key *key)
+ }
+ EXPORT_SYMBOL_GPL(static_key_count);
+ 
+-void static_key_enable(struct static_key *key)
++static void static_key_enable_with_lock(struct static_key *key, bool lock)
+ {
+ 	int count = static_key_count(key);
+ 
+ 	WARN_ON_ONCE(count < 0 || count > 1);
+ 
+ 	if (!count)
+-		static_key_slow_inc(key);
++		static_key_slow_inc_with_lock(key, lock);
++}
++
++void static_key_enable(struct static_key *key)
++{
++	static_key_enable_with_lock(key, true);
+ }
+ EXPORT_SYMBOL_GPL(static_key_enable);
+ 
+-void static_key_disable(struct static_key *key)
++void static_key_enable_locked(struct static_key *key)
++{
++	lockdep_assert_cpus_held();
++	static_key_enable_with_lock(key, false);
++}
++EXPORT_SYMBOL_GPL(static_key_enable_locked);
++
++static void static_key_disable_with_lock(struct static_key *key, bool lock)
+ {
+ 	int count = static_key_count(key);
+ 
+ 	WARN_ON_ONCE(count < 0 || count > 1);
+ 
+ 	if (count)
+-		static_key_slow_dec(key);
++		__static_key_slow_dec_with_lock(key, lock, 0, NULL);
++}
++
++void static_key_disable(struct static_key *key)
++{
++	static_key_disable_with_lock(key, true);
+ }
+ EXPORT_SYMBOL_GPL(static_key_disable);
+ 
+-void static_key_slow_inc(struct static_key *key)
++void static_key_disable_locked(struct static_key *key)
++{
++	lockdep_assert_cpus_held();
++	static_key_disable_with_lock(key, false);
++}
++EXPORT_SYMBOL_GPL(static_key_disable_locked);
++
++static void static_key_slow_inc_with_lock(struct static_key *key, bool lock)
+ {
+ 	int v, v1;
+ 
+@@ -125,7 +154,8 @@ void static_key_slow_inc(struct static_key *key)
+ 			return;
+ 	}
+ 
+-	cpus_read_lock();
++	if (lock)
++		cpus_read_lock();
+ 	jump_label_lock();
+ 	if (atomic_read(&key->enabled) == 0) {
+ 		atomic_set(&key->enabled, -1);
+@@ -135,14 +165,30 @@ void static_key_slow_inc(struct static_key *key)
+ 		atomic_inc(&key->enabled);
+ 	}
+ 	jump_label_unlock();
+-	cpus_read_unlock();
++	if (lock)
++		cpus_read_unlock();
++}
++
++void static_key_slow_inc(struct static_key *key)
++{
++	static_key_slow_inc_with_lock(key, true);
+ }
+ EXPORT_SYMBOL_GPL(static_key_slow_inc);
+ 
+-static void __static_key_slow_dec(struct static_key *key,
+-		unsigned long rate_limit, struct delayed_work *work)
++void static_key_slow_inc_locked(struct static_key *key)
+ {
+-	cpus_read_lock();
++	lockdep_assert_cpus_held();
++	static_key_slow_inc_with_lock(key, false);
++}
++EXPORT_SYMBOL_GPL(static_key_slow_inc_locked);
++
++static void __static_key_slow_dec_with_lock(struct static_key *key,
++					    bool lock,
++					    unsigned long rate_limit,
++					    struct delayed_work *work)
++{
++	if (lock)
++		cpus_read_lock();
+ 	/*
+ 	 * The negative count check is valid even when a negative
+ 	 * key->enabled is in use by static_key_slow_inc(); a
+@@ -153,7 +199,8 @@ static void __static_key_slow_dec(struct static_key *key,
+ 	if (!atomic_dec_and_mutex_lock(&key->enabled, &jump_label_mutex)) {
+ 		WARN(atomic_read(&key->enabled) < 0,
+ 		     "jump label: negative count!\n");
+-		cpus_read_unlock();
++		if (lock)
++			cpus_read_unlock();
+ 		return;
+ 	}
+ 
+@@ -164,27 +211,36 @@ static void __static_key_slow_dec(struct static_key *key,
+ 		jump_label_update(key);
+ 	}
+ 	jump_label_unlock();
+-	cpus_read_unlock();
++	if (lock)
++		cpus_read_unlock();
+ }
+ 
+ static void jump_label_update_timeout(struct work_struct *work)
+ {
+ 	struct static_key_deferred *key =
+ 		container_of(work, struct static_key_deferred, work.work);
+-	__static_key_slow_dec(&key->key, 0, NULL);
++	__static_key_slow_dec_with_lock(&key->key, true, 0, NULL);
+ }
+ 
+ void static_key_slow_dec(struct static_key *key)
+ {
+ 	STATIC_KEY_CHECK_USE();
+-	__static_key_slow_dec(key, 0, NULL);
++	__static_key_slow_dec_with_lock(key, true, 0, NULL);
+ }
+ EXPORT_SYMBOL_GPL(static_key_slow_dec);
+ 
++void static_key_slow_dec_locked(struct static_key *key)
++{
++	lockdep_assert_cpus_held();
++	STATIC_KEY_CHECK_USE();
++	__static_key_slow_dec_with_lock(key, false, 0, NULL);
++}
++EXPORT_SYMBOL_GPL(static_key_slow_dec_locked);
++
+ void static_key_slow_dec_deferred(struct static_key_deferred *key)
+ {
+ 	STATIC_KEY_CHECK_USE();
+-	__static_key_slow_dec(&key->key, key->timeout, &key->work);
++	__static_key_slow_dec_with_lock(&key->key, true, key->timeout, &key->work);
+ }
+ EXPORT_SYMBOL_GPL(static_key_slow_dec_deferred);
+ 
 
-> -- 
-> Regards/Gruss,
->     Boris.
-> 
-> ECO tip #101: Trim your mails when you reply.
-> --
+-- 
+Jazz is not dead. It just smells funny...
