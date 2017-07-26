@@ -1,225 +1,172 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Wed, 26 Jul 2017 08:51:43 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n  - any one
- else seeing this?
-In-Reply-To: <20170726035306.GF3730@linux.vnet.ibm.com>
-References: <20170725175207.000001cb@huawei.com>
- <20170726035306.GF3730@linux.vnet.ibm.com>
-Message-ID: <20170726085143.00007689@huawei.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 26 Jul 2017 15:52:30 +0800
+Subject: [PATCH v2] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+In-Reply-To: <91588872-441b-88c0-07e3-452c2998d173@arm.com>
+References: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
+ <91588872-441b-88c0-07e3-452c2998d173@arm.com>
+Message-ID: <f57a04ad-b686-9872-8b6a-bbacea29b3b0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jul 2017 20:53:06 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+On 2017/7/25 18:30, Marc Zyngier wrote:
+> On 22/07/17 04:54, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> When running 4.13-rc1 on top of D05, I got the boot log:
+>>
+>> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+>> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+>> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+>> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+>> [    0.000000] SRAT: ITS affinity exceeding max count[4]
+>>
+>> This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
+>>
+>> So dynamically alloc the memory needed instead of using
+>> its_srat_maps[MAX_NUMNODES], which count the number of
+>> ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+>> then build the mapping of numa node to ITS ID. Of course,
+>> its_srat_maps will be freed after ITS probing because
+>> we don't need that after boot.
+>>
+>> After doing this, I got what I wanted:
+>>
+>> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+>> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+>> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+>> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+>> [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+>> [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+>> [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+>> [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+>>
+>> Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>
+>> v1->v2:
+>>    - Add NULL check in acpi_get_its_numa_node() for no ITS affinity case;
+>>    - Free the its_srat_maps after ITS probing.
+>>
+>>   drivers/irqchip/irq-gic-v3-its.c | 39 ++++++++++++++++++++++++++++++++-------
+>>   1 file changed, 32 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 3ccdf76..1d692aa 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -1847,13 +1847,16 @@ struct its_srat_map {
+>>   	u32	its_id;
+>>   };
+>>   
+>> -static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
+>> +static struct its_srat_map *its_srat_maps __initdata;
+>>   static int its_in_srat __initdata;
+>>   
+>>   static int __init acpi_get_its_numa_node(u32 its_id)
+>>   {
+>>   	int i;
+>>   
+>> +	if (!its_srat_maps)
+>> +		return NUMA_NO_NODE;
+>> +
+>>   	for (i = 0; i < its_in_srat; i++) {
+>>   		if (its_id == its_srat_maps[i].its_id)
+>>   			return its_srat_maps[i].numa_node;
+>> @@ -1861,6 +1864,12 @@ static int __init acpi_get_its_numa_node(u32 its_id)
+>>   	return NUMA_NO_NODE;
+>>   }
+>>   
+>> +static int __init gic_acpi_match_srat_its(struct acpi_subtable_header *header,
+>> +					  const unsigned long end)
+>> +{
+>> +	return 0;
+>> +}
+>> +
+>>   static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>>   			 const unsigned long end)
+>>   {
+>> @@ -1877,12 +1886,6 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>>   		return -EINVAL;
+>>   	}
+>>   
+>> -	if (its_in_srat >= MAX_NUMNODES) {
+>> -		pr_err("SRAT: ITS affinity exceeding max count[%d]\n",
+>> -				MAX_NUMNODES);
+>> -		return -EINVAL;
+>> -	}
+>> -
+> 
+> So you're getting rid of that message when overflowing the array...
 
-> On Wed, Jul 26, 2017 at 12:52:07AM +0800, Jonathan Cameron wrote:
-> > On Tue, 25 Jul 2017 08:12:45 -0700
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> >   
-> > > On Tue, Jul 25, 2017 at 10:42:45PM +0800, Jonathan Cameron wrote:  
-> > > > On Tue, 25 Jul 2017 06:46:26 -0700
-> > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > > >     
-> > > > > On Tue, Jul 25, 2017 at 10:26:54PM +1000, Nicholas Piggin wrote:    
-> > > > > > On Tue, 25 Jul 2017 19:32:10 +0800
-> > > > > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
-> > > > > >       
-> > > > > > > Hi All,
-> > > > > > > 
-> > > > > > > We observed a regression on our d05 boards (but curiously not
-> > > > > > > the fairly similar but single socket / smaller core count
-> > > > > > > d03), initially seen with linux-next prior to the merge window
-> > > > > > > and still present in v4.13-rc2.
-> > > > > > > 
-> > > > > > > The symptom is:      
-> > > > > 
-> > > > > Adding Dave Miller and the sparclinux at vger.kernel.org email on CC, as
-> > > > > they have been seeing something similar, and you might well have saved
-> > > > > them the trouble of bisecting.
-> > > > > 
-> > > > > [ . . . ]
-> > > > >     
-> > > > > > > [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1      
-> > > > > 
-> > > > > This is the cause from an RCU perspective.  You had a lot of idle CPUs,
-> > > > > and RCU is not permitted to disturb them -- the battery-powered embedded
-> > > > > guys get very annoyed by that sort of thing.  What happens instead is
-> > > > > that each CPU updates a per-CPU state variable when entering or exiting
-> > > > > idle, and the grace-period kthread ("rcu_preempt kthread" in the above
-> > > > > message) checks these state variables, and if when sees an idle CPU,
-> > > > > it reports a quiescent state on that CPU's behalf.
-> > > > > 
-> > > > > But the grace-period kthread can only do this work if it gets a chance
-> > > > > to run.  And the message above says that this kthread hasn't had a chance
-> > > > > to run for a full 5,663 jiffies.  For completeness, the "g1566 c1565"
-> > > > > says that grace period #1566 is in progress, the "f0x0" says that no one
-> > > > > is needing another grace period #1567.  The "RCU_GP_WAIT_FQS(3)" says
-> > > > > that the grace-period kthread has fully initialized the current grace
-> > > > > period and is sleeping for a few jiffies waiting to scan for idle tasks.
-> > > > > Finally, the "->state=0x1" says that the grace-period kthread is in
-> > > > > TASK_INTERRUPTIBLE state, in other words, still sleeping.    
-> > > > 
-> > > > Thanks for the explanation!    
-> > > > > 
-> > > > > So my first question is "What did commit 05a4a9527 (kernel/watchdog:
-> > > > > split up config options) do to prevent the grace-period kthread from
-> > > > > getting a chance to run?"     
-> > > > 
-> > > > As far as we can tell it was a side effect of that patch.
-> > > > 
-> > > > The real cause is that patch changed the result of defconfigs to stop running
-> > > > the softlockup detector - now CONFIG_SOFTLOCKUP_DETECTOR
-> > > > 
-> > > > Enabling that on 4.13-rc2 (and presumably everything in between)
-> > > > means we don't see the problem any more.
-> > > >     
-> > > > > I must confess that I don't see anything
-> > > > > obvious in that commit, so my second question is "Are we sure that
-> > > > > reverting this commit makes the problem go away?"    
-> > > > 
-> > > > Simply enabling CONFIG_SOFTLOCKUP_DETECTOR seems to make it go away.
-> > > > That detector fires up a thread on every cpu, which may be relevant.    
-> > > 
-> > > Interesting...  Why should it be necessary to fire up a thread on every
-> > > CPU in order to make sure that RCU's grace-period kthreads get some
-> > > CPU time?  Especially give how many idle CPUs you had on your system.
-> > > 
-> > > So I have to ask if there is some other bug that the softlockup detector
-> > > is masking.  
-> > I am thinking the same.  We can try going back further than 4.12 tomorrow
-> > (we think we can realistically go back to 4.8 and possibly 4.6
-> > with this board)  
-> 
-> Looking forward to seeing results!
-> 
-> > > > > and my third is "Is
-> > > > > this an intermittent problem that led to a false bisection?"    
-> > > > 
-> > > > Whilst it is a bit slow to occur, we verified with long runs on either
-> > > > side of that patch and since with the option enabled on latest mainline.
-> > > > 
-> > > > Also can cause the issue before that patch by disabling the previous
-> > > > relevant option on 4.12.    
-> > > 
-> > > OK, thank you -- hard to argue with that!  ;-)  
-> > 
-> > We thought it was a pretty unlikely a bisection result
-> > hence hammered it thoroughly ;)  
-> 
-> Glad that I am not the only paranoid one out here.  ;-)
-> 
-> > > Except that I am still puzzled as to why per-CPU softlockup threads
-> > > are needed for RCU's kthreads to get their wakeups.  We really should
-> > > be able to disable softlockup and still have kthreads get wakeups and
-> > > access to CPU, after all.
-> > >   
-> > > > > [ . . . ]
-> > > > >     
-> > > > > > > Reducing the RCU CPU stall timeout makes it happen more often,
-> > > > > > > but we are seeing even with the default value of 24 seconds.
-> > > > > > > 
-> > > > > > > Tends to occur after a period or relatively low usage, but has
-> > > > > > > also been seen mid way through performance tests.
-> > > > > > > 
-> > > > > > > This was not seen with v4.12 so a bisection run later lead to
-> > > > > > > commit 05a4a9527 (kernel/watchdog: split up config options).
-> > > > > > > 
-> > > > > > > Which was odd until we discovered that a side effect of this patch
-> > > > > > > was to change whether the softlockup detector was enabled or not in
-> > > > > > > the arm64 defconfig.
-> > > > > > > 
-> > > > > > > On 4.13-rc2 enabling the softlockup detector indeed stopped us
-> > > > > > > seeing the rcu issue. Disabling the equivalent on 4.12 made the
-> > > > > > > issue occur there as well.
-> > > > > > > 
-> > > > > > > Clearly the softlockup detector results in a thread on every cpu,
-> > > > > > > which might be related but beyond that we are still looking into
-> > > > > > > the issue.
-> > > > > > > 
-> > > > > > > So the obvious question is whether anyone else is seeing this as
-> > > > > > > it might help us to focus in on where to look!      
-> > > > > > 
-> > > > > > Huh. Something similar has been seen very intermittently on powerpc
-> > > > > > as well. We couldn't reproduce it reliably to bisect it already, so
-> > > > > > this is a good help.
-> > > > > > 
-> > > > > > http://marc.info/?l=linuxppc-embedded&m=149872815523646&w=2
-> > > > > > 
-> > > > > > It looks like the watchdog patch has a similar effect on powerpc in
-> > > > > > that it stops enabling the softlockup detector by default. Haven't
-> > > > > > confirmed, but it looks like the same thing.
-> > > > > > 
-> > > > > > A bug in RCU stall detection?      
-> > > > > 
-> > > > > Well, if I am expected to make grace periods complete when my grace-period
-> > > > > kthreads aren't getting any CPU time, I will have to make some substantial
-> > > > > changes.  ;-)
-> > > > > 
-> > > > > One possibility is that the timer isn't firing and another is that the
-> > > > > timer's wakeup is being lost somehow.
-> > > > > 
-> > > > > So another thing to try is to boot with rcutree.rcu_kick_kthreads=1.
-> > > > > This will cause RCU to do redundant wakeups on the grace-period kthread
-> > > > > if the grace period is moving slowly.  This is of course a crude hack,
-> > > > > which is why this boot parameter will also cause a splat if it ever has
-> > > > > to do anything.    
-> > > > 
-> > > > Running that now will let you know how it goes.  Not seen the issue yet
-> > > > but might just be a 'lucky' run - will give it a few hours.    
-> > > 
-> > > Thank you very much!  
-> > 
-> > So far it's not actually shown any splats.  I did a quick drop back to running
-> > without the parameter and got the original splat in less that 5 minutes.  
-> 
-> That is a bit strange.  Sensitive to code position or some such???
-> 
-Could be.  An overnight run on two boards showed no splats either.
+This overflowing will not happen, because I scan the SRAT
+to count the entry(ies) of ITS affinity first to alloc the
+array, and then parse the same SRAT again to setup the mapping
+of NUMA node to ITS, so is it fine for us to just remove the
+check here?
 
-If we are looking at code position then we may find it is hidden again
-in older kernels even if nothing 'relevant' changed.
+> 
+>>   	node = acpi_map_pxm_to_node(its_affinity->proximity_domain);
+>>   
+>>   	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+>> @@ -1901,14 +1904,35 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>>   
+>>   static void __init acpi_table_parse_srat_its(void)
+>>   {
+>> +	int count;
+>> +
+>> +	count = acpi_table_parse_entries(ACPI_SIG_SRAT,
+>> +			sizeof(struct acpi_table_srat),
+>> +			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+>> +			gic_acpi_match_srat_its, 0);
+>> +	if (count <= 0)
+>> +		return;
+>> +
+>> +	its_srat_maps = kmalloc(count * sizeof(struct its_srat_map),
+>> +				GFP_KERNEL);
+>> +	if (!its_srat_maps)
+>> +		return;
+> 
+> and here silently returning when failing to allocate the memory. I think
+> it'd be worth having a bit of a warning.
 
-Jonathan
+Will do.
 
-> > I've spun up another board with this parameter set as well and will leave
-> > them both running overnight to see if anything interesting happens.
-> > 
-> > Thanks for your help with this,  
 > 
-> And thanks to you as well!!!
+>> +
+>>   	acpi_table_parse_entries(ACPI_SIG_SRAT,
+>>   			sizeof(struct acpi_table_srat),
+>>   			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+>>   			gic_acpi_parse_srat_its, 0);
+>>   }
+>> +
+>> +/* free the its_srat_maps after ITS probing */
+>> +static void __init acpi_its_srat_maps_free(void)
+>> +{
+>> +	kfree(its_srat_maps);
+>> +}
+>>   #else
+>>   static void __init acpi_table_parse_srat_its(void)	{ }
+>>   static int __init acpi_get_its_numa_node(u32 its_id) { return NUMA_NO_NODE; }
+>> +static void __init acpi_its_srat_maps_free(void) { }
+>>   #endif
+>>   
+>>   static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>> @@ -1955,6 +1979,7 @@ static void __init its_acpi_probe(void)
+>>   	acpi_table_parse_srat_its();
+>>   	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+>>   			      gic_acpi_parse_madt_its, 0);
+>> +	acpi_its_srat_maps_free();
+>>   }
+>>   #else
+>>   static void __init its_acpi_probe(void) { }
+>>
 > 
-> 							Thanx, Paul
-> 
-> > Jonathan
-> >   
-> > > 
-> > > 							Thanx, Paul
-> > >   
-> > > > Jonathan    
-> > > > > 
-> > > > > Does this help at all?
-> > > > > 
-> > > > > 							Thanx, Paul
-> > > > >     
-> > > > > > > In the meantime we'll carry on digging.
-> > > > > > > 
-> > > > > > > Thanks,
-> > > > > > > 
-> > > > > > > Jonathan
-> > > > > > > 
-> > > > > > > p.s. As a more general question, do we want to have the
-> > > > > > > soft lockup detector enabledon arm64 by default?      
-> > > > > > 
-> > > > > > I've cc'ed Don. My patch should not have changed defconfigs, I
-> > > > > > should have been more careful with that.
-> > > > > > 
-> > > > > > Thanks,
-> > > > > > Nick
-> > > > > >       
-> > > > >     
-> > > > 
-> > > >     
-> > >   
-> > 
-> >   
-> 
+> Otherwise looks good.
+
+Thanks
+Hanjun
