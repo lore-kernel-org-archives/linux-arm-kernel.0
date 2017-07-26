@@ -1,146 +1,225 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 26 Jul 2017 09:50:04 +0200
-Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
- from suspend_noirq
-In-Reply-To: <3f0f8ed2-9466-d5c9-10e4-de95e5155653@ti.com>
-References: <20170724095201.21601-1-johan@kernel.org>
- <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
- <20170725082444.GL2729@localhost>
- <3f0f8ed2-9466-d5c9-10e4-de95e5155653@ti.com>
-Message-ID: <20170726075004.GD27516@localhost>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Wed, 26 Jul 2017 08:51:43 +0100
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n  - any one
+ else seeing this?
+In-Reply-To: <20170726035306.GF3730@linux.vnet.ibm.com>
+References: <20170725175207.000001cb@huawei.com>
+ <20170726035306.GF3730@linux.vnet.ibm.com>
+Message-ID: <20170726085143.00007689@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 12:48:40PM -0500, Grygorii Strashko wrote:
-> Hi Johan,
-> 
-> On 07/25/2017 03:24 AM, Johan Hovold wrote:
-> > On Mon, Jul 24, 2017 at 05:16:02PM -0500, Grygorii Strashko wrote:
-> >> On 07/24/2017 04:52 AM, Johan Hovold wrote:
-> >>> Since commit a8636c89648a ("PM / Runtime: Don't allow to suspend a
-> >>> device with an active child"), which went into 4.10, it is no longer
-> >>> permitted to set RPM_SUSPENDED state for a device with active children
-> >>> (unless power.ignore_children is set).
-> >>>
-> >>> This specifically means that the attempts to do just that from the omap
-> >>> pm-domain suspend_noirq callback have since been failing whenever a
-> >>> child is active, for example:
-> >>>
-> >>>     am335x-usb-childs 47400000.usb: runtime PM trying to suspend
-> >>>       device but active child
-> >>>
-> >>> Silence this warning by dropping the broken pm_runtime_set_suspended()
-> >>> call from the omap suspend_noirq callback along with the redundant
-> >>> pm_runtime_set_active() in resume_noirq.
-> >>>
-> >>> This effectively reverts commit 3522bf7bfa24 ("ARM: OMAP2+: omap_device:
-> >>> maintain sane runtime pm status around suspend/resume"), which started
-> >>> updating the RPM state after the runtime_suspend callback (!) for active
-> >>> omap devices had been called during system suspend. The rationale was
-> >>> that a later pm_runtime_get_sync() would then fail (even after runtime
-> >>> pm had been disabled) and that this in turn would avoid any external
-> >>> aborts when accessing registers with clocks disabled. (See also commit
-> >>> 6f3c77b040fc ("PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
-> >>> even when disabled, v2").
-> >>>
-> >>> But during the suspend_noirq phase all children would already have been
-> >>> suspended and their drivers would specifically not attempt any further
-> >>> register accesses. And if this was all just a workaround for random
-> >>> device drivers doing cross-tree calls during system suspend, those
-> >>> drivers should be fixed and updated to explicitly model such
-> >>> dependencies using device-links instead (and either way, any such calls
-> >>> have been causing crashes since 4.10).
-> >>
-> >> I'd like to provide some background and comments here.
+On Tue, 25 Jul 2017 20:53:06 -0700
+"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
 
-> >> As result, below two calls really switch OFF device and its state
-> >> should be RPM_SUSPENDED as it will reflect real PM state of HW:
-> >> 	m_generic_runtime_suspend(dev)
-> >> 	omap_device_idle(pdev);
+> On Wed, Jul 26, 2017 at 12:52:07AM +0800, Jonathan Cameron wrote:
+> > On Tue, 25 Jul 2017 08:12:45 -0700
+> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> >   
+> > > On Tue, Jul 25, 2017 at 10:42:45PM +0800, Jonathan Cameron wrote:  
+> > > > On Tue, 25 Jul 2017 06:46:26 -0700
+> > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> > > >     
+> > > > > On Tue, Jul 25, 2017 at 10:26:54PM +1000, Nicholas Piggin wrote:    
+> > > > > > On Tue, 25 Jul 2017 19:32:10 +0800
+> > > > > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+> > > > > >       
+> > > > > > > Hi All,
+> > > > > > > 
+> > > > > > > We observed a regression on our d05 boards (but curiously not
+> > > > > > > the fairly similar but single socket / smaller core count
+> > > > > > > d03), initially seen with linux-next prior to the merge window
+> > > > > > > and still present in v4.13-rc2.
+> > > > > > > 
+> > > > > > > The symptom is:      
+> > > > > 
+> > > > > Adding Dave Miller and the sparclinux at vger.kernel.org email on CC, as
+> > > > > they have been seeing something similar, and you might well have saved
+> > > > > them the trouble of bisecting.
+> > > > > 
+> > > > > [ . . . ]
+> > > > >     
+> > > > > > > [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1      
+> > > > > 
+> > > > > This is the cause from an RCU perspective.  You had a lot of idle CPUs,
+> > > > > and RCU is not permitted to disturb them -- the battery-powered embedded
+> > > > > guys get very annoyed by that sort of thing.  What happens instead is
+> > > > > that each CPU updates a per-CPU state variable when entering or exiting
+> > > > > idle, and the grace-period kthread ("rcu_preempt kthread" in the above
+> > > > > message) checks these state variables, and if when sees an idle CPU,
+> > > > > it reports a quiescent state on that CPU's behalf.
+> > > > > 
+> > > > > But the grace-period kthread can only do this work if it gets a chance
+> > > > > to run.  And the message above says that this kthread hasn't had a chance
+> > > > > to run for a full 5,663 jiffies.  For completeness, the "g1566 c1565"
+> > > > > says that grace period #1566 is in progress, the "f0x0" says that no one
+> > > > > is needing another grace period #1567.  The "RCU_GP_WAIT_FQS(3)" says
+> > > > > that the grace-period kthread has fully initialized the current grace
+> > > > > period and is sleeping for a few jiffies waiting to scan for idle tasks.
+> > > > > Finally, the "->state=0x1" says that the grace-period kthread is in
+> > > > > TASK_INTERRUPTIBLE state, in other words, still sleeping.    
+> > > > 
+> > > > Thanks for the explanation!    
+> > > > > 
+> > > > > So my first question is "What did commit 05a4a9527 (kernel/watchdog:
+> > > > > split up config options) do to prevent the grace-period kthread from
+> > > > > getting a chance to run?"     
+> > > > 
+> > > > As far as we can tell it was a side effect of that patch.
+> > > > 
+> > > > The real cause is that patch changed the result of defconfigs to stop running
+> > > > the softlockup detector - now CONFIG_SOFTLOCKUP_DETECTOR
+> > > > 
+> > > > Enabling that on 4.13-rc2 (and presumably everything in between)
+> > > > means we don't see the problem any more.
+> > > >     
+> > > > > I must confess that I don't see anything
+> > > > > obvious in that commit, so my second question is "Are we sure that
+> > > > > reverting this commit makes the problem go away?"    
+> > > > 
+> > > > Simply enabling CONFIG_SOFTLOCKUP_DETECTOR seems to make it go away.
+> > > > That detector fires up a thread on every cpu, which may be relevant.    
+> > > 
+> > > Interesting...  Why should it be necessary to fire up a thread on every
+> > > CPU in order to make sure that RCU's grace-period kthreads get some
+> > > CPU time?  Especially give how many idle CPUs you had on your system.
+> > > 
+> > > So I have to ask if there is some other bug that the softlockup detector
+> > > is masking.  
+> > I am thinking the same.  We can try going back further than 4.12 tomorrow
+> > (we think we can realistically go back to 4.8 and possibly 4.6
+> > with this board)  
+> 
+> Looking forward to seeing results!
+> 
+> > > > > and my third is "Is
+> > > > > this an intermittent problem that led to a false bisection?"    
+> > > > 
+> > > > Whilst it is a bit slow to occur, we verified with long runs on either
+> > > > side of that patch and since with the option enabled on latest mainline.
+> > > > 
+> > > > Also can cause the issue before that patch by disabling the previous
+> > > > relevant option on 4.12.    
+> > > 
+> > > OK, thank you -- hard to argue with that!  ;-)  
 > > 
-> > That's the point to be discussed; does the runtime status really need to
-> > reflect the hardware state *during* suspend?
+> > We thought it was a pretty unlikely a bisection result
+> > hence hammered it thoroughly ;)  
 > 
-> At least there are no restriction, as I know.
+> Glad that I am not the only paranoid one out here.  ;-)
 > 
-> > As you've noticed, not all subsystems enforce that, even if omap seems
-> > to have been expecting it.
-> 
-> True.
-> 
-> > And as I mentioned in the commit message, at least the point about
-> > wanting to have late pm_runtime_get_sync() fail during suspend appears
-> > to be moot.
-> 
-> Correct. It was introduced long time ago (before device-links).
-
-Yeah, and I'm sure there were good reasons at the time.
-
-> >> As result, when "runtime PM trying to suspend device but active child"
-> >> happens the OMAP device framework will ignore it and gracefully
-> >> continue to suspend where target device will finally powered off
-> >> (depending on suspend mode and device).  On resume, target device will
-> >> not be powered on, because its state was not marked as
-> >> OMAP_DEVICE_SUSPENDED, so further attempts to power on device with
-> >> pm_runtime_get_sync() will be a NOP (because device state is
-> >> RPM_ACTIVE) and any access to the device will fail (system crash).
+> > > Except that I am still puzzled as to why per-CPU softlockup threads
+> > > are needed for RCU's kthreads to get their wakeups.  We really should
+> > > be able to disable softlockup and still have kthreads get wakeups and
+> > > access to CPU, after all.
+> > >   
+> > > > > [ . . . ]
+> > > > >     
+> > > > > > > Reducing the RCU CPU stall timeout makes it happen more often,
+> > > > > > > but we are seeing even with the default value of 24 seconds.
+> > > > > > > 
+> > > > > > > Tends to occur after a period or relatively low usage, but has
+> > > > > > > also been seen mid way through performance tests.
+> > > > > > > 
+> > > > > > > This was not seen with v4.12 so a bisection run later lead to
+> > > > > > > commit 05a4a9527 (kernel/watchdog: split up config options).
+> > > > > > > 
+> > > > > > > Which was odd until we discovered that a side effect of this patch
+> > > > > > > was to change whether the softlockup detector was enabled or not in
+> > > > > > > the arm64 defconfig.
+> > > > > > > 
+> > > > > > > On 4.13-rc2 enabling the softlockup detector indeed stopped us
+> > > > > > > seeing the rcu issue. Disabling the equivalent on 4.12 made the
+> > > > > > > issue occur there as well.
+> > > > > > > 
+> > > > > > > Clearly the softlockup detector results in a thread on every cpu,
+> > > > > > > which might be related but beyond that we are still looking into
+> > > > > > > the issue.
+> > > > > > > 
+> > > > > > > So the obvious question is whether anyone else is seeing this as
+> > > > > > > it might help us to focus in on where to look!      
+> > > > > > 
+> > > > > > Huh. Something similar has been seen very intermittently on powerpc
+> > > > > > as well. We couldn't reproduce it reliably to bisect it already, so
+> > > > > > this is a good help.
+> > > > > > 
+> > > > > > http://marc.info/?l=linuxppc-embedded&m=149872815523646&w=2
+> > > > > > 
+> > > > > > It looks like the watchdog patch has a similar effect on powerpc in
+> > > > > > that it stops enabling the softlockup detector by default. Haven't
+> > > > > > confirmed, but it looks like the same thing.
+> > > > > > 
+> > > > > > A bug in RCU stall detection?      
+> > > > > 
+> > > > > Well, if I am expected to make grace periods complete when my grace-period
+> > > > > kthreads aren't getting any CPU time, I will have to make some substantial
+> > > > > changes.  ;-)
+> > > > > 
+> > > > > One possibility is that the timer isn't firing and another is that the
+> > > > > timer's wakeup is being lost somehow.
+> > > > > 
+> > > > > So another thing to try is to boot with rcutree.rcu_kick_kthreads=1.
+> > > > > This will cause RCU to do redundant wakeups on the grace-period kthread
+> > > > > if the grace period is moving slowly.  This is of course a crude hack,
+> > > > > which is why this boot parameter will also cause a splat if it ever has
+> > > > > to do anything.    
+> > > > 
+> > > > Running that now will let you know how it goes.  Not seen the issue yet
+> > > > but might just be a 'lucky' run - will give it a few hours.    
+> > > 
+> > > Thank you very much!  
 > > 
-> > I believe you're mistaken here; _od_suspend_noirq() will continue to
-> > power-off *and* set OMAP_DEVICE_SUSPENDED, so that device is again
-> > powered during resume_noirq also after this patch has been applied.
-> > 
-> > Specifically, note that the return value of pm_runtime_set_suspended()
-> > was never checked, so the only difference here would be that the error
-> > message is suppressed.
+> > So far it's not actually shown any splats.  I did a quick drop back to running
+> > without the parameter and got the original splat in less that 5 minutes.  
 > 
-> Correct. Sorry. My bad - it was Monday. 
-
-Heh, no worries.
-
-> >> My personal thought here is that removing of pm_runtime_set_active()
-> >> will not fix root cause of the problem, but rather hide it :( and,
-> >> probably, real fix will be to update USB framework to ensure that all
-> >> suspend devices are also PM runtime suspend (not sure how) or add few
-> >> more pm_suspend_ignore_children() calls (for example as I've tried to
-> >> do in [2], but this was unfinished).
-> >>
-> >> I've found very simple steps to reproduce suspend failure on
-> >> am335x-evm (should also > work on BBB) -  do below sequence with USB
-> >> device plugged:
-> >>
-> >>     echo platform > /sys/power/pm_test
-> >>     echo 1 > /sys/power/pm_print_times
-> >>     [ echo 0 > /sys/module/printk/parameters/console_suspend ]
-> >>     echo mem > /sys/power/state
-> >>
-> >> [   95.499685] calling  47400000.usb+ @ 733, parent: ocp
-> >> [   95.504818] am335x-usb-childs 47400000.usb: runtime PM trying to suspend device but active child
-> >> [   95.513750] am335x-usb-childs 47400000.usb: omap device suspend failure 0
-> >>
-> >> Below I've attached possible patch which converts OMAP device to
-> >> use pm_runtime_force_suspend/resume().
-> > 
-> > What code are you running above? The OMAP PM code should not be failing
-> > due to that error message at least (as mentioned twice above).
-> > 
-> > I have musb suspend working on BBB with the patch I posted yesterday
-> > which keeps the controller at RPM_ACTIVE during suspend:
-> > 
-> > 	https://marc.info/?i=20170724094939.21477-1-johan%40kernel.org
+> That is a bit strange.  Sensitive to code position or some such???
 > 
-> I re-checked it on clean master (Linux 4.13-rc2) with and without your
-> patches and see no issues, just "runtime PM trying to suspend device
-> but active child" message is gone. Above test sequence still can be
-> used without any additional patches.
+Could be.  An overnight run on two boards showed no splats either.
 
-Yes, the musb patch I mentioned is only needed when the ancestor device
-controlling the clock is runtime suspended when going into system
-suspend. With an active port, suspend works without it also on BBB.
+If we are looking at code position then we may find it is hidden again
+in older kernels even if nothing 'relevant' changed.
 
-> So, thank you for your patches and sorry for the noise.
+Jonathan
+
+> > I've spun up another board with this parameter set as well and will leave
+> > them both running overnight to see if anything interesting happens.
+> > 
+> > Thanks for your help with this,  
 > 
-> Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
-
-Thanks for testing.
-
-Johan
+> And thanks to you as well!!!
+> 
+> 							Thanx, Paul
+> 
+> > Jonathan
+> >   
+> > > 
+> > > 							Thanx, Paul
+> > >   
+> > > > Jonathan    
+> > > > > 
+> > > > > Does this help at all?
+> > > > > 
+> > > > > 							Thanx, Paul
+> > > > >     
+> > > > > > > In the meantime we'll carry on digging.
+> > > > > > > 
+> > > > > > > Thanks,
+> > > > > > > 
+> > > > > > > Jonathan
+> > > > > > > 
+> > > > > > > p.s. As a more general question, do we want to have the
+> > > > > > > soft lockup detector enabledon arm64 by default?      
+> > > > > > 
+> > > > > > I've cc'ed Don. My patch should not have changed defconfigs, I
+> > > > > > should have been more careful with that.
+> > > > > > 
+> > > > > > Thanks,
+> > > > > > Nick
+> > > > > >       
+> > > > >     
+> > > > 
+> > > >     
+> > >   
+> > 
+> >   
+> 
