@@ -1,30 +1,41 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 25 Jul 2017 21:15:49 -0500
-Subject: [PATCH 0/3] ARM: dts: am335x-evm: am437xx: dra7xx: Enable NAND DMA
- prefetch by default
-Message-ID: <20170726021552.19880-1-fcooper@ti.com>
+Date: Tue, 25 Jul 2017 21:15:50 -0500
+Subject: [PATCH 1/3] ARM: dts: am335x-evm: Enable NAND dma prefetch by default
+In-Reply-To: <20170726021552.19880-1-fcooper@ti.com>
+References: <20170726021552.19880-1-fcooper@ti.com>
+Message-ID: <20170726021552.19880-2-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable NAND DMA prefetch by default for AM335x, AM437x and DRA7x evms that
-include NAND.
+Currently the default method of prefetch polled shows the highest
+possible read and write speed when minimal non NAND background
+activity is being done. But it is also very CPU intensive to reach
+these high speeds (CPU load of 99% via mtd performance tests). While
+DMA prefetch only uses 50% of the CPU to achieve around 23% less in
+top read and write performance.
 
-The below commit went into additional details regarding performance numbers
-seen between the two modes.
+However, as the non NAND CPU load increases the read and write
+performance takes a large hit when using polled prefetch. Therefore,
+prefetch dma mode ends up outperforming prefetch polled in general
+"system level" test. So switch to using dma prefetch by default since
+it is likely what most users would prefer.
 
-commit aa7abd312c11 ("mtd: nand: omap2: Support parsing dma channel information from DT")
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ arch/arm/boot/dts/am335x-evm.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-Franklin S Cooper Jr (3):
-  ARM: dts: am335x-evm: Enable NAND dma prefetch by default
-  ARM: dts: am437xx: Enable NAND dma prefetch by default
-  ARM: dts: dra7xx: Enable NAND dma prefetch by default
-
- arch/arm/boot/dts/am335x-evm.dts        | 1 +
- arch/arm/boot/dts/am437x-gp-evm.dts     | 1 +
- arch/arm/boot/dts/am43x-epos-evm.dts    | 1 +
- arch/arm/boot/dts/dra7-evm.dts          | 1 +
- arch/arm/boot/dts/dra72-evm-common.dtsi | 1 +
- 5 files changed, 5 insertions(+)
-
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 1c37a7c..ddd8975 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -531,6 +531,7 @@
+ 		interrupts = <0 IRQ_TYPE_NONE>, /* fifoevent */
+ 			     <1 IRQ_TYPE_NONE>;	/* termcount */
+ 		rb-gpios = <&gpmc 0 GPIO_ACTIVE_HIGH>; /* gpmc_wait0 */
++		ti,nand-xfer-type = "prefetch-dma";
+ 		ti,nand-ecc-opt = "bch8";
+ 		ti,elm-id = <&elm>;
+ 		nand-bus-width = <8>;
 -- 
 2.10.0
