@@ -1,83 +1,64 @@
 From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Wed, 26 Jul 2017 14:05:30 +0200
-Subject: [PATCH v5 0/4] ARM: dts: imx: add CX9020 Embedded PC device tree
-Message-ID: <20170726120534.5516-1-linux-kernel-dev@beckhoff.com>
+Date: Wed, 26 Jul 2017 14:05:31 +0200
+Subject: [PATCH v5 1/4] dt-bindings: arm: Add entry for Beckhoff CX9020
+In-Reply-To: <20170726120534.5516-1-linux-kernel-dev@beckhoff.com>
+References: <20170726120534.5516-1-linux-kernel-dev@beckhoff.com>
+Message-ID: <20170726120534.5516-2-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-The CX9020 differs from i.MX53 Quick Start Board by:
-- use uart2 instead of uart1
-- DVI-D connector instead of VGA
-- no audio
-- no SATA connector
-- CCAT FPGA connected to emi
-- enable rtc
+- add vendor prefix bhf for Beckhoff
+- add new board binding bhf,cx9020
 
-v5:
-- rebased on v4.13-rc2
-- don't take maintainership for imx53-cx9020.dtsi, keep it to
-  ARM/FREESCALE IMX maintainers
-- add explicit pinmux settings for pwr leds (EIM_D22 - D24)
-- remove display0->status="okay"
-- use "regulator-vbus" as name for usb_vbus regulator node
-- use correct reset values for explicit pinmux settings of:
-  MX53_PAD_GPIO_0__CCM_CLKO
-  MX53_PAD_GPIO_16__I2C3_SDA
-  MX53_PAD_GPIO_1__ESDHC1_CD
-  MX53_PAD_GPIO_3__GPIO1_3
-  MX53_PAD_GPIO_8__GPIO1_8
-
-v4:
-- move alternative UART2 pinmux settings to imx53-pinfunc.h
-- fix copyright notice and model name to clearify cx9020 is a
-  Beckhoff board and not from Freescale/NXP/Qualcomm
-- add "bhf,cx9020" compatible
-- remove ccat node and pin configuration as long as the ccat
-  driver is not mainlined
-- use dvi-connector + ti,tfp410 instead of panel-simple
-- add newlines between property list and child nodes
-- replace underscores in node names with hypens
-- replace magic number 0 with polarity defines from
-  include/dt-bindings/gpio/gpio.h
-- move rtc node into imx53.dtsi, change it's name into 'srtc',
-  to avoid a conflict with 'rtc' node in imx53-m53.dtsi
-- rename regulator-3p2v
-- drop imx53-qsb container node
-- make iomux configuration explicit
-- remove unused audmux
-- remove unused led_pin_gpio3_23 configuration
-- use blue gpio-leds as disk-activity indicators for mmc0 and mmc1
-- add mmc indicator leds to sdhc pingroups
-- keep node names in alphabetical order
-- remove unused sata and ssi2
-- remove unused pin configs from hoggrp
-- add entry for Beckhoff related files to MAINTAINERS
-
-v3: add missig changelog
-v2:
-- keep alphabetic order of dts/Makefile
-- configure uart2 with 'fsl,dte-mode'
-- use display-0 and panel-0 as node names
-- remove unnecessary "simple-bus" for fixed regulators
-
-Patrick Bruenn (4):
-  dt-bindings: arm: Add entry for Beckhoff CX9020
-  ARM: dts: imx53: add srtc node
-  ARM: dts: imx53: add alternative UART2 configuration
-  ARM: dts: imx: add CX9020 Embedded PC device tree
-
- Documentation/devicetree/bindings/arm/bhf.txt      |   6 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   5 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/imx53-cx9020.dts                 | 297 +++++++++++++++++++++
- arch/arm/boot/dts/imx53-pinfunc.h                  |   4 +
- arch/arm/boot/dts/imx53.dtsi                       |   9 +
- 7 files changed, 323 insertions(+)
+Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+---
+ Documentation/devicetree/bindings/arm/bhf.txt         | 6 ++++++
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ MAINTAINERS                                           | 5 +++++
+ 3 files changed, 12 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/bhf.txt
- create mode 100644 arch/arm/boot/dts/imx53-cx9020.dts
 
+diff --git a/Documentation/devicetree/bindings/arm/bhf.txt b/Documentation/devicetree/bindings/arm/bhf.txt
+new file mode 100644
+index 000000000000..886b503caf9c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bhf.txt
+@@ -0,0 +1,6 @@
++Beckhoff Automation Platforms Device Tree Bindings
++--------------------------------------------------
++
++CX9020 Embedded PC
++Required root node properties:
++    - compatible = "bhf,cx9020", "fsl,imx53";
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index daf465bef758..20c2cf57ebc9 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -47,6 +47,7 @@ avic	Shanghai AVIC Optoelectronics Co., Ltd.
+ axentia	Axentia Technologies AB
+ axis	Axis Communications AB
+ bananapi BIPAI KEJI LIMITED
++bhf	Beckhoff Automation GmbH & Co. KG
+ boe	BOE Technology Group Co., Ltd.
+ bosch	Bosch Sensortec GmbH
+ boundary	Boundary Devices Inc.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f66488dfdbc9..e1d3111aea97 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1196,6 +1196,11 @@ F:	arch/arm/boot/dts/sama*.dtsi
+ F:	arch/arm/include/debug/at91.S
+ F:	drivers/memory/atmel*
+ 
++ARM/BECKHOFF SUPPORT
++M:	Patrick Bruenn <p.bruenn@beckhoff.com>
++S:	Maintained
++F:	Documentation/devicetree/bindings/arm/bhf.txt
++
+ ARM/CALXEDA HIGHBANK ARCHITECTURE
+ M:	Rob Herring <robh@kernel.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
 2.11.0
