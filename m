@@ -1,81 +1,44 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Wed, 26 Jul 2017 10:32:32 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170726091623.000004f7@huawei.com>
-References: <20170725175207.000001cb@huawei.com>
- <20170725.141029.676882447882600000.davem@davemloft.net>
- <20170726035545.GG3730@linux.vnet.ibm.com>
- <20170725.210233.1441906980505926406.davem@davemloft.net>
- <20170726041217.GH3730@linux.vnet.ibm.com>
- <20170726091623.000004f7@huawei.com>
-Message-ID: <20170726103232.0000368e@huawei.com>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Wed, 26 Jul 2017 11:34:43 +0200
+Subject: [PATCH 1/6] nvmem: lpc18xx-eeprom: explicitly request exclusive reset
+ control
+In-Reply-To: <20170726093448.2564-1-srinivas.kandagatla@linaro.org>
+References: <20170726093448.2564-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20170726093448.2564-2-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jul 2017 09:16:23 +0100
-Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-> On Tue, 25 Jul 2017 21:12:17 -0700
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> 
-> > On Tue, Jul 25, 2017 at 09:02:33PM -0700, David Miller wrote:  
-> > > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> > > Date: Tue, 25 Jul 2017 20:55:45 -0700
-> > >     
-> > > > On Tue, Jul 25, 2017 at 02:10:29PM -0700, David Miller wrote:    
-> > > >> Just to report, turning softlockup back on fixes things for me on
-> > > >> sparc64 too.    
-> > > > 
-> > > > Very good!
-> > > >     
-> > > >> The thing about softlockup is it runs an hrtimer, which seems to run
-> > > >> about every 4 seconds.    
-> > > > 
-> > > > I could see where that could shake things loose, but I am surprised that
-> > > > it would be needed.  I ran a short run with CONFIG_SOFTLOCKUP_DETECTOR=y
-> > > > with no trouble, but I will be running a longer test later on.
-> > > >     
-> > > >> So I wonder if this is a NO_HZ problem.    
-> > > > 
-> > > > Might be.  My tests run with NO_HZ_FULL=n and NO_HZ_IDLE=y.  What are
-> > > > you running?  (Again, my symptoms are slightly different, so I might
-> > > > be seeing a different bug.)    
-> > > 
-> > > I run with NO_HZ_FULL=n and NO_HZ_IDLE=y, just like you.
-> > > 
-> > > To clarify, the symptoms show up with SOFTLOCKUP_DETECTOR disabled.    
-> > 
-> > Same here -- but my failure case happens fairly rarely, so it will take
-> > some time to gain reasonable confidence that enabling SOFTLOCKUP_DETECTOR
-> > had effect.
-> > 
-> > But you are right, might be interesting to try NO_HZ_PERIODIC=y
-> > or NO_HZ_FULL=y.  So many possible tests, and so little time.  ;-)
-> > 
-> > 							Thanx, Paul
-> >   
-> I'll be the headless chicken running around and trying as many tests
-> as I can fit in.  Typical time to see the failure for us is sub 10
-> minutes so we'll see how far we get.
-> 
-> Make me a list to run if you like ;)
-> 
-> NO_HZ_PERIODIC=y running now.
-By which I mean CONFIG_HZ_PERIODIC=y
+Commit a53e35db70d1 ("reset: Ensure drivers are explicit when requesting
+reset lines") started to transition the reset control request API calls
+to explicitly state whether the driver needs exclusive or shared reset
+control behavior. Convert all drivers requesting exclusive resets to the
+explicit API call so the temporary transition helpers can be removed.
 
-Anyhow, run for 40 minutes with out seeing a splat but my sanity check
-on the NO_FULL_HZ=n and NO_HZ_IDLE=y this morning took 20 minutes so
-I won't have much confidence until we are a few hours in on this.
+No functional changes.
 
-Anyhow, certainly looking like a promising direction for investigation!
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Joachim Eastwood <manabian@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/lpc18xx_eeprom.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Jonathan
-
-> 
-> Jonathan
-> 
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
+index c81ae4c..6c7e2c4 100644
+--- a/drivers/nvmem/lpc18xx_eeprom.c
++++ b/drivers/nvmem/lpc18xx_eeprom.c
+@@ -197,7 +197,7 @@ static int lpc18xx_eeprom_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	rst = devm_reset_control_get(dev, NULL);
++	rst = devm_reset_control_get_exclusive(dev, NULL);
+ 	if (IS_ERR(rst)) {
+ 		dev_err(dev, "failed to get reset: %ld\n", PTR_ERR(rst));
+ 		ret = PTR_ERR(rst);
+-- 
+2.9.3
