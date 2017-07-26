@@ -1,82 +1,145 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Jul 2017 14:25:39 +0100
-Subject: [PATCH v2] arm64: kernel: implement fast refcount checking
-In-Reply-To: <34605822-8f95-f963-48c4-65d724eae0c7@huawei.com>
-References: <20170725181536.21092-1-ard.biesheuvel@linaro.org>
- <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
- <CAKv+Gu8djcgmovajhUUpniHwEVDupCWW3L__3JtqZ0GCM3=U2w@mail.gmail.com>
- <34605822-8f95-f963-48c4-65d724eae0c7@huawei.com>
-Message-ID: <48B13266-4D48-40AD-A205-169D907FAD68@linaro.org>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Wed, 26 Jul 2017 08:27:03 -0500
+Subject: [PATCH v3 1/2] gpio: davinci: Add keystone-k2g compatible
+In-Reply-To: <5aa0d273-8e05-a5ff-7931-b9a94acade36@ti.com>
+References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
+ <5aa0d273-8e05-a5ff-7931-b9a94acade36@ti.com>
+Message-ID: <8021c424-460c-def4-3a67-ed760997193d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 26 Jul 2017, at 10:21, Li Kun <hw.likun@huawei.com> wrote:
-> 
-> 
-> 
->> ? 2017/7/26 16:40, Ard Biesheuvel ??:
->>> On 26 July 2017 at 05:11, Li Kun <hw.likun@huawei.com> wrote:
->>> Hi Ard?
->>> 
->>> 
->>>> on 2017/7/26 2:15, Ard Biesheuvel wrote:
->>>> +#define REFCOUNT_OP(op, asm_op, cond, l, clobber...)                   \
->>>> +__LL_SC_INLINE int                                                     \
->>>> +__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))                    \
->>>> +{                                                                      \
->>>> +       unsigned long tmp;                                              \
->>>> +       int result;                                                     \
->>>> +                                                                       \
->>>> +       asm volatile("// refcount_" #op "\n"                            \
->>>> +"      prfm            pstl1strm, %2\n"                                \
->>>> +"1:    ldxr            %w0, %2\n"                                      \
->>>> +"      " #asm_op "     %w0, %w0, %w[i]\n"                              \
->>>> +"      st" #l "xr      %w1, %w0, %2\n"                                 \
->>>> +"      cbnz            %w1, 1b\n"                                      \
->>>> +       REFCOUNT_CHECK(cond)                                            \
->>>> +       : "=&r" (result), "=&r" (tmp), "+Q" (r->counter)                \
->>>> +       : REFCOUNT_INPUTS(r) [i] "Ir" (i)                               \
->>>> +       clobber);                                                       \
->>>> +                                                                       \
->>>> +       return result;                                                  \
->>>> +}                                                                      \
->>>> +__LL_SC_EXPORT(__refcount_##op);
->>>> +
->>>> +REFCOUNT_OP(add_lt, adds, mi,  , REFCOUNT_CLOBBERS);
->>>> +REFCOUNT_OP(sub_lt_neg, adds, mi, l, REFCOUNT_CLOBBERS);
->>>> +REFCOUNT_OP(sub_le_neg, adds, ls, l, REFCOUNT_CLOBBERS);
->>>> +REFCOUNT_OP(sub_lt, subs, mi, l, REFCOUNT_CLOBBERS);
->>>> +REFCOUNT_OP(sub_le, subs, ls, l, REFCOUNT_CLOBBERS);
->>>> +
->>> I'm not quite sure if we use b.lt to judge whether the result of adds is
->>> less than zero is correct or not.
->>> The b.lt means N!=V, take an extreme example, if we operate like below, the
->>> b.lt will also be true.
->>> 
->>> refcount_set(&ref_c,0x80000000);
->>> refcount_dec_and_test(&ref_c);
->>> 
->>> maybe we should use PL/NE/MI/EQ to judge the LT_ZERO or LE_ZERO condition ?
->>> 
->> The lt/le is confusing here: the actual condition coded used are mi
->> for negative and ls for negative or zero.
->> 
->> I started out using lt and le, because it matches the x86 code, but I
->> moved to mi and ls instead. (I don't think it makes sense to deviate
->> from that just because the flags and predicates work a bit
->> differently.)
->> 
->> However, I see now that there is one instance of REFCOUNT_CHECK(lt)
->> remaining (in refcount.h). That should mi as well.
-> Sorry for having  misunderstood your implementation.
-> If we want to catch the refcount_sub operate on negetive value(like -1 to -2 ), i think b.ls can't achieve that.
 
-You are right. Decrementing a refcount which is already negative will not be caught. Is that a problem?
+On 07/26/2017 08:00 AM, Suman Anna wrote:
+> Hi Keerthy,
+> 
+> On 07/26/2017 01:45 AM, Keerthy wrote:
+>> The patch adds keystone-k2g compatible, specific properties and
+>> an example.
 
-> I think (b.eq || b.mi ) may be better than b.ls for this case.
+Seems we are adding information regarding several Keystone 2 SoCs. So
+the commit and subject should be tweaked to reflect this.
+> 
+> Please update patch header to "dt-bindings: gpio: davinci: ...."
+> 
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>
+>> Changes in v3:
+>>
+>>   * Added details about family of SoCs corresponding to compatibles.
+>>
+>>  .../devicetree/bindings/gpio/gpio-davinci.txt      | 40 +++++++++++++++++++++-
+>>  1 file changed, 39 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> index 5079ba7..fb9efee 100644
+>> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> @@ -1,7 +1,10 @@
+>>  Davinci/Keystone GPIO controller bindings
+>>  
+>>  Required Properties:
+>> -- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+>> +- compatible: should be "ti,dm6441-gpio": for Davinci da850 SoCs 
+>> +			"ti,keystone-gpio": for Keystone 2 66AK2H/K, 66AK2L,
+>> +						66AK2E SoCs
+>> +			"ti,keystone-k2g-gpio", "ti,keystone-gpio": for 66AK2G
+>>  
+>>  - reg: Physical base address of the controller and the size of memory mapped
+>>         registers.
+>> @@ -26,6 +29,17 @@ The GPIO controller also acts as an interrupt controller. It uses the default
+>>  two cells specifier as described in Documentation/devicetree/bindings/
+>>  interrupt-controller/interrupts.txt.
+>>  
+>> +Required Properties specific to keystone-k2g
+> 
+> Thanks for updating the binding for the clocks, but clocks are not
+> specific to K2G. They also apply to other K2 SoCs. Davinci platforms do
+> not have DT clocks atm, so the Davinci portion can be updated later if
+> and when they get added.
 > 
 
-At the expense of one more instruction, yes. I tend to agree, though. The atomics are fairly costly to begin with, so one more predicted non-taken branch won't really make a difference.
+What about power-domain property?
 
-In fact, I realised that we could easily implement the add-from-zero case as well: both ll/sc and lse versions have the old count in a register already, so all we need is a cbz in the right place.
+>> +
+>> +- clocks: Should contain devices input clock. The first parameter
+>> +           is a handle to k2g_clks. The second parameter is the
+>> +           device ID and the third parameter is the clock ID. One can
+>> +           refer: http://processors.wiki.ti.com/index.php/TISCI#66AK2G02_Data
+> 
+> No need for this link here, just refer to the appropriate clock
+> bindings. Some thing like the following would be better
+
+This information is helpful especially with the macros being dropped.
+However, I agree that this is not the place for this information.
+Probably should be linked to in the ti,sci-clk.txt and
+sci-pm-domain.txt. However, both of these are outdated since it is
+referring to macros and includes that don't exist or will no longer exist.
+
+> 
+> - clocks:               Should contain the device's input clock, and
+>                         should be defined as per the appropriate clock
+> bindings consumer usage in,
+> 
+> Documentation/devicetree/bindings/clock/keystone-gate.txt
+>                             for 66AK2HK/66AK2L/66AK2E SoCs or,
+> 
+> Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>                             for 66AK2G SoCs
+> 
+>> +
+>> +           Example: <&k2g_clks 0x001c 0x0>;
+> 
+> This can be dropped as well, below example already demonstrates it.
+> 
+>> +
+>> +- clock-names: The driver expects the clock name to be "gpio";
+> 
+> Just say, Should be "gpio". No need of mentioning about the driver.
+> 
+>> +
+>>  Example:
+>>  
+>>  gpio: gpio at 1e26000 {
+>> @@ -60,3 +74,27 @@ leds {
+>>  		...
+>>  	};
+>>  };
+>> +
+>> +Example for keystone-k2g:
+> 
+> s/keystone-k2g/66AK2G/
+> 
+>> +
+>> +gpio0: gpio at 2603000 {
+>> +	compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
+>> +	reg = <0x02603000 0x100>;
+>> +	gpio-controller;
+>> +	#gpio-cells = <2>;
+>> +	interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
+>> +			<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
+>> +	interrupt-controller;
+>> +	#interrupt-cells = <2>;
+>> +	ti,ngpio = <144>;
+>> +	ti,davinci-gpio-unbanked = <0>;
+>> +	clocks = <&k2g_clks 0x001b 0x0>;
+>> +	clock-names = "gpio";
+>> +};
+
+If your going to talk about other Keystone 2 devices it would be helpful
+to include an example for one of them since they have slightly different
+properties.
+>>
+> 
+> regards
+> Suman
+> 
