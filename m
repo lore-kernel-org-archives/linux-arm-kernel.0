@@ -1,72 +1,53 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=C5=99ej?= Jirman)
-Date: Wed, 26 Jul 2017 12:23:48 +0200
-Subject: [linux-sunxi] [PATCH 10/10] ARM: dts: sun8i: Add SY8106A
- regulator to Orange Pi PC
-In-Reply-To: <82507f40a1ddba8517cf09f51d3afa33@aosc.io>
-References: <20170723102749.17323-1-icenowy@aosc.io>
- <20170723102749.17323-11-icenowy@aosc.io>
- <CAGb2v66AGjazHT-+hWVLyNBLDw=DJ5yTmNxF-_=BtZFfjnni-A@mail.gmail.com>
- <25C8A89C-8495-4787-934C-8E9667CD70BF@aosc.io>
- <CAGb2v64xXOmC44TKrSDZFAh6i_rgFEccCHj4EG+1fxFJd9fjjw@mail.gmail.com>
- <82507f40a1ddba8517cf09f51d3afa33@aosc.io>
-Message-ID: <1501064628.14577.1.camel@megous.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Jul 2017 11:27:48 +0100
+Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
+In-Reply-To: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
+References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
+Message-ID: <20170726102748.GM31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-icenowy at aosc.io p??e v St 26. 07. 2017 v 15:36 +0800:
+On Wed, Jul 26, 2017 at 11:05:39AM +0100, Russell King wrote:
+> Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
+> initialise without an interrupt present.
 > 
-> > > > 
-> > > > Otherwse
-> > > > 
-> > > > > +               regulator-max-microvolt = <1400000>;
-> > > > > +               regulator-ramp-delay = <200>;
-> > > > 
-> > > > Is this an actual constraint of the SoC? Or is it a characteristic
-> > > > of the regulator? If it is the latter, it belongs in the driver.
-> > > > AFAIK the regulator supports varying the ramp delay (slew rate).
-> 
-> I don't know...
-> 
-> Maybe I should ask Ondrej?
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-It is probably neither.
+This isn't fully functional on ARM MPS platforms yet, but at least
+gets us further.  Without any display connected:
 
-It is used to calculate a delay inserted by the kernel between setting
-a new target voltage over I2C and changing the frequency of the CPU.
-The actual delay is calculated by the difference between previous and
-the new voltage.
+[   14.315986] [drm] found ARM HDLCD version r0p0
+[   14.557038] tda998x 2-0070: found TDA19988
+[   14.622232] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
+[   14.630406] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+[   14.639335] [drm] No driver support for vblank timestamp query.
+[   14.653210] [drm] Cannot find any crtc or sizes - going 1024x768
+[   15.232556] hdlcd 40205000.hdlcd: fb0:  frame buffer device
+[   15.284076] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
 
-I don't remember seeing anything in the datasheet of the regulator.
-This is just some low value that works.
+With a TV connected, the driver doesn't initialise:
 
-It would probably be dependent on the capacitance on the output of the
-regulator, actual load (which varies), etc. So it is a board specific
-value. One could measure it with an oscilloscope if there's a need to
-optimize this.
+[   14.422810] [drm] found ARM HDLCD version r0p0
+[   14.657227] tda998x 2-0070: found TDA19988
+[   14.722439] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
+[   14.730613] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+[   14.739538] [drm] No driver support for vblank timestamp query.
+[   15.311977] hdlcd 40205000.hdlcd: Failed to set initial hw configuration.
+[   15.357402] hdlcd 40205000.hdlcd: master bind failed: -12
+[   15.365082] tda998x: probe of 2-0070 failed with error -12
 
-regards,
-  o.
+I don't think this is correct behaviour - if we fail to set an initial
+configuration (which will be based on the resolution of the connected
+display) why should the driver fail to probe - it's not that there is
+no device, it's (in this case) that there aren't the resources for the
+chosen mode.  Userspace could always try setting a different mode.
 
-> > > > 
-> > > > ChenYu
-> > > > 
-> > > > > +               regulator-boot-on;
-> > > > > +               regulator-always-on;
-> > > > > +       };
-> > > > > +};
-> > > > > +
-> > > > >  &r_pio {
-> > > > >         leds_r_opc: led_pins at 0 {
-> > > > >                 pins = "PL10";
-> > > > > --
-> > > > > 2.13.0
-> > > > > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/7d2c9119/attachment.sig>
+I suspect the above failure is down to either (a) not having enough
+memory available to allocate a 1920x1080 frame buffer, or (b) not
+(yet) being able to program the hdlcd pixel clock for this platform,
+which is currently hard-coded in DT at 23.75MHz.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
