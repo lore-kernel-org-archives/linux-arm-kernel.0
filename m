@@ -1,41 +1,26 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Wed, 26 Jul 2017 18:40:54 +0200
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170726172515.0000185c@huawei.com>
-References: <72145781-e9ec-036f-f752-b4756fef08ee@arm.com>
- <20170726111946.GA6273@hc>
- <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
- <20170726131058.GA8665@hc>
- <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
- <20170726145522.GC28875@nazgul.tnic> <20170726151314.GA10696@hc>
- <0a0daa94-bad7-cbb5-e421-f8e9d6c79d54@arm.com>
- <20170726154623.GB11453@hc> <20170726172515.0000185c@huawei.com>
-Message-ID: <20170726164054.GA13136@hc>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 26 Jul 2017 09:48:58 -0700 (PDT)
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170726141417.GJ3730@linux.vnet.ibm.com>
+References: <20170726103232.0000368e@huawei.com>
+ <20170726132801.00001e8c@huawei.com>
+ <20170726141417.GJ3730@linux.vnet.ibm.com>
+Message-ID: <20170726.094858.1478051591748336400.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 05:25:15PM +0100, Jonathan Cameron wrote:
-> On Wed, 26 Jul 2017 17:46:23 +0200
-> Jan Glauber <jan.glauber@caviumnetworks.com> wrote:
-> 
-> > On Wed, Jul 26, 2017 at 04:17:11PM +0100, Suzuki K Poulose wrote:
-> > > How about adding a soc specific (wrapper) driver for the memory controller, which
-> > > could use the PCI id and trigger EDAC and PMU drivers (based on what is
-> > > selected by configs)  ?  
-> > 
-> > Sounds good to me. Is there a driver that already does this?
-> Sounds like a classic MFD (multifunction device). There are quite a few pci
-> devices to be found under drivers/mfd/ than may provide some inspiration.
+From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+Date: Wed, 26 Jul 2017 07:14:17 -0700
 
-I've looked into that before, from what I recall it did not fit my use
-case. After all these are multi-fn devices.
+> Dave, any other ideas on what might be causing this or what might be
+> tested?
 
-> Jonathan
-> > 
-> > --Jan
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I was going to go through the changes that happened between v4.12
+and now to kernel/timer/tick-sched.c and see if reverting any of
+those help.
+
+But I don't know when I would get to that.
+
+Commit 411fe24e6b7c283c3a1911450cdba6dd3aaea56e, looks particularly juicy.
+:-)
