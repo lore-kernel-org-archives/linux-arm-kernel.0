@@ -1,55 +1,40 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 26 Jul 2017 11:20:05 -0700
-Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
- callback
-In-Reply-To: <yw1xbmo8odan.fsf@mansr.com>
-References: <20170719190734.18566-1-opendmb@gmail.com>
- <20170719190734.18566-3-opendmb@gmail.com>
- <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
- <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
- <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
- <yw1xfudkodvv.fsf@mansr.com>
- <6f0092f7-692f-4a15-1d95-40f4e59c8585@sigmadesigns.com>
- <yw1xbmo8odan.fsf@mansr.com>
-Message-ID: <3b858e14-0da1-d4aa-eb84-f136ece8c2a6@gmail.com>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Wed, 26 Jul 2017 18:26:38 +0000
+Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
+In-Reply-To: <20170724090516.2e0f0d2a@w520.home>
+References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
+ <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
+ <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
+ <0260e398-bd8e-6615-6d5c-1f7c07b6fc09@huawei.com>
+ <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
+ <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>,
+ <20170724090516.2e0f0d2a@w520.home>
+Message-ID: <MWHPR12MB1600065968964410EDFBDA3BC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2017 06:29 AM, M?ns Rullg?rd wrote:
-> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
-> 
->> On 25/07/2017 15:16, M?ns Rullg?rd wrote:
->>
->>> What happened to the patch adding the proper combined function?
->>
->> It appears you're not CCed on v2.
->>
->> https://patchwork.kernel.org/patch/9859799/
->>
->> Doug wrote:
->>> Yes, you understand correctly.  The irq_mask_ack method is entirely
->>> optional and I assume that is why this issue went undetected for so
->>> long; however, it is slightly more efficient to combine the functions
->>> (even if the ack is unnecessary) which is why I chose to do so for my
->>> changes to the irqchip-brcmstb-l2 driver where I first discovered this
->>> issue.  How much value the improved efficiency has is certainly
->>> debatable, but interrupt handling is one area where people might care
->>> about such a small difference.  As the irqchip-tango driver maintainer
->>> you are welcome to decide whether or not the irq_mask_ack method makes
->>> sense to you.
->>
->> My preference goes to leaving the irq_mask_ack callback undefined,
->> and let the irqchip framework use irq_mask and irq_ack instead.
-> 
-> Why would you prefer the less efficient way?
-> 
+  By the way Ding, two issues:
 
-Same question here, that does not really make sense to me.
+ 1. Did we ever get any acknowledgement from either Intel or AMD
+    on this patch?  I know that we can't ensure that, but it sure would
+    be nice since the PCI Quirks that we're putting in affect their
+    products.
 
-The whole point of this patch series is to have a set of efficient and
-bugfree (or nearly) helper functions that drivers can rely on, are you
-saying that somehow using irq_mask_and_ack is exposing a bug in the
-tango irqchip driver and using the separate functions does not expose
-this bug?
--- 
-Florian
+ 2. I just realized that there's still a small hole in the patch with
+    respect to PCIe SR-IOV Virtual Functions.  When the PCI Quirk
+    notices a problematic PCIe Device and marks it to note that
+    it's not "happy" receiving Transaction Layer Packets with the
+    Relaxed Ordering Attribute set, it's my understanding that your
+    current patch iterates down the PCIe Fabric and turns off the
+    PCIe Capability Device Control[Relaxed Ordering Enable].
+    But this scan may miss any SR-IOV VFs because they
+    probably won't be instantiated at that time.  And, at a later
+    time, when they are instantiated, they could well have their
+    Relaxed Ordering Enable set.
+
+    I think that the patch will need to be extended to modify
+    drivers/pci.c/iov.c:sriov_enable() to explicitly turn off
+    Relaxed Ordering Enable if the Root Complex is marked
+    for no RO TLPs.
+
+Casey
