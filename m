@@ -1,54 +1,97 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 25 Jul 2017 21:15:51 -0500
-Subject: [PATCH 2/3] ARM: dts: am437xx: Enable NAND dma prefetch by default
-In-Reply-To: <20170726021552.19880-1-fcooper@ti.com>
-References: <20170726021552.19880-1-fcooper@ti.com>
-Message-ID: <20170726021552.19880-3-fcooper@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 26 Jul 2017 10:24:16 +0800
+Subject: [PATCH] usb: dts: fix the issue that usb is not detected on
+ ls1088ardb
+In-Reply-To: <1500518306-9879-1-git-send-email-yinbo.zhu@nxp.com>
+References: <1500518306-9879-1-git-send-email-yinbo.zhu@nxp.com>
+Message-ID: <20170726022414.GH29754@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the default method of prefetch polled shows the highest
-possible read and write speed when minimal non NAND background
-activity is being done. But it is also very CPU intensive to reach
-these high speeds (CPU load of 99% via mtd performance tests). While
-DMA prefetch only uses 50% of the CPU to achieve around 23% less in
-top read and write performance.
+On Thu, Jul 20, 2017 at 10:38:26AM +0800, yinbo.zhu at nxp.com wrote:
+> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+> 
+> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
 
-However, as the non NAND CPU load increases the read and write
-performance takes a large hit when using polled prefetch. Therefore,
-prefetch dma mode ends up outperforming prefetch polled in general
-"system level" test. So switch to using dma prefetch by default since
-it is likely what most users would prefer.
+The subject should be prefixed like 'arm64: dts: ls1088a: ...'.  And
+the current subject is confusing.  You are adding USB support rather
+than fixing something.
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- arch/arm/boot/dts/am437x-gp-evm.dts  | 1 +
- arch/arm/boot/dts/am43x-epos-evm.dts | 1 +
- 2 files changed, 2 insertions(+)
+Also empty commit log is not really good.
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index 29a538e..a0a4ed0 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -842,6 +842,7 @@
- 		interrupts = <0 IRQ_TYPE_NONE>, /* fifoevent */
- 			     <1 IRQ_TYPE_NONE>;	/* termcount */
- 		rb-gpios = <&gpmc 0 GPIO_ACTIVE_HIGH>;	/* gpmc_wait0 */
-+		ti,nand-xfer-type = "prefetch-dma";
- 		ti,nand-ecc-opt = "bch16";
- 		ti,elm-id = <&elm>;
- 		nand-bus-width = <8>;
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 54f40f3..9d276af 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -564,6 +564,7 @@
- 		interrupts = <0 IRQ_TYPE_NONE>, /* fifoevent */
- 			     <1 IRQ_TYPE_NONE>;	/* termcount */
- 		rb-gpios = <&gpmc 0 GPIO_ACTIVE_HIGH>;	/* gpmc_wait0 */
-+		ti,nand-xfer-type = "prefetch-dma";
- 		ti,nand-ecc-opt = "bch16";
- 		ti,elm-id = <&elm>;
- 		nand-bus-width = <8>;
--- 
-2.10.0
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 18 ++++++++++++++++++
+>  2 files changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> index e9276a5..d5c3d96 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> @@ -149,6 +149,14 @@
+>  	status = "okay";
+>  };
+>  
+> +&usb0 {
+> +	status = "okay";
+> +};
+> +
+> +&usb1 {
+> +	status = "okay";
+> +};
+> +
+>  &emdio1 {
+>  	/* Freescale F104 PHY1 */
+>  	mdio1_phy1: emdio1_phy at 1 {
+
+What tree is your patch generated against?  I do not see this 'emdio1'
+device in my tree.
+
+Remember to sort the node alphabetically in label name when adding new
+labelled nodes.
+
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> index 3a3be87..65b3059 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> @@ -566,6 +566,24 @@
+>  			fsl,qspi-has-second-chip;
+>  		};
+>  
+> +		usb0: usb3 at 3100000 {
+> +			compatible = "snps,dwc3";
+> +			reg = <0x0 0x3100000 0x0 0x10000>;
+> +			interrupts = <0 80 0x4>; /* Level high type */
+
+Use IRQ_TYPE_LEVEL_HIGH, so that you can save the comment here.
+
+> +			dr_mode = "host";
+> +			configure-gfladj;
+
+What is this property?
+
+Shawn
+
+> +			snps,dis_rxdet_inp3_quirk;
+> +		};
+> +
+> +		usb1: usb3 at 3110000 {
+> +			compatible = "snps,dwc3";
+> +			reg = <0x0 0x3110000 0x0 0x10000>;
+> +			interrupts = <0 81 0x4>; /* Level high type */
+> +			dr_mode = "host";
+> +			configure-gfladj;
+> +			snps,dis_rxdet_inp3_quirk;
+> +		};
+> +
+>  		pcie at 3400000 {
+>  			compatible = "fsl,ls2088a-pcie", "fsl,ls1088a-pcie",
+>  				     "snps,dw-pcie";
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
