@@ -1,79 +1,123 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=C5=99ej?= Jirman)
-Date: Wed, 26 Jul 2017 14:54:40 +0200
-Subject: [linux-sunxi] [PATCH 10/10] ARM: dts: sun8i: Add SY8106A
- regulator to Orange Pi PC
-In-Reply-To: <20170726114420.ipirqgbluqmggcjy@flea>
-References: <20170723102749.17323-1-icenowy@aosc.io>
- <20170723102749.17323-11-icenowy@aosc.io>
- <CAGb2v66AGjazHT-+hWVLyNBLDw=DJ5yTmNxF-_=BtZFfjnni-A@mail.gmail.com>
- <25C8A89C-8495-4787-934C-8E9667CD70BF@aosc.io>
- <CAGb2v64xXOmC44TKrSDZFAh6i_rgFEccCHj4EG+1fxFJd9fjjw@mail.gmail.com>
- <82507f40a1ddba8517cf09f51d3afa33@aosc.io>
- <1501064628.14577.1.camel@megous.com>
- <20170726114420.ipirqgbluqmggcjy@flea>
-Message-ID: <1501073680.20056.3.camel@megous.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 26 Jul 2017 08:00:13 -0500
+Subject: [PATCH v3 1/2] gpio: davinci: Add keystone-k2g compatible
+In-Reply-To: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
+References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <5aa0d273-8e05-a5ff-7931-b9a94acade36@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard p??e v St 26. 07. 2017 v 13:44 +0200:
-> Hi,
-> 
-> On Wed, Jul 26, 2017 at 12:23:48PM +0200, Ond?ej Jirman wrote:
-> > Hi,
-> > 
-> > icenowy at aosc.io p??e v St 26. 07. 2017 v 15:36 +0800:
-> > > 
-> > > > > > 
-> > > > > > Otherwse
-> > > > > > 
-> > > > > > > +               regulator-max-microvolt = <1400000>;
-> > > > > > > +               regulator-ramp-delay = <200>;
-> > > > > > 
-> > > > > > Is this an actual constraint of the SoC? Or is it a characteristic
-> > > > > > of the regulator? If it is the latter, it belongs in the driver.
-> > > > > > AFAIK the regulator supports varying the ramp delay (slew rate).
-> > > 
-> > > I don't know...
-> > > 
-> > > Maybe I should ask Ondrej?
-> > 
-> > It is probably neither.
-> > 
-> > It is used to calculate a delay inserted by the kernel between setting
-> > a new target voltage over I2C and changing the frequency of the CPU.
-> > The actual delay is calculated by the difference between previous and
-> > the new voltage.
-> > 
-> > I don't remember seeing anything in the datasheet of the regulator.
-> > This is just some low value that works.
-> > 
-> > It would probably be dependent on the capacitance on the output of the
-> > regulator, actual load (which varies), etc. So it is a board specific
-> > value. One could measure it with an oscilloscope if there's a need to
-> > optimize this.
-> 
-> If this is a reasonable default, then this should be in the
-> driver. You can't expect anyone to properly calculate a ramp delay and
-> have access to both a scope and the CPU power lines.
+Hi Keerthy,
 
-It translates to 1ms per 0.2V which is highly conservative. The real
-times will be in 1-10us range. So I guess this could be a default in
-the driver.
+On 07/26/2017 01:45 AM, Keerthy wrote:
+> The patch adds keystone-k2g compatible, specific properties and
+> an example.
 
-regards,
-  o.
+Please update patch header to "dt-bindings: gpio: davinci: ...."
 
-> Maxime
 > 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/f70a2b27/attachment.sig>
+> Changes in v3:
+> 
+>   * Added details about family of SoCs corresponding to compatibles.
+> 
+>  .../devicetree/bindings/gpio/gpio-davinci.txt      | 40 +++++++++++++++++++++-
+>  1 file changed, 39 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> index 5079ba7..fb9efee 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> @@ -1,7 +1,10 @@
+>  Davinci/Keystone GPIO controller bindings
+>  
+>  Required Properties:
+> -- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+> +- compatible: should be "ti,dm6441-gpio": for Davinci da850 SoCs 
+> +			"ti,keystone-gpio": for Keystone 2 66AK2H/K, 66AK2L,
+> +						66AK2E SoCs
+> +			"ti,keystone-k2g-gpio", "ti,keystone-gpio": for 66AK2G
+>  
+>  - reg: Physical base address of the controller and the size of memory mapped
+>         registers.
+> @@ -26,6 +29,17 @@ The GPIO controller also acts as an interrupt controller. It uses the default
+>  two cells specifier as described in Documentation/devicetree/bindings/
+>  interrupt-controller/interrupts.txt.
+>  
+> +Required Properties specific to keystone-k2g
+
+Thanks for updating the binding for the clocks, but clocks are not
+specific to K2G. They also apply to other K2 SoCs. Davinci platforms do
+not have DT clocks atm, so the Davinci portion can be updated later if
+and when they get added.
+
+> +
+> +- clocks: Should contain devices input clock. The first parameter
+> +           is a handle to k2g_clks. The second parameter is the
+> +           device ID and the third parameter is the clock ID. One can
+> +           refer: http://processors.wiki.ti.com/index.php/TISCI#66AK2G02_Data
+
+No need for this link here, just refer to the appropriate clock
+bindings. Some thing like the following would be better
+
+- clocks:               Should contain the device's input clock, and
+                        should be defined as per the appropriate clock
+bindings consumer usage in,
+
+Documentation/devicetree/bindings/clock/keystone-gate.txt
+                            for 66AK2HK/66AK2L/66AK2E SoCs or,
+
+Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+                            for 66AK2G SoCs
+
+> +
+> +           Example: <&k2g_clks 0x001c 0x0>;
+
+This can be dropped as well, below example already demonstrates it.
+
+> +
+> +- clock-names: The driver expects the clock name to be "gpio";
+
+Just say, Should be "gpio". No need of mentioning about the driver.
+
+> +
+>  Example:
+>  
+>  gpio: gpio at 1e26000 {
+> @@ -60,3 +74,27 @@ leds {
+>  		...
+>  	};
+>  };
+> +
+> +Example for keystone-k2g:
+
+s/keystone-k2g/66AK2G/
+
+> +
+> +gpio0: gpio at 2603000 {
+> +	compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
+> +	reg = <0x02603000 0x100>;
+> +	gpio-controller;
+> +	#gpio-cells = <2>;
+> +	interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
+> +			<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
+> +			<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
+> +			<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
+> +			<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
+> +			<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
+> +			<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
+> +			<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
+> +			<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +	ti,ngpio = <144>;
+> +	ti,davinci-gpio-unbanked = <0>;
+> +	clocks = <&k2g_clks 0x001b 0x0>;
+> +	clock-names = "gpio";
+> +};
+> 
+
+regards
+Suman
