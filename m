@@ -1,329 +1,40 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 26 Jul 2017 14:35:08 +0200
-Subject: [PATCH v3 4/9] pwm: Add STM32 LPTimer PWM driver
-In-Reply-To: <1499445068-7037-5-git-send-email-fabrice.gasnier@st.com>
-References: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
- <1499445068-7037-5-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <bbebdf27-e811-23d4-32e5-71941502197d@st.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Wed, 26 Jul 2017 20:35:27 +0800
+Subject: [PATCH] memory: mtk-smi: Use of_device_get_match_data helper
+In-Reply-To: <1d31eedd-fdab-bd6f-65b1-c0e8b79a8888@arm.com>
+References: <1501063150-8778-1-git-send-email-honghui.zhang@mediatek.com>
+ <1d31eedd-fdab-bd6f-65b1-c0e8b79a8888@arm.com>
+Message-ID: <1501072527.20860.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2017 06:31 PM, Fabrice Gasnier wrote:
-> Add support for single PWM channel on Low-Power Timer, that can be
-> found on some STM32 platforms.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
-> Changes in v3:
-> - remove prescalers[] array, use power-of-2 presc directly
-> - Update following Thierry's comments:
-> - fix issue using FIELD_GET() macro
-> - Add get_state() callback
-> - remove some checks in probe
-> - slight rework 'reenable' flag
-> - use more common method to disable pwm in remove()
+On Wed, 2017-07-26 at 11:36 +0100, Robin Murphy wrote:
+> On 26/07/17 10:59, honghui.zhang at mediatek.com wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > 
 
-Hi Thierry,
-
-Gentle ping for PWM driver review since I did changes in v3.
-Please advise.
-
-Best Regards,
-Fabrice
+> >  	 * for mtk smi gen 1, we need to get the ao(always on) base to config
+> >  	 * m4u port, and we need to enable the aync clock for transform the smi
+> >  	 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
+> >  	 * base.
+> >  	 */
+> > -	smi_gen = (enum mtk_smi_gen)of_id->data;
+> > -	if (smi_gen == MTK_SMI_GEN1) {
+> > +	smi_gen = of_device_get_match_data(dev);
 > 
-> Changes in v2:
-> - s/Low Power/Low-Power
-> - update few comment lines
-> ---
->  drivers/pwm/Kconfig        |  10 ++
->  drivers/pwm/Makefile       |   1 +
->  drivers/pwm/pwm-stm32-lp.c | 246 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 257 insertions(+)
->  create mode 100644 drivers/pwm/pwm-stm32-lp.c
+> The data you're retrieving is the exact same thing as of_id->data was,
+> i.e. an enum mtk_smi_gen cast to void*, so dereferencing it is not a
+> good idea. The first patch was almost right; you just need to keep the
+> cast in the assignment to smi_gen.
 > 
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 313c107..7cb982b 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -417,6 +417,16 @@ config PWM_STM32
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-stm32.
->  
-> +config PWM_STM32_LP
-> +	tristate "STMicroelectronics STM32 PWM LP"
-> +	depends on MFD_STM32_LPTIMER || COMPILE_TEST
-> +	help
-> +	  Generic PWM framework driver for STMicroelectronics STM32 SoCs
-> +	  with Low-Power Timer (LPTIM).
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-stm32-lp.
-> +
->  config PWM_STMPE
->  	bool "STMPE expander PWM export"
->  	depends on MFD_STMPE
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index 93da1f7..a3a4bee 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -40,6 +40,7 @@ obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
->  obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
->  obj-$(CONFIG_PWM_STI)		+= pwm-sti.o
->  obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
-> +obj-$(CONFIG_PWM_STM32_LP)	+= pwm-stm32-lp.o
->  obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
->  obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
->  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-> diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
-> new file mode 100644
-> index 0000000..9793b29
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-stm32-lp.c
-> @@ -0,0 +1,246 @@
-> +/*
-> + * STM32 Low-Power Timer PWM driver
-> + *
-> + * Copyright (C) STMicroelectronics 2017
-> + *
-> + * Author: Gerald Baeza <gerald.baeza@st.com>
-> + *
-> + * License terms: GNU General Public License (GPL), version 2
-> + *
-> + * Inspired by Gerald Baeza's pwm-stm32 driver
-> + */
-> +
-> +#include <linux/bitfield.h>
-> +#include <linux/mfd/stm32-lptimer.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pwm.h>
-> +
-> +struct stm32_pwm_lp {
-> +	struct pwm_chip chip;
-> +	struct clk *clk;
-> +	struct regmap *regmap;
-> +};
-> +
-> +static inline struct stm32_pwm_lp *to_stm32_pwm_lp(struct pwm_chip *chip)
-> +{
-> +	return container_of(chip, struct stm32_pwm_lp, chip);
-> +}
-> +
-> +/* STM32 Low-Power Timer is preceded by a configurable power-of-2 prescaler */
-> +#define STM32_LPTIM_MAX_PRESCALER	128
-> +
-> +static int stm32_pwm_lp_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-> +			      struct pwm_state *state)
-> +{
-> +	struct stm32_pwm_lp *priv = to_stm32_pwm_lp(chip);
-> +	unsigned long long prd, div, dty;
-> +	struct pwm_state cstate;
-> +	u32 val, mask, cfgr, presc = 0;
-> +	bool reenable;
-> +	int ret;
-> +
-> +	pwm_get_state(pwm, &cstate);
-> +	reenable = !cstate.enabled;
-> +
-> +	if (!state->enabled) {
-> +		if (cstate.enabled) {
-> +			/* Disable LP timer */
-> +			ret = regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
-> +			if (ret)
-> +				return ret;
-> +			/* disable clock to PWM counter */
-> +			clk_disable(priv->clk);
-> +		}
-> +		return 0;
-> +	}
-> +
-> +	/* Calculate the period and prescaler value */
-> +	div = (unsigned long long)clk_get_rate(priv->clk) * state->period;
-> +	do_div(div, NSEC_PER_SEC);
-> +	prd = div;
-> +	while (div > STM32_LPTIM_MAX_ARR) {
-> +		presc++;
-> +		if ((1 << presc) > STM32_LPTIM_MAX_PRESCALER) {
-> +			dev_err(priv->chip.dev, "max prescaler exceeded\n");
-> +			return -EINVAL;
-> +		}
-> +		div = prd >> presc;
-> +	}
-> +	prd = div;
-> +
-> +	/* Calculate the duty cycle */
-> +	dty = prd * state->duty_cycle;
-> +	do_div(dty, state->period);
-> +
-> +	if (!cstate.enabled) {
-> +		/* enable clock to drive PWM counter */
-> +		ret = clk_enable(priv->clk);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	ret = regmap_read(priv->regmap, STM32_LPTIM_CFGR, &cfgr);
-> +	if (ret)
-> +		goto err;
-> +
-> +	if ((FIELD_GET(STM32_LPTIM_PRESC, cfgr) != presc) ||
-> +	    (FIELD_GET(STM32_LPTIM_WAVPOL, cfgr) != state->polarity)) {
-> +		val = FIELD_PREP(STM32_LPTIM_PRESC, presc);
-> +		val |= FIELD_PREP(STM32_LPTIM_WAVPOL, state->polarity);
-> +		mask = STM32_LPTIM_PRESC | STM32_LPTIM_WAVPOL;
-> +
-> +		/* Must disable LP timer to modify CFGR */
-> +		reenable = true;
-> +		ret = regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
-> +		if (ret)
-> +			goto err;
-> +
-> +		ret = regmap_update_bits(priv->regmap, STM32_LPTIM_CFGR, mask,
-> +					 val);
-> +		if (ret)
-> +			goto err;
-> +	}
-> +
-> +	if (reenable) {
-> +		/* Must (re)enable LP timer to modify CMP & ARR */
-> +		ret = regmap_write(priv->regmap, STM32_LPTIM_CR,
-> +				   STM32_LPTIM_ENABLE);
-> +		if (ret)
-> +			goto err;
-> +	}
-> +
-> +	ret = regmap_write(priv->regmap, STM32_LPTIM_ARR, prd - 1);
-> +	if (ret)
-> +		goto err;
-> +
-> +	ret = regmap_write(priv->regmap, STM32_LPTIM_CMP, prd - (1 + dty));
-> +	if (ret)
-> +		goto err;
-> +
-> +	/* ensure CMP & ARR registers are properly written */
-> +	ret = regmap_read_poll_timeout(priv->regmap, STM32_LPTIM_ISR, val,
-> +				       (val & STM32_LPTIM_CMPOK_ARROK),
-> +				       100, 1000);
-> +	if (ret) {
-> +		dev_err(priv->chip.dev, "ARR/CMP registers write issue\n");
-> +		goto err;
-> +	}
-> +	ret = regmap_write(priv->regmap, STM32_LPTIM_ICR,
-> +			   STM32_LPTIM_CMPOKCF_ARROKCF);
-> +	if (ret)
-> +		goto err;
-> +
-> +	if (reenable) {
-> +		/* Start LP timer in continuous mode */
-> +		ret = regmap_update_bits(priv->regmap, STM32_LPTIM_CR,
-> +					 STM32_LPTIM_CNTSTRT,
-> +					 STM32_LPTIM_CNTSTRT);
-> +		if (ret) {
-> +			regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
-> +			goto err;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +err:
-> +	if (!cstate.enabled)
-> +		clk_disable(priv->clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static void stm32_pwm_lp_get_state(struct pwm_chip *chip,
-> +				   struct pwm_device *pwm,
-> +				   struct pwm_state *state)
-> +{
-> +	struct stm32_pwm_lp *priv = to_stm32_pwm_lp(chip);
-> +	unsigned long rate = clk_get_rate(priv->clk);
-> +	u32 val, presc, prd;
-> +	u64 tmp;
-> +
-> +	regmap_read(priv->regmap, STM32_LPTIM_CR, &val);
-> +	state->enabled = !!FIELD_GET(STM32_LPTIM_ENABLE, val);
-> +	/* Keep PWM counter clock refcount in sync with PWM initial state */
-> +	if (state->enabled)
-> +		clk_enable(priv->clk);
-> +
-> +	regmap_read(priv->regmap, STM32_LPTIM_CFGR, &val);
-> +	presc = FIELD_GET(STM32_LPTIM_PRESC, val);
-> +	state->polarity = FIELD_GET(STM32_LPTIM_WAVPOL, val);
-> +
-> +	regmap_read(priv->regmap, STM32_LPTIM_ARR, &prd);
-> +	tmp = prd + 1;
-> +	tmp = (tmp << presc) * NSEC_PER_SEC;
-> +	state->period = DIV_ROUND_CLOSEST_ULL(tmp, rate);
-> +
-> +	regmap_read(priv->regmap, STM32_LPTIM_CMP, &val);
-> +	tmp = prd - val;
-> +	tmp = (tmp << presc) * NSEC_PER_SEC;
-> +	state->duty_cycle = DIV_ROUND_CLOSEST_ULL(tmp, rate);
-> +}
-> +
-> +static const struct pwm_ops stm32_pwm_lp_ops = {
-> +	.owner = THIS_MODULE,
-> +	.apply = stm32_pwm_lp_apply,
-> +	.get_state = stm32_pwm_lp_get_state,
-> +};
-> +
-> +static int stm32_pwm_lp_probe(struct platform_device *pdev)
-> +{
-> +	struct stm32_lptimer *ddata = dev_get_drvdata(pdev->dev.parent);
-> +	struct stm32_pwm_lp *priv;
-> +	int ret;
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->regmap = ddata->regmap;
-> +	priv->clk = ddata->clk;
-> +	priv->chip.base = -1;
-> +	priv->chip.dev = &pdev->dev;
-> +	priv->chip.ops = &stm32_pwm_lp_ops;
-> +	priv->chip.npwm = 1;
-> +
-> +	ret = pwmchip_add(&priv->chip);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	return 0;
-> +}
-> +
-> +static int stm32_pwm_lp_remove(struct platform_device *pdev)
-> +{
-> +	struct stm32_pwm_lp *priv = platform_get_drvdata(pdev);
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < priv->chip.npwm; i++)
-> +		if (pwm_is_enabled(&priv->chip.pwms[i]))
-> +			pwm_disable(&priv->chip.pwms[i]);
-> +
-> +	return pwmchip_remove(&priv->chip);
-> +}
-> +
-> +static const struct of_device_id stm32_pwm_lp_of_match[] = {
-> +	{ .compatible = "st,stm32-pwm-lp", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, stm32_pwm_lp_of_match);
-> +
-> +static struct platform_driver stm32_pwm_lp_driver = {
-> +	.probe	= stm32_pwm_lp_probe,
-> +	.remove	= stm32_pwm_lp_remove,
-> +	.driver	= {
-> +		.name = "stm32-pwm-lp",
-> +		.of_match_table = of_match_ptr(stm32_pwm_lp_of_match),
-> +	},
-> +};
-> +module_platform_driver(stm32_pwm_lp_driver);
-> +
-> +MODULE_ALIAS("platform:stm32-pwm-lp");
-> +MODULE_DESCRIPTION("STMicroelectronics STM32 PWM LP driver");
-> +MODULE_LICENSE("GPL v2");
+> Robin.
+> 
+Hi, Robin, thanks very much.
+I will send a new version.
+
+> > +	if (*smi_gen == MTK_SMI_GEN1) {
+> >  		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  		common->smi_ao_base = devm_ioremap_resource(dev, res);
+> >  		if (IS_ERR(common->smi_ao_base))
+> > 
 > 
