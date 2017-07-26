@@ -1,82 +1,27 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 26 Jul 2017 15:08:06 +0800
-Subject: [linux-sunxi] [PATCH 10/10] ARM: dts: sun8i: Add SY8106A
- regulator to Orange Pi PC
-In-Reply-To: <20170723102749.17323-11-icenowy@aosc.io>
+Date: Wed, 26 Jul 2017 15:14:43 +0800
+Subject: [linux-sunxi] [PATCH 05/10] clk: sunxi-ng: h3: gate then ungate
+ PLL CPU clk after rate change
+In-Reply-To: <20170723102749.17323-6-icenowy@aosc.io>
 References: <20170723102749.17323-1-icenowy@aosc.io>
- <20170723102749.17323-11-icenowy@aosc.io>
-Message-ID: <CAGb2v66AGjazHT-+hWVLyNBLDw=DJ5yTmNxF-_=BtZFfjnni-A@mail.gmail.com>
+ <20170723102749.17323-6-icenowy@aosc.io>
+Message-ID: <CAGb2v66jK+iAbKVsv6=4tb0470KBdwU+AHjWDnWwKKTY+U+W6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, Jul 23, 2017 at 6:27 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> From: Ondrej Jirman <megous@megous.com>
+> From: Chen-Yu Tsai <wens@csie.org>
 >
-> Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
-> Orange Pi PC, then set the power supply of the ARM cores to this
-> regulator, in order to enable DVFS.
+> This patch utilizes the new PLL clk notifier to gate then ungate the
+> PLL CPU clock after rate changes. This should prevent any system hangs
+> resulting from cpufreq changes to the clk.
 >
-> Signed-off-by: Ondrej Jirman <megous@megous.com>
-> [Icenowy: Enable DVFS in this patch, slight changes and change commit
->  message]
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> index 998b60f8d295..d855f8b6254e 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> @@ -98,6 +98,10 @@
->         status = "okay";
->  };
->
-> +&cpu0 {
-> +       cpu-supply = <&reg_sy8106a>;
-> +};
-> +
->  &ehci0 {
->         status = "okay";
->  };
-> @@ -160,6 +164,21 @@
->         };
->  };
->
-> +&r_i2c {
-> +       status = "okay";
-> +
-> +       reg_sy8106a: regulator at 65 {
-> +               compatible = "silergy,sy8106a";
-> +               reg = <0x65>;
-> +               regulator-name = "vdd-cpux";
-> +               regulator-min-microvolt = <1000000>;
+> Reported-by: Ondrej Jirman <megous@megous.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Tested-by: Icenowy Zheng <icenowy@aosc.io>
 
-According to the H3 datasheet, the minimum voltage is 1.1V, not 1V.
+This is missing
 
-Otherwse
-
-> +               regulator-max-microvolt = <1400000>;
-> +               regulator-ramp-delay = <200>;
-
-Is this an actual constraint of the SoC? Or is it a characteristic
-of the regulator? If it is the latter, it belongs in the driver.
-AFAIK the regulator supports varying the ramp delay (slew rate).
+Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
 
 ChenYu
-
-> +               regulator-boot-on;
-> +               regulator-always-on;
-> +       };
-> +};
-> +
->  &r_pio {
->         leds_r_opc: led_pins at 0 {
->                 pins = "PL10";
-> --
-> 2.13.0
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
