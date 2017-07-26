@@ -1,46 +1,37 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 26 Jul 2017 16:09:43 -0500
-Subject: [PATCH v2] arm64: dts: cavium: fix PCI bus dtc warnings
+Date: Wed, 26 Jul 2017 16:09:40 -0500
+Subject: [PATCH v2] ARM: dts: versatile: fix PCI bus dtc warnings
 In-Reply-To: <20170726210943.6875-1-robh@kernel.org>
 References: <20170726210943.6875-1-robh@kernel.org>
-Message-ID: <20170726210943.6875-7-robh@kernel.org>
+Message-ID: <20170726210943.6875-4-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dtc recently added PCI bus checks. Fix these warnings:
-
-arch/arm64/boot/dts/cavium/thunder2-99xx.dtb: Warning (pci_bridge): Node /pci missing bus-range for PCI bridge
-arch/arm64/boot/dts/cavium/thunder2-99xx.dtb: Warning (unit_address_vs_reg): Node /pci has a reg or ranges property, but no unit name
+dtc recently added PCI bus checks. Fix these warnings.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Jayachandran C <jnair@caviumnetworks.com>
+Cc: Russell King <linux@armlinux.org.uk>
 ---
 v2:
-- Reapply broadcom vulkan changes to thunder2.
+- rebase on v4.13-rc2
 
- arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+arm-soc, Please apply as Versatile has no maintainer.
 
-diff --git a/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi b/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
-index 4220fbdcb24a..ea50c1320bf7 100644
---- a/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
-+++ b/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
-@@ -98,7 +98,7 @@
- 		clock-output-names = "clk125mhz";
- 	};
+ arch/arm/boot/dts/versatile-pb.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/versatile-pb.dts b/arch/arm/boot/dts/versatile-pb.dts
+index 06e2331f666d..9abe26028c8b 100644
+--- a/arch/arm/boot/dts/versatile-pb.dts
++++ b/arch/arm/boot/dts/versatile-pb.dts
+@@ -39,7 +39,7 @@
+ 			clock-names = "apb_pclk";
+ 		};
  
--	pci {
-+	pci at 30000000 {
- 		compatible = "pci-host-ecam-generic";
- 		device_type = "pci";
- 		#interrupt-cells = <1>;
-@@ -118,6 +118,7 @@
- 		ranges =
- 		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
- 		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
-+		bus-range = <0 0xff>;
- 		interrupt-map-mask = <0 0 0 7>;
- 		interrupt-map =
- 		      /* addr  pin  ic   icaddr  icintr */
+-		pci-controller at 10001000 {
++		pci at 10001000 {
+ 			compatible = "arm,versatile-pci";
+ 			device_type = "pci";
+ 			reg = <0x10001000 0x1000
 -- 
 2.11.0
