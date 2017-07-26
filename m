@@ -1,48 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 26 Jul 2017 16:28:29 +0800
-Subject: [PATCH v2 6/9] ARM: sun8i: a83t: cubietruck-plus: Enable PMIC part of
- AXP818 PMIC
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 26 Jul 2017 10:32:42 +0200
+Subject: [PATCH v2 0/9] mfd: axp20x: Add basic support for AXP813
 In-Reply-To: <20170726082832.16789-1-wens@csie.org>
 References: <20170726082832.16789-1-wens@csie.org>
-Message-ID: <20170726082832.16789-7-wens@csie.org>
+Message-ID: <20170726083242.k35gnk22h35as55n@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP813/AXP818 PMICs used with the A83T/H8 SoCs are actually 2 dies
-in one package sharing the serial bus (I2C/RSB) pins. One die is the
-actual PMIC. The other is an AC100 codec / RTC combo chip.
+On Wed, Jul 26, 2017 at 04:28:23PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This is v2 of my AXP813 support series. The device tree patches are
+> based on my A83T MMC support series. These will go through the sunxi
+> tree. The dt-binding and mfd patches are based on v4.13-rc1. These
+> will go through Lee's mfd tree.
+> 
+> Changes since v1:
+> 
+>   - Provided relative path for ac100.txt in dt-bindings/mfd/axp20x.txt
+> 
+>   - Added Rob's acks to dt-binding patches
+> 
+>   - Added Quentin's "mfd: axp20x: use correct platform device id for
+>     many PEK" patch to this series. This patch depends on mfd changes
+>     in this series. It is included so Lee can take them together in
+>     one go.
+> 
+>   - Added Lee's mfd-acks to mfd patches
+> 
+>   - Added axp818 compatible with axp813 fallback. The two chips are
+>     identical except for the markings. The added compatible matches
+>     what is actually on the board, to avoid confusing readers.
+> 
+>   - Fixed up device tree patches to mention which board is changed
+> 
+>   - Added device tree patches for the H8 homlet
 
-This patch enables the RSB controller and adds a device node for the
-PMIC die to the Cubietruck Plus device tree. Since the AXP813 and
-AXP818 are virtually identical, this patch uses the compatible string
-for the former as a fallback.
+For the whole serie,
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Maxime
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-index 163ddf8868b5..d88a22ac6222 100644
---- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-@@ -129,6 +129,17 @@
- 	status = "okay";
- };
- 
-+&r_rsb {
-+	status = "okay";
-+
-+	axp81x: pmic at 3a3 {
-+		compatible = "x-powers,axp818", "x-powers,axp813";
-+		reg = <0x3a3>;
-+		interrupt-parent = <&r_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
- &spdif {
- 	status = "okay";
- };
 -- 
-2.13.3
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/8696d85a/attachment.sig>
