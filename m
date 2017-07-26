@@ -1,126 +1,50 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 26 Jul 2017 01:42:35 +0000
-Subject: [alsa-devel] [PATCH] ASoC: fix balance
- of	of_node_get()/of_node_put()
-In-Reply-To: <20170725214952.6491-1-borneo.antonio@gmail.com>
-References: <20170725214952.6491-1-borneo.antonio@gmail.com>
-Message-ID: <87y3rcm12o.wl%kuninori.morimoto.gx@renesas.com>
+From: hw.likun@huawei.com (Li Kun)
+Date: Wed, 26 Jul 2017 09:47:35 +0800
+Subject: [RFC PATCH untested] arm64: kernel: implement fast refcount
+ checking
+In-Reply-To: <CAKv+Gu8L1M6iO-pELrVvouxgh+t1qjzD4fOu3Fw+LeiWMZWzpA@mail.gmail.com>
+References: <20170725114901.31403-1-ard.biesheuvel@linaro.org>
+ <CAGXu5jLNB5dmA0o=n_nn=4NRu3LjuNf5PGRopATuRiq0aJ1ECA@mail.gmail.com>
+ <CAKv+Gu8L1M6iO-pELrVvouxgh+t1qjzD4fOu3Fw+LeiWMZWzpA@mail.gmail.com>
+Message-ID: <c89c560c-c8b5-2079-6e19-0b85d9658ca3@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard and Kees,
 
-Hi
+Yes, i have been working on this for several days, but i think Ard's 
+patch is better than mine in some ways.
+So i'll help reviewing the patch and try to give some suggestions.
+Never mind:)
 
-> On Hikey target board, enabling CONFIG_OF_DYNAMIC triggers several
-> errors at kernel boot, like the following one
-> OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0/endpoint
-> each followed by stack dump.
-> 
-> Fixed by:
-> - removing of_node_put() in the body of of_for_each_phandle(){},
->   since already provided at each iteration. Add it in case the
->   loop is break out;
-> - adding of_node_get() before calling of_graph_get_port_parent()
->   or asoc_graph_card_dai_link_of().
-> 
-> Tested with kernel v4.13-rc1 with hikey_defconfig taken from
-> https://git.linaro.org/people/john.stultz/android-dev.git
-> branch dev/hikey-mainline-WIP
-> 
-> Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
-> ---
+on 2017/7/26 1:20, Ard Biesheuvel wrote:
+> On 25 July 2017 at 18:13, Kees Cook <keescook@chromium.org> wrote:
+>> On Tue, Jul 25, 2017 at 4:49 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> Hi all,
+>>>
+>>> I had a stab at porting the fast refcount checks to arm64. It is slightly
+>>> less straight-forward than x86 given that we need to support both LSE and
+>>> LL/SC, and fallback to the latter if running a kernel built with support
+>>> for the former on hardware that does not support it.
+>>>
+>>> It is build tested with and without LSE support, and boots fine on non-LSE
+>>> hardware in both cases.
+>> Ah! Very cool. Hopefully you and Li can compare notes; I think they've
+>> been working on an implementation too.
+>>
+> I wasn't aware of that.
+>
+>>> Suggestions welcome as to how to test and/or benchmark this,
+>> I'll post a patch for LKDTM that I've been using. It's more
+>> comprehensive than the existing ATOMIC checks (which predated the
+>> refcount-only protection).
+>>
+> OK. One thing I couldn't figure out: is refcount_t signed or not? The
+> saturate tests set the initial value to UINT_MAX - 1, but this is
+> interpreted as a negative value and so the refcount manipulations that
+> are expected to succeed also fail in my case.
 
-I got kernel boot error on my board (= Renesas R-Car Salvator-X) + CONFIG_OF_DYNAMIC.
-This patch solved this issue.
-
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-> To: Liam Girdwood <lgirdwood@gmail.com>
-> To: Mark Brown <broonie@kernel.org>
-> To: Jaroslav Kysela <perex@perex.cz>
-> To: Takashi Iwai <tiwai@suse.com>
-> To: alsa-devel at alsa-project.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: Wei Xu <xuwei5@hisilicon.com>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  sound/soc/generic/audio-graph-card.c  | 14 +++++++++-----
->  sound/soc/generic/simple-card-utils.c |  5 +++++
->  sound/soc/soc-core.c                  |  5 +++++
->  3 files changed, 19 insertions(+), 5 deletions(-)
-> 
-> diff --git a/sound/soc/generic/audio-graph-card.c b/sound/soc/generic/audio-graph-card.c
-> index c0f08a6..7574c5f 100644
-> --- a/sound/soc/generic/audio-graph-card.c
-> +++ b/sound/soc/generic/audio-graph-card.c
-> @@ -228,10 +228,16 @@ static int asoc_graph_card_parse_of(struct graph_card_data *priv)
->  	 */
->  
->  	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
-> +		/*
-> +		 * asoc_graph_card_dai_link_of() will call
-> +		 * of_node_put(). So, call of_node_get() here
-> +		 */
-> +		of_node_get(it.node);
->  		ret = asoc_graph_card_dai_link_of(it.node, priv, idx++);
-> -		of_node_put(it.node);
-> -		if (ret < 0)
-> +		if (ret < 0) {
-> +			of_node_put(it.node);
->  			return ret;
-> +		}
->  	}
->  
->  	return asoc_simple_card_parse_card_name(card, NULL);
-> @@ -244,10 +250,8 @@ static int asoc_graph_get_dais_count(struct device *dev)
->  	int count = 0;
->  	int rc;
->  
-> -	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
-> +	of_for_each_phandle(&it, rc, node, "dais", NULL, 0)
->  		count++;
-> -		of_node_put(it.node);
-> -	}
->  
->  	return count;
->  }
-> diff --git a/sound/soc/generic/simple-card-utils.c b/sound/soc/generic/simple-card-utils.c
-> index 26d64fa..144954b 100644
-> --- a/sound/soc/generic/simple-card-utils.c
-> +++ b/sound/soc/generic/simple-card-utils.c
-> @@ -250,6 +250,11 @@ static int asoc_simple_card_get_dai_id(struct device_node *ep)
->  	if (ret != -ENOTSUPP)
->  		return ret;
->  
-> +	/*
-> +	 * of_graph_get_port_parent() will call
-> +	 * of_node_put(). So, call of_node_get() here
-> +	 */
-> +	of_node_get(ep);
->  	node = of_graph_get_port_parent(ep);
->  
->  	/*
-> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-> index 921622a..a0f39de 100644
-> --- a/sound/soc/soc-core.c
-> +++ b/sound/soc/soc-core.c
-> @@ -4087,6 +4087,11 @@ int snd_soc_get_dai_id(struct device_node *ep)
->  	struct device_node *node;
->  	int ret;
->  
-> +	/*
-> +	 * of_graph_get_port_parent() will call
-> +	 * of_node_put(). So, call of_node_get() here
-> +	 */
-> +	of_node_get(ep);
->  	node = of_graph_get_port_parent(ep);
->  
->  	/*
-> -- 
-> 1.9.1
-> 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+-- 
+Best Regards
+Li Kun
