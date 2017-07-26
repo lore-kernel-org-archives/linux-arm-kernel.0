@@ -1,76 +1,45 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 26 Jul 2017 18:56:22 -0400
-Subject: [PATCH v2 1/6] dt-bindings: phy: Add documentation for NS2 USB3 PHY
-In-Reply-To: <1501109787-15489-1-git-send-email-jon.mason@broadcom.com>
-References: <1501109787-15489-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1501109787-15489-2-git-send-email-jon.mason@broadcom.com>
+Date: Wed, 26 Jul 2017 18:56:21 -0400
+Subject: [PATCH v2 0/6] USB3 support for Broadcom NS2 SoC
+Message-ID: <1501109787-15489-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+Changes in v2:
+* Addressed Rob Herring's comments on the binding documentation, which
+  resulted in a restructing of the device tree and how the driver
+  references those nodes.  This, in turn, resulted in a few new
+  documentation files being created.
 
-Add documentation for USB3 PHY available in NS2 SoC
+This patch set contains the USB3 support for Broadcom NS2 SoC.  The USB3
+PHY is connected through the MDIO interface.
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- .../devicetree/bindings/phy/brcm,ns2-usb3-phy.txt  | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+Jon Mason (3):
+  dt-bindings: usb: Add documentation for NS2 CDRU USB3
+  dt-bindings: usb: Add documentation for NS2 ICFG USB3
+  dt-bindings: usb: Add documentation for NS2 IDM USB3
+
+Yendapally Reddy Dhananjaya Reddy (3):
+  dt-bindings: phy: Add documentation for NS2 USB3 PHY
+  phy: Add USB3 PHY support for Broadcom NS2 SoC
+  arm64: dts: ns2: Add USB3 Support
+
+ .../devicetree/bindings/phy/brcm,ns2-usb3-phy.txt  |  48 ++
+ .../bindings/usb/brcm,cdru-usb3-ctrl.txt           |  14 +
+ .../devicetree/bindings/usb/brcm,icfg-usb.txt      |  13 +
+ .../devicetree/bindings/usb/brcm,usb3-idm.txt      |  14 +
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  16 +
+ arch/arm64/boot/dts/broadcom/ns2-xmc.dts           |   8 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  59 +++
+ drivers/phy/broadcom/Kconfig                       |   9 +
+ drivers/phy/broadcom/Makefile                      |   1 +
+ drivers/phy/broadcom/phy-bcm-ns2-usb3.c            | 580 +++++++++++++++++++++
+ 10 files changed, 762 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/brcm,cdru-usb3-ctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/brcm,icfg-usb.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/brcm,usb3-idm.txt
+ create mode 100644 drivers/phy/broadcom/phy-bcm-ns2-usb3.c
 
-diff --git a/Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt b/Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt
-new file mode 100644
-index 000000000000..b1c058c37d54
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt
-@@ -0,0 +1,48 @@
-+Broadcom USB3 dual port phy for Northstar2 SoC
-+This is a child bus node of "brcm,mdio-mux-iproc" node.
-+
-+Required mdio bus properties:
-+- reg: MDIO Bus number for the MDIO interface
-+- #address-cells: must be 1
-+- #size-cells: must be 0
-+
-+Required PHY properties:
-+- compatible: should be "brcm,ns2-usb3-phy"
-+- reg: MDIO Phy ID for the MDIO interface
-+- #phy-cells: must be 0
-+- #address-cells: must be 1
-+- #size-cells: must be 0
-+
-+Sub-nodes:
-+  Each port's PHY should be represented as a sub-node.
-+
-+Sub-nodes required properties:
-+ - reg: the PHY number
-+ - phy-cells: from the generic PHY bindings, must be 0
-+
-+Example:
-+
-+mdio at 1 {
-+	reg = <0x1>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	usb3_phy: usb3_phy at 0 {
-+		compatible = "brcm,ns2-usb3-phy";
-+		reg = <0x0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		usb3_phy0: usb3_phy at 0 {
-+			reg = <0>;
-+			#phy-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		usb3_phy1: usb_phy at 1 {
-+			reg = <1>;
-+			#phy-cells = <0>;
-+			status = "disabled";
-+		};
-+	};
-+};
 -- 
 2.7.4
