@@ -1,66 +1,53 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 26 Jul 2017 20:13:47 +0100
-Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
- callback
-In-Reply-To: <3b858e14-0da1-d4aa-eb84-f136ece8c2a6@gmail.com> (Florian
- Fainelli's message of "Wed, 26 Jul 2017 11:20:05 -0700")
-References: <20170719190734.18566-1-opendmb@gmail.com>
- <20170719190734.18566-3-opendmb@gmail.com>
- <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
- <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
- <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
- <yw1xfudkodvv.fsf@mansr.com>
- <6f0092f7-692f-4a15-1d95-40f4e59c8585@sigmadesigns.com>
- <yw1xbmo8odan.fsf@mansr.com>
- <3b858e14-0da1-d4aa-eb84-f136ece8c2a6@gmail.com>
-Message-ID: <yw1x4ltzm2ok.fsf@mansr.com>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Wed, 26 Jul 2017 19:05:49 +0000
+Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
+In-Reply-To: <CAKgT0Udn2vh6NaqZyiF69nXVnz2sT=e0ZgiDjWznhGZz-Gk+qQ@mail.gmail.com>
+References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
+ <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
+ <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
+ <0260e398-bd8e-6615-6d5c-1f7c07b6fc09@huawei.com>
+ <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
+ <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
+ <20170724090516.2e0f0d2a@w520.home>
+ <MWHPR12MB1600065968964410EDFBDA3BC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0UeAad6WArvrE71MFJywDs1wOnCF-iJRnbNLrL+knqhXeA@mail.gmail.com>
+ <CAKgT0Uf5hdXUXja_jUB6_kBg6pyX8zXuOMOGzCVNgeBFMUsWqQ@mail.gmail.com>,
+ <CAKgT0Udn2vh6NaqZyiF69nXVnz2sT=e0ZgiDjWznhGZz-Gk+qQ@mail.gmail.com>
+Message-ID: <MWHPR12MB16007782C422082A92F4765DC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Fainelli <f.fainelli@gmail.com> writes:
+| From: Alexander Duyck <alexander.duyck@gmail.com>
+| Sent: Wednesday, July 26, 2017 11:44 AM
+| 
+| On Jul 26, 2017 11:26 AM, "Casey Leedom" <leedom@chelsio.com> wrote:
+| |
+| | ? ? I think that the patch will need to be extended to modify
+| | ? ? drivers/pci.c/iov.c:sriov_enable() to explicitly turn off
+| | ? ? Relaxed Ordering Enable if the Root Complex is marked
+| ? ? for no RO TLPs.
+| 
+| I'm not sure that would be an issue. Wouldn't most VFs inherit the PF's settings?
 
-> On 07/25/2017 06:29 AM, M?ns Rullg?rd wrote:
->> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
->> 
->>> On 25/07/2017 15:16, M?ns Rullg?rd wrote:
->>>
->>>> What happened to the patch adding the proper combined function?
->>>
->>> It appears you're not CCed on v2.
->>>
->>> https://patchwork.kernel.org/patch/9859799/
->>>
->>> Doug wrote:
->>>> Yes, you understand correctly.  The irq_mask_ack method is entirely
->>>> optional and I assume that is why this issue went undetected for so
->>>> long; however, it is slightly more efficient to combine the functions
->>>> (even if the ack is unnecessary) which is why I chose to do so for my
->>>> changes to the irqchip-brcmstb-l2 driver where I first discovered this
->>>> issue.  How much value the improved efficiency has is certainly
->>>> debatable, but interrupt handling is one area where people might care
->>>> about such a small difference.  As the irqchip-tango driver maintainer
->>>> you are welcome to decide whether or not the irq_mask_ack method makes
->>>> sense to you.
->>>
->>> My preference goes to leaving the irq_mask_ack callback undefined,
->>> and let the irqchip framework use irq_mask and irq_ack instead.
->> 
->> Why would you prefer the less efficient way?
->> 
->
-> Same question here, that does not really make sense to me.
->
-> The whole point of this patch series is to have a set of efficient and
-> bugfree (or nearly) helper functions that drivers can rely on, are you
-> saying that somehow using irq_mask_and_ack is exposing a bug in the
-> tango irqchip driver and using the separate functions does not expose
-> this bug?
+Ah yes, you're right.  This is covered in section 3.5.4 of the Single Root I/O
+Virtualization and Sharing Specification, Revision 1.0 (September 11, 2007),
+governing the PCIe Capability Device Control register.  It states that the VF
+version of that register shall follow the setting of the corresponding PF.
 
-There is currently a bug in that the function used doesn't do what its
-name implies which can't be good.  Using the separate mask and ack
-functions obviously works, but combining them saves a lock/unlock
-sequence.  The correct combined function has already been written, so I
-see no reason not to use it.
+So we should enhance the cxgb4vf/sge.c:t4vf_sge_alloc_rxq() in the same
+way we did for the cxgb4 driver, but that's not critical since the Relaxed
+Ordering Enable supersedes the internal chip's desire to use the Relaxed
+Ordering Attribute.
 
--- 
-M?ns Rullg?rd
+Ding, send me a note if you'd like me to work that up for you.
+
+| Also I thought most of the VF configuration space is read only.
+
+Yes, but not all of it.  And when a VF is exported to a Virtual Machine,
+then the Hypervisor captures and interprets all accesses to the VF's
+PCIe Configuration Space from the VM.
+
+Thanks again for reminding me of the subtle aspect of the SR_IOV
+specification that I forgot.
+
+Casey
