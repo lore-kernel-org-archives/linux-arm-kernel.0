@@ -1,20 +1,75 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 26 Jul 2017 11:55:39 +0200
-Subject: [PATCH] iommu/exynos: Replace non-existing big-endian Kconfig
- option
-In-Reply-To: <1500270422-4805-1-git-send-email-krzk@kernel.org>
-References: <1500270422-4805-1-git-send-email-krzk@kernel.org>
-Message-ID: <20170726095539.GH15833@8bytes.org>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Wed, 26 Jul 2017 17:59:10 +0800
+Subject: [PATCH] memory: mtk-smi: Use of_device_get_match_data helper
+Message-ID: <1501063150-8778-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 07:47:02AM +0200, Krzysztof Kozlowski wrote:
-> Wrong Kconfig option was used when adding warning for untested
-> big-endian capabilities. There is no CONFIG_BIG_ENDIAN option.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/iommu/exynos-iommu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Applied, thanks.
+Replace custom code with generic helper to retrieve driver data.
+
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/memory/mtk-smi.c | 18 ++++--------------
+ 1 file changed, 4 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index 4afbc41..fe8b81a 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -240,20 +240,15 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *smi_node;
+ 	struct platform_device *smi_pdev;
+-	const struct of_device_id *of_id;
+ 
+ 	if (!dev->pm_domain)
+ 		return -EPROBE_DEFER;
+ 
+-	of_id = of_match_node(mtk_smi_larb_of_ids, pdev->dev.of_node);
+-	if (!of_id)
+-		return -EINVAL;
+-
+ 	larb = devm_kzalloc(dev, sizeof(*larb), GFP_KERNEL);
+ 	if (!larb)
+ 		return -ENOMEM;
+ 
+-	larb->larb_gen = of_id->data;
++	larb->larb_gen = of_device_get_match_data(dev);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	larb->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(larb->base))
+@@ -319,8 +314,7 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct mtk_smi *common;
+ 	struct resource *res;
+-	const struct of_device_id *of_id;
+-	enum mtk_smi_gen smi_gen;
++	const enum mtk_smi_gen *smi_gen;
+ 
+ 	if (!dev->pm_domain)
+ 		return -EPROBE_DEFER;
+@@ -338,18 +332,14 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	if (IS_ERR(common->clk_smi))
+ 		return PTR_ERR(common->clk_smi);
+ 
+-	of_id = of_match_node(mtk_smi_common_of_ids, pdev->dev.of_node);
+-	if (!of_id)
+-		return -EINVAL;
+-
+ 	/*
+ 	 * for mtk smi gen 1, we need to get the ao(always on) base to config
+ 	 * m4u port, and we need to enable the aync clock for transform the smi
+ 	 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
+ 	 * base.
+ 	 */
+-	smi_gen = (enum mtk_smi_gen)of_id->data;
+-	if (smi_gen == MTK_SMI_GEN1) {
++	smi_gen = of_device_get_match_data(dev);
++	if (*smi_gen == MTK_SMI_GEN1) {
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 		common->smi_ao_base = devm_ioremap_resource(dev, res);
+ 		if (IS_ERR(common->smi_ao_base))
+-- 
+2.6.4
