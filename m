@@ -1,116 +1,80 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Wed, 26 Jul 2017 15:36:27 +0800
-Subject: [linux-sunxi] [PATCH 10/10] ARM: dts: sun8i: Add SY8106A
- regulator to Orange Pi PC
-In-Reply-To: <CAGb2v64xXOmC44TKrSDZFAh6i_rgFEccCHj4EG+1fxFJd9fjjw@mail.gmail.com>
-References: <20170723102749.17323-1-icenowy@aosc.io>
- <20170723102749.17323-11-icenowy@aosc.io>
- <CAGb2v66AGjazHT-+hWVLyNBLDw=DJ5yTmNxF-_=BtZFfjnni-A@mail.gmail.com>
- <25C8A89C-8495-4787-934C-8E9667CD70BF@aosc.io>
- <CAGb2v64xXOmC44TKrSDZFAh6i_rgFEccCHj4EG+1fxFJd9fjjw@mail.gmail.com>
-Message-ID: <82507f40a1ddba8517cf09f51d3afa33@aosc.io>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Wed, 26 Jul 2017 07:38:02 +0000
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <20170726052930.GF3053@localhost>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+Message-ID: <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-07-26 15:30?Chen-Yu Tsai ???
-> On Wed, Jul 26, 2017 at 3:16 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> 
->> 
->> ? 2017?7?26? GMT+08:00 ??3:08:06, Chen-Yu Tsai <wens@csie.org> ??:
->>> On Sun, Jul 23, 2017 at 6:27 PM, Icenowy Zheng <icenowy@aosc.io> 
->>> wrote:
->>>> From: Ondrej Jirman <megous@megous.com>
->>>> 
->>>> Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
->>>> Orange Pi PC, then set the power supply of the ARM cores to this
->>>> regulator, in order to enable DVFS.
->>>> 
->>>> Signed-off-by: Ondrej Jirman <megous@megous.com>
->>>> [Icenowy: Enable DVFS in this patch, slight changes and change 
->>>> commit
->>>>  message]
->>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>> ---
->>>>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 19 +++++++++++++++++++
->>>>  1 file changed, 19 insertions(+)
->>>> 
->>>> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->>> b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->>>> index 998b60f8d295..d855f8b6254e 100644
->>>> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->>>> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->>>> @@ -98,6 +98,10 @@
->>>>         status = "okay";
->>>>  };
->>>> 
->>>> +&cpu0 {
->>>> +       cpu-supply = <&reg_sy8106a>;
->>>> +};
+
+
+On 07/26/2017 07:29 AM, Vinod Koul wrote:
+> On Mon, Jul 24, 2017 at 01:55:10PM +0000, Pierre Yves MORDRET wrote:
+> 
 >>>> +
->>>>  &ehci0 {
->>>>         status = "okay";
->>>>  };
->>>> @@ -160,6 +164,21 @@
->>>>         };
->>>>  };
->>>> 
->>>> +&r_i2c {
->>>> +       status = "okay";
+>>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>> +	if (!res)
+>>>> +		return -ENODEV;
 >>>> +
->>>> +       reg_sy8106a: regulator at 65 {
->>>> +               compatible = "silergy,sy8106a";
->>>> +               reg = <0x65>;
->>>> +               regulator-name = "vdd-cpux";
->>>> +               regulator-min-microvolt = <1000000>;
->>> 
->>> According to the H3 datasheet, the minimum voltage is 1.1V, not 1V.
->> 
->> But the Armbian OPP table for H3 contains several
->> OPP under 1.1V...
-> 
-> Can you provide a link?
-> 
-> If Armbian users have actually field tested this (a big if),
-> then I would like to see some evidence of the SoC running
-> stably at those OPPs with those lower voltages under full load.
-
-See [1].
-
-[1] 
-https://github.com/armbian/build/blob/master/config/fex/orangepipc.fex#L736
-
-> 
-> Even then you should still leave a note describing why we allow
-> voltages below the recommended range.
-> 
-> ChenYu
-> 
->> 
->>> 
->>> Otherwse
->>> 
->>>> +               regulator-max-microvolt = <1400000>;
->>>> +               regulator-ramp-delay = <200>;
->>> 
->>> Is this an actual constraint of the SoC? Or is it a characteristic
->>> of the regulator? If it is the latter, it belongs in the driver.
->>> AFAIK the regulator supports varying the ramp delay (slew rate).
-
-I don't know...
-
-Maybe I should ask Ondrej?
-
->>> 
->>> ChenYu
->>> 
->>>> +               regulator-boot-on;
->>>> +               regulator-always-on;
->>>> +       };
->>>> +};
+>>>> +	iomem = devm_ioremap_resource(&pdev->dev, res);
+>>>> +	if (!iomem)
+>>>> +		return -ENOMEM;
 >>>> +
->>>>  &r_pio {
->>>>         leds_r_opc: led_pins at 0 {
->>>>                 pins = "PL10";
->>>> --
->>>> 2.13.0
->>>> 
+>>>> +	spin_lock_init(&stm32_dmamux->lock);
+>>>> +
+>>>> +	stm32_dmamux->clk = devm_clk_get(&pdev->dev, NULL);
+>>>> +	if (IS_ERR(stm32_dmamux->clk)) {
+>>>> +		dev_info(&pdev->dev, "Missing controller clock\n");
+>>>
+>>> Can you check for EPROBE_DEFER and print only for if that is not the error
+>>> otherwise we end up sapmming with defered probe issues
+>>>
+>>
+>> This is what you meant ?
+>> 	if (IS_ERR(stm32_dmamux->clk) != EPROBE_DEFER) {
+>> 		dev_info(&pdev->dev, "Missing controller clock\n");
+>> 		return PTR_ERR(stm32_dmamux->clk);
+>> 	}
+>>
+>> OR
+>>
+>> 	if (IS_ERR(stm32_dmamux->clk)) {
+>> 		if (IS_ERR(stm32_dmamux->clk) != EPROBE_DEFER)
+>> 			dev_info(&pdev->dev, "Missing controller clock\n");
+>> 		return PTR_ERR(stm32_dmamux->clk);
+>> 	}
+> 
+> This one please
+> 
+
+ok
+
+>>
+>>>> +
+>>>> +#ifndef __DMA_STM32_DMAMUX_H
+>>>> +#define __DMA_STM32_DMAMUX_H
+>>>> +
+>>>> +#if defined(CONFIG_STM32_DMAMUX)
+>>>> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
+>>>
+>>> Why do we need a custom API in this case?
+>>>
+>>
+>> This API is called by DMA when a slave is requested by client. DMA can work
+>> without DMAMUX this API has been put in place to configure DMAMUX whether client
+>> is requesting a DMAMUX Channel instead of a DMA one.
+> 
+> You mean the dmaengine driver right?
+> 
+
+Yes. The API is mainly called by "device_config" through out STM32 DMA Driver
+when a router is in place for client.
+Please refer to Patch 4/5 on this set.
+
+Thanks
+Py
