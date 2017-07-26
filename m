@@ -1,10 +1,10 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 26 Jul 2017 15:55:25 +0200
+Date: Wed, 26 Jul 2017 15:55:17 +0200
 Subject: [PATCH RESEND v3 2/3] arm: dts: rockchip: Don't set otp-gpio pinctrl
  by default in rk3288.dtsi
 In-Reply-To: <20170726135526.475-1-romain.perier@collabora.com>
 References: <20170726135526.475-1-romain.perier@collabora.com>
-Message-ID: <20170726135526.475-11-romain.perier@collabora.com>
+Message-ID: <20170726135526.475-3-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
