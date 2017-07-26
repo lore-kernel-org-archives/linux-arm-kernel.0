@@ -1,57 +1,143 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 26 Jul 2017 15:55:20 +0200
-Subject: [PATCH RESEND v3 1/3] SoC: es8328-i2c: Add compatible for ES8323
-In-Reply-To: <20170726135526.475-1-romain.perier@collabora.com>
-References: <20170726135526.475-1-romain.perier@collabora.com>
-Message-ID: <20170726135526.475-6-romain.perier@collabora.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 26 Jul 2017 16:03:34 +0200
+Subject: [PATCH v2] ARM: zImage: Fix stack overflow in merge_fdt_bootargs()
+In-Reply-To: <e116599d71f0fe70b083eed29c66e09ad600c1cf.1500726646.git.rask@formelder.dk>
+References: <e116599d71f0fe70b083eed29c66e09ad600c1cf.1500726646.git.rask@formelder.dk>
+Message-ID: <CACQ1gAiSaKV22TkS1ihO-OeKEb6RnOaf_9ahu+9r6MTbqjLRnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a compatible string for everest,es8323. This is an
-audio codec that is compatible with es8328 and can be found for example
-on the Firefly-RK3288 board.
+2017-07-22 15:02 GMT+02:00 Rask Ingemann Lambertsen <rask@formelder.dk>:
+> This function is called very early on from head.S and currently sets up a
+> stack frame of more than 1024 bytes:
+>
+> atags_to_fdt.c: In function ?merge_fdt_bootargs?:
+> atags_to_fdt.c:98:1: warning: the frame size of 1032 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+>
+> This causes a crash and failure to boot with some combinations of kernel
+> version, gcc version and dtb, such as kernel version 4.1-rc1 or 4.1.0,
+> gcc version 5.4.1 20161019 (Debian 5.4.1-3) and tegra20-trimslice.dtb.
+>
+> With this patch, merge_fdt_bootargs() is rewritten to not use a large buffer,
+> thereby solving the problem of the stack overflow.
+>
+> As a side effect of this rewrite, you no longer get a space added in front
+> of the kernel command line when no bootargs property was found in the FDT.
+>
+> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+> Tested-by: Pavel Machek <pavel@ucw.cz>
+> Tested-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> Fixes: d0f34a11ddab ("ARM: 7437/1: zImage: Allow DTB command line concatenation with ATAG_CMDLINE")
+seems good to me !
+Reviewed-by: Richard Genoud <richard.genoud@gmail.com>
 
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- Documentation/devicetree/bindings/sound/es8328.txt | 5 ++++-
- sound/soc/codecs/es8328-i2c.c                      | 2 ++
- 2 files changed, 6 insertions(+), 1 deletion(-)
+> ---
+>
+> I have tested that this works properly when
+> a) only the FDT bootargs are provided,
+> b) only the ATAG command line is provided, and
+> c) both the FDT bootargs and the ATAG command line are provided.
+>
+> Changes from v1 to v2:
+> The original "bootargs" NUL terminator is changed into a space only when
+> appenprop_string() succeeds. Commented by Richard Genoud.
+>
+>  arch/arm/boot/compressed/atags_to_fdt.c | 59 +++++++++++++++++++++------------
+>  1 file changed, 37 insertions(+), 22 deletions(-)
+>
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+> index 9448aa0c6686..87a5fba5a28e 100644
+> --- a/arch/arm/boot/compressed/atags_to_fdt.c
+> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
+> @@ -55,6 +55,29 @@ static const void *getprop(const void *fdt, const char *node_path,
+>         return fdt_getprop(fdt, offset, property, len);
+>  }
+>
+> +static int appendprop_string(void *fdt, const char *node_path,
+> +                            const char *property, const char *string)
+> +{
+> +       int offset = node_offset(fdt, node_path);
+> +
+> +       if (offset < 0)
+> +               return offset;
+> +       return fdt_appendprop_string(fdt, offset, property, string);
+> +}
+> +
+> +static int setprop_inplace_partial(void *fdt, const char *node_path,
+> +                                  const char *property, unsigned int idx,
+> +                                  const void *val, int len)
+> +{
+> +       int offset = node_offset(fdt, node_path);
+> +
+> +       if (offset < 0)
+> +               return offset;
+> +       return fdt_setprop_inplace_namelen_partial(fdt, offset, property,
+> +                                                  strlen(property), idx,
+> +                                                  val, len);
+> +}
+> +
+>  static uint32_t get_cell_size(const void *fdt)
+>  {
+>         int len;
+> @@ -66,35 +89,27 @@ static uint32_t get_cell_size(const void *fdt)
+>         return cell_size;
+>  }
+>
+> -static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+> -{
+> -       char cmdline[COMMAND_LINE_SIZE];
+> -       const char *fdt_bootargs;
+> -       char *ptr = cmdline;
+> -       int len = 0;
+> -
+> -       /* copy the fdt command line into the buffer */
+> -       fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
+> -       if (fdt_bootargs)
+> -               if (len < COMMAND_LINE_SIZE) {
+> -                       memcpy(ptr, fdt_bootargs, len);
+> -                       /* len is the length of the string
+> -                        * including the NULL terminator */
+> -                       ptr += len - 1;
+> -               }
+> -
+> -       /* and append the ATAG_CMDLINE */
+> -       if (fdt_cmdline) {
+> -               len = strlen(fdt_cmdline);
+> -               if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
+> -                       *ptr++ = ' ';
+> -                       memcpy(ptr, fdt_cmdline, len);
+> -                       ptr += len;
+> -               }
+> -       }
+> -       *ptr = '\0';
+> -
+> -       setprop_string(fdt, "/chosen", "bootargs", cmdline);
+> +/* This is called early on from head.S, so it can't use much stack. */
+> +static void merge_fdt_bootargs(void *fdt, const char *atag_cmdline)
+> +{
+> +       const char *fdt_bootargs;
+> +       int len = 0;
+> +
+> +       /* With no ATAG command line or an empty one, there is nothing to do. */
+> +       if (!atag_cmdline || strlen(atag_cmdline) == 0)
+> +               return;
+> +
+> +       fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
+> +
+> +       /* With no FDT command line or an empty one, just use the ATAG one. */
+> +       if (!fdt_bootargs || len <= 1) {
+> +               setprop_string(fdt, "/chosen", "bootargs", atag_cmdline);
+> +               return;
+> +       }
+> +       if (appendprop_string(fdt, "/chosen", "bootargs", atag_cmdline) < 0)
+> +               return;
+> +       /* Replace the previous NUL terminator with a space. */
+> +       setprop_inplace_partial(fdt, "/chosen", "bootargs", len - 1, " ", 1);
+>  }
+>
+>  /*
+> --
+> 2.13.2
+>
 
-diff --git a/Documentation/devicetree/bindings/sound/es8328.txt b/Documentation/devicetree/bindings/sound/es8328.txt
-index 33fbf058c997..86b6d6e99732 100644
---- a/Documentation/devicetree/bindings/sound/es8328.txt
-+++ b/Documentation/devicetree/bindings/sound/es8328.txt
-@@ -4,7 +4,10 @@ This device supports both I2C and SPI.
- 
- Required properties:
- 
--  - compatible  : Should be "everest,es8328" or "everest,es8388"
-+  - compatible  : Should be one of the following:
-+	- "everest,es8323"
-+	- "everest,es8328"
-+	- "everest,es8388"
-   - DVDD-supply : Regulator providing digital core supply voltage 1.8 - 3.6V
-   - AVDD-supply : Regulator providing analog supply voltage 3.3V
-   - PVDD-supply : Regulator providing digital IO supply voltage 1.8 - 3.6V
-diff --git a/sound/soc/codecs/es8328-i2c.c b/sound/soc/codecs/es8328-i2c.c
-index 318ab28c5351..be3f03c35137 100644
---- a/sound/soc/codecs/es8328-i2c.c
-+++ b/sound/soc/codecs/es8328-i2c.c
-@@ -19,6 +19,7 @@
- #include "es8328.h"
- 
- static const struct i2c_device_id es8328_id[] = {
-+	{ "es8323", 0 },
- 	{ "es8328", 0 },
- 	{ "es8388", 0 },
- 	{ }
-@@ -26,6 +27,7 @@ static const struct i2c_device_id es8328_id[] = {
- MODULE_DEVICE_TABLE(i2c, es8328_id);
- 
- static const struct of_device_id es8328_of_match[] = {
-+	{ .compatible = "everest,es8323", },
- 	{ .compatible = "everest,es8328", },
- 	{ .compatible = "everest,es8388", },
- 	{ }
--- 
-2.11.0
+Thanks !
