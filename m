@@ -1,151 +1,20 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Jul 2017 10:52:08 +0100
-Subject: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to reserve
- HW ITS address regions for IOMMU drivers
-In-Reply-To: <b7512f89-4fe7-940e-0fa9-9274d8b1e935@arm.com>
-References: <20170725111732.41792-1-shameerali.kolothum.thodi@huawei.com>
- <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
- <20170725171100.GA1663@red-moon>
- <b7512f89-4fe7-940e-0fa9-9274d8b1e935@arm.com>
-Message-ID: <20170726095208.GA2468@red-moon>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 26 Jul 2017 11:55:39 +0200
+Subject: [PATCH] iommu/exynos: Replace non-existing big-endian Kconfig
+ option
+In-Reply-To: <1500270422-4805-1-git-send-email-krzk@kernel.org>
+References: <1500270422-4805-1-git-send-email-krzk@kernel.org>
+Message-ID: <20170726095539.GH15833@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 06:32:40PM +0100, Robin Murphy wrote:
-> On 25/07/17 18:11, Lorenzo Pieralisi wrote:
-> > On Tue, Jul 25, 2017 at 12:17:31PM +0100, Shameer Kolothum wrote:
-> >> The helper function retrieves ITS address regions through IORT
-> >> device <-> ITS mappings and reserves it so that these regions
-> >> will not be translated by IOMMU and will be excluded from IOVA
-> >> allocations. IOMMU drivers can use this to implement their
-> >> .get_resv_regions callback.
-> >>
-> >> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> >> ---
-> >>  drivers/acpi/arm64/iort.c        | 91 ++++++++++++++++++++++++++++++++++++++--
-> >>  drivers/irqchip/irq-gic-v3-its.c |  3 +-
-> >>  include/linux/acpi_iort.h        |  8 +++-
-> >>  3 files changed, 97 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> >> index a3215ee..e28f30c 100644
-> >> --- a/drivers/acpi/arm64/iort.c
-> >> +++ b/drivers/acpi/arm64/iort.c
-> >> @@ -39,6 +39,7 @@
-> >>  struct iort_its_msi_chip {
-> >>  	struct list_head	list;
-> >>  	struct fwnode_handle	*fw_node;
-> >> +	phys_addr_t		base_addr;
-> >>  	u32			translation_id;
-> >>  };
-> >>  
-> >> @@ -136,14 +137,16 @@ typedef acpi_status (*iort_find_node_callback)
-> >>  static DEFINE_SPINLOCK(iort_msi_chip_lock);
-> >>  
-> >>  /**
-> >> - * iort_register_domain_token() - register domain token and related ITS ID
-> >> - * to the list from where we can get it back later on.
-> >> + * iort_register_domain_token() - register domain token along with related
-> >> + * ITS ID and base address to the list from where we can get it back later on.
-> >>   * @trans_id: ITS ID.
-> >> + * @base: ITS base address.
-> >>   * @fw_node: Domain token.
-> >>   *
-> >>   * Returns: 0 on success, -ENOMEM if no memory when allocating list element
-> >>   */
-> >> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-> >> +int iort_register_domain_token(int trans_id, phys_addr_t base,
-> >> +			       struct fwnode_handle *fw_node)
-> >>  {
-> >>  	struct iort_its_msi_chip *its_msi_chip;
-> >>  
-> >> @@ -153,6 +156,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-> >>  
-> >>  	its_msi_chip->fw_node = fw_node;
-> >>  	its_msi_chip->translation_id = trans_id;
-> >> +	its_msi_chip->base_addr = base;
-> >>  
-> >>  	spin_lock(&iort_msi_chip_lock);
-> >>  	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-> >> @@ -481,6 +485,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
-> >>  	return -ENODEV;
-> >>  }
-> >>  
-> >> +static int iort_find_its_base(u32 its_id, phys_addr_t *base)
-> > 
-> > You have to tag it as __maybe_unused for the !IOMMU_API case.
-> > 
-> >> +{
-> >> +	struct iort_its_msi_chip *its_msi_chip;
-> >> +	bool match = false;
-> >> +
-> >> +	spin_lock(&iort_msi_chip_lock);
-> >> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-> >> +		if (its_msi_chip->translation_id == its_id) {
-> >> +			*base = its_msi_chip->base_addr;
-> >> +			match = true;
-> >> +			break;
-> >> +		}
-> >> +	}
-> >> +	spin_unlock(&iort_msi_chip_lock);
-> >> +
-> >> +	return match ? 0 : -ENODEV;
-> >> +}
-> >> +
-> >>  /**
-> >>   * iort_dev_find_its_id() - Find the ITS identifier for a device
-> >>   * @dev: The device.
-> >> @@ -639,6 +661,67 @@ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
-> >>  
-> >>  	return err;
-> >>  }
-> >> +
-> >> +/**
-> >> + * iort_iommu_its_get_resv_regions - Reserved region driver helper
-> >> + * @dev: Device from iommu_get_resv_regions()
-> >> + * @list: Reserved region list from iommu_get_resv_regions()
-> >> + *
-> >> + * Returns: Number of reserved regions on success(0 if no associated ITS),
-> >> + *          appropriate error value otherwise.
-> >> + *
-> >> + * IOMMU drivers can use this to implement their .get_resv_regions callback
-> >> + * for reserving the HW ITS address regions.
-> > 
-> > Stale comment.
-> > 
-> >> + */
-> >> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
-> >> +{
-> >> +	int i;
-> >> +	struct acpi_iort_its_group *its;
-> >> +	struct acpi_iort_node *node, *its_node = NULL;
-> >> +	int resv = 0;
-> > 
-> > Nit: int i, resv = 0;
-> > 
-> > I can make these changes but I suspect this series will go via IOMMU
-> > tree, let me know how you want to handle it.
-> > 
-> > Lorenzo
-> > 
-> >> +	node = iort_find_dev_node(dev);
-> >> +	if (!node)
-> >> +		return -ENODEV;
-> >> +
+On Mon, Jul 17, 2017 at 07:47:02AM +0200, Krzysztof Kozlowski wrote:
+> Wrong Kconfig option was used when adding warning for untested
+> big-endian capabilities. There is no CONFIG_BIG_ENDIAN option.
 > 
-> I'd suggest we also want a comment here to clarify that we're currently
-> assuming straightforward topologies where all mappings for a given root
-> complex/named component target the same ITS group. Otherwise we're going
-> to need somewhat more logic to iterate the its_node processing over
-> every mapping (or every alias in the PCI case), but avoid creating
-> duplicate entries.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  drivers/iommu/exynos-iommu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-You have a point and we have time to update the code. Short of reserving
-all ITS regions for every device that maps to one at least, we could (even
-pre-compute instead of looking it up on the fly) create a list of ITS
-identifiers a given IORT node may map to and use that to reserve the
-regions.
-
-Thoughts ?
-
-Lorenzo
+Applied, thanks.
