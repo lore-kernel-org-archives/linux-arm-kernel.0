@@ -1,25 +1,78 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 26 Jul 2017 19:55:21 +0200
-Subject: "external abort on linefetch (0x814)" on Kirkwood 6282 SoC
-In-Reply-To: <1501085885.3330.24.camel@hellion.org.uk>
-References: <1500801941.22097.24.camel@hellion.org.uk>
- <20170726152251.GE12049@lunn.ch>
- <1501085885.3330.24.camel@hellion.org.uk>
-Message-ID: <20170726175521.GU12049@lunn.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 26 Jul 2017 19:18:25 +0100
+Subject: [PATCHv2 2/7] arm64: consistently use bl for C exception entry
+In-Reply-To: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
+References: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1501093110-3844-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 05:18:05PM +0100, Ian Campbell wrote:
-> On Wed, 2017-07-26 at 17:22 +0200, Andrew Lunn wrote:
-> > I have a 6282 system i can try to reproduce this on. It will probably
-> > be a few days before i get around to it.
-> 
-> Thanks!
-> 
-> For some reason my original mail never made it to debian-arm or linux-
-> arm-kernel, suspiciously the mail which I attached _also_ doesn't
-> appear in the archives.
+In most cases, our exception entry assembly branches to C handlers with
+a BL instruction, but in cases where we do not expect to return, we use
+B instead.
 
-I suspect it is because you used attachments. They are frowned upon.
+While this is correct today, it means that backtraces for fatal
+exceptions miss the entry assembly (as the LR is stale at the point we
+call C code), while non-fatal exceptions have the entry assembly in the
+LR. In subsequent patches, we will need the LR to be set in these cases
+in order to backtrace reliably.
 
-  Andrew
+This patch updates these sites to use a BL, ensuring consistency, and
+preparing for backtrace rework. An ASM_BUG() is added after each of
+these new BLs, which both catches unexpected returns, and ensures that
+the LR value doesn't point to another function label.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/entry.S | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index b738880..660612a 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -351,7 +351,8 @@ END(vectors)
+ 	mov	x0, sp
+ 	mov	x1, #\reason
+ 	mrs	x2, esr_el1
+-	b	bad_mode
++	bl	bad_mode
++	ASM_BUG()
+ 	.endm
+ 
+ el0_sync_invalid:
+@@ -448,14 +449,16 @@ el1_sp_pc:
+ 	mrs	x0, far_el1
+ 	enable_dbg
+ 	mov	x2, sp
+-	b	do_sp_pc_abort
++	bl	do_sp_pc_abort
++	ASM_BUG()
+ el1_undef:
+ 	/*
+ 	 * Undefined instruction
+ 	 */
+ 	enable_dbg
+ 	mov	x0, sp
+-	b	do_undefinstr
++	bl	do_undefinstr
++	ASM_BUG()
+ el1_dbg:
+ 	/*
+ 	 * Debug exception handling
+@@ -473,7 +476,8 @@ el1_inv:
+ 	mov	x0, sp
+ 	mov	x2, x1
+ 	mov	x1, #BAD_SYNC
+-	b	bad_mode
++	bl	bad_mode
++	ASM_BUG()
+ ENDPROC(el1_sync)
+ 
+ 	.align	6
+-- 
+1.9.1
