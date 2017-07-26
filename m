@@ -1,30 +1,31 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 26 Jul 2017 18:24:46 +0200
-Subject: [PATCH 0/3] ARM: dts: stm32: Remove rdinit from bootargs
-In-Reply-To: <1500280565-26049-1-git-send-email-alexandre.torgue@st.com>
-References: <1500280565-26049-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <c38e634a-0475-4541-1127-b7a2fb390daa@st.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 26 Jul 2017 18:26:48 +0200
+Subject: [PATCH net-next 10/18] net: mvpp2: use the GoP interrupt for
+ link status changes
+In-Reply-To: <20170724134848.19330-11-antoine.tenart@free-electrons.com>
+References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+ <20170724134848.19330-11-antoine.tenart@free-electrons.com>
+Message-ID: <20170726162648.GK12049@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 24, 2017 at 03:48:40PM +0200, Antoine Tenart wrote:
+> This patch adds the GoP link interrupt support for when a port isn't
+> connected to a PHY. Because of this the phylib callback is never called
+> and the link status management isn't done. This patch use the GoP link
+> interrupt in such cases to still have a minimal link management. Without
+> this patch ports not connected to a PHY cannot work.
 
+Hi Antoine
 
-On 07/17/2017 10:36 AM, Alexandre TORGUE wrote:
-> This series remove rdinit from bootargs on stm32f4 boards (429-eval,
-> 429-disco, 469-disco). Indeed, rootfs is independent from boards.
-> Furthermore it will align stm32 F4 devicetree on stm32 F7/H7 one.
-> 
-> Regards
-> Alex
-> 
-> Alexandre TORGUE (3):
->    ARM: dts: stm32: Remove rdinit from bootargs on stm32f469-disco
->    ARM: dts: stm32: Remove rdinit from bootargs on stm32f429i-eval
->    ARM: dts: stm32: Remove rdinit from bootargs on stm32f429-disco
-> 
->   arch/arm/boot/dts/stm32429i-eval.dts  | 2 +-
->   arch/arm/boot/dts/stm32f429-disco.dts | 2 +-
->   arch/arm/boot/dts/stm32f469-disco.dts | 2 +-
->   3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-Series applied on stm32-dt-for-v4.14 branch.
+When is a GoP link interrupt signalled? When is a port without a PHY
+actually up/down?
+
+With SFF/SFP ports, you generally need a gpio line the fibre module
+can use to indicate if it has link. Fixed-phy has such support, and
+your link_change function will get called when the link changes.
+
+And this is another bit of code you probably need to change in a while
+with phylink lands.
+
+     Andrew
