@@ -1,65 +1,66 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 26 Jul 2017 08:18:18 +0200
-Subject: [PATCH 0/8] net: mvpp2: add TX interrupts support
-In-Reply-To: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
-References: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAPv3WKeC4Ry+cR5FMh5BGgp=+UdzkxRf6=EqKBmWMNQtb+YLdg@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Wed, 26 Jul 2017 14:18:50 +0800
+Subject: [PATCH v6 0/7] drm/rockchip: add all full framework vop support
+Message-ID: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+These patches try to make all current rockchip full framework vop works
+on drm, fill missing vop on full framework.
+Vop Full framework now has following vops:
+IP version    chipname
+      3.1           rk3288
+      3.2           rk3368
+      3.4           rk3366
+      3.5           rk3399 big
+      3.6           rk3399 lit
+      3.7           rk3228
+      3.8           rk3328
 
-I tested patchset on A8040-DB, everything seems fine.
+Group the vop register, it would make register  definition clearer and
+more easily to reuse same group register define for difference vops.
 
-Best regards,
-Marcin
+Tested on rk3399 excavator board with kernel 4.13-rc1.
 
-2017-07-25 17:55 GMT+02:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Hello,
->
-> So far, the mvpp2 driver was using an hrtimer to handle TX
-> completion. This patch series adds support for using TX interrupts
-> (for each CPU) on PPv2.2, the variant of the IP used on Marvell Armada
-> 7K/8K.
->
-> This series has been tested on Marvell Armada 7K (PPv2.2) and Armada
-> 375 (PPv2.1).
->
-> Dave:
->
->  - This series depends on the previous series sent by Antoine T?nart
->    "net: mvpp2: MAC/GoP configuration and optional PHYs". Functionally
->    speaking there is no real dependency, but we touch in a few areas
->    the same piece of code, so I based my patch series on top of
->    Antoine's.
->
->  - Please do not apply the last patch of this series "arm64: dts:
->    marvell: add TX interrupts for PPv2.2", it will be taken by the ARM
->    mvebu maintainers.
->
-> Thanks!
->
-> Thomas
->
-> Thomas Petazzoni (8):
->   net: mvpp2: fix MVPP21_ISR_RXQ_GROUP_REG definition
->   net: mvpp2: remove RX queue group reset code
->   net: mvpp2: introduce per-port nrxqs/ntxqs variables
->   net: mvpp2: move from cpu-centric naming to "software thread" naming
->   net: mvpp2: introduce queue_vector concept
->   net: mvpp2: add support for TX interrupts and RX queue distribution
->     modes
->   dt-bindings: net: marvell-pp2: update interrupt-names with TX
->     interrupts
->   arm64: dts: marvell: add TX interrupts for PPv2.2
->
->  .../devicetree/bindings/net/marvell-pp2.txt        |  33 +-
->  .../boot/dts/marvell/armada-cp110-master.dtsi      |  21 +-
->  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  21 +-
->  drivers/net/ethernet/marvell/mvpp2.c               | 638 +++++++++++++++------
->  4 files changed, 534 insertions(+), 179 deletions(-)
->
-> --
-> 2.9.4
->
+And other chips tested on rockchip kernel 4.4:
+   https://github.com/rockchip-linux/kernel/tree/release-4.4/drivers/gpu/drm/rockchip
+
+Changes in v6:
+- fix some patches complie error
+- fix rk3036 display blank
+
+Changes in v5:
+- clean document commit title
+- move changes description out of docummit commit msg
+
+Changes in v4:
+- rebase to newest torvalds kernel, fix merge conflict 
+
+Changes in v3:
+- group vop register instead using VOP_REG_VER mechanism
+- Explain more on patch commit message
+- move write_relaxed flags to vop registers
+- fix rk3328 overlay abnormal
+
+Changes in v2:
+- rename rk322x to rk3228
+- correct some vop registers define
+
+Mark Yao (7):
+  drm/rockchip: vop: initialize registers directly
+  drm/rockchip: vop: move write_relaxed flags to vop register
+  drm/rockchip: vop: move line_flag_num to interrupt registers
+  drm/rockchip: vop: group vop registers
+  drm/rockchip: vop: add a series of vop support
+  dt-bindings: display: rockchip: fill Documents for vop series
+  drm/rockchip: vop: rk3328: fix overlay abnormal
+
+ .../bindings/display/rockchip/rockchip-vop.txt     |   4 +
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 109 ++-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |  81 +-
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        | 375 ++++++---
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.h        | 905 ++++++++++++++++-----
+ 5 files changed, 1075 insertions(+), 399 deletions(-)
+
+-- 
+1.9.1
