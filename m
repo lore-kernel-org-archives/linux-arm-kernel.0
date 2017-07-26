@@ -1,65 +1,78 @@
 From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 26 Jul 2017 14:17:06 +0800
-Subject: [PATCH v5 3/7] drm/rockchip: vop: move line_flag_num to interrupt
- registers
-In-Reply-To: <1816316.NCRF09CkBJ@phil>
+Date: Wed, 26 Jul 2017 14:17:23 +0800
+Subject: [PATCH v5 2/7] drm/rockchip: vop: move write_relaxed flags to vop
+ register
+In-Reply-To: <2048476.V4PpOSpEqb@phil>
 References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
- <1500518613-30590-1-git-send-email-mark.yao@rock-chips.com>
- <1816316.NCRF09CkBJ@phil>
-Message-ID: <597833E2.4070607@rock-chips.com>
+ <1500518608-30538-1-git-send-email-mark.yao@rock-chips.com>
+ <2048476.V4PpOSpEqb@phil>
+Message-ID: <597833F3.4050307@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?07?26? 05:54, Heiko Stuebner wrote:
+On 2017?07?26? 05:47, Heiko Stuebner wrote:
 > Hi Mark,
 >
-> Am Donnerstag, 20. Juli 2017, 10:43:32 CEST schrieb Mark Yao:
->> In the hardware design process, the design of line flags
->> register is associated with the interrupt register,
->> placing the line flags in the interrupt definition is
->> more reasonable, and it would make multi-vop define easilier.
+> Am Donnerstag, 20. Juli 2017, 10:43:27 CEST schrieb Mark Yao:
+>> Since the drm atomic framework, only a small part of the vop
+>> register needs sync write, Currently seems only following registers
+>> need sync write:
+>>     cfg_done, standby and interrupt related register.
 >>
->> Changes in v3:
->> - Explain more in details, introduce why we need this patch
+>> All ctrl registers are using the sync write method that is
+>> inefficient, hardcode the write_relaxed flags to vop registers,
+>> then can only do synchronize write for those actual needed register.
 >>
 >> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> Reviewed-by: Sean Paul <seanpaul@chromium.org>
 >> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 4 ++--
->>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 8 ++++----
->>   3 files changed, 7 insertions(+), 7 deletions(-)
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 14 +++-------
+>>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 42 ++++++++++++++++-------------
+>>   2 files changed, 28 insertions(+), 28 deletions(-)
 >>
 >> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index 784a2b7..4f6c7bc 100644
+>> index 81164d6..784a2b7 100644
 >> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 >> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -982,7 +982,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
->>   	VOP_CTRL_SET(vop, vact_st_end, val);
->>   	VOP_CTRL_SET(vop, vpost_st_end, val);
+>> @@ -42,18 +42,12 @@
+>>   #include "rockchip_drm_psr.h"
+>>   #include "rockchip_drm_vop.h"
 >>   
->> -	VOP_CTRL_SET(vop, line_flag_num[0], vact_end);
->> +	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
-> With patches applied up to this one I end up with
+>> -#define __REG_SET_RELAXED(x, off, mask, shift, v, write_mask) \
+>> -		vop_mask_write(x, off, mask, shift, v, write_mask, true)
+>> -
+>> -#define __REG_SET_NORMAL(x, off, mask, shift, v, write_mask) \
+>> -		vop_mask_write(x, off, mask, shift, v, write_mask, false)
+>> -
+>>   #define REG_SET(x, base, reg, v, mode) \
+>> -		__REG_SET_##mode(x, base + reg.offset, \
+>> -				 reg.mask, reg.shift, v, reg.write_mask)
+>> +		vop_mask_write(x, base + reg.offset, reg.mask, reg.shift, \
+>> +			       v, reg.write_mask, reg.relaxed)
+>>   #define REG_SET_MASK(x, base, reg, mask, v, mode) \
+>> -		__REG_SET_##mode(x, base + reg.offset, \
+>> -				 mask, reg.shift, v, reg.write_mask)
+>> +		vop_mask_write(x, base + reg.offset, \
+>> +			       mask, reg.shift, v, reg.write_mask, reg.relaxed)
+> you only introduce the relaxed element of struct vop_reg in patch4.
+> So using it here produces a compile error
 >
->    CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_vop.o
-> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c: In function ?vop_crtc_enable?:
-> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:46: error: macro "VOP_INTR_SET" requires 4 arguments, but only 3 given
->    VOP_INTR_SET(vop, line_flag_num[0], vact_end);
->                                                ^
-> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:2: error: ?VOP_INTR_SET? undeclared (first use in this function)
->    VOP_INTR_SET(vop, line_flag_num[0], vact_end);
+> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c: In function ?vop_cfg_done?:
+> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:47:33: error: ?const struct vop_reg? has no member named ?relaxed?
+>             v, reg.write_mask, reg.relaxed)
+>                                   ^
+> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:59:3: note: in expansion of macro ?REG_SET?
+>     REG_SET(x, 0, (x)->data->ctrl->name, v, NORMAL)
+>     ^~~~~~~
+> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:201:2: note: in expansion of macro ?VOP_CTRL_SET?
+>    VOP_CTRL_SET(vop, cfg_done, 1);
 >    ^~~~~~~~~~~~
-> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:2: note: each undeclared identifier is reported only once for each function it appears in
 >
-> In patch4 you replace this again, with
-> -	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
-> +	VOP_REG_SET(vop, intr, line_flag_num[0], vact_end);
->
-> but this intermediate breakage should not happen, to keep bisectability.
+> when only patches 1+2 are applied. So the relaxed field addition should
+> definitly move into this patch to not break bisectability.
 >
 >
 > Heiko
+>
 >
 >
 >
