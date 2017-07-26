@@ -1,69 +1,82 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 26 Jul 2017 09:08:37 +0200
-Subject: [PATCH v4 0/9] add support for Sama5d2 audio PLLs and enable
- ClassD
-In-Reply-To: <20170726065732.zphp7zaug4ypcqzj@piout.net>
-References: <cover.c8ce78c15296190b2aa5c452c0c4512528e28518.1500968090.git-series.quentin.schulz@free-electrons.com>
- <194d2fc6-4c88-bc3b-1127-b4c0bdb7c6a1@microchip.com>
- <20170726065732.zphp7zaug4ypcqzj@piout.net>
-Message-ID: <a2f50c1d-7889-8a62-a7d4-240d6310de15@free-electrons.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 26 Jul 2017 15:08:06 +0800
+Subject: [linux-sunxi] [PATCH 10/10] ARM: dts: sun8i: Add SY8106A
+ regulator to Orange Pi PC
+In-Reply-To: <20170723102749.17323-11-icenowy@aosc.io>
+References: <20170723102749.17323-1-icenowy@aosc.io>
+ <20170723102749.17323-11-icenowy@aosc.io>
+Message-ID: <CAGb2v66AGjazHT-+hWVLyNBLDw=DJ5yTmNxF-_=BtZFfjnni-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+On Sun, Jul 23, 2017 at 6:27 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> From: Ondrej Jirman <megous@megous.com>
+>
+> Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
+> Orange Pi PC, then set the power supply of the ARM cores to this
+> regulator, in order to enable DVFS.
+>
+> Signed-off-by: Ondrej Jirman <megous@megous.com>
+> [Icenowy: Enable DVFS in this patch, slight changes and change commit
+>  message]
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> index 998b60f8d295..d855f8b6254e 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> @@ -98,6 +98,10 @@
+>         status = "okay";
+>  };
+>
+> +&cpu0 {
+> +       cpu-supply = <&reg_sy8106a>;
+> +};
+> +
+>  &ehci0 {
+>         status = "okay";
+>  };
+> @@ -160,6 +164,21 @@
+>         };
+>  };
+>
+> +&r_i2c {
+> +       status = "okay";
+> +
+> +       reg_sy8106a: regulator at 65 {
+> +               compatible = "silergy,sy8106a";
+> +               reg = <0x65>;
+> +               regulator-name = "vdd-cpux";
+> +               regulator-min-microvolt = <1000000>;
 
-On 26/07/2017 08:57, Alexandre Belloni wrote:
-> On 25/07/2017 at 17:44:19 +0200, Nicolas Ferre wrote:
->> On 25/07/2017 at 09:37, Quentin Schulz wrote:
->>> This patch series adds support for the audio PLLs and enables ClassD that
->>> can be found in ATMEL Sama5d2 SoC.
->>>
->>> There are two audio PLLs (PMC and PAD) that shares the same parent (FRAC).
->>> FRAC can output between 620 and 700MHz and only multiply the rate of its
->>> parent. The two audio PLLs then divide the FRAC rate to best match the
->>> asked rate.
->>>
->>> I basically took an old patch series posted by Nicolas on December, 6th
->>> 2016[1][2][3] and the comments Boris did on the first version[4] Nicolas
->>> sent on July, 15th 2015.
->>>
->>> I also fixed the function used to compute the divisors, removed useless
->>> spinlocks and added a range to the audio frac PLL to stay within vendor's
->>> supported range. Clocks that are children of gclk (generated-clk) are now
->>> able to propagate rate to the audio PLL clocks when needed.
->>>
->>> However, there are multiple children clocks that could technically
->>> change the rate of audio_pll (via gck). With the rate locking introduced
->>> in Jerome Brunet's patch series[5], the first consumer to enable the clock
->>> will be the one definitely setting the rate of the clock. Without the rate
->>> locking, the last consumer to set the rate will be able to mess with the
->>> rate.
->>> Since audio IPs are most likely to request the same rate, we enforce
->>> that the only clks able to modify gck rate are those of audio IPs.
->>>
->>> To remain consistent, we deny other clocks to be children of audio_pll.
->>
->> Quentin,
->>
->> Thanks for having revived this series. Everything's okay on my side for
->> this v4. I think that my tag isn't missing from any patch of this
->> series. Now we surely need to define which path it must take...
->>
-> 
-> I'll take the two dts patches now as the bindings have been acked.
-> Everything else should probably go through the clk tree.
-> 
+According to the H3 datasheet, the minimum voltage is 1.1V, not 1V.
 
-Thanks for taking the dts patches.
+Otherwse
 
-I agree that the remaining should go through the clk tree. @Stephen,
-@Michael, any objection (apart from your reviews on the patches) on
-taking this through your tree?
+> +               regulator-max-microvolt = <1400000>;
+> +               regulator-ramp-delay = <200>;
 
-Thanks,
-Quentin
+Is this an actual constraint of the SoC? Or is it a characteristic
+of the regulator? If it is the latter, it belongs in the driver.
+AFAIK the regulator supports varying the ramp delay (slew rate).
 
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+ChenYu
+
+> +               regulator-boot-on;
+> +               regulator-always-on;
+> +       };
+> +};
+> +
+>  &r_pio {
+>         leds_r_opc: led_pins at 0 {
+>                 pins = "PL10";
+> --
+> 2.13.0
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
