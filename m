@@ -1,80 +1,109 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Wed, 26 Jul 2017 07:38:02 +0000
-Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <20170726052930.GF3053@localhost>
-References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
- <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
- <20170722065133.GT3053@localhost>
- <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
- <20170726052930.GF3053@localhost>
-Message-ID: <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+From: andy.tang@nxp.com (andy.tang at nxp.com)
+Date: Wed, 26 Jul 2017 15:24:52 +0800
+Subject: [PATCH 1/2] arm64: dts: ls1088a: add cpu idle support
+Message-ID: <1501053893-20897-1-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Yuantian Tang <andy.tang@nxp.com>
 
+ls1088a supports another cpu idle state which is ph20 which saves
+more power when cpu is idle.
+It was implemented through psci firmware.
 
-On 07/26/2017 07:29 AM, Vinod Koul wrote:
-> On Mon, Jul 24, 2017 at 01:55:10PM +0000, Pierre Yves MORDRET wrote:
-> 
->>>> +
->>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>> +	if (!res)
->>>> +		return -ENODEV;
->>>> +
->>>> +	iomem = devm_ioremap_resource(&pdev->dev, res);
->>>> +	if (!iomem)
->>>> +		return -ENOMEM;
->>>> +
->>>> +	spin_lock_init(&stm32_dmamux->lock);
->>>> +
->>>> +	stm32_dmamux->clk = devm_clk_get(&pdev->dev, NULL);
->>>> +	if (IS_ERR(stm32_dmamux->clk)) {
->>>> +		dev_info(&pdev->dev, "Missing controller clock\n");
->>>
->>> Can you check for EPROBE_DEFER and print only for if that is not the error
->>> otherwise we end up sapmming with defered probe issues
->>>
->>
->> This is what you meant ?
->> 	if (IS_ERR(stm32_dmamux->clk) != EPROBE_DEFER) {
->> 		dev_info(&pdev->dev, "Missing controller clock\n");
->> 		return PTR_ERR(stm32_dmamux->clk);
->> 	}
->>
->> OR
->>
->> 	if (IS_ERR(stm32_dmamux->clk)) {
->> 		if (IS_ERR(stm32_dmamux->clk) != EPROBE_DEFER)
->> 			dev_info(&pdev->dev, "Missing controller clock\n");
->> 		return PTR_ERR(stm32_dmamux->clk);
->> 	}
-> 
-> This one please
-> 
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-ok
-
->>
->>>> +
->>>> +#ifndef __DMA_STM32_DMAMUX_H
->>>> +#define __DMA_STM32_DMAMUX_H
->>>> +
->>>> +#if defined(CONFIG_STM32_DMAMUX)
->>>> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
->>>
->>> Why do we need a custom API in this case?
->>>
->>
->> This API is called by DMA when a slave is requested by client. DMA can work
->> without DMAMUX this API has been put in place to configure DMAMUX whether client
->> is requesting a DMAMUX Channel instead of a DMA one.
-> 
-> You mean the dmaengine driver right?
-> 
-
-Yes. The API is mainly called by "device_config" through out STM32 DMA Driver
-when a router is in place for client.
-Please refer to Patch 4/5 on this set.
-
-Thanks
-Py
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index c144d06..adc1ff5 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -62,6 +62,7 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x0>;
+ 			clocks = <&clockgen 1 0>;
++			cpu-idle-states = <&CPU_PH20>;
+ 			#cooling-cells = <2>;
+ 		};
+ 
+@@ -70,6 +71,7 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x1>;
+ 			clocks = <&clockgen 1 0>;
++			cpu-idle-states = <&CPU_PH20>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -77,6 +79,7 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x2>;
+ 			clocks = <&clockgen 1 0>;
++			cpu-idle-states = <&CPU_PH20>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -84,6 +87,7 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x3>;
+ 			clocks = <&clockgen 1 0>;
++			cpu-idle-states = <&CPU_PH20>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+@@ -91,6 +95,7 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x100>;
+ 			clocks = <&clockgen 1 1>;
++			cpu-idle-states = <&CPU_PH20>;
+ 			#cooling-cells = <2>;
+ 		};
+ 
+@@ -99,6 +104,7 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x101>;
+ 			clocks = <&clockgen 1 1>;
++			cpu-idle-states = <&CPU_PH20>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -106,6 +112,7 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x102>;
+ 			clocks = <&clockgen 1 1>;
++			cpu-idle-states = <&CPU_PH20>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -113,6 +120,16 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x103>;
+ 			clocks = <&clockgen 1 1>;
++			cpu-idle-states = <&CPU_PH20>;
++		};
++
++		CPU_PH20: cpu-ph20 {
++			compatible = "arm,idle-state";
++			idle-state-name = "PH20";
++			arm,psci-suspend-param = <0x00010000>;
++			entry-latency-us = <1000>;
++			exit-latency-us = <1000>;
++			min-residency-us = <3000>;
+ 		};
+ 	};
+ 
+@@ -136,6 +153,11 @@
+ 			     <1 10 IRQ_TYPE_LEVEL_LOW>;/* Hypervisor PPI */
+ 	};
+ 
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
+ 	sysclk: sysclk {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-- 
+2.1.0.27.g96db324
