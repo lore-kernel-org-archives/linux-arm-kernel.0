@@ -1,63 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Jul 2017 13:02:08 +0100
-Subject: [PATCH 1/3] arm/syscalls: Move address limit check in loop
-In-Reply-To: <CAJcbSZF1ddWuQ-c2Xyr1Nvrjzg2TZZNHPfSo7R6Vqg2mnhiPOg@mail.gmail.com>
-References: <20170719175900.124074-1-thgarnie@google.com>
- <CAJcbSZFw9GhVvNfYi1oHhpintHSzGcHvGjg5LtRViNBPDzLHaA@mail.gmail.com>
- <1500978481.30745.10.camel@nxp.com>
- <20170725103828.GJ31807@n2100.armlinux.org.uk>
- <CAJcbSZF1ddWuQ-c2Xyr1Nvrjzg2TZZNHPfSo7R6Vqg2mnhiPOg@mail.gmail.com>
-Message-ID: <20170726120208.GB2115@arm.com>
+Date: Wed, 26 Jul 2017 13:02:33 +0100
+Subject: [PATCH] arm64: Convert to using %pOF instead of full_name
+In-Reply-To: <CAL_JsqJFD4y3MXFApApj59brOyagysGjmrPFBGx96gf-ZjCdSA@mail.gmail.com>
+References: <20170718214339.7774-2-robh@kernel.org>
+ <20170725120422.GD27768@arm.com>
+ <CAL_JsqJFD4y3MXFApApj59brOyagysGjmrPFBGx96gf-ZjCdSA@mail.gmail.com>
+Message-ID: <20170726120233.GC2115@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 01:01:17PM -0700, Thomas Garnier wrote:
-> On Tue, Jul 25, 2017 at 3:38 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Tue, Jul 25, 2017 at 01:28:01PM +0300, Leonard Crestez wrote:
-> >> On Mon, 2017-07-24 at 10:07 -0700, Thomas Garnier wrote:
-> >> > On Wed, Jul 19, 2017 at 10:58 AM, Thomas Garnier <thgarnie@google.com
-> >> > > wrote:
-> >> > >
-> >> > > The work pending loop can call set_fs after addr_limit_user_check
-> >> > > removed the _TIF_FSCHECK flag. To prevent the infinite loop, move
-> >> > > the addr_limit_user_check call at the beginning of the loop.
-> >> > >
-> >> > > Fixes: 73ac5d6a2b6a ("arm/syscalls: Check address limit on user-
-> >> > > mode return")
-> >> > > Reported-by: Leonard Crestez <leonard.crestez@nxp.com>
-> >> > > Signed-off-by: Thomas Garnier <thgarnie@google.com>
+Hi Rob,
+
+On Tue, Jul 25, 2017 at 07:27:29PM -0500, Rob Herring wrote:
+> On Tue, Jul 25, 2017 at 7:04 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jul 18, 2017 at 04:42:42PM -0500, Rob Herring wrote:
+> >> Now that we have a custom printf format specifier, convert users of
+> >> full_name to use %pOF instead. This is preparation to remove storing
+> >> of the full path string for each node.
 > >>
-> >> > Any comments on this patch set?
-> >>
-> >> Tested-by: Leonard Crestez <leonard.crestez@nxp.com>
-> >>
-> >> This appears to fix the original issue of failing to boot from NFS when
-> >> there are lots of alignment faults. But this is a very basic test
-> >> relative to the reach of this change.
-> >>
-> >> However the original patch has been in linux-next for a while and
-> >> apparently nobody else noticed system calls randomly hanging on arm.
-> >>
-> >> I assume maintainers need to give their opinion.
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> ---
+> >>  arch/arm64/kernel/cpu_ops.c  |  4 ++--
+> >>  arch/arm64/kernel/smp.c      | 12 ++++++------
+> >>  arch/arm64/kernel/topology.c | 22 +++++++++++-----------
+> >>  3 files changed, 19 insertions(+), 19 deletions(-)
 > >
-> > I've already stated my opinion, which is different from what Linus has
-> > requested of Thomas.  IMHO, the current approach is going to keep on
-> > causing problems along the lines that I've already pointed out.
+> > I've queued this and the perf patch too, but it would be good if somebody
+> > could update sparse to recognise this format specifier. Currently it
+> > just complains about it.
 > 
-> I understand. Do you think this problem apply to arm64 as well?
+> I'm happy to fix it, but I ran sparse and don't see any errors. Got a pointer?
 
-It's probably less of an issue for arm64 because we don't take alignment
-faults from the kernel and I think the perf case would resolve itself by
-throttling the event. However, I also don't see the advantage of doing
-this in the work loop as opposed to leaving it until we're actually doing
-the return to userspace.
+I went back and checked again and it's not sparse that's warning, it's
+actually smatch (sorry for getting that mixed up):
 
-I looked to see what you've done for x86, but it looks like you check/clear
-the flag before the work pending loop (exit_to_usermode_loop), which
-subsequently re-enables interrupts and exits when
-EXIT_TO_USERMODE_LOOP_FLAGS are all clear. Since TIF_FSCHECK isn't included
-in those flags, what stops it being set again by an irq and remaining set
-for the return to userspace?
+  arch/arm64/kernel/cpu_ops.c:85 cpu_read_enable_method() error: unrecognized %p extension 'O', treated as normal %p [smatch]
 
 Will
