@@ -1,27 +1,42 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 27 Jul 2017 00:44:09 +0200
-Subject: [PATCH v6 1/7] drm/rockchip: vop: initialize registers directly
-In-Reply-To: <1501049946-5877-1-git-send-email-mark.yao@rock-chips.com>
-References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
- <1501049946-5877-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <3205727.pYBXLEh47x@phil>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 26 Jul 2017 15:45:40 -0700 (PDT)
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170726223658.GA27617@linux.vnet.ibm.com>
+References: <20170726.095432.169004918437663011.davem@davemloft.net>
+ <20170726175013.GT3730@linux.vnet.ibm.com>
+ <20170726223658.GA27617@linux.vnet.ibm.com>
+Message-ID: <20170726.154540.150558937277891719.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 26. Juli 2017, 14:19:05 CEST schrieb Mark Yao:
-> At present we are using init_table to initialize some
-> registers, but the Register init table use un-document define,
-> it is unreadable, and sometimes we only want to update tiny
-> bits, init table method is not friendly, it's diffcult to
-> reuse for difference chips.
-> 
-> To make it clean, initialize registers directly, and drops
-> init_table mechanism out.
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+Date: Wed, 26 Jul 2017 15:36:58 -0700
 
-on rk3036 and rk3288
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+> And without CONFIG_SOFTLOCKUP_DETECTOR, I see five runs of 24 with RCU
+> CPU stall warnings.  So it seems likely that CONFIG_SOFTLOCKUP_DETECTOR
+> really is having an effect.
 
+Thanks for all of the info Paul, I'll digest this and scan over the
+code myself.
 
-Heiko
+Just out of curiousity, what x86 idle method is your machine using?
+The mwait one or the one which simply uses 'halt'?  The mwait variant
+might mask this bug, and halt would be a lot closer to how sparc64 and
+Jonathan's system operates.
+
+On sparc64 the cpu yield we do in the idle loop sleeps the cpu.  It's
+local TICK register keeps advancing, and the local timer therefore
+will still trigger.  Also, any externally generated interrupts
+(including cross calls) will wake up the cpu as well.
+
+The tick-sched code is really tricky wrt. NO_HZ even in the NO_HZ_IDLE
+case.  One of my running theories is that we miss scheduling a tick
+due to a race.  That would be consistent with the behavior we see
+in the RCU dumps, I think.
+
+Anyways, just a theory, and that's why I keep mentioning that commit
+about the revert of the revert (specifically
+411fe24e6b7c283c3a1911450cdba6dd3aaea56e).
+
+:-)
