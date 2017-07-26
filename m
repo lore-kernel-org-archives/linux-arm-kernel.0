@@ -1,109 +1,77 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 26 Jul 2017 08:03:29 -0500
-Subject: [PATCH v3 2/2] ARM: dts: keystone-k2g-evm: Add gpio nodes
-In-Reply-To: <1501051524-5990-2-git-send-email-j-keerthy@ti.com>
-References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
- <1501051524-5990-2-git-send-email-j-keerthy@ti.com>
-Message-ID: <1fb21a17-c38e-539f-7cd3-b72bd819a531@ti.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Wed, 26 Jul 2017 15:10:58 +0200
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
+References: <20170725150422.4775-1-jglauber@cavium.com>
+ <20170725150422.4775-2-jglauber@cavium.com>
+ <72145781-e9ec-036f-f752-b4756fef08ee@arm.com>
+ <20170726111946.GA6273@hc>
+ <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
+Message-ID: <20170726131058.GA8665@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Keerthy,
+On Wed, Jul 26, 2017 at 01:47:35PM +0100, Suzuki K Poulose wrote:
+> On 26/07/17 12:19, Jan Glauber wrote:
+> >On Tue, Jul 25, 2017 at 04:39:18PM +0100, Suzuki K Poulose wrote:
+> >>On 25/07/17 16:04, Jan Glauber wrote:
+> >>>Add support for the PMU counters on Cavium SOC memory controllers.
+> >>>
+> >>>This patch also adds generic functions to allow supporting more
+> >>>devices with PMU counters.
+> >>>
+> >>>Properties of the LMC PMU counters:
+> >>>- not stoppable
+> >>>- fixed purpose
+> >>>- read-only
+> >>>- one PCI device per memory controller
+> >>>
+> >>>Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> >>>---
+> >>>drivers/perf/Kconfig       |   8 +
+> >>>drivers/perf/Makefile      |   1 +
+> >>>drivers/perf/cavium_pmu.c  | 424 +++++++++++++++++++++++++++++++++++++++++++++
+> >>>include/linux/cpuhotplug.h |   1 +
+> >>>4 files changed, 434 insertions(+)
+> >>>create mode 100644 drivers/perf/cavium_pmu.c
+> >>>
+> >>>diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+> >>>index e5197ff..a46c3f0 100644
+> >>>--- a/drivers/perf/Kconfig
+> >>>+++ b/drivers/perf/Kconfig
+> >>>@@ -43,4 +43,12 @@ config XGENE_PMU
+> >>>        help
+> >>>          Say y if you want to use APM X-Gene SoC performance monitors.
+> >>>
+> >>>+config CAVIUM_PMU
+> >>>+	bool "Cavium SOC PMU"
+> >>
+> >>Is there any specific reason why this can't be built as a module ?
+> >
+> >Yes. I don't know how to load the module automatically. I can't make it
+> >a pci driver as the EDAC driver "owns" the device (and having two
+> >drivers for one device wont work as far as I know). I tried to hook
+> >into the EDAC driver but the EDAC maintainer was not overly welcoming
+> >that approach.
+> 
+> >
+> >And while it would be possible to have it a s a module I think it is of
+> >no use if it requires manualy loading. But maybe there is a simple
+> >solution I'm missing here?
+> 
+> 
+> If you are talking about a Cavium specific EDAC driver, may be we could
+> make that depend on this driver "at runtime" via symbols (may be even,
+> trigger the probe of PMU), which will be referenced only when CONFIG_CAVIUM_PMU
+> is defined. It is not the perfect solution, but that should do the trick.
 
-On 07/26/2017 01:45 AM, Keerthy wrote:
-> 66AK2G has 2 instances of gpio. The first one has all the 144 GPIOs
-> functional( 9 banks with 16 gpios = 144). The second instance has
+I think that is roughly what I proposed in v6. Can you have a look at:
 
-nit, space before ( and not after.
+https://lkml.org/lkml/2017/6/23/333
+https://patchwork.kernel.org/patch/9806427/
 
-> only the GPIO0:GPIO67 functional and rest are marked reserved.
+Probably there is a better way to do it. Or maybe we just keep it as
+built-in for the time being.
 
-s/keystone-k2g-evm/keystone-k2g/ on the patch header please, otherwise
-this patch looks good.
-
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
-> 
-> The patch depends on the below series:
-> 
-> http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
-> http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2
-
-FYI, these are already picked up my Santosh and are part of linux-next.
-
-regards
-Suman
-
-> 
-> Driver patches related are already posted:
-> 
-> https://www.spinics.net/lists/arm-kernel/msg594862.html
-> 
-> Changes in v2:
-> 
->   * Split the documentation part into a separate patch.
-> 
->  arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-> index bf4d1fa..f9ff299 100644
-> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
-> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-> @@ -15,6 +15,7 @@
->  
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/pinctrl/keystone.h>
-> +#include <dt-bindings/gpio/gpio.h>
->  
->  / {
->  	compatible = "ti,k2g","ti,keystone";
-> @@ -168,5 +169,46 @@
->  				#reset-cells = <2>;
->  			};
->  		};
-> +
-> +		gpio0: gpio at 2603000 {
-> +			compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
-> +			reg = <0x02603000 0x100>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +
-> +			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			ti,ngpio = <144>;
-> +			ti,davinci-gpio-unbanked = <0>;
-> +			clocks = <&k2g_clks 0x001b 0x0>;
-> +			clock-names = "gpio";
-> +		};
-> +
-> +		gpio1: gpio at 260a000 {
-> +			compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
-> +			reg = <0x0260a000 0x100>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
-> +					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			ti,ngpio = <68>;
-> +			ti,davinci-gpio-unbanked = <0>;
-> +			clocks = <&k2g_clks 0x001c 0x0>;
-> +			clock-names = "gpio";
-> +		};
->  	};
->  };
-> 
+--Jan
