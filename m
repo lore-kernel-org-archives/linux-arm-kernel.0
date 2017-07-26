@@ -1,93 +1,71 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 26 Jul 2017 11:20:28 +0530
-Subject: [PATCH v2 2/2] ARM: dts: keystone-k2g-evm: Add gpio nodes
-In-Reply-To: <1501048228-3492-1-git-send-email-j-keerthy@ti.com>
-References: <1501048228-3492-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1501048228-3492-2-git-send-email-j-keerthy@ti.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Wed, 26 Jul 2017 14:17:06 +0800
+Subject: [PATCH v5 3/7] drm/rockchip: vop: move line_flag_num to interrupt
+ registers
+In-Reply-To: <1816316.NCRF09CkBJ@phil>
+References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
+ <1500518613-30590-1-git-send-email-mark.yao@rock-chips.com>
+ <1816316.NCRF09CkBJ@phil>
+Message-ID: <597833E2.4070607@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-66AK2G has 2 instances of gpio. The first one has all the 144 GPIOs
-functional( 9 banks with 16 gpios = 144). The second instance has
-only the GPIO0:GPIO67 functional and rest are marked reserved.
+On 2017?07?26? 05:54, Heiko Stuebner wrote:
+> Hi Mark,
+>
+> Am Donnerstag, 20. Juli 2017, 10:43:32 CEST schrieb Mark Yao:
+>> In the hardware design process, the design of line flags
+>> register is associated with the interrupt register,
+>> placing the line flags in the interrupt definition is
+>> more reasonable, and it would make multi-vop define easilier.
+>>
+>> Changes in v3:
+>> - Explain more in details, introduce why we need this patch
+>>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>> Reviewed-by: Sean Paul <seanpaul@chromium.org>
+>> ---
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 4 ++--
+>>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 8 ++++----
+>>   3 files changed, 7 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index 784a2b7..4f6c7bc 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -982,7 +982,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+>>   	VOP_CTRL_SET(vop, vact_st_end, val);
+>>   	VOP_CTRL_SET(vop, vpost_st_end, val);
+>>   
+>> -	VOP_CTRL_SET(vop, line_flag_num[0], vact_end);
+>> +	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
+> With patches applied up to this one I end up with
+>
+>    CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_vop.o
+> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c: In function ?vop_crtc_enable?:
+> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:46: error: macro "VOP_INTR_SET" requires 4 arguments, but only 3 given
+>    VOP_INTR_SET(vop, line_flag_num[0], vact_end);
+>                                                ^
+> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:2: error: ?VOP_INTR_SET? undeclared (first use in this function)
+>    VOP_INTR_SET(vop, line_flag_num[0], vact_end);
+>    ^~~~~~~~~~~~
+> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:985:2: note: each undeclared identifier is reported only once for each function it appears in
+>
+> In patch4 you replace this again, with
+> -	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
+> +	VOP_REG_SET(vop, intr, line_flag_num[0], vact_end);
+>
+> but this intermediate breakage should not happen, to keep bisectability.
+>
+>
+> Heiko
+>
+>
+>
+Hi Heiko
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
+Thanks for the test, will fix it at next version.
 
-The patch depends on the below series:
-
-http://marc.info/?l=linux-arm-kernel&m=150034845427555&w=2
-http://marc.info/?l=linux-arm-kernel&m=150034856627618&w=2
-
-Driver patches related are already posted:
-
-https://www.spinics.net/lists/arm-kernel/msg594862.html
-
-Changes in v2:
-
-  * Split the documentation part into a separate patch.
-
- arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index bf4d1fa..f9ff299 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -15,6 +15,7 @@
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/keystone.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	compatible = "ti,k2g","ti,keystone";
-@@ -168,5 +169,46 @@
- 				#reset-cells = <2>;
- 			};
- 		};
-+
-+		gpio0: gpio at 2603000 {
-+			compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
-+			reg = <0x02603000 0x100>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+
-+			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			ti,ngpio = <144>;
-+			ti,davinci-gpio-unbanked = <0>;
-+			clocks = <&k2g_clks 0x001b 0x0>;
-+			clock-names = "gpio";
-+		};
-+
-+		gpio1: gpio at 260a000 {
-+			compatible = "ti,keystone-k2g-gpio", "ti,keystone-gpio";
-+			reg = <0x0260a000 0x100>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			ti,ngpio = <68>;
-+			ti,davinci-gpio-unbanked = <0>;
-+			clocks = <&k2g_clks 0x001c 0x0>;
-+			clock-names = "gpio";
-+		};
- 	};
- };
 -- 
-1.9.1
+?ark Yao
