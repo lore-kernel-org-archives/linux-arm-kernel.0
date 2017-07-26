@@ -1,175 +1,60 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 26 Jul 2017 13:01:56 -0700
-Subject: [PATCH v2] ARM: dts: bcm283x: Move the BCM2837 DT contents from arm64
- to arm.
-Message-ID: <20170726200156.30161-1-eric@anholt.net>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Wed, 26 Jul 2017 13:02:38 -0700
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170726173353.GB21705@kroah.com>
+References: <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
+ <20170726131058.GA8665@hc> <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
+ <20170726145522.GC28875@nazgul.tnic> <20170726151314.GA10696@hc>
+ <20170726153502.GE28875@nazgul.tnic> <20170726154515.GA11453@hc>
+ <20170726155548.GF28875@nazgul.tnic> <20170726161949.GB15426@kroah.com>
+ <20170726163049.GG28875@nazgul.tnic> <20170726173353.GB21705@kroah.com>
+Message-ID: <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BCM2837 is somewhat unusual in that we build its DT on both arm32 and
-arm64.  Most devices are being run in arm32 mode.
+On 07/26/2017 10:33 AM, Greg KH wrote:
+> On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
+>> On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
+>>> On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
+>>>> On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
+>>>>> The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
+>>>>> I'm not aware of other ways to access these devices. Please enlighten
+>>>>> me if I'm missing something.
+>>>>
+>>>> Me enlighten you on Cavium hardware?! You're funny.
+>>>>
+>>>> So I don't know whether the PCI hotplug code can run more than one
+>>>> function upon PCI ID detection. Probably Greg will say, write a
+>>>> multiplexer wrapper. :-)
+>>>
+>>> -ENOCONTEXT....
+>>>
+>>> Anyway, pci questions are best asked on the linux-pci at vger list.  And
+>>> yes, all PCI devices end up with a 'struct pci_dev *' automatically.
+>>
+>> Simple: so they have a PCI ID of a memory contoller and want to hotplug
+>> two drivers for it. And those two drivers should remain independent from
+>> each other.
+> 
+> Hahahahaha, no.  That's crazy, you were right in guessing what my answer
+> was going to be :)
+> 
 
-Having the body of the DT for 2837 separate from 2835/6 has been a
-source of pain, as we often need to make changes that span both
-directories simultaneously (for example, the thermal changes for 4.13,
-or anything that changes the name of a node referenced by '&' from
-board files).  Other changes are made more complicated than they need
-to be, such as the SDHOST enabling, because we have to split a single
-logical change into a 283[56] half and a 2837 half.
 
-To fix this, make the stub board include file live in arm64 instead of
-arm32, and keep all of BCM283x's contents in arm32.  From here on, our
-changes to DT contents can be submitted through a single tree.
+Just to be clear about the situation, the device is a memory controller. 
+  It has two main behaviors we are interested in:
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+A) Error Detection And Correction (EDAC).  This should be connected to 
+the kernel's EDAC subsystem.  An existing driver 
+(drivers/edac/thunderx_edac.c) does exactly this.
 
-v2: Drop the .dtsi symlinks from arm64 -- they get successfully found
-    by the .dtsi in arm/
+B) Performance Counters for actions taken in the corresponding memory. 
+This should be connected to the kernel's perf framework as an uncore-PMU 
+(the subject of this patch set).
 
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts              | 42 +++++++++++++++++++++-
- .../dts/broadcom => arm/boot/dts}/bcm2837.dtsi     |  0
- arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi      |  1 -
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   | 42 +---------------------
- .../boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi    |  1 -
- .../boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi    |  1 -
- arch/arm64/boot/dts/broadcom/bcm283x.dtsi          |  1 -
- 7 files changed, 42 insertions(+), 46 deletions(-)
- rename arch/{arm64/boot/dts/broadcom => arm/boot/dts}/bcm2837.dtsi (100%)
- delete mode 120000 arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
- delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
- delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
- delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x.dtsi
+It is a single PCI device.  What should the driver architecture look 
+like to connect it to two different kernel subsystems?
 
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index c72a27d908b6..972f14db28ac 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -1 +1,41 @@
--#include "arm64/broadcom/bcm2837-rpi-3-b.dts"
-+/dts-v1/;
-+#include "bcm2837.dtsi"
-+#include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
-+#include "bcm283x-rpi-usb-host.dtsi"
-+
-+/ {
-+	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
-+	model = "Raspberry Pi 3 Model B";
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+
-+	leds {
-+		act {
-+			gpios = <&gpio 47 0>;
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+/* SDHCI is used to control the SDIO for wireless */
-+&sdhci {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_gpio34>;
-+	status = "okay";
-+	bus-width = <4>;
-+	non-removable;
-+};
-+
-+/* SDHOST is used to drive the SD card */
-+&sdhost {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdhost_gpio48>;
-+	status = "okay";
-+	bus-width = <4>;
-+};
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
-similarity index 100%
-rename from arch/arm64/boot/dts/broadcom/bcm2837.dtsi
-rename to arch/arm/boot/dts/bcm2837.dtsi
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi b/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
-deleted file mode 120000
-index 3937b77cb310..000000000000
---- a/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts/bcm2835-rpi.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-index 972f14db28ac..699d340a3437 100644
---- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-@@ -1,41 +1 @@
--/dts-v1/;
--#include "bcm2837.dtsi"
--#include "bcm2835-rpi.dtsi"
--#include "bcm283x-rpi-smsc9514.dtsi"
--#include "bcm283x-rpi-usb-host.dtsi"
--
--/ {
--	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
--	model = "Raspberry Pi 3 Model B";
--
--	memory {
--		reg = <0 0x40000000>;
--	};
--
--	leds {
--		act {
--			gpios = <&gpio 47 0>;
--		};
--	};
--};
--
--&uart1 {
--	status = "okay";
--};
--
--/* SDHCI is used to control the SDIO for wireless */
--&sdhci {
--	pinctrl-names = "default";
--	pinctrl-0 = <&emmc_gpio34>;
--	status = "okay";
--	bus-width = <4>;
--	non-removable;
--};
--
--/* SDHOST is used to drive the SD card */
--&sdhost {
--	pinctrl-names = "default";
--	pinctrl-0 = <&sdhost_gpio48>;
--	status = "okay";
--	bus-width = <4>;
--};
-+#include "arm/bcm2837-rpi-3-b.dts"
-diff --git a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
-deleted file mode 120000
-index dca7c057d5a5..000000000000
---- a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
-deleted file mode 120000
-index cbeebe312ff8..000000000000
---- a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts/bcm283x-rpi-usb-host.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/broadcom/bcm283x.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x.dtsi
-deleted file mode 120000
-index 5f54e4cab99b..000000000000
---- a/arch/arm64/boot/dts/broadcom/bcm283x.dtsi
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts/bcm283x.dtsi
-\ No newline at end of file
--- 
-2.13.3
+Thanks,
+David Daney
