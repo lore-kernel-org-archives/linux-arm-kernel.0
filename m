@@ -1,172 +1,71 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 26 Jul 2017 15:52:30 +0800
-Subject: [PATCH v2] irqchip/gic-v3-its: Allow GIC ITS number more than
- MAX_NUMNODES
-In-Reply-To: <91588872-441b-88c0-07e3-452c2998d173@arm.com>
-References: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
- <91588872-441b-88c0-07e3-452c2998d173@arm.com>
-Message-ID: <f57a04ad-b686-9872-8b6a-bbacea29b3b0@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 26 Jul 2017 08:57:26 +0100
+Subject: Tegra baseline test results for v4.13-rc2
+Message-ID: <0af5ef68-7d7f-e9b0-d452-e406de518c65@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/7/25 18:30, Marc Zyngier wrote:
-> On 22/07/17 04:54, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> When running 4.13-rc1 on top of D05, I got the boot log:
->>
->> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
->> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
->> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
->> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
->> [    0.000000] SRAT: ITS affinity exceeding max count[4]
->>
->> This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
->>
->> So dynamically alloc the memory needed instead of using
->> its_srat_maps[MAX_NUMNODES], which count the number of
->> ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
->> then build the mapping of numa node to ITS ID. Of course,
->> its_srat_maps will be freed after ITS probing because
->> we don't need that after boot.
->>
->> After doing this, I got what I wanted:
->>
->> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
->> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
->> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
->> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
->> [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
->> [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
->> [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
->> [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
->>
->> Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>
->> v1->v2:
->>    - Add NULL check in acpi_get_its_numa_node() for no ITS affinity case;
->>    - Free the its_srat_maps after ITS probing.
->>
->>   drivers/irqchip/irq-gic-v3-its.c | 39 ++++++++++++++++++++++++++++++++-------
->>   1 file changed, 32 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 3ccdf76..1d692aa 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -1847,13 +1847,16 @@ struct its_srat_map {
->>   	u32	its_id;
->>   };
->>   
->> -static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
->> +static struct its_srat_map *its_srat_maps __initdata;
->>   static int its_in_srat __initdata;
->>   
->>   static int __init acpi_get_its_numa_node(u32 its_id)
->>   {
->>   	int i;
->>   
->> +	if (!its_srat_maps)
->> +		return NUMA_NO_NODE;
->> +
->>   	for (i = 0; i < its_in_srat; i++) {
->>   		if (its_id == its_srat_maps[i].its_id)
->>   			return its_srat_maps[i].numa_node;
->> @@ -1861,6 +1864,12 @@ static int __init acpi_get_its_numa_node(u32 its_id)
->>   	return NUMA_NO_NODE;
->>   }
->>   
->> +static int __init gic_acpi_match_srat_its(struct acpi_subtable_header *header,
->> +					  const unsigned long end)
->> +{
->> +	return 0;
->> +}
->> +
->>   static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
->>   			 const unsigned long end)
->>   {
->> @@ -1877,12 +1886,6 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
->>   		return -EINVAL;
->>   	}
->>   
->> -	if (its_in_srat >= MAX_NUMNODES) {
->> -		pr_err("SRAT: ITS affinity exceeding max count[%d]\n",
->> -				MAX_NUMNODES);
->> -		return -EINVAL;
->> -	}
->> -
-> 
-> So you're getting rid of that message when overflowing the array...
+Here are some basic Tegra test results for Linux v4.13-rc2.
+Logs and other details at:
 
-This overflowing will not happen, because I scan the SRAT
-to count the entry(ies) of ITS affinity first to alloc the
-array, and then parse the same SRAT again to setup the mapping
-of NUMA node to ITS, so is it fine for us to just remove the
-check here?
+    https://nvtb.github.io//linux/test_v4.13-rc2/20170723190104/
 
-> 
->>   	node = acpi_map_pxm_to_node(its_affinity->proximity_domain);
->>   
->>   	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
->> @@ -1901,14 +1904,35 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
->>   
->>   static void __init acpi_table_parse_srat_its(void)
->>   {
->> +	int count;
->> +
->> +	count = acpi_table_parse_entries(ACPI_SIG_SRAT,
->> +			sizeof(struct acpi_table_srat),
->> +			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
->> +			gic_acpi_match_srat_its, 0);
->> +	if (count <= 0)
->> +		return;
->> +
->> +	its_srat_maps = kmalloc(count * sizeof(struct its_srat_map),
->> +				GFP_KERNEL);
->> +	if (!its_srat_maps)
->> +		return;
-> 
-> and here silently returning when failing to allocate the memory. I think
-> it'd be worth having a bit of a warning.
 
-Will do.
+Test summary
+------------
 
-> 
->> +
->>   	acpi_table_parse_entries(ACPI_SIG_SRAT,
->>   			sizeof(struct acpi_table_srat),
->>   			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
->>   			gic_acpi_parse_srat_its, 0);
->>   }
->> +
->> +/* free the its_srat_maps after ITS probing */
->> +static void __init acpi_its_srat_maps_free(void)
->> +{
->> +	kfree(its_srat_maps);
->> +}
->>   #else
->>   static void __init acpi_table_parse_srat_its(void)	{ }
->>   static int __init acpi_get_its_numa_node(u32 its_id) { return NUMA_NO_NODE; }
->> +static void __init acpi_its_srat_maps_free(void) { }
->>   #endif
->>   
->>   static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->> @@ -1955,6 +1979,7 @@ static void __init its_acpi_probe(void)
->>   	acpi_table_parse_srat_its();
->>   	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
->>   			      gic_acpi_parse_madt_its, 0);
->> +	acpi_its_srat_maps_free();
->>   }
->>   #else
->>   static void __init its_acpi_probe(void) { }
->>
-> 
-> Otherwise looks good.
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-Thanks
-Hanjun
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.13-rc1 (5771a8c08880cdca3bfb4a3fc6d309d6bba20877)):
+   text     data      bss    total  kernel
+ -64559   +64836        0     +277  defconfig
+ -30706   +32048        0    +1342  multi_v7_defconfig
+ -32950   +34436        0    +1486  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.13-rc1 (5771a8c08880cdca3bfb4a3fc6d309d6bba20877))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+      -4k       4k        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
