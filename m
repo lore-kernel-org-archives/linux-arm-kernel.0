@@ -1,46 +1,66 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 26 Jul 2017 20:57:03 +0200
-Subject: [PATCH v6 1/1] acpi: apei: Enable APEI multiple GHES source to
- share a single external IRQ
-In-Reply-To: <1893763.BLgt1zgLk5@aspire.rjw.lan>
-References: <1500661477-6536-1-git-send-email-lho@apm.com>
- <20170722055954.GA2082@nazgul.tnic> <1893763.BLgt1zgLk5@aspire.rjw.lan>
-Message-ID: <1632667.Vgem7HtdXu@aspire.rjw.lan>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 26 Jul 2017 20:13:47 +0100
+Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
+ callback
+In-Reply-To: <3b858e14-0da1-d4aa-eb84-f136ece8c2a6@gmail.com> (Florian
+ Fainelli's message of "Wed, 26 Jul 2017 11:20:05 -0700")
+References: <20170719190734.18566-1-opendmb@gmail.com>
+ <20170719190734.18566-3-opendmb@gmail.com>
+ <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
+ <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
+ <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
+ <yw1xfudkodvv.fsf@mansr.com>
+ <6f0092f7-692f-4a15-1d95-40f4e59c8585@sigmadesigns.com>
+ <yw1xbmo8odan.fsf@mansr.com>
+ <3b858e14-0da1-d4aa-eb84-f136ece8c2a6@gmail.com>
+Message-ID: <yw1x4ltzm2ok.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, July 23, 2017 12:01:10 AM Rafael J. Wysocki wrote:
-> On Saturday, July 22, 2017 07:59:54 AM Borislav Petkov wrote:
-> > On Fri, Jul 21, 2017 at 11:24:37AM -0700, Loc Ho wrote:
-> > > X-Gene platforms describe multiple GHES error sources with the same hardware
-> > > error notification type (external interrupt) and interrupt number.
-> > > Change the GHES interrupt request to support sharing the same IRQ.
-> > > 
-> > > Co-authored-by: Tuan Phan <tphan@apm.com>
-> > > Signed-off-by: Loc Ho <lho@apm.com>
-> > > ---
-> > >  drivers/acpi/apei/ghes.c | 3 ++-
-> > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> > > index d661d45..eed09fc 100644
-> > > --- a/drivers/acpi/apei/ghes.c
-> > > +++ b/drivers/acpi/apei/ghes.c
-> > > @@ -1157,7 +1157,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
-> > >  			       generic->header.source_id);
-> > >  			goto err_edac_unreg;
-> > >  		}
-> > > -		rc = request_irq(ghes->irq, ghes_irq_func, 0, "GHES IRQ", ghes);
-> > > +		rc = request_irq(ghes->irq, ghes_irq_func, IRQF_SHARED,
-> > > +				 "GHES IRQ", ghes);
-> > >  		if (rc) {
-> > >  			pr_err(GHES_PFX "Failed to register IRQ for generic hardware error source: %d\n",
-> > >  			       generic->header.source_id);
-> > 
-> > Acked-by: Borislav Petkov <bp@suse.de>
-> 
-> OK
-> 
-> Should I apply this or will Tony do that?
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
-So am I suppsed to drop this?
+> On 07/25/2017 06:29 AM, M?ns Rullg?rd wrote:
+>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+>> 
+>>> On 25/07/2017 15:16, M?ns Rullg?rd wrote:
+>>>
+>>>> What happened to the patch adding the proper combined function?
+>>>
+>>> It appears you're not CCed on v2.
+>>>
+>>> https://patchwork.kernel.org/patch/9859799/
+>>>
+>>> Doug wrote:
+>>>> Yes, you understand correctly.  The irq_mask_ack method is entirely
+>>>> optional and I assume that is why this issue went undetected for so
+>>>> long; however, it is slightly more efficient to combine the functions
+>>>> (even if the ack is unnecessary) which is why I chose to do so for my
+>>>> changes to the irqchip-brcmstb-l2 driver where I first discovered this
+>>>> issue.  How much value the improved efficiency has is certainly
+>>>> debatable, but interrupt handling is one area where people might care
+>>>> about such a small difference.  As the irqchip-tango driver maintainer
+>>>> you are welcome to decide whether or not the irq_mask_ack method makes
+>>>> sense to you.
+>>>
+>>> My preference goes to leaving the irq_mask_ack callback undefined,
+>>> and let the irqchip framework use irq_mask and irq_ack instead.
+>> 
+>> Why would you prefer the less efficient way?
+>> 
+>
+> Same question here, that does not really make sense to me.
+>
+> The whole point of this patch series is to have a set of efficient and
+> bugfree (or nearly) helper functions that drivers can rely on, are you
+> saying that somehow using irq_mask_and_ack is exposing a bug in the
+> tango irqchip driver and using the separate functions does not expose
+> this bug?
+
+There is currently a bug in that the function used doesn't do what its
+name implies which can't be good.  Using the separate mask and ack
+functions obviously works, but combining them saves a lock/unlock
+sequence.  The correct combined function has already been written, so I
+see no reason not to use it.
+
+-- 
+M?ns Rullg?rd
