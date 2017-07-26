@@ -1,20 +1,18 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Jul 2017 19:18:28 +0100
-Subject: [PATCHv2 5/7] arm64: unwind: disregard frame.sp when validating frame
- pointer
+Date: Wed, 26 Jul 2017 19:18:30 +0100
+Subject: [PATCHv2 7/7] arm64: unwind: remove sp from struct stackframe
 In-Reply-To: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
 References: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1501093110-3844-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1501093110-3844-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Currently, when unwinding the call stack, we validate the frame pointer
-of each frame against frame.sp, whose value is not clearly defined, and
-which makes it more difficult to link stack frames together across
-different stacks. It is far better to simply check whether the frame
-pointer itself points into a valid stack.
+The unwind code sets the sp member of struct stackframe to
+'frame pointer + 0x10' unconditionally, without regard for whether
+doing so produces a legal value. So let's simply remove it now that
+we have stopped using it anyway.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
@@ -22,93 +20,135 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/irq.h   | 10 +++++++++-
- arch/arm64/kernel/stacktrace.c | 24 +++++++-----------------
- 2 files changed, 16 insertions(+), 18 deletions(-)
+ arch/arm64/include/asm/stacktrace.h | 1 -
+ arch/arm64/kernel/perf_callchain.c  | 1 -
+ arch/arm64/kernel/process.c         | 5 +----
+ arch/arm64/kernel/return_address.c  | 1 -
+ arch/arm64/kernel/stacktrace.c      | 4 ----
+ arch/arm64/kernel/time.c            | 1 -
+ arch/arm64/kernel/traps.c           | 2 --
+ 7 files changed, 1 insertion(+), 14 deletions(-)
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index 6d6f85e..8155e48 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -7,6 +7,7 @@
- #ifndef __ASSEMBLER__
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 5b6eafc..3bebab3 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -20,7 +20,6 @@
  
- #include <linux/percpu.h>
-+#include <linux/sched/task_stack.h>
+ struct stackframe {
+ 	unsigned long fp;
+-	unsigned long sp;
+ 	unsigned long pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	unsigned int graph;
+diff --git a/arch/arm64/kernel/perf_callchain.c b/arch/arm64/kernel/perf_callchain.c
+index 713ca82..bcafd7d 100644
+--- a/arch/arm64/kernel/perf_callchain.c
++++ b/arch/arm64/kernel/perf_callchain.c
+@@ -162,7 +162,6 @@ void perf_callchain_kernel(struct perf_callchain_entry_ctx *entry,
+ 	}
  
- #include <asm-generic/irq.h>
- #include <asm/thread_info.h>
-@@ -49,12 +50,19 @@ static inline int nr_legacy_irqs(void)
+ 	frame.fp = regs->regs[29];
+-	frame.sp = regs->sp;
+ 	frame.pc = regs->pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	frame.graph = current->curr_ret_stack;
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 659ae80..85b953d 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -382,15 +382,12 @@ unsigned long get_wchan(struct task_struct *p)
+ 		return 0;
  
- static inline bool on_irq_stack(unsigned long sp)
- {
--	/* variable names the same as kernel/stacktrace.c */
- 	unsigned long low = (unsigned long)raw_cpu_ptr(irq_stack);
- 	unsigned long high = low + IRQ_STACK_START_SP;
- 
- 	return (low <= sp && sp <= high);
- }
- 
-+static inline bool on_task_stack(struct task_struct *tsk, unsigned long sp)
-+{
-+	unsigned long low = (unsigned long)task_stack_page(tsk);
-+	unsigned long high = low + THREAD_SIZE;
-+
-+	return (low <= sp && sp < high);
-+}
-+
- #endif /* !__ASSEMBLER__ */
+ 	frame.fp = thread_saved_fp(p);
+-	frame.sp = thread_saved_sp(p);
+ 	frame.pc = thread_saved_pc(p);
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	frame.graph = p->curr_ret_stack;
  #endif
+ 	do {
+-		if (frame.sp < stack_page ||
+-		    frame.sp >= stack_page + THREAD_SIZE ||
+-		    unwind_frame(p, &frame))
++		if (unwind_frame(p, &frame))
+ 			goto out;
+ 		if (!in_sched_functions(frame.pc)) {
+ 			ret = frame.pc;
+diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
+index 12a87f2..933adbc 100644
+--- a/arch/arm64/kernel/return_address.c
++++ b/arch/arm64/kernel/return_address.c
+@@ -42,7 +42,6 @@ void *return_address(unsigned int level)
+ 	data.addr = NULL;
+ 
+ 	frame.fp = (unsigned long)__builtin_frame_address(0);
+-	frame.sp = current_stack_pointer;
+ 	frame.pc = (unsigned long)return_address; /* dummy */
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	frame.graph = current->curr_ret_stack;
 diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 6ffb965..beaf51f 100644
+index b079af1..54f3463 100644
 --- a/arch/arm64/kernel/stacktrace.c
 +++ b/arch/arm64/kernel/stacktrace.c
-@@ -42,9 +42,10 @@
-  */
- int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- {
--	unsigned long high, low;
- 	unsigned long fp = frame->fp;
--	unsigned long irq_stack_ptr;
-+
-+	if (fp & 0xf)
-+		return -EINVAL;
- 
- 	if (!tsk)
- 		tsk = current;
-@@ -53,19 +54,8 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 	 * Switching between stacks is valid when tracing current and in
- 	 * non-preemptible context.
- 	 */
--	if (tsk == current && !preemptible())
--		irq_stack_ptr = IRQ_STACK_PTR();
--	else
--		irq_stack_ptr = 0;
--
--	low  = frame->sp;
--	/* irq stacks are not THREAD_SIZE aligned */
--	if (on_irq_stack(frame->sp))
--		high = irq_stack_ptr;
--	else
--		high = ALIGN(low, THREAD_SIZE) - 0x20;
--
--	if (fp < low || fp > high || fp & 0xf)
-+	if (!(tsk == current && !preemptible() && on_irq_stack(fp)) &&
-+	    !on_task_stack(tsk, fp))
+@@ -58,7 +58,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ 	    !on_task_stack(tsk, fp))
  		return -EINVAL;
  
- 	frame->sp = fp + 0x10;
-@@ -94,9 +84,9 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 	 * Check the frame->fp we read from the bottom of the irq_stack,
- 	 * and the original task stack pointer are both in current->stack.
- 	 */
--	if (frame->sp == irq_stack_ptr) {
-+	if (frame->sp == IRQ_STACK_PTR()) {
- 		struct pt_regs *irq_args;
--		unsigned long orig_sp = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
-+		unsigned long orig_sp = IRQ_STACK_TO_TASK_STACK(frame->sp);
+-	frame->sp = fp + 0x10;
+ 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
+ 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
  
- 		if (object_is_on_stack((void *)orig_sp) &&
- 		   object_is_on_stack((void *)frame->fp)) {
+@@ -127,7 +126,6 @@ void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
+ 	data.no_sched_functions = 0;
+ 
+ 	frame.fp = regs->regs[29];
+-	frame.sp = regs->sp;
+ 	frame.pc = regs->pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	frame.graph = current->curr_ret_stack;
+@@ -152,12 +150,10 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 	if (tsk != current) {
+ 		data.no_sched_functions = 1;
+ 		frame.fp = thread_saved_fp(tsk);
+-		frame.sp = thread_saved_sp(tsk);
+ 		frame.pc = thread_saved_pc(tsk);
+ 	} else {
+ 		data.no_sched_functions = 0;
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+-		frame.sp = current_stack_pointer;
+ 		frame.pc = (unsigned long)save_stack_trace_tsk;
+ 	}
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index da33c90..a439128 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -50,7 +50,6 @@ unsigned long profile_pc(struct pt_regs *regs)
+ 		return regs->pc;
+ 
+ 	frame.fp = regs->regs[29];
+-	frame.sp = regs->sp;
+ 	frame.pc = regs->pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	frame.graph = -1; /* no task info */
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index caf2f79..63cbfb0 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -155,14 +155,12 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 
+ 	if (tsk == current) {
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+-		frame.sp = current_stack_pointer;
+ 		frame.pc = (unsigned long)dump_backtrace;
+ 	} else {
+ 		/*
+ 		 * task blocked in __switch_to
+ 		 */
+ 		frame.fp = thread_saved_fp(tsk);
+-		frame.sp = thread_saved_sp(tsk);
+ 		frame.pc = thread_saved_pc(tsk);
+ 	}
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 -- 
 1.9.1
