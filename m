@@ -1,29 +1,45 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Wed, 26 Jul 2017 14:02:21 -0700
-Subject: [PATCH] clk: sunxi-ng: Fix header guard of ccu-sun8i-r.h
-Message-ID: <20170726210221.173968-1-mka@chromium.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 26 Jul 2017 16:09:38 -0500
+Subject: [PATCH v2] ARM: dts: exynos: fix PCI bus dtc warnings
+In-Reply-To: <20170726210943.6875-1-robh@kernel.org>
+References: <20170726210943.6875-1-robh@kernel.org>
+Message-ID: <20170726210943.6875-2-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove trailing extra underscore in definition of _CCU_SUN8I_R_H
+dtc recently added PCI bus checks. Fix these warnings.
 
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-r.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v2:
+- rebase on v4.13-rc2
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r.h b/drivers/clk/sunxi-ng/ccu-sun8i-r.h
-index a7a407f12b56..fb01bffb929d 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-r.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-r.h
-@@ -13,7 +13,7 @@
-  */
- 
- #ifndef _CCU_SUN8I_R_H
--#define _CCU_SUN8I_R_H_
-+#define _CCU_SUN8I_R_H
- 
- #include <dt-bindings/clock/sun8i-r-ccu.h>
- #include <dt-bindings/reset/sun8i-r-ccu.h>
+ arch/arm/boot/dts/exynos5440.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index bc4954e69f7b..7a00be7ea6d7 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -317,6 +317,7 @@
+ 		phys = <&pcie_phy0>;
+ 		ranges = <0x81000000 0 0	  0x40001000 0 0x00010000   /* downstream I/O */
+ 			  0x82000000 0 0x40011000 0x40011000 0 0x1ffef000>; /* non-prefetchable memory */
++		bus-range = <0x00 0xff>;
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+ 		interrupt-map = <0x0 0 &gic 53>;
+@@ -339,6 +340,7 @@
+ 		phys = <&pcie_phy1>;
+ 		ranges = <0x81000000 0 0	  0x60001000 0 0x00010000   /* downstream I/O */
+ 			  0x82000000 0 0x60011000 0x60011000 0 0x1ffef000>; /* non-prefetchable memory */
++		bus-range = <0x00 0xff>;
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+ 		interrupt-map = <0x0 0 &gic 56>;
 -- 
-2.14.0.rc0.400.g1c36432dff-goog
+2.11.0
