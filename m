@@ -1,84 +1,126 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 26 Jul 2017 08:59:10 +0800
-Subject: [PATCH v5 1/7] drm/rockchip: vop: initialize registers directly
-In-Reply-To: <3165793.eZGRgZzZRy@phil>
-References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
- <1500518603-30486-1-git-send-email-mark.yao@rock-chips.com>
- <3165793.eZGRgZzZRy@phil>
-Message-ID: <5977E95E.1040700@rock-chips.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 26 Jul 2017 01:42:35 +0000
+Subject: [alsa-devel] [PATCH] ASoC: fix balance
+ of	of_node_get()/of_node_put()
+In-Reply-To: <20170725214952.6491-1-borneo.antonio@gmail.com>
+References: <20170725214952.6491-1-borneo.antonio@gmail.com>
+Message-ID: <87y3rcm12o.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?07?26? 06:36, Heiko Stuebner wrote:
-> Hi Mark,
->
-> Am Donnerstag, 20. Juli 2017, 10:43:22 CEST schrieb Mark Yao:
->> At present we are using init_table to initialize some
->> registers, but the Register init table use un-document define,
->> it is unreadable, and sometimes we only want to update tiny
->> bits, init table method is not friendly, it's diffcult to
->> reuse for difference chips.
->>
->> To make it clean, initialize registers directly, and drops
->> init_table mechanism out.
->>
->> Changes in v3:
->> - Explain more in details
->>
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> [...]
->
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> index bafd698..00e9d79 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> @@ -127,13 +127,7 @@
->>   	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
->>   };
->>   
->> -static const struct vop_reg_data rk3036_vop_init_reg_table[] = {
->> -	{RK3036_DSP_CTRL1, 0x00000000},
->> -};
->> -
->>   static const struct vop_data rk3036_vop = {
->> -	.init_table = rk3036_vop_init_reg_table,
->> -	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
->>   	.ctrl = &rk3036_ctrl_data,
->>   	.intr = &rk3036_intr,
->>   	.win = rk3036_vop_win_data,
-> This seems to break vop initialization on my rk3036 kylin board.
->
-> Before, kylin was able to bring output to the hdmi but with this
-> patch applied this stops working. As the init-value is to zero it seems
-> there is still something turned on, that should be turned off instead.
->
-> rk3288 seems to stay in working condition though.
->
->
-> Heiko
->
+
+Hi
+
+> On Hikey target board, enabling CONFIG_OF_DYNAMIC triggers several
+> errors at kernel boot, like the following one
+> OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0/endpoint
+> each followed by stack dump.
+> 
+> Fixed by:
+> - removing of_node_put() in the body of of_for_each_phandle(){},
+>   since already provided at each iteration. Add it in case the
+>   loop is break out;
+> - adding of_node_get() before calling of_graph_get_port_parent()
+>   or asoc_graph_card_dai_link_of().
+> 
+> Tested with kernel v4.13-rc1 with hikey_defconfig taken from
+> https://git.linaro.org/people/john.stultz/android-dev.git
+> branch dev/hikey-mainline-WIP
+> 
+> Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
+> ---
+
+I got kernel boot error on my board (= Renesas R-Car Salvator-X) + CONFIG_OF_DYNAMIC.
+This patch solved this issue.
+
+Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+> To: Liam Girdwood <lgirdwood@gmail.com>
+> To: Mark Brown <broonie@kernel.org>
+> To: Jaroslav Kysela <perex@perex.cz>
+> To: Takashi Iwai <tiwai@suse.com>
+> To: alsa-devel at alsa-project.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  sound/soc/generic/audio-graph-card.c  | 14 +++++++++-----
+>  sound/soc/generic/simple-card-utils.c |  5 +++++
+>  sound/soc/soc-core.c                  |  5 +++++
+>  3 files changed, 19 insertions(+), 5 deletions(-)
+> 
+> diff --git a/sound/soc/generic/audio-graph-card.c b/sound/soc/generic/audio-graph-card.c
+> index c0f08a6..7574c5f 100644
+> --- a/sound/soc/generic/audio-graph-card.c
+> +++ b/sound/soc/generic/audio-graph-card.c
+> @@ -228,10 +228,16 @@ static int asoc_graph_card_parse_of(struct graph_card_data *priv)
+>  	 */
+>  
+>  	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
+> +		/*
+> +		 * asoc_graph_card_dai_link_of() will call
+> +		 * of_node_put(). So, call of_node_get() here
+> +		 */
+> +		of_node_get(it.node);
+>  		ret = asoc_graph_card_dai_link_of(it.node, priv, idx++);
+> -		of_node_put(it.node);
+> -		if (ret < 0)
+> +		if (ret < 0) {
+> +			of_node_put(it.node);
+>  			return ret;
+> +		}
+>  	}
+>  
+>  	return asoc_simple_card_parse_card_name(card, NULL);
+> @@ -244,10 +250,8 @@ static int asoc_graph_get_dais_count(struct device *dev)
+>  	int count = 0;
+>  	int rc;
+>  
+> -	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
+> +	of_for_each_phandle(&it, rc, node, "dais", NULL, 0)
+>  		count++;
+> -		of_node_put(it.node);
+> -	}
+>  
+>  	return count;
+>  }
+> diff --git a/sound/soc/generic/simple-card-utils.c b/sound/soc/generic/simple-card-utils.c
+> index 26d64fa..144954b 100644
+> --- a/sound/soc/generic/simple-card-utils.c
+> +++ b/sound/soc/generic/simple-card-utils.c
+> @@ -250,6 +250,11 @@ static int asoc_simple_card_get_dai_id(struct device_node *ep)
+>  	if (ret != -ENOTSUPP)
+>  		return ret;
+>  
+> +	/*
+> +	 * of_graph_get_port_parent() will call
+> +	 * of_node_put(). So, call of_node_get() here
+> +	 */
+> +	of_node_get(ep);
+>  	node = of_graph_get_port_parent(ep);
+>  
+>  	/*
+> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+> index 921622a..a0f39de 100644
+> --- a/sound/soc/soc-core.c
+> +++ b/sound/soc/soc-core.c
+> @@ -4087,6 +4087,11 @@ int snd_soc_get_dai_id(struct device_node *ep)
+>  	struct device_node *node;
+>  	int ret;
+>  
+> +	/*
+> +	 * of_graph_get_port_parent() will call
+> +	 * of_node_put(). So, call of_node_get() here
+> +	 */
+> +	of_node_get(ep);
+>  	node = of_graph_get_port_parent(ep);
+>  
+>  	/*
+> -- 
+> 1.9.1
+> 
 > _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
->
->
-Hi Heiko
-
-Thanks for your testing on rk3036 board.
-
-I research the init table on rk3036, the dsp_blank reset value is 1, we need set the register to zero.
-
-So I think not working problem can be fixed by following change:
-
-     drivers/gpu/drm/rockchip/rockchip_vop_reg.c:
-     static const struct vop_ctrl rk3036_ctrl_data = {
-             .standby = VOP_REG(RK3036_SYS_CTRL, 0x1, 30),
-     +       .dsp_blank = VOP_REG(RK3036_DSP_CTRL1, 0x1, 24),
-             .out_mode = VOP_REG(RK3036_DSP_CTRL0, 0xf, 0),
-             .pin_pol = VOP_REG(RK3036_DSP_CTRL0, 0xf, 4),
-             .htotal_pw = VOP_REG(RK3036_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
-
--- 
-?ark Yao
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
