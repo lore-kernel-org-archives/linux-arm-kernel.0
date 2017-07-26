@@ -1,17 +1,17 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 26 Jul 2017 08:35:05 -0500
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 26 Jul 2017 19:06:51 +0530
 Subject: [PATCH v3 1/2] gpio: davinci: Add keystone-k2g compatible
 In-Reply-To: <8021c424-460c-def4-3a67-ed760997193d@ti.com>
 References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
  <5aa0d273-8e05-a5ff-7931-b9a94acade36@ti.com>
  <8021c424-460c-def4-3a67-ed760997193d@ti.com>
-Message-ID: <312d3c64-3afd-874b-eb6a-6c2aa931bbb2@ti.com>
+Message-ID: <2eeaeea5-9476-8631-8680-7db3322151bf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Franklin,
 
-On 07/26/2017 08:27 AM, Franklin S Cooper Jr wrote:
+On Wednesday 26 July 2017 06:57 PM, Franklin S Cooper Jr wrote:
+> 
 > 
 > On 07/26/2017 08:00 AM, Suman Anna wrote:
 >> Hi Keerthy,
@@ -22,6 +22,9 @@ On 07/26/2017 08:27 AM, Franklin S Cooper Jr wrote:
 > 
 > Seems we are adding information regarding several Keystone 2 SoCs. So
 > the commit and subject should be tweaked to reflect this.
+
+Okay i can add that as well.
+
 >>
 >> Please update patch header to "dt-bindings: gpio: davinci: ...."
 >>
@@ -65,6 +68,9 @@ On 07/26/2017 08:27 AM, Franklin S Cooper Jr wrote:
 >>
 > 
 > What about power-domain property?
+
+Driver has no pm_runtime implemented yet.
+
 > 
 >>> +
 >>> +- clocks: Should contain devices input clock. The first parameter
@@ -81,11 +87,8 @@ On 07/26/2017 08:27 AM, Franklin S Cooper Jr wrote:
 > sci-pm-domain.txt. However, both of these are outdated since it is
 > referring to macros and includes that don't exist or will no longer exist.
 
-You are probably looking at the bindings on current master. These have
-already been addressed/updated, lookup linux-next.
-
-regards
-Suman
+Hence included here but yes i can point to something like what Suman
+asked me to.
 
 > 
 >>
@@ -148,6 +151,9 @@ Suman
 > If your going to talk about other Keystone 2 devices it would be helpful
 > to include an example for one of them since they have slightly different
 > properties.
+
+Sure.
+
 >>>
 >>
 >> regards
