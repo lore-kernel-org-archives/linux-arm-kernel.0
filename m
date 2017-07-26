@@ -1,134 +1,63 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 26 Jul 2017 13:09:06 -0700
-Subject: [PATCH 3/3] ARM: dts: bcm2835: Add Raspberry Pi Zero W
-In-Reply-To: <1500579429-9101-4-git-send-email-stefan.wahren@i2se.com>
-References: <1500579429-9101-1-git-send-email-stefan.wahren@i2se.com>
- <1500579429-9101-4-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87vamfx8nx.fsf@eliezer.anholt.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 26 Jul 2017 13:08:02 -0700
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+References: <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
+ <20170726145522.GC28875@nazgul.tnic> <20170726151314.GA10696@hc>
+ <20170726153502.GE28875@nazgul.tnic> <20170726154515.GA11453@hc>
+ <20170726155548.GF28875@nazgul.tnic>
+ <20170726161949.GB15426@kroah.com>
+ <20170726163049.GG28875@nazgul.tnic>
+ <20170726173353.GB21705@kroah.com>
+ <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+Message-ID: <20170726200802.GA17722@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Wed, Jul 26, 2017 at 01:02:38PM -0700, David Daney wrote:
+> On 07/26/2017 10:33 AM, Greg KH wrote:
+> > On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
+> > > On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
+> > > > On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
+> > > > > On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
+> > > > > > The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
+> > > > > > I'm not aware of other ways to access these devices. Please enlighten
+> > > > > > me if I'm missing something.
+> > > > > 
+> > > > > Me enlighten you on Cavium hardware?! You're funny.
+> > > > > 
+> > > > > So I don't know whether the PCI hotplug code can run more than one
+> > > > > function upon PCI ID detection. Probably Greg will say, write a
+> > > > > multiplexer wrapper. :-)
+> > > > 
+> > > > -ENOCONTEXT....
+> > > > 
+> > > > Anyway, pci questions are best asked on the linux-pci at vger list.  And
+> > > > yes, all PCI devices end up with a 'struct pci_dev *' automatically.
+> > > 
+> > > Simple: so they have a PCI ID of a memory contoller and want to hotplug
+> > > two drivers for it. And those two drivers should remain independent from
+> > > each other.
+> > 
+> > Hahahahaha, no.  That's crazy, you were right in guessing what my answer
+> > was going to be :)
+> > 
+> 
+> 
+> Just to be clear about the situation, the device is a memory controller.  It
+> has two main behaviors we are interested in:
+> 
+> A) Error Detection And Correction (EDAC).  This should be connected to the
+> kernel's EDAC subsystem.  An existing driver (drivers/edac/thunderx_edac.c)
+> does exactly this.
+> 
+> B) Performance Counters for actions taken in the corresponding memory. This
+> should be connected to the kernel's perf framework as an uncore-PMU (the
+> subject of this patch set).
+> 
+> It is a single PCI device.  What should the driver architecture look like to
+> connect it to two different kernel subsystems?
 
-> The Raspberry Pi Zero W has the same components like the Zero plus
-> a Cypress CYW43438 wireless chip (wifi + bl).
-
-I sent out v2 of the arm64 patch so that hopefully we can get started
-merging this.  Couple of comments on a re-read.
-
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Reviewed-by: Eric Anholt <eric@anholt.net>
-> ---
->  arch/arm/boot/dts/Makefile               |  3 +-
->  arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 73 ++++++++++++++++++++++++++++++++
->  2 files changed, 75 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index ec60f4f..f3bf9397 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -74,7 +74,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
->  	bcm2835-rpi-a-plus.dtb \
->  	bcm2836-rpi-2-b.dtb \
->  	bcm2837-rpi-3-b.dtb \
-> -	bcm2835-rpi-zero.dtb
-> +	bcm2835-rpi-zero.dtb \
-> +	bcm2835-rpi-zero-w.dtb
->  dtb-$(CONFIG_ARCH_BCM_5301X) += \
->  	bcm4708-asus-rt-ac56u.dtb \
->  	bcm4708-asus-rt-ac68u.dtb \
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-> new file mode 100644
-> index 0000000..9c6d714
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-> @@ -0,0 +1,73 @@
-> +/*
-> + * Copyright (C) 2017 Stefan Wahren <stefan.wahren@i2se.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "bcm2835.dtsi"
-> +#include "bcm2835-rpi.dtsi"
-> +#include "bcm283x-rpi-usb-host.dtsi"
-> +
-> +/ {
-> +	compatible = "raspberrypi,model-zero-w", "brcm,bcm2835";
-> +	model = "Raspberry Pi Zero W";
-> +
-> +	aliases {
-> +		uart0 = "/soc/serial at 7e201000";
-> +		uart1 = "/soc/serial at 7e215040";
-> +		serial0 = "/soc/serial at 7e201000";
-> +		serial1 = "/soc/serial at 7e215040";
-> +	};
-
-Should we have this in the other board DTs?  What does it do?
-
-> +
-> +	leds {
-> +		act {
-> +			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +
-> +	wifi_pwrseq: wifi-pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&wl_on>;
-> +		reset-gpios = <&gpio 41 GPIO_ACTIVE_LOW>;
-> +	};
-> +};
-> +
-> +&gpio {
-> +	pinctrl-0 = <&gpioout &alt0>;
-> +
-> +	wl_on: wl-on {
-> +		brcm,pins = <41>;
-> +		brcm,function = <BCM2835_FSEL_GPIO_OUT>;
-> +	};
-> +};
-
-Would you be up for adding gpio-line-names based on the dt-blob.dts?
-
-> +
-> +&hdmi {
-> +	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
-> +};
-> +
-> +&sdhci {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	pinctrl-0 = <&emmc_gpio34 &gpclk2_gpio43>;
-> +	mmc-pwrseq = <&wifi_pwrseq>;
-> +	non-removable;
-> +	status = "okay";
-> +
-> +	brcmf: wifi at 1 {
-> +		reg = <1>;
-> +		compatible = "brcm,bcm4329-fmac";
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_gpio14>;
-> +	status = "okay";
-> +};
-> -- 
-> 2.7.4
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/dc6e8710/attachment.sig>
+Modify the drivers/edac/thunderx_edac.c code to add support for
+performance counters.
