@@ -1,53 +1,85 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Jul 2017 11:27:48 +0100
-Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
-In-Reply-To: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
-References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
-Message-ID: <20170726102748.GM31807@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 26 Jul 2017 11:36:52 +0100
+Subject: [PATCH] memory: mtk-smi: Use of_device_get_match_data helper
+In-Reply-To: <1501063150-8778-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1501063150-8778-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1d31eedd-fdab-bd6f-65b1-c0e8b79a8888@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 11:05:39AM +0100, Russell King wrote:
-> Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
-> initialise without an interrupt present.
+On 26/07/17 10:59, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Replace custom code with generic helper to retrieve driver data.
+> 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> ---
+>  drivers/memory/mtk-smi.c | 18 ++++--------------
+>  1 file changed, 4 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> index 4afbc41..fe8b81a 100644
+> --- a/drivers/memory/mtk-smi.c
+> +++ b/drivers/memory/mtk-smi.c
+> @@ -240,20 +240,15 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *smi_node;
+>  	struct platform_device *smi_pdev;
+> -	const struct of_device_id *of_id;
+>  
+>  	if (!dev->pm_domain)
+>  		return -EPROBE_DEFER;
+>  
+> -	of_id = of_match_node(mtk_smi_larb_of_ids, pdev->dev.of_node);
+> -	if (!of_id)
+> -		return -EINVAL;
+> -
+>  	larb = devm_kzalloc(dev, sizeof(*larb), GFP_KERNEL);
+>  	if (!larb)
+>  		return -ENOMEM;
+>  
+> -	larb->larb_gen = of_id->data;
+> +	larb->larb_gen = of_device_get_match_data(dev);
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	larb->base = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(larb->base))
+> @@ -319,8 +314,7 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct mtk_smi *common;
+>  	struct resource *res;
+> -	const struct of_device_id *of_id;
+> -	enum mtk_smi_gen smi_gen;
+> +	const enum mtk_smi_gen *smi_gen;
+>  
+>  	if (!dev->pm_domain)
+>  		return -EPROBE_DEFER;
+> @@ -338,18 +332,14 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+>  	if (IS_ERR(common->clk_smi))
+>  		return PTR_ERR(common->clk_smi);
+>  
+> -	of_id = of_match_node(mtk_smi_common_of_ids, pdev->dev.of_node);
+> -	if (!of_id)
+> -		return -EINVAL;
+> -
+>  	/*
+>  	 * for mtk smi gen 1, we need to get the ao(always on) base to config
+>  	 * m4u port, and we need to enable the aync clock for transform the smi
+>  	 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
+>  	 * base.
+>  	 */
+> -	smi_gen = (enum mtk_smi_gen)of_id->data;
+> -	if (smi_gen == MTK_SMI_GEN1) {
+> +	smi_gen = of_device_get_match_data(dev);
 
-This isn't fully functional on ARM MPS platforms yet, but at least
-gets us further.  Without any display connected:
+The data you're retrieving is the exact same thing as of_id->data was,
+i.e. an enum mtk_smi_gen cast to void*, so dereferencing it is not a
+good idea. The first patch was almost right; you just need to keep the
+cast in the assignment to smi_gen.
 
-[   14.315986] [drm] found ARM HDLCD version r0p0
-[   14.557038] tda998x 2-0070: found TDA19988
-[   14.622232] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
-[   14.630406] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-[   14.639335] [drm] No driver support for vblank timestamp query.
-[   14.653210] [drm] Cannot find any crtc or sizes - going 1024x768
-[   15.232556] hdlcd 40205000.hdlcd: fb0:  frame buffer device
-[   15.284076] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
+Robin.
 
-With a TV connected, the driver doesn't initialise:
-
-[   14.422810] [drm] found ARM HDLCD version r0p0
-[   14.657227] tda998x 2-0070: found TDA19988
-[   14.722439] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
-[   14.730613] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-[   14.739538] [drm] No driver support for vblank timestamp query.
-[   15.311977] hdlcd 40205000.hdlcd: Failed to set initial hw configuration.
-[   15.357402] hdlcd 40205000.hdlcd: master bind failed: -12
-[   15.365082] tda998x: probe of 2-0070 failed with error -12
-
-I don't think this is correct behaviour - if we fail to set an initial
-configuration (which will be based on the resolution of the connected
-display) why should the driver fail to probe - it's not that there is
-no device, it's (in this case) that there aren't the resources for the
-chosen mode.  Userspace could always try setting a different mode.
-
-I suspect the above failure is down to either (a) not having enough
-memory available to allocate a 1920x1080 frame buffer, or (b) not
-(yet) being able to program the hdlcd pixel clock for this platform,
-which is currently hard-coded in DT at 23.75MHz.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> +	if (*smi_gen == MTK_SMI_GEN1) {
+>  		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  		common->smi_ao_base = devm_ioremap_resource(dev, res);
+>  		if (IS_ERR(common->smi_ao_base))
+> 
