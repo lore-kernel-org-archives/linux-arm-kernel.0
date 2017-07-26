@@ -1,44 +1,69 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 26 Jul 2017 10:35:21 +0200
-Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
- from suspend_noirq
-In-Reply-To: <20170726081716.GB10026@atomide.com>
-References: <20170724095201.21601-1-johan@kernel.org>
- <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
- <20170725082444.GL2729@localhost>
- <3f0f8ed2-9466-d5c9-10e4-de95e5155653@ti.com>
- <20170726075004.GD27516@localhost>
- <20170726081716.GB10026@atomide.com>
-Message-ID: <20170726083521.GE27516@localhost>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Jul 2017 09:40:41 +0100
+Subject: [PATCH v2] arm64: kernel: implement fast refcount checking
+In-Reply-To: <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
+References: <20170725181536.21092-1-ard.biesheuvel@linaro.org>
+ <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
+Message-ID: <CAKv+Gu8djcgmovajhUUpniHwEVDupCWW3L__3JtqZ0GCM3=U2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 01:17:17AM -0700, Tony Lindgren wrote: > * Johan Hovold <johan@kernel.org> [170726 00:51]:
-> > On Tue, Jul 25, 2017 at 12:48:40PM -0500, Grygorii Strashko wrote:
-> > > So, thank you for your patches and sorry for the noise.
-> > > 
-> > > Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> > 
-> > Thanks for testing.
-> 
-> So does the patch description need updating?
+On 26 July 2017 at 05:11, Li Kun <hw.likun@huawei.com> wrote:
+> Hi Ard?
+>
+>
+> on 2017/7/26 2:15, Ard Biesheuvel wrote:
+>>
+>> +#define REFCOUNT_OP(op, asm_op, cond, l, clobber...)                   \
+>> +__LL_SC_INLINE int                                                     \
+>> +__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))                    \
+>> +{                                                                      \
+>> +       unsigned long tmp;                                              \
+>> +       int result;                                                     \
+>> +                                                                       \
+>> +       asm volatile("// refcount_" #op "\n"                            \
+>> +"      prfm            pstl1strm, %2\n"                                \
+>> +"1:    ldxr            %w0, %2\n"                                      \
+>> +"      " #asm_op "     %w0, %w0, %w[i]\n"                              \
+>> +"      st" #l "xr      %w1, %w0, %2\n"                                 \
+>> +"      cbnz            %w1, 1b\n"                                      \
+>> +       REFCOUNT_CHECK(cond)                                            \
+>> +       : "=&r" (result), "=&r" (tmp), "+Q" (r->counter)                \
+>> +       : REFCOUNT_INPUTS(r) [i] "Ir" (i)                               \
+>> +       clobber);                                                       \
+>> +                                                                       \
+>> +       return result;                                                  \
+>> +}                                                                      \
+>> +__LL_SC_EXPORT(__refcount_##op);
+>> +
+>> +REFCOUNT_OP(add_lt, adds, mi,  , REFCOUNT_CLOBBERS);
+>> +REFCOUNT_OP(sub_lt_neg, adds, mi, l, REFCOUNT_CLOBBERS);
+>> +REFCOUNT_OP(sub_le_neg, adds, ls, l, REFCOUNT_CLOBBERS);
+>> +REFCOUNT_OP(sub_lt, subs, mi, l, REFCOUNT_CLOBBERS);
+>> +REFCOUNT_OP(sub_le, subs, ls, l, REFCOUNT_CLOBBERS);
+>> +
+>
+> I'm not quite sure if we use b.lt to judge whether the result of adds is
+> less than zero is correct or not.
+> The b.lt means N!=V, take an extreme example, if we operate like below, the
+> b.lt will also be true.
+>
+> refcount_set(&ref_c,0x80000000);
+> refcount_dec_and_test(&ref_c);
+>
+> maybe we should use PL/NE/MI/EQ to judge the LT_ZERO or LE_ZERO condition ?
+>
 
-I don't think so.
+The lt/le is confusing here: the actual condition coded used are mi
+for negative and ls for negative or zero.
 
-I did notice that I left out a "would" in the final sentence
+I started out using lt and le, because it matches the x86 code, but I
+moved to mi and ls instead. (I don't think it makes sense to deviate
+from that just because the flags and predicates work a bit
+differently.)
 
-	"and either way, any such calls *would* have been causing
-	crashes since 4.10"
-	
-which perhaps you could add when applying?
-
-> And this is needed as a fix for the -rc cycle in addition to your musb
-> patch?
-
-Unlike the musb patch, this one is not critical and could possibly wait
-for 4.14. But since all it does is to get rid of a (since 4.10) broken
-state update, and thereby those warning messages on suspend, I'd say
-it's -rc material.
+However, I see now that there is one instance of REFCOUNT_CHECK(lt)
+remaining (in refcount.h). That should mi as well.
 
 Thanks,
-Johan
+Ard.
