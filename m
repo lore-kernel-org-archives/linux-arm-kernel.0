@@ -1,45 +1,72 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 26 Jul 2017 18:56:21 -0400
-Subject: [PATCH v2 0/6] USB3 support for Broadcom NS2 SoC
-Message-ID: <1501109787-15489-1-git-send-email-jon.mason@broadcom.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Wed, 26 Jul 2017 16:15:05 -0700
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170726.154540.150558937277891719.davem@davemloft.net>
+References: <20170726.095432.169004918437663011.davem@davemloft.net>
+ <20170726175013.GT3730@linux.vnet.ibm.com>
+ <20170726223658.GA27617@linux.vnet.ibm.com>
+ <20170726.154540.150558937277891719.davem@davemloft.net>
+Message-ID: <20170726231505.GG3730@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v2:
-* Addressed Rob Herring's comments on the binding documentation, which
-  resulted in a restructing of the device tree and how the driver
-  references those nodes.  This, in turn, resulted in a few new
-  documentation files being created.
+On Wed, Jul 26, 2017 at 03:45:40PM -0700, David Miller wrote:
+> From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> Date: Wed, 26 Jul 2017 15:36:58 -0700
+> 
+> > And without CONFIG_SOFTLOCKUP_DETECTOR, I see five runs of 24 with RCU
+> > CPU stall warnings.  So it seems likely that CONFIG_SOFTLOCKUP_DETECTOR
+> > really is having an effect.
+> 
+> Thanks for all of the info Paul, I'll digest this and scan over the
+> code myself.
+> 
+> Just out of curiousity, what x86 idle method is your machine using?
+> The mwait one or the one which simply uses 'halt'?  The mwait variant
+> might mask this bug, and halt would be a lot closer to how sparc64 and
+> Jonathan's system operates.
 
-This patch set contains the USB3 support for Broadcom NS2 SoC.  The USB3
-PHY is connected through the MDIO interface.
+My kernel builds with CONFIG_INTEL_IDLE=n, which I believe means that
+I am not using the mwait one.  Here is a grep for IDLE in my .config:
 
-Jon Mason (3):
-  dt-bindings: usb: Add documentation for NS2 CDRU USB3
-  dt-bindings: usb: Add documentation for NS2 ICFG USB3
-  dt-bindings: usb: Add documentation for NS2 IDM USB3
+	CONFIG_NO_HZ_IDLE=y
+	CONFIG_GENERIC_SMP_IDLE_THREAD=y
+	# CONFIG_IDLE_PAGE_TRACKING is not set
+	CONFIG_ACPI_PROCESSOR_IDLE=y
+	CONFIG_CPU_IDLE=y
+	# CONFIG_CPU_IDLE_GOV_LADDER is not set
+	CONFIG_CPU_IDLE_GOV_MENU=y
+	# CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED is not set
+	# CONFIG_INTEL_IDLE is not set
 
-Yendapally Reddy Dhananjaya Reddy (3):
-  dt-bindings: phy: Add documentation for NS2 USB3 PHY
-  phy: Add USB3 PHY support for Broadcom NS2 SoC
-  arm64: dts: ns2: Add USB3 Support
+> On sparc64 the cpu yield we do in the idle loop sleeps the cpu.  It's
+> local TICK register keeps advancing, and the local timer therefore
+> will still trigger.  Also, any externally generated interrupts
+> (including cross calls) will wake up the cpu as well.
+> 
+> The tick-sched code is really tricky wrt. NO_HZ even in the NO_HZ_IDLE
+> case.  One of my running theories is that we miss scheduling a tick
+> due to a race.  That would be consistent with the behavior we see
+> in the RCU dumps, I think.
 
- .../devicetree/bindings/phy/brcm,ns2-usb3-phy.txt  |  48 ++
- .../bindings/usb/brcm,cdru-usb3-ctrl.txt           |  14 +
- .../devicetree/bindings/usb/brcm,icfg-usb.txt      |  13 +
- .../devicetree/bindings/usb/brcm,usb3-idm.txt      |  14 +
- arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  16 +
- arch/arm64/boot/dts/broadcom/ns2-xmc.dts           |   8 +
- arch/arm64/boot/dts/broadcom/ns2.dtsi              |  59 +++
- drivers/phy/broadcom/Kconfig                       |   9 +
- drivers/phy/broadcom/Makefile                      |   1 +
- drivers/phy/broadcom/phy-bcm-ns2-usb3.c            | 580 +++++++++++++++++++++
- 10 files changed, 762 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt
- create mode 100644 Documentation/devicetree/bindings/usb/brcm,cdru-usb3-ctrl.txt
- create mode 100644 Documentation/devicetree/bindings/usb/brcm,icfg-usb.txt
- create mode 100644 Documentation/devicetree/bindings/usb/brcm,usb3-idm.txt
- create mode 100644 drivers/phy/broadcom/phy-bcm-ns2-usb3.c
+But wouldn't you have to miss a -lot- of ticks to get an RCU CPU stall
+warning?  By default, your grace period needs to extend for more than
+21 seconds (more than one-third of a -minute-) to get one.  Or do
+you mean that the ticks get shut off now and forever, as opposed to
+just losing one of them?
 
--- 
-2.7.4
+> Anyways, just a theory, and that's why I keep mentioning that commit
+> about the revert of the revert (specifically
+> 411fe24e6b7c283c3a1911450cdba6dd3aaea56e).
+> 
+> :-)
+
+I am running an overnight test in preparation for attempting to push
+some fixes for regressions into 4.12, but will try reverting this
+and enabling CONFIG_HZ_PERIODIC tomorrow.
+
+Jonathan, might the commit that Dave points out above be what reduces
+the probability of occurrence as you test older releases?
+
+							Thanx, Paul
