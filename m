@@ -1,64 +1,40 @@
 From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Wed, 26 Jul 2017 14:05:31 +0200
-Subject: [PATCH v5 1/4] dt-bindings: arm: Add entry for Beckhoff CX9020
+Date: Wed, 26 Jul 2017 14:05:32 +0200
+Subject: [PATCH v5 2/4] ARM: dts: imx53: add srtc node
 In-Reply-To: <20170726120534.5516-1-linux-kernel-dev@beckhoff.com>
 References: <20170726120534.5516-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20170726120534.5516-2-linux-kernel-dev@beckhoff.com>
+Message-ID: <20170726120534.5516-3-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-- add vendor prefix bhf for Beckhoff
-- add new board binding bhf,cx9020
+The i.MX53 has an integrated secure real time clock. Add it to the dtsi.
 
 Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
 ---
- Documentation/devicetree/bindings/arm/bhf.txt         | 6 ++++++
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- MAINTAINERS                                           | 5 +++++
- 3 files changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bhf.txt
+ arch/arm/boot/dts/imx53.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/bhf.txt b/Documentation/devicetree/bindings/arm/bhf.txt
-new file mode 100644
-index 000000000000..886b503caf9c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bhf.txt
-@@ -0,0 +1,6 @@
-+Beckhoff Automation Platforms Device Tree Bindings
-+--------------------------------------------------
-+
-+CX9020 Embedded PC
-+Required root node properties:
-+    - compatible = "bhf,cx9020", "fsl,imx53";
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index daf465bef758..20c2cf57ebc9 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -47,6 +47,7 @@ avic	Shanghai AVIC Optoelectronics Co., Ltd.
- axentia	Axentia Technologies AB
- axis	Axis Communications AB
- bananapi BIPAI KEJI LIMITED
-+bhf	Beckhoff Automation GmbH & Co. KG
- boe	BOE Technology Group Co., Ltd.
- bosch	Bosch Sensortec GmbH
- boundary	Boundary Devices Inc.
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f66488dfdbc9..e1d3111aea97 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1196,6 +1196,11 @@ F:	arch/arm/boot/dts/sama*.dtsi
- F:	arch/arm/include/debug/at91.S
- F:	drivers/memory/atmel*
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 2e516f4985e4..8bf0d89cdd35 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -433,6 +433,15 @@
+ 				clock-names = "ipg", "per";
+ 			};
  
-+ARM/BECKHOFF SUPPORT
-+M:	Patrick Bruenn <p.bruenn@beckhoff.com>
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/arm/bhf.txt
++			srtc: srtc at 53fa4000 {
++				compatible = "fsl,imx53-rtc", "fsl,imx25-rtc";
++				reg = <0x53fa4000 0x4000>;
++				interrupts = <24>;
++				interrupt-parent = <&tzic>;
++				clocks = <&clks IMX5_CLK_SRTC_GATE>;
++				clock-names = "ipg";
++			};
 +
- ARM/CALXEDA HIGHBANK ARCHITECTURE
- M:	Rob Herring <robh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ 			iomuxc: iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc";
+ 				reg = <0x53fa8000 0x4000>;
 -- 
 2.11.0
